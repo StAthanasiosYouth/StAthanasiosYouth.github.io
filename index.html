@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+
+<head>
+
+  <meta charset="utf-8">
+
+  <!-- pinch-zoom stays enabled on purpose (accessibility) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <!--
+    Content Security Policy. Only this site's own files run; the only
+    third-party request is the Google Maps embed, loaded when a visitor taps
+    "اعرض الخريطة". No trackers.
+  -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src https://www.google.com; object-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
+
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+
+  <title>أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا</title>
+
+  <meta name="description" content="مواعيد الاجتماع، المكان، صوتك يهمنا، صفحاتنا على السوشيال ميديا، وأرقام التواصل — كل حاجة تخص اجتماعنا في كنيسة أبي سيفين بسفاجا في مكان واحد.">
+
+  <meta name="theme-color" content="#020914">
+  <meta name="color-scheme" content="dark">
+  <meta name="format-detection" content="telephone=no">
+
+  <!-- SITE_URL: keep in sync with tools/site.config.mjs -->
+  <link rel="canonical" href="https://stathanasiosyouth.github.io/">
+
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ar_EG">
+  <meta property="og:site_name" content="أسرة البابا أثناسيوس – سفاجا">
+  <meta property="og:title" content="أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا">
+  <meta property="og:description" content="معاد الاجتماع، المكان، صوتك يهمنا، وصفحاتنا — كل حاجة في لينك واحد.">
+  <meta property="og:url" content="https://stathanasiosyouth.github.io/">
+  <meta property="og:image" content="https://stathanasiosyouth.github.io/assets/img/og-image.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="شعار أسرة البابا أثناسيوس الرسولي مع اسم الخدمة">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/img/favicon-192.png">
+  <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+
+  <link rel="preload" href="assets/fonts/cairo-arabic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/aref-ruqaa-arabic.woff2" as="font" type="font/woff2" crossorigin>
+
+  <link rel="stylesheet" href="assets/css/main.css">
+
+  <link rel="modulepreload" href="assets/js/render.js">
+  <link rel="modulepreload" href="assets/js/content.js">
+  <link rel="modulepreload" href="assets/js/schedule.js">
+  <script type="module" src="assets/js/main.js"></script>
+
+</head>
+
+<body>
+
+  <a class="skip-link" href="#main">انتقل للمحتوى</a>
+
+  <div class="backdrop" aria-hidden="true">
+    <div class="backdrop__glow"></div>
+    <div class="backdrop__lattice"></div>
+  </div>
+
+  <main id="main" class="hub" data-state="loading">
+
+    <!--
+      The hero is in the HTML (not rendered from JSON) so the identity paints
+      instantly; main.js updates the text if the published name changes.
+    -->
+    <header class="widget hero" data-area="hero">
+
+      <div class="hero__arch">
+        <img
+          class="hero__logo"
+          src="assets/img/logo-128.webp"
+          srcset="assets/img/logo-128.webp 128w, assets/img/logo-256.webp 256w, assets/img/logo-384.webp 384w"
+          sizes="(min-width: 1024px) 128px, 112px"
+          width="112"
+          height="112"
+          alt="شعار أسرة البابا أثناسيوس الرسولي – كنيسة الشهيد العظيم أبي سيفين بسفاجا"
+          fetchpriority="high"
+          decoding="async"
+        >
+      </div>
+
+      <h1 class="hero__name" id="site-name"><span class="hero__name-lead">أسرة البابا أثناسيوس</span> <span class="hero__name-rest">لخدمة شعب كنيستها الحبيبة في سفاجا</span></h1>
+
+      <p class="hero__tagline" id="site-tagline">كل اللي يخصّ اجتماعنا… في مكان واحد</p>
+
+    </header>
+
+    <!-- Placeholders; assets/js/render.js replaces them with widgets from content.json -->
+    <div class="widget skeleton" data-area="meeting" data-dynamic aria-hidden="true"></div>
+    <div class="widget skeleton skeleton--tall" data-area="featured" data-dynamic aria-hidden="true"></div>
+    <div class="widget skeleton" data-area="location" data-dynamic aria-hidden="true"></div>
+
+    <noscript>
+      <p class="widget noscript">
+        الصفحة محتاجة الجافاسكريبت علشان تعرض المواعيد واللينكات. فعّلها من إعدادات المتصفح.
+      </p>
+    </noscript>
+
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+</body>
+
+</html>

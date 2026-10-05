@@ -1,0 +1,114 @@
+{
+  "schema": 1,
+  "revision": "c157b1f66ffa",
+  "publishedAt": "2026-10-05T16:07:36.648Z",
+  "timezone": "Africa/Cairo",
+  "site": {
+    "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
+    "tagline": "كل اللي يخصّ اجتماعنا… في مكان واحد",
+    "shareText": "كل حاجة تخص اجتماعنا في كنيسة أبي سيفين – سفاجا في لينك واحد"
+  },
+  "meeting": {
+    "title": "اجتماع الشباب",
+    "day": 0,
+    "dayKey": "sunday",
+    "time": "20:00",
+    "durationMinutes": null,
+    "note": "",
+    "skipDates": [],
+    "ics": "meeting.ics"
+  },
+  "location": {
+    "name": "كنيسة أبي سيفين – سفاجا",
+    "address": "سفاجا، البحر الأحمر",
+    "note": "",
+    "mapsUrl": "https://maps.app.goo.gl/eCUtm5AftfTzSXmV7",
+    "directionsUrl": "https://www.google.com/maps/dir/?api=1&destination=26.7314392%2C33.9379229",
+    "lat": 26.7314392,
+    "lng": 33.9379229
+  },
+  "announcement": null,
+  "featured": [
+    {
+      "id": "your-voice-matters",
+      "title": "صوتك يهمنا",
+      "subtitle": "قول رأيك، اطلب حد يكلمك، أو اطلب صلاة",
+      "url": "https://stathanasiosyouth.github.io/your-voice-matters/",
+      "icon": "voice",
+      "style": "card",
+      "badge": "",
+      "startAt": "",
+      "endAt": "",
+      "cta": "ابعت دلوقتي"
+    }
+  ],
+  "sections": [
+    {
+      "key": "social",
+      "title": "تابعنا",
+      "links": [
+        {
+          "id": "facebook",
+          "title": "فيسبوك",
+          "subtitle": "الأخبار والإعلانات",
+          "url": "https://www.facebook.com/Pope.Athanasius.The.Apostolic.Safaga",
+          "icon": "facebook",
+          "style": "tile",
+          "badge": "",
+          "startAt": "",
+          "endAt": ""
+        },
+        {
+          "id": "instagram",
+          "title": "إنستجرام",
+          "subtitle": "صور وستوريز",
+          "url": "https://www.instagram.com/pope.athanasiustheapostolic/",
+          "icon": "instagram",
+          "style": "tile",
+          "badge": "",
+          "startAt": "",
+          "endAt": ""
+        },
+        {
+          "id": "tiktok",
+          "title": "تيك توك",
+          "subtitle": "فيديوهات قصيرة",
+          "url": "https://www.tiktok.com/@stathanasios.safaga",
+          "icon": "tiktok",
+          "style": "tile",
+          "badge": "",
+          "startAt": "",
+          "endAt": ""
+        }
+      ]
+    }
+  ],
+  "contacts": [
+    {
+      "id": "service-leader",
+      "kind": "service",
+      "name": "فادي يوسف",
+      "role": "أمين الخدمة",
+      "description": "لأي سؤال أو حاجة تخص الاجتماع والخدمة",
+      "phoneDisplay": "0122 012 9458",
+      "action": {
+        "type": "call",
+        "href": "tel:+201220129458",
+        "label": "اتصال"
+      }
+    },
+    {
+      "id": "tech-support",
+      "kind": "support",
+      "name": "مينا زكريا",
+      "role": "الدعم الفني",
+      "description": "الدعم الفني لصفحات أسرة البابا أثناسيوس الرسولي",
+      "phoneDisplay": "0127 616 2016",
+      "action": {
+        "type": "whatsapp",
+        "href": "https://wa.me/201276162016?text=%D8%A3%D9%87%D9%84%D8%A7%D9%8B%20%D9%8A%D8%A7%20%D9%85%D9%8A%D9%86%D8%A7%D8%8C%20%D8%B9%D9%86%D8%AF%D9%8A%20%D9%85%D8%B4%D9%83%D9%84%D8%A9%20%D8%A3%D9%88%20%D8%A7%D8%B3%D8%AA%D9%81%D8%B3%D8%A7%D8%B1%20%D9%81%D9%8A%20%D8%B5%D9%81%D8%AD%D8%A7%D8%AA%20%D8%A3%D8%B3%D8%B1%D8%A9%20%D8%A7%D9%84%D8%A8%D8%A7%D8%A8%D8%A7%20%D8%A3%D8%AB%D9%86%D8%A7%D8%B3%D9%8A%D9%88%D8%B3%3A",
+        "label": "واتساب"
+      }
+    }
+  ]
+}

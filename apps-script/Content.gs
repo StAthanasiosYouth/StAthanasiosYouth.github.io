@@ -1,0 +1,1140 @@
+/**
+ * CONTENT MODEL
+ *
+ * Turns the draft rows from the Sheet into the public content.json (and
+ * meeting.ics). Pure functions only: no SpreadsheetApp, UrlFetchApp or other
+ * Google services, so tools/ and tests/ run this exact file in Node.
+ *
+ * Everything that reaches the public site passes through here, so this is
+ * where validation, URL allowlisting and stripping of internal fields happen.
+ * The public site re-checks URLs on render as a second line of defence.
+ */
+
+var CONTENT_SCHEMA_VERSION = 1;
+
+var CONTENT_TIMEZONE = 'Africa/Cairo';
+
+var LINK_STYLES = ['card', 'tile'];
+
+var CONTACT_KINDS = ['service', 'support'];
+
+var CONTACT_METHODS = ['call', 'whatsapp'];
+
+var ANNOUNCEMENT_TONES = ['info', 'alert', 'celebrate'];
+
+/* Keep in sync with assets/js/icons.js (tools/sync-admin.mjs checks this). */
+var ICON_NAMES = [
+  'voice', 'facebook', 'instagram', 'tiktok', 'youtube', 'whatsapp',
+  'telegram', 'spotify', 'form', 'calendar', 'ticket', 'bus', 'book',
+  'music', 'photos', 'video', 'church', 'cross', 'heart', 'star',
+  'megaphone', 'gift', 'users', 'map', 'info', 'link'
+];
+
+var DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+var DAY_ALIASES = {
+  sunday: ['sunday', 'sun', 'الأحد', 'الاحد', 'احد', 'أحد'],
+  monday: ['monday', 'mon', 'الاثنين', 'الإثنين', 'الاتنين', 'الإتنين', 'اتنين'],
+  tuesday: ['tuesday', 'tue', 'الثلاثاء', 'التلات', 'الثلاث', 'تلات'],
+  wednesday: ['wednesday', 'wed', 'الأربعاء', 'الاربعاء', 'الأربع', 'الاربع'],
+  thursday: ['thursday', 'thu', 'الخميس', 'خميس'],
+  friday: ['friday', 'fri', 'الجمعة', 'الجمعه', 'جمعة'],
+  saturday: ['saturday', 'sat', 'السبت', 'سبت']
+};
+
+var LIMITS = {
+  siteName: 120,
+  tagline: 140,
+  shareText: 200,
+  title: 60,
+  subtitle: 140,
+  cta: 24,
+  badge: 16,
+  sectionTitle: 40,
+  note: 200,
+  address: 160,
+  announcement: 280,
+  linkLabel: 30,
+  personName: 60,
+  role: 60,
+  description: 140,
+  message: 300
+};
+
+
+/* =========================================================
+   SMALL HELPERS
+========================================================= */
+
+function contentText_(value) {
+
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  return String(value)
+    // control characters (keep newlines out of single-line fields later)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .replace(/\r\n?/g, '\n')
+    .trim();
+
+}
+
+
+function contentLine_(value) {
+
+  return contentText_(value).replace(/\s+/g, ' ');
+
+}
+
+
+function contentBool_(value) {
+
+  if (value === true || value === 1) {
+    return true;
+  }
+
+  var text = contentLine_(value).toLowerCase();
+
+  return ['true', 'yes', '1', 'نعم', 'اه', 'أه', 'ايوه', 'on', 'enabled', 'مفعل'].indexOf(text) !== -1;
+
+}
+
+
+/* Arabic-Indic and Persian digits to ASCII. */
+function contentDigits_(value) {
+
+  return contentText_(value)
+    .replace(/[٠-٩]/g, function (d) { return String(d.charCodeAt(0) - 0x0660); })
+    .replace(/[۰-۹]/g, function (d) { return String(d.charCodeAt(0) - 0x06F0); });
+
+}
+
+
+function contentNumber_(value) {
+
+  var text = contentDigits_(value).replace(/,/g, '.');
+
+  if (text === '') {
+    return null;
+  }
+
+  var number = Number(text);
+
+  return isFinite(number) ? number : NaN;
+
+}
+
+
+function pad2_(n) {
+
+  return (n < 10 ? '0' : '') + n;
+
+}
+
+
+/**
+ * Only absolute https URLs with a real hostname. No credentials, no spaces,
+ * no quotes or angle brackets. Returns '' when the URL is not acceptable.
+ */
+function safeHttpsUrl(value) {
+
+  var url = contentLine_(value);
+
+  if (!url) {
+    return '';
+  }
+
+  var match = /^https:\/\/([^\/?#\s]+)([\/?#][^\s]*)?$/i.exec(url);
+
+  if (!match) {
+    return '';
+  }
+
+  var authority = match[1];
+
+  // user:pass@host is a classic phishing trick
+  if (authority.indexOf('@') !== -1) {
+    return '';
+  }
+
+  var host = authority.replace(/:\d{1,5}$/, '').toLowerCase();
+
+  if (!/^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(host)) {
+    return '';
+  }
+
+  if (/["'<>`\\]/.test(url)) {
+    return '';
+  }
+
+  return url;
+
+}
+
+
+/**
+ * "YYYY-MM-DD" or "YYYY-MM-DD HH:MM" (also with "T") in Cairo wall time.
+ * Returns "YYYY-MM-DDTHH:MM", '' for empty input, or null when invalid.
+ * Date-only values become the start or end of that day.
+ */
+function contentDateTime_(value, endOfDay) {
+
+  var text = contentDigits_(value);
+
+  if (!text) {
+    return '';
+  }
+
+  var match = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?$/.exec(text);
+
+  if (!match) {
+    return null;
+  }
+
+  var year = Number(match[1]);
+  var month = Number(match[2]);
+  var day = Number(match[3]);
+
+  var check = new Date(Date.UTC(year, month - 1, day));
+
+  if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) {
+    return null;
+  }
+
+  var hasTime = match[4] !== undefined;
+  var hours = hasTime ? Number(match[4]) : (endOfDay ? 23 : 0);
+  var minutes = hasTime ? Number(match[5]) : (endOfDay ? 59 : 0);
+
+  if (hours > 23 || minutes > 59) {
+    return null;
+  }
+
+  return year + '-' + pad2_(month) + '-' + pad2_(day) + 'T' + pad2_(hours) + ':' + pad2_(minutes);
+
+}
+
+
+function contentTime_(value) {
+
+  var text = contentDigits_(value).replace(/\s+/g, ' ').toLowerCase();
+
+  if (!text) {
+    return '';
+  }
+
+  var pm = /(pm|م|مساء|مساءً|بالليل)$/.test(text);
+  var am = /(am|ص|صباحا|صباحاً|الصبح)$/.test(text);
+
+  text = text.replace(/(pm|am|مساءً|مساء|صباحاً|صباحا|بالليل|الصبح|م|ص)$/, '').trim();
+
+  var match = /^(\d{1,2})(?::(\d{2}))?$/.exec(text);
+
+  if (!match) {
+    return null;
+  }
+
+  var hours = Number(match[1]);
+  var minutes = match[2] === undefined ? 0 : Number(match[2]);
+
+  if (pm || am) {
+    if (hours < 1 || hours > 12) {
+      return null;
+    }
+    if (pm && hours !== 12) {
+      hours += 12;
+    }
+    if (am && hours === 12) {
+      hours = 0;
+    }
+  }
+
+  if (hours > 23 || minutes > 59) {
+    return null;
+  }
+
+  return pad2_(hours) + ':' + pad2_(minutes);
+
+}
+
+
+function contentDay_(value) {
+
+  var text = contentDigits_(value).toLowerCase();
+
+  if (text === '') {
+    return null;
+  }
+
+  if (/^[0-6]$/.test(text)) {
+    return Number(text);
+  }
+
+  for (var i = 0; i < DAY_KEYS.length; i++) {
+    if (DAY_ALIASES[DAY_KEYS[i]].indexOf(text) !== -1) {
+      return i;
+    }
+  }
+
+  return null;
+
+}
+
+
+/**
+ * Egyptian-friendly phone normalization.
+ * Returns { e164: '201220129458', display: '0122 012 9458' } or null.
+ */
+function normalizePhone(value) {
+
+  var digits = contentDigits_(value).replace(/[^\d+]/g, '');
+
+  if (digits.indexOf('+') > 0) {
+    return null;
+  }
+
+  digits = digits.replace(/^\+/, '').replace(/^00/, '');
+
+  if (/^0(1[0125]\d{8})$/.test(digits)) {
+    digits = '2' + digits;
+  }
+  else if (/^1[0125]\d{8}$/.test(digits)) {
+    digits = '20' + digits;
+  }
+
+  if (/^201[0125]\d{8}$/.test(digits)) {
+    var local = '0' + digits.slice(2);
+    return {
+      e164: digits,
+      display: local.slice(0, 4) + ' ' + local.slice(4, 7) + ' ' + local.slice(7)
+    };
+  }
+
+  // other international numbers: accept plain E.164 lengths
+  if (/^[1-9]\d{7,14}$/.test(digits)) {
+    return {
+      e164: digits,
+      display: '+' + digits
+    };
+  }
+
+  return null;
+
+}
+
+
+/* =========================================================
+   BUILD
+========================================================= */
+
+/**
+ * draft = {
+ *   settings: { 'site.name': '...', ... },
+ *   sections: [{ key, title, order, enabled }],
+ *   links:    [{ id, enabled, order, section, style, featured, title, subtitle,
+ *                cta, url, icon, badge, startAt, endAt }],
+ *   contacts: [{ id, enabled, order, kind, name, role, description, phone,
+ *                method, message }]
+ * }
+ *
+ * options = { now: 'YYYY-MM-DDTHH:MM' (Cairo wall time), hash: fn(string) -> hex }
+ *
+ * Returns { content, errors: [{ where, message }], warnings: [...] }.
+ * Publishing is refused when errors is not empty.
+ */
+function buildPublicContent(draft, options) {
+
+  options = options || {};
+
+  var errors = [];
+  var warnings = [];
+  var now = options.now || '';
+
+  function error(where, message) {
+    errors.push({ where: where, message: message });
+  }
+
+  function warn(where, message) {
+    warnings.push({ where: where, message: message });
+  }
+
+  function limited(where, value, max, label) {
+    if (value.length > max) {
+      error(where, label + ' أطول من ' + max + ' حرف');
+    }
+    return value;
+  }
+
+  var s = draft.settings || {};
+
+  function setting(key) {
+    return s[key] === undefined ? '' : s[key];
+  }
+
+
+  /* ---------- site ---------- */
+
+  var site = {
+    name: limited('الإعدادات', contentLine_(setting('site.name')), LIMITS.siteName, 'اسم الخدمة'),
+    tagline: limited('الإعدادات', contentLine_(setting('site.tagline')), LIMITS.tagline, 'الجملة التعريفية'),
+    shareText: limited('الإعدادات', contentLine_(setting('site.shareText')), LIMITS.shareText, 'نص المشاركة')
+  };
+
+  if (!site.name) {
+    error('الإعدادات', 'اسم الخدمة مطلوب');
+  }
+
+
+  /* ---------- meeting ---------- */
+
+  var meeting = null;
+
+  if (contentBool_(setting('meeting.enabled'))) {
+
+    var day = contentDay_(setting('meeting.day'));
+    var time = contentTime_(setting('meeting.time'));
+    var duration = contentNumber_(setting('meeting.durationMinutes'));
+
+    if (day === null) {
+      error('الاجتماع', 'يوم الاجتماع مش مفهوم');
+    }
+
+    if (!time) {
+      error('الاجتماع', 'ميعاد الاجتماع مطلوب بالشكل 20:00');
+    }
+
+    if (duration !== null && (isNaN(duration) || duration < 15 || duration > 600 || Math.round(duration) !== duration)) {
+      error('الاجتماع', 'مدة الاجتماع لازم تكون عدد دقايق بين 15 و 600، أو تتساب فاضية');
+    }
+
+    var skipDates = [];
+
+    contentDigits_(setting('meeting.skipDates'))
+      .split(/[,،\s]+/)
+      .filter(Boolean)
+      .forEach(function (item) {
+        var date = contentDateTime_(item, false);
+        if (!date) {
+          error('الاجتماع', 'تاريخ إلغاء مش مفهوم: ' + item);
+          return;
+        }
+        var dateOnly = date.slice(0, 10);
+        // past dates are irrelevant to visitors
+        if (!now || dateOnly >= now.slice(0, 10)) {
+          skipDates.push(dateOnly);
+        }
+      });
+
+    meeting = {
+      title: limited('الاجتماع', contentLine_(setting('meeting.title')), LIMITS.title, 'اسم الاجتماع') || 'الاجتماع',
+      day: day,
+      dayKey: day === null ? '' : DAY_KEYS[day],
+      time: time || '',
+      durationMinutes: duration === null || isNaN(duration) ? null : duration,
+      note: limited('الاجتماع', contentLine_(setting('meeting.note')), LIMITS.note, 'ملاحظة الاجتماع'),
+      skipDates: skipDates.sort(),
+      ics: 'meeting.ics'
+    };
+
+  }
+
+
+  /* ---------- location ---------- */
+
+  var location = null;
+
+  var locationName = contentLine_(setting('location.name'));
+
+  if (locationName) {
+
+    var mapsUrl = contentLine_(setting('location.mapsUrl'));
+    var safeMaps = safeHttpsUrl(mapsUrl);
+
+    if (mapsUrl && !safeMaps) {
+      error('المكان', 'رابط الخريطة لازم يبدأ بـ https://');
+    }
+
+    var lat = contentNumber_(setting('location.lat'));
+    var lng = contentNumber_(setting('location.lng'));
+    var hasCoords = lat !== null && lng !== null;
+
+    if ((lat === null) !== (lng === null)) {
+      error('المكان', 'لازم تكتب خط العرض وخط الطول مع بعض، أو تسيبهم فاضيين');
+      hasCoords = false;
+    }
+    else if (hasCoords && (isNaN(lat) || isNaN(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180)) {
+      error('المكان', 'الإحداثيات مش صحيحة');
+      hasCoords = false;
+    }
+
+    var destination = hasCoords
+      ? lat + ',' + lng
+      : locationName;
+
+    location = {
+      name: limited('المكان', locationName, LIMITS.title, 'اسم المكان'),
+      address: limited('المكان', contentLine_(setting('location.address')), LIMITS.address, 'العنوان'),
+      note: limited('المكان', contentLine_(setting('location.note')), LIMITS.note, 'ملاحظة المكان'),
+      mapsUrl: safeMaps || ('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(destination)),
+      directionsUrl: 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(destination),
+      lat: hasCoords ? lat : null,
+      lng: hasCoords ? lng : null
+    };
+
+  }
+
+
+  /* ---------- announcement ---------- */
+
+  var announcement = null;
+
+  if (contentBool_(setting('announcement.enabled'))) {
+
+    var text = contentText_(setting('announcement.text'));
+    var expiresAt = contentDateTime_(setting('announcement.expiresAt'), true);
+    var tone = contentLine_(setting('announcement.tone')).toLowerCase() || 'info';
+    var linkUrl = contentLine_(setting('announcement.linkUrl'));
+    var safeLink = safeHttpsUrl(linkUrl);
+
+    if (!text) {
+      error('الإعلان', 'الإعلان مفعّل بس مفيش نص');
+    }
+
+    limited('الإعلان', text, LIMITS.announcement, 'نص الإعلان');
+
+    if (expiresAt === null) {
+      error('الإعلان', 'تاريخ انتهاء الإعلان مش مفهوم');
+    }
+
+    if (ANNOUNCEMENT_TONES.indexOf(tone) === -1) {
+      error('الإعلان', 'نوع الإعلان لازم يكون info أو alert أو celebrate');
+    }
+
+    if (linkUrl && !safeLink) {
+      error('الإعلان', 'رابط الإعلان لازم يبدأ بـ https://');
+    }
+
+    var expired = expiresAt && now && expiresAt < now;
+
+    if (expired) {
+      warn('الإعلان', 'الإعلان انتهى ومش هيظهر');
+    }
+    else if (text) {
+      announcement = {
+        text: text.replace(/\n{3,}/g, '\n\n'),
+        tone: tone,
+        link: safeLink
+          ? {
+            url: safeLink,
+            label: limited('الإعلان', contentLine_(setting('announcement.linkLabel')), LIMITS.linkLabel, 'نص زرار الإعلان') || 'التفاصيل'
+          }
+          : null,
+        expiresAt: expiresAt || ''
+      };
+    }
+
+  }
+
+
+  /* ---------- sections ---------- */
+
+  var sectionRows = (draft.sections || [])
+    .map(function (row, index) {
+      return {
+        key: contentLine_(row.key).toLowerCase(),
+        title: contentLine_(row.title),
+        order: contentNumber_(row.order),
+        enabled: contentBool_(row.enabled),
+        index: index
+      };
+    });
+
+  // null-prototype maps: keys like "constructor" or "__proto__" are just keys
+  var sectionsByKey = Object.create(null);
+
+  sectionRows.forEach(function (row) {
+
+    var where = 'الأقسام: ' + (row.title || row.key || ('صف ' + (row.index + 2)));
+
+    if (!/^[a-z][a-z0-9-]{0,30}$/.test(row.key)) {
+      error(where, 'مفتاح القسم لازم يكون حروف إنجليزي صغيرة وأرقام وشرطة (مثلاً social)');
+      return;
+    }
+
+    if (sectionsByKey[row.key]) {
+      error(where, 'مفتاح القسم متكرر: ' + row.key);
+      return;
+    }
+
+    if (!row.title) {
+      error(where, 'عنوان القسم مطلوب');
+    }
+
+    limited(where, row.title, LIMITS.sectionTitle, 'عنوان القسم');
+
+    sectionsByKey[row.key] = row;
+
+  });
+
+
+  /* ---------- links ---------- */
+
+  var seenLinkIds = Object.create(null);
+  var featured = [];
+  var linksBySection = Object.create(null);
+
+  sortRows_(draft.links || []).forEach(function (row) {
+
+    if (!contentBool_(row.enabled)) {
+      return;
+    }
+
+    var title = contentLine_(row.title);
+    var where = 'الروابط: ' + (title || ('صف ' + (row.__index + 2)));
+    var id = contentLine_(row.id);
+
+    if (!id) {
+      error(where, 'الرابط من غير id');
+      return;
+    }
+
+    if (seenLinkIds[id]) {
+      error(where, 'id متكرر: ' + id);
+      return;
+    }
+
+    seenLinkIds[id] = true;
+
+    var url = safeHttpsUrl(row.url);
+
+    if (!title) {
+      error(where, 'العنوان مطلوب');
+    }
+
+    if (!url) {
+      error(where, 'الرابط لازم يكون كامل ويبدأ بـ https://');
+    }
+
+    var isFeatured = contentBool_(row.featured);
+    var style = contentLine_(row.style).toLowerCase() || 'card';
+
+    if (LINK_STYLES.indexOf(style) === -1) {
+      error(where, 'الشكل لازم يكون card أو tile');
+    }
+
+    var icon = contentLine_(row.icon).toLowerCase() || 'link';
+
+    if (ICON_NAMES.indexOf(icon) === -1) {
+      warn(where, 'الأيقونة "' + icon + '" مش معروفة، هيتحط بدلها أيقونة رابط');
+      icon = 'link';
+    }
+
+    var startAt = contentDateTime_(row.startAt, false);
+    var endAt = contentDateTime_(row.endAt, true);
+
+    if (startAt === null) {
+      error(where, 'تاريخ البداية مش مفهوم');
+    }
+
+    if (endAt === null) {
+      error(where, 'تاريخ النهاية مش مفهوم');
+    }
+
+    if (startAt && endAt && startAt > endAt) {
+      error(where, 'تاريخ البداية بعد تاريخ النهاية');
+    }
+
+    var section = contentLine_(row.section).toLowerCase();
+
+    if (!isFeatured) {
+      if (!section) {
+        error(where, 'لازم تختار قسم للرابط (أو تخليه مميز)');
+      }
+      else if (!sectionsByKey[section]) {
+        error(where, 'القسم "' + section + '" مش موجود في شيت الأقسام');
+      }
+    }
+
+    if (endAt && now && endAt < now) {
+      warn(where, 'ميعاد الرابط خلص ومش هيظهر');
+      return;
+    }
+
+    var link = {
+      id: id,
+      title: limited(where, title, LIMITS.title, 'العنوان'),
+      subtitle: limited(where, contentLine_(row.subtitle), LIMITS.subtitle, 'الوصف'),
+      url: url,
+      icon: icon,
+      style: style,
+      badge: limited(where, contentLine_(row.badge), LIMITS.badge, 'الشارة'),
+      startAt: startAt || '',
+      endAt: endAt || ''
+    };
+
+    if (isFeatured) {
+      link.cta = limited(where, contentLine_(row.cta), LIMITS.cta, 'نص الزرار');
+      featured.push(link);
+      return;
+    }
+
+    if (!sectionsByKey[section]) {
+      return;
+    }
+
+    if (!sectionsByKey[section].enabled) {
+      return;
+    }
+
+    (linksBySection[section] = linksBySection[section] || []).push(link);
+
+  });
+
+  var sections = sortRows_(sectionRows.filter(function (row) {
+    return row.enabled && sectionsByKey[row.key] === row && linksBySection[row.key];
+  }))
+    .map(function (row) {
+      return {
+        key: row.key,
+        title: row.title,
+        links: linksBySection[row.key]
+      };
+    });
+
+
+  /* ---------- contacts ---------- */
+
+  var seenContactIds = Object.create(null);
+  var contacts = [];
+
+  sortRows_(draft.contacts || []).forEach(function (row) {
+
+    if (!contentBool_(row.enabled)) {
+      return;
+    }
+
+    var name = contentLine_(row.name);
+    var where = 'التواصل: ' + (name || ('صف ' + (row.__index + 2)));
+    var id = contentLine_(row.id);
+
+    if (!id) {
+      error(where, 'جهة التواصل من غير id');
+      return;
+    }
+
+    if (seenContactIds[id]) {
+      error(where, 'id متكرر: ' + id);
+      return;
+    }
+
+    seenContactIds[id] = true;
+
+    var kind = contentLine_(row.kind).toLowerCase() || 'service';
+    var method = contentLine_(row.method).toLowerCase();
+    var phone = normalizePhone(row.phone);
+
+    if (!name) {
+      error(where, 'الاسم مطلوب');
+    }
+
+    if (CONTACT_KINDS.indexOf(kind) === -1) {
+      error(where, 'النوع لازم يكون service أو support');
+    }
+
+    if (CONTACT_METHODS.indexOf(method) === -1) {
+      error(where, 'طريقة التواصل لازم تكون call أو whatsapp');
+    }
+
+    if (!phone) {
+      error(where, 'رقم التليفون مش صحيح');
+      return;
+    }
+
+    var message = limited(where, contentText_(row.message), LIMITS.message, 'رسالة الواتساب');
+
+    var action = method === 'whatsapp'
+      ? {
+        type: 'whatsapp',
+        href: 'https://wa.me/' + phone.e164 + (message ? '?text=' + encodeURIComponent(message) : ''),
+        label: 'واتساب'
+      }
+      : {
+        type: 'call',
+        href: 'tel:+' + phone.e164,
+        label: 'اتصال'
+      };
+
+    contacts.push({
+      id: id,
+      kind: kind,
+      name: limited(where, name, LIMITS.personName, 'الاسم'),
+      role: limited(where, contentLine_(row.role), LIMITS.role, 'الدور'),
+      description: limited(where, contentLine_(row.description), LIMITS.description, 'الوصف'),
+      phoneDisplay: phone.display,
+      action: action
+    });
+
+  });
+
+
+  /* ---------- assemble ---------- */
+
+  var content = {
+    schema: CONTENT_SCHEMA_VERSION,
+    revision: '',
+    publishedAt: '',
+    timezone: CONTENT_TIMEZONE,
+    site: site,
+    meeting: meeting,
+    location: location,
+    announcement: announcement,
+    featured: featured,
+    sections: sections,
+    contacts: contacts
+  };
+
+  if (options.hash) {
+    content.revision = contentRevision(content, options.hash);
+  }
+
+  if (options.publishedAt) {
+    content.publishedAt = options.publishedAt;
+  }
+
+  return {
+    content: content,
+    errors: errors,
+    warnings: warnings
+  };
+
+}
+
+
+/* Stable rows order: by "order", then by original position. */
+function sortRows_(rows) {
+
+  return rows
+    .map(function (row, index) {
+      var copy = {};
+      for (var key in row) {
+        copy[key] = row[key];
+      }
+      copy.__index = row.__index === undefined ? (row.index === undefined ? index : row.index) : row.__index;
+      var order = contentNumber_(row.order);
+      copy.__order = order === null || isNaN(order) ? Infinity : order;
+      return copy;
+    })
+    .sort(function (a, b) {
+      return a.__order === b.__order ? a.__index - b.__index : (a.__order < b.__order ? -1 : 1);
+    });
+
+}
+
+
+/**
+ * Hash of everything a visitor can see. Used to detect unpublished changes
+ * and as the cache key on the public site. publishedAt is excluded so
+ * re-publishing identical content keeps the same revision.
+ */
+function contentRevision(content, hash) {
+
+  var copy = JSON.parse(JSON.stringify(content));
+
+  delete copy.revision;
+  delete copy.publishedAt;
+
+  return hash(JSON.stringify(copy)).slice(0, 12);
+
+}
+
+
+/* =========================================================
+   CALENDAR (meeting.ics)
+========================================================= */
+
+function icsEscape_(text) {
+
+  return String(text)
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\n/g, '\\n');
+
+}
+
+
+/* Fold lines at 75 octets without splitting UTF-8 characters (RFC 5545 3.1). */
+function icsFold_(line) {
+
+  var out = [];
+  var current = '';
+  var bytes = 0;
+
+  for (var i = 0; i < line.length; i++) {
+
+    var ch = line[i];
+    var code = line.charCodeAt(i);
+
+    // keep surrogate pairs together
+    if (code >= 0xD800 && code <= 0xDBFF && i + 1 < line.length) {
+      ch += line[++i];
+    }
+
+    var size = encodeURIComponent(ch).replace(/%[0-9A-F]{2}/gi, 'x').length;
+    var limit = out.length === 0 ? 75 : 74;
+
+    if (bytes + size > limit) {
+      out.push(current);
+      current = '';
+      bytes = 0;
+    }
+
+    current += ch;
+    bytes += size;
+
+  }
+
+  out.push(current);
+
+  return out.join('\r\n ');
+
+}
+
+
+/**
+ * Weekly recurring event in Africa/Cairo.
+ * today = 'YYYY-MM-DD' (Cairo), stamp = 'YYYYMMDDTHHMMSSZ' (UTC), siteUrl optional.
+ * Returns '' when there is no usable meeting.
+ */
+function buildMeetingIcs(content, today, stamp, siteUrl) {
+
+  var meeting = content.meeting;
+
+  if (!meeting || meeting.day === null || !meeting.time) {
+    return '';
+  }
+
+  // first occurrence on or after today
+  var parts = today.split('-').map(Number);
+  var start = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+
+  while (start.getUTCDay() !== meeting.day) {
+    start.setUTCDate(start.getUTCDate() + 1);
+  }
+
+  var hm = meeting.time.split(':');
+
+  function stampOf(date, hours, minutes) {
+    return date.getUTCFullYear() + pad2_(date.getUTCMonth() + 1) + pad2_(date.getUTCDate()) +
+      'T' + pad2_(hours) + pad2_(minutes) + '00';
+  }
+
+  var startStamp = stampOf(start, Number(hm[0]), Number(hm[1]));
+  var byDay = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][meeting.day];
+
+  var description = [meeting.note, content.site.name].filter(Boolean).join('\n');
+
+  var lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//St Athanasius Safaga//Portal//AR',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VTIMEZONE',
+    'TZID:Africa/Cairo',
+    'BEGIN:STANDARD',
+    // Egypt: DST ends at the end of the last Thursday of October
+    'DTSTART:20231026T235959',
+    'RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1TH',
+    'TZOFFSETFROM:+0300',
+    'TZOFFSETTO:+0200',
+    'TZNAME:EET',
+    'END:STANDARD',
+    'BEGIN:DAYLIGHT',
+    // and starts at the beginning of the last Friday of April
+    'DTSTART:20230428T000000',
+    'RRULE:FREQ=YEARLY;BYMONTH=4;BYDAY=-1FR',
+    'TZOFFSETFROM:+0200',
+    'TZOFFSETTO:+0300',
+    'TZNAME:EEST',
+    'END:DAYLIGHT',
+    'END:VTIMEZONE',
+    'BEGIN:VEVENT',
+    'UID:weekly-meeting@st-athanasius-safaga',
+    'DTSTAMP:' + stamp,
+    'DTSTART;TZID=Africa/Cairo:' + startStamp
+  ];
+
+  if (meeting.durationMinutes) {
+    lines.push('DURATION:PT' + meeting.durationMinutes + 'M');
+  }
+
+  lines.push('RRULE:FREQ=WEEKLY;BYDAY=' + byDay);
+
+  (meeting.skipDates || []).forEach(function (date) {
+    var p = date.split('-').map(Number);
+    lines.push('EXDATE;TZID=Africa/Cairo:' + stampOf(new Date(Date.UTC(p[0], p[1] - 1, p[2])), Number(hm[0]), Number(hm[1])));
+  });
+
+  lines.push('SUMMARY:' + icsEscape_(meeting.title + ' — ' + content.site.name));
+
+  if (description) {
+    lines.push('DESCRIPTION:' + icsEscape_(description));
+  }
+
+  if (content.location) {
+    lines.push('LOCATION:' + icsEscape_([content.location.name, content.location.address].filter(Boolean).join('، ')));
+    if (content.location.lat !== null) {
+      lines.push('GEO:' + content.location.lat + ';' + content.location.lng);
+    }
+  }
+
+  if (siteUrl) {
+    lines.push('URL:' + siteUrl);
+  }
+
+  lines.push('END:VEVENT', 'END:VCALENDAR');
+
+  return lines.map(icsFold_).join('\r\n') + '\r\n';
+
+}
+
+
+/* =========================================================
+   CHANGE SUMMARY (draft vs published)
+========================================================= */
+
+/**
+ * Human-readable Arabic list of what publishing would change.
+ * previous may be null (nothing published yet).
+ */
+function summarizeChanges(previous, next) {
+
+  if (!previous) {
+    return ['أول نشر للموقع'];
+  }
+
+  var lines = [];
+
+  function same(a, b) {
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+
+  if (!same(previous.site, next.site)) {
+    lines.push('تعديل في بيانات الموقع (الاسم / الجملة التعريفية / نص المشاركة)');
+  }
+
+  if (!same(previous.meeting, next.meeting)) {
+    if (!next.meeting) {
+      lines.push('إخفاء معاد الاجتماع');
+    }
+    else if (!previous.meeting) {
+      lines.push('إظهار معاد الاجتماع');
+    }
+    else {
+      lines.push('تعديل في معاد الاجتماع');
+    }
+  }
+
+  if (!same(previous.location, next.location)) {
+    lines.push(next.location ? 'تعديل في مكان الاجتماع' : 'إخفاء مكان الاجتماع');
+  }
+
+  if (!same(previous.announcement, next.announcement)) {
+    if (!next.announcement) {
+      lines.push('إخفاء الإعلان');
+    }
+    else if (!previous.announcement) {
+      lines.push('إعلان جديد: ' + next.announcement.text.slice(0, 60));
+    }
+    else {
+      lines.push('تعديل الإعلان');
+    }
+  }
+
+  function allLinks(content) {
+    var list = [];
+    (content.featured || []).forEach(function (link, i) {
+      list.push({ link: link, place: 'featured:' + i });
+    });
+    (content.sections || []).forEach(function (section) {
+      section.links.forEach(function (link, i) {
+        list.push({ link: link, place: section.key + ':' + i });
+      });
+    });
+    return list;
+  }
+
+  diffById_(allLinks(previous), allLinks(next), function (item) { return item.link.id; }, {
+    added: function (item) { lines.push('رابط جديد: ' + item.link.title); },
+    removed: function (item) { lines.push('إخفاء/حذف رابط: ' + item.link.title); },
+    changed: function (before, after) {
+      if (!same(before.link, after.link)) {
+        lines.push('تعديل رابط: ' + after.link.title);
+      }
+      else if (before.place !== after.place) {
+        lines.push('تغيير ترتيب/مكان: ' + after.link.title);
+      }
+    }
+  });
+
+  if (!same((previous.sections || []).map(sectionHead_), (next.sections || []).map(sectionHead_))) {
+    lines.push('تعديل في الأقسام (العناوين أو الترتيب)');
+  }
+
+  diffById_(previous.contacts || [], next.contacts || [], function (c) { return c.id; }, {
+    added: function (c) { lines.push('جهة تواصل جديدة: ' + c.name); },
+    removed: function (c) { lines.push('إخفاء/حذف جهة تواصل: ' + c.name); },
+    changed: function (before, after) {
+      if (!same(before, after)) {
+        lines.push('تعديل جهة تواصل: ' + after.name);
+      }
+    }
+  });
+
+  var order = function (list) { return list.map(function (c) { return c.id; }); };
+
+  if (!same(order(previous.contacts || []), order(next.contacts || [])) && lines.join().indexOf('جهة تواصل') === -1) {
+    lines.push('تغيير ترتيب جهات التواصل');
+  }
+
+  return lines;
+
+}
+
+
+function sectionHead_(section) {
+
+  return section.key + '|' + section.title;
+
+}
+
+
+function diffById_(before, after, idOf, handlers) {
+
+  var beforeById = Object.create(null);
+
+  before.forEach(function (item) {
+    beforeById[idOf(item)] = item;
+  });
+
+  var afterIds = Object.create(null);
+
+  after.forEach(function (item) {
+    var id = idOf(item);
+    afterIds[id] = true;
+    if (beforeById[id]) {
+      handlers.changed(beforeById[id], item);
+    }
+    else {
+      handlers.added(item);
+    }
+  });
+
+  before.forEach(function (item) {
+    if (!afterIds[idOf(item)]) {
+      handlers.removed(item);
+    }
+  });
+
+}

@@ -1,0 +1,1217 @@
+<script>
+/*
+ * Admin panel client.
+ * Talks to the api* functions in Code.gs / Publish.gs through
+ * google.script.run. Every value from the Sheet is inserted as text
+ * (textContent / value), never as HTML.
+ */
+(function () {
+
+  'use strict';
+
+  var ICONS = window.ADMIN_ICONS || {};
+
+  var ICON_LABELS = {
+    voice: 'رسالة / صوتك يهمنا', facebook: 'فيسبوك', instagram: 'إنستجرام', tiktok: 'تيك توك',
+    youtube: 'يوتيوب', whatsapp: 'واتساب', telegram: 'تيليجرام', spotify: 'سبوتيفاي',
+    form: 'استمارة', calendar: 'تقويم', ticket: 'تذكرة / حجز', bus: 'رحلة', book: 'كتاب مقدس',
+    music: 'ترانيم', photos: 'صور', video: 'فيديو', church: 'كنيسة', cross: 'صليب', heart: 'قلب',
+    star: 'نجمة', megaphone: 'إعلان', gift: 'هدية', users: 'ناس / أسرة', map: 'مكان', info: 'معلومة', link: 'لينك'
+  };
+
+  var TONE_LABELS = { info: 'إعلان عادي', alert: 'تنبيه (زي إلغاء)', celebrate: 'مناسبة حلوة' };
+
+  var state = null;
+  var currentTab = 'links';
+  var dirty = false;
+
+  var view = document.getElementById('view');
+  var sheet = document.getElementById('sheet');
+
+
+  /* =======================================================
+     HELPERS
+  ======================================================= */
+
+  function el(tag, attrs) {
+
+    var node = document.createElement(tag);
+
+    Object.keys(attrs || {}).forEach(function (name) {
+      var value = attrs[name];
+      if (value === null || value === undefined || value === false) return;
+      if (name === 'class') node.className = value;
+      else if (name === 'text') node.textContent = value;
+      else if (name === 'value') node.value = value;
+      else if (name === 'checked') node.checked = !!value;
+      else if (name.indexOf('on') === 0 && typeof value === 'function') node.addEventListener(name.slice(2), value);
+      else node.setAttribute(name, value === true ? '' : String(value));
+    });
+
+    for (var i = 2; i < arguments.length; i++) {
+      appendChild(node, arguments[i]);
+    }
+
+    return node;
+
+  }
+
+  function appendChild(node, child) {
+
+    if (child === null || child === undefined || child === false) return;
+    if (Array.isArray(child)) { child.forEach(function (c) { appendChild(node, c); }); return; }
+    node.appendChild(child instanceof Node ? child : document.createTextNode(String(child)));
+
+  }
+
+  /* icon markup is generated from the public site's icon set (trusted, static) */
+  var iconTemplate = document.createElement('template');
+
+  function icon(name) {
+
+    iconTemplate.innerHTML = ICONS[name] || ICONS.link || '';
+    return iconTemplate.content.firstElementChild || document.createTextNode('');
+
+  }
+
+  function call(name) {
+
+    var args = Array.prototype.slice.call(arguments, 1);
+
+    return new Promise(function (resolve, reject) {
+      var runner = google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(function (error) {
+          reject(error && error.message ? error : new Error(String(error)));
+        });
+      runner[name].apply(runner, args);
+    });
+
+  }
+
+  var toastTimer = 0;
+
+  function toast(message, isError) {
+
+    var node = document.getElementById('toast');
+    node.textContent = message;
+    node.className = 'toast is-visible' + (isError ? ' toast--error' : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { node.className = 'toast'; }, isError ? 6000 : 2800);
+
+  }
+
+  /* Runs an action with a busy button; returns the promise. */
+  function withBusy(button, promise) {
+
+    var original = Array.prototype.slice.call(button.childNodes);
+    button.disabled = true;
+    button.replaceChildren(el('span', { class: 'spinner', 'aria-hidden': 'true' }), 'استنى…');
+
+    return promise.finally(function () {
+      button.disabled = false;
+      button.replaceChildren.apply(button, original);
+    });
+
+  }
+
+  function bool(value) {
+
+    return value === true || String(value).toLowerCase() === 'true';
+
+  }
+
+  function byOrder(list) {
+
+    return list.slice().sort(function (a, b) {
+      var x = Number(a.order), y = Number(b.order);
+      x = isFinite(x) && a.order !== '' ? x : Infinity;
+      y = isFinite(y) && b.order !== '' ? y : Infinity;
+      return x === y ? 0 : (x < y ? -1 : 1);
+    });
+
+  }
+
+  function setting(key) {
+
+    var row = state.draft.settings.filter(function (s) { return s.key === key; })[0];
+    return row ? row.value : '';
+
+  }
+
+  function settingHelp(key) {
+
+    var row = state.draft.settings.filter(function (s) { return s.key === key; })[0];
+    return row ? row.help : '';
+
+  }
+
+  function formatDateTime(iso) {
+
+    if (!iso) return '—';
+    try {
+      return new Date(iso).toLocaleString('ar-EG', { timeZone: 'Africa/Cairo', dateStyle: 'medium', timeStyle: 'short' });
+    }
+    catch (e) {
+      return iso;
+    }
+
+  }
+
+  function shortUrl(url) {
+
+    return String(url || '').replace(/^https:\/\//, '').replace(/\/$/, '');
+
+  }
+
+  function applyState(next) {
+
+    state = next;
+    renderStatus();
+    render();
+
+  }
+
+  function fail(error, box) {
+
+    var message = error && error.message ? error.message : String(error);
+
+    if (box) {
+      box.textContent = message;
+      box.hidden = false;
+      box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+    else {
+      toast(message, true);
+    }
+
+  }
+
+
+  /* =======================================================
+     FORM PIECES
+  ======================================================= */
+
+  function markDirty() {
+
+    dirty = true;
+
+  }
+
+  function field(label, control, hint, counter) {
+
+    return el('label', { class: 'field' },
+      el('span', { class: 'field__label', text: label }),
+      control,
+      counter || null,
+      hint ? el('span', { class: 'field__hint', text: hint }) : null
+    );
+
+  }
+
+  function textInput(value, options) {
+
+    options = options || {};
+
+    return el(options.multiline ? 'textarea' : 'input', {
+      class: 'input' + (options.ltr ? ' input--ltr' : ''),
+      type: options.multiline ? null : (options.type || 'text'),
+      value: value === undefined || value === null ? '' : String(value),
+      maxlength: options.max || null,
+      inputmode: options.inputmode || null,
+      placeholder: options.placeholder || null,
+      dir: options.ltr ? 'ltr' : null,
+      required: options.required || null,
+      oninput: markDirty
+    });
+
+  }
+
+  /* text input with a live character counter */
+  function counted(label, value, max, hint, options) {
+
+    var input = textInput(value, Object.assign({ max: max }, options || {}));
+    var counter = el('span', { class: 'field__count' });
+
+    function update() {
+      counter.textContent = input.value.length + ' / ' + max;
+      counter.classList.toggle('field__count--over', input.value.length > max);
+    }
+
+    input.addEventListener('input', update);
+    update();
+
+    return { node: field(label, input, hint, counter), input: input };
+
+  }
+
+  function switchInput(label, checked, onchange) {
+
+    var input = el('input', { type: 'checkbox', role: 'switch', checked: checked, onchange: function () {
+      markDirty();
+      if (onchange) onchange(input.checked);
+    } });
+
+    return {
+      node: el('label', { class: 'switch' }, input, el('span', { class: 'switch__track', 'aria-hidden': 'true' }), el('span', { text: label })),
+      input: input
+    };
+
+  }
+
+  function choices(name, options, selected, onchange) {
+
+    var inputs = [];
+
+    var node = el('div', { class: 'choices', role: 'radiogroup' }, options.map(function (option) {
+      var input = el('input', { type: 'radio', name: name, value: option.value, checked: option.value === selected, onchange: function () {
+        markDirty();
+        if (onchange) onchange(option.value);
+      } });
+      inputs.push(input);
+      return el('label', { class: 'choice' }, input, el('span', {}, option.icon ? icon(option.icon) : null, option.label));
+    }));
+
+    return {
+      node: node,
+      value: function () {
+        var checked = inputs.filter(function (i) { return i.checked; })[0];
+        return checked ? checked.value : '';
+      }
+    };
+
+  }
+
+  function iconPicker(selected) {
+
+    var inputs = [];
+
+    var node = el('div', { class: 'icon-grid', role: 'radiogroup', 'aria-label': 'الأيقونة' }, state.meta.icons.map(function (name) {
+      var input = el('input', { type: 'radio', name: 'icon', value: name, checked: name === selected, onchange: markDirty, 'aria-label': ICON_LABELS[name] || name });
+      inputs.push(input);
+      return el('label', { class: 'choice', title: ICON_LABELS[name] || name }, input, el('span', {}, icon(name)));
+    }));
+
+    return {
+      node: node,
+      value: function () {
+        var checked = inputs.filter(function (i) { return i.checked; })[0];
+        return checked ? checked.value : 'link';
+      }
+    };
+
+  }
+
+  /* "YYYY-MM-DD" or "YYYY-MM-DD HH:MM" as a date + optional time pair */
+  function dateTimeInput(value) {
+
+    var parts = String(value || '').split(/[ T]/);
+    var date = el('input', { class: 'input', type: 'date', value: parts[0] || '', oninput: markDirty });
+    var time = el('input', { class: 'input', type: 'time', value: parts[1] || '', oninput: markDirty });
+
+    return {
+      node: el('div', { class: 'row' }, date, time),
+      value: function () {
+        if (!date.value) return '';
+        return time.value ? date.value + ' ' + time.value : date.value;
+      }
+    };
+
+  }
+
+  function errorBox() {
+
+    return el('div', { class: 'errors', role: 'alert', hidden: true });
+
+  }
+
+
+  /* =======================================================
+     SHEET (dialog)
+  ======================================================= */
+
+  function openSheet(title, body, footer) {
+
+    sheet.replaceChildren(
+      el('div', { class: 'sheet__head' },
+        el('h2', { class: 'sheet__title', id: 'sheet-title', text: title }),
+        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: closeSheet }, icon('close'))
+      ),
+      el('div', { class: 'sheet__body' }, body),
+      footer ? el('div', { class: 'sheet__foot' }, footer) : null
+    );
+
+    if (!sheet.open) sheet.showModal();
+
+  }
+
+  function closeSheet() {
+
+    if (dirty && !confirm('في تعديلات لسه ما اتحفظتش. تقفل من غير حفظ؟')) return;
+    dirty = false;
+    sheet.close();
+
+  }
+
+  sheet.addEventListener('cancel', function (event) {
+    event.preventDefault();
+    closeSheet();
+  });
+
+
+  /* =======================================================
+     STATUS + TABS
+  ======================================================= */
+
+  function renderStatus() {
+
+    var node = document.getElementById('status');
+    var s = state.status;
+
+    if (s.errors.length) {
+      node.className = 'status status--error';
+      node.textContent = 'في أخطاء (' + s.errors.length + ')';
+    }
+    else if (s.hasChanges) {
+      node.className = 'status status--dirty';
+      node.textContent = 'في تغييرات مش منشورة';
+    }
+    else {
+      node.className = 'status status--clean';
+      node.textContent = 'الموقع متحدث';
+    }
+
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (button) {
+    button.addEventListener('click', function () {
+      if (dirty && !confirm('في تعديلات لسه ما اتحفظتش. تسيبها؟')) return;
+      dirty = false;
+      currentTab = button.dataset.tab;
+      Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (b) {
+        b.setAttribute('aria-selected', String(b === button));
+      });
+      render();
+    });
+  });
+
+  window.addEventListener('beforeunload', function (event) {
+    if (dirty) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
+  });
+
+  function render() {
+
+    var views = { links: viewLinks, meeting: viewMeeting, announcement: viewAnnouncement, contacts: viewContacts, settings: viewSettings };
+
+    view.replaceChildren.apply(view, [].concat(views[currentTab]()));
+    view.setAttribute('aria-busy', 'false');
+
+  }
+
+  function card(title, hint) {
+
+    var children = Array.prototype.slice.call(arguments, 2);
+
+    return el('section', { class: 'card' },
+      el('div', { class: 'card__head' },
+        el('div', {},
+          el('h2', { class: 'card__title', text: title }),
+          hint ? el('p', { class: 'card__hint', text: hint }) : null
+        )
+      ),
+      children
+    );
+
+  }
+
+  /* Save button for settings-based forms */
+  function settingsSaver(collect, box) {
+
+    var button = el('button', { class: 'btn btn--primary', type: 'button', text: 'حفظ' });
+
+    button.addEventListener('click', function () {
+      box.hidden = true;
+      withBusy(button, call('apiSaveSettings', collect()))
+        .then(function (next) {
+          dirty = false;
+          applyState(next);
+          toast('اتحفظ ✓ — لسه محتاج نشر');
+        })
+        .catch(function (error) { fail(error, box); });
+    });
+
+    return button;
+
+  }
+
+
+  /* =======================================================
+     LINKS
+  ======================================================= */
+
+  function viewLinks() {
+
+    var links = byOrder(state.draft.links);
+    var sections = byOrder(state.draft.sections);
+    var sectionKeys = sections.map(function (s) { return s.key; });
+    var out = [];
+
+    out.push(card('الروابط', 'بتظهر في الصفحة بنفس الترتيب ده. أي تعديل بيتحفظ كمسودة لحد ما تدوس "راجع وانشر".',
+      el('div', { class: 'actions' },
+        el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { editLink(null); } }, '+ رابط جديد'),
+        el('button', { class: 'btn', type: 'button', onclick: function () { editSection(null); } }, '+ قسم جديد')
+      )
+    ));
+
+    out.push(linkGroup('مميز — بيظهر كبير فوق', 'زي صوتك يهمنا', null, links.filter(function (l) { return bool(l.featured); })));
+
+    sections.forEach(function (section, index) {
+      out.push(linkGroup(section.title, null, { section: section, first: index === 0, last: index === sections.length - 1 },
+        links.filter(function (l) { return !bool(l.featured) && l.section === section.key; })));
+    });
+
+    var orphans = links.filter(function (l) { return !bool(l.featured) && sectionKeys.indexOf(l.section) === -1; });
+
+    if (orphans.length) {
+      out.push(linkGroup('روابط من غير قسم', 'مش هتظهر في الصفحة لحد ما تختارلها قسم', null, orphans));
+    }
+
+    return out;
+
+  }
+
+  function linkGroup(title, hint, sectionInfo, links) {
+
+    var section = sectionInfo && sectionInfo.section;
+    var head = el('div', { class: 'card__head' },
+      el('div', {},
+        el('h2', { class: 'group-title' }, title, section && !bool(section.enabled) ? el('span', { class: 'chip chip--off', text: 'القسم مخفي' }) : null),
+        hint ? el('p', { class: 'card__hint', text: hint }) : null,
+        section ? el('span', { class: 'chip chip--ltr', text: section.key }) : null
+      ),
+      section ? el('div', { class: 'actions' },
+        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'طلّع القسم لفوق', disabled: sectionInfo.first, onclick: function (e) { move('apiMoveSection', section.key, -1, e.currentTarget); } }, icon('chevron-up')),
+        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'نزّل القسم لتحت', disabled: sectionInfo.last, onclick: function (e) { move('apiMoveSection', section.key, 1, e.currentTarget); } }, icon('chevron')),
+        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'تعديل القسم', onclick: function () { editSection(section); } }, icon('edit')),
+        el('button', { class: 'icon-btn icon-btn--danger', type: 'button', 'aria-label': 'مسح القسم', onclick: function (e) { removeSection(section, e.currentTarget); } }, icon('trash'))
+      ) : null
+    );
+
+    return el('section', { class: 'card' },
+      head,
+      links.length
+        ? el('ul', { class: 'list' }, links.map(function (link, index) { return linkItem(link, index === 0, index === links.length - 1); }))
+        : el('p', { class: 'empty', text: 'مفيش روابط هنا لسه' })
+    );
+
+  }
+
+  function linkItem(link, first, last) {
+
+    var enabled = bool(link.enabled);
+    var meta = [];
+
+    if (!enabled) meta.push(el('span', { class: 'chip chip--off', text: 'مخفي' }));
+    if (!bool(link.featured)) meta.push(el('span', { class: 'chip', text: link.style === 'tile' ? 'مربع' : 'صف' }));
+    if (link.badge) meta.push(el('span', { class: 'chip chip--gold', text: link.badge }));
+    if (link.startAt) meta.push(el('span', { class: 'chip', text: 'من ' + link.startAt }));
+    if (link.endAt) meta.push(el('span', { class: 'chip', text: 'لحد ' + link.endAt }));
+
+    var toggle = switchInput('ظاهر', enabled, function (checked) {
+      dirty = false;
+      call('apiSetLinkEnabled', link.id, checked)
+        .then(function (next) { applyState(next); toast(checked ? 'الرابط هيظهر بعد النشر' : 'الرابط هيستخبى بعد النشر'); })
+        .catch(function (error) { toggle.input.checked = !checked; fail(error); });
+    });
+
+    return el('li', { class: 'item' + (enabled ? '' : ' item--off') },
+      el('span', { class: 'item__icon', 'aria-hidden': 'true' }, icon(link.icon)),
+      el('div', { class: 'item__main' },
+        el('span', { class: 'item__title', text: link.title || '(من غير عنوان)' }),
+        el('span', { class: 'item__sub', text: shortUrl(link.url) }),
+        meta.length ? el('div', { class: 'item__meta' }, meta) : null
+      ),
+      el('div', { class: 'item__controls' },
+        toggle.node,
+        el('span', { class: 'spacer' }),
+        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'لفوق', disabled: first, onclick: function (e) { move('apiMoveLink', link.id, -1, e.currentTarget); } }, icon('chevron-up')),
+        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'لتحت', disabled: last, onclick: function (e) { move('apiMoveLink', link.id, 1, e.currentTarget); } }, icon('chevron')),
+        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'تعديل ' + link.title, onclick: function () { editLink(link); } }, icon('edit')),
+        el('button', { class: 'icon-btn icon-btn--danger', type: 'button', 'aria-label': 'مسح ' + link.title, onclick: function (e) { removeLink(link, e.currentTarget); } }, icon('trash'))
+      )
+    );
+
+  }
+
+  function move(api, id, direction, button) {
+
+    withBusy(button, call(api, id, direction)).then(applyState).catch(function (error) { fail(error); });
+
+  }
+
+  function removeLink(link, button) {
+
+    if (!confirm('تمسح "' + link.title + '" خالص؟\nلو عايز تخفيه بس، اقفل "ظاهر" بدل المسح.')) return;
+    withBusy(button, call('apiDeleteLink', link.id))
+      .then(function (next) { applyState(next); toast('اتمسح — هيختفي من الموقع بعد النشر'); })
+      .catch(function (error) { fail(error); });
+
+  }
+
+  function removeSection(section, button) {
+
+    if (!confirm('تمسح قسم "' + section.title + '"؟')) return;
+    withBusy(button, call('apiDeleteSection', section.key))
+      .then(function (next) { applyState(next); toast('القسم اتمسح'); })
+      .catch(function (error) { fail(error); });
+
+  }
+
+  function editLink(link) {
+
+    var isNew = !link;
+    // new links default to a general section rather than the social one
+    var sections = byOrder(state.draft.sections);
+    var defaultSection = sections.filter(function (s) { return s.key !== 'social'; })[0] || sections[0] || {};
+    link = link || { enabled: true, featured: false, style: 'card', icon: 'link', section: defaultSection.key || '' };
+
+    var featured = bool(link.featured);
+    var box = errorBox();
+
+    var title = counted('العنوان', link.title, state.meta.limits.title, null, { required: true });
+    var subtitle = counted('وصف قصير', link.subtitle, state.meta.limits.subtitle, 'اختياري');
+    var url = field('اللينك', textInput(link.url, { ltr: true, type: 'url', placeholder: 'https://', inputmode: 'url', required: true }), 'لازم يبدأ بـ https://');
+    var urlInput = url.querySelector('input');
+
+    var sectionSelect = el('select', { class: 'input', onchange: markDirty }, byOrder(state.draft.sections).map(function (s) {
+      return el('option', { value: s.key, selected: s.key === link.section ? 'selected' : null, text: s.title + (bool(s.enabled) ? '' : ' (مخفي)') });
+    }));
+    var sectionField = field('القسم', sectionSelect);
+
+    var style = choices('style', [
+      { value: 'card', label: 'صف عريض' },
+      { value: 'tile', label: 'مربع زي التطبيقات' }
+    ], link.style === 'tile' ? 'tile' : 'card');
+    var styleField = field('الشكل', style.node, 'المربع مناسب للسوشيال ميديا، والصف مناسب للينكات اللي محتاجة وصف');
+
+    var cta = counted('نص الزرار', link.cta, state.meta.limits.cta, 'مثلاً: ابعت دلوقتي');
+
+    function syncFeatured(on) {
+      sectionField.hidden = on;
+      styleField.hidden = on;
+      cta.node.hidden = !on;
+    }
+
+    var featuredSwitch = switchInput('رابط مميز (يظهر كبير فوق)', featured, syncFeatured);
+    var icons = iconPicker(link.icon || 'link');
+
+    var badge = textInput(link.badge, { max: state.meta.limits.badge, placeholder: 'مثلاً: جديد' });
+    var badgeField = field('شارة', el('div', { class: 'actions' },
+      badge,
+      el('button', { class: 'btn', type: 'button', onclick: function () { badge.value = 'جديد'; markDirty(); } }, 'جديد'),
+      el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { badge.value = ''; markDirty(); } }, 'من غير')
+    ), 'اختياري');
+
+    var start = dateTimeInput(link.startAt);
+    var end = dateTimeInput(link.endAt);
+    var enabled = switchInput('ظاهر', link.enabled === undefined ? true : bool(link.enabled));
+
+    syncFeatured(featured);
+
+    var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
+
+    save.addEventListener('click', function () {
+      box.hidden = true;
+      withBusy(save, call('apiSaveLink', {
+        id: link.id || '',
+        title: title.input.value,
+        subtitle: subtitle.input.value,
+        url: urlInput.value.trim(),
+        featured: featuredSwitch.input.checked,
+        section: sectionSelect.value,
+        style: style.value(),
+        cta: cta.input.value,
+        icon: icons.value(),
+        badge: badge.value,
+        startAt: start.value(),
+        endAt: end.value(),
+        enabled: enabled.input.checked
+      }))
+        .then(function (next) {
+          dirty = false;
+          sheet.close();
+          applyState(next);
+          toast(isNew ? 'الرابط اتضاف ✓ — لسه محتاج نشر' : 'اتحفظ ✓ — لسه محتاج نشر');
+        })
+        .catch(function (error) { fail(error, box); });
+    });
+
+    dirty = false;
+
+    openSheet(isNew ? 'رابط جديد' : 'تعديل: ' + link.title, [
+      box,
+      el('div', { class: 'form' },
+        title.node,
+        subtitle.node,
+        url,
+        featuredSwitch.node,
+        sectionField,
+        styleField,
+        cta.node,
+        field('الأيقونة', icons.node),
+        badgeField,
+        field('يبدأ يظهر من', start.node, 'اختياري — سيبه فاضي لو هيظهر على طول'),
+        field('آخر ظهور', end.node, 'اختياري — مناسب للمؤتمرات والرحلات والتسجيل'),
+        enabled.node
+      )
+    ], [save, el('button', { class: 'btn', type: 'button', text: 'إلغاء', onclick: closeSheet })]);
+
+  }
+
+  function editSection(section) {
+
+    var isNew = !section;
+    section = section || { key: '', title: '', enabled: true };
+
+    var box = errorBox();
+    var key = textInput(section.key, { ltr: true, placeholder: 'events', max: 31 });
+
+    if (!isNew) {
+      key.readOnly = true;
+    }
+
+    var title = counted('العنوان اللي بيظهر', section.title, state.meta.limits.sectionTitle, null, { required: true });
+    var enabled = switchInput('القسم ظاهر', bool(section.enabled));
+
+    var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
+
+    save.addEventListener('click', function () {
+      box.hidden = true;
+      withBusy(save, call('apiSaveSection', { key: key.value.trim(), title: title.input.value, enabled: enabled.input.checked }, isNew))
+        .then(function (next) {
+          dirty = false;
+          sheet.close();
+          applyState(next);
+          toast('اتحفظ ✓');
+        })
+        .catch(function (error) { fail(error, box); });
+    });
+
+    dirty = false;
+
+    openSheet(isNew ? 'قسم جديد' : 'تعديل القسم', [
+      box,
+      el('div', { class: 'form' },
+        field('مفتاح القسم', key, isNew ? 'بالإنجليزي الصغير ومن غير مسافات، مثلاً events. مش هيظهر للناس' : 'المفتاح مبيتغيرش بعد الإضافة'),
+        title.node,
+        enabled.node
+      )
+    ], [save, el('button', { class: 'btn', type: 'button', text: 'إلغاء', onclick: closeSheet })]);
+
+  }
+
+
+  /* =======================================================
+     MEETING + LOCATION
+  ======================================================= */
+
+  function viewMeeting() {
+
+    /* ----- meeting ----- */
+
+    var meetingBox = errorBox();
+    var enabled = switchInput('إظهار معاد الاجتماع', bool(setting('meeting.enabled')));
+    var title = counted('اسم الاجتماع', setting('meeting.title'), state.meta.limits.title);
+
+    var currentDay = String(setting('meeting.day'));
+    var daySelect = el('select', { class: 'input', onchange: markDirty }, state.meta.days.map(function (day, index) {
+      var selected = currentDay === day || currentDay === String(index) || (currentDay && day.indexOf(currentDay.replace(/^ال/, '')) !== -1);
+      return el('option', { value: day, selected: selected ? 'selected' : null, text: day });
+    }));
+
+    var time = el('input', { class: 'input', type: 'time', value: setting('meeting.time'), oninput: markDirty });
+    var duration = textInput(setting('meeting.durationMinutes'), { type: 'number', inputmode: 'numeric', placeholder: 'مثلاً 120' });
+    var note = counted('ملاحظة', setting('meeting.note'), state.meta.limits.note, settingHelp('meeting.note'));
+
+    var skipDates = String(setting('meeting.skipDates') || '').split(/[,،\s]+/).filter(Boolean);
+    var skipList = el('div', { class: 'item__meta' });
+    var skipInput = el('input', { class: 'input', type: 'date' });
+
+    function renderSkips() {
+      skipList.replaceChildren.apply(skipList, skipDates.length ? skipDates.map(function (date) {
+        return el('span', { class: 'chip chip--danger' },
+          date,
+          el('button', { class: 'btn--ghost', type: 'button', 'aria-label': 'شيل ' + date, style: 'border:0;background:none;color:inherit;cursor:pointer;padding:0 2px', onclick: function () {
+            skipDates = skipDates.filter(function (d) { return d !== date; });
+            markDirty();
+            renderSkips();
+          } }, '×')
+        );
+      }) : [el('span', { class: 'field__hint', text: 'مفيش تواريخ ملغية' })]);
+    }
+
+    renderSkips();
+
+    var addSkip = el('button', { class: 'btn', type: 'button', text: 'أضف', onclick: function () {
+      if (skipInput.value && skipDates.indexOf(skipInput.value) === -1) {
+        skipDates.push(skipInput.value);
+        skipDates.sort();
+        skipInput.value = '';
+        markDirty();
+        renderSkips();
+      }
+    } });
+
+    var meetingCard = card('الاجتماع', 'المعاد اللي بيظهر في أول الصفحة ومعاه العد التنازلي.',
+      meetingBox,
+      el('div', { class: 'form' },
+        enabled.node,
+        title.node,
+        el('div', { class: 'row' }, field('اليوم', daySelect), field('الساعة', time)),
+        field('مدة الاجتماع بالدقايق', duration, 'سيبها فاضية لو مش متأكد — ساعتها الموقع مش هيقول "شغال دلوقتي"'),
+        note.node,
+        field('أيام مفيهاش اجتماع', el('div', { class: 'form' }, skipList, el('div', { class: 'row' }, skipInput, addSkip)), 'العد التنازلي هيتخطاها، وهيظهر تنبيه "مفيش اجتماع"')
+      ),
+      settingsSaver(function () {
+        return {
+          'meeting.enabled': enabled.input.checked,
+          'meeting.title': title.input.value,
+          'meeting.day': daySelect.value,
+          'meeting.time': time.value,
+          'meeting.durationMinutes': duration.value,
+          'meeting.note': note.input.value,
+          'meeting.skipDates': skipDates.join(', ')
+        };
+      }, meetingBox)
+    );
+
+    /* ----- location ----- */
+
+    var locationBox = errorBox();
+    var name = counted('اسم المكان', setting('location.name'), state.meta.limits.title, 'لو فاضي كارت المكان مش هيظهر');
+    var address = counted('العنوان', setting('location.address'), state.meta.limits.address);
+    var locNote = counted('ملاحظة', setting('location.note'), state.meta.limits.note, 'مثلاً: القاعة اللي في الدور التاني');
+    var mapsUrl = textInput(setting('location.mapsUrl'), { ltr: true, type: 'url', placeholder: 'https://maps.app.goo.gl/...' });
+    var lat = textInput(setting('location.lat'), { ltr: true, inputmode: 'decimal', placeholder: '26.73' });
+    var lng = textInput(setting('location.lng'), { ltr: true, inputmode: 'decimal', placeholder: '33.93' });
+
+    var resolve = el('button', { class: 'btn', type: 'button' }, icon('map'), 'هات الإحداثيات من اللينك');
+
+    resolve.addEventListener('click', function () {
+      locationBox.hidden = true;
+      withBusy(resolve, call('apiResolveMapsUrl', mapsUrl.value.trim()))
+        .then(function (coords) {
+          lat.value = coords.lat;
+          lng.value = coords.lng;
+          markDirty();
+          toast('اتجابت الإحداثيات — دوس حفظ');
+        })
+        .catch(function (error) { fail(error, locationBox); });
+    });
+
+    var locationCard = card('مكان الاجتماع', 'زرار "الاتجاهات" والخريطة بيستخدموا الإحداثيات.',
+      locationBox,
+      el('div', { class: 'form' },
+        name.node,
+        address.node,
+        locNote.node,
+        field('لينك جوجل ماب', mapsUrl),
+        el('div', { class: 'actions' }, resolve),
+        el('div', { class: 'row' }, field('خط العرض', lat), field('خط الطول', lng))
+      ),
+      settingsSaver(function () {
+        return {
+          'location.name': name.input.value,
+          'location.address': address.input.value,
+          'location.note': locNote.input.value,
+          'location.mapsUrl': mapsUrl.value.trim(),
+          'location.lat': lat.value.trim(),
+          'location.lng': lng.value.trim()
+        };
+      }, locationBox)
+    );
+
+    return [meetingCard, locationCard];
+
+  }
+
+
+  /* =======================================================
+     ANNOUNCEMENT
+  ======================================================= */
+
+  function viewAnnouncement() {
+
+    var box = errorBox();
+    var enabled = switchInput('إظهار الإعلان', bool(setting('announcement.enabled')), updatePreview);
+    var text = counted('نص الإعلان', setting('announcement.text'), state.meta.limits.announcement, 'مثلاً: مفيش اجتماع الأحد ده علشان المؤتمر', { multiline: true });
+    var tone = choices('tone', state.meta.tones.map(function (t) { return { value: t, label: TONE_LABELS[t] || t }; }), setting('announcement.tone') || 'info', updatePreview);
+    var linkUrl = textInput(setting('announcement.linkUrl'), { ltr: true, type: 'url', placeholder: 'https://' });
+    var linkLabel = counted('نص الزرار', setting('announcement.linkLabel'), state.meta.limits.linkLabel, 'مثلاً: سجّل هنا');
+    var expires = el('input', { class: 'input', type: 'date', value: String(setting('announcement.expiresAt') || '').slice(0, 10), oninput: markDirty });
+
+    var preview = el('div', { class: 'preview-announcement' });
+
+    function updatePreview() {
+      var toneValue = tone.value();
+      preview.className = 'preview-announcement' + (toneValue === 'alert' ? ' preview-announcement--alert' : '');
+      preview.replaceChildren(
+        icon(toneValue === 'alert' ? 'alert' : toneValue === 'celebrate' ? 'sparkle' : 'megaphone'),
+        el('span', { text: text.input.value || 'نص الإعلان هيظهر هنا' })
+      );
+      preview.style.opacity = enabled.input.checked ? '1' : '.45';
+    }
+
+    text.input.addEventListener('input', updatePreview);
+    updatePreview();
+
+    return [card('الإعلان', 'بيظهر تحت معاد الاجتماع. مناسب للرحلات والمؤتمرات وتغيير المواعيد.',
+      box,
+      el('div', { class: 'form' },
+        enabled.node,
+        text.node,
+        field('النوع', tone.node),
+        field('لينك للتفاصيل', linkUrl, 'اختياري'),
+        linkLabel.node,
+        field('آخر يوم يظهر فيه', expires, 'اختياري — بعد اليوم ده الإعلان بيختفي لوحده'),
+        field('شكله هيبقى كده', preview)
+      ),
+      settingsSaver(function () {
+        return {
+          'announcement.enabled': enabled.input.checked,
+          'announcement.text': text.input.value,
+          'announcement.tone': tone.value(),
+          'announcement.linkUrl': linkUrl.value.trim(),
+          'announcement.linkLabel': linkLabel.input.value,
+          'announcement.expiresAt': expires.value
+        };
+      }, box)
+    )];
+
+  }
+
+
+  /* =======================================================
+     CONTACTS
+  ======================================================= */
+
+  function viewContacts() {
+
+    var contacts = byOrder(state.draft.contacts);
+
+    return [card('التواصل', '"تواصل مع الخدمة" بيظهر بشكل واضح، و"الدعم الفني" بيظهر أهدى.',
+      el('div', { class: 'actions' },
+        el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { editContact(null); } }, '+ جهة تواصل')
+      ),
+      contacts.length
+        ? el('ul', { class: 'list' }, contacts.map(function (contact, index) {
+          var enabled = bool(contact.enabled);
+          return el('li', { class: 'item' + (enabled ? '' : ' item--off') },
+            el('span', { class: 'item__icon', 'aria-hidden': 'true' }, icon(contact.method === 'whatsapp' ? 'whatsapp' : 'phone')),
+            el('div', { class: 'item__main' },
+              el('span', { class: 'item__title', text: contact.name }),
+              el('span', { class: 'item__sub', text: contact.phone }),
+              el('div', { class: 'item__meta' },
+                el('span', { class: 'chip chip--gold', text: contact.kind === 'support' ? 'دعم فني' : 'تواصل مع الخدمة' }),
+                el('span', { class: 'chip', text: contact.method === 'whatsapp' ? 'واتساب بس' : 'اتصال بس' }),
+                contact.role ? el('span', { class: 'chip', text: contact.role }) : null,
+                enabled ? null : el('span', { class: 'chip chip--off', text: 'مخفي' })
+              )
+            ),
+            el('div', { class: 'item__controls' },
+              el('span', { class: 'spacer' }),
+              el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'لفوق', disabled: index === 0, onclick: function (e) { move('apiMoveContact', contact.id, -1, e.currentTarget); } }, icon('chevron-up')),
+              el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'لتحت', disabled: index === contacts.length - 1, onclick: function (e) { move('apiMoveContact', contact.id, 1, e.currentTarget); } }, icon('chevron')),
+              el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'تعديل ' + contact.name, onclick: function () { editContact(contact); } }, icon('edit')),
+              el('button', { class: 'icon-btn icon-btn--danger', type: 'button', 'aria-label': 'مسح ' + contact.name, onclick: function (e) {
+                if (!confirm('تمسح "' + contact.name + '"؟')) return;
+                withBusy(e.currentTarget, call('apiDeleteContact', contact.id)).then(applyState).catch(function (error) { fail(error); });
+              } }, icon('trash'))
+            )
+          );
+        }))
+        : el('p', { class: 'empty', text: 'مفيش جهات تواصل' })
+    )];
+
+  }
+
+  function editContact(contact) {
+
+    var isNew = !contact;
+    contact = contact || { enabled: true, kind: 'service', method: 'call' };
+
+    var box = errorBox();
+    var name = counted('الاسم', contact.name, state.meta.limits.personName, null, { required: true });
+    var role = counted('الدور', contact.role, state.meta.limits.role, 'مثلاً: أمين الخدمة');
+    var description = counted('وصف قصير', contact.description, state.meta.limits.description);
+    var phone = field('رقم التليفون', textInput(contact.phone, { ltr: true, type: 'tel', inputmode: 'tel', placeholder: '01xxxxxxxxx' }));
+    var phoneInput = phone.querySelector('input');
+
+    var kind = choices('kind', [
+      { value: 'service', label: 'تواصل مع الخدمة' },
+      { value: 'support', label: 'دعم فني (أهدى)' }
+    ], contact.kind || 'service');
+
+    var message = counted('رسالة الواتساب الجاهزة', contact.message, state.meta.limits.message, 'اختياري — بتتكتب لوحدها لما حد يفتح الواتساب', { multiline: true });
+
+    var method = choices('method', [
+      { value: 'call', label: 'اتصال بس', icon: 'phone' },
+      { value: 'whatsapp', label: 'واتساب بس', icon: 'whatsapp' }
+    ], contact.method || 'call', function (value) { message.node.hidden = value !== 'whatsapp'; });
+
+    message.node.hidden = (contact.method || 'call') !== 'whatsapp';
+
+    var enabled = switchInput('ظاهر', contact.enabled === undefined ? true : bool(contact.enabled));
+    var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
+
+    save.addEventListener('click', function () {
+      box.hidden = true;
+      withBusy(save, call('apiSaveContact', {
+        id: contact.id || '',
+        name: name.input.value,
+        role: role.input.value,
+        description: description.input.value,
+        phone: phoneInput.value,
+        kind: kind.value(),
+        method: method.value(),
+        message: message.input.value,
+        enabled: enabled.input.checked
+      }))
+        .then(function (next) {
+          dirty = false;
+          sheet.close();
+          applyState(next);
+          toast('اتحفظ ✓ — لسه محتاج نشر');
+        })
+        .catch(function (error) { fail(error, box); });
+    });
+
+    dirty = false;
+
+    openSheet(isNew ? 'جهة تواصل جديدة' : 'تعديل: ' + contact.name, [
+      box,
+      el('div', { class: 'form' },
+        name.node,
+        role.node,
+        description.node,
+        phone,
+        field('النوع', kind.node),
+        field('طريقة التواصل', method.node),
+        message.node,
+        enabled.node
+      )
+    ], [save, el('button', { class: 'btn', type: 'button', text: 'إلغاء', onclick: closeSheet })]);
+
+  }
+
+
+  /* =======================================================
+     SETTINGS
+  ======================================================= */
+
+  function viewSettings() {
+
+    var box = errorBox();
+    var name = counted('اسم الخدمة الرسمي', setting('site.name'), state.meta.limits.siteName, settingHelp('site.name'), { required: true });
+    var tagline = counted('الجملة التعريفية', setting('site.tagline'), state.meta.limits.tagline, settingHelp('site.tagline'));
+    var shareText = counted('نص المشاركة', setting('site.shareText'), state.meta.limits.shareText, settingHelp('site.shareText'));
+
+    var siteCard = card('الموقع', null,
+      box,
+      el('div', { class: 'form' }, name.node, tagline.node, shareText.node),
+      settingsSaver(function () {
+        return {
+          'site.name': name.input.value,
+          'site.tagline': tagline.input.value,
+          'site.shareText': shareText.input.value
+        };
+      }, box)
+    );
+
+    var config = state.config;
+    var status = state.status;
+    var checkResult = el('p', { class: 'note', hidden: true });
+
+    var check = el('button', { class: 'btn', type: 'button', text: 'اختبر الاتصال بـ GitHub' });
+
+    check.addEventListener('click', function () {
+      checkResult.hidden = true;
+      withBusy(check, call('apiCheckGithub'))
+        .then(function (result) {
+          checkResult.className = 'note note--ok';
+          checkResult.textContent = 'تمام ✓ — ' + result.repo + ' (' + result.branch + ' @ ' + result.head + ')' + (result.pages ? ' — GitHub Pages شغال' : ' — GitHub Pages مش متفعل');
+          checkResult.hidden = false;
+        })
+        .catch(function (error) {
+          checkResult.className = 'errors';
+          checkResult.textContent = error.message;
+          checkResult.hidden = false;
+        });
+    });
+
+    var commitLink = status.publishedCommit && config.repo
+      ? el('a', { href: 'https://github.com/' + config.repo + '/commit/' + status.publishedCommit, target: '_blank', rel: 'noopener', text: status.publishedCommit.slice(0, 7) })
+      : '—';
+
+    var publishCard = card('النشر', 'القيم دي بتتظبط من Script Properties في محرر Apps Script (مش من هنا، علشان الأمان).',
+      el('dl', { class: 'kv' },
+        el('dt', { text: 'الريبو' }), el('dd', { class: 'chip--ltr', text: config.repo || 'ناقص — GITHUB_REPO' }),
+        el('dt', { text: 'الفرع' }), el('dd', { text: config.branch }),
+        el('dt', { text: 'التوكن' }), el('dd', { text: config.tokenSet ? 'متسجل ✓' : 'ناقص — GITHUB_TOKEN' }),
+        el('dt', { text: 'الموقع' }), el('dd', {}, config.siteUrl ? el('a', { href: config.siteUrl, target: '_blank', rel: 'noopener', text: config.siteUrl }) : 'ناقص — SITE_URL'),
+        el('dt', { text: 'آخر نشر' }), el('dd', { text: formatDateTime(status.publishedAt) }),
+        el('dt', { text: 'الكوميت' }), el('dd', {}, commitLink)
+      ),
+      checkResult,
+      el('div', { class: 'actions' },
+        check,
+        el('a', { class: 'btn', href: config.sheetUrl, target: '_blank', rel: 'noopener', text: 'افتح الشيت' })
+      )
+    );
+
+    var accountCard = card('الحساب', null,
+      el('p', {}, 'انت داخل بـ ', el('span', { class: 'chip chip--ltr', text: state.user }))
+    );
+
+    return [siteCard, publishCard, accountCard];
+
+  }
+
+
+  /* =======================================================
+     REVIEW + PUBLISH
+  ======================================================= */
+
+  document.getElementById('publish-open').addEventListener('click', openReview);
+
+  function openReview() {
+
+    dirty = false;
+    openSheet('مراجعة قبل النشر', [el('p', { class: 'loading', text: 'بنقارن المسودة بالموقع الحالي…' })]);
+
+    call('apiReview')
+      .then(renderReview)
+      .catch(function (error) {
+        openSheet('مراجعة قبل النشر', [el('div', { class: 'errors', text: error.message })]);
+      });
+
+  }
+
+  function renderReview(review) {
+
+    var blocked = review.errors.length > 0 || !!review.githubError;
+    var nothing = !review.changes.length;
+
+    var body = [];
+
+    if (review.githubError) {
+      body.push(el('div', { class: 'errors', text: review.githubError }));
+    }
+
+    if (review.errors.length) {
+      body.push(el('div', { class: 'errors' },
+        el('strong', { text: 'لازم تتصلح قبل النشر:' }),
+        review.errors.map(function (e) { return el('span', { text: '• ' + e.where + ': ' + e.message }); })
+      ));
+    }
+
+    if (review.warnings.length) {
+      body.push(el('div', { class: 'note note--warn' }, review.warnings.map(function (w) {
+        return el('div', { text: '• ' + w.where + ': ' + w.message });
+      })));
+    }
+
+    if (!review.githubError) {
+      body.push(nothing
+        ? el('p', { class: 'note note--ok', text: 'مفيش تغييرات — الموقع متحدث.' })
+        : el('div', { class: 'form' },
+          el('p', { class: 'field__label', text: 'اللي هيتغير في الموقع:' }),
+          el('ul', { class: 'changes' }, review.changes.map(function (line) { return el('li', { text: line }); }))
+        ));
+    }
+
+    var publish = el('button', { class: 'btn btn--primary', type: 'button', disabled: blocked || nothing, text: 'نشر التغييرات' });
+
+    publish.addEventListener('click', function () {
+      withBusy(publish, call('apiPublish', review.revision))
+        .then(function (result) {
+          applyState(result.state);
+          renderPublished(result);
+        })
+        .catch(function (error) {
+          var box = el('div', { class: 'errors', text: error.message });
+          sheet.querySelector('.sheet__body').prepend(box);
+        });
+    });
+
+    openSheet('مراجعة قبل النشر', body, [publish, el('button', { class: 'btn', type: 'button', text: 'إلغاء', onclick: closeSheet })]);
+
+  }
+
+  function renderPublished(result) {
+
+    var live = el('p', { class: 'note' }, el('span', { class: 'spinner', 'aria-hidden': 'true', style: 'display:inline-block;vertical-align:middle;margin-inline-end:8px' }), 'بيتنشر على الموقع… (عادةً أقل من دقيقة)');
+
+    openSheet('اتنشر ✓', [
+      el('p', { class: 'note note--ok', text: result.unchanged ? 'الملفات على GitHub زي ما هي.' : 'التغييرات اتبعتت لـ GitHub.' }),
+      result.commitUrl ? el('a', { href: result.commitUrl, target: '_blank', rel: 'noopener', text: 'شوف الكوميت على GitHub' }) : null,
+      result.siteUrl ? live : null
+    ], [el('button', { class: 'btn btn--primary', type: 'button', text: 'تمام', onclick: function () { sheet.close(); } })]);
+
+    if (result.siteUrl) {
+      waitForSite(result.siteUrl, result.revision, live);
+    }
+
+  }
+
+  /* GitHub Pages sends Access-Control-Allow-Origin: *, so we can watch the
+     published file until the new revision is live. */
+  function waitForSite(siteUrl, revision, node) {
+
+    var tries = 0;
+
+    function check() {
+      tries++;
+      fetch(siteUrl.replace(/\/?$/, '/') + 'content.json?check=' + Date.now(), { cache: 'no-store' })
+        .then(function (response) { return response.json(); })
+        .then(function (json) {
+          if (json.revision === revision) {
+            node.className = 'note note--ok';
+            node.replaceChildren('ظهر على الموقع ✓ ', el('a', { href: siteUrl, target: '_blank', rel: 'noopener', text: 'افتح الموقع' }));
+            return;
+          }
+          retry();
+        })
+        .catch(retry);
+    }
+
+    function retry() {
+      if (!node.isConnected) return;
+      if (tries >= 40) {
+        node.className = 'note note--warn';
+        node.textContent = 'لسه مظهرش. GitHub Pages أحياناً بياخد كام دقيقة — افتح الموقع بعد شوية.';
+        return;
+      }
+      setTimeout(check, 5000);
+    }
+
+    setTimeout(check, 8000);
+
+  }
+
+
+  /* =======================================================
+     START
+  ======================================================= */
+
+  call('apiState')
+    .then(applyState)
+    .catch(function (error) {
+      view.replaceChildren(el('div', { class: 'errors', text: error.message }));
+    });
+
+})();
+</script>

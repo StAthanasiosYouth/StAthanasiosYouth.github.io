@@ -1,0 +1,12 @@
+# GitHub Pages (Jekyll) serves only the public portal.
+# Source code for the admin, tooling, tests and docs stay in the repo but are
+# not published to the website.
+exclude:
+  - apps-script
+  - tools
+  - tests
+  - docs
+  - README.md
+  - PRODUCT.md
+  - DESIGN.md
+  - node_modules

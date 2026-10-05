@@ -1,0 +1,24 @@
+{
+  "name": "athanasios-links-tools",
+  "private": true,
+  "type": "module",
+  "description": "Dev-only tooling: asset optimization, seed content, QR/OG rendering, tests. Not deployed.",
+  "scripts": {
+    "assets": "node build-assets.mjs",
+    "seed": "node build-seed.mjs",
+    "icons": "node gen-brand-icons.mjs",
+    "sync": "node sync-admin.mjs",
+    "test": "node --test ../tests/*.test.mjs",
+    "serve": "node serve.mjs",
+    "e2e": "node --test ../tests/browser.e2e.mjs",
+    "set-url": "node set-url.mjs"
+  },
+  "devDependencies": {
+    "axe-core": "^4.13.0",
+    "jsqr": "^1.4.0",
+    "puppeteer-core": "^23.11.1",
+    "qrcode-generator": "^2.0.4",
+    "sharp": "^0.35.5",
+    "simple-icons": "^16.34.0"
+  }
+}

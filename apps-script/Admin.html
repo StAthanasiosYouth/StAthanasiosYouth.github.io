@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400..800&display=swap" rel="stylesheet">
+  <?!= include_('AdminStyles') ?>
+</head>
+
+<body>
+
+  <div class="top">
+
+  <header class="bar">
+    <div class="bar__brand">
+      <span class="bar__cross" aria-hidden="true"></span>
+      <div>
+        <p class="bar__title">لوحة التحكم</p>
+        <p class="bar__sub">أسرة البابا أثناسيوس – سفاجا</p>
+      </div>
+    </div>
+    <div class="bar__actions">
+      <span class="status" id="status" role="status" aria-live="polite">…</span>
+      <button class="btn btn--primary" id="publish-open" type="button">راجع وانشر</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="أقسام لوحة التحكم">
+    <button class="tab" role="tab" type="button" data-tab="links" aria-selected="true">الروابط</button>
+    <button class="tab" role="tab" type="button" data-tab="meeting" aria-selected="false">الاجتماع والمكان</button>
+    <button class="tab" role="tab" type="button" data-tab="announcement" aria-selected="false">الإعلان</button>
+    <button class="tab" role="tab" type="button" data-tab="contacts" aria-selected="false">التواصل</button>
+    <button class="tab" role="tab" type="button" data-tab="settings" aria-selected="false">الإعدادات</button>
+  </nav>
+
+  </div>
+
+  <main class="view" id="view" role="tabpanel" aria-busy="true">
+    <p class="loading">جاري التحميل…</p>
+  </main>
+
+  <dialog class="sheet" id="sheet" aria-labelledby="sheet-title"></dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <?!= include_('AdminIcons') ?>
+  <?!= include_('AdminScript') ?>
+
+</body>
+
+</html>
