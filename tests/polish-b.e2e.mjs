@@ -413,7 +413,7 @@ test('admin: the contact editor saves a photo, «جملة البداية» and �
   await page.evaluate(() => A.editContact(A.state.draft.contacts.find(c => c.kind === 'support')));
   await page.waitForSelector('dialog.sheet[open] .picker--avatar');
   const placeholders = await page.evaluate(() => ['جملة البداية', 'الرد'].map(label => document.querySelector(`dialog.sheet[open] .field[data-label="${label}"] input, dialog.sheet[open] .field[data-label="${label}"] textarea`).placeholder));
-  assert.deepEqual(placeholders, ['معايا مشكلة', 'أهلاً بيك 👋 ابعتلي المشكلة وأنا هساعدك.']);
+  assert.deepEqual(placeholders, ['معايا مشكلة', 'أهلاً بيك 👋 ابعتلي المشكلة أو التفاصيل وأنا هساعدك إن شاء الله.']);
 
   await page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .picker--avatar button')].find(b => b.textContent.includes('من المكتبة')).click());
   await pickFromLibrary(page, 0);

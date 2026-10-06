@@ -1359,6 +1359,28 @@ ol {
   background: #121212;
 }
 
+.app-icon--messenger {
+  color: #fff;
+  background: linear-gradient(200deg, #a033ff, #0866ff 60%, #00c6ff);
+}
+
+.app-icon--discord {
+  color: #fff;
+  background: #5865f2;
+}
+
+.app-icon--x,
+.app-icon--threads {
+  color: #fff;
+  background: #000;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22), 0 10px 20px -10px rgba(0, 0, 0, .8);
+}
+
+.app-icon--snapchat {
+  color: #000;
+  background: #fffc00;
+}
+
 /* list rows for "card" style links */
 .rows {
   display: grid;
