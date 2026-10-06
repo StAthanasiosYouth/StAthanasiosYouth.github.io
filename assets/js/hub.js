@@ -175,14 +175,88 @@ export function art(section = {}, iconName = '') {
 }
 
 
-/* a section's own banner, above its content */
+/*
+ * A section's own banner, above its content. Banners are often text-heavy
+ * (the admin's designed artwork), so the slot follows the banner's own
+ * shape (--banner-ar, main.css), within a sensible height range. When the
+ * slot still differs noticeably from the banner (very tall or very wide
+ * artwork, a capped band on desktop), the whole banner is shown (contain)
+ * on an intentional surround: the same picture blurred (full tier) or a
+ * light in its colour. A small difference just fills the slot (cover).
+ */
+const BANNER_SIZES = '(min-width: 1024px) 760px, 92vw';
+
+const bannerFit = typeof ResizeObserver === 'function'
+  ? new ResizeObserver(entries => {
+    for (const { target, contentRect } of entries) {
+      // a re-render replaced it (it reports a last, empty size): let it go
+      if (!target.isConnected) { bannerFit.unobserve(target); continue; }
+      if (!contentRect.width || !contentRect.height) continue;
+      const slot = contentRect.width / contentRect.height;
+      const off = Math.abs(slot / Number(target.dataset.ar) - 1);
+      target.dataset.fit = off < 0.035 ? 'cover' : 'contain';
+    }
+  })
+  : null;
+
 export function sectionBanner(section = {}) {
 
-  if (!section.banner) return null;
+  const banner = section.banner;
 
-  return h('div', { class: 'section-banner' }, picture(section.banner, { sizes: '(min-width: 1024px) 760px, 92vw' }));
+  if (!banner) return null;
+
+  const ratio = banner.w && banner.h ? banner.w / banner.h : 16 / 6;
+
+  const img = picture(banner, { sizes: BANNER_SIZES, className: 'section-banner__img' });
+
+  const wrap = h('div', { class: 'section-banner', 'data-ar': ratio.toFixed(4), 'data-fit': 'cover' },
+    img,
+    // the surround (blurred anyway: the thumbnail; lazy, so only fetched when it shows)
+    h('img', { class: 'section-banner__ambient', src: banner.thumb, alt: '', 'aria-hidden': 'true', loading: 'lazy', decoding: 'async' })
+  );
+
+  // the full-size file only when the banner comes near the screen (a phone's
+  // first visit gets the thumbnail; a banner on the first screen is sharp at once)
+  const srcset = img.getAttribute('srcset');
+  if (srcset && bannerNear) {
+    img.removeAttribute('srcset');
+    img.dataset.srcset = srcset;
+    bannerNear.observe(img);
+  }
+
+  // CSSOM (the CSP blocks style=""): the banner's own shape and colour
+  wrap.style.setProperty('--banner-ar', ratio.toFixed(4));
+  if (banner.color) wrap.style.setProperty('--tint', banner.color);
+  bannerFit?.observe(wrap);
+
+  return wrap;
 
 }
+
+/* right after the page is built (render.js): a banner already on the first
+   screen gets its full-size file before the browser even fetches the
+   thumbnail (one download, sharp at once) */
+export function sharpenVisibleBanners(root) {
+
+  for (const img of root.querySelectorAll('.section-banner__img[data-srcset]')) {
+    const r = img.getBoundingClientRect();
+    if (r.top < innerHeight + 80 && r.bottom > -80 && !img.srcset) {
+      img.srcset = img.dataset.srcset;
+      bannerNear?.unobserve(img);
+    }
+  }
+
+}
+
+const bannerNear = typeof IntersectionObserver === 'function'
+  ? new IntersectionObserver(entries => {
+    for (const { target, isIntersecting } of entries) {
+      if (!isIntersecting && target.isConnected) continue;
+      bannerNear.unobserve(target);
+      if (isIntersecting) target.srcset = target.dataset.srcset;
+    }
+  }, { rootMargin: '80px 0px' })
+  : null;
 
 
 /* =========================================================

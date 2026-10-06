@@ -15,7 +15,7 @@ import { iconNode, isBrandIcon } from './icons.js';
 import { meetingStatus, meetingJourney, fromDayNumber, isWithinWindow, calendarDates } from './schedule.js';
 import { journeyElement } from './journey.js';
 import { describeMeeting, formatDate, DAY_SHORT } from './words.js';
-import { bannerWidget, newsSection, gamesSection, liveGameWidget, meetingTopic, visibleNews, gameStates, sectionBanner } from './hub.js';
+import { bannerWidget, newsSection, gamesSection, liveGameWidget, meetingTopic, visibleNews, gameStates, sectionBanner, sharpenVisibleBanners } from './hub.js';
 import { updateBell, visibleNotifications } from './bell.js';
 import { liveSections } from './layout.js';
 import { itemsSection, visibleItems } from './items.js';
@@ -461,7 +461,7 @@ function sectionWidget(section, links) {
   const tiles = links.filter(link => link.style === 'tile');
   const rows = links.filter(link => link.style !== 'tile');
 
-  return h('section', { class: 'widget links-section', 'data-area': 'section', 'data-theme': section.theme || null, 'aria-labelledby': id },
+  return h('section', { class: `widget links-section${rows.length ? '' : ' links-section--icons'}`, 'data-area': 'section', 'data-theme': section.theme || null, 'aria-labelledby': id },
     h('h2', { class: 'widget__title', id }, section.title),
     section.subtitle ? h('p', { class: 'section-head__sub' }, section.subtitle) : null,
     tiles.length ? h('ul', { class: 'tiles' }, tiles.map(tile)) : null,
@@ -624,7 +624,7 @@ function supportWidget(contacts) {
     morePeople(contacts)
   );
 
-  playOnce(chat);
+  liveChat(chat);
 
   return section;
 
@@ -648,29 +648,65 @@ function tickMarks(extra) {
 
 
 /*
- * The conversation plays once per visit, when it scrolls into view, and
- * rests on its final frame. Before that it waits on its first frame
- * (.is-armed). Reduced motion (or no IntersectionObserver): the final frame
- * at once. Lite: the same story, shorter (main.css).
+ * The conversation:
+ *  - full tier: it keeps living while it is on screen (main.css, one 4.4 s
+ *    cycle: message → typing → reply → pause → fade → again). Off screen or
+ *    in a hidden tab it pauses where it is. If the page later measures slow
+ *    (lite) or asks for reduced motion, it settles on the final frame.
+ *  - lite: the same story once, when it scrolls into view (once per
+ *    visit), then it rests on its full frame.
+ *  - reduced motion (or no IntersectionObserver): the final frame at once.
+ * The words never change (screen readers read a stable list); the button
+ * below never waits for any of it.
  */
 let chatPlayed = false;
 
-function playOnce(stage) {
+function liveChat(stage) {
 
-  if (chatPlayed || motionTier() === 'reduced' || !('IntersectionObserver' in window)) return;
+  const tier = motionTier();
+  const once = tier === 'lite';
+
+  if (tier === 'reduced' || (once && chatPlayed) || !('IntersectionObserver' in window)) return;
 
   stage.classList.add('is-armed');
+  stage.dataset.cycle = '0';
+
+  let visible = false;
+
+  const settle = () => {
+    observer.disconnect();
+    document.removeEventListener('visibilitychange', pauseIfHidden);
+    stage.classList.remove('is-armed', 'is-looping', 'is-once', 'is-paused');
+  };
+
+  const pauseIfHidden = () => {
+    if (!stage.isConnected) { settle(); return; }
+    stage.classList.toggle('is-paused', !visible || document.hidden);
+  };
 
   const observer = new IntersectionObserver(entries => {
-    if (!entries.some(entry => entry.isIntersecting)) return;
-    observer.disconnect();
-    chatPlayed = true;
-    stage.classList.add('is-playing');
-    // after the last step the class goes: the final frame is the resting state
-    setTimeout(() => stage.classList.remove('is-armed', 'is-playing'), motionTier() === 'lite' ? 2600 : 5200);
-  }, { threshold: 0.6 });
+    visible = entries.some(entry => entry.isIntersecting);
+    if (visible && !stage.classList.contains('is-looping')) {
+      stage.classList.add('is-looping');
+      stage.classList.toggle('is-once', once);
+      chatPlayed = true;
+    }
+    pauseIfHidden();
+  }, { threshold: once ? 0.6 : 0.35 });
+
+  // one cycle done (the visitor's message starts the next one)
+  stage.addEventListener('animationiteration', event => {
+    if (!event.target.classList.contains('chat__msg--out') || !event.animationName.startsWith('loop-')) return;
+    stage.dataset.cycle = String(Number(stage.dataset.cycle) + 1);
+    if (motionTier() !== 'full') settle();
+  });
+  // the single play ended (lite), or reduced motion cut it short: rest
+  stage.addEventListener('animationend', event => {
+    if (event.target.classList.contains('chat__msg--out') && event.animationName.startsWith('loop-')) settle();
+  });
 
   observer.observe(stage);
+  document.addEventListener('visibilitychange', pauseIfHidden);
 
 }
 
@@ -793,9 +829,13 @@ const WIDE_SPAN = { featured: 7, location: 5, contacts: 6, support: 6 };
 function pairsWith(a, b) {
 
   if (a.kind === 'hero') return b.kind === 'meeting';
+  // two short lists of activities (two cards or fewer each) share a row
+  if (a.kind === 'items' && b.kind === 'items') return shortList(a.el) && shortList(b.el);
   return !!WIDE_SPAN[a.kind] && !!WIDE_SPAN[b.kind] && WIDE_SPAN[a.kind] + WIDE_SPAN[b.kind] === 12;
 
 }
+
+const shortList = el => el.querySelectorAll('.items__list > li').length <= 2;
 
 function pairUp(flow) {
 
@@ -805,12 +845,40 @@ function pairUp(flow) {
     if (b && pairsWith(a, b)) {
       a.el.removeAttribute('data-wide');
       b.el.removeAttribute('data-wide');
+      if (a.kind !== 'hero') matchBanners(a, b);
       i++;
     }
     else {
       a.el.setAttribute('data-wide', '');
     }
   }
+
+}
+
+
+/*
+ * Two partners side by side: one banner height for both. Each slot gets
+ * the shape that makes it as tall as the shorter of the two banners would
+ * naturally be (desktop: their 12-column spans; tablet: equal halves), so
+ * neither is cropped and the pair stays balanced. A partner without a
+ * banner leaves the other one its own shape.
+ */
+function matchBanners(a, b) {
+
+  const banners = [a, b].map(item => item.el.querySelector(':scope > .section-banner'));
+  if (!banners[0] || !banners[1]) return;
+
+  const ratios = banners.map(el => Number(el.dataset.ar) || 16 / 6);
+  const spans = [WIDE_SPAN[a.kind] || 6, WIDE_SPAN[b.kind] || 6];
+
+  // height ∝ width / ratio; the shorter one sets the pair's height
+  const desktop = Math.min(spans[0] / ratios[0], spans[1] / ratios[1]);
+  const tablet = Math.min(1 / ratios[0], 1 / ratios[1]);
+
+  banners.forEach((el, i) => {
+    el.style.setProperty('--pair-ar-d', (spans[i] / desktop).toFixed(4));
+    el.style.setProperty('--pair-ar-t', (1 / tablet).toFixed(4));
+  });
 
 }
 
@@ -963,6 +1031,7 @@ export function renderPage(content, clock, actions, { animate = false } = {}) {
   widgets.forEach(el => el.setAttribute('data-dynamic', ''));
   main.append(...widgets);
   main.dataset.state = 'ready';
+  sharpenVisibleBanners(main);
 
   // on screen: a staggered entrance; further down: rise in when scrolled to
   if (animate) choreograph(widgets);

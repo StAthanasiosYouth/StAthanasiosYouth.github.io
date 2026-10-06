@@ -183,6 +183,19 @@ function reveal(widget) {
 
 }
 
+/* while the intro plays: how long until the sections rise (the identity
+   leads: from 1.6 s on a phone, where it only moves up; on a wide screen
+   it crosses the stage first, so they wait until it has nearly landed) */
+const introAssemble = () => (innerWidth >= 1024 ? 1950 : 1600);
+
+function introWait() {
+
+  if (html.dataset.introState !== 'playing') return 0;
+
+  return Math.max(0, Math.round(Number(html.dataset.introAt || 0) + introAssemble() - performance.now()));
+
+}
+
 /**
  * Called after the page's widgets are in the DOM. Widgets on screen enter
  * with a stagger; the rest wait until they scroll in. Reduced / lite:
@@ -197,6 +210,7 @@ export function choreograph(widgets) {
   }
 
   const fold = innerHeight * 0.92;
+  const wait = introWait();
   let index = 0;
 
   for (const widget of widgets) {
@@ -204,6 +218,8 @@ export function choreograph(widgets) {
     if (top < fold) {
       widget.classList.add('is-entering', 'is-new');
       widget.style.setProperty('--i', String(index++));
+      // the first visit's intro (intro.js): they rise as the page assembles
+      widget.style.setProperty('--intro-wait', `${wait}ms`);
       widget.addEventListener('animationend', event => {
         if (event.target === widget) widget.classList.remove('is-entering');
       });
