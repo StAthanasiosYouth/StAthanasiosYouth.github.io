@@ -1,9 +1,12 @@
 /**
  * ADMIN WEB APP
  *
- * doGet serves the admin panel (Admin.html) to allowlisted Google accounts.
+ * doGet serves the admin panel (Admin.html) to allowlisted Google accounts
+ * (the recovery admin, a deployment that runs as the user accessing it).
  * The page talks to the api* functions below through google.script.run.
- * Every api* function starts with assertAdmin_() (see Auth.gs).
+ * The official admin (GitHub Pages /admin/) reaches the same functions
+ * through doPost (Api.gs). Every api* function starts with assertAdmin_()
+ * (see Auth.gs).
  *
  * Saving writes to the Sheet (the draft). Nothing reaches the public site
  * until apiPublish() (Publish.gs).
@@ -14,6 +17,14 @@
 ========================================================= */
 
 function doGet() {
+
+  // The API deployment runs as the owner: there the page (and with it
+  // google.script.run) would run with the owner's rights, so it never serves
+  // any HTML. The admin for that deployment is the static page on GitHub
+  // Pages, talking to doPost (Api.gs).
+  if (runsAsOwner_()) {
+    return jsonOutput_({ ok: false, code: 'api', error: 'This URL is the admin API (POST only). The admin is at https://stathanasiosyouth.github.io/admin/' });
+  }
 
   var email = currentEmail_();
 

@@ -70,7 +70,7 @@ test('every browser-callable data function rejects non-admins', () => {
 test('no unguarded public function slipped in', () => {
   // public = callable from the browser through google.script.run
   const world = configuredWorld();
-  const pure = new Set(['buildPublicContent', 'safeHttpsUrl', 'normalizePhone', 'contentRevision', 'buildMeetingIcs', 'summarizeChanges', 'describeChanges', 'seedDraft', 'doGet']);
+  const pure = new Set(['buildPublicContent', 'safeHttpsUrl', 'normalizePhone', 'contentRevision', 'buildMeetingIcs', 'summarizeChanges', 'describeChanges', 'seedDraft', 'doGet', 'doPost']);
   const publicFns = Object.keys(world.gs).filter(k => typeof world.gs[k] === 'function' && !k.endsWith('_'));
   const unexpected = publicFns.filter(k => !pure.has(k) && !/^api/.test(k) && !['setup', 'checkSheet', 'clearStrayIds', 'checkMedia', 'planMigration', 'migrate'].includes(k));
   assert.deepEqual(unexpected, []);
