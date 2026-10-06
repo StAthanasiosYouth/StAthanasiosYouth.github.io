@@ -1,0 +1,747 @@
+<script>
+/*
+ * Admin views for the content center: the timeline (الجدول), meetings,
+ * news, games and notifications. Saved through apiSaveItem (Items.gs).
+ * All times are Cairo wall time.
+ */
+(function () {
+
+  'use strict';
+
+  var A = window.A;
+  var el = A.el;
+  var icon = A.icon;
+  var bool = A.bool;
+
+  A.editors = {};
+
+  var TONE_LABELS = { info: 'عادي', alert: 'تنبيه (زي إلغاء)', celebrate: 'مناسبة حلوة' };
+
+  var TYPE_LABELS = { general: 'عام', meeting: 'اجتماع', news: 'خبر', game: 'لعبة', important: 'مهم' };
+  var TYPE_ICONS = { general: 'info', meeting: 'church', news: 'megaphone', game: 'star', important: 'alert' };
+
+  var nowMinutes = function () { return A.wallMinutes(A.cairoNow()); };
+
+  function hubLimits() { return A.state.meta.hubLimits; }
+
+  function hasNotification(id) {
+
+    return (A.state.draft.notifications || []).some(function (n) { return n.id === id; });
+
+  }
+
+  function guard(builder) {
+
+    return function () {
+      return A.state.hubReady ? builder() : [A.hubNotReady()];
+    };
+
+  }
+
+  function addButton(label, onclick) {
+
+    return el('button', { class: 'btn btn--primary', type: 'button', onclick: onclick }, label);
+
+  }
+
+  function saveButton(isNew) {
+
+    return el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
+
+  }
+
+  /* chips for a time window */
+  function windowChips(from, until, labels) {
+
+    var now = nowMinutes();
+    var chips = [];
+    var start = from ? A.wallMinutes(from) : null;
+    var end = until ? A.wallMinutes(until, true) : null;
+
+    if (end !== null && end < now) chips.push(A.chip(labels.ended || 'انتهى', 'off'));
+    else if (start !== null && start > now) chips.push(A.chip((labels.scheduled || 'يظهر') + ' ' + A.formatWall(from), 'gold'));
+    else chips.push(A.chip(labels.live || 'ظاهر دلوقتي', 'ok'));
+
+    if (end !== null && end >= now) chips.push(A.chip('لحد ' + A.formatWall(until)));
+
+    return chips;
+
+  }
+
+
+  /* =======================================================
+     TIMELINE (الجدول)
+  ======================================================= */
+
+  function timelineEvents() {
+
+    var draft = A.state.draft;
+    var events = [];
+    var meetingTime = A.setting('meeting.time') || '20:00';
+
+    function push(at, kind, item, label, iconName) {
+      var minutes = A.wallMinutes(at);
+      if (minutes !== null) events.push({ minutes: minutes, at: at, kind: kind, item: item, label: label, icon: iconName });
+    }
+
+    (draft.sessions || []).filter(function (s) { return bool(s.enabled); }).forEach(function (s) {
+      var when = s.date + ' ' + (s.time || meetingTime);
+      push(when, 'sessions', s, s.status === 'cancelled' ? 'اجتماع ملغي' : 'اجتماع' + (s.topic ? ': ' + s.topic : ''), 'church');
+      if (s.visibleFrom && s.topic) push(s.visibleFrom, 'sessions', s, 'يظهر موضوع الاجتماع: ' + s.topic, 'church');
+    });
+
+    (draft.news || []).filter(function (n) { return bool(n.enabled); }).forEach(function (n) {
+      push(n.publishAt, 'news', n, 'خبر يتنشر: ' + n.title, 'megaphone');
+      if (n.expireAt) push(n.expireAt, 'news', n, 'خبر يختفي: ' + n.title, 'megaphone');
+    });
+
+    (draft.games || []).filter(function (g) { return bool(g.enabled); }).forEach(function (g) {
+      if (g.visibleFrom) push(g.visibleFrom, 'games', g, 'لعبة تظهر "قريبًا": ' + g.title, 'star');
+      push(g.startAt, 'games', g, 'لعبة تبدأ: ' + g.title, 'star');
+      push(g.endAt, 'games', g, 'لعبة تخلص: ' + g.title, 'star');
+    });
+
+    (draft.notifications || []).filter(function (n) { return bool(n.enabled); }).forEach(function (n) {
+      push(n.publishAt, 'notifications', n, 'إشعار في الجرس: ' + n.title, TYPE_ICONS[n.type] || 'bell');
+    });
+
+    return events.sort(function (a, b) { return a.minutes - b.minutes; });
+
+  }
+
+  A.views.schedule = function () {
+
+    if (!A.state.hubReady) {
+      return [A.hubNotReady()];
+    }
+
+    var now = nowMinutes();
+    var today = Math.floor(now / 1440);
+
+    var quick = A.card('اعمل حاجة جديدة', 'كل حاجة بتتحفظ مسودة، وتظهر في معادها بتوقيت مصر بعد ما تنشر.',
+      el('div', { class: 'actions' },
+        addButton('+ اجتماع', function () { A.editors.sessions(null); }),
+        addButton('+ خبر', function () { A.editors.news(null); }),
+        addButton('+ لعبة', function () { A.editors.games(null); }),
+        addButton('+ إشعار', function () { A.editors.notifications(null); })
+      )
+    );
+
+    var events = timelineEvents().filter(function (e) {
+      return e.minutes >= now - 12 * 60 && e.minutes <= now + 60 * 1440;
+    });
+
+    var groups = [];
+    var current = null;
+
+    events.forEach(function (event) {
+      var day = Math.floor(event.minutes / 1440);
+      if (!current || current.day !== day) {
+        current = { day: day, items: [] };
+        groups.push(current);
+      }
+      current.items.push(event);
+    });
+
+    var timeline = A.card('الجدول', 'اللي جاي في الشهرين الجايين، بتوقيت مصر. دوس على أي حاجة تعدلها.',
+      groups.length
+        ? el('div', { class: 'timeline' }, groups.map(function (group) {
+          var label = group.day === today ? 'النهارده' : group.day === today + 1 ? 'بكره' : group.day === today - 1 ? 'امبارح' : A.formatWall(A.wallFromMinutes(group.day * 1440).slice(0, 10), false);
+          return el('section', { class: 'timeline__day' },
+            el('h3', { class: 'timeline__date', text: label }),
+            el('ol', { class: 'timeline__list' }, group.items.map(function (event) {
+              var past = event.minutes < now;
+              var time = A.formatWall(event.at).split(' · ')[1] || '';
+              return el('li', {},
+                el('button', { class: 'timeline__row' + (past ? ' is-past' : ''), type: 'button', onclick: function () { A.editors[event.kind](event.item); } },
+                  el('span', { class: 'timeline__time', text: time }),
+                  el('span', { class: 'timeline__icon', 'aria-hidden': 'true' }, icon(event.icon)),
+                  el('span', { class: 'timeline__label', text: event.label })
+                )
+              );
+            }))
+          );
+        }))
+        : el('p', { class: 'empty', text: 'مفيش حاجة متجدولة. ابدأ بإضافة اجتماع أو خبر.' })
+    );
+
+    return [quick, timeline];
+
+  };
+
+
+  /* =======================================================
+     MEETINGS (weekly rule + dated sessions)
+  ======================================================= */
+
+  A.views.meetings = guard(function () {
+
+    var setting = A.setting;
+    var limits = A.state.meta.limits;
+    var box = A.errorBox();
+
+    var enabled = A.switchInput('إظهار معاد الاجتماع', bool(setting('meeting.enabled')));
+    var title = A.counted('اسم الاجتماع', setting('meeting.title'), limits.title);
+
+    var currentDay = String(setting('meeting.day'));
+    var daySelect = el('select', { class: 'input', onchange: A.markDirty }, A.state.meta.days.map(function (day, index) {
+      var selected = currentDay === day || currentDay === String(index) || (currentDay && day.indexOf(currentDay.replace(/^ال/, '')) !== -1);
+      return el('option', { value: day, selected: selected ? 'selected' : null, text: day });
+    }));
+
+    var time = el('input', { class: 'input', type: 'time', value: setting('meeting.time'), oninput: A.markDirty });
+    var duration = A.textInput(setting('meeting.durationMinutes'), { type: 'number', inputmode: 'numeric', placeholder: 'مثلاً 120' });
+    var note = A.counted('ملاحظة', setting('meeting.note'), limits.note, A.settingHelp('meeting.note'));
+
+    var weekly = A.card('الميعاد الأسبوعي', 'الأساس اللي الموقع بيعد عليه. أي أسبوع مختلف (موضوع، ساعة تانية، إلغاء) ضيفه تحت.',
+      box,
+      el('div', { class: 'form' },
+        enabled.node,
+        title.node,
+        el('div', { class: 'row' }, A.field('اليوم', daySelect), A.field('الساعة', time)),
+        A.field('مدة الاجتماع بالدقايق', duration, 'سيبها فاضية لو مش متأكد — ساعتها الموقع مش هيقول "شغال دلوقتي"'),
+        note.node
+      ),
+      A.settingsSaver(function () {
+        return {
+          'meeting.enabled': enabled.input.checked,
+          'meeting.title': title.input.value,
+          'meeting.day': daySelect.value,
+          'meeting.time': time.value,
+          'meeting.durationMinutes': duration.value,
+          'meeting.note': note.input.value
+        };
+      }, box)
+    );
+
+    var today = A.cairoNow().slice(0, 10);
+    var sessions = (A.state.draft.sessions || []).slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+    var upcoming = sessions.filter(function (s) { return s.date >= today; });
+    var past = sessions.filter(function (s) { return s.date < today; }).reverse();
+
+    var list = function (items) {
+      return el('ul', { class: 'list' }, items.map(sessionItem));
+    };
+
+    var dated = A.card('الاجتماعات الجاية', 'موضوع كل أسبوع، المتكلم، البوستر، أو إلغاء أسبوع.',
+      el('div', { class: 'actions' }, addButton('+ اجتماع', function () { A.editors.sessions(null); })),
+      upcoming.length ? list(upcoming) : el('p', { class: 'empty', text: 'مفيش اجتماعات متسجلة لسه — الموقع هيعرض الميعاد الأسبوعي بس.' }),
+      past.length ? el('details', { class: 'past' }, el('summary', { text: 'اجتماعات فاتت (' + past.length + ')' }), list(past)) : null
+    );
+
+    return [weekly, dated];
+
+  });
+
+  function sessionItem(session) {
+
+    var enabled = bool(session.enabled);
+    var cancelled = session.status === 'cancelled';
+    var chips = [];
+
+    if (cancelled) chips.push(A.chip('ملغي', 'danger'));
+    if (session.time) chips.push(A.chip('الساعة ' + session.time));
+    if (session.speaker) chips.push(A.chip(session.speaker));
+    if (session.visibleFrom && A.wallMinutes(session.visibleFrom) > nowMinutes()) chips.push(A.chip('الموضوع يظهر ' + A.formatWall(session.visibleFrom), 'gold'));
+    if (hasNotification('notif-session-' + session.date)) chips.push(A.chip('🔔 في الجرس'));
+    if (!enabled) chips.push(A.chip('مخفي', 'off'));
+
+    var toggle = A.toggleItem('sessions', session.date, enabled);
+
+    return A.listItem({
+      icon: cancelled ? 'alert' : 'church',
+      image: session.image,
+      title: A.formatWall(session.date, false) + (session.topic ? ' — ' + session.topic : ''),
+      off: !enabled,
+      chips: chips,
+      controls: [
+        toggle.node,
+        el('span', { class: 'spacer' }),
+        A.editButton('الاجتماع', function () { A.editors.sessions(session); }),
+        A.deleteButton('الاجتماع', function (e) { A.deleteItem('sessions', session.date, 'اجتماع ' + session.date, e.currentTarget); })
+      ]
+    });
+
+  }
+
+  A.editors.sessions = function (session) {
+
+    var isNew = !session;
+    session = session || { enabled: true, status: 'normal', date: A.nextWeekday(dayIndex(), '20:00').slice(0, 10) };
+
+    var box = A.errorBox();
+    var limits = hubLimits();
+
+    var date = A.dateTimeInput(session.date, { dateOnly: true, clearable: false, presets: [
+      { label: 'الأحد الجاي', value: function () { return A.nextWeekday(dayIndex(), '20:00').slice(0, 10); } }
+    ] });
+
+    var time = el('input', { class: 'input', type: 'time', value: session.time || '', oninput: A.markDirty });
+    var topic = A.counted('الموضوع', session.topic, limits.topic, 'مثلاً: حياة التسليم');
+    var speaker = A.counted('الخادم / المتكلم', session.speaker, limits.speaker, 'مثلاً: أبونا أنطوني عياد');
+    var description = A.counted('وصف', session.description, limits.sessionDescription, 'اختياري', { multiline: true });
+    var image = A.imagePicker(session.image, { label: 'بوستر الاجتماع' });
+    var note = A.counted('ملاحظة', session.note, A.state.meta.limits.note, 'مثلاً سبب الإلغاء، أو "الاجتماع في القاعة الكبيرة"');
+
+    var status = A.choices('status', [
+      { value: 'normal', label: 'عادي' },
+      { value: 'cancelled', label: 'ملغي الأسبوع ده' }
+    ], session.status === 'cancelled' ? 'cancelled' : 'normal', sync);
+
+    var visibleFrom = A.dateTimeInput(session.visibleFrom, {
+      emptyText: 'الموضوع يظهر على طول',
+      presets: [A.PRESETS.now, A.PRESETS.thursday8, A.PRESETS.friday]
+    });
+
+    var notify = A.checkbox('اعمل إشعار بالموضوع في الجرس', isNew ? true : hasNotification('notif-session-' + session.date), 'بيظهر للناس لما الموضوع يظهر');
+    var enabled = A.switchInput('ظاهر', session.enabled === undefined ? true : bool(session.enabled));
+
+    var details = el('div', { class: 'form' },
+      topic.node,
+      speaker.node,
+      description.node,
+      image.node,
+      A.field('الموضوع يظهر في الموقع من', visibleFrom.node, 'سيبه فاضي لو عايز يظهر أول ما تنشر'),
+      notify.node
+    );
+
+    function sync(value) {
+      details.hidden = (value || status.value()) === 'cancelled';
+    }
+
+    sync();
+
+    var save = saveButton(isNew);
+
+    save.addEventListener('click', function () {
+      A.saveItem('sessions', {
+        originalDate: isNew ? '' : session.date,
+        date: date.value(),
+        time: time.value,
+        topic: topic.input.value,
+        speaker: speaker.input.value,
+        description: description.input.value,
+        image: image.value(),
+        status: status.value(),
+        note: note.input.value,
+        visibleFrom: visibleFrom.value(),
+        enabled: enabled.input.checked,
+        notify: { topic: notify.input.checked }
+      }, box, save);
+    });
+
+    A.dirty = false;
+
+    A.openSheet(isNew ? 'اجتماع جديد' : 'تعديل الاجتماع', [
+      box,
+      el('div', { class: 'form' },
+        A.field('التاريخ', date.node),
+        A.field('الساعة', time, 'سيبها فاضية لو نفس الميعاد المعتاد (' + (A.setting('meeting.time') || '—') + ')'),
+        A.field('الحالة', status.node),
+        details,
+        note.node,
+        enabled.node
+      )
+    ], A.sheetFooter(save));
+
+  };
+
+  function dayIndex() {
+
+    var day = String(A.setting('meeting.day'));
+    var index = A.state.meta.days.indexOf(day);
+    return index === -1 ? 0 : index;
+
+  }
+
+
+  /* =======================================================
+     NEWS
+  ======================================================= */
+
+  A.views.news = guard(function () {
+
+    var news = (A.state.draft.news || []).slice().sort(function (a, b) { return (b.publishAt || '') < (a.publishAt || '') ? -1 : 1; });
+
+    return [A.card('جديد الأسرة', 'الأخبار والبوسترات والإعلانات. "مثبت" بيظهر كشريط فوق في الصفحة بدل الإعلان القديم.',
+      el('div', { class: 'actions' }, addButton('+ خبر', function () { A.editors.news(null); })),
+      news.length
+        ? el('ul', { class: 'list' }, news.map(function (item) {
+          var enabled = bool(item.enabled);
+          var chips = windowChips(item.publishAt, item.expireAt, { scheduled: 'يتنشر' });
+          if (bool(item.pinned)) chips.unshift(A.chip('مثبت · ' + TONE_LABELS[item.tone || 'info'], 'gold'));
+          if (bool(item.featured)) chips.unshift(A.chip('مميز', 'gold'));
+          if (item.badge) chips.push(A.chip(item.badge));
+          if (hasNotification('notif-' + item.id)) chips.push(A.chip('🔔 في الجرس'));
+          if (!enabled) chips.push(A.chip('مخفي', 'off'));
+          return A.listItem({
+            icon: 'megaphone',
+            image: item.image,
+            title: item.title,
+            sub: item.summary,
+            off: !enabled,
+            chips: chips,
+            controls: [
+              A.toggleItem('news', item.id, enabled).node,
+              el('span', { class: 'spacer' }),
+              A.editButton(item.title, function () { A.editors.news(item); }),
+              A.deleteButton(item.title, function (e) { A.deleteItem('news', item.id, item.title, e.currentTarget); })
+            ]
+          });
+        }))
+        : el('p', { class: 'empty', text: 'مفيش أخبار لسه' })
+    )];
+
+  });
+
+  A.editors.news = function (item) {
+
+    var isNew = !item;
+    item = item || { enabled: true, tone: 'info' };
+
+    var box = A.errorBox();
+    var limits = hubLimits();
+    var base = A.state.meta.limits;
+
+    var title = A.counted('العنوان', item.title, limits.newsTitle, null, { required: true });
+    var summary = A.counted('سطر قصير', item.summary, limits.summary, 'بيظهر على الكارت');
+    var body = A.counted('التفاصيل', item.body, limits.body, 'اختياري — بتظهر لما حد يفتح الخبر', { multiline: true, rows: 6 });
+    var image = A.imagePicker(item.image, { label: 'البوستر' });
+    var linkUrl = A.textInput(item.linkUrl, { ltr: true, type: 'url', placeholder: 'https://', inputmode: 'url' });
+    var linkLabel = A.counted('نص الزرار', item.linkLabel, base.linkLabel, 'مثلاً: سجّل هنا');
+
+    var badge = A.textInput(item.badge, { max: base.badge, placeholder: 'مثلاً: جديد' });
+    var badgeField = A.field('شارة', el('div', { class: 'actions' },
+      badge,
+      el('button', { class: 'btn', type: 'button', onclick: function () { badge.value = 'جديد'; A.markDirty(); } }, 'جديد'),
+      el('button', { class: 'btn', type: 'button', onclick: function () { badge.value = 'مهم'; A.markDirty(); } }, 'مهم'),
+      el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { badge.value = ''; A.markDirty(); } }, 'من غير')
+    ));
+
+    var publishAt = A.dateTimeInput(item.publishAt, {
+      emptyText: 'هيتنشر أول ما تدوس نشر',
+      presets: [A.PRESETS.now, A.PRESETS.thursday8, A.PRESETS.friday]
+    });
+
+    var expireAt = A.dateTimeInput(item.expireAt, { emptyText: 'مش هيختفي لوحده', presets: [A.PRESETS.sunday10] });
+
+    var tone = A.choices('tone', ['info', 'alert', 'celebrate'].map(function (t) { return { value: t, label: TONE_LABELS[t] }; }), item.tone || 'info');
+    var toneField = A.field('شكل الشريط', tone.node);
+
+    var featured = A.switchInput('مميز (كارت كبير أول القائمة)', bool(item.featured));
+    var pinned = A.switchInput('مثبت كشريط فوق في الصفحة', bool(item.pinned), function (on) { toneField.hidden = !on; });
+    toneField.hidden = !bool(item.pinned);
+
+    var notify = A.checkbox('ابعت إشعار في الجرس', isNew ? true : hasNotification('notif-' + item.id), 'بيظهر في نفس ميعاد نشر الخبر');
+    var enabled = A.switchInput('ظاهر', item.enabled === undefined ? true : bool(item.enabled));
+
+    var save = saveButton(isNew);
+
+    save.addEventListener('click', function () {
+      A.saveItem('news', {
+        id: item.id || '',
+        title: title.input.value,
+        summary: summary.input.value,
+        body: body.input.value,
+        image: image.value(),
+        linkUrl: linkUrl.value.trim(),
+        linkLabel: linkLabel.input.value,
+        badge: badge.value,
+        publishAt: publishAt.value(),
+        expireAt: expireAt.value(),
+        featured: featured.input.checked,
+        pinned: pinned.input.checked,
+        tone: tone.value(),
+        enabled: enabled.input.checked,
+        notify: { publish: notify.input.checked }
+      }, box, save);
+    });
+
+    A.dirty = false;
+
+    A.openSheet(isNew ? 'خبر جديد' : 'تعديل: ' + item.title, [
+      box,
+      el('div', { class: 'form' },
+        title.node,
+        summary.node,
+        image.node,
+        body.node,
+        A.field('لينك', linkUrl, 'اختياري — تسجيل، صور، تفاصيل…'),
+        linkLabel.node,
+        badgeField,
+        A.field('يتنشر', publishAt.node),
+        A.field('يختفي', expireAt.node),
+        featured.node,
+        pinned.node,
+        toneField,
+        notify.node,
+        enabled.node
+      )
+    ], A.sheetFooter(save));
+
+  };
+
+
+  /* =======================================================
+     GAMES
+  ======================================================= */
+
+  function gameStateLabel(game) {
+
+    var now = nowMinutes();
+    var visible = game.visibleFrom ? A.wallMinutes(game.visibleFrom) : null;
+    var start = A.wallMinutes(game.startAt);
+    var end = A.wallMinutes(game.endAt, true);
+
+    if (visible !== null && now < visible) return A.chip('مستخبية لحد ' + A.formatWall(game.visibleFrom), 'off');
+    if (start !== null && now < start) return A.chip('قريبًا — تبدأ ' + A.formatWall(game.startAt), 'gold');
+    if (end !== null && now < end) return A.chip('🔥 شغالة دلوقتي', 'ok');
+    return A.chip('انتهت', 'off');
+
+  }
+
+  A.views.games = guard(function () {
+
+    var games = (A.state.draft.games || []).slice().sort(function (a, b) { return (a.startAt || '') < (b.startAt || '') ? 1 : -1; });
+
+    return [A.card('تحديات وألعاب', 'زرار اللعبة بيتفتح لوحده في ميعاد البداية بتوقيت مصر.',
+      el('div', { class: 'actions' }, addButton('+ لعبة', function () { A.editors.games(null); })),
+      games.length
+        ? el('ul', { class: 'list' }, games.map(function (game) {
+          var enabled = bool(game.enabled);
+          var chips = [gameStateLabel(game), A.chip(A.formatWall(game.startAt) + ' ← ' + (A.formatWall(game.endAt).split(' · ')[1] || ''))];
+          var linked = ['soon', 'start'].filter(function (k) { return hasNotification('notif-' + game.id + '-' + k); }).length;
+          if (linked) chips.push(A.chip('🔔 ' + linked));
+          if (!enabled) chips.push(A.chip('مخفية', 'off'));
+          return A.listItem({
+            icon: 'star',
+            image: game.image,
+            title: game.title,
+            sub: A.shortUrl(game.url),
+            off: !enabled,
+            chips: chips,
+            controls: [
+              A.toggleItem('games', game.id, enabled).node,
+              el('span', { class: 'spacer' }),
+              A.editButton(game.title, function () { A.editors.games(game); }),
+              A.deleteButton(game.title, function (e) { A.deleteItem('games', game.id, game.title, e.currentTarget); })
+            ]
+          });
+        }))
+        : el('p', { class: 'empty', text: 'مفيش ألعاب لسه' })
+    )];
+
+  });
+
+  A.editors.games = function (game) {
+
+    var isNew = !game;
+    game = game || { enabled: true, afterEnd: 'show' };
+
+    var box = A.errorBox();
+    var limits = hubLimits();
+
+    var title = A.counted('اسم اللعبة', game.title, limits.gameTitle, 'مثلاً: رحلة الاستكشاف في الكنيسة', { required: true });
+    var description = A.counted('وصف قصير', game.description, limits.gameDescription, 'اختياري', { multiline: true, rows: 3 });
+    var image = A.imagePicker(game.image, { label: 'بوستر اللعبة' });
+    var url = A.textInput(game.url, { ltr: true, type: 'url', placeholder: 'https://', inputmode: 'url', required: true });
+    var buttonLabel = A.counted('نص الزرار', game.buttonLabel, limits.buttonLabel, 'افتراضي: ابدأ اللعب');
+
+    var start = A.dateTimeInput(game.startAt, { clearable: false, presets: [A.PRESETS.sunday10, A.PRESETS.now] });
+
+    var end = A.dateTimeInput(game.endAt, { clearable: false, presets: [
+      { label: 'بعد البداية بساعة', value: function () { return after(60); } },
+      { label: 'بعد البداية بساعة ونص', value: function () { return after(90); } }
+    ] });
+
+    function after(minutes) {
+      var base = A.wallMinutes(start.value());
+      return base === null ? '' : A.wallFromMinutes(base + minutes);
+    }
+
+    var visibleFrom = A.dateTimeInput(game.visibleFrom, {
+      emptyText: 'تظهر "قريبًا" أول ما تنشر',
+      presets: [A.PRESETS.sunday9, A.PRESETS.now]
+    });
+
+    var afterEnd = A.choices('afterEnd', [
+      { value: 'show', label: 'تفضل ظاهرة "انتهت" شوية' },
+      { value: 'hide', label: 'تختفي على طول' }
+    ], game.afterEnd === 'hide' ? 'hide' : 'show');
+
+    var soon = A.checkbox('تنبيه قبل البداية بـ ١٥ دقيقة', isNew ? true : hasNotification('notif-' + game.id + '-soon'), '"استعدوا 👀 تحدي جديد هيبدأ بعد ١٥ دقيقة"');
+    var atStart = A.checkbox('تنبيه عند البداية', isNew ? true : hasNotification('notif-' + game.id + '-start'), '"🔥 اللعبة جاهزة! ادخل دلوقتي"');
+    var enabled = A.switchInput('ظاهرة', game.enabled === undefined ? true : bool(game.enabled));
+
+    var save = saveButton(isNew);
+
+    save.addEventListener('click', function () {
+      A.saveItem('games', {
+        id: game.id || '',
+        title: title.input.value,
+        description: description.input.value,
+        image: image.value(),
+        url: url.value.trim(),
+        buttonLabel: buttonLabel.input.value,
+        visibleFrom: visibleFrom.value(),
+        startAt: start.value(),
+        endAt: end.value(),
+        afterEnd: afterEnd.value(),
+        enabled: enabled.input.checked,
+        notify: { soon: soon.input.checked, start: atStart.input.checked }
+      }, box, save);
+    });
+
+    A.dirty = false;
+
+    A.openSheet(isNew ? 'لعبة جديدة' : 'تعديل: ' + game.title, [
+      box,
+      el('div', { class: 'form' },
+        title.node,
+        description.node,
+        image.node,
+        A.field('لينك اللعبة', url, 'الزرار بيتفعل في ميعاد البداية. اللينك نفسه بيبقى في ملف الموقع من وقت النشر، فلو اللعبة لازم تتقفل فعلاً خليها تتأكد من الوقت بنفسها.'),
+        buttonLabel.node,
+        A.field('تظهر "قريبًا" من', visibleFrom.node),
+        A.field('تبدأ', start.node),
+        A.field('تخلص', end.node),
+        A.field('بعد ما تخلص', afterEnd.node),
+        soon.node,
+        atStart.node,
+        enabled.node
+      )
+    ], A.sheetFooter(save));
+
+  };
+
+
+  /* =======================================================
+     NOTIFICATIONS
+  ======================================================= */
+
+  function targetLabel(target) {
+
+    if (!target) return 'من غير لينك';
+    if (target === 'meeting') return 'بيفتح: الاجتماع';
+
+    var match = /^(news|game):(.+)$/.exec(target);
+
+    if (match) {
+      var list = match[1] === 'news' ? A.state.draft.news : A.state.draft.games;
+      var found = (list || []).filter(function (x) { return x.id === match[2]; })[0];
+      return 'بيفتح: ' + (match[1] === 'news' ? 'خبر ' : 'لعبة ') + (found ? found.title : '(مش موجودة)');
+    }
+
+    return 'بيفتح: ' + A.shortUrl(target);
+
+  }
+
+  A.views.notifications = guard(function () {
+
+    var items = (A.state.draft.notifications || []).slice().sort(function (a, b) { return (b.publishAt || '') < (a.publishAt || '') ? -1 : 1; });
+    var days = A.state.meta.historyDays;
+
+    return [A.card('الإشعارات', 'بتظهر في جرس الموقع 🔔 في معادها، وبتفضل في السجل ' + days + ' يوم (إلا لو حددت غير كده). إشعارات الموبايل نفسها جاية في المرحلة الجاية.',
+      el('div', { class: 'actions' }, addButton('+ إشعار', function () { A.editors.notifications(null); })),
+      items.length
+        ? el('ul', { class: 'list' }, items.map(function (item) {
+          var enabled = bool(item.enabled);
+          var until = item.expireAt || (item.publishAt ? A.wallFromMinutes(A.wallMinutes(item.publishAt) + days * 1440) : '');
+          var chips = [A.chip(TYPE_LABELS[item.type] || 'عام', item.type === 'important' ? 'danger' : 'gold')]
+            .concat(windowChips(item.publishAt, until, { scheduled: 'يظهر', live: 'في الجرس دلوقتي' }));
+          if (/^notif-(game|news|session)-/.test(item.id) || /^notif-news-/.test(item.id)) chips.push(A.chip('مرتبط'));
+          if (!enabled) chips.push(A.chip('مخفي', 'off'));
+          return A.listItem({
+            icon: TYPE_ICONS[item.type] || 'info',
+            image: item.image,
+            title: item.title,
+            sub: (item.message ? item.message + ' — ' : '') + targetLabel(item.target),
+            off: !enabled,
+            chips: chips,
+            controls: [
+              A.toggleItem('notifications', item.id, enabled).node,
+              el('span', { class: 'spacer' }),
+              A.editButton(item.title, function () { A.editors.notifications(item); }),
+              A.deleteButton(item.title, function (e) { A.deleteItem('notifications', item.id, item.title, e.currentTarget); })
+            ]
+          });
+        }))
+        : el('p', { class: 'empty', text: 'مفيش إشعارات لسه' })
+    )];
+
+  });
+
+  A.editors.notifications = function (item) {
+
+    var isNew = !item;
+    item = item || { enabled: true, type: 'general', target: '' };
+
+    var box = A.errorBox();
+    var limits = hubLimits();
+
+    var title = A.counted('العنوان', item.title, limits.notificationTitle, 'مثلاً: موضوع اجتماع الأحد الجاي', { required: true });
+    var message = A.counted('الرسالة', item.message, limits.notificationMessage, 'سطر قصير', { multiline: true, rows: 2 });
+
+    var type = A.choices('type', A.state.meta.notificationTypes.map(function (t) {
+      return { value: t, label: TYPE_LABELS[t], icon: TYPE_ICONS[t] };
+    }), item.type || 'general');
+
+    /* what tapping it opens */
+    var current = item.target || '';
+    var options = [{ value: '', label: 'ولا حاجة' }, { value: 'meeting', label: 'الاجتماع' }]
+      .concat((A.state.draft.news || []).map(function (n) { return { value: 'news:' + n.id, label: 'خبر: ' + n.title }; }))
+      .concat((A.state.draft.games || []).map(function (g) { return { value: 'game:' + g.id, label: 'لعبة: ' + g.title }; }))
+      .concat([{ value: 'url', label: 'لينك…' }]);
+
+    var isUrl = current && !/^(meeting|news:|game:)/.test(current);
+    var targetSelect = el('select', { class: 'input', onchange: function () { A.markDirty(); urlField.hidden = targetSelect.value !== 'url'; } }, options.map(function (o) {
+      var selected = isUrl ? o.value === 'url' : o.value === current;
+      return el('option', { value: o.value, selected: selected ? 'selected' : null, text: o.label });
+    }));
+    var urlInput = A.textInput(isUrl ? current : '', { ltr: true, type: 'url', placeholder: 'https://' });
+    var urlField = A.field('اللينك', urlInput);
+    urlField.hidden = !isUrl;
+
+    var image = A.imagePicker(item.image, { label: 'صورة (اختياري)' });
+
+    var publishAt = A.dateTimeInput(item.publishAt, { emptyText: 'يظهر أول ما تنشر', presets: [A.PRESETS.now, A.PRESETS.thursday8, A.PRESETS.sunday10] });
+    var expireAt = A.dateTimeInput(item.expireAt, { emptyText: 'يفضل ' + A.state.meta.historyDays + ' يوم' });
+    var enabled = A.switchInput('ظاهر', item.enabled === undefined ? true : bool(item.enabled));
+
+    var save = saveButton(isNew);
+
+    save.addEventListener('click', function () {
+      A.saveItem('notifications', {
+        id: item.id || '',
+        title: title.input.value,
+        message: message.input.value,
+        type: type.value(),
+        target: targetSelect.value === 'url' ? urlInput.value.trim() : targetSelect.value,
+        image: image.value(),
+        publishAt: publishAt.value(),
+        expireAt: expireAt.value(),
+        enabled: enabled.input.checked
+      }, box, save);
+    });
+
+    A.dirty = false;
+
+    A.openSheet(isNew ? 'إشعار جديد' : 'تعديل: ' + item.title, [
+      box,
+      el('div', { class: 'form' },
+        title.node,
+        message.node,
+        A.field('النوع', type.node),
+        A.field('لما حد يدوس عليه يفتح', targetSelect),
+        urlField,
+        image.node,
+        A.field('يظهر في الجرس', publishAt.node),
+        A.field('يختفي من الجرس', expireAt.node),
+        enabled.node
+      )
+    ], A.sheetFooter(save));
+
+  };
+
+})();
+</script>

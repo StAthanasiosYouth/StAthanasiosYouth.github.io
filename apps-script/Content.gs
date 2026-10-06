@@ -10,7 +10,8 @@
  * The public site re-checks URLs on render as a second line of defence.
  */
 
-var CONTENT_SCHEMA_VERSION = 1;
+/* 2 = adds sessions, news, games, notifications (additive: schema-1 readers ignore them) */
+var CONTENT_SCHEMA_VERSION = 2;
 
 var CONTENT_TIMEZONE = 'Africa/Cairo';
 
@@ -777,6 +778,21 @@ function buildPublicContent(draft, options) {
   });
 
 
+  /* ---------- hub: sessions, news, games, notifications (Hub.gs) ---------- */
+
+  var hub = buildHub_(draft, { now: now, error: error, warn: warn, limited: limited, setting: setting });
+
+  // a cancelled session is a skipped date for the countdown and calendar
+  if (meeting) {
+    hub.cancelledDates.forEach(function (date) {
+      if (meeting.skipDates.indexOf(date) === -1) {
+        meeting.skipDates.push(date);
+      }
+    });
+    meeting.skipDates.sort();
+  }
+
+
   /* ---------- assemble ---------- */
 
   var content = {
@@ -787,10 +803,15 @@ function buildPublicContent(draft, options) {
     site: site,
     meeting: meeting,
     location: location,
+    // legacy banner; new banners are pinned news items
     announcement: announcement,
     featured: featured,
     sections: sections,
-    contacts: contacts
+    contacts: contacts,
+    sessions: hub.sessions,
+    news: hub.news,
+    games: hub.games,
+    notifications: hub.notifications
   };
 
   if (options.hash) {
@@ -804,7 +825,9 @@ function buildPublicContent(draft, options) {
   return {
     content: content,
     errors: errors,
-    warnings: warnings
+    warnings: warnings,
+    // Media ids the published content shows (their files go in the commit)
+    media: hub.usedMedia
   };
 
 }
@@ -1091,6 +1114,8 @@ function summarizeChanges(previous, next) {
       }
     }
   });
+
+  summarizeHubChanges_(previous, next, lines);
 
   var order = function (list) { return list.map(function (c) { return c.id; }); };
 

@@ -110,18 +110,32 @@ function apiStateFor_(email, built) {
       }),
       sections: draft.sections.map(clean),
       links: draft.links.map(clean),
-      contacts: draft.contacts.map(clean)
+      contacts: draft.contacts.map(clean),
+      sessions: draft.sessions.map(clean),
+      news: draft.news.map(clean),
+      games: draft.games.map(clean),
+      notifications: draft.notifications.map(clean),
+      // Drive ids stay on the server
+      media: draft.media.map(function (row) {
+        return { id: row.id, path: row.path, thumb: row.thumb, width: row.width, height: row.height, alt: row.alt, publishedAt: row.publishedAt };
+      })
     },
     status: publishStatus_(built),
     config: publicConfig_(),
+    // the tabs added by the content center exist (setup() was re-run)
+    hubReady: OPTIONAL_TABLES.every(function (name) { return !!spreadsheet_().getSheetByName(name); }),
+    now: cairoNow_(),
     meta: {
       icons: ICON_NAMES,
       styles: LINK_STYLES,
       kinds: CONTACT_KINDS,
       methods: CONTACT_METHODS,
       tones: ANNOUNCEMENT_TONES,
+      notificationTypes: NOTIFICATION_TYPES,
       days: ADMIN_META.days,
-      limits: LIMITS
+      limits: LIMITS,
+      hubLimits: HUB_LIMITS,
+      historyDays: Number(draft.settings['notifications.historyDays']) || 14
     }
   };
 
@@ -623,6 +637,18 @@ function apiSaveSettings(values) {
         var bad = dates.filter(function (d) { return contentDateTime_(d, false) === null || /[ T]/.test(d); });
         if (bad.length) problems.push('تواريخ الإلغاء مش مفهومة: ' + bad.join('، '));
         else clean[key] = dates.join(', ');
+        return;
+      }
+
+      case 'notifications.historyDays':
+      case 'games.endedHours': {
+        var count = contentNumber_(value);
+        var max = key === 'games.endedHours' ? 72 : 90;
+        var min = key === 'games.endedHours' ? 0 : 1;
+        if (count === null || isNaN(count) || count < min || count > max || Math.round(count) !== count) {
+          problems.push((key === 'games.endedHours' ? 'عدد الساعات' : 'عدد الأيام') + ' لازم يكون رقم صحيح بين ' + min + ' و ' + max);
+        }
+        else clean[key] = String(count);
         return;
       }
 

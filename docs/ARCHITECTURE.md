@@ -137,7 +137,94 @@ shift them (tested).
 | Concurrency                 | Script lock around every write and publish; fast-forward-only ref updates with one rebuild-and-retry. |
 | Maps helper                 | Fetches only exact Google Maps hosts (no open fetch).                            |
 
+## Content center (schema 2)
+
+Meetings with topics, news with posters, games, and the in-site bell. All
+of it is still static: the browser decides what to show from Cairo time, so
+scheduled things appear, open and expire on time without anyone publishing
+at that minute.
+
+### More files
+
+| Path                        | Runs on            | What                                                   |
+| --------------------------- | ------------------ | ------------------------------------------------------ |
+| `apps-script/Hub.gs`        | Apps Script + Node | Builds `sessions`, `news`, `games`, `notifications`; media index; Cairo wall-clock arithmetic (pure) |
+| `apps-script/Items.gs`      | Apps Script        | One save / delete / toggle API for the four content types; "linked notification" checkboxes |
+| `apps-script/Media.gs`      | Apps Script        | Poster upload checks, Drive staging (`drive.file`), files for the publish commit |
+| `apps-script/AdminPage.html`, `AdminContent.html` | Apps Script | Admin views: page (links, location, contacts, settings) and content center (timeline, meetings, news, games, notifications) |
+| `assets/js/hub.js`          | browser            | News, games, pinned banner, meeting topic, detail sheets |
+| `assets/js/bell.js`, `inbox.js` | browser        | The bell, history panel, per-browser read state         |
+| `assets/js/sheet.js`, `router.js` | browser      | App-like sheets; deep links `#notifications`, `#news/<id>`, `#game/<id>`, `#meeting` |
+| `assets/js/motion.js`, `sound.js` | browser      | Springs, swaps, particles; optional synthesized sounds    |
+| `tools/demo.mjs`            | dev machine        | Demo content built through the real admin code           |
+
+### Sheet tabs
+
+| Tab             | Columns                                                         |
+| --------------- | --------------------------------------------------------------- |
+| `Sessions`      | `date` (key), `enabled`, `time` (override), `topic`, `speaker`, `description`, `image`, `status` (`normal`/`cancelled`), `note`, `visibleFrom`, `updatedAt` |
+| `News`          | `id`, `enabled`, `featured`, `pinned`, `tone`, `title`, `summary`, `body`, `image`, `linkUrl`, `linkLabel`, `badge`, `publishAt`, `expireAt`, `updatedAt` |
+| `Games`         | `id`, `enabled`, `title`, `description`, `image`, `url`, `buttonLabel`, `visibleFrom`, `startAt`, `endAt`, `afterEnd` (`show`/`hide`), `updatedAt` |
+| `Notifications` | `id`, `enabled`, `type` (`general`/`meeting`/`news`/`game`/`important`), `title`, `message`, `target` (`meeting`, `news:<id>`, `game:<id>` or an https link), `image`, `publishAt`, `expireAt`, `updatedAt` |
+| `Media`         | `id`, `path`, `thumb`, `width`, `height`, `alt`, `mime`, `driveId`, `thumbDriveId`, `uploadedAt`, `publishedAt` |
+
+The `image` columns hold a Media id (`img-xxxxxxxx`). Linked notifications
+have predictable ids (`notif-<gameId>-soon`, `notif-<gameId>-start`,
+`notif-<newsId>`, `notif-session-<date>`), so the editors know whether their
+checkbox is on, and editing an item moves its notification's times while
+keeping the admin's own wording.
+
+### content.json additions
+
+```jsonc
+{
+  "schema": 2,                       // additive: schema-1 readers ignore the new keys
+  "sessions": [{ "date", "time", "topic", "speaker", "description", "image", "status", "note", "visibleFrom" }],
+  "news": [{ "id", "title", "summary", "body", "image", "link", "badge", "featured", "pinned", "tone", "publishAt", "expireAt" }],
+  "games": [{ "id", "title", "description", "image", "url", "buttonLabel", "visibleFrom", "startAt", "endAt", "afterEnd", "endedUntil" }],
+  "notifications": [{ "id", "type", "title", "message", "target": { "kind": "meeting|news|game|url", "id"?, "url"? }, "image", "publishAt", "expireAt" }]
+}
+// image = { "src": "media/2026/img-ab12cd34.webp", "thumb": "…-480.webp", "w", "h", "alt" }
+```
+
+At publish: expired items are dropped, notifications without `expireAt`
+last `notifications.historyDays` (14), ended games stay visible for
+`games.endedHours` (12) when `afterEnd` is `show`, and cancelled sessions
+are added to `meeting.skipDates` (countdown and calendar file).
+
+### Posters
+
+1. The admin page resizes the photo in the browser: WebP at most 1600px
+   (JPEG on Safari, which can't encode WebP) plus a 480px thumbnail.
+2. `apiUploadMedia` checks the type, size and the file's first bytes, then
+   stores both in a Drive folder the script created. The `drive.file` scope
+   means it can't see anything else in the admin's Drive. It uses the Drive
+   REST API because the built-in DriveApp needs full Drive access.
+3. Publishing adds the images the published content uses (and only those)
+   to the same commit as `content.json`, under `media/YYYY/`. Drafts never
+   reach the public repository. Images are served by GitHub Pages from the
+   same site, so the security policy is unchanged.
+
+### Time
+
+- Everything is a Cairo wall-clock string (`YYYY-MM-DD HH:MM` in the Sheet,
+  `YYYY-MM-DDTHH:MM` in `content.json`) compared as text. No UTC, no
+  visitor time zone.
+- The visitor's clock can be wrong: `content.js` reads the `Date` header
+  GitHub Pages sends with `content.json` and corrects for it (tested with a
+  clock 5 hours off).
+- The page ticks every 15 seconds: countdowns update in place; when
+  something appears, opens or expires, the page re-renders.
+- Game "locks" are a convenience: the game URL is in `content.json` from
+  publish time. A game that must really stay closed should check the time
+  itself.
+
 ## Ready for later (not built yet)
+
+- **Push notifications (Phase B):** light PWA (manifest + service worker),
+  Firebase Cloud Messaging, an anonymous append-only "push relay" Apps
+  Script, a 5-minute timer that sends due bell items to subscribed devices.
+  The bell items already carry everything a push needs.
 
 - **Click analytics:** a `navigator.sendBeacon` to a separate anonymous
   Apps Script endpoint appending to a `Clicks` tab. Links already have

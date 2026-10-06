@@ -10,11 +10,17 @@
  */
 
 import { LINK_ICON_NAMES } from './icons.js';
+import { setServerTime } from './schedule.js';
 
 const CACHE_KEY = 'athanasios.content.v1';
 
 const DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/* images are always this site's own published files */
+const MEDIA_PATH = /^media\/\d{4}\/img-[a-z0-9]{8}(-480)?\.(webp|jpg)$/;
+
+const NOTIFICATION_TYPES = ['general', 'meeting', 'news', 'game', 'important'];
 
 
 /* ---------- primitives ---------- */
@@ -107,6 +113,113 @@ function cleanLink(raw) {
     startAt: dateTime(raw.startAt),
     endAt: dateTime(raw.endAt)
   };
+
+}
+
+
+function cleanImage(raw) {
+
+  if (!raw || typeof raw !== 'object' || !MEDIA_PATH.test(raw.src || '')) {
+    return null;
+  }
+
+  const w = number(raw.w, 1, 10000);
+  const h = number(raw.h, 1, 10000);
+
+  if (w === null || h === null) {
+    return null;
+  }
+
+  return {
+    src: raw.src,
+    thumb: MEDIA_PATH.test(raw.thumb || '') ? raw.thumb : raw.src,
+    w: Math.round(w),
+    h: Math.round(h),
+    alt: text(raw.alt, 140)
+  };
+
+}
+
+
+const list = value => (Array.isArray(value) ? value.filter(item => item && typeof item === 'object') : []);
+
+const cleanId = value => (typeof value === 'string' && /^[\w-]{1,60}$/.test(value) ? value : '');
+
+
+/* sessions, news, games, notifications (schema 2; empty for schema 1) */
+function cleanHub(raw) {
+
+  const sessions = list(raw.sessions)
+    .filter(s => DATE.test(s.date || ''))
+    .map(s => ({
+      date: s.date,
+      time: /^\d{2}:\d{2}$/.test(s.time || '') ? s.time : '',
+      topic: text(s.topic, 80),
+      speaker: text(s.speaker, 60),
+      description: text(s.description, 600),
+      image: cleanImage(s.image),
+      status: s.status === 'cancelled' ? 'cancelled' : 'normal',
+      note: text(s.note, 200),
+      visibleFrom: dateTime(s.visibleFrom)
+    }));
+
+  const news = list(raw.news)
+    .map(n => {
+      const link = n.link && safeHttps(n.link.url);
+      return {
+        id: cleanId(n.id),
+        title: text(n.title, 80),
+        summary: text(n.summary, 200),
+        body: text(n.body, 1500),
+        image: cleanImage(n.image),
+        link: link ? { url: link, label: text(n.link.label, 30) || 'التفاصيل' } : null,
+        badge: text(n.badge, 16),
+        featured: n.featured === true,
+        pinned: n.pinned === true,
+        tone: ['info', 'alert', 'celebrate'].includes(n.tone) ? n.tone : 'info',
+        publishAt: dateTime(n.publishAt),
+        expireAt: dateTime(n.expireAt)
+      };
+    })
+    .filter(n => n.id && n.title);
+
+  const games = list(raw.games)
+    .map(g => ({
+      id: cleanId(g.id),
+      title: text(g.title, 60),
+      description: text(g.description, 300),
+      image: cleanImage(g.image),
+      url: safeHttps(g.url),
+      buttonLabel: text(g.buttonLabel, 24),
+      visibleFrom: dateTime(g.visibleFrom),
+      startAt: dateTime(g.startAt),
+      endAt: dateTime(g.endAt),
+      afterEnd: g.afterEnd === 'hide' ? 'hide' : 'show',
+      endedUntil: dateTime(g.endedUntil)
+    }))
+    .filter(g => g.id && g.title && g.url && g.startAt && g.endAt);
+
+  const notifications = list(raw.notifications)
+    .map(n => {
+      const t = n.target;
+      let target = null;
+      if (t && t.kind === 'meeting') target = { kind: 'meeting' };
+      else if (t && (t.kind === 'news' || t.kind === 'game') && cleanId(t.id)) target = { kind: t.kind, id: t.id };
+      else if (t && t.kind === 'url' && safeHttps(t.url)) target = { kind: 'url', url: safeHttps(t.url) };
+      return {
+        id: cleanId(n.id),
+        type: NOTIFICATION_TYPES.includes(n.type) ? n.type : 'general',
+        title: text(n.title, 60),
+        message: text(n.message, 200),
+        target,
+        image: cleanImage(n.image),
+        publishAt: dateTime(n.publishAt),
+        expireAt: dateTime(n.expireAt)
+      };
+    })
+    .filter(n => n.id && n.title && n.publishAt);
+
+  return { sessions, news, games, notifications };
 
 }
 
@@ -204,6 +317,7 @@ export function sanitizeContent(raw) {
     .filter(Boolean);
 
   return {
+    ...cleanHub(raw),
     revision: text(raw.revision, 40),
     publishedAt: text(raw.publishedAt, 40),
     timezone: text(raw.timezone, 40) || 'Africa/Cairo',
@@ -255,6 +369,9 @@ export async function fetchContent() {
   if (!response.ok) {
     throw new Error(`content.json: HTTP ${response.status}`);
   }
+
+  // GitHub Pages' clock corrects a wrong device clock (games, countdowns)
+  setServerTime(response.headers.get('Date'));
 
   const raw = await response.json();
   const content = sanitizeContent(raw);

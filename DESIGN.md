@@ -59,16 +59,52 @@ inside their app icons.
 A widget whose partner is missing takes the full row (`data-wide`).
 Safe-area insets are respected; there's no horizontal scroll at 360px.
 
-## Motion
+## Motion: "motion graphics implemented as UI"
 
-- Staggered widget entrance (65ms steps, expo-out), once.
-- One-time heart beat and gold sheen on the featured card; again on hover.
-- Map pin ripple (three times, then still). Live dot pulses only while the
-  meeting is live.
-- Background gold glow drifts very slowly.
-- Press feedback: scale 0.97 on tap.
-- `prefers-reduced-motion`: all of it off.
-- No sounds.
+Built on CSS and the Web Animations API (no library, about 2.5 KB gzipped).
+Springs are real physics curves (k=170 c=20 and k=260 c=16) expressed with
+CSS `linear()`, falling back to a cubic-bezier where unsupported.
+
+| Layer / moment     | Motion                                                        |
+| ------------------ | ------------------------------------------------------------- |
+| Background         | Gold glow drifting very slowly; the cross lattice moves slower than the page on scroll (parallax, where scroll-driven animation is supported) |
+| Hero, on arrival   | The arch reveals upward, the logo springs in, the cross drops in, the name and tagline rise out of a soft blur; about 20 drifting gold dust particles |
+| Hero, on scroll    | Recedes slightly (moves up, scales to 96%, fades) as you scroll past |
+| Widgets            | Enter in priority order with depth (rise + scale from 95.5%), 70 ms apart, once |
+| Taps               | Spring press (scale down fast, spring back); app icons tilt     |
+| Featured card      | One gold sheen and heart beat on arrival; again on hover        |
+| Meeting goes live  | A one-time glow; the live dot pulses while it's live            |
+| Game opens         | The card "wakes up": a one-time ignition, then a slow rotating gold rim and rising embers while it's open |
+| Countdowns         | Changed text rolls out and in instead of jumping                |
+| Bell               | Swings once (damped) when something new arrives; the badge springs in. Never loops |
+| Sheets (bell, news, game, meeting) | Slide up with a spring; drag down to dismiss; the list inside staggers in 40 ms apart |
+| Top bar            | The compact name slides in after the hero scrolls away          |
+
+Rules:
+
+- Only transform, opacity and filter are animated.
+- At most one continuous animation per visible card. Particles pause
+  off-screen and in background tabs, and are skipped on very low-end devices.
+- Not animated: reading text, phone/WhatsApp buttons, the QR card, the real map.
+- `prefers-reduced-motion`: no movement at all (no particles, no rim, no
+  intro, no parallax). States still change, just instantly.
+
+## Sound
+
+Optional UI sounds, synthesized with Web Audio (zero downloads). **Silent by
+default**; the 🔇/🔊 button in the top bar turns them on, and the choice is
+remembered on that device. No audio is created until the visitor turns it on.
+
+| Sound     | When                         | Character                         |
+| --------- | ---------------------------- | --------------------------------- |
+| tap       | buttons and cards            | a 35 ms soft click                |
+| open / close | sheets                     | a glassy whoosh up / down         |
+| success   | link copied, sound turned on | two-note major third              |
+| ready     | a game opens while you watch | warm four-note rising arpeggio with shimmer |
+| important | an "important" notification arrives while you watch | one low bell with a quiet harmonic |
+
+Sounds never play in a hidden tab. Sounds not caused by a tap ("ready",
+"important") play only if audio was already unlocked by an earlier tap.
 
 ## Components
 
@@ -82,3 +118,9 @@ Safe-area insets are respected; there's no horizontal scroll at 360px.
 | Contact          | Arch initial, name, role, a full-width call button showing the number |
 | Support          | Smaller, muted; WhatsApp button with a ready message         |
 | Share            | Native share sheet or copy link; branded QR card (download as PNG) |
+| Top bar          | Sticky: compact name after scrolling, sound toggle, bell with badge (Arabic digits, "+٩" cap) |
+| Meeting topic    | Inside the meeting widget: arch poster, «موضوع الاجتماع», the topic in Ruqaa, the speaker; opens the meeting sheet with upcoming meetings |
+| Pinned banner    | A pinned news item in the announcement style (replaces the old single announcement) |
+| «جديد الأسرة»     | A featured poster card, then a swipeable row of cards (a grid on desktop); each opens a sheet with the full poster, text, link and share |
+| Games            | Cards with state: «قريبًا» (locked button + countdown), «اللعبة جاهزة دلوقتي 🔥» (moves up under the meeting as the live card), «انتهت» (muted) |
+| Bell panel       | Grouped by النهارده / امبارح / الأسبوع ده / أقدم; type icons (important in carmine); unread dots; poster thumbnails |

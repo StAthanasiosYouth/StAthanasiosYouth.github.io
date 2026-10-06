@@ -11,6 +11,10 @@ import { h, external } from './dom.js';
 import { iconNode, isBrandIcon } from './icons.js';
 import { meetingStatus, fromDayNumber, isWithinWindow, calendarDates } from './schedule.js';
 import { describeMeeting, formatDate, DAY_SHORT } from './words.js';
+import { bannerWidget, newsSection, gamesSection, liveGameWidget, meetingTopic, visibleNews, gameStates } from './hub.js';
+import { updateBell, visibleNotifications } from './bell.js';
+import { wake } from './motion.js';
+import { play } from './sound.js';
 
 
 /* =========================================================
@@ -54,15 +58,21 @@ export function updateHero(site) {
    MEETING
 ========================================================= */
 
+/* sessions-only setups (no weekly rule) still get a meeting widget */
+const NO_WEEKLY = { title: 'الاجتماع', day: null, time: '', durationMinutes: null, note: '', skipDates: [], ics: '' };
+
 function meetingWidget(content, now) {
 
-  const meeting = content.meeting;
+  const meeting = content.meeting || NO_WEEKLY;
 
   const headline = h('p', { class: 'meeting__headline' });
   const detail = h('p', { class: 'meeting__detail' });
   const week = h('ol', { class: 'week', 'aria-hidden': 'true' });
   const note = meeting.note ? h('p', { class: 'meeting__note' }, meeting.note) : null;
   const skipNote = h('p', { class: 'meeting__note meeting__note--skip', hidden: true });
+  const topicSlot = h('div', { class: 'meeting__topic' });
+  let lastState = null;
+  let lastTopicKey = null;
 
   const googleLink = h('a', { class: 'btn btn--small', ...external('https://calendar.google.com/') },
     iconNode('calendar'),
@@ -97,19 +107,20 @@ function meetingWidget(content, now) {
   const section = h('section', { class: 'widget meeting', 'data-area': 'meeting', 'aria-labelledby': 'meeting-title' },
     h('div', { class: 'meeting__top' },
       h('h2', { class: 'widget__title', id: 'meeting-title' }, iconNode('clock'), meeting.title),
-      h('span', { class: 'meeting__repeat' }, `كل ${DAY_SHORT[meeting.day]}`)
+      meeting.day !== null ? h('span', { class: 'meeting__repeat' }, `كل ${DAY_SHORT[meeting.day]}`) : null
     ),
     headline,
     detail,
     note,
     skipNote,
+    topicSlot,
     week,
     h('div', { class: 'meeting__actions' }, calendarToggle, calendarMenu)
   );
 
   function update(currentNow) {
 
-    const status = meetingStatus(meeting, currentNow);
+    const status = meetingStatus(content.meeting, currentNow, content.sessions);
 
     if (!status) {
       section.hidden = true;
@@ -129,15 +140,34 @@ function meetingWidget(content, now) {
     detail.textContent = words.detail;
     section.classList.toggle('meeting--live', live);
 
+    // went live while someone was looking
+    if (live && lastState && lastState !== 'live') wake(section);
+    lastState = status.state;
+
     if (status.skipped.length) {
-      skipNote.replaceChildren(iconNode('alert'), `مفيش اجتماع ${formatDate(fromDayNumber(dayNumberOf(status.skipped[0])))}`);
+      const first = status.skipped[0];
+      const cancelled = (content.sessions || []).find(s => s.date === first && s.status === 'cancelled');
+      skipNote.replaceChildren(iconNode('alert'), `مفيش اجتماع ${formatDate(fromDayNumber(dayNumberOf(first)))}${cancelled && cancelled.note ? ` — ${cancelled.note}` : ''}`);
       skipNote.hidden = false;
     }
     else {
       skipNote.hidden = true;
     }
 
-    const skipDates = new Set(meeting.skipDates);
+    // the topic block appears when its session becomes visible
+    const session = status.session;
+    const topicKey = session ? `${session.date}|${session.topic}|${session.speaker}` : '';
+    if (topicKey !== lastTopicKey) {
+      topicSlot.replaceChildren(meetingTopic(session) || '');
+      lastTopicKey = topicKey;
+    }
+
+    currentStatus = status;
+
+    const skipDates = new Set([
+      ...meeting.skipDates,
+      ...(content.sessions || []).filter(s => s.status === 'cancelled').map(s => s.date)
+    ]);
     const meetingOffset = live ? 0 : status.daysUntil;
 
     week.replaceChildren(...Array.from({ length: 7 }, (_, offset) => {
@@ -159,9 +189,9 @@ function meetingWidget(content, now) {
       text: `${meeting.title} — ${content.site.name}`,
       dates: calendarDates(status),
       ctz: content.timezone,
-      recur: `RRULE:FREQ=WEEKLY;BYDAY=${['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][meeting.day]}`,
       details: [meeting.note, content.site.name].filter(Boolean).join('\n')
     });
+    if (meeting.day !== null) params.set('recur', `RRULE:FREQ=WEEKLY;BYDAY=${['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][meeting.day]}`);
     if (place) params.set('location', place);
 
     googleLink.href = `https://calendar.google.com/calendar/render?${params}`;
@@ -510,12 +540,27 @@ function footer(content) {
 ========================================================= */
 
 let meetingHandle = null;
+let currentStatus = null;
+let gameCards = [];
+let previousGameStates = new Map();
 
 
-/** Visible links/announcement right now (dates are Cairo wall time). */
+/** The meeting status the widget last showed (for the meeting sheet). */
+export function meetingSnapshot() {
+
+  return currentStatus;
+
+}
+
+
+/** Visible parts right now (dates are Cairo wall time). */
 function visibleParts(content, nowStamp) {
 
-  const announcement = content.announcement && (!content.announcement.expiresAt || nowStamp <= content.announcement.expiresAt)
+  const news = visibleNews(content, nowStamp);
+  const pinned = news.find(item => item.pinned) || null;
+
+  // a pinned news item replaces the legacy announcement
+  const announcement = !pinned && content.announcement && (!content.announcement.expiresAt || nowStamp <= content.announcement.expiresAt)
     ? content.announcement
     : null;
 
@@ -525,18 +570,32 @@ function visibleParts(content, nowStamp) {
     .map(section => ({ section, links: section.links.filter(link => isWithinWindow(link, nowStamp)) }))
     .filter(item => item.links.length);
 
-  return { announcement, featured, sections };
+  const games = gameStates(content, nowStamp);
+
+  return {
+    announcement,
+    pinned,
+    news: news.filter(item => item !== pinned),
+    liveGames: games.filter(g => g.state === 'open'),
+    otherGames: games.filter(g => g.state !== 'open'),
+    featured,
+    sections
+  };
 
 }
 
 
-/* Changes when a scheduled link or the announcement appears/disappears. */
+/* Changes whenever something appears, disappears or changes state. */
 export function visibilityKey(content, nowStamp) {
 
   const parts = visibleParts(content, nowStamp);
 
   return [
     parts.announcement ? 'a' : '',
+    parts.pinned ? parts.pinned.id : '',
+    parts.news.map(item => item.id).join(','),
+    gameStates(content, nowStamp).map(g => `${g.game.id}:${g.state}`).join(','),
+    visibleNotifications(content, nowStamp).map(n => n.id).join(','),
     parts.featured.map(link => link.id).join(','),
     parts.sections.map(item => item.links.map(link => link.id).join(',')).join('|')
   ].join('#');
@@ -554,13 +613,28 @@ export function renderPage(content, clock, actions, { animate = false } = {}) {
   const parts = visibleParts(content, clock.stamp);
   const widgets = [];
 
-  meetingHandle = content.meeting ? meetingWidget(content, clock.now) : null;
+  meetingHandle = content.meeting || content.sessions.length ? meetingWidget(content, clock.now) : null;
+  gameCards = [];
 
   if (meetingHandle) widgets.push(meetingHandle.el);
-  if (parts.announcement) widgets.push(announcementWidget(parts.announcement));
+
+  // a game that is open right now goes straight under the meeting
+  const live = parts.liveGames.map(liveGameWidget);
+  live.forEach(item => { widgets.push(item.el); gameCards.push(...item.cards); });
+
+  if (parts.pinned) widgets.push(bannerWidget(parts.pinned));
+  else if (parts.announcement) widgets.push(announcementWidget(parts.announcement));
 
   const featured = parts.featured.map(featuredWidget);
   widgets.push(...featured);
+
+  if (parts.news.length) widgets.push(newsSection(parts.news, clock.stamp));
+
+  if (parts.otherGames.length) {
+    const games = gamesSection(parts.otherGames);
+    widgets.push(games.el);
+    gameCards.push(...games.cards);
+  }
 
   const location = content.location ? locationWidget(content.location) : null;
   if (location) widgets.push(location);
@@ -581,8 +655,10 @@ export function renderPage(content, clock, actions, { animate = false } = {}) {
 
   // widgets whose usual partner is missing take the full row
   hero.toggleAttribute('data-wide', !meetingHandle || meetingHandle.el.hidden);
-  featured.forEach(el => el.toggleAttribute('data-wide', featured.length !== 1 || !location));
-  if (location) location.toggleAttribute('data-wide', featured.length === 0);
+  // featured + location share a row only when nothing sits between them
+  const separated = parts.news.length > 0 || parts.otherGames.length > 0;
+  featured.forEach(el => el.toggleAttribute('data-wide', featured.length !== 1 || !location || separated));
+  if (location) location.toggleAttribute('data-wide', featured.length === 0 || separated);
   if (serviceEl) serviceEl.toggleAttribute('data-wide', !supportEl);
   if (supportEl) supportEl.toggleAttribute('data-wide', !serviceEl);
 
@@ -602,12 +678,35 @@ export function renderPage(content, clock, actions, { animate = false } = {}) {
   main.append(...widgets);
   main.dataset.state = 'ready';
 
+  // a game opened while the visitor was here: wake its card up
+  const states = new Map(gameStates(content, clock.stamp).map(g => [g.game.id, g.state]));
+  if (!animate && !document.hidden) {
+    for (const item of live) {
+      const id = item.cards[0].id;
+      if (previousGameStates.get(id) === 'soon') {
+        wake(item.el.querySelector('.game'), 'is-waking', 2200);
+        play('ready', { passive: true });
+      }
+    }
+  }
+  previousGameStates = states;
+
+  updateBell(content, clock.stamp);
+
 }
 
 
-export function tickMeeting(now) {
+/* Every tick: meeting wording and game countdowns, without rebuilding. */
+export function tickPage(content, clock) {
 
-  meetingHandle?.update(now);
+  meetingHandle?.update(clock.now);
+
+  const states = new Map(gameStates(content, clock.stamp).map(g => [g.game.id, g]));
+
+  for (const card of gameCards) {
+    const entry = states.get(card.id);
+    if (entry) card.update(entry);
+  }
 
 }
 

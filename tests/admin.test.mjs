@@ -38,7 +38,7 @@ test('setup by the admin creates the private Sheet and its tabs', () => {
   assert.equal(world.spreadsheet.owner, ADMIN);
   assert.equal(world.properties.get('SHEET_ID'), 'sheet-id-123');
   const names = world.spreadsheet.getSheets().map(s => s.name);
-  assert.deepEqual(names, ['Settings', 'Sections', 'Links', 'Contacts', 'Log']);
+  assert.deepEqual(names, ['Settings', 'Sections', 'Links', 'Contacts', 'Sessions', 'News', 'Games', 'Notifications', 'Media', 'Log']);
   assert.equal(world.spreadsheet.getSheetByName('Links').getLastRow(), 5, 'header + 4 seed links');
   // running again keeps data
   world.gs.setup();

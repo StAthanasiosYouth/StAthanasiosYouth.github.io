@@ -56,14 +56,19 @@ another admin.
    | Type   | Name           | From                            |
    | ------ | -------------- | ------------------------------- |
    | Script | `Content`      | `apps-script/Content.gs`        |
+   | Script | `Hub`          | `apps-script/Hub.gs`            |
    | Script | `Seed`         | `apps-script/Seed.gs`           |
    | Script | `Auth`         | `apps-script/Auth.gs`           |
    | Script | `Store`        | `apps-script/Store.gs`          |
    | Script | `Publish`      | `apps-script/Publish.gs`        |
    | Script | `Code`         | `apps-script/Code.gs` (replace the default `Code.gs`) |
+   | Script | `Items`        | `apps-script/Items.gs`          |
+   | Script | `Media`        | `apps-script/Media.gs`          |
    | HTML   | `Admin`        | `apps-script/Admin.html`        |
    | HTML   | `AdminStyles`  | `apps-script/AdminStyles.html`  |
    | HTML   | `AdminScript`  | `apps-script/AdminScript.html`  |
+   | HTML   | `AdminPage`    | `apps-script/AdminPage.html`    |
+   | HTML   | `AdminContent` | `apps-script/AdminContent.html` |
    | HTML   | `AdminIcons`   | `apps-script/AdminIcons.html`   |
    | HTML   | `NoAccess`     | `apps-script/NoAccess.html`     |
 
@@ -112,7 +117,8 @@ property**:
 "first person to open the app becomes admin" shortcut. Only people who can
 edit this script can change Script Properties.
 
-`SHEET_ID` is written by `setup`. `PUBLISHED_*` are written by the
+`SHEET_ID` is written by `setup`, and `MEDIA_FOLDER_ID` (the private Drive
+folder for draft posters) by the first image upload. `PUBLISHED_*` are written by the
 publisher; don't edit them.
 
 ## 5. Run setup (creates the Sheet)
@@ -174,3 +180,30 @@ can't see the code or the token.
 When the token expires, publishing shows "GitHub رفض التوكن (401)". Create a
 new token (step 3) and replace `GITHUB_TOKEN` in Script Properties. Nothing
 else changes.
+
+## Upgrading an existing admin to the content center
+
+If the admin was set up before meetings, news, games and the bell existed:
+
+1. Paste the new and changed files from `apps-script/` (the table in step 2;
+   `Hub`, `Items`, `Media`, `AdminPage` and `AdminContent` are new, and most
+   others changed). Replace `appsscript.json` too.
+2. Run `setup` again from the editor. Google asks for one new permission:
+   *"See, edit, create, and delete only the specific Google Drive files you
+   use with this app"*. That's the narrow `drive.file` scope: the script only
+   ever sees the poster files it created itself, never the rest of your Drive.
+   `setup` then:
+   - adds the tabs `Sessions`, `News`, `Games`, `Notifications`, `Media`;
+   - moves an announcement that is still switched on into **News** as a
+     pinned item, and switches the old one off;
+   - moves future "days without a meeting" into **Sessions** as cancelled
+     meetings.
+
+   Existing data is never overwritten.
+3. **Deploy → Manage deployments → Edit → Version: New version → Deploy.**
+4. Push the updated website files (`index.html`, `assets/`) to GitHub.
+
+The new website reads both the old and the new `content.json`, so the order
+of these steps can't break the live site. Until `setup` runs again, the
+admin's content-center screens show a notice; links, location and contacts
+keep working.

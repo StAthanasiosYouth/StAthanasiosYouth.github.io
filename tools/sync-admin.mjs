@@ -26,11 +26,12 @@ if (missing.length || extra.length) {
 // admin-only interface icons (same 24px line style)
 const ADMIN_EXTRA = {
   'chevron-up': '<path d="m6 15 6-6 6 6"/>',
+  gear: '<circle class="duo" cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.2 6.5l2.6 1.5M17.2 16l2.6 1.5M4.2 17.5l2.6-1.5M17.2 8l2.6-1.5"/><circle cx="12" cy="12" r="6.5"/>',
   edit: '<path class="duo" d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/>',
   trash: '<path d="M4 7h16M10 11v6M14 11v6"/><path class="duo" d="M6 7l1 12.5A1.5 1.5 0 0 0 8.5 21h7a1.5 1.5 0 0 0 1.5-1.5L18 7"/><path d="M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7"/>'
 };
 
-const names = [...LINK_ICON_NAMES, 'phone', 'close', 'chevron', 'alert', 'sparkle', 'megaphone'];
+const names = [...LINK_ICON_NAMES, 'phone', 'close', 'chevron', 'alert', 'sparkle', 'megaphone', 'bell', 'clock'];
 const icons = Object.fromEntries(names.map(name => [name, iconSvg(name)]));
 
 for (const [name, body] of Object.entries(ADMIN_EXTRA)) {

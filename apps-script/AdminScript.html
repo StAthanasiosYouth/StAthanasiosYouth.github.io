@@ -1,39 +1,31 @@
 <script>
 /*
- * Admin panel client.
- * Talks to the api* functions in Code.gs / Publish.gs through
- * google.script.run. Every value from the Sheet is inserted as text
- * (textContent / value), never as HTML.
+ * Admin panel: core (helpers, form pieces, navigation, review/publish).
+ * Views live in AdminPage.html (links, location, contacts, settings) and
+ * AdminContent.html (timeline, meetings, news, games, notifications).
+ *
+ * Talks to the api* functions through google.script.run. Every value from
+ * the Sheet is inserted as text (textContent / value), never as HTML.
+ * All dates are Cairo wall time ("YYYY-MM-DD HH:MM"), whatever the
+ * admin's own device time zone.
  */
 (function () {
 
   'use strict';
 
-  var ICONS = window.ADMIN_ICONS || {};
+  var A = window.A = {};
 
-  var ICON_LABELS = {
-    voice: 'رسالة / صوتك يهمنا', facebook: 'فيسبوك', instagram: 'إنستجرام', tiktok: 'تيك توك',
-    youtube: 'يوتيوب', whatsapp: 'واتساب', telegram: 'تيليجرام', spotify: 'سبوتيفاي',
-    form: 'استمارة', calendar: 'تقويم', ticket: 'تذكرة / حجز', bus: 'رحلة', book: 'كتاب مقدس',
-    music: 'ترانيم', photos: 'صور', video: 'فيديو', church: 'كنيسة', cross: 'صليب', heart: 'قلب',
-    star: 'نجمة', megaphone: 'إعلان', gift: 'هدية', users: 'ناس / أسرة', map: 'مكان', info: 'معلومة', link: 'لينك'
-  };
-
-  var TONE_LABELS = { info: 'إعلان عادي', alert: 'تنبيه (زي إلغاء)', celebrate: 'مناسبة حلوة' };
-
-  var state = null;
-  var currentTab = 'links';
-  var dirty = false;
-
-  var view = document.getElementById('view');
-  var sheet = document.getElementById('sheet');
+  A.ICONS = window.ADMIN_ICONS || {};
+  A.views = {};
+  A.state = null;
+  A.dirty = false;
 
 
   /* =======================================================
-     HELPERS
+     DOM HELPERS
   ======================================================= */
 
-  function el(tag, attrs) {
+  A.el = function (tag, attrs) {
 
     var node = document.createElement(tag);
 
@@ -54,7 +46,7 @@
 
     return node;
 
-  }
+  };
 
   function appendChild(node, child) {
 
@@ -64,17 +56,22 @@
 
   }
 
+  var el = A.el;
+
   /* icon markup is generated from the public site's icon set (trusted, static) */
   var iconTemplate = document.createElement('template');
 
-  function icon(name) {
+  A.icon = function (name) {
 
-    iconTemplate.innerHTML = ICONS[name] || ICONS.link || '';
+    var markup = Object.prototype.hasOwnProperty.call(A.ICONS, name) ? A.ICONS[name] : A.ICONS.link;
+    iconTemplate.innerHTML = markup || '';
     return iconTemplate.content.firstElementChild || document.createTextNode('');
 
-  }
+  };
 
-  function call(name) {
+  var icon = A.icon;
+
+  A.call = function (name) {
 
     var args = Array.prototype.slice.call(arguments, 1);
 
@@ -87,11 +84,11 @@
       runner[name].apply(runner, args);
     });
 
-  }
+  };
 
   var toastTimer = 0;
 
-  function toast(message, isError) {
+  A.toast = function (message, isError) {
 
     var node = document.getElementById('toast');
     node.textContent = message;
@@ -99,10 +96,10 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { node.className = 'toast'; }, isError ? 6000 : 2800);
 
-  }
+  };
 
   /* Runs an action with a busy button; returns the promise. */
-  function withBusy(button, promise) {
+  A.withBusy = function (button, promise) {
 
     var original = Array.prototype.slice.call(button.childNodes);
     button.disabled = true;
@@ -113,15 +110,15 @@
       button.replaceChildren.apply(button, original);
     });
 
-  }
+  };
 
-  function bool(value) {
+  A.bool = function (value) {
 
     return value === true || String(value).toLowerCase() === 'true';
 
-  }
+  };
 
-  function byOrder(list) {
+  A.byOrder = function (list) {
 
     return list.slice().sort(function (a, b) {
       var x = Number(a.order), y = Number(b.order);
@@ -130,49 +127,29 @@
       return x === y ? 0 : (x < y ? -1 : 1);
     });
 
-  }
+  };
 
-  function setting(key) {
+  A.setting = function (key) {
 
-    var row = state.draft.settings.filter(function (s) { return s.key === key; })[0];
+    var row = A.state.draft.settings.filter(function (s) { return s.key === key; })[0];
     return row ? row.value : '';
 
-  }
+  };
 
-  function settingHelp(key) {
+  A.settingHelp = function (key) {
 
-    var row = state.draft.settings.filter(function (s) { return s.key === key; })[0];
+    var row = A.state.draft.settings.filter(function (s) { return s.key === key; })[0];
     return row ? row.help : '';
 
-  }
+  };
 
-  function formatDateTime(iso) {
-
-    if (!iso) return '—';
-    try {
-      return new Date(iso).toLocaleString('ar-EG', { timeZone: 'Africa/Cairo', dateStyle: 'medium', timeStyle: 'short' });
-    }
-    catch (e) {
-      return iso;
-    }
-
-  }
-
-  function shortUrl(url) {
+  A.shortUrl = function (url) {
 
     return String(url || '').replace(/^https:\/\//, '').replace(/\/$/, '');
 
-  }
+  };
 
-  function applyState(next) {
-
-    state = next;
-    renderStatus();
-    render();
-
-  }
-
-  function fail(error, box) {
+  A.fail = function (error, box) {
 
     var message = error && error.message ? error.message : String(error);
 
@@ -182,10 +159,96 @@
       box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
     else {
-      toast(message, true);
+      A.toast(message, true);
     }
 
-  }
+  };
+
+
+  /* =======================================================
+     CAIRO TIME
+     Wall-clock strings. Arithmetic treats them as UTC numbers only.
+  ======================================================= */
+
+  var DAY_NAMES = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+  var MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+
+  /* "YYYY-MM-DD HH:MM" now in Cairo */
+  A.cairoNow = function () {
+
+    var parts = {};
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+    }).formatToParts(new Date()).forEach(function (p) { parts[p.type] = p.value; });
+
+    return parts.year + '-' + parts.month + '-' + parts.day + ' ' + (parts.hour === '24' ? '00' : parts.hour) + ':' + parts.minute;
+
+  };
+
+  /* "YYYY-MM-DD" or "YYYY-MM-DD HH:MM" -> minutes (or null) */
+  A.wallMinutes = function (value, endOfDay) {
+
+    var m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?$/.exec(String(value || ''));
+    if (!m) return null;
+    var hh = m[4] === undefined ? (endOfDay ? 23 : 0) : +m[4];
+    var mm = m[5] === undefined ? (endOfDay ? 59 : 0) : +m[5];
+    return Date.UTC(+m[1], +m[2] - 1, +m[3], hh, mm) / 60000;
+
+  };
+
+  A.wallFromMinutes = function (minutes) {
+
+    var d = new Date(minutes * 60000);
+    return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()) + ' ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes());
+
+  };
+
+  /* next given weekday (0 = Sunday) at "HH:MM"; today counts if still ahead */
+  A.nextWeekday = function (weekday, time) {
+
+    var now = A.wallMinutes(A.cairoNow());
+    var base = Math.floor(now / 1440) * 1440;
+    var t = time.split(':');
+    for (var i = 0; i < 8; i++) {
+      var day = base + i * 1440;
+      var at = day + (+t[0]) * 60 + (+t[1]);
+      if (new Date(day * 60000).getUTCDay() === weekday && at > now) {
+        return A.wallFromMinutes(at);
+      }
+    }
+    return A.wallFromMinutes(base + 7 * 1440);
+
+  };
+
+  /* "الأحد ١١ أكتوبر · ٨:٠٠ م" */
+  A.formatWall = function (value, withTime) {
+
+    var minutes = A.wallMinutes(value);
+    if (minutes === null) return String(value || '—');
+    var d = new Date(minutes * 60000);
+    var text = DAY_NAMES[d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()];
+    if (withTime !== false && /[ T]\d{2}:\d{2}$/.test(String(value))) {
+      var h = d.getUTCHours(), m = d.getUTCMinutes();
+      text += ' · ' + ((h % 12) || 12) + ':' + pad(m) + (h < 12 ? ' ص' : ' م');
+    }
+    return text.replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; });
+
+  };
+
+  A.formatIso = function (iso) {
+
+    if (!iso) return '—';
+    try {
+      return new Date(iso).toLocaleString('ar-EG', { timeZone: 'Africa/Cairo', dateStyle: 'medium', timeStyle: 'short' });
+    }
+    catch (e) {
+      return iso;
+    }
+
+  };
 
 
   /* =======================================================
@@ -194,11 +257,13 @@
 
   function markDirty() {
 
-    dirty = true;
+    A.dirty = true;
 
   }
 
-  function field(label, control, hint, counter) {
+  A.markDirty = markDirty;
+
+  A.field = function (label, control, hint, counter) {
 
     return el('label', { class: 'field' },
       el('span', { class: 'field__label', text: label }),
@@ -207,9 +272,9 @@
       hint ? el('span', { class: 'field__hint', text: hint }) : null
     );
 
-  }
+  };
 
-  function textInput(value, options) {
+  A.textInput = function (value, options) {
 
     options = options || {};
 
@@ -222,16 +287,18 @@
       placeholder: options.placeholder || null,
       dir: options.ltr ? 'ltr' : null,
       required: options.required || null,
+      rows: options.rows || null,
       oninput: markDirty
     });
 
-  }
+  };
 
   /* text input with a live character counter */
-  function counted(label, value, max, hint, options) {
+  A.counted = function (label, value, max, hint, options) {
 
-    var input = textInput(value, Object.assign({ max: max }, options || {}));
-    var counter = el('span', { class: 'field__count' });
+    var input = A.textInput(value, Object.assign({ max: max }, options || {}));
+    // ltr so "25 / 60" doesn't read as "60 / 25"
+    var counter = el('span', { class: 'field__count', dir: 'ltr' });
 
     function update() {
       counter.textContent = input.value.length + ' / ' + max;
@@ -241,11 +308,11 @@
     input.addEventListener('input', update);
     update();
 
-    return { node: field(label, input, hint, counter), input: input };
+    return { node: A.field(label, input, hint, counter), input: input };
 
-  }
+  };
 
-  function switchInput(label, checked, onchange) {
+  A.switchInput = function (label, checked, onchange) {
 
     var input = el('input', { type: 'checkbox', role: 'switch', checked: checked, onchange: function () {
       markDirty();
@@ -257,9 +324,20 @@
       input: input
     };
 
-  }
+  };
 
-  function choices(name, options, selected, onchange) {
+  A.checkbox = function (label, checked, hint) {
+
+    var input = el('input', { type: 'checkbox', checked: checked, onchange: markDirty });
+
+    return {
+      node: el('label', { class: 'check' }, input, el('span', {}, el('strong', { text: label }), hint ? el('small', { text: hint }) : null)),
+      input: input
+    };
+
+  };
+
+  A.choices = function (name, options, selected, onchange) {
 
     var inputs = [];
 
@@ -280,16 +358,17 @@
       }
     };
 
-  }
+  };
 
-  function iconPicker(selected) {
+  A.iconPicker = function (selected) {
 
     var inputs = [];
+    var labels = A.ICON_LABELS || {};
 
-    var node = el('div', { class: 'icon-grid', role: 'radiogroup', 'aria-label': 'الأيقونة' }, state.meta.icons.map(function (name) {
-      var input = el('input', { type: 'radio', name: 'icon', value: name, checked: name === selected, onchange: markDirty, 'aria-label': ICON_LABELS[name] || name });
+    var node = el('div', { class: 'icon-grid', role: 'radiogroup', 'aria-label': 'الأيقونة' }, A.state.meta.icons.map(function (name) {
+      var input = el('input', { type: 'radio', name: 'icon', value: name, checked: name === selected, onchange: markDirty, 'aria-label': labels[name] || name });
       inputs.push(input);
-      return el('label', { class: 'choice', title: ICON_LABELS[name] || name }, input, el('span', {}, icon(name)));
+      return el('label', { class: 'choice', title: labels[name] || name }, input, el('span', {}, icon(name)));
     }));
 
     return {
@@ -300,42 +379,298 @@
       }
     };
 
-  }
+  };
 
-  /* "YYYY-MM-DD" or "YYYY-MM-DD HH:MM" as a date + optional time pair */
-  function dateTimeInput(value) {
+  /*
+   * Date + optional time, in Cairo time, with quick presets.
+   * presets: [{ label, value: "YYYY-MM-DD HH:MM" | function () {...} }]
+   */
+  A.dateTimeInput = function (value, options) {
+
+    options = options || {};
 
     var parts = String(value || '').split(/[ T]/);
-    var date = el('input', { class: 'input', type: 'date', value: parts[0] || '', oninput: markDirty });
-    var time = el('input', { class: 'input', type: 'time', value: parts[1] || '', oninput: markDirty });
+    var date = el('input', { class: 'input', type: 'date', value: parts[0] || '', oninput: onInput });
+    var time = el('input', { class: 'input', type: 'time', value: parts[1] || '', oninput: onInput, hidden: options.dateOnly || null });
+    var said = el('span', { class: 'field__hint field__hint--when' });
+
+    function current() {
+      if (!date.value) return '';
+      return time.value && !options.dateOnly ? date.value + ' ' + time.value : date.value;
+    }
+
+    function describe() {
+      said.textContent = current() ? A.formatWall(current()) + ' — بتوقيت مصر' : (options.emptyText || 'فاضي');
+    }
+
+    function onInput() {
+      markDirty();
+      describe();
+      if (options.onchange) options.onchange(current());
+    }
+
+    function set(text) {
+      var p = String(text || '').split(/[ T]/);
+      date.value = p[0] || '';
+      time.value = p[1] || '';
+      onInput();
+    }
+
+    var presets = (options.presets || []).map(function (preset) {
+      return el('button', { class: 'preset', type: 'button', onclick: function () {
+        set(typeof preset.value === 'function' ? preset.value() : preset.value);
+      } }, preset.label);
+    });
+
+    if (options.clearable !== false) {
+      presets.push(el('button', { class: 'preset preset--ghost', type: 'button', onclick: function () { set(''); } }, 'مسح'));
+    }
+
+    describe();
 
     return {
-      node: el('div', { class: 'row' }, date, time),
-      value: function () {
-        if (!date.value) return '';
-        return time.value ? date.value + ' ' + time.value : date.value;
-      }
+      node: el('div', { class: 'datetime' },
+        el('div', { class: 'row' }, date, time),
+        presets.length ? el('div', { class: 'presets' }, presets) : null,
+        said
+      ),
+      value: current,
+      set: set
     };
 
-  }
+  };
 
-  function errorBox() {
+  /* common presets */
+  A.PRESETS = {
+    now: { label: 'دلوقتي', value: function () { return A.cairoNow(); } },
+    thursday8: { label: 'الخميس الجاي ٨م', value: function () { return A.nextWeekday(4, '20:00'); } },
+    friday: { label: 'الجمعة الجاية', value: function () { return A.nextWeekday(5, '10:00'); } },
+    sunday8: { label: 'الأحد الجاي ٨م', value: function () { return A.nextWeekday(0, '20:00'); } },
+    sunday9: { label: 'الأحد الجاي ٩م', value: function () { return A.nextWeekday(0, '21:00'); } },
+    sunday10: { label: 'الأحد الجاي ١٠م', value: function () { return A.nextWeekday(0, '22:00'); } }
+  };
+
+  A.errorBox = function () {
 
     return el('div', { class: 'errors', role: 'alert', hidden: true });
 
+  };
+
+
+  /* =======================================================
+     IMAGE PICKER
+     Resizes in the browser (WebP, or JPEG where WebP encoding isn't
+     available, e.g. Safari), uploads to the private Drive staging area.
+  ======================================================= */
+
+  function canvasBlob(canvas, type, quality) {
+
+    return new Promise(function (resolve) { canvas.toBlob(resolve, type, quality); });
+
   }
+
+  function blobBase64(blob) {
+
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(String(reader.result).split(',')[1]); };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+
+  }
+
+  function loadBitmap(file) {
+
+    if (window.createImageBitmap) {
+      return createImageBitmap(file, { imageOrientation: 'from-image' }).catch(function () { return createImageBitmap(file); });
+    }
+
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.onload = function () { resolve(img); };
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+
+  }
+
+  async function encode(bitmap, maxSide, maxBytes) {
+
+    var scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    var canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+    var blob = null;
+    var qualities = [0.82, 0.72, 0.62, 0.5];
+
+    for (var i = 0; i < qualities.length; i++) {
+      blob = await canvasBlob(canvas, 'image/webp', qualities[i]);
+      // Safari can't encode WebP and silently returns PNG
+      if (!blob || blob.type !== 'image/webp') {
+        blob = await canvasBlob(canvas, 'image/jpeg', qualities[i] + 0.05);
+      }
+      if (blob && blob.size <= maxBytes) break;
+    }
+
+    return { blob: blob, width: canvas.width, height: canvas.height };
+
+  }
+
+  A.prepareImage = async function (file) {
+
+    var bitmap = await loadBitmap(file);
+    var full = await encode(bitmap, 1600, 1500 * 1024);
+    var thumb = await encode(bitmap, 480, 280 * 1024);
+
+    if (!full.blob || full.blob.size > 1500 * 1024) {
+      throw new Error('الصورة كبيرة قوي حتى بعد التصغير');
+    }
+
+    return {
+      mime: full.blob.type,
+      width: full.width,
+      height: full.height,
+      full: await blobBase64(full.blob),
+      thumb: await blobBase64(thumb.blob),
+      previewUrl: URL.createObjectURL(thumb.blob)
+    };
+
+  };
+
+  /* thumbnail URL for a media id: the live site if published, else a Drive preview */
+  A.mediaPreview = function (id) {
+
+    var media = (A.state.draft.media || []).filter(function (m) { return m.id === id; })[0];
+
+    if (!media) return Promise.resolve('');
+
+    if (media.publishedAt && A.state.config.siteUrl) {
+      return Promise.resolve(A.state.config.siteUrl.replace(/\/?$/, '/') + media.thumb);
+    }
+
+    A.previewCache = A.previewCache || {};
+
+    if (!A.previewCache[id]) {
+      A.previewCache[id] = A.call('apiMediaPreview', id);
+    }
+
+    return A.previewCache[id];
+
+  };
+
+  A.imagePicker = function (currentId, options) {
+
+    options = options || {};
+
+    var value = currentId || '';
+    var media = function () { return (A.state.draft.media || []).filter(function (m) { return m.id === value; })[0]; };
+
+    var preview = el('div', { class: 'picker__preview' });
+    var status = el('span', { class: 'field__hint' });
+    var file = el('input', { type: 'file', accept: 'image/*', class: 'visually-hidden' });
+    var alt = A.textInput(media() ? media().alt : '', { max: 140, placeholder: 'وصف الصورة لقارئ الشاشة (مثلاً: بوستر رحلة الغردقة)' });
+    var altField = A.field('وصف الصورة', alt, 'مهم للي بيستخدم قارئ شاشة');
+
+    function show() {
+
+      preview.replaceChildren();
+      altField.hidden = !value;
+      remove.hidden = !value;
+      choose.lastChild.textContent = value ? 'غيّر الصورة' : 'اختار صورة';
+
+      if (!value) {
+        preview.appendChild(el('span', { class: 'picker__empty' }, icon('photos'), 'من غير صورة'));
+        return;
+      }
+
+      var img = el('img', { alt: '', class: 'picker__img' });
+      preview.appendChild(img);
+
+      A.mediaPreview(value).then(function (src) { if (src) img.src = src; }).catch(function () {
+        preview.replaceChildren(el('span', { class: 'picker__empty', text: 'مقدرناش نعرض المعاينة' }));
+      });
+
+    }
+
+    var choose = el('button', { class: 'btn', type: 'button', onclick: function () { file.click(); } }, icon('photos'), el('span', { text: 'اختار صورة' }));
+    var remove = el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { value = ''; markDirty(); show(); } }, 'شيل الصورة');
+
+    file.addEventListener('change', function () {
+
+      var chosen = file.files && file.files[0];
+      file.value = '';
+      if (!chosen) return;
+
+      status.textContent = 'بنجهز الصورة…';
+      choose.disabled = true;
+
+      A.prepareImage(chosen)
+        .then(function (prepared) {
+          status.textContent = 'بنرفعها… (' + Math.round(prepared.full.length * 0.75 / 1024) + ' KB)';
+          return A.call('apiUploadMedia', {
+            full: prepared.full,
+            thumb: prepared.thumb,
+            mime: prepared.mime,
+            width: prepared.width,
+            height: prepared.height,
+            alt: alt.value
+          }).then(function (result) {
+            A.previewCache = A.previewCache || {};
+            A.previewCache[result.media.id] = Promise.resolve(prepared.previewUrl);
+            // keep the editor open: update the state without re-rendering
+            A.state = result.state;
+            A.renderStatus();
+            value = result.media.id;
+            markDirty();
+            status.textContent = 'اترفعت ✓ — هتتنشر مع المحتوى';
+            show();
+          });
+        })
+        .catch(function (error) {
+          status.textContent = '';
+          A.fail(error);
+        })
+        .finally(function () { choose.disabled = false; });
+
+    });
+
+    alt.addEventListener('change', function () {
+      if (!value) return;
+      A.call('apiSetMediaAlt', value, alt.value).then(function (state) {
+        A.state = state;
+      }).catch(function (error) { A.fail(error); });
+    });
+
+    show();
+
+    return {
+      node: A.field(options.label || 'الصورة / البوستر', el('div', { class: 'picker' },
+        preview,
+        el('div', { class: 'actions' }, choose, remove, file),
+        status,
+        altField
+      ), options.hint || 'من الموبايل أو الكمبيوتر — بتتصغر لوحدها قبل الرفع'),
+      value: function () { return value; }
+    };
+
+  };
 
 
   /* =======================================================
      SHEET (dialog)
   ======================================================= */
 
-  function openSheet(title, body, footer) {
+  var sheet = document.getElementById('sheet');
+
+  A.openSheet = function (title, body, footer) {
 
     sheet.replaceChildren(
       el('div', { class: 'sheet__head' },
         el('h2', { class: 'sheet__title', id: 'sheet-title', text: title }),
-        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: closeSheet }, icon('close'))
+        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: A.closeSheet }, icon('close'))
       ),
       el('div', { class: 'sheet__body' }, body),
       footer ? el('div', { class: 'sheet__foot' }, footer) : null
@@ -343,30 +678,132 @@
 
     if (!sheet.open) sheet.showModal();
 
-  }
+  };
 
-  function closeSheet() {
+  A.closeSheet = function () {
 
-    if (dirty && !confirm('في تعديلات لسه ما اتحفظتش. تقفل من غير حفظ؟')) return;
-    dirty = false;
+    if (A.dirty && !confirm('في تعديلات لسه ما اتحفظتش. تقفل من غير حفظ؟')) return;
+    A.dirty = false;
     sheet.close();
 
-  }
+  };
 
   sheet.addEventListener('cancel', function (event) {
     event.preventDefault();
-    closeSheet();
+    A.closeSheet();
+  });
+
+  A.sheetFooter = function (save) {
+
+    return [save, el('button', { class: 'btn', type: 'button', text: 'إلغاء', onclick: A.closeSheet })];
+
+  };
+
+
+  /* =======================================================
+     NAVIGATION
+  ======================================================= */
+
+  A.AREAS = [
+    { key: 'schedule', label: 'الجدول', icon: 'calendar' },
+    { key: 'content', label: 'المحتوى', icon: 'megaphone', subs: [
+      { key: 'meetings', label: 'الاجتماعات' },
+      { key: 'news', label: 'الأخبار' },
+      { key: 'games', label: 'الألعاب' }
+    ] },
+    { key: 'notifications', label: 'الإشعارات', icon: 'bell' },
+    { key: 'page', label: 'الصفحة', icon: 'link', subs: [
+      { key: 'links', label: 'الروابط' },
+      { key: 'location', label: 'المكان' },
+      { key: 'contacts', label: 'التواصل' }
+    ] },
+    { key: 'settings', label: 'الإعدادات', icon: 'gear' }
+  ];
+
+  A.area = 'schedule';
+  A.sub = { content: 'meetings', page: 'links' };
+
+  function leaveOk() {
+
+    if (A.dirty && !confirm('في تعديلات لسه ما اتحفظتش. تسيبها؟')) return false;
+    A.dirty = false;
+    return true;
+
+  }
+
+  /* jump from anywhere, e.g. the timeline: A.go('content', 'games') */
+  A.go = function (area, sub) {
+
+    if (!leaveOk()) return;
+    A.area = area;
+    if (sub) A.sub[area] = sub;
+    renderNav();
+    A.render();
+    window.scrollTo(0, 0);
+
+  };
+
+  function renderNav() {
+
+    var areas = document.getElementById('areas');
+    var subs = document.getElementById('subtabs');
+
+    areas.replaceChildren.apply(areas, A.AREAS.map(function (area) {
+      return el('button', {
+        class: 'area', type: 'button', role: 'tab',
+        'aria-selected': String(area.key === A.area),
+        onclick: function () { if (area.key !== A.area) A.go(area.key); }
+      }, icon(area.icon), el('span', { text: area.label }));
+    }));
+
+    var current = A.AREAS.filter(function (a) { return a.key === A.area; })[0];
+
+    subs.hidden = !current.subs;
+    subs.replaceChildren.apply(subs, (current.subs || []).map(function (sub) {
+      return el('button', {
+        class: 'tab', type: 'button', role: 'tab',
+        'aria-selected': String(sub.key === A.sub[A.area]),
+        onclick: function () { if (sub.key !== A.sub[A.area]) A.go(A.area, sub.key); }
+      }, sub.label);
+    }));
+
+  }
+
+  A.render = function () {
+
+    var view = document.getElementById('view');
+    var key = A.AREAS.filter(function (a) { return a.key === A.area; })[0].subs ? A.sub[A.area] : A.area;
+    var builder = A.views[key];
+
+    view.replaceChildren.apply(view, [].concat(builder ? builder() : []));
+    view.setAttribute('aria-busy', 'false');
+
+  };
+
+  A.applyState = function (next) {
+
+    A.state = next;
+    A.renderStatus();
+    A.render();
+
+  };
+
+  window.addEventListener('beforeunload', function (event) {
+    if (A.dirty) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
   });
 
 
   /* =======================================================
-     STATUS + TABS
+     STATUS
   ======================================================= */
 
-  function renderStatus() {
+  A.renderStatus = function () {
 
     var node = document.getElementById('status');
-    var s = state.status;
+    var s = A.state.status;
 
     if (s.errors.length) {
       node.className = 'status status--error';
@@ -381,37 +818,14 @@
       node.textContent = 'الموقع متحدث';
     }
 
-  }
+  };
 
-  Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (button) {
-    button.addEventListener('click', function () {
-      if (dirty && !confirm('في تعديلات لسه ما اتحفظتش. تسيبها؟')) return;
-      dirty = false;
-      currentTab = button.dataset.tab;
-      Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (b) {
-        b.setAttribute('aria-selected', String(b === button));
-      });
-      render();
-    });
-  });
 
-  window.addEventListener('beforeunload', function (event) {
-    if (dirty) {
-      event.preventDefault();
-      event.returnValue = '';
-    }
-  });
+  /* =======================================================
+     SHARED PIECES FOR VIEWS
+  ======================================================= */
 
-  function render() {
-
-    var views = { links: viewLinks, meeting: viewMeeting, announcement: viewAnnouncement, contacts: viewContacts, settings: viewSettings };
-
-    view.replaceChildren.apply(view, [].concat(views[currentTab]()));
-    view.setAttribute('aria-busy', 'false');
-
-  }
-
-  function card(title, hint) {
+  A.card = function (title, hint) {
 
     var children = Array.prototype.slice.call(arguments, 2);
 
@@ -425,660 +839,122 @@
       children
     );
 
-  }
+  };
 
   /* Save button for settings-based forms */
-  function settingsSaver(collect, box) {
+  A.settingsSaver = function (collect, box) {
 
     var button = el('button', { class: 'btn btn--primary', type: 'button', text: 'حفظ' });
 
     button.addEventListener('click', function () {
       box.hidden = true;
-      withBusy(button, call('apiSaveSettings', collect()))
+      A.withBusy(button, A.call('apiSaveSettings', collect()))
         .then(function (next) {
-          dirty = false;
-          applyState(next);
-          toast('اتحفظ ✓ — لسه محتاج نشر');
+          A.dirty = false;
+          A.applyState(next);
+          A.toast('اتحفظ ✓ — لسه محتاج نشر');
         })
-        .catch(function (error) { fail(error, box); });
+        .catch(function (error) { A.fail(error, box); });
     });
 
     return button;
 
-  }
+  };
 
+  A.move = function (api, id, direction, button) {
 
-  /* =======================================================
-     LINKS
-  ======================================================= */
+    A.withBusy(button, A.call(api, id, direction)).then(A.applyState).catch(function (error) { A.fail(error); });
 
-  function viewLinks() {
+  };
 
-    var links = byOrder(state.draft.links);
-    var sections = byOrder(state.draft.sections);
-    var sectionKeys = sections.map(function (s) { return s.key; });
-    var out = [];
+  /* content-center items (Items.gs) */
+  A.saveItem = function (kind, data, box, button, message) {
 
-    out.push(card('الروابط', 'بتظهر في الصفحة بنفس الترتيب ده. أي تعديل بيتحفظ كمسودة لحد ما تدوس "راجع وانشر".',
-      el('div', { class: 'actions' },
-        el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { editLink(null); } }, '+ رابط جديد'),
-        el('button', { class: 'btn', type: 'button', onclick: function () { editSection(null); } }, '+ قسم جديد')
-      )
-    ));
+    box.hidden = true;
 
-    out.push(linkGroup('مميز — بيظهر كبير فوق', 'زي صوتك يهمنا', null, links.filter(function (l) { return bool(l.featured); })));
+    return A.withBusy(button, A.call('apiSaveItem', kind, data))
+      .then(function (next) {
+        A.dirty = false;
+        sheet.close();
+        A.applyState(next);
+        A.toast(message || 'اتحفظ ✓ — لسه محتاج نشر');
+      })
+      .catch(function (error) { A.fail(error, box); });
 
-    sections.forEach(function (section, index) {
-      out.push(linkGroup(section.title, null, { section: section, first: index === 0, last: index === sections.length - 1 },
-        links.filter(function (l) { return !bool(l.featured) && l.section === section.key; })));
+  };
+
+  A.deleteItem = function (kind, key, title, button) {
+
+    if (!confirm('تمسح "' + title + '"؟\nلو عايز تخفيه بس، اقفل "ظاهر" بدل المسح.')) return;
+
+    A.withBusy(button, A.call('apiDeleteItem', kind, key))
+      .then(function (next) { A.applyState(next); A.toast('اتمسح — هيختفي من الموقع بعد النشر'); })
+      .catch(function (error) { A.fail(error); });
+
+  };
+
+  A.toggleItem = function (kind, key, enabled) {
+
+    var toggle = A.switchInput('ظاهر', enabled, function (checked) {
+      A.dirty = false;
+      A.call('apiSetItemEnabled', kind, key, checked)
+        .then(function (next) { A.applyState(next); })
+        .catch(function (error) { toggle.input.checked = !checked; A.fail(error); });
     });
 
-    var orphans = links.filter(function (l) { return !bool(l.featured) && sectionKeys.indexOf(l.section) === -1; });
+    return toggle;
 
-    if (orphans.length) {
-      out.push(linkGroup('روابط من غير قسم', 'مش هتظهر في الصفحة لحد ما تختارلها قسم', null, orphans));
+  };
+
+  /* a list item: thumb/icon, title, sub, chips, controls */
+  A.listItem = function (options) {
+
+    var leading = options.image
+      ? el('span', { class: 'item__thumb', 'aria-hidden': 'true' })
+      : el('span', { class: 'item__icon', 'aria-hidden': 'true' }, icon(options.icon || 'link'));
+
+    if (options.image) {
+      A.mediaPreview(options.image).then(function (src) {
+        if (src) leading.appendChild(el('img', { src: src, alt: '' }));
+      }).catch(function () {});
     }
 
-    return out;
-
-  }
-
-  function linkGroup(title, hint, sectionInfo, links) {
-
-    var section = sectionInfo && sectionInfo.section;
-    var head = el('div', { class: 'card__head' },
-      el('div', {},
-        el('h2', { class: 'group-title' }, title, section && !bool(section.enabled) ? el('span', { class: 'chip chip--off', text: 'القسم مخفي' }) : null),
-        hint ? el('p', { class: 'card__hint', text: hint }) : null,
-        section ? el('span', { class: 'chip chip--ltr', text: section.key }) : null
-      ),
-      section ? el('div', { class: 'actions' },
-        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'طلّع القسم لفوق', disabled: sectionInfo.first, onclick: function (e) { move('apiMoveSection', section.key, -1, e.currentTarget); } }, icon('chevron-up')),
-        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'نزّل القسم لتحت', disabled: sectionInfo.last, onclick: function (e) { move('apiMoveSection', section.key, 1, e.currentTarget); } }, icon('chevron')),
-        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'تعديل القسم', onclick: function () { editSection(section); } }, icon('edit')),
-        el('button', { class: 'icon-btn icon-btn--danger', type: 'button', 'aria-label': 'مسح القسم', onclick: function (e) { removeSection(section, e.currentTarget); } }, icon('trash'))
-      ) : null
-    );
-
-    return el('section', { class: 'card' },
-      head,
-      links.length
-        ? el('ul', { class: 'list' }, links.map(function (link, index) { return linkItem(link, index === 0, index === links.length - 1); }))
-        : el('p', { class: 'empty', text: 'مفيش روابط هنا لسه' })
-    );
-
-  }
-
-  function linkItem(link, first, last) {
-
-    var enabled = bool(link.enabled);
-    var meta = [];
-
-    if (!enabled) meta.push(el('span', { class: 'chip chip--off', text: 'مخفي' }));
-    if (!bool(link.featured)) meta.push(el('span', { class: 'chip', text: link.style === 'tile' ? 'مربع' : 'صف' }));
-    if (link.badge) meta.push(el('span', { class: 'chip chip--gold', text: link.badge }));
-    if (link.startAt) meta.push(el('span', { class: 'chip', text: 'من ' + link.startAt }));
-    if (link.endAt) meta.push(el('span', { class: 'chip', text: 'لحد ' + link.endAt }));
-
-    var toggle = switchInput('ظاهر', enabled, function (checked) {
-      dirty = false;
-      call('apiSetLinkEnabled', link.id, checked)
-        .then(function (next) { applyState(next); toast(checked ? 'الرابط هيظهر بعد النشر' : 'الرابط هيستخبى بعد النشر'); })
-        .catch(function (error) { toggle.input.checked = !checked; fail(error); });
-    });
-
-    return el('li', { class: 'item' + (enabled ? '' : ' item--off') },
-      el('span', { class: 'item__icon', 'aria-hidden': 'true' }, icon(link.icon)),
+    return el('li', { class: 'item' + (options.off ? ' item--off' : '') },
+      leading,
       el('div', { class: 'item__main' },
-        el('span', { class: 'item__title', text: link.title || '(من غير عنوان)' }),
-        el('span', { class: 'item__sub', text: shortUrl(link.url) }),
-        meta.length ? el('div', { class: 'item__meta' }, meta) : null
+        el('span', { class: 'item__title', text: options.title || '(من غير عنوان)' }),
+        options.sub ? el('span', { class: 'item__sub item__sub--rtl', text: options.sub }) : null,
+        options.chips && options.chips.length ? el('div', { class: 'item__meta' }, options.chips) : null
       ),
-      el('div', { class: 'item__controls' },
-        toggle.node,
-        el('span', { class: 'spacer' }),
-        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'لفوق', disabled: first, onclick: function (e) { move('apiMoveLink', link.id, -1, e.currentTarget); } }, icon('chevron-up')),
-        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'لتحت', disabled: last, onclick: function (e) { move('apiMoveLink', link.id, 1, e.currentTarget); } }, icon('chevron')),
-        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'تعديل ' + link.title, onclick: function () { editLink(link); } }, icon('edit')),
-        el('button', { class: 'icon-btn icon-btn--danger', type: 'button', 'aria-label': 'مسح ' + link.title, onclick: function (e) { removeLink(link, e.currentTarget); } }, icon('trash'))
-      )
+      el('div', { class: 'item__controls' }, options.controls)
     );
 
-  }
+  };
 
-  function move(api, id, direction, button) {
+  A.chip = function (text, kind) {
 
-    withBusy(button, call(api, id, direction)).then(applyState).catch(function (error) { fail(error); });
+    return el('span', { class: 'chip' + (kind ? ' chip--' + kind : ''), text: text });
 
-  }
+  };
 
-  function removeLink(link, button) {
+  A.editButton = function (label, onclick) {
 
-    if (!confirm('تمسح "' + link.title + '" خالص؟\nلو عايز تخفيه بس، اقفل "ظاهر" بدل المسح.')) return;
-    withBusy(button, call('apiDeleteLink', link.id))
-      .then(function (next) { applyState(next); toast('اتمسح — هيختفي من الموقع بعد النشر'); })
-      .catch(function (error) { fail(error); });
+    return el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'تعديل ' + label, onclick: onclick }, icon('edit'));
 
-  }
+  };
 
-  function removeSection(section, button) {
+  A.deleteButton = function (label, onclick) {
 
-    if (!confirm('تمسح قسم "' + section.title + '"؟')) return;
-    withBusy(button, call('apiDeleteSection', section.key))
-      .then(function (next) { applyState(next); toast('القسم اتمسح'); })
-      .catch(function (error) { fail(error); });
+    return el('button', { class: 'icon-btn icon-btn--danger', type: 'button', 'aria-label': 'مسح ' + label, onclick: onclick }, icon('trash'));
 
-  }
+  };
 
-  function editLink(link) {
+  /* where the content center tabs don't exist yet */
+  A.hubNotReady = function () {
 
-    var isNew = !link;
-    // new links default to a general section rather than the social one
-    var sections = byOrder(state.draft.sections);
-    var defaultSection = sections.filter(function (s) { return s.key !== 'social'; })[0] || sections[0] || {};
-    link = link || { enabled: true, featured: false, style: 'card', icon: 'link', section: defaultSection.key || '' };
+    return A.card('مركز المحتوى محتاج تجهيز', 'شغّل الدالة setup مرة تانية من محرر Apps Script علشان تتعمل تبويبات الاجتماعات والأخبار والألعاب والإشعارات. البيانات الحالية مش هتتغير.');
 
-    var featured = bool(link.featured);
-    var box = errorBox();
-
-    var title = counted('العنوان', link.title, state.meta.limits.title, null, { required: true });
-    var subtitle = counted('وصف قصير', link.subtitle, state.meta.limits.subtitle, 'اختياري');
-    var url = field('اللينك', textInput(link.url, { ltr: true, type: 'url', placeholder: 'https://', inputmode: 'url', required: true }), 'لازم يبدأ بـ https://');
-    var urlInput = url.querySelector('input');
-
-    var sectionSelect = el('select', { class: 'input', onchange: markDirty }, byOrder(state.draft.sections).map(function (s) {
-      return el('option', { value: s.key, selected: s.key === link.section ? 'selected' : null, text: s.title + (bool(s.enabled) ? '' : ' (مخفي)') });
-    }));
-    var sectionField = field('القسم', sectionSelect);
-
-    var style = choices('style', [
-      { value: 'card', label: 'صف عريض' },
-      { value: 'tile', label: 'مربع زي التطبيقات' }
-    ], link.style === 'tile' ? 'tile' : 'card');
-    var styleField = field('الشكل', style.node, 'المربع مناسب للسوشيال ميديا، والصف مناسب للينكات اللي محتاجة وصف');
-
-    var cta = counted('نص الزرار', link.cta, state.meta.limits.cta, 'مثلاً: ابعت دلوقتي');
-
-    function syncFeatured(on) {
-      sectionField.hidden = on;
-      styleField.hidden = on;
-      cta.node.hidden = !on;
-    }
-
-    var featuredSwitch = switchInput('رابط مميز (يظهر كبير فوق)', featured, syncFeatured);
-    var icons = iconPicker(link.icon || 'link');
-
-    var badge = textInput(link.badge, { max: state.meta.limits.badge, placeholder: 'مثلاً: جديد' });
-    var badgeField = field('شارة', el('div', { class: 'actions' },
-      badge,
-      el('button', { class: 'btn', type: 'button', onclick: function () { badge.value = 'جديد'; markDirty(); } }, 'جديد'),
-      el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { badge.value = ''; markDirty(); } }, 'من غير')
-    ), 'اختياري');
-
-    var start = dateTimeInput(link.startAt);
-    var end = dateTimeInput(link.endAt);
-    var enabled = switchInput('ظاهر', link.enabled === undefined ? true : bool(link.enabled));
-
-    syncFeatured(featured);
-
-    var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
-
-    save.addEventListener('click', function () {
-      box.hidden = true;
-      withBusy(save, call('apiSaveLink', {
-        id: link.id || '',
-        title: title.input.value,
-        subtitle: subtitle.input.value,
-        url: urlInput.value.trim(),
-        featured: featuredSwitch.input.checked,
-        section: sectionSelect.value,
-        style: style.value(),
-        cta: cta.input.value,
-        icon: icons.value(),
-        badge: badge.value,
-        startAt: start.value(),
-        endAt: end.value(),
-        enabled: enabled.input.checked
-      }))
-        .then(function (next) {
-          dirty = false;
-          sheet.close();
-          applyState(next);
-          toast(isNew ? 'الرابط اتضاف ✓ — لسه محتاج نشر' : 'اتحفظ ✓ — لسه محتاج نشر');
-        })
-        .catch(function (error) { fail(error, box); });
-    });
-
-    dirty = false;
-
-    openSheet(isNew ? 'رابط جديد' : 'تعديل: ' + link.title, [
-      box,
-      el('div', { class: 'form' },
-        title.node,
-        subtitle.node,
-        url,
-        featuredSwitch.node,
-        sectionField,
-        styleField,
-        cta.node,
-        field('الأيقونة', icons.node),
-        badgeField,
-        field('يبدأ يظهر من', start.node, 'اختياري — سيبه فاضي لو هيظهر على طول'),
-        field('آخر ظهور', end.node, 'اختياري — مناسب للمؤتمرات والرحلات والتسجيل'),
-        enabled.node
-      )
-    ], [save, el('button', { class: 'btn', type: 'button', text: 'إلغاء', onclick: closeSheet })]);
-
-  }
-
-  function editSection(section) {
-
-    var isNew = !section;
-    section = section || { key: '', title: '', enabled: true };
-
-    var box = errorBox();
-    var key = textInput(section.key, { ltr: true, placeholder: 'events', max: 31 });
-
-    if (!isNew) {
-      key.readOnly = true;
-    }
-
-    var title = counted('العنوان اللي بيظهر', section.title, state.meta.limits.sectionTitle, null, { required: true });
-    var enabled = switchInput('القسم ظاهر', bool(section.enabled));
-
-    var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
-
-    save.addEventListener('click', function () {
-      box.hidden = true;
-      withBusy(save, call('apiSaveSection', { key: key.value.trim(), title: title.input.value, enabled: enabled.input.checked }, isNew))
-        .then(function (next) {
-          dirty = false;
-          sheet.close();
-          applyState(next);
-          toast('اتحفظ ✓');
-        })
-        .catch(function (error) { fail(error, box); });
-    });
-
-    dirty = false;
-
-    openSheet(isNew ? 'قسم جديد' : 'تعديل القسم', [
-      box,
-      el('div', { class: 'form' },
-        field('مفتاح القسم', key, isNew ? 'بالإنجليزي الصغير ومن غير مسافات، مثلاً events. مش هيظهر للناس' : 'المفتاح مبيتغيرش بعد الإضافة'),
-        title.node,
-        enabled.node
-      )
-    ], [save, el('button', { class: 'btn', type: 'button', text: 'إلغاء', onclick: closeSheet })]);
-
-  }
-
-
-  /* =======================================================
-     MEETING + LOCATION
-  ======================================================= */
-
-  function viewMeeting() {
-
-    /* ----- meeting ----- */
-
-    var meetingBox = errorBox();
-    var enabled = switchInput('إظهار معاد الاجتماع', bool(setting('meeting.enabled')));
-    var title = counted('اسم الاجتماع', setting('meeting.title'), state.meta.limits.title);
-
-    var currentDay = String(setting('meeting.day'));
-    var daySelect = el('select', { class: 'input', onchange: markDirty }, state.meta.days.map(function (day, index) {
-      var selected = currentDay === day || currentDay === String(index) || (currentDay && day.indexOf(currentDay.replace(/^ال/, '')) !== -1);
-      return el('option', { value: day, selected: selected ? 'selected' : null, text: day });
-    }));
-
-    var time = el('input', { class: 'input', type: 'time', value: setting('meeting.time'), oninput: markDirty });
-    var duration = textInput(setting('meeting.durationMinutes'), { type: 'number', inputmode: 'numeric', placeholder: 'مثلاً 120' });
-    var note = counted('ملاحظة', setting('meeting.note'), state.meta.limits.note, settingHelp('meeting.note'));
-
-    var skipDates = String(setting('meeting.skipDates') || '').split(/[,،\s]+/).filter(Boolean);
-    var skipList = el('div', { class: 'item__meta' });
-    var skipInput = el('input', { class: 'input', type: 'date' });
-
-    function renderSkips() {
-      skipList.replaceChildren.apply(skipList, skipDates.length ? skipDates.map(function (date) {
-        return el('span', { class: 'chip chip--danger' },
-          date,
-          el('button', { class: 'btn--ghost', type: 'button', 'aria-label': 'شيل ' + date, style: 'border:0;background:none;color:inherit;cursor:pointer;padding:0 2px', onclick: function () {
-            skipDates = skipDates.filter(function (d) { return d !== date; });
-            markDirty();
-            renderSkips();
-          } }, '×')
-        );
-      }) : [el('span', { class: 'field__hint', text: 'مفيش تواريخ ملغية' })]);
-    }
-
-    renderSkips();
-
-    var addSkip = el('button', { class: 'btn', type: 'button', text: 'أضف', onclick: function () {
-      if (skipInput.value && skipDates.indexOf(skipInput.value) === -1) {
-        skipDates.push(skipInput.value);
-        skipDates.sort();
-        skipInput.value = '';
-        markDirty();
-        renderSkips();
-      }
-    } });
-
-    var meetingCard = card('الاجتماع', 'المعاد اللي بيظهر في أول الصفحة ومعاه العد التنازلي.',
-      meetingBox,
-      el('div', { class: 'form' },
-        enabled.node,
-        title.node,
-        el('div', { class: 'row' }, field('اليوم', daySelect), field('الساعة', time)),
-        field('مدة الاجتماع بالدقايق', duration, 'سيبها فاضية لو مش متأكد — ساعتها الموقع مش هيقول "شغال دلوقتي"'),
-        note.node,
-        field('أيام مفيهاش اجتماع', el('div', { class: 'form' }, skipList, el('div', { class: 'row' }, skipInput, addSkip)), 'العد التنازلي هيتخطاها، وهيظهر تنبيه "مفيش اجتماع"')
-      ),
-      settingsSaver(function () {
-        return {
-          'meeting.enabled': enabled.input.checked,
-          'meeting.title': title.input.value,
-          'meeting.day': daySelect.value,
-          'meeting.time': time.value,
-          'meeting.durationMinutes': duration.value,
-          'meeting.note': note.input.value,
-          'meeting.skipDates': skipDates.join(', ')
-        };
-      }, meetingBox)
-    );
-
-    /* ----- location ----- */
-
-    var locationBox = errorBox();
-    var name = counted('اسم المكان', setting('location.name'), state.meta.limits.title, 'لو فاضي كارت المكان مش هيظهر');
-    var address = counted('العنوان', setting('location.address'), state.meta.limits.address);
-    var locNote = counted('ملاحظة', setting('location.note'), state.meta.limits.note, 'مثلاً: القاعة اللي في الدور التاني');
-    var mapsUrl = textInput(setting('location.mapsUrl'), { ltr: true, type: 'url', placeholder: 'https://maps.app.goo.gl/...' });
-    var lat = textInput(setting('location.lat'), { ltr: true, inputmode: 'decimal', placeholder: '26.73' });
-    var lng = textInput(setting('location.lng'), { ltr: true, inputmode: 'decimal', placeholder: '33.93' });
-
-    var resolve = el('button', { class: 'btn', type: 'button' }, icon('map'), 'هات الإحداثيات من اللينك');
-
-    resolve.addEventListener('click', function () {
-      locationBox.hidden = true;
-      withBusy(resolve, call('apiResolveMapsUrl', mapsUrl.value.trim()))
-        .then(function (coords) {
-          lat.value = coords.lat;
-          lng.value = coords.lng;
-          markDirty();
-          toast('اتجابت الإحداثيات — دوس حفظ');
-        })
-        .catch(function (error) { fail(error, locationBox); });
-    });
-
-    var locationCard = card('مكان الاجتماع', 'زرار "الاتجاهات" والخريطة بيستخدموا الإحداثيات.',
-      locationBox,
-      el('div', { class: 'form' },
-        name.node,
-        address.node,
-        locNote.node,
-        field('لينك جوجل ماب', mapsUrl),
-        el('div', { class: 'actions' }, resolve),
-        el('div', { class: 'row' }, field('خط العرض', lat), field('خط الطول', lng))
-      ),
-      settingsSaver(function () {
-        return {
-          'location.name': name.input.value,
-          'location.address': address.input.value,
-          'location.note': locNote.input.value,
-          'location.mapsUrl': mapsUrl.value.trim(),
-          'location.lat': lat.value.trim(),
-          'location.lng': lng.value.trim()
-        };
-      }, locationBox)
-    );
-
-    return [meetingCard, locationCard];
-
-  }
-
-
-  /* =======================================================
-     ANNOUNCEMENT
-  ======================================================= */
-
-  function viewAnnouncement() {
-
-    var box = errorBox();
-    var enabled = switchInput('إظهار الإعلان', bool(setting('announcement.enabled')), updatePreview);
-    var text = counted('نص الإعلان', setting('announcement.text'), state.meta.limits.announcement, 'مثلاً: مفيش اجتماع الأحد ده علشان المؤتمر', { multiline: true });
-    var tone = choices('tone', state.meta.tones.map(function (t) { return { value: t, label: TONE_LABELS[t] || t }; }), setting('announcement.tone') || 'info', updatePreview);
-    var linkUrl = textInput(setting('announcement.linkUrl'), { ltr: true, type: 'url', placeholder: 'https://' });
-    var linkLabel = counted('نص الزرار', setting('announcement.linkLabel'), state.meta.limits.linkLabel, 'مثلاً: سجّل هنا');
-    var expires = el('input', { class: 'input', type: 'date', value: String(setting('announcement.expiresAt') || '').slice(0, 10), oninput: markDirty });
-
-    var preview = el('div', { class: 'preview-announcement' });
-
-    function updatePreview() {
-      var toneValue = tone.value();
-      preview.className = 'preview-announcement' + (toneValue === 'alert' ? ' preview-announcement--alert' : '');
-      preview.replaceChildren(
-        icon(toneValue === 'alert' ? 'alert' : toneValue === 'celebrate' ? 'sparkle' : 'megaphone'),
-        el('span', { text: text.input.value || 'نص الإعلان هيظهر هنا' })
-      );
-      preview.style.opacity = enabled.input.checked ? '1' : '.45';
-    }
-
-    text.input.addEventListener('input', updatePreview);
-    updatePreview();
-
-    return [card('الإعلان', 'بيظهر تحت معاد الاجتماع. مناسب للرحلات والمؤتمرات وتغيير المواعيد.',
-      box,
-      el('div', { class: 'form' },
-        enabled.node,
-        text.node,
-        field('النوع', tone.node),
-        field('لينك للتفاصيل', linkUrl, 'اختياري'),
-        linkLabel.node,
-        field('آخر يوم يظهر فيه', expires, 'اختياري — بعد اليوم ده الإعلان بيختفي لوحده'),
-        field('شكله هيبقى كده', preview)
-      ),
-      settingsSaver(function () {
-        return {
-          'announcement.enabled': enabled.input.checked,
-          'announcement.text': text.input.value,
-          'announcement.tone': tone.value(),
-          'announcement.linkUrl': linkUrl.value.trim(),
-          'announcement.linkLabel': linkLabel.input.value,
-          'announcement.expiresAt': expires.value
-        };
-      }, box)
-    )];
-
-  }
-
-
-  /* =======================================================
-     CONTACTS
-  ======================================================= */
-
-  function viewContacts() {
-
-    var contacts = byOrder(state.draft.contacts);
-
-    return [card('التواصل', '"تواصل مع الخدمة" بيظهر بشكل واضح، و"الدعم الفني" بيظهر أهدى.',
-      el('div', { class: 'actions' },
-        el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { editContact(null); } }, '+ جهة تواصل')
-      ),
-      contacts.length
-        ? el('ul', { class: 'list' }, contacts.map(function (contact, index) {
-          var enabled = bool(contact.enabled);
-          return el('li', { class: 'item' + (enabled ? '' : ' item--off') },
-            el('span', { class: 'item__icon', 'aria-hidden': 'true' }, icon(contact.method === 'whatsapp' ? 'whatsapp' : 'phone')),
-            el('div', { class: 'item__main' },
-              el('span', { class: 'item__title', text: contact.name }),
-              el('span', { class: 'item__sub', text: contact.phone }),
-              el('div', { class: 'item__meta' },
-                el('span', { class: 'chip chip--gold', text: contact.kind === 'support' ? 'دعم فني' : 'تواصل مع الخدمة' }),
-                el('span', { class: 'chip', text: contact.method === 'whatsapp' ? 'واتساب بس' : 'اتصال بس' }),
-                contact.role ? el('span', { class: 'chip', text: contact.role }) : null,
-                enabled ? null : el('span', { class: 'chip chip--off', text: 'مخفي' })
-              )
-            ),
-            el('div', { class: 'item__controls' },
-              el('span', { class: 'spacer' }),
-              el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'لفوق', disabled: index === 0, onclick: function (e) { move('apiMoveContact', contact.id, -1, e.currentTarget); } }, icon('chevron-up')),
-              el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'لتحت', disabled: index === contacts.length - 1, onclick: function (e) { move('apiMoveContact', contact.id, 1, e.currentTarget); } }, icon('chevron')),
-              el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'تعديل ' + contact.name, onclick: function () { editContact(contact); } }, icon('edit')),
-              el('button', { class: 'icon-btn icon-btn--danger', type: 'button', 'aria-label': 'مسح ' + contact.name, onclick: function (e) {
-                if (!confirm('تمسح "' + contact.name + '"؟')) return;
-                withBusy(e.currentTarget, call('apiDeleteContact', contact.id)).then(applyState).catch(function (error) { fail(error); });
-              } }, icon('trash'))
-            )
-          );
-        }))
-        : el('p', { class: 'empty', text: 'مفيش جهات تواصل' })
-    )];
-
-  }
-
-  function editContact(contact) {
-
-    var isNew = !contact;
-    contact = contact || { enabled: true, kind: 'service', method: 'call' };
-
-    var box = errorBox();
-    var name = counted('الاسم', contact.name, state.meta.limits.personName, null, { required: true });
-    var role = counted('الدور', contact.role, state.meta.limits.role, 'مثلاً: أمين الخدمة');
-    var description = counted('وصف قصير', contact.description, state.meta.limits.description);
-    var phone = field('رقم التليفون', textInput(contact.phone, { ltr: true, type: 'tel', inputmode: 'tel', placeholder: '01xxxxxxxxx' }));
-    var phoneInput = phone.querySelector('input');
-
-    var kind = choices('kind', [
-      { value: 'service', label: 'تواصل مع الخدمة' },
-      { value: 'support', label: 'دعم فني (أهدى)' }
-    ], contact.kind || 'service');
-
-    var message = counted('رسالة الواتساب الجاهزة', contact.message, state.meta.limits.message, 'اختياري — بتتكتب لوحدها لما حد يفتح الواتساب', { multiline: true });
-
-    var method = choices('method', [
-      { value: 'call', label: 'اتصال بس', icon: 'phone' },
-      { value: 'whatsapp', label: 'واتساب بس', icon: 'whatsapp' }
-    ], contact.method || 'call', function (value) { message.node.hidden = value !== 'whatsapp'; });
-
-    message.node.hidden = (contact.method || 'call') !== 'whatsapp';
-
-    var enabled = switchInput('ظاهر', contact.enabled === undefined ? true : bool(contact.enabled));
-    var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
-
-    save.addEventListener('click', function () {
-      box.hidden = true;
-      withBusy(save, call('apiSaveContact', {
-        id: contact.id || '',
-        name: name.input.value,
-        role: role.input.value,
-        description: description.input.value,
-        phone: phoneInput.value,
-        kind: kind.value(),
-        method: method.value(),
-        message: message.input.value,
-        enabled: enabled.input.checked
-      }))
-        .then(function (next) {
-          dirty = false;
-          sheet.close();
-          applyState(next);
-          toast('اتحفظ ✓ — لسه محتاج نشر');
-        })
-        .catch(function (error) { fail(error, box); });
-    });
-
-    dirty = false;
-
-    openSheet(isNew ? 'جهة تواصل جديدة' : 'تعديل: ' + contact.name, [
-      box,
-      el('div', { class: 'form' },
-        name.node,
-        role.node,
-        description.node,
-        phone,
-        field('النوع', kind.node),
-        field('طريقة التواصل', method.node),
-        message.node,
-        enabled.node
-      )
-    ], [save, el('button', { class: 'btn', type: 'button', text: 'إلغاء', onclick: closeSheet })]);
-
-  }
-
-
-  /* =======================================================
-     SETTINGS
-  ======================================================= */
-
-  function viewSettings() {
-
-    var box = errorBox();
-    var name = counted('اسم الخدمة الرسمي', setting('site.name'), state.meta.limits.siteName, settingHelp('site.name'), { required: true });
-    var tagline = counted('الجملة التعريفية', setting('site.tagline'), state.meta.limits.tagline, settingHelp('site.tagline'));
-    var shareText = counted('نص المشاركة', setting('site.shareText'), state.meta.limits.shareText, settingHelp('site.shareText'));
-
-    var siteCard = card('الموقع', null,
-      box,
-      el('div', { class: 'form' }, name.node, tagline.node, shareText.node),
-      settingsSaver(function () {
-        return {
-          'site.name': name.input.value,
-          'site.tagline': tagline.input.value,
-          'site.shareText': shareText.input.value
-        };
-      }, box)
-    );
-
-    var config = state.config;
-    var status = state.status;
-    var checkResult = el('p', { class: 'note', hidden: true });
-
-    var check = el('button', { class: 'btn', type: 'button', text: 'اختبر الاتصال بـ GitHub' });
-
-    check.addEventListener('click', function () {
-      checkResult.hidden = true;
-      withBusy(check, call('apiCheckGithub'))
-        .then(function (result) {
-          checkResult.className = 'note note--ok';
-          checkResult.textContent = 'تمام ✓ — ' + result.repo + ' (' + result.branch + ' @ ' + result.head + ')' + (result.pages ? ' — GitHub Pages شغال' : ' — GitHub Pages مش متفعل');
-          checkResult.hidden = false;
-        })
-        .catch(function (error) {
-          checkResult.className = 'errors';
-          checkResult.textContent = error.message;
-          checkResult.hidden = false;
-        });
-    });
-
-    var commitLink = status.publishedCommit && config.repo
-      ? el('a', { href: 'https://github.com/' + config.repo + '/commit/' + status.publishedCommit, target: '_blank', rel: 'noopener', text: status.publishedCommit.slice(0, 7) })
-      : '—';
-
-    var publishCard = card('النشر', 'القيم دي بتتظبط من Script Properties في محرر Apps Script (مش من هنا، علشان الأمان).',
-      el('dl', { class: 'kv' },
-        el('dt', { text: 'الريبو' }), el('dd', { class: 'chip--ltr', text: config.repo || 'ناقص — GITHUB_REPO' }),
-        el('dt', { text: 'الفرع' }), el('dd', { text: config.branch }),
-        el('dt', { text: 'التوكن' }), el('dd', { text: config.tokenSet ? 'متسجل ✓' : 'ناقص — GITHUB_TOKEN' }),
-        el('dt', { text: 'الموقع' }), el('dd', {}, config.siteUrl ? el('a', { href: config.siteUrl, target: '_blank', rel: 'noopener', text: config.siteUrl }) : 'ناقص — SITE_URL'),
-        el('dt', { text: 'آخر نشر' }), el('dd', { text: formatDateTime(status.publishedAt) }),
-        el('dt', { text: 'الكوميت' }), el('dd', {}, commitLink)
-      ),
-      checkResult,
-      el('div', { class: 'actions' },
-        check,
-        el('a', { class: 'btn', href: config.sheetUrl, target: '_blank', rel: 'noopener', text: 'افتح الشيت' })
-      )
-    );
-
-    var accountCard = card('الحساب', null,
-      el('p', {}, 'انت داخل بـ ', el('span', { class: 'chip chip--ltr', text: state.user }))
-    );
-
-    return [siteCard, publishCard, accountCard];
-
-  }
+  };
 
 
   /* =======================================================
@@ -1089,13 +965,13 @@
 
   function openReview() {
 
-    dirty = false;
-    openSheet('مراجعة قبل النشر', [el('p', { class: 'loading', text: 'بنقارن المسودة بالموقع الحالي…' })]);
+    A.dirty = false;
+    A.openSheet('مراجعة قبل النشر', [el('p', { class: 'loading', text: 'بنقارن المسودة بالموقع الحالي…' })]);
 
-    call('apiReview')
+    A.call('apiReview')
       .then(renderReview)
       .catch(function (error) {
-        openSheet('مراجعة قبل النشر', [el('div', { class: 'errors', text: error.message })]);
+        A.openSheet('مراجعة قبل النشر', [el('div', { class: 'errors', text: error.message })]);
       });
 
   }
@@ -1104,7 +980,6 @@
 
     var blocked = review.errors.length > 0 || !!review.githubError;
     var nothing = !review.changes.length;
-
     var body = [];
 
     if (review.githubError) {
@@ -1136,26 +1011,25 @@
     var publish = el('button', { class: 'btn btn--primary', type: 'button', disabled: blocked || nothing, text: 'نشر التغييرات' });
 
     publish.addEventListener('click', function () {
-      withBusy(publish, call('apiPublish', review.revision))
+      A.withBusy(publish, A.call('apiPublish', review.revision))
         .then(function (result) {
-          applyState(result.state);
+          A.applyState(result.state);
           renderPublished(result);
         })
         .catch(function (error) {
-          var box = el('div', { class: 'errors', text: error.message });
-          sheet.querySelector('.sheet__body').prepend(box);
+          sheet.querySelector('.sheet__body').prepend(el('div', { class: 'errors', text: error.message }));
         });
     });
 
-    openSheet('مراجعة قبل النشر', body, [publish, el('button', { class: 'btn', type: 'button', text: 'إلغاء', onclick: closeSheet })]);
+    A.openSheet('مراجعة قبل النشر', body, A.sheetFooter(publish));
 
   }
 
   function renderPublished(result) {
 
-    var live = el('p', { class: 'note' }, el('span', { class: 'spinner', 'aria-hidden': 'true', style: 'display:inline-block;vertical-align:middle;margin-inline-end:8px' }), 'بيتنشر على الموقع… (عادةً أقل من دقيقة)');
+    var live = el('p', { class: 'note' }, el('span', { class: 'spinner spinner--inline', 'aria-hidden': 'true' }), 'بيتنشر على الموقع… (عادةً أقل من دقيقة)');
 
-    openSheet('اتنشر ✓', [
+    A.openSheet('اتنشر ✓', [
       el('p', { class: 'note note--ok', text: result.unchanged ? 'الملفات على GitHub زي ما هي.' : 'التغييرات اتبعتت لـ GitHub.' }),
       result.commitUrl ? el('a', { href: result.commitUrl, target: '_blank', rel: 'noopener', text: 'شوف الكوميت على GitHub' }) : null,
       result.siteUrl ? live : null
@@ -1204,14 +1078,20 @@
 
 
   /* =======================================================
-     START
+     START (called at the end of Admin.html, after the views load)
   ======================================================= */
 
-  call('apiState')
-    .then(applyState)
-    .catch(function (error) {
-      view.replaceChildren(el('div', { class: 'errors', text: error.message }));
-    });
+  A.start = function () {
+
+    renderNav();
+
+    A.call('apiState')
+      .then(A.applyState)
+      .catch(function (error) {
+        document.getElementById('view').replaceChildren(el('div', { class: 'errors', text: error.message }));
+      });
+
+  };
 
 })();
 </script>

@@ -28,6 +28,10 @@ var SETTINGS_SPEC = [
   ['location.lat', 26.7314392, 'خط العرض (للخريطة والاتجاهات)'],
   ['location.lng', 33.9379229, 'خط الطول (للخريطة والاتجاهات)'],
 
+  ['notifications.historyDays', 14, 'الإشعارات بتفضل ظاهرة في الجرس كام يوم (لو مالهاش ميعاد اختفاء)'],
+  ['games.endedHours', 12, 'اللعبة بتفضل ظاهرة كام ساعة بعد ما تخلص وعليها "انتهت"'],
+
+  // legacy: replaced by pinned news; setup() migrates an enabled announcement
   ['announcement.enabled', false, 'إظهار الإعلان'],
   ['announcement.text', '', 'نص الإعلان'],
   ['announcement.tone', 'info', 'info = عادي، alert = تنبيه (زي إلغاء اجتماع)، celebrate = مناسبة حلوة'],
@@ -139,6 +143,15 @@ var SEED_CONTACTS = [
 ];
 
 
+var SEED_SESSIONS = [];
+
+var SEED_NEWS = [];
+
+var SEED_GAMES = [];
+
+var SEED_NOTIFICATIONS = [];
+
+
 function seedDraft() {
 
   var settings = {};
@@ -151,7 +164,12 @@ function seedDraft() {
     settings: settings,
     sections: SEED_SECTIONS,
     links: SEED_LINKS,
-    contacts: SEED_CONTACTS
+    contacts: SEED_CONTACTS,
+    sessions: SEED_SESSIONS,
+    news: SEED_NEWS,
+    games: SEED_GAMES,
+    notifications: SEED_NOTIFICATIONS,
+    media: []
   };
 
 }

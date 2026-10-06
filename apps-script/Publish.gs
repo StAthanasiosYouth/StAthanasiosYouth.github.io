@@ -128,13 +128,23 @@ function githubErrorMessage_(code, detail) {
 
 
 /**
- * One commit with several files (Git Data API), so content.json and
- * meeting.ics always change together. Returns the commit, or null when the
- * files are already identical.
+ * One commit with several files (Git Data API), so content.json,
+ * meeting.ics and any new images always change together. Text files go
+ * inline; binaries ({ path: base64 }) are uploaded as blobs first.
+ * Returns the commit, or null when the files are already identical.
  */
-function githubCommitFiles_(files, message) {
+function githubCommitFiles_(files, message, binaries) {
 
   var branch = githubConfig_().branch;
+
+  // blobs are content-addressed, so they survive a retry below
+  var blobEntries = Object.keys(binaries || {}).map(function (path) {
+    if (!/^media\/\d{4}\/img-[a-z0-9]{8}(-480)?\.(webp|jpg)$/.test(path)) {
+      throw new Error('مسار صورة مش مسموح: ' + path);
+    }
+    var blob = github_('post', '/git/blobs', { content: binaries[path], encoding: 'base64' });
+    return { path: path, mode: '100644', type: 'blob', sha: blob.sha };
+  });
 
   for (var attempt = 0; attempt < 2; attempt++) {
 
@@ -146,7 +156,7 @@ function githubCommitFiles_(files, message) {
       base_tree: parent.tree.sha,
       tree: Object.keys(files).map(function (path) {
         return { path: path, mode: '100644', type: 'blob', content: files[path] };
-      })
+      }).concat(blobEntries)
     });
 
     if (tree.sha === parent.tree.sha) {
@@ -344,8 +354,20 @@ function apiPublish(expectedRevision) {
       files['meeting.ics'] = ics;
     }
 
+    // images used by the content that aren't on the site yet
+    var media = mediaForPublish_(built.media);
+
     // no personal data in the public commit history
-    var commit = githubCommitFiles_(files, 'Publish content ' + built.content.revision + ' (' + cairoNow_(now).replace('T', ' ') + ' Cairo)');
+    var commit = githubCommitFiles_(
+      files,
+      'Publish content ' + built.content.revision + ' (' + cairoNow_(now).replace('T', ' ') + ' Cairo)',
+      media.binaries
+    );
+
+    // only after the commit landed
+    media.ids.forEach(function (id) {
+      upsertRow_('Media', 'id', { id: id, publishedAt: nowStamp_() });
+    });
 
     var props = PropertiesService.getScriptProperties();
 

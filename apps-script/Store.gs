@@ -75,6 +75,104 @@ var TABLES = {
     }
   },
 
+  Sessions: {
+    columns: ['date', 'enabled', 'time', 'topic', 'speaker', 'description', 'image', 'status', 'note', 'visibleFrom', 'updatedAt'],
+    bool: ['enabled'],
+    text: ['date', 'time', 'topic', 'speaker', 'description', 'image', 'status', 'note', 'visibleFrom', 'updatedAt'],
+    notes: {
+      date: 'تاريخ الاجتماع: 2026-10-11',
+      enabled: 'ظاهر',
+      time: 'الساعة لو مختلفة عن المعتاد (مثلاً 19:00)، أو فاضي',
+      topic: 'الموضوع',
+      speaker: 'الخادم / المتكلم',
+      description: 'وصف (اختياري)',
+      image: 'معرّف البوستر من شيت Media (اختياري)',
+      status: 'normal = عادي، cancelled = ملغي',
+      note: 'ملاحظة (مثلاً سبب الإلغاء)',
+      visibleFrom: 'الموضوع يظهر من (اختياري): 2026-10-09 20:00',
+      updatedAt: 'آخر تعديل (تلقائي)'
+    }
+  },
+
+  News: {
+    columns: ['id', 'enabled', 'featured', 'pinned', 'tone', 'title', 'summary', 'body', 'image', 'linkUrl', 'linkLabel', 'badge', 'publishAt', 'expireAt', 'updatedAt'],
+    bool: ['enabled', 'featured', 'pinned'],
+    text: ['id', 'tone', 'title', 'summary', 'body', 'image', 'linkUrl', 'linkLabel', 'badge', 'publishAt', 'expireAt', 'updatedAt'],
+    notes: {
+      id: 'معرّف ثابت (تلقائي)',
+      enabled: 'ظاهر',
+      featured: 'مميز (كارت كبير)',
+      pinned: 'مثبت كشريط فوق (بدل الإعلان)',
+      tone: 'شكل الشريط: info / alert / celebrate',
+      title: 'العنوان',
+      summary: 'سطر قصير',
+      body: 'التفاصيل (اختياري)',
+      image: 'معرّف البوستر من شيت Media',
+      linkUrl: 'لينك (اختياري، https)',
+      linkLabel: 'نص زرار اللينك',
+      badge: 'شارة زي: جديد',
+      publishAt: 'يظهر من: 2026-10-08 20:00',
+      expireAt: 'يختفي بعد (اختياري)',
+      updatedAt: 'آخر تعديل (تلقائي)'
+    }
+  },
+
+  Games: {
+    columns: ['id', 'enabled', 'title', 'description', 'image', 'url', 'buttonLabel', 'visibleFrom', 'startAt', 'endAt', 'afterEnd', 'updatedAt'],
+    bool: ['enabled'],
+    text: ['id', 'title', 'description', 'image', 'url', 'buttonLabel', 'visibleFrom', 'startAt', 'endAt', 'afterEnd', 'updatedAt'],
+    notes: {
+      id: 'معرّف ثابت (تلقائي)',
+      enabled: 'ظاهر',
+      title: 'اسم اللعبة',
+      description: 'وصف قصير',
+      image: 'معرّف البوستر من شيت Media',
+      url: 'لينك اللعبة (https)',
+      buttonLabel: 'نص الزرار (افتراضي: ابدأ اللعب)',
+      visibleFrom: 'تظهر "قريبًا" من (اختياري)',
+      startAt: 'تبدأ: 2026-10-11 22:00',
+      endAt: 'تخلص: 2026-10-11 23:30',
+      afterEnd: 'show = تفضل ظاهرة "انتهت" شوية، hide = تختفي',
+      updatedAt: 'آخر تعديل (تلقائي)'
+    }
+  },
+
+  Notifications: {
+    columns: ['id', 'enabled', 'type', 'title', 'message', 'target', 'image', 'publishAt', 'expireAt', 'updatedAt'],
+    bool: ['enabled'],
+    text: ['id', 'type', 'title', 'message', 'target', 'image', 'publishAt', 'expireAt', 'updatedAt'],
+    notes: {
+      id: 'معرّف ثابت (تلقائي)',
+      enabled: 'ظاهر',
+      type: 'general / meeting / news / game / important',
+      title: 'العنوان',
+      message: 'الرسالة',
+      target: 'بيفتح إيه: meeting أو news:id أو game:id أو لينك https',
+      image: 'معرّف صورة من شيت Media (اختياري)',
+      publishAt: 'يظهر في الجرس من: 2026-10-08 20:00',
+      expireAt: 'يختفي بعد (اختياري، افتراضي 14 يوم)',
+      updatedAt: 'آخر تعديل (تلقائي)'
+    }
+  },
+
+  Media: {
+    columns: ['id', 'path', 'thumb', 'width', 'height', 'alt', 'mime', 'driveId', 'thumbDriveId', 'uploadedAt', 'publishedAt'],
+    text: ['id', 'path', 'thumb', 'alt', 'mime', 'driveId', 'thumbDriveId', 'uploadedAt', 'publishedAt'],
+    notes: {
+      id: 'معرّف الصورة (تلقائي)',
+      path: 'مكانها على الموقع بعد النشر',
+      thumb: 'النسخة الصغيرة',
+      width: 'العرض',
+      height: 'الارتفاع',
+      alt: 'وصف الصورة للي مش شايف',
+      mime: 'النوع',
+      driveId: 'الملف في Drive (مسودة)',
+      thumbDriveId: 'النسخة الصغيرة في Drive',
+      uploadedAt: 'اترفعت',
+      publishedAt: 'اتنشرت على الموقع'
+    }
+  },
+
   Log: {
     columns: ['time', 'user', 'action', 'details'],
     text: ['user', 'action', 'details'],
@@ -87,6 +185,9 @@ var TABLES = {
   }
 
 };
+
+/* tabs added after the first release: missing until setup() runs again */
+var OPTIONAL_TABLES = ['Sessions', 'News', 'Games', 'Notifications', 'Media'];
 
 var LOG_MAX_ROWS = 3000;
 
@@ -245,8 +346,26 @@ function readDraft_() {
     settings: settings,
     sections: readTable_('Sections').map(strip),
     links: readTable_('Links').map(strip),
-    contacts: readTable_('Contacts').map(strip)
+    contacts: readTable_('Contacts').map(strip),
+    sessions: readOptionalTable_('Sessions').map(strip),
+    news: readOptionalTable_('News').map(strip),
+    games: readOptionalTable_('Games').map(strip),
+    notifications: readOptionalTable_('Notifications').map(strip),
+    media: readOptionalTable_('Media').map(strip)
   };
+
+}
+
+
+/* New tabs read as empty until setup() creates them, so updating the code
+   never breaks a deployment that hasn't re-run setup yet. */
+function readOptionalTable_(name) {
+
+  if (!spreadsheet_().getSheetByName(name)) {
+    return [];
+  }
+
+  return readTable_(name);
 
 }
 
@@ -462,10 +581,18 @@ function setup() {
     return TABLES.Contacts.columns.map(function (column) { return row[column] === undefined ? '' : row[column]; });
   }), created);
 
+  OPTIONAL_TABLES.forEach(function (name) {
+    setupTable_(ss, name, [], created);
+  });
+
   setupTable_(ss, 'Log', [], created);
 
   // add settings rows introduced by newer versions of the code
   addMissingSettings_();
+
+  migrateAnnouncement_();
+
+  migrateSkipDates_();
 
   applyValidation_(ss);
 
@@ -556,6 +683,80 @@ function addMissingSettings_() {
 }
 
 
+/**
+ * The single announcement became "pinned news". An announcement that is
+ * still switched on moves into the News tab once, then is switched off.
+ */
+function migrateAnnouncement_() {
+
+  var rows = readTable_('Settings');
+  var value = function (key) {
+    var row = rows.filter(function (r) { return r.key === key; })[0];
+    return row ? row.value : '';
+  };
+
+  var enabledRow = rows.filter(function (r) { return r.key === 'announcement.enabled'; })[0];
+
+  if (!enabledRow || !contentBool_(enabledRow.value) || !contentText_(value('announcement.text'))) {
+    return false;
+  }
+
+  var text = contentText_(value('announcement.text'));
+  var lines = text.split('\n');
+
+  upsertRow_('News', 'id', {
+    id: 'news-' + Utilities.getUuid().slice(0, 8),
+    enabled: true,
+    featured: false,
+    pinned: true,
+    tone: ANNOUNCEMENT_TONES.indexOf(value('announcement.tone')) !== -1 ? value('announcement.tone') : 'info',
+    title: lines[0].slice(0, HUB_LIMITS.newsTitle),
+    summary: lines.slice(1).join(' ').slice(0, HUB_LIMITS.summary),
+    linkUrl: safeHttpsUrl(value('announcement.linkUrl')),
+    linkLabel: contentLine_(value('announcement.linkLabel')),
+    publishAt: nowStamp_(),
+    expireAt: contentLine_(value('announcement.expiresAt')),
+    updatedAt: nowStamp_()
+  });
+
+  sheet_('Settings').getRange(enabledRow.__row, 2).setValue(false);
+
+  return true;
+
+}
+
+
+/**
+ * "Days without a meeting" became cancelled sessions (one place for
+ * cancellations, with a note). Future dates move once; the setting empties.
+ */
+function migrateSkipDates_() {
+
+  var row = readTable_('Settings').filter(function (r) { return r.key === 'meeting.skipDates'; })[0];
+  var text = row ? contentDigits_(row.value) : '';
+
+  if (!text) {
+    return 0;
+  }
+
+  var today = Utilities.formatDate(new Date(), CONTENT_TIMEZONE, 'yyyy-MM-dd');
+  var moved = 0;
+
+  text.split(/[,،\s]+/).filter(Boolean).forEach(function (date) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < today || findRow_('Sessions', 'date', date)) {
+      return;
+    }
+    upsertRow_('Sessions', 'date', { date: date, enabled: true, status: 'cancelled', updatedAt: nowStamp_() });
+    moved++;
+  });
+
+  sheet_('Settings').getRange(row.__row, 2).setNumberFormat('@').setValue('');
+
+  return moved;
+
+}
+
+
 function applyValidation_(ss) {
 
   var checkbox = SpreadsheetApp.newDataValidation().requireCheckbox().build();
@@ -588,6 +789,24 @@ function applyValidation_(ss) {
   columnRange(contacts, 'Contacts', 'enabled').setDataValidation(checkbox);
   columnRange(contacts, 'Contacts', 'kind').setDataValidation(list(CONTACT_KINDS));
   columnRange(contacts, 'Contacts', 'method').setDataValidation(list(CONTACT_METHODS));
+
+  var sessionsSheet = ss.getSheetByName('Sessions');
+  columnRange(sessionsSheet, 'Sessions', 'enabled').setDataValidation(checkbox);
+  columnRange(sessionsSheet, 'Sessions', 'status').setDataValidation(list(SESSION_STATUSES));
+
+  var news = ss.getSheetByName('News');
+  ['enabled', 'featured', 'pinned'].forEach(function (column) {
+    columnRange(news, 'News', column).setDataValidation(checkbox);
+  });
+  columnRange(news, 'News', 'tone').setDataValidation(list(ANNOUNCEMENT_TONES));
+
+  var games = ss.getSheetByName('Games');
+  columnRange(games, 'Games', 'enabled').setDataValidation(checkbox);
+  columnRange(games, 'Games', 'afterEnd').setDataValidation(list(GAME_AFTER_END));
+
+  var notifications = ss.getSheetByName('Notifications');
+  columnRange(notifications, 'Notifications', 'enabled').setDataValidation(checkbox);
+  columnRange(notifications, 'Notifications', 'type').setDataValidation(list(NOTIFICATION_TYPES));
 
   // boolean settings as checkboxes, tone as a dropdown
   var settings = ss.getSheetByName('Settings');

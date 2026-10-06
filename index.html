@@ -66,6 +66,23 @@
     <div class="backdrop__lattice"></div>
   </div>
 
+  <!-- top bar: compact name (after scrolling), sounds toggle, the bell -->
+  <div class="topbar" id="topbar">
+    <span class="topbar__brand" aria-hidden="true">
+      <img src="assets/img/logo-128.webp" width="28" height="28" alt="">
+      <span>أسرة البابا أثناسيوس</span>
+    </span>
+    <div class="topbar__actions">
+      <button class="topbar__btn" id="sound-toggle" type="button" aria-pressed="false" aria-label="أصوات الواجهة: مقفولة">
+        <svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5Z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></svg>
+      </button>
+      <button class="topbar__btn bell" id="bell" type="button" aria-label="الإشعارات" disabled>
+        <svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo bell-body" d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15Z"/><path class="bell-clapper" d="M10 20.5a2 2 0 0 0 4 0"/><path d="M12 3v2"/></svg>
+        <span class="bell__badge" hidden></span>
+      </button>
+    </div>
+  </div>
+
   <main id="main" class="hub" data-state="loading">
 
     <!--
@@ -73,6 +90,8 @@
       instantly; main.js updates the text if the published name changes.
     -->
     <header class="widget hero" data-area="hero">
+
+      <canvas class="hero__dust" aria-hidden="true"></canvas>
 
       <div class="hero__arch">
         <img

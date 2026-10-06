@@ -8,6 +8,7 @@
 
 import { h } from './dom.js';
 import { iconNode } from './icons.js';
+import { play } from './sound.js';
 
 const QR_CARD = { width: 1200, height: 1500 };
 
@@ -65,22 +66,22 @@ async function copyText(text) {
 }
 
 
-export async function copyLink() {
+export async function copyLink(url = pageUrl()) {
 
-  const url = pageUrl();
+  const ok = await copyText(url);
 
-  toast(await copyText(url) ? 'اتنسخ اللينك ✓' : url);
+  toast(ok ? 'اتنسخ اللينك ✓' : url);
+
+  if (ok) play('success');
 
 }
 
 
-export async function shareLink(site) {
-
-  const url = pageUrl();
+export async function shareLink(site, { url = pageUrl(), title = site.name, text = site.shareText || site.name } = {}) {
 
   if (navigator.share) {
     try {
-      await navigator.share({ title: site.name, text: site.shareText || site.name, url });
+      await navigator.share({ title, text, url });
       return;
     }
     catch (error) {
@@ -90,7 +91,15 @@ export async function shareLink(site) {
     }
   }
 
-  await copyLink();
+  await copyLink(url);
+
+}
+
+
+/* Sharing one item (news, game) by its deep link, e.g. "#news/trip". */
+export function shareTarget(site) {
+
+  return (hash, title) => shareLink(site, { url: pageUrl() + hash, title, text: `${title} — ${site.name}` });
 
 }
 
@@ -298,7 +307,7 @@ export async function openQr(site) {
               setTimeout(() => URL.revokeObjectURL(href), 4000);
             }, 'image/png')
           }, iconNode('download'), 'حمّل الصورة'),
-          h('button', { class: 'btn', type: 'button', onclick: copyLink }, iconNode('copy'), 'انسخ اللينك'),
+          h('button', { class: 'btn', type: 'button', onclick: () => copyLink() }, iconNode('copy'), 'انسخ اللينك'),
           h('button', { class: 'btn', type: 'button', onclick: () => shareLink(site) }, iconNode('share'), 'شارك')
         )
       )

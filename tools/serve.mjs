@@ -6,7 +6,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { ROOT } from './lib/gs.mjs';
 
-const PORT = Number(process.argv[2] || process.env.PORT || 4321);
+const PORT = Number(process.argv.slice(2).find(a => /^\d+$/.test(a)) || process.env.PORT || 4321);
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -26,13 +26,18 @@ const TYPES = {
 // case-insensitive (Windows paths) and no dot-folders (.git, .claude)
 const PRIVATE = /^\/(apps-script|tools|tests|docs|node_modules)(\/|$)|\/\.|\.md$/i;
 
+// --demo: published files come from tools/demo.mjs output instead
+const DEMO = process.argv.includes('--demo');
+const DEMO_FILES = /^\/(content\.json|meeting\.ics|media\/.+)$/;
+
 createServer(async (req, res) => {
   try {
     let path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
     if (PRIVATE.test(path)) throw Object.assign(new Error('private'), { code: 'ENOENT' });
     if (path.endsWith('/')) path += 'index.html';
-    const file = normalize(join(ROOT, path));
-    if (!file.startsWith(normalize(ROOT))) throw Object.assign(new Error('outside'), { code: 'ENOENT' });
+    const base = DEMO && DEMO_FILES.test(path) ? join(ROOT, 'tools/.cache/demo') : ROOT;
+    const file = normalize(join(base, path));
+    if (!file.startsWith(normalize(base))) throw Object.assign(new Error('outside'), { code: 'ENOENT' });
     if (!(await stat(file)).isFile()) throw Object.assign(new Error('dir'), { code: 'ENOENT' });
     const body = await readFile(file);
     res.writeHead(200, {

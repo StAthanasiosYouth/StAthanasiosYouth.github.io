@@ -1,0 +1,551 @@
+<script>
+/*
+ * Admin views for the page itself: links, location, contacts, settings.
+ */
+(function () {
+
+  'use strict';
+
+  var A = window.A;
+  var el = A.el;
+  var icon = A.icon;
+  var bool = A.bool;
+
+  A.ICON_LABELS = {
+    voice: 'رسالة / صوتك يهمنا', facebook: 'فيسبوك', instagram: 'إنستجرام', tiktok: 'تيك توك',
+    youtube: 'يوتيوب', whatsapp: 'واتساب', telegram: 'تيليجرام', spotify: 'سبوتيفاي',
+    form: 'استمارة', calendar: 'تقويم', ticket: 'تذكرة / حجز', bus: 'رحلة', book: 'كتاب مقدس',
+    music: 'ترانيم', photos: 'صور', video: 'فيديو', church: 'كنيسة', cross: 'صليب', heart: 'قلب',
+    star: 'نجمة', megaphone: 'إعلان', gift: 'هدية', users: 'ناس / أسرة', map: 'مكان', info: 'معلومة', link: 'لينك'
+  };
+
+
+  /* =======================================================
+     LINKS
+  ======================================================= */
+
+  A.views.links = function () {
+
+    var links = A.byOrder(A.state.draft.links);
+    var sections = A.byOrder(A.state.draft.sections);
+    var sectionKeys = sections.map(function (s) { return s.key; });
+    var out = [];
+
+    out.push(A.card('الروابط', 'بتظهر في الصفحة بنفس الترتيب ده. أي تعديل بيتحفظ كمسودة لحد ما تدوس "راجع وانشر".',
+      el('div', { class: 'actions' },
+        el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { editLink(null); } }, '+ رابط جديد'),
+        el('button', { class: 'btn', type: 'button', onclick: function () { editSection(null); } }, '+ قسم جديد')
+      )
+    ));
+
+    out.push(linkGroup('مميز — بيظهر كبير فوق', 'زي صوتك يهمنا', null, links.filter(function (l) { return bool(l.featured); })));
+
+    sections.forEach(function (section, index) {
+      out.push(linkGroup(section.title, null, { section: section, first: index === 0, last: index === sections.length - 1 },
+        links.filter(function (l) { return !bool(l.featured) && l.section === section.key; })));
+    });
+
+    var orphans = links.filter(function (l) { return !bool(l.featured) && sectionKeys.indexOf(l.section) === -1; });
+
+    if (orphans.length) {
+      out.push(linkGroup('روابط من غير قسم', 'مش هتظهر في الصفحة لحد ما تختارلها قسم', null, orphans));
+    }
+
+    return out;
+
+  };
+
+  function linkGroup(title, hint, sectionInfo, links) {
+
+    var section = sectionInfo && sectionInfo.section;
+
+    var head = el('div', { class: 'card__head' },
+      el('div', {},
+        el('h2', { class: 'group-title' }, title, section && !bool(section.enabled) ? A.chip('القسم مخفي', 'off') : null),
+        hint ? el('p', { class: 'card__hint', text: hint }) : null,
+        section ? A.chip(section.key, 'ltr') : null
+      ),
+      section ? el('div', { class: 'actions' },
+        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'طلّع القسم لفوق', disabled: sectionInfo.first, onclick: function (e) { A.move('apiMoveSection', section.key, -1, e.currentTarget); } }, icon('chevron-up')),
+        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'نزّل القسم لتحت', disabled: sectionInfo.last, onclick: function (e) { A.move('apiMoveSection', section.key, 1, e.currentTarget); } }, icon('chevron')),
+        A.editButton('القسم', function () { editSection(section); }),
+        A.deleteButton('القسم', function (e) { removeSection(section, e.currentTarget); })
+      ) : null
+    );
+
+    return el('section', { class: 'card' },
+      head,
+      links.length
+        ? el('ul', { class: 'list' }, links.map(function (link, index) { return linkItem(link, index === 0, index === links.length - 1); }))
+        : el('p', { class: 'empty', text: 'مفيش روابط هنا لسه' })
+    );
+
+  }
+
+  function linkItem(link, first, last) {
+
+    var enabled = bool(link.enabled);
+    var chips = [];
+
+    if (!enabled) chips.push(A.chip('مخفي', 'off'));
+    if (!bool(link.featured)) chips.push(A.chip(link.style === 'tile' ? 'مربع' : 'صف'));
+    if (link.badge) chips.push(A.chip(link.badge, 'gold'));
+    if (link.startAt) chips.push(A.chip('من ' + A.formatWall(link.startAt)));
+    if (link.endAt) chips.push(A.chip('لحد ' + A.formatWall(link.endAt)));
+
+    var toggle = A.switchInput('ظاهر', enabled, function (checked) {
+      A.dirty = false;
+      A.call('apiSetLinkEnabled', link.id, checked)
+        .then(function (next) { A.applyState(next); A.toast(checked ? 'الرابط هيظهر بعد النشر' : 'الرابط هيستخبى بعد النشر'); })
+        .catch(function (error) { toggle.input.checked = !checked; A.fail(error); });
+    });
+
+    var item = A.listItem({
+      icon: link.icon,
+      title: link.title,
+      off: !enabled,
+      chips: chips,
+      controls: [
+        toggle.node,
+        el('span', { class: 'spacer' }),
+        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'لفوق', disabled: first, onclick: function (e) { A.move('apiMoveLink', link.id, -1, e.currentTarget); } }, icon('chevron-up')),
+        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'لتحت', disabled: last, onclick: function (e) { A.move('apiMoveLink', link.id, 1, e.currentTarget); } }, icon('chevron')),
+        A.editButton(link.title, function () { editLink(link); }),
+        A.deleteButton(link.title, function (e) { removeLink(link, e.currentTarget); })
+      ]
+    });
+
+    // URLs read left to right
+    item.querySelector('.item__main').insertBefore(
+      el('span', { class: 'item__sub', text: A.shortUrl(link.url) }),
+      item.querySelector('.item__meta')
+    );
+
+    return item;
+
+  }
+
+  function removeLink(link, button) {
+
+    if (!confirm('تمسح "' + link.title + '" خالص؟\nلو عايز تخفيه بس، اقفل "ظاهر" بدل المسح.')) return;
+    A.withBusy(button, A.call('apiDeleteLink', link.id))
+      .then(function (next) { A.applyState(next); A.toast('اتمسح — هيختفي من الموقع بعد النشر'); })
+      .catch(function (error) { A.fail(error); });
+
+  }
+
+  function removeSection(section, button) {
+
+    if (!confirm('تمسح قسم "' + section.title + '"؟')) return;
+    A.withBusy(button, A.call('apiDeleteSection', section.key))
+      .then(function (next) { A.applyState(next); A.toast('القسم اتمسح'); })
+      .catch(function (error) { A.fail(error); });
+
+  }
+
+  function editLink(link) {
+
+    var isNew = !link;
+    // new links default to a general section rather than the social one
+    var sections = A.byOrder(A.state.draft.sections);
+    var defaultSection = sections.filter(function (s) { return s.key !== 'social'; })[0] || sections[0] || {};
+    link = link || { enabled: true, featured: false, style: 'card', icon: 'link', section: defaultSection.key || '' };
+
+    var featured = bool(link.featured);
+    var box = A.errorBox();
+    var limits = A.state.meta.limits;
+
+    var title = A.counted('العنوان', link.title, limits.title, null, { required: true });
+    var subtitle = A.counted('وصف قصير', link.subtitle, limits.subtitle, 'اختياري');
+    var urlInput = A.textInput(link.url, { ltr: true, type: 'url', placeholder: 'https://', inputmode: 'url', required: true });
+
+    var sectionSelect = el('select', { class: 'input', onchange: A.markDirty }, sections.map(function (s) {
+      return el('option', { value: s.key, selected: s.key === link.section ? 'selected' : null, text: s.title + (bool(s.enabled) ? '' : ' (مخفي)') });
+    }));
+    var sectionField = A.field('القسم', sectionSelect);
+
+    var style = A.choices('style', [
+      { value: 'card', label: 'صف عريض' },
+      { value: 'tile', label: 'مربع زي التطبيقات' }
+    ], link.style === 'tile' ? 'tile' : 'card');
+    var styleField = A.field('الشكل', style.node, 'المربع مناسب للسوشيال ميديا، والصف مناسب للينكات اللي محتاجة وصف');
+
+    var cta = A.counted('نص الزرار', link.cta, limits.cta, 'مثلاً: ابعت دلوقتي');
+
+    function syncFeatured(on) {
+      sectionField.hidden = on;
+      styleField.hidden = on;
+      cta.node.hidden = !on;
+    }
+
+    var featuredSwitch = A.switchInput('رابط مميز (يظهر كبير فوق)', featured, syncFeatured);
+    var icons = A.iconPicker(link.icon || 'link');
+
+    var badge = A.textInput(link.badge, { max: limits.badge, placeholder: 'مثلاً: جديد' });
+    var badgeField = A.field('شارة', el('div', { class: 'actions' },
+      badge,
+      el('button', { class: 'btn', type: 'button', onclick: function () { badge.value = 'جديد'; A.markDirty(); } }, 'جديد'),
+      el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { badge.value = ''; A.markDirty(); } }, 'من غير')
+    ), 'اختياري');
+
+    var start = A.dateTimeInput(link.startAt, { presets: [A.PRESETS.now, A.PRESETS.thursday8] });
+    var end = A.dateTimeInput(link.endAt, { presets: [A.PRESETS.sunday10] });
+    var enabled = A.switchInput('ظاهر', link.enabled === undefined ? true : bool(link.enabled));
+
+    syncFeatured(featured);
+
+    var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
+
+    save.addEventListener('click', function () {
+      box.hidden = true;
+      A.withBusy(save, A.call('apiSaveLink', {
+        id: link.id || '',
+        title: title.input.value,
+        subtitle: subtitle.input.value,
+        url: urlInput.value.trim(),
+        featured: featuredSwitch.input.checked,
+        section: sectionSelect.value,
+        style: style.value(),
+        cta: cta.input.value,
+        icon: icons.value(),
+        badge: badge.value,
+        startAt: start.value(),
+        endAt: end.value(),
+        enabled: enabled.input.checked
+      }))
+        .then(function (next) {
+          A.dirty = false;
+          document.getElementById('sheet').close();
+          A.applyState(next);
+          A.toast(isNew ? 'الرابط اتضاف ✓ — لسه محتاج نشر' : 'اتحفظ ✓ — لسه محتاج نشر');
+        })
+        .catch(function (error) { A.fail(error, box); });
+    });
+
+    A.dirty = false;
+
+    A.openSheet(isNew ? 'رابط جديد' : 'تعديل: ' + link.title, [
+      box,
+      el('div', { class: 'form' },
+        title.node,
+        subtitle.node,
+        A.field('اللينك', urlInput, 'لازم يبدأ بـ https://'),
+        featuredSwitch.node,
+        sectionField,
+        styleField,
+        cta.node,
+        A.field('الأيقونة', icons.node),
+        badgeField,
+        A.field('يبدأ يظهر من', start.node, 'اختياري — سيبه فاضي لو هيظهر على طول'),
+        A.field('آخر ظهور', end.node, 'اختياري — مناسب للمؤتمرات والرحلات والتسجيل'),
+        enabled.node
+      )
+    ], A.sheetFooter(save));
+
+  }
+
+  function editSection(section) {
+
+    var isNew = !section;
+    section = section || { key: '', title: '', enabled: true };
+
+    var box = A.errorBox();
+    var key = A.textInput(section.key, { ltr: true, placeholder: 'events', max: 31 });
+
+    if (!isNew) {
+      key.readOnly = true;
+    }
+
+    var title = A.counted('العنوان اللي بيظهر', section.title, A.state.meta.limits.sectionTitle, null, { required: true });
+    var enabled = A.switchInput('القسم ظاهر', bool(section.enabled));
+    var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
+
+    save.addEventListener('click', function () {
+      box.hidden = true;
+      A.withBusy(save, A.call('apiSaveSection', { key: key.value.trim(), title: title.input.value, enabled: enabled.input.checked }, isNew))
+        .then(function (next) {
+          A.dirty = false;
+          document.getElementById('sheet').close();
+          A.applyState(next);
+          A.toast('اتحفظ ✓');
+        })
+        .catch(function (error) { A.fail(error, box); });
+    });
+
+    A.dirty = false;
+
+    A.openSheet(isNew ? 'قسم جديد' : 'تعديل القسم', [
+      box,
+      el('div', { class: 'form' },
+        A.field('مفتاح القسم', key, isNew ? 'بالإنجليزي الصغير ومن غير مسافات، مثلاً events. مش هيظهر للناس' : 'المفتاح مبيتغيرش بعد الإضافة'),
+        title.node,
+        enabled.node
+      )
+    ], A.sheetFooter(save));
+
+  }
+
+
+  /* =======================================================
+     LOCATION
+  ======================================================= */
+
+  A.views.location = function () {
+
+    var setting = A.setting;
+    var limits = A.state.meta.limits;
+    var box = A.errorBox();
+
+    var name = A.counted('اسم المكان', setting('location.name'), limits.title, 'لو فاضي كارت المكان مش هيظهر');
+    var address = A.counted('العنوان', setting('location.address'), limits.address);
+    var note = A.counted('ملاحظة', setting('location.note'), limits.note, 'مثلاً: القاعة اللي في الدور التاني');
+    var mapsUrl = A.textInput(setting('location.mapsUrl'), { ltr: true, type: 'url', placeholder: 'https://maps.app.goo.gl/...' });
+    var lat = A.textInput(setting('location.lat'), { ltr: true, inputmode: 'decimal', placeholder: '26.73' });
+    var lng = A.textInput(setting('location.lng'), { ltr: true, inputmode: 'decimal', placeholder: '33.93' });
+
+    var resolve = el('button', { class: 'btn', type: 'button' }, icon('map'), 'هات الإحداثيات من اللينك');
+
+    resolve.addEventListener('click', function () {
+      box.hidden = true;
+      A.withBusy(resolve, A.call('apiResolveMapsUrl', mapsUrl.value.trim()))
+        .then(function (coords) {
+          lat.value = coords.lat;
+          lng.value = coords.lng;
+          A.markDirty();
+          A.toast('اتجابت الإحداثيات — دوس حفظ');
+        })
+        .catch(function (error) { A.fail(error, box); });
+    });
+
+    return [A.card('مكان الاجتماع', 'زرار "الاتجاهات" والخريطة بيستخدموا الإحداثيات.',
+      box,
+      el('div', { class: 'form' },
+        name.node,
+        address.node,
+        note.node,
+        A.field('لينك جوجل ماب', mapsUrl),
+        el('div', { class: 'actions' }, resolve),
+        el('div', { class: 'row' }, A.field('خط العرض', lat), A.field('خط الطول', lng))
+      ),
+      A.settingsSaver(function () {
+        return {
+          'location.name': name.input.value,
+          'location.address': address.input.value,
+          'location.note': note.input.value,
+          'location.mapsUrl': mapsUrl.value.trim(),
+          'location.lat': lat.value.trim(),
+          'location.lng': lng.value.trim()
+        };
+      }, box)
+    )];
+
+  };
+
+
+  /* =======================================================
+     CONTACTS
+  ======================================================= */
+
+  A.views.contacts = function () {
+
+    var contacts = A.byOrder(A.state.draft.contacts);
+
+    return [A.card('التواصل', '"تواصل مع الخدمة" بيظهر بشكل واضح، و"الدعم الفني" بيظهر أهدى.',
+      el('div', { class: 'actions' },
+        el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { editContact(null); } }, '+ جهة تواصل')
+      ),
+      contacts.length
+        ? el('ul', { class: 'list' }, contacts.map(function (contact, index) {
+          var enabled = bool(contact.enabled);
+          return A.listItem({
+            icon: contact.method === 'whatsapp' ? 'whatsapp' : 'phone',
+            title: contact.name,
+            sub: contact.phone,
+            off: !enabled,
+            chips: [
+              A.chip(contact.kind === 'support' ? 'دعم فني' : 'تواصل مع الخدمة', 'gold'),
+              A.chip(contact.method === 'whatsapp' ? 'واتساب بس' : 'اتصال بس'),
+              contact.role ? A.chip(contact.role) : null,
+              enabled ? null : A.chip('مخفي', 'off')
+            ],
+            controls: [
+              el('span', { class: 'spacer' }),
+              el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'لفوق', disabled: index === 0, onclick: function (e) { A.move('apiMoveContact', contact.id, -1, e.currentTarget); } }, icon('chevron-up')),
+              el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'لتحت', disabled: index === contacts.length - 1, onclick: function (e) { A.move('apiMoveContact', contact.id, 1, e.currentTarget); } }, icon('chevron')),
+              A.editButton(contact.name, function () { editContact(contact); }),
+              A.deleteButton(contact.name, function (e) {
+                if (!confirm('تمسح "' + contact.name + '"؟')) return;
+                A.withBusy(e.currentTarget, A.call('apiDeleteContact', contact.id)).then(A.applyState).catch(function (error) { A.fail(error); });
+              })
+            ]
+          });
+        }))
+        : el('p', { class: 'empty', text: 'مفيش جهات تواصل' })
+    )];
+
+  };
+
+  function editContact(contact) {
+
+    var isNew = !contact;
+    contact = contact || { enabled: true, kind: 'service', method: 'call' };
+
+    var limits = A.state.meta.limits;
+    var box = A.errorBox();
+    var name = A.counted('الاسم', contact.name, limits.personName, null, { required: true });
+    var role = A.counted('الدور', contact.role, limits.role, 'مثلاً: أمين الخدمة');
+    var description = A.counted('وصف قصير', contact.description, limits.description);
+    var phoneInput = A.textInput(contact.phone, { ltr: true, type: 'tel', inputmode: 'tel', placeholder: '01xxxxxxxxx' });
+
+    var kind = A.choices('kind', [
+      { value: 'service', label: 'تواصل مع الخدمة' },
+      { value: 'support', label: 'دعم فني (أهدى)' }
+    ], contact.kind || 'service');
+
+    var message = A.counted('رسالة الواتساب الجاهزة', contact.message, limits.message, 'اختياري — بتتكتب لوحدها لما حد يفتح الواتساب', { multiline: true });
+
+    var method = A.choices('method', [
+      { value: 'call', label: 'اتصال بس', icon: 'phone' },
+      { value: 'whatsapp', label: 'واتساب بس', icon: 'whatsapp' }
+    ], contact.method || 'call', function (value) { message.node.hidden = value !== 'whatsapp'; });
+
+    message.node.hidden = (contact.method || 'call') !== 'whatsapp';
+
+    var enabled = A.switchInput('ظاهر', contact.enabled === undefined ? true : bool(contact.enabled));
+    var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
+
+    save.addEventListener('click', function () {
+      box.hidden = true;
+      A.withBusy(save, A.call('apiSaveContact', {
+        id: contact.id || '',
+        name: name.input.value,
+        role: role.input.value,
+        description: description.input.value,
+        phone: phoneInput.value,
+        kind: kind.value(),
+        method: method.value(),
+        message: message.input.value,
+        enabled: enabled.input.checked
+      }))
+        .then(function (next) {
+          A.dirty = false;
+          document.getElementById('sheet').close();
+          A.applyState(next);
+          A.toast('اتحفظ ✓ — لسه محتاج نشر');
+        })
+        .catch(function (error) { A.fail(error, box); });
+    });
+
+    A.dirty = false;
+
+    A.openSheet(isNew ? 'جهة تواصل جديدة' : 'تعديل: ' + contact.name, [
+      box,
+      el('div', { class: 'form' },
+        name.node,
+        role.node,
+        description.node,
+        A.field('رقم التليفون', phoneInput),
+        A.field('النوع', kind.node),
+        A.field('طريقة التواصل', method.node),
+        message.node,
+        enabled.node
+      )
+    ], A.sheetFooter(save));
+
+  }
+
+
+  /* =======================================================
+     SETTINGS
+  ======================================================= */
+
+  A.views.settings = function () {
+
+    var setting = A.setting;
+    var limits = A.state.meta.limits;
+    var box = A.errorBox();
+
+    var name = A.counted('اسم الخدمة الرسمي', setting('site.name'), limits.siteName, A.settingHelp('site.name'), { required: true });
+    var tagline = A.counted('الجملة التعريفية', setting('site.tagline'), limits.tagline, A.settingHelp('site.tagline'));
+    var shareText = A.counted('نص المشاركة', setting('site.shareText'), limits.shareText, A.settingHelp('site.shareText'));
+
+    var siteCard = A.card('الموقع', null,
+      box,
+      el('div', { class: 'form' }, name.node, tagline.node, shareText.node),
+      A.settingsSaver(function () {
+        return {
+          'site.name': name.input.value,
+          'site.tagline': tagline.input.value,
+          'site.shareText': shareText.input.value
+        };
+      }, box)
+    );
+
+    var hubBox = A.errorBox();
+    var historyDays = A.textInput(setting('notifications.historyDays'), { type: 'number', inputmode: 'numeric' });
+    var endedHours = A.textInput(setting('games.endedHours'), { type: 'number', inputmode: 'numeric' });
+
+    var hubCard = A.card('المحتوى', null,
+      hubBox,
+      el('div', { class: 'form' },
+        A.field('الإشعارات بتفضل في الجرس كام يوم', historyDays, A.settingHelp('notifications.historyDays')),
+        A.field('اللعبة بتفضل ظاهرة كام ساعة بعد ما تخلص', endedHours, A.settingHelp('games.endedHours'))
+      ),
+      A.settingsSaver(function () {
+        return {
+          'notifications.historyDays': historyDays.value,
+          'games.endedHours': endedHours.value
+        };
+      }, hubBox)
+    );
+
+    var config = A.state.config;
+    var status = A.state.status;
+    var checkResult = el('p', { class: 'note', hidden: true });
+    var check = el('button', { class: 'btn', type: 'button', text: 'اختبر الاتصال بـ GitHub' });
+
+    check.addEventListener('click', function () {
+      checkResult.hidden = true;
+      A.withBusy(check, A.call('apiCheckGithub'))
+        .then(function (result) {
+          checkResult.className = 'note note--ok';
+          checkResult.textContent = 'تمام ✓ — ' + result.repo + ' (' + result.branch + ' @ ' + result.head + ')' + (result.pages ? ' — GitHub Pages شغال' : ' — GitHub Pages مش متفعل');
+          checkResult.hidden = false;
+        })
+        .catch(function (error) {
+          checkResult.className = 'errors';
+          checkResult.textContent = error.message;
+          checkResult.hidden = false;
+        });
+    });
+
+    var commitLink = status.publishedCommit && config.repo
+      ? el('a', { href: 'https://github.com/' + config.repo + '/commit/' + status.publishedCommit, target: '_blank', rel: 'noopener', text: status.publishedCommit.slice(0, 7) })
+      : '—';
+
+    var publishCard = A.card('النشر', 'القيم دي بتتظبط من Script Properties في محرر Apps Script (مش من هنا، علشان الأمان).',
+      el('dl', { class: 'kv' },
+        el('dt', { text: 'الريبو' }), el('dd', { class: 'chip--ltr', text: config.repo || 'ناقص — GITHUB_REPO' }),
+        el('dt', { text: 'الفرع' }), el('dd', { text: config.branch }),
+        el('dt', { text: 'التوكن' }), el('dd', { text: config.tokenSet ? 'متسجل ✓' : 'ناقص — GITHUB_TOKEN' }),
+        el('dt', { text: 'الموقع' }), el('dd', {}, config.siteUrl ? el('a', { href: config.siteUrl, target: '_blank', rel: 'noopener', text: config.siteUrl }) : 'ناقص — SITE_URL'),
+        el('dt', { text: 'آخر نشر' }), el('dd', { text: A.formatIso(status.publishedAt) }),
+        el('dt', { text: 'الكوميت' }), el('dd', {}, commitLink)
+      ),
+      checkResult,
+      el('div', { class: 'actions' },
+        check,
+        el('a', { class: 'btn', href: config.sheetUrl, target: '_blank', rel: 'noopener', text: 'افتح الشيت' })
+      )
+    );
+
+    var accountCard = A.card('الحساب', null,
+      el('p', {}, 'انت داخل بـ ', A.chip(A.state.user, 'ltr'))
+    );
+
+    return [siteCard, A.state.hubReady ? hubCard : null, publishCard, accountCard].filter(Boolean);
+
+  };
+
+})();
+</script>

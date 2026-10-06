@@ -149,6 +149,7 @@ export class FakeGitHub {
     this.repo = repo;
     this.token = token;
     this.trees = new Map();
+    this.blobs = new Map();
     this.commits = new Map();
     this.requests = [];
     const tree = this.storeTree({ ...files });
@@ -212,9 +213,15 @@ export class FakeGitHub {
       return commit ? this.respond(200, { sha: match[1], tree: { sha: commit.tree } }) : this.respond(404, { message: 'no commit' });
     }
 
+    if (method === 'post' && path === '/git/blobs') {
+      const sha = createHash('sha1').update(body.content).digest('hex');
+      this.blobs.set(sha, Buffer.from(body.content, body.encoding === 'base64' ? 'base64' : 'utf8'));
+      return this.respond(201, { sha });
+    }
+
     if (method === 'post' && path === '/git/trees') {
       const files = { ...this.trees.get(body.base_tree) };
-      for (const entry of body.tree) files[entry.path] = entry.content;
+      for (const entry of body.tree) files[entry.path] = entry.sha ? this.blobs.get(entry.sha) : entry.content;
       return this.respond(201, { sha: this.storeTree(files) });
     }
 
@@ -245,6 +252,58 @@ export class FakeGitHub {
 
     return this.respond(404, { message: `unhandled ${method} ${path}` });
 
+  }
+
+}
+
+
+/* =========================================================
+   DRIVE (REST, drive.file)
+========================================================= */
+
+export class FakeDrive {
+
+  constructor() {
+    this.files = new Map();
+    this.requests = [];
+  }
+
+  respond(code, body, bytes) {
+    const text = body === undefined ? '' : JSON.stringify(body);
+    return { getResponseCode: () => code, getContentText: () => text, getContent: () => bytes || [], getHeaders: () => ({}) };
+  }
+
+  fetch(url, options = {}) {
+    const method = (options.method || 'get').toLowerCase();
+    this.requests.push({ method, url, contentType: options.contentType });
+    if ((options.headers || {}).Authorization !== 'Bearer fake-oauth-token') return this.respond(401, { error: 'auth' });
+
+    if (method === 'post' && url.startsWith('https://www.googleapis.com/drive/v3/files?')) {
+      const id = 'folder' + randomUUID().replace(/-/g, '');
+      this.files.set(id, { meta: JSON.parse(options.payload), bytes: [] });
+      return this.respond(200, { id });
+    }
+
+    if (method === 'post' && url.startsWith('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart')) {
+      // multipart/related: JSON part, then the binary part
+      const boundary = /boundary=(\S+)/.exec(options.contentType)[1];
+      const raw = Buffer.from(options.payload.map(b => (b < 0 ? b + 256 : b)));
+      const text = raw.toString('latin1');
+      const parts = text.split('--' + boundary).slice(1, -1);
+      const meta = JSON.parse(Buffer.from(parts[0].split('\r\n\r\n')[1].trim(), 'latin1').toString('utf8'));
+      const body = parts[1].slice(parts[1].indexOf('\r\n\r\n') + 4, -2);
+      const id = 'file' + randomUUID().replace(/-/g, '');
+      this.files.set(id, { meta, bytes: [...Buffer.from(body, 'latin1')].map(b => (b > 127 ? b - 256 : b)) });
+      return this.respond(200, { id });
+    }
+
+    const match = /^https:\/\/www\.googleapis\.com\/drive\/v3\/files\/([\w-]+)\?alt=media$/.exec(url);
+    if (method === 'get' && match) {
+      const file = this.files.get(match[1]);
+      return file ? this.respond(200, undefined, file.bytes) : this.respond(404, { error: 'not found' });
+    }
+
+    return this.respond(404, { error: 'unhandled ' + url });
   }
 
 }
@@ -283,7 +342,7 @@ function formatDate(date, timeZone, pattern) {
  * Creates a fresh Apps Script world with all project .gs files loaded.
  * world.as(email) switches the signed-in user.
  */
-export function createWorld({ owner = 'menazakmena@gmail.com', github = new FakeGitHub(), mapsRedirects = {}, adminEmails = owner } = {}) {
+export function createWorld({ owner = 'menazakmena@gmail.com', github = new FakeGitHub(), drive = new FakeDrive(), mapsRedirects = {}, adminEmails = owner } = {}) {
 
   // standalone script project: no active spreadsheet; setup() creates one
   const properties = new Map(adminEmails ? [['ADMIN_EMAILS', adminEmails]] : []);
@@ -336,8 +395,15 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
       DigestAlgorithm: { SHA_256: 'sha256' },
       Charset: { UTF_8: 'utf8' },
       computeDigest: (algorithm, text) => [...createHash(algorithm).update(text, 'utf8').digest()].map(b => (b > 127 ? b - 256 : b)),
-      base64Decode: text => [...Buffer.from(text, 'base64')],
-      newBlob: bytes => ({ getDataAsString: () => Buffer.from(bytes.map(b => (b < 0 ? b + 256 : b))).toString('utf8') })
+      base64Decode: text => [...Buffer.from(text, 'base64')].map(b => (b > 127 ? b - 256 : b)),
+      base64Encode: bytes => Buffer.from(bytes.map(b => (b < 0 ? b + 256 : b))).toString('base64'),
+      newBlob: data => {
+        const buffer = typeof data === 'string' ? Buffer.from(data, 'utf8') : Buffer.from(data.map(b => (b < 0 ? b + 256 : b)));
+        return {
+          getDataAsString: () => buffer.toString('utf8'),
+          getBytes: () => [...buffer].map(b => (b > 127 ? b - 256 : b))
+        };
+      }
     },
 
     UrlFetchApp: {
@@ -345,6 +411,7 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
         if (mapsRedirects[url]) {
           return { getResponseCode: () => 302, getContentText: () => '', getHeaders: () => ({ Location: mapsRedirects[url] }) };
         }
+        if (url.startsWith('https://www.googleapis.com/')) return drive.fetch(url, options);
         return github.fetch(url, options);
       }
     },
@@ -371,17 +438,21 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
       createHtmlOutputFromFile: name => ({ getContent: () => readFileSync(`${ROOT}apps-script/${name}.html`, 'utf8') })
     },
 
-    ScriptApp: { getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/fake/exec' }) }
+    ScriptApp: {
+      getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/fake/exec' }),
+      getOAuthToken: () => 'fake-oauth-token'
+    }
 
   });
 
-  for (const file of ['Content.gs', 'Seed.gs', 'Auth.gs', 'Store.gs', 'Publish.gs', 'Code.gs']) {
+  for (const file of ['Content.gs', 'Hub.gs', 'Seed.gs', 'Auth.gs', 'Store.gs', 'Publish.gs', 'Code.gs', 'Media.gs', 'Items.gs']) {
     vm.runInContext(readFileSync(`${ROOT}apps-script/${file}`, 'utf8'), context, { filename: file });
   }
 
   return {
     gs: context,
     github,
+    drive,
     get spreadsheet() { return spreadsheet; },
     properties,
     as(email) { user = email; return this; }

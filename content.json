@@ -1,7 +1,7 @@
 {
-  "schema": 1,
-  "revision": "c157b1f66ffa",
-  "publishedAt": "2026-10-05T16:07:36.648Z",
+  "schema": 2,
+  "revision": "e1e30fe42612",
+  "publishedAt": "2026-10-05T18:18:38.006Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -110,5 +110,9 @@
         "label": "واتساب"
       }
     }
-  ]
+  ],
+  "sessions": [],
+  "news": [],
+  "games": [],
+  "notifications": []
 }

@@ -128,6 +128,11 @@ for (const [name, viewport] of Object.entries(VIEWPORTS)) {
     await page.setBypassCSP(true);
     await page.reload({ waitUntil: 'networkidle0' });
     await ready(page);
+    // measure contrast after the one-time entrance animations (fading cards are see-through)
+    const ENTRANCES = ['rise-depth', 'arch-in', 'logo-in', 'cross-in', 'name-in'];
+    await page.waitForFunction(names => document.getAnimations()
+      .filter(a => names.includes(a.animationName))
+      .every(a => a.playState !== 'running'), { timeout: 8000 }, ENTRANCES);
     await page.evaluate(AXE);
     const results = await page.evaluate(() => axe.run(document, {
       runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'] }

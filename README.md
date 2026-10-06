@@ -22,20 +22,25 @@ contact.
 Everything is done from the admin panel (the Apps Script web app URL), on
 a phone or a computer:
 
-| I want to…                              | Where                                        |
-| --------------------------------------- | -------------------------------------------- |
-| add / edit / hide / reorder a link      | **الروابط**                                   |
-| show a link only between two dates      | edit the link → *يبدأ يظهر من* / *آخر ظهور*  |
-| mark a link «جديد»                       | edit the link → *شارة*                        |
-| change the meeting day, time or duration | **الاجتماع والمكان**                          |
-| cancel one week's meeting               | **الاجتماع والمكان** → *أيام مفيهاش اجتماع*   |
-| change the location or map link         | **الاجتماع والمكان**                          |
-| post an announcement with an end date   | **الإعلان**                                   |
-| change phone numbers or contacts        | **التواصل**                                   |
-| change the name / tagline / share text  | **الإعدادات**                                 |
-| make it live                            | **راجع وانشر** → check the list → **نشر التغييرات** |
+| I want to…                                   | Where                                              |
+| -------------------------------------------- | -------------------------------------------------- |
+| see everything coming up, by day             | **الجدول**                                          |
+| set next Sunday's topic, speaker, poster     | **المحتوى → الاجتماعات** → *+ اجتماع*               |
+| cancel one week / move it to another time    | same meeting → *ملغي الأسبوع ده* / *الساعة*        |
+| change the weekly day, time or duration      | **المحتوى → الاجتماعات** → *الميعاد الأسبوعي*        |
+| post news or a poster, now or scheduled      | **المحتوى → الأخبار**                               |
+| pin an important banner (e.g. "مفيش اجتماع") | a news item → *مثبت كشريط فوق*                      |
+| prepare a game that opens at a set time      | **المحتوى → الألعاب** (with "15 min before" / "at start" alerts) |
+| add something to the bell 🔔                  | **الإشعارات**, or the checkbox in any meeting, news or game |
+| add / edit / hide / reorder a link           | **الصفحة → الروابط**                                |
+| change the location or map link              | **الصفحة → المكان**                                 |
+| change phone numbers or contacts             | **الصفحة → التواصل**                                |
+| change the name / tagline / share text       | **الإعدادات**                                        |
+| make it live                                 | **راجع وانشر** → check the list → **نشر التغييرات** |
 
-Changes appear on the site about a minute after publishing.
+Changes appear on the site about a minute after publishing. Anything with a
+future time (news, topics, games, bell items) can be published early: the site
+shows it, opens it or hides it on time by itself, in Egypt time.
 
 ## Repository layout
 
@@ -65,7 +70,8 @@ npm install
 | `npm run serve`                        | Public site at <http://localhost:4321/>                |
 | `node admin-preview.mjs`               | Admin panel at <http://localhost:4322/>, real `.gs` code on a fake Sheet and fake GitHub |
 | `npm test`                             | Content model, schedule, admin/auth/publishing tests   |
-| `npm run e2e`                          | Headless Chrome: accessibility (axe), layout, CSP, QR decode, tampering |
+| `npm run e2e`                          | Headless Chrome: accessibility (axe), layout, CSP, QR decode, tampering, bell, deep links, wrong device clock, sound, reduced motion |
+| `npm run demo`, then `node serve.mjs 4321 --demo` | The site with demo meetings, news (posters), games in every state and notifications, built through the real admin code |
 | `npm run assets`                       | Rebuild logo sizes, icons, Open Graph image            |
 | `npm run seed`                         | Regenerate `content.json` + `meeting.ics` from `apps-script/Seed.gs` |
 | `npm run sync`                         | Regenerate the admin's icon file after changing icons  |

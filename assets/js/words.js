@@ -144,3 +144,75 @@ export function describeMeeting(status) {
   }
 
 }
+
+
+/* =========================================================
+   STAMPS ("YYYY-MM-DDTHH:MM", Cairo wall time)
+========================================================= */
+
+function stampParts(value) {
+
+  const [date, time] = value.split('T');
+  const [y, m, d] = date.split('-').map(Number);
+  const [hh, mm] = (time || '00:00').split(':').map(Number);
+  const dayNumber = Math.round(Date.UTC(y, m - 1, d) / 86400000);
+
+  return {
+    date: { year: y, month: m, day: d, weekday: new Date(dayNumber * 86400000).getUTCDay() },
+    dayNumber,
+    minutes: hh * 60 + mm
+  };
+
+}
+
+
+/* "الأحد ١١ أكتوبر الساعة ٨ بالليل" */
+export function formatStamp(value, { withTime = true } = {}) {
+
+  const p = stampParts(value);
+  const date = formatDate(p.date);
+
+  return withTime ? `${date} الساعة ${formatTime(p.minutes)}` : date;
+
+}
+
+
+/* Bell history groups. */
+export function dayGroup(value, nowStamp) {
+
+  const diff = stampParts(nowStamp).dayNumber - stampParts(value).dayNumber;
+
+  if (diff <= 0) return 'النهارده';
+  if (diff === 1) return 'امبارح';
+  if (diff < 7) return 'الأسبوع ده';
+  return 'أقدم';
+
+}
+
+
+/* "دلوقتي", "من ١٠ دقايق", "من ساعتين", "امبارح ٨ بالليل", "الأحد ٤ أكتوبر" */
+export function relativeTime(value, nowStamp) {
+
+  const then = stampParts(value);
+  const now = stampParts(nowStamp);
+  const minutes = (now.dayNumber - then.dayNumber) * 1440 + now.minutes - then.minutes;
+
+  if (minutes < 1) return 'دلوقتي';
+  if (minutes < 60) return `من ${countMinutes(minutes)}`;
+  if (now.dayNumber === then.dayNumber) return `من ${countMinutes(Math.floor(minutes / 60) * 60)}`;
+  if (now.dayNumber - then.dayNumber === 1) return `امبارح ${formatTime(then.minutes)}`;
+
+  return formatDate(then.date);
+
+}
+
+
+/* Countdown to a start: "بعد ٤٥ دقيقة", "بعد ساعتين و١٠ دقايق", "بعد ٣ أيام" */
+export function untilText(minutes) {
+
+  if (minutes < 1) return 'خلال لحظات';
+  if (minutes < 24 * 60) return `بعد ${countMinutes(minutes)}`;
+
+  return `بعد ${countDays(Math.round(minutes / 1440))}`;
+
+}
