@@ -455,7 +455,8 @@ function bytesHash_(bytes) {
 
 /**
  * Where each image is used: { id: [{ area, key, label }] }.
- * area: sessions / news / games / notifications / activities / sections / types
+ * area: sessions / news / games / notifications / activities / sections / types /
+ *       contacts / links
  */
 function mediaUsage_() {
 
@@ -474,6 +475,11 @@ function mediaUsage_() {
   readOptionalTable_('Activities').forEach(function (r) { add(r.image, 'activities', r.id, 'فعالية: ' + r.title); });
   readOptionalTable_('Types').forEach(function (r) { add(r.banner, 'types', r.key, 'بانر النوع: ' + r.label); });
   readTable_('Sections').forEach(function (r) { add(r.banner, 'sections', r.key, 'بانر القسم: ' + r.title); });
+  // schema 4: a person's photo, a link scene's own photos
+  readTable_('Contacts').forEach(function (r) { add(r.image, 'contacts', r.id, 'صورة: ' + r.name); });
+  readTable_('Links').forEach(function (r) {
+    contentLine_(r.gallery).split(/[\s,،]+/).filter(Boolean).forEach(function (id) { add(id, 'links', r.id, 'صور مشهد: ' + r.title); });
+  });
 
   return usage;
 
