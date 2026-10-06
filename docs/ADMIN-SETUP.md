@@ -19,7 +19,7 @@ The portal is the service account's main site:
 
 | Account             | Repository                    | Public URL                                  |
 | ------------------- | ----------------------------- | ------------------------------------------- |
-| `StAthanasiosYouth` | `stathanasiosyouth.github.io` | **`https://stathanasiosyouth.github.io/`** |
+| `StAthanasiosYouth` | `StAthanasiosYouth.github.io` | **`https://stathanasiosyouth.github.io/`** |
 
 `صوتك يهمنا` keeps working at `https://stathanasiosyouth.github.io/your-voice-matters/`
 (a project site under the same account).
@@ -29,7 +29,7 @@ shared links, calendar). If it ever changes: `npm run set-url -- <new URL>`
 in `tools/`, then the same value in `SITE_URL` (step 4).
 
 1. Signed in as **StAthanasiosYouth**, create a **public** repository named
-   exactly `stathanasiosyouth.github.io`. Don't add a README, license or
+   exactly `StAthanasiosYouth.github.io` (GitHub ignores the case). Don't add a README, license or
    .gitignore (this folder has them).
 2. Push this folder to the repository's `main` branch.
 3. Repository **Settings → Pages**: *Source* = "Deploy from a branch",
@@ -109,7 +109,7 @@ property**:
 | --------------- | -------------------------------------------------------- |
 | `ADMIN_EMAILS`  | `menazakmena@gmail.com` (comma-separated if you add admins later) |
 | `GITHUB_TOKEN`  | the token from step 3                                    |
-| `GITHUB_REPO`   | `StAthanasiosYouth/stathanasiosyouth.github.io` |
+| `GITHUB_REPO`   | `StAthanasiosYouth/StAthanasiosYouth.github.io` |
 | `GITHUB_BRANCH` | `main`                                                   |
 | `SITE_URL`      | `https://stathanasiosyouth.github.io/`                   |
 

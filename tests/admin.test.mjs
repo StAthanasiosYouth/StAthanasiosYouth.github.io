@@ -14,7 +14,7 @@ function configuredWorld(options = {}) {
   const world = createWorld(options);
   world.as(ADMIN).gs.setup();
   world.properties.set('GITHUB_TOKEN', 'test-token');
-  world.properties.set('GITHUB_REPO', 'StAthanasiosYouth/stathanasiosyouth.github.io');
+  world.properties.set('GITHUB_REPO', 'StAthanasiosYouth/StAthanasiosYouth.github.io');
   world.properties.set('SITE_URL', 'https://stathanasiosyouth.github.io/');
   return world;
 }
@@ -209,7 +209,7 @@ test('publish: review, revision guard, one commit with both files, clean JSON', 
   const headBefore = world.github.head;
   const result = plain(gs.apiPublish(review.revision));
   assert.equal(result.revision, review.revision);
-  assert.ok(result.commitUrl.startsWith('https://github.com/StAthanasiosYouth/stathanasiosyouth.github.io/commit/'));
+  assert.ok(result.commitUrl.startsWith('https://github.com/StAthanasiosYouth/StAthanasiosYouth.github.io/commit/'));
   assert.equal(world.github.commits.get(world.github.head).parents[0], headBefore, 'single fast-forward commit');
 
   const files = world.github.files();
@@ -297,7 +297,7 @@ test('publish: missing or bad token gives a clear message without leaking it', (
 
 test('check GitHub connection', () => {
   const result = plain(configuredWorld().as(ADMIN).gs.apiCheckGithub());
-  assert.equal(result.repo, 'StAthanasiosYouth/stathanasiosyouth.github.io');
+  assert.equal(result.repo, 'StAthanasiosYouth/StAthanasiosYouth.github.io');
   assert.equal(result.canPush, true);
 });
 

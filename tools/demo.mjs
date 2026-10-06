@@ -20,7 +20,7 @@ const gs = world.as(ADMIN).gs;
 
 gs.setup();
 world.properties.set('GITHUB_TOKEN', 'test-token');
-world.properties.set('GITHUB_REPO', 'StAthanasiosYouth/stathanasiosyouth.github.io');
+world.properties.set('GITHUB_REPO', 'StAthanasiosYouth/StAthanasiosYouth.github.io');
 world.properties.set('SITE_URL', 'https://stathanasiosyouth.github.io/');
 
 const now = gs.cairoNow_();                       // "YYYY-MM-DDTHH:MM"

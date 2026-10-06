@@ -18,7 +18,7 @@ function world() {
   const w = createWorld();
   w.as(ADMIN).gs.setup();
   w.properties.set('GITHUB_TOKEN', 'test-token');
-  w.properties.set('GITHUB_REPO', 'StAthanasiosYouth/stathanasiosyouth.github.io');
+  w.properties.set('GITHUB_REPO', 'StAthanasiosYouth/StAthanasiosYouth.github.io');
   w.properties.set('SITE_URL', 'https://stathanasiosyouth.github.io/');
   return w;
 }
