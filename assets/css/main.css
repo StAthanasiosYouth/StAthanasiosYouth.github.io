@@ -2996,3 +2996,146 @@ dialog.sheet::backdrop {
   }
 
 }
+
+
+/* =========================================================
+   MEETING TOPIC v2: clear hierarchy
+   label (pill)  ->  topic (big, clear)  ->  speaker (under a hairline)
+========================================================= */
+
+.topic {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 16px;
+}
+
+.topic__poster img {
+  width: 64px;
+  height: 82px;
+  border-radius: 32px 32px 12px 12px;
+}
+
+.topic__text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.topic__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 11px 3px 12px;
+  border-radius: 999px;
+  font-size: .76rem;
+  font-weight: 800;
+  line-height: 1.5;
+  color: var(--gold-hi);
+  background: rgba(215, 170, 80, .16);
+}
+
+.topic__label .icon {
+  width: 15px;
+  height: 15px;
+}
+
+/* the topic itself: the clearest thing in the card */
+.topic__title {
+  font-family: var(--font-ui);
+  font-size: clamp(1.2rem, 5.2vw, 1.4rem);
+  font-weight: 800;
+  line-height: 1.5;
+  color: #fff;
+  text-wrap: balance;
+}
+
+.topic__speaker {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  align-self: stretch;
+  padding-top: 8px;
+  border-top: 1px solid var(--gold-line);
+  font-size: .9rem;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+.topic__speaker .icon {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  color: var(--gold);
+}
+
+.topic__go {
+  align-self: center;
+}
+
+/* small phones: a little tighter, poster smaller */
+@media (max-width: 380px) {
+
+  .topic {
+    gap: 12px;
+    padding: 14px 12px;
+  }
+
+  .topic__poster img {
+    width: 54px;
+    height: 70px;
+  }
+
+}
+
+
+/* =========================================================
+   GAMES CORNER LOGO
+========================================================= */
+
+.games__head {
+  display: flex;
+  justify-content: center;
+  margin: -2px 0 16px;
+}
+
+.games__logo {
+  display: block;
+  width: min(240px, 72%);
+  height: auto;
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, .55));
+}
+
+.live-game {
+  position: relative;
+}
+
+/* the logo as a badge on the live card's corner */
+.live-game__brand {
+  position: absolute;
+  z-index: 3;
+  top: 10px;
+  inset-inline-start: 10px;
+  pointer-events: none;
+}
+
+.live-game__logo {
+  display: block;
+  width: 118px;
+  height: auto;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .6));
+}
+
+@media (min-width: 1024px) {
+
+  .games__logo {
+    width: 300px;
+  }
+
+  .live-game__logo {
+    width: 150px;
+  }
+
+}

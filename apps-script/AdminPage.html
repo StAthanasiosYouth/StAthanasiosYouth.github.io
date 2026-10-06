@@ -543,7 +543,13 @@
       el('p', {}, 'انت داخل بـ ', A.chip(A.state.user, 'ltr'))
     );
 
-    return [siteCard, A.state.hubReady ? hubCard : null, publishCard, accountCard].filter(Boolean);
+    var guideCard = config.repo
+      ? A.card('دليل الأدمن', 'كل خانة معناها إيه، وإزاي تضيف اجتماع أو خبر أو لعبة خطوة بخطوة.',
+        el('a', { class: 'btn', href: 'https://github.com/' + config.repo + '/blob/main/docs/ADMIN-GUIDE.md', target: '_blank', rel: 'noopener', text: 'افتح الدليل' })
+      )
+      : null;
+
+    return [siteCard, A.state.hubReady ? hubCard : null, guideCard, publishCard, accountCard].filter(Boolean);
 
   };
 

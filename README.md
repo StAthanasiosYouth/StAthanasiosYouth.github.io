@@ -13,6 +13,8 @@ contact.
 
 | Read this                                        | For                                          |
 | ------------------------------------------------ | -------------------------------------------- |
+| [docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md)       | **دليل الأدمن**: where the data lives, how to add meetings, topics, news, games, every field explained (Arabic) |
+| [docs/examples/](docs/examples/)                 | A complete, valid `content.json` example and the same data as Sheet rows |
 | [docs/ADMIN-SETUP.md](docs/ADMIN-SETUP.md)       | First-time setup and deployment (step by step) |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)     | How it works, data model, security           |
 | [PRODUCT.md](PRODUCT.md), [DESIGN.md](DESIGN.md) | Who it's for, visual system                  |

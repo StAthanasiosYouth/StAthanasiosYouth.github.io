@@ -54,6 +54,13 @@ await out('apple-touch-icon.png',
     .png({ compressionLevel: 9 })
 );
 
+// games corner logo (tools/source/games-logo.png, transparent): trimmed, 1x / 2x
+const gamesLogo = await sharp(`${ROOT}tools/source/games-logo.png`).trim({ threshold: 1 }).png().toBuffer();
+
+for (const width of [480, 960]) {
+  await out(`games-logo-${width}.webp`, sharp(gamesLogo).resize({ width, kernel: 'lanczos3' }).webp({ quality: 86, alphaQuality: 92, effort: 6 }));
+}
+
 
 /* ---------- Open Graph image ---------- */
 

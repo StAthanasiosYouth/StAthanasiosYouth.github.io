@@ -265,15 +265,29 @@ export function gameCard(entry, { live = false, inSheet = false } = {}) {
 }
 
 
+/* «تحديات وألعاب أسرة البابا أثناسيوس للشباب» logo (assets/img/games-logo-*.webp) */
+function gamesLogo(className, sizes) {
+
+  return h('img', {
+    class: className,
+    src: 'assets/img/games-logo-480.webp',
+    srcset: 'assets/img/games-logo-480.webp 480w, assets/img/games-logo-960.webp 960w',
+    sizes,
+    width: 480,
+    height: 331,
+    alt: 'تحديات وألعاب أسرة البابا أثناسيوس للشباب',
+    decoding: 'async'
+  });
+
+}
+
+
 export function gamesSection(entries) {
 
   const cards = entries.map(entry => gameCard(entry));
 
   const section = h('section', { class: 'widget games', 'data-area': 'games', 'aria-labelledby': 'games-title' },
-    h('div', { class: 'section-head' },
-      h('h2', { class: 'widget__title', id: 'games-title' }, iconNode('star'), 'تحديات وألعاب'),
-      h('p', { class: 'section-head__sub' }, 'تحديات وألعاب أسرة البابا أثناسيوس')
-    ),
+    h('h2', { class: 'games__head', id: 'games-title' }, gamesLogo('games__logo', '(min-width: 1024px) 300px, 240px')),
     h('div', { class: 'games__list' }, cards.map(card => card.el))
   );
 
@@ -285,7 +299,10 @@ export function gamesSection(entries) {
 export function liveGameWidget(entry) {
 
   const card = gameCard(entry, { live: true });
-  const widget = h('section', { class: 'widget live-game', 'data-area': 'live-game', 'aria-label': `تحدي شغال دلوقتي: ${entry.game.title}` }, card.el);
+  const widget = h('section', { class: 'widget live-game', 'data-area': 'live-game', 'aria-label': `تحدي شغال دلوقتي: ${entry.game.title}` },
+    h('div', { class: 'live-game__brand' }, gamesLogo('live-game__logo', '150px')),
+    card.el
+  );
 
   return { el: widget, cards: [card] };
 
@@ -322,11 +339,13 @@ export function meetingTopic(session) {
   if (!session || !session.topic) return null;
 
   return h('button', { class: 'topic', type: 'button', onclick: () => go('meeting') },
-    session.image ? h('span', { class: 'topic__poster' }, picture(session.image, { sizes: '64px' })) : null,
+    session.image ? h('span', { class: 'topic__poster' }, picture(session.image, { sizes: '72px' })) : null,
     h('span', { class: 'topic__text' },
-      h('span', { class: 'topic__label' }, 'موضوع الاجتماع'),
+      h('span', { class: 'topic__label' }, iconNode('book'), 'موضوع الاجتماع'),
       h('span', { class: 'topic__title' }, session.topic),
-      session.speaker ? h('span', { class: 'topic__speaker' }, `مع ${session.speaker}`) : null
+      session.speaker
+        ? h('span', { class: 'topic__speaker' }, iconNode('users'), h('span', {}, `مع ${session.speaker}`))
+        : null
     ),
     iconNode('arrow', 'topic__go')
   );

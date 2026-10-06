@@ -109,6 +109,11 @@ for (const [name, viewport] of Object.entries(VIEWPORTS)) {
     assert.deepEqual(order.filter((a, i) => order.indexOf(a) === i),
       ['hero', 'meeting', 'featured', 'location', 'section', 'contacts', 'support', 'share', 'footer']);
 
+    // measure after the entrance animations (cards start slightly scaled down)
+    await page.waitForFunction(names => document.getAnimations()
+      .filter(a => names.includes(a.animationName))
+      .every(a => a.playState !== 'running'), { timeout: 8000 }, ['rise-depth', 'arch-in', 'logo-in', 'cross-in', 'name-in']);
+
     // touch targets: every link/button at least 44x44 (stretched card link counts as its card)
     const small = await page.$$eval('a[href], button', els => els
       .filter(el => el.offsetParent !== null && !el.closest('dialog:not([open])'))

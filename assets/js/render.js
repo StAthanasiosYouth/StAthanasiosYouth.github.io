@@ -577,7 +577,8 @@ function visibleParts(content, nowStamp) {
     pinned,
     news: news.filter(item => item !== pinned),
     liveGames: games.filter(g => g.state === 'open'),
-    otherGames: games.filter(g => g.state !== 'open'),
+    // upcoming first, finished last
+    otherGames: games.filter(g => g.state === 'soon').concat(games.filter(g => g.state === 'ended')),
     featured,
     sections
   };
