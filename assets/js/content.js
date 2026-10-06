@@ -29,6 +29,13 @@ const SECTION_THEMES = ['gold', 'ember', 'azure', 'rose', 'emerald', 'night'];
 
 /* ---------- primitives ---------- */
 
+/* a link-experience key (same rule as platforms.js; the registry itself
+   loads with the scenes, not with the page) */
+function experienceKey(value) {
+  const key = String(value == null ? '' : value).trim().toLowerCase();
+  return /^[a-z][a-z0-9-]{0,23}$/.test(key) ? key : '';
+}
+
 function text(value, max = 300) {
 
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -116,7 +123,11 @@ function cleanLink(raw) {
     badge: text(raw.badge, 16),
     startAt: dateTime(raw.startAt),
     endAt: dateTime(raw.endAt),
-    experience: ['facebook', 'instagram', 'tiktok', 'whatsapp'].includes(raw.experience) ? raw.experience : ''
+    // any registry-shaped key (platforms.js); one the site doesn't know yet
+    // still opens the generic scene
+    experience: experienceKey(raw.experience) === 'none' ? '' : experienceKey(raw.experience),
+    // the scene's own photos (optional, up to 6)
+    gallery: list(raw.gallery).map(cleanImage).filter(Boolean).slice(0, 6)
   };
 
 }
@@ -358,7 +369,11 @@ export function sanitizeContent(raw) {
         role: text(contact.role, 60),
         description: text(contact.description, 140),
         phoneDisplay: text(contact.phoneDisplay, 24),
-        action: { type: contact.action.type, href }
+        action: { type: contact.action.type, href },
+        // the person card (schema 4, optional): avatar and its words
+        image: cleanImage(contact.image),
+        intro: text(contact.intro, 80),
+        reply: text(contact.reply, 200)
       };
     })
     .filter(Boolean);

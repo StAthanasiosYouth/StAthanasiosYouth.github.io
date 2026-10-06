@@ -378,8 +378,18 @@ function apiSaveLink(input) {
     startAt: dateInput_(input.startAt, false, 'تاريخ البداية', problems),
     endAt: dateInput_(input.endAt, true, 'تاريخ النهاية', problems),
     // '' = from the icon, 'none' = straight to the link
-    experience: LINK_EXPERIENCES.indexOf(input.experience) !== -1 ? input.experience : ''
+    experience: linkExperiences_().indexOf(input.experience) !== -1 ? input.experience : ''
   };
+
+  // the scene's own photos (schema 4): written only when the editor sends them
+  if (input.gallery !== undefined) {
+    var gallery = (Array.isArray(input.gallery) ? input.gallery : String(input.gallery || '').split(/[\s,،]+/))
+      .map(function (id) { return contentLine_(id); })
+      .filter(Boolean)
+      .slice(0, LIMITS.gallery);
+    gallery.forEach(function (id) { imageRef_(id, problems); });
+    link.gallery = gallery.join(',');
+  }
 
   if (!link.url) {
     problems.push('الرابط لازم يكون كامل ويبدأ بـ https://');
@@ -683,6 +693,18 @@ function apiSaveContact(input) {
     message: method === 'whatsapp' ? contentText_(input.message).slice(0, LIMITS.message) : '',
     enabled: input.enabled !== false
   };
+
+  // the person card (schema 4): only written when the editor sends them, so
+  // an editor that doesn't know these fields never wipes them
+  if (input.image !== undefined) {
+    contact.image = imageRef_(input.image, problems);
+  }
+  if (input.intro !== undefined) {
+    contact.intro = input_(input.intro, LIMITS.contactIntro, 'جملة البداية', problems, false);
+  }
+  if (input.reply !== undefined) {
+    contact.reply = contentText_(input.reply).slice(0, LIMITS.contactReply);
+  }
 
   if (!method) {
     problems.push('اختار طريقة التواصل: اتصال أو واتساب');

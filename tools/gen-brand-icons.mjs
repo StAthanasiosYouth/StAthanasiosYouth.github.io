@@ -1,6 +1,10 @@
 // Extracts brand glyphs from simple-icons (CC0) into assets/js/icons-brand.js
 // so the public site ships only the few paths it needs. Re-run after
 // adding a brand to BRANDS.
+//
+// The paths are rounded to 2 decimals (on the 24-unit grid that is far below
+// a pixel at the sizes we draw) and the unused brand colours are left out:
+// the file loads with every page, so every byte counts.
 
 import { writeFileSync } from 'node:fs';
 import * as si from 'simple-icons';
@@ -13,13 +17,74 @@ const BRANDS = {
   youtube: 'siYoutube',
   whatsapp: 'siWhatsapp',
   telegram: 'siTelegram',
-  spotify: 'siSpotify'
+  spotify: 'siSpotify',
+  messenger: 'siMessenger',
+  discord: 'siDiscord',
+  x: 'siX',
+  threads: 'siThreads',
+  snapchat: 'siSnapchat'
 };
+
+/* every number rounded to `places` decimals, with the shortest separators SVG allows */
+/* commands, numbers and arc flags (an arc's 4th and 5th values are one
+   character each and may be packed: "a1 1 0 00.5.5") */
+function tokenize(d) {
+
+  const out = [];
+  const number = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/;
+  let command = '';
+  let index = 0;
+
+  for (let i = 0; i < d.length;) {
+    const c = d[i];
+    if (/[\s,]/.test(c)) { i += 1; continue; }
+    if (/[a-zA-Z]/.test(c)) { command = c; index = 0; out.push(c); i += 1; continue; }
+    if (/[aA]/.test(command) && (index % 7 === 3 || index % 7 === 4)) { out.push({ flag: c }); i += 1; index += 1; continue; }
+    const match = number.exec(d.slice(i));
+    if (!match) throw new Error(`unexpected "${c}" in a path`);
+    out.push(match[0]);
+    i += match[0].length;
+    index += 1;
+  }
+
+  return out;
+
+}
+
+export function compactPath(d, places = 2) {
+
+  let out = '';
+  let previous = '';
+
+  for (const token of tokenize(d)) {
+    if (typeof token === 'string' && /^[a-zA-Z]$/.test(token)) {
+      out += token;
+      previous = token;
+      continue;
+    }
+    if (typeof token === 'object') {
+      if (previous && !/^[a-zA-Z]$/.test(previous)) out += ' ';
+      out += token.flag;
+      previous = token.flag;
+      continue;
+    }
+    let number = String(Number(Number(token).toFixed(places)));
+    if (number === '-0') number = '0';
+    number = number.replace(/^(-?)0\./, '$1.');
+    const afterNumber = previous && !/^[a-zA-Z]$/.test(previous);
+    if (afterNumber && !number.startsWith('-') && !(number.startsWith('.') && previous.includes('.'))) out += ' ';
+    out += number;
+    previous = number;
+  }
+
+  return out;
+
+}
 
 const lines = Object.entries(BRANDS).map(([name, key]) => {
   const icon = si[key];
   if (!icon) throw new Error(`simple-icons has no ${key}`);
-  return `  ${name}: { hex: '#${icon.hex}', path: '${icon.path}' }`;
+  return `  ${name}: { path: '${compactPath(icon.path)}' }`;
 });
 
 writeFileSync(`${ROOT}assets/js/icons-brand.js`,

@@ -1,0 +1,266 @@
+/* /admin/: the door to the admin panel. Same family as the site (navy,
+   gold, Cairo + Aref Ruqaa). No inline styles (CSP). */
+
+@font-face {
+  font-family: "Cairo";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("../assets/fonts/cairo-arabic.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
+}
+
+@font-face {
+  font-family: "Aref Ruqaa";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../assets/fonts/aref-ruqaa-arabic.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+  background: #020914;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  font-family: "Cairo", system-ui, sans-serif;
+  line-height: 1.7;
+  color: #f5f7fb;
+  background:
+    radial-gradient(70% 45% at 50% 28%, rgba(215, 170, 80, .13), transparent 70%),
+    radial-gradient(circle at 88% -8%, rgba(31, 94, 151, .3), transparent 42%),
+    linear-gradient(170deg, #071a31, #020914 70%);
+  -webkit-font-smoothing: antialiased;
+}
+
+.gate {
+  position: relative;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  min-height: 100dvh;
+  overflow: hidden;
+  padding: max(32px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
+  text-align: center;
+}
+
+.gate__glow {
+  position: absolute;
+  z-index: -1;
+  top: 34%;
+  left: 50%;
+  width: min(560px, 120vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(242, 210, 139, .14), transparent 66%);
+  transform: translate(-50%, -50%);
+}
+
+/* the iconostasis door around the logo */
+.gate__arch {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 170px;
+  height: 198px;
+  border: 1px solid rgba(242, 210, 139, .55);
+  border-radius: 85px 85px 18px 18px;
+  background: linear-gradient(180deg, rgba(18, 56, 95, .55), rgba(6, 26, 49, .25));
+  box-shadow:
+    inset 0 0 0 5px rgba(2, 9, 20, .55),
+    inset 0 0 0 6px rgba(242, 210, 139, .22),
+    0 34px 70px -34px #000;
+}
+
+.gate__cross {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  width: 14px;
+  height: 22px;
+  transform: translateX(-50%);
+}
+
+.gate__cross::before,
+.gate__cross::after {
+  content: "";
+  position: absolute;
+  border-radius: 2px;
+  background: #d7aa50;
+}
+
+.gate__cross::before {
+  left: 6px;
+  top: 0;
+  width: 2px;
+  height: 22px;
+}
+
+.gate__cross::after {
+  left: 0;
+  top: 6px;
+  width: 14px;
+  height: 2px;
+}
+
+.gate__logo {
+  position: relative;
+  width: 116px;
+  height: 116px;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 3px #c99a45,
+    0 6px 0 2px rgba(140, 100, 35, .65),
+    0 22px 44px rgba(0, 0, 0, .5),
+    0 0 50px rgba(215, 170, 80, .22);
+}
+
+.gate__ring {
+  position: absolute;
+  width: 136px;
+  height: 136px;
+  border: 1px solid rgba(242, 210, 139, .55);
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.gate__title {
+  margin: 26px 0 0;
+  font-family: "Aref Ruqaa", "Cairo", serif;
+  font-size: clamp(2.3rem, 9vw, 3.2rem);
+  font-weight: 700;
+  line-height: 1.3;
+  color: #f2d28b;
+  text-shadow: 0 2px 0 rgba(111, 79, 27, .7), 0 14px 30px rgba(0, 0, 0, .5);
+}
+
+.gate__sub {
+  margin: 2px 0 0;
+  font-size: 1rem;
+  color: #b9c5d5;
+}
+
+.gate__status {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin: 28px 0 0;
+  font-size: .92rem;
+  color: #8d9db3;
+}
+
+.gate__line {
+  display: block;
+  width: 168px;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(242, 210, 139, .16);
+}
+
+.gate__line i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(270deg, #f2d28b, #d7aa50);
+  transform: scaleX(.12);
+  transform-origin: right;
+}
+
+.gate__enter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  margin-top: 24px;
+  padding: 0 30px;
+  border-radius: 999px;
+  font-size: 1.02rem;
+  font-weight: 800;
+  text-decoration: none;
+  color: #102039;
+  background: linear-gradient(135deg, #f3d48e, #c89235);
+  box-shadow: 0 6px 0 #8c6423, 0 18px 40px -12px rgba(201, 145, 53, .5);
+  transition: transform .2s cubic-bezier(.16, 1, .3, 1);
+}
+
+.gate__enter:hover {
+  transform: translateY(-1px);
+}
+
+.gate__enter:active {
+  transform: translateY(3px);
+}
+
+.gate__enter:focus-visible {
+  outline: 2px solid #f2d28b;
+  outline-offset: 4px;
+}
+
+.gate__note {
+  max-width: 32ch;
+  margin: 16px 0 0;
+  font-size: .82rem;
+  color: #8d9db3;
+}
+
+
+/* ---------- the entry (only when admin.js runs; ~0.85 s) ---------- */
+
+.is-going .gate__arch { animation: gate-rise .7s cubic-bezier(.16, 1, .3, 1) both; }
+.is-going .gate__logo { animation: gate-logo .85s cubic-bezier(.34, 1.4, .64, 1) .08s both; }
+.is-going .gate__ring { animation: gate-ring 1s ease-out .3s; }
+.is-going .gate__cross { animation: gate-drop .6s cubic-bezier(.34, 1.4, .64, 1) .2s both; }
+.is-going .gate__title { animation: gate-in .6s cubic-bezier(.16, 1, .3, 1) .18s both; }
+.is-going .gate__sub { animation: gate-in .6s cubic-bezier(.16, 1, .3, 1) .26s both; }
+.is-going .gate__status { animation: gate-in .5s cubic-bezier(.16, 1, .3, 1) .3s both; }
+.is-going .gate__enter { animation: gate-in .5s cubic-bezier(.16, 1, .3, 1) .36s both; }
+.is-going .gate__note { animation: gate-in .5s cubic-bezier(.16, 1, .3, 1) .42s both; }
+.is-going .gate__line i { animation: gate-fill .8s cubic-bezier(.45, 0, .2, 1) .05s forwards; }
+
+.is-still .gate__line i {
+  transform: none;
+}
+
+@keyframes gate-rise {
+  from { opacity: 0; transform: translateY(18px) scale(.94); }
+}
+
+@keyframes gate-logo {
+  from { opacity: 0; transform: scale(.6) rotate(-10deg); }
+}
+
+@keyframes gate-ring {
+  from { opacity: .8; transform: scale(.85); }
+  to { opacity: 0; transform: scale(1.6); }
+}
+
+@keyframes gate-drop {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+}
+
+@keyframes gate-in {
+  from { opacity: 0; transform: translateY(10px); }
+}
+
+@keyframes gate-fill {
+  to { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gate *,
+  .gate *::before,
+  .gate *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

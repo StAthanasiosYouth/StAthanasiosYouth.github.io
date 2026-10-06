@@ -156,6 +156,16 @@ To update the code later: paste the new files, then **Deploy → Manage
 deployments → Edit → Version: New version → Deploy**. The URL stays the
 same.
 
+**The short address.** `https://stathanasiosyouth.github.io/admin/` is a
+small branded page (`admin/` in this repository) that opens the admin URL
+in the same tab. It never embeds the admin and holds nothing secret: only
+the public `/exec` URL, and Google sign-in plus `ADMIN_EMAILS` still
+decide who gets in. It isn't linked from the public page and asks search
+engines to stay away (`noindex`, `robots.txt`). If you ever make a **new**
+deployment (a new URL, not a new version), replace the URL in
+`admin/index.html` (the two marked places, side by side), run
+`cd tools && npm test`, and commit.
+
 ## 7. First publish and checks
 
 1. Open the admin URL. The status should say **في تغييرات مش منشورة** or

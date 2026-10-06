@@ -438,7 +438,7 @@ test('upgrade: notice on home, plan, confirm with our modal, done — data intac
   const message = await page.$eval('dialog.modal--success .modal__text', n => n.textContent);
   assert.match(message, /نسخة احتياطية/);
 
-  assert.equal(legacy.properties.get('DATA_SCHEMA'), '3');
+  assert.equal(legacy.properties.get('DATA_SCHEMA'), '4');
   const linksAfter = legacy.gs.readTable_('Links').map(l => l.id);
   assert.deepEqual(linksAfter.slice(0, linksBefore.length), linksBefore, 'every link still there, same order');
   assert.ok(linksAfter.includes('whatsapp-group'));

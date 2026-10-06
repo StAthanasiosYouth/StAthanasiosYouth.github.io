@@ -9,12 +9,12 @@ import { renderPage, renderError, tickPage, visibilityKey, meetingSnapshot } fro
 import { zonedNow, stamp, meetingStatus } from './schedule.js';
 import { shareLink, openQr, shareRow } from './share.js';
 import { startRouter, resolveRoute, go, leave } from './router.js';
-import { openSheet, closeSheet } from './sheet.js';
+import { openSheet, closeSheet, sheetStyles } from './sheet.js';
 import { openBell } from './bell.js';
 import { newsSheetContent, gameSheetContent, meetingSheetContent, gameStates, visibleNews } from './hub.js';
 import { itemSheetContent, typeOf, visibleItems } from './items.js';
 import { isSectionLive, liveSections } from './layout.js';
-import { openExperience, prepareExperience } from './xp.js';
+import { openExperience, prepareExperience, hasScene } from './xp.js';
 import { iconNode } from './icons.js';
 import { particles } from './motion.js';
 import { startFeel } from './feel.js';
@@ -185,7 +185,7 @@ function followableLink(id, nowStamp) {
     ...current.sections.filter(s => live.has(s.key)).flatMap(s => s.links)
   ];
 
-  return candidates.find(link => link.id === id && link.experience) || null;
+  return candidates.find(link => link.id === id && hasScene(link.experience)) || null;
 
 }
 
@@ -230,10 +230,7 @@ function setupTopbar() {
 
   paintSound();
 
-  // the compact name shows once the big hero has scrolled away
-  new IntersectionObserver(entries => {
-    bar.classList.toggle('is-compact', !entries[0].isIntersecting);
-  }, { rootMargin: '-60px 0px 0px 0px' }).observe(hero.querySelector('.hero__name'));
+  scrollBar(bar, hero.querySelector('.hero__name'));
 
   // a soft tap sound on buttons and cards (only when enabled)
   document.addEventListener('click', event => {
@@ -249,7 +246,76 @@ function setupTopbar() {
   document.addEventListener('pointerdown', prepare, { passive: true });
   document.addEventListener('pointerover', prepare, { passive: true });
 
+  // the sheets' stylesheet: on the first touch, click or key, before any
+  // sheet can open (a deep link loads it itself)
+  const warm = () => {
+    sheetStyles();
+    for (const type of ['pointerdown', 'keydown']) document.removeEventListener(type, warm, true);
+  };
+  for (const type of ['pointerdown', 'keydown']) document.addEventListener(type, warm, { capture: true, passive: true });
+
   particles(hero.querySelector('.hero__dust'), 'dust');
+
+}
+
+
+/*
+ * The bar follows the scroll continuously (main.css, "top bar"):
+ * --brand-at = how far the page scrolls before the hero's name passes under
+ * the bar (the compact name glides in from there). Browsers without
+ * scroll-driven animations get --p / --pb from here, once per frame.
+ * .is-compact (the reduced-motion end state) flips when the name is gone.
+ */
+function scrollBar(bar, name) {
+
+  const RANGE = 120;
+  const BRAND = 90;
+  const native = typeof CSS !== 'undefined' && CSS.supports('animation-timeline: scroll()');
+  let brandAt = 160;
+  let pending = false;
+
+  const measure = () => {
+    // layout position (offsets ignore the hero's own scroll transform)
+    let top = name.offsetHeight;
+    for (let el = name; el; el = el.offsetParent) top += el.offsetTop;
+    brandAt = Math.max(24, Math.round(top - bar.offsetHeight - 28));
+    bar.style.setProperty('--brand-at', `${brandAt}px`);
+  };
+
+  const clamp = v => Math.min(1, Math.max(0, v));
+
+  const paint = () => {
+    pending = false;
+    if (document.documentElement.dataset.motion === 'reduced') {
+      bar.style.removeProperty('--p');
+      bar.style.removeProperty('--pb');
+      return;
+    }
+    const y = scrollY;
+    bar.style.setProperty('--p', clamp(y / RANGE).toFixed(3));
+    bar.style.setProperty('--pb', clamp((y - brandAt) / BRAND).toFixed(3));
+  };
+
+  const schedule = () => {
+    if (!pending) {
+      pending = true;
+      requestAnimationFrame(paint);
+    }
+  };
+
+  // again whenever the page above the fold reflows (fonts, the rendered
+  // widgets next to the hero on desktop, a rotated phone)
+  measure();
+  new ResizeObserver(() => { measure(); if (!native) schedule(); }).observe(document.getElementById('main'));
+
+  if (!native) {
+    addEventListener('scroll', schedule, { passive: true });
+    schedule();
+  }
+
+  new IntersectionObserver(entries => {
+    bar.classList.toggle('is-compact', !entries[0].isIntersecting);
+  }, { rootMargin: `-${bar.offsetHeight + 4}px 0px 0px 0px` }).observe(name);
 
 }
 

@@ -12,6 +12,32 @@ import { play } from './sound.js';
 
 let current = null;
 let counter = 0;
+let styles = null;
+let stylesReady = false;
+
+
+/*
+ * The sheets' own stylesheet (assets/css/sheets.css) is not part of the
+ * first visit: it loads on the first touch / key press (main.js), or at
+ * the latest when a sheet opens (a deep link), which then waits for it.
+ */
+export function sheetStyles() {
+
+  if (!styles) {
+    styles = new Promise(resolve => {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = new URL('../css/sheets.css', import.meta.url).href;
+      const done = () => { stylesReady = true; resolve(); };
+      link.onload = done;
+      link.onerror = done;   // never block a sheet; it still works unstyled
+      document.head.append(link);
+    });
+  }
+
+  return styles;
+
+}
 
 
 export function openSheet({ title, content, variant = 'detail', onClose }) {
@@ -31,21 +57,29 @@ export function openSheet({ title, content, variant = 'detail', onClose }) {
   document.body.append(dialog);
   document.documentElement.classList.add('has-sheet');
 
-  if (typeof dialog.showModal === 'function') {
-    dialog.showModal();
-  }
-  else {
-    dialog.setAttribute('open', '');
-  }
-
-  // start on the title: no focus ring on the close button, screen readers
-  // hear what opened; Tab goes on to the close button and the content
-  head.firstChild.focus({ preventScroll: true });
-
   current = { dialog, panel, onClose };
 
-  animate(panel, [{ transform: 'translateY(100%)' }, { transform: 'translateY(0)' }], { duration: 620, easing: SPRING });
-  play('open');
+  const show = () => {
+    // closed or replaced while its styles were still on the way
+    if (!current || current.dialog !== dialog) return;
+
+    if (typeof dialog.showModal === 'function') {
+      dialog.showModal();
+    }
+    else {
+      dialog.setAttribute('open', '');
+    }
+
+    // start on the title: no focus ring on the close button, screen readers
+    // hear what opened; Tab goes on to the close button and the content
+    head.firstChild.focus({ preventScroll: true });
+
+    animate(panel, [{ transform: 'translateY(100%)' }, { transform: 'translateY(0)' }], { duration: 620, easing: SPRING });
+    play('open');
+  };
+
+  if (stylesReady) show();
+  else sheetStyles().then(show);
 
   dialog.addEventListener('cancel', event => {
     event.preventDefault();
@@ -73,6 +107,9 @@ export function closeSheet({ silent = false, fromRoute = false } = {}) {
 
   const { dialog, panel, onClose } = current;
   current = null;
+
+  // a poster viewer opened from this sheet goes with it
+  closeViewer();
 
   let done = false;
 
@@ -103,6 +140,81 @@ export function closeSheet({ silent = false, fromRoute = false } = {}) {
   }
 
   if (onClose) onClose({ fromRoute });
+
+}
+
+
+/*
+ * VIEWER: a poster at full resolution, over everything (a second modal
+ * dialog above the sheet). The picture fits the screen first; a tap (or
+ * Enter) shows it at its real size; it scrolls, and phones can pinch-zoom
+ * the page as usual. Esc, the close button or a tap beside it closes it.
+ */
+export function openViewer(image) {
+
+  closeViewer();
+
+  const img = h('img', {
+    class: 'viewer__img',
+    src: image.src,
+    width: image.w,
+    height: image.h,
+    alt: image.alt || '',
+    decoding: 'async'
+  });
+  if (image.color) img.style.backgroundColor = image.color;
+
+  const toggle = () => {
+    const zoomed = !scroller.classList.contains('is-zoomed');
+    // keep the point under the finger roughly where it was
+    const fx = scroller.scrollWidth ? (scroller.scrollLeft + scroller.clientWidth / 2) / scroller.scrollWidth : 0.5;
+    const fy = scroller.scrollHeight ? (scroller.scrollTop + scroller.clientHeight / 2) / scroller.scrollHeight : 0.5;
+    scroller.classList.toggle('is-zoomed', zoomed);
+    scroller.setAttribute('aria-pressed', String(zoomed));
+    scroller.scrollLeft = fx * scroller.scrollWidth - scroller.clientWidth / 2;
+    scroller.scrollTop = fy * scroller.scrollHeight - scroller.clientHeight / 2;
+  };
+
+  const scroller = h('div', {
+    class: 'viewer__scroll',
+    role: 'button',
+    tabindex: '0',
+    'aria-pressed': 'false',
+    'aria-label': 'تكبير وتصغير الصورة',
+    onclick: event => { if (event.target === img) toggle(); else closeViewer(); },
+    onkeydown: event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(); } }
+  }, img);
+
+  const close = h('button', { class: 'viewer__close', type: 'button', 'aria-label': 'قفل الصورة', onclick: () => closeViewer() }, iconNode('close'));
+
+  // a very tall poster starts at the screen's width (scroll down to read it)
+  const dialog = h('dialog', { class: `viewer${image.w / image.h < 0.5 ? ' viewer--tall' : ''}`, 'aria-label': image.alt || 'الصورة' }, scroller, close);
+
+  document.body.append(dialog);
+  dialog.addEventListener('cancel', event => {
+    event.preventDefault();
+    closeViewer();
+  });
+
+  if (typeof dialog.showModal === 'function') dialog.showModal();
+  else dialog.setAttribute('open', '');
+
+  close.focus({ preventScroll: true });
+  animate(dialog, [{ opacity: 0, transform: 'scale(.97)' }, { opacity: 1, transform: 'none' }], { duration: 260, easing: 'cubic-bezier(.22, 1, .36, 1)' });
+  play('open');
+
+  return dialog;
+
+}
+
+
+export function closeViewer() {
+
+  const dialog = document.querySelector('dialog.viewer');
+
+  if (!dialog) return;
+  if (dialog.open) dialog.close();
+  dialog.remove();
 
 }
 

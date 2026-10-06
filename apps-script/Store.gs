@@ -41,10 +41,10 @@ var TABLES = {
   },
 
   Links: {
-    columns: ['id', 'enabled', 'order', 'section', 'style', 'featured', 'title', 'subtitle', 'cta', 'url', 'icon', 'badge', 'startAt', 'endAt', 'updatedAt', 'experience'],
+    columns: ['id', 'enabled', 'order', 'section', 'style', 'featured', 'title', 'subtitle', 'cta', 'url', 'icon', 'badge', 'startAt', 'endAt', 'updatedAt', 'experience', 'gallery'],
     bool: ['enabled', 'featured'],
     autoId: 'link',
-    text: ['id', 'section', 'style', 'title', 'subtitle', 'cta', 'url', 'icon', 'badge', 'startAt', 'endAt', 'updatedAt', 'experience'],
+    text: ['id', 'section', 'style', 'title', 'subtitle', 'cta', 'url', 'icon', 'badge', 'startAt', 'endAt', 'updatedAt', 'experience', 'gallery'],
     notes: {
       id: 'معرّف ثابت للرابط. لو سبته فاضي لوحة التحكم هتعمله',
       enabled: 'إظهار الرابط',
@@ -61,15 +61,16 @@ var TABLES = {
       startAt: 'يبدأ يظهر من (اختياري): 2026-10-12 أو 2026-10-12 18:00',
       endAt: 'آخر ظهور (اختياري): 2026-10-20 أو 2026-10-20 22:00',
       updatedAt: 'آخر تعديل (تلقائي)',
-      experience: 'التجربة اللي بتفتح قبل اللينك: facebook / instagram / tiktok / whatsapp / none (فاضي = حسب الأيقونة)'
+      experience: 'التجربة اللي بتفتح قبل اللينك (مفتاح من assets/js/platforms.js زي facebook / telegram / voice)، none = يفتح على طول، فاضي = تلقائي (الأيقونة ثم الرابط)',
+      gallery: 'صور المشهد (اختياري): أرقام صور من المكتبة مفصولة بفاصلة، لحد ٦'
     }
   },
 
   Contacts: {
-    columns: ['id', 'enabled', 'order', 'kind', 'name', 'role', 'description', 'phone', 'method', 'message', 'updatedAt'],
+    columns: ['id', 'enabled', 'order', 'kind', 'name', 'role', 'description', 'phone', 'method', 'message', 'updatedAt', 'image', 'intro', 'reply'],
     bool: ['enabled'],
     autoId: 'contact',
-    text: ['id', 'kind', 'name', 'role', 'description', 'phone', 'method', 'message', 'updatedAt'],
+    text: ['id', 'kind', 'name', 'role', 'description', 'phone', 'method', 'message', 'updatedAt', 'image', 'intro', 'reply'],
     notes: {
       id: 'معرّف ثابت',
       enabled: 'إظهار',
@@ -81,7 +82,10 @@ var TABLES = {
       phone: 'رقم التليفون (01xxxxxxxxx أو +20...)',
       method: 'call = اتصال بس، whatsapp = واتساب بس',
       message: 'رسالة الواتساب الجاهزة (اختياري)',
-      updatedAt: 'آخر تعديل (تلقائي)'
+      updatedAt: 'آخر تعديل (تلقائي)',
+      image: 'الصورة (اختياري): رقم صورة من المكتبة',
+      intro: 'جملة البداية في الكارت (اختياري)، زي «عندك سؤال؟» أو رسالة الزائر في محادثة الدعم',
+      reply: 'الرد اللي بيظهر في محادثة الدعم (اختياري)'
     }
   },
 
@@ -1134,7 +1138,7 @@ function applyValidation_(ss) {
   ifColumn(games, 'Games', 'archived', checkbox);
   ifColumn(notifications, 'Notifications', 'archived', checkbox);
   ifColumn(sections, 'Sections', 'theme', list(SECTION_THEMES));
-  ifColumn(links, 'Links', 'experience', list(LINK_EXPERIENCES));
+  ifColumn(links, 'Links', 'experience', list(linkExperiences_()));
 
   var activities = ss.getSheetByName('Activities');
   if (activities) {

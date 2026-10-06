@@ -1975,6 +1975,114 @@ input[type="time"].input {
   color: var(--text-3);
 }
 
+/* a person's photo: a round preview */
+.picker--avatar .picker__preview {
+  width: 112px;
+  height: 112px;
+  min-height: 0;
+  border-radius: 50%;
+}
+
+.picker--avatar .picker__img {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: cover;
+}
+
+.picker--avatar .picker__empty {
+  flex-direction: column;
+  gap: 2px;
+  font-size: .78rem;
+  text-align: center;
+}
+
+/* several images in order (a link scene's photos) */
+.gallery-picker__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+  min-height: 84px;
+  padding: 8px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 16px;
+  background: rgba(1, 8, 18, .35);
+}
+
+.gallery-picker__row > .picker__empty {
+  grid-column: 1 / -1;
+  justify-content: center;
+  font-size: .88rem;
+}
+
+.gallery-picker__item {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  aspect-ratio: 1;
+  background: var(--navy-800);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+
+.gallery-picker__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gallery-picker__n {
+  position: absolute;
+  inset: 6px auto auto 6px;
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  font-size: .72rem;
+  font-weight: 800;
+  color: var(--gold-ink);
+  background: var(--gold-hi);
+}
+
+.gallery-picker__remove {
+  position: absolute;
+  inset: 4px 4px auto auto;
+  width: 30px;
+  height: 30px;
+  min-height: 0;
+  background: rgba(2, 9, 20, .72);
+}
+
+.gallery-picker__count {
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+/* the link editor: what «تلقائي» means for this link */
+.experience-said {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  font-size: .88rem;
+  color: var(--text-2);
+  background: rgba(215, 170, 80, .07);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.experience-said .icon {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  color: var(--gold-hi);
+}
+
+.experience-said b {
+  color: var(--gold-hi);
+}
+
 .upload {
   display: grid;
   gap: 6px;

@@ -5,7 +5,12 @@
 ========================================================= */
 
 
-/* ---------- fonts (self-hosted) ---------- */
+/* ---------- fonts (self-hosted) ----------
+   The space (U+0020, U+00A0) is in the Arabic files, so it is mapped
+   there: an Arabic sentence never loads a Latin file for its spaces.
+   Cairo's Latin is split (tools/subset-fonts.mjs): punctuation + digits
+   (+ the "QR" of the share button) load when used; letters only when a
+   text really contains English. Keep these ranges in sync with the script. */
 
 @font-face {
   font-family: "Cairo";
@@ -13,7 +18,7 @@
   font-weight: 400 800;
   font-display: swap;
   src: url("../fonts/cairo-arabic.woff2") format("woff2");
-  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
+  unicode-range: U+0020, U+00A0, U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
 }
 
 @font-face {
@@ -22,7 +27,16 @@
   font-weight: 400 800;
   font-display: swap;
   src: url("../fonts/cairo-latin.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  unicode-range: U+0021-0040, U+0051-0052, U+005B-0060, U+007B-007E, U+00AB, U+00BB, U+00D7, U+2013-2014, U+2018-2019, U+201C-201D, U+2022, U+2026;
+}
+
+@font-face {
+  font-family: "Cairo";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("../fonts/cairo-latin-letters.woff2") format("woff2");
+  unicode-range: U+0041-0050, U+0053-005A, U+0061-007A;
 }
 
 @font-face {
@@ -31,7 +45,7 @@
   font-weight: 700;
   font-display: swap;
   src: url("../fonts/aref-ruqaa-arabic.woff2") format("woff2");
-  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
+  unicode-range: U+0020-0021, U+00A0, U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
 }
 
 @font-face {
@@ -40,7 +54,7 @@
   font-weight: 700;
   font-display: swap;
   src: url("../fonts/aref-ruqaa-latin.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+2000-206F;
+  unicode-range: U+0022-007E, U+00A1-00FF, U+2000-200B, U+200F, U+2012-206F;
 }
 
 
@@ -281,11 +295,6 @@ ol {
   box-shadow:
     inset 0 1px 0 rgba(242, 210, 139, .09),
     0 22px 44px -28px rgba(0, 0, 0, .8);
-}
-
-.widget.is-entering {
-  animation: rise .72s var(--ease-out-expo) both;
-  animation-delay: calc(var(--i, 0) * 65ms);
 }
 
 .widget__title {
@@ -1350,6 +1359,28 @@ ol {
   background: #121212;
 }
 
+.app-icon--messenger {
+  color: #fff;
+  background: linear-gradient(200deg, #a033ff, #0866ff 60%, #00c6ff);
+}
+
+.app-icon--discord {
+  color: #fff;
+  background: #5865f2;
+}
+
+.app-icon--x,
+.app-icon--threads {
+  color: #fff;
+  background: #000;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22), 0 10px 20px -10px rgba(0, 0, 0, .8);
+}
+
+.app-icon--snapchat {
+  color: #000;
+  background: #fffc00;
+}
+
 /* list rows for "card" style links */
 .rows {
   display: grid;
@@ -1426,58 +1457,483 @@ ol {
    CONTACTS
 ========================================================= */
 
-.contact {
-  display: grid;
-  gap: 16px;
-  align-content: start;
-}
-
-.person {
-  display: grid;
+/* the service leader and the technical support: one matched pair
+   head → stage (same height) → action at the bottom */
+.person-card {
+  --stage-h: 172px;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
-}
-
-.person + .person {
-  padding-top: 16px;
-  border-top: 1px solid var(--gold-line);
 }
 
 .person__head {
   display: flex;
   align-items: center;
   gap: 14px;
+  min-width: 0;
+}
+
+.person__who {
+  display: grid;
+  min-width: 0;
 }
 
 .person__avatar {
   display: grid;
   place-items: center;
-  width: 58px;
-  height: 66px;
+  width: 52px;
+  height: 60px;
   flex: none;
+  overflow: hidden;
   border: 1px solid var(--gold-line-strong);
-  border-radius: 29px 29px 12px 12px;
+  border-radius: 26px 26px 12px 12px;
   font-family: var(--font-display);
-  font-size: 1.7rem;
+  font-size: 1.6rem;
   line-height: 1;
   color: var(--gold-hi);
   background: radial-gradient(circle at 50% 60%, rgba(215, 170, 80, .22), rgba(215, 170, 80, 0) 70%), var(--navy-950);
 }
 
+.person__avatar--photo img,
+.chat__avatar--photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .person__name {
-  font-size: 1.2rem;
+  overflow: hidden;
+  font-size: 1.15rem;
   font-weight: 800;
   line-height: 1.4;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .person__role {
-  font-size: .9rem;
+  font-size: .86rem;
   font-weight: 700;
+  line-height: 1.5;
   color: var(--gold-soft);
 }
 
-.person__desc {
-  font-size: .92rem;
+/* the stage: a window of the same size in both cards */
+.person__stage {
+  position: relative;
+  flex: 1 0 auto;
+  min-height: var(--stage-h);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .06);
+  border-radius: var(--radius-md);
+}
+
+.person__actions {
+  display: grid;
+}
+
+.person--more {
+  display: grid;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--gold-line);
+}
+
+/* ---- service: a phone ringing softly ---- */
+
+.ring {
+  display: grid;
+  grid-template-columns: auto minmax(0, max-content);
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 20px;
+  background:
+    radial-gradient(70% 120% at 100% 50%, rgba(215, 170, 80, .16), rgba(215, 170, 80, 0) 70%),
+    rgba(2, 9, 20, .38);
+}
+
+.ring__phone {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+}
+
+.ring__glyph {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  color: var(--gold-ink);
+  background: radial-gradient(circle at 35% 30%, var(--gold-hi), var(--gold) 70%);
+  box-shadow: 0 0 0 5px rgba(215, 170, 80, .12), 0 12px 26px -10px rgba(215, 170, 80, .7);
+}
+
+.ring__glyph .icon {
+  width: 26px;
+  height: 26px;
+  stroke-width: 1.9;
+}
+
+/* resting: two quiet rings; on screen (full tier) they travel outwards */
+.ring__wave {
+  position: absolute;
+  inset: 14px;
+  border: 1.5px solid rgba(242, 210, 139, .55);
+  border-radius: 50%;
+  opacity: .32;
+  transform: scale(1.22);
+}
+
+.ring__wave:nth-child(2) {
+  opacity: .16;
+  transform: scale(1.48);
+}
+
+.ring__wave:nth-child(3) {
+  opacity: 0;
+}
+
+.ring__copy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ring__intro {
+  font-family: var(--font-display);
+  font-size: clamp(1.3rem, 5.4vw, 1.55rem);
+  line-height: 1.45;
+  color: var(--gold-hi);
+}
+
+.ring__desc {
+  font-size: .86rem;
+  line-height: 1.6;
   color: var(--text-2);
+}
+
+:root[data-motion="full"] .ring.is-live .ring__wave {
+  animation: ring-wave 3.2s cubic-bezier(.2, .6, .35, 1) infinite;
+}
+
+:root[data-motion="full"] .ring.is-live .ring__wave:nth-child(2) {
+  animation-delay: 1.07s;
+}
+
+:root[data-motion="full"] .ring.is-live .ring__wave:nth-child(3) {
+  animation-delay: 2.13s;
+}
+
+:root[data-motion="full"] .ring.is-live .ring__glyph {
+  animation: ring-buzz 3.2s ease-in-out infinite;
+}
+
+/* lite: two rings go out once, then it rests */
+:root[data-motion="lite"] .ring.is-live .ring__wave:nth-child(-n+2) {
+  animation: ring-wave 2.4s cubic-bezier(.2, .6, .35, 1) 1 backwards;
+}
+
+:root[data-motion="lite"] .ring.is-live .ring__wave:nth-child(2) {
+  animation-delay: .8s;
+}
+
+@keyframes ring-wave {
+  from {
+    opacity: .7;
+    transform: scale(.9);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2);
+  }
+}
+
+@keyframes ring-buzz {
+  0%, 18%, 100% { transform: none; }
+  3% { transform: rotate(-11deg); }
+  6% { transform: rotate(9deg); }
+  9% { transform: rotate(-7deg); }
+  12% { transform: rotate(5deg); }
+  15% { transform: rotate(-2deg); }
+}
+
+/* ---- technical support: a short WhatsApp conversation ---- */
+
+.chat {
+  --t: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 12px 16px;
+  background:
+    radial-gradient(90% 70% at 0% 100%, rgba(37, 211, 102, .07), rgba(37, 211, 102, 0) 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 36 36'%3E%3Cpath d='M17 13h2v4h4v2h-4v4h-2v-4h-4v-2h4z' fill='%23f2d28b' fill-opacity='.05'/%3E%3C/svg%3E") 0 0 / 36px 36px,
+    #071423;
+}
+
+.chat__chip {
+  align-self: center;
+  max-width: 92%;
+  padding: 2px 10px;
+  border-radius: 8px;
+  font-size: .72rem;
+  font-weight: 600;
+  line-height: 1.6;
+  text-align: center;
+  color: var(--text-2);
+  background: rgba(255, 255, 255, .06);
+}
+
+.chat__log {
+  display: grid;
+  gap: 10px;
+}
+
+.chat__text {
+  font-size: .9rem;
+  line-height: 1.55;
+}
+
+/* the visitor's message: the end side, WhatsApp green */
+.chat__msg--out {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  justify-self: end;
+  max-width: 86%;
+  margin-bottom: 6px;
+  padding: 6px 12px 7px 9px;
+  border-radius: 14px;
+  border-end-end-radius: 4px;
+  color: #effff6;
+  background: linear-gradient(180deg, #1c6c4e, #135a40);
+  box-shadow: 0 6px 14px -8px rgba(0, 0, 0, .8);
+  transform-origin: left bottom;
+}
+
+.chat__meta {
+  position: relative;
+  flex: none;
+  width: 17px;
+  height: 12px;
+  margin-bottom: 3px;
+}
+
+/* sent (grey), then seen (blue) laid over it */
+.chat__ticks {
+  position: absolute;
+  inset: 0;
+  width: 17px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  color: rgba(239, 255, 246, .55);
+}
+
+.chat__ticks--seen {
+  color: #53bdeb;
+}
+
+.chat__reaction {
+  position: absolute;
+  bottom: -12px;
+  inset-inline-end: 8px;
+  padding: 0 4px;
+  border-radius: 999px;
+  font-size: .68rem;
+  line-height: 1.6;
+  background: #10263c;
+  box-shadow: 0 0 0 2px #071423;
+}
+
+/* the reply: avatar + bubble on the start side; typing dots in its place first */
+.chat__msg--in {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: end;
+  gap: 8px;
+  justify-self: start;
+  max-width: 94%;
+}
+
+.chat__avatar {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  overflow: hidden;
+  border-radius: 50%;
+  font-family: var(--font-display);
+  font-size: .95rem;
+  line-height: 1;
+  color: var(--gold-hi);
+  background: var(--navy-800);
+  box-shadow: 0 0 0 1px var(--gold-line-strong);
+}
+
+.chat__bubble,
+.chat__typing {
+  grid-area: 1 / 2;
+}
+
+.chat__bubble {
+  display: grid;
+  padding: 6px 11px 8px;
+  border-radius: 14px;
+  border-end-start-radius: 4px;
+  color: var(--text);
+  background: #13304d;
+  box-shadow: 0 6px 14px -8px rgba(0, 0, 0, .8);
+  transform-origin: right bottom;
+}
+
+.chat__from {
+  font-size: .74rem;
+  font-weight: 800;
+  line-height: 1.6;
+  color: var(--gold);
+}
+
+.chat__typing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-self: start;
+  align-self: end;
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 14px;
+  border-end-start-radius: 4px;
+  background: #13304d;
+  opacity: 0;
+  transform-origin: right bottom;
+}
+
+.chat__typing i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-2);
+}
+
+/* waiting for its turn: the first frame */
+.chat.is-armed:not(.is-playing) :is(.chat__msg--out, .chat__avatar, .chat__bubble, .chat__ticks--seen, .chat__reaction) {
+  opacity: 0;
+}
+
+/* playing: each step at its time (--t: 1 full, .5 lite); every step
+   fills backwards, so the final frame is simply the normal style */
+.chat.is-playing .chat__msg--out {
+  animation: chat-pop .5s var(--spring) calc(var(--t) * 250ms) backwards;
+}
+
+.chat.is-playing .chat__ticks--seen {
+  animation: chat-fade .3s ease-out calc(var(--t) * 1000ms) backwards;
+}
+
+.chat.is-playing .chat__avatar {
+  animation: chat-pop .45s var(--spring) calc(var(--t) * 1300ms) backwards;
+}
+
+.chat.is-playing .chat__typing {
+  animation: chat-typing calc(var(--t) * 1500ms) var(--ease-out) calc(var(--t) * 1350ms) backwards;
+}
+
+.chat.is-playing .chat__typing i {
+  animation: chat-dot .9s ease-in-out calc(var(--t) * 1400ms) 2 backwards;
+}
+
+.chat.is-playing .chat__typing i:nth-child(2) {
+  animation-delay: calc(var(--t) * 1400ms + 150ms);
+}
+
+.chat.is-playing .chat__typing i:nth-child(3) {
+  animation-delay: calc(var(--t) * 1400ms + 300ms);
+}
+
+.chat.is-playing .chat__bubble {
+  animation: chat-pop .55s var(--spring) calc(var(--t) * 2850ms) backwards;
+}
+
+.chat.is-playing .chat__reaction {
+  animation: chat-react .6s var(--spring) calc(var(--t) * 3700ms) backwards;
+}
+
+:root[data-motion="lite"] .chat {
+  --t: .5;
+}
+
+:root[data-motion="lite"] .chat.is-playing .chat__typing i {
+  animation: none;
+}
+
+@keyframes chat-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(.86);
+  }
+}
+
+@keyframes chat-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes chat-typing {
+  0% {
+    opacity: 0;
+    transform: scale(.7);
+  }
+  15%, 85% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(.9);
+  }
+}
+
+@keyframes chat-dot {
+  0%, 60%, 100% {
+    transform: none;
+    opacity: .55;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+@keyframes chat-react {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+}
+
+@media (min-width: 1024px) {
+
+  .person-card {
+    --stage-h: 184px;
+  }
+
+}
+
+@media print {
+  .chat.is-armed :is(.chat__msg--out, .chat__avatar, .chat__bubble, .chat__ticks--seen, .chat__reaction) {
+    opacity: 1 !important;
+  }
 }
 
 .btn--call {
@@ -1501,48 +1957,12 @@ ol {
   gap: 10px;
 }
 
-/* technical support: deliberately quieter */
-.support {
-  display: grid;
-  gap: 10px;
-  align-content: start;
-  padding-block: 18px;
-  border-color: rgba(255, 255, 255, .07);
-  background: rgba(6, 26, 49, .55);
-  box-shadow: none;
-}
-
-.support__title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: .95rem;
-  font-weight: 800;
-  color: var(--text-2);
-}
-
-.support__title .icon {
-  width: 18px;
-  height: 18px;
-  color: var(--text-3);
-}
-
-.support__desc {
-  font-size: .86rem;
-  line-height: 1.65;
-  color: var(--text-3);
-}
-
-.support__name {
-  color: var(--text-2);
-  font-weight: 700;
-}
-
+/* technical support: the same card, a quieter (secondary) action */
 .btn--whatsapp {
-  justify-self: start;
+  min-height: 54px;
   color: var(--text);
-  border-color: rgba(37, 211, 102, .35);
-  background: rgba(37, 211, 102, .08);
+  border-color: rgba(37, 211, 102, .38);
+  background: rgba(37, 211, 102, .09);
 }
 
 .btn--whatsapp .icon {
@@ -1788,14 +2208,18 @@ ol {
     grid-column: span 7;
   }
 
-  [data-area="featured"],
-  [data-area="contacts"] {
+  [data-area="featured"] {
     grid-column: span 7;
   }
 
-  [data-area="location"],
-  [data-area="support"] {
+  [data-area="location"] {
     grid-column: span 5;
+  }
+
+  /* the two people: a matched pair, half and half */
+  [data-area="contacts"],
+  [data-area="support"] {
+    grid-column: span 6;
   }
 
   [data-area][data-wide] {
@@ -1822,9 +2246,10 @@ ol {
   }
 
   .featured {
+    --pad: 28px;
     grid-template-columns: auto minmax(0, 1fr);
     gap: 24px;
-    padding: 28px;
+    padding: var(--pad);
   }
 
   .featured__art {
@@ -1868,13 +2293,6 @@ ol {
 /* =========================================================
    MOTION
 ========================================================= */
-
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(16px) scale(.985);
-  }
-}
 
 @keyframes glow-drift {
   to {
@@ -1988,63 +2406,113 @@ html.has-sheet {
 
 /* ---------- top bar ---------- */
 
+/*
+ * One bar, two moments, and every step in between. At the top of the page
+ * it is part of the composition (no surface, the buttons float on the
+ * hero's light); as the page scrolls it gains, continuously:
+ *   --p  (0 → 1 over the first 120px): the surface (translucent navy, a
+ *        blur on capable devices), a gold hairline drawn from the centre,
+ *        the buttons settling into it;
+ *   --pb (0 → 1 as the hero's name passes under the bar): the logo and
+ *        the compact name gliding in.
+ * Where scroll-driven animations exist, CSS runs it all on the compositor
+ * (scroll(root)); elsewhere main.js sets --p / --pb per frame.
+ * The bar's own height never changes (no layout shift).
+ * Reduced motion: the final frames only, switched by .is-compact.
+ */
+
+@property --p {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --pb {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
 .topbar {
+  --bar-h: 60px;
   position: sticky;
   top: 0;
   z-index: var(--z-topbar);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: min(100%, 1120px);
-  margin-inline: auto;
-  padding:
-    max(8px, env(safe-area-inset-top))
-    max(12px, env(safe-area-inset-right))
-    8px
-    max(12px, env(safe-area-inset-left));
+  height: calc(var(--bar-h) + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
 }
 
+.topbar__inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(100%, 1120px);
+  height: var(--bar-h);
+  margin-inline: auto;
+  padding-inline: max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-left));
+}
+
+/* the surface: full-bleed, solid navy unless the device can afford a blur */
 .topbar::before {
   content: "";
   position: absolute;
-  inset: 0 calc(50% - 50vw);
+  inset: 0;
   z-index: -1;
-  background: rgba(4, 17, 39, .94);
-  border-bottom: 1px solid var(--gold-line);
-  opacity: 0;
-  transition: opacity .3s;
+  background: linear-gradient(180deg, rgba(8, 33, 61, .97), rgba(4, 17, 39, .97));
+  box-shadow: 0 14px 30px -22px rgba(0, 0, 0, .95);
+  opacity: var(--p);
+  pointer-events: none;
 }
 
-.topbar.is-compact::before {
-  opacity: 1;
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  :root[data-motion="full"] .topbar::before {
+    background: linear-gradient(180deg, rgba(8, 33, 61, .74), rgba(4, 17, 39, .66));
+    -webkit-backdrop-filter: blur(18px) saturate(1.35);
+    backdrop-filter: blur(18px) saturate(1.35);
+  }
+}
+
+/* the gold hairline, drawn from the centre outwards */
+.topbar::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(242, 210, 139, 0), rgba(242, 210, 139, .22) 20%, rgba(242, 210, 139, .62) 50%, rgba(242, 210, 139, .22) 80%, rgba(242, 210, 139, 0));
+  opacity: var(--p);
+  transform: scaleX(var(--p));
+  pointer-events: none;
 }
 
 .topbar__brand {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-family: var(--font-display);
-  font-size: 1.05rem;
-  color: var(--gold-hi);
-  text-decoration: none;
-  opacity: 0;
-  transform: translateY(-6px);
-  transition: opacity .3s var(--ease-out), transform .45s var(--spring);
+  gap: 10px;
+  min-width: 0;
+  opacity: var(--pb);
+  transform: translateY(calc((1 - var(--pb)) * 12px));
   pointer-events: none;
 }
 
-.topbar.is-compact .topbar__brand {
-  opacity: 1;
-  transform: none;
+.topbar__brand img {
+  flex: none;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--gold-line-strong), 0 4px 12px -4px rgba(0, 0, 0, .8);
 }
 
-.topbar__brand img {
-  border-radius: 50%;
+.topbar__name {
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 1.12rem;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--gold-hi);
 }
 
 .topbar__actions {
   display: flex;
+  flex: none;
   gap: 8px;
   margin-inline-start: auto;
 }
@@ -2053,14 +2521,35 @@ html.has-sheet {
   position: relative;
   display: grid;
   place-items: center;
-  width: 46px;
-  height: 46px;
-  border: 1px solid var(--gold-line-strong);
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
   border-radius: 50%;
   color: var(--gold-hi);
-  background: rgba(6, 26, 49, .85);
+  background: none;
   cursor: pointer;
-  transition: transform .45s var(--spring), background-color .2s;
+  isolation: isolate;
+  transition: transform .45s var(--spring);
+}
+
+/* the button's own disc: floats on the hero, then settles into the bar
+   (smaller, quieter); only its opacity and scale change */
+.topbar__btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 50%;
+  background: rgba(6, 26, 49, .85);
+  box-shadow: inset 0 0 0 1px var(--gold-line-strong), 0 8px 18px -10px rgba(0, 0, 0, .9);
+  opacity: calc(1 - var(--p) * .45);
+  transform: scale(calc(1 - var(--p) * .08));
+  transition: background-color .2s;
+}
+
+.topbar__btn:hover::before {
+  background: rgba(18, 56, 95, .9);
 }
 
 .topbar__btn:active {
@@ -2068,8 +2557,8 @@ html.has-sheet {
   transition-duration: .1s;
 }
 
-.topbar__btn[aria-pressed="true"] {
-  background: rgba(215, 170, 80, .16);
+.topbar__btn[aria-pressed="true"]::before {
+  background: rgba(78, 62, 30, .9);
 }
 
 .topbar__btn:disabled {
@@ -2080,6 +2569,97 @@ html.has-sheet {
 .topbar__btn .icon {
   width: 22px;
   height: 22px;
+}
+
+@media (min-width: 640px) {
+
+  .topbar__inner {
+    padding-inline: max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-left));
+  }
+
+}
+
+@media (min-width: 1024px) {
+
+  .topbar {
+    --bar-h: 64px;
+  }
+
+  .topbar__name {
+    font-size: 1.2rem;
+  }
+
+}
+
+/* the compositor runs it where the browser can (no script per frame) */
+@supports (animation-timeline: scroll()) {
+
+  .topbar::before {
+    animation: bar-surface linear both;
+    animation-timeline: scroll(root block);
+    animation-range: 0 120px;
+  }
+
+  .topbar::after {
+    animation: bar-line linear both;
+    animation-timeline: scroll(root block);
+    animation-range: 20px 150px;
+  }
+
+  .topbar__btn::before {
+    animation: bar-settle linear both;
+    animation-timeline: scroll(root block);
+    animation-range: 0 120px;
+  }
+
+  .topbar__brand {
+    animation: bar-brand linear both;
+    animation-timeline: scroll(root block);
+    animation-range: var(--brand-at, 160px) calc(var(--brand-at, 160px) + 90px);
+  }
+
+}
+
+@keyframes bar-surface {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes bar-line {
+  from { opacity: 0; transform: scaleX(0); }
+  to { opacity: 1; transform: scaleX(1); }
+}
+
+@keyframes bar-settle {
+  from { opacity: 1; transform: none; }
+  to { opacity: .55; transform: scale(.92); }
+}
+
+@keyframes bar-brand {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* reduced motion: no movement, only the two end states */
+:root[data-motion="reduced"] .topbar {
+  --p: 0;
+  --pb: 0;
+}
+
+:root[data-motion="reduced"] .topbar.is-compact {
+  --p: 1;
+  --pb: 1;
+}
+
+:root[data-motion="reduced"] .topbar::before,
+:root[data-motion="reduced"] .topbar::after,
+:root[data-motion="reduced"] .topbar__btn::before,
+:root[data-motion="reduced"] .topbar__brand {
+  animation: none !important;
+}
+
+:root[data-motion="reduced"] .topbar__brand {
+  transform: none;
 }
 
 .bell .icon {
@@ -2231,14 +2811,11 @@ html.has-sheet {
   display: none;
 }
 
+/* (the hierarchy: "MEETING TOPIC v2" below) */
 .topic {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
   width: 100%;
-  margin-top: 14px;
-  padding: 12px 14px;
   border: 1px solid var(--gold-line-strong);
   border-radius: var(--radius-md);
   text-align: start;
@@ -2259,35 +2836,12 @@ html.has-sheet {
 
 .topic__poster img {
   display: block;
-  width: 54px;
-  height: 68px;
-  border-radius: 27px 27px 10px 10px;
   object-fit: cover;
   box-shadow: inset 0 0 0 1px var(--gold-line-strong);
 }
 
 .topic__text {
-  display: grid;
   min-width: 0;
-}
-
-.topic__label {
-  font-size: .76rem;
-  font-weight: 800;
-  color: var(--gold);
-}
-
-.topic__title {
-  font-family: var(--font-display);
-  font-size: 1.45rem;
-  line-height: 1.4;
-  color: var(--gold-hi);
-}
-
-.topic__speaker {
-  font-size: .88rem;
-  font-weight: 700;
-  color: var(--text-2);
 }
 
 .topic__go {
@@ -2437,11 +2991,6 @@ html.has-sheet {
   object-fit: cover;
 }
 
-.news-card--text {
-  grid-template-rows: 1fr;
-  background: linear-gradient(160deg, rgba(215, 170, 80, .1), rgba(255, 255, 255, .02));
-}
-
 .news-card__body {
   display: grid;
   align-content: start;
@@ -2493,8 +3042,7 @@ html.has-sheet {
   background: rgba(255, 255, 255, .03);
 }
 
-.game__media img,
-.game__media--icon {
+.game__media img {
   display: grid;
   place-items: center;
   width: 84px;
@@ -2504,11 +3052,6 @@ html.has-sheet {
   color: var(--gold-hi);
   background: radial-gradient(circle at 50% 60%, rgba(215, 170, 80, .25), transparent 70%), var(--navy-950);
   box-shadow: inset 0 0 0 1px var(--gold-line-strong);
-}
-
-.game__media--icon .icon {
-  width: 40px;
-  height: 40px;
 }
 
 .game__body {
@@ -2605,17 +3148,12 @@ html.has-sheet {
   }
 }
 
-.game--live .game__media img,
-.game--live .game__media--icon {
+.game--live .game__media img {
   width: 100%;
   height: auto;
   max-height: 280px;
   border-radius: 0;
   box-shadow: none;
-}
-
-.game--live .game__media--icon {
-  height: 120px;
 }
 
 .game--live .game__body {
@@ -2685,389 +3223,6 @@ html.has-sheet {
 }
 
 
-/* ---------- sheet ---------- */
-
-dialog.sheet {
-  position: fixed;
-  inset: auto 0 0;
-  width: 100%;
-  max-width: 600px;
-  max-height: 100dvh;
-  margin: 0 auto;
-  padding: 0;
-  overflow: visible;
-  border: 0;
-  color: var(--text);
-  background: transparent;
-}
-
-dialog.sheet::backdrop {
-  background: rgba(2, 9, 20, .72);
-  animation: fade-in .3s ease-out;
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-}
-
-.sheet__panel {
-  display: flex;
-  flex-direction: column;
-  max-height: 90dvh;
-  overflow: hidden;
-  border: 1px solid var(--gold-line-strong);
-  border-bottom: 0;
-  border-radius: 26px 26px 0 0;
-  background:
-    radial-gradient(100% 40% at 50% 0%, rgba(215, 170, 80, .1), transparent 70%),
-    var(--navy-900);
-  box-shadow: 0 -20px 60px -10px rgba(0, 0, 0, .8);
-}
-
-.sheet__grip {
-  flex: none;
-  width: 44px;
-  height: 5px;
-  margin: 10px auto 0;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, .22);
-  cursor: grab;
-  touch-action: none;
-}
-
-.sheet__head {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px var(--pad) 10px;
-  cursor: grab;
-  touch-action: none;
-}
-
-.sheet__title:focus {
-  outline: none;
-}
-
-.sheet__title {
-  font-size: 1.15rem;
-  font-weight: 800;
-  line-height: 1.4;
-}
-
-.sheet__close {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border: 1px solid rgba(255, 255, 255, .1);
-  border-radius: 50%;
-  background: rgba(255, 255, 255, .05);
-  cursor: pointer;
-}
-
-.sheet__close .icon {
-  width: 20px;
-  height: 20px;
-}
-
-.sheet__body {
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 4px var(--pad) max(24px, env(safe-area-inset-bottom));
-}
-
-@media (min-width: 720px) {
-
-  dialog.sheet {
-    inset: auto 0 24px;
-  }
-
-  .sheet__panel {
-    max-height: calc(100dvh - 48px);
-    border-bottom: 1px solid var(--gold-line-strong);
-    border-radius: 26px;
-  }
-
-}
-
-
-/* ---------- detail (inside sheets) ---------- */
-
-.detail {
-  display: grid;
-  gap: 12px;
-}
-
-.detail__media img {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-height: 60dvh;
-  border-radius: var(--radius-md);
-  object-fit: contain;
-  background: var(--ink);
-}
-
-.detail__meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  font-size: .84rem;
-  color: var(--text-3);
-}
-
-.detail__kicker {
-  font-size: .8rem;
-  font-weight: 800;
-  color: var(--gold);
-}
-
-.detail__topic {
-  font-family: var(--font-display);
-  font-size: 2rem;
-  line-height: 1.35;
-  color: var(--gold-hi);
-}
-
-.detail__lead {
-  font-size: 1.05rem;
-  font-weight: 700;
-}
-
-.detail__when {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.detail__when .icon {
-  width: 20px;
-  height: 20px;
-  color: var(--gold);
-}
-
-.detail__body {
-  line-height: 1.85;
-  color: var(--text-2);
-  white-space: pre-line;
-}
-
-.detail__note {
-  padding: 10px 14px;
-  border-radius: 12px;
-  font-size: .92rem;
-  color: var(--text-2);
-  background: rgba(255, 255, 255, .04);
-}
-
-.detail__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 4px;
-}
-
-.detail__game .game {
-  border-color: var(--gold-line-strong);
-}
-
-.detail__upcoming h3 {
-  margin-bottom: 8px;
-  font-size: .95rem;
-  font-weight: 800;
-  color: var(--text-2);
-}
-
-.detail__upcoming ul {
-  display: grid;
-  gap: 6px;
-}
-
-.detail__upcoming li {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, .03);
-}
-
-.detail__upcoming li.is-cancelled {
-  color: var(--carmine-hi);
-}
-
-.detail__date {
-  font-weight: 800;
-  color: var(--gold-soft);
-}
-
-
-/* ---------- bell panel ---------- */
-
-.inbox {
-  display: grid;
-  gap: 18px;
-}
-
-.inbox__day {
-  margin-bottom: 8px;
-  font-size: .82rem;
-  font-weight: 800;
-  color: var(--gold);
-}
-
-.inbox__list {
-  display: grid;
-  gap: 6px;
-}
-
-.note-item {
-  position: relative;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  min-height: 64px;
-  padding: 10px 12px;
-  border: 1px solid transparent;
-  border-radius: 16px;
-  text-align: start;
-  text-decoration: none;
-  color: var(--text);
-  background: rgba(255, 255, 255, .03);
-  cursor: pointer;
-  transition: transform .45s var(--spring), background-color .2s;
-  animation: note-in .5s var(--ease-out-expo) both;
-}
-
-.inbox__group:nth-child(1) li:nth-child(2) .note-item { animation-delay: 40ms; }
-.inbox__group:nth-child(1) li:nth-child(3) .note-item { animation-delay: 80ms; }
-.inbox__group:nth-child(1) li:nth-child(4) .note-item { animation-delay: 120ms; }
-.inbox__group:nth-child(2) .note-item { animation-delay: 140ms; }
-.inbox__group:nth-child(n+3) .note-item { animation-delay: 180ms; }
-
-@keyframes note-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-}
-
-.note-item:active {
-  transform: scale(.98);
-  transition-duration: .1s;
-}
-
-.note-item.is-new {
-  border-color: var(--gold-line-strong);
-  background: rgba(215, 170, 80, .08);
-}
-
-.note-item.is-new::after {
-  content: "";
-  position: absolute;
-  top: 12px;
-  inset-inline-end: 12px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--gold);
-  box-shadow: 0 0 0 3px rgba(215, 170, 80, .2);
-}
-
-.note-item__icon {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 13px;
-  color: var(--gold-hi);
-  background: var(--navy-800);
-}
-
-.note-item__icon .icon {
-  width: 22px;
-  height: 22px;
-}
-
-.note-item--important .note-item__icon {
-  color: #fff;
-  background: var(--carmine);
-}
-
-.note-item--game .note-item__icon {
-  color: #ffb27a;
-  background: rgba(224, 115, 47, .18);
-}
-
-.note-item--meeting .note-item__icon {
-  color: var(--gold-hi);
-  background: rgba(215, 170, 80, .16);
-}
-
-.note-item__text {
-  display: grid;
-  min-width: 0;
-}
-
-.note-item__title {
-  font-weight: 800;
-  line-height: 1.45;
-}
-
-.note-item__message {
-  font-size: .86rem;
-  line-height: 1.55;
-  color: var(--text-2);
-}
-
-.note-item__time {
-  margin-top: 2px;
-  font-size: .74rem;
-  font-weight: 700;
-  color: var(--text-3);
-}
-
-.note-item__thumb img {
-  display: block;
-  width: 48px;
-  height: 60px;
-  border-radius: 10px;
-  object-fit: cover;
-}
-
-.inbox__empty {
-  display: grid;
-  justify-items: center;
-  gap: 4px;
-  padding: 30px 10px 40px;
-  text-align: center;
-  color: var(--text-2);
-}
-
-.inbox__empty-icon {
-  width: 48px;
-  height: 48px;
-  margin-bottom: 8px;
-  color: var(--gold);
-  opacity: .7;
-}
-
-.inbox__hint {
-  font-size: .86rem;
-  color: var(--text-3);
-}
-
-
 /* ---------- desktop extras ---------- */
 
 @media (min-width: 1024px) {
@@ -3103,8 +3258,7 @@ dialog.sheet::backdrop {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
   }
 
-  .game--live .game__media img,
-  .game--live .game__media--icon {
+  .game--live .game__media img {
     height: 100%;
     max-height: 320px;
   }
@@ -3373,12 +3527,55 @@ dialog.sheet::backdrop {
 }
 
 /* a section's own banner, above its content */
+/* any section kind (render.js dressSection): the first thing in its first
+   widget, edge to edge, whatever the widget's own layout */
 .section-banner {
+  grid-column: 1 / -1;
+  align-self: stretch;
+  justify-self: stretch;
   margin: calc(var(--pad) * -1) calc(var(--pad) * -1) 14px;
   overflow: hidden;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0;
   aspect-ratio: 16 / 6;
   background: var(--navy-950);
+}
+
+/* widgets that space their children with a gap */
+:is(.person-card, .links-section, .featured, .share, .location) > .section-banner {
+  margin-bottom: 0;
+}
+
+/* the location card has no padding of its own (its map is edge to edge) */
+.location > .section-banner {
+  margin: 0;
+  border-bottom: 1px solid var(--gold-line);
+}
+
+.location.has-banner .location__map {
+  margin-top: -16px;
+}
+
+.announcement > .section-banner {
+  margin-top: -16px;
+}
+
+/* side by side, two banners are the same height (balanced pairs) */
+@media (min-width: 640px) {
+
+  [data-area]:not([data-wide]) > .section-banner {
+    height: 128px;
+    aspect-ratio: auto;
+  }
+
+}
+
+/* a full-row banner on a wide screen: a band, not a wall */
+@media (min-width: 1024px) {
+
+  [data-area][data-wide] > .section-banner {
+    max-height: 250px;
+  }
+
 }
 
 .section-banner img {
@@ -3457,10 +3654,6 @@ dialog.sheet::backdrop {
   height: 120px;
   border-radius: 0;
   box-shadow: none;
-}
-
-.detail__media .art {
-  aspect-ratio: 16 / 9;
 }
 
 /* pictures show their own colour while loading */
@@ -3639,129 +3832,6 @@ img[style*="background-color"] {
   opacity: .7;
   cursor: default;
 }
-
-/* the share row in detail sheets */
-.share-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--gold-line);
-}
-
-.share-row__whatsapp .icon {
-  color: var(--whatsapp);
-}
-
-.detail__state {
-  margin: 4px 0 0;
-  font-weight: 800;
-}
-
-
-/* =========================================================
-   MINI-EXPERIENCES (xp.js, assets/js/xp/*.js)
-   Each platform gets its own small "phone" scene in its own palette —
-   our interpretation, not a copy of the apps.
-========================================================= */
-
-.xp {
-  display: grid;
-  gap: 14px;
-}
-
-.xp-stage {
-  position: relative;
-  display: grid;
-  place-items: center;
-  min-height: 200px;
-  padding: 6px 0 2px;
-}
-
-.xp-phone {
-  position: relative;
-  width: min(236px, 66vw);
-  aspect-ratio: 9 / 16;
-  max-height: 44vh;
-  overflow: hidden;
-  border-radius: 26px;
-  box-shadow: 0 30px 60px -28px rgba(0, 0, 0, .9), inset 0 0 0 1px rgba(255, 255, 255, .12);
-  isolation: isolate;
-  direction: rtl;
-}
-
-@media (min-height: 760px) {
-  .xp-phone {
-    max-height: 48vh;
-  }
-}
-
-.xp__copy {
-  display: grid;
-  gap: 4px;
-  text-align: center;
-}
-
-.xp__line {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(1.3rem, 5vw, 1.6rem);
-  line-height: 1.5;
-  color: var(--gold-hi);
-}
-
-.xp__sub {
-  margin: 0;
-  font-size: .92rem;
-  color: var(--text-2);
-}
-
-.xp__actions {
-  display: grid;
-}
-
-.xp__cta {
-  min-height: 52px;
-  font-size: 1rem;
-  transition: opacity .45s var(--ease-out), transform .55s var(--spring);
-}
-
-.xp__cta .icon:first-child {
-  width: 22px;
-  height: 22px;
-}
-
-/* the first scene: the button arrives after ~0.9 s (still in the DOM) */
-.xp.cta-pending .xp__cta {
-  opacity: 0;
-  transform: translateY(12px);
-}
-
-.xp__cta--facebook { background: linear-gradient(180deg, #4b8df8, #1877f2); color: #fff; }
-.xp__cta--instagram { background: linear-gradient(90deg, #f9a03f, #e1306c 45%, #8a3ab9); color: #fff; }
-.xp__cta--tiktok { background: #0b0b0d; color: #fff; box-shadow: -2px 0 0 #25f4ee, 2px 0 0 #fe2c55, 0 10px 24px -12px rgba(0, 0, 0, .9); }
-.xp__cta--whatsapp { background: linear-gradient(180deg, #3fe07c, #1fae55); color: #062b14; }
-
-/* a floating reaction */
-.xp-float {
-  position: absolute;
-  z-index: 5;
-  pointer-events: none;
-  line-height: 1;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, .4));
-}
-
-.xp-float--ig { color: #ff3b6b; }
-.xp-float--tt { color: #fe2c55; }
-
-.xp-stage.is-static .xp-phone {
-  opacity: .85;
-}
-
-
-/* the scenes themselves (.fb, .ig, .tt, .wa): assets/css/xp.css, loaded on demand */
-
 
 /* =========================================================
    FEEL (Phase 7): pointer light, press ripples, scroll reveals.

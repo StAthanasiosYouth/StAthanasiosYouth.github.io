@@ -17,7 +17,9 @@
     form: 'استمارة', calendar: 'تقويم', ticket: 'تذكرة / حجز', bus: 'رحلة', book: 'كتاب مقدس',
     music: 'ترانيم', photos: 'صور', video: 'فيديو', church: 'كنيسة', cross: 'صليب', heart: 'قلب',
     star: 'نجمة', megaphone: 'إعلان', gift: 'هدية', users: 'ناس / أسرة', map: 'مكان', info: 'معلومة', link: 'لينك',
-    trophy: 'كأس / مسابقة', theatre: 'مسرح'
+    trophy: 'كأس / مسابقة', theatre: 'مسرح',
+    messenger: 'ماسنجر', discord: 'ديسكورد', x: 'إكس (تويتر)', threads: 'ثريدز', snapchat: 'سناب شات',
+    mail: 'إيميل', phone: 'تليفون'
   };
 
 
@@ -91,6 +93,10 @@
     if (!bool(link.featured)) chips.push(A.chip(link.style === 'tile' ? 'مربع' : 'صف'));
     if (link.badge) chips.push(A.chip(link.badge, 'gold'));
 
+    // which scene it opens (the same resolution as the publisher)
+    var scene = link.experience === 'none' ? '' : link.experience || (window.adminResolveExperience ? window.adminResolveExperience({ icon: link.icon, url: link.url }) : '');
+    if (scene) chips.push(A.chip('مشهد: ' + experienceLabel(scene)));
+
     var toggle = A.switchInput('ظاهر', enabled, function (checked) {
       A.dirty = false;
       A.call('apiSetLinkEnabled', link.id, checked)
@@ -145,6 +151,97 @@
 
   }
 
+  /*
+   * «التجربة قبل اللينك»: the choices come from the registry
+   * (assets/js/platforms.js → AdminPlatforms.html, generated), grouped by
+   * kind of scene. Below it, what the link will really open, worked out
+   * with the registry's own resolveExperience (the same as the publisher).
+   * current() → { icon, url } of the editor right now.
+   */
+  var EXPERIENCE_GROUPS = [
+    { label: 'خدماتنا', scenes: ['voice'] },
+    { label: 'سوشيال ميديا', scenes: ['facebook', 'instagram', 'tiktok', 'feed', 'vertical', 'stories'] },
+    { label: 'رسايل وجروبات', scenes: ['whatsapp', 'chat'] },
+    { label: 'فيديو وصوت', scenes: ['player', 'music'] },
+    { label: 'مكان وتواصل', scenes: ['map', 'call', 'mail'] }
+  ];
+
+  function experienceLabel(key) {
+
+    var platforms = window.ADMIN_PLATFORMS || {};
+    if (!key) return '';
+    if (key === 'web') return 'مشهد عام';
+    return platforms[key] && platforms[key].label ? platforms[key].label : key + ' (مشهد عام)';
+
+  }
+
+  function experiencePicker(selected, current) {
+
+    var platforms = window.ADMIN_PLATFORMS || {};
+    var keys = Object.keys(platforms);
+    var used = [];
+
+    function option(value, label) {
+      used.push(value);
+      return el('option', { value: value, selected: value === selected ? 'selected' : null, text: label });
+    }
+
+    var groups = EXPERIENCE_GROUPS.map(function (group) {
+      var members = keys.filter(function (key) { return key !== 'web' && group.scenes.indexOf(platforms[key].scene) !== -1; });
+      return members.length ? el('optgroup', { label: group.label }, members.map(function (key) { return option(key, platforms[key].label); })) : null;
+    });
+
+    // anything the groups don't cover (a platform added later) still shows
+    var rest = keys.filter(function (key) { return key !== 'web' && used.indexOf(key) === -1; });
+
+    var select = el('select', { class: 'input', 'aria-describedby': null, onchange: A.markDirty },
+      option('', 'تلقائي (حسب الأيقونة أو الرابط)'),
+      option('none', 'من غير — يفتح على طول'),
+      groups,
+      rest.length ? el('optgroup', { label: 'تانية' }, rest.map(function (key) { return option(key, platforms[key].label || key); })) : null,
+      option('web', 'مشهد عام (أي موقع)'),
+      selected && used.indexOf(selected) === -1 ? option(selected, experienceLabel(selected)) : null
+    );
+
+    var said = el('p', { class: 'experience-said', 'aria-live': 'polite' });
+
+    /* shows what the link opens; returns true when that is a scene */
+    function update() {
+
+      var now = current();
+      var chosen = select.value;
+      var resolve = window.adminResolveExperience || function () { return ''; };
+      var key = chosen === 'none' ? '' : chosen || resolve({ experience: '', icon: now.icon, url: now.url });
+      var why = '';
+
+      if (!chosen && key) {
+        why = resolve({ experience: '', icon: now.icon, url: '' }) === key ? ' (من الأيقونة)' : ' (من اللينك)';
+      }
+
+      var platform = platforms[key];
+
+      A.fill(said,
+        A.icon(key ? (platform && platform.icon) || 'sparkle' : 'external'),
+        key
+          ? el('span', {}, chosen ? 'هيفتح مشهد ' : 'تلقائي هنا = مشهد ', el('b', { text: experienceLabel(key) }), why, ' — وبعده زرار للينك نفسه')
+          : el('span', { text: chosen === 'none' ? 'من غير مشهد: اللينك هيفتح على طول.' : 'تلقائي هنا = من غير مشهد: ده موقع عادي، هيفتح على طول.' })
+      );
+
+      return !!key;
+
+    }
+
+    return {
+      node: A.field('التجربة قبل اللينك', el('div', {}, select, said), 'مشهد قصير يعرّف الزائر بالمكان اللي رايحله، وبعدين زرار يودّيه للينك نفسه'),
+      select: select,
+      update: update,
+      value: function () { return select.value; }
+    };
+
+  }
+
+  A.experienceLabel = experienceLabel;
+
   function editLink(link) {
 
     var isNew = !link;
@@ -196,20 +293,32 @@
 
     syncFeatured(featured);
 
-    var experience = A.choices('experience', [
-      { value: '', label: 'تلقائي (حسب الأيقونة)' },
-      { value: 'facebook', label: 'فيسبوك' },
-      { value: 'instagram', label: 'إنستجرام' },
-      { value: 'tiktok', label: 'تيك توك' },
-      { value: 'whatsapp', label: 'واتساب' },
-      { value: 'none', label: 'من غير — يفتح على طول' }
-    ], link.experience || '');
+    var experience = experiencePicker(link.experience || '', function () {
+      return { icon: icons.value(), url: urlInput.value.trim() };
+    });
+    var gallery = A.galleryPicker(link.gallery || '', {
+      max: limits.gallery || 6,
+      label: 'صور المشهد',
+      hint: 'اختياري — لحد ٦ صور من المكتبة بتظهر جوه المشهد. من غيرها بيظهر أحدث بوسترات منشورة.'
+    });
+
+    // the photos only matter when the link opens a scene
+    function syncExperience() {
+      gallery.node.hidden = !experience.update();
+    }
+
+    experience.select.addEventListener('change', syncExperience);
+    icons.node.addEventListener('change', syncExperience);
+    urlInput.addEventListener('input', syncExperience);
+    syncExperience();
+
     var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
 
     save.addEventListener('click', function () {
       box.hidden = true;
       A.withBusy(save, A.call('apiSaveLink', {
         experience: experience.value(),
+        gallery: gallery.value(),
         id: link.id || '',
         title: title.input.value,
         subtitle: subtitle.input.value,
@@ -246,7 +355,8 @@
         styleField,
         cta.node,
         A.field('الأيقونة', icons.node),
-        A.field('التجربة قبل اللينك', experience.node, 'لينكات السوشيال بتفتح تجربة قصيرة الأول، وبعدين زرار يودّي للصفحة نفسها'),
+        experience.node,
+        gallery.node,
         badgeField,
         A.field('يبدأ يظهر من', start.node, 'اختياري — سيبه فاضي لو هيظهر على طول'),
         A.field('آخر ظهور', end.node, 'اختياري — مناسب للمؤتمرات والرحلات والتسجيل'),
@@ -279,7 +389,8 @@
     var from = A.dateTimeInput(row.visibleFrom, { emptyText: 'يظهر على طول', presets: [A.PRESETS.now, A.PRESETS.thursday8, A.PRESETS.friday] });
     var until = A.dateTimeInput(row.visibleUntil, { emptyText: 'مبيختفيش لوحده', presets: [A.PRESETS.sunday10] });
     var enabled = A.switchInput('القسم ظاهر', isNew ? true : bool(row.enabled));
-    var banner = A.imagePicker(row.banner || '', { label: 'بانر القسم (اختياري)', hint: 'بيظهر فوق القسم، وأي عنصر جواه من غير بوستر بياخده' });
+    // every kind of section can have a banner (no exceptions)
+    var banner = A.imagePicker(row.banner || '', { label: 'بانر القسم (اختياري)', hint: info.bannerHint || 'بيظهر فوق القسم في الموقع، بعرض القسم' });
     var theme = A.themePicker(row.theme || '');
     var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
 
@@ -313,11 +424,11 @@
         isNew || kind === 'links' ? A.field('مفتاح القسم', key, isNew ? 'بالإنجليزي الصغير ومن غير مسافات، مثلاً events. مش هيظهر للناس' : 'المفتاح مبيتغيرش بعد الإضافة') : null,
         title.node,
         info.publicTitle ? subtitle.node : null,
-        info.publicTitle ? el('div', { class: 'form-group' },
+        el('div', { class: 'form-group' },
           el('p', { class: 'section-label', text: 'الشكل' }),
-          A.field('لون القسم', theme.node, 'بيغيّر لمسة اللون والإضاءة بتاعة القسم بس'),
+          info.publicTitle ? A.field('لون القسم', theme.node, 'بيغيّر لمسة اللون والإضاءة بتاعة القسم بس') : null,
           banner.node
-        ) : null,
+        ),
         el('div', { class: 'form-group' },
           el('p', { class: 'section-label', text: 'الظهور (بتوقيت مصر)' }),
           enabled.node,
@@ -330,6 +441,7 @@
   }
 
   A.editSection = editSection;
+  A.editLink = editLink;
 
 
   /* =======================================================
@@ -337,16 +449,16 @@
   ======================================================= */
 
   var KIND_INFO = {
-    meeting: { label: 'ركن الاجتماع', icon: 'church', titleHint: 'اسم القسم في لوحة التحكم (عنوان الكارت في الموقع هو اسم الاجتماع)' },
-    featured: { label: 'الروابط المميزة', icon: 'heart' },
-    news: { label: 'الأخبار', icon: 'megaphone', publicTitle: true, titleHint: 'بيظهر فوق الأخبار في الموقع' },
-    games: { label: 'التحديات والألعاب', icon: 'star', publicTitle: true },
-    items: { label: 'مسابقات / فعاليات', icon: 'calendar', publicTitle: true, titleHint: 'بيظهر فوق القسم في الموقع' },
-    location: { label: 'مكان الاجتماع', icon: 'map' },
-    links: { label: 'مجموعة روابط', icon: 'link', publicTitle: true, titleHint: 'بيظهر فوق الروابط في الموقع' },
-    contacts: { label: 'تواصل مع الخدمة', icon: 'phone' },
-    support: { label: 'الدعم الفني', icon: 'info' },
-    share: { label: 'شارك الصفحة', icon: 'share' }
+    meeting: { label: 'ركن الاجتماع', icon: 'church', titleHint: 'اسم القسم في لوحة التحكم (عنوان الكارت في الموقع هو اسم الاجتماع)', bannerHint: 'بيظهر فوق ركن الاجتماع (المعاد والموضوع)' },
+    featured: { label: 'الروابط المميزة', icon: 'heart', bannerHint: 'بيظهر فوق الروابط المميزة (زي صوتك يهمنا)' },
+    news: { label: 'الأخبار', icon: 'megaphone', publicTitle: true, titleHint: 'بيظهر فوق الأخبار في الموقع', bannerHint: 'بيظهر فوق الأخبار، وأي خبر من غير بوستر بياخده' },
+    games: { label: 'التحديات والألعاب', icon: 'star', publicTitle: true, bannerHint: 'بيظهر فوق الألعاب، وأي لعبة من غير صورة بتاخده' },
+    items: { label: 'مسابقات / فعاليات', icon: 'calendar', publicTitle: true, titleHint: 'بيظهر فوق القسم في الموقع', bannerHint: 'بيظهر فوق القسم، وأي عنصر جواه من غير بوستر بياخده' },
+    location: { label: 'مكان الاجتماع', icon: 'map', bannerHint: 'بيظهر فوق كارت المكان والخريطة' },
+    links: { label: 'مجموعة روابط', icon: 'link', publicTitle: true, titleHint: 'بيظهر فوق الروابط في الموقع', bannerHint: 'بيظهر فوق الروابط دي' },
+    contacts: { label: 'تواصل مع الخدمة', icon: 'phone', bannerHint: 'بيظهر فوق كروت التواصل' },
+    support: { label: 'الدعم الفني', icon: 'info', bannerHint: 'بيظهر فوق الدعم الفني' },
+    share: { label: 'شارك الصفحة', icon: 'share', bannerHint: 'بيظهر فوق «شارك الصفحة»' }
   };
 
   A.KIND_INFO = KIND_INFO;
@@ -558,6 +670,13 @@
 
   };
 
+  /* what the site shows when these are left empty (placeholders here) */
+  var CONTACT_DEFAULTS = {
+    serviceIntro: 'عندك سؤال أو محتاج تتكلم؟',
+    supportIntro: 'معايا مشكلة',
+    reply: 'أهلاً بيك 👋 ابعتلي المشكلة أو التفاصيل وأنا هساعدك إن شاء الله.'
+  };
+
   function editContact(contact) {
 
     var isNew = !contact;
@@ -573,7 +692,7 @@
     var kind = A.choices('kind', [
       { value: 'service', label: 'تواصل مع الخدمة' },
       { value: 'support', label: 'دعم فني (أهدى)' }
-    ], contact.kind || 'service');
+    ], contact.kind || 'service', function (value) { syncKind(value); });
 
     var message = A.counted('رسالة الواتساب الجاهزة', contact.message, limits.message, 'اختياري — بتتكتب لوحدها لما حد يفتح الواتساب', { multiline: true });
 
@@ -584,11 +703,34 @@
 
     message.node.hidden = (contact.method || 'call') !== 'whatsapp';
 
+    // the person card (schema 4): a photo, the opening line, the reply bubble
+    var avatar = A.imagePicker(contact.image || '', {
+      label: 'الصورة (اختياري)',
+      className: 'picker--avatar',
+      hint: 'صورة الشخص في الكارت — من المكتبة أو ارفع جديدة. من غيرها بيظهر أول حرف من الاسم'
+    });
+    var intro = A.counted('جملة البداية', contact.intro, limits.contactIntro || 80, ' ', {});
+    var reply = A.counted('الرد', contact.reply, limits.contactReply || 200, 'الرد اللي بيظهر في الكارت بعد جملة البداية (للدعم الفني بس)', { multiline: true, rows: 3, placeholder: CONTACT_DEFAULTS.reply });
+
+    function syncKind(value) {
+      var support = value === 'support';
+      intro.input.placeholder = CONTACT_DEFAULTS[support ? 'supportIntro' : 'serviceIntro'];
+      intro.node.querySelector('.field__hint').textContent = support
+        ? 'اللي الزائر بيقوله في الكارت (فقاعة منه). سيبه فاضي للجملة اللي ظاهرة'
+        : 'سطر دعوة صغير فوق زرار التواصل. سيبه فاضي للجملة اللي ظاهرة';
+      reply.node.hidden = !support;
+    }
+
     var enabled = A.switchInput('ظاهر', contact.enabled === undefined ? true : bool(contact.enabled));
     var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
 
     save.addEventListener('click', function () {
+      if (avatar.busy()) {
+        A.toast('الصورة لسه بتترفع — استنى «تم الرفع ✓» وبعدين احفظ', 'info');
+        return;
+      }
       box.hidden = true;
+      var isSupport = kind.value() === 'support';
       A.withBusy(save, A.call('apiSaveContact', {
         id: contact.id || '',
         name: name.input.value,
@@ -598,6 +740,10 @@
         kind: kind.value(),
         method: method.value(),
         message: message.input.value,
+        image: avatar.value(),
+        intro: intro.input.value,
+        // the reply belongs to the support card; a service card keeps none
+        reply: isSupport ? reply.input.value : '',
         enabled: enabled.input.checked
       }))
         .then(function (next) {
@@ -621,11 +767,21 @@
         A.field('النوع', kind.node),
         A.field('طريقة التواصل', method.node),
         message.node,
+        el('div', { class: 'form-group' },
+          el('p', { class: 'section-label', text: 'الكارت في الموقع' }),
+          avatar.node,
+          intro.node,
+          reply.node
+        ),
         enabled.node
       )
     ], A.sheetFooter(save));
 
+    syncKind(contact.kind || 'service');
+
   }
+
+  A.editContact = editContact;
 
 
   /* =======================================================
