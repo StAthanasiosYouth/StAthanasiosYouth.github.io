@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+
+<head>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <!--
+    /admin/ — a short branded door to the admin panel (Apps Script).
+
+    It does NOT embed the admin (the admin refuses to be framed on purpose,
+    and Google sign-in doesn't work inside frames): it opens it, in this tab.
+    No secrets here: the admin's /exec URL is public; Google sign-in and the
+    ADMIN_EMAILS allow-list protect it.
+
+    THE ADMIN URL lives in this file only, twice, on purpose and side by side:
+    the no-JavaScript refresh and the button below (admin.js reads the
+    button's href). If the deployment ever changes (a NEW deployment, not a
+    new version of the same one), replace both, then check with
+    `cd tools && npm test` (tests/polish-b.test.mjs compares them).
+  -->
+
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#020914">
+  <meta name="color-scheme" content="dark">
+
+  <title>لوحة التحكم · أسرة البابا أثناسيوس</title>
+
+  <link rel="icon" href="../assets/img/favicon-32.png" sizes="32x32">
+  <link rel="stylesheet" href="admin.css">
+
+  <!-- without JavaScript: go after a moment anyway -->
+  <noscript><meta http-equiv="refresh" content="2; url=https://script.google.com/macros/s/AKfycbwhHMp54vLJLK5UuwH_7zByzkPRkQErcUQdvZ1ad2_AxpasNWzShoh1CT3AIOrB8Rtbvw/exec"></noscript>
+
+  <script src="admin.js" defer></script>
+
+</head>
+
+<body>
+
+  <main class="gate">
+
+    <div class="gate__glow" aria-hidden="true"></div>
+
+    <div class="gate__arch" aria-hidden="true">
+      <span class="gate__cross"></span>
+      <span class="gate__ring"></span>
+      <img class="gate__logo" src="../assets/img/logo-256.webp" width="128" height="128" alt="">
+    </div>
+
+    <h1 class="gate__title">لوحة التحكم</h1>
+    <p class="gate__sub">أسرة البابا أثناسيوس – سفاجا</p>
+
+    <p class="gate__status" role="status">
+      <span class="gate__line" aria-hidden="true"><i></i></span>
+      <span>بنفتحلك لوحة التحكم…</span>
+    </p>
+
+    <a class="gate__enter" id="enter" href="https://script.google.com/macros/s/AKfycbwhHMp54vLJLK5UuwH_7zByzkPRkQErcUQdvZ1ad2_AxpasNWzShoh1CT3AIOrB8Rtbvw/exec" rel="noreferrer">ادخل لوحة التحكم</a>
+
+    <p class="gate__note">هتدخل بحساب جوجل المسموح له. لو مش مسموح، جوجل هيقولك.</p>
+
+  </main>
+
+</body>
+
+</html>
