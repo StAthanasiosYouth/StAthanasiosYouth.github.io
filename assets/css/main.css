@@ -131,12 +131,9 @@ html {
 }
 
 
-/* ---------- scrollbars (mouse + fine pointer only) ----------
-   Slim, navy/gold, a soft rounded thumb on a barely-there track; the same
-   tokens as the admin. Touch screens keep their native overlay bars.
-   Chromium and Safari: ::-webkit-scrollbar (Chromium ignores those as soon
-   as a standard scrollbar-* property is set, so the standard ones are only
-   for browsers without the pseudo-elements, i.e. Firefox). */
+/* ---------- scrollbars: mouse screens only (touch keeps its own) ----------
+   Same tokens as the admin. Chromium ignores ::-webkit-scrollbar once a
+   standard scrollbar-* is set, so those are for Firefox only. */
 
 :root {
   --sb-size: 10px;
@@ -503,10 +500,8 @@ ol {
   box-shadow: none;
 }
 
-/* the logo stands in an arched "door", like an iconostasis panel.
-   Layers (so the intro can stage each one): the light behind
-   (.hero__arch::before), the door itself (.hero__frame), the logo, the
-   small cross on top (.hero__arch::after). */
+/* the logo in an arched "door" (iconostasis). Layers the intro stages:
+   light (::before), door (.hero__frame), logo, cross (::after) */
 .hero__arch {
   --arch-r: 66px;
   position: relative;
@@ -1931,15 +1926,9 @@ ol {
   opacity: 0;
 }
 
-/*
- * Full tier: the conversation keeps living while it is on screen. One
- * shared cycle (--cycle) for every part, so they never drift apart:
- *   visitor's message → seen → Mena types → his reply → a reaction
- *   → a calm pause → everything fades up and away → again.
- * Percentages are moments of a 4.4 s cycle (0.1 s ≈ 2.3%). render.js
- * pauses it off screen and in a hidden tab (.is-paused); lite plays the
- * story once (.is-once); reduced motion shows the final frame.
- */
+/* Full tier: the chat loops on one shared 4.4 s cycle (0.1 s ≈ 2.3%):
+   message → seen → typing → reply → reaction → pause → fade → again.
+   render.js: .is-paused off screen / hidden tab, .is-once in lite. */
 .chat {
   --cycle: 4.4s;
 }
@@ -2317,11 +2306,9 @@ ol {
 
   .hub {
     grid-template-columns: repeat(12, minmax(0, 1fr));
-    padding-top: max(36px, env(safe-area-inset-top));
   }
 
-  /* the opening (row 1, placed explicitly so the lit stage behind it can
-     share the row): the identity on the start side, the meeting beside it */
+  /* the opening: row 1, placed so the lit stage can share the row */
   [data-area="hero"] {
     grid-row: 1;
     grid-column: 1 / span 5;
@@ -2359,10 +2346,6 @@ ol {
 
   [data-area][data-wide] {
     grid-column: 1 / -1;
-  }
-
-  .hero {
-    padding-block: 10px;
   }
 
   .hero__arch {
@@ -2548,20 +2531,11 @@ html.has-sheet {
 
 /* ---------- top bar ---------- */
 
-/*
- * One bar, two moments, and every step in between. At the top of the page
- * it is part of the composition (no surface, the buttons float on the
- * hero's light); as the page scrolls it gains, continuously:
- *   --p  (0 → 1 over the first 120px): the surface (translucent navy, a
- *        blur on capable devices), a gold hairline drawn from the centre,
- *        the buttons settling into it;
- *   --pb (0 → 1 as the hero's name passes under the bar): the logo and
- *        the compact name gliding in.
- * Where scroll-driven animations exist, CSS runs it all on the compositor
- * (scroll(root)); elsewhere main.js sets --p / --pb per frame.
- * The bar's own height never changes (no layout shift).
- * Reduced motion: the final frames only, switched by .is-compact.
- */
+/* One bar, every step between two moments, never changing height:
+   --p (0 → 1 over the first 120px): surface, hairline, buttons settling;
+   --pb (as the hero's name passes under it): logo + compact name glide in.
+   Scroll-driven where supported, else main.js sets them per frame.
+   Reduced motion: the end frames only (.is-compact). */
 
 @property --p {
   syntax: "<number>";
@@ -2594,11 +2568,8 @@ html.has-sheet {
   padding-inline: max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-left));
 }
 
-/* the surface: the page's own sky gathering behind the bar. The same navy
-   and the same gold light as the opening (a glow from the top centre), no
-   slab: it reaches a little below the bar and feathers out there, so the
-   bar has no hard bottom edge. Solid enough to read on; a blur where the
-   device can afford one (full tier). */
+/* the surface: the page's own navy and gold light, feathering out a little
+   below the bar (no slab, no hard edge); a blur in the full tier */
 .topbar::before {
   content: "";
   position: absolute;
@@ -3405,15 +3376,6 @@ html.has-sheet {
     padding: 24px;
   }
 
-  .news__rail {
-    grid-auto-flow: row;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    grid-auto-columns: auto;
-    margin-inline: 0;
-    padding-inline: 0;
-    overflow: visible;
-  }
-
   .games__list {
     grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
   }
@@ -3695,9 +3657,8 @@ html.has-sheet {
 /* a section's own banner, above its content */
 /* any section kind (render.js dressSection): the first thing in its first
    widget, edge to edge, whatever the widget's own layout */
-/* the slot takes the banner's own shape (--banner-ar, hub.js) within a
-   height range; hub.js decides cover (a near match) or contain (the whole
-   banner on a surround) from the slot it really got */
+/* the slot takes the banner's shape (--banner-ar) within a height range;
+   hub.js: cover for a near match, else contain on a surround */
 .section-banner {
   --tint: var(--navy-700);
   position: relative;
@@ -4419,13 +4380,12 @@ img[style*="background-color"] {
     color: var(--gold-hi);
   }
 
-  /* news: one row of cards that share the width (176-232px each); more
-     than fit scroll sideways, like the phone's rail: no lonely card on a
-     second row */
+  /* news: one row (176-232px cards), more scroll sideways; no lone card */
   .news__rail {
     display: flex;
     gap: 14px;
-    padding-bottom: 10px;
+    margin-inline: 0;
+    padding: 2px 0 10px;
     overflow-x: auto;
   }
 
@@ -4520,6 +4480,11 @@ html[data-intro-state="playing"] .hero {
   pointer-events: none;
 }
 
+/* the page's own scrollbar appears with the page */
+html[data-intro-state="playing"]::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+
 html[data-intro="play"] .backdrop {
   animation: intro-dawn 2.4s linear backwards;
 }
@@ -4534,7 +4499,7 @@ html[data-intro="play"] .topbar {
 }
 
 html[data-intro="play"] :is(.skeleton, .hero__dust) {
-  animation: intro-fade .8s var(--ease-out) 1.6s backwards;
+  animation: intro-fade .8s var(--ease-out) 1.95s backwards;
 }
 
 html[data-intro="play"] :is(.hero__arch, .hero__name) {

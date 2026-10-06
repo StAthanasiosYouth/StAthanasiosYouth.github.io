@@ -12,7 +12,7 @@ import { h, external } from './dom.js';
 import { iconNode } from './icons.js';
 import { visibilityState } from './schedule.js';
 import { formatStamp, untilText } from './words.js';
-import { posterOrFallback, mediaHero } from './hub.js';
+import { posterOrFallback } from './hub.js';
 import { go } from './router.js';
 
 const SECTION_ICONS = { competitions: 'trophy', activities: 'calendar' };
@@ -134,7 +134,8 @@ export function itemsSection(section, items, content, nowStamp) {
 }
 
 
-export function itemSheetContent(item, type, section, nowStamp, shareRow) {
+/* hero: detail.js mediaHero (the sheets' lazy module, passed in by main.js) */
+export function itemSheetContent(item, type, section, nowStamp, shareRow, hero) {
 
   const competition = section.key === 'competitions';
   const state = itemState(item, nowStamp);
@@ -142,7 +143,7 @@ export function itemSheetContent(item, type, section, nowStamp, shareRow) {
   const media = item.image || type.banner || section.banner;
 
   return h('article', { class: 'detail', 'data-theme': type.theme || section.theme || null },
-    mediaHero(media),
+    hero(media),
     h('p', { class: 'detail__kicker' }, type.label || SECTION_TITLES[section.key] || ''),
     label ? h('p', { class: `detail__state item-card__state is-${state.state}` }, label) : null,
     item.subtitle ? h('p', { class: 'detail__lead' }, item.subtitle) : null,

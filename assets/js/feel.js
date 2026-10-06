@@ -184,15 +184,14 @@ function reveal(widget) {
 }
 
 /* while the intro plays: how long until the sections rise (the identity
-   leads: from 1.6 s on a phone, where it only moves up; on a wide screen
-   it crosses the stage first, so they wait until it has nearly landed) */
-const introAssemble = () => (innerWidth >= 1024 ? 1950 : 1600);
+   leads; they rise as it lands, never under it on its way) */
+const INTRO_ASSEMBLE = 1950;
 
 function introWait() {
 
   if (html.dataset.introState !== 'playing') return 0;
 
-  return Math.max(0, Math.round(Number(html.dataset.introAt || 0) + introAssemble() - performance.now()));
+  return Math.max(0, Math.round(Number(html.dataset.introAt || 0) + INTRO_ASSEMBLE - performance.now()));
 
 }
 

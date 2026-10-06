@@ -11,7 +11,7 @@ import { shareLink, openQr, shareRow } from './share.js';
 import { startRouter, resolveRoute, go, leave } from './router.js';
 import { openSheet, closeSheet, sheetStyles } from './sheet.js';
 import { openBell } from './bell.js';
-import { newsSheetContent, gameSheetContent, meetingSheetContent, gameStates, visibleNews } from './hub.js';
+import { gameStates, visibleNews } from './hub.js';
 import { itemSheetContent, typeOf, visibleItems } from './items.js';
 import { isSectionLive, liveSections } from './layout.js';
 import { openExperience, prepareExperience, hasScene } from './xp.js';
@@ -138,7 +138,7 @@ function openRoute(route) {
   if (route.name === 'news') {
     const item = live('news') && visibleNews(current, time.stamp).find(n => n.id === route.id);
     if (!item) return missing();
-    openSheet({ title: item.title, content: newsSheetContent(item, time.stamp, share), onClose });
+    withDetail(d => openSheet({ title: item.title, content: d.newsSheetContent(item, time.stamp, share), onClose }));
     return;
   }
 
@@ -146,7 +146,7 @@ function openRoute(route) {
     const item = (current.activities || []).find(a => a.id === route.id);
     const section = item && liveSections(current, time.stamp).find(s => s.key === item.section);
     if (!item || !section || !visibleItems(current, item.section, time.stamp).includes(item)) return missing();
-    openSheet({ title: item.title, content: itemSheetContent(item, typeOf(current, item), section, time.stamp, share), onClose });
+    withDetail(d => openSheet({ title: item.title, content: itemSheetContent(item, typeOf(current, item), section, time.stamp, share, d.mediaHero), onClose }));
     return;
   }
 
@@ -160,9 +160,11 @@ function openRoute(route) {
   if (route.name === 'game') {
     const entry = live('games') && gameStates(current, time.stamp).find(g => g.game.id === route.id);
     if (!entry) return missing();
-    const { node, card } = gameSheetContent(entry, share);
-    sheetCards = [card];
-    openSheet({ title: entry.game.title, content: node, onClose });
+    withDetail(d => {
+      const { node, card } = d.gameSheetContent(entry, share);
+      sheetCards = [card];
+      openSheet({ title: entry.game.title, content: node, onClose });
+    });
     return;
   }
 
@@ -170,8 +172,26 @@ function openRoute(route) {
     if (!live('meeting')) return missing();
     const status = meetingSnapshot() || meetingStatus(current.meeting, time.now, current.sessions);
     const title = status && status.session && status.session.topic ? 'الاجتماع الجاي' : (current.meeting ? current.meeting.title : 'الاجتماع');
-    openSheet({ title, content: meetingSheetContent(current, status, time.stamp), onClose });
+    withDetail(d => openSheet({ title, content: d.meetingSheetContent(current, status, time.stamp), onClose }));
   }
+
+}
+
+
+/* the sheets' content (detail.js) is not part of the first visit: it comes
+   with the sheets' stylesheet (the first touch, or a deep link). A route
+   that changed meanwhile is not opened late. */
+let detailModule = null;
+
+const detail = () => (detailModule ||= import('./detail.js'));
+
+function withDetail(open) {
+
+  const hash = location.hash;
+
+  detail().then(module => {
+    if (location.hash === hash) open(module);
+  }).catch(error => console.warn(error));
 
 }
 
@@ -250,6 +270,7 @@ function setupTopbar() {
   // sheet can open (a deep link loads it itself)
   const warm = () => {
     sheetStyles();
+    detail();
     for (const type of ['pointerdown', 'keydown']) document.removeEventListener(type, warm, true);
   };
   for (const type of ['pointerdown', 'keydown']) document.addEventListener(type, warm, { capture: true, passive: true });

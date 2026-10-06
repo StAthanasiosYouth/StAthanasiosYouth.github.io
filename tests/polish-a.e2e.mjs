@@ -166,7 +166,7 @@ for (const [name, viewport] of Object.entries({ phone: PHONE, desktop: DESKTOP }
     assert.ok(scaleX(top.line) < 0.05, 'the hairline is not drawn yet');
     // full-bleed: the whole layout width (refine A keeps a stable scrollbar
     // gutter on mouse screens, so that is the viewport minus the gutter)
-    assert.equal(top.width, await page.evaluate(() => document.documentElement.clientWidth), 'full-bleed');
+    assert.equal(top.width, await page.evaluate(() => Math.round(document.body.getBoundingClientRect().width)), 'full-bleed');
 
     // part way: in between (continuous, not a switch)
     await scrollTo(page, 60);

@@ -1,17 +1,9 @@
 /*
- * INTRO: the opening of a first visit. A classic script in <head>: it
- * decides before the first paint. The intro IS the homepage (no overlay,
- * no copy): the page renders underneath from the start and main.css
- * (INTRO) stages the hero: the logo out of the dark in the middle of the
- * screen, the name writing itself in, then the identity gliding into its
- * place while the page assembles around it (feel.js times the sections).
- * Only transform / opacity / filter / clip-path move: no layout shift.
- *
- * Never in the admin's preview, with reduced motion, on a weak device or
- * a data saver, for a deep link, in a background tab or a frame, or twice
- * in a session. A tap, key, wheel or scroll fast-forwards it (the tap
- * itself still reaches the page).
- *
+ * INTRO: a first visit's opening (classic script in <head>: decides before
+ * the first paint). No overlay: the real hero is staged by main.css INTRO
+ * while the page renders underneath; feel.js times the sections. Never in
+ * the preview, with reduced motion, on weak devices / data saver, for deep
+ * links, hidden tabs, frames, or twice a session. Input fast-forwards it.
  * <html data-intro="play" data-intro-state="playing|done" data-intro-at>
  */
 (function () {

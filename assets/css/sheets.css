@@ -124,12 +124,10 @@ dialog.sheet::backdrop {
   gap: 12px;
 }
 
-/* the poster at the top of a sheet (hub.js mediaHero). The IMAGE decides
-   the shape: the frame has exactly the poster's ratio (--ar = w / h), so
-   there are no bars, no crop and no distortion. When the height has to be
-   capped (--cap: 56dvh, 62dvh from 720px), the frame narrows, keeping the
-   ratio, and stands centred. Around it, the poster's own light: the same
-   picture blurred into a soft glow (full tier), or a shadow in its colour. */
+/* the poster atop a sheet (hub.js mediaHero): the IMAGE decides the shape
+   (frame ratio = --ar: no bars, no crop, no distortion). Capped in height
+   (--cap), the frame narrows and stays centred. Around it, its own light:
+   the picture blurred into a glow (full tier), else a shadow in its colour. */
 .media-hero {
   --tint: var(--gold);
   --cap: 56dvh;
