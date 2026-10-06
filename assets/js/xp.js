@@ -10,7 +10,8 @@
  *   Later visits: a short version, the button right away.
  *   localStorage "athanasios.xp.v1"; blocked storage = first visit.
  * - Reduced motion: the scene's final frame, no movement.
- * - Scenes load only when opened (assets/js/xp/<platform>.js).
+ * - Scenes load only when opened (assets/js/xp/<platform>.js), with their
+ *   styles (assets/css/xp.css); the copy and the button never wait for them.
  */
 
 import { h, external } from './dom.js';
@@ -20,6 +21,39 @@ import { play } from './sound.js';
 import { openSheet } from './sheet.js';
 
 const STORE = 'athanasios.xp.v1';
+
+let styles = null;
+
+/* the scenes' own stylesheet, fetched once, with the first scene */
+function sceneStyles() {
+
+  if (!styles) {
+    styles = new Promise((resolve, reject) => {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = new URL('../css/xp.css', import.meta.url).href;
+      link.addEventListener('load', resolve);
+      link.addEventListener('error', () => {
+        link.remove();
+        styles = null;
+        reject(new Error('xp.css'));
+      });
+      document.head.append(link);
+    });
+  }
+
+  return styles;
+
+}
+
+/* start fetching as the finger lands, so the scene is ready by the click */
+export function prepareExperience(platform) {
+
+  if (!PLATFORMS[platform]) return;
+  sceneStyles().catch(() => {});
+  import(`./xp/${platform}.js`).catch(() => {});
+
+}
 
 export const PLATFORMS = {
   facebook: {
@@ -149,8 +183,8 @@ export function openExperience(link, context, onClose) {
     }
   });
 
-  import(`./xp/${platform}.js`)
-    .then(module => {
+  Promise.all([import(`./xp/${platform}.js`), sceneStyles()])
+    .then(([module]) => {
       if (!stage.isConnected) return;
       const scene = module.play(stage, { quick: !first, reduced, content: context.content, sound: play });
       stopScene = scene && scene.stop ? scene.stop : stopScene;

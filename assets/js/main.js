@@ -14,9 +14,10 @@ import { openBell } from './bell.js';
 import { newsSheetContent, gameSheetContent, meetingSheetContent, gameStates, visibleNews } from './hub.js';
 import { itemSheetContent, typeOf, visibleItems } from './items.js';
 import { isSectionLive, liveSections } from './layout.js';
-import { openExperience } from './xp.js';
+import { openExperience, prepareExperience } from './xp.js';
 import { iconNode } from './icons.js';
 import { particles } from './motion.js';
+import { startFeel } from './feel.js';
 import { play, soundEnabled, setSoundEnabled } from './sound.js';
 
 let current = null;
@@ -240,6 +241,14 @@ function setupTopbar() {
     if (event.target.closest('button, a.btn, .tile, .row-link, .note-item, .news-card, .news-lead')) play('tap');
   });
 
+  // a social link: its scene starts loading as the finger lands (or the mouse arrives)
+  const prepare = event => {
+    const link = event.target.closest && event.target.closest('[data-experience]');
+    if (link) prepareExperience(link.dataset.experience);
+  };
+  document.addEventListener('pointerdown', prepare, { passive: true });
+  document.addEventListener('pointerover', prepare, { passive: true });
+
   particles(hero.querySelector('.hero__dust'), 'dust');
 
 }
@@ -270,6 +279,7 @@ if (window.top !== window.self) {
   }
 }
 
+startFeel();
 setupTopbar();
 startRouter(openRoute);
 load();

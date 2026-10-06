@@ -106,7 +106,8 @@ export function wake(el, className = 'is-waking', duration = 1600) {
 
 const lowPower = () =>
   (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2) ||
-  (navigator.deviceMemory && navigator.deviceMemory <= 1);
+  (navigator.deviceMemory && navigator.deviceMemory <= 1) ||
+  document.documentElement.dataset.motion === 'lite';
 
 const KINDS = {
   // slow gold dust drifting up through the hero
@@ -172,6 +173,11 @@ export function particles(canvas, kind) {
   function tick() {
     frame = 0;
     if (!visible || stopped || document.hidden) return;
+    // the page measured slow (feel.js): the decoration goes, the content stays
+    if (document.documentElement.dataset.motion === 'lite') {
+      ctx.clearRect(0, 0, width, height);
+      return;
+    }
     ctx.clearRect(0, 0, width, height);
     for (const p of points) {
       p.life += 1;

@@ -20,6 +20,7 @@ import { updateBell, visibleNotifications } from './bell.js';
 import { liveSections } from './layout.js';
 import { itemsSection, visibleItems } from './items.js';
 import { wake } from './motion.js';
+import { choreograph } from './feel.js';
 import { play } from './sound.js';
 import { pageUrl } from './share.js';
 
@@ -782,21 +783,14 @@ export function renderPage(content, clock, actions, { animate = false } = {}) {
 
   const widgets = flow.map(item => item.el).concat(footer(content));
 
-  if (animate) {
-    widgets.forEach((el, index) => {
-      el.classList.add('is-entering', 'is-new');
-      el.style.setProperty('--i', String(index));
-      el.addEventListener('animationend', event => {
-        if (event.target === el) el.classList.remove('is-entering');
-      });
-    });
-  }
-
   main.querySelectorAll('[data-dynamic]').forEach(el => el.remove());
 
   widgets.forEach(el => el.setAttribute('data-dynamic', ''));
   main.append(...widgets);
   main.dataset.state = 'ready';
+
+  // on screen: a staggered entrance; further down: rise in when scrolled to
+  if (animate) choreograph(widgets);
 
   // a game opened while the visitor was here: wake its card up
   const states = new Map(gameStates(content, clock.stamp).map(g => [g.game.id, g.state]));
