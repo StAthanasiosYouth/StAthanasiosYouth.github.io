@@ -11,5 +11,14 @@
   "webapp": {
     "executeAs": "USER_ACCESSING",
     "access": "ANYONE"
+  },
+  "dependencies": {
+    "enabledAdvancedServices": [
+      {
+        "userSymbol": "Drive",
+        "version": "v3",
+        "serviceId": "drive"
+      }
+    ]
   }
 }
