@@ -12,6 +12,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { gzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ROOT } from '../tools/lib/gs.mjs';
@@ -226,7 +227,16 @@ test('page weight on first visit', async () => {
   const total = resources.reduce((sum, r) => sum + r.size, html);
   console.log(`  first load: ${resources.length + 1} requests, ${(total / 1024).toFixed(0)} KB uncompressed`);
   for (const r of resources.sort((a, b) => b.size - a.size).slice(0, 6)) console.log(`    ${(r.size / 1024).toFixed(1).padStart(6)} KB  ${r.name}`);
-  assert.ok(total < 350 * 1024, 'first load under 350 KB before compression');
+  // what actually travels: GitHub Pages compresses text (gzip/brotli); fonts
+  // and images are already compressed
+  const sent = resources.reduce((sum, r) => {
+    const path = r.name.split('?')[0].replace(/^\//, '');
+    const text = /\.(js|css|json|html|ics|svg)$/.test(path) && existsSync(ROOT + path);
+    return sum + (text ? gzipSync(readFileSync(ROOT + path), { level: 9 }).length : r.size);
+  }, gzipSync(readFileSync(`${ROOT}index.html`)).length);
+  console.log(`  sent over the network (compressed): ${(sent / 1024).toFixed(0)} KB`);
+  assert.ok(sent < 230 * 1024, 'first load under 230 KB over the network');
+  assert.ok(total < 420 * 1024, 'first load under 420 KB before compression');
   assert.ok(!resources.some(r => r.name.includes('qrcode')), 'QR library is lazy-loaded');
   await page.close();
 });

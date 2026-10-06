@@ -154,7 +154,9 @@
         : el('p', { class: 'empty', text: 'مفيش حاجة متجدولة. ابدأ بإضافة اجتماع أو خبر.' })
     );
 
-    return [quick, timeline];
+    var pending = A.state.schema && A.state.schema.data < A.state.schema.target ? A.upgradeNotice() : null;
+
+    return [pending, quick, timeline].filter(Boolean);
 
   };
 
@@ -169,7 +171,6 @@
     var limits = A.state.meta.limits;
     var box = A.errorBox();
 
-    var enabled = A.switchInput('إظهار معاد الاجتماع', bool(setting('meeting.enabled')));
     var title = A.counted('اسم الاجتماع', setting('meeting.title'), limits.title);
 
     var currentDay = String(setting('meeting.day'));
@@ -185,7 +186,6 @@
     var weekly = A.card('الميعاد الأسبوعي', 'الأساس اللي الموقع بيعد عليه. أي أسبوع مختلف (موضوع، ساعة تانية، إلغاء) ضيفه تحت.',
       box,
       el('div', { class: 'form' },
-        enabled.node,
         title.node,
         el('div', { class: 'row' }, A.field('اليوم', daySelect), A.field('الساعة', time)),
         A.field('مدة الاجتماع بالدقايق', duration, 'سيبها فاضية لو مش متأكد — ساعتها الموقع مش هيقول "شغال دلوقتي"'),
@@ -193,7 +193,6 @@
       ),
       A.settingsSaver(function () {
         return {
-          'meeting.enabled': enabled.input.checked,
           'meeting.title': title.input.value,
           'meeting.day': daySelect.value,
           'meeting.time': time.value,
@@ -218,9 +217,44 @@
       past.length ? el('details', { class: 'past' }, el('summary', { text: 'اجتماعات فاتت (' + past.length + ')' }), list(past)) : null
     );
 
-    return [weekly, dated];
+    return [meetingSectionCard(), weekly, dated];
 
   });
+
+  /*
+   * «إظهار ركن الاجتماع»: the whole meeting block on the site. Off, no
+   * session, topic or poster can make it appear. (One week's cancellation
+   * is a dated meeting below, not this.)
+   */
+  function meetingSectionCard() {
+
+    var row = (A.state.layout || []).filter(function (s) { return s.key === 'meeting'; })[0] || { enabled: true };
+    var upgraded = A.state.schema.data >= A.state.schema.target;
+    var on = bool(row.enabled);
+
+    var toggle = A.switchInput('إظهار ركن الاجتماع', on, function (checked) {
+      A.dirty = false;
+      var call = upgraded
+        ? A.call('apiSetSectionEnabled', 'meeting', checked)
+        : A.call('apiSaveSettings', { 'meeting.enabled': checked });
+      call.then(function (next) {
+        A.applyState(next);
+        A.toast(checked ? 'ركن الاجتماع هيظهر بعد النشر' : 'ركن الاجتماع هيختفي بعد النشر — بكل مواضيعه');
+      }).catch(function (error) { toggle.input.checked = !checked; A.fail(error); });
+    });
+
+    return el('section', { class: 'card card--switch' + (on ? '' : ' is-off') },
+      el('div', { class: 'card--switch__text' },
+        el('h2', { class: 'card__title', text: 'ركن الاجتماع في الموقع' }),
+        el('p', { class: 'card__hint', text: on
+          ? 'ظاهر: الميعاد والعد التنازلي وموضوع الأسبوع. لإلغاء أسبوع واحد بس، استخدم «ملغي الأسبوع ده» تحت.'
+          : 'مخفي بالكامل: مفيش ميعاد ولا موضوع ولا بوستر هيظهر للزوار، حتى لو متسجلين تحت.' }),
+        A.visibilityChip(on, row.visibleFrom, row.visibleUntil)
+      ),
+      toggle.node
+    );
+
+  }
 
   function sessionItem(session) {
 

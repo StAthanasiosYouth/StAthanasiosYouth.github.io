@@ -137,6 +137,30 @@ class FakeSheet {
   setRightToLeft() {}
   setColumnWidth() {}
 
+  // a new tab in Google Sheets has 26 columns (A..Z)
+  getMaxColumns() { return Math.max(this.maxColumns || 26, this.getLastColumn()); }
+  insertColumnsAfter(column, count) { this.maxColumns = this.getMaxColumns() + count; }
+
+  setName(name) {
+    if (this.spreadsheet && this.spreadsheet.sheets.some(s => s !== this && s.name === name)) {
+      throw new Error(`A sheet with the name "${name}" already exists.`);
+    }
+    this.name = name;
+    return this;
+  }
+
+  hideSheet() { this.hidden = true; return this; }
+  isSheetHidden() { return !!this.hidden; }
+
+  copyTo(spreadsheet) {
+    const copy = new FakeSheet(`Copy of ${this.name}`, this.stats);
+    copy.spreadsheet = spreadsheet;
+    copy.data = this.data.map(line => line.slice());
+    copy.maxRows = this.maxRows;
+    spreadsheet.sheets.push(copy);
+    return copy;
+  }
+
 }
 
 
@@ -158,6 +182,7 @@ class FakeSpreadsheet {
 
   insertSheet(name) {
     const sheet = new FakeSheet(name, this.stats);
+    sheet.spreadsheet = this;
     this.sheets.push(sheet);
     return sheet;
   }
@@ -496,7 +521,7 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
 
   });
 
-  for (const file of ['Content.gs', 'Hub.gs', 'Seed.gs', 'Auth.gs', 'Store.gs', 'Publish.gs', 'Code.gs', 'Media.gs', 'Items.gs']) {
+  for (const file of ['Content.gs', 'Hub.gs', 'Seed.gs', 'Auth.gs', 'Store.gs', 'Publish.gs', 'Code.gs', 'Media.gs', 'Items.gs', 'Migrate.gs']) {
     vm.runInContext(readFileSync(`${ROOT}apps-script/${file}`, 'utf8'), context, { filename: file });
   }
 

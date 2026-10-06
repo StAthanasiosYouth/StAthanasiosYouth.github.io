@@ -1,6 +1,6 @@
 {
-  "schema": 2,
-  "revision": "b619da884047",
+  "schema": 3,
+  "revision": "135e563bbaca",
   "publishedAt": "2026-10-08T09:00:00.000Z",
   "timezone": "Africa/Cairo",
   "site": {
@@ -266,6 +266,118 @@
       },
       "publishAt": "2026-10-08T20:00",
       "expireAt": "2026-10-15T23:59"
+    }
+  ],
+  "layout": [
+    {
+      "key": "meeting",
+      "kind": "meeting",
+      "title": "ركن الاجتماع",
+      "subtitle": "",
+      "icon": "",
+      "theme": "",
+      "visibleFrom": "",
+      "visibleUntil": ""
+    },
+    {
+      "key": "featured",
+      "kind": "featured",
+      "title": "الروابط المميزة",
+      "subtitle": "",
+      "icon": "",
+      "theme": "",
+      "visibleFrom": "",
+      "visibleUntil": ""
+    },
+    {
+      "key": "news",
+      "kind": "news",
+      "title": "جديد الأسرة",
+      "subtitle": "",
+      "icon": "",
+      "theme": "",
+      "visibleFrom": "",
+      "visibleUntil": ""
+    },
+    {
+      "key": "games",
+      "kind": "games",
+      "title": "تحديات وألعاب",
+      "subtitle": "",
+      "icon": "",
+      "theme": "",
+      "visibleFrom": "",
+      "visibleUntil": ""
+    },
+    {
+      "key": "competitions",
+      "kind": "items",
+      "title": "المسابقات",
+      "subtitle": "",
+      "icon": "",
+      "theme": "",
+      "visibleFrom": "",
+      "visibleUntil": ""
+    },
+    {
+      "key": "activities",
+      "kind": "items",
+      "title": "الفعاليات",
+      "subtitle": "",
+      "icon": "",
+      "theme": "",
+      "visibleFrom": "",
+      "visibleUntil": ""
+    },
+    {
+      "key": "location",
+      "kind": "location",
+      "title": "مكان الاجتماع",
+      "subtitle": "",
+      "icon": "",
+      "theme": "",
+      "visibleFrom": "",
+      "visibleUntil": ""
+    },
+    {
+      "key": "social",
+      "kind": "links",
+      "title": "تابعنا",
+      "subtitle": "",
+      "icon": "",
+      "theme": "",
+      "visibleFrom": "",
+      "visibleUntil": ""
+    },
+    {
+      "key": "contacts",
+      "kind": "contacts",
+      "title": "تواصل مع الخدمة",
+      "subtitle": "",
+      "icon": "",
+      "theme": "",
+      "visibleFrom": "",
+      "visibleUntil": ""
+    },
+    {
+      "key": "support",
+      "kind": "support",
+      "title": "الدعم الفني",
+      "subtitle": "",
+      "icon": "",
+      "theme": "",
+      "visibleFrom": "",
+      "visibleUntil": ""
+    },
+    {
+      "key": "share",
+      "kind": "share",
+      "title": "شارك الصفحة",
+      "subtitle": "",
+      "icon": "",
+      "theme": "",
+      "visibleFrom": "",
+      "visibleUntil": ""
     }
   ]
 }

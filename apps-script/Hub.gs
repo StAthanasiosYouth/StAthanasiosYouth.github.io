@@ -152,11 +152,17 @@ function mediaIndex_(rows) {
 
 /**
  * ctx = { now, error(where, msg), warn(where, msg), limited(where, value, max, label),
- *         setting(key) }
+ *         setting(key), sections: { meeting, news, games } }
+ * ctx.sections: false = that whole section is switched off. Its items are
+ * not built at all (not validated, not published, their images stay
+ * private), and bell notifications that point into it are dropped:
+ * section visibility always wins.
  * Returns { sessions, news, games, notifications, cancelledDates, usedMedia }.
  */
 function buildHub_(draft, ctx) {
 
+  var sectionsOn = ctx.sections || {};
+  var on = function (key) { return sectionsOn[key] !== false; };
   var media = mediaIndex_(draft.media);
   var usedMedia = Object.create(null);
   var today = ctx.now ? ctx.now.slice(0, 10) : '';
@@ -208,7 +214,7 @@ function buildHub_(draft, ctx) {
   var seenDates = Object.create(null);
   var cancelledDates = [];
 
-  sortRows_(draft.sessions || []).forEach(function (row) {
+  sortRows_(on('meeting') ? draft.sessions || [] : []).forEach(function (row) {
 
     if (!contentBool_(row.enabled)) {
       return;
@@ -285,7 +291,7 @@ function buildHub_(draft, ctx) {
       allNewsIds[id] = true;
     }
 
-    if (!contentBool_(row.enabled)) {
+    if (!on('news') || !contentBool_(row.enabled)) {
       return;
     }
 
@@ -367,7 +373,7 @@ function buildHub_(draft, ctx) {
       allGameIds[id] = true;
     }
 
-    if (!contentBool_(row.enabled)) {
+    if (!on('games') || !contentBool_(row.enabled)) {
       return;
     }
 
@@ -468,6 +474,14 @@ function buildHub_(draft, ctx) {
       type = 'general';
     }
 
+    // a meeting / news / game notification never announces a hidden section
+    var typeSection = { meeting: 'meeting', news: 'news', game: 'games' }[type];
+
+    if (typeSection && !on(typeSection)) {
+      ctx.warn(where, 'القسم بتاعه مخفي، فالإشعار ده مش هيظهر');
+      return;
+    }
+
     var publishAt = dateTime(where, row.publishAt, false, 'ميعاد الظهور');
 
     if (!publishAt) {
@@ -494,7 +508,15 @@ function buildHub_(draft, ctx) {
       target = null;
     }
     else if (targetText === 'meeting') {
+      if (!on('meeting')) {
+        ctx.warn(where, 'ركن الاجتماع مخفي، فالإشعار ده مش هيظهر');
+        return;
+      }
       target = { kind: 'meeting' };
+    }
+    else if (match && !on(match[1] === 'news' ? 'news' : 'games')) {
+      ctx.warn(where, 'قسم ' + (match[1] === 'news' ? 'الأخبار' : 'الألعاب') + ' مخفي، فالإشعار ده مش هيظهر');
+      return;
     }
     else if (match) {
       var known = match[1] === 'news' ? allNewsIds : allGameIds;

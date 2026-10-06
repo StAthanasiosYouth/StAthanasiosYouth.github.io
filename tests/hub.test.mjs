@@ -29,10 +29,10 @@ test('wall-clock arithmetic ignores daylight saving and crosses months', () => {
   assert.equal(gs.wallAdd_('nope', 5), '');
 });
 
-test('schema 2 keeps every schema-1 field', () => {
+test('schema 3 keeps every schema-1 and schema-2 field', () => {
   const { content, errors } = build();
   assert.deepEqual(errors, []);
-  assert.equal(content.schema, 2);
+  assert.equal(content.schema, 3);
   for (const key of ['site', 'meeting', 'location', 'announcement', 'featured', 'sections', 'contacts']) {
     assert.ok(key in content, key);
   }

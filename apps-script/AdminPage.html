@@ -27,14 +27,15 @@
   A.views.links = function () {
 
     var links = A.byOrder(A.state.draft.links);
-    var sections = A.byOrder(A.state.draft.sections);
+    // link groups only (the page's other sections live in «ترتيب الصفحة»)
+    var sections = A.byOrder(A.state.draft.sections).filter(function (s) { return !s.kind || s.kind === 'links'; });
     var sectionKeys = sections.map(function (s) { return s.key; });
     var out = [];
 
     out.push(A.card('الروابط', 'بتظهر في الصفحة بنفس الترتيب ده. أي تعديل بيتحفظ كمسودة لحد ما تدوس "راجع وانشر".',
       el('div', { class: 'actions' },
-        el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { editLink(null); } }, '+ رابط جديد'),
-        el('button', { class: 'btn', type: 'button', onclick: function () { editSection(null); } }, '+ قسم جديد')
+        el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { editLink(null); } }, icon('plus'), 'رابط جديد'),
+        el('button', { class: 'btn', type: 'button', onclick: function () { editSection(null); } }, icon('plus'), 'قسم روابط جديد')
       )
     ));
 
@@ -66,8 +67,6 @@
         section ? A.chip(section.key, 'ltr') : null
       ),
       section ? el('div', { class: 'actions' },
-        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'طلّع القسم لفوق', disabled: sectionInfo.first, onclick: function (e) { A.move('apiMoveSection', section.key, -1, e.currentTarget); } }, icon('chevron-up')),
-        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'نزّل القسم لتحت', disabled: sectionInfo.last, onclick: function (e) { A.move('apiMoveSection', section.key, 1, e.currentTarget); } }, icon('chevron')),
         A.editButton('القسم', function () { editSection(section); }),
         A.deleteButton('القسم', function (e) { removeSection(section, e.currentTarget); })
       ) : null
@@ -246,11 +245,16 @@
 
   }
 
+  /* any page section: link groups (new or existing) and the built-in ones */
   function editSection(section) {
 
     var isNew = !section;
-    section = section || { key: '', title: '', enabled: true };
+    section = section || { key: '', title: '', kind: 'links', enabled: true };
 
+    // the layout row carries the resolved values (works for every kind)
+    var row = (A.state.layout || []).filter(function (s) { return s.key === section.key; })[0] || section;
+    var kind = row.kind || 'links';
+    var info = KIND_INFO[kind] || KIND_INFO.links;
     var box = A.errorBox();
     var key = A.textInput(section.key, { ltr: true, placeholder: 'events', max: 31 });
 
@@ -258,32 +262,175 @@
       key.readOnly = true;
     }
 
-    var title = A.counted('العنوان اللي بيظهر', section.title, A.state.meta.limits.sectionTitle, null, { required: true });
-    var enabled = A.switchInput('القسم ظاهر', bool(section.enabled));
+    var limits = A.state.meta.limits;
+    var title = A.counted('عنوان القسم', row.title, limits.sectionTitle, info.titleHint, { required: kind === 'links' });
+    var subtitle = A.counted('سطر تحت العنوان', row.subtitle, limits.subtitle, 'اختياري', {});
+    var from = A.dateTimeInput(row.visibleFrom, { emptyText: 'يظهر على طول', presets: [A.PRESETS.now, A.PRESETS.thursday8, A.PRESETS.friday] });
+    var until = A.dateTimeInput(row.visibleUntil, { emptyText: 'مبيختفيش لوحده', presets: [A.PRESETS.sunday10] });
+    var enabled = A.switchInput('القسم ظاهر', isNew ? true : bool(row.enabled));
     var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
 
     save.addEventListener('click', function () {
       box.hidden = true;
-      A.withBusy(save, A.call('apiSaveSection', { key: key.value.trim(), title: title.input.value, enabled: enabled.input.checked }, isNew))
+      A.withBusy(save, A.call('apiSaveSection', {
+        key: key.value.trim(),
+        title: title.input.value,
+        subtitle: subtitle.input.value,
+        visibleFrom: from.value(),
+        visibleUntil: until.value(),
+        theme: row.theme || '',
+        icon: row.icon || '',
+        enabled: enabled.input.checked
+      }, isNew))
         .then(function (next) {
           A.dirty = false;
           document.getElementById('sheet').close();
           A.applyState(next);
-          A.toast('اتحفظ ✓');
+          A.toast('اتحفظ ✓ — لسه محتاج نشر');
         })
         .catch(function (error) { A.fail(error, box); });
     });
 
     A.dirty = false;
 
-    A.openSheet(isNew ? 'قسم جديد' : 'تعديل القسم', [
+    A.openSheet(isNew ? 'قسم روابط جديد' : 'تعديل: ' + (row.title || info.label), [
       box,
       el('div', { class: 'form' },
-        A.field('مفتاح القسم', key, isNew ? 'بالإنجليزي الصغير ومن غير مسافات، مثلاً events. مش هيظهر للناس' : 'المفتاح مبيتغيرش بعد الإضافة'),
+        isNew || kind === 'links' ? A.field('مفتاح القسم', key, isNew ? 'بالإنجليزي الصغير ومن غير مسافات، مثلاً events. مش هيظهر للناس' : 'المفتاح مبيتغيرش بعد الإضافة') : null,
         title.node,
-        enabled.node
+        info.publicTitle ? subtitle.node : null,
+        el('div', { class: 'form-group' },
+          el('p', { class: 'section-label', text: 'الظهور (بتوقيت مصر)' }),
+          enabled.node,
+          A.field('يظهر من', from.node, 'سيبه فاضي لو عايزه يظهر أول ما تنشر'),
+          A.field('يختفي بعد', until.node, 'سيبه فاضي لو مش عايزه يختفي لوحده')
+        )
       )
     ], A.sheetFooter(save));
+
+  }
+
+  A.editSection = editSection;
+
+
+  /* =======================================================
+     PAGE LAYOUT — «ترتيب الصفحة»
+  ======================================================= */
+
+  var KIND_INFO = {
+    meeting: { label: 'ركن الاجتماع', icon: 'church', titleHint: 'اسم القسم في لوحة التحكم (عنوان الكارت في الموقع هو اسم الاجتماع)' },
+    featured: { label: 'الروابط المميزة', icon: 'heart' },
+    news: { label: 'الأخبار', icon: 'megaphone', publicTitle: true, titleHint: 'بيظهر فوق الأخبار في الموقع' },
+    games: { label: 'التحديات والألعاب', icon: 'star', publicTitle: true },
+    items: { label: 'مسابقات / فعاليات', icon: 'calendar', publicTitle: true, titleHint: 'بيظهر فوق القسم في الموقع' },
+    location: { label: 'مكان الاجتماع', icon: 'map' },
+    links: { label: 'مجموعة روابط', icon: 'link', publicTitle: true, titleHint: 'بيظهر فوق الروابط في الموقع' },
+    contacts: { label: 'تواصل مع الخدمة', icon: 'phone' },
+    support: { label: 'الدعم الفني', icon: 'info' },
+    share: { label: 'شارك الصفحة', icon: 'share' }
+  };
+
+  A.KIND_INFO = KIND_INFO;
+
+  /* how many things a section would show (0 = it stays hidden on the site) */
+  function sectionCount(s) {
+
+    var d = A.state.draft;
+    var on = function (row) { return bool(row.enabled) && !bool(row.archived); };
+
+    switch (s.kind) {
+      case 'meeting': return A.setting('meeting.day') !== '' || (d.sessions || []).some(on) ? 1 : 0;
+      case 'featured': return d.links.filter(function (l) { return bool(l.featured) && on(l); }).length;
+      case 'news': return (d.news || []).filter(on).length;
+      case 'games': return (d.games || []).filter(on).length;
+      case 'items': return (d.activities || []).filter(function (a) {
+        var type = (d.types || []).filter(function (t) { return t.key === a.type; })[0];
+        return on(a) && type && type.section === s.key;
+      }).length;
+      case 'location': return A.setting('location.name') ? 1 : 0;
+      case 'links': return d.links.filter(function (l) { return !bool(l.featured) && l.section === s.key && on(l); }).length;
+      case 'contacts': return d.contacts.filter(function (c) { return c.kind !== 'support' && on(c); }).length;
+      case 'support': return d.contacts.filter(function (c) { return c.kind === 'support' && on(c); }).length;
+      default: return 1;
+    }
+
+  }
+
+  A.sectionCount = sectionCount;
+
+  function sectionLiveNow(s) {
+
+    var v = A.visibility(bool(s.enabled), s.visibleFrom, s.visibleUntil);
+    return (v.state === 'live' || v.state === 'always') && sectionCount(s) > 0;
+
+  }
+
+  A.views.layout = function () {
+
+    var layout = A.state.layout || [];
+    var upgraded = A.state.schema.data >= A.state.schema.target;
+    var out = [];
+
+    if (!upgraded) {
+      out.push(A.upgradeNotice());
+    }
+
+    var showing = layout.filter(sectionLiveNow);
+
+    out.push(A.card('الزوار شايفين دلوقتي', 'بعد آخر نشر + المواعيد بتوقيت مصر. اللي مش هنا مخفي أو فاضي أو لسه مجاش ميعاده.',
+      showing.length
+        ? el('div', { class: 'now-showing' }, showing.map(function (s) {
+          return el('span', { class: 'now-showing__item' }, icon((KIND_INFO[s.kind] || KIND_INFO.links).icon), s.title);
+        }))
+        : el('p', { class: 'empty', text: 'مفيش أقسام ظاهرة — الصفحة هتبان فيها الهيدر بس.' })
+    ));
+
+    out.push(A.card('أقسام الصفحة', 'بنفس الترتيب ده في الموقع. اقفل أي قسم يختفي بكل اللي جواه (ومش بيتنشر أصلاً)، أو حدّد له ميعاد يظهر ويختفي فيه.',
+      el('div', { class: 'actions' },
+        el('button', { class: 'btn', type: 'button', onclick: function () { editSection(null); } }, icon('plus'), 'قسم روابط جديد')
+      ),
+      el('ol', { class: 'list layout-list' }, layout.map(function (s, index) { return layoutItem(s, index, layout.length, upgraded); }))
+    ));
+
+    return out;
+
+  };
+
+  function layoutItem(s, index, total, upgraded) {
+
+    var info = KIND_INFO[s.kind] || KIND_INFO.links;
+    var count = sectionCount(s);
+    var enabled = bool(s.enabled);
+    var chips = [A.visibilityChip(enabled, s.visibleFrom, s.visibleUntil)];
+    var locked = s.virtual;
+
+    if (enabled && count === 0) chips.push(A.chip('فاضي — مش هيظهر', 'off'));
+    if (s.kind === 'links') chips.push(A.chip(s.key, 'ltr'));
+
+    var toggle = A.switchInput('ظاهر', enabled, function (checked) {
+      A.dirty = false;
+      A.call('apiSetSectionEnabled', s.key, checked)
+        .then(function (next) { A.applyState(next); A.toast(checked ? 'القسم هيظهر بعد النشر' : 'القسم هيختفي بعد النشر'); })
+        .catch(function (error) { toggle.input.checked = !checked; A.fail(error); });
+    });
+
+    toggle.input.disabled = locked;
+
+    return A.listItem({
+      icon: s.icon || info.icon,
+      title: s.title || info.label,
+      sub: info.label,
+      off: !enabled,
+      chips: chips,
+      controls: [
+        toggle.node,
+        el('span', { class: 'spacer' }),
+        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'طلّع «' + s.title + '» لفوق', disabled: locked || index === 0, onclick: function (e) { A.move('apiMoveSection', s.key, -1, e.currentTarget); } }, icon('chevron-up')),
+        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'نزّل «' + s.title + '» لتحت', disabled: locked || index === total - 1, onclick: function (e) { A.move('apiMoveSection', s.key, 1, e.currentTarget); } }, icon('chevron')),
+        locked ? null : A.editButton(s.title, function () { editSection(s); }),
+        s.kind === 'links' && !locked ? A.deleteButton(s.title, function (e) { removeSection(s, e.currentTarget); }) : null
+      ]
+    });
 
   }
 
@@ -577,6 +724,8 @@
       el('div', { class: 'actions' }, mediaCheck)
     );
 
+    var upgradeCard = A.upgradeCard();
+
     var accountCard = A.card('الحساب', null,
       el('p', {}, 'انت داخل بـ ', A.chip(A.state.user, 'ltr'))
     );
@@ -587,7 +736,7 @@
       )
       : null;
 
-    return [siteCard, A.state.hubReady ? hubCard : null, guideCard, publishCard, mediaCard, accountCard].filter(Boolean);
+    return [siteCard, A.state.hubReady ? hubCard : null, guideCard, upgradeCard, publishCard, mediaCard, accountCard].filter(Boolean);
 
   };
 

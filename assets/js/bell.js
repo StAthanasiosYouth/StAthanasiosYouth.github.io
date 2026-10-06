@@ -10,6 +10,7 @@
 import { h } from './dom.js';
 import { iconNode } from './icons.js';
 import { isPublished } from './schedule.js';
+import { liveSections } from './layout.js';
 import { dayGroup, relativeTime, arabicDigits } from './words.js';
 import { loadInbox, saveInbox, unreadCount, isNew, markOpened, markRead, pruneInbox } from './inbox.js';
 import { openSheet } from './sheet.js';
@@ -31,9 +32,21 @@ let lastCount = -1;
 let seenIds = null;
 
 
+/* a notification about the meeting, news or games shows only while that
+   section is showing (section visibility always wins) */
+const SECTION_OF_TYPE = { meeting: 'meeting', news: 'news', game: 'games' };
+const SECTION_OF_TARGET = { meeting: 'meeting', news: 'news', game: 'games' };
+
 export function visibleNotifications(content, nowStamp) {
 
-  return content.notifications.filter(item => isPublished(item, nowStamp));
+  const live = new Set(liveSections(content, nowStamp).map(s => s.key));
+
+  return content.notifications.filter(item => {
+    if (!isPublished(item, nowStamp)) return false;
+    const byType = SECTION_OF_TYPE[item.type];
+    const byTarget = item.target && SECTION_OF_TARGET[item.target.kind];
+    return (!byType || live.has(byType)) && (!byTarget || live.has(byTarget));
+  });
 
 }
 

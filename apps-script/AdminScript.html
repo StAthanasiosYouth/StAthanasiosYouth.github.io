@@ -1337,6 +1337,7 @@
       { key: 'notifications', label: 'الإشعارات' }
     ] },
     { key: 'page', label: 'الصفحة', icon: 'layers', subs: [
+      { key: 'layout', label: 'ترتيب الصفحة' },
       { key: 'links', label: 'الروابط' },
       { key: 'location', label: 'المكان' },
       { key: 'contacts', label: 'التواصل' }
@@ -1352,12 +1353,13 @@
     news: ['content', 'news'],
     games: ['content', 'games'],
     links: ['page', 'links'],
+    layout: ['page', 'layout'],
     location: ['page', 'location'],
     contacts: ['page', 'contacts']
   };
 
   A.area = 'home';
-  A.sub = { content: 'meetings', page: 'links' };
+  A.sub = { content: 'meetings', page: 'layout' };
 
   function areaOf(key) {
 
@@ -1699,6 +1701,94 @@
     return el('button', { class: 'icon-btn icon-btn--danger', type: 'button', 'aria-label': 'مسح ' + label, onclick: onclick }, icon('trash'));
 
   };
+
+  /* =======================================================
+     DATA UPGRADE (Migrate.gs): plan first, then run
+  ======================================================= */
+
+  A.upgradeNotice = function () {
+
+    return el('section', { class: 'card card--notice' },
+      el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('layers')),
+      el('div', {},
+        el('h2', { class: 'card__title', text: 'في ترقية للبيانات مستنياك' }),
+        el('p', { class: 'card__hint', text: 'بتضيف أقسام الصفحة (علشان تقدر تخفي وتظهر وترتب أي قسم)، وأعمدة المسابقات والفعاليات والأرشيف، ورابط جروب الواتساب. بتعمل نسخة احتياطية الأول ومبتمسحش حاجة.' })
+      ),
+      el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.go('settings'); } }, 'روح للترقية')
+    );
+
+  };
+
+  A.upgradeCard = function () {
+
+    var schema = A.state.schema;
+    var done = schema.data >= schema.target;
+    var result = el('div', { class: 'upgrade', 'aria-live': 'polite' });
+    var check = el('button', { class: 'btn', type: 'button' }, icon('eye'), 'شوف هيتعمل إيه');
+    var run = el('button', { class: 'btn btn--primary', type: 'button', disabled: true }, icon('upload'), 'نفّذ الترقية');
+    var plan = null;
+
+    check.addEventListener('click', function () {
+      A.fill(result, el('div', { class: 'skeleton-list' }, el('div', { class: 'skeleton skeleton--line' }), el('div', { class: 'skeleton skeleton--line skeleton--short' })));
+      A.withBusy(check, A.call('apiPlanMigration'))
+        .then(function (p) {
+          plan = p;
+          A.fill(result,
+            el('ol', { class: 'checklist__steps' }, p.steps.map(function (s) {
+              return el('li', { class: s.needed ? 'is-todo' : 'is-ok' },
+                el('span', { class: 'checklist__mark', 'aria-hidden': 'true', text: s.needed ? '•' : '✓' }),
+                el('span', {}, el('strong', { text: s.label }), s.detail ? el('small', { class: 'upgrade__detail', text: s.detail }) : null)
+              );
+            })),
+            p.pending
+              ? el('p', { class: 'note', text: 'قبل أي تغيير هتتعمل نسخة احتياطية مخفية من: ' + p.backups.join('، ') + '. مفيش أي صف هيتمسح أو يتنقل.' })
+              : el('p', { class: 'note note--ok', text: 'البيانات محدثة ✓' })
+          );
+          run.disabled = !p.pending;
+        })
+        .catch(function (error) {
+          A.fill(result, el('div', { class: 'errors' }));
+          A.fail(error, result.firstChild);
+        });
+    });
+
+    run.addEventListener('click', function () {
+      A.confirm({
+        tone: 'warn',
+        icon: 'layers',
+        title: 'تنفّذ ترقية البيانات؟',
+        message: 'هتتعمل نسخة احتياطية من كل التبويبات الأول، وبعدين هتتضاف الأعمدة والأقسام الجديدة. مفيش حاجة هتتمسح، والموقع مش هيتغير لحد ما تنشر.',
+        confirmLabel: 'نفّذ',
+        cancelLabel: 'لأ، بعدين'
+      }).then(function (ok) {
+        if (!ok) return;
+        A.withBusy(run, A.call('apiMigrate'))
+          .then(function (res) {
+            A.applyState(res.state);
+            A.toast(res.report.changed ? 'الترقية خلصت ✓' : 'البيانات كانت محدثة');
+            A.modal({
+              tone: 'success',
+              title: res.report.changed ? 'الترقية خلصت ✓' : 'مفيش حاجة اتغيرت',
+              message: res.report.lines.join('\n'),
+              actions: [{ label: 'تمام', value: true, kind: 'primary', autofocus: true }]
+            });
+          })
+          .catch(function (error) {
+            A.fill(result, el('div', { class: 'errors' }));
+            A.fail(error, result.firstChild);
+          });
+      });
+    });
+
+    return A.card('ترقية البيانات', done
+      ? 'البيانات على آخر نسخة (' + schema.data + ') ✓'
+      : 'نسخة البيانات ' + schema.data + ' والكود محتاج ' + schema.target + '. شوف الخطة الأول، وبعدين نفّذ.',
+      result,
+      done ? el('div', { class: 'actions' }, check) : el('div', { class: 'actions' }, check, run)
+    );
+
+  };
+
 
   /* where the content center tabs don't exist yet */
   A.hubNotReady = function () {

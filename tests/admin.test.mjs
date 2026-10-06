@@ -38,11 +38,15 @@ test('setup by the admin creates the private Sheet and its tabs', () => {
   assert.equal(world.spreadsheet.owner, ADMIN);
   assert.equal(world.properties.get('SHEET_ID'), 'sheet-id-123');
   const names = world.spreadsheet.getSheets().map(s => s.name);
-  assert.deepEqual(names, ['Settings', 'Sections', 'Links', 'Contacts', 'Sessions', 'News', 'Games', 'Notifications', 'Media', 'Log']);
-  assert.equal(world.gs.readTable_('Links').length, 4, '4 seed links');
-  // running again keeps data
+  assert.deepEqual(names, ['Settings', 'Sections', 'Links', 'Contacts', 'Sessions', 'News', 'Games', 'Notifications', 'Media', 'Activities', 'Types', 'Log']);
+  assert.equal(world.gs.readTable_('Links').length, 5, '4 seed links + the WhatsApp group');
+  assert.equal(world.gs.readTable_('Sections').length, 12, '2 link groups + 10 built-in sections');
+  assert.equal(world.properties.get('DATA_SCHEMA'), '3');
+  // running again keeps data (and makes no backup: nothing to upgrade)
   world.gs.setup();
-  assert.equal(world.gs.readTable_('Links').length, 4);
+  assert.equal(world.gs.readTable_('Links').length, 5);
+  assert.equal(world.gs.readTable_('Sections').length, 12);
+  assert.ok(!world.spreadsheet.getSheets().some(s => s.name.startsWith('_backup_')));
 });
 
 test('every browser-callable data function rejects non-admins', () => {
@@ -60,7 +64,7 @@ test('every browser-callable data function rejects non-admins', () => {
   }
   // nothing changed
   world.as(ADMIN);
-  assert.equal(stateOf(world).draft.links.length, 4);
+  assert.equal(stateOf(world).draft.links.length, 5);
 });
 
 test('no unguarded public function slipped in', () => {
@@ -68,7 +72,7 @@ test('no unguarded public function slipped in', () => {
   const world = configuredWorld();
   const pure = new Set(['buildPublicContent', 'safeHttpsUrl', 'normalizePhone', 'contentRevision', 'buildMeetingIcs', 'summarizeChanges', 'seedDraft', 'doGet']);
   const publicFns = Object.keys(world.gs).filter(k => typeof world.gs[k] === 'function' && !k.endsWith('_'));
-  const unexpected = publicFns.filter(k => !pure.has(k) && !/^api/.test(k) && !['setup', 'checkSheet', 'clearStrayIds', 'checkMedia'].includes(k));
+  const unexpected = publicFns.filter(k => !pure.has(k) && !/^api/.test(k) && !['setup', 'checkSheet', 'clearStrayIds', 'checkMedia', 'planMigration', 'migrate'].includes(k));
   assert.deepEqual(unexpected, []);
 });
 
@@ -97,7 +101,7 @@ test('allowlist comes from Script Properties, comma separated, case-insensitive'
 test('state: seed draft, unpublished, no errors', () => {
   const state = stateOf(configuredWorld());
   assert.equal(state.user, ADMIN);
-  assert.deepEqual(state.draft.links.map(l => l.id), ['your-voice-matters', 'facebook', 'instagram', 'tiktok']);
+  assert.deepEqual(state.draft.links.map(l => l.id), ['your-voice-matters', 'facebook', 'instagram', 'tiktok', 'whatsapp-group']);
   assert.equal(state.status.hasChanges, true);
   assert.deepEqual(state.status.errors, []);
   assert.equal(state.config.tokenSet, true);
@@ -122,7 +126,7 @@ test('links: validation, add, move, toggle, delete', () => {
   // reorder social: instagram up -> instagram, facebook, tiktok
   state = plain(gs.apiMoveLink('instagram', -1));
   const social = state.draft.links.filter(l => l.section === 'social').sort((a, b) => a.order - b.order).map(l => l.id);
-  assert.deepEqual(social, ['instagram', 'facebook', 'tiktok']);
+  assert.deepEqual(social, ['instagram', 'facebook', 'tiktok', 'whatsapp-group']);
 
   // edit keeps id and order
   state = plain(gs.apiSaveLink({ ...trip, title: 'رحلة الغردقة ٢٠٢٦', enabled: true }));
@@ -147,9 +151,16 @@ test('sections: add, guard against deleting a used section, reorder', () => {
   assert.ok(state.draft.sections.some(s => s.key === 'events'));
   assert.throws(() => gs.apiSaveSection({ key: 'events', title: 'x' }, true), /نفس المفتاح/);
   assert.throws(() => gs.apiDeleteSection('social'), /فيه روابط/);
+  // a new link group goes right after the last link group, before contacts
+  let order = state.draft.sections.sort((a, b) => a.order - b.order).map(s => s.key);
+  assert.deepEqual(order, ['meeting', 'featured', 'news', 'games', 'competitions', 'activities', 'location', 'social', 'links', 'events', 'contacts', 'support', 'share']);
   state = plain(gs.apiMoveSection('events', -1));
-  const order = state.draft.sections.sort((a, b) => a.order - b.order).map(s => s.key);
-  assert.deepEqual(order, ['social', 'events', 'links']);
+  order = state.draft.sections.sort((a, b) => a.order - b.order).map(s => s.key);
+  assert.deepEqual(order.slice(7, 10), ['social', 'events', 'links']);
+  // built-in sections can be hidden, not deleted
+  assert.throws(() => gs.apiDeleteSection('meeting'), /مينفعش يتمسح/);
+  state = plain(gs.apiSetSectionEnabled('meeting', false));
+  assert.equal(state.layout.find(s => s.key === 'meeting').enabled, false);
   state = plain(gs.apiDeleteSection('events'));
   assert.ok(!state.draft.sections.some(s => s.key === 'events'));
 });

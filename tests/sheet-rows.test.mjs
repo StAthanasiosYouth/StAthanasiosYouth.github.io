@@ -13,7 +13,7 @@ import { createWorld } from './fakes/gas.mjs';
 const ADMIN = 'menazakmena@gmail.com';
 const plain = value => JSON.parse(JSON.stringify(value));
 
-const TABLES = ['Settings', 'Sections', 'Links', 'Contacts', 'Sessions', 'News', 'Games', 'Notifications', 'Media', 'Log'];
+const TABLES = ['Settings', 'Sections', 'Links', 'Contacts', 'Sessions', 'News', 'Games', 'Notifications', 'Media', 'Activities', 'Types', 'Log'];
 
 function world() {
   const w = createWorld();
@@ -48,18 +48,21 @@ test('the fake behaves like Sheets: empty checkbox rows hold FALSE down to row 1
   assert.equal(sections.getRange(500, col(w, 'Sections', 'key')).getValue(), '');
 });
 
-test('Sections returns only its 2 real rows, not 999', () => {
+test('Sections returns only its real rows, not 999', () => {
   const w = world();
   const rows = plain(w.gs.readTable_('Sections'));
-  assert.deepEqual(rows.map(r => r.key), ['social', 'links']);
-  assert.deepEqual(rows.map(r => r.__row), [2, 3]);
+  // 2 seed link groups, then the 10 built-in page sections added by the upgrade
+  assert.deepEqual(rows.slice(0, 2).map(r => r.key), ['social', 'links']);
+  assert.equal(rows.length, 12);
+  assert.deepEqual(rows.map(r => r.__row), Array.from({ length: 12 }, (_, i) => i + 2));
 });
 
 test('no phantom rows in any table', () => {
   const w = world();
   const expected = {
-    Settings: w.gs.SETTINGS_SPEC.length, Sections: 2, Links: 4, Contacts: 2,
-    Sessions: 0, News: 0, Games: 0, Notifications: 0, Media: 0, Log: 1
+    Settings: w.gs.SETTINGS_SPEC.length, Sections: 12, Links: 5, Contacts: 2,
+    Sessions: 0, News: 0, Games: 0, Notifications: 0, Media: 0,
+    Activities: 0, Types: w.gs.SEED_TYPES.length, Log: 2
   };
   for (const name of TABLES) {
     assert.equal(w.gs.readTable_(name).length, expected[name], name);
@@ -70,8 +73,8 @@ test('the admin status has no errors and the panel gets only real rows', () => {
   const w = world();
   const state = plain(w.as(ADMIN).gs.apiState());
   assert.deepEqual(state.status.errors, []);
-  assert.equal(state.draft.sections.length, 2);
-  assert.equal(state.draft.links.length, 4);
+  assert.equal(state.draft.sections.length, 12);
+  assert.equal(state.draft.links.length, 5);
   assert.equal(state.draft.contacts.length, 2);
   for (const kind of ['sessions', 'news', 'games', 'notifications', 'media']) {
     assert.equal(state.draft[kind].length, 0, kind);
@@ -91,10 +94,10 @@ test('loading the panel writes nothing and stays small', () => {
 
 test('rows damaged by older versions (an id and nothing else) stay ignored', () => {
   const w = world();
-  assert.equal(stampOldIds(w, 'Links', 'link'), 995);
+  assert.equal(stampOldIds(w, 'Links', 'link'), 994);
   assert.equal(stampOldIds(w, 'Contacts', 'contact'), 997);
   const state = plain(w.as(ADMIN).gs.apiState());
-  assert.equal(state.draft.links.length, 4);
+  assert.equal(state.draft.links.length, 5);
   assert.equal(state.draft.contacts.length, 2);
   assert.deepEqual(state.status.errors, []);
 });
@@ -104,15 +107,15 @@ test('a new record goes right after the last record, even with old ids and ticke
   const gs = w.as(ADMIN).gs;
   stampOldIds(w, 'Links', 'link');
   // someone ticked "featured" on an empty row
-  tab(w, 'Links').set(6, col(w, 'Links', 'featured'), true);
-  tab(w, 'Sections').set(4, col(w, 'Sections', 'enabled'), true);
+  tab(w, 'Links').set(7, col(w, 'Links', 'featured'), true);
+  tab(w, 'Sections').set(14, col(w, 'Sections', 'enabled'), true);
 
   gs.apiSaveSection({ key: 'events', title: 'فعاليات' }, true);
-  assert.equal(tab(w, 'Sections').getRange(4, col(w, 'Sections', 'key')).getValue(), 'events');
+  assert.equal(tab(w, 'Sections').getRange(14, col(w, 'Sections', 'key')).getValue(), 'events', 'row 14 = after the 12 sections');
 
   const state = plain(gs.apiSaveLink({ title: 'جديد', url: 'https://example.org', section: 'events' }));
   const added = state.draft.links.find(l => l.title === 'جديد');
-  assert.equal(tab(w, 'Links').getRange(6, col(w, 'Links', 'title')).getValue(), 'جديد', 'row 6 = after the 4 seed links');
+  assert.equal(tab(w, 'Links').getRange(7, col(w, 'Links', 'title')).getValue(), 'جديد', 'row 7 = after the 5 links');
   assert.equal(added.featured, false, 'a stray ticked box does not leak into the new record');
   assert.match(added.id, /^link-/);
   assert.equal(tab(w, 'Links').getMaxRows(), 1000, 'nothing written past the end');
@@ -153,7 +156,7 @@ test('manual editing still works: a row typed by hand counts, a lone ticked box 
   sheet.set(30, col(w, 'Links', 'enabled'), true);
   sheet.set(40, col(w, 'Links', 'title'), '   ');
   const state = plain(w.as(ADMIN).gs.apiState());
-  assert.equal(state.draft.links.length, 5);
+  assert.equal(state.draft.links.length, 6);
   const manual = state.draft.links.find(l => l.title === 'يدوي');
   assert.match(manual.id, /^link-[0-9a-f]{8}$/, 'gets an id');
   assert.equal(manual.enabled, true);
@@ -186,8 +189,8 @@ test('checkSheet reports per tab; clearStrayIds empties only the old automatic i
   const realId = tab(w, 'Links').getRange(2, 1).getValue();
 
   const report = gs.checkSheet();
-  assert.match(report, /Sections: 2 صف بيانات من 1000/);
-  assert.match(report, /Links: 4 صف بيانات من 1000، معرّفات زيادة في صفوف فاضية: 995/);
+  assert.match(report, /Sections: 12 صف بيانات من 1000/);
+  assert.match(report, /Links: 5 صف بيانات من 1000، معرّفات زيادة في صفوف فاضية: 994/);
   assert.match(report, /Contacts: 2 صف بيانات من 1000، معرّفات زيادة في صفوف فاضية: 997/);
   assert.match(report, /أخطاء: 0/);
 
@@ -198,7 +201,7 @@ test('checkSheet reports per tab; clearStrayIds empties only the old automatic i
   assert.equal(tab(w, 'Links').getRange(2, 1).getValue(), realId);
   assert.equal(tab(w, 'Links').getRange(500, 1).getValue(), '');
   assert.equal(tab(w, 'Contacts').getRange(999, 1).getValue(), '');
-  assert.match(gs.checkSheet(), /Links: 4 صف بيانات من 1000، معرّفات زيادة في صفوف فاضية: 0/);
+  assert.match(gs.checkSheet(), /Links: 5 صف بيانات من 1000، معرّفات زيادة في صفوف فاضية: 0/);
   assert.deepEqual(plain(gs.apiState()).draft, before, 'records unchanged');
 });
 

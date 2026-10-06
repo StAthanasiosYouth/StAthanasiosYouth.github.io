@@ -22,22 +22,29 @@ var TABLES = {
   },
 
   Sections: {
-    columns: ['key', 'title', 'order', 'enabled'],
+    columns: ['key', 'title', 'order', 'enabled', 'kind', 'subtitle', 'icon', 'theme', 'banner', 'visibleFrom', 'visibleUntil'],
     bool: ['enabled'],
-    text: ['key', 'title'],
+    text: ['key', 'title', 'kind', 'subtitle', 'icon', 'theme', 'banner', 'visibleFrom', 'visibleUntil'],
     notes: {
       key: 'مفتاح القسم بالإنجليزي الصغير (مثلاً social). اللينكات بتتربط بيه',
       title: 'عنوان القسم اللي بيظهر في الصفحة',
       order: 'الترتيب: الأصغر يظهر الأول',
-      enabled: 'إظهار القسم'
+      enabled: 'إظهار القسم (مقفول = مفيش حاجة منه بتتنشر)',
+      kind: 'نوع القسم (متغيرهوش): meeting / featured / news / games / items / location / links / contacts / support / share',
+      subtitle: 'سطر تحت العنوان (اختياري)',
+      icon: 'أيقونة القسم (اختياري)',
+      theme: 'الشكل: gold / ember / azure / rose / emerald / night',
+      banner: 'معرّف صورة البانر من شيت Media (اختياري)',
+      visibleFrom: 'القسم يظهر من (اختياري): 2026-10-12 18:00',
+      visibleUntil: 'القسم يختفي بعد (اختياري)'
     }
   },
 
   Links: {
-    columns: ['id', 'enabled', 'order', 'section', 'style', 'featured', 'title', 'subtitle', 'cta', 'url', 'icon', 'badge', 'startAt', 'endAt', 'updatedAt'],
+    columns: ['id', 'enabled', 'order', 'section', 'style', 'featured', 'title', 'subtitle', 'cta', 'url', 'icon', 'badge', 'startAt', 'endAt', 'updatedAt', 'experience'],
     bool: ['enabled', 'featured'],
     autoId: 'link',
-    text: ['id', 'section', 'style', 'title', 'subtitle', 'cta', 'url', 'icon', 'badge', 'startAt', 'endAt', 'updatedAt'],
+    text: ['id', 'section', 'style', 'title', 'subtitle', 'cta', 'url', 'icon', 'badge', 'startAt', 'endAt', 'updatedAt', 'experience'],
     notes: {
       id: 'معرّف ثابت للرابط. لو سبته فاضي لوحة التحكم هتعمله',
       enabled: 'إظهار الرابط',
@@ -53,7 +60,8 @@ var TABLES = {
       badge: 'شارة صغيرة زي: جديد',
       startAt: 'يبدأ يظهر من (اختياري): 2026-10-12 أو 2026-10-12 18:00',
       endAt: 'آخر ظهور (اختياري): 2026-10-20 أو 2026-10-20 22:00',
-      updatedAt: 'آخر تعديل (تلقائي)'
+      updatedAt: 'آخر تعديل (تلقائي)',
+      experience: 'التجربة اللي بتفتح قبل اللينك: facebook / instagram / tiktok / whatsapp / none (فاضي = حسب الأيقونة)'
     }
   },
 
@@ -78,7 +86,7 @@ var TABLES = {
   },
 
   Sessions: {
-    columns: ['date', 'enabled', 'time', 'topic', 'speaker', 'description', 'image', 'status', 'note', 'visibleFrom', 'updatedAt'],
+    columns: ['date', 'enabled', 'time', 'topic', 'speaker', 'description', 'image', 'status', 'note', 'visibleFrom', 'updatedAt', 'durationMinutes'],
     bool: ['enabled'],
     text: ['date', 'time', 'topic', 'speaker', 'description', 'image', 'status', 'note', 'visibleFrom', 'updatedAt'],
     notes: {
@@ -92,13 +100,14 @@ var TABLES = {
       status: 'normal = عادي، cancelled = ملغي',
       note: 'ملاحظة (مثلاً سبب الإلغاء)',
       visibleFrom: 'الموضوع يظهر من (اختياري): 2026-10-09 20:00',
-      updatedAt: 'آخر تعديل (تلقائي)'
+      updatedAt: 'آخر تعديل (تلقائي)',
+      durationMinutes: 'مدة الاجتماع ده بالدقايق لو مختلفة (اختياري)'
     }
   },
 
   News: {
-    columns: ['id', 'enabled', 'featured', 'pinned', 'tone', 'title', 'summary', 'body', 'image', 'linkUrl', 'linkLabel', 'badge', 'publishAt', 'expireAt', 'updatedAt'],
-    bool: ['enabled', 'featured', 'pinned'],
+    columns: ['id', 'enabled', 'featured', 'pinned', 'tone', 'title', 'summary', 'body', 'image', 'linkUrl', 'linkLabel', 'badge', 'publishAt', 'expireAt', 'updatedAt', 'archived'],
+    bool: ['enabled', 'featured', 'pinned', 'archived'],
     text: ['id', 'tone', 'title', 'summary', 'body', 'image', 'linkUrl', 'linkLabel', 'badge', 'publishAt', 'expireAt', 'updatedAt'],
     notes: {
       id: 'معرّف ثابت (تلقائي)',
@@ -115,13 +124,14 @@ var TABLES = {
       badge: 'شارة زي: جديد',
       publishAt: 'يظهر من: 2026-10-08 20:00',
       expireAt: 'يختفي بعد (اختياري)',
-      updatedAt: 'آخر تعديل (تلقائي)'
+      updatedAt: 'آخر تعديل (تلقائي)',
+      archived: 'في الأرشيف (مش بيظهر في القايمة اليومية)'
     }
   },
 
   Games: {
-    columns: ['id', 'enabled', 'title', 'description', 'image', 'url', 'buttonLabel', 'visibleFrom', 'startAt', 'endAt', 'afterEnd', 'updatedAt'],
-    bool: ['enabled'],
+    columns: ['id', 'enabled', 'title', 'description', 'image', 'url', 'buttonLabel', 'visibleFrom', 'startAt', 'endAt', 'afterEnd', 'updatedAt', 'archived'],
+    bool: ['enabled', 'archived'],
     text: ['id', 'title', 'description', 'image', 'url', 'buttonLabel', 'visibleFrom', 'startAt', 'endAt', 'afterEnd', 'updatedAt'],
     notes: {
       id: 'معرّف ثابت (تلقائي)',
@@ -135,13 +145,14 @@ var TABLES = {
       startAt: 'تبدأ: 2026-10-11 22:00',
       endAt: 'تخلص: 2026-10-11 23:30',
       afterEnd: 'show = تفضل ظاهرة "انتهت" شوية، hide = تختفي',
-      updatedAt: 'آخر تعديل (تلقائي)'
+      updatedAt: 'آخر تعديل (تلقائي)',
+      archived: 'في الأرشيف'
     }
   },
 
   Notifications: {
-    columns: ['id', 'enabled', 'type', 'title', 'message', 'target', 'image', 'publishAt', 'expireAt', 'updatedAt'],
-    bool: ['enabled'],
+    columns: ['id', 'enabled', 'type', 'title', 'message', 'target', 'image', 'publishAt', 'expireAt', 'updatedAt', 'archived'],
+    bool: ['enabled', 'archived'],
     text: ['id', 'type', 'title', 'message', 'target', 'image', 'publishAt', 'expireAt', 'updatedAt'],
     notes: {
       id: 'معرّف ثابت (تلقائي)',
@@ -153,13 +164,14 @@ var TABLES = {
       image: 'معرّف صورة من شيت Media (اختياري)',
       publishAt: 'يظهر في الجرس من: 2026-10-08 20:00',
       expireAt: 'يختفي بعد (اختياري، افتراضي 14 يوم)',
-      updatedAt: 'آخر تعديل (تلقائي)'
+      updatedAt: 'آخر تعديل (تلقائي)',
+      archived: 'في الأرشيف'
     }
   },
 
   Media: {
-    columns: ['id', 'path', 'thumb', 'width', 'height', 'alt', 'mime', 'driveId', 'thumbDriveId', 'uploadedAt', 'publishedAt'],
-    text: ['id', 'path', 'thumb', 'alt', 'mime', 'driveId', 'thumbDriveId', 'uploadedAt', 'publishedAt'],
+    columns: ['id', 'path', 'thumb', 'width', 'height', 'alt', 'mime', 'driveId', 'thumbDriveId', 'uploadedAt', 'publishedAt', 'name', 'tiny', 'color', 'hash', 'bytes', 'deletedAt'],
+    text: ['id', 'path', 'thumb', 'alt', 'mime', 'driveId', 'thumbDriveId', 'uploadedAt', 'publishedAt', 'name', 'tiny', 'color', 'hash', 'deletedAt'],
     notes: {
       id: 'معرّف الصورة (تلقائي)',
       path: 'مكانها على الموقع بعد النشر',
@@ -171,7 +183,57 @@ var TABLES = {
       driveId: 'الملف في Drive (مسودة)',
       thumbDriveId: 'النسخة الصغيرة في Drive',
       uploadedAt: 'اترفعت',
-      publishedAt: 'اتنشرت على الموقع'
+      publishedAt: 'اتنشرت على الموقع',
+      name: 'اسم الصورة في المكتبة',
+      tiny: 'صورة صغيرة جدًا للمكتبة (تلقائي)',
+      color: 'اللون الغالب (تلقائي)',
+      hash: 'بصمة الصورة لمنع التكرار (تلقائي)',
+      bytes: 'الحجم بالبايت',
+      deletedAt: 'اتشالت من المكتبة (بتتمسح نهائي بعدين)'
+    }
+  },
+
+  Activities: {
+    columns: ['id', 'enabled', 'type', 'title', 'subtitle', 'description', 'image', 'ctaLabel', 'url', 'location', 'startAt', 'endAt', 'visibleFrom', 'visibleUntil', 'order', 'archived', 'updatedAt'],
+    bool: ['enabled', 'archived'],
+    text: ['id', 'type', 'title', 'subtitle', 'description', 'image', 'ctaLabel', 'url', 'location', 'startAt', 'endAt', 'visibleFrom', 'visibleUntil', 'updatedAt'],
+    notes: {
+      id: 'معرّف ثابت (تلقائي)',
+      enabled: 'ظاهر',
+      type: 'النوع من شيت Types (مثلاً competition أو trip)',
+      title: 'العنوان',
+      subtitle: 'سطر قصير',
+      description: 'التفاصيل (اختياري)',
+      image: 'معرّف البوستر من شيت Media (اختياري)',
+      ctaLabel: 'نص الزرار (فاضي = حسب النوع)',
+      url: 'اللينك (https)',
+      location: 'المكان (اختياري)',
+      startAt: 'بيبدأ (اختياري): 2026-10-16 07:00',
+      endAt: 'بيخلص (اختياري)',
+      visibleFrom: 'يظهر من (اختياري)',
+      visibleUntil: 'يختفي بعد (اختياري)',
+      order: 'الترتيب',
+      archived: 'في الأرشيف',
+      updatedAt: 'آخر تعديل (تلقائي)'
+    }
+  },
+
+  Types: {
+    columns: ['key', 'enabled', 'label', 'section', 'icon', 'theme', 'banner', 'ctaDefault', 'notifyTemplate', 'order', 'updatedAt'],
+    bool: ['enabled'],
+    text: ['key', 'label', 'section', 'icon', 'theme', 'banner', 'ctaDefault', 'notifyTemplate', 'updatedAt'],
+    notes: {
+      key: 'مفتاح النوع بالإنجليزي (مثلاً trip)',
+      enabled: 'متاح في لوحة التحكم',
+      label: 'اسم النوع (مثلاً رحلة)',
+      section: 'القسم اللي بيظهر فيه (مفتاح من شيت Sections، مثلاً activities)',
+      icon: 'الأيقونة',
+      theme: 'الشكل: gold / ember / azure / rose / emerald / night',
+      banner: 'معرّف البانر الافتراضي من شيت Media (اختياري)',
+      ctaDefault: 'نص الزرار الافتراضي',
+      notifyTemplate: 'نص الإشعار ({title} = العنوان)',
+      order: 'الترتيب',
+      updatedAt: 'آخر تعديل (تلقائي)'
     }
   },
 
@@ -188,8 +250,8 @@ var TABLES = {
 
 };
 
-/* tabs added after the first release: missing until setup() runs again */
-var OPTIONAL_TABLES = ['Sessions', 'News', 'Games', 'Notifications', 'Media'];
+/* tabs added after the first release: missing until setup() / migrate() runs */
+var OPTIONAL_TABLES = ['Sessions', 'News', 'Games', 'Notifications', 'Media', 'Activities', 'Types'];
 
 var LOG_MAX_ROWS = 3000;
 
@@ -644,6 +706,7 @@ function setup() {
 
   var props = PropertiesService.getScriptProperties();
   var ss = null;
+  var fresh = false;
 
   try {
     ss = spreadsheet_();
@@ -651,6 +714,7 @@ function setup() {
   catch (error) {
     ss = SpreadsheetApp.create('أسرة البابا أثناسيوس – بيانات الموقع');
     openSpreadsheet_ = ss;
+    fresh = true;
   }
 
   props.setProperty('SHEET_ID', ss.getId());
@@ -680,7 +744,7 @@ function setup() {
   }), created);
 
   OPTIONAL_TABLES.forEach(function (name) {
-    setupTable_(ss, name, [], created);
+    setupTable_(ss, name, name === 'Types' ? typesSeedRows_() : [], created);
   });
 
   setupTable_(ss, 'Log', [], created);
@@ -702,11 +766,15 @@ function setup() {
     }
   });
 
-  log_(currentEmail_(), 'setup', created.length ? 'created: ' + created.join(', ') : 'checked');
+  // the same upgrade as migrate(): new columns, page sections, WhatsApp
+  // link. An existing Sheet is backed up first; a new one has nothing to back up.
+  var upgrade = runMigration_({ backup: !fresh });
+
+  log_(currentEmail_(), 'setup', (created.length ? 'created: ' + created.join(', ') : 'checked') + (upgrade.changed ? ' + upgrade' : ''));
 
   var message = (created.length
     ? 'تم تجهيز: ' + created.join('، ')
-    : 'الشيت متجهز قبل كده، متغيرش حاجة في البيانات.') + '\n' + ss.getUrl();
+    : 'الشيت متجهز قبل كده.') + '\n' + upgrade.lines.join('\n') + '\n' + ss.getUrl();
 
   console.log(message);
 
@@ -844,6 +912,19 @@ function strayIdRows_(name) {
   }
 
   return rows;
+
+}
+
+
+function typesSeedRows_() {
+
+  return SEED_TYPES.map(function (t, i) {
+    return TABLES.Types.columns.map(function (column) {
+      if (column === 'enabled') return true;
+      if (column === 'order') return (i + 1) * 10;
+      return t[column] === undefined ? '' : t[column];
+    });
+  });
 
 }
 
@@ -997,7 +1078,8 @@ function applyValidation_(ss) {
   }
 
   function columnRange(sheet, name, column) {
-    var col = TABLES[name].columns.indexOf(column) + 1;
+    // by header name: a tab whose columns were moved by hand still works
+    var col = headerIndex_(sheet)[column] || (TABLES[name].columns.indexOf(column) + 1);
     return sheet.getRange(2, col, sheet.getMaxRows() - 1, 1);
   }
 
@@ -1038,6 +1120,31 @@ function applyValidation_(ss) {
   var notifications = ss.getSheetByName('Notifications');
   columnRange(notifications, 'Notifications', 'enabled').setDataValidation(checkbox);
   columnRange(notifications, 'Notifications', 'type').setDataValidation(list(NOTIFICATION_TYPES));
+
+  // columns added by the schema-3 upgrade (only where they exist yet)
+  function ifColumn(sheet, name, column, rule) {
+    if (sheet && headerIndex_(sheet)[column]) {
+      sheet.getRange(2, headerIndex_(sheet)[column], sheet.getMaxRows() - 1, 1).setDataValidation(rule);
+    }
+  }
+
+  ifColumn(news, 'News', 'archived', checkbox);
+  ifColumn(games, 'Games', 'archived', checkbox);
+  ifColumn(notifications, 'Notifications', 'archived', checkbox);
+  ifColumn(sections, 'Sections', 'theme', list(SECTION_THEMES));
+  ifColumn(links, 'Links', 'experience', list(LINK_EXPERIENCES));
+
+  var activities = ss.getSheetByName('Activities');
+  if (activities) {
+    ifColumn(activities, 'Activities', 'enabled', checkbox);
+    ifColumn(activities, 'Activities', 'archived', checkbox);
+  }
+
+  var types = ss.getSheetByName('Types');
+  if (types) {
+    ifColumn(types, 'Types', 'enabled', checkbox);
+    ifColumn(types, 'Types', 'theme', list(SECTION_THEMES));
+  }
 
   // boolean settings as checkboxes, tone as a dropdown
   var settings = ss.getSheetByName('Settings');

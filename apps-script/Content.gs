@@ -10,8 +10,10 @@
  * The public site re-checks URLs on render as a second line of defence.
  */
 
-/* 2 = adds sessions, news, games, notifications (additive: schema-1 readers ignore them) */
-var CONTENT_SCHEMA_VERSION = 2;
+/* 2 = adds sessions, news, games, notifications (additive: schema-1 readers ignore them)
+   3 = adds layout: the page's sections in order, with their own visibility
+       (additive: schema-2 readers ignore it) */
+var CONTENT_SCHEMA_VERSION = 3;
 
 var CONTENT_TIMEZONE = 'Africa/Cairo';
 
@@ -29,6 +31,34 @@ var ICON_NAMES = [
   'telegram', 'spotify', 'form', 'calendar', 'ticket', 'bus', 'book',
   'music', 'photos', 'video', 'church', 'cross', 'heart', 'star',
   'megaphone', 'gift', 'users', 'map', 'info', 'link'
+];
+
+/*
+ * PAGE SECTIONS
+ * Every block on the public page is a row in the Sections tab: the
+ * built-in blocks below plus any number of link groups ("links") and
+ * item sections ("items": competitions, activities...). A section can be
+ * switched off or scheduled; switched off, nothing inside it is published.
+ */
+var SECTION_KINDS = ['meeting', 'featured', 'news', 'games', 'items', 'location', 'links', 'contacts', 'support', 'share'];
+
+/* what a link opens first (Phase 6 mini-experiences); empty = from its icon */
+var LINK_EXPERIENCES = ['none', 'facebook', 'instagram', 'tiktok', 'whatsapp'];
+
+var SECTION_THEMES = ['gold', 'ember', 'azure', 'rose', 'emerald', 'night'];
+
+/* today's page order; link groups sit between "before" and "after" */
+var BUILTIN_SECTIONS = [
+  { key: 'meeting', kind: 'meeting', title: 'ركن الاجتماع', place: 'before' },
+  { key: 'featured', kind: 'featured', title: 'الروابط المميزة', place: 'before' },
+  { key: 'news', kind: 'news', title: 'جديد الأسرة', place: 'before' },
+  { key: 'games', kind: 'games', title: 'تحديات وألعاب', place: 'before' },
+  { key: 'competitions', kind: 'items', title: 'المسابقات', place: 'before' },
+  { key: 'activities', kind: 'items', title: 'الفعاليات', place: 'before' },
+  { key: 'location', kind: 'location', title: 'مكان الاجتماع', place: 'before' },
+  { key: 'contacts', kind: 'contacts', title: 'تواصل مع الخدمة', place: 'after' },
+  { key: 'support', kind: 'support', title: 'الدعم الفني', place: 'after' },
+  { key: 'share', kind: 'share', title: 'شارك الصفحة', place: 'after' }
 ];
 
 var DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -386,11 +416,22 @@ function buildPublicContent(draft, options) {
   }
 
 
+  /* ---------- page layout: which sections show, in what order ---------- */
+
+  var layout = resolveLayout_(draft.sections || [], setting, error, limited);
+
+  function sectionOn(key) {
+    var row = layout.byKey[key];
+    return !row || row.enabled;
+  }
+
+
   /* ---------- meeting ---------- */
 
   var meeting = null;
 
-  if (contentBool_(setting('meeting.enabled'))) {
+  // the meeting section wins: switched off, no session or topic can show it
+  if (sectionOn('meeting')) {
 
     var day = contentDay_(setting('meeting.day'));
     var time = contentTime_(setting('meeting.time'));
@@ -446,7 +487,7 @@ function buildPublicContent(draft, options) {
 
   var locationName = contentLine_(setting('location.name'));
 
-  if (locationName) {
+  if (locationName && sectionOn('location')) {
 
     var mapsUrl = contentLine_(setting('location.mapsUrl'));
     var safeMaps = safeHttpsUrl(mapsUrl);
@@ -539,39 +580,29 @@ function buildPublicContent(draft, options) {
 
   /* ---------- sections ---------- */
 
+  // link groups only; the other sections are checked in resolveLayout_
   var sectionRows = (draft.sections || [])
     .map(function (row, index) {
       return {
         key: contentLine_(row.key).toLowerCase(),
+        kind: contentLine_(row.kind).toLowerCase() || 'links',
         title: contentLine_(row.title),
         order: contentNumber_(row.order),
         enabled: contentBool_(row.enabled),
         index: index
       };
-    });
+    })
+    .filter(function (row) { return row.kind === 'links'; });
 
   // null-prototype maps: keys like "constructor" or "__proto__" are just keys
   var sectionsByKey = Object.create(null);
 
   sectionRows.forEach(function (row) {
 
-    var where = 'الأقسام: ' + (row.title || row.key || ('صف ' + (row.index + 2)));
-
-    if (!/^[a-z][a-z0-9-]{0,30}$/.test(row.key)) {
-      error(where, 'مفتاح القسم لازم يكون حروف إنجليزي صغيرة وأرقام وشرطة (مثلاً social)');
+    // bad or repeated keys are reported once, by resolveLayout_
+    if (!/^[a-z][a-z0-9-]{0,30}$/.test(row.key) || sectionsByKey[row.key]) {
       return;
     }
-
-    if (sectionsByKey[row.key]) {
-      error(where, 'مفتاح القسم متكرر: ' + row.key);
-      return;
-    }
-
-    if (!row.title) {
-      error(where, 'عنوان القسم مطلوب');
-    }
-
-    limited(where, row.title, LIMITS.sectionTitle, 'عنوان القسم');
 
     sectionsByKey[row.key] = row;
 
@@ -587,6 +618,11 @@ function buildPublicContent(draft, options) {
   sortRows_(draft.links || []).forEach(function (row) {
 
     if (!contentBool_(row.enabled)) {
+      return;
+    }
+
+    // the featured block switched off: its links aren't published
+    if (contentBool_(row.featured) && !sectionOn('featured')) {
       return;
     }
 
@@ -652,7 +688,9 @@ function buildPublicContent(draft, options) {
         error(where, 'لازم تختار قسم للرابط (أو تخليه مميز)');
       }
       else if (!sectionsByKey[section]) {
-        error(where, 'القسم "' + section + '" مش موجود في شيت الأقسام');
+        error(where, layout.byKey[section]
+          ? 'القسم "' + section + '" مش قسم روابط — اختار قسم روابط (زي social)'
+          : 'القسم "' + section + '" مش موجود في شيت الأقسام');
       }
     }
 
@@ -778,9 +816,22 @@ function buildPublicContent(draft, options) {
   });
 
 
+  // the contact blocks switched off
+  contacts = contacts.filter(function (contact) {
+    return sectionOn(contact.kind === 'support' ? 'support' : 'contacts');
+  });
+
+
   /* ---------- hub: sessions, news, games, notifications (Hub.gs) ---------- */
 
-  var hub = buildHub_(draft, { now: now, error: error, warn: warn, limited: limited, setting: setting });
+  var hub = buildHub_(draft, {
+    now: now,
+    error: error,
+    warn: warn,
+    limited: limited,
+    setting: setting,
+    sections: { meeting: sectionOn('meeting'), news: sectionOn('news'), games: sectionOn('games') }
+  });
 
   // a cancelled session is a skipped date for the countdown and calendar
   if (meeting) {
@@ -811,7 +862,8 @@ function buildPublicContent(draft, options) {
     sessions: hub.sessions,
     news: hub.news,
     games: hub.games,
-    notifications: hub.notifications
+    notifications: hub.notifications,
+    layout: publicLayout_(layout.rows, sections)
   };
 
   if (options.hash) {
@@ -829,6 +881,197 @@ function buildPublicContent(draft, options) {
     // Media ids the published content shows (their files go in the commit)
     media: hub.usedMedia
   };
+
+}
+
+
+/* =========================================================
+   PAGE LAYOUT
+========================================================= */
+
+function builtinSection_(key) {
+
+  return BUILTIN_SECTIONS.filter(function (b) { return b.key === key; })[0] || null;
+
+}
+
+
+/**
+ * Where a built-in section goes when its row doesn't exist yet: around the
+ * link groups exactly like the page always looked. The data upgrade
+ * (Migrate.gs) writes these same numbers into the new rows.
+ */
+function builtinOrder_(key, firstLinks, lastLinks) {
+
+  var before = BUILTIN_SECTIONS.filter(function (b) { return b.place === 'before'; }).map(function (b) { return b.key; });
+  var after = BUILTIN_SECTIONS.filter(function (b) { return b.place === 'after'; }).map(function (b) { return b.key; });
+  var i = before.indexOf(key);
+
+  if (i !== -1) {
+    return Math.round((firstLinks - (before.length - i) * 0.1) * 100) / 100;
+  }
+
+  return lastLinks + (after.indexOf(key) + 1) * 10;
+
+}
+
+
+/**
+ * Sections rows -> { rows: [...ordered], byKey }.
+ * Built-in sections missing from the Sheet (before the data upgrade) are
+ * filled in where the page always had them; the meeting block then follows
+ * the old "meeting.enabled" setting.
+ */
+function resolveLayout_(rows, setting, error, limited) {
+
+  var byKey = Object.create(null);
+  var list = [];
+
+  rows.forEach(function (row, index) {
+
+    var key = contentLine_(row.key).toLowerCase();
+    var kind = contentLine_(row.kind).toLowerCase() || 'links';
+    var title = contentLine_(row.title);
+    var where = 'الأقسام: ' + (title || key || ('صف ' + (index + 2)));
+
+    if (!/^[a-z][a-z0-9-]{0,30}$/.test(key)) {
+      error(where, 'مفتاح القسم لازم يكون حروف إنجليزي صغيرة وأرقام وشرطة (مثلاً social)');
+      return;
+    }
+
+    if (byKey[key]) {
+      error(where, 'مفتاح القسم متكرر: ' + key);
+      return;
+    }
+
+    if (SECTION_KINDS.indexOf(kind) === -1) {
+      error(where, 'نوع القسم مش معروف: ' + kind);
+      return;
+    }
+
+    var builtin = builtinSection_(key);
+
+    if (builtin && builtin.kind !== kind) {
+      error(where, 'القسم "' + key + '" نوعه لازم يكون ' + builtin.kind);
+      return;
+    }
+
+    if (!builtin && kind !== 'links' && kind !== 'items') {
+      error(where, 'النوع ' + kind + ' بيتعمل منه قسم واحد بس (' + kind + ')');
+      return;
+    }
+
+    if (kind === 'links' && !title) {
+      error(where, 'عنوان القسم مطلوب');
+    }
+
+    var from = contentDateTime_(row.visibleFrom, false);
+    var until = contentDateTime_(row.visibleUntil, true);
+
+    if (from === null) {
+      error(where, 'ميعاد الظهور مش مفهوم');
+    }
+
+    if (until === null) {
+      error(where, 'ميعاد الاختفاء مش مفهوم');
+    }
+
+    if (from && until && from > until) {
+      error(where, 'ميعاد الظهور بعد ميعاد الاختفاء');
+    }
+
+    var theme = contentLine_(row.theme).toLowerCase();
+
+    if (theme && SECTION_THEMES.indexOf(theme) === -1) {
+      error(where, 'الشكل "' + theme + '" مش معروف');
+      theme = '';
+    }
+
+    var icon = contentLine_(row.icon).toLowerCase();
+
+    var entry = {
+      key: key,
+      kind: kind,
+      title: limited(where, title || (builtin ? builtin.title : ''), LIMITS.sectionTitle, 'عنوان القسم'),
+      subtitle: limited(where, contentLine_(row.subtitle), LIMITS.subtitle, 'وصف القسم'),
+      icon: ICON_NAMES.indexOf(icon) !== -1 ? icon : '',
+      theme: theme,
+      banner: contentLine_(row.banner),
+      enabled: contentBool_(row.enabled),
+      visibleFrom: from || '',
+      visibleUntil: until || '',
+      order: contentNumber_(row.order),
+      index: index,
+      virtual: false
+    };
+
+    byKey[key] = entry;
+    list.push(entry);
+
+  });
+
+  var linkOrders = list
+    .filter(function (r) { return r.kind === 'links' && r.order !== null && !isNaN(r.order); })
+    .map(function (r) { return r.order; });
+  var firstLinks = linkOrders.length ? Math.min.apply(null, linkOrders) : 10;
+  var lastLinks = linkOrders.length ? Math.max.apply(null, linkOrders) : 20;
+
+  BUILTIN_SECTIONS.forEach(function (b, i) {
+    if (byKey[b.key]) {
+      return;
+    }
+    var entry = {
+      key: b.key,
+      kind: b.kind,
+      title: b.title,
+      subtitle: '',
+      icon: '',
+      theme: '',
+      banner: '',
+      enabled: b.key === 'meeting' ? contentBool_(setting('meeting.enabled')) : true,
+      visibleFrom: '',
+      visibleUntil: '',
+      order: builtinOrder_(b.key, firstLinks, lastLinks),
+      index: 10000 + i,
+      virtual: true
+    };
+    byKey[b.key] = entry;
+    list.push(entry);
+  });
+
+  list.sort(function (a, b) {
+    var x = a.order === null || isNaN(a.order) ? Infinity : a.order;
+    var y = b.order === null || isNaN(b.order) ? Infinity : b.order;
+    return x === y ? a.index - b.index : (x < y ? -1 : 1);
+  });
+
+  return { rows: list, byKey: byKey };
+
+}
+
+
+/* What the site gets: switched-on sections in order. A link group without
+   published links is left out; its time window travels with it. */
+function publicLayout_(rows, linkSections) {
+
+  var withLinks = Object.create(null);
+
+  linkSections.forEach(function (section) { withLinks[section.key] = true; });
+
+  return rows
+    .filter(function (row) { return row.enabled && (row.kind !== 'links' || withLinks[row.key]); })
+    .map(function (row) {
+      return {
+        key: row.key,
+        kind: row.kind,
+        title: row.title,
+        subtitle: row.subtitle,
+        icon: row.icon,
+        theme: row.theme,
+        visibleFrom: row.visibleFrom,
+        visibleUntil: row.visibleUntil
+      };
+    });
 
 }
 

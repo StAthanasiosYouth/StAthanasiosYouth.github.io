@@ -91,14 +91,15 @@ export function bannerWidget(item) {
    NEWS: «جديد الأسرة»
 ========================================================= */
 
-export function newsSection(items, nowStamp) {
+export function newsSection(items, nowStamp, section = {}) {
 
   const lead = items.find(item => item.featured) || null;
   const rest = items.filter(item => item !== lead);
 
   return h('section', { class: 'widget news', 'data-area': 'news', 'aria-labelledby': 'news-title' },
     h('div', { class: 'section-head' },
-      h('h2', { class: 'widget__title', id: 'news-title' }, iconNode('megaphone'), 'جديد الأسرة')
+      h('h2', { class: 'widget__title', id: 'news-title' }, iconNode(section.icon || 'megaphone'), section.title || 'جديد الأسرة'),
+      section.subtitle ? h('p', { class: 'section-head__sub' }, section.subtitle) : null
     ),
     lead ? newsLead(lead, nowStamp) : null,
     rest.length
@@ -282,12 +283,13 @@ function gamesLogo(className, sizes) {
 }
 
 
-export function gamesSection(entries) {
+export function gamesSection(entries, layoutSection = {}) {
 
   const cards = entries.map(entry => gameCard(entry));
 
   const section = h('section', { class: 'widget games', 'data-area': 'games', 'aria-labelledby': 'games-title' },
     h('h2', { class: 'games__head', id: 'games-title' }, gamesLogo('games__logo', '(min-width: 1024px) 300px, 240px')),
+    layoutSection.subtitle ? h('p', { class: 'section-head__sub games__sub' }, layoutSection.subtitle) : null,
     h('div', { class: 'games__list' }, cards.map(card => card.el))
   );
 

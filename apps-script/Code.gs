@@ -123,7 +123,11 @@ function apiStateFor_(email, built) {
     status: publishStatus_(built),
     config: publicConfig_(),
     // the tabs added by the content center exist (setup() was re-run)
-    hubReady: OPTIONAL_TABLES.every(function (name) { return !!spreadsheet_().getSheetByName(name); }),
+    hubReady: ['Sessions', 'News', 'Games', 'Notifications', 'Media'].every(function (name) { return !!spreadsheet_().getSheetByName(name); }),
+    // data upgrade: the Sheet's version vs what this code expects
+    schema: { data: dataSchema_(), target: DATA_SCHEMA_VERSION },
+    // every section in page order; virtual = not a Sheet row yet (before the upgrade)
+    layout: adminLayout_(draft),
     now: cairoNow_(),
     meta: {
       icons: ICON_NAMES,
@@ -138,6 +142,31 @@ function apiStateFor_(email, built) {
       historyDays: Number(draft.settings['notifications.historyDays']) || 14
     }
   };
+
+}
+
+
+function adminLayout_(draft) {
+
+  var setting = function (key) { return draft.settings[key] === undefined ? '' : draft.settings[key]; };
+  var quiet = function () {};
+  var same = function (where, value) { return value; };
+
+  return resolveLayout_(draft.sections, setting, quiet, same).rows.map(function (row) {
+    return {
+      key: row.key,
+      kind: row.kind,
+      title: row.title,
+      subtitle: row.subtitle,
+      icon: row.icon,
+      theme: row.theme,
+      banner: row.banner,
+      enabled: row.enabled,
+      visibleFrom: row.visibleFrom.replace('T', ' '),
+      visibleUntil: row.visibleUntil.replace('T', ' '),
+      virtual: row.virtual
+    };
+  });
 
 }
 
@@ -277,9 +306,12 @@ function dateInput_(value, endOfDay, label, problems) {
 }
 
 
+/* link groups only: the sections a link can go into */
 function sectionKeys_() {
 
-  return readTable_('Sections').map(function (row) { return contentLine_(row.key).toLowerCase(); });
+  return readTable_('Sections')
+    .filter(function (row) { return (contentLine_(row.kind).toLowerCase() || 'links') === 'links'; })
+    .map(function (row) { return contentLine_(row.key).toLowerCase(); });
 
 }
 
@@ -459,6 +491,11 @@ function moveWithin_(table, group, id, direction) {
    SECTIONS
 ========================================================= */
 
+/*
+ * Saves a page section. New ones are link groups, placed right after the
+ * last link group. Built-in sections (meeting, news, games...) are edited
+ * here too (title, subtitle, schedule, look) but keep their kind.
+ */
 function apiSaveSection(input, isNew) {
 
   assertAdmin_();
@@ -467,10 +504,32 @@ function apiSaveSection(input, isNew) {
 
   var problems = [];
   var key = contentLine_(input.key).toLowerCase();
-  var title = input_(input.title, LIMITS.sectionTitle, 'عنوان القسم', problems, true);
+  var builtin = builtinSection_(key);
+  var title = input_(input.title, LIMITS.sectionTitle, 'عنوان القسم', problems, !builtin);
+  var subtitle = input_(input.subtitle, LIMITS.subtitle, 'وصف القسم', problems, false);
+  var visibleFrom = dateInput_(input.visibleFrom, false, 'يظهر من', problems);
+  var visibleUntil = dateInput_(input.visibleUntil, true, 'يختفي بعد', problems);
+  var theme = contentLine_(input.theme).toLowerCase();
+  var icon = contentLine_(input.icon).toLowerCase();
 
   if (!/^[a-z][a-z0-9-]{0,30}$/.test(key)) {
     problems.push('مفتاح القسم: حروف إنجليزي صغيرة وأرقام وشرطة، ويبدأ بحرف (مثلاً events)');
+  }
+
+  if (isNew && builtin) {
+    problems.push('مفتاح القسم ده محجوز لقسم أساسي، اختار مفتاح تاني');
+  }
+
+  if (visibleFrom && visibleUntil && contentDateTime_(visibleFrom, false) > contentDateTime_(visibleUntil, true)) {
+    problems.push('يظهر من: لازم يكون قبل ميعاد الاختفاء');
+  }
+
+  if (theme && SECTION_THEMES.indexOf(theme) === -1) {
+    problems.push('الشكل مش معروف');
+  }
+
+  if (icon && ICON_NAMES.indexOf(icon) === -1) {
+    problems.push('الأيقونة مش معروفة');
   }
 
   if (problems.length) {
@@ -479,21 +538,66 @@ function apiSaveSection(input, isNew) {
 
   return mutate_('section.save', key, function () {
 
-    var rows = readTable_('Sections');
+    var rows = sortRows_(readTable_('Sections'));
     var exists = rows.some(function (row) { return row.key === key; });
 
     if (isNew && exists) {
       throw new Error('في قسم بنفس المفتاح ده');
     }
 
-    var record = { key: key, title: title, enabled: input.enabled !== false };
+    if (!isNew && !exists) {
+      throw builtin
+        ? appError_('الأقسام الأساسية محتاجة ترقية البيانات الأول.', 'من الإعدادات ← ترقية البيانات.')
+        : new Error('القسم مش موجود');
+    }
+
+    var record = {
+      key: key,
+      title: title || (builtin ? builtin.title : ''),
+      subtitle: subtitle,
+      enabled: input.enabled !== false,
+      visibleFrom: visibleFrom,
+      visibleUntil: visibleUntil,
+      theme: theme,
+      icon: icon
+    };
 
     if (!exists) {
-      record.order = nextOrder_(rows, function () { return true; });
+      record.kind = 'links';
+      record.order = 0;
     }
 
     upsertRow_('Sections', 'key', record);
 
+    if (!exists) {
+      // after the last link group, then everything renumbered 10, 20, 30...
+      var keys = rows.map(function (row) { return row.key; });
+      var lastLinks = -1;
+      rows.forEach(function (row, i) {
+        if ((contentLine_(row.kind).toLowerCase() || 'links') === 'links') lastLinks = i;
+      });
+      keys.splice(lastLinks + 1, 0, key);
+      writeOrder_('Sections', 'key', keys);
+    }
+
+  });
+
+}
+
+
+/* the quick ظاهر / مخفي switch for any section */
+function apiSetSectionEnabled(key, enabled) {
+
+  assertAdmin_();
+  validId_(key);
+
+  return mutate_('section.enabled', key + ' ' + (enabled === true), function () {
+    if (!findRow_('Sections', 'key', key)) {
+      throw builtinSection_(key)
+        ? appError_('الأقسام الأساسية محتاجة ترقية البيانات الأول.', 'من الإعدادات ← ترقية البيانات.')
+        : new Error('القسم مش موجود');
+    }
+    upsertRow_('Sections', 'key', { key: key, enabled: enabled === true });
   });
 
 }
@@ -503,6 +607,10 @@ function apiDeleteSection(key) {
 
   assertAdmin_();
   validId_(key);
+
+  if (builtinSection_(key)) {
+    throw appError_('القسم ده أساسي ومينفعش يتمسح.', 'لو مش عايزه يظهر، اقفل «ظاهر» بتاعه.');
+  }
 
   return mutate_('section.delete', key, function () {
 

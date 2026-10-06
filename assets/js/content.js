@@ -22,6 +22,10 @@ const MEDIA_PATH = /^media\/\d{4}\/img-[a-z0-9]{8}(-480)?\.(webp|jpg)$/;
 
 const NOTIFICATION_TYPES = ['general', 'meeting', 'news', 'game', 'important'];
 
+const SECTION_KINDS = ['meeting', 'featured', 'news', 'games', 'items', 'location', 'links', 'contacts', 'support', 'share'];
+
+const SECTION_THEMES = ['gold', 'ember', 'azure', 'rose', 'emerald', 'night'];
+
 
 /* ---------- primitives ---------- */
 
@@ -316,8 +320,25 @@ export function sanitizeContent(raw) {
     })
     .filter(Boolean);
 
+  // schema 3: the sections in order; null = older content (fixed order)
+  const layout = Array.isArray(raw.layout)
+    ? list(raw.layout)
+      .map(s => ({
+        key: typeof s.key === 'string' && /^[a-z][a-z0-9-]{0,30}$/.test(s.key) ? s.key : '',
+        kind: SECTION_KINDS.includes(s.kind) ? s.kind : '',
+        title: text(s.title, 40),
+        subtitle: text(s.subtitle, 140),
+        icon: LINK_ICON_NAMES.includes(s.icon) ? s.icon : '',
+        theme: SECTION_THEMES.includes(s.theme) ? s.theme : '',
+        visibleFrom: dateTime(s.visibleFrom),
+        visibleUntil: dateTime(s.visibleUntil)
+      }))
+      .filter(s => s.key && s.kind)
+    : null;
+
   return {
     ...cleanHub(raw),
+    layout,
     revision: text(raw.revision, 40),
     publishedAt: text(raw.publishedAt, 40),
     timezone: text(raw.timezone, 40) || 'Africa/Cairo',

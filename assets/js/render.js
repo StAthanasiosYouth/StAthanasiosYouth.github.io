@@ -1,10 +1,12 @@
 /**
  * RENDER
  *
- * Builds the widgets from sanitized content. Widget order in the DOM follows
- * the agreed priority (mobile reads top to bottom):
- *   hero → meeting → announcement → featured → location → link sections
- *   → service contact → technical support → share → footer
+ * Builds the widgets from sanitized content, in the order of the page
+ * layout (layout.js): the sections the admin switched on, each showing
+ * only inside its own time window (Cairo). The hero is always first and
+ * the footer always last. Default order (older content):
+ *   hero → meeting → banner → featured → news → games → location
+ *   → link sections → service contact → technical support → share → footer
  */
 
 import { h, external } from './dom.js';
@@ -13,6 +15,7 @@ import { meetingStatus, fromDayNumber, isWithinWindow, calendarDates } from './s
 import { describeMeeting, formatDate, DAY_SHORT } from './words.js';
 import { bannerWidget, newsSection, gamesSection, liveGameWidget, meetingTopic, visibleNews, gameStates } from './hub.js';
 import { updateBell, visibleNotifications } from './bell.js';
+import { liveSections } from './layout.js';
 import { wake } from './motion.js';
 import { play } from './sound.js';
 import { pageUrl } from './share.js';
@@ -430,6 +433,7 @@ function sectionWidget(section, links) {
 
   return h('section', { class: 'widget links-section', 'data-area': 'section', 'aria-labelledby': id },
     h('h2', { class: 'widget__title', id }, section.title),
+    section.subtitle ? h('p', { class: 'section-head__sub' }, section.subtitle) : null,
     tiles.length ? h('ul', { class: 'tiles' }, tiles.map(tile)) : null,
     rows.length ? h('ul', { class: 'rows' }, rows.map(row)) : null
   );
@@ -557,23 +561,28 @@ export function meetingSnapshot() {
 /** Visible parts right now (dates are Cairo wall time). */
 function visibleParts(content, nowStamp) {
 
-  const news = visibleNews(content, nowStamp);
+  const sections = liveSections(content, nowStamp);
+  const live = new Set(sections.map(s => s.key));
+
+  const news = live.has('news') ? visibleNews(content, nowStamp) : [];
   const pinned = news.find(item => item.pinned) || null;
 
-  // a pinned news item replaces the legacy announcement
-  const announcement = !pinned && content.announcement && (!content.announcement.expiresAt || nowStamp <= content.announcement.expiresAt)
+  // a pinned news item replaces the legacy announcement (both belong to news)
+  const announcement = live.has('news') && !pinned && content.announcement && (!content.announcement.expiresAt || nowStamp <= content.announcement.expiresAt)
     ? content.announcement
     : null;
 
-  const featured = content.featured.filter(link => isWithinWindow(link, nowStamp));
+  const featured = live.has('featured') ? content.featured.filter(link => isWithinWindow(link, nowStamp)) : [];
 
-  const sections = content.sections
-    .map(section => ({ section, links: section.links.filter(link => isWithinWindow(link, nowStamp)) }))
-    .filter(item => item.links.length);
+  const linkGroups = new Map(content.sections
+    .map(section => [section.key, { section, links: section.links.filter(link => isWithinWindow(link, nowStamp)) }])
+    .filter(([, item]) => item.links.length));
 
-  const games = gameStates(content, nowStamp);
+  const games = live.has('games') ? gameStates(content, nowStamp) : [];
 
   return {
+    sections,
+    live,
     announcement,
     pinned,
     news: news.filter(item => item !== pinned),
@@ -581,7 +590,7 @@ function visibleParts(content, nowStamp) {
     // upcoming first, finished last
     otherGames: games.filter(g => g.state === 'soon').concat(games.filter(g => g.state === 'ended')),
     featured,
-    sections
+    linkGroups
   };
 
 }
@@ -593,14 +602,48 @@ export function visibilityKey(content, nowStamp) {
   const parts = visibleParts(content, nowStamp);
 
   return [
+    parts.sections.map(s => s.key).join(','),
     parts.announcement ? 'a' : '',
     parts.pinned ? parts.pinned.id : '',
     parts.news.map(item => item.id).join(','),
     gameStates(content, nowStamp).map(g => `${g.game.id}:${g.state}`).join(','),
     visibleNotifications(content, nowStamp).map(n => n.id).join(','),
     parts.featured.map(link => link.id).join(','),
-    parts.sections.map(item => item.links.map(link => link.id).join(',')).join('|')
+    [...parts.linkGroups.values()].map(item => item.links.map(link => link.id).join(',')).join('|')
   ].join('#');
+
+}
+
+
+/*
+ * Desktop pairs two widgets side by side when they fit together at both
+ * breakpoints: hero + meeting (5 + 7), or two of the small blocks
+ * (featured / contacts are 7, location / support are 5). Anything else
+ * takes the full row.
+ */
+const WIDE_SPAN = { featured: 7, contacts: 7, location: 5, support: 5 };
+
+function pairsWith(a, b) {
+
+  if (a.kind === 'hero') return b.kind === 'meeting';
+  return !!WIDE_SPAN[a.kind] && !!WIDE_SPAN[b.kind] && WIDE_SPAN[a.kind] + WIDE_SPAN[b.kind] === 12;
+
+}
+
+function pairUp(flow) {
+
+  for (let i = 0; i < flow.length; i++) {
+    const a = flow[i];
+    const b = flow[i + 1];
+    if (b && pairsWith(a, b)) {
+      a.el.removeAttribute('data-wide');
+      b.el.removeAttribute('data-wide');
+      i++;
+    }
+    else {
+      a.el.setAttribute('data-wide', '');
+    }
+  }
 
 }
 
@@ -613,56 +656,100 @@ export function renderPage(content, clock, actions, { animate = false } = {}) {
   updateHero(content.site);
 
   const parts = visibleParts(content, clock.stamp);
-  const widgets = [];
+  const flow = [];
+  const add = (el, kind) => { if (el) flow.push({ el, kind }); };
 
-  meetingHandle = content.meeting || content.sessions.length ? meetingWidget(content, clock.now) : null;
+  meetingHandle = null;
   gameCards = [];
 
-  if (meetingHandle) widgets.push(meetingHandle.el);
+  const banner = parts.pinned ? bannerWidget(parts.pinned) : parts.announcement ? announcementWidget(parts.announcement) : null;
+  const liveGames = parts.liveGames.map(liveGameWidget);
+  let bannerPlaced = false;
 
-  // a game that is open right now goes straight under the meeting
-  const live = parts.liveGames.map(liveGameWidget);
-  live.forEach(item => { widgets.push(item.el); gameCards.push(...item.cards); });
+  const placeBanner = () => {
+    if (banner && !bannerPlaced) add(banner, 'banner');
+    bannerPlaced = true;
+  };
 
-  if (parts.pinned) widgets.push(bannerWidget(parts.pinned));
-  else if (parts.announcement) widgets.push(announcementWidget(parts.announcement));
+  const placeLiveGames = () => {
+    liveGames.splice(0).forEach(item => { add(item.el, 'live-game'); gameCards.push(...item.cards); });
+  };
 
-  const featured = parts.featured.map(featuredWidget);
-  widgets.push(...featured);
+  // the top banner sits right under the meeting when the meeting comes first
+  if (!parts.sections.length || parts.sections[0].kind !== 'meeting') placeBanner();
 
-  if (parts.news.length) widgets.push(newsSection(parts.news, clock.stamp));
+  for (const section of parts.sections) {
 
-  if (parts.otherGames.length) {
-    const games = gamesSection(parts.otherGames);
-    widgets.push(games.el);
-    gameCards.push(...games.cards);
+    switch (section.kind) {
+
+      case 'meeting':
+        if (content.meeting || content.sessions.length) {
+          meetingHandle = meetingWidget(content, clock.now);
+          add(meetingHandle.el, 'meeting');
+          // a game that is open right now goes straight under the meeting
+          placeLiveGames();
+        }
+        placeBanner();
+        break;
+
+      case 'featured':
+        parts.featured.forEach(link => add(featuredWidget(link), 'featured'));
+        break;
+
+      case 'news':
+        if (parts.news.length) add(newsSection(parts.news, clock.stamp, section), 'news');
+        break;
+
+      case 'games': {
+        placeLiveGames();
+        if (parts.otherGames.length) {
+          const games = gamesSection(parts.otherGames, section);
+          add(games.el, 'games');
+          gameCards.push(...games.cards);
+        }
+        break;
+      }
+
+      case 'location':
+        if (content.location) add(locationWidget(content.location), 'location');
+        break;
+
+      case 'links': {
+        const group = parts.linkGroups.get(section.key);
+        if (group) add(sectionWidget({ ...group.section, title: section.title || group.section.title, subtitle: section.subtitle }, group.links), 'links');
+        break;
+      }
+
+      case 'contacts': {
+        const service = content.contacts.filter(c => c.kind === 'service');
+        if (service.length) add(contactsWidget(service), 'contacts');
+        break;
+      }
+
+      case 'support': {
+        const support = content.contacts.filter(c => c.kind === 'support');
+        if (support.length) add(supportWidget(support), 'support');
+        break;
+      }
+
+      case 'share':
+        add(shareWidget(actions), 'share');
+        break;
+
+      default:
+        // "items" sections (competitions, activities) arrive with their content
+        break;
+
+    }
+
   }
 
-  const location = content.location ? locationWidget(content.location) : null;
-  if (location) widgets.push(location);
+  // live games whose section comes after everything else
+  placeLiveGames();
 
-  for (const item of parts.sections) {
-    widgets.push(sectionWidget(item.section, item.links));
-  }
+  pairUp([{ el: hero, kind: 'hero' }, ...flow]);
 
-  const service = content.contacts.filter(c => c.kind === 'service');
-  const support = content.contacts.filter(c => c.kind === 'support');
-  const serviceEl = service.length ? contactsWidget(service) : null;
-  const supportEl = support.length ? supportWidget(support) : null;
-
-  if (serviceEl) widgets.push(serviceEl);
-  if (supportEl) widgets.push(supportEl);
-
-  widgets.push(shareWidget(actions), footer(content));
-
-  // widgets whose usual partner is missing take the full row
-  hero.toggleAttribute('data-wide', !meetingHandle || meetingHandle.el.hidden);
-  // featured + location share a row only when nothing sits between them
-  const separated = parts.news.length > 0 || parts.otherGames.length > 0;
-  featured.forEach(el => el.toggleAttribute('data-wide', featured.length !== 1 || !location || separated));
-  if (location) location.toggleAttribute('data-wide', featured.length === 0 || separated);
-  if (serviceEl) serviceEl.toggleAttribute('data-wide', !supportEl);
-  if (supportEl) supportEl.toggleAttribute('data-wide', !serviceEl);
+  const widgets = flow.map(item => item.el).concat(footer(content));
 
   if (animate) {
     widgets.forEach((el, index) => {
@@ -683,10 +770,10 @@ export function renderPage(content, clock, actions, { animate = false } = {}) {
   // a game opened while the visitor was here: wake its card up
   const states = new Map(gameStates(content, clock.stamp).map(g => [g.game.id, g.state]));
   if (!animate && !document.hidden) {
-    for (const item of live) {
-      const id = item.cards[0].id;
-      if (previousGameStates.get(id) === 'soon') {
-        wake(item.el.querySelector('.game'), 'is-waking', 2200);
+    for (const item of parts.liveGames) {
+      if (previousGameStates.get(item.game.id) === 'soon') {
+        const card = main.querySelector('.live-game .game');
+        if (card) wake(card, 'is-waking', 2200);
         play('ready', { passive: true });
       }
     }

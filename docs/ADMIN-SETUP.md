@@ -235,3 +235,36 @@ step and shows Google's exact reason. Nothing is left behind.
 
 A failed upload also shows that reason in the editor (under «تفاصيل
 تقنية») and is written to the Log tab as `media.upload.failed`.
+
+
+## Data upgrade to schema 3 (`planMigration`, `migrate`)
+
+Version 3 of the data makes every block on the page a row in **Sections**
+(meeting, featured links, news, games, competitions, activities, location,
+link groups, contacts, support, share). Each section can be switched off or
+scheduled. It also adds the columns used by competitions, activities,
+the archive and the media library, plus the WhatsApp group link.
+
+1. **الإعدادات → ترقية البيانات → «شوف هيتعمل إيه»** (or run
+   `planMigration` in the editor). It only reads, and lists each step.
+2. **«نفّذ الترقية»** (or `migrate`). Before changing anything it copies every
+   tab to a hidden `_backup_YYYYMMDD_<tab>`, never overwriting an older
+   backup. Then it:
+   - creates the new tabs **Activities** and **Types** (Types with the
+     standard activity types);
+   - appends the new columns at the end of existing tabs (nothing moves);
+   - adds the built-in sections in the order the page already had, with the
+     meeting block keeping its old on/off value;
+   - adds the WhatsApp group link once.
+
+   It never deletes, reorders or re-seeds anything, and it checks afterwards
+   that no tab lost a row. Running it again does nothing.
+3. Review and publish as usual. The site looks the same until you change a
+   section.
+
+The site and the admin both work before the upgrade (the built-in sections
+then follow the old layout). Editing a built-in section asks for the upgrade
+first. `setup` runs the same upgrade, so re-running it is safe.
+
+To undo: unhide the `_backup_…` tabs (right-click the tab bar → show) and
+copy their contents back.

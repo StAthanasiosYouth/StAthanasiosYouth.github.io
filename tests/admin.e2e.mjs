@@ -13,6 +13,7 @@ import test from 'node:test';
 import { ROOT } from '../tools/lib/gs.mjs';
 import { createAdminServer } from '../tools/lib/admin-server.mjs';
 import { createWorld } from './fakes/gas.mjs';
+import { legacyWorld } from './fakes/legacy.mjs';
 
 const require = createRequire(`${ROOT}tools/package.json`);
 const puppeteer = require('puppeteer-core');
@@ -367,6 +368,157 @@ test('every list shows the same visibility words', async () => {
   const states = await page.$$eval('.chip--state', chips => chips.map(c => c.dataset.state + ':' + c.textContent.split(' · ')[0]));
   assert.ok(states.includes('scheduled:يظهر لاحقًا'), states.join(' | '));
   assert.ok(states.includes('ended:انتهى'), states.join(' | '));
+  assert.deepEqual(problems, []);
+  await close();
+
+});
+
+
+/* ---------------- Phase 2: page sections + the data upgrade ---------------- */
+
+/* a second admin, on a Sheet shaped like the live one before the upgrade */
+async function legacyAdmin(viewport = PHONE) {
+
+  const legacy = legacyWorld();
+  legacy.properties.set('GITHUB_TOKEN', 'test-token');
+  legacy.properties.set('GITHUB_REPO', 'StAthanasiosYouth/StAthanasiosYouth.github.io');
+  legacy.properties.set('SITE_URL', 'https://stathanasiosyouth.github.io/');
+  const legacyServer = createAdminServer({ world: legacy, admin: ADMIN, latency: 20 });
+  await new Promise(resolve => legacyServer.listen(4395, '127.0.0.1', resolve));
+
+  const context = await browser.createBrowserContext();
+  const page = await context.newPage();
+  const problems = [];
+  page.on('pageerror', error => problems.push(`pageerror: ${error.message}`));
+  page.on('dialog', async dialog => { problems.push(`native ${dialog.type()}`); await dialog.dismiss(); });
+  await page.setViewport(viewport);
+  await page.goto('http://localhost:4395/', { waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => window.A && A.state);
+
+  return {
+    legacy, page, problems,
+    close: async () => { await context.close(); await new Promise(resolve => legacyServer.close(resolve)); }
+  };
+
+}
+
+const clickText = (page, scope, text) => page.evaluate((s, t) => {
+  const button = [...document.querySelectorAll(`${s} button`)].find(b => b.textContent.trim() === t || b.textContent.includes(t));
+  if (!button) throw new Error('no button: ' + t);
+  button.click();
+}, scope, text);
+
+test('upgrade: notice on home, plan, confirm with our modal, done — data intact', async () => {
+
+  const { legacy, page, problems, close } = await legacyAdmin();
+  try {
+  const linksBefore = legacy.gs.readTable_('Links').map(l => l.id);
+
+  // home tells the admin about it
+  await page.waitForSelector('.card--notice');
+  await clickText(page, '.card--notice', 'روح للترقية');
+  await page.waitForFunction(() => document.getElementById('page-title').textContent === 'الإعدادات');
+
+  // plan: read-only list of steps
+  await clickText(page, '.view', 'شوف هيتعمل إيه');
+  await page.waitForSelector('.upgrade .checklist__steps li');
+  const steps = await page.$$eval('.upgrade .checklist__steps li', items => items.map(li => li.className + ' ' + li.querySelector('strong').textContent));
+  assert.equal(steps.length, 4);
+  assert.ok(steps.every(s => s.startsWith('is-todo')), steps.join(' | '));
+  assert.equal(legacy.properties.get('DATA_SCHEMA'), undefined, 'planning changed nothing');
+
+  // run, through our confirm modal
+  await clickText(page, '.view', 'نفّذ الترقية');
+  await page.waitForSelector('dialog.modal[open]');
+  await clickText(page, 'dialog.modal[open]', 'نفّذ');
+  await page.waitForFunction(() => document.querySelector('dialog.modal--success[open]'));
+  const message = await page.$eval('dialog.modal--success .modal__text', n => n.textContent);
+  assert.match(message, /نسخة احتياطية/);
+
+  assert.equal(legacy.properties.get('DATA_SCHEMA'), '3');
+  const linksAfter = legacy.gs.readTable_('Links').map(l => l.id);
+  assert.deepEqual(linksAfter.slice(0, linksBefore.length), linksBefore, 'every link still there, same order');
+  assert.ok(linksAfter.includes('whatsapp-group'));
+  assert.ok(legacy.spreadsheet.getSheets().some(s => s.name.startsWith('_backup_')), 'backups made');
+
+  assert.deepEqual(problems, []);
+  }
+  finally {
+    await close();
+  }
+
+});
+
+test('ترتيب الصفحة: every section, what visitors see now, hide and show', async () => {
+
+  const { page, problems, close } = await open(DESKTOP);
+  await page.evaluate(() => { A.go('page', 'layout'); });
+  await page.waitForSelector('.layout-list .item');
+
+  const titles = await page.$$eval('.layout-list .item__title', t => t.map(x => x.textContent));
+  assert.equal(titles.length, 12);
+  assert.equal(titles[0], 'ركن الاجتماع');
+  const showing = await page.$$eval('.now-showing__item', t => t.map(x => x.textContent));
+  assert.ok(showing.includes('تابعنا'), showing.join(' | '));
+  assert.ok(!showing.includes('المسابقات'), 'an empty section is not "showing"');
+
+  // hide "تابعنا"
+  await page.evaluate(() => {
+    const item = [...document.querySelectorAll('.layout-list .item')].find(i => i.querySelector('.item__title').textContent === 'تابعنا');
+    item.querySelector('.switch input').click();
+  });
+  await page.waitForFunction(() => ![...document.querySelectorAll('.now-showing__item')].some(x => x.textContent === 'تابعنا'));
+  assert.equal(world.gs.readTable_('Sections').find(s => s.key === 'social').enabled, false);
+  world.gs.apiSetSectionEnabled('social', true);
+
+  assert.deepEqual(problems, []);
+  await close();
+
+});
+
+test('ركن الاجتماع: one switch hides the whole meeting block, topics included', async () => {
+
+  const { page, problems, close } = await open();
+  await page.evaluate(() => { A.go('content', 'meetings'); });
+  await page.waitForSelector('.card--switch .switch input');
+  assert.equal(await page.$eval('.card--switch .switch input', i => i.checked), true);
+
+  await page.click('.card--switch .switch');
+  await page.waitForSelector('.card--switch.is-off');
+  const built = JSON.parse(JSON.stringify(world.gs.buildPublicContent(world.gs.readDraft_(), { now: '2026-10-08T12:00' })));
+  assert.equal(built.content.meeting, null);
+  assert.deepEqual(built.content.sessions, [], 'the topic of 2026-10-11 is not published either');
+
+  await page.click('.card--switch .switch');
+  await page.waitForSelector('.card--switch:not(.is-off)');
+
+  assert.deepEqual(problems, []);
+  await close();
+
+});
+
+test('a section can be scheduled (Cairo time) from its editor', async () => {
+
+  const { page, problems, close } = await open(DESKTOP);
+  await page.evaluate(() => { A.go('page', 'layout'); });
+  await page.waitForSelector('[aria-label="تعديل تحديات وألعاب"]');
+  await page.click('[aria-label="تعديل تحديات وألعاب"]');
+  await page.waitForSelector('dialog.sheet[open] input[type=date]');
+  await page.evaluate(() => {
+    const [from] = document.querySelectorAll('dialog.sheet[open] .datetime');
+    const date = from.querySelector('input[type=date]');
+    const time = from.querySelector('input[type=time]');
+    date.value = '2099-01-01'; date.dispatchEvent(new Event('input'));
+    time.value = '18:00'; time.dispatchEvent(new Event('input'));
+    document.querySelector('dialog.sheet[open] .sheet__foot .btn--primary').click();
+  });
+  await page.waitForFunction(() => !document.querySelector('dialog.sheet').open);
+  const games = world.gs.readTable_('Sections').find(s => s.key === 'games');
+  assert.equal(games.visibleFrom, '2099-01-01 18:00');
+  const chip = await page.evaluate(() => [...document.querySelectorAll('.layout-list .item')].find(i => i.querySelector('.item__title').textContent === 'تحديات وألعاب').querySelector('.chip--state').dataset.state);
+  assert.equal(chip, 'scheduled');
+  world.gs.apiSaveSection({ key: 'games', title: 'تحديات وألعاب', visibleFrom: '', visibleUntil: '' });
+
   assert.deepEqual(problems, []);
   await close();
 
