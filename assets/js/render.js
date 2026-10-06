@@ -265,7 +265,8 @@ function featuredWidget(link) {
     h('div', { class: 'featured__art', 'aria-hidden': 'true' }, iconNode(link.icon)),
     h('div', { class: 'featured__body' },
       h('h2', { class: 'featured__title' },
-        h('a', { class: 'stretched', ...external(link.url) }, link.title),
+        // the same link behaviour as tiles: its experience opens on the first tap
+        h('a', { class: 'stretched', ...linkAttrs(link) }, link.title),
         link.badge ? h('span', { class: 'badge' }, link.badge) : null
       ),
       link.subtitle ? h('p', { class: 'featured__text' }, link.subtitle) : null,
