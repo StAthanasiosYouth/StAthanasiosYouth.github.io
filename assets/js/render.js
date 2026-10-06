@@ -10,6 +10,7 @@
  */
 
 import { h, external } from './dom.js';
+import { go } from './router.js';
 import { iconNode, isBrandIcon } from './icons.js';
 import { meetingStatus, meetingJourney, fromDayNumber, isWithinWindow, calendarDates } from './schedule.js';
 import { journeyElement } from './journey.js';
@@ -394,10 +395,33 @@ function appIcon(name) {
 }
 
 
+/*
+ * A social link opens its mini-experience on a plain tap/click/Enter. It
+ * stays a real link: ctrl/cmd/middle-click and "open in new tab" still go
+ * straight to the platform, and without JavaScript it is a normal link.
+ */
+function linkAttrs(link) {
+
+  if (!link.experience) return external(link.url);
+
+  return {
+    ...external(link.url),
+    'aria-haspopup': 'dialog',
+    'data-experience': link.experience,
+    onclick: event => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      go('follow', link.id);
+    }
+  };
+
+}
+
+
 function tile(link) {
 
   return h('li', {},
-    h('a', { class: 'tile', ...external(link.url) },
+    h('a', { class: 'tile', ...linkAttrs(link) },
       link.badge ? h('span', { class: 'badge' }, link.badge) : null,
       appIcon(link.icon),
       h('span', { class: 'tile__title' }, link.title),
@@ -411,7 +435,7 @@ function tile(link) {
 function row(link) {
 
   return h('li', {},
-    h('a', { class: 'row-link', ...external(link.url) },
+    h('a', { class: 'row-link', ...linkAttrs(link) },
       appIcon(link.icon),
       h('span', { class: 'row-link__text' },
         h('span', { class: 'row-link__title' }, link.title, link.badge ? h('span', { class: 'badge' }, link.badge) : null),

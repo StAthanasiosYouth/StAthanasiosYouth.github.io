@@ -376,7 +376,9 @@ function apiSaveLink(input) {
     enabled: input.enabled !== false,
     section: featured ? '' : contentLine_(input.section).toLowerCase(),
     startAt: dateInput_(input.startAt, false, 'تاريخ البداية', problems),
-    endAt: dateInput_(input.endAt, true, 'تاريخ النهاية', problems)
+    endAt: dateInput_(input.endAt, true, 'تاريخ النهاية', problems),
+    // '' = from the icon, 'none' = straight to the link
+    experience: LINK_EXPERIENCES.indexOf(input.experience) !== -1 ? input.experience : ''
   };
 
   if (!link.url) {

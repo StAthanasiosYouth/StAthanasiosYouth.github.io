@@ -14,6 +14,7 @@ import { openBell } from './bell.js';
 import { newsSheetContent, gameSheetContent, meetingSheetContent, gameStates, visibleNews } from './hub.js';
 import { itemSheetContent, typeOf, visibleItems } from './items.js';
 import { isSectionLive, liveSections } from './layout.js';
+import { openExperience } from './xp.js';
 import { iconNode } from './icons.js';
 import { particles } from './motion.js';
 import { play, soundEnabled, setSoundEnabled } from './sound.js';
@@ -148,6 +149,13 @@ function openRoute(route) {
     return;
   }
 
+  if (route.name === 'follow') {
+    const link = followableLink(route.id, time.stamp);
+    if (!link) return missing();
+    openExperience(link, { content: current }, onClose);
+    return;
+  }
+
   if (route.name === 'game') {
     const entry = live('games') && gameStates(current, time.stamp).find(g => g.game.id === route.id);
     if (!entry) return missing();
@@ -163,6 +171,20 @@ function openRoute(route) {
     const title = status && status.session && status.session.topic ? 'الاجتماع الجاي' : (current.meeting ? current.meeting.title : 'الاجتماع');
     openSheet({ title, content: meetingSheetContent(current, status, time.stamp), onClose });
   }
+
+}
+
+
+/* a link with a mini-experience that is showing right now */
+function followableLink(id, nowStamp) {
+
+  const live = new Set(liveSections(current, nowStamp).map(s => s.key));
+  const candidates = [
+    ...(live.has('featured') ? current.featured : []),
+    ...current.sections.filter(s => live.has(s.key)).flatMap(s => s.links)
+  ];
+
+  return candidates.find(link => link.id === id && link.experience) || null;
 
 }
 

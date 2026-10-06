@@ -711,6 +711,13 @@ function buildPublicContent(draft, options) {
       endAt: endAt || ''
     };
 
+    // a social link opens its short mini-experience first (site: xp.js)
+    var experience = linkExperience_(row.experience, icon);
+
+    if (experience) {
+      link.experience = experience;
+    }
+
     if (isFeatured) {
       link.cta = limited(where, contentLine_(row.cta), LIMITS.cta, 'نص الزرار');
       featured.push(link);
@@ -905,6 +912,23 @@ function buildPublicContent(draft, options) {
     // Media ids the published content shows (their files go in the commit)
     media: usedMedia
   };
+
+}
+
+
+/* =========================================================
+   LINKS
+========================================================= */
+
+/* "none" switches it off; empty = from the icon (facebook, instagram...) */
+function linkExperience_(value, icon) {
+
+  var chosen = contentLine_(value).toLowerCase();
+
+  if (chosen === 'none') return '';
+  if (LINK_EXPERIENCES.indexOf(chosen) !== -1) return chosen;
+
+  return ['facebook', 'instagram', 'tiktok', 'whatsapp'].indexOf(icon) !== -1 ? icon : '';
 
 }
 

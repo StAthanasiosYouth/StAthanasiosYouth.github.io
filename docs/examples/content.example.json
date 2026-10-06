@@ -1,6 +1,6 @@
 {
   "schema": 3,
-  "revision": "a3fd1515d40d",
+  "revision": "d4110939c31b",
   "publishedAt": "2026-10-08T09:00:00.000Z",
   "timezone": "Africa/Cairo",
   "site": {
@@ -58,7 +58,8 @@
           "style": "tile",
           "badge": "",
           "startAt": "",
-          "endAt": ""
+          "endAt": "",
+          "experience": "facebook"
         },
         {
           "id": "instagram",
@@ -69,7 +70,8 @@
           "style": "tile",
           "badge": "",
           "startAt": "",
-          "endAt": ""
+          "endAt": "",
+          "experience": "instagram"
         },
         {
           "id": "tiktok",
@@ -80,7 +82,8 @@
           "style": "tile",
           "badge": "",
           "startAt": "",
-          "endAt": ""
+          "endAt": "",
+          "experience": "tiktok"
         }
       ]
     }

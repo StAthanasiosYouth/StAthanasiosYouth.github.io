@@ -115,7 +115,8 @@ function cleanLink(raw) {
     style: raw.style === 'tile' ? 'tile' : 'card',
     badge: text(raw.badge, 16),
     startAt: dateTime(raw.startAt),
-    endAt: dateTime(raw.endAt)
+    endAt: dateTime(raw.endAt),
+    experience: ['facebook', 'instagram', 'tiktok', 'whatsapp'].includes(raw.experience) ? raw.experience : ''
   };
 
 }

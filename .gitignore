@@ -27,3 +27,4 @@ tools/.cache/
 tools/.shots.mjs
 tools/.live.mjs
 tools/.shots-public.mjs
+tools/.shots-xp.mjs

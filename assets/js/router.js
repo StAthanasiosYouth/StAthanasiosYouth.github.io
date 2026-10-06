@@ -4,6 +4,7 @@
  *   #news/<id>       a news item
  *   #game/<id>       a game
  *   #activity/<id>   a competition, trip, play...
+ *   #follow/<link>   a social link's mini-experience
  *   #meeting         the next meeting (topic, speaker, upcoming)
  *
  * In-app taps push a history entry, so the phone's back button closes the
@@ -20,10 +21,10 @@ let expecting = false;
 
 export function parseHash(hash) {
 
-  const match = /^#(notifications|meeting|news|game|activity)(?:\/([\w-]{1,60}))?$/.exec(hash || '');
+  const match = /^#(notifications|meeting|news|game|activity|follow)(?:\/([\w-]{1,60}))?$/.exec(hash || '');
 
   if (!match) return null;
-  if ((match[1] === 'news' || match[1] === 'game' || match[1] === 'activity') && !match[2]) return null;
+  if (['news', 'game', 'activity', 'follow'].includes(match[1]) && !match[2]) return null;
 
   return { name: match[1], id: match[2] || '' };
 

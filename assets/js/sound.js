@@ -132,6 +132,10 @@ const SOUNDS = {
     noise(0, 0.15, { from: 3000, to: 900, gain: 0.3 });
     tone(1180, 0, 0.12, { gain: 0.2, glideTo: 780 });
   },
+  // a soft bubble (reactions, messages)
+  pop: () => {
+    tone(740, 0, 0.09, { gain: 0.3, glideTo: 1180, attack: 0.004 });
+  },
   // two-note major third
   success: () => {
     tone(1046.5, 0, 0.28, { gain: 0.4 });

@@ -149,7 +149,7 @@
 
     var isNew = !link;
     // new links default to a general section rather than the social one
-    var sections = A.byOrder(A.state.draft.sections);
+    var sections = A.byOrder(A.state.draft.sections).filter(function (s) { return !s.kind || s.kind === 'links'; });
     var defaultSection = sections.filter(function (s) { return s.key !== 'social'; })[0] || sections[0] || {};
     link = link || { enabled: true, featured: false, style: 'card', icon: 'link', section: defaultSection.key || '' };
 
@@ -196,11 +196,20 @@
 
     syncFeatured(featured);
 
+    var experience = A.choices('experience', [
+      { value: '', label: 'تلقائي (حسب الأيقونة)' },
+      { value: 'facebook', label: 'فيسبوك' },
+      { value: 'instagram', label: 'إنستجرام' },
+      { value: 'tiktok', label: 'تيك توك' },
+      { value: 'whatsapp', label: 'واتساب' },
+      { value: 'none', label: 'من غير — يفتح على طول' }
+    ], link.experience || '');
     var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
 
     save.addEventListener('click', function () {
       box.hidden = true;
       A.withBusy(save, A.call('apiSaveLink', {
+        experience: experience.value(),
         id: link.id || '',
         title: title.input.value,
         subtitle: subtitle.input.value,
@@ -237,6 +246,7 @@
         styleField,
         cta.node,
         A.field('الأيقونة', icons.node),
+        A.field('التجربة قبل اللينك', experience.node, 'لينكات السوشيال بتفتح تجربة قصيرة الأول، وبعدين زرار يودّي للصفحة نفسها'),
         badgeField,
         A.field('يبدأ يظهر من', start.node, 'اختياري — سيبه فاضي لو هيظهر على طول'),
         A.field('آخر ظهور', end.node, 'اختياري — مناسب للمؤتمرات والرحلات والتسجيل'),

@@ -24,7 +24,7 @@ export function openSheet({ title, content, variant = 'detail', onClose }) {
 
   const close = h('button', { class: 'sheet__close', type: 'button', 'aria-label': 'قفل', onclick: () => closeSheet() }, iconNode('close'));
   const grip = h('div', { class: 'sheet__grip', 'aria-hidden': 'true' });
-  const head = h('div', { class: 'sheet__head' }, h('h2', { class: 'sheet__title', id: titleId }, title), close);
+  const head = h('div', { class: 'sheet__head' }, h('h2', { class: 'sheet__title', id: titleId, tabindex: '-1' }, title), close);
 
   panel.append(grip, head, h('div', { class: 'sheet__body' }, content));
 
@@ -37,6 +37,10 @@ export function openSheet({ title, content, variant = 'detail', onClose }) {
   else {
     dialog.setAttribute('open', '');
   }
+
+  // start on the title: no focus ring on the close button, screen readers
+  // hear what opened; Tab goes on to the close button and the content
+  head.firstChild.focus({ preventScroll: true });
 
   current = { dialog, panel, onClose };
 
