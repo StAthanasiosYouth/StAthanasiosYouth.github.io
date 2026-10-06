@@ -37,6 +37,8 @@
       else if (name === 'value') node.value = value;
       else if (name === 'checked') node.checked = !!value;
       else if (name.indexOf('on') === 0 && typeof value === 'function') node.addEventListener(name.slice(2), value);
+      // through the CSSOM, not the attribute: allowed under a strict CSP (no 'unsafe-inline')
+      else if (name === 'style') node.style.cssText = String(value);
       else node.setAttribute(name, value === true ? '' : String(value));
     });
 
@@ -82,9 +84,17 @@
 
   var icon = A.icon;
 
+  /*
+   * One server call -> a promise. Here (Apps Script) through
+   * google.script.run; on the official admin page (GitHub Pages /admin/)
+   * window.AdminTransport sends it to the API (doPost) with the Google
+   * sign-in token. Same results, same error texts.
+   */
   A.call = function (name) {
 
     var args = Array.prototype.slice.call(arguments, 1);
+
+    if (window.AdminTransport) return window.AdminTransport.call(name, args);
 
     return new Promise(function (resolve, reject) {
       var runner = google.script.run
@@ -1620,7 +1630,10 @@
       A.fill(foot,
         A.state.config.siteUrl ? el('a', { class: 'navlink navlink--quiet', href: A.state.config.siteUrl, target: '_blank', rel: 'noopener' },
           el('span', { class: 'navlink__icon' }, icon('globe')), el('span', { class: 'navlink__label', text: 'افتح الموقع' })) : null,
-        el('p', { class: 'rail__user' }, icon('user'), el('span', { class: 'ltr', text: A.state.user }))
+        el('p', { class: 'rail__user' }, icon('user'), el('span', { class: 'ltr', text: A.state.user })),
+        // the official admin page only (Google sign-in lives there)
+        A.signOut ? el('button', { class: 'navlink navlink--quiet', type: 'button', onclick: function () { A.signOut(); } },
+          el('span', { class: 'navlink__icon' }, icon('logout')), el('span', { class: 'navlink__label', text: 'خروج' })) : null
       );
     }
 
@@ -2226,12 +2239,14 @@
 
   }
 
-  A.start = function () {
+  /* preloaded: the state already fetched (the official admin page loads it
+     while it checks the sign-in) */
+  A.start = function (preloaded) {
 
     document.getElementById('publish-open').prepend(icon('send'));
     renderNav();
 
-    A.call('apiState')
+    (preloaded ? Promise.resolve(preloaded) : A.call('apiState'))
       .then(function (state) {
         A.state = state;
         A.renderStatus();

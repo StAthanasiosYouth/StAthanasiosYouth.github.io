@@ -6,7 +6,10 @@
  * site's index.html with <html data-preview> and a <base> pointing at the
  * site, so it runs the site's own CSS and JS. The draft is handed to it by
  * postMessage, same origin only. So:
- *  - drafts never reach GitHub, the public site's origin or its cache;
+ *  - drafts never reach GitHub or the public site's cache. In Apps Script
+ *    the frame has the admin's own origin; on the official admin page
+ *    (GitHub Pages /admin/) it shares the site's origin, so a guard script
+ *    (admin/preview-guard.js) swaps the page's storage for memory first;
  *  - the public site keeps refusing to be framed by anyone (unchanged);
  *  - images not on the site yet are shown from Drive previews (blob: URLs).
  * Phone / computer widths, and time travel (Cairo time).
@@ -49,7 +52,13 @@
       })
       .then(function (html) {
         html = html.replace(/<html\b([^>]*)>/i, '<html$1 data-preview>');
-        html = html.replace(/<head>/i, '<head><base href="' + base + '">');
+        // On the official admin page (GitHub Pages /admin/) this frame shares
+        // the site's own origin, so its storage is the visitors' storage on
+        // this browser. The guard runs first and gives the page a storage of
+        // its own (memory only): the draft never lands in the site's cache,
+        // bell or anything else saved for the real site.
+        var guard = origin === location.origin ? '<script src="' + base + 'admin/preview-guard.js"><' + '/script>' : '';
+        html = html.replace(/<head>/i, '<head><base href="' + base + '">' + guard);
         // the same rules, naming the site's origin ('self' is this admin page now)
         html = html.replace(/(<meta http-equiv="Content-Security-Policy" content=")([^"]*)(")/i, function (_, open, csp, close) {
           csp = csp.replace(/'self'/g, "'self' " + origin)
@@ -60,6 +69,24 @@
         pageHtml[base] = html;
         return html;
       });
+
+  }
+
+  /* a data: URL decoded here (a strict CSP's connect-src doesn't allow
+     fetching data: URLs); anything else is fetched */
+  function toBlob(url) {
+
+    var match = /^data:([\w.+\/-]+)?(;base64)?,(.*)$/.exec(url || '');
+
+    if (!match) {
+      return fetch(url).then(function (response) { return response.blob(); });
+    }
+
+    var text = match[2] ? atob(match[3]) : decodeURIComponent(match[3]);
+    var bytes = new Uint8Array(text.length);
+    for (var i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i) & 255;
+
+    return Promise.resolve(new Blob([bytes], { type: match[1] || 'application/octet-stream' }));
 
   }
 
@@ -74,8 +101,7 @@
       var ready = blobs[media.id]
         ? Promise.resolve(blobs[media.id])
         : A.mediaPreview(media.id)
-          .then(function (dataUrl) { return fetch(dataUrl); })
-          .then(function (response) { return response.blob(); })
+          .then(toBlob)
           .then(function (blob) { blobs[media.id] = URL.createObjectURL(blob); return blobs[media.id]; });
       return ready.then(function (url) {
         map[media.path] = url;
