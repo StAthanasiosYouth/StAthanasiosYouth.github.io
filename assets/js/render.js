@@ -20,7 +20,7 @@ import { updateBell, visibleNotifications } from './bell.js';
 import { liveSections } from './layout.js';
 import { itemsSection, visibleItems } from './items.js';
 import { wake } from './motion.js';
-import { choreograph } from './feel.js';
+import { choreograph, motionTier } from './feel.js';
 import { hasScene } from './xp.js';
 import { play } from './sound.js';
 import { pageUrl } from './share.js';
@@ -54,6 +54,10 @@ export function updateHero(site) {
     }
 
     document.title = site.name;
+
+    // the top bar's compact name: the name's lead words
+    const compact = document.querySelector('.topbar__name');
+    if (compact) compact.textContent = words.length > 5 ? words.slice(0, 3).join(' ') : site.name;
 
   }
 
@@ -172,7 +176,7 @@ function meetingWidget(content, now, layoutSection = {}) {
     const session = status.session;
     const topicKey = session ? `${session.date}|${session.topic}|${session.speaker}` : '';
     if (topicKey !== lastTopicKey) {
-      topicSlot.replaceChildren(meetingTopic(session, layoutSection) || '');
+      topicSlot.replaceChildren(meetingTopic(session) || '');
       lastTopicKey = topicKey;
     }
 
@@ -457,7 +461,6 @@ function sectionWidget(section, links) {
   const rows = links.filter(link => link.style !== 'tile');
 
   return h('section', { class: 'widget links-section', 'data-area': 'section', 'data-theme': section.theme || null, 'aria-labelledby': id },
-    sectionBanner(section),
     h('h2', { class: 'widget__title', id }, section.title),
     section.subtitle ? h('p', { class: 'section-head__sub' }, section.subtitle) : null,
     tiles.length ? h('ul', { class: 'tiles' }, tiles.map(tile)) : null,
@@ -471,66 +474,202 @@ function sectionWidget(section, links) {
    CONTACTS
 ========================================================= */
 
-function contactButton(contact, primary) {
+/*
+ * The service leader and the technical support are one matched pair:
+ *   head (avatar or arch monogram, name, role)
+ *   → a "stage" of the same height (a ringing phone / a short WhatsApp chat)
+ *   → the action, aligned at the bottom.
+ * The stage is decoration around real words (contact.intro / reply); the
+ * button never waits for it.
+ */
+const SERVICE_INTRO = 'عندك سؤال أو محتاج تتكلم؟';
+const SUPPORT_INTRO = 'معايا مشكلة';
+const SUPPORT_REPLY = 'أهلاً بيك 👋 ابعتلي المشكلة أو التفاصيل وأنا هساعدك إن شاء الله.';
 
-  const number = h('span', { class: 'phone-number ltr' }, contact.phoneDisplay);
+function contactButton(contact) {
 
   if (contact.action.type === 'call') {
     return h('a', {
-      class: `btn btn--call${primary ? ' btn--primary' : ''}`,
+      class: 'btn btn--call btn--primary',
       href: contact.action.href,
       'aria-label': `اتصال بـ${contact.name} على ${contact.phoneDisplay}`
     },
     h('span', { class: 'btn__label' }, iconNode('phone'), 'اتصال'),
-    number
+    h('span', { class: 'phone-number ltr' }, contact.phoneDisplay)
     );
   }
 
   return h('a', {
     class: 'btn btn--whatsapp',
     ...external(contact.action.href),
-    'aria-label': `راسل ${contact.name} على واتساب`
+    'aria-label': `تواصل مع ${contact.name} على واتساب`
   },
   iconNode('whatsapp'),
-  'واتساب'
+  'تواصل على واتساب'
   );
+
+}
+
+
+/* a small picture of the person, else the arch with their initial */
+function avatar(contact, className = 'person__avatar') {
+
+  if (contact.image) {
+    return h('span', { class: `${className} ${className}--photo`, 'aria-hidden': 'true' },
+      h('img', { src: contact.image.thumb, width: 52, height: 52, alt: '', decoding: 'async', loading: 'lazy' }));
+  }
+
+  return h('span', { class: className, 'aria-hidden': 'true' }, Array.from(contact.name)[0]);
+
+}
+
+
+function personHead(contact, titleId) {
+
+  return h('div', { class: 'person__head' },
+    avatar(contact),
+    h('div', { class: 'person__who' },
+      h('h2', { class: 'person__name', id: titleId }, contact.name),
+      contact.role ? h('p', { class: 'person__role' }, contact.role) : null
+    )
+  );
+
+}
+
+
+/* more than one person of a kind: the others in a compact row each */
+function morePeople(contacts) {
+
+  return contacts.slice(1).map(contact => h('div', { class: 'person person--more' },
+    personHead(contact, null),
+    contactButton(contact)
+  ));
 
 }
 
 
 function contactsWidget(contacts) {
 
-  return h('section', { class: 'widget contact', 'data-area': 'contacts', 'aria-labelledby': 'contacts-title' },
-    h('h2', { class: 'widget__title', id: 'contacts-title' }, iconNode('phone'), 'تواصل مع الخدمة'),
-    contacts.map(contact => h('div', { class: 'person' },
-      h('div', { class: 'person__head' },
-        h('span', { class: 'person__avatar', 'aria-hidden': 'true' }, Array.from(contact.name)[0]),
-        h('div', {},
-          h('p', { class: 'person__name' }, contact.name),
-          contact.role ? h('p', { class: 'person__role' }, contact.role) : null
-        )
-      ),
-      contact.description ? h('p', { class: 'person__desc' }, contact.description) : null,
-      contactButton(contact, true)
-    ))
+  const lead = contacts[0];
+
+  // the phone rings softly: waves around a phone, the invitation beside it
+  const stage = h('div', { class: 'person__stage ring' },
+    h('span', { class: 'ring__phone', 'aria-hidden': 'true' },
+      h('span', { class: 'ring__wave' }),
+      h('span', { class: 'ring__wave' }),
+      h('span', { class: 'ring__wave' }),
+      h('span', { class: 'ring__glyph' }, iconNode('phone'))
+    ),
+    h('div', { class: 'ring__copy' },
+      h('p', { class: 'ring__intro' }, lead.intro || SERVICE_INTRO),
+      lead.description ? h('p', { class: 'ring__desc' }, lead.description) : null
+    )
   );
+
+  liveWhileVisible(stage);
+
+  return h('section', { class: 'widget person-card contact', 'data-area': 'contacts', 'aria-labelledby': 'contacts-title' },
+    personHead(lead, 'contacts-title'),
+    stage,
+    h('div', { class: 'person__actions' }, contactButton(lead)),
+    morePeople(contacts)
+  );
+
+}
+
+
+/* the waves move only while the card is on screen (full tier: CSS) */
+function liveWhileVisible(el) {
+
+  if (!('IntersectionObserver' in window)) return;
+
+  new IntersectionObserver(entries => {
+    for (const entry of entries) el.classList.toggle('is-live', entry.isIntersecting);
+  }, { threshold: 0.3 }).observe(el);
 
 }
 
 
 function supportWidget(contacts) {
 
-  return h('section', { class: 'widget support', 'data-area': 'support', 'aria-labelledby': 'support-title' },
-    h('h2', { class: 'support__title', id: 'support-title' }, iconNode('info'), contacts[0].role || 'الدعم الفني'),
-    contacts.map(contact => [
-      h('p', { class: 'support__desc' },
-        contact.description,
-        contact.description ? ' — ' : '',
-        h('span', { class: 'support__name' }, contact.name)
+  const lead = contacts[0];
+  const reply = lead.reply || SUPPORT_REPLY;
+
+  // a short WhatsApp-like conversation: real words, read as a list
+  const chat = h('div', { class: 'person__stage chat' },
+    lead.description ? h('p', { class: 'chat__chip' }, lead.description) : null,
+    h('ol', { class: 'chat__log', 'aria-label': `محادثة مع ${lead.name}` },
+      h('li', { class: 'chat__msg chat__msg--out' },
+        h('span', { class: 'visually-hidden' }, 'إنت: '),
+        h('span', { class: 'chat__text' }, lead.intro || SUPPORT_INTRO),
+        h('span', { class: 'chat__meta', 'aria-hidden': 'true' }, tickMarks(''), tickMarks(' chat__ticks--seen')),
+        h('span', { class: 'chat__reaction', 'aria-hidden': 'true' }, '❤️')
       ),
-      contactButton(contact, false)
-    ])
+      h('li', { class: 'chat__msg chat__msg--in' },
+        avatar(lead, 'chat__avatar'),
+        h('span', { class: 'chat__typing', 'aria-hidden': 'true' }, h('i'), h('i'), h('i')),
+        h('span', { class: 'chat__bubble' },
+          h('span', { class: 'chat__from' }, lead.name, h('span', { class: 'visually-hidden' }, ': ')),
+          h('span', { class: 'chat__text' }, reply)
+        )
+      )
+    )
   );
+
+  const section = h('section', { class: 'widget person-card support', 'data-area': 'support', 'aria-labelledby': 'support-title' },
+    personHead(lead, 'support-title'),
+    chat,
+    h('div', { class: 'person__actions' }, contactButton(lead)),
+    morePeople(contacts)
+  );
+
+  playOnce(chat);
+
+  return section;
+
+}
+
+
+/* two read ticks (they turn blue once "seen") */
+function tickMarks(extra) {
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 18 12');
+  svg.setAttribute('class', `chat__ticks${extra}`);
+  svg.setAttribute('focusable', 'false');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'm1 6.5 3.2 3.2L11 2.5M7.4 9.2l.5.5L14.7 2.5');
+  svg.append(path);
+
+  return svg;
+
+}
+
+
+/*
+ * The conversation plays once per visit, when it scrolls into view, and
+ * rests on its final frame. Before that it waits on its first frame
+ * (.is-armed). Reduced motion (or no IntersectionObserver): the final frame
+ * at once. Lite: the same story, shorter (main.css).
+ */
+let chatPlayed = false;
+
+function playOnce(stage) {
+
+  if (chatPlayed || motionTier() === 'reduced' || !('IntersectionObserver' in window)) return;
+
+  stage.classList.add('is-armed');
+
+  const observer = new IntersectionObserver(entries => {
+    if (!entries.some(entry => entry.isIntersecting)) return;
+    observer.disconnect();
+    chatPlayed = true;
+    stage.classList.add('is-playing');
+    // after the last step the class goes: the final frame is the resting state
+    setTimeout(() => stage.classList.remove('is-armed', 'is-playing'), motionTier() === 'lite' ? 2600 : 5200);
+  }, { threshold: 0.6 });
+
+  observer.observe(stage);
 
 }
 
@@ -644,11 +783,11 @@ export function visibilityKey(content, nowStamp) {
 
 /*
  * Desktop pairs two widgets side by side when they fit together at both
- * breakpoints: hero + meeting (5 + 7), or two of the small blocks
- * (featured / contacts are 7, location / support are 5). Anything else
+ * breakpoints: hero + meeting (5 + 7), featured + location (7 + 5), or the
+ * two people, service + support (6 + 6, a matched pair). Anything else
  * takes the full row.
  */
-const WIDE_SPAN = { featured: 7, contacts: 7, location: 5, support: 5 };
+const WIDE_SPAN = { featured: 7, location: 5, contacts: 6, support: 6 };
 
 function pairsWith(a, b) {
 
@@ -675,6 +814,25 @@ function pairUp(flow) {
 }
 
 
+/*
+ * A section's own look, applied in one place for every kind (the meeting,
+ * links, contacts, share, a kind added later...): the banner the admin
+ * chose goes on top of the section's first widget; the theme tints it.
+ */
+function dressSection(el, section) {
+
+  if (section.banner && !el.querySelector(':scope > .section-banner')) {
+    el.prepend(sectionBanner(section));
+    el.classList.add('has-banner');
+  }
+
+  if (section.theme && !el.hasAttribute('data-theme')) {
+    el.dataset.theme = section.theme;
+  }
+
+}
+
+
 export function renderPage(content, clock, actions, { animate = false } = {}) {
 
   const main = document.getElementById('main');
@@ -684,7 +842,9 @@ export function renderPage(content, clock, actions, { animate = false } = {}) {
 
   const parts = visibleParts(content, clock.stamp);
   const flow = [];
-  const add = (el, kind) => { if (el) flow.push({ el, kind }); };
+  // owner: the layout section a widget belongs to (its banner and theme)
+  let owner = null;
+  const add = (el, kind, by = owner) => { if (el) flow.push({ el, kind, section: by }); };
 
   meetingHandle = null;
   gameCards = [];
@@ -695,18 +855,21 @@ export function renderPage(content, clock, actions, { animate = false } = {}) {
   let bannerPlaced = false;
 
   const placeBanner = () => {
-    if (banner && !bannerPlaced) add(banner, 'banner');
+    if (banner && !bannerPlaced) add(banner, 'banner', null);
     bannerPlaced = true;
   };
 
+  // (a live game sits under the meeting, outside its own section's place)
   const placeLiveGames = () => {
-    liveGames.splice(0).forEach(item => { add(item.el, 'live-game'); gameCards.push(...item.cards); });
+    liveGames.splice(0).forEach(item => { add(item.el, 'live-game', null); gameCards.push(...item.cards); });
   };
 
   // the top banner sits right under the meeting when the meeting comes first
   if (!parts.sections.length || parts.sections[0].kind !== 'meeting') placeBanner();
 
   for (const section of parts.sections) {
+
+    owner = section;
 
     switch (section.kind) {
 
@@ -777,8 +940,18 @@ export function renderPage(content, clock, actions, { animate = false } = {}) {
 
   }
 
+  owner = null;
+
   // live games whose section comes after everything else
   placeLiveGames();
+
+  // every section, whatever its kind: its banner and theme, once, on its first widget
+  const dressed = new Set();
+  for (const item of flow) {
+    if (!item.section || dressed.has(item.section)) continue;
+    dressed.add(item.section);
+    dressSection(item.el, item.section);
+  }
 
   pairUp([{ el: hero, kind: 'hero' }, ...flow]);
 

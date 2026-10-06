@@ -54,7 +54,7 @@ inside their app icons.
 | ---------- | ------------------------------------- |
 | < 640px    | one column, in priority order         |
 | 640–1023px | two columns; featured + location side by side, contact + support side by side |
-| ≥ 1024px   | 12 columns: hero 5 + meeting 7, featured 7 + location 5, contact 7 + support 5 |
+| ≥ 1024px   | 12 columns: hero 5 + meeting 7, featured 7 + location 5, contact 6 + support 6 (a matched pair) |
 
 A widget whose partner is missing takes the full row (`data-wide`).
 Safe-area insets are respected; there's no horizontal scroll at 360px.
@@ -78,7 +78,7 @@ CSS `linear()`, falling back to a cubic-bezier where unsupported.
 | Countdowns         | Changed text rolls out and in instead of jumping                |
 | Bell               | Swings once (damped) when something new arrives; the badge springs in. Never loops |
 | Sheets (bell, news, game, meeting) | Slide up with a spring; drag down to dismiss; the list inside staggers in 40 ms apart |
-| Top bar            | The compact name slides in after the hero scrolls away          |
+| Top bar            | Follows the scroll continuously (scroll-driven where supported): surface, blur (full tier), a gold hairline drawn from the centre, buttons settling; the compact name glides in as the hero name passes under it. Never changes height |
 
 Rules:
 
@@ -115,10 +115,12 @@ Sounds never play in a hidden tab. Sounds not caused by a tap ("ready",
 | Featured service | Arch art, title, one line, gold CTA pill; the whole card is one tap target |
 | Location         | Stylized map (hills, coast, Red Sea, pin), name and address, Maps / directions / an on-demand real map |
 | Link section     | Tiles (app icons) and/or rows (icon, title, description, arrow) |
-| Contact          | Arch initial, name, role, a full-width call button showing the number |
-| Support          | Smaller, muted; WhatsApp button with a ready message         |
+| Contact          | Matched pair with Support: head (arch initial or photo, name, role), a stage of equal height, the action at the bottom. Service: a phone ringing softly (waves), the invitation line (intro), a full-width call button showing the number |
+| Support          | A short WhatsApp-style chat (intro → typing → reply with the avatar → read ticks, a reaction), played once when scrolled into view, then resting; a quieter WhatsApp button with a ready message |
 | Share            | Native share sheet or copy link; branded QR card (download as PNG) |
-| Top bar          | Sticky: compact name after scrolling, sound toggle, bell with badge (Arabic digits, "+٩" cap) |
+| Top bar          | Sticky, full-bleed surface, content at the page width: compact name after scrolling, sound toggle, bell with badge (Arabic digits, "+٩" cap) |
+| Poster hero      | Top of every detail sheet: the poster's own ratio, height-capped, never cropped; the space around unusual shapes is the poster blurred (full tier) or a light in its colour; tap opens a full-resolution viewer |
+| Section banner   | Any section can carry the admin's banner on top of its first widget (one place in render.js) |
 | Meeting topic    | Inside the meeting widget: arch poster, «موضوع الاجتماع», the topic in Ruqaa, the speaker; opens the meeting sheet with upcoming meetings |
 | Pinned banner    | A pinned news item in the announcement style (replaces the old single announcement) |
 | «جديد الأسرة»     | A featured poster card, then a swipeable row of cards (a grid on desktop); each opens a sheet with the full poster, text, link and share |

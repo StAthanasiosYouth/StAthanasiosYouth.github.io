@@ -10,6 +10,7 @@ import { gameState, isPublished, upcomingSessions } from './schedule.js';
 import { formatStamp, relativeTime, untilText, formatDate, formatTime, DAY_NAMES } from './words.js';
 import { go } from './router.js';
 import { particles, swapText } from './motion.js';
+import { openViewer } from './sheet.js';
 
 
 /* =========================================================
@@ -36,6 +37,91 @@ export function picture(image, { sizes = '(min-width: 1024px) 360px, 92vw', clas
   if (image.color) img.style.backgroundColor = image.color;
 
   return img;
+
+}
+
+
+/*
+ * MEDIA HERO: the poster at the top of every detail sheet.
+ * - Its frame has the poster's own ratio before anything loads (no jump),
+ *   capped in height (main.css); the poster is never cropped or stretched
+ *   (contain) and always sharp: srcset + sizes = the width it really gets.
+ * - The space a tall or wide poster leaves is filled on purpose: the same
+ *   picture blurred and darkened (full tier, the cached thumbnail), else a
+ *   navy/gold light in the poster's own colour.
+ * - A tap opens the full picture in a viewer (zoom, scroll, Esc).
+ */
+const SHEET_WIDTH = 552;   // the sheet's content width from 720px up
+const HERO_VH = { wide: 62, narrow: 56 };
+
+export function shapeOf(image) {
+
+  const ratio = image.w / image.h;
+
+  if (ratio >= 1.25) return 'wide';
+  if (ratio >= 0.8) return 'square';
+  if (ratio >= 0.5) return 'portrait';
+  return 'tall';
+
+}
+
+export function mediaHero(image) {
+
+  if (!image) return null;
+
+  const ratio = image.w / image.h;
+  const r = ratio.toFixed(4);
+
+  const img = h('img', {
+    class: 'media-hero__img',
+    src: image.thumb,
+    srcset: image.thumb !== image.src ? `${image.thumb} 480w, ${image.src} ${Math.max(image.w, 481)}w` : null,
+    // the width the poster really gets: the sheet's width, or less when its height is the limit
+    sizes: `(min-width: 720px) min(${SHEET_WIDTH}px, calc(${HERO_VH.wide}vh * ${r})), min(calc(100vw - 40px), calc(${HERO_VH.narrow}vh * ${r}))`,
+    width: image.w,
+    height: image.h,
+    alt: image.alt || '',
+    decoding: 'async',
+    fetchpriority: 'high'
+  });
+
+  const zoom = h('button', {
+    class: 'media-hero__zoom',
+    type: 'button',
+    'aria-haspopup': 'dialog',
+    'aria-label': image.alt ? `${image.alt} — اعرضها كاملة` : 'اعرض الصورة كاملة',
+    onclick: () => openViewer(image)
+  },
+  img,
+  h('span', { class: 'media-hero__hint', 'aria-hidden': 'true' }, expandIcon(), shapeOf(image) === 'tall' ? 'البوستر كامل' : 'كبّر')
+  );
+
+  const figure = h('figure', { class: 'media-hero', 'data-shape': shapeOf(image) },
+    // the cinematic surround (decorative; lazy so the lite tier never loads it)
+    h('img', { class: 'media-hero__ambient', src: image.thumb, alt: '', 'aria-hidden': 'true', loading: 'lazy', decoding: 'async' }),
+    zoom
+  );
+
+  // CSSOM (the CSP blocks style=""): the ratio and the poster's colour
+  figure.style.setProperty('--ar', `${image.w} / ${image.h}`);
+  if (image.color) figure.style.setProperty('--tint', image.color);
+
+  return figure;
+
+}
+
+
+function expandIcon() {
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('class', 'icon icon--line');
+  svg.setAttribute('focusable', 'false');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5');
+  svg.append(path);
+
+  return svg;
 
 }
 
@@ -137,7 +223,6 @@ export function newsSection(items, nowStamp, section = {}) {
   const rest = items.filter(item => item !== lead);
 
   return h('section', { class: 'widget news', 'data-area': 'news', 'data-theme': section.theme || null, 'aria-labelledby': 'news-title' },
-    sectionBanner(section),
     h('div', { class: 'section-head' },
       h('h2', { class: 'widget__title', id: 'news-title' }, iconNode(section.icon || 'megaphone'), section.title || 'جديد الأسرة'),
       section.subtitle ? h('p', { class: 'section-head__sub' }, section.subtitle) : null
@@ -193,7 +278,7 @@ function newsCard(item, nowStamp, section = {}) {
 export function newsSheetContent(item, nowStamp, shareItem) {
 
   return h('article', { class: 'detail' },
-    item.image ? h('div', { class: 'detail__media' }, picture(item.image, { sizes: '(min-width: 720px) 560px, 100vw', eager: true })) : null,
+    mediaHero(item.image),
     h('div', { class: 'detail__meta' },
       item.badge ? h('span', { class: 'badge' }, item.badge) : null,
       item.publishAt ? h('span', {}, formatStamp(item.publishAt)) : null
@@ -327,7 +412,6 @@ export function gamesSection(entries, layoutSection = {}) {
   const cards = entries.map(entry => gameCard(entry, { section: layoutSection }));
 
   const section = h('section', { class: 'widget games', 'data-area': 'games', 'data-theme': layoutSection.theme || null, 'aria-labelledby': 'games-title' },
-    sectionBanner(layoutSection),
     h('h2', { class: 'games__head', id: 'games-title' }, gamesLogo('games__logo', '(min-width: 1024px) 300px, 240px')),
     layoutSection.subtitle ? h('p', { class: 'section-head__sub games__sub' }, layoutSection.subtitle) : null,
     h('div', { class: 'games__list' }, cards.map(card => card.el))
@@ -358,7 +442,7 @@ export function gameSheetContent(entry, shareItem) {
 
   return {
     node: h('article', { class: 'detail' },
-      game.image ? h('div', { class: 'detail__media' }, picture(game.image, { sizes: '(min-width: 720px) 560px, 100vw', eager: true })) : null,
+      mediaHero(game.image),
       game.description ? h('p', { class: 'detail__body' }, game.description) : null,
       h('div', { class: 'detail__game' }, card.el),
       shareItem(`#game/${game.id}`, game.title)
@@ -373,12 +457,13 @@ export function gameSheetContent(entry, shareItem) {
    MEETING TOPIC + DETAIL
 ========================================================= */
 
-/* The "موضوع الاجتماع" block inside the meeting widget. */
-export function meetingTopic(session, meetingSection = {}) {
+/* The "موضوع الاجتماع" block inside the meeting widget. (The section's
+   banner is on the meeting card itself now, so it isn't repeated here.) */
+export function meetingTopic(session) {
 
   if (!session || !session.topic) return null;
 
-  const poster = session.image || meetingSection.banner || null;
+  const poster = session.image || null;
 
   return h('button', { class: 'topic', type: 'button', onclick: () => go('meeting') },
     poster ? h('span', { class: 'topic__poster' }, picture(poster, { sizes: '72px' })) : null,
@@ -407,7 +492,7 @@ export function meetingSheetContent(content, status, nowStamp) {
     : '';
 
   return h('article', { class: 'detail' },
-    session && session.image ? h('div', { class: 'detail__media' }, picture(session.image, { sizes: '(min-width: 720px) 560px, 100vw', eager: true })) : null,
+    session ? mediaHero(session.image) : null,
     session && session.topic ? h('p', { class: 'detail__kicker' }, 'موضوع الاجتماع') : null,
     session && session.topic ? h('p', { class: 'detail__topic' }, session.topic) : null,
     session && session.speaker ? h('p', { class: 'detail__lead' }, `مع ${session.speaker}`) : null,
