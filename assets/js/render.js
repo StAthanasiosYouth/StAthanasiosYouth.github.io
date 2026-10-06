@@ -15,6 +15,7 @@ import { bannerWidget, newsSection, gamesSection, liveGameWidget, meetingTopic, 
 import { updateBell, visibleNotifications } from './bell.js';
 import { wake } from './motion.js';
 import { play } from './sound.js';
+import { pageUrl } from './share.js';
 
 
 /* =========================================================
@@ -189,7 +190,7 @@ function meetingWidget(content, now) {
       text: `${meeting.title} — ${content.site.name}`,
       dates: calendarDates(status),
       ctz: content.timezone,
-      details: [meeting.note, content.site.name].filter(Boolean).join('\n')
+      details: [meeting.note, content.site.name, pageUrl()].filter(Boolean).join('\n')
     });
     if (meeting.day !== null) params.set('recur', `RRULE:FREQ=WEEKLY;BYDAY=${['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][meeting.day]}`);
     if (place) params.set('location', place);

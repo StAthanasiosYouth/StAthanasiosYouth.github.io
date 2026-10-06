@@ -13,8 +13,20 @@ import { play } from './sound.js';
 const QR_CARD = { width: 1200, height: 1500 };
 
 
-/* The canonical page address, whatever host serves it. */
+/*
+ * The official address, from <link rel="canonical"> in index.html
+ * (https://stathanasiosyouth.github.io/). QR codes and shared links always
+ * use it, even when the page is opened from a local preview or a copy.
+ * Falls back to the current address only if the tag is missing.
+ */
 export function pageUrl() {
+
+  const canonical = document.querySelector('link[rel="canonical"]');
+  const href = canonical ? canonical.href : '';
+
+  if (/^https:\/\/[^/]+\//.test(href)) {
+    return href;
+  }
 
   return `${location.origin}${location.pathname}`.replace(/index\.html$/, '');
 

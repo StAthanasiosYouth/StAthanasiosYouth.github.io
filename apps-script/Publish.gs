@@ -7,7 +7,7 @@
  * Script Properties used (Project Settings > Script Properties):
  *   GITHUB_TOKEN   fine-grained token, this repository only,
  *                  "Contents: Read and write". Never sent to the browser.
- *   GITHUB_REPO    "owner/repo", e.g. StAthanasiosYouth/athanasios-links
+ *   GITHUB_REPO    "owner/repo": StAthanasiosYouth/stathanasiosyouth.github.io
  *   GITHUB_BRANCH  default "main"
  *   SITE_URL       public address, e.g. https://stathanasiosyouth.github.io/
  *

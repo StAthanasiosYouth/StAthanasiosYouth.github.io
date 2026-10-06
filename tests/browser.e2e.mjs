@@ -163,7 +163,7 @@ test('reduced motion: no looping or entrance animation', async () => {
 });
 
 
-test('QR code decodes to the page URL', async () => {
+test('QR code decodes to the official URL', async () => {
   const { page } = await open(VIEWPORTS.phone);
   await ready(page);
   await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent.includes('QR')).click());
@@ -173,7 +173,8 @@ test('QR code decodes to the page URL', async () => {
   const { data, info } = await sharp(Buffer.from(dataUrl.split(',')[1], 'base64')).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const code = jsQR(new Uint8ClampedArray(data), info.width, info.height);
   assert.ok(code, 'QR not readable');
-  assert.equal(code.data, BASE);
+  // always the official address, even from a local preview
+  assert.equal(code.data, 'https://stathanasiosyouth.github.io/');
   await page.close();
 });
 

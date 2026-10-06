@@ -15,7 +15,7 @@ const ADMIN = 'menazakmena@gmail.com';
 const world = createWorld();
 world.as(ADMIN).gs.setup();
 world.properties.set('GITHUB_TOKEN', 'test-token');
-world.properties.set('GITHUB_REPO', 'StAthanasiosYouth/athanasios-links');
+world.properties.set('GITHUB_REPO', 'StAthanasiosYouth/stathanasiosyouth.github.io');
 world.properties.set('SITE_URL', 'https://stathanasiosyouth.github.io/');
 
 // sample content-center data, timed relative to now (Cairo)

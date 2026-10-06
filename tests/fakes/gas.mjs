@@ -145,7 +145,7 @@ const sha = text => createHash('sha1').update(text).digest('hex');
 
 export class FakeGitHub {
 
-  constructor({ repo = 'StAthanasiosYouth/athanasios-links', token = 'test-token', files = {} } = {}) {
+  constructor({ repo = 'StAthanasiosYouth/stathanasiosyouth.github.io', token = 'test-token', files = {} } = {}) {
     this.repo = repo;
     this.token = token;
     this.trees = new Map();

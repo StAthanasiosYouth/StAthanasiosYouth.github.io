@@ -15,26 +15,26 @@ One-time setup, in order. Plan about 30 minutes. Do everything signed in as
 
 ## 1. GitHub repository and Pages
 
-The repository name decides the public URL, and the URL goes on printed QR
-codes, so choose it once.
+The portal is the service account's main site:
 
-| Repository name                         | Public URL                                              |
-| --------------------------------------- | ------------------------------------------------------- |
-| `stathanasiosyouth.github.io` (recommended) | `https://stathanasiosyouth.github.io/`              |
-| `athanasios-links`                      | `https://stathanasiosyouth.github.io/athanasios-links/` |
+| Account             | Repository                    | Public URL                                  |
+| ------------------- | ----------------------------- | ------------------------------------------- |
+| `StAthanasiosYouth` | `stathanasiosyouth.github.io` | **`https://stathanasiosyouth.github.io/`** |
 
-`صوتك يهمنا` keeps working at `/your-voice-matters/` either way.
+`صوتك يهمنا` keeps working at `https://stathanasiosyouth.github.io/your-voice-matters/`
+(a project site under the same account).
 
-1. In the `StAthanasiosYouth` organization, create a **public** repository
-   with the chosen name. Don't add a README (this folder has one).
-2. If you chose `athanasios-links`, update the URL in the code first:
-   ```bash
-   cd tools && npm install && npm run set-url -- https://stathanasiosyouth.github.io/athanasios-links/
-   ```
-3. Push this folder to the repository's `main` branch.
-4. Repository **Settings → Pages**: *Source* = "Deploy from a branch",
+The code is already set to this address (canonical, Open Graph, QR codes,
+shared links, calendar). If it ever changes: `npm run set-url -- <new URL>`
+in `tools/`, then the same value in `SITE_URL` (step 4).
+
+1. Signed in as **StAthanasiosYouth**, create a **public** repository named
+   exactly `stathanasiosyouth.github.io`. Don't add a README, license or
+   .gitignore (this folder has them).
+2. Push this folder to the repository's `main` branch.
+3. Repository **Settings → Pages**: *Source* = "Deploy from a branch",
    *Branch* = `main`, folder `/ (root)`. Tick **Enforce HTTPS** once it's available.
-5. Wait a minute, then open the URL. You should see the portal with the
+4. Wait a minute, then open the URL. You should see the portal with the
    seed content.
 
 GitHub Pages builds with Jekyll; `_config.yml` keeps `apps-script/`,
@@ -109,9 +109,9 @@ property**:
 | --------------- | -------------------------------------------------------- |
 | `ADMIN_EMAILS`  | `menazakmena@gmail.com` (comma-separated if you add admins later) |
 | `GITHUB_TOKEN`  | the token from step 3                                    |
-| `GITHUB_REPO`   | `StAthanasiosYouth/stathanasiosyouth.github.io` (or `StAthanasiosYouth/athanasios-links`) |
+| `GITHUB_REPO`   | `StAthanasiosYouth/stathanasiosyouth.github.io` |
 | `GITHUB_BRANCH` | `main`                                                   |
-| `SITE_URL`      | the public URL from step 1, ending with `/`              |
+| `SITE_URL`      | `https://stathanasiosyouth.github.io/`                   |
 
 `ADMIN_EMAILS` has to be set here by hand. There is deliberately no
 "first person to open the app becomes admin" shortcut. Only people who can
