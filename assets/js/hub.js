@@ -105,8 +105,32 @@ export function mediaHero(image) {
   // CSSOM (the CSP blocks style=""): the ratio and the poster's colour
   figure.style.setProperty('--ar', `${image.w} / ${image.h}`);
   if (image.color) figure.style.setProperty('--tint', image.color);
+  else if (img.complete && img.naturalWidth) tintFrom(img, figure);
+  else img.addEventListener('load', () => tintFrom(img, figure), { once: true });
 
   return figure;
+
+}
+
+
+/* the poster's average colour, for the light around it (a same-origin
+   picture, an 8×8 sample: cheap) */
+function tintFrom(img, figure) {
+
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 8;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, 8, 8);
+    const data = ctx.getImageData(0, 0, 8, 8).data;
+    const sum = [0, 0, 0];
+    for (let i = 0; i < data.length; i += 4) for (let c = 0; c < 3; c++) sum[c] += data[i + c];
+    const [r, g, b] = sum.map(v => Math.round(v / 64));
+    figure.style.setProperty('--tint', `rgb(${r} ${g} ${b})`);
+  }
+  catch {
+    // keep the default light
+  }
 
 }
 

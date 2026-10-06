@@ -434,6 +434,7 @@ for (const [name, viewport] of Object.entries({ phone: PHONE, desktop: DESKTOP }
   test(`${name}: every poster shape keeps its ratio, is never cropped, capped, sharp`, async () => {
 
     const cap = name === 'phone' ? 0.56 : 0.62;
+    const tiers = [];
 
     for (const [shape, title] of Object.entries(POSTERS)) {
 
@@ -461,10 +462,13 @@ for (const [name, viewport] of Object.entries({ phone: PHONE, desktop: DESKTOP }
       const drawn = Math.min(m.w, m.h * ratio) * m.dpr;
       const chosen = /-480\.webp$/.test(m.current) ? 480 : item.image.w;
       assert.ok(chosen >= drawn - 2 || chosen === item.image.w, `${shape}: ${chosen}px file for ${Math.round(drawn)} device px`);
-      // full tier: the blurred poster around unusual shapes
+      // full tier: the blurred poster around unusual shapes (a headless phone
+      // may measure slow frames and land in lite: then the colour light)
+      const tier = await page.evaluate(() => document.documentElement.dataset.motion);
+      tiers.push(tier);
       if (shape !== 'wide') {
-        assert.equal(m.ambient, 'block', `${shape}: surround`);
-        assert.ok(m.ambientLoaded, `${shape}: surround loaded`);
+        assert.equal(m.ambient, tier === 'full' ? 'block' : 'none', `${shape}: surround in the ${tier} tier`);
+        if (tier === 'full') assert.ok(m.ambientLoaded, `${shape}: surround loaded`);
       }
       assert.match(m.background, /gradient/, 'a navy/gold light under it anyway');
 
@@ -472,6 +476,8 @@ for (const [name, viewport] of Object.entries({ phone: PHONE, desktop: DESKTOP }
       await close();
 
     }
+
+    assert.ok(tiers.includes('full'), `the full-tier surround was checked at least once (${tiers})`);
 
   });
 
@@ -486,6 +492,10 @@ test('lite tier: no blurred surround, the colour light instead', async () => {
   assert.equal(m.ambient, 'none');
   assert.equal(m.ambientLoaded, false, 'the lite tier never downloads it');
   assert.match(m.background, /radial-gradient/);
+  // no image.color in the demo: the light takes the poster's own average colour (green)
+  const tint = await page.$eval('.media-hero', fig => fig.style.getPropertyValue('--tint'));
+  const [r, g, b] = tint.match(/\d+/g).map(Number);
+  assert.ok(g > r && g > b, `a green poster, a green light (${tint})`);
   assert.deepEqual(problems, []);
   await close();
 
