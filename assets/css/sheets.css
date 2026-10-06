@@ -1,0 +1,716 @@
+/* =========================================================
+   SHEETS: the app-like panels (news, games, meeting, the bell,
+   the mini-experiences), the poster hero and its viewer.
+   Loaded by sheet.js when a sheet is first needed (or the first
+   touch), so the first visit parses only the page itself.
+   Tokens and shared pieces (.btn, .badge, .art...) are in main.css.
+========================================================= */
+
+/* ---------- sheet ---------- */
+
+dialog.sheet {
+  position: fixed;
+  inset: auto 0 0;
+  width: 100%;
+  max-width: 600px;
+  max-height: 100dvh;
+  margin: 0 auto;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  color: var(--text);
+  background: transparent;
+}
+
+dialog.sheet::backdrop {
+  background: rgba(2, 9, 20, .72);
+  animation: fade-in .3s ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.sheet__panel {
+  display: flex;
+  flex-direction: column;
+  max-height: 90dvh;
+  overflow: hidden;
+  border: 1px solid var(--gold-line-strong);
+  border-bottom: 0;
+  border-radius: 26px 26px 0 0;
+  background:
+    radial-gradient(100% 40% at 50% 0%, rgba(215, 170, 80, .1), transparent 70%),
+    var(--navy-900);
+  box-shadow: 0 -20px 60px -10px rgba(0, 0, 0, .8);
+}
+
+.sheet__grip {
+  flex: none;
+  width: 44px;
+  height: 5px;
+  margin: 10px auto 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .22);
+  cursor: grab;
+  touch-action: none;
+}
+
+.sheet__head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px var(--pad) 10px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.sheet__title:focus {
+  outline: none;
+}
+
+.sheet__title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.sheet__close {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .05);
+  cursor: pointer;
+}
+
+.sheet__close .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.sheet__body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px var(--pad) max(24px, env(safe-area-inset-bottom));
+}
+
+@media (min-width: 720px) {
+
+  dialog.sheet {
+    inset: auto 0 24px;
+  }
+
+  .sheet__panel {
+    max-height: calc(100dvh - 48px);
+    border-bottom: 1px solid var(--gold-line-strong);
+    border-radius: 26px;
+  }
+
+}
+
+
+/* ---------- detail (inside sheets) ---------- */
+
+.detail {
+  display: grid;
+  gap: 12px;
+}
+
+/* the poster at the top of a sheet (hub.js mediaHero): its own ratio,
+   capped in height, never cropped; around an unusual shape, the same
+   picture blurred (full tier) or a light in its own colour */
+.media-hero {
+  --tint: var(--gold);
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  max-height: 56dvh;
+  aspect-ratio: var(--ar, 4 / 5);
+  margin: 0;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  /* --tint: image.color, else the poster's own average colour (hub.js);
+     this light is what lite / reduced show around the poster */
+  background:
+    radial-gradient(80% 70% at 50% 45%, color-mix(in srgb, var(--tint) 62%, transparent), transparent 88%),
+    linear-gradient(165deg, color-mix(in srgb, var(--tint) 46%, var(--navy-900)), color-mix(in srgb, var(--tint) 24%, var(--navy-950)));
+  box-shadow: inset 0 0 0 1px var(--gold-line), 0 26px 50px -32px rgba(0, 0, 0, .95);
+}
+
+/* a soft vignette toward navy at the outer edges only */
+.media-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(125% 100% at 50% 50%, rgba(4, 17, 39, 0) 62%, rgba(4, 17, 39, .5) 100%);
+  pointer-events: none;
+}
+
+/* full tier: the poster itself, blurred, fills the space around it
+   (scaled past the frame so the blur's soft edges never show) */
+.media-hero__ambient {
+  position: absolute;
+  inset: -12%;
+  z-index: -2;
+  display: none;
+  width: 124%;
+  height: 124%;
+  object-fit: cover;
+  filter: blur(32px) brightness(.66) saturate(1.38);
+}
+
+:root[data-motion="full"] .media-hero:not([data-shape="wide"]) .media-hero__ambient {
+  display: block;
+}
+
+.media-hero__zoom {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  cursor: zoom-in;
+}
+
+.media-hero__zoom:focus-visible {
+  outline-offset: -4px;
+}
+
+.media-hero__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+:root[data-motion="full"] .media-hero:not([data-shape="wide"]) .media-hero__img {
+  filter: drop-shadow(0 18px 28px rgba(0, 0, 0, .6));
+}
+
+.media-hero__hint {
+  position: absolute;
+  bottom: 10px;
+  inset-inline-end: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px 4px 9px;
+  border-radius: 999px;
+  font-size: .76rem;
+  font-weight: 700;
+  line-height: 1.6;
+  color: var(--text);
+  background: rgba(2, 9, 20, .7);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14);
+}
+
+.media-hero__hint .icon {
+  width: 15px;
+  height: 15px;
+}
+
+@media (min-width: 720px) {
+
+  .media-hero {
+    max-height: 62dvh;
+  }
+
+}
+
+/* a game sheet: the poster is the hero, the card below needs no copy of it */
+.detail:has(> .media-hero) .detail__game .game__media {
+  display: none;
+}
+
+/* ---------- poster viewer (sheet.js openViewer) ---------- */
+
+dialog.viewer {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  color: var(--text);
+  background: rgba(2, 9, 20, .97);
+}
+
+dialog.viewer::backdrop {
+  background: rgba(2, 9, 20, .6);
+}
+
+.viewer__scroll {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding:
+    max(64px, calc(env(safe-area-inset-top) + 56px))
+    max(12px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-left));
+  cursor: zoom-out;
+}
+
+.viewer__scroll:focus-visible {
+  outline-offset: -4px;
+}
+
+/* fit the screen first; auto margins centre it and never cut an overflow */
+.viewer__img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  margin: auto;
+  border-radius: 6px;
+  cursor: zoom-in;
+}
+
+.viewer--tall .viewer__img {
+  max-height: none;
+  width: min(100%, 720px);
+}
+
+.viewer__scroll.is-zoomed .viewer__img {
+  width: auto;
+  max-width: none;
+  max-height: none;
+  cursor: zoom-out;
+}
+
+.viewer__close {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  inset-inline-end: max(12px, env(safe-area-inset-right));
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: 50%;
+  color: var(--gold-hi);
+  background: rgba(6, 26, 49, .9);
+  cursor: pointer;
+}
+
+.viewer__close .icon {
+  width: 22px;
+  height: 22px;
+}
+
+.detail__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: .84rem;
+  color: var(--text-3);
+}
+
+.detail__kicker {
+  font-size: .8rem;
+  font-weight: 800;
+  color: var(--gold);
+}
+
+.detail__topic {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  line-height: 1.35;
+  color: var(--gold-hi);
+}
+
+.detail__lead {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.detail__when {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.detail__when .icon {
+  width: 20px;
+  height: 20px;
+  color: var(--gold);
+}
+
+.detail__body {
+  line-height: 1.85;
+  color: var(--text-2);
+  white-space: pre-line;
+}
+
+.detail__note {
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: .92rem;
+  color: var(--text-2);
+  background: rgba(255, 255, 255, .04);
+}
+
+.detail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.detail__game .game {
+  border-color: var(--gold-line-strong);
+}
+
+.detail__upcoming h3 {
+  margin-bottom: 8px;
+  font-size: .95rem;
+  font-weight: 800;
+  color: var(--text-2);
+}
+
+.detail__upcoming ul {
+  display: grid;
+  gap: 6px;
+}
+
+.detail__upcoming li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .03);
+}
+
+.detail__upcoming li.is-cancelled {
+  color: var(--carmine-hi);
+}
+
+.detail__date {
+  font-weight: 800;
+  color: var(--gold-soft);
+}
+
+
+/* ---------- bell panel ---------- */
+
+.inbox {
+  display: grid;
+  gap: 18px;
+}
+
+.inbox__day {
+  margin-bottom: 8px;
+  font-size: .82rem;
+  font-weight: 800;
+  color: var(--gold);
+}
+
+.inbox__list {
+  display: grid;
+  gap: 6px;
+}
+
+.note-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  text-align: start;
+  text-decoration: none;
+  color: var(--text);
+  background: rgba(255, 255, 255, .03);
+  cursor: pointer;
+  transition: transform .45s var(--spring), background-color .2s;
+  animation: note-in .5s var(--ease-out-expo) both;
+}
+
+.inbox__group:nth-child(1) li:nth-child(2) .note-item { animation-delay: 40ms; }
+.inbox__group:nth-child(1) li:nth-child(3) .note-item { animation-delay: 80ms; }
+.inbox__group:nth-child(1) li:nth-child(4) .note-item { animation-delay: 120ms; }
+.inbox__group:nth-child(2) .note-item { animation-delay: 140ms; }
+.inbox__group:nth-child(n+3) .note-item { animation-delay: 180ms; }
+
+@keyframes note-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+.note-item:active {
+  transform: scale(.98);
+  transition-duration: .1s;
+}
+
+.note-item.is-new {
+  border-color: var(--gold-line-strong);
+  background: rgba(215, 170, 80, .08);
+}
+
+.note-item.is-new::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  inset-inline-end: 12px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 3px rgba(215, 170, 80, .2);
+}
+
+.note-item__icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  color: var(--gold-hi);
+  background: var(--navy-800);
+}
+
+.note-item__icon .icon {
+  width: 22px;
+  height: 22px;
+}
+
+.note-item--important .note-item__icon {
+  color: #fff;
+  background: var(--carmine);
+}
+
+.note-item--game .note-item__icon {
+  color: #ffb27a;
+  background: rgba(224, 115, 47, .18);
+}
+
+.note-item--meeting .note-item__icon {
+  color: var(--gold-hi);
+  background: rgba(215, 170, 80, .16);
+}
+
+.note-item__text {
+  display: grid;
+  min-width: 0;
+}
+
+.note-item__title {
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.note-item__message {
+  font-size: .86rem;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+.note-item__time {
+  margin-top: 2px;
+  font-size: .74rem;
+  font-weight: 700;
+  color: var(--text-3);
+}
+
+.note-item__thumb img {
+  display: block;
+  width: 48px;
+  height: 60px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.inbox__empty {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 30px 10px 40px;
+  text-align: center;
+  color: var(--text-2);
+}
+
+.inbox__empty-icon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 8px;
+  color: var(--gold);
+  opacity: .7;
+}
+
+.inbox__hint {
+  font-size: .86rem;
+  color: var(--text-3);
+}
+
+
+/* the share row in detail sheets */
+/* phones: an even 2 × 2 (three buttons: WhatsApp across, then two);
+   wider sheets: one row of equal buttons */
+.share-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--gold-line);
+}
+
+.share-row > :first-child:nth-last-child(3) {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 720px) {
+
+  .share-row {
+    grid-template-columns: none;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+  }
+
+  .share-row > :first-child:nth-last-child(3) {
+    grid-column: auto;
+  }
+
+}
+
+.share-row__whatsapp .icon {
+  color: var(--whatsapp);
+}
+
+.detail__state {
+  margin: 4px 0 0;
+  font-weight: 800;
+}
+
+
+/* =========================================================
+   MINI-EXPERIENCES (xp.js, assets/js/xp/*.js)
+   Each platform gets its own small "phone" scene in its own palette —
+   our interpretation, not a copy of the apps.
+========================================================= */
+
+.xp {
+  display: grid;
+  gap: 14px;
+}
+
+.xp-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 200px;
+  padding: 6px 0 2px;
+}
+
+.xp-phone {
+  position: relative;
+  width: min(236px, 66vw);
+  aspect-ratio: 9 / 16;
+  max-height: 44vh;
+  overflow: hidden;
+  border-radius: 26px;
+  box-shadow: 0 30px 60px -28px rgba(0, 0, 0, .9), inset 0 0 0 1px rgba(255, 255, 255, .12);
+  isolation: isolate;
+  direction: rtl;
+}
+
+@media (min-height: 760px) {
+  .xp-phone {
+    max-height: 48vh;
+  }
+}
+
+.xp__copy {
+  display: grid;
+  gap: 4px;
+  text-align: center;
+}
+
+.xp__line {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.3rem, 5vw, 1.6rem);
+  line-height: 1.5;
+  color: var(--gold-hi);
+}
+
+.xp__sub {
+  margin: 0;
+  font-size: .92rem;
+  color: var(--text-2);
+}
+
+.xp__actions {
+  display: grid;
+}
+
+.xp__cta {
+  min-height: 52px;
+  font-size: 1rem;
+  transition: opacity .45s var(--ease-out), transform .55s var(--spring);
+}
+
+.xp__cta .icon:first-child {
+  width: 22px;
+  height: 22px;
+}
+
+/* the first scene: the button arrives after ~0.9 s (still in the DOM) */
+.xp.cta-pending .xp__cta {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+.xp__cta--facebook { background: linear-gradient(180deg, #4b8df8, #1877f2); color: #fff; }
+.xp__cta--instagram { background: linear-gradient(90deg, #f9a03f, #e1306c 45%, #8a3ab9); color: #fff; }
+.xp__cta--tiktok { background: #0b0b0d; color: #fff; box-shadow: -2px 0 0 #25f4ee, 2px 0 0 #fe2c55, 0 10px 24px -12px rgba(0, 0, 0, .9); }
+.xp__cta--whatsapp { background: linear-gradient(180deg, #3fe07c, #1fae55); color: #062b14; }
+
+/* a floating reaction */
+.xp-float {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  line-height: 1;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, .4));
+}
+
+.xp-float--ig { color: #ff3b6b; }
+.xp-float--tt { color: #fe2c55; }
+
+.xp-stage.is-static .xp-phone {
+  opacity: .85;
+}
+
+
+/* the scenes themselves (.fb, .ig, .tt, .wa): assets/css/xp.css, loaded on demand */

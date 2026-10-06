@@ -12,7 +12,7 @@ import { h, external } from './dom.js';
 import { iconNode } from './icons.js';
 import { visibilityState } from './schedule.js';
 import { formatStamp, untilText } from './words.js';
-import { posterOrFallback, picture, sectionBanner } from './hub.js';
+import { posterOrFallback, mediaHero } from './hub.js';
 import { go } from './router.js';
 
 const SECTION_ICONS = { competitions: 'trophy', activities: 'calendar' };
@@ -124,7 +124,6 @@ export function itemsSection(section, items, content, nowStamp) {
   const id = `items-${section.key}`;
 
   return h('section', { class: `widget items items--${section.key}`, 'data-area': 'items', 'data-key': section.key, 'data-theme': section.theme || null, 'aria-labelledby': id },
-    sectionBanner(section),
     h('div', { class: 'section-head' },
       h('h2', { class: 'widget__title', id }, iconNode(section.icon || SECTION_ICONS[section.key] || 'calendar'), section.title || SECTION_TITLES[section.key] || 'الفعاليات'),
       section.subtitle ? h('p', { class: 'section-head__sub' }, section.subtitle) : null
@@ -143,7 +142,7 @@ export function itemSheetContent(item, type, section, nowStamp, shareRow) {
   const media = item.image || type.banner || section.banner;
 
   return h('article', { class: 'detail', 'data-theme': type.theme || section.theme || null },
-    media ? h('div', { class: 'detail__media' }, picture(media, { sizes: '(min-width: 720px) 560px, 100vw', eager: true })) : null,
+    mediaHero(media),
     h('p', { class: 'detail__kicker' }, type.label || SECTION_TITLES[section.key] || ''),
     label ? h('p', { class: `detail__state item-card__state is-${state.state}` }, label) : null,
     item.subtitle ? h('p', { class: 'detail__lead' }, item.subtitle) : null,

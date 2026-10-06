@@ -226,14 +226,14 @@ test('page weight on first visit', async () => {
   await ready(page);
   const resources = await page.evaluate(() => performance.getEntriesByType('resource').map(r => ({ name: r.name.replace(location.origin, ''), size: r.encodedBodySize })));
   const html = Buffer.byteLength(readFileSync(`${ROOT}index.html`));
-  const total = resources.reduce((sum, r) => sum + r.size, html);
-  console.log(`  first load: ${resources.length + 1} requests, ${(total / 1024).toFixed(0)} KB uncompressed`);
+  // the admin's own posters (media/) depend on what is published this week:
+  // reported and capped one by one, outside the code budget (both totals)
+  const posters = resources.filter(r => /^\/?media\//.test(r.name));
+  const total = resources.filter(r => !posters.includes(r)).reduce((sum, r) => sum + r.size, html);
+  console.log(`  first load: ${resources.length + 1} requests, ${(total / 1024).toFixed(0)} KB uncompressed (without content images)`);
   for (const r of resources.sort((a, b) => b.size - a.size).slice(0, 6)) console.log(`    ${(r.size / 1024).toFixed(1).padStart(6)} KB  ${r.name}`);
   // what actually travels: GitHub Pages compresses text (gzip/brotli); fonts
   // and images are already compressed
-  // the admin's own posters (media/) depend on what is published this week:
-  // reported and capped one by one, outside the code budget
-  const posters = resources.filter(r => /^\/?media\//.test(r.name));
   for (const r of posters) {
     console.log(`  content image: ${(r.size / 1024).toFixed(1)} KB  ${r.name}`);
     assert.ok(r.size < 60 * 1024, `a published thumbnail stays small: ${r.name}`);

@@ -155,6 +155,8 @@ at that minute.
 | `assets/js/hub.js`          | browser            | News, games, pinned banner, meeting topic, detail sheets |
 | `assets/js/bell.js`, `inbox.js` | browser        | The bell, history panel, per-browser read state         |
 | `assets/js/sheet.js`, `router.js` | browser      | App-like sheets; deep links `#notifications`, `#news/<id>`, `#game/<id>`, `#meeting` |
+| `assets/css/sheets.css`    | browser            | The sheets' own styles (detail, poster hero + viewer, bell panel), loaded on the first touch or by a deep link |
+| `tools/subset-fonts.mjs`   | dev machine        | Rebuilds the lean Latin subsets of Cairo (main.css unicode-ranges) |
 | `assets/js/motion.js`, `sound.js` | browser      | Springs, swaps, particles; optional synthesized sounds    |
 | `tools/demo.mjs`            | dev machine        | Demo content built through the real admin code           |
 
