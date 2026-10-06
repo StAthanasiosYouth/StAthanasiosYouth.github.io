@@ -1,7 +1,7 @@
 {
   "schema": 2,
-  "revision": "6b6881dc3f44",
-  "publishedAt": "2026-10-06T03:36:01.863Z",
+  "revision": "e26f50dbc98b",
+  "publishedAt": "2026-10-06T03:43:40.455Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -111,8 +111,33 @@
       }
     }
   ],
-  "sessions": [],
+  "sessions": [
+    {
+      "date": "2026-10-11",
+      "time": "20:00",
+      "topic": "الكسل الروحى",
+      "speaker": "",
+      "description": "",
+      "image": null,
+      "status": "normal",
+      "note": "",
+      "visibleFrom": ""
+    }
+  ],
   "news": [],
   "games": [],
-  "notifications": []
+  "notifications": [
+    {
+      "id": "notif-session-2026-10-11",
+      "type": "meeting",
+      "title": "موضوع الاجتماع الجاي",
+      "message": "الكسل الروحى",
+      "target": {
+        "kind": "meeting"
+      },
+      "image": null,
+      "publishAt": "2026-10-06T06:42",
+      "expireAt": "2026-10-11T20:00"
+    }
+  ]
 }
