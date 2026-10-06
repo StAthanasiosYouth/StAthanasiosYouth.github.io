@@ -58,8 +58,8 @@ export function shapeOf(image) {
 
   const ratio = image.w / image.h;
 
-  if (ratio >= 1.25) return 'wide';
-  if (ratio >= 0.8) return 'square';
+  if (ratio >= 1.2) return 'wide';
+  if (ratio > 0.85) return 'square';
   if (ratio >= 0.5) return 'portrait';
   return 'tall';
 
