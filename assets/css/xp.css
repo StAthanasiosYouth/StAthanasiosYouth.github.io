@@ -1,8 +1,55 @@
 /**
- * MINI-EXPERIENCE SCENES (assets/js/xp/*.js): the four little "phones".
- * Loaded only when a visitor opens a scene (xp.js), not with the page.
- * The sheet itself (copy, button) is styled in main.css.
+ * MINI-EXPERIENCE SCENES (assets/js/xp/*.js): the little "phones" of every
+ * scene family, the ambient and edge layers, the accent buttons.
+ * Loaded only when a visitor opens a scene (xp/engine.js), never with the
+ * page. The sheet's own frame (.xp copy, the button) is styled with the
+ * sheets; the scene's stage and phone are styled here too, so the scenes
+ * never depend on where the page keeps its sheet styles.
+ * «صوتك يهمنا» has its own file: xp-voice.css.
  */
+
+/* ---------- the stage and the phone ---------- */
+
+.xp-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 200px;
+  padding: 6px 0 2px;
+}
+
+.xp-phone {
+  position: relative;
+  width: min(236px, 66vw);
+  aspect-ratio: 9 / 16;
+  max-height: 44vh;
+  overflow: hidden;
+  border-radius: 26px;
+  box-shadow: 0 30px 60px -28px rgba(0, 0, 0, .9), inset 0 0 0 1px rgba(255, 255, 255, .12);
+  isolation: isolate;
+  direction: rtl;
+}
+
+@media (min-height: 760px) {
+  .xp-phone {
+    max-height: 48vh;
+  }
+}
+
+.xp-float {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  line-height: 1;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, .4));
+}
+
+.xp-float--ig { color: #ff3b6b; }
+.xp-float--tt { color: #fe2c55; }
+
+.xp-stage.is-static .xp-phone {
+  opacity: .85;
+}
 
 /* ---------- Facebook ---------- */
 

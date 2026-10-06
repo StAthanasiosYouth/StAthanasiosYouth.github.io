@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { ROOT } from '../tools/lib/gs.mjs';
 import { platformsGs } from '../tools/lib/platforms-gs.mjs';
+import { platformsAdminHtml } from '../tools/lib/platforms-admin.mjs';
 import { PLATFORMS, SCENES, resolveExperience, experienceKey } from '../assets/js/platforms.js';
 import { createWorld } from './fakes/gas.mjs';
 
@@ -16,6 +17,10 @@ const plain = value => JSON.parse(JSON.stringify(value));
 
 test('Platforms.gs is generated from platforms.js (run: npm run sync)', () => {
   assert.equal(readFileSync(`${ROOT}apps-script/Platforms.gs`, 'utf8').replace(/\r\n/g, '\n'), platformsGs());
+});
+
+test('AdminPlatforms.html is generated from platforms.js (run: npm run sync)', () => {
+  assert.equal(readFileSync(`${ROOT}apps-script/AdminPlatforms.html`, 'utf8').replace(/\r\n/g, '\n'), platformsAdminHtml());
 });
 
 test('every platform names a known scene and valid hosts', () => {

@@ -178,6 +178,7 @@ export function open(link, context, onClose) {
   const reduced = isReduced() || tier === 'reduced';
   const lite = !reduced && tier === 'lite';
   let stopScene = () => {};
+  let closed = false;
 
   markSeen(key);
 
@@ -222,17 +223,35 @@ export function open(link, context, onClose) {
     content,
     variant: 'xp',
     onClose: info => {
+      closed = true;
       stopScene();
       if (onClose) onClose(info);
     }
   });
 
+  // the sheet may still be on its way (its own styles load first): the
+  // scene starts once the stage is really on screen, never after a close
+  const opened = performance.now();
+  const start = module => {
+    // closed, or replaced by another sheet (no close callback then)
+    if (closed || performance.now() - opened > 10000) return;
+    if (!stage.isConnected || !stage.getClientRects().length) {
+      requestAnimationFrame(() => start(module));
+      return;
+    }
+    const running = module.play(stage, { quick: !first, reduced, lite, content: context.content || {}, sound: play, link, platform });
+    if (!running || !running.stop) return;
+    // another sheet can replace this one without a close: stop with it
+    const watch = setInterval(() => { if (!stage.isConnected) stopScene(); }, 1000);
+    stopScene = () => {
+      clearInterval(watch);
+      running.stop();
+      stopScene = () => {};
+    };
+  };
+
   Promise.all([sceneModule(scene), styles(scene)])
-    .then(([module]) => {
-      if (!stage.isConnected) return;
-      const running = module.play(stage, { quick: !first, reduced, lite, content: context.content || {}, sound: play, link, platform });
-      stopScene = running && running.stop ? () => running.stop() : stopScene;
-    })
+    .then(([module]) => start(module))
     .catch(error => {
       console.warn('scene', error);
       stage.classList.add('is-static');
