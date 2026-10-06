@@ -86,7 +86,7 @@ export function leave({ fromRoute = false } = {}) {
     history.back();
   }
   else {
-    history.replaceState(history.state, '', location.pathname + location.search);
+    history.replaceState(history.state, '', location.href.split('#')[0]);
   }
 
 }

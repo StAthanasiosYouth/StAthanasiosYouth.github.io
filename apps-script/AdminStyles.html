@@ -3197,4 +3197,136 @@ dialog .toasts[popover] {
   }
 }
 
+
+/* =========================================================
+   PREVIEW (AdminPreview.html): the draft on the real page
+========================================================= */
+
+.sheet--preview {
+  max-height: 96dvh;
+}
+
+@media (min-width: 900px) {
+  .sheet--preview.sheet--wide {
+    width: min(1220px, 96vw);
+  }
+}
+
+.preview-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.preview-tools__time {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.preview-when {
+  width: auto;
+  min-height: 40px;
+  padding-block: 6px;
+  font-size: .85rem;
+}
+
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .04);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+
+.segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 10px;
+  font: inherit;
+  font-size: .84rem;
+  font-weight: 700;
+  color: var(--text-2);
+  background: none;
+  cursor: pointer;
+}
+
+.segment .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.segment[aria-pressed="true"] {
+  color: var(--gold-ink);
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+}
+
+.segment:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: 2px;
+}
+
+.preview-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  font-size: .86rem;
+  color: var(--text-2);
+}
+
+.preview-status--ok {
+  color: var(--ok);
+}
+
+.preview-status--warn {
+  color: var(--warn);
+}
+
+.preview-status--error {
+  color: var(--danger);
+}
+
+.preview-stage {
+  display: grid;
+  justify-items: center;
+  padding: 12px 0;
+  border-radius: 18px;
+  background:
+    radial-gradient(60% 60% at 50% 0%, rgba(215, 170, 80, .08), transparent),
+    rgba(0, 0, 0, .25);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+
+.preview-holder {
+  position: relative;
+  overflow: hidden;
+  border-radius: 22px;
+  box-shadow: 0 0 0 1px var(--line-strong), 0 30px 60px -30px rgba(0, 0, 0, .9);
+}
+
+.preview-stage[data-device="desktop"] .preview-holder {
+  border-radius: 12px;
+}
+
+.preview-frame {
+  display: block;
+  border: 0;
+  background: #030b18;
+  transform-origin: top left;
+}
+
+[dir="rtl"] .preview-frame {
+  transform-origin: top right;
+}
+
 </style>

@@ -240,3 +240,36 @@ test('page weight on first visit', async () => {
   assert.ok(!resources.some(r => r.name.includes('qrcode')), 'QR library is lazy-loaded');
   await page.close();
 });
+
+test('framed by another site: it never takes drafts from the framing page', async () => {
+  const context = await browser.createBrowserContext();
+  const page = await context.newPage();
+  // another origin (127.0.0.1 is not localhost) frames the site and posts a fake draft
+  await page.goto(`http://127.0.0.1:${PORT}/404-not-here`).catch(() => {});
+  await page.evaluate(base => {
+    document.body.innerHTML = '';
+    const frame = document.createElement('iframe');
+    frame.src = base;
+    frame.width = 400;
+    frame.height = 800;
+    document.body.append(frame);
+  }, BASE);
+  // usually the page leaves the frame at once (top navigates to the site)
+  await page.waitForFunction(base => location.href === base, { timeout: 4000 }, BASE).catch(() => {});
+  if (page.url() === BASE) {
+    await page.waitForSelector('#main[data-state="ready"]');
+    assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-preview')), false);
+    await context.close();
+    return;
+  }
+
+  // a browser that blocks that: still framed, and drafts from outside are ignored
+  const frame = page.frames().find(f => f.url() === BASE);
+  await frame.waitForSelector('#main[data-state="ready"]');
+  const before = await frame.$eval('#main', n => n.textContent);
+  await page.evaluate(() => document.querySelector('iframe').contentWindow.postMessage({ type: 'athanasios:preview', content: { site: { name: 'مزيف' } } }, '*'));
+  await new Promise(resolve => setTimeout(resolve, 500));
+  assert.equal(await frame.$eval('#main', n => n.textContent), before, 'the published content stays');
+  assert.equal(await frame.evaluate(() => document.documentElement.hasAttribute('data-preview')), false, 'no preview mode from outside');
+  await context.close();
+});

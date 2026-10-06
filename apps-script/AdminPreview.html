@@ -1,0 +1,290 @@
+<script>
+/*
+ * PREVIEW (معاينة): the draft on the real page, before publishing.
+ *
+ * The page is built here, as this admin page's own frame (srcdoc): the
+ * site's index.html with <html data-preview> and a <base> pointing at the
+ * site, so it runs the site's own CSS and JS. The draft is handed to it by
+ * postMessage, same origin only. So:
+ *  - drafts never reach GitHub, the public site's origin or its cache;
+ *  - the public site keeps refusing to be framed by anyone (unchanged);
+ *  - images not on the site yet are shown from Drive previews (blob: URLs).
+ * Phone / computer widths, and time travel (Cairo time).
+ */
+(function () {
+
+  'use strict';
+
+  var A = window.A;
+  var el = A.el;
+  var icon = A.icon;
+
+  var DEVICES = {
+    phone: { width: 390, height: 844, label: 'موبايل' },
+    desktop: { width: 1280, height: 860, label: 'كمبيوتر' }
+  };
+
+  var view = null;      // the open preview: { frame, stage, status, ... }
+  var blobs = {};       // media id -> blob: URL (kept for the session)
+  var pageHtml = {};    // site URL -> the prepared page
+
+  function siteBase() {
+
+    var url = (A.state.config && A.state.config.siteUrl) || '';
+    return url ? url.replace(/\/?$/, '/') : '';
+
+  }
+
+  /* the site's own page, made to run here: same files, preview mode */
+  function previewPage(base) {
+
+    if (pageHtml[base]) return Promise.resolve(pageHtml[base]);
+
+    var origin = new URL(base).origin;
+
+    return fetch(base + 'index.html?preview=' + Date.now(), { cache: 'no-store' })
+      .then(function (response) {
+        if (!response.ok) throw new Error('index.html: HTTP ' + response.status);
+        return response.text();
+      })
+      .then(function (html) {
+        html = html.replace(/<html\b([^>]*)>/i, '<html$1 data-preview>');
+        html = html.replace(/<head>/i, '<head><base href="' + base + '">');
+        // the same rules, naming the site's origin ('self' is this admin page now)
+        html = html.replace(/(<meta http-equiv="Content-Security-Policy" content=")([^"]*)(")/i, function (_, open, csp, close) {
+          csp = csp.replace(/'self'/g, "'self' " + origin)
+            .replace(/base-uri 'none'/, 'base-uri ' + origin)
+            .replace(/;?\s*upgrade-insecure-requests/, '');
+          return open + csp + close;
+        });
+        pageHtml[base] = html;
+        return html;
+      });
+
+  }
+
+  /* images not published yet: our Drive previews, as blob: URLs (no commas,
+     so they work in srcset too). The page swaps them in after its sanitizer
+     (which only accepts the site's own media paths). Returns path -> URL. */
+  function pendingImages(pending) {
+
+    var map = {};
+
+    return Promise.all(pending.map(function (media) {
+      var ready = blobs[media.id]
+        ? Promise.resolve(blobs[media.id])
+        : A.mediaPreview(media.id)
+          .then(function (dataUrl) { return fetch(dataUrl); })
+          .then(function (response) { return response.blob(); })
+          .then(function (blob) { blobs[media.id] = URL.createObjectURL(blob); return blobs[media.id]; });
+      return ready.then(function (url) {
+        map[media.path] = url;
+        map[media.thumb] = url;
+      }).catch(function () {});
+    })).then(function () { return map; });
+
+  }
+
+  /* still on screen? (the sheet may have closed or moved on to the review) */
+  function open() {
+
+    return !!(view && view.frame.isConnected);
+
+  }
+
+  function setStatus(text, kind) {
+
+    if (!view) return;
+    view.status.className = 'preview-status' + (kind ? ' preview-status--' + kind : '');
+    A.fill(view.status, kind === 'busy' ? el('span', { class: 'spinner spinner--inline', 'aria-hidden': 'true' }) : null, text);
+
+  }
+
+  /* fit the chosen device width into the space we have */
+  function fit() {
+
+    if (!view) return;
+    var device = DEVICES[view.device];
+    var room = view.stage.clientWidth;
+    var scale = Math.min(1, room / device.width);
+    var height = Math.max(420, Math.min(device.height, (window.innerHeight - 260) / scale));
+    view.frame.style.width = device.width + 'px';
+    view.frame.style.height = height + 'px';
+    view.frame.style.transform = 'scale(' + scale + ')';
+    view.holder.style.width = Math.round(device.width * scale) + 'px';
+    view.holder.style.height = Math.round(height * scale) + 'px';
+    view.stage.dataset.device = view.device;
+
+  }
+
+  /* fetch the draft as of the chosen moment and hand it to the page */
+  function load() {
+
+    if (!view) return;
+    var token = view.token = (view.token || 0) + 1;
+    setStatus('بنجهز المعاينة…', 'busy');
+
+    A.call('apiPreview', view.at || '')
+      .then(function (result) {
+        return pendingImages(result.pending || []).then(function (images) {
+          return { result: result, content: result.content, images: images };
+        });
+      })
+      .then(function (data) {
+        if (!view || token !== view.token) return;
+        // "now" keeps the visitor's real clock; a chosen moment moves it there
+        view.pendingMessage = { type: 'athanasios:preview', content: data.content, images: data.images, at: view.at ? data.result.at : null };
+        view.lastResult = data.result;
+        send();
+      })
+      .catch(function (error) {
+        if (!view || token !== view.token) return;
+        setStatus(A.parseError(error).message, 'error');
+      });
+
+  }
+
+  function send() {
+
+    if (!open() || !view.ready || !view.pendingMessage) return;
+    view.frame.contentWindow.postMessage(view.pendingMessage, location.origin);
+    view.pendingMessage = null;
+
+  }
+
+  /* only our own frame, on our own origin */
+  window.addEventListener('message', function (event) {
+
+    if (!open() || event.source !== view.frame.contentWindow || event.origin !== location.origin) return;
+    var data = event.data || {};
+
+    if (data.type === 'athanasios:preview-ready') {
+      view.ready = true;
+      send();
+    }
+    else if (data.type === 'athanasios:preview-shown') {
+      var r = view.lastResult || {};
+      var when = view.at ? 'زي ما هيبان ' + A.formatWall(r.at.replace('T', ' ')) : 'زي ما هيبان دلوقتي بعد النشر';
+      var issues = (r.errors || []).length ? ' — في ' + r.errors.length + ' خطأ لازم يتصلح قبل النشر' : '';
+      setStatus(when + issues, issues ? 'warn' : 'ok');
+    }
+    else if (data.type === 'athanasios:preview-error') {
+      setStatus('المعاينة مقدرتش تعرض المسودة: ' + data.message, 'error');
+    }
+
+  });
+
+  window.addEventListener('resize', function () { fit(); });
+
+
+  /* =======================================================
+     THE SHEET
+  ======================================================= */
+
+  function segmented(label, options, selected, onchange) {
+
+    var buttons = options.map(function (option) {
+      return el('button', {
+        class: 'segment',
+        type: 'button',
+        'aria-pressed': String(option.value === selected),
+        onclick: function (event) {
+          buttons.forEach(function (b) { b.setAttribute('aria-pressed', String(b === event.currentTarget)); });
+          onchange(option.value);
+        }
+      }, option.icon ? icon(option.icon) : null, option.label);
+    });
+
+    return el('div', { class: 'segmented', role: 'group', 'aria-label': label }, buttons);
+
+  }
+
+  function timeOptions() {
+
+    var options = [{ value: '', label: 'دلوقتي' }];
+    var next = A.nextMeeting ? A.nextMeeting() : null;
+
+    if (next && next.date && next.at) {
+      options.push({ value: A.wallFromMinutes(next.at - 120), label: 'قبل الاجتماع بساعتين' });
+      options.push({ value: A.wallFromMinutes(next.at + 20), label: 'أثناء الاجتماع' });
+    }
+
+    var tomorrow = (Math.floor(A.wallMinutes(A.cairoNow()) / 1440) + 1) * 1440 + 10 * 60;
+    options.push({ value: A.wallFromMinutes(tomorrow), label: 'بكره ١٠ الصبح' });
+
+    return options;
+
+  }
+
+  A.openPreview = function () {
+
+    var base = siteBase();
+
+    if (!base) {
+      A.toast('عنوان الموقع (SITE_URL) مش متظبط — المعاينة محتاجاه', true);
+      return;
+    }
+
+    var frame = el('iframe', { class: 'preview-frame', title: 'معاينة الموقع', loading: 'eager', referrerpolicy: 'no-referrer' });
+    var holder = el('div', { class: 'preview-holder' }, frame);
+    var stage = el('div', { class: 'preview-stage' }, holder);
+    var status = el('p', { class: 'preview-status', role: 'status' });
+
+    var custom = el('input', { class: 'input preview-when', type: 'datetime-local', 'aria-label': 'تاريخ ووقت المعاينة (بتوقيت مصر)' });
+
+    view = { frame: frame, holder: holder, stage: stage, status: status, device: matchMedia('(min-width: 900px)').matches ? 'desktop' : 'phone', at: '', ready: false };
+
+    var devices = segmented('حجم الشاشة', [
+      { value: 'phone', label: DEVICES.phone.label, icon: 'phone' },
+      { value: 'desktop', label: DEVICES.desktop.label, icon: 'globe' }
+    ], view.device, function (value) { view.device = value; fit(); });
+
+    var times = segmented('وقت المعاينة', timeOptions(), '', function (value) {
+      view.at = value;
+      custom.value = '';
+      load();
+    });
+
+    custom.addEventListener('change', function () {
+      if (!custom.value) return;
+      view.at = custom.value.replace('T', ' ');
+      times.querySelectorAll('.segment').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
+      load();
+    });
+
+    A.openSheet('معاينة قبل النشر', [
+      el('p', { class: 'note', text: 'دي المسودة على صفحة الموقع نفسها. محدش شايفها غيرك — الزوار مش هيشوفوا التغييرات غير بعد النشر.' }),
+      el('div', { class: 'preview-tools' },
+        devices,
+        el('div', { class: 'preview-tools__time' }, times, custom)
+      ),
+      status,
+      stage
+    ], [
+      el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.openReview(); } }, icon('send'), 'راجع وانشر'),
+      el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })
+    ], { wide: true, className: 'sheet--preview' });
+
+    // the page is what to look at, not the date field
+    var heading = document.getElementById('sheet-title');
+    if (heading) heading.focus({ preventScroll: true });
+
+    fit();
+    setStatus('بنجهز المعاينة…', 'busy');
+
+    var current = view;
+    previewPage(base)
+      .then(function (html) {
+        if (view !== current) return;
+        frame.srcdoc = html;
+        load();
+      })
+      .catch(function (error) {
+        if (view !== current) return;
+        setStatus('مقدرناش نفتح صفحة الموقع للمعاينة (' + error.message + ').', 'error');
+      });
+
+  };
+
+})();
+</script>

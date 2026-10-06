@@ -149,3 +149,32 @@ test('library functions refuse non-admins', () => {
     assert.throws(() => gs[name]('img-12345678', {}), /مش مسموح/, name);
   }
 });
+
+
+/* ---------------- the admin's preview (apiPreview) ---------------- */
+
+test('preview: the draft as the page gets it; unpublished images listed; nothing written or sent', () => {
+  const w = world();
+  const gs = w.as(ADMIN).gs;
+  const { media } = upload(gs, 21);
+  gs.apiSaveItem('news', { title: 'خبر في المسودة', image: media.id, publishAt: '2020-01-01 00:00' });
+
+  const writes = w.spreadsheet.stats.writes;
+  const requests = w.github.requests.length;
+  const preview = plain(gs.apiPreview('2030-05-01 19:30'));
+
+  assert.equal(preview.at, '2030-05-01T19:30', 'time travel: built as of that Cairo moment');
+  assert.ok(preview.content.news.some(n => n.title === 'خبر في المسودة'), 'draft content');
+  assert.deepEqual(preview.pending, [{ id: media.id, path: media.path, thumb: media.thumb }]);
+  assert.equal(w.spreadsheet.stats.writes, writes, 'no Sheet writes');
+  assert.equal(w.github.requests.length, requests, 'nothing sent to GitHub');
+  assert.deepEqual(Object.keys(w.github.files()).filter(f => f.includes(media.id)), [], 'the image stays private');
+
+  // anything else than a Cairo moment falls back to now
+  assert.match(plain(gs.apiPreview('tomorrow')).at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+});
+
+test('preview: only the admin', () => {
+  const w = world();
+  assert.throws(() => w.as('someone@example.com').gs.apiPreview());
+});

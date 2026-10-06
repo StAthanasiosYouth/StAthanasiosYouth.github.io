@@ -193,7 +193,7 @@ function followableLink(id, nowStamp) {
 /* a shared link to something that already expired */
 function missing() {
 
-  history.replaceState(history.state, '', location.pathname + location.search);
+  history.replaceState(history.state, '', location.href.split('#')[0]);
   closeSheet({ silent: true });
 
 }
@@ -258,28 +258,58 @@ function setupTopbar() {
    START
 ========================================================= */
 
-setInterval(tick, 15000);
+function startSite() {
 
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) {
-    tick();
-    // pick up a publish that happened while the tab was in the background
-    if (current) load();
-  }
-});
+  setInterval(tick, 15000);
 
-/* This page is never meant to be embedded by another site (clickjacking).
-   GitHub Pages can't send frame headers, so leave the frame instead. */
-if (window.top !== window.self) {
-  try {
-    window.top.location.replace(window.location.href);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      tick();
+      // pick up a publish that happened while the tab was in the background
+      if (current) load();
+    }
+  });
+
+  /* This page is never meant to be embedded by another site (clickjacking).
+     GitHub Pages can't send frame headers, so leave the frame instead. */
+  if (window.top !== window.self) {
+    try {
+      window.top.location.replace(window.location.href);
+    }
+    catch {
+      // sandboxed frame: nothing more we can do
+    }
   }
-  catch {
-    // sandboxed frame: nothing more we can do
-  }
+
+  startFeel();
+  setupTopbar();
+  startRouter(openRoute);
+  load();
+
 }
 
-startFeel();
-setupTopbar();
-startRouter(openRoute);
-load();
+
+/* the admin's preview (preview.js): same page, the draft instead of content.json */
+function startPreview() {
+
+  startFeel();
+  setupTopbar();
+  startRouter(openRoute);
+  setInterval(tick, 15000);
+
+  import('./preview.js').then(({ listen }) => listen(content => {
+    const first = !current;
+    closeSheet({ silent: true });
+    show(content, true);
+    if (first) resolveRoute();
+  }));
+
+}
+
+
+if (document.documentElement.hasAttribute('data-preview')) {
+  startPreview();
+}
+else {
+  startSite();
+}

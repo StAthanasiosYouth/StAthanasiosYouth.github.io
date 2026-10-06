@@ -38,6 +38,14 @@ export function setServerTime(dateHeader, receivedAt = Date.now()) {
 }
 
 
+/** Preview only (the admin's time travel): show the page as of another moment. */
+export function setClockOffset(ms) {
+
+  clockOffsetMs = Number.isFinite(ms) ? ms : 0;
+
+}
+
+
 export function clockOffset() {
 
   return clockOffsetMs;

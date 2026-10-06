@@ -775,3 +775,81 @@ test('review: changes grouped in plain words, scheduled ones say when', async ()
   await close();
 
 });
+
+/* the live site's files, served from this checkout (no network in tests) */
+const TYPES = { html: 'text/html', js: 'text/javascript', css: 'text/css', json: 'application/json', webp: 'image/webp', png: 'image/png', svg: 'image/svg+xml', woff2: 'font/woff2', ico: 'image/x-icon', ics: 'text/calendar' };
+
+async function serveSiteLocally(page) {
+  const { readFileSync, existsSync: exists } = await import('node:fs');
+  const site = 'https://stathanasiosyouth.github.io/';
+  const sent = [];
+  await page.setRequestInterception(true);
+  page.on('request', request => {
+    const url = request.url();
+    if (url.startsWith(site)) {
+      const path = decodeURIComponent(new URL(url).pathname.slice(1)) || 'index.html';
+      sent.push(path);
+      const file = `${ROOT}${path}`;
+      if (!exists(file)) return request.respond({ status: 404, body: '' });
+      return request.respond({ status: 200, headers: { 'Access-Control-Allow-Origin': '*' }, contentType: TYPES[path.split('.').pop()] || 'application/octet-stream', body: readFileSync(file) });
+    }
+    if (url.startsWith(BASE) || url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('about:')) return request.continue();
+    return request.respond({ status: 204, body: '' });
+  });
+  return sent;
+}
+
+test('preview: the draft on the real page, phone/computer, time travel; nothing cached or sent', async () => {
+
+  const pad = n => String(n).padStart(2, '0');
+  const cairoDay = days => { const d = new Date(Date.now() + 3 * 3600e3 + days * 86400e3); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`; };
+
+  const poster = await sharp({ create: { width: 600, height: 750, channels: 3, background: '#2a6f4e' } }).webp().toBuffer();
+  const thumb = await sharp(poster).resize(480).webp().toBuffer();
+  const { media } = JSON.parse(JSON.stringify(world.gs.apiUploadMedia({
+    full: poster.toString('base64'), thumb: thumb.toString('base64'), mime: 'image/webp', width: 600, height: 750, alt: 'بوستر المعاينة', name: 'معاينة'
+  })));
+  world.gs.apiSaveItem('news', { title: 'خبر المعاينة', image: media.id, publishAt: '2020-01-01 00:00' });
+  world.gs.apiSaveItem('news', { title: 'خبر بكره الصبح', publishAt: `${cairoDay(1)} 09:00` });
+  const githubCalls = world.github.requests.length;
+
+  const { page, problems, close } = await open(DESKTOP);
+  const sent = await serveSiteLocally(page);
+  await page.evaluate(() => A.go('home'));
+  await page.waitForSelector('.dash-site');
+  await page.evaluate(() => [...document.querySelectorAll('.dash-site .btn')].find(b => b.textContent.includes('معاينة')).click());
+  await page.waitForSelector('.preview-status--ok', { timeout: 20000 });
+
+  const frame = page.frames().find(f => f.url() === 'about:srcdoc');
+  assert.ok(frame, 'the preview runs in the admin\'s own frame');
+  await frame.waitForSelector('#main[data-state="ready"]');
+  const shown = await frame.evaluate(() => ({
+    preview: document.documentElement.hasAttribute('data-preview'),
+    text: document.body.innerText,
+    poster: [...document.querySelectorAll('.news-lead img, .news-card img')].map(i => i.currentSrc).find(s => s.startsWith('blob:')) || '',
+    cached: localStorage.getItem('athanasios.content.v1')
+  }));
+  assert.equal(shown.preview, true);
+  assert.ok(shown.text.includes('خبر المعاينة'), 'the draft is on the page');
+  assert.ok(!shown.text.includes('خبر بكره الصبح'), 'not before its time');
+  assert.match(shown.poster, /^blob:/, 'an image not on the site yet comes from our own preview');
+  assert.equal(shown.cached, null, 'the draft is never cached as site content');
+  assert.ok(sent.includes('assets/js/main.js') && sent.includes('assets/css/main.css'), 'the site\'s own files');
+  assert.ok(!sent.includes('content.json'), 'the published content is not fetched');
+
+  // time travel: tomorrow morning shows tomorrow's news
+  await page.evaluate(() => [...document.querySelectorAll('.segment')].find(b => b.textContent.includes('بكره')).click());
+  await page.waitForFunction(() => document.querySelector('.preview-status--ok')?.textContent.includes('زي ما هيبان'), { timeout: 20000 });
+  await frame.waitForFunction(() => document.body.innerText.includes('خبر بكره الصبح'), { timeout: 10000 });
+
+  // phone width
+  await page.evaluate(() => [...document.querySelectorAll('.segment')].find(b => b.textContent.includes('موبايل')).click());
+  assert.equal(await page.$eval('.preview-frame', f => f.style.width), '390px');
+  assert.equal(await frame.evaluate(() => innerWidth), 390);
+
+  assert.equal(world.github.requests.length, githubCalls, 'nothing sent to GitHub');
+  assert.deepEqual(Object.keys(world.github.files()).filter(f => f.includes(media.id)), [], 'the draft image stays private');
+  assert.deepEqual(problems, []);
+  await close();
+
+});

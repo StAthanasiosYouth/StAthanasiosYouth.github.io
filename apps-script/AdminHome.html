@@ -70,6 +70,9 @@
       state !== 'clean'
         ? el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.openReview(); } }, icon(state === 'error' ? 'alert' : 'send'), state === 'error' ? 'شوف الأخطاء' : 'راجع وانشر')
         : null,
+      state !== 'clean' && config.siteUrl
+        ? el('button', { class: 'btn', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'معاينة')
+        : null,
       config.siteUrl ? el('a', { class: 'btn btn--ghost', href: config.siteUrl, target: '_blank', rel: 'noopener' }, icon('external'), 'افتح الموقع') : null
     );
 

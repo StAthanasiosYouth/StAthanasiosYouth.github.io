@@ -52,7 +52,7 @@ test('setup by the admin creates the private Sheet and its tabs', () => {
 test('every browser-callable data function rejects non-admins', () => {
   const world = configuredWorld().as(STRANGER);
   const calls = {
-    apiState: [], apiReview: [], apiPublish: ['x'], apiCheckGithub: [],
+    apiState: [], apiReview: [], apiPreview: [], apiPublish: ['x'], apiCheckGithub: [],
     apiSaveLink: [{ title: 'x', url: 'https://a.com', section: 'social' }], apiSetLinkEnabled: ['facebook', false],
     apiDeleteLink: ['facebook'], apiMoveLink: ['facebook', 1], apiSaveSection: [{ key: 'x', title: 'x' }, true],
     apiDeleteSection: ['links'], apiMoveSection: ['social', 1], apiSaveContact: [{ name: 'x', phone: '01012345678', method: 'call' }],

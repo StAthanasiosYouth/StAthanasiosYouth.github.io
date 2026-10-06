@@ -297,6 +297,37 @@ function apiReview() {
 
 
 /**
+ * The draft exactly as the public page would receive it, as of a Cairo
+ * moment ("YYYY-MM-DD HH:MM", default now): for the admin's preview only.
+ * Nothing is written or published. Images not on the site yet are listed
+ * (id, path, thumb) so the admin can show its own previews of them.
+ */
+function apiPreview(at) {
+
+  assertAdmin_();
+
+  var when = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}$/.test(String(at || '')) ? String(at).replace(' ', 'T') : cairoNow_();
+  var built = buildPublicContent(readDraft_(), { now: when, hash: sha256Hex_ });
+  var used = built.media || [];
+
+  var pending = readOptionalTable_('Media').filter(function (row) {
+    return used.indexOf(row.id) !== -1 && !row.publishedAt;
+  }).map(function (row) {
+    return { id: row.id, path: row.path, thumb: row.thumb || row.path };
+  });
+
+  return {
+    at: when,
+    content: built.content,
+    pending: pending,
+    errors: built.errors,
+    warnings: built.warnings
+  };
+
+}
+
+
+/**
  * Publishes the draft. expectedRevision is what the admin reviewed; if the
  * Sheet changed since then, publishing stops so nothing unreviewed goes live.
  */

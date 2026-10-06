@@ -1198,7 +1198,7 @@
 
     options = options || {};
 
-    sheet.className = 'sheet' + (options.wide ? ' sheet--wide' : '');
+    sheet.className = 'sheet' + (options.wide ? ' sheet--wide' : '') + (options.className ? ' ' + options.className : '');
     A.fill(sheet,
       el('div', { class: 'sheet__grab', 'aria-hidden': 'true' }),
       el('div', { class: 'sheet__head' },
@@ -2047,7 +2047,11 @@
         });
     });
 
-    A.openSheet('مراجعة قبل النشر', body, A.sheetFooter(publish));
+    var preview = A.state.config.siteUrl && !nothing
+      ? el('button', { class: 'btn', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'معاينة')
+      : null;
+
+    A.openSheet('مراجعة قبل النشر', body, [publish, preview].concat(A.sheetFooter(publish).slice(1)).filter(Boolean));
 
   }
 
