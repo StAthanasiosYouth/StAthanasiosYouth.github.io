@@ -233,10 +233,12 @@ export function meetingStatus(meeting, now, sessions = []) {
     }
     const start = session && session.time ? parseTime(session.time) : defaultStart;
     if (start === null) return null;
-    return { start, end: duration === null ? null : start + duration, session };
+    const length = session && Number.isFinite(session.durationMinutes) && session.durationMinutes > 0 ? session.durationMinutes : duration;
+    return { start, end: length === null ? null : start + length, session };
   }
 
   const skipped = [];
+  let endedToday = null;
 
   // a meeting that started yesterday and runs past midnight
   const yesterday = fromDayNumber(now.dayNumber - 1);
@@ -277,7 +279,9 @@ export function meetingStatus(meeting, now, sessions = []) {
       endMinutes: occ.end,
       minutesUntil: null,
       skipped,
-      session: occ.session
+      session: occ.session,
+      startStamp: `${date.iso}T${pad(Math.floor(occ.start / 60))}:${pad(occ.start % 60)}`,
+      endedToday
     };
 
     if (offset > 0) {
@@ -297,6 +301,7 @@ export function meetingStatus(meeting, now, sessions = []) {
     }
 
     // today's meeting is over; keep looking
+    endedToday = { date, endMinutes: occ.end };
   }
 
   return null;
@@ -312,6 +317,132 @@ export function upcomingSessions(sessions, nowStamp, limit = 4) {
   return (sessions || [])
     .filter(s => s.date >= today && (!s.visibleFrom || s.visibleFrom <= nowStamp))
     .slice(0, limit);
+
+}
+
+
+/* =========================================================
+   CAIRO INSTANTS
+   Wall times are compared as numbers everywhere; only a countdown that
+   crosses Egypt's summer-time switch needs the real instant (the clock
+   jumps an hour). Egypt uses UTC+2 (winter) and UTC+3 (summer).
+========================================================= */
+
+/** UTC milliseconds of a Cairo wall time "YYYY-MM-DDTHH:MM". */
+export function cairoInstant(wallStamp) {
+
+  const base = stampToMinutes(wallStamp);
+
+  if (base === null) return null;
+
+  for (const offset of [180, 120]) {
+    const instant = (base - offset) * 60000;
+    if (stamp(zonedNow('Africa/Cairo', new Date(instant))) === wallStamp) return instant;
+  }
+
+  // a wall time skipped by the spring-forward jump
+  return (base - 120) * 60000;
+
+}
+
+
+/** Real minutes from one Cairo wall time to another (summer time included). */
+export function realMinutesBetween(fromStamp, toStamp) {
+
+  const a = cairoInstant(fromStamp);
+  const b = cairoInstant(toStamp);
+
+  return a === null || b === null ? null : Math.round((b - a) / 60000);
+
+}
+
+
+/* =========================================================
+   MEETING JOURNEY
+   The week as a journey from the last meeting to the next one. The strip
+   is the 7 days that end on the next meeting's day, so it follows the
+   meeting day from the settings (Sunday meetings: Monday → Sunday;
+   Wednesday meetings: Thursday → Wednesday). "Now" moves through the day
+   (21:00 is further along than 09:00), and the energy rises as the
+   meeting gets closer.
+========================================================= */
+
+const STRIP_DAYS = 7;
+const STRIP_MINUTES = STRIP_DAYS * 1440;
+
+const clamp01 = n => Math.max(0, Math.min(1, n));
+
+/**
+ * status: meetingStatus(); now: zonedNow().
+ * Returns {
+ *   phase: 'live' | 'started' | 'imminent' (<=15 min) | 'soon' (<=2 h) | 'today'
+ *        | 'tomorrow' | 'near' (<3 days) | 'week' | 'far' (> 6 days),
+ *   remaining: real minutes to the start (0 while live),
+ *   nowPos, meetingPos: 0..1 along the strip (RTL start = 0),
+ *   energy: 0..1,
+ *   liveProgress: 0..1 through the meeting while live (null otherwise),
+ *   days: [{ iso, weekday, day, isToday, isMeeting, isPassed, isCancelled }]
+ * }
+ */
+export function meetingJourney(status, now, cancelledDates = []) {
+
+  if (!status) return null;
+
+  const nowStamp = stamp(now);
+  const live = status.state === 'live';
+  const started = status.state === 'started';
+  const remaining = live || started ? 0 : Math.max(0, realMinutesBetween(nowStamp, status.startStamp) ?? 0);
+
+  // the strip: 7 days ending on the meeting day; a meeting further away
+  // than that (a cancelled week) shows the coming 7 days instead
+  const meetingDay = status.date.dayNumber;
+  const far = !live && status.daysUntil > STRIP_DAYS - 1;
+  const first = far ? now.dayNumber : meetingDay - (STRIP_DAYS - 1);
+  const cancelled = new Set(cancelledDates);
+
+  const minutesIntoStrip = (now.dayNumber - first) * 1440 + now.minutes;
+  const nowPos = clamp01(minutesIntoStrip / STRIP_MINUTES);
+  const meetingPos = far ? 1 : clamp01(((meetingDay - first) * 1440 + status.startMinutes) / STRIP_MINUTES);
+
+  // closeness: a week away = 0, the start = 1, with extra lift at the end
+  let energy = 1;
+  if (!live && !started) {
+    energy = Math.pow(clamp01(1 - remaining / STRIP_MINUTES), 1.6);
+    if (remaining <= 1440) energy += 0.08;
+    if (remaining <= 120) energy += 0.1;
+    if (remaining <= 15) energy += 0.08;
+    energy = clamp01(energy);
+  }
+
+  let liveProgress = null;
+  if (live && status.endMinutes !== null) {
+    const elapsed = status.daysUntil < 0
+      ? now.minutes + 1440 - status.startMinutes
+      : now.minutes - status.startMinutes;
+    liveProgress = clamp01(elapsed / (status.endMinutes - status.startMinutes));
+  }
+
+  const phase = live ? 'live'
+    : started ? 'started'
+      : status.daysUntil === 0 ? (remaining <= 15 ? 'imminent' : remaining <= 120 ? 'soon' : 'today')
+        : status.daysUntil === 1 ? 'tomorrow'
+          : far ? 'far'
+            : remaining < 3 * 1440 ? 'near' : 'week';
+
+  const days = Array.from({ length: STRIP_DAYS }, (_, i) => {
+    const date = fromDayNumber(first + i);
+    return {
+      iso: date.iso,
+      weekday: date.weekday,
+      day: date.day,
+      isToday: date.dayNumber === now.dayNumber,
+      isMeeting: !far && date.dayNumber === meetingDay,
+      isPassed: date.dayNumber < now.dayNumber,
+      isCancelled: cancelled.has(date.iso)
+    };
+  });
+
+  return { phase, remaining, nowPos, meetingPos, energy, liveProgress, days, far };
 
 }
 

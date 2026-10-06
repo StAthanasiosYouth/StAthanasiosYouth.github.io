@@ -108,8 +108,17 @@ var ITEM_VALIDATORS = {
       problems.push('الساعة لازم تكون بالشكل 20:00');
     }
 
+    // this week's length, if different from the usual
+    var duration = contentLine_(input.durationMinutes);
+    var minutes = duration === '' ? '' : Number(duration);
+
+    if (minutes !== '' && !(minutes >= 15 && minutes <= 600 && Math.round(minutes) === minutes)) {
+      problems.push('مدة الاجتماع لازم تكون عدد دقايق بين 15 و 600، أو فاضية');
+    }
+
     return {
       date: date,
+      durationMinutes: minutes,
       enabled: input.enabled !== false,
       time: time || '',
       topic: input_(input.topic, HUB_LIMITS.topic, 'الموضوع', problems, false),

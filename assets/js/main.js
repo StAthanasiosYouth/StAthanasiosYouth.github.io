@@ -64,6 +64,11 @@ async function load() {
       show(fresh, first);
       if (first) resolveRoute();
     }
+    else {
+      // same content, but the server's clock is known now: apply it at once
+      // (the cached render used the device clock, which may be wrong)
+      tick();
+    }
   }
   catch (error) {
     console.warn(error);

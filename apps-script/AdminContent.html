@@ -140,7 +140,7 @@
             el('h3', { class: 'timeline__date', text: label }),
             el('ol', { class: 'timeline__list' }, group.items.map(function (event) {
               var past = event.minutes < now;
-              var time = A.formatWall(event.at).split(' · ')[1] || '';
+              var time = A.formatWall(event.at).split('، ')[1] || '';
               return el('li', {},
                 el('button', { class: 'timeline__row' + (past ? ' is-past' : ''), type: 'button', onclick: function () { A.editors[event.kind](event.item); } },
                   el('span', { class: 'timeline__time', text: time }),
@@ -299,6 +299,7 @@
     ] });
 
     var time = el('input', { class: 'input', type: 'time', value: session.time || '', oninput: A.markDirty });
+    var duration = A.textInput(session.durationMinutes, { type: 'number', inputmode: 'numeric', placeholder: A.setting('meeting.durationMinutes') ? 'المعتاد ' + A.setting('meeting.durationMinutes') : 'مثلاً 120' });
     var topic = A.counted('الموضوع', session.topic, limits.topic, 'مثلاً: حياة التسليم');
     var speaker = A.counted('الخادم / المتكلم', session.speaker, limits.speaker, 'مثلاً: أبونا أنطوني عياد');
     var description = A.counted('وصف', session.description, limits.sessionDescription, 'اختياري', { multiline: true });
@@ -340,6 +341,7 @@
         originalDate: isNew ? '' : session.date,
         date: date.value(),
         time: time.value,
+        durationMinutes: duration.value,
         topic: topic.input.value,
         speaker: speaker.input.value,
         description: description.input.value,
@@ -358,7 +360,10 @@
       box,
       el('div', { class: 'form' },
         A.field('التاريخ', date.node),
-        A.field('الساعة', time, 'سيبها فاضية لو نفس الميعاد المعتاد (' + (A.setting('meeting.time') || '—') + ')'),
+        el('div', { class: 'row' },
+          A.field('الساعة', time, 'فاضية = المعتاد (' + (A.setting('meeting.time') || '—') + ')'),
+          A.field('المدة بالدقايق', duration, 'فاضية = المعتاد')
+        ),
         A.field('الحالة', status.node),
         details,
         note.node,
@@ -530,7 +535,7 @@
       games.length
         ? el('ul', { class: 'list' }, games.map(function (game) {
           var enabled = bool(game.enabled);
-          var chips = [enabled ? gameStateLabel(game) : A.visibilityChip(false), A.chip(A.formatWall(game.startAt) + ' ← ' + (A.formatWall(game.endAt).split(' · ')[1] || ''))];
+          var chips = [enabled ? gameStateLabel(game) : A.visibilityChip(false), A.chip(A.formatWall(game.startAt) + ' ← ' + (A.formatWall(game.endAt).split('، ')[1] || ''))];
           var linked = ['soon', 'start'].filter(function (k) { return hasNotification('notif-' + game.id + '-' + k); }).length;
           if (linked) chips.push(A.chip('🔔 ' + linked));
 

@@ -25,3 +25,5 @@ apps-script/.clasp.json
 *.tmp
 tools/.cache/
 tools/.shots.mjs
+tools/.live.mjs
+tools/.shots-public.mjs

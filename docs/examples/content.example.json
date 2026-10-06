@@ -1,6 +1,6 @@
 {
   "schema": 3,
-  "revision": "135e563bbaca",
+  "revision": "5f56062132c9",
   "publishedAt": "2026-10-08T09:00:00.000Z",
   "timezone": "Africa/Cairo",
   "site": {
@@ -129,7 +129,8 @@
       },
       "status": "normal",
       "note": "",
-      "visibleFrom": "2026-10-08T20:00"
+      "visibleFrom": "2026-10-08T20:00",
+      "durationMinutes": null
     },
     {
       "date": "2026-10-18",
@@ -140,7 +141,8 @@
       "image": null,
       "status": "cancelled",
       "note": "علشان مؤتمر الشباب",
-      "visibleFrom": ""
+      "visibleFrom": "",
+      "durationMinutes": null
     }
   ],
   "news": [

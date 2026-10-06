@@ -103,6 +103,16 @@ function visibilityState_(enabled, from, until, now) {
 }
 
 
+/* a week's own length in minutes (15..600), or null = the usual */
+function sessionDuration_(value) {
+
+  var n = contentNumber_(value);
+
+  return n !== null && !isNaN(n) && n >= 15 && n <= 600 ? Math.round(n) : null;
+
+}
+
+
 /* =========================================================
    MEDIA
 ========================================================= */
@@ -269,7 +279,8 @@ function buildHub_(draft, ctx) {
       image: image(where, row.image),
       status: status,
       note: ctx.limited(where, contentLine_(row.note), LIMITS.note, 'الملاحظة'),
-      visibleFrom: dateTime(where, row.visibleFrom, false, 'ميعاد الظهور')
+      visibleFrom: dateTime(where, row.visibleFrom, false, 'ميعاد الظهور'),
+      durationMinutes: sessionDuration_(row.durationMinutes)
     });
 
   });

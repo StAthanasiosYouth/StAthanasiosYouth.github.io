@@ -11,7 +11,8 @@
 
 import { h, external } from './dom.js';
 import { iconNode, isBrandIcon } from './icons.js';
-import { meetingStatus, fromDayNumber, isWithinWindow, calendarDates } from './schedule.js';
+import { meetingStatus, meetingJourney, fromDayNumber, isWithinWindow, calendarDates } from './schedule.js';
+import { journeyElement } from './journey.js';
 import { describeMeeting, formatDate, DAY_SHORT } from './words.js';
 import { bannerWidget, newsSection, gamesSection, liveGameWidget, meetingTopic, visibleNews, gameStates } from './hub.js';
 import { updateBell, visibleNotifications } from './bell.js';
@@ -71,7 +72,9 @@ function meetingWidget(content, now) {
 
   const headline = h('p', { class: 'meeting__headline' });
   const detail = h('p', { class: 'meeting__detail' });
-  const week = h('ol', { class: 'week', 'aria-hidden': 'true' });
+  const journey = journeyElement();
+  // the countdown, spoken once in a while (not every tick) for screen readers
+  const spoken = h('p', { class: 'visually-hidden', 'aria-live': 'polite' });
   const note = meeting.note ? h('p', { class: 'meeting__note' }, meeting.note) : null;
   const skipNote = h('p', { class: 'meeting__note meeting__note--skip', hidden: true });
   const topicSlot = h('div', { class: 'meeting__topic' });
@@ -118,7 +121,8 @@ function meetingWidget(content, now) {
     note,
     skipNote,
     topicSlot,
-    week,
+    journey.el,
+    spoken,
     h('div', { class: 'meeting__actions' }, calendarToggle, calendarMenu)
   );
 
@@ -133,7 +137,9 @@ function meetingWidget(content, now) {
 
     section.hidden = false;
 
-    const words = describeMeeting(status);
+    const cancelledDates = (content.sessions || []).filter(s => s.status === 'cancelled').map(s => s.date).concat(meeting.skipDates);
+    const trip = meetingJourney(status, currentNow, cancelledDates);
+    const words = describeMeeting(status, trip.remaining);
     const live = status.state === 'live';
 
     headline.replaceChildren(
@@ -168,24 +174,16 @@ function meetingWidget(content, now) {
 
     currentStatus = status;
 
-    const skipDates = new Set([
-      ...meeting.skipDates,
-      ...(content.sessions || []).filter(s => s.status === 'cancelled').map(s => s.date)
-    ]);
-    const meetingOffset = live ? 0 : status.daysUntil;
+    journey.update(trip);
+    section.dataset.phase = trip.phase;
+    section.style.setProperty('--energy', trip.energy.toFixed(3));
 
-    week.replaceChildren(...Array.from({ length: 7 }, (_, offset) => {
-      const day = fromDayNumber(currentNow.dayNumber + offset);
-      const classes = ['week__day'];
-      if (offset === 0) classes.push('is-today');
-      if (offset === meetingOffset) classes.push('is-meeting');
-      if (offset > 0 && offset < meetingOffset) classes.push('is-between');
-      if (skipDates.has(day.iso)) classes.push('is-skipped');
-      return h('li', { class: classes.join(' ') },
-        h('span', {}, offset === 0 ? 'النهارده' : DAY_SHORT[day.weekday]),
-        h('span', { class: 'week__dot' })
-      );
-    }));
+    // the live region speaks when the wording changes, not every 15 seconds
+    const sentence = `${words.headline}. ${words.detail}`;
+    if (spoken.dataset.said !== words.headline) {
+      spoken.dataset.said = words.headline;
+      spoken.textContent = sentence;
+    }
 
     const place = content.location ? [content.location.name, content.location.address].filter(Boolean).join('، ') : '';
     const params = new URLSearchParams({

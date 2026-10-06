@@ -92,6 +92,27 @@ export function countMinutes(total) {
 }
 
 
+/* 1 -> "ساعة", 2 -> "ساعتين", 6 -> "٦ ساعات", 20 -> "٢٠ ساعة" */
+export function countHours(n) {
+
+  return n === 1 ? 'ساعة' : n === 2 ? 'ساعتين' : `${arabicDigits(n)} ${n <= 10 ? 'ساعات' : 'ساعة'}`;
+
+}
+
+
+/* real minutes -> "يوم و٦ ساعات", "يومين و٣ ساعات", "يومين" (a day or more) */
+export function countDuration(minutes) {
+
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+
+  if (days === 0) return countMinutes(minutes);
+
+  return hours ? `${countDays(days)} و${countHours(hours)}` : countDays(days);
+
+}
+
+
 export function formatDate(date, withWeekday = true) {
 
   const text = `${arabicDigits(date.day)} ${MONTH_NAMES[date.month - 1]}`;
@@ -102,43 +123,71 @@ export function formatDate(date, withWeekday = true) {
 
 
 /**
- * Headline + detail for the meeting widget, from meetingStatus().
+ * The countdown for the meeting widget, from meetingStatus() and the real
+ * minutes left (meetingJourney().remaining):
+ *   فاضل ٤ أيام             3 calendar days or more
+ *   فاضل يوم و٦ ساعات      tomorrow / the day after, a day or more away
+ *   فاضل ٢٠ ساعة            tomorrow, less than a day away
+ *   الاجتماع النهارده        later today (with the hours left)
+ *   فاضل ٤٥ دقيقة           the last hour
+ *   الاجتماع بدأ             started (live while within its duration)
  */
-export function describeMeeting(status) {
+export function describeMeeting(status, remaining = status.minutesUntil) {
 
   const time = formatTime(status.startMinutes);
+  const day = status.daysUntil > 6 ? formatDate(status.date) : DAY_NAMES[status.date.weekday];
+  const left = Math.max(1, Math.round(remaining ?? 0));
 
   switch (status.state) {
 
     case 'live':
       return {
-        headline: 'شغال دلوقتي',
-        detail: status.endMinutes === null ? `بدأ الساعة ${time}` : `لحد ${formatTime(status.endMinutes)}`
-      };
-
-    case 'today':
-      return {
-        headline: 'النهارده',
-        detail: status.minutesUntil <= 180
-          ? `الساعة ${time} (بعد ${countMinutes(status.minutesUntil)})`
-          : `الساعة ${time}`
+        headline: 'الاجتماع بدأ',
+        detail: status.endMinutes === null ? 'شغال دلوقتي' : `شغال دلوقتي، لحد ${formatTime(status.endMinutes)}`
       };
 
     case 'started':
       return {
-        headline: 'النهارده',
-        detail: `بدأ الساعة ${time}`
+        headline: 'الاجتماع بدأ',
+        detail: `من الساعة ${time}`
       };
 
+    case 'today':
+      return left <= 60
+        ? { headline: `فاضل ${countMinutes(left)}`, detail: `الاجتماع النهارده، الساعة ${time}` }
+        : { headline: 'الاجتماع النهارده', detail: `الساعة ${time}، فاضل ${countMinutes(left)}` };
+
     default: {
-      const far = status.daysUntil > 6;
-      const when = far ? formatDate(status.date) : DAY_NAMES[status.date.weekday];
+
+      // the meeting already happened today: say so first
+      if (status.endedToday) {
+        return {
+          headline: 'الاجتماع خلص ✓ نشوفكم الجاي',
+          detail: `${day}، الساعة ${time} (فاضل ${countDays(status.daysUntil)})`
+        };
+      }
+
+      if (status.daysUntil === 1) {
+        // under a day: whole hours read better than "١٩ ساعة و٣٧ دقيقة"
+        const hoursOnly = left >= 60 ? Math.floor(left / 60) * 60 : left;
+        return {
+          headline: `فاضل ${left < 1440 ? countMinutes(hoursOnly) : countDuration(left)}`,
+          detail: `بكره، الساعة ${time}`
+        };
+      }
+
+      if (status.daysUntil === 2) {
+        return {
+          headline: `فاضل ${countDuration(left)}`,
+          detail: `بعد بكره، ${day} الساعة ${time}`
+        };
+      }
+
       return {
-        headline: status.daysUntil === 1 ? 'بكره' :
-          status.daysUntil === 2 ? 'بعد بكره' :
-            `فاضل ${countDays(status.daysUntil)}`,
-        detail: `${when} الساعة ${time}`
+        headline: `فاضل ${countDays(status.daysUntil)}`,
+        detail: `${day}، الساعة ${time}`
       };
+
     }
 
   }

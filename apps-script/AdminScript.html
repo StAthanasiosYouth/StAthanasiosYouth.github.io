@@ -394,7 +394,8 @@
     var text = DAY_NAMES[d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()];
     if (withTime !== false && /[ T]\d{2}:\d{2}$/.test(String(value))) {
       var h = d.getUTCHours(), m = d.getUTCMinutes();
-      text += ' · ' + ((h % 12) || 12) + ':' + pad(m) + (h < 12 ? ' ص' : ' م');
+      // a comma, not a middle dot: «·» next to an Arabic digit reads as «٠»
+      text += '، ' + ((h % 12) || 12) + ':' + pad(m) + (h < 12 ? ' ص' : ' م');
     }
     return text.replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; });
 

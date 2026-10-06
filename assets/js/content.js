@@ -164,7 +164,8 @@ function cleanHub(raw) {
       image: cleanImage(s.image),
       status: s.status === 'cancelled' ? 'cancelled' : 'normal',
       note: text(s.note, 200),
-      visibleFrom: dateTime(s.visibleFrom)
+      visibleFrom: dateTime(s.visibleFrom),
+      durationMinutes: number(s.durationMinutes, 15, 600)
     }));
 
   const news = list(raw.news)
