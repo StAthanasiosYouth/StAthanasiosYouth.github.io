@@ -4,9 +4,10 @@
 
 ```
  Admin (Google account on the allowlist)
-   │  Google sign-in
+   │  github.io/admin/: "Sign in with Google" → ID token → POST to doPost (Api.gs)
+   │  (recovery: the Apps Script URL, Google session → google.script.run)
    ▼
- Apps Script web app (Admin.html + Code.gs) ──read/write──► Google Sheet  (drafts)
+ Apps Script (Code.gs, api* functions) ──read/write──► Google Sheet  (drafts)
    │  "نشر التغييرات": buildPublicContent() → one Git commit
    ▼  GitHub Git Data API (token in Script Properties)
  Repository: content.json + meeting.ics
@@ -39,7 +40,9 @@
 | `content.json`, `meeting.ics` | GitHub Pages | Published data (written by the admin)              |
 | `apps-script/Content.gs` | Apps Script + Node | Content model: validation, build, ICS, change summary (pure) |
 | `apps-script/Seed.gs`    | Apps Script + Node | Initial content, settings list with Arabic help     |
-| `apps-script/Auth.gs`    | Apps Script    | Allowlist check                                         |
+| `apps-script/Auth.gs`    | Apps Script    | Who is calling (API token or Google session), allowlist + its admin functions |
+| `apps-script/Api.gs`     | Apps Script    | `doPost`: the official admin's API (ID token check, listed functions only) |
+| `admin/`                 | GitHub Pages   | The official admin page; `index.html`, `admin.css`, `admin-app.js` generated from `apps-script/Admin*.html` (`tools/build-admin.mjs`); `boot.js` sign-in + transport; `config.js` the two public settings |
 | `apps-script/Store.gs`   | Apps Script    | Sheet schema, `setup()`, row read/write, log            |
 | `apps-script/Code.gs`    | Apps Script    | `doGet`, admin API (`api*`)                             |
 | `apps-script/Publish.gs` | Apps Script    | Review, publish, GitHub API                             |
@@ -124,7 +127,8 @@ shift them (tested).
 
 | Concern                     | How it's handled                                                                 |
 | --------------------------- | -------------------------------------------------------------------------------- |
-| Who can edit                | Google sign-in + `ADMIN_EMAILS` allowlist (Script Properties), checked by `assertAdmin_()` at the start of every browser-callable function. Fails closed. |
+| Who can edit                | Google sign-in + `ADMIN_EMAILS` allowlist (Script Properties), checked by `assertAdmin_()` at the start of every browser-callable function. Fails closed. Admins manage the list in «صلاحيات لوحة التحكم»; the primary (`ADMIN_PRIMARY`) can't be removed, the list is never empty, changes are logged. |
+| Official admin (`/admin/`)  | Static page; Google ID token (GIS) sent with every call to `doPost` on a deployment that runs as the owner. The server verifies it with Google (aud = `ADMIN_CLIENT_ID`, issuer, expiry, verified email; cached per token hash), then the allowlist, then runs only a listed `api*` function as that email. In that mode the Session is never read: no valid token, no access, for every function. `doGet` there never serves HTML. Strict CSP (meta), frame-busting, `noindex`, `no-referrer`; no secrets in the page (client ID and API URL are public). |
 | Browser-callable functions  | Apps Script exposes every function not ending in `_`. All of them are either guarded or pure (no data access); a test enumerates them. |
 | First admin                 | Set by hand in Script Properties; no automatic bootstrap.                        |
 | Code and token isolation    | Standalone Apps Script project (not bound to the Sheet), so sharing the Sheet with an editor never exposes the code or the token. |
@@ -231,7 +235,7 @@ are added to `meeting.skipDates` (countdown and calendar file).
 - **Click analytics:** a `navigator.sendBeacon` to a separate anonymous
   Apps Script endpoint appending to a `Clicks` tab. Links already have
   stable `id`s.
-- **More admins:** add emails to `ADMIN_EMAILS` and share the Sheet. No code
+- **More admins:** add them in «صلاحيات لوحة التحكم» (and share the Sheet for the recovery admin). No code
   change.
 - **Rollback UI:** publishing is a commit; a "restore" button could re-commit
   an older `content.json`.

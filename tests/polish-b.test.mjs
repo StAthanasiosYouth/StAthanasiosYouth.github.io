@@ -107,31 +107,7 @@ test('a person\'s photo and a scene\'s photos are «used»: the library shows it
 });
 
 
-/* ---------------- the /admin/ gateway ---------------- */
+/* ---------------- the /admin/ page ---------------- */
 
-const EXEC = /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/;
-
-test('/admin/: one admin URL (refresh = button), noindex, no-referrer, strict CSP, no inline code', () => {
-  const html = readFileSync(`${ROOT}admin/index.html`, 'utf8');
-  const button = /<a class="gate__enter" id="enter" href="([^"]+)"/.exec(html)[1];
-  const refresh = /<meta http-equiv="refresh" content="\d+; url=([^"]+)">/.exec(html)[1];
-  assert.match(button, EXEC);
-  assert.equal(refresh, button, 'the no-JS refresh and the button go to the same place');
-  assert.equal([...html.matchAll(/script\.google\.com\/macros/g)].length, 2, 'the URL is only in those two places');
-
-  assert.match(html, /<meta name="robots" content="noindex, nofollow">/);
-  assert.match(html, /<meta name="referrer" content="no-referrer">/);
-  const csp = /<meta http-equiv="Content-Security-Policy" content="([^"]+)">/.exec(html)[1];
-  for (const rule of ["default-src 'none'", "script-src 'self'", "style-src 'self'", "base-uri 'none'", "form-action 'none'"]) assert.ok(csp.includes(rule), rule);
-  assert.doesNotMatch(html, /\sstyle=|<style|<script>|\son[a-z]+="/, 'no inline style or script');
-  assert.doesNotMatch(html, /<iframe/, 'the admin is never embedded');
-
-  const js = readFileSync(`${ROOT}admin/admin.js`, 'utf8');
-  assert.doesNotMatch(js, /script\.google\.com\/macros\/s\/AK/, 'admin.js reads the URL from the button');
-  assert.match(js, /location\.replace/);
-  assert.match(js, /window\.top !== window\.self/, 'frame-busting');
-
-  assert.match(readFileSync(`${ROOT}robots.txt`, 'utf8'), /^Disallow: \/admin\/$/m);
-  const index = readFileSync(`${ROOT}index.html`, 'utf8');
-  assert.doesNotMatch(index, /admin\//, 'not linked from the public page');
-});
+// /admin/ is no longer a door that redirects to Apps Script: it is the admin
+// itself (Refine B). Its checks live in tests/refine-b.test.mjs.
