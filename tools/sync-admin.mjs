@@ -62,6 +62,8 @@ window.ADMIN_ICONS = ${JSON.stringify(icons, null, 1)};
 console.log(`AdminIcons.html written (${Object.keys(icons).length} icons); ICON_NAMES in sync.`);
 
 // the link-experience registry for Apps Script
-const { platformsGs } = await import('./lib/platforms-gs.mjs');
+const { platformsGs, platformsAdminHtml } = await import('./lib/platforms-gs.mjs');
 writeFileSync(`${ROOT}apps-script/Platforms.gs`, platformsGs());
-console.log('Platforms.gs written from assets/js/platforms.js.');
+// …and for the admin's link editor
+writeFileSync(`${ROOT}apps-script/AdminPlatforms.html`, platformsAdminHtml());
+console.log('Platforms.gs and AdminPlatforms.html written from assets/js/platforms.js.');
