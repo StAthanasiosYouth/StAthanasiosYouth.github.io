@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "ae5ce0167631",
-  "publishedAt": "2026-10-06T09:01:07.258Z",
+  "revision": "17fca452316f",
+  "publishedAt": "2026-10-06T09:47:32.531Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -64,12 +64,11 @@
           "title": "إنستجرام",
           "subtitle": "صور وستوريز",
           "url": "https://www.instagram.com/pope.athanasiustheapostolic/",
-          "icon": "instagram",
+          "icon": "telegram",
           "style": "tile",
           "badge": "",
-          "startAt": "",
-          "endAt": "",
-          "experience": "instagram"
+          "startAt": "2026-10-06T12:31",
+          "endAt": ""
         },
         {
           "id": "tiktok",
