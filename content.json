@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "8ed267c940bd",
-  "publishedAt": "2026-10-06T09:49:30.757Z",
+  "revision": "0826a99c4805",
+  "publishedAt": "2026-10-06T12:57:06.591Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -39,6 +39,7 @@
       "badge": "",
       "startAt": "",
       "endAt": "",
+      "experience": "voice",
       "cta": "ابعت دلوقتي"
     }
   ],
