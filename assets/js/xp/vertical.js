@@ -59,7 +59,7 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
 
   /* ---------- entrance ---------- */
 
-  tl.from(phone, [{ transform: 'scale(.9)', opacity: 0, borderRadius: '50%' }, { transform: 'none', opacity: 1 }], { duration: 700, easing: SPRING });
+  tl.from(phone, [{ transform: 'scale(.9)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 700, easing: SPRING });
   tl.from(ring, [{ transform: 'scale(.4)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 700, delay: 200, easing: SPRING });
   tl.from(bars[0].firstChild, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: quick ? 900 : 2200, delay: 400, easing: 'linear' });
   tl.at(400, () => sound('open', { passive: true }));

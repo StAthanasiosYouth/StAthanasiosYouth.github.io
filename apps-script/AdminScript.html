@@ -111,6 +111,12 @@
 
     var stack = document.getElementById('toasts');
     var dialogs = document.querySelectorAll('dialog[open]');
+
+    // an editor refilled while the stack sat inside it took the stack along
+    if (!stack) {
+      stack = el('div', { class: 'toasts', id: 'toasts', popover: 'manual', 'aria-live': 'polite' });
+      document.body.appendChild(stack);
+    }
     var holder = dialogs.length ? dialogs[dialogs.length - 1] : document.body;
 
     if (stack.parentNode !== holder) {
@@ -1267,6 +1273,10 @@
   A.openSheet = function (title, body, footer, options) {
 
     options = options || {};
+
+    // the message stack may live inside the editor: keep it when refilling
+    var toasts = document.getElementById('toasts');
+    if (toasts && sheet.contains(toasts)) document.body.appendChild(toasts);
 
     sheet.className = 'sheet' + (options.wide ? ' sheet--wide' : '') + (options.className ? ' ' + options.className : '');
     A.fill(sheet,

@@ -99,12 +99,12 @@ export const PLATFORMS = {
   },
   phone: {
     scene: 'call', icon: 'phone', hosts: [], accent: '#5ad7a0',
-    label: 'اتصال', cta: 'افتح',
+    label: 'اتصال', cta: 'كلمنا',
     line: 'إحنا على بعد مكالمة', sub: 'كلمنا في أي وقت.'
   },
   email: {
     scene: 'mail', icon: 'mail', hosts: [], accent: '#f2d28b',
-    label: 'إيميل', cta: 'افتح',
+    label: 'إيميل', cta: 'ابعتلنا',
     line: 'ابعتلنا رسالة', sub: 'هنرد عليك في أقرب وقت.'
   },
   web: {

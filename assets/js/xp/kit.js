@@ -47,9 +47,20 @@ export function timeline({ quick = false, reduced = false, lite = false } = {}) 
   let stopped = false;
   let hidden = typeof document !== 'undefined' && document.hidden;
 
+  let held = [];
+
   const onVisibility = () => {
     if (stopped) return;
     hidden = document.hidden;
+    // everything moving inside the scene (one-off pops and counters too)
+    if (hidden) {
+      held = tl.root && tl.root.getAnimations ? tl.root.getAnimations({ subtree: true }).filter(a => a.playState === 'running') : [];
+      held.forEach(a => a.pause());
+    }
+    else {
+      held.forEach(a => a.play());
+      held = [];
+    }
     loops.forEach(a => (hidden ? a.pause() : a.play()));
     moving.forEach(a => (hidden ? a.pause() : a.play()));
     layers.forEach(layer => (hidden ? layer.pause() : layer.resume()));
@@ -63,6 +74,7 @@ export function timeline({ quick = false, reduced = false, lite = false } = {}) 
     reduced,
     lite,
     speed,
+    root: null,      // the stage (set by the engine): all of it pauses in a hidden tab
 
     /* run fn after ms (scaled); skipped entirely with reduced motion */
     at(ms, fn) {

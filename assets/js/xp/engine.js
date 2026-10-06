@@ -234,13 +234,14 @@ export function open(link, context, onClose) {
   const opened = performance.now();
   const start = module => {
     // closed, or replaced by another sheet (no close callback then)
-    if (closed || performance.now() - opened > 10000) return;
+    if (closed || (!stage.isConnected && performance.now() - opened > 10000)) return;
     if (!stage.isConnected || !stage.getClientRects().length) {
       requestAnimationFrame(() => start(module));
       return;
     }
     const running = module.play(stage, { quick: !first, reduced, lite, content: context.content || {}, sound: play, link, platform });
     if (!running || !running.stop) return;
+    if ('root' in running) running.root = stage;
     // another sheet can replace this one without a close: stop with it
     const watch = setInterval(() => { if (!stage.isConnected) stopScene(); }, 1000);
     stopScene = () => {

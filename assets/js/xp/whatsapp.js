@@ -94,8 +94,8 @@ export function play(stage, { quick, reduced, lite, content, sound }) {
       const animations = [];
       if (out) {
         animations.push(node.animate([{ opacity: 0, transform: 'translateX(18px) scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: SPRING }));
-        node.lastChild.classList.add('is-read');
-        animations.push(node.lastChild.animate([{ color: 'rgba(255, 255, 255, .55)' }, { color: 'rgba(255, 255, 255, .55)', offset: 0.6 }, { color: '#53bdeb' }], { duration: 1400 }));
+        // delivered, then read (blue) a moment later
+        tl.at(1100, () => node.lastChild.classList.add('is-read'));
         sound('tap', { passive: true });
       }
       else {
