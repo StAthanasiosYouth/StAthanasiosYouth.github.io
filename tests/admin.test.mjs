@@ -68,7 +68,7 @@ test('no unguarded public function slipped in', () => {
   const world = configuredWorld();
   const pure = new Set(['buildPublicContent', 'safeHttpsUrl', 'normalizePhone', 'contentRevision', 'buildMeetingIcs', 'summarizeChanges', 'seedDraft', 'doGet']);
   const publicFns = Object.keys(world.gs).filter(k => typeof world.gs[k] === 'function' && !k.endsWith('_'));
-  const unexpected = publicFns.filter(k => !pure.has(k) && !/^api/.test(k) && !['setup', 'checkSheet', 'clearStrayIds'].includes(k));
+  const unexpected = publicFns.filter(k => !pure.has(k) && !/^api/.test(k) && !['setup', 'checkSheet', 'clearStrayIds', 'checkMedia'].includes(k));
   assert.deepEqual(unexpected, []);
 });
 

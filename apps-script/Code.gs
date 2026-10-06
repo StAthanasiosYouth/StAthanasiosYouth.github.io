@@ -187,6 +187,60 @@ function fail_(problems) {
 }
 
 
+/**
+ * An error the admin can act on: what happened (message), what to do
+ * (hint), and technical details folded away behind «تفاصيل تقنية».
+ * google.script.run only passes error.message to the page, so the parts
+ * travel as JSON inside it; the page parses them back (A.parseError).
+ */
+function appError_(message, hint, details, field) {
+
+  var error = new Error(JSON.stringify({
+    appError: 1,
+    message: String(message || ''),
+    hint: String(hint || ''),
+    details: cleanDetails_(details),
+    field: field || ''
+  }));
+
+  error.plain = String(message || '');
+
+  return error;
+
+}
+
+
+/* technical details for the admin: never a token, never a long dump */
+function cleanDetails_(details) {
+
+  return String(details || '')
+    .replace(/(access_token|token|Bearer)[=: ]+[\w.\-]+/gi, '$1=…')
+    .replace(/gh[pousr]_[A-Za-z0-9]{20,}|github_pat_\w{20,}/g, '…')
+    .slice(0, 600);
+
+}
+
+
+/* one line for the Log tab / a report, from any error */
+function errorDetails_(error) {
+
+  var text = String((error && error.message) || error || '');
+
+  try {
+    var parsed = JSON.parse(text);
+    if (parsed && parsed.appError) {
+      return parsed.message + (parsed.details ? ' [' + parsed.details + ']' : '');
+    }
+  }
+  catch (ignored) {
+    // a plain message
+  }
+
+  return cleanDetails_(text);
+
+}
+
+
 function input_(value, max, label, problems, required) {
 
   var text = contentLine_(value);

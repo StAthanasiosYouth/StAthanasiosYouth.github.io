@@ -1179,4 +1179,192 @@ select.input {
   }
 }
 
+
+/* =========================================================
+   UPLOAD STAGES, INLINE ERRORS, TOP-LAYER TOAST
+========================================================= */
+
+/* the toast is a popover (top layer): undo the UA popover box */
+.toast[popover] {
+  inset: auto;
+  left: 50%;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  margin: 0;
+  color: var(--text);
+  overflow: visible;
+}
+
+.toast[popover].toast--error {
+  color: var(--danger);
+}
+
+.upload {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(2, 9, 20, .45);
+}
+
+.upload__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: .88rem;
+  font-weight: 700;
+}
+
+.upload__meta {
+  color: var(--text-3);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.upload__track {
+  position: relative;
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(242, 210, 139, .12);
+}
+
+.upload__bar {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--gold), var(--gold-hi));
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform .35s var(--ease), background-color .3s;
+}
+
+.upload.is-indeterminate .upload__bar {
+  transform: none;
+  width: 38%;
+  animation: upload-sweep 1.15s var(--ease) infinite;
+}
+
+@keyframes upload-sweep {
+  from { transform: translateX(110%); }
+  to { transform: translateX(-280%); }
+}
+
+.upload.is-done .upload__bar {
+  background: var(--ok);
+}
+
+.upload.is-done .upload__label {
+  color: var(--ok);
+}
+
+.upload.is-error .upload__bar {
+  background: var(--danger);
+}
+
+.upload.is-error .upload__label {
+  color: var(--danger);
+}
+
+.upload-error {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 138, 125, .4);
+  border-radius: 12px;
+  background: var(--danger-bg);
+}
+
+.upload-error__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  color: var(--danger);
+}
+
+.upload-error__title svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.upload-error__hint,
+.errors__hint {
+  color: var(--text-2);
+  font-size: .9rem;
+}
+
+.errors__title {
+  font-weight: 800;
+}
+
+.tech {
+  font-size: .82rem;
+  color: var(--text-3);
+}
+
+.tech summary {
+  cursor: pointer;
+  width: max-content;
+}
+
+.tech pre {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  max-height: 160px;
+  overflow: auto;
+  border-radius: 8px;
+  background: rgba(2, 9, 20, .6);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: .78rem;
+}
+
+.checklist {
+  display: grid;
+  gap: 10px;
+}
+
+.checklist__steps {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checklist__steps li {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 2px 8px;
+  align-items: start;
+}
+
+.checklist__steps .tech {
+  grid-column: 2;
+}
+
+.checklist__mark {
+  font-weight: 800;
+  text-align: center;
+}
+
+.checklist__steps .is-ok .checklist__mark {
+  color: var(--ok);
+}
+
+.checklist__steps .is-fail {
+  color: var(--danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upload.is-indeterminate .upload__bar {
+    animation: none;
+    width: 100%;
+    opacity: .5;
+  }
+}
+
 </style>

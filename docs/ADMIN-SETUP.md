@@ -224,3 +224,14 @@ records go right after the last real row.
   `link-1a2b3c4d` into empty Links/Contacts rows. The panel ignores those
   rows already. This function only empties those id cells, in rows that
   have nothing else in them, to tidy the Sheet. Real rows are not touched.
+
+## Checking poster uploads (`checkMedia`)
+
+**الإعدادات → الصور → «اختبر رفع الصور»** (or run `checkMedia` from the
+editor) walks every step a poster upload takes against the real Google
+Drive: the `drive.file` permission, the staging folder, a tiny test
+upload, reading it back, and deleting it. It stops at the first failing
+step and shows Google's exact reason. Nothing is left behind.
+
+A failed upload also shows that reason in the editor (under «تفاصيل
+تقنية») and is written to the Log tab as `media.upload.failed`.

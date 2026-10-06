@@ -296,6 +296,8 @@ export class FakeDrive {
   constructor() {
     this.files = new Map();
     this.requests = [];
+    // set to { code, body } to make every Drive call fail like the real API
+    this.failWith = null;
   }
 
   respond(code, body, bytes) {
@@ -307,6 +309,16 @@ export class FakeDrive {
     const method = (options.method || 'get').toLowerCase();
     this.requests.push({ method, url, contentType: options.contentType });
     if ((options.headers || {}).Authorization !== 'Bearer fake-oauth-token') return this.respond(401, { error: 'auth' });
+    if (this.failWith) return this.respond(this.failWith.code, this.failWith.body);
+
+    const fileUrl = /^https:\/\/www\.googleapis\.com\/drive\/v3\/files\/([\w-]+)(\?fields=[\w,]+)?$/.exec(url);
+    if (fileUrl && method === 'delete') {
+      return this.files.delete(fileUrl[1]) ? this.respond(204) : this.respond(404, { error: { code: 404, message: 'File not found', errors: [{ reason: 'notFound' }] } });
+    }
+    if (fileUrl && method === 'get') {
+      const file = this.files.get(fileUrl[1]);
+      return file ? this.respond(200, { id: fileUrl[1], trashed: false }) : this.respond(404, { error: { code: 404, message: 'File not found', errors: [{ reason: 'notFound' }] } });
+    }
 
     if (method === 'post' && url.startsWith('https://www.googleapis.com/drive/v3/files?')) {
       const id = 'folder' + randomUUID().replace(/-/g, '');
@@ -322,6 +334,9 @@ export class FakeDrive {
       const parts = text.split('--' + boundary).slice(1, -1);
       const meta = JSON.parse(Buffer.from(parts[0].split('\r\n\r\n')[1].trim(), 'latin1').toString('utf8'));
       const body = parts[1].slice(parts[1].indexOf('\r\n\r\n') + 4, -2);
+      if (meta.parents && !this.files.has(meta.parents[0])) {
+        return this.respond(404, { error: { code: 404, message: 'File not found: ' + meta.parents[0], errors: [{ reason: 'notFound' }] } });
+      }
       const id = 'file' + randomUUID().replace(/-/g, '');
       this.files.set(id, { meta, bytes: [...Buffer.from(body, 'latin1')].map(b => (b > 127 ? b - 256 : b)) });
       return this.respond(200, { id });
@@ -444,6 +459,10 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
           return { getResponseCode: () => 302, getContentText: () => '', getHeaders: () => ({ Location: mapsRedirects[url] }) };
         }
         if (url.startsWith('https://www.googleapis.com/')) return drive.fetch(url, options);
+        if (url === 'https://oauth2.googleapis.com/tokeninfo') {
+          const scope = drive.grantedScopes ?? 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
+          return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ scope }), getHeaders: () => ({}) };
+        }
         return github.fetch(url, options);
       }
     },

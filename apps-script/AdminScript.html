@@ -88,13 +88,89 @@
 
   var toastTimer = 0;
 
+  /* The toast is a popover: shown in the top layer, above an open editor
+     dialog (a plain fixed element would sit underneath it, unseen). */
   A.toast = function (message, isError) {
 
     var node = document.getElementById('toast');
+    // a modal dialog makes the rest of the page inert (not announced by
+    // screen readers): the toast lives inside the open dialog meanwhile
+    var host = document.querySelector('dialog[open]') || document.body;
+    var popover = !!node.showPopover;
+
+    if (popover && node.matches(':popover-open')) {
+      try { node.hidePopover(); } catch (e) { /* already hidden */ }
+    }
+
+    if (node.parentNode !== host) host.appendChild(node);
+
     node.textContent = message;
-    node.className = 'toast is-visible' + (isError ? ' toast--error' : '');
+    node.className = 'toast' + (isError ? ' toast--error' : '');
+
+    if (popover) {
+      try { node.showPopover(); } catch (e) { /* not a popover in this browser */ }
+    }
+
+    requestAnimationFrame(function () { node.classList.add('is-visible'); });
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { node.className = 'toast'; }, isError ? 6000 : 2800);
+    toastTimer = setTimeout(function () {
+      node.classList.remove('is-visible');
+      setTimeout(function () {
+        if (node.hidePopover && !node.classList.contains('is-visible')) {
+          try { node.hidePopover(); } catch (e) { /* already hidden */ }
+        }
+      }, 450);
+    }, isError ? 7000 : 2800);
+
+  };
+
+  /* Network / runtime messages from google.script.run in plain Arabic */
+  var KNOWN_ERRORS = [
+    [/NetworkError|HTTP 0|Failed to fetch|connection/i, 'الاتصال بالإنترنت اتقطع.', 'اتأكد من النت وجرّب تاني.'],
+    [/maximum execution time|timed? ?out/i, 'العملية أخدت وقت أطول من المسموح.', 'جرّب تاني. لو اتكررت، ابعت التفاصيل للدعم الفني.'],
+    [/Authorization is required|authorization|PERMISSION_DENIED|ScriptError: .*permission/i, 'لوحة التحكم محتاجة توافق على صلاحياتها.', 'اعمل Refresh للصفحة ووافق على الصلاحيات.'],
+    [/Service invoked too many times|quota|Rate Limit/i, 'Google بيطلب نستنى شوية.', 'استنى دقيقة وجرّب تاني.'],
+    [/lock|Lock timeout/i, 'في عملية تانية شغالة دلوقتي.', 'استنى ثواني وجرّب تاني.']
+  ];
+
+  /** Any error -> { message, hint, details, field } for display. */
+  A.parseError = function (error) {
+
+    if (error && error.parsed) return error.parsed;
+
+    var text = String(error && error.message ? error.message : error || '');
+
+    try {
+      var parsed = JSON.parse(text);
+      if (parsed && parsed.appError) {
+        return { message: parsed.message, hint: parsed.hint || '', details: parsed.details || '', field: parsed.field || '' };
+      }
+    }
+    catch (e) { /* plain text */ }
+
+    for (var i = 0; i < KNOWN_ERRORS.length; i++) {
+      if (KNOWN_ERRORS[i][0].test(text)) {
+        return { message: KNOWN_ERRORS[i][1], hint: KNOWN_ERRORS[i][2], details: text, field: '' };
+      }
+    }
+
+    // messages written for the admin are Arabic; anything else is technical
+    if (/[؀-ۿ]/.test(text)) {
+      return { message: text, hint: '', details: '', field: '' };
+    }
+
+    return { message: 'حصلت مشكلة غير متوقعة.', hint: 'جرّب تاني. لو اتكررت، ابعت التفاصيل التقنية للدعم الفني.', details: text, field: '' };
+
+  };
+
+  A.technicalDetails = function (details) {
+
+    if (!details) return null;
+
+    return el('details', { class: 'tech' },
+      el('summary', { text: 'تفاصيل تقنية' }),
+      el('pre', { class: 'ltr', text: details })
+    );
 
   };
 
@@ -151,16 +227,27 @@
 
   A.fail = function (error, box) {
 
-    var message = error && error.message ? error.message : String(error);
+    var parsed = A.parseError(error);
+
+    if (window.console) console.warn('[admin]', parsed.message, parsed.details || '');
+
+    // no box given but an editor is open: show it there, not behind it
+    if (!box) {
+      var open = document.querySelector('dialog[open] .errors');
+      if (open) box = open;
+    }
 
     if (box) {
-      box.textContent = message;
+      box.replaceChildren(
+        el('p', { class: 'errors__title', text: parsed.message }),
+        parsed.hint ? el('p', { class: 'errors__hint', text: parsed.hint }) : null,
+        A.technicalDetails(parsed.details)
+      );
       box.hidden = false;
       box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
-    else {
-      A.toast(message, true);
-    }
+
+    A.toast(parsed.message + (parsed.hint && !box ? '\n' + parsed.hint : ''), true);
 
   };
 
@@ -459,9 +546,21 @@
 
   /* =======================================================
      IMAGE PICKER
-     Resizes in the browser (WebP, or JPEG where WebP encoding isn't
-     available, e.g. Safari), uploads to the private Drive staging area.
+     The photo is resized in the browser (WebP, or JPEG where WebP
+     encoding isn't available, e.g. Safari), then uploaded to the private
+     Drive staging area. Every stage is shown; a failure stays visible
+     inside the editor with a retry that reuses the prepared image.
   ======================================================= */
+
+  var IMAGE = {
+    maxInputBytes: 40 * 1024 * 1024,
+    fullSide: 1600,
+    fullTarget: 700 * 1024,
+    fullLimit: 1500 * 1024,
+    thumbSide: 480,
+    thumbTarget: 120 * 1024,
+    thumbLimit: 280 * 1024
+  };
 
   function canvasBlob(canvas, type, quality) {
 
@@ -474,7 +573,7 @@
     return new Promise(function (resolve, reject) {
       var reader = new FileReader();
       reader.onload = function () { resolve(String(reader.result).split(',')[1]); };
-      reader.onerror = reject;
+      reader.onerror = function () { reject(reader.error || new Error('read failed')); };
       reader.readAsDataURL(blob);
     });
 
@@ -483,7 +582,8 @@
   function loadBitmap(file) {
 
     if (window.createImageBitmap) {
-      return createImageBitmap(file, { imageOrientation: 'from-image' }).catch(function () { return createImageBitmap(file); });
+      return createImageBitmap(file, { imageOrientation: 'from-image' })
+        .catch(function () { return createImageBitmap(file); });
     }
 
     return new Promise(function (resolve, reject) {
@@ -495,47 +595,120 @@
 
   }
 
-  async function encode(bitmap, maxSide, maxBytes) {
+  /* halves the image until it's close to the target, then one last
+     high-quality step: big phone photos come out sharp, not jagged */
+  function scaled(source, maxSide) {
 
-    var scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    var width = source.width;
+    var height = source.height;
+    var scale = Math.min(1, maxSide / Math.max(width, height));
+    var targetW = Math.max(1, Math.round(width * scale));
+    var targetH = Math.max(1, Math.round(height * scale));
+    var current = source;
+
+    while (current.width / 2 >= targetW * 1.25) {
+      var half = document.createElement('canvas');
+      half.width = Math.round(current.width / 2);
+      half.height = Math.round(current.height / 2);
+      var hctx = half.getContext('2d');
+      hctx.imageSmoothingQuality = 'high';
+      hctx.drawImage(current, 0, 0, half.width, half.height);
+      current = half;
+    }
+
     var canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    canvas.width = targetW;
+    canvas.height = targetH;
+    var ctx = canvas.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(current, 0, 0, targetW, targetH);
 
+    return canvas;
+
+  }
+
+  async function encode(canvas, target) {
+
+    var qualities = [0.86, 0.8, 0.72, 0.64, 0.55, 0.46];
     var blob = null;
-    var qualities = [0.82, 0.72, 0.62, 0.5];
 
     for (var i = 0; i < qualities.length; i++) {
       blob = await canvasBlob(canvas, 'image/webp', qualities[i]);
       // Safari can't encode WebP and silently returns PNG
       if (!blob || blob.type !== 'image/webp') {
-        blob = await canvasBlob(canvas, 'image/jpeg', qualities[i] + 0.05);
+        blob = await canvasBlob(canvas, 'image/jpeg', Math.min(0.92, qualities[i] + 0.04));
       }
-      if (blob && blob.size <= maxBytes) break;
+      if (blob && blob.size <= target) break;
     }
 
-    return { blob: blob, width: canvas.width, height: canvas.height };
+    return blob;
 
   }
 
-  A.prepareImage = async function (file) {
+  function imageError(message, hint, details) {
 
-    var bitmap = await loadBitmap(file);
-    var full = await encode(bitmap, 1600, 1500 * 1024);
-    var thumb = await encode(bitmap, 480, 280 * 1024);
+    var error = new Error(message);
+    error.parsed = { message: message, hint: hint || '', details: details || '' };
+    return error;
 
-    if (!full.blob || full.blob.size > 1500 * 1024) {
-      throw new Error('الصورة كبيرة قوي حتى بعد التصغير');
+  }
+
+  /**
+   * file -> { mime, width, height, full, thumb (base64), previewUrl, bytesIn, bytesOut }
+   * onStage(stage, fraction) reports 'prepare' and 'compress' progress.
+   */
+  A.prepareImage = async function (file, onStage) {
+
+    onStage = onStage || function () {};
+
+    var heic = /\.(heic|heif)$/i.test(file.name || '') || /heic|heif/i.test(file.type || '');
+
+    if (file.type && !/^image\//.test(file.type) && !heic) {
+      throw imageError('الملف ده مش صورة.', 'اختار صورة (JPG أو PNG أو WebP).', file.type);
+    }
+
+    if (file.size > IMAGE.maxInputBytes) {
+      throw imageError('الصورة كبيرة جدًا (' + Math.round(file.size / 1048576) + ' MB).', 'اختار صورة أصغر من 40 MB.');
+    }
+
+    onStage('prepare', 0.1);
+
+    var bitmap;
+
+    try {
+      bitmap = await loadBitmap(file);
+    }
+    catch (error) {
+      throw heic
+        ? imageError('المتصفح ده مش بيفتح صور HEIC.', 'من الآيفون: الإعدادات ← الكاميرا ← الصيغ ← «الأكثر توافقًا»، أو افتح لوحة التحكم من Safari.', String(error))
+        : imageError('مقدرناش نفتح الصورة.', 'جرّب صورة تانية، أو صوّرها screenshot وارفعها.', String(error));
+    }
+
+    onStage('prepare', 1);
+    onStage('compress', 0.05);
+
+    var fullCanvas = scaled(bitmap, IMAGE.fullSide);
+    onStage('compress', 0.3);
+    var full = await encode(fullCanvas, IMAGE.fullTarget);
+    onStage('compress', 0.75);
+    var thumb = await encode(scaled(fullCanvas, IMAGE.thumbSide), IMAGE.thumbTarget);
+    onStage('compress', 1);
+
+    if (bitmap.close) bitmap.close();
+
+    if (!full || full.size > IMAGE.fullLimit || !thumb || thumb.size > IMAGE.thumbLimit) {
+      throw imageError('الصورة كبيرة قوي حتى بعد الضغط.', 'جرّب صورة أبسط أو قصّها الأول.', 'full ' + (full && full.size) + ' thumb ' + (thumb && thumb.size));
     }
 
     return {
-      mime: full.blob.type,
-      width: full.width,
-      height: full.height,
-      full: await blobBase64(full.blob),
-      thumb: await blobBase64(thumb.blob),
-      previewUrl: URL.createObjectURL(thumb.blob)
+      mime: full.type,
+      width: fullCanvas.width,
+      height: fullCanvas.height,
+      full: await blobBase64(full),
+      thumb: await blobBase64(thumb),
+      previewUrl: URL.createObjectURL(thumb),
+      bytesIn: file.size,
+      bytesOut: full.size
     };
 
   };
@@ -555,10 +728,26 @@
 
     if (!A.previewCache[id]) {
       A.previewCache[id] = A.call('apiMediaPreview', id);
+      // a failed preview can be tried again later
+      A.previewCache[id].catch(function () { delete A.previewCache[id]; });
     }
 
     return A.previewCache[id];
 
+  };
+
+  A.formatBytes = function (bytes) {
+
+    return bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(bytes / 1024)) + ' KB';
+
+  };
+
+  var STAGES = {
+    prepare: { label: 'جاري تجهيز الصورة…', from: 0, to: 0.15 },
+    compress: { label: 'جاري ضغط الصورة…', from: 0.15, to: 0.5 },
+    upload: { label: 'جاري الرفع…' },
+    done: { label: 'تم الرفع ✓' },
+    error: { label: 'حدث خطأ أثناء الرفع' }
   };
 
   A.imagePicker = function (currentId, options) {
@@ -566,19 +755,87 @@
     options = options || {};
 
     var value = currentId || '';
+    var pending = null;      // prepared image kept only for a retry
+    var busy = false;
     var media = function () { return (A.state.draft.media || []).filter(function (m) { return m.id === value; })[0]; };
 
     var preview = el('div', { class: 'picker__preview' });
-    var status = el('span', { class: 'field__hint' });
-    var file = el('input', { type: 'file', accept: 'image/*', class: 'visually-hidden' });
+    var file = el('input', { type: 'file', accept: 'image/*', class: 'visually-hidden', tabindex: '-1', 'aria-hidden': 'true' });
     var alt = A.textInput(media() ? media().alt : '', { max: 140, placeholder: 'وصف الصورة لقارئ الشاشة (مثلاً: بوستر رحلة الغردقة)' });
     var altField = A.field('وصف الصورة', alt, 'مهم للي بيستخدم قارئ شاشة');
+
+    var stageLabel = el('span', { class: 'upload__label' });
+    var stageMeta = el('span', { class: 'upload__meta ltr' });
+    var bar = el('span', { class: 'upload__bar' });
+    var track = el('span', { class: 'upload__track', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100' }, bar);
+    var progress = el('div', { class: 'upload', hidden: true, 'aria-live': 'polite' },
+      el('div', { class: 'upload__row' }, stageLabel, stageMeta),
+      track
+    );
+    var errorBox = el('div', { class: 'upload-error', role: 'alert', hidden: true });
+
+    var choose = el('button', { class: 'btn', type: 'button', onclick: function () { if (!busy) file.click(); } }, icon('photos'), el('span', { text: 'اختار صورة' }));
+    var remove = el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { value = ''; markDirty(); setStage(null); show(); } }, 'شيل الصورة');
+
+    var uploadStarted = 0;
+    var elapsedTimer = 0;
+
+    function setStage(stage, fraction, meta) {
+
+      clearInterval(elapsedTimer);
+      progress.classList.remove('is-indeterminate', 'is-done', 'is-error');
+
+      if (!stage) {
+        progress.hidden = true;
+        return;
+      }
+
+      var info = STAGES[stage];
+      progress.hidden = false;
+      stageLabel.textContent = info.label;
+      if (meta !== undefined) stageMeta.textContent = meta;
+
+      if (stage === 'upload') {
+        // google.script.run reports no byte progress: an honest moving bar plus elapsed time
+        progress.classList.add('is-indeterminate');
+        track.removeAttribute('aria-valuenow');
+        uploadStarted = Date.now();
+        elapsedTimer = setInterval(function () {
+          stageLabel.textContent = info.label + ' ' + Math.round((Date.now() - uploadStarted) / 1000) + ' ث';
+        }, 1000);
+        return;
+      }
+
+      var done = stage === 'done' ? 1 : stage === 'error' ? 1 : info.from + (info.to - info.from) * (fraction || 0);
+      bar.style.transform = 'scaleX(' + done.toFixed(3) + ')';
+      track.setAttribute('aria-valuenow', String(Math.round(done * 100)));
+      if (stage === 'done') progress.classList.add('is-done');
+      if (stage === 'error') progress.classList.add('is-error');
+
+    }
+
+    function showError(error) {
+
+      var parsed = A.parseError(error);
+      errorBox.replaceChildren(
+        el('p', { class: 'upload-error__title' }, icon('alert'), el('span', { text: parsed.message })),
+        parsed.hint ? el('p', { class: 'upload-error__hint', text: parsed.hint }) : null,
+        el('div', { class: 'actions' },
+          pending ? el('button', { class: 'btn btn--small', type: 'button', onclick: function () { upload(pending); } }, 'جرّب الرفع تاني') : null,
+          el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () { file.click(); } }, 'اختار صورة تانية')
+        ),
+        A.technicalDetails(parsed.details)
+      );
+      errorBox.hidden = false;
+      setStage('error');
+
+    }
 
     function show() {
 
       preview.replaceChildren();
       altField.hidden = !value;
-      remove.hidden = !value;
+      remove.hidden = !value || busy;
       choose.lastChild.textContent = value ? 'غيّر الصورة' : 'اختار صورة';
 
       if (!value) {
@@ -590,50 +847,74 @@
       preview.appendChild(img);
 
       A.mediaPreview(value).then(function (src) { if (src) img.src = src; }).catch(function () {
-        preview.replaceChildren(el('span', { class: 'picker__empty', text: 'مقدرناش نعرض المعاينة' }));
+        preview.replaceChildren(el('span', { class: 'picker__empty', text: 'الصورة محفوظة، بس مقدرناش نعرض المعاينة' }));
       });
 
     }
 
-    var choose = el('button', { class: 'btn', type: 'button', onclick: function () { file.click(); } }, icon('photos'), el('span', { text: 'اختار صورة' }));
-    var remove = el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { value = ''; markDirty(); show(); } }, 'شيل الصورة');
+    function setBusy(on) {
+
+      if (on !== busy) A.uploadsInFlight = Math.max(0, (A.uploadsInFlight || 0) + (on ? 1 : -1));
+      busy = on;
+      choose.disabled = on;
+      remove.hidden = !value || on;
+
+    }
+
+    function upload(prepared) {
+
+      setBusy(true);
+      errorBox.hidden = true;
+      setStage('upload', 0, A.formatBytes(prepared.bytesOut));
+
+      return A.call('apiUploadMedia', {
+        full: prepared.full,
+        thumb: prepared.thumb,
+        mime: prepared.mime,
+        width: prepared.width,
+        height: prepared.height,
+        alt: alt.value
+      }).then(function (result) {
+        if (!result || !result.media || !result.media.id || !result.state) {
+          throw imageError('الرفع خلص بس الرد رجع ناقص.', 'جرّب تاني.', JSON.stringify(result || null).slice(0, 200));
+        }
+        A.previewCache = A.previewCache || {};
+        A.previewCache[result.media.id] = Promise.resolve(prepared.previewUrl);
+        // keep the editor open: update the state without re-rendering
+        A.state = result.state;
+        A.renderStatus();
+        value = result.media.id;
+        pending = null;     // the base64 copy is not kept around
+        markDirty();
+        setStage('done', 1, A.formatBytes(prepared.bytesIn) + ' ← ' + A.formatBytes(prepared.bytesOut));
+        stageLabel.textContent = 'تم الرفع ✓ — احفظ عشان تتربط، وهتتنشر مع المحتوى';
+        show();
+      }).catch(function (error) {
+        pending = prepared;
+        showError(error);
+      }).finally(function () {
+        setBusy(false);
+      });
+
+    }
 
     file.addEventListener('change', function () {
 
       var chosen = file.files && file.files[0];
       file.value = '';
-      if (!chosen) return;
+      if (!chosen || busy) return;
 
-      status.textContent = 'بنجهز الصورة…';
-      choose.disabled = true;
+      setBusy(true);
+      errorBox.hidden = true;
+      pending = null;
+      setStage('prepare', 0, A.formatBytes(chosen.size));
 
-      A.prepareImage(chosen)
-        .then(function (prepared) {
-          status.textContent = 'بنرفعها… (' + Math.round(prepared.full.length * 0.75 / 1024) + ' KB)';
-          return A.call('apiUploadMedia', {
-            full: prepared.full,
-            thumb: prepared.thumb,
-            mime: prepared.mime,
-            width: prepared.width,
-            height: prepared.height,
-            alt: alt.value
-          }).then(function (result) {
-            A.previewCache = A.previewCache || {};
-            A.previewCache[result.media.id] = Promise.resolve(prepared.previewUrl);
-            // keep the editor open: update the state without re-rendering
-            A.state = result.state;
-            A.renderStatus();
-            value = result.media.id;
-            markDirty();
-            status.textContent = 'اترفعت ✓ — هتتنشر مع المحتوى';
-            show();
-          });
-        })
+      A.prepareImage(chosen, function (stage, fraction) { setStage(stage, fraction); })
+        .then(function (prepared) { return upload(prepared); })
         .catch(function (error) {
-          status.textContent = '';
-          A.fail(error);
-        })
-        .finally(function () { choose.disabled = false; });
+          setBusy(false);
+          showError(error);
+        });
 
     });
 
@@ -646,18 +927,24 @@
 
     show();
 
+    // a <div>, not a <label>: a label around several buttons forwards stray clicks
     return {
-      node: A.field(options.label || 'الصورة / البوستر', el('div', { class: 'picker' },
-        preview,
-        el('div', { class: 'actions' }, choose, remove, file),
-        status,
-        altField
-      ), options.hint || 'من الموبايل أو الكمبيوتر — بتتصغر لوحدها قبل الرفع'),
-      value: function () { return value; }
+      node: el('div', { class: 'field' },
+        el('span', { class: 'field__label', text: options.label || 'الصورة / البوستر' }),
+        el('div', { class: 'picker' },
+          preview,
+          el('div', { class: 'actions' }, choose, remove, file),
+          progress,
+          errorBox,
+          altField
+        ),
+        el('span', { class: 'field__hint', text: options.hint || 'من الموبايل أو الكمبيوتر — بتتصغر وتتضغط لوحدها قبل الرفع' })
+      ),
+      value: function () { return value; },
+      busy: function () { return busy; }
     };
 
   };
-
 
   /* =======================================================
      SHEET (dialog)
@@ -687,6 +974,16 @@
     sheet.close();
 
   };
+
+  // a toast shown inside the editor moves back to the page when it closes
+  sheet.addEventListener('close', function () {
+    var toast = document.getElementById('toast');
+    if (toast.parentNode !== sheet) return;
+    var visible = toast.classList.contains('is-visible');
+    if (toast.hidePopover && toast.matches(':popover-open')) toast.hidePopover();
+    document.body.appendChild(toast);
+    if (visible && toast.showPopover) toast.showPopover();
+  });
 
   sheet.addEventListener('cancel', function (event) {
     event.preventDefault();
@@ -871,6 +1168,11 @@
   A.saveItem = function (kind, data, box, button, message) {
 
     box.hidden = true;
+
+    if (A.uploadsInFlight > 0) {
+      A.fail(imageError('الصورة لسه بتترفع.', 'استنى لما يظهر «تم الرفع ✓» وبعدين احفظ.'), box);
+      return Promise.resolve();
+    }
 
     return A.withBusy(button, A.call('apiSaveItem', kind, data))
       .then(function (next) {

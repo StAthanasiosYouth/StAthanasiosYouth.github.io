@@ -514,8 +514,34 @@
         })
         .catch(function (error) {
           checkResult.className = 'errors';
-          checkResult.textContent = error.message;
-          checkResult.hidden = false;
+          A.fail(error, checkResult);
+        });
+    });
+
+    /* every step of a poster upload against the real Google Drive */
+    var mediaResult = el('div', { class: 'checklist', hidden: true, 'aria-live': 'polite' });
+    var mediaCheck = el('button', { class: 'btn', type: 'button', text: 'اختبر رفع الصور' });
+
+    mediaCheck.addEventListener('click', function () {
+      mediaResult.hidden = true;
+      A.withBusy(mediaCheck, A.call('apiCheckMedia'))
+        .then(function (report) {
+          mediaResult.replaceChildren(
+            el('p', { class: report.ok ? 'note note--ok' : 'errors', text: report.ok ? 'رفع الصور شغال ✓' : 'فيه مشكلة في رفع الصور — الخطوة اللي عليها ✗ هي السبب' }),
+            el('ol', { class: 'checklist__steps' }, report.steps.map(function (step) {
+              return el('li', { class: step.ok ? 'is-ok' : 'is-fail' },
+                el('span', { class: 'checklist__mark', 'aria-hidden': 'true', text: step.ok ? '✓' : '✗' }),
+                el('span', { text: step.label + (step.ok && step.detail ? ' — ' + step.detail : '') }),
+                step.ok ? null : A.technicalDetails(step.detail)
+              );
+            }))
+          );
+          mediaResult.hidden = false;
+        })
+        .catch(function (error) {
+          mediaResult.replaceChildren(el('div', { class: 'errors' }));
+          A.fail(error, mediaResult.firstChild);
+          mediaResult.hidden = false;
         });
     });
 
@@ -539,6 +565,11 @@
       )
     );
 
+    var mediaCard = A.card('الصور', 'لو رفع البوسترات مش شغال، الاختبار ده بيجرّب كل خطوة على Google Drive الحقيقي ويقولك السبب بالظبط. مبيسيبش أي ملفات وراه.',
+      mediaResult,
+      el('div', { class: 'actions' }, mediaCheck)
+    );
+
     var accountCard = A.card('الحساب', null,
       el('p', {}, 'انت داخل بـ ', A.chip(A.state.user, 'ltr'))
     );
@@ -549,7 +580,7 @@
       )
       : null;
 
-    return [siteCard, A.state.hubReady ? hubCard : null, guideCard, publishCard, accountCard].filter(Boolean);
+    return [siteCard, A.state.hubReady ? hubCard : null, guideCard, publishCard, mediaCard, accountCard].filter(Boolean);
 
   };
 

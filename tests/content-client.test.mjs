@@ -14,7 +14,8 @@ const IMG = { src: 'media/2026/img-ab12cd34.webp', thumb: 'media/2026/img-ab12cd
 
 test('schema 1 content still works (hub lists empty)', () => {
   const v1 = { ...seed, schema: 1 };
-  delete v1.news;
+  // schema 1 had none of the hub lists (the live file may have them now)
+  for (const key of ['sessions', 'news', 'games', 'notifications']) delete v1[key];
   const c = sanitizeContent(v1);
   assert.deepEqual([c.sessions, c.news, c.games, c.notifications], [[], [], [], []]);
   assert.equal(c.featured.length, 1);

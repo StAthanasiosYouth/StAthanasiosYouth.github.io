@@ -46,10 +46,47 @@ function drive_(method, url, options) {
   var code = response.getResponseCode();
 
   if (code < 200 || code >= 300) {
-    throw new Error('Google Drive رفض العملية (' + code + '). جرّب تاني بعد شوية.');
+    throw driveError_(code, response.getContentText());
   }
 
   return response;
+
+}
+
+
+/**
+ * Google's own answer, kept (it names the real cause: API disabled,
+ * missing permission, folder gone, quota...), plus Arabic for the admin.
+ */
+function driveError_(code, text) {
+
+  var reason = '';
+  var message = '';
+
+  try {
+    var body = JSON.parse(text || '{}').error || {};
+    message = String(body.message || '');
+    reason = String((body.errors && body.errors[0] && body.errors[0].reason) || body.status || '');
+  }
+  catch (error) {
+    message = String(text || '').slice(0, 300);
+  }
+
+  var details = 'Google Drive ' + code + (reason ? ' ' + reason : '') + (message ? ': ' + message : '');
+  var disabled = /accessNotConfigured|SERVICE_DISABLED|has not been used|is disabled/i.test(reason + ' ' + message);
+
+  var known =
+    disabled ? ['خدمة Google Drive مش مفعّلة لمشروع لوحة التحكم.', 'ده إعداد في مشروع Apps Script نفسه، مش في الصورة. ابعت التفاصيل التقنية للدعم الفني.'] :
+    code === 401 || reason === 'insufficientPermissions' || reason === 'authError' ? ['حسابك لسه مدّاش لوحة التحكم صلاحية حفظ الصور في Drive.', 'اقفل لوحة التحكم وافتحها تاني، ووافق على الصلاحيات لو اتطلبت.'] :
+    code === 404 ? ['فولدر الصور في Drive مش موجود أو اتمسح.', 'جرّب ترفع الصورة تاني: هيتعمل فولدر جديد لوحده.'] :
+    /storageQuotaExceeded|quotaExceeded/i.test(reason) ? ['مساحة Google Drive خلصت.', 'فضّي مساحة في Drive وجرّب تاني.'] :
+    code === 429 || code >= 500 || /rateLimit/i.test(reason) ? ['Google Drive مشغول دلوقتي.', 'استنى دقيقة وجرّب تاني.'] :
+    ['Google Drive رفض حفظ الصورة.', 'جرّب تاني بعد شوية. لو اتكررت، ابعت التفاصيل التقنية للدعم الفني.'];
+
+  var error = appError_(known[0], known[1], details);
+  error.driveCode = code;
+
+  return error;
 
 }
 
@@ -80,6 +117,23 @@ function mediaFolderId_() {
 
 
 function driveUpload_(bytes, mime, name) {
+
+  try {
+    return driveUploadOnce_(bytes, mime, name);
+  }
+  catch (error) {
+    // the staging folder was deleted by hand: make a new one, once
+    if (error.driveCode === 404 && PropertiesService.getScriptProperties().getProperty('MEDIA_FOLDER_ID')) {
+      PropertiesService.getScriptProperties().deleteProperty('MEDIA_FOLDER_ID');
+      return driveUploadOnce_(bytes, mime, name);
+    }
+    throw error;
+  }
+
+}
+
+
+function driveUploadOnce_(bytes, mime, name) {
 
   var boundary = 'athanasios' + Utilities.getUuid().replace(/-/g, '');
 
@@ -197,6 +251,18 @@ function apiUploadMedia(input) {
   var year = Utilities.formatDate(new Date(), CONTENT_TIMEZONE, 'yyyy');
   var ext = mime === 'image/webp' ? 'webp' : 'jpg';
 
+  var driveId, thumbDriveId;
+
+  try {
+    driveId = driveUpload_(full, mime, id + '.' + ext);
+    thumbDriveId = driveUpload_(thumb, mime, id + '-480.' + ext);
+  }
+  catch (error) {
+    // failures are visible in the Log tab, with Google's own reason
+    log_(email, 'media.upload.failed', errorDetails_(error));
+    throw error;
+  }
+
   var record = {
     id: id,
     path: 'media/' + year + '/' + id + '.' + ext,
@@ -205,8 +271,8 @@ function apiUploadMedia(input) {
     height: height,
     alt: alt,
     mime: mime,
-    driveId: driveUpload_(full, mime, id + '.' + ext),
-    thumbDriveId: driveUpload_(thumb, mime, id + '-480.' + ext),
+    driveId: driveId,
+    thumbDriveId: thumbDriveId,
     uploadedAt: nowStamp_(),
     publishedAt: ''
   };
@@ -222,6 +288,131 @@ function apiUploadMedia(input) {
     state: state,
     user: email
   };
+
+}
+
+
+/* =========================================================
+   CHECK (run from the editor, or «اختبر رفع الصور» in Settings)
+========================================================= */
+
+/* the smallest valid WebP: 1x1 lossless */
+var CHECK_WEBP_BASE64 = 'UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==';
+
+
+/**
+ * Walks every step a poster upload takes, against the real Google Drive,
+ * and reports which step fails and Google's exact reason. Leaves nothing
+ * behind (the test file is deleted).
+ */
+function checkMedia() {
+
+  assertAdmin_();
+
+  var report = runMediaCheck_();
+  var text = report.steps.map(function (step) {
+    return (step.ok ? '✓ ' : '✗ ') + step.label + (step.detail ? ' — ' + step.detail : '');
+  }).join('\n') + '\n' + (report.ok ? 'كله تمام: رفع الصور شغال.' : 'فيه مشكلة في الخطوة اللي عليها ✗');
+
+  console.log(text);
+
+  return text;
+
+}
+
+
+function apiCheckMedia() {
+
+  assertAdmin_();
+
+  return runMediaCheck_();
+
+}
+
+
+function runMediaCheck_() {
+
+  var email = currentEmail_();
+  var steps = [];
+  var testId = null;
+
+  function step(label, action) {
+    if (steps.length && !steps[steps.length - 1].ok) {
+      return null;
+    }
+    try {
+      var detail = action();
+      steps.push({ label: label, ok: true, detail: detail || '' });
+      return true;
+    }
+    catch (error) {
+      steps.push({ label: label, ok: false, detail: errorDetails_(error) });
+      return false;
+    }
+  }
+
+  step('صلاحية Drive في حسابك', function () {
+    var response = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo', {
+      method: 'post',
+      payload: { access_token: ScriptApp.getOAuthToken() },
+      muteHttpExceptions: true
+    });
+    var scopes = String((JSON.parse(response.getContentText() || '{}')).scope || '');
+    if (scopes.indexOf('https://www.googleapis.com/auth/drive.file') === -1) {
+      throw appError_('صلاحية drive.file مش موجودة', '', 'granted scopes: ' + (scopes || '(none)'));
+    }
+    return 'drive.file';
+  });
+
+  step('فولدر الصور', function () {
+    var id = PropertiesService.getScriptProperties().getProperty('MEDIA_FOLDER_ID');
+    if (id) {
+      try {
+        var meta = JSON.parse(drive_('get', DRIVE_FILES + '/' + encodeURIComponent(id) + '?fields=id,trashed').getContentText());
+        if (!meta.trashed) {
+          return 'موجود';
+        }
+      }
+      catch (error) {
+        if (error.driveCode !== 404) {
+          throw error;
+        }
+      }
+      PropertiesService.getScriptProperties().deleteProperty('MEDIA_FOLDER_ID');
+    }
+    mediaFolderId_();
+    return 'اتعمل فولدر جديد';
+  });
+
+  step('رفع ملف تجربة صغير', function () {
+    testId = driveUpload_(Utilities.base64Decode(CHECK_WEBP_BASE64), 'image/webp', '_check-' + Utilities.getUuid().slice(0, 8) + '.webp');
+    return '';
+  });
+
+  step('قراءة الملف من Drive', function () {
+    if (driveDownloadBase64_(testId) !== CHECK_WEBP_BASE64) {
+      throw appError_('الملف رجع مختلف عن اللي اترفع', '', 'content mismatch');
+    }
+    return '';
+  });
+
+  step('مسح ملف التجربة', function () {
+    drive_('delete', DRIVE_FILES + '/' + encodeURIComponent(testId));
+    return '';
+  });
+
+  step('شيت الصور (Media)', function () {
+    ensureTable_('Media');
+    return readTable_('Media').length + ' صورة';
+  });
+
+  var ok = steps.every(function (s) { return s.ok; });
+
+  log_(email, ok ? 'media.check' : 'media.check.failed', steps.map(function (s) {
+    return (s.ok ? 'ok ' : 'FAIL ') + s.label + (s.detail ? ': ' + s.detail : '');
+  }).join(' | '));
+
+  return { ok: ok, steps: steps };
 
 }
 
