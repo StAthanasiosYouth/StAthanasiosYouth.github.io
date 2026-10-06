@@ -412,20 +412,58 @@ function formatDate(date, timeZone, pattern) {
  * Creates a fresh Apps Script world with all project .gs files loaded.
  * world.as(email) switches the signed-in user.
  */
-export function createWorld({ owner = 'menazakmena@gmail.com', github = new FakeGitHub(), drive = new FakeDrive(), mapsRedirects = {}, adminEmails = owner } = {}) {
+export function createWorld({ owner = 'menazakmena@gmail.com', github = new FakeGitHub(), drive = new FakeDrive(), mapsRedirects = {}, adminEmails = owner, executeAs = 'USER_ACCESSING' } = {}) {
 
   // standalone script project: no active spreadsheet; setup() creates one
   const properties = new Map(adminEmails ? [['ADMIN_EMAILS', adminEmails]] : []);
   let spreadsheet = null;
   let user = owner;
 
+  // Google ID tokens the fake tokeninfo knows: token -> claims (like Google's JSON)
+  const idTokens = new Map();
+  const tokeninfo = { calls: 0 };
+  // CacheService.getScriptCache(): key -> { value, until }
+  const cache = new Map();
+
   const context = vm.createContext({
 
     console: { log() {}, warn() {}, error() {} },
 
+    // USER_ACCESSING: the script runs as the visitor. USER_DEPLOYING (the
+    // API deployment): it runs as the owner, and like Google with consumer
+    // accounts, the visitor's email is unknown unless it is the owner.
     Session: {
-      getActiveUser: () => ({ getEmail: () => user }),
-      getEffectiveUser: () => ({ getEmail: () => user })
+      getActiveUser: () => ({ getEmail: () => (executeAs === 'USER_DEPLOYING' ? (user === owner ? owner : '') : user) }),
+      getEffectiveUser: () => ({ getEmail: () => (executeAs === 'USER_DEPLOYING' ? owner : user) })
+    },
+
+    CacheService: {
+      getScriptCache: () => ({
+        get: key => {
+          const entry = cache.get(key);
+          if (!entry || entry.until <= Date.now()) { cache.delete(key); return null; }
+          return entry.value;
+        },
+        put: (key, value, seconds = 600) => {
+          if (String(key).length > 250) throw new Error('Argument too large: key');
+          cache.set(key, { value: String(value), until: Date.now() + Math.min(seconds, 21600) * 1000, seconds });
+        },
+        remove: key => { cache.delete(key); }
+      })
+    },
+
+    ContentService: {
+      MimeType: { JSON: 'JSON', TEXT: 'TEXT' },
+      createTextOutput: text => {
+        const output = {
+          content: String(text),
+          mime: 'TEXT',
+          getContent: () => output.content,
+          getMimeType: () => output.mime,
+          setMimeType: mime => { output.mime = mime; return output; }
+        };
+        return output;
+      }
     },
 
     PropertiesService: {
@@ -485,6 +523,16 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
           return { getResponseCode: () => 302, getContentText: () => '', getHeaders: () => ({ Location: mapsRedirects[url] }) };
         }
         if (url.startsWith('https://www.googleapis.com/')) return drive.fetch(url, options);
+        if (url === 'https://oauth2.googleapis.com/tokeninfo' && options && options.payload && options.payload.id_token !== undefined) {
+          // Google checks the signature and the expiry; we only know the tokens we issued
+          tokeninfo.calls++;
+          const claims = idTokens.get(options.payload.id_token);
+          if (!claims || Number(claims.exp) <= Date.now() / 1000) {
+            return { getResponseCode: () => 400, getContentText: () => JSON.stringify({ error: 'invalid_token', error_description: 'Invalid Value' }), getHeaders: () => ({}) };
+          }
+          return { getResponseCode: () => 200, getContentText: () => JSON.stringify(claims), getHeaders: () => ({}) };
+        }
+        if (String(url).startsWith('https://oauth2.googleapis.com/tokeninfo?')) throw new Error('ID tokens are verified by POST, never in a URL');
         if (url === 'https://oauth2.googleapis.com/tokeninfo') {
           const scope = drive.grantedScopes ?? 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
           return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ scope }), getHeaders: () => ({}) };
@@ -522,7 +570,7 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
 
   });
 
-  for (const file of ['Platforms.gs', 'Content.gs', 'Hub.gs', 'Review.gs', 'Seed.gs', 'Auth.gs', 'Store.gs', 'Publish.gs', 'Code.gs', 'Media.gs', 'Items.gs', 'Migrate.gs']) {
+  for (const file of ['Platforms.gs', 'Content.gs', 'Hub.gs', 'Review.gs', 'Seed.gs', 'Auth.gs', 'Store.gs', 'Publish.gs', 'Code.gs', 'Media.gs', 'Items.gs', 'Migrate.gs', 'Api.gs']) {
     vm.runInContext(readFileSync(`${ROOT}apps-script/${file}`, 'utf8'), context, { filename: file });
   }
 
@@ -532,7 +580,43 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
     drive,
     get spreadsheet() { return spreadsheet; },
     properties,
-    as(email) { user = email; return this; }
+    cache,
+    idTokens,
+    tokeninfo,
+    executeAs,
+    as(email) { user = email; return this; },
+
+    /**
+     * A Google ID token for this world's tokeninfo. claims override the
+     * defaults (aud = ADMIN_CLIENT_ID, a verified email, one hour).
+     */
+    issueToken(claims = {}) {
+      const now = Math.floor(Date.now() / 1000);
+      const client = properties.get('ADMIN_CLIENT_ID') || 'test-client.apps.googleusercontent.com';
+      const full = {
+        iss: 'https://accounts.google.com',
+        aud: client,
+        azp: client,
+        sub: '1' + String(Math.random()).slice(2, 12),
+        email: owner,
+        email_verified: 'true',
+        iat: String(now),
+        exp: String(now + 3600),
+        ...claims
+      };
+      const b64 = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+      const token = `${b64({ alg: 'RS256', kid: 'fake', typ: 'JWT' })}.${b64(full)}.${randomUUID().replace(/-/g, '')}`;
+      // like Google's tokeninfo: numbers and booleans come back as strings
+      idTokens.set(token, Object.fromEntries(Object.entries(full).map(([k, v]) => [k, typeof v === 'number' || typeof v === 'boolean' ? String(v) : v])));
+      return token;
+    },
+
+    /** One API request, the way the admin page sends it: { mime, ok, result | error, code }. */
+    post(body) {
+      const contents = typeof body === 'string' ? body : JSON.stringify(body);
+      const output = context.doPost({ postData: { contents, type: 'text/plain', length: contents.length }, parameter: {}, parameters: {}, queryString: '', contentLength: contents.length });
+      return { mime: output.getMimeType(), ...JSON.parse(output.getContent()) };
+    }
   };
 
 }
