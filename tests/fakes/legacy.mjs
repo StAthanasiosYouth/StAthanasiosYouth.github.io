@@ -14,7 +14,14 @@ export const OLD_COLUMNS = {
   News: ['id', 'enabled', 'featured', 'pinned', 'tone', 'title', 'summary', 'body', 'image', 'linkUrl', 'linkLabel', 'badge', 'publishAt', 'expireAt', 'updatedAt'],
   Games: ['id', 'enabled', 'title', 'description', 'image', 'url', 'buttonLabel', 'visibleFrom', 'startAt', 'endAt', 'afterEnd', 'updatedAt'],
   Notifications: ['id', 'enabled', 'type', 'title', 'message', 'target', 'image', 'publishAt', 'expireAt', 'updatedAt'],
-  Media: ['id', 'path', 'thumb', 'width', 'height', 'alt', 'mime', 'driveId', 'thumbDriveId', 'uploadedAt', 'publishedAt']
+  Media: ['id', 'path', 'thumb', 'width', 'height', 'alt', 'mime', 'driveId', 'thumbDriveId', 'uploadedAt', 'publishedAt'],
+  Contacts: ['id', 'enabled', 'order', 'kind', 'name', 'role', 'description', 'phone', 'method', 'message', 'updatedAt']
+};
+
+/* the columns schema 4 added (the live Sheet is at schema 3 before it) */
+export const SCHEMA_4_COLUMNS = {
+  Links: ['gallery'],
+  Contacts: ['image', 'intro', 'reply']
 };
 
 /** A Sheet like the live one: set up by the previous version, with content. */
@@ -44,6 +51,27 @@ export function legacyWorld({ meetingEnabled = true } = {}) {
   gs.apiSaveItem('sessions', { date: '2099-10-11', topic: 'الكسل الروحى', notify: { topic: true } });
   gs.apiSaveItem('news', { title: 'رحلة الغردقة', summary: 'سجّل اسمك', notify: { publish: true } });
   if (!meetingEnabled) gs.apiSaveSettings({ 'meeting.enabled': false });
+
+  return world;
+
+}
+
+
+/** A Sheet like the live one at schema 3: upgraded once, WhatsApp row in. */
+export function schema3World() {
+
+  const world = legacyWorld();
+  const gs = world.gs;
+  const saved = {};
+
+  // migrate with the schema-3 columns, then put the current ones back
+  for (const [name, extra] of Object.entries(SCHEMA_4_COLUMNS)) {
+    saved[name] = gs.TABLES[name].columns;
+    gs.TABLES[name].columns = saved[name].filter(column => !extra.includes(column));
+  }
+  world.as(ADMIN).gs.migrate();
+  for (const [name, columns] of Object.entries(saved)) gs.TABLES[name].columns = columns;
+  world.properties.set('DATA_SCHEMA', '3');
 
   return world;
 

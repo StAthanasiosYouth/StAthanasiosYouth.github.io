@@ -21,6 +21,7 @@ import { liveSections } from './layout.js';
 import { itemsSection, visibleItems } from './items.js';
 import { wake } from './motion.js';
 import { choreograph } from './feel.js';
+import { hasScene } from './xp.js';
 import { play } from './sound.js';
 import { pageUrl } from './share.js';
 
@@ -403,7 +404,7 @@ function appIcon(name) {
  */
 function linkAttrs(link) {
 
-  if (!link.experience) return external(link.url);
+  if (!hasScene(link.experience)) return external(link.url);
 
   return {
     ...external(link.url),

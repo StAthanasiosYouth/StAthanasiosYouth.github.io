@@ -2,6 +2,9 @@
 // the admin preview shows exactly the icons visitors will see. Also checks
 // that Content.gs ICON_NAMES and icons.js LINK_ICON_NAMES agree.
 //
+// Also generates apps-script/Platforms.gs from assets/js/platforms.js (the
+// link-experience registry), so the publisher and the site share one list.
+//
 // Run after changing assets/js/icons.js: npm run sync
 
 import { writeFileSync } from 'node:fs';
@@ -12,7 +15,7 @@ globalThis.document = { createElement: () => ({ content: {} }) };
 
 const { iconSvg, LINK_ICON_NAMES } = await import('../assets/js/icons.js');
 
-const gs = loadGs(['Content.gs']);
+const gs = loadGs(['Platforms.gs', 'Content.gs']);
 const serverNames = [...gs.ICON_NAMES];
 
 const missing = serverNames.filter(n => !LINK_ICON_NAMES.includes(n));
@@ -57,3 +60,8 @@ window.ADMIN_ICONS = ${JSON.stringify(icons, null, 1)};
 `);
 
 console.log(`AdminIcons.html written (${Object.keys(icons).length} icons); ICON_NAMES in sync.`);
+
+// the link-experience registry for Apps Script
+const { platformsGs } = await import('./lib/platforms-gs.mjs');
+writeFileSync(`${ROOT}apps-script/Platforms.gs`, platformsGs());
+console.log('Platforms.gs written from assets/js/platforms.js.');

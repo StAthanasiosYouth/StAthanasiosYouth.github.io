@@ -1,6 +1,6 @@
 {
   "schema": 3,
-  "revision": "d4110939c31b",
+  "revision": "3314785ff14d",
   "publishedAt": "2026-10-08T09:00:00.000Z",
   "timezone": "Africa/Cairo",
   "site": {
@@ -41,6 +41,7 @@
       "badge": "",
       "startAt": "",
       "endAt": "",
+      "experience": "voice",
       "cta": "ابعت دلوقتي"
     }
   ],

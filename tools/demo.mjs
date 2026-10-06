@@ -7,7 +7,7 @@
 // Usage: node tools/demo.mjs
 
 import sharp from 'sharp';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createWorld } from '../tests/fakes/gas.mjs';
 import { ROOT } from './lib/gs.mjs';
@@ -88,6 +88,47 @@ gs.apiSaveItem('activities', { type: 'black-theatre', title: 'عرض المسر�
 
 gs.apiSaveItem('notifications', { title: 'بوستر المؤتمر نزل', message: 'شوفوا المواعيد والتفاصيل', type: 'important', target: 'https://example.org/poster', publishAt: at(-10) });
 gs.apiSaveItem('notifications', { title: 'شكراً على الأحد اللي فات', message: 'كان اجتماع جميل', type: 'general', publishAt: at(-4 * 1440) });
+
+/* posters in every shape (the adaptive poster sheet) */
+const widePoster = await poster('WIDE', ['#14324f', '#5aa0d8'], { w: 1600, h: 900 });
+const squarePoster = await poster('SQUARE', ['#3b1e54', '#d7aa50'], { w: 1200, h: 1200 });
+const tallPoster = await poster('TALL', ['#0f3d2e', '#7fd1a8'], { w: 900, h: 2400 });
+gs.apiSaveItem('news', { title: 'بوستر عريض', summary: 'صورة بالعرض', image: widePoster, publishAt: at(-5 * 1440) });
+gs.apiSaveItem('news', { title: 'بوستر مربع', summary: 'صورة مربعة', image: squarePoster, publishAt: at(-6 * 1440) });
+gs.apiSaveItem('news', { title: 'بوستر طويل جداً', summary: 'صورة طويلة', image: tallPoster, publishAt: at(-7 * 1440) });
+
+/* the person cards (schema 4): the support avatar, the cards' words */
+const avatarFile = readFileSync(`${ROOT}tools/source/support-avatar.webp`);
+const avatar = gs.apiUploadMedia({
+  full: avatarFile.toString('base64'), thumb: avatarFile.toString('base64'),
+  mime: 'image/webp', width: 256, height: 256, alt: 'مينا زكريا', name: 'صورة مينا'
+}).media.id;
+for (const contact of JSON.parse(JSON.stringify(gs.apiState())).draft.contacts) {
+  if (contact.kind === 'support') {
+    gs.apiSaveContact({ ...contact, image: avatar, intro: 'معايا مشكلة', reply: 'أهلاً بيك 👋 ابعتلي المشكلة أو التفاصيل وأنا هساعدك إن شاء الله.' });
+  }
+  else {
+    gs.apiSaveContact({ ...contact, intro: 'عندك سؤال أو محتاج تتكلم؟' });
+  }
+}
+
+/* more platforms (the registry): auto by icon, by URL, a chosen generic scene */
+gs.apiSaveLink({ title: 'تيليجرام', subtitle: 'القناة', url: 'https://t.me/stathanasios_demo', section: 'social', icon: 'telegram', style: 'tile' });
+gs.apiSaveLink({ title: 'يوتيوب', subtitle: 'العظات والترانيم', url: 'https://youtu.be/demo', section: 'social', icon: 'youtube', style: 'tile' });
+gs.apiSaveLink({ title: 'سبوتيفاي', subtitle: 'ترانيم', url: 'https://open.spotify.com/playlist/demo', section: 'social', icon: 'spotify', style: 'tile' });
+gs.apiSaveLink({ title: 'موقع الكنيسة', subtitle: 'مشهد عام', url: 'https://example.org/church', section: 'social', icon: 'church', experience: 'web' });
+
+// a scene's own photos (instagram)
+const instagram = JSON.parse(JSON.stringify(gs.apiState())).draft.links.find(l => l.icon === 'instagram');
+if (instagram) gs.apiSaveLink({ ...instagram, gallery: [tripPoster, confPoster, squarePoster] });
+
+/* --banners: a banner on every section (the universal banner check) */
+if (process.argv.includes('--banners')) {
+  const banner = await poster('BANNER', ['#0b2a4c', '#d7aa50'], { w: 1600, h: 600 });
+  for (const section of JSON.parse(JSON.stringify(gs.apiState())).layout) {
+    gs.apiSaveSection({ ...section, banner }, false);
+  }
+}
 
 /* publish through the real path */
 const review = gs.apiReview();

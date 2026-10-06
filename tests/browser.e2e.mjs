@@ -211,7 +211,9 @@ test('tampered content.json cannot inject links or markup', async () => {
   const hrefs = await page.$$eval('a[href]', els => els.map(a => a.getAttribute('href')));
   assert.ok(hrefs.every(h => /^(https:|tel:\+|#|meeting\.ics$)/.test(h)), `unsafe href: ${hrefs.filter(h => !/^(https:|tel:\+|#|meeting\.ics$)/.test(h))}`);
   assert.equal(await page.$eval('#site-tagline', el => el.textContent), '<img src=x onerror="window.__pwned=1">', 'shown as text');
-  assert.equal(await page.$$eval('#main img', imgs => imgs.length), 1, 'only the logo image');
+  // only the logo, plus posters from our own media/ folder (real content has some)
+  const foreign = await page.$$eval('#main img', imgs => imgs.map(i => i.getAttribute('src')).filter(src => !/^media\/\d{4}\/img-[a-z0-9]{8}(-480)?\.webp$/.test(src)));
+  assert.equal(foreign.length, 1, `only the logo image: ${foreign}`);
   assert.ok(await page.evaluate(() => document.body.innerText.includes('<b>bold</b>')));
   assert.equal(await page.$('.featured'), null, 'featured link with a bad URL is dropped');
   assert.deepEqual(problems.filter(p => p.includes('CSP')), []);
@@ -229,12 +231,19 @@ test('page weight on first visit', async () => {
   for (const r of resources.sort((a, b) => b.size - a.size).slice(0, 6)) console.log(`    ${(r.size / 1024).toFixed(1).padStart(6)} KB  ${r.name}`);
   // what actually travels: GitHub Pages compresses text (gzip/brotli); fonts
   // and images are already compressed
-  const sent = resources.reduce((sum, r) => {
+  // the admin's own posters (media/) depend on what is published this week:
+  // reported and capped one by one, outside the code budget
+  const posters = resources.filter(r => /^\/?media\//.test(r.name));
+  for (const r of posters) {
+    console.log(`  content image: ${(r.size / 1024).toFixed(1)} KB  ${r.name}`);
+    assert.ok(r.size < 60 * 1024, `a published thumbnail stays small: ${r.name}`);
+  }
+  const sent = resources.filter(r => !posters.includes(r)).reduce((sum, r) => {
     const path = r.name.split('?')[0].replace(/^\//, '');
     const text = /\.(js|css|json|html|ics|svg)$/.test(path) && existsSync(ROOT + path);
     return sum + (text ? gzipSync(readFileSync(ROOT + path), { level: 9 }).length : r.size);
   }, gzipSync(readFileSync(`${ROOT}index.html`)).length);
-  console.log(`  sent over the network (compressed): ${(sent / 1024).toFixed(0)} KB`);
+  console.log(`  sent over the network (compressed, without content images): ${(sent / 1024).toFixed(1)} KB`);
   assert.ok(sent < 230 * 1024, 'first load under 230 KB over the network');
   assert.ok(total < 420 * 1024, 'first load under 420 KB before compression');
   assert.ok(!resources.some(r => r.name.includes('qrcode')), 'QR library is lazy-loaded');

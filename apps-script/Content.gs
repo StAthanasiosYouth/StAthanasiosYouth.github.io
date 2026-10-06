@@ -42,8 +42,14 @@ var ICON_NAMES = [
  */
 var SECTION_KINDS = ['meeting', 'featured', 'news', 'games', 'items', 'location', 'links', 'contacts', 'support', 'share'];
 
-/* what a link opens first (Phase 6 mini-experiences); empty = from its icon */
-var LINK_EXPERIENCES = ['none', 'facebook', 'instagram', 'tiktok', 'whatsapp'];
+/* what a link may open first: '' (auto), 'none', or a key of PLATFORMS
+   (Platforms.gs, generated from assets/js/platforms.js). A function, not a
+   var: Platforms.gs may load after this file. */
+function linkExperiences_() {
+
+  return ['none'].concat(Object.keys(PLATFORMS));
+
+}
 
 var SECTION_THEMES = ['gold', 'ember', 'azure', 'rose', 'emerald', 'night'];
 
@@ -89,7 +95,10 @@ var LIMITS = {
   personName: 60,
   role: 60,
   description: 140,
-  message: 300
+  message: 300,
+  contactIntro: 80,
+  contactReply: 200,
+  gallery: 6
 };
 
 
@@ -609,6 +618,24 @@ function buildPublicContent(draft, options) {
   });
 
 
+  /* ---------- library images used outside the hub (scene photos, avatars) ---------- */
+
+  var mediaById = mediaIndex_(draft.media);
+  var extraMedia = [];
+
+  /* one library image, or null (a missing one is a warning, not a blocker) */
+  function libraryImage(id, where, label) {
+    id = contentLine_(id);
+    if (!id) return null;
+    if (!mediaById[id]) {
+      warn(where, label + ' "' + id + '" مش موجودة في المكتبة، ومش هتظهر');
+      return null;
+    }
+    if (extraMedia.indexOf(id) === -1) extraMedia.push(id);
+    return mediaById[id];
+  }
+
+
   /* ---------- links ---------- */
 
   var seenLinkIds = Object.create(null);
@@ -712,15 +739,27 @@ function buildPublicContent(draft, options) {
     };
 
     // a social link opens its short mini-experience first (site: xp.js)
-    var experience = linkExperience_(row.experience, icon);
+    var experience = linkExperience_(row.experience, icon, url, where, warn);
 
     if (experience) {
       link.experience = experience;
     }
 
+    // the scene's own photos (Media Library ids, comma separated); without
+    // them the site uses our newest published posters. Only resolved for a
+    // link that is really published (its images go public with it).
+    function withGallery() {
+      if (!experience) return link;
+      var gallery = contentLine_(row.gallery).split(/[\s,،]+/).filter(Boolean).slice(0, LIMITS.gallery)
+        .map(function (mediaId) { return libraryImage(mediaId, where, 'صورة المشهد'); })
+        .filter(Boolean);
+      if (gallery.length) link.gallery = gallery;
+      return link;
+    }
+
     if (isFeatured) {
       link.cta = limited(where, contentLine_(row.cta), LIMITS.cta, 'نص الزرار');
-      featured.push(link);
+      featured.push(withGallery());
       return;
     }
 
@@ -732,7 +771,7 @@ function buildPublicContent(draft, options) {
       return;
     }
 
-    (linksBySection[section] = linksBySection[section] || []).push(link);
+    (linksBySection[section] = linksBySection[section] || []).push(withGallery());
 
   });
 
@@ -817,7 +856,12 @@ function buildPublicContent(draft, options) {
       role: limited(where, contentLine_(row.role), LIMITS.role, 'الدور'),
       description: limited(where, contentLine_(row.description), LIMITS.description, 'الوصف'),
       phoneDisplay: phone.display,
-      action: action
+      action: action,
+      // the person card's words (optional; the site has defaults)
+      intro: limited(where, contentLine_(row.intro), LIMITS.contactIntro, 'جملة البداية'),
+      reply: limited(where, contentText_(row.reply), LIMITS.contactReply, 'الرد'),
+      _image: contentLine_(row.image),
+      _where: where
     });
 
   });
@@ -826,6 +870,16 @@ function buildPublicContent(draft, options) {
   // the contact blocks switched off
   contacts = contacts.filter(function (contact) {
     return sectionOn(contact.kind === 'support' ? 'support' : 'contacts');
+  });
+
+  // avatars: only for the people really published
+  contacts.forEach(function (contact) {
+    var image = libraryImage(contact._image, contact._where, 'الصورة');
+    if (image) contact.image = image;
+    if (!contact.intro) delete contact.intro;
+    if (!contact.reply) delete contact.reply;
+    delete contact._image;
+    delete contact._where;
   });
 
 
@@ -854,8 +908,11 @@ function buildPublicContent(draft, options) {
 
   /* ---------- section banners (an item without a poster falls back to its section's) ---------- */
 
-  var mediaById = mediaIndex_(draft.media);
   var usedMedia = hub.usedMedia.slice();
+
+  extraMedia.forEach(function (id) {
+    if (usedMedia.indexOf(id) === -1) usedMedia.push(id);
+  });
   var banners = Object.create(null);
 
   layout.rows.forEach(function (row) {
@@ -920,15 +977,17 @@ function buildPublicContent(draft, options) {
    LINKS
 ========================================================= */
 
-/* "none" switches it off; empty = from the icon (facebook, instagram...) */
-function linkExperience_(value, icon) {
+/* the platform registry decides: explicit choice, then icon, then URL host;
+   a plain website opens directly. 'none' switches it off. */
+function linkExperience_(value, icon, url, where, warn) {
 
-  var chosen = contentLine_(value).toLowerCase();
+  var chosen = experienceKey_(value);
 
-  if (chosen === 'none') return '';
-  if (LINK_EXPERIENCES.indexOf(chosen) !== -1) return chosen;
+  if (chosen && chosen !== 'none' && chosen !== 'auto' && !PLATFORMS[chosen] && warn) {
+    warn(where, 'التجربة "' + chosen + '" مش معروفة، هيظهر المشهد العام');
+  }
 
-  return ['facebook', 'instagram', 'tiktok', 'whatsapp'].indexOf(icon) !== -1 ? icon : '';
+  return resolveExperience_({ experience: value, icon: icon, url: url || '' }, PLATFORMS);
 
 }
 

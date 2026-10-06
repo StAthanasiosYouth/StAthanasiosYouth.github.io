@@ -47,6 +47,18 @@ function sceneStyles() {
 }
 
 /* start fetching as the finger lands, so the scene is ready by the click */
+/**
+ * Can this page show a scene for that experience key? render.js only routes a
+ * link to a scene when this says yes (otherwise the link opens directly).
+ * CONTRACT (Final Polish): once the registry scenes and the generic scene
+ * exist, every valid key returns true.
+ */
+export function hasScene(key) {
+
+  return !!(key && PLATFORMS[key]);
+
+}
+
 export function prepareExperience(platform) {
 
   if (!PLATFORMS[platform]) return;

@@ -14,7 +14,7 @@ import { openBell } from './bell.js';
 import { newsSheetContent, gameSheetContent, meetingSheetContent, gameStates, visibleNews } from './hub.js';
 import { itemSheetContent, typeOf, visibleItems } from './items.js';
 import { isSectionLive, liveSections } from './layout.js';
-import { openExperience, prepareExperience } from './xp.js';
+import { openExperience, prepareExperience, hasScene } from './xp.js';
 import { iconNode } from './icons.js';
 import { particles } from './motion.js';
 import { startFeel } from './feel.js';
@@ -185,7 +185,7 @@ function followableLink(id, nowStamp) {
     ...current.sections.filter(s => live.has(s.key)).flatMap(s => s.links)
   ];
 
-  return candidates.find(link => link.id === id && link.experience) || null;
+  return candidates.find(link => link.id === id && hasScene(link.experience)) || null;
 
 }
 

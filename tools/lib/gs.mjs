@@ -9,7 +9,7 @@ import vm from 'node:vm';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
-export function loadGs(files = ['Content.gs', 'Hub.gs', 'Review.gs', 'Seed.gs'], globals = {}) {
+export function loadGs(files = ['Platforms.gs', 'Content.gs', 'Hub.gs', 'Review.gs', 'Seed.gs'], globals = {}) {
 
   const context = vm.createContext({ ...globals });
 
