@@ -36,6 +36,7 @@ var TABLES = {
   Links: {
     columns: ['id', 'enabled', 'order', 'section', 'style', 'featured', 'title', 'subtitle', 'cta', 'url', 'icon', 'badge', 'startAt', 'endAt', 'updatedAt'],
     bool: ['enabled', 'featured'],
+    autoId: 'link',
     text: ['id', 'section', 'style', 'title', 'subtitle', 'cta', 'url', 'icon', 'badge', 'startAt', 'endAt', 'updatedAt'],
     notes: {
       id: 'معرّف ثابت للرابط. لو سبته فاضي لوحة التحكم هتعمله',
@@ -59,6 +60,7 @@ var TABLES = {
   Contacts: {
     columns: ['id', 'enabled', 'order', 'kind', 'name', 'role', 'description', 'phone', 'method', 'message', 'updatedAt'],
     bool: ['enabled'],
+    autoId: 'contact',
     text: ['id', 'kind', 'name', 'role', 'description', 'phone', 'method', 'message', 'updatedAt'],
     notes: {
       id: 'معرّف ثابت',
@@ -196,7 +198,24 @@ var LOG_MAX_ROWS = 3000;
    SPREADSHEET ACCESS
 ========================================================= */
 
+/* opened once per request: openById() is slow and every table read needs it */
+var openSpreadsheet_ = null;
+
+
 function spreadsheet_() {
+
+  if (openSpreadsheet_) {
+    return openSpreadsheet_;
+  }
+
+  openSpreadsheet_ = findSpreadsheet_();
+
+  return openSpreadsheet_;
+
+}
+
+
+function findSpreadsheet_() {
 
   var active = null;
 
@@ -267,10 +286,40 @@ function cellOut_(table, column, value, key) {
 }
 
 
+function blankCell_(value) {
+
+  return value === '' || value === null || value === undefined || value === false ||
+    (typeof value === 'string' && !value.trim());
+
+}
+
+
+/**
+ * The columns that decide whether a sheet row is a record.
+ *
+ * A row that nobody filled in is not always empty: a checkbox column stores
+ * FALSE in every row it covers (setup() puts checkboxes down the whole
+ * column so rows typed by hand get them too). So checkbox columns never make
+ * a row exist, nor do values the code writes by itself: updatedAt, and the
+ * ids ensureIds_() gives to Links/Contacts rows (older versions also gave
+ * ids to the empty checkbox rows; those rows stay ignored).
+ */
+function recordColumns_(spec) {
+
+  return spec.columns.filter(function (column) {
+    return (spec.bool || []).indexOf(column) === -1 &&
+      column !== 'updatedAt' &&
+      !(spec.autoId && column === 'id');
+  });
+
+}
+
+
 /**
  * Rows as plain objects ({ column: value, __row: sheetRowNumber }).
  * Only the columns we know are read; extra columns someone adds are kept
- * in the Sheet but ignored.
+ * in the Sheet but ignored. Rows with nothing in their record columns
+ * (see recordColumns_) are skipped.
  */
 function readTable_(name) {
 
@@ -290,13 +339,17 @@ function readTable_(name) {
     index[column] = header.indexOf(column);
   });
 
+  var deciding = recordColumns_(spec)
+    .map(function (column) { return index[column]; })
+    .filter(function (i) { return i !== -1; });
+
   var rows = [];
 
   for (var r = 1; r < values.length; r++) {
 
     var line = values[r];
 
-    if (line.every(function (cell) { return cell === '' || cell === null; })) {
+    if (deciding.every(function (i) { return blankCell_(line[i]); })) {
       continue;
     }
 
@@ -411,6 +464,29 @@ function findRow_(name, column, value) {
 
 
 /**
+ * The first row after the last record. Not getLastRow(): the checkbox
+ * columns hold FALSE down to the bottom of the sheet, so getLastRow() is
+ * always the last row of the sheet and "last row + 1" would not exist.
+ */
+function nextRow_(name, rows) {
+
+  var sheet = sheet_(name);
+  var last = 1;
+
+  (rows || readTable_(name)).forEach(function (row) {
+    last = Math.max(last, row.__row);
+  });
+
+  if (last + 1 > sheet.getMaxRows()) {
+    sheet.insertRowsAfter(sheet.getMaxRows(), 1);
+  }
+
+  return last + 1;
+
+}
+
+
+/**
  * Writes record fields into the row identified by idColumn (or appends a
  * row). Only the given fields change; other columns keep their values.
  */
@@ -418,10 +494,31 @@ function upsertRow_(name, idColumn, record) {
 
   var sheet = sheet_(name);
   var index = headerIndex_(sheet);
-  var rowNumber = findRow_(name, idColumn, record[idColumn]);
+  var rows = readTable_(name);
+  var rowNumber = null;
+
+  rows.some(function (row) {
+    if (String(row[idColumn]) === String(record[idColumn])) {
+      rowNumber = row.__row;
+      return true;
+    }
+    return false;
+  });
 
   if (!rowNumber) {
-    rowNumber = Math.max(sheet.getLastRow(), 1) + 1;
+
+    rowNumber = nextRow_(name, rows);
+
+    // the row may still hold a checkbox someone ticked or an old stray id:
+    // a new record starts clean (unchecked boxes, empty cells)
+    var fresh = {};
+
+    TABLES[name].columns.forEach(function (column) {
+      fresh[column] = (TABLES[name].bool || []).indexOf(column) !== -1 ? false : '';
+    });
+
+    record = Object.assign(fresh, record);
+
   }
 
   Object.keys(record).forEach(function (column) {
@@ -553,6 +650,7 @@ function setup() {
   }
   catch (error) {
     ss = SpreadsheetApp.create('أسرة البابا أثناسيوس – بيانات الموقع');
+    openSpreadsheet_ = ss;
   }
 
   props.setProperty('SHEET_ID', ss.getId());
@@ -613,6 +711,139 @@ function setup() {
   console.log(message);
 
   return message;
+
+}
+
+
+/**
+ * Read-only health report, run from the Apps Script editor: per tab, how
+ * many rows the sheet has, how many are records, and how many unused rows
+ * still carry an id that older versions wrote into empty checkbox rows.
+ * Also times one full draft read + validation (what the panel waits for).
+ */
+function checkSheet() {
+
+  assertAdmin_();
+
+  var lines = [];
+
+  Object.keys(TABLES).forEach(function (name) {
+
+    var sheet = spreadsheet_().getSheetByName(name);
+
+    if (!sheet) {
+      lines.push(name + ': (مش موجود — شغّل setup)');
+      return;
+    }
+
+    lines.push(name + ': ' + readTable_(name).length + ' صف بيانات من ' + sheet.getMaxRows() +
+      (TABLES[name].autoId ? '، معرّفات زيادة في صفوف فاضية: ' + strayIdRows_(name).length : ''));
+
+  });
+
+  var started = Date.now();
+  var built = buildPublicContent(readDraft_(), { now: cairoNow_(), hash: sha256Hex_ });
+
+  lines.push('قراية المسودة + المراجعة: ' + (Date.now() - started) + ' ms');
+  lines.push('أخطاء: ' + built.errors.length + '، تنبيهات: ' + built.warnings.length);
+
+  var report = lines.join('\n');
+
+  console.log(report);
+
+  return report;
+
+}
+
+
+/**
+ * Optional cleanup, run from the Apps Script editor: empties the id cell of
+ * rows that are not records but got an automatic id (link-xxxxxxxx /
+ * contact-xxxxxxxx) from older versions. Nothing else is touched; the
+ * panel already ignores these rows, this only tidies the Sheet.
+ */
+function clearStrayIds() {
+
+  var email = assertAdmin_();
+  var lock = LockService.getScriptLock();
+  var cleared = [];
+
+  lock.waitLock(20000);
+
+  try {
+
+    Object.keys(TABLES).forEach(function (name) {
+
+      if (!TABLES[name].autoId || !spreadsheet_().getSheetByName(name)) {
+        return;
+      }
+
+      var sheet = sheet_(name);
+      var column = headerIndex_(sheet).id;
+      var rows = strayIdRows_(name);
+
+      // consecutive rows are cleared with one call
+      for (var i = 0; i < rows.length;) {
+        var start = i;
+        while (i + 1 < rows.length && rows[i + 1] === rows[i] + 1) {
+          i++;
+        }
+        var count = i - start + 1;
+        sheet.getRange(rows[start], column, count, 1).setValues(rows.slice(start, i + 1).map(function () { return ['']; }));
+        i++;
+      }
+
+      cleared.push(name + ': ' + rows.length);
+
+    });
+
+    log_(email, 'clearStrayIds', cleared.join(', '));
+
+  }
+  finally {
+    lock.releaseLock();
+  }
+
+  var report = 'اتمسح: ' + cleared.join('، ');
+
+  console.log(report);
+
+  return report;
+
+}
+
+
+/* Row numbers that are not records but hold an automatic id. */
+function strayIdRows_(name) {
+
+  var spec = TABLES[name];
+  var sheet = sheet_(name);
+  var values = sheet.getDataRange().getValues();
+
+  if (!values.length) {
+    return [];
+  }
+
+  var header = values[0].map(function (cell) { return String(cell).trim(); });
+  var idIndex = header.indexOf('id');
+  var deciding = recordColumns_(spec)
+    .map(function (column) { return header.indexOf(column); })
+    .filter(function (i) { return i !== -1; });
+  var pattern = new RegExp('^' + spec.autoId + '-[0-9a-f]{8}$');
+  var rows = [];
+
+  if (idIndex === -1) {
+    return [];
+  }
+
+  for (var r = 1; r < values.length; r++) {
+    var line = values[r];
+    if (pattern.test(String(line[idIndex]).trim()) && deciding.every(function (i) { return blankCell_(line[i]); })) {
+      rows.push(r + 1);
+    }
+  }
+
+  return rows;
 
 }
 

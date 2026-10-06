@@ -207,3 +207,20 @@ The new website reads both the old and the new `content.json`, so the order
 of these steps can't break the live site. Until `setup` runs again, the
 admin's content-center screens show a notice; links, location and contacts
 keep working.
+
+## Checking the Sheet (`checkSheet`, `clearStrayIds`)
+
+Every checkbox column holds FALSE down to the last row of its tab (1000 by
+default). The admin decides whether a row is a record from its other
+columns, so those empty checkbox rows are never read as data, and new
+records go right after the last real row.
+
+- **`checkSheet`** (read-only): run it from the editor and open the
+  **Execution log**. For each tab it shows how many rows are records, and
+  for Links/Contacts how many empty rows still carry an automatic id. It
+  also shows how long reading and checking the whole draft takes, and the
+  error count.
+- **`clearStrayIds`** (optional): versions before this fix wrote ids like
+  `link-1a2b3c4d` into empty Links/Contacts rows. The panel ignores those
+  rows already. This function only empties those id cells, in rows that
+  have nothing else in them, to tidy the Sheet. Real rows are not touched.

@@ -19,6 +19,7 @@ class FakeRange {
   }
 
   getValues() {
+    this.sheet.stats.cellsRead += this.rows * this.cols;
     const out = [];
     for (let r = 0; r < this.rows; r++) {
       const line = [];
@@ -36,36 +37,55 @@ class FakeRange {
   }
 
   setValues(values) {
+    this.sheet.stats.writes++;
     values.forEach((line, r) => line.forEach((value, c) => this.sheet.set(this.row + r, this.col + c, value)));
     return this;
   }
 
   setValue(value) {
+    this.sheet.stats.writes++;
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) this.sheet.set(this.row + r, this.col + c, value);
     }
     return this;
   }
 
-  // formatting / validation: accepted and ignored
+  // formatting: accepted and ignored
   setNumberFormat() { return this; }
   setFontWeight() { return this; }
   setFontColor() { return this; }
   setBackground() { return this; }
   setNote() { return this; }
-  setDataValidation() { return this; }
+
+  // like Google Sheets: a checkbox stores FALSE in every empty cell it
+  // covers, so getLastRow() / getDataRange() reach the end of the range
+  setDataValidation(rule) {
+    if (rule && rule.checkbox) {
+      for (let r = 0; r < this.rows; r++) {
+        for (let c = 0; c < this.cols; c++) {
+          const value = (this.sheet.data[this.row - 1 + r] || [])[this.col - 1 + c];
+          if (value === undefined || value === '' || value === null) this.sheet.set(this.row + r, this.col + c, false);
+        }
+      }
+    }
+    return this;
+  }
 
 }
 
 
 class FakeSheet {
 
-  constructor(name) {
+  constructor(name, stats) {
     this.name = name;
     this.data = [];
+    // a new tab in Google Sheets has 1000 rows
+    this.maxRows = 1000;
+    this.stats = stats || { cellsRead: 0, writes: 0, opens: 0 };
   }
 
   set(row, col, value) {
+    if (row > this.maxRows) throw new Error('The coordinates of the range are outside the dimensions of the sheet.');
     while (this.data.length < row) this.data.push([]);
     const line = this.data[row - 1];
     while (line.length < col) line.push('');
@@ -85,11 +105,17 @@ class FakeSheet {
     return this.data.reduce((max, line) => Math.max(max, line.length), 0);
   }
 
-  getMaxRows() { return Math.max(1000, this.data.length); }
+  getMaxRows() { return this.maxRows; }
 
   getRange(row, col, rows, cols) {
     if (typeof row === 'string') return new FakeRange(this, 2, 1, 1, 1);
+    if (row + (rows || 1) - 1 > this.maxRows) throw new Error('The coordinates of the range are outside the dimensions of the sheet.');
     return new FakeRange(this, row, col, rows || 1, cols || 1);
+  }
+
+  insertRowsAfter(row, count) {
+    if (row < this.data.length) this.data.splice(row, 0, ...Array.from({ length: count }, () => []));
+    this.maxRows += count;
   }
 
   getDataRange() {
@@ -97,13 +123,15 @@ class FakeSheet {
   }
 
   appendRow(values) {
+    this.stats.writes++;
     const row = this.getLastRow() + 1;
+    if (row > this.maxRows) this.maxRows = row;
     values.forEach((value, i) => this.set(row, i + 1, value));
   }
 
-  deleteRow(row) { this.data.splice(row - 1, 1); }
+  deleteRow(row) { this.data.splice(row - 1, 1); this.maxRows--; }
 
-  deleteRows(row, count) { this.data.splice(row - 1, count); }
+  deleteRows(row, count) { this.data.splice(row - 1, count); this.maxRows -= count; }
 
   setFrozenRows() {}
   setRightToLeft() {}
@@ -116,7 +144,9 @@ class FakeSpreadsheet {
 
   constructor(owner) {
     this.owner = owner;
-    this.sheets = [new FakeSheet('Sheet1')];
+    // service-call counters, for the performance tests
+    this.stats = { cellsRead: 0, writes: 0, opens: 0 };
+    this.sheets = [new FakeSheet('Sheet1', this.stats)];
   }
 
   getId() { return 'sheet-id-123'; }
@@ -127,7 +157,7 @@ class FakeSpreadsheet {
   getSheetByName(name) { return this.sheets.find(s => s.name === name) || null; }
 
   insertSheet(name) {
-    const sheet = new FakeSheet(name);
+    const sheet = new FakeSheet(name, this.stats);
     this.sheets.push(sheet);
     return sheet;
   }
@@ -373,17 +403,19 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
       getActiveSpreadsheet: () => null,
       openById: id => {
         if (!spreadsheet || id !== spreadsheet.getId()) throw new Error('not found');
+        spreadsheet.stats.opens++;
         return spreadsheet;
       },
       create: () => { spreadsheet = new FakeSpreadsheet(user); return spreadsheet; },
       getUi: () => { throw new Error('no UI in tests'); },
       newDataValidation: () => {
+        let checkbox = false;
         const builder = {
-          requireCheckbox: () => builder,
+          requireCheckbox: () => { checkbox = true; return builder; },
           requireValueInList: () => builder,
           requireValueInRange: () => builder,
           setAllowInvalid: () => builder,
-          build: () => ({})
+          build: () => ({ checkbox })
         };
         return builder;
       }

@@ -39,10 +39,10 @@ test('setup by the admin creates the private Sheet and its tabs', () => {
   assert.equal(world.properties.get('SHEET_ID'), 'sheet-id-123');
   const names = world.spreadsheet.getSheets().map(s => s.name);
   assert.deepEqual(names, ['Settings', 'Sections', 'Links', 'Contacts', 'Sessions', 'News', 'Games', 'Notifications', 'Media', 'Log']);
-  assert.equal(world.spreadsheet.getSheetByName('Links').getLastRow(), 5, 'header + 4 seed links');
+  assert.equal(world.gs.readTable_('Links').length, 4, '4 seed links');
   // running again keeps data
   world.gs.setup();
-  assert.equal(world.spreadsheet.getSheetByName('Links').getLastRow(), 5);
+  assert.equal(world.gs.readTable_('Links').length, 4);
 });
 
 test('every browser-callable data function rejects non-admins', () => {
@@ -53,7 +53,7 @@ test('every browser-callable data function rejects non-admins', () => {
     apiDeleteLink: ['facebook'], apiMoveLink: ['facebook', 1], apiSaveSection: [{ key: 'x', title: 'x' }, true],
     apiDeleteSection: ['links'], apiMoveSection: ['social', 1], apiSaveContact: [{ name: 'x', phone: '01012345678', method: 'call' }],
     apiDeleteContact: ['tech-support'], apiMoveContact: ['tech-support', -1], apiSaveSettings: [{ 'site.tagline': 'x' }],
-    apiResolveMapsUrl: ['https://maps.app.goo.gl/x'], setup: []
+    apiResolveMapsUrl: ['https://maps.app.goo.gl/x'], setup: [], checkSheet: [], clearStrayIds: []
   };
   for (const [name, args] of Object.entries(calls)) {
     assert.throws(() => world.gs[name](...args), /مش مسموح/, name);
@@ -68,7 +68,7 @@ test('no unguarded public function slipped in', () => {
   const world = configuredWorld();
   const pure = new Set(['buildPublicContent', 'safeHttpsUrl', 'normalizePhone', 'contentRevision', 'buildMeetingIcs', 'summarizeChanges', 'seedDraft', 'doGet']);
   const publicFns = Object.keys(world.gs).filter(k => typeof world.gs[k] === 'function' && !k.endsWith('_'));
-  const unexpected = publicFns.filter(k => !pure.has(k) && !/^api/.test(k) && k !== 'setup');
+  const unexpected = publicFns.filter(k => !pure.has(k) && !/^api/.test(k) && !['setup', 'checkSheet', 'clearStrayIds'].includes(k));
   assert.deepEqual(unexpected, []);
 });
 

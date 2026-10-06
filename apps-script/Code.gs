@@ -719,11 +719,20 @@ function apiSaveSettings(values) {
 
     var sheet = sheet_('Settings');
     var rows = readTable_('Settings');
+    var next = null;
 
     Object.keys(clean).forEach(function (key) {
 
       var row = rows.filter(function (r) { return r.key === key; })[0];
-      var rowNumber = row ? row.__row : sheet.getLastRow() + 1;
+
+      if (!row) {
+        next = next ? next + 1 : nextRow_('Settings', rows);
+        if (next > sheet.getMaxRows()) {
+          sheet.insertRowsAfter(sheet.getMaxRows(), 1);
+        }
+      }
+
+      var rowNumber = row ? row.__row : next;
 
       if (!row) {
         sheet.getRange(rowNumber, 1).setNumberFormat('@').setValue(key);
