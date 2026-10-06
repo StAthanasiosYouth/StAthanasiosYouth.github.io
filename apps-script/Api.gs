@@ -17,8 +17,8 @@
  * Session. For every request, before anything else:
  *
  *  1. the ID token is verified with Google (tokeninfo; cached per token hash
- *     in CacheService until it expires): aud = ADMIN_CLIENT_ID (Script
- *     Property), iss = accounts.google.com, not expired, email verified;
+ *     in CacheService until it expires): aud = the page's client ID (Script
+ *     Property ADMIN_CLIENT_ID, else DEFAULT_ADMIN_CLIENT_ID), iss = accounts.google.com, not expired, email verified;
  *  2. that email must be on the allowlist (ADMIN_EMAILS, Auth.gs);
  *  3. only a function listed in apiFunctions_() runs — never any other
  *     global — and it runs with currentEmail_() = that verified email.
@@ -28,6 +28,10 @@
  */
 
 var ID_TOKEN_ISSUERS = ['accounts.google.com', 'https://accounts.google.com'];
+
+/* The OAuth client ID of the admin page (public, not a secret; the same as
+   admin/config.js clientId). The Script Property ADMIN_CLIENT_ID overrides it. */
+var DEFAULT_ADMIN_CLIENT_ID = '246924773718-38p45gji0ouvi7an4jdjsip3obmk6ve4.apps.googleusercontent.com';
 var API_MAX_BODY = 12 * 1024 * 1024;
 var API_MAX_ARGS = 6;
 var TOKEN_CACHE_MAX_SECONDS = 21600;   // CacheService's limit (6 h); ID tokens live 1 h
@@ -176,9 +180,10 @@ function readApiRequest_(e) {
    GOOGLE ID TOKEN
 ========================================================= */
 
+/* ADMIN_CLIENT_ID when set, else the default; a malformed property = not configured (fails closed) */
 function adminClientId_() {
 
-  var id = String(PropertiesService.getScriptProperties().getProperty('ADMIN_CLIENT_ID') || '').trim();
+  var id = String(PropertiesService.getScriptProperties().getProperty('ADMIN_CLIENT_ID') || '').trim() || DEFAULT_ADMIN_CLIENT_ID;
 
   return /^[\w-]+\.apps\.googleusercontent\.com$/.test(id) ? id : '';
 

@@ -189,11 +189,38 @@ test('API: an account that is not on the allowlist gets the Arabic «not allowed
   assert.equal(world.post({ fn: 'apiState', args: [], token }).code, 'denied');
 });
 
-test('API: not configured (no ADMIN_CLIENT_ID) or a broken request fails closed', () => {
+test('API: the client ID defaults to the admin page\'s; the property overrides it; aud must match exactly', () => {
+  const DEFAULT = '246924773718-38p45gji0ouvi7an4jdjsip3obmk6ve4.apps.googleusercontent.com';
+  const config = readFileSync(`${ROOT}admin/config.js`, 'utf8');
+  assert.ok(config.includes(`clientId: '${DEFAULT}'`), 'the same value as admin/config.js');
+
+  // no property: the default
+  const world = apiWorld();
+  world.properties.delete('ADMIN_CLIENT_ID');
+  assert.equal(world.gs.adminClientId_(), DEFAULT);
+  const forDefault = world.issueToken({ email: ADMIN, aud: DEFAULT, azp: DEFAULT });
+  assert.equal(world.post({ fn: 'apiState', args: [], token: forDefault }).ok, true, 'default used');
+  for (const aud of [CLIENT, 'someone-else.apps.googleusercontent.com', DEFAULT.toUpperCase(), DEFAULT + ' ', 'x' + DEFAULT, '']) {
+    assert.equal(world.post({ fn: 'apiState', args: [], token: world.issueToken({ email: ADMIN, aud }) }).code, 'auth', `aud ${aud}`);
+  }
+
+  // an empty / blank property is "not set"
+  world.properties.set('ADMIN_CLIENT_ID', '   ');
+  assert.equal(world.gs.adminClientId_(), DEFAULT);
+
+  // the property overrides: then the default's tokens are refused
+  world.properties.set('ADMIN_CLIENT_ID', CLIENT);
+  world.cache.clear();
+  assert.equal(world.post({ fn: 'apiState', args: [], token: forDefault }).code, 'auth', 'another aud refused');
+  assert.equal(world.post({ fn: 'apiState', args: [], token: world.issueToken({ email: ADMIN, aud: CLIENT }) }).ok, true, 'property used');
+  for (const aud of [DEFAULT, 'someone-else.apps.googleusercontent.com']) {
+    assert.equal(world.post({ fn: 'apiState', args: [], token: world.issueToken({ email: ADMIN, aud }) }).code, 'auth', `aud ${aud}`);
+  }
+});
+
+test('API: a malformed ADMIN_CLIENT_ID or a broken request fails closed', () => {
   const world = apiWorld();
   const token = world.issueToken({ email: ADMIN });
-  world.properties.delete('ADMIN_CLIENT_ID');
-  assert.equal(world.post({ fn: 'apiState', args: [], token }).code, 'config');
   world.properties.set('ADMIN_CLIENT_ID', 'not a client id');
   assert.equal(world.post({ fn: 'apiState', args: [], token }).code, 'config');
   world.properties.set('ADMIN_CLIENT_ID', CLIENT);
@@ -393,7 +420,7 @@ test('admin/: strict CSP, noindex, no-referrer, no inline code, no redirect, no 
   const boot = readFileSync(`${ROOT}admin/boot.js`, 'utf8');
   assert.match(boot, /window\.top !== window\.self/, 'frame-busting');
   assert.doesNotMatch(boot, /location\.(href\s*=|assign|replace\((?!window\.location\.href))/, 'never sends the admin elsewhere');
-  assert.doesNotMatch(boot, /localStorage/, 'the sign-in is kept for this tab only');
+  assert.doesNotMatch(boot, /localStorage|sessionStorage|indexedDB|document\.cookie/, 'the token is kept in memory only');
   assert.match(boot, /'Content-Type': 'text\/plain;charset=utf-8'/, 'a simple request: no CORS preflight');
   assert.match(boot, /credentials: 'omit'/);
 

@@ -105,6 +105,22 @@ async function signIn(page) {
 
 }
 
+/* no ID token (or anything like one) in storage or cookies on this origin */
+async function noTokenStored(page, when) {
+
+  const stored = await page.evaluate(() => {
+    const all = [];
+    for (const store of [localStorage, sessionStorage]) {
+      for (let i = 0; i < store.length; i++) all.push(store.key(i) + '=' + store.getItem(store.key(i)));
+    }
+    return { all, session: sessionStorage.length, cookie: document.cookie };
+  });
+  assert.equal(stored.session, 0, `sessionStorage is empty (${when})`);
+  assert.equal(stored.cookie, '', `no cookies (${when})`);
+  assert.deepEqual(stored.all.filter(entry => /eyJ[\w-]+\.[\w-]+\.[\w-]+|token|credential|admin/i.test(entry)), [], `no token in storage (${when})`);
+
+}
+
 /* the address bar, drawn into the screenshot */
 async function showAddress(page) {
 
@@ -204,13 +220,27 @@ test('sign in with Google → the dashboard, and the browser stays on /admin/', 
     await page.screenshot({ captureBeyondViewport: false, path: `${SHOTS}02-dashboard-${name}-url.png` });
     console.log(`[refine-b] dashboard (${name}) at ${page.url()}`);
 
-    // a reload keeps the sign-in for this tab (no new Google round trip)
-    const issued = await page.evaluate(() => window.__gisIssued);
+    // the token lives in memory only: not in any storage, after sign-in and after more API calls
+    await noTokenStored(page, 'after sign-in');
+    await page.evaluate(() => A.go('settings'));
+    await page.waitForSelector('.card--admins .admin');
+    assert.ok(calls.some(c => c.fn === 'apiAdmins'));
+    await noTokenStored(page, 'after an API call');
+
+    // a reload forgets it: Google signs in again silently (auto-select) …
+    await page.evaluateOnNewDocument(() => { window.__gisSilent = true; });
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForFunction(() => window.A && A.state && !document.getElementById('shell').hidden, { timeout: 15000 });
-    assert.equal(await page.evaluate(() => window.__gisIssued), undefined, `no new sign-in after a reload (was ${issued})`);
-    assert.equal(await page.evaluate(() => Object.keys(localStorage).length), 0, 'nothing in localStorage');
+    assert.equal(await page.evaluate(() => window.__gisIssued), 1, 'a fresh token from Google after the reload');
+    assert.equal(page.url(), ADMIN_URL);
+    await noTokenStored(page, 'after a silent re-sign-in');
     await close();
+
+    // … and without a Google session for auto-select, the button
+    const again = await open({ viewport });
+    await again.page.waitForSelector('.gate[data-state="signin"] .gis-stub');
+    assert.equal(await again.page.evaluate(() => !!(window.A && A.state)), false, 'nothing restored');
+    await again.close();
   }
 
 });
@@ -312,6 +342,7 @@ test('the token runs out (server or clock) → sign in again over the open edito
   await page.waitForFunction(() => !document.querySelector('dialog.sheet').open, { timeout: 15000 });
   assert.equal(await page.$('dialog.reauth'), null);
   assert.ok(world.gs.readTable_('Contacts').some(c => c.name === name), 'saved after signing in again');
+  await noTokenStored(page, 'after signing in again');
   assert.equal(page.url(), ADMIN_URL);
 
   // 2. the token is about to expire by the clock: renewed before the call is sent

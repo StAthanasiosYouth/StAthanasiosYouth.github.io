@@ -297,7 +297,7 @@ screen.
    │  POST {fn, args, token}  (text/plain, no cookies)
    ▼
  Apps Script API deployment: doPost (Api.gs), runs as the owner
-   1. tokeninfo: Google checks the signature; aud = ADMIN_CLIENT_ID,
+   1. tokeninfo: Google checks the signature; aud = the client ID,
       iss = accounts.google.com, not expired, email verified (cached per token)
    2. the email is on ADMIN_EMAILS
    3. only a listed api* function runs, as that email
@@ -347,11 +347,11 @@ Already created. For the record, or to make it again:
 
 | Property          | Value |
 | ----------------- | ----- |
-| `ADMIN_CLIENT_ID` | the **same** Client ID as `admin/config.js` `clientId` |
+| `ADMIN_CLIENT_ID` | optional. `Api.gs` already defaults to the Client ID above (`DEFAULT_ADMIN_CLIENT_ID`); set this only if the client ever changes. It must equal `admin/config.js` `clientId` |
 | `ADMIN_PRIMARY`   | optional; default `menazakmena@gmail.com`. The account that can never be removed from the allowlist |
 | `ADMIN_EMAILS`    | unchanged (now also editable from **الإعدادات → صلاحيات لوحة التحكم**) |
 
-If `ADMIN_CLIENT_ID` is missing or different, every API call is refused
+If the server's client ID (property or default) differs from `clientId`, or the property is malformed, every API call is refused
 (the page says «جوجل دخّلك، بس خادم لوحة التحكم مقبلش الدخول»).
 
 ### 8.3 The API deployment (a second deployment of the same project)
@@ -410,8 +410,10 @@ The code is safe under both settings:
   (the API answers through a redirect to googleusercontent), the map frame
   for the preview. No inline code or styles, no `eval`. `noindex`,
   `no-referrer`; frame-busting in `boot.js` (Pages can't send headers).
-- The token is kept in memory and `sessionStorage` (this tab only), never
-  past its expiry. When it runs out, a «الدخول محتاج يتجدد» dialog opens over
+- The token is kept in memory only (never sessionStorage/localStorage: the
+  origin is shared with /your-voice-matters/), never past its expiry. A
+  reload signs in again through Google: silently with auto-select when it
+  can, otherwise with the button. When it runs out, a «الدخول محتاج يتجدد» dialog opens over
   the panel; the call that needed it continues after signing in, so nothing
   being edited is lost.
 - Preview (معاينة): on github.io the preview frame shares the site's origin.

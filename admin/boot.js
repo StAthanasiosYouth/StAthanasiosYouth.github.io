@@ -4,8 +4,9 @@
  * 1. Never runs inside someone else's frame (clickjacking): it leaves the
  *    frame, and if it can't, it stops.
  * 2. "Sign in with Google" (Google Identity Services) gives a Google ID
- *    token: who you are, signed by Google, valid one hour. It is kept for
- *    this tab only (memory + sessionStorage, never past its expiry) and
+ *    token: who you are, signed by Google, valid one hour. It is kept in
+ *    memory only (never in any browser storage: this origin is
+ *    shared with other project sites), never used past its expiry, and
  *    renewed by signing in again — silently when Google can, otherwise with
  *    the button, over the open panel, so nothing being edited is lost.
  * 3. window.AdminTransport: every A.call() goes to the Apps Script API
@@ -39,7 +40,6 @@
   var EXEC = /^https:\/\/script\.google\.com\/macros\/s\/[\w-]{20,}\/exec$/;
   var CLIENT_ID = /^[\w-]+\.apps\.googleusercontent\.com$/;
   var GIS_SRC = 'https://accounts.google.com/gsi/client';
-  var STORE = 'athanasios.admin.session';
   var MARGIN_SECONDS = 60;     // a token this close to its end is renewed first
 
   var config = window.ADMIN_CONFIG || {};
@@ -130,30 +130,10 @@
 
   }
 
+  /* memory only: a reload signs in again (silently when Google can) */
   function remember(value) {
 
     session = value;
-    try {
-      if (value) sessionStorage.setItem(STORE, JSON.stringify(value));
-      else sessionStorage.removeItem(STORE);
-    }
-    catch (error) {
-      // storage blocked: memory only (a reload asks to sign in again)
-    }
-
-  }
-
-  function restored() {
-
-    try {
-      var value = JSON.parse(sessionStorage.getItem(STORE) || 'null');
-      if (value && typeof value.token === 'string' && fresh(value)) return value;
-      sessionStorage.removeItem(STORE);
-    }
-    catch (error) {
-      // nothing usable
-    }
-    return null;
 
   }
 
@@ -235,7 +215,7 @@
       done.resolve(token);
     }
 
-    if (phase === 'gate') enter(false);
+    if (phase === 'gate') enter();
 
   }
 
@@ -479,7 +459,7 @@
   /* ---------- into the panel ---------- */
 
   /* checks the sign-in with the server and loads the panel in one call */
-  function enter(fromStorage) {
+  function enter() {
 
     var current = session;
 
@@ -498,20 +478,19 @@
         }
         else if (reply.code === 'auth') {
           remember(null);
-          if (fromStorage) showSignIn('الدخول اللي فات انتهى. ادخل تاني.');
-          else showProblem('جوجل دخّلك، بس خادم لوحة التحكم مقبلش الدخول.', 'غالبًا ADMIN_CLIENT_ID في Script Properties مش نفس clientId في admin/config.js (docs/ADMIN-SETUP.md).', details.message, function () { showSignIn(); });
+          showProblem('جوجل دخّلك، بس خادم لوحة التحكم مقبلش الدخول.', 'غالبًا ADMIN_CLIENT_ID في Script Properties مش نفس clientId في admin/config.js (docs/ADMIN-SETUP.md).', details.message, function () { showSignIn(); });
         }
         else if (reply.code === 'config') {
-          showProblem(details.message, details.hint, '', function () { enter(fromStorage); });
+          showProblem(details.message, details.hint, '', function () { enter(); });
         }
         else {
-          showProblem(details.message, details.hint, details.details, function () { enter(fromStorage); });
+          showProblem(details.message, details.hint, details.details, function () { enter(); });
         }
       })
       .catch(function (error) {
         if (session !== current) return;
         var info = parsed(error);
-        showProblem(info.message, info.hint, info.details, function () { enter(fromStorage); });
+        showProblem(info.message, info.hint, info.details, function () { enter(); });
       });
 
   }
@@ -559,16 +538,7 @@
     return;
   }
 
-  var kept = restored();
-
-  if (kept) {
-    session = kept;
-    loadGis().catch(function () {});
-    enter(true);
-  }
-  else {
-    showLoading('بنجهز تسجيل الدخول…');
-    showSignIn();
-  }
+  showLoading('بنجهز تسجيل الدخول…');
+  showSignIn();
 
 })();
