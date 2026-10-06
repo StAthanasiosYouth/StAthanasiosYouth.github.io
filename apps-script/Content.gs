@@ -30,7 +30,8 @@ var ICON_NAMES = [
   'voice', 'facebook', 'instagram', 'tiktok', 'youtube', 'whatsapp',
   'telegram', 'spotify', 'form', 'calendar', 'ticket', 'bus', 'book',
   'music', 'photos', 'video', 'church', 'cross', 'heart', 'star',
-  'megaphone', 'gift', 'users', 'map', 'info', 'link', 'trophy', 'theatre'
+  'megaphone', 'gift', 'users', 'map', 'info', 'link', 'trophy', 'theatre',
+  'messenger', 'discord', 'x', 'threads', 'snapchat', 'mail', 'phone'
 ];
 
 /*

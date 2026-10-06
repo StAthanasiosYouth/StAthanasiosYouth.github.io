@@ -112,6 +112,10 @@ const LINE_ICONS = {
     '<path class="duo" d="M11 3c.6 3.6 2.4 5.4 6 6-3.6.6-5.4 2.4-6 6-.6-3.6-2.4-5.4-6-6 3.6-.6 5.4-2.4 6-6Z"/>' +
     '<path d="M18.5 14c.3 1.6 1 2.3 2.5 2.5-1.5.3-2.2 1-2.5 2.5-.3-1.5-1-2.2-2.5-2.5 1.5-.2 2.2-.9 2.5-2.5Z"/>',
 
+  mail:
+    '<rect class="duo" x="3" y="5.5" width="18" height="13" rx="2.5"/>' +
+    '<path d="m4 7.5 8 5.5 8-5.5"/>',
+
   link:
     '<path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/>' +
     '<path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/>',
@@ -190,7 +194,8 @@ export const LINK_ICON_NAMES = [
   'voice', 'facebook', 'instagram', 'tiktok', 'youtube', 'whatsapp',
   'telegram', 'spotify', 'form', 'calendar', 'ticket', 'bus', 'book',
   'music', 'photos', 'video', 'church', 'cross', 'heart', 'star',
-  'megaphone', 'gift', 'users', 'map', 'info', 'link', 'trophy', 'theatre'
+  'megaphone', 'gift', 'users', 'map', 'info', 'link', 'trophy', 'theatre',
+  'messenger', 'discord', 'x', 'threads', 'snapchat', 'mail', 'phone'
 ];
 
 

@@ -111,6 +111,12 @@
 
     var stack = document.getElementById('toasts');
     var dialogs = document.querySelectorAll('dialog[open]');
+
+    // an editor refilled while the stack sat inside it took the stack along
+    if (!stack) {
+      stack = el('div', { class: 'toasts', id: 'toasts', popover: 'manual', 'aria-live': 'polite' });
+      document.body.appendChild(stack);
+    }
     var holder = dialogs.length ? dialogs[dialogs.length - 1] : document.body;
 
     if (stack.parentNode !== holder) {
@@ -1171,7 +1177,7 @@
     return {
       node: el('div', { class: 'field' },
         el('span', { class: 'field__label', text: options.label || 'الصورة / البوستر' }),
-        el('div', { class: 'picker' },
+        el('div', { class: 'picker' + (options.className ? ' ' + options.className : '') },
           preview,
           el('div', { class: 'actions' }, choose, fromLibrary, remove, file),
           progress,
@@ -1182,6 +1188,76 @@
       ),
       value: function () { return value; },
       busy: function () { return busy; }
+    };
+
+  };
+
+  /*
+   * Several images from the Media Library, in order (a link scene's own
+   * photos, «صور المشهد»). ids: array or "id1,id2". options.max (6).
+   * Each one can be taken out; «زوّد صورة» opens the library chooser.
+   */
+  A.galleryPicker = function (ids, options) {
+
+    options = options || {};
+
+    var max = options.max || 6;
+    var list = (Array.isArray(ids) ? ids : String(ids || '').split(/[\s,،]+/)).filter(Boolean).slice(0, max);
+    var row = el('div', { class: 'gallery-picker__row', role: 'list' });
+    var count = el('span', { class: 'gallery-picker__count', dir: 'ltr' });
+    var add = el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () {
+      if (list.length >= max) return;
+      A.pickFromLibrary(null).then(function (id) {
+        if (!id) return;
+        if (list.indexOf(id) === -1) list.push(id);
+        markDirty();
+        draw();
+      });
+    } }, icon('plus'), 'زوّد صورة من المكتبة');
+
+    function draw() {
+
+      row.replaceChildren();
+
+      list.forEach(function (id, index) {
+        var img = el('img', { alt: '', class: 'gallery-picker__img' });
+        var media = (A.state.draft.media || []).filter(function (m) { return m.id === id; })[0];
+        A.mediaPreview(id).then(function (src) { if (src) img.src = src; }).catch(function () {});
+        row.appendChild(el('div', { class: 'gallery-picker__item', role: 'listitem', 'data-id': id },
+          img,
+          el('span', { class: 'gallery-picker__n', text: String(index + 1) }),
+          el('button', {
+            class: 'icon-btn gallery-picker__remove',
+            type: 'button',
+            'aria-label': 'شيل الصورة ' + (index + 1) + (media && media.alt ? ' (' + media.alt + ')' : ''),
+            onclick: function () {
+              list.splice(index, 1);
+              markDirty();
+              draw();
+            }
+          }, icon('close'))
+        ));
+      });
+
+      if (!list.length) {
+        row.appendChild(el('span', { class: 'picker__empty' }, icon('photos'), options.emptyText || 'من غير صور — هيظهر أحدث بوسترات منشورة'));
+      }
+
+      count.textContent = list.length + ' / ' + max;
+      add.disabled = list.length >= max;
+
+    }
+
+    draw();
+
+    return {
+      node: el('div', { class: 'field gallery-picker', role: 'group', 'aria-label': options.label || 'صور' },
+        el('span', { class: 'field__label' }, options.label || 'صور', ' ', count),
+        row,
+        el('div', { class: 'actions' }, add),
+        options.hint ? el('span', { class: 'field__hint', text: options.hint }) : null
+      ),
+      value: function () { return list.slice(); }
     };
 
   };
@@ -1197,6 +1273,10 @@
   A.openSheet = function (title, body, footer, options) {
 
     options = options || {};
+
+    // the message stack may live inside the editor: keep it when refilling
+    var toasts = document.getElementById('toasts');
+    if (toasts && sheet.contains(toasts)) document.body.appendChild(toasts);
 
     sheet.className = 'sheet' + (options.wide ? ' sheet--wide' : '') + (options.className ? ' ' + options.className : '');
     A.fill(sheet,
