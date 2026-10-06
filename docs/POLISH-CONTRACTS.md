@@ -54,6 +54,16 @@ exactly: `columns: Links: gallery — Contacts: image, intro, reply`
 - Motion tiers: `document.documentElement.dataset.motion` = `full | lite | reduced`
   (feel.js). Scenes and contact animations must honour all three.
 
+### Agreed during implementation (Agent A)
+
+- Contacts + support are a matched pair: 6 + 6 columns on desktop (was 7 + 5).
+- Every section's banner is rendered in one place (`dressSection` in
+  render.js) on the section's first widget; the meeting topic no longer
+  repeats the section banner as its poster.
+- Sheet-only CSS (including the `.xp` frame: `.xp`, `.xp__cta`…) lives in the
+  lazily loaded `assets/css/sheets.css`; `openSheet()` waits for it before
+  `showModal` the first time. Scene CSS stays in its own lazy files.
+
 ## 4. File ownership (do not edit the other agent's files)
 
 | Agent A — public page | Agent B — experiences, data, admin |
