@@ -50,6 +50,9 @@
 
   <link rel="stylesheet" href="assets/css/main.css">
 
+  <!-- the opening intro decides before the first paint (first visit of the session only; see intro.js) -->
+  <script src="assets/js/intro.js"></script>
+
   <link rel="modulepreload" href="assets/js/render.js">
   <link rel="modulepreload" href="assets/js/content.js">
   <link rel="modulepreload" href="assets/js/schedule.js">
@@ -74,7 +77,7 @@
     <div class="topbar__inner">
       <span class="topbar__brand" aria-hidden="true">
         <!-- the hero's own candidates and sizes: the browser picks the same file, one download -->
-        <img src="assets/img/logo-128.webp" srcset="assets/img/logo-128.webp 128w, assets/img/logo-256.webp 256w, assets/img/logo-384.webp 384w" sizes="(min-width: 1024px) 128px, 112px" width="30" height="30" alt="">
+        <img src="assets/img/logo-128.webp" srcset="assets/img/logo-128.webp 128w, assets/img/logo-256.webp 256w, assets/img/logo-384.webp 384w" sizes="(min-width: 1024px) 164px, 112px" width="30" height="30" alt="">
         <span class="topbar__name">أسرة البابا أثناسيوس</span>
       </span>
       <div class="topbar__actions">
@@ -100,11 +103,12 @@
       <canvas class="hero__dust" aria-hidden="true"></canvas>
 
       <div class="hero__arch">
+        <span class="hero__frame" aria-hidden="true"></span>
         <img
           class="hero__logo"
           src="assets/img/logo-128.webp"
           srcset="assets/img/logo-128.webp 128w, assets/img/logo-256.webp 256w, assets/img/logo-384.webp 384w"
-          sizes="(min-width: 1024px) 128px, 112px"
+          sizes="(min-width: 1024px) 164px, 112px"
           width="112"
           height="112"
           alt="شعار أسرة البابا أثناسيوس الرسولي – كنيسة الشهيد العظيم أبي سيفين بسفاجا"

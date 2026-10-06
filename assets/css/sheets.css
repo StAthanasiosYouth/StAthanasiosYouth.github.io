@@ -124,48 +124,55 @@ dialog.sheet::backdrop {
   gap: 12px;
 }
 
-/* the poster at the top of a sheet (hub.js mediaHero): its own ratio,
-   capped in height, never cropped; around an unusual shape, the same
-   picture blurred (full tier) or a light in its own colour */
+/* the poster atop a sheet (hub.js mediaHero): the IMAGE decides the shape
+   (frame ratio = --ar: no bars, no crop, no distortion). Capped in height
+   (--cap), the frame narrows and stays centred. Around it, its own light:
+   the picture blurred into a glow (full tier), else a shadow in its colour. */
 .media-hero {
   --tint: var(--gold);
+  --cap: 56dvh;
   position: relative;
   isolation: isolate;
-  width: 100%;
-  max-height: 56dvh;
+  width: min(100%, calc(var(--cap) * var(--ar, 4 / 5)));
   aspect-ratio: var(--ar, 4 / 5);
-  margin: 0;
-  overflow: hidden;
+  margin: 4px auto 6px;
   border-radius: var(--radius-md);
-  /* --tint: image.color, else the poster's own average colour (hub.js);
-     this light is what lite / reduced show around the poster */
+  /* --tint: image.color, else the poster's own average colour (hub.js):
+     what shows while the file arrives, and the light lite / reduced use */
   background:
     radial-gradient(80% 70% at 50% 45%, color-mix(in srgb, var(--tint) 62%, transparent), transparent 88%),
     linear-gradient(165deg, color-mix(in srgb, var(--tint) 46%, var(--navy-900)), color-mix(in srgb, var(--tint) 24%, var(--navy-950)));
-  box-shadow: inset 0 0 0 1px var(--gold-line), 0 26px 50px -32px rgba(0, 0, 0, .95);
+  box-shadow:
+    0 30px 60px -34px rgba(0, 0, 0, .95),
+    0 18px 70px -30px color-mix(in srgb, var(--tint) 70%, transparent);
 }
 
-/* a soft vignette toward navy at the outer edges only */
-.media-hero::before {
+/* a fine edge over the picture, so a light poster still has a border */
+.media-hero::after {
   content: "";
   position: absolute;
   inset: 0;
-  z-index: -1;
-  background: radial-gradient(125% 100% at 50% 50%, rgba(4, 17, 39, 0) 62%, rgba(4, 17, 39, .5) 100%);
+  z-index: 1;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .09);
   pointer-events: none;
 }
 
-/* full tier: the poster itself, blurred, fills the space around it
-   (scaled past the frame so the blur's soft edges never show) */
+/* full tier: the poster itself, blurred, glows softly around the frame
+   (behind it; the picture covers the middle) */
 .media-hero__ambient {
   position: absolute;
-  inset: -12%;
-  z-index: -2;
+  /* (low enough that the glow never reaches the sheet's top edge) */
+  inset: 18% -4% -8%;
+  z-index: -1;
   display: none;
-  width: 124%;
-  height: 124%;
+  width: 108%;
+  height: 90%;
+  border-radius: inherit;
   object-fit: cover;
-  filter: blur(32px) brightness(.66) saturate(1.38);
+  opacity: .5;
+  filter: blur(34px) saturate(1.4);
+  pointer-events: none;
 }
 
 :root[data-motion="full"] .media-hero:not([data-shape="wide"]) .media-hero__ambient {
@@ -179,6 +186,7 @@ dialog.sheet::backdrop {
   width: 100%;
   height: 100%;
   padding: 0;
+  overflow: hidden;
   border: 0;
   border-radius: inherit;
   background: none;
@@ -186,18 +194,22 @@ dialog.sheet::backdrop {
 }
 
 .media-hero__zoom:focus-visible {
-  outline-offset: -4px;
+  outline-offset: 3px;
 }
 
+/* the frame is the picture's shape, so contain fills it exactly */
 .media-hero__img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: contain;
+  transition: transform .6s var(--ease-out);
 }
 
-:root[data-motion="full"] .media-hero:not([data-shape="wide"]) .media-hero__img {
-  filter: drop-shadow(0 18px 28px rgba(0, 0, 0, .6));
+@media (hover: hover) and (pointer: fine) {
+  .media-hero__zoom:hover .media-hero__img {
+    transform: scale(1.015);
+  }
 }
 
 .media-hero__hint {
@@ -225,7 +237,7 @@ dialog.sheet::backdrop {
 @media (min-width: 720px) {
 
   .media-hero {
-    max-height: 62dvh;
+    --cap: 62dvh;
   }
 
 }
