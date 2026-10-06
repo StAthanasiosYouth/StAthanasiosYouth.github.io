@@ -205,7 +205,7 @@ test('change summary', () => {
     d.links.push({ id: 'trip', enabled: true, order: 1, section: 'links', style: 'card', title: 'رحلة', url: 'https://a.com' });
   }).content;
   const lines = gs.summarizeChanges(before, after);
-  assert.ok(lines.includes('تعديل في معاد الاجتماع'));
+  assert.ok(lines.includes('معاد الاجتماع بقى: كل الأحد، ٧:٠٠ م'), lines.join(' | '));
   assert.ok(lines.includes('رابط جديد: رحلة'));
   assert.ok(lines.includes('إخفاء/حذف رابط: تيك توك'));
 });

@@ -70,7 +70,7 @@ test('every browser-callable data function rejects non-admins', () => {
 test('no unguarded public function slipped in', () => {
   // public = callable from the browser through google.script.run
   const world = configuredWorld();
-  const pure = new Set(['buildPublicContent', 'safeHttpsUrl', 'normalizePhone', 'contentRevision', 'buildMeetingIcs', 'summarizeChanges', 'seedDraft', 'doGet']);
+  const pure = new Set(['buildPublicContent', 'safeHttpsUrl', 'normalizePhone', 'contentRevision', 'buildMeetingIcs', 'summarizeChanges', 'describeChanges', 'seedDraft', 'doGet']);
   const publicFns = Object.keys(world.gs).filter(k => typeof world.gs[k] === 'function' && !k.endsWith('_'));
   const unexpected = publicFns.filter(k => !pure.has(k) && !/^api/.test(k) && !['setup', 'checkSheet', 'clearStrayIds', 'checkMedia', 'planMigration', 'migrate'].includes(k));
   assert.deepEqual(unexpected, []);
@@ -250,7 +250,7 @@ test('publish: drafts stay drafts until published; review lists the change', () 
   assert.equal(world.github.files()['content.json'], published, 'saving does not touch GitHub');
 
   const review = plain(gs.apiReview());
-  assert.deepEqual(review.changes, ['تعديل في معاد الاجتماع']);
+  assert.deepEqual(review.changes, ['معاد الاجتماع بقى: كل الأحد، ٧:٠٠ م']);
   gs.apiPublish(review.revision);
   assert.equal(JSON.parse(world.github.files()['content.json']).meeting.time, '19:00');
 });

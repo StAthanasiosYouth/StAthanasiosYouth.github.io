@@ -1955,6 +1955,33 @@
 
   }
 
+  /* the changes grouped the way the admin thinks: الاجتماع، الأخبار… each line
+     marked new / edited / leaving, with when a scheduled thing appears */
+  function changeList(review) {
+
+    if (!review.groups || !review.groups.length) {
+      return el('ul', { class: 'changes' }, review.changes.map(function (line) { return el('li', { text: line }); }));
+    }
+
+    var tones = { add: 'جديد', change: 'تعديل', remove: 'هيختفي' };
+
+    return el('div', { class: 'review-groups' }, review.groups.map(function (group) {
+      return el('section', { class: 'review-group' },
+        el('h3', { class: 'review-group__title' }, icon(group.icon), group.title),
+        el('ul', { class: 'changes' }, group.items.map(function (item) {
+          return el('li', { class: 'is-' + item.tone },
+            el('span', { class: 'visually-hidden', text: tones[item.tone] + ': ' }),
+            el('span', { class: 'change__text' },
+              el('span', { text: item.text }),
+              item.when ? el('span', { class: 'chip chip--gold change__when', text: item.when }) : null
+            )
+          );
+        }))
+      );
+    }));
+
+  }
+
   function renderReview(review) {
 
     var blocked = review.errors.length > 0 || !!review.githubError;
@@ -1996,8 +2023,8 @@
           el('p', { class: 'empty-state__title', text: 'الموقع متحدث' }),
           el('p', { class: 'empty-state__text', text: 'مفيش تغييرات في المسودة عن اللي على الموقع.' }))
         : el('div', { class: 'form' },
-          el('p', { class: 'section-label', text: 'اللي هيتغير في الموقع (' + review.changes.length + ')' }),
-          el('ul', { class: 'changes' }, review.changes.map(function (line) { return el('li', { text: line }); }))
+          el('p', { class: 'section-label', text: 'اللي الزوار هيشوفوه بعد النشر (' + review.changes.length + ')' }),
+          changeList(review)
         ));
     }
 

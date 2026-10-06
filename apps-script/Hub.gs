@@ -703,34 +703,3 @@ function buildHub_(draft, ctx) {
   };
 
 }
-
-
-/* =========================================================
-   CHANGE SUMMARY for the hub parts (used by summarizeChanges)
-========================================================= */
-
-function summarizeHubChanges_(previous, next, lines) {
-
-  var same = function (a, b) { return JSON.stringify(a) === JSON.stringify(b); };
-
-  function list(name, label, titleOf) {
-    diffById_(previous[name] || [], next[name] || [], function (item) { return item.id || item.date; }, {
-      added: function (item) { lines.push(label.added + ': ' + titleOf(item)); },
-      removed: function (item) { lines.push(label.removed + ': ' + titleOf(item)); },
-      changed: function (before, after) {
-        if (!same(before, after)) {
-          lines.push(label.changed + ': ' + titleOf(after));
-        }
-      }
-    });
-  }
-
-  list('sessions', { added: 'اجتماع اتضاف', removed: 'اجتماع اتشال', changed: 'تعديل اجتماع' }, function (s) {
-    return s.date + (s.status === 'cancelled' ? ' (ملغي)' : s.topic ? ' — ' + s.topic : '');
-  });
-
-  list('news', { added: 'خبر جديد', removed: 'إخفاء/حذف خبر', changed: 'تعديل خبر' }, function (n) { return n.title; });
-  list('games', { added: 'لعبة جديدة', removed: 'إخفاء/حذف لعبة', changed: 'تعديل لعبة' }, function (g) { return g.title; });
-  list('notifications', { added: 'إشعار جديد', removed: 'إخفاء/حذف إشعار', changed: 'تعديل إشعار' }, function (n) { return n.title; });
-
-}

@@ -112,14 +112,6 @@
     var now = nowMinutes();
     var today = Math.floor(now / 1440);
 
-    var quick = A.card('اعمل حاجة جديدة', 'كل حاجة بتتحفظ مسودة، وتظهر في معادها بتوقيت مصر بعد ما تنشر.',
-      el('div', { class: 'actions' },
-        addButton('+ اجتماع', function () { A.editors.sessions(null); }),
-        addButton('+ خبر', function () { A.editors.news(null); }),
-        addButton('+ لعبة', function () { A.editors.games(null); }),
-        addButton('+ إشعار', function () { A.editors.notifications(null); })
-      )
-    );
 
     var events = timelineEvents().filter(function (e) {
       return e.minutes >= now - 12 * 60 && e.minutes <= now + 60 * 1440;
@@ -161,7 +153,7 @@
 
     var pending = A.state.schema && A.state.schema.data < A.state.schema.target ? A.upgradeNotice() : null;
 
-    return [pending, quick, timeline].filter(Boolean);
+    return [pending, A.dashboard(), timeline].filter(Boolean);
 
   };
 
@@ -291,10 +283,14 @@
 
   }
 
-  A.editors.sessions = function (session) {
+  /* prefill (new only): e.g. { date } from the home page's next meeting */
+  A.editors.sessions = function (session, prefill) {
 
     var isNew = !session;
     session = session || { enabled: true, status: 'normal', date: A.nextWeekday(dayIndex(), '20:00').slice(0, 10) };
+    if (isNew && prefill) {
+      Object.keys(prefill).forEach(function (key) { session[key] = prefill[key]; });
+    }
 
     var box = A.errorBox();
     var limits = hubLimits();

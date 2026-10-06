@@ -1,0 +1,377 @@
+<script>
+/*
+ * Admin home (الرئيسية): one look at what matters this week.
+ *  - the site: unpublished changes, errors, last publish, GitHub
+ *  - the next meeting and its topic (or a button to add one)
+ *  - what's coming up: scheduled news, games, competitions, activities
+ *  - what the bell shows right now
+ *  - quick actions (+ موضوع، + خبر، + مسابقة، + فعالية…)
+ * The timeline (الجدول) follows below. Everything in Cairo time.
+ */
+(function () {
+
+  'use strict';
+
+  var A = window.A;
+  var el = A.el;
+  var icon = A.icon;
+  var bool = A.bool;
+
+  var DAY = 1440;
+
+  function now() { return A.wallMinutes(A.cairoNow()); }
+
+  function upgraded() { return A.state.schema && A.state.schema.data >= A.state.schema.target; }
+
+  /* "النهارده" / "بكره" / "بعد ٣ أيام" */
+  function relative(minutes) {
+
+    var today = Math.floor(now() / DAY);
+    var day = Math.floor(minutes / DAY);
+    var diff = day - today;
+    var text = diff === 0 ? 'النهارده' : diff === 1 ? 'بكره' : diff === 2 ? 'بعد بكره' : diff < 0 ? 'من ' + (-diff) + ' يوم' : 'بعد ' + diff + ' أيام';
+    if (diff > 10) text = 'بعد ' + diff + ' يوم';
+    return text.replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; });
+
+  }
+
+  function dashCard(options) {
+
+    return el('section', { class: 'card dash-card' + (options.className ? ' ' + options.className : ''), 'aria-labelledby': options.id },
+      el('div', { class: 'dash-card__head' },
+        el('span', { class: 'dash-card__icon', 'aria-hidden': 'true' }, icon(options.icon)),
+        el('h2', { class: 'card__title', id: options.id, text: options.title }),
+        options.chip || null
+      ),
+      options.body
+    );
+
+  }
+
+
+  /* =======================================================
+     THE SITE: publish status
+  ======================================================= */
+
+  function siteCard() {
+
+    var s = A.state.status;
+    var config = A.state.config || {};
+    var github = config.repo && config.tokenSet;
+    var state = s.errors.length ? 'error' : s.hasChanges ? 'dirty' : 'clean';
+
+    var words = {
+      error: { title: 'يوجد خطأ يمنع النشر', text: 'صلّح ' + (s.errors.length === 1 ? 'الخطأ' : 'الأخطاء') + ' الأول، وبعدين انشر.', kind: 'danger', icon: 'alert' },
+      dirty: { title: 'في تغييرات مستنية النشر', text: 'الزوار لسه شايفين النسخة القديمة لحد ما تنشر.', kind: 'gold', icon: 'send' },
+      clean: { title: 'الموقع متحدث', text: 'كل اللي في المسودة ظاهر على الموقع.', kind: 'ok', icon: 'check' }
+    }[state];
+
+    var actions = el('div', { class: 'actions' },
+      state !== 'clean'
+        ? el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.openReview(); } }, icon(state === 'error' ? 'alert' : 'send'), state === 'error' ? 'شوف الأخطاء' : 'راجع وانشر')
+        : null,
+      config.siteUrl ? el('a', { class: 'btn btn--ghost', href: config.siteUrl, target: '_blank', rel: 'noopener' }, icon('external'), 'افتح الموقع') : null
+    );
+
+    var facts = el('dl', { class: 'dash-facts' },
+      el('div', {}, el('dt', { text: 'آخر نشر' }), el('dd', { text: s.publishedAt ? A.formatIso(s.publishedAt) : 'لسه متنشرش' })),
+      el('div', {}, el('dt', { text: 'GitHub' }), el('dd', {},
+        A.chip(github ? 'متوصل' : 'مش متظبط', github ? 'ok' : 'danger'),
+        s.publishedCommit && config.repo
+          ? el('a', { class: 'dash-facts__link', href: 'https://github.com/' + config.repo + '/commit/' + s.publishedCommit, target: '_blank', rel: 'noopener', text: s.publishedCommit.slice(0, 7) })
+          : null
+      )),
+      s.warnings && s.warnings.length ? el('div', {}, el('dt', { text: 'تنبيهات' }), el('dd', { text: String(s.warnings.length).replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; }) + ' (مش بتمنع النشر)' })) : null
+    );
+
+    return el('section', { class: 'card dash-site dash-site--' + state, 'aria-labelledby': 'dash-site-title' },
+      el('div', { class: 'dash-site__main' },
+        el('span', { class: 'dash-site__icon', 'aria-hidden': 'true' }, icon(words.icon)),
+        el('div', {},
+          el('h2', { class: 'card__title', id: 'dash-site-title', text: words.title }),
+          el('p', { class: 'card__hint', text: words.text })
+        )
+      ),
+      facts,
+      actions
+    );
+
+  }
+
+
+  /* =======================================================
+     THE NEXT MEETING
+  ======================================================= */
+
+  /* the next meeting that hasn't ended, and any cancelled ones before it */
+  A.nextMeeting = function () {
+
+    var draft = A.state.draft;
+    var days = A.state.meta.days || [];
+    var weekday = days.indexOf(String(A.setting('meeting.day')));
+    var time = A.setting('meeting.time') || '20:00';
+    var duration = +A.setting('meeting.durationMinutes') || 120;
+    var current = now();
+    var today = Math.floor(current / DAY);
+    var byDate = {};
+    var dates = {};
+
+    (draft.sessions || []).filter(function (s) { return bool(s.enabled); }).forEach(function (s) {
+      byDate[s.date] = s;
+      dates[s.date] = true;
+    });
+
+    if (weekday !== -1) {
+      for (var i = 0; i < 70; i++) {
+        var day = today + i;
+        if (new Date(day * DAY * 60000).getUTCDay() === weekday) {
+          dates[A.wallFromMinutes(day * DAY).slice(0, 10)] = true;
+        }
+      }
+    }
+
+    var cancelled = [];
+    var sorted = Object.keys(dates).sort();
+
+    for (var j = 0; j < sorted.length; j++) {
+      var date = sorted[j];
+      var session = byDate[date] || null;
+      var at = A.wallMinutes(date + ' ' + ((session && session.time) || time));
+      var end = at + ((session && +session.durationMinutes) || duration);
+      if (at === null || end < current) continue;
+      if (session && session.status === 'cancelled') {
+        cancelled.push(date);
+        continue;
+      }
+      return { date: date, at: at, live: at <= current, session: session, cancelled: cancelled };
+    }
+
+    return { date: '', cancelled: cancelled };
+
+  };
+
+  function meetingCard() {
+
+    var row = (A.state.layout || []).filter(function (s) { return s.key === 'meeting'; })[0] || { enabled: true };
+    var shown = A.visibility(bool(row.enabled), row.visibleFrom, row.visibleUntil);
+    var off = shown.state === 'off' || shown.state === 'ended';
+    var next = A.nextMeeting();
+    var body = [];
+
+    if (off) {
+      body.push(el('p', { class: 'note note--warn', text: 'ركن الاجتماع مخفي من الموقع: الزوار مش شايفين ميعاد ولا موضوع.' }));
+    }
+
+    next.cancelled.forEach(function (date) {
+      body.push(el('p', { class: 'dash-meeting__cancelled' }, icon('alert'), 'مفيش اجتماع ' + A.formatWall(date, false) + ' (ملغي)'));
+    });
+
+    if (!next.date) {
+      body.push(el('p', { class: 'empty', text: 'مفيش ميعاد اجتماع متظبط.' }));
+      body.push(el('div', { class: 'actions' }, el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.go('content', 'meetings'); } }, 'ظبط الميعاد')));
+      return dashCard({ id: 'dash-meeting-title', icon: 'church', title: 'الاجتماع الجاي', body: body });
+    }
+
+    var session = next.session;
+    var topic = session && session.topic;
+
+    body.push(el('div', { class: 'dash-meeting' },
+      el('p', { class: 'dash-meeting__when' },
+        el('strong', { text: A.formatWall(A.wallFromMinutes(next.at)) }),
+        el('span', { class: 'dash-meeting__rel', text: next.live ? 'شغال دلوقتي' : relative(next.at) })
+      ),
+      el('p', { class: 'dash-meeting__topic' + (topic ? '' : ' is-empty') }, topic ? '«' + topic + '»' : 'لسه مفيش موضوع للاجتماع ده'),
+      session && session.speaker ? el('p', { class: 'card__hint', text: session.speaker }) : null,
+      topic && session.visibleFrom && A.wallMinutes(session.visibleFrom) > now()
+        ? A.chip('الموضوع يظهر ' + A.formatWall(session.visibleFrom), 'gold')
+        : null
+    ));
+
+    body.push(el('div', { class: 'actions' },
+      el('button', { class: 'btn ' + (topic ? 'btn--ghost' : 'btn--primary'), type: 'button', onclick: function () {
+        A.editors.sessions(session, session ? null : { date: next.date });
+      } }, icon(topic ? 'edit' : 'plus'), topic ? 'تعديل الموضوع' : 'أضف موضوع'),
+      el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { A.go('content', 'meetings'); } }, 'كل الاجتماعات')
+    ));
+
+    return dashCard({
+      id: 'dash-meeting-title',
+      icon: 'church',
+      title: 'الاجتماع الجاي',
+      chip: off ? A.chip('مخفي', 'off') : null,
+      className: off ? 'is-off' : '',
+      body: body
+    });
+
+  }
+
+
+  /* =======================================================
+     COMING UP (two weeks) + LIVE NOW
+  ======================================================= */
+
+  function sectionOfType(key) {
+
+    var type = (A.state.draft.types || []).filter(function (t) { return t.key === key; })[0];
+    return type && type.section === 'competitions' ? 'competitions' : 'activities';
+
+  }
+
+  function upcoming() {
+
+    var draft = A.state.draft;
+    var current = now();
+    var until = current + 14 * DAY;
+    var rows = [];
+
+    function add(at, kind, item, label, iconName, live) {
+      var minutes = A.wallMinutes(at);
+      if (minutes === null) return;
+      if (!live && (minutes < current || minutes > until)) return;
+      rows.push({ minutes: live ? current : minutes, at: at, kind: kind, item: item, label: label, icon: iconName, live: !!live });
+    }
+
+    var visible = function (item) { return bool(item.enabled) && !bool(item.archived); };
+
+    (draft.news || []).filter(visible).forEach(function (n) {
+      add(n.publishAt, 'news', n, 'خبر هيتنشر: ' + n.title, 'megaphone');
+    });
+
+    (draft.games || []).filter(visible).forEach(function (g) {
+      var start = A.wallMinutes(g.startAt);
+      var end = A.wallMinutes(g.endAt);
+      if (start !== null && end !== null && start <= current && current < end) add(g.startAt, 'games', g, 'لعبة شغالة: ' + g.title, 'star', true);
+      else add(g.startAt, 'games', g, 'لعبة تبدأ: ' + g.title, 'star');
+    });
+
+    (draft.activities || []).filter(visible).forEach(function (a) {
+      var competition = sectionOfType(a.type) === 'competitions';
+      var start = A.wallMinutes(a.startAt);
+      var end = A.wallMinutes(a.endAt, true);
+      var noun = competition ? 'مسابقة' : 'فعالية';
+      if (start !== null && start <= current && (end === null || current <= end)) add(a.startAt, 'activities', a, noun + ' شغالة: ' + a.title, competition ? 'trophy' : 'calendar', true);
+      else add(a.startAt, 'activities', a, noun + ' تبدأ: ' + a.title, competition ? 'trophy' : 'calendar');
+    });
+
+    return rows.sort(function (a, b) { return (b.live - a.live) || (a.minutes - b.minutes); });
+
+  }
+
+  function upcomingCard() {
+
+    var rows = upcoming();
+    var shown = rows.slice(0, 7);
+
+    return dashCard({
+      id: 'dash-upcoming-title',
+      icon: 'calendar',
+      className: 'dash-card--wide',
+      title: 'جاي قريب',
+      body: [
+        el('p', { class: 'card__hint', text: 'الأخبار والألعاب والمسابقات والفعاليات في الأسبوعين الجايين.' }),
+        shown.length
+          ? el('ul', { class: 'dash-list' }, shown.map(function (row) {
+            return el('li', {},
+              el('button', { class: 'dash-row' + (row.live ? ' is-live' : ''), type: 'button', onclick: function () { A.editors[row.kind](row.item); } },
+                el('span', { class: 'dash-row__icon', 'aria-hidden': 'true' }, icon(row.icon)),
+                el('span', { class: 'dash-row__label', text: row.label }),
+                el('span', { class: 'dash-row__when', text: row.live ? 'دلوقتي' : relative(row.minutes) + '، ' + (A.formatWall(row.at).split('، ')[1] || '') })
+              )
+            );
+          }))
+          : el('p', { class: 'empty', text: 'مفيش حاجة متجدولة في الأسبوعين الجايين.' }),
+        rows.length > shown.length ? el('p', { class: 'card__hint', text: '+ ' + (rows.length - shown.length) + ' كمان في الجدول تحت' }) : null
+      ]
+    });
+
+  }
+
+  function bellCard() {
+
+    var days = A.state.meta.historyDays;
+    var current = now();
+    var live = (A.state.draft.notifications || []).filter(function (n) {
+      if (!bool(n.enabled) || bool(n.archived)) return false;
+      var until = n.expireAt || (n.publishAt ? A.wallFromMinutes(A.wallMinutes(n.publishAt) + days * DAY) : '');
+      var v = A.visibility(true, n.publishAt, until, current);
+      return v.state === 'live' || v.state === 'always';
+    }).sort(function (a, b) { return (b.publishAt || '') < (a.publishAt || '') ? -1 : 1; });
+
+    var count = String(live.length).replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; });
+
+    return dashCard({
+      id: 'dash-bell-title',
+      icon: 'bell',
+      title: 'الجرس دلوقتي',
+      chip: A.chip(count + (live.length === 1 ? ' إشعار' : ' إشعارات'), live.length ? 'ok' : 'off'),
+      body: [
+        live.length
+          ? el('ul', { class: 'dash-list' }, live.slice(0, 4).map(function (n) {
+            return el('li', {},
+              el('button', { class: 'dash-row', type: 'button', onclick: function () { A.editors.notifications(n); } },
+                el('span', { class: 'dash-row__icon', 'aria-hidden': 'true' }, icon('bell')),
+                el('span', { class: 'dash-row__label', text: n.title }),
+                el('span', { class: 'dash-row__when', text: n.publishAt ? relative(A.wallMinutes(n.publishAt)) : '' })
+              )
+            );
+          }))
+          : el('p', { class: 'empty', text: 'الجرس فاضي دلوقتي.' }),
+        el('div', { class: 'actions' },
+          el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { A.go('content', 'notifications'); } }, 'كل الإشعارات')
+        )
+      ]
+    });
+
+  }
+
+
+  /* =======================================================
+     QUICK ACTIONS
+  ======================================================= */
+
+  function quickCard() {
+
+    function quick(label, iconName, onclick) {
+      return el('button', { class: 'quick', type: 'button', onclick: onclick },
+        el('span', { class: 'quick__icon', 'aria-hidden': 'true' }, icon(iconName)),
+        el('span', { class: 'quick__label', text: label })
+      );
+    }
+
+    var items = upgraded();
+
+    return el('section', { class: 'card dash-quick', 'aria-labelledby': 'dash-quick-title' },
+      el('h2', { class: 'card__title', id: 'dash-quick-title', text: 'اعمل حاجة جديدة' }),
+      el('div', { class: 'quick-grid' },
+        quick('موضوع اجتماع', 'church', function () {
+          var next = A.nextMeeting();
+          A.editors.sessions(next.session, next.session ? null : (next.date ? { date: next.date } : null));
+        }),
+        quick('خبر', 'megaphone', function () { A.editors.news(null); }),
+        items ? quick('مسابقة', 'trophy', function () { A.editors.activities(null, 'competitions'); }) : null,
+        items ? quick('فعالية', 'calendar', function () { A.editors.activities(null, 'activities'); }) : null,
+        quick('لعبة', 'star', function () { A.editors.games(null); }),
+        quick('إشعار', 'bell', function () { A.editors.notifications(null); }),
+        quick('صورة', 'photos', function () { A.go('media'); })
+      ),
+      el('p', { class: 'card__hint', text: 'كل حاجة بتتحفظ مسودة، وتظهر في معادها بتوقيت مصر بعد ما تنشر.' })
+    );
+
+  }
+
+
+  /* the home view: the dashboard, then the timeline (AdminContent) */
+  A.dashboard = function () {
+
+    return el('div', { class: 'dash' },
+      siteCard(),
+      meetingCard(),
+      bellCard(),
+      quickCard(),
+      upcomingCard()
+    );
+
+  };
+
+})();
+</script>

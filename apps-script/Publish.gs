@@ -282,9 +282,12 @@ function apiReview() {
     githubError = error.message;
   }
 
+  var entries = published || !githubError ? describeChanges(published, built.content, cairoNow_()) : [];
+
   return {
     revision: built.content.revision,
-    changes: published || !githubError ? summarizeChanges(published, built.content) : [],
+    changes: entries.map(function (e) { return e.text + (e.when ? ' — ' + e.when : ''); }),
+    groups: groupChanges_(entries),
     errors: built.errors,
     warnings: built.warnings,
     githubError: githubError

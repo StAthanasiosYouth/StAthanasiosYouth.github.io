@@ -210,5 +210,5 @@ test('change summary covers hub items', () => {
   }).content;
   const lines = plain(gs.summarizeChanges(before, after));
   assert.ok(lines.includes('خبر جديد: رحلة'));
-  assert.ok(lines.includes('اجتماع اتضاف: 2026-10-11 — حياة التسليم'));
+  assert.ok(lines.includes('موضوع الاجتماع (الأحد ١١ أكتوبر): حياة التسليم'), lines.join(' | '));
 });
