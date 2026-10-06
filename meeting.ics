@@ -22,8 +22,9 @@ END:DAYLIGHT
 END:VTIMEZONE
 BEGIN:VEVENT
 UID:weekly-meeting@st-athanasius-safaga
-DTSTAMP:20261005T181838Z
+DTSTAMP:20261006T033601Z
 DTSTART;TZID=Africa/Cairo:20261011T200000
+DURATION:PT120M
 RRULE:FREQ=WEEKLY;BYDAY=SU
 SUMMARY:اجتماع الشباب — أسرة البابا أثناسيو
  س لخدمة شعب كنيستها الحبيبة في سفاجا
