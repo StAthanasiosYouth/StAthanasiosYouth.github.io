@@ -1,6 +1,6 @@
 {
   "schema": 3,
-  "revision": "5f56062132c9",
+  "revision": "e51b6be4d8d3",
   "publishedAt": "2026-10-08T09:00:00.000Z",
   "timezone": "Africa/Cairo",
   "site": {
@@ -278,6 +278,7 @@
       "subtitle": "",
       "icon": "",
       "theme": "",
+      "banner": null,
       "visibleFrom": "",
       "visibleUntil": ""
     },
@@ -288,6 +289,7 @@
       "subtitle": "",
       "icon": "",
       "theme": "",
+      "banner": null,
       "visibleFrom": "",
       "visibleUntil": ""
     },
@@ -298,6 +300,7 @@
       "subtitle": "",
       "icon": "",
       "theme": "",
+      "banner": null,
       "visibleFrom": "",
       "visibleUntil": ""
     },
@@ -308,6 +311,7 @@
       "subtitle": "",
       "icon": "",
       "theme": "",
+      "banner": null,
       "visibleFrom": "",
       "visibleUntil": ""
     },
@@ -318,6 +322,7 @@
       "subtitle": "",
       "icon": "",
       "theme": "",
+      "banner": null,
       "visibleFrom": "",
       "visibleUntil": ""
     },
@@ -328,6 +333,7 @@
       "subtitle": "",
       "icon": "",
       "theme": "",
+      "banner": null,
       "visibleFrom": "",
       "visibleUntil": ""
     },
@@ -338,6 +344,7 @@
       "subtitle": "",
       "icon": "",
       "theme": "",
+      "banner": null,
       "visibleFrom": "",
       "visibleUntil": ""
     },
@@ -348,6 +355,7 @@
       "subtitle": "",
       "icon": "",
       "theme": "",
+      "banner": null,
       "visibleFrom": "",
       "visibleUntil": ""
     },
@@ -358,6 +366,7 @@
       "subtitle": "",
       "icon": "",
       "theme": "",
+      "banner": null,
       "visibleFrom": "",
       "visibleUntil": ""
     },
@@ -368,6 +377,7 @@
       "subtitle": "",
       "icon": "",
       "theme": "",
+      "banner": null,
       "visibleFrom": "",
       "visibleUntil": ""
     },
@@ -378,6 +388,7 @@
       "subtitle": "",
       "icon": "",
       "theme": "",
+      "banner": null,
       "visibleFrom": "",
       "visibleUntil": ""
     }

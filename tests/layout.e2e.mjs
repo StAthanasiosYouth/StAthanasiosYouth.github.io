@@ -173,3 +173,34 @@ test('older content without a layout still renders the usual page', async () => 
   assert.deepEqual(problems, []);
   await close();
 });
+
+
+/* ---------------- Phase 4: themes, banners, never an empty picture ---------------- */
+
+const WEBP = Buffer.concat([Buffer.from('RIFF'), Buffer.from([0x20, 0, 0, 0]), Buffer.from('WEBPVP8L'), Buffer.alloc(40, 5)]).toString('base64');
+
+test('an item without a poster gets built-in art in its section colour', async () => {
+  const content = publish(gs => gs.apiSaveSection({ key: 'news', title: 'جديد الأسرة', theme: 'ember' }));
+  const { page, problems, close } = await open(content, THURSDAY_NOON);
+  assert.equal(await page.$eval('[data-area="news"]', n => n.dataset.theme), 'ember');
+  assert.ok(await page.$('[data-area="news"] .art'), 'art instead of an empty box');
+  assert.equal(await page.$('[data-area="news"] .news-card--text'), null);
+  assert.deepEqual(problems, []);
+  await close();
+});
+
+test('a section banner shows on top, and stands in for missing posters', async () => {
+  const content = publish(gs => {
+    const banner = JSON.parse(JSON.stringify(gs.apiUploadMedia({ full: WEBP, thumb: WEBP, mime: 'image/webp', width: 1600, height: 600, alt: 'بانر', color: '#204060' }))).media;
+    gs.apiSaveSection({ key: 'news', title: 'جديد الأسرة', banner: banner.id });
+  });
+  const { page, problems, close } = await open(content, THURSDAY_NOON);
+  const srcs = await page.$$eval('[data-area="news"] img', imgs => imgs.map(i => i.getAttribute('src')));
+  assert.ok(await page.$('[data-area="news"] .section-banner img'));
+  assert.ok(srcs.length >= 2 && srcs.every(s => /^media\/\d{4}\/img-/.test(s)), srcs.join(' '));
+  assert.equal(await page.$('[data-area="news"] .art'), null, 'the banner, not art');
+  const bg = await page.$eval('[data-area="news"] .section-banner img', i => i.style.backgroundColor);
+  assert.equal(bg, 'rgb(32, 64, 96)', 'its colour while loading');
+  assert.deepEqual(problems, []);
+  await close();
+});

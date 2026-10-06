@@ -116,8 +116,13 @@ function apiStateFor_(email, built) {
       games: draft.games.map(clean),
       notifications: draft.notifications.map(clean),
       // Drive ids stay on the server
+      // no Drive ids and no tiny thumbnails here (the library loads those)
       media: draft.media.map(function (row) {
-        return { id: row.id, path: row.path, thumb: row.thumb, width: row.width, height: row.height, alt: row.alt, publishedAt: row.publishedAt };
+        return {
+          id: row.id, path: row.path, thumb: row.thumb, width: row.width, height: row.height, alt: row.alt,
+          publishedAt: row.publishedAt, name: row.name || '', color: row.color || '', hash: row.hash || '',
+          bytes: row.bytes || '', uploadedAt: row.uploadedAt || '', deletedAt: row.deletedAt || ''
+        };
       })
     },
     status: publishStatus_(built),
@@ -511,6 +516,7 @@ function apiSaveSection(input, isNew) {
   var visibleUntil = dateInput_(input.visibleUntil, true, 'يختفي بعد', problems);
   var theme = contentLine_(input.theme).toLowerCase();
   var icon = contentLine_(input.icon).toLowerCase();
+  var banner = imageRef_(input.banner, problems);
 
   if (!/^[a-z][a-z0-9-]{0,30}$/.test(key)) {
     problems.push('مفتاح القسم: حروف إنجليزي صغيرة وأرقام وشرطة، ويبدأ بحرف (مثلاً events)');
@@ -559,7 +565,8 @@ function apiSaveSection(input, isNew) {
       visibleFrom: visibleFrom,
       visibleUntil: visibleUntil,
       theme: theme,
-      icon: icon
+      icon: icon,
+      banner: banner
     };
 
     if (!exists) {

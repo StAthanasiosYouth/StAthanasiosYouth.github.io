@@ -20,7 +20,7 @@ const BEFORE_LINKS = [
 
 const AFTER_LINKS = [['contacts', 'contacts'], ['support', 'support'], ['share', 'share']];
 
-const section = ([key, kind]) => ({ key, kind, title: '', subtitle: '', icon: '', theme: '', visibleFrom: '', visibleUntil: '' });
+const section = ([key, kind]) => ({ key, kind, title: '', subtitle: '', icon: '', theme: '', banner: null, visibleFrom: '', visibleUntil: '' });
 
 
 /** Every published section, in page order. */

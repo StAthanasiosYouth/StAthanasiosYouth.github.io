@@ -1,0 +1,343 @@
+<script>
+/*
+ * Admin: the media library («الصور»).
+ * - A grid of every image (tiny thumbnails stored in the Sheet, so it
+ *   opens without touching Drive), searchable, filtered.
+ * - Each image: name, description, size, where it's used.
+ * - Removing: refused while used (and says where); otherwise to the bin,
+ *   restorable; «امسح نهائي» only from the bin.
+ * - A.pickFromLibrary(): the same grid as a chooser for any editor.
+ */
+(function () {
+
+  'use strict';
+
+  var A = window.A;
+  var el = A.el;
+  var icon = A.icon;
+
+  var library = null;     // { items, usage } from apiMediaLibrary
+  var loading = null;
+
+  function load(force) {
+
+    if (library && !force) return Promise.resolve(library);
+    if (loading && !force) return loading;
+
+    loading = A.call('apiMediaLibrary').then(function (result) {
+      library = result;
+      loading = null;
+      return result;
+    }, function (error) {
+      loading = null;
+      throw error;
+    });
+
+    return loading;
+
+  }
+
+  /* any state change may change usage: refresh next time */
+  A.invalidateLibrary = function () { library = null; };
+
+  var FILTERS = [
+    { key: 'all', label: 'الكل' },
+    { key: 'used', label: 'مستخدمة' },
+    { key: 'unused', label: 'مش مستخدمة' },
+    { key: 'site', label: 'على الموقع' },
+    { key: 'bin', label: 'المحذوفة' }
+  ];
+
+  function matches(item, filter, query) {
+
+    if (filter === 'bin') { if (!item.deletedAt) return false; }
+    else if (item.deletedAt) return false;
+    if (filter === 'used' && !item.usage.length) return false;
+    if (filter === 'unused' && item.usage.length) return false;
+    if (filter === 'site' && !item.publishedAt) return false;
+
+    if (query) {
+      var text = (item.name + ' ' + item.alt + ' ' + item.usage.map(function (u) { return u.label; }).join(' ')).toLowerCase();
+      if (text.indexOf(query.toLowerCase()) === -1) return false;
+    }
+
+    return true;
+
+  }
+
+  /* one tile: the tiny thumbnail, or the Drive preview loaded when visible */
+  function tile(item, onclick, selected) {
+
+    var img = el('img', { class: 'media-tile__img', alt: '' });
+    var button = el('button', {
+      class: 'media-tile' + (selected ? ' is-selected' : '') + (item.deletedAt ? ' is-deleted' : ''),
+      type: 'button',
+      'aria-pressed': selected ? 'true' : null,
+      'aria-label': (item.name || item.alt || item.id) + (item.usage.length ? ' — مستخدمة ' + item.usage.length : ''),
+      style: item.color ? '--tile:' + item.color : null,
+      onclick: onclick
+    },
+    el('span', { class: 'media-tile__frame' }, img),
+    el('span', { class: 'media-tile__name', text: item.name || item.alt || 'من غير اسم' }),
+    el('span', { class: 'media-tile__meta' },
+      item.usage.length ? el('span', { class: 'media-tile__badge', text: 'مستخدمة ' + item.usage.length }) : null,
+      item.publishedAt ? el('span', { class: 'media-tile__dot', title: 'على الموقع' }) : null
+    ));
+
+    if (item.tiny) {
+      img.src = item.tiny;
+    }
+    else {
+      lazyPreview(img, item.id);
+    }
+
+    return button;
+
+  }
+
+  var observer = 'IntersectionObserver' in window ? new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (!entry.isIntersecting) return;
+      observer.unobserve(entry.target);
+      var img = entry.target;
+      A.mediaPreview(img.dataset.media).then(function (src) { if (src) img.src = src; }).catch(function () {});
+    });
+  }, { rootMargin: '200px' }) : null;
+
+  function lazyPreview(img, id) {
+
+    img.dataset.media = id;
+    if (observer) observer.observe(img);
+    else A.mediaPreview(id).then(function (src) { if (src) img.src = src; }).catch(function () {});
+
+  }
+
+  function grid(items, onPick, selectedId) {
+
+    if (!items.length) {
+      return el('div', { class: 'empty-state' },
+        el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('photos')),
+        el('p', { class: 'empty-state__title', text: 'مفيش صور هنا' }),
+        el('p', { class: 'empty-state__text', text: 'ارفع صورة من الزرار فوق، أو غيّر الفلتر.' })
+      );
+    }
+
+    return el('div', { class: 'media-grid' }, items.map(function (item) {
+      return tile(item, function () { onPick(item); }, item.id === selectedId);
+    }));
+
+  }
+
+  function skeletonGrid() {
+
+    return el('div', { class: 'media-grid', 'aria-hidden': 'true' },
+      [0, 1, 2, 3, 4, 5].map(function () { return el('div', { class: 'skeleton media-tile--skeleton' }); }));
+
+  }
+
+
+  /* =======================================================
+     THE VIEW
+  ======================================================= */
+
+  var viewFilter = 'all';
+  var viewQuery = '';
+
+  A.views.media = function () {
+
+    var body = el('div', { class: 'media-view' }, skeletonGrid());
+    var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر بالاسم أو الوصف أو مكان الاستخدام', value: viewQuery, 'aria-label': 'دوّر في الصور' });
+    var chips = el('div', { class: 'filter-chips', role: 'group', 'aria-label': 'فلتر' });
+    var upload = A.imageUploader(function () { load(true).then(draw); });
+
+    function drawChips() {
+      chips.replaceChildren.apply(chips, FILTERS.map(function (f) {
+        return el('button', {
+          class: 'filter-chip', type: 'button', 'aria-pressed': String(f.key === viewFilter),
+          onclick: function () { viewFilter = f.key; drawChips(); draw(); }
+        }, f.label);
+      }));
+    }
+
+    function draw() {
+      if (!library) return;
+      var items = library.items.filter(function (item) { return matches(item, viewFilter, viewQuery); });
+      body.replaceChildren(grid(items, openDetails));
+    }
+
+    search.addEventListener('input', function () { viewQuery = search.value.trim(); draw(); });
+    drawChips();
+
+    load().then(draw).catch(function (error) {
+      body.replaceChildren(el('div', { class: 'errors' }));
+      A.fail(error, body.firstChild);
+    });
+
+    return [
+      A.card('مكتبة الصور', 'كل البوسترات والبانرات في مكان واحد. اختار من هنا بدل ما ترفع نفس الصورة كذا مرة.',
+        upload.node,
+        search,
+        chips
+      ),
+      el('section', { class: 'card' }, body)
+    ];
+
+  };
+
+  /* a standalone uploader (the library's own "ارفع صورة") */
+  A.imageUploader = function (onDone) {
+
+    var picker = A.imagePicker('', { uploadOnly: true, label: 'رفع صورة جديدة', hint: 'من الموبايل أو الكمبيوتر — بتتصغر وتتضغط لوحدها، والصورة المكررة مبتترفعش تاني', onUploaded: function () { onDone(); } });
+    return picker;
+
+  };
+
+
+  /* =======================================================
+     DETAILS
+  ======================================================= */
+
+  function openDetails(item) {
+
+    var box = A.errorBox();
+    var name = A.counted('اسم الصورة', item.name, 80, 'علشان تلاقيها بسهولة');
+    var alt = A.counted('وصف الصورة', item.alt, 140, 'للي بيستخدم قارئ شاشة (مثلاً: بوستر رحلة الغردقة)');
+    var preview = el('img', { class: 'media-detail__img', alt: '' });
+
+    A.mediaPreview(item.id).then(function (src) { if (src) preview.src = src; }).catch(function () {
+      if (item.tiny) preview.src = item.tiny;
+    });
+
+    var facts = el('dl', { class: 'kv' },
+      el('dt', { text: 'المقاس' }), el('dd', { class: 'ltr', text: item.width + ' × ' + item.height }),
+      item.bytes ? el('dt', { text: 'الحجم' }) : null, item.bytes ? el('dd', { class: 'ltr', text: A.formatBytes(Number(item.bytes)) }) : null,
+      el('dt', { text: 'اترفعت' }), el('dd', { text: item.uploadedAt ? A.formatWall(item.uploadedAt) : '—' }),
+      el('dt', { text: 'على الموقع' }), el('dd', { text: item.publishedAt ? 'أيوه، من ' + A.formatWall(item.publishedAt) : 'لسه (هتتنشر مع أول حاجة بتستخدمها)' })
+    );
+
+    var usage = item.usage.length
+      ? el('ul', { class: 'usage-list' }, item.usage.map(function (u) {
+        return el('li', {}, icon(AREA_ICONS[u.area] || 'link'), el('span', { text: u.label }));
+      }))
+      : el('p', { class: 'note', text: 'مش مستخدمة في أي حاجة دلوقتي.' });
+
+    var save = el('button', { class: 'btn btn--primary', type: 'button', text: 'حفظ' });
+    save.addEventListener('click', function () {
+      box.hidden = true;
+      A.withBusy(save, A.call('apiUpdateMedia', item.id, { name: name.input.value, alt: alt.input.value }))
+        .then(function (next) { A.dirty = false; A.invalidateLibrary(); A.applyState(next); document.getElementById('sheet').close(); A.toast('اتحفظ ✓'); })
+        .catch(function (error) { A.fail(error, box); });
+    });
+
+    var actions = [];
+
+    if (item.deletedAt) {
+      actions.push(el('button', { class: 'btn', type: 'button', onclick: function (e) { act('apiRestoreMedia', 'رجعت للمكتبة ✓', e.currentTarget); } }, icon('retry'), 'رجّعها'));
+      actions.push(el('button', { class: 'btn btn--danger', type: 'button', onclick: function (e) {
+        var button = e.currentTarget;
+        A.confirm({ tone: 'danger', title: 'تمسح الصورة نهائي؟', message: 'هتتمسح من Drive ومش هترجع. لو كانت اتنشرت قبل كده، الملف اللي على الموقع هيفضل علشان اللينكات القديمة.', confirmLabel: 'امسح نهائي', cancelLabel: 'لأ' })
+          .then(function (ok) { if (ok) act('apiPurgeMedia', 'اتمسحت نهائي', button); });
+      } }, icon('trash'), 'امسح نهائي'));
+    }
+    else {
+      actions.push(el('button', { class: 'btn btn--danger', type: 'button', onclick: function (e) {
+        var button = e.currentTarget;
+        if (item.usage.length) {
+          // the clear warning: where it is used, nothing happens
+          A.modal({
+            tone: 'warn',
+            title: 'الصورة دي مستخدمة',
+            message: 'مينفعش تتشال وهي مستخدمة في:\n' + item.usage.map(function (u) { return '• ' + u.label; }).join('\n') + '\n\nغيّرها في الأماكن دي الأول.',
+            actions: [{ label: 'تمام', value: true, kind: 'primary', autofocus: true }]
+          });
+          return;
+        }
+        A.confirm({ tone: 'danger', title: 'تشيل الصورة من المكتبة؟', message: 'هتروح «المحذوفة» وتقدر ترجعها بعدين.', confirmLabel: 'شيلها', cancelLabel: 'لأ' })
+          .then(function (ok) { if (ok) act('apiDeleteMedia', 'اتشالت — تلاقيها في «المحذوفة»', button); });
+      } }, icon('trash'), 'شيلها'));
+    }
+
+    function act(api, message, button) {
+      A.withBusy(button, A.call(api, item.id))
+        .then(function (next) {
+          A.dirty = false;
+          A.invalidateLibrary();
+          document.getElementById('sheet').close();
+          A.applyState(next);
+          A.toast(message);
+        })
+        .catch(function (error) { A.fail(error, box); });
+    }
+
+    A.dirty = false;
+
+    A.openSheet(item.name || 'صورة', [
+      box,
+      el('div', { class: 'media-detail', style: item.color ? '--tile:' + item.color : null }, preview),
+      el('div', { class: 'form' }, name.node, alt.node),
+      facts,
+      el('div', { class: 'form-group' }, el('p', { class: 'section-label', text: 'مستخدمة في' }), usage),
+      el('div', { class: 'actions' }, actions)
+    ], A.sheetFooter(save));
+
+  }
+
+  var AREA_ICONS = { sessions: 'church', news: 'megaphone', games: 'star', notifications: 'bell', activities: 'calendar', sections: 'layers', types: 'layers' };
+
+
+  /* =======================================================
+     PICKER (from any editor)
+  ======================================================= */
+
+  /** Resolves with the chosen media id, or null. */
+  A.pickFromLibrary = function (currentId) {
+
+    return new Promise(function (resolve) {
+
+      var dialog = el('dialog', { class: 'modal modal--wide picker-dialog', 'aria-label': 'اختار صورة من المكتبة' });
+      var body = el('div', { class: 'picker-dialog__body' }, skeletonGrid());
+      var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر…', 'aria-label': 'دوّر في الصور' });
+      var done = false;
+
+      function close(value) {
+        if (done) return;
+        done = true;
+        dialog.close();
+        dialog.remove();
+        resolve(value);
+      }
+
+      function draw() {
+        var query = search.value.trim();
+        var items = library.items.filter(function (item) { return matches(item, 'all', query); });
+        body.replaceChildren(grid(items, function (item) { close(item.id); }, currentId));
+      }
+
+      dialog.append(
+        el('div', { class: 'picker-dialog__head' },
+          el('h2', { class: 'modal__title', text: 'اختار من المكتبة' }),
+          el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: function () { close(null); } }, icon('close'))
+        ),
+        search,
+        body
+      );
+
+      dialog.addEventListener('cancel', function (event) { event.preventDefault(); close(null); });
+      dialog.addEventListener('click', function (event) { if (event.target === dialog) close(null); });
+      search.addEventListener('input', function () { if (library) draw(); });
+
+      document.body.appendChild(dialog);
+      dialog.showModal();
+      search.focus();
+
+      load().then(draw).catch(function (error) {
+        body.replaceChildren(el('div', { class: 'errors' }));
+        A.fail(error, body.firstChild);
+      });
+
+    });
+
+  };
+
+})();
+</script>

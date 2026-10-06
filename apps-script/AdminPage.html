@@ -268,6 +268,8 @@
     var from = A.dateTimeInput(row.visibleFrom, { emptyText: 'يظهر على طول', presets: [A.PRESETS.now, A.PRESETS.thursday8, A.PRESETS.friday] });
     var until = A.dateTimeInput(row.visibleUntil, { emptyText: 'مبيختفيش لوحده', presets: [A.PRESETS.sunday10] });
     var enabled = A.switchInput('القسم ظاهر', isNew ? true : bool(row.enabled));
+    var banner = A.imagePicker(row.banner || '', { label: 'بانر القسم (اختياري)', hint: 'بيظهر فوق القسم، وأي عنصر جواه من غير بوستر بياخده' });
+    var theme = A.themePicker(row.theme || '');
     var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
 
     save.addEventListener('click', function () {
@@ -278,7 +280,8 @@
         subtitle: subtitle.input.value,
         visibleFrom: from.value(),
         visibleUntil: until.value(),
-        theme: row.theme || '',
+        theme: theme.value(),
+        banner: banner.value(),
         icon: row.icon || '',
         enabled: enabled.input.checked
       }, isNew))
@@ -299,6 +302,11 @@
         isNew || kind === 'links' ? A.field('مفتاح القسم', key, isNew ? 'بالإنجليزي الصغير ومن غير مسافات، مثلاً events. مش هيظهر للناس' : 'المفتاح مبيتغيرش بعد الإضافة') : null,
         title.node,
         info.publicTitle ? subtitle.node : null,
+        info.publicTitle ? el('div', { class: 'form-group' },
+          el('p', { class: 'section-label', text: 'الشكل' }),
+          A.field('لون القسم', theme.node, 'بيغيّر لمسة اللون والإضاءة بتاعة القسم بس'),
+          banner.node
+        ) : null,
         el('div', { class: 'form-group' },
           el('p', { class: 'section-label', text: 'الظهور (بتوقيت مصر)' }),
           enabled.node,

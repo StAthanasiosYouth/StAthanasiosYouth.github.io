@@ -137,6 +137,11 @@ function mediaIndex_(rows) {
       return;
     }
 
+    // removed from the library: never published again
+    if (contentLine_(row.deletedAt)) {
+      return;
+    }
+
     if (!(width > 0) || !(height > 0)) {
       return;
     }
@@ -148,6 +153,12 @@ function mediaIndex_(rows) {
       h: Math.round(height),
       alt: contentLine_(row.alt).slice(0, HUB_LIMITS.alt)
     };
+
+    // the dominant colour shows while the picture loads
+    var color = contentLine_(row.color).toLowerCase();
+    if (/^#[0-9a-f]{6}$/.test(color)) {
+      index[id].color = color;
+    }
 
   });
 

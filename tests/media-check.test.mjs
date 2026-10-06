@@ -65,7 +65,8 @@ test('a staging folder deleted by hand is recreated once', () => {
   gs.apiUploadMedia(uploadInput());
   const folder = w.properties.get('MEDIA_FOLDER_ID');
   w.drive.files.delete(folder);
-  const result = plain(gs.apiUploadMedia(uploadInput()));
+  const other = Buffer.concat([WEBP.subarray(0, 16), Buffer.alloc(40, 9)]).toString('base64');
+  const result = plain(gs.apiUploadMedia({ ...uploadInput(), full: other }));
   assert.match(result.media.id, /^img-[0-9a-f]{8}$/);
   assert.notEqual(w.properties.get('MEDIA_FOLDER_ID'), folder);
 });

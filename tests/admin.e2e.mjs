@@ -61,6 +61,9 @@ test.before(async () => {
   writeFileSync(photos.big, await sharp(noise, { raw: { width: 4032, height: 3024, channels: 3 } }).jpeg({ quality: 92 }).toBuffer());
   photos.small = join(tmpdir(), 'athanasios-e2e-small.png');
   writeFileSync(photos.small, await sharp({ create: { width: 800, height: 1000, channels: 3, background: '#1d3557' } }).png().toBuffer());
+  // a third, different picture (the same one twice would be reused, not uploaded)
+  photos.other = join(tmpdir(), 'athanasios-e2e-other.png');
+  writeFileSync(photos.other, await sharp({ create: { width: 900, height: 900, channels: 3, background: '#7a3b1d' } }).png().toBuffer());
 
   browser = await puppeteer.launch({ executablePath: CHROME, headless: true });
 
@@ -183,7 +186,7 @@ test('a Drive failure is visible inside the editor, with the real reason, and re
   await openMeeting(page);
   world.drive.failWith = DISABLED;
 
-  const stages = await upload(page, photos.small);
+  const stages = await upload(page, photos.other);
   assert.ok(stages.includes('حدث خطأ أثناء الرفع'), stages.join(' | '));
 
   const shown = await page.evaluate(() => {
@@ -518,6 +521,90 @@ test('a section can be scheduled (Cairo time) from its editor', async () => {
   const chip = await page.evaluate(() => [...document.querySelectorAll('.layout-list .item')].find(i => i.querySelector('.item__title').textContent === 'تحديات وألعاب').querySelector('.chip--state').dataset.state);
   assert.equal(chip, 'scheduled');
   world.gs.apiSaveSection({ key: 'games', title: 'تحديات وألعاب', visibleFrom: '', visibleUntil: '' });
+
+  assert.deepEqual(problems, []);
+  await close();
+
+});
+
+
+/* ---------------- Phase 4: the media library ---------------- */
+
+test('library: tiles from tiny thumbnails, details with usage, a used image is protected', async () => {
+
+  const { page, problems, close } = await open(DESKTOP);
+  await page.evaluate(() => { A.go('media'); });
+  await page.waitForSelector('.media-grid .media-tile');
+  const tiles = await page.$$eval('.media-grid .media-tile', t => t.length);
+  assert.ok(tiles >= 2, `${tiles} tiles`);
+
+  // the photo uploaded by the first test is used by the 2026-10-11 meeting
+  const used = await page.evaluate(() => {
+    const tile = [...document.querySelectorAll('.media-tile')].find(t => t.querySelector('.media-tile__badge'));
+    tile.click();
+    return tile.getAttribute('aria-label');
+  });
+  assert.match(used, /مستخدمة/);
+  await page.waitForSelector('dialog.sheet[open] .usage-list li');
+  assert.match(await page.$eval('dialog.sheet[open] .usage-list', n => n.textContent), /اجتماع 2026-10-11/);
+
+  await page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .actions button')].find(b => b.textContent.includes('شيلها')).click());
+  await page.waitForSelector('dialog.modal--warn[open]');
+  assert.match(await page.$eval('dialog.modal--warn .modal__text', n => n.textContent), /اجتماع 2026-10-11/);
+  await page.evaluate(() => document.querySelector('dialog.modal--warn button').click());
+  assert.ok(world.gs.readTable_('Media').every(m => !m.deletedAt), 'nothing removed');
+
+  assert.deepEqual(problems, []);
+  await close();
+
+});
+
+test('any editor can choose an existing image «من المكتبة»', async () => {
+
+  const { page, problems, close } = await open();
+  await page.evaluate(() => { A.go('content', 'news'); });
+  await page.evaluate(() => A.editors.news(null));
+  await page.waitForSelector('dialog.sheet[open] .picker');
+  await page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .picker button')].find(b => b.textContent.includes('من المكتبة')).click());
+  await page.waitForSelector('dialog.picker-dialog[open] .media-tile');
+  const chosen = await page.evaluate(() => {
+    const tile = document.querySelector('dialog.picker-dialog[open] .media-tile');
+    tile.click();
+    return tile.getAttribute('aria-label');
+  });
+  await page.waitForFunction(() => !document.querySelector('dialog.picker-dialog'));
+  await page.waitForSelector('dialog.sheet[open] .picker__img');
+
+  await page.type('dialog.sheet[open] input', 'خبر بصورة من المكتبة');
+  await page.evaluate(() => document.querySelector('dialog.sheet[open] .sheet__foot .btn--primary').click());
+  await page.waitForFunction(() => !document.querySelector('dialog.sheet').open);
+  const news = world.gs.readTable_('News').find(n => n.title === 'خبر بصورة من المكتبة');
+  assert.match(news.image, /^img-[0-9a-f]{8}$/, chosen);
+
+  assert.deepEqual(problems, []);
+  await close();
+
+});
+
+test('a section gets a colour and a banner from its editor', async () => {
+
+  const { page, problems, close } = await open(DESKTOP);
+  await page.evaluate(() => { A.go('page', 'layout'); });
+  await page.waitForSelector('[aria-label="تعديل جديد الأسرة"]');
+  await page.click('[aria-label="تعديل جديد الأسرة"]');
+  await page.waitForSelector('dialog.sheet[open] .swatches');
+  await page.evaluate(() => document.querySelector('dialog.sheet[open] .swatch--emerald input').click());
+  await page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .picker button')].find(b => b.textContent.includes('من المكتبة')).click());
+  await page.waitForSelector('dialog.picker-dialog[open] .media-tile');
+  await page.evaluate(() => document.querySelector('dialog.picker-dialog[open] .media-tile').click());
+  await page.waitForFunction(() => !document.querySelector('dialog.picker-dialog'));
+  await page.evaluate(() => document.querySelector('dialog.sheet[open] .sheet__foot .btn--primary').click());
+  await page.waitForFunction(() => !document.querySelector('dialog.sheet').open);
+
+  const news = world.gs.readTable_('Sections').find(s => s.key === 'news');
+  assert.equal(news.theme, 'emerald');
+  assert.match(news.banner, /^img-/);
+  world.gs.apiSaveSection({ key: 'news', title: 'جديد الأسرة', theme: '', banner: '' });
 
   assert.deepEqual(problems, []);
   await close();

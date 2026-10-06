@@ -14,7 +14,7 @@ import { iconNode, isBrandIcon } from './icons.js';
 import { meetingStatus, meetingJourney, fromDayNumber, isWithinWindow, calendarDates } from './schedule.js';
 import { journeyElement } from './journey.js';
 import { describeMeeting, formatDate, DAY_SHORT } from './words.js';
-import { bannerWidget, newsSection, gamesSection, liveGameWidget, meetingTopic, visibleNews, gameStates } from './hub.js';
+import { bannerWidget, newsSection, gamesSection, liveGameWidget, meetingTopic, visibleNews, gameStates, sectionBanner } from './hub.js';
 import { updateBell, visibleNotifications } from './bell.js';
 import { liveSections } from './layout.js';
 import { wake } from './motion.js';
@@ -66,7 +66,7 @@ export function updateHero(site) {
 /* sessions-only setups (no weekly rule) still get a meeting widget */
 const NO_WEEKLY = { title: 'الاجتماع', day: null, time: '', durationMinutes: null, note: '', skipDates: [], ics: '' };
 
-function meetingWidget(content, now) {
+function meetingWidget(content, now, layoutSection = {}) {
 
   const meeting = content.meeting || NO_WEEKLY;
 
@@ -111,7 +111,7 @@ function meetingWidget(content, now) {
   'أضف للتقويم'
   );
 
-  const section = h('section', { class: 'widget meeting', 'data-area': 'meeting', 'aria-labelledby': 'meeting-title' },
+  const section = h('section', { class: 'widget meeting', 'data-area': 'meeting', 'data-theme': layoutSection.theme || null, 'aria-labelledby': 'meeting-title' },
     h('div', { class: 'meeting__top' },
       h('h2', { class: 'widget__title', id: 'meeting-title' }, iconNode('clock'), meeting.title),
       meeting.day !== null ? h('span', { class: 'meeting__repeat' }, `كل ${DAY_SHORT[meeting.day]}`) : null
@@ -168,7 +168,7 @@ function meetingWidget(content, now) {
     const session = status.session;
     const topicKey = session ? `${session.date}|${session.topic}|${session.speaker}` : '';
     if (topicKey !== lastTopicKey) {
-      topicSlot.replaceChildren(meetingTopic(session) || '');
+      topicSlot.replaceChildren(meetingTopic(session, layoutSection) || '');
       lastTopicKey = topicKey;
     }
 
@@ -429,7 +429,8 @@ function sectionWidget(section, links) {
   const tiles = links.filter(link => link.style === 'tile');
   const rows = links.filter(link => link.style !== 'tile');
 
-  return h('section', { class: 'widget links-section', 'data-area': 'section', 'aria-labelledby': id },
+  return h('section', { class: 'widget links-section', 'data-area': 'section', 'data-theme': section.theme || null, 'aria-labelledby': id },
+    sectionBanner(section),
     h('h2', { class: 'widget__title', id }, section.title),
     section.subtitle ? h('p', { class: 'section-head__sub' }, section.subtitle) : null,
     tiles.length ? h('ul', { class: 'tiles' }, tiles.map(tile)) : null,
@@ -661,7 +662,8 @@ export function renderPage(content, clock, actions, { animate = false } = {}) {
   gameCards = [];
 
   const banner = parts.pinned ? bannerWidget(parts.pinned) : parts.announcement ? announcementWidget(parts.announcement) : null;
-  const liveGames = parts.liveGames.map(liveGameWidget);
+  const gamesLayout = parts.sections.find(s => s.key === 'games') || {};
+  const liveGames = parts.liveGames.map(entry => liveGameWidget(entry, gamesLayout));
   let bannerPlaced = false;
 
   const placeBanner = () => {
@@ -682,7 +684,7 @@ export function renderPage(content, clock, actions, { animate = false } = {}) {
 
       case 'meeting':
         if (content.meeting || content.sessions.length) {
-          meetingHandle = meetingWidget(content, clock.now);
+          meetingHandle = meetingWidget(content, clock.now, section);
           add(meetingHandle.el, 'meeting');
           // a game that is open right now goes straight under the meeting
           placeLiveGames();
@@ -714,7 +716,7 @@ export function renderPage(content, clock, actions, { animate = false } = {}) {
 
       case 'links': {
         const group = parts.linkGroups.get(section.key);
-        if (group) add(sectionWidget({ ...group.section, title: section.title || group.section.title, subtitle: section.subtitle }, group.links), 'links');
+        if (group) add(sectionWidget({ ...group.section, title: section.title || group.section.title, subtitle: section.subtitle, theme: section.theme, banner: section.banner }, group.links), 'links');
         break;
       }
 

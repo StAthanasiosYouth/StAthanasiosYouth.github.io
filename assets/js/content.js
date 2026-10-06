@@ -134,13 +134,20 @@ function cleanImage(raw) {
     return null;
   }
 
-  return {
+  const image = {
     src: raw.src,
     thumb: MEDIA_PATH.test(raw.thumb || '') ? raw.thumb : raw.src,
     w: Math.round(w),
     h: Math.round(h),
     alt: text(raw.alt, 140)
   };
+
+  // the loading colour, only when the publisher sent a valid one
+  if (typeof raw.color === 'string' && /^#[0-9a-f]{6}$/i.test(raw.color)) {
+    image.color = raw.color;
+  }
+
+  return image;
 
 }
 
@@ -331,6 +338,7 @@ export function sanitizeContent(raw) {
         subtitle: text(s.subtitle, 140),
         icon: LINK_ICON_NAMES.includes(s.icon) ? s.icon : '',
         theme: SECTION_THEMES.includes(s.theme) ? s.theme : '',
+        banner: cleanImage(s.banner),
         visibleFrom: dateTime(s.visibleFrom),
         visibleUntil: dateTime(s.visibleUntil)
       }))

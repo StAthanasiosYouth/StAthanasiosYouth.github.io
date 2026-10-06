@@ -20,7 +20,7 @@ export function picture(image, { sizes = '(min-width: 1024px) 360px, 92vw', clas
 
   if (!image) return null;
 
-  return h('img', {
+  const img = h('img', {
     class: className,
     src: image.thumb,
     srcset: image.thumb !== image.src ? `${image.thumb} 480w, ${image.src} 1600w` : null,
@@ -31,6 +31,46 @@ export function picture(image, { sizes = '(min-width: 1024px) 360px, 92vw', clas
     loading: eager ? null : 'lazy',
     decoding: 'async'
   });
+
+  // the picture's own colour while it loads (CSSOM: the CSP blocks style="")
+  if (image.color) img.style.backgroundColor = image.color;
+
+  return img;
+
+}
+
+
+/*
+ * An item's picture, never an empty box: its own poster, else its
+ * section's banner, else built-in art in the section's colour.
+ */
+export function posterOrFallback(image, section = {}, options = {}) {
+
+  if (image) return picture(image, options);
+  if (section.banner) return picture(section.banner, options);
+
+  return art(section, options.icon);
+
+}
+
+
+/* built-in art: the section's colour, a quiet cross lattice, its icon */
+export function art(section = {}, iconName = '') {
+
+  return h('span', { class: 'art', 'data-theme': section.theme || null, 'aria-hidden': 'true' },
+    h('span', { class: 'art__glow' }),
+    iconNode(section.icon || iconName || 'cross', 'art__icon')
+  );
+
+}
+
+
+/* a section's own banner, above its content */
+export function sectionBanner(section = {}) {
+
+  if (!section.banner) return null;
+
+  return h('div', { class: 'section-banner' }, picture(section.banner, { sizes: '(min-width: 1024px) 760px, 92vw' }));
 
 }
 
@@ -96,24 +136,25 @@ export function newsSection(items, nowStamp, section = {}) {
   const lead = items.find(item => item.featured) || null;
   const rest = items.filter(item => item !== lead);
 
-  return h('section', { class: 'widget news', 'data-area': 'news', 'aria-labelledby': 'news-title' },
+  return h('section', { class: 'widget news', 'data-area': 'news', 'data-theme': section.theme || null, 'aria-labelledby': 'news-title' },
+    sectionBanner(section),
     h('div', { class: 'section-head' },
       h('h2', { class: 'widget__title', id: 'news-title' }, iconNode(section.icon || 'megaphone'), section.title || 'جديد الأسرة'),
       section.subtitle ? h('p', { class: 'section-head__sub' }, section.subtitle) : null
     ),
-    lead ? newsLead(lead, nowStamp) : null,
+    lead ? newsLead(lead, nowStamp, section) : null,
     rest.length
-      ? h('ul', { class: 'news__rail', 'aria-label': 'أخبار تانية' }, rest.map(item => h('li', {}, newsCard(item, nowStamp))))
+      ? h('ul', { class: 'news__rail', 'aria-label': 'أخبار تانية' }, rest.map(item => h('li', {}, newsCard(item, nowStamp, section))))
       : null
   );
 
 }
 
 
-function newsLead(item, nowStamp) {
+function newsLead(item, nowStamp, section = {}) {
 
   return h('article', { class: 'news-lead' },
-    item.image ? h('div', { class: 'news-lead__media' }, picture(item.image, { sizes: '(min-width: 1024px) 520px, 92vw' })) : null,
+    h('div', { class: 'news-lead__media' }, posterOrFallback(item.image, section, { sizes: '(min-width: 1024px) 520px, 92vw', icon: 'megaphone' })),
     h('div', { class: 'news-lead__body' },
       h('div', { class: 'news__meta' },
         item.badge ? h('span', { class: 'badge' }, item.badge) : null,
@@ -130,10 +171,10 @@ function newsLead(item, nowStamp) {
 }
 
 
-function newsCard(item, nowStamp) {
+function newsCard(item, nowStamp, section = {}) {
 
-  return h('article', { class: `news-card${item.image ? '' : ' news-card--text'}` },
-    item.image ? h('div', { class: 'news-card__media' }, picture(item.image, { sizes: '220px' })) : null,
+  return h('article', { class: 'news-card' },
+    h('div', { class: 'news-card__media' }, posterOrFallback(item.image, section, { sizes: '220px', icon: 'megaphone' })),
     h('div', { class: 'news-card__body' },
       h('div', { class: 'news__meta' },
         item.badge ? h('span', { class: 'badge' }, item.badge) : null,
@@ -204,7 +245,7 @@ const STATE_LABEL = {
  * One game card. Returns { el, update(entry) } so the countdown can tick
  * without rebuilding the card. Live cards get embers and a moving rim.
  */
-export function gameCard(entry, { live = false, inSheet = false } = {}) {
+export function gameCard(entry, { live = false, inSheet = false, section = {} } = {}) {
 
   const { game } = entry;
   const stateLabel = h('span', { class: 'game__state' });
@@ -215,7 +256,7 @@ export function gameCard(entry, { live = false, inSheet = false } = {}) {
 
   const card = h('article', { class: `game game--${entry.state}${live ? ' game--live' : ''}`, 'data-game': game.id },
     canvas,
-    game.image ? h('div', { class: 'game__media' }, picture(game.image, { sizes: live ? '(min-width: 1024px) 420px, 92vw' : '160px' })) : h('div', { class: 'game__media game__media--icon', 'aria-hidden': 'true' }, iconNode('star')),
+    h('div', { class: 'game__media' }, posterOrFallback(game.image, section, { sizes: live ? '(min-width: 1024px) 420px, 92vw' : '160px', icon: 'star' })),
     h('div', { class: 'game__body' },
       stateLabel,
       h('h3', { class: 'game__title' }, game.title),
@@ -285,9 +326,10 @@ function gamesLogo(className, sizes) {
 
 export function gamesSection(entries, layoutSection = {}) {
 
-  const cards = entries.map(entry => gameCard(entry));
+  const cards = entries.map(entry => gameCard(entry, { section: layoutSection }));
 
-  const section = h('section', { class: 'widget games', 'data-area': 'games', 'aria-labelledby': 'games-title' },
+  const section = h('section', { class: 'widget games', 'data-area': 'games', 'data-theme': layoutSection.theme || null, 'aria-labelledby': 'games-title' },
+    sectionBanner(layoutSection),
     h('h2', { class: 'games__head', id: 'games-title' }, gamesLogo('games__logo', '(min-width: 1024px) 300px, 240px')),
     layoutSection.subtitle ? h('p', { class: 'section-head__sub games__sub' }, layoutSection.subtitle) : null,
     h('div', { class: 'games__list' }, cards.map(card => card.el))
@@ -298,9 +340,9 @@ export function gamesSection(entries, layoutSection = {}) {
 }
 
 
-export function liveGameWidget(entry) {
+export function liveGameWidget(entry, section = {}) {
 
-  const card = gameCard(entry, { live: true });
+  const card = gameCard(entry, { live: true, section });
   const widget = h('section', { class: 'widget live-game', 'data-area': 'live-game', 'aria-label': `تحدي شغال دلوقتي: ${entry.game.title}` },
     h('div', { class: 'live-game__brand' }, gamesLogo('live-game__logo', '150px')),
     card.el
@@ -336,12 +378,14 @@ export function gameSheetContent(entry, shareItem) {
 ========================================================= */
 
 /* The "موضوع الاجتماع" block inside the meeting widget. */
-export function meetingTopic(session) {
+export function meetingTopic(session, meetingSection = {}) {
 
   if (!session || !session.topic) return null;
 
+  const poster = session.image || meetingSection.banner || null;
+
   return h('button', { class: 'topic', type: 'button', onclick: () => go('meeting') },
-    session.image ? h('span', { class: 'topic__poster' }, picture(session.image, { sizes: '72px' })) : null,
+    poster ? h('span', { class: 'topic__poster' }, picture(poster, { sizes: '72px' })) : null,
     h('span', { class: 'topic__text' },
       h('span', { class: 'topic__label' }, iconNode('book'), 'موضوع الاجتماع'),
       h('span', { class: 'topic__title' }, session.topic),

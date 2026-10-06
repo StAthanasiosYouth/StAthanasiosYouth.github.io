@@ -844,6 +844,27 @@ function buildPublicContent(draft, options) {
   }
 
 
+  /* ---------- section banners (an item without a poster falls back to its section's) ---------- */
+
+  var mediaById = mediaIndex_(draft.media);
+  var usedMedia = hub.usedMedia.slice();
+  var banners = Object.create(null);
+
+  layout.rows.forEach(function (row) {
+    if (!row.enabled || !row.banner) {
+      return;
+    }
+    if (!mediaById[row.banner]) {
+      error('الأقسام: ' + row.title, 'صورة البانر "' + row.banner + '" مش موجودة في المكتبة');
+      return;
+    }
+    banners[row.key] = mediaById[row.banner];
+    if (usedMedia.indexOf(row.banner) === -1) {
+      usedMedia.push(row.banner);
+    }
+  });
+
+
   /* ---------- assemble ---------- */
 
   var content = {
@@ -863,7 +884,7 @@ function buildPublicContent(draft, options) {
     news: hub.news,
     games: hub.games,
     notifications: hub.notifications,
-    layout: publicLayout_(layout.rows, sections)
+    layout: publicLayout_(layout.rows, sections, banners)
   };
 
   if (options.hash) {
@@ -879,7 +900,7 @@ function buildPublicContent(draft, options) {
     errors: errors,
     warnings: warnings,
     // Media ids the published content shows (their files go in the commit)
-    media: hub.usedMedia
+    media: usedMedia
   };
 
 }
@@ -1052,7 +1073,7 @@ function resolveLayout_(rows, setting, error, limited) {
 
 /* What the site gets: switched-on sections in order. A link group without
    published links is left out; its time window travels with it. */
-function publicLayout_(rows, linkSections) {
+function publicLayout_(rows, linkSections, banners) {
 
   var withLinks = Object.create(null);
 
@@ -1068,6 +1089,7 @@ function publicLayout_(rows, linkSections) {
         subtitle: row.subtitle,
         icon: row.icon,
         theme: row.theme,
+        banner: (banners && banners[row.key]) || null,
         visibleFrom: row.visibleFrom,
         visibleUntil: row.visibleUntil
       };

@@ -204,7 +204,9 @@ test('publish: used images go in the same commit, once; unused drafts stay priva
   const w = world();
   const gs = w.as(ADMIN).gs;
   const used = upload(gs).media;
-  const unused = upload(gs).media;
+  // a different picture (the same one twice would be reused, not stored again)
+  const other = Buffer.concat([WEBP.subarray(0, 16), Buffer.alloc(40, 9)]);
+  const unused = upload(gs, { full: other.toString('base64') }).media;
   gs.apiSaveItem('news', { title: 'رحلة', image: used.id, publishAt: '2020-01-01 00:00' });
 
   const review = plain(gs.apiReview());

@@ -19,6 +19,7 @@ var DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
 var MEDIA_LIMITS = {
   fullBytes: 1600 * 1024,
   thumbBytes: 300 * 1024,
+  tinyBytes: 24 * 1024,
   maxSide: 4000
 };
 
@@ -232,6 +233,22 @@ function apiUploadMedia(input) {
 
   var full = decodeImage_(input.full, mime, MEDIA_LIMITS.fullBytes, 'الصورة');
   var thumb = decodeImage_(input.thumb, mime, MEDIA_LIMITS.thumbBytes, 'النسخة الصغيرة');
+  var tinyMime = input.tinyMime === 'image/jpeg' || input.tinyMime === 'image/webp' ? input.tinyMime : mime;
+  var tiny = input.tiny ? (decodeImage_(input.tiny, tinyMime, MEDIA_LIMITS.tinyBytes, 'الصورة المصغرة'), String(input.tiny)) : '';
+  var color = /^#[0-9a-f]{6}$/i.test(String(input.color || '')) ? String(input.color).toLowerCase() : '';
+  var hash = bytesHash_(full);
+
+  // the same picture was uploaded before: use it, don't store a copy
+  var same = readOptionalTable_('Media').filter(function (row) { return row.hash === hash && !row.deletedAt; })[0];
+
+  if (same) {
+    return {
+      media: { id: same.id, path: same.path, thumb: same.thumb, width: same.width, height: same.height, alt: same.alt },
+      duplicate: true,
+      state: apiStateFor_(email),
+      user: email
+    };
+  }
 
   var width = Math.round(Number(input.width));
   var height = Math.round(Number(input.height));
@@ -242,6 +259,7 @@ function apiUploadMedia(input) {
 
   var problems = [];
   var alt = input_(input.alt, HUB_LIMITS.alt, 'وصف الصورة', problems, false);
+  var name = input_(input.name, 80, 'اسم الصورة', problems, false);
 
   if (problems.length) {
     fail_(problems);
@@ -274,7 +292,12 @@ function apiUploadMedia(input) {
     driveId: driveId,
     thumbDriveId: thumbDriveId,
     uploadedAt: nowStamp_(),
-    publishedAt: ''
+    publishedAt: '',
+    name: name,
+    tiny: tiny,
+    color: color,
+    hash: hash,
+    bytes: full.length
   };
 
   var state = mutate_('media.upload', id, function () {
@@ -417,6 +440,185 @@ function runMediaCheck_() {
 }
 
 
+/* =========================================================
+   LIBRARY
+========================================================= */
+
+function bytesHash_(bytes) {
+
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes)
+    .map(function (b) { return ('0' + (b & 0xff).toString(16)).slice(-2); })
+    .join('');
+
+}
+
+
+/**
+ * Where each image is used: { id: [{ area, key, label }] }.
+ * area: sessions / news / games / notifications / activities / sections / types
+ */
+function mediaUsage_() {
+
+  var usage = Object.create(null);
+
+  function add(id, area, key, label) {
+    id = contentLine_(id);
+    if (!id) return;
+    (usage[id] = usage[id] || []).push({ area: area, key: String(key), label: label });
+  }
+
+  readOptionalTable_('Sessions').forEach(function (r) { add(r.image, 'sessions', r.date, 'اجتماع ' + r.date + (r.topic ? ' — ' + r.topic : '')); });
+  readOptionalTable_('News').forEach(function (r) { add(r.image, 'news', r.id, 'خبر: ' + r.title); });
+  readOptionalTable_('Games').forEach(function (r) { add(r.image, 'games', r.id, 'لعبة: ' + r.title); });
+  readOptionalTable_('Notifications').forEach(function (r) { add(r.image, 'notifications', r.id, 'إشعار: ' + r.title); });
+  readOptionalTable_('Activities').forEach(function (r) { add(r.image, 'activities', r.id, 'فعالية: ' + r.title); });
+  readOptionalTable_('Types').forEach(function (r) { add(r.banner, 'types', r.key, 'بانر النوع: ' + r.label); });
+  readTable_('Sections').forEach(function (r) { add(r.banner, 'sections', r.key, 'بانر القسم: ' + r.title); });
+
+  return usage;
+
+}
+
+
+/** Everything in the library (tiny thumbnails included), with where it's used. */
+function apiMediaLibrary() {
+
+  assertAdmin_();
+
+  var usage = mediaUsage_();
+
+  return {
+    items: readOptionalTable_('Media').map(function (r) {
+      return {
+        id: r.id,
+        name: r.name || '',
+        alt: r.alt || '',
+        width: r.width,
+        height: r.height,
+        bytes: r.bytes || '',
+        color: r.color || '',
+        tiny: r.tiny ? 'data:' + (r.mime || 'image/webp') + ';base64,' + r.tiny : '',
+        uploadedAt: r.uploadedAt || '',
+        publishedAt: r.publishedAt || '',
+        deletedAt: r.deletedAt || '',
+        thumbUrl: r.publishedAt ? r.thumb : '',
+        usage: usage[r.id] || []
+      };
+    }).reverse(),
+    usage: usage
+  };
+
+}
+
+
+function findMedia_(id) {
+
+  validId_(id);
+
+  var row = readOptionalTable_('Media').filter(function (r) { return r.id === id; })[0];
+
+  if (!row) {
+    throw new Error('الصورة مش موجودة');
+  }
+
+  return row;
+
+}
+
+
+/** Name and description. */
+function apiUpdateMedia(id, input) {
+
+  assertAdmin_();
+  findMedia_(id);
+  input = input || {};
+
+  var problems = [];
+  var record = { id: id };
+
+  if (input.name !== undefined) record.name = input_(input.name, 80, 'اسم الصورة', problems, false);
+  if (input.alt !== undefined) record.alt = input_(input.alt, HUB_LIMITS.alt, 'وصف الصورة', problems, false);
+
+  if (problems.length) {
+    fail_(problems);
+  }
+
+  return mutate_('media.update', id, function () {
+    upsertRow_('Media', 'id', record);
+  });
+
+}
+
+
+/*
+ * Removing an image: refused while anything uses it (the admin sees
+ * where). Otherwise it goes to the bin (deletedAt) and can come back;
+ * only «امسح نهائي» removes the files from Drive. Files already on the
+ * site stay there (old shared links keep working).
+ */
+function apiDeleteMedia(id) {
+
+  assertAdmin_();
+  findMedia_(id);
+
+  var used = mediaUsage_()[id] || [];
+
+  if (used.length) {
+    throw appError_('الصورة دي مستخدمة، ومينفعش تتشال.', 'مستخدمة في: ' + used.map(function (u) { return u.label; }).join('، ') + '. غيّرها هناك الأول.', '', 'usage');
+  }
+
+  return mutate_('media.delete', id, function () {
+    upsertRow_('Media', 'id', { id: id, deletedAt: nowStamp_() });
+  });
+
+}
+
+
+function apiRestoreMedia(id) {
+
+  assertAdmin_();
+  findMedia_(id);
+
+  return mutate_('media.restore', id, function () {
+    upsertRow_('Media', 'id', { id: id, deletedAt: '' });
+  });
+
+}
+
+
+/** Only from the bin, only when unused: the Drive files and the row go. */
+function apiPurgeMedia(id) {
+
+  assertAdmin_();
+
+  var row = findMedia_(id);
+
+  if (!row.deletedAt) {
+    throw appError_('شيل الصورة الأول، وبعدين امسحها نهائي من «المحذوفة».', '');
+  }
+
+  if ((mediaUsage_()[id] || []).length) {
+    throw appError_('الصورة رجعت اتستخدمت، ومينفعش تتمسح.', '');
+  }
+
+  return mutate_('media.purge', id, function () {
+    [row.driveId, row.thumbDriveId].forEach(function (fileId) {
+      if (!fileId) return;
+      try {
+        drive_('delete', DRIVE_FILES + '/' + encodeURIComponent(fileId));
+      }
+      catch (error) {
+        // already gone from Drive is fine
+        if (error.driveCode !== 404) throw error;
+      }
+    });
+    deleteRow_('Media', 'id', id);
+    return id + (row.publishedAt ? ' (الملف على الموقع فضل زي ما هو)' : '');
+  });
+
+}
+
+
 /** Thumbnail of a draft image for the admin preview (data URL). */
 function apiMediaPreview(id) {
 
@@ -436,22 +638,7 @@ function apiMediaPreview(id) {
 
 function apiSetMediaAlt(id, alt) {
 
-  assertAdmin_();
-  validId_(id);
-
-  var problems = [];
-  var clean = input_(alt, HUB_LIMITS.alt, 'وصف الصورة', problems, false);
-
-  if (problems.length) {
-    fail_(problems);
-  }
-
-  return mutate_('media.alt', id, function () {
-    if (!findRow_('Media', 'id', id)) {
-      throw new Error('الصورة مش موجودة');
-    }
-    upsertRow_('Media', 'id', { id: id, alt: clean });
-  });
+  return apiUpdateMedia(id, { alt: alt });
 
 }
 

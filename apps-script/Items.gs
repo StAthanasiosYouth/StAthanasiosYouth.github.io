@@ -66,7 +66,9 @@ function imageRef_(value, problems) {
     return '';
   }
 
-  if (!/^img-[a-z0-9]{8}$/.test(id) || !findRow_('Media', 'id', id)) {
+  var media = /^img-[a-z0-9]{8}$/.test(id) ? readOptionalTable_('Media').filter(function (r) { return r.id === id; })[0] : null;
+
+  if (!media || media.deletedAt) {
     problems.push('الصورة مش موجودة');
   }
 

@@ -466,7 +466,8 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
       getUuid: () => randomUUID(),
       DigestAlgorithm: { SHA_256: 'sha256' },
       Charset: { UTF_8: 'utf8' },
-      computeDigest: (algorithm, text) => [...createHash(algorithm).update(text, 'utf8').digest()].map(b => (b > 127 ? b - 256 : b)),
+      // like Apps Script: a string (UTF-8) or a Byte[] (signed bytes)
+      computeDigest: (algorithm, data) => [...createHash(algorithm).update(Array.isArray(data) ? Buffer.from(data.map(b => (b < 0 ? b + 256 : b))) : Buffer.from(String(data), 'utf8')).digest()].map(b => (b > 127 ? b - 256 : b)),
       base64Decode: text => [...Buffer.from(text, 'base64')].map(b => (b > 127 ? b - 256 : b)),
       base64Encode: bytes => Buffer.from(bytes.map(b => (b < 0 ? b + 256 : b))).toString('base64'),
       newBlob: data => {

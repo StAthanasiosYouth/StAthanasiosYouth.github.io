@@ -3303,3 +3303,160 @@ dialog.sheet::backdrop {
   }
 
 }
+
+
+/* =========================================================
+   SECTION THEMES, BANNERS, BUILT-IN ART
+   A section's theme only changes its accent (the gold by default):
+   --accent / --accent-hi / --accent-deep / --accent-glow.
+========================================================= */
+
+:root,
+[data-theme="gold"] {
+  --accent: #d7aa50;
+  --accent-hi: #f2d28b;
+  --accent-deep: #6b4c17;
+  --accent-glow: rgba(215, 170, 80, .35);
+}
+
+[data-theme="ember"] {
+  --accent: #ef8a4c;
+  --accent-hi: #ffc39a;
+  --accent-deep: #6e2a12;
+  --accent-glow: rgba(239, 138, 76, .35);
+}
+
+[data-theme="azure"] {
+  --accent: #4cc3cb;
+  --accent-hi: #9fe7ec;
+  --accent-deep: #0b3f4f;
+  --accent-glow: rgba(76, 195, 203, .32);
+}
+
+[data-theme="rose"] {
+  --accent: #e8789f;
+  --accent-hi: #f8b9cf;
+  --accent-deep: #5d1a33;
+  --accent-glow: rgba(232, 120, 159, .32);
+}
+
+[data-theme="emerald"] {
+  --accent: #4fca8c;
+  --accent-hi: #a6efc8;
+  --accent-deep: #0e4a30;
+  --accent-glow: rgba(79, 202, 140, .3);
+}
+
+[data-theme="night"] {
+  --accent: #9a95ee;
+  --accent-hi: #cfccff;
+  --accent-deep: #25226b;
+  --accent-glow: rgba(154, 149, 238, .32);
+}
+
+/* a themed section: a soft light of its colour, its title icon tinted */
+.widget[data-theme] {
+  background:
+    radial-gradient(120% 70% at 100% 0%, var(--accent-glow), transparent 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, .042), rgba(255, 255, 255, .012) 60%),
+    var(--navy-900);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.widget[data-theme] .widget__title .icon,
+.widget[data-theme] .section-head__sub {
+  color: var(--accent-hi);
+}
+
+/* a section's own banner, above its content */
+.section-banner {
+  margin: calc(var(--pad) * -1) calc(var(--pad) * -1) 14px;
+  overflow: hidden;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  aspect-ratio: 16 / 6;
+  background: var(--navy-950);
+}
+
+.section-banner img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* built-in art when there is no poster and no banner */
+.art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  overflow: hidden;
+  color: var(--accent-hi);
+  background:
+    radial-gradient(90% 70% at 70% 20%, var(--accent-glow), transparent 70%),
+    linear-gradient(160deg, color-mix(in srgb, var(--accent-deep) 85%, #061a31), #041127 85%);
+}
+
+/* a quiet lattice of small crosses */
+.art::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: .12;
+  background: var(--accent-hi);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M13 9h2v4h4v2h-4v4h-2v-4H9v-2h4z'/%3E%3C/svg%3E") 0 0 / 28px 28px;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M13 9h2v4h4v2h-4v4h-2v-4H9v-2h4z'/%3E%3C/svg%3E") 0 0 / 28px 28px;
+}
+
+.art__glow {
+  position: absolute;
+  width: 70%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--accent-glow), transparent 65%);
+}
+
+.art__icon {
+  position: relative;
+  width: 38%;
+  max-width: 64px;
+  height: auto;
+  aspect-ratio: 1;
+  opacity: .9;
+  filter: drop-shadow(0 6px 18px var(--accent-glow));
+}
+
+/* each slot keeps its own shape */
+.news-card__media .art {
+  aspect-ratio: 4 / 5;
+}
+
+.news-lead__media .art {
+  aspect-ratio: 16 / 9;
+  max-height: 340px;
+}
+
+.game__media .art {
+  width: 84px;
+  height: 104px;
+  border-radius: 42px 42px 14px 14px;
+  box-shadow: inset 0 0 0 1px var(--gold-line-strong);
+}
+
+.game--live .game__media .art {
+  width: 100%;
+  height: 120px;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.detail__media .art {
+  aspect-ratio: 16 / 9;
+}
+
+/* pictures show their own colour while loading */
+img[style*="background-color"] {
+  background-clip: padding-box;
+}
