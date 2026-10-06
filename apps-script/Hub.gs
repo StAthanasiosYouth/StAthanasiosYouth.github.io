@@ -77,6 +77,33 @@ function wallAdd_(stamp, minutes) {
 
 
 /* =========================================================
+   VISIBILITY
+   The one rule for sections and items (same as assets/js/schedule.js
+   visibilityState and the admin's A.visibility):
+   'off' | 'scheduled' | 'ended' | 'live'. Stamps are "YYYY-MM-DDTHH:MM"
+   wall times; "until" is inclusive.
+========================================================= */
+
+function visibilityState_(enabled, from, until, now) {
+
+  if (!enabled) {
+    return 'off';
+  }
+
+  if (from && now < from) {
+    return 'scheduled';
+  }
+
+  if (until && now > until) {
+    return 'ended';
+  }
+
+  return 'live';
+
+}
+
+
+/* =========================================================
    MEDIA
 ========================================================= */
 

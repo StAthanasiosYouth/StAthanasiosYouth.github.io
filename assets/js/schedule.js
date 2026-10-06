@@ -317,21 +317,39 @@ export function upcomingSessions(sessions, nowStamp, limit = 4) {
 
 
 /* =========================================================
-   VISIBILITY WINDOWS
+   VISIBILITY
+   One rule for sections and items, the same as the admin and the
+   publish check (Hub.gs visibilityState_). Times are Cairo wall stamps
+   "YYYY-MM-DDTHH:MM"; "until" is inclusive.
+     off        switched off
+     scheduled  before "from"
+     ended      after "until"
+     live       showing now
 ========================================================= */
+
+export function visibilityState({ enabled = true, from = '', until = '' }, nowStamp) {
+
+  if (!enabled) {
+    return 'off';
+  }
+
+  if (from && nowStamp < from) {
+    return 'scheduled';
+  }
+
+  if (until && nowStamp > until) {
+    return 'ended';
+  }
+
+  return 'live';
+
+}
+
 
 /* Links: startAt / endAt. */
 export function isWithinWindow(item, nowStamp) {
 
-  if (item.startAt && nowStamp < item.startAt) {
-    return false;
-  }
-
-  if (item.endAt && nowStamp > item.endAt) {
-    return false;
-  }
-
-  return true;
+  return visibilityState({ from: item.startAt, until: item.endAt }, nowStamp) === 'live';
 
 }
 
@@ -339,15 +357,7 @@ export function isWithinWindow(item, nowStamp) {
 /* News and notifications: publishAt / expireAt. */
 export function isPublished(item, nowStamp) {
 
-  if (item.publishAt && nowStamp < item.publishAt) {
-    return false;
-  }
-
-  if (item.expireAt && nowStamp > item.expireAt) {
-    return false;
-  }
-
-  return true;
+  return visibilityState({ from: item.publishAt, until: item.expireAt }, nowStamp) === 'live';
 
 }
 

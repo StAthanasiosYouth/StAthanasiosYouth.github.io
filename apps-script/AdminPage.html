@@ -87,11 +87,9 @@
     var enabled = bool(link.enabled);
     var chips = [];
 
-    if (!enabled) chips.push(A.chip('مخفي', 'off'));
+    chips.push(A.visibilityChip(enabled, link.startAt, link.endAt));
     if (!bool(link.featured)) chips.push(A.chip(link.style === 'tile' ? 'مربع' : 'صف'));
     if (link.badge) chips.push(A.chip(link.badge, 'gold'));
-    if (link.startAt) chips.push(A.chip('من ' + A.formatWall(link.startAt)));
-    if (link.endAt) chips.push(A.chip('لحد ' + A.formatWall(link.endAt)));
 
     var toggle = A.switchInput('ظاهر', enabled, function (checked) {
       A.dirty = false;
@@ -127,19 +125,23 @@
 
   function removeLink(link, button) {
 
-    if (!confirm('تمسح "' + link.title + '" خالص؟\nلو عايز تخفيه بس، اقفل "ظاهر" بدل المسح.')) return;
-    A.withBusy(button, A.call('apiDeleteLink', link.id))
-      .then(function (next) { A.applyState(next); A.toast('اتمسح — هيختفي من الموقع بعد النشر'); })
-      .catch(function (error) { A.fail(error); });
+    A.confirmDelete(link.title).then(function (ok) {
+      if (!ok) return;
+      A.withBusy(button, A.call('apiDeleteLink', link.id))
+        .then(function (next) { A.applyState(next); A.toast('اتمسح — هيختفي من الموقع بعد النشر'); })
+        .catch(function (error) { A.fail(error); });
+    });
 
   }
 
   function removeSection(section, button) {
 
-    if (!confirm('تمسح قسم "' + section.title + '"؟')) return;
-    A.withBusy(button, A.call('apiDeleteSection', section.key))
-      .then(function (next) { A.applyState(next); A.toast('القسم اتمسح'); })
-      .catch(function (error) { A.fail(error); });
+    A.confirmDelete('قسم ' + section.title).then(function (ok) {
+      if (!ok) return;
+      A.withBusy(button, A.call('apiDeleteSection', section.key))
+        .then(function (next) { A.applyState(next); A.toast('القسم اتمسح'); })
+        .catch(function (error) { A.fail(error); });
+    });
 
   }
 
@@ -366,7 +368,7 @@
               A.chip(contact.kind === 'support' ? 'دعم فني' : 'تواصل مع الخدمة', 'gold'),
               A.chip(contact.method === 'whatsapp' ? 'واتساب بس' : 'اتصال بس'),
               contact.role ? A.chip(contact.role) : null,
-              enabled ? null : A.chip('مخفي', 'off')
+              A.visibilityChip(enabled)
             ],
             controls: [
               el('span', { class: 'spacer' }),
@@ -374,8 +376,13 @@
               el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'لتحت', disabled: index === contacts.length - 1, onclick: function (e) { A.move('apiMoveContact', contact.id, 1, e.currentTarget); } }, icon('chevron')),
               A.editButton(contact.name, function () { editContact(contact); }),
               A.deleteButton(contact.name, function (e) {
-                if (!confirm('تمسح "' + contact.name + '"؟')) return;
-                A.withBusy(e.currentTarget, A.call('apiDeleteContact', contact.id)).then(A.applyState).catch(function (error) { A.fail(error); });
+                var button = e.currentTarget;
+                A.confirmDelete(contact.name).then(function (ok) {
+                  if (!ok) return;
+                  A.withBusy(button, A.call('apiDeleteContact', contact.id))
+                    .then(function (next) { A.applyState(next); A.toast('اتمسح — هيختفي من الموقع بعد النشر'); })
+                    .catch(function (error) { A.fail(error); });
+                });
               })
             ]
           });

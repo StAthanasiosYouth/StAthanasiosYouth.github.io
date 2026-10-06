@@ -12,36 +12,57 @@
 
 <body>
 
-  <div class="top">
+  <div class="app">
 
-    <header class="bar">
-      <div class="bar__brand">
-        <span class="bar__cross" aria-hidden="true"></span>
-        <div>
-          <p class="bar__title">لوحة التحكم</p>
-          <p class="bar__sub">أسرة البابا أثناسيوس – سفاجا</p>
+    <!-- wide screens: the navigation rail -->
+    <aside class="rail" aria-label="التنقل">
+      <div class="brand">
+        <span class="brand__mark" aria-hidden="true"><span class="brand__cross"></span></span>
+        <div class="brand__text">
+          <p class="brand__title">لوحة التحكم</p>
+          <p class="brand__sub">أسرة البابا أثناسيوس – سفاجا</p>
         </div>
       </div>
-      <div class="bar__actions">
-        <span class="status" id="status" role="status" aria-live="polite">…</span>
-        <button class="btn btn--primary" id="publish-open" type="button">راجع وانشر</button>
-      </div>
-    </header>
+      <nav class="rail__nav" id="rail-nav" aria-label="أقسام لوحة التحكم"></nav>
+      <div class="rail__foot" id="rail-foot"></div>
+    </aside>
 
-    <!-- main areas: a bottom bar on phones, a row under the header on wide screens -->
-    <nav class="areas" id="areas" role="tablist" aria-label="أقسام لوحة التحكم"></nav>
+    <div class="app__main">
 
-    <nav class="tabs" id="subtabs" role="tablist" aria-label="الأقسام الفرعية" hidden></nav>
+      <header class="topbar">
+        <span class="topbar__mark" aria-hidden="true"><span class="brand__cross"></span></span>
+        <div class="topbar__title">
+          <p class="topbar__crumb" id="crumb"></p>
+          <h1 class="topbar__heading" id="page-title">لوحة التحكم</h1>
+        </div>
+        <span class="status" id="status" role="status" aria-live="polite"><span class="status__dot" aria-hidden="true"></span><span class="status__text">جاري التحميل…</span></span>
+        <button class="btn btn--primary btn--publish" id="publish-open" type="button">
+          <span class="btn__label">راجع وانشر</span>
+        </button>
+      </header>
+
+      <nav class="tabs" id="subtabs" aria-label="الأقسام الفرعية" hidden></nav>
+
+      <main class="view" id="view" aria-busy="true">
+        <div class="skeleton-page" aria-hidden="true">
+          <div class="skeleton skeleton--card"></div>
+          <div class="skeleton skeleton--card skeleton--tall"></div>
+          <div class="skeleton skeleton--card"></div>
+        </div>
+        <p class="visually-hidden">جاري التحميل…</p>
+      </main>
+
+    </div>
+
+    <!-- phones: the bottom dock -->
+    <nav class="dock" id="dock" aria-label="أقسام لوحة التحكم"></nav>
 
   </div>
 
-  <main class="view" id="view" role="tabpanel" aria-busy="true">
-    <p class="loading">جاري التحميل…</p>
-  </main>
-
   <dialog class="sheet" id="sheet" aria-labelledby="sheet-title"></dialog>
 
-  <div class="toast" id="toast" role="status" aria-live="polite" popover="manual"></div>
+  <!-- messages: a popover, so they show above any open editor -->
+  <div class="toasts" id="toasts" popover="manual" aria-live="polite"></div>
 
   <?!= include_('AdminIcons') ?>
   <?!= include_('AdminScript') ?>

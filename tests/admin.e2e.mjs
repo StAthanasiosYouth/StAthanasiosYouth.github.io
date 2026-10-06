@@ -203,7 +203,7 @@ test('a Drive failure is visible inside the editor, with the real reason, and re
   await page.evaluate(() => A.toast('اختبار', true));
   await new Promise(resolve => setTimeout(resolve, 600));
   const toastOnTop = await page.evaluate(() => {
-    const toast = document.getElementById('toast');
+    const all = document.querySelectorAll('.toast'); const toast = all[all.length - 1];
     const rect = toast.getBoundingClientRect();
     const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
     return rect.height > 0 && !!hit && (hit === toast || toast.contains(hit));
@@ -235,6 +235,138 @@ test('Settings: «اختبر رفع الصور» shows each step', async () => {
   const steps = await page.$$eval('.checklist__steps li', items => items.map(li => li.className));
   assert.equal(steps.length, 6);
   assert.ok(steps.every(c => c === 'is-ok'));
+  assert.deepEqual(problems, []);
+  await close();
+
+});
+
+
+/* ---------------- Phase 1: the control center ---------------- */
+
+const DESKTOP = { width: 1366, height: 860 };
+
+test('navigation: dock on phones, rail on wide screens, tabs for sub-sections', async () => {
+
+  for (const viewport of [PHONE, DESKTOP]) {
+    const { page, problems, close } = await open(viewport);
+    const nav = await page.evaluate(() => ({
+      dock: getComputedStyle(document.getElementById('dock')).display !== 'none',
+      rail: getComputedStyle(document.querySelector('.rail')).display !== 'none'
+    }));
+    assert.deepEqual(nav, viewport === PHONE ? { dock: true, rail: false } : { dock: false, rail: true });
+
+    const container = viewport === PHONE ? '#dock' : '#rail-nav';
+    await page.click(`${container} [data-area="content"]`);
+    await page.waitForFunction(() => document.getElementById('page-title').textContent === 'الاجتماعات');
+    assert.equal(await page.$eval(`${container} [aria-current="page"]`, b => b.dataset.area), 'content');
+
+    const tabs = await page.$$eval('#subtabs .tab', t => t.map(b => b.textContent));
+    assert.deepEqual(tabs, ['الاجتماعات', 'الأخبار', 'الألعاب', 'الإشعارات']);
+    await page.click('#subtabs .tab:nth-child(4)');
+    await page.waitForFunction(() => document.getElementById('page-title').textContent === 'الإشعارات');
+
+    assert.deepEqual(problems, []);
+    await close();
+  }
+
+});
+
+test('delete asks with our own modal: cancel keeps it, confirm deletes it', async () => {
+
+  world.gs.apiSaveItem('news', { title: 'خبر للمسح', summary: 'x' });
+  const { page, problems, close } = await open();
+  await page.evaluate(() => A.go('content', 'news'));
+  await page.waitForSelector('[aria-label="مسح خبر للمسح"]');
+
+  await page.click('[aria-label="مسح خبر للمسح"]');
+  await page.waitForSelector('dialog.modal[open]');
+  const modal = await page.$eval('dialog.modal[open]', d => ({
+    title: d.querySelector('.modal__title').textContent,
+    focused: document.activeElement.textContent,
+    text: d.textContent
+  }));
+  assert.ok(!/null|undefined/.test(modal.text), modal.text);
+  assert.match(modal.title, /تمسح «خبر للمسح»/);
+  assert.equal(modal.focused, 'لأ، سيبه', 'the safe choice has focus');
+
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('dialog.modal'));
+  assert.ok(world.gs.readTable_('News').some(n => n.title === 'خبر للمسح'), 'Esc keeps it');
+
+  await page.click('[aria-label="مسح خبر للمسح"]');
+  await page.waitForSelector('dialog.modal[open]');
+  await page.evaluate(() => [...document.querySelectorAll('dialog.modal[open] button')].find(b => b.textContent === 'امسح').click());
+  await page.waitForFunction(() => !document.querySelector('[aria-label="مسح خبر للمسح"]'));
+  assert.ok(!world.gs.readTable_('News').some(n => n.title === 'خبر للمسح'), 'confirm deletes it');
+
+  assert.deepEqual(problems, [], 'no native dialogs');
+  await close();
+
+});
+
+test('unsaved changes: closing the editor asks first (our modal), and can go back', async () => {
+
+  const { page, problems, close } = await open();
+  await page.evaluate(() => A.go('content', 'news'));
+  await page.evaluate(() => A.editors.news(null));
+  await page.waitForSelector('dialog.sheet[open] input');
+  await page.type('dialog.sheet[open] input', 'عنوان جديد');
+
+  await page.click('dialog.sheet[open] .sheet__head .icon-btn');
+  await page.waitForSelector('dialog.modal[open]');
+  assert.match(await page.$eval('dialog.modal .modal__title', n => n.textContent), /ما اتحفظتش/);
+  await page.evaluate(() => [...document.querySelectorAll('dialog.modal[open] button')].find(b => b.textContent === 'ارجع للتعديل').click());
+  await page.waitForFunction(() => !document.querySelector('dialog.modal'));
+  assert.equal(await page.$eval('dialog.sheet', d => d.open), true, 'still editing');
+  assert.equal(await page.$eval('dialog.sheet[open] input', i => i.value), 'عنوان جديد');
+
+  // leaving through the navigation asks too
+  await page.evaluate(() => { A.go('settings'); });
+  await page.waitForSelector('dialog.modal[open]');
+  await page.evaluate(() => [...document.querySelectorAll('dialog.modal[open] button')].find(b => b.textContent === 'سيبها من غير حفظ').click());
+  await page.waitForFunction(() => document.getElementById('page-title').textContent === 'الإعدادات');
+
+  assert.deepEqual(problems, []);
+  await close();
+
+});
+
+test('validation errors appear under the field they belong to', async () => {
+
+  const { page, problems, close } = await open(DESKTOP);
+  await page.evaluate(() => A.go('content', 'games'));
+  await page.evaluate(() => A.editors.games(null));
+  await page.waitForSelector('dialog.sheet[open] .sheet__foot .btn--primary');
+  await page.evaluate(() => document.querySelector('dialog.sheet[open] .sheet__foot .btn--primary').click());
+  await page.waitForSelector('dialog.sheet[open] .field--invalid');
+
+  const invalid = await page.$$eval('dialog.sheet[open] .field--invalid', fields => fields.map(f => ({
+    label: f.dataset.label,
+    error: f.querySelector('.field__error').textContent,
+    aria: !!f.querySelector('[aria-invalid="true"]')
+  })));
+  assert.ok(invalid.some(f => f.label === 'اسم اللعبة' && /مطلوب/.test(f.error)), JSON.stringify(invalid));
+  assert.ok(invalid.every(f => f.aria), 'inputs are marked aria-invalid');
+
+  // typing in the field clears its error
+  await page.type('dialog.sheet[open] .field--invalid input', 'لعبة');
+  assert.equal(await page.$$eval('dialog.sheet[open] .field--invalid', f => f.filter(x => x.dataset.label === 'اسم اللعبة').length), 0);
+
+  assert.deepEqual(problems, []);
+  await close();
+
+});
+
+test('every list shows the same visibility words', async () => {
+
+  world.gs.apiSaveItem('news', { title: 'لاحقًا', summary: 'x', publishAt: '2099-01-01 10:00' });
+  world.gs.apiSaveItem('news', { title: 'خلص', summary: 'x', publishAt: '2020-01-01 10:00', expireAt: '2020-01-02' });
+  const { page, problems, close } = await open();
+  await page.evaluate(() => A.go('content', 'news'));
+  await page.waitForSelector('.chip--state');
+  const states = await page.$$eval('.chip--state', chips => chips.map(c => c.dataset.state + ':' + c.textContent.split(' · ')[0]));
+  assert.ok(states.includes('scheduled:يظهر لاحقًا'), states.join(' | '));
+  assert.ok(states.includes('ended:انتهى'), states.join(' | '));
   assert.deepEqual(problems, []);
   await close();
 

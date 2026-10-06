@@ -24,3 +24,4 @@ apps-script/.clasp.json
 *.log
 *.tmp
 tools/.cache/
+tools/.shots.mjs

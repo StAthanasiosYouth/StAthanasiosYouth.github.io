@@ -28,10 +28,21 @@ const ADMIN_EXTRA = {
   'chevron-up': '<path d="m6 15 6-6 6 6"/>',
   gear: '<circle class="duo" cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.2 6.5l2.6 1.5M17.2 16l2.6 1.5M4.2 17.5l2.6-1.5M17.2 8l2.6-1.5"/><circle cx="12" cy="12" r="6.5"/>',
   edit: '<path class="duo" d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/>',
-  trash: '<path d="M4 7h16M10 11v6M14 11v6"/><path class="duo" d="M6 7l1 12.5A1.5 1.5 0 0 0 8.5 21h7a1.5 1.5 0 0 0 1.5-1.5L18 7"/><path d="M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7"/>'
+  trash: '<path d="M4 7h16M10 11v6M14 11v6"/><path class="duo" d="M6 7l1 12.5A1.5 1.5 0 0 0 8.5 21h7a1.5 1.5 0 0 0 1.5-1.5L18 7"/><path d="M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7"/>',
+  home: '<rect class="duo" x="3.5" y="3.5" width="7" height="9" rx="2"/><rect x="13.5" y="3.5" width="7" height="5" rx="2"/><rect x="13.5" y="11.5" width="7" height="9" rx="2"/><rect class="duo" x="3.5" y="15.5" width="7" height="5" rx="2"/>',
+  layers: '<path class="duo" d="m12 3.5 8.5 4.5-8.5 4.5L3.5 8Z"/><path d="m3.5 12 8.5 4.5 8.5-4.5M3.5 16l8.5 4.5 8.5-4.5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  eye: '<path class="duo" d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/>',
+  'eye-off': '<path d="M3 3l18 18"/><path class="duo" d="M10.6 5.6A10 10 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-2.9 3.7M6.6 6.6A16.6 16.6 0 0 0 2.5 12S6 18.5 12 18.5a9.7 9.7 0 0 0 4.4-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
+  upload: '<path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path class="duo" d="M4 14.5V18a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3.5"/>',
+  send: '<path class="duo" d="M20.5 3.5 3.5 10.8l6.8 2.9 2.9 6.8Z"/><path d="m10.3 13.7 4.6-4.6"/>',
+  user: '<circle class="duo" cx="12" cy="8" r="4"/><path d="M4 20.5c1.2-4 4.4-6 8-6s6.8 2 8 6"/>',
+  globe: '<circle class="duo" cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9S14.5 18.3 12 21c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3Z"/>',
+  grip: '<path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" stroke-width="3"/>',
+  dots: '<path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3.2"/>'
 };
 
-const names = [...LINK_ICON_NAMES, 'phone', 'close', 'chevron', 'alert', 'sparkle', 'megaphone', 'bell', 'clock'];
+const names = [...LINK_ICON_NAMES, 'phone', 'close', 'chevron', 'alert', 'sparkle', 'megaphone', 'bell', 'clock', 'check', 'info', 'external', 'retry', 'copy', 'qr', 'share', 'download', 'arrow'];
 const icons = Object.fromEntries(names.map(name => [name, iconSvg(name)]));
 
 for (const [name, body] of Object.entries(ADMIN_EXTRA)) {

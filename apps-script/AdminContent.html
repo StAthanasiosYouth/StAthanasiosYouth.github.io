@@ -50,21 +50,10 @@
 
   }
 
-  /* chips for a time window */
-  function windowChips(from, until, labels) {
+  /* the visibility pill first (مخفي / يظهر لاحقًا / ظاهر دلوقتي / انتهى) */
+  function windowChips(enabled, from, until) {
 
-    var now = nowMinutes();
-    var chips = [];
-    var start = from ? A.wallMinutes(from) : null;
-    var end = until ? A.wallMinutes(until, true) : null;
-
-    if (end !== null && end < now) chips.push(A.chip(labels.ended || 'انتهى', 'off'));
-    else if (start !== null && start > now) chips.push(A.chip((labels.scheduled || 'يظهر') + ' ' + A.formatWall(from), 'gold'));
-    else chips.push(A.chip(labels.live || 'ظاهر دلوقتي', 'ok'));
-
-    if (end !== null && end >= now) chips.push(A.chip('لحد ' + A.formatWall(until)));
-
-    return chips;
+    return [A.visibilityChip(enabled, from, until)];
 
   }
 
@@ -242,9 +231,8 @@
     if (cancelled) chips.push(A.chip('ملغي', 'danger'));
     if (session.time) chips.push(A.chip('الساعة ' + session.time));
     if (session.speaker) chips.push(A.chip(session.speaker));
-    if (session.visibleFrom && A.wallMinutes(session.visibleFrom) > nowMinutes()) chips.push(A.chip('الموضوع يظهر ' + A.formatWall(session.visibleFrom), 'gold'));
+    chips.unshift(A.visibilityChip(enabled, cancelled ? '' : session.visibleFrom, ''));
     if (hasNotification('notif-session-' + session.date)) chips.push(A.chip('🔔 في الجرس'));
-    if (!enabled) chips.push(A.chip('مخفي', 'off'));
 
     var toggle = A.toggleItem('sessions', session.date, enabled);
 
@@ -368,12 +356,11 @@
       news.length
         ? el('ul', { class: 'list' }, news.map(function (item) {
           var enabled = bool(item.enabled);
-          var chips = windowChips(item.publishAt, item.expireAt, { scheduled: 'يتنشر' });
+          var chips = windowChips(enabled, item.publishAt, item.expireAt);
           if (bool(item.pinned)) chips.unshift(A.chip('مثبت · ' + TONE_LABELS[item.tone || 'info'], 'gold'));
           if (bool(item.featured)) chips.unshift(A.chip('مميز', 'gold'));
           if (item.badge) chips.push(A.chip(item.badge));
           if (hasNotification('notif-' + item.id)) chips.push(A.chip('🔔 في الجرس'));
-          if (!enabled) chips.push(A.chip('مخفي', 'off'));
           return A.listItem({
             icon: 'megaphone',
             image: item.image,
@@ -509,10 +496,10 @@
       games.length
         ? el('ul', { class: 'list' }, games.map(function (game) {
           var enabled = bool(game.enabled);
-          var chips = [gameStateLabel(game), A.chip(A.formatWall(game.startAt) + ' ← ' + (A.formatWall(game.endAt).split(' · ')[1] || ''))];
+          var chips = [enabled ? gameStateLabel(game) : A.visibilityChip(false), A.chip(A.formatWall(game.startAt) + ' ← ' + (A.formatWall(game.endAt).split(' · ')[1] || ''))];
           var linked = ['soon', 'start'].filter(function (k) { return hasNotification('notif-' + game.id + '-' + k); }).length;
           if (linked) chips.push(A.chip('🔔 ' + linked));
-          if (!enabled) chips.push(A.chip('مخفية', 'off'));
+
           return A.listItem({
             icon: 'star',
             image: game.image,
@@ -647,10 +634,9 @@
         ? el('ul', { class: 'list' }, items.map(function (item) {
           var enabled = bool(item.enabled);
           var until = item.expireAt || (item.publishAt ? A.wallFromMinutes(A.wallMinutes(item.publishAt) + days * 1440) : '');
-          var chips = [A.chip(TYPE_LABELS[item.type] || 'عام', item.type === 'important' ? 'danger' : 'gold')]
-            .concat(windowChips(item.publishAt, until, { scheduled: 'يظهر', live: 'في الجرس دلوقتي' }));
-          if (/^notif-(game|news|session)-/.test(item.id) || /^notif-news-/.test(item.id)) chips.push(A.chip('مرتبط'));
-          if (!enabled) chips.push(A.chip('مخفي', 'off'));
+          var chips = windowChips(enabled, item.publishAt, until)
+            .concat(A.chip(TYPE_LABELS[item.type] || 'عام', item.type === 'important' ? 'danger' : 'gold'));
+          if (/^notif-(game|news|session)-/.test(item.id)) chips.push(A.chip('مرتبط'));
           return A.listItem({
             icon: TYPE_ICONS[item.type] || 'info',
             image: item.image,

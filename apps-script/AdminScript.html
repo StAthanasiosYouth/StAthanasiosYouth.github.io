@@ -58,6 +58,17 @@
 
   var el = A.el;
 
+  /* replaceChildren() that skips null/false (the DOM would print "null") */
+  A.fill = function (node) {
+
+    node.replaceChildren();
+    for (var i = 1; i < arguments.length; i++) {
+      appendChild(node, arguments[i]);
+    }
+    return node;
+
+  };
+
   /* icon markup is generated from the public site's icon set (trusted, static) */
   var iconTemplate = document.createElement('template');
 
@@ -86,41 +97,83 @@
 
   };
 
-  var toastTimer = 0;
+  /* =======================================================
+     TOASTS
+     The stack is a popover (top layer), so messages show above an open
+     editor or modal. A modal dialog makes the rest of the page inert (not
+     announced by screen readers), so while one is open the stack lives
+     inside the topmost dialog.
+  ======================================================= */
 
-  /* The toast is a popover: shown in the top layer, above an open editor
-     dialog (a plain fixed element would sit underneath it, unseen). */
-  A.toast = function (message, isError) {
+  var TOAST_ICONS = { success: 'check', error: 'alert', info: 'info' };
 
-    var node = document.getElementById('toast');
-    // a modal dialog makes the rest of the page inert (not announced by
-    // screen readers): the toast lives inside the open dialog meanwhile
-    var host = document.querySelector('dialog[open]') || document.body;
-    var popover = !!node.showPopover;
+  function toastHost() {
 
-    if (popover && node.matches(':popover-open')) {
-      try { node.hidePopover(); } catch (e) { /* already hidden */ }
+    var stack = document.getElementById('toasts');
+    var dialogs = document.querySelectorAll('dialog[open]');
+    var holder = dialogs.length ? dialogs[dialogs.length - 1] : document.body;
+
+    if (stack.parentNode !== holder) {
+      if (stack.hidePopover && stack.matches(':popover-open')) stack.hidePopover();
+      holder.appendChild(stack);
     }
 
-    if (node.parentNode !== host) host.appendChild(node);
-
-    node.textContent = message;
-    node.className = 'toast' + (isError ? ' toast--error' : '');
-
-    if (popover) {
-      try { node.showPopover(); } catch (e) { /* not a popover in this browser */ }
+    if (stack.childElementCount && stack.showPopover && !stack.matches(':popover-open')) {
+      try { stack.showPopover(); } catch (e) { /* no popover support */ }
     }
 
-    requestAnimationFrame(function () { node.classList.add('is-visible'); });
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () {
-      node.classList.remove('is-visible');
+    return stack;
+
+  }
+
+  // re-home the stack whenever a dialog closes
+  document.addEventListener('close', function () { toastHost(); }, true);
+
+  /**
+   * A.toast(message)                  success
+   * A.toast(message, true|'error')    error (stays longer, role=alert)
+   * A.toast(message, 'info')
+   */
+  A.toast = function (message, kind) {
+
+    kind = kind === true ? 'error' : (kind || 'success');
+
+    var stack = document.getElementById('toasts');
+    var item = el('div', { class: 'toast toast--' + kind, role: kind === 'error' ? 'alert' : 'status' },
+      el('span', { class: 'toast__icon', 'aria-hidden': 'true' }, icon(TOAST_ICONS[kind] || 'info')),
+      el('p', { class: 'toast__text', text: message }),
+      el('button', { class: 'toast__close', type: 'button', 'aria-label': 'قفل الرسالة', onclick: function () { dismiss(); } }, icon('close'))
+    );
+
+    var timer = 0;
+    var life = kind === 'error' ? 8000 : 3400;
+
+    function dismiss() {
+      clearTimeout(timer);
+      item.classList.remove('is-visible');
       setTimeout(function () {
-        if (node.hidePopover && !node.classList.contains('is-visible')) {
-          try { node.hidePopover(); } catch (e) { /* already hidden */ }
-        }
-      }, 450);
-    }, isError ? 7000 : 2800);
+        item.remove();
+        if (!stack.childElementCount && stack.hidePopover && stack.matches(':popover-open')) stack.hidePopover();
+      }, 320);
+    }
+
+    function arm() {
+      clearTimeout(timer);
+      timer = setTimeout(dismiss, life);
+    }
+
+    // at most three; the oldest goes first
+    while (stack.childElementCount >= 3) stack.firstElementChild.remove();
+
+    stack.appendChild(item);
+    toastHost();
+    item.style.setProperty('--life', life + 'ms');
+    item.addEventListener('pointerenter', function () { clearTimeout(timer); item.classList.add('is-held'); });
+    item.addEventListener('pointerleave', function () { item.classList.remove('is-held'); arm(); });
+    requestAnimationFrame(function () { requestAnimationFrame(function () { item.classList.add('is-visible'); }); });
+    arm();
+
+    return dismiss;
 
   };
 
@@ -178,11 +231,19 @@
   A.withBusy = function (button, promise) {
 
     var original = Array.prototype.slice.call(button.childNodes);
+    // keep the button's size while it shows the spinner
+    var width = button.getBoundingClientRect().width;
     button.disabled = true;
-    button.replaceChildren(el('span', { class: 'spinner', 'aria-hidden': 'true' }), 'استنى…');
+    button.setAttribute('aria-busy', 'true');
+    if (width) button.style.minWidth = width + 'px';
+    button.classList.add('is-busy');
+    button.replaceChildren(el('span', { class: 'spinner', 'aria-hidden': 'true' }), button.classList.contains('icon-btn') ? '' : 'استنى…');
 
     return promise.finally(function () {
       button.disabled = false;
+      button.removeAttribute('aria-busy');
+      button.style.minWidth = '';
+      button.classList.remove('is-busy');
       button.replaceChildren.apply(button, original);
     });
 
@@ -233,21 +294,35 @@
 
     // no box given but an editor is open: show it there, not behind it
     if (!box) {
-      var open = document.querySelector('dialog[open] .errors');
+      var open = document.querySelector('dialog.sheet[open] .errors');
       if (open) box = open;
     }
 
-    if (box) {
-      box.replaceChildren(
-        el('p', { class: 'errors__title', text: parsed.message }),
-        parsed.hint ? el('p', { class: 'errors__hint', text: parsed.hint }) : null,
-        A.technicalDetails(parsed.details)
-      );
-      box.hidden = false;
-      box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (!box) {
+      A.toast(parsed.message + (parsed.hint ? '\n' + parsed.hint : ''), true);
+      return;
     }
 
-    A.toast(parsed.message + (parsed.hint && !box ? '\n' + parsed.hint : ''), true);
+    // validation lines that name a field ("العنوان مطلوب") go under that field
+    var scope = box.closest('dialog, .card, .view') || document;
+    var lines = String(parsed.message).split('\n').filter(Boolean);
+    var rest = A.showFieldErrors(scope, lines);
+    var placed = lines.length - rest.length;
+
+    A.fill(box,
+      el('p', { class: 'errors__title', text: rest.length ? rest.join('\n') : 'راجع الخانات اللي عليها علامة حمرا.' }),
+      placed && rest.length ? el('p', { class: 'errors__hint', text: 'وراجع كمان الخانات اللي عليها علامة حمرا.' }) : null,
+      parsed.hint ? el('p', { class: 'errors__hint', text: parsed.hint }) : null,
+      A.technicalDetails(parsed.details)
+    );
+    box.hidden = false;
+
+    var firstInvalid = scope.querySelector('.field--invalid');
+    (firstInvalid || box).scrollIntoView({ block: 'center', behavior: A.reducedMotion() ? 'auto' : 'smooth' });
+    if (firstInvalid) {
+      var control = firstInvalid.querySelector('input, textarea, select');
+      if (control) control.focus({ preventScroll: true });
+    }
 
   };
 
@@ -350,14 +425,94 @@
 
   A.markDirty = markDirty;
 
+  var uid = 0;
+
+  A.uid = function (prefix) {
+
+    uid++;
+    return (prefix || 'id') + '-' + uid;
+
+  };
+
+  /* One input: a <label>. Several controls (date + presets, picker...):
+     a group labelled by its title, so stray clicks aren't forwarded. */
   A.field = function (label, control, hint, counter) {
 
-    return el('label', { class: 'field' },
-      el('span', { class: 'field__label', text: label }),
-      control,
-      counter || null,
-      hint ? el('span', { class: 'field__hint', text: hint }) : null
+    var single = control && control.nodeType === 1 && /^(INPUT|SELECT|TEXTAREA)$/.test(control.tagName);
+    var title = el('span', { class: 'field__label', id: A.uid('label'), text: label });
+    var hintNode = hint ? el('span', { class: 'field__hint', id: A.uid('hint'), text: hint }) : null;
+
+    if (single && hintNode) control.setAttribute('aria-describedby', hintNode.id);
+
+    return el(single ? 'label' : 'div', {
+      class: 'field',
+      'data-label': label,
+      role: single ? null : 'group',
+      'aria-labelledby': single ? null : title.id
+    },
+    title,
+    control,
+    counter || null,
+    hintNode
     );
+
+  };
+
+  /*
+   * Puts "<label> ..." validation lines under the field with that label.
+   * Returns the lines that matched no field.
+   */
+  A.showFieldErrors = function (scope, lines) {
+
+    A.clearFieldErrors(scope);
+
+    var fields = Array.prototype.slice.call(scope.querySelectorAll('.field[data-label]'))
+      .sort(function (a, b) { return b.dataset.label.length - a.dataset.label.length; });
+
+    return lines.filter(function (line) {
+
+      var text = line.replace(/^[•\-\s]+/, '');
+      var field = fields.filter(function (f) {
+        var label = f.dataset.label;
+        return text === label || text.indexOf(label + ' ') === 0 || text.indexOf(label + ':') === 0;
+      })[0];
+
+      if (!field || field.offsetParent === null) return true;
+
+      field.classList.add('field--invalid');
+      var message = el('span', { class: 'field__error', id: A.uid('error') }, icon('alert'), el('span', { text: text }));
+      field.appendChild(message);
+
+      field.querySelectorAll('input, textarea, select').forEach(function (control) {
+        control.setAttribute('aria-invalid', 'true');
+        control.setAttribute('aria-errormessage', message.id);
+        control.addEventListener('input', function clear() {
+          field.classList.remove('field--invalid');
+          message.remove();
+          control.removeAttribute('aria-invalid');
+          control.removeEventListener('input', clear);
+        });
+      });
+
+      return false;
+
+    });
+
+  };
+
+  A.clearFieldErrors = function (scope) {
+
+    scope.querySelectorAll('.field--invalid').forEach(function (field) {
+      field.classList.remove('field--invalid');
+      field.querySelectorAll('.field__error').forEach(function (n) { n.remove(); });
+      field.querySelectorAll('[aria-invalid]').forEach(function (n) { n.removeAttribute('aria-invalid'); });
+    });
+
+  };
+
+  A.reducedMotion = function () {
+
+    return window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   };
 
@@ -817,7 +972,7 @@
     function showError(error) {
 
       var parsed = A.parseError(error);
-      errorBox.replaceChildren(
+      A.fill(errorBox,
         el('p', { class: 'upload-error__title' }, icon('alert'), el('span', { text: parsed.message })),
         parsed.hint ? el('p', { class: 'upload-error__hint', text: parsed.hint }) : null,
         el('div', { class: 'actions' },
@@ -947,69 +1102,241 @@
   };
 
   /* =======================================================
-     SHEET (dialog)
+     SHEET (the editor)
+     Phones: a bottom sheet you can drag down to close.
+     Wide screens: a drawer from the side.
   ======================================================= */
 
   var sheet = document.getElementById('sheet');
 
-  A.openSheet = function (title, body, footer) {
+  A.openSheet = function (title, body, footer, options) {
 
-    sheet.replaceChildren(
+    options = options || {};
+
+    sheet.className = 'sheet' + (options.wide ? ' sheet--wide' : '');
+    A.fill(sheet,
+      el('div', { class: 'sheet__grab', 'aria-hidden': 'true' }),
       el('div', { class: 'sheet__head' },
-        el('h2', { class: 'sheet__title', id: 'sheet-title', text: title }),
-        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: A.closeSheet }, icon('close'))
+        el('h2', { class: 'sheet__title', id: 'sheet-title', tabindex: '-1', text: title }),
+        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: function () { A.closeSheet(); } }, icon('close'))
       ),
       el('div', { class: 'sheet__body' }, body),
       footer ? el('div', { class: 'sheet__foot' }, footer) : null
     );
 
-    if (!sheet.open) sheet.showModal();
+    sheet.style.transform = '';
+
+    if (!sheet.open) {
+      A.lastFocus = document.activeElement;
+      sheet.showModal();
+      // keyboards: straight into the first field. Touch: the title, so the
+      // on-screen keyboard doesn't pop up and no focus ring is drawn.
+      var first = sheet.querySelector('.sheet__body input:not([type=hidden]):not([type=file]):not([type=checkbox]):not([type=radio]), .sheet__body textarea, .sheet__body select');
+      if (first && !matchMedia('(hover: none)').matches) first.focus({ preventScroll: true });
+      else sheet.querySelector('.sheet__title').focus({ preventScroll: true });
+    }
 
   };
 
+  /* asks before throwing edits away; resolves true when it closed */
   A.closeSheet = function () {
 
-    if (A.dirty && !confirm('في تعديلات لسه ما اتحفظتش. تقفل من غير حفظ؟')) return;
-    A.dirty = false;
-    sheet.close();
+    return A.confirmLeave().then(function (ok) {
+      if (!ok) return false;
+      A.dirty = false;
+      if (sheet.open) sheet.close();
+      if (A.lastFocus && A.lastFocus.isConnected) A.lastFocus.focus({ preventScroll: true });
+      return true;
+    });
 
   };
 
-  // a toast shown inside the editor moves back to the page when it closes
-  sheet.addEventListener('close', function () {
-    var toast = document.getElementById('toast');
-    if (toast.parentNode !== sheet) return;
-    var visible = toast.classList.contains('is-visible');
-    if (toast.hidePopover && toast.matches(':popover-open')) toast.hidePopover();
-    document.body.appendChild(toast);
-    if (visible && toast.showPopover) toast.showPopover();
-  });
+  A.confirmLeave = function () {
+
+    if (!A.dirty) return Promise.resolve(true);
+
+    return A.confirm({
+      tone: 'warn',
+      title: 'في تعديلات لسه ما اتحفظتش',
+      message: 'لو كملت، التعديلات دي هتضيع.',
+      confirmLabel: 'سيبها من غير حفظ',
+      cancelLabel: 'ارجع للتعديل'
+    });
+
+  };
 
   sheet.addEventListener('cancel', function (event) {
     event.preventDefault();
     A.closeSheet();
   });
 
+  // tap on the dimmed backdrop closes too (same rules as the close button)
+  sheet.addEventListener('click', function (event) {
+    if (event.target === sheet) A.closeSheet();
+  });
+
+  /* drag the handle / header down to close (phones) */
+  (function () {
+
+    var startY = 0;
+    var lastY = 0;
+    var lastT = 0;
+    var speed = 0;
+    var dragging = false;
+
+    sheet.addEventListener('pointerdown', function (event) {
+      if (!matchMedia('(max-width: 759px)').matches) return;
+      if (!event.target.closest('.sheet__grab, .sheet__head') || event.target.closest('button')) return;
+      dragging = true;
+      startY = lastY = event.clientY;
+      lastT = event.timeStamp;
+      speed = 0;
+      sheet.setPointerCapture(event.pointerId);
+      sheet.classList.add('is-dragging');
+    });
+
+    sheet.addEventListener('pointermove', function (event) {
+      if (!dragging) return;
+      var dy = Math.max(0, event.clientY - startY);
+      speed = (event.clientY - lastY) / Math.max(1, event.timeStamp - lastT);
+      lastY = event.clientY;
+      lastT = event.timeStamp;
+      sheet.style.transform = 'translateY(' + dy + 'px)';
+    });
+
+    function end(event) {
+      if (!dragging) return;
+      dragging = false;
+      sheet.classList.remove('is-dragging');
+      var dy = Math.max(0, event.clientY - startY);
+      if (dy > 120 || speed > 0.8) {
+        A.closeSheet().then(function (closed) { if (!closed) sheet.style.transform = ''; });
+      }
+      else {
+        sheet.style.transform = '';
+      }
+    }
+
+    sheet.addEventListener('pointerup', end);
+    sheet.addEventListener('pointercancel', end);
+
+  })();
+
   A.sheetFooter = function (save) {
 
-    return [save, el('button', { class: 'btn', type: 'button', text: 'إلغاء', onclick: A.closeSheet })];
+    return [save, el('button', { class: 'btn btn--ghost', type: 'button', text: 'إلغاء', onclick: function () { A.closeSheet(); } })];
+
+  };
+
+
+  /* =======================================================
+     MODALS (instead of alert / confirm / prompt)
+  ======================================================= */
+
+  var MODAL_ICONS = { danger: 'trash', warn: 'alert', info: 'info', success: 'check' };
+
+  /**
+   * options: { tone: 'danger'|'warn'|'info'|'success', title, message,
+   *            details, actions: [{ label, value, kind, autofocus }] }
+   * Resolves with the chosen action's value (Esc / backdrop: null).
+   */
+  A.modal = function (options) {
+
+    return new Promise(function (resolve) {
+
+      var tone = options.tone || 'info';
+      var titleId = A.uid('modal-title');
+      var textId = A.uid('modal-text');
+      var previous = document.activeElement;
+      var done = false;
+      var focusTarget = null;
+
+      var dialog = el('dialog', { class: 'modal modal--' + tone, 'aria-labelledby': titleId, 'aria-describedby': options.message ? textId : null });
+
+      function close(value) {
+        if (done) return;
+        done = true;
+        dialog.classList.add('is-closing');
+        setTimeout(function () {
+          if (dialog.open) dialog.close();
+          dialog.remove();
+          if (previous && previous.isConnected) previous.focus({ preventScroll: true });
+          resolve(value);
+        }, A.reducedMotion() ? 0 : 160);
+      }
+
+      var buttons = (options.actions || [{ label: 'تمام', value: true, kind: 'primary', autofocus: true }]).map(function (action) {
+        var button = el('button', {
+          class: 'btn' + (action.kind ? ' btn--' + action.kind : ''),
+          type: 'button',
+          text: action.label,
+          onclick: function () { close(action.value); }
+        });
+        if (action.autofocus) focusTarget = button;
+        return button;
+      });
+
+      // (append() would turn a null into the text "null")
+      dialog.append.apply(dialog, [
+        el('span', { class: 'modal__icon', 'aria-hidden': 'true' }, icon(options.icon || MODAL_ICONS[tone] || 'info')),
+        el('h2', { class: 'modal__title', id: titleId, text: options.title || '' }),
+        options.message ? el('p', { class: 'modal__text', id: textId, text: options.message }) : null,
+        options.body || null,
+        A.technicalDetails(options.details),
+        el('div', { class: 'modal__actions' }, buttons)
+      ].filter(Boolean));
+
+      dialog.addEventListener('cancel', function (event) {
+        event.preventDefault();
+        close(null);
+      });
+
+      dialog.addEventListener('click', function (event) {
+        if (event.target === dialog) close(null);
+      });
+
+      document.body.appendChild(dialog);
+      dialog.showModal();
+      (focusTarget || buttons[buttons.length - 1]).focus();
+
+    });
+
+  };
+
+  /** Resolves true only when the admin chose the confirming action. */
+  A.confirm = function (options) {
+
+    var danger = options.tone === 'danger';
+
+    return A.modal({
+      tone: options.tone || 'warn',
+      icon: options.icon,
+      title: options.title,
+      message: options.message,
+      details: options.details,
+      actions: [
+        { label: options.confirmLabel || 'تمام', value: true, kind: danger ? 'danger-solid' : 'primary', autofocus: !danger },
+        { label: options.cancelLabel || 'رجوع', value: false, kind: 'ghost', autofocus: danger }
+      ]
+    }).then(function (value) { return value === true; });
 
   };
 
 
   /* =======================================================
      NAVIGATION
+     Wide screens: the rail. Phones: the dock. Sub-sections: tabs.
   ======================================================= */
 
   A.AREAS = [
-    { key: 'schedule', label: 'الجدول', icon: 'calendar' },
+    { key: 'home', label: 'الرئيسية', icon: 'home', view: 'schedule' },
     { key: 'content', label: 'المحتوى', icon: 'megaphone', subs: [
       { key: 'meetings', label: 'الاجتماعات' },
       { key: 'news', label: 'الأخبار' },
-      { key: 'games', label: 'الألعاب' }
+      { key: 'games', label: 'الألعاب' },
+      { key: 'notifications', label: 'الإشعارات' }
     ] },
-    { key: 'notifications', label: 'الإشعارات', icon: 'bell' },
-    { key: 'page', label: 'الصفحة', icon: 'link', subs: [
+    { key: 'page', label: 'الصفحة', icon: 'layers', subs: [
       { key: 'links', label: 'الروابط' },
       { key: 'location', label: 'المكان' },
       { key: 'contacts', label: 'التواصل' }
@@ -1017,63 +1344,136 @@
     { key: 'settings', label: 'الإعدادات', icon: 'gear' }
   ];
 
-  A.area = 'schedule';
+  /* older names still used by links inside views */
+  var AREA_ALIASES = {
+    schedule: ['home'],
+    notifications: ['content', 'notifications'],
+    meetings: ['content', 'meetings'],
+    news: ['content', 'news'],
+    games: ['content', 'games'],
+    links: ['page', 'links'],
+    location: ['page', 'location'],
+    contacts: ['page', 'contacts']
+  };
+
+  A.area = 'home';
   A.sub = { content: 'meetings', page: 'links' };
 
-  function leaveOk() {
+  function areaOf(key) {
 
-    if (A.dirty && !confirm('في تعديلات لسه ما اتحفظتش. تسيبها؟')) return false;
-    A.dirty = false;
-    return true;
+    return A.AREAS.filter(function (a) { return a.key === key; })[0];
 
   }
 
   /* jump from anywhere, e.g. the timeline: A.go('content', 'games') */
   A.go = function (area, sub) {
 
-    if (!leaveOk()) return;
-    A.area = area;
-    if (sub) A.sub[area] = sub;
-    renderNav();
-    A.render();
-    window.scrollTo(0, 0);
+    if (!areaOf(area) && AREA_ALIASES[area]) {
+      sub = AREA_ALIASES[area][1] || sub;
+      area = AREA_ALIASES[area][0];
+    }
+
+    return A.confirmLeave().then(function (ok) {
+      if (!ok) return false;
+      A.dirty = false;
+      var changed = area !== A.area || (sub && sub !== A.sub[area]);
+      A.area = area;
+      if (sub) A.sub[area] = sub;
+      renderNav();
+      A.render({ animate: changed });
+      window.scrollTo(0, 0);
+      return true;
+    });
 
   };
 
-  function renderNav() {
+  function pop(node) {
 
-    var areas = document.getElementById('areas');
-    var subs = document.getElementById('subtabs');
-
-    areas.replaceChildren.apply(areas, A.AREAS.map(function (area) {
-      return el('button', {
-        class: 'area', type: 'button', role: 'tab',
-        'aria-selected': String(area.key === A.area),
-        onclick: function () { if (area.key !== A.area) A.go(area.key); }
-      }, icon(area.icon), el('span', { text: area.label }));
-    }));
-
-    var current = A.AREAS.filter(function (a) { return a.key === A.area; })[0];
-
-    subs.hidden = !current.subs;
-    subs.replaceChildren.apply(subs, (current.subs || []).map(function (sub) {
-      return el('button', {
-        class: 'tab', type: 'button', role: 'tab',
-        'aria-selected': String(sub.key === A.sub[A.area]),
-        onclick: function () { if (sub.key !== A.sub[A.area]) A.go(A.area, sub.key); }
-      }, sub.label);
-    }));
+    var target = node.querySelector('.icon');
+    if (!target || A.reducedMotion()) return;
+    target.classList.remove('is-pop');
+    void target.getBoundingClientRect();
+    target.classList.add('is-pop');
 
   }
 
-  A.render = function () {
+  function navButton(area, className) {
+
+    var selected = area.key === A.area;
+
+    return el('button', {
+      class: className,
+      type: 'button',
+      'aria-current': selected ? 'page' : null,
+      'data-area': area.key,
+      onclick: function (event) {
+        pop(event.currentTarget);
+        if (area.key !== A.area) A.go(area.key);
+      }
+    },
+    el('span', { class: className + '__icon' }, icon(area.icon)),
+    el('span', { class: className + '__label', text: area.label })
+    );
+
+  }
+
+  function renderNav() {
+
+    var rail = document.getElementById('rail-nav');
+    var dock = document.getElementById('dock');
+    var subs = document.getElementById('subtabs');
+    var current = areaOf(A.area);
+    var sub = current.subs ? current.subs.filter(function (s) { return s.key === A.sub[A.area]; })[0] : null;
+
+    rail.replaceChildren.apply(rail, A.AREAS.map(function (area) { return navButton(area, 'navlink'); }));
+    dock.replaceChildren.apply(dock, A.AREAS.map(function (area) { return navButton(area, 'dockbtn'); }));
+    dock.style.setProperty('--count', String(A.AREAS.length));
+    dock.style.setProperty('--active', String(A.AREAS.indexOf(current)));
+
+    subs.hidden = !current.subs;
+    subs.replaceChildren.apply(subs, (current.subs || []).map(function (s) {
+      return el('button', {
+        class: 'tab', type: 'button',
+        'aria-current': s.key === A.sub[A.area] ? 'page' : null,
+        onclick: function () { if (s.key !== A.sub[A.area]) A.go(A.area, s.key); }
+      }, s.label);
+    }));
+
+    document.getElementById('crumb').textContent = sub ? current.label : 'لوحة التحكم';
+    document.getElementById('page-title').textContent = sub ? sub.label : current.label;
+    document.title = (sub ? sub.label : current.label) + ' — لوحة التحكم';
+
+    var foot = document.getElementById('rail-foot');
+    if (A.state) {
+      A.fill(foot,
+        A.state.config.siteUrl ? el('a', { class: 'navlink navlink--quiet', href: A.state.config.siteUrl, target: '_blank', rel: 'noopener' },
+          el('span', { class: 'navlink__icon' }, icon('globe')), el('span', { class: 'navlink__label', text: 'افتح الموقع' })) : null,
+        el('p', { class: 'rail__user' }, icon('user'), el('span', { class: 'ltr', text: A.state.user }))
+      );
+    }
+
+  }
+
+  A.renderNav = renderNav;
+
+  A.render = function (options) {
 
     var view = document.getElementById('view');
-    var key = A.AREAS.filter(function (a) { return a.key === A.area; })[0].subs ? A.sub[A.area] : A.area;
+    var area = areaOf(A.area);
+    var key = area.subs ? A.sub[A.area] : (area.view || area.key);
     var builder = A.views[key];
 
     view.replaceChildren.apply(view, [].concat(builder ? builder() : []));
     view.setAttribute('aria-busy', 'false');
+
+    // a new section enters with a short stagger; re-renders after a save don't
+    if (options && options.animate && !A.reducedMotion()) {
+      Array.prototype.forEach.call(view.children, function (child, i) {
+        child.style.setProperty('--i', String(Math.min(i, 6)));
+        child.classList.add('is-entering');
+        child.addEventListener('animationend', function () { child.classList.remove('is-entering'); }, { once: true });
+      });
+    }
 
   };
 
@@ -1081,6 +1481,7 @@
 
     A.state = next;
     A.renderStatus();
+    renderNav();
     A.render();
 
   };
@@ -1097,26 +1498,28 @@
      STATUS
   ======================================================= */
 
-  A.renderStatus = function () {
+  A.renderStatus = function (override) {
 
     var node = document.getElementById('status');
+    var text = node.querySelector('.status__text');
     var s = A.state.status;
+    var state = override ||
+      (s.errors.length ? 'error' : s.hasChanges ? 'dirty' : 'clean');
 
-    if (s.errors.length) {
-      node.className = 'status status--error';
-      node.textContent = 'في أخطاء (' + s.errors.length + ')';
-    }
-    else if (s.hasChanges) {
-      node.className = 'status status--dirty';
-      node.textContent = 'في تغييرات مش منشورة';
-    }
-    else {
-      node.className = 'status status--clean';
-      node.textContent = 'الموقع متحدث';
-    }
+    var words = {
+      error: 'يوجد خطأ يمنع النشر',
+      dirty: 'في تغييرات مش منشورة',
+      clean: 'الموقع متحدث',
+      publishing: 'جاري النشر…',
+      waiting: 'جاري انتظار GitHub Pages…',
+      live: 'ظهر على الموقع ✓'
+    };
+
+    node.className = 'status status--' + state;
+    text.textContent = words[state] + (state === 'error' ? ' (' + s.errors.length + ')' : '');
+    node.title = text.textContent;
 
   };
-
 
   /* =======================================================
      SHARED PIECES FOR VIEWS
@@ -1185,13 +1588,27 @@
 
   };
 
+  /* the branded "really delete?" for everything */
+  A.confirmDelete = function (title, extra) {
+
+    return A.confirm({
+      tone: 'danger',
+      title: 'تمسح «' + title + '»؟',
+      message: (extra ? extra + '\n' : '') + 'المسح من المسودة نهائي. لو عايز تخفيه بس، اقفل «ظاهر» بدل المسح.',
+      confirmLabel: 'امسح',
+      cancelLabel: 'لأ، سيبه'
+    });
+
+  };
+
   A.deleteItem = function (kind, key, title, button) {
 
-    if (!confirm('تمسح "' + title + '"؟\nلو عايز تخفيه بس، اقفل "ظاهر" بدل المسح.')) return;
-
-    A.withBusy(button, A.call('apiDeleteItem', kind, key))
-      .then(function (next) { A.applyState(next); A.toast('اتمسح — هيختفي من الموقع بعد النشر'); })
-      .catch(function (error) { A.fail(error); });
+    return A.confirmDelete(title).then(function (ok) {
+      if (!ok) return;
+      return A.withBusy(button, A.call('apiDeleteItem', kind, key))
+        .then(function (next) { A.applyState(next); A.toast('اتمسح — هيختفي من الموقع بعد النشر'); })
+        .catch(function (error) { A.fail(error); });
+    });
 
   };
 
@@ -1239,6 +1656,38 @@
 
   };
 
+  /*
+   * The one visibility rule (same as the site and the publish check):
+   * off       مخفي            switched off
+   * scheduled يظهر لاحقًا     before "from"
+   * ended     انتهى           after "until" (a date alone = end of that day)
+   * live      ظاهر دلوقتي     inside a window
+   * always    ظاهر            on, no window
+   */
+  A.visibility = function (enabled, from, until, now) {
+
+    now = now === undefined ? A.wallMinutes(A.cairoNow()) : now;
+    var start = from ? A.wallMinutes(from) : null;
+    var end = until ? A.wallMinutes(until, true) : null;
+
+    if (!enabled) return { state: 'off', label: 'مخفي', kind: 'off' };
+    if (start !== null && start > now) return { state: 'scheduled', label: 'يظهر لاحقًا · ' + A.formatWall(from), kind: 'gold' };
+    if (end !== null && end < now) return { state: 'ended', label: 'انتهى', kind: 'off' };
+    if (start !== null || end !== null) return { state: 'live', label: 'ظاهر دلوقتي' + (end !== null ? ' · لحد ' + A.formatWall(until) : ''), kind: 'ok' };
+    return { state: 'always', label: 'ظاهر', kind: 'ok' };
+
+  };
+
+  A.visibilityChip = function (enabled, from, until) {
+
+    var v = A.visibility(enabled, from, until);
+    var chip = A.chip(v.label, v.kind);
+    chip.classList.add('chip--state');
+    chip.dataset.state = v.state;
+    return chip;
+
+  };
+
   A.editButton = function (label, onclick) {
 
     return el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'تعديل ' + label, onclick: onclick }, icon('edit'));
@@ -1261,19 +1710,65 @@
 
   /* =======================================================
      REVIEW + PUBLISH
+     Draft (saved) → review → publish to GitHub → wait for GitHub Pages
+     → live on the site. Every step is visible in the editor and in the
+     status pill at the top.
   ======================================================= */
 
-  document.getElementById('publish-open').addEventListener('click', openReview);
+  document.getElementById('publish-open').addEventListener('click', function () {
+    A.confirmLeave().then(function (ok) { if (ok) openReview(); });
+  });
+
+  A.openReview = function () { openReview(); };
+
+  var PUBLISH_STEPS = [
+    { key: 'review', label: 'مراجعة' },
+    { key: 'github', label: 'نشر على GitHub' },
+    { key: 'pages', label: 'انتظار GitHub Pages' },
+    { key: 'live', label: 'ظهر على الموقع' }
+  ];
+
+  /* step: index of the current step; failed: that step failed */
+  function stepper(step, failed) {
+
+    return el('ol', { class: 'stepper', 'aria-label': 'خطوات النشر' }, PUBLISH_STEPS.map(function (s, i) {
+      var state = i < step ? 'done' : i === step ? (failed ? 'failed' : 'current') : 'todo';
+      return el('li', { class: 'stepper__step is-' + state, 'aria-current': i === step ? 'step' : null },
+        el('span', { class: 'stepper__dot', 'aria-hidden': 'true' }, state === 'done' ? icon('check') : state === 'failed' ? icon('alert') : String(i + 1)),
+        el('span', { class: 'stepper__label', text: s.label })
+      );
+    }));
+
+  }
+
+  function reviewSkeleton() {
+
+    return [
+      stepper(0),
+      el('div', { class: 'skeleton-list', 'aria-hidden': 'true' },
+        el('div', { class: 'skeleton skeleton--line' }),
+        el('div', { class: 'skeleton skeleton--line skeleton--short' }),
+        el('div', { class: 'skeleton skeleton--line' })
+      ),
+      el('p', { class: 'loading-text', role: 'status' }, el('span', { class: 'spinner spinner--inline', 'aria-hidden': 'true' }), 'بنقارن المسودة بالموقع الحالي…')
+    ];
+
+  }
 
   function openReview() {
 
     A.dirty = false;
-    A.openSheet('مراجعة قبل النشر', [el('p', { class: 'loading', text: 'بنقارن المسودة بالموقع الحالي…' })]);
+    A.openSheet('مراجعة قبل النشر', reviewSkeleton());
 
     A.call('apiReview')
       .then(renderReview)
       .catch(function (error) {
-        A.openSheet('مراجعة قبل النشر', [el('div', { class: 'errors', text: error.message })]);
+        var box = A.errorBox();
+        A.openSheet('مراجعة قبل النشر', [stepper(0, true), box], [
+          el('button', { class: 'btn btn--primary', type: 'button', onclick: openReview }, icon('retry'), 'جرّب تاني'),
+          el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })
+        ]);
+        A.fail(error, box);
       });
 
   }
@@ -1282,44 +1777,64 @@
 
     var blocked = review.errors.length > 0 || !!review.githubError;
     var nothing = !review.changes.length;
-    var body = [];
+    var body = [stepper(0, blocked)];
+    var box = A.errorBox();
+
+    body.push(box);
 
     if (review.githubError) {
-      body.push(el('div', { class: 'errors', text: review.githubError }));
+      body.push(el('div', { class: 'errors' },
+        el('p', { class: 'errors__title', text: 'مش قادرين نوصل لـ GitHub' }),
+        el('p', { class: 'errors__hint', text: review.githubError })
+      ));
     }
 
     if (review.errors.length) {
       body.push(el('div', { class: 'errors' },
-        el('strong', { text: 'لازم تتصلح قبل النشر:' }),
-        review.errors.map(function (e) { return el('span', { text: '• ' + e.where + ': ' + e.message }); })
+        el('p', { class: 'errors__title', text: 'يوجد خطأ يمنع النشر — صلّحه الأول:' }),
+        el('ul', { class: 'issue-list' }, review.errors.map(function (e) {
+          return el('li', {}, el('strong', { text: e.where }), el('span', { text: e.message }));
+        }))
       ));
     }
 
     if (review.warnings.length) {
-      body.push(el('div', { class: 'note note--warn' }, review.warnings.map(function (w) {
-        return el('div', { text: '• ' + w.where + ': ' + w.message });
-      })));
+      body.push(el('div', { class: 'note note--warn' },
+        el('p', { class: 'note__title', text: 'تنبيهات (مش هتمنع النشر):' }),
+        el('ul', { class: 'issue-list' }, review.warnings.map(function (w) {
+          return el('li', {}, el('strong', { text: w.where }), el('span', { text: w.message }));
+        }))
+      ));
     }
 
     if (!review.githubError) {
       body.push(nothing
-        ? el('p', { class: 'note note--ok', text: 'مفيش تغييرات — الموقع متحدث.' })
+        ? el('div', { class: 'empty-state empty-state--ok' },
+          el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('check')),
+          el('p', { class: 'empty-state__title', text: 'الموقع متحدث' }),
+          el('p', { class: 'empty-state__text', text: 'مفيش تغييرات في المسودة عن اللي على الموقع.' }))
         : el('div', { class: 'form' },
-          el('p', { class: 'field__label', text: 'اللي هيتغير في الموقع:' }),
+          el('p', { class: 'section-label', text: 'اللي هيتغير في الموقع (' + review.changes.length + ')' }),
           el('ul', { class: 'changes' }, review.changes.map(function (line) { return el('li', { text: line }); }))
         ));
     }
 
-    var publish = el('button', { class: 'btn btn--primary', type: 'button', disabled: blocked || nothing, text: 'نشر التغييرات' });
+    var publish = el('button', { class: 'btn btn--primary', type: 'button', disabled: blocked || nothing }, icon('send'), el('span', { text: 'نشر التغييرات' }));
 
     publish.addEventListener('click', function () {
+      box.hidden = true;
+      A.renderStatus('publishing');
+      sheet.querySelector('.stepper').replaceWith(stepper(1));
       A.withBusy(publish, A.call('apiPublish', review.revision))
         .then(function (result) {
           A.applyState(result.state);
           renderPublished(result);
         })
         .catch(function (error) {
-          sheet.querySelector('.sheet__body').prepend(el('div', { class: 'errors', text: error.message }));
+          A.renderStatus();
+          var current = sheet.querySelector('.stepper');
+          if (current) current.replaceWith(stepper(1, true));
+          A.fail(error, box);
         });
     });
 
@@ -1329,15 +1844,20 @@
 
   function renderPublished(result) {
 
-    var live = el('p', { class: 'note' }, el('span', { class: 'spinner spinner--inline', 'aria-hidden': 'true' }), 'بيتنشر على الموقع… (عادةً أقل من دقيقة)');
+    var live = el('div', { class: 'note', role: 'status' },
+      el('span', { class: 'spinner spinner--inline', 'aria-hidden': 'true' }),
+      'جاري انتظار GitHub Pages… (عادةً أقل من دقيقة)'
+    );
 
-    A.openSheet('اتنشر ✓', [
+    A.openSheet('تم النشر ✓', [
+      stepper(result.siteUrl ? 2 : 3),
       el('p', { class: 'note note--ok', text: result.unchanged ? 'الملفات على GitHub زي ما هي.' : 'التغييرات اتبعتت لـ GitHub.' }),
-      result.commitUrl ? el('a', { href: result.commitUrl, target: '_blank', rel: 'noopener', text: 'شوف الكوميت على GitHub' }) : null,
+      result.commitUrl ? el('a', { class: 'link-row', href: result.commitUrl, target: '_blank', rel: 'noopener' }, icon('external'), 'شوف الكوميت على GitHub') : null,
       result.siteUrl ? live : null
-    ], [el('button', { class: 'btn btn--primary', type: 'button', text: 'تمام', onclick: function () { sheet.close(); } })]);
+    ], [el('button', { class: 'btn btn--primary', type: 'button', text: 'تمام', onclick: function () { A.closeSheet(); } })]);
 
     if (result.siteUrl) {
+      A.renderStatus('waiting');
       waitForSite(result.siteUrl, result.revision, live);
     }
 
@@ -1355,8 +1875,17 @@
         .then(function (response) { return response.json(); })
         .then(function (json) {
           if (json.revision === revision) {
-            node.className = 'note note--ok';
-            node.replaceChildren('ظهر على الموقع ✓ ', el('a', { href: siteUrl, target: '_blank', rel: 'noopener', text: 'افتح الموقع' }));
+            A.renderStatus('live');
+            setTimeout(function () { A.renderStatus(); }, 6000);
+            if (node.isConnected) {
+              var current = sheet.querySelector('.stepper');
+              if (current) current.replaceWith(stepper(4));
+              node.className = 'note note--ok';
+              node.replaceChildren('ظهر على الموقع ✓ ', el('a', { href: siteUrl, target: '_blank', rel: 'noopener', text: 'افتح الموقع' }));
+            }
+            else {
+              A.toast('ظهر على الموقع ✓');
+            }
             return;
           }
           retry();
@@ -1365,10 +1894,12 @@
     }
 
     function retry() {
-      if (!node.isConnected) return;
       if (tries >= 40) {
-        node.className = 'note note--warn';
-        node.textContent = 'لسه مظهرش. GitHub Pages أحياناً بياخد كام دقيقة — افتح الموقع بعد شوية.';
+        A.renderStatus();
+        if (node.isConnected) {
+          node.className = 'note note--warn';
+          node.textContent = 'لسه مظهرش. GitHub Pages أحياناً بياخد كام دقيقة — افتح الموقع بعد شوية.';
+        }
         return;
       }
       setTimeout(check, 5000);
@@ -1383,15 +1914,38 @@
      START (called at the end of Admin.html, after the views load)
   ======================================================= */
 
+  function startFailed(error) {
+
+    var parsed = A.parseError(error);
+    var view = document.getElementById('view');
+
+    view.setAttribute('aria-busy', 'false');
+    view.replaceChildren(el('section', { class: 'card card--center' },
+      el('span', { class: 'empty-state__icon empty-state__icon--danger', 'aria-hidden': 'true' }, icon('alert')),
+      el('h2', { class: 'card__title', text: 'لوحة التحكم مفتحتش' }),
+      el('p', { class: 'card__hint', text: parsed.message }),
+      parsed.hint ? el('p', { class: 'card__hint', text: parsed.hint }) : null,
+      A.technicalDetails(parsed.details),
+      el('div', { class: 'actions actions--center' },
+        el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { location.reload(); } }, icon('retry'), 'جرّب تاني')
+      )
+    ));
+
+  }
+
   A.start = function () {
 
+    document.getElementById('publish-open').prepend(icon('send'));
     renderNav();
 
     A.call('apiState')
-      .then(A.applyState)
-      .catch(function (error) {
-        document.getElementById('view').replaceChildren(el('div', { class: 'errors', text: error.message }));
-      });
+      .then(function (state) {
+        A.state = state;
+        A.renderStatus();
+        renderNav();
+        A.render({ animate: true });
+      })
+      .catch(startFailed);
 
   };
 
