@@ -161,6 +161,8 @@ at that minute.
 | `assets/js/sheet.js`, `router.js` | browser      | App-like sheets; deep links `#notifications`, `#news/<id>`, `#game/<id>`, `#meeting` |
 | `assets/css/sheets.css`    | browser            | The sheets' own styles (detail, poster hero + viewer, bell panel), loaded on the first touch or by a deep link |
 | `tools/subset-fonts.mjs`   | dev machine        | Rebuilds the lean Latin subsets of Cairo (main.css unicode-ranges) |
+| `assets/js/intro.js`       | browser (classic script in `<head>`) | The first-visit intro: stages the real hero, then hands over (skipped on repeat visits, deep links, reduced motion, weak devices, the admin preview) |
+| `assets/js/detail.js`      | browser (lazy)     | The detail sheets' content and the poster hero, loaded on the first touch or by a deep link |
 | `assets/js/motion.js`, `sound.js` | browser      | Springs, swaps, particles; optional synthesized sounds    |
 | `tools/demo.mjs`            | dev machine        | Demo content built through the real admin code           |
 
