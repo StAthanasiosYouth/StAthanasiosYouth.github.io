@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "2230f2a3e797",
-  "publishedAt": "2026-10-06T08:36:20.655Z",
+  "revision": "34d0943c926e",
+  "publishedAt": "2026-10-06T08:53:23.829Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -133,10 +133,17 @@
       "topic": "الكسل الروحى",
       "speaker": "",
       "description": "",
-      "image": null,
+      "image": {
+        "src": "media/2026/img-af6b0c28.webp",
+        "thumb": "media/2026/img-af6b0c28-480.webp",
+        "w": 1122,
+        "h": 1402,
+        "alt": "بوستر الكسل الروحي test",
+        "color": "#21252e"
+      },
       "status": "normal",
       "note": "",
-      "visibleFrom": "",
+      "visibleFrom": "2026-10-06T11:52",
       "durationMinutes": null
     }
   ],
@@ -152,7 +159,7 @@
         "kind": "meeting"
       },
       "image": null,
-      "publishAt": "2026-10-06T06:42",
+      "publishAt": "2026-10-06T11:52",
       "expireAt": "2026-10-11T20:00"
     }
   ],
