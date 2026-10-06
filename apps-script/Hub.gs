@@ -10,7 +10,7 @@ var SESSION_STATUSES = ['normal', 'cancelled'];
 
 var GAME_AFTER_END = ['show', 'hide'];
 
-var NOTIFICATION_TYPES = ['general', 'meeting', 'news', 'game', 'important'];
+var NOTIFICATION_TYPES = ['general', 'meeting', 'news', 'game', 'important', 'competition', 'activity'];
 
 var HUB_LIMITS = {
   topic: 80,
@@ -183,7 +183,12 @@ function mediaIndex_(rows) {
 function buildHub_(draft, ctx) {
 
   var sectionsOn = ctx.sections || {};
-  var on = function (key) { return sectionsOn[key] !== false; };
+  var on = function (key) {
+    if (ctx.sectionOn) return ctx.sectionOn(key);
+    return sectionsOn[key] !== false;
+  };
+  // archived items are kept in the Sheet, never published
+  var archived = function (row) { return contentBool_(row.archived); };
   var media = mediaIndex_(draft.media);
   var usedMedia = Object.create(null);
   var today = ctx.now ? ctx.now.slice(0, 10) : '';
@@ -313,7 +318,7 @@ function buildHub_(draft, ctx) {
       allNewsIds[id] = true;
     }
 
-    if (!on('news') || !contentBool_(row.enabled)) {
+    if (!on('news') || !contentBool_(row.enabled) || archived(row)) {
       return;
     }
 
@@ -395,7 +400,7 @@ function buildHub_(draft, ctx) {
       allGameIds[id] = true;
     }
 
-    if (!on('games') || !contentBool_(row.enabled)) {
+    if (!on('games') || !contentBool_(row.enabled) || archived(row)) {
       return;
     }
 
@@ -465,6 +470,113 @@ function buildHub_(draft, ctx) {
   games.sort(function (a, b) { return a.startAt < b.startAt ? -1 : a.startAt > b.startAt ? 1 : 0; });
 
 
+  /* ---------- activities: competitions, trips, plays... (Activities + Types) ---------- */
+
+  var types = Object.create(null);
+
+  sortRows_(draft.types || []).forEach(function (row) {
+    var key = contentLine_(row.key).toLowerCase();
+    if (!key || !contentBool_(row.enabled)) return;
+    types[key] = {
+      key: key,
+      label: contentLine_(row.label) || key,
+      section: contentLine_(row.section).toLowerCase(),
+      icon: ICON_NAMES.indexOf(contentLine_(row.icon)) !== -1 ? contentLine_(row.icon) : '',
+      theme: SECTION_THEMES.indexOf(contentLine_(row.theme)) !== -1 ? contentLine_(row.theme) : '',
+      bannerId: contentLine_(row.banner),
+      ctaDefault: contentLine_(row.ctaDefault)
+    };
+  });
+
+  var activities = [];
+  var activityIds = Object.create(null);
+  var allActivityIds = Object.create(null);
+  var activitySection = Object.create(null);
+  var usedTypes = Object.create(null);
+
+  sortRows_(draft.activities || []).forEach(function (row) {
+
+    var id = contentLine_(row.id);
+
+    if (id) {
+      allActivityIds[id] = true;
+    }
+
+    if (!contentBool_(row.enabled) || archived(row)) {
+      return;
+    }
+
+    var title = contentLine_(row.title);
+    var where = 'الفعاليات: ' + (title || ('صف ' + (row.__index + 2)));
+    var type = types[contentLine_(row.type).toLowerCase()];
+
+    if (!type) {
+      ctx.error(where, 'النوع "' + contentLine_(row.type) + '" مش موجود أو مقفول في شيت Types');
+      return;
+    }
+
+    // its section switched off: nothing of it is published
+    if (!on(type.section)) {
+      return;
+    }
+
+    if (!uniqueId(where, id, activityIds)) {
+      return;
+    }
+
+    if (!title) {
+      ctx.error(where, 'العنوان مطلوب');
+    }
+
+    var urlText = contentLine_(row.url);
+    var url = safeHttpsUrl(urlText);
+
+    if (urlText && !url) {
+      ctx.error(where, 'اللينك لازم يبدأ بـ https://');
+    }
+
+    var startAt = dateTime(where, row.startAt, false, 'بيبدأ');
+    var endAt = dateTime(where, row.endAt, true, 'بيخلص');
+    var visibleFrom = dateTime(where, row.visibleFrom, false, 'يظهر من');
+    var visibleUntil = dateTime(where, row.visibleUntil, true, 'يختفي بعد') || endAt;
+
+    if (startAt && endAt && startAt >= endAt) {
+      ctx.error(where, 'ميعاد البداية بعد النهاية');
+    }
+
+    if (visibleUntil && ctx.now && visibleUntil < ctx.now) {
+      ctx.warn(where, 'خلصت ومش هتظهر');
+      delete activityIds[id];
+      return;
+    }
+
+    activitySection[id] = type.section;
+    usedTypes[type.key] = true;
+
+    activities.push({
+      id: id,
+      type: type.key,
+      section: type.section,
+      title: ctx.limited(where, title, 80, 'العنوان'),
+      subtitle: ctx.limited(where, contentLine_(row.subtitle), 140, 'السطر القصير'),
+      description: ctx.limited(where, contentText_(row.description).replace(/\n{3,}/g, '\n\n'), 1500, 'التفاصيل'),
+      image: image(where, row.image),
+      cta: url ? { label: ctx.limited(where, contentLine_(row.ctaLabel) || type.ctaDefault || 'التفاصيل', 24, 'نص الزرار'), url: url } : null,
+      location: ctx.limited(where, contentLine_(row.location), 120, 'المكان'),
+      startAt: startAt,
+      endAt: endAt,
+      visibleFrom: visibleFrom,
+      visibleUntil: visibleUntil
+    });
+
+  });
+
+  var publishedTypes = Object.keys(usedTypes).map(function (key) {
+    var t = types[key];
+    return { key: t.key, label: t.label, icon: t.icon, theme: t.theme, banner: t.bannerId ? image('الأنواع: ' + t.label, t.bannerId) : null };
+  });
+
+
   /* ---------- notifications (the bell) ---------- */
 
   var notifications = [];
@@ -473,7 +585,7 @@ function buildHub_(draft, ctx) {
 
   sortRows_(draft.notifications || []).forEach(function (row) {
 
-    if (!contentBool_(row.enabled)) {
+    if (!contentBool_(row.enabled) || archived(row)) {
       return;
     }
 
@@ -497,7 +609,7 @@ function buildHub_(draft, ctx) {
     }
 
     // a meeting / news / game notification never announces a hidden section
-    var typeSection = { meeting: 'meeting', news: 'news', game: 'games' }[type];
+    var typeSection = { meeting: 'meeting', news: 'news', game: 'games', competition: 'competitions' }[type];
 
     if (typeSection && !on(typeSection)) {
       ctx.warn(where, 'القسم بتاعه مخفي، فالإشعار ده مش هيظهر');
@@ -524,7 +636,7 @@ function buildHub_(draft, ctx) {
     // what tapping the notification opens
     var targetText = contentLine_(row.target);
     var target = null;
-    var match = /^(news|game):([\w-]{1,60})$/.exec(targetText);
+    var match = /^(news|game|activity):([\w-]{1,60})$/.exec(targetText);
 
     if (!targetText) {
       target = null;
@@ -536,15 +648,19 @@ function buildHub_(draft, ctx) {
       }
       target = { kind: 'meeting' };
     }
-    else if (match && !on(match[1] === 'news' ? 'news' : 'games')) {
+    else if (match && match[1] !== 'activity' && !on(match[1] === 'news' ? 'news' : 'games')) {
       ctx.warn(where, 'قسم ' + (match[1] === 'news' ? 'الأخبار' : 'الألعاب') + ' مخفي، فالإشعار ده مش هيظهر');
       return;
     }
+    else if (match && match[1] === 'activity' && allActivityIds[match[2]] && !activityIds[match[2]]) {
+      ctx.warn(where, 'الفعالية بتاعته مش ظاهرة، فالإشعار ده مش هيظهر');
+      return;
+    }
     else if (match) {
-      var known = match[1] === 'news' ? allNewsIds : allGameIds;
-      var live = match[1] === 'news' ? newsIds : gameIds;
+      var known = match[1] === 'news' ? allNewsIds : match[1] === 'game' ? allGameIds : allActivityIds;
+      var live = match[1] === 'news' ? newsIds : match[1] === 'game' ? gameIds : activityIds;
       if (!known[match[2]]) {
-        ctx.error(where, 'الإشعار بيشاور على ' + (match[1] === 'news' ? 'خبر' : 'لعبة') + ' مش موجودة: ' + match[2]);
+        ctx.error(where, 'الإشعار بيشاور على ' + ({ news: 'خبر', game: 'لعبة', activity: 'فعالية' })[match[1]] + ' مش موجودة: ' + match[2]);
       }
       else if (!live[match[2]]) {
         ctx.warn(where, 'الإشعار بيشاور على حاجة مش منشورة دلوقتي، هيظهر من غير لينك');
@@ -580,6 +696,8 @@ function buildHub_(draft, ctx) {
     news: news.slice(0, HUB_CAPS.news),
     games: games.slice(0, HUB_CAPS.games),
     notifications: notifications.slice(0, HUB_CAPS.notifications),
+    activities: activities.slice(0, 60),
+    types: publishedTypes,
     cancelledDates: cancelledDates,
     usedMedia: Object.keys(usedMedia)
   };

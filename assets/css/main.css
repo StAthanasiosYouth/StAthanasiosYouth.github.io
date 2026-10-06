@@ -3389,6 +3389,9 @@ dialog.sheet::backdrop {
   position: relative;
   display: grid;
   place-items: center;
+  /* centred even when the height comes from an aspect ratio */
+  place-content: center;
+  grid-template: 100% / 100%;
   width: 100%;
   height: 100%;
   min-height: inherit;
@@ -3459,4 +3462,195 @@ dialog.sheet::backdrop {
 /* pictures show their own colour while loading */
 img[style*="background-color"] {
   background-clip: padding-box;
+}
+
+
+/* =========================================================
+   ITEMS: competitions, trips, plays... (items.js)
+========================================================= */
+
+.items__list {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 640px) {
+  .items__list {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+}
+
+.item-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 14px;
+  height: 100%;
+  padding: 10px;
+  overflow: hidden;
+  border-radius: 18px;
+  background:
+    radial-gradient(140% 90% at 100% 0%, var(--accent-glow), transparent 60%),
+    rgba(2, 9, 20, .42);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+  transition: transform .45s var(--spring), box-shadow .3s;
+}
+
+@media (min-width: 640px) {
+  .item-card {
+    grid-template-columns: 1fr;
+    padding: 0 0 14px;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .item-card:hover {
+    transform: translateY(-3px);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent), 0 20px 40px -24px var(--accent-glow);
+  }
+}
+
+.item-card:active {
+  transform: scale(.985);
+}
+
+.item-card__media {
+  overflow: hidden;
+  border-radius: 13px;
+  aspect-ratio: 4 / 5;
+  background: var(--navy-950);
+}
+
+@media (min-width: 640px) {
+  .item-card__media {
+    border-radius: 18px 18px 0 0;
+    aspect-ratio: 16 / 10;
+  }
+}
+
+.item-card__media img,
+.item-card__media .art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.item-card__body {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-width: 0;
+}
+
+@media (min-width: 640px) {
+  .item-card__body {
+    padding: 0 14px;
+  }
+}
+
+.item-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0;
+  font-size: .76rem;
+  font-weight: 800;
+}
+
+.item-card__type {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent-hi);
+}
+
+.item-card__type .icon {
+  width: 15px;
+  height: 15px;
+}
+
+.item-card__state {
+  color: var(--text-2);
+}
+
+.item-card--open .item-card__state {
+  color: var(--accent-hi);
+}
+
+.item-card--ended {
+  opacity: .72;
+}
+
+.item-card__title {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.item-card__title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.item-card__sub {
+  margin: 0;
+  font-size: .86rem;
+  color: var(--text-2);
+}
+
+.item-card__when {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: .78rem;
+  color: var(--text-3);
+}
+
+.item-card__when span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.item-card__when .icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* the button sits above the card's whole-card link */
+.item-card__actions {
+  position: relative;
+  z-index: 2;
+  margin-top: 6px;
+}
+
+.item-card__cta.is-waiting {
+  opacity: .7;
+  cursor: default;
+}
+
+/* the share row in detail sheets */
+.share-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--gold-line);
+}
+
+.share-row__whatsapp .icon {
+  color: var(--whatsapp);
+}
+
+.detail__state {
+  margin: 4px 0 0;
+  font-weight: 800;
 }

@@ -1,0 +1,378 @@
+<script>
+/*
+ * Admin: competitions and activities (one model: Activities + Types),
+ * the types themselves, and the archive shared by news, games,
+ * notifications and activities.
+ */
+(function () {
+
+  'use strict';
+
+  var A = window.A;
+  var el = A.el;
+  var icon = A.icon;
+  var bool = A.bool;
+
+  var SECTION_INFO = {
+    competitions: { title: 'المسابقات', one: 'مسابقة', add: 'مسابقة جديدة', icon: 'trophy', hint: 'مسابقات بلينك (زي مسابقة الكتاب المقدس). الزرار بيشتغل بس من ميعاد البداية لميعاد النهاية.' },
+    activities: { title: 'الفعاليات', one: 'فعالية', add: 'فعالية جديدة', icon: 'calendar', hint: 'رحلات، مسرحيات، مؤتمرات، أيام روحية، حفلات… كل نوع ليه شكله. الزرار (تسجيل مثلاً) بيشتغل أي وقت.' }
+  };
+
+  function info(sectionKey) {
+
+    var row = (A.state.layout || []).filter(function (s) { return s.key === sectionKey; })[0];
+    var base = SECTION_INFO[sectionKey] || { title: row ? row.title : sectionKey, one: 'عنصر', add: 'إضافة', icon: 'calendar', hint: '' };
+    return Object.assign({}, base, { title: row && row.title ? row.title : base.title });
+
+  }
+
+  function upgraded() {
+
+    return A.state.schema && A.state.schema.data >= A.state.schema.target;
+
+  }
+
+  function typesOf(sectionKey) {
+
+    return A.byOrder((A.state.draft.types || []).filter(function (t) { return t.section === sectionKey; }));
+
+  }
+
+  function typeByKey(key) {
+
+    return (A.state.draft.types || []).filter(function (t) { return t.key === key; })[0] || null;
+
+  }
+
+
+  /* =======================================================
+     ARCHIVE (shared)
+  ======================================================= */
+
+  A.archiveView = A.archiveView || {};
+
+  /** { items, toggle } — active items, or the archived ones when shown */
+  A.archiveSplit = function (kind, items, rerender) {
+
+    var showing = !!A.archiveView[kind];
+    var archived = items.filter(function (i) { return bool(i.archived); });
+    var active = items.filter(function (i) { return !bool(i.archived); });
+
+    var toggle = archived.length || showing
+      ? el('button', { class: 'btn btn--ghost btn--small', type: 'button', 'aria-pressed': String(showing), onclick: function () {
+        A.archiveView[kind] = !showing;
+        rerender();
+      } }, icon(showing ? 'arrow' : 'layers'), showing ? 'رجوع للحالي' : 'الأرشيف (' + archived.length + ')')
+      : null;
+
+    return { items: showing ? archived : active, toggle: toggle, showing: showing };
+
+  };
+
+  /** archive / bring back, and «استخدم تاني» (a hidden copy) */
+  A.archiveControls = function (kind, item, label) {
+
+    if (!upgraded()) return [];
+
+    var archived = bool(item.archived);
+
+    return [
+      el('button', {
+        class: 'icon-btn', type: 'button',
+        'aria-label': (archived ? 'رجّع من الأرشيف: ' : 'أرشفة: ') + label,
+        title: archived ? 'رجّع' : 'أرشيف',
+        onclick: function (e) {
+          A.withBusy(e.currentTarget, A.call('apiSetItemArchived', kind, item.id, !archived))
+            .then(function (next) { A.applyState(next); A.toast(archived ? 'رجع للقايمة' : 'اتأرشف — مش هيظهر في الموقع، وتقدر ترجعه'); })
+            .catch(function (error) { A.fail(error); });
+        }
+      }, icon(archived ? 'retry' : 'download')),
+      el('button', {
+        class: 'icon-btn', type: 'button',
+        'aria-label': 'استخدم تاني: ' + label,
+        title: 'استخدم تاني (نسخة)',
+        onclick: function (e) {
+          A.withBusy(e.currentTarget, A.call('apiDuplicateItem', kind, item.id))
+            .then(function (res) {
+              A.archiveView[kind] = false;
+              A.applyState(res.state);
+              A.toast('اتعملت نسخة مخفية — عدّل المواعيد وظهّرها');
+              var copy = (A.state.draft[kind] || []).filter(function (x) { return x.id === res.id; })[0];
+              if (copy && A.editors[kind]) A.editors[kind](copy);
+            })
+            .catch(function (error) { A.fail(error); });
+        }
+      }, icon('copy'))
+    ];
+
+  };
+
+
+  /* =======================================================
+     COMPETITIONS / ACTIVITIES VIEWS
+  ======================================================= */
+
+  function itemState(item) {
+
+    var now = A.wallMinutes(A.cairoNow());
+    var start = item.startAt ? A.wallMinutes(item.startAt) : null;
+    var end = item.endAt ? A.wallMinutes(item.endAt, true) : null;
+
+    if (start !== null && now < start) return A.chip('تبدأ ' + A.formatWall(item.startAt), 'gold');
+    if (end !== null && now > end) return A.chip('خلصت', 'off');
+    if (start !== null || end !== null) return A.chip('شغالة دلوقتي 🔥', 'ok');
+    return null;
+
+  }
+
+  function itemsView(sectionKey) {
+
+    if (!upgraded()) return [A.upgradeNotice()];
+
+    var meta = info(sectionKey);
+    var types = typesOf(sectionKey);
+    var typeKeys = types.map(function (t) { return t.key; });
+    var all = (A.state.draft.activities || []).filter(function (a) { return typeKeys.indexOf(a.type) !== -1; });
+    var split = A.archiveSplit('activities', A.byOrder(all), function () { A.render(); });
+
+    var list = split.items.length
+      ? el('ul', { class: 'list' }, split.items.map(function (item) { return activityItem(item, sectionKey); }))
+      : el('div', { class: 'empty-state' },
+        el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon(meta.icon)),
+        el('p', { class: 'empty-state__title', text: split.showing ? 'الأرشيف فاضي' : 'مفيش ' + meta.title + ' لسه' }),
+        split.showing ? null : el('p', { class: 'empty-state__text', text: 'دوس «' + meta.add + '» وابدأ.' })
+      );
+
+    return [
+      A.card(meta.title, meta.hint,
+        el('div', { class: 'actions' },
+          types.length
+            ? el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.editors.activities(null, sectionKey); } }, icon('plus'), meta.add)
+            : el('p', { class: 'note note--warn', text: 'مفيش أنواع للقسم ده — ضيف نوع من تحت الأول.' }),
+          split.toggle
+        ),
+        list
+      ),
+      typesCard(sectionKey, types)
+    ];
+
+  }
+
+  A.views.competitions = function () { return itemsView('competitions'); };
+  A.views.activities = function () { return itemsView('activities'); };
+
+  function activityItem(item, sectionKey) {
+
+    var enabled = bool(item.enabled);
+    var type = typeByKey(item.type) || {};
+    var chips = [A.visibilityChip(enabled, item.visibleFrom, item.visibleUntil || item.endAt)];
+    var state = itemState(item);
+
+    if (state) chips.push(state);
+    chips.push(A.chip(type.label || item.type, 'gold'));
+    if (item.location) chips.push(A.chip(item.location));
+    if ((A.state.draft.notifications || []).some(function (n) { return n.id === 'notif-' + item.id; })) chips.push(A.chip('🔔 في الجرس'));
+
+    return A.listItem({
+      icon: type.icon || info(sectionKey).icon,
+      image: item.image,
+      title: item.title,
+      sub: item.subtitle,
+      off: !enabled,
+      chips: chips,
+      controls: [
+        A.toggleItem('activities', item.id, enabled).node,
+        el('span', { class: 'spacer' }),
+        A.editButton(item.title, function () { A.editors.activities(item, sectionKey); })
+      ].concat(A.archiveControls('activities', item, item.title), [
+        A.deleteButton(item.title, function (e) { A.deleteItem('activities', item.id, item.title, e.currentTarget); })
+      ])
+    });
+
+  }
+
+
+  /* =======================================================
+     ACTIVITY EDITOR
+  ======================================================= */
+
+  A.editors.activities = function (item, sectionKey) {
+
+    var isNew = !item;
+    var current = item ? typeByKey(item.type) : null;
+    sectionKey = sectionKey || (current && current.section) || 'activities';
+    var types = typesOf(sectionKey).filter(function (t) { return bool(t.enabled) || (item && t.key === item.type); });
+    item = item || { enabled: true, type: types.length ? types[0].key : '' };
+
+    var meta = info(sectionKey);
+    var box = A.errorBox();
+
+    var typeSelect = el('select', { class: 'input', onchange: function () { A.markDirty(); syncType(); } }, types.map(function (t) {
+      return el('option', { value: t.key, selected: t.key === item.type ? 'selected' : null, text: t.label });
+    }));
+    var title = A.counted('العنوان', item.title, 80, 'مثلاً: مسابقة الكتاب المقدس', { required: true });
+    var subtitle = A.counted('سطر قصير', item.subtitle, 140, 'بيظهر على الكارت');
+    var description = A.counted('التفاصيل', item.description, 1500, 'اختياري — بتظهر لما حد يفتحها', { multiline: true });
+    var image = A.imagePicker(item.image, { label: 'البوستر', hint: 'من غير بوستر؟ هياخد بانر النوع أو القسم تلقائي' });
+    var url = A.textInput(item.url, { ltr: true, placeholder: 'https://', type: 'url' });
+    var cta = A.textInput(item.ctaLabel, { max: 24 });
+    var location = A.counted('المكان', item.location, 120, 'اختياري، مثلاً: الغردقة');
+    var startAt = A.dateTimeInput(item.startAt, { emptyText: 'من غير ميعاد', presets: [A.PRESETS.now, A.PRESETS.friday, A.PRESETS.sunday8] });
+    var endAt = A.dateTimeInput(item.endAt, { emptyText: 'من غير ميعاد', presets: [A.PRESETS.sunday10] });
+    var visibleFrom = A.dateTimeInput(item.visibleFrom, { emptyText: 'يظهر أول ما تنشر', presets: [A.PRESETS.now, A.PRESETS.thursday8] });
+    var visibleUntil = A.dateTimeInput(item.visibleUntil, { emptyText: 'يختفي بعد ميعاد النهاية (لو موجود)', presets: [] });
+    var enabled = A.switchInput('ظاهر', item.enabled === undefined ? true : bool(item.enabled));
+    var hasNotif = function (id) { return (A.state.draft.notifications || []).some(function (n) { return n.id === id; }); };
+    var notifyPublish = A.checkbox('اعمل إشعار في الجرس لما تظهر', isNew ? true : hasNotif('notif-' + item.id), 'بنص النوع (مثلاً: المسابقة الجديدة بدأت)');
+    var notifyStart = A.checkbox('إشعار وقت البداية', isNew ? sectionKey === 'competitions' : hasNotif('notif-' + item.id + '-start'), 'بيظهر في الجرس في ميعاد البداية');
+
+    function syncType() {
+      var t = typeByKey(typeSelect.value) || {};
+      cta.placeholder = t.ctaDefault ? 'افتراضي: ' + t.ctaDefault : 'مثلاً: سجّل دلوقتي';
+    }
+
+    syncType();
+
+    var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
+
+    save.addEventListener('click', function () {
+      A.saveItem('activities', {
+        id: isNew ? '' : item.id,
+        type: typeSelect.value,
+        title: title.input.value,
+        subtitle: subtitle.input.value,
+        description: description.input.value,
+        image: image.value(),
+        url: url.value.trim(),
+        ctaLabel: cta.value,
+        location: location.input.value,
+        startAt: startAt.value(),
+        endAt: endAt.value(),
+        visibleFrom: visibleFrom.value(),
+        visibleUntil: visibleUntil.value(),
+        order: item.order,
+        enabled: enabled.input.checked,
+        notify: { publish: notifyPublish.input.checked, start: notifyStart.input.checked }
+      }, box, save);
+    });
+
+    A.dirty = false;
+
+    A.openSheet(isNew ? meta.add : 'تعديل: ' + item.title, [
+      box,
+      el('div', { class: 'form' },
+        types.length > 1 ? A.field('النوع', typeSelect) : null,
+        title.node,
+        subtitle.node,
+        image.node,
+        el('div', { class: 'form-group' },
+          el('p', { class: 'section-label', text: 'الزرار' }),
+          A.field('اللينك', url, sectionKey === 'competitions' ? 'لينك المسابقة (https)' : 'لينك التسجيل أو التفاصيل (اختياري)'),
+          A.field('نص الزرار', cta)
+        ),
+        el('div', { class: 'form-group' },
+          el('p', { class: 'section-label', text: sectionKey === 'competitions' ? 'مواعيد المسابقة (بتوقيت مصر)' : 'ميعاد الفعالية (بتوقيت مصر)' }),
+          A.field('بيبدأ', startAt.node),
+          A.field('بيخلص', endAt.node)
+        ),
+        location.node,
+        description.node,
+        el('div', { class: 'form-group' },
+          el('p', { class: 'section-label', text: 'الظهور في الموقع' }),
+          enabled.node,
+          A.field('يظهر من', visibleFrom.node),
+          A.field('يختفي بعد', visibleUntil.node)
+        ),
+        notifyPublish.node,
+        notifyStart.node
+      )
+    ], A.sheetFooter(save));
+
+  };
+
+
+  /* =======================================================
+     TYPES
+  ======================================================= */
+
+  function typesCard(sectionKey, types) {
+
+    return A.card('الأنواع', 'كل نوع ليه اسم وأيقونة ولون وبانر افتراضي. نوع جديد = من غير أي تعديل في الكود.',
+      el('div', { class: 'actions' },
+        el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.types(null, sectionKey); } }, icon('plus'), 'نوع جديد')
+      ),
+      types.length
+        ? el('ul', { class: 'list' }, types.map(function (t) {
+          var count = (A.state.draft.activities || []).filter(function (a) { return a.type === t.key; }).length;
+          return A.listItem({
+            icon: t.icon || 'calendar',
+            image: t.banner,
+            title: t.label,
+            sub: t.ctaDefault ? 'الزرار: ' + t.ctaDefault : '',
+            off: !bool(t.enabled),
+            chips: [A.visibilityChip(bool(t.enabled)), A.chip(t.key, 'ltr'), A.chip(count + ' ' + (count === 1 ? 'عنصر' : 'عناصر'))],
+            controls: [
+              el('span', { class: 'spacer' }),
+              A.editButton(t.label, function () { A.editors.types(t, sectionKey); }),
+              count ? null : A.deleteButton(t.label, function (e) { A.deleteItem('types', t.key, t.label, e.currentTarget); })
+            ]
+          });
+        }))
+        : el('p', { class: 'empty', text: 'مفيش أنواع هنا لسه.' })
+    );
+
+  }
+
+  A.editors.types = function (type, sectionKey) {
+
+    var isNew = !type;
+    type = type || { enabled: true, section: sectionKey };
+
+    var box = A.errorBox();
+    var key = A.textInput(type.key, { ltr: true, placeholder: 'trip', max: 31 });
+    if (!isNew) key.readOnly = true;
+    var label = A.counted('اسم النوع', type.label, 30, 'مثلاً: رحلة', { required: true });
+    var iconChoice = A.iconPicker(type.icon || 'calendar');
+    var theme = A.themePicker(type.theme || '');
+    var banner = A.imagePicker(type.banner || '', { label: 'البانر الافتراضي', hint: 'لأي عنصر من النوع ده من غير بوستر' });
+    var cta = A.textInput(type.ctaDefault, { max: 24, placeholder: 'مثلاً: سجّل دلوقتي' });
+    var template = A.textInput(type.notifyTemplate, { max: 120, placeholder: 'مثلاً: التسجيل للرحلة فتح: {title}' });
+    var enabled = A.switchInput('متاح', bool(type.enabled));
+    var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
+
+    save.addEventListener('click', function () {
+      A.saveItem('types', {
+        isNew: isNew,
+        key: key.value.trim(),
+        label: label.input.value,
+        section: type.section || sectionKey,
+        icon: iconChoice.value(),
+        theme: theme.value(),
+        banner: banner.value(),
+        ctaDefault: cta.value,
+        notifyTemplate: template.value,
+        order: type.order,
+        enabled: enabled.input.checked
+      }, box, save, 'النوع اتحفظ ✓');
+    });
+
+    A.dirty = false;
+
+    A.openSheet(isNew ? 'نوع جديد' : 'تعديل النوع: ' + type.label, [
+      box,
+      el('div', { class: 'form' },
+        A.field('مفتاح النوع', key, isNew ? 'بالإنجليزي الصغير، مثلاً trip. مش بيظهر للناس' : 'المفتاح مبيتغيرش'),
+        label.node,
+        A.field('الأيقونة', iconChoice.node),
+        A.field('اللون', theme.node),
+        banner.node,
+        A.field('نص الزرار الافتراضي', cta),
+        A.field('نص الإشعار', template, '{title} بيتبدل بعنوان العنصر'),
+        enabled.node
+      )
+    ], A.sheetFooter(save));
+
+  };
+
+})();
+</script>

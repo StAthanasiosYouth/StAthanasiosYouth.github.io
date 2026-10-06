@@ -24,7 +24,9 @@ const TYPE = {
   meeting: { icon: 'church', label: 'الاجتماع' },
   news: { icon: 'megaphone', label: 'خبر' },
   game: { icon: 'star', label: 'تحدي' },
-  important: { icon: 'alert', label: 'مهم' }
+  important: { icon: 'alert', label: 'مهم' },
+  competition: { icon: 'trophy', label: 'مسابقة' },
+  activity: { icon: 'calendar', label: 'فعالية' }
 };
 
 let inbox = null;
@@ -34,7 +36,7 @@ let seenIds = null;
 
 /* a notification about the meeting, news or games shows only while that
    section is showing (section visibility always wins) */
-const SECTION_OF_TYPE = { meeting: 'meeting', news: 'news', game: 'games' };
+const SECTION_OF_TYPE = { meeting: 'meeting', news: 'news', game: 'games', competition: 'competitions' };
 const SECTION_OF_TARGET = { meeting: 'meeting', news: 'news', game: 'games' };
 
 export function visibleNotifications(content, nowStamp) {
@@ -44,7 +46,12 @@ export function visibleNotifications(content, nowStamp) {
   return content.notifications.filter(item => {
     if (!isPublished(item, nowStamp)) return false;
     const byType = SECTION_OF_TYPE[item.type];
-    const byTarget = item.target && SECTION_OF_TARGET[item.target.kind];
+    let byTarget = item.target && SECTION_OF_TARGET[item.target.kind];
+    // an activity lives in its own section (المسابقات, الفعاليات...)
+    if (item.target && item.target.kind === 'activity') {
+      const activity = (content.activities || []).find(a => a.id === item.target.id);
+      byTarget = activity ? activity.section : '__missing';
+    }
     return (!byType || live.has(byType)) && (!byTarget || live.has(byTarget));
   });
 

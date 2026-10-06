@@ -7,11 +7,13 @@
 import { fetchContent, readCached } from './content.js';
 import { renderPage, renderError, tickPage, visibilityKey, meetingSnapshot } from './render.js';
 import { zonedNow, stamp, meetingStatus } from './schedule.js';
-import { shareLink, openQr, shareTarget } from './share.js';
+import { shareLink, openQr, shareRow } from './share.js';
 import { startRouter, resolveRoute, go, leave } from './router.js';
 import { openSheet, closeSheet } from './sheet.js';
 import { openBell } from './bell.js';
 import { newsSheetContent, gameSheetContent, meetingSheetContent, gameStates, visibleNews } from './hub.js';
+import { itemSheetContent, typeOf, visibleItems } from './items.js';
+import { isSectionLive, liveSections } from './layout.js';
 import { iconNode } from './icons.js';
 import { particles } from './motion.js';
 import { play, soundEnabled, setSoundEnabled } from './sound.js';
@@ -122,28 +124,41 @@ function openRoute(route) {
 
   sheetCards = [];
 
+  // a deep link never opens something whose section isn't showing
+  const live = section => isSectionLive(current, time.stamp, section);
+  const share = (hash, title) => shareRow(current.site, hash, title);
+
   if (route.name === 'notifications') {
     openBell(current, time.stamp);
     return;
   }
 
   if (route.name === 'news') {
-    const item = visibleNews(current, time.stamp).find(n => n.id === route.id);
+    const item = live('news') && visibleNews(current, time.stamp).find(n => n.id === route.id);
     if (!item) return missing();
-    openSheet({ title: item.title, content: newsSheetContent(item, time.stamp, shareTarget(current.site)), onClose });
+    openSheet({ title: item.title, content: newsSheetContent(item, time.stamp, share), onClose });
+    return;
+  }
+
+  if (route.name === 'activity') {
+    const item = (current.activities || []).find(a => a.id === route.id);
+    const section = item && liveSections(current, time.stamp).find(s => s.key === item.section);
+    if (!item || !section || !visibleItems(current, item.section, time.stamp).includes(item)) return missing();
+    openSheet({ title: item.title, content: itemSheetContent(item, typeOf(current, item), section, time.stamp, share), onClose });
     return;
   }
 
   if (route.name === 'game') {
-    const entry = gameStates(current, time.stamp).find(g => g.game.id === route.id);
+    const entry = live('games') && gameStates(current, time.stamp).find(g => g.game.id === route.id);
     if (!entry) return missing();
-    const { node, card } = gameSheetContent(entry, shareTarget(current.site));
+    const { node, card } = gameSheetContent(entry, share);
     sheetCards = [card];
     openSheet({ title: entry.game.title, content: node, onClose });
     return;
   }
 
   if (route.name === 'meeting') {
+    if (!live('meeting')) return missing();
     const status = meetingSnapshot() || meetingStatus(current.meeting, time.now, current.sessions);
     const title = status && status.session && status.session.topic ? 'الاجتماع الجاي' : (current.meeting ? current.meeting.title : 'الاجتماع');
     openSheet({ title, content: meetingSheetContent(current, status, time.stamp), onClose });

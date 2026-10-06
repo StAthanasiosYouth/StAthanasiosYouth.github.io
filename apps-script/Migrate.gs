@@ -25,11 +25,11 @@ var DATA_SCHEMA_VERSION = 3;
 var WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/K5CfLt5X0uM5qCgr7Z2PTt';
 
 var SEED_TYPES = [
-  { key: 'competition', label: 'مسابقة', section: 'competitions', icon: 'star', theme: 'ember', ctaDefault: 'ابدأ المسابقة', notifyTemplate: 'المسابقة الجديدة بدأت: {title}' },
+  { key: 'competition', label: 'مسابقة', section: 'competitions', icon: 'trophy', theme: 'ember', ctaDefault: 'ابدأ المسابقة', notifyTemplate: 'المسابقة الجديدة بدأت: {title}' },
   { key: 'trip', label: 'رحلة', section: 'activities', icon: 'bus', theme: 'azure', ctaDefault: 'سجّل في الرحلة', notifyTemplate: 'التسجيل للرحلة فتح: {title}' },
-  { key: 'play', label: 'مسرحية', section: 'activities', icon: 'ticket', theme: 'rose', ctaDefault: 'التفاصيل', notifyTemplate: 'مسرحية جديدة: {title}' },
-  { key: 'black-theatre', label: 'مسرح أسود', section: 'activities', icon: 'ticket', theme: 'night', ctaDefault: 'التفاصيل', notifyTemplate: 'مسرح أسود: {title}' },
-  { key: 'mime', label: 'مسرح صامت', section: 'activities', icon: 'ticket', theme: 'night', ctaDefault: 'التفاصيل', notifyTemplate: 'مسرح صامت: {title}' },
+  { key: 'play', label: 'مسرحية', section: 'activities', icon: 'theatre', theme: 'rose', ctaDefault: 'التفاصيل', notifyTemplate: 'مسرحية جديدة: {title}' },
+  { key: 'black-theatre', label: 'مسرح أسود', section: 'activities', icon: 'theatre', theme: 'night', ctaDefault: 'التفاصيل', notifyTemplate: 'مسرح أسود: {title}' },
+  { key: 'mime', label: 'مسرح صامت', section: 'activities', icon: 'theatre', theme: 'night', ctaDefault: 'التفاصيل', notifyTemplate: 'مسرح صامت: {title}' },
   { key: 'conference', label: 'مؤتمر', section: 'activities', icon: 'users', theme: 'gold', ctaDefault: 'سجّل في المؤتمر', notifyTemplate: 'التسجيل في المؤتمر فتح: {title}' },
   { key: 'retreat', label: 'يوم روحي', section: 'activities', icon: 'church', theme: 'emerald', ctaDefault: 'التفاصيل', notifyTemplate: 'يوم روحي: {title}' },
   { key: 'party', label: 'حفلة', section: 'activities', icon: 'music', theme: 'rose', ctaDefault: 'التفاصيل', notifyTemplate: 'حفلة: {title}' },

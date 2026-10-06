@@ -466,7 +466,9 @@ function readDraft_() {
     news: readOptionalTable_('News').map(strip),
     games: readOptionalTable_('Games').map(strip),
     notifications: readOptionalTable_('Notifications').map(strip),
-    media: readOptionalTable_('Media').map(strip)
+    media: readOptionalTable_('Media').map(strip),
+    activities: readOptionalTable_('Activities').map(strip),
+    types: readOptionalTable_('Types').map(strip)
   };
 
 }

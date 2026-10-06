@@ -12,10 +12,15 @@
 
 var ITEM_KINDS = {
   sessions: { table: 'Sessions', key: 'date', label: 'الاجتماع' },
-  news: { table: 'News', key: 'id', prefix: 'news', label: 'الخبر' },
-  games: { table: 'Games', key: 'id', prefix: 'game', label: 'اللعبة' },
-  notifications: { table: 'Notifications', key: 'id', prefix: 'notif', label: 'الإشعار' }
+  news: { table: 'News', key: 'id', prefix: 'news', label: 'الخبر', archive: true },
+  games: { table: 'Games', key: 'id', prefix: 'game', label: 'اللعبة', archive: true },
+  notifications: { table: 'Notifications', key: 'id', prefix: 'notif', label: 'الإشعار', archive: true },
+  // competitions, trips, plays... one table; the type decides the section
+  activities: { table: 'Activities', key: 'id', prefix: 'act', label: 'الفعالية', archive: true },
+  types: { table: 'Types', key: 'key', label: 'النوع' }
 };
+
+var ACTIVITY_LIMITS = { title: 80, subtitle: 140, description: 1500, cta: 24, location: 120, typeLabel: 30, template: 120 };
 
 
 function itemKind_(kind) {
@@ -207,17 +212,103 @@ var ITEM_VALIDATORS = {
 
   },
 
+  activities: function (input, problems) {
+
+    var typeKey = contentLine_(input.type).toLowerCase();
+    var type = readOptionalTable_('Types').filter(function (t) { return t.key === typeKey; })[0];
+
+    if (!type) {
+      problems.push('النوع مطلوب (مسابقة، رحلة، مؤتمر...)');
+    }
+
+    var urlText = contentLine_(input.url);
+    var url = safeHttpsUrl(urlText);
+
+    if (urlText && !url) {
+      problems.push('اللينك لازم يكون كامل ويبدأ بـ https://');
+    }
+
+    var order = contentNumber_(input.order);
+
+    var record = {
+      enabled: input.enabled !== false,
+      type: typeKey,
+      title: input_(input.title, ACTIVITY_LIMITS.title, 'العنوان', problems, true),
+      subtitle: input_(input.subtitle, ACTIVITY_LIMITS.subtitle, 'سطر قصير', problems, false),
+      description: textBlock_(input.description, ACTIVITY_LIMITS.description, 'التفاصيل', problems),
+      image: imageRef_(input.image, problems),
+      ctaLabel: input_(input.ctaLabel, ACTIVITY_LIMITS.cta, 'نص الزرار', problems, false),
+      url: url || '',
+      location: input_(input.location, ACTIVITY_LIMITS.location, 'المكان', problems, false),
+      startAt: dateInput_(input.startAt, false, 'بيبدأ', problems),
+      endAt: dateInput_(input.endAt, true, 'بيخلص', problems),
+      visibleFrom: dateInput_(input.visibleFrom, false, 'يظهر من', problems),
+      visibleUntil: dateInput_(input.visibleUntil, true, 'يختفي بعد', problems),
+      order: order === null || isNaN(order) ? '' : order
+    };
+
+    if (record.startAt && record.endAt && wallOf_(record.startAt) >= wallOf_(record.endAt, true)) {
+      problems.push('بيبدأ: لازم يكون قبل ميعاد النهاية');
+    }
+
+    if (record.visibleFrom && record.visibleUntil && wallOf_(record.visibleFrom) > wallOf_(record.visibleUntil, true)) {
+      problems.push('يظهر من: لازم يكون قبل ميعاد الاختفاء');
+    }
+
+    return record;
+
+  },
+
+  types: function (input, problems) {
+
+    var key = contentLine_(input.key).toLowerCase();
+
+    if (!/^[a-z][a-z0-9-]{1,30}$/.test(key)) {
+      problems.push('مفتاح النوع: حروف إنجليزي صغيرة وأرقام وشرطة (مثلاً trip)');
+    }
+
+    var section = contentLine_(input.section).toLowerCase();
+    var row = readTable_('Sections').filter(function (s) { return s.key === section; })[0];
+
+    if (!row || (contentLine_(row.kind).toLowerCase() || 'links') !== 'items') {
+      problems.push('القسم لازم يكون قسم مسابقات أو فعاليات');
+    }
+
+    var icon = contentLine_(input.icon).toLowerCase();
+    var theme = contentLine_(input.theme).toLowerCase();
+
+    if (icon && ICON_NAMES.indexOf(icon) === -1) problems.push('الأيقونة مش معروفة');
+    if (theme && SECTION_THEMES.indexOf(theme) === -1) problems.push('الشكل مش معروف');
+
+    var order = contentNumber_(input.order);
+
+    return {
+      key: key,
+      enabled: input.enabled !== false,
+      label: input_(input.label, ACTIVITY_LIMITS.typeLabel, 'اسم النوع', problems, true),
+      section: section,
+      icon: icon,
+      theme: theme,
+      banner: imageRef_(input.banner, problems),
+      ctaDefault: input_(input.ctaDefault, ACTIVITY_LIMITS.cta, 'نص الزرار', problems, false),
+      notifyTemplate: input_(input.notifyTemplate, ACTIVITY_LIMITS.template, 'نص الإشعار', problems, false),
+      order: order === null || isNaN(order) ? '' : order
+    };
+
+  },
+
   notifications: function (input, problems) {
 
     var target = contentLine_(input.target);
-    var match = /^(news|game):([\w-]{1,60})$/.exec(target);
+    var match = /^(news|game|activity):([\w-]{1,60})$/.exec(target);
+    var TARGET_TABLES = { news: 'News', game: 'Games', activity: 'Activities' };
 
     if (!target || target === 'meeting') {
       // fine
     }
     else if (match) {
-      ensureTable_(match[1] === 'news' ? 'News' : 'Games');
-      if (!findRow_(match[1] === 'news' ? 'News' : 'Games', 'id', match[2])) {
+      ensureTable_(TARGET_TABLES[match[1]]);
+      if (!findRow_(TARGET_TABLES[match[1]], 'id', match[2])) {
         problems.push('الإشعار بيشاور على حاجة مش موجودة');
       }
     }
@@ -225,7 +316,7 @@ var ITEM_VALIDATORS = {
       target = safeHttpsUrl(target);
     }
     else {
-      problems.push('الوجهة لازم تكون الاجتماع أو خبر أو لعبة أو لينك https');
+      problems.push('الوجهة لازم تكون الاجتماع أو خبر أو لعبة أو فعالية أو لينك https');
     }
 
     var record = {
@@ -300,6 +391,34 @@ function linkedNotifications_(kind, record, notify) {
 
   }
 
+  if (kind === 'activities') {
+
+    var type = readOptionalTable_('Types').filter(function (t) { return t.key === record.type; })[0] || {};
+    var competition = type.section === 'competitions';
+    var template = contentLine_(type.notifyTemplate) || (competition ? 'المسابقة الجديدة: {title}' : '{title}');
+    var until = record.visibleUntil || record.endAt || '';
+
+    out['notif-' + record.id] = notify.publish ? {
+      type: competition ? 'competition' : 'activity',
+      title: template.replace('{title}', record.title).slice(0, HUB_LIMITS.notificationTitle),
+      message: (record.subtitle || '').slice(0, HUB_LIMITS.notificationMessage),
+      target: 'activity:' + record.id,
+      image: record.image,
+      publishAt: record.visibleFrom || nowStamp_(),
+      expireAt: until
+    } : null;
+
+    out['notif-' + record.id + '-start'] = notify.start && record.startAt ? {
+      type: competition ? 'competition' : 'activity',
+      title: (competition ? '🏁 المسابقة بدأت!' : '✨ بدأت دلوقتي').slice(0, HUB_LIMITS.notificationTitle),
+      message: ('«' + record.title + '»').slice(0, HUB_LIMITS.notificationMessage),
+      target: 'activity:' + record.id,
+      publishAt: record.startAt,
+      expireAt: until
+    } : null;
+
+  }
+
   if (kind === 'sessions') {
 
     out['notif-session-' + record.date] = notify.topic && record.topic && record.status !== 'cancelled' ? {
@@ -361,6 +480,7 @@ function linkedIds_(kind, key) {
   if (kind === 'games') return ['notif-' + key + '-soon', 'notif-' + key + '-start'];
   if (kind === 'news') return ['notif-' + key];
   if (kind === 'sessions') return ['notif-session-' + key];
+  if (kind === 'activities') return ['notif-' + key, 'notif-' + key + '-start'];
 
   return [];
 
@@ -410,6 +530,19 @@ function apiSaveItem(kind, input) {
       record.id = existing || (spec.prefix + '-' + Utilities.getUuid().replace(/-/g, '').slice(0, 8));
 
     }
+    else if (kind === 'types') {
+
+      var exists = !!findRow_(spec.table, 'key', record.key);
+
+      if (input.isNew && exists) {
+        throw new Error('في نوع بنفس المفتاح ده');
+      }
+
+      if (!input.isNew && !exists) {
+        throw new Error('النوع مش موجود');
+      }
+
+    }
     else {
 
       var original = contentLine_(input.originalDate);
@@ -430,11 +563,11 @@ function apiSaveItem(kind, input) {
     record.updatedAt = nowStamp_();
     upsertRow_(spec.table, spec.key, record);
 
-    if (kind !== 'notifications') {
+    if (kind !== 'notifications' && kind !== 'types') {
       syncLinkedNotifications_(kind, record, input.notify);
     }
 
-    return record[spec.key] + ' ' + (record.title || record.topic || '');
+    return record[spec.key] + ' ' + (record.title || record.topic || record.label || '');
 
   });
 
@@ -447,6 +580,10 @@ function apiDeleteItem(kind, key) {
   validId_(key);
 
   var spec = itemKind_(kind);
+
+  if (kind === 'types' && readOptionalTable_('Activities').some(function (a) { return a.type === key; })) {
+    throw appError_('النوع ده عليه فعاليات، ومينفعش يتمسح.', 'غيّر نوعها أو امسحها الأول، أو اقفل النوع بدل ما تمسحه.');
+  }
 
   return mutate_(kind + '.delete', key, function () {
 
@@ -461,6 +598,89 @@ function apiDeleteItem(kind, key) {
     }
 
   });
+
+}
+
+
+/*
+ * The archive: old items leave the daily lists and the site, without
+ * being deleted. They can come back, or be reused as a copy.
+ */
+function apiSetItemArchived(kind, key, archived) {
+
+  assertAdmin_();
+  validId_(key);
+
+  var spec = itemKind_(kind);
+
+  if (!spec.archive) {
+    throw new Error('النوع ده مبيتأرشفش');
+  }
+
+  return mutate_(kind + (archived ? '.archive' : '.unarchive'), key, function () {
+
+    ensureTable_(spec.table);
+
+    if (!headerIndex_(sheet_(spec.table)).archived) {
+      throw appError_('الأرشيف محتاج ترقية البيانات الأول.', 'من الإعدادات ← ترقية البيانات.');
+    }
+
+    if (!findRow_(spec.table, spec.key, key)) {
+      throw new Error(spec.label + ' مش موجود');
+    }
+
+    var record = { archived: archived === true, updatedAt: nowStamp_() };
+    record[spec.key] = key;
+    upsertRow_(spec.table, spec.key, record);
+
+  });
+
+}
+
+
+/** «استخدم تاني»: a hidden copy without dates, ready to edit. */
+function apiDuplicateItem(kind, key) {
+
+  assertAdmin_();
+  validId_(key);
+
+  var spec = itemKind_(kind);
+
+  if (spec.key !== 'id') {
+    throw new Error('النوع ده مبيتنسخش');
+  }
+
+  var copyId = null;
+
+  var state = mutate_(kind + '.duplicate', key, function () {
+
+    var row = readTable_(spec.table).filter(function (r) { return r[spec.key] === key; })[0];
+
+    if (!row) {
+      throw new Error(spec.label + ' مش موجود');
+    }
+
+    var copy = {};
+
+    TABLES[spec.table].columns.forEach(function (column) {
+      if (/^(publishAt|expireAt|visibleFrom|visibleUntil|startAt|endAt)$/.test(column)) return;
+      copy[column] = row[column];
+    });
+
+    copyId = spec.prefix + '-' + Utilities.getUuid().replace(/-/g, '').slice(0, 8);
+    copy.id = copyId;
+    copy.title = String(row.title || '').slice(0, 70) + ' (نسخة)';
+    copy.enabled = false;
+    copy.archived = false;
+    copy.updatedAt = nowStamp_();
+
+    upsertRow_(spec.table, 'id', copy);
+
+    return copyId;
+
+  });
+
+  return { state: state, id: copyId };
 
 }
 

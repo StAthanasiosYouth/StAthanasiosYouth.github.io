@@ -17,8 +17,8 @@
 
   var TONE_LABELS = { info: 'عادي', alert: 'تنبيه (زي إلغاء)', celebrate: 'مناسبة حلوة' };
 
-  var TYPE_LABELS = { general: 'عام', meeting: 'اجتماع', news: 'خبر', game: 'لعبة', important: 'مهم' };
-  var TYPE_ICONS = { general: 'info', meeting: 'church', news: 'megaphone', game: 'star', important: 'alert' };
+  var TYPE_LABELS = { general: 'عام', meeting: 'اجتماع', news: 'خبر', game: 'لعبة', important: 'مهم', competition: 'مسابقة', activity: 'فعالية' };
+  var TYPE_ICONS = { general: 'info', meeting: 'church', news: 'megaphone', game: 'star', important: 'alert', competition: 'trophy', activity: 'calendar' };
 
   var nowMinutes = function () { return A.wallMinutes(A.cairoNow()); };
 
@@ -88,6 +88,11 @@
       if (g.visibleFrom) push(g.visibleFrom, 'games', g, 'لعبة تظهر "قريبًا": ' + g.title, 'star');
       push(g.startAt, 'games', g, 'لعبة تبدأ: ' + g.title, 'star');
       push(g.endAt, 'games', g, 'لعبة تخلص: ' + g.title, 'star');
+    });
+
+    (draft.activities || []).filter(function (a) { return bool(a.enabled) && !bool(a.archived); }).forEach(function (a) {
+      if (a.visibleFrom) push(a.visibleFrom, 'activities', a, 'يظهر: ' + a.title, 'calendar');
+      if (a.startAt) push(a.startAt, 'activities', a, 'بيبدأ: ' + a.title, 'calendar');
     });
 
     (draft.notifications || []).filter(function (n) { return bool(n.enabled); }).forEach(function (n) {
@@ -388,10 +393,11 @@
 
   A.views.news = guard(function () {
 
-    var news = (A.state.draft.news || []).slice().sort(function (a, b) { return (b.publishAt || '') < (a.publishAt || '') ? -1 : 1; });
+    var split = A.archiveSplit('news', (A.state.draft.news || []).slice().sort(function (a, b) { return (b.publishAt || '') < (a.publishAt || '') ? -1 : 1; }), function () { A.render(); });
+    var news = split.items;
 
     return [A.card('جديد الأسرة', 'الأخبار والبوسترات والإعلانات. "مثبت" بيظهر كشريط فوق في الصفحة بدل الإعلان القديم.',
-      el('div', { class: 'actions' }, addButton('+ خبر', function () { A.editors.news(null); })),
+      el('div', { class: 'actions' }, addButton('+ خبر', function () { A.editors.news(null); }), split.toggle),
       news.length
         ? el('ul', { class: 'list' }, news.map(function (item) {
           var enabled = bool(item.enabled);
@@ -410,12 +416,13 @@
             controls: [
               A.toggleItem('news', item.id, enabled).node,
               el('span', { class: 'spacer' }),
-              A.editButton(item.title, function () { A.editors.news(item); }),
+              A.editButton(item.title, function () { A.editors.news(item); })
+            ].concat(A.archiveControls('news', item, item.title), [
               A.deleteButton(item.title, function (e) { A.deleteItem('news', item.id, item.title, e.currentTarget); })
-            ]
+            ])
           });
         }))
-        : el('p', { class: 'empty', text: 'مفيش أخبار لسه' })
+        : el('p', { class: 'empty', text: split.showing ? 'الأرشيف فاضي' : 'مفيش أخبار لسه' })
     )];
 
   });
@@ -528,10 +535,11 @@
 
   A.views.games = guard(function () {
 
-    var games = (A.state.draft.games || []).slice().sort(function (a, b) { return (a.startAt || '') < (b.startAt || '') ? 1 : -1; });
+    var split = A.archiveSplit('games', (A.state.draft.games || []).slice().sort(function (a, b) { return (a.startAt || '') < (b.startAt || '') ? 1 : -1; }), function () { A.render(); });
+    var games = split.items;
 
     return [A.card('تحديات وألعاب', 'زرار اللعبة بيتفتح لوحده في ميعاد البداية بتوقيت مصر.',
-      el('div', { class: 'actions' }, addButton('+ لعبة', function () { A.editors.games(null); })),
+      el('div', { class: 'actions' }, addButton('+ لعبة', function () { A.editors.games(null); }), split.toggle),
       games.length
         ? el('ul', { class: 'list' }, games.map(function (game) {
           var enabled = bool(game.enabled);
@@ -549,12 +557,13 @@
             controls: [
               A.toggleItem('games', game.id, enabled).node,
               el('span', { class: 'spacer' }),
-              A.editButton(game.title, function () { A.editors.games(game); }),
+              A.editButton(game.title, function () { A.editors.games(game); })
+            ].concat(A.archiveControls('games', game, game.title), [
               A.deleteButton(game.title, function (e) { A.deleteItem('games', game.id, game.title, e.currentTarget); })
-            ]
+            ])
           });
         }))
-        : el('p', { class: 'empty', text: 'مفيش ألعاب لسه' })
+        : el('p', { class: 'empty', text: split.showing ? 'الأرشيف فاضي' : 'مفيش ألعاب لسه' })
     )];
 
   });
@@ -650,12 +659,12 @@
     if (!target) return 'من غير لينك';
     if (target === 'meeting') return 'بيفتح: الاجتماع';
 
-    var match = /^(news|game):(.+)$/.exec(target);
+    var match = /^(news|game|activity):(.+)$/.exec(target);
 
     if (match) {
-      var list = match[1] === 'news' ? A.state.draft.news : A.state.draft.games;
+      var list = { news: A.state.draft.news, game: A.state.draft.games, activity: A.state.draft.activities }[match[1]];
       var found = (list || []).filter(function (x) { return x.id === match[2]; })[0];
-      return 'بيفتح: ' + (match[1] === 'news' ? 'خبر ' : 'لعبة ') + (found ? found.title : '(مش موجودة)');
+      return 'بيفتح: ' + ({ news: 'خبر ', game: 'لعبة ', activity: 'فعالية ' })[match[1]] + (found ? found.title : '(مش موجودة)');
     }
 
     return 'بيفتح: ' + A.shortUrl(target);
@@ -664,18 +673,19 @@
 
   A.views.notifications = guard(function () {
 
-    var items = (A.state.draft.notifications || []).slice().sort(function (a, b) { return (b.publishAt || '') < (a.publishAt || '') ? -1 : 1; });
+    var split = A.archiveSplit('notifications', (A.state.draft.notifications || []).slice().sort(function (a, b) { return (b.publishAt || '') < (a.publishAt || '') ? -1 : 1; }), function () { A.render(); });
+    var items = split.items;
     var days = A.state.meta.historyDays;
 
     return [A.card('الإشعارات', 'بتظهر في جرس الموقع 🔔 في معادها، وبتفضل في السجل ' + days + ' يوم (إلا لو حددت غير كده). إشعارات الموبايل نفسها جاية في المرحلة الجاية.',
-      el('div', { class: 'actions' }, addButton('+ إشعار', function () { A.editors.notifications(null); })),
+      el('div', { class: 'actions' }, addButton('+ إشعار', function () { A.editors.notifications(null); }), split.toggle),
       items.length
         ? el('ul', { class: 'list' }, items.map(function (item) {
           var enabled = bool(item.enabled);
           var until = item.expireAt || (item.publishAt ? A.wallFromMinutes(A.wallMinutes(item.publishAt) + days * 1440) : '');
           var chips = windowChips(enabled, item.publishAt, until)
             .concat(A.chip(TYPE_LABELS[item.type] || 'عام', item.type === 'important' ? 'danger' : 'gold'));
-          if (/^notif-(game|news|session)-/.test(item.id)) chips.push(A.chip('مرتبط'));
+          if (/^notif-(game|news|session|act)-/.test(item.id)) chips.push(A.chip('مرتبط'));
           return A.listItem({
             icon: TYPE_ICONS[item.type] || 'info',
             image: item.image,
@@ -686,12 +696,13 @@
             controls: [
               A.toggleItem('notifications', item.id, enabled).node,
               el('span', { class: 'spacer' }),
-              A.editButton(item.title, function () { A.editors.notifications(item); }),
+              A.editButton(item.title, function () { A.editors.notifications(item); })
+            ].concat(A.archiveControls('notifications', item, item.title), [
               A.deleteButton(item.title, function (e) { A.deleteItem('notifications', item.id, item.title, e.currentTarget); })
-            ]
+            ])
           });
         }))
-        : el('p', { class: 'empty', text: 'مفيش إشعارات لسه' })
+        : el('p', { class: 'empty', text: split.showing ? 'الأرشيف فاضي' : 'مفيش إشعارات لسه' })
     )];
 
   });
@@ -716,9 +727,10 @@
     var options = [{ value: '', label: 'ولا حاجة' }, { value: 'meeting', label: 'الاجتماع' }]
       .concat((A.state.draft.news || []).map(function (n) { return { value: 'news:' + n.id, label: 'خبر: ' + n.title }; }))
       .concat((A.state.draft.games || []).map(function (g) { return { value: 'game:' + g.id, label: 'لعبة: ' + g.title }; }))
+      .concat((A.state.draft.activities || []).map(function (a) { return { value: 'activity:' + a.id, label: 'فعالية: ' + a.title }; }))
       .concat([{ value: 'url', label: 'لينك…' }]);
 
-    var isUrl = current && !/^(meeting|news:|game:)/.test(current);
+    var isUrl = current && !/^(meeting|news:|game:|activity:)/.test(current);
     var targetSelect = el('select', { class: 'input', onchange: function () { A.markDirty(); urlField.hidden = targetSelect.value !== 'url'; } }, options.map(function (o) {
       var selected = isUrl ? o.value === 'url' : o.value === current;
       return el('option', { value: o.value, selected: selected ? 'selected' : null, text: o.label });

@@ -20,7 +20,7 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 /* images are always this site's own published files */
 const MEDIA_PATH = /^media\/\d{4}\/img-[a-z0-9]{8}(-480)?\.(webp|jpg)$/;
 
-const NOTIFICATION_TYPES = ['general', 'meeting', 'news', 'game', 'important'];
+const NOTIFICATION_TYPES = ['general', 'meeting', 'news', 'game', 'important', 'competition', 'activity'];
 
 const SECTION_KINDS = ['meeting', 'featured', 'news', 'games', 'items', 'location', 'links', 'contacts', 'support', 'share'];
 
@@ -216,7 +216,7 @@ function cleanHub(raw) {
       const t = n.target;
       let target = null;
       if (t && t.kind === 'meeting') target = { kind: 'meeting' };
-      else if (t && (t.kind === 'news' || t.kind === 'game') && cleanId(t.id)) target = { kind: t.kind, id: t.id };
+      else if (t && (t.kind === 'news' || t.kind === 'game' || t.kind === 'activity') && cleanId(t.id)) target = { kind: t.kind, id: t.id };
       else if (t && t.kind === 'url' && safeHttps(t.url)) target = { kind: 'url', url: safeHttps(t.url) };
       return {
         id: cleanId(n.id),
@@ -231,7 +231,41 @@ function cleanHub(raw) {
     })
     .filter(n => n.id && n.title && n.publishAt);
 
-  return { sessions, news, games, notifications };
+  // competitions, trips, plays... and their types (schema 3)
+  const types = list(raw.types)
+    .map(t => ({
+      key: cleanId(t.key),
+      label: text(t.label, 30),
+      icon: LINK_ICON_NAMES.includes(t.icon) ? t.icon : '',
+      theme: SECTION_THEMES.includes(t.theme) ? t.theme : '',
+      banner: cleanImage(t.banner)
+    }))
+    .filter(t => t.key && t.label);
+
+  const typeKeys = new Set(types.map(t => t.key));
+
+  const activities = list(raw.activities)
+    .map(a => {
+      const url = a.cta && safeHttps(a.cta.url);
+      return {
+        id: cleanId(a.id),
+        type: cleanId(a.type),
+        section: typeof a.section === 'string' && /^[a-z][a-z0-9-]{0,30}$/.test(a.section) ? a.section : '',
+        title: text(a.title, 80),
+        subtitle: text(a.subtitle, 140),
+        description: text(a.description, 1500),
+        image: cleanImage(a.image),
+        cta: url ? { label: text(a.cta.label, 24) || 'التفاصيل', url } : null,
+        location: text(a.location, 120),
+        startAt: dateTime(a.startAt),
+        endAt: dateTime(a.endAt),
+        visibleFrom: dateTime(a.visibleFrom),
+        visibleUntil: dateTime(a.visibleUntil)
+      };
+    })
+    .filter(a => a.id && a.title && a.section && typeKeys.has(a.type));
+
+  return { sessions, news, games, notifications, activities, types };
 
 }
 

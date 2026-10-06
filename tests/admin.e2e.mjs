@@ -265,8 +265,8 @@ test('navigation: dock on phones, rail on wide screens, tabs for sub-sections', 
     assert.equal(await page.$eval(`${container} [aria-current="page"]`, b => b.dataset.area), 'content');
 
     const tabs = await page.$$eval('#subtabs .tab', t => t.map(b => b.textContent));
-    assert.deepEqual(tabs, ['الاجتماعات', 'الأخبار', 'الألعاب', 'الإشعارات']);
-    await page.click('#subtabs .tab:nth-child(4)');
+    assert.deepEqual(tabs, ['الاجتماعات', 'الأخبار', 'الألعاب', 'المسابقات', 'الفعاليات', 'الإشعارات']);
+    await page.click('#subtabs .tab:nth-child(6)');
     await page.waitForFunction(() => document.getElementById('page-title').textContent === 'الإشعارات');
 
     assert.deepEqual(problems, []);
@@ -605,6 +605,92 @@ test('a section gets a colour and a banner from its editor', async () => {
   assert.equal(news.theme, 'emerald');
   assert.match(news.banner, /^img-/);
   world.gs.apiSaveSection({ key: 'news', title: 'جديد الأسرة', theme: '', banner: '' });
+
+  assert.deepEqual(problems, []);
+  await close();
+
+});
+
+
+/* ---------------- Phase 5: competitions, activities, archive ---------------- */
+
+test('a competition from the admin: type preset, dates in Cairo time, a notification', async () => {
+
+  const { page, problems, close } = await open();
+  await page.evaluate(() => { A.go('content', 'competitions'); });
+  await page.waitForSelector('#subtabs .tab[aria-current="page"]');
+  assert.equal(await page.$eval('#page-title', n => n.textContent), 'المسابقات');
+  await page.evaluate(() => [...document.querySelectorAll('.view button')].find(b => b.textContent.includes('مسابقة جديدة')).click());
+  await page.waitForSelector('dialog.sheet[open] input');
+
+  await page.evaluate(() => {
+    const sheet = document.querySelector('dialog.sheet[open]');
+    const set = (input, value) => { input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); };
+    set(sheet.querySelector('.field[data-label="العنوان"] input'), 'مسابقة الكتاب المقدس');
+    set(sheet.querySelector('input[type=url]'), 'https://forms.gle/bible');
+    const [start, end] = sheet.querySelectorAll('.datetime');
+    set(start.querySelector('input[type=date]'), '2099-10-09'); set(start.querySelector('input[type=time]'), '18:00');
+    set(end.querySelector('input[type=date]'), '2099-10-16'); set(end.querySelector('input[type=time]'), '23:00');
+    sheet.querySelector('.sheet__foot .btn--primary').click();
+  });
+  await page.waitForFunction(() => !document.querySelector('dialog.sheet').open);
+
+  const row = world.gs.readTable_('Activities').find(a => a.title === 'مسابقة الكتاب المقدس');
+  assert.equal(row.type, 'competition');
+  assert.deepEqual([row.startAt, row.endAt], ['2099-10-09 18:00', '2099-10-16 23:00']);
+  assert.ok(world.gs.readTable_('Notifications').some(n => n.id === 'notif-' + row.id), 'publish notification');
+  assert.ok(world.gs.readTable_('Notifications').some(n => n.id === 'notif-' + row.id + '-start'), 'start notification');
+  assert.match(await page.$eval('.list .item__title', n => n.textContent), /مسابقة الكتاب المقدس/);
+
+  assert.deepEqual(problems, []);
+  await close();
+
+});
+
+test('archive and «استخدم تاني»: old items leave the list, come back, or become a hidden copy', async () => {
+
+  world.gs.apiSaveItem('activities', { type: 'trip', title: 'رحلة السنة اللي فاتت', url: 'https://forms.gle/old' });
+  const { page, problems, close } = await open(DESKTOP);
+  await page.evaluate(() => { A.go('content', 'activities'); });
+  await page.waitForSelector('[aria-label="أرشفة: رحلة السنة اللي فاتت"]');
+
+  await page.click('[aria-label="أرشفة: رحلة السنة اللي فاتت"]');
+  await page.waitForFunction(() => !document.querySelector('[aria-label="أرشفة: رحلة السنة اللي فاتت"]'));
+  assert.equal(world.gs.readTable_('Activities').find(a => a.title === 'رحلة السنة اللي فاتت').archived, true);
+
+  // the archive view
+  await page.evaluate(() => [...document.querySelectorAll('.view button')].find(b => b.textContent.startsWith('الأرشيف')).click());
+  await page.waitForSelector('[aria-label="استخدم تاني: رحلة السنة اللي فاتت"]');
+  await page.click('[aria-label="استخدم تاني: رحلة السنة اللي فاتت"]');
+  // the copy opens straight in its editor
+  await page.waitForSelector('dialog.sheet[open]');
+  assert.match(await page.$eval('#sheet-title', n => n.textContent), /\(نسخة\)/);
+  const copy = world.gs.readTable_('Activities').find(a => a.title === 'رحلة السنة اللي فاتت (نسخة)');
+  assert.equal(copy.enabled, false);
+
+  assert.deepEqual(problems, []);
+  await close();
+
+});
+
+test('a new activity type, from the admin, without code', async () => {
+
+  const { page, problems, close } = await open(DESKTOP);
+  await page.evaluate(() => { A.go('content', 'activities'); });
+  await page.evaluate(() => [...document.querySelectorAll('.view button')].find(b => b.textContent.includes('نوع جديد')).click());
+  await page.waitForSelector('dialog.sheet[open] .icon-grid');
+  await page.evaluate(() => {
+    const sheet = document.querySelector('dialog.sheet[open]');
+    const set = (input, value) => { input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); };
+    set(sheet.querySelector('.field[data-label="مفتاح النوع"] input'), 'bazaar');
+    set(sheet.querySelector('.field[data-label="اسم النوع"] input'), 'بازار');
+    sheet.querySelector('.icon-grid input[value="gift"]').click();
+    sheet.querySelector('.swatch--rose input').click();
+    sheet.querySelector('.sheet__foot .btn--primary').click();
+  });
+  await page.waitForFunction(() => !document.querySelector('dialog.sheet').open);
+  const type = world.gs.readTable_('Types').find(t => t.key === 'bazaar');
+  assert.deepEqual([type.label, type.section, type.icon, type.theme], ['بازار', 'activities', 'gift', 'rose']);
 
   assert.deepEqual(problems, []);
   await close();

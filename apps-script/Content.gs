@@ -30,7 +30,7 @@ var ICON_NAMES = [
   'voice', 'facebook', 'instagram', 'tiktok', 'youtube', 'whatsapp',
   'telegram', 'spotify', 'form', 'calendar', 'ticket', 'bus', 'book',
   'music', 'photos', 'video', 'church', 'cross', 'heart', 'star',
-  'megaphone', 'gift', 'users', 'map', 'info', 'link'
+  'megaphone', 'gift', 'users', 'map', 'info', 'link', 'trophy', 'theatre'
 ];
 
 /*
@@ -830,7 +830,8 @@ function buildPublicContent(draft, options) {
     warn: warn,
     limited: limited,
     setting: setting,
-    sections: { meeting: sectionOn('meeting'), news: sectionOn('news'), games: sectionOn('games') }
+    sections: { meeting: sectionOn('meeting'), news: sectionOn('news'), games: sectionOn('games') },
+    sectionOn: sectionOn
   });
 
   // a cancelled session is a skipped date for the countdown and calendar
@@ -884,6 +885,8 @@ function buildPublicContent(draft, options) {
     news: hub.news,
     games: hub.games,
     notifications: hub.notifications,
+    activities: hub.activities,
+    types: hub.types,
     layout: publicLayout_(layout.rows, sections, banners)
   };
 

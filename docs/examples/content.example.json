@@ -1,6 +1,6 @@
 {
   "schema": 3,
-  "revision": "e51b6be4d8d3",
+  "revision": "a3fd1515d40d",
   "publishedAt": "2026-10-08T09:00:00.000Z",
   "timezone": "Africa/Cairo",
   "site": {
@@ -270,6 +270,8 @@
       "expireAt": "2026-10-15T23:59"
     }
   ],
+  "activities": [],
+  "types": [],
   "layout": [
     {
       "key": "meeting",

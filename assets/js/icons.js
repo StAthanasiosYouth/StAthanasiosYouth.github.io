@@ -168,6 +168,15 @@ const LINE_ICONS = {
   clock:
     '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
 
+  trophy:
+    '<path class="duo" d="M7 4h10v5a5 5 0 0 1-10 0Z"/>' +
+    '<path d="M7 6H4.5v1.5A3.5 3.5 0 0 0 7.8 11M17 6h2.5v1.5a3.5 3.5 0 0 1-3.3 3.5M12 14v3.5M8.5 20.5h7M9.5 17.5h5v3h-5Z"/>',
+
+  theatre:
+    '<path class="duo" d="M4 4.5c2.6 1 5.4 1 8 0v6.2A4 4 0 0 1 8 14.7a4 4 0 0 1-4-4Z"/>' +
+    '<path d="M12 9.3c2.6 1 5.4 1 8 0v6.2a4 4 0 0 1-4 4 4 4 0 0 1-4-4"/>' +
+    '<path d="M6.3 8.6h.01M9.7 8.6h.01M6.6 11.4a2 2 0 0 0 2.8 0M14.3 13.4h.01M17.7 13.4h.01M14.6 16.8a2 2 0 0 1 2.8 0"/>',
+
   chevron:
     '<path d="m6 9 6 6 6-6"/>',
 
@@ -181,7 +190,7 @@ export const LINK_ICON_NAMES = [
   'voice', 'facebook', 'instagram', 'tiktok', 'youtube', 'whatsapp',
   'telegram', 'spotify', 'form', 'calendar', 'ticket', 'bus', 'book',
   'music', 'photos', 'video', 'church', 'cross', 'heart', 'star',
-  'megaphone', 'gift', 'users', 'map', 'info', 'link'
+  'megaphone', 'gift', 'users', 'map', 'info', 'link', 'trophy', 'theatre'
 ];
 
 

@@ -204,3 +204,91 @@ test('a section banner shows on top, and stands in for missing posters', async (
   assert.deepEqual(problems, []);
   await close();
 });
+
+
+/* ---------------- Phase 5: competitions and activities ---------------- */
+
+const withItems = gs => {
+  gs.apiSaveItem('activities', {
+    type: 'competition', title: 'مسابقة الكتاب المقدس', subtitle: 'سفر أعمال الرسل', url: 'https://forms.gle/bible',
+    startAt: '2026-10-09 18:00', endAt: '2026-10-16 23:00', notify: { publish: true }
+  });
+  gs.apiSaveItem('activities', {
+    type: 'trip', title: 'رحلة الغردقة', subtitle: 'يوم كامل على البحر', url: 'https://forms.gle/trip',
+    location: 'الغردقة', startAt: '2026-10-16 07:00', notify: { publish: true }
+  });
+};
+
+test('competitions and activities: own sections; a competition opens its link only on time', async () => {
+  const content = publish(withItems);
+
+  const before = await open(content, THURSDAY_NOON); // before the competition starts
+  const comp = await before.page.$eval('[data-key="competitions"]', s => ({
+    title: s.querySelector('.widget__title').textContent,
+    state: s.querySelector('.item-card__state').textContent,
+    link: !!s.querySelector('.item-card__cta[href]')
+  }));
+  assert.equal(comp.title, 'المسابقات');
+  assert.match(comp.state, /تبدأ بعد/);
+  assert.equal(comp.link, false, 'no link before the start');
+  const trip = await before.page.$eval('[data-key="activities"] .item-card', c => ({
+    type: c.querySelector('.item-card__type').textContent,
+    cta: c.querySelector('.item-card__cta').getAttribute('href'),
+    where: c.querySelector('.item-card__when').textContent
+  }));
+  assert.deepEqual([trip.type, trip.cta], ['رحلة', 'https://forms.gle/trip']);
+  assert.match(trip.where, /الغردقة/);
+  assert.deepEqual(before.problems, []);
+  await before.close();
+
+  const during = await open(content, '2026-10-10T09:00:00Z');
+  assert.equal(await during.page.$eval('[data-key="competitions"] .item-card__cta', a => a.getAttribute('href')), 'https://forms.gle/bible');
+  await during.close();
+});
+
+test('an activity opens in a sheet (deep link), with its share row', async () => {
+  const content = publish(withItems);
+  const trip = content.activities.find(a => a.title === 'رحلة الغردقة');
+  const { page, problems, close } = await open(content, THURSDAY_NOON);
+
+  // the card's first tap opens the sheet, not the external link
+  await page.click('[data-key="activities"] .item-card__title a');
+  await page.waitForSelector('dialog.sheet[open] .detail');
+  assert.equal(new URL(page.url()).hash, `#activity/${trip.id}`);
+  const sheet = await page.$eval('dialog.sheet[open]', d => ({
+    kicker: d.querySelector('.detail__kicker').textContent,
+    share: [...d.querySelectorAll('.share-row .btn')].map(b => b.textContent.trim()),
+    whatsapp: d.querySelector('.share-row__whatsapp').getAttribute('href')
+  }));
+  assert.equal(sheet.kicker, 'رحلة');
+  assert.ok(sheet.share.includes('واتساب') && sheet.share.includes('انسخ اللينك') && sheet.share.includes('QR'));
+  assert.match(decodeURIComponent(sheet.whatsapp), new RegExp(`#activity/${trip.id}`));
+  assert.deepEqual(problems, []);
+  await close();
+});
+
+test('the bell opens a competition; a hidden competition leaves no bell item', async () => {
+  const content = publish(withItems);
+  const { page, problems, close } = await open(content, '2026-10-10T09:00:00Z');
+  await page.click('#bell');
+  await page.waitForSelector('dialog.sheet[open] .note-item');
+  const titles = await page.$$eval('dialog.sheet[open] .note-item__title', t => t.map(x => x.textContent));
+  // tapping it opens the competition itself
+  await page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .note-item')].find(n => /المسابقة/.test(n.textContent)).click());
+  await page.waitForFunction(() => location.hash.startsWith('#activity/'));
+  assert.ok(titles.some(t => /المسابقة الجديدة بدأت/.test(t)), titles.join(' | '));
+  await close();
+
+  const hidden = publish(gs => { withItems(gs); gs.apiSetSectionEnabled('competitions', false); });
+  const second = await open(hidden, '2026-10-10T09:00:00Z');
+  assert.ok(!second.areas.includes('items') || !(await second.page.$('[data-key="competitions"]')));
+  const ids = await second.page.evaluate(async () => {
+    const { visibleNotifications } = await import('./assets/js/bell.js');
+    const { readCached } = await import('./assets/js/content.js');
+    const { stamp, zonedNow } = await import('./assets/js/schedule.js');
+    return visibleNotifications(readCached(), stamp(zonedNow())).map(n => n.title);
+  });
+  assert.ok(!ids.some(t => /المسابقة/.test(t)), ids.join(' | '));
+  assert.deepEqual([...problems, ...second.problems], []);
+  await second.close();
+});

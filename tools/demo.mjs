@@ -80,6 +80,12 @@ gs.apiSaveItem('games', { title: 'مسابقة الكتاب المقدس', image
 gs.apiSaveItem('games', { title: 'خمّن الصوت', url: 'https://example.org/sounds', startAt: at(-300), endAt: at(-200), afterEnd: 'show' });
 
 /* notifications */
+// competitions + activities (one model, typed)
+gs.apiSaveItem('activities', { type: 'competition', title: 'مسابقة الكتاب المقدس', subtitle: 'سفر أعمال الرسل — ١٠ أسئلة', image: quizPoster, url: 'https://example.org/bible-quiz', startAt: at(-60), endAt: at(6 * 1440), notify: { publish: true } });
+gs.apiSaveItem('activities', { type: 'competition', title: 'مسابقة الحفظ', subtitle: 'مزمور ٢٣', url: 'https://example.org/memory', startAt: at(2 * 1440), endAt: at(9 * 1440) });
+gs.apiSaveItem('activities', { type: 'trip', title: 'رحلة الغردقة', subtitle: 'يوم كامل على البحر', image: tripPoster, url: 'https://forms.gle/example', location: 'الغردقة', startAt: day(5) + ' 07:00', notify: { publish: true } });
+gs.apiSaveItem('activities', { type: 'black-theatre', title: 'عرض المسرح الأسود', subtitle: 'قصة الابن الضال', location: 'مسرح الكنيسة', startAt: day(12) + ' 19:00' });
+
 gs.apiSaveItem('notifications', { title: 'بوستر المؤتمر نزل', message: 'شوفوا المواعيد والتفاصيل', type: 'important', target: 'https://example.org/poster', publishAt: at(-10) });
 gs.apiSaveItem('notifications', { title: 'شكراً على الأحد اللي فات', message: 'كان اجتماع جميل', type: 'general', publishAt: at(-4 * 1440) });
 

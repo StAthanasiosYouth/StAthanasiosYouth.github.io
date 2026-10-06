@@ -17,6 +17,7 @@ import { describeMeeting, formatDate, DAY_SHORT } from './words.js';
 import { bannerWidget, newsSection, gamesSection, liveGameWidget, meetingTopic, visibleNews, gameStates, sectionBanner } from './hub.js';
 import { updateBell, visibleNotifications } from './bell.js';
 import { liveSections } from './layout.js';
+import { itemsSection, visibleItems } from './items.js';
 import { wake } from './motion.js';
 import { play } from './sound.js';
 import { pageUrl } from './share.js';
@@ -608,6 +609,7 @@ export function visibilityKey(content, nowStamp) {
     gameStates(content, nowStamp).map(g => `${g.game.id}:${g.state}`).join(','),
     visibleNotifications(content, nowStamp).map(n => n.id).join(','),
     parts.featured.map(link => link.id).join(','),
+    parts.sections.filter(s => s.kind === 'items').map(s => visibleItems(content, s.key, nowStamp).map(i => i.id).join(',')).join('|'),
     [...parts.linkGroups.values()].map(item => item.links.map(link => link.id).join(',')).join('|')
   ].join('#');
 
@@ -736,8 +738,13 @@ export function renderPage(content, clock, actions, { animate = false } = {}) {
         add(shareWidget(actions), 'share');
         break;
 
+      case 'items': {
+        const items = visibleItems(content, section.key, clock.stamp);
+        if (items.length) add(itemsSection(section, items, content, clock.stamp), 'items');
+        break;
+      }
+
       default:
-        // "items" sections (competitions, activities) arrive with their content
         break;
 
     }

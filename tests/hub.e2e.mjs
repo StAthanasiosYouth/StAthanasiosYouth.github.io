@@ -124,7 +124,7 @@ test('bell: badge, panel groups, read state survives a reload, axe inside the pa
   const { page } = await open(PHONE, { bypassCSP: true });
 
   const badge = await page.$eval('.bell__badge', el => el.textContent);
-  assert.equal(badge, '٥');
+  assert.equal(badge, '٧', '5 notifications + the competition and the trip (tools/demo.mjs)');
 
   await page.click('#bell');
   await page.waitForSelector('dialog.sheet--panel[open]');
@@ -141,7 +141,8 @@ test('bell: badge, panel groups, read state survives a reload, axe inside the pa
   assert.deepEqual(results.violations.map(v => `${v.id}: ${v.nodes.slice(0, 2).map(n => n.target.join(' ')).join(' | ')}`), []);
 
   // tap the trip notification: opens the news item, marks it read
-  await page.evaluate(() => [...document.querySelectorAll('.note-item')].find(e => e.textContent.includes('رحلة الغردقة')).click());
+  // (the news item; the trip activity has its own «التسجيل للرحلة فتح» notification)
+  await page.evaluate(() => [...document.querySelectorAll('.note-item')].find(e => e.textContent.includes('رحلة الغردقة') && !e.textContent.includes('التسجيل')).click());
   await page.waitForFunction(() => location.hash.startsWith('#news/'));
   await page.waitForSelector('dialog.sheet--detail[open] .detail__body');
 
@@ -149,7 +150,7 @@ test('bell: badge, panel groups, read state survives a reload, axe inside the pa
   await page.goBack();
   await page.waitForFunction(() => location.hash === '#notifications');
   await page.waitForSelector('dialog.sheet--panel[open]');
-  const tripNew = await page.evaluate(() => [...document.querySelectorAll('.note-item.is-new')].some(e => e.textContent.includes('رحلة الغردقة')));
+  const tripNew = await page.evaluate(() => [...document.querySelectorAll('.note-item.is-new')].some(e => e.textContent.includes('رحلة الغردقة') && !e.textContent.includes('التسجيل')));
   assert.equal(tripNew, false);
 
   await page.goBack();

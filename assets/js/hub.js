@@ -200,10 +200,8 @@ export function newsSheetContent(item, nowStamp, shareItem) {
     ),
     item.summary ? h('p', { class: 'detail__lead' }, item.summary) : null,
     item.body ? h('p', { class: 'detail__body' }, item.body) : null,
-    h('div', { class: 'detail__actions' },
-      item.link ? h('a', { class: 'btn btn--primary', ...external(item.link.url) }, item.link.label, iconNode('external')) : null,
-      h('button', { class: 'btn', type: 'button', onclick: () => shareItem(`#news/${item.id}`, item.title) }, iconNode('share'), 'شارك الخبر')
-    )
+    item.link ? h('div', { class: 'detail__actions' }, h('a', { class: 'btn btn--primary', ...external(item.link.url) }, item.link.label, iconNode('external'))) : null,
+    shareItem(`#news/${item.id}`, item.title)
   );
 
 }
@@ -363,9 +361,7 @@ export function gameSheetContent(entry, shareItem) {
       game.image ? h('div', { class: 'detail__media' }, picture(game.image, { sizes: '(min-width: 720px) 560px, 100vw', eager: true })) : null,
       game.description ? h('p', { class: 'detail__body' }, game.description) : null,
       h('div', { class: 'detail__game' }, card.el),
-      h('div', { class: 'detail__actions' },
-        h('button', { class: 'btn', type: 'button', onclick: () => shareItem(`#game/${game.id}`, game.title) }, iconNode('share'), 'شارك التحدي')
-      )
+      shareItem(`#game/${game.id}`, game.title)
     ),
     card
   };

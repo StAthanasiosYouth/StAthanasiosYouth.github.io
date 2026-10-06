@@ -108,6 +108,28 @@ export async function shareLink(site, { url = pageUrl(), title = site.name, text
 }
 
 
+/*
+ * The share row under an item (news, game, competition, activity): share
+ * (phone's own sheet when there is one), WhatsApp, copy the link, QR.
+ */
+export function shareRow(site, hash, title, label = 'شارك') {
+
+  const url = pageUrl() + hash;
+  const text = `${title} — ${site.name}`;
+  const whatsapp = `https://wa.me/?text=${encodeURIComponent(`${text}\n${url}`)}`;
+
+  return h('div', { class: 'share-row', role: 'group', 'aria-label': label },
+    navigator.share
+      ? h('button', { class: 'btn btn--small', type: 'button', onclick: () => shareLink(site, { url, title, text }) }, iconNode('share'), label)
+      : null,
+    h('a', { class: 'btn btn--small share-row__whatsapp', href: whatsapp, target: '_blank', rel: 'noopener noreferrer' }, iconNode('whatsapp'), 'واتساب'),
+    h('button', { class: 'btn btn--small', type: 'button', onclick: () => copyLink(url) }, iconNode('copy'), 'انسخ اللينك'),
+    h('button', { class: 'btn btn--small', type: 'button', onclick: () => openQr(site, { url, title }) }, iconNode('qr'), 'QR')
+  );
+
+}
+
+
 /* Sharing one item (news, game) by its deep link, e.g. "#news/trip". */
 export function shareTarget(site) {
 
@@ -284,20 +306,34 @@ async function drawQrCard(canvas, site, url) {
 
 let dialog = null;
 
-export async function openQr(site) {
+/*
+ * The QR card for the page, or for one item (item = { url, title }):
+ * the page's card is kept; an item's is made fresh and removed on close.
+ */
+export async function openQr(site, item = null) {
 
-  const url = pageUrl();
+  const url = item ? item.url : pageUrl();
+
+  if (item && dialog && dialog.dataset.url !== url) {
+    dialog.remove();
+    dialog = null;
+  }
+
+  if (!item && dialog && dialog.dataset.url !== url) {
+    dialog.remove();
+    dialog = null;
+  }
 
   if (!dialog) {
 
-    const canvas = h('canvas', { class: 'qr-canvas', role: 'img', 'aria-label': 'كود QR لرابط الصفحة' });
+    const canvas = h('canvas', { class: 'qr-canvas', role: 'img', 'aria-label': item ? `كود QR لـ${item.title}` : 'كود QR لرابط الصفحة' });
 
     const close = () => dialog.close();
 
-    dialog = h('dialog', { class: 'qr-dialog', 'aria-labelledby': 'qr-title' },
+    dialog = h('dialog', { class: 'qr-dialog', 'aria-labelledby': 'qr-title', 'data-url': url },
       h('div', { class: 'qr-dialog__inner' },
         h('div', { class: 'qr-dialog__head' },
-          h('h2', { class: 'qr-dialog__title', id: 'qr-title' }, 'كود الصفحة'),
+          h('h2', { class: 'qr-dialog__title', id: 'qr-title' }, item ? item.title : 'كود الصفحة'),
           h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: close }, iconNode('close'))
         ),
         canvas,
@@ -319,8 +355,8 @@ export async function openQr(site) {
               setTimeout(() => URL.revokeObjectURL(href), 4000);
             }, 'image/png')
           }, iconNode('download'), 'حمّل الصورة'),
-          h('button', { class: 'btn', type: 'button', onclick: () => copyLink() }, iconNode('copy'), 'انسخ اللينك'),
-          h('button', { class: 'btn', type: 'button', onclick: () => shareLink(site) }, iconNode('share'), 'شارك')
+          h('button', { class: 'btn', type: 'button', onclick: () => copyLink(url) }, iconNode('copy'), 'انسخ اللينك'),
+          h('button', { class: 'btn', type: 'button', onclick: () => shareLink(site, item ? { url, title: item.title, text: `${item.title} — ${site.name}` } : {}) }, iconNode('share'), 'شارك')
         )
       )
     );

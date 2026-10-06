@@ -115,6 +115,8 @@ function apiStateFor_(email, built) {
       news: draft.news.map(clean),
       games: draft.games.map(clean),
       notifications: draft.notifications.map(clean),
+      activities: draft.activities.map(clean),
+      types: draft.types.map(clean),
       // Drive ids stay on the server
       // no Drive ids and no tiny thumbnails here (the library loads those)
       media: draft.media.map(function (row) {
