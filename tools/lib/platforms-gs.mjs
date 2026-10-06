@@ -20,6 +20,6 @@ export function platformsGs({ PLATFORMS, SCENES, experienceKey, resolveExperienc
       .replace('function resolveExperience(', 'function resolveExperience_(')
       .replace(/experienceKey\(/g, 'experienceKey_('),
     ''
-  ].join('\n');
+  ].join('\n').replace(/\r\n/g, '\n');   // a CRLF checkout must generate the same file
 
 }
