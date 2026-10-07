@@ -429,7 +429,7 @@ The code is safe under both settings:
 - `admin/index.html`, `admin/admin.css`, `admin/admin-app.js` are
   **generated** from `apps-script/Admin*.html` by `tools/build-admin.mjs`
   (`npm run build-admin`; `npm run sync` runs it too). `tests/refine-b.test.mjs`
-  fails when they are stale. Hand-written: `boot.js` (sign-in, the transport
+  fails when they are stale. Hand-written: `restore.js` (the compact gate after a reload), `boot.js` (sign-in, the transport
   `window.AdminTransport`), `config.js`, `gate.css`, `preview-guard.js`.
 - Security policy (meta tag): own files, `accounts.google.com/gsi/*` (script,
   button frame, style), `script.google.com` + `script.googleusercontent.com`
@@ -438,7 +438,7 @@ The code is safe under both settings:
   `no-referrer`; frame-busting in `boot.js` (Pages can't send headers).
 - The token is kept in memory only (never sessionStorage/localStorage: the
   origin is shared with /your-voice-matters/), never past its expiry. A
-  reload signs in again through Google: silently with auto-select when it
+  reload gets a fresh one from Google: silently with auto-select when it
   can, otherwise with the button. When it runs out, a «الدخول محتاج يتجدد» dialog opens over
   the panel; the call that needed it continues after signing in, so nothing
   being edited is lost.
@@ -458,20 +458,37 @@ The code is safe under both settings:
   Google's One Tap card is capped in `gate.css` so it can never cover the
   screen.
 - One session per Google account (`apps-script/Presence.gs`): signing in
-  asks the server for a session id (kept in memory, sent with every call).
-  If the account is live on another device or tab (a heartbeat in the last
-  ~90 s) the page asks «الحساب ده شغال دلوقتي على جهاز تاني» → «إنهاء الجلسة
-  الأخرى والدخول هنا» or «إلغاء». The tab that was taken over goes back to
-  the sign-in screen («الجلسة اتقفلت لأنك دخلت من جهاز تاني»). A reload or
-  sign-out ends the session at once (a `sendBeacon` when leaving), so it never
-  asks about itself.
+  asks the server for a session id (sent with every call; never enough
+  without the token). If the account is live on another device or tab (a
+  heartbeat in the last ~90 s) the page asks «الحساب ده شغال دلوقتي على جهاز
+  تاني» → «إنهاء الجلسة الأخرى والدخول هنا» or «إلغاء». The tab that was taken
+  over goes back to the sign-in screen («الجلسة اتقفلت لأنك دخلت من جهاز تاني»).
+  Sign-out ends the session at once.
+- A reload is almost invisible. This tab's sessionStorage (`athanasios-admin.*`,
+  gone when the tab closes) keeps only the opaque session id with the page
+  load's id, where the admin was (area, sub-tab, scroll) and an open item
+  editor's unsaved values (plain form values, capped; never a file) — never
+  the token or anything from Google. Leaving the page parks the session (a
+  `sendBeacon`): no longer live for other devices, its locks and presence
+  kept ~45 s. The next page load shows only «جاري استعادة الجلسة...»
+  (`admin/restore.js` sets that before anything is drawn), gets a token from
+  Google (Google's button right there if it wants a click) and calls
+  `apiSessionResume`: the SAME session, locks and presence, with the panel's
+  state in the same answer — never the takeover question for its own tab. A
+  duplicated tab or another device is still asked. Expired → the usual
+  sign-in; taken over → «الجلسة اتقفلت…». The editor comes back with
+  «رجعنا التعديلات اللي ماكانتش اتحفظت» / «تجاهلها» (read-only under the lock
+  banner if someone else took the item meanwhile); nothing is saved to the
+  server by itself. The browser's own "leave the page?" stays only for what
+  can't come back (a photo still uploading, a settings card). Pull-to-refresh
+  is switched off on the admin (`overscroll-behavior-y: contain`).
 - Working together: a heartbeat every ~25 s while the page is visible (paused
   when hidden) shows the other admins online under the top bar (name, «متصل
   الآن», where, what they edit). Opening an existing item (meetings, news,
   games, notifications, activities, types, links, contacts, sections, images)
   or changing a settings card locks it; another admin sees it read-only with
   «فلان بيعدّل ده دلوقتي», and the server refuses their save of that item.
-  Locks end on save, close, sign-out, leaving the page, or ~90 s after the
+  Locks end on save, close, sign-out, ~45 s after leaving the page, or ~90 s after the
   holder's last heartbeat. The recovery admin (version 14) doesn't take part.
 - Preview (معاينة): on github.io the preview frame shares the site's origin.
   `admin/preview-guard.js` runs first in it and gives the page its own

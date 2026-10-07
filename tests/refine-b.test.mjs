@@ -53,7 +53,7 @@ const ARGS = {
   apiMediaLibrary: [], apiUpdateMedia: ['img-x', {}], apiDeleteMedia: ['img-x'], apiRestoreMedia: ['img-x'],
   apiPurgeMedia: ['img-x'], apiMediaPreview: ['img-x'], apiSetMediaAlt: ['img-x', 'x'], apiPlanMigration: [], apiMigrate: [],
   apiAdmins: [], apiAddAdmin: ['x@gmail.com'], apiRemoveAdmin: [SECOND],
-  apiSessionStart: [{ device: 'x' }], apiHeartbeat: [{}], apiSessionEnd: []
+  apiSessionStart: [{ device: 'x' }], apiSessionResume: [{ device: 'x' }], apiHeartbeat: [{}], apiSessionEnd: []
 };
 
 /*
@@ -434,12 +434,20 @@ test('admin/: strict CSP, noindex, no-referrer, no inline code, no redirect, no 
   assert.match(html, /<meta name="referrer" content="no-referrer">/);
   assert.doesNotMatch(html, /\sstyle=|<style|<script>|\son[a-z]+="/, 'no inline style or script');
   assert.doesNotMatch(html, /<iframe|http-equiv="refresh"/i, 'never embedded, never redirected');
-  assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]), ['config.js', 'admin-app.js', 'boot.js', 'layout-check.js']);
+  // restore.js first and not deferred (final/r: the compact gate after a reload, before anything is drawn)
+  assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]), ['restore.js', 'config.js', 'admin-app.js', 'boot.js', 'layout-check.js']);
 
   const boot = readFileSync(`${ROOT}admin/boot.js`, 'utf8');
   assert.match(boot, /window\.top !== window\.self/, 'frame-busting');
   assert.doesNotMatch(boot, /location\.(href\s*=|assign|replace\((?!window\.location\.href))/, 'never sends the admin elsewhere');
-  assert.doesNotMatch(boot, /localStorage|sessionStorage|indexedDB|document\.cookie/, 'the token is kept in memory only');
+  // the token is kept in memory only. Since final/r this tab's sessionStorage holds the
+  // server's opaque session id, where the admin was and unsaved editor values — through
+  // one helper (keep), never the token (tests/final-r.test.mjs checks it in detail)
+  assert.doesNotMatch(boot, /localStorage|indexedDB|document\.cookie/, 'no persistent storage, no cookies');
+  const keepBlock = /var keep = \(function \(\) \{[\s\S]*?\r?\n {2}\}\)\(\);/.exec(boot);
+  assert.ok(keepBlock, 'one storage helper');
+  assert.doesNotMatch(boot.replace(keepBlock[0], ''), /sessionStorage\s*[.[]/, 'sessionStorage only through keep');
+  assert.doesNotMatch(boot, /keep\.set\([^;]*token/, 'the token is never kept');
   assert.match(boot, /'Content-Type': 'text\/plain;charset=utf-8'/, 'a simple request: no CORS preflight');
   assert.match(boot, /credentials: 'omit'/);
 

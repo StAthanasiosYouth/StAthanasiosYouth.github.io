@@ -23,7 +23,8 @@
  *  3. only a function listed in apiFunctions_() runs — never any other
  *     global — and it runs with currentEmail_() = that verified email;
  *  4. the request's session id ("sid") must be the account's one live
- *     session (Presence.gs), except for apiSessionStart, which issues it.
+ *     session (Presence.gs), except for apiSessionStart, which issues it,
+ *     and apiSessionResume, which checks it itself (a reload of the same tab).
  *     The sid alone is never enough: the token is checked first.
  *
  * Anything missing or wrong fails closed, for every function. Responses never
@@ -89,6 +90,7 @@ function apiFunctions_() {
     apiAddAdmin: apiAddAdmin,
     apiRemoveAdmin: apiRemoveAdmin,
     apiSessionStart: apiSessionStart,
+    apiSessionResume: apiSessionResume,
     apiHeartbeat: apiHeartbeat,
     apiSessionEnd: apiSessionEnd
   };
@@ -121,8 +123,13 @@ function doPost(e) {
 
     API_REQUEST_.email = email;
 
-    // one live session per account (Presence.gs): every call but the one that starts it
-    if (request.fn !== 'apiSessionStart') {
+    // one live session per account (Presence.gs): every call but the one that
+    // starts it, and the one that picks it up after a reload of the same tab
+    // (it checks the sid itself: whose it is, and whether this tab may have it back)
+    if (request.fn === 'apiSessionResume') {
+      API_REQUEST_.sid = request.sid;
+    }
+    else if (request.fn !== 'apiSessionStart') {
       requireSession_(email, request.sid);
       API_REQUEST_.sid = request.sid;
     }

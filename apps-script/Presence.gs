@@ -19,7 +19,24 @@
  *     session, says where the admin is, takes/renews the edit locks the page
  *     wants (and lets go of the others); answers with who else is online and
  *     the state of each lock.
- *   apiSessionEnd()                              sign out / leaving the page.
+ *   apiSessionEnd()                              sign out: the session and its locks end now.
+ *   apiSessionEnd({ park: true, tab })           leaving the page (a reload, or the tab
+ *                                                closing — the page can't tell): the
+ *                                                session is "parked". It is no longer
+ *                                                live (another device gets in without a
+ *                                                question), its locks and its presence
+ *                                                last SESSION_PARK_SECONDS more, and the
+ *                                                same tab can pick it up again:
+ *   apiSessionResume({ device, tab, prev, left })   with the sid of the page load
+ *     → { sid, state }   before (sessionStorage, that tab only). The SAME session
+ *                        goes on: same sid, locks, presence; no takeover question.
+ *                        Only for the account that owns that sid (the token says
+ *                        who), only while it is parked, quiet (no heartbeat ~90 s),
+ *                        or this tab's own page load said it left (prev = its
+ *                        record's tab, left = true: a reload, not a duplicated
+ *                        tab), and within SESSION_RESUME_SECONDS.
+ *     → { active }       a live session of another tab: the takeover question
+ *     → 'session_replaced' / 'session_expired' errors: the page signs in as usual.
  *
  * Edit locks: '<kind>:<key>' (e.g. 'news:news-ab12cd34', 'sessions:2026-10-11',
  * 'links:link-1', 'settings:location'). A lock lives LOCK_SECONDS after its
@@ -39,6 +56,8 @@ var PRESENCE_ONLINE_SECONDS = 70;    // shown as online
 var LOCK_SECONDS = 90;               // a lock outlives its last heartbeat by this much
 var SESSION_KEEP_SECONDS = 21600;    // CacheService's limit (6 h)
 var SESSION_MAX_LOCKS = 6;           // an editor + a settings card's groups
+var SESSION_PARK_SECONDS = 45;       // a parked session (its page reloading) keeps its locks and shows online this long
+var SESSION_RESUME_SECONDS = 7200;    // a parked or quiet session can be picked up again by its tab this long
 var LOCK_KINDS = ['sessions', 'news', 'games', 'notifications', 'activities', 'types', 'links', 'contacts', 'sections', 'settings', 'media'];
 
 
@@ -182,6 +201,32 @@ function replacedError_() {
 
 }
 
+function expiredError_() {
+
+  return apiError_('session_expired', 'الجلسة انتهت.', 'ادخل تاني.');
+
+}
+
+function cleanTab_(value) {
+
+  return typeof value === 'string' && /^[\w-]{16,64}$/.test(value) ? value : '';
+
+}
+
+/* live = the account's session in use: a recent heartbeat, and its page didn't leave */
+function sessionLive_(record, now) {
+
+  return !!(record && record.sid && !record.parked && now - Number(record.seen) < SESSION_STALE_SECONDS * 1000);
+
+}
+
+/* a parked session (its page left: a reload, or closed) past its grace: no locks, not online */
+function parkedOut_(record, now) {
+
+  return !!(record && record.parked && now - Number(record.parked) >= SESSION_PARK_SECONDS * 1000);
+
+}
+
 
 /* =========================================================
    THE SESSION
@@ -212,7 +257,7 @@ function requireSession_(email, sid) {
     throw replacedError_();
   }
 
-  throw apiError_('session_expired', 'الجلسة انتهت.', 'ادخل تاني.');
+  throw expiredError_();
 
 }
 
@@ -250,7 +295,7 @@ function apiSessionStart(options) {
   options = options && typeof options === 'object' ? options : {};
 
   var device = cleanLabel_(options.device, 40) || 'جهاز';
-  var tab = typeof options.tab === 'string' && /^[\w-]{16,64}$/.test(options.tab) ? options.tab : '';
+  var tab = cleanTab_(options.tab);
   var withState = options.state !== false;
   var key = sessionCacheKey_(email);
   var lock = LockService.getScriptLock();
@@ -262,7 +307,8 @@ function apiSessionStart(options) {
 
     var now = presenceNow_();
     var current = readCached_(key);
-    var live = !!(current && current.sid && now - Number(current.seen) < SESSION_STALE_SECONDS * 1000);
+    // a parked one (its page left) is not live: taken over without a question, as if it had ended
+    var live = sessionLive_(current, now);
 
     // a session that never drew its panel (no heartbeat yet) on a device
     // that looks the same: this page reloaded while signing in (a phone
@@ -301,8 +347,17 @@ function apiSessionStart(options) {
 
 }
 
-/** Sign out, or the page goes away: the session and its locks end now. */
-function apiSessionEnd() {
+/**
+ * The same tab after a reload: picks its session up again (same sid, locks,
+ * presence), never "another device". The sid is the request's own (doPost
+ * passes it unchecked to this one function); the token, verified first,
+ * says whose it must be.
+ * options.device, options.tab   as apiSessionStart (tab: this new page load)
+ * options.prev                  the page load that had this sid
+ * options.left                  true: that page load said it left (pagehide)
+ * options.state                 false: no panel state in the answer
+ */
+function apiSessionResume(options) {
 
   var email = assertAdmin_();
 
@@ -310,6 +365,89 @@ function apiSessionEnd() {
     return { off: true };
   }
 
+  options = options && typeof options === 'object' ? options : {};
+
+  var sid = typeof API_REQUEST_.sid === 'string' ? API_REQUEST_.sid : '';
+
+  if (!/^[\w-]{16,64}$/.test(sid)) {
+    throw apiError_('session_replaced', 'الصفحة دي محتاجة تتفتح من جديد.', 'اعمل Refresh للصفحة وادخل تاني.');
+  }
+
+  var device = cleanLabel_(options.device, 40) || 'جهاز';
+  var tab = cleanTab_(options.tab);
+  var prev = cleanTab_(options.prev);
+  var withState = options.state !== false;
+  var key = sessionCacheKey_(email);
+  var cache = CacheService.getScriptCache();
+  var lock = LockService.getScriptLock();
+
+  lock.waitLock(20000);
+
+  try {
+
+    var now = presenceNow_();
+    var current = readCached_(key);
+
+    // not this account's session (any more): someone took over, or it ended
+    if (!current || current.sid !== sid) {
+      if (current || cache.get(goneCacheKey_(sid))) throw replacedError_();
+      throw expiredError_();
+    }
+
+    // too long ago to pick up: it ends now, the page signs in as usual
+    if (!(now - Number(current.parked || current.seen) < SESSION_RESUME_SECONDS * 1000)) {
+      endSession_(current, false);
+      cache.remove(key);
+      throw expiredError_();
+    }
+
+    // still live and its page never said it left: another tab with the same
+    // sid (a duplicated tab) — that one is asked, like any other
+    var reloaded = !!(prev && options.left === true && current.tab === prev);
+
+    if (sessionLive_(current, now) && !reloaded) {
+      return { active: { device: cleanLabel_(current.device, 40), since: ageSeconds_(current.since, now), seen: ageSeconds_(current.seen, now) } };
+    }
+
+    delete current.parked;
+    current.tab = tab;
+    current.device = device;
+    current.seen = now;
+
+    writeCached_(key, current, SESSION_KEEP_SECONDS);
+
+    if (withState) {
+      assignMissingIds_();
+    }
+
+  }
+  finally {
+    lock.releaseLock();
+  }
+
+  console.log('api: session resumed after a reload');
+
+  return { sid: sid, device: device, resumed: true, state: withState ? apiStateFor_(email) : null };
+
+}
+
+/**
+ * Sign out: the session and its locks end now.
+ * options.park (the page is leaving: a reload or a closed tab, it can't
+ * tell): parked instead, for that page load (options.tab) only — a late
+ * goodbye from a page load that already reloaded and resumed changes nothing.
+ */
+function apiSessionEnd(options) {
+
+  var email = assertAdmin_();
+
+  if (!presenceMode_()) {
+    return { off: true };
+  }
+
+  options = options && typeof options === 'object' ? options : {};
+
+  var park = options.park === true;
   var lock = LockService.getScriptLock();
 
   if (!lock.tryLock(10000)) {
@@ -320,15 +458,24 @@ function apiSessionEnd() {
   try {
     var current = readCached_(sessionCacheKey_(email));
     if (current && current.sid === API_REQUEST_.sid) {
-      endSession_(current, false);
-      CacheService.getScriptCache().remove(sessionCacheKey_(email));
+      if (park) {
+        var tab = cleanTab_(options.tab);
+        if (!current.tab || current.tab === tab) {
+          current.parked = presenceNow_();
+          writeCached_(sessionCacheKey_(email), current, SESSION_KEEP_SECONDS);
+        }
+      }
+      else {
+        endSession_(current, false);
+        CacheService.getScriptCache().remove(sessionCacheKey_(email));
+      }
     }
   }
   finally {
     lock.releaseLock();
   }
 
-  return { ended: true };
+  return park ? { parked: true } : { ended: true };
 
 }
 
@@ -382,6 +529,8 @@ function apiHeartbeat(info) {
 
       record.locks = held;
       record.seen = now;
+      // a page back from the back/forward cache: it is here after all
+      delete record.parked;
       // the panel is drawn and alive (apiSessionStart: a confirmed session is never taken silently)
       record.beats = Math.min(Number(record.beats || 0) + 1, 1000000);
       record.area = cleanPlace_(info.area);
@@ -421,7 +570,7 @@ function othersOnline_(email, now) {
     var record = null;
     try { record = found[keys[i]] ? JSON.parse(found[keys[i]]) : null; }
     catch (ignored) { record = null; }
-    if (!record || now - Number(record.seen) >= PRESENCE_ONLINE_SECONDS * 1000) return;
+    if (!record || now - Number(record.seen) >= PRESENCE_ONLINE_SECONDS * 1000 || parkedOut_(record, now)) return;
     others.push({
       email: other,
       name: nameOf_(other),
@@ -442,14 +591,14 @@ function othersOnline_(email, now) {
    EDIT LOCKS
 ========================================================= */
 
-/* alive = not run out, and its holder is still its account's live session */
+/* alive = not run out, and its holder is still its account's session (parked: only for a short grace) */
 function lockAlive_(lock, now) {
 
   if (!lock || !(Number(lock.exp) > now) || !lock.email) return false;
 
   var holder = readCached_(sessionCacheKey_(lock.email));
 
-  return !!(holder && holder.sid === lock.sid);
+  return !!(holder && holder.sid === lock.sid && !parkedOut_(holder, now));
 
 }
 

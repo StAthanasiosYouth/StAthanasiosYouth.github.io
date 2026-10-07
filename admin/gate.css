@@ -7,6 +7,13 @@ html.is-framed body {
   display: none;
 }
 
+/* no pull-to-refresh by accident (Android Chrome, iOS Safari): the page's own
+   scrolling, the editors' scrolling and the bottom sheet's drag stay as they are */
+html,
+body {
+  overscroll-behavior-y: contain;
+}
+
 .shell {
   display: contents;
 }
@@ -413,6 +420,7 @@ body.is-gated {
 .gate .gate__sub { animation: gate-in .6s cubic-bezier(.16, 1, .3, 1) .26s both; }
 .gate .gate__panel > * { animation: gate-in .45s cubic-bezier(.16, 1, .3, 1) both; }
 .gate[data-state="loading"] .gate__line i,
+.gate[data-state="restoring"] .gate__line i,
 .gate__google .gate__line i,
 .gate:not([data-state]) .gate__line i { animation: gate-sweep 1.4s cubic-bezier(.45, 0, .2, 1) infinite; }
 
@@ -455,6 +463,45 @@ body.is-gated {
 
 .gate__step {
   margin-top: -6px;
+}
+
+/* ---------- after a reload (html.is-restoring: restore.js, boot.js) ----------
+   Only «جاري استعادة الجلسة...» on the page's background: no door, no title,
+   no entrance — from the very first frame (restore.js runs before drawing). */
+.gate__boot-restore {
+  display: none;
+}
+
+html.is-restoring .gate__boot,
+html.is-restoring .gate__glow,
+html.is-restoring .gate__arch,
+html.is-restoring .gate__title,
+html.is-restoring .gate__sub,
+html.is-restoring .gate:not([data-state="problem"]) .gate__fallback {
+  display: none;
+}
+
+html.is-restoring .gate__boot-restore {
+  display: inline;
+}
+
+html.is-restoring .gate__panel {
+  margin-top: 0;
+}
+
+html.is-restoring .gate .gate__panel > * {
+  animation: none;
+}
+
+/* Google wants a click: its button right under the words */
+.gate__restore-google {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.gate__google[hidden] {
+  display: none;
 }
 
 /* the entrances below start dimmed, never invisible: if a phone doesn't

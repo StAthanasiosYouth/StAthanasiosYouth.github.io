@@ -39,6 +39,8 @@
   <link rel="stylesheet" href="admin.css">
   <link rel="stylesheet" href="gate.css">
 
+  <!-- not deferred: after a reload, the gate starts compact («جاري استعادة الجلسة...») -->
+  <script src="restore.js"></script>
   <script src="config.js" defer></script>
   <script src="admin-app.js" defer></script>
   <script src="boot.js" defer></script>
@@ -65,7 +67,8 @@
     <section class="gate__panel" id="gate-panel" aria-live="polite">
       <p class="gate__status" role="status">
         <span class="gate__line" aria-hidden="true"><i></i></span>
-        <span>بنجهز لوحة التحكم…</span>
+        <span class="gate__boot">بنجهز لوحة التحكم…</span>
+        <span class="gate__verify gate__boot-restore">جاري استعادة الجلسة...</span>
       </p>
       <noscript><p class="gate__note">لوحة التحكم محتاجة JavaScript. شغّله في المتصفح وافتح الصفحة تاني.</p></noscript>
     </section>

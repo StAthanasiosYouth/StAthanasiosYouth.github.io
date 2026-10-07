@@ -117,11 +117,15 @@ async function noTokenStored(page, when) {
     for (const store of [localStorage, sessionStorage]) {
       for (let i = 0; i < store.length; i++) all.push(store.key(i) + '=' + store.getItem(store.key(i)));
     }
-    return { all, session: sessionStorage.length, cookie: document.cookie };
+    const keys = [];
+    for (let i = 0; i < sessionStorage.length; i++) keys.push(sessionStorage.key(i));
+    return { all, keys, cookie: document.cookie };
   });
-  assert.equal(stored.session, 0, `sessionStorage is empty (${when})`);
+  // final/r: this tab's sessionStorage may hold the server's opaque session id, where the
+  // admin was and unsaved editor values (athanasios-admin.*) — never the token
+  assert.deepEqual(stored.keys.filter(key => !/^athanasios-admin\.(session|ui|draft)$/.test(key)), [], `only the admin's own entries in sessionStorage (${when})`);
   assert.equal(stored.cookie, '', `no cookies (${when})`);
-  assert.deepEqual(stored.all.filter(entry => /eyJ[\w-]+\.[\w-]+\.[\w-]+|token|credential|admin/i.test(entry)), [], `no token in storage (${when})`);
+  assert.deepEqual(stored.all.filter(entry => /eyJ[\w-]+\.[\w-]+\.[\w-]+|token|credential|@/i.test(entry)), [], `no token in storage (${when})`);
 
 }
 
