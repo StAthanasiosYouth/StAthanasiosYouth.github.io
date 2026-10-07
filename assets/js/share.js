@@ -9,6 +9,7 @@
 import { h } from './dom.js';
 import { iconNode } from './icons.js';
 import { play } from './sound.js';
+import { sheetStyles } from './sheet.js';
 
 const QR_CARD = { width: 1200, height: 1500 };
 
@@ -382,6 +383,9 @@ export async function openQr(site, item = null) {
     }
 
   }
+
+  // its styles live with the sheets' (sheets.css, usually loaded by the first touch)
+  await sheetStyles();
 
   if (typeof dialog.showModal === 'function') {
     dialog.showModal();

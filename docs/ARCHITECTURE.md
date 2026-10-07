@@ -230,6 +230,27 @@ are added to `meeting.skipDates` (countdown and calendar file).
   publish time. A game that must really stay closed should check the time
   itself.
 
+## Live program and surfaces (public side)
+
+- `sessions[].program` (optional): `[{ title ≤ 40, start, end }]`, Cairo
+  wall stamps, in order, each starting at or after the one before
+  (content.js drops anything else; no valid stage = `null`).
+- `layout[].surface` / `surfaceMobile` (optional): `glass | dark | filled |
+  none`. render.js (`dressSection`) puts the result on every widget of the
+  section as `data-surface`, the phone's own value below 640px (it follows
+  a resize); main.css draws them.
+- `live.json` (site root, separate from content.json, may be missing):
+  `{ schema: 1, date, stage: <index> | null, updatedAt }`. For its own date
+  a valid stage is "now"; anything else = the program's own times.
+- `assets/js/program.js` + `assets/css/program.css` are not in the first
+  load: the meeting widget loads them only when its session has a program.
+  They draw «دلوقتي / بعدها», keep the meeting sheet's list current, and ask
+  for `live.json?ts=…` (`cache: 'no-store'`) only from 15 minutes before the
+  first stage to the end of the last and only while the tab is visible:
+  about every 30 s with the page's tick, and at once when the tab comes
+  back. Never stored; a 404 or broken JSON = automatic. The admin's preview
+  never asks.
+
 ## Ready for later (not built yet)
 
 - **Push notifications (Phase B):** light PWA (manifest + service worker),

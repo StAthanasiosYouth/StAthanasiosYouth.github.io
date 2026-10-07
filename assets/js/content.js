@@ -26,6 +26,8 @@ const SECTION_KINDS = ['meeting', 'featured', 'news', 'games', 'items', 'locatio
 
 const SECTION_THEMES = ['gold', 'ember', 'azure', 'rose', 'emerald', 'night'];
 
+const SURFACES = ['glass', 'dark', 'filled', 'none'];
+
 
 /* ---------- primitives ---------- */
 
@@ -169,6 +171,23 @@ const list = value => (Array.isArray(value) ? value.filter(item => item && typeo
 const cleanId = value => (typeof value === 'string' && /^[\w-]{1,60}$/.test(value) ? value : '');
 
 
+/* a meeting's program: stages in order, each after the one before
+   (anything out of order or overlapping is dropped); null = none */
+function cleanProgram(raw) {
+
+  const stages = [];
+
+  for (const s of list(raw).slice(0, 24)) {
+    const stage = { title: text(s.title, 40), start: dateTime(s.start), end: dateTime(s.end) };
+    const last = stages[stages.length - 1];
+    if (stage.title && stage.start && stage.start < stage.end && (!last || stage.start >= last.end)) stages.push(stage);
+  }
+
+  return stages.length ? stages : null;
+
+}
+
+
 /* sessions, news, games, notifications (schema 2; empty for schema 1) */
 function cleanHub(raw) {
 
@@ -184,7 +203,8 @@ function cleanHub(raw) {
       status: s.status === 'cancelled' ? 'cancelled' : 'normal',
       note: text(s.note, 200),
       visibleFrom: dateTime(s.visibleFrom),
-      durationMinutes: number(s.durationMinutes, 15, 600)
+      durationMinutes: number(s.durationMinutes, 15, 600),
+      program: cleanProgram(s.program)
     }));
 
   const news = list(raw.news)
@@ -390,7 +410,10 @@ export function sanitizeContent(raw) {
         theme: SECTION_THEMES.includes(s.theme) ? s.theme : '',
         banner: cleanImage(s.banner),
         visibleFrom: dateTime(s.visibleFrom),
-        visibleUntil: dateTime(s.visibleUntil)
+        visibleUntil: dateTime(s.visibleUntil),
+        // «شكل الخلفية»: everywhere, and phones only ('' = the default look)
+        surface: SURFACES.includes(s.surface) ? s.surface : '',
+        surfaceMobile: SURFACES.includes(s.surfaceMobile) ? s.surfaceMobile : ''
       }))
       .filter(s => s.key && s.kind)
     : null;

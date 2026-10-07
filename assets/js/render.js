@@ -86,6 +86,8 @@ function meetingWidget(content, now, layoutSection = {}) {
   const note = meeting.note ? h('p', { class: 'meeting__note' }, meeting.note) : null;
   const skipNote = h('p', { class: 'meeting__note meeting__note--skip', hidden: true });
   const topicSlot = h('div', { class: 'meeting__topic' });
+  // the program while it runs (program.js, loaded only when there is one)
+  const programSlot = h('div', { class: 'meeting__program' });
   let lastState = null;
   let lastTopicKey = null;
 
@@ -126,6 +128,7 @@ function meetingWidget(content, now, layoutSection = {}) {
     ),
     headline,
     detail,
+    programSlot,
     note,
     skipNote,
     topicSlot,
@@ -182,6 +185,10 @@ function meetingWidget(content, now, layoutSection = {}) {
 
     currentStatus = status;
 
+    if (programSlot.firstChild || (status.session && status.session.program)) {
+      program().then(m => m.paint(programSlot, status, currentNow));
+    }
+
     journey.update(trip);
     section.dataset.phase = trip.phase;
     section.style.setProperty('--energy', trip.energy.toFixed(3));
@@ -213,6 +220,11 @@ function meetingWidget(content, now, layoutSection = {}) {
   return { el: section, update };
 
 }
+
+
+let programModule = null;
+
+const program = () => (programModule ||= import('./program.js').then(m => m.styles().then(() => m)));
 
 
 function dayNumberOf(iso) {
@@ -284,7 +296,7 @@ function featuredWidget(link) {
 /* A stylized, not-to-scale map: Red Sea hills to the west, the coast and
    the sea to the east, a pin for the church. Static, trusted markup. */
 const MAP_ART = `
-<svg class="mapart" viewBox="0 0 320 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+<svg class="mapart" viewBox="0 0 320 150" preserveAspectRatio="xMaxYMid slice" aria-hidden="true" focusable="false">
   <defs>
     <linearGradient id="mapart-sea" x1="0" x2="1" y1="0" y2="0">
       <stop offset="0" stop-color="#0b3f4f"/>
@@ -335,8 +347,9 @@ function locationWidget(location) {
 
   const map = h('div', { class: 'location__map', id: 'location-map' }, art.content.firstElementChild);
 
+  // one toggle; both labels share one cell (CSS shows one): its size never changes
   const toggle = h('button', {
-    class: 'btn',
+    class: 'btn location__toggle',
     type: 'button',
     'aria-expanded': 'false',
     'aria-controls': 'location-map',
@@ -360,11 +373,12 @@ function locationWidget(location) {
       }
       map.classList.toggle('is-live', show);
       toggle.setAttribute('aria-expanded', String(show));
-      toggle.lastChild.textContent = show ? 'اخفي الخريطة' : 'عرض الخريطة';
+      // a phone: the opened map may start above the screen
+      if (show && map.getBoundingClientRect().top < 64) map.scrollIntoView({ block: 'nearest', behavior: motionTier() === 'reduced' ? 'auto' : 'smooth' });
     }
   },
   iconNode('map-view'),
-  h('span', {}, 'عرض الخريطة')
+  h('span', { class: 'location__toggle-label' }, h('span', {}, 'عرض الخريطة'), h('span', {}, 'اخفي الخريطة'))
   );
 
   const maps = location.mapsUrl || location.directionsUrl;
@@ -886,20 +900,41 @@ function matchBanners(a, b) {
 /*
  * A section's own look, applied in one place for every kind (the meeting,
  * links, contacts, share, a kind added later...): the banner the admin
- * chose goes on top of the section's first widget; the theme tints it.
+ * chose goes on top of the section's first widget; the theme tints it;
+ * its surface («شكل الخلفية») goes on each of its widgets (the phone's own
+ * choice below 640px).
  */
-function dressSection(el, section) {
+const PHONE = matchMedia('(max-width: 639px)');
+let surfaced = [];
 
-  if (section.banner && !el.querySelector(':scope > .section-banner')) {
+function dressSection(el, section, first) {
+
+  if (first && section.banner && !el.querySelector(':scope > .section-banner')) {
     el.prepend(sectionBanner(section));
     el.classList.add('has-banner');
   }
 
-  if (section.theme && !el.hasAttribute('data-theme')) {
+  if (first && section.theme && !el.hasAttribute('data-theme')) {
     el.dataset.theme = section.theme;
   }
 
+  if (section.surface || section.surfaceMobile) {
+    surfaced.push([el, section]);
+    paintSurface(el, section);
+  }
+
 }
+
+function paintSurface(el, section) {
+
+  const surface = (PHONE.matches && section.surfaceMobile) || section.surface;
+
+  if (surface) el.dataset.surface = surface;
+  else el.removeAttribute('data-surface');
+
+}
+
+PHONE.addEventListener('change', () => surfaced.forEach(([el, section]) => paintSurface(el, section)));
 
 
 export function renderPage(content, clock, actions, { animate = false } = {}) {
@@ -1014,12 +1049,14 @@ export function renderPage(content, clock, actions, { animate = false } = {}) {
   // live games whose section comes after everything else
   placeLiveGames();
 
-  // every section, whatever its kind: its banner and theme, once, on its first widget
+  // every section, whatever its kind: its banner and theme once, on its
+  // first widget; its surface on each of its widgets
   const dressed = new Set();
+  surfaced = [];
   for (const item of flow) {
-    if (!item.section || dressed.has(item.section)) continue;
+    if (!item.section) continue;
+    dressSection(item.el, item.section, !dressed.has(item.section));
     dressed.add(item.section);
-    dressSection(item.el, item.section);
   }
 
   pairUp([{ el: hero, kind: 'hero' }, ...flow]);

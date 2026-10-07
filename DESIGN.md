@@ -130,3 +130,6 @@ Sounds never play in a hidden tab. Sounds not caused by a tap ("ready",
 | «جديد الأسرة»     | A featured poster card, then a swipeable row of cards (a grid on desktop); each opens a sheet with the full poster, text, link and share |
 | Games            | Cards with state: «قريبًا» (locked button + countdown), «اللعبة جاهزة دلوقتي 🔥» (moves up under the meeting as the live card), «انتهت» (muted) |
 | Bell panel       | Grouped by النهارده / امبارح / الأسبوع ده / أقدم; type icons (important in carmine); unread dots; poster thumbnails |
+| Meeting program  | While the meeting runs: «دلوقتي» (bold) and «بعدها» (with its time while it is still ahead) in two fixed rows under the countdown; one quiet «أول حاجة» line earlier that day; nothing after. A soft roll on a change in the full tier only. The meeting sheet lists the whole program, the stage on now in a gold-lit row |
+| Surfaces («شكل الخلفية») | Per section, and per section on phones: glass (see-through, a soft hairline, frosted in the full tier only), dark (one solid deep navy), filled (the featured card's light), none (no box). Unset = the usual look |
+| Location on phones | A narrow card (≤ 380px) lets its buttons flow: Google Maps full width, then directions + the one map toggle (both labels share one cell, so it never changes size); the real map is 5:4 and exactly as wide as the card |

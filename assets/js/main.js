@@ -171,7 +171,8 @@ function openRoute(route) {
   if (route.name === 'meeting') {
     if (!live('meeting')) return missing();
     const status = meetingSnapshot() || meetingStatus(current.meeting, time.now, current.sessions);
-    const title = status && status.session && status.session.topic ? 'الاجتماع الجاي' : (current.meeting ? current.meeting.title : 'الاجتماع');
+    const title = status && status.state === 'live' ? 'الاجتماع دلوقتي'
+      : status && status.session && status.session.topic ? 'الاجتماع الجاي' : (current.meeting ? current.meeting.title : 'الاجتماع');
     withDetail(d => openSheet({ title, content: d.meetingSheetContent(current, status, time.stamp), onClose }));
   }
 

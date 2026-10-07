@@ -146,4 +146,35 @@ for (const [path, data] of Object.entries(world.github.files())) {
   writeFileSync(OUT + path, data);
 }
 
+/*
+ * Optional, written straight into the published file (the same fields the
+ * admin publishes: sessions[].program, layout[].surface / surfaceMobile):
+ *   --program                a meeting on now (started 40 min ago) with a
+ *                            four-stage program; also writes live.json
+ *                            (automatic: stage null) next to it
+ *   --live=<n>               live.json names stage n instead
+ *   --surface=<s>            the social section's surface (glass|dark|filled|none)
+ *   --surface-mobile=<s>     its phone-only surface
+ */
+const flag = name => (process.argv.find(a => a.startsWith(`--${name}=`)) || '').split('=')[1] || '';
+
+if (process.argv.includes('--program') || flag('surface') || flag('surface-mobile')) {
+  const content = JSON.parse(readFileSync(`${OUT}content.json`, 'utf8'));
+  if (process.argv.includes('--program')) {
+    const start = gs.wallAdd_(now, -40);
+    const date = start.slice(0, 10);
+    const program = [['تسبحة', 0, 30], ['الكلمة', 30, 75], ['ترانيم', 75, 105], ['الختام', 105, 120]]
+      .map(([title, from, to]) => ({ title, start: gs.wallAdd_(start, from), end: gs.wallAdd_(start, to) }));
+    content.sessions = content.sessions.filter(s => s.date !== date).concat({
+      date, time: start.slice(11), topic: 'حياة التسليم', speaker: 'أبونا أنطوني عياد', status: 'normal', durationMinutes: 120, program
+    }).sort((a, b) => a.date.localeCompare(b.date));
+    const stage = flag('live');
+    writeFileSync(`${OUT}live.json`, JSON.stringify({ schema: 1, date, stage: stage === '' ? null : Number(stage), updatedAt: new Date().toISOString() }));
+  }
+  const social = content.layout.find(s => s.key === 'social');
+  if (social && flag('surface')) social.surface = flag('surface');
+  if (social && flag('surface-mobile')) social.surfaceMobile = flag('surface-mobile');
+  writeFileSync(`${OUT}content.json`, JSON.stringify(content));
+}
+
 console.log(`demo written to tools/.cache/demo (${review.changes.length} changes), now = ${now}`);
