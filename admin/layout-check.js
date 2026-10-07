@@ -1,7 +1,10 @@
 /*
- * LAYOUT CHECK (only with ?layout in the address): finds anything wider than
- * the page — the source of a sideways scrollbar — and names it in a small
- * panel, so a screenshot shows the exact element. Reads the page only.
+ * LAYOUT CHECK (only with ?layout in the address): finds what makes the page
+ * wider than the window — the source of a sideways scrollbar — and names it
+ * in a small panel, so one screenshot shows the exact element. Reads only.
+ *
+ * Positions are measured from the page itself (not the scrolled view), and
+ * every element is ranked by how far it sticks out, worst first.
  */
 (function () {
 
@@ -19,25 +22,39 @@
 
   function scan() {
     var root = document.documentElement;
-    var width = root.clientWidth;
-    var lines = ['page ' + root.scrollWidth + ' / view ' + width];
+    var view = root.clientWidth;
+    // page coordinates: undo the horizontal scroll (RTL scrolls to negative)
+    var shift = window.scrollX || 0;
+    var rows = [];
     var all = document.querySelectorAll('body *');
 
-    for (var i = 0; i < all.length && lines.length < 12; i++) {
+    for (var i = 0; i < all.length; i++) {
       var el = all[i];
       if (el.closest('#layout-check')) continue;
       var r = el.getBoundingClientRect();
       if (!r.width && !r.height) continue;
-      var cs = getComputedStyle(el);
-      // something sticking out of the page
-      if (r.right > width + 0.5 || r.left < -0.5) {
-        lines.push('OUT ' + describe(el) + ' [' + Math.round(r.left) + '…' + Math.round(r.right) + '] ' + cs.position);
-      }
-      // a box that scrolls sideways on its own
-      else if (el.scrollWidth > el.clientWidth + 1 && el.clientWidth > 0 && /auto|scroll/.test(cs.overflowX)) {
-        lines.push('SCROLL ' + describe(el) + ' ' + el.scrollWidth + '/' + el.clientWidth);
-      }
+      var left = r.left + shift;
+      var right = r.right + shift;
+      var out = Math.max(0, right - view) + Math.max(0, -left);
+      if (out > 0.5) rows.push({ el: el, left: left, right: right, out: out });
     }
+
+    rows.sort(function (a, b) { return b.out - a.out; });
+
+    var lines = ['page ' + root.scrollWidth + ' / view ' + view + ' / scrolled ' + Math.round(shift)];
+
+    rows.slice(0, 6).forEach(function (row) {
+      var cs = getComputedStyle(row.el);
+      lines.push('OUT ' + Math.round(row.out) + 'px ' + describe(row.el) +
+        ' [' + Math.round(row.left) + '…' + Math.round(row.right) + '] ' + cs.position +
+        (row.el.getAttribute('style') ? ' style="' + row.el.getAttribute('style').slice(0, 80) + '"' : ''));
+    });
+
+    if (rows[0]) {
+      lines.push('worst: ' + rows[0].el.outerHTML.replace(/\s+/g, ' ').slice(0, 160));
+    }
+
+    lines.push('body: ' + Array.prototype.map.call(document.body.children, describe).join(' | '));
 
     var box = document.getElementById('layout-check');
     if (!box) {
