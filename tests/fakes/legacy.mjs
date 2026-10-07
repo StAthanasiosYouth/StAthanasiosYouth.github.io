@@ -57,21 +57,56 @@ export function legacyWorld({ meetingEnabled = true } = {}) {
 }
 
 
+/* the columns schema 5 added (the live Sheet is at schema 4 before it) */
+export const SCHEMA_5_COLUMNS = {
+  Sections: ['surface', 'surfaceMobile'],
+  Sessions: ['program']
+};
+
+/* migrate with some columns left out (an older version's tabs), then put the current ones back */
+function migrateWithout(world, ...groups) {
+
+  const gs = world.gs;
+  const saved = {};
+
+  for (const group of groups) {
+    for (const [name, extra] of Object.entries(group)) {
+      saved[name] = saved[name] || gs.TABLES[name].columns;
+      gs.TABLES[name].columns = gs.TABLES[name].columns.filter(column => !extra.includes(column));
+    }
+  }
+  world.as(ADMIN).gs.migrate();
+  for (const [name, columns] of Object.entries(saved)) gs.TABLES[name].columns = columns;
+
+}
+
 /** A Sheet like the live one at schema 3: upgraded once, WhatsApp row in. */
 export function schema3World() {
 
   const world = legacyWorld();
-  const gs = world.gs;
-  const saved = {};
-
-  // migrate with the schema-3 columns, then put the current ones back
-  for (const [name, extra] of Object.entries(SCHEMA_4_COLUMNS)) {
-    saved[name] = gs.TABLES[name].columns;
-    gs.TABLES[name].columns = saved[name].filter(column => !extra.includes(column));
-  }
-  world.as(ADMIN).gs.migrate();
-  for (const [name, columns] of Object.entries(saved)) gs.TABLES[name].columns = columns;
+  migrateWithout(world, SCHEMA_4_COLUMNS, SCHEMA_5_COLUMNS);
   world.properties.set('DATA_SCHEMA', '3');
+
+  return world;
+
+}
+
+/**
+ * A Sheet like the live one today (schema 4): upgraded twice, with content
+ * in the schema-4 columns too (a person card's intro), a section with a
+ * colour and a dated meeting.
+ */
+export function schema4World() {
+
+  const world = legacyWorld();
+  migrateWithout(world, SCHEMA_5_COLUMNS);
+  world.properties.set('DATA_SCHEMA', '4');
+
+  const gs = world.as(ADMIN).gs;
+  gs.apiSaveSection({ key: 'news', title: 'جديد الأسرة', theme: 'azure' });
+  gs.apiSaveItem('sessions', { date: '2099-10-18', topic: 'الصلاة', speaker: 'أبونا', notify: { topic: false } });
+  const contact = JSON.parse(JSON.stringify(gs.readTable_('Contacts')[0]));
+  gs.apiSaveContact({ ...contact, intro: 'عندك سؤال؟' });
 
   return world;
 

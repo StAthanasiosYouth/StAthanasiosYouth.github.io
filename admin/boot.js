@@ -18,8 +18,13 @@
  *    time — loading Google → waiting for the sign-in → asking the server →
  *    drawing the panel. Every stage has a watchdog: "slower than usual"
  *    first, then a clear Arabic message with «جرّب تاني», never a blank
- *    page. The gate goes away only once the panel is drawn. The recovery
- *    admin (Apps Script) is a small link, never a redirect.
+ *    page. Once Google answers, the gate says «جاري التحقق...» (with the
+ *    account) while the server and the panel get ready, and closes
+ *    Google's own prompt. The gate goes away only once the panel is drawn
+ *    AND measured on screen (reveal()); a request the browser itself
+ *    dropped (a phone freezing the tab behind Google's sign-in) is a
+ *    «جرّب تاني», never a page left waiting. The recovery admin (Apps
+ *    Script) is a small link, never a redirect.
  * 5. One session per Google account: signing in asks the server for a
  *    session; if the account is live on another device the gate asks
  *    before taking over. A tab that was taken over goes back to the gate.
@@ -75,6 +80,7 @@
   var waiting = null;          // a sign-in the panel is waiting for
   var reauth = null;           // the «ادخل تاني» dialog
   var restarting = null;       // a quiet new session (the server forgot this one)
+  var verifying = '';          // the account the gate is verifying now («جاري التحقق...»)
 
 
   /*
@@ -324,7 +330,7 @@
     }
 
     if (hint) {
-      hint.textContent = 'لو دخلت قبل كده، جوجل ممكن يدخّلك لوحده…';
+      hint.textContent = 'جاري التحقق... لو دخلت قبل كده، جوجل هيدخّلك لوحده — أو دوس على الزرار.';
       hint.hidden = false;
       shown = true;
       stop = watchdog(TIMING.silent, done);
@@ -365,6 +371,10 @@
 
     remember({ token: token, email: claims.email, exp: claims.exp });
 
+    // Google's own prompt (One Tap / FedCM) has done its job: close it, so
+    // nothing of Google's stays over the page while we verify
+    cancelPrompt();
+
     if (waiting) {
       var done = waiting;
       waiting = null;
@@ -372,7 +382,26 @@
       done.resolve(token);
     }
 
-    if (phase === 'gate') enter();
+    if (phase !== 'gate') return;
+
+    // Google may answer twice (auto-select, then the prompt): the same
+    // account already being verified is not a new try
+    if (verifying === claims.email && gate.dataset.state === 'loading') return;
+
+    enter();
+
+  }
+
+  function cancelPrompt() {
+
+    try {
+      if (window.google && window.google.accounts && window.google.accounts.id && window.google.accounts.id.cancel) {
+        window.google.accounts.id.cancel();
+      }
+    }
+    catch (ignored) {
+      // nothing open
+    }
 
   }
 
@@ -598,6 +627,9 @@
   /* state: what the gate says; stage: where the sign-in is (loading only) */
   function showGate(state, nodes, stage) {
 
+    if (state !== 'loading') verifying = '';
+    // before the panel, the gate is always on screen (never a blank page)
+    if (phase === 'gate') gate.hidden = false;
     gate.dataset.state = state;
     if (stage) gate.dataset.stage = stage;
     else delete gate.dataset.stage;
@@ -621,16 +653,27 @@
 
   }
 
-  function showLoading(text, stage) {
+  /*
+   * Google said who you are; now the server and the panel: «جاري التحقق...»
+   * with the account and the step, on the sign-in screen itself. It stays
+   * until the panel is drawn; anything that stalls turns into «جرّب تاني».
+   */
+  function showVerifying(step, stage) {
 
     var note = h('p', { class: 'gate__note gate__note--slow', role: 'status', hidden: true });
+    var email = session && session.email || '';
 
     showGate('loading', [
+      h('h2', { class: 'gate__heading', text: 'ادخل بحساب جوجل' }),
       h('p', { class: 'gate__status', role: 'status' },
         h('span', { class: 'gate__line', 'aria-hidden': 'true' }, h('i')),
-        h('span', { text: text })),
+        h('span', { class: 'gate__verify', text: 'جاري التحقق...' })),
+      email ? h('p', { class: 'gate__email', dir: 'ltr', text: email }) : null,
+      h('p', { class: 'gate__note gate__step', text: step }),
       note
     ], stage);
+
+    verifying = email;
 
     return {
       slow: function (message) {
@@ -811,7 +854,7 @@
 
     var my = nextAttempt();
     var signal = controller ? controller.signal : undefined;
-    var view = showLoading(options.force ? 'بنقفل الجلسة التانية وبنفتح هنا…' : 'بنفتح لوحة التحكم…', 'server');
+    var view = showVerifying(options.force ? 'بنقفل الجلسة التانية وبنفتح هنا…' : 'بنفتح لوحة التحكم…', 'server');
     var stopSlow = watchdog(TIMING.slow, function () {
       if (my !== attempt) return;
       view.slow('بياخد وقت أطول من العادي… الخادم بيصحى لو بقاله فترة من غير استخدام، وده ممكن ياخد لحد ١٥ ثانية.');
@@ -840,8 +883,13 @@
       })
       .catch(function (error) {
         stopSlow();
-        if (my !== attempt || error.aborted) return;
-        var info = parsed(error);
+        // a newer try took over: its own answer decides
+        if (my !== attempt) return;
+        // stopped by the browser itself (the tab was frozen or put away while
+        // Google's sign-in was in front): never a page left waiting — try again
+        var info = error.aborted
+          ? { message: 'الاتصال بخادم لوحة التحكم اتقطع.', hint: 'جرّب تاني.', details: 'apiSessionStart: aborted by the browser' }
+          : parsed(error);
         showProblem(info.message, info.hint, info.details, function () { enter(options); });
       });
 
@@ -871,7 +919,7 @@
   /* draws the panel behind the gate; the gate goes only once it is drawn */
   function openPanel(state, my) {
 
-    showLoading('بنجهز اللوحة…', 'dashboard');
+    showVerifying('بنجهز اللوحة…', 'dashboard');
 
     window.AdminTransport = { call: call };
     A.signOut = signOut;
@@ -902,12 +950,44 @@
         showProblem('لوحة التحكم مفتحتش.', 'جرّب تاني. لو المشكلة فضلت، استخدم لوحة الطوارئ.', '', function () { enter(); });
         return;
       }
+      var blank = reveal();
+      if (blank) {
+        showProblem('لوحة التحكم مظهرتش على الشاشة.', 'جرّب تاني. لو المشكلة فضلت، استخدم لوحة الطوارئ.', 'render: ' + blank, function () { enter(); });
+        return;
+      }
       phase = 'app';
-      gate.hidden = true;
-      shell.hidden = false;
-      document.body.classList.remove('is-gated');
       collab.begin();
     });
+
+  }
+
+  /*
+   * The gate → the panel, in one go (no frame is painted in between): the
+   * panel is shown and measured first; only a panel that really has
+   * something on screen replaces the gate. Returns '' when it did, else
+   * what was wrong (the gate stays, the panel is hidden again).
+   */
+  function reveal() {
+
+    var view = document.getElementById('view');
+
+    shell.hidden = false;
+
+    var box = view ? view.getBoundingClientRect() : null;
+    var problem = !view ? 'no #view'
+      : !view.childElementCount ? 'the view is empty'
+      : !(box.width > 0 && box.height > 0) ? 'the view has no size (' + Math.round(box.width) + '×' + Math.round(box.height) + ')'
+      : '';
+
+    if (problem) {
+      shell.hidden = true;
+      return problem;
+    }
+
+    gate.hidden = true;
+    document.body.classList.remove('is-gated');
+
+    return '';
 
   }
 
@@ -1142,6 +1222,15 @@
     showUnconfigured();
     return;
   }
+
+  // back from the back/forward cache while still at the gate: whatever was
+  // in flight is gone, so verify again (or show the button) — never a page
+  // left on «جاري التحقق...»
+  window.addEventListener('pageshow', function (event) {
+    if (!event.persisted || phase !== 'gate' || gate.dataset.state !== 'loading') return;
+    if (fresh(session)) enter();
+    else showSignIn();
+  });
 
   showSignIn();
 

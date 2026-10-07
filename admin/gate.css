@@ -442,12 +442,29 @@ body.is-gated {
   margin: 0;
 }
 
+/* «جاري التحقق...»: the account and the step under it */
+.gate__verify {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #f2d28b;
+}
+
+.gate__panel .gate__email {
+  justify-self: center;
+}
+
+.gate__step {
+  margin-top: -6px;
+}
+
+/* the entrances below start dimmed, never invisible: if a phone doesn't
+   run them (a tab put away, a throttled renderer), everything still shows */
 @keyframes gate-rise {
-  from { opacity: 0; transform: translateY(18px) scale(.94); }
+  from { opacity: .35; transform: translateY(18px) scale(.94); }
 }
 
 @keyframes gate-logo {
-  from { opacity: 0; transform: scale(.6) rotate(-10deg); }
+  from { opacity: .35; transform: scale(.6) rotate(-10deg); }
 }
 
 @keyframes gate-ring {
@@ -456,11 +473,11 @@ body.is-gated {
 }
 
 @keyframes gate-drop {
-  from { opacity: 0; transform: translate(-50%, -10px); }
+  from { opacity: .35; transform: translate(-50%, -10px); }
 }
 
 @keyframes gate-in {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: .35; transform: translateY(10px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -485,10 +502,19 @@ body.is-gated {
   max-width: calc(100% - 24px);
 }
 
+/* a card, never a sheet over the whole screen: whatever size Google's
+   script sets (it can set inline sizes through the CSSOM, which the CSP
+   allows), the sign-in screen and the panel stay visible around it */
+#credential_picker_container,
+#credential_picker_container iframe,
+#credential_picker_iframe {
+  max-width: min(400px, calc(100vw - 24px)) !important;
+  max-height: min(420px, 70vh) !important;
+}
+
 #credential_picker_container iframe,
 #credential_picker_iframe {
   display: block;
-  max-width: 100%;
   border: 0;
 }
 

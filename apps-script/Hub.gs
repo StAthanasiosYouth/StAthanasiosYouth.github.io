@@ -114,6 +114,171 @@ function sessionDuration_(value) {
 
 
 /* =========================================================
+   MEETING PROGRAM «برنامج الاجتماع»
+   Stored (Sessions.program) as JSON text, in order:
+     [{ title (≤ 40), time 'HH:MM' | '', minutes 1..600 | '' }]
+   Published (content.json sessions[].program) as contiguous Cairo wall
+   times: [{ title, start, end }] — a stage ends where the next one
+   starts, the last one at the meeting's end.
+========================================================= */
+
+var PROGRAM_LIMITS = { stages: 20, title: 40, minutes: 600 };
+
+/**
+ * The stages of a cell / an editor's list, checked for shape only:
+ * { stages: [{ title, time, minutes }], problems: ['…'] }. '' = no program.
+ */
+function programStages_(value) {
+
+  var problems = [];
+  var list = value;
+
+  if (value === null || value === undefined || value === '') {
+    return { stages: [], problems: problems };
+  }
+
+  if (typeof value === 'string') {
+    var text = contentText_(value);
+    if (!text) return { stages: [], problems: problems };
+    try {
+      list = JSON.parse(text);
+    }
+    catch (ignored) {
+      return { stages: [], problems: ['البرنامج المتسجل مش مفهوم (افتحه من لوحة التحكم واحفظه تاني)'] };
+    }
+  }
+
+  if (!Array.isArray(list)) {
+    return { stages: [], problems: ['البرنامج المتسجل مش مفهوم (افتحه من لوحة التحكم واحفظه تاني)'] };
+  }
+
+  if (list.length > PROGRAM_LIMITS.stages) {
+    problems.push('أقصى عدد فقرات ' + PROGRAM_LIMITS.stages);
+  }
+
+  var stages = [];
+
+  list.slice(0, PROGRAM_LIMITS.stages).forEach(function (item, i) {
+
+    item = item && typeof item === 'object' ? item : {};
+
+    var title = contentLine_(item.title);
+    var label = 'الفقرة ' + (i + 1) + (title ? ' «' + title + '»' : '');
+    var time = contentTime_(item.time === undefined || item.time === null ? '' : item.time);
+    var minutesText = contentDigits_(item.minutes === undefined || item.minutes === null ? '' : String(item.minutes));
+    var minutes = minutesText === '' ? '' : Number(minutesText);
+
+    if (!title) problems.push(label + ': الاسم مطلوب');
+    if (title.length > PROGRAM_LIMITS.title) problems.push(label + ': الاسم أطول من ' + PROGRAM_LIMITS.title + ' حرف');
+    if (time === null) problems.push(label + ': الوقت لازم يكون بالشكل 20:30');
+    if (minutes !== '' && !(minutes >= 1 && minutes <= PROGRAM_LIMITS.minutes && Math.round(minutes) === minutes)) {
+      problems.push(label + ': المدة لازم تكون عدد دقايق من 1 لـ ' + PROGRAM_LIMITS.minutes);
+    }
+
+    stages.push({ title: title, time: time || '', minutes: minutes === '' || isNaN(minutes) ? '' : minutes });
+
+  });
+
+  return { stages: stages, problems: problems };
+
+}
+
+
+/**
+ * Stages → the published, contiguous program of one meeting.
+ * date 'YYYY-MM-DD', startTime 'HH:MM' (the meeting's), duration minutes
+ * or null (unknown). A stage starts at its own time, else right after the
+ * previous one (its start + its minutes); the first defaults to the
+ * meeting's start. Each ends where the next starts; the last at the
+ * meeting's end (or its own minutes when the meeting's length is unknown).
+ * → { stages: [{ title, start, end }], errors: [], warnings: [] }
+ */
+function resolveProgram_(stages, date, startTime, duration) {
+
+  var errors = [];
+  var warnings = [];
+  var out = [];
+
+  if (!stages || !stages.length) {
+    return { stages: out, errors: errors, warnings: warnings };
+  }
+
+  if (!startTime) {
+    errors.push('ميعاد الاجتماع نفسه مش معروف، فمينفعش نحسب أوقات الفقرات');
+    return { stages: out, errors: errors, warnings: warnings };
+  }
+
+  var meetingStart = date + 'T' + startTime;
+  var meetingEnd = duration ? wallAdd_(meetingStart, duration) : '';
+  var crossesMidnight = !!meetingEnd && meetingEnd.slice(0, 10) !== date;
+  var name = function (stage, i) { return '«' + (stage.title || ('الفقرة ' + (i + 1))) + '»'; };
+
+  for (var i = 0; i < stages.length; i++) {
+
+    var stage = stages[i];
+    var start = '';
+
+    if (stage.time) {
+      start = date + 'T' + stage.time;
+      // a meeting that runs past midnight: an early time is the next day
+      if (crossesMidnight && stage.time < startTime) start = wallAdd_(start, 1440);
+    }
+    else if (i === 0) {
+      start = meetingStart;
+    }
+    else if (stages[i - 1].minutes && out[i - 1]) {
+      start = wallAdd_(out[i - 1].start, stages[i - 1].minutes);
+    }
+    else {
+      errors.push(name(stage, i) + ' محتاجة وقت بداية، أو الفقرة اللي قبلها محتاجة مدة');
+      return { stages: [], errors: errors, warnings: warnings };
+    }
+
+    if (start < meetingStart) {
+      errors.push(name(stage, i) + ' بتبدأ قبل ميعاد الاجتماع');
+    }
+
+    if (meetingEnd && start >= meetingEnd) {
+      errors.push(name(stage, i) + ' بتبدأ بعد ما الاجتماع يخلص');
+    }
+
+    if (i > 0 && out[i - 1] && start <= out[i - 1].start) {
+      errors.push('الفقرات مش بالترتيب: ' + name(stage, i) + ' لازم تبدأ بعد ' + name(stages[i - 1], i - 1));
+    }
+    else if (i > 0 && stage.time && stages[i - 1].minutes && wallAdd_(out[i - 1].start, stages[i - 1].minutes) > start) {
+      warnings.push(name(stages[i - 1], i - 1) + ' مدتها بتدخل في ' + name(stage, i) + '، فهتخلص أول ما اللي بعدها تبدأ');
+    }
+
+    out.push({ title: stage.title, start: start, end: '' });
+
+  }
+
+  for (var j = 0; j < out.length - 1; j++) {
+    out[j].end = out[j + 1].start;
+  }
+
+  var last = out[out.length - 1];
+  var lastStage = stages[stages.length - 1];
+
+  if (meetingEnd) {
+    last.end = meetingEnd;
+    if (lastStage.minutes && wallAdd_(last.start, lastStage.minutes) > meetingEnd) {
+      warnings.push(name(lastStage, stages.length - 1) + ' هتخلص مع نهاية الاجتماع');
+    }
+  }
+  else if (lastStage.minutes) {
+    last.end = wallAdd_(last.start, lastStage.minutes);
+  }
+  else {
+    errors.push('حدد مدة الاجتماع، أو مدة آخر فقرة، علشان نعرف البرنامج بيخلص إمتى');
+  }
+
+  return { stages: errors.length ? [] : out, errors: errors, warnings: warnings };
+
+}
+
+
+/* =========================================================
    MEDIA
 ========================================================= */
 
@@ -286,7 +451,7 @@ function buildHub_(draft, ctx) {
       cancelledDates.push(date);
     }
 
-    sessions.push({
+    var entry = {
       date: date,
       time: time || '',
       topic: ctx.limited(where, contentLine_(row.topic), HUB_LIMITS.topic, 'الموضوع'),
@@ -297,7 +462,26 @@ function buildHub_(draft, ctx) {
       note: ctx.limited(where, contentLine_(row.note), LIMITS.note, 'الملاحظة'),
       visibleFrom: dateTime(where, row.visibleFrom, false, 'ميعاد الظهور'),
       durationMinutes: sessionDuration_(row.durationMinutes)
-    });
+    };
+
+    // «برنامج الاجتماع»: contiguous stages in Cairo wall time (only when there is one)
+    var program = programStages_(row.program);
+
+    program.problems.forEach(function (problem) { ctx.error(where, 'برنامج الاجتماع: ' + problem); });
+
+    if (!program.problems.length && program.stages.length && status !== 'cancelled') {
+      var resolved = resolveProgram_(
+        program.stages,
+        date,
+        time || contentTime_(ctx.setting('meeting.time')) || '',
+        entry.durationMinutes || sessionDuration_(ctx.setting('meeting.durationMinutes'))
+      );
+      resolved.errors.forEach(function (problem) { ctx.error(where, 'برنامج الاجتماع: ' + problem); });
+      resolved.warnings.forEach(function (problem) { ctx.warn(where, 'برنامج الاجتماع: ' + problem); });
+      if (!resolved.errors.length && resolved.stages.length) entry.program = resolved.stages;
+    }
+
+    sessions.push(entry);
 
   });
 

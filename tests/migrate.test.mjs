@@ -34,7 +34,7 @@ test('planMigration only reads, and lists exactly the approved steps', () => {
   const plan = plain(w.as(ADMIN).gs.apiPlanMigration());
   assert.deepEqual(snapshot(w), before, 'nothing written');
   assert.equal(plan.pending, true);
-  assert.deepEqual([plan.current, plan.target], [2, 4]);
+  assert.deepEqual([plan.current, plan.target], [2, 5]);
   const steps = Object.fromEntries(plan.steps.map(s => [s.id, s]));
   assert.deepEqual(Object.keys(steps), ['tabs', 'columns', 'sections', 'whatsapp']);
   assert.match(steps.tabs.detail, /Activities، Types/);
@@ -91,7 +91,7 @@ test('migrate: backups first, nothing lost, everything added, same page', () => 
   const whatsapp = plain(w.gs.readTable_('Links')).find(l => l.url === 'https://chat.whatsapp.com/K5CfLt5X0uM5qCgr7Z2PTt');
   assert.equal(whatsapp.section, 'social');
   assert.equal(whatsapp.icon, 'whatsapp');
-  assert.equal(w.properties.get('DATA_SCHEMA'), '4');
+  assert.equal(w.properties.get('DATA_SCHEMA'), '5');
 
   // 4. the page is the same (plus the WhatsApp link), in the same order
   const pageAfter = visibleContent(w);
@@ -149,7 +149,7 @@ test('the WhatsApp link is not added twice', () => {
 test('before the upgrade: the admin sees the built-in sections, editing them asks for the upgrade', () => {
   const w = legacyWorld();
   const state = plain(w.as(ADMIN).gs.apiState());
-  assert.deepEqual([state.schema.data, state.schema.target], [2, 4]);
+  assert.deepEqual([state.schema.data, state.schema.target], [2, 5]);
   assert.equal(state.layout.find(s => s.key === 'meeting').virtual, true);
   assert.throws(() => w.gs.apiSetSectionEnabled('meeting', false), /ترقية البيانات/);
   assert.equal(state.hubReady, true, 'the content center keeps working');
@@ -221,12 +221,12 @@ test('a scheduled section carries its window to the site', () => {
 
 /* ---------------- schema 4: the live Sheet today (schema 3) ---------------- */
 
-test('schema 3 -> 4: only the four new columns, a backup, the same page', () => {
+test('schema 3 -> 5 (an older Sheet skipping a step): only the seven new columns, a backup, the same page', () => {
   const w = schema3World();
   const gs = w.as(ADMIN).gs;
   const plan = plain(gs.apiPlanMigration());
-  assert.deepEqual([plan.current, plan.target], [3, 4]);
-  assert.deepEqual(plan.steps.filter(s => s.needed).map(s => [s.id, s.detail]), [['columns', 'Links: gallery — Contacts: image, intro, reply']]);
+  assert.deepEqual([plan.current, plan.target], [3, 5]);
+  assert.deepEqual(plan.steps.filter(s => s.needed).map(s => [s.id, s.detail]), [['columns', 'Sections: surface, surfaceMobile — Links: gallery — Contacts: image, intro, reply — Sessions: program']]);
 
   const before = plain(gs.buildDraft_()).content;
   const counts = plain(gs.tableCounts_(gs.spreadsheet_()));
@@ -234,7 +234,7 @@ test('schema 3 -> 4: only the four new columns, a backup, the same page', () => 
   assert.equal(report.changed, true);
   assert.ok(report.backups.some(name => /_backup_\d{8}(-\d+)?_Contacts$/.test(name)), 'Contacts backed up first');
   assert.deepEqual(plain(gs.tableCounts_(gs.spreadsheet_())), counts, 'no row added or lost');
-  assert.equal(w.properties.get('DATA_SCHEMA'), '4');
+  assert.equal(w.properties.get('DATA_SCHEMA'), '5');
   assert.deepEqual(plain(gs.buildDraft_()).content, before, 'visitors see exactly the same page');
 
   // again: nothing to do

@@ -54,6 +54,9 @@ function linkExperiences_() {
 
 var SECTION_THEMES = ['gold', 'ember', 'azure', 'rose', 'emerald', 'night'];
 
+/* the cards' background in a section («شكل الخلفية»); '' = automatic (the site decides) */
+var SECTION_SURFACES = ['glass', 'dark', 'filled', 'none'];
+
 /* today's page order; link groups sit between "before" and "after" */
 var BUILTIN_SECTIONS = [
   { key: 'meeting', kind: 'meeting', title: 'ركن الاجتماع', place: 'before' },
@@ -1097,6 +1100,20 @@ function resolveLayout_(rows, setting, error, limited) {
 
     var icon = contentLine_(row.icon).toLowerCase();
 
+    // «شكل الخلفية»: a whitelist; '' = automatic, the phone one '' = same as the computer
+    var surface = contentLine_(row.surface).toLowerCase();
+    var surfaceMobile = contentLine_(row.surfaceMobile).toLowerCase();
+
+    if (surface && SECTION_SURFACES.indexOf(surface) === -1) {
+      error(where, 'شكل الخلفية "' + surface + '" مش معروف');
+      surface = '';
+    }
+
+    if (surfaceMobile && SECTION_SURFACES.indexOf(surfaceMobile) === -1) {
+      error(where, 'شكل الخلفية على الموبايل "' + surfaceMobile + '" مش معروف');
+      surfaceMobile = '';
+    }
+
     var entry = {
       key: key,
       kind: kind,
@@ -1105,6 +1122,8 @@ function resolveLayout_(rows, setting, error, limited) {
       icon: ICON_NAMES.indexOf(icon) !== -1 ? icon : '',
       theme: theme,
       banner: contentLine_(row.banner),
+      surface: surface,
+      surfaceMobile: surfaceMobile,
       enabled: contentBool_(row.enabled),
       visibleFrom: from || '',
       visibleUntil: until || '',
@@ -1136,6 +1155,8 @@ function resolveLayout_(rows, setting, error, limited) {
       icon: '',
       theme: '',
       banner: '',
+      surface: '',
+      surfaceMobile: '',
       enabled: b.key === 'meeting' ? contentBool_(setting('meeting.enabled')) : true,
       visibleFrom: '',
       visibleUntil: '',
@@ -1169,7 +1190,7 @@ function publicLayout_(rows, linkSections, banners) {
   return rows
     .filter(function (row) { return row.enabled && (row.kind !== 'links' || withLinks[row.key]); })
     .map(function (row) {
-      return {
+      var entry = {
         key: row.key,
         kind: row.kind,
         title: row.title,
@@ -1180,6 +1201,10 @@ function publicLayout_(rows, linkSections, banners) {
         visibleFrom: row.visibleFrom,
         visibleUntil: row.visibleUntil
       };
+      // «شكل الخلفية» (schema-5 data): only when chosen, so older pages stay byte-identical
+      if (row.surface) entry.surface = row.surface;
+      if (row.surfaceMobile) entry.surfaceMobile = row.surfaceMobile;
+      return entry;
     });
 
 }

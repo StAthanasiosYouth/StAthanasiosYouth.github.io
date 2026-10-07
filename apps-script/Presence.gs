@@ -264,7 +264,13 @@ function apiSessionStart(options) {
     var current = readCached_(key);
     var live = !!(current && current.sid && now - Number(current.seen) < SESSION_STALE_SECONDS * 1000);
 
-    if (live && options.force !== true && !(tab && current.tab === tab)) {
+    // a session that never drew its panel (no heartbeat yet) on a device
+    // that looks the same: this page reloaded while signing in (a phone
+    // reloads a tab it put away while Google's sign-in was in front). Not
+    // "another device": no question.
+    var unconfirmed = live && !current.beats && cleanLabel_(current.device, 40) === device;
+
+    if (live && options.force !== true && !(tab && current.tab === tab) && !unconfirmed) {
       return { active: { device: cleanLabel_(current.device, 40), since: ageSeconds_(current.since, now), seen: ageSeconds_(current.seen, now) } };
     }
 
@@ -376,6 +382,8 @@ function apiHeartbeat(info) {
 
       record.locks = held;
       record.seen = now;
+      // the panel is drawn and alive (apiSessionStart: a confirmed session is never taken silently)
+      record.beats = Math.min(Number(record.beats || 0) + 1, 1000000);
       record.area = cleanPlace_(info.area);
       record.view = cleanPlace_(info.view);
       record.item = cleanItem_(info.item);
@@ -497,18 +505,36 @@ function assertUnlocked_(keys) {
 
   [].concat(keys).forEach(function (key) {
 
-    // a key nobody could have locked (locks are taken only with clean keys)
-    if (!cleanLockKey_(key)) return;
+    var holder = lockHolder_(key, now);
 
-    var current = readCached_(lockCacheKey_(key));
-
-    if (current && current.sid !== API_REQUEST_.sid && lockAlive_(current, now)) {
-      var holder = holderOf_(current, now);
+    if (holder) {
       throw apiError_('locked', holder.name + ' بيعدّل ده دلوقتي (' + agoText_(holder.since) + ').',
         'استنى لما يخلّص، وبعدين افتح آخر نسخة وعدّل. الحاجات التانية تقدر تعدّلها عادي.');
     }
 
   });
+
+}
+
+/**
+ * Who holds this lock, when it is ANOTHER live session (API mode only),
+ * else null. For changes that skip a locked item instead of failing
+ * (the meetings import).
+ */
+function lockHolder_(key, now) {
+
+  if (!API_REQUEST_ || !API_REQUEST_.sid) {
+    return null;
+  }
+
+  // a key nobody could have locked (locks are taken only with clean keys)
+  if (!cleanLockKey_(key)) return null;
+
+  now = now || presenceNow_();
+
+  var current = readCached_(lockCacheKey_(key));
+
+  return current && current.sid !== API_REQUEST_.sid && lockAlive_(current, now) ? holderOf_(current, now) : null;
 
 }
 

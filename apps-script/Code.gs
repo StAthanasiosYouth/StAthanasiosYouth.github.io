@@ -146,6 +146,8 @@ function apiStateFor_(email, built) {
     schema: { data: dataSchema_(), target: DATA_SCHEMA_VERSION },
     // every section in page order; virtual = not a Sheet row yet (before the upgrade)
     layout: adminLayout_(draft),
+    // the live meeting's stage as last set from here (live.json, Publish.gs)
+    live: liveState_(),
     now: cairoNow_(),
     meta: {
       icons: ICON_NAMES,
@@ -179,6 +181,8 @@ function adminLayout_(draft) {
       icon: row.icon,
       theme: row.theme,
       banner: row.banner,
+      surface: row.surface,
+      surfaceMobile: row.surfaceMobile,
       enabled: row.enabled,
       visibleFrom: row.visibleFrom.replace('T', ' '),
       visibleUntil: row.visibleUntil.replace('T', ' '),
@@ -572,6 +576,19 @@ function apiSaveSection(input, isNew) {
     problems.push('الأيقونة مش معروفة');
   }
 
+  // «شكل الخلفية» (schema 5): a whitelist; written only when the editor sends it
+  var surfaces = {};
+
+  ['surface', 'surfaceMobile'].forEach(function (name) {
+    if (input[name] === undefined) return;
+    var value = contentLine_(input[name]).toLowerCase();
+    if (value && SECTION_SURFACES.indexOf(value) === -1) {
+      problems.push((name === 'surface' ? 'شكل الخلفية' : 'على الموبايل') + ': الاختيار ده مش معروف');
+      return;
+    }
+    surfaces[name] = value;
+  });
+
   if (problems.length) {
     fail_(problems);
   }
@@ -610,6 +627,16 @@ function apiSaveSection(input, isNew) {
       record.kind = 'links';
       record.order = 0;
     }
+
+    var columns = headerIndex_(sheet_('Sections'));
+
+    Object.keys(surfaces).forEach(function (name) {
+      // a choice needs its column (schema 5): never dropped silently
+      if (surfaces[name] && !columns[name]) {
+        throw appError_('«شكل الخلفية» محتاج ترقية البيانات الأول.', 'من الإعدادات ← ترقية البيانات، وبعدين احفظ تاني.');
+      }
+      record[name] = surfaces[name];
+    });
 
     upsertRow_('Sections', 'key', record);
 

@@ -22,9 +22,9 @@ var TABLES = {
   },
 
   Sections: {
-    columns: ['key', 'title', 'order', 'enabled', 'kind', 'subtitle', 'icon', 'theme', 'banner', 'visibleFrom', 'visibleUntil'],
+    columns: ['key', 'title', 'order', 'enabled', 'kind', 'subtitle', 'icon', 'theme', 'banner', 'visibleFrom', 'visibleUntil', 'surface', 'surfaceMobile'],
     bool: ['enabled'],
-    text: ['key', 'title', 'kind', 'subtitle', 'icon', 'theme', 'banner', 'visibleFrom', 'visibleUntil'],
+    text: ['key', 'title', 'kind', 'subtitle', 'icon', 'theme', 'banner', 'visibleFrom', 'visibleUntil', 'surface', 'surfaceMobile'],
     notes: {
       key: 'مفتاح القسم بالإنجليزي الصغير (مثلاً social). اللينكات بتتربط بيه',
       title: 'عنوان القسم اللي بيظهر في الصفحة',
@@ -36,7 +36,9 @@ var TABLES = {
       theme: 'الشكل: gold / ember / azure / rose / emerald / night',
       banner: 'معرّف صورة البانر من شيت Media (اختياري)',
       visibleFrom: 'القسم يظهر من (اختياري): 2026-10-12 18:00',
-      visibleUntil: 'القسم يختفي بعد (اختياري)'
+      visibleUntil: 'القسم يختفي بعد (اختياري)',
+      surface: 'شكل خلفية الكروت: فاضي = تلقائي، glass = شفاف، dark = داكن، filled = ممتلئ، none = بدون خلفية',
+      surfaceMobile: 'شكل الخلفية على الموبايل (فاضي = زي الكمبيوتر)'
     }
   },
 
@@ -90,9 +92,9 @@ var TABLES = {
   },
 
   Sessions: {
-    columns: ['date', 'enabled', 'time', 'topic', 'speaker', 'description', 'image', 'status', 'note', 'visibleFrom', 'updatedAt', 'durationMinutes'],
+    columns: ['date', 'enabled', 'time', 'topic', 'speaker', 'description', 'image', 'status', 'note', 'visibleFrom', 'updatedAt', 'durationMinutes', 'program'],
     bool: ['enabled'],
-    text: ['date', 'time', 'topic', 'speaker', 'description', 'image', 'status', 'note', 'visibleFrom', 'updatedAt'],
+    text: ['date', 'time', 'topic', 'speaker', 'description', 'image', 'status', 'note', 'visibleFrom', 'updatedAt', 'program'],
     notes: {
       date: 'تاريخ الاجتماع: 2026-10-11',
       enabled: 'ظاهر',
@@ -105,7 +107,8 @@ var TABLES = {
       note: 'ملاحظة (مثلاً سبب الإلغاء)',
       visibleFrom: 'الموضوع يظهر من (اختياري): 2026-10-09 20:00',
       updatedAt: 'آخر تعديل (تلقائي)',
-      durationMinutes: 'مدة الاجتماع ده بالدقايق لو مختلفة (اختياري)'
+      durationMinutes: 'مدة الاجتماع ده بالدقايق لو مختلفة (اختياري)',
+      program: 'برنامج الاجتماع (لوحة التحكم بتكتبه): [{"title":"تسبحة","time":"20:00","minutes":30}, ...]'
     }
   },
 
@@ -1138,6 +1141,8 @@ function applyValidation_(ss) {
   ifColumn(games, 'Games', 'archived', checkbox);
   ifColumn(notifications, 'Notifications', 'archived', checkbox);
   ifColumn(sections, 'Sections', 'theme', list(SECTION_THEMES));
+  ifColumn(sections, 'Sections', 'surface', list(SECTION_SURFACES));
+  ifColumn(sections, 'Sections', 'surfaceMobile', list(SECTION_SURFACES));
   ifColumn(links, 'Links', 'experience', list(linkExperiences_()));
 
   var activities = ss.getSheetByName('Activities');

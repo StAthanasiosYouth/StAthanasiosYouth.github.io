@@ -1933,12 +1933,18 @@
     view.setAttribute('aria-busy', 'false');
 
     // a new section enters with a short stagger; re-renders after a save don't
-    if (options && options.animate && !A.reducedMotion()) {
-      Array.prototype.forEach.call(view.children, function (child, i) {
+    // (never while the page is hidden: the entrance starts transparent)
+    if (options && options.animate && !A.reducedMotion() && document.visibilityState !== 'hidden') {
+      var entering = Array.prototype.slice.call(view.children);
+      entering.forEach(function (child, i) {
         child.style.setProperty('--i', String(Math.min(i, 6)));
         child.classList.add('is-entering');
         child.addEventListener('animationend', function () { child.classList.remove('is-entering'); }, { once: true });
       });
+      // a phone that doesn't run the animation (tab put away, throttled) still shows everything
+      setTimeout(function () {
+        entering.forEach(function (child) { child.classList.remove('is-entering'); });
+      }, 1600);
     }
 
   };
