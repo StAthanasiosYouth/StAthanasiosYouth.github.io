@@ -37,6 +37,11 @@
 | `assets/js/share.js`     | browser        | Share sheet, copy link, branded QR card                 |
 | `assets/js/icons.js`     | browser        | Line icons + brand glyphs (`icons-brand.js`, generated) |
 | `assets/vendor/qrcode.mjs` | browser      | QR encoder (MIT), loaded only when QR is opened         |
+| `assets/js/map.js`, `assets/css/map.css` | browser (lazy) | The real map in the location card (Leaflet + OpenStreetMap tiles, darkened in CSS) and routes («الاتجاهات»); loaded only on «عرض الخريطة» / «الاتجاهات» |
+| `assets/js/map-route.js` | browser (lazy) | Route wording (كم/متر, دقيقة/ساعة) and the request/answer format (pure, tested) |
+| `assets/js/map-config.js` | browser (lazy) | `routeUrl`: the Apps Script web app that answers routes (empty = «الاتجاهات» opens Google Maps) |
+| `assets/vendor/leaflet/` | browser (lazy)  | Leaflet 1.9.4 (BSD-2-Clause, `LICENSE` kept), self-hosted: the CSP allows scripts from the site only |
+| `apps-script/Route.gs`   | Apps Script    | `publicRoute_`: routes from openrouteservice.org (key in the Script Property `ORS_API_KEY`), validated, cached, rate-limited |
 | `content.json`, `meeting.ics` | GitHub Pages | Published data (written by the admin)              |
 | `apps-script/Content.gs` | Apps Script + Node | Content model: validation, build, ICS, change summary (pure) |
 | `apps-script/Seed.gs`    | Apps Script + Node | Initial content, settings list with Arabic help     |
@@ -136,7 +141,8 @@ shift them (tested).
 | Draft data                  | Private Sheet created by `setup()`, shared only with admins; read only through guarded functions. Log cells are written as plain text (no formula injection). |
 | GitHub token                | Script Properties only; never returned to the page, logged, or put in errors or commits. Fine-grained: one repository, Contents read/write, with an expiry. |
 | Public content              | Validated at publish (`Content.gs`) and again in the browser (`content.js`). URLs: `https:` only; contacts `tel:+…` or `wa.me`. Text is set with `textContent`; no HTML from data anywhere (public site or admin). |
-| Page hardening              | CSP: scripts, styles, fonts and data from the site only; frames only `www.google.com` (map, on demand). `rel="noopener"` on new-tab links. No trackers or third-party requests on load. |
+| Page hardening              | CSP: scripts, styles, fonts and data from the site only; images also from `tile.openstreetmap.org` (the map, on demand); fetch also to `script.google.com` / `script.googleusercontent.com` (routes, on demand); frames only `www.google.com` (the embed, only for a place without coordinates). `rel="noopener"` on new-tab links. No trackers or third-party requests on load. |
+| Routes («الاتجاهات»)        | The browser sends only the start (rounded to ~11 m) to `publicRoute_` (Route.gs); the destination is always the church from Settings. The openrouteservice key never leaves Script Properties. Profiles whitelisted; the start must be in Egypt and within 400 km; answers cached 6 h; ≤ 30 upstream calls a minute and ≤ 1,500 a day (`ROUTE_DAY_COUNT`), else «busy». Nothing about the visitor is logged or stored (the page keeps it in memory, gone with the map). OSM tiles keep the page's referrer policy and normal caching; the attribution «© OpenStreetMap contributors» (and «Routing © openrouteservice.org by HeiGIT» under a route) is always visible. |
 | Admin page                  | Served with X-Frame-Options (no clickjacking). Unsaved-changes guard. Publishing requires the reviewed revision and refuses if the draft changed since. |
 | Public page framing         | GitHub Pages can't send frame headers; the page leaves any frame it is put in. |
 | Concurrency                 | Script lock around every write and publish; fast-forward-only ref updates with one rebuild-and-retry. |

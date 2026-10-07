@@ -376,6 +376,8 @@ Already created. For the record, or to make it again:
 | `ADMIN_CLIENT_ID` | optional. `Api.gs` already defaults to the Client ID above (`DEFAULT_ADMIN_CLIENT_ID`); set this only if the client ever changes. It must equal `admin/config.js` `clientId` |
 | `ADMIN_PRIMARY`   | optional; default `menazakmena@gmail.com`. The account that can never be removed from the allowlist |
 | `ADMIN_EMAILS`    | unchanged (now also editable from **الإعدادات → صلاحيات لوحة التحكم**) |
+| `ORS_API_KEY`     | optional: an openrouteservice.org API key (free Standard plan, no card) for routes inside the site's map card («الاتجاهات», `Route.gs`). Missing or rejected = the card says the in-site route isn't available and offers Google Maps. Never shown to the browser |
+| `ROUTE_DAY_COUNT` | written by `Route.gs` (`YYYY-MM-DD:n`, the day's upstream route calls, capped at 1,500); leave it alone |
 
 If the server's client ID (property or default) differs from `clientId`, or the property is malformed, every API call is refused
 (the page says «جوجل دخّلك، بس خادم لوحة التحكم مقبلش الدخول»).

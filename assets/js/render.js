@@ -297,55 +297,78 @@ function featuredWidget(link) {
    the sea to the east, a pin for the church. Static, trusted markup. */
 const MAP_ART = `
 <svg class="mapart" viewBox="0 0 320 150" preserveAspectRatio="xMaxYMid slice" aria-hidden="true" focusable="false">
-  <defs>
-    <linearGradient id="mapart-sea" x1="0" x2="1" y1="0" y2="0">
-      <stop offset="0" stop-color="#0b3f4f"/>
-      <stop offset="1" stop-color="#0f5e6d"/>
-    </linearGradient>
-    <radialGradient id="mapart-glow" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#d7aa50" stop-opacity=".35"/>
-      <stop offset="1" stop-color="#d7aa50" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <rect width="320" height="150" fill="#071d36"/>
-  <g fill="none" stroke="#f2d28b" stroke-opacity=".08">
-    <path d="M-10 128C30 98 60 106 92 76S132 44 150-10"/>
-    <path d="M-10 148C40 116 72 124 108 92S152 58 174-10"/>
-    <path d="M-10 106C20 80 46 88 74 60S112 28 130-10"/>
-    <path d="M-10 84C16 64 36 68 56 46S90 14 106-10"/>
-    <path d="M-10 62C10 48 24 50 38 34S66 4 80-10"/>
-  </g>
-  <path d="M236-5C226 30 242 56 230 86S218 128 226 160H330V-5Z" fill="url(#mapart-sea)"/>
-  <path d="M236-5C226 30 242 56 230 86S218 128 226 160" fill="none" stroke="#4cc3cb" stroke-opacity=".55" stroke-width="1.2"/>
-  <g fill="none" stroke="#4cc3cb" stroke-opacity=".3" stroke-linecap="round">
-    <path d="M262 34q6-4 12 0t12 0"/>
-    <path d="M280 112q6-4 12 0t12 0"/>
-    <path d="M252 132q6-4 12 0t12 0"/>
-  </g>
-  <text class="mapart__label" x="281" y="80" text-anchor="middle" direction="rtl">البحر الأحمر</text>
-  <g fill="none" stroke="#f2d28b" stroke-opacity=".2" stroke-linecap="round" stroke-width="2.2">
-    <path d="M-5 96C60 92 126 88 200 84"/>
-    <path d="M150 160C166 124 182 104 200 84S218 40 224-5"/>
-  </g>
-  <circle cx="200" cy="84" r="34" fill="url(#mapart-glow)"/>
-  <g transform="translate(200 84)">
-    <circle class="mapart__ring" r="12" fill="none" stroke="#4cc3cb" stroke-width="1.5"/>
-    <circle class="mapart__ring mapart__ring--late" r="12" fill="none" stroke="#4cc3cb" stroke-width="1.5"/>
-    <ellipse cx="0" cy="1" rx="6" ry="2" fill="#000" fill-opacity=".35"/>
-    <path d="M0 0C-8-8-11-13-11-19a11 11 0 0 1 22 0C11-13 8-8 0 0Z" fill="#d7aa50"/>
-    <g fill="none" stroke="#061a31" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M-4.6-14.2v-3.8a4.6 4.6 0 0 1 9.2 0v3.8Z"/>
-      <path d="M0-26.4v3.6M-1.7-24.8h3.4"/>
-    </g>
-  </g>
+<defs>
+<linearGradient id="mapart-sea" x1="0" x2="1" y1="0" y2="0">
+<stop offset="0" stop-color="#0b3f4f"/>
+<stop offset="1" stop-color="#0f5e6d"/>
+</linearGradient>
+<radialGradient id="mapart-glow" cx="0.5" cy="0.5" r="0.5">
+<stop offset="0" stop-color="#d7aa50" stop-opacity=".35"/>
+<stop offset="1" stop-color="#d7aa50" stop-opacity="0"/>
+</radialGradient>
+</defs>
+<rect width="320" height="150" fill="#071d36"/>
+<g fill="none" stroke="#f2d28b" stroke-opacity=".08">
+<path d="M-10 128C30 98 60 106 92 76S132 44 150-10"/>
+<path d="M-10 148C40 116 72 124 108 92S152 58 174-10"/>
+<path d="M-10 106C20 80 46 88 74 60S112 28 130-10"/>
+<path d="M-10 84C16 64 36 68 56 46S90 14 106-10"/>
+<path d="M-10 62C10 48 24 50 38 34S66 4 80-10"/>
+</g>
+<path d="M236-5C226 30 242 56 230 86S218 128 226 160H330V-5Z" fill="url(#mapart-sea)"/>
+<path d="M236-5C226 30 242 56 230 86S218 128 226 160" fill="none" stroke="#4cc3cb" stroke-opacity=".55" stroke-width="1.2"/>
+<g fill="none" stroke="#4cc3cb" stroke-opacity=".3" stroke-linecap="round">
+<path d="M262 34q6-4 12 0t12 0"/>
+<path d="M280 112q6-4 12 0t12 0"/>
+<path d="M252 132q6-4 12 0t12 0"/>
+</g>
+<text class="mapart__label" x="281" y="80" text-anchor="middle" direction="rtl">البحر الأحمر</text>
+<g fill="none" stroke="#f2d28b" stroke-opacity=".2" stroke-linecap="round" stroke-width="2.2">
+<path d="M-5 96C60 92 126 88 200 84"/>
+<path d="M150 160C166 124 182 104 200 84S218 40 224-5"/>
+</g>
+<circle cx="200" cy="84" r="34" fill="url(#mapart-glow)"/>
+<g transform="translate(200 84)">
+<circle class="mapart__ring" r="12" fill="none" stroke="#4cc3cb" stroke-width="1.5"/>
+<circle class="mapart__ring mapart__ring--late" r="12" fill="none" stroke="#4cc3cb" stroke-width="1.5"/>
+<ellipse cx="0" cy="1" rx="6" ry="2" fill="#000" fill-opacity=".35"/>
+<path d="M0 0C-8-8-11-13-11-19a11 11 0 0 1 22 0C11-13 8-8 0 0Z" fill="#d7aa50"/>
+<g fill="none" stroke="#061a31" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M-4.6-14.2v-3.8a4.6 4.6 0 0 1 9.2 0v3.8Z"/>
+<path d="M0-26.4v3.6M-1.7-24.8h3.4"/>
+</g>
+</g>
 </svg>`;
 
 function locationWidget(location) {
 
-  const art = document.createElement('template');
-  art.innerHTML = MAP_ART.trim();
+  const art = () => {
+    const t = document.createElement('template');
+    t.innerHTML = MAP_ART.trim();
+    return t.content.firstElementChild;
+  };
 
-  const map = h('div', { class: 'location__map', id: 'location-map' }, art.content.firstElementChild);
+  const map = h('div', { class: 'location__map', id: 'location-map' }, art());
+
+  // the real map (map.js, Leaflet) loads on demand; closing destroys it
+  let live = null;
+  const show = (on, route) => {
+    if (on !== !!live) {
+      map.classList.toggle('is-live', on);
+      toggle.setAttribute('aria-expanded', String(on));
+      if (on) {
+        const stop = new AbortController();
+        const mine = live = { stop, ready: import('./map.js').then(m => m.mount(map, location, stop.signal)) };
+        mine.ready.catch(() => live === mine && show(false));
+      }
+      else {
+        live.stop.abort();
+        live = null;
+        map.replaceChildren(art());
+      }
+    }
+    if (route) live.ready.then(c => c?.directions(), () => {});
+  };
 
   // one toggle; both labels share one cell (CSS shows one): its size never changes
   const toggle = h('button', {
@@ -353,33 +376,21 @@ function locationWidget(location) {
     type: 'button',
     'aria-expanded': 'false',
     'aria-controls': 'location-map',
-    onclick: () => {
-      const show = !map.classList.contains('is-live');
-      if (show) {
-        const query = location.lat !== null ? `${location.lat},${location.lng}` : location.name;
-        const src = `https://www.google.com/maps?q=${encodeURIComponent(query)}&z=16&hl=ar&output=embed`;
-        map.replaceChildren(h('iframe', {
-          src,
-          title: `خريطة: ${location.name}`,
-          loading: 'lazy',
-          referrerpolicy: 'strict-origin-when-cross-origin',
-          allowfullscreen: true
-        }));
-      }
-      else {
-        const fresh = document.createElement('template');
-        fresh.innerHTML = MAP_ART.trim();
-        map.replaceChildren(fresh.content.firstElementChild);
-      }
-      map.classList.toggle('is-live', show);
-      toggle.setAttribute('aria-expanded', String(show));
-      // a phone: the opened map may start above the screen
-      if (show && map.getBoundingClientRect().top < 64) map.scrollIntoView({ block: 'nearest', behavior: motionTier() === 'reduced' ? 'auto' : 'smooth' });
-    }
+    onclick: () => show(!live)
   },
   iconNode('map-view'),
   h('span', { class: 'location__toggle-label' }, h('span', {}, 'عرض الخريطة'), h('span', {}, 'اخفي الخريطة'))
   );
+
+  // «الاتجاهات»: a route in the card if map-config.js has a routeUrl
+  let url;
+  const warm = () => (url ??= import('./map-config.js').then(m => (url = m.MAP_CONFIG.routeUrl || ''), () => (url = '')));
+  const directions = e => {
+    if (location.lat === null || url === '' || e.ctrlKey || e.metaKey) return;
+    e.preventDefault();
+    const href = e.currentTarget.href;
+    Promise.resolve(warm()).then(u => (u ? show(true, true) : open(href, '_blank', 'noopener')));
+  };
 
   const maps = location.mapsUrl || location.directionsUrl;
 
@@ -395,7 +406,7 @@ function locationWidget(location) {
           ? h('a', { class: 'btn btn--primary', ...external(maps) }, iconNode('map'), 'فتح في خرائط جوجل')
           : null,
         location.directionsUrl
-          ? h('a', { class: 'btn', ...external(location.directionsUrl) }, iconNode('directions'), 'الاتجاهات')
+          ? h('a', { class: 'btn', ...external(location.directionsUrl), onclick: directions, onpointerdown: warm, onfocus: warm }, iconNode('directions'), 'الاتجاهات')
           : null,
         toggle
       )

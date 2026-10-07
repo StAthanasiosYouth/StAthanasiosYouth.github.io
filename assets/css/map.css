@@ -1,0 +1,389 @@
+/* =========================================================
+   THE REAL MAP AND ROUTES (lazy: loaded by map.js after
+   vendor/leaflet/leaflet.css, so these rules win). The closed card and the
+   opened map's size stay in main.css (.location*).
+========================================================= */
+
+.location__live {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--navy-850);
+}
+
+.location__live.leaflet-container {
+  font-family: var(--font-ui);
+  background: #0b1626;
+  isolation: isolate;
+}
+
+.location__live:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: -3px;
+  border-radius: 0;
+}
+
+/* OpenStreetMap's standard tiles, turned dark in the page's navy: streets
+   and labels stay readable. Only the tiles: the controls, the pin, the
+   route and the attribution are not filtered. */
+.map-tiles {
+  filter: grayscale(.8) invert(1) brightness(2) sepia(.8) hue-rotate(185deg) saturate(2.4) brightness(.85) contrast(1.15);
+}
+
+/* no hairline seams between tiles (Chrome, high-DPI screens): no layer
+   per tile, and the transparent outline keeps the edges un-antialiased */
+.map-tiles .leaflet-tile {
+  will-change: auto;
+  outline: 1px solid transparent;
+}
+
+
+/* ---------- controls: navy and gold, 44px ---------- */
+
+.location__live .leaflet-bar,
+.location__live.leaflet-touch .leaflet-bar {
+  overflow: hidden;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--navy-900);
+  box-shadow: 0 8px 20px -10px #000;
+}
+
+.location__live .leaflet-bar a,
+.location__live.leaflet-touch .leaflet-bar a {
+  width: 44px;
+  height: 44px;
+  font: 400 24px/42px var(--font-ui);
+  color: var(--gold-hi);
+  background: var(--navy-900);
+  border-bottom: 1px solid var(--gold-line);
+  border-radius: 0;
+}
+
+.location__live .leaflet-bar a:last-child {
+  border-bottom: 0;
+}
+
+.location__live .leaflet-bar a:hover,
+.location__live .leaflet-bar a:focus-visible {
+  color: var(--gold-hi);
+  background: var(--navy-700);
+}
+
+.location__live .leaflet-bar a:focus-visible,
+.map-recenter:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: -4px;
+}
+
+.location__live .leaflet-bar a.leaflet-disabled {
+  color: var(--text-3);
+  background: var(--navy-900);
+}
+
+.map-recenter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: var(--radius-sm);
+  font-size: .85rem;
+  font-weight: 700;
+  color: var(--gold-hi);
+  background: var(--navy-900);
+  box-shadow: 0 8px 20px -10px #000;
+  direction: rtl;
+  cursor: pointer;
+}
+
+.map-recenter:hover {
+  background: var(--navy-700);
+}
+
+.map-recenter .icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* the attribution: clear and linked (OSM tile policy), never filtered */
+.location__live .leaflet-control-attribution {
+  padding: 2px 8px;
+  font: 600 11px/1.6 var(--font-ui);
+  color: var(--text);
+  background: rgba(4, 17, 39, .88);
+  border-start-start-radius: 8px;
+}
+
+.location__live .leaflet-control-attribution a {
+  color: var(--gold-hi);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+
+/* ---------- the church pin and its popup ---------- */
+
+.map-pin {
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, .55));
+}
+
+.map-pin:focus-visible,
+.map-start:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+.location__live .leaflet-popup-content-wrapper,
+.location__live .leaflet-popup-tip {
+  color: var(--text);
+  background: var(--navy-900);
+  box-shadow: 0 10px 26px -10px #000;
+}
+
+.location__live .leaflet-popup-content-wrapper {
+  border: 1px solid var(--gold-line-strong);
+  border-radius: var(--radius-sm);
+}
+
+.location__live .leaflet-popup-content {
+  margin: 10px 14px 10px 30px;
+  font: 400 .9rem/1.6 var(--font-ui);
+}
+
+.location__live .leaflet-popup-close-button {
+  right: auto;
+  left: 2px;
+  top: 2px;
+  width: 28px;
+  height: 28px;
+  font: 400 20px/28px var(--font-ui);
+  color: var(--text-2);
+}
+
+.map-popup {
+  display: grid;
+  gap: 2px;
+  text-align: right;
+}
+
+.map-popup strong {
+  font-weight: 800;
+  color: var(--gold-hi);
+}
+
+.map-popup span {
+  font-size: .85rem;
+  color: var(--text-2);
+}
+
+/* the start (the visitor's location or the point they chose) */
+.map-start span {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border: 3px solid var(--gold-hi);
+  border-radius: 50%;
+  background: var(--navy-900);
+  box-shadow: 0 0 0 5px rgba(242, 210, 139, .22), 0 2px 6px rgba(0, 0, 0, .6);
+}
+
+/* the route: gold with a soft glow */
+.location__live .route-glow {
+  stroke: var(--gold);
+  stroke-opacity: .3;
+}
+
+.location__live .route-line {
+  stroke: var(--gold-hi);
+  stroke-opacity: 1;
+}
+
+/* choosing the start: a crosshair (Enter picks the centre) */
+.location__live.is-picking,
+.location__live.is-picking.leaflet-grab {
+  cursor: crosshair;
+}
+
+.location__live.is-picking::after {
+  content: "";
+  position: absolute;
+  z-index: 450;
+  top: 50%;
+  left: 50%;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  border: 2px solid var(--gold-hi);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(2, 9, 20, .55);
+  pointer-events: none;
+}
+
+.location__fail {
+  position: absolute;
+  inset: auto 12px 12px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: .85rem;
+  color: var(--text);
+  background: rgba(4, 17, 39, .92);
+}
+
+
+/* ---------- the map a bit taller while routing ---------- */
+
+.location__map.is-live.is-routing {
+  height: 340px;
+}
+
+@container (max-width: 380px) {
+
+  .location__map.is-live.is-routing {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    max-height: 360px;
+  }
+
+}
+
+
+/* ---------- the directions panel (right under the map) ---------- */
+
+.route {
+  display: grid;
+  gap: 10px;
+  padding: 0 var(--pad) 16px;
+  border-bottom: 1px solid var(--gold-line);
+}
+
+.location[data-surface="none"] .route {
+  padding-inline: 0;
+}
+
+/* a full-row card on desktop: the map on one side, the details then the panel on the other */
+@media (min-width: 1024px) {
+
+  .location[data-wide] .location__map.is-routing {
+    grid-row: span 2;
+  }
+
+  .location[data-wide] > .route {
+    order: 1;
+    padding: 0 var(--pad) var(--pad);
+    border-bottom: 0;
+  }
+
+}
+
+.route__modes {
+  display: flex;
+  gap: 8px;
+}
+
+.route__mode {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: 999px;
+  font-size: .92rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--text-2);
+  background: transparent;
+  cursor: pointer;
+}
+
+.route__mode .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.route__mode[aria-pressed="true"] {
+  color: var(--gold-hi);
+  border-color: var(--gold);
+  background: rgba(215, 170, 80, .16);
+}
+
+.route__hint {
+  font-size: .82rem;
+  line-height: 1.7;
+  color: var(--text-3);
+}
+
+.route__start {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.route__start .btn {
+  flex: 1 1 auto;
+  padding-inline: 12px;
+}
+
+.route__pick[aria-pressed="true"] {
+  color: var(--gold-hi);
+  border-color: var(--gold);
+  background: rgba(215, 170, 80, .12);
+}
+
+.route__status {
+  font-size: .9rem;
+  line-height: 1.7;
+  color: var(--text-2);
+}
+
+.route__status:empty {
+  display: none;
+}
+
+.route__status.is-result {
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.route__status.is-result strong {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--gold-hi);
+}
+
+.route.is-problem .route__status {
+  color: var(--carmine-hi);
+}
+
+.route__credit {
+  font-size: .72rem;
+  line-height: 1.6;
+  text-align: left;
+  color: var(--text-3);
+}
+
+.route__credit a {
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.route__outside {
+  min-height: 44px;
+  font-size: .88rem;
+  white-space: normal;
+  color: var(--text-2);
+  background: transparent;
+}
+
+.route.is-problem .route__outside {
+  color: var(--gold-ink);
+  border-color: transparent;
+  background: var(--gold);
+}
