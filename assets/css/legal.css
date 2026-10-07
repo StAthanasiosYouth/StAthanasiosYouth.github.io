@@ -1,0 +1,158 @@
+/* The small legal pages (/privacy/, /terms/): the site's fonts and colours,
+   nothing else loaded. */
+
+@font-face {
+  font-family: "Cairo";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("../fonts/cairo-arabic.woff2") format("woff2");
+  unicode-range: U+0020, U+00A0, U+0600-06FF, U+0750-077F, U+08A0-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
+}
+
+@font-face {
+  font-family: "Cairo";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("../fonts/cairo-latin-letters.woff2") format("woff2");
+  unicode-range: U+0041-005A, U+0061-007A;
+}
+
+@font-face {
+  font-family: "Cairo";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("../fonts/cairo-latin.woff2") format("woff2");
+  unicode-range: U+0021-0040, U+005B-0060, U+007B-007E, U+2013-2014, U+2018-201D, U+2022, U+2026;
+}
+
+:root {
+  color-scheme: dark;
+  --navy: #030b18;
+  --navy-2: #08213d;
+  --gold: #d7aa50;
+  --gold-hi: #f2d28b;
+  --text: #eef2f8;
+  --text-2: #b9c5d6;
+  --line: rgba(242, 210, 139, .2);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--navy);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  padding: max(28px, env(safe-area-inset-top)) 16px 48px;
+  font-family: "Cairo", system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.9;
+  color: var(--text);
+  background:
+    radial-gradient(70% 40% at 50% 0%, rgba(215, 170, 80, .1), transparent 70%),
+    linear-gradient(180deg, #0a2140, var(--navy) 420px);
+}
+
+.legal {
+  width: min(100%, 720px);
+  margin: 0 auto;
+}
+
+.legal__head {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin-bottom: 28px;
+  text-align: center;
+}
+
+.legal__head img {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--line), 0 16px 40px -18px rgba(215, 170, 80, .55);
+}
+
+.legal__site {
+  margin: 0;
+  font-size: .9rem;
+  color: var(--text-2);
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.7rem;
+  font-weight: 800;
+  line-height: 1.4;
+  color: var(--gold-hi);
+}
+
+.legal__updated {
+  margin: 0;
+  font-size: .82rem;
+  color: var(--text-2);
+}
+
+section {
+  margin-top: 18px;
+  padding: 22px 22px 8px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(16, 44, 80, .55), rgba(7, 24, 46, .55));
+}
+
+h2 {
+  margin: 0 0 6px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--gold-hi);
+}
+
+ul {
+  margin: 0 0 14px;
+  padding-inline-start: 1.2em;
+}
+
+li {
+  margin-bottom: 6px;
+}
+
+li::marker {
+  color: var(--gold);
+}
+
+p {
+  margin: 0 0 14px;
+}
+
+[lang="en"] {
+  font-family: "Cairo", system-ui, sans-serif;
+  line-height: 1.75;
+}
+
+a {
+  color: var(--gold-hi);
+  text-underline-offset: 3px;
+}
+
+a:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.legal__foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 22px;
+  margin-top: 28px;
+  font-size: .9rem;
+}
