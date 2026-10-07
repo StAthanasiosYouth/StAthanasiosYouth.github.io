@@ -146,6 +146,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   A.ICONS = window.ADMIN_ICONS || {};
   A.views = {};
+  // the item editors, by kind (AdminContent, AdminItems, AdminPage): reopened after a reload
+  A.editors = {};
   A.state = null;
   A.dirty = false;
 
@@ -573,6 +575,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   function markDirty() {
 
     A.dirty = true;
+    // the official admin keeps an open editor's unsaved values in this tab (A.restore)
+    draftSoon();
 
   }
 
@@ -1321,7 +1325,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     // a <div>, not a <label>: a label around several buttons forwards stray clicks
     return {
-      node: el('div', { class: 'field' },
+      // after a reload (A.restore): the chosen image's id comes back — never a file being uploaded
+      node: A.draftWidget(el('div', { class: 'field' },
         el('span', { class: 'field__label', text: options.label || 'الصورة / البوستر' }),
         el('div', { class: 'picker' + (options.className ? ' ' + options.className : '') },
           preview,
@@ -1331,7 +1336,19 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           altField
         ),
         el('span', { class: 'field__hint', text: options.hint || 'من الموبايل أو الكمبيوتر — بتتصغر وتتضغط لوحدها قبل الرفع' })
-      ),
+      ), {
+        get: function () { return value; },
+        set: function (id) {
+          if (typeof id !== 'string' || id === value || busy || (id && !/^[\w.-]{1,80}$/.test(id))) return false;
+          value = id;
+          var chosen = media();
+          alt.value = chosen ? chosen.alt || '' : '';
+          errorBox.hidden = true;
+          setStage(null);
+          show();
+          return true;
+        }
+      }),
       value: function () { return value; },
       busy: function () { return busy; }
     };
@@ -1397,12 +1414,22 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     draw();
 
     return {
-      node: el('div', { class: 'field gallery-picker', role: 'group', 'aria-label': options.label || 'صور' },
+      node: A.draftWidget(el('div', { class: 'field gallery-picker', role: 'group', 'aria-label': options.label || 'صور' },
         el('span', { class: 'field__label' }, options.label || 'صور', ' ', count),
         row,
         el('div', { class: 'actions' }, add),
         options.hint ? el('span', { class: 'field__hint', text: options.hint }) : null
-      ),
+      ), {
+        get: function () { return list.slice(); },
+        set: function (ids) {
+          if (!Array.isArray(ids)) return false;
+          var next = ids.filter(function (id) { return typeof id === 'string' && /^[\w.-]{1,80}$/.test(id); }).slice(0, max);
+          if (next.join(',') === list.join(',')) return false;
+          list = next;
+          draw();
+          return true;
+        }
+      }),
       value: function () { return list.slice(); }
     };
 
@@ -1437,9 +1464,6 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     sheet.style.transform = '';
 
-    // one editor per existing item (the official admin; options.lock from A.editLock)
-    holdSheetLock(options.lock || null);
-
     if (!sheet.open) {
       A.lastFocus = document.activeElement;
       sheet.showModal();
@@ -1449,6 +1473,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       if (first && !matchMedia('(hover: none)').matches) first.focus({ preventScroll: true });
       else sheet.querySelector('.sheet__title').focus({ preventScroll: true });
     }
+
+    // an item editor (options.draft from A.draftKey) comes back after a reload, with its unsaved values
+    draftBegin(options.draft || null);
+
+    // one editor per existing item (the official admin; options.lock from A.editLock)
+    holdSheetLock(options.lock || null);
 
   };
 
@@ -1524,9 +1554,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   function holdSheetLock(info) {
 
-    // the same item's editor refilled: keep its lock
+    // the same item's editor refilled: keep its lock (still someone else's: still read-only)
     if (sheetLock && info && sheetLock.info.key === info.key) {
       sheetLock.info = info;
+      if (sheetLock.status && !sheetLock.status.granted) sheetLockStatus(sheetLock, sheetLock.status);
       return;
     }
 
@@ -1534,9 +1565,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     if (!info || !A.collab) return;
 
-    var held = { info: info, handle: null };
+    var held = { info: info, handle: null, status: null };
     sheetLock = held;
     held.handle = A.collab.lock(info, function (status) {
+      held.status = status;
       if (sheetLock === held) sheetLockStatus(held, status);
     });
 
@@ -1570,8 +1602,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     held.holder = status.holder || null;
     sheet.classList.add('is-locked');
-    // nothing here can be saved: don't ask about "unsaved changes" on close
-    A.dirty = false;
+    // nothing here can be saved: don't ask about "unsaved changes" on close —
+    // unless they came back after a reload (closing would lose them)
+    if (!body.querySelector('.draft-note')) A.dirty = false;
 
     if (!banner) {
       banner = el('div', { class: 'lock-banner', role: 'status' });
@@ -1582,7 +1615,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     // read only: nothing in it can be saved, deleted or changed
     Array.prototype.forEach.call(sheet.querySelectorAll('.sheet__body input, .sheet__body textarea, .sheet__body select, .sheet__body button, .sheet__foot .btn--primary'), function (control) {
-      if (!banner.contains(control)) control.disabled = true;
+      if (!banner.contains(control) && !control.closest('.draft-note')) control.disabled = true;
     });
 
   }
@@ -1812,6 +1845,377 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
 
   /* =======================================================
+     AFTER A RELOAD (official admin only: A.keep, set by boot.js)
+     This tab's sessionStorage, through A.keep: where the admin was (area,
+     sub-tab, scroll), which item editor was open, and its unsaved values
+     — plain form values, capped; never a file or a photo being uploaded,
+     never the token. boot.js resumes the same session, then A.restore puts
+     the panel back. Nothing is ever saved to the server by itself.
+     In the recovery admin A.keep stays null and none of this runs.
+  ======================================================= */
+
+  A.keep = null;          // { get(name), set(name, value) → bool, drop(name) }: 'ui', 'draft'
+
+  var DRAFT_KINDS = {     // kind → the field that finds the item again
+    sessions: 'date', news: 'id', games: 'id', notifications: 'id', activities: 'id',
+    types: 'key', links: 'id', sections: 'key', contacts: 'id'
+  };
+  var DRAFT_TEXT_MAX = 20000;
+
+  var widgetHooks = typeof WeakMap === 'function' ? new WeakMap() : null;
+  var draftOpen = null;   // { kind, id, arg } of the open item editor
+  var draftTimer = 0;
+  var draftHold = false;  // the session ended under the editor: keep its values
+  var pendingScroll = 0;
+  var myAcct = '';        // which account the values belong to (a short hash, never the email)
+
+  /* the open editor, as A.openSheet's options.draft; arg: the editor's second argument (a section key) */
+  A.draftKey = function (kind, id, arg) {
+
+    return { kind: kind, id: id ? String(id) : '', arg: arg ? String(arg) : '' };
+
+  };
+
+  /* a widget that keeps its value in its own code (a picker, the program list): get/set for drafts */
+  A.draftWidget = function (node, hooks) {
+
+    if (widgetHooks && node) {
+      node.setAttribute('data-draft-widget', '');
+      widgetHooks.set(node, hooks);
+    }
+    return node;
+
+  };
+
+  function sameDraft(a, b) {
+
+    return !!(a && b && a.kind === b.kind && String(a.id || '') === String(b.id || '') && String(a.arg || '') === String(b.arg || ''));
+
+  }
+
+  /* a short, non-reversible tag of the account (synchronous; not a secret, only "the same admin?") */
+  function acctTag(email) {
+
+    var text = String(email || '').toLowerCase();
+    var h1 = 0xdeadbeef;
+    var h2 = 0x41c6ce57;
+    for (var i = 0; i < text.length; i++) {
+      var c = text.charCodeAt(i);
+      h1 = Math.imul(h1 ^ c, 2654435761);
+      h2 = Math.imul(h2 ^ c, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return text ? ((h2 >>> 0).toString(36) + (h1 >>> 0).toString(36)) : '';
+
+  }
+
+  function draftBody() {
+
+    return sheet.open ? sheet.querySelector('.sheet__body') : null;
+
+  }
+
+  /* the plain controls, in order (a widget's own inside parts, files, the notes: not) */
+  function draftControls(body) {
+
+    return body ? Array.prototype.filter.call(body.querySelectorAll('input, textarea, select'), function (control) {
+      return control.type !== 'file' && control.type !== 'hidden' &&
+        !control.closest('[data-draft-widget], .draft-note, .lock-banner');
+    }) : [];
+
+  }
+
+  function draftWidgets(body) {
+
+    return body ? Array.prototype.filter.call(body.querySelectorAll('[data-draft-widget]'), function (node) {
+      return !node.parentElement.closest('[data-draft-widget]') && widgetHooks && widgetHooks.has(node);
+    }) : [];
+
+  }
+
+  /* the form's shape: values are put back only into the same form */
+  function draftShape(controls) {
+
+    return controls.map(function (control) {
+      return control.tagName.charAt(0) + (control.type || '') + (control.type === 'radio' ? ':' + control.value : '');
+    }).join('|');
+
+  }
+
+  function draftRecord() {
+
+    var record = { v: 1, kind: draftOpen.kind, id: draftOpen.id, arg: draftOpen.arg, acct: myAcct, at: Date.now(), dirty: !!A.dirty };
+    var body = draftBody();
+
+    if (A.dirty && body) {
+      var controls = draftControls(body);
+      record.shape = draftShape(controls);
+      record.fields = controls.map(function (control) {
+        return control.type === 'checkbox' || control.type === 'radio' ? !!control.checked : String(control.value).slice(0, DRAFT_TEXT_MAX);
+      });
+      record.widgets = draftWidgets(body).map(function (node) {
+        try { return widgetHooks.get(node).get(); }
+        catch (error) { return null; }
+      });
+    }
+
+    return record;
+
+  }
+
+  /* now; true when the editor (and its unsaved values) will come back after a reload */
+  function saveDraft() {
+
+    clearTimeout(draftTimer);
+
+    if (!A.keep || !draftOpen || !sheet.open) return false;
+
+    var record = draftRecord();
+    if (A.keep.set('draft', record)) return true;
+
+    // too big for this tab's storage: the editor comes back, its values can't
+    A.keep.set('draft', { v: 1, kind: record.kind, id: record.id, arg: record.arg, acct: record.acct, at: record.at, dirty: false, lost: true });
+    return false;
+
+  }
+
+  function draftSoon() {
+
+    if (!A.keep || !draftOpen) return;
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(saveDraft, 400);
+
+  }
+
+  /* puts a draft's values back into the open editor; null when the form isn't the same any more */
+  function applyDraft(record) {
+
+    var body = draftBody();
+    var controls = draftControls(body);
+    var widgets = draftWidgets(body);
+    var changed = false;
+
+    if (!Array.isArray(record.fields) || record.shape !== draftShape(controls) ||
+        !Array.isArray(record.widgets) || record.widgets.length !== widgets.length) {
+      return null;
+    }
+
+    widgets.forEach(function (node, i) {
+      try { if (widgetHooks.get(node).set(record.widgets[i])) changed = true; }
+      catch (error) { /* that one stays as it is */ }
+    });
+
+    controls.forEach(function (control, i) {
+      var value = record.fields[i];
+      if (control.type === 'checkbox' || control.type === 'radio') {
+        if (typeof value !== 'boolean' || control.checked === value) return;
+        control.checked = value;
+        changed = true;
+        if (value || control.type === 'checkbox') control.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+      if (typeof value !== 'string' || control.value === value) return;
+      control.value = value;
+      changed = true;
+      control.dispatchEvent(new Event('input', { bubbles: true }));
+      control.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    return changed;
+
+  }
+
+  function draftNote() {
+
+    var body = draftBody();
+    if (!body) return;
+
+    var old = body.querySelector('.draft-note');
+    if (old) old.remove();
+
+    var note = el('div', { class: 'draft-note', role: 'status' },
+      el('span', { class: 'draft-note__icon', 'aria-hidden': 'true' }, icon('retry')),
+      el('p', { class: 'draft-note__text', text: 'رجعنا التعديلات اللي ماكانتش اتحفظت' }),
+      el('button', { class: 'btn btn--ghost btn--small draft-note__drop', type: 'button', onclick: discardDraft }, 'تجاهلها')
+    );
+
+    var banner = body.querySelector('.lock-banner');
+    if (banner) banner.after(note);
+    else body.prepend(note);
+
+  }
+
+  /* «تجاهلها»: the editor again, as it is saved */
+  function discardDraft() {
+
+    var key = draftOpen;
+
+    if (A.keep) A.keep.drop('draft');
+    A.dirty = false;
+
+    if (!key || !reopenEditor(key)) {
+      if (sheet.open) sheet.close();
+    }
+
+  }
+
+  /* the item's editor again (its latest version), or false (gone) */
+  function reopenEditor(key) {
+
+    var field = DRAFT_KINDS[key.kind];
+    var open = A.editors[key.kind];
+    var row = null;
+
+    if (!field || typeof open !== 'function' || !A.state) return false;
+
+    if (key.id) {
+      var list = key.kind === 'sections'
+        ? (A.state.layout || []).concat(A.state.draft.sections || [])
+        : A.state.draft[key.kind];
+      row = A.findRow(list, field, key.id);
+      if (!row) return false;
+    }
+
+    open(row, key.arg || undefined);
+    return true;
+
+  }
+
+  /* A.openSheet: an item editor opens (key) or anything else does (null) */
+  function draftBegin(key) {
+
+    clearTimeout(draftTimer);
+
+    if (!A.keep) return;
+
+    draftOpen = key && DRAFT_KINDS[key.kind] ? key : null;
+
+    if (!draftOpen) {
+      A.keep.drop('draft');
+      return;
+    }
+
+    // this editor's unsaved values from before a reload (or the latest version after a lock): back in
+    var stored = A.keep.get('draft');
+
+    if (stored && sameDraft(stored, draftOpen) && stored.dirty && stored.acct === myAcct) {
+      var changed = applyDraft(stored);
+      if (changed) {
+        A.dirty = true;
+        draftNote();
+      }
+      else if (changed === null) {
+        A.toast('مقدرناش نرجّع التعديلات اللي ماكانتش اتحفظت — الفورم ده اتغيّر.', 'info');
+      }
+    }
+
+    saveDraft();
+
+  }
+
+  sheet.addEventListener('input', draftSoon);
+  sheet.addEventListener('change', draftSoon);
+
+  sheet.addEventListener('close', function () {
+    clearTimeout(draftTimer);
+    if (draftHold) return;
+    // saved, cancelled, or closed: nothing to bring back
+    if (draftOpen && A.keep) A.keep.drop('draft');
+    draftOpen = null;
+  });
+
+  function saveUi() {
+
+    if (!A.keep) return;
+    A.keep.set('ui', { area: A.area, sub: { content: A.sub.content, page: A.sub.page }, y: Math.max(0, Math.round(window.scrollY || 0)) });
+
+  }
+
+  /* leaving or put away: where you are, and the editor's values, right now */
+  function keepNow() {
+
+    if (!A.keep || !A.state) return;
+    saveUi();
+    if (draftOpen) saveDraft();
+
+  }
+
+  window.addEventListener('pagehide', keepNow);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') keepNow();
+  });
+
+  /* unsaved work a reload can't bring back: a photo still uploading, or edits outside an item editor */
+  A.unrestorable = function () {
+
+    if (A.uploadsInFlight > 0) return true;
+    if (!A.dirty) return false;
+    return !(A.keep && draftOpen && sheet.open && saveDraft());
+
+  };
+
+  A.restore = {
+
+    /* before the panel is drawn: the area and sub-tab the admin was in */
+    view: function () {
+
+      var ui = A.keep && A.keep.get('ui');
+      var area = ui && areaOf(ui.area);
+
+      if (!area) return;
+
+      A.area = area.key;
+      ['content', 'page'].forEach(function (key) {
+        var owner = areaOf(key);
+        var sub = ui.sub && ui.sub[key];
+        if (owner && owner.subs && owner.subs.some(function (s) { return s.key === sub; })) A.sub[key] = sub;
+      });
+      pendingScroll = Math.max(0, Math.min(200000, Number(ui.y) || 0));
+
+    },
+
+    /* the panel is on screen: the scroll position, then the editor that was open, with its values */
+    rest: function () {
+
+      draftHold = false;
+
+      if (!A.keep) return;
+
+      if (pendingScroll) {
+        window.scrollTo(0, pendingScroll);
+        pendingScroll = 0;
+      }
+
+      var stored = A.keep.get('draft');
+
+      if (!stored || !DRAFT_KINDS[stored.kind] || sheet.open) return;
+
+      if (stored.acct !== myAcct) {
+        A.keep.drop('draft');
+        return;
+      }
+
+      if (!reopenEditor({ kind: stored.kind, id: stored.id || '', arg: stored.arg || '' })) {
+        A.keep.drop('draft');
+        if (stored.dirty) A.toast('التعديلات اللي ماكانتش اتحفظت مش هترجع: العنصر ده مبقاش موجود.', 'info');
+      }
+
+    },
+
+    /* the session ended under the panel (boot.js, before closing the editor): keep its values for after signing in */
+    hold: function () {
+
+      if (draftOpen) saveDraft();
+      saveUi();
+      draftHold = true;
+
+    }
+
+  };
+
+
+  /* =======================================================
      MODALS (instead of alert / confirm / prompt)
   ======================================================= */
 
@@ -1971,6 +2375,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       renderNav();
       A.render({ animate: changed });
       window.scrollTo(0, 0);
+      saveUi();
       return true;
     });
 
@@ -2089,8 +2494,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   };
 
+  // the browser's own "leave the page?" only for what a reload can't bring back
+  // (on the official admin an item editor's unsaved values come back by themselves)
   window.addEventListener('beforeunload', function (event) {
-    if (A.dirty) {
+    if (A.unrestorable()) {
       event.preventDefault();
       event.returnValue = '';
     }
@@ -2676,6 +3083,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return (preloaded ? Promise.resolve(preloaded) : A.call('apiState'))
       .then(function (state) {
         A.state = state;
+        myAcct = acctTag(state.user);
         A.renderStatus();
         renderNav();
         A.render({ animate: true });
@@ -3057,6 +3465,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       )
     ], A.sheetFooter(save), {
       // one editor per item: the official admin locks it while this is open
+      draft: A.draftKey('links', isNew ? '' : link.id),
       lock: isNew ? null : A.editLock('links', link.id, 'رابط «' + (link.title || '') + '»', function () { var fresh = A.findRow(A.state.draft.links, 'id', link.id); if (fresh) editLink(fresh); else A.closeSheet(); })
     });
 
@@ -3141,6 +3550,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       )
     ], A.sheetFooter(save), {
       // one editor per item: the official admin locks it while this is open
+      draft: A.draftKey('sections', isNew ? '' : section.key),
       lock: isNew ? null : A.editLock('sections', section.key, 'قسم «' + (row.title || info.label || section.key) + '»', function () { var fresh = A.findRow(A.state.layout, 'key', section.key) || A.findRow(A.state.draft.sections, 'key', section.key); if (fresh) editSection(fresh); else A.closeSheet(); })
     });
 
@@ -3157,6 +3567,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   A.editSection = editSection;
   A.editLink = editLink;
+  A.editors.sections = editSection;
+  A.editors.links = editLink;
 
 
   /* =======================================================
@@ -3492,14 +3904,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       )
     ], A.sheetFooter(save), {
       // one editor per item: the official admin locks it while this is open
+      draft: A.draftKey('contacts', isNew ? '' : contact.id),
       lock: isNew ? null : A.editLock('contacts', contact.id, 'جهة تواصل «' + (contact.name || '') + '»', function () { var fresh = A.findRow(A.state.draft.contacts, 'id', contact.id); if (fresh) editContact(fresh); else A.closeSheet(); })
     });
 
-    syncKind(contact.kind || 'service');
+    // the chosen kind (a draft that came back after a reload may have changed it)
+    syncKind(kind.value() || 'service');
 
   }
 
   A.editContact = editContact;
+  A.editors.contacts = editContact;
 
 
   /* =======================================================
@@ -3811,7 +4226,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   var icon = A.icon;
   var bool = A.bool;
 
-  A.editors = {};
+  A.editors = A.editors || {};
 
   var TONE_LABELS = { info: 'عادي', alert: 'تنبيه (زي إلغاء)', celebrate: 'مناسبة حلوة' };
 
@@ -4191,6 +4606,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       )
     ], A.sheetFooter(save), {
       // one editor per item: the official admin locks it while this is open
+      draft: A.draftKey('sessions', isNew ? '' : session.date),
       lock: isNew ? null : A.editLock('sessions', session.date, 'اجتماع ' + A.formatWall(session.date, false), function () { var fresh = A.findRow(A.state.draft.sessions, 'date', session.date); if (fresh) A.editors.sessions(fresh); else A.closeSheet(); })
     });
 
@@ -4379,15 +4795,32 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     draw();
 
+    function value() {
+      return stages.map(function (s) { return { title: String(s.title || '').trim(), time: s.time || '', minutes: s.minutes === '' || s.minutes === null || isNaN(s.minutes) ? '' : Number(s.minutes) }; });
+    }
+
     return {
-      node: A.field('برنامج الاجتماع', el('div', { class: 'program-editor' },
+      node: A.field('برنامج الاجتماع', A.draftWidget(el('div', { class: 'program-editor' },
         empty,
         list,
         el('div', { class: 'actions' }, addButtonNode, copySelect)
-      ), 'كل فقرة: وقت بدايتها أو مدتها (أو الاتنين). الفقرة بتخلص لما اللي بعدها تبدأ، وآخر فقرة مع نهاية الاجتماع.'),
-      value: function () {
-        return stages.map(function (s) { return { title: String(s.title || '').trim(), time: s.time || '', minutes: s.minutes === '' || s.minutes === null || isNaN(s.minutes) ? '' : Number(s.minutes) }; });
-      },
+      ), {
+        // after a reload (A.restore): the stages as they were being edited
+        get: function () { return stages.map(function (s) { return { title: String(s.title || ''), time: s.time || '', minutes: s.minutes }; }); },
+        set: function (saved) {
+          if (!Array.isArray(saved)) return false;
+          var next = saved.slice(0, PROGRAM_MAX).map(function (s) {
+            s = s && typeof s === 'object' ? s : {};
+            var minutes = s.minutes === '' || s.minutes === null || s.minutes === undefined || !isFinite(Number(s.minutes)) ? '' : Number(s.minutes);
+            return { title: String(s.title || '').slice(0, 40), time: /^\d{2}:\d{2}$/.test(s.time) ? s.time : '', minutes: minutes };
+          });
+          if (JSON.stringify(next) === JSON.stringify(stages)) return false;
+          stages = next;
+          draw();
+          return true;
+        }
+      }), 'كل فقرة: وقت بدايتها أو مدتها (أو الاتنين). الفقرة بتخلص لما اللي بعدها تبدأ، وآخر فقرة مع نهاية الاجتماع.'),
+      value: value,
       refresh: refresh
     };
 
@@ -4808,6 +5241,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       )
     ], A.sheetFooter(save), {
       // one editor per item: the official admin locks it while this is open
+      draft: A.draftKey('news', isNew ? '' : item.id),
       lock: isNew ? null : A.editLock('news', item.id, 'خبر «' + (item.title || '') + '»', function () { var fresh = A.findRow(A.state.draft.news, 'id', item.id); if (fresh) A.editors.news(fresh); else A.closeSheet(); })
     });
 
@@ -4946,6 +5380,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       )
     ], A.sheetFooter(save), {
       // one editor per item: the official admin locks it while this is open
+      draft: A.draftKey('games', isNew ? '' : game.id),
       lock: isNew ? null : A.editLock('games', game.id, 'لعبة «' + (game.title || '') + '»', function () { var fresh = A.findRow(A.state.draft.games, 'id', game.id); if (fresh) A.editors.games(fresh); else A.closeSheet(); })
     });
 
@@ -5080,6 +5515,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       )
     ], A.sheetFooter(save), {
       // one editor per item: the official admin locks it while this is open
+      draft: A.draftKey('notifications', isNew ? '' : item.id),
       lock: isNew ? null : A.editLock('notifications', item.id, 'إشعار «' + (item.title || '') + '»', function () { var fresh = A.findRow(A.state.draft.notifications, 'id', item.id); if (fresh) A.editors.notifications(fresh); else A.closeSheet(); })
     });
 
@@ -5723,6 +6159,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       )
     ], A.sheetFooter(save), {
       // one editor per item: the official admin locks it while this is open
+      draft: A.draftKey('activities', isNew ? '' : item.id, sectionKey),
       lock: isNew ? null : A.editLock('activities', item.id, (meta.one || 'فعالية') + ' «' + (item.title || '') + '»', function () { var fresh = A.findRow(A.state.draft.activities, 'id', item.id); if (fresh) A.editors.activities(fresh, sectionKey); else A.closeSheet(); })
     });
 
@@ -5810,6 +6247,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       )
     ], A.sheetFooter(save), {
       // one editor per item: the official admin locks it while this is open
+      draft: A.draftKey('types', isNew ? '' : type.key, sectionKey),
       lock: isNew ? null : A.editLock('types', type.key, 'نوع «' + (type.label || type.key) + '»', function () { var fresh = A.findRow(A.state.draft.types, 'key', type.key); if (fresh) A.editors.types(fresh, sectionKey); else A.closeSheet(); })
     });
 

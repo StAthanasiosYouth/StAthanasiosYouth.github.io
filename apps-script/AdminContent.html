@@ -13,7 +13,7 @@
   var icon = A.icon;
   var bool = A.bool;
 
-  A.editors = {};
+  A.editors = A.editors || {};
 
   var TONE_LABELS = { info: 'عادي', alert: 'تنبيه (زي إلغاء)', celebrate: 'مناسبة حلوة' };
 
@@ -393,6 +393,7 @@
       )
     ], A.sheetFooter(save), {
       // one editor per item: the official admin locks it while this is open
+      draft: A.draftKey('sessions', isNew ? '' : session.date),
       lock: isNew ? null : A.editLock('sessions', session.date, 'اجتماع ' + A.formatWall(session.date, false), function () { var fresh = A.findRow(A.state.draft.sessions, 'date', session.date); if (fresh) A.editors.sessions(fresh); else A.closeSheet(); })
     });
 
@@ -581,15 +582,32 @@
 
     draw();
 
+    function value() {
+      return stages.map(function (s) { return { title: String(s.title || '').trim(), time: s.time || '', minutes: s.minutes === '' || s.minutes === null || isNaN(s.minutes) ? '' : Number(s.minutes) }; });
+    }
+
     return {
-      node: A.field('برنامج الاجتماع', el('div', { class: 'program-editor' },
+      node: A.field('برنامج الاجتماع', A.draftWidget(el('div', { class: 'program-editor' },
         empty,
         list,
         el('div', { class: 'actions' }, addButtonNode, copySelect)
-      ), 'كل فقرة: وقت بدايتها أو مدتها (أو الاتنين). الفقرة بتخلص لما اللي بعدها تبدأ، وآخر فقرة مع نهاية الاجتماع.'),
-      value: function () {
-        return stages.map(function (s) { return { title: String(s.title || '').trim(), time: s.time || '', minutes: s.minutes === '' || s.minutes === null || isNaN(s.minutes) ? '' : Number(s.minutes) }; });
-      },
+      ), {
+        // after a reload (A.restore): the stages as they were being edited
+        get: function () { return stages.map(function (s) { return { title: String(s.title || ''), time: s.time || '', minutes: s.minutes }; }); },
+        set: function (saved) {
+          if (!Array.isArray(saved)) return false;
+          var next = saved.slice(0, PROGRAM_MAX).map(function (s) {
+            s = s && typeof s === 'object' ? s : {};
+            var minutes = s.minutes === '' || s.minutes === null || s.minutes === undefined || !isFinite(Number(s.minutes)) ? '' : Number(s.minutes);
+            return { title: String(s.title || '').slice(0, 40), time: /^\d{2}:\d{2}$/.test(s.time) ? s.time : '', minutes: minutes };
+          });
+          if (JSON.stringify(next) === JSON.stringify(stages)) return false;
+          stages = next;
+          draw();
+          return true;
+        }
+      }), 'كل فقرة: وقت بدايتها أو مدتها (أو الاتنين). الفقرة بتخلص لما اللي بعدها تبدأ، وآخر فقرة مع نهاية الاجتماع.'),
+      value: value,
       refresh: refresh
     };
 
@@ -1010,6 +1028,7 @@
       )
     ], A.sheetFooter(save), {
       // one editor per item: the official admin locks it while this is open
+      draft: A.draftKey('news', isNew ? '' : item.id),
       lock: isNew ? null : A.editLock('news', item.id, 'خبر «' + (item.title || '') + '»', function () { var fresh = A.findRow(A.state.draft.news, 'id', item.id); if (fresh) A.editors.news(fresh); else A.closeSheet(); })
     });
 
@@ -1148,6 +1167,7 @@
       )
     ], A.sheetFooter(save), {
       // one editor per item: the official admin locks it while this is open
+      draft: A.draftKey('games', isNew ? '' : game.id),
       lock: isNew ? null : A.editLock('games', game.id, 'لعبة «' + (game.title || '') + '»', function () { var fresh = A.findRow(A.state.draft.games, 'id', game.id); if (fresh) A.editors.games(fresh); else A.closeSheet(); })
     });
 
@@ -1282,6 +1302,7 @@
       )
     ], A.sheetFooter(save), {
       // one editor per item: the official admin locks it while this is open
+      draft: A.draftKey('notifications', isNew ? '' : item.id),
       lock: isNew ? null : A.editLock('notifications', item.id, 'إشعار «' + (item.title || '') + '»', function () { var fresh = A.findRow(A.state.draft.notifications, 'id', item.id); if (fresh) A.editors.notifications(fresh); else A.closeSheet(); })
     });
 

@@ -31,6 +31,16 @@
  * 6. Working together (A.collab): a heartbeat every ~25 s while the page is
  *    visible says where this admin is and which item it edits, keeps the
  *    edit locks, and brings back who else is online.
+ * 7. A reload is almost invisible: this tab's sessionStorage keeps ONLY the
+ *    server's opaque session id (with this page load's id), where the admin
+ *    was, and unsaved editor values (A.keep, A.restore in AdminScript) —
+ *    never the token, nothing from Google. Leaving parks the session (a
+ *    beacon); the next page load shows only «جاري استعادة الجلسة...», gets a
+ *    fresh token from Google (silently when it can, else its button right
+ *    there), and apiSessionResume picks up the SAME session: no takeover
+ *    question, locks and presence kept. The sid alone opens nothing: every
+ *    call still needs the token. Expired → the usual sign-in; replaced →
+ *    «الجلسة اتقفلت…».
  *
  * Settings: admin/config.js.
  */
@@ -81,6 +91,8 @@
   var reauth = null;           // the «ادخل تاني» dialog
   var restarting = null;       // a quiet new session (the server forgot this one)
   var verifying = '';          // the account the gate is verifying now («جاري التحقق...»)
+  var saved = null;            // { sid, tab, left } this tab had before a reload: to resume
+  var restoring = false;       // the compact «جاري استعادة الجلسة...» gate is in charge
 
 
   /*
@@ -242,6 +254,106 @@
   }
 
 
+  /* ---------- 7. this tab's storage: the sid, where you were, unsaved edits ---------- */
+
+  /*
+   * sessionStorage (this tab only, gone when it closes), namespaced, JSON.
+   * Only these names, and never anything from Google: 'session' = { sid,
+   * tab } (the server's opaque id and the page load it belongs to), 'ui'
+   * and 'draft' (AdminScript, A.keep). Every access may fail (private
+   * mode, storage off): then a reload simply signs in again.
+   */
+  var keep = (function () {
+
+    var PREFIX = 'athanasios-admin.';
+    var NAMES = ['session', 'ui', 'draft'];
+    var MAX = 120000;           // characters per entry: unsaved text, never media
+    var closed = false;         // signed out: nothing is written any more
+
+    function allowed(name) {
+      return NAMES.indexOf(name) !== -1;
+    }
+
+    return {
+      get: function (name) {
+        if (!allowed(name)) return null;
+        try {
+          var text = window.sessionStorage.getItem(PREFIX + name);
+          var value = text ? JSON.parse(text) : null;
+          return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+        }
+        catch (error) {
+          return null;
+        }
+      },
+      set: function (name, value) {
+        if (!allowed(name) || closed) return false;
+        try {
+          var text = JSON.stringify(value);
+          if (text.length > MAX) return false;
+          window.sessionStorage.setItem(PREFIX + name, text);
+          return true;
+        }
+        catch (error) {
+          return false;
+        }
+      },
+      drop: function (name) {
+        if (!allowed(name)) return;
+        try { window.sessionStorage.removeItem(PREFIX + name); }
+        catch (ignored) { /* nothing to drop */ }
+      },
+      clear: function () {
+        NAMES.forEach(function (name) {
+          try { window.sessionStorage.removeItem(PREFIX + name); }
+          catch (ignored) { /* nothing to drop */ }
+        });
+      },
+      /* sign out: everything goes, and stays gone until the page reloads */
+      close: function () {
+        closed = true;
+        this.clear();
+      }
+    };
+
+  })();
+
+  /* the panel's share (AdminScript): where you were, and an editor's unsaved values */
+  if (A) {
+    A.keep = {
+      get: function (name) { return name === 'session' ? null : keep.get(name); },
+      set: function (name, value) { return name === 'session' ? false : keep.set(name, value); },
+      drop: function (name) { if (name !== 'session') keep.drop(name); }
+    };
+  }
+
+  var SID = /^[\w-]{16,64}$/;
+
+  /* the session this tab had before the reload, or null */
+  function savedSession() {
+
+    var value = keep.get('session');
+    if (!value || !SID.test(value.sid || '')) return null;
+    return { sid: value.sid, tab: SID.test(value.tab || '') ? value.tab : '', left: value.left === true };
+
+  }
+
+  /* this tab's session now (or none) */
+  function storeSession(left) {
+
+    if (sid) keep.set('session', left ? { sid: sid, tab: TAB, left: true } : { sid: sid, tab: TAB });
+    else keep.drop('session');
+
+  }
+
+  function forgetSession() {
+
+    saved = null;
+    keep.drop('session');
+
+  }
+
+
   /* ---------- Google Identity Services ---------- */
 
   function loadGis() {
@@ -386,9 +498,11 @@
 
     // Google may answer twice (auto-select, then the prompt): the same
     // account already being verified is not a new try
-    if (verifying === claims.email && gate.dataset.state === 'loading') return;
+    if (verifying === claims.email && (gate.dataset.state === 'loading' || gate.dataset.stage === 'server' || gate.dataset.stage === 'dashboard')) return;
 
-    enter();
+    // after a reload: the same session again; else a new one
+    if (saved) resume();
+    else enter();
 
   }
 
@@ -529,6 +643,7 @@
         var result = reply.ok && reply.result || {};
         if (result.sid) {
           sid = result.sid;
+          storeSession();
           collab.soon();
           return;
         }
@@ -627,7 +742,10 @@
   /* state: what the gate says; stage: where the sign-in is (loading only) */
   function showGate(state, nodes, stage) {
 
-    if (state !== 'loading') verifying = '';
+    if (state !== 'loading' && state !== 'restoring') verifying = '';
+    // after a reload: the compact gate (no intro), until the panel or the usual sign-in
+    if (state !== 'problem') restoring = state === 'restoring';
+    document.documentElement.classList.toggle('is-restoring', restoring);
     // before the panel, the gate is always on screen (never a blank page)
     if (phase === 'gate') gate.hidden = false;
     gate.dataset.state = state;
@@ -682,6 +800,179 @@
         gate.dataset.slow = '1';
       }
     };
+
+  }
+
+  /*
+   * After a reload: only «جاري استعادة الجلسة...» (no intro, no account), the
+   * same words restore.js already put on screen before anything loaded.
+   * extra: Google's button and a line, when Google wants a click.
+   */
+  function showRestoring(stage, extra) {
+
+    var note = h('p', { class: 'gate__note gate__note--slow', role: 'status', hidden: true });
+
+    showGate('restoring', [
+      h('p', { class: 'gate__status', role: 'status' },
+        h('span', { class: 'gate__line', 'aria-hidden': 'true' }, h('i')),
+        h('span', { class: 'gate__verify', text: 'جاري استعادة الجلسة...' })),
+      extra || null,
+      note
+    ], stage);
+
+    return {
+      slow: function (message) {
+        note.textContent = message;
+        note.hidden = false;
+        gate.dataset.slow = '1';
+      }
+    };
+
+  }
+
+  /* the panel is on its way: the restore look, or «جاري التحقق...» */
+  function progress(step, stage) {
+
+    return restoring ? showRestoring(stage) : showVerifying(step, stage);
+
+  }
+
+  /*
+   * A reload of a tab that had a session: a fresh token from Google first —
+   * silently (auto-select) when it can; if Google wants a click, its button
+   * right here, under the same words — then resume().
+   */
+  function restore() {
+
+    if (fresh(session)) { resume(); return; }
+
+    var my = nextAttempt();
+    var host = h('div', { class: 'gate__google', hidden: true });
+    var line = h('p', { class: 'gate__note', hidden: true, text: 'جوجل محتاج تأكيد — دوس على الزرار وهتكمّل من مكانك.' });
+    var view = showRestoring('google', h('div', { class: 'gate__restore-google' }, host, line));
+    var offered = false;
+
+    var stopSlow = watchdog(TIMING.gisSlow, function () {
+      if (my !== attempt) return;
+      view.slow('جوجل بياخد وقت أطول من العادي… لو النت ضعيف استنى شوية.');
+    });
+
+    function offer(id) {
+      if (offered || my !== attempt) return;
+      offered = true;
+      host.hidden = false;
+      line.hidden = false;
+      renderButton(host, id);
+      gate.dataset.stage = 'signin';
+    }
+
+    loadGis()
+      .then(function (id) {
+        stopSlow();
+        if (my !== attempt) return;
+        // a returning admin is signed in without a click; if nothing comes, the button
+        var stopSilent = watchdog(TIMING.silent, function () { offer(id); });
+        try {
+          id.prompt(function (moment) {
+            try {
+              if (moment && ((moment.isNotDisplayed && moment.isNotDisplayed()) ||
+                  (moment.isSkippedMoment && moment.isSkippedMoment()) ||
+                  (moment.isDismissedMoment && moment.isDismissedMoment()))) {
+                stopSilent();
+                offer(id);
+              }
+            }
+            catch (ignored) {
+              offer(id);
+            }
+          });
+        }
+        catch (error) {
+          stopSilent();
+          offer(id);
+        }
+      })
+      .catch(function (error) {
+        stopSlow();
+        if (my !== attempt) return;
+        showProblem('مقدرناش نفتح تسجيل الدخول بتاع جوجل.', 'اتأكد من النت، وإن المتصفح مش مانع accounts.google.com، وجرّب تاني.', error.message, restore);
+      });
+
+  }
+
+  /*
+   * The same session as before the reload (apiSessionResume): the panel's
+   * state comes with it (one round trip). Never the takeover question for
+   * this tab; anything else falls back to the usual sign-in.
+   */
+  function resume() {
+
+    var current = session;
+    var before = saved;
+
+    if (!before) { enter(); return; }
+    if (!fresh(current)) { restore(); return; }
+
+    var my = nextAttempt();
+    var signal = controller ? controller.signal : undefined;
+    var view = showRestoring('server');
+    var stopSlow = watchdog(TIMING.slow, function () {
+      if (my !== attempt) return;
+      view.slow('بياخد وقت أطول من العادي… الخادم بيصحى لو بقاله فترة من غير استخدام.');
+    });
+
+    verifying = current.email;
+
+    post('apiSessionResume', [{ device: DEVICE, tab: TAB, prev: before.tab, left: before.left }], current.token, before.sid, { timeout: TIMING.fail, signal: signal })
+      .then(function (reply) {
+        stopSlow();
+        if (my !== attempt) return;
+
+        var result = reply.ok ? reply.result || {} : {};
+
+        if (reply.ok && result.sid && result.state) {
+          saved = null;
+          sid = result.sid;
+          storeSession();
+          openPanel(result.state, my);
+          return;
+        }
+
+        // from here on, the usual way in: this sid is not ours to resume
+        if (reply.code === 'session_replaced') {
+          forgetSession();
+          var info = parsed(failure(reply));
+          showRevoked(info.message, info.hint);
+          return;
+        }
+        if (reply.code === 'session_expired') {
+          forgetSession();
+          enter();
+          return;
+        }
+        if (reply.ok && result.active) {
+          // the same sid live in another tab (a duplicated tab): asked, like any other
+          forgetSession();
+          showSessionActive(result.active);
+          return;
+        }
+        if (!reply.ok && (reply.code === 'denied' || reply.code === 'auth')) {
+          if (reply.code === 'denied') keep.clear();
+          refused(reply, current, {});
+          return;
+        }
+
+        var details = reply.ok ? { message: 'رد خادم لوحة التحكم مش مفهوم.', hint: 'غالبًا نشر الـ API في Apps Script محتاج يتحدّث (docs/ADMIN-SETUP.md).', details: JSON.stringify(result).slice(0, 200) } : parsed(failure(reply));
+        showProblem(details.message, details.hint, details.details, resume);
+      })
+      .catch(function (error) {
+        stopSlow();
+        if (my !== attempt) return;
+        var info = error.aborted
+          ? { message: 'الاتصال بخادم لوحة التحكم اتقطع.', hint: 'جرّب تاني.', details: 'apiSessionResume: aborted by the browser' }
+          : parsed(error);
+        showProblem(info.message, info.hint, info.details, resume);
+      });
 
   }
 
@@ -879,6 +1170,7 @@
         }
 
         sid = result.sid;
+        storeSession();
         openPanel(result.state, my);
       })
       .catch(function (error) {
@@ -901,6 +1193,7 @@
 
     if (reply.code === 'denied') {
       remember(null);
+      keep.clear();
       showDenied(current.email);
     }
     else if (reply.code === 'auth') {
@@ -919,7 +1212,7 @@
   /* draws the panel behind the gate; the gate goes only once it is drawn */
   function openPanel(state, my) {
 
-    showVerifying('بنجهز اللوحة…', 'dashboard');
+    progress('بنجهز اللوحة…', 'dashboard');
 
     window.AdminTransport = { call: call };
     A.signOut = signOut;
@@ -935,6 +1228,8 @@
     var drawn;
 
     try {
+      // where the admin was before a reload (area, sub-tab): drawn there straight away
+      if (A.restore) A.restore.view();
       drawn = A.start(state);
     }
     catch (error) {
@@ -956,6 +1251,12 @@
         return;
       }
       phase = 'app';
+      // the scroll position, the editor that was open and its unsaved values —
+      // before the first heartbeat, so the editor's lock is asked for, never let go
+      if (A.restore) {
+        try { A.restore.rest(); }
+        catch (error) { if (window.console) console.warn('[admin] restore', error); }
+      }
       collab.begin();
     });
 
@@ -986,6 +1287,8 @@
 
     gate.hidden = true;
     document.body.classList.remove('is-gated');
+    restoring = false;
+    document.documentElement.classList.remove('is-restoring');
 
     return '';
 
@@ -998,7 +1301,10 @@
 
     collab.stop();
     sid = '';
+    forgetSession();
     phase = 'gate';
+    // an open editor's unsaved values stay in this tab: they come back after signing in again
+    if (A.restore) A.restore.hold();
     A.dirty = false;
     closeReauth();
     Array.prototype.forEach.call(document.querySelectorAll('dialog[open]'), function (dialog) {
@@ -1032,6 +1338,8 @@
         : Promise.resolve();
       collab.stop();
       sid = '';
+      // nothing of this admin stays in the tab: no session to resume, no place, no drafts
+      keep.close();
       ending.then(function () {
         remember(null);
         try {
@@ -1156,21 +1464,28 @@
       }
     });
 
-    // leaving (reload, closing the tab, sign-in elsewhere in this tab): end the session now.
-    // Best effort: if it never arrives, the session and its locks run out by themselves.
+    // leaving (a reload, or closing the tab: the page can't tell): this tab
+    // notes that this page load left (a duplicated tab never has that), and
+    // the session is parked — not live for anyone else, its locks kept a few
+    // seconds, for this tab to resume. Best effort: if the beacon never
+    // arrives, the session goes quiet and runs out by itself.
     window.addEventListener('pagehide', function () {
-      if (!sid || !fresh(session) || !navigator.sendBeacon) return;
+      if (!sid) return;
+      storeSession(true);
+      if (!fresh(session) || !navigator.sendBeacon) return;
       try {
-        navigator.sendBeacon(API, new Blob([JSON.stringify({ fn: 'apiSessionEnd', args: [], token: session.token, sid: sid })], { type: 'text/plain;charset=utf-8' }));
+        navigator.sendBeacon(API, new Blob([JSON.stringify({ fn: 'apiSessionEnd', args: [{ park: true, tab: TAB }], token: session.token, sid: sid })], { type: 'text/plain;charset=utf-8' }));
       }
       catch (ignored) {
         // the locks run out by themselves
       }
     });
 
-    // back from the back/forward cache: the server ended that session; the beat finds out and starts a new one
+    // back from the back/forward cache: still here after all (the beat unparks the session, or finds it gone and starts a new one)
     window.addEventListener('pageshow', function (event) {
-      if (event.persisted && running) beat();
+      if (!event.persisted) return;
+      if (sid) storeSession();
+      if (running) beat();
     });
 
     return {
@@ -1227,11 +1542,17 @@
   // in flight is gone, so verify again (or show the button) — never a page
   // left on «جاري التحقق...»
   window.addEventListener('pageshow', function (event) {
-    if (!event.persisted || phase !== 'gate' || gate.dataset.state !== 'loading') return;
+    if (!event.persisted || phase !== 'gate') return;
+    if (gate.dataset.state === 'restoring') { restore(); return; }
+    if (gate.dataset.state !== 'loading') return;
     if (fresh(session)) enter();
     else showSignIn();
   });
 
-  showSignIn();
+  // a reload of a tab that had a session: the same session again; else the sign-in
+  saved = savedSession();
+
+  if (saved) restore();
+  else showSignIn();
 
 })();

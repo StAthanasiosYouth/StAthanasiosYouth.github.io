@@ -463,7 +463,10 @@ test('sign-in: the API hangs → "slower than usual" → «جرّب تاني» (
 
 });
 
-test('a reload mid-session (an editor open) comes back without a question, and frees the lock at once', async () => {
+// final/r changed what a reload does: the SAME session comes back (apiSessionResume),
+// with the editor that was open and its lock (tests/final-r.e2e.mjs); closing the
+// editor (or signing out) is what frees the lock now.
+test('a reload mid-session (an editor open) comes back without a question, the same session keeps its lock; closing frees it', async () => {
 
   freshWorld();
   const laptop = await device({ viewport: DESKTOP });
@@ -475,13 +478,23 @@ test('a reload mid-session (an editor open) comes back without a question, and f
 
   await laptop.page.evaluateOnNewDocument(() => { window.__gisSilent = true; });
   await laptop.page.evaluate(() => { A.dirty = false; });
+  const sidBefore = [...world.cache.entries()].filter(([k]) => k.startsWith('adm:ses:')).map(([, v]) => JSON.parse(v.value)).find(r => r.email === ADMIN).sid;
   await laptop.page.reload({ waitUntil: 'networkidle0' });
   await inPanel(laptop.page);
   assert.equal(await laptop.page.$('.gate[data-state="session-active"]'), null);
 
-  // the other admin can edit it right away (the page said goodbye when it left)
+  // the same session, the editor back, still its lock: the other admin is refused …
+  await laptop.page.waitForSelector('dialog.sheet[open] .sheet__foot .btn--primary');
+  await sleep(1200);
+  assert.equal(JSON.parse(world.cache.get('adm:lck:news:news-aaaa1111').value).sid, sidBefore, 'the same session holds it');
   const other = world.issueToken({ email: SECOND });
   const started = world.post({ fn: 'apiSessionStart', args: [{ device: 'x', state: false }], token: other });
+  const refused = world.post({ fn: 'apiSaveItem', args: ['news', { id: 'news-aaaa1111', title: 'بعد الريفرش', summary: 'x' }], token: other, sid: started.result.sid });
+  assert.equal(refused.code, 'locked');
+
+  // … until the editor closes
+  await laptop.page.evaluate(() => { A.closeSheet(); });
+  await sleep(1200);
   const saved = world.post({ fn: 'apiSaveItem', args: ['news', { id: 'news-aaaa1111', title: 'بعد الريفرش', summary: 'x' }], token: other, sid: started.result.sid });
   assert.equal(saved.ok, true, saved.error);
 
