@@ -51,7 +51,7 @@ const ARGS = {
   apiSetLiveStage: ['2099-01-01', null], apiDeleteItem: ['news', 'x'], apiSetItemArchived: ['news', 'x', true],
   apiDuplicateItem: ['news', 'x'], apiSetItemEnabled: ['news', 'x', false], apiUploadMedia: [{}], apiCheckMedia: [],
   apiMediaLibrary: [], apiUpdateMedia: ['img-x', {}], apiDeleteMedia: ['img-x'], apiRestoreMedia: ['img-x'],
-  apiPurgeMedia: ['img-x'], apiMediaPreview: ['img-x'], apiSetMediaAlt: ['img-x', 'x'], apiPlanMigration: [], apiMigrate: [],
+  apiPurgeMedia: ['img-x'], apiMediaPreview: ['img-x'], apiSetMediaAlt: ['img-x', 'x'], apiFetchMediaUrl: ['https://example.org/a.jpg'], apiPlanMigration: [], apiMigrate: [],
   apiAdmins: [], apiAddAdmin: ['x@gmail.com'], apiRemoveAdmin: [SECOND],
   apiSessionStart: [{ device: 'x' }], apiSessionResume: [{ device: 'x' }], apiHeartbeat: [{}], apiSessionEnd: []
 };

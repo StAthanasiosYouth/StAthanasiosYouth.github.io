@@ -90,7 +90,8 @@ export function createAdminServer({ world, admin, latency = 250, calls = null })
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.ics': 'text/calendar; charset=utf-8',
-  '.png': 'image/png', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8'
+  '.png': 'image/png', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8',
+  '.jpg': 'image/jpeg', '.mp4': 'video/mp4', '.webm': 'video/webm'
 };
 
 // like _config.yml: these never reach the website

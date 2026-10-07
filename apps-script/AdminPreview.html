@@ -104,7 +104,8 @@
           .then(toBlob)
           .then(function (blob) { blobs[media.id] = URL.createObjectURL(blob); return blobs[media.id]; });
       return ready.then(function (url) {
-        map[media.path] = url;
+        // a video: only its poster has a preview here (the clip plays once published)
+        if (media.kind !== 'video') map[media.path] = url;
         map[media.thumb] = url;
       }).catch(function () {});
     })).then(function () { return map; });

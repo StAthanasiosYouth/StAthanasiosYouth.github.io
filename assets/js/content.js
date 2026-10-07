@@ -20,6 +20,10 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 /* images are always this site's own published files */
 const MEDIA_PATH = /^media\/\d{4}\/img-[a-z0-9]{8}(-480)?\.(webp|jpg)$/;
 
+/* a scene's video clip and its poster frame (link galleries only) */
+const VIDEO_PATH = /^media\/\d{4}\/vid-[a-z0-9]{8}\.(mp4|webm)$/;
+const POSTER_PATH = /^media\/\d{4}\/vid-[a-z0-9]{8}-480\.(webp|jpg)$/;
+
 const NOTIFICATION_TYPES = ['general', 'meeting', 'news', 'game', 'important', 'competition', 'activity'];
 
 const SECTION_KINDS = ['meeting', 'featured', 'news', 'games', 'items', 'location', 'links', 'contacts', 'support', 'share'];
@@ -128,8 +132,41 @@ function cleanLink(raw) {
     // any registry-shaped key (platforms.js); one the site doesn't know yet
     // still opens the generic scene
     experience: experienceKey(raw.experience) === 'none' ? '' : experienceKey(raw.experience),
-    // the scene's own photos (optional, up to 6)
-    gallery: list(raw.gallery).map(cleanImage).filter(Boolean).slice(0, 6)
+    // the scene's own photos and video clips (optional, up to 6)
+    gallery: list(raw.gallery).map(item => (item.type === 'video' ? cleanVideo(item) : cleanImage(item))).filter(Boolean).slice(0, 6)
+  };
+
+}
+
+
+/* { type: 'video', src, poster, w, h, alt, start, end } — end 0 = to the end.
+   thumb = the poster, for code that only shows pictures. */
+export function cleanVideo(raw) {
+
+  if (!raw || typeof raw !== 'object' || !VIDEO_PATH.test(raw.src || '') || !POSTER_PATH.test(raw.poster || '')) {
+    return null;
+  }
+
+  const w = number(raw.w, 1, 10000);
+  const h = number(raw.h, 1, 10000);
+
+  if (w === null || h === null) {
+    return null;
+  }
+
+  const start = number(raw.start, 0, 600) || 0;
+  const end = number(raw.end, 0, 600) || 0;
+
+  return {
+    type: 'video',
+    src: raw.src,
+    poster: raw.poster,
+    thumb: raw.poster,
+    w: Math.round(w),
+    h: Math.round(h),
+    alt: text(raw.alt, 140),
+    start,
+    end: end > start ? end : 0
   };
 
 }

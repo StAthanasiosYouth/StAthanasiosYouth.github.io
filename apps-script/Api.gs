@@ -84,6 +84,7 @@ function apiFunctions_() {
     apiPurgeMedia: apiPurgeMedia,
     apiMediaPreview: apiMediaPreview,
     apiSetMediaAlt: apiSetMediaAlt,
+    apiFetchMediaUrl: apiFetchMediaUrl,
     apiPlanMigration: apiPlanMigration,
     apiMigrate: apiMigrate,
     apiAdmins: apiAdmins,

@@ -1,8 +1,10 @@
 /**
- * MEDIA (posters and images)
+ * MEDIA (posters, images and scene videos)
  *
  * 1. The admin page resizes the photo in the browser (WebP or JPEG, max
- *    1600px, plus a 480px thumbnail) and sends both here.
+ *    1600px, plus a 480px thumbnail) and sends both here. A video (MP4 or
+ *    WebM, up to 8 MB, 10 minutes) is sent as it is, with a poster frame the
+ *    browser captured (480px, like a thumbnail). Ids: img-… / vid-….
  * 2. They are checked and stored as private drafts in a Drive folder the
  *    script creates itself. The "drive.file" scope means the script can
  *    only see files it created, not the rest of the admin's Drive.
@@ -20,8 +22,16 @@ var MEDIA_LIMITS = {
   fullBytes: 1600 * 1024,
   thumbBytes: 300 * 1024,
   tinyBytes: 24 * 1024,
-  maxSide: 4000
+  maxSide: 4000,
+  // scene videos: the file as it is (base64 + poster must fit API_MAX_BODY)
+  videoBytes: 8 * 1024 * 1024,
+  videoSeconds: 600,
+  // «من رابط»: what the admin may fetch (images are resized after, in the browser)
+  urlImageBytes: 15 * 1024 * 1024,
+  urlVideoBytes: 8 * 1024 * 1024
 };
+
+var VIDEO_MIMES = { 'video/mp4': 'mp4', 'video/webm': 'webm' };
 
 
 /* =========================================================
@@ -210,6 +220,84 @@ function decodeImage_(base64, mime, maxBytes, label) {
 }
 
 
+/** base64 -> bytes, refusing anything that isn't really an MP4/WebM of at most 8 MB. */
+function decodeVideo_(base64, mime) {
+
+  if (typeof base64 !== 'string' || !base64 || base64.length % 4 !== 0) {
+    throw new Error('بيانات الفيديو مش سليمة');
+  }
+
+  // refused before decoding anything big
+  if (base64.length / 4 * 3 > MEDIA_LIMITS.videoBytes + 2) {
+    throw appError_('الفيديو أكبر من 8 MB.', 'قصّ الجزء اللي عايزه بس من الفيديو وارفعه.', Math.round(base64.length / 4 * 3 / 1024) + ' KB');
+  }
+
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(base64)) {
+    throw new Error('بيانات الفيديو مش سليمة');
+  }
+
+  var bytes = Utilities.base64Decode(base64);
+
+  if (bytes.length > MEDIA_LIMITS.videoBytes) {
+    throw appError_('الفيديو أكبر من 8 MB.', 'قصّ الجزء اللي عايزه بس من الفيديو وارفعه.', bytes.length + ' bytes');
+  }
+
+  if (sniffMedia_(bytes) !== mime) {
+    throw new Error('الملف مش فيديو ' + (mime === 'video/webm' ? 'WebM' : 'MP4'));
+  }
+
+  return bytes;
+
+}
+
+
+/* what the first bytes say the file is ('' = none of ours) */
+function sniffMedia_(bytes) {
+
+  var b = function (i) { return bytes[i] & 0xff; };
+  var ascii = function (from, to) {
+    var out = '';
+    for (var i = from; i < to && i < bytes.length; i++) out += String.fromCharCode(b(i));
+    return out;
+  };
+
+  if (!bytes || bytes.length < 12) return '';
+  if (b(0) === 0xff && b(1) === 0xd8 && b(2) === 0xff) return 'image/jpeg';
+  if (b(0) === 0x89 && ascii(1, 4) === 'PNG') return 'image/png';
+  if (ascii(0, 4) === 'GIF8') return 'image/gif';
+  if (ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return 'image/webp';
+  if (ascii(4, 8) === 'ftyp') {
+    var brand = ascii(8, 12);
+    if (/^(avif|avis)$/.test(brand)) return 'image/avif';
+    if (/^(heic|heix|hevc|hevx|heim|heis|hevm|hevs|mif1|msf1)$/.test(brand)) return 'image/heic';
+    return 'video/mp4';
+  }
+  if (b(0) === 0x1a && b(1) === 0x45 && b(2) === 0xdf && b(3) === 0xa3) return 'video/webm';
+  return '';
+
+}
+
+
+/* a library item is a video when its id says so */
+function isVideoMedia_(row) {
+
+  return /^vid-/.test(String((row && row.id) || ''));
+
+}
+
+
+/* the type of the small pictures (thumb / tiny): a video's are its poster's */
+function thumbMime_(row) {
+
+  if (isVideoMedia_(row)) {
+    return /\.jpg$/.test(String(row.thumb || '')) ? 'image/jpeg' : 'image/webp';
+  }
+
+  return row.mime || 'image/webp';
+
+}
+
+
 /* =========================================================
    API
 ========================================================= */
@@ -224,6 +312,10 @@ function apiUploadMedia(input) {
   var email = assertAdmin_();
 
   input = input || {};
+
+  if (input.kind === 'video') {
+    return uploadVideo_(email, input);
+  }
 
   var mime = input.mime === 'image/jpeg' || input.mime === 'image/webp' ? input.mime : '';
 
@@ -311,6 +403,229 @@ function apiUploadMedia(input) {
     state: state,
     user: email
   };
+
+}
+
+
+/**
+ * A scene video: input = { kind: 'video', video: base64, mime: 'video/mp4'|'video/webm',
+ *   poster: base64 (480px frame), posterMime: 'image/webp'|'image/jpeg', tiny, tinyMime,
+ *   color, width, height, duration (s), name, alt }.
+ * The duration is only checked (0 < d <= 10 min), not stored: the admin reads
+ * it again from the video when a clip is chosen.
+ */
+function uploadVideo_(email, input) {
+
+  var mime = VIDEO_MIMES.hasOwnProperty(input.mime) ? input.mime : '';
+
+  if (!mime) {
+    throw appError_('نوع الفيديو لازم يكون MP4 أو WebM.', 'فيديوهات الآيفون (MOV): ابعتها لنفسك على واتساب ونزّلها، أو صدّرها MP4 الأول.', String(input.mime || '').slice(0, 60));
+  }
+
+  var duration = Number(input.duration);
+
+  if (!(duration > 0 && duration <= MEDIA_LIMITS.videoSeconds)) {
+    throw appError_('الفيديو لازم يكون أقل من ١٠ دقايق.', 'قصّ الجزء اللي عايزه بس وارفعه.', 'duration ' + String(input.duration).slice(0, 20));
+  }
+
+  var video = decodeVideo_(input.video, mime);
+  var posterMime = input.posterMime === 'image/jpeg' ? 'image/jpeg' : 'image/webp';
+  var poster = decodeImage_(input.poster, posterMime, MEDIA_LIMITS.thumbBytes, 'صورة غلاف الفيديو');
+  var tinyMime = input.tinyMime === 'image/jpeg' || input.tinyMime === 'image/webp' ? input.tinyMime : posterMime;
+  var tiny = input.tiny ? (decodeImage_(input.tiny, tinyMime, MEDIA_LIMITS.tinyBytes, 'الصورة المصغرة'), String(input.tiny)) : '';
+  var color = /^#[0-9a-f]{6}$/i.test(String(input.color || '')) ? String(input.color).toLowerCase() : '';
+  var hash = bytesHash_(video);
+
+  // the same video was uploaded before: use it
+  var same = readOptionalTable_('Media').filter(function (row) { return row.hash === hash && !row.deletedAt && isVideoMedia_(row); })[0];
+
+  if (same) {
+    return {
+      media: { id: same.id, path: same.path, thumb: same.thumb, width: same.width, height: same.height, alt: same.alt, kind: 'video' },
+      duplicate: true,
+      state: apiStateFor_(email),
+      user: email
+    };
+  }
+
+  var width = Math.round(Number(input.width));
+  var height = Math.round(Number(input.height));
+
+  if (!(width >= 16 && width <= MEDIA_LIMITS.maxSide && height >= 16 && height <= MEDIA_LIMITS.maxSide)) {
+    throw new Error('مقاسات الفيديو مش منطقية');
+  }
+
+  var problems = [];
+  var alt = input_(input.alt, HUB_LIMITS.alt, 'وصف الفيديو', problems, false);
+  var name = input_(input.name, 80, 'اسم الفيديو', problems, false);
+
+  if (problems.length) {
+    fail_(problems);
+  }
+
+  var id = 'vid-' + Utilities.getUuid().replace(/-/g, '').slice(0, 8).toLowerCase();
+  var year = Utilities.formatDate(new Date(), CONTENT_TIMEZONE, 'yyyy');
+  var ext = VIDEO_MIMES[mime];
+  // the poster's own type, whatever the video's
+  var posterExt = posterMime === 'image/jpeg' ? 'jpg' : 'webp';
+
+  var driveId, thumbDriveId;
+
+  try {
+    driveId = driveUpload_(video, mime, id + '.' + ext);
+    thumbDriveId = driveUpload_(poster, posterMime, id + '-480.' + posterExt);
+  }
+  catch (error) {
+    log_(email, 'media.upload.failed', errorDetails_(error));
+    throw error;
+  }
+
+  var record = {
+    id: id,
+    path: 'media/' + year + '/' + id + '.' + ext,
+    thumb: 'media/' + year + '/' + id + '-480.' + posterExt,
+    width: width,
+    height: height,
+    alt: alt,
+    mime: mime,
+    driveId: driveId,
+    thumbDriveId: thumbDriveId,
+    uploadedAt: nowStamp_(),
+    publishedAt: '',
+    name: name,
+    tiny: tiny,
+    color: color,
+    hash: hash,
+    bytes: video.length
+  };
+
+  var state = mutate_('media.upload', id, function () {
+    ensureTable_('Media');
+    upsertRow_('Media', 'id', record);
+    return id + ' ' + Math.round(video.length / 1024) + 'KB ' + Math.round(duration) + 's';
+  });
+
+  return {
+    media: { id: id, path: record.path, thumb: record.thumb, width: width, height: height, alt: alt, kind: 'video' },
+    state: state,
+    user: email
+  };
+
+}
+
+
+/* =========================================================
+   «من رابط»: a direct link to an image or video FILE
+========================================================= */
+
+/* pages, not files: the admin downloads the video and uploads it instead */
+var PAGE_HOSTS = /(^|\.)(youtube\.com|youtu\.be|tiktok\.com|facebook\.com|fb\.watch|instagram\.com|x\.com|twitter\.com|threads\.net|drive\.google\.com|photos\.google\.com|photos\.app\.goo\.gl)$/i;
+
+var URL_IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
+
+
+function pageLinkError_(details) {
+
+  return appError_('الرابط ده صفحة، مش ملف صورة أو فيديو.',
+    'لينكات تيك توك ويوتيوب وفيسبوك وإنستجرام بتفتح صفحة. نزّل الفيديو على جهازك الأول وارفعه من «ارفع صورة أو فيديو»، أو استخدم رابط مباشر للملف نفسه (بيخلص بـ .mp4 أو .jpg مثلاً).',
+    details || '');
+
+}
+
+
+/**
+ * Fetches a direct https link to an image or a video file, for the admin to
+ * run through the same upload as a picked file (images are resized in the
+ * browser, videos probed there). Nothing is stored here.
+ * Returns { mime, base64, name, bytes }.
+ */
+function apiFetchMediaUrl(url) {
+
+  assertAdmin_();
+
+  var href = String(url === null || url === undefined ? '' : url).trim();
+  var parts = /^https:\/\/([^\/?#]+)([^?#]*)/i.exec(href);
+
+  if (!parts || href.length > 2000 || /\s/.test(href)) {
+    throw appError_('الرابط لازم يكون كامل ويبدأ بـ https://', 'انسخ رابط الملف نفسه والزقه هنا.');
+  }
+
+  var host = parts[1].toLowerCase();
+
+  // no user:password@, no bare addresses or local names
+  if (host.indexOf('@') !== -1 || !/^[a-z0-9.-]+(:\d{1,5})?$/.test(host) || host.indexOf('.') === -1 ||
+      /^[\d.]+(:\d+)?$/.test(host) || /(^|\.)(localhost|local|internal)(:\d+)?$/.test(host)) {
+    throw appError_('الرابط ده مش مقبول.', 'استخدم رابط https عادي لملف صورة أو فيديو.', host.slice(0, 80));
+  }
+
+  if (PAGE_HOSTS.test(host.replace(/:\d+$/, ''))) {
+    throw pageLinkError_(host);
+  }
+
+  var response;
+
+  try {
+    response = UrlFetchApp.fetch(href, { method: 'get', followRedirects: true, muteHttpExceptions: true, validateHttpsCertificates: true });
+  }
+  catch (error) {
+    throw appError_('مقدرناش نوصل للرابط ده.', 'اتأكد إن الرابط شغال وبيفتح الملف نفسه في المتصفح.', errorDetails_(error));
+  }
+
+  var code = response.getResponseCode();
+
+  if (code !== 200) {
+    throw appError_('الرابط رجّع خطأ (' + code + ').', 'اتأكد إن الملف مش خاص أو محتاج تسجيل دخول.', 'HTTP ' + code);
+  }
+
+  var headers = response.getHeaders() || {};
+  var type = '';
+
+  Object.keys(headers).forEach(function (key) {
+    if (key.toLowerCase() === 'content-type') type = String(headers[key]).split(';')[0].trim().toLowerCase();
+  });
+
+  if (/^text\/|html|xml|json/.test(type)) {
+    throw pageLinkError_(type);
+  }
+
+  if (type && !/^(image|video)\//.test(type) && !/^(application|binary)\/octet-stream$/.test(type)) {
+    throw appError_('الرابط ده مش لصورة أو فيديو.', 'استخدم رابط مباشر لملف صورة (JPG / PNG / WebP) أو فيديو (MP4 / WebM).', type.slice(0, 60));
+  }
+
+  var bytes = response.getContent();
+  var mime = sniffMedia_(bytes);
+
+  if (/^video\//.test(mime)) {
+    if (bytes.length > MEDIA_LIMITS.urlVideoBytes) {
+      throw appError_('الفيديو أكبر من 8 MB.', 'قصّ الجزء اللي عايزه بس وارفعه من جهازك.', bytes.length + ' bytes');
+    }
+  }
+  else if (URL_IMAGE_MIMES.indexOf(mime) !== -1) {
+    if (bytes.length > MEDIA_LIMITS.urlImageBytes) {
+      throw appError_('الصورة أكبر من 15 MB.', 'نزّلها على جهازك وارفعها من هناك.', bytes.length + ' bytes');
+    }
+  }
+  else {
+    throw appError_(/^video\//.test(type) ? 'نوع الفيديو ده مش مدعوم.' : 'الملف ده مش صورة أو فيديو نقدر نستخدمه.',
+      'الصور: JPG أو PNG أو WebP. الفيديو: MP4 أو WebM.', (type || 'no content-type') + (mime ? ' / ' + mime : ''));
+  }
+
+  var file = decodeURIComponentSafe_(parts[2].split('/').pop() || '');
+  var name = file.replace(/\.[a-z0-9]{2,5}$/i, '').replace(/[\u0000-\u001f]/g, '').slice(0, 80);
+
+  return { mime: mime, base64: Utilities.base64Encode(bytes), name: name, bytes: bytes.length };
+
+}
+
+
+function decodeURIComponentSafe_(text) {
+
+  try {
+    return decodeURIComponent(text);
+  }
+  catch (error) {
+    return text;
+  }
 
 }
 
@@ -477,8 +792,16 @@ function mediaUsage_() {
   readTable_('Sections').forEach(function (r) { add(r.banner, 'sections', r.key, 'بانر القسم: ' + r.title); });
   // schema 4: a person's photo, a link scene's own photos
   readTable_('Contacts').forEach(function (r) { add(r.image, 'contacts', r.id, 'صورة: ' + r.name); });
+  // gallery tokens: "id" or "vid-…@start-end" (Content.gs parseGalleryToken_)
   readTable_('Links').forEach(function (r) {
-    contentLine_(r.gallery).split(/[\s,،]+/).filter(Boolean).forEach(function (id) { add(id, 'links', r.id, 'صور مشهد: ' + r.title); });
+    var seen = Object.create(null);
+    galleryTokens_(r.gallery).forEach(function (token) {
+      var item = parseGalleryToken_(token);
+      var id = item ? item.id : token;
+      if (seen[id]) return;
+      seen[id] = true;
+      add(id, 'links', r.id, 'صور مشهد: ' + r.title);
+    });
   });
 
   return usage;
@@ -497,13 +820,14 @@ function apiMediaLibrary() {
     items: readOptionalTable_('Media').map(function (r) {
       return {
         id: r.id,
+        kind: isVideoMedia_(r) ? 'video' : 'image',
         name: r.name || '',
         alt: r.alt || '',
         width: r.width,
         height: r.height,
         bytes: r.bytes || '',
         color: r.color || '',
-        tiny: r.tiny ? 'data:' + (r.mime || 'image/webp') + ';base64,' + r.tiny : '',
+        tiny: r.tiny ? 'data:' + thumbMime_(r) + ';base64,' + r.tiny : '',
         uploadedAt: r.uploadedAt || '',
         publishedAt: r.publishedAt || '',
         deletedAt: r.deletedAt || '',
@@ -524,7 +848,7 @@ function findMedia_(id) {
   var row = readOptionalTable_('Media').filter(function (r) { return r.id === id; })[0];
 
   if (!row) {
-    throw new Error('الصورة مش موجودة');
+    throw new Error(/^vid-/.test(id) ? 'الفيديو مش موجود' : 'الصورة مش موجودة');
   }
 
   return row;
@@ -568,12 +892,12 @@ function apiUpdateMedia(id, input) {
 function apiDeleteMedia(id) {
 
   assertAdmin_();
-  findMedia_(id);
+  var row = findMedia_(id);
 
   var used = mediaUsage_()[id] || [];
 
   if (used.length) {
-    throw appError_('الصورة دي مستخدمة، ومينفعش تتشال.', 'مستخدمة في: ' + used.map(function (u) { return u.label; }).join('، ') + '. غيّرها هناك الأول.', '', 'usage');
+    throw appError_(isVideoMedia_(row) ? 'الفيديو ده مستخدم، ومينفعش يتشال.' : 'الصورة دي مستخدمة، ومينفعش تتشال.','مستخدمة في: ' + used.map(function (u) { return u.label; }).join('، ') + '. غيّرها هناك الأول.', '', 'usage');
   }
 
   return mutate_('media.delete', id, function () {
@@ -649,7 +973,12 @@ function apiMediaPreview(id) {
     throw new Error('الصورة مش موجودة');
   }
 
-  return 'data:' + (row.mime || 'image/webp') + ';base64,' + driveDownloadBase64_(row.thumbDriveId || row.driveId);
+  // a video's preview is its poster frame, never the video itself
+  if (isVideoMedia_(row)) {
+    return 'data:' + thumbMime_(row) + ';base64,' + driveDownloadBase64_(row.thumbDriveId);
+  }
+
+  return 'data:' + thumbMime_(row) + ';base64,' + driveDownloadBase64_(row.thumbDriveId || row.driveId);
 
 }
 

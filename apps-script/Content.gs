@@ -105,6 +105,71 @@ var LIMITS = {
   gallery: 6
 };
 
+/* a scene video's clip (seconds): «من» / «لحد» */
+var GALLERY_CLIP = {
+  maxSeconds: 600,
+  minSeconds: 0.5
+};
+
+
+/* =========================================================
+   SCENE GALLERY TOKENS (Links.gallery)
+   "img-xxxxxxxx", "vid-xxxxxxxx" or "vid-xxxxxxxx@START-END" (seconds,
+   up to one decimal), comma separated, up to LIMITS.gallery.
+========================================================= */
+
+function galleryTokens_(value) {
+
+  return (Array.isArray(value) ? value : String(value === null || value === undefined ? '' : value).split(/[\s,،]+/))
+    .map(function (token) { return contentLine_(token); })
+    .filter(Boolean);
+
+}
+
+
+/* one token -> { id, kind: 'image'|'video', start, end, clip } or null (not a token) */
+function parseGalleryToken_(token) {
+
+  var match = /^(img|vid)-([a-z0-9]{8})(?:@(\d{1,4}(?:\.\d+)?)-(\d{1,4}(?:\.\d+)?))?$/.exec(String(token || '').trim().toLowerCase());
+
+  if (!match) {
+    return null;
+  }
+
+  var item = { id: match[1] + '-' + match[2], kind: match[1] === 'vid' ? 'video' : 'image', start: 0, end: 0, clip: false };
+
+  if (match[3] !== undefined) {
+    // a picture has no start and end
+    if (item.kind !== 'video') return null;
+    item.start = Math.round(Number(match[3]) * 10) / 10;
+    item.end = Math.round(Number(match[4]) * 10) / 10;
+    item.clip = true;
+  }
+
+  return item;
+
+}
+
+
+/* '' or what is wrong with a video's clip */
+function galleryClipProblem_(item) {
+
+  if (!item || !item.clip) return '';
+  if (!(item.start >= 0) || !(item.end > item.start)) return 'وقت «لحد» لازم يكون بعد «من»';
+  if (item.end > GALLERY_CLIP.maxSeconds) return 'المقطع لازم يخلص قبل الدقيقة ١٠';
+  if (item.end - item.start < GALLERY_CLIP.minSeconds) return 'المقطع لازم يكون نص ثانية على الأقل';
+  return '';
+
+}
+
+
+/* the stored form of a parsed token */
+function galleryToken_(item) {
+
+  return item.id + (item.clip ? '@' + item.start + '-' + item.end : '');
+
+}
+
 
 /* =========================================================
    SMALL HELPERS
@@ -639,6 +704,33 @@ function buildPublicContent(draft, options) {
     return mediaById[id];
   }
 
+  var videoById = videoIndex_(draft.media);
+
+  /* one library video in a scene (item from parseGalleryToken_), or null;
+     end 0 = to the end of the video */
+  function libraryVideo(item, where) {
+    var video = videoById[item.id];
+    if (!video) {
+      warn(where, 'فيديو المشهد "' + item.id + '" مش موجود في المكتبة، ومش هيظهر');
+      return null;
+    }
+    var clipProblem = galleryClipProblem_(item);
+    if (clipProblem) {
+      warn(where, 'فيديو المشهد "' + item.id + '": ' + clipProblem + ' — هيشتغل من الأول');
+    }
+    if (extraMedia.indexOf(item.id) === -1) extraMedia.push(item.id);
+    return {
+      type: 'video',
+      src: video.src,
+      poster: video.poster,
+      w: video.w,
+      h: video.h,
+      alt: video.alt,
+      start: item.clip && !clipProblem ? item.start : 0,
+      end: item.clip && !clipProblem ? item.end : 0
+    };
+  }
+
 
   /* ---------- links ---------- */
 
@@ -752,10 +844,18 @@ function buildPublicContent(draft, options) {
     // the scene's own photos (Media Library ids, comma separated); without
     // them the site uses our newest published posters. Only resolved for a
     // link that is really published (its images go public with it).
+    // Videos (vid-…, optionally @start-end) play their clip in the scene.
     function withGallery() {
       if (!experience) return link;
-      var gallery = contentLine_(row.gallery).split(/[\s,،]+/).filter(Boolean).slice(0, LIMITS.gallery)
-        .map(function (mediaId) { return libraryImage(mediaId, where, 'صورة المشهد'); })
+      var gallery = galleryTokens_(row.gallery).slice(0, LIMITS.gallery)
+        .map(function (token) {
+          var item = parseGalleryToken_(token);
+          if (!item) {
+            warn(where, 'عنصر المشهد "' + token.slice(0, 40) + '" مش مفهوم، ومش هيظهر');
+            return null;
+          }
+          return item.kind === 'video' ? libraryVideo(item, where) : libraryImage(item.id, where, 'صورة المشهد');
+        })
         .filter(Boolean);
       if (gallery.length) link.gallery = gallery;
       return link;

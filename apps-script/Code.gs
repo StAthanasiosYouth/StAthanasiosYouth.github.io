@@ -396,14 +396,10 @@ function apiSaveLink(input) {
     experience: linkExperiences_().indexOf(input.experience) !== -1 ? input.experience : ''
   };
 
-  // the scene's own photos (schema 4): written only when the editor sends them
+  // the scene's own photos and video clips (schema 4; Items.gs galleryInput_):
+  // written only when the editor sends them
   if (input.gallery !== undefined) {
-    var gallery = (Array.isArray(input.gallery) ? input.gallery : String(input.gallery || '').split(/[\s,،]+/))
-      .map(function (id) { return contentLine_(id); })
-      .filter(Boolean)
-      .slice(0, LIMITS.gallery);
-    gallery.forEach(function (id) { imageRef_(id, problems); });
-    link.gallery = gallery.join(',');
+    link.gallery = galleryInput_(input.gallery, problems);
   }
 
   if (!link.url) {
