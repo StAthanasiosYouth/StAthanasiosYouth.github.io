@@ -298,8 +298,8 @@
     });
     var gallery = A.galleryPicker(link.gallery || '', {
       max: limits.gallery || 6,
-      label: 'صور المشهد',
-      hint: 'اختياري — لحد ٦ صور من المكتبة بتظهر جوه المشهد. من غيرها بيظهر أحدث بوسترات منشورة.'
+      label: 'صور وفيديوهات المشهد',
+      hint: 'اختياري — لحد ٦ صور أو مقاطع فيديو من المكتبة، بتظهر جوه المشهد بالترتيب ده. الفيديو: «من» و«لحد» (مثلاً 0:37 و0:43)؛ لو سبتهم فاضيين بيشتغل أول ٦ ثواني. من غيرهم بيظهر أحدث بوسترات منشورة.'
     });
 
     // the photos only matter when the link opens a scene
@@ -316,6 +316,12 @@
 
     save.addEventListener('click', function () {
       box.hidden = true;
+      // a video's «من» / «لحد» that don't make sense: the message is next to them
+      var clipProblem = gallery.check();
+      if (clipProblem) {
+        A.fail(new Error(clipProblem), box);
+        return;
+      }
       A.withBusy(save, A.call('apiSaveLink', {
         experience: experience.value(),
         gallery: gallery.value(),

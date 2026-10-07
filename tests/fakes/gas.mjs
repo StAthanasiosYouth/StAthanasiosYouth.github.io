@@ -412,7 +412,10 @@ function formatDate(date, timeZone, pattern) {
  * Creates a fresh Apps Script world with all project .gs files loaded.
  * world.as(email) switches the signed-in user.
  */
-export function createWorld({ owner = 'menazakmena@gmail.com', github = new FakeGitHub(), drive = new FakeDrive(), mapsRedirects = {}, adminEmails = owner, executeAs = 'USER_ACCESSING' } = {}) {
+export function createWorld({ owner = 'menazakmena@gmail.com', github = new FakeGitHub(), drive = new FakeDrive(), mapsRedirects = {}, adminEmails = owner, executeAs = 'USER_ACCESSING', web = {} } = {}) {
+
+  // other websites (apiFetchMediaUrl): url -> { status, headers, body: Buffer }; every request is recorded
+  const webRequests = [];
 
   // standalone script project: no active spreadsheet; setup() creates one
   const properties = new Map(adminEmails ? [['ADMIN_EMAILS', adminEmails]] : []);
@@ -540,6 +543,17 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
           return { getResponseCode: () => 302, getContentText: () => '', getHeaders: () => ({ Location: mapsRedirects[url] }) };
         }
         if (url.startsWith('https://www.googleapis.com/')) return drive.fetch(url, options);
+        if (Object.prototype.hasOwnProperty.call(web, url)) {
+          webRequests.push({ url, options });
+          const page = web[url];
+          const body = Buffer.isBuffer(page.body) ? page.body : Buffer.from(String(page.body || ''), 'utf8');
+          return {
+            getResponseCode: () => page.status || 200,
+            getHeaders: () => ({ ...(page.headers || {}) }),
+            getContent: () => [...body].map(b => (b > 127 ? b - 256 : b)),
+            getContentText: () => body.toString('utf8')
+          };
+        }
         if (url === 'https://oauth2.googleapis.com/tokeninfo' && options && options.payload && options.payload.id_token !== undefined) {
           // Google checks the signature and the expiry; we only know the tokens we issued
           tokeninfo.calls++;
@@ -599,6 +613,8 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
     gs: context,
     github,
     drive,
+    web,
+    webRequests,
     get spreadsheet() { return spreadsheet; },
     properties,
     cache,

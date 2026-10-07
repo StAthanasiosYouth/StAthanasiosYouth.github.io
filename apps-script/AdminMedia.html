@@ -45,8 +45,15 @@
     { key: 'used', label: 'مستخدمة' },
     { key: 'unused', label: 'مش مستخدمة' },
     { key: 'site', label: 'على الموقع' },
+    { key: 'videos', label: 'فيديوهات' },
     { key: 'bin', label: 'المحذوفة' }
   ];
+
+  function isVideo(item) {
+
+    return item.kind === 'video' || /^vid-/.test(item.id || '');
+
+  }
 
   function matches(item, filter, query) {
 
@@ -55,9 +62,10 @@
     if (filter === 'used' && !item.usage.length) return false;
     if (filter === 'unused' && item.usage.length) return false;
     if (filter === 'site' && !item.publishedAt) return false;
+    if (filter === 'videos' && !isVideo(item)) return false;
 
     if (query) {
-      var text = (item.name + ' ' + item.alt + ' ' + item.usage.map(function (u) { return u.label; }).join(' ')).toLowerCase();
+      var text = (item.name + ' ' + item.alt + ' ' + (isVideo(item) ? 'فيديو مقطع video ' : 'صورة ') + item.usage.map(function (u) { return u.label; }).join(' ')).toLowerCase();
       if (text.indexOf(query.toLowerCase()) === -1) return false;
     }
 
@@ -69,15 +77,16 @@
   function tile(item, onclick, selected) {
 
     var img = el('img', { class: 'media-tile__img', alt: '' });
+    var video = isVideo(item);
     var button = el('button', {
-      class: 'media-tile' + (selected ? ' is-selected' : '') + (item.deletedAt ? ' is-deleted' : ''),
+      class: 'media-tile' + (selected ? ' is-selected' : '') + (item.deletedAt ? ' is-deleted' : '') + (video ? ' is-video' : ''),
       type: 'button',
       'aria-pressed': selected ? 'true' : null,
-      'aria-label': (item.name || item.alt || item.id) + (item.usage.length ? ' — مستخدمة ' + item.usage.length : ''),
+      'aria-label': (video ? 'فيديو: ' : '') + (item.name || item.alt || item.id) + (item.usage.length ? ' — مستخدمة ' + item.usage.length : ''),
       style: item.color ? '--tile:' + item.color : null,
       onclick: onclick
     },
-    el('span', { class: 'media-tile__frame' }, img),
+    el('span', { class: 'media-tile__frame' }, img, video ? el('span', { class: 'media-tile__play', 'aria-hidden': 'true', text: '▶' }) : null),
     el('span', { class: 'media-tile__name', text: item.name || item.alt || 'من غير اسم' }),
     el('span', { class: 'media-tile__meta' },
       item.usage.length ? el('span', { class: 'media-tile__badge', text: 'مستخدمة ' + item.usage.length }) : null,
@@ -149,6 +158,9 @@
     var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر بالاسم أو الوصف أو مكان الاستخدام', value: viewQuery, 'aria-label': 'دوّر في الصور' });
     var chips = el('div', { class: 'filter-chips', role: 'group', 'aria-label': 'فلتر' });
     var upload = A.imageUploader(function () { load(true).then(draw); });
+    // the recovery admin: no trimmer here (AdminTrim.html)
+    var videoNote = A.trimmerAvailable && A.trimmerAvailable() ? null
+      : el('p', { class: 'note', text: 'مقاطع الفيديو بتتعمل من لوحة التحكم الرسمية (/admin/) من Google Chrome على الكمبيوتر. من هنا تقدر تستخدم الفيديوهات اللي في المكتبة.' });
 
     function drawChips() {
       chips.replaceChildren.apply(chips, FILTERS.map(function (f) {
@@ -174,8 +186,9 @@
     });
 
     return [
-      A.card('مكتبة الصور', 'كل البوسترات والبانرات في مكان واحد. اختار من هنا بدل ما ترفع نفس الصورة كذا مرة.',
+      A.card('مكتبة الصور', 'كل البوسترات والبانرات ومقاطع المشاهد في مكان واحد. اختار من هنا بدل ما ترفع نفس الصورة كذا مرة.',
         upload.node,
+        videoNote,
         search,
         chips
       ),
@@ -187,7 +200,14 @@
   /* a standalone uploader (the library's own "ارفع صورة") */
   A.imageUploader = function (onDone) {
 
-    var picker = A.imagePicker('', { uploadOnly: true, label: 'رفع صورة جديدة', hint: 'من الموبايل أو الكمبيوتر — بتتصغر وتتضغط لوحدها، والصورة المكررة مبتترفعش تاني', onUploaded: function () { onDone(); } });
+    var picker = A.imagePicker('', {
+      uploadOnly: true,
+      allowVideo: true,
+      allowUrl: true,
+      label: 'رفع صورة أو فيديو',
+      hint: 'الصورة بتتصغر وتتضغط لوحدها، والمكررة مبتترفعش تاني. الفيديو (حتى لو كبير جدًا): بتختار منه جزء من ثانية لـ ٣٠ ثانية، والمقطع بس هو اللي بيترفع.',
+      onUploaded: function () { onDone(); }
+    });
     return picker;
 
   };
@@ -200,15 +220,24 @@
   function openDetails(item) {
 
     var box = A.errorBox();
-    var name = A.counted('اسم الصورة', item.name, 80, 'علشان تلاقيها بسهولة');
-    var alt = A.counted('وصف الصورة', item.alt, 140, 'للي بيستخدم قارئ شاشة (مثلاً: بوستر رحلة الغردقة)');
+    var video = isVideo(item);
+    var name = A.counted(video ? 'اسم الفيديو' : 'اسم الصورة', item.name, 80, 'علشان تلاقيه بسهولة');
+    var alt = A.counted(video ? 'وصف الفيديو' : 'وصف الصورة', item.alt, 140, video ? 'للي بيستخدم قارئ شاشة (مثلاً: الشباب في رحلة الغردقة)' : 'للي بيستخدم قارئ شاشة (مثلاً: بوستر رحلة الغردقة)');
+    // a video: its poster frame (the clip itself plays on the site)
     var preview = el('img', { class: 'media-detail__img', alt: '' });
+    var length = el('dd', { class: 'ltr', text: '—' });
 
     A.mediaPreview(item.id).then(function (src) { if (src) preview.src = src; }).catch(function () {
       if (item.tiny) preview.src = item.tiny;
     });
 
+    if (video) {
+      A.videoDuration(item.id).then(function (seconds) { if (seconds) length.textContent = A.clip.formatTime(seconds); });
+    }
+
     var facts = el('dl', { class: 'kv' },
+      video ? el('dt', { text: 'النوع' }) : null, video ? el('dd', { text: 'مقطع فيديو (MP4، من غير صوت)' }) : null,
+      video ? el('dt', { text: 'المدة' }) : null, video ? length : null,
       el('dt', { text: 'المقاس' }), el('dd', { class: 'ltr', text: item.width + ' × ' + item.height }),
       item.bytes ? el('dt', { text: 'الحجم' }) : null, item.bytes ? el('dd', { class: 'ltr', text: A.formatBytes(Number(item.bytes)) }) : null,
       el('dt', { text: 'اترفعت' }), el('dd', { text: item.uploadedAt ? A.formatWall(item.uploadedAt) : '—' }),
@@ -235,7 +264,7 @@
       actions.push(el('button', { class: 'btn', type: 'button', onclick: function (e) { act('apiRestoreMedia', 'رجعت للمكتبة ✓', e.currentTarget); } }, icon('retry'), 'رجّعها'));
       actions.push(el('button', { class: 'btn btn--danger', type: 'button', onclick: function (e) {
         var button = e.currentTarget;
-        A.confirm({ tone: 'danger', title: 'تمسح الصورة نهائي؟', message: 'هتتمسح من Drive ومش هترجع. لو كانت اتنشرت قبل كده، الملف اللي على الموقع هيفضل علشان اللينكات القديمة.', confirmLabel: 'امسح نهائي', cancelLabel: 'لأ' })
+        A.confirm({ tone: 'danger', title: video ? 'تمسح الفيديو نهائي؟' : 'تمسح الصورة نهائي؟', message: 'هتتمسح من Drive ومش هترجع. لو كانت اتنشرت قبل كده، الملف اللي على الموقع هيفضل علشان اللينكات القديمة.', confirmLabel: 'امسح نهائي', cancelLabel: 'لأ' })
           .then(function (ok) { if (ok) act('apiPurgeMedia', 'اتمسحت نهائي', button); });
       } }, icon('trash'), 'امسح نهائي'));
     }
@@ -246,13 +275,13 @@
           // the clear warning: where it is used, nothing happens
           A.modal({
             tone: 'warn',
-            title: 'الصورة دي مستخدمة',
+            title: video ? 'الفيديو ده مستخدم' : 'الصورة دي مستخدمة',
             message: 'مينفعش تتشال وهي مستخدمة في:\n' + item.usage.map(function (u) { return '• ' + u.label; }).join('\n') + '\n\nغيّرها في الأماكن دي الأول.',
             actions: [{ label: 'تمام', value: true, kind: 'primary', autofocus: true }]
           });
           return;
         }
-        A.confirm({ tone: 'danger', title: 'تشيل الصورة من المكتبة؟', message: 'هتروح «المحذوفة» وتقدر ترجعها بعدين.', confirmLabel: 'شيلها', cancelLabel: 'لأ' })
+        A.confirm({ tone: 'danger', title: video ? 'تشيل الفيديو من المكتبة؟' : 'تشيل الصورة من المكتبة؟', message: 'هتروح «المحذوفة» وتقدر ترجعها بعدين.', confirmLabel: 'شيلها', cancelLabel: 'لأ' })
           .then(function (ok) { if (ok) act('apiDeleteMedia', 'اتشالت — تلاقيها في «المحذوفة»', button); });
       } }, icon('trash'), 'شيلها'));
     }
@@ -271,16 +300,16 @@
 
     A.dirty = false;
 
-    A.openSheet(item.name || 'صورة', [
+    A.openSheet(item.name || (video ? 'فيديو' : 'صورة'), [
       box,
-      el('div', { class: 'media-detail', style: item.color ? '--tile:' + item.color : null }, preview),
+      el('div', { class: 'media-detail' + (video ? ' is-video' : ''), style: item.color ? '--tile:' + item.color : null }, preview, video ? el('span', { class: 'media-tile__play', 'aria-hidden': 'true', text: '▶' }) : null),
       el('div', { class: 'form' }, name.node, alt.node),
       facts,
       el('div', { class: 'form-group' }, el('p', { class: 'section-label', text: 'مستخدمة في' }), usage),
       el('div', { class: 'actions' }, actions)
     ], A.sheetFooter(save), {
       // one editor per item: the official admin locks it while this is open
-      lock: A.editLock('media', item.id, 'صورة «' + (item.name || item.alt || item.id) + '»')
+      lock: A.editLock('media', item.id, (video ? 'فيديو «' : 'صورة «') + (item.name || item.alt || item.id) + '»')
     });
 
   }
@@ -292,12 +321,18 @@
      PICKER (from any editor)
   ======================================================= */
 
-  /** Resolves with the chosen media id, or null. */
-  A.pickFromLibrary = function (currentId) {
+  /**
+   * Resolves with the chosen media id, or null. Pictures only, unless
+   * options.videos (a link scene's gallery): every other field takes
+   * pictures only (the server refuses a video there too).
+   */
+  A.pickFromLibrary = function (currentId, options) {
+
+    var videos = !!(options && options.videos);
 
     return new Promise(function (resolve) {
 
-      var dialog = el('dialog', { class: 'modal modal--wide picker-dialog', 'aria-label': 'اختار صورة من المكتبة' });
+      var dialog = el('dialog', { class: 'modal modal--wide picker-dialog', 'aria-label': videos ? 'اختار صورة أو فيديو من المكتبة' : 'اختار صورة من المكتبة' });
       var body = el('div', { class: 'picker-dialog__body' }, skeletonGrid());
       var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر…', 'aria-label': 'دوّر في الصور' });
       var done = false;
@@ -312,7 +347,7 @@
 
       function draw() {
         var query = search.value.trim();
-        var items = library.items.filter(function (item) { return matches(item, 'all', query); });
+        var items = library.items.filter(function (item) { return (videos || !isVideo(item)) && matches(item, 'all', query); });
         body.replaceChildren(grid(items, function (item) { close(item.id); }, currentId));
       }
 

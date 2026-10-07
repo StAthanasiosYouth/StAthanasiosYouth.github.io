@@ -4,8 +4,9 @@
 //   apps-script/Admin.html          → the panel markup in admin/index.html
 //                                     (wrapped by tools/source/admin-index.html)
 //   apps-script/AdminStyles.html    → admin/admin.css (+ the site's own fonts)
-//   apps-script/Admin{Icons,Platforms,Script,Page,Content,Media,Items,
+//   apps-script/Admin{Icons,Platforms,Script,Page,Content,Media,Trim,Items,
 //                     Home,Preview}.html → admin/admin-app.js
+//   (admin/vendor/mediabunny.js: tools/build-admin-vendor.mjs, loaded by AdminTrim on demand)
 //
 // The <script>/<style> wrappers are stripped; the order is Admin.html's
 // include order. Hand-written (not generated): admin/boot.js (Google

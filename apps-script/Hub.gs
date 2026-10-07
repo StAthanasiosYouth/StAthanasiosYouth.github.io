@@ -37,6 +37,10 @@ var HUB_CAPS = {
 
 var MEDIA_PATH = /^media\/\d{4}\/img-[a-z0-9]{8}(-480)?\.(webp|jpg)$/;
 
+/* scene videos (Links.gallery only): the file and its poster frame */
+var VIDEO_PATH = /^media\/\d{4}\/vid-[a-z0-9]{8}\.(mp4|webm)$/;
+var VIDEO_POSTER_PATH = /^media\/\d{4}\/vid-[a-z0-9]{8}-480\.(webp|jpg)$/;
+
 
 /* =========================================================
    CAIRO WALL-CLOCK ARITHMETIC
@@ -324,6 +328,45 @@ function mediaIndex_(rows) {
     if (/^#[0-9a-f]{6}$/.test(color)) {
       index[id].color = color;
     }
+
+  });
+
+  return index;
+
+}
+
+
+/**
+ * Media rows -> { id: { src, poster, w, h, alt } } for the library's videos
+ * (vid-…). Never mixed into mediaIndex_: every other field takes images only.
+ */
+function videoIndex_(rows) {
+
+  var index = Object.create(null);
+
+  (rows || []).forEach(function (row) {
+
+    var id = contentLine_(row.id);
+    var path = contentLine_(row.path);
+    var thumb = contentLine_(row.thumb);
+    var width = contentNumber_(row.width);
+    var height = contentNumber_(row.height);
+
+    if (!/^vid-[a-z0-9]{8}$/.test(id) || !VIDEO_PATH.test(path) || !VIDEO_POSTER_PATH.test(thumb) || contentLine_(row.deletedAt)) {
+      return;
+    }
+
+    if (!(width > 0) || !(height > 0)) {
+      return;
+    }
+
+    index[id] = {
+      src: path,
+      poster: thumb,
+      w: Math.round(width),
+      h: Math.round(height),
+      alt: contentLine_(row.alt).slice(0, HUB_LIMITS.alt)
+    };
 
   });
 

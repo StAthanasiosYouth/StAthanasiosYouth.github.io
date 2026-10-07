@@ -278,6 +278,63 @@ are added to `meeting.skipDates` (countdown and calendar file).
   ticked and still exactly what the preview showed; through the meetings
   editor's own validation; no bell notifications).
 
+## Scene videos (Media Library + «صور وفيديوهات المشهد»)
+
+No new Sheet column, no migration (data schema stays 5); one media system.
+
+- **Making a clip (admin only, `apps-script/AdminTrim.html`).** The admin
+  chooses a video on the computer (any size; 10 GB phone / camera files
+  work). The browser opens it with Mediabunny (MPL-2.0) over WebCodecs and
+  reads only the byte ranges it needs: its index and the frames of the
+  chosen part. The admin previews and scrubs it locally (a `blob:` URL),
+  picks «من» / «لحد» (1–30 s) and a shape (portrait 540×960 with a blurred
+  fill, the default, or 854×480), and the browser encodes **only that part**:
+  H.264 MP4, ~1.2 Mbps, 30 fps, keyframe every 2 s, `faststart`, **no
+  audio**. Over 8 MB it re-encodes once at a lower bitrate. A frame from the
+  clip becomes the poster through the same WebP thumb / tiny steps as photos.
+  **The original never leaves the computer**: it is not uploaded, not kept,
+  and its object URL and file handle are released when the dialog closes.
+  `tests/final-v.e2e.mjs` checks that no request carries any part of it.
+- **The vendor file.** `admin/vendor/mediabunny.js` (+ its license) is built
+  by `tools/build-admin-vendor.mjs` (esbuild, only the exports used, the
+  MP4 / MOV / Matroska / WebM readers). The admin loads it with `import()`
+  only when a video is chosen. The public site never references it
+  (unit-tested). The admin page's CSP gains `media-src 'self' blob:` (the
+  local preview); the public site's CSP is unchanged.
+- **Capability checks:** no WebCodecs, a codec the browser / GPU can't decode
+  (e.g. HEVC without hardware support), no H.264 encoder, or an unknown
+  container → a clear message in the dialog; nothing is faked.
+- **The recovery admin (HtmlService)** has no trimmer: it says to use
+  `/admin/` from Chrome on a computer, and can still use library videos.
+- **Server (`Media.gs`).** `apiUploadMedia({ kind: 'video', … })` →
+  `uploadVideo_`: MP4 / WebM by MIME and by magic bytes (`ftyp` at 4..8 /
+  `1A 45 DF A3`), ≤ 8 MB, a duration 0 < d ≤ 600 s (checked, not stored),
+  a WebP / JPEG poster (≤ 300 KB), sane width / height, the same SHA-256
+  dedupe. Ids `vid-xxxxxxxx`; files `media/YYYY/vid-xxxxxxxx.mp4|webm` and
+  the poster `media/YYYY/vid-xxxxxxxx-480.webp|jpg` (thumb / thumbDriveId).
+  Preview, library tiles and "where used" use the poster; delete / restore /
+  purge work as for images. Every other image field rejects `vid-` ids
+  (`imageRef_`), and `mediaIndex_` (images) never lists them.
+- **«من رابط».** `apiFetchMediaUrl(url)`: https only, no `user:pass@`, no
+  bare IPs / local names, known social *page* hosts refused up front
+  (TikTok, YouTube, Facebook, Instagram…), redirects followed, no
+  credentials sent; HTML / non-media refused; the type is decided by the
+  bytes; ≤ 8 MB video, ≤ 15 MB image. Returns `{ mime, base64, name, bytes }`
+  and stores nothing: the admin then runs the same steps as a picked file
+  (photo → resize, video → trimmer).
+- **Gallery tokens (`Links.gallery`).** `img-xxxxxxxx`, `vid-xxxxxxxx` or
+  `vid-xxxxxxxx@START-END` (seconds, one decimal), ≤ 6, comma separated
+  (`Content.gs` `parseGalleryToken_`; `Items.gs` `galleryInput_` validates
+  on save: known, not removed, `0 ≤ start < end ≤ 600`, `end − start ≥ 0.5`).
+  The same library clip can appear twice with different parts.
+- **content.json.** `link.gallery[]` mixes pictures (unchanged image
+  objects) and `{ type: 'video', src, poster, w, h, alt, start, end }`
+  (`end` 0 = to the end). The clips and posters a published link uses are
+  added to the publish commit like images (`githubCommitFiles_` accepts
+  `media/YYYY/vid-…` paths). `content.js` `cleanVideo` re-checks the paths
+  and numbers and adds `thumb` = the poster for code that only shows
+  pictures. Playback in the scenes: `assets/js/xp/*` (separate work).
+
 ## Ready for later (not built yet)
 
 - **Push notifications (Phase B):** light PWA (manifest + service worker),

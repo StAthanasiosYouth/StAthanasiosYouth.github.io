@@ -139,7 +139,7 @@ function githubCommitFiles_(files, message, binaries) {
 
   // blobs are content-addressed, so they survive a retry below
   var blobEntries = Object.keys(binaries || {}).map(function (path) {
-    if (!/^media\/\d{4}\/img-[a-z0-9]{8}(-480)?\.(webp|jpg)$/.test(path)) {
+    if (!MEDIA_PATH.test(path) && !VIDEO_PATH.test(path) && !VIDEO_POSTER_PATH.test(path)) {
       throw new Error('مسار صورة مش مسموح: ' + path);
     }
     var blob = github_('post', '/git/blobs', { content: binaries[path], encoding: 'base64' });
@@ -310,10 +310,13 @@ function apiPreview(at) {
   var built = buildPublicContent(readDraft_(), { now: when, hash: sha256Hex_ });
   var used = built.media || [];
 
+  // a video's preview is its poster (thumb); the admin never maps the video file itself
   var pending = readOptionalTable_('Media').filter(function (row) {
     return used.indexOf(row.id) !== -1 && !row.publishedAt;
   }).map(function (row) {
-    return { id: row.id, path: row.path, thumb: row.thumb || row.path };
+    return /^vid-/.test(row.id)
+      ? { id: row.id, path: row.path, thumb: row.thumb, kind: 'video' }
+      : { id: row.id, path: row.path, thumb: row.thumb || row.path };
   });
 
   return {

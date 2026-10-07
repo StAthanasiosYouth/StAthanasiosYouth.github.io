@@ -956,6 +956,52 @@
 
   };
 
+  /* the same resize / encode steps for a video clip's poster (AdminTrim.html) */
+  A.imageKit = { IMAGE: IMAGE, encode: encode, scaled: scaled, dominantColor: dominantColor, blobBase64: blobBase64 };
+
+  /*
+   * A library video's length in seconds, or null when it can't be known
+   * here: uploaded in this tab (remembered), or on the site already (its
+   * metadata, from the published file). A draft from another tab: null.
+   */
+  A.videoDurations = {};
+
+  A.videoDuration = function (id) {
+
+    if (A.videoDurations[id] > 0) return Promise.resolve(A.videoDurations[id]);
+
+    var media = (A.state.draft.media || []).filter(function (m) { return m.id === id; })[0];
+
+    if (!media || !media.publishedAt || !A.state.config.siteUrl || !/^media\/\d{4}\/vid-[a-z0-9]{8}\.(mp4|webm)$/.test(media.path || '')) {
+      return Promise.resolve(null);
+    }
+
+    A.durationCache = A.durationCache || {};
+
+    if (!A.durationCache[id]) {
+      A.durationCache[id] = new Promise(function (resolve) {
+        var video = document.createElement('video');
+        var timer = setTimeout(function () { finish(null); }, 15000);
+        function finish(value) {
+          clearTimeout(timer);
+          video.removeAttribute('src');
+          video.load();
+          if (value > 0) A.videoDurations[id] = value;
+          else delete A.durationCache[id];
+          resolve(value > 0 ? value : null);
+        }
+        video.preload = 'metadata';
+        video.muted = true;
+        video.addEventListener('loadedmetadata', function () { finish(isFinite(video.duration) ? video.duration : null); });
+        video.addEventListener('error', function () { finish(null); });
+        video.src = A.state.config.siteUrl.replace(/\/?$/, '/') + media.path;
+      });
+    }
+
+    return A.durationCache[id];
+
+  };
+
   /* thumbnail URL for a media id: the live site if published, else a Drive preview */
   A.mediaPreview = function (id) {
 
@@ -988,6 +1034,7 @@
   var STAGES = {
     prepare: { label: 'جاري تجهيز الصورة…', from: 0, to: 0.15 },
     compress: { label: 'جاري ضغط الصورة…', from: 0.15, to: 0.5 },
+    fetch: { label: 'جاري جلب الملف من الرابط…' },
     upload: { label: 'جاري الرفع…' },
     done: { label: 'تم الرفع ✓' },
     error: { label: 'حدث خطأ أثناء الرفع' }
@@ -1002,10 +1049,13 @@
     var busy = false;
     var media = function () { return (A.state.draft.media || []).filter(function (m) { return m.id === value; })[0]; };
 
+    // options.allowVideo (the library's uploader): a video opens the trimmer
+    // (AdminTrim.html); options.allowUrl: «من رابط» (a direct link to a file)
     var preview = el('div', { class: 'picker__preview' });
-    var file = el('input', { type: 'file', accept: 'image/*', class: 'visually-hidden', tabindex: '-1', 'aria-hidden': 'true' });
-    var alt = A.textInput(media() ? media().alt : '', { max: 140, placeholder: 'وصف الصورة لقارئ الشاشة (مثلاً: بوستر رحلة الغردقة)' });
-    var altField = A.field('وصف الصورة', alt, 'مهم للي بيستخدم قارئ شاشة');
+    var file = el('input', { type: 'file', accept: options.allowVideo ? 'image/*,video/*' : 'image/*', class: 'visually-hidden', tabindex: '-1', 'aria-hidden': 'true' });
+    var chooseLabel = options.allowVideo ? 'ارفع صورة أو فيديو' : 'ارفع صورة';
+    var alt = A.textInput(media() ? media().alt : '', { max: 140, placeholder: options.allowVideo ? 'وصف لقارئ الشاشة (مثلاً: الشباب في رحلة الغردقة)' : 'وصف الصورة لقارئ الشاشة (مثلاً: بوستر رحلة الغردقة)' });
+    var altField = A.field(options.allowVideo ? 'الوصف' : 'وصف الصورة', alt, 'مهم للي بيستخدم قارئ شاشة');
 
     var stageLabel = el('span', { class: 'upload__label' });
     var stageMeta = el('span', { class: 'upload__meta ltr' });
@@ -1017,7 +1067,21 @@
     );
     var errorBox = el('div', { class: 'upload-error', role: 'alert', hidden: true });
 
-    var choose = el('button', { class: 'btn', type: 'button', onclick: function () { if (!busy) file.click(); } }, icon('upload'), el('span', { text: 'ارفع صورة' }));
+    var choose = el('button', { class: 'btn', type: 'button', onclick: function () { if (!busy) file.click(); } }, icon('upload'), el('span', { text: chooseLabel }));
+
+    // «من رابط»: an inline row, never a prompt()
+    var urlInput = el('input', { class: 'input input--ltr', type: 'url', dir: 'ltr', inputmode: 'url', placeholder: 'https://…/video.mp4', 'aria-label': 'رابط الملف' });
+    var urlGo = el('button', { class: 'btn btn--small btn--primary', type: 'button', text: 'هات الملف' });
+    var urlRow = el('div', { class: 'url-import', hidden: true },
+      urlInput,
+      el('div', { class: 'actions' }, urlGo, el('button', { class: 'btn btn--small btn--ghost', type: 'button', text: 'إلغاء', onclick: function () { urlRow.hidden = true; fromUrl.focus(); } })),
+      el('span', { class: 'field__hint', text: 'رابط مباشر لملف صورة أو فيديو (بيخلص بـ .jpg أو .mp4 مثلاً). لينكات تيك توك ويوتيوب صفحات مش ملفات: نزّل الفيديو الأول وارفعه من جهازك.' })
+    );
+    var fromUrl = el('button', { class: 'btn btn--ghost', type: 'button', hidden: !options.allowUrl, onclick: function () {
+      if (busy) return;
+      urlRow.hidden = !urlRow.hidden;
+      if (!urlRow.hidden) urlInput.focus();
+    } }, icon('link'), 'من رابط');
     var fromLibrary = el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () {
       if (busy) return;
       A.pickFromLibrary(value).then(function (id) {
@@ -1051,7 +1115,7 @@
       stageLabel.textContent = info.label;
       if (meta !== undefined) stageMeta.textContent = meta;
 
-      if (stage === 'upload') {
+      if (stage === 'upload' || stage === 'fetch') {
         // google.script.run reports no byte progress: an honest moving bar plus elapsed time
         progress.classList.add('is-indeterminate');
         track.removeAttribute('aria-valuenow');
@@ -1078,7 +1142,7 @@
         parsed.hint ? el('p', { class: 'upload-error__hint', text: parsed.hint }) : null,
         el('div', { class: 'actions' },
           pending ? el('button', { class: 'btn btn--small', type: 'button', onclick: function () { upload(pending); } }, 'جرّب الرفع تاني') : null,
-          el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () { file.click(); } }, 'اختار صورة تانية')
+          el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () { file.click(); } }, options.allowVideo ? 'اختار ملف تاني' : 'اختار صورة تانية')
         ),
         A.technicalDetails(parsed.details)
       );
@@ -1095,7 +1159,7 @@
       fromLibrary.hidden = !!options.uploadOnly;
       altField.hidden = !value;
       remove.hidden = !value || busy || !!options.uploadOnly;
-      choose.lastChild.textContent = value ? 'ارفع صورة تانية' : 'ارفع صورة';
+      choose.lastChild.textContent = options.allowVideo ? chooseLabel : value ? 'ارفع صورة تانية' : 'ارفع صورة';
 
       if (!value) {
         preview.appendChild(el('span', { class: 'picker__empty' }, icon('photos'), 'من غير صورة'));
@@ -1116,7 +1180,9 @@
       if (on !== busy) A.uploadsInFlight = Math.max(0, (A.uploadsInFlight || 0) + (on ? 1 : -1));
       busy = on;
       choose.disabled = on;
-      remove.hidden = !value || on;
+      fromUrl.disabled = on;
+      urlGo.disabled = on;
+      remove.hidden = !value || on || !!options.uploadOnly;
 
     }
 
@@ -1126,18 +1192,39 @@
       errorBox.hidden = true;
       setStage('upload', 0, A.formatBytes(prepared.bytesOut));
 
-      return A.call('apiUploadMedia', {
-        full: prepared.full,
-        thumb: prepared.thumb,
-        tiny: prepared.tiny,
-        tinyMime: prepared.tinyMime,
-        color: prepared.color,
-        name: prepared.name,
-        mime: prepared.mime,
-        width: prepared.width,
-        height: prepared.height,
-        alt: alt.value
-      }).then(function (result) {
+      var video = prepared.kind === 'video';
+      // a video: the generated clip only (AdminTrim.html), never the original
+      var payload = video
+        ? {
+          kind: 'video',
+          video: prepared.video,
+          mime: prepared.mime,
+          poster: prepared.poster,
+          posterMime: prepared.posterMime,
+          tiny: prepared.tiny,
+          tinyMime: prepared.tinyMime,
+          color: prepared.color,
+          name: prepared.name,
+          width: prepared.width,
+          height: prepared.height,
+          duration: prepared.duration,
+          alt: alt.value
+        }
+        : {
+          full: prepared.full,
+          thumb: prepared.thumb,
+          tiny: prepared.tiny,
+          tinyMime: prepared.tinyMime,
+          color: prepared.color,
+          name: prepared.name,
+          mime: prepared.mime,
+          width: prepared.width,
+          height: prepared.height,
+          alt: alt.value
+        };
+
+      return A.call('apiUploadMedia', payload).then(function (result) {
+        if (video && result && result.media && result.media.id) A.videoDurations[result.media.id] = prepared.duration;
         if (!result || !result.media || !result.media.id || !result.state) {
           throw imageError('الرفع خلص بس الرد رجع ناقص.', 'جرّب تاني.', JSON.stringify(result || null).slice(0, 200));
         }
@@ -1152,9 +1239,11 @@
         if (A.invalidateLibrary) A.invalidateLibrary();
         if (options.onUploaded) options.onUploaded(value);
         setStage('done', 1, A.formatBytes(prepared.bytesIn) + ' ← ' + A.formatBytes(prepared.bytesOut));
-        stageLabel.textContent = result.duplicate
-          ? 'الصورة دي موجودة في المكتبة قبل كده — اتختارت هي ✓'
-          : 'تم الرفع ✓ — احفظ عشان تتربط، وهتتنشر مع المحتوى';
+        stageLabel.textContent = video
+          ? (result.duplicate ? 'المقطع ده موجود في المكتبة قبل كده ✓' : 'المقطع اترفع ✓ — اختاره في «صور وفيديوهات المشهد» لأي رابط')
+          : result.duplicate
+            ? 'الصورة دي موجودة في المكتبة قبل كده — اتختارت هي ✓'
+            : 'تم الرفع ✓ — احفظ عشان تتربط، وهتتنشر مع المحتوى';
         show();
       }).catch(function (error) {
         pending = prepared;
@@ -1165,11 +1254,42 @@
 
     }
 
-    file.addEventListener('change', function () {
+    /* a video: the trimmer makes the short clip first (the original stays on this computer) */
+    function handleVideo(chosen) {
 
-      var chosen = file.files && file.files[0];
-      file.value = '';
+      if (!A.trimmerAvailable || !A.trimmerAvailable()) {
+        showError(A.trimError
+          ? A.trimError('قصّ الفيديو شغال من لوحة التحكم الرسمية بس.', 'افتح /admin/ من Google Chrome على الكمبيوتر. من هنا تقدر تختار فيديو موجود في المكتبة.')
+          : new Error('قصّ الفيديو شغال من لوحة التحكم الرسمية بس.'));
+        setStage(null);
+        return;
+      }
+
+      setBusy(true);
+      errorBox.hidden = true;
+      pending = null;
+      setStage(null);
+
+      A.openTrimmer(chosen)
+        .then(function (prepared) {
+          if (!prepared) { setBusy(false); return null; }
+          return upload(prepared);
+        })
+        .catch(function (error) {
+          setBusy(false);
+          showError(error);
+        });
+
+    }
+
+    function handleFile(chosen) {
+
       if (!chosen || busy) return;
+
+      if (options.allowVideo && A.clip && A.clip.isVideoFile(chosen)) {
+        handleVideo(chosen);
+        return;
+      }
 
       setBusy(true);
       errorBox.hidden = true;
@@ -1183,6 +1303,58 @@
           showError(error);
         });
 
+    }
+
+    file.addEventListener('change', function () {
+
+      var chosen = file.files && file.files[0];
+      file.value = '';
+      handleFile(chosen);
+
+    });
+
+    /* «من رابط»: the server fetches the file (Media.gs apiFetchMediaUrl); then the same steps as a picked file */
+    function fetchUrl() {
+
+      var href = urlInput.value.trim();
+
+      if (busy) return;
+
+      if (!/^https:\/\/[^\s/]+\.[^\s/]+/i.test(href)) {
+        showError(new Error('الرابط لازم يكون كامل ويبدأ بـ https://'));
+        urlInput.focus();
+        return;
+      }
+
+      setBusy(true);
+      errorBox.hidden = true;
+      pending = null;
+      setStage('fetch', 0, '');
+
+      A.call('apiFetchMediaUrl', href)
+        .then(function (result) {
+          if (!result || !result.base64 || !result.mime) throw new Error('الرابط رجع ملف فاضي.');
+          var binary = atob(result.base64);
+          var bytes = new Uint8Array(binary.length);
+          for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          var ext = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif', 'image/avif': '.avif', 'video/mp4': '.mp4', 'video/webm': '.webm' }[result.mime] || '';
+          var fetched = new File([bytes], (result.name || 'من رابط') + ext, { type: result.mime });
+          setBusy(false);
+          setStage(null);
+          urlRow.hidden = true;
+          urlInput.value = '';
+          handleFile(fetched);
+        })
+        .catch(function (error) {
+          setBusy(false);
+          showError(error);
+        });
+
+    }
+
+    urlGo.addEventListener('click', fetchUrl);
+    urlInput.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') { event.preventDefault(); fetchUrl(); }
     });
 
     alt.addEventListener('change', function () {
@@ -1201,7 +1373,8 @@
         el('span', { class: 'field__label', text: options.label || 'الصورة / البوستر' }),
         el('div', { class: 'picker' + (options.className ? ' ' + options.className : '') },
           preview,
-          el('div', { class: 'actions' }, choose, fromLibrary, remove, file),
+          el('div', { class: 'actions' }, choose, fromUrl, fromLibrary, remove, file),
+          urlRow,
           progress,
           errorBox,
           altField
@@ -1227,62 +1400,192 @@
   };
 
   /*
-   * Several images from the Media Library, in order (a link scene's own
-   * photos, «صور المشهد»). ids: array or "id1,id2". options.max (6).
-   * Each one can be taken out; «زوّد صورة» opens the library chooser.
+   * Pictures and video clips from the Media Library, in order (a link
+   * scene's own, «صور وفيديوهات المشهد»). tokens: array or "a,b": "img-…",
+   * "vid-…" or "vid-…@start-end" (seconds). options.max (6).
+   * Each one can be moved (↑ / ↓) or taken out; a video has «من» / «لحد»
+   * (m:ss or seconds), checked live against its length when it is known
+   * (A.videoDuration); check() says what blocks saving.
    */
-  A.galleryPicker = function (ids, options) {
+  A.galleryPicker = function (tokens, options) {
 
     options = options || {};
 
     var max = options.max || 6;
-    var list = (Array.isArray(ids) ? ids : String(ids || '').split(/[\s,،]+/)).filter(Boolean).slice(0, max);
+    var clip = A.clip;
+    var CAP = clip.CLIP.galleryCap;
+    var items = (Array.isArray(tokens) ? tokens : String(tokens || '').split(/[\s,،]+/)).filter(Boolean).slice(0, max).map(toItem);
     var row = el('div', { class: 'gallery-picker__row', role: 'list' });
     var count = el('span', { class: 'gallery-picker__count', dir: 'ltr' });
+    var focusAfter = null;
     var add = el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () {
-      if (list.length >= max) return;
-      A.pickFromLibrary(null).then(function (id) {
+      if (items.length >= max) return;
+      A.pickFromLibrary(null, { videos: true }).then(function (id) {
         if (!id) return;
-        if (list.indexOf(id) === -1) list.push(id);
+        // a picture once; a video may come back for another part of it
+        if (/^vid-/.test(id) || !items.some(function (item) { return item.id === id; })) items.push(toItem(id));
         markDirty();
         draw();
       });
-    } }, icon('plus'), 'زوّد صورة من المكتبة');
+    } }, icon('plus'), 'زوّد صورة أو فيديو من المكتبة');
+
+    function toItem(token) {
+      var match = /^((?:img|vid)-[a-z0-9]{8})(?:@(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?))?$/.exec(String(token).trim());
+      var id = match ? match[1] : String(token).trim();
+      var video = /^vid-/.test(id);
+      return {
+        id: id,
+        video: video,
+        from: video && match && match[2] !== undefined ? clip.formatTime(Number(match[2])) : '',
+        to: video && match && match[3] !== undefined ? clip.formatTime(Number(match[3])) : '',
+        duration: video && A.videoDurations[id] > 0 ? A.videoDurations[id] : null,
+        refs: null
+      };
+    }
+
+    /* «من» / «لحد» with the defaults: empty «من» = 0, empty «لحد» = six seconds later */
+    function times(item) {
+      var start = clip.parseTime(item.from);
+      var end = clip.parseTime(item.to);
+      if (start === null) start = 0;
+      if (end === null && !isNaN(start)) end = clip.defaultEnd(start, item.duration || 0);
+      return { start: start, end: end };
+    }
+
+    function problem(item) {
+      if (!item.video) return '';
+      var t = times(item);
+      return clip.checkClip(t.start, t.end, { duration: item.duration || 0, min: clip.CLIP.galleryMin, cap: CAP });
+    }
+
+    function token(item) {
+      if (!item.video) return item.id;
+      var t = times(item);
+      if (problem(item)) return item.id;
+      return item.id + '@' + (Math.round(t.start * 10) / 10) + '-' + (Math.round(t.end * 10) / 10);
+    }
+
+    function find(id) {
+      return (A.state.draft.media || []).filter(function (m) { return m.id === id; })[0];
+    }
+
+    /* the item's message, under its times (no re-draw: typing keeps its focus) */
+    function showCheck(item) {
+      if (!item.refs || !item.video) return '';
+      var text = problem(item);
+      item.refs.message.textContent = text;
+      item.refs.message.hidden = !text;
+      [item.refs.from, item.refs.to].forEach(function (input) {
+        if (text) input.setAttribute('aria-invalid', 'true');
+        else input.removeAttribute('aria-invalid');
+      });
+      var t = times(item);
+      item.refs.to.placeholder = !isNaN(t.start) ? clip.formatTime(clip.defaultEnd(t.start, item.duration || 0)) : '0:06';
+      item.refs.length.textContent = item.duration ? 'المدة ' + clip.formatTime(item.duration) : 'المدة هتبان بعد النشر';
+      return text;
+    }
+
+    function move(index, by, which) {
+      var next = index + by;
+      if (next < 0 || next >= items.length) return;
+      var moved = items.splice(index, 1)[0];
+      items.splice(next, 0, moved);
+      focusAfter = { index: next, which: which };
+      markDirty();
+      draw();
+    }
 
     function draw() {
 
       row.replaceChildren();
 
-      list.forEach(function (id, index) {
+      items.forEach(function (item, index) {
+        var n = index + 1;
+        var media = find(item.id);
+        var name = media && (media.name || media.alt) ? (media.name || media.alt) : item.video ? 'فيديو' : 'صورة';
+        var what = (item.video ? 'الفيديو ' : 'الصورة ') + n;
         var img = el('img', { alt: '', class: 'gallery-picker__img' });
-        var media = (A.state.draft.media || []).filter(function (m) { return m.id === id; })[0];
-        A.mediaPreview(id).then(function (src) { if (src) img.src = src; }).catch(function () {});
-        row.appendChild(el('div', { class: 'gallery-picker__item', role: 'listitem', 'data-id': id },
-          img,
-          el('span', { class: 'gallery-picker__n', text: String(index + 1) }),
-          el('button', {
-            class: 'icon-btn gallery-picker__remove',
-            type: 'button',
-            'aria-label': 'شيل الصورة ' + (index + 1) + (media && media.alt ? ' (' + media.alt + ')' : ''),
-            onclick: function () {
-              list.splice(index, 1);
-              markDirty();
-              draw();
-            }
-          }, icon('close'))
+        A.mediaPreview(item.id).then(function (src) { if (src) img.src = src; }).catch(function () {});
+
+        var up = el('button', { class: 'icon-btn gallery-picker__move', type: 'button', 'data-move': 'up', 'aria-label': 'قدّم ' + what + ' خطوة', disabled: index === 0, onclick: function () { move(index, -1, 'up'); } }, '↑');
+        var down = el('button', { class: 'icon-btn gallery-picker__move', type: 'button', 'data-move': 'down', 'aria-label': 'أخّر ' + what + ' خطوة', disabled: index === items.length - 1, onclick: function () { move(index, 1, 'down'); } }, '↓');
+        var remove = el('button', {
+          class: 'icon-btn gallery-picker__remove',
+          type: 'button',
+          'aria-label': 'شيل ' + what + (media && media.alt ? ' (' + media.alt + ')' : ''),
+          onclick: function () {
+            items.splice(index, 1);
+            focusAfter = { index: Math.min(index, items.length - 1), which: 'remove' };
+            markDirty();
+            draw();
+          }
+        }, icon('close'));
+
+        var body = el('div', { class: 'gallery-picker__body' }, el('span', { class: 'gallery-picker__name', text: name }));
+
+        if (item.video) {
+          var messageId = A.uid('clip-msg');
+          var from = el('input', { class: 'input input--ltr gallery-picker__time', dir: 'ltr', inputmode: 'decimal', placeholder: '0:00', value: item.from, 'aria-label': 'من (' + what + ')', 'aria-describedby': messageId });
+          var to = el('input', { class: 'input input--ltr gallery-picker__time', dir: 'ltr', inputmode: 'decimal', placeholder: '0:06', value: item.to, 'aria-label': 'لحد (' + what + ')', 'aria-describedby': messageId });
+          var length = el('span', { class: 'gallery-picker__len' });
+          var message = el('span', { class: 'gallery-picker__msg', id: messageId, role: 'status', 'aria-live': 'polite', hidden: true });
+          item.refs = { from: from, to: to, length: length, message: message };
+          from.addEventListener('input', function () { item.from = from.value; markDirty(); showCheck(item); });
+          to.addEventListener('input', function () { item.to = to.value; markDirty(); showCheck(item); });
+          body.append(
+            length,
+            el('div', { class: 'gallery-picker__clip' },
+              el('label', { class: 'gallery-picker__t' }, el('span', { text: 'من' }), from),
+              el('label', { class: 'gallery-picker__t' }, el('span', { text: 'لحد' }), to)
+            ),
+            message
+          );
+          showCheck(item);
+          if (!item.duration) {
+            A.videoDuration(item.id).then(function (seconds) {
+              if (!seconds) return;
+              item.duration = seconds;
+              showCheck(item);
+            });
+          }
+        }
+        else {
+          item.refs = null;
+        }
+
+        row.appendChild(el('div', { class: 'gallery-picker__item' + (item.video ? ' is-video' : ''), role: 'listitem', 'data-id': item.id, 'data-kind': item.video ? 'video' : 'image' },
+          el('div', { class: 'gallery-picker__thumb' },
+            img,
+            el('span', { class: 'gallery-picker__n', text: String(n) }),
+            item.video ? el('span', { class: 'gallery-picker__play', 'aria-hidden': 'true', text: '▶' }) : null
+          ),
+          body,
+          el('div', { class: 'gallery-picker__tools' }, up, down, remove)
         ));
       });
 
-      if (!list.length) {
+      if (!items.length) {
         row.appendChild(el('span', { class: 'picker__empty' }, icon('photos'), options.emptyText || 'من غير صور — هيظهر أحدث بوسترات منشورة'));
       }
 
-      count.textContent = list.length + ' / ' + max;
-      add.disabled = list.length >= max;
+      count.textContent = items.length + ' / ' + max;
+      add.disabled = items.length >= max;
+
+      // keyboard: the focus stays on the moved item's button (or the next one)
+      if (focusAfter) {
+        var target = row.children[focusAfter.index];
+        var button = target && (focusAfter.which === 'remove' ? target.querySelector('.gallery-picker__remove') : target.querySelector('[data-move="' + focusAfter.which + '"]:not([disabled])') || target.querySelector('.gallery-picker__move:not([disabled])'));
+        (button || add).focus();
+        focusAfter = null;
+      }
 
     }
 
     draw();
+
+    function value() {
+      return items.map(token);
+    }
 
     return {
       node: A.draftWidget(el('div', { class: 'field gallery-picker', role: 'group', 'aria-label': options.label || 'صور' },
@@ -1291,17 +1594,29 @@
         el('div', { class: 'actions' }, add),
         options.hint ? el('span', { class: 'field__hint', text: options.hint }) : null
       ), {
-        get: function () { return list.slice(); },
-        set: function (ids) {
-          if (!Array.isArray(ids)) return false;
-          var next = ids.filter(function (id) { return typeof id === 'string' && /^[\w.-]{1,80}$/.test(id); }).slice(0, max);
-          if (next.join(',') === list.join(',')) return false;
-          list = next;
+        get: value,
+        set: function (next) {
+          if (!Array.isArray(next)) return false;
+          next = next.filter(function (t) { return typeof t === 'string' && /^[\w.@-]{1,80}$/.test(t); }).slice(0, max);
+          if (next.join(',') === value().join(',')) return false;
+          items = next.map(toItem);
           draw();
           return true;
         }
       }),
-      value: function () { return list.slice(); }
+      value: value,
+      /* '' or the first reason saving must wait (each item shows its own) */
+      check: function () {
+        var first = '';
+        items.forEach(function (item, index) {
+          var text = showCheck(item);
+          if (text && !first) {
+            first = 'الفيديو ' + (index + 1) + ' في المشهد: ' + text;
+            if (item.refs) item.refs.from.focus();
+          }
+        });
+        return first;
+      }
     };
 
   };

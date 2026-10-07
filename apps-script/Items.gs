@@ -71,6 +71,12 @@ function imageRef_(value, problems) {
     return '';
   }
 
+  // videos go only in a link scene's gallery (galleryInput_)
+  if (/^vid-/.test(id)) {
+    problems.push('المكان ده بياخد صورة بس، مش فيديو');
+    return id;
+  }
+
   var media = /^img-[a-z0-9]{8}$/.test(id) ? readOptionalTable_('Media').filter(function (r) { return r.id === id; })[0] : null;
 
   if (!media || media.deletedAt) {
@@ -78,6 +84,44 @@ function imageRef_(value, problems) {
   }
 
   return id;
+
+}
+
+
+/**
+ * A link scene's pictures and videos (Links.gallery): tokens checked one by
+ * one (Content.gs parseGalleryToken_), each id in the library and not
+ * removed, each clip sane. Returns the stored form "id,id@start-end,...".
+ */
+function galleryInput_(value, problems) {
+
+  var rows = readOptionalTable_('Media');
+
+  return galleryTokens_(value).slice(0, LIMITS.gallery).map(function (token, index) {
+
+    var item = parseGalleryToken_(token);
+    var label = 'صور وفيديوهات المشهد (' + (index + 1) + ')';
+
+    if (!item) {
+      problems.push(label + ': "' + token.slice(0, 40) + '" مش مفهوم');
+      return '';
+    }
+
+    var row = rows.filter(function (r) { return r.id === item.id; })[0];
+
+    if (!row || row.deletedAt) {
+      problems.push(label + ': ' + (item.kind === 'video' ? 'الفيديو مش موجود' : 'الصورة مش موجودة'));
+    }
+
+    var clip = galleryClipProblem_(item);
+
+    if (clip) {
+      problems.push(label + ': ' + clip);
+    }
+
+    return galleryToken_(item);
+
+  }).filter(Boolean).join(',');
 
 }
 

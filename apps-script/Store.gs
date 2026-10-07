@@ -64,7 +64,7 @@ var TABLES = {
       endAt: 'آخر ظهور (اختياري): 2026-10-20 أو 2026-10-20 22:00',
       updatedAt: 'آخر تعديل (تلقائي)',
       experience: 'التجربة اللي بتفتح قبل اللينك (مفتاح من assets/js/platforms.js زي facebook / telegram / voice)، none = يفتح على طول، فاضي = تلقائي (الأيقونة ثم الرابط)',
-      gallery: 'صور المشهد (اختياري): أرقام صور من المكتبة مفصولة بفاصلة، لحد ٦'
+      gallery: 'صور وفيديوهات المشهد (اختياري): أرقام من المكتبة مفصولة بفاصلة، لحد ٦. الفيديو ممكن ياخد مقطع: vid-xxxxxxxx@37-43 (من الثانية 37 لحد 43)'
     }
   },
 
@@ -180,7 +180,7 @@ var TABLES = {
     columns: ['id', 'path', 'thumb', 'width', 'height', 'alt', 'mime', 'driveId', 'thumbDriveId', 'uploadedAt', 'publishedAt', 'name', 'tiny', 'color', 'hash', 'bytes', 'deletedAt'],
     text: ['id', 'path', 'thumb', 'alt', 'mime', 'driveId', 'thumbDriveId', 'uploadedAt', 'publishedAt', 'name', 'tiny', 'color', 'hash', 'deletedAt'],
     notes: {
-      id: 'معرّف الصورة (تلقائي)',
+      id: 'معرّف الصورة (تلقائي): img-… للصور، vid-… لمقاطع الفيديو',
       path: 'مكانها على الموقع بعد النشر',
       thumb: 'النسخة الصغيرة',
       width: 'العرض',
