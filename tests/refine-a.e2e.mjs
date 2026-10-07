@@ -470,7 +470,8 @@ test('support chat: pauses off screen and in a hidden tab', async () => {
   await page.evaluate(() => scrollTo(0, 0));
   await page.waitForFunction(() => document.querySelector('.chat').classList.contains('is-paused'), { timeout: 2000 });
   assert.equal(await playState(), 'paused');
-  const frozen = await page.$eval('.chat__msg--out', el => el.getAnimations()[0].currentTime);
+  // (a pause applies on the next frame: let it land before reading the clock; final/s)
+  const frozen = await page.$eval('.chat__msg--out', el => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(() => done(el.getAnimations()[0].currentTime)))));
   await wait(600);
   assert.equal(await page.$eval('.chat__msg--out', el => el.getAnimations()[0].currentTime), frozen, 'nothing moves off screen');
 

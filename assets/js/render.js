@@ -593,6 +593,8 @@ function contactsWidget(contacts) {
 }
 
 
+const cards = (el, kind) => import('./xp/cards.js').then(m => m.enhance(el, kind), () => {});
+
 /* the waves move only while the card is on screen (full tier: CSS); there,
    the cards' extra life and sounds load (xp/cards.js) */
 function liveWhileVisible(el, kind) {
@@ -603,9 +605,8 @@ function liveWhileVisible(el, kind) {
     for (const entry of entries) {
       el.classList.toggle('is-live', entry.isIntersecting);
       if (entry.isIntersecting && kind && motionTier() !== 'reduced') {
-        const k = kind;
+        cards(el, kind);
         kind = '';
-        import('./xp/cards.js').then(m => m.enhance(el, k), () => {});
       }
     }
   }, { threshold: 0.3 }).observe(el);
@@ -647,7 +648,6 @@ function supportWidget(contacts) {
   );
 
   liveChat(chat);
-  liveWhileVisible(chat, 'chat');
 
   return section;
 
@@ -702,6 +702,7 @@ function liveChat(stage) {
 
   const observer = new IntersectionObserver(entries => {
     visible = entries.some(entry => entry.isIntersecting);
+    if (visible) cards(stage, 'chat');
     if (visible && !stage.classList.contains('is-looping')) {
       stage.classList.add('is-looping');
       stage.classList.toggle('is-once', once);

@@ -13,8 +13,7 @@
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { deck, timeline, spray, side, floats, tickUp, climb, clipNode, bubble, chip, rand, pick, compact, LOGO, EASE, SPRING } from './kit.js';
-import { CLIPS } from './library.js';
+import { deck, timeline, spray, side, floats, tickUp, climb, sceneClips, clipNode, bubble, chip, rand, pick, compact, LOGO, EASE, SPRING } from './kit.js';
 import { COMMENTS, WHO } from './talk.js';
 
 const nextComment = deck(COMMENTS);
@@ -32,9 +31,11 @@ export function play(stage, { quick, reduced, lite, sound, link, platform }) {
 
   const tl = timeline({ quick, reduced, lite });
   const glyph = platform.icon || (link.icon !== 'link' ? link.icon : 'video');
-  const clips = WIDE.map(id => CLIPS.find(c => c.id === id)).filter(Boolean);
+  // the link's own videos first (landscape ones lead), then our landscape segments
+  const all = sceneClips(link, Infinity, { order: WIDE });
+  const clips = all.filter(c => c.own && c.w >= c.h).concat(all.filter(c => c.own && c.w < c.h), all.filter(c => !c.own && WIDE.includes(c.id)));
   const main = clips[0];
-  const own = (link.gallery || [])[0];
+  const own = clips[0].own ? null : (link.gallery || []).find(item => item.type !== 'video');
 
   const video = own ? h('img', { src: own.thumb || own.src, alt: '' }) : clipNode(main, tl);
   const frame = h('span', { class: 'pl-frame' }, video);
@@ -49,12 +50,12 @@ export function play(stage, { quick, reduced, lite, sound, link, platform }) {
     h('div', { class: 'pl-top' }, h('span', { class: 'pl-top__glyph' }, iconNode(glyph)), h('span', { class: 'pl-top__name' }, platform.label || link.title)),
     h('div', { class: 'pl-video' }, frame, playButton, time, progress),
     h('div', { class: 'pl-info' },
-      h('span', { class: 'pl-title' }, `${main.caption} 😂 | تحديات وألعاب أسرة البابا أثناسيوس`),
+      h('span', { class: 'pl-title' }, `${main.caption ? `${main.caption} 😂` : link.title || 'من اجتماعنا'} | تحديات وألعاب أسرة البابا أثناسيوس`),
       h('span', { class: 'pl-stats' }, '١٫٢ ألف مشاهدة · من ٣ أيام'),
       h('span', { class: 'pl-channel' }, h('img', { src: LOGO, alt: '' }), h('span', { class: 'pl-channel__name' }, 'أسرة البابا أثناسيوس'), subscribe),
       h('span', { class: 'pl-actions' }, h('span', { class: 'pl-like' }, '👍 ', likes), h('span', {}, '👎'), h('span', {}, '↗ مشاركة'))
     ),
-    h('div', { class: 'pl-more' }, clips.slice(1, 3).map(c => h('span', { class: 'pl-thumb' }, h('img', { src: c.poster, alt: '' }), h('i', {}, c.caption)))),
+    h('div', { class: 'pl-more' }, clips.slice(1).filter(c => c.poster).slice(0, 2).map(c => h('span', { class: 'pl-thumb' }, h('img', { src: c.poster, alt: '' }), h('i', {}, c.caption)))),
     comments
   );
 

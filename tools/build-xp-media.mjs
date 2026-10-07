@@ -14,35 +14,10 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import sharp from 'sharp';
 import { ROOT } from './lib/gs.mjs';
+import { POSTERS_SRC, GAMES_SRC, POSTERS, CLIPS } from './lib/xp-sources.mjs';
 
-const POSTERS_SRC = 'E:/اجتماع الشباب/';
-const GAMES_SRC = 'F:/Adobe/فيديوهات فقرات ألعاب الأجتماع/';
 const OUT = `${ROOT}assets/media/xp/`;
 const TMP = `${ROOT}tools/.cache/xp-media/`;
-
-/* the weekly posters (newest first): date, file, topic, guest (as printed) */
-const POSTERS = [
-  ['2026-10-04', '2026-10-4/بوستر.png', 'Why me?', ''],
-  ['2026-09-27', '2026-9-27/بوستر.png', 'اتخاذ القرار', 'م/ أرمانيوس عزيز'],
-  ['2026-09-20', '2026-9-20/بوستر.png', 'حياة التسليم', 'أبونا أنطوني عياد'],
-  ['2026-09-13', '2026-9-13/بوستر.png', 'اللسان والإدانة', ''],
-  ['2026-09-06', '2026-9-6/بوستر.png', 'الانطوائية', ''],
-  ['2026-08-09', '2026-8-9/poster.png', 'القلق والخوف', ''],
-  ['2026-08-02', '2026-8-2/بوستر.png', 'الثبات الروحي', ''],
-  ['2026-07-26', '2026-7-26/بوستر.png', 'اكتشاف الذات', ''],
-  ['2026-07-12', '2026-7-12/بوستر.png', 'الصداقة', 'أبونا أنجيلوس'],
-  ['2026-07-05', '2026-7-5/بوستر.png', 'الصلاة', '']
-];
-
-/* game segments: [id, source, [[from, to]…], landscape?, poster at (s), caption] */
-const CLIPS = [
-  ['saboona', 'لعبة الصابونة و المصاصة/فيديو.mp4', [[2.4, 6.4]], true, 2.6, 'تحدي المصاصة والصابونة'],
-  ['asela', 'أسئلة سريعة/أسئلة سريعة.mp4', [[87.3, 91.1]], false, 2.4, 'أسئلة سريعة'],
-  ['timer', 'لعبة الTimer/Firefly Animate this image without changing, rewriting, regenerating, or moving any text.__Important.mp4', [[0.2, 4.6]], true, 1.6, 'لعبة الـTimer'],
-  ['khamen', 'خمن الورقة/final bromo.mp4', [[0.9, 4.6], [37.7, 39.3]], true, 3.2, 'خمن الورقة'],
-  ['metgawzeen', 'لعبة المتجوزين/final bromo.mp4', [[38.3, 42.2]], true, 1.9, 'لعبة المتجوزين'],
-  ['sot', 'قلد الصوت/قلد صوت.mp4', [[202.1, 205.7]], false, 2.6, 'قلد الصوت']
-];
 
 const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args], { stdio: 'pipe' });
 const kb = file => Math.round(statSync(file).size / 102.4) / 10;

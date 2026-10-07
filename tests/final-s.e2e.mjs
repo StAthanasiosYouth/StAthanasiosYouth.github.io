@@ -175,6 +175,8 @@ for (const width of [320, 390, 1366]) {
     for (const key of ['facebook', 'whatsapp', 'tiktok', 'instagram', 'telegram']) {
       await follow(page, key);
       const crossings = new Set();
+      let seen = 0;
+      let covering = 0;
       for (let i = 0; i < 16; i++) {
         await sleep(500);
         const sample = await page.evaluate(() => {
@@ -183,7 +185,18 @@ for (const width of [320, 390, 1366]) {
           const fx = stage.querySelector(':scope > .xp-fx');
           const p = phone.getBoundingClientRect();
           const items = [...fx.querySelectorAll('.xp-amb, .xp-float')].filter(n => Number(getComputedStyle(n).opacity) > 0.15);
+          // the screen's content: the phone inside its edge band
+          const b = Math.min(14, p.width * 0.06);
+          const c = { left: p.left + b, right: p.right - b, top: p.top + b, bottom: p.bottom - b };
+          const over = items.filter(n => {
+            const r = n.getBoundingClientRect();
+            const w = Math.max(0, Math.min(r.right, c.right) - Math.max(r.left, c.left));
+            const h = Math.max(0, Math.min(r.bottom, c.bottom) - Math.max(r.top, c.top));
+            return r.width * r.height > 0 && (w * h) / (r.width * r.height) > 0.35;
+          }).length;
           return {
+            seen: items.length,
+            over,
             sibling: fx.parentNode === phone.parentNode && !phone.contains(fx),
             inPhone: phone.querySelectorAll('.xp-float, .xp-edge, .xp-edge__item').length,
             fxAbove: Number(getComputedStyle(fx).zIndex) > Number(getComputedStyle(phone).zIndex || 0),
@@ -199,12 +212,17 @@ for (const width of [320, 390, 1366]) {
         assert.equal(sample.fxAbove, true);
         assert.equal(sample.pointer, 'none');
         sample.crossing.forEach(name => crossings.add(name));
+        seen += sample.seen;
+        covering += sample.over;
         for (const control of ['.xp__cta', '.sheet__close', '.xp-sound']) {
           assert.ok(await onTop(page, `dialog.sheet--xp[open] ${control}`), `${key} @${width}: ${control} is clickable (${i})`);
         }
         assert.ok(await overflow(page) <= 0, `${key} @${width}: no horizontal page overflow`);
       }
       assert.ok(crossings.size > 0, `${key} @${width}: reactions outside / across the phone's edges`);
+      // they frame the phone: most of their time is beside it, not over its content
+      console.log(`  ${key} @${width}: ${covering}/${seen} reaction samples over the content`);
+      assert.ok(seen > 0 && covering / seen <= 0.25, `${key} @${width}: ${covering}/${seen} over the content`);
       await shut(page);
     }
     assert.deepEqual(problems, []);
@@ -336,35 +354,40 @@ test('reduced motion: the final frame, nothing around the phone, no video', asyn
 
 /* ---------------- sound ---------------- */
 
-test('sound: off by default, nothing before a gesture, the speaker in the sheet is the page setting', async () => {
+test('sound: on by default (after a gesture); the speaker in the sheet mutes the page setting', async () => {
   const { page, problems, close } = await open();
+  assert.deepEqual(await page.evaluate(() => [window.__audio.contexts, window.__xpAudioLog.length]), [0, 0], 'nothing before a gesture');
+  assert.equal(await page.$eval('#sound-toggle', b => b.getAttribute('aria-pressed')), 'true', 'on by default');
+  await page.keyboard.press('Shift');   // the first gesture wakes the audio
+  assert.equal(await page.evaluate(() => window.__audio.contexts), 1, 'one shared AudioContext, woken by the gesture');
   await follow(page, 'whatsapp');
-  await sleep(2500);
-  assert.deepEqual(await page.evaluate(() => [window.__audio.contexts, window.__xpAudioLog.length]), [0, 0], 'silent by default');
-  assert.equal(await page.$eval('.xp-sound', b => b.getAttribute('aria-pressed')), 'false');
-  assert.match(await page.$eval('.xp-sound', b => b.getAttribute('aria-label')), /صوت/);
-
-  await page.click('.xp-sound');
   assert.equal(await page.$eval('.xp-sound', b => b.getAttribute('aria-pressed')), 'true');
-  assert.equal(await page.$eval('#sound-toggle', b => b.getAttribute('aria-pressed')), 'true', 'the top bar shows the same setting');
-  assert.equal(await page.evaluate(() => localStorage.getItem('athanasios.sound')), 'on');
+  assert.match(await page.$eval('.xp-sound', b => b.getAttribute('aria-label')), /صوت/);
   await sleep(9000);
   const log = await page.evaluate(() => window.__xpAudioLog);
-  assert.equal(await page.evaluate(() => window.__audio.contexts), 1, 'one shared AudioContext');
   assert.ok(log.filter(e => !e.dropped).length > 3, `scene sounds play (${log.length})`);
+  assert.equal(await page.evaluate(() => window.__audio.contexts), 1, 'still the one context');
 
-  // mute: nothing more
+  // mute from the sheet: the top bar follows, nothing more plays, the choice is kept
   await page.click('.xp-sound');
-  assert.equal(await page.$eval('#sound-toggle', b => b.getAttribute('aria-pressed')), 'false');
+  assert.equal(await page.$eval('.xp-sound', b => b.getAttribute('aria-pressed')), 'false');
+  assert.equal(await page.$eval('#sound-toggle', b => b.getAttribute('aria-pressed')), 'false', 'the top bar shows the same setting');
+  assert.equal(await page.evaluate(() => localStorage.getItem('athanasios.sound')), 'off');
   const before = await page.evaluate(() => window.__xpAudioLog.length);
   await sleep(4000);
   assert.equal(await page.evaluate(() => window.__xpAudioLog.length), before, 'muted');
+
+  // and back on
+  await page.click('.xp-sound');
+  assert.equal(await page.$eval('#sound-toggle', b => b.getAttribute('aria-pressed')), 'true');
+  await sleep(5000);
+  assert.ok(await page.evaluate(() => window.__xpAudioLog.length) > before, 'sounds again');
   assert.deepEqual(problems, []);
   await close();
 });
 
-test('sound on, but a deep link with no gesture: nothing until the visitor touches', async () => {
-  const { page, problems, close } = await open({ sound: true, inactive: true, hash: `#follow/${linkOf('tiktok').id}` });
+test('sound on (the default), but a deep link with no gesture: nothing until the visitor touches', async () => {
+  const { page, problems, close } = await open({ inactive: true, hash: `#follow/${linkOf('tiktok').id}` });
   await page.waitForSelector('dialog.sheet--xp[open] .tt');
   await sleep(4000);
   const heard = await page.evaluate(() => [window.__audio.contexts, window.__audio.starts, window.__xpAudioLog.length, navigator.userActivation.hasBeenActive]);
@@ -498,4 +521,41 @@ test('contact cards: reduced motion loads nothing; lite has no moving extras', a
   assert.equal(await lite.page.$$eval('.card-fx', n => n.length), 0);
   assert.deepEqual(lite.problems, []);
   await lite.close();
+});
+
+
+/* ---------------- an admin-chosen video: its segment, in a loop ---------------- */
+
+test('a gallery video plays only its start → end segment, looping', async () => {
+  const { page, problems, close } = await open();
+  const times = await page.evaluate(async () => {
+    const kit = await import('/assets/js/xp/kit.js');
+    const tl = kit.timeline({});
+    const video = kit.clipNode({ id: 'own-0', src: 'assets/media/xp/clips/timer.mp4', poster: '', w: 360, h: 640, caption: '', start: 1, end: 2.2 }, tl);
+    document.body.append(video);
+    const preload = video.getAttribute('preload');
+    tl.video(video);
+    const seen = [];
+    await new Promise(done => {
+      const start = performance.now();
+      const tick = () => {
+        // (the first frames may come before the seek to the start lands)
+        if (video.readyState >= 2 && !video.seeking && seen.started && performance.now() - seen.started > 400) seen.push(video.currentTime);
+        if (!seen.started && video.readyState >= 2) seen.started = performance.now();
+        if (performance.now() - start < 4500) requestAnimationFrame(tick); else done();
+      };
+      tick();
+    });
+    tl.stop();
+    video.remove();
+    return { preload, loop: video.loop, seen };
+  });
+  assert.equal(times.preload, 'none');
+  assert.equal(times.loop, false, 'a segment loops by itself, not the whole file');
+  const played = times.seen.filter(t => t > 0);
+  assert.ok(played.length > 20, `it played (${played.length} samples)`);
+  assert.ok(played.every(t => t >= 0.95 && t <= 2.3), `inside 1 → 2.2 s: ${played.slice(0, 8).map(t => t.toFixed(2))} … ${Math.min(...played).toFixed(2)}…${Math.max(...played).toFixed(2)}`);
+  assert.ok(played.some((t, i) => i && t < played[i - 1] - 0.5), 'it went back to the start');
+  assert.deepEqual(problems, []);
+  await close();
 });

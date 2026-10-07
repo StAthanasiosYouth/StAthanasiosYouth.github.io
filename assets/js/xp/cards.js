@@ -5,9 +5,9 @@
  *     softly from the phone with each ring;
  *   - support (the chat): a reaction or two floating up from the ❤️ as it
  *     lands, in step with the chat's own CSS cycle;
- *   - sound (only if the visitor turned sounds on): a soft call pulse as
- *     the finger lands on «اتصال», a "sent" swish on WhatsApp, and the
- *     chat's reply pop + reaction pop once per visit.
+ *   - sound (the page's setting): only as the visitor's own finger lands —
+ *     a soft call pulse on «اتصال», a "sent" swish on WhatsApp. Nothing
+ *     plays on its own on the main page.
  * Calm: at most two signs at a time, paused off screen and in hidden
  * tabs; lite tier: the sounds only; reduced motion: nothing moves.
  */
@@ -16,25 +16,15 @@ import { h } from '../dom.js';
 import { ambient, rand, pick } from './kit.js';
 import { mixer } from './audio.js';
 
-let styles = null;
-
-function stylesheet() {
-
-  if (!styles) {
-    styles = new Promise(resolve => {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = new URL('../../css/xp-cards.css', import.meta.url).href;
-      link.onload = link.onerror = resolve;
-      document.head.append(link);
-    });
-  }
-
-  return styles;
-
-}
-
-let heard = false;
+/* inline styles (no stylesheet to load: nothing restyles the page's cards) */
+const FX = { position: 'absolute', inset: '0', overflow: 'hidden', pointerEvents: 'none', borderRadius: 'inherit' };
+const SIGN = {
+  position: 'absolute', left: '0', top: '0', display: 'grid', placeItems: 'center', minWidth: '24px', height: '24px', padding: '0 6px',
+  border: '1px solid rgba(242, 210, 139, .35)', borderRadius: '999px', fontSize: '12px', fontWeight: '800', lineHeight: '1',
+  color: '#f2d28b', background: 'rgba(6, 26, 49, .82)', boxShadow: '0 8px 16px -10px rgba(0, 0, 0, .9)', opacity: '0'
+};
+const REACT = { ...SIGN, minWidth: '0', height: 'auto', padding: '0', border: '0', fontSize: '15px', background: 'none', boxShadow: 'none', filter: 'drop-shadow(0 4px 6px rgba(0, 0, 0, .5))' };
+const styled = (node, style) => Object.assign(node.style, style) && node;
 
 export function enhance(stage, kind) {
 
@@ -51,7 +41,8 @@ export function enhance(stage, kind) {
 
   if (tier !== 'full') return;
 
-  stylesheet().then(() => (kind === 'ring' ? ring(stage) : chat(stage, sound)));
+  if (kind === 'ring') ring(stage);
+  else chat(stage);
 
 }
 
@@ -72,7 +63,7 @@ function whileSeen(stage, engine) {
 
 function layer(stage) {
 
-  const fx = h('span', { class: 'card-fx', 'aria-hidden': 'true' });
+  const fx = styled(h('span', { class: 'card-fx', 'aria-hidden': 'true' }), FX);
   stage.append(fx);
   return fx;
 
@@ -87,7 +78,7 @@ function ring(stage) {
 
   const engine = ambient(fx, {
     every: 3200, jitter: 0.2, max: 2, name: 'card-sign',
-    make: () => h('span', { class: 'card-sign' }),
+    make: () => styled(h('span', { class: 'card-sign' }), SIGN),
     spawn: node => {
       node.textContent = pick(['؟', '💬', '🙏', '♥', '؟']);
       const box = stage.getBoundingClientRect();
@@ -109,7 +100,7 @@ function ring(stage) {
 
 
 /* the support chat: in step with its CSS cycle (render.js / main.css) */
-function chat(stage, sound) {
+function chat(stage) {
 
   const fx = layer(stage);
   const out = stage.querySelector('.chat__msg--out');
@@ -118,7 +109,7 @@ function chat(stage, sound) {
 
   const engine = ambient(fx, {
     every: 0, max: 2, name: 'card-react',
-    make: () => h('span', { class: 'card-sign card-sign--react' }),
+    make: () => styled(h('span', { class: 'card-sign card-sign--react' }), REACT),
     spawn: node => {
       node.textContent = pick(['❤️', '🙏', '👍', '❤️']);
       const box = stage.getBoundingClientRect();
@@ -142,11 +133,7 @@ function chat(stage, sound) {
     if (event.target !== out || !event.animationName.startsWith('loop-')) return;
     timers.forEach(clearTimeout);
     timers.length = 0;
-    // the reply lands (~45% of the cycle), then the ❤️ (~60%)
-    if (!heard) {
-      timers.push(setTimeout(() => sound('pop'), cycle * 0.45));
-      timers.push(setTimeout(() => { sound('react'); heard = true; }, cycle * 0.6));
-    }
+    // the ❤️ lands at ~60% of the cycle
     timers.push(setTimeout(() => {
       if (stage.classList.contains('is-looping') && !stage.classList.contains('is-paused')) engine.burst(Math.random() < 0.5 ? 1 : 2);
     }, cycle * 0.6));

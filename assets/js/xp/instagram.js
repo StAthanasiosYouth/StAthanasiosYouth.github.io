@@ -11,8 +11,7 @@
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { deck, timeline, float, floats, spray, side, pictures, clipNode, typeInto, bubble, chip, pick, digits, LOGO, EASE, SPRING } from './kit.js';
-import { CLIPS } from './library.js';
+import { deck, timeline, float, floats, spray, side, pictures, sceneClips, clipNode, typeInto, bubble, chip, pick, digits, LOGO, EASE, SPRING } from './kit.js';
 import { PAGE, COMMENTS, WHO } from './talk.js';
 
 const nextComment = deck(COMMENTS);
@@ -21,7 +20,8 @@ export function play(stage, { quick, reduced, lite, sound, link }) {
 
   const tl = timeline({ quick, reduced, lite });
   const pics = pictures(link, 2, { wide: false });
-  const reel = CLIPS[0];
+  // the reel: the link's own video first, else a game segment
+  const reel = sceneClips(link, 1)[0];
 
   const bars = [0, 1, 2].map(() => h('span', { class: 'ig-bar' }, h('i')));
   const still = (pic, i) => h('div', { class: `ig-frame ig-frame--${i}` },
@@ -32,7 +32,7 @@ export function play(stage, { quick, reduced, lite, sound, link }) {
   const video = clipNode(reel, tl, 'ig-frame__video');
   const frames = [
     still(pics[0], 0),
-    h('div', { class: 'ig-frame ig-frame--1 ig-frame--reel' }, video, h('span', { class: 'ig-frame__tag' }, '▶ ريلز'), h('span', { class: 'ig-frame__caption' }, `${reel.caption} 😂🔥`)),
+    h('div', { class: 'ig-frame ig-frame--1 ig-frame--reel' }, video, h('span', { class: 'ig-frame__tag' }, '▶ ريلز'), reel.caption ? h('span', { class: 'ig-frame__caption' }, `${reel.caption} 😂🔥`) : null),
     still(pics[1], 2)
   ];
   const track = h('div', { class: 'ig-track' }, frames);
@@ -133,7 +133,7 @@ export function play(stage, { quick, reduced, lite, sound, link }) {
   tl.later(settled + 2200, reply);
 
   // hearts rise from the bottom corner, out over the edge
-  floats(tl, phone, { glyphs: ['♥', '♥', '❤️'], x: [78, 96], y: [84, 92], rise: [130, 200], drift: 40, size: [0.9, 1.4], every: 850, max: 6, delay: settled, className: 'xp-float--ig', name: 'ig-heart', sound, cue: 'like' });
+  floats(tl, phone, { glyphs: ['♥', '♥', '❤️'], x: [78, 96], y: [84, 92], rise: [130, 200], drift: 40, size: [0.9, 1.4], every: 850, max: 5, delay: settled, className: 'xp-float--ig', name: 'ig-heart', sound, cue: 'like' });
 
   // (B) around the phone
   let likes = 157;

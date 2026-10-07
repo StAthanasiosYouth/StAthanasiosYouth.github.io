@@ -86,21 +86,21 @@ test('the words: believable, varied, nothing private', () => {
   assert.ok(posts.some(p => p.poster && p.text.includes(p.poster.topic)));
 });
 
-test('mixer: silent unless sound is on and the visitor has touched the page', () => {
+test('mixer: on by default, nothing before a gesture, a mute is kept', () => {
   store.delete('athanasios.sound');
   const sound = mixer({});
-  activation.hasBeenActive = true;
-  now = 1000;
-  assert.equal(sound('pop'), false, 'off by default');
-  store.set('athanasios.sound', 'on');
   activation.hasBeenActive = false;
-  const before = stats.contexts;
-  now = 2000;
+  now = 1000;
   assert.equal(sound('pop'), false, 'no gesture yet');
-  assert.equal(stats.contexts, before, 'no AudioContext before a gesture');
+  assert.equal(stats.contexts, 0, 'no AudioContext before a gesture');
   activation.hasBeenActive = true;
+  now = 2000;
+  assert.equal(sound('pop'), true, 'on by default, after a gesture');
+  assert.equal(stats.contexts, 1);
+  store.set('athanasios.sound', 'off');
   now = 3000;
-  assert.equal(sound('pop'), true);
+  assert.equal(sound('pop'), false, 'a mute is kept');
+  store.set('athanasios.sound', 'on');
   document.hidden = true;
   now = 4000;
   assert.equal(sound('pop'), false, 'hidden tab');
@@ -143,4 +143,37 @@ test('mixer: reduced motion is quiet (the speaker\'s own confirmation only); lit
   assert.equal(lite('pop'), true);
   now += 300;
   assert.equal(lite('pop'), false, 'lite: twice the gap');
+});
+
+test('scene clips: the link\'s own videos first (admin order, their segments), then the bundled game clips', async () => {
+  const { sceneClips, pictures } = await import('../assets/js/xp/kit.js');
+  const link = {
+    gallery: [
+      { src: 'media/2026/img-aaaaaaaa.webp', thumb: 'media/2026/img-aaaaaaaa-480.webp', w: 1200, h: 1500, alt: 'a' },
+      { type: 'video', src: 'media/2026/vid-bbbbbbbb.mp4', poster: 'media/2026/vid-bbbbbbbb-480.webp', w: 1080, h: 1920, alt: 'b', start: 4, end: 9 },
+      { type: 'video', src: 'media/2026/vid-cccccccc.webm', poster: 'media/2026/vid-cccccccc-480.webp', w: 1920, h: 1080, alt: 'c' }
+    ]
+  };
+  const clips = sceneClips(link, Infinity, { order: ['timer'] });
+  assert.deepEqual(clips.slice(0, 2).map(c => [c.src, c.start, c.end, c.caption]), [
+    ['media/2026/vid-bbbbbbbb.mp4', 4, 9, ''],
+    ['media/2026/vid-cccccccc.webm', 0, 0, '']
+  ]);
+  assert.equal(clips[2].id, 'timer', 'then the bundled ones, the asked order first');
+  assert.equal(clips.length, 2 + CLIPS.length);
+  assert.ok(clips.slice(2).every(c => c.start === 0 && c.end === 0 && c.caption));
+  assert.deepEqual(sceneClips(null, 2).map(c => c.id), CLIPS.slice(0, 2).map(c => c.id), 'no gallery: the bundled clips');
+  assert.equal(sceneClips(link, 1)[0].src, 'media/2026/vid-bbbbbbbb.mp4');
+  // pictures: images only
+  assert.deepEqual(pictures(link, 2).map(p => p.src), ['media/2026/img-aaaaaaaa-480.webp', POSTERS[0].src]);
+});
+
+test('clip segments: start/end clamp to the real duration', async () => {
+  const { segment } = await import('../assets/js/xp/kit.js');
+  assert.deepEqual(segment(0, 0, 12), [0, 12], 'the whole clip');
+  assert.deepEqual(segment(4, 9, 12), [4, 9]);
+  assert.deepEqual(segment(4, 30, 12), [4, 12], 'end past the video: its end');
+  assert.deepEqual(segment(15, 20, 12), [0, 12], 'start past the end: from 0');
+  assert.deepEqual(segment(4, 2, 12), [4, 12], 'an end before the start: to the end');
+  assert.deepEqual(segment(3, 0, NaN), [3, Infinity], 'duration not known yet');
 });

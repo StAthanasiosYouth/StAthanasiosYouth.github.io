@@ -22,7 +22,7 @@
 
 import { h } from '../dom.js';
 import { DAY_NAMES, formatTime } from '../words.js';
-import { POSTERS } from './library.js';
+import { POSTERS, CLIPS } from './library.js';
 
 export const LOGO = 'assets/img/logo-128.webp';
 
@@ -379,10 +379,25 @@ function onPhone(layer, phone, x, y) {
 
 const phoneOf = el => (el.classList.contains('xp-phone') ? el : el.querySelector(':scope > .xp-phone'));
 
+/* the edge band (px) reactions may cross for depth; the content inside it stays clear */
+const band = g => Math.min(14, g.pw * 0.06);
+
+/* from a point on the phone: the drift that takes it out over the nearest side */
+function exitDrift(layer, phone, left, prefer = Math.random() - 0.5) {
+
+  const g = geometry(layer, phone);
+  const toLeft = left - g.x;
+  const toRight = g.x + g.pw - left;
+  const goLeft = Math.abs(toLeft - toRight) < 12 ? prefer < 0 : toLeft < toRight;
+  return goLeft ? -(toLeft + rand(20, 46)) : toRight + rand(20, 46);
+
+}
+
+/* floats leave the phone early (most of their life is beside it) */
 const floatFrames = (drift, rise) => [
   { transform: 'translate(-50%, 0) scale(.4)', opacity: 0 },
-  { transform: `translate(calc(-50% + ${drift * 0.3}px), -${rise * 0.25}px) scale(1.15)`, opacity: 1, offset: 0.18 },
-  { transform: `translate(calc(-50% + ${drift}px), -${rise}px) scale(.9)`, opacity: 0 }
+  { transform: `translate(calc(-50% + ${drift * 0.82}px), -${rise * 0.22}px) scale(1.12)`, opacity: 1, offset: 0.22 },
+  { transform: `translate(calc(-50% + ${drift * 1.15}px), -${rise}px) scale(.9)`, opacity: 0 }
 ];
 
 function put(node, left, top, size) {
@@ -409,7 +424,7 @@ export function float(phone, text, { x = 50, y = 80, drift = 0, rise = 120, size
     return;
   }
 
-  const animation = bubble.animate(floatFrames(drift, rise), { duration, easing: 'cubic-bezier(.2, .6, .3, 1)', fill: 'forwards' });
+  const animation = bubble.animate(floatFrames(exitDrift(layer, phoneOf(phone) || phone, left, drift) + drift * 0.2, rise), { duration, easing: 'cubic-bezier(.2, .6, .3, 1)', fill: 'forwards' });
   animation.finished.then(() => bubble.remove(), () => bubble.remove());
 
 }
@@ -433,7 +448,7 @@ export function floats(tl, phone, { glyphs, x = [40, 60], y = [80, 90], rise = [
       put(node, left, top, rand(size[0], size[1]));
       const time = duration * rand(0.85, 1.15);
       if (sound && cue && n % 2) tl.later(time * 0.18, () => sound(cue));
-      return node.animate(floatFrames(rand(-drift, drift), rand(rise[0], rise[1])), { duration: time, easing: 'cubic-bezier(.2, .6, .3, 1)' });
+      return node.animate(floatFrames(exitDrift(layer, phone, left) + rand(-drift, drift) * 0.2, rand(rise[0], rise[1])), { duration: time, easing: 'cubic-bezier(.2, .6, .3, 1)' });
     }
   });
 
@@ -442,44 +457,51 @@ export function floats(tl, phone, { glyphs, x = [40, 60], y = [80, 90], rise = [
 
 /*
  * The paths an outer item can take (g: geometry; left: which side; w/hh:
- * the node's size). Each returns its start (px) and keyframes; all of them
- * cross the phone's edge somewhere, none of them stay on the phone.
+ * the node's size). They FRAME the phone: they live in its side margins
+ * and corners, and only touch its very edge (the band) for depth — never
+ * lingering over the screen's content. Each returns its start (px), its
+ * keyframes and its duration.
  */
 const PATHS = {
-  // from the side, sliding over the phone's edge (message bubbles)
+  // from the side margin up to the phone's edge (message bubbles, pills)
   in(g, left, w, hh) {
-    const dx = (left ? 1 : -1) * rand(26, 56);
+    const b = band(g);
+    const room = left ? g.x : g.w - g.x - g.pw;
+    const dx = (left ? 1 : -1) * rand(10, 22);
     // it may start beyond the sheet's edge (clipped there): it slides in from it
-    const x = left ? g.x - w + rand(-6, 22) : g.x + g.pw - rand(-6, 22);
-    const y = g.y + g.ph * rand(0.25, 0.82) - hh / 2;
-    const dy = -rand(14, 44);
+    const x = left ? g.x - w + b - Math.abs(dx) - rand(0, Math.max(0, room - w) * 0.5) : g.x + g.pw - b + Math.abs(dx) + rand(0, Math.max(0, room - w) * 0.5);
+    const y = g.y + g.ph * rand(0.12, 0.86) - hh / 2;
+    const dy = -rand(14, 40);
     return [x, y, [
-      { transform: `translate(${-dx * 0.7}px, 12px) scale(.86)`, opacity: 0 },
+      { transform: `translate(${-dx * 1.6}px, 12px) scale(.86)`, opacity: 0 },
       { transform: 'translate(0, 0) scale(1)', opacity: 1, offset: 0.16 },
-      { transform: `translate(${dx * 0.65}px, ${dy * 0.7}px) scale(1)`, opacity: 0.96, offset: 0.78 },
+      { transform: `translate(${dx * 0.7}px, ${dy * 0.7}px) scale(1)`, opacity: 0.96, offset: 0.78 },
       { transform: `translate(${dx}px, ${dy}px) scale(.96)`, opacity: 0 }
     ], rand(3000, 3900)];
   },
-  // out of the phone, over its edge, into the room (reactions)
+  // a pop at the phone's edge, out into the room (reactions)
   out(g, left, w, hh) {
-    const x = left ? g.x + rand(2, 26) : g.x + g.pw - w - rand(2, 26);
-    const y = g.y + g.ph * rand(0.35, 0.9) - hh / 2;
-    const gutter = left ? g.x : g.w - g.x - g.pw;
-    const dx = (left ? -1 : 1) * rand(36, Math.max(60, gutter + 24));
-    const dy = -rand(50, 130);
+    const b = band(g);
+    const x = left ? g.x - w / 2 + rand(0, b) : g.x + g.pw - w / 2 - rand(0, b);
+    const y = g.y + g.ph * rand(0.2, 0.92) - hh / 2;
+    const room = left ? g.x : g.w - g.x - g.pw;
+    const dx = (left ? -1 : 1) * rand(24, Math.max(34, room - 6));
+    const dy = -rand(40, 120);
     return [x, y, [
       { transform: 'translate(0, 0) scale(.3)', opacity: 0 },
-      { transform: `translate(${dx * 0.2}px, ${dy * 0.15}px) scale(1.2)`, opacity: 1, offset: 0.16 },
-      { transform: `translate(${dx * 0.7}px, ${dy * 0.7}px) scale(1)`, opacity: 0.9, offset: 0.7 },
+      { transform: `translate(${dx * 0.35}px, ${dy * 0.12}px) scale(1.2)`, opacity: 1, offset: 0.14 },
+      { transform: `translate(${dx * 0.8}px, ${dy * 0.7}px) scale(1)`, opacity: 0.9, offset: 0.7 },
       { transform: `translate(${dx}px, ${dy}px) scale(.85)`, opacity: 0 }
     ], rand(1900, 2600)];
   },
-  // rising along an edge, half in, half out
+  // rising in the margin, beside the edge
   rise(g, left, w, hh) {
-    const x = (left ? g.x : g.x + g.pw) - w / 2 + rand(-16, 16);
-    const y = g.y + g.ph * rand(0.8, 1) - hh / 2;
+    const b = band(g);
+    const room = left ? g.x : g.w - g.x - g.pw;
+    const x = left ? g.x - w + b - rand(0, Math.max(0, room - w)) : g.x + g.pw - b + rand(0, Math.max(0, room - w));
+    const y = g.y + g.ph * rand(0.78, 1) - hh / 2;
     const dy = -rand(g.ph * 0.35, g.ph * 0.62);
-    const dx = rand(-18, 18);
+    const dx = (left ? -1 : 1) * rand(0, 12);
     return [x, y, [
       { transform: 'translate(0, 16px) scale(.7)', opacity: 0 },
       { transform: `translate(${dx * 0.3}px, ${dy * 0.2}px) scale(1)`, opacity: 0.95, offset: 0.2 },
@@ -487,25 +509,28 @@ const PATHS = {
       { transform: `translate(${dx * 1.2}px, ${dy}px) scale(.9)`, opacity: 0 }
     ], rand(3200, 4400)];
   },
-  // a fly-by across the phone (paper planes, swipes)
+  // a fly-by up the margin and away past the top corner (paper planes, swipes)
   cross(g, left, w, hh) {
-    const x = left ? rand(-10, Math.max(0, g.x * 0.5)) : g.w - w - rand(-10, Math.max(0, (g.w - g.x - g.pw) * 0.5));
-    const y = g.y + g.ph * rand(0.62, 0.92) - hh / 2;
-    const dx = (left ? 1 : -1) * (g.pw + rand(20, 70));
-    const dy = -g.ph * rand(0.45, 0.75);
-    const turn = left ? 1 : -1;
+    const b = band(g);
+    const room = left ? g.x : g.w - g.x - g.pw;
+    const x = left ? g.x - w + b - rand(0, Math.max(0, room - w)) : g.x + g.pw - b + rand(0, Math.max(0, room - w));
+    const y = g.y + g.ph * rand(0.8, 0.98) - hh / 2;
+    const side = left ? 1 : -1;
+    const dy = -(g.ph * rand(0.85, 1.05));
     return [x, y, [
-      { transform: `translate(0, 0) rotate(${-8 * turn}deg) scale(.7)`, opacity: 0 },
-      { transform: `translate(${dx * 0.15}px, ${dy * 0.12}px) rotate(${-4 * turn}deg) scale(1)`, opacity: 1, offset: 0.12 },
-      { transform: `translate(${dx * 0.85}px, ${dy * 0.8}px) rotate(${6 * turn}deg) scale(.95)`, opacity: 0.9, offset: 0.85 },
-      { transform: `translate(${dx}px, ${dy}px) rotate(${10 * turn}deg) scale(.8)`, opacity: 0 }
-    ], rand(2200, 2900)];
+      { transform: `translate(${-side * 18}px, 0) rotate(${-10 * side}deg) scale(.7)`, opacity: 0 },
+      { transform: `translate(0, ${dy * 0.15}px) rotate(${-4 * side}deg) scale(1)`, opacity: 1, offset: 0.12 },
+      { transform: `translate(${side * b * 0.6}px, ${dy * 0.7}px) rotate(${4 * side}deg) scale(.95)`, opacity: 0.95, offset: 0.7 },
+      { transform: `translate(${-side * 30}px, ${dy}px) rotate(${-12 * side}deg) scale(.8)`, opacity: 0 }
+    ], rand(2400, 3000)];
   },
-  // dropping in over the top edge (pins)
+  // dropping in beside the top corners (pins)
   drop(g, left, w, hh) {
-    const x = (left ? g.x + rand(-w * 0.6, g.pw * 0.2) : g.x + g.pw - w - rand(-w * 0.6, g.pw * 0.2));
-    const y = g.y + rand(-6, g.ph * 0.25) - hh;
-    const dy = rand(40, 90);
+    const b = band(g);
+    const room = left ? g.x : g.w - g.x - g.pw;
+    const x = left ? g.x - w + b - rand(0, Math.max(0, room - w)) : g.x + g.pw - b + rand(0, Math.max(0, room - w));
+    const y = g.y + rand(0, g.ph * 0.3) - hh;
+    const dy = rand(30, 70);
     return [x, y, [
       { transform: 'translate(0, -40px) scale(.8)', opacity: 0 },
       { transform: `translate(0, ${dy}px) scale(1)`, opacity: 1, offset: 0.3 },
@@ -514,30 +539,34 @@ const PATHS = {
       { transform: `translate(0, ${dy + 10}px) scale(.9)`, opacity: 0 }
     ], rand(2600, 3300)];
   },
-  // walking up along an edge (half over it)
+  // walking up along an edge, on its outer side
   orbit(g, left, w, hh) {
-    const x = (left ? g.x : g.x + g.pw) - w / 2;
+    const b = band(g);
+    const x = left ? g.x - w + b : g.x + g.pw - b;
     const y = g.y + g.ph * 0.86 - hh / 2;
-    const dy = -g.ph * 0.66;
-    const sway = (left ? -1 : 1) * rand(8, 20);
+    const dy = -g.ph * 0.7;
+    const sway = (left ? -1 : 1) * rand(6, 16);
     return [x, y, [
       { transform: 'translate(0, 0) scale(.6)', opacity: 0 },
       { transform: `translate(${sway}px, ${dy * 0.25}px) scale(1)`, opacity: 1, offset: 0.2 },
-      { transform: `translate(${-sway * 0.5}px, ${dy * 0.6}px) scale(1)`, opacity: 0.9, offset: 0.6 },
+      { transform: `translate(${sway * 0.4}px, ${dy * 0.6}px) scale(1)`, opacity: 0.9, offset: 0.6 },
       { transform: `translate(${sway}px, ${dy}px) scale(.85)`, opacity: 0 }
     ], rand(3400, 4200)];
   },
-  // a pulse ring from the phone's middle, out past its edges (calls)
+  // a pulse around the whole phone, going out past its edges (calls)
   ring(g, left, w, hh, node) {
-    const size = g.pw * 0.62;
-    node.style.width = node.style.height = `${size}px`;
-    return [g.x + g.pw / 2 - size / 2, g.y + g.ph * 0.4 - size / 2, [
-      { transform: 'scale(.5)', opacity: 0 },
-      { transform: 'scale(.75)', opacity: 0.5, offset: 0.12 },
-      { transform: 'scale(2.2)', opacity: 0 }
+    node.style.width = `${g.pw}px`;
+    node.style.height = `${g.ph}px`;
+    return [g.x, g.y, [
+      { transform: 'scale(1)', opacity: 0 },
+      { transform: 'scale(1.02)', opacity: 0.55, offset: 0.1 },
+      { transform: 'scale(1.2, 1.1)', opacity: 0 }
     ], 2800];
   }
 };
+
+/* a reaction for narrow margins, where words would cover the screen */
+const SMALL = ['❤️', '✨', '👍', '🙏'];
 
 
 /**
@@ -578,6 +607,12 @@ export function spray(tl, stage, { items, every = 1300, max = 6, name = 'edge', 
 
       const phone = stage.querySelector(':scope > .xp-phone');
       const g = geometry(layer, phone);
+      // narrow margins: words would cover the screen, a small reaction frames it instead
+      if (spec.node && path !== 'ring' && node.offsetWidth > (left ? g.x : g.w - g.x - g.pw) + 2) {
+        node.className = `xp-edge__item xp-amb xp-edge__item--${path}`;
+        node.style.fontSize = '1.1em';
+        node.replaceChildren(spec.alt || pick(SMALL));
+      }
       const [x, y, frames, duration] = PATHS[path](g, left, node.offsetWidth || 24, node.offsetHeight || 24, node);
       node.style.left = `${x}px`;
       node.style.top = `${y}px`;
@@ -738,14 +773,18 @@ export function posters(content, count = 3) {
 }
 
 
+/* the link's own gallery, split: images (any item that isn't a video) */
+const ownImages = link => ((link && link.gallery) || []).filter(item => item && item.type !== 'video');
+
 /**
  * The pictures a scene shows, as { src, topic?, w, h }: the link's own
- * (chosen in the admin, «صور المشهد») first, then the service's real
- * weekly posters (library.js). Never anything fetched from the platform.
+ * images (chosen in the admin, «صور المشهد», in its order) first, then the
+ * service's real weekly posters (library.js). Videos are not pictures
+ * (sceneClips). Never anything fetched from the platform.
  */
 export function pictures(link, count = 3, { wide = true } = {}) {
 
-  const own = ((link && link.gallery) || []).map(image => ({ src: image.thumb || image.src, w: image.w, h: image.h, topic: '' })).filter(p => p.src);
+  const own = ownImages(link).map(image => ({ src: image.thumb || image.src, w: image.w, h: image.h, topic: '' })).filter(p => p.src);
   const library = POSTERS.filter(p => wide || p.w < p.h);
   const list = own.concat(library);
 
@@ -756,24 +795,81 @@ export function pictures(link, count = 3, { wide = true } = {}) {
 /* the srcs only (older scenes) */
 export function media(link, content, count = 3) {
 
-  const own = ((link && link.gallery) || []).map(image => image.thumb || image.src).filter(Boolean);
+  const own = ownImages(link).map(image => image.thumb || image.src).filter(Boolean);
   return (own.length ? own : pictures(null, count).map(p => p.src)).slice(0, count);
 
 }
 
 
 /**
- * A real game-segment clip (library.js): a muted, looping, inline video
- * that loads nothing until its scene plays it (preload none), else its
- * poster frame. lite / reduced motion: the poster only.
+ * The clips a video scene plays (TikTok, YouTube, the Instagram reel): the
+ * link's own videos first (admin order, with their start/end), then the
+ * bundled game segments (library.js; `order`: ids first, then the rest).
+ * Shape: { id, src, poster, w, h, caption, start, end } (end 0 = to the end).
+ */
+export function sceneClips(link, count = Infinity, { order = [] } = {}) {
+
+  const own = ((link && link.gallery) || [])
+    .filter(item => item && item.type === 'video' && item.src)
+    .map((item, i) => ({ id: `own-${i}`, src: item.src, poster: item.poster || '', w: item.w || 360, h: item.h || 640, caption: '', start: Math.max(0, Number(item.start) || 0), end: Math.max(0, Number(item.end) || 0), own: true }));
+  const ranked = order.map(id => CLIPS.find(c => c.id === id)).filter(Boolean);
+  const bundled = ranked.concat(CLIPS.filter(c => !ranked.includes(c))).map(c => ({ ...c, start: 0, end: 0 }));
+
+  return own.concat(bundled).slice(0, count);
+
+}
+
+/*
+ * The part of a clip that plays, once its real duration is known:
+ * [from, to] in seconds. A start past the end falls back to 0; an end of 0
+ * (or past the video) means the end of the video.
+ */
+export function segment(start, end, duration) {
+
+  const length = Number.isFinite(duration) && duration > 0 ? duration : Infinity;
+  const from = start > 0 && start < length ? start : 0;
+  const to = end > from ? Math.min(end, length) : length;
+  return [from, to];
+
+}
+
+
+/**
+ * A clip (sceneClips): a muted, inline video that loads nothing until its
+ * scene plays it (preload none), playing its segment (start → end) in a
+ * loop; else its poster frame. lite / reduced motion: the poster only.
  */
 export function clipNode(clip, tl, className = '') {
 
-  if (tl.reduced || tl.lite) return h('img', { class: className, src: clip.poster, alt: '', decoding: 'async' });
+  if (tl.reduced || tl.lite || !clip.src) return h('img', { class: className, src: clip.poster, alt: '', decoding: 'async' });
 
-  const video = h('video', { class: className, poster: clip.poster, preload: 'none', playsinline: '', muted: '', loop: '', disablepictureinpicture: '', 'aria-hidden': 'true' });
+  const part = clip.start > 0 || clip.end > 0;
+  const video = h('video', { class: className, poster: clip.poster || null, preload: 'none', playsinline: '', muted: '', loop: part ? null : '', disablepictureinpicture: '', 'aria-hidden': 'true' });
   video.muted = true;
   video.src = clip.src;
+
+  if (part) {
+    const range = () => segment(clip.start || 0, clip.end || 0, video.duration);
+    const restart = () => {
+      video.currentTime = range()[0];
+      if (video.paused && video.dataset.playing) video.play().catch(() => {});
+    };
+    const toStart = () => { if (video.currentTime < range()[0] - 0.1) video.currentTime = range()[0]; };
+    video.addEventListener('loadedmetadata', toStart);
+    video.addEventListener('loadeddata', toStart);
+    // every frame where the browser can say so (else on timeupdate)
+    const watch = () => {
+      const [from, to] = range();
+      if (video.currentTime >= to - 0.05 || video.currentTime < from - 0.1) restart();
+      if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(watch);
+    };
+    if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(watch);
+    else video.addEventListener('timeupdate', watch);
+    video.addEventListener('ended', restart);
+    video.addEventListener('play', () => { video.dataset.playing = '1'; });
+    video.addEventListener('pause', () => { if (!video.ended) delete video.dataset.playing; });
+  }
+
   return video;
 
 }

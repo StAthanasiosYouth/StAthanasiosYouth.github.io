@@ -12,8 +12,7 @@
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { deck, timeline, float, floats, spray, side, climb, tickUp, clipNode, bubble, chip, pick, compact, LOGO, EASE, SPRING } from './kit.js';
-import { CLIPS } from './library.js';
+import { deck, timeline, float, floats, spray, side, climb, tickUp, sceneClips, clipNode, bubble, chip, pick, compact, LOGO, EASE, SPRING } from './kit.js';
 import { PAGE, QUICK, WHO } from './talk.js';
 
 const nextQuick = deck(QUICK);
@@ -23,8 +22,11 @@ const ORDER = ['asela', 'timer', 'saboona', 'sot', 'khamen', 'metgawzeen'];
 export function play(stage, { quick, reduced, lite, sound, link }) {
 
   const tl = timeline({ quick, reduced, lite });
-  const list = ORDER.map(id => CLIPS.find(c => c.id === id)).filter(Boolean);
-  const gallery = (link.gallery || []).map(image => ({ poster: image.thumb || image.src, caption: '' }));
+  // the link's own videos first (their segments), then our game segments
+  const list = sceneClips(link, Infinity, { order: ORDER });
+  const ownVideo = list.length && list[0].own;
+  // own photos (no own video): the first one leads
+  const gallery = ownVideo ? [] : (link.gallery || []).filter(item => item.type !== 'video').map(image => ({ poster: image.thumb || image.src, caption: '' }));
   let next = 2;
 
   const slide = (clip, i) => {
@@ -46,7 +48,8 @@ export function play(stage, { quick, reduced, lite, sound, link }) {
   const say = clip => {
     text.textContent = `${clip.caption || 'من اجتماعنا'} 😂🔥 #تحديات_وألعاب #اجتماع_الشباب #سفاجا`;
   };
-  say(shown[1]);
+  // the caption follows the clip on screen (the entrance starts on the first)
+  say(reduced ? shown[1] : shown[0]);
 
   const phone = h('div', { class: 'xp-phone tt' },
     h('div', { class: 'tt-viewport' }, clips),
@@ -113,6 +116,7 @@ export function play(stage, { quick, reduced, lite, sound, link }) {
   tl.at(300, () => tl.video(media(0)));
   tl.at(quick ? 1000 : 2400, () => {
     sound('swipe');
+    say(shown[1]);
     tl.video(media(0), false);
     tl.video(media(1));
   });

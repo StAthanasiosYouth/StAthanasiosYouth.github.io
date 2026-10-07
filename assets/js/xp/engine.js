@@ -156,7 +156,7 @@ function ctaLabel(link, key, platform) {
 /*
  * The speaker in the sheet: the page's ONE sound setting (the top bar's
  * button shows the same state), so a visitor can hear the scene without
- * hunting for the top bar. Scene sounds: xp/audio.js (silent by default).
+ * hunting for the top bar. Scene sounds: xp/audio.js (on by default, after a gesture).
  */
 function speaker(sound) {
 

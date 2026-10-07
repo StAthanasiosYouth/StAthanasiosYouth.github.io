@@ -19,6 +19,8 @@ const TYPES = {
   '.webp': 'image/webp',
   '.svg': 'image/svg+xml',
   '.woff2': 'font/woff2',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
   '.txt': 'text/plain; charset=utf-8'
 };
 
@@ -40,11 +42,22 @@ createServer(async (req, res) => {
     if (!file.startsWith(normalize(base))) throw Object.assign(new Error('outside'), { code: 'ENOENT' });
     if (!(await stat(file)).isFile()) throw Object.assign(new Error('dir'), { code: 'ENOENT' });
     const body = await readFile(file);
-    res.writeHead(200, {
+    const headers = {
       'Content-Type': TYPES[extname(file)] || 'application/octet-stream',
       'Cache-Control': 'max-age=0, must-revalidate',
-      'Access-Control-Allow-Origin': '*'
-    });
+      'Access-Control-Allow-Origin': '*',
+      'Accept-Ranges': 'bytes'
+    };
+    // byte ranges, like GitHub Pages (videos seek with them)
+    const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+    if (range && (range[1] || range[2])) {
+      const from = range[1] ? Number(range[1]) : Math.max(0, body.length - Number(range[2]));
+      const to = range[1] && range[2] ? Math.min(Number(range[2]), body.length - 1) : body.length - 1;
+      res.writeHead(206, { ...headers, 'Content-Range': `bytes ${from}-${to}/${body.length}` });
+      res.end(body.subarray(from, to + 1));
+      return;
+    }
+    res.writeHead(200, headers);
     res.end(body);
   }
   catch {

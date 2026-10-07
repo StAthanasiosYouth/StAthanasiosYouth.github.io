@@ -1,37 +1,36 @@
 /**
- * SOUND: optional UI sounds, synthesized with Web Audio (no files).
- * Silent by default; the 🔇/🔊 toggle remembers the choice on this device.
- * Nothing is created before the visitor's first gesture. "ready" /
- * "important" (not caused by a tap) need audio already unlocked.
- * The scenes' mixer (xp/audio.js, lazy) shares this one AudioContext.
- * Character: short, soft, glassy (about -18 dBFS).
+ * SOUND: UI sounds, synthesized with Web Audio (no files). On by default;
+ * the 🔇/🔊 toggle remembers a mute on this device (else for the visit).
+ * Nothing is created before the visitor's first gesture, which wakes it.
+ * "ready" / "important" need it awake. Soft, glassy (~-18 dBFS); the
+ * scenes' mixer (xp/audio.js, lazy) shares the one AudioContext.
  */
 
 const KEY = 'athanasios.sound';
 
 let context = null;
 let master = null;
+let visit = true;
 
 export function soundEnabled() {
 
   try {
-    return localStorage.getItem(KEY) === 'on';
+    const stored = localStorage.getItem(KEY);
+    if (stored) return stored === 'on';
   }
-  catch {
-    return false;
-  }
+  catch { /* blocked: this visit's choice */ }
+  return visit;
 
 }
 
 
 export function setSoundEnabled(on) {
 
+  visit = on;
   try {
     localStorage.setItem(KEY, on ? 'on' : 'off');
   }
-  catch {
-    // private mode
-  }
+  catch { /* private mode */ }
 
   if (on) audio();
 
@@ -61,6 +60,13 @@ export function audio() {
   return context;
 
 }
+
+/* the first real gesture wakes the audio (autoplay rules), if sound is on */
+const WAKE = ['pointerdown', 'keydown', 'touchend'];
+const wake = () => {
+  if (soundEnabled() && audio()) WAKE.forEach(type => removeEventListener(type, wake, true));
+};
+if (typeof addEventListener === 'function') WAKE.forEach(type => addEventListener(type, wake, true));
 
 
 function tone(freq, start, duration, { type = 'sine', gain = 1, glideTo = null, attack = 0.006 } = {}) {
@@ -114,14 +120,14 @@ function noise(start, duration, { from = 1800, to = 3800, gain = 0.5 } = {}) {
 
 
 const SOUNDS = {
-  tap: () => tone(1650, 0, 0.035, { type: 'triangle', gain: 0.35, attack: 0.002 }),
+  tap: () => tone(1650, 0, 0.03, { type: 'triangle', gain: 0.16, attack: 0.002 }),
   open: () => {
-    noise(0, 0.18, { from: 900, to: 3200, gain: 0.35 });
-    tone(880, 0.02, 0.16, { gain: 0.25, glideTo: 1320 });
+    noise(0, 0.18, { from: 900, to: 3200, gain: 0.24 });
+    tone(880, 0.02, 0.16, { gain: 0.18, glideTo: 1320 });
   },
   close: () => {
-    noise(0, 0.15, { from: 3000, to: 900, gain: 0.3 });
-    tone(1180, 0, 0.12, { gain: 0.2, glideTo: 780 });
+    noise(0, 0.15, { from: 3000, to: 900, gain: 0.2 });
+    tone(1180, 0, 0.12, { gain: 0.14, glideTo: 780 });
   },
   pop: () => tone(740, 0, 0.09, { gain: 0.3, glideTo: 1180, attack: 0.004 }),
   success: () => {
@@ -140,10 +146,7 @@ const SOUNDS = {
 };
 
 
-/**
- * Plays a named sound if the visitor enabled sounds.
- * passive: true for sounds not caused by a tap (needs a running context).
- */
+/* passive: not caused by a tap (needs a running context) */
 export function play(name, { passive = false } = {}) {
 
   if (!soundEnabled() || !SOUNDS[name] || document.hidden) return;
@@ -153,8 +156,6 @@ export function play(name, { passive = false } = {}) {
   try {
     SOUNDS[name]();
   }
-  catch {
-    // never let a sound break the page
-  }
+  catch { /* never break the page */ }
 
 }

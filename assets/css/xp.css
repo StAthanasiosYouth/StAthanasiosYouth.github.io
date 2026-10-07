@@ -2802,7 +2802,7 @@ html[data-motion="reduced"] .ch-typing i {
   width: 100%;
   height: 100%;
   border: 2px solid var(--xp-accent, #5ad7a0);
-  border-radius: 50%;
+  border-radius: 26px;
 }
 
 .xp-edge__item--ring {
@@ -3490,10 +3490,10 @@ html[data-motion="reduced"] .ch-typing i {
   opacity: .75;
 }
 
-/* narrow phones: smaller words around the phone */
-@media (max-width: 380px) {
+/* phones: smaller words around the phone (they must fit its margins) */
+@media (max-width: 420px) {
   .xp-fx .xp-msg {
-    max-width: 112px;
+    max-width: 96px;
     padding: 4px 7px 5px;
     font-size: 9.5px;
   }

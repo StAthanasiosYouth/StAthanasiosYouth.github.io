@@ -230,10 +230,11 @@ test('top bar: dialogs sit above it; the bell and the sound button still work', 
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('dialog.sheet'));
 
-  assert.equal(await page.$eval('#sound-toggle', b => b.getAttribute('aria-pressed')), 'false');
-  await page.click('#sound-toggle');
+  // (final/s: sound is on by default; the button mutes)
   assert.equal(await page.$eval('#sound-toggle', b => b.getAttribute('aria-pressed')), 'true');
-  assert.match(await page.$eval('#sound-toggle', b => b.getAttribute('aria-label')), /شغالة/);
+  await page.click('#sound-toggle');
+  assert.equal(await page.$eval('#sound-toggle', b => b.getAttribute('aria-pressed')), 'false');
+  assert.match(await page.$eval('#sound-toggle', b => b.getAttribute('aria-label')), /مقفولة/);
 
   // touch targets
   const sizes = await page.$$eval('.topbar__btn', els => els.map(e => Math.min(e.offsetWidth, e.offsetHeight)));
