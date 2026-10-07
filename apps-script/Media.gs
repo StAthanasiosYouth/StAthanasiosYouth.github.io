@@ -550,6 +550,9 @@ function apiUpdateMedia(id, input) {
   }
 
   return mutate_('media.update', id, function () {
+
+    // someone else is editing it right now (Presence.gs; API mode only)
+    assertUnlocked_('media:' + id);
     upsertRow_('Media', 'id', record);
   });
 
@@ -574,6 +577,9 @@ function apiDeleteMedia(id) {
   }
 
   return mutate_('media.delete', id, function () {
+
+    // someone else is editing it right now (Presence.gs; API mode only)
+    assertUnlocked_('media:' + id);
     upsertRow_('Media', 'id', { id: id, deletedAt: nowStamp_() });
   });
 
@@ -586,6 +592,9 @@ function apiRestoreMedia(id) {
   findMedia_(id);
 
   return mutate_('media.restore', id, function () {
+
+    // someone else is editing it right now (Presence.gs; API mode only)
+    assertUnlocked_('media:' + id);
     upsertRow_('Media', 'id', { id: id, deletedAt: '' });
   });
 
@@ -608,6 +617,9 @@ function apiPurgeMedia(id) {
   }
 
   return mutate_('media.purge', id, function () {
+
+    // someone else is editing it right now (Presence.gs; API mode only)
+    assertUnlocked_('media:' + id);
     [row.driveId, row.thumbDriveId].forEach(function (fileId) {
       if (!fileId) return;
       try {

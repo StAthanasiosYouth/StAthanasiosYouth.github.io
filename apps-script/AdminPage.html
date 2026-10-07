@@ -362,7 +362,10 @@
         A.field('آخر ظهور', end.node, 'اختياري — مناسب للمؤتمرات والرحلات والتسجيل'),
         enabled.node
       )
-    ], A.sheetFooter(save));
+    ], A.sheetFooter(save), {
+      // one editor per item: the official admin locks it while this is open
+      lock: isNew ? null : A.editLock('links', link.id, 'رابط «' + (link.title || '') + '»', function () { var fresh = A.findRow(A.state.draft.links, 'id', link.id); if (fresh) editLink(fresh); else A.closeSheet(); })
+    });
 
   }
 
@@ -436,7 +439,10 @@
           A.field('يختفي بعد', until.node, 'سيبه فاضي لو مش عايزه يختفي لوحده')
         )
       )
-    ], A.sheetFooter(save));
+    ], A.sheetFooter(save), {
+      // one editor per item: the official admin locks it while this is open
+      lock: isNew ? null : A.editLock('sections', section.key, 'قسم «' + (row.title || info.label || section.key) + '»', function () { var fresh = A.findRow(A.state.layout, 'key', section.key) || A.findRow(A.state.draft.sections, 'key', section.key); if (fresh) editSection(fresh); else A.closeSheet(); })
+    });
 
   }
 
@@ -775,7 +781,10 @@
         ),
         enabled.node
       )
-    ], A.sheetFooter(save));
+    ], A.sheetFooter(save), {
+      // one editor per item: the official admin locks it while this is open
+      lock: isNew ? null : A.editLock('contacts', contact.id, 'جهة تواصل «' + (contact.name || '') + '»', function () { var fresh = A.findRow(A.state.draft.contacts, 'id', contact.id); if (fresh) editContact(fresh); else A.closeSheet(); })
+    });
 
     syncKind(contact.kind || 'service');
 

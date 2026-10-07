@@ -278,7 +278,10 @@
       facts,
       el('div', { class: 'form-group' }, el('p', { class: 'section-label', text: 'مستخدمة في' }), usage),
       el('div', { class: 'actions' }, actions)
-    ], A.sheetFooter(save));
+    ], A.sheetFooter(save), {
+      // one editor per item: the official admin locks it while this is open
+      lock: A.editLock('media', item.id, 'صورة «' + (item.name || item.alt || item.id) + '»')
+    });
 
   }
 

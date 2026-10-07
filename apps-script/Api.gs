@@ -6,7 +6,7 @@
  * Google" and sends every call here as
  *
  *     POST <API deployment>/exec   (Content-Type: text/plain, no cookies)
- *     { "fn": "apiState", "args": [...], "token": "<Google ID token>" }
+ *     { "fn": "apiState", "args": [...], "token": "<Google ID token>", "sid": "<session id>" }
  *
  * and gets back JSON: { ok: true, result } or { ok: false, error, code }.
  * `error` is the same text google.script.run would have passed to the page
@@ -21,7 +21,10 @@
  *     Property ADMIN_CLIENT_ID, else DEFAULT_ADMIN_CLIENT_ID), iss = accounts.google.com, not expired, email verified;
  *  2. that email must be on the allowlist (ADMIN_EMAILS, Auth.gs);
  *  3. only a function listed in apiFunctions_() runs — never any other
- *     global — and it runs with currentEmail_() = that verified email.
+ *     global — and it runs with currentEmail_() = that verified email;
+ *  4. the request's session id ("sid") must be the account's one live
+ *     session (Presence.gs), except for apiSessionStart, which issues it.
+ *     The sid alone is never enough: the token is checked first.
  *
  * Anything missing or wrong fails closed, for every function. Responses never
  * contain Script Properties, the token, or the GitHub token.
@@ -81,7 +84,10 @@ function apiFunctions_() {
     apiMigrate: apiMigrate,
     apiAdmins: apiAdmins,
     apiAddAdmin: apiAddAdmin,
-    apiRemoveAdmin: apiRemoveAdmin
+    apiRemoveAdmin: apiRemoveAdmin,
+    apiSessionStart: apiSessionStart,
+    apiHeartbeat: apiHeartbeat,
+    apiSessionEnd: apiSessionEnd
   };
 
 }
@@ -111,6 +117,12 @@ function doPost(e) {
     }
 
     API_REQUEST_.email = email;
+
+    // one live session per account (Presence.gs): every call but the one that starts it
+    if (request.fn !== 'apiSessionStart') {
+      requireSession_(email, request.sid);
+      API_REQUEST_.sid = request.sid;
+    }
 
     var result = functions[request.fn].apply(null, request.args);
 
@@ -171,7 +183,7 @@ function readApiRequest_(e) {
     throw apiError_('bad', 'الطلب مش مفهوم.', 'اعمل Refresh للصفحة.');
   }
 
-  return { fn: data.fn, args: data.args || [], token: typeof data.token === 'string' ? data.token : '' };
+  return { fn: data.fn, args: data.args || [], token: typeof data.token === 'string' ? data.token : '', sid: typeof data.sid === 'string' ? data.sid : '' };
 
 }
 

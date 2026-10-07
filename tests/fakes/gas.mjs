@@ -424,6 +424,11 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
   const tokeninfo = { calls: 0 };
   // CacheService.getScriptCache(): key -> { value, until }
   const cache = new Map();
+  // the clock the .gs code (Date.now) and the cache see; world.advance(ms) moves it
+  const clock = { skew: 0 };
+  const now = () => Date.now() + clock.skew;
+  // LockService.getScriptLock(): busy = another execution holds it (tryLock fails, waitLock throws)
+  const scriptLock = { busy: false, waits: 0 };
 
   const context = vm.createContext({
 
@@ -438,18 +443,24 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
     },
 
     CacheService: {
-      getScriptCache: () => ({
-        get: key => {
+      getScriptCache: () => {
+        const tooLong = key => { if (String(key).length > 250) throw new Error('Argument too large: key'); };
+        const get = key => {
+          tooLong(key);
           const entry = cache.get(key);
-          if (!entry || entry.until <= Date.now()) { cache.delete(key); return null; }
+          if (!entry || entry.until <= now()) { cache.delete(key); return null; }
           return entry.value;
-        },
-        put: (key, value, seconds = 600) => {
-          if (String(key).length > 250) throw new Error('Argument too large: key');
-          cache.set(key, { value: String(value), until: Date.now() + Math.min(seconds, 21600) * 1000, seconds });
-        },
-        remove: key => { cache.delete(key); }
-      })
+        };
+        return {
+          get,
+          getAll: keys => Object.fromEntries(keys.map(key => [key, get(key)]).filter(([, value]) => value !== null)),
+          put: (key, value, seconds = 600) => {
+            tooLong(key);
+            cache.set(key, { value: String(value), until: now() + Math.min(seconds, 21600) * 1000, seconds });
+          },
+          remove: key => { cache.delete(key); }
+        };
+      }
     },
 
     ContentService: {
@@ -475,7 +486,13 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
       })
     },
 
-    LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
+    LockService: {
+      getScriptLock: () => ({
+        waitLock() { scriptLock.waits++; if (scriptLock.busy) throw new Error('Lock timeout: another process was holding the lock for too long.'); },
+        tryLock() { scriptLock.waits++; return !scriptLock.busy; },
+        releaseLock() {}
+      })
+    },
 
     SpreadsheetApp: {
       getActiveSpreadsheet: () => null,
@@ -570,9 +587,13 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
 
   });
 
-  for (const file of ['Platforms.gs', 'Content.gs', 'Hub.gs', 'Review.gs', 'Seed.gs', 'Auth.gs', 'Store.gs', 'Publish.gs', 'Code.gs', 'Media.gs', 'Items.gs', 'Migrate.gs', 'Api.gs']) {
+  for (const file of ['Platforms.gs', 'Content.gs', 'Hub.gs', 'Review.gs', 'Seed.gs', 'Auth.gs', 'Store.gs', 'Publish.gs', 'Code.gs', 'Media.gs', 'Items.gs', 'Migrate.gs', 'Api.gs', 'Presence.gs']) {
     vm.runInContext(readFileSync(`${ROOT}apps-script/${file}`, 'utf8'), context, { filename: file });
   }
+
+  // Date.now() inside the .gs code follows the world's clock (new Date() does not)
+  const contextDate = vm.runInContext('Date', context);
+  contextDate.now = () => now();
 
   return {
     gs: context,
@@ -581,6 +602,10 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
     get spreadsheet() { return spreadsheet; },
     properties,
     cache,
+    clock,
+    scriptLock,
+    /** moves the world's clock (Date.now in the .gs code, cache expiry) */
+    advance(ms) { clock.skew += ms; return this; },
     idTokens,
     tokeninfo,
     executeAs,

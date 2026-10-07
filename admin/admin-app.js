@@ -149,6 +149,13 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   A.state = null;
   A.dirty = false;
 
+  /*
+   * Working together (the official admin page only): boot.js sets A.collab
+   * to { lock(info, onStatus) → { release() }, where(area, view) }. In the
+   * recovery admin it stays null and nothing below takes part.
+   */
+  A.collab = null;
+
 
   /* =======================================================
      DOM HELPERS
@@ -1430,6 +1437,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     sheet.style.transform = '';
 
+    // one editor per existing item (the official admin; options.lock from A.editLock)
+    holdSheetLock(options.lock || null);
+
     if (!sheet.open) {
       A.lastFocus = document.activeElement;
       sheet.showModal();
@@ -1439,6 +1449,274 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       if (first && !matchMedia('(hover: none)').matches) first.focus({ preventScroll: true });
       else sheet.querySelector('.sheet__title').focus({ preventScroll: true });
     }
+
+  };
+
+  /* =======================================================
+     EDIT LOCKS (official admin only: A.collab, set by boot.js)
+     An editor of an existing item asks for its lock. Held by another
+     admin's live session: the editor opens read-only with who and since
+     when, and the save button off; the page keeps asking, and once it is
+     free it offers to open the latest version. The server refuses the
+     save anyway (Presence.gs), so this is about telling, not guarding.
+  ======================================================= */
+
+  /* "<kind>:<key>" of an existing item's editor; null for a new one */
+  A.editLock = function (kind, id, label, reopen) {
+
+    if (!id) return null;
+    return { key: kind + ':' + id, kind: kind, id: String(id), label: label || '', reopen: reopen || null };
+
+  };
+
+  A.findRow = function (list, field, value) {
+
+    return (list || []).filter(function (row) { return row[field] === value; })[0] || null;
+
+  };
+
+  /* «من دقيقتين» */
+  A.ago = function (seconds) {
+
+    var minutes = Math.floor((Number(seconds) || 0) / 60);
+    var text = minutes < 1 ? 'من أقل من دقيقة' : minutes === 1 ? 'من دقيقة' : minutes === 2 ? 'من دقيقتين'
+      : minutes <= 10 ? 'من ' + minutes + ' دقايق' : minutes < 60 ? 'من ' + minutes + ' دقيقة' : 'من أكتر من ساعة';
+    return text.replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; });
+
+  };
+
+  /* the banner over a locked editor / settings card */
+  function lockBanner(banner, holder, free, onRefresh) {
+
+    var who = holder && holder.name ? holder.name : 'أدمن تاني';
+
+    banner.className = 'lock-banner' + (free ? ' lock-banner--free' : '');
+    A.fill(banner,
+      el('span', { class: 'lock-banner__icon', 'aria-hidden': 'true' }, icon(free ? 'check' : 'lock')),
+      el('div', { class: 'lock-banner__text' },
+        el('p', { class: 'lock-banner__title', text: free ? who + ' خلّص التعديل.' : who + ' بيعدّل ده دلوقتي (' + A.ago(holder && holder.since) + ')' }),
+        el('p', { class: 'lock-banner__hint', text: free
+          ? 'ممكن يكون غيّر حاجات — افتح آخر نسخة وكمّل منها.'
+          : 'مفتوح للقراءة بس. الحفظ هيتفتح أول ما يخلّص.' })
+      ),
+      free ? el('button', { class: 'btn btn--primary btn--small', type: 'button', onclick: onRefresh }, icon('retry'), 'افتح آخر نسخة') : null
+    );
+
+    return banner;
+
+  }
+
+  /* fresh state, then the editor again (or closed) */
+  function latestVersion(info, button) {
+
+    A.withBusy(button, A.call('apiState'))
+      .then(function (next) {
+        A.dirty = false;
+        A.applyState(next);
+        if (info && typeof info.reopen === 'function') info.reopen();
+        else if (sheet.open) sheet.close();
+      })
+      .catch(function (error) { A.fail(error); });
+
+  }
+
+  var sheetLock = null;   // { info, handle }
+
+  function holdSheetLock(info) {
+
+    // the same item's editor refilled: keep its lock
+    if (sheetLock && info && sheetLock.info.key === info.key) {
+      sheetLock.info = info;
+      return;
+    }
+
+    releaseSheetLock();
+
+    if (!info || !A.collab) return;
+
+    var held = { info: info, handle: null };
+    sheetLock = held;
+    held.handle = A.collab.lock(info, function (status) {
+      if (sheetLock === held) sheetLockStatus(held, status);
+    });
+
+  }
+
+  function releaseSheetLock() {
+
+    if (!sheetLock) return;
+    var held = sheetLock;
+    sheetLock = null;
+    if (held.handle) held.handle.release();
+
+  }
+
+  sheet.addEventListener('close', releaseSheetLock);
+
+  function sheetLockStatus(held, status) {
+
+    var body = sheet.open && sheet.querySelector('.sheet__body');
+    if (!body) return;
+
+    var banner = body.querySelector('.lock-banner');
+
+    if (status.granted) {
+      // free (again): only a read-only editor has something to say
+      if (banner && sheet.classList.contains('is-locked')) {
+        lockBanner(banner, held.holder, true, function (event) { latestVersion(held.info, event.currentTarget); });
+      }
+      return;
+    }
+
+    held.holder = status.holder || null;
+    sheet.classList.add('is-locked');
+    // nothing here can be saved: don't ask about "unsaved changes" on close
+    A.dirty = false;
+
+    if (!banner) {
+      banner = el('div', { class: 'lock-banner', role: 'status' });
+      body.prepend(banner);
+    }
+
+    lockBanner(banner, held.holder, false);
+
+    // read only: nothing in it can be saved, deleted or changed
+    Array.prototype.forEach.call(sheet.querySelectorAll('.sheet__body input, .sheet__body textarea, .sheet__body select, .sheet__body button, .sheet__foot .btn--primary'), function (control) {
+      if (!banner.contains(control)) control.disabled = true;
+    });
+
+  }
+
+  /*
+   * Settings cards (no editor sheet: the form is the page) take their
+   * groups' locks on the first change, and let go when saved or when the
+   * view changes.
+   */
+  var cardLocks = [];
+
+  function settingsLockInfo(collect, card) {
+
+    var groups = [];
+
+    Object.keys(collect() || {}).forEach(function (name) {
+      var group = String(name).split('.')[0];
+      if (groups.indexOf(group) === -1) groups.push(group);
+    });
+
+    var title = card.querySelector('.card__title');
+
+    return {
+      keys: groups.map(function (group) { return 'settings:' + group; }),
+      kind: 'settings',
+      id: groups.join(','),
+      label: 'إعدادات «' + (title ? title.textContent : groups.join('، ')) + '»'
+    };
+
+  }
+
+  function cardLockStatus(card, saver, status) {
+
+    if (!card.isConnected) return;
+
+    var banner = card.querySelector('.lock-banner');
+
+    if (status.granted) {
+      if (banner && card.classList.contains('is-locked')) {
+        lockBanner(banner, saver._lockHolder, true, function (event) { latestVersion(null, event.currentTarget); });
+      }
+      return;
+    }
+
+    saver._lockHolder = status.holder || null;
+    card.classList.add('is-locked');
+    saver.disabled = true;
+    A.dirty = false;
+
+    if (!banner) {
+      banner = el('div', { class: 'lock-banner', role: 'status' });
+      var head = card.querySelector('.card__head');
+      if (head) head.after(banner);
+      else card.prepend(banner);
+    }
+
+    lockBanner(banner, saver._lockHolder, false);
+
+  }
+
+  function releaseCardLock(saver) {
+
+    if (!saver || !saver._lock) return;
+    var handle = saver._lock;
+    saver._lock = null;
+    cardLocks = cardLocks.filter(function (h) { return h !== handle; });
+    handle.release();
+
+  }
+
+  function onFormEdit(event) {
+
+    if (!A.collab || !event.target || !event.target.closest) return;
+
+    var card = event.target.closest('#view .card');
+    var saver = card && card.querySelector('[data-lockable="settings"]');
+
+    if (!saver || saver._lock || !saver._collect) return;
+
+    var info = settingsLockInfo(saver._collect, card);
+    if (!info.keys.length) return;
+
+    saver._lock = A.collab.lock(info, function (status) { cardLockStatus(card, saver, status); });
+    cardLocks.push(saver._lock);
+
+  }
+
+  document.addEventListener('input', onFormEdit, true);
+  document.addEventListener('change', onFormEdit, true);
+
+  /* a new view: the old one's cards are gone, and so are their locks */
+  function releaseCardLocks() {
+
+    var handles = cardLocks;
+    cardLocks = [];
+    handles.forEach(function (handle) { handle.release(); });
+
+  }
+
+
+  /* =======================================================
+     WHO ELSE IS HERE (official admin only: boot.js calls it with
+     each heartbeat's answer). A thin strip under the top bar.
+  ======================================================= */
+
+  function placeLabel(areaKey, viewKey) {
+
+    var area = A.AREAS.filter(function (a) { return a.key === areaKey; })[0];
+    if (!area) return 'لوحة التحكم';
+    var sub = (area.subs || []).filter(function (s) { return s.key === viewKey; })[0];
+    return sub ? area.label + ' ← ' + sub.label : area.label;
+
+  }
+
+  A.renderPresence = function (others) {
+
+    var strip = document.getElementById('presence');
+    if (!strip) return;
+
+    others = Array.isArray(others) ? others : [];
+    strip.hidden = !others.length;
+
+    A.fill(strip, others.length ? [
+      el('span', { class: 'presence__icon', 'aria-hidden': 'true' }, icon('users')),
+      el('ul', { class: 'presence__list', 'aria-label': 'أدمنز تانيين فاتحين دلوقتي' }, others.map(function (other) {
+        var what = other.item && other.item.label ? 'بيعدّل ' + other.item.label : 'في ' + placeLabel(other.area, other.view);
+        return el('li', { class: 'presence__item', title: other.email + (other.device ? ' · ' + other.device : '') },
+          el('span', { class: 'presence__dot' + (other.seen < 40 ? ' is-live' : ''), 'aria-hidden': 'true' }),
+          el('span', { class: 'presence__name', dir: 'auto', text: other.name || other.email }),
+          el('span', { class: 'presence__when', text: other.seen < 40 ? 'متصل الآن' : 'آخر نشاط ' + A.ago(other.seen) }),
+          el('span', { class: 'presence__what', text: what })
+        );
+      }))
+    ] : []);
 
   };
 
@@ -1777,6 +2055,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var key = area.subs ? A.sub[A.area] : (area.view || area.key);
     var builder = A.views[key];
 
+    releaseCardLocks();
+    if (A.collab) A.collab.where(A.area, area.subs ? key : '');
+
     view.replaceChildren.apply(view, [].concat(builder ? builder() : []));
     view.setAttribute('aria-busy', 'false');
 
@@ -1860,13 +2141,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   /* Save button for settings-based forms */
   A.settingsSaver = function (collect, box) {
 
-    var button = el('button', { class: 'btn btn--primary', type: 'button', text: 'حفظ' });
+    var button = el('button', { class: 'btn btn--primary', type: 'button', text: 'حفظ', 'data-lockable': 'settings' });
+
+    // the official admin locks the card's settings groups on the first change
+    button._collect = collect;
 
     button.addEventListener('click', function () {
       box.hidden = true;
       A.withBusy(button, A.call('apiSaveSettings', collect()))
         .then(function (next) {
           A.dirty = false;
+          releaseCardLock(button);
           A.applyState(next);
           A.toast('اتحفظ ✓ — لسه محتاج نشر');
         })
@@ -2369,20 +2654,32 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   }
 
   /* preloaded: the state already fetched (the official admin page loads it
-     while it checks the sign-in) */
+     while it checks the sign-in). Safe to call again (a retry, signing in
+     again); resolves true once the panel is drawn, false when it failed. */
+  var started = false;
+
   A.start = function (preloaded) {
 
-    document.getElementById('publish-open').prepend(icon('send'));
+    if (!started) {
+      started = true;
+      document.getElementById('publish-open').prepend(icon('send'));
+    }
+
     renderNav();
 
-    (preloaded ? Promise.resolve(preloaded) : A.call('apiState'))
+    return (preloaded ? Promise.resolve(preloaded) : A.call('apiState'))
       .then(function (state) {
         A.state = state;
         A.renderStatus();
         renderNav();
         A.render({ animate: true });
+        return true;
       })
-      .catch(startFailed);
+      .catch(function (error) {
+        if (window.console) console.error('[admin] start', error);
+        startFailed(error);
+        return false;
+      });
 
   };
 
@@ -2752,7 +3049,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.field('آخر ظهور', end.node, 'اختياري — مناسب للمؤتمرات والرحلات والتسجيل'),
         enabled.node
       )
-    ], A.sheetFooter(save));
+    ], A.sheetFooter(save), {
+      // one editor per item: the official admin locks it while this is open
+      lock: isNew ? null : A.editLock('links', link.id, 'رابط «' + (link.title || '') + '»', function () { var fresh = A.findRow(A.state.draft.links, 'id', link.id); if (fresh) editLink(fresh); else A.closeSheet(); })
+    });
 
   }
 
@@ -2826,7 +3126,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           A.field('يختفي بعد', until.node, 'سيبه فاضي لو مش عايزه يختفي لوحده')
         )
       )
-    ], A.sheetFooter(save));
+    ], A.sheetFooter(save), {
+      // one editor per item: the official admin locks it while this is open
+      lock: isNew ? null : A.editLock('sections', section.key, 'قسم «' + (row.title || info.label || section.key) + '»', function () { var fresh = A.findRow(A.state.layout, 'key', section.key) || A.findRow(A.state.draft.sections, 'key', section.key); if (fresh) editSection(fresh); else A.closeSheet(); })
+    });
 
   }
 
@@ -3165,7 +3468,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         ),
         enabled.node
       )
-    ], A.sheetFooter(save));
+    ], A.sheetFooter(save), {
+      // one editor per item: the official admin locks it while this is open
+      lock: isNew ? null : A.editLock('contacts', contact.id, 'جهة تواصل «' + (contact.name || '') + '»', function () { var fresh = A.findRow(A.state.draft.contacts, 'id', contact.id); if (fresh) editContact(fresh); else A.closeSheet(); })
+    });
 
     syncKind(contact.kind || 'service');
 
@@ -3840,7 +4146,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         note.node,
         enabled.node
       )
-    ], A.sheetFooter(save));
+    ], A.sheetFooter(save), {
+      // one editor per item: the official admin locks it while this is open
+      lock: isNew ? null : A.editLock('sessions', session.date, 'اجتماع ' + A.formatWall(session.date, false), function () { var fresh = A.findRow(A.state.draft.sessions, 'date', session.date); if (fresh) A.editors.sessions(fresh); else A.closeSheet(); })
+    });
 
   };
 
@@ -3976,7 +4285,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         notify.node,
         enabled.node
       )
-    ], A.sheetFooter(save));
+    ], A.sheetFooter(save), {
+      // one editor per item: the official admin locks it while this is open
+      lock: isNew ? null : A.editLock('news', item.id, 'خبر «' + (item.title || '') + '»', function () { var fresh = A.findRow(A.state.draft.news, 'id', item.id); if (fresh) A.editors.news(fresh); else A.closeSheet(); })
+    });
 
   };
 
@@ -4111,7 +4423,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         atStart.node,
         enabled.node
       )
-    ], A.sheetFooter(save));
+    ], A.sheetFooter(save), {
+      // one editor per item: the official admin locks it while this is open
+      lock: isNew ? null : A.editLock('games', game.id, 'لعبة «' + (game.title || '') + '»', function () { var fresh = A.findRow(A.state.draft.games, 'id', game.id); if (fresh) A.editors.games(fresh); else A.closeSheet(); })
+    });
 
   };
 
@@ -4242,7 +4557,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.field('يختفي من الجرس', expireAt.node),
         enabled.node
       )
-    ], A.sheetFooter(save));
+    ], A.sheetFooter(save), {
+      // one editor per item: the official admin locks it while this is open
+      lock: isNew ? null : A.editLock('notifications', item.id, 'إشعار «' + (item.title || '') + '»', function () { var fresh = A.findRow(A.state.draft.notifications, 'id', item.id); if (fresh) A.editors.notifications(fresh); else A.closeSheet(); })
+    });
 
   };
 
@@ -4528,7 +4846,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       facts,
       el('div', { class: 'form-group' }, el('p', { class: 'section-label', text: 'مستخدمة في' }), usage),
       el('div', { class: 'actions' }, actions)
-    ], A.sheetFooter(save));
+    ], A.sheetFooter(save), {
+      // one editor per item: the official admin locks it while this is open
+      lock: A.editLock('media', item.id, 'صورة «' + (item.name || item.alt || item.id) + '»')
+    });
 
   }
 
@@ -4879,7 +5200,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         notifyPublish.node,
         notifyStart.node
       )
-    ], A.sheetFooter(save));
+    ], A.sheetFooter(save), {
+      // one editor per item: the official admin locks it while this is open
+      lock: isNew ? null : A.editLock('activities', item.id, (meta.one || 'فعالية') + ' «' + (item.title || '') + '»', function () { var fresh = A.findRow(A.state.draft.activities, 'id', item.id); if (fresh) A.editors.activities(fresh, sectionKey); else A.closeSheet(); })
+    });
 
   };
 
@@ -4963,7 +5287,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.field('نص الإشعار', template, '{title} بيتبدل بعنوان العنصر'),
         enabled.node
       )
-    ], A.sheetFooter(save));
+    ], A.sheetFooter(save), {
+      // one editor per item: the official admin locks it while this is open
+      lock: isNew ? null : A.editLock('types', type.key, 'نوع «' + (type.label || type.key) + '»', function () { var fresh = A.findRow(A.state.draft.types, 'key', type.key); if (fresh) A.editors.types(fresh, sectionKey); else A.closeSheet(); })
+    });
 
   };
 

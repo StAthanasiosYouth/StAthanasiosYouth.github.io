@@ -36,7 +36,8 @@ var MAX_ADMINS = 20;
 
 /*
  * One API request (doPost) at a time per execution: { email } once the ID
- * token is verified, '' before that. null outside the API (HtmlService and
+ * token is verified, '' before that, plus { sid } once the request's
+ * session is checked (Presence.gs). null outside the API (HtmlService and
  * the Apps Script editor), where the Google session decides.
  */
 var API_REQUEST_ = null;
@@ -70,9 +71,15 @@ function normalizeEmail_(value) {
 
 function adminEmails_() {
 
+  // read once per API request (the heartbeat asks several times; Script
+  // Properties reads have a daily quota). Never kept between requests.
+  if (API_REQUEST_ && API_REQUEST_.admins) {
+    return API_REQUEST_.admins.slice();
+  }
+
   var seen = Object.create(null);
 
-  return String(PropertiesService.getScriptProperties().getProperty('ADMIN_EMAILS') || '')
+  var emails = String(PropertiesService.getScriptProperties().getProperty('ADMIN_EMAILS') || '')
     .split(',')
     .map(function (email) { return email.trim().toLowerCase(); })
     .filter(function (email) {
@@ -80,6 +87,21 @@ function adminEmails_() {
       seen[email] = true;
       return true;
     });
+
+  if (API_REQUEST_) {
+    API_REQUEST_.admins = emails.slice();
+  }
+
+  return emails;
+
+}
+
+/* the allowlist was just written: the next read is fresh */
+function forgetAdminEmails_() {
+
+  if (API_REQUEST_) {
+    API_REQUEST_.admins = null;
+  }
 
 }
 
@@ -155,6 +177,8 @@ function apiAddAdmin(value) {
 
   try {
 
+    // read again under the lock (not this request's earlier read)
+    forgetAdminEmails_();
     var emails = adminEmails_();
 
     if (emails.indexOf(email) !== -1) {
@@ -167,6 +191,7 @@ function apiAddAdmin(value) {
 
     emails.push(email);
     PropertiesService.getScriptProperties().setProperty('ADMIN_EMAILS', emails.join(', '));
+    forgetAdminEmails_();
     log_(me, 'admins.add', email);
 
   }
@@ -203,6 +228,8 @@ function apiRemoveAdmin(value) {
 
   try {
 
+    // read again under the lock (not this request's earlier read)
+    forgetAdminEmails_();
     var emails = adminEmails_();
     var index = emails.indexOf(email);
 
@@ -217,6 +244,7 @@ function apiRemoveAdmin(value) {
     }
 
     PropertiesService.getScriptProperties().setProperty('ADMIN_EMAILS', emails.join(', '));
+    forgetAdminEmails_();
     log_(me, 'admins.remove', email);
 
   }

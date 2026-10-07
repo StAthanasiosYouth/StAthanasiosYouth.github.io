@@ -51,8 +51,19 @@ const ARGS = {
   apiDuplicateItem: ['news', 'x'], apiSetItemEnabled: ['news', 'x', false], apiUploadMedia: [{}], apiCheckMedia: [],
   apiMediaLibrary: [], apiUpdateMedia: ['img-x', {}], apiDeleteMedia: ['img-x'], apiRestoreMedia: ['img-x'],
   apiPurgeMedia: ['img-x'], apiMediaPreview: ['img-x'], apiSetMediaAlt: ['img-x', 'x'], apiPlanMigration: [], apiMigrate: [],
-  apiAdmins: [], apiAddAdmin: ['x@gmail.com'], apiRemoveAdmin: [SECOND]
+  apiAdmins: [], apiAddAdmin: ['x@gmail.com'], apiRemoveAdmin: [SECOND],
+  apiSessionStart: [{ device: 'x' }], apiHeartbeat: [{}], apiSessionEnd: []
 };
+
+/*
+ * A signed-in page: it starts its session (Presence.gs, tests/admin-rel.test.mjs)
+ * and then sends every call with the token and that session id.
+ */
+function signedIn(world, token) {
+  const started = world.post({ fn: 'apiSessionStart', args: [{ device: 'test', force: true, state: false }], token });
+  assert.equal(started.ok, true, `session: ${started.error}`);
+  return (fn, args = []) => world.post({ fn, args, token, sid: started.result.sid });
+}
 
 /* everything that can change on a call */
 const snapshot = world => JSON.stringify({ props: [...world.properties], sheets: world.spreadsheet.getSheets().map(s => [s.name, s.data]), head: world.github.head });
@@ -86,19 +97,20 @@ test('API: an allowlisted Google account works, as itself', () => {
   world.properties.set('ADMIN_EMAILS', `${ADMIN}, ${SECOND}`);
   const token = world.issueToken({ email: 'Second.Admin@Gmail.com' });
 
-  const state = world.post({ fn: 'apiState', args: [], token });
+  const call = signedIn(world, token);
+  const state = call('apiState');
   assert.equal(state.ok, true);
   assert.equal(state.mime, 'JSON');
   assert.equal(state.result.user, SECOND, 'the verified token email, lower-cased');
 
-  const saved = world.post({ fn: 'apiSaveSettings', args: [{ 'site.tagline': 'من الـ API' }], token });
+  const saved = call('apiSaveSettings', [{ 'site.tagline': 'من الـ API' }]);
   assert.equal(saved.ok, true);
   const log = world.spreadsheet.getSheetByName('Log').data;
   assert.equal(log.at(-1)[1], SECOND, 'logged as the token\'s account');
   assert.equal(world.gs.API_REQUEST_, null, 'request identity is cleared after the request');
 
   // a validation error comes back in the same shape google.script.run gives the page
-  const bad = world.post({ fn: 'apiSaveLink', args: [{ title: '', url: 'https://a.com', section: 'social' }], token });
+  const bad = call('apiSaveLink', [{ title: '', url: 'https://a.com', section: 'social' }]);
   assert.equal(bad.ok, false);
   assert.match(bad.error, /العنوان مطلوب/);
   assert.equal(bad.code, '');
@@ -142,9 +154,10 @@ test('API: no / bad / expired / wrong-audience / wrong-issuer / unverified token
 test('API: an ID token is never put in a URL, and verification is cached per token until it expires', () => {
   const world = apiWorld();
   const token = world.issueToken({ email: ADMIN });
-  assert.equal(world.post({ fn: 'apiAdmins', args: [], token }).ok, true);
-  assert.equal(world.post({ fn: 'apiAdmins', args: [], token }).ok, true);
-  assert.equal(world.post({ fn: 'apiState', args: [], token }).ok, true);
+  const call = signedIn(world, token);
+  assert.equal(call('apiAdmins').ok, true);
+  assert.equal(call('apiAdmins').ok, true);
+  assert.equal(call('apiState').ok, true);
   assert.equal(world.tokeninfo.calls, 1, 'Google asked once');
 
   const [key, entry] = [...world.cache].find(([k]) => k.startsWith('idtoken:'));
@@ -184,9 +197,10 @@ test('API: an account that is not on the allowlist gets the Arabic «not allowed
 
   // removed from the list → refused at once (the allowlist is not cached)
   world.properties.set('ADMIN_EMAILS', `${ADMIN}, ${STRANGER}`);
-  assert.equal(world.post({ fn: 'apiState', args: [], token }).ok, true);
+  const call = signedIn(world, token);
+  assert.equal(call('apiState').ok, true);
   world.properties.set('ADMIN_EMAILS', ADMIN);
-  assert.equal(world.post({ fn: 'apiState', args: [], token }).code, 'denied');
+  assert.equal(call('apiState').code, 'denied');
 });
 
 test('API: the client ID defaults to the admin page\'s; the property overrides it; aud must match exactly', () => {
@@ -199,7 +213,7 @@ test('API: the client ID defaults to the admin page\'s; the property overrides i
   world.properties.delete('ADMIN_CLIENT_ID');
   assert.equal(world.gs.adminClientId_(), DEFAULT);
   const forDefault = world.issueToken({ email: ADMIN, aud: DEFAULT, azp: DEFAULT });
-  assert.equal(world.post({ fn: 'apiState', args: [], token: forDefault }).ok, true, 'default used');
+  assert.equal(signedIn(world, forDefault)('apiState').ok, true, 'default used');
   for (const aud of [CLIENT, 'someone-else.apps.googleusercontent.com', DEFAULT.toUpperCase(), DEFAULT + ' ', 'x' + DEFAULT, '']) {
     assert.equal(world.post({ fn: 'apiState', args: [], token: world.issueToken({ email: ADMIN, aud }) }).code, 'auth', `aud ${aud}`);
   }
@@ -212,7 +226,7 @@ test('API: the client ID defaults to the admin page\'s; the property overrides i
   world.properties.set('ADMIN_CLIENT_ID', CLIENT);
   world.cache.clear();
   assert.equal(world.post({ fn: 'apiState', args: [], token: forDefault }).code, 'auth', 'another aud refused');
-  assert.equal(world.post({ fn: 'apiState', args: [], token: world.issueToken({ email: ADMIN, aud: CLIENT }) }).ok, true, 'property used');
+  assert.equal(signedIn(world, world.issueToken({ email: ADMIN, aud: CLIENT }))('apiState').ok, true, 'property used');
   for (const aud of [DEFAULT, 'someone-else.apps.googleusercontent.com']) {
     assert.equal(world.post({ fn: 'apiState', args: [], token: world.issueToken({ email: ADMIN, aud }) }).code, 'auth', `aud ${aud}`);
   }
@@ -247,7 +261,7 @@ test('API mode never falls back to the Google session (not even the owner\'s)', 
   }
   // inside a request the identity is the token's, whatever the session says
   world.properties.set('ADMIN_EMAILS', `${ADMIN}, ${SECOND}`);
-  const reply = world.post({ fn: 'apiState', args: [], token: world.issueToken({ email: SECOND }) });
+  const reply = signedIn(world, world.issueToken({ email: SECOND }))('apiState');
   assert.equal(reply.result.user, SECOND);
 });
 
@@ -256,12 +270,15 @@ test('responses never contain Script Properties, tokens or the GitHub token', ()
   world.properties.set('ADMIN_EMAILS', `${ADMIN}, ${SECOND}`);
   const token = world.issueToken({ email: ADMIN });
   const secrets = ['ghp_SECRETsecretSECRETsecret1234567890', CLIENT, token];
+  const call = signedIn(world, token);
   const replies = [
-    world.post({ fn: 'apiState', args: [], token }),
-    world.post({ fn: 'apiReview', args: [], token }),
-    world.post({ fn: 'apiPreview', args: [], token }),
-    world.post({ fn: 'apiAdmins', args: [], token }),
-    world.post({ fn: 'apiCheckGithub', args: [], token }),
+    call('apiState'),
+    call('apiReview'),
+    call('apiPreview'),
+    call('apiAdmins'),
+    call('apiCheckGithub'),
+    call('apiHeartbeat', [{}]),
+    world.post({ fn: 'apiSessionStart', args: [{}], token }),
     world.post({ fn: 'apiState', args: [], token: 'aaaaaaaaaaaa.bbbbbbbbbbbbbbbb.cccccccccccc' }),
     world.post({ fn: 'apiState', args: [], token: world.issueToken({ email: STRANGER }) }),
     world.post({ fn: 'nope', args: [], token })
@@ -377,10 +394,11 @@ test('allowlist: only admins can read or change it — in both deployments', () 
   assert.equal(api.post({ fn: 'apiAddAdmin', args: [STRANGER], token: outsider }).code, 'denied');
   assert.equal(api.properties.get('ADMIN_EMAILS'), ADMIN);
   const admin = api.issueToken({ email: ADMIN });
-  const added = api.post({ fn: 'apiAddAdmin', args: [STRANGER], token: admin });
+  const added = signedIn(api, admin)('apiAddAdmin', [STRANGER]);
   assert.deepEqual(added.result.emails, [ADMIN, STRANGER]);
-  assert.equal(api.post({ fn: 'apiState', args: [], token: outsider }).ok, true, 'and now they get in');
-  assert.equal(api.post({ fn: 'apiRemoveAdmin', args: [ADMIN], token: outsider }).ok, false, 'but can\'t remove the primary');
+  const asOutsider = signedIn(api, outsider);
+  assert.equal(asOutsider('apiState').ok, true, 'and now they get in');
+  assert.equal(asOutsider('apiRemoveAdmin', [ADMIN]).ok, false, 'but can\'t remove the primary');
 });
 
 
