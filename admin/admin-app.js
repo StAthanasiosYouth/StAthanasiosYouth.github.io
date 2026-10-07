@@ -2062,12 +2062,18 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     view.setAttribute('aria-busy', 'false');
 
     // a new section enters with a short stagger; re-renders after a save don't
-    if (options && options.animate && !A.reducedMotion()) {
-      Array.prototype.forEach.call(view.children, function (child, i) {
+    // (never while the page is hidden: the entrance starts transparent)
+    if (options && options.animate && !A.reducedMotion() && document.visibilityState !== 'hidden') {
+      var entering = Array.prototype.slice.call(view.children);
+      entering.forEach(function (child, i) {
         child.style.setProperty('--i', String(Math.min(i, 6)));
         child.classList.add('is-entering');
         child.addEventListener('animationend', function () { child.classList.remove('is-entering'); }, { once: true });
       });
+      // a phone that doesn't run the animation (tab put away, throttled) still shows everything
+      setTimeout(function () {
+        entering.forEach(function (child) { child.classList.remove('is-entering'); });
+      }, 1600);
     }
 
   };
@@ -3082,6 +3088,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     // every kind of section can have a banner (no exceptions)
     var banner = A.imagePicker(row.banner || '', { label: 'بانر القسم (اختياري)', hint: info.bannerHint || 'بيظهر فوق القسم في الموقع، بعرض القسم' });
     var theme = A.themePicker(row.theme || '');
+    // «شكل الخلفية»: the cards' background in this section, any kind of section
+    var surface = A.choices(A.uid('surface'), SURFACES, row.surface || '');
+    var surfaceMobile = A.choices(A.uid('surface-mobile'), [{ value: '', label: 'زي الكمبيوتر' }].concat(SURFACES.slice(1)), row.surfaceMobile || '');
     var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
 
     save.addEventListener('click', function () {
@@ -3094,6 +3103,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         visibleUntil: until.value(),
         theme: theme.value(),
         banner: banner.value(),
+        surface: surface.value(),
+        surfaceMobile: surfaceMobile.value(),
         icon: row.icon || '',
         enabled: enabled.input.checked
       }, isNew))
@@ -3117,7 +3128,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         el('div', { class: 'form-group' },
           el('p', { class: 'section-label', text: 'الشكل' }),
           info.publicTitle ? A.field('لون القسم', theme.node, 'بيغيّر لمسة اللون والإضاءة بتاعة القسم بس') : null,
-          banner.node
+          banner.node,
+          A.field('شكل الخلفية', surface.node, 'خلفية الكروت اللي في القسم ده. «تلقائي» = زي ما الموقع شايف أحسن'),
+          A.field('على الموبايل', surfaceMobile.node, 'لو عايز شكل تاني على الموبايل بس')
         ),
         el('div', { class: 'form-group' },
           el('p', { class: 'section-label', text: 'الظهور (بتوقيت مصر)' }),
@@ -3132,6 +3145,15 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     });
 
   }
+
+  /* «شكل الخلفية» (SECTION_SURFACES, Content.gs) */
+  var SURFACES = [
+    { value: '', label: 'تلقائي' },
+    { value: 'glass', label: 'شفاف (Glass)' },
+    { value: 'dark', label: 'داكن' },
+    { value: 'filled', label: 'ممتلئ' },
+    { value: 'none', label: 'بدون خلفية' }
+  ];
 
   A.editSection = editSection;
   A.editLink = editLink;
@@ -3985,7 +4007,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     };
 
     var dated = A.card('الاجتماعات الجاية', 'موضوع كل أسبوع، المتكلم، البوستر، أو إلغاء أسبوع.',
-      el('div', { class: 'actions' }, addButton('+ اجتماع', function () { A.editors.sessions(null); })),
+      el('div', { class: 'actions' },
+        addButton('+ اجتماع', function () { A.editors.sessions(null); }),
+        el('button', { class: 'btn', type: 'button', onclick: function () { A.openImport(); } }, icon('calendar'), 'استيراد جدول الاجتماعات')
+      ),
       upcoming.length ? list(upcoming) : el('p', { class: 'empty', text: 'مفيش اجتماعات متسجلة لسه — الموقع هيعرض الميعاد الأسبوعي بس.' }),
       past.length ? el('details', { class: 'past' }, el('summary', { text: 'اجتماعات فاتت (' + past.length + ')' }), list(past)) : null
     );
@@ -4096,11 +4121,22 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var notify = A.checkbox('اعمل إشعار بالموضوع في الجرس', isNew ? true : hasNotification('notif-session-' + session.date), 'بيظهر للناس لما الموضوع يظهر');
     var enabled = A.switchInput('ظاهر', session.enabled === undefined ? true : bool(session.enabled));
 
+    // «برنامج الاجتماع»: its times follow this meeting's own time and length
+    var program = programEditor(A.programStages(session.program), {
+      date: function () { return date.value(); },
+      time: function () { return time.value || A.setting('meeting.time') || ''; },
+      duration: function () { return Number(duration.value || A.setting('meeting.durationMinutes')) || null; },
+      exclude: isNew ? '' : session.date
+    });
+    time.addEventListener('input', program.refresh);
+    duration.addEventListener('input', program.refresh);
+
     var details = el('div', { class: 'form' },
       topic.node,
       speaker.node,
       description.node,
       image.node,
+      program.node,
       A.field('الموضوع يظهر في الموقع من', visibleFrom.node, 'سيبه فاضي لو عايز يظهر أول ما تنشر'),
       notify.node
     );
@@ -4126,6 +4162,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         status: status.value(),
         note: note.input.value,
         visibleFrom: visibleFrom.value(),
+        program: program.value(),
         enabled: enabled.input.checked,
         notify: { topic: notify.input.checked }
       }, box, save);
@@ -4133,8 +4170,14 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     A.dirty = false;
 
+    // during the meeting itself: which stage is on now (live.json)
+    var live = !isNew && session.date === A.cairoNow().slice(0, 10) && A.programStages(session.program).length
+      ? A.liveControl(session)
+      : null;
+
     A.openSheet(isNew ? 'اجتماع جديد' : 'تعديل الاجتماع', [
       box,
+      live,
       el('div', { class: 'form' },
         A.field('التاريخ', date.node),
         el('div', { class: 'row' },
@@ -4158,6 +4201,484 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var day = String(A.setting('meeting.day'));
     var index = A.state.meta.days.indexOf(day);
     return index === -1 ? 0 : index;
+
+  }
+
+
+  /* =======================================================
+     MEETING PROGRAM «برنامج الاجتماع»
+     Stages in order, each with a start time OR a length (or both: the
+     time wins). The server checks and publishes (Hub.gs resolveProgram_);
+     the times shown here are the same rules, for the editor's eyes only.
+  ======================================================= */
+
+  var PROGRAM_MAX = 20;
+
+  /* Sessions.program (JSON text) → [{ title, time, minutes }] */
+  A.programStages = function (value) {
+
+    var list = value;
+
+    if (typeof value === 'string') {
+      try { list = value ? JSON.parse(value) : []; }
+      catch (e) { list = []; }
+    }
+
+    return (Array.isArray(list) ? list : []).map(function (stage) {
+      stage = stage && typeof stage === 'object' ? stage : {};
+      var minutes = stage.minutes === '' || stage.minutes === null || stage.minutes === undefined ? '' : Number(stage.minutes);
+      return { title: String(stage.title || ''), time: String(stage.time || ''), minutes: isFinite(minutes) ? minutes : '' };
+    });
+
+  };
+
+  /* the stages' [start, end] in wall minutes (null where unknown) — same rules as Hub.gs */
+  A.resolveProgram = function (stages, date, startTime, duration) {
+
+    var meetingStart = A.wallMinutes(date + ' ' + startTime);
+    var meetingEnd = meetingStart !== null && duration ? meetingStart + duration : null;
+    var starts = [];
+
+    stages.forEach(function (stage, i) {
+      var start = null;
+      if (meetingStart !== null && /^\d{1,2}:\d{2}$/.test(stage.time)) {
+        start = A.wallMinutes(date + ' ' + stage.time);
+        if (meetingEnd !== null && Math.floor(meetingEnd / 1440) > Math.floor(meetingStart / 1440) && start < meetingStart) start += 1440;
+      }
+      else if (i === 0) start = meetingStart;
+      else if (starts[i - 1] !== null && stages[i - 1].minutes) start = starts[i - 1] + Number(stages[i - 1].minutes);
+      starts.push(start);
+    });
+
+    return starts.map(function (start, i) {
+      var end = i < starts.length - 1 ? starts[i + 1]
+        : meetingEnd !== null ? meetingEnd
+        : start !== null && stages[i].minutes ? start + Number(stages[i].minutes) : null;
+      return { start: start, end: start === null ? null : end };
+    });
+
+  };
+
+  /* "٨:٣٠ م" */
+  function clock(minutes) {
+
+    if (minutes === null || minutes === undefined) return '—';
+    return (A.formatWall(A.wallFromMinutes(minutes)).split('، ')[1] || '').trim() || '—';
+
+  }
+
+  /*
+   * context: { date(), time(), duration(), exclude: a date not to copy from }
+   * → { node (a field named «برنامج الاجتماع»), value(), refresh() }
+   */
+  function programEditor(initial, context) {
+
+    var stages = initial.map(function (s) { return { title: s.title, time: s.time, minutes: s.minutes }; });
+    var list = el('ol', { class: 'program' });
+    var empty = el('p', { class: 'program__empty', text: 'مفيش برنامج — الموقع هيعرض الاجتماع من غير فقرات.' });
+    var addButtonNode = el('button', { class: 'btn', type: 'button', onclick: function () {
+      stages.push({ title: '', time: '', minutes: '' });
+      A.markDirty();
+      draw();
+      var inputs = list.querySelectorAll('.program__title');
+      if (inputs.length) inputs[inputs.length - 1].focus();
+    } }, icon('plus'), 'فقرة');
+
+    // «انسخ من اجتماع تاني»
+    var others = (A.state.draft.sessions || []).filter(function (s) {
+      return s.date !== context.exclude && A.programStages(s.program).length;
+    }).sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+
+    var copySelect = others.length ? el('select', { class: 'input program__copy-select', 'aria-label': 'اجتماع تنسخ منه' },
+      el('option', { value: '', text: 'انسخ من اجتماع تاني…' }),
+      others.slice(0, 30).map(function (s) {
+        return el('option', { value: s.date, text: A.formatWall(s.date, false) + (s.topic ? ' — ' + s.topic : '') + ' (' + A.programStages(s.program).length + ' فقرات)' });
+      })
+    ) : null;
+
+    if (copySelect) {
+      copySelect.addEventListener('change', function () {
+        var source = A.findRow(A.state.draft.sessions, 'date', copySelect.value);
+        copySelect.value = '';
+        if (!source) return;
+        var copy = function () {
+          stages = A.programStages(source.program);
+          A.markDirty();
+          draw();
+          A.toast('اتنسخ برنامج ' + A.formatWall(source.date, false));
+        };
+        if (!stages.length) { copy(); return; }
+        A.confirm({ tone: 'warn', title: 'تبدّل البرنامج ده؟', message: 'الفقرات اللي هنا هتتشال، ويتحط مكانها برنامج ' + A.formatWall(source.date, false) + '.', confirmLabel: 'انسخ', cancelLabel: 'لأ' })
+          .then(function (ok) { if (ok) copy(); });
+      });
+    }
+
+    function move(i, by) {
+      var j = i + by;
+      if (j < 0 || j >= stages.length) return;
+      stages.splice(j, 0, stages.splice(i, 1)[0]);
+      A.markDirty();
+      draw();
+      var row = list.children[j];
+      var again = row && row.querySelector(by < 0 ? '.program__up' : '.program__down');
+      if (again && !again.disabled) again.focus();
+    }
+
+    function draw() {
+
+      var times = A.resolveProgram(stages, context.date(), context.time(), context.duration());
+
+      list.replaceChildren.apply(list, stages.map(function (stage, i) {
+
+        var n = String(i + 1).replace(/\d/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[d]; });
+        var title = el('input', { class: 'input program__title', type: 'text', value: stage.title, maxlength: 40, placeholder: 'مثلاً: تسبحة', 'aria-label': 'اسم الفقرة ' + n,
+          oninput: function () { stage.title = title.value; A.markDirty(); } });
+        var time = el('input', { class: 'input program__time', type: 'time', value: stage.time, 'aria-label': 'تبدأ الساعة (الفقرة ' + n + ')',
+          oninput: function () { stage.time = time.value; A.markDirty(); refresh(); } });
+        var minutes = el('input', { class: 'input program__minutes', type: 'number', inputmode: 'numeric', min: 1, max: 600, value: stage.minutes === '' ? '' : String(stage.minutes), placeholder: 'دقايق', 'aria-label': 'المدة بالدقايق (الفقرة ' + n + ')',
+          oninput: function () { stage.minutes = minutes.value === '' ? '' : Number(minutes.value); A.markDirty(); refresh(); } });
+        var span = times[i] || {};
+
+        return el('li', { class: 'program__row' },
+          el('span', { class: 'program__n', 'aria-hidden': 'true', text: n }),
+          el('div', { class: 'program__main' },
+            title,
+            el('div', { class: 'program__when' },
+              el('label', { class: 'program__part' }, el('span', { text: 'تبدأ' }), time),
+              el('span', { class: 'program__or', text: 'أو' }),
+              el('label', { class: 'program__part' }, el('span', { text: 'المدة' }), minutes)
+            ),
+            el('span', { class: 'program__span', 'data-i': String(i), text: span.start === null || span.start === undefined ? 'محتاجة وقت بداية أو مدة للي قبلها' : clock(span.start) + ' ← ' + clock(span.end) })
+          ),
+          el('div', { class: 'program__tools' },
+            el('button', { class: 'icon-btn program__up', type: 'button', 'aria-label': 'لفوق', disabled: i === 0, onclick: function () { move(i, -1); } }, icon('chevron-up')),
+            el('button', { class: 'icon-btn program__down', type: 'button', 'aria-label': 'لتحت', disabled: i === stages.length - 1, onclick: function () { move(i, 1); } }, icon('chevron')),
+            el('button', { class: 'icon-btn icon-btn--danger program__delete', type: 'button', 'aria-label': 'امسح الفقرة ' + n, onclick: function () {
+              stages.splice(i, 1);
+              A.markDirty();
+              draw();
+            } }, icon('trash'))
+          )
+        );
+
+      }));
+
+      empty.hidden = stages.length > 0;
+      addButtonNode.disabled = stages.length >= PROGRAM_MAX;
+
+    }
+
+    /* only the times (typing keeps focus) */
+    function refresh() {
+      var times = A.resolveProgram(stages, context.date(), context.time(), context.duration());
+      list.querySelectorAll('.program__span').forEach(function (node) {
+        var span = times[Number(node.dataset.i)] || {};
+        node.textContent = span.start === null || span.start === undefined ? 'محتاجة وقت بداية أو مدة للي قبلها' : clock(span.start) + ' ← ' + clock(span.end);
+      });
+    }
+
+    draw();
+
+    return {
+      node: A.field('برنامج الاجتماع', el('div', { class: 'program-editor' },
+        empty,
+        list,
+        el('div', { class: 'actions' }, addButtonNode, copySelect)
+      ), 'كل فقرة: وقت بدايتها أو مدتها (أو الاتنين). الفقرة بتخلص لما اللي بعدها تبدأ، وآخر فقرة مع نهاية الاجتماع.'),
+      value: function () {
+        return stages.map(function (s) { return { title: String(s.title || '').trim(), time: s.time || '', minutes: s.minutes === '' || s.minutes === null || isNaN(s.minutes) ? '' : Number(s.minutes) }; });
+      },
+      refresh: refresh
+    };
+
+  }
+
+
+  /* =======================================================
+     LIVE: which stage is on now (live.json, apiSetLiveStage)
+     Fast, no review: it changes only that small file on the site, never
+     the draft or content.json. «رجّع للتوقيت التلقائي» = the program's times.
+  ======================================================= */
+
+  A.liveControl = function (session) {
+
+    var node = el('section', { class: 'live-control', 'aria-label': 'الاجتماع شغال دلوقتي' });
+
+    function draw() {
+
+      var stages = A.programStages(session.program);
+      var live = A.state.live && A.state.live.date === session.date ? A.state.live : null;
+      var manual = live && live.stage !== null && live.stage !== undefined && stages[live.stage] ? live.stage : null;
+      var time = session.time || A.setting('meeting.time') || '';
+      var duration = Number(session.durationMinutes || A.setting('meeting.durationMinutes')) || null;
+      var times = A.resolveProgram(stages, session.date, time, duration);
+      var now = A.wallMinutes(A.cairoNow());
+      var auto = -1;
+
+      times.forEach(function (span, i) {
+        if (span.start !== null && now >= span.start && (span.end === null || now < span.end)) auto = i;
+      });
+
+      var mode = manual === null
+        ? A.chip('تلقائي' + (auto !== -1 ? ': ' + stages[auto].title : ''), 'ok')
+        : A.chip('يدوي: ' + stages[manual].title, 'gold');
+
+      A.fill(node,
+        el('div', { class: 'live-control__head' },
+          el('span', { class: 'live-control__dot', 'aria-hidden': 'true' }),
+          el('h3', { class: 'live-control__title', text: 'الفقرة دلوقتي' }),
+          el('span', { class: 'live-control__mode' }, mode)
+        ),
+        el('p', { class: 'card__hint', text: 'الموقع بيتبع أوقات البرنامج لوحده. لو الاجتماع اتأخر أو اتقدم، اختار الفقرة اللي شغالة — بتظهر على الموقع خلال دقيقة، من غير نشر.' }),
+        el('ol', { class: 'live-control__list' }, stages.map(function (stage, i) {
+          var current = manual === null ? i === auto : i === manual;
+          var button = el('button', { class: 'btn' + (current ? ' btn--primary' : ''), type: 'button', disabled: manual === i, 'aria-pressed': current ? 'true' : 'false',
+            onclick: function () { set(i, button); } }, current ? 'الحالية' : 'دي الحالية دلوقتي');
+          return el('li', { class: 'live-control__row' + (current ? ' is-current' : '') },
+            el('span', { class: 'live-control__time', text: clock(times[i] && times[i].start) }),
+            el('span', { class: 'live-control__name', text: stage.title }),
+            button
+          );
+        })),
+        manual !== null
+          ? el('div', { class: 'actions' }, (function () {
+            var back = el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { set(null, back); } }, icon('retry'), 'رجّع للتوقيت التلقائي');
+            return back;
+          })())
+          : null
+      );
+
+    }
+
+    function set(index, button) {
+      A.withBusy(button, A.call('apiSetLiveStage', session.date, index))
+        .then(function (result) {
+          A.state.live = result.live;
+          draw();
+          A.toast(index === null ? 'رجع للتوقيت التلقائي ✓' : 'اتغيرت ✓ — هتظهر على الموقع خلال دقيقة');
+        })
+        .catch(function (error) { A.fail(error); });
+    }
+
+    draw();
+
+    return node;
+
+  };
+
+
+  /* =======================================================
+     «استيراد جدول الاجتماعات»
+     Paste rows from Excel / Google Sheets, or a .csv file → the server's
+     preview (add / update / skip / error / locked) → the admin ticks what
+     to do (updates are never ticked for them) → apply. Nothing is
+     overwritten without a tick.
+  ======================================================= */
+
+  var IMPORT_ACTIONS = {
+    add: { label: 'جديد', kind: 'ok' },
+    update: { label: 'تعديل', kind: 'gold' },
+    skip: { label: 'زي ما هو', kind: 'off' },
+    error: { label: 'فيه مشكلة', kind: 'danger' },
+    locked: { label: 'حد بيعدّله', kind: 'off' }
+  };
+
+  function arabicDigits(n) {
+
+    return String(n).replace(/\d/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[d]; });
+
+  }
+
+  /* the template: a header and two example rows; the BOM makes Excel read the Arabic right */
+  function downloadTemplate() {
+
+    var next = A.nextWeekday(dayIndex(), '20:00').slice(0, 10);
+    var after = A.wallFromMinutes(A.wallMinutes(next) + 7 * 1440).slice(0, 10);
+    var dmy = function (date) { var p = date.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; };
+    var rows = [
+      ['التاريخ', 'الموضوع', 'المتكلم', 'الوصف', 'الوقت', 'ملاحظات'],
+      [next, 'حياة التسليم', 'أبونا أنطوني', 'إزاي نسلّم حياتنا لربنا', '20:00', ''],
+      [dmy(after), 'الصلاة', 'أ. مينا', '', '8:30 م', 'في القاعة الكبيرة']
+    ];
+    var csv = rows.map(function (row) {
+      return row.map(function (cell) { return /[",\n]/.test(cell) ? '"' + cell.replace(/"/g, '""') + '"' : cell; }).join(',');
+    }).join('\r\n') + '\r\n';
+    var url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+    var link = el('a', { href: url, download: 'جدول-الاجتماعات.csv', hidden: true });
+
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(function () { URL.revokeObjectURL(url); link.remove(); }, 1000);
+
+  }
+
+  /* a .csv as text: UTF-8 (with or without BOM), else Arabic Windows (Excel's older "CSV") */
+  function readCsv(file) {
+
+    return file.arrayBuffer().then(function (buffer) {
+      try {
+        return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+      }
+      catch (e) {
+        return new TextDecoder('windows-1256').decode(buffer);
+      }
+    });
+
+  }
+
+  A.openImport = function () {
+
+    var box = A.errorBox();
+    var text = A.textInput('', { multiline: true, rows: 7, placeholder: 'التاريخ\tالموضوع\tالمتكلم\n2026-11-01\tحياة التسليم\tأبونا أنطوني' });
+    text.classList.add('import__paste');
+    text.setAttribute('dir', 'auto');
+    var file = el('input', { class: 'import__file', type: 'file', accept: '.csv,text/csv,text/plain' });
+    var fileName = el('span', { class: 'field__hint' });
+
+    file.addEventListener('change', function () {
+      var chosen = file.files && file.files[0];
+      if (!chosen) return;
+      if (chosen.size > 300000) {
+        A.fail(new Error('الملف كبير قوي. قسّمه (لحد ٥٠٠ اجتماع في المرة).'), box);
+        return;
+      }
+      readCsv(chosen).then(function (content) {
+        text.value = content.replace(/^﻿/, '');
+        fileName.textContent = chosen.name;
+        A.markDirty();
+      }).catch(function (error) { A.fail(error, box); });
+    });
+
+    var preview = el('button', { class: 'btn btn--primary', type: 'button' }, icon('eye'), 'معاينة');
+
+    preview.addEventListener('click', function () {
+      box.hidden = true;
+      if (!text.value.trim()) {
+        A.fail(new Error('الصق الصفوف الأول، أو اختار ملف CSV.'), box);
+        return;
+      }
+      var source = text.value;
+      A.withBusy(preview, A.call('apiImportPreview', source))
+        .then(function (result) { showPreview(source, result); })
+        .catch(function (error) { A.fail(error, box); });
+    });
+
+    A.dirty = false;
+
+    A.openSheet('استيراد جدول الاجتماعات', [
+      box,
+      el('div', { class: 'form' },
+        el('p', { class: 'note', text: 'من إكسل أو جوجل شيت: انسخ الصفوف (ومعاها صف العناوين) والصقها هنا، أو احفظ الجدول CSV واختاره. التاريخ بالشكل 2026-11-01 أو 01/11/2026، والوقت 20:00 أو 8:00 م.' }),
+        el('div', { class: 'actions' },
+          el('button', { class: 'btn', type: 'button', onclick: downloadTemplate }, icon('download'), 'نزّل نموذج')
+        ),
+        A.field('الصق الصفوف هنا', text, 'العناوين بالعربي أو بالإنجليزي: التاريخ، الموضوع، المتكلم، الوصف، الوقت، ملاحظات'),
+        A.field('أو اختار ملف CSV', el('div', { class: 'import__pick' }, file, fileName)),
+        el('p', { class: 'field__hint', text: 'قبل أي حفظ هتشوف كل صف: جديد، تعديل، زي ما هو، أو فيه مشكلة. التعديلات على اجتماعات موجودة مش هتتعمل غير لو علّمت عليها بنفسك.' })
+      )
+    ], [preview, el('button', { class: 'btn btn--ghost', type: 'button', text: 'إلغاء', onclick: function () { A.closeSheet(); } })], { className: 'sheet--import' });
+
+  };
+
+  function showPreview(source, result) {
+
+    var box = A.errorBox();
+    var ticks = {};
+    var counts = result.counts || {};
+
+    var summary = el('div', { class: 'import__summary' }, ['add', 'update', 'skip', 'error', 'locked'].filter(function (k) { return counts[k]; }).map(function (k) {
+      return A.chip(IMPORT_ACTIONS[k].label + ': ' + arabicDigits(counts[k]), IMPORT_ACTIONS[k].kind);
+    }));
+
+    var rows = result.rows.map(function (row) {
+
+      var info = IMPORT_ACTIONS[row.action] || IMPORT_ACTIONS.error;
+      var tickable = row.action === 'add' || row.action === 'update';
+      // a new meeting is ticked, unless its date is past; an update never is
+      var check = tickable ? el('input', { type: 'checkbox', class: 'import__tick', checked: row.action === 'add' && !row.warnings.length, 'aria-label': 'استورد ' + row.date }) : null;
+
+      if (check) ticks[row.date] = { input: check, value: row.action === 'add' ? 'add' : 'update:' + row.base };
+
+      var lines = [];
+
+      if (row.values.topic && row.action !== 'update') lines.push(el('span', { class: 'import__topic', text: row.values.topic + (row.values.speaker ? ' — ' + row.values.speaker : '') }));
+      (row.changes || []).forEach(function (change) {
+        lines.push(el('span', { class: 'import__change' },
+          el('strong', { text: change.label + ': ' }),
+          el('del', { text: change.from || '(فاضي)' }), ' ← ', el('ins', { text: change.to })));
+      });
+      row.errors.forEach(function (message) { lines.push(el('span', { class: 'import__error' }, icon('alert'), el('span', { text: message }))); });
+      row.warnings.forEach(function (message) { lines.push(el('span', { class: 'import__warn', text: message })); });
+      if (row.reason && row.action !== 'add') lines.push(el('span', { class: 'field__hint', text: row.reason }));
+
+      return el('li', { class: 'import__row import__row--' + row.action },
+        el('label', { class: 'import__head' },
+          check || el('span', { class: 'import__tick-space', 'aria-hidden': 'true' }),
+          el('span', { class: 'import__date', text: row.date ? A.formatWall(row.date, false) : 'سطر ' + arabicDigits(row.line) }),
+          A.chip(info.label, info.kind)
+        ),
+        lines.length ? el('div', { class: 'import__lines' }, lines) : null
+      );
+
+    });
+
+    var apply = el('button', { class: 'btn btn--primary', type: 'button' }, icon('check'), 'استورد اللي متعلّم عليه');
+    var back = el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { A.openImport(); } }, 'رجوع');
+
+    apply.addEventListener('click', function () {
+      box.hidden = true;
+      var decisions = {};
+      Object.keys(ticks).forEach(function (date) { if (ticks[date].input.checked) decisions[date] = ticks[date].value; });
+      if (!Object.keys(decisions).length) {
+        A.fail(new Error('مفيش صف متعلّم عليه.'), box);
+        return;
+      }
+      A.withBusy(apply, A.call('apiImportApply', source, decisions))
+        .then(function (report) {
+          A.dirty = false;
+          A.applyState(report.state);
+          showResult(report);
+        })
+        .catch(function (error) { A.fail(error, box); });
+    });
+
+    A.dirty = true;
+
+    A.openSheet('معاينة الاستيراد', [
+      box,
+      (result.problems || []).length ? el('div', { class: 'note note--warn' }, result.problems.map(function (p) { return el('p', { text: p }); })) : null,
+      (result.ignored || []).length ? el('p', { class: 'field__hint', text: 'أعمدة مش معروفة (اتجاهلت): ' + result.ignored.join('، ') }) : null,
+      summary,
+      counts.update ? el('p', { class: 'note', text: 'التعديلات مش متعلّم عليها: علّم على اللي عايز تغيّره بس.' }) : null,
+      rows.length ? el('ul', { class: 'import__list' }, rows) : el('p', { class: 'empty', text: 'مفيش صفوف.' })
+    ], [apply, back], { className: 'sheet--import' });
+
+    apply.disabled = !Object.keys(ticks).length;
+
+  }
+
+  function showResult(report) {
+
+    var notable = (report.rows || []).filter(function (r) { return r.result !== 'added'; });
+
+    A.openSheet('الاستيراد خلص ✓', [
+      el('div', { class: 'import__summary' },
+        A.chip('اتضاف: ' + arabicDigits(report.added), 'ok'),
+        A.chip('اتعدل: ' + arabicDigits(report.updated), 'gold'),
+        A.chip('اتساب: ' + arabicDigits(report.skipped), 'off'),
+        report.errors ? A.chip('فيه مشكلة: ' + arabicDigits(report.errors), 'danger') : null
+      ),
+      el('p', { class: 'note note--ok', text: 'اتحفظ في المسودة — لسه محتاج نشر علشان يظهر على الموقع.' }),
+      notable.length ? el('ul', { class: 'import__list' }, notable.map(function (r) {
+        var words = { updated: 'اتعدل', skipped: 'اتساب', error: 'فيه مشكلة' };
+        return el('li', { class: 'import__row import__row--' + r.result },
+          el('div', { class: 'import__head' },
+            el('span', { class: 'import__date', text: r.date ? A.formatWall(r.date, false) : 'سطر ' + arabicDigits(r.line) }),
+            A.chip(words[r.result] || r.result, r.result === 'error' ? 'danger' : r.result === 'updated' ? 'gold' : 'off')),
+          r.reason ? el('div', { class: 'import__lines' }, el('span', { class: 'field__hint', text: r.reason })) : null
+        );
+      })) : null
+    ], [el('button', { class: 'btn btn--primary', type: 'button', text: 'تمام', onclick: function () { A.closeSheet(); } })], { className: 'sheet--import' });
 
   }
 
@@ -5487,6 +6008,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         ? A.chip('الموضوع يظهر ' + A.formatWall(session.visibleFrom), 'gold')
         : null
     ));
+
+    // the meeting is on now and has a program: which stage is happening (live.json)
+    if (next.live && session && A.liveControl && A.programStages(session.program).length) {
+      body.push(A.liveControl(session));
+    }
 
     body.push(el('div', { class: 'actions' },
       el('button', { class: 'btn ' + (topic ? 'btn--ghost' : 'btn--primary'), type: 'button', onclick: function () {

@@ -430,6 +430,93 @@ function apiPublish(expectedRevision) {
 }
 
 
+/* =========================================================
+   LIVE STAGE (live.json): «دي الحالية دلوقتي» during a meeting
+   One small file at the site's root, written ONLY here, as its own
+   one-file commit (never content.json, never the draft, no review):
+     { "schema": 1, "date": "YYYY-MM-DD", "stage": <index> | null, "updatedAt": "<ISO>" }
+   stage null = back to the automatic timing (the published program).
+   The last value is kept in LIVE_STATE (Script Properties) for the panel.
+========================================================= */
+
+var LIVE_FILE = 'live.json';
+
+/* what the panel shows: the last live.json written from here, or null */
+function liveState_() {
+
+  var text = PropertiesService.getScriptProperties().getProperty('LIVE_STATE') || '';
+
+  try {
+    var value = text ? JSON.parse(text) : null;
+    if (value && /^\d{4}-\d{2}-\d{2}$/.test(value.date) && (value.stage === null || (typeof value.stage === 'number' && value.stage >= 0))) {
+      return { schema: 1, date: value.date, stage: value.stage, updatedAt: String(value.updatedAt || '') };
+    }
+  }
+  catch (ignored) {
+    // a broken value = automatic
+  }
+
+  return null;
+
+}
+
+
+/**
+ * date: the meeting ('YYYY-MM-DD'); stage: the program's stage index
+ * that is happening now, or null = automatic again. Commits live.json only.
+ */
+function apiSetLiveStage(date, stage) {
+
+  var email = assertAdmin_();
+  var day = contentDigits_(date);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || contentDateTime_(day, false) === null) {
+    throw appError_('تاريخ الاجتماع مش صحيح.', 'اعمل Refresh للصفحة.');
+  }
+
+  var index = stage === null || stage === undefined || stage === '' ? null : Number(stage);
+
+  if (index !== null && !(isFinite(index) && index >= 0 && Math.round(index) === index && index < PROGRAM_LIMITS.stages)) {
+    throw appError_('الفقرة دي مش موجودة في برنامج الاجتماع.', 'اعمل Refresh للصفحة.');
+  }
+
+  var lock = LockService.getScriptLock();
+  var live = null;
+  var commit = null;
+
+  lock.waitLock(20000);
+
+  try {
+
+    if (index !== null) {
+      var session = readOptionalTable_('Sessions').filter(function (row) { return contentDigits_(row.date) === day; })[0];
+      var stages = session ? programStages_(session.program).stages : [];
+      if (!session || index >= stages.length) {
+        throw appError_('الفقرة دي مش موجودة في برنامج الاجتماع.', 'افتح الاجتماع وراجع برنامجه، وانشر لو لسه ما اتنشرش.');
+      }
+    }
+
+    live = { schema: 1, date: day, stage: index, updatedAt: new Date().toISOString() };
+
+    // only this one file changes (base tree = the current site)
+    var files = {};
+    files[LIVE_FILE] = JSON.stringify(live, null, 2) + '\n';
+
+    commit = githubCommitFiles_(files, 'Live stage ' + day + ': ' + (index === null ? 'automatic' : 'stage ' + (index + 1)));
+
+    PropertiesService.getScriptProperties().setProperty('LIVE_STATE', JSON.stringify(live));
+    log_(email, 'live.stage', day + ' ' + (index === null ? 'auto' : String(index)) + (commit ? ' ' + commit.sha.slice(0, 7) : ''));
+
+  }
+  finally {
+    lock.releaseLock();
+  }
+
+  return { live: live, commit: commit ? commit.sha : '' };
+
+}
+
+
 /** Checks the GitHub setup without changing anything. */
 function apiCheckGithub() {
 

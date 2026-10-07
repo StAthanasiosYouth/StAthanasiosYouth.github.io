@@ -65,7 +65,7 @@ another admin.
    | Script | `Items`        | `apps-script/Items.gs`          |
    | Script | `Media`        | `apps-script/Media.gs`          |
    | Script | `Api`          | `apps-script/Api.gs` (the API for `/admin/`) |
-   | Script | `Migrate`, `Review`, `Platforms` | `apps-script/*.gs` |
+   | Script | `Migrate`, `Review`, `Platforms`, `Presence`, `Import` | `apps-script/*.gs` |
    | HTML   | `Admin`        | `apps-script/Admin.html`        |
    | HTML   | `AdminStyles`  | `apps-script/AdminStyles.html`  |
    | HTML   | `AdminScript`  | `apps-script/AdminScript.html`  |
@@ -282,6 +282,32 @@ first. `setup` runs the same upgrade, so re-running it is safe.
 To undo: unhide the `_backup_…` tabs (right-click the tab bar → show) and
 copy their contents back.
 
+### Schema 5 (meeting program, cards' background)
+
+The same upgrade, run again after updating the code: **الإعدادات → ترقية
+البيانات → «شوف هيتعمل إيه»** must list exactly one step, *أعمدة جديدة*:
+`Sections: surface, surfaceMobile — Sessions: program`. Then **«نفّذ
+الترقية»** (backup first, columns appended at the end, nothing else
+touched; the site looks the same). Until then, saving a meeting program or
+a «شكل الخلفية» choice asks for the upgrade (nothing is dropped silently);
+everything else works as before.
+
+New in this version: `Import.gs` (the meetings import) — create it in the
+Apps Script project next to the others; `Hub`, `Items`, `Code`, `Content`,
+`Store`, `Migrate`, `Publish`, `Presence`, `Api`, `AdminContent`,
+`AdminHome`, `AdminPage`, `AdminScript`, `AdminStyles` changed. No new
+scopes or Script Properties to set (`LIVE_STATE` is written by the panel).
+
+### `live.json` (the live meeting stage)
+
+During a meeting with a program, «دي الحالية دلوقتي» calls
+`apiSetLiveStage(date, index | null)`: one commit that changes **only**
+`live.json` at the site's root
+(`{ "schema": 1, "date": "YYYY-MM-DD", "stage": <index> | null, "updatedAt": "<ISO>" }`),
+through the same token as publishing. It never touches `content.json` or the
+draft, needs no review, and is logged (`live.stage`). `stage: null` = the
+program's own times. The normal publish never writes `live.json`.
+
 
 ## 8. The official admin page (`/admin/`)
 
@@ -422,7 +448,15 @@ The code is safe under both settings:
   nothing), the server ("slower than usual" after ~7 s: a cold start takes
   5–15 s; the request is aborted after 45 s → «جرّب تاني» and the recovery
   link), then drawing the panel. The sign-in screen goes away only once the
-  panel is drawn; a retry is always safe.
+  panel is drawn; a retry is always safe. Once Google answers (a click, or
+  silently for a returning admin), the sign-in screen itself shows «جاري
+  التحقق...» with the account and closes Google's prompt; the panel replaces
+  it only after it is drawn and measured on screen. A request the browser
+  drops (a phone freezing the tab behind Google's sign-in) becomes «جرّب تاني»;
+  a reload in the middle of signing in is never "another device" (a session
+  that never drew its panel, on a look-alike device, is taken over quietly);
+  Google's One Tap card is capped in `gate.css` so it can never cover the
+  screen.
 - One session per Google account (`apps-script/Presence.gs`): signing in
   asks the server for a session id (kept in memory, sent with every call).
   If the account is live on another device or tab (a heartbeat in the last

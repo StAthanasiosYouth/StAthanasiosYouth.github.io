@@ -395,6 +395,9 @@
     // every kind of section can have a banner (no exceptions)
     var banner = A.imagePicker(row.banner || '', { label: 'بانر القسم (اختياري)', hint: info.bannerHint || 'بيظهر فوق القسم في الموقع، بعرض القسم' });
     var theme = A.themePicker(row.theme || '');
+    // «شكل الخلفية»: the cards' background in this section, any kind of section
+    var surface = A.choices(A.uid('surface'), SURFACES, row.surface || '');
+    var surfaceMobile = A.choices(A.uid('surface-mobile'), [{ value: '', label: 'زي الكمبيوتر' }].concat(SURFACES.slice(1)), row.surfaceMobile || '');
     var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
 
     save.addEventListener('click', function () {
@@ -407,6 +410,8 @@
         visibleUntil: until.value(),
         theme: theme.value(),
         banner: banner.value(),
+        surface: surface.value(),
+        surfaceMobile: surfaceMobile.value(),
         icon: row.icon || '',
         enabled: enabled.input.checked
       }, isNew))
@@ -430,7 +435,9 @@
         el('div', { class: 'form-group' },
           el('p', { class: 'section-label', text: 'الشكل' }),
           info.publicTitle ? A.field('لون القسم', theme.node, 'بيغيّر لمسة اللون والإضاءة بتاعة القسم بس') : null,
-          banner.node
+          banner.node,
+          A.field('شكل الخلفية', surface.node, 'خلفية الكروت اللي في القسم ده. «تلقائي» = زي ما الموقع شايف أحسن'),
+          A.field('على الموبايل', surfaceMobile.node, 'لو عايز شكل تاني على الموبايل بس')
         ),
         el('div', { class: 'form-group' },
           el('p', { class: 'section-label', text: 'الظهور (بتوقيت مصر)' }),
@@ -445,6 +452,15 @@
     });
 
   }
+
+  /* «شكل الخلفية» (SECTION_SURFACES, Content.gs) */
+  var SURFACES = [
+    { value: '', label: 'تلقائي' },
+    { value: 'glass', label: 'شفاف (Glass)' },
+    { value: 'dark', label: 'داكن' },
+    { value: 'filled', label: 'ممتلئ' },
+    { value: 'none', label: 'بدون خلفية' }
+  ];
 
   A.editSection = editSection;
   A.editLink = editLink;

@@ -3107,6 +3107,304 @@ dialog .toasts[popover] {
 
 
 /* =========================================================
+   MEETING PROGRAM «برنامج الاجتماع» (the meeting editor)
+========================================================= */
+
+.program-editor {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.program {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.program__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, .03);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+
+.program__n {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-top: 8px;
+  border-radius: 50%;
+  font-size: .82rem;
+  font-weight: 800;
+  color: var(--gold-ink);
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+}
+
+.program__main {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.program__when {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+
+.program__part {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  font-size: .78rem;
+  color: var(--text-3);
+}
+
+.program__part .input {
+  width: 128px;
+  max-width: 100%;
+}
+
+.program__or {
+  padding-bottom: 12px;
+  font-size: .78rem;
+  color: var(--text-3);
+}
+
+.program__span {
+  font-size: .82rem;
+  font-weight: 700;
+  color: var(--gold-soft);
+}
+
+.program__tools {
+  display: grid;
+  gap: 4px;
+}
+
+.program__empty {
+  margin: 0;
+  font-size: .86rem;
+  color: var(--text-3);
+}
+
+.program__copy-select {
+  width: auto;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* the live stage (dashboard «الاجتماع الجاي», the meeting editor) */
+.live-control {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 14px;
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(90, 215, 160, .07), rgba(255, 255, 255, .02));
+  box-shadow: inset 0 0 0 1px rgba(90, 215, 160, .28);
+}
+
+.live-control__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-control__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 0 4px rgba(90, 215, 160, .18);
+}
+
+.live-control__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.live-control__mode {
+  margin-inline-start: auto;
+}
+
+.live-control__list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.live-control__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.live-control__row.is-current {
+  background: rgba(242, 210, 139, .08);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+.live-control__time {
+  font-size: .82rem;
+  color: var(--text-3);
+}
+
+.live-control__name {
+  min-width: 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+/* «استيراد جدول الاجتماعات» */
+.import__paste {
+  min-height: 150px;
+  font-family: ui-monospace, Consolas, "Cairo", monospace;
+  font-size: .86rem;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.import__pick {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.import__file {
+  max-width: 100%;
+  font: inherit;
+  color: var(--text-2);
+}
+
+.import__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.import__list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.import__row {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, .03);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+
+.import__row--error {
+  box-shadow: inset 0 0 0 1px rgba(255, 138, 125, .35);
+}
+
+.import__row--update {
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+.import__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.import__tick,
+.import__tick-space {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  accent-color: var(--gold);
+}
+
+.import__date {
+  font-weight: 800;
+}
+
+.import__lines {
+  display: grid;
+  gap: 4px;
+  padding-inline-start: 32px;
+  min-width: 0;
+  font-size: .86rem;
+}
+
+.import__topic {
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+.import__change {
+  overflow-wrap: anywhere;
+}
+
+.import__change del {
+  color: var(--text-3);
+}
+
+.import__change ins {
+  color: var(--gold-hi);
+  text-decoration: none;
+}
+
+.import__error {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  color: var(--danger);
+}
+
+.import__error .icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+}
+
+.import__warn {
+  color: var(--warn);
+}
+
+@media (max-width: 420px) {
+
+  .program__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .program__n {
+    display: none;
+  }
+
+  .program__part .input {
+    width: 112px;
+  }
+
+}
+
+
+/* =========================================================
    MOTION
 ========================================================= */
 

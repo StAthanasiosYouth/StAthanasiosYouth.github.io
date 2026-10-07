@@ -104,6 +104,9 @@ test('session: a stale one (no heartbeat ~90 s) is replaced without asking; a re
   const two = page.start();
   assert.ok(one.result.sid && two.result.sid && one.result.sid !== two.result.sid);
   assert.equal(page.call('apiState').ok, true);
+  // its panel is drawn (a heartbeat); a session that never got that far on a
+  // look-alike device is a reload mid-sign-in instead (tests/prog-b.test.mjs)
+  page.beat({ area: 'home' });
   // a different page load of the same account is asked
   assert.ok(tab(world, SECOND, { tab: 'tab-ffffffffffffffffffff' }).start().result.active);
 });

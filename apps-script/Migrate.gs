@@ -1,5 +1,5 @@
 /**
- * DATA UPGRADE (schema 4)
+ * DATA UPGRADE (schema 5)
  *
  * Brings an existing Sheet up to what this version of the code expects,
  * without touching real content:
@@ -7,7 +7,9 @@
  *   - new columns are appended at the end of existing tabs (never moved,
  *     never renamed); their cells start empty (checkboxes unchecked).
  *     Schema 4 adds only columns: Contacts image / intro / reply (the
- *     person cards) and Links gallery (a scene's own photos);
+ *     person cards) and Links gallery (a scene's own photos). Schema 5
+ *     adds only columns too: Sessions program (the meeting's stages) and
+ *     Sections surface / surfaceMobile (the cards' background);
  *   - the page's built-in sections become rows in Sections, in the exact
  *     order the page already had (so nothing moves on the site), the
  *     meeting block taking the old "meeting.enabled" value;
@@ -22,7 +24,7 @@
  * Both run from the editor, or from الإعدادات → ترقية البيانات.
  */
 
-var DATA_SCHEMA_VERSION = 4;
+var DATA_SCHEMA_VERSION = 5;
 
 var WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/K5CfLt5X0uM5qCgr7Z2PTt';
 

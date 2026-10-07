@@ -95,6 +95,43 @@ function textBlock_(value, max, label, problems) {
 }
 
 
+/**
+ * The meeting editor's program → the JSON text for Sessions.program ('' =
+ * none). Shape and timing are checked like the publish does (same
+ * functions, Hub.gs), against this meeting's time and length; problems
+ * are named «برنامج الاجتماع: …» so they show under that field.
+ */
+function sessionProgramInput_(value, record, problems) {
+
+  var parsed = programStages_(Array.isArray(value) ? value : (value ? String(value) : ''));
+  var label = 'برنامج الاجتماع: ';
+
+  parsed.problems.forEach(function (problem) { problems.push(label + problem); });
+
+  if (parsed.problems.length || !parsed.stages.length) {
+    return '';
+  }
+
+  if (record.status !== 'cancelled' && record.date && /^\d{4}-\d{2}-\d{2}$/.test(record.date)) {
+    var settings = readOptionalTable_('Settings');
+    var setting = function (key) {
+      var row = settings.filter(function (r) { return r.key === key; })[0];
+      return row ? row.value : '';
+    };
+    var resolved = resolveProgram_(
+      parsed.stages,
+      record.date,
+      record.time || contentTime_(setting('meeting.time')) || '',
+      sessionDuration_(record.durationMinutes) || sessionDuration_(setting('meeting.durationMinutes'))
+    );
+    resolved.errors.forEach(function (problem) { problems.push(label + problem); });
+  }
+
+  return JSON.stringify(parsed.stages);
+
+}
+
+
 /* =========================================================
    VALIDATORS: input from the page -> clean row
 ========================================================= */
@@ -123,7 +160,7 @@ var ITEM_VALIDATORS = {
       problems.push('مدة الاجتماع لازم تكون عدد دقايق بين 15 و 600، أو فاضية');
     }
 
-    return {
+    var record = {
       date: date,
       durationMinutes: minutes,
       enabled: input.enabled !== false,
@@ -136,6 +173,14 @@ var ITEM_VALIDATORS = {
       note: input_(input.note, LIMITS.note, 'الملاحظة', problems, false),
       visibleFrom: dateInput_(input.visibleFrom, false, 'ميعاد ظهور الموضوع', problems)
     };
+
+    // «برنامج الاجتماع» (schema 5): only written when the editor sends it,
+    // so a save that doesn't know about it (an import, an older page) keeps it
+    if (input.program !== undefined) {
+      record.program = sessionProgramInput_(input.program, record, problems);
+    }
+
+    return record;
 
   },
 
@@ -565,6 +610,11 @@ function apiSaveItem(kind, input) {
 
     }
     else {
+
+      // a program needs its column (schema 5): never dropped silently
+      if (record.program && !headerIndex_(sheet_(spec.table)).program) {
+        throw appError_('برنامج الاجتماع محتاج ترقية البيانات الأول.', 'من الإعدادات ← ترقية البيانات، وبعدين احفظ تاني.');
+      }
 
       var original = contentLine_(input.originalDate);
       var clash = findRow_(spec.table, 'date', record.date);

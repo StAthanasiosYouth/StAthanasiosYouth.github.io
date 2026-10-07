@@ -41,7 +41,7 @@ test('setup by the admin creates the private Sheet and its tabs', () => {
   assert.deepEqual(names, ['Settings', 'Sections', 'Links', 'Contacts', 'Sessions', 'News', 'Games', 'Notifications', 'Media', 'Activities', 'Types', 'Log']);
   assert.equal(world.gs.readTable_('Links').length, 5, '4 seed links + the WhatsApp group');
   assert.equal(world.gs.readTable_('Sections').length, 12, '2 link groups + 10 built-in sections');
-  assert.equal(world.properties.get('DATA_SCHEMA'), '4');
+  assert.equal(world.properties.get('DATA_SCHEMA'), '5');
   // running again keeps data (and makes no backup: nothing to upgrade)
   world.gs.setup();
   assert.equal(world.gs.readTable_('Links').length, 5);

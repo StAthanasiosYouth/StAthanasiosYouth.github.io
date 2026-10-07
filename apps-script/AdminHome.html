@@ -190,6 +190,11 @@
         : null
     ));
 
+    // the meeting is on now and has a program: which stage is happening (live.json)
+    if (next.live && session && A.liveControl && A.programStages(session.program).length) {
+      body.push(A.liveControl(session));
+    }
+
     body.push(el('div', { class: 'actions' },
       el('button', { class: 'btn ' + (topic ? 'btn--ghost' : 'btn--primary'), type: 'button', onclick: function () {
         A.editors.sessions(session, session ? null : { date: next.date });
