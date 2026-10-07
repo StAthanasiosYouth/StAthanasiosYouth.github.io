@@ -362,8 +362,8 @@ it is with the ID token instead. That setting belongs **only** to this new
 deployment's version. The recovery deployment stays on version 14 (runs as
 the visitor) and must not be touched.
 
-1. Update the project's files from `apps-script/` (new: `Api.gs`; changed:
-   `Auth.gs`, `Code.gs`, `Migrate.gs`, `Admin*.html`). The repository's
+1. Update the project's files from `apps-script/` (new: `Api.gs`, `Presence.gs`;
+   changed: `Auth.gs`, `Code.gs`, `Items.gs`, `Media.gs`, `Migrate.gs`, `Admin*.html`). The repository's
    `appsscript.json` keeps the recovery settings (`USER_ACCESSING`); leave
    the Drive advanced service as it is.
 2. In the editor, open `appsscript.json` and set only the `webapp` part to:
@@ -416,6 +416,29 @@ The code is safe under both settings:
   can, otherwise with the button. When it runs out, a «الدخول محتاج يتجدد» dialog opens over
   the panel; the call that needed it continues after signing in, so nothing
   being edited is lost.
+- Signing in goes through stages, each with a watchdog: Google's script
+  ("slower than usual" after ~6 s, a message with «جرّب تاني» after 20 s), the
+  button (always shown at once; a silent sign-in that never answers changes
+  nothing), the server ("slower than usual" after ~7 s: a cold start takes
+  5–15 s; the request is aborted after 45 s → «جرّب تاني» and the recovery
+  link), then drawing the panel. The sign-in screen goes away only once the
+  panel is drawn; a retry is always safe.
+- One session per Google account (`apps-script/Presence.gs`): signing in
+  asks the server for a session id (kept in memory, sent with every call).
+  If the account is live on another device or tab (a heartbeat in the last
+  ~90 s) the page asks «الحساب ده شغال دلوقتي على جهاز تاني» → «إنهاء الجلسة
+  الأخرى والدخول هنا» or «إلغاء». The tab that was taken over goes back to
+  the sign-in screen («الجلسة اتقفلت لأنك دخلت من جهاز تاني»). A reload or
+  sign-out ends the session at once (a `sendBeacon` when leaving), so it never
+  asks about itself.
+- Working together: a heartbeat every ~25 s while the page is visible (paused
+  when hidden) shows the other admins online under the top bar (name, «متصل
+  الآن», where, what they edit). Opening an existing item (meetings, news,
+  games, notifications, activities, types, links, contacts, sections, images)
+  or changing a settings card locks it; another admin sees it read-only with
+  «فلان بيعدّل ده دلوقتي», and the server refuses their save of that item.
+  Locks end on save, close, sign-out, leaving the page, or ~90 s after the
+  holder's last heartbeat. The recovery admin (version 14) doesn't take part.
 - Preview (معاينة): on github.io the preview frame shares the site's origin.
   `admin/preview-guard.js` runs first in it and gives the page its own
   in-memory storage, so drafts never land in the site's cache or bell.
@@ -424,6 +447,12 @@ The code is safe under both settings:
 
 - Apps Script quotas apply to the API (URL fetch for token checks: cached,
   one per token per hour; consumer accounts get 20,000 fetches a day).
+- The heartbeat is one short request per ~25 s per admin with the page in
+  front (~150 an hour, none while the tab is hidden), plus one when an editor
+  opens or closes. Each request reads the Script Properties twice (the client
+  ID and the allowlist; consumer quota 50,000 reads a day) and uses
+  CacheService and the script lock (no daily quota). Sessions and locks live
+  in CacheService: no new Script Properties.
 - A bad request costs one quick refusal; nothing runs before the token and
   the allowlist are checked.
 - Signing out on the page signs out of the admin only (not of Google).

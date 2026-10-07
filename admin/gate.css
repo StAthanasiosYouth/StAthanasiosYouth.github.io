@@ -232,6 +232,66 @@ body.is-gated {
   color: #f5c56b;
 }
 
+/* "slower than usual…", "Google may sign you in…" */
+.gate__note--slow {
+  color: #c9b27f;
+}
+
+.gate__note[hidden] {
+  display: none;
+}
+
+.gate__link--button {
+  padding: 0;
+  border: 0;
+  font: inherit;
+  text-decoration: underline;
+  background: none;
+  cursor: pointer;
+}
+
+/* the other device, on «الحساب ده شغال دلوقتي على جهاز تاني» */
+.gate__device {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 8px;
+  max-width: 100%;
+  margin: 2px 0;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: .92rem;
+  font-weight: 700;
+  color: #f2d28b;
+  background: rgba(215, 170, 80, .12);
+  overflow-wrap: anywhere;
+}
+
+.gate__device .icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.gate__actions--stack {
+  flex-direction: column;
+  align-items: stretch;
+  width: min(340px, 100%);
+}
+
+/* (.gate__btn comes later in this file: two classes to win) */
+.gate__btn.gate__btn--ghost {
+  min-height: 46px;
+  color: #d9e2ee;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22);
+}
+
+.gate__btn.gate__btn--ghost:active {
+  transform: none;
+  background: rgba(255, 255, 255, .05);
+}
+
 .gate__message {
   display: grid;
   gap: 6px;
@@ -353,6 +413,7 @@ body.is-gated {
 .gate .gate__sub { animation: gate-in .6s cubic-bezier(.16, 1, .3, 1) .26s both; }
 .gate .gate__panel > * { animation: gate-in .45s cubic-bezier(.16, 1, .3, 1) both; }
 .gate[data-state="loading"] .gate__line i,
+.gate__google .gate__line i,
 .gate:not([data-state]) .gate__line i { animation: gate-sweep 1.4s cubic-bezier(.45, 0, .2, 1) infinite; }
 
 @keyframes gate-sweep {

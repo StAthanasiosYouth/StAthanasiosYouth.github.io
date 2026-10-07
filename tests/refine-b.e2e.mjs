@@ -54,6 +54,10 @@ function freshWorld() {
   world.properties.set('SITE_URL', BASE);
   world.properties.set('ADMIN_CLIENT_ID', TEST_CLIENT);
   world.gs.apiSaveItem('sessions', { date: '2026-10-11', topic: 'الكسل الروحي', notify: { topic: false } });
+  // every test signs the same account in from a new browser, while the last
+  // one's session may still look live: here a new sign-in simply takes over.
+  // (One session per account, the takeover question: tests/admin-rel.e2e.mjs.)
+  world.gs.SESSION_STALE_SECONDS = 0;
   // from now on the requests come from the browser, anonymously
   world.as('');
 }

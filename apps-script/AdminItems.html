@@ -286,7 +286,10 @@
         notifyPublish.node,
         notifyStart.node
       )
-    ], A.sheetFooter(save));
+    ], A.sheetFooter(save), {
+      // one editor per item: the official admin locks it while this is open
+      lock: isNew ? null : A.editLock('activities', item.id, (meta.one || 'فعالية') + ' «' + (item.title || '') + '»', function () { var fresh = A.findRow(A.state.draft.activities, 'id', item.id); if (fresh) A.editors.activities(fresh, sectionKey); else A.closeSheet(); })
+    });
 
   };
 
@@ -370,7 +373,10 @@
         A.field('نص الإشعار', template, '{title} بيتبدل بعنوان العنصر'),
         enabled.node
       )
-    ], A.sheetFooter(save));
+    ], A.sheetFooter(save), {
+      // one editor per item: the official admin locks it while this is open
+      lock: isNew ? null : A.editLock('types', type.key, 'نوع «' + (type.label || type.key) + '»', function () { var fresh = A.findRow(A.state.draft.types, 'key', type.key); if (fresh) A.editors.types(fresh, sectionKey); else A.closeSheet(); })
+    });
 
   };
 

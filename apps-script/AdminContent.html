@@ -370,7 +370,10 @@
         note.node,
         enabled.node
       )
-    ], A.sheetFooter(save));
+    ], A.sheetFooter(save), {
+      // one editor per item: the official admin locks it while this is open
+      lock: isNew ? null : A.editLock('sessions', session.date, 'اجتماع ' + A.formatWall(session.date, false), function () { var fresh = A.findRow(A.state.draft.sessions, 'date', session.date); if (fresh) A.editors.sessions(fresh); else A.closeSheet(); })
+    });
 
   };
 
@@ -506,7 +509,10 @@
         notify.node,
         enabled.node
       )
-    ], A.sheetFooter(save));
+    ], A.sheetFooter(save), {
+      // one editor per item: the official admin locks it while this is open
+      lock: isNew ? null : A.editLock('news', item.id, 'خبر «' + (item.title || '') + '»', function () { var fresh = A.findRow(A.state.draft.news, 'id', item.id); if (fresh) A.editors.news(fresh); else A.closeSheet(); })
+    });
 
   };
 
@@ -641,7 +647,10 @@
         atStart.node,
         enabled.node
       )
-    ], A.sheetFooter(save));
+    ], A.sheetFooter(save), {
+      // one editor per item: the official admin locks it while this is open
+      lock: isNew ? null : A.editLock('games', game.id, 'لعبة «' + (game.title || '') + '»', function () { var fresh = A.findRow(A.state.draft.games, 'id', game.id); if (fresh) A.editors.games(fresh); else A.closeSheet(); })
+    });
 
   };
 
@@ -772,7 +781,10 @@
         A.field('يختفي من الجرس', expireAt.node),
         enabled.node
       )
-    ], A.sheetFooter(save));
+    ], A.sheetFooter(save), {
+      // one editor per item: the official admin locks it while this is open
+      lock: isNew ? null : A.editLock('notifications', item.id, 'إشعار «' + (item.title || '') + '»', function () { var fresh = A.findRow(A.state.draft.notifications, 'id', item.id); if (fresh) A.editors.notifications(fresh); else A.closeSheet(); })
+    });
 
   };
 

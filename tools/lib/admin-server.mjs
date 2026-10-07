@@ -191,7 +191,7 @@ export const GIS_STUB = `(function () {
  * a 302 to script.googleusercontent.com, whose GET returns the JSON.
  * Everything else outside the local site is refused (and recorded).
  */
-export async function interceptGoogle(page, world, { outside = [], calls = [], site = null } = {}) {
+export async function interceptGoogle(page, world, { outside = [], calls = [], site = null, gisHangs = () => false } = {}) {
 
   const echoes = new Map();
   let echo = 0;
@@ -209,14 +209,17 @@ export async function interceptGoogle(page, world, { outside = [], calls = [], s
         response.headers.forEach((value, key) => { if (!/^(content-length|content-encoding|transfer-encoding|connection|keep-alive)$/i.test(key)) headers[key] = value; });
         return request.respond({ status: response.status, headers, body: Buffer.from(await response.arrayBuffer()) });
       }
-      if (url === 'https://accounts.google.com/gsi/client') {
+      if (url.split('?')[0] === 'https://accounts.google.com/gsi/client') {
+        // gisHangs(): Google's script never arrives (a stalled phone network)
+        if (gisHangs()) return undefined;
         return request.respond({ status: 200, contentType: 'text/javascript', body: GIS_STUB });
       }
       if (url === TEST_API && request.method() === 'POST') {
         const body = request.postData() ?? (request.hasPostData() ? await request.fetchPostData() : '');
         const parsed = JSON.parse(body || '{}');
         calls.push({ fn: parsed.fn, contentType: request.headers()['content-type'], cookie: request.headers().cookie || '' });
-        const reply = world.post(body);
+        // world.post may answer later (a slow or hanging server, tests/admin-rel.e2e.mjs)
+        const reply = { ...(await world.post(body)) };
         delete reply.mime;
         const key = `k${++echo}`;
         echoes.set(key, JSON.stringify(reply));

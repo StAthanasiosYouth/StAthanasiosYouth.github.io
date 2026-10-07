@@ -42,6 +42,7 @@
 | `apps-script/Seed.gs`    | Apps Script + Node | Initial content, settings list with Arabic help     |
 | `apps-script/Auth.gs`    | Apps Script    | Who is calling (API token or Google session), allowlist + its admin functions |
 | `apps-script/Api.gs`     | Apps Script    | `doPost`: the official admin's API (ID token check, listed functions only) |
+| `apps-script/Presence.gs` | Apps Script   | The official admin's sessions (one per account), heartbeat/presence, edit locks (CacheService) |
 | `admin/`                 | GitHub Pages   | The official admin page; `index.html`, `admin.css`, `admin-app.js` generated from `apps-script/Admin*.html` (`tools/build-admin.mjs`); `boot.js` sign-in + transport; `config.js` the two public settings |
 | `apps-script/Store.gs`   | Apps Script    | Sheet schema, `setup()`, row read/write, log            |
 | `apps-script/Code.gs`    | Apps Script    | `doGet`, admin API (`api*`)                             |
@@ -139,6 +140,8 @@ shift them (tested).
 | Admin page                  | Served with X-Frame-Options (no clickjacking). Unsaved-changes guard. Publishing requires the reviewed revision and refuses if the draft changed since. |
 | Public page framing         | GitHub Pages can't send frame headers; the page leaves any frame it is put in. |
 | Concurrency                 | Script lock around every write and publish; fast-forward-only ref updates with one rebuild-and-retry. |
+| One session per account (`/admin/`) | `apiSessionStart` issues a random session id (memory only on the page); every other API call must carry it and match the account's live session, or it fails closed (`session_replaced`). A second device is asked before it takes over; the old tab goes back to the sign-in screen. The id is never enough without the token. The recovery admin doesn't take part. |
+| Two admins, one item (`/admin/`) | An editor of an existing item holds its lock (`<kind>:<key>`, ~90 s, renewed by the heartbeat). The save / delete / archive / toggle functions refuse (`locked`, naming who) while another live session holds it; the page opens it read-only. Locks run out by themselves and die with their session. Only email, device label and what is being edited are shared between admins. |
 | Maps helper                 | Fetches only exact Google Maps hosts (no open fetch).                            |
 
 ## Content center (schema 2)
