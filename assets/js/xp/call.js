@@ -1,15 +1,17 @@
 /**
  * CALL family: a phone call (and any "call us" platform). Our logo in the
- * middle, the call ringing (waves going out), the green answer button
- * breathing, «بيرن…».
+ * middle, the call ringing (waves going out, past the phone's edges),
+ * the green answer button breathing, «بيرن…» with a soft ring pulse.
  *
- * Alive: the waves keep going out, the phone glyph rings now and then;
- * small hearts and dots drift in from the edges. Calm, never loud.
+ * Alive: the waves keep going out, the phone glyph rings now and then
+ * (a soft synthesised pulse when sound is on); «متاح دلوقتي» and small
+ * hearts drift around. Calm, never loud.
  */
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { timeline, edge, pick, LOGO, SPRING } from './kit.js';
+import { timeline, spray, side, chip, pick, LOGO, SPRING } from './kit.js';
+import { SERVANT } from './talk.js';
 
 export function play(stage, { quick, reduced, lite, sound, link, platform }) {
 
@@ -20,8 +22,9 @@ export function play(stage, { quick, reduced, lite, sound, link, platform }) {
   const status = h('span', { class: 'cl-status' }, 'بيرن…');
 
   const phone = h('div', { class: `xp-phone cl cl--${platform.key}` },
-    h('div', { class: 'cl-head' }, h('span', { class: 'cl-name' }, link.title || platform.label), status),
+    h('div', { class: 'cl-head' }, h('span', { class: 'cl-name' }, link.title || platform.label), h('span', { class: 'cl-who' }, SERVANT), status),
     avatar,
+    h('div', { class: 'cl-hint' }, '💬 عندك سؤال؟ إحنا هنا'),
     h('div', { class: 'cl-actions' },
       h('span', { class: 'cl-btn cl-btn--decline' }, iconNode('phone')),
       answer
@@ -32,7 +35,6 @@ export function play(stage, { quick, reduced, lite, sound, link, platform }) {
 
   tl.from(phone, [{ transform: 'translateY(26px) scale(.96)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 620, easing: SPRING });
   tl.from(avatar, [{ transform: 'scale(.6)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 700, delay: 200, easing: SPRING });
-  tl.at(600, () => sound('pop', { passive: true }));
 
   // the waves go out, one after another, all the time
   waves.forEach((wave, i) => tl.loop(wave, [
@@ -42,12 +44,25 @@ export function play(stage, { quick, reduced, lite, sound, link, platform }) {
 
   tl.loop(answer, [{ transform: 'none' }, { transform: 'scale(1.1)', offset: 0.15 }, { transform: 'none', offset: 0.3 }, { transform: 'none' }], { duration: 1600, delay: 800 });
 
-  // the glyph rings now and then
+  // the glyph rings now and then (a soft pulse with it)
+  let rings = 0;
   tl.every(2600, () => {
     if (answer.firstChild.animate) answer.firstChild.animate([{ transform: 'rotate(0)' }, { transform: 'rotate(-14deg)' }, { transform: 'rotate(12deg)' }, { transform: 'rotate(-8deg)' }, { transform: 'rotate(0)' }], { duration: 600 });
-  }, { delay: 1200, jitter: 0.1 });
+    if (rings++ % 2 === 0) sound('ring');
+  }, { delay: 600, jitter: 0.1 });
 
-  edge(tl, stage, { every: 1700, max: 4, items: () => ({ text: pick(['♥', '📞', '✨']), className: 'xp-edge__item--cl' }) });
+  // around the phone: pulse rings past its edges, «متاح», hearts
+  spray(tl, stage, {
+    every: 1500, max: 5, sound, paths: ['ring', 'rise', 'ring', 'out'],
+    items: () => {
+      const roll = Math.random();
+      if (roll < 0.4) return { node: h('span', { class: 'xp-ring' }), path: 'ring' };
+      if (roll < 0.55) return { node: chip(pick(['🟢 متاح دلوقتي', '📞 كلمنا', '🙏 إحنا سامعينك']), 'cl'), path: 'rise' };
+      return { text: pick(['♥', '📞', '✨']), className: 'xp-edge__item--cl', path: 'out' };
+    }
+  });
+
+  side(tl, stage, { items: () => (Math.random() < 0.5 ? { node: chip(pick(['🟢 متاح دلوقتي', '📞 كلمنا في أي وقت']), 'cl') } : { text: '♥', className: 'xp-edge__item--cl' }) });
 
   return tl;
 

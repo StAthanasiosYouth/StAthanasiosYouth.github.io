@@ -12,7 +12,7 @@
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { timeline, edge, floats, lines, pick, EASE, SPRING } from './kit.js';
+import { timeline, spray, side, floats, pick, EASE, SPRING } from './kit.js';
 import { hostOf } from './engine.js';
 
 export function play(stage, { quick, reduced, lite, sound, link, platform }) {
@@ -28,7 +28,9 @@ export function play(stage, { quick, reduced, lite, sound, link, platform }) {
   const tile = h('span', { class: 'br-tile' }, iconNode(glyph), sweep);
   const title = h('span', { class: 'br-title' }, link.title || platform.label || domain);
   const sub = link.subtitle ? h('span', { class: 'br-sub' }, link.subtitle) : null;
-  const blocks = h('span', { class: 'br-blocks' }, h('span', { class: 'br-block' }, lines(2)), h('span', { class: 'br-block' }, lines(3)));
+  const blocks = h('span', { class: 'br-blocks' },
+    h('span', { class: 'br-block' }, h('b', {}, '✦ من أسرة البابا أثناسيوس'), h('span', {}, link.subtitle || 'كل التفاصيل هنا')),
+    h('span', { class: 'br-block' }, h('b', {}, '↗ ' + domain), h('span', {}, 'افتح اللينك من الزرار تحت')));
 
   const phone = h('div', { class: `xp-phone br br--${platform.key}` },
     h('div', { class: 'br-bar' },
@@ -55,7 +57,7 @@ export function play(stage, { quick, reduced, lite, sound, link, platform }) {
   loading.firstChild.classList.add('is-done');
   tl.from(halo, [{ transform: 'scale(.3)', opacity: 0 }, { transform: 'scale(1.15)', opacity: 1, offset: 0.6 }, { transform: 'none', opacity: 1 }], { duration: 900, delay: 800, easing: EASE });
   tl.from(tile, [{ transform: 'scale(.2) rotate(-14deg)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 820, delay: 850, easing: SPRING });
-  tl.at(850, () => sound('pop', { passive: true }));
+  tl.at(850, () => sound('pop'));
   [title, sub, blocks].filter(Boolean).forEach((node, i) => tl.from(node, [{ opacity: 0, transform: 'translateY(14px)' }, { opacity: 1, transform: 'none' }], { duration: 520, delay: 1150 + i * 140, easing: EASE }));
   tl.from(sweep, [{ transform: 'translateX(-130%) skewX(-18deg)' }, { transform: 'translateX(130%) skewX(-18deg)' }], { duration: 900, delay: 1500, easing: 'ease-in-out' });
 
@@ -70,7 +72,9 @@ export function play(stage, { quick, reduced, lite, sound, link, platform }) {
 
   floats(tl, phone, { glyphs: ['✦', '✧', '·'], x: [26, 72], y: [30, 40], rise: [40, 80], drift: 30, size: [0.8, 1.3], every: 900, max: 5, delay: settled, className: 'xp-float--br', name: 'br-spark' });
 
-  edge(tl, stage, { every: 1500, max: 4, items: () => ({ text: pick(['✦', '✧', '✨']), className: 'xp-edge__item--br' }) });
+  spray(tl, stage, { every: 1300, max: 5, paths: ['orbit', 'out', 'rise'], items: () => ({ text: pick(['✦', '✧', '✨']), className: 'xp-edge__item--br' }) });
+
+  side(tl, stage, { items: () => ({ text: pick(['✦', '✧', '✨']), className: 'xp-edge__item--br' }) });
 
   return tl;
 

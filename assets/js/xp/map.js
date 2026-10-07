@@ -10,7 +10,7 @@
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { timeline, edge, pick, LOGO, EASE, SPRING } from './kit.js';
+import { timeline, spray, side, chip, pick, LOGO, EASE, SPRING } from './kit.js';
 
 /* the route: points in % of the map (from the visitor to the church) */
 const ROUTE = [[18, 88], [22, 76], [30, 70], [34, 60], [44, 56], [52, 50], [56, 42], [62, 36], [66, 30]];
@@ -76,7 +76,7 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
   dots.forEach((dot, i) => tl.from(dot, [{ opacity: 0, transform: 'translate(-50%, -50%) scale(0)' }, { opacity: 1, transform: 'translate(-50%, -50%)' }], { duration: 260, delay: 600 + i * (quick ? 22 : 55), easing: EASE }));
   const landed = 600 + dots.length * (quick ? 22 : 55);
   tl.from(pin, [{ transform: 'translateY(-60px) scale(.8)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 640, delay: landed, easing: SPRING });
-  tl.at(landed + 200, () => sound('success', { passive: true }));
+  tl.at(landed + 200, () => sound('like'));
   tl.from(card, [{ transform: 'translateY(100%)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 520, delay: landed + 300, easing: EASE });
 
   /* ---------- alive ---------- */
@@ -90,8 +90,18 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
   const path = along(ROUTE, 1);
   tl.at(settled, () => tl.loop(walker, path.map(([x, y], i) => ({ transform: `translate(${x}cqw, ${y}cqh)`, opacity: i === 0 || i === path.length - 1 ? 0 : 1, offset: i / (path.length - 1) })), { duration: 7000, easing: 'linear' }));
 
-  // (B) from the edges
-  edge(tl, stage, { every: 1600, max: 4, items: () => ({ text: pick(['📍', '✨', '⛪', '🚶']), className: 'xp-edge__item--mp' }) });
+  // (B) around the phone: pins dropping in over its edge, the way, the place
+  spray(tl, stage, {
+    every: 1500, max: 5, sound, paths: ['drop', 'rise', 'out'],
+    items: () => {
+      const roll = Math.random();
+      if (roll < 0.2) return { node: chip(`📍 ${place}`, 'mp'), path: 'rise' };
+      if (roll < 0.32) return { node: chip(pick(['🚶 ١٢ دقيقة', '🚗 ٤ دقايق', '⛪ وصلت']), 'mp'), path: 'rise' };
+      return { text: pick(['📍', '📍', '✨', '⛪']), className: 'xp-edge__item--mp', path: 'drop', sound: 'tick' };
+    }
+  });
+
+  side(tl, stage, { items: () => (Math.random() < 0.4 ? { node: chip(`📍 ${place}`, 'mp') } : { text: pick(['📍', '⛪', '✨']) }) });
 
   return tl;
 

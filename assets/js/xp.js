@@ -1,13 +1,8 @@
 /**
- * MINI-EXPERIENCES: the door.
- *
- * A link with an experience doesn't send the visitor away on the first tap:
- * it opens a short scene in a sheet that says what they'll find there, with
- * a clear button to the real page (assets/js/xp/engine.js, the scenes in
- * assets/js/xp/, the platform registry in platforms.js).
- *
- * This file is in the first page load, so it stays tiny: everything else
- * loads when a scene is about to open (the finger landing is enough).
+ * MINI-EXPERIENCES: the door. A link with an experience opens a short scene
+ * in a sheet, with a clear button to the real page (xp/engine.js, the
+ * scenes in xp/, the registry in platforms.js). First page load: tiny;
+ * the rest loads as a scene is about to open.
  */
 
 import { h, external } from './dom.js';

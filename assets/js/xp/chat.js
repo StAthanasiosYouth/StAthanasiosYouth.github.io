@@ -1,24 +1,39 @@
 /**
  * CHAT family: Telegram (a channel), Messenger (a conversation), Discord
  * (a server channel), and any future chat platform (a channel in its
- * registry accent). One renderer, three layouts, skinned by the registry
- * (accent, icon, label).
+ * registry accent). One renderer, three layouts, skinned by the registry.
  *
  * Entrance: the app opens, (Telegram) a paper plane flies through, the
- * first messages land. Alive: someone types, new messages arrive (the
- * oldest scrolls away), views and reactions tick; reactions and bubbles
- * drift in from the edges. Message shapes only, no real chats; the one
- * readable message is the real meeting time from the page.
+ * first messages land — real words: the meeting time from the page, the
+ * topic, the game segment of the week, the Pope Athanasius quote.
+ * Alive: new posts / messages (the oldest scroll away), views and
+ * reactions tick, (Messenger, Discord) the visitor types and sends;
+ * around the phone: paper planes and channel posts (Telegram), message
+ * bubbles and reactions (the others).
  * Our own interpretation, not the apps' interfaces.
  */
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { timeline, edge, media, lines, rand, pick, digits, compact, meetingLine, LOGO, EASE, SPRING } from './kit.js';
+import { deck, timeline, spray, side, pictures, typeInto, bubble, chip, rand, pick, digits, compact, LOGO, EASE, SPRING } from './kit.js';
+import { GROUP, MINE, WHO, channelPosts } from './talk.js';
+
+const nextGroup = deck(GROUP);
 
 const LAYOUT = { telegram: 'channel', messenger: 'dm', discord: 'server' };
 const REACTIONS = ['❤️', '👍', '🙏', '🔥', '😂', '👏'];
 const NAME = 'أسرة البابا أثناسيوس';
+
+/* Messenger: the conversation (the page answering, the visitor asking) */
+const DM = [
+  [false, 'أهلاً بيك 👋 تحب تسأل عن حاجة؟'],
+  [true, 'هو الاجتماع كل أحد؟'],
+  [false, 'أيوه، كل أحد الساعة ٨ مساءً في كنيسة أبي سيفين ✨'],
+  [true, 'تمام هاجي 🙌'],
+  [false, 'هنستناك 🤍 ولو حابب هات صاحبك معاك'],
+  [true, 'هو فيه ألعاب بعد الكلمة؟ 😂'],
+  [false, 'أكيد 😂 الأسبوع ده «خمن الورقة» 🔥']
+];
 
 /* ---------- messages ---------- */
 
@@ -28,31 +43,31 @@ function reactions(list) {
 
 }
 
-/* a channel post (Telegram-like): optional photo, text lines, views */
-function post({ src, text, views, reacts, n = 2 }) {
+/* a channel post (Telegram-like): optional photo, words, views, time */
+function post({ src, text, views, reacts, time = '٨:٠٢ م' }) {
 
   return h('div', { class: 'ch-msg ch-msg--post' },
-    src ? h('span', { class: 'ch-msg__photo' }, h('img', { src, alt: '' })) : null,
-    text ? h('span', { class: 'ch-msg__text' }, text) : lines(n),
-    h('span', { class: 'ch-msg__meta' }, h('span', { class: 'ch-views' }, '👁 ', h('b', { 'data-n': views }, compact(views))), h('span', { class: 'ch-time' })),
+    src ? h('span', { class: 'ch-msg__photo' }, h('img', { src, alt: '', decoding: 'async' })) : null,
+    h('span', { class: 'ch-msg__text' }, text),
+    h('span', { class: 'ch-msg__meta' }, h('span', { class: 'ch-views' }, '👁 ', h('b', { 'data-n': views }, compact(views))), h('span', { class: 'ch-time' }, time)),
     reacts ? reactions(reacts) : null
   );
 
 }
 
 /* a conversation bubble (Messenger-like) */
-function bubble(out, n = 2) {
+function said(out, text) {
 
-  return h('div', { class: `ch-msg ch-msg--${out ? 'out' : 'in'}` }, lines(n));
+  return h('div', { class: `ch-msg ch-msg--${out ? 'out' : 'in'}` }, h('span', { class: 'ch-msg__text' }, text));
 
 }
 
-/* a server message (Discord-like): avatar, a name line, text lines */
-function said(n = 2, tone = 0) {
+/* a server message (Discord-like): avatar, a name, words */
+function line(who, text, tone = 0, us = false) {
 
   return h('div', { class: 'ch-msg ch-msg--said' },
-    h('span', { class: `ch-avatar ch-avatar--${tone}` }),
-    h('span', { class: 'ch-said' }, h('span', { class: 'ch-said__name' }, h('i')), lines(n))
+    us ? h('img', { class: 'ch-avatar', src: LOGO, alt: '' }) : h('span', { class: `ch-avatar ch-avatar--${tone % 3}` }, who.replace('.', '')),
+    h('span', { class: 'ch-said' }, h('span', { class: `ch-said__name${us ? ' ch-said__name--us' : ''}` }, us ? NAME : who, h('i', {}, ' النهارده ٨:٠٥ م')), h('span', { class: 'ch-msg__text' }, text))
   );
 
 }
@@ -69,7 +84,8 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
   const tl = timeline({ quick, reduced, lite });
   const layout = LAYOUT[platform.key] || 'channel';
   const glyph = platform.icon || (link.icon !== 'link' ? link.icon : 'users');
-  const pics = media(link, content, 2);
+  const pics = pictures(link, 3);
+  const words = channelPosts(content);
 
   const feed = h('div', { class: 'ch-feed' });
   const typing = typingDots(layout === 'server' ? 'ch-typing--server' : '');
@@ -77,16 +93,17 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
 
   if (layout === 'channel') {
     messages = [
-      post({ src: pics[0], views: 1180, n: 2 }),
-      post({ text: meetingLine(content), views: 964, reacts: [['❤️', 42], ['🙏', 17]] }),
-      post({ views: 312, n: 1 })
+      post({ src: pics[0] && pics[0].src, text: pics[0] && pics[0].topic ? `📌 «${pics[0].topic}» — كان أحد حلو، شكرًا لكل اللي جه 🤍` : words[2], views: 1180, time: '٧:٤٠ م' }),
+      post({ text: words[0], views: 964, reacts: [['❤️', 42], ['🙏', 17]], time: '٧:٥٥ م' }),
+      post({ text: words[3], views: 312, time: '٨:٠١ م' })
     ];
   }
   else if (layout === 'dm') {
-    messages = [bubble(false, 2), bubble(true, 1), bubble(false, 1), h('div', { class: 'ch-msg ch-msg--in ch-msg--text' }, meetingLine(content, 'أهلاً بيك 👋'))];
+    messages = DM.slice(0, 4).map(([out, text]) => said(out, text));
   }
   else {
-    messages = [said(2, 1), said(1, 2), h('div', { class: 'ch-msg ch-msg--said' }, h('img', { class: 'ch-avatar', src: LOGO, alt: '' }), h('span', { class: 'ch-said' }, h('span', { class: 'ch-said__name ch-said__name--us' }, NAME), h('span', { class: 'ch-msg__text' }, meetingLine(content)), reactions([['🔥', 9], ['🙏', 6]])))];
+    messages = [line('م.', GROUP[0], 1), line('ر.', GROUP[4], 2), line('', words[0], 0, true)];
+    messages[2].querySelector('.ch-said').append(reactions([['🔥', 9], ['🙏', 6]]));
   }
 
   feed.append(...messages);
@@ -101,13 +118,11 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
   );
 
   const rail = layout === 'server'
-    ? h('div', { class: 'ch-rail' }, h('img', { src: LOGO, alt: '' }), h('span', { class: 'ch-rail__dot' }, '#'), h('span', { class: 'ch-rail__dot' }, '🎵'), h('span', { class: 'ch-rail__dot' }, '+'))
+    ? h('div', { class: 'ch-rail' }, h('img', { src: LOGO, alt: '' }), h('span', { class: 'ch-rail__dot' }, '#'), h('span', { class: 'ch-rail__dot' }, '🎮'), h('span', { class: 'ch-rail__dot' }, '🎵'), h('span', { class: 'ch-rail__dot' }, '+'))
     : null;
 
-  const bar = h('div', { class: 'ch-bar' },
-    h('span', { class: 'ch-bar__field' }, layout === 'channel' ? 'كتم الصوت' : 'اكتب رسالة…'),
-    h('span', { class: 'ch-bar__send' }, iconNode(layout === 'channel' ? 'bell' : glyph))
-  );
+  const field = h('span', { class: 'ch-bar__field' }, layout === 'channel' ? 'كتم الصوت' : 'اكتب رسالة…');
+  const bar = h('div', { class: 'ch-bar' }, field, h('span', { class: 'ch-bar__send' }, iconNode(layout === 'channel' ? 'bell' : glyph)));
 
   const phone = h('div', { class: `xp-phone ch ch--${layout} ch--${platform.key}` },
     rail,
@@ -131,7 +146,7 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
       { transform: 'translate(80px, -60px) rotate(6deg) scale(.9)', opacity: 1, offset: 0.75 },
       { transform: 'translate(160px, -160px) rotate(12deg) scale(.6)', opacity: 0 }
     ], { duration: 1300, delay: 250, easing: 'cubic-bezier(.4, 0, .3, 1)' });
-    tl.at(500, () => sound('open', { passive: true }));
+    tl.at(450, () => sound('whoosh'));
   }
 
   typing.classList.add('is-done');
@@ -141,7 +156,7 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
     const out = message.classList.contains('ch-msg--out');
     const at = 700 + i * (quick ? 260 : 520);
     tl.from(message, [{ opacity: 0, transform: `translate(${out ? 16 : -16}px, 10px) scale(.94)` }, { opacity: 1, transform: 'none' }], { duration: 440, delay: at, easing: SPRING });
-    tl.at(at, () => sound(out ? 'tap' : 'pop', { passive: true }));
+    tl.at(at, () => sound(out ? 'send' : layout === 'channel' ? 'notify' : 'pop'));
   });
 
   messages.forEach(message => message.querySelectorAll('.ch-react').forEach((r, i) => {
@@ -151,28 +166,58 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
   /* ---------- alive ---------- */
 
   const settled = 3200;
+  let n = 0;
 
-  // new messages; the feed keeps the newest few
-  tl.ambient(feed, {
-    every: 3800, max: 4, recycle: true, delay: settled, name: 'ch-msg',
-    make: () => h('div', { class: 'ch-msg' }),
-    spawn: (node, n) => {
-      let next;
-      if (layout === 'channel') next = post({ src: n % 3 === 1 ? pics[1] : null, views: Math.round(rand(80, 400)), n: n % 2 ? 1 : 2 });
-      else if (layout === 'dm') next = bubble(n % 3 === 0, n % 2 ? 1 : 2);
-      else next = said(n % 2 ? 1 : 2, n % 3);
-      node.className = `${next.className} xp-amb`;
-      node.replaceChildren(...next.childNodes);
-      feed.append(node);
-      const shown = [...feed.children];
-      shown.slice(0, Math.max(0, shown.length - 5)).forEach(old => { if (!old.classList.contains('xp-amb')) old.remove(); });
+  const add = (node, out) => {
+    feed.append(node);
+    [...feed.children].slice(0, -5).forEach(old => old.remove());
+    node.animate([{ opacity: 0, transform: `translate(${out ? 16 : -16}px, 12px) scale(.94)` }, { opacity: 1, transform: 'none' }], { duration: 460, easing: SPRING });
+  };
 
-      const out = node.classList.contains('ch-msg--out');
-      sound(out ? 'tap' : 'pop', { passive: true });
-      if (!out && typing.animate) typing.animate([{ opacity: 1 }, { opacity: 1, offset: 0.8 }, { opacity: 0 }], { duration: 900 });
-      return node.animate([{ opacity: 0, transform: `translate(${out ? 16 : -16}px, 12px) scale(.94)` }, { opacity: 1, transform: 'none' }], { duration: 460, delay: out ? 0 : 700, fill: 'backwards', easing: SPRING });
+  const incoming = () => {
+    n += 1;
+    let next;
+    if (layout === 'channel') next = post({ src: n % 3 === 1 && pics[1 + (n % 2)] ? pics[1 + (n % 2)].src : null, text: words[(n + 3) % words.length], views: Math.round(rand(80, 400)), reacts: n % 2 ? [[pick(REACTIONS), Math.round(rand(3, 20))]] : null, time: '٨:١٠ م' });
+    else if (layout === 'dm') next = said(false, DM[script % DM.length][1]);
+    else next = line(WHO[n % WHO.length], GROUP[(n * 3) % GROUP.length], n);
+    const delay = layout === 'channel' ? 0 : rand(800, 1300);
+    if (delay) {
+      typing.classList.remove('is-done');
+      typing.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200 });
     }
-  });
+    tl.later(delay, () => {
+      typing.classList.add('is-done');
+      add(next, false);
+      sound(layout === 'channel' ? 'notify' : 'pop');
+    });
+  };
+
+  // the visitor writes (not in a channel)
+  const outgoing = () => {
+    typeInto(tl, field, layout === 'dm' ? DM[script % DM.length][1] : MINE[n % MINE.length], {
+      sound,
+      done: () => {
+        const text = field.textContent;
+        field.textContent = 'اكتب رسالة…';
+        add(layout === 'dm' ? said(true, text) : line('أنا', text, 1), true);
+        sound('send');
+      }
+    });
+  };
+
+  // Messenger follows its script (the visitor asks, the page answers); the others: 2 in, 1 out
+  let beat = 0;
+  let script = 4;
+  tl.every(layout === 'channel' ? 4200 : 3800, () => {
+    beat += 1;
+    if (layout === 'dm') {
+      if (DM[script % DM.length][0]) outgoing();
+      else incoming();
+      script += 1;
+    }
+    else if (layout !== 'channel' && beat % 3 === 0) outgoing();
+    else incoming();
+  }, { jitter: 0.15, delay: settled });
 
   // views and reactions tick on the newest messages
   tl.every(1700, () => {
@@ -190,15 +235,26 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
       r.dataset.n = String(value);
       r.textContent = digits(value);
       if (r.parentNode.animate) r.parentNode.animate([{ transform: 'scale(1.25)' }, { transform: 'none' }], { duration: 320, easing: EASE });
+      sound('react');
     }
   }, { delay: settled + 600 });
 
-  // (B) from the edges
-  edge(tl, stage, {
-    every: 1400, max: 5,
-    items: () => (Math.random() < 0.4
-      ? { node: h('span', { class: `xp-bubble xp-bubble--chat` }, lines(Math.random() < 0.5 ? 1 : 2)) }
-      : pick(REACTIONS))
+  // (B) around the phone
+  const plane = () => h('span', { class: 'xp-plane' }, iconNode(glyph));
+  spray(tl, stage, {
+    every: 1200, max: 7, sound,
+    paths: layout === 'channel' ? ['cross', 'in', 'out'] : ['in', 'out', 'rise'],
+    items: () => {
+      const roll = Math.random();
+      if (layout === 'channel' && roll < 0.3) return { node: plane(), path: 'cross', sound: 'whoosh' };
+      if (roll < 0.62) return { node: bubble(layout === 'channel' ? pick(words) : nextGroup(), { tone: 'chat', who: layout === 'channel' ? '' : pick(WHO) }), path: 'in' };
+      if (roll < 0.72) return { node: chip(layout === 'channel' ? `👁 ${compact(Math.round(rand(300, 1300)))}` : pick(['@الكل', '✓ اتشافت', '+١']), 'chat'), path: 'rise' };
+      return { text: pick(REACTIONS), path: 'out', sound: 'react' };
+    }
+  });
+
+  side(tl, stage, {
+    items: () => (Math.random() < 0.6 ? { node: bubble(layout === 'channel' ? pick(words) : nextGroup(), { tone: 'chat' }) } : layout === 'channel' ? { node: plane() } : { text: pick(REACTIONS) })
   });
 
   return tl;

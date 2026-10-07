@@ -110,6 +110,14 @@ remembered on that device. No audio is created until the visitor turns it on.
 Sounds never play in a hidden tab. Sounds not caused by a tap ("ready",
 "important") play only if audio was already unlocked by an earlier tap.
 
+Scenes (lazy, `assets/js/xp/audio.js`) add soft phone sounds on the same
+setting and the same AudioContext: a touchscreen key tap per typed
+character (they stop with the typing), message pop, send swish, reaction
+pop, like, read tick, reel swipe, paper-plane whoosh, a call pulse. A
+small mixer: compressor + limiter, at most 3 voices, each kind throttled.
+A speaker in every scene sheet toggles the same setting. Reduced motion:
+no ambient scene sounds; lite: no key taps, half the rate.
+
 ## Components
 
 | Component        | Notes                                                        |

@@ -168,6 +168,9 @@ at that minute.
 | `assets/js/detail.js`      | browser (lazy)     | The detail sheets' content and the poster hero, loaded on the first touch or by a deep link |
 | `assets/js/motion.js`, `sound.js` | browser      | Springs, swaps, particles; optional synthesized sounds    |
 | `tools/demo.mjs`            | dev machine        | Demo content built through the real admin code           |
+| `assets/js/xp/kit.js`, `talk.js`, `library.js` | browser (lazy) | Scenes: the outer effects layer (reactions beside the phone, crossing its edges), the scenes' words, the real media manifest |
+| `assets/js/xp/audio.js`, `cards.js` | browser (lazy) | The scenes' sound mixer (one AudioContext, 3 voices max, throttled, silent by default); the contact cards' extra life (loaded when on screen) |
+| `assets/media/xp/`, `tools/build-xp-media.mjs` | repo / dev machine | The service's real weekly posters and short silent game-segment clips (≤ 300 KB, preload none), rebuilt from the local originals |
 
 ### Sheet tabs
 
