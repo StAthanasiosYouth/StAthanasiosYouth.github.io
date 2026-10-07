@@ -11,6 +11,7 @@ import { formatStamp, formatDate, formatTime, DAY_NAMES } from './words.js';
 import { openViewer } from './sheet.js';
 import { gameCard } from './hub.js';
 import { motionTier } from './feel.js';
+import { programList } from './program.js';
 
 
 /*
@@ -176,6 +177,8 @@ export function meetingSheetContent(content, status, nowStamp) {
     session && session.speaker ? h('p', { class: 'detail__lead' }, `مع ${session.speaker}`) : null,
     when ? h('p', { class: 'detail__when' }, iconNode('clock'), when) : null,
     session && session.description ? h('p', { class: 'detail__body' }, session.description) : null,
+    // its program, the stage on now marked (program.js keeps it current)
+    programList(session, nowStamp),
     session && session.note ? h('p', { class: 'detail__note' }, session.note) : null,
     meeting && meeting.note ? h('p', { class: 'detail__note' }, meeting.note) : null,
     upcoming.length

@@ -10,7 +10,7 @@
     "sync": "node sync-admin.mjs && node build-admin.mjs",
     "test": "node --test ../tests/*.test.mjs",
     "serve": "node serve.mjs",
-    "e2e": "node --test --test-concurrency=1 ../tests/browser.e2e.mjs ../tests/hub.e2e.mjs ../tests/admin.e2e.mjs ../tests/layout.e2e.mjs ../tests/xp.e2e.mjs ../tests/feel.e2e.mjs ../tests/polish-a.e2e.mjs ../tests/polish-b.e2e.mjs ../tests/refine-a.e2e.mjs ../tests/refine-b.e2e.mjs ../tests/admin-rel.e2e.mjs",
+    "e2e": "node --test --test-concurrency=1 ../tests/browser.e2e.mjs ../tests/hub.e2e.mjs ../tests/admin.e2e.mjs ../tests/layout.e2e.mjs ../tests/xp.e2e.mjs ../tests/feel.e2e.mjs ../tests/polish-a.e2e.mjs ../tests/polish-b.e2e.mjs ../tests/refine-a.e2e.mjs ../tests/prog-a.e2e.mjs ../tests/refine-b.e2e.mjs ../tests/admin-rel.e2e.mjs",
     "set-url": "node set-url.mjs",
     "demo": "node demo.mjs",
     "example": "node build-example.mjs",

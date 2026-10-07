@@ -28,7 +28,7 @@ const PRIVATE = /^\/(apps-script|tools|tests|docs|node_modules)(\/|$)|\/\.|\.md$
 
 // --demo: published files come from tools/demo.mjs output instead
 const DEMO = process.argv.includes('--demo');
-const DEMO_FILES = /^\/(content\.json|meeting\.ics|media\/.+)$/;
+const DEMO_FILES = /^\/(content\.json|live\.json|meeting\.ics|media\/.+)$/;
 
 createServer(async (req, res) => {
   try {
