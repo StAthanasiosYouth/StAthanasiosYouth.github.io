@@ -492,12 +492,21 @@ body.is-gated {
   border: 0;
 }
 
+/* Google parks its screen-reader announcer at left: -10000px (set from its
+   script, so the CSP allows it). In this right-to-left page that offset is
+   scrollable: 10,000 px of empty sideways scroll. Keep it a 1px clipped box
+   at the viewport's edge instead — fixed, so it never adds to the page width,
+   and still read by screen readers. !important: Google's value is inline. */
 #g_a11y_announcement {
-  position: absolute;
-  width: 1px;
-  height: 1px;
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
+  left: auto !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: 0 !important;
   overflow: hidden;
-  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
   white-space: nowrap;
 }
 
