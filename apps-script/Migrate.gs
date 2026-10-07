@@ -335,6 +335,9 @@ function apiPlanMigration() {
 
 function migrate() {
 
+  // run from the editor by the owner; refuse anyone else who reaches it
+  assertAdmin_();
+
   var result = runMigration_({ backup: true });
 
   console.log(result.lines.join('\n'));

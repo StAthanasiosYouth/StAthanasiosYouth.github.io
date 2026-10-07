@@ -902,7 +902,10 @@
     var upgradeCard = A.upgradeCard();
 
     var accountCard = A.card('الحساب', null,
-      el('p', {}, 'انت داخل بـ ', A.chip(A.state.user, 'ltr'))
+      el('p', {}, 'انت داخل بـ ', A.chip(A.state.user, 'ltr')),
+      A.signOut ? el('div', { class: 'actions' },
+        el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { A.signOut(); } }, icon('logout'), 'خروج')
+      ) : null
     );
 
     var guideCard = config.repo
@@ -911,9 +914,167 @@
       )
       : null;
 
-    return [siteCard, A.state.hubReady ? hubCard : null, guideCard, upgradeCard, publishCard, mediaCard, accountCard].filter(Boolean);
+    return [siteCard, A.state.hubReady ? hubCard : null, guideCard, upgradeCard, publishCard, adminsCard(), mediaCard, accountCard].filter(Boolean);
 
   };
+
+
+  /* =======================================================
+     «صلاحيات لوحة التحكم»: the Google emails allowed in.
+     The server decides everything (Auth.gs); this only shows the list
+     and asks before each change, with our own modal.
+  ======================================================= */
+
+  var EMAIL = /^[^@\s,;<>"]+@[^@\s,;<>"]+\.[a-z]{2,}$/i;
+
+  function adminsCard() {
+
+    var box = A.errorBox();
+    var list = el('ul', { class: 'admins', 'aria-label': 'الحسابات المسموح لها', 'aria-busy': 'true' },
+      el('li', { class: 'skeleton skeleton--line' }),
+      el('li', { class: 'skeleton skeleton--line skeleton--short' })
+    );
+    var count = el('span', { class: 'admins__count', dir: 'ltr' });
+    var input = A.textInput('', { type: 'email', ltr: true, max: 254, placeholder: 'name@gmail.com', inputmode: 'email' });
+    var add = el('button', { class: 'btn btn--primary', type: 'button' }, icon('plus'), 'ضيف');
+    var data = null;
+
+    input.setAttribute('autocomplete', 'off');
+    input.setAttribute('spellcheck', 'false');
+    input.setAttribute('autocapitalize', 'off');
+
+    function row(email) {
+
+      var primary = email === data.primary;
+      var me = email === data.me;
+
+      return el('li', { class: 'admin' + (primary ? ' admin--primary' : ''), 'data-email': email },
+        el('span', { class: 'admin__icon', 'aria-hidden': 'true' }, icon(primary ? 'shield' : 'user')),
+        el('span', { class: 'admin__main' },
+          el('span', { class: 'admin__email ltr', text: email }),
+          primary || me ? el('span', { class: 'admin__chips' },
+            primary ? A.chip('الحساب الأساسي', 'gold') : null,
+            me ? A.chip('انت', 'info') : null
+          ) : null
+        ),
+        primary
+          ? el('span', { class: 'admin__lock', role: 'img', 'aria-label': 'محمي: مينفعش يتشال', title: 'محمي: مينفعش يتشال' }, icon('lock'))
+          : me
+            ? null
+            : el('button', {
+              class: 'icon-btn icon-btn--danger',
+              type: 'button',
+              'aria-label': 'شيل صلاحية ' + email,
+              onclick: function (event) { remove(email, event.currentTarget); }
+            }, icon('trash'))
+      );
+
+    }
+
+    function draw(next) {
+
+      data = next;
+      list.setAttribute('aria-busy', 'false');
+      A.fill(list, data.emails.map(row));
+      count.textContent = data.emails.length + ' / ' + data.max;
+      add.disabled = data.emails.length >= data.max;
+
+    }
+
+    function load() {
+
+      A.call('apiAdmins').then(draw).catch(function (error) {
+        list.setAttribute('aria-busy', 'false');
+        list.replaceChildren();
+        A.fail(error, box);
+      });
+
+    }
+
+    function remove(email, button) {
+
+      box.hidden = true;
+      A.confirm({
+        tone: 'danger',
+        icon: 'user',
+        title: 'تشيل صلاحية «' + email + '»؟',
+        message: 'مش هيقدر يدخل لوحة التحكم تاني بالحساب ده. تقدر تضيفه تاني في أي وقت.',
+        confirmLabel: 'شيل الصلاحية',
+        cancelLabel: 'لأ، سيبه'
+      }).then(function (ok) {
+        if (!ok) return;
+        A.withBusy(button, A.call('apiRemoveAdmin', email))
+          .then(function (next) {
+            draw(next);
+            A.toast('اتشالت صلاحية ' + email);
+          })
+          .catch(function (error) { A.fail(error, box); });
+      });
+
+    }
+
+    add.addEventListener('click', function () {
+
+      box.hidden = true;
+      A.clearFieldErrors(card);
+
+      var email = input.value.trim().toLowerCase();
+
+      if (!EMAIL.test(email)) {
+        A.fail(new Error('الإيميل ده مش مكتوب صح. اكتب إيميل جوجل كامل، مثلاً name@gmail.com'), box);
+        return;
+      }
+
+      if (data && data.emails.indexOf(email) !== -1) {
+        A.fail(new Error('الإيميل ده مسموح له قبل كده.'), box);
+        return;
+      }
+
+      A.confirm({
+        tone: 'info',
+        icon: 'shield',
+        title: 'تدّي «' + email + '» صلاحية لوحة التحكم؟',
+        message: 'هيقدر يدخل بحساب جوجل ده ويعدّل المسودة وينشر على الموقع.',
+        confirmLabel: 'ضيف',
+        cancelLabel: 'لأ، رجوع'
+      }).then(function (ok) {
+        if (!ok) return;
+        A.withBusy(add, A.call('apiAddAdmin', email))
+          .then(function (next) {
+            input.value = '';
+            A.dirty = false;
+            draw(next);
+            A.toast('اتضاف ' + email + ' ✓');
+          })
+          .catch(function (error) { A.fail(error, box); });
+      });
+
+    });
+
+    input.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        add.click();
+      }
+    });
+
+    var card = A.card('صلاحيات لوحة التحكم', 'حسابات جوجل اللي تقدر تدخل لوحة التحكم. من غير باسوردات: كل واحد بيدخل بحساب جوجل بتاعه.',
+      box,
+      el('div', { class: 'admins__head' }, el('span', { class: 'section-label', text: 'مسموح لهم' }), count),
+      list,
+      el('div', { class: 'admins__add' },
+        A.field('الإيميل', input, 'حساب جوجل (Gmail أو حساب شغل على جوجل)'),
+        el('div', { class: 'actions' }, add)
+      ),
+      el('p', { class: 'note' }, 'لو هيستخدم لوحة الطوارئ (رابط Apps Script)، شارك معاه الشيت كمان من «افتح الشيت».')
+    );
+
+    card.classList.add('card--admins');
+    load();
+
+    return card;
+
+  }
 
 })();
 </script>

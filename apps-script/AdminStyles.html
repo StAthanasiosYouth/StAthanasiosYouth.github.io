@@ -2237,30 +2237,43 @@ input[type="time"].input {
 
 
 /* =========================================================
-   SHEET — bottom sheet on phones, drawer on wide screens
+   SHEET — the editor panel (A.openSheet)
+   Phones: a bottom sheet (drag the handle or the header down to close).
+   Wide screens: a floating side panel. Both are as tall as their content,
+   up to the screen; only the body scrolls, so the title and the buttons
+   always stay in view.
 ========================================================= */
 
 .sheet {
+  --sheet-gap: 0px;
   position: fixed;
   inset: auto 0 0 0;
   width: 100%;
   max-width: 100%;
-  max-height: 92dvh;
+  height: auto;
+  max-height: calc(100dvh - max(24px, env(safe-area-inset-top)));
   margin: 0;
   padding: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
-  border: 1px solid var(--line-strong);
+  overflow: hidden;
+  border: 1px solid rgba(242, 210, 139, .2);
   border-bottom: 0;
-  border-radius: 26px 26px 0 0;
+  border-radius: 24px 24px 0 0;
   color: var(--text);
-  background: linear-gradient(180deg, #0c2646, var(--navy-900) 160px);
-  box-shadow: 0 -24px 60px -20px rgba(0, 0, 0, .8);
+  background:
+    radial-gradient(120% 70% at 100% 0%, rgba(215, 170, 80, .07), transparent 55%),
+    linear-gradient(180deg, rgba(13, 37, 68, .96), rgba(6, 22, 42, .97) 220px);
+  -webkit-backdrop-filter: blur(22px) saturate(1.2);
+  backdrop-filter: blur(22px) saturate(1.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .07),
+    0 -18px 50px -18px rgba(0, 0, 0, .75);
   transform: translateY(100%);
-  transition: transform .55s var(--spring), display .55s allow-discrete, overlay .55s allow-discrete;
+  transition: transform .5s var(--spring), display .5s allow-discrete, overlay .5s allow-discrete;
 }
 
 .sheet[open] {
+  display: flex;
+  flex-direction: column;
   transform: translateY(0);
 }
 
@@ -2275,11 +2288,11 @@ input[type="time"].input {
 }
 
 .sheet::backdrop {
-  background: rgba(1, 6, 14, .66);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
+  background: rgba(1, 6, 14, .58);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
   opacity: 0;
-  transition: opacity .35s, display .35s allow-discrete, overlay .35s allow-discrete;
+  transition: opacity .3s, display .3s allow-discrete, overlay .3s allow-discrete;
 }
 
 .sheet[open]::backdrop {
@@ -2293,9 +2306,9 @@ input[type="time"].input {
 }
 
 .sheet__grab {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 3;
+  flex: none;
   height: 0;
 }
 
@@ -2304,55 +2317,74 @@ input[type="time"].input {
   position: absolute;
   top: 8px;
   left: 50%;
-  width: 44px;
-  height: 5px;
+  width: 40px;
+  height: 4px;
   border-radius: 99px;
-  background: rgba(255, 255, 255, .24);
+  background: rgba(255, 255, 255, .26);
   transform: translateX(-50%);
 }
 
 .sheet__head {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 2;
   display: flex;
+  flex: none;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   padding: 22px 16px 12px;
   border-bottom: 1px solid var(--line-2);
-  background: rgba(12, 36, 68, .94);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
   touch-action: none;
 }
 
 .sheet__title {
-  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 1.08rem;
   font-weight: 800;
+  line-height: 1.4;
+}
+
+/* a short gold mark: the same accent as the cards */
+.sheet__title::before {
+  content: "";
+  flex: none;
+  width: 4px;
+  height: 18px;
+  border-radius: 99px;
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold-deep));
 }
 
 .sheet__title:focus {
   outline: none;
 }
 
+.sheet__head .icon-btn {
+  flex: none;
+}
+
 .sheet__body {
   display: grid;
+  flex: 0 1 auto;
+  align-content: start;
   gap: 16px;
+  min-height: 0;
   padding: 18px 16px 22px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: 16px;
 }
 
 .sheet__foot {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
   display: flex;
+  flex: none;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 12px 16px max(12px, env(safe-area-inset-bottom));
   border-top: 1px solid var(--line-2);
-  background: rgba(6, 26, 49, .95);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  background: rgba(3, 14, 29, .5);
 }
 
 .sheet__foot .btn--primary {
@@ -2362,29 +2394,44 @@ input[type="time"].input {
 @media (min-width: 760px) {
 
   .sheet {
-    inset: 0 auto 0 0;
-    width: min(600px, 92vw);
-    height: 100dvh;
-    max-height: 100dvh;
-    border: 1px solid var(--line-strong);
-    border-left: 0;
-    border-radius: 0 26px 26px 0;
-    box-shadow: 30px 0 80px -30px rgba(0, 0, 0, .85);
-    transform: translateX(-100%);
+    --sheet-gap: 14px;
+    inset: var(--sheet-gap) auto auto var(--sheet-gap);
+    width: min(560px, calc(100vw - 2 * var(--sheet-gap)));
+    max-height: calc(100dvh - 2 * var(--sheet-gap));
+    border: 1px solid rgba(242, 210, 139, .2);
+    border-radius: 22px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .07),
+      0 0 0 1px rgba(0, 0, 0, .25),
+      0 30px 70px -28px rgba(0, 0, 0, .8);
+    opacity: 0;
+    transform: translateX(-28px) scale(.985);
+    transform-origin: left top;
+    transition:
+      transform .42s var(--ease),
+      opacity .28s var(--ease),
+      display .42s allow-discrete,
+      overlay .42s allow-discrete;
   }
 
   .sheet[open] {
-    transform: translateX(0);
+    opacity: 1;
+    transform: none;
   }
 
   @starting-style {
     .sheet[open] {
-      transform: translateX(-100%);
+      opacity: 0;
+      transform: translateX(-28px) scale(.985);
     }
   }
 
+  .sheet::backdrop {
+    background: rgba(1, 6, 14, .46);
+  }
+
   .sheet--wide {
-    width: min(760px, 94vw);
+    width: min(760px, calc(100vw - 2 * var(--sheet-gap)));
   }
 
   .sheet__grab {
@@ -2392,23 +2439,30 @@ input[type="time"].input {
   }
 
   .sheet__head {
-    padding: 18px 24px;
+    padding: 16px 20px 14px;
     touch-action: auto;
   }
 
   .sheet__body {
-    padding: 22px 24px 28px;
+    padding: 20px 22px 24px;
   }
 
   .sheet__foot {
-    padding: 14px 24px;
+    padding: 12px 20px;
   }
 
   .sheet__foot .btn--primary {
     flex: 0 1 auto;
-    min-width: 160px;
+    min-width: 150px;
   }
 
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet,
+  .sheet[open] {
+    transform: none;
+  }
 }
 
 
@@ -3311,12 +3365,18 @@ dialog .toasts[popover] {
 ========================================================= */
 
 .sheet--preview {
-  max-height: 96dvh;
+  max-height: calc(100dvh - 12px);
+}
+
+@media (min-width: 760px) {
+  .sheet--preview {
+    max-height: calc(100dvh - 2 * var(--sheet-gap));
+  }
 }
 
 @media (min-width: 900px) {
   .sheet--preview.sheet--wide {
-    width: min(1220px, 96vw);
+    width: min(1220px, calc(100vw - 2 * var(--sheet-gap)));
   }
 }
 
@@ -3435,6 +3495,159 @@ dialog .toasts[popover] {
 
 [dir="rtl"] .preview-frame {
   transform-origin: top right;
+}
+
+
+/* =========================================================
+   «صلاحيات لوحة التحكم» (AdminPage.html: the allowlist)
+========================================================= */
+
+.admins__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admins__count {
+  font-size: .8rem;
+  font-weight: 700;
+  color: var(--text-3);
+}
+
+.admins {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, .025);
+}
+
+.admin--primary {
+  border-color: rgba(242, 210, 139, .26);
+  background:
+    linear-gradient(90deg, rgba(215, 170, 80, .08), transparent 70%),
+    rgba(255, 255, 255, .025);
+}
+
+.admin__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  color: var(--text-2);
+  background: rgba(255, 255, 255, .05);
+}
+
+.admin--primary .admin__icon {
+  color: var(--gold-hi);
+  background: rgba(215, 170, 80, .14);
+}
+
+.admin__main {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin__email {
+  overflow: hidden;
+  font-weight: 700;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin__lock {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  color: var(--gold);
+  opacity: .8;
+}
+
+.admins__add {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+@media (min-width: 560px) {
+  .admins__add {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+  }
+  .admins__add .actions {
+    padding-top: 30px;
+  }
+}
+
+
+/* =========================================================
+   SCROLLBARS — mouse and trackpad only (touch keeps the native ones).
+   Same tokens as the public site. Chrome/Safari: ::-webkit-scrollbar
+   (these are ignored where scrollbar-color is set, so that one is for
+   Firefox only).
+========================================================= */
+
+@media (hover: hover) and (pointer: fine) {
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .035);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    min-height: 40px;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-color: rgba(215, 170, 80, .42);
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover,
+  ::-webkit-scrollbar-thumb:active {
+    background-color: rgba(242, 210, 139, .75);
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(215, 170, 80, .45) transparent;
+    }
+  }
+
 }
 
 </style>

@@ -64,6 +64,8 @@ another admin.
    | Script | `Code`         | `apps-script/Code.gs` (replace the default `Code.gs`) |
    | Script | `Items`        | `apps-script/Items.gs`          |
    | Script | `Media`        | `apps-script/Media.gs`          |
+   | Script | `Api`          | `apps-script/Api.gs` (the API for `/admin/`) |
+   | Script | `Migrate`, `Review`, `Platforms` | `apps-script/*.gs` |
    | HTML   | `Admin`        | `apps-script/Admin.html`        |
    | HTML   | `AdminStyles`  | `apps-script/AdminStyles.html`  |
    | HTML   | `AdminScript`  | `apps-script/AdminScript.html`  |
@@ -156,15 +158,11 @@ To update the code later: paste the new files, then **Deploy → Manage
 deployments → Edit → Version: New version → Deploy**. The URL stays the
 same.
 
-**The short address.** `https://stathanasiosyouth.github.io/admin/` is a
-small branded page (`admin/` in this repository) that opens the admin URL
-in the same tab. It never embeds the admin and holds nothing secret: only
-the public `/exec` URL, and Google sign-in plus `ADMIN_EMAILS` still
-decide who gets in. It isn't linked from the public page and asks search
-engines to stay away (`noindex`, `robots.txt`). If you ever make a **new**
-deployment (a new URL, not a new version), replace the URL in
-`admin/index.html` (the two marked places, side by side), run
-`cd tools && npm test`, and commit.
+This deployment is now the **recovery admin** (لوحة الطوارئ). The everyday
+admin is `https://stathanasiosyouth.github.io/admin/` (section 8). Keep this
+one exactly as it is: `AKfycbwhHMp54vLJLK5UuwH_7zByzkPRkQErcUQdvZ1ad2_AxpasNWzShoh1CT3AIOrB8Rtbvw`,
+pinned to **version 14**, *User accessing the web app*. Don't give it a new
+version while the manifest says `USER_DEPLOYING` (section 8.3).
 
 ## 7. First publish and checks
 
@@ -179,11 +177,16 @@ deployment (a new URL, not a new version), replace the URL in
 
 ## Adding a second admin later
 
-1. Share the **Sheet** (not the script) with their Google account as Editor.
-2. Add their email to `ADMIN_EMAILS` (comma-separated).
+In the admin: **الإعدادات → صلاحيات لوحة التحكم → ضيف** (any admin can do it;
+the primary account can never be removed and the list is never empty). It
+writes `ADMIN_EMAILS` for you. Or add the email to `ADMIN_EMAILS` by hand.
 
-They can then open the same admin URL. Nothing needs redeploying, and they
-can't see the code or the token.
+- On `/admin/` that's all: the API runs as the owner, so they don't need
+  access to the Sheet.
+- For the recovery admin (Apps Script URL) also share the **Sheet** (not the
+  script) with them as Editor: there the script runs as them.
+
+Nothing needs redeploying, and they can't see the code or the token.
 
 ## Renewing the GitHub token
 
@@ -278,3 +281,149 @@ first. `setup` runs the same upgrade, so re-running it is safe.
 
 To undo: unhide the `_backup_…` tabs (right-click the tab bar → show) and
 copy their contents back.
+
+
+## 8. The official admin page (`/admin/`)
+
+`https://stathanasiosyouth.github.io/admin/` **is** the admin: the same
+panel, served by GitHub Pages. The browser stays on that address the whole
+time (no redirect, no frame). The Apps Script URL from section 6 stays as
+the recovery admin (لوحة الطوارئ), linked in small print on the sign-in
+screen.
+
+```
+ /admin/ (GitHub Pages: index.html, admin-app.js, admin.css, boot.js, config.js)
+   │  "Sign in with Google" → a Google ID token (1 hour, kept for this tab only)
+   │  POST {fn, args, token}  (text/plain, no cookies)
+   ▼
+ Apps Script API deployment: doPost (Api.gs), runs as the owner
+   1. tokeninfo: Google checks the signature; aud = the client ID,
+      iss = accounts.google.com, not expired, email verified (cached per token)
+   2. the email is on ADMIN_EMAILS
+   3. only a listed api* function runs, as that email
+   ▼
+ Sheet / Drive / GitHub, exactly as before
+```
+
+There are **two public values** and they live in **one file**,
+`admin/config.js`:
+
+| Field      | What                                         | Status |
+| ---------- | -------------------------------------------- | ------ |
+| `clientId` | OAuth 2.0 Client ID (Web application)        | set: `246924773718-38p45gji0ouvi7an4jdjsip3obmk6ve4.apps.googleusercontent.com` |
+| `apiUrl`   | the API deployment's Web app URL (`…/exec`)  | **empty until step 8.3** → the page says «لوحة التحكم لسه بتتجهز» and offers the recovery admin |
+| `fallbackUrl` | the recovery admin (section 6)            | set |
+
+Neither is a secret (anyone can read a website's files). Who gets in is
+decided only by the server. There is **no client secret** in this flow:
+never create, store or use one.
+
+### 8.1 The OAuth client (done once, needs the owner's Google login)
+
+Already created. For the record, or to make it again:
+
+1. <https://console.cloud.google.com/> signed in as the owner → pick or create
+   a project (e.g. "athanasios-admin").
+2. **APIs & Services → OAuth consent screen** (Google Auth Platform →
+   *Branding / Audience / Data access*):
+   - *User type*: **External**. App name «لوحة تحكم أسرة البابا أثناسيوس»,
+     support email = the owner, developer contact = the owner.
+   - *Scopes / Data access*: add only **openid**, **…/auth/userinfo.email**,
+     **…/auth/userinfo.profile** (all "non-sensitive"; no verification needed).
+   - *Audience*: either **Publish app** ("In production"; fine for these three
+     scopes), or keep "Testing" and add every admin's Gmail under *Test users*
+     (otherwise Google refuses their sign-in).
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID**:
+   - *Application type*: **Web application**, name "admin page".
+   - *Authorized JavaScript origins*: **`https://stathanasiosyouth.github.io`**
+     (exactly: https, no path, no trailing slash).
+   - *Authorized redirect URIs*: leave empty.
+   - **Create**. Copy the **Client ID** (`…apps.googleusercontent.com`).
+     Ignore the client secret; it is not used anywhere.
+4. Put the Client ID in `admin/config.js` → `clientId` (already there) and in
+   the Script Property of step 8.2.
+
+### 8.2 Script Properties
+
+| Property          | Value |
+| ----------------- | ----- |
+| `ADMIN_CLIENT_ID` | optional. `Api.gs` already defaults to the Client ID above (`DEFAULT_ADMIN_CLIENT_ID`); set this only if the client ever changes. It must equal `admin/config.js` `clientId` |
+| `ADMIN_PRIMARY`   | optional; default `menazakmena@gmail.com`. The account that can never be removed from the allowlist |
+| `ADMIN_EMAILS`    | unchanged (now also editable from **الإعدادات → صلاحيات لوحة التحكم**) |
+
+If the server's client ID (property or default) differs from `clientId`, or the property is malformed, every API call is refused
+(the page says «جوجل دخّلك، بس خادم لوحة التحكم مقبلش الدخول»).
+
+### 8.3 The API deployment (a second deployment of the same project)
+
+The page on github.io can't send Google cookies to Apps Script, so the API
+runs as the owner and accepts anonymous requests; every request proves who
+it is with the ID token instead. That setting belongs **only** to this new
+deployment's version. The recovery deployment stays on version 14 (runs as
+the visitor) and must not be touched.
+
+1. Update the project's files from `apps-script/` (new: `Api.gs`; changed:
+   `Auth.gs`, `Code.gs`, `Migrate.gs`, `Admin*.html`). The repository's
+   `appsscript.json` keeps the recovery settings (`USER_ACCESSING`); leave
+   the Drive advanced service as it is.
+2. In the editor, open `appsscript.json` and set only the `webapp` part to:
+   ```json
+   "webapp": { "executeAs": "USER_DEPLOYING", "access": "ANYONE_ANONYMOUS" }
+   ```
+   Save.
+3. **Deploy → New deployment** → type **Web app** → description "Admin API" →
+   *Execute as*: **Me (menazakmena@gmail.com)** → *Who has access*:
+   **Anyone** → **Deploy**. Authorize if asked. Copy the **Web app URL**.
+4. Put the `appsscript.json` `webapp` part back to
+   `{ "executeAs": "USER_ACCESSING", "access": "ANYONE" }` and save, so the
+   project's head again matches the recovery deployment.
+5. Put the URL in **`admin/config.js` → `apiUrl`**, run
+   `cd tools && npm test`, commit and push. That's the only place.
+6. Open `https://stathanasiosyouth.github.io/admin/`, sign in, and check
+   **الإعدادات → صلاحيات لوحة التحكم** shows the list.
+
+To update the API later: step 1, step 2, **Deploy → Manage deployments →**
+the "Admin API" deployment **→ Edit → Version: New version → Deploy**, step 4.
+The URL stays the same. Never pick the recovery deployment there.
+
+The code is safe under both settings:
+
+- Runs as the owner (`USER_DEPLOYING`): `doGet` never serves the HTML admin
+  (it answers with a short JSON note), so there is no `google.script.run`
+  page running with the owner's rights. The only exception it can't tell
+  apart is the owner himself, signed in to Google, opening the API URL: he
+  gets the same panel the recovery admin gives him. The Session is never
+  used inside `doPost`, and `Session.getEffectiveUser()` is never used to let
+  anyone in.
+- Runs as the visitor (`USER_ACCESSING`, the recovery admin): unchanged.
+  `doPost` there still demands a valid token.
+
+### 8.4 What the page does (for maintainers)
+
+- `admin/index.html`, `admin/admin.css`, `admin/admin-app.js` are
+  **generated** from `apps-script/Admin*.html` by `tools/build-admin.mjs`
+  (`npm run build-admin`; `npm run sync` runs it too). `tests/refine-b.test.mjs`
+  fails when they are stale. Hand-written: `boot.js` (sign-in, the transport
+  `window.AdminTransport`), `config.js`, `gate.css`, `preview-guard.js`.
+- Security policy (meta tag): own files, `accounts.google.com/gsi/*` (script,
+  button frame, style), `script.google.com` + `script.googleusercontent.com`
+  (the API answers through a redirect to googleusercontent), the map frame
+  for the preview. No inline code or styles, no `eval`. `noindex`,
+  `no-referrer`; frame-busting in `boot.js` (Pages can't send headers).
+- The token is kept in memory only (never sessionStorage/localStorage: the
+  origin is shared with /your-voice-matters/), never past its expiry. A
+  reload signs in again through Google: silently with auto-select when it
+  can, otherwise with the button. When it runs out, a «الدخول محتاج يتجدد» dialog opens over
+  the panel; the call that needed it continues after signing in, so nothing
+  being edited is lost.
+- Preview (معاينة): on github.io the preview frame shares the site's origin.
+  `admin/preview-guard.js` runs first in it and gives the page its own
+  in-memory storage, so drafts never land in the site's cache or bell.
+
+### 8.5 Limits
+
+- Apps Script quotas apply to the API (URL fetch for token checks: cached,
+  one per token per hour; consumer accounts get 20,000 fetches a day).
+- A bad request costs one quick refusal; nothing runs before the token and
+  the allowlist are checked.
+- Signing out on the page signs out of the admin only (not of Google).

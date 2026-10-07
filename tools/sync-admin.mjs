@@ -42,7 +42,10 @@ const ADMIN_EXTRA = {
   user: '<circle class="duo" cx="12" cy="8" r="4"/><path d="M4 20.5c1.2-4 4.4-6 8-6s6.8 2 8 6"/>',
   globe: '<circle class="duo" cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9S14.5 18.3 12 21c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3Z"/>',
   grip: '<path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" stroke-width="3"/>',
-  dots: '<path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3.2"/>'
+  dots: '<path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3.2"/>',
+  lock: '<rect class="duo" x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5M12 14.5v2.5"/>',
+  shield: '<path class="duo" d="M12 3 4.5 6v5.5c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V6Z"/><path d="m9 12 2.2 2.2L15.5 10"/>',
+  logout: '<path d="M14 4.5h3.5A1.5 1.5 0 0 1 19 6v12a1.5 1.5 0 0 1-1.5 1.5H14"/><path d="m10 8-4 4 4 4M6 12h9"/>'
 };
 
 const names = [...LINK_ICON_NAMES, 'phone', 'close', 'chevron', 'alert', 'sparkle', 'megaphone', 'bell', 'clock', 'check', 'info', 'external', 'retry', 'copy', 'qr', 'share', 'download', 'arrow'];

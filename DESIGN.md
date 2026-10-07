@@ -54,9 +54,10 @@ inside their app icons.
 | ---------- | ------------------------------------- |
 | < 640px    | one column, in priority order         |
 | 640–1023px | two columns; featured + location side by side, contact + support side by side |
-| ≥ 1024px   | 12 columns: hero 5 + meeting 7, featured 7 + location 5, contact 6 + support 6 (a matched pair) |
+| ≥ 1024px   | 12 columns. The opening is one composition: the identity (logo in the arch, Ruqaa name) and the meeting share a lit full-bleed stage. Then: featured 7 + location 5, contact 6 + support 6 (a matched pair); icon-only link groups and the share band sit open (no box); news is one row (a rail) |
 
-A widget whose partner is missing takes the full row (`data-wide`).
+A widget whose partner is missing takes the full row (`data-wide`). Section
+order always comes from content.json `layout`.
 Safe-area insets are respected; there's no horizontal scroll at 360px.
 
 ## Motion: "motion graphics implemented as UI"
@@ -68,7 +69,8 @@ CSS `linear()`, falling back to a cubic-bezier where unsupported.
 | Layer / moment     | Motion                                                        |
 | ------------------ | ------------------------------------------------------------- |
 | Background         | Gold glow drifting very slowly; the cross lattice moves slower than the page on scroll (parallax, where scroll-driven animation is supported) |
-| Hero, on arrival   | The arch reveals upward, the logo springs in, the cross drops in, the name and tagline rise out of a soft blur; about 20 drifting gold dust particles |
+| Intro (first visit in a session, ≤ 2.7 s) | Not an overlay: the real hero is staged. The logo comes out of the dark at the centre in a blooming light, the name writes in, then the identity glides into its exact place, the arch draws, the cross drops and the page assembles around it. Any tap/key/scroll fast-forwards; skipped on repeat visits, deep links, reduced motion, weak devices and in the admin preview (assets/js/intro.js) |
+| Hero, on arrival (repeat visits) | The arch reveals upward, the logo springs in, the cross drops in, the name and tagline rise out of a soft blur; about 20 drifting gold dust particles |
 | Hero, on scroll    | Recedes slightly (moves up, scales to 96%, fades) as you scroll past |
 | Widgets            | Enter in priority order with depth (rise + scale from 95.5%), 70 ms apart, once |
 | Taps               | Spring press (scale down fast, spring back); app icons tilt     |
@@ -78,7 +80,9 @@ CSS `linear()`, falling back to a cubic-bezier where unsupported.
 | Countdowns         | Changed text rolls out and in instead of jumping                |
 | Bell               | Swings once (damped) when something new arrives; the badge springs in. Never loops |
 | Sheets (bell, news, game, meeting) | Slide up with a spring; drag down to dismiss; the list inside staggers in 40 ms apart |
-| Top bar            | Follows the scroll continuously (scroll-driven where supported): surface, blur (full tier), a gold hairline drawn from the centre, buttons settling; the compact name glides in as the hero name passes under it. Never changes height |
+| Top bar            | Follows the scroll continuously (scroll-driven where supported): a surface made of the page's own navy and light that feathers out below the bar (no slab, no hard edge), blur (full tier), a soft gold glow line, buttons settling; the compact name glides in as the hero name passes under it. Never changes height |
+| Support chat       | Loops calmly while on screen (≈ 4.4 s): visitor → seen → typing → reply → reaction → pause → fade. Paused off-screen and in hidden tabs; once in the lite tier; still under reduced motion |
+| Scrollbars (mouse/trackpad) | Slim navy/gold, the same tokens on the site, its sheets and the admin; touch keeps native scrollbars |
 
 Rules:
 

@@ -164,7 +164,9 @@ for (const [name, viewport] of Object.entries({ phone: PHONE, desktop: DESKTOP }
     assert.ok(top.surface < 0.05, `no surface at the very top (${top.surface})`);
     assert.ok(top.brand < 0.05, `no compact name at the top (${top.brand})`);
     assert.ok(scaleX(top.line) < 0.05, 'the hairline is not drawn yet');
-    assert.equal(top.width, viewport.width, 'full-bleed');
+    // full-bleed: the whole layout width (refine A keeps a stable scrollbar
+    // gutter on mouse screens, so that is the viewport minus the gutter)
+    assert.equal(top.width, await page.evaluate(() => Math.round(document.body.getBoundingClientRect().width)), 'full-bleed');
 
     // part way: in between (continuous, not a switch)
     await scrollTo(page, 60);
@@ -302,7 +304,7 @@ test('desktop: service and support are a matched pair of equal height', async ()
 
 });
 
-test('phone: the pair stacks; links unchanged; the chat plays once and rests; the avatar shows', async () => {
+test('phone: the pair stacks; links unchanged; the chat plays (and loops); the avatar shows', async () => {
 
   const { page, problems, close } = await open();
 
@@ -326,16 +328,19 @@ test('phone: the pair stacks; links unchanged; the chat plays once and rests; th
   assert.equal(await page.$eval('.chat__msg--out .chat__text', el => el.textContent), support().intro);
   assert.equal(await page.$eval('.chat__bubble .chat__text', el => el.textContent), support().reply);
 
-  // waiting before it is seen, then plays and rests on the final frame
+  // waiting before it is seen, then it plays (refine A: it keeps looping
+  // while visible in the full tier, see tests/refine-a.e2e.mjs; this used
+  // to assert "plays once and rests", which the loop makes obsolete)
   assert.equal(await page.$eval('.chat', el => el.classList.contains('is-armed')), true);
   await showContacts(page);
-  await page.waitForFunction(() => document.querySelector('.chat').classList.contains('is-playing'), { timeout: 3000 });
-  await page.waitForFunction(() => !document.querySelector('.chat').className.includes('is-'), { timeout: 8000 });
-  const final = await page.evaluate(() => {
+  await page.waitForFunction(() => document.querySelector('.chat').classList.contains('is-looping'), { timeout: 3000 });
+  // the whole story is shown within one cycle (the reply and the reaction appear)
+  await page.waitForFunction(() => Number(getComputedStyle(document.querySelector('.chat__reaction')).opacity) > 0.99, { timeout: 6000 });
+  const full = await page.evaluate(() => {
     const op = sel => Number(getComputedStyle(document.querySelector(sel)).opacity);
-    return { out: op('.chat__msg--out'), reply: op('.chat__bubble'), seen: op('.chat__ticks--seen'), reaction: op('.chat__reaction'), typing: op('.chat__typing') };
+    return { out: op('.chat__msg--out') > 0.99, reply: op('.chat__bubble') > 0.99, seen: op('.chat__ticks--seen') > 0.99, typing: op('.chat__typing') < 0.01 };
   });
-  assert.deepEqual(final, { out: 1, reply: 1, seen: 1, reaction: 1, typing: 0 });
+  assert.deepEqual(full, { out: true, reply: true, seen: true, typing: true });
 
   // the CTA never waited
   assert.equal(await page.$eval('.support .btn--whatsapp', el => getComputedStyle(el).opacity), '1');

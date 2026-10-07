@@ -826,7 +826,8 @@ test('preview: the draft on the real page, phone/computer, time travel; nothing 
   const shown = await frame.evaluate(() => ({
     preview: document.documentElement.hasAttribute('data-preview'),
     text: document.body.innerText,
-    poster: [...document.querySelectorAll('.news-lead img, .news-card img')].map(i => i.currentSrc).find(s => s.startsWith('blob:')) || '',
+    // the source the page chose (a lazy poster below the fold has no currentSrc yet)
+    poster: [...document.querySelectorAll('.news-lead img, .news-card img')].flatMap(i => [i.currentSrc, i.getAttribute('src') || '', ...(i.getAttribute('srcset') || '').split(/\s+/)]).find(s => s.startsWith('blob:')) || '',
     cached: localStorage.getItem('athanasios.content.v1')
   }));
   assert.equal(shown.preview, true);

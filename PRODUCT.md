@@ -47,4 +47,6 @@ digits so they're easy to dial.
 - A generic Linktree clone (identical stacked buttons).
 - A SaaS dashboard look.
 - A copy of صوتك يهمنا. Same family, different product.
-- Splash screens, autoplay sound, trackers.
+- Loading screens that make people wait, autoplay sound, trackers. (The short intro
+  is not one: the real page is there underneath from the first moment, any tap
+  skips it, and it plays once per session.)

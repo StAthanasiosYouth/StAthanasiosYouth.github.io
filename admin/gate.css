@@ -1,0 +1,365 @@
+/* /admin/: the gate before the panel (sign in, not set up, not allowed)
+   and the «ادخل تاني» dialog. Same family as the site: navy, gold, Cairo +
+   Aref Ruqaa. Hand-written (the panel's own styles are admin.css,
+   generated). No inline styles anywhere (CSP). */
+
+html.is-framed body {
+  display: none;
+}
+
+.shell {
+  display: contents;
+}
+
+body.is-gated {
+  background:
+    radial-gradient(70% 45% at 50% 28%, rgba(215, 170, 80, .13), transparent 70%),
+    radial-gradient(circle at 88% -8%, rgba(31, 94, 151, .3), transparent 42%),
+    linear-gradient(170deg, #071a31, #020914 70%);
+}
+
+.gate {
+  position: relative;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  min-height: 100dvh;
+  overflow: hidden;
+  padding: max(32px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom));
+  text-align: center;
+}
+
+.gate__glow {
+  position: absolute;
+  z-index: -1;
+  top: 34%;
+  left: 50%;
+  width: min(560px, 120vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(242, 210, 139, .14), transparent 66%);
+  transform: translate(-50%, -50%);
+}
+
+/* the iconostasis door around the logo */
+.gate__arch {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 170px;
+  height: 198px;
+  border: 1px solid rgba(242, 210, 139, .55);
+  border-radius: 85px 85px 18px 18px;
+  background: linear-gradient(180deg, rgba(18, 56, 95, .55), rgba(6, 26, 49, .25));
+  box-shadow:
+    inset 0 0 0 5px rgba(2, 9, 20, .55),
+    inset 0 0 0 6px rgba(242, 210, 139, .22),
+    0 34px 70px -34px #000;
+}
+
+.gate__cross {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  width: 14px;
+  height: 22px;
+  transform: translateX(-50%);
+}
+
+.gate__cross::before,
+.gate__cross::after {
+  content: "";
+  position: absolute;
+  border-radius: 2px;
+  background: #d7aa50;
+}
+
+.gate__cross::before {
+  left: 6px;
+  top: 0;
+  width: 2px;
+  height: 22px;
+}
+
+.gate__cross::after {
+  left: 0;
+  top: 6px;
+  width: 14px;
+  height: 2px;
+}
+
+.gate__logo {
+  position: relative;
+  width: 116px;
+  height: 116px;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 3px #c99a45,
+    0 6px 0 2px rgba(140, 100, 35, .65),
+    0 22px 44px rgba(0, 0, 0, .5),
+    0 0 50px rgba(215, 170, 80, .22);
+}
+
+.gate__ring {
+  position: absolute;
+  width: 136px;
+  height: 136px;
+  border: 1px solid rgba(242, 210, 139, .55);
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.gate__title {
+  margin: 26px 0 0;
+  font-family: "Aref Ruqaa", "Cairo", serif;
+  font-size: clamp(2.3rem, 9vw, 3.2rem);
+  font-weight: 700;
+  line-height: 1.3;
+  color: #f2d28b;
+  text-shadow: 0 2px 0 rgba(111, 79, 27, .7), 0 14px 30px rgba(0, 0, 0, .5);
+}
+
+.gate__sub {
+  margin: 2px 0 0;
+  font-size: 1rem;
+  color: #b9c5d5;
+}
+
+.gate__status {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin: 28px 0 0;
+  font-size: .92rem;
+  color: #8d9db3;
+}
+
+.gate__line {
+  display: block;
+  width: 168px;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(242, 210, 139, .16);
+}
+
+.gate__line i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(270deg, #f2d28b, #d7aa50);
+  transform: scaleX(.12);
+  transform-origin: right;
+}
+
+/* ---------- the panel under the title: one state at a time ---------- */
+
+.gate__panel {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  width: min(420px, 100%);
+  margin-top: 26px;
+}
+
+.gate__heading {
+  font-size: 1.12rem;
+  font-weight: 800;
+  color: #f3f6fb;
+}
+
+.gate__google {
+  display: grid;
+  place-items: center;
+  width: min(320px, 100%);
+  min-height: 48px;
+}
+
+.gate__note {
+  max-width: 34ch;
+  margin: 0;
+  font-size: .84rem;
+  color: #8d9db3;
+}
+
+.gate__note--warn {
+  color: #f5c56b;
+}
+
+.gate__message {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  padding: 16px 18px;
+  border: 1px solid rgba(242, 210, 139, .22);
+  border-radius: 18px;
+  text-align: start;
+  background: rgba(10, 33, 64, .6);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
+}
+
+.gate__message--danger {
+  border-color: rgba(255, 138, 125, .38);
+  background: rgba(200, 67, 58, .12);
+}
+
+.gate__message--info {
+  border-color: rgba(143, 198, 255, .28);
+}
+
+.gate__message-title {
+  margin: 0;
+  font-weight: 800;
+  color: #f3f6fb;
+}
+
+.gate__message--danger .gate__message-title {
+  color: #ffb3aa;
+}
+
+.gate__message-hint {
+  margin: 0;
+  font-size: .88rem;
+  color: #b9c5d6;
+}
+
+.gate__email {
+  justify-self: start;
+  margin: 2px 0;
+  padding: 2px 12px;
+  border-radius: 999px;
+  font-size: .9rem;
+  font-weight: 700;
+  color: #f2d28b;
+  background: rgba(215, 170, 80, .12);
+  unicode-bidi: isolate;
+}
+
+.gate__details {
+  font-size: .78rem;
+  color: #8d9db3;
+}
+
+.gate__details pre {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-align: left;
+}
+
+.gate__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.gate__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50px;
+  padding: 0 28px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  text-decoration: none;
+  color: #102039;
+  background: linear-gradient(135deg, #f3d48e, #c89235);
+  box-shadow: 0 5px 0 #8c6423, 0 18px 40px -12px rgba(201, 145, 53, .5);
+  cursor: pointer;
+  transition: transform .2s cubic-bezier(.16, 1, .3, 1);
+}
+
+.gate__btn:hover {
+  transform: translateY(-1px);
+}
+
+.gate__btn:active {
+  transform: translateY(3px);
+}
+
+.gate__btn:focus-visible,
+.gate__link:focus-visible {
+  outline: 2px solid #f2d28b;
+  outline-offset: 4px;
+}
+
+.gate__fallback {
+  margin: 30px 0 0;
+  font-size: .8rem;
+  color: #74859c;
+}
+
+.gate__fallback a,
+.gate__link {
+  color: #c9b27f;
+  text-underline-offset: 3px;
+}
+
+.gate .gate__arch { animation: gate-rise .7s cubic-bezier(.16, 1, .3, 1) both; }
+.gate .gate__logo { animation: gate-logo .85s cubic-bezier(.34, 1.4, .64, 1) .08s both; }
+.gate .gate__ring { animation: gate-ring 1s ease-out .3s; }
+.gate .gate__cross { animation: gate-drop .6s cubic-bezier(.34, 1.4, .64, 1) .2s both; }
+.gate .gate__title { animation: gate-in .6s cubic-bezier(.16, 1, .3, 1) .18s both; }
+.gate .gate__sub { animation: gate-in .6s cubic-bezier(.16, 1, .3, 1) .26s both; }
+.gate .gate__panel > * { animation: gate-in .45s cubic-bezier(.16, 1, .3, 1) both; }
+.gate[data-state="loading"] .gate__line i,
+.gate:not([data-state]) .gate__line i { animation: gate-sweep 1.4s cubic-bezier(.45, 0, .2, 1) infinite; }
+
+@keyframes gate-sweep {
+  0% { transform: scaleX(.08); transform-origin: right; }
+  50% { transform: scaleX(1); transform-origin: right; }
+  51% { transform-origin: left; }
+  100% { transform: scaleX(.08); transform-origin: left; }
+}
+
+
+/* ---------- «ادخل تاني» over the open panel (admin.css .modal) ---------- */
+
+.reauth__button {
+  display: grid;
+  place-items: center;
+  min-height: 48px;
+  margin: 6px 0 2px;
+}
+
+.reauth__error {
+  font-size: .86rem;
+  color: var(--danger, #ff8a7d);
+}
+
+.gate__panel .gate__status {
+  margin: 0;
+}
+
+@keyframes gate-rise {
+  from { opacity: 0; transform: translateY(18px) scale(.94); }
+}
+
+@keyframes gate-logo {
+  from { opacity: 0; transform: scale(.6) rotate(-10deg); }
+}
+
+@keyframes gate-ring {
+  from { opacity: .8; transform: scale(.85); }
+  to { opacity: 0; transform: scale(1.6); }
+}
+
+@keyframes gate-drop {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+}
+
+@keyframes gate-in {
+  from { opacity: 0; transform: translateY(10px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gate *,
+  .gate *::before,
+  .gate *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

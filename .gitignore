@@ -28,3 +28,9 @@ tools/.shots.mjs
 tools/.live.mjs
 tools/.shots-public.mjs
 tools/.shots-xp.mjs
+# scratch screenshot / review / live-check scripts
+tools/.shots-*.mjs
+tools/.review-*.mjs
+tools/.live-*.mjs
+tools/.icons-check.mjs
+review/
