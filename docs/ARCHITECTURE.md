@@ -251,6 +251,24 @@ are added to `meeting.skipDates` (countdown and calendar file).
   back. Never stored; a 404 or broken JSON = automatic. The admin's preview
   never asks.
 
+## Live program, import and surfaces (admin / server side)
+
+- Data schema 5 (additive columns, through the usual plan → backup →
+  migrate): `Sessions.program` (JSON text of `[{ title, time 'HH:MM' | '',
+  minutes | '' }]`), `Sections.surface`, `Sections.surfaceMobile`.
+- Publishing (Hub.gs) turns a session's program into the contiguous
+  `sessions[].program` above (start by time or by the previous stage's
+  duration; the last stage ends at the meeting's end); errors / warnings go
+  through the review like everything else.
+- `live.json` is written ONLY by `apiSetLiveStage(date, index | null)`: one
+  single-file GitHub commit, no review, never touching content.json or the
+  drafts; the last value is kept in the Script Property `LIVE_STATE`.
+- `apps-script/Import.gs`: «استيراد جدول الاجتماعات». `apiImportPreview`
+  (read-only: add / update with before → after / skip / error / locked) and
+  `apiImportApply(text, decisions)` (under the script lock; an update only if
+  ticked and still exactly what the preview showed; through the meetings
+  editor's own validation; no bell notifications).
+
 ## Ready for later (not built yet)
 
 - **Push notifications (Phase B):** light PWA (manifest + service worker),
