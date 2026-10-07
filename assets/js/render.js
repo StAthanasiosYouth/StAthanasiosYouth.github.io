@@ -592,7 +592,7 @@ function contactsWidget(contacts) {
     )
   );
 
-  liveWhileVisible(stage);
+  liveWhileVisible(stage, 'ring');
 
   return h('section', { class: 'widget person-card contact', 'data-area': 'contacts', 'aria-labelledby': 'contacts-title' },
     personHead(lead, 'contacts-title'),
@@ -604,13 +604,22 @@ function contactsWidget(contacts) {
 }
 
 
-/* the waves move only while the card is on screen (full tier: CSS) */
-function liveWhileVisible(el) {
+const cards = (el, kind) => import('./xp/cards.js').then(m => m.enhance(el, kind), () => {});
+
+/* the waves move only while the card is on screen (full tier: CSS); there,
+   the cards' extra life and sounds load (xp/cards.js) */
+function liveWhileVisible(el, kind) {
 
   if (!('IntersectionObserver' in window)) return;
 
   new IntersectionObserver(entries => {
-    for (const entry of entries) el.classList.toggle('is-live', entry.isIntersecting);
+    for (const entry of entries) {
+      el.classList.toggle('is-live', entry.isIntersecting);
+      if (entry.isIntersecting && kind && motionTier() !== 'reduced') {
+        cards(el, kind);
+        kind = '';
+      }
+    }
   }, { threshold: 0.3 }).observe(el);
 
 }
@@ -673,16 +682,9 @@ function tickMarks(extra) {
 
 
 /*
- * The conversation:
- *  - full tier: it keeps living while it is on screen (main.css, one 4.4 s
- *    cycle: message → typing → reply → pause → fade → again). Off screen or
- *    in a hidden tab it pauses where it is. If the page later measures slow
- *    (lite) or asks for reduced motion, it settles on the final frame.
- *  - lite: the same story once, when it scrolls into view (once per
- *    visit), then it rests on its full frame.
- *  - reduced motion (or no IntersectionObserver): the final frame at once.
- * The words never change (screen readers read a stable list); the button
- * below never waits for any of it.
+ * The conversation: full tier, a 4.4 s CSS loop while on screen (paused off
+ * screen / hidden tab; settles if the tier drops); lite, once per visit;
+ * reduced motion, the final frame. The words never change.
  */
 let chatPlayed = false;
 
@@ -711,6 +713,7 @@ function liveChat(stage) {
 
   const observer = new IntersectionObserver(entries => {
     visible = entries.some(entry => entry.isIntersecting);
+    if (visible) cards(stage, 'chat');
     if (visible && !stage.classList.contains('is-looping')) {
       stage.classList.add('is-looping');
       stage.classList.toggle('is-once', once);

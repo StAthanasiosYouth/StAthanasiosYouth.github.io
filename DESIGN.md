@@ -95,20 +95,30 @@ Rules:
 
 ## Sound
 
-Optional UI sounds, synthesized with Web Audio (zero downloads). **Silent by
-default**; the 🔇/🔊 button in the top bar turns them on, and the choice is
-remembered on that device. No audio is created until the visitor turns it on.
+UI sounds, synthesized with Web Audio (zero downloads). **On by default**
+(the user's call, final polish); the 🔇/🔊 button in the top bar mutes them,
+and a mute is remembered on that device (else for the visit). Autoplay
+rules hold: no audio is created before the visitor's first gesture, which
+wakes it; from then on sounds just work. Page sounds stay very soft.
 
 | Sound     | When                         | Character                         |
 | --------- | ---------------------------- | --------------------------------- |
-| tap       | buttons and cards            | a 35 ms soft click                |
+| tap       | buttons and cards            | a 30 ms very soft click           |
 | open / close | sheets                     | a glassy whoosh up / down         |
 | success   | link copied, sound turned on | two-note major third              |
 | ready     | a game opens while you watch | warm four-note rising arpeggio with shimmer |
 | important | an "important" notification arrives while you watch | one low bell with a quiet harmonic |
 
 Sounds never play in a hidden tab. Sounds not caused by a tap ("ready",
-"important") play only if audio was already unlocked by an earlier tap.
+"important") play only if audio was already woken by an earlier gesture.
+
+Scenes (lazy, `assets/js/xp/audio.js`) add soft phone sounds on the same
+setting and the same AudioContext: a touchscreen key tap per typed
+character (they stop with the typing), message pop, send swish, reaction
+pop, like, read tick, reel swipe, paper-plane whoosh, a call pulse. A
+small mixer: compressor + limiter, at most 3 voices, each kind throttled.
+A speaker in every scene sheet toggles the same setting. Reduced motion:
+no ambient scene sounds; lite: no key taps, half the rate.
 
 ## Components
 

@@ -213,7 +213,8 @@ test('a device clock 5 hours off still shows Egypt time states (server Date head
 });
 
 
-test('sound: silent by default; toggle remembers; no audio before opting in', async () => {
+// (final/s: sound is ON by default now; nothing audible before a gesture, a mute is remembered)
+test('sound: on by default, woken by the first gesture; a mute is remembered', async () => {
 
   const { page } = await open(PHONE, {
     before: () => {
@@ -223,20 +224,24 @@ test('sound: silent by default; toggle remembers; no audio before opting in', as
     }
   });
 
+  assert.equal(await page.$eval('#sound-toggle', el => el.getAttribute('aria-pressed')), 'true', 'on by default');
+  assert.equal(await page.evaluate(() => window.__audioContexts), 0, 'no audio context before a gesture');
+
   await page.click('#bell');
   await page.waitForSelector('dialog.sheet[open]');
   await page.evaluate(() => document.querySelector('dialog.sheet .sheet__close').click());
   await page.waitForFunction(() => !document.querySelector('dialog.sheet'));
-  assert.equal(await page.evaluate(() => window.__audioContexts), 0, 'no audio context before opting in');
-  assert.equal(await page.$eval('#sound-toggle', el => el.getAttribute('aria-pressed')), 'false');
+  assert.equal(await page.evaluate(() => window.__audioContexts), 1, 'the first gesture wakes it');
 
   await page.click('#sound-toggle');
-  assert.equal(await page.$eval('#sound-toggle', el => el.getAttribute('aria-pressed')), 'true');
-  assert.equal(await page.evaluate(() => window.__audioContexts), 1);
-  assert.equal(await page.evaluate(() => localStorage.getItem('athanasios.sound')), 'on');
+  assert.equal(await page.$eval('#sound-toggle', el => el.getAttribute('aria-pressed')), 'false');
+  assert.equal(await page.evaluate(() => localStorage.getItem('athanasios.sound')), 'off');
 
   await page.reload({ waitUntil: 'networkidle0' });
-  assert.equal(await page.$eval('#sound-toggle', el => el.getAttribute('aria-pressed')), 'true', 'remembered');
+  assert.equal(await page.$eval('#sound-toggle', el => el.getAttribute('aria-pressed')), 'false', 'the mute is remembered');
+  await page.click('#bell');
+  await page.waitForSelector('dialog.sheet[open]');
+  assert.equal(await page.evaluate(() => window.__audioContexts), 0, 'muted: no audio at all');
   await page.close();
 
 });

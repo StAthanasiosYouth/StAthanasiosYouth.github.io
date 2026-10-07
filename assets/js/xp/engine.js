@@ -22,7 +22,8 @@
 import { h, external } from '../dom.js';
 import { iconNode } from '../icons.js';
 import { isReduced } from '../motion.js';
-import { play } from '../sound.js';
+import { play, soundEnabled, setSoundEnabled } from '../sound.js';
+import { mixer } from './audio.js';
 import { openSheet } from '../sheet.js';
 import { PLATFORMS, platformOf } from '../platforms.js';
 
@@ -152,6 +153,43 @@ function ctaLabel(link, key, platform) {
 }
 
 
+/*
+ * The speaker in the sheet: the page's ONE sound setting (the top bar's
+ * button shows the same state), so a visitor can hear the scene without
+ * hunting for the top bar. Scene sounds: xp/audio.js (on by default, after a gesture).
+ */
+function speaker(sound) {
+
+  const paint = (button, on) => {
+    button.replaceChildren(iconNode(on ? 'sound-on' : 'sound-off'));
+    button.setAttribute('aria-pressed', String(on));
+  };
+
+  const button = h('button', {
+    class: 'xp-sound',
+    type: 'button',
+    'aria-label': 'صوت المشهد',
+    title: 'صوت المشهد',
+    onclick: () => {
+      const on = !soundEnabled();
+      setSoundEnabled(on);
+      paint(button, on);
+      // the top bar's button tells the same (painted as main.js does)
+      const top = document.getElementById('sound-toggle');
+      if (top) {
+        paint(top, on);
+        top.setAttribute('aria-label', on ? 'أصوات الواجهة: شغالة' : 'أصوات الواجهة: مقفولة');
+      }
+      if (on) setTimeout(() => sound('like', { force: true }), 80);
+    }
+  });
+
+  paint(button, soundEnabled());
+  return button;
+
+}
+
+
 /* readable text on an accent colour */
 function onAccent(hex) {
 
@@ -177,7 +215,8 @@ export function open(link, context, onClose) {
   const tier = document.documentElement.dataset.motion;
   const reduced = isReduced() || tier === 'reduced';
   const lite = !reduced && tier === 'lite';
-  let stopScene = () => {};
+  const sound = mixer({ reduced, lite });
+  let stopScene = () => sound.stop();
   let closed = false;
 
   markSeen(key);
@@ -204,6 +243,7 @@ export function open(link, context, onClose) {
   const sub = link.subtitle || platform.sub || hostOf(link.url);
 
   const content = h('div', { class: `xp xp--${scene} xp--${key}${first && !reduced ? ' is-first' : ''}` },
+    speaker(sound),
     stage,
     h('div', { class: 'xp__copy' },
       line ? h('p', { class: 'xp__line' }, line) : null,
@@ -239,13 +279,14 @@ export function open(link, context, onClose) {
       requestAnimationFrame(() => start(module));
       return;
     }
-    const running = module.play(stage, { quick: !first, reduced, lite, content: context.content || {}, sound: play, link, platform });
+    const running = module.play(stage, { quick: !first, reduced, lite, content: context.content || {}, sound, link, platform });
     if (!running || !running.stop) return;
     if ('root' in running) running.root = stage;
     // another sheet can replace this one without a close: stop with it
     const watch = setInterval(() => { if (!stage.isConnected) stopScene(); }, 1000);
     stopScene = () => {
       clearInterval(watch);
+      sound.stop();
       running.stop();
       stopScene = () => {};
     };

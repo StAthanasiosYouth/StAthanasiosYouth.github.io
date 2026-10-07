@@ -1,63 +1,57 @@
 /**
- * SOUND
- *
- * Optional UI sounds, synthesized with Web Audio (no files to download).
- * Silent by default; the 🔇/🔊 toggle remembers the choice on this device.
- * Sounds only answer the visitor's own taps, except "ready" / "important"
- * which play only if sound is on, the tab is visible, and audio was already
- * unlocked by an earlier tap.
- *
- * Character: short, soft, glassy. Peak level about -18 dBFS.
+ * SOUND: UI sounds, synthesized with Web Audio (no files). On by default;
+ * the 🔇/🔊 toggle remembers a mute on this device (else for the visit).
+ * Nothing is created before the visitor's first gesture, which wakes it.
+ * "ready" / "important" need it awake. Soft, glassy (~-18 dBFS); the
+ * scenes' mixer (xp/audio.js, lazy) shares the one AudioContext.
  */
 
 const KEY = 'athanasios.sound';
 
 let context = null;
 let master = null;
+let visit = true;
 
 export function soundEnabled() {
 
   try {
-    return localStorage.getItem(KEY) === 'on';
+    const stored = localStorage.getItem(KEY);
+    if (stored) return stored === 'on';
   }
-  catch {
-    return false;
-  }
+  catch { /* blocked: this visit's choice */ }
+  return visit;
 
 }
 
 
 export function setSoundEnabled(on) {
 
+  visit = on;
   try {
     localStorage.setItem(KEY, on ? 'on' : 'off');
   }
-  catch {
-    // private mode
-  }
+  catch { /* private mode */ }
 
-  if (on) {
-    unlock();
-  }
+  if (on) audio();
 
 }
 
 
-/* Must run inside a tap handler the first time (browser autoplay rules). */
-function unlock() {
+/* the shared context (created / resumed only after a gesture), or null */
+export function audio() {
+
+  const active = navigator.userActivation;
 
   try {
     if (!context) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return null;
+      if (!AudioCtx || (active && !active.hasBeenActive)) return null;
       context = new AudioCtx();
       master = context.createGain();
       master.gain.value = 0.12;
       master.connect(context.destination);
     }
-    if (context.state === 'suspended') {
-      context.resume();
-    }
+    if (context.state === 'suspended' && (!active || active.hasBeenActive)) context.resume();
   }
   catch {
     context = null;
@@ -66,6 +60,13 @@ function unlock() {
   return context;
 
 }
+
+/* the first real gesture wakes the audio (autoplay rules), if sound is on */
+const WAKE = ['pointerdown', 'keydown', 'touchend'];
+const wake = () => {
+  if (soundEnabled() && audio()) WAKE.forEach(type => removeEventListener(type, wake, true));
+};
+if (typeof addEventListener === 'function') WAKE.forEach(type => addEventListener(type, wake, true));
 
 
 function tone(freq, start, duration, { type = 'sine', gain = 1, glideTo = null, attack = 0.006 } = {}) {
@@ -119,34 +120,24 @@ function noise(start, duration, { from = 1800, to = 3800, gain = 0.5 } = {}) {
 
 
 const SOUNDS = {
-  // barely-there click
-  tap: () => {
-    tone(1650, 0, 0.035, { type: 'triangle', gain: 0.35, attack: 0.002 });
-  },
-  // soft glassy rise
+  tap: () => tone(1650, 0, 0.03, { type: 'triangle', gain: 0.16, attack: 0.002 }),
   open: () => {
-    noise(0, 0.18, { from: 900, to: 3200, gain: 0.35 });
-    tone(880, 0.02, 0.16, { gain: 0.25, glideTo: 1320 });
+    noise(0, 0.18, { from: 900, to: 3200, gain: 0.24 });
+    tone(880, 0.02, 0.16, { gain: 0.18, glideTo: 1320 });
   },
   close: () => {
-    noise(0, 0.15, { from: 3000, to: 900, gain: 0.3 });
-    tone(1180, 0, 0.12, { gain: 0.2, glideTo: 780 });
+    noise(0, 0.15, { from: 3000, to: 900, gain: 0.2 });
+    tone(1180, 0, 0.12, { gain: 0.14, glideTo: 780 });
   },
-  // a soft bubble (reactions, messages)
-  pop: () => {
-    tone(740, 0, 0.09, { gain: 0.3, glideTo: 1180, attack: 0.004 });
-  },
-  // two-note major third
+  pop: () => tone(740, 0, 0.09, { gain: 0.3, glideTo: 1180, attack: 0.004 }),
   success: () => {
     tone(1046.5, 0, 0.28, { gain: 0.4 });
     tone(1318.5, 0.08, 0.34, { gain: 0.35 });
   },
-  // warm rising arpeggio with a shimmer
   ready: () => {
     [659.3, 830.6, 987.8, 1318.5].forEach((f, i) => tone(f, i * 0.07, 0.42, { gain: 0.32 }));
     noise(0.2, 0.35, { from: 4000, to: 7000, gain: 0.12 });
   },
-  // single low bell with a quiet harmonic
   important: () => {
     tone(392, 0, 0.9, { gain: 0.45 });
     tone(784, 0, 0.7, { gain: 0.12 });
@@ -155,29 +146,16 @@ const SOUNDS = {
 };
 
 
-/**
- * Plays a named sound if the visitor enabled sounds.
- * passive: true for sounds not caused by a tap (needs an unlocked context).
- */
+/* passive: not caused by a tap (needs a running context) */
 export function play(name, { passive = false } = {}) {
 
-  if (!soundEnabled() || !SOUNDS[name] || document.hidden) {
-    return;
-  }
-
-  if (passive && (!context || context.state !== 'running')) {
-    return;
-  }
-
-  if (!unlock()) {
-    return;
-  }
+  if (!soundEnabled() || !SOUNDS[name] || document.hidden) return;
+  if (passive && (!context || context.state !== 'running')) return;
+  if (!audio()) return;
 
   try {
     SOUNDS[name]();
   }
-  catch {
-    // never let a sound break the page
-  }
+  catch { /* never break the page */ }
 
 }
