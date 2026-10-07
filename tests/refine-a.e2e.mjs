@@ -366,6 +366,8 @@ test('the live featured banner (img-cadc4835) is shown whole on desktop', async 
 
   const { page, problems, close } = await open({ viewport: DESKTOP, port: LIVE, seen: true });
   await ready(page);
+  // below the first screen its full-size file loads as it comes near
+  await page.$eval('.featured', n => n.scrollIntoView({ block: 'center' }));
   await page.waitForFunction(() => { const i = document.querySelector('.featured .section-banner__img'); return i && i.complete && i.naturalWidth > 480; }, { timeout: 5000 });
   const b = await bannerState(page, '.featured');
   assert.ok(b.fit === 'contain' || Math.abs(b.slot / b.ar - 1) < 0.035, `whole banner (${b.fit}, slot ${b.slot.toFixed(3)} vs ${b.ar})`);

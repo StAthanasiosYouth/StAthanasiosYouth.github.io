@@ -4590,3 +4590,67 @@ html[data-intro="play"] .hero__tagline {
     filter: blur(0);
   }
 }
+
+/* =========================================================
+   DESKTOP OPENING, CENTRED: the identity stands at the upper centre of
+   the lit stage (centred, kept high, not in the middle of the screen),
+   the meeting sits under it in the same light. The intro's glide then
+   only rises (no sideways travel).
+========================================================= */
+
+@media (min-width: 1024px) {
+
+  [data-area="hero"],
+  [data-area="hero"][data-wide] {
+    grid-row: 1;
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: min(100%, 720px);
+  }
+
+  [data-area="hero"] ~ [data-area="meeting"],
+  [data-area="hero"]:not([data-wide]) ~ [data-area="meeting"] {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: min(100%, 880px);
+  }
+
+  .hero {
+    padding: 6px 0 8px;
+  }
+
+  /* the stage now holds both rows, its light on the identity's axis */
+  .hub::before {
+    grid-row: 1 / span 2;
+    background:
+      radial-gradient(38% 46% at 50% 24%, rgba(215, 170, 80, .14), transparent 72%),
+      radial-gradient(60% 56% at 50% 62%, rgba(18, 56, 95, .4), transparent 76%),
+      linear-gradient(rgba(13, 48, 88, .5), rgba(6, 26, 49, .26) 58%, transparent);
+  }
+
+  /* the meeting is lit from above now (the identity is over it) */
+  [data-area="hero"]:not([data-wide]) ~ .meeting:not([data-theme]),
+  [data-area="hero"] ~ .meeting:not([data-theme]) {
+    background:
+      radial-gradient(70% 70% at 50% 0%, rgba(215, 170, 80, .13), transparent 64%),
+      linear-gradient(rgba(255, 255, 255, .05), rgba(255, 255, 255, .012) 52%),
+      rgba(6, 26, 49, .8);
+  }
+
+  [data-area="hero"]:not([data-wide]) ~ .meeting::after,
+  [data-area="hero"] ~ .meeting::after {
+    background: linear-gradient(180deg, rgba(242, 210, 139, .55), rgba(242, 210, 139, .14) 40%, transparent 74%);
+  }
+
+  [data-area="hero"] ~ .meeting {
+    margin-top: 0;
+  }
+
+  /* the intro: the identity already sits on the centre line */
+  html[data-intro="play"],
+  html[data-intro="play"] .hero[data-wide] {
+    --intro-dx: 0px;
+  }
+
+}
