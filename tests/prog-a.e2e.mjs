@@ -3,7 +3,8 @@
 // code needed) and a Cairo clock override:
 //   - the location card on phones (320/360/390/412): no sideways overflow,
 //     one map toggle (aria-expanded, keyboard), buttons ≥ 44px, the real
-//     map exactly as wide as the card; desktop keeps its two-up grid
+//     map (.location__live: Leaflet since final pass M) exactly as wide as
+//     the card; desktop keeps its two-up grid
 //   - the live program: «دلوقتي / بعدها» by Cairo time, following the
 //     tick without a layout jump; live.json wins for its own date; stage
 //     null / another date / 404 / broken JSON = automatic; live.json is
@@ -41,6 +42,9 @@ const PHONE = phone(390);
 const DESKTOP = { width: 1440, height: 900, deviceScaleFactor: 1 };
 
 const PUBLISHED = JSON.parse(readFileSync(`${ROOT}content.json`, 'utf8'));
+
+/* a 1×1 PNG for the map tiles (no real network) */
+const TILE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
 
 /* a Sunday meeting at 20:00 (two hours) with a four-stage program */
 const D = '2026-10-11';
@@ -137,6 +141,10 @@ async function open({ viewport = PHONE, content = PUBLISHED, at = null, live = 4
     if (url.hostname === 'www.google.com') {
       request.respond({ status: 200, contentType: 'text/html', body: '<!doctype html><title>map</title>' });
     }
+    else if (url.hostname === 'tile.openstreetmap.org') {
+      // the real map since final pass M: Leaflet + OSM tiles
+      request.respond({ status: 200, contentType: 'image/png', body: TILE });
+    }
     else if (url.pathname === '/content.json') {
       request.respond({ status: 200, contentType: 'application/json', body: JSON.stringify(content), headers: { Date: new Date(Date.now() + skew).toUTCString() } });
     }
@@ -200,7 +208,7 @@ for (const width of [320, 360, 390, 412]) {
     const check = () => page.evaluate(() => {
       const card = document.querySelector('.location');
       const box = card.getBoundingClientRect();
-      const outside = [...card.querySelectorAll('.location__body *, .location__map, .location__map > iframe')]
+      const outside = [...card.querySelectorAll('.location__body *, .location__map, .location__live')]
         .filter(el => { const r = el.getBoundingClientRect(); return r.width && (r.left < box.left - 0.5 || r.right > box.right + 0.5); })
         .map(el => el.className || el.tagName);
       const buttons = [...card.querySelectorAll('.location__actions > *')].map(el => {
@@ -208,7 +216,7 @@ for (const width of [320, 360, 390, 412]) {
         return { text: el.textContent.trim(), w: r.width, h: r.height, clipped: el.scrollWidth > el.clientWidth + 1, top: Math.round(r.top) };
       });
       const map = card.querySelector('.location__map').getBoundingClientRect();
-      const frame = card.querySelector('.location__map iframe');
+      const frame = card.querySelector('.location__live');
       return {
         outside,
         buttons,
@@ -236,7 +244,7 @@ for (const width of [320, 360, 390, 412]) {
     // open it (a tap), then close it from the keyboard
     const toggle = await page.$('.location__toggle');
     await toggle.click();
-    await page.waitForSelector('.location__map.is-live iframe');
+    await page.waitForSelector('.location__map.is-live .location__live');
     assert.equal(await toggle.evaluate(el => el.getAttribute('aria-expanded')), 'true');
     const opened = await check();
     assert.equal(await overflow(page), 0);
@@ -250,7 +258,7 @@ for (const width of [320, 360, 390, 412]) {
     await toggle.focus();
     await page.keyboard.press('Enter');
     assert.equal(await toggle.evaluate(el => el.getAttribute('aria-expanded')), 'false');
-    assert.equal(await page.$('.location__map iframe'), null, 'back to the drawing');
+    assert.equal(await page.$('.location__live'), null, 'back to the drawing');
     await page.keyboard.press('Space');
     assert.equal(await toggle.evaluate(el => el.getAttribute('aria-expanded')), 'true');
 

@@ -117,7 +117,8 @@ Sounds never play in a hidden tab. Sounds not caused by a tap ("ready",
 | Meeting widget   | Ruqaa headline, the day and time in a sentence, a 7-day strip from today to the meeting, add-to-calendar (Google, or `.ics` for iPhone/Outlook) |
 | Announcement     | Three tones: info (gold), alert (carmine), celebrate (gold sparkle) |
 | Featured service | Arch art, title, one line, gold CTA pill; the whole card is one tap target |
-| Location         | Stylized map (hills, coast, Red Sea, pin), name and address, Maps / directions / an on-demand real map |
+| Location         | Stylized map (hills, coast, Red Sea, pin), name and address, Maps / directions / an on-demand real map: OpenStreetMap in Leaflet, the tiles darkened to navy in CSS (controls, the gold church pin, the route and the attribution unfiltered), navy/gold 44px controls, «رجّع للكنيسة»; the wheel zooms only after a click or focus |
+| Directions («الاتجاهات») | A panel right under the map: «بالعربية» / «مشي» chips, «من موقعي» (why we ask, said before the prompt) or «اختار نقطة البداية» (tap the map; Enter picks its centre), the route in gold with a soft glow, distance and time in Arabic digits, the routing credit; any failure says so plainly and turns «افتح الاتجاهات في خرائط جوجل» gold |
 | Link section     | Tiles (app icons) and/or rows (icon, title, description, arrow) |
 | Contact          | Matched pair with Support: head (arch initial or photo, name, role), a stage of equal height, the action at the bottom. Service: a phone ringing softly (waves), the invitation line (intro), a full-width call button showing the number |
 | Support          | A short WhatsApp-style chat (intro → typing → reply with the avatar → read ticks, a reaction), played once when scrolled into view, then resting; a quieter WhatsApp button with a ready message |
@@ -132,4 +133,4 @@ Sounds never play in a hidden tab. Sounds not caused by a tap ("ready",
 | Bell panel       | Grouped by النهارده / امبارح / الأسبوع ده / أقدم; type icons (important in carmine); unread dots; poster thumbnails |
 | Meeting program  | While the meeting runs: «دلوقتي» (bold) and «بعدها» (with its time while it is still ahead) in two fixed rows under the countdown; one quiet «أول حاجة» line earlier that day; nothing after. A soft roll on a change in the full tier only. The meeting sheet lists the whole program, the stage on now in a gold-lit row |
 | Surfaces («شكل الخلفية») | Per section, and per section on phones: glass (see-through, a soft hairline, frosted in the full tier only), dark (one solid deep navy), filled (the featured card's light), none (no box). Unset = the usual look |
-| Location on phones | A narrow card (≤ 380px) lets its buttons flow: Google Maps full width, then directions + the one map toggle (both labels share one cell, so it never changes size); the real map is 5:4 and exactly as wide as the card |
+| Location on phones | A narrow card (≤ 380px) lets its buttons flow: Google Maps full width, then directions + the one map toggle (both labels share one cell, so it never changes size); the real map is 5:4 and exactly as wide as the card (square, ≤ 360px, while routing) |
