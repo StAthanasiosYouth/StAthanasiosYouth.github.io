@@ -81,9 +81,11 @@ function routeFor_(request) {
     return JSON.parse(cached);
   }
 
-  var key = PropertiesService.getScriptProperties().getProperty('ORS_API_KEY');
+  // pasted keys often carry a stray space, newline or quotes
+  var key = String(PropertiesService.getScriptProperties().getProperty('ORS_API_KEY') || '').trim().replace(/^["']|["']$/g, '');
 
   if (!key) {
+    console.warn('route: the Script Property ORS_API_KEY is not set');
     return routeFailure_('config');
   }
 
@@ -102,6 +104,8 @@ function routeFor_(request) {
   var status = response.getResponseCode();
 
   if (status === 401 || status === 403) {
+    // the owner's executions log says why (openrouteservice's own words; never the key)
+    console.warn('route: openrouteservice refused the key: HTTP ' + status + ' ' + String(response.getContentText() || '').slice(0, 200));
     return routeFailure_('config');
   }
 
