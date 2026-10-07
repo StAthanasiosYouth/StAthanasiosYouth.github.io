@@ -496,6 +496,24 @@ function linkedIds_(kind, key) {
  * original date for sessions as input.originalDate); input.notify: linked
  * notification checkboxes.
  */
+/* the edit locks a save touches (Presence.gs): an existing item's, never a new one's */
+function itemLockKeys_(kind, spec, input, record) {
+
+  if (spec.key === 'id') {
+    var id = contentLine_(input.id);
+    return id ? [kind + ':' + id] : [];
+  }
+
+  if (kind === 'types') {
+    return input.isNew ? [] : [kind + ':' + record.key];
+  }
+
+  // sessions: the date it had, and the date it moves to
+  return [contentLine_(input.originalDate), record.date].filter(Boolean).map(function (date) { return kind + ':' + date; });
+
+}
+
+
 function apiSaveItem(kind, input) {
 
   assertAdmin_();
@@ -518,6 +536,9 @@ function apiSaveItem(kind, input) {
   }
 
   return mutate_(kind + '.save', '', function () {
+
+    // someone else is editing it right now (Presence.gs; API mode only)
+    assertUnlocked_(itemLockKeys_(kind, spec, input, record));
 
     if (spec.key === 'id') {
 
@@ -587,6 +608,9 @@ function apiDeleteItem(kind, key) {
 
   return mutate_(kind + '.delete', key, function () {
 
+    // someone else is editing it right now (Presence.gs; API mode only)
+    assertUnlocked_(kind + ':' + key);
+
     ensureTable_(spec.table);
 
     if (!deleteRow_(spec.table, spec.key, key)) {
@@ -618,6 +642,9 @@ function apiSetItemArchived(kind, key, archived) {
   }
 
   return mutate_(kind + (archived ? '.archive' : '.unarchive'), key, function () {
+
+    // someone else is editing it right now (Presence.gs; API mode only)
+    assertUnlocked_(kind + ':' + key);
 
     ensureTable_(spec.table);
 
@@ -693,6 +720,9 @@ function apiSetItemEnabled(kind, key, enabled) {
   var spec = itemKind_(kind);
 
   return mutate_(kind + '.toggle', key + ' ' + enabled, function () {
+
+    // someone else is editing it right now (Presence.gs; API mode only)
+    assertUnlocked_(kind + ':' + key);
 
     ensureTable_(spec.table);
 

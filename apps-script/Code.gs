@@ -423,6 +423,9 @@ function apiSaveLink(input) {
 
   return mutate_('link.save', link.title, function () {
 
+    // someone else is editing it right now (Presence.gs; API mode only)
+    assertUnlocked_(existingId ? 'links:' + existingId : '');
+
     var rows = readTable_('Links');
     var isNew = !existingId || !rows.some(function (row) { return row.id === existingId; });
 
@@ -450,6 +453,9 @@ function apiSetLinkEnabled(id, enabled) {
   validId_(id);
 
   return mutate_('link.toggle', id + ' ' + enabled, function () {
+
+    // someone else is editing it right now (Presence.gs; API mode only)
+    assertUnlocked_('links:' + id);
     if (!findRow_('Links', 'id', id)) {
       throw new Error('الرابط مش موجود');
     }
@@ -465,6 +471,9 @@ function apiDeleteLink(id) {
   validId_(id);
 
   return mutate_('link.delete', id, function () {
+
+    // someone else is editing it right now (Presence.gs; API mode only)
+    assertUnlocked_('links:' + id);
     if (!deleteRow_('Links', 'id', id)) {
       throw new Error('الرابط مش موجود');
     }
@@ -569,6 +578,9 @@ function apiSaveSection(input, isNew) {
 
   return mutate_('section.save', key, function () {
 
+    // someone else is editing it right now (Presence.gs; API mode only)
+    assertUnlocked_(isNew ? '' : 'sections:' + key);
+
     var rows = sortRows_(readTable_('Sections'));
     var exists = rows.some(function (row) { return row.key === key; });
 
@@ -624,6 +636,9 @@ function apiSetSectionEnabled(key, enabled) {
   validId_(key);
 
   return mutate_('section.enabled', key + ' ' + (enabled === true), function () {
+
+    // someone else is editing it right now (Presence.gs; API mode only)
+    assertUnlocked_('sections:' + key);
     if (!findRow_('Sections', 'key', key)) {
       throw builtinSection_(key)
         ? appError_('الأقسام الأساسية محتاجة ترقية البيانات الأول.', 'من الإعدادات ← ترقية البيانات.')
@@ -645,6 +660,9 @@ function apiDeleteSection(key) {
   }
 
   return mutate_('section.delete', key, function () {
+
+    // someone else is editing it right now (Presence.gs; API mode only)
+    assertUnlocked_('sections:' + key);
 
     var used = readTable_('Links').some(function (row) {
       return !contentBool_(row.featured) && row.section === key;
@@ -735,6 +753,9 @@ function apiSaveContact(input) {
 
   return mutate_('contact.save', contact.name, function () {
 
+    // someone else is editing it right now (Presence.gs; API mode only)
+    assertUnlocked_(existingId ? 'contacts:' + existingId : '');
+
     var rows = readTable_('Contacts');
     var isNew = !existingId || !rows.some(function (row) { return row.id === existingId; });
 
@@ -760,6 +781,9 @@ function apiDeleteContact(id) {
   validId_(id);
 
   return mutate_('contact.delete', id, function () {
+
+    // someone else is editing it right now (Presence.gs; API mode only)
+    assertUnlocked_('contacts:' + id);
     if (!deleteRow_('Contacts', 'id', id)) {
       throw new Error('جهة التواصل مش موجودة');
     }
@@ -922,6 +946,9 @@ function apiSaveSettings(values) {
   }
 
   return mutate_('settings.save', Object.keys(clean).join(', '), function () {
+
+    // someone else is editing it right now (Presence.gs; API mode only)
+    assertUnlocked_(settingsLockKeys_(clean));
 
     var sheet = sheet_('Settings');
     var rows = readTable_('Settings');
