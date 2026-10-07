@@ -89,7 +89,7 @@ export const CLIPS = [
     poster: "assets/media/xp/clips/saboona.webp",
     w: 360,
     h: 640,
-    duration: 4,
+    duration: 3.7,
     caption: "تحدي المصاصة والصابونة"
   },
   {
@@ -98,7 +98,7 @@ export const CLIPS = [
     poster: "assets/media/xp/clips/asela.webp",
     w: 360,
     h: 640,
-    duration: 3.8,
+    duration: 5,
     caption: "أسئلة سريعة"
   },
   {
@@ -107,7 +107,7 @@ export const CLIPS = [
     poster: "assets/media/xp/clips/timer.webp",
     w: 360,
     h: 640,
-    duration: 4.4,
+    duration: 4.5,
     caption: "لعبة الـTimer"
   },
   {
@@ -116,7 +116,7 @@ export const CLIPS = [
     poster: "assets/media/xp/clips/khamen.webp",
     w: 360,
     h: 640,
-    duration: 5.3,
+    duration: 5,
     caption: "خمن الورقة"
   },
   {
@@ -125,7 +125,7 @@ export const CLIPS = [
     poster: "assets/media/xp/clips/metgawzeen.webp",
     w: 360,
     h: 640,
-    duration: 3.8,
+    duration: 4.8,
     caption: "لعبة المتجوزين"
   },
   {
@@ -134,7 +134,7 @@ export const CLIPS = [
     poster: "assets/media/xp/clips/sot.webp",
     w: 360,
     h: 640,
-    duration: 3.6,
-    caption: "قلد الصوت"
+    duration: 5,
+    caption: "تمثيل الصوت"
   }
 ];
