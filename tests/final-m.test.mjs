@@ -3,7 +3,7 @@
 //     start, rounded), reading the web app's answers and error codes
 //   - apps-script/Route.gs in the fake Apps Script world: the ORS key stays
 //     on the server (Script Property ORS_API_KEY), validation (profile,
-//     Egypt, 400 km), the church from Settings, caching, the minute/day
+//     Egypt, 1,000 km), the church from Settings, caching, the minute/day
 //     budgets, upstream errors mapped to config / busy / invalid / upstream,
 //     replies with only the documented fields, nothing written anywhere
 //   - the vendored Leaflet is the official 1.9.4 file with its licence; the
@@ -139,7 +139,7 @@ test('Route.gs: walking too; profiles outside the list and malformed starts are 
     { profile: 'driving-car', from: [33.93, Infinity] },
     { profile: 'driving-car', from: [2.35, 48.85] },        // Paris: outside Egypt
     { profile: 'driving-car', from: [34.2, 21.5] },         // south of the box
-    { profile: 'driving-car', from: [25.5, 31.3] }          // in Egypt (Sallum) but > 400 km away
+    { profile: 'driving-car', from: [24.8, 22.0] }          // in Egypt (the far south-west corner) but > 1,000 km away
   ];
   for (const request of bad) {
     const answer = route(request);
@@ -150,7 +150,7 @@ test('Route.gs: walking too; profiles outside the list and malformed starts are 
   assert.equal(calls.length, 1, 'no upstream call for a refused request');
   assert.equal(route({ profile: 'driving-car', from: [33.81, 27.25] }).ok, true, 'Hurghada');
   assert.equal(route({ profile: 'driving-car', from: [32.64, 25.69] }).ok, true, 'Luxor (about 170 km)');
-  assert.equal(route({ profile: 'driving-car', from: [31.23, 30.04] }).code, 'invalid', 'Cairo is about 450 km away: beyond the limit');
+  assert.equal(route({ profile: 'driving-car', from: [31.23, 30.04] }).ok, true, 'Cairo (about 450 km): visitors may come from anywhere in Egypt');
 });
 
 test('Route.gs: no key = config (and no call)', () => {
@@ -286,4 +286,24 @@ test('public CSP: only the OSM tiles (img) and the Apps Script hosts (connect) a
   assert.doesNotMatch(csp, /openrouteservice/, 'routing goes through Apps Script, never from the browser');
   assert.match(html, /<meta name="referrer" content="strict-origin-when-cross-origin">/);
   assert.doesNotMatch(readFileSync(`${ROOT}assets/js/map-config.js`, 'utf8') + readFileSync(`${ROOT}assets/js/map.js`, 'utf8'), /api\.openrouteservice|ORS_API_KEY\s*=|Authorization/);
+});
+
+
+test('doPost: the public route action needs no sign-in and reaches nothing else', () => {
+  const { world, calls } = routeWorld();
+  world.as('');
+  // a visitor (no token, no session): a route answer, through the real API entry
+  const reply = world.post({ fn: 'route', args: [{ profile: 'driving-car', from: [33.93, 26.74] }] });
+  assert.equal(reply.ok, true, JSON.stringify(reply));
+  assert.equal(calls.length, 1, 'one upstream call');
+  assert.equal(typeof reply.distance, 'number');
+  assert.ok(!JSON.stringify(reply).includes(KEY), 'the key never comes back');
+  // anything else without a token is still refused
+  const admin = world.post({ fn: 'apiState', args: [] });
+  assert.equal(admin.ok, false);
+  assert.equal(admin.code, 'auth');
+  // a "route" can't smuggle another function or a destination
+  const sneaky = world.post({ fn: 'route', args: [{ profile: 'driving-car', from: [33.93, 26.74], to: [0, 0], fn: 'apiState' }] });
+  assert.equal(calls.at(-1).body.coordinates.at(-1)[0] !== 0, true, 'the destination is always the church');
+  assert.ok(!('state' in sneaky));
 });

@@ -108,6 +108,14 @@ function doPost(e) {
   try {
 
     var request = readApiRequest_(e);
+
+    // the ONE public action: a visitor's route to the church (Route.gs). No
+    // token, no session, no admin data: its own validation, cache and daily
+    // budget; the openrouteservice key never leaves the server.
+    if (request.fn === 'route') {
+      return jsonOutput_(publicRoute_(request.args && request.args[0]));
+    }
+
     var email = verifyIdToken_(request.token);
 
     if (!isAdmin_(email)) {
