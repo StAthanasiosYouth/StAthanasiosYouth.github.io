@@ -471,3 +471,52 @@ body.is-gated {
     transition: none !important;
   }
 }
+
+/* ---------- what Google's sign-in adds to the page ----------
+   With a Google session in the browser, Google appends its own elements to
+   <body> (the One Tap card, an announcer for screen readers) and positions
+   them with inline styles, which this page's strict CSP blocks. Unstyled,
+   they fall into the page flow at default sizes. Place them here instead. */
+#credential_picker_container {
+  position: fixed;
+  z-index: 2147483000;
+  top: 12px;
+  right: 12px;
+  max-width: calc(100% - 24px);
+}
+
+#credential_picker_container iframe,
+#credential_picker_iframe {
+  display: block;
+  max-width: 100%;
+  border: 0;
+}
+
+#g_a11y_announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* the ?layout check panel (admin/layout-check.js) */
+#layout-check {
+  position: fixed;
+  z-index: 2147483001;
+  bottom: 10px;
+  left: 10px;
+  max-width: calc(100% - 20px);
+  max-height: 40vh;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border-radius: 10px;
+  font: 12px/1.5 ui-monospace, Consolas, monospace;
+  color: #111;
+  background: #fffbe6;
+  direction: ltr;
+  white-space: pre-wrap;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .5);
+}

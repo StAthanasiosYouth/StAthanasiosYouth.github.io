@@ -433,7 +433,7 @@ test('admin/: strict CSP, noindex, no-referrer, no inline code, no redirect, no 
   assert.match(html, /<meta name="referrer" content="no-referrer">/);
   assert.doesNotMatch(html, /\sstyle=|<style|<script>|\son[a-z]+="/, 'no inline style or script');
   assert.doesNotMatch(html, /<iframe|http-equiv="refresh"/i, 'never embedded, never redirected');
-  assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]), ['config.js', 'admin-app.js', 'boot.js']);
+  assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]), ['config.js', 'admin-app.js', 'boot.js', 'layout-check.js']);
 
   const boot = readFileSync(`${ROOT}admin/boot.js`, 'utf8');
   assert.match(boot, /window\.top !== window\.self/, 'frame-busting');
@@ -460,7 +460,7 @@ test('admin/config.js: the one public config place — no secrets, the right sha
   assert.doesNotMatch(text, /GOCSPX|client_secret|ghp_|github_pat_|AIza/, 'no secrets');
 
   // the deployment ids appear nowhere else in admin/
-  for (const file of ['index.html', 'boot.js', 'admin-app.js', 'gate.css', 'admin.css', 'preview-guard.js']) {
+  for (const file of ['index.html', 'boot.js', 'admin-app.js', 'gate.css', 'admin.css', 'preview-guard.js', 'layout-check.js']) {
     assert.doesNotMatch(readFileSync(`${ROOT}admin/${file}`, 'utf8'), /script\.google\.com\/macros\/s\/AK|apps\.googleusercontent\.com"/, file);
   }
 });
