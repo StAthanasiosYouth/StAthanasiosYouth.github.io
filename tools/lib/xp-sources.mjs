@@ -18,12 +18,14 @@ export const POSTERS = [
   ['2026-07-05', '2026-7-5/بوستر.png', 'الصلاة', '']
 ];
 
-/* game segments: [id, source, [[from, to]…], landscape?, poster at (s), caption] */
+/* game segments: [id, source, [[from, to]…], landscape?, poster at (s), caption]
+   real moments of people playing, cut from the original camera/phone files
+   (or the segment's own edited export), wide or medium-wide group shots */
 export const CLIPS = [
-  ['saboona', 'لعبة الصابونة و المصاصة/فيديو.mp4', [[2.4, 6.4]], true, 2.6, 'تحدي المصاصة والصابونة'],
-  ['asela', 'أسئلة سريعة/أسئلة سريعة.mp4', [[87.3, 91.1]], false, 2.4, 'أسئلة سريعة'],
-  ['timer', 'لعبة الTimer/Firefly Animate this image without changing, rewriting, regenerating, or moving any text.__Important.mp4', [[0.2, 4.6]], true, 1.6, 'لعبة الـTimer'],
-  ['khamen', 'خمن الورقة/final bromo.mp4', [[0.9, 4.6], [37.7, 39.3]], true, 3.2, 'خمن الورقة'],
-  ['metgawzeen', 'لعبة المتجوزين/final bromo.mp4', [[38.3, 42.2]], true, 1.9, 'لعبة المتجوزين'],
-  ['sot', 'قلد الصوت/قلد صوت.mp4', [[202.1, 205.7]], false, 2.6, 'قلد الصوت']
+  ['saboona', 'لعبة الصابونة و المصاصة/فيديو.mp4', [[86.1, 89.8]], true, 3.0, 'تحدي المصاصة والصابونة'],
+  ['asela', 'أسئلة سريعة/٢٠٢٦٠٥٠٣_٢٢٣٢٥٢.mp4', [[57.6, 62.6]], false, 2.0, 'أسئلة سريعة'],
+  ['timer', 'لعبة الTimer/فيديوهات/٢٠٢٦٠٨٠٢_٢١٣٩٥٩.mp4', [[434.0, 438.5]], true, 1.6, 'لعبة الـTimer'],
+  ['khamen', 'خمن الورقة/٢٠٢٦٠٥١٠_٢٢٢٩٠٣.mp4', [[68.5, 73.5]], true, 3.0, 'خمن الورقة'],
+  ['metgawzeen', 'لعبة المتجوزين/مجلد ١/٢٠٢٦٠٥٢٤_٢٢٢٦٣٨.mp4', [[27.6, 32.4]], true, 2.6, 'لعبة المتجوزين'],
+  ['sot', 'فيديو تمثيل الصوت/٢٠٢٦١٠٠٤_٢١٥٠٠٠.mp4', [[76.5, 81.5]], false, 2.5, 'تمثيل الصوت']
 ];

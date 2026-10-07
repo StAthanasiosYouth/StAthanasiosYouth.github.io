@@ -1,14 +1,16 @@
 // Builds the scenes' real material (assets/media/xp/) from the service's own
-// published designs, and writes the manifest the scenes read
+// posters and game footage, and writes the manifest the scenes read
 // (assets/js/xp/library.js). Dev-only; the sources live on the author's
-// machine (E: weekly posters, F: game-segment exports), read-only.
+// machine (E: weekly posters, F: game-segment footage), read-only.
 //
 //   cd tools && node build-xp-media.mjs
 //
-// Privacy: only finished, published material: the weekly posters, and the
-// game segments' own title cards / graphics (no close-ups, no raw footage,
-// no phone numbers). Clips are silent, ~4 s, 360x640 H.264 (landscape
-// sources sit on a blurred fill, the reel look), preload none on the site.
+// Privacy: the weekly posters as published, and short real moments of the
+// game segments: wide / medium-wide shots of people playing, cut from the
+// original camera / phone files or the segment's own export (no close-up
+// portraits, nothing focused on one person, no readable screens or phone
+// numbers). Clips are silent, ~4-5 s, 360x640 H.264 (landscape sources sit
+// on a blurred fill, the reel look), preload none on the site.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -49,15 +51,18 @@ for (const [id, file, parts, landscape, posterAt, caption] of CLIPS) {
   const src = GAMES_SRC + file;
   if (!existsSync(src)) throw new Error(`missing ${src}`);
   const out = `${OUT}clips/${id}.mp4`;
-  // each part trimmed, joined, then framed 360x640 at 24 fps
-  const trims = parts.map(([a, b], i) => `[0:v]trim=${a}:${b},setpts=PTS-STARTPTS,fps=24[p${i}]`).join(';');
+  // seek near the first part (raw camera files are long), then each part
+  // trimmed, joined, and framed 360x640 at 24 fps
+  const seek = Math.max(0, Math.floor(Math.min(...parts.map(([a]) => a))) - 1);
+  const at = s => +(s - seek).toFixed(3);
+  const trims = parts.map(([a, b], i) => `[0:v]trim=${at(a)}:${at(b)},setpts=PTS-STARTPTS,fps=24[p${i}]`).join(';');
   const join = parts.length > 1 ? `${parts.map((_, i) => `[p${i}]`).join('')}concat=n=${parts.length}:v=1:a=0[v]` : '[p0]null[v]';
   const frame = landscape
     ? '[v]split[a][b];[a]scale=360:640:force_original_aspect_ratio=increase,crop=360:640,boxblur=18:2,eq=brightness=-0.12:saturation=1.1[bg];[b]scale=360:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,format=yuv420p[o]'
     : '[v]scale=360:640:force_original_aspect_ratio=increase,crop=360:640,format=yuv420p[o]';
   let crf = 29;
   do {
-    ff(['-i', src, '-filter_complex', `${trims};${join};${frame}`, '-map', '[o]', '-an', '-c:v', 'libx264', '-profile:v', 'main', '-preset', 'slow', '-crf', String(crf), '-maxrate', '700k', '-bufsize', '1400k', '-movflags', '+faststart', out]);
+    ff(['-ss', String(seek), '-i', src, '-filter_complex', `${trims};${join};${frame}`, '-map', '[o]', '-an', '-c:v', 'libx264', '-profile:v', 'main', '-preset', 'slow', '-crf', String(crf), '-maxrate', '700k', '-bufsize', '1400k', '-movflags', '+faststart', out]);
     crf += 2;
   } while (statSync(out).size > 300 * 1024 && crf < 40);
   const png = `${TMP}${id}.png`;
