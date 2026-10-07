@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "e63965cfc6fd",
-  "publishedAt": "2026-10-06T13:15:47.709Z",
+  "revision": "3b0f5707a452",
+  "publishedAt": "2026-10-07T05:24:50.071Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -124,6 +124,14 @@
         "type": "whatsapp",
         "href": "https://wa.me/201276162016?text=%D8%A3%D9%87%D9%84%D8%A7%D9%8B%20%D9%8A%D8%A7%20%D9%85%D9%8A%D9%86%D8%A7%D8%8C%20%D8%B9%D9%86%D8%AF%D9%8A%20%D9%85%D8%B4%D9%83%D9%84%D8%A9%20%D8%A3%D9%88%20%D8%A7%D8%B3%D8%AA%D9%81%D8%B3%D8%A7%D8%B1%20%D9%81%D9%8A%20%D8%B5%D9%81%D8%AD%D8%A7%D8%AA%20%D8%A3%D8%B3%D8%B1%D8%A9%20%D8%A7%D9%84%D8%A8%D8%A7%D8%A8%D8%A7%20%D8%A3%D8%AB%D9%86%D8%A7%D8%B3%D9%8A%D9%88%D8%B3%3A",
         "label": "واتساب"
+      },
+      "image": {
+        "src": "media/2026/img-592fd134.webp",
+        "thumb": "media/2026/img-592fd134-480.webp",
+        "w": 1448,
+        "h": 1086,
+        "alt": "",
+        "color": "#263431"
       }
     }
   ],
