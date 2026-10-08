@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "e93c040a7e51",
-  "publishedAt": "2026-10-08T04:30:01.932Z",
+  "revision": "e6be29029599",
+  "publishedAt": "2026-10-08T04:38:40.221Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -40,7 +40,19 @@
       "startAt": "",
       "endAt": "",
       "experience": "voice",
-      "cta": "ابعت دلوقتي"
+      "cta": "ابعت دلوقتي",
+      "gallery": [
+        {
+          "type": "video",
+          "src": "media/2026/vid-c9c3c633.mp4",
+          "poster": "media/2026/vid-c9c3c633-480.webp",
+          "w": 540,
+          "h": 960,
+          "alt": "",
+          "start": 0,
+          "end": 15
+        }
+      ]
     }
   ],
   "sections": [
