@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "f48ed4e49447",
-  "publishedAt": "2026-10-08T05:22:45.857Z",
+  "revision": "8bfb50744202",
+  "publishedAt": "2026-10-08T17:29:43.746Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -112,7 +112,19 @@
           "badge": "",
           "startAt": "",
           "endAt": "",
-          "experience": "tiktok"
+          "experience": "tiktok",
+          "gallery": [
+            {
+              "type": "video",
+              "src": "media/2026/vid-55f81cd6.mp4",
+              "poster": "media/2026/vid-55f81cd6-480.webp",
+              "w": 540,
+              "h": 960,
+              "alt": "",
+              "start": 0,
+              "end": 6.8
+            }
+          ]
         },
         {
           "id": "whatsapp-group",
