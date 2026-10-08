@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "3e41f81760a5",
-  "publishedAt": "2026-10-08T05:19:25.855Z",
+  "revision": "f48ed4e49447",
+  "publishedAt": "2026-10-08T05:22:45.857Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -73,50 +73,12 @@
           "experience": "facebook",
           "gallery": [
             {
-              "type": "video",
-              "src": "media/2026/vid-c9c3c633.mp4",
-              "poster": "media/2026/vid-c9c3c633-480.webp",
-              "w": 540,
-              "h": 960,
-              "alt": "",
-              "start": 0,
-              "end": 15
-            },
-            {
               "src": "media/2026/img-af6b0c28.webp",
               "thumb": "media/2026/img-af6b0c28-480.webp",
               "w": 1122,
               "h": 1402,
               "alt": "بوستر الكسل الروحي test",
               "color": "#21252e"
-            },
-            {
-              "src": "media/2026/img-592fd134.webp",
-              "thumb": "media/2026/img-592fd134-480.webp",
-              "w": 1448,
-              "h": 1086,
-              "alt": "",
-              "color": "#263431"
-            },
-            {
-              "type": "video",
-              "src": "media/2026/vid-16578d0e.mp4",
-              "poster": "media/2026/vid-16578d0e-480.webp",
-              "w": 540,
-              "h": 960,
-              "alt": "",
-              "start": 0,
-              "end": 6.1
-            },
-            {
-              "type": "video",
-              "src": "media/2026/vid-9efef24d.mp4",
-              "poster": "media/2026/vid-9efef24d-480.webp",
-              "w": 540,
-              "h": 960,
-              "alt": "",
-              "start": 0,
-              "end": 7.8
             },
             {
               "src": "media/2026/img-5d2af330.webp",
