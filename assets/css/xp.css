@@ -3541,9 +3541,11 @@ html[data-motion="reduced"] .ch-typing i {
 }
 
 /* small screens in a message: never taller than this (wider: blurred sides) */
+/* a picture in a message: its own shape, never taller than 170px; the bubble hugs it */
 .ch-msg__photo.xp-media,
 .wa-photo.xp-media {
-  max-height: 150px;
+  width: min(calc(var(--r, 1) * 170px), 190px);
+  max-width: 100%;
 }
 
 .fd-post__photo.xp-media {
@@ -3559,12 +3561,10 @@ html[data-motion="reduced"] .ch-typing i {
   border-radius: 8px;
 }
 
-.wa-msg--media {
-  width: 78%;
-}
-
+.wa-msg--media,
 .ch-msg--media {
-  width: 80%;
+  width: min-content;
+  max-width: 84%;
 }
 
 .ch-msg--said.ch-msg--media .ch-msg__photo {

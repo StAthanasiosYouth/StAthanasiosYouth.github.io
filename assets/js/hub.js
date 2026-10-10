@@ -225,7 +225,7 @@ export function layCard(card, media, body, item, image, big = false) {
   card.dataset.m = m;
   media.classList.add('lay__media');
   body.classList.add('lay__body');
-  media.style.setProperty('--r', String(Math.round(Math.min(3.5, Math.max(0.6, r)) * 1000) / 1000));
+  media.style.setProperty('--r', String(Math.round(Math.min(6, Math.max(0.4, r)) * 1000) / 1000));
   if (image && image.color) media.style.setProperty('--fill', image.color);
   // the file for the size it shows at: a small card the thumbnail, a wide one the full picture
   const img = media.querySelector('img[srcset]');

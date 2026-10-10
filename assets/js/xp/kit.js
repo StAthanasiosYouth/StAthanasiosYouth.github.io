@@ -1004,7 +1004,12 @@ export function mediaNode(item, tl, { className = '', main = '', ratio = null, a
     inner
   );
 
-  if (ratio) box.style.aspectRatio = Math.min(ratio[1], Math.max(ratio[0], (item.w || 1) / (item.h || 1))).toFixed(4);
+  if (ratio) {
+    const shape = Math.min(ratio[1], Math.max(ratio[0], (item.w || 1) / (item.h || 1))).toFixed(4);
+    box.style.aspectRatio = shape;
+    // (a message's picture sizes its bubble from it: xp.css)
+    box.style.setProperty('--r', shape);
+  }
 
   return box;
 
