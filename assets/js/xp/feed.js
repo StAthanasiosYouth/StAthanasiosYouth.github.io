@@ -19,6 +19,10 @@ import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
 import { deck, timeline, spray, side, floats, playlist, cycle, mediaNode, words as say, fitWords, FEED, bubble, chip, rand, pick, compact, meetingLine, LOGO, EASE, SPRING } from './kit.js';
 import { PAGE, COMMENTS, WHO, TIMES, channelPosts } from './talk.js';
+import { ui } from './glyphs.js';
+
+/* the timeline's skin: X's action row or Threads' (play() sets it) */
+let threads = false;
 
 const nextComment = deck(COMMENTS);
 
@@ -38,12 +42,21 @@ function post({ item = null, text, likes = 40, time = 'من ساعة' }, tl = nu
       h('span', { class: 'fd-post__who' }, h('b', {}, PAGE.short), h('span', { class: 'fd-post__handle' }, `${HANDLE} · ${time}`)),
       say(text, { className: 'fd-post__text', lines: 7, more: '… عرض المزيد' }),
       item && item.kind !== 'text' ? mediaNode(item, tl, { className: 'fd-post__photo', ratio: FEED, advance }) : null,
-      h('span', { class: 'fd-post__actions' },
-        h('span', {}, '💬 ', compact(Math.round(likes / 9))),
-        h('span', { class: 'fd-repost' }, '🔁 ', repost),
-        h('span', { class: 'fd-like' }, '♥ ', like),
-        h('span', {}, '↗')
-      )
+      // X: reply, repost, like, views, share — Threads: like, reply, repost, send
+      threads
+        ? h('span', { class: 'fd-post__actions fd-post__actions--threads' },
+          h('span', { class: 'fd-like' }, ui('heartLine'), like),
+          h('span', {}, ui('comment'), compact(Math.round(likes / 9))),
+          h('span', { class: 'fd-repost' }, ui('loop'), repost),
+          h('span', {}, ui('plane'))
+        )
+        : h('span', { class: 'fd-post__actions' },
+          h('span', {}, ui('reply'), compact(Math.round(likes / 9))),
+          h('span', { class: 'fd-repost' }, ui('repost'), repost),
+          h('span', { class: 'fd-like' }, ui('heartLine'), like),
+          h('span', {}, ui('views'), compact(likes * 14)),
+          h('span', {}, ui('upload'))
+        )
     )
   );
 
@@ -52,6 +65,7 @@ function post({ item = null, text, likes = 40, time = 'من ساعة' }, tl = nu
 export function play(stage, { quick, reduced, lite, content, sound, link, platform }) {
 
   const tl = timeline({ quick, reduced, lite });
+  threads = platform.key === 'threads';
   const items = playlist(link, { posters: 3, text: true });
   const own = items.length > 0 && items[0].own;
   const textOf = item => (item.own ? item.text || GENERIC : item.topic ? `«${item.topic}» 🤍 شكرًا لكل اللي جه` : item.text);

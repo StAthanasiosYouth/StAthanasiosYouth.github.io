@@ -3626,3 +3626,83 @@ html[data-motion="reduced"] .ch-typing i {
   width: 74%;
   margin-inline: auto;
 }
+
+
+/* =========================================================
+   THE APPS' OWN UI GLYPHS (glyphs.js): 1em, in the slot's colour
+========================================================= */
+
+.xp-ui {
+  flex: none;
+  width: 1em;
+  height: 1em;
+  vertical-align: -.14em;
+}
+
+/* icon + label / count rows */
+.fb-post__actions > span,
+.fb-react__like,
+.fd-post__actions > span,
+.pl-actions > span {
+  display: inline-flex;
+  align-items: center;
+  gap: .35em;
+}
+
+.fd-post__actions .xp-ui {
+  width: 1.25em;
+  height: 1.25em;
+}
+
+/* TikTok: white rail glyphs a bit larger than the old emoji, the liked heart red */
+.tt-rail__btn .xp-ui {
+  width: 1.3em;
+  height: 1.3em;
+}
+
+.tt-rail__btn:not(.tt-rail__btn--heart) {
+  color: #fff;
+}
+
+/* YouTube: like | dislike in one pill */
+.pl-split {
+  width: 1px;
+  height: 1em;
+  margin-inline: .15em;
+  background: currentColor;
+  opacity: .35;
+}
+
+/* WhatsApp: the two ticks overlap */
+.wa-ticks {
+  letter-spacing: -.42em;
+  padding-inline-end: .42em;
+}
+
+.wa-bar__box .xp-ui {
+  width: 1.35em;
+  height: 1.35em;
+  opacity: .7;
+}
+
+.wa-bar__send .xp-ui,
+.ch-bar__send .xp-ui,
+.fb-compose__send .xp-ui {
+  width: 1.25em;
+  height: 1.25em;
+}
+
+/* Spotify: shuffle on (green), the controls' glyphs */
+.mu-controls .mu-on {
+  color: var(--xp-accent);
+}
+
+.mu-controls .xp-ui {
+  width: 1.2em;
+  height: 1.2em;
+}
+
+/* the send arrow points the way the writing goes (as in the Arabic apps) */
+.xp-phone .xp-ui--send {
+  transform: scaleX(-1);
+}

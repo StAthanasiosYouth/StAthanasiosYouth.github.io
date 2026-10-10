@@ -15,6 +15,7 @@ import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
 import { deck, timeline, float, floats, spray, side, playlist, cycle, mediaNode, words, fitWords, typeInto, bubble, chip, pick, digits, LOGO, EASE, SPRING } from './kit.js';
 import { PAGE, COMMENTS, WHO } from './talk.js';
+import { ui } from './glyphs.js';
 
 const nextComment = deck(COMMENTS);
 
@@ -55,7 +56,7 @@ export function play(stage, { quick, reduced, lite, sound, link }) {
     ),
     heart,
     sent,
-    h('div', { class: 'ig-reply' }, field, h('span', { class: 'ig-reply__heart' }, '♡'), h('span', {}, '➤'))
+    h('div', { class: 'ig-reply' }, field, h('span', { class: 'ig-reply__heart' }, ui('heartLine')), h('span', { class: 'ig-reply__send' }, ui('plane')))
   );
 
   stage.append(phone);

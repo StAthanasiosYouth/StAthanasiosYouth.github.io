@@ -26,6 +26,7 @@ import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
 import { deck, timeline, spray, side, playlist, cycle, mediaNode, words as say, fitWords, FEED, typeInto, bubble, chip, rand, pick, digits, compact, LOGO, EASE, SPRING } from './kit.js';
 import { GROUP, MINE, WHO, channelPosts } from './talk.js';
+import { ui } from './glyphs.js';
 
 const nextGroup = deck(GROUP);
 
@@ -170,7 +171,7 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
     : null;
 
   const field = h('span', { class: 'ch-bar__field' }, layout === 'channel' ? 'كتم الصوت' : 'اكتب رسالة…');
-  const bar = h('div', { class: 'ch-bar' }, field, h('span', { class: 'ch-bar__send' }, iconNode(layout === 'channel' ? 'bell' : glyph)));
+  const bar = h('div', { class: 'ch-bar' }, field, h('span', { class: 'ch-bar__send' }, layout === 'channel' ? iconNode('bell') : ui('send')));
 
   const phone = h('div', { class: `xp-phone ch ch--${layout} ch--${platform.key}` },
     rail,

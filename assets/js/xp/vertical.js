@@ -19,6 +19,7 @@ import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
 import { deck, timeline, spray, side, floats, playlist, cycle, mediaNode, words, fitWords, typeInto, bubble, chip, pick, digits, LOGO, EASE, SPRING } from './kit.js';
 import { COMMENTS, WHO } from './talk.js';
+import { ui } from './glyphs.js';
 
 const nextComment = deck(COMMENTS);
 
@@ -55,7 +56,7 @@ export function play(stage, { quick, reduced, lite, sound, link, platform }, var
       h('span', { class: 'vt-top__name' }, 'أسرة البابا أثناسيوس', h('i', {}, ' · ٣ س')),
       h('span', { class: 'vt-top__glyph' }, iconNode(glyph))
     ),
-    h('div', { class: 'vt-reply' }, field, h('span', { class: 'vt-reply__heart' }, '♥'))
+    h('div', { class: 'vt-reply' }, field, h('span', { class: 'vt-reply__heart' }, ui('heartLine')))
   );
 
   stage.append(phone);

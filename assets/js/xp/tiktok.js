@@ -17,6 +17,7 @@ import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
 import { deck, timeline, float, floats, spray, side, climb, tickUp, playlist, cycle, mediaNode, words, fitWords, bubble, chip, pick, compact, LOGO, EASE, SPRING } from './kit.js';
 import { PAGE, QUICK, WHO } from './talk.js';
+import { ui } from './glyphs.js';
 
 const nextQuick = deck(QUICK);
 
@@ -39,7 +40,7 @@ export function play(stage, { quick, reduced, lite, sound, link }) {
   const clips = h('div', { class: 'tt-clips' }, current);
   const likes = h('span', { class: 'tt-rail__n' });
   const comments = h('span', { class: 'tt-rail__n' });
-  const heartButton = h('span', { class: 'tt-rail__btn tt-rail__btn--heart' }, '♥');
+  const heartButton = h('span', { class: 'tt-rail__btn tt-rail__btn--heart' }, ui('heart'));
   const scrub = h('span', { class: 'tt-scrub' }, h('i'));
   const playIcon = h('span', { class: 'tt-play' }, '▶');
   const text = h('span', { class: 'tt-caption__words' });
@@ -60,9 +61,9 @@ export function play(stage, { quick, reduced, lite, sound, link }) {
     h('div', { class: 'tt-rail' },
       h('img', { class: 'tt-rail__avatar', src: LOGO, alt: '' }),
       h('span', { class: 'tt-rail__item' }, heartButton, likes),
-      h('span', { class: 'tt-rail__item' }, h('span', { class: 'tt-rail__btn' }, '💬'), comments),
-      h('span', { class: 'tt-rail__item' }, h('span', { class: 'tt-rail__btn' }, '🔖'), h('span', { class: 'tt-rail__n' }, '٨٦')),
-      h('span', { class: 'tt-rail__item' }, h('span', { class: 'tt-rail__btn' }, '↗'), h('span', { class: 'tt-rail__n' }, 'شارك'))
+      h('span', { class: 'tt-rail__item' }, h('span', { class: 'tt-rail__btn' }, ui('bubble')), comments),
+      h('span', { class: 'tt-rail__item' }, h('span', { class: 'tt-rail__btn' }, ui('bookmark')), h('span', { class: 'tt-rail__n' }, '٨٦')),
+      h('span', { class: 'tt-rail__item' }, h('span', { class: 'tt-rail__btn' }, ui('shareTT')), h('span', { class: 'tt-rail__n' }, 'شارك'))
     ),
     h('div', { class: 'tt-caption' },
       chips,

@@ -14,6 +14,7 @@ import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
 import { deck, timeline, spray, side, playlist, cycle, mediaNode, words, fitWords, typeInto, bubble, chip, rand, pick, digits, meetingLine, LOGO, EASE, SPRING } from './kit.js';
 import { GROUP, MINE, REPLIES, WHO, SERVANT, nextTopic } from './talk.js';
+import { ui } from './glyphs.js';
 
 const nextGroup = deck(GROUP);
 
@@ -95,7 +96,7 @@ export function play(stage, { quick, reduced, lite, content, sound, link }) {
     ? h('div', { class: 'wa-chat' }, h('span', { class: 'wa-day' }, 'النهارده'), opening, typing)
     : h('div', { class: 'wa-chat' }, h('span', { class: 'wa-day' }, 'النهارده'), first, news, firstShared, mine, typing);
   const field = h('span', { class: 'wa-bar__field' }, 'رسالة');
-  const action = h('span', { class: 'wa-bar__send' }, '🎤');
+  const action = h('span', { class: 'wa-bar__send' }, ui('mic'));
 
   const phone = h('div', { class: 'xp-phone wa' },
     h('div', { class: 'wa-top' },
@@ -107,7 +108,7 @@ export function play(stage, { quick, reduced, lite, content, sound, link }) {
       h('span', { class: 'wa-top__glyph' }, iconNode('whatsapp'))
     ),
     chat,
-    h('div', { class: 'wa-bar' }, h('span', { class: 'wa-bar__box' }, '🙂', field, '📎'), action)
+    h('div', { class: 'wa-bar' }, h('span', { class: 'wa-bar__box' }, ui('smile'), field, ui('clip')), action)
   );
 
   stage.append(phone);
@@ -184,7 +185,7 @@ export function play(stage, { quick, reduced, lite, content, sound, link }) {
   };
 
   const outgoing = () => {
-    action.textContent = '➤';
+    action.replaceChildren(ui('send'));
     typeInto(tl, field, MINE[n % MINE.length], {
       sound,
       done: () => {
@@ -193,7 +194,7 @@ export function play(stage, { quick, reduced, lite, content, sound, link }) {
         mark.className = 'wa-ticks is-sent';
         mark.textContent = '✓';
         field.textContent = 'رسالة';
-        action.textContent = '🎤';
+        action.replaceChildren(ui('mic'));
         add(node);
         node.animate([{ opacity: 0, transform: 'translateX(18px) scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: 400, easing: SPRING });
         sound('send');

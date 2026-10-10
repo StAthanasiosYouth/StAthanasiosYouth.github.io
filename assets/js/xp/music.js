@@ -19,6 +19,7 @@ import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
 import { timeline, spray, side, floats, playlist, cycle, mediaNode, words, fitWords, chip, pick, LOGO, EASE, SPRING } from './kit.js';
 import { POSTERS } from './library.js';
+import { ui } from './glyphs.js';
 
 const BARS = 14;
 
@@ -70,18 +71,18 @@ export function play(stage, { quick, reduced, lite, sound, link, platform }) {
   const playButton = h('span', { class: 'mu-play' }, h('span', { class: 'mu-play__pause' }));
 
   const phone = h('div', { class: `xp-phone mu mu--${platform.key}` },
-    h('div', { class: 'mu-top' }, h('span', { class: 'mu-top__down' }, '⌄'), h('span', { class: 'mu-top__what' }, 'بيشتغل دلوقتي'), h('span', { class: 'mu-top__glyph' }, iconNode(glyph))),
+    h('div', { class: 'mu-top' }, h('span', { class: 'mu-top__down' }, ui('down')), h('span', { class: 'mu-top__what' }, 'بيشتغل دلوقتي'), h('span', { class: 'mu-top__glyph' }, iconNode(glyph))),
     cover,
     h('div', { class: 'mu-meta' },
       title,
       h('span', { class: 'mu-artist' }, 'أسرة البابا أثناسيوس'),
-      h('span', { class: 'mu-heart' }, '♥')
+      h('span', { class: 'mu-heart' }, ui('liked'))
     ),
     lyric,
     eq,
     progress,
     h('div', { class: 'mu-time' }, h('span', {}, '١:٢٤'), h('span', {}, '٤:٠٨')),
-    h('div', { class: 'mu-controls' }, h('span', {}, '⇄'), h('span', {}, '⏮'), playButton, h('span', {}, '⏭'), h('span', {}, '↻'))
+    h('div', { class: 'mu-controls' }, h('span', { class: 'mu-on' }, ui('shuffle')), h('span', {}, ui('prev')), playButton, h('span', {}, ui('next')), h('span', {}, ui('repeat')))
   );
 
   stage.append(phone);

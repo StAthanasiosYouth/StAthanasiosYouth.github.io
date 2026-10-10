@@ -19,6 +19,7 @@ import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
 import { deck, timeline, spray, side, floats, tickUp, climb, playlist, cycle, mediaNode, words, fitWords, bubble, chip, rand, pick, compact, LOGO, EASE, SPRING } from './kit.js';
 import { COMMENTS, WHO } from './talk.js';
+import { ui } from './glyphs.js';
 
 const nextComment = deck(COMMENTS);
 
@@ -70,7 +71,7 @@ export function play(stage, { quick, reduced, lite, sound, link, platform }) {
       title,
       h('span', { class: 'pl-stats' }, '١٫٢ ألف مشاهدة · من ٣ أيام'),
       h('span', { class: 'pl-channel' }, h('img', { src: LOGO, alt: '' }), h('span', { class: 'pl-channel__name' }, 'أسرة البابا أثناسيوس'), subscribe),
-      h('span', { class: 'pl-actions' }, h('span', { class: 'pl-like' }, '👍 ', likes), h('span', {}, '👎'), h('span', {}, '↗ مشاركة'))
+      h('span', { class: 'pl-actions' }, h('span', { class: 'pl-like' }, ui('thumb'), likes, h('i', { class: 'pl-split' }), ui('thumb', '', { flip: true })), h('span', {}, ui('share'), 'مشاركة'))
     ),
     more,
     comments
