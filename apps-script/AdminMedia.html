@@ -151,13 +151,21 @@
 
   var viewFilter = 'all';
   var viewQuery = '';
+  var drawView = null;    // the grid on screen now (an upload may end after its screen was left)
+
+  /* an upload ended (from here or any editor, maybe after its screen was left): the grid on screen gets it */
+  A.libraryUploaded = function () {
+    if (drawView && document.querySelector('.media-view')) load(true).then(drawView).catch(function () {});
+  };
 
   A.views.media = function () {
 
     var body = el('div', { class: 'media-view' }, skeletonGrid());
     var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر بالاسم أو الوصف أو مكان الاستخدام', value: viewQuery, 'aria-label': 'دوّر في الصور' });
     var chips = el('div', { class: 'filter-chips', role: 'group', 'aria-label': 'فلتر' });
-    var upload = A.imageUploader(function () { load(true).then(draw); });
+    var upload = A.imageUploader(A.libraryUploaded);
+    // uploads started before (another screen, an earlier visit, an editor): name, step, how it ended
+    var uploads = A.uploadList();
     // the recovery admin: no trimmer here (AdminTrim.html)
     var videoNote = A.trimmerAvailable && A.trimmerAvailable() ? null
       : el('p', { class: 'note', text: 'مقاطع الفيديو بتتعمل من لوحة التحكم الرسمية (/admin/) من Google Chrome على الكمبيوتر. من هنا تقدر تستخدم الفيديوهات اللي في المكتبة.' });
@@ -179,6 +187,7 @@
 
     search.addEventListener('input', function () { viewQuery = search.value.trim(); draw(); });
     drawChips();
+    drawView = draw;
 
     load().then(draw).catch(function (error) {
       body.replaceChildren(el('div', { class: 'errors' }));
@@ -188,6 +197,7 @@
     return [
       A.card('مكتبة الصور', 'كل البوسترات والبانرات ومقاطع المشاهد في مكان واحد. اختار من هنا بدل ما ترفع نفس الصورة كذا مرة.',
         upload.node,
+        uploads,
         videoNote,
         search,
         chips

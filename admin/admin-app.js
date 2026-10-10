@@ -1160,6 +1160,163 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   };
 
+  /* =======================================================
+     UPLOADS (the whole panel's, not one screen's)
+     Every upload from any picker (the library's, an editor's poster, a
+     trimmed clip) is listed in A.uploads while it runs and for a while
+     after, whatever screen the admin is on: the Media screen draws the
+     list each time it opens (A.uploadList), the top bar shows a small
+     count (#uploads). The work itself stays with the picker that started
+     it: nothing here starts, restarts or repeats an upload.
+  ======================================================= */
+
+  /* { id, name, kind: 'image'|'video', stage: 'preparing'|'trimming'|'uploading'|'done'|'failed',
+       progress: 0..1 | null (unknown), label, error, retry: fn | null } */
+  A.uploads = [];
+
+  var UPLOAD_KEEP = 90000;    // a finished one stays this long (a failed one: until dismissed)
+  var uploadSeq = 0;
+  var uploadsFrame = 0;
+
+  var UPLOAD_WORDS = {
+    preparing: 'بيتجهز…',
+    trimming: 'بيتعمل المقطع…',
+    uploading: 'بيترفع…',
+    done: 'اترفع ✓',
+    failed: 'ما اترفعش'
+  };
+
+  function uploadActive(entry) {
+
+    return entry.stage !== 'done' && entry.stage !== 'failed';
+
+  }
+
+  A.uploadBegin = function (name, kind, stage) {
+
+    var entry = {
+      id: 'up-' + (++uploadSeq),
+      name: String(name || '').slice(0, 80) || (kind === 'video' ? 'فيديو' : 'صورة'),
+      kind: kind === 'video' ? 'video' : 'image',
+      stage: stage || 'preparing',
+      progress: null,
+      label: '',
+      error: '',
+      retry: null,
+      timer: 0
+    };
+    A.uploads.push(entry);
+    uploadsChanged();
+    return entry;
+
+  };
+
+  /* patch: any of stage, progress, label, error, retry, name, kind */
+  A.uploadSet = function (entry, patch) {
+
+    if (!entry) return;
+    Object.keys(patch).forEach(function (key) { entry[key] = patch[key]; });
+    clearTimeout(entry.timer);
+    // a retry of a dismissed one comes back
+    if (A.uploads.indexOf(entry) === -1) {
+      if (!uploadActive(entry)) return;
+      A.uploads.push(entry);
+    }
+    if (entry.stage === 'done') entry.timer = setTimeout(function () { A.uploadDismiss(entry); }, UPLOAD_KEEP);
+    uploadsChanged();
+
+  };
+
+  /* out of the list (a finished one, or a cancelled trim) */
+  A.uploadDismiss = function (entry) {
+
+    var index = A.uploads.indexOf(entry);
+    if (index === -1) return;
+    clearTimeout(entry.timer);
+    A.uploads.splice(index, 1);
+    uploadsChanged();
+
+  };
+
+  function uploadsChanged() {
+
+    if (uploadsFrame) return;
+    var run = function () { uploadsFrame = 0; drawUploads(); };
+    // one redraw per frame however often the progress moves (and still one when the tab is hidden)
+    uploadsFrame = document.visibilityState === 'hidden' ? setTimeout(run, 50) : requestAnimationFrame(run);
+
+  }
+
+  function uploadRow(entry) {
+
+    var active = uploadActive(entry);
+    var known = entry.progress !== null && entry.progress !== undefined;
+    var fraction = active ? (known ? Math.max(0, Math.min(1, entry.progress)) : 0) : 1;
+    var bar = el('span', { class: 'upload__bar' });
+    var track = el('span', { class: 'upload__track', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-label': 'رفع ' + entry.name }, bar);
+    var words = entry.label || UPLOAD_WORDS[entry.stage] || '';
+
+    if (!active || known) {
+      bar.style.transform = 'scaleX(' + fraction.toFixed(3) + ')';
+      track.setAttribute('aria-valuenow', String(Math.round(fraction * 100)));
+    }
+
+    return el('li', {
+      class: 'upload uploads__item' + (entry.stage === 'done' ? ' is-done' : entry.stage === 'failed' ? ' is-error' : known ? '' : ' is-indeterminate'),
+      'data-upload': entry.id,
+      'data-stage': entry.stage
+    },
+    el('div', { class: 'upload__row' },
+      el('span', { class: 'uploads__name' }, icon(entry.kind === 'video' ? 'video' : 'photos'), el('bdi', { text: entry.name })),
+      el('span', { class: 'uploads__end' },
+        el('span', { class: 'upload__label', text: words + (active && known ? ' ' + Math.round(fraction * 100) + '%' : '') }),
+        active ? null : el('button', { class: 'icon-btn uploads__dismiss', type: 'button', 'aria-label': 'شيل «' + entry.name + '» من القايمة', onclick: function () { A.uploadDismiss(entry); } }, icon('close'))
+      )
+    ),
+    track,
+    entry.stage === 'failed' && entry.error ? el('p', { class: 'upload-error__hint', text: entry.error }) : null,
+    entry.stage === 'failed' && entry.retry ? el('div', { class: 'actions' },
+      el('button', { class: 'btn btn--small', type: 'button', onclick: function () { var again = entry.retry; entry.retry = null; again(); } }, icon('retry'), 'جرّب الرفع تاني')
+    ) : null
+    );
+
+  }
+
+  /* the ones whose picker is not on screen (that picker shows its own progress) */
+  function fillUploadList(list) {
+
+    var shown = A.uploads.filter(function (entry) { return !(entry.owner && entry.owner.isConnected); });
+    list.hidden = !shown.length;
+    A.fill(list, shown.map(uploadRow));
+
+  }
+
+  function drawUploads() {
+
+    Array.prototype.forEach.call(document.querySelectorAll('.uploads'), fillUploadList);
+
+    // the top bar: how many are still going (or that one failed); a tap opens «الصور»
+    var pill = document.getElementById('uploads');
+    if (!pill) return;
+    var going = A.uploads.filter(uploadActive).length;
+    var failed = A.uploads.filter(function (entry) { return entry.stage === 'failed'; }).length;
+    pill.hidden = !going && !failed;
+    pill.classList.toggle('is-error', !going && failed > 0);
+    var text = going ? 'بيترفع ' + going : 'رفع ما خلصش';
+    pill.querySelector('.uploads-pill__text').textContent = text.replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; });
+    pill.setAttribute('aria-label', (going ? going + ' ملف بيترفع' : 'في رفع ما خلصش') + ' — افتح «الصور»');
+
+  }
+
+  /* the list for a screen (the Media screen): filled now, kept current while it is on screen */
+  A.uploadList = function () {
+
+    var list = el('ul', { class: 'uploads', 'aria-label': 'الرفع' });
+    fillUploadList(list);
+    return list;
+
+  };
+
   var STAGES = {
     prepare: { label: 'جاري تجهيز الصورة…', from: 0, to: 0.15 },
     compress: { label: 'جاري ضغط الصورة…', from: 0.15, to: 0.5 },
@@ -1245,6 +1402,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       if (meta !== undefined) stageMeta.textContent = meta;
 
       if (stage === 'upload' || stage === 'fetch') {
+        jobSet(stage === 'upload' ? { stage: 'uploading', progress: null, label: '' } : { stage: 'preparing', progress: null, label: 'بيتجاب من الرابط…' });
         // google.script.run reports no byte progress: an honest moving bar plus elapsed time
         progress.classList.add('is-indeterminate');
         track.removeAttribute('aria-valuenow');
@@ -1260,6 +1418,34 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       track.setAttribute('aria-valuenow', String(Math.round(done * 100)));
       if (stage === 'done') progress.classList.add('is-done');
       if (stage === 'error') progress.classList.add('is-error');
+      if (stage === 'prepare' || stage === 'compress') jobSet({ stage: 'preparing', progress: done, label: '' });
+
+    }
+
+    /* this picker's current upload in A.uploads (the list outlives the picker) */
+    var job = null;
+    var root = null;
+
+    function jobSet(patch) {
+
+      if (job) A.uploadSet(job, patch);
+
+    }
+
+    function jobStart(name, kind, stage) {
+
+      job = A.uploadBegin(name, kind, stage);
+      job.owner = root;
+      return job;
+
+    }
+
+    /* the picker is gone (another screen, the editor closed): say how it ended */
+    function jobNotice(entry) {
+
+      if (root && root.isConnected) return;
+      if (entry.stage === 'done') A.toast('«' + entry.name + '» اترفع ✓ — تلاقيه في «الصور»');
+      else A.toast('«' + entry.name + '» ما اترفعش — التفاصيل في «الصور»', 'error');
 
     }
 
@@ -1315,13 +1501,25 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     }
 
-    function upload(prepared) {
+    /* mine: its entry in A.uploads (a retry keeps the same one) */
+    function upload(prepared, mine) {
+
+      var video = prepared.kind === 'video';
+
+      if (busy && mine && mine !== job) {
+        // a retry from the list while this picker is busy with another file
+        A.toast('في رفع شغال من نفس المكان — استنى يخلص وجرّب تاني', 'info');
+        return Promise.resolve();
+      }
+
+      job = mine || job || jobStart(prepared.name, video ? 'video' : 'image', 'uploading');
+      mine = job;
+      if (video) A.uploadSet(mine, { kind: 'video' });
 
       setBusy(true);
       errorBox.hidden = true;
       setStage('upload', 0, A.formatBytes(prepared.bytesOut));
 
-      var video = prepared.kind === 'video';
       // a video: the generated clip only (AdminTrim.html), never the original
       var payload = video
         ? {
@@ -1364,9 +1562,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.renderStatus();
         value = result.media.id;
         pending = null;     // the base64 copy is not kept around
-        markDirty();
+        // an editor closed meanwhile: nothing of it is left to save
+        if (root.isConnected) markDirty();
         if (A.invalidateLibrary) A.invalidateLibrary();
         if (options.onUploaded) options.onUploaded(value);
+        else if (A.libraryUploaded) A.libraryUploaded();
         setStage('done', 1, A.formatBytes(prepared.bytesIn) + ' ← ' + A.formatBytes(prepared.bytesOut));
         stageLabel.textContent = video
           ? (result.duplicate ? 'المقطع ده موجود في المكتبة قبل كده ✓' : 'المقطع اترفع ✓ — اختاره في «صور وفيديوهات المشهد» لأي رابط')
@@ -1374,12 +1574,28 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
             ? 'الصورة دي موجودة في المكتبة قبل كده — اتختارت هي ✓'
             : 'تم الرفع ✓ — احفظ عشان تتربط، وهتتنشر مع المحتوى';
         show();
+        A.uploadSet(mine, { stage: 'done', progress: 1, label: result.duplicate ? 'موجود في المكتبة قبل كده ✓' : '', error: '', retry: null });
+        if (job === mine) job = null;
+        jobNotice(mine);
       }).catch(function (error) {
         pending = prepared;
         showError(error);
+        A.uploadSet(mine, { stage: 'failed', label: '', error: A.parseError(error).message, retry: function () { upload(prepared, mine); } });
+        jobNotice(mine);
       }).finally(function () {
         setBusy(false);
       });
+
+    }
+
+    /* a step before the upload failed (preparing, fetching): the list says so too */
+    function jobFailed(error) {
+
+      if (!job) return;
+      var failed = job;
+      job = null;
+      A.uploadSet(failed, { stage: 'failed', label: '', error: A.parseError(error).message, retry: null });
+      jobNotice(failed);
 
     }
 
@@ -1398,24 +1614,46 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       errorBox.hidden = true;
       pending = null;
       setStage(null);
+      job = null;
 
-      A.openTrimmer(chosen)
+      // listed from the moment the clip is being made (the trimmer is still open then)
+      var trim = null;
+      var hooks = {
+        progress: function (fraction) {
+          if (!trim) trim = jobStart(chosen.name, 'video', 'trimming');
+          A.uploadSet(trim, { stage: 'trimming', progress: fraction, label: '' });
+        },
+        // stopped or failed inside the trimmer (it says why there): off the list
+        idle: function () {
+          if (trim) A.uploadDismiss(trim);
+          trim = null;
+          job = null;
+        }
+      };
+
+      A.openTrimmer(chosen, hooks)
         .then(function (prepared) {
-          if (!prepared) { setBusy(false); return null; }
-          return upload(prepared);
+          if (!prepared) { hooks.idle(); setBusy(false); return null; }
+          return upload(prepared, trim);
         })
         .catch(function (error) {
           setBusy(false);
           showError(error);
+          jobFailed(error);
         });
 
     }
 
-    function handleFile(chosen) {
+    /* from: the entry of a file fetched from a link (the same upload, one line) */
+    function handleFile(chosen, from) {
 
-      if (!chosen || busy) return;
+      if (!chosen || busy) {
+        if (from) A.uploadDismiss(from);
+        return;
+      }
 
       if (options.allowVideo && A.clip && A.clip.isVideoFile(chosen)) {
+        if (from) A.uploadDismiss(from);
         handleVideo(chosen);
         return;
       }
@@ -1423,13 +1661,15 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       setBusy(true);
       errorBox.hidden = true;
       pending = null;
+      job = from || jobStart(chosen.name, 'image', 'preparing');
       setStage('prepare', 0, A.formatBytes(chosen.size));
 
       A.prepareImage(chosen, function (stage, fraction) { setStage(stage, fraction); })
-        .then(function (prepared) { return upload(prepared); })
+        .then(function (prepared) { return upload(prepared, job); })
         .catch(function (error) {
           setBusy(false);
           showError(error);
+          jobFailed(error);
         });
 
     }
@@ -1458,6 +1698,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       setBusy(true);
       errorBox.hidden = true;
       pending = null;
+      var named = '';
+      try { named = decodeURIComponent(href.split(/[?#]/)[0].split('/').pop() || ''); }
+      catch (ignored) { /* a broken escape: no name */ }
+      jobStart(named || 'من رابط', 'image', 'preparing');
       setStage('fetch', 0, '');
 
       A.call('apiFetchMediaUrl', href)
@@ -1472,11 +1716,13 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           setStage(null);
           urlRow.hidden = true;
           urlInput.value = '';
-          handleFile(fetched);
+          A.uploadSet(job, { name: fetched.name });
+          handleFile(fetched, job);
         })
         .catch(function (error) {
           setBusy(false);
           showError(error);
+          jobFailed(error);
         });
 
     }
@@ -1498,7 +1744,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     // a <div>, not a <label>: a label around several buttons forwards stray clicks
     return {
       // after a reload (A.restore): the chosen image's id comes back — never a file being uploaded
-      node: A.draftWidget(el('div', { class: 'field' },
+      node: A.draftWidget(root = el('div', { class: 'field' },
         el('span', { class: 'field__label', text: options.label || 'الصورة / البوستر' }),
         el('div', { class: 'picker' + (options.className ? ' ' + options.className : '') },
           preview,
@@ -1528,13 +1774,36 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   };
 
+  var GALLERY_TEXT_MAX = 280;     // Content.gs GALLERY_TEXT.max
+
+  /* the Links.gallery cell as the editor gets it -> [token | { id, start, end, text }]:
+     "a,b@1-2" (tokens) or, when an item has text, a JSON array (Content.gs galleryEntries_) */
+  function galleryList(value) {
+
+    if (Array.isArray(value)) return value;
+    var cell = String(value || '').trim();
+    if (cell.charAt(0) === '[') {
+      try {
+        var list = JSON.parse(cell);
+        if (Array.isArray(list)) return list;
+      }
+      catch (ignored) { /* shown as it is: the save says what is wrong */ }
+      return [cell];
+    }
+    return cell.split(/[\s,،]+/);
+
+  }
+
   /*
    * Pictures and video clips from the Media Library, in order (a link
-   * scene's own, «صور وفيديوهات المشهد»). tokens: array or "a,b": "img-…",
-   * "vid-…" or "vid-…@start-end" (seconds). options.max (6).
-   * Each one can be moved (↑ / ↓) or taken out; a video has «من» / «لحد»
+   * scene's own, «صور وفيديوهات المشهد»). tokens: the stored cell or an
+   * array: "img-…", "vid-…" or "vid-…@start-end" (seconds), or
+   * { id, start, end, text }. options.max (6).
+   * Each one can be moved (↑ / ↓) or taken out, and has its own optional
+   * «الكلام اللي مع الصورة/الفيديو» (up to 280); a video has «من» / «لحد»
    * (m:ss or seconds), checked live against its length when it is known
-   * (A.videoDuration); check() says what blocks saving.
+   * (A.videoDuration); check() says what blocks saving. value(): tokens,
+   * or { id, start, end, text } for an item with text.
    */
   A.galleryPicker = function (tokens, options) {
 
@@ -1543,7 +1812,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var max = options.max || 6;
     var clip = A.clip;
     var CAP = clip.CLIP.galleryCap;
-    var items = (Array.isArray(tokens) ? tokens : String(tokens || '').split(/[\s,،]+/)).filter(Boolean).slice(0, max).map(toItem);
+    var items = galleryList(tokens).filter(Boolean).slice(0, max).map(toItem);
     var row = el('div', { class: 'gallery-picker__row', role: 'list' });
     var count = el('span', { class: 'gallery-picker__count', dir: 'ltr' });
     var focusAfter = null;
@@ -1559,6 +1828,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     } }, icon('plus'), 'زوّد صورة أو فيديو من المكتبة');
 
     function toItem(token) {
+      var said = '';
+      if (token && typeof token === 'object') {
+        said = typeof token.text === 'string' ? token.text : '';
+        var timed = token.start !== undefined && token.start !== null && token.start !== '';
+        token = String(token.id || '') + (timed ? '@' + token.start + '-' + token.end : '');
+      }
       var match = /^((?:img|vid)-[a-z0-9]{8})(?:@(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?))?$/.exec(String(token).trim());
       var id = match ? match[1] : String(token).trim();
       var video = /^vid-/.test(id);
@@ -1567,9 +1842,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         video: video,
         from: video && match && match[2] !== undefined ? clip.formatTime(Number(match[2])) : '',
         to: video && match && match[3] !== undefined ? clip.formatTime(Number(match[3])) : '',
+        text: said.slice(0, GALLERY_TEXT_MAX),
         duration: video && A.videoDurations[id] > 0 ? A.videoDurations[id] : null,
         refs: null
       };
+    }
+
+    /* the textarea follows its text (no inner scrollbar for a few lines) */
+    function grow(area) {
+      if (!area.isConnected || !area.offsetParent) return;
+      area.style.height = 'auto';
+      area.style.height = (area.scrollHeight + 2) + 'px';
     }
 
     /* «من» / «لحد» with the defaults: empty «من» = 0, empty «لحد» = six seconds later */
@@ -1682,6 +1965,28 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           item.refs = null;
         }
 
+        // «الكلام اللي مع الصورة/الفيديو»: optional, several lines, emoji fine
+        var sayCount = el('span', { class: 'field__count', dir: 'ltr', id: A.uid('say-count') });
+        var say = el('textarea', {
+          class: 'input gallery-picker__say-input',
+          rows: '1',
+          maxlength: String(GALLERY_TEXT_MAX),
+          value: item.text,
+          placeholder: item.video ? 'مثلاً: لحظة الفوز 🎉' : 'مثلاً: أول يوم في الرحلة 🌊',
+          'aria-label': 'الكلام اللي مع ' + what,
+          'aria-describedby': sayCount.id
+        });
+        var counted = function () {
+          sayCount.textContent = say.value.length + ' / ' + GALLERY_TEXT_MAX;
+        };
+        say.addEventListener('input', function () {
+          item.text = say.value;
+          markDirty();
+          counted();
+          grow(say);
+        });
+        counted();
+
         row.appendChild(el('div', { class: 'gallery-picker__item' + (item.video ? ' is-video' : ''), role: 'listitem', 'data-id': item.id, 'data-kind': item.video ? 'video' : 'image' },
           el('div', { class: 'gallery-picker__thumb' },
             img,
@@ -1689,8 +1994,20 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
             item.video ? el('span', { class: 'gallery-picker__play', 'aria-hidden': 'true', text: '▶' }) : null
           ),
           body,
-          el('div', { class: 'gallery-picker__tools' }, up, down, remove)
+          el('div', { class: 'gallery-picker__tools' }, up, down, remove),
+          el('div', { class: 'gallery-picker__say' },
+            el('div', { class: 'gallery-picker__say-head' },
+              el('span', { text: 'الكلام اللي مع ' + (item.video ? 'الفيديو' : 'الصورة') + ' (اختياري)', 'aria-hidden': 'true' }),
+              sayCount
+            ),
+            say
+          )
         ));
+      });
+
+      // after layout: each caption box as tall as its text
+      requestAnimationFrame(function () {
+        Array.prototype.forEach.call(row.querySelectorAll('.gallery-picker__say-input'), grow);
       });
 
       if (!items.length) {
@@ -1712,8 +2029,26 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     draw();
 
+    /* the token, or { id, start, end, text } when the item has text */
+    function entry(item) {
+      var t = token(item);
+      if (!item.text.trim()) return t;
+      var at = t.indexOf('@');
+      if (at === -1) return { id: item.id, text: item.text };
+      var range = t.slice(at + 1).split('-');
+      return { id: item.id, start: Number(range[0]), end: Number(range[1]), text: item.text };
+    }
+
     function value() {
-      return items.map(token);
+      return items.map(entry);
+    }
+
+    var ID = /^(?:img|vid)-[a-z0-9]{8}$/;
+
+    function restorable(t) {
+      if (typeof t === 'string') return /^[\w.@-]{1,80}$/.test(t);
+      return !!t && typeof t === 'object' && ID.test(String(t.id)) && typeof t.text === 'string' && t.text.length <= GALLERY_TEXT_MAX &&
+        (t.start === undefined || (typeof t.start === 'number' && typeof t.end === 'number'));
     }
 
     return {
@@ -1726,8 +2061,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         get: value,
         set: function (next) {
           if (!Array.isArray(next)) return false;
-          next = next.filter(function (t) { return typeof t === 'string' && /^[\w.@-]{1,80}$/.test(t); }).slice(0, max);
-          if (next.join(',') === value().join(',')) return false;
+          next = next.filter(restorable).slice(0, max);
+          if (JSON.stringify(next) === JSON.stringify(value())) return false;
           items = next.map(toItem);
           draw();
           return true;
@@ -2100,6 +2435,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     A.closeSheet();
   });
 
+  // an editor's picker that was uploading is gone from the screen: the list takes over
+  sheet.addEventListener('close', function () { uploadsChanged(); });
+
   // tap on the dimmed backdrop closes too (same rules as the close button)
   sheet.addEventListener('click', function (event) {
     if (event.target === sheet) A.closeSheet();
@@ -2443,7 +2781,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   function saveUi() {
 
     if (!A.keep) return;
-    A.keep.set('ui', { area: A.area, sub: { content: A.sub.content, page: A.sub.page }, y: Math.max(0, Math.round(window.scrollY || 0)) });
+    A.keep.set('ui', { area: A.area, sub: { content: A.sub.content, page: A.sub.page }, y: Math.max(0, Math.round(window.scrollY || 0)), publish: publishMemo() });
 
   }
 
@@ -2828,8 +3166,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var node = document.getElementById('status');
     var text = node.querySelector('.status__text');
     var s = A.state.status;
+    var job = publishActive() ? publishJob : null;
     var state = override ||
-      (s.errors.length ? 'error' : s.hasChanges ? 'dirty' : 'clean');
+      (job ? (job.step === 1 ? 'publishing' : 'waiting') : s.errors.length ? 'error' : s.hasChanges ? 'dirty' : 'clean');
 
     var words = {
       error: 'يوجد خطأ يمنع النشر',
@@ -3130,11 +3469,50 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
      Draft (saved) → review → publish to GitHub → wait for GitHub Pages
      → live on the site. Every step is visible in the editor and in the
      status pill at the top.
+     The publish under way belongs to the panel, not to the editor
+     (publishJob): closing the editor never stops or forgets it, and
+     «راجع وانشر» again shows it at its real step and keeps following it
+     to the end — it never starts a second one. After a reload (the
+     official admin: A.keep 'ui'.publish) a publish waiting for GitHub
+     Pages is followed again; one that was still talking to GitHub is
+     followed through apiState until the server says it landed.
   ======================================================= */
+
+  /* { revision, step: 1 GitHub | 2 GitHub Pages | 4 live, failed, result, slow, at } */
+  var publishJob = null;
+  var PUBLISH_MEMO_MAX = 15 * 60000;
+
+  /* still going (the status pill and «راجع وانشر» follow it) */
+  function publishActive() {
+
+    return !!publishJob && !publishJob.failed && (publishJob.step === 1 || (publishJob.step === 2 && !publishJob.slow));
+
+  }
+
+  /* what a reload needs to follow it (never the token, never content) */
+  function publishMemo() {
+
+    return publishActive() ? { revision: publishJob.revision, step: publishJob.step, at: publishJob.at } : null;
+
+  }
+
+  /* the editor shows the review or the publish (its stepper) right now */
+  function publishShowing() {
+
+    return sheet.open && !!sheet.querySelector('.stepper[data-publish]');
+
+  }
 
   document.getElementById('publish-open').addEventListener('click', function () {
     A.confirmLeave().then(function (ok) { if (ok) openReview(); });
   });
+
+  /* for tests and the console: a copy of where the publish is */
+  A.publishState = function () {
+
+    return publishJob ? { revision: publishJob.revision, step: publishJob.step, failed: !!publishJob.failed, slow: !!publishJob.slow } : null;
+
+  };
 
   A.openReview = function () { openReview(); };
 
@@ -3148,7 +3526,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   /* step: index of the current step; failed: that step failed */
   function stepper(step, failed) {
 
-    return el('ol', { class: 'stepper', 'aria-label': 'خطوات النشر' }, PUBLISH_STEPS.map(function (s, i) {
+    return el('ol', { class: 'stepper', 'aria-label': 'خطوات النشر', 'data-publish': '' }, PUBLISH_STEPS.map(function (s, i) {
       var state = i < step ? 'done' : i === step ? (failed ? 'failed' : 'current') : 'todo';
       return el('li', { class: 'stepper__step is-' + state, 'aria-current': i === step ? 'step' : null },
         el('span', { class: 'stepper__dot', 'aria-hidden': 'true' }, state === 'done' ? icon('check') : state === 'failed' ? icon('alert') : String(i + 1)),
@@ -3175,6 +3553,14 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   function openReview() {
 
     A.dirty = false;
+
+    // a publish under way: where it is now, never a new review (or a second publish)
+    if (publishActive()) {
+      renderJob();
+      return;
+    }
+
+    publishJob = null;
     A.openSheet('مراجعة قبل النشر', reviewSkeleton());
 
     A.call('apiReview')
@@ -3266,16 +3652,16 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var publish = el('button', { class: 'btn btn--primary', type: 'button', disabled: blocked || nothing }, icon('send'), el('span', { text: 'نشر التغييرات' }));
 
     publish.addEventListener('click', function () {
+      if (publishActive()) {
+        renderJob();
+        return;
+      }
       box.hidden = true;
-      A.renderStatus('publishing');
       sheet.querySelector('.stepper').replaceWith(stepper(1));
-      A.withBusy(publish, A.call('apiPublish', review.revision))
-        .then(function (result) {
-          A.applyState(result.state);
-          renderPublished(result);
-        })
+      A.withBusy(publish, startPublish(review.revision))
         .catch(function (error) {
-          A.renderStatus();
+          // still on this review: the reason under it, and the button to try again
+          if (!box.isConnected) return;
           var current = sheet.querySelector('.stepper');
           if (current) current.replaceWith(stepper(1, true));
           A.fail(error, box);
@@ -3290,50 +3676,117 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   }
 
-  function renderPublished(result) {
+  /* the one publish: apiPublish once, then GitHub Pages; resolves with the result, rejects with the error */
+  function startPublish(revision) {
 
-    var live = el('div', { class: 'note', role: 'status' },
-      el('span', { class: 'spinner spinner--inline', 'aria-hidden': 'true' }),
-      'جاري انتظار GitHub Pages… (عادةً أقل من دقيقة)'
-    );
+    var job = publishJob = { revision: revision, step: 1, failed: false, result: null, slow: false, at: Date.now() };
+
+    A.renderStatus();
+    saveUi();
+
+    return A.call('apiPublish', revision).then(function (result) {
+      if (publishJob !== job) return result;
+      job.result = result;
+      job.step = result.siteUrl ? 2 : 4;
+      A.applyState(result.state);
+      saveUi();
+      if (publishShowing()) renderJob();
+      else A.toast(result.siteUrl ? 'اتنشر على GitHub ✓ — مستنيين GitHub Pages' : 'اتنشر ✓');
+      if (result.siteUrl) waitForSite(job, result.siteUrl);
+      return result;
+    }, function (error) {
+      if (publishJob === job) {
+        job.failed = true;
+        A.renderStatus();
+        saveUi();
+        // the review that started it shows the reason itself (startPublish's caller)
+        if (sheet.open && sheet.querySelector('[data-publish-job]')) renderJobFailed(error);
+        else if (!publishShowing()) A.toast('النشر ما كملش: ' + A.parseError(error).message, 'error');
+      }
+      throw error;
+    });
+
+  }
+
+  /* the editor for the publish as it is now (reopened, or moved on a step) */
+  function renderJob() {
+
+    var job = publishJob;
+
+    if (!job) return;
+
+    if (job.step === 1) {
+      A.openSheet('جاري النشر…', [
+        stepper(1),
+        el('p', { class: 'loading-text', role: 'status', 'data-publish-job': '' },
+          el('span', { class: 'spinner spinner--inline', 'aria-hidden': 'true' }),
+          'بنبعت التغييرات لـ GitHub… النشر شغال حتى لو قفلت الشاشة دي.')
+      ], [el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })]);
+      return;
+    }
+
+    var result = job.result || {};
+    var siteUrl = result.siteUrl || A.state.config.siteUrl || '';
+    var live = null;
+
+    if (siteUrl) {
+      live = job.step === 4
+        ? el('div', { class: 'note note--ok', role: 'status' }, 'ظهر على الموقع ✓ ', el('a', { href: siteUrl, target: '_blank', rel: 'noopener', text: 'افتح الموقع' }))
+        : job.slow
+          ? el('div', { class: 'note note--warn', role: 'status', text: 'لسه مظهرش. GitHub Pages أحياناً بياخد كام دقيقة — افتح الموقع بعد شوية.' })
+          : el('div', { class: 'note', role: 'status' },
+            el('span', { class: 'spinner spinner--inline', 'aria-hidden': 'true' }),
+            'جاري انتظار GitHub Pages… (عادةً أقل من دقيقة)'
+          );
+    }
 
     A.openSheet('تم النشر ✓', [
-      stepper(result.siteUrl ? 2 : 3),
-      el('p', { class: 'note note--ok', text: result.unchanged ? 'الملفات على GitHub زي ما هي.' : 'التغييرات اتبعتت لـ GitHub.' }),
+      stepper(siteUrl ? job.step : 3),
+      el('p', { class: 'note note--ok', 'data-publish-job': '', text: result.unchanged ? 'الملفات على GitHub زي ما هي.' : 'التغييرات اتبعتت لـ GitHub.' }),
       result.commitUrl ? el('a', { class: 'link-row', href: result.commitUrl, target: '_blank', rel: 'noopener' }, icon('external'), 'شوف الكوميت على GitHub') : null,
-      result.siteUrl ? live : null
+      live
     ], [el('button', { class: 'btn btn--primary', type: 'button', text: 'تمام', onclick: function () { A.closeSheet(); } })]);
 
-    if (result.siteUrl) {
-      A.renderStatus('waiting');
-      waitForSite(result.siteUrl, result.revision, live);
-    }
+  }
+
+  /* reopened at step 1 and then it failed */
+  function renderJobFailed(error) {
+
+    var box = A.errorBox();
+
+    A.openSheet('النشر ما كملش', [stepper(1, true), box], [
+      el('button', { class: 'btn btn--primary', type: 'button', onclick: openReview }, icon('retry'), 'راجع تاني'),
+      el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })
+    ]);
+    A.fail(error, box);
 
   }
 
   /* GitHub Pages sends Access-Control-Allow-Origin: *, so we can watch the
      published file until the new revision is live. */
-  function waitForSite(siteUrl, revision, node) {
+  function waitForSite(job, siteUrl) {
 
     var tries = 0;
 
+    function moved() {
+      saveUi();
+      if (publishShowing()) renderJob();
+    }
+
     function check() {
+      if (publishJob !== job) return;
       tries++;
       fetch(siteUrl.replace(/\/?$/, '/') + 'content.json?check=' + Date.now(), { cache: 'no-store' })
         .then(function (response) { return response.json(); })
         .then(function (json) {
-          if (json.revision === revision) {
+          if (publishJob !== job) return;
+          if (json.revision === job.revision) {
+            job.step = 4;
             A.renderStatus('live');
             setTimeout(function () { A.renderStatus(); }, 6000);
-            if (node.isConnected) {
-              var current = sheet.querySelector('.stepper');
-              if (current) current.replaceWith(stepper(4));
-              node.className = 'note note--ok';
-              node.replaceChildren('ظهر على الموقع ✓ ', el('a', { href: siteUrl, target: '_blank', rel: 'noopener', text: 'افتح الموقع' }));
-            }
-            else {
-              A.toast('ظهر على الموقع ✓');
-            }
+            if (publishShowing()) renderJob();
+            else A.toast('ظهر على الموقع ✓');
+            saveUi();
             return;
           }
           retry();
@@ -3342,18 +3795,83 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
 
     function retry() {
+      if (publishJob !== job) return;
       if (tries >= 40) {
+        job.slow = true;
         A.renderStatus();
-        if (node.isConnected) {
-          node.className = 'note note--warn';
-          node.textContent = 'لسه مظهرش. GitHub Pages أحياناً بياخد كام دقيقة — افتح الموقع بعد شوية.';
-        }
+        moved();
         return;
       }
       setTimeout(check, 5000);
     }
 
     setTimeout(check, 8000);
+
+  }
+
+  /* after a reload (official admin): the publish this tab was following, if any */
+  var PUBLISH_POLL = 6000;
+  var PUBLISH_FOLLOW_MAX = 7 * 60000;   // an Apps Script call never runs longer than 6 minutes
+
+  function resumePublish() {
+
+    if (publishJob || !A.keep || !A.state) return;
+
+    var ui = A.keep.get('ui');
+    var memo = ui && ui.publish;
+
+    if (!memo || typeof memo.revision !== 'string' || !(Date.now() - Number(memo.at) < PUBLISH_MEMO_MAX)) return;
+
+    var job = publishJob = { revision: memo.revision, step: 1, failed: false, result: null, slow: false, at: Number(memo.at) };
+    var siteUrl = A.state.config.siteUrl;
+
+    function landed() {
+      job.step = siteUrl ? 2 : 4;
+      job.result = { revision: job.revision, siteUrl: siteUrl, unchanged: false, commitUrl: '' };
+      A.renderStatus();
+      saveUi();
+      if (publishShowing()) renderJob();
+      if (siteUrl) waitForSite(job, siteUrl);
+    }
+
+    if (A.state.status.publishedRevision === memo.revision) {
+      landed();
+      return;
+    }
+
+    // not landed yet: only a publish that was still talking to GitHub can still land
+    if (memo.step !== 1) {
+      publishJob = null;
+      saveUi();
+      return;
+    }
+
+    A.renderStatus();
+
+    (function follow() {
+      setTimeout(function () {
+        if (publishJob !== job) return;
+        A.call('apiState').then(function (next) {
+          if (publishJob !== job) return;
+          if (next.status.publishedRevision === job.revision) {
+            A.applyState(next);
+            landed();
+            return;
+          }
+          if (Date.now() - job.at < PUBLISH_FOLLOW_MAX) {
+            follow();
+            return;
+          }
+          // the server never said it landed: it failed or stopped there
+          job.failed = true;
+          A.renderStatus();
+          saveUi();
+          if (publishShowing()) renderJobFailed(new Error('النشر اللي كان شغال قبل ما الصفحة تتحمل من جديد ما ظهرش إنه خلص. راجع وانشر تاني.'));
+        }).catch(function () {
+          if (publishJob === job) follow();
+        });
+      }, PUBLISH_POLL);
+    })();
 
   }
 
@@ -3391,6 +3909,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     if (!started) {
       started = true;
       document.getElementById('publish-open').prepend(icon('send'));
+      var uploads = document.getElementById('uploads');
+      if (uploads) {
+        uploads.prepend(icon('upload'));
+        uploads.addEventListener('click', function () { if (A.state) A.go('media'); });
+      }
     }
 
     renderNav();
@@ -3402,6 +3925,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.renderStatus();
         renderNav();
         A.render({ animate: true });
+        resumePublish();
         return true;
       })
       .catch(function (error) {
@@ -5997,13 +6521,21 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   var viewFilter = 'all';
   var viewQuery = '';
+  var drawView = null;    // the grid on screen now (an upload may end after its screen was left)
+
+  /* an upload ended (from here or any editor, maybe after its screen was left): the grid on screen gets it */
+  A.libraryUploaded = function () {
+    if (drawView && document.querySelector('.media-view')) load(true).then(drawView).catch(function () {});
+  };
 
   A.views.media = function () {
 
     var body = el('div', { class: 'media-view' }, skeletonGrid());
     var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر بالاسم أو الوصف أو مكان الاستخدام', value: viewQuery, 'aria-label': 'دوّر في الصور' });
     var chips = el('div', { class: 'filter-chips', role: 'group', 'aria-label': 'فلتر' });
-    var upload = A.imageUploader(function () { load(true).then(draw); });
+    var upload = A.imageUploader(A.libraryUploaded);
+    // uploads started before (another screen, an earlier visit, an editor): name, step, how it ended
+    var uploads = A.uploadList();
     // the recovery admin: no trimmer here (AdminTrim.html)
     var videoNote = A.trimmerAvailable && A.trimmerAvailable() ? null
       : el('p', { class: 'note', text: 'مقاطع الفيديو بتتعمل من لوحة التحكم الرسمية (/admin/) من Google Chrome على الكمبيوتر. من هنا تقدر تستخدم الفيديوهات اللي في المكتبة.' });
@@ -6025,6 +6557,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     search.addEventListener('input', function () { viewQuery = search.value.trim(); draw(); });
     drawChips();
+    drawView = draw;
 
     load().then(draw).catch(function (error) {
       body.replaceChildren(el('div', { class: 'errors' }));
@@ -6034,6 +6567,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return [
       A.card('مكتبة الصور', 'كل البوسترات والبانرات ومقاطع المشاهد في مكان واحد. اختار من هنا بدل ما ترفع نفس الصورة كذا مرة.',
         upload.node,
+        uploads,
         videoNote,
         search,
         chips
@@ -6723,8 +7257,14 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
      THE TRIMMER
   ======================================================= */
 
-  /** file (a local File or a fetched Blob with a name) -> Promise<prepared clip | null (cancelled)> */
-  A.openTrimmer = function (file) {
+  /**
+   * file (a local File or a fetched Blob with a name) -> Promise<prepared clip | null (cancelled)>
+   * hooks (optional, the panel's upload list): progress(fraction) while the
+   * clip is being made; idle() when that stopped or failed (the trimmer stays open)
+   */
+  A.openTrimmer = function (file, hooks) {
+
+    hooks = hooks || {};
 
     return new Promise(function (resolve) {
 
@@ -6836,6 +7376,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         bar.style.transform = 'scaleX(' + value.toFixed(3) + ')';
         track.setAttribute('aria-valuenow', String(Math.round(value * 100)));
         stageLabel.textContent = (cancelled ? 'جاري الإلغاء…' : 'جاري عمل المقطع… ') + (cancelled ? '' : Math.round(value * 100) + '%');
+        if (busy && !cancelled && hooks.progress) hooks.progress(value);
       }
 
       function setBusy(on) {
@@ -6935,6 +7476,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           .then(function (prepared) {
             if (!prepared) {
               setBusy(false);
+              if (hooks.idle) hooks.idle();
               message.textContent = 'اتوقف — مفيش حاجة اترفعت.';
               return;
             }
@@ -6942,6 +7484,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           })
           .catch(function (error) {
             setBusy(false);
+            if (hooks.idle) hooks.idle();
             showError(error);
           });
       });

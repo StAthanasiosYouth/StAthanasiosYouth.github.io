@@ -116,13 +116,91 @@ var GALLERY_CLIP = {
    SCENE GALLERY TOKENS (Links.gallery)
    "img-xxxxxxxx", "vid-xxxxxxxx" or "vid-xxxxxxxx@START-END" (seconds,
    up to one decimal), comma separated, up to LIMITS.gallery.
+   With a caption on any item the cell holds a JSON array instead (same
+   column, no migration): a cell starting with "[" is JSON —
+     [{"id":"img-…","text":"…"},{"id":"vid-…","start":37,"end":43,"text":"…"}]
+   Both forms are always read; galleryInput_ (Items.gs) writes the tokens
+   when no item has text.
 ========================================================= */
+
+var GALLERY_TEXT = {
+  max: 280,
+  lines: 7          // at most six line breaks
+};
+
+
+/* the cell (or the editor's array of tokens / { id, start, end, text }) -> [{ token, text }] */
+function galleryEntries_(value) {
+
+  var list = value;
+
+  if (!Array.isArray(value)) {
+    var cell = String(value === null || value === undefined ? '' : value).trim();
+    if (cell.charAt(0) === '[') {
+      try { list = JSON.parse(cell); }
+      catch (error) { list = null; }
+      // not readable: one item that says so (never dropped silently)
+      if (!Array.isArray(list)) return [{ token: contentLine_(cell).slice(0, 40), text: '' }];
+    }
+    else {
+      list = cell.split(/[\s,،]+/);
+    }
+  }
+
+  return list.map(function (entry) {
+    if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+      var time = function (v) { return typeof v === 'number' && isFinite(v) ? String(v) : typeof v === 'string' ? v.trim() : 'x'; };
+      var timed = (entry.start !== undefined && entry.start !== null && entry.start !== '') || (entry.end !== undefined && entry.end !== null && entry.end !== '');
+      return {
+        token: (contentLine_(entry.id) || '?') + (timed ? '@' + time(entry.start) + '-' + time(entry.end) : ''),
+        text: entry.text === undefined || entry.text === null ? '' : entry.text
+      };
+    }
+    return { token: contentLine_(entry), text: '' };
+  }).filter(function (entry) { return entry.token; });
+
+}
+
 
 function galleryTokens_(value) {
 
-  return (Array.isArray(value) ? value : String(value === null || value === undefined ? '' : value).split(/[\s,،]+/))
-    .map(function (token) { return contentLine_(token); })
-    .filter(Boolean);
+  return galleryEntries_(value).map(function (entry) { return entry.token; });
+
+}
+
+
+/* an item's caption: plain text, line breaks kept (at most six), other
+   control characters dropped, trimmed. Not cut: the caller checks the length. */
+function galleryText_(value) {
+
+  if (typeof value !== 'string') return '';
+
+  var lines = value
+    .replace(/\r\n?|[\u2028\u2029]/g, '\n')
+    .replace(/\t/g, ' ')
+    .replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/g, '')
+    .split('\n')
+    .map(function (line) { return line.trim(); })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .split('\n');
+
+  if (lines.length > GALLERY_TEXT.lines) {
+    lines = lines.slice(0, GALLERY_TEXT.lines - 1).concat([lines.slice(GALLERY_TEXT.lines - 1).join(' ').replace(/\s+/g, ' ').trim()]);
+  }
+
+  return lines.join('\n');
+
+}
+
+
+/* at most GALLERY_TEXT.max UTF-16 units, never half an emoji */
+function galleryTextCut_(text) {
+
+  if (text.length <= GALLERY_TEXT.max) return text;
+  var cut = text.slice(0, GALLERY_TEXT.max);
+  return /[\ud800-\udbff]$/.test(cut) ? cut.slice(0, -1) : cut;
 
 }
 
@@ -847,14 +925,25 @@ function buildPublicContent(draft, options) {
     // Videos (vid-…, optionally @start-end) play their clip in the scene.
     function withGallery() {
       if (!experience) return link;
-      var gallery = galleryTokens_(row.gallery).slice(0, LIMITS.gallery)
-        .map(function (token) {
-          var item = parseGalleryToken_(token);
+      var gallery = galleryEntries_(row.gallery).slice(0, LIMITS.gallery)
+        .map(function (entry) {
+          var item = parseGalleryToken_(entry.token);
           if (!item) {
-            warn(where, 'عنصر المشهد "' + token.slice(0, 40) + '" مش مفهوم، ومش هيظهر');
+            warn(where, 'عنصر المشهد "' + entry.token.slice(0, 40) + '" مش مفهوم، ومش هيظهر');
             return null;
           }
-          return item.kind === 'video' ? libraryVideo(item, where) : libraryImage(item.id, where, 'صورة المشهد');
+          var found = item.kind === 'video' ? libraryVideo(item, where) : libraryImage(item.id, where, 'صورة المشهد');
+          var said = galleryText_(entry.text);
+          if (!found || !said) return found;
+          if (said.length > GALLERY_TEXT.max) {
+            warn(where, 'الكلام اللي مع "' + item.id + '" أطول من ' + GALLERY_TEXT.max + ' حرف، واتقص');
+            said = galleryTextCut_(said);
+          }
+          // a copy: the same library picture may be used elsewhere without text
+          var copy = {};
+          Object.keys(found).forEach(function (key) { copy[key] = found[key]; });
+          copy.text = said;
+          return copy;
         })
         .filter(Boolean);
       if (gallery.length) link.gallery = gallery;

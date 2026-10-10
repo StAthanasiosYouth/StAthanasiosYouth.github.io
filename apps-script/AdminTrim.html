@@ -496,8 +496,14 @@
      THE TRIMMER
   ======================================================= */
 
-  /** file (a local File or a fetched Blob with a name) -> Promise<prepared clip | null (cancelled)> */
-  A.openTrimmer = function (file) {
+  /**
+   * file (a local File or a fetched Blob with a name) -> Promise<prepared clip | null (cancelled)>
+   * hooks (optional, the panel's upload list): progress(fraction) while the
+   * clip is being made; idle() when that stopped or failed (the trimmer stays open)
+   */
+  A.openTrimmer = function (file, hooks) {
+
+    hooks = hooks || {};
 
     return new Promise(function (resolve) {
 
@@ -609,6 +615,7 @@
         bar.style.transform = 'scaleX(' + value.toFixed(3) + ')';
         track.setAttribute('aria-valuenow', String(Math.round(value * 100)));
         stageLabel.textContent = (cancelled ? 'جاري الإلغاء…' : 'جاري عمل المقطع… ') + (cancelled ? '' : Math.round(value * 100) + '%');
+        if (busy && !cancelled && hooks.progress) hooks.progress(value);
       }
 
       function setBusy(on) {
@@ -708,6 +715,7 @@
           .then(function (prepared) {
             if (!prepared) {
               setBusy(false);
+              if (hooks.idle) hooks.idle();
               message.textContent = 'اتوقف — مفيش حاجة اترفعت.';
               return;
             }
@@ -715,6 +723,7 @@
           })
           .catch(function (error) {
             setBusy(false);
+            if (hooks.idle) hooks.idle();
             showError(error);
           });
       });

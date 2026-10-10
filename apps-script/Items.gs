@@ -91,20 +91,40 @@ function imageRef_(value, problems) {
 /**
  * A link scene's pictures and videos (Links.gallery): tokens checked one by
  * one (Content.gs parseGalleryToken_), each id in the library and not
- * removed, each clip sane. Returns the stored form "id,id@start-end,...".
+ * removed, each clip sane, each caption plain text (Content.gs galleryText_,
+ * at most GALLERY_TEXT.max). Takes the stored form or the editor's array
+ * (tokens and/or { id, start, end, text }). Returns the stored form:
+ * "id,id@start-end,..." — or, when any item has text, the JSON array
+ * [{ id, start?, end?, text? }] (Content.gs galleryEntries_).
  */
 function galleryInput_(value, problems) {
 
   var rows = readOptionalTable_('Media');
+  var said = false;
 
-  return galleryTokens_(value).slice(0, LIMITS.gallery).map(function (token, index) {
+  var items = galleryEntries_(value).slice(0, LIMITS.gallery).map(function (entry, index) {
 
+    var token = entry.token;
     var item = parseGalleryToken_(token);
     var label = 'صور وفيديوهات المشهد (' + (index + 1) + ')';
 
     if (!item) {
       problems.push(label + ': "' + token.slice(0, 40) + '" مش مفهوم');
-      return '';
+      return null;
+    }
+
+    var text = galleryText_(entry.text);
+
+    if (typeof entry.text !== 'string') {
+      problems.push(label + ': الكلام اللي مع ' + (item.kind === 'video' ? 'الفيديو' : 'الصورة') + ' لازم يكون نص');
+    }
+    else if (text.length > GALLERY_TEXT.max) {
+      problems.push(label + ': الكلام اللي مع ' + (item.kind === 'video' ? 'الفيديو' : 'الصورة') + ' أطول من ' + GALLERY_TEXT.max + ' حرف');
+    }
+
+    if (text) {
+      item.text = text;
+      said = true;
     }
 
     var row = rows.filter(function (r) { return r.id === item.id; })[0];
@@ -119,9 +139,23 @@ function galleryInput_(value, problems) {
       problems.push(label + ': ' + clip);
     }
 
-    return galleryToken_(item);
+    return item;
 
-  }).filter(Boolean).join(',');
+  }).filter(Boolean);
+
+  if (!said) {
+    return items.map(galleryToken_).join(',');
+  }
+
+  return JSON.stringify(items.map(function (item) {
+    var out = { id: item.id };
+    if (item.clip) {
+      out.start = item.start;
+      out.end = item.end;
+    }
+    if (item.text) out.text = item.text;
+    return out;
+  }));
 
 }
 
