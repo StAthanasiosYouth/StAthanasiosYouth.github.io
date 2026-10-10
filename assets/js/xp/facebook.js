@@ -1,34 +1,42 @@
 /**
- * Facebook: our page's feed — the real weekly posters with their captions,
- * the «صوتكم يهمنا» post, the Pope Athanasius quote — sliding by, reactions
- * bubbling up (👍 ❤️ 😂 😮), comments arriving, a comment typed in the bar
- * and posted. "هنا هتتابع أخبارنا وإعلاناتنا".
- * Alive: the feed drifts between posts, reactions pop out over the
- * phone's edges, comments and replies slide in, shares tick; comment
- * bubbles and «شارك» hints drift around (and beside the sheet on wide
- * screens). Our own interpretation, not Facebook's interface.
+ * Facebook: our page's feed — a real feed, one post per item of the link's
+ * playlist (kit.js: the admin's own pictures and clips, in its order, each
+ * with its own words), scrolling post by post through ALL of them, then
+ * from the top again. No gallery: the real weekly posters with their
+ * captions, with the «صوتكم يهمنا» post and the Pope Athanasius quote
+ * between them. Reactions bubble up (👍 ❤️ 😂 😮), comments arrive, a
+ * comment is typed in the bar and posted. "هنا هتتابع أخبارنا وإعلاناتنا".
+ * Alive: the feed moves to the next post (a clip plays its segment
+ * first), reactions pop out over the phone's edges, comments and replies
+ * slide in, shares tick; comment bubbles and «شارك» hints drift around
+ * (and beside the sheet on wide screens). Our own interpretation, not
+ * Facebook's interface.
  */
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { deck, timeline, float, floats, spray, side, pictures, climb, tickUp, typeInto, bubble, chip, pick, compact, digits, LOGO, EASE, SPRING } from './kit.js';
-import { PAGE, COMMENTS, PAGE_REPLIES, WHO, pagePosts } from './talk.js';
+import { deck, timeline, float, floats, spray, side, playlist, cycle, mediaNode, words, fitWords, FEED, climb, tickUp, typeInto, bubble, chip, pick, compact, digits, LOGO, EASE, SPRING } from './kit.js';
+import { PAGE, COMMENTS, PAGE_REPLIES, WHO, TIMES, pagePosts } from './talk.js';
 
 const nextComment = deck(COMMENTS);
 
 const REACTIONS = ['👍', '❤️', '😮', '👍', '❤️', '👍', '😂', '❤️', '👍'];
 const LIVE = ['👍', '❤️', '😂', '😮', '👍', '❤️', '🥰'];
+const LIKES = [128, 74, 212, 96, 157, 63];
 
-function post({ text, time, src, wide }, likes) {
+/* an own picture or clip the admin left without words */
+const GENERIC = `من اجتماعنا 🤍 كل أحد الساعة ٨ مساءً — ${PAGE.place}`;
+
+function post({ item, text, time }, likes, tl, advance) {
 
   const count = h('span', { class: 'fb-post__n' }, compact(likes));
-  return h('div', { class: 'fb-post' },
+  return h('div', { class: 'fb-post', 'data-item': item ? item.id : null },
     h('div', { class: 'fb-post__head' },
       h('img', { class: 'fb-post__avatar', src: LOGO, alt: '' }),
       h('span', { class: 'fb-post__who' }, h('b', {}, PAGE.facebook), h('i', {}, `${time} · 🌐`))
     ),
-    h('p', { class: 'fb-post__text' }, text),
-    src ? h('div', { class: `fb-post__media${wide ? ' is-wide' : ''}` }, h('img', { src, alt: '', decoding: 'async' })) : null,
+    words(text, { className: 'fb-post__text', lines: 5, more: '… عرض المزيد' }),
+    item ? mediaNode(item, tl, { className: 'fb-post__media', ratio: FEED, advance }) : null,
     h('div', { class: 'fb-post__counts' }, h('span', { class: 'fb-post__faces' }, '👍❤️'), count, h('span', { class: 'fb-post__more' }, `${digits(Math.round(likes / 9))} تعليق · ${digits(Math.round(likes / 30) + 1)} مشاركة`)),
     h('div', { class: 'fb-post__actions' }, h('span', {}, '👍 أعجبني'), h('span', {}, '💬 تعليق'), h('span', {}, '↗ مشاركة'))
   );
@@ -47,19 +55,15 @@ function comment(who, text, { page = false } = {}) {
 export function play(stage, { quick, reduced, lite, content, sound, link }) {
 
   const tl = timeline({ quick, reduced, lite });
-  const pics = pictures(link, 4);
-  const texts = pagePosts(content);
-  const own = !!(link.gallery && link.gallery.length);
+  const items = playlist(link, { posters: 3 });
+  const own = items.length > 0 && items[0].own;
 
-  // posts: a poster with its caption, the page's words, another poster…
-  const specs = [0, 1, 2].map(i => {
-    const pic = pics[i];
-    const words = i === 1 ? texts.find(t => !t.poster) : null;
-    if (words) return { ...words, src: null };
-    const fromLibrary = !own && pic && pic.topic;
-    return { text: fromLibrary ? texts.find(t => t.poster && t.poster.src === pic.src).text : texts[0].text, time: ['من ساعة', 'امبارح', 'من ٣ أيام'][i], src: pic && pic.src, wide: pic && pic.w > pic.h };
-  });
-  const posts = specs.map((spec, i) => post(spec, [128, 74, 212][i]));
+  // one post per item, in order; the bundled feed keeps the page's words between its posters
+  const specs = items.map((item, i) => ({ item, text: own ? item.text || GENERIC : item.text, time: TIMES[(i + 3) % TIMES.length] }));
+  if (!own) {
+    pagePosts(content).filter(p => !p.poster).slice(0, specs.length).forEach((extra, i) => specs.splice(i * 2 + 1, 0, { item: null, text: extra.text, time: extra.time }));
+  }
+  const posts = specs.map((spec, i) => post(spec, LIKES[i % LIKES.length], tl, specs.length > 1));
   const feed = h('div', { class: 'fb-feed' }, posts);
   const count = h('span', { class: 'fb-count__n' });
   const bar = h('div', { class: 'fb-react' },
@@ -70,6 +74,7 @@ export function play(stage, { quick, reduced, lite, content, sound, link }) {
   const comments = h('div', { class: 'fb-comments' });
   const field = h('span', { class: 'fb-compose__field' }, 'اكتب تعليق…');
   const compose = h('div', { class: 'fb-compose' }, h('i', { class: 'fb-compose__me' }), field, h('span', { class: 'fb-compose__send' }, '➤'));
+  const viewport = h('div', { class: 'fb-viewport' }, feed, comments);
 
   const phone = h('div', { class: 'xp-phone fb' },
     h('div', { class: 'fb-top' },
@@ -77,18 +82,31 @@ export function play(stage, { quick, reduced, lite, content, sound, link }) {
       h('span', { class: 'fb-top__name' }, h('b', {}, PAGE.facebook), h('i', {}, '١٫٣ ألف متابع')),
       h('span', { class: 'fb-top__follow' }, 'متابَع ✓')
     ),
-    h('div', { class: 'fb-viewport' }, feed, comments),
+    viewport,
     bar,
     compose
   );
 
   stage.append(phone);
+  fitWords(feed);
 
-  // the phone rises in, the feed scrolls to the second post
+  // the feed at a post: its top under the bar (never past the feed's end)
+  let at = 0;
+  const offset = i => Math.max(0, Math.min(posts[i].offsetTop - 8, feed.scrollHeight - viewport.clientHeight));
+  const show = i => {
+    const from = at;
+    at = offset(i);
+    posts.forEach((p, n) => p.classList.toggle('is-current', n === i));
+    feed.style.transform = `translateY(${-at}px)`;
+    if (feed.animate && from !== at) feed.animate([{ transform: `translateY(${-from}px)` }, { transform: `translateY(${-at}px)` }], { duration: i === 0 ? 1100 : 900, easing: 'cubic-bezier(.45, 0, .2, 1)' });
+    sound('swipe');
+    return posts[i].querySelector('.fb-post__media');
+  };
+  posts[0].classList.add('is-current');
+
+  // the phone rises in, the first post settles
   tl.from(phone, [{ transform: 'translateY(26px) scale(.96)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 650, easing: SPRING });
-  tl.from(feed, [{ transform: 'translateY(0)' }, { transform: 'translateY(-30%)' }], { duration: 1600, delay: 900, easing: 'cubic-bezier(.45, 0, .2, 1)' });
-  feed.classList.add('is-scrolled');
-  tl.at(900, () => sound('swipe'));
+  tl.from(feed, [{ transform: 'translateY(40px)', opacity: 0.4 }, { transform: 'none', opacity: 1 }], { duration: 900, delay: 400, easing: EASE });
   tl.from(bar, [{ transform: 'translateY(100%)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 500, delay: 500, easing: EASE });
 
   const start = 128;
@@ -111,15 +129,8 @@ export function play(stage, { quick, reduced, lite, content, sound, link }) {
 
   const settled = 2700;
 
-  // the feed keeps drifting between the posts, slowly
-  tl.at(settled, () => tl.loop(feed, [
-    { transform: 'translateY(-30%)' },
-    { transform: 'translateY(-30%)', offset: 0.2 },
-    { transform: 'translateY(-4%)', offset: 0.5 },
-    { transform: 'translateY(-4%)', offset: 0.68 },
-    { transform: 'translateY(-58%)', offset: 0.9 },
-    { transform: 'translateY(-30%)' }
-  ], { duration: 14000, easing: 'cubic-bezier(.45, 0, .25, 1)' }));
+  // post by post through every item (a clip: once its segment has played), then from the top
+  cycle(tl, posts.length, show, { first: posts[0].querySelector('.fb-post__media'), image: 4400, delay: quick ? 800 : 1400 });
 
   // reactions keep coming from the bar, out over the phone's edge; the count follows
   floats(tl, phone, { glyphs: LIVE, x: [4, 20], y: [84, 88], rise: [120, 190], drift: 46, size: [1.1, 1.5], every: 900, max: 6, delay: settled, name: 'fb-react', sound, cue: 'react' });
@@ -127,7 +138,7 @@ export function play(stage, { quick, reduced, lite, content, sound, link }) {
 
   // comments arrive (now and then the page answers); the oldest leaves
   let said = 1;
-  const show = node => {
+  const add = node => {
     comments.append(node);
     [...comments.children].slice(0, -2).forEach(old => old.remove());
     node.animate([{ transform: 'translateX(-24px) scale(.94)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 460, easing: SPRING });
@@ -135,7 +146,7 @@ export function play(stage, { quick, reduced, lite, content, sound, link }) {
   tl.every(4200, () => {
     said += 1;
     const page = said % 4 === 0;
-    show(comment(pick(WHO), page ? pick(PAGE_REPLIES) : COMMENTS[said % COMMENTS.length], { page }));
+    add(comment(pick(WHO), page ? pick(PAGE_REPLIES) : COMMENTS[said % COMMENTS.length], { page }));
     sound('pop');
   }, { delay: settled + 900 });
 
@@ -144,7 +155,7 @@ export function play(stage, { quick, reduced, lite, content, sound, link }) {
     typeInto(tl, field, pick(['نشوفكم الأحد 🙏', 'موضوع مهم جدًا', 'جاي إن شاء الله ❤️', 'تسلم إيديكم']), {
       sound,
       done: () => {
-        show(comment('أنا', field.textContent));
+        add(comment('أنا', field.textContent));
         sound('send');
         field.textContent = 'اكتب تعليق…';
         tl.later(9000, typeOne);

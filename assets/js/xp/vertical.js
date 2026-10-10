@@ -1,12 +1,15 @@
 /**
  * VERTICAL family: Snapchat and any full-screen vertical platform (stories,
- * snaps, reels). Our pictures full-bleed — the link's «صور المشهد», else
- * the real weekly posters with their topics — the platform's accent ring
- * and glyph, story progress, a reply typed and sent.
+ * snaps, reels). The link's playlist full-screen (kit.js: the admin's own
+ * pictures and clips, in its order, with its words, whole on a blurred
+ * copy of themselves), else the real weekly posters with their topics —
+ * the platform's accent ring and glyph, story progress, a reply typed and
+ * sent.
  *
- * Entrance: the first snap opens from the ring. Alive: snaps advance every
- * few seconds (progress bars fill, a soft swipe), reactions burst out over
- * the edge; emoji, streaks and replies drift around.
+ * Entrance: the first snap opens from the ring. Alive: snaps advance one
+ * by one through ALL the items (a clip: once its segment has played; then
+ * from the first), reactions burst out over the edge; emoji, streaks and
+ * replies drift around.
  * Our own interpretation, not the apps' interfaces.
  *
  * The "stories" scene uses this same renderer (stories.js).
@@ -14,24 +17,30 @@
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { deck, timeline, spray, side, floats, pictures, typeInto, bubble, chip, pick, digits, LOGO, EASE, SPRING } from './kit.js';
+import { deck, timeline, spray, side, floats, playlist, cycle, mediaNode, words, fitWords, typeInto, bubble, chip, pick, digits, LOGO, EASE, SPRING } from './kit.js';
 import { COMMENTS, WHO } from './talk.js';
 
 const nextComment = deck(COMMENTS);
 
+/* a picture stays this long (ms) */
+const SNAP = 3400;
+
 export function play(stage, { quick, reduced, lite, sound, link, platform }, variant = 'snap') {
 
   const tl = timeline({ quick, reduced, lite });
-  const pics = pictures(link, 4, { wide: false });
-  const count = Math.max(3, pics.length);
+  const items = playlist(link, { posters: 4, portrait: true });
+  const count = items.length;
   const glyph = platform.icon || (link.icon !== 'link' ? link.icon : 'photos');
   const snap = platform.key === 'snapchat';
 
-  const bars = Array.from({ length: count }, () => h('span', { class: 'vt-bar' }, h('i')));
-  const frames = Array.from({ length: count }, (_, i) => h('div', { class: `vt-frame vt-frame--${i % 3}` },
-    pics[i] ? [h('img', { class: 'vt-frame__bg', src: pics[i].src, alt: '' }), h('img', { class: 'vt-frame__img', src: pics[i].src, alt: '', decoding: 'async' })] : h('span', { class: 'vt-frame__art' }, iconNode(glyph)),
-    pics[i] && pics[i].topic ? h('span', { class: 'vt-frame__caption' }, `«${pics[i].topic}» ${snap ? '👻' : '✨'}`) : null
-  ));
+  const bars = items.map(() => h('span', { class: 'vt-bar' }, h('i')));
+  const frames = items.map((item, i) => {
+    const text = item.own ? item.text : `«${item.topic}» ${snap ? '👻' : '✨'}`;
+    return h('div', { class: `vt-frame vt-frame--${i % 3}`, 'data-item': item.id },
+      mediaNode(item, tl, { className: 'vt-frame__media', main: 'vt-frame__img', advance: count > 1 }),
+      text ? words(text, { className: 'vt-frame__caption', lines: 3 }) : null
+    );
+  });
   const track = h('div', { class: 'vt-track' }, frames);
   track.style.setProperty('--count', String(count));
 
@@ -50,16 +59,20 @@ export function play(stage, { quick, reduced, lite, sound, link, platform }, var
   );
 
   stage.append(phone);
+  fitWords(track);
 
   let current = 0;
 
   const show = index => {
     track.style.transform = `translateX(${-100 * index / count}%)`;
+    frames.forEach((frame, i) => frame.classList.toggle('is-current', i === index));
     bars.forEach((bar, i) => {
       bar.firstChild.getAnimations().forEach(a => a.cancel());
       bar.firstChild.style.transform = i < index ? 'scaleX(1)' : 'scaleX(0)';
     });
   };
+  // a clip's bar: its segment's length when the admin set one
+  const length = item => (item.kind === 'video' && item.end > item.start ? (item.end - item.start) * 1000 : SNAP) * (lite ? 1.5 : 1);
 
   // final frame: the first snap, its bar full
   show(0);
@@ -75,16 +88,16 @@ export function play(stage, { quick, reduced, lite, sound, link, platform }, var
   /* ---------- alive ---------- */
 
   const settled = quick ? 1300 : 2600;
-  const step = 3400;
 
-  tl.every(step, () => {
+  cycle(tl, count, index => {
     const from = current;
-    current = (current + 1) % count;
-    track.animate([{ transform: `translateX(${-100 * from / count}%)` }, { transform: `translateX(${-100 * current / count}%)` }], { duration: 560, easing: EASE });
-    show(current);
-    bars[current].firstChild.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: step * (lite ? 1.8 : 1), easing: 'linear', fill: 'forwards' });
+    current = index;
+    track.animate([{ transform: `translateX(${-100 * from / count}%)` }, { transform: `translateX(${-100 * index / count}%)` }], { duration: 560, easing: EASE });
+    show(index);
+    bars[index].firstChild.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: length(items[index]), easing: 'linear', fill: 'forwards' });
     sound('swipe');
-  }, { jitter: 0, delay: settled });
+    return frames[index].firstChild;
+  }, { first: frames[0].firstChild, image: SNAP, delay: quick ? 0 : 900 });
 
   const reply = () => typeInto(tl, field, pick(['🔥🔥', 'جامد ❤️', 'مستنيين الأحد', 'تحفة 😍']), {
     sound,

@@ -1,41 +1,44 @@
 /**
- * Instagram: our stories — the real weekly posters (or the link's own
- * «صور المشهد») and a reel of a game segment — the ring that fills, the
- * frames that swipe, a double-tap heart, a reply typed and sent.
- * "صور وستوريز من كل اجتماع".
- * Alive: the stories keep playing (bars fill, frames swipe, the reel
- * plays), the ring's gradient turns, hearts burst out over the phone's
- * edges; likes, comments and gradient sparkles drift around (and beside
- * the sheet on wide screens). Our own interpretation, not Instagram's.
+ * Instagram: our stories — the link's playlist (kit.js: the admin's own
+ * pictures as posts and clips as reel moments, in its order, with its
+ * words), else the real weekly posters and a reel of a game segment — the
+ * ring that turns, the bars that fill, the frames that swipe one by one
+ * through ALL the items (then from the first), a double-tap heart, a reply
+ * typed and sent. "صور وستوريز من كل اجتماع".
+ * Alive: the stories keep playing (a bar fills, a clip plays its segment,
+ * the next frame slides in), hearts burst out over the phone's edges;
+ * likes, comments and gradient sparkles drift around (and beside the
+ * sheet on wide screens). Our own interpretation, not Instagram's.
  */
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { deck, timeline, float, floats, spray, side, pictures, sceneClips, clipNode, typeInto, bubble, chip, pick, digits, LOGO, EASE, SPRING } from './kit.js';
+import { deck, timeline, float, floats, spray, side, playlist, cycle, mediaNode, words, fitWords, typeInto, bubble, chip, pick, digits, LOGO, EASE, SPRING } from './kit.js';
 import { PAGE, COMMENTS, WHO } from './talk.js';
 
 const nextComment = deck(COMMENTS);
 
+/* a picture stays this long (ms) */
+const STORY = 3600;
+
 export function play(stage, { quick, reduced, lite, sound, link }) {
 
   const tl = timeline({ quick, reduced, lite });
-  const pics = pictures(link, 2, { wide: false });
-  // the reel: the link's own video first, else a game segment
-  const reel = sceneClips(link, 1)[0];
+  // the link's own items, else a poster, a reel, a poster
+  const items = playlist(link, { posters: 2, clips: 1, portrait: true });
+  const count = items.length;
 
-  const bars = [0, 1, 2].map(() => h('span', { class: 'ig-bar' }, h('i')));
-  const still = (pic, i) => h('div', { class: `ig-frame ig-frame--${i}` },
-    pic ? h('img', { class: 'ig-frame__bg', src: pic.src, alt: '' }) : null,
-    pic ? h('img', { class: 'ig-frame__img', src: pic.src, alt: '', decoding: 'async' }) : null,
-    pic && pic.topic ? h('span', { class: 'ig-frame__caption' }, `«${pic.topic}» ✨`) : null
-  );
-  const video = clipNode(reel, tl, 'ig-frame__video');
-  const frames = [
-    still(pics[0], 0),
-    h('div', { class: 'ig-frame ig-frame--1 ig-frame--reel' }, video, h('span', { class: 'ig-frame__tag' }, '▶ ريلز'), reel.caption ? h('span', { class: 'ig-frame__caption' }, `${reel.caption} 😂🔥`) : null),
-    still(pics[1], 2)
-  ];
+  const bars = items.map(() => h('span', { class: 'ig-bar' }, h('i')));
+  const frames = items.map((item, i) => {
+    const text = item.own ? item.text : item.kind === 'video' ? `${item.caption} 😂🔥` : `«${item.topic}» ✨`;
+    return h('div', { class: `ig-frame ig-frame--${i % 3}${item.kind === 'video' ? ' ig-frame--reel' : ''}`, 'data-item': item.id },
+      mediaNode(item, tl, { className: 'ig-frame__media', main: item.kind === 'video' ? 'ig-frame__video' : 'ig-frame__img', advance: count > 1 }),
+      item.kind === 'video' ? h('span', { class: 'ig-frame__tag' }, '▶ ريلز') : null,
+      text ? words(text, { className: 'ig-frame__caption', lines: 3 }) : null
+    );
+  });
   const track = h('div', { class: 'ig-track' }, frames);
+  track.style.width = `${count * 100}%`;
   const heart = h('span', { class: 'ig-heart' }, '♥');
   const glow = h('span', { class: 'ig-ring__glow' });
   const ring = h('span', { class: 'ig-ring' }, glow, h('img', { src: LOGO, alt: '' }));
@@ -56,30 +59,31 @@ export function play(stage, { quick, reduced, lite, sound, link }) {
   );
 
   stage.append(phone);
+  fitWords(track);
 
-  const step = quick ? 520 : 1000;
+  // a frame on screen: the bars before it full, its own filling
+  const fill = (index, time) => {
+    track.style.transform = `translateX(${-100 * index / count}%)`;
+    frames.forEach((frame, i) => frame.classList.toggle('is-current', i === index));
+    bars.forEach((bar, i) => {
+      bar.firstChild.getAnimations().forEach(a => a.cancel());
+      bar.firstChild.style.transform = i < index ? 'scaleX(1)' : 'scaleX(0)';
+    });
+    if (!reduced && bars[index].firstChild.animate) bars[index].firstChild.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: time, easing: 'linear', fill: 'forwards' });
+  };
+  // a clip's bar: its segment's length when the admin set one
+  const length = item => (item.kind === 'video' && item.end > item.start ? (item.end - item.start) * 1000 : STORY) * (lite ? 1.5 : 1);
+
+  // the final frame: the first item, its bar full
+  fill(0, length(items[0]));
+  if (reduced) bars[0].firstChild.style.transform = 'scaleX(1)';
 
   tl.from(phone, [{ transform: 'scale(.92)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 600, easing: SPRING });
   tl.from(ring, [{ transform: 'rotate(-120deg) scale(.7)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 900, delay: 150, easing: SPRING });
-
-  // the bars fill one after the other; the frames swipe with them
-  bars.forEach((bar, i) => {
-    tl.from(bar.firstChild, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: step, delay: 300 + i * step, easing: 'linear' });
-  });
-
-  // the final frame is the third: the track shows it; it travels there
-  tl.from(track, [
-    { transform: 'translateX(0)' },
-    { transform: 'translateX(0)', offset: 0.3 },
-    { transform: 'translateX(-33.333%)', offset: 0.42 },
-    { transform: 'translateX(-33.333%)', offset: 0.72 },
-    { transform: 'translateX(-66.666%)' }
-  ], { duration: 300 + 3 * step, easing: EASE });
-  tl.at(300 + step * 1.1, () => { sound('swipe'); if (video.play) tl.video(video); });
-  tl.at(300 + step * 2.1, () => sound('swipe'));
+  tl.at(300, () => sound('swipe'));
 
   // double tap: a heart, bursting out over the phone's edges
-  const tapAt = 300 + step * 1.55;
+  const tapAt = quick ? 700 : 1300;
   tl.from(heart, [
     { transform: 'scale(0)', opacity: 0 },
     { transform: 'scale(0)', opacity: 0, offset: 0.0001 },
@@ -95,30 +99,21 @@ export function play(stage, { quick, reduced, lite, sound, link }) {
 
   /* ---------- alive ---------- */
 
-  const settled = 300 + 3 * step + 200;
+  const settled = tapAt + 1300;
 
   // the ring's gradient turns slowly (the logo stays still)
   tl.loop(glow, [{ transform: 'rotate(0)' }, { transform: 'rotate(360deg)' }], { duration: 6000, easing: 'linear' });
 
-  // the stories keep playing: a bar fills, the next frame slides in
-  let current = 2;
-  const story = 3600;
-  const show = index => {
-    track.style.transform = `translateX(${-33.333 * index}%)`;
-    bars.forEach((bar, i) => {
-      bar.firstChild.getAnimations().forEach(a => a.cancel());
-      bar.firstChild.style.transform = i < index ? 'scaleX(1)' : 'scaleX(0)';
-    });
-    bars[index].firstChild.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: story * (lite ? 1.8 : 1), easing: 'linear', fill: 'forwards' });
-  };
-
-  tl.every(story, () => {
+  // the stories keep playing, in order: a bar fills (a clip: its segment), the next frame slides in
+  let current = 0;
+  cycle(tl, count, index => {
     const from = current;
-    current = (current + 1) % 3;
-    track.animate([{ transform: `translateX(${-33.333 * from}%)` }, { transform: `translateX(${-33.333 * current}%)` }], { duration: 520, easing: EASE });
-    show(current);
+    current = index;
+    track.animate([{ transform: `translateX(${-100 * from / count}%)` }, { transform: `translateX(${-100 * index / count}%)` }], { duration: 520, easing: EASE });
+    fill(index, length(items[index]));
     sound('swipe');
-  }, { jitter: 0, delay: settled + 800 });
+    return frames[index].firstChild;
+  }, { first: frames[0].firstChild, image: STORY, delay: 300 });
 
   // a reply typed under the story, then sent
   const reply = () => typeInto(tl, field, pick(['تحفة 😍', 'مستنيين الأحد 🔥', 'أحلى اجتماع ❤️', 'جاي إن شاء الله']), {

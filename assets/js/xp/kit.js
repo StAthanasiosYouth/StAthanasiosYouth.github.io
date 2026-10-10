@@ -23,6 +23,7 @@
 import { h } from '../dom.js';
 import { DAY_NAMES, formatTime } from '../words.js';
 import { POSTERS, CLIPS } from './library.js';
+import { caption } from './talk.js';
 
 export const LOGO = 'assets/img/logo-128.webp';
 
@@ -179,8 +180,15 @@ export function timeline({ quick = false, reduced = false, lite = false } = {}) 
       if (!on) {
         videos.delete(el);
         el.pause();
+        // a playlist clip that isn't on screen keeps nothing loaded
+        if (el.dataset.src && el.getAttribute('src')) {
+          el.removeAttribute('src');
+          el.load();
+          owned.delete(el);
+        }
         return el;
       }
+      if (el.dataset.src && !el.getAttribute('src')) el.src = el.dataset.src;
       videos.add(el);
       owned.add(el);
       if (!hidden) el.play().catch(() => {});
@@ -773,49 +781,127 @@ export function posters(content, count = 3) {
 }
 
 
-/* the link's own gallery, split: images (any item that isn't a video) */
-const ownImages = link => ((link && link.gallery) || []).filter(item => item && item.type !== 'video');
-
 /**
- * The pictures a scene shows, as { src, topic?, w, h }: the link's own
- * images (chosen in the admin, «صور المشهد», in its order) first, then the
- * service's real weekly posters (library.js). Videos are not pictures
- * (sceneClips). Never anything fetched from the platform.
+ * THE PLAYLIST a scene shows: one shared list, in one shape.
+ *
+ * The link has its own gallery (the admin's «صور وفيديوهات المشهد», at most
+ * 6): EXACTLY those items, in the admin's order, pictures and clips mixed,
+ * each with its own words (`text`, the admin's caption). Nothing bundled is
+ * ever mixed into a configured scene.
+ * No gallery: the service's bundled material (library.js) — `posters`
+ * weekly posters (portrait ones only with `portrait`) and `clips` game
+ * segments (`order`: ids first), interleaved (a poster, a clip, …), with
+ * their default words (talk.js).
+ *
+ * Shape: { id, kind: 'image' | 'video', own, src, poster, w, h, text,
+ *          alt, start, end, topic?, caption? } (end 0 = to the end).
+ * Never anything fetched from the platform.
  */
-export function pictures(link, count = 3, { wide = true } = {}) {
+export function playlist(link, { posters = 3, clips = 0, order = [], portrait = false } = {}) {
 
-  const own = ownImages(link).map(image => ({ src: image.thumb || image.src, w: image.w, h: image.h, topic: '' })).filter(p => p.src);
-  const library = POSTERS.filter(p => wide || p.w < p.h);
-  const list = own.concat(library);
+  const own = ((link && link.gallery) || []).filter(item => item && item.src).map((item, i) => {
+    const video = item.type === 'video';
+    const still = video ? item.poster || item.thumb || '' : item.thumb || item.src;
+    return {
+      id: `own-${i}`,
+      kind: video ? 'video' : 'image',
+      own: true,
+      src: video ? item.src : still,
+      poster: still,
+      w: Number(item.w) || (video ? 360 : 400),
+      h: Number(item.h) || (video ? 640 : 400),
+      text: typeof item.text === 'string' ? item.text.trim() : '',
+      alt: item.alt || '',
+      start: video ? Math.max(0, Number(item.start) || 0) : 0,
+      end: video ? Math.max(0, Number(item.end) || 0) : 0
+    };
+  });
 
-  return list.slice(0, count);
+  if (own.length) return own;
 
-}
-
-/* the srcs only (older scenes) */
-export function media(link, content, count = 3) {
-
-  const own = ownImages(link).map(image => image.thumb || image.src).filter(Boolean);
-  return (own.length ? own : pictures(null, count).map(p => p.src)).slice(0, count);
-
-}
-
-
-/**
- * The clips a video scene plays (TikTok, YouTube, the Instagram reel): the
- * link's own videos first (admin order, with their start/end), then the
- * bundled game segments (library.js; `order`: ids first, then the rest).
- * Shape: { id, src, poster, w, h, caption, start, end } (end 0 = to the end).
- */
-export function sceneClips(link, count = Infinity, { order = [] } = {}) {
-
-  const own = ((link && link.gallery) || [])
-    .filter(item => item && item.type === 'video' && item.src)
-    .map((item, i) => ({ id: `own-${i}`, src: item.src, poster: item.poster || '', w: item.w || 360, h: item.h || 640, caption: '', start: Math.max(0, Number(item.start) || 0), end: Math.max(0, Number(item.end) || 0), own: true }));
+  const stills = POSTERS.filter(p => !portrait || p.w < p.h).slice(0, posters).map((p, i) => ({
+    id: `poster-${p.date}`, kind: 'image', own: false, src: p.src, poster: p.src, w: p.w, h: p.h,
+    text: caption(p, i), alt: '', start: 0, end: 0, topic: p.topic
+  }));
   const ranked = order.map(id => CLIPS.find(c => c.id === id)).filter(Boolean);
-  const bundled = ranked.concat(CLIPS.filter(c => !ranked.includes(c))).map(c => ({ ...c, start: 0, end: 0 }));
+  const moving = ranked.concat(CLIPS.filter(c => !ranked.includes(c))).slice(0, clips).map(c => ({
+    id: c.id, kind: 'video', own: false, src: c.src, poster: c.poster, w: c.w, h: c.h,
+    text: c.caption, alt: '', start: 0, end: 0, caption: c.caption
+  }));
 
-  return own.concat(bundled).slice(0, count);
+  const list = [];
+  for (let i = 0; i < Math.max(stills.length, moving.length); i++) {
+    if (stills[i]) list.push(stills[i]);
+    if (moving[i]) list.push(moving[i]);
+  }
+  return list;
+
+}
+
+/* the next place in a playlist of n: in order, then from the start again */
+export const nextIndex = (i, n) => (n > 0 ? (i + 1) % n : 0);
+
+/* the <video> of a media node (mediaNode / clipNode), if it is one */
+export const videoOf = node => (!node ? null : node.tagName === 'VIDEO' ? node : (node.querySelector && node.querySelector('video')));
+
+/**
+ * Plays a playlist of `count` items in order, then loops: show(i) puts item
+ * i on screen (the scene's own way: a swipe, a scroll, a new message…) and
+ * returns its media node. A picture stays `image` ms; a clip plays its
+ * segment and the next item comes when it ends (never longer than `max`;
+ * soon if it can't load). Only the current clip stays loaded. The first
+ * item (`first`: its node) is already on screen; it moves on after `delay`
+ * (+ its own time). One item, or reduced motion: nothing to advance (a
+ * lone clip loops). Lite: slower (clips are posters there).
+ */
+export function cycle(tl, count, show, { first = null, image = 4200, max = 30000, delay = 0 } = {}) {
+
+  if (tl.reduced) return null;
+  if (count < 2) {
+    const lone = videoOf(first);
+    if (lone) tl.later(delay, () => tl.video(lone));
+    return null;
+  }
+
+  let index = 0;
+  let wait = null;
+  let video = null;
+
+  const step = () => {
+    const before = video;
+    index = nextIndex(index, count);
+    arm(show(index), 0);
+    if (before && before !== video) tl.video(before, false);
+  };
+  const ended = () => step();
+  const broken = () => {
+    if (wait) wait.cancel();
+    wait = tl.later(1200, step);
+  };
+
+  function arm(node, extra) {
+    if (wait) wait.cancel();
+    if (video) {
+      video.removeEventListener('segmentend', ended);
+      video.removeEventListener('error', broken);
+    }
+    video = videoOf(node);
+    if (video) {
+      video.addEventListener('segmentend', ended);
+      video.addEventListener('error', broken);
+      const mine = video;
+      if (extra) tl.later(extra, () => { if (video === mine) tl.video(mine); });
+      else tl.video(mine);
+      wait = tl.later(extra + max, step);
+    }
+    else {
+      wait = tl.later(extra + image * (tl.lite ? 1.5 : 1), step);
+    }
+  }
+
+  arm(first, delay);
+
+  return { get index() { return index; }, next: step };
 
 }
 
@@ -835,42 +921,116 @@ export function segment(start, end, duration) {
 
 
 /**
- * A clip (sceneClips): a muted, inline video that loads nothing until its
- * scene plays it (preload none), playing its segment (start → end) in a
- * loop; else its poster frame. lite / reduced motion: the poster only.
+ * A clip (a playlist video): a muted, inline video that loads nothing until
+ * its scene plays it (preload none), playing its segment (start → end);
+ * else its poster frame. lite / reduced motion: the poster only.
+ * By default the segment loops; with `advance` it plays once, stops and
+ * tells the scene (a `segmentend` event) so the next item can come.
  */
-export function clipNode(clip, tl, className = '') {
+export function clipNode(clip, tl, className = '', { advance = false } = {}) {
 
   if (tl.reduced || tl.lite || !clip.src) return h('img', { class: className, src: clip.poster, alt: '', decoding: 'async' });
 
   const part = clip.start > 0 || clip.end > 0;
-  const video = h('video', { class: className, poster: clip.poster || null, preload: 'none', playsinline: '', muted: '', loop: part ? null : '', disablepictureinpicture: '', 'aria-hidden': 'true' });
+  const video = h('video', { class: className, poster: clip.poster || null, preload: 'none', playsinline: '', muted: '', loop: part || advance ? null : '', disablepictureinpicture: '', 'aria-hidden': 'true' });
   video.muted = true;
   video.src = clip.src;
+  // tl.video(…, false) unloads it; tl.video(…) loads it again from here
+  video.dataset.src = clip.src;
+
+  const range = () => segment(clip.start || 0, clip.end || 0, video.duration);
+  const toStart = () => { video.currentTime = range()[0]; };
+  let done = false;
+  const end = () => {
+    if (!advance) {
+      toStart();
+      if (video.paused && video.dataset.playing) video.play().catch(() => {});
+      return;
+    }
+    if (done) return;
+    done = true;
+    video.pause();
+    video.dispatchEvent(new Event('segmentend'));
+  };
+  video.addEventListener('play', () => { done = false; video.dataset.playing = '1'; });
+  video.addEventListener('pause', () => { if (!video.ended) delete video.dataset.playing; });
+  if (part || advance) video.addEventListener('ended', end);
 
   if (part) {
-    const range = () => segment(clip.start || 0, clip.end || 0, video.duration);
-    const restart = () => {
-      video.currentTime = range()[0];
-      if (video.paused && video.dataset.playing) video.play().catch(() => {});
-    };
-    const toStart = () => { if (video.currentTime < range()[0] - 0.1) video.currentTime = range()[0]; };
-    video.addEventListener('loadedmetadata', toStart);
-    video.addEventListener('loadeddata', toStart);
+    const early = () => { if (video.currentTime < range()[0] - 0.1) toStart(); };
+    video.addEventListener('loadedmetadata', early);
+    video.addEventListener('loadeddata', early);
     // every frame where the browser can say so (else on timeupdate)
     const watch = () => {
       const [from, to] = range();
-      if (video.currentTime >= to - 0.05 || video.currentTime < from - 0.1) restart();
+      if (!video.paused && video.currentTime >= to - 0.05) end();
+      else if (video.currentTime < from - 0.1) toStart();
       if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(watch);
     };
     if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(watch);
     else video.addEventListener('timeupdate', watch);
-    video.addEventListener('ended', restart);
-    video.addEventListener('play', () => { video.dataset.playing = '1'; });
-    video.addEventListener('pause', () => { if (!video.ended) delete video.dataset.playing; });
   }
 
   return video;
+
+}
+
+
+/**
+ * A playlist item on a screen: the picture, or the clip (clipNode), over a
+ * blurred copy of itself, so any ratio (9:16, 4:5, 1:1, 16:9…) shows whole
+ * instead of cropped ("contain"); the bundled game clips carry their own
+ * fill and cover their frame. `ratio` [min, max] (w / h): the box takes the
+ * item's own shape, clamped (feeds: FEED, 4:5 to 16:9); else it fills the
+ * place the scene gives it. `main`: a class for the picture / video itself.
+ * `advance`: see clipNode.
+ */
+export function mediaNode(item, tl, { className = '', main = '', ratio = null, advance = false, fit = item.own || item.kind === 'image' ? 'contain' : 'cover' } = {}) {
+
+  const still = item.poster || item.src;
+  const inner = item.kind === 'video'
+    ? clipNode(item, tl, `xp-media__main ${main}`, { advance })
+    : h('img', { class: `xp-media__main ${main}`, src: item.src, alt: '', decoding: 'async' });
+  const box = h('span', { class: `xp-media xp-media--${fit} ${className}`, 'data-kind': item.kind, 'data-id': item.id },
+    fit === 'contain' && still ? h('img', { class: 'xp-media__bg', src: still, alt: '', decoding: 'async' }) : null,
+    inner
+  );
+
+  if (ratio) box.style.aspectRatio = Math.min(ratio[1], Math.max(ratio[0], (item.w || 1) / (item.h || 1))).toFixed(4);
+
+  return box;
+
+}
+
+/* the feeds' media box: the item's own shape, between 4:5 and 16:9 */
+export const FEED = [4 / 5, 16 / 9];
+
+
+/**
+ * An item's words (the admin's caption: up to 280 characters, emoji, a few
+ * line breaks, Arabic or not): plain text, line breaks kept, clamped to
+ * `lines` with «… المزيد» under it only when it doesn't fit (fitWords, once
+ * it is on screen).
+ */
+export function words(text, { className = '', lines = 3, more = '… المزيد' } = {}) {
+
+  const say = h('span', { class: `xp-say ${className}` },
+    h('span', { class: 'xp-say__text', dir: 'auto' }, text),
+    h('span', { class: 'xp-say__more' }, more)
+  );
+  say.style.setProperty('--lines', String(lines));
+  return say;
+
+}
+
+/* shows «المزيد» under the words that are clamped (needs layout: on screen) */
+export function fitWords(root) {
+
+  const all = root.classList && root.classList.contains('xp-say') ? [root] : [...root.querySelectorAll('.xp-say')];
+  all.forEach(say => {
+    const text = say.firstChild;
+    say.classList.toggle('is-more', text.scrollHeight > text.clientHeight + 2);
+  });
 
 }
 
