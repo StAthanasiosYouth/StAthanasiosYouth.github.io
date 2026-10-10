@@ -202,7 +202,7 @@ test('from a URL: https only, no pages, no credentials, the right types and size
 
 /* ---------------- gallery tokens ---------------- */
 
-test('gallery: pictures and clips, normalised tokens, in order, at most 6', () => {
+test('gallery: pictures and clips, normalised tokens, in order, at most 12', () => {
   const gs = world().as(ADMIN).gs;
   const a = image(gs, 1);
   const b = image(gs, 2);
@@ -219,9 +219,9 @@ test('gallery: pictures and clips, normalised tokens, in order, at most 6', () =
   gs.apiSaveLink({ ...link, gallery: row.gallery });
   assert.equal(gs.readTable_('Links').find(l => l.id === link.id).gallery, row.gallery);
 
-  gs.apiSaveLink({ ...link, gallery: [a.id, b.id, clip.id, clip.id + '@1-2', clip.id + '@2-3', clip.id + '@3-4', clip.id + '@4-5'] });
+  gs.apiSaveLink({ ...link, gallery: [a.id, b.id, ...Array.from({ length: 11 }, (_, i) => clip.id + '@' + i + '-' + (i + 1))] });
   row = gs.readTable_('Links').find(l => l.id === link.id);
-  assert.equal(row.gallery.split(',').length, 6, 'the first six');
+  assert.equal(row.gallery.split(',').length, 12, 'the first twelve');
 
   // used once per link in the library, whatever the number of clips
   const usage = plain(gs.apiMediaLibrary()).items.find(i => i.id === clip.id).usage;
@@ -342,12 +342,12 @@ test('content.js cleanVideo: own paths only, sane numbers, end 0 = to the end', 
   assert.equal(cleanVideo({ ...ok, end: 9999 }).end, 0);
   assert.equal(cleanVideo({ ...ok, start: 'x' }).start, 0);
 
-  // a mixed gallery, still at most six
+  // a mixed gallery, still at most twelve
   const seed = JSON.parse(readFileSync(new URL('../content.json', import.meta.url), 'utf8'));
   const picture = { src: 'media/2026/img-ab12cd34.webp', thumb: 'media/2026/img-ab12cd34-480.webp', w: 10, h: 10, alt: '' };
-  seed.featured = [{ id: 'x', title: 'x', url: 'https://example.org', icon: 'link', gallery: [ok, picture, { ...ok, src: 'bad' }, ok, ok, ok, ok, ok] }];
+  seed.featured = [{ id: 'x', title: 'x', url: 'https://example.org', icon: 'link', gallery: [ok, picture, { ...ok, src: 'bad' }, ...Array(12).fill(ok)] }];
   const gallery = sanitizeContent(seed).featured[0].gallery;
-  assert.equal(gallery.length, 6);
+  assert.equal(gallery.length, 12);
   assert.deepEqual(gallery.slice(0, 2).map(i => i.type || 'image'), ['video', 'image']);
   assert.equal(gallery[1].type, undefined, 'pictures unchanged');
 });

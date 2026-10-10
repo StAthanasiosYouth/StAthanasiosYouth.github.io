@@ -793,13 +793,19 @@ export function posters(content, count = 3) {
  * segments (`order`: ids first), interleaved (a poster, a clip, …), with
  * their default words (talk.js).
  *
- * Shape: { id, kind: 'image' | 'video', own, src, poster, w, h, text,
- *          alt, start, end, topic?, caption? } (end 0 = to the end).
+ * `text`: the scene also takes the admin's words-only items (a text post,
+ * a chat message: kind 'text') — only where one is natural (Facebook, the
+ * feeds, the chats); elsewhere they are left out.
+ * Shape: { id, kind: 'image' | 'video' | 'text', own, src, poster, w, h,
+ *          text, from ('us' | 'them' | ''), alt, start, end, topic?,
+ *          caption? } (end 0 = to the end).
  * Never anything fetched from the platform.
  */
-export function playlist(link, { posters = 3, clips = 0, order = [], portrait = false } = {}) {
+export function playlist(link, { posters = 3, clips = 0, order = [], portrait = false, text = false } = {}) {
 
-  const own = ((link && link.gallery) || []).filter(item => item && item.src).map((item, i) => {
+  const own = ((link && link.gallery) || []).filter(item => item && (item.src || (text && item.type === 'text' && item.text))).map((item, i) => {
+    const from = item.from === 'us' || item.from === 'them' ? item.from : '';
+    if (item.type === 'text') return { id: `own-${i}`, kind: 'text', own: true, src: '', poster: '', w: 0, h: 0, text: item.text.trim(), from, alt: '', start: 0, end: 0 };
     const video = item.type === 'video';
     const still = video ? item.poster || item.thumb || '' : item.thumb || item.src;
     return {
@@ -811,6 +817,7 @@ export function playlist(link, { posters = 3, clips = 0, order = [], portrait = 
       w: Number(item.w) || (video ? 360 : 400),
       h: Number(item.h) || (video ? 640 : 400),
       text: typeof item.text === 'string' ? item.text.trim() : '',
+      from,
       alt: item.alt || '',
       start: video ? Math.max(0, Number(item.start) || 0) : 0,
       end: video ? Math.max(0, Number(item.end) || 0) : 0
@@ -854,7 +861,7 @@ export const videoOf = node => (!node ? null : node.tagName === 'VIDEO' ? node :
  * (+ its own time). One item, or reduced motion: nothing to advance (a
  * lone clip loops). Lite: slower (clips are posters there).
  */
-export function cycle(tl, count, show, { first = null, image = 4200, max = 30000, delay = 0 } = {}) {
+export function cycle(tl, count, show, { first = null, image = 4200, max = 30000, delay = 0, start = 0 } = {}) {
 
   if (tl.reduced) return null;
   if (count < 2) {
@@ -863,7 +870,8 @@ export function cycle(tl, count, show, { first = null, image = 4200, max = 30000
     return null;
   }
 
-  let index = 0;
+  // `start`: the place of the item already on screen (`first`)
+  let index = start;
   let wait = null;
   let video = null;
 

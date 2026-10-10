@@ -205,6 +205,8 @@
 
     var said = el('p', { class: 'experience-said', 'aria-live': 'polite' });
 
+    var shown = '';
+
     /* shows what the link opens; returns true when that is a scene */
     function update() {
 
@@ -219,6 +221,7 @@
       }
 
       var platform = platforms[key];
+      shown = key;
 
       A.fill(said,
         A.icon(key ? (platform && platform.icon) || 'sparkle' : 'external'),
@@ -235,6 +238,8 @@
       node: A.field('التجربة قبل اللينك', el('div', {}, select, said), 'مشهد قصير يعرّف الزائر بالمكان اللي رايحله، وبعدين زرار يودّيه للينك نفسه'),
       select: select,
       update: update,
+      /* the scene family it opens (platforms.js `scene`), '' = none */
+      scene: function () { return (platforms[shown] && platforms[shown].scene) || ''; },
       value: function () { return select.value; }
     };
 
@@ -297,14 +302,18 @@
       return { icon: icons.value(), url: urlInput.value.trim() };
     });
     var gallery = A.galleryPicker(link.gallery || '', {
-      max: limits.gallery || 6,
-      label: 'صور وفيديوهات المشهد',
-      hint: 'اختياري — لحد ٦ صور أو مقاطع فيديو من المكتبة، بتظهر جوه المشهد بالترتيب ده. الفيديو: «من» و«لحد» (مثلاً 0:37 و0:43)؛ لو سبتهم فاضيين بيشتغل أول ٦ ثواني. من غيرهم بيظهر أحدث بوسترات منشورة.'
+      max: limits.gallery || 12,
+      label: 'محتوى المشهد',
+      scene: experience.scene,
+      hint: 'اختياري — لحد ١٢ عنصر بيظهروا جوه المشهد بالترتيب ده: صور وفيديوهات من المكتبة بالكلام اللي معاها، ورسايل أو منشورات نصية في فيسبوك وX وThreads وواتساب وتليجرام وماسنجر وديسكورد. الفيديو: «من» و«لحد» (مثلاً 0:37 و0:43)؛ لو سبتهم فاضيين بيشتغل أول ٦ ثواني. من غير محتوى بيظهر المحتوى الجاهز للمشهد.'
     });
 
-    // the photos only matter when the link opens a scene
+    // the content only matters when the link opens a scene (and what it can show depends on which)
+    var lastScene = null;
     function syncExperience() {
       gallery.node.hidden = !experience.update();
+      if (lastScene !== null && lastScene !== experience.scene()) gallery.redraw();
+      lastScene = experience.scene();
     }
 
     experience.select.addEventListener('change', syncExperience);

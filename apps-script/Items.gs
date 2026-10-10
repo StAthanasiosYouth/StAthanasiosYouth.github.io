@@ -95,7 +95,8 @@ function imageRef_(value, problems) {
  * at most GALLERY_TEXT.max). Takes the stored form or the editor's array
  * (tokens and/or { id, start, end, text }). Returns the stored form:
  * "id,id@start-end,..." — or, when any item has text, the JSON array
- * [{ id, start?, end?, text? }] (Content.gs galleryEntries_).
+ * [{ id, start?, end?, text?, from? }] (Content.gs galleryEntries_), where
+ * a words-only item (a text post / chat message) is { text, from? }.
  */
 function galleryInput_(value, problems) {
 
@@ -105,8 +106,22 @@ function galleryInput_(value, problems) {
   var items = galleryEntries_(value).slice(0, LIMITS.gallery).map(function (entry, index) {
 
     var token = entry.token;
+    var label = 'محتوى المشهد (' + (index + 1) + ')';
+
+    if (entry.from !== '' && GALLERY_FROM.indexOf(entry.from) === -1) {
+      problems.push(label + ': مين اللي بيقول الكلام ده مش مفهوم');
+    }
+
+    // words only: a text post / a chat message
+    if (entry.said) {
+      var words = galleryText_(entry.text);
+      if (typeof entry.text !== 'string' || !words) problems.push(label + ': الرسالة / المنشور فاضي');
+      else if (words.length > GALLERY_TEXT.max) problems.push(label + ': الكلام أطول من ' + GALLERY_TEXT.max + ' حرف');
+      said = true;
+      return { said: true, text: words, from: entry.from };
+    }
+
     var item = parseGalleryToken_(token);
-    var label = 'صور وفيديوهات المشهد (' + (index + 1) + ')';
 
     if (!item) {
       problems.push(label + ': "' + token.slice(0, 40) + '" مش مفهوم');
@@ -124,6 +139,11 @@ function galleryInput_(value, problems) {
 
     if (text) {
       item.text = text;
+      said = true;
+    }
+
+    if (entry.from) {
+      item.from = entry.from;
       said = true;
     }
 
@@ -148,12 +168,14 @@ function galleryInput_(value, problems) {
   }
 
   return JSON.stringify(items.map(function (item) {
+    if (item.said) return item.from ? { text: item.text, from: item.from } : { text: item.text };
     var out = { id: item.id };
     if (item.clip) {
       out.start = item.start;
       out.end = item.end;
     }
     if (item.text) out.text = item.text;
+    if (item.from) out.from = item.from;
     return out;
   }));
 

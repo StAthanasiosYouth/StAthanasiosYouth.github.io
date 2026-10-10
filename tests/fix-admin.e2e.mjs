@@ -164,3 +164,70 @@ test('an upload stays listed (name, progress, result) after leaving «الصور
   await close();
 
 });
+
+test('scene content: a chat link takes words-only messages with who says them; a TikTok link keeps them but does not offer them', async () => {
+
+  const { page, problems, close } = await open();
+
+  const link = await page.evaluate(() => A.state.draft.links.find(l => l.icon === 'whatsapp' || l.experience === 'whatsapp'));
+  assert.ok(link, 'a WhatsApp link in the seed');
+  await page.evaluate(id => A.editLink(A.state.draft.links.find(l => l.id === id)), link.id);
+  await page.waitForSelector('dialog.sheet[open] .gallery-picker');
+  assert.match(await page.$eval('dialog.sheet[open] .gallery-picker .field__label', n => n.textContent), /محتوى المشهد/);
+
+  const addText = () => page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .gallery-picker button')].find(b => b.textContent.includes('رسالة / منشور نصي')).click());
+  const type = (index, text) => page.evaluate((i, t) => {
+    const area = document.querySelectorAll('dialog.sheet[open] .gallery-picker__item')[i].querySelector('.gallery-picker__say-input');
+    area.value = t;
+    area.dispatchEvent(new Event('input', { bubbles: true }));
+  }, index, text);
+  const before = await page.$$eval('dialog.sheet[open] .gallery-picker__item', n => n.length);
+  await addText();
+  await type(before, 'يا جماعة متنسوش اجتماع الأحد ❤️');
+  await addText();
+  await type(before + 1, 'مين جاي بدري؟ 😂');
+  await page.evaluate(i => {
+    const select = document.querySelectorAll('dialog.sheet[open] .gallery-picker__item')[i].querySelector('.gallery-picker__from');
+    select.value = 'them';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  }, before + 1);
+
+  // an empty message blocks saving
+  await addText();
+  await page.evaluate(() => document.querySelector('dialog.sheet[open] .sheet__foot .btn--primary').click());
+  await new Promise(resolve => setTimeout(resolve, 400));
+  assert.equal(await page.evaluate(() => document.querySelector('dialog.sheet').open), true, 'not saved with an empty message');
+  await page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .gallery-picker__item')].pop().querySelector('.gallery-picker__remove').click());
+
+  await page.evaluate(() => document.querySelector('dialog.sheet[open] .sheet__foot .btn--primary').click());
+  await page.waitForFunction(() => !document.querySelector('dialog.sheet').open, { timeout: 15000 });
+  const saved = JSON.parse(world.gs.readTable_('Links').find(l => l.id === link.id).gallery);
+  assert.deepEqual(saved.slice(-2), [{ text: 'يا جماعة متنسوش اجتماع الأحد ❤️', from: 'us' }, { text: 'مين جاي بدري؟ 😂', from: 'them' }]);
+
+  // published in order, ready for the scene
+  world.as(ADMIN);
+  const built = JSON.parse(JSON.stringify(world.gs.buildDraft_()));
+  world.as('');
+  const published = [...built.content.featured, ...built.content.sections.flatMap(s => s.links)].find(l => l.id === link.id);
+  assert.deepEqual(published.gallery.slice(-2), [{ type: 'text', text: 'يا جماعة متنسوش اجتماع الأحد ❤️', from: 'us' }, { type: 'text', text: 'مين جاي بدري؟ 😂', from: 'them' }]);
+
+  // the same link opening TikTok: the messages stay (said plainly), no button to add more, no «مين بيقول»
+  await page.evaluate(id => A.editLink(A.state.draft.links.find(l => l.id === id)), link.id);
+  await page.waitForSelector('dialog.sheet[open] .gallery-picker');
+  await page.evaluate(() => {
+    const select = [...document.querySelectorAll('dialog.sheet[open] select')].find(s => [...s.options].some(o => o.value === 'tiktok'));
+    select.value = 'tiktok';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  const state = await page.evaluate(() => ({
+    add: [...document.querySelectorAll('dialog.sheet[open] .gallery-picker button')].find(b => b.textContent.includes('رسالة / منشور نصي')).hidden,
+    from: document.querySelectorAll('dialog.sheet[open] .gallery-picker__from').length,
+    words: document.querySelectorAll('dialog.sheet[open] .gallery-picker__item[data-kind=text]').length,
+    note: document.querySelector('dialog.sheet[open] .gallery-picker__item[data-kind=text] .gallery-picker__msg')?.textContent || ''
+  }));
+  assert.deepEqual([state.add, state.from, state.words], [true, 0, 2]);
+  assert.match(state.note, /مبيعرضش/);
+  assert.deepEqual(problems, []);
+  await close();
+
+});

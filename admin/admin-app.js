@@ -1776,6 +1776,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   var GALLERY_TEXT_MAX = 280;     // Content.gs GALLERY_TEXT.max
 
+  /* the scenes (platforms.js `scene`) where a words-only item is natural
+     (a text post, a chat message), and those where who says it matters */
+  var GALLERY_TEXT_SCENES = ['facebook', 'feed', 'whatsapp', 'chat'];
+  var GALLERY_FROM_SCENES = ['whatsapp', 'chat'];
+
   /* the Links.gallery cell as the editor gets it -> [token | { id, start, end, text }]:
      "a,b@1-2" (tokens) or, when an item has text, a JSON array (Content.gs galleryEntries_) */
   function galleryList(value) {
@@ -1798,7 +1803,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
    * Pictures and video clips from the Media Library, in order (a link
    * scene's own, «صور وفيديوهات المشهد»). tokens: the stored cell or an
    * array: "img-…", "vid-…" or "vid-…@start-end" (seconds), or
-   * { id, start, end, text }. options.max (6).
+   * { id, start, end, text, from }, or a words-only item { text, from }
+   * (a text post / chat message: only offered where options.scene() is
+   * one of GALLERY_TEXT_SCENES; «مين بيقول» where it is a chat). options.max (12).
    * Each one can be moved (↑ / ↓) or taken out, and has its own optional
    * «الكلام اللي مع الصورة/الفيديو» (up to 280); a video has «من» / «لحد»
    * (m:ss or seconds), checked live against its length when it is known
@@ -1809,7 +1816,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     options = options || {};
 
-    var max = options.max || 6;
+    var max = options.max || 12;
+    var scene = options.scene || function () { return ''; };
+    var canSay = function () { return GALLERY_TEXT_SCENES.indexOf(scene()) !== -1; };
+    var canFrom = function () { return GALLERY_FROM_SCENES.indexOf(scene()) !== -1; };
     var clip = A.clip;
     var CAP = clip.CLIP.galleryCap;
     var items = galleryList(tokens).filter(Boolean).slice(0, max).map(toItem);
@@ -1826,11 +1836,22 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         draw();
       });
     } }, icon('plus'), 'زوّد صورة أو فيديو من المكتبة');
+    var addText = el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () {
+      if (items.length >= max) return;
+      items.push({ id: '', text: '', from: 'us', words: true, refs: null });
+      focusAfter = { index: items.length - 1, which: 'say' };
+      markDirty();
+      draw();
+    } }, icon('plus'), 'رسالة / منشور نصي');
 
     function toItem(token) {
       var said = '';
+      var from = '';
       if (token && typeof token === 'object') {
         said = typeof token.text === 'string' ? token.text : '';
+        from = token.from === 'us' || token.from === 'them' ? token.from : '';
+        // words only: a text post / a chat message
+        if (!token.id) return { id: '', text: said.slice(0, GALLERY_TEXT_MAX), from: from || 'us', words: true, refs: null };
         var timed = token.start !== undefined && token.start !== null && token.start !== '';
         token = String(token.id || '') + (timed ? '@' + token.start + '-' + token.end : '');
       }
@@ -1843,6 +1864,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         from: video && match && match[2] !== undefined ? clip.formatTime(Number(match[2])) : '',
         to: video && match && match[3] !== undefined ? clip.formatTime(Number(match[3])) : '',
         text: said.slice(0, GALLERY_TEXT_MAX),
+        from: from,
         duration: video && A.videoDurations[id] > 0 ? A.videoDurations[id] : null,
         refs: null
       };
@@ -1865,6 +1887,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
 
     function problem(item) {
+      if (item.words) return item.text.trim() ? '' : 'اكتب الرسالة / المنشور (أو شيله)';
       if (!item.video) return '';
       var t = times(item);
       return clip.checkClip(t.start, t.end, { duration: item.duration || 0, min: clip.CLIP.galleryMin, cap: CAP });
@@ -1883,6 +1906,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     /* the item's message, under its times (no re-draw: typing keeps its focus) */
     function showCheck(item) {
+      if (item.words) return problem(item);
       if (!item.refs || !item.video) return '';
       var text = problem(item);
       item.refs.message.textContent = text;
@@ -1911,13 +1935,16 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
       row.replaceChildren();
 
+      var says = canSay();
+      var froms = canFrom();
+
       items.forEach(function (item, index) {
         var n = index + 1;
-        var media = find(item.id);
+        var media = item.words ? null : find(item.id);
         var name = media && (media.name || media.alt) ? (media.name || media.alt) : item.video ? 'فيديو' : 'صورة';
-        var what = (item.video ? 'الفيديو ' : 'الصورة ') + n;
-        var img = el('img', { alt: '', class: 'gallery-picker__img' });
-        A.mediaPreview(item.id).then(function (src) { if (src) img.src = src; }).catch(function () {});
+        var what = (item.words ? 'الرسالة ' : item.video ? 'الفيديو ' : 'الصورة ') + n;
+        var img = item.words ? el('span', { class: 'gallery-picker__words', 'aria-hidden': 'true', text: '💬' }) : el('img', { alt: '', class: 'gallery-picker__img' });
+        if (!item.words) A.mediaPreview(item.id).then(function (src) { if (src) img.src = src; }).catch(function () {});
 
         var up = el('button', { class: 'icon-btn gallery-picker__move', type: 'button', 'data-move': 'up', 'aria-label': 'قدّم ' + what + ' خطوة', disabled: index === 0, onclick: function () { move(index, -1, 'up'); } }, '↑');
         var down = el('button', { class: 'icon-btn gallery-picker__move', type: 'button', 'data-move': 'down', 'aria-label': 'أخّر ' + what + ' خطوة', disabled: index === items.length - 1, onclick: function () { move(index, 1, 'down'); } }, '↓');
@@ -1933,7 +1960,20 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           }
         }, icon('close'));
 
-        var body = el('div', { class: 'gallery-picker__body' }, el('span', { class: 'gallery-picker__name', text: name }));
+        var body = el('div', { class: 'gallery-picker__body' }, el('span', { class: 'gallery-picker__name', text: item.words ? (froms ? 'رسالة' : 'منشور نصي') : name }));
+
+        // a words-only item in a scene that has none: kept, said plainly
+        if (item.words && !says) body.append(el('span', { class: 'gallery-picker__msg', text: 'المشهد ده مبيعرضش رسايل من غير صورة — هتظهر لو غيّرت المشهد' }));
+
+        // «مين بيقول»: chats only
+        if (froms) {
+          var who = el('select', { class: 'input gallery-picker__from', 'aria-label': 'مين بيقول ' + what },
+            el('option', { value: 'us', selected: item.from !== 'them' ? 'selected' : null, text: 'إحنا (الخدمة)' }),
+            el('option', { value: 'them', selected: item.from === 'them' ? 'selected' : null, text: 'حد من الشباب' })
+          );
+          who.addEventListener('change', function () { item.from = who.value; markDirty(); });
+          body.append(el('label', { class: 'gallery-picker__t' }, el('span', { text: 'مين بيقول' }), who));
+        }
 
         if (item.video) {
           var messageId = A.uid('clip-msg');
@@ -1972,7 +2012,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           rows: '1',
           maxlength: String(GALLERY_TEXT_MAX),
           value: item.text,
-          placeholder: item.video ? 'مثلاً: لحظة الفوز 🎉' : 'مثلاً: أول يوم في الرحلة 🌊',
+          placeholder: item.words ? 'مثلاً: مين جاي بدري؟ 😂' : item.video ? 'مثلاً: لحظة الفوز 🎉' : 'مثلاً: أول يوم في الرحلة 🌊',
           'aria-label': 'الكلام اللي مع ' + what,
           'aria-describedby': sayCount.id
         });
@@ -1987,7 +2027,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         });
         counted();
 
-        row.appendChild(el('div', { class: 'gallery-picker__item' + (item.video ? ' is-video' : ''), role: 'listitem', 'data-id': item.id, 'data-kind': item.video ? 'video' : 'image' },
+        row.appendChild(el('div', { class: 'gallery-picker__item' + (item.video ? ' is-video' : '') + (item.words ? ' is-words' : ''), role: 'listitem', 'data-id': item.id, 'data-kind': item.words ? 'text' : item.video ? 'video' : 'image' },
           el('div', { class: 'gallery-picker__thumb' },
             img,
             el('span', { class: 'gallery-picker__n', text: String(n) }),
@@ -1997,7 +2037,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           el('div', { class: 'gallery-picker__tools' }, up, down, remove),
           el('div', { class: 'gallery-picker__say' },
             el('div', { class: 'gallery-picker__say-head' },
-              el('span', { text: 'الكلام اللي مع ' + (item.video ? 'الفيديو' : 'الصورة') + ' (اختياري)', 'aria-hidden': 'true' }),
+              el('span', { text: item.words ? (froms ? 'الرسالة' : 'المنشور') : 'الكلام اللي مع ' + (item.video ? 'الفيديو' : 'الصورة') + ' (اختياري)', 'aria-hidden': 'true' }),
               sayCount
             ),
             say
@@ -2011,16 +2051,18 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       });
 
       if (!items.length) {
-        row.appendChild(el('span', { class: 'picker__empty' }, icon('photos'), options.emptyText || 'من غير صور — هيظهر أحدث بوسترات منشورة'));
+        row.appendChild(el('span', { class: 'picker__empty' }, icon('photos'), options.emptyText || 'من غير محتوى — بيظهر المحتوى الجاهز للمشهد'));
       }
 
       count.textContent = items.length + ' / ' + max;
       add.disabled = items.length >= max;
+      addText.disabled = items.length >= max;
+      addText.hidden = !says;
 
       // keyboard: the focus stays on the moved item's button (or the next one)
       if (focusAfter) {
         var target = row.children[focusAfter.index];
-        var button = target && (focusAfter.which === 'remove' ? target.querySelector('.gallery-picker__remove') : target.querySelector('[data-move="' + focusAfter.which + '"]:not([disabled])') || target.querySelector('.gallery-picker__move:not([disabled])'));
+        var button = target && (focusAfter.which === 'say' ? target.querySelector('.gallery-picker__say-input') : focusAfter.which === 'remove' ? target.querySelector('.gallery-picker__remove') : target.querySelector('[data-move="' + focusAfter.which + '"]:not([disabled])') || target.querySelector('.gallery-picker__move:not([disabled])'));
         (button || add).focus();
         focusAfter = null;
       }
@@ -2029,14 +2071,23 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     draw();
 
-    /* the token, or { id, start, end, text } when the item has text */
+    /* the token, or { id, start, end, text, from } when the item has text
+       or a speaker, or { text, from } (words only) */
     function entry(item) {
+      if (item.words) return item.from ? { text: item.text, from: item.from } : { text: item.text };
       var t = token(item);
-      if (!item.text.trim()) return t;
+      var from = canFrom() && item.from ? item.from : '';
+      if (!item.text.trim() && !from) return t;
+      var out = { id: item.id };
       var at = t.indexOf('@');
-      if (at === -1) return { id: item.id, text: item.text };
-      var range = t.slice(at + 1).split('-');
-      return { id: item.id, start: Number(range[0]), end: Number(range[1]), text: item.text };
+      if (at !== -1) {
+        var range = t.slice(at + 1).split('-');
+        out.start = Number(range[0]);
+        out.end = Number(range[1]);
+      }
+      if (item.text.trim()) out.text = item.text;
+      if (from) out.from = from;
+      return out;
     }
 
     function value() {
@@ -2047,15 +2098,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     function restorable(t) {
       if (typeof t === 'string') return /^[\w.@-]{1,80}$/.test(t);
-      return !!t && typeof t === 'object' && ID.test(String(t.id)) && typeof t.text === 'string' && t.text.length <= GALLERY_TEXT_MAX &&
-        (t.start === undefined || (typeof t.start === 'number' && typeof t.end === 'number'));
+      if (!t || typeof t !== 'object' || (t.text !== undefined && (typeof t.text !== 'string' || t.text.length > GALLERY_TEXT_MAX))) return false;
+      if (t.from !== undefined && t.from !== 'us' && t.from !== 'them') return false;
+      if (!t.id) return typeof t.text === 'string';
+      return ID.test(String(t.id)) && (t.start === undefined || (typeof t.start === 'number' && typeof t.end === 'number'));
     }
 
     return {
       node: A.draftWidget(el('div', { class: 'field gallery-picker', role: 'group', 'aria-label': options.label || 'صور' },
         el('span', { class: 'field__label' }, options.label || 'صور', ' ', count),
         row,
-        el('div', { class: 'actions' }, add),
+        el('div', { class: 'actions' }, add, addText),
         options.hint ? el('span', { class: 'field__hint', text: options.hint }) : null
       ), {
         get: value,
@@ -2069,13 +2122,15 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         }
       }),
       value: value,
+      /* the scene changed (the editor's «التجربة»): what it can show */
+      redraw: draw,
       /* '' or the first reason saving must wait (each item shows its own) */
       check: function () {
         var first = '';
         items.forEach(function (item, index) {
           var text = showCheck(item);
           if (text && !first) {
-            first = 'الفيديو ' + (index + 1) + ' في المشهد: ' + text;
+            first = (item.words ? 'الرسالة ' : 'الفيديو ') + (index + 1) + ' في المشهد: ' + text;
             if (item.refs) item.refs.from.focus();
           }
         });
@@ -4145,6 +4200,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var said = el('p', { class: 'experience-said', 'aria-live': 'polite' });
 
+    var shown = '';
+
     /* shows what the link opens; returns true when that is a scene */
     function update() {
 
@@ -4159,6 +4216,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       }
 
       var platform = platforms[key];
+      shown = key;
 
       A.fill(said,
         A.icon(key ? (platform && platform.icon) || 'sparkle' : 'external'),
@@ -4175,6 +4233,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       node: A.field('التجربة قبل اللينك', el('div', {}, select, said), 'مشهد قصير يعرّف الزائر بالمكان اللي رايحله، وبعدين زرار يودّيه للينك نفسه'),
       select: select,
       update: update,
+      /* the scene family it opens (platforms.js `scene`), '' = none */
+      scene: function () { return (platforms[shown] && platforms[shown].scene) || ''; },
       value: function () { return select.value; }
     };
 
@@ -4237,14 +4297,18 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       return { icon: icons.value(), url: urlInput.value.trim() };
     });
     var gallery = A.galleryPicker(link.gallery || '', {
-      max: limits.gallery || 6,
-      label: 'صور وفيديوهات المشهد',
-      hint: 'اختياري — لحد ٦ صور أو مقاطع فيديو من المكتبة، بتظهر جوه المشهد بالترتيب ده. الفيديو: «من» و«لحد» (مثلاً 0:37 و0:43)؛ لو سبتهم فاضيين بيشتغل أول ٦ ثواني. من غيرهم بيظهر أحدث بوسترات منشورة.'
+      max: limits.gallery || 12,
+      label: 'محتوى المشهد',
+      scene: experience.scene,
+      hint: 'اختياري — لحد ١٢ عنصر بيظهروا جوه المشهد بالترتيب ده: صور وفيديوهات من المكتبة بالكلام اللي معاها، ورسايل أو منشورات نصية في فيسبوك وX وThreads وواتساب وتليجرام وماسنجر وديسكورد. الفيديو: «من» و«لحد» (مثلاً 0:37 و0:43)؛ لو سبتهم فاضيين بيشتغل أول ٦ ثواني. من غير محتوى بيظهر المحتوى الجاهز للمشهد.'
     });
 
-    // the photos only matter when the link opens a scene
+    // the content only matters when the link opens a scene (and what it can show depends on which)
+    var lastScene = null;
     function syncExperience() {
       gallery.node.hidden = !experience.update();
+      if (lastScene !== null && lastScene !== experience.scene()) gallery.redraw();
+      lastScene = experience.scene();
     }
 
     experience.select.addEventListener('change', syncExperience);

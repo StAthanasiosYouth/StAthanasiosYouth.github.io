@@ -139,12 +139,13 @@ function cleanLink(raw) {
     // still opens the generic scene
     experience: experienceKey(raw.experience) === 'none' ? '' : experienceKey(raw.experience),
     // the scene's own photos and video clips (optional, up to 6)
-    gallery: list(raw.gallery).map(item => withText(item.type === 'video' ? cleanVideo(item) : cleanImage(item), caption(item.text))).filter(Boolean).slice(0, 6)
+    gallery: list(raw.gallery).map(item => withText(item.type === 'text' ? { type: 'text' } : item.type === 'video' ? cleanVideo(item) : cleanImage(item), caption(item.text), item.from)).filter(Boolean).slice(0, 12)
   };
 
 }
 
-const withText = (item, text) => (item && text ? { ...item, text } : item);
+/* + its words and who says them (chat scenes); words only: { type: 'text', text } */
+const withText = (item, text, from) => (!item || (!item.src && !text) ? null : { ...item, ...(text && { text }), ...(/^(us|them)$/.test(from) && { from }) });
 
 
 /* { type: 'video', src, poster, w, h, alt, start, end } — end 0 = to the end.

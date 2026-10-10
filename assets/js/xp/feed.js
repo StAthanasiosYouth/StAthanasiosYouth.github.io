@@ -2,8 +2,9 @@
  * FEED family: X, Threads, and any future "timeline" platform. A column of
  * short posts from us — the meeting line, the Pope Athanasius quote — and
  * one post per item of the link's playlist (kit.js: the admin's own
- * pictures and clips, in its order, each with its own words; else the
- * weekly posters), with the action row, skinned by the registry.
+ * pictures and clips, in its order, each with its own words, and its
+ * words-only posts; else the weekly posters), with the action row,
+ * skinned by the registry.
  *
  * Entrance: the timeline drops in post by post, a like lands. Alive: the
  * next playlist item arrives as a new post at the top (a clip plays its
@@ -36,7 +37,7 @@ function post({ item = null, text, likes = 40, time = 'من ساعة' }, tl = nu
     h('span', { class: 'fd-post__body' },
       h('span', { class: 'fd-post__who' }, h('b', {}, PAGE.short), h('span', { class: 'fd-post__handle' }, `${HANDLE} · ${time}`)),
       say(text, { className: 'fd-post__text', lines: 7, more: '… عرض المزيد' }),
-      item ? mediaNode(item, tl, { className: 'fd-post__photo', ratio: FEED, advance }) : null,
+      item && item.kind !== 'text' ? mediaNode(item, tl, { className: 'fd-post__photo', ratio: FEED, advance }) : null,
       h('span', { class: 'fd-post__actions' },
         h('span', {}, '💬 ', compact(Math.round(likes / 9))),
         h('span', { class: 'fd-repost' }, '🔁 ', repost),
@@ -51,7 +52,8 @@ function post({ item = null, text, likes = 40, time = 'من ساعة' }, tl = nu
 export function play(stage, { quick, reduced, lite, content, sound, link, platform }) {
 
   const tl = timeline({ quick, reduced, lite });
-  const items = playlist(link, { posters: 3 });
+  const items = playlist(link, { posters: 3, text: true });
+  const own = items.length > 0 && items[0].own;
   const textOf = item => (item.own ? item.text || GENERIC : item.topic ? `«${item.topic}» 🤍 شكرًا لكل اللي جه` : item.text);
   const multi = items.length > 1;
   const glyph = platform.icon || (link.icon !== 'link' ? link.icon : 'megaphone');
@@ -116,8 +118,8 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
     return node.querySelector('.fd-post__photo');
   }, { first: posts[1].querySelector('.fd-post__photo'), image: 5200, delay: settled });
 
-  // now and then words only between them
-  tl.every(9800, () => {
+  // now and then words only between them (ours: only when the admin wrote none)
+  if (!own) tl.every(9800, () => {
     n += 1;
     arrive(post({ text: n % 2 ? words[(n + 1) % words.length] : `${nextComment()}`, likes: Math.round(rand(8, 40)), time: TIMES[0] }));
   }, { delay: settled + 5600 });

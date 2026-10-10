@@ -231,7 +231,7 @@ test('the scene gallery: a clip with «من» / «لحد» checked live, save bl
   const link = await page.evaluate(() => A.state.draft.links.find(l => l.icon === 'instagram'));
   await page.evaluate(id => A.editLink(A.state.draft.links.find(l => l.id === id)), link.id);
   await page.waitForSelector('dialog.sheet[open] .gallery-picker');
-  assert.match(await page.$eval('dialog.sheet[open] .gallery-picker .field__label', n => n.textContent), /صور وفيديوهات المشهد/);
+  assert.match(await page.$eval('dialog.sheet[open] .gallery-picker .field__label', n => n.textContent), /محتوى المشهد/);
 
   const addFromLibrary = async kind => {
     await page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .gallery-picker button')].find(b => b.textContent.includes('زوّد')).click());

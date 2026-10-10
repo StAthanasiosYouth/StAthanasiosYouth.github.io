@@ -38,15 +38,31 @@ function message({ who = '', text, out = false, news = false, tone = 0 }) {
 
 }
 
-/* the servant shares one of the admin's own pictures / clips, with its words */
-function shared(item, tl, advance) {
+/* who says an admin item: ours (the default) = this phone, out; theirs =
+   someone from the group */
+const sender = (item, i) => (item.from === 'them' ? WHO[(i * 7) % WHO.length] : '');
 
-  return h('div', { class: 'wa-msg wa-msg--in wa-msg--media', 'data-item': item.id },
-    h('b', { class: 'wa-msg__who wa-who--3' }, SERVANT),
+/* one of the admin's own pictures / clips, with its words */
+function shared(item, tl, advance, i = 0) {
+
+  const who = sender(item, i);
+  return h('div', { class: `wa-msg wa-msg--${who ? 'in' : 'out'} wa-msg--media`, 'data-item': item.id },
+    who ? h('b', { class: `wa-msg__who wa-who--${who === SERVANT ? 3 : i % TONES}` }, who) : null,
     mediaNode(item, tl, { className: 'wa-photo', ratio: [3 / 4, 16 / 9], advance }),
     item.text ? words(item.text, { className: 'wa-text', lines: 6, more: 'اقرأ المزيد' }) : null,
-    h('span', { class: 'wa-meta' }, stamp())
+    h('span', { class: 'wa-meta' }, stamp(), who ? null : h('span', { class: 'wa-ticks is-read' }, '✓✓'))
   );
+
+}
+
+/* an admin item as a message of the chat */
+function said(item, tl, advance, i) {
+
+  if (item.kind !== 'text') return shared(item, tl, advance, i);
+  const who = sender(item, i);
+  const node = message({ who, text: item.text, out: !who, news: who === SERVANT, tone: who === SERVANT ? 3 : i });
+  node.dataset.item = item.id;
+  return node;
 
 }
 
@@ -55,9 +71,13 @@ export function play(stage, { quick, reduced, lite, content, sound, link }) {
   const tl = timeline({ quick, reduced, lite });
   clock = 20 * 60 + 2;
 
-  // the admin's own pictures / clips (only those; none: the chat alone)
-  const items = playlist(link, { posters: 0 }).filter(item => item.own);
+  // the admin's own pictures / clips and messages; with messages the
+  // conversation is exactly theirs (nothing built-in mixed in)
+  const items = playlist(link, { posters: 0, text: true }).filter(item => item.own);
   const multi = items.length > 1;
+  const talk = items.some(item => item.kind === 'text');
+  const ownWords = items.filter(item => item.text).map(item => item.text);
+  const nextSay = ownWords.length ? deck(ownWords) : nextGroup;
 
   const topic = nextTopic(content);
   const status = h('span', { class: 'wa-top__sub' }, 'الشباب · سفاجا');
@@ -65,12 +85,15 @@ export function play(stage, { quick, reduced, lite, content, sound, link }) {
   const first = message({ who: 'ك.', text: 'مين نازل الأحد؟ 🙋', tone: 1 });
   const reaction = h('span', { class: 'wa-reaction' }, '❤️');
   const news = message({ who: SERVANT, text: topic ? `${meetingLine(content, '📣 الاجتماع الأحد ٨ مساءً')}\n📌 الموضوع: «${topic}»` : meetingLine(content, '📣 الاجتماع الأحد الساعة ٨ مساءً — مستنيينكم!'), news: true, tone: 3 });
-  news.append(reaction);
   const mine = message({ text: 'أنا جاي إن شاء الله 🙌', out: true });
   const ticks = mine.querySelector('.wa-ticks');
-  const firstShared = items.length ? shared(items[0], tl, multi) : null;
+  // a conversation the admin wrote opens with its first few messages
+  const opening = (talk ? items.slice(0, 3) : items.slice(0, 1)).map((item, i) => said(item, tl, multi, i));
+  const firstShared = opening[opening.length - 1] || null;
   if (firstShared) firstShared.classList.add('is-current');
-  const chat = h('div', { class: 'wa-chat' }, h('span', { class: 'wa-day' }, 'النهارده'), first, news, firstShared, mine, typing);
+  const chat = talk
+    ? h('div', { class: 'wa-chat' }, h('span', { class: 'wa-day' }, 'النهارده'), opening, typing)
+    : h('div', { class: 'wa-chat' }, h('span', { class: 'wa-day' }, 'النهارده'), first, news, firstShared, mine, typing);
   const field = h('span', { class: 'wa-bar__field' }, 'رسالة');
   const action = h('span', { class: 'wa-bar__send' }, '🎤');
 
@@ -103,22 +126,26 @@ export function play(stage, { quick, reduced, lite, content, sound, link }) {
     tl.at(at, () => sound(out ? 'send' : 'pop'));
   };
 
-  arrive(first, 1100 * s);
-  arrive(news, 1700 * s);
-  if (firstShared) arrive(firstShared, 2000 * s);
-  arrive(mine, 2300 * s, true);
+  if (talk) opening.forEach((node, i) => arrive(node, (1100 + i * 700) * s, node.classList.contains('wa-msg--out')));
+  else {
+    arrive(first, 1100 * s);
+    arrive(news, 1700 * s);
+    if (firstShared) arrive(firstShared, 2000 * s);
+    arrive(mine, 2300 * s, true);
+  }
 
   // sent ✓ → delivered ✓✓ → read (blue)
-  tl.from(ticks, [
+  if (!talk) tl.from(ticks, [
     { color: 'rgba(255, 255, 255, .55)', clipPath: 'inset(0 50% 0 0)' },
     { color: 'rgba(255, 255, 255, .55)', clipPath: 'inset(0 50% 0 0)', offset: 0.35 },
     { color: 'rgba(255, 255, 255, .55)', clipPath: 'inset(0 0 0 0)', offset: 0.4 },
     { color: 'rgba(255, 255, 255, .55)', clipPath: 'inset(0 0 0 0)', offset: 0.75 },
     { color: '#53bdeb', clipPath: 'inset(0 0 0 0)' }
   ], { duration: 1300 * s, delay: 2400 * s, easing: 'linear' });
-  tl.at(2400 * s + 1300 * s * 0.4, () => sound('tick'));
+  if (!talk) tl.at(2400 * s + 1300 * s * 0.4, () => sound('tick'));
 
-  // a ❤️ on the announcement
+  // a ❤️ on the announcement (the admin's first message)
+  (talk ? opening[0] : news).append(reaction);
   tl.from(reaction, [{ transform: 'scale(0)', opacity: 0 }, { transform: 'scale(1.3)', opacity: 1, offset: 0.6 }, { transform: 'scale(1)', opacity: 1 }], { duration: 520, delay: 3000 * s, easing: EASE });
   tl.at(3000 * s, () => sound('react'));
 
@@ -184,20 +211,47 @@ export function play(stage, { quick, reduced, lite, content, sound, link }) {
     });
   };
 
-  // the servant shares the next item (all of them, in order, then again)
+  // the admin's next item (all of them, in order, then again): theirs after
+  // «… بيكتب», ours sent ✓ → ✓✓ → read
   cycle(tl, items.length, index => {
-    const node = shared(items[index], tl, multi);
-    chat.querySelectorAll('.wa-msg--media.is-current').forEach(old => old.classList.remove('is-current'));
-    node.classList.add('is-current');
-    add(node);
-    fitWords(node);
-    node.animate([{ opacity: 0, transform: 'translateX(-14px) scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: 380, easing: SPRING });
-    sound('pop');
+    const item = items[index];
+    const node = said(item, tl, multi, index);
+    const out = node.classList.contains('wa-msg--out');
+    const land = () => {
+      chat.querySelectorAll('.wa-msg.is-current').forEach(old => old.classList.remove('is-current'));
+      node.classList.add('is-current');
+      add(node);
+      fitWords(node);
+      node.animate([{ opacity: 0, transform: `translateX(${out ? 18 : -14}px) scale(.9)` }, { opacity: 1, transform: 'none' }], { duration: 380, easing: SPRING });
+      sound(out ? 'send' : 'pop');
+      const mark = out && node.querySelector('.wa-ticks');
+      if (mark) {
+        mark.className = 'wa-ticks is-sent';
+        mark.textContent = '✓';
+        tl.later(800, () => { mark.className = 'wa-ticks'; mark.textContent = '✓✓'; sound('tick'); });
+        tl.later(1900, () => mark.classList.add('is-read'));
+      }
+    };
+    if (item.kind === 'text' && !out) {
+      status.textContent = `${sender(item, index)} بيكتب…`;
+      status.classList.add('is-typing');
+      typing.classList.remove('is-done');
+      typing.animate([{ opacity: 0, transform: 'scale(.7)' }, { opacity: 1, transform: 'none' }], { duration: 260, easing: SPRING });
+      tl.later(1000, () => {
+        typing.classList.add('is-done');
+        status.textContent = 'الشباب · سفاجا';
+        status.classList.remove('is-typing');
+        land();
+      });
+      return null;
+    }
+    land();
     return node.querySelector('.wa-photo');
-  }, { first: firstShared && firstShared.querySelector('.wa-photo'), image: 5200, delay: settled });
+  }, { first: firstShared && firstShared.querySelector('.wa-photo'), image: 5200, delay: settled, start: Math.max(0, opening.length - 1) });
 
+  // the built-in chatter: only when the admin wrote no conversation
   let beat = 0;
-  tl.every(items.length ? 5600 : 3900, () => {
+  if (!talk) tl.every(items.length ? 5600 : 3900, () => {
     beat += 1;
     if (beat % 3 === 2) outgoing();
     else incoming();
@@ -219,14 +273,14 @@ export function play(stage, { quick, reduced, lite, content, sound, link }) {
     every: 1150, max: 7, sound, paths: ['in', 'out', 'in', 'rise'],
     items: () => {
       const roll = Math.random();
-      if (roll < 0.36) return { node: bubble(nextGroup(), { tone: Math.random() < 0.3 ? 'wa-out' : 'wa', who: pick(WHO), meta: Math.random() < 0.3 ? '✓✓' : '' }), path: 'in' };
+      if (roll < 0.36) return { node: bubble(nextSay(), { tone: Math.random() < 0.3 ? 'wa-out' : 'wa', who: pick(WHO), meta: Math.random() < 0.3 ? '✓✓' : '' }), path: 'in' };
       if (roll < 0.46) return { node: chip(pick(['✓✓', '… بيكتب', '✓✓ اتقرت', '↩︎ رد']), 'wa'), path: 'rise' };
       return { text: pick(REACTIONS), path: 'out', sound: 'react' };
     }
   });
 
   side(tl, stage, {
-    items: () => (Math.random() < 0.65 ? { node: bubble(nextGroup(), { tone: 'wa', who: pick(WHO), meta: stamp() }) } : { text: pick(REACTIONS) })
+    items: () => (Math.random() < 0.65 ? { node: bubble(nextSay(), { tone: 'wa', who: pick(WHO), meta: stamp() }) } : { text: pick(REACTIONS) })
   });
 
   return tl;

@@ -1,7 +1,8 @@
 /**
  * Facebook: our page's feed — a real feed, one post per item of the link's
  * playlist (kit.js: the admin's own pictures and clips, in its order, each
- * with its own words), scrolling post by post through ALL of them, then
+ * with its own words, and its words-only posts), scrolling post by post
+ * through ALL of them, then
  * from the top again. No gallery: the real weekly posters with their
  * captions, with the «صوتكم يهمنا» post and the Pope Athanasius quote
  * between them. Reactions bubble up (👍 ❤️ 😂 😮), comments arrive, a
@@ -36,7 +37,7 @@ function post({ item, text, time }, likes, tl, advance) {
       h('span', { class: 'fb-post__who' }, h('b', {}, PAGE.facebook), h('i', {}, `${time} · 🌐`))
     ),
     words(text, { className: 'fb-post__text', lines: 5, more: '… عرض المزيد' }),
-    item ? mediaNode(item, tl, { className: 'fb-post__media', ratio: FEED, advance }) : null,
+    item && item.kind !== 'text' ? mediaNode(item, tl, { className: 'fb-post__media', ratio: FEED, advance }) : null,
     h('div', { class: 'fb-post__counts' }, h('span', { class: 'fb-post__faces' }, '👍❤️'), count, h('span', { class: 'fb-post__more' }, `${digits(Math.round(likes / 9))} تعليق · ${digits(Math.round(likes / 30) + 1)} مشاركة`)),
     h('div', { class: 'fb-post__actions' }, h('span', {}, '👍 أعجبني'), h('span', {}, '💬 تعليق'), h('span', {}, '↗ مشاركة'))
   );
@@ -55,7 +56,7 @@ function comment(who, text, { page = false } = {}) {
 export function play(stage, { quick, reduced, lite, content, sound, link }) {
 
   const tl = timeline({ quick, reduced, lite });
-  const items = playlist(link, { posters: 3 });
+  const items = playlist(link, { posters: 3, text: true });
   const own = items.length > 0 && items[0].own;
 
   // one post per item, in order; the bundled feed keeps the page's words between its posters

@@ -10,8 +10,11 @@
  * order, each with its own words): one message per item, all of them in
  * turn (a clip plays its segment first), then from the first again — a
  * channel post (Telegram), the page sending it (Messenger), our message in
- * the channel (Discord). No gallery: the channel shows the weekly posters;
- * the conversations stay words only.
+ * the channel (Discord) — and its words-only messages, said by our side
+ * («from: us») or by someone from the group («them»): with them the
+ * conversation is exactly the admin's, in order (typing dots before
+ * theirs), nothing of ours mixed in. No gallery: the channel shows the
+ * weekly posters; the conversations keep our built-in words.
  * Alive: new posts / messages (the oldest scroll away), views and
  * reactions tick, (Messenger, Discord) the visitor types and sends;
  * around the phone: paper planes and channel posts (Telegram), message
@@ -60,7 +63,7 @@ function reactions(list) {
 function post({ item = null, text: words, views, reacts, time = '٨:٠٢ م' }, tl = null, advance = false) {
 
   return h('div', { class: 'ch-msg ch-msg--post', 'data-item': item ? item.id : null },
-    item ? photo(item, tl, advance) : null,
+    item && item.kind !== 'text' ? photo(item, tl, advance) : null,
     text(words),
     h('span', { class: 'ch-msg__meta' }, h('span', { class: 'ch-views' }, '👁 ', h('b', { 'data-n': views }, compact(views))), h('span', { class: 'ch-time' }, time)),
     reacts ? reactions(reacts) : null
@@ -72,7 +75,7 @@ function post({ item = null, text: words, views, reacts, time = '٨:٠٢ م' }, 
 function said(out, words, item = null, tl = null, advance = false) {
 
   return h('div', { class: `ch-msg ch-msg--${out ? 'out' : 'in'}${item ? ' ch-msg--media' : ''}`, 'data-item': item ? item.id : null },
-    item ? photo(item, tl, advance) : null,
+    item && item.kind !== 'text' ? photo(item, tl, advance) : null,
     words ? text(words, 6) : null
   );
 
@@ -84,9 +87,9 @@ function line(who, words, tone = 0, us = false, item = null, tl = null, advance 
   return h('div', { class: `ch-msg ch-msg--said${item ? ' ch-msg--media' : ''}`, 'data-item': item ? item.id : null },
     us ? h('img', { class: 'ch-avatar', src: LOGO, alt: '' }) : h('span', { class: `ch-avatar ch-avatar--${tone % 3}` }, who.replace('.', '')),
     h('span', { class: 'ch-said' },
-      h('span', { class: `ch-said__name${us ? ' ch-said__name--us' : ''}` }, us ? NAME : who, h('i', {}, ' النهارده ٨:٠٥ م')),
+      h('span', { class: `ch-ownWords_name${us ? ' ch-ownWords_name--us' : ''}` }, us ? NAME : who, h('i', {}, ' النهارده ٨:٠٥ م')),
       words ? text(words, 6) : null,
-      item ? photo(item, tl, advance) : null
+      item && item.kind !== 'text' ? photo(item, tl, advance) : null
     )
   );
 
@@ -105,16 +108,23 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
   const layout = LAYOUT[platform.key] || 'channel';
   const glyph = platform.icon || (link.icon !== 'link' ? link.icon : 'users');
   const words = channelPosts(content);
-  const all = playlist(link, { posters: 3 });
+  const all = playlist(link, { posters: 3, text: true });
   const own = all.length > 0 && all[0].own;
   // the items this layout shows: a channel always (the posters when there is no gallery), the others only the admin's own
   const items = layout === 'channel' || own ? all : [];
+  // the admin wrote the conversation (words-only items): only theirs
+  const talk = own && items.some(item => item.kind === 'text');
   const multi = items.length > 1;
   const textOf = item => (item.own ? item.text || GENERIC : item.topic ? `📌 «${item.topic}» — كان أحد حلو، شكرًا لكل اللي جه 🤍` : item.text);
   // one message for an item, the layout's way
   const share = (item, views = 1180, time = '٧:٤٠ م') => (layout === 'channel'
     ? post({ item, text: textOf(item), views, time }, tl, multi)
-    : layout === 'dm' ? said(false, item.text, item, tl, multi) : line('', item.text, 0, true, item, tl, multi));
+    // Messenger: ours = the page, theirs = the visitor; Discord: ours = our account
+    : layout === 'dm' ? said(item.from === 'them', item.text, item, tl, multi)
+      : item.from === 'them' ? line(pick(WHO), item.text, Math.round(rand(0, 2)), false, item, tl, multi) : line('', item.text, 0, true, item, tl, multi));
+  // the admin's own words, for the bubbles around the phone too
+  const ownWords = items.filter(item => item.own && item.text).map(item => item.text);
+  const nextSay = ownWords.length ? deck(ownWords) : nextGroup;
 
   const feed = h('div', { class: 'ch-feed' });
   const typing = typingDots(layout === 'server' ? 'ch-typing--server' : '');
@@ -127,18 +137,23 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
       post({ text: words[3], views: 312, time: '٨:٠١ م' })
     ];
   }
+  else if (talk) {
+    // the conversation opens with its first few messages
+    messages = items.slice(0, 3).map(item => share(item));
+  }
   else if (layout === 'dm') {
     messages = DM.slice(0, own ? 3 : 4).map(([out, words]) => said(out, words));
-    if (items[0]) messages.push(share(items[0]));
+    if (own) messages.push(share(items[0]));
   }
   else {
     messages = [line('م.', GROUP[0], 1), line('ر.', GROUP[4], 2), line('', words[0], 0, true)];
     messages[2].querySelector('.ch-said').append(reactions([['🔥', 9], ['🙏', 6]]));
-    if (items[0]) messages.push(share(items[0]));
+    if (own) messages.push(share(items[0]));
   }
 
   feed.append(...messages);
-  const firstShared = items[0] ? messages.find(m => m.dataset.item === items[0].id) : null;
+  const opened = layout !== 'channel' && talk ? messages.length : 1;
+  const firstShared = items[0] ? messages.find(m => m.dataset.item === items[opened - 1].id) : null;
   if (firstShared) firstShared.classList.add('is-current');
 
   const head = h('div', { class: 'ch-top' },
@@ -243,18 +258,31 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
 
   // the next item (all of them, in order, then again)
   cycle(tl, items.length, index => {
-    const node = share(items[index], Math.round(rand(300, 900)), '٨:١٠ م');
-    feed.querySelectorAll('.is-current').forEach(old => old.classList.remove('is-current'));
-    node.classList.add('is-current');
-    add(node, false);
-    sound(layout === 'channel' ? 'notify' : 'pop');
+    const item = items[index];
+    const node = share(item, Math.round(rand(300, 900)), '٨:١٠ م');
+    const out = node.classList.contains('ch-msg--out');
+    const land = () => {
+      feed.querySelectorAll('.is-current').forEach(old => old.classList.remove('is-current'));
+      node.classList.add('is-current');
+      add(node, out);
+      sound(layout === 'channel' ? 'notify' : out ? 'send' : 'pop');
+    };
+    // words in a conversation: someone is typing first
+    if (item.kind === 'text' && layout !== 'channel') {
+      typing.classList.remove('is-done');
+      typing.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200 });
+      tl.later(900, () => { typing.classList.add('is-done'); land(); });
+      return null;
+    }
+    land();
     return node.querySelector('.ch-msg__photo');
-  }, { first: firstShared && firstShared.querySelector('.ch-msg__photo'), image: 5000, delay: settled });
+  }, { first: firstShared && firstShared.querySelector('.ch-msg__photo'), image: 5000, delay: settled, start: opened - 1 });
 
   // Messenger follows its script (the visitor asks, the page answers); the others: 2 in, 1 out
   let beat = 0;
   let script = own ? 3 : 4;
-  tl.every(layout === 'channel' ? (items.length ? 7400 : 4200) : items.length ? 5200 : 3800, () => {
+  // (a conversation the admin wrote: only theirs)
+  if (!talk || layout === 'channel') tl.every(layout === 'channel' ? (items.length ? 7400 : 4200) : items.length ? 5200 : 3800, () => {
     beat += 1;
     if (layout === 'dm') {
       if (DM[script % DM.length][0]) outgoing();
@@ -293,14 +321,14 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
     items: () => {
       const roll = Math.random();
       if (layout === 'channel' && roll < 0.3) return { node: plane(), path: 'cross', sound: 'whoosh' };
-      if (roll < 0.62) return { node: bubble(layout === 'channel' ? pick(words) : nextGroup(), { tone: 'chat', who: layout === 'channel' ? '' : pick(WHO) }), path: 'in' };
+      if (roll < 0.62) return { node: bubble(layout === 'channel' ? pick(words) : nextSay(), { tone: 'chat', who: layout === 'channel' ? '' : pick(WHO) }), path: 'in' };
       if (roll < 0.72) return { node: chip(layout === 'channel' ? `👁 ${compact(Math.round(rand(300, 1300)))}` : pick(['@الكل', '✓ اتشافت', '+١']), 'chat'), path: 'rise' };
       return { text: pick(REACTIONS), path: 'out', sound: 'react' };
     }
   });
 
   side(tl, stage, {
-    items: () => (Math.random() < 0.6 ? { node: bubble(layout === 'channel' ? pick(words) : nextGroup(), { tone: 'chat' }) } : layout === 'channel' ? { node: plane() } : { text: pick(REACTIONS) })
+    items: () => (Math.random() < 0.6 ? { node: bubble(layout === 'channel' ? pick(words) : nextSay(), { tone: 'chat' }) } : layout === 'channel' ? { node: plane() } : { text: pick(REACTIONS) })
   });
 
   return tl;

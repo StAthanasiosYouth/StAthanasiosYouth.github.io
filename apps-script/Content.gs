@@ -102,7 +102,7 @@ var LIMITS = {
   message: 300,
   contactIntro: 80,
   contactReply: 200,
-  gallery: 6
+  gallery: 12
 };
 
 /* a scene video's clip (seconds): «من» / «لحد» */
@@ -121,7 +121,13 @@ var GALLERY_CLIP = {
      [{"id":"img-…","text":"…"},{"id":"vid-…","start":37,"end":43,"text":"…"}]
    Both forms are always read; galleryInput_ (Items.gs) writes the tokens
    when no item has text.
+   A words-only item (a text post / a chat message, for the scenes where
+   one is natural) has no id: {"text":"…","from":"them"}. "from": who
+   says it in a chat scene — "us" (our side) or "them" (someone from the
+   group); any item may carry it, empty = the scene decides.
 ========================================================= */
+
+var GALLERY_FROM = ['us', 'them'];
 
 var GALLERY_TEXT = {
   max: 280,
@@ -129,7 +135,8 @@ var GALLERY_TEXT = {
 };
 
 
-/* the cell (or the editor's array of tokens / { id, start, end, text }) -> [{ token, text }] */
+/* the cell (or the editor's array of tokens / { id, start, end, text, from }) -> [{ token, text, from }]
+   (a words-only item: token '', said: true) */
 function galleryEntries_(value) {
 
   var list = value;
@@ -140,7 +147,7 @@ function galleryEntries_(value) {
       try { list = JSON.parse(cell); }
       catch (error) { list = null; }
       // not readable: one item that says so (never dropped silently)
-      if (!Array.isArray(list)) return [{ token: contentLine_(cell).slice(0, 40), text: '' }];
+      if (!Array.isArray(list)) return [{ token: contentLine_(cell).slice(0, 40), text: '', from: '' }];
     }
     else {
       list = cell.split(/[\s,،]+/);
@@ -151,20 +158,25 @@ function galleryEntries_(value) {
     if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
       var time = function (v) { return typeof v === 'number' && isFinite(v) ? String(v) : typeof v === 'string' ? v.trim() : 'x'; };
       var timed = (entry.start !== undefined && entry.start !== null && entry.start !== '') || (entry.end !== undefined && entry.end !== null && entry.end !== '');
+      var from = entry.from === undefined || entry.from === null ? '' : entry.from;
+      var text = entry.text === undefined || entry.text === null ? '' : entry.text;
+      // words only: no media id at all
+      if ((entry.id === undefined || entry.id === null || entry.id === '') && !timed) return { token: '', text: text, from: from, said: true };
       return {
         token: (contentLine_(entry.id) || '?') + (timed ? '@' + time(entry.start) + '-' + time(entry.end) : ''),
-        text: entry.text === undefined || entry.text === null ? '' : entry.text
+        text: text,
+        from: from
       };
     }
-    return { token: contentLine_(entry), text: '' };
-  }).filter(function (entry) { return entry.token; });
+    return { token: contentLine_(entry), text: '', from: '' };
+  }).filter(function (entry) { return entry.token || entry.said; });
 
 }
 
 
 function galleryTokens_(value) {
 
-  return galleryEntries_(value).map(function (entry) { return entry.token; });
+  return galleryEntries_(value).map(function (entry) { return entry.token; }).filter(Boolean);
 
 }
 
@@ -927,22 +939,29 @@ function buildPublicContent(draft, options) {
       if (!experience) return link;
       var gallery = galleryEntries_(row.gallery).slice(0, LIMITS.gallery)
         .map(function (entry) {
+          var from = GALLERY_FROM.indexOf(entry.from) !== -1 ? entry.from : '';
+          var said = galleryText_(entry.text);
+          if (said.length > GALLERY_TEXT.max) {
+            warn(where, 'كلام في محتوى المشهد أطول من ' + GALLERY_TEXT.max + ' حرف، واتقص');
+            said = galleryTextCut_(said);
+          }
+          // words only: a text post / a chat message
+          if (entry.said) {
+            if (!said) return null;
+            return from ? { type: 'text', text: said, from: from } : { type: 'text', text: said };
+          }
           var item = parseGalleryToken_(entry.token);
           if (!item) {
             warn(where, 'عنصر المشهد "' + entry.token.slice(0, 40) + '" مش مفهوم، ومش هيظهر');
             return null;
           }
           var found = item.kind === 'video' ? libraryVideo(item, where) : libraryImage(item.id, where, 'صورة المشهد');
-          var said = galleryText_(entry.text);
-          if (!found || !said) return found;
-          if (said.length > GALLERY_TEXT.max) {
-            warn(where, 'الكلام اللي مع "' + item.id + '" أطول من ' + GALLERY_TEXT.max + ' حرف، واتقص');
-            said = galleryTextCut_(said);
-          }
+          if (!found || (!said && !from)) return found;
           // a copy: the same library picture may be used elsewhere without text
           var copy = {};
           Object.keys(found).forEach(function (key) { copy[key] = found[key]; });
-          copy.text = said;
+          if (said) copy.text = said;
+          if (from) copy.from = from;
           return copy;
         })
         .filter(Boolean);
