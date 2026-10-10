@@ -6,7 +6,8 @@
 // admin (executes as the user accessing it, Google accounts only). The API
 // deployment must instead execute as the owner and accept anonymous requests
 // at the transport level — every admin action is still checked by the Google
-// ID token / server session (Auth.gs); only the narrow public handlers (route)
+// ID token / server session (Auth.gs); only the narrow public handlers (route,
+// pushSubscribe, pushUnsubscribe)
 // answer without them. Pushing the repository manifest as-is to the API
 // deployment makes every /admin/ request land on Google's sign-in page.
 //

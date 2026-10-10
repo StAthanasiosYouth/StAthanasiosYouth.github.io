@@ -4,6 +4,7 @@
 //
 // Usage: node tools/admin-preview.mjs [port]   → http://localhost:4322/
 
+import { generateKeyPairSync } from 'node:crypto';
 import { createWorld } from '../tests/fakes/gas.mjs';
 import { createAdminServer } from './lib/admin-server.mjs';
 
@@ -26,6 +27,23 @@ world.properties.set('SITE_URL', 'https://stathanasiosyouth.github.io/');
   gs.apiSaveItem('news', { title: 'رحلة الغردقة', summary: 'سجّل اسمك قبل الخميس', linkUrl: 'https://forms.gle/example', badge: 'جديد', featured: true, notify: { publish: true } });
   gs.apiSaveItem('games', { title: 'رحلة الاستكشاف في الكنيسة', url: 'https://example.org/explore', visibleFrom: sunday + ' 21:00', startAt: sunday + ' 22:00', endAt: sunday + ' 23:30', notify: { soon: true, start: true } });
   gs.apiSaveItem('notifications', { title: 'بوستر المؤتمر نزل', type: 'important', target: 'https://example.org/poster' });
+}
+
+// push (Push.gs): a throwaway service account for the fake FCM, and a few
+// subscribed devices (one gone for good, to show the cleanup). The site
+// "live" for the push list is the fake GitHub's content.json after «نشر».
+{
+  const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  world.properties.set('FCM_SERVICE_ACCOUNT', JSON.stringify({
+    project_id: 'athanasios-links',
+    client_email: 'push-sender@athanasios-links.iam.gserviceaccount.com',
+    private_key: privateKey.export({ type: 'pkcs8', format: 'pem' })
+  }));
+  ['android', 'android', 'ios', 'desktop'].forEach((platform, i) => {
+    const token = `demo${i}Xk2:APA91b${'Q'.repeat(140)}${i}`;
+    world.fcm.devices.set(token, i === 3 ? 'unregistered' : 'ok');
+    world.gs.publicPush_('pushSubscribe', { token, platform });
+  });
 }
 
 createAdminServer({ world, admin: ADMIN }).listen(PORT, '127.0.0.1', () => console.log(`admin preview: http://localhost:${PORT}/`));

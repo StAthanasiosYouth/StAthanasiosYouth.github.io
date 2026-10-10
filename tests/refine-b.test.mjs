@@ -53,7 +53,8 @@ const ARGS = {
   apiMediaLibrary: [], apiUpdateMedia: ['img-x', {}], apiDeleteMedia: ['img-x'], apiRestoreMedia: ['img-x'],
   apiPurgeMedia: ['img-x'], apiMediaPreview: ['img-x'], apiSetMediaAlt: ['img-x', 'x'], apiFetchMediaUrl: ['https://example.org/a.jpg'], apiPlanMigration: [], apiMigrate: [],
   apiAdmins: [], apiAddAdmin: ['x@gmail.com'], apiRemoveAdmin: [SECOND],
-  apiSessionStart: [{ device: 'x' }], apiSessionResume: [{ device: 'x' }], apiHeartbeat: [{}], apiSessionEnd: []
+  apiSessionStart: [{ device: 'x' }], apiSessionResume: [{ device: 'x' }], apiHeartbeat: [{}], apiSessionEnd: [],
+  apiPushState: [], apiPushCheck: [], apiSendPush: ['notif-x', 's-0123456789', {}]
 };
 
 /*

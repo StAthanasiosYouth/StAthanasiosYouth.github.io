@@ -6,6 +6,12 @@
       "runtimeExecutable": "node",
       "runtimeArgs": ["tools/serve.mjs", "4321"],
       "port": 4321
+    },
+    {
+      "name": "admin-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["tools/admin-preview.mjs", "4322"],
+      "port": 4322
     }
   ]
 }

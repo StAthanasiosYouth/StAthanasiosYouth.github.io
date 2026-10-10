@@ -93,7 +93,10 @@ function apiFunctions_() {
     apiSessionStart: apiSessionStart,
     apiSessionResume: apiSessionResume,
     apiHeartbeat: apiHeartbeat,
-    apiSessionEnd: apiSessionEnd
+    apiSessionEnd: apiSessionEnd,
+    apiPushState: apiPushState,
+    apiPushCheck: apiPushCheck,
+    apiSendPush: apiSendPush
   };
 
 }
@@ -110,11 +113,16 @@ function doPost(e) {
 
     var request = readApiRequest_(e);
 
-    // the ONE public action: a visitor's route to the church (Route.gs). No
+    // a public action: a visitor's route to the church (Route.gs). No
     // token, no session, no admin data: its own validation, cache and daily
     // budget; the openrouteservice key never leaves the server.
     if (request.fn === 'route') {
       return jsonOutput_(publicRoute_(request.args && request.args[0]));
+    }
+
+    // the two public push actions (Push.gs): one FCM token in or out, nothing read back
+    if (request.fn === 'pushSubscribe' || request.fn === 'pushUnsubscribe') {
+      return jsonOutput_(publicPush_(request.fn, request.args && request.args[0]));
     }
 
     var email = verifyIdToken_(request.token);

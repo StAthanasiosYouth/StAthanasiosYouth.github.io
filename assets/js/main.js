@@ -8,7 +8,7 @@ import { fetchContent, readCached } from './content.js';
 import { renderPage, renderError, tickPage, visibilityKey, meetingSnapshot } from './render.js';
 import { zonedNow, stamp, meetingStatus } from './schedule.js';
 import { shareLink, openQr, shareRow } from './share.js';
-import { startRouter, resolveRoute, go, leave } from './router.js';
+import { startRouter, resolveRoute, go, leave, parseHash } from './router.js';
 import { openSheet, closeSheet, sheetStyles } from './sheet.js';
 import { openBell } from './bell.js';
 import { gameStates, visibleNews } from './hub.js';
@@ -343,6 +343,67 @@ function scrollBar(bar, name) {
 
 
 /* =========================================================
+   PUSH NOTIFICATIONS
+   push.js (and Firebase) load only when something needs doing; this
+   reads the device's memo (push-env.js MEMO_KEY) to decide.
+========================================================= */
+
+const PUSH_MEMO = 'athanasios.push.v1';
+// the token refresh and the invitation's gap (push-env.js REFRESH_MS, NUDGE_GAP_MS)
+const PUSH_WEEK_MS = 7 * 86400000;
+
+function startPush() {
+
+  const nav = navigator;
+  const supported = 'serviceWorker' in nav && 'PushManager' in window && 'Notification' in window;
+
+  // a notification tapped while the site is open: sw.js asks us to open its item
+  if ('serviceWorker' in nav) {
+    nav.serviceWorker.addEventListener('message', event => {
+      const data = event.data;
+      if (!data || data.type !== 'athanasios:open' || typeof data.url !== 'string') return;
+      const url = new URL(data.url, location.href);
+      const route = url.origin === location.origin ? parseHash(url.hash) : null;
+      if (route) go(route.name, route.id);
+    });
+  }
+
+  let memo = {};
+  try {
+    memo = JSON.parse(localStorage.getItem(PUSH_MEMO) || 'null') || {};
+    // one visit per browser session (for the invitation, from the second visit)
+    if (!sessionStorage.getItem(PUSH_MEMO)) {
+      sessionStorage.setItem(PUSH_MEMO, '1');
+      memo.visits = (Number(memo.visits) || 0) + 1;
+      localStorage.setItem(PUSH_MEMO, JSON.stringify(memo));
+    }
+  }
+  catch {
+    return;   // no storage: nothing to remember, nothing to refresh
+  }
+
+  const later = run => setTimeout(() => {
+    const idle = window.requestIdleCallback || (fn => fn());
+    idle(() => import('./push.js').then(run).catch(error => console.warn(error)));
+  }, 6000);
+
+  if (memo.token) {
+    // subscribed: confirm the token weekly, or tidy up if it was turned off in the browser
+    if (!supported || Notification.permission !== 'granted' || !(Date.now() - (Number(memo.at) || 0) < PUSH_WEEK_MS)) {
+      later(push => push.refresh());
+    }
+    return;
+  }
+
+  if (supported && Notification.permission === 'default' && (Number(memo.visits) || 0) >= 2 &&
+      (Number(memo.nudges) || 0) < 2 && Date.now() - (Number(memo.nudgedAt) || 0) >= PUSH_WEEK_MS) {
+    later(push => push.maybeNudge());
+  }
+
+}
+
+
+/* =========================================================
    START
 ========================================================= */
 
@@ -373,6 +434,7 @@ function startSite() {
   setupTopbar();
   startRouter(openRoute);
   load();
+  startPush();
 
 }
 

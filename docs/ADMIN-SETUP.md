@@ -386,6 +386,8 @@ Already created. For the record, or to make it again:
 | `ADMIN_EMAILS`    | unchanged (now also editable from **الإعدادات → صلاحيات لوحة التحكم**) |
 | `ORS_API_KEY`     | optional: an openrouteservice.org API key (free Standard plan, no card) for routes inside the site's map card («الاتجاهات», `Route.gs`). Missing or rejected = the card says the in-site route isn't available and offers Google Maps. Never shown to the browser |
 | `ROUTE_DAY_COUNT` | written by `Route.gs` (`YYYY-MM-DD:n`, the day's upstream route calls, capped at 1,500); leave it alone |
+| `FCM_SERVICE_ACCOUNT` | **secret.** The whole JSON key of the `push-sender` service account (push notifications, `Push.gs`; see 8.5). Never in the repository or the browser |
+| `PUSH_DAY_COUNT`  | written by `Push.gs` (`YYYY-MM-DD:n`, the day's public subscribe/unsubscribe calls, capped at 5,000); leave it alone |
 
 If the server's client ID (property or default) differs from `clientId`, or the property is malformed, every API call is refused
 (the page says «جوجل دخّلك، بس خادم لوحة التحكم مقبلش الدخول»).
@@ -504,7 +506,32 @@ The code is safe under both settings:
   `admin/preview-guard.js` runs first in it and gives the page its own
   in-memory storage, so drafts never land in the site's cache or bell.
 
-### 8.5 Limits
+### 8.5 Push notifications (Firebase Cloud Messaging)
+
+Done once, by the owner. Everything here is free (Firebase Spark plan, no card).
+
+1. **Firebase project** (https://console.firebase.google.com, the owner's account): *Create a project*
+   `athanasios-links`, Google Analytics **off**.
+2. **Web app**: *Project Overview → </> (Web)*, nickname "Athanasios site", no Hosting → *Register app*.
+   Copy the `firebaseConfig` values (public) into `assets/js/push-config.js` `firebase`.
+3. **Web Push key**: *Project settings → Cloud Messaging*: check *Firebase Cloud Messaging API (V1)*
+   is **Enabled**; *Web configuration → Web Push certificates → Generate key pair*; copy the key (public,
+   the VAPID public key) into `push-config.js` `vapidKey`.
+4. **Service account** (https://console.cloud.google.com, same project): *IAM & Admin → Service Accounts →
+   Create service account* `push-sender`, role **Firebase Cloud Messaging API Admin** only; then *Keys →
+   Add key → JSON*.
+5. **Secret**: paste the whole JSON file as the Script Property `FCM_SERVICE_ACCOUNT`, then delete the
+   downloaded file. To rotate: create a new key, replace the property, delete the old key in Cloud Console.
+6. Deploy the API (`cd tools && node deploy-api.mjs "vNN: push"`). In the admin: **الإشعارات →
+   إرسال للمشتركين → اختبر الإعداد** (a `validate_only` call: nothing is delivered).
+7. Optional, after the first real test: *APIs & Services → Credentials → Browser key (auto created by
+   Firebase) → Application restrictions → Websites* → `https://stathanasiosyouth.github.io/*`.
+
+`push-config.js` `apiUrl` must stay the same `/exec` as `admin/config.js` `apiUrl` (a test checks).
+The Sheet gets two tabs on first use: `PushSubs` (one row per device: token hash, token, platform,
+first/last seen, failures) and `PushLog` (one row per send). Don't edit them by hand.
+
+### 8.6 Limits
 
 - Apps Script quotas apply to the API (URL fetch for token checks: cached,
   one per token per hour; consumer accounts get 20,000 fetches a day).

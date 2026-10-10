@@ -15,11 +15,14 @@
     "demo": "node demo.mjs",
     "example": "node build-example.mjs",
     "build-admin": "node build-admin.mjs",
-    "build-vendor": "node build-admin-vendor.mjs"
+    "build-vendor": "node build-admin-vendor.mjs",
+    "build-push-vendor": "node build-push-vendor.mjs",
+    "pwa-icons": "node build-pwa-icons.mjs"
   },
   "devDependencies": {
     "axe-core": "^4.13.0",
     "esbuild": "0.28.2",
+    "firebase": "12.19.0",
     "jsqr": "^1.4.0",
     "mediabunny": "1.61.3",
     "puppeteer-core": "^23.11.1",

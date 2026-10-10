@@ -3669,11 +3669,19 @@
           );
     }
 
+    // once the site shows it: optionally send a bell item to the phones (AdminPush; never part of the publish)
+    var push = A.push && (job.step === 4 || !siteUrl)
+      ? el('div', { class: 'push-offer' },
+        el('p', { text: 'في إشعار مهم في الجرس؟ تقدر تبعته للموبايلات اللي مفعّلة الإشعارات.' }),
+        el('button', { class: 'btn', type: 'button', onclick: function () { A.push.open(); } }, icon('bell'), 'إرسال إشعار للمشتركين'))
+      : null;
+
     A.openSheet('تم النشر ✓', [
       stepper(siteUrl ? job.step : 3),
       el('p', { class: 'note note--ok', 'data-publish-job': '', text: result.unchanged ? 'الملفات على GitHub زي ما هي.' : 'التغييرات اتبعتت لـ GitHub.' }),
       result.commitUrl ? el('a', { class: 'link-row', href: result.commitUrl, target: '_blank', rel: 'noopener' }, icon('external'), 'شوف الكوميت على GitHub') : null,
-      live
+      live,
+      push
     ], [el('button', { class: 'btn btn--primary', type: 'button', text: 'تمام', onclick: function () { A.closeSheet(); } })]);
 
   }

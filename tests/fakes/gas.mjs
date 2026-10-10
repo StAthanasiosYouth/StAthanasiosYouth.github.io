@@ -2,7 +2,7 @@
 // fake GitHub API with real commit/ref semantics. Lets the actual .gs files
 // run in Node: tests/admin.test.mjs.
 
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, createSign, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { ROOT } from '../../tools/lib/gs.mjs';
@@ -412,7 +412,58 @@ function formatDate(date, timeZone, pattern) {
  * Creates a fresh Apps Script world with all project .gs files loaded.
  * world.as(email) switches the signed-in user.
  */
-export function createWorld({ owner = 'menazakmena@gmail.com', github = new FakeGitHub(), drive = new FakeDrive(), mapsRedirects = {}, adminEmails = owner, executeAs = 'USER_ACCESSING', web = {} } = {}) {
+/* =========================================================
+   FIREBASE CLOUD MESSAGING (HTTP v1) + Google's OAuth token endpoint
+========================================================= */
+
+export class FakeFcm {
+
+  constructor() {
+    this.sent = [];            // every messages:send body (validate_only too)
+    this.tokenRequests = 0;
+    this.accessToken = 'ya29.fake-access-token';
+    this.rejectAuth = false;   // the token endpoint refuses the JWT
+    this.revoked = false;      // messages:send refuses every access token (401)
+    this.verify = null;        // optional (assertion) => bool: check the JWT's signature
+    // device token -> 'ok' | 'unregistered' | 'invalid' | 'mismatch' | 'busy' | 'busy-once' | 'denied'
+    this.devices = new Map();
+    this.siteContent = undefined;   // override the live content.json (else GitHub's)
+  }
+
+  respond(code, body) {
+    return { getResponseCode: () => code, getHeaders: () => ({}), getContentText: () => JSON.stringify(body) };
+  }
+
+  fetch(url, options = {}) {
+    if (url === 'https://oauth2.googleapis.com/token') {
+      this.tokenRequests++;
+      const assertion = options.payload && options.payload.assertion;
+      const ok = !this.rejectAuth && options.payload.grant_type === 'urn:ietf:params:oauth:grant-type:jwt-bearer' &&
+        /^[\w-]+\.[\w-]+\.[\w-]+$/.test(assertion || '') && (!this.verify || this.verify(assertion));
+      return ok ? this.respond(200, { access_token: this.accessToken, expires_in: 3599, token_type: 'Bearer' }) : this.respond(400, { error: 'invalid_grant' });
+    }
+    if (this.revoked || (options.headers || {}).Authorization !== 'Bearer ' + this.accessToken) {
+      return this.respond(401, { error: { code: 401, status: 'UNAUTHENTICATED', message: 'Request had invalid authentication credentials.' } });
+    }
+    const body = JSON.parse(options.payload);
+    this.sent.push({ url, body });
+    const token = body.message.token;
+    const fcmError = (code, status, errorCode, message) => this.respond(code, { error: { code, status, message, details: [{ '@type': 'type.googleapis.com/google.firebase.fcm.v1.FcmError', errorCode }] } });
+    if (body.validate_only) return fcmError(400, 'INVALID_ARGUMENT', 'INVALID_ARGUMENT', 'The registration token is not a valid FCM registration token');
+    const state = this.devices.get(token) || 'unregistered';
+    if (state === 'busy-once') { this.devices.set(token, 'ok'); return fcmError(503, 'UNAVAILABLE', 'UNAVAILABLE', 'The service is currently unavailable.'); }
+    if (state === 'ok') return this.respond(200, { name: `projects/x/messages/${this.sent.length}` });
+    if (state === 'unregistered') return fcmError(404, 'NOT_FOUND', 'UNREGISTERED', 'Requested entity was not found.');
+    if (state === 'invalid') return fcmError(400, 'INVALID_ARGUMENT', 'INVALID_ARGUMENT', 'The registration token is not a valid FCM registration token');
+    if (state === 'mismatch') return fcmError(403, 'PERMISSION_DENIED', 'SENDER_ID_MISMATCH', 'SenderId mismatch');
+    if (state === 'denied') return fcmError(403, 'PERMISSION_DENIED', 'THIRD_PARTY_AUTH_ERROR', 'Permission denied');
+    return fcmError(503, 'UNAVAILABLE', 'UNAVAILABLE', 'The service is currently unavailable.');
+  }
+
+}
+
+
+export function createWorld({ owner = 'menazakmena@gmail.com', github = new FakeGitHub(), drive = new FakeDrive(), mapsRedirects = {}, adminEmails = owner, executeAs = 'USER_ACCESSING', web = {}, fcm = new FakeFcm() } = {}) {
 
   // other websites (apiFetchMediaUrl): url -> { status, headers, body: Buffer }; every request is recorded
   const webRequests = [];
@@ -528,6 +579,10 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
       computeDigest: (algorithm, data) => [...createHash(algorithm).update(Array.isArray(data) ? Buffer.from(data.map(b => (b < 0 ? b + 256 : b))) : Buffer.from(String(data), 'utf8')).digest()].map(b => (b > 127 ? b - 256 : b)),
       base64Decode: text => [...Buffer.from(text, 'base64')].map(b => (b > 127 ? b - 256 : b)),
       base64Encode: bytes => Buffer.from(bytes.map(b => (b < 0 ? b + 256 : b))).toString('base64'),
+      // RS256 like Apps Script: (text, PEM key) -> signed Byte[]
+      computeRsaSha256Signature: (text, key) => [...createSign('RSA-SHA256').update(String(text), 'utf8').sign(key)].map(b => (b > 127 ? b - 256 : b)),
+      base64EncodeWebSafe: bytes => Buffer.from(typeof bytes === 'string' ? Buffer.from(bytes, 'utf8') : bytes.map(b => (b < 0 ? b + 256 : b))).toString('base64').replace(/\+/g, '-').replace(/\//g, '_'),
+      sleep: () => {},
       newBlob: data => {
         const buffer = typeof data === 'string' ? Buffer.from(data, 'utf8') : Buffer.from(data.map(b => (b < 0 ? b + 256 : b)));
         return {
@@ -538,7 +593,15 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
     },
 
     UrlFetchApp: {
+      fetchAll: requests => requests.map(r => context.UrlFetchApp.fetch(r.url, r)),
       fetch: (url, options) => {
+        if (url === 'https://oauth2.googleapis.com/token' || String(url).startsWith('https://fcm.googleapis.com/')) return fcm.fetch(url, options);
+        const site = properties.get('SITE_URL');
+        if (site && String(url).startsWith(site.replace(/\/?$/, '/') + 'content.json')) {
+          webRequests.push({ url, options });
+          const text = fcm.siteContent !== undefined ? fcm.siteContent : github.files()['content.json'];
+          return { getResponseCode: () => (text === null || text === undefined ? 404 : 200), getHeaders: () => ({}), getContentText: () => String(text || '') };
+        }
         if (mapsRedirects[url]) {
           return { getResponseCode: () => 302, getContentText: () => '', getHeaders: () => ({ Location: mapsRedirects[url] }) };
         }
@@ -601,7 +664,7 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
 
   });
 
-  for (const file of ['Platforms.gs', 'Content.gs', 'Hub.gs', 'Review.gs', 'Seed.gs', 'Auth.gs', 'Store.gs', 'Publish.gs', 'Code.gs', 'Media.gs', 'Items.gs', 'Import.gs', 'Migrate.gs', 'Api.gs', 'Presence.gs', 'Route.gs']) {
+  for (const file of ['Platforms.gs', 'Content.gs', 'Hub.gs', 'Review.gs', 'Seed.gs', 'Auth.gs', 'Store.gs', 'Publish.gs', 'Code.gs', 'Media.gs', 'Items.gs', 'Import.gs', 'Migrate.gs', 'Api.gs', 'Presence.gs', 'Route.gs', 'Push.gs']) {
     vm.runInContext(readFileSync(`${ROOT}apps-script/${file}`, 'utf8'), context, { filename: file });
   }
 
@@ -615,6 +678,7 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
     drive,
     web,
     webRequests,
+    fcm,
     get spreadsheet() { return spreadsheet; },
     properties,
     cache,

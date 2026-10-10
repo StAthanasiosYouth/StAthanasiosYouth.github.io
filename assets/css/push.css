@@ -1,0 +1,127 @@
+/* =========================================================
+   PUSH: the notifications card at the top of the bell panel and the
+   once-in-a-while invitation. Loaded with assets/js/push.js only.
+========================================================= */
+
+.push-slot:empty {
+  display: none;
+}
+
+.push-slot {
+  margin-bottom: 18px;
+}
+
+.push-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(215, 170, 80, .14), transparent 60%),
+    rgba(255, 255, 255, .03);
+}
+
+.push-card[hidden] {
+  display: none;
+}
+
+.push-card__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.push-card__text,
+.push-card__steps {
+  font-size: .88rem;
+  line-height: 1.65;
+  color: var(--text-2);
+}
+
+.push-card__steps {
+  display: grid;
+  gap: 4px;
+  padding-inline-start: 1.4em;
+  list-style: arabic-indic;
+}
+
+.push-card__note {
+  font-size: .78rem;
+  color: var(--text-3);
+}
+
+.push-card__inline-icon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  vertical-align: -4px;
+  color: var(--gold-hi);
+}
+
+.push-card__ok {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: var(--gold-ink);
+  background: var(--gold);
+}
+
+.push-card__ok .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.push-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.push-card__btn {
+  min-height: 44px;
+  padding: 8px 16px;
+  font-size: .9rem;
+}
+
+
+/* ---------- the invitation (floats above the page) ---------- */
+
+.push-nudge {
+  position: fixed;
+  z-index: var(--z-toast);
+  inset-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  max-width: 440px;
+  margin-inline: auto;
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(215, 170, 80, .16), transparent 60%),
+    var(--navy-900);
+  box-shadow: 0 22px 50px -16px rgba(0, 0, 0, .9);
+  animation: push-in .5s var(--ease-out-expo) both;
+}
+
+.push-nudge.is-leaving {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity .25s, transform .25s;
+}
+
+@keyframes push-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .push-nudge {
+    animation: none;
+  }
+}

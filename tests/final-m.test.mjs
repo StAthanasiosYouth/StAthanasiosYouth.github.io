@@ -274,14 +274,15 @@ test('Leaflet 1.9.4 is the official build (npm leaflet@1.9.4 dist), with its BSD
   assert.match(readFileSync(`${dir}LICENSE`, 'utf8'), /BSD 2-Clause License[\s\S]*Agafonkin/);
 });
 
-test('public CSP: only the OSM tiles (img) and the Apps Script hosts (connect) are added', () => {
+test('public CSP: only the OSM tiles (img), the Apps Script hosts and push sign-up (connect) are added', () => {
   const html = readFileSync(`${ROOT}index.html`, 'utf8');
   const csp = /<meta http-equiv="Content-Security-Policy" content="([^"]+)">/.exec(html)[1];
   const rules = Object.fromEntries(csp.split(';').map(s => s.trim().split(/\s+/)).map(([k, ...v]) => [k, v]));
   assert.deepEqual(rules['script-src'], ["'self'"]);
   assert.deepEqual(rules['style-src'], ["'self'"]);
   assert.deepEqual(rules['img-src'], ["'self'", 'data:', 'blob:', 'https://tile.openstreetmap.org']);
-  assert.deepEqual(rules['connect-src'], ["'self'", 'https://script.google.com', 'https://script.googleusercontent.com']);
+  // + the two Firebase hosts push sign-up needs (push.js; tests/push-site.test.mjs)
+  assert.deepEqual(rules['connect-src'], ["'self'", 'https://script.google.com', 'https://script.googleusercontent.com', 'https://firebaseinstallations.googleapis.com', 'https://fcmregistrations.googleapis.com']);
   assert.deepEqual(rules['frame-src'], ['https://www.google.com']);
   assert.doesNotMatch(csp, /openrouteservice/, 'routing goes through Apps Script, never from the browser');
   assert.match(html, /<meta name="referrer" content="strict-origin-when-cross-origin">/);

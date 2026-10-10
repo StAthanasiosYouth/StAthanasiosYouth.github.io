@@ -126,10 +126,17 @@ export function openBell(content, nowStamp) {
       h('p', { class: 'inbox__hint' }, 'أي جديد في الأسرة هيظهر هنا.')
     );
 
+  // notifications on this phone (push.js, loaded only now; never in the admin's preview)
+  const pushSlot = h('div', { class: 'push-slot' });
+
+  if (!document.documentElement.hasAttribute('data-preview')) {
+    import('./push.js').then(push => push.fillPushSlot(pushSlot)).catch(error => console.warn(error));
+  }
+
   openSheet({
     title: 'الإشعارات',
     variant: 'panel',
-    content: list,
+    content: [pushSlot, list],
     onClose: ({ fromRoute }) => leave({ fromRoute })
   });
 

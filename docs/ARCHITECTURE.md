@@ -335,12 +335,51 @@ No new Sheet column, no migration (data schema stays 5); one media system.
   and numbers and adds `thumb` = the poster for code that only shows
   pictures. Playback in the scenes: `assets/js/xp/*` (separate work).
 
+## Push notifications (Firebase Cloud Messaging)
+
+One content system: a push is a bell item (`Notifications`) that is
+already **live** on the site, sent once more to devices that opted in.
+
+- **Site.** `manifest.webmanifest` (standalone, maskable icon: installable,
+  which iPhone needs for push) and `sw.js` at the root (scope `/`): push and
+  `notificationclick` only, **no fetch handler, no cache**. A tap focuses an
+  open site window and posts `{ type: 'athanasios:open', url }` (main.js
+  routes it), else opens `/#news/<id>` etc. Links and pictures are checked
+  in the worker (own deep links, own `/media/` only).
+- **Loading.** main.js reads `localStorage['athanasios.push.v1']` and loads
+  `push.js` only when needed: the bell opens (the card at its top), the
+  invitation is due (2nd visit on, ≤ 2 times, a week apart), or a subscribed
+  device's weekly token refresh. `push.js` loads the vendored Firebase
+  subset (`assets/vendor/firebase-messaging.js`, ~15 KB gz,
+  `tools/build-push-vendor.mjs`) only to turn push on/off or refresh.
+  The permission prompt only follows a tap on «فعّل الإشعارات».
+- **API (public).** `doPost` `pushSubscribe` / `pushUnsubscribe`
+  (`Push.gs`): one FCM token (format-checked), platform, optional previous
+  token; a shared 60/min and 5,000/day budget; ≤ 20,000 rows; nothing is
+  read back. CSP adds only `firebaseinstallations.googleapis.com` and
+  `fcmregistrations.googleapis.com` to `connect-src`.
+- **API (admin).** `apiPushState`, `apiPushCheck`, `apiSendPush(id,
+  sendKey, edits)`. The item is looked up in the **live** content.json
+  (fetched from SITE_URL) and must be published, not expired, its section
+  showing. `PushLog` makes it once per item; a repeated `sendKey` replays
+  its result; 60 s cooldown, 10 a day. The row is claimed (`sending`) under
+  the script lock, then the lock is released for the fan-out:
+  `UrlFetchApp.fetchAll` in batches of 100 to FCM HTTP v1, data-only
+  messages, `Urgency: high`, TTL = until the item expires (1 h – 4 days),
+  one retry for transient errors. UNREGISTERED / SENDER_ID_MISMATCH / an
+  invalid registration token delete the row; 5 failures in a row or 270
+  days unseen too. Auth: a JWT signed with the service account
+  (`FCM_SERVICE_ACCOUNT`, `Utilities.computeRsaSha256Signature`) exchanged
+  for an access token, cached ~50 min. `apiPublish` never touches any of it.
+- **Admin.** `AdminPush.html`: offered on «تم النشر ✓» once the site shows
+  the new revision, and in «الإشعارات»; preview with push-only edits,
+  confirmation with the device count, result summary.
+
 ## Ready for later (not built yet)
 
-- **Push notifications (Phase B):** light PWA (manifest + service worker),
-  Firebase Cloud Messaging, an anonymous append-only "push relay" Apps
-  Script, a 5-minute timer that sends due bell items to subscribed devices.
-  The bell items already carry everything a push needs.
+- **Push, later:** categories (الاجتماعات / الأخبار / المسابقات والأنشطة) as
+  a `topics` column in PushSubs filtered at send time; automatic sends of
+  future-dated bell items (a time-driven trigger); "test on my device".
 
 - **Click analytics:** a `navigator.sendBeacon` to a separate anonymous
   Apps Script endpoint appending to a `Clicks` tab. Links already have

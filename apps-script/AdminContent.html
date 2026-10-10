@@ -1238,8 +1238,11 @@
     var items = split.items;
     var days = A.state.meta.historyDays;
 
-    return [A.card('الإشعارات', 'بتظهر في جرس الموقع 🔔 في معادها، وبتفضل في السجل ' + days + ' يوم (إلا لو حددت غير كده). إشعارات الموبايل نفسها جاية في المرحلة الجاية.',
-      el('div', { class: 'actions' }, addButton('+ إشعار', function () { A.editors.notifications(null); }), split.toggle),
+    return [A.card('الإشعارات', 'بتظهر في جرس الموقع 🔔 في معادها، وبتفضل في السجل ' + days + ' يوم (إلا لو حددت غير كده). وأي إشعار ظاهر على الموقع تقدر تبعته كمان للموبايلات اللي مفعّلة الإشعارات.',
+      el('div', { class: 'actions' },
+        addButton('+ إشعار', function () { A.editors.notifications(null); }),
+        A.push ? el('button', { class: 'btn', type: 'button', onclick: function () { A.push.open(); } }, icon('bell'), 'إرسال للمشتركين') : null,
+        split.toggle),
       items.length
         ? el('ul', { class: 'list' }, items.map(function (item) {
           var enabled = bool(item.enabled);
