@@ -4304,10 +4304,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     });
 
     // the content only matters when the link opens a scene (and what it can show depends on which)
-    var lastScene = null;
+    // (the picker first drew before the scene was known: '' = that first drawing)
+    var lastScene = '';
     function syncExperience() {
       gallery.node.hidden = !experience.update();
-      if (lastScene !== null && lastScene !== experience.scene()) gallery.redraw();
+      if (lastScene !== experience.scene()) gallery.redraw();
       lastScene = experience.scene();
     }
 

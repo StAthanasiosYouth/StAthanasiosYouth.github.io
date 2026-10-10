@@ -175,22 +175,34 @@ test('scene content: a chat link takes words-only messages with who says them; a
   await page.waitForSelector('dialog.sheet[open] .gallery-picker');
   assert.match(await page.$eval('dialog.sheet[open] .gallery-picker .field__label', n => n.textContent), /محتوى المشهد/);
 
-  const addText = () => page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .gallery-picker button')].find(b => b.textContent.includes('رسالة / منشور نصي')).click());
-  const type = (index, text) => page.evaluate((i, t) => {
-    const area = document.querySelectorAll('dialog.sheet[open] .gallery-picker__item')[i].querySelector('.gallery-picker__say-input');
-    area.value = t;
-    area.dispatchEvent(new Event('input', { bubbles: true }));
-  }, index, text);
-  const before = await page.$$eval('dialog.sheet[open] .gallery-picker__item', n => n.length);
+  // on screen as soon as the editor opens (no change of «التجربة» first), used like a person would
+  const shown = handle => handle.evaluate(n => !n.hidden && !n.disabled && !!n.offsetParent && n.getBoundingClientRect().height > 0 && getComputedStyle(n).visibility === 'visible');
+  const addButton = await page.evaluateHandle(() => [...document.querySelectorAll('dialog.sheet[open] .gallery-picker button')].find(b => b.textContent.includes('رسالة / منشور نصي')));
+  assert.ok(await shown(addButton), '«+ رسالة / منشور نصي» visible right away');
+  const froms = await page.$$('dialog.sheet[open] .gallery-picker__from');
+  const rows = await page.$$('dialog.sheet[open] .gallery-picker__item');
+  assert.equal(froms.length, rows.length, '«مين بيقول» on every item of a chat scene');
+  for (const select of froms) assert.ok(await shown(select), '«مين بيقول» visible right away');
+  const addText = async () => {
+    await addButton.evaluate(b => b.scrollIntoView({ block: 'center' }));
+    await addButton.click();
+  };
+  const item = async index => (await page.$$('dialog.sheet[open] .gallery-picker__item'))[index];
+  const type = async (index, text) => {
+    const area = await (await item(index)).$('.gallery-picker__say-input');
+    assert.ok(await shown(area), 'the message box is visible');
+    await area.click();
+    await area.type(text);
+  };
+  const before = rows.length;
   await addText();
-  await type(before, 'يا جماعة متنسوش اجتماع الأحد ❤️');
+  await type(before, 'يا جماعة متنسوش اجتماع الأحد');
   await addText();
-  await type(before + 1, 'مين جاي بدري؟ 😂');
-  await page.evaluate(i => {
-    const select = document.querySelectorAll('dialog.sheet[open] .gallery-picker__item')[i].querySelector('.gallery-picker__from');
-    select.value = 'them';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-  }, before + 1);
+  await type(before + 1, 'مين جاي بدري؟');
+  const who = await (await item(before + 1)).$('.gallery-picker__from');
+  assert.ok(await shown(who), '«مين بيقول» visible on the new message');
+  assert.equal(await who.evaluate(s => s.value), 'us', 'a new message: ours by default');
+  await who.select('them');
 
   // an empty message blocks saving
   await addText();
@@ -202,14 +214,14 @@ test('scene content: a chat link takes words-only messages with who says them; a
   await page.evaluate(() => document.querySelector('dialog.sheet[open] .sheet__foot .btn--primary').click());
   await page.waitForFunction(() => !document.querySelector('dialog.sheet').open, { timeout: 15000 });
   const saved = JSON.parse(world.gs.readTable_('Links').find(l => l.id === link.id).gallery);
-  assert.deepEqual(saved.slice(-2), [{ text: 'يا جماعة متنسوش اجتماع الأحد ❤️', from: 'us' }, { text: 'مين جاي بدري؟ 😂', from: 'them' }]);
+  assert.deepEqual(saved.slice(-2), [{ text: 'يا جماعة متنسوش اجتماع الأحد', from: 'us' }, { text: 'مين جاي بدري؟', from: 'them' }]);
 
   // published in order, ready for the scene
   world.as(ADMIN);
   const built = JSON.parse(JSON.stringify(world.gs.buildDraft_()));
   world.as('');
   const published = [...built.content.featured, ...built.content.sections.flatMap(s => s.links)].find(l => l.id === link.id);
-  assert.deepEqual(published.gallery.slice(-2), [{ type: 'text', text: 'يا جماعة متنسوش اجتماع الأحد ❤️', from: 'us' }, { type: 'text', text: 'مين جاي بدري؟ 😂', from: 'them' }]);
+  assert.deepEqual(published.gallery.slice(-2), [{ type: 'text', text: 'يا جماعة متنسوش اجتماع الأحد', from: 'us' }, { type: 'text', text: 'مين جاي بدري؟', from: 'them' }]);
 
   // the same link opening TikTok: the messages stay (said plainly), no button to add more, no «مين بيقول»
   await page.evaluate(id => A.editLink(A.state.draft.links.find(l => l.id === id)), link.id);
