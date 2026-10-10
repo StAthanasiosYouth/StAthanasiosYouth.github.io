@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "d980a580b393",
-  "publishedAt": "2026-10-10T16:58:26.661Z",
+  "revision": "d374866696d4",
+  "publishedAt": "2026-10-10T21:06:37.582Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -257,6 +257,26 @@
   "games": [],
   "notifications": [
     {
+      "id": "notif-act-f13391bf",
+      "type": "competition",
+      "title": "المسابقة الجديدة بدأت: test مسابقة",
+      "message": "test",
+      "target": {
+        "kind": "activity",
+        "id": "act-f13391bf"
+      },
+      "image": {
+        "src": "media/2026/img-4f71317c.webp",
+        "thumb": "media/2026/img-4f71317c-480.webp",
+        "w": 1600,
+        "h": 400,
+        "alt": "",
+        "color": "#1b324b"
+      },
+      "publishAt": "2026-10-11T00:05",
+      "expireAt": "2026-10-25T00:05"
+    },
+    {
       "id": "notif-session-2026-10-11",
       "type": "meeting",
       "title": "موضوع الاجتماع الجاي",
@@ -269,8 +289,42 @@
       "expireAt": "2026-10-11T20:00"
     }
   ],
-  "activities": [],
-  "types": [],
+  "activities": [
+    {
+      "id": "act-f13391bf",
+      "type": "competition",
+      "section": "competitions",
+      "title": "test مسابقة",
+      "subtitle": "test",
+      "description": "",
+      "image": {
+        "src": "media/2026/img-4f71317c.webp",
+        "thumb": "media/2026/img-4f71317c-480.webp",
+        "w": 1600,
+        "h": 400,
+        "alt": "",
+        "color": "#1b324b"
+      },
+      "cta": {
+        "label": "ابدأ المسابقة",
+        "url": "https://stathanasiosyouth.github.io/"
+      },
+      "location": "",
+      "startAt": "",
+      "endAt": "",
+      "visibleFrom": "2026-10-11T00:05",
+      "visibleUntil": ""
+    }
+  ],
+  "types": [
+    {
+      "key": "competition",
+      "label": "مسابقة",
+      "icon": "trophy",
+      "theme": "ember",
+      "banner": null
+    }
+  ],
   "layout": [
     {
       "key": "meeting",
