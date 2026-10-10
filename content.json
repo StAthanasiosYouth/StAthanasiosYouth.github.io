@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "3b0f5707a452",
-  "publishedAt": "2026-10-07T05:24:50.071Z",
+  "revision": "8bfb50744202",
+  "publishedAt": "2026-10-08T17:29:43.746Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -40,7 +40,19 @@
       "startAt": "",
       "endAt": "",
       "experience": "voice",
-      "cta": "ابعت دلوقتي"
+      "cta": "ابعت دلوقتي",
+      "gallery": [
+        {
+          "type": "video",
+          "src": "media/2026/vid-c9c3c633.mp4",
+          "poster": "media/2026/vid-c9c3c633-480.webp",
+          "w": 540,
+          "h": 960,
+          "alt": "",
+          "start": 0,
+          "end": 15
+        }
+      ]
     }
   ],
   "sections": [
@@ -58,7 +70,25 @@
           "badge": "",
           "startAt": "",
           "endAt": "",
-          "experience": "facebook"
+          "experience": "facebook",
+          "gallery": [
+            {
+              "src": "media/2026/img-af6b0c28.webp",
+              "thumb": "media/2026/img-af6b0c28-480.webp",
+              "w": 1122,
+              "h": 1402,
+              "alt": "بوستر الكسل الروحي test",
+              "color": "#21252e"
+            },
+            {
+              "src": "media/2026/img-5d2af330.webp",
+              "thumb": "media/2026/img-5d2af330-480.webp",
+              "w": 1122,
+              "h": 1402,
+              "alt": "",
+              "color": "#454543"
+            }
+          ]
         },
         {
           "id": "instagram",
@@ -82,7 +112,19 @@
           "badge": "",
           "startAt": "",
           "endAt": "",
-          "experience": "tiktok"
+          "experience": "tiktok",
+          "gallery": [
+            {
+              "type": "video",
+              "src": "media/2026/vid-55f81cd6.mp4",
+              "poster": "media/2026/vid-55f81cd6-480.webp",
+              "w": 540,
+              "h": 960,
+              "alt": "",
+              "start": 0,
+              "end": 6.8
+            }
+          ]
         },
         {
           "id": "whatsapp-group",
@@ -268,7 +310,9 @@
       "theme": "",
       "banner": null,
       "visibleFrom": "",
-      "visibleUntil": ""
+      "visibleUntil": "",
+      "surface": "glass",
+      "surfaceMobile": "glass"
     },
     {
       "key": "contacts",
