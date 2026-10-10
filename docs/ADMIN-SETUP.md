@@ -82,6 +82,14 @@ another admin.
 Put the script ID in `apps-script/.clasp.json` (git-ignored) and run
 `clasp push` from `apps-script/`.
 
+**Updating the API deployment** (the one `admin/config.js` `apiUrl` points
+at): run `cd tools && node deploy-api.mjs "vNN: what changed"`. It pushes
+with the API's web-app settings (execute as owner, anonymous transport —
+admin actions are still checked by the Google sign-in token and session),
+deploys, and puts `appsscript.json` back. A plain `clasp push` + `clasp
+deploy` ships the repository manifest's settings instead, and every `/admin/`
+request then lands on Google's sign-in page ("Failed to fetch").
+
 ## 3. GitHub token
 
 The admin publishes by committing `content.json` and `meeting.ics`. It
