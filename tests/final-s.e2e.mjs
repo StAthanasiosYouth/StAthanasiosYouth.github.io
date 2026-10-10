@@ -312,7 +312,8 @@ test('the real material: posters in the feeds, game clips load only with their s
   await follow(page, 'tiktok');
   await page.waitForFunction(() => [...document.querySelectorAll('.tt-clip__video')].some(v => v.tagName === 'VIDEO' && !v.paused && v.readyState >= 2), { timeout: 8000 });
   const video = await page.$eval('.tt-clip__video', v => ({ preload: v.getAttribute('preload'), muted: v.muted, loop: v.loop, inline: v.hasAttribute('playsinline') }));
-  assert.deepEqual(video, { preload: 'none', muted: true, loop: true, inline: true });
+  // one clip after the other (each plays once, then the next): no loop of its own
+  assert.deepEqual(video, { preload: 'none', muted: true, loop: false, inline: true });
   assert.ok(requests.some(u => u.includes('/assets/media/xp/clips/') && u.endsWith('.mp4')));
   await shut(page);
   await sleep(300);

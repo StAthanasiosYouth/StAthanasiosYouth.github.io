@@ -34,3 +34,6 @@ tools/.review-*.mjs
 tools/.live-*.mjs
 tools/.icons-check.mjs
 review/
+
+# moved-in worktree folders (never part of the site)
+/athanasios-*/

@@ -145,8 +145,8 @@ test('mixer: reduced motion is quiet (the speaker\'s own confirmation only); lit
   assert.equal(lite('pop'), false, 'lite: twice the gap');
 });
 
-test('scene clips: the link\'s own videos first (admin order, their segments), then the bundled game clips', async () => {
-  const { sceneClips, pictures } = await import('../assets/js/xp/kit.js');
+test('scene playlist: a configured scene shows exactly its own items (admin order, pictures and clips mixed, their segments and words), never anything bundled', async () => {
+  const { playlist, nextIndex } = await import('../assets/js/xp/kit.js');
   const link = {
     gallery: [
       { src: 'media/2026/img-aaaaaaaa.webp', thumb: 'media/2026/img-aaaaaaaa-480.webp', w: 1200, h: 1500, alt: 'a' },
@@ -154,18 +154,31 @@ test('scene clips: the link\'s own videos first (admin order, their segments), t
       { type: 'video', src: 'media/2026/vid-cccccccc.webm', poster: 'media/2026/vid-cccccccc-480.webp', w: 1920, h: 1080, alt: 'c' }
     ]
   };
-  const clips = sceneClips(link, Infinity, { order: ['timer'] });
-  assert.deepEqual(clips.slice(0, 2).map(c => [c.src, c.start, c.end, c.caption]), [
-    ['media/2026/vid-bbbbbbbb.mp4', 4, 9, ''],
-    ['media/2026/vid-cccccccc.webm', 0, 0, '']
-  ]);
-  assert.equal(clips[2].id, 'timer', 'then the bundled ones, the asked order first');
-  assert.equal(clips.length, 2 + CLIPS.length);
-  assert.ok(clips.slice(2).every(c => c.start === 0 && c.end === 0 && c.caption));
-  assert.deepEqual(sceneClips(null, 2).map(c => c.id), CLIPS.slice(0, 2).map(c => c.id), 'no gallery: the bundled clips');
-  assert.equal(sceneClips(link, 1)[0].src, 'media/2026/vid-bbbbbbbb.mp4');
-  // pictures: images only
-  assert.deepEqual(pictures(link, 2).map(p => p.src), ['media/2026/img-aaaaaaaa-480.webp', POSTERS[0].src]);
+  link.gallery[0].text = 'موضوع الأحد الجاي 🙏\nمستنيينكم الساعة 8';
+  const items = playlist(link, { posters: 3, clips: 6, order: ['timer'] });
+  assert.deepEqual(items.map(i => [i.kind, i.src, i.start, i.end, i.own]), [
+    ['image', 'media/2026/img-aaaaaaaa-480.webp', 0, 0, true],
+    ['video', 'media/2026/vid-bbbbbbbb.mp4', 4, 9, true],
+    ['video', 'media/2026/vid-cccccccc.webm', 0, 0, true]
+  ], 'exactly the three, in order — no poster, no game clip');
+  assert.equal(items[0].text, 'موضوع الأحد الجاي 🙏\nمستنيينكم الساعة 8');
+  assert.equal(items[1].text, '');
+  assert.equal(items[1].poster, 'media/2026/vid-bbbbbbbb-480.webp');
+  // six configured items: all six, then from the first again
+  const six = { gallery: Array.from({ length: 6 }, (_, i) => ({ src: `media/2026/img-0000000${i}.webp`, w: 1080, h: 1920 })) };
+  const list = playlist(six, { posters: 3, clips: 2 });
+  assert.equal(list.length, 6);
+  let at = 0;
+  const seen = [at];
+  for (let k = 0; k < 6; k++) seen.push(at = nextIndex(at, list.length));
+  assert.deepEqual(seen, [0, 1, 2, 3, 4, 5, 0]);
+  // no gallery: the bundled material only, interleaved, the asked clip order first
+  const bundled = playlist(null, { posters: 2, clips: 2, order: ['timer'] });
+  assert.deepEqual(bundled.map(i => i.kind), ['image', 'video', 'image', 'video']);
+  assert.equal(bundled[0].src, POSTERS[0].src);
+  assert.equal(bundled[1].id, 'timer');
+  assert.ok(bundled.every(i => !i.own && i.text));
+  assert.ok(CLIPS.length >= 2);
 });
 
 test('clip segments: start/end clamp to the real duration', async () => {

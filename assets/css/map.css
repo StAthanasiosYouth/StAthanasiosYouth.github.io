@@ -387,3 +387,14 @@
   border-color: transparent;
   background: var(--gold);
 }
+
+
+/* the opened map grows on its own (tablet / desktop): «صوتك يهمنا» beside
+   it keeps its own height instead of stretching to the map's row */
+@media (min-width: 640px) {
+
+  .hub:has(.location__map.is-live) > [data-area="featured"] {
+    align-self: start;
+  }
+
+}

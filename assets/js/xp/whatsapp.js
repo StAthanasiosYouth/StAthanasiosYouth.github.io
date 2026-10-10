@@ -12,7 +12,7 @@
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { deck, timeline, spray, side, typeInto, bubble, chip, rand, pick, digits, meetingLine, LOGO, EASE, SPRING } from './kit.js';
+import { deck, timeline, spray, side, playlist, cycle, mediaNode, words, fitWords, typeInto, bubble, chip, rand, pick, digits, meetingLine, LOGO, EASE, SPRING } from './kit.js';
 import { GROUP, MINE, REPLIES, WHO, SERVANT, nextTopic } from './talk.js';
 
 const nextGroup = deck(GROUP);
@@ -38,10 +38,26 @@ function message({ who = '', text, out = false, news = false, tone = 0 }) {
 
 }
 
-export function play(stage, { quick, reduced, lite, content, sound }) {
+/* the servant shares one of the admin's own pictures / clips, with its words */
+function shared(item, tl, advance) {
+
+  return h('div', { class: 'wa-msg wa-msg--in wa-msg--media', 'data-item': item.id },
+    h('b', { class: 'wa-msg__who wa-who--3' }, SERVANT),
+    mediaNode(item, tl, { className: 'wa-photo', ratio: [3 / 4, 16 / 9], advance }),
+    item.text ? words(item.text, { className: 'wa-text', lines: 6, more: 'اقرأ المزيد' }) : null,
+    h('span', { class: 'wa-meta' }, stamp())
+  );
+
+}
+
+export function play(stage, { quick, reduced, lite, content, sound, link }) {
 
   const tl = timeline({ quick, reduced, lite });
   clock = 20 * 60 + 2;
+
+  // the admin's own pictures / clips (only those; none: the chat alone)
+  const items = playlist(link, { posters: 0 }).filter(item => item.own);
+  const multi = items.length > 1;
 
   const topic = nextTopic(content);
   const status = h('span', { class: 'wa-top__sub' }, 'الشباب · سفاجا');
@@ -52,7 +68,9 @@ export function play(stage, { quick, reduced, lite, content, sound }) {
   news.append(reaction);
   const mine = message({ text: 'أنا جاي إن شاء الله 🙌', out: true });
   const ticks = mine.querySelector('.wa-ticks');
-  const chat = h('div', { class: 'wa-chat' }, h('span', { class: 'wa-day' }, 'النهارده'), first, news, mine, typing);
+  const firstShared = items.length ? shared(items[0], tl, multi) : null;
+  if (firstShared) firstShared.classList.add('is-current');
+  const chat = h('div', { class: 'wa-chat' }, h('span', { class: 'wa-day' }, 'النهارده'), first, news, firstShared, mine, typing);
   const field = h('span', { class: 'wa-bar__field' }, 'رسالة');
   const action = h('span', { class: 'wa-bar__send' }, '🎤');
 
@@ -70,6 +88,7 @@ export function play(stage, { quick, reduced, lite, content, sound }) {
   );
 
   stage.append(phone);
+  fitWords(chat);
 
   const s = quick ? 0.45 : 1;
 
@@ -86,6 +105,7 @@ export function play(stage, { quick, reduced, lite, content, sound }) {
 
   arrive(first, 1100 * s);
   arrive(news, 1700 * s);
+  if (firstShared) arrive(firstShared, 2000 * s);
   arrive(mine, 2300 * s, true);
 
   // sent ✓ → delivered ✓✓ → read (blue)
@@ -107,11 +127,11 @@ export function play(stage, { quick, reduced, lite, content, sound }) {
   const settled = 3800;
   let n = 0;
 
-  // the chat shows the newest few; older ones scroll away
+  // the chat shows the newest few; older ones scroll away (never the shared item on screen)
   const add = node => {
     chat.insertBefore(node, typing);
     const all = [...chat.children].filter(m => m.classList.contains('wa-msg') && m !== typing);
-    all.slice(0, Math.max(0, all.length - 5)).forEach(m => m.remove());
+    all.slice(0, Math.max(0, all.length - (items.length ? 4 : 5))).filter(m => !m.classList.contains('is-current')).forEach(m => m.remove());
     const day = chat.querySelector('.wa-day');
     if (day && all.length > 5) day.remove();
   };
@@ -164,8 +184,20 @@ export function play(stage, { quick, reduced, lite, content, sound }) {
     });
   };
 
+  // the servant shares the next item (all of them, in order, then again)
+  cycle(tl, items.length, index => {
+    const node = shared(items[index], tl, multi);
+    chat.querySelectorAll('.wa-msg--media.is-current').forEach(old => old.classList.remove('is-current'));
+    node.classList.add('is-current');
+    add(node);
+    fitWords(node);
+    node.animate([{ opacity: 0, transform: 'translateX(-14px) scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: 380, easing: SPRING });
+    sound('pop');
+    return node.querySelector('.wa-photo');
+  }, { first: firstShared && firstShared.querySelector('.wa-photo'), image: 5200, delay: settled });
+
   let beat = 0;
-  tl.every(3900, () => {
+  tl.every(items.length ? 5600 : 3900, () => {
     beat += 1;
     if (beat % 3 === 2) outgoing();
     else incoming();

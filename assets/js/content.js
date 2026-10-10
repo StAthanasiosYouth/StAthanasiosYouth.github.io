@@ -49,37 +49,10 @@ function text(value, max = 300) {
 }
 
 
-/* a scene picture's / clip's caption (link.gallery[i].text): plain text
-   (the site shows it with textContent), line breaks kept (at most six),
-   other control characters dropped, at most 280 — Content.gs galleryText_ */
-export function caption(value) {
-
-  if (typeof value !== 'string') {
-    return '';
-  }
-
-  let lines = value
-    .replace(/\r\n?|[\u2028\u2029]/g, '\n')
-    .replace(/\t/g, ' ')
-    .replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/g, '')
-    .split('\n')
-    .map(line => line.trim())
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-    .split('\n');
-
-  if (lines.length > 7) {
-    lines = [...lines.slice(0, 6), lines.slice(6).join(' ').replace(/\s+/g, ' ').trim()];
-  }
-
-  const said = lines.join('\n');
-  const cut = said.slice(0, 280);
-
-  // never half an emoji
-  return said.length > 280 && /[\ud800-\udbff]$/.test(cut) ? cut.slice(0, -1) : cut;
-
-}
+/* a scene item's words (Content.gs galleryText_): plain text, 7 lines, 280 */
+export const caption = value => (typeof value === 'string'
+  ? value.replace(/\r\n?/g, '\n').replace(/[\0-\t\v-\x1f\x7f-\x9f]/g, '').split('\n').slice(0, 7).join('\n').trim().slice(0, 280).replace(/[\ud800-\udbff]$/, '')
+  : '');
 
 
 export function safeHttps(value) {
@@ -166,10 +139,12 @@ function cleanLink(raw) {
     // still opens the generic scene
     experience: experienceKey(raw.experience) === 'none' ? '' : experienceKey(raw.experience),
     // the scene's own photos and video clips (optional, up to 6)
-    gallery: list(raw.gallery).map(item => (item.type === 'video' ? cleanVideo(item) : cleanImage(item))).filter(Boolean).slice(0, 6)
+    gallery: list(raw.gallery).map(item => withText(item.type === 'video' ? cleanVideo(item) : cleanImage(item), caption(item.text))).filter(Boolean).slice(0, 6)
   };
 
 }
+
+const withText = (item, text) => (item && text ? { ...item, text } : item);
 
 
 /* { type: 'video', src, poster, w, h, alt, start, end } — end 0 = to the end.
@@ -190,7 +165,7 @@ export function cleanVideo(raw) {
   const start = number(raw.start, 0, 600) || 0;
   const end = number(raw.end, 0, 600) || 0;
 
-  const video = {
+  return {
     type: 'video',
     src: raw.src,
     poster: raw.poster,
@@ -201,15 +176,6 @@ export function cleanVideo(raw) {
     start,
     end: end > start ? end : 0
   };
-
-  // its caption in the scene (only when there is one)
-  const said = caption(raw.text);
-
-  if (said) {
-    video.text = said;
-  }
-
-  return video;
 
 }
 
@@ -238,13 +204,6 @@ function cleanImage(raw) {
   // the loading colour, only when the publisher sent a valid one
   if (typeof raw.color === 'string' && /^#[0-9a-f]{6}$/i.test(raw.color)) {
     image.color = raw.color;
-  }
-
-  // a scene picture's caption (link galleries; only when there is one)
-  const said = caption(raw.text);
-
-  if (said) {
-    image.text = said;
   }
 
   return image;

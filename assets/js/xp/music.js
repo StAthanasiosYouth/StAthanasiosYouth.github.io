@@ -5,6 +5,10 @@
  * the progress bar and the controls; skinned by the registry accent.
  *
  * Entrance: the cover drops in, play is pressed, the equalizer wakes up.
+ * With the admin's own pictures / clips (the link's playlist, kit.js): one
+ * track per item, in its order — the item fills the cover (a clip plays
+ * its segment there, like a canvas), its words are the title and the
+ * lyrics card under it; after the last, the first again.
  * Alive: the track plays (progress, equalizer, the cover breathing), now
  * and then the next track (the cover and title change); notes, small
  * equalizers and «التالي» pills drift around the phone.
@@ -13,7 +17,7 @@
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { timeline, spray, side, floats, pictures, chip, pick, LOGO, EASE, SPRING } from './kit.js';
+import { timeline, spray, side, floats, playlist, cycle, mediaNode, words, fitWords, chip, pick, LOGO, EASE, SPRING } from './kit.js';
 import { POSTERS } from './library.js';
 
 const BARS = 14;
@@ -21,19 +25,46 @@ const BARS = 14;
 export function play(stage, { quick, reduced, lite, sound, link, platform }) {
 
   const tl = timeline({ quick, reduced, lite });
-  const pics = pictures(link, 3, { wide: false });
+  const items = playlist(link, { posters: 1, portrait: true });
+  const own = items.length > 0 && items[0].own;
   const glyph = platform.icon || (link.icon !== 'link' ? link.icon : 'music');
 
-  // the queue: the link's own words first, then episodes named after real topics
-  const queue = [
-    { title: link.subtitle || 'ترانيم اجتماع الأحد', src: pics[0] && pics[0].src },
-    ...POSTERS.slice(0, 4).map(p => ({ title: `بودكاست الاجتماع · «${p.topic}»`, src: p.w < p.h ? p.src : null }))
-  ];
+  // the queue: the admin's own items (each its own track), else the link's
+  // words first, then episodes named after real topics
+  const fallback = link.subtitle || 'ترانيم اجتماع الأحد';
+  const queue = own
+    ? items.map(item => ({ item, title: item.text ? item.text.split('\n')[0] : fallback, words: item.text }))
+    : [
+      { title: fallback, src: items[0] && items[0].src },
+      ...POSTERS.slice(0, 4).map(p => ({ title: `بودكاست الاجتماع · «${p.topic}»`, src: p.w < p.h ? p.src : null }))
+    ];
   let playing = 0;
 
-  const coverImg = queue[0].src ? h('img', { src: queue[0].src, alt: '' }) : h('img', { class: 'mu-cover__logo', src: LOGO, alt: '' });
-  const cover = h('span', { class: 'mu-cover' }, coverImg);
-  const title = h('span', { class: 'mu-title' }, queue[0].title);
+  const coverImg = h('img', { alt: '' });
+  const cover = h('span', { class: 'mu-cover' });
+  const title = h('span', { class: 'mu-title', dir: 'auto' });
+  const lyric = h('div', { class: 'mu-lyric' });
+
+  // a track on screen: its cover (picture, clip or logo), its title, its words
+  const show = index => {
+    const track = queue[index];
+    title.textContent = track.title;
+    if (track.item) {
+      cover.classList.add('is-media');
+      cover.replaceChildren(mediaNode(track.item, tl, { className: 'mu-cover__media', advance: queue.length > 1 }));
+    }
+    else {
+      cover.classList.remove('is-media');
+      coverImg.className = track.src ? '' : 'mu-cover__logo';
+      coverImg.src = track.src || LOGO;
+      cover.replaceChildren(coverImg);
+    }
+    lyric.hidden = !track.words;
+    lyric.replaceChildren(...(track.words ? [words(track.words, { className: 'mu-lyric__words', lines: 4 })] : []));
+    if (lyric.isConnected) fitWords(lyric);
+    return cover.firstChild;
+  };
+  show(0);
   const eq = h('span', { class: 'mu-eq' }, Array.from({ length: BARS }, () => h('i')));
   const progress = h('span', { class: 'mu-progress' }, h('i'), h('b'));
   const playButton = h('span', { class: 'mu-play' }, h('span', { class: 'mu-play__pause' }));
@@ -46,6 +77,7 @@ export function play(stage, { quick, reduced, lite, sound, link, platform }) {
       h('span', { class: 'mu-artist' }, 'أسرة البابا أثناسيوس'),
       h('span', { class: 'mu-heart' }, '♥')
     ),
+    lyric,
     eq,
     progress,
     h('div', { class: 'mu-time' }, h('span', {}, '١:٢٤'), h('span', {}, '٤:٠٨')),
@@ -53,6 +85,7 @@ export function play(stage, { quick, reduced, lite, sound, link, platform }) {
   );
 
   stage.append(phone);
+  fitWords(lyric);
 
   const bars = [...eq.children];
   const heights = bars.map((_, i) => (0.35 + 0.6 * Math.abs(Math.sin(i * 1.7))).toFixed(2));
@@ -84,16 +117,16 @@ export function play(stage, { quick, reduced, lite, sound, link, platform }) {
   });
 
   // the next track: the cover and the title change
-  tl.every(9000, () => {
-    playing = (playing + 1) % queue.length;
-    const track = queue[playing];
-    title.textContent = track.title;
-    coverImg.className = track.src ? '' : 'mu-cover__logo';
-    coverImg.src = track.src || LOGO;
+  const next = index => {
+    playing = index;
+    const node = show(index);
     cover.animate([{ transform: 'translateX(-30px) scale(.9)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 520, easing: SPRING });
     title.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 400, easing: EASE });
     sound('swipe');
-  }, { jitter: 0.1, delay: settled + 6000 });
+    return node;
+  };
+  if (own) cycle(tl, queue.length, next, { first: cover.firstChild, image: 6500, delay: 900 });
+  else tl.every(9000, () => next((playing + 1) % queue.length), { jitter: 0.1, delay: settled + 6000 });
 
   floats(tl, phone, { glyphs: ['♪', '♫', '♪'], x: [10, 90], y: [34, 48], rise: [80, 140], drift: 60, size: [1, 1.5], every: 1200, max: 5, delay: settled, className: 'xp-float--mu', name: 'mu-note' });
 
@@ -104,13 +137,13 @@ export function play(stage, { quick, reduced, lite, sound, link, platform }) {
     items: () => {
       const roll = Math.random();
       if (roll < 0.18) return { node: mini(), path: 'rise' };
-      if (roll < 0.3) return { node: chip(`⏭ التالي: ${queue[(playing + 1) % queue.length].title.replace('بودكاست الاجتماع · ', '')}`, 'mu'), path: 'in' };
+      if (roll < 0.3) return { node: chip(`⏭ التالي: ${queue[(playing + 1) % queue.length].title.replace('بودكاست الاجتماع · ', '').slice(0, 40)}`, 'mu'), path: 'in' };
       if (roll < 0.38) return { node: chip('♥ اتضافت للمفضلة', 'mu'), path: 'rise', sound: 'like' };
       return { text: pick(['♪', '♫', '♪', '♥']), className: 'xp-edge__item--mu', path: pick(['out', 'orbit']) };
     }
   });
 
-  side(tl, stage, { items: () => (Math.random() < 0.4 ? { node: chip(`♪ ${pick(queue).title}`, 'mu') } : { text: pick(['♪', '♫']), className: 'xp-edge__item--mu' }) });
+  side(tl, stage, { items: () => (Math.random() < 0.4 ? { node: chip(`♪ ${pick(queue).title.slice(0, 40)}`, 'mu') } : { text: pick(['♪', '♫']), className: 'xp-edge__item--mu' }) });
 
   return tl;
 

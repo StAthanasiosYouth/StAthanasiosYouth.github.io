@@ -6,6 +6,12 @@
  * Entrance: the app opens, (Telegram) a paper plane flies through, the
  * first messages land — real words: the meeting time from the page, the
  * topic, the game segment of the week, the Pope Athanasius quote.
+ * The link's playlist (kit.js: the admin's own pictures and clips, in its
+ * order, each with its own words): one message per item, all of them in
+ * turn (a clip plays its segment first), then from the first again — a
+ * channel post (Telegram), the page sending it (Messenger), our message in
+ * the channel (Discord). No gallery: the channel shows the weekly posters;
+ * the conversations stay words only.
  * Alive: new posts / messages (the oldest scroll away), views and
  * reactions tick, (Messenger, Discord) the visitor types and sends;
  * around the phone: paper planes and channel posts (Telegram), message
@@ -15,7 +21,7 @@
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { deck, timeline, spray, side, pictures, typeInto, bubble, chip, rand, pick, digits, compact, LOGO, EASE, SPRING } from './kit.js';
+import { deck, timeline, spray, side, playlist, cycle, mediaNode, words as say, fitWords, FEED, typeInto, bubble, chip, rand, pick, digits, compact, LOGO, EASE, SPRING } from './kit.js';
 import { GROUP, MINE, WHO, channelPosts } from './talk.js';
 
 const nextGroup = deck(GROUP);
@@ -23,6 +29,13 @@ const nextGroup = deck(GROUP);
 const LAYOUT = { telegram: 'channel', messenger: 'dm', discord: 'server' };
 const REACTIONS = ['❤️', '👍', '🙏', '🔥', '😂', '👏'];
 const NAME = 'أسرة البابا أثناسيوس';
+
+/* an own picture or clip the admin left without words */
+const GENERIC = 'من اجتماعنا 🤍 كل أحد الساعة ٨ مساءً';
+
+/* a picture / clip in a message (its own shape, between 4:5 and 16:9) */
+const photo = (item, tl, advance) => mediaNode(item, tl, { className: 'ch-msg__photo', ratio: FEED, advance });
+const text = (words, lines = 8) => say(words, { className: 'ch-msg__text', lines, more: 'اقرأ المزيد' });
 
 /* Messenger: the conversation (the page answering, the visitor asking) */
 const DM = [
@@ -44,11 +57,11 @@ function reactions(list) {
 }
 
 /* a channel post (Telegram-like): optional photo, words, views, time */
-function post({ src, text, views, reacts, time = '٨:٠٢ م' }) {
+function post({ item = null, text: words, views, reacts, time = '٨:٠٢ م' }, tl = null, advance = false) {
 
-  return h('div', { class: 'ch-msg ch-msg--post' },
-    src ? h('span', { class: 'ch-msg__photo' }, h('img', { src, alt: '', decoding: 'async' })) : null,
-    h('span', { class: 'ch-msg__text' }, text),
+  return h('div', { class: 'ch-msg ch-msg--post', 'data-item': item ? item.id : null },
+    item ? photo(item, tl, advance) : null,
+    text(words),
     h('span', { class: 'ch-msg__meta' }, h('span', { class: 'ch-views' }, '👁 ', h('b', { 'data-n': views }, compact(views))), h('span', { class: 'ch-time' }, time)),
     reacts ? reactions(reacts) : null
   );
@@ -56,18 +69,25 @@ function post({ src, text, views, reacts, time = '٨:٠٢ م' }) {
 }
 
 /* a conversation bubble (Messenger-like) */
-function said(out, text) {
+function said(out, words, item = null, tl = null, advance = false) {
 
-  return h('div', { class: `ch-msg ch-msg--${out ? 'out' : 'in'}` }, h('span', { class: 'ch-msg__text' }, text));
+  return h('div', { class: `ch-msg ch-msg--${out ? 'out' : 'in'}${item ? ' ch-msg--media' : ''}`, 'data-item': item ? item.id : null },
+    item ? photo(item, tl, advance) : null,
+    words ? text(words, 6) : null
+  );
 
 }
 
 /* a server message (Discord-like): avatar, a name, words */
-function line(who, text, tone = 0, us = false) {
+function line(who, words, tone = 0, us = false, item = null, tl = null, advance = false) {
 
-  return h('div', { class: 'ch-msg ch-msg--said' },
+  return h('div', { class: `ch-msg ch-msg--said${item ? ' ch-msg--media' : ''}`, 'data-item': item ? item.id : null },
     us ? h('img', { class: 'ch-avatar', src: LOGO, alt: '' }) : h('span', { class: `ch-avatar ch-avatar--${tone % 3}` }, who.replace('.', '')),
-    h('span', { class: 'ch-said' }, h('span', { class: `ch-said__name${us ? ' ch-said__name--us' : ''}` }, us ? NAME : who, h('i', {}, ' النهارده ٨:٠٥ م')), h('span', { class: 'ch-msg__text' }, text))
+    h('span', { class: 'ch-said' },
+      h('span', { class: `ch-said__name${us ? ' ch-said__name--us' : ''}` }, us ? NAME : who, h('i', {}, ' النهارده ٨:٠٥ م')),
+      words ? text(words, 6) : null,
+      item ? photo(item, tl, advance) : null
+    )
   );
 
 }
@@ -84,8 +104,17 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
   const tl = timeline({ quick, reduced, lite });
   const layout = LAYOUT[platform.key] || 'channel';
   const glyph = platform.icon || (link.icon !== 'link' ? link.icon : 'users');
-  const pics = pictures(link, 3);
   const words = channelPosts(content);
+  const all = playlist(link, { posters: 3 });
+  const own = all.length > 0 && all[0].own;
+  // the items this layout shows: a channel always (the posters when there is no gallery), the others only the admin's own
+  const items = layout === 'channel' || own ? all : [];
+  const multi = items.length > 1;
+  const textOf = item => (item.own ? item.text || GENERIC : item.topic ? `📌 «${item.topic}» — كان أحد حلو، شكرًا لكل اللي جه 🤍` : item.text);
+  // one message for an item, the layout's way
+  const share = (item, views = 1180, time = '٧:٤٠ م') => (layout === 'channel'
+    ? post({ item, text: textOf(item), views, time }, tl, multi)
+    : layout === 'dm' ? said(false, item.text, item, tl, multi) : line('', item.text, 0, true, item, tl, multi));
 
   const feed = h('div', { class: 'ch-feed' });
   const typing = typingDots(layout === 'server' ? 'ch-typing--server' : '');
@@ -93,20 +122,24 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
 
   if (layout === 'channel') {
     messages = [
-      post({ src: pics[0] && pics[0].src, text: pics[0] && pics[0].topic ? `📌 «${pics[0].topic}» — كان أحد حلو، شكرًا لكل اللي جه 🤍` : words[2], views: 1180, time: '٧:٤٠ م' }),
+      items[0] ? share(items[0]) : post({ text: words[2], views: 1180, time: '٧:٤٠ م' }),
       post({ text: words[0], views: 964, reacts: [['❤️', 42], ['🙏', 17]], time: '٧:٥٥ م' }),
       post({ text: words[3], views: 312, time: '٨:٠١ م' })
     ];
   }
   else if (layout === 'dm') {
-    messages = DM.slice(0, 4).map(([out, text]) => said(out, text));
+    messages = DM.slice(0, own ? 3 : 4).map(([out, words]) => said(out, words));
+    if (items[0]) messages.push(share(items[0]));
   }
   else {
     messages = [line('م.', GROUP[0], 1), line('ر.', GROUP[4], 2), line('', words[0], 0, true)];
     messages[2].querySelector('.ch-said').append(reactions([['🔥', 9], ['🙏', 6]]));
+    if (items[0]) messages.push(share(items[0]));
   }
 
   feed.append(...messages);
+  const firstShared = items[0] ? messages.find(m => m.dataset.item === items[0].id) : null;
+  if (firstShared) firstShared.classList.add('is-current');
 
   const head = h('div', { class: 'ch-top' },
     layout === 'server' ? h('span', { class: 'ch-top__hash' }, '#') : h('img', { class: 'ch-top__avatar', src: LOGO, alt: '' }),
@@ -130,6 +163,7 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
   );
 
   stage.append(phone);
+  fitWords(feed);
 
   /* ---------- entrance ---------- */
 
@@ -168,16 +202,18 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
   const settled = 3200;
   let n = 0;
 
+  // (never the item on screen)
   const add = (node, out) => {
     feed.append(node);
-    [...feed.children].slice(0, -5).forEach(old => old.remove());
+    fitWords(node);
+    [...feed.children].slice(0, -5).filter(old => !old.classList.contains('is-current')).forEach(old => old.remove());
     node.animate([{ opacity: 0, transform: `translate(${out ? 16 : -16}px, 12px) scale(.94)` }, { opacity: 1, transform: 'none' }], { duration: 460, easing: SPRING });
   };
 
   const incoming = () => {
     n += 1;
     let next;
-    if (layout === 'channel') next = post({ src: n % 3 === 1 && pics[1 + (n % 2)] ? pics[1 + (n % 2)].src : null, text: words[(n + 3) % words.length], views: Math.round(rand(80, 400)), reacts: n % 2 ? [[pick(REACTIONS), Math.round(rand(3, 20))]] : null, time: '٨:١٠ م' });
+    if (layout === 'channel') next = post({ text: words[(n + 3) % words.length], views: Math.round(rand(80, 400)), reacts: n % 2 ? [[pick(REACTIONS), Math.round(rand(3, 20))]] : null, time: '٨:١٠ م' });
     else if (layout === 'dm') next = said(false, DM[script % DM.length][1]);
     else next = line(WHO[n % WHO.length], GROUP[(n * 3) % GROUP.length], n);
     const delay = layout === 'channel' ? 0 : rand(800, 1300);
@@ -205,10 +241,20 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
     });
   };
 
+  // the next item (all of them, in order, then again)
+  cycle(tl, items.length, index => {
+    const node = share(items[index], Math.round(rand(300, 900)), '٨:١٠ م');
+    feed.querySelectorAll('.is-current').forEach(old => old.classList.remove('is-current'));
+    node.classList.add('is-current');
+    add(node, false);
+    sound(layout === 'channel' ? 'notify' : 'pop');
+    return node.querySelector('.ch-msg__photo');
+  }, { first: firstShared && firstShared.querySelector('.ch-msg__photo'), image: 5000, delay: settled });
+
   // Messenger follows its script (the visitor asks, the page answers); the others: 2 in, 1 out
   let beat = 0;
-  let script = 4;
-  tl.every(layout === 'channel' ? 4200 : 3800, () => {
+  let script = own ? 3 : 4;
+  tl.every(layout === 'channel' ? (items.length ? 7400 : 4200) : items.length ? 5200 : 3800, () => {
     beat += 1;
     if (layout === 'dm') {
       if (DM[script % DM.length][0]) outgoing();
