@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "8bfb50744202",
-  "publishedAt": "2026-10-08T17:29:43.746Z",
+  "revision": "1a66fb127ac0",
+  "publishedAt": "2026-10-10T16:50:29.301Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -100,7 +100,20 @@
           "badge": "",
           "startAt": "2026-10-06T12:31",
           "endAt": "",
-          "experience": "instagram"
+          "experience": "instagram",
+          "gallery": [
+            {
+              "type": "video",
+              "src": "media/2026/vid-55f81cd6.mp4",
+              "poster": "media/2026/vid-55f81cd6-480.webp",
+              "w": 540,
+              "h": 960,
+              "alt": "",
+              "start": 0,
+              "end": 6.8,
+              "text": "🔥 مستنيينكم الأحد الجاي!❤️\nإوعوا تتأخروا… عشان محضّرينلكم مفاجآت وحاجات كتير حلوة، واللي هيفوته مش هيعرف يعوّضه! 👀🔥"
+            }
+          ]
         },
         {
           "id": "tiktok",
