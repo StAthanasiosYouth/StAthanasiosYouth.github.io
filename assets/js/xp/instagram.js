@@ -38,7 +38,7 @@ export function play(stage, { quick, reduced, lite, sound, link }) {
     );
   });
   const track = h('div', { class: 'ig-track' }, frames);
-  track.style.width = `${count * 100}%`;
+  track.style.setProperty('--count', String(count));
   const heart = h('span', { class: 'ig-heart' }, '♥');
   const glow = h('span', { class: 'ig-ring__glow' });
   const ring = h('span', { class: 'ig-ring' }, glow, h('img', { src: LOGO, alt: '' }));
