@@ -163,29 +163,14 @@
 }
 
 .fb-post__text {
-  display: -webkit-box;
-  margin: 0;
-  overflow: hidden;
   line-height: 1.55;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
 }
 
+/* the item's own shape (4:5 … 16:9, set by the scene), edge to edge */
 .fb-post__media {
-  overflow: hidden;
   margin: 0 -8px;
   aspect-ratio: 4 / 5;
-  background: linear-gradient(140deg, #12385f, #d7aa50);
-}
-
-.fb-post__media.is-wide {
-  aspect-ratio: 16 / 9;
-}
-
-.fb-post__media img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  background: #0b0b0b;
 }
 
 .fb-post__counts {
