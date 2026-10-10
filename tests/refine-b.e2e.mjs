@@ -431,7 +431,7 @@ test('the editor panel: as tall as its content, floating on wide screens, a bott
 
     // unsaved changes still ask, with our modal
     await page.type('dialog.sheet[open] input', 'خبر');
-    await page.click('dialog.sheet[open] .sheet__head .icon-btn');
+    await page.click('dialog.sheet[open] .sheet__head .icon-btn[aria-label="قفل"]');
     await page.waitForSelector('dialog.modal[open]');
     await page.evaluate(() => [...document.querySelectorAll('dialog.modal[open] .btn')].find(b => b.textContent.includes('سيبها')).click());
     await page.waitForFunction(() => !document.querySelector('dialog.sheet').open);

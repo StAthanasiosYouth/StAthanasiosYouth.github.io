@@ -34,6 +34,8 @@
         <div class="topbar__title">
           <p class="topbar__crumb" id="crumb"></p>
           <h1 class="topbar__heading" id="page-title">لوحة التحكم</h1>
+          <!-- help for the screen on now (AdminHelp; shown once it can load) -->
+          <button class="icon-btn help-btn" id="help-open" type="button" aria-label="مساعدة: إزاي أستخدم الجزء ده" hidden>؟</button>
         </div>
         <span class="status" id="status" role="status" aria-live="polite"><span class="status__dot" aria-hidden="true"></span><span class="status__text">جاري التحميل…</span></span>
         <!-- uploads still going (A.uploads), whatever the screen; a tap opens «الصور» -->
@@ -79,6 +81,7 @@
   <?!= include_('AdminItems') ?>
   <?!= include_('AdminHome') ?>
   <?!= include_('AdminPreview') ?>
+  <?!= include_('AdminHelp') ?>
 
   <script>
     A.start();

@@ -316,7 +316,7 @@ test('unsaved changes: closing the editor asks first (our modal), and can go bac
   await page.waitForSelector('dialog.sheet[open] input');
   await page.type('dialog.sheet[open] input', 'عنوان جديد');
 
-  await page.click('dialog.sheet[open] .sheet__head .icon-btn');
+  await page.click('dialog.sheet[open] .sheet__head .icon-btn[aria-label="قفل"]');
   await page.waitForSelector('dialog.modal[open]');
   assert.match(await page.$eval('dialog.modal .modal__title', n => n.textContent), /ما اتحفظتش/);
   await page.evaluate(() => [...document.querySelectorAll('dialog.modal[open] button')].find(b => b.textContent === 'ارجع للتعديل').click());

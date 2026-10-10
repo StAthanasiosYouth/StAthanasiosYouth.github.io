@@ -1,0 +1,103 @@
+<script>
+/*
+ * In-admin help («؟»): explains the screen you are on. The words live in
+ * one file, admin/help.json (official admin, fetched the first time help
+ * opens — nothing on the panel's first load); this only shows them.
+ * Two ways in: the «؟» next to the screen title, and the «؟» in an
+ * editor's header (the help of the screen that editor belongs to).
+ * Its own <dialog>, over an open editor: closing it leaves the editor as
+ * it was. The Apps Script admin (no help.json next to it) says so.
+ */
+(function () {
+
+  'use strict';
+
+  var A = window.A;
+  var el = A.el;
+  var icon = A.icon;
+
+  var loading = null;
+  var dialog = null;
+
+  function load() {
+    if (!loading) {
+      loading = fetch('help.json', { cache: 'no-cache' })
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .catch(function (error) { loading = null; throw error; });
+    }
+    return loading;
+  }
+
+  /* the screen on now -> its help topic */
+  function here() {
+    if (A.area === 'content') return A.sub.content;
+    if (A.area === 'page') return A.sub.page;
+    return A.area || 'home';
+  }
+
+  function topicNode(topic, open) {
+    return el('section', { class: 'help__topic', 'data-topic': topic.key },
+      el('h3', { class: 'help__title', text: topic.title }),
+      topic.intro ? el('p', { class: 'help__intro', text: topic.intro }) : null,
+      el('div', { class: 'help__items' }, (topic.items || []).map(function (item, i) {
+        return el('details', { class: 'help__item', open: open && i === 0 ? 'open' : null },
+          el('summary', { text: item.q }),
+          el('p', { text: item.a })
+        );
+      }))
+    );
+  }
+
+  function show(key) {
+
+    if (!dialog) {
+      dialog = el('dialog', { class: 'help', 'aria-labelledby': 'help-heading' });
+      dialog.addEventListener('click', function (event) { if (event.target === dialog) dialog.close(); });
+      document.body.appendChild(dialog);
+    }
+
+    var body = el('div', { class: 'help__body' }, el('p', { class: 'loading-text', role: 'status' }, el('span', { class: 'spinner spinner--inline', 'aria-hidden': 'true' }), 'جاري التحميل…'));
+    A.fill(dialog,
+      el('div', { class: 'help__head' },
+        el('h2', { id: 'help-heading', class: 'help__heading' }, icon('info'), 'مساعدة'),
+        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل المساعدة', onclick: function () { dialog.close(); } }, icon('close'))
+      ),
+      body
+    );
+    if (!dialog.open) dialog.showModal();
+
+    load().then(function (help) {
+      var topics = help.topics || [];
+      var current = topics.filter(function (t) { return t.key === key; })[0] || topics[0];
+      var others = topics.filter(function (t) { return t !== current; });
+      A.fill(body,
+        topicNode(current, true),
+        el('nav', { class: 'help__more', 'aria-label': 'مواضيع تانية' },
+          el('p', { class: 'help__more-title', text: 'مواضيع تانية' }),
+          el('div', { class: 'help__chips' }, others.map(function (topic) {
+            return el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () { show(topic.key); }, text: topic.title });
+          }))
+        )
+      );
+      body.scrollTop = 0;
+    }, function () {
+      A.fill(body, el('p', { class: 'help__intro', text: 'المساعدة موجودة في لوحة التحكم الرسمية (stathanasiosyouth.github.io/admin). لو إنت فيها، اتأكد من النت وجرّب تاني.' }));
+    });
+
+  }
+
+  A.help = function (key) { show(key || here()); };
+
+  /* the «؟» in an editor's header (AdminScript openSheet) */
+  A.helpButton = function () {
+    return el('button', { class: 'icon-btn help-btn', type: 'button', 'aria-label': 'مساعدة: إزاي أستخدم ده', onclick: function () { A.help(); } }, '؟');
+  };
+
+  var open = document.getElementById('help-open');
+  if (open) {
+    open.hidden = false;
+    open.addEventListener('click', function () { A.help(); });
+  }
+
+})();
+</script>

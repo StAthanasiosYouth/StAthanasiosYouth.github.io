@@ -2032,6 +2032,7 @@
       el('div', { class: 'sheet__grab', 'aria-hidden': 'true' }),
       el('div', { class: 'sheet__head' },
         el('h2', { class: 'sheet__title', id: 'sheet-title', tabindex: '-1', text: title }),
+        A.helpButton ? A.helpButton() : null,
         el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: function () { A.closeSheet(); } }, icon('close'))
       ),
       el('div', { class: 'sheet__body' }, body),

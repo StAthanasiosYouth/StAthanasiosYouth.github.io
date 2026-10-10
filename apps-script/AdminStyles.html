@@ -53,6 +53,8 @@
 html {
   -webkit-text-size-adjust: 100%;
   scroll-padding-top: 90px;
+  /* whatever is scrolled to (focus, a moved row, a field to fix) clears the phones' dock */
+  scroll-padding-bottom: calc(var(--dock-h) + 28px);
 }
 
 body {
@@ -332,7 +334,129 @@ a {
 
 .topbar__title {
   grid-area: title;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
   min-width: 0;
+}
+
+.topbar__title .topbar__crumb {
+  flex-basis: 100%;
+}
+
+.topbar__title .topbar__heading {
+  min-width: 0;
+}
+
+/* «؟» help (AdminHelp): next to the screen title and in an editor's header */
+.help-btn {
+  flex: none;
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--gold);
+}
+
+.sheet__head .help-btn {
+  margin-inline-start: auto;
+}
+
+.help {
+  width: min(560px, calc(100vw - 24px));
+  max-height: min(86dvh, 760px);
+  margin: auto;
+  padding: 0;
+  overflow: clip;
+  border: 1px solid rgba(242, 210, 139, .22);
+  border-radius: 20px;
+  color: var(--text);
+  background: var(--navy-900, #071a33);
+  box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .9);
+}
+
+.help[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.help::backdrop {
+  background: rgba(2, 8, 18, .6);
+}
+
+.help__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.help__heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.help__body {
+  overflow-y: auto;
+  padding: 16px 18px 20px;
+  line-height: 1.75;
+}
+
+.help__title {
+  margin-bottom: 4px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--gold);
+}
+
+.help__intro {
+  margin-bottom: 12px;
+  color: var(--text-2);
+}
+
+.help__items {
+  display: grid;
+  gap: 8px;
+}
+
+.help__item {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(215, 170, 80, .05);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.help__item summary {
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.help__item p {
+  margin-top: 6px;
+  color: var(--text-2);
+}
+
+.help__more {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-2);
+}
+
+.help__more-title {
+  margin-bottom: 8px;
+  font-weight: 800;
+  font-size: .9rem;
+  color: var(--text-2);
+}
+
+.help__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .topbar__crumb {
@@ -2258,7 +2382,10 @@ input[type="datetime-local"].input {
 
 /* switch */
 
+/* positioned: its hidden checkbox stays inside the scrolling form (else
+   it sits on the dialog, and focusing it scrolled the whole sheet away) */
 .switch {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -2822,6 +2949,8 @@ textarea.input.gallery-picker__say-input {
   margin: 0;
   padding: 0;
   overflow: hidden;
+  /* never scrolled itself (focus can scroll a "hidden" box): only its body scrolls */
+  overflow: clip;
   border: 1px solid rgba(242, 210, 139, .2);
   border-bottom: 0;
   border-radius: 24px 24px 0 0;

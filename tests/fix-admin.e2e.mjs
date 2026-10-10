@@ -55,7 +55,7 @@ test.after(async () => {
   await new Promise(resolve => (server ? server.close(resolve) : resolve()));
 });
 
-async function open() {
+async function open(viewport = DESKTOP) {
 
   const context = await browser.createBrowserContext();
   const page = await context.newPage();
@@ -63,7 +63,7 @@ async function open() {
   page.on('pageerror', error => problems.push(`pageerror: ${error.message}`));
   page.on('dialog', async dialog => { problems.push(`native ${dialog.type()}`); await dialog.dismiss(); });
   const google = await interceptGoogle(page, { post: body => world.post(body) }, { site: { origin: SITE, local: LOCAL } });
-  await page.setViewport(DESKTOP);
+  await page.setViewport(viewport);
   await page.goto(ADMIN_URL, { waitUntil: 'networkidle0' });
   await page.waitForSelector('.gis-stub');
   await page.click('.gis-stub');
@@ -241,5 +241,90 @@ test('scene content: a chat link takes words-only messages with who says them; a
   assert.match(state.note, /مبيعرضش/);
   assert.deepEqual(problems, []);
   await close();
+
+});
+
+test('help «؟»: the screen\'s own topic from admin/help.json, on top of an open editor without touching it (desktop + phone)', async () => {
+
+  const shown = handle => handle.evaluate(n => !n.hidden && !!n.offsetParent && n.getBoundingClientRect().height > 0 && getComputedStyle(n).visibility === 'visible');
+  const press = async handle => { await handle.evaluate(n => n.scrollIntoView({ block: 'center' })); await handle.click(); };
+
+  for (const viewport of [{ width: 1366, height: 900 }, { width: 412, height: 915, isMobile: true, hasTouch: true }]) {
+    const { page, problems, close } = await open(viewport);
+    for (const [area, sub, title] of [['home', null, 'الرئيسية'], ['content', 'news', 'الأخبار'], ['content', 'meetings', 'الاجتماعات'], ['page', 'links', 'الروابط'], ['media', null, 'الصور'], ['settings', null, 'الإعدادات']]) {
+      await page.evaluate((a, s) => A.go(a, s || undefined), area, sub);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const button = await page.$('#help-open');
+      assert.ok(await shown(button), `«؟» visible on ${area}/${sub || ''} (${viewport.width})`);
+      await press(button);
+      await page.waitForSelector('dialog.help[open] .help__title');
+      assert.equal(await page.$eval('dialog.help[open] .help__title', n => n.textContent), title);
+      assert.ok(await page.$$eval('dialog.help[open] .help__item', n => n.length) >= 2);
+      // another topic from the list, then closed with its own button
+      await press(await page.$('dialog.help[open] .help__chips button'));
+      await page.waitForFunction(t => document.querySelector('dialog.help[open] .help__title')?.textContent !== t, {}, title);
+      await press(await page.$('dialog.help[open] .help__head .icon-btn'));
+      await page.waitForFunction(() => !document.querySelector('dialog.help[open]'));
+    }
+
+    // the editor's «؟»: over the news editor, which keeps what was typed
+    await page.evaluate(() => A.go('content', 'news'));
+    await new Promise(resolve => setTimeout(resolve, 300));
+    await press(await page.evaluateHandle(() => [...document.querySelectorAll('button')].find(b => b.offsetParent && b.textContent.trim() === '+ خبر')));
+    await page.waitForSelector('dialog.sheet[open] .help-btn');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const field = await page.evaluateHandle(() => [...document.querySelectorAll('dialog.sheet[open] input, dialog.sheet[open] textarea')].find(n => n.offsetParent));
+    await press(field);
+    await page.keyboard.type('خبر تجربة');
+    const help = await page.$('dialog.sheet[open] .help-btn');
+    assert.ok(await shown(help), 'the editor\'s «؟» visible');
+    await press(help);
+    await page.waitForSelector('dialog.help[open] .help__title');
+    assert.equal(await page.$eval('dialog.help[open] .help__title', n => n.textContent), 'الأخبار');
+    await page.screenshot({ path: `${ROOT}tools/.cache/help-${viewport.width}.png` });
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.querySelector('dialog.help[open]'));
+    assert.equal(await page.evaluate(() => !!document.querySelector('dialog.sheet[open]')), true, 'the editor stays open');
+    assert.equal(await field.evaluate(n => n.value), 'خبر تجربة', 'what was typed is still there');
+    assert.deepEqual(problems, []);
+    await close();
+  }
+
+});
+
+
+test('news editor: the «مميز» / «مثبت» switches, alone and together, never scroll the editor away (real clicks, desktop + phone)', async () => {
+
+  for (const viewport of [{ width: 1366, height: 900 }, { width: 412, height: 915, isMobile: true, hasTouch: true }]) {
+    const { page, problems, close } = await open(viewport);
+    await page.evaluate(() => A.go('content', 'news'));
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const add = await page.evaluateHandle(() => [...document.querySelectorAll('button')].find(b => b.offsetParent && b.textContent.trim() === '+ خبر'));
+    await add.evaluate(n => n.scrollIntoView({ block: 'center' }));
+    await add.click();
+    await page.waitForSelector('dialog.sheet[open] .switch');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const title = await page.evaluateHandle(() => [...document.querySelectorAll('dialog.sheet[open] input, dialog.sheet[open] textarea')].find(n => n.offsetParent));
+    await title.click();
+    await page.keyboard.type('خبر مهم');
+
+    const whole = () => page.evaluate(() => {
+      const d = document.querySelector('dialog.sheet[open]');
+      const head = d.querySelector('#sheet-title').getBoundingClientRect();
+      const save = [...d.querySelectorAll('.sheet__foot button')].find(b => b.offsetParent).getBoundingClientRect();
+      const hit = document.elementFromPoint(save.left + save.width / 2, save.top + save.height / 2);
+      return { shell: d.scrollTop, head: head.top >= 0 && head.bottom <= innerHeight, save: !!hit && !!hit.closest('.sheet__foot'), body: d.querySelector('.sheet__body').innerText.trim().length > 50 };
+    });
+    for (const label of ['مميز', 'مثبت', 'مميز', 'مثبت', 'مثبت', 'مميز']) {
+      const sw = await page.evaluateHandle(l => [...document.querySelectorAll('dialog.sheet[open] .switch')].find(s => s.textContent.includes(l)), label);
+      await sw.evaluate(n => n.scrollIntoView({ block: 'center' }));
+      await sw.click();
+      await new Promise(resolve => setTimeout(resolve, 250));
+      assert.deepEqual(await whole(), { shell: 0, head: true, save: true, body: true }, `after «${label}» (${viewport.width})`);
+    }
+    assert.equal(await title.evaluate(n => n.value), 'خبر مهم');
+    assert.deepEqual(problems, []);
+    await close();
+  }
 
 });
