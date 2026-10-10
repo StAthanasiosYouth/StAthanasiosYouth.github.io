@@ -12,6 +12,15 @@ var GAME_AFTER_END = ['show', 'hide'];
 
 var NOTIFICATION_TYPES = ['general', 'meeting', 'news', 'game', 'important', 'competition', 'activity'];
 
+/* a card's «شكل العرض» as published ('' = auto / as on desktop; Items.gs ITEM_DISPLAYS) */
+function cardDisplay_(value, mobile) {
+
+  var v = contentLine_(value);
+  return ITEM_DISPLAYS.indexOf(v) !== -1 || (mobile && v === 'auto') ? v : '';
+
+}
+
+
 var HUB_LIMITS = {
   topic: 80,
   speaker: 60,
@@ -601,7 +610,9 @@ function buildHub_(draft, ctx) {
       pinned: contentBool_(row.pinned),
       tone: tone,
       publishAt: publishAt,
-      expireAt: expireAt
+      expireAt: expireAt,
+      display: cardDisplay_(row.display),
+      displayMobile: cardDisplay_(row.displayMobile, true)
     });
 
   });
@@ -689,7 +700,9 @@ function buildHub_(draft, ctx) {
       startAt: startAt,
       endAt: endAt,
       afterEnd: afterEnd,
-      endedUntil: endedUntil
+      endedUntil: endedUntil,
+      display: cardDisplay_(row.display),
+      displayMobile: cardDisplay_(row.displayMobile, true)
     });
 
   });
@@ -793,7 +806,10 @@ function buildHub_(draft, ctx) {
       startAt: startAt,
       endAt: endAt,
       visibleFrom: visibleFrom,
-      visibleUntil: visibleUntil
+      visibleUntil: visibleUntil,
+      // «شكل العرض» ('' = تلقائي / زي الكمبيوتر)
+      display: cardDisplay_(row.display),
+      displayMobile: cardDisplay_(row.displayMobile, true)
     });
 
   });

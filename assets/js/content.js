@@ -145,6 +145,9 @@ function cleanLink(raw) {
 }
 
 /* + its words and who says them (chat scenes); words only: { type: 'text', text } */
+/* a card's «شكل العرض» (cardlayout.js; '' = auto / as on desktop) */
+const display = x => ({ display: /^(compact|side|banner|stack)$/.test(x.display) ? x.display : '', displayMobile: /^(auto|compact|side|banner|stack)$/.test(x.displayMobile) ? x.displayMobile : '' });
+
 const withText = (item, text, from) => (!item || (!item.src && !text) ? null : { ...item, ...(text && { text }), ...(/^(us|them)$/.test(from) && { from }) });
 
 
@@ -268,7 +271,8 @@ function cleanHub(raw) {
         pinned: n.pinned === true,
         tone: ['info', 'alert', 'celebrate'].includes(n.tone) ? n.tone : 'info',
         publishAt: dateTime(n.publishAt),
-        expireAt: dateTime(n.expireAt)
+        expireAt: dateTime(n.expireAt),
+        ...display(n)
       };
     })
     .filter(n => n.id && n.title);
@@ -285,7 +289,8 @@ function cleanHub(raw) {
       startAt: dateTime(g.startAt),
       endAt: dateTime(g.endAt),
       afterEnd: g.afterEnd === 'hide' ? 'hide' : 'show',
-      endedUntil: dateTime(g.endedUntil)
+      endedUntil: dateTime(g.endedUntil),
+      ...display(g)
     }))
     .filter(g => g.id && g.title && g.url && g.startAt && g.endAt);
 
@@ -338,7 +343,8 @@ function cleanHub(raw) {
         startAt: dateTime(a.startAt),
         endAt: dateTime(a.endAt),
         visibleFrom: dateTime(a.visibleFrom),
-        visibleUntil: dateTime(a.visibleUntil)
+        visibleUntil: dateTime(a.visibleUntil),
+        ...display(a)
       };
     })
     .filter(a => a.id && a.title && a.section && typeKeys.has(a.type));

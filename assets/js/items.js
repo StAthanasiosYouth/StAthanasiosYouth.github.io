@@ -12,10 +12,11 @@ import { h, external } from './dom.js';
 import { iconNode } from './icons.js';
 import { visibilityState } from './schedule.js';
 import { formatStamp, untilText } from './words.js';
-import { posterOrFallback } from './hub.js';
+import { posterOrFallback, layCard } from './hub.js';
 import { go } from './router.js';
 
 const SECTION_ICONS = { competitions: 'trophy', activities: 'calendar' };
+
 const SECTION_TITLES = { competitions: 'المسابقات', activities: 'الفعاليات' };
 
 
@@ -95,9 +96,8 @@ export function itemCard(item, type, section, nowStamp) {
   const theme = type.theme || section.theme || null;
   const fallback = { theme, icon: type.icon || SECTION_ICONS[section.key] || 'calendar', banner: type.banner || section.banner };
 
-  return h('article', { class: `item-card item-card--${state.state}`, 'data-theme': theme },
-    h('div', { class: 'item-card__media' }, posterOrFallback(item.image, fallback, { sizes: '(min-width: 1024px) 300px, 46vw', icon: fallback.icon })),
-    h('div', { class: 'item-card__body' },
+  const media = h('div', { class: 'item-card__media' }, posterOrFallback(item.image, fallback, { sizes: '(min-width: 1024px) 480px, 46vw', icon: fallback.icon }));
+  const body = h('div', { class: 'item-card__body' },
       h('p', { class: 'item-card__meta' },
         type.label ? h('span', { class: 'item-card__type' }, iconNode(type.icon || fallback.icon), type.label) : null,
         label ? h('span', { class: 'item-card__state' }, label) : null
@@ -113,8 +113,9 @@ export function itemCard(item, type, section, nowStamp) {
         )
         : null,
       h('div', { class: 'item-card__actions' }, cta(item, state, competition, true))
-    )
   );
+
+  return layCard(h('article', { class: `item-card item-card--${state.state}`, 'data-theme': theme }, media, body), media, body, item, item.image || fallback.banner);
 
 }
 

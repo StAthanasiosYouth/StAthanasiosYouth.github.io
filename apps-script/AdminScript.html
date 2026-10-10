@@ -1339,6 +1339,8 @@
 
     function show() {
 
+      // (an editor that follows the picture: «شكل العرض»)
+      if (options.onchange) options.onchange(value);
       preview.replaceChildren();
       // upload-only (the library): no empty box, no «من المكتبة»
       preview.hidden = options.uploadOnly && !value;

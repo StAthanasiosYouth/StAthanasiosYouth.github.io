@@ -113,7 +113,8 @@ var TABLES = {
   },
 
   News: {
-    columns: ['id', 'enabled', 'featured', 'pinned', 'tone', 'title', 'summary', 'body', 'image', 'linkUrl', 'linkLabel', 'badge', 'publishAt', 'expireAt', 'updatedAt', 'archived'],
+    columns: ['id', 'enabled', 'featured', 'pinned', 'tone', 'title', 'summary', 'body', 'image', 'linkUrl', 'linkLabel', 'badge', 'publishAt', 'expireAt', 'updatedAt', 'archived', 'display', 'displayMobile'],
+    lazy: ['display', 'displayMobile'],
     bool: ['enabled', 'featured', 'pinned', 'archived'],
     text: ['id', 'tone', 'title', 'summary', 'body', 'image', 'linkUrl', 'linkLabel', 'badge', 'publishAt', 'expireAt', 'updatedAt'],
     notes: {
@@ -132,12 +133,15 @@ var TABLES = {
       publishAt: 'يظهر من: 2026-10-08 20:00',
       expireAt: 'يختفي بعد (اختياري)',
       updatedAt: 'آخر تعديل (تلقائي)',
-      archived: 'في الأرشيف (مش بيظهر في القايمة اليومية)'
+      archived: 'في الأرشيف (مش بيظهر في القايمة اليومية)',
+      display: 'شكل العرض: فاضي = تلقائي، compact = كارت مدمج، side = صورة كبيرة جنب الكلام، banner = بانر عريض، stack = صورة فوق والكلام تحت',
+      displayMobile: 'شكل العرض على الموبايل: فاضي = زي الكمبيوتر، auto = تلقائي، أو compact / side / banner / stack'
     }
   },
 
   Games: {
-    columns: ['id', 'enabled', 'title', 'description', 'image', 'url', 'buttonLabel', 'visibleFrom', 'startAt', 'endAt', 'afterEnd', 'updatedAt', 'archived'],
+    columns: ['id', 'enabled', 'title', 'description', 'image', 'url', 'buttonLabel', 'visibleFrom', 'startAt', 'endAt', 'afterEnd', 'updatedAt', 'archived', 'display', 'displayMobile'],
+    lazy: ['display', 'displayMobile'],
     bool: ['enabled', 'archived'],
     text: ['id', 'title', 'description', 'image', 'url', 'buttonLabel', 'visibleFrom', 'startAt', 'endAt', 'afterEnd', 'updatedAt'],
     notes: {
@@ -153,7 +157,9 @@ var TABLES = {
       endAt: 'تخلص: 2026-10-11 23:30',
       afterEnd: 'show = تفضل ظاهرة "انتهت" شوية، hide = تختفي',
       updatedAt: 'آخر تعديل (تلقائي)',
-      archived: 'في الأرشيف'
+      archived: 'في الأرشيف',
+      display: 'شكل العرض: فاضي = تلقائي، compact = كارت مدمج، side = صورة كبيرة جنب الكلام، banner = بانر عريض، stack = صورة فوق والكلام تحت',
+      displayMobile: 'شكل العرض على الموبايل: فاضي = زي الكمبيوتر، auto = تلقائي، أو compact / side / banner / stack'
     }
   },
 
@@ -201,9 +207,11 @@ var TABLES = {
   },
 
   Activities: {
-    columns: ['id', 'enabled', 'type', 'title', 'subtitle', 'description', 'image', 'ctaLabel', 'url', 'location', 'startAt', 'endAt', 'visibleFrom', 'visibleUntil', 'order', 'archived', 'updatedAt'],
+    columns: ['id', 'enabled', 'type', 'title', 'subtitle', 'description', 'image', 'ctaLabel', 'url', 'location', 'startAt', 'endAt', 'visibleFrom', 'visibleUntil', 'order', 'archived', 'updatedAt', 'display', 'displayMobile'],
     bool: ['enabled', 'archived'],
-    text: ['id', 'type', 'title', 'subtitle', 'description', 'image', 'ctaLabel', 'url', 'location', 'startAt', 'endAt', 'visibleFrom', 'visibleUntil', 'updatedAt'],
+    text: ['id', 'type', 'title', 'subtitle', 'description', 'image', 'ctaLabel', 'url', 'location', 'startAt', 'endAt', 'visibleFrom', 'visibleUntil', 'updatedAt', 'display', 'displayMobile'],
+    // added by the first save that sets them (Items.gs lazyColumns_), never an upgrade step
+    lazy: ['display', 'displayMobile'],
     notes: {
       id: 'معرّف ثابت (تلقائي)',
       enabled: 'ظاهر',
@@ -221,7 +229,9 @@ var TABLES = {
       visibleUntil: 'يختفي بعد (اختياري)',
       order: 'الترتيب',
       archived: 'في الأرشيف',
-      updatedAt: 'آخر تعديل (تلقائي)'
+      updatedAt: 'آخر تعديل (تلقائي)',
+      display: 'شكل العرض: فاضي = تلقائي، compact = كارت مدمج، side = صورة كبيرة جنب الكلام، banner = بانر عريض، stack = صورة فوق والكلام تحت',
+      displayMobile: 'شكل العرض على الموبايل: فاضي = زي الكمبيوتر، auto = تلقائي، أو compact / side / banner / stack'
     }
   },
 

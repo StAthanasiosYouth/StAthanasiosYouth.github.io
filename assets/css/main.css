@@ -3806,13 +3806,14 @@ img[style*="background-color"] {
   }
 }
 
+/* its layout: .lay (SHARED CARD LAYOUT, end of file); this base is «stack» */
 .item-card {
   position: relative;
   display: grid;
-  grid-template-columns: 112px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   height: 100%;
-  padding: 10px;
+  padding: 0 0 14px;
   overflow: hidden;
   border-radius: 18px;
   background:
@@ -3820,13 +3821,6 @@ img[style*="background-color"] {
     rgba(2, 9, 20, .42);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
   transition: transform .45s var(--spring), box-shadow .3s;
-}
-
-@media (min-width: 640px) {
-  .item-card {
-    grid-template-columns: 1fr;
-    padding: 0 0 14px;
-  }
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -3840,39 +3834,12 @@ img[style*="background-color"] {
   transform: scale(.985);
 }
 
-.item-card__media {
-  overflow: hidden;
-  border-radius: 13px;
-  aspect-ratio: 4 / 5;
-  background: var(--navy-950);
-}
-
-@media (min-width: 640px) {
-  .item-card__media {
-    border-radius: 18px 18px 0 0;
-    aspect-ratio: 16 / 10;
-  }
-}
-
-.item-card__media img,
-.item-card__media .art {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
 .item-card__body {
   display: grid;
   align-content: start;
   gap: 5px;
   min-width: 0;
-}
-
-@media (min-width: 640px) {
-  .item-card__body {
-    padding: 0 14px;
-  }
+  padding: 0 14px;
 }
 
 .item-card__meta {
@@ -4376,19 +4343,6 @@ img[style*="background-color"] {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  [data-wide] .items__list:has(> li:only-child) .item-card {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
-    align-items: center;
-    padding: 0;
-  }
-
-  [data-wide] .items__list:has(> li:only-child) .item-card__media {
-    border-radius: 18px 0 0 18px;
-  }
-
-  [data-wide] .items__list:has(> li:only-child) .item-card__body {
-    padding: 22px 26px;
-  }
 
 }
 
@@ -4666,4 +4620,85 @@ html[data-intro="play"] .hero__tagline {
 
 .location[data-surface="none"] .location__body {
   padding-inline: 0;
+}
+
+
+/* =========================================================
+   SHARED CARD LAYOUT «شكل العرض» (hub.js layCard): every picture card —
+   news lead, games, competitions / activities — as .lay + is-compact |
+   is-side | is-banner | is-stack; each card keeps its own look. The
+   picture is whole (its shape --r, its colour --fill around it).
+========================================================= */
+
+:has(> .lay),
+.items__list > li {
+  container-type: inline-size;
+}
+
+.lay.lay {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  padding: 0 0 14px;
+}
+
+.lay .lay__media {
+  overflow: hidden;
+  aspect-ratio: var(--r, 1.6);
+  max-height: 280px;
+  background: var(--fill, var(--navy-950));
+}
+
+.lay .lay__media :is(img, .art) {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  border-radius: 0;
+  object-fit: contain;
+}
+
+.lay .lay__body {
+  padding: 0 14px;
+}
+
+.lay.is-banner .lay__media {
+  max-height: 320px;
+}
+
+.lay.is-compact {
+  grid-template-columns: clamp(96px, 30%, 150px) minmax(0, 1fr);
+  align-items: center;
+  padding: 10px;
+}
+
+.lay.is-compact .lay__media {
+  aspect-ratio: max(.75, min(var(--r, .8), 1.34));
+  border-radius: 13px;
+}
+
+/* a game keeps its arched poster */
+.game.is-compact .lay__media {
+  border-radius: 42px 42px 14px 14px;
+}
+
+.lay.is-compact .lay__body {
+  padding: 0;
+}
+
+/* the big picture beside the words: only where the card is wide (else «stack») */
+@container (min-width: 560px) {
+  .lay.is-side {
+    grid-template-columns: min(44%, 420px) minmax(0, 1fr);
+    align-items: center;
+    padding: 0;
+  }
+
+  .lay.is-side .lay__media {
+    max-height: 300px;
+  }
+
+  .lay.is-side .lay__body {
+    padding: 20px 24px;
+  }
 }

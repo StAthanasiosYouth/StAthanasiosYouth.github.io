@@ -328,3 +328,107 @@ test('news editor: the «مميز» / «مثبت» switches, alone and together,
   }
 
 });
+
+test('competition «شكل العرض»: auto says what it chose, the site\'s own card previewed (desktop / phone), a phone override, saved and published', async () => {
+
+  const { page, problems, close } = await open();
+  const press = async handle => { await handle.evaluate(n => n.scrollIntoView({ block: 'center' })); await handle.click(); };
+  const shown = handle => handle.evaluate(n => !n.hidden && !!n.offsetParent && n.getBoundingClientRect().height > 0);
+
+  await page.evaluate(() => A.go('content', 'competitions'));
+  await new Promise(resolve => setTimeout(resolve, 300));
+  await press(await page.evaluateHandle(() => [...document.querySelectorAll('.app__main button')].find(b => b.offsetParent && b.textContent.trim() === 'مسابقة جديدة')));
+  await page.waitForSelector('dialog.sheet[open] .item-display');
+  const title = await page.evaluateHandle(() => [...document.querySelectorAll('dialog.sheet[open] input')].find(n => n.offsetParent));
+  await press(title);
+  await page.keyboard.type('مسابقة الكتاب');
+
+  // no picture: auto picks the compact card, and says so; the preview is the site's card
+  await page.waitForFunction(() => /التلقائي اختار: كارت مدمج/.test(document.querySelector('dialog.sheet[open] .item-preview__auto')?.textContent || ''), { timeout: 15000 });
+  const card = () => page.evaluate(() => {
+    const frame = document.querySelector('dialog.sheet[open] .item-preview__frame');
+    const node = frame.contentDocument.querySelector('.item-card');
+    const stage = frame.parentNode.getBoundingClientRect();
+    return node ? { cls: [...node.classList].find(k => k.startsWith('is-')), title: node.querySelector('.item-card__title').textContent, width: frame.offsetWidth, stage: Math.round(stage.height) } : null;
+  });
+  await page.waitForFunction(() => document.querySelector('dialog.sheet[open] .item-preview__frame')?.contentDocument?.querySelector('.item-card__title')?.textContent === 'مسابقة الكتاب', { timeout: 15000 });
+  let now = await card();
+  assert.equal(now.cls, 'is-compact');
+  assert.equal(now.width, 1100, 'desktop width');
+  assert.ok(now.stage > 60, 'the preview shows');
+  assert.ok(await shown(await page.$('dialog.sheet[open] .item-preview__stage')));
+
+  // «بانر عريض» by a real click: the preview follows
+  await press(await page.evaluateHandle(() => [...document.querySelectorAll('dialog.sheet[open] .item-display label.choice')].find(l => l.textContent.includes('بانر عريض'))));
+  await page.waitForFunction(() => document.querySelector('dialog.sheet[open] .item-preview__frame').contentDocument.querySelector('.item-card.is-banner'), { timeout: 10000 });
+  assert.match(await page.$eval('dialog.sheet[open] .item-preview__auto', n => n.textContent), /سطح المكتب: بانر عريض — الموبايل: بانر عريض/);
+
+  // the phone: «كارت مدمج» there only
+  const mobile = await page.evaluateHandle(() => [...document.querySelectorAll('dialog.sheet[open] .item-display select')][0]);
+  assert.ok(await shown(mobile));
+  await mobile.select('compact');
+  await press(await page.evaluateHandle(() => [...document.querySelectorAll('dialog.sheet[open] .item-preview__tabs button')].find(b => b.textContent === 'الموبايل')));
+  await page.waitForFunction(() => document.querySelector('dialog.sheet[open] .item-preview__frame').offsetWidth === 400, { timeout: 10000 });
+  await page.waitForFunction(() => document.querySelector('dialog.sheet[open] .item-preview__frame').contentDocument.querySelector('.item-card.is-compact'), { timeout: 10000 });
+  await page.screenshot({ path: `${ROOT}tools/.cache/display-preview.png` });
+
+  await press(await page.$('dialog.sheet[open] .sheet__foot .btn--primary'));
+  await page.waitForFunction(() => !document.querySelector('dialog.sheet').open, { timeout: 15000 });
+  const saved = world.gs.readTable_('Activities').find(a => a.title === 'مسابقة الكتاب');
+  assert.deepEqual([saved.display, saved.displayMobile], ['banner', 'compact'], 'stored (the columns came by themselves)');
+  world.as(ADMIN);
+  const built = JSON.parse(JSON.stringify(world.gs.buildDraft_()));
+  world.as('');
+  const published = built.content.activities.find(a => a.title === 'مسابقة الكتاب');
+  assert.deepEqual([published.display, published.displayMobile], ['banner', 'compact']);
+  assert.deepEqual(problems, []);
+  await close();
+
+});
+
+test('«شكل العرض» is one shared control: news (its «مميز» card) and games preview the site\'s own card, and save their choice', async () => {
+
+  const { page, problems, close } = await open();
+  const press = async handle => { await handle.evaluate(n => n.scrollIntoView({ block: 'center' })); await handle.click(); };
+  const frameCard = selector => page.waitForFunction(s => document.querySelector('dialog.sheet[open] .item-preview__frame')?.contentDocument?.querySelector(s), { timeout: 15000 }, selector);
+  const choose = label => page.evaluateHandle(l => [...document.querySelectorAll('dialog.sheet[open] .item-display label.choice')].find(c => c.textContent.includes(l)), label);
+
+  for (const [sub, add, label, card, field, table] of [
+    ['news', '+ خبر', 'شكل عرض الخبر', '.news-lead.lay', 'خبر الشكل', 'News'],
+    ['games', '+ لعبة', 'شكل عرض اللعبة', '.game.lay', 'لعبة الشكل', 'Games']
+  ]) {
+    await page.evaluate(s => A.go('content', s), sub);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    await press(await page.evaluateHandle(t => [...document.querySelectorAll('.app__main button')].find(b => b.offsetParent && b.textContent.trim() === t), add));
+    await page.waitForSelector('dialog.sheet[open] .item-display');
+    assert.equal(await page.$eval('dialog.sheet[open] .item-display .section-label', n => n.textContent), label);
+    const input = await page.evaluateHandle(() => [...document.querySelectorAll('dialog.sheet[open] input')].find(n => n.offsetParent));
+    await press(input);
+    await page.keyboard.type(field);
+    if (sub === 'games') {
+      const link = await page.evaluateHandle(() => [...document.querySelectorAll('dialog.sheet[open] input[type=url]')].find(n => n.offsetParent));
+      await press(link);
+      await page.keyboard.type('https://example.org/game');
+      // its times: the editor's own preset buttons
+      for (const name of ['تبدأ', 'تخلص']) {
+        await press(await page.evaluateHandle(n => [...document.querySelectorAll('dialog.sheet[open] .field')].find(f => f.dataset.label === n).querySelector('button.chip, .presets button, button'), name));
+      }
+    }
+    await frameCard(card);
+    assert.match(await page.$eval('dialog.sheet[open] .item-preview__auto', n => n.textContent), /التلقائي اختار: /);
+    if (sub === 'news') assert.match(await page.$eval('dialog.sheet[open] .item-preview__note:not([hidden])', n => n.textContent), /المميز/);
+    await press(await choose('كارت مدمج'));
+    await frameCard(`${card}.is-compact`);
+    await press(await page.$('dialog.sheet[open] .sheet__foot .btn--primary'));
+    await page.waitForFunction(() => !document.querySelector('dialog.sheet').open, { timeout: 15000 }).catch(async error => { throw new Error(sub + ': ' + await page.evaluate(() => document.querySelector('dialog.sheet[open]')?.innerText.slice(0, 300))); });
+    const row = world.gs.readTable_(table).find(r => r.title === field);
+    assert.equal(row.display, 'compact', `${table}: stored`);
+  }
+  world.as(ADMIN);
+  const built = JSON.parse(JSON.stringify(world.gs.buildDraft_()));
+  world.as('');
+  assert.equal(built.content.news.find(n => n.title === 'خبر الشكل').display, 'compact');
+  assert.deepEqual(problems, []);
+  await close();
+
+});

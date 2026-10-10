@@ -199,7 +199,8 @@ function missingColumns_(sheet, name) {
   var lastColumn = Math.max(sheet.getLastColumn(), 1);
   var header = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (cell) { return String(cell).trim(); });
 
-  return TABLES[name].columns.filter(function (column) { return header.indexOf(column) === -1; });
+  var lazy = TABLES[name].lazy || [];
+  return TABLES[name].columns.filter(function (column) { return header.indexOf(column) === -1 && lazy.indexOf(column) === -1; });
 
 }
 

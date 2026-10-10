@@ -955,7 +955,8 @@
     var title = A.counted('العنوان', item.title, limits.newsTitle, null, { required: true });
     var summary = A.counted('سطر قصير', item.summary, limits.summary, 'بيظهر على الكارت');
     var body = A.counted('التفاصيل', item.body, limits.body, 'اختياري — بتظهر لما حد يفتح الخبر', { multiline: true, rows: 6 });
-    var image = A.imagePicker(item.image, { label: 'البوستر' });
+    var display = null;
+    var image = A.imagePicker(item.image, { label: 'البوستر', onchange: function () { if (display) display.refresh(); } });
     var linkUrl = A.textInput(item.linkUrl, { ltr: true, type: 'url', placeholder: 'https://', inputmode: 'url' });
     var linkLabel = A.counted('نص الزرار', item.linkLabel, base.linkLabel, 'مثلاً: سجّل هنا');
 
@@ -984,6 +985,19 @@
     var notify = A.checkbox('ابعت إشعار في الجرس', isNew ? true : hasNotification('notif-' + item.id), 'بيظهر في نفس ميعاد نشر الخبر');
     var enabled = A.switchInput('ظاهر', item.enabled === undefined ? true : bool(item.enabled));
 
+    // «شكل العرض»: the «مميز» card (the big one, first in the list)
+    display = A.cardDisplay(item, {
+      label: 'شكل عرض الخبر',
+      draft: function () { return { title: title.input.value, summary: summary.input.value, image: image.value(), badge: badge.value, publishAt: publishAt.value(), featured: featured.input.checked }; },
+      build: function (site, d, picture, now) {
+        var card = { id: item.id || 'preview', title: d.title || 'العنوان', summary: d.summary || '', body: '', image: picture, link: null, badge: d.badge || '', featured: true, pinned: false, tone: 'info', publishAt: String(d.publishAt || now).replace(' ', 'T').slice(0, 16), expireAt: '', display: d.display, displayMobile: d.displayMobile };
+        return {
+          node: site.hub.newsSection([card], now, {}), card: card, image: picture, big: true,
+          note: d.featured ? '' : 'الشكل ده للخبر «المميز» (الكارت الكبير أول القائمة). من غير «مميز» الخبر بيظهر كارت صغير في صف الأخبار.'
+        };
+      }
+    });
+
     var save = saveButton(isNew);
 
     save.addEventListener('click', function () {
@@ -1000,6 +1014,8 @@
         expireAt: expireAt.value(),
         featured: featured.input.checked,
         pinned: pinned.input.checked,
+        display: display.value(),
+        displayMobile: display.mobile(),
         tone: tone.value(),
         enabled: enabled.input.checked,
         notify: { publish: notify.input.checked }
@@ -1010,7 +1026,7 @@
 
     A.openSheet(isNew ? 'خبر جديد' : 'تعديل: ' + item.title, [
       box,
-      el('div', { class: 'form' },
+      el('div', { class: 'form', oninput: function () { display.refresh(); }, onchange: function () { display.refresh(); } },
         title.node,
         summary.node,
         image.node,
@@ -1021,6 +1037,7 @@
         A.field('يتنشر', publishAt.node),
         A.field('يختفي', expireAt.node),
         featured.node,
+        display.node,
         pinned.node,
         toneField,
         notify.node,
@@ -1098,7 +1115,8 @@
 
     var title = A.counted('اسم اللعبة', game.title, limits.gameTitle, 'مثلاً: رحلة الاستكشاف في الكنيسة', { required: true });
     var description = A.counted('وصف قصير', game.description, limits.gameDescription, 'اختياري', { multiline: true, rows: 3 });
-    var image = A.imagePicker(game.image, { label: 'بوستر اللعبة' });
+    var display = null;
+    var image = A.imagePicker(game.image, { label: 'بوستر اللعبة', onchange: function () { if (display) display.refresh(); } });
     var url = A.textInput(game.url, { ltr: true, type: 'url', placeholder: 'https://', inputmode: 'url', required: true });
     var buttonLabel = A.counted('نص الزرار', game.buttonLabel, limits.buttonLabel, 'افتراضي: ابدأ اللعب');
 
@@ -1128,6 +1146,22 @@
     var atStart = A.checkbox('تنبيه عند البداية', isNew ? true : hasNotification('notif-' + game.id + '-start'), '"🔥 اللعبة جاهزة! ادخل دلوقتي"');
     var enabled = A.switchInput('ظاهرة', game.enabled === undefined ? true : bool(game.enabled));
 
+    // «شكل العرض»: its card (a game that's on now: the big card)
+    display = A.cardDisplay(game, {
+      label: 'شكل عرض اللعبة',
+      draft: function () { return { title: title.input.value, description: description.input.value, image: image.value(), url: url.value.trim(), buttonLabel: buttonLabel.input.value, startAt: start.value(), endAt: end.value() }; },
+      build: function (site, d, picture, now) {
+        var at = function (v) { return String(v || '').replace(' ', 'T').slice(0, 16); };
+        var card = { id: game.id || 'preview', title: d.title || 'اللعبة', description: d.description || '', image: picture, url: d.url || 'https://example.org/', buttonLabel: d.buttonLabel || '', visibleFrom: '', startAt: at(d.startAt) || now, endAt: at(d.endAt) || now, afterEnd: 'show', endedUntil: '', display: d.display, displayMobile: d.displayMobile };
+        var entry = site.hub.gameStates({ games: [card] }, now)[0] || { game: card, state: 'soon', minutesUntil: 60 };
+        var live = entry.state === 'open';
+        return {
+          node: (live ? site.hub.liveGameWidget(entry, {}) : site.hub.gamesSection([entry], {})).el, card: card, image: picture, big: live,
+          note: live ? 'اللعبة شغالة في الميعاد ده: بتظهر الكارت الكبير فوق.' : ''
+        };
+      }
+    });
+
     var save = saveButton(isNew);
 
     save.addEventListener('click', function () {
@@ -1142,6 +1176,8 @@
         startAt: start.value(),
         endAt: end.value(),
         afterEnd: afterEnd.value(),
+        display: display.value(),
+        displayMobile: display.mobile(),
         enabled: enabled.input.checked,
         notify: { soon: soon.input.checked, start: atStart.input.checked }
       }, box, save);
@@ -1151,10 +1187,11 @@
 
     A.openSheet(isNew ? 'لعبة جديدة' : 'تعديل: ' + game.title, [
       box,
-      el('div', { class: 'form' },
+      el('div', { class: 'form', oninput: function () { display.refresh(); }, onchange: function () { display.refresh(); } },
         title.node,
         description.node,
         image.node,
+        display.node,
         A.field('لينك اللعبة', url, 'الزرار بيتفعل في ميعاد البداية. اللينك نفسه بيبقى في ملف الموقع من وقت النشر، فلو اللعبة لازم تتقفل فعلاً خليها تتأكد من الوقت بنفسها.'),
         buttonLabel.node,
         A.field('تظهر "قريبًا" من', visibleFrom.node),

@@ -4692,3 +4692,36 @@ dialog .toasts[popover] {
 
 }
 
+
+/* «شكل العرض» and its live card preview (AdminItems A.itemDisplay) */
+.item-preview__auto {
+  font-weight: 800;
+  color: var(--gold);
+}
+
+.item-preview__tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.item-preview__tabs .is-on {
+  color: var(--gold-ink);
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+}
+
+.item-preview__stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #030b18;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.item-preview__frame {
+  position: absolute;
+  inset: 0 0 auto auto;
+  border: 0;
+  transform-origin: top right;
+  pointer-events: none;
+}
+

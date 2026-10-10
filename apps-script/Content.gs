@@ -83,6 +83,10 @@ var DAY_ALIASES = {
   saturday: ['saturday', 'sat', 'السبت', 'سبت']
 };
 
+/* a picture card's «شكل العرض» (assets/js/cardlayout.js) */
+var ITEM_DISPLAYS = ['compact', 'side', 'banner', 'stack'];
+
+
 var LIMITS = {
   siteName: 120,
   tagline: 140,

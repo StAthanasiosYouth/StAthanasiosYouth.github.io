@@ -201,6 +201,39 @@ export function bannerWidget(item) {
 }
 
 
+/* «شكل العرض» — one engine for every picture card (news lead, games, items):
+   compact | side (wide cards, else stack) | banner | stack. '' = auto by the
+   picture: ≥ 1.9 wide → banner; else small cards: landscape → side on wide
+   screens, otherwise compact; big cards (big): side on wide screens, stack on
+   phones. displayMobile '' = as on desktop. */
+const LAYOUTS = ['compact', 'side', 'banner', 'stack'];
+const WIDE = typeof matchMedia === 'function' ? matchMedia('(min-width: 640px)') : null;
+
+export function cardLayout(item, image, wide, big = false) {
+  const r = image && image.w && image.h ? image.w / image.h : 0;
+  const pick = mode => (LAYOUTS.includes(mode) ? mode : r >= 1.9 ? 'banner' : big ? (wide && r ? 'side' : 'stack') : wide && r >= 1.15 ? 'side' : 'compact');
+  return pick(wide || !LAYOUTS.concat('auto').includes(item.displayMobile) ? item.display : item.displayMobile);
+}
+
+/* card, its picture box, its words: the layout classes, the picture's shape (--r) and colour (CSSOM: CSP) */
+export function layCard(card, media, body, item, image, big = false) {
+  const d = cardLayout(item, image, true, big);
+  const m = cardLayout(item, image, false, big);
+  const r = image && image.w && image.h ? image.w / image.h : 0.8;
+  card.classList.add('lay', `is-${WIDE && !WIDE.matches ? m : d}`);
+  card.dataset.d = d;
+  card.dataset.m = m;
+  media.classList.add('lay__media');
+  body.classList.add('lay__body');
+  media.style.setProperty('--r', String(Math.round(Math.min(3.5, Math.max(0.6, r)) * 1000) / 1000));
+  if (image && image.color) media.style.setProperty('--fill', image.color);
+  return card;
+}
+
+// a turned tablet: each card swaps to its other layout
+if (WIDE) WIDE.addEventListener('change', () => document.querySelectorAll('.lay[data-d]').forEach(card => { card.classList.remove(`is-${card.dataset.d}`, `is-${card.dataset.m}`); card.classList.add(`is-${WIDE.matches ? card.dataset.d : card.dataset.m}`); }));
+
+
 /* =========================================================
    NEWS: «جديد الأسرة»
 ========================================================= */
@@ -224,11 +257,10 @@ export function newsSection(items, nowStamp, section = {}) {
 }
 
 
-function newsLead(item, nowStamp, section = {}) {
+export function newsLead(item, nowStamp, section = {}) {
 
-  return h('article', { class: 'news-lead' },
-    h('div', { class: 'news-lead__media' }, posterOrFallback(item.image, section, { sizes: '(min-width: 1024px) 520px, 92vw', icon: 'megaphone' })),
-    h('div', { class: 'news-lead__body' },
+  const media = h('div', { class: 'news-lead__media' }, posterOrFallback(item.image, section, { sizes: '(min-width: 1024px) 520px, 92vw', icon: 'megaphone' }));
+  const body = h('div', { class: 'news-lead__body' },
       h('div', { class: 'news__meta' },
         item.badge ? h('span', { class: 'badge' }, item.badge) : null,
         item.publishAt ? h('span', { class: 'news__date' }, relativeTime(item.publishAt, nowStamp)) : null
@@ -238,8 +270,9 @@ function newsLead(item, nowStamp, section = {}) {
       ),
       item.summary ? h('p', { class: 'news-lead__summary' }, item.summary) : null,
       h('span', { class: 'news__more', 'aria-hidden': 'true' }, 'اقرأ أكتر', iconNode('arrow'))
-    )
   );
+
+  return layCard(h('article', { class: 'news-lead' }, media, body), media, body, item, item.image || section.banner, true);
 
 }
 
@@ -308,10 +341,8 @@ export function gameCard(entry, { live = false, inSheet = false, section = {} } 
 
   const canvas = live ? h('canvas', { class: 'game__embers', 'aria-hidden': 'true' }) : null;
 
-  const card = h('article', { class: `game game--${entry.state}${live ? ' game--live' : ''}`, 'data-game': game.id },
-    canvas,
-    h('div', { class: 'game__media' }, posterOrFallback(game.image, section, { sizes: live ? '(min-width: 1024px) 420px, 92vw' : '160px', icon: 'star' })),
-    h('div', { class: 'game__body' },
+  const media = h('div', { class: 'game__media' }, posterOrFallback(game.image, section, { sizes: live ? '(min-width: 1024px) 420px, 92vw' : '160px', icon: 'star' }));
+  const body = h('div', { class: 'game__body' },
       stateLabel,
       h('h3', { class: 'game__title' }, game.title),
       game.description && live ? h('p', { class: 'game__desc' }, game.description) : null,
@@ -320,14 +351,16 @@ export function gameCard(entry, { live = false, inSheet = false, section = {} } 
         button,
         inSheet ? null : h('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: () => go('game', game.id) }, 'التفاصيل')
       )
-    )
   );
+  const card = layCard(h('article', { class: `game game--${entry.state}${live ? ' game--live' : ''}`, 'data-game': game.id }, canvas, media, body), media, body, game, game.image || section.banner, live);
+  const layout = [...card.classList].filter(c => c === 'lay' || c.startsWith('is-'));
 
   let embers = null;
 
   function update(next) {
 
     card.className = `game game--${next.state}${live ? ' game--live' : ''}`;
+    card.classList.add(...layout);
     swapText(stateLabel, STATE_LABEL[next.state]);
     swapText(time, gameTimeText(next));
 

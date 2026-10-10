@@ -98,6 +98,34 @@ function imageRef_(value, problems) {
  * [{ id, start?, end?, text?, from? }] (Content.gs galleryEntries_), where
  * a words-only item (a text post / chat message) is { text, from? }.
  */
+function oneOfDisplay_(value, allowed, problems, label) {
+
+  var v = contentLine_(value);
+  if (!v || v === 'same' || (v === 'auto' && allowed.indexOf('auto') === -1)) return '';
+  if (allowed.indexOf(v) === -1) {
+    problems.push(label + ': "' + v.slice(0, 20) + '" مش من الاختيارات');
+    return '';
+  }
+  return v;
+
+}
+
+
+/* a table's lazy columns (TABLES[name].lazy) appear the first time a save
+   sets one — no upgrade step for an optional field */
+function lazyColumns_(name, record) {
+
+  var lazy = TABLES[name].lazy || [];
+  var wanted = lazy.filter(function (column) { return record[column] !== undefined && record[column] !== ''; });
+  if (!wanted.length) return;
+  var sheet = sheet_(name);
+  var have = headerIndex_(sheet);
+  var missing = wanted.filter(function (column) { return !have[column]; });
+  if (missing.length) appendColumns_(sheet, name, missing);
+
+}
+
+
 function galleryInput_(value, problems) {
 
   var rows = readOptionalTable_('Media');
@@ -297,6 +325,8 @@ var ITEM_VALIDATORS = {
       enabled: input.enabled !== false,
       featured: input.featured === true,
       pinned: input.pinned === true,
+      display: oneOfDisplay_(input.display, ITEM_DISPLAYS, problems, 'شكل العرض'),
+      displayMobile: oneOfDisplay_(input.displayMobile, ['auto'].concat(ITEM_DISPLAYS), problems, 'شكل الموبايل'),
       tone: ANNOUNCEMENT_TONES.indexOf(input.tone) !== -1 ? input.tone : 'info',
       title: input_(input.title, HUB_LIMITS.newsTitle, 'العنوان', problems, true),
       summary: input_(input.summary, HUB_LIMITS.summary, 'الملخص', problems, false),
@@ -336,7 +366,9 @@ var ITEM_VALIDATORS = {
       visibleFrom: dateInput_(input.visibleFrom, false, 'ميعاد الظهور', problems),
       startAt: dateInput_(input.startAt, false, 'ميعاد البداية', problems),
       endAt: dateInput_(input.endAt, true, 'ميعاد النهاية', problems),
-      afterEnd: input.afterEnd === 'hide' ? 'hide' : 'show'
+      afterEnd: input.afterEnd === 'hide' ? 'hide' : 'show',
+      display: oneOfDisplay_(input.display, ITEM_DISPLAYS, problems, 'شكل العرض'),
+      displayMobile: oneOfDisplay_(input.displayMobile, ['auto'].concat(ITEM_DISPLAYS), problems, 'شكل الموبايل')
     };
 
     var start = wallOf_(record.startAt);
@@ -389,7 +421,10 @@ var ITEM_VALIDATORS = {
       endAt: dateInput_(input.endAt, true, 'بيخلص', problems),
       visibleFrom: dateInput_(input.visibleFrom, false, 'يظهر من', problems),
       visibleUntil: dateInput_(input.visibleUntil, true, 'يختفي بعد', problems),
-      order: order === null || isNaN(order) ? '' : order
+      order: order === null || isNaN(order) ? '' : order,
+      // «شكل العرض» ('' = تلقائي / زي الكمبيوتر)
+      display: oneOfDisplay_(input.display, ITEM_DISPLAYS, problems, 'شكل العرض'),
+      displayMobile: oneOfDisplay_(input.displayMobile, ['auto'].concat(ITEM_DISPLAYS), problems, 'شكل الموبايل')
     };
 
     if (record.startAt && record.endAt && wallOf_(record.startAt) >= wallOf_(record.endAt, true)) {
@@ -732,6 +767,7 @@ function apiSaveItem(kind, input) {
     }
 
     record.updatedAt = nowStamp_();
+    lazyColumns_(spec.table, record);
     upsertRow_(spec.table, spec.key, record);
 
     if (kind !== 'notifications' && kind !== 'types') {

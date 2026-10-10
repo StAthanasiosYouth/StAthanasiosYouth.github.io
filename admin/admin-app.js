@@ -1468,6 +1468,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     function show() {
 
+      // (an editor that follows the picture: «شكل العرض»)
+      if (options.onchange) options.onchange(value);
       preview.replaceChildren();
       // upload-only (the library): no empty box, no «من المكتبة»
       preview.hidden = options.uploadOnly && !value;
@@ -6079,7 +6081,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var title = A.counted('العنوان', item.title, limits.newsTitle, null, { required: true });
     var summary = A.counted('سطر قصير', item.summary, limits.summary, 'بيظهر على الكارت');
     var body = A.counted('التفاصيل', item.body, limits.body, 'اختياري — بتظهر لما حد يفتح الخبر', { multiline: true, rows: 6 });
-    var image = A.imagePicker(item.image, { label: 'البوستر' });
+    var display = null;
+    var image = A.imagePicker(item.image, { label: 'البوستر', onchange: function () { if (display) display.refresh(); } });
     var linkUrl = A.textInput(item.linkUrl, { ltr: true, type: 'url', placeholder: 'https://', inputmode: 'url' });
     var linkLabel = A.counted('نص الزرار', item.linkLabel, base.linkLabel, 'مثلاً: سجّل هنا');
 
@@ -6108,6 +6111,19 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var notify = A.checkbox('ابعت إشعار في الجرس', isNew ? true : hasNotification('notif-' + item.id), 'بيظهر في نفس ميعاد نشر الخبر');
     var enabled = A.switchInput('ظاهر', item.enabled === undefined ? true : bool(item.enabled));
 
+    // «شكل العرض»: the «مميز» card (the big one, first in the list)
+    display = A.cardDisplay(item, {
+      label: 'شكل عرض الخبر',
+      draft: function () { return { title: title.input.value, summary: summary.input.value, image: image.value(), badge: badge.value, publishAt: publishAt.value(), featured: featured.input.checked }; },
+      build: function (site, d, picture, now) {
+        var card = { id: item.id || 'preview', title: d.title || 'العنوان', summary: d.summary || '', body: '', image: picture, link: null, badge: d.badge || '', featured: true, pinned: false, tone: 'info', publishAt: String(d.publishAt || now).replace(' ', 'T').slice(0, 16), expireAt: '', display: d.display, displayMobile: d.displayMobile };
+        return {
+          node: site.hub.newsSection([card], now, {}), card: card, image: picture, big: true,
+          note: d.featured ? '' : 'الشكل ده للخبر «المميز» (الكارت الكبير أول القائمة). من غير «مميز» الخبر بيظهر كارت صغير في صف الأخبار.'
+        };
+      }
+    });
+
     var save = saveButton(isNew);
 
     save.addEventListener('click', function () {
@@ -6124,6 +6140,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         expireAt: expireAt.value(),
         featured: featured.input.checked,
         pinned: pinned.input.checked,
+        display: display.value(),
+        displayMobile: display.mobile(),
         tone: tone.value(),
         enabled: enabled.input.checked,
         notify: { publish: notify.input.checked }
@@ -6134,7 +6152,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     A.openSheet(isNew ? 'خبر جديد' : 'تعديل: ' + item.title, [
       box,
-      el('div', { class: 'form' },
+      el('div', { class: 'form', oninput: function () { display.refresh(); }, onchange: function () { display.refresh(); } },
         title.node,
         summary.node,
         image.node,
@@ -6145,6 +6163,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.field('يتنشر', publishAt.node),
         A.field('يختفي', expireAt.node),
         featured.node,
+        display.node,
         pinned.node,
         toneField,
         notify.node,
@@ -6222,7 +6241,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var title = A.counted('اسم اللعبة', game.title, limits.gameTitle, 'مثلاً: رحلة الاستكشاف في الكنيسة', { required: true });
     var description = A.counted('وصف قصير', game.description, limits.gameDescription, 'اختياري', { multiline: true, rows: 3 });
-    var image = A.imagePicker(game.image, { label: 'بوستر اللعبة' });
+    var display = null;
+    var image = A.imagePicker(game.image, { label: 'بوستر اللعبة', onchange: function () { if (display) display.refresh(); } });
     var url = A.textInput(game.url, { ltr: true, type: 'url', placeholder: 'https://', inputmode: 'url', required: true });
     var buttonLabel = A.counted('نص الزرار', game.buttonLabel, limits.buttonLabel, 'افتراضي: ابدأ اللعب');
 
@@ -6252,6 +6272,22 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var atStart = A.checkbox('تنبيه عند البداية', isNew ? true : hasNotification('notif-' + game.id + '-start'), '"🔥 اللعبة جاهزة! ادخل دلوقتي"');
     var enabled = A.switchInput('ظاهرة', game.enabled === undefined ? true : bool(game.enabled));
 
+    // «شكل العرض»: its card (a game that's on now: the big card)
+    display = A.cardDisplay(game, {
+      label: 'شكل عرض اللعبة',
+      draft: function () { return { title: title.input.value, description: description.input.value, image: image.value(), url: url.value.trim(), buttonLabel: buttonLabel.input.value, startAt: start.value(), endAt: end.value() }; },
+      build: function (site, d, picture, now) {
+        var at = function (v) { return String(v || '').replace(' ', 'T').slice(0, 16); };
+        var card = { id: game.id || 'preview', title: d.title || 'اللعبة', description: d.description || '', image: picture, url: d.url || 'https://example.org/', buttonLabel: d.buttonLabel || '', visibleFrom: '', startAt: at(d.startAt) || now, endAt: at(d.endAt) || now, afterEnd: 'show', endedUntil: '', display: d.display, displayMobile: d.displayMobile };
+        var entry = site.hub.gameStates({ games: [card] }, now)[0] || { game: card, state: 'soon', minutesUntil: 60 };
+        var live = entry.state === 'open';
+        return {
+          node: (live ? site.hub.liveGameWidget(entry, {}) : site.hub.gamesSection([entry], {})).el, card: card, image: picture, big: live,
+          note: live ? 'اللعبة شغالة في الميعاد ده: بتظهر الكارت الكبير فوق.' : ''
+        };
+      }
+    });
+
     var save = saveButton(isNew);
 
     save.addEventListener('click', function () {
@@ -6266,6 +6302,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         startAt: start.value(),
         endAt: end.value(),
         afterEnd: afterEnd.value(),
+        display: display.value(),
+        displayMobile: display.mobile(),
         enabled: enabled.input.checked,
         notify: { soon: soon.input.checked, start: atStart.input.checked }
       }, box, save);
@@ -6275,10 +6313,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     A.openSheet(isNew ? 'لعبة جديدة' : 'تعديل: ' + game.title, [
       box,
-      el('div', { class: 'form' },
+      el('div', { class: 'form', oninput: function () { display.refresh(); }, onchange: function () { display.refresh(); } },
         title.node,
         description.node,
         image.node,
+        display.node,
         A.field('لينك اللعبة', url, 'الزرار بيتفعل في ميعاد البداية. اللينك نفسه بيبقى في ملف الموقع من وقت النشر، فلو اللعبة لازم تتقفل فعلاً خليها تتأكد من الوقت بنفسها.'),
         buttonLabel.node,
         A.field('تظهر "قريبًا" من', visibleFrom.node),
@@ -7787,6 +7826,183 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
 
   /* =======================================================
+     «شكل العرض» + THE CARD ITSELF, PREVIEWED
+     The site's own card (assets/js/items.js itemsSection / cardLayout,
+     imported from the site next to /admin/) in a frame with the site's
+     own CSS, at the desktop width or a phone's — the same code that draws
+     it on the site, so what you see is what the site shows. The Apps
+     Script admin (no site next to it) says the preview is in the
+     official admin. draft(): the editor's current fields.
+  ======================================================= */
+
+  var DISPLAYS = [
+    { value: '', label: 'تلقائي' },
+    { value: 'compact', label: 'كارت مدمج' },
+    { value: 'side', label: 'صورة كبيرة جنب الكلام' },
+    { value: 'banner', label: 'بانر عريض' },
+    { value: 'stack', label: 'صورة فوق والكلام تحت' }
+  ];
+  var DISPLAY_NAME = { compact: 'كارت مدمج', side: 'صورة كبيرة جنب الكلام', banner: 'بانر عريض', stack: 'صورة فوق والكلام تحت' };
+  var SITE = new URL('../', location.href).href;
+  var siteCards = null;
+
+  /* the site's own modules: hub.js (the layout rule, news, games) and items.js */
+  function siteModules() {
+    if (!siteCards) {
+      siteCards = Promise.all([import(SITE + 'assets/js/hub.js'), import(SITE + 'assets/js/items.js')])
+        .then(function (m) { return { hub: m[0], items: m[1] }; })
+        .catch(function (error) { siteCards = null; throw error; });
+    }
+    return siteCards;
+  }
+
+  /* a library picture as the site gets it ({ src, thumb, w, h, color }) */
+  function sitePicture(id) {
+    var media = id && (A.state.draft.media || []).filter(function (m) { return m.id === id; })[0];
+    if (!media) return Promise.resolve(null);
+    return A.mediaPreview(id).then(function (src) {
+      return src ? { src: src, thumb: src, w: Number(media.width) || 0, h: Number(media.height) || 0, color: media.color || '', alt: '' } : null;
+    }, function () { return null; });
+  }
+
+  var stamp = function (value) { return String(value || '').replace(' ', 'T').slice(0, 16); };
+
+  /*
+   * A.cardDisplay(item, options): «شكل العرض» for ANY picture card (news,
+   * games, competitions / activities), with its live preview.
+   * options.label: the field's title; options.draft(): the editor's fields
+   * now ({ image, … }); options.build(site, draft, picture, now) → { node
+   * (the site's own section / card), card (the item as the site gets it),
+   * image (the picture «تلقائي» looks at), big (a highlighted card) } —
+   * site.hub / site.items: the site's own modules. value() / mobile(): the
+   * choices; refresh(): after a field changed.
+   */
+  A.cardDisplay = function (item, options) {
+
+    var mode = A.choices('display-' + A.uid('d'), DISPLAYS, item.display || '', function () { refresh(); });
+    var mobile = el('select', { class: 'input', onchange: function () { A.markDirty(); refresh(); } },
+      [{ value: '', label: 'نفس إعداد سطح المكتب' }, { value: 'auto', label: 'تلقائي' }].concat(DISPLAYS.slice(1)).map(function (o) {
+        return el('option', { value: o.value, selected: o.value === (item.displayMobile || '') ? 'selected' : null, text: o.label });
+      })
+    );
+    var chose = el('p', { class: 'item-preview__auto', role: 'status', 'aria-live': 'polite' });
+    var note = el('p', { class: 'field__hint item-preview__note', hidden: true });
+    var wide = true;
+    var tabs = el('div', { class: 'item-preview__tabs', role: 'group', 'aria-label': 'المعاينة' },
+      ['سطح المكتب', 'الموبايل'].map(function (label, i) {
+        return el('button', { class: 'btn btn--small' + (i === 0 ? ' is-on' : ''), type: 'button', 'aria-pressed': i === 0 ? 'true' : 'false', onclick: function () {
+          wide = i === 0;
+          Array.prototype.forEach.call(tabs.children, function (b, k) { b.classList.toggle('is-on', k === i); b.setAttribute('aria-pressed', k === i ? 'true' : 'false'); });
+          refresh();
+        } }, label);
+      })
+    );
+    var frame = el('iframe', { class: 'item-preview__frame', title: 'معاينة الكارت', tabindex: '-1', 'aria-hidden': 'true' });
+    var stage = el('div', { class: 'item-preview__stage' }, frame);
+    var ready = new Promise(function (resolve) {
+      frame.addEventListener('load', resolve, { once: true });
+      frame.srcdoc = '<!doctype html><html lang="ar" dir="rtl" data-motion="lite"><head><meta charset="utf-8"><base href="' + SITE + '"><link rel="stylesheet" href="assets/css/main.css"></head><body><main class="hub"></main></body></html>';
+    });
+    var run = 0;
+    var timer = 0;
+
+    function refresh() {
+      clearTimeout(timer);
+      timer = setTimeout(draw, 120);
+    }
+
+    function draw() {
+      var mine = ++run;
+      var d = options.draft();
+      d.display = mode.value();
+      d.displayMobile = mobile.value;
+      Promise.all([siteModules(), sitePicture(d.image), ready]).then(function (got) {
+        if (mine !== run) return;
+        var built = options.build(got[0], d, got[1], stamp(A.cairoNow()));
+        // what «تلقائي» picks (the site's own rule, the picture it looks at)
+        var shown = got[0].hub.cardLayout(built.card, built.image, true, built.big);
+        var shownMobile = got[0].hub.cardLayout(built.card, built.image, false, built.big);
+        chose.textContent = (mode.value() ? 'سطح المكتب: ' : 'التلقائي اختار: ') + DISPLAY_NAME[shown] + ' — الموبايل: ' + DISPLAY_NAME[shownMobile];
+        note.textContent = built.note || '';
+        note.hidden = !built.note;
+        var doc = frame.contentDocument;
+        var width = wide ? 1100 : 400;
+        frame.style.width = width + 'px';
+        var hub = doc.querySelector('main');
+        hub.style.display = 'block';
+        hub.style.padding = '12px';
+        hub.style.pointerEvents = 'none';
+        var node = built.node;
+        if (wide) node.setAttribute('data-wide', '');
+        // the layout for the width shown (not this window's)
+        Array.prototype.forEach.call(node.matches('.lay') ? [node] : node.querySelectorAll('.lay'), function (card) {
+          card.classList.remove('is-' + card.dataset.d, 'is-' + card.dataset.m);
+          card.classList.add('is-' + (wide ? card.dataset.d : card.dataset.m));
+        });
+        // adopted, not copied: its CSSOM custom properties (--r, --fill) stay
+        hub.replaceChildren(doc.adoptNode(node));
+        requestAnimationFrame(function () {
+          // the card's own height (not the page's), centred when narrower than the editor
+          var height = Math.ceil(hub.getBoundingClientRect().bottom) + 12;
+          var scale = Math.min(1, stage.clientWidth / width);
+          frame.style.height = height + 'px';
+          frame.style.transform = 'scale(' + scale + ')';
+          frame.style.right = Math.max(0, Math.round((stage.clientWidth - width * scale) / 2)) + 'px';
+          stage.style.height = Math.ceil(height * scale) + 'px';
+        });
+      }, function () {
+        chose.textContent = 'المعاينة موجودة في لوحة التحكم الرسمية (stathanasiosyouth.github.io/admin).';
+        stage.hidden = true;
+      });
+    }
+
+    refresh();
+
+    return {
+      node: el('div', { class: 'form-group item-display' },
+        el('p', { class: 'section-label', text: options.label || 'شكل العرض' }),
+        A.field('على سطح المكتب', mode.node),
+        A.field('شكل الموبايل', mobile, 'عادةً سيبها «نفس إعداد سطح المكتب»'),
+        chose,
+        note,
+        tabs,
+        stage
+      ),
+      value: function () { return mode.value(); },
+      mobile: function () { return mobile.value; },
+      refresh: refresh
+    };
+
+  };
+
+  /* competitions / activities: the site's items section with this one card */
+  A.itemDisplay = function (item, sectionKey, draft) {
+
+    return A.cardDisplay(item, {
+      label: sectionKey === 'competitions' ? 'شكل عرض المسابقة' : 'شكل عرض الفعالية',
+      draft: draft,
+      build: function (site, d, picture, now) {
+        var type = typeByKey(d.type) || {};
+        var section = (A.state.draft.sections || []).filter(function (s) { return s.key === sectionKey; })[0] || {};
+        var siteType = { key: type.key || 'preview', label: type.label || '', icon: type.icon || '', theme: type.theme || '', banner: null };
+        var card = {
+          id: item.id || 'preview', type: siteType.key, section: sectionKey,
+          title: d.title || 'العنوان', subtitle: d.subtitle || '', image: picture,
+          cta: d.url ? { label: d.ctaLabel || type.ctaDefault || 'التفاصيل', url: d.url } : null,
+          location: d.location || '', startAt: stamp(d.startAt), endAt: stamp(d.endAt),
+          display: d.display, displayMobile: d.displayMobile
+        };
+        return {
+          node: site.items.itemsSection({ key: sectionKey, title: section.title || '', icon: section.icon || '', theme: section.theme || '' }, [card], { types: [siteType] }, now),
+          card: card, image: picture, big: false
+        };
+      }
+    });
+
+  };
+
+
+  /* =======================================================
      ACTIVITY EDITOR
   ======================================================= */
 
@@ -7807,7 +8023,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var title = A.counted('العنوان', item.title, 80, 'مثلاً: مسابقة الكتاب المقدس', { required: true });
     var subtitle = A.counted('سطر قصير', item.subtitle, 140, 'بيظهر على الكارت');
     var description = A.counted('التفاصيل', item.description, 1500, 'اختياري — بتظهر لما حد يفتحها', { multiline: true });
-    var image = A.imagePicker(item.image, { label: 'البوستر', hint: 'من غير بوستر؟ هياخد بانر النوع أو القسم تلقائي' });
+    var image = A.imagePicker(item.image, { label: 'البوستر', hint: 'من غير بوستر؟ هياخد بانر النوع أو القسم تلقائي', onchange: function () { if (display) display.refresh(); } });
+    var display = null;
     var url = A.textInput(item.url, { ltr: true, placeholder: 'https://', type: 'url' });
     var cta = A.textInput(item.ctaLabel, { max: 24 });
     var location = A.counted('المكان', item.location, 120, 'اختياري، مثلاً: الغردقة');
@@ -7827,6 +8044,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     syncType();
 
+    // «شكل العرض» and the card, live from the fields above
+    display = A.itemDisplay(item, sectionKey, function () {
+      return { type: typeSelect.value, title: title.input.value, subtitle: subtitle.input.value, image: image.value(), url: url.value.trim(), ctaLabel: cta.value, location: location.input.value, startAt: startAt.value(), endAt: endAt.value() };
+    });
+
     var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
 
     save.addEventListener('click', function () {
@@ -7844,6 +8066,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         endAt: endAt.value(),
         visibleFrom: visibleFrom.value(),
         visibleUntil: visibleUntil.value(),
+        display: display.value(),
+        displayMobile: display.mobile(),
         order: item.order,
         enabled: enabled.input.checked,
         notify: { publish: notifyPublish.input.checked, start: notifyStart.input.checked }
@@ -7852,13 +8076,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     A.dirty = false;
 
-    A.openSheet(isNew ? meta.add : 'تعديل: ' + item.title, [
-      box,
-      el('div', { class: 'form' },
+    var form = el('div', { class: 'form', oninput: function () { display.refresh(); }, onchange: function () { display.refresh(); } },
         types.length > 1 ? A.field('النوع', typeSelect) : null,
         title.node,
         subtitle.node,
         image.node,
+        display.node,
         el('div', { class: 'form-group' },
           el('p', { class: 'section-label', text: 'الزرار' }),
           A.field('اللينك', url, sectionKey === 'competitions' ? 'لينك المسابقة (https)' : 'لينك التسجيل أو التفاصيل (اختياري)'),
@@ -7879,7 +8102,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         ),
         notifyPublish.node,
         notifyStart.node
-      )
+    );
+
+    A.openSheet(isNew ? meta.add : 'تعديل: ' + item.title, [
+      box,
+      form
     ], A.sheetFooter(save), {
       // one editor per item: the official admin locks it while this is open
       draft: A.draftKey('activities', isNew ? '' : item.id, sectionKey),

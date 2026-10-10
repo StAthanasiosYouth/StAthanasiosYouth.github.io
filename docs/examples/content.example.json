@@ -1,6 +1,6 @@
 {
   "schema": 3,
-  "revision": "3314785ff14d",
+  "revision": "a55029924e36",
   "publishedAt": "2026-10-08T09:00:00.000Z",
   "timezone": "Africa/Cairo",
   "site": {
@@ -162,7 +162,9 @@
       "pinned": true,
       "tone": "alert",
       "publishAt": "2026-10-12T10:00",
-      "expireAt": "2026-10-18T23:59"
+      "expireAt": "2026-10-18T23:59",
+      "display": "",
+      "displayMobile": ""
     },
     {
       "id": "news-trip2026",
@@ -185,7 +187,9 @@
       "pinned": false,
       "tone": "info",
       "publishAt": "2026-10-08T20:00",
-      "expireAt": "2026-10-15T23:59"
+      "expireAt": "2026-10-15T23:59",
+      "display": "",
+      "displayMobile": ""
     }
   ],
   "games": [
@@ -206,7 +210,9 @@
       "startAt": "2026-10-11T22:00",
       "endAt": "2026-10-11T23:30",
       "afterEnd": "show",
-      "endedUntil": "2026-10-12T11:30"
+      "endedUntil": "2026-10-12T11:30",
+      "display": "",
+      "displayMobile": ""
     }
   ],
   "notifications": [
