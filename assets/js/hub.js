@@ -227,6 +227,10 @@ export function layCard(card, media, body, item, image, big = false) {
   body.classList.add('lay__body');
   media.style.setProperty('--r', String(Math.round(Math.min(3.5, Math.max(0.6, r)) * 1000) / 1000));
   if (image && image.color) media.style.setProperty('--fill', image.color);
+  // the file for the size it shows at: a small card the thumbnail, a wide one the full picture
+  const img = media.querySelector('img[srcset]');
+  const at = small => (small ? '150px' : '92vw');
+  if (img) img.sizes = `(min-width: 1024px) ${d === 'compact' ? '150px' : '1040px'}, (min-width: 640px) ${at(d === 'compact')}, ${at(m === 'compact')}`;
   return card;
 }
 
