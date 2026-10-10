@@ -297,6 +297,14 @@ test('CSP allows exactly the hosts the Firebase bundle talks to; the bundle is c
   assert.equal(vendor.replace(/\r\n/g, '\n'), code, 'assets/vendor/firebase-messaging.js is stale: cd tools && npm run build-push-vendor');
 });
 
+test('push config: the VAPID key is a real P-256 public key (a mistyped one makes FCM answer 401)', async () => {
+  const { PUSH_CONFIG } = await import('../assets/js/push-config.js');
+  const raw = Buffer.from(PUSH_CONFIG.vapidKey, 'base64url');
+  assert.equal(raw.length, 65);
+  assert.equal(raw[0], 4, 'uncompressed point');
+  await crypto.subtle.importKey('raw', raw, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+});
+
 test('push config: public values only, and the same API deployment as the admin and the map', () => {
   const config = readFileSync(`${ROOT}assets/js/push-config.js`, 'utf8');
   const exec = text => /https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec/.exec(text)[0];

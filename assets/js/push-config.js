@@ -13,7 +13,7 @@
 
 export const PUSH_CONFIG = {
   apiUrl: 'https://script.google.com/macros/s/AKfycbxJjDyktRi6VlwRGSrF-H_KzN-vkw9QaFCiLD1TlqgrppKs4CHfmOBE4cKEd6AZ9Km1/exec',
-  vapidKey: 'BG1xbtyFFTedzotjPEgX4HEpiuMQ05R1KRCezOGMtjcXsgtdWEemVgamRZnegbztyomvpmVL-D74niZLoKduS5Q',
+  vapidKey: 'BG1xbtyFFTedzotjPEgX4HEpiuMQ05R1KRCezOGMtjcXsgtdWEemVgamRZnegbztyomypmVL-D74niZLoKduS5Q',
   firebase: {
     apiKey: 'AIzaSyDFT6GqY1RHMn9V9xBStPTQ3fwfHSTdE4Q',
     authDomain: 'athanasios-links.firebaseapp.com',
