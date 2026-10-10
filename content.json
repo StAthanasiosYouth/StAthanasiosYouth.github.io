@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "115fb0543c9e",
-  "publishedAt": "2026-10-10T16:54:32.261Z",
+  "revision": "d980a580b393",
+  "publishedAt": "2026-10-10T16:58:26.661Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -147,6 +147,26 @@
               "alt": "",
               "start": 0,
               "end": 6.8
+            },
+            {
+              "type": "video",
+              "src": "media/2026/vid-16578d0e.mp4",
+              "poster": "media/2026/vid-16578d0e-480.webp",
+              "w": 540,
+              "h": 960,
+              "alt": "",
+              "start": 0,
+              "end": 6
+            },
+            {
+              "type": "video",
+              "src": "media/2026/vid-2b939f69.mp4",
+              "poster": "media/2026/vid-2b939f69-480.webp",
+              "w": 540,
+              "h": 960,
+              "alt": "",
+              "start": 0,
+              "end": 6
             }
           ]
         },
@@ -160,7 +180,18 @@
           "badge": "",
           "startAt": "",
           "endAt": "",
-          "experience": "whatsapp"
+          "experience": "whatsapp",
+          "gallery": [
+            {
+              "src": "media/2026/img-5d2af330.webp",
+              "thumb": "media/2026/img-5d2af330-480.webp",
+              "w": 1122,
+              "h": 1402,
+              "alt": "",
+              "color": "#454543",
+              "text": "موضوع الجاي عن الصلاه"
+            }
+          ]
         }
       ]
     }
