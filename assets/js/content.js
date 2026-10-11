@@ -32,6 +32,11 @@ const SECTION_THEMES = ['gold', 'ember', 'azure', 'rose', 'emerald', 'night'];
 
 const SURFACES = ['glass', 'dark', 'filled', 'none'];
 
+/* a competition's address: competition/<slug>/ (docs/COMPETITIONS.md §4.3) */
+export const COMP_SLUG = /^[a-z0-9-]{2,40}$/;
+
+const compSlug = value => (typeof value === 'string' && COMP_SLUG.test(value) ? value : '');
+
 
 /* ---------- primitives ---------- */
 
@@ -301,6 +306,8 @@ function cleanHub(raw) {
       if (t && t.kind === 'meeting') target = { kind: 'meeting' };
       else if (t && (t.kind === 'news' || t.kind === 'game' || t.kind === 'activity') && cleanId(t.id)) target = { kind: t.kind, id: t.id };
       else if (t && t.kind === 'url' && safeHttps(t.url)) target = { kind: 'url', url: safeHttps(t.url) };
+      // a competition opens its own page (same tab)
+      else if (t && t.kind === 'competition' && compSlug(t.slug || t.id)) target = { kind: 'competition', slug: compSlug(t.slug || t.id) };
       return {
         id: cleanId(n.id),
         type: NOTIFICATION_TYPES.includes(n.type) ? n.type : 'general',
@@ -344,12 +351,28 @@ function cleanHub(raw) {
         endAt: dateTime(a.endAt),
         visibleFrom: dateTime(a.visibleFrom),
         visibleUntil: dateTime(a.visibleUntil),
+        // a linked competition: the card's button opens competition/<slug>/ (same tab)
+        competition: compSlug(a.competition),
         ...display(a)
       };
     })
     .filter(a => a.id && a.title && a.section && typeKeys.has(a.type));
 
-  return { sessions, news, games, notifications, activities, types };
+  // the published competitions (index only; each has its own comp.json)
+  const seen = new Set();
+  const competitions = list(raw.competitions)
+    .map(c => ({
+      id: cleanId(c.id),
+      slug: compSlug(c.slug),
+      title: text(c.title, 80),
+      shortTitle: text(c.shortTitle, 30),
+      startAt: dateTime(c.startAt),
+      endAt: dateTime(c.endAt),
+      v: typeof c.v === 'string' && /^[\w.-]{1,40}$/.test(c.v) ? c.v : ''
+    }))
+    .filter(c => c.slug && c.title && !seen.has(c.slug) && seen.add(c.slug));
+
+  return { sessions, news, games, notifications, activities, types, competitions };
 
 }
 

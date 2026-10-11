@@ -8,7 +8,7 @@ import { fetchContent, readCached } from './content.js';
 import { renderPage, renderError, tickPage, visibilityKey, meetingSnapshot } from './render.js';
 import { zonedNow, stamp, meetingStatus } from './schedule.js';
 import { shareLink, openQr, shareRow } from './share.js';
-import { startRouter, resolveRoute, go, leave, parseHash } from './router.js';
+import { startRouter, resolveRoute, go, leave, parseHash, followPageHash } from './router.js';
 import { openSheet, closeSheet, sheetStyles } from './sheet.js';
 import { openBell } from './bell.js';
 import { gameStates, visibleNews } from './hub.js';
@@ -364,8 +364,15 @@ function startPush() {
       const data = event.data;
       if (!data || data.type !== 'athanasios:open' || typeof data.url !== 'string') return;
       const url = new URL(data.url, location.href);
-      const route = url.origin === location.origin ? parseHash(url.hash) : null;
+      if (url.origin !== location.origin) return;
+      // a competition / «نقاطي»: its own page, in this tab
+      if (/^\/(competition\/[a-z0-9-]{2,40}|points)\/$/.test(url.pathname)) {
+        location.assign(url.href);
+        return;
+      }
+      const route = parseHash(url.hash);
       if (route) go(route.name, route.id);
+      else followPageHash(url.hash);
     });
   }
 
@@ -411,6 +418,9 @@ function startPush() {
 ========================================================= */
 
 function startSite() {
+
+  // #competition/<slug> and #points are other pages: go there before anything loads
+  if (followPageHash()) return;
 
   setInterval(tick, 15000);
 

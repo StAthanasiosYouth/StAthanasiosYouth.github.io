@@ -548,17 +548,94 @@ failure never fails the action.
 
 - `competition/index.html` — the ONE engine shell (also used by the admin
   preview with `?preview`). Generated stubs differ only in head tags and `data-slug`.
+  The shell's URLs are relative to `/competition/` (`../assets/…`,
+  `../manifest.webmanifest`, `href="../"`). **Stub rule** (`compStubHtml_`):
+  every `href="../` / `src="../` becomes `href="../../` / `src="../../`, and
+  `<html lang="ar" dir="rtl">` becomes `<html lang="ar" dir="rtl" data-slug="<slug>">`
+  (optionally `data-v="<version>"`: comp.json is then fetched with `?v=`), plus
+  the competition's own `<title>` / description / canonical / OG tags. The
+  engine resolves everything else from `import.meta.url` (site root =
+  `new URL('../../../', import.meta.url)`), never from the page address. The
+  shell itself also works as `competition/?s=<slug>`.
 - `points/index.html` — «نقاطي» + store (Phase 3), one stable page, code login.
 - Engine modules `assets/js/comp/`: `api.js` (transport), `flow.js` (state
   machine, pure where possible), `view.js` (DOM), `save.js` (local autosave),
-  `main.js` (boot), `portal.js`. Styles `assets/css/comp.css`. No inline
+  `main.js` (boot), `config.js` (API URL = `push-config.js` `apiUrl`, the one
+  source), `portal.js` (Phase 3). Styles `assets/css/comp.css` (self-contained:
+  the site's tokens, fonts and themes; no main.css). No inline
   scripts/styles (CSP), `textContent` only, real form controls, RTL.
 - Local autosave: `localStorage['athanasios.comp.v1:<slug>']` = `{ clientKey,
   token, receipt, answers, at, step }`, written on every change, cleared
   (except the receipt) after a confirmed submit. Offline submit is queued and
-  retried with backoff when back online.
+  retried with backoff when back online. Also kept while an attempt is in
+  progress (all optional, validated on read): `v`, `fields` (the typed form,
+  to repeat compStart), `ptoken`, `participant`, `attempt { id, startedAt,
+  deadlineMs }`, `comp`, `questions` (as served, so a reload works offline),
+  `pending` (a queued submit), `def` (the comp.json it started with),
+  `submittedAt`. `step` = `q:<index>` | `single` | `review`.
 - Main site: `#competition/<slug>` redirects to `competition/<slug>/`;
-  `#points` → `points/`.
+  `#points` → `points/` (router.js `pageForHash`; `location.replace`, so the
+  back button returns to the site instead of bouncing on the redirect).
+  content.json `competitions[]` and activity `competition` are sanitized by
+  content.js; an activity with `competition` gets a same-tab CTA
+  `competition/<slug>/` (label = its `cta.label` or «ادخل المسابقة»);
+  notification `target: { kind: 'competition', slug }` is a same-tab link in
+  the bell; sw.js allows exactly `/competition/<slug>/` and `/points/` (no
+  query/hash) and `#competition/<slug>` / `#points` deep links.
+
+### 13.1 What the engine sends (exact payloads)
+
+All `POST <apiUrl>`, body `{"fn":<fn>,"args":[<arg>]}`, `Content-Type:
+text/plain;charset=utf-8`, `credentials:'omit'`, `cache:'no-store'`,
+redirects followed, 25 s timeout. Network errors / HTTP 5xx / 429 / non-object
+replies and `code:'busy'` are retried (≤ 4 retries, backoff 0.8 s × 2ⁿ ×
+0.5–1.5, cap 15 s) with the SAME body; every other `ok:false` is final.
+
+```
+compStart  open:        { slug, clientKey, fields:{ name?, phone?, age?, church?, group?, custom1..3? }, hp:'' }
+           registered:  { slug, clientKey, ptoken }
+             clientKey = crypto.randomUUID() (kept in the autosave; reused on retry/reload)
+             fields: only visible fields with a value; phone normalized to 01xxxxxxxxx
+             (or +<intl>), age as digits; the server re-validates everything
+compSubmit { token, clientKey, answers:{ qid: value } }
+             only answered, valid values; multi in choice order; short/long/number trimmed
+             (number may contain Arabic digits); info never
+compResult { receipt }          (reopening the page after a submit)
+compCode   { code:'ATH-XXXX-XXXX' }   (normalized: Arabic digits → ASCII, uppercase,
+                                       8 symbols of the §7.1 alphabet; else not sent)
+```
+Replies are re-validated (`flow.js` `cleanAttempt`, `cleanQuestions`,
+`cleanStartComp`, `sanitizeResult`). Used error fields: `code`, `message`
+(shown when present), `field` (compStart invalid), `qid` (compSubmit invalid),
+`startAt` (not_open). A Result's `review` is rendered only when present.
+
+### 13.2 Admin preview protocol
+
+The admin opens `competition/index.html?preview` in a SAME-ORIGIN iframe.
+The page only enters preview mode when its parent is same-origin (else it
+leaves the frame / shows «المعاينة بتشتغل من لوحة التحكم بس»). It never
+fetches comp.json, never calls the API and never touches localStorage
+(in-memory autosave). Only messages with `event.source === window.parent`
+and `event.origin === location.origin` are read.
+
+```
+page → parent  { type:'athanasios:comp-preview-ready' }                 on load
+parent → page  { type:'athanasios:comp-preview',
+                 definition: <public definition (comp.json shape) + questions:[PublicQuestion]>,
+                 at: 'YYYY-MM-DDTHH:MM' (Cairo) | null (= now),
+                 state: 'auto' | 'scheduled' | 'open' | 'closed',
+                 images?: { '<media path>': 'blob:<same origin>/…' } }   (re)renders from scratch
+page → parent  { type:'athanasios:comp-preview-shown', state:<step name> }
+               { type:'athanasios:comp-preview-error', message }         unusable definition
+page → parent  { type:'athanasios:comp-preview-submit', answers:{ qid: value }, id:<uuid> }
+parent → page  { type:'athanasios:comp-preview-result', id:<same uuid>, result:<Result> }
+```
+The definition goes through the same sanitizer as comp.json (private keys such
+as `correct` / `explanation` are dropped even if sent). Start is local
+(`deadlineMs` = now + timeLimit). `compCode` answers «مشارك تجريبي». The
+admin computes the result with `apiCompPreviewGrade(compId, answers)`; with
+no reply within 30 s the page shows an error. `at` shifts the page's clock
+(like the site preview); `state` other than `auto` forces the intro state.
 
 ## 14. Limits and scale
 
