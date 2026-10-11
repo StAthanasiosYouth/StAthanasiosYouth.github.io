@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "3f86741be9ce",
-  "publishedAt": "2026-10-11T00:09:32.894Z",
+  "revision": "01fb351d17ff",
+  "publishedAt": "2026-10-11T00:12:13.194Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -236,44 +236,8 @@
   "news": [],
   "games": [],
   "notifications": [],
-  "activities": [
-    {
-      "id": "act-f13391bf",
-      "type": "competition",
-      "section": "competitions",
-      "title": "test مسابقة",
-      "subtitle": "test",
-      "description": "",
-      "image": {
-        "src": "media/2026/img-4f71317c.webp",
-        "thumb": "media/2026/img-4f71317c-480.webp",
-        "w": 1600,
-        "h": 400,
-        "alt": "",
-        "color": "#1b324b"
-      },
-      "cta": {
-        "label": "ابدأ المسابقة",
-        "url": "https://stathanasiosyouth.github.io/"
-      },
-      "location": "",
-      "startAt": "",
-      "endAt": "",
-      "visibleFrom": "2026-10-11T00:05",
-      "visibleUntil": "",
-      "display": "",
-      "displayMobile": ""
-    }
-  ],
-  "types": [
-    {
-      "key": "competition",
-      "label": "مسابقة",
-      "icon": "trophy",
-      "theme": "ember",
-      "banner": null
-    }
-  ],
+  "activities": [],
+  "types": [],
   "layout": [
     {
       "key": "meeting",
