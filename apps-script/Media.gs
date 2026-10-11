@@ -805,6 +805,20 @@ function mediaUsage_() {
       add(id, 'links', r.id, 'صور مشهد: ' + r.title);
     });
   });
+  // competitions: banner, icon, question and explanation pictures (CompStore.gs draft, cached)
+  var comps = typeof compDraft_ === 'function' ? compDraft_() : null;
+  if (comps && !comps.error) {
+    var titles = Object.create(null);
+    (comps.comps || []).forEach(function (c) {
+      titles[c.id] = c.title;
+      add(c.banner, 'competitions', c.id, 'بانر المسابقة: ' + c.title);
+      add(c.icon, 'competitions', c.id, 'أيقونة المسابقة: ' + c.title);
+    });
+    (comps.questions || []).forEach(function (q) {
+      add(q.media, 'competitions', q.compId, 'سؤال في مسابقة: ' + (titles[q.compId] || ''));
+      add(q.explanationMedia, 'competitions', q.compId, 'شرح سؤال في مسابقة: ' + (titles[q.compId] || ''));
+    });
+  }
 
   return usage;
 

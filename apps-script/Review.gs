@@ -48,6 +48,12 @@ function reviewWhen_(value) {
 
 }
 
+function reviewDigits_(value) {
+
+  return String(value).replace(/\d/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[d]; });
+
+}
+
 /* "20:00" -> "٨:٠٠ م" */
 function reviewTime_(time) {
 
@@ -64,7 +70,8 @@ function reviewTime_(time) {
 }
 
 
-function describeChanges(previous, next, now) {
+/* info (optional): { competitions: { compId: question count } } from the draft (CompPublish.gs compReviewInfo_) */
+function describeChanges(previous, next, now, info) {
 
   var entries = [];
 
@@ -196,6 +203,20 @@ function describeChanges(previous, next, now) {
     constant({ added: 'لعبة جديدة', removed: 'لعبة هتختفي', changed: 'تعديل لعبة' }),
     null, function (g) { return g.endedUntil || g.endAt; });
 
+  // competitions themselves (content.json `competitions`: v changes with any public change)
+  var questionCount = function (c) {
+    var n = info && info.competitions ? info.competitions[c.id] : undefined;
+    return typeof n === 'number' ? ' (' + reviewDigits_(n) + ' سؤال)' : '';
+  };
+
+  diffById_(previous.competitions || [], next.competitions || [], function (c) { return c.id; }, {
+    added: function (c) { add('competitions', 'add', 'مسابقة جديدة: ' + c.title + questionCount(c), later(c.startAt).replace(/^يظهر/, 'تبدأ')); },
+    removed: function (c) { add('competitions', 'remove', 'مسابقة هتختفي: ' + c.title); },
+    changed: function (before, after) {
+      if (!same(before, after)) add('competitions', 'change', 'تعديل مسابقة: ' + after.title + questionCount(after));
+    }
+  });
+
   var typeLabels = {};
   (next.types || []).concat(previous.types || []).forEach(function (t) {
     if (!typeLabels[t.key]) typeLabels[t.key] = t.label;
@@ -204,6 +225,10 @@ function describeChanges(previous, next, now) {
   items('activities',
     function (a) { return a.section === 'competitions' ? 'competitions' : 'activities'; },
     function (a) {
+      // the card of a competition (the competition itself is listed above)
+      if (a.competition) {
+        return { added: 'كارت مسابقة جديد', removed: 'كارت مسابقة هيختفي', changed: 'تعديل كارت مسابقة' };
+      }
       if (a.section === 'competitions') {
         return { added: 'مسابقة جديدة', removed: 'مسابقة هتختفي', changed: 'تعديل مسابقة' };
       }

@@ -207,11 +207,12 @@ var TABLES = {
   },
 
   Activities: {
-    columns: ['id', 'enabled', 'type', 'title', 'subtitle', 'description', 'image', 'ctaLabel', 'url', 'location', 'startAt', 'endAt', 'visibleFrom', 'visibleUntil', 'order', 'archived', 'updatedAt', 'display', 'displayMobile'],
+    columns: ['id', 'enabled', 'type', 'title', 'subtitle', 'description', 'image', 'ctaLabel', 'url', 'location', 'startAt', 'endAt', 'visibleFrom', 'visibleUntil', 'order', 'archived', 'updatedAt', 'display', 'displayMobile', 'competition'],
     bool: ['enabled', 'archived'],
-    text: ['id', 'type', 'title', 'subtitle', 'description', 'image', 'ctaLabel', 'url', 'location', 'startAt', 'endAt', 'visibleFrom', 'visibleUntil', 'updatedAt', 'display', 'displayMobile'],
-    // added by the first save that sets them (Items.gs lazyColumns_), never an upgrade step
-    lazy: ['display', 'displayMobile'],
+    text: ['id', 'type', 'title', 'subtitle', 'description', 'image', 'ctaLabel', 'url', 'location', 'startAt', 'endAt', 'visibleFrom', 'visibleUntil', 'updatedAt', 'display', 'displayMobile', 'competition'],
+    // added by the first save that sets them (Items.gs lazyColumns_), never an upgrade step;
+    // competition: the linked competition's id (CompAdmin.gs compSyncCard_)
+    lazy: ['display', 'displayMobile', 'competition'],
     notes: {
       id: 'معرّف ثابت (تلقائي)',
       enabled: 'ظاهر',
@@ -231,7 +232,8 @@ var TABLES = {
       archived: 'في الأرشيف',
       updatedAt: 'آخر تعديل (تلقائي)',
       display: 'شكل العرض: فاضي = تلقائي، compact = كارت مدمج، side = صورة كبيرة جنب الكلام، banner = بانر عريض، stack = صورة فوق والكلام تحت',
-      displayMobile: 'شكل العرض على الموبايل: فاضي = زي الكمبيوتر، auto = تلقائي، أو compact / side / banner / stack'
+      displayMobile: 'شكل العرض على الموبايل: فاضي = زي الكمبيوتر، auto = تلقائي، أو compact / side / banner / stack',
+      competition: 'المسابقة المربوطة بالكارت (تلقائي من صفحة المسابقة؛ العنوان والصورة والمواعيد بتيجي منها)'
     }
   },
 
@@ -485,7 +487,9 @@ function readDraft_() {
     notifications: readOptionalTable_('Notifications').map(strip),
     media: readOptionalTable_('Media').map(strip),
     activities: readOptionalTable_('Activities').map(strip),
-    types: readOptionalTable_('Types').map(strip)
+    types: readOptionalTable_('Types').map(strip),
+    // the competitions spreadsheet (CompStore.gs, through its cache; null = none yet)
+    competitions: typeof compDraft_ === 'function' ? compDraft_() : null
   };
 
 }

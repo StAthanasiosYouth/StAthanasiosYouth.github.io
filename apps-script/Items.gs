@@ -519,11 +519,19 @@ var ITEM_VALIDATORS = {
         problems.push('الإشعار بيشاور على حاجة مش موجودة');
       }
     }
+    else if (/^competition:[a-z0-9-]{2,40}$/.test(target)) {
+      // a competition's page (CompStore.gs draft: the slug must exist)
+      var compDraft = typeof compDraft_ === 'function' ? compDraft_() : null;
+      var slug = target.slice('competition:'.length);
+      if (!compDraft || !(compDraft.comps || []).some(function (c) { return c.slug === slug; })) {
+        problems.push('الإشعار بيشاور على مسابقة مش موجودة');
+      }
+    }
     else if (safeHttpsUrl(target)) {
       target = safeHttpsUrl(target);
     }
     else {
-      problems.push('الوجهة لازم تكون الاجتماع أو خبر أو لعبة أو فعالية أو لينك https');
+      problems.push('الوجهة لازم تكون الاجتماع أو خبر أو لعبة أو فعالية أو مسابقة أو لينك https');
     }
 
     var record = {
@@ -925,7 +933,8 @@ function apiDuplicateItem(kind, key) {
     var copy = {};
 
     TABLES[spec.table].columns.forEach(function (column) {
-      if (/^(publishAt|expireAt|visibleFrom|visibleUntil|startAt|endAt)$/.test(column)) return;
+      // dates start empty; a copy is never linked to the original's competition
+      if (/^(publishAt|expireAt|visibleFrom|visibleUntil|startAt|endAt|competition)$/.test(column)) return;
       copy[column] = row[column];
     });
 

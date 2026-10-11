@@ -166,15 +166,19 @@ class FakeSheet {
 
 class FakeSpreadsheet {
 
-  constructor(owner) {
+  constructor(owner, id = 'sheet-id-123', name = '') {
     this.owner = owner;
+    this.id = id;
+    this.name = name;
     // service-call counters, for the performance tests
     this.stats = { cellsRead: 0, writes: 0, opens: 0 };
     this.sheets = [new FakeSheet('Sheet1', this.stats)];
+    this.sheets[0].spreadsheet = this;
   }
 
-  getId() { return 'sheet-id-123'; }
-  getUrl() { return 'https://docs.google.com/spreadsheets/d/sheet-id-123/edit'; }
+  getId() { return this.id; }
+  getName() { return this.name; }
+  getUrl() { return `https://docs.google.com/spreadsheets/d/${this.id}/edit`; }
   getOwner() { return { getEmail: () => this.owner }; }
   setSpreadsheetTimeZone() {}
   getSheets() { return this.sheets.slice(); }
@@ -298,7 +302,7 @@ export class FakeGitHub {
       return this.respond(200, { object: { sha: body.sha } });
     }
 
-    if (method === 'get' && (match = /^\/contents\/([\w.-]+)\?ref=main$/.exec(path))) {
+    if (method === 'get' && (match = /^\/contents\/([\w./-]+)\?ref=main$/.exec(path))) {
       const content = this.files()[match[1]];
       return content === undefined
         ? this.respond(404, { message: 'Not Found' })
@@ -483,6 +487,10 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
   const now = () => Date.now() + clock.skew;
   // LockService.getScriptLock(): busy = another execution holds it (tryLock fails, waitLock throws)
   const scriptLock = { busy: false, waits: 0 };
+  // LockService.getUserLock(): the same, for the competitions' live tabs
+  const userLock = { busy: false, waits: 0 };
+  // every spreadsheet SpreadsheetApp.create made (the first is the content Sheet setup() makes)
+  const spreadsheets = [];
 
   const context = vm.createContext({
 
@@ -505,14 +513,19 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
           if (!entry || entry.until <= now()) { cache.delete(key); return null; }
           return entry.value;
         };
+        // like CacheService: a value is at most 100 KB (UTF-8)
+        const put = (key, value, seconds = 600) => {
+          tooLong(key);
+          if (Buffer.byteLength(String(value), 'utf8') > 100 * 1024) throw new Error('Argument too large: value');
+          cache.set(key, { value: String(value), until: now() + Math.min(seconds, 21600) * 1000, seconds });
+        };
         return {
           get,
           getAll: keys => Object.fromEntries(keys.map(key => [key, get(key)]).filter(([, value]) => value !== null)),
-          put: (key, value, seconds = 600) => {
-            tooLong(key);
-            cache.set(key, { value: String(value), until: now() + Math.min(seconds, 21600) * 1000, seconds });
-          },
-          remove: key => { cache.delete(key); }
+          put,
+          putAll: (values, seconds = 600) => { for (const [key, value] of Object.entries(values)) put(key, value, seconds); },
+          remove: key => { cache.delete(key); },
+          removeAll: keys => { for (const key of keys) cache.delete(key); }
         };
       }
     },
@@ -546,17 +559,30 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
         waitLock() { scriptLock.waits++; if (scriptLock.busy) throw new Error('Lock timeout: another process was holding the lock for too long.'); },
         tryLock() { scriptLock.waits++; return !scriptLock.busy; },
         releaseLock() {}
+      }),
+      // the owner's user lock (every API request runs as the owner): its own mutex
+      getUserLock: () => ({
+        waitLock() { userLock.waits++; if (userLock.busy) throw new Error('Lock timeout: another process was holding the lock for too long.'); },
+        tryLock() { userLock.waits++; return !userLock.busy; },
+        releaseLock() {}
       })
     },
 
     SpreadsheetApp: {
       getActiveSpreadsheet: () => null,
       openById: id => {
-        if (!spreadsheet || id !== spreadsheet.getId()) throw new Error('not found');
-        spreadsheet.stats.opens++;
-        return spreadsheet;
+        const found = spreadsheets.find(s => s.getId() === id);
+        if (!found) throw new Error('not found');
+        found.stats.opens++;
+        return found;
       },
-      create: () => { spreadsheet = new FakeSpreadsheet(user); return spreadsheet; },
+      // the first one is the content Sheet (setup()); later ones get their own ids (the competitions spreadsheet)
+      create: name => {
+        const made = new FakeSpreadsheet(user, spreadsheets.length ? `sheet-id-${spreadsheets.length + 123}` : 'sheet-id-123', String(name || ''));
+        spreadsheets.push(made);
+        if (!spreadsheet) spreadsheet = made;
+        return made;
+      },
       getUi: () => { throw new Error('no UI in tests'); },
       newDataValidation: () => {
         let checkbox = false;
@@ -582,9 +608,18 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
       base64Encode: bytes => Buffer.from(bytes.map(b => (b < 0 ? b + 256 : b))).toString('base64'),
       // RS256 like Apps Script: (text, PEM key) -> signed Byte[]
       // HMAC-SHA256 like Apps Script: (value, key[, charset]) strings (UTF-8) -> signed Byte[]
-      computeHmacSha256Signature: (value, key) => [...createHmac('sha256', Buffer.from(String(key), 'utf8')).update(String(value), 'utf8').digest()].map(b => (b > 127 ? b - 256 : b)),
+      // … or (Byte[], Byte[]) (signed bytes), the other overload
+      computeHmacSha256Signature: (value, key) => {
+        const bytes = data => (Array.isArray(data) ? Buffer.from(data.map(b => (b < 0 ? b + 256 : b))) : Buffer.from(String(data), 'utf8'));
+        return [...createHmac('sha256', bytes(key)).update(bytes(value)).digest()].map(b => (b > 127 ? b - 256 : b));
+      },
       computeRsaSha256Signature: (text, key) => [...createSign('RSA-SHA256').update(String(text), 'utf8').sign(key)].map(b => (b > 127 ? b - 256 : b)),
       base64EncodeWebSafe: bytes => Buffer.from(typeof bytes === 'string' ? Buffer.from(bytes, 'utf8') : bytes.map(b => (b < 0 ? b + 256 : b))).toString('base64').replace(/\+/g, '-').replace(/\//g, '_'),
+      // like Apps Script: web-safe base64 (padded) → Byte[]; anything else throws
+      base64DecodeWebSafe: text => {
+        if (typeof text !== 'string' || !/^[A-Za-z0-9_-]*={0,2}$/.test(text) || text.length % 4 !== 0) throw new Error('Could not decode string.');
+        return [...Buffer.from(text.replace(/-/g, '+').replace(/_/g, '/'), 'base64')].map(b => (b > 127 ? b - 256 : b));
+      },
       sleep: () => {},
       newBlob: data => {
         const buffer = typeof data === 'string' ? Buffer.from(data, 'utf8') : Buffer.from(data.map(b => (b < 0 ? b + 256 : b)));
@@ -667,7 +702,8 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
 
   });
 
-  for (const file of ['Platforms.gs', 'Content.gs', 'Hub.gs', 'Review.gs', 'Seed.gs', 'Auth.gs', 'Store.gs', 'Publish.gs', 'Code.gs', 'Media.gs', 'Items.gs', 'Import.gs', 'Migrate.gs', 'Api.gs', 'Presence.gs', 'Route.gs', 'Push.gs', 'Activity.gs', 'AdminNotify.gs', 'AdminDevice.gs']) {
+  for (const file of ['Platforms.gs', 'Content.gs', 'Hub.gs', 'Review.gs', 'Seed.gs', 'Auth.gs', 'Store.gs', 'Publish.gs', 'Code.gs', 'Media.gs', 'Items.gs', 'Import.gs', 'Migrate.gs', 'Api.gs', 'Presence.gs', 'Route.gs', 'Push.gs', 'Activity.gs', 'AdminNotify.gs', 'AdminDevice.gs',
+    'CompStore.gs', 'CompModel.gs', 'CompScore.gs', 'CompCrypto.gs', 'CompPublic.gs', 'CompAdmin.gs', 'CompPublish.gs']) {
     vm.runInContext(readFileSync(`${ROOT}apps-script/${file}`, 'utf8'), context, { filename: file });
   }
 
@@ -683,10 +719,16 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
     webRequests,
     fcm,
     get spreadsheet() { return spreadsheet; },
+    /** every spreadsheet made; compSpreadsheet = the one COMP_SHEET_ID names (or null) */
+    spreadsheets,
+    get compSpreadsheet() { return spreadsheets.find(s => s.getId() === properties.get('COMP_SHEET_ID')) || null; },
     properties,
     cache,
     clock,
     scriptLock,
+    userLock,
+    /** the world's clock (what Date.now gives the .gs code) */
+    now,
     /** moves the world's clock (Date.now in the .gs code, cache expiry) */
     advance(ms) { clock.skew += ms; return this; },
     idTokens,

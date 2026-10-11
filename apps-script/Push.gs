@@ -461,6 +461,10 @@ function pushItemState_(content, item, now) {
     if (!found) return 'hidden';
     targetSection = target.kind === 'news' ? 'news' : target.kind === 'game' ? 'games' : found.section;
   }
+  if (target && target.kind === 'competition') {
+    var published = (Array.isArray(content.competitions) ? content.competitions : []).some(function (c) { return c && c.slug === target.slug; });
+    if (!published) return 'hidden';
+  }
 
   if ((bySection && !live(bySection)) || (targetSection && !live(targetSection))) {
     return 'hidden';
@@ -478,6 +482,10 @@ function pushUrl_(target) {
   if (target.kind === 'meeting') return '/#meeting';
   if ((target.kind === 'news' || target.kind === 'game' || target.kind === 'activity') && /^[\w-]{1,60}$/.test(String(target.id || ''))) {
     return '/#' + target.kind + '/' + target.id;
+  }
+  // a competition has its own page (same tab)
+  if (target.kind === 'competition' && /^[a-z0-9-]{2,40}$/.test(String(target.slug || ''))) {
+    return '/competition/' + target.slug + '/';
   }
 
   // an outside link: the site's bell, where the item links out

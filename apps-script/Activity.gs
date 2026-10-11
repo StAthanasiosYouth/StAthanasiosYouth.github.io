@@ -92,16 +92,19 @@ var ADMIN_NAME_MAX = 40;
 
 var ACTIVITY_ACTIONS = ['create', 'update', 'delete', 'archive', 'unarchive', 'enable', 'disable', 'duplicate', 'reorder', 'settings',
   'publish', 'push', 'upload', 'media.update', 'media.delete', 'media.restore', 'media.purge', 'import', 'live.stage',
-  'admin.add', 'admin.remove', 'admin.rename', 'migrate', 'session.takeover'];
+  'admin.add', 'admin.remove', 'admin.rename', 'migrate', 'session.takeover',
+  // competitions (docs/COMPETITIONS.md §11): never a code, a phone or an answer in `changes`
+  'review', 'finalize', 'regrade', 'close', 'code.view', 'code.reset', 'code.export', 'participant.phone', 'points.adjust', 'redemption.status'];
 
 var ACTIVITY_TYPES = ['sessions', 'news', 'games', 'activities', 'notifications', 'types', 'links', 'sections', 'contacts',
-  'settings', 'media', 'site', 'admins', 'data', 'session'];
+  'settings', 'media', 'site', 'admins', 'data', 'session',
+  'competition', 'participant', 'points', 'shopitem', 'redemption'];
 
 /* small, repeatable actions: merged into the admin's last row for the same thing */
-var ACTIVITY_MERGEABLE = ['update', 'reorder', 'settings', 'enable', 'disable', 'media.update', 'live.stage'];
+var ACTIVITY_MERGEABLE = ['update', 'reorder', 'settings', 'enable', 'disable', 'media.update', 'live.stage', 'review', 'code.view'];
 
 /* the content people see: create/delete notify now, edits with a cooldown */
-var ACTIVITY_CONTENT = ['sessions', 'news', 'games', 'activities', 'notifications'];
+var ACTIVITY_CONTENT = ['sessions', 'news', 'games', 'activities', 'notifications', 'competition'];
 var ACTIVITY_PAGE_PARTS = ['links', 'sections', 'contacts'];
 
 /*
@@ -109,7 +112,8 @@ var ACTIVITY_PAGE_PARTS = ['links', 'sections', 'contacts'];
  */
 var ACTIVITY_FAMILIES = {
   add: ['create', 'upload', 'import', 'duplicate'],
-  edit: ['update', 'settings', 'reorder', 'enable', 'disable', 'archive', 'unarchive', 'media.update', 'media.restore', 'live.stage'],
+  edit: ['update', 'settings', 'reorder', 'enable', 'disable', 'archive', 'unarchive', 'media.update', 'media.restore', 'live.stage',
+    'review', 'finalize', 'regrade', 'close', 'code.view', 'code.reset', 'code.export', 'participant.phone', 'points.adjust', 'redemption.status'],
   remove: ['delete', 'media.delete', 'media.purge'],
   publish: ['publish'],
   push: ['push'],
@@ -125,11 +129,17 @@ var ACTIVITY_SECTIONS = {
   page: ['links', 'sections', 'contacts', 'settings'],
   media: ['media'],
   site: ['site', 'data'],
-  admins: ['admins', 'session']
+  admins: ['admins', 'session'],
+  competitions: ['competition', 'participant', 'points', 'shopitem', 'redemption']
 };
 
 /* how each kind of thing is named: the (title), a new one, several */
 var ACTIVITY_NOUNS = {
+  competition: { one: 'المسابقة', fresh: 'مسابقة جديدة', many: 'المسابقات' },
+  participant: { one: 'المشترك', fresh: 'مشترك جديد', many: 'المشتركين' },
+  points: { one: 'نقاط', fresh: 'نقاط', many: 'النقاط' },
+  shopitem: { one: 'الجايزة', fresh: 'جايزة جديدة', many: 'الجوايز' },
+  redemption: { one: 'طلب الجايزة', fresh: 'طلب جايزة', many: 'طلبات الجوايز' },
   sessions: { one: 'الاجتماع', fresh: 'اجتماع جديد', many: 'الاجتماعات' },
   news: { one: 'الخبر', fresh: 'خبر جديد', many: 'الأخبار' },
   games: { one: 'اللعبة', fresh: 'لعبة جديدة', many: 'الألعاب' },
@@ -497,7 +507,23 @@ function activitySummary_(entry) {
     case 'media.delete': return 'رمى ' + thing + ' في سلة المحذوفات';
     case 'media.restore': return 'رجّع ' + thing + ' من سلة المحذوفات';
     case 'media.purge': return 'مسح ' + thing + ' نهائيًا';
-    case 'import': return 'استورد اجتماعات من ملف (' + activityDigits_(changes.added || 0) + ' جديد، ' + activityDigits_(changes.updated || 0) + ' متعدّل)';
+    case 'import':
+      if (type === 'competition') return 'استورد ' + activityDigits_(changes.added || 0) + ' سؤال في ' + thing;
+      if (type === 'participant') return 'استورد ' + activityDigits_(changes.added || 0) + ' مشترك';
+      return 'استورد اجتماعات من ملف (' + activityDigits_(changes.added || 0) + ' جديد، ' + activityDigits_(changes.updated || 0) + ' متعدّل)';
+    case 'review':
+      if (changes['void'] === true) return 'لغى مشاركة في ' + thing;
+      if (changes['void'] === false) return 'رجّع مشاركة في ' + thing;
+      return 'راجع ' + activityDigits_(changes.answers || 1) + ' إجابة' + (changes.q ? ' في ' + activityText_(changes.q, 10) : '') + ' في ' + thing;
+    case 'finalize': return changes.undo ? 'رجّع اعتماد نتايج ' + thing : 'اعتمد نتايج ' + thing;
+    case 'regrade': return 'صحّح ' + thing + ' تاني (' + activityDigits_(changes.changed || 0) + ' مشاركة اتغيرت)';
+    case 'close': return changes.reopen ? 'فتح ' + thing + ' تاني' : 'قفل ' + thing;
+    case 'code.view': return 'شاف كود ' + quoted(title);
+    case 'code.reset': return 'عمل كود جديد لـ ' + quoted(title);
+    case 'code.export': return 'صدّر أكواد (' + activityDigits_(changes.count || 0) + ')';
+    case 'participant.phone': return 'غيّر رقم ' + quoted(title);
+    case 'points.adjust': return 'عدّل نقاط ' + quoted(title);
+    case 'redemption.status': return 'غيّر حالة ' + thing;
     case 'live.stage': return 'غيّر الفقرة الحالية في ' + thing;
     case 'admin.add': return 'ضاف ' + quoted(title) + ' للوحة التحكم';
     case 'admin.remove': return 'شال صلاحية ' + quoted(changes.name || title);
@@ -603,6 +629,8 @@ function mergeChanges_(older, newer) {
 
   if (older.title && newer.title) result.title = [older.title[0], newer.title[1]];
   if (older.other || newer.other) result.other = (older.other || 0) + (newer.other || 0);
+  // reviews merged within the window: their answers add up («راجع ٣١ إجابة»)
+  if (typeof older.answers === 'number' && typeof newer.answers === 'number') result.answers = older.answers + newer.answers;
 
   return result;
 

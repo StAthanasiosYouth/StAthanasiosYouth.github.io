@@ -29,6 +29,11 @@
  *
  * Anything missing or wrong fails closed, for every function. Responses never
  * contain Script Properties, the token, or the GitHub token.
+ *
+ * A few public actions come first, with no token at all and their own
+ * checks: route (Route.gs), pushSubscribe / pushUnsubscribe (Push.gs),
+ * deviceSignIn (AdminDevice.gs) and every comp* / portal* / shop* action
+ * (CompPublic.gs, docs/COMPETITIONS.md §5).
  */
 
 var ID_TOKEN_ISSUERS = ['accounts.google.com', 'https://accounts.google.com'];
@@ -104,7 +109,35 @@ function apiFunctions_() {
     apiAdminPushDevices: apiAdminPushDevices,
     apiAdminPushRemoveDevice: apiAdminPushRemoveDevice,
     apiTrustDevice: apiTrustDevice,
-    apiForgetDevice: apiForgetDevice
+    apiForgetDevice: apiForgetDevice,
+    // competitions (CompAdmin.gs, docs/COMPETITIONS.md §10)
+    apiComps: apiComps,
+    apiComp: apiComp,
+    apiCompCreate: apiCompCreate,
+    apiCompSave: apiCompSave,
+    apiCompDuplicate: apiCompDuplicate,
+    apiCompArchive: apiCompArchive,
+    apiCompDelete: apiCompDelete,
+    apiCompClose: apiCompClose,
+    apiCompFinalize: apiCompFinalize,
+    apiCompSettings: apiCompSettings,
+    apiCompQuestionSave: apiCompQuestionSave,
+    apiCompQuestionDuplicate: apiCompQuestionDuplicate,
+    apiCompQuestionDelete: apiCompQuestionDelete,
+    apiCompQuestionsReorder: apiCompQuestionsReorder,
+    apiCompImportPreview: apiCompImportPreview,
+    apiCompImportApply: apiCompImportApply,
+    apiCompPreviewGrade: apiCompPreviewGrade,
+    apiCompPreviewDefinition: apiCompPreviewDefinition,
+    apiCompSubmissions: apiCompSubmissions,
+    apiCompSubmission: apiCompSubmission,
+    apiCompGrade: apiCompGrade,
+    apiCompGradeGroup: apiCompGradeGroup,
+    apiCompReviewQueue: apiCompReviewQueue,
+    apiCompRegrade: apiCompRegrade,
+    apiCompVoid: apiCompVoid,
+    apiCompResults: apiCompResults,
+    apiCompExport: apiCompExport
   };
 
 }
@@ -134,6 +167,12 @@ function doPost(e) {
     // the two public push actions (Push.gs): one FCM token in or out, nothing read back
     if (request.fn === 'pushSubscribe' || request.fn === 'pushUnsubscribe') {
       return jsonOutput_(publicPush_(request.fn, request.args && request.args[0]));
+    }
+
+    // competitions, «نقاطي» and the store (CompPublic.gs): a participant's
+    // own actions, no admin token; their own validation, budget and size limit
+    if (/^(comp|portal|shop)[A-Z]\w*$/.test(request.fn)) {
+      return jsonOutput_(publicComp_(request.fn, request.args && request.args[0], request.size));
     }
 
     // the installed admin app's trusted device (AdminDevice.gs): a signed
@@ -247,7 +286,7 @@ function readApiRequest_(e) {
     throw apiError_('bad', 'الطلب مش مفهوم.', 'اعمل Refresh للصفحة.');
   }
 
-  return { fn: data.fn, args: data.args || [], token: typeof data.token === 'string' ? data.token : '', sid: typeof data.sid === 'string' ? data.sid : '' };
+  return { fn: data.fn, args: data.args || [], token: typeof data.token === 'string' ? data.token : '', sid: typeof data.sid === 'string' ? data.sid : '', size: body.length };
 
 }
 

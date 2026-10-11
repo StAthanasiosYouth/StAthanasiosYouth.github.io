@@ -1099,9 +1099,17 @@ function buildPublicContent(draft, options) {
   });
 
 
+  /* ---------- competitions (CompModel.gs; the competitions spreadsheet's draft) ---------- */
+
+  var competitions = draft.competitions && typeof compBuildPublic_ === 'function'
+    ? compBuildPublic_(draft.competitions, { media: mediaById, error: error, warn: warn, hash: options.hash, now: now })
+    : null;
+
+
   /* ---------- hub: sessions, news, games, notifications (Hub.gs) ---------- */
 
   var hub = buildHub_(draft, {
+    competitions: competitions,
     now: now,
     error: error,
     warn: warn,
@@ -1127,6 +1135,11 @@ function buildPublicContent(draft, options) {
   var usedMedia = hub.usedMedia.slice();
 
   extraMedia.forEach(function (id) {
+    if (usedMedia.indexOf(id) === -1) usedMedia.push(id);
+  });
+
+  // a competition's banner, icon, question and explanation pictures (compStart shows them)
+  (competitions ? competitions.media : []).forEach(function (id) {
     if (usedMedia.indexOf(id) === -1) usedMedia.push(id);
   });
   var banners = Object.create(null);
@@ -1170,6 +1183,13 @@ function buildPublicContent(draft, options) {
     layout: publicLayout_(layout.rows, sections, banners)
   };
 
+  // additive (schema stays 3), and only when there is one: content without
+  // competitions stays byte-identical. `v` = each definition's hash, so any
+  // change to a competition's public files changes the revision.
+  if (competitions && competitions.index.length) {
+    content.competitions = competitions.index;
+  }
+
   if (options.hash) {
     content.revision = contentRevision(content, options.hash);
   }
@@ -1183,7 +1203,9 @@ function buildPublicContent(draft, options) {
     errors: errors,
     warnings: warnings,
     // Media ids the published content shows (their files go in the commit)
-    media: usedMedia
+    media: usedMedia,
+    // live definitions, withdrawn ones, files to write (CompPublish.gs); null without competitions
+    competitions: competitions
   };
 
 }

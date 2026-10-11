@@ -3,6 +3,8 @@
  *
  * Draft (Sheet) -> buildPublicContent() -> one commit to GitHub containing
  * content.json and meeting.ics -> GitHub Pages redeploys (about a minute).
+ * Competitions (CompPublish.gs) add their stubs and comp.json files to the
+ * same commit; their private definitions go to the Snapshots tab first.
  *
  * Script Properties used (Project Settings > Script Properties):
  *   GITHUB_TOKEN   fine-grained token, this repository only,
@@ -271,6 +273,9 @@ function apiReview() {
 
   assertAdmin_();
 
+  // the review and the publish read the competitions spreadsheet itself, never a cached copy
+  if (typeof compDropDraft_ === 'function') compDropDraft_();
+
   var built = buildDraft_();
   var published = null;
   var githubError = '';
@@ -282,7 +287,9 @@ function apiReview() {
     githubError = error.message;
   }
 
-  var entries = published || !githubError ? describeChanges(published, built.content, cairoNow_()) : [];
+  var entries = published || !githubError
+    ? describeChanges(published, built.content, cairoNow_(), { competitions: typeof compReviewInfo_ === 'function' ? compReviewInfo_(built.competitions) : {} })
+    : [];
 
   return {
     revision: built.content.revision,
@@ -343,6 +350,8 @@ function apiPublish(expectedRevision) {
 
   try {
 
+    if (typeof compDropDraft_ === 'function') compDropDraft_();
+
     var now = new Date();
     var built = buildPublicContent(readDraft_(), {
       now: cairoNow_(now),
@@ -363,8 +372,18 @@ function apiPublish(expectedRevision) {
     var config = githubConfig_();
     var live = fetchPublishedContent_();
 
+    // competitions (CompPublish.gs): the definitions this publish makes live, before the commit
+    var stamp = Utilities.formatDate(now, CONTENT_TIMEZONE, 'yyyy-MM-dd HH:mm');
+    var comps = built.competitions || null;
+
+    if (comps) {
+      compWriteSnapshots_(comps, email, stamp);
+    }
+
     // same visible content already live: don't make an empty-change commit
     if (live && live.revision === built.content.revision) {
+      // (an earlier publish may have stopped right after its commit)
+      if (comps) compAfterCommit_(comps, stamp);
       PropertiesService.getScriptProperties().setProperty('PUBLISHED_REVISION', built.content.revision);
       activity_({ action: 'publish', type: 'site', id: built.content.revision, title: '', ref: built.content.revision, changes: { unchanged: true } });
       return {
@@ -392,6 +411,12 @@ function apiPublish(expectedRevision) {
       files['meeting.ics'] = ics;
     }
 
+    // competition/<slug>/index.html + comp.json (or the withdrawn comp.json): the same commit
+    if (comps) {
+      var compFiles = compPublishFiles_(comps, config.siteUrl, cairoNow_(now), Object.keys(comps.live).length ? compShellText_() : '');
+      Object.keys(compFiles).forEach(function (path) { files[path] = compFiles[path]; });
+    }
+
     // images used by the content that aren't on the site yet
     var media = mediaForPublish_(built.media);
 
@@ -406,6 +431,10 @@ function apiPublish(expectedRevision) {
     media.ids.forEach(function (id) {
       upsertRow_('Media', 'id', { id: id, publishedAt: nowStamp_() });
     });
+
+    if (comps) {
+      compAfterCommit_(comps, stamp);
+    }
 
     var props = PropertiesService.getScriptProperties();
 

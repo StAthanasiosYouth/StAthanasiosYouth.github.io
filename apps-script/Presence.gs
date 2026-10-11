@@ -58,7 +58,9 @@ var SESSION_KEEP_SECONDS = 21600;    // CacheService's limit (6 h)
 var SESSION_MAX_LOCKS = 6;           // an editor + a settings card's groups
 var SESSION_PARK_SECONDS = 45;       // a parked session (its page reloading) keeps its locks and shows online this long
 var SESSION_RESUME_SECONDS = 7200;    // a parked or quiet session can be picked up again by its tab this long
-var LOCK_KINDS = ['sessions', 'news', 'games', 'notifications', 'activities', 'types', 'links', 'contacts', 'sections', 'settings', 'media'];
+var LOCK_KINDS = ['sessions', 'news', 'games', 'notifications', 'activities', 'types', 'links', 'contacts', 'sections', 'settings', 'media',
+  // competitions (docs/COMPETITIONS.md §10): the builder, a participant, a store item
+  'comp', 'participant', 'shopitem'];
 
 
 /* =========================================================

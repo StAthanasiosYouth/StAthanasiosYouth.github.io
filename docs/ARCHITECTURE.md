@@ -539,6 +539,33 @@ already **live** on the site, sent once more to devices that opted in.
   A tap with an admin window open: the worker posts
   `{ type: 'athanasios-admin:open', url }` and focuses it (no second session).
 
+## Competitions (engine, Phase 1)
+
+The full design and build contract is **[docs/COMPETITIONS.md](COMPETITIONS.md)**
+(tabs, JSON shapes, error codes, the admin API). In short:
+
+- **A second, private spreadsheet** (`COMP_SHEET_ID`, made by the first admin
+  write) holds Competitions, Questions, Snapshots (the live, private
+  definitions, content-addressed) and Submissions. Server files:
+  `apps-script/Comp*.gs` (`CompModel.gs` and `CompScore.gs` are pure and
+  tested in Node).
+- **Publishing stays one button and one commit**: content.json gains a
+  `competitions` index whose `v` (the definition's hash) makes any
+  competition change a new revision; the commit also carries
+  `competition/<slug>/index.html` (a stub made from the engine shell
+  `competition/index.html`) and `comp.json` (no questions, no answers).
+  Question text, choices and keys never reach GitHub (a test scans every
+  committed file).
+- **The only dynamic public calls** are `comp*` (and later `portal*` /
+  `shop*`) through the same `doPost`, before the admin token check:
+  start / submit / result with stateless HMAC tokens, the server's clock,
+  idempotency keys, a 300/min budget, 64 KB requests, grading before a short
+  user-lock section (one row written per submit).
+- The admin works through `apiComp*` (not `mutate_`); live writes (grading)
+  only from `/admin/`. Cards (Activities `competition` column), bell targets
+  `competition:<slug>`, media usage, the review and «سجل النشاط» know
+  competitions. `apiState` reads them through a cache.
+
 ## Ready for later (not built yet)
 
 - **Push, later:** categories (الاجتماعات / الأخبار / المسابقات والأنشطة) as

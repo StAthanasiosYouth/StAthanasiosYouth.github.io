@@ -57,7 +57,18 @@ const ARGS = {
   apiPushState: [], apiPushCheck: [], apiSendPush: ['notif-x', 's-0123456789', {}],
   apiActivity: [{}], apiSetAdminName: [SECOND, 'اسم'],
   apiAdminPushSubscribe: [{ token: 'x' }], apiAdminPushUnsubscribe: [{ token: 'x' }], apiAdminPushDevices: [{}], apiAdminPushRemoveDevice: ['h0123456789abcde'],
-  apiTrustDevice: [{}], apiForgetDevice: [{}]
+  apiTrustDevice: [{}], apiForgetDevice: [{}],
+  // competitions (tests/comp-*.test.mjs)
+  apiComps: [], apiComp: ['cmp-00000000'], apiCompCreate: [{ title: 'x' }], apiCompSave: ['cmp-00000000', { title: 'x' }],
+  apiCompDuplicate: ['cmp-00000000'], apiCompArchive: ['cmp-00000000', true], apiCompDelete: ['cmp-00000000'],
+  apiCompClose: ['cmp-00000000'], apiCompFinalize: ['cmp-00000000', true], apiCompSettings: [{ registry: false }],
+  apiCompQuestionSave: ['cmp-00000000', { type: 'short', text: 'x' }], apiCompQuestionDuplicate: ['cmp-00000000', 'q-00000000'],
+  apiCompQuestionDelete: ['cmp-00000000', 'q-00000000'], apiCompQuestionsReorder: ['cmp-00000000', []],
+  apiCompImportPreview: ['cmp-00000000', 'السؤال\nx'], apiCompImportApply: ['cmp-00000000', 'السؤال\nx', {}],
+  apiCompPreviewGrade: ['cmp-00000000', {}], apiCompPreviewDefinition: ['cmp-00000000'], apiCompSubmissions: ['cmp-00000000', {}],
+  apiCompSubmission: ['s-000000000000'], apiCompGrade: ['s-000000000000', { 'q-00000000': true }],
+  apiCompGradeGroup: ['cmp-00000000', 'q-00000000', 'x', 1], apiCompReviewQueue: ['cmp-00000000'], apiCompRegrade: ['cmp-00000000'],
+  apiCompVoid: ['s-000000000000', true], apiCompResults: ['cmp-00000000'], apiCompExport: ['cmp-00000000']
 };
 
 /*

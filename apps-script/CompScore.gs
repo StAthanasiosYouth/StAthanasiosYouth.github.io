@@ -1,0 +1,420 @@
+/**
+ * COMPETITIONS: SCORING (pure — no Google services; runs in Apps Script
+ * and in Node: tests/comp-score.test.mjs). docs/COMPETITIONS.md §6.
+ *
+ * A definition (CompModel.gs compDefinition_) carries the private parts
+ * (correct answers, review modes); everything here works on it:
+ *
+ *   compNormalizeText_(s)            Arabic-aware comparison form
+ *   compNumber_(v)                   a typed number (Arabic digits ok) or null
+ *   compValidateAnswers_(def, qids, answers)  what the browser sent, checked
+ *   compGrade_(def, answers, opts)   → { grading, score, maxScore, correctCount,
+ *                                        gradableCount, pendingCount, status }
+ *   compApplyManual_(grading, qid, pts, email, def, at)   a reviewer's mark
+ *   compRegrade_(def, answers, grading, qids, at)          new key, manual marks kept
+ *
+ * The browser never sends a score: only `answers` is ever read.
+ */
+
+var COMP_ANSWER_LIMITS = { short: 200, long: 3000, total: 40000, number: 40 };
+
+
+/* =========================================================
+   NORMALIZATION
+========================================================= */
+
+/**
+ * NFC; no tashkeel (U+064B–U+0652, U+0670), tatweel, bidi marks;
+ * أ إ آ ٱ → ا, ة → ه, ى → ي, ؤ → و, ئ → ي; Arabic/Persian digits → ASCII;
+ * lower case; one space; trimmed.
+ */
+function compNormalizeText_(value) {
+
+  var text = String(value === null || value === undefined ? '' : value);
+
+  if (typeof text.normalize === 'function') {
+    text = text.normalize('NFC');
+  }
+
+  return text
+    .replace(/[ً-ْٰ]/g, '')
+    .replace(/ـ/g, '')
+    .replace(/[‎‏؜‪-‮⁦-⁩]/g, '')
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/ؤ/g, 'و')
+    .replace(/ئ/g, 'ي')
+    .replace(/[٠-٩]/g, function (d) { return String(d.charCodeAt(0) - 0x0660); })
+    .replace(/[۰-۹]/g, function (d) { return String(d.charCodeAt(0) - 0x06F0); })
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+
+}
+
+
+/* a typed number → a finite number, or null ("٤٠", "3.5", "٣٫٥", " 40 ") */
+function compNumber_(value) {
+
+  if (typeof value === 'number') {
+    return isFinite(value) ? value : null;
+  }
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  var text = compNormalizeText_(value)
+    .replace(/٫/g, '.')
+    .replace(/[٬\s]/g, '');
+
+  // a single comma is a decimal point (like contentNumber_), never a thousands mark
+  if (text.indexOf('.') === -1 && (text.match(/,/g) || []).length === 1) {
+    text = text.replace(',', '.');
+  }
+
+  if (!text || text.length > COMP_ANSWER_LIMITS.number || !/^[+-]?(\d+(\.\d*)?|\.\d+)$/.test(text)) {
+    return null;
+  }
+
+  var number = Number(text);
+
+  return isFinite(number) ? number : null;
+
+}
+
+
+/* the stored, canonical text of a number ('' when not one) */
+function compNumberText_(value) {
+
+  var number = compNumber_(value);
+
+  return number === null ? '' : String(number);
+
+}
+
+
+function compEmpty_(value) {
+
+  return value === undefined || value === null || value === '' ||
+    (typeof value === 'string' && !value.trim()) ||
+    (Array.isArray(value) && !value.length);
+
+}
+
+
+/* what a group of answers is matched by (manual review «زي بعض»), '' = unanswered */
+function compAnswerKey_(question, value) {
+
+  if (compEmpty_(value)) return '';
+
+  switch (question.type) {
+    case 'short':
+    case 'long':
+      return compNormalizeText_(value);
+    case 'number':
+      return compNumberText_(value);
+    case 'multi':
+      return Array.isArray(value) ? value.slice().sort().join(',') : '';
+    default:
+      return String(value);
+  }
+
+}
+
+
+/* =========================================================
+   ANSWERS FROM THE BROWSER (docs/COMPETITIONS.md §5.2)
+========================================================= */
+
+/**
+ * def: a definition; qids: the attempt's question ids (what was served);
+ * answers: { qid: value } as sent. Unknown qids, foreign choice ids, wrong
+ * types, over-long text and missing required answers are problems.
+ * → { answers: { qid: clean value }, problems: [{ qid, message }] }
+ */
+function compValidateAnswers_(def, qids, answers) {
+
+  var problems = [];
+  var clean = {};
+  var byId = Object.create(null);
+
+  (def.questions || []).forEach(function (q) {
+    if (qids.indexOf(q.id) !== -1) byId[q.id] = q;
+  });
+
+  if (answers === undefined || answers === null) {
+    answers = {};
+  }
+
+  if (typeof answers !== 'object' || Array.isArray(answers)) {
+    return { answers: {}, problems: [{ qid: '', message: 'الإجابات مش مفهومة' }] };
+  }
+
+  Object.keys(answers).forEach(function (key) {
+    if (!byId[key]) problems.push({ qid: String(key).slice(0, 40), message: 'السؤال ده مش من المسابقة' });
+  });
+
+  qids.forEach(function (qid) {
+
+    var q = byId[qid];
+
+    if (!q) return;
+
+    var value = answers[qid];
+    var bad = function (message) { problems.push({ qid: qid, message: message }); };
+
+    if (q.type === 'info') return;
+
+    if (compEmpty_(value)) {
+      if (q.required) bad('السؤال ده إجباري');
+      return;
+    }
+
+    var ids = (q.choices || []).map(function (c) { return c.id; });
+
+    switch (q.type) {
+
+      case 'single':
+        if (typeof value !== 'string' || ids.indexOf(value) === -1) return bad('الاختيار ده مش من اختيارات السؤال');
+        clean[qid] = value;
+        return;
+
+      case 'multi': {
+        if (!Array.isArray(value) || value.length > ids.length) return bad('الاختيارات مش مفهومة');
+        var seen = Object.create(null);
+        for (var i = 0; i < value.length; i++) {
+          if (typeof value[i] !== 'string' || ids.indexOf(value[i]) === -1) return bad('الاختيار ده مش من اختيارات السؤال');
+          if (seen[value[i]]) return bad('نفس الاختيار متكرر');
+          seen[value[i]] = true;
+        }
+        // in the question's own order: the same set always looks the same
+        clean[qid] = ids.filter(function (id) { return seen[id]; });
+        return;
+      }
+
+      case 'truefalse':
+        if (value !== 't' && value !== 'f') return bad('الإجابة لازم تكون صح أو غلط');
+        clean[qid] = value;
+        return;
+
+      case 'short':
+      case 'long': {
+        if (typeof value !== 'string') return bad('الإجابة لازم تكون كلام');
+        var text = String(value).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').replace(/\r\n?/g, '\n').trim();
+        if (q.type === 'short') text = text.replace(/\s+/g, ' ');
+        var max = q.type === 'short' ? COMP_ANSWER_LIMITS.short : COMP_ANSWER_LIMITS.long;
+        if (text.length > max) return bad('الإجابة أطول من ' + max + ' حرف');
+        if (!text) {
+          if (q.required) bad('السؤال ده إجباري');
+          return;
+        }
+        clean[qid] = text;
+        return;
+      }
+
+      case 'number': {
+        if (typeof value !== 'string' && typeof value !== 'number') return bad('الرقم مش مفهوم');
+        var number = compNumberText_(typeof value === 'number' ? value : String(value));
+        if (!number) return bad('الرقم مش مفهوم');
+        clean[qid] = number;
+        return;
+      }
+
+      default:
+        bad('نوع السؤال مش معروف');
+
+    }
+
+  });
+
+  if (!problems.length && JSON.stringify(clean).length > COMP_ANSWER_LIMITS.total) {
+    problems.push({ qid: '', message: 'الإجابات أطول من المسموح' });
+  }
+
+  return { answers: clean, problems: problems };
+
+}
+
+
+/* =========================================================
+   GRADING
+========================================================= */
+
+/* one question, automatically: { ok: true | false | null (pending), pts, by: 'auto', at } */
+function compGradeOne_(question, value, at) {
+
+  var entry = { ok: false, pts: 0, by: 'auto', at: at || '' };
+
+  if (compEmpty_(value)) {
+    return entry;
+  }
+
+  var correct = question.correct;
+  var ok = false;
+
+  switch (question.type) {
+
+    case 'single':
+    case 'truefalse':
+      ok = typeof correct === 'string' && value === correct;
+      break;
+
+    case 'multi':
+      ok = Array.isArray(correct) && Array.isArray(value) && correct.length === value.length &&
+        correct.every(function (id) { return value.indexOf(id) !== -1; });
+      break;
+
+    case 'number': {
+      var want = compNumber_(String(correct === null || correct === undefined ? '' : correct));
+      var got = compNumber_(typeof value === 'number' ? value : String(value));
+      ok = want !== null && got !== null && Math.abs(want - got) < 1e-9;
+      break;
+    }
+
+    case 'short': {
+      if (question.review === 'manual') {
+        entry.ok = null;
+        return entry;
+      }
+      var said = compNormalizeText_(value);
+      ok = Array.isArray(correct) && correct.some(function (accepted) { return compNormalizeText_(accepted) === said && said !== ''; });
+      if (!ok && question.review === 'fallback') {
+        entry.ok = null;
+        return entry;
+      }
+      break;
+    }
+
+    case 'long':
+      entry.ok = null;
+      return entry;
+
+    default:
+      return entry;
+
+  }
+
+  entry.ok = ok;
+  entry.pts = ok ? Number(question.points) || 0 : 0;
+
+  return entry;
+
+}
+
+
+/**
+ * The totals of a grading over the definition's gradable questions (all but
+ * info), limited to qids when given (the questions the attempt was served).
+ * Scoring off: everything 0, status 'submitted'.
+ */
+function compTotals_(def, grading, qids) {
+
+  var totals = { grading: grading, score: 0, maxScore: 0, correctCount: 0, gradableCount: 0, pendingCount: 0, status: 'submitted' };
+
+  if (!def.scoring) {
+    return totals;
+  }
+
+  (def.questions || []).forEach(function (q) {
+
+    if (q.type === 'info' || (qids && qids.indexOf(q.id) === -1)) return;
+
+    var g = grading[q.id] || { ok: false, pts: 0 };
+
+    totals.gradableCount++;
+    totals.maxScore += Number(q.points) || 0;
+    totals.score += Number(g.pts) || 0;
+
+    if (g.ok === true) totals.correctCount++;
+    if (g.ok === null) totals.pendingCount++;
+
+  });
+
+  totals.status = totals.pendingCount ? 'pending_review' : 'graded';
+
+  return totals;
+
+}
+
+
+/**
+ * def: the definition the person was served; answers: clean answers;
+ * opts: { qids, at }. → totals (compTotals_) with the grading.
+ */
+function compGrade_(def, answers, opts) {
+
+  opts = opts || {};
+
+  var qids = opts.qids || null;
+  var grading = {};
+
+  (def.questions || []).forEach(function (q) {
+
+    if (q.type === 'info' || (qids && qids.indexOf(q.id) === -1)) return;
+
+    grading[q.id] = def.scoring
+      ? compGradeOne_(q, answers ? answers[q.id] : undefined, opts.at)
+      : { ok: null, pts: 0, by: 'auto', at: opts.at || '' };
+
+  });
+
+  return compTotals_(def, grading, qids);
+
+}
+
+
+/**
+ * A reviewer's mark on one question: true (full points), false (0), a number
+ * 0..points (ok = pts > 0), or null = back to «لسه بتتراجع». Returns the new
+ * totals, or null when the question can't be graded (unknown, info, scoring off).
+ */
+function compApplyManual_(grading, qid, pts, email, def, at) {
+
+  var q = (def.questions || []).filter(function (x) { return x.id === qid; })[0];
+
+  if (!q || q.type === 'info' || !def.scoring) {
+    return null;
+  }
+
+  var copy = {};
+
+  Object.keys(grading || {}).forEach(function (key) { copy[key] = grading[key]; });
+
+  if (pts === null) {
+    copy[qid] = { ok: null, pts: 0, by: String(email || ''), at: at || '' };
+  }
+  else {
+    // true = «صح» (full points), false = «غلط», a number = those points (partial counts as right)
+    var points = Number(q.points) || 0;
+    var value = pts === true ? points : pts === false ? 0 : Math.max(0, Math.min(points, Math.round(Number(pts) || 0)));
+    var ok = pts === true ? true : pts === false ? false : value > 0;
+    copy[qid] = { ok: ok, pts: value, by: String(email || ''), at: at || '' };
+  }
+
+  return compTotals_(def, copy, Object.keys(copy));
+
+}
+
+
+/**
+ * Grades again with a (new) key: automatic marks follow the key; a
+ * reviewer's marks (by !== 'auto') are kept. Questions the definition no
+ * longer has keep what they had.
+ */
+function compRegrade_(def, answers, grading, qids, at) {
+
+  var fresh = compGrade_(def, answers, { qids: qids, at: at }).grading;
+  var merged = {};
+
+  Object.keys(grading || {}).forEach(function (key) { merged[key] = grading[key]; });
+
+  Object.keys(fresh).forEach(function (key) {
+    var old = grading ? grading[key] : null;
+    merged[key] = old && old.by && old.by !== 'auto' ? old : fresh[key];
+  });
+
+  return compTotals_(def, merged, qids);
+
+}

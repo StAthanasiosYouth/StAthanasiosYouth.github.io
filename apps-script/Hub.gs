@@ -750,6 +750,22 @@ function buildHub_(draft, ctx) {
     var where = 'الفعاليات: ' + (title || ('صف ' + (row.__index + 2)));
     var type = types[contentLine_(row.type).toLowerCase()];
 
+    // a card linked to a competition follows it (title, line, picture, dates)
+    // and the page links it to competition/<slug>/; a competition that is not
+    // in this publish hides its card. Without competitions data: as before.
+    var linkedId = contentLine_(row.competition);
+    var linked = null;
+
+    if (linkedId && ctx.competitions) {
+      linked = ctx.competitions.byId[linkedId] || null;
+      if (!linked) {
+        ctx.warn(where, 'المسابقة المربوطة بالكارت ده مش في النشر ده، فالكارت مش هيظهر');
+        return;
+      }
+      title = linked.title;
+      where = 'الفعاليات: ' + title;
+    }
+
     if (!type) {
       ctx.error(where, 'النوع "' + contentLine_(row.type) + '" مش موجود أو مقفول في شيت Types');
       return;
@@ -768,15 +784,15 @@ function buildHub_(draft, ctx) {
       ctx.error(where, 'العنوان مطلوب');
     }
 
-    var urlText = contentLine_(row.url);
+    var urlText = linked ? '' : contentLine_(row.url);
     var url = safeHttpsUrl(urlText);
 
     if (urlText && !url) {
       ctx.error(where, 'اللينك لازم يبدأ بـ https://');
     }
 
-    var startAt = dateTime(where, row.startAt, false, 'بيبدأ');
-    var endAt = dateTime(where, row.endAt, true, 'بيخلص');
+    var startAt = linked ? linked.startAt : dateTime(where, row.startAt, false, 'بيبدأ');
+    var endAt = linked ? linked.endAt : dateTime(where, row.endAt, true, 'بيخلص');
     var visibleFrom = dateTime(where, row.visibleFrom, false, 'يظهر من');
     var visibleUntil = dateTime(where, row.visibleUntil, true, 'يختفي بعد') || endAt;
 
@@ -793,14 +809,14 @@ function buildHub_(draft, ctx) {
     activitySection[id] = type.section;
     usedTypes[type.key] = true;
 
-    activities.push({
+    var card = {
       id: id,
       type: type.key,
       section: type.section,
       title: ctx.limited(where, title, 80, 'العنوان'),
-      subtitle: ctx.limited(where, contentLine_(row.subtitle), 140, 'السطر القصير'),
+      subtitle: ctx.limited(where, linked ? linked.subtitle : contentLine_(row.subtitle), 140, 'السطر القصير'),
       description: ctx.limited(where, contentText_(row.description).replace(/\n{3,}/g, '\n\n'), 1500, 'التفاصيل'),
-      image: image(where, row.image),
+      image: image(where, linked && linked.bannerId ? linked.bannerId : row.image),
       cta: url ? { label: ctx.limited(where, contentLine_(row.ctaLabel) || type.ctaDefault || 'التفاصيل', 24, 'نص الزرار'), url: url } : null,
       location: ctx.limited(where, contentLine_(row.location), 120, 'المكان'),
       startAt: startAt,
@@ -810,7 +826,15 @@ function buildHub_(draft, ctx) {
       // «شكل العرض» ('' = تلقائي / زي الكمبيوتر)
       display: cardDisplay_(row.display),
       displayMobile: cardDisplay_(row.displayMobile, true)
-    });
+    };
+
+    // the page makes its button: same tab, competition/<slug>/ (its label from the competition)
+    if (linked) {
+      card.competition = linked.slug;
+      card.ctaLabel = linked.ctaLabel;
+    }
+
+    activities.push(card);
 
   });
 
@@ -880,9 +904,24 @@ function buildHub_(draft, ctx) {
     var targetText = contentLine_(row.target);
     var target = null;
     var match = /^(news|game|activity):([\w-]{1,60})$/.exec(targetText);
+    var compMatch = /^competition:([a-z0-9-]{2,40})$/.exec(targetText);
 
     if (!targetText) {
       target = null;
+    }
+    else if (compMatch) {
+      // a competition's page: { kind: 'competition', slug } → /competition/<slug>/
+      var compState = ctx.competitions ? ctx.competitions.slugs[compMatch[1]] : '';
+      if (!compState) {
+        ctx.error(where, 'الإشعار بيشاور على مسابقة مش موجودة: ' + compMatch[1]);
+      }
+      else if (compState !== 'live') {
+        ctx.warn(where, 'المسابقة بتاعته مش في النشر ده، فالإشعار ده مش هيظهر');
+        return;
+      }
+      else {
+        target = { kind: 'competition', slug: compMatch[1] };
+      }
     }
     else if (targetText === 'meeting') {
       if (!on('meeting')) {
@@ -916,7 +955,7 @@ function buildHub_(draft, ctx) {
       target = { kind: 'url', url: safeHttpsUrl(targetText) };
     }
     else {
-      ctx.error(where, 'الوجهة لازم تكون meeting أو news:id أو game:id أو لينك https');
+      ctx.error(where, 'الوجهة لازم تكون meeting أو news:id أو game:id أو competition:slug أو لينك https');
     }
 
     notifications.push({
