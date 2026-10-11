@@ -353,6 +353,8 @@ function cleanHub(raw) {
         visibleUntil: dateTime(a.visibleUntil),
         // a linked competition: the card's button opens competition/<slug>/ (same tab)
         competition: compSlug(a.competition),
+        // its button's words (from the competition; the card has no cta of its own)
+        ctaLabel: compSlug(a.competition) ? text(a.ctaLabel, 24) : '',
         ...display(a)
       };
     })

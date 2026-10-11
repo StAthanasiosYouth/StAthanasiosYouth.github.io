@@ -27,6 +27,10 @@ var COMP_FAIL_PER_DAY = 1000;
 var COMP_FAIL_PAUSE_MS = 300;
 var COMP_TOKEN_HOURS = 48;
 var COMP_DEADLINE_SLACK_MS = 60000;
+/* from this close to the time limit on, a submit is the page's automatic one: what was
+   answered goes in, unanswered required questions included (the page's clock may run a
+   little ahead of the server's) */
+var COMP_TIMEUP_EARLY_MS = 15000;
 var COMP_FAST_SECONDS = 2;
 var COMP_CLIENT_KEY = /^[A-Za-z0-9_-]{16,64}$/;
 var COMP_SUBMITTED = ['submitted', 'pending_review', 'graded'];
@@ -607,9 +611,13 @@ function compSubmitAction_(arg) {
 
   var qids = compJson_(row.qids, []) || [];
   var checked = compValidateAnswers_(def, qids, arg.answers);
+  var sent = arg.answers && typeof arg.answers === 'object' ? arg.answers : {};
+  var problems = deadline && now.ms >= deadline - COMP_TIMEUP_EARLY_MS
+    ? checked.problems.filter(function (problem) { return !(problem.qid && qids.indexOf(problem.qid) !== -1 && compEmpty_(sent[problem.qid])); })
+    : checked.problems;
 
-  if (checked.problems.length) {
-    return compFail_('invalid', checked.problems[0].message, { qid: checked.problems[0].qid });
+  if (problems.length) {
+    return compFail_('invalid', problems[0].message, { qid: problems[0].qid });
   }
 
   var graded = compGrade_(def, checked.answers, { qids: qids, at: now.stamp });

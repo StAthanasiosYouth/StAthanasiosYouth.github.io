@@ -95,7 +95,7 @@ function cta(item, state, competition, small = false) {
   // the competition engine: same tab, our own page
   if (engine) {
     return h('a', { class: `btn btn--primary ${small ? 'btn--small ' : ''}item-card__cta`, href: engine, 'data-competition': item.competition },
-      (item.cta && item.cta.label) || 'ادخل المسابقة',
+      item.ctaLabel || (item.cta && item.cta.label) || 'ادخل المسابقة',
       iconNode('arrow')
     );
   }

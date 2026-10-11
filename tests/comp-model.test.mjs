@@ -287,7 +287,14 @@ test('stub page from the real shell: ../ → ../../, data-slug + data-v, its own
   assert.match(html, /<link rel="canonical" href="https:\/\/stathanasiosyouth\.github\.io\/competition\/bible-quiz\/">/);
   assert.ok(!html.includes('\r'));
   // something that is not the shell (an error page, a 404 body) is never used
-  assert.match(gs.compStubHtml_(def, '', 'v', '<html><body>Not Found</body></html>'), /comp-app/);
+  assert.match(gs.compStubHtml_(def, '', 'v', '<html><body>Not Found</body></html>'), /comp-main/);
+  // a comment that names a tag (the real shell explains itself) never anchors a removal
+  const commented = shell.replace('<head>', '<head>  <!-- stubs get their own <title> and og: tags -->');
+  const fromCommented = gs.compStubHtml_(def, 'https://stathanasiosyouth.github.io/', 'v123', commented);
+  assert.ok(!fromCommented.includes('<!--'), 'comments dropped');
+  assert.ok(fromCommented.includes('src="../../assets/js/comp/main.js"'));
+  assert.equal((fromCommented.match(/<title>/g) || []).length, 1);
+  assert.match(fromCommented, /<meta http-equiv="Content-Security-Policy"/);
 });
 
 test('publish build: index with v, withdrawn ones, media, errors (keys, modules, slugs), card data', () => {

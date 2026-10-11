@@ -408,6 +408,9 @@ compSubmit  { token, clientKey, answers }
   - token (attempt) verified; row by id; same clientKey
   - already submitted → the stored result again (idempotent replay)
   - window: now ≤ end + grace and (deadlineMs = 0 or nowMs ≤ deadlineMs + 60 s)
+  - from 15 s before the time limit on (`COMP_TIMEUP_EARLY_MS`; the page sends by
+    itself at zero and its clock may run a little ahead), unanswered required
+    questions don't block: what was answered is graded
   - answers validated against the attempt's qids (unknown qids rejected,
     choice ids must belong to the question, length caps, required present)
   - graded with CompScore BEFORE taking compLock_; inside the lock: the row

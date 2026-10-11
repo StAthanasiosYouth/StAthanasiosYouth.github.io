@@ -320,6 +320,22 @@ test('time limit: the deadline (+60 s slack) is the server\'s; late inside the s
   assert.deepEqual(list.items[0].flags, ['late']);
 });
 
+test('time limit: the automatic submit at the deadline goes in with required questions unanswered; before that they are required', () => {
+  const { world, call, id } = live({ timeLimit: 2 });
+  const a = begin(world, 1);
+  const single = a.questions.find(q => q.type === 'single');
+  const partial = { [single.id]: single.choices.find(c => c.text === 'نوح').id };
+  assert.equal(submit(world, a, partial).code, 'invalid', 'early: required means required');
+  world.advance(110_000);   // 10 s before the deadline (the page's clock may be ahead)
+  const sent = submit(world, a, partial);
+  assert.equal(sent.ok, true);
+  assert.equal(sent.result.score, 10);
+  const c = begin(world, 3);
+  world.advance(100_000);
+  assert.equal(submit(world, c, partial).code, 'invalid', '20 s before: still required');
+  assert.equal(call('apiCompSubmissions', id, { status: 'done' }).total, 1);
+});
+
 test('grace: an attempt started before the end may send until end + 3 minutes; then closed', () => {
   const { world } = live({ endAt: wallAtOf(5) });
   const a = begin(world, 1);
@@ -473,5 +489,5 @@ test('stubs are made from the committed engine shell (read from GitHub, cached);
   assert.ok(world.cache.get('comp:shell'), 'cached');
   // the plain world has no shell committed: the built-in copy
   const plainWorld = live().world;
-  assert.match(plainWorld.github.files()['competition/bible-quiz/index.html'], /id="comp-app"/);
+  assert.match(plainWorld.github.files()['competition/bible-quiz/index.html'], /id="comp-main"/, 'the built-in copy has the engine mount points');
 });

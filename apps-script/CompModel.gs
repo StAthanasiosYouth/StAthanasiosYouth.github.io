@@ -942,10 +942,14 @@ var COMP_SHELL_FALLBACK = [
   '',
   '</head>',
   '',
-  '<body class="comp-page">',
-  '  <main id="comp-app" class="comp-app" aria-live="polite">',
-  '    <noscript><p class="comp-noscript">المسابقة محتاجة JavaScript يكون شغال في المتصفح. شغّله وافتح الصفحة تاني.</p></noscript>',
+  '<body>',
+  '  <a class="skip-link" href="#comp-main">انتقل للمسابقة</a>',
+  '  <header class="cbar"><a class="cbar__brand" href="../"><img src="../assets/img/logo-128.webp" width="34" height="34" alt=""><span class="cbar__name">أسرة البابا أثناسيوس</span><span class="visually-hidden">— الصفحة الرئيسية</span></a><p class="cbar__timer" id="comp-timer" hidden></p></header>',
+  '  <main id="comp-main" class="comp" data-state="loading" tabindex="-1">',
+  '    <noscript><p class="card noscript">المسابقة محتاجة جافاسكريبت يكون شغال في المتصفح. شغّله وافتح الصفحة تاني.</p></noscript>',
   '  </main>',
+  '  <p class="netbar" id="comp-net" role="status" hidden></p>',
+  '  <p class="visually-hidden" id="comp-live" aria-live="polite"></p>',
   '</body>',
   '',
   '</html>',
@@ -1007,6 +1011,8 @@ function compStubHtml_(def, siteUrl, version, shell) {
   var source = compShellOk_(shell) ? shell : COMP_SHELL_FALLBACK;
   var e = compEscapeHtml_;
   var html = source.replace(/\r\n?/g, '\n')
+    // comments first: a tag named inside a comment must never anchor the removals below
+    .replace(/[ \t]*<!--[\s\S]*?-->[ \t]*\n?/g, '')
     .replace(/(\s(?:href|src))="\.\.\//g, '$1="../../')
     .replace(/[ \t]*<title>[\s\S]*?<\/title>[ \t]*\n?/i, '')
     .replace(/[ \t]*<meta\s+name="description"[^>]*>[ \t]*\n?/gi, '')

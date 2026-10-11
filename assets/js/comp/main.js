@@ -20,6 +20,29 @@ import * as F from './flow.js';
 import { createView } from './view.js';
 import { zonedNow, stamp, setServerTime, setClockOffset, clockOffset, cairoInstant, realMinutesBetween } from '../schedule.js';
 
+/* the mount points (a stub made from an older shell may only have its own <main>) */
+function mount(id, make) {
+  let el = document.getElementById(id);
+  if (!el) {
+    el = make();
+    el.id = id;
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
+(function ensureMounts() {
+  const legacy = document.getElementById('comp-app');
+  if (legacy && !document.getElementById('comp-main')) {
+    legacy.id = 'comp-main';
+    legacy.className = 'comp';
+    legacy.removeAttribute('aria-live');
+    legacy.tabIndex = -1;
+  }
+  mount('comp-main', () => Object.assign(document.createElement('main'), { className: 'comp', tabIndex: -1 }));
+  mount('comp-live', () => Object.assign(document.createElement('p'), { className: 'visually-hidden' })).setAttribute('aria-live', 'polite');
+})();
+
 const ROOT = new URL('../../../', import.meta.url);
 const html = document.documentElement;
 const PREVIEW = new URLSearchParams(location.search).has('preview');
@@ -100,7 +123,7 @@ const S = {
   busy: false,
   queueReason: '',
   online: navigator.onLine !== false,
-  warnedMinute: false
+  warnedMinute: false, timeUpSent: false
 };
 
 let api = null;
@@ -339,6 +362,23 @@ async function start() {
   if (S.state.name !== 'starting') return;
 
   const attempt = reply.ok ? F.cleanAttempt(reply.attempt) : null;
+
+  // the server's own clock (ms): finer than the Date header for the time limit
+  if (reply.ok && reply.attempt && Number.isFinite(reply.attempt.serverNow) && reply.attempt.serverNow > 0) {
+    setClockOffset(reply.attempt.serverNow - Date.now());
+  }
+
+  // this attempt was already sent (e.g. the reply was lost): show its result
+  if (reply.ok && typeof reply.receipt === 'string' && reply.receipt && reply.result) {
+    S.receipt = reply.receipt;
+    S.result = F.sanitizeResult(reply.result) || { status: 'submitted' };
+    S.token = '';
+    S.attempt = null;
+    save.afterSubmit(S.receipt, S.result.submittedAt);
+    S.state = { name: 'result' };
+    render();
+    return;
+  }
   const questions = reply.ok ? F.cleanQuestions(reply.questions) : [];
 
   if (!reply.ok || !attempt || !questions.length) {
@@ -355,6 +395,7 @@ async function start() {
   // a resumed attempt (same clientKey) keeps what was typed so far
   S.answers = attempt.resumed ? F.cleanSavedAnswers(questions, S.answers) : {};
   S.warnedMinute = false;
+  S.timeUpSent = false;
 
   save.write({
     clientKey: S.clientKey, token: S.token, receipt: '', answers: S.answers, step: '',
@@ -456,7 +497,9 @@ function tick() {
   const left = remaining();
 
   if (Number.isFinite(left) && ['question', 'single', 'review'].includes(name)) {
-    if (left <= 0) {
+    // once per attempt: if that automatic send is refused, the person can still send by hand
+    if (left <= 0 && !S.timeUpSent) {
+      S.timeUpSent = true;
       go({ type: 'time-up' });
       return;
     }
@@ -684,7 +727,7 @@ function startPreview() {
     Object.assign(S, {
       slug: def.slug, def, defRaw: null, forcePhase: ['scheduled', 'open', 'closed'].includes(data.state) ? data.state : 'auto',
       questions: [], answers: {}, comp: null, attempt: null, token: '', clientKey: '', ptoken: '', fields: {}, fieldValues: {}, fieldErrors: {},
-      codeValue: '', hp: '', result: null, receipt: '', resultLoading: false, resultNote: '', confirming: false, busy: false, warnedMinute: false
+      codeValue: '', hp: '', result: null, receipt: '', resultLoading: false, resultNote: '', confirming: false, busy: false, warnedMinute: false, timeUpSent: false
     });
     if (def.theme) html.dataset.theme = def.theme;
     else delete html.dataset.theme;
