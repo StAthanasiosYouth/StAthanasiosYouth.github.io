@@ -102,7 +102,9 @@ function apiFunctions_() {
     apiAdminPushSubscribe: apiAdminPushSubscribe,
     apiAdminPushUnsubscribe: apiAdminPushUnsubscribe,
     apiAdminPushDevices: apiAdminPushDevices,
-    apiAdminPushRemoveDevice: apiAdminPushRemoveDevice
+    apiAdminPushRemoveDevice: apiAdminPushRemoveDevice,
+    apiTrustDevice: apiTrustDevice,
+    apiForgetDevice: apiForgetDevice
   };
 
 }
@@ -134,7 +136,17 @@ function doPost(e) {
       return jsonOutput_(publicPush_(request.fn, request.args && request.args[0]));
     }
 
-    var email = verifyIdToken_(request.token);
+    // the installed admin app's trusted device (AdminDevice.gs): a signed
+    // challenge in, a short-lived access token out; nothing else readable
+    if (request.fn === 'deviceSignIn') {
+      return jsonOutput_(publicDeviceSignIn_(request.args && request.args[0]));
+    }
+
+    // a Google ID token, or the access token a trusted device got (AdminDevice.gs)
+    var viaDevice = /^adm1\./.test(request.token);
+    var email = viaDevice ? verifyDeviceToken_(request.token) : verifyIdToken_(request.token);
+
+    API_REQUEST_.via = viaDevice ? 'device' : 'google';
 
     if (!isAdmin_(email)) {
       console.warn('api: not on the allowlist: ' + email);
@@ -145,6 +157,11 @@ function doPost(e) {
 
     if (!Object.prototype.hasOwnProperty.call(functions, request.fn) || typeof functions[request.fn] !== 'function') {
       throw apiError_('fn', 'الطلب ده مش معروف.', 'اعمل Refresh للصفحة.');
+    }
+
+    // a few things always want Google itself, not a remembered device
+    if (viaDevice && GOOGLE_ONLY_FUNCTIONS.indexOf(request.fn) !== -1) {
+      throw apiError_('reauth', 'محتاجين نتأكد إنه انت.', 'ادخل بحساب جوجل وكمّل.');
     }
 
     API_REQUEST_.email = email;

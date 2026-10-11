@@ -535,3 +535,22 @@ test('admin push: at most 6 from one admin in 10 minutes — a publish still goe
   assert.equal(rows(world).at(-1).action, 'publish');
   assert.equal(rows(world).at(-1).notified, '2', 'the publish is never held back');
 });
+
+test('admin push: none of the actor\'s devices (phone, PC…) hears about the actor\'s own action — by account, not by device', () => {
+  const { world } = pushWorld();
+  // Mina has a second device (his phone) besides the PC subscribed in pushWorld
+  const phone = tab(world, ADMIN, 'موبايل مينا').start();
+  phone.ok('apiAdminPushSubscribe', { token: deviceToken(4), platform: 'android' });
+  world.fcm.devices.set(deviceToken(4), 'ok');
+  phone.leave();
+  world.advance(5 * 60_000);
+  const before = fcmSent(world).length;
+  // he edits from the PC
+  const pc = tab(world, ADMIN, 'كمبيوتر').start();
+  pc.ok('apiSaveItem', 'news', { title: 'من الكمبيوتر', summary: 'x' });
+  pc.leave();
+  const to = sentTo(world, before);
+  assert.equal(to.includes(deviceToken(1)), false, 'not his PC');
+  assert.equal(to.includes(deviceToken(4)), false, 'not his phone');
+  assert.deepEqual(to.sort(), [deviceToken(2), deviceToken(3)].sort(), 'the other admins only');
+});

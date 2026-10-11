@@ -19,6 +19,7 @@ import { iconNode } from './icons.js';
 import { particles } from './motion.js';
 import { startFeel } from './feel.js';
 import { play, soundEnabled, setSoundEnabled } from './sound.js';
+import { watchInstall } from './install.js';
 
 let current = null;
 let shownKey = '';
@@ -432,6 +433,15 @@ function startSite() {
     }
   }
 
+  // the installed site app lives at /index.html (its manifest scope; /admin/ is another
+  // app): "/" is the same page, so say /index.html in the address. Chrome's «فتح في
+  // التطبيق» hands the app the tab's address, and "/" is outside its scope
+  // («Could not open app»). Shared links still say "/" (share.js).
+  if (location.pathname === '/' && window.top === window.self) {
+    history.replaceState(history.state, '', `/index.html${location.search}${location.hash}`);
+  }
+
+  watchInstall();
   startFeel();
   setupTopbar();
   startRouter(openRoute);

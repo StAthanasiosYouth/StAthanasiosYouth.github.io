@@ -56,7 +56,8 @@ const ARGS = {
   apiSessionStart: [{ device: 'x' }], apiSessionResume: [{ device: 'x' }], apiHeartbeat: [{}], apiSessionEnd: [],
   apiPushState: [], apiPushCheck: [], apiSendPush: ['notif-x', 's-0123456789', {}],
   apiActivity: [{}], apiSetAdminName: [SECOND, 'اسم'],
-  apiAdminPushSubscribe: [{ token: 'x' }], apiAdminPushUnsubscribe: [{ token: 'x' }], apiAdminPushDevices: [{}], apiAdminPushRemoveDevice: ['h0123456789abcde']
+  apiAdminPushSubscribe: [{ token: 'x' }], apiAdminPushUnsubscribe: [{ token: 'x' }], apiAdminPushDevices: [{}], apiAdminPushRemoveDevice: ['h0123456789abcde'],
+  apiTrustDevice: [{}], apiForgetDevice: [{}]
 };
 
 /*

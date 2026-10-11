@@ -1,0 +1,144 @@
+// «خليك داخل» on the installed admin app (apps-script/AdminDevice.gs): a
+// trusted device made only after a real Google sign-in, a signed challenge
+// for a short-lived access token, nothing readable, and every way it ends
+// (logout, end date, admin removed, bad signatures, replay).
+
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createHmac, randomBytes } from 'node:crypto';
+import { createWorld } from './fakes/gas.mjs';
+
+const ADMIN = 'menazakmena@gmail.com';
+const SECOND = 'fady.youssef@gmail.com';
+const CLIENT = '1234-abc.apps.googleusercontent.com';
+
+function apiWorld() {
+  const world = createWorld({ executeAs: 'USER_DEPLOYING' });
+  world.as(ADMIN).gs.setup();
+  world.properties.set('ADMIN_CLIENT_ID', CLIENT);
+  world.properties.set('ADMIN_EMAILS', `${ADMIN}, ${SECOND}`);
+  world.as('');
+  return world;
+}
+
+function googleTab(world, email) {
+  const now = Math.floor((Date.now() + world.clock.skew) / 1000);
+  const token = world.issueToken({ email, iat: String(now), exp: String(now + 3600) });
+  const started = world.post({ fn: 'apiSessionStart', args: [{ device: 'موبايل أندرويد – التطبيق', force: true, state: false }], token });
+  assert.equal(started.ok, true, started.error);
+  return { token, sid: started.result.sid, call: (fn, ...args) => world.post({ fn, args, token, sid: started.result.sid }) };
+}
+
+/* what admin/device.js does, with the secret it was given */
+function signIn(world, device, { ts, nonce, secret = device.secret, id = device.deviceId } = {}) {
+  ts = ts ?? Date.now() + world.clock.skew;
+  nonce = nonce ?? randomBytes(16).toString('hex');
+  const sig = createHmac('sha256', Buffer.from(secret, 'utf8')).update(`${id}.${ts}.${nonce}`, 'utf8').digest('hex');
+  return world.post({ fn: 'deviceSignIn', args: [{ deviceId: id, ts, nonce, sig }] });
+}
+
+function deviceTab(world, access) {
+  const started = world.post({ fn: 'apiSessionStart', args: [{ device: 'موبايل أندرويد – التطبيق', force: true, state: false }], token: access });
+  assert.equal(started.ok, true, started.error);
+  return { call: (fn, ...args) => world.post({ fn, args, token: access, sid: started.result.sid }) };
+}
+
+
+test('trust: only after a Google sign-in; the secret is stored server-side only (Script Properties), with a hard end', () => {
+  const world = apiWorld();
+  const app = googleTab(world, ADMIN);
+  const trusted = app.call('apiTrustDevice', { label: 'موبايل أندرويد – التطبيق' });
+  assert.equal(trusted.ok, true, trusted.error);
+  const { deviceId, secret, until } = trusted.result;
+  assert.match(deviceId, /^[0-9a-f]{24}$/);
+  assert.match(secret, /^[0-9a-f]{64}$/);
+  const days = (until - (Date.now() + world.clock.skew)) / 86400000;
+  assert.ok(days > 29.9 && days <= 30, 'thirty days from this Google sign-in');
+  const stored = JSON.parse(world.properties.get(`ADMIN_DEVICE_${deviceId}`));
+  assert.equal(stored.email, ADMIN);
+  assert.equal(world.spreadsheet.getSheets().some(s => JSON.stringify(s.data).includes(secret)), false, 'never in the Sheet');
+
+  // no token at all: refused
+  assert.equal(world.post({ fn: 'apiTrustDevice', args: [{}] }).ok, false);
+});
+
+test('device sign-in: a right signature → a short-lived access token that works like the Google token, as that account', () => {
+  const world = apiWorld();
+  const device = googleTab(world, ADMIN).call('apiTrustDevice', {}).result;
+  const reply = signIn(world, device);
+  assert.equal(reply.ok, true);
+  assert.equal(reply.email, ADMIN);
+  assert.match(reply.token, /^adm1\.[0-9a-f]{64}$/);
+  const app = deviceTab(world, reply.token);
+  const state = app.call('apiState');
+  assert.equal(state.ok, true);
+  assert.equal(state.result.user, ADMIN);
+  // logged as the account
+  app.call('apiSaveItem', 'news', { title: 'من التطبيق', summary: 'x' });
+  const activity = world.spreadsheet.getSheetByName('Activity').data.at(-1);
+  assert.equal(activity[3], ADMIN);
+});
+
+test('device sign-in: wrong secret, old time, a replayed nonce, an unknown device — all refused alike; ten bad tries end the device', () => {
+  const world = apiWorld();
+  const device = googleTab(world, ADMIN).call('apiTrustDevice', {}).result;
+  assert.equal(signIn(world, device, { secret: 'f'.repeat(64) }).code, 'device');
+  assert.equal(signIn(world, device, { ts: Date.now() + world.clock.skew - 11 * 60000 }).code, 'device');
+  const nonce = randomBytes(16).toString('hex');
+  assert.equal(signIn(world, device, { nonce }).ok, true);
+  assert.equal(signIn(world, device, { nonce }).ok, false, 'a replay');
+  assert.equal(signIn(world, device, { id: '0'.repeat(24) }).ok, false);
+  for (let i = 0; i < 10; i++) signIn(world, device, { secret: 'e'.repeat(64) });
+  assert.equal(signIn(world, device).ok, false, 'locked out after ten bad signatures');
+  assert.equal(world.properties.get(`ADMIN_DEVICE_${device.deviceId}`), undefined);
+});
+
+test('device tokens can\'t add/remove admins or trust another device (Google again: reauth)', () => {
+  const world = apiWorld();
+  const device = googleTab(world, ADMIN).call('apiTrustDevice', {}).result;
+  const app = deviceTab(world, signIn(world, device).token);
+  for (const [fn, arg] of [['apiAddAdmin', 'x@gmail.com'], ['apiRemoveAdmin', SECOND], ['apiTrustDevice', {}]]) {
+    const reply = app.call(fn, arg);
+    assert.equal(reply.ok, false, fn);
+    assert.equal(reply.code, 'reauth', fn);
+  }
+  assert.match(world.properties.get('ADMIN_EMAILS'), new RegExp(SECOND));
+});
+
+test('it ends: logout, the end date (never extended by use), the admin removed — at once, also for tokens already given', () => {
+  const world = apiWorld();
+
+  // logout
+  let device = googleTab(world, ADMIN).call('apiTrustDevice', {}).result;
+  let app = deviceTab(world, signIn(world, device).token);
+  assert.equal(app.call('apiForgetDevice', {}).ok, true);
+  assert.equal(app.call('apiState').code, 'auth', 'the token it had stops working');
+  assert.equal(signIn(world, device).ok, false);
+
+  // end date: daily use doesn't extend it
+  device = googleTab(world, ADMIN).call('apiTrustDevice', {}).result;
+  for (let day = 0; day < 29; day++) {
+    world.advance(86400000);
+    assert.equal(signIn(world, device).ok, true, `day ${day + 1}`);
+  }
+  world.advance(2 * 86400000);
+  assert.equal(signIn(world, device).code, 'expired');
+
+  // the admin removed
+  const fady = googleTab(world, SECOND).call('apiTrustDevice', {}).result;
+  const fadyApp = deviceTab(world, signIn(world, fady).token);
+  googleTab(world, ADMIN).call('apiRemoveAdmin', SECOND);
+  assert.equal(signIn(world, fady).ok, false);
+  assert.equal(fadyApp.call('apiState').ok, false);
+});
+
+test('a new Google sign-in on the same phone replaces its old credential; at most five per admin', () => {
+  const world = apiWorld();
+  const first = googleTab(world, ADMIN).call('apiTrustDevice', {}).result;
+  const again = googleTab(world, ADMIN).call('apiTrustDevice', { previous: first.deviceId }).result;
+  assert.equal(signIn(world, first).ok, false, 'the old one is gone');
+  assert.equal(signIn(world, again).ok, true);
+  for (let i = 0; i < 6; i++) { world.advance(1000); googleTab(world, ADMIN).call('apiTrustDevice', {}); }
+  const mine = [...world.properties.keys()].filter(k => k.startsWith('ADMIN_DEVICE_'));
+  assert.equal(mine.length, 5);
+});

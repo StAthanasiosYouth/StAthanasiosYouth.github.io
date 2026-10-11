@@ -552,3 +552,105 @@ test('home: one nudge while setup isn\'t finished; «مش دلوقتي» hides i
   assert.deepEqual(d.problems, []);
   await d.close();
 });
+
+
+/* ---------------- «خليك داخل»: the installed admin app remembers this phone ---------------- */
+
+/* the admin app on this "phone": its own window, opened from its icon */
+async function launch(context) {
+  const page = await context.newPage();
+  const problems = [];
+  page.on('pageerror', error => problems.push(`pageerror: ${error.message}`));
+  await page.setUserAgent(ANDROID);
+  await page.setViewport(PHONE);
+  await interceptGoogle(page, { post: body => world.post(body) });
+  await page.evaluateOnNewDocument(stage({ standalone: true }));
+  await page.goto(`${LOCAL}/admin/?app=admin`, { waitUntil: 'networkidle0' });
+  return { page, problems };
+}
+
+const devices = () => [...world.properties.keys()].filter(k => k.startsWith('ADMIN_DEVICE_'));
+
+test('stay signed in: Google once in the app → later launches open the panel with no Google screen; Logout ends it (device + admin push)', async () => {
+  freshWorld();
+  const context = await browser.createBrowserContext();
+
+  // first launch: Google, then this phone is remembered
+  const first = await launch(context);
+  await signIn(first.page);
+  await first.page.waitForFunction(() => true);
+  for (let i = 0; i < 40 && !devices().length; i++) await sleep(150);
+  assert.equal(devices().length, 1, 'a device credential after the Google sign-in');
+  const stored = await first.page.evaluate(() => new Promise(resolve => {
+    const open = indexedDB.open('athanasios-admin-device');
+    open.onsuccess = () => {
+      const get = open.result.transaction('device').objectStore('device').get('current');
+      get.onsuccess = () => resolve({ extractable: get.result.key.extractable, type: get.result.key.type, keys: Object.keys(get.result).sort() });
+    };
+  }));
+  assert.deepEqual(stored, { extractable: false, type: 'secret', keys: ['deviceId', 'key', 'until'] }, 'only a key that can\'t be read back');
+  await first.page.close();
+
+  // the app killed and opened again: straight in, no Google
+  const issued = world.tokeninfo.calls;
+  const again = await launch(context);
+  await again.page.waitForFunction(() => window.A && A.state && !document.getElementById('shell').hidden, { timeout: 15000 });
+  assert.equal(await again.page.$('.gis-stub'), null, 'no Google button');
+  assert.equal(world.tokeninfo.calls, issued, 'no Google token checked');
+  assert.equal(await again.page.evaluate(() => A.state.user), ADMIN);
+  await shot(again.page, '13-relaunch-no-google');
+
+  // something that needs Google itself: asked once, then done
+  await again.page.evaluate(() => { window.__added = A.call('apiAddAdmin', 'new.admin@gmail.com').then(() => 'ok', e => A.parseError(e).message); });
+  await again.page.waitForSelector('dialog.reauth[open] .gis-stub', { timeout: 8000 });
+  await again.page.click('dialog.reauth[open] .gis-stub');
+  assert.equal(await again.page.evaluate(() => window.__added), 'ok');
+  assert.match(world.properties.get('ADMIN_EMAILS'), /new\.admin/);
+
+  // admin notifications on this device (the server's row), then «خروج»
+  const sid = await again.page.evaluate(() => A.state && true);
+  assert.ok(sid);
+  world.gs.apiAdminPushSubscribe; // (subscribing needs a real push service; the row is checked below by token)
+  await again.page.evaluate(() => {
+    // as admin/push.js leaves it after «فعّل»: its mark for this device
+    localStorage.setItem('athanasios-admin.push', JSON.stringify({ token: 'a001Xk2:APA91b' + 'Z'.repeat(140) + '1', at: Date.now() }));
+  });
+  await again.page.evaluate(token => A.call('apiAdminPushSubscribe', { token, platform: 'android' }), 'a001Xk2:APA91b' + 'Z'.repeat(140) + '1');
+  assert.equal(world.spreadsheet.getSheetByName('AdminPushSubs').data.slice(1).filter(r => r[0]).length, 1);
+  await again.page.evaluate(() => { A.signOut(); });
+  await again.page.waitForSelector('.gis-stub', { timeout: 15000 });
+  assert.equal(devices().length, 0, 'the device credential is gone on the server');
+  assert.equal(world.spreadsheet.getSheetByName('AdminPushSubs').data.slice(1).filter(r => r[0]).length, 0, 'and this device gets no admin notifications');
+  assert.equal(await again.page.evaluate(() => localStorage.getItem('athanasios-admin.push')), null);
+  await again.page.close();
+
+  // after Logout: Google again
+  const after = await launch(context);
+  await after.page.waitForSelector('.gis-stub', { timeout: 15000 });
+  await after.page.close();
+  await context.close();
+});
+
+test('stay signed in: a browser tab never keeps anything; a removed admin\'s phone is back at Google', async () => {
+  freshWorld();
+  // a tab (not the installed app): no device credential
+  const tab = await device({ viewport: PHONE, ua: ANDROID });
+  await signIn(tab.page);
+  await sleep(1500);
+  assert.equal(devices().length, 0, 'nothing remembered in a browser tab');
+  await tab.close();
+
+  // the app for Fady, then he is removed
+  const context = await browser.createBrowserContext();
+  const app = await launch(context);
+  await signIn(app.page, SECOND);
+  for (let i = 0; i < 40 && !devices().length; i++) await sleep(150);
+  assert.equal(devices().length, 1);
+  await app.page.close();
+  world.gs.forgetTrustedDevices_(SECOND);
+  world.properties.set('ADMIN_EMAILS', ADMIN);
+  const again = await launch(context);
+  await again.page.waitForSelector('.gis-stub', { timeout: 15000 });
+  await again.page.close();
+  await context.close();
+});

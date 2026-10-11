@@ -446,7 +446,14 @@ already **live** on the site, sent once more to devices that opted in.
   fixed with `id`; only non-overlapping scopes (or another origin) can. The
   site worker opens taps at `/index.html#…` (also older `/#…` links) so
   they land in the site app. Shared links to `/` now open in the browser,
-  not the installed site app (accepted trade-off).
+  not the installed site app (accepted trade-off). main.js renames "/" to
+  "/index.html" in the address (replaceState, same page): Chrome's «فتح في
+  التطبيق» hands the app the tab's address, and "/" outside the scope gave
+  «Could not open app». The bell offers «ثبّت تطبيق الأسرة» on Android
+  (install.js: Chrome's real dialog when `beforeinstallprompt` came — never
+  `preventDefault()`ed — else the ⋮ menu steps; «مش دلوقتي» for 30 days;
+  hidden when the SITE app is installed: standalone, `appinstalled`, or
+  `getInstalledRelatedApps` listing the site manifest, never the admin's).
   The admin is its own app: `admin/manifest.webmanifest` (id and scope
   `/admin/`, start `/admin/?app=admin`, «لوحة تحكم الأسرة» / «إدارة أسرة
   البابا أثناسيوس - سفاجا», `related_applications` = itself),
@@ -510,6 +517,21 @@ already **live** on the site, sent once more to devices that opted in.
   install (the browser's dialog when `beforeinstallprompt` came, else a drawn
   Chrome-menu / Safari guide — never a dead button), admin notifications;
   a home card nudges until done, «مش دلوقتي» hides it for 30 days.
+- **«خليك داخل» in the installed admin app** (`AdminDevice.gs`,
+  `admin/device.js`, boot.js section 10). Only in the admin app's own window
+  (`?app=admin` + standalone). After a real Google sign-in there,
+  `apiTrustDevice` (Google token only) creates a 256-bit secret kept in
+  Script Properties (`ADMIN_DEVICE_<id>`, with the account and a hard end 30
+  days after that sign-in — never extended by use; ≤ 5 per admin); the page
+  imports it as a NON-EXTRACTABLE HMAC key (IndexedDB) and keeps nothing
+  else. A launch signs `<id>.<ms>.<nonce>` for `deviceSignIn` (doPost, no
+  Google token): device, end date, ±10 min, unused nonce, constant-time
+  HMAC, allowlist → a random `adm1.…` access token (1 h, hashed in
+  CacheService) used like the ID token; the device is re-checked on every
+  call. `apiAddAdmin`, `apiRemoveAdmin`, `apiTrustDevice` answer `reauth`
+  to device tokens (Google again). It ends with «خروج» (`apiForgetDevice`,
+  plus this device's admin push unsubscribed — before the session ends), the
+  end date, admin removal, 10 bad signatures.
 - **Links into the panel.** boot.js takes `#open/…` / `#activity/…` out of
   the address bar and follows it once the panel is drawn (`A.openLink`:
   `A.go` → `A.openEditor`, asking first about unsaved changes; the data is

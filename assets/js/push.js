@@ -17,6 +17,7 @@ import { iconNode } from './icons.js';
 import { toast } from './share.js';
 import { PUSH_CONFIG } from './push-config.js';
 import { pushSupport, platformOf, loadMemo, saveMemo, shouldNudge, pushRequest, pushReplyOk, bellHint } from './push-env.js';
+import { installState, promptInstall, onInstallChange } from './install.js';
 
 const SW_URL = '/sw.js';
 const ICON = '/assets/img/icon-192.png';
@@ -344,10 +345,99 @@ export function fillPushSlot(slot) {
 
   pushStyles().then(() => {
     const card = { node: h('div', { class: 'push-card', role: 'group', 'aria-label': 'إشعارات الموبايل' }), onDismiss: null, remove() {} };
+    const install = h('div', { class: 'push-card install-card', role: 'group', 'aria-label': 'تطبيق الأسرة', hidden: true });
     cards.add(card);
     paint(card);
-    slot.replaceChildren(card.node);
+    slot.replaceChildren(card.node, install);
+    paintInstall(install);
+    const stop = onInstallChange(() => {
+      if (!install.isConnected) { stop(); return; }
+      paintInstall(install);
+    });
   });
+
+}
+
+
+/* =========================================================
+   «ثبّت تطبيق الأسرة» (optional, under the notifications card)
+   Only on Android phones and only while the SITE app isn't installed
+   (install.js: never the admin app). «مش دلوقتي» hides it for 30 days.
+   On an iPhone the notifications card above already explains «إضافة
+   إلى الشاشة الرئيسية», so nothing is repeated here.
+========================================================= */
+
+const INSTALL_LATER_KEY = 'athanasios.install.later';
+const INSTALL_LATER_MS = 30 * 86400000;
+
+function installLater() {
+
+  try {
+    return Date.now() - (Number(localStorage.getItem(INSTALL_LATER_KEY)) || 0) < INSTALL_LATER_MS;
+  }
+  catch {
+    return false;
+  }
+
+}
+
+async function paintInstall(node) {
+
+  const state = await installState();
+
+  // the bell closed meanwhile
+  if (!node.isConnected) return;
+
+  if (state === 'running') {
+    node.hidden = true;
+    return;
+  }
+
+  if (state === 'installed') {
+    node.hidden = false;
+    node.replaceChildren(
+      h('p', { class: 'push-card__title' }, h('span', { class: 'push-card__ok', 'aria-hidden': 'true' }, iconNode('check')), 'تطبيق الأسرة متثبت على الموبايل ده'),
+      h('p', { class: 'push-card__text' }, 'افتحه من أيقونته «أسرة البابا أثناسيوس - سفاجا» على الشاشة الرئيسية.')
+    );
+    return;
+  }
+
+  if (platformOf() !== 'android' || pushSupport() === 'inapp' || installLater()) {
+    node.hidden = true;
+    return;
+  }
+
+  const later = h('button', { class: 'btn push-card__btn', type: 'button', onclick: () => {
+    try { localStorage.setItem(INSTALL_LATER_KEY, String(Date.now())); }
+    catch { /* shown again next time */ }
+    node.hidden = true;
+  } }, 'مش دلوقتي');
+
+  node.hidden = false;
+
+  if (state === 'prompt') {
+    node.replaceChildren(
+      h('p', { class: 'push-card__title' }, 'ثبّت تطبيق الأسرة على موبايلك'),
+      h('p', { class: 'push-card__text' }, 'يتفتح من أيقونة على الشاشة الرئيسية، زي أي تطبيق.'),
+      h('div', { class: 'push-card__actions' },
+        h('button', { class: 'btn push-card__btn btn--primary', type: 'button', onclick: async () => {
+          if (await promptInstall()) toast('اتثبت ✓ هتلاقيه على الشاشة الرئيسية');
+          paintInstall(node);
+        } }, 'تثبيت التطبيق'),
+        later
+      )
+    );
+    return;
+  }
+
+  node.replaceChildren(
+    h('p', { class: 'push-card__title' }, 'ثبّت تطبيق الأسرة على موبايلك'),
+    steps([
+      h('span', {}, 'افتح قايمة Chrome ', h('b', { class: 'install-card__key' }, '⋮'), ' فوق.'),
+      'اختار «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية» ← «تثبيت».'
+    ]),
+    h('div', { class: 'push-card__actions' }, later)
+  );
 
 }
 

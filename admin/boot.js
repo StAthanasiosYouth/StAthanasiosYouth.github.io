@@ -537,7 +537,8 @@
       return;
     }
 
-    remember({ token: token, email: claims.email, exp: claims.exp });
+    remember({ token: token, email: claims.email, exp: claims.exp, via: 'google' });
+    trust.googleArrived();
 
     // Google's own prompt (One Tap / FedCM) has done its job: close it, so
     // nothing of Google's stays over the page while we verify
@@ -657,7 +658,8 @@
   function token() {
 
     if (fresh(session)) return Promise.resolve(session.token);
-    return signInAgain();
+    // the installed admin app: its trusted device first (no Google screen), else Google
+    return trust.signIn().then(function (value) { return value || signInAgain(); });
 
   }
 
@@ -673,6 +675,12 @@
       .then(function (value) { return post(name, args, value, sid); })
       .then(function (reply) {
         if (reply.ok) return reply.result;
+        if (reply.code === 'reauth' && !retried.reauth) {
+          // this needs Google itself, not the remembered device: sign in with Google, then the same call
+          trust.needGoogle();
+          remember(null);
+          return call(name, args, { auth: retried.auth, session: retried.session, reauth: true });
+        }
         if (reply.code === 'auth' && !retried.auth) {
           // the server no longer takes this token: sign in again, then the same call
           remember(null);
@@ -1317,6 +1325,7 @@
       // a link this page was opened with (an admin notification): there now
       links.ready();
       app.ready();
+      trust.panelOpen();
     });
 
   }
@@ -1387,19 +1396,41 @@
 
   }
 
+  /* this device's admin notifications off (never blocks the sign-out for long) */
+  function leavePush() {
+
+    var push = window.AdminApp && window.AdminApp.push;
+
+    // (push.js: the server row for this device's token, if it has one; the browser's subscription where allowed)
+    if (!push || !('serviceWorker' in navigator)) return Promise.resolve();
+
+    return Promise.race([
+      push.disable().catch(function () {}),
+      new Promise(function (resolve) { setTimeout(resolve, 6000); })
+    ]);
+
+  }
+
   function signOut() {
 
     A.confirmLeave().then(function (ok) {
       if (!ok) return;
       A.dirty = false;
-      var ending = sid && fresh(session)
-        ? post('apiSessionEnd', [], session.token, sid, { timeout: 4000 }).catch(function () {})
-        : Promise.resolve();
+      // «خروج» first, while the session still works: no more admin notifications on this
+      // device (its subscription goes, the server's row too), and the installed app forgets
+      // its device credential; then the session ends
+      var live = sid && fresh(session);
+      var ending = (live ? leavePush() : Promise.resolve())
+        .then(function () { return trust.forget(); })
+        .then(function () {
+          return live ? post('apiSessionEnd', [], session.token, sid, { timeout: 4000 }).catch(function () {}) : null;
+        });
       collab.stop();
-      sid = '';
       // nothing of this admin stays in the tab: no session to resume, no place, no drafts
       keep.close();
       ending.then(function () {
+        // (only now: the steps above still needed this session)
+        sid = '';
         remember(null);
         try {
           if (window.google && window.google.accounts && window.google.accounts.id) window.google.accounts.id.disableAutoSelect();
@@ -1493,7 +1524,12 @@
       if (document.visibilityState === 'hidden') return;
       if (inflight) { again = true; return; }
       // never a sign-in prompt from the background: the next thing the admin does renews the token
-      if (!fresh(session)) { schedule(TIMING.beat); return; }
+      // (the installed app's device renews silently, so its heartbeat goes on)
+      if (!fresh(session)) {
+        if (session && session.via === 'device') trust.signIn().then(function (value) { schedule(value ? 0 : TIMING.beat); });
+        else schedule(TIMING.beat);
+        return;
+      }
 
       inflight = true;
       lastBeat = Date.now();
@@ -1842,6 +1878,144 @@
   })();
 
 
+  /*
+   * 10. «خليك داخل» on the installed admin app (apps-script/AdminDevice.gs,
+   *     admin/device.js). Only when this window was opened from the admin
+   *     app's own icon (appMode 'admin-app'); a browser tab never keeps
+   *     anything. After a real Google sign-in the server gives this phone a
+   *     device credential (30 days from THAT sign-in, never extended by use),
+   *     kept only as a non-extractable key. A later launch (or an expired
+   *     hour) gets a short-lived access token with it — no Google screen. It
+   *     ends with «خروج», at its end date, when the admin is removed, or when
+   *     the server says so; then it's Google as usual. A call that needs
+   *     Google itself (adding/removing admins) answers 'reauth': Google again.
+   */
+  var trust = (function () {
+
+    var module = null;
+    var pending = null;
+    var googleNeeded = false;
+    var trusting = false;
+    var current = '';      // this phone's device id (replaced by the next Google sign-in)
+
+    function on() {
+      return appMode() === 'admin-app';
+    }
+
+    function deviceModule() {
+      if (!module) {
+        module = import('./device.js');
+        module.catch(function () { module = null; });
+      }
+      return module;
+    }
+
+    /* a fresh access token from this phone's device credential, or null (none, gone, not the app, trouble) */
+    function signIn() {
+
+      if (!on() || googleNeeded) return Promise.resolve(null);
+      if (pending) return pending;
+
+      pending = deviceModule().then(function (m) {
+        if (!m.supported()) return null;
+        return m.load().then(function (record) {
+          if (!record) return null;
+          current = record.deviceId;
+          return m.challenge(record)
+            .then(function (payload) { return post('deviceSignIn', [payload], '', '', { timeout: TIMING.fail }); })
+            .then(function (reply) {
+              if (reply && reply.ok && reply.token && isFinite(Number(reply.exp))) {
+                remember({ token: reply.token, email: String(reply.email || '').toLowerCase(), exp: Number(reply.exp), via: 'device' });
+                return reply.token;
+              }
+              // the server says this device is no more: forget it here too, then Google as usual
+              if (reply && /^(device|expired|denied|bad)$/.test(String(reply.code || ''))) {
+                current = '';
+                return m.forget().then(function () { return null; });
+              }
+              return null;
+            });
+        });
+      }).catch(function () { return null; });
+
+      pending.then(function () { pending = null; });
+
+      return pending;
+
+    }
+
+    /* right after a real Google sign-in in the app, with the panel open: remember this phone */
+    function trustNow() {
+
+      if (!on() || trusting || !sid || !session || session.via !== 'google' || !fresh(session)) return;
+
+      trusting = true;
+
+      deviceModule().then(function (m) {
+        if (!m.supported()) return null;
+        return post('apiTrustDevice', [{ label: DEVICE, previous: current || undefined }], session.token, sid, { timeout: TIMING.fail })
+          .then(function (reply) {
+            if (!reply || !reply.ok || !reply.result || !reply.result.deviceId) return null;
+            current = reply.result.deviceId;
+            return m.save(reply.result);
+          });
+      }).catch(function (error) {
+        if (window.console) console.warn('[admin] device', error);
+      }).then(function () {
+        trusting = false;
+      });
+
+    }
+
+    return {
+      signIn: signIn,
+      needGoogle: function () { googleNeeded = true; },
+      googleArrived: function () {
+        googleNeeded = false;
+        if (phase === 'app') trustNow();
+      },
+      panelOpen: trustNow,
+
+      /* «خروج»: the server and this phone forget the device (before the session ends) */
+      forget: function () {
+        if (!on() && !current) return Promise.resolve();
+        return deviceModule().then(function (m) {
+          var tell = current && sid && fresh(session)
+            ? post('apiForgetDevice', [{ deviceId: current }], session.token, sid, { timeout: 4000 }).catch(function () {})
+            : Promise.resolve();
+          return tell.then(function () { current = ''; return m.forget(); });
+        }).catch(function () {});
+      },
+
+      /* the first thing on a page load: the app's device, else the usual (restore after a reload, or Google) */
+      start: function () {
+        if (!on()) {
+          if (saved) restore();
+          else showSignIn();
+          return;
+        }
+        var my = nextAttempt();
+        var view = showRestoring('device');
+        var stopSlow = watchdog(TIMING.slow, function () {
+          if (my === attempt) view.slow('بياخد وقت أطول من العادي… الخادم بيصحى لو بقاله فترة من غير استخدام.');
+        });
+        signIn().then(function (value) {
+          stopSlow();
+          if (my !== attempt) return;
+          if (value) {
+            if (saved) resume();
+            else enter();
+            return;
+          }
+          if (saved) restore();
+          else showSignIn();
+        });
+      }
+    };
+
+  })();
+
+
   /* ---------- start ---------- */
 
   if (!A || !A.start) {
@@ -1868,7 +2042,6 @@
   // a reload of a tab that had a session: the same session again; else the sign-in
   saved = savedSession();
 
-  if (saved) restore();
-  else showSignIn();
+  trust.start();
 
 })();

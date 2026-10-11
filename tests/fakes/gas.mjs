@@ -2,7 +2,7 @@
 // fake GitHub API with real commit/ref semantics. Lets the actual .gs files
 // run in Node: tests/admin.test.mjs.
 
-import { createHash, createSign, randomUUID } from 'node:crypto';
+import { createHash, createHmac, createSign, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { ROOT } from '../../tools/lib/gs.mjs';
@@ -536,7 +536,8 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
         getProperty: key => (properties.has(key) ? properties.get(key) : null),
         setProperty: (key, value) => { properties.set(key, String(value)); },
         setProperties: values => { for (const [k, v] of Object.entries(values)) properties.set(k, String(v)); },
-        deleteProperty: key => { properties.delete(key); }
+        deleteProperty: key => { properties.delete(key); },
+        getProperties: () => Object.fromEntries(properties)
       })
     },
 
@@ -580,6 +581,8 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
       base64Decode: text => [...Buffer.from(text, 'base64')].map(b => (b > 127 ? b - 256 : b)),
       base64Encode: bytes => Buffer.from(bytes.map(b => (b < 0 ? b + 256 : b))).toString('base64'),
       // RS256 like Apps Script: (text, PEM key) -> signed Byte[]
+      // HMAC-SHA256 like Apps Script: (value, key[, charset]) strings (UTF-8) -> signed Byte[]
+      computeHmacSha256Signature: (value, key) => [...createHmac('sha256', Buffer.from(String(key), 'utf8')).update(String(value), 'utf8').digest()].map(b => (b > 127 ? b - 256 : b)),
       computeRsaSha256Signature: (text, key) => [...createSign('RSA-SHA256').update(String(text), 'utf8').sign(key)].map(b => (b > 127 ? b - 256 : b)),
       base64EncodeWebSafe: bytes => Buffer.from(typeof bytes === 'string' ? Buffer.from(bytes, 'utf8') : bytes.map(b => (b < 0 ? b + 256 : b))).toString('base64').replace(/\+/g, '-').replace(/\//g, '_'),
       sleep: () => {},
@@ -664,7 +667,7 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
 
   });
 
-  for (const file of ['Platforms.gs', 'Content.gs', 'Hub.gs', 'Review.gs', 'Seed.gs', 'Auth.gs', 'Store.gs', 'Publish.gs', 'Code.gs', 'Media.gs', 'Items.gs', 'Import.gs', 'Migrate.gs', 'Api.gs', 'Presence.gs', 'Route.gs', 'Push.gs', 'Activity.gs', 'AdminNotify.gs']) {
+  for (const file of ['Platforms.gs', 'Content.gs', 'Hub.gs', 'Review.gs', 'Seed.gs', 'Auth.gs', 'Store.gs', 'Publish.gs', 'Code.gs', 'Media.gs', 'Items.gs', 'Import.gs', 'Migrate.gs', 'Api.gs', 'Presence.gs', 'Route.gs', 'Push.gs', 'Activity.gs', 'AdminNotify.gs', 'AdminDevice.gs']) {
     vm.runInContext(readFileSync(`${ROOT}apps-script/${file}`, 'utf8'), context, { filename: file });
   }
 

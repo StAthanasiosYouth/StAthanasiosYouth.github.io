@@ -264,8 +264,9 @@ test('framed by another site: it never takes drafts from the framing page', asyn
     document.body.append(frame);
   }, BASE);
   // usually the page leaves the frame at once (top navigates to the site)
-  await page.waitForFunction(base => location.href === base, { timeout: 4000 }, BASE).catch(() => {});
-  if (page.url() === BASE) {
+  // (the site page names itself /index.html: the installed app's address)
+  await page.waitForFunction(base => location.href === base || location.href === base + 'index.html', { timeout: 4000 }, BASE).catch(() => {});
+  if (page.url() === BASE || page.url() === BASE + 'index.html') {
     await page.waitForSelector('#main[data-state="ready"]');
     assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-preview')), false);
     await context.close();

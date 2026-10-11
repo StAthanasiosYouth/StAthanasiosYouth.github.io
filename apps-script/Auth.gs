@@ -254,6 +254,7 @@ function apiRemoveAdmin(value) {
     // no name and no admin notifications left behind for someone who isn't an admin any more
     try { forgetAdminName_(email); } catch (ignored) { console.warn('admins: name not removed'); }
     forgetAdminDevices_(email);
+    forgetTrustedDevices_(email);
     activity_({ action: 'admin.remove', type: 'admins', id: email, title: email, changes: { name: shown } });
 
   }

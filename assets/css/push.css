@@ -275,3 +275,18 @@
     transition: none;
   }
 }
+
+/* «ثبّت تطبيق الأسرة» under the notifications card (push.js paintInstall) */
+.install-card {
+  margin-top: 10px;
+}
+
+.install-card__key {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.6em;
+  padding: 0 .3em;
+  border-radius: 6px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, .1);
+}

@@ -544,6 +544,10 @@ its origin are unchanged. Deploy the API as usual
 - **New tabs, made on first use:** `Activity` (the log; trimmed to 5,000
   rows and one year) and `AdminPushSubs` (admin devices; never mix with
   `PushSubs`). Don't edit them by hand. The technical `Log` tab is unchanged.
+- **Script Properties `ADMIN_DEVICE_<id>`**: one per installed admin app
+  that is signed in («خليك داخل»): the account, a secret and an end date (30
+  days after its Google sign-in). Written and deleted by the API; deleting
+  one by hand signs that phone out. Never copy them anywhere.
 - **Two apps:** the site app's scope is `/index.html` and the admin's
   `/admin/`; they must never overlap (Android gives nested pages to the outer
   app and never installs the inner one). A phone that installed the site app
