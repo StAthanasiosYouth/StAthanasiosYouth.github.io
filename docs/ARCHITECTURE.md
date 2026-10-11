@@ -434,6 +434,69 @@ already **live** on the site, sent once more to devices that opted in.
   the new revision, and in «الإشعارات»; preview with push-only edits,
   confirmation with the device count, result summary.
 
+## Admin app, display names, «سجل النشاط», admin push
+
+- **Two apps, one origin.** The site's PWA is unchanged (`/manifest.webmanifest`,
+  id/scope `/`, `/sw.js`). The admin is its own app: `admin/manifest.webmanifest`
+  (id, scope, start `/admin/`; «لوحة تحكم الأسرة» / «إدارة أسرة البابا أثناسيوس - سفاجا»),
+  its own icons (`tools/build-admin-icons.mjs`: the logo on gold with a gear
+  badge), iOS meta + `apple-touch-icon`, and `admin/sw.js` (scope `/admin/`,
+  push + taps only, no fetch handler, no cache). The longest scope wins, so
+  admin pages are controlled by the admin worker. The admin CSP allows only
+  `manifest-src 'self'`, `worker-src 'self'` and the two Firebase hosts.
+- **Two push subscriptions, two tokens.** A push subscription belongs to one
+  worker registration, so the admin worker gets its own FCM token. Firebase
+  Messaging stores its token in IndexedDB keyed by the web app id only — the
+  same for both pages — so the admin uses its own SDK copy
+  (`admin/vendor/firebase-messaging-admin.js`, built by
+  `tools/build-push-vendor.mjs` with the database renamed to
+  `athanasios-admin-messaging-database`) and its own Firebase app name.
+  Without that, a getToken() on the admin page would revoke and replace the
+  visitor token on the same phone. Checked in real Chrome against Firebase.
+- **Identity.** Always `currentEmail_()` (verified ID token, allowlist,
+  session). Display names: Script Property `ADMIN_NAMES` (JSON, next to
+  `ADMIN_EMAILS`), `displayName_()`, `apiSetAdminName` (any admin, any
+  admin; 2–40 chars; invisible / direction characters stripped; never the same as
+  another admin's name or fallback, compared without spaces, case or Arabic
+  letter variants; every rename logged). Presence, locks, the log and
+  notifications use them.
+- **Activity log** (`Activity.gs`, tab `Activity`). One row per completed,
+  meaningful action: id, epoch ms, Cairo time, actor email + name then,
+  action, entity type/id/title, Arabic summary without the actor, small
+  `changes` JSON (changed field labels, titles, counts; ≤ 1 KB), ref
+  (revision + commit, sendKey), count, notified, device. `mutate_()` takes
+  rows noted by the change (`activityNote_`) and writes them only after it
+  succeeded; publish, live stage, push sends, import, upgrade, admin changes
+  and takeovers call `activity_()` directly. A failure there is caught and
+  never fails the action. Merging: the same admin repeating a small action
+  (edit, reorder, show/hide, settings…) on the same thing within 10 minutes
+  updates the row (a create absorbs its edits). Retention: 5,000 rows (+250
+  slack, trimmed in one chunk) and 365 days. The last 30 rows live in
+  CacheService for the home card and the heartbeat. `apiActivity(query)`:
+  person, family, section, Cairo dates, cursor, one id; admins only.
+  Not logged: reads, previews, heartbeats, drafts, sign-in/out.
+- **Admin push** (`AdminPush.gs`, tab `AdminPushSubs`: token hash, token,
+  email, device, platform, dates, failures, `prefs` for later categories).
+  Subscribe / unsubscribe / devices only through the API (token + session);
+  the row's email is the server's; a token already in `PushSubs` is
+  refused; ≤ 5 devices per admin (the oldest makes room), ≤ 100 in all;
+  removing an admin deletes their devices and name. Sending happens in
+  `doPost` after the function returned (outside every lock): now for
+  publish, create/delete of content, a public push send, import, admin
+  add/remove; with a 30-minute cooldown per (admin, item) for edits, links,
+  sections, contacts, settings; never for the rest. At most 6 per admin per
+  10 minutes. Recipients: admins on the allowlist **now**, not the actor, not
+  present in the panel (heartbeat < 70 s, not parked) — those get an in-panel
+  toast from `apiHeartbeat({ since })` instead. Payload: title «<name>
+  <summary>», a detail line, `url` `/admin/#open/<kind>/<id>` or
+  `/admin/#activity/<id>`, `tag` per item (replaces instead of stacking).
+- **Links into the panel.** boot.js takes `#open/…` / `#activity/…` out of
+  the address bar and follows it once the panel is drawn (`A.openLink`:
+  `A.go` → `A.openEditor`, asking first about unsaved changes; the data is
+  read again before saying an item is gone, which shows its log entries).
+  A tap with an admin window open: the worker posts
+  `{ type: 'athanasios-admin:open', url }` and focuses it (no second session).
+
 ## Ready for later (not built yet)
 
 - **Push, later:** categories (الاجتماعات / الأخبار / المسابقات والأنشطة) as

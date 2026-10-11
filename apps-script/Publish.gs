@@ -366,6 +366,7 @@ function apiPublish(expectedRevision) {
     // same visible content already live: don't make an empty-change commit
     if (live && live.revision === built.content.revision) {
       PropertiesService.getScriptProperties().setProperty('PUBLISHED_REVISION', built.content.revision);
+      activity_({ action: 'publish', type: 'site', id: built.content.revision, title: '', ref: built.content.revision, changes: { unchanged: true } });
       return {
         revision: built.content.revision,
         commit: '',
@@ -415,6 +416,7 @@ function apiPublish(expectedRevision) {
     });
 
     log_(email, 'publish', built.content.revision + (commit ? ' ' + commit.sha.slice(0, 7) : ' (no file change)'));
+    activity_({ action: 'publish', type: 'site', id: built.content.revision, title: '', ref: built.content.revision + (commit ? ' ' + commit.sha.slice(0, 7) : ''), changes: commit ? activitySincePublish_() : { unchanged: true } });
 
     return {
       revision: built.content.revision,
@@ -509,6 +511,7 @@ function apiSetLiveStage(date, stage) {
 
     PropertiesService.getScriptProperties().setProperty('LIVE_STATE', JSON.stringify(live));
     log_(email, 'live.stage', day + ' ' + (index === null ? 'auto' : String(index)) + (commit ? ' ' + commit.sha.slice(0, 7) : ''));
+    activity_({ action: 'live.stage', type: 'sessions', id: day, title: day, ref: commit ? commit.sha.slice(0, 7) : '', changes: { stage: index === null ? 'auto' : index + 1 } });
 
   }
   finally {

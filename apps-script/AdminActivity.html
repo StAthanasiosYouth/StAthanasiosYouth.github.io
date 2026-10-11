@@ -1,0 +1,813 @@
+<script>
+/*
+ * «سجل النشاط» (apps-script/Activity.gs): who did what, when.
+ *  - the page (A.views.activity): filters (person, action, section, date),
+ *    rows grouped by day, newest first, «اعرض أقدم» for more; a row opens
+ *    its item when it still exists (else it says it's gone)
+ *  - the home card (A.activityCard): the latest few
+ *  - in-panel toasts (A.activityToasts): what OTHER admins just did, from
+ *    the heartbeat (boot.js), instead of a push while the panel is open
+ *  - links into the panel (A.openLink): #open/<kind>/<id>, #open/settings,
+ *    #activity, #activity/<id> — from admin notifications and from rows
+ *  - the admin app card (A.appCard): install + this device's admin
+ *    notifications; only on the official admin (boot.js gives window.AdminApp)
+ *
+ * Who did it always comes from the server (the verified account); names are
+ * display names (shown as text, never HTML).
+ */
+(function () {
+
+  'use strict';
+
+  var A = window.A;
+  var el = A.el;
+  var icon = A.icon;
+
+  var TYPE_ICONS = {
+    sessions: 'church', news: 'megaphone', games: 'star', activities: 'calendar', notifications: 'bell', types: 'layers',
+    links: 'link', sections: 'layers', contacts: 'phone', settings: 'gear', media: 'photos', site: 'globe', admins: 'shield',
+    data: 'retry', session: 'user'
+  };
+
+  var TONES = {
+    create: 'ok', upload: 'ok', import: 'ok', duplicate: 'ok', 'admin.add': 'ok',
+    'delete': 'danger', 'media.delete': 'danger', 'media.purge': 'danger', 'admin.remove': 'danger',
+    publish: 'gold', push: 'info', 'session.takeover': 'warn'
+  };
+
+  var FAMILIES = [
+    { key: '', label: 'كل العمليات' },
+    { key: 'add', label: 'إضافة' },
+    { key: 'edit', label: 'تعديل' },
+    { key: 'remove', label: 'مسح' },
+    { key: 'publish', label: 'نشر' },
+    { key: 'push', label: 'إشعارات اتبعتت' },
+    { key: 'admins', label: 'الصلاحيات والأمان' }
+  ];
+
+  var SECTIONS = [
+    { key: '', label: 'كل الأقسام' },
+    { key: 'sessions', label: 'الاجتماعات' },
+    { key: 'news', label: 'الأخبار' },
+    { key: 'games', label: 'الألعاب' },
+    { key: 'activities', label: 'المسابقات والفعاليات' },
+    { key: 'notifications', label: 'الإشعارات' },
+    { key: 'page', label: 'الصفحة والإعدادات' },
+    { key: 'media', label: 'الصور' },
+    { key: 'site', label: 'النشر' },
+    { key: 'admins', label: 'لوحة التحكم' }
+  ];
+
+  /* where each kind of item lives in the panel */
+  var PLACES = {
+    sessions: ['content', 'meetings'], news: ['content', 'news'], games: ['content', 'games'],
+    notifications: ['content', 'notifications'], links: ['page', 'links'], sections: ['page', 'layout'],
+    contacts: ['page', 'contacts'], media: ['media'], settings: ['settings']
+  };
+
+  var KEYS = { sessions: 'date', news: 'id', games: 'id', notifications: 'id', activities: 'id', types: 'key', links: 'id', sections: 'key', contacts: 'id', media: 'id' };
+
+  var GONE_ACTIONS = ['delete', 'media.purge'];
+
+  /* a row about an item that can be opened (not a deletion) */
+  function openable(entry) {
+
+    if (GONE_ACTIONS.indexOf(entry.action) !== -1) return false;
+    return entry.type === 'settings' || entry.type === 'media' || !!(KEYS[entry.type] && entry.entityId);
+
+  }
+
+  /* such an item, missing from this panel's (older) copy of the data */
+  function stale(entry) {
+
+    return openable(entry) && entry.type !== 'settings' && !findItem(entry.type, entry.entityId);
+
+  }
+
+  var digits = function (value) { return String(value).replace(/\d/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[d]; }); };
+
+
+  /* =======================================================
+     ITEMS: does it still exist, and where is it
+  ======================================================= */
+
+  function typeSection(typeKey) {
+
+    var type = A.findRow((A.state.draft.types || []), 'key', typeKey);
+    return type && type.section ? type.section : 'activities';
+
+  }
+
+  function findItem(kind, id) {
+
+    if (!A.state || !KEYS[kind] || !id) return null;
+    var list = kind === 'sections'
+      ? (A.state.layout || []).concat(A.state.draft.sections || [])
+      : (A.state.draft[kind] || []);
+    var row = A.findRow(list, KEYS[kind], id);
+    if (kind === 'media' && row && row.deletedAt) return row;
+    return row || null;
+
+  }
+
+  function placeOf(kind, row) {
+
+    if (kind === 'activities') return ['content', typeSection(row && row.type)];
+    if (kind === 'types') return ['content', (row && row.section) || 'activities'];
+    return PLACES[kind] || null;
+
+  }
+
+  /* what a row opens: { label, open() } or null */
+  function targetOf(entry) {
+
+    if (!entry || GONE_ACTIONS.indexOf(entry.action) !== -1) return null;
+
+    if (entry.type === 'settings') {
+      return { label: 'افتح', open: function () { return A.go('settings'); } };
+    }
+
+    if (entry.type === 'media') {
+      return findItem('media', entry.entityId) ? { label: 'افتح', open: function () { return A.go('media'); } } : null;
+    }
+
+    if (!KEYS[entry.type] || !entry.entityId) return null;
+
+    var row = findItem(entry.type, entry.entityId);
+
+    if (!row) return null;
+
+    return { label: 'افتح', open: function () { return openItem(entry.type, entry.entityId); } };
+
+  }
+
+  /* the item's place, then its editor (A.go asks first when something isn't saved) */
+  function openItem(kind, id) {
+
+    var row = findItem(kind, id);
+    var place = placeOf(kind, row);
+
+    if (!row || !place) return Promise.resolve(false);
+
+    return A.go(place[0], place[1]).then(function (ok) {
+      if (!ok) return false;
+      if (kind === 'media') return true;
+      // the newest version (the state may have changed while asking)
+      if (!A.openEditor(kind, id)) {
+        A.toast('العنصر ده مبقاش موجود.', 'info');
+        return false;
+      }
+      return true;
+    });
+
+  }
+
+
+  /* =======================================================
+     LINKS INTO THE PANEL (notifications, rows): #open/…, #activity/…
+  ======================================================= */
+
+  var focusId = '';
+
+  /**
+   * '#open/news/news-ab12cd34' | '#open/sessions/2026-10-12' | '#open/settings'
+   * | '#open/media' | '#activity' | '#activity/act-…' → resolves true when it went there.
+   * Anything else is ignored (false).
+   */
+  A.openLink = function (hash) {
+
+    var text = String(hash || '').replace(/^#/, '');
+    var m;
+
+    if (!A.state) return Promise.resolve(false);
+
+    if ((m = /^open\/(sessions|news|games|activities|notifications|types|links|sections|contacts)\/([\w-]{1,80})$/.exec(text))) {
+      var kind = m[1];
+      var id = m[2];
+      return findFresh(kind, id).then(function (row) {
+        // gone (deleted since): what happened to it
+        return row ? openItem(kind, id) : showActivity('', { gone: true, type: kind, id: id });
+      });
+    }
+
+    if (/^open\/settings$/.test(text)) return A.go('settings');
+    if (/^open\/media(?:\/[\w-]{1,80})?$/.test(text)) return A.go('media');
+
+    if ((m = /^activity(?:\/(act-[0-9a-f]{12}))?$/.exec(text))) {
+      return showActivity(m[1] || '');
+    }
+
+    return Promise.resolve(false);
+
+  };
+
+  function showActivity(id, gone) {
+
+    focusId = id || '';
+    goneNote = gone || null;
+
+    // A.go draws the page (also when it is already open), for this entry
+    return A.go('activity');
+
+  }
+
+  /*
+   * The panel's copy of the data may be older than the log (another admin
+   * added something since it loaded): read it again — quietly, without
+   * redrawing the page — before saying an item is gone. Once at a time.
+   */
+  var refreshing = null;
+
+  function freshState() {
+
+    if (!refreshing) {
+      refreshing = A.call('apiState').then(function (next) {
+        A.state = next;
+        if (A.invalidateLibrary) A.invalidateLibrary();
+        if (A.renderStatus) A.renderStatus();
+        return next;
+      });
+      refreshing.then(function () { refreshing = null; }, function () { refreshing = null; });
+    }
+
+    return refreshing;
+
+  }
+
+  /* finds an item, reading the data again first when this copy doesn't have it */
+  function findFresh(kind, id) {
+
+    var row = findItem(kind, id);
+    if (row) return Promise.resolve(row);
+    return freshState().then(function () { return findItem(kind, id); }, function () { return null; });
+
+  }
+
+  /* a row or a toast: its item when it is still there, else the log at that entry */
+  A.openEntry = function (entry) {
+
+    if (entry.type === 'settings') return A.go('settings');
+    if (entry.type === 'media' && GONE_ACTIONS.indexOf(entry.action) === -1) return A.go('media');
+
+    if (KEYS[entry.type] && entry.entityId && GONE_ACTIONS.indexOf(entry.action) === -1) {
+      return findFresh(entry.type, entry.entityId).then(function (row) {
+        return row ? openItem(entry.type, entry.entityId) : showActivity(entry.id);
+      });
+    }
+
+    return showActivity(entry.id);
+
+  };
+
+  var goneNote = null;
+
+
+  /* =======================================================
+     ONE ROW
+  ======================================================= */
+
+  function initials(name) {
+
+    // one letter: two Arabic initials join into a word («في»)
+    var first = String(name || '?').trim().charAt(0) || '?';
+    return /[a-z]/i.test(first) ? first.toUpperCase() : first;
+
+  }
+
+  /* a steady color per person (from the email, never random) */
+  function hue(email) {
+
+    var h = 0;
+    for (var i = 0; i < String(email).length; i++) h = (h * 31 + String(email).charCodeAt(i)) % 360;
+    return h;
+
+  }
+
+  function avatar(entry) {
+
+    return el('span', { class: 'act__avatar', 'aria-hidden': 'true', style: '--hue:' + hue(entry.actor) }, initials(entry.actorName));
+
+  }
+
+  function when(entry) {
+
+    var seconds = Math.max(0, (Date.now() - Number(entry.at)) / 1000);
+    if (seconds < 3600) return A.ago(seconds);
+    return A.formatWall(String(entry.cairo).replace(' ', 'T'), true);
+
+  }
+
+  function changeChips(entry) {
+
+    var changes = entry.changes || {};
+    var chips = [];
+
+    if (Array.isArray(changes.fields)) {
+      changes.fields.slice(0, 4).forEach(function (f) { chips.push(A.chip(f)); });
+      if (changes.fields.length > 4 || changes.other) chips.push(A.chip('+' + digits((changes.fields.length > 4 ? changes.fields.length - 4 : 0) + (changes.other || 0)), 'off'));
+    }
+
+    if (entry.action === 'publish' && Array.isArray(changes.items)) {
+      changes.items.forEach(function (t) { chips.push(A.chip(t)); });
+      if (changes.more) chips.push(A.chip('+' + digits(changes.more), 'off'));
+    }
+
+    if (Array.isArray(changes.title) && changes.title.length === 2) {
+      chips.unshift(A.chip('كان «' + changes.title[0] + '»', 'off'));
+    }
+
+    return chips.length ? el('span', { class: 'act__chips' }, chips) : null;
+
+  }
+
+  function entryNode(entry, options) {
+
+    options = options || {};
+
+    var target = targetOf(entry);
+    var gone = !target && KEYS[entry.type] && entry.entityId && GONE_ACTIONS.indexOf(entry.action) === -1 && entry.type !== 'settings';
+    var tone = TONES[entry.action] || '';
+    var meta = [when(entry)];
+
+    if (entry.count > 1) meta.push(digits(entry.count) + ' مرات');
+    if (options.full && entry.device) meta.push(entry.device);
+
+    var text = el('p', { class: 'act__text' },
+      el('strong', { class: 'act__who', dir: 'auto', text: entry.actorName }),
+      ' ',
+      el('span', { dir: 'auto', text: entry.summary })
+    );
+
+    var body = el('div', { class: 'act__main' },
+      text,
+      el('p', { class: 'act__meta' },
+        el('span', { class: 'act__type', 'aria-hidden': 'true' }, icon(TYPE_ICONS[entry.type] || 'info')),
+        el('span', { text: meta.join(' · ') })
+      ),
+      options.compact ? null : changeChips(entry),
+      options.full && entry.ref ? el('p', { class: 'act__ref ltr', text: entry.ref }) : null
+    );
+
+    var action = target
+      ? el('button', { class: 'btn btn--small act__open', type: 'button', 'aria-label': target.label + ': ' + entry.text, onclick: function () { target.open(); } }, target.label)
+      : gone && !options.compact ? A.chip('مبقاش موجود', 'off') : null;
+
+    return el('li', {
+      class: 'act' + (tone ? ' act--' + tone : '') + (options.focus ? ' is-focus' : ''),
+      'data-id': entry.id
+    }, avatar(entry), body, action);
+
+  }
+
+  function dayLabel(day) {
+
+    var today = String(A.cairoNow()).slice(0, 10);
+    var yesterday = A.wallFromMinutes ? String(A.wallFromMinutes(A.wallMinutes(today) - 1440)).slice(0, 10) : '';
+
+    if (day === today) return 'النهارده';
+    if (day === yesterday) return 'امبارح';
+    return A.formatWall(day, false);
+
+  }
+
+  /* rows grouped by Cairo day */
+  function grouped(items, list, focus) {
+
+    var current = '';
+
+    items.forEach(function (entry) {
+      var day = String(entry.cairo).slice(0, 10);
+      if (day !== current) {
+        current = day;
+        list.appendChild(el('li', { class: 'act-day', role: 'presentation' }, el('span', { text: dayLabel(day) })));
+      }
+      list.appendChild(entryNode(entry, { focus: !!focus && entry.id === focus }));
+    });
+
+
+  }
+
+
+  /* =======================================================
+     THE PAGE
+  ======================================================= */
+
+  var query = { actor: '', family: '', section: '', from: '', to: '' };
+
+  function select(options, value, onchange, label, extra) {
+
+    return el('label', { class: 'act-filter' + (extra ? ' ' + extra : '') },
+      el('span', { class: 'act-filter__label', text: label }),
+      el('select', { class: 'input', onchange: function (event) { onchange(event.target.value); } }, options.map(function (o) {
+        return el('option', { value: o.key, selected: o.key === value ? 'selected' : null, text: o.label });
+      }))
+    );
+
+  }
+
+  function dateField(value, onchange, label) {
+
+    return el('label', { class: 'act-filter' },
+      el('span', { class: 'act-filter__label', text: label }),
+      el('input', { class: 'input input--ltr', type: 'date', dir: 'ltr', value: value || '', onchange: function (event) { onchange(event.target.value); } })
+    );
+
+  }
+
+  A.views.activity = function () {
+
+    var box = A.errorBox();
+    var list = el('ul', { class: 'acts', 'aria-busy': 'true', 'aria-label': 'سجل النشاط' });
+    var more = el('button', { class: 'btn btn--ghost', type: 'button', hidden: true, text: 'اعرض أقدم' });
+    var next = 0;
+    var drawn = [];
+    var refreshed = false;
+    var loading = 0;
+    var focus = focusId;
+    var gone = goneNote;
+
+    // once: a link opened this page for one entry / a gone item
+    focusId = '';
+    goneNote = null;
+
+    var people = [{ key: '', label: 'كل الأدمنز' }].concat(Object.keys(A.state.names || {}).map(function (email) {
+      return { key: email, label: A.state.names[email] };
+    }));
+
+    function skeleton() {
+
+      A.fill(list,
+        el('li', { class: 'skeleton skeleton--line' }),
+        el('li', { class: 'skeleton skeleton--line' }),
+        el('li', { class: 'skeleton skeleton--line skeleton--short' })
+      );
+
+    }
+
+    function load(append) {
+
+      var my = ++loading;
+      var ask = {};
+      Object.keys(query).forEach(function (k) { if (query[k]) ask[k] = query[k]; });
+      if (focus && !append) ask = { id: focus };
+      if (append && next) ask.before = next;
+
+      box.hidden = true;
+      more.disabled = true;
+      if (!append) skeleton();
+      list.setAttribute('aria-busy', 'true');
+
+      return A.call('apiActivity', ask).then(function (result) {
+        if (my !== loading) return;
+        list.setAttribute('aria-busy', 'false');
+        if (!append) list.replaceChildren();
+        // the people filter knows everyone on the list now
+        next = result.next || 0;
+        more.hidden = !result.more;
+        more.disabled = false;
+        if (!result.items.length && !append) {
+          list.appendChild(el('li', { class: 'empty-state' },
+            el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('clock')),
+            el('p', { class: 'empty-state__title', text: focus ? 'الحدث ده مش موجود في السجل.' : 'مفيش نشاط بالشكل ده.' }),
+            el('p', { class: 'empty-state__text', text: focus ? 'يمكن اتشال مع الوقت.' : 'غيّر الفلاتر أو امسحها.' })
+          ));
+          return;
+        }
+        drawn = append ? drawn.concat(result.items) : result.items.slice();
+        grouped(result.items, list, focus);
+        // an item another admin added after this panel loaded: read the data again once, then «افتح» works
+        if (!refreshed && result.items.some(stale)) {
+          refreshed = true;
+          freshState().then(function () {
+            if (my !== loading || !list.isConnected) return;
+            list.replaceChildren();
+            grouped(drawn, list, focus);
+          }, function () {});
+        }
+        if (focus && !append) {
+          var row = list.querySelector('.is-focus');
+          if (row) row.scrollIntoView({ block: 'center', behavior: A.reducedMotion() ? 'auto' : 'smooth' });
+        }
+      }).catch(function (error) {
+        if (my !== loading) return;
+        list.setAttribute('aria-busy', 'false');
+        list.replaceChildren();
+        more.disabled = false;
+        A.fail(error, box);
+      });
+
+    }
+
+    function change(key, value) {
+
+      query[key] = value || '';
+      focus = '';
+      load(false);
+      filters.classList.toggle('is-filtered', Object.keys(query).some(function (k) { return !!query[k]; }));
+
+    }
+
+    more.addEventListener('click', function () { load(true); });
+
+    var filters = el('div', { class: 'act-filters' + (Object.keys(query).some(function (k) { return !!query[k]; }) ? ' is-filtered' : '') },
+      select(people, query.actor, function (v) { change('actor', v); }, 'مين'),
+      select(FAMILIES, query.family, function (v) { change('family', v); }, 'عمل إيه'),
+      select(SECTIONS, query.section, function (v) { change('section', v); }, 'في أنهي جزء', 'act-filter--wide'),
+      dateField(query.from, function (v) { change('from', v); }, 'من يوم'),
+      dateField(query.to, function (v) { change('to', v); }, 'لحد يوم'),
+      el('button', { class: 'btn btn--ghost btn--small act-filters__reset', type: 'button', text: 'امسح الفلاتر', onclick: function () {
+        query = { actor: '', family: '', section: '', from: '', to: '' };
+        focus = '';
+        A.render();
+      } })
+    );
+
+    var intro = null;
+
+    if (focus || gone) {
+      intro = el('div', { class: 'act-focus' },
+        el('p', { class: gone ? 'note note--warn' : 'note', text: gone ? 'العنصر ده اتمسح من لوحة التحكم. ده آخر اللي حصل له:' : 'الحدث اللي فتحته:' }),
+        el('button', { class: 'btn btn--ghost btn--small', type: 'button', text: 'اعرض كل النشاط', onclick: function () { focus = ''; A.render(); } })
+      );
+      if (gone) {
+        // what happened to that item: its rows, newest first
+        focus = '';
+        query = { actor: '', family: '', section: gone.type === 'activities' || gone.type === 'types' ? 'activities' : (gone.type === 'links' || gone.type === 'sections' || gone.type === 'contacts' ? 'page' : gone.type), from: '', to: '' };
+      }
+    }
+
+    load(false);
+
+    return [
+      A.card('سجل النشاط', 'كل اللي اتعمل في لوحة التحكم: مين عمل إيه وإمتى. اضغط «افتح» علشان تروح للحاجة نفسها.',
+        box,
+        intro,
+        filters,
+        list,
+        el('div', { class: 'actions acts__more' }, more)
+      )
+    ];
+
+  };
+
+
+  /* =======================================================
+     THE HOME CARD
+  ======================================================= */
+
+  A.activityCard = function () {
+
+    var recent = (A.state.activity && A.state.activity.recent) || [];
+    var list = el('ul', { class: 'acts acts--compact', 'aria-label': 'آخر نشاط' }, recent.slice(0, 5).map(function (entry) {
+      return entryNode(entry, { compact: true });
+    }));
+
+    return el('section', { class: 'card dash-card dash-activity', id: 'dash-activity', 'aria-labelledby': 'dash-activity-title' },
+      el('div', { class: 'dash-card__head' },
+        el('span', { class: 'dash-card__icon', 'aria-hidden': 'true' }, icon('clock')),
+        el('h2', { class: 'card__title', id: 'dash-activity-title', text: 'آخر نشاط' })
+      ),
+      recent.length ? list : el('p', { class: 'card__hint', text: 'لسه مفيش نشاط متسجل. أول ما حد يضيف أو يعدّل أو ينشر هيظهر هنا.' }),
+      el('div', { class: 'actions' },
+        el('button', { class: 'btn btn--ghost btn--small', type: 'button', onclick: function () { A.go('activity'); } }, icon('clock'), 'كل النشاط')
+      )
+    );
+
+  };
+
+  function refreshHomeCard() {
+
+    var card = document.getElementById('dash-activity');
+    if (card && card.isConnected) card.replaceWith(A.activityCard());
+
+  }
+
+
+  /* =======================================================
+     IN-PANEL TOASTS (the heartbeat: what the others just did)
+  ======================================================= */
+
+  var since = 0;
+  var shown = {};
+
+  /* where the toasts start: the newest row when the panel opened */
+  A.activitySince = function () {
+
+    if (!since && A.state && A.state.activity) {
+      since = Number(A.state.activity.latest) || Number(A.state.activity.now) || 1;
+    }
+    return since;
+
+  };
+
+  A.activityToasts = function (list) {
+
+    list = (Array.isArray(list) ? list : []).filter(function (entry) {
+      return entry && entry.id && !shown[entry.id] && entry.actor !== (A.state && A.state.user);
+    });
+
+    list.forEach(function (entry) {
+      shown[entry.id] = true;
+      since = Math.max(since, Number(entry.at) || 0);
+    });
+
+    if (!list.length || !A.state) return;
+
+    // the home card and the log show them too
+    var activity = A.state.activity || (A.state.activity = { recent: [] });
+    var ids = list.map(function (e) { return e.id; });
+    activity.recent = list.slice().reverse().concat((activity.recent || []).filter(function (e) { return ids.indexOf(e.id) === -1; })).slice(0, 6);
+    activity.latest = since;
+    refreshHomeCard();
+
+    var last = list.slice(-2);
+    last.forEach(function (entry) {
+      A.toast(entry.text, 'info', { label: openable(entry) ? 'افتح' : 'السجل', onclick: function () { A.openEntry(entry); } });
+    });
+
+    if (list.length > 2) {
+      A.toast('و' + digits(list.length - 2) + ' تحديثات تانية من الأدمنز', 'info', { label: 'السجل', onclick: function () { A.go('activity'); } });
+    }
+
+  };
+
+
+  /* =======================================================
+     THE ADMIN APP (official admin only: window.AdminApp from boot.js)
+  ======================================================= */
+
+  var PLATFORM_NAMES = { android: 'أندرويد', ios: 'آيفون', desktop: 'كمبيوتر', other: 'جهاز' };
+
+  A.appCard = function () {
+
+    var app = window.AdminApp;
+
+    if (!app) return null;
+
+    var box = A.errorBox();
+    var install = el('div', { class: 'app-card__part' });
+    var push = el('div', { class: 'app-card__part' });
+    var devices = el('ul', { class: 'admins app-devices', hidden: true, 'aria-label': 'أجهزتي اللي عليها إشعارات الإدارة' });
+    var busy = false;
+
+    function steps(lines) {
+      return el('ol', { class: 'app-steps' }, lines.map(function (line) { return el('li', { text: line }); }));
+    }
+
+    function drawInstall() {
+
+      if (app.standalone()) {
+        A.fill(install, el('p', { class: 'note note--ok' }, icon('check'), ' انت فاتح «لوحة تحكم الأسرة» كتطبيق متثبت.'));
+        return;
+      }
+
+      if (app.canInstall()) {
+        A.fill(install,
+          el('p', { class: 'card__hint', text: 'تفتحها من أيقونة على الشاشة الرئيسية، في شاشة لوحدها، منفصلة عن تطبيق الموقع.' }),
+          el('div', { class: 'actions' },
+            el('button', { class: 'btn btn--primary', type: 'button', onclick: function () {
+              app.install().then(function (accepted) {
+                if (accepted) A.toast('اتثبتت ✓ افتحها من «لوحة تحكم الأسرة» على الشاشة الرئيسية.');
+                drawInstall();
+              });
+            } }, icon('download'), 'ثبّت التطبيق')
+          )
+        );
+        return;
+      }
+
+      if (app.platform() === 'ios') {
+        A.fill(install,
+          el('p', { class: 'card__hint', text: 'على الآيفون (من Safari):' }),
+          steps([
+            'افتح الصفحة دي في Safari (مش من جوه تطبيق تاني).',
+            'دوس على زرار المشاركة (المربع اللي طالع منه سهم) تحت.',
+            'اختار «إضافة إلى الشاشة الرئيسية» ← «إضافة».',
+            'افتح «لوحة تحكم الأسرة» من الشاشة الرئيسية وادخل بحساب جوجل مرة واحدة.'
+          ])
+        );
+        return;
+      }
+
+      A.fill(install,
+        el('p', { class: 'card__hint', text: app.platform() === 'android'
+          ? 'من قايمة كروم (⋮) اختار «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».'
+          : 'من شريط العنوان في كروم أو إيدج اضغط أيقونة التثبيت، أو من القايمة اختار «تثبيت لوحة تحكم الأسرة».' })
+      );
+
+    }
+
+    function drawDevices(list) {
+
+      devices.hidden = !list || !list.length;
+      A.fill(devices, (list || []).map(function (d) {
+        return el('li', { class: 'admin' },
+          el('span', { class: 'admin__icon', 'aria-hidden': 'true' }, icon(d.platform === 'desktop' ? 'globe' : 'phone')),
+          el('span', { class: 'admin__main' },
+            el('span', { class: 'admin__name', text: d.device || PLATFORM_NAMES[d.platform] || 'جهاز' }),
+            el('span', { class: 'admin__email', text: (PLATFORM_NAMES[d.platform] || '') + (d.lastSeen ? ' · آخر مرة ' + A.ago((Date.now() - d.lastSeen) / 1000).replace(/^من /, 'من ') : '') }),
+            d.current ? el('span', { class: 'admin__chips' }, A.chip('الجهاز ده', 'info')) : null
+          ),
+          el('button', { class: 'icon-btn icon-btn--danger', type: 'button', 'aria-label': 'وقّف الإشعارات على ' + (d.device || 'الجهاز ده'), onclick: function (event) {
+            var button = event.currentTarget;
+            (d.current ? app.push.disable() : A.withBusy(button, app.push.removeDevice(d.id)))
+              .then(function () { refresh(); })
+              .catch(function (error) { A.fail(error, box); });
+          } }, icon('trash'))
+        );
+      }));
+
+    }
+
+    function drawPush(status) {
+
+      var support = app.push.support();
+      var rows = [];
+
+      if (support === 'ios-install') {
+        rows.push(el('p', { class: 'note note--warn', text: 'على الآيفون، إشعارات الإدارة بتشتغل بس من التطبيق المتثبت على الشاشة الرئيسية (iOS 16.4 أو أحدث). ثبّته الأول من فوق، وافتحه، وفعّلها من هنا.' }));
+      }
+      else if (support === 'unsupported') {
+        rows.push(el('p', { class: 'note', text: 'المتصفح ده مش بيدعم الإشعارات. جرّب كروم على أندرويد أو الكمبيوتر، أو التطبيق المتثبت على الآيفون.' }));
+      }
+      else if (support === 'denied') {
+        rows.push(el('p', { class: 'note note--warn', text: 'الإشعارات مقفولة للموقع ده من إعدادات المتصفح. افتحها من إعدادات الموقع (القفل جنب العنوان) وارجع هنا.' }));
+      }
+      else {
+        var on = !!(status && status.on);
+        rows.push(
+          el('p', { class: on ? 'note note--ok' : 'card__hint', text: on
+            ? 'إشعارات الإدارة شغالة على الجهاز ده ✓'
+            : 'فعّلها علشان يوصلك لما أدمن تاني ينشر أو يضيف أو يمسح أو يعدّل حاجة، حتى واللوحة مقفولة.' }),
+          status && status.configured === false ? el('p', { class: 'note note--warn', text: 'إرسال الإشعارات لسه مش متظبط على السيرفر (FCM_SERVICE_ACCOUNT). الجهاز هيتسجل، بس مفيش إشعارات هتتبعت لحد ما يتظبط.' }) : null,
+          el('div', { class: 'actions' },
+            el('button', { class: 'btn' + (on ? ' btn--ghost' : ' btn--primary'), type: 'button', disabled: busy || null, onclick: function () {
+              busy = true;
+              drawPush(status);
+              (on ? app.push.disable() : app.push.enable())
+                .then(function (next) {
+                  if (next && next.on && !on) A.toast('تمام! إشعارات الإدارة اتفعّلت على الجهاز ده 🔔');
+                  else if (on) A.toast('وقفنا إشعارات الإدارة على الجهاز ده.');
+                  return refresh();
+                })
+                .catch(function (error) { A.fail(error, box); })
+                .then(function () { busy = false; drawPush(currentStatus); });
+            } }, icon(on ? 'close' : 'bell'), busy ? 'لحظة…' : (on ? 'وقّف على الجهاز ده' : 'فعّل إشعارات الإدارة'))
+          )
+        );
+      }
+
+      rows.push(el('details', { class: 'app-card__more' },
+        el('summary', { text: 'إيه اللي بيوصل؟' }),
+        el('p', { text: 'فورًا: النشر، إضافة أو مسح اجتماع أو خبر أو لعبة أو مسابقة أو فعالية أو إشعار، إرسال إشعار للموقع، وتغيير صلاحيات لوحة التحكم.' }),
+        el('p', { text: 'التعديلات (وكمان الروابط والأقسام والتواصل والإعدادات): مرة واحدة بس كل نص ساعة لنفس الحاجة من نفس الأدمن.' }),
+        el('p', { text: 'مش بيوصلك اللي انت عملته، ولا وانت فاتح لوحة التحكم (بيظهر لك هنا كرسالة صغيرة بدل الإشعار). الترتيب والإظهار والإخفاء والأرشيف والصور بيتسجلوا في «سجل النشاط» من غير إشعار.' })
+      ));
+
+      A.fill(push, rows);
+
+    }
+
+    var currentStatus = null;
+
+    function refresh() {
+
+      drawInstall();
+      if (app.push.support() !== 'ok') {
+        drawPush(null);
+        drawDevices([]);
+        return Promise.resolve();
+      }
+      return app.push.status().then(function (status) {
+        currentStatus = status;
+        drawPush(status);
+        drawDevices(status && status.devices);
+      }).catch(function (error) {
+        drawPush(null);
+        A.fail(error, box);
+      });
+
+    }
+
+    app.onChange(function () { if (card.isConnected) drawInstall(); });
+
+    var card = A.card('تطبيق لوحة التحكم', 'ثبّت «لوحة تحكم الأسرة» على موبايلك زي أي تطبيق، وفعّل إشعارات الإدارة علشان تعرف أول بأول مين عمل إيه.',
+      box,
+      el('h3', { class: 'section-label', text: 'التثبيت' }),
+      install,
+      el('h3', { class: 'section-label', text: 'إشعارات الإدارة على الجهاز ده' }),
+      push,
+      devices
+    );
+
+    card.classList.add('card--app');
+    drawInstall();
+    drawPush(null);
+    refresh();
+
+    return card;
+
+  };
+
+})();
+</script>

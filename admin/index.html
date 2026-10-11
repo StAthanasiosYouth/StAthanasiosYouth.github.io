@@ -23,18 +23,31 @@
     frame (srcdoc) inherits this policy and runs the site's own files.
     GitHub Pages can't send headers: frame-ancestors is enforced by boot.js
     (it leaves any frame and refuses to start inside one).
+
+    The admin app: its own manifest (id/scope /admin/, «لوحة تحكم الأسرة»)
+    and its own service worker (sw.js, scope /admin/: push and taps only,
+    no cache), separate from the public site's. Firebase (admin/push.js,
+    loaded only to turn admin notifications on/off) talks to two Google
+    hosts: firebaseinstallations and fcmregistrations.
   -->
 
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://accounts.google.com/gsi/; frame-src https://accounts.google.com/gsi/ https://www.google.com; object-src 'none'; base-uri 'self'; form-action 'none'; manifest-src 'none'; worker-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://accounts.google.com/gsi/ https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com; frame-src https://accounts.google.com/gsi/ https://www.google.com; object-src 'none'; base-uri 'self'; form-action 'none'; manifest-src 'self'; worker-src 'self'">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#020914">
   <meta name="color-scheme" content="dark">
   <meta name="format-detection" content="telephone=no">
+  <meta name="application-name" content="لوحة تحكم الأسرة">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="لوحة تحكم الأسرة">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
 
   <title>لوحة التحكم · أسرة البابا أثناسيوس</title>
 
-  <link rel="icon" href="../assets/img/favicon-32.png" sizes="32x32">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="preload" href="../assets/fonts/cairo-arabic.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="admin.css">
   <link rel="stylesheet" href="gate.css">

@@ -158,20 +158,22 @@
    * A.toast(message)                  success
    * A.toast(message, true|'error')    error (stays longer, role=alert)
    * A.toast(message, 'info')
+   * A.toast(message, kind, { label, onclick })   with a button (stays longer)
    */
-  A.toast = function (message, kind) {
+  A.toast = function (message, kind, action) {
 
     kind = kind === true ? 'error' : (kind || 'success');
 
     var stack = document.getElementById('toasts');
-    var item = el('div', { class: 'toast toast--' + kind, role: kind === 'error' ? 'alert' : 'status' },
+    var item = el('div', { class: 'toast toast--' + kind + (action ? ' toast--action' : ''), role: kind === 'error' ? 'alert' : 'status' },
       el('span', { class: 'toast__icon', 'aria-hidden': 'true' }, icon(TOAST_ICONS[kind] || 'info')),
       el('p', { class: 'toast__text', text: message }),
+      action ? el('button', { class: 'toast__action', type: 'button', text: action.label, onclick: function () { dismiss(); action.onclick(); } }) : null,
       el('button', { class: 'toast__close', type: 'button', 'aria-label': 'قفل الرسالة', onclick: function () { dismiss(); } }, icon('close'))
     );
 
     var timer = 0;
-    var life = kind === 'error' ? 8000 : 3400;
+    var life = kind === 'error' ? 8000 : action ? 7000 : 3400;
 
     function dismiss() {
       clearTimeout(timer);
@@ -2642,6 +2644,13 @@
 
   }
 
+  /* an item's editor by kind and key (deep links, the activity log): false when it's gone */
+  A.openEditor = function (kind, id) {
+
+    return reopenEditor({ kind: kind, id: String(id || '') });
+
+  };
+
   /* the item's editor again (its latest version), or false (gone) */
   function reopenEditor(key) {
 
@@ -2913,6 +2922,8 @@
       { key: 'contacts', label: 'التواصل' }
     ] },
     { key: 'media', label: 'الصور', icon: 'photos' },
+    // «سجل النشاط» (AdminActivity.html)
+    { key: 'activity', label: 'النشاط', icon: 'clock', title: 'سجل النشاط' },
     { key: 'settings', label: 'الإعدادات', icon: 'gear' }
   ];
 
@@ -3016,15 +3027,17 @@
     }));
 
     document.getElementById('crumb').textContent = sub ? current.label : 'لوحة التحكم';
-    document.getElementById('page-title').textContent = sub ? sub.label : current.label;
-    document.title = (sub ? sub.label : current.label) + ' — لوحة التحكم';
+    document.getElementById('page-title').textContent = sub ? sub.label : (current.title || current.label);
+    document.title = (sub ? sub.label : (current.title || current.label)) + ' — لوحة التحكم';
 
     var foot = document.getElementById('rail-foot');
     if (A.state) {
       A.fill(foot,
         A.state.config.siteUrl ? el('a', { class: 'navlink navlink--quiet', href: A.state.config.siteUrl, target: '_blank', rel: 'noopener' },
           el('span', { class: 'navlink__icon' }, icon('globe')), el('span', { class: 'navlink__label', text: 'افتح الموقع' })) : null,
-        el('p', { class: 'rail__user' }, icon('user'), el('span', { class: 'ltr', text: A.state.user })),
+        el('p', { class: 'rail__user', title: A.state.user }, icon('user'), A.state.me && A.state.me !== A.state.user.split('@')[0]
+          ? el('span', { class: 'rail__name', dir: 'auto', text: A.state.me })
+          : el('span', { class: 'ltr', text: A.state.user })),
         // the official admin page only (Google sign-in lives there)
         A.signOut ? el('button', { class: 'navlink navlink--quiet', type: 'button', onclick: function () { A.signOut(); } },
           el('span', { class: 'navlink__icon' }, icon('logout')), el('span', { class: 'navlink__label', text: 'خروج' })) : null

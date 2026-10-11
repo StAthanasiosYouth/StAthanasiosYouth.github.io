@@ -807,6 +807,10 @@ function apiSendPush(id, sendKey, edits) {
 
   log_(email, 'push', id + ': ' + outcome.delivered.length + '/' + subs.length + (removed ? ', removed ' + removed : ''));
 
+  if (status === 'sent') {
+    activity_({ action: 'push', type: 'notifications', id: id, title: message.title, ref: sendKey, changes: { sent: outcome.delivered.length, audience: subs.length, body: String(message.body || '').slice(0, 120) } });
+  }
+
   if (status === 'failed' && outcome.error) {
     throw appError_('الإشعار ما اتبعتش.', outcome.error);
   }

@@ -115,6 +115,11 @@ function apiStateFor_(email, built) {
 
   return {
     user: email,
+    // how the admins are shown (display names, Activity.gs); identity stays the email
+    me: displayName_(email),
+    names: adminDirectory_(),
+    // the home card's latest rows and where the in-panel toasts start
+    activity: activityState_(),
     draft: {
       settings: Object.keys(draft.settings).map(function (key) {
         return { key: key, value: draft.settings[key], help: help[key] || '' };
@@ -193,7 +198,11 @@ function adminLayout_(draft) {
 }
 
 
-/* Runs a change under the script lock, logs it, returns the fresh state. */
+/*
+ * Runs a change under the script lock, logs it, returns the fresh state.
+ * The change notes its Activity row(s) with activityNote_(); they are
+ * written only once it succeeded (Activity.gs — never failing the change).
+ */
 function mutate_(action, details, change) {
 
   var email = assertAdmin_();
@@ -203,14 +212,29 @@ function mutate_(action, details, change) {
 
   try {
     assignMissingIds_();
+    takeActivityNotes_();
     var summary = change();
     log_(email, action, summary || details);
+    takeActivityNotes_().forEach(function (entry) { activity_(entry); });
   }
   finally {
+    takeActivityNotes_();
     lock.releaseLock();
   }
 
   return apiStateFor_(email);
+
+}
+
+/* a row as it is now (for the Activity log: its title, what an edit changed) */
+function activityBefore_(table, column, value) {
+
+  try {
+    return readOptionalTable_(table).filter(function (row) { return String(row[column]) === String(value); })[0] || null;
+  }
+  catch (ignored) {
+    return null;
+  }
 
 }
 
@@ -428,6 +452,7 @@ function apiSaveLink(input) {
 
     var rows = readTable_('Links');
     var isNew = !existingId || !rows.some(function (row) { return row.id === existingId; });
+    var before = isNew ? null : rows.filter(function (row) { return row.id === existingId; })[0];
 
     link.id = existingId || ('link-' + Utilities.getUuid().slice(0, 8));
     link.updatedAt = nowStamp_();
@@ -439,6 +464,8 @@ function apiSaveLink(input) {
     }
 
     upsertRow_('Links', 'id', link);
+
+    activityNote_({ action: isNew ? 'create' : 'update', type: 'links', id: link.id, title: link.title, changes: isNew ? null : activityDiff_(before, link) });
 
     return (isNew ? 'new ' : '') + link.id + ' ' + link.title;
 
@@ -456,10 +483,12 @@ function apiSetLinkEnabled(id, enabled) {
 
     // someone else is editing it right now (Presence.gs; API mode only)
     assertUnlocked_('links:' + id);
-    if (!findRow_('Links', 'id', id)) {
+    var row = activityBefore_('Links', 'id', id);
+    if (!row) {
       throw new Error('الرابط مش موجود');
     }
     upsertRow_('Links', 'id', { id: id, enabled: enabled === true, updatedAt: nowStamp_() });
+    activityNote_({ action: enabled === true ? 'enable' : 'disable', type: 'links', id: id, title: row.title });
   });
 
 }
@@ -474,9 +503,11 @@ function apiDeleteLink(id) {
 
     // someone else is editing it right now (Presence.gs; API mode only)
     assertUnlocked_('links:' + id);
+    var row = activityBefore_('Links', 'id', id);
     if (!deleteRow_('Links', 'id', id)) {
       throw new Error('الرابط مش موجود');
     }
+    activityNote_({ action: 'delete', type: 'links', id: id, title: row ? row.title : id });
   });
 
 }
@@ -504,6 +535,7 @@ function apiMoveLink(id, direction) {
     });
 
     moveWithin_('Links', group, id, direction);
+    activityNote_({ action: 'reorder', type: 'links', id: '', title: '' });
 
   });
 
@@ -596,6 +628,7 @@ function apiSaveSection(input, isNew) {
 
     var rows = sortRows_(readTable_('Sections'));
     var exists = rows.some(function (row) { return row.key === key; });
+    var before = rows.filter(function (row) { return row.key === key; })[0] || null;
 
     if (isNew && exists) {
       throw new Error('في قسم بنفس المفتاح ده');
@@ -647,6 +680,8 @@ function apiSaveSection(input, isNew) {
       writeOrder_('Sections', 'key', keys);
     }
 
+    activityNote_({ action: exists ? 'update' : 'create', type: 'sections', id: key, title: record.title || key, changes: exists ? activityDiff_(before, record) : null });
+
   });
 
 }
@@ -662,12 +697,14 @@ function apiSetSectionEnabled(key, enabled) {
 
     // someone else is editing it right now (Presence.gs; API mode only)
     assertUnlocked_('sections:' + key);
-    if (!findRow_('Sections', 'key', key)) {
+    var row = activityBefore_('Sections', 'key', key);
+    if (!row) {
       throw builtinSection_(key)
         ? appError_('الأقسام الأساسية محتاجة ترقية البيانات الأول.', 'من الإعدادات ← ترقية البيانات.')
         : new Error('القسم مش موجود');
     }
     upsertRow_('Sections', 'key', { key: key, enabled: enabled === true });
+    activityNote_({ action: enabled === true ? 'enable' : 'disable', type: 'sections', id: key, title: row.title || key });
   });
 
 }
@@ -695,9 +732,13 @@ function apiDeleteSection(key) {
       throw new Error('القسم فيه روابط. انقلها أو امسحها الأول.');
     }
 
+    var row = activityBefore_('Sections', 'key', key);
+
     if (!deleteRow_('Sections', 'key', key)) {
       throw new Error('القسم مش موجود');
     }
+
+    activityNote_({ action: 'delete', type: 'sections', id: key, title: row ? row.title || key : key });
 
   });
 
@@ -711,6 +752,7 @@ function apiMoveSection(key, direction) {
 
   return mutate_('section.move', key + ' ' + direction, function () {
     moveWithin_('Sections', sortRows_(readTable_('Sections')), key, direction);
+    activityNote_({ action: 'reorder', type: 'sections', id: '', title: '' });
   });
 
 }
@@ -781,6 +823,7 @@ function apiSaveContact(input) {
 
     var rows = readTable_('Contacts');
     var isNew = !existingId || !rows.some(function (row) { return row.id === existingId; });
+    var before = isNew ? null : rows.filter(function (row) { return row.id === existingId; })[0];
 
     contact.id = existingId || ('contact-' + Utilities.getUuid().slice(0, 8));
     contact.updatedAt = nowStamp_();
@@ -790,6 +833,8 @@ function apiSaveContact(input) {
     }
 
     upsertRow_('Contacts', 'id', contact);
+
+    activityNote_({ action: isNew ? 'create' : 'update', type: 'contacts', id: contact.id, title: contact.name, changes: isNew ? null : activityDiff_(before, contact) });
 
     return (isNew ? 'new ' : '') + contact.id + ' ' + contact.name;
 
@@ -807,9 +852,11 @@ function apiDeleteContact(id) {
 
     // someone else is editing it right now (Presence.gs; API mode only)
     assertUnlocked_('contacts:' + id);
+    var row = activityBefore_('Contacts', 'id', id);
     if (!deleteRow_('Contacts', 'id', id)) {
       throw new Error('جهة التواصل مش موجودة');
     }
+    activityNote_({ action: 'delete', type: 'contacts', id: id, title: row ? row.name : id });
   });
 
 }
@@ -822,6 +869,7 @@ function apiMoveContact(id, direction) {
 
   return mutate_('contact.move', id + ' ' + direction, function () {
     moveWithin_('Contacts', sortRows_(readTable_('Contacts')), id, direction);
+    activityNote_({ action: 'reorder', type: 'contacts', id: '', title: '' });
   });
 
 }
@@ -976,10 +1024,15 @@ function apiSaveSettings(values) {
     var sheet = sheet_('Settings');
     var rows = readTable_('Settings');
     var next = null;
+    var changed = [];
 
     Object.keys(clean).forEach(function (key) {
 
       var row = rows.filter(function (r) { return r.key === key; })[0];
+
+      if (!row || String(row.value === null || row.value === undefined ? '' : row.value) !== String(clean[key])) {
+        changed.push(key);
+      }
 
       if (!row) {
         next = next ? next + 1 : nextRow_('Settings', rows);
@@ -1003,6 +1056,11 @@ function apiSaveSettings(values) {
       cell.setValue(clean[key]);
 
     });
+
+    if (changed.length) {
+      var group = settingsGroups_(changed);
+      activityNote_({ action: 'settings', type: 'settings', id: group, title: group, changes: { keys: changed.slice(0, 12) } });
+    }
 
   });
 

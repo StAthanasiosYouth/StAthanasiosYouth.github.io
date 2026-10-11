@@ -395,6 +395,7 @@ function apiUploadMedia(input) {
   var state = mutate_('media.upload', id, function () {
     ensureTable_('Media');
     upsertRow_('Media', 'id', record);
+    activityNote_({ action: 'upload', type: 'media', id: id, title: name || alt || '' });
     return id + ' ' + Math.round(full.length / 1024) + 'KB';
   });
 
@@ -502,6 +503,7 @@ function uploadVideo_(email, input) {
   var state = mutate_('media.upload', id, function () {
     ensureTable_('Media');
     upsertRow_('Media', 'id', record);
+    activityNote_({ action: 'upload', type: 'media', id: id, title: name || alt || '', sub: 'video' });
     return id + ' ' + Math.round(video.length / 1024) + 'KB ' + Math.round(duration) + 's';
   });
 
@@ -860,7 +862,7 @@ function findMedia_(id) {
 function apiUpdateMedia(id, input) {
 
   assertAdmin_();
-  findMedia_(id);
+  var before = findMedia_(id);
   input = input || {};
 
   var problems = [];
@@ -878,6 +880,7 @@ function apiUpdateMedia(id, input) {
     // someone else is editing it right now (Presence.gs; API mode only)
     assertUnlocked_('media:' + id);
     upsertRow_('Media', 'id', record);
+    activityNote_({ action: 'media.update', type: 'media', id: id, title: record.name || before.name || before.alt || '', sub: isVideoMedia_(before) ? 'video' : '', changes: activityDiff_(before, record) });
   });
 
 }
@@ -905,6 +908,7 @@ function apiDeleteMedia(id) {
     // someone else is editing it right now (Presence.gs; API mode only)
     assertUnlocked_('media:' + id);
     upsertRow_('Media', 'id', { id: id, deletedAt: nowStamp_() });
+    activityNote_({ action: 'media.delete', type: 'media', id: id, title: row.name || row.alt || '', sub: isVideoMedia_(row) ? 'video' : '' });
   });
 
 }
@@ -913,13 +917,14 @@ function apiDeleteMedia(id) {
 function apiRestoreMedia(id) {
 
   assertAdmin_();
-  findMedia_(id);
+  var row = findMedia_(id);
 
   return mutate_('media.restore', id, function () {
 
     // someone else is editing it right now (Presence.gs; API mode only)
     assertUnlocked_('media:' + id);
     upsertRow_('Media', 'id', { id: id, deletedAt: '' });
+    activityNote_({ action: 'media.restore', type: 'media', id: id, title: row.name || row.alt || '', sub: isVideoMedia_(row) ? 'video' : '' });
   });
 
 }
@@ -955,6 +960,7 @@ function apiPurgeMedia(id) {
       }
     });
     deleteRow_('Media', 'id', id);
+    activityNote_({ action: 'media.purge', type: 'media', id: id, title: row.name || row.alt || '', sub: isVideoMedia_(row) ? 'video' : '' });
     return id + (row.publishedAt ? ' (الملف على الموقع فضل زي ما هو)' : '');
   });
 

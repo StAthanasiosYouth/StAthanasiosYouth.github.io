@@ -4838,3 +4838,320 @@ dialog .toasts[popover] {
   display: none;
 }
 
+
+/* =========================================================
+   «سجل النشاط» (AdminActivity.html): rows, filters, home card
+========================================================= */
+
+.acts {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.acts .skeleton {
+  height: 58px;
+}
+
+.act-day {
+  padding: 10px 2px 2px;
+  font-size: .78rem;
+  font-weight: 800;
+  color: var(--gold-soft);
+}
+
+.act-day:first-child {
+  padding-top: 0;
+}
+
+.act-day span {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(7, 22, 42, .9);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.act {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, .025);
+}
+
+/* the kind of action, as a thin edge */
+.act::before {
+  content: "";
+  position: absolute;
+  inset-block: 10px;
+  inset-inline-start: -1px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--line-strong);
+  opacity: .55;
+}
+
+.act--ok::before { background: var(--ok); }
+.act--danger::before { background: var(--danger); }
+.act--gold::before { background: var(--gold-hi); opacity: .9; }
+.act--info::before { background: var(--info); }
+.act--warn::before { background: var(--warn); }
+
+.act.is-focus {
+  border-color: var(--line-strong);
+  background:
+    linear-gradient(90deg, rgba(215, 170, 80, .1), transparent 75%),
+    rgba(255, 255, 255, .03);
+  box-shadow: 0 0 0 3px rgba(215, 170, 80, .12);
+}
+
+.act__avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-size: .82rem;
+  font-weight: 800;
+  line-height: 1;
+  color: hsl(var(--hue, 40) 70% 82%);
+  background: hsl(var(--hue, 40) 45% 26% / .7);
+  box-shadow: inset 0 0 0 1px hsl(var(--hue, 40) 60% 60% / .35);
+}
+
+.act__main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.act__text {
+  margin: 0;
+  line-height: 1.55;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.act__who {
+  font-weight: 800;
+  color: var(--gold-hi);
+}
+
+.act__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: .76rem;
+  color: var(--text-3);
+}
+
+.act__type .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.act__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.act__chips .chip {
+  font-size: .7rem;
+}
+
+.act__ref {
+  margin: 0;
+  font-size: .72rem;
+  color: var(--text-3);
+}
+
+.act__open {
+  flex: none;
+}
+
+.acts--compact .act {
+  min-height: 50px;
+  padding: 8px 10px;
+}
+
+.acts--compact .act__avatar {
+  width: 32px;
+  height: 32px;
+  font-size: .74rem;
+}
+
+.acts--compact .act__text {
+  font-size: .88rem;
+}
+
+.act-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.act-filter {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.act-filter__label {
+  font-size: .74rem;
+  font-weight: 700;
+  color: var(--text-3);
+}
+
+.act-filter .input {
+  min-height: 40px;
+  padding-block: 6px;
+  font-size: .86rem;
+}
+
+.act-filters__reset {
+  visibility: hidden;
+}
+
+@media (max-width: 759px) {
+  .act-filter--wide {
+    grid-column: span 2;
+  }
+  .act-filters__reset {
+    display: none;
+  }
+  .act-filters.is-filtered .act-filters__reset {
+    display: inline-flex;
+    grid-column: span 2;
+    justify-self: start;
+  }
+}
+
+.act-filters.is-filtered .act-filters__reset {
+  visibility: visible;
+}
+
+@media (min-width: 760px) {
+  .act-filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) repeat(2, minmax(0, .8fr)) auto;
+  }
+}
+
+.act-focus {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.act-focus .note {
+  margin: 0;
+}
+
+.acts__more {
+  justify-content: center;
+}
+
+@media (max-width: 520px) {
+  .act {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .act__open,
+  .act > .chip {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+/* a toast with a button (another admin's action: «افتح») */
+.toast--action {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  color: var(--info);
+}
+
+.toast__action {
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  font: inherit;
+  font-size: .8rem;
+  font-weight: 800;
+  color: var(--gold-hi);
+  background: rgba(215, 170, 80, .1);
+  cursor: pointer;
+}
+
+.toast__action:hover {
+  background: rgba(215, 170, 80, .2);
+}
+
+/* display names (AdminPage.html: «صلاحيات لوحة التحكم») */
+.admin__name {
+  overflow: hidden;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin__name.is-unnamed {
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.admin__name + .admin__email {
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.rail__name {
+  font-weight: 800;
+  color: var(--text-2);
+}
+
+/* the admin app card (install + this device's admin notifications) */
+.app-card__part {
+  display: grid;
+  gap: 10px;
+}
+
+.app-steps {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-inline-start: 22px;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+
+.app-card__more summary {
+  font-size: .84rem;
+  font-weight: 700;
+  color: var(--gold-soft);
+  cursor: pointer;
+}
+
+.app-card__more p {
+  margin: 6px 0 0;
+  font-size: .84rem;
+  line-height: 1.65;
+  color: var(--text-2);
+}
+
+.app-devices {
+  margin-top: 4px;
+}
+

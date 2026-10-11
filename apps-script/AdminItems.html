@@ -293,6 +293,8 @@
         note.textContent = built.note || '';
         note.hidden = !built.note;
         var doc = frame.contentDocument;
+        // the editor was refilled or closed meanwhile: this frame is gone
+        if (!doc || !frame.isConnected || !doc.querySelector('main')) return;
         var width = wide ? 1100 : 400;
         frame.style.width = width + 'px';
         var hub = doc.querySelector('main');

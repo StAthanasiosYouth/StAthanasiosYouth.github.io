@@ -1,0 +1,20 @@
+{
+  "id": "/admin/",
+  "name": "إدارة أسرة البابا أثناسيوس - سفاجا",
+  "short_name": "لوحة تحكم الأسرة",
+  "description": "لوحة تحكم خدمة أسرة البابا أثناسيوس بسفاجا: المحتوى والنشر وسجل النشاط وإشعارات الإدارة.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/admin/",
+  "scope": "/admin/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#020914",
+  "theme_color": "#020914",
+  "categories": ["productivity"],
+  "icons": [
+    { "src": "/admin/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/admin/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/admin/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

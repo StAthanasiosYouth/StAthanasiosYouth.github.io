@@ -145,6 +145,9 @@ function adminList_(me) {
 
   return {
     emails: adminEmails_(),
+    // how each is shown (Activity.gs): the display name, else the email's local part
+    names: adminDirectory_(),
+    stored: adminNames_(),
     primary: primary,
     me: me,
     max: MAX_ADMINS
@@ -193,6 +196,7 @@ function apiAddAdmin(value) {
     PropertiesService.getScriptProperties().setProperty('ADMIN_EMAILS', emails.join(', '));
     forgetAdminEmails_();
     log_(me, 'admins.add', email);
+    activity_({ action: 'admin.add', type: 'admins', id: email, title: email });
 
   }
   finally {
@@ -243,9 +247,14 @@ function apiRemoveAdmin(value) {
       throw appError_('القايمة مينفعش تفضل فاضية.', '');
     }
 
+    var shown = displayName_(email);
     PropertiesService.getScriptProperties().setProperty('ADMIN_EMAILS', emails.join(', '));
     forgetAdminEmails_();
     log_(me, 'admins.remove', email);
+    // no name and no admin notifications left behind for someone who isn't an admin any more
+    try { forgetAdminName_(email); } catch (ignored) { console.warn('admins: name not removed'); }
+    forgetAdminDevices_(email);
+    activity_({ action: 'admin.remove', type: 'admins', id: email, title: email, changes: { name: shown } });
 
   }
   finally {

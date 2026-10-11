@@ -355,6 +355,11 @@ function apiMigrate() {
   var email = assertAdmin_();
   var result = runMigration_({ backup: true });
 
+  // only the upgrade an admin asked for from the panel (never setup() from the editor)
+  if (result.changed) {
+    activity_({ action: 'migrate', type: 'data', id: String(DATA_SCHEMA_VERSION), title: '', changes: { schema: DATA_SCHEMA_VERSION, backups: (result.backups || []).slice(0, 5) } });
+  }
+
   return { report: result, state: apiStateFor_(email) };
 
 }

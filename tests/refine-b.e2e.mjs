@@ -540,9 +540,10 @@ test('allowlist card: the list, add and remove with our modal, the primary accou
   await sleep(400);
 
   const primary = await page.$eval('.admin--primary', row => ({
-    email: row.dataset.email, remove: !!row.querySelector('button'), lock: !!row.querySelector('.admin__lock'), text: row.innerText
+    email: row.dataset.email, remove: !!row.querySelector('.icon-btn--danger'), rename: !!row.querySelector('button[title="غيّر الاسم"]'), lock: !!row.querySelector('.admin__lock'), text: row.innerText
   }));
   assert.deepEqual([primary.email, primary.remove, primary.lock], [ADMIN, false, true], 'primary: locked, no remove button');
+  assert.equal(primary.rename, true, 'but it can be renamed (display names)');
   assert.match(primary.text, /الحساب الأساسي/);
   await (await page.$('.card--admins')).screenshot({ captureBeyondViewport: false, path: `${SHOTS}40-allowlist-list.png` });
 

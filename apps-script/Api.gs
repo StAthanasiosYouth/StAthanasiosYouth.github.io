@@ -96,7 +96,13 @@ function apiFunctions_() {
     apiSessionEnd: apiSessionEnd,
     apiPushState: apiPushState,
     apiPushCheck: apiPushCheck,
-    apiSendPush: apiSendPush
+    apiSendPush: apiSendPush,
+    apiActivity: apiActivity,
+    apiSetAdminName: apiSetAdminName,
+    apiAdminPushSubscribe: apiAdminPushSubscribe,
+    apiAdminPushUnsubscribe: apiAdminPushUnsubscribe,
+    apiAdminPushDevices: apiAdminPushDevices,
+    apiAdminPushRemoveDevice: apiAdminPushRemoveDevice
   };
 
 }
@@ -106,6 +112,9 @@ function doPost(e) {
 
   // API mode from the first line: no verified token yet = nobody
   API_REQUEST_ = { email: '' };
+  // nothing left over from an earlier request in this execution (Activity.gs)
+  ACTIVITY_NOTES_ = [];
+  ACTIVITY_QUEUE_ = [];
 
   var reply;
 
@@ -155,6 +164,15 @@ function doPost(e) {
 
     reply = { ok: true, result: result === undefined ? null : result };
 
+    // the other admins' notifications for what just happened, outside every
+    // lock (Activity.gs, AdminPush.gs); a failure there never changes the reply
+    try {
+      activityDispatch_();
+    }
+    catch (error) {
+      console.warn('api: admin push dispatch failed');
+    }
+
   }
   catch (error) {
 
@@ -164,6 +182,8 @@ function doPost(e) {
   finally {
 
     API_REQUEST_ = null;
+    ACTIVITY_NOTES_ = [];
+    ACTIVITY_QUEUE_ = [];
 
   }
 

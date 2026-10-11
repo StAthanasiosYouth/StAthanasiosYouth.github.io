@@ -531,7 +531,29 @@ Done once, by the owner. Everything here is free (Firebase Spark plan, no card).
 The Sheet gets two tabs on first use: `PushSubs` (one row per device: token hash, token, platform,
 first/last seen, failures) and `PushLog` (one row per send). Don't edit them by hand.
 
-### 8.6 Limits
+### 8.6 The admin app, «سجل النشاط» and admin notifications
+
+Nothing new to set up: the same Firebase project, web config, VAPID key and
+`FCM_SERVICE_ACCOUNT` send admin notifications too, and the OAuth client and
+its origin are unchanged. Deploy the API as usual
+(`cd tools && node deploy-api.mjs "vNN: …"`) and push the site.
+
+- **Script Property `ADMIN_NAMES`** (JSON `{ "email": "name" }`): written by
+  the panel (**الإعدادات ← صلاحيات لوحة التحكم ← ✏️**). No need to touch it;
+  if you do, keep it valid JSON. Removing an admin removes their name.
+- **New tabs, made on first use:** `Activity` (the log; trimmed to 5,000
+  rows and one year) and `AdminPushSubs` (admin devices; never mix with
+  `PushSubs`). Don't edit them by hand. The technical `Log` tab is unchanged.
+- **Installing:** Android / desktop Chrome or Edge: **الإعدادات ← تطبيق لوحة
+  التحكم ← ثبّت التطبيق** (or the browser's own install). iPhone: open
+  `/admin/` in Safari → Share → **Add to Home Screen**, open «لوحة تحكم
+  الأسرة» from there and sign in with Google once (a home-screen app has its
+  own cookies). Admin notifications on iPhone work only from that installed
+  app (iOS 16.4+).
+- **Admin icons:** `cd tools && npm run admin-icons` (from `tools/source/logo.png`).
+  The admin's Firebase copy: `npm run build-push-vendor` (writes both copies).
+
+### 8.7 Limits
 
 - Apps Script quotas apply to the API (URL fetch for token checks: cached,
   one per token per hour; consumer accounts get 20,000 fetches a day).

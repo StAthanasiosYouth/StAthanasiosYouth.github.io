@@ -41,6 +41,13 @@
  *    question, locks and presence kept. The sid alone opens nothing: every
  *    call still needs the token. Expired → the usual sign-in; replaced →
  *    «الجلسة اتقفلت…».
+ * 8. Links into the panel (#open/…, #activity/…): from admin notifications
+ *    (admin/sw.js) — followed once the panel is drawn (A.openLink).
+ * 9. The admin app (window.AdminApp): install, its own service worker
+ *    (/admin/sw.js, scope /admin/, separate from the site's /sw.js), and
+ *    this device's admin notifications (admin/push.js, loaded on demand).
+ *    The heartbeat also brings what the other admins just did: in-panel
+ *    toasts (A.activityToasts) instead of a push while the panel is open.
  *
  * Settings: admin/config.js.
  */
@@ -215,7 +222,36 @@
     var kind = tablet ? 'تابلت' : mobile ? 'موبايل' : 'كمبيوتر';
     var label = os === 'آيفون' || os === 'آيباد' ? os : kind + (os ? ' ' + os : '');
 
+    // the installed admin app (its own window), not a browser tab
+    if (standalone()) browser = 'التطبيق';
+
     return (label + (browser ? ' – ' + browser : '')).slice(0, 40);
+
+  }
+
+
+  /* opened as the installed admin app (its own window, from the home screen) */
+  function standalone() {
+
+    try {
+      return !!((window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches ||
+        window.matchMedia('(display-mode: fullscreen)').matches ||
+        window.matchMedia('(display-mode: window-controls-overlay)').matches)) ||
+        window.navigator.standalone === true);
+    }
+    catch (ignored) {
+      return false;
+    }
+
+  }
+
+  /* 'ios' | 'android' | 'desktop' (for the install help and the device list) */
+  function platform() {
+
+    var ua = navigator.userAgent || '';
+    if (/iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'ios';
+    if (/Android/i.test(ua)) return 'android';
+    return 'desktop';
 
   }
 
@@ -1258,6 +1294,9 @@
         catch (error) { if (window.console) console.warn('[admin] restore', error); }
       }
       collab.begin();
+      // a link this page was opened with (an admin notification): there now
+      links.ready();
+      app.ready();
     });
 
   }
@@ -1409,6 +1448,11 @@
 
     function apply(result) {
       if (A.renderPresence) A.renderPresence(result.others || []);
+      // what the other admins just did (instead of a push while this panel is open)
+      if (result.activity && A.activityToasts) {
+        try { A.activityToasts(result.activity); }
+        catch (error) { if (window.console) console.warn('[admin] activity', error); }
+      }
       // a long publish held the server's lock: nothing decided about locks this time
       if (result.busy) return;
       var locks = result.locks || {};
@@ -1434,7 +1478,7 @@
       inflight = true;
       lastBeat = Date.now();
 
-      post('apiHeartbeat', [{ area: place.area, view: place.view, item: editing(), locks: lockKeys() }], session.token, sid, { timeout: TIMING.beatFail })
+      post('apiHeartbeat', [{ area: place.area, view: place.view, item: editing(), locks: lockKeys(), since: A.activitySince ? A.activitySince() : undefined }], session.token, sid, { timeout: TIMING.beatFail })
         .then(function (reply) {
           if (!running) return;
           if (reply.ok) apply(reply.result || {});
@@ -1520,6 +1564,220 @@
         where: function (area, view) {
           place = { area: area || '', view: view || '' };
         }
+      }
+    };
+
+  })();
+
+
+  /*
+   * 8. Links into the panel: '#open/<kind>/<id>', '#open/settings',
+   *    '#activity', '#activity/<id>' — from an admin notification (the
+   *    worker opens /admin/#…, or tells an open admin window where to go)
+   *    or from a link. Taken out of the address bar at once (a reload never
+   *    opens it again) and followed once the panel is drawn; A.openLink
+   *    (AdminActivity) goes there the usual way (unsaved changes asked first).
+   */
+  var links = (function () {
+
+    var LINK = /^#(?:open\/[a-z]{1,20}(?:\/[\w-]{1,80})?|activity(?:\/act-[0-9a-f]{12})?)$/;
+    var pending = '';
+
+    function take(hash) {
+
+      if (!LINK.test(hash || '')) return false;
+      pending = hash;
+      try { window.history.replaceState(null, '', window.location.pathname + window.location.search); }
+      catch (ignored) { /* the hash stays; harmless */ }
+      follow();
+      return true;
+
+    }
+
+    function follow() {
+
+      if (!pending || phase !== 'app' || !A.openLink) return;
+      var hash = pending;
+      pending = '';
+      Promise.resolve(A.openLink(hash)).catch(function (error) {
+        if (window.console) console.warn('[admin] link', error);
+      });
+
+    }
+
+    take(window.location.hash);
+
+    window.addEventListener('hashchange', function () { take(window.location.hash); });
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', function (event) {
+        var data = event.data;
+        if (!data || data.type !== 'athanasios-admin:open' || typeof data.url !== 'string') return;
+        try {
+          var url = new URL(data.url, window.location.origin);
+          if (url.origin === window.location.origin && url.pathname === window.location.pathname) take(url.hash);
+        }
+        catch (ignored) {
+          // not a link of ours
+        }
+      });
+    }
+
+    return { ready: follow };
+
+  })();
+
+
+  /*
+   * 9. The admin app (window.AdminApp, for A.appCard in AdminActivity):
+   *    - install: the browser's own prompt (Android / desktop Chrome, Edge),
+   *      kept for the «ثبّت التطبيق» button; iPhone: «إضافة إلى الشاشة
+   *      الرئيسية» from Safari (the card explains it);
+   *    - its service worker, /admin/sw.js (scope /admin/, push and taps only,
+   *      no cache), registered once the panel is open;
+   *    - admin notifications on this device: admin/push.js, loaded only when
+   *      the card asks (or for an occasional token refresh of a subscribed
+   *      device). The permission prompt opens inside the tap.
+   */
+  var app = (function () {
+
+    var deferred = null;
+    var listeners = [];
+    var worker = null;
+    var module = null;
+
+    function changed() {
+      listeners.forEach(function (fn) { try { fn(); } catch (ignored) { /* a card that's gone */ } });
+    }
+
+    window.addEventListener('beforeinstallprompt', function (event) {
+      event.preventDefault();
+      deferred = event;
+      changed();
+    });
+
+    window.addEventListener('appinstalled', function () {
+      deferred = null;
+      changed();
+    });
+
+    /* the admin worker, active (never the site's /sw.js) */
+    function registration() {
+
+      if (!('serviceWorker' in navigator)) return Promise.reject(new Error('هنا مفيش دعم للإشعارات.'));
+
+      if (!worker) {
+        worker = navigator.serviceWorker.register('sw.js', { scope: './' }).then(function (reg) {
+          var pending = reg.installing || reg.waiting;
+          if (reg.active || !pending) return reg;
+          return new Promise(function (resolve) {
+            pending.addEventListener('statechange', function () {
+              if (pending.state === 'activated') resolve(reg);
+            });
+            setTimeout(function () { resolve(reg); }, 8000);
+          });
+        });
+        worker.catch(function () { worker = null; });
+      }
+
+      return worker;
+
+    }
+
+    function pushModule() {
+
+      if (!module) {
+        module = import('./push.js');
+        module.catch(function () { module = null; });
+      }
+
+      return module;
+
+    }
+
+    function support() {
+
+      var ok = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+      if (!ok) return platform() === 'ios' && !standalone() ? 'ios-install' : 'unsupported';
+      if (window.Notification.permission === 'denied') return 'denied';
+      return 'ok';
+
+    }
+
+    var info = function () { return { platform: platform(), device: DEVICE }; };
+
+    window.AdminApp = {
+
+      standalone: standalone,
+      platform: platform,
+      canInstall: function () { return !!deferred; },
+
+      /* resolves true when the admin accepted */
+      install: function () {
+        var event = deferred;
+        if (!event) return Promise.resolve(false);
+        deferred = null;
+        event.prompt();
+        return event.userChoice.then(function (choice) {
+          changed();
+          return !!choice && choice.outcome === 'accepted';
+        }, function () { return false; });
+      },
+
+      onChange: function (fn) { listeners.push(fn); },
+
+      push: {
+        support: support,
+        status: function () {
+          return pushModule().then(function (m) { return m.status(A.call); });
+        },
+        /* must be called inside the tap: the permission prompt opens first */
+        enable: function () {
+          var asked = window.Notification.permission === 'granted'
+            ? Promise.resolve('granted')
+            : new Promise(function (resolve) {
+              // older Safari answers through a callback, newer browsers with a promise
+              var answer = window.Notification.requestPermission(resolve);
+              if (answer && typeof answer.then === 'function') answer.then(resolve, function () { resolve('default'); });
+            });
+          return asked.then(function (answer) {
+            if (answer !== 'granted') {
+              throw new Error(answer === 'denied'
+                ? 'الإشعارات اتقفلت للموقع ده. افتحها من إعدادات الموقع في المتصفح وجرّب تاني.'
+                : 'محتاجين توافق على الإشعارات علشان تشتغل.');
+            }
+            return Promise.all([pushModule(), registration()]);
+          }).then(function (both) {
+            return both[0].enable(A.call, both[1], info());
+          });
+        },
+        disable: function () {
+          return Promise.all([pushModule(), registration().catch(function () { return null; })]).then(function (both) {
+            return both[0].disable(A.call, both[1]);
+          });
+        },
+        removeDevice: function (id) {
+          return pushModule().then(function (m) { return m.removeDevice(A.call, id); });
+        }
+      }
+
+    };
+
+    return {
+      /* the panel is open: the worker (quietly), and an occasional token check of a subscribed device */
+      ready: function () {
+        var later = window.requestIdleCallback || function (fn) { return setTimeout(fn, 1500); };
+        later(function () {
+          registration().then(function (reg) {
+            // only where notifications are allowed; push.js checks whether this device
+            // turned admin notifications on and is due a check (every few days) before
+            // it loads anything else
+            if (!('Notification' in window) || window.Notification.permission !== 'granted') return;
+            return pushModule().then(function (m) { return m.refresh(A.call, reg, info()); });
+          }).catch(function (error) {
+            if (window.console) console.warn('[admin] app worker', error);
+          });
+        });
       }
     };
 

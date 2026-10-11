@@ -174,9 +174,10 @@ function ageSeconds_(stamp, now) {
 
 }
 
+/* how an admin is shown: the display name (Activity.gs), else the email's local part */
 function nameOf_(email) {
 
-  return String(email || '').split('@')[0];
+  return displayName_(email);
 
 }
 
@@ -322,7 +323,10 @@ function apiSessionStart(options) {
 
     if (current && current.sid) {
       endSession_(current, true);
-      if (live && options.force === true) log_(email, 'session.takeover', device + ' ← ' + cleanLabel_(current.device, 40));
+      if (live && options.force === true) {
+        log_(email, 'session.takeover', device + ' ← ' + cleanLabel_(current.device, 40));
+        activity_({ action: 'session.takeover', type: 'session', id: '', title: '', changes: { device: device, from: cleanLabel_(current.device, 40) } });
+      }
     }
 
     sid = Utilities.getUuid();
@@ -550,6 +554,16 @@ function apiHeartbeat(info) {
   }
 
   result.others = othersOnline_(email, presenceNow_());
+
+  // what the others did since this page last asked: in-panel toasts (Activity.gs)
+  if (info.since !== undefined) {
+    try {
+      result.activity = activitySince_(email, info.since);
+    }
+    catch (ignored) {
+      result.activity = [];
+    }
+  }
 
   return result;
 

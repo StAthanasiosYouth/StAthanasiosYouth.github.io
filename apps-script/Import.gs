@@ -543,6 +543,10 @@ function apiImportApply(text, decisions) {
       (adds.length ? ' | + ' + adds.map(function (r) { return r.date; }).join(' ') : '') +
       (updates.length ? ' | ~ ' + updates.map(function (u) { return u.patch.date; }).join(' ') : ''));
 
+    if (adds.length || updates.length) {
+      activity_({ action: 'import', type: 'sessions', id: '', title: '', changes: { added: adds.length, updated: updates.length, dates: adds.map(function (r) { return r.date; }).concat(updates.map(function (u) { return u.patch.date; })).slice(0, 20) } });
+    }
+
   }
   finally {
     lock.releaseLock();

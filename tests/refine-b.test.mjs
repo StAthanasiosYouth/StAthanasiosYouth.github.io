@@ -54,7 +54,9 @@ const ARGS = {
   apiPurgeMedia: ['img-x'], apiMediaPreview: ['img-x'], apiSetMediaAlt: ['img-x', 'x'], apiFetchMediaUrl: ['https://example.org/a.jpg'], apiPlanMigration: [], apiMigrate: [],
   apiAdmins: [], apiAddAdmin: ['x@gmail.com'], apiRemoveAdmin: [SECOND],
   apiSessionStart: [{ device: 'x' }], apiSessionResume: [{ device: 'x' }], apiHeartbeat: [{}], apiSessionEnd: [],
-  apiPushState: [], apiPushCheck: [], apiSendPush: ['notif-x', 's-0123456789', {}]
+  apiPushState: [], apiPushCheck: [], apiSendPush: ['notif-x', 's-0123456789', {}],
+  apiActivity: [{}], apiSetAdminName: [SECOND, 'اسم'],
+  apiAdminPushSubscribe: [{ token: 'x' }], apiAdminPushUnsubscribe: [{ token: 'x' }], apiAdminPushDevices: [{}], apiAdminPushRemoveDevice: ['h0123456789abcde']
 };
 
 /*
@@ -334,7 +336,7 @@ test('allowlist: list, add (validated, lower-cased, logged), remove (logged)', (
   const gs = world.as(ADMIN).gs;
 
   let list = plain(gs.apiAdmins());
-  assert.deepEqual(list, { emails: [ADMIN], primary: ADMIN, me: ADMIN, max: 20 });
+  assert.deepEqual(list, { emails: [ADMIN], names: { [ADMIN]: 'menazakmena' }, stored: {}, primary: ADMIN, me: ADMIN, max: 20 });
 
   list = plain(gs.apiAddAdmin('  Second.Admin@GMAIL.com '));
   assert.deepEqual(list.emails, [ADMIN, SECOND]);
@@ -423,7 +425,11 @@ test('admin/: strict CSP, noindex, no-referrer, no inline code, no redirect, no 
   assert.deepEqual(rules['default-src'], ["'none'"]);
   assert.deepEqual(rules['script-src'], ["'self'", 'https://accounts.google.com/gsi/client']);
   assert.deepEqual(rules['style-src'], ["'self'", 'https://accounts.google.com/gsi/style']);
-  assert.deepEqual(rules['connect-src'], ["'self'", 'https://script.google.com', 'https://script.googleusercontent.com', 'https://accounts.google.com/gsi/']);
+  assert.deepEqual(rules['connect-src'], ["'self'", 'https://script.google.com', 'https://script.googleusercontent.com', 'https://accounts.google.com/gsi/',
+    'https://firebaseinstallations.googleapis.com', 'https://fcmregistrations.googleapis.com']);
+  // the admin app: its own manifest and worker, from this origin only
+  assert.deepEqual(rules['manifest-src'], ["'self'"]);
+  assert.deepEqual(rules['worker-src'], ["'self'"]);
   assert.deepEqual(rules['frame-src'], ['https://accounts.google.com/gsi/', 'https://www.google.com']);
   assert.deepEqual(rules['img-src'], ["'self'", 'data:', 'blob:']);
   assert.deepEqual(rules['object-src'], ["'none'"]);

@@ -950,7 +950,7 @@
     var upgradeCard = A.upgradeCard();
 
     var accountCard = A.card('الحساب', null,
-      el('p', {}, 'انت داخل بـ ', A.chip(A.state.user, 'ltr')),
+      el('p', {}, 'انت داخل بـ ', A.chip(A.state.user, 'ltr'), A.state.me ? el('span', {}, ' — اسمك في اللوحة: ', el('strong', { dir: 'auto', text: A.state.me })) : null),
       A.signOut ? el('div', { class: 'actions' },
         el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { A.signOut(); } }, icon('logout'), 'خروج')
       ) : null
@@ -962,15 +962,17 @@
       )
       : null;
 
-    return [siteCard, A.state.hubReady ? hubCard : null, guideCard, upgradeCard, publishCard, adminsCard(), mediaCard, accountCard].filter(Boolean);
+    return [siteCard, A.state.hubReady ? hubCard : null, A.appCard ? A.appCard() : null, guideCard, upgradeCard, publishCard, adminsCard(), mediaCard, accountCard].filter(Boolean);
 
   };
 
 
   /* =======================================================
-     «صلاحيات لوحة التحكم»: the Google emails allowed in.
-     The server decides everything (Auth.gs); this only shows the list
-     and asks before each change, with our own modal.
+     «صلاحيات لوحة التحكم»: the Google emails allowed in, and the name
+     each admin is shown with (presence, «سجل النشاط», notifications).
+     The server decides everything (Auth.gs, Activity.gs): the email is
+     who someone is; the name is only how they're shown. Any admin may
+     rename any admin; two admins can never have the same name.
   ======================================================= */
 
   var EMAIL = /^[^@\s,;<>"]+@[^@\s,;<>"]+\.[a-z]{2,}$/i;
@@ -996,15 +998,26 @@
       var primary = email === data.primary;
       var me = email === data.me;
 
+      var shown = (data.names && data.names[email]) || email.split('@')[0];
+      var named = !!(data.stored && data.stored[email]);
+
       return el('li', { class: 'admin' + (primary ? ' admin--primary' : ''), 'data-email': email },
         el('span', { class: 'admin__icon', 'aria-hidden': 'true' }, icon(primary ? 'shield' : 'user')),
         el('span', { class: 'admin__main' },
+          el('span', { class: 'admin__name' + (named ? '' : ' is-unnamed'), dir: 'auto', text: named ? shown : shown + ' (من غير اسم)' }),
           el('span', { class: 'admin__email ltr', text: email }),
           primary || me ? el('span', { class: 'admin__chips' },
             primary ? A.chip('الحساب الأساسي', 'gold') : null,
             me ? A.chip('انت', 'info') : null
           ) : null
         ),
+        el('button', {
+          class: 'icon-btn',
+          type: 'button',
+          'aria-label': 'غيّر اسم ' + email,
+          title: 'غيّر الاسم',
+          onclick: function (event) { rename(email, named ? shown : '', event.currentTarget); }
+        }, icon('edit')),
         primary
           ? el('span', { class: 'admin__lock', role: 'img', 'aria-label': 'محمي: مينفعش يتشال', title: 'محمي: مينفعش يتشال' }, icon('lock'))
           : me
@@ -1036,6 +1049,46 @@
         list.replaceChildren();
         A.fail(error, box);
       });
+
+    }
+
+    /* the display name: our own small dialog; the server checks it (length, no copies) */
+    function rename(email, current, button) {
+
+      box.hidden = true;
+
+      var field = A.textInput(current, { max: 40, placeholder: 'مثلاً: مينا زكريا' });
+      field.setAttribute('autocomplete', 'off');
+      field.setAttribute('dir', 'auto');
+
+      A.modal({
+        tone: 'info',
+        icon: 'user',
+        title: 'اسم «' + email + '» في لوحة التحكم',
+        message: 'ده الاسم اللي بيظهر في «سجل النشاط» والإشعارات ومين فاتح دلوقتي. الدخول بيفضل بالإيميل زي ما هو. سيبه فاضي علشان يرجع لأول الإيميل.',
+        body: A.field('الاسم', field, 'من ٢ لـ ٤٠ حرف، ومينفعش يبقى زي اسم أدمن تاني.'),
+        actions: [
+          { label: 'إلغاء', value: false, kind: 'ghost' },
+          { label: 'احفظ الاسم', value: true, kind: 'primary', autofocus: false }
+        ]
+      }).then(function (ok) {
+        A.dirty = false;
+        if (!ok) return;
+        A.withBusy(button, A.call('apiSetAdminName', email, field.value))
+          .then(function (next) {
+            draw(next);
+            // presence, the rail and the log use the names: the state learns them too
+            if (A.state) {
+              A.state.names = next.names;
+              if (email === A.state.user) A.state.me = next.names[email];
+              if (A.renderNav) A.renderNav();
+            }
+            A.toast(field.value.trim() ? 'اتحفظ الاسم ✓' : 'رجع لأول الإيميل');
+          })
+          .catch(function (error) { A.fail(error, box); });
+      });
+
+      setTimeout(function () { field.focus(); field.select(); }, 30);
 
     }
 

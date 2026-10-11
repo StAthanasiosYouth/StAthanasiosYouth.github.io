@@ -23,6 +23,33 @@ var ITEM_KINDS = {
 var ACTIVITY_LIMITS = { title: 80, subtitle: 140, description: 1500, cta: 24, location: 120, typeLabel: 30, template: 120 };
 
 
+/* an item, as the Activity log names it: { type, id, title, sub } (sessions: title = the date) */
+function itemActivity_(kind, row, key) {
+
+  var spec = ITEM_KINDS[kind];
+  var entry = { type: kind, id: String(key || (row && row[spec.key]) || ''), title: '' };
+
+  if (!row) {
+    entry.title = kind === 'sessions' ? entry.id : '';
+    return entry;
+  }
+
+  entry.title = kind === 'sessions' ? String(row.date || entry.id) : String(row.title || row.label || row.key || entry.id);
+
+  if (kind === 'sessions' && row.topic) {
+    entry.changes = { topic: String(row.topic).slice(0, 80) };
+  }
+
+  if (kind === 'activities' && row.type) {
+    var type = activityBefore_('Types', 'key', row.type);
+    if (type && type.section === 'competitions') entry.sub = 'competitions';
+  }
+
+  return entry;
+
+}
+
+
 function itemKind_(kind) {
 
   if (typeof kind !== 'string' || !Object.prototype.hasOwnProperty.call(ITEM_KINDS, kind)) {
@@ -720,6 +747,11 @@ function apiSaveItem(kind, input) {
     // someone else is editing it right now (Presence.gs; API mode only)
     assertUnlocked_(itemLockKeys_(kind, spec, input, record));
 
+    // the item as it was (the Activity log: new or edited, and what changed)
+    var before = spec.key === 'id'
+      ? (contentLine_(input.id) ? activityBefore_(spec.table, 'id', contentLine_(input.id)) : null)
+      : activityBefore_(spec.table, spec.key, kind === 'sessions' ? (contentLine_(input.originalDate) || record.date) : record.key);
+
     if (spec.key === 'id') {
 
       var existing = contentLine_(input.id);
@@ -774,6 +806,11 @@ function apiSaveItem(kind, input) {
       syncLinkedNotifications_(kind, record, input.notify);
     }
 
+    var note = itemActivity_(kind, record);
+    note.action = before ? 'update' : 'create';
+    note.changes = before ? mergeChanges_(note.changes || null, activityDiff_(before, record)) : (note.changes || null);
+    activityNote_(note);
+
     return record[spec.key] + ' ' + (record.title || record.topic || record.label || '');
 
   });
@@ -799,9 +836,15 @@ function apiDeleteItem(kind, key) {
 
     ensureTable_(spec.table);
 
+    var gone = activityBefore_(spec.table, spec.key, key);
+
     if (!deleteRow_(spec.table, spec.key, key)) {
       throw new Error(spec.label + ' مش موجود');
     }
+
+    var note = itemActivity_(kind, gone || null, key);
+    note.action = 'delete';
+    activityNote_(note);
 
     if (kind !== 'notifications' && spreadsheet_().getSheetByName('Notifications')) {
       linkedIds_(kind, key).forEach(function (id) { deleteRow_('Notifications', 'id', id); });
@@ -838,13 +881,19 @@ function apiSetItemArchived(kind, key, archived) {
       throw appError_('الأرشيف محتاج ترقية البيانات الأول.', 'من الإعدادات ← ترقية البيانات.');
     }
 
-    if (!findRow_(spec.table, spec.key, key)) {
+    var row = activityBefore_(spec.table, spec.key, key);
+
+    if (!row) {
       throw new Error(spec.label + ' مش موجود');
     }
 
     var record = { archived: archived === true, updatedAt: nowStamp_() };
     record[spec.key] = key;
     upsertRow_(spec.table, spec.key, record);
+
+    var note = itemActivity_(kind, row, key);
+    note.action = archived === true ? 'archive' : 'unarchive';
+    activityNote_(note);
 
   });
 
@@ -889,6 +938,11 @@ function apiDuplicateItem(kind, key) {
 
     upsertRow_(spec.table, 'id', copy);
 
+    var note = itemActivity_(kind, row, key);
+    note.action = 'duplicate';
+    note.changes = { copy: copyId };
+    activityNote_(note);
+
     return copyId;
 
   });
@@ -912,7 +966,9 @@ function apiSetItemEnabled(kind, key, enabled) {
 
     ensureTable_(spec.table);
 
-    if (!findRow_(spec.table, spec.key, key)) {
+    var row = activityBefore_(spec.table, spec.key, key);
+
+    if (!row) {
       throw new Error(spec.label + ' مش موجود');
     }
 
@@ -920,6 +976,10 @@ function apiSetItemEnabled(kind, key, enabled) {
     record[spec.key] = key;
 
     upsertRow_(spec.table, spec.key, record);
+
+    var note = itemActivity_(kind, row, key);
+    note.action = enabled === true ? 'enable' : 'disable';
+    activityNote_(note);
 
   });
 
