@@ -576,3 +576,45 @@ its origin are unchanged. Deploy the API as usual
 - A bad request costs one quick refusal; nothing runs before the token and
   the allowlist are checked.
 - Signing out on the page signs out of the admin only (not of Google).
+
+### 8.8 المسابقات (competitions, participant codes, points, store)
+
+**Nothing to create by hand.** Architecture: [COMPETITIONS.md](COMPETITIONS.md).
+How to use it: [ADMIN-GUIDE.md](ADMIN-GUIDE.md) sections ٧–١٢.
+
+- **The private competitions spreadsheet** (**"Athanasios — Competitions
+  (private)"**, separate from the content Sheet) is created automatically in
+  the owner's Drive by the first competitions change saved from `/admin/`
+  (usually **مسابقة جديدة**; just opening **المسابقات** creates nothing).
+  Its id goes into the Script Property **`COMP_SHEET_ID`** (with
+  `COMP_SCHEMA`); don't edit either. Its tabs (`Competitions`, `Questions`,
+  `Snapshots`, `Submissions`, `Participants`, `PointsLedger`, `StoreItems`,
+  `Redemptions`) are made on first use. Don't edit them by hand.
+- **Never share the competitions spreadsheet** with anyone, admins included.
+  It holds names, phone numbers, every answer, the answer keys and the
+  participants' codes (hashed and encrypted). The API runs as the owner, so
+  admins never need access to it.
+- **Secrets, generated automatically** on first use: **`COMP_SECRET`**
+  (signs attempt / receipt / participant tokens), **`CODE_PEPPER`** (code
+  hashes), **`CODE_KEY`** (the encrypted copy admins can view). They are
+  never shown, logged or sent to the browser. **Never edit or delete them.**
+  Deleting `CODE_PEPPER` or `CODE_KEY` makes every participant code
+  unverifiable / unreadable: nobody can log in, and the only fix is
+  **إعادة توليد الكود** for every participant (and sending everyone a new
+  code). Deleting `COMP_SECRET` signs everyone out of attempts in progress and
+  «نقاطي».
+- **Module switches** **`COMP_REGISTRY`**, **`COMP_WALLET`**, **`COMP_SHOP`**
+  (`'1'` = on) are set from the admin: **المسابقات ← الإعدادات** (تفعيل
+  المشاركين بالأكواد / المحفظة والنقاط / متجر الجوائز). Turning one off hides
+  its screens and pages but deletes nothing. `COMP_FAIL_DAY` is a counter of
+  wrong codes written by the server; leave it alone.
+- **The recovery admin** (Apps Script URL, section 6) has no competitions: it
+  shows «المسابقات من لوحة التحكم الرسمية» and points to `/admin/`. Grading,
+  points and store actions are refused there.
+- **Deploying** is the usual: `cd tools && node deploy-api.mjs "vNN: …"`
+  (pushes every `apps-script/` file, including `Comp*.gs` and
+  `AdminComp*.html`) and push the site (`competition/`, `points/`,
+  `assets/js/comp/`, `assets/css/comp.css`, `admin/`). No new scopes, OAuth
+  settings or Firebase steps. Published competitions are committed by
+  «راجع وانشر» (`competition/<link>/index.html` + `comp.json`, never the
+  questions or the answers).

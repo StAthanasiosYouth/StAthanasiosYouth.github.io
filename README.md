@@ -13,7 +13,8 @@ contact.
 
 | Read this                                        | For                                          |
 | ------------------------------------------------ | -------------------------------------------- |
-| [docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md)       | **دليل الأدمن**: where the data lives, how to add meetings, topics, news, games, every field explained (Arabic) |
+| [docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md)       | **دليل الأدمن**: where the data lives, how to add meetings, topics, news, games, competitions, participant codes, points and the store, every field explained (Arabic) |
+| [docs/COMPETITIONS.md](docs/COMPETITIONS.md)     | Competitions platform: architecture and build contract |
 | [docs/examples/](docs/examples/)                 | A complete, valid `content.json` example and the same data as Sheet rows |
 | [docs/ADMIN-SETUP.md](docs/ADMIN-SETUP.md)       | First-time setup and deployment (step by step) |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)     | How it works, data model, security           |
@@ -39,6 +40,24 @@ a phone or a computer:
 | change phone numbers or contacts             | **الصفحة → التواصل**                                |
 | change the name / tagline / share text       | **الإعدادات**                                        |
 | make it live                                 | **راجع وانشر** → check the list → **نشر التغييرات** |
+| create a competition (quiz, survey, coded, points) | **المسابقات** → *مسابقة جديدة* (name + kind → dates → link), then the builder's tabs |
+| add questions in bulk from Excel             | competition → **الأسئلة** → *تحميل نموذج الأسئلة*, fill it, *استيراد أسئلة* → preview → *ضيف اللي متعلّم عليه* |
+| try it before publishing                     | competition → **المعاينة** (phone / desktop; nothing is recorded) |
+| publish it and share the link / QR           | **نظرة عامة** → *تتنشر مع الموقع* (+ *اعرض كارت في قسم المسابقات*) → **راجع وانشر** → *نسخ اللينك* / *QR* |
+| stop it early                                | **نظرة عامة** → *اقفل دلوقتي* (immediate, no publish) |
+| review answers                               | **المشاركات** (one submission: ✓ / ✕ / ⏳, grade by hand) and **المراجعة** (same answers grouped, one tap grades all) |
+| results, regrade, export                     | **النتائج** → ranking, *إعادة التصحيح*, *تصدير Excel*; *اعتماد النتائج* in **نظرة عامة** |
+| turn on participants with codes, points, store | **المسابقات → الإعدادات** (each needs the one before) |
+| add participants and send their codes        | **المسابقات → المشاركين** → *مشارك جديد* → *ابعت الكود على واتساب* / *إعادة توليد الكود* |
+| import names from Excel                      | **المشاركين** → *تحميل نموذج الأسماء* → *استيراد أسماء* → preview → *سجّل اللي متعلّم عليه* → codes / cards / export |
+| adjust points                                | **المسابقات → النقاط** → a person → *تعديل نقاط* (amount + reason); *مزامنة النقاط مع النتايج* |
+| manage prizes and requests                   | **المسابقات → المتجر** → *جايزة جديدة*; requests: *جاهزة للاستلام* → *اتسلمت*, or *إلغاء ورجّع النقاط* |
+
+Competitions, participants, points and the store work only from the official
+admin (`/admin/`), not from the recovery Apps Script URL. Participants use
+their code on `/competition/<link>/` and on **نقاطي** (`/points/`). Full
+walkthrough: sections ٧–١٢ of the admin guide; the engine itself:
+[docs/COMPETITIONS.md](docs/COMPETITIONS.md).
 
 Changes appear on the site about a minute after publishing. Anything with a
 future time (news, topics, games, bell items) can be published early: the site
@@ -50,8 +69,12 @@ shows it, opens it or hides it on time by itself, in Egypt time.
 index.html             page shell (CSP, Open Graph, static hero)
 content.json           published content   ← written by the admin
 meeting.ics            weekly meeting for calendars ← written by the admin
-assets/css, js, fonts, img, vendor
-apps-script/           admin (copy into the Apps Script project)
+assets/css, js, fonts, img, vendor   (assets/js/comp/ = the competition engine and «نقاطي»)
+competition/           the one competition page shell; published ones get competition/<link>/ (index.html + comp.json) ← written by the admin
+points/                «نقاطي»: participants' code login, points, history, store
+admin/                 the official admin page (/admin/)
+apps-script/           admin (copy into the Apps Script project); Comp*.gs = competitions,
+                       participants & codes, wallet, store (private spreadsheet)
 tools/                 dev tooling (not deployed)
 tests/                 unit, admin end-to-end, browser end-to-end
 docs/                  setup + architecture

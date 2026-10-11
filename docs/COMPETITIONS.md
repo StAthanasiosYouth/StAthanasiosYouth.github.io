@@ -637,10 +637,12 @@ rest never (like other content).
 
 ## 12. Push and bell
 
-- The builder's «إشعارات» offers linked bell items (ids `notif-<cardId>`
-  (opened, existing), `notif-<cardId>-start` (existing), `notif-<cardId>-closing`
-  (1 h before end), `notif-<cardId>-results` (at resultsAt)), off by default
-  except «لما تفتح». They are normal Notifications rows → published → the admin
+- The builder's «الإشعارات» tab offers linked bell items (ids `notif-<cardId>`
+  «لما تفتح», `notif-<cardId>-start` «وقت البداية», `notif-<cardId>-closing`
+  «قبل النهاية بساعة» (1 h before end), `notif-<cardId>-results` «لما النتيجة
+  تظهر» (at resultsAt)); each one is unticked until the admin ticks it (an
+  existing row shows ticked), and the tab needs the linked card on. They are
+  normal Notifications rows → published → the admin
   sends a push from the existing AdminPush flow if they want. Nothing is sent
   automatically.
 - Notification target kind `competition:<slug>` (Notifications.target text,
@@ -989,7 +991,7 @@ picture is not in content.json), `Activity.gs` (summaries, push decisions),
   takes the queue along and reconciles the latest 200 registered submissions of
   wallet competitions (one batch); `apiWalletParticipant(id)` reconciles that
   participant's graded wallet submissions and every one the ledger has rows for
-  (≤ 100, newest first); `apiWalletSync()` («راجع النقاط») reconciles EVERY
+  (≤ 100, newest first); `apiWalletSync()` (the button «مزامنة النقاط مع النتايج») reconciles EVERY
   registered submission of every wallet competition plus every submission with
   ledger rows (so a competition whose wallet went off is reversed), in batches of
   200, one compLock_ each. All idempotent; failures on the views are swallowed.
