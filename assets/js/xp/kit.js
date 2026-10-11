@@ -1005,8 +1005,46 @@ export function clipNode(clip, tl, className = '', { advance = false } = {}) {
  */
 export function mediaNode(item, tl, { className = '', main = '', ratio = null, crop = 0, frame = 0, advance = false, fit = item.own || item.kind === 'image' ? 'contain' : 'cover' } = {}) {
 
-  const own = (item.w || 1) / (item.h || 1);
+  const still = item.poster || item.src;
+  const inner = item.kind === 'video'
+    ? clipNode(item, tl, `xp-media__main ${main}`, { advance })
+    : h('img', { class: `xp-media__main ${main}`, src: item.src, alt: '', decoding: 'async' });
+  const box = h('span', { class: `xp-media ${className}`, 'data-kind': item.kind, 'data-id': item.id },
+    fit === 'contain' && still ? h('img', { class: 'xp-media__bg', src: still, alt: '', decoding: 'async' }) : null,
+    inner
+  );
+  const rule = { base: fit, ratio, crop, frame };
+
+  // the shape the content says (laid out before the picture arrives: no jump)…
+  let own = (item.w || 1) / (item.h || 1);
+  shapeMedia(box, own, rule);
+
+  // …and the picture's real shape once known (an old upload, a missing size)
+  const real = () => {
+    const w = inner.naturalWidth || inner.videoWidth;
+    const hgt = inner.naturalHeight || inner.videoHeight;
+    if (!w || !hgt || Math.abs(w / hgt / own - 1) <= 0.02) return;
+    own = w / hgt;
+    shapeMedia(box, own, rule);
+  };
+  inner.addEventListener(inner.tagName === 'VIDEO' ? 'loadedmetadata' : 'load', real, { once: true });
+
+  // a frame: fill it or sit in it, from the frame's real shape on this screen
+  if (frame && fit === 'contain' && typeof ResizeObserver === 'function') {
+    new ResizeObserver(() => shapeMedia(box, own, rule)).observe(box);
+  }
+
+  return box;
+
+}
+
+const FIT_CLASSES = ['xp-media--contain', 'xp-media--cover', 'xp-media--top', 'xp-media--framed', 'xp-media--bleed'];
+
+/* mediaNode's rule for one shape (own = w / h): the box's shape, its fit, its framing */
+export function shapeRule(own, { base = 'contain', ratio = null, crop = 0, frame = 0 } = {}, frameShape = frame) {
+
   const shape = ratio ? Math.min(ratio[1], Math.max(ratio[0], own)) : 0;
+  let fit = base;
   const modifiers = [];
 
   // outside the box's range, a feed may cut a little off, like the platform itself
@@ -1016,18 +1054,21 @@ export function mediaNode(item, tl, { className = '', main = '', ratio = null, c
   }
 
   if (frame && fit === 'contain') {
-    modifiers.push(Math.abs(own / frame - 1) <= 0.08 ? 'xp-media--bleed' : 'xp-media--framed');
+    modifiers.push(Math.abs(own / frameShape - 1) <= 0.08 ? 'xp-media--bleed' : 'xp-media--framed');
   }
 
-  const still = item.poster || item.src;
-  const inner = item.kind === 'video'
-    ? clipNode(item, tl, `xp-media__main ${main}`, { advance })
-    : h('img', { class: `xp-media__main ${main}`, src: item.src, alt: '', decoding: 'async' });
-  const box = h('span', { class: `xp-media xp-media--${fit} ${modifiers.join(' ')} ${className}`, 'data-kind': item.kind, 'data-id': item.id },
-    fit === 'contain' && still ? h('img', { class: 'xp-media__bg', src: still, alt: '', decoding: 'async' }) : null,
-    inner
-  );
+  return { shape, fit, modifiers };
 
+}
+
+function shapeMedia(box, own, rule) {
+
+  const rect = rule.frame ? box.getBoundingClientRect() : null;
+  const measured = rect && rect.width > 4 && rect.height > 4 ? rect.width / rect.height : rule.frame;
+  const { shape, fit, modifiers } = shapeRule(own, rule, measured);
+
+  box.classList.remove(...FIT_CLASSES);
+  box.classList.add(`xp-media--${fit}`, ...modifiers);
   // the item's own shape (a frame sizes the picture from it: xp.css)
   box.style.setProperty('--ir', own.toFixed(4));
 
@@ -1037,7 +1078,60 @@ export function mediaNode(item, tl, { className = '', main = '', ratio = null, c
     box.style.setProperty('--r', shape.toFixed(4));
   }
 
-  return box;
+}
+
+
+/**
+ * A chat keeps the shared item (.is-current) whole on screen: when newer
+ * messages would push its top out of view (a short screen, long words), the
+ * oldest messages under it give way. (A message is whatever `isMessage`
+ * says; the typing dots and the day label stay.) watchCurrent: again on
+ * every change inside the chat; returns the check itself.
+ */
+export function watchCurrent(viewport, list, isMessage) {
+
+  const keep = () => keepCurrent(viewport, list, isMessage);
+  let pending = false;
+  const soon = () => {
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(() => { pending = false; keep(); });
+  };
+
+  // any change can push it: a message, the typing dots showing, a quote, longer words
+  if (typeof MutationObserver === 'function') {
+    new MutationObserver(soon).observe(viewport, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'hidden'] });
+  }
+  soon();
+
+  return keep;
+
+}
+
+export function keepCurrent(viewport, list, isMessage) {
+
+  const current = list.querySelector('.is-current');
+
+  if (!current || !current.isConnected) return;
+
+  // its layout position inside the viewport (offsets: no entrance transform, no zoom involved)
+  const top = () => {
+    let y = 0;
+    for (let el = current; el && el !== viewport; el = el.offsetParent) {
+      if (!el.offsetParent) return current.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+      y += el.offsetTop;
+      if (el.offsetParent === viewport) return y;
+    }
+    return y;
+  };
+  const clipped = () => top() < -1;
+
+  for (let guard = 0; guard < 12 && clipped(); guard++) {
+    let next = current.nextElementSibling;
+    while (next && !isMessage(next)) next = next.nextElementSibling;
+    if (!next) return;
+    next.remove();
+  }
 
 }
 

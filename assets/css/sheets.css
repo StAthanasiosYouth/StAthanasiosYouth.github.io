@@ -681,35 +681,130 @@ dialog.viewer::backdrop {
    our interpretation, not a copy of the apps.
 ========================================================= */
 
+/*
+ * ONE FIT RULE for every scene, on any screen:
+ *  - the sheet is one column that never outgrows the visible screen
+ *    (100dvh: the browser's own bars; the notch's safe area);
+ *  - only the stage gives way: the title, the words and the button keep
+ *    their size, so the button is always on screen;
+ *  - the phone inside is always the same design, 236 × 420 (9:16), so every
+ *    app inside it has the same shape everywhere; it is scaled as ONE piece
+ *    to the room its stage has (--xp-zoom, set by engine.js fitStage from
+ *    the stage's own size on every resize / rotation);
+ *  - short landscape screens: the phone beside the words and the button.
+ * («صوتك يهمنا» has its own canvas: xp-voice.css.)
+ */
+
+dialog.sheet--xp .sheet__panel {
+  max-height: calc(100dvh - max(10px, env(safe-area-inset-top)));
+}
+
+dialog.sheet--xp .sheet__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .xp {
-  display: grid;
-  gap: 14px;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: clamp(8px, 1.8dvh, 14px);
+  min-height: 0;
 }
 
 .xp-stage {
+  /* the phone's room: its full size when there is space (narrow screens: as
+     wide as the sheet allows beside the speaker), less when there isn't */
+  --xp-stage-h: min(428px, calc((100vw - 2 * var(--pad) - 96px) * 1.78 + 8px));
   position: relative;
   display: grid;
+  flex: 0 1 auto;
   place-items: center;
-  min-height: 200px;
-  padding: 6px 0 2px;
+  height: var(--xp-stage-h);
+  min-height: 190px;
 }
 
 .xp-phone {
   position: relative;
-  width: min(236px, 66vw);
-  aspect-ratio: 9 / 16;
-  max-height: 44vh;
+  width: 236px;
+  height: 420px;
   overflow: hidden;
   border-radius: 26px;
   box-shadow: 0 30px 60px -28px rgba(0, 0, 0, .9), inset 0 0 0 1px rgba(255, 255, 255, .12);
   isolation: isolate;
   direction: rtl;
+  zoom: var(--xp-zoom, 1);
 }
 
-@media (min-height: 760px) {
+@supports not (zoom: 1) {
   .xp-phone {
-    max-height: 48vh;
+    margin: calc((var(--xp-zoom, 1) - 1) * 210px) calc((var(--xp-zoom, 1) - 1) * 118px);
+    scale: var(--xp-zoom, 1);
   }
+}
+
+/* «صوتك يهمنا»: its canvas sizes itself (xp-voice.css) */
+.xp--voice .xp-stage {
+  flex: none;
+  height: auto;
+}
+
+/* big screens: a little more phone */
+@media (min-width: 1024px) and (min-height: 900px) {
+  .xp-stage {
+    --xp-stage-h: 492px;
+  }
+}
+
+@media (min-width: 720px) {
+  dialog.sheet--xp .sheet__panel {
+    max-height: calc(100dvh - 48px);
+  }
+}
+
+/* short landscape screens: the phone on one side, the words and the button on the other */
+@media (orientation: landscape) and (max-height: 540px) {
+
+  /* a phone on its side: the sheet sits on the bottom edge, like on the phone held upright */
+  dialog.sheet--xp {
+    inset: auto 0 0;
+    max-width: min(780px, 100%);
+  }
+
+  /* the visible screen's height, so the stage can take exactly what is left */
+  dialog.sheet--xp:has(.xp:not(.xp--voice)) .sheet__panel {
+    height: calc(100dvh - max(10px, env(safe-area-inset-top)));
+    max-height: none;
+  }
+
+  .xp:not(.xp--voice) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto auto minmax(0, 1fr);
+    column-gap: 18px;
+  }
+
+  .xp:not(.xp--voice) .xp-stage {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    height: auto;
+    min-height: 0;
+    /* its size from the grid, never from the phone inside (fitStage scales the phone to it) */
+    contain: size;
+  }
+
+  .xp:not(.xp--voice) .xp__copy {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .xp:not(.xp--voice) .xp__actions {
+    grid-column: 2;
+    grid-row: 3;
+  }
+
 }
 
 .xp__copy {
@@ -736,9 +831,19 @@ dialog.viewer::backdrop {
   display: grid;
 }
 
+.xp__actions {
+  min-width: 0;
+}
+
+/* the button never outgrows the sheet: on the narrowest phones its words
+   shrink a little and may wrap, the button stays full width */
 .xp__cta {
   min-height: 52px;
-  font-size: 1rem;
+  padding-inline: clamp(10px, 4vw, 18px);
+  font-size: clamp(.88rem, 4.6vw, 1rem);
+  line-height: 1.3;
+  text-align: center;
+  white-space: normal;
   transition: opacity .45s var(--ease-out), transform .55s var(--spring);
 }
 

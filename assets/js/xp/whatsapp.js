@@ -12,7 +12,7 @@
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { deck, timeline, spray, side, playlist, cycle, mediaNode, words, fitWords, CHAT, typeInto, bubble, chip, rand, pick, digits, meetingLine, LOGO, EASE, SPRING } from './kit.js';
+import { deck, timeline, spray, side, playlist, cycle, mediaNode, words, fitWords, CHAT, watchCurrent, typeInto, bubble, chip, rand, pick, digits, meetingLine, LOGO, EASE, SPRING } from './kit.js';
 import { GROUP, MINE, REPLIES, WHO, SERVANT, nextTopic } from './talk.js';
 import { ui } from './glyphs.js';
 
@@ -114,6 +114,10 @@ export function play(stage, { quick, reduced, lite, content, sound, link }) {
   stage.append(phone);
   fitWords(chat);
 
+  // the shared picture stays whole on screen (newer messages under it give way)
+  const isMessage = el => el.classList.contains('wa-msg') && el !== typing;
+  const keep = watchCurrent(chat, chat, isMessage);
+
   const s = quick ? 0.45 : 1;
 
   tl.from(phone, [{ transform: 'translateY(24px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 600, easing: SPRING });
@@ -162,6 +166,7 @@ export function play(stage, { quick, reduced, lite, content, sound, link }) {
     all.slice(0, Math.max(0, all.length - (items.length ? 4 : 5))).filter(m => !m.classList.contains('is-current')).forEach(m => m.remove());
     const day = chat.querySelector('.wa-day');
     if (day && all.length > 5) day.remove();
+    keep();
   };
 
   const incoming = () => {

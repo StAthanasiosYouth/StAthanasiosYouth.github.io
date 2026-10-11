@@ -335,6 +335,40 @@ No new Sheet column, no migration (data schema stays 5); one media system.
   and numbers and adds `thumb` = the poster for code that only shows
   pictures. Playback in the scenes: `assets/js/xp/*` (separate work).
 
+## Scenes on any screen: one fit rule
+
+The scene sheet (`sheets.css` "MINI-EXPERIENCES", `engine.js` `fitStage`):
+
+- The sheet is one column that never outgrows the visible screen
+  (`100dvh`: the browser's own bars; the top safe area). Only the stage gives
+  way; the title, the words and the button keep their size, so the button
+  is always on screen (on the narrowest phones its words shrink a little and
+  may wrap).
+- The phone inside is always the same design, **236 × 420 (9:16)**, so every
+  app inside it (frames, chats, feeds) has the same shape on every device.
+  It is scaled as one piece with `zoom` (`--xp-zoom` =
+  `min((stage width − 96) / 236, stage height / 420)`, between 0.3 and 1.15),
+  recomputed by a ResizeObserver on the stage: resize, rotation, browser
+  bars. The 96 px keep the speaker's corner clear.
+- Short landscape screens (`orientation: landscape` and height ≤ 540 px):
+  the phone on one side, the words and the button on the other; the sheet
+  is the screen's height and the stage takes what is left.
+- Media boxes take their shape from the content's size before the picture
+  arrives (no jump), re-shape if the real picture differs, and a frame
+  decides "fill or sit in it" from its measured shape.
+- Chats keep the shared picture (`.is-current`) whole: when newer messages
+  would push its top out of view, the oldest messages under it give way
+  (`kit.js` `keepCurrent`, measured with layout offsets).
+
+`tools/xp-fit-matrix.mjs` (`npm run fit-matrix`, `--quick` for the hardest
+screens) opens every scene on 23 screens (280 × 653 … 440 × 956, the Galaxy
+S20 FE with and without Chrome's bars, short phones, landscape, tablet,
+desktop) and checks the sheet, the button, overflow, overlaps, the phone's
+shape and size, the media and the chats' shared picture; contact sheets go
+to `tools/.cache/fit/`. `tests/xp-fit.e2e.mjs` runs the same checks plus the
+WhatsApp poster on first open / after new messages / reopened, a slow
+picture, a wrong stored size, and rotating the phone.
+
 ## Pictures in scenes: one sizing rule
 
 Every scene shows the admin's pictures and clips through `kit.js`

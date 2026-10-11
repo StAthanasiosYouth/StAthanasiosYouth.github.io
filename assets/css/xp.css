@@ -10,31 +10,8 @@
 
 /* ---------- the stage and the phone ---------- */
 
-.xp-stage {
-  position: relative;
-  display: grid;
-  place-items: center;
-  min-height: 200px;
-  padding: 6px 0 2px;
-}
-
-.xp-phone {
-  position: relative;
-  width: min(236px, 66vw);
-  aspect-ratio: 9 / 16;
-  max-height: 44vh;
-  overflow: hidden;
-  border-radius: 26px;
-  box-shadow: 0 30px 60px -28px rgba(0, 0, 0, .9), inset 0 0 0 1px rgba(255, 255, 255, .12);
-  isolation: isolate;
-  direction: rtl;
-}
-
-@media (min-height: 760px) {
-  .xp-phone {
-    max-height: 48vh;
-  }
-}
+/* the stage and the phone's size: ONE fit rule, in sheets.css ("MINI-EXPERIENCES"):
+   the phone is always 236 × 420 inside, scaled as one piece (--xp-zoom) */
 
 .xp-float {
   position: absolute;
@@ -3489,13 +3466,6 @@ html[data-motion="reduced"] .ch-typing i {
   }
 }
 
-/* tall wide screens: a little more phone */
-@media (min-width: 1024px) and (min-height: 900px) {
-  .xp-phone {
-    width: 272px;
-    max-height: 54vh;
-  }
-}
 
 
 /* =========================================================

@@ -9236,7 +9236,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var phone = el('div', { class: 'push-phone', 'aria-label': 'شكل الإشعار على الموبايل' },
       el('div', { class: 'push-phone__head' },
         base ? el('img', { class: 'push-phone__icon', src: base + 'assets/img/icon-192.png', alt: '' }) : null,
-        el('span', { text: 'أسرة البابا أثناسيوس · دلوقتي' })
+        el('span', { text: 'أسرة البابا أثناسيوس - سفاجا · دلوقتي' })
       ),
       phoneTitle,
       phoneText,

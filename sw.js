@@ -17,7 +17,7 @@
 
 'use strict';
 
-const SITE_NAME = 'أسرة البابا أثناسيوس';
+const SITE_NAME = 'أسرة البابا أثناسيوس - سفاجا';
 const ICON = '/assets/img/icon-192.png';
 const BADGE = '/assets/img/push-badge.png';
 const ROUTE = /^#(?:notifications|meeting|(?:news|game|activity)\/[\w-]{1,60})$/;

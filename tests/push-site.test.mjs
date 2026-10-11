@@ -118,7 +118,7 @@ test('sw.js: an empty or broken push still shows something (Safari requires it)'
   await sw.push({ data: { title: '', body: 5, tag: 'x y' } });
   assert.equal(sw.shown.length, 3);
   for (const { title, options } of sw.shown) {
-    assert.equal(title, 'أسرة البابا أثناسيوس');
+    assert.equal(title, 'أسرة البابا أثناسيوس - سفاجا');
     assert.equal(options.tag, 'athanasios');
     assert.equal(options.data.url, '/');
   }
@@ -279,6 +279,12 @@ test('manifest: installable, standalone, Arabic RTL, every icon present at its s
   assert.equal(manifest.dir, 'rtl');
   assert.equal(manifest.lang, 'ar');
   assert.ok(manifest.icons.some(i => i.purpose === 'maskable'));
+  // one app name everywhere: the installed app, the iPhone's Home Screen, a notification's fallback title
+  const NAME = 'أسرة البابا أثناسيوس - سفاجا';
+  assert.equal(manifest.name, NAME);
+  assert.equal(manifest.short_name, NAME);
+  assert.match(readFileSync(`${ROOT}index.html`, 'utf8'), new RegExp(`<meta name="apple-mobile-web-app-title" content="${NAME}">`));
+  assert.match(readFileSync(`${ROOT}sw.js`, 'utf8'), new RegExp(`const SITE_NAME = '${NAME}';`));
   for (const icon of manifest.icons) {
     const file = `${ROOT}${icon.src.slice(1)}`;
     assert.ok(existsSync(file), icon.src);

@@ -24,7 +24,7 @@
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { deck, timeline, spray, side, playlist, cycle, mediaNode, words as say, fitWords, FEED, CROP, CHAT, typeInto, bubble, chip, rand, pick, digits, compact, LOGO, EASE, SPRING } from './kit.js';
+import { deck, timeline, spray, side, playlist, cycle, mediaNode, words as say, fitWords, FEED, CROP, CHAT, watchCurrent, typeInto, bubble, chip, rand, pick, digits, compact, LOGO, EASE, SPRING } from './kit.js';
 import { GROUP, MINE, WHO, channelPosts } from './talk.js';
 import { ui } from './glyphs.js';
 
@@ -175,13 +175,17 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
   const field = h('span', { class: 'ch-bar__field' }, layout === 'channel' ? 'كتم الصوت' : 'اكتب رسالة…');
   const bar = h('div', { class: 'ch-bar' }, field, h('span', { class: 'ch-bar__send' }, layout === 'channel' ? iconNode('bell') : ui('send')));
 
+  const scroll = h('div', { class: 'ch-scroll' }, feed, typing);
   const phone = h('div', { class: `xp-phone ch ch--${layout} ch--${platform.key}` },
     rail,
-    h('div', { class: 'ch-main' }, head, h('div', { class: 'ch-scroll' }, feed, typing), bar)
+    h('div', { class: 'ch-main' }, head, scroll, bar)
   );
 
   stage.append(phone);
   fitWords(feed);
+
+  // the shared picture stays whole on screen (newer messages under it give way)
+  const keep = watchCurrent(scroll, feed, el => el.classList.contains('ch-msg'));
 
   /* ---------- entrance ---------- */
 
@@ -225,6 +229,7 @@ export function play(stage, { quick, reduced, lite, content, sound, link, platfo
     feed.append(node);
     fitWords(node);
     [...feed.children].slice(0, -5).filter(old => !old.classList.contains('is-current')).forEach(old => old.remove());
+    keep();
     node.animate([{ opacity: 0, transform: `translate(${out ? 16 : -16}px, 12px) scale(.94)` }, { opacity: 1, transform: 'none' }], { duration: 460, easing: SPRING });
   };
 

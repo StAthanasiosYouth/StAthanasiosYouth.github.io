@@ -190,6 +190,43 @@ function speaker(sound) {
 }
 
 
+/*
+ * THE FIT RULE (sheets.css "MINI-EXPERIENCES"): the phone is always the same
+ * 236 × 420 design inside; its stage gets whatever room the screen leaves
+ * (the sheet never outgrows 100dvh), and the phone is scaled as ONE piece
+ * to that room, leaving the speaker its corner (SIDE). Again on every
+ * resize, rotation or browser-bar change (ResizeObserver).
+ */
+export const PHONE = { width: 236, height: 420 };
+const SIDE = 96;
+const ZOOM_MAX = 1.15;
+const ZOOM_MIN = 0.3;
+
+export function phoneZoom(width, height) {
+
+  if (!(width > 0) || !(height > 0)) return 1;
+
+  return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, (width - SIDE) / PHONE.width, height / PHONE.height));
+
+}
+
+function fitStage(stage) {
+
+  const apply = () => stage.style.setProperty('--xp-zoom', phoneZoom(stage.clientWidth, stage.clientHeight).toFixed(3));
+
+  if (typeof ResizeObserver !== 'function') {
+    apply();
+    addEventListener('resize', apply);
+    return () => removeEventListener('resize', apply);
+  }
+
+  const watch = new ResizeObserver(apply);
+  watch.observe(stage);
+  return () => watch.disconnect();
+
+}
+
+
 /* readable text on an accent colour */
 function onAccent(hex) {
 
@@ -216,7 +253,8 @@ export function open(link, context, onClose) {
   const reduced = isReduced() || tier === 'reduced';
   const lite = !reduced && tier === 'lite';
   const sound = mixer({ reduced, lite });
-  let stopScene = () => sound.stop();
+  let unfit = () => {};
+  let stopScene = () => { sound.stop(); unfit(); };
   let closed = false;
 
   markSeen(key);
@@ -272,6 +310,10 @@ export function open(link, context, onClose) {
   // the sheet may still be on its way (its own styles load first): the
   // scene starts once the stage is really on screen, never after a close
   const opened = performance.now();
+
+  // the phone fits its room from the first frame («صوتك يهمنا» sizes its own canvas)
+  if (scene !== 'voice') unfit = fitStage(stage);
+
   const start = module => {
     // closed, or replaced by another sheet (no close callback then)
     if (closed || (!stage.isConnected && performance.now() - opened > 10000)) return;
@@ -288,6 +330,7 @@ export function open(link, context, onClose) {
       clearInterval(watch);
       sound.stop();
       running.stop();
+      unfit();
       stopScene = () => {};
     };
   };
