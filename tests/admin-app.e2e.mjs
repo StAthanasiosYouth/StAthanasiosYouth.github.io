@@ -96,7 +96,7 @@ test.after(async () => {
 });
 
 /* one device: its own browser context, the admin at this server's own address (a secure context: workers allowed) */
-async function device({ viewport = DESKTOP, ua = null, hash = '' } = {}) {
+async function device({ viewport = DESKTOP, ua = null, hash = '', path = '', before = '' } = {}) {
 
   const context = await browser.createBrowserContext();
   const page = await context.newPage();
@@ -110,7 +110,8 @@ async function device({ viewport = DESKTOP, ua = null, hash = '' } = {}) {
   if (ua) await page.setUserAgent(ua);
   await page.setViewport(viewport);
   await interceptGoogle(page, { post: body => world.post(body) });
-  await page.goto(`${LOCAL}/admin/${hash}`, { waitUntil: 'networkidle0' });
+  if (before) await page.evaluateOnNewDocument(before);
+  await page.goto(`${LOCAL}/admin/${path}${hash}`, { waitUntil: 'networkidle0' });
 
   return { context, page, problems, close: () => context.close() };
 
@@ -139,6 +140,8 @@ test('admin app: its own manifest, installable, its own worker at /admin/ next t
   assert.match(manifest.url, /\/admin\/manifest\.webmanifest$/);
   const parsed = JSON.parse(manifest.data);
   assert.equal(parsed.id, '/admin/');
+  assert.equal(parsed.start_url, '/admin/?app=admin');
+  assert.equal(parsed.scope, '/admin/');
   assert.equal(parsed.short_name, 'لوحة تحكم الأسرة');
 
   // the gate and Google sign-in work as before
@@ -407,7 +410,7 @@ test('layout: the log, its filters and the app card fit a phone (no sideways scr
     await d.page.evaluate(() => A.go('settings'));
     await d.page.waitForSelector('.card--app');
     const app = await d.page.$eval('.card--app', n => n.innerText);
-    assert.match(app, /تطبيق لوحة التحكم/);
+    assert.match(app, /إعداد تطبيق الإدارة/);
     assert.match(app, /إشعارات الإدارة/);
     assert.ok(await d.page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
     await d.page.$eval('.card--app', n => n.scrollIntoView());
@@ -417,4 +420,135 @@ test('layout: the log, its filters and the app card fit a phone (no sideways scr
     await d.close();
   }
 
+});
+
+
+/* ---------------- «إعداد تطبيق الإدارة»: what the page can honestly say ---------------- */
+
+/*
+ * The platform, staged before the page loads: an app window or a tab
+ * (display-mode), the browser's install dialog, and what
+ * getInstalledRelatedApps says about the ADMIN app.
+ */
+function stage({ standalone = false, related = null, prompt = false } = {}) {
+  return `(() => {
+    const real = window.matchMedia.bind(window);
+    window.matchMedia = q => /display-mode: standalone/.test(q) ? { matches: ${standalone}, media: q, addEventListener() {}, removeEventListener() {} } : real(q);
+    ${related === null ? 'delete Navigator.prototype.getInstalledRelatedApps;' : `navigator.getInstalledRelatedApps = async () => ${JSON.stringify(related)};`}
+    window.__prompted = 0;
+    ${prompt ? `window.addEventListener('load', () => setTimeout(() => {
+      const e = new Event('beforeinstallprompt', { cancelable: true });
+      e.prompt = () => { window.__prompted++; };
+      e.userChoice = Promise.resolve({ outcome: 'accepted' });
+      window.dispatchEvent(e);
+    }, 50));` : ''}
+  })();`;
+}
+
+async function staged(options, path = '') {
+  const d = await device({ viewport: PHONE, ua: ANDROID, path, before: stage(options) });
+  await signIn(d.page);
+  await d.page.evaluate(() => A.go('settings'));
+  await d.page.waitForSelector('#app-setup .setup__step');
+  await sleep(600);
+  const read = () => d.page.$eval('#app-setup', n => ({
+    text: n.innerText,
+    progress: n.querySelector('.setup__head .chip').textContent,
+    install: n.querySelectorAll('.setup__step')[1].className,
+    push: n.querySelectorAll('.setup__step')[2].className
+  }));
+  return { d, read };
+}
+
+const ADMIN_MANIFEST = 'https://stathanasiosyouth.github.io/admin/manifest.webmanifest';
+
+test('setup: a Chrome tab with no install dialog → the drawn Chrome-menu guide, nothing claimed installed', async () => {
+  freshWorld();
+  const { d, read } = await staged({});
+  const s = await read();
+  assert.match(s.text, /إعداد تطبيق الإدارة/);
+  assert.match(s.text, /تسجيل الدخول/);
+  assert.match(s.text, /افتح قايمة Chrome/);
+  assert.match(s.text, /تثبيت التطبيق/);
+  assert.match(s.text, /فتح في تطبيق أسرة البابا أثناسيوس/, 'the old site app trap is explained');
+  assert.doesNotMatch(s.text, /مثبتة|متثبتة/);
+  assert.match(s.install, /is-next/);
+  assert.doesNotMatch(s.install, /is-done/);
+  assert.equal(s.progress, '١ من ٣');
+  assert.equal(await d.page.$('#app-setup .setup__step:nth-child(2) .btn--primary'), null, 'no dead install button');
+  await shot(d.page, '08-setup-android-guide');
+  assert.deepEqual(d.problems, []);
+  await d.close();
+});
+
+test('setup: the browser\'s install dialog is ready → «تثبيت التطبيق» opens it for real', async () => {
+  freshWorld();
+  const { d } = await staged({ prompt: true });
+  await d.page.waitForFunction(() => [...document.querySelectorAll('#app-setup .btn--primary')].some(b => /تثبيت التطبيق/.test(b.textContent)));
+  await shot(d.page, '09-setup-install-button');
+  await d.page.evaluate(() => [...document.querySelectorAll('#app-setup .btn--primary')].find(b => /تثبيت التطبيق/.test(b.textContent)).click());
+  await d.page.waitForFunction(() => window.__prompted === 1);
+  await d.page.waitForFunction(() => /اتثبتت/.test(document.getElementById('toasts')?.innerText || ''));
+  assert.deepEqual(d.problems, []);
+  await d.close();
+});
+
+test('setup: an app window that is NOT the admin app (the site\'s, a shortcut) is never called the installed admin app', async () => {
+  freshWorld();
+  const { d, read } = await staged({ standalone: true, related: [] });
+  const s = await read();
+  assert.match(s.text, /مش تطبيق «لوحة تحكم الأسرة»/);
+  assert.doesNotMatch(s.text, /مثبتة، وانت فاتحها|متثبتة على الجهاز/);
+  assert.doesNotMatch(s.install, /is-done/);
+  assert.match(await d.page.evaluate(() => A.state && document.querySelector('#app-setup').innerText), /\/admin\//, 'where to open it instead');
+  await shot(d.page, '10-setup-other-app');
+  await d.close();
+});
+
+test('setup: opened from the admin app\'s icon (?app=admin) → installed ✓; notifications are the obvious next step', async () => {
+  freshWorld();
+  const { d, read } = await staged({ standalone: true, related: null }, '?app=admin');
+  const s = await read();
+  assert.match(s.text, /لوحة تحكم الأسرة مثبتة، وانت فاتحها كتطبيق/);
+  assert.match(s.install, /is-done/);
+  assert.match(s.push, /is-next/);
+  assert.equal(s.progress, '٢ من ٣');
+  assert.ok(await d.page.$('#app-setup .setup__step.is-next .btn--primary'), 'the push button is the primary action');
+  // the address keeps the mark through a link (reloads stay "the app")
+  await d.page.evaluate(() => { location.hash = '#activity'; });
+  await d.page.waitForSelector('.acts');
+  assert.equal(await d.page.evaluate(() => location.search), '?app=admin');
+  await shot(d.page, '11-setup-admin-app');
+  assert.deepEqual(d.problems, []);
+  await d.close();
+});
+
+test('setup: a Chrome tab where the browser says the ADMIN app is installed → «متثبتة»; another installed app doesn\'t count', async () => {
+  freshWorld();
+  const yes = await staged({ related: [{ platform: 'webapp', url: ADMIN_MANIFEST }] });
+  assert.match((await yes.read()).text, /متثبتة على الجهاز ده/);
+  await yes.d.close();
+  const other = await staged({ related: [{ platform: 'webapp', url: 'https://stathanasiosyouth.github.io/manifest.webmanifest' }] });
+  assert.doesNotMatch((await other.read()).text, /متثبتة على الجهاز ده/, 'the site\'s app is not the admin app');
+  await other.d.close();
+});
+
+test('home: one nudge while setup isn\'t finished; «مش دلوقتي» hides it (and stays hidden after a reload)', async () => {
+  freshWorld();
+  const d = await device({ viewport: PHONE, ua: ANDROID, before: stage({}) });
+  await signIn(d.page);
+  await d.page.waitForSelector('.dash-setup:not([hidden])');
+  assert.match(await d.page.$eval('.dash-setup', n => n.innerText), /ثبّت «لوحة تحكم الأسرة»/);
+  await shot(d.page, '12-home-nudge');
+  await d.page.evaluate(() => [...document.querySelectorAll('.dash-setup .btn')].find(b => /كمّل/.test(b.textContent)).click());
+  await d.page.waitForFunction(() => A.area === 'settings');
+  await d.page.evaluate(() => { A.go('home'); });
+  await d.page.waitForSelector('.dash-setup:not([hidden])');
+  await d.page.evaluate(() => [...document.querySelectorAll('.dash-setup .btn')].find(b => /مش دلوقتي/.test(b.textContent)).click());
+  assert.equal(await d.page.$('.dash-setup'), null);
+  await d.page.evaluate(() => A.render());
+  await sleep(500);
+  assert.equal(await d.page.$('.dash-setup:not([hidden])'), null, 'not again for a while');
+  assert.deepEqual(d.problems, []);
+  await d.close();
 });

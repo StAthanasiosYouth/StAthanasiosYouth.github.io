@@ -544,8 +544,14 @@ its origin are unchanged. Deploy the API as usual
 - **New tabs, made on first use:** `Activity` (the log; trimmed to 5,000
   rows and one year) and `AdminPushSubs` (admin devices; never mix with
   `PushSubs`). Don't edit them by hand. The technical `Log` tab is unchanged.
-- **Installing:** Android / desktop Chrome or Edge: **الإعدادات ← تطبيق لوحة
-  التحكم ← ثبّت التطبيق** (or the browser's own install). iPhone: open
+- **Two apps:** the site app's scope is `/index.html` and the admin's
+  `/admin/`; they must never overlap (Android gives nested pages to the outer
+  app and never installs the inner one). A phone that installed the site app
+  before this change (scope `/`) still has the old scope until Chrome
+  refreshes that app: uninstall it, install «لوحة تحكم الأسرة» from
+  `/admin/` in Chrome, then install the site app again from the site.
+- **Installing:** Android / desktop Chrome or Edge: **الإعدادات ← إعداد تطبيق
+  الإدارة ← تثبيت التطبيق** (or Chrome menu ⋮ ← تثبيت التطبيق). iPhone: open
   `/admin/` in Safari → Share → **Add to Home Screen**, open «لوحة تحكم
   الأسرة» from there and sign in with Google once (a home-screen app has its
   own cookies). Admin notifications on iPhone work only from that installed

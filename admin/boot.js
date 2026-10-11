@@ -88,6 +88,9 @@
   var session = null;          // { token, email, exp } — memory only
   var sid = '';                // this tab's server session — memory only
   var TAB = randomId();        // this page load: a retry from here is never "another device"
+  // opened from the admin app's own icon: its manifest start_url is /admin/?app=admin
+  // (kept in the address through reloads and links; a tab or another app has no such mark)
+  var LAUNCHED = /(?:^|[?&])app=admin(?:&|$)/.test(window.location.search.slice(1));
   var DEVICE = deviceLabel();
   var phase = 'gate';          // 'gate' until the panel is drawn, then 'app'
   var attempt = 0;             // the gate's current try: answers to older ones are ignored
@@ -223,7 +226,7 @@
     var label = os === 'آيفون' || os === 'آيباد' ? os : kind + (os ? ' ' + os : '');
 
     // the installed admin app (its own window), not a browser tab
-    if (standalone()) browser = 'التطبيق';
+    if (appMode() === 'admin-app') browser = 'التطبيق';
 
     return (label + (browser ? ' – ' + browser : '')).slice(0, 40);
 
@@ -242,6 +245,23 @@
     catch (ignored) {
       return false;
     }
+
+  }
+
+  /*
+   * Where this page runs, as far as the platform lets us know:
+   *  'admin-app'  its own window AND opened from the admin app's icon (the
+   *               manifest's start_url mark): the installed «لوحة تحكم الأسرة»
+   *  'other-app'  an app window without that mark: possibly another app that
+   *               holds /admin/ (an old site app whose scope was "/"), a
+   *               shortcut, or the admin app opened from a plain link —
+   *               never claimed to be the admin app
+   *  'browser'    a normal browser tab
+   */
+  function appMode() {
+
+    if (!standalone()) return 'browser';
+    return LAUNCHED ? 'admin-app' : 'other-app';
 
   }
 
@@ -1706,10 +1726,48 @@
 
     var info = function () { return { platform: platform(), device: DEVICE }; };
 
+    /*
+     * Is THE ADMIN APP installed on this device? The browser answers for the
+     * admin manifest only (related_applications lists itself; Chrome on
+     * Android and desktop): true / false, or null when it can't tell (Safari,
+     * Firefox, older Chrome). Never true for the site's app or a shortcut.
+     */
+    var related = null;
+
+    function installedHere() {
+
+      if (installedNow) return Promise.resolve(true);
+      if (!navigator.getInstalledRelatedApps) return Promise.resolve(null);
+      if (!related) {
+        related = Promise.race([
+          navigator.getInstalledRelatedApps().then(function (apps) {
+            return (apps || []).some(function (a) {
+              return a && a.platform === 'webapp' && /\/admin\/manifest\.webmanifest$/.test(String(a.url || ''));
+            });
+          }),
+          new Promise(function (resolve) { setTimeout(function () { resolve(null); }, 3000); })
+        ]).catch(function () { return null; });
+        // asked again later (it may be installed meanwhile)
+        related.then(function () { setTimeout(function () { related = null; }, 15000); });
+      }
+      return related;
+
+    }
+
+    var installedNow = false;
+
+    window.addEventListener('appinstalled', function () {
+      installedNow = true;
+      changed();
+    });
+
     window.AdminApp = {
 
       standalone: standalone,
+      mode: appMode,
       platform: platform,
+      installedHere: installedHere,
+      justInstalled: function () { return installedNow; },
       canInstall: function () { return !!deferred; },
 
       /* resolves true when the admin accepted */

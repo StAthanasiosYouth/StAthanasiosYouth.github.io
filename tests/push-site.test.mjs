@@ -91,7 +91,8 @@ test('sw.js: an FCM data message becomes an Arabic RTL notification with the ite
   assert.equal(options.renotify, false);
   assert.equal(options.icon, '/assets/img/icon-192.png');
   assert.equal(options.badge, '/assets/img/push-badge.png');
-  assert.deepEqual({ ...options.data }, { url: '/#meeting', id: 'notif-session-1' });
+  // the installed site app's own address (manifest scope /index.html)
+  assert.deepEqual({ ...options.data }, { url: '/index.html#meeting', id: 'notif-session-1' });
   assert.equal(options.image, undefined);
 });
 
@@ -103,11 +104,12 @@ test('sw.js: pictures only from the site\'s own media; links only to the site\'s
     assert.equal((await show({ title: 'x', image })).image, undefined, image);
   }
   const url = async value => (await show({ title: 'x', url: value })).data.url;
-  assert.equal(await url('/#news/news-aaaa1111'), '/#news/news-aaaa1111');
-  assert.equal(await url('/#activity/act-1'), '/#activity/act-1');
-  assert.equal(await url('/#notifications'), '/#notifications');
+  assert.equal(await url('/#news/news-aaaa1111'), '/index.html#news/news-aaaa1111');
+  assert.equal(await url('/#activity/act-1'), '/index.html#activity/act-1');
+  assert.equal(await url('/#notifications'), '/index.html#notifications');
+  assert.equal(await url('/index.html#meeting'), '/index.html#meeting');
   for (const bad of ['https://evil.example/#meeting', 'javascript:alert(1)', '/admin/#meeting', '/#news/', '/#news/<x>', '/?x=1#settings', 42, null]) {
-    assert.equal(await url(bad), '/', String(bad));
+    assert.equal(await url(bad), '/index.html', String(bad));
   }
 });
 
@@ -120,7 +122,7 @@ test('sw.js: an empty or broken push still shows something (Safari requires it)'
   for (const { title, options } of sw.shown) {
     assert.equal(title, 'أسرة البابا أثناسيوس - سفاجا');
     assert.equal(options.tag, 'athanasios');
-    assert.equal(options.data.url, '/');
+    assert.equal(options.data.url, '/index.html');
   }
   // long text is cut, whitespace folded
   await sw.push({ data: { title: 'ع'.repeat(200), body: 'a\n\n b   c' } });
@@ -132,7 +134,7 @@ test('sw.js: a tap brings the open site forward and lets its router open the ite
   const sw = worker({ windows: [`${ORIGIN}/admin/`, `${ORIGIN}/#news/old`] });
   const notification = await sw.click({ url: '/#news/news-aaaa1111' });
   assert.equal(notification.closed, true);
-  assert.deepEqual(JSON.parse(JSON.stringify(sw.posted)), [{ url: `${ORIGIN}/#news/old`, message: { type: 'athanasios:open', url: `${ORIGIN}/#news/news-aaaa1111` } }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(sw.posted)), [{ url: `${ORIGIN}/#news/old`, message: { type: 'athanasios:open', url: `${ORIGIN}/index.html#news/news-aaaa1111` } }]);
   assert.deepEqual(sw.focused, [`${ORIGIN}/#news/old`]);
   assert.deepEqual(sw.opened, [], 'no second window, and never the admin');
 });
@@ -140,10 +142,10 @@ test('sw.js: a tap brings the open site forward and lets its router open the ite
 test('sw.js: with no site window open, a tap opens the deep link', async () => {
   const sw = worker({ windows: [`${ORIGIN}/admin/`] });
   await sw.click({ url: '/#meeting' });
-  assert.deepEqual(sw.opened, [`${ORIGIN}/#meeting`]);
+  assert.deepEqual(sw.opened, [`${ORIGIN}/index.html#meeting`]);
   const bare = worker();
   await bare.click(null);
-  assert.deepEqual(bare.opened, [`${ORIGIN}/`]);
+  assert.deepEqual(bare.opened, [`${ORIGIN}/index.html`]);
 });
 
 test('sw.js and Push.gs agree: every link the server builds survives the worker', async () => {
@@ -153,7 +155,8 @@ test('sw.js and Push.gs agree: every link the server builds survives the worker'
   for (const target of targets) {
     const url = gs.pushUrl_(target);
     await sw.push({ data: { title: 'x', url } });
-    assert.equal(sw.shown.at(-1).options.data.url, url, JSON.stringify(target));
+    // the same link, at the installed app's address
+    assert.equal(sw.shown.at(-1).options.data.url, url.replace(/^\/(?=#|$)/, '/index.html'), JSON.stringify(target));
   }
   const message = gs.pushMessage_({ id: 'n1', title: 'x', message: 'y', target: null, image: { src: 'media/2026/img-af6b0c28.webp' } }, {});
   await sw.push({ data: message });
@@ -273,8 +276,10 @@ test('push-env: the memo survives broken storage; requests and replies', () => {
 test('manifest: installable, standalone, Arabic RTL, every icon present at its size', async () => {
   const manifest = JSON.parse(readFileSync(`${ROOT}manifest.webmanifest`, 'utf8'));
   assert.equal(manifest.display, 'standalone', 'iPhone needs a Home Screen web app for push');
-  assert.equal(manifest.start_url, '/');
-  assert.equal(manifest.scope, '/');
+  // the site app is /index.html (same id as always): its scope must not hold /admin/, or
+  // Android treats the admin pages as part of it and never installs the admin app
+  assert.equal(manifest.start_url, '/index.html');
+  assert.equal(manifest.scope, '/index.html');
   assert.equal(manifest.id, '/');
   assert.equal(manifest.dir, 'rtl');
   assert.equal(manifest.lang, 'ar');

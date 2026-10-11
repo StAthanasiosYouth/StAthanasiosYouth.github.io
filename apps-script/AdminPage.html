@@ -962,7 +962,7 @@
       )
       : null;
 
-    return [siteCard, A.state.hubReady ? hubCard : null, A.appCard ? A.appCard() : null, guideCard, upgradeCard, publishCard, adminsCard(), mediaCard, accountCard].filter(Boolean);
+    return [A.appCard ? A.appCard() : null, siteCard, A.state.hubReady ? hubCard : null, guideCard, upgradeCard, publishCard, adminsCard(), mediaCard, accountCard].filter(Boolean);
 
   };
 

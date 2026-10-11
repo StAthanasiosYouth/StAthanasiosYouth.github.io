@@ -436,9 +436,20 @@ already **live** on the site, sent once more to devices that opted in.
 
 ## Admin app, display names, «سجل النشاط», admin push
 
-- **Two apps, one origin.** The site's PWA is unchanged (`/manifest.webmanifest`,
-  id/scope `/`, `/sw.js`). The admin is its own app: `admin/manifest.webmanifest`
-  (id, scope, start `/admin/`; «لوحة تحكم الأسرة» / «إدارة أسرة البابا أثناسيوس - سفاجا»),
+- **Two apps, one origin, scopes that never overlap.** The site's PWA
+  (`/manifest.webmanifest`) keeps its id `/`, name and icons, but its
+  start_url and scope are `/index.html` (same page as `/`). With scope `/`
+  it contained `/admin/`: on Android, Chrome then treats every admin page as
+  part of the installed site WebAPK — no install dialog for the admin, the
+  menu only opens the site app, which shows /admin/ in its own window with
+  the site's splash and icon (seen on a Galaxy S20 FE). Nested scopes can't be
+  fixed with `id`; only non-overlapping scopes (or another origin) can. The
+  site worker opens taps at `/index.html#…` (also older `/#…` links) so
+  they land in the site app. Shared links to `/` now open in the browser,
+  not the installed site app (accepted trade-off).
+  The admin is its own app: `admin/manifest.webmanifest` (id and scope
+  `/admin/`, start `/admin/?app=admin`, «لوحة تحكم الأسرة» / «إدارة أسرة
+  البابا أثناسيوس - سفاجا», `related_applications` = itself),
   its own icons (`tools/build-admin-icons.mjs`: the logo on gold with a gear
   badge), iOS meta + `apple-touch-icon`, and `admin/sw.js` (scope `/admin/`,
   push + taps only, no fetch handler, no cache). The longest scope wins, so
@@ -490,6 +501,15 @@ already **live** on the site, sent once more to devices that opted in.
   toast from `apiHeartbeat({ since })` instead. Payload: title «<name>
   <summary>», a detail line, `url` `/admin/#open/<kind>/<id>` or
   `/admin/#activity/<id>`, `tag` per item (replaces instead of stacking).
+- **Is the admin app installed?** Only claimed when it can be known: the
+  window was opened from the admin app's icon (standalone AND the
+  `?app=admin` start mark, kept in the address), or the browser says so for
+  the admin manifest (`navigator.getInstalledRelatedApps()`, Chrome). Any
+  other app window ("other-app", e.g. an old site app with scope `/`) is
+  never called the admin app. «إعداد تطبيق الإدارة» (settings): sign-in ✓,
+  install (the browser's dialog when `beforeinstallprompt` came, else a drawn
+  Chrome-menu / Safari guide — never a dead button), admin notifications;
+  a home card nudges until done, «مش دلوقتي» hides it for 30 days.
 - **Links into the panel.** boot.js takes `#open/…` / `#activity/…` out of
   the address bar and follows it once the panel is drawn (`A.openLink`:
   `A.go` → `A.openEditor`, asking first about unsaved changes; the data is

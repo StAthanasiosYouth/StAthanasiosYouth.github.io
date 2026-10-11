@@ -123,7 +123,9 @@ self.addEventListener('notificationclick', event => {
       }
       return;
     }
-    await self.clients.openWindow(url);
+    // the admin app's own start address (manifest start_url: ?app=admin), at the item
+    const target = new URL(url);
+    await self.clients.openWindow(`${HOME}?app=admin${target.hash}`);
   })());
 
 });

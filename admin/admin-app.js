@@ -4981,7 +4981,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       )
       : null;
 
-    return [siteCard, A.state.hubReady ? hubCard : null, A.appCard ? A.appCard() : null, guideCard, upgradeCard, publishCard, adminsCard(), mediaCard, accountCard].filter(Boolean);
+    return [A.appCard ? A.appCard() : null, siteCard, A.state.hubReady ? hubCard : null, guideCard, upgradeCard, publishCard, adminsCard(), mediaCard, accountCard].filter(Boolean);
 
   };
 
@@ -8659,6 +8659,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     return el('div', { class: 'dash' },
       siteCard(),
+      A.setupNudge ? A.setupNudge() : null,
       meetingCard(),
       bellCard(),
       quickCard(),
@@ -10017,9 +10018,144 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   /* =======================================================
      THE ADMIN APP (official admin only: window.AdminApp from boot.js)
+     «إعداد تطبيق الإدارة»: three steps, the next one obvious —
+       1. تسجيل الدخول (done: you are here)
+       2. تثبيت التطبيق: claimed only when the browser says the ADMIN app
+          is installed (getInstalledRelatedApps) or this window was opened
+          from its icon (start_url ?app=admin) — never from "some app
+          window" alone (the site's app is one too)
+       3. تفعيل إشعارات الإدارة على الجهاز ده
+     A.setupNudge: one small card on the home screen while setup isn't
+     finished, which «مش دلوقتي» hides for 30 days.
   ======================================================= */
 
   var PLATFORM_NAMES = { android: 'أندرويد', ios: 'آيفون', desktop: 'كمبيوتر', other: 'جهاز' };
+  var LATER_KEY = 'athanasios-admin.setup-later';
+  var LATER_DAYS = 30;
+
+  /* admin notifications on for this device, without asking the server (admin/push.js keeps the mark) */
+  function pushLocallyOn() {
+
+    try {
+      return !!(window.Notification && window.Notification.permission === 'granted' &&
+        JSON.parse(window.localStorage.getItem('athanasios-admin.push') || '{}').token);
+    }
+    catch (ignored) {
+      return false;
+    }
+
+  }
+
+  /*
+   * The install step: { done, state }
+   *   running        this window IS the admin app
+   *   installed      a browser tab; the admin app is installed on this device
+   *   elsewhere      an app window that isn't the admin app; the admin app is installed
+   *   other-app      an app window that isn't the admin app (likely the site's); not installed
+   *   prompt         not installed; the browser's own install dialog is ready
+   *   android / ios / desktop   not installed (or can't tell): how to install there
+   */
+  function installState(app) {
+
+    var mode = app.mode();
+
+    if (mode === 'admin-app') return Promise.resolve({ done: true, state: 'running' });
+
+    return app.installedHere().then(function (installed) {
+      if (installed || app.justInstalled()) return { done: true, state: mode === 'other-app' ? 'elsewhere' : 'installed' };
+      if (mode === 'other-app') return { done: false, state: 'other-app' };
+      return { done: false, state: app.canInstall() ? 'prompt' : app.platform() };
+    });
+
+  }
+
+  function guideStep(n, node, text) {
+
+    return el('li', { class: 'install-guide__step' },
+      el('span', { class: 'install-guide__n', text: digits(n) }),
+      el('span', { class: 'install-guide__pic', 'aria-hidden': 'true' }, node),
+      el('span', { class: 'install-guide__text', text: text })
+    );
+
+  }
+
+  /* Android without the browser's install dialog: Chrome's menu, drawn */
+  function androidGuide() {
+
+    return el('div', { class: 'install-guide' },
+      el('ol', { class: 'install-guide__steps' },
+        guideStep(1, el('span', { class: 'install-guide__dots', text: '⋮' }), 'افتح قايمة Chrome (التلات نقط فوق)'),
+        guideStep(2, el('span', { class: 'install-guide__item' }, icon('download'), el('span', { text: 'تثبيت التطبيق' })), 'اختار «تثبيت التطبيق» (أو «إضافة إلى الشاشة الرئيسية» ← «تثبيت»)'),
+        guideStep(3, el('img', { class: 'install-guide__icon', src: 'icon-192.png', alt: '', width: 40, height: 40 }), 'هتلاقي «لوحة تحكم الأسرة» بالأيقونة الدهبي دي على الشاشة الرئيسية')
+      ),
+      el('p', { class: 'note note--warn install-guide__trouble', text: 'لو القايمة فيها «فتح في تطبيق أسرة البابا أثناسيوس» بدل «تثبيت التطبيق»: ده تطبيق الموقع القديم ماسك لوحة التحكم. امسحه من الموبايل (اضغط مطوّل على أيقونته ← إلغاء التثبيت)، وارجع للصفحة دي في Chrome وثبّت، وبعدين نزّل تطبيق الموقع تاني من الموقع لو عايزه.' })
+    );
+
+  }
+
+  function iosGuide() {
+
+    var chrome = /CriOS|FxiOS|EdgiOS/.test(navigator.userAgent || '');
+
+    return el('div', { class: 'install-guide' },
+      chrome ? el('p', { class: 'note note--warn', text: 'على الآيفون التثبيت بيتعمل من Safari بس: انسخ عنوان الصفحة وافتحه في Safari.' }) : null,
+      el('ol', { class: 'install-guide__steps' },
+        guideStep(1, el('span', { class: 'install-guide__dots', text: '⬆︎' }), 'دوس على زرار المشاركة (المربع اللي طالع منه سهم)'),
+        guideStep(2, el('span', { class: 'install-guide__item' }, icon('plus'), el('span', { text: 'إضافة إلى الشاشة الرئيسية' })), 'اختار «إضافة إلى الشاشة الرئيسية» ← «إضافة»'),
+        guideStep(3, el('img', { class: 'install-guide__icon', src: 'apple-touch-icon.png', alt: '', width: 40, height: 40 }), 'افتح «لوحة تحكم الأسرة» من الأيقونة دي وادخل بحساب جوجل مرة واحدة')
+      )
+    );
+
+  }
+
+  /* the install step's words and action */
+  function installBody(app, step, redraw) {
+
+    switch (step.state) {
+      case 'running':
+        return el('p', { class: 'setup__text', text: 'لوحة تحكم الأسرة مثبتة، وانت فاتحها كتطبيق دلوقتي.' });
+      case 'installed':
+        return el('p', { class: 'setup__text', text: 'لوحة تحكم الأسرة متثبتة على الجهاز ده. افتحها من أيقونتها الدهبي على الشاشة الرئيسية أو من قايمة التطبيقات.' });
+      case 'elsewhere':
+        return el('p', { class: 'setup__text', text: 'لوحة تحكم الأسرة متثبتة على الجهاز ده، بس الشاشة دي مش مفتوحة منها. افتحها من أيقونتها الدهبي.' });
+      case 'other-app':
+        return el('div', {},
+          el('p', { class: 'note note--warn', text: 'انت فاتح لوحة التحكم جوه شاشة تطبيق، بس مش تطبيق «لوحة تحكم الأسرة» (غالبًا تطبيق الموقع بالأيقونة الكحلي). علشان تثبّت لوحة التحكم كتطبيق لوحدها: افتح العنوان ده في Chrome.' }),
+          el('p', { class: 'setup__text ltr', text: window.location.origin + '/admin/' })
+        );
+      case 'prompt':
+        return el('div', {},
+          el('p', { class: 'setup__text', text: 'ثبّت لوحة التحكم على موبايلك: تتفتح من أيقونة لوحدها، في شاشة لوحدها، منفصلة عن تطبيق الموقع.' }),
+          el('div', { class: 'actions' },
+            el('button', { class: 'btn btn--primary', type: 'button', onclick: function () {
+              app.install().then(function (accepted) {
+                if (accepted) A.toast('اتثبتت ✓ افتحها من «لوحة تحكم الأسرة» على الشاشة الرئيسية.');
+                redraw();
+              });
+            } }, icon('download'), 'تثبيت التطبيق')
+          )
+        );
+      case 'android':
+        return el('div', {}, el('p', { class: 'setup__text', text: 'ثبّت لوحة التحكم على موبايلك من Chrome:' }), androidGuide());
+      case 'ios':
+        return el('div', {}, el('p', { class: 'setup__text', text: 'ثبّت لوحة التحكم على الآيفون من Safari:' }), iosGuide());
+      default:
+        return el('p', { class: 'setup__text', text: 'من شريط العنوان في Chrome أو Edge اضغط أيقونة التثبيت (شاشة بسهم)، أو من القايمة اختار «تثبيت لوحة تحكم الأسرة». على الموبايل بيبقى أريح.' });
+    }
+
+  }
+
+  function setupStep(done, next, title, body) {
+
+    return el('li', { class: 'setup__step' + (done ? ' is-done' : '') + (next ? ' is-next' : '') },
+      el('span', { class: 'setup__mark', 'aria-hidden': 'true' }, done ? icon('check') : el('span', { class: 'setup__dot' })),
+      el('div', { class: 'setup__main' },
+        el('p', { class: 'setup__title' }, el('strong', { text: title }), el('span', { class: 'visually-hidden', text: done ? ' (تم)' : ' (لسه)' })),
+        body
+      )
+    );
+
+  }
 
   A.appCard = function () {
 
@@ -10028,54 +10164,65 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     if (!app) return null;
 
     var box = A.errorBox();
-    var install = el('div', { class: 'app-card__part' });
-    var push = el('div', { class: 'app-card__part' });
+    var steps = el('ol', { class: 'setup', 'aria-label': 'خطوات إعداد تطبيق الإدارة' });
+    var progress = el('span', { class: 'chip' });
     var devices = el('ul', { class: 'admins app-devices', hidden: true, 'aria-label': 'أجهزتي اللي عليها إشعارات الإدارة' });
+    var install = { done: false, state: 'desktop' };
+    var status = null;
     var busy = false;
 
-    function steps(lines) {
-      return el('ol', { class: 'app-steps' }, lines.map(function (line) { return el('li', { text: line }); }));
+    function pushBody(next) {
+
+      var support = app.push.support();
+      var on = !!(status && status.on);
+
+      if (support === 'ios-install') {
+        return el('p', { class: 'setup__text', text: 'على الآيفون إشعارات الإدارة بتشتغل من التطبيق المتثبت بس (iOS 16.4 أو أحدث). ثبّته الأول وافتحه، وفعّلها من هنا.' });
+      }
+      if (support === 'unsupported') {
+        return el('p', { class: 'setup__text', text: 'المتصفح ده مش بيدعم الإشعارات. جرّب Chrome على أندرويد أو الكمبيوتر، أو التطبيق المتثبت على الآيفون.' });
+      }
+      if (support === 'denied') {
+        return el('p', { class: 'note note--warn', text: 'الإشعارات مقفولة للموقع ده من إعدادات المتصفح. افتحها من إعدادات الموقع (القفل جنب العنوان، أو معلومات التطبيق ← الإشعارات) وارجع هنا.' });
+      }
+
+      return el('div', {},
+        el('p', { class: on ? 'note note--ok' : 'setup__text', text: on
+          ? 'شغالة على الجهاز ده ✓ هيوصلك لما أدمن تاني ينشر أو يضيف أو يمسح أو يعدّل حاجة.'
+          : 'من غيرها مش هتعرف لما أدمن تاني ينشر أو يضيف أو يمسح أو يعدّل حاجة، إلا لو فاتح اللوحة.' }),
+        status && status.configured === false ? el('p', { class: 'note note--warn', text: 'إرسال الإشعارات لسه مش متظبط على السيرفر (FCM_SERVICE_ACCOUNT). الجهاز هيتسجل، بس مفيش إشعارات هتتبعت لحد ما يتظبط.' }) : null,
+        el('div', { class: 'actions' },
+          el('button', { class: 'btn' + (on ? ' btn--ghost' : next ? ' btn--primary' : ''), type: 'button', disabled: busy || null, onclick: function () {
+            busy = true;
+            draw();
+            (on ? app.push.disable() : app.push.enable())
+              .then(function (result) {
+                if (result && result.on && !on) A.toast('تمام! إشعارات الإدارة اتفعّلت على الجهاز ده 🔔');
+                else if (on) A.toast('وقفنا إشعارات الإدارة على الجهاز ده.');
+                return refresh();
+              })
+              .catch(function (error) { A.fail(error, box); })
+              .then(function () { busy = false; draw(); });
+          } }, icon(on ? 'close' : 'bell'), busy ? 'لحظة…' : (on ? 'وقّف على الجهاز ده' : 'فعّل إشعارات الإدارة'))
+        )
+      );
+
     }
 
-    function drawInstall() {
+    function draw() {
 
-      if (app.standalone()) {
-        A.fill(install, el('p', { class: 'note note--ok' }, icon('check'), ' انت فاتح «لوحة تحكم الأسرة» كتطبيق متثبت.'));
-        return;
-      }
+      var pushOn = !!(status && status.on);
+      var done = 1 + (install.done ? 1 : 0) + (pushOn ? 1 : 0);
+      var nextInstall = !install.done;
+      var nextPush = install.done && !pushOn;
 
-      if (app.canInstall()) {
-        A.fill(install,
-          el('p', { class: 'card__hint', text: 'تفتحها من أيقونة على الشاشة الرئيسية، في شاشة لوحدها، منفصلة عن تطبيق الموقع.' }),
-          el('div', { class: 'actions' },
-            el('button', { class: 'btn btn--primary', type: 'button', onclick: function () {
-              app.install().then(function (accepted) {
-                if (accepted) A.toast('اتثبتت ✓ افتحها من «لوحة تحكم الأسرة» على الشاشة الرئيسية.');
-                drawInstall();
-              });
-            } }, icon('download'), 'ثبّت التطبيق')
-          )
-        );
-        return;
-      }
+      progress.textContent = done === 3 ? 'جاهز ✓' : digits(done) + ' من ٣';
+      progress.className = 'chip' + (done === 3 ? ' chip--ok' : ' chip--gold');
 
-      if (app.platform() === 'ios') {
-        A.fill(install,
-          el('p', { class: 'card__hint', text: 'على الآيفون (من Safari):' }),
-          steps([
-            'افتح الصفحة دي في Safari (مش من جوه تطبيق تاني).',
-            'دوس على زرار المشاركة (المربع اللي طالع منه سهم) تحت.',
-            'اختار «إضافة إلى الشاشة الرئيسية» ← «إضافة».',
-            'افتح «لوحة تحكم الأسرة» من الشاشة الرئيسية وادخل بحساب جوجل مرة واحدة.'
-          ])
-        );
-        return;
-      }
-
-      A.fill(install,
-        el('p', { class: 'card__hint', text: app.platform() === 'android'
-          ? 'من قايمة كروم (⋮) اختار «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».'
-          : 'من شريط العنوان في كروم أو إيدج اضغط أيقونة التثبيت، أو من القايمة اختار «تثبيت لوحة تحكم الأسرة».' })
+      A.fill(steps,
+        setupStep(true, false, 'تسجيل الدخول', el('p', { class: 'setup__text', text: 'داخل باسم ' + (A.state.me || A.state.user) + '.' })),
+        setupStep(install.done, nextInstall, 'تثبيت التطبيق', installBody(app, install, refresh)),
+        setupStep(pushOn, nextPush, 'تفعيل إشعارات الإدارة', pushBody(nextPush))
       );
 
     }
@@ -10088,13 +10235,13 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           el('span', { class: 'admin__icon', 'aria-hidden': 'true' }, icon(d.platform === 'desktop' ? 'globe' : 'phone')),
           el('span', { class: 'admin__main' },
             el('span', { class: 'admin__name', text: d.device || PLATFORM_NAMES[d.platform] || 'جهاز' }),
-            el('span', { class: 'admin__email', text: (PLATFORM_NAMES[d.platform] || '') + (d.lastSeen ? ' · آخر مرة ' + A.ago((Date.now() - d.lastSeen) / 1000).replace(/^من /, 'من ') : '') }),
+            el('span', { class: 'admin__email', text: (PLATFORM_NAMES[d.platform] || '') + (d.lastSeen ? ' · آخر مرة ' + A.ago((Date.now() - d.lastSeen) / 1000) : '') }),
             d.current ? el('span', { class: 'admin__chips' }, A.chip('الجهاز ده', 'info')) : null
           ),
           el('button', { class: 'icon-btn icon-btn--danger', type: 'button', 'aria-label': 'وقّف الإشعارات على ' + (d.device || 'الجهاز ده'), onclick: function (event) {
             var button = event.currentTarget;
             (d.current ? app.push.disable() : A.withBusy(button, app.push.removeDevice(d.id)))
-              .then(function () { refresh(); })
+              .then(function () { return refresh(); })
               .catch(function (error) { A.fail(error, box); });
           } }, icon('trash'))
         );
@@ -10102,91 +10249,109 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     }
 
-    function drawPush(status) {
+    function refresh() {
 
-      var support = app.push.support();
-      var rows = [];
+      var installing = installState(app).then(function (next) {
+        install = next;
+        draw();
+      });
 
-      if (support === 'ios-install') {
-        rows.push(el('p', { class: 'note note--warn', text: 'على الآيفون، إشعارات الإدارة بتشتغل بس من التطبيق المتثبت على الشاشة الرئيسية (iOS 16.4 أو أحدث). ثبّته الأول من فوق، وافتحه، وفعّلها من هنا.' }));
-      }
-      else if (support === 'unsupported') {
-        rows.push(el('p', { class: 'note', text: 'المتصفح ده مش بيدعم الإشعارات. جرّب كروم على أندرويد أو الكمبيوتر، أو التطبيق المتثبت على الآيفون.' }));
-      }
-      else if (support === 'denied') {
-        rows.push(el('p', { class: 'note note--warn', text: 'الإشعارات مقفولة للموقع ده من إعدادات المتصفح. افتحها من إعدادات الموقع (القفل جنب العنوان) وارجع هنا.' }));
-      }
-      else {
-        var on = !!(status && status.on);
-        rows.push(
-          el('p', { class: on ? 'note note--ok' : 'card__hint', text: on
-            ? 'إشعارات الإدارة شغالة على الجهاز ده ✓'
-            : 'فعّلها علشان يوصلك لما أدمن تاني ينشر أو يضيف أو يمسح أو يعدّل حاجة، حتى واللوحة مقفولة.' }),
-          status && status.configured === false ? el('p', { class: 'note note--warn', text: 'إرسال الإشعارات لسه مش متظبط على السيرفر (FCM_SERVICE_ACCOUNT). الجهاز هيتسجل، بس مفيش إشعارات هتتبعت لحد ما يتظبط.' }) : null,
-          el('div', { class: 'actions' },
-            el('button', { class: 'btn' + (on ? ' btn--ghost' : ' btn--primary'), type: 'button', disabled: busy || null, onclick: function () {
-              busy = true;
-              drawPush(status);
-              (on ? app.push.disable() : app.push.enable())
-                .then(function (next) {
-                  if (next && next.on && !on) A.toast('تمام! إشعارات الإدارة اتفعّلت على الجهاز ده 🔔');
-                  else if (on) A.toast('وقفنا إشعارات الإدارة على الجهاز ده.');
-                  return refresh();
-                })
-                .catch(function (error) { A.fail(error, box); })
-                .then(function () { busy = false; drawPush(currentStatus); });
-            } }, icon(on ? 'close' : 'bell'), busy ? 'لحظة…' : (on ? 'وقّف على الجهاز ده' : 'فعّل إشعارات الإدارة'))
-          )
-        );
-      }
+      var pushing = app.push.support() !== 'ok'
+        ? Promise.resolve().then(function () { status = null; drawDevices([]); draw(); })
+        : app.push.status().then(function (next) {
+          status = next;
+          drawDevices(next && next.devices);
+          draw();
+        }).catch(function (error) {
+          A.fail(error, box);
+        });
 
-      rows.push(el('details', { class: 'app-card__more' },
+      return Promise.all([installing, pushing]);
+
+    }
+
+    app.onChange(function () { if (card.isConnected) refresh(); });
+
+    var card = A.card('إعداد تطبيق الإدارة', '«لوحة تحكم الأسرة» على موبايلك زي أي تطبيق، وإشعارات الإدارة علشان تعرف أول بأول مين عمل إيه.',
+      box,
+      el('div', { class: 'setup__head' }, el('span', { class: 'section-label', text: 'الخطوات' }), progress),
+      steps,
+      devices,
+      el('details', { class: 'app-card__more' },
         el('summary', { text: 'إيه اللي بيوصل؟' }),
         el('p', { text: 'فورًا: النشر، إضافة أو مسح اجتماع أو خبر أو لعبة أو مسابقة أو فعالية أو إشعار، إرسال إشعار للموقع، وتغيير صلاحيات لوحة التحكم.' }),
         el('p', { text: 'التعديلات (وكمان الروابط والأقسام والتواصل والإعدادات): مرة واحدة بس كل نص ساعة لنفس الحاجة من نفس الأدمن.' }),
         el('p', { text: 'مش بيوصلك اللي انت عملته، ولا وانت فاتح لوحة التحكم (بيظهر لك هنا كرسالة صغيرة بدل الإشعار). الترتيب والإظهار والإخفاء والأرشيف والصور بيتسجلوا في «سجل النشاط» من غير إشعار.' })
-      ));
-
-      A.fill(push, rows);
-
-    }
-
-    var currentStatus = null;
-
-    function refresh() {
-
-      drawInstall();
-      if (app.push.support() !== 'ok') {
-        drawPush(null);
-        drawDevices([]);
-        return Promise.resolve();
-      }
-      return app.push.status().then(function (status) {
-        currentStatus = status;
-        drawPush(status);
-        drawDevices(status && status.devices);
-      }).catch(function (error) {
-        drawPush(null);
-        A.fail(error, box);
-      });
-
-    }
-
-    app.onChange(function () { if (card.isConnected) drawInstall(); });
-
-    var card = A.card('تطبيق لوحة التحكم', 'ثبّت «لوحة تحكم الأسرة» على موبايلك زي أي تطبيق، وفعّل إشعارات الإدارة علشان تعرف أول بأول مين عمل إيه.',
-      box,
-      el('h3', { class: 'section-label', text: 'التثبيت' }),
-      install,
-      el('h3', { class: 'section-label', text: 'إشعارات الإدارة على الجهاز ده' }),
-      push,
-      devices
+      )
     );
 
     card.classList.add('card--app');
-    drawInstall();
-    drawPush(null);
+    card.id = 'app-setup';
+    draw();
     refresh();
+
+    return card;
+
+  };
+
+
+  /* =======================================================
+     THE HOME NUDGE: setup not finished on this device
+  ======================================================= */
+
+  function later() {
+
+    try {
+      var at = Number(window.localStorage.getItem(LATER_KEY)) || 0;
+      return Date.now() - at < LATER_DAYS * 86400000;
+    }
+    catch (ignored) {
+      return false;
+    }
+
+  }
+
+  A.setupNudge = function () {
+
+    var app = window.AdminApp;
+
+    if (!app || later()) return null;
+
+    // a phone (or the admin app itself): that's where the app and its notifications matter
+    if (app.platform() === 'desktop' && app.mode() !== 'admin-app') return null;
+
+    var text = el('p', { class: 'card__hint' });
+    var card = el('section', { class: 'card dash-card dash-setup', hidden: true, 'aria-labelledby': 'dash-setup-title' },
+      el('div', { class: 'dash-card__head' },
+        el('span', { class: 'dash-card__icon', 'aria-hidden': 'true' }, icon('bell')),
+        el('h2', { class: 'card__title', id: 'dash-setup-title', text: 'كمّل إعداد تطبيق الإدارة' })
+      ),
+      text,
+      el('div', { class: 'actions' },
+        el('button', { class: 'btn btn--primary btn--small', type: 'button', onclick: function () {
+          A.go('settings').then(function (ok) {
+            if (!ok) return;
+            var target = document.getElementById('app-setup');
+            if (target) target.scrollIntoView({ block: 'start', behavior: A.reducedMotion() ? 'auto' : 'smooth' });
+          });
+        } }, 'كمّل الإعداد'),
+        el('button', { class: 'btn btn--ghost btn--small', type: 'button', onclick: function () {
+          try { window.localStorage.setItem(LATER_KEY, String(Date.now())); }
+          catch (ignored) { /* shown again next time */ }
+          card.remove();
+        } }, 'مش دلوقتي')
+      )
+    );
+
+    var pushOn = pushLocallyOn();
+
+    installState(app).then(function (install) {
+      if (install.done && (pushOn || app.push.support() !== 'ok')) return;
+      text.textContent = !install.done
+        ? 'ثبّت «لوحة تحكم الأسرة» على الموبايل' + (pushOn ? '.' : '، وفعّل إشعارات الإدارة علشان تعرف لما حد تاني ينشر أو يعدّل.')
+        : 'فاضل تفعّل إشعارات الإدارة علشان تعرف لما حد تاني ينشر أو يضيف أو يعدّل.';
+      card.hidden = false;
+    }, function () {});
 
     return card;
 

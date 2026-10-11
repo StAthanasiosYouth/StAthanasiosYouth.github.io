@@ -11,6 +11,9 @@
  * Registered by assets/js/push.js when a visitor turns notifications on.
  * Payload (FCM wraps it as { data: {...}, from, ... }):
  *   { id, title, body, url: '/#news/<id>' | '/#meeting' | '/', image?, tag }
+ * A tap opens /index.html#… : the installed site app's own address (its
+ * scope is /index.html, so the admin app at /admin/ is a separate app on
+ * Android — manifest.webmanifest). '/' and '/index.html' are the same page.
  * Anything unexpected falls back to safe defaults: a push must always show
  * a notification (Safari revokes push for sites that stay silent).
  */
@@ -20,6 +23,7 @@
 const SITE_NAME = 'أسرة البابا أثناسيوس - سفاجا';
 const ICON = '/assets/img/icon-192.png';
 const BADGE = '/assets/img/push-badge.png';
+const HOME = '/index.html';
 const ROUTE = /^#(?:notifications|meeting|(?:news|game|activity)\/[\w-]{1,60})$/;
 const IMAGE = /^\/media\/[\w./-]{1,200}\.(?:webp|jpe?g|png)$/;
 
@@ -31,16 +35,16 @@ function text(value, max) {
 }
 
 
-/* only this site's own page, with one of its deep links (anything else = the home page) */
+/* only this site's own page, with one of its deep links (anything else = the home page), as /index.html#… */
 function safeUrl(value) {
 
   try {
     const url = new URL(String(value || '/'), self.location.origin);
-    if (url.origin !== self.location.origin || url.pathname !== '/') return '/';
-    return ROUTE.test(url.hash) ? `/${url.hash}` : '/';
+    if (url.origin !== self.location.origin || (url.pathname !== '/' && url.pathname !== HOME)) return HOME;
+    return ROUTE.test(url.hash) ? HOME + url.hash : HOME;
   }
   catch {
-    return '/';
+    return HOME;
   }
 
 }
@@ -103,14 +107,15 @@ self.addEventListener('notificationclick', event => {
 
   event.notification.close();
 
-  const url = new URL((event.notification.data && event.notification.data.url) || '/', self.location.origin).href;
+  // (also a notification shown before the site app moved to /index.html)
+  const url = new URL(safeUrl(event.notification.data && event.notification.data.url), self.location.origin).href;
 
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    // the site already open (not the admin): bring it forward and let its router open the item
+    // the site page already open (never the admin): bring it forward and let its router open the item
     const open = windows.find(client => {
       const at = new URL(client.url);
-      return at.origin === self.location.origin && !at.pathname.startsWith('/admin');
+      return at.origin === self.location.origin && (at.pathname === '/' || at.pathname === HOME);
     });
     if (open) {
       open.postMessage({ type: 'athanasios:open', url });

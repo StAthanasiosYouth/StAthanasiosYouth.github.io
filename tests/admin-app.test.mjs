@@ -24,8 +24,10 @@ test('manifest: the admin app is its own app (id, scope, start /admin/), named a
   const site = JSON.parse(read('manifest.webmanifest'));
 
   assert.equal(admin.id, '/admin/');
-  assert.equal(admin.start_url, '/admin/');
+  // ?app=admin: the page can tell it was opened as the admin app (not a tab, not another app)
+  assert.equal(admin.start_url, '/admin/?app=admin');
   assert.equal(admin.scope, '/admin/');
+  assert.deepEqual(admin.related_applications, [{ platform: 'webapp', url: 'https://stathanasiosyouth.github.io/admin/manifest.webmanifest' }]);
   assert.equal(admin.display, 'standalone');
   assert.equal(admin.short_name, 'لوحة تحكم الأسرة');
   assert.equal(admin.name, 'إدارة أسرة البابا أثناسيوس - سفاجا');
@@ -33,11 +35,16 @@ test('manifest: the admin app is its own app (id, scope, start /admin/), named a
   assert.equal(admin.lang, 'ar');
   assert.notEqual(admin.id, site.id, 'two apps, not one');
 
-  // the public app is exactly as before
+  // the public app keeps its id and name; its scope is /index.html so that it never contains /admin/
+  // (nested scopes: Android gives /admin/ to the site's WebAPK and never installs the admin one)
   assert.equal(site.id, '/');
-  assert.equal(site.scope, '/');
-  assert.equal(site.start_url, '/');
+  assert.equal(site.scope, '/index.html');
+  assert.equal(site.start_url, '/index.html');
   assert.equal(site.name, 'أسرة البابا أثناسيوس - سفاجا');
+  const inScope = (path, scope) => path.startsWith(scope);
+  assert.equal(inScope('/admin/', site.scope), false, 'the admin is outside the site app');
+  assert.equal(inScope('/index.html', admin.scope), false, 'and the site outside the admin app');
+  assert.equal(inScope(new URL(admin.start_url, 'https://x/').pathname, admin.scope), true);
 });
 
 test('manifest: the admin icons exist at their sizes, and they are not the site\'s', async () => {
@@ -162,13 +169,13 @@ test('admin/sw.js: a tap focuses an open admin window and tells it where to go; 
 
   const none = worker({ windows: [`${ORIGIN}/`] });
   await none.click({ url: '/admin/#activity/act-0123456789ab' });
-  assert.deepEqual(none.opened, [`${ORIGIN}/admin/#activity/act-0123456789ab`]);
+  assert.deepEqual(none.opened, ["/admin/?app=admin#activity/act-0123456789ab"], "the admin app's own start address");
 });
 
 test('the public sw.js still never handles admin windows (unchanged)', () => {
   const code = read('sw.js');
-  assert.match(code, /!at\.pathname\.startsWith\('\/admin'\)/);
-  assert.match(code, /url\.pathname !== '\/'/, 'site links only');
+  assert.match(code, /at\.pathname === '\/' \|\| at\.pathname === HOME/, 'the site page only, never an admin window');
+  assert.match(code, /const HOME = '\/index\.html';/, 'taps open the installed site app');
 });
 
 
