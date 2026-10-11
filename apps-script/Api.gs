@@ -137,7 +137,28 @@ function apiFunctions_() {
     apiCompRegrade: apiCompRegrade,
     apiCompVoid: apiCompVoid,
     apiCompResults: apiCompResults,
-    apiCompExport: apiCompExport
+    apiCompExport: apiCompExport,
+    // registry (CompRegistry.gs, §7)
+    apiParticipants: apiParticipants,
+    apiParticipant: apiParticipant,
+    apiParticipantSave: apiParticipantSave,
+    apiParticipantSetActive: apiParticipantSetActive,
+    apiParticipantCode: apiParticipantCode,
+    apiParticipantCodes: apiParticipantCodes,
+    apiParticipantResetCode: apiParticipantResetCode,
+    apiParticipantsImportPreview: apiParticipantsImportPreview,
+    apiParticipantsImportApply: apiParticipantsImportApply,
+    apiParticipantsUndoImport: apiParticipantsUndoImport,
+    // wallet (CompWallet.gs, §8)
+    apiWallet: apiWallet,
+    apiWalletParticipant: apiWalletParticipant,
+    apiWalletAdjust: apiWalletAdjust,
+    // store (CompStoreItems.gs, §9)
+    apiShopItems: apiShopItems,
+    apiShopItemSave: apiShopItemSave,
+    apiShopItemDelete: apiShopItemDelete,
+    apiShopRedemptions: apiShopRedemptions,
+    apiShopRedemptionStatus: apiShopRedemptionStatus
   };
 
 }

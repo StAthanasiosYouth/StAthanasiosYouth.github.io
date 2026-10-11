@@ -362,6 +362,22 @@ function compAfterGrade_(submissionId) {
 }
 
 
+/* the same for many submissions (a regrade, a group review): one lock, one ledger read */
+function compAfterGradeMany_(ids) {
+
+  if (!ids.length || !compModules_().wallet) return;
+
+  try {
+    if (typeof walletReconcileMany_ === 'function') walletReconcileMany_(ids);
+    else ids.forEach(compAfterGrade_);
+  }
+  catch (error) {
+    console.warn('comp: wallet not reconciled');
+  }
+
+}
+
+
 /* =========================================================
    compStart
 ========================================================= */
@@ -443,7 +459,7 @@ function compStartAction_(arg) {
     if (!compModules_().registry || typeof compParticipantFromToken_ !== 'function') return compFail_('disabled');
     var participant = compParticipantFromToken_(arg.ptoken);
     if (!participant || !participant.id) return compFail_('session');
-    who = { participantId: participant.id, name: String(participant.name || ''), phone: '', fields: participant.group ? { group: String(participant.group) } : {} };
+    who = { participantId: participant.id, name: String(participant.name || ''), phone: String(participant.phone || ''), fields: participant.group ? { group: String(participant.group) } : {} };
   }
   else {
     var values = compFieldValues_(def.fields, arg.fields);

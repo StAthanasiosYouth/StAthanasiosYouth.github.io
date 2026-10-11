@@ -337,6 +337,18 @@ function apiPreview(at) {
 }
 
 
+/* does a used library file still wait to go to the site (never published)? */
+function mediaWaiting_(usedIds) {
+
+  if (!usedIds || !usedIds.length) return false;
+
+  return readOptionalTable_('Media').some(function (row) {
+    return usedIds.indexOf(row.id) !== -1 && !row.publishedAt && !row.deletedAt;
+  });
+
+}
+
+
 /**
  * Publishes the draft. expectedRevision is what the admin reviewed; if the
  * Sheet changed since then, publishing stops so nothing unreviewed goes live.
@@ -381,7 +393,8 @@ function apiPublish(expectedRevision) {
     }
 
     // same visible content already live: don't make an empty-change commit
-    if (live && live.revision === built.content.revision) {
+    // (unless a picture still waits to go to the site: a store prize's is not in content.json)
+    if (live && live.revision === built.content.revision && !mediaWaiting_(built.media)) {
       // (an earlier publish may have stopped right after its commit)
       if (comps) compAfterCommit_(comps, stamp);
       PropertiesService.getScriptProperties().setProperty('PUBLISHED_REVISION', built.content.revision);

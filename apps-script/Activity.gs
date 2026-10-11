@@ -492,11 +492,11 @@ function activitySummary_(entry) {
       if (type === 'sessions') return 'أضاف ' + thing;
       return 'أضاف ' + noun.fresh + (title ? ' ' + quoted(title) : '');
     case 'update': return 'عدّل ' + thing;
-    case 'delete': return 'مسح ' + thing;
+    case 'delete': return type === 'participant' && changes.undoImport ? 'لغى استيراد ' + activityDigits_(changes.undoImport) + ' مشترك' : 'مسح ' + thing;
     case 'archive': return 'أرشف ' + thing;
     case 'unarchive': return 'رجّع ' + thing + ' من الأرشيف';
-    case 'enable': return 'أظهر ' + thing;
-    case 'disable': return 'أخفى ' + thing;
+    case 'enable': return (type === 'participant' ? 'فعّل ' : 'أظهر ') + thing;
+    case 'disable': return (type === 'participant' ? 'وقّف ' : 'أخفى ') + thing;
     case 'duplicate': return 'عمل نسخة من ' + thing;
     case 'reorder': return 'رتّب ' + (noun.many || 'العناصر');
     case 'settings': return 'غيّر إعدادات ' + (title || 'الموقع');
@@ -509,7 +509,7 @@ function activitySummary_(entry) {
     case 'media.purge': return 'مسح ' + thing + ' نهائيًا';
     case 'import':
       if (type === 'competition') return 'استورد ' + activityDigits_(changes.added || 0) + ' سؤال في ' + thing;
-      if (type === 'participant') return 'استورد ' + activityDigits_(changes.added || 0) + ' مشترك';
+      if (type === 'participant') return 'استورد ' + activityDigits_(changes.added || 0) + ' مشترك' + (changes.updated || changes.phone ? ' (' + activityDigits_((changes.updated || 0) + (changes.phone || 0)) + ' اتعدّلوا)' : '');
       return 'استورد اجتماعات من ملف (' + activityDigits_(changes.added || 0) + ' جديد، ' + activityDigits_(changes.updated || 0) + ' متعدّل)';
     case 'review':
       if (changes['void'] === true) return 'لغى مشاركة في ' + thing;
@@ -522,8 +522,8 @@ function activitySummary_(entry) {
     case 'code.reset': return 'عمل كود جديد لـ ' + quoted(title);
     case 'code.export': return 'صدّر أكواد (' + activityDigits_(changes.count || 0) + ')';
     case 'participant.phone': return 'غيّر رقم ' + quoted(title);
-    case 'points.adjust': return 'عدّل نقاط ' + quoted(title);
-    case 'redemption.status': return 'غيّر حالة ' + thing;
+    case 'points.adjust': return 'عدّل نقاط ' + quoted(title) + (typeof changes.amount === 'number' ? ' (' + (changes.amount > 0 ? '+' : '−') + activityDigits_(Math.abs(changes.amount)) + ')' : '');
+    case 'redemption.status': return 'غيّر حالة ' + thing + ({ approved: ' لـ «جاهزة للاستلام»', fulfilled: ' لـ «اتسلمت»', cancelled: ' لـ «اتلغت»' }[changes.status] || '');
     case 'live.stage': return 'غيّر الفقرة الحالية في ' + thing;
     case 'admin.add': return 'ضاف ' + quoted(title) + ' للوحة التحكم';
     case 'admin.remove': return 'شال صلاحية ' + quoted(changes.name || title);
@@ -1137,6 +1137,11 @@ function activityNotifyKind_(row, entry) {
   }
 
   if (action === 'settings') return 'cooldown';
+
+  // the registry, the wallet and the store (docs/COMPETITIONS.md §11): a code view never rings
+  if (action === 'code.view') return '';
+  if (action === 'code.export') return 'now';
+  if (action === 'code.reset' || action === 'points.adjust' || action === 'redemption.status') return 'cooldown';
 
   return '';
 

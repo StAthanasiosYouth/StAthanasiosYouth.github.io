@@ -1,0 +1,609 @@
+/**
+ * COMPETITIONS: THE POINTS WALLET (Phase 3). docs/COMPETITIONS.md §8.
+ *
+ * Switch: COMP_WALLET = '1' (needs the registry; apiCompSettings keeps the
+ * chain). Tab: PointsLedger — append-only, never edited; every append and
+ * every balance check runs under compLock_(). A balance is the sum of a
+ * participant's rows (cached per participant as wal:bal:<id>, dropped on
+ * every write to them; checks inside the lock always sum the tab).
+ *
+ * Competition points follow the grade: walletReconcile_(submissionId)
+ * (called through compAfterGrade_ after the auto grade at submit, a manual
+ * grade, a group grade, a regrade, void / unvoid) computes
+ *   target  = (the competition's wallet is on AND the submission is graded) ? score : 0
+ *   current = Σ ledger rows with refType 'submission' and refId = the submission
+ * and, when they differ, appends ONE row (kind competition for the first,
+ * correction after) with idemKey sub:<id>:<n> (n = rows it already has).
+ * Running it again adds nothing. Only registered submissions (participantId)
+ * count; with the wallet switched off it does nothing. When the live lock
+ * is busy the ids wait in wal:retry and the next reconcile takes them along.
+ *
+ * Admin: apiWallet, apiWalletParticipant, apiWalletAdjust (manual rows,
+ * idemKey adj:<key>, never below zero, logged points.adjust).
+ */
+
+var WALLET_KINDS = ['competition', 'correction', 'manual', 'redeem', 'refund'];
+var WALLET_KIND_LABELS = { competition: 'مسابقة', correction: 'تعديل نتيجة', manual: 'تعديل من الخدام', redeem: 'جايزة', refund: 'استرجاع' };
+var WALLET_MAX_ADJUST = 1000000;
+var WALLET_NOTE_MAX = 200;
+var WALLET_ADJUST_KEY = /^[A-Za-z0-9_-]{8,64}$/;
+var WALLET_BALANCE_SECONDS = 21600;
+var WALLET_PORTAL_LEDGER = 200;
+var WALLET_RETRY_MAX = 300;
+
+/* this execution: competition id → wallet on (read once) */
+var WALLET_COMP_FLAGS_ = null;
+var WALLET_RECONCILING_ = false;
+
+
+/* =========================================================
+   MODULE
+========================================================= */
+
+function compWalletReady_() {
+
+  return true;
+
+}
+
+function walletRequireOn_() {
+
+  if (!compModules_().wallet) {
+    throw appError_('«المحفظة والنقاط» مش متفعّلة.', 'فعّلها من إعدادات المسابقات الأول.');
+  }
+
+}
+
+
+/* =========================================================
+   THE LEDGER
+========================================================= */
+
+function walletSheet_() {
+
+  return compSheet_('PointsLedger');
+
+}
+
+/* does the ledger tab exist yet (public reads never make it) */
+function walletHasTab_() {
+
+  var ss = compSpreadsheet_(false);
+
+  return !!(ss && ss.getSheetByName('PointsLedger'));
+
+}
+
+/* every ledger row (text cells), oldest first */
+function walletLedger_() {
+
+  return walletHasTab_() ? compColumns_(walletSheet_(), COMP_TABLES.PointsLedger) : [];
+
+}
+
+/* { participantId: balance } over the whole ledger (one read) */
+function walletBalances_() {
+
+  var sums = Object.create(null);
+
+  if (!walletHasTab_()) return sums;
+
+  compColumns_(walletSheet_(), ['participantId', 'amount']).forEach(function (r) {
+    if (r.participantId) sums[r.participantId] = (sums[r.participantId] || 0) + (Number(r.amount) || 0);
+  });
+
+  return sums;
+
+}
+
+/* one participant's balance: the cache, else the tab (fresh = always the tab) */
+function walletBalance_(pid, fresh) {
+
+  var key = 'wal:bal:' + pid;
+
+  if (!fresh) {
+    try {
+      var cached = CacheService.getScriptCache().get(key);
+      if (cached !== null && cached !== undefined && cached !== '' && isFinite(Number(cached))) return Number(cached);
+    }
+    catch (ignored) {
+      // the tab then
+    }
+  }
+
+  var sum = 0;
+
+  if (walletHasTab_()) {
+    compColumns_(walletSheet_(), ['participantId', 'amount']).forEach(function (r) {
+      if (r.participantId === pid) sum += Number(r.amount) || 0;
+    });
+  }
+
+  try {
+    CacheService.getScriptCache().put(key, String(sum), WALLET_BALANCE_SECONDS);
+  }
+  catch (ignored) {
+    // only a shortcut
+  }
+
+  return sum;
+
+}
+
+function walletDropBalance_(pid) {
+
+  try {
+    CacheService.getScriptCache().remove('wal:bal:' + pid);
+  }
+  catch (ignored) {
+    // the next fresh read fixes it
+  }
+
+}
+
+/* appends ledger rows in one block (call under compLock_) → the records with their ids */
+function walletAppend_(records) {
+
+  if (!records.length) return [];
+
+  var stamp = compNow_().stamp;
+
+  records.forEach(function (r) {
+    r.id = r.id || 'l-' + compRandomHex_(6);
+    r.createdAt = r.createdAt || stamp;
+    r.actor = r.actor || '';
+    r.note = r.note || '';
+    r.compId = r.compId || '';
+    r.refType = r.refType || '';
+    r.refId = r.refId || '';
+  });
+
+  compAppend_(walletSheet_(), records);
+
+  records.forEach(function (r) { walletDropBalance_(r.participantId); });
+
+  return records;
+
+}
+
+/* totals of a set of ledger rows: { balance, earned, adjusted, spent, entries, lastAt } */
+function walletTotals_(rows) {
+
+  var t = { balance: 0, earned: 0, adjusted: 0, spent: 0, entries: rows.length, lastAt: '' };
+
+  rows.forEach(function (r) {
+    var amount = Number(r.amount) || 0;
+    t.balance += amount;
+    if (r.kind === 'competition' || r.kind === 'correction') t.earned += amount;
+    else if (r.kind === 'manual') t.adjusted += amount;
+    else if (r.kind === 'redeem' || r.kind === 'refund') t.spent -= amount;
+    if (r.createdAt > t.lastAt) t.lastAt = r.createdAt;
+  });
+
+  return t;
+
+}
+
+
+/* =========================================================
+   COMPETITION POINTS (walletReconcile_)
+========================================================= */
+
+/* is the competition's wallet on (its live definition; else the version the row was served) */
+function walletCompOn_(compId, version) {
+
+  if (!WALLET_COMP_FLAGS_) {
+    WALLET_COMP_FLAGS_ = Object.create(null);
+    compColumns_(compSheet_('Competitions'), ['id', 'liveVersion']).forEach(function (c) {
+      WALLET_COMP_FLAGS_[c.id] = { live: String(c.liveVersion || '').trim() };
+    });
+  }
+
+  var entry = WALLET_COMP_FLAGS_[compId] || (WALLET_COMP_FLAGS_[compId] = { live: '' });
+  var key = 'on:' + (entry.live || version);
+
+  if (entry[key] === undefined) {
+    var def = compDefinitionFor_(compId, entry.live || version) || compDefinitionFor_(compId, version);
+    entry[key] = !!(def && def.wallet && def.scoring);
+  }
+
+  return entry[key];
+
+}
+
+/* what the ledger should hold for one submission row */
+function walletTarget_(row) {
+
+  if (!row.participantId || row.status !== 'graded') return 0;
+
+  return walletCompOn_(row.compId, row.version) ? Math.max(0, Math.round(Number(row.score) || 0)) : 0;
+
+}
+
+function walletQueue_(ids) {
+
+  try {
+    var cache = CacheService.getScriptCache();
+    var list = compJson_(cache.get('wal:retry'), []) || [];
+    ids.forEach(function (id) { if (list.indexOf(id) === -1) list.push(id); });
+    cache.put('wal:retry', JSON.stringify(list.slice(-WALLET_RETRY_MAX)), 21600);
+  }
+  catch (ignored) {
+    // a later regrade heals it
+  }
+
+}
+
+function walletTakeQueue_() {
+
+  try {
+    var cache = CacheService.getScriptCache();
+    var list = compJson_(cache.get('wal:retry'), []) || [];
+    if (list.length) cache.remove('wal:retry');
+    return Array.isArray(list) ? list.filter(function (id) { return typeof id === 'string' && COMP_SUBMISSION_ID.test(id); }) : [];
+  }
+  catch (ignored) {
+    return [];
+  }
+
+}
+
+/**
+ * The ledger follows the grade of each submission (one lock, one read of each tab, one block).
+ * → { appended, checked }. Throws when the live lock is busy (the ids are queued for the next time).
+ */
+function walletReconcileMany_(ids) {
+
+  var result = { appended: 0, checked: 0 };
+
+  if (!compModules_().wallet || !compSpreadsheet_(false)) return result;
+
+  ids = (ids || []).filter(function (id, i) { return typeof id === 'string' && COMP_SUBMISSION_ID.test(id) && ids.indexOf(id) === i; });
+
+  var queued = WALLET_RECONCILING_ ? [] : walletTakeQueue_();
+
+  queued.forEach(function (id) { if (ids.indexOf(id) === -1) ids.push(id); });
+
+  if (!ids.length) return result;
+
+  var t = compSheet_('Submissions');
+  var wanted = Object.create(null);
+
+  ids.forEach(function (id) { wanted[id] = true; });
+
+  // before the lock: only registered submissions can hold points (an open competition stops here)
+  var registered = compColumns_(t, ['id', 'compId', 'version', 'participantId']).filter(function (r) { return wanted[r.id] && r.participantId; });
+
+  if (!registered.length) return result;
+
+  // the competitions' wallet switches, read again (a publish may have happened since), outside the lock
+  WALLET_COMP_FLAGS_ = null;
+  registered.forEach(function (r) { walletCompOn_(r.compId, r.version); });
+
+  wanted = Object.create(null);
+  registered.forEach(function (r) { wanted[r.id] = true; });
+
+  var lock = compLock_(20000);
+
+  if (!lock) {
+    walletQueue_(ids);
+    throw new Error('wallet: busy');
+  }
+
+  WALLET_RECONCILING_ = true;
+
+  try {
+
+    // the rows as they are now (a grade may have moved since the caller wrote it)
+    var rows = compColumns_(t, ['id', 'compId', 'version', 'participantId', 'status', 'score'])
+      .filter(function (r) { return wanted[r.id]; });
+    var held = Object.create(null);
+    var keys = Object.create(null);
+
+    (walletHasTab_() ? compColumns_(walletSheet_(), ['refType', 'refId', 'amount', 'idemKey']) : []).forEach(function (l) {
+      keys[l.idemKey] = true;
+      if (l.refType !== 'submission' || !wanted[l.refId]) return;
+      var h = held[l.refId] = held[l.refId] || { sum: 0, n: 0 };
+      h.sum += Number(l.amount) || 0;
+      h.n++;
+    });
+
+    var records = [];
+
+    rows.forEach(function (row) {
+      var h = held[row.id] || { sum: 0, n: 0 };
+      var target = walletTarget_(row);
+      result.checked++;
+      // nothing ever registered and nothing to give: nothing to write (open competitions included)
+      if (!row.participantId || target === h.sum) return;
+      var key = 'sub:' + row.id + ':' + h.n;
+      if (keys[key]) return;
+      keys[key] = true;
+      records.push({
+        participantId: row.participantId,
+        amount: target - h.sum,
+        kind: h.n ? 'correction' : 'competition',
+        refType: 'submission',
+        refId: row.id,
+        compId: row.compId,
+        note: '',
+        idemKey: key,
+        actor: ''
+      });
+    });
+
+    walletAppend_(records);
+    result.appended = records.length;
+
+  }
+  finally {
+    WALLET_RECONCILING_ = false;
+    lock.releaseLock();
+  }
+
+  return result;
+
+}
+
+/** §8 / §16.3: after every grade change of one submission. */
+function walletReconcile_(submissionId) {
+
+  return walletReconcileMany_([submissionId]);
+
+}
+
+/** Result.pointsAwarded: what the ledger holds for one submission. */
+function walletPointsFor_(submissionId) {
+
+  if (!walletHasTab_()) return 0;
+
+  var sum = 0;
+
+  compColumns_(walletSheet_(), ['refType', 'refId', 'amount']).forEach(function (r) {
+    if (r.refType === 'submission' && r.refId === submissionId) sum += Number(r.amount) || 0;
+  });
+
+  return sum;
+
+}
+
+
+/* =========================================================
+   ADMIN
+========================================================= */
+
+/* competition titles by id */
+function walletCompTitles_() {
+
+  var titles = Object.create(null);
+
+  if (compSpreadsheet_(false)) {
+    compColumns_(compSheet_('Competitions'), ['id', 'title', 'shortTitle']).forEach(function (c) { titles[c.id] = c.title || c.shortTitle || ''; });
+  }
+
+  return titles;
+
+}
+
+/**
+ * query: { q, group, status, sort: 'balance' | 'name' | 'earned' | 'spent' | 'lastAt', dir, offset, limit ≤ 200, all? }
+ * (by default only participants with a ledger row or a balance; all: true = everyone)
+ * → { items: [{ id, name, phone, group, status, balance, earned, adjusted, spent, entries, lastAt }], total, offset,
+ *     limit, totals: { participants, balance, earned, adjusted, spent, entries }, modules }
+ */
+function apiWallet(query) {
+
+  assertAdmin_();
+
+  query = query && typeof query === 'object' && !Array.isArray(query) ? query : {};
+
+  var modules = compModules_();
+  var limit = Math.max(1, Math.min(REG_LIMITS.pageMax, Math.floor(Number(query.limit)) || REG_LIMITS.page));
+  var offset = Math.max(0, Math.floor(Number(query.offset)) || 0);
+  var result = { items: [], total: 0, offset: offset, limit: limit, totals: { participants: 0, balance: 0, earned: 0, adjusted: 0, spent: 0, entries: 0 }, modules: modules };
+
+  if (!compSpreadsheet_(false)) return result;
+
+  // waiting reconciles first (a busy moment earlier)
+  if (modules.wallet) {
+    try {
+      walletReconcileMany_([]);
+    }
+    catch (ignored) {
+      // still busy: they stay queued
+    }
+  }
+
+  var byPerson = Object.create(null);
+
+  walletLedger_().forEach(function (l) { (byPerson[l.participantId] = byPerson[l.participantId] || []).push(l); });
+
+  var search = typeof query.q === 'string' ? query.q.slice(0, REG_LIMITS.search) : '';
+  var nameKey = normName_(search);
+  var phoneKey = regPhoneSearch_(search);
+  var group = typeof query.group === 'string' ? normName_(query.group) : '';
+  var status = query.status === 'active' || query.status === 'inactive' ? query.status : 'all';
+
+  var items = regRows_().map(function (r) {
+    var totals = walletTotals_(byPerson[r.id] || []);
+    return {
+      id: r.id, name: r.name, phone: r.phoneNorm ? '0' + r.phoneNorm : '', group: r.group || '', status: r.status === 'inactive' ? 'inactive' : 'active',
+      balance: totals.balance, earned: totals.earned, adjusted: totals.adjusted, spent: totals.spent, entries: totals.entries, lastAt: totals.lastAt,
+      _norm: r.nameNorm || normName_(r.name), _phone: r.phoneNorm || '', _group: normName_(r.group)
+    };
+  });
+
+  items.forEach(function (i) {
+    if (!i.entries) return;
+    result.totals.participants++;
+    result.totals.balance += i.balance;
+    result.totals.earned += i.earned;
+    result.totals.adjusted += i.adjusted;
+    result.totals.spent += i.spent;
+    result.totals.entries += i.entries;
+  });
+
+  var found = items.filter(function (i) {
+    if (query.all !== true && !i.entries) return false;
+    if (status !== 'all' && i.status !== status) return false;
+    if (group && i._group !== group) return false;
+    if (search) {
+      var inName = !!nameKey && i._norm.indexOf(nameKey) !== -1;
+      var inPhone = !!phoneKey && i._phone.indexOf(phoneKey) !== -1;
+      if (!inName && !inPhone && i.id !== search.trim()) return false;
+    }
+    return true;
+  });
+
+  var dir = query.dir === 'asc' ? 1 : -1;
+  var sort = ['balance', 'earned', 'spent', 'lastAt'].indexOf(query.sort) !== -1 ? query.sort : (query.sort === 'name' ? 'name' : 'balance');
+  var key = sort === 'name' ? function (i) { return i._norm; } : function (i) { return i[sort]; };
+
+  if (sort === 'name' && query.dir !== 'desc') dir = 1;
+
+  found.sort(function (a, b) { var x = key(a); var y = key(b); return x === y ? (a._norm < b._norm ? -1 : 1) : (x < y ? -dir : dir); });
+
+  result.total = found.length;
+  result.items = found.slice(offset, offset + limit).map(function (i) {
+    delete i._norm;
+    delete i._phone;
+    delete i._group;
+    return i;
+  });
+
+  return result;
+
+}
+
+
+/**
+ * One participant's ledger, newest first:
+ * → { participant: Person, balance, totals, entries: [{ id, amount, kind, kindLabel, note, compId, compTitle,
+ *     refType, refId, redemption: { id, itemName, status } | null, actor, createdAt, balanceAfter }] }
+ */
+function apiWalletParticipant(id) {
+
+  assertAdmin_();
+
+  var person = regFind_(id);
+  var titles = walletCompTitles_();
+  var redemptions = Object.create(null);
+
+  if (typeof shopRedemptionRows_ === 'function') {
+    shopRedemptionRows_().forEach(function (r) { if (r.participantId === id) redemptions[r.id] = { id: r.id, itemName: r.itemName, status: r.status }; });
+  }
+
+  var rows = walletLedger_().filter(function (l) { return l.participantId === id; });
+  var running = 0;
+  var entries = rows.map(function (l) {
+    running += Number(l.amount) || 0;
+    return {
+      id: l.id,
+      amount: Number(l.amount) || 0,
+      kind: l.kind,
+      kindLabel: WALLET_KIND_LABELS[l.kind] || l.kind,
+      note: l.note,
+      compId: l.compId,
+      compTitle: l.compId ? titles[l.compId] || '' : '',
+      refType: l.refType,
+      refId: l.refId,
+      redemption: l.refType === 'redemption' ? redemptions[l.refId] || null : null,
+      actor: l.actor,
+      createdAt: l.createdAt,
+      balanceAfter: running
+    };
+  }).reverse();
+
+  var totals = walletTotals_(rows);
+
+  return { participant: regPerson_(person), balance: totals.balance, totals: totals, entries: entries };
+
+}
+
+
+/**
+ * A manual row: amount (a non-zero integer, |amount| ≤ 1,000,000), note (required, ≤ 200),
+ * adjustKey (the request's idempotency key, 8..64 of [A-Za-z0-9_-]; the same key again = the same
+ * row back). A deduction that would leave the balance below zero is refused.
+ * → { entry: { id, amount, kind, note, createdAt }, balance, replay }
+ */
+function apiWalletAdjust(id, amount, note, adjustKey) {
+
+  assertAdmin_();
+  walletRequireOn_();
+  compValidId_(id, REG_ID, 'معرّف المشترك');
+
+  if (typeof amount !== 'number' || !isFinite(amount) || Math.round(amount) !== amount || amount === 0 || Math.abs(amount) > WALLET_MAX_ADJUST) {
+    throw appError_('عدد النقاط لازم يكون رقم صحيح مش صفر (لحد مليون).', '', '', 'amount');
+  }
+
+  var text = contentLine_(note);
+
+  if (!text) throw appError_('اكتب سبب التعديل.', 'السبب بيظهر للمشترك في «نقاطي».', '', 'note');
+  if (text.length > WALLET_NOTE_MAX) throw appError_('السبب أطول من ٢٠٠ حرف.', '', '', 'note');
+  if (typeof adjustKey !== 'string' || !WALLET_ADJUST_KEY.test(adjustKey)) throw new Error('الطلب مش مفهوم (adjustKey)');
+
+  var person = regFind_(id);
+  var out = {};
+
+  compLiveWrite_('points.adjust', function (email) {
+
+    var key = 'adj:' + adjustKey;
+    var rows = walletLedger_();
+    var same = rows.filter(function (l) { return l.idemKey === key; })[0];
+
+    if (same) {
+      out.entry = { id: same.id, amount: Number(same.amount) || 0, kind: same.kind, note: same.note, createdAt: same.createdAt };
+      out.replay = true;
+      return 'replay';
+    }
+
+    var balance = rows.reduce(function (sum, l) { return l.participantId === id ? sum + (Number(l.amount) || 0) : sum; }, 0);
+
+    if (balance + amount < 0) {
+      throw appError_('مينفعش الرصيد يبقى بالسالب: رصيده دلوقتي ' + regAr_(balance) + ' نقطة.', 'اخصم ' + regAr_(balance) + ' أو أقل.', '', 'amount');
+    }
+
+    var record = walletAppend_([{ participantId: id, amount: amount, kind: 'manual', note: text, idemKey: key, actor: email }])[0];
+
+    out.entry = { id: record.id, amount: amount, kind: 'manual', note: text, createdAt: record.createdAt };
+    out.replay = false;
+
+    activityNote_({ action: 'points.adjust', type: 'points', id: id, title: person.name, changes: { amount: amount } });
+
+    return 'ok';
+
+  });
+
+  out.balance = walletBalance_(id, true);
+
+  return { entry: out.entry, balance: out.balance, replay: out.replay };
+
+}
+
+
+/* =========================================================
+   PORTAL PARTS (portalMe)
+========================================================= */
+
+/* { balance, ledger: [{ amount, kind, note, compTitle, createdAt }] (newest first, ≤ 200) } */
+function walletPortal_(pid) {
+
+  var rows = walletLedger_().filter(function (l) { return l.participantId === pid; });
+  var titles = rows.some(function (l) { return l.compId; }) ? walletCompTitles_() : {};
+  var balance = rows.reduce(function (sum, l) { return sum + (Number(l.amount) || 0); }, 0);
+
+  return {
+    balance: balance,
+    ledger: rows.slice(-WALLET_PORTAL_LEDGER).reverse().map(function (l) {
+      return {
+        amount: Number(l.amount) || 0,
+        kind: WALLET_KINDS.indexOf(l.kind) !== -1 ? l.kind : 'manual',
+        note: l.note || '',
+        compTitle: l.compId ? titles[l.compId] || '' : '',
+        createdAt: l.createdAt
+      };
+    })
+  };
+
+}

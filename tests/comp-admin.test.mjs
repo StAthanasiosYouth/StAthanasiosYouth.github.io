@@ -480,7 +480,11 @@ test('media: banner and question pictures are «used» in the library, go out wi
 test('module switches: refused until the module is installed; each needs the one before; logged', () => {
   const world = compWorld();
   const call = adminApi(world);
+  // as if the registry's code were not installed (CompRegistry.gs defines compRegistryReady_)
+  const installed = world.gs.compRegistryReady_;
+  world.gs.compRegistryReady_ = undefined;
   assert.throws(() => call('apiCompSettings', { registry: true }), /لسه مش متركب/);
+  world.gs.compRegistryReady_ = installed;
   world.gs.compRegistryReady_ = () => true;
   assert.deepEqual(plain(call('apiCompSettings', { registry: true }).modules), { registry: true, wallet: false, shop: false });
   assert.equal(world.properties.get('COMP_REGISTRY'), '1');
