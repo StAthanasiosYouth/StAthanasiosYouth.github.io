@@ -698,7 +698,10 @@ function regWrite_(label, change) {
   var lock = LockService.getScriptLock();
   var result;
 
+  // the code secrets are made before the lock (never inside it)
+  compEnsureSecrets_();
   lock.waitLock(30000);
+  COMP_SCRIPT_LOCK_HELD_ = true;
 
   try {
     takeActivityNotes_();
@@ -715,6 +718,7 @@ function regWrite_(label, change) {
   }
   finally {
     takeActivityNotes_();
+    COMP_SCRIPT_LOCK_HELD_ = false;
     lock.releaseLock();
   }
 

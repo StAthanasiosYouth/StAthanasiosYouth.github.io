@@ -983,6 +983,24 @@ picture is not in content.json), `Activity.gs` (summaries, push decisions),
   `code.reset`, `points.adjust`, `redemption.status` with the cooldown; `code.view`
   never; participant / store item create / update / delete never.
 - Caches added: `wal:bal:<pid>` (6 h), `wal:retry`, `shop:img` (5 min).
+- Wallet drift safety (a lost `wal:retry`, a reconcile that failed): `apiWallet`
+  takes the queue along and reconciles the latest 200 registered submissions of
+  wallet competitions (one batch); `apiWalletParticipant(id)` reconciles that
+  participant's graded wallet submissions and every one the ledger has rows for
+  (≤ 100, newest first); `apiWalletSync()` («راجع النقاط») reconciles EVERY
+  registered submission of every wallet competition plus every submission with
+  ledger rows (so a competition whose wallet went off is reversed), in batches of
+  200, one compLock_ each. All idempotent; failures on the views are swallowed.
+- Secrets: `compEnsureSecrets_()` makes the missing ones (COMP_SECRET, CODE_PEPPER,
+  CODE_KEY) at the start of `compWrite_` / `regWrite_` (before the lock) and when
+  the spreadsheet is created; `compSecret_` never blocks: a missing secret is
+  made with `tryLock(0)` (public paths), or without touching the lock while this
+  execution holds it (`COMP_SCRIPT_LOCK_HELD_`; reentrancy is undocumented), then
+  re-read. An existing secret is never replaced.
+- Property writes on public paths: only `COMP_FAIL_DAY` (one per counted wrong
+  code, never past the 1,000/day cap: the budget refuses first and
+  `compCodeFailed_` skips the write at the cap) and a secret's one-time creation.
+  Everything else per request is CacheService.
 
 ### 17.2 Registry replies
 
@@ -1045,6 +1063,8 @@ apiWalletParticipant(id) → { participant: Person, balance, totals, entries:[{ 
 apiWalletAdjust(id, amount, note, adjustKey) → { entry:{ id, amount, kind:'manual', note, createdAt }, balance, replay }
   amount: non-zero integer, |amount| ≤ 1,000,000; note required ≤ 200; adjustKey /^[A-Za-z0-9_-]{8,64}$/
   (a new key per confirmed form; the same key again → replay:true, no new row). Official admin only.
+apiWalletSync() → { checked, fixed, entries }   (official admin only; logged points.adjust with changes.sync
+  «راجع النقاط مع النتايج (n مشاركة اتصلحت)» only when fixed > 0)
 ```
 
 ### 17.4 Store replies

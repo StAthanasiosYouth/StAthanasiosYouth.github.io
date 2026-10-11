@@ -522,7 +522,8 @@ function activitySummary_(entry) {
     case 'code.reset': return 'عمل كود جديد لـ ' + quoted(title);
     case 'code.export': return 'صدّر أكواد (' + activityDigits_(changes.count || 0) + ')';
     case 'participant.phone': return 'غيّر رقم ' + quoted(title);
-    case 'points.adjust': return 'عدّل نقاط ' + quoted(title) + (typeof changes.amount === 'number' ? ' (' + (changes.amount > 0 ? '+' : '−') + activityDigits_(Math.abs(changes.amount)) + ')' : '');
+    case 'points.adjust': if (changes.sync) return 'راجع النقاط مع النتايج (' + activityDigits_(changes.sync) + ' مشاركة اتصلحت)';
+      return 'عدّل نقاط ' + quoted(title) + (typeof changes.amount === 'number' ? ' (' + (changes.amount > 0 ? '+' : '−') + activityDigits_(Math.abs(changes.amount)) + ')' : '');
     case 'redemption.status': return 'غيّر حالة ' + thing + ({ approved: ' لـ «جاهزة للاستلام»', fulfilled: ' لـ «اتسلمت»', cancelled: ' لـ «اتلغت»' }[changes.status] || '');
     case 'live.stage': return 'غيّر الفقرة الحالية في ' + thing;
     case 'admin.add': return 'ضاف ' + quoted(title) + ' للوحة التحكم';

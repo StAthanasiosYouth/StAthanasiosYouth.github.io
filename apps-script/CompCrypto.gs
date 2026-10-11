@@ -131,41 +131,71 @@ function compSafeEqualBytes_(a, b) {
    SECRETS
 ========================================================= */
 
-/* the secret's base64 text (created once; a concurrent first use re-reads under the lock) */
-function compSecret_(name) {
+/* set while this execution holds the script lock through compWrite_ / regWrite_ / compSpreadsheet_ creation */
+var COMP_SCRIPT_LOCK_HELD_ = false;
 
-  if (COMP_SECRET_NAMES.indexOf(name) === -1) {
-    throw new Error('secret');
-  }
+/*
+ * Makes a missing secret: 32 random bytes, base64. Never replaces one that
+ * exists. waitMs: how long the script lock may be waited for (0 = never
+ * blocks). Inside an outer script lock of this execution the lock is not
+ * touched at all (Apps Script's lock reentrancy is undocumented; the outer
+ * lock already serializes the writers). Returns the stored value (re-read).
+ */
+function compCreateSecret_(name, waitMs) {
 
   var props = PropertiesService.getScriptProperties();
-  var value = props.getProperty(name);
-
-  if (value && value.length >= 40) {
-    return value;
-  }
-
-  var lock = LockService.getScriptLock();
+  var lock = null;
   var locked = false;
 
-  try {
-    locked = lock.tryLock(10000);
-  }
-  catch (ignored) {
-    locked = false;
+  if (!COMP_SCRIPT_LOCK_HELD_) {
+    try {
+      lock = LockService.getScriptLock();
+      locked = lock.tryLock(waitMs || 0);
+    }
+    catch (ignored) {
+      locked = false;
+    }
   }
 
   try {
-    value = props.getProperty(name);
-    if (!value || value.length < 40) {
-      value = Utilities.base64Encode(compRandomBytes_(32));
-      props.setProperty(name, value);
+    var value = props.getProperty(name);
+    if (!value) {
+      props.setProperty(name, Utilities.base64Encode(compRandomBytes_(32)));
+      // a racing creation without the lock: whichever value was stored last is the one everybody reads
+      value = props.getProperty(name);
     }
     return value;
   }
   finally {
     if (locked) lock.releaseLock();
   }
+
+}
+
+/* the secret's base64 text (created on first use, without ever blocking on the script lock) */
+function compSecret_(name) {
+
+  if (COMP_SECRET_NAMES.indexOf(name) === -1) {
+    throw new Error('secret');
+  }
+
+  var value = PropertiesService.getScriptProperties().getProperty(name);
+
+  return value ? value : compCreateSecret_(name, 0);
+
+}
+
+/*
+ * Every secret exists afterwards. Admin functions call this FIRST, before
+ * they take any lock, so nothing has to be created while a lock is held.
+ */
+function compEnsureSecrets_() {
+
+  var props = PropertiesService.getScriptProperties();
+
+  COMP_SECRET_NAMES.forEach(function (name) {
+    if (!props.getProperty(name)) compCreateSecret_(name, COMP_SCRIPT_LOCK_HELD_ ? 0 : 10000);
+  });
 
 }
 

@@ -203,3 +203,55 @@ test('live wallet writes run only from the official admin (API mode)', () => {
   world.properties.set('ADMIN_EMAILS', 'menazakmena@gmail.com');
   assert.throws(() => world.as('menazakmena@gmail.com').gs.apiWalletAdjust(mina.id, 5, 'x', 'adjust-key-0009'), /لوحة التحكم الرسمية/);
 });
+
+
+/* ---------------- drift safety ---------------- */
+
+/* plays while every reconcile fails and nothing is queued (as if wal:retry were lost) */
+function playLost(world, ptoken) {
+  const real = world.gs.walletReconcileMany_;
+  world.gs.walletReconcileMany_ = () => { throw new Error('lost'); };
+  try {
+    return play(world, ptoken);
+  }
+  finally {
+    world.gs.walletReconcileMany_ = real;
+    world.cache.delete('wal:retry');
+  }
+}
+
+test('drift: a lost reconcile is healed by the participant\'s wallet page (theirs only) and by apiWalletSync (everyone, idempotent, logged only when it fixed something)', () => {
+  const { world, call, mina, mariam, tokens } = walletWorld();
+  playLost(world, tokens.mina);
+  playLost(world, tokens.mariam);
+  assert.equal(ledger(world).length, 0, 'drifted');
+
+  const detail = call('apiWalletParticipant', mina.id);
+  assert.equal(detail.balance, 15, 'healed on view');
+  assert.deepEqual(ledger(world).map(r => r.participantId), [mina.id], 'only theirs');
+
+  const sync = call('apiWalletSync');
+  assert.deepEqual(plain(sync), { checked: 2, fixed: 1, entries: 1 });
+  assert.equal(world.gs.walletBalance_(mariam.id, true), 15);
+  const logged = activityRows(world).filter(r => r[5] === 'points.adjust' && r[7] === 'sync');
+  assert.equal(logged.length, 1);
+  assert.equal(logged[0][9], 'راجع النقاط مع النتايج (١ مشاركة اتصلحت)');
+
+  assert.deepEqual(plain(call('apiWalletSync')), { checked: 2, fixed: 0, entries: 0 }, 'a second run fixes nothing');
+  assert.equal(activityRows(world).filter(r => r[7] === 'sync').length, 1, 'not logged when nothing was fixed');
+  assert.equal(ledger(world).length, 2);
+});
+
+test('drift: the wallet list heals the latest graded submissions; apiWalletSync also reverses points of a competition whose wallet went off', () => {
+  const { world, call, mina, comp, tokens } = walletWorld();
+  playLost(world, tokens.mina);
+  assert.equal(call('apiWallet', {}).items.find(i => i.id === mina.id).balance, 15);
+
+  // the competition stops giving points (republished without the wallet): the sync takes them back
+  call('apiCompSave', comp.id, { wallet: false, resultShow: 'score' });
+  publish(world, call);
+  const sync = call('apiWalletSync');
+  assert.equal(sync.fixed, 1);
+  assert.equal(world.gs.walletBalance_(mina.id, true), 0);
+  assert.equal(ledger(world).at(-1).kind, 'correction');
+});

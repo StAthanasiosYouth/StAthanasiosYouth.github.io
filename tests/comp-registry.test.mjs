@@ -579,3 +579,78 @@ test('codeEnc: decrypts to the code with CODE_KEY only; a tampered copy is refus
   world.gs.COMP_TABS_ = {};
   assert.throws(() => call('apiParticipantCode', p.id), /مش متاح للعرض/);
 });
+
+
+/* ---------------- secrets never wait on a lock this execution holds ---------------- */
+
+function recordLocks(world) {
+  const calls = [];
+  let held = false;
+  const real = world.gs.LockService.getScriptLock;
+  world.gs.LockService.getScriptLock = () => {
+    const lock = real();
+    return {
+      waitLock(ms) { calls.push({ op: 'wait', ms, held }); lock.waitLock(ms); held = true; },
+      tryLock(ms) { calls.push({ op: 'try', ms, held }); const ok = lock.tryLock(ms); if (ok) held = true; return ok; },
+      releaseLock() { held = false; lock.releaseLock(); }
+    };
+  };
+  return calls;
+}
+
+test('secrets: made eagerly before admin locks; never a blocking tryLock while the script lock is held; public creation never blocks', () => {
+  const world = compWorld();
+  const call = adminApi(world);
+  const calls = recordLocks(world);
+  call('apiCompSettings', { registry: true });
+  for (const name of ['COMP_SECRET', 'CODE_PEPPER', 'CODE_KEY']) assert.equal(world.properties.get(name).length, 44, name);
+  addPerson(call, 'مينا عادل', phone(81));
+  assert.ok(!calls.some(c => c.op === 'try' && c.held), 'no tryLock while holding the script lock: ' + JSON.stringify(calls));
+
+  // inside an outer script lock of this execution: created without touching the lock at all
+  const before = calls.length;
+  world.gs.COMP_SCRIPT_LOCK_HELD_ = true;
+  world.properties.delete('CODE_KEY');
+  world.scriptLock.busy = true;
+  const value = world.gs.compSecret_('CODE_KEY');
+  world.gs.COMP_SCRIPT_LOCK_HELD_ = false;
+  assert.equal(value.length, 44);
+  assert.equal(world.properties.get('CODE_KEY'), value);
+  assert.equal(calls.length, before, 'the lock was not touched');
+
+  // an existing secret is never replaced
+  world.scriptLock.busy = false;
+  world.gs.compEnsureSecrets_();
+  assert.equal(world.properties.get('CODE_KEY'), value);
+  world.properties.set('CODE_PEPPER', 'short');
+  assert.equal(world.gs.compSecret_('CODE_PEPPER'), 'short', 'present = kept');
+
+  // a public call that finds COMP_SECRET missing while someone holds the script lock: tryLock(0), created, no wait
+  codedComp(world, call);
+  world.properties.delete('COMP_SECRET');
+  world.scriptLock.busy = true;
+  const mark = calls.length;
+  const reply = pub(world, 'compStart', { slug: 'coded-quiz', clientKey: clientKey(), ptoken: 'pt1.abababab.' + 'A'.repeat(43) });
+  world.scriptLock.busy = false;
+  assert.equal(reply.code, 'session', 'answered (token checked with the new secret)');
+  assert.equal(world.properties.get('COMP_SECRET').length, 44);
+  assert.ok(calls.slice(mark).every(c => c.op === 'try' && c.ms === 0), JSON.stringify(calls.slice(mark)));
+});
+
+test('failed-code day counter: one property write per counted failure, none once the day cap is reached', () => {
+  const { world, call } = regWorld();
+  const p = addPerson(call, 'مينا عادل', phone(82));
+  const today = new Date(world.now()).toISOString().slice(0, 10);
+  pub(world, 'compCode', { code: 'ATH-2345-6789' });
+  assert.equal(world.properties.get('COMP_FAIL_DAY'), today + ':1');
+  world.properties.set('COMP_FAIL_DAY', today + ':1000');
+  let writes = 0;
+  const props = world.gs.PropertiesService.getScriptProperties;
+  world.gs.PropertiesService.getScriptProperties = () => { const p2 = props(); return { ...p2, setProperty: (k, v) => { writes++; p2.setProperty(k, v); } }; };
+  assert.equal(pub(world, 'compCode', { code: 'ATH-2345-6789' }).code, 'busy');
+  assert.equal(pub(world, 'compCode', { code: codeOf(call, p.id) }).code, 'busy');
+  world.gs.compCodeFailed_();
+  world.gs.PropertiesService.getScriptProperties = props;
+  assert.equal(writes, 0, 'no write past the cap');
+  assert.equal(world.properties.get('COMP_FAIL_DAY'), today + ':1000');
+});

@@ -172,7 +172,8 @@ function compCodeFailed_() {
   var day = stored[0] === today ? Number(stored[1]) || 0 : 0;
 
   cache.put(key, String((Number(cache.get(key)) || 0) + 1), 120);
-  props.setProperty('COMP_FAIL_DAY', today + ':' + (day + 1));
+  // one property write per counted failure, never past the day's cap (the budget check refuses before that)
+  if (day < COMP_FAIL_PER_DAY) props.setProperty('COMP_FAIL_DAY', today + ':' + (day + 1));
   Utilities.sleep(COMP_FAIL_PAUSE_MS);
 
 }

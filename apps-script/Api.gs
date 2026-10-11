@@ -153,6 +153,7 @@ function apiFunctions_() {
     apiWallet: apiWallet,
     apiWalletParticipant: apiWalletParticipant,
     apiWalletAdjust: apiWalletAdjust,
+    apiWalletSync: apiWalletSync,
     // store (CompStoreItems.gs, §9)
     apiShopItems: apiShopItems,
     apiShopItemSave: apiShopItemSave,

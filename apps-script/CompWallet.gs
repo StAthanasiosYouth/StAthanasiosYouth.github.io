@@ -404,7 +404,7 @@ function apiWallet(query) {
 
   if (!compSpreadsheet_(false)) return result;
 
-  // waiting reconciles first (a busy moment earlier)
+  // waiting reconciles first (a busy moment earlier), then the latest graded ones (a lost queue)
   if (modules.wallet) {
     try {
       walletReconcileMany_([]);
@@ -412,6 +412,7 @@ function apiWallet(query) {
     catch (ignored) {
       // still busy: they stay queued
     }
+    walletSyncRecent_();
   }
 
   var byPerson = Object.create(null);
@@ -486,6 +487,10 @@ function apiWalletParticipant(id) {
   assertAdmin_();
 
   var person = regFind_(id);
+
+  // their rows follow their grades even if a queued reconcile was lost (bounded, never fails the view)
+  walletSyncParticipant_(id);
+
   var titles = walletCompTitles_();
   var redemptions = Object.create(null);
 
@@ -578,6 +583,158 @@ function apiWalletAdjust(id, amount, note, adjustKey) {
   out.balance = walletBalance_(id, true);
 
   return { entry: out.entry, balance: out.balance, replay: out.replay };
+
+}
+
+
+/* =========================================================
+   DRIFT SAFETY (a lost wal:retry queue, a reconcile that failed)
+========================================================= */
+
+var WALLET_SYNC_BATCH = 200;
+var WALLET_PERSON_SYNC_MAX = 100;
+
+/* submission ids that have competition / correction rows in the ledger: { id: true } */
+function walletSubmissionRefs_(pid) {
+
+  var refs = Object.create(null);
+
+  if (!walletHasTab_()) return refs;
+
+  compColumns_(walletSheet_(), ['participantId', 'refType', 'refId']).forEach(function (l) {
+    if (l.refType === 'submission' && (!pid || l.participantId === pid)) refs[l.refId] = true;
+  });
+
+  return refs;
+
+}
+
+/*
+ * The latest WALLET_SYNC_BATCH registered submissions of wallet competitions (by their last
+ * change): one batch, one lock — what a lost wal:retry queue would most likely have missed.
+ * Never throws.
+ */
+function walletSyncRecent_() {
+
+  try {
+    WALLET_COMP_FLAGS_ = null;
+    var ids = compColumns_(compSheet_('Submissions'), ['id', 'compId', 'version', 'participantId', 'updatedAt'])
+      .filter(function (r) { return r.participantId && walletCompOn_(r.compId, r.version); })
+      .sort(function (a, b) { return a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : b.__row - a.__row; })
+      .slice(0, WALLET_SYNC_BATCH)
+      .map(function (r) { return r.id; });
+    return ids.length ? walletReconcileMany_(ids) : null;
+  }
+  catch (error) {
+    return null;
+  }
+
+}
+
+/* reconciles ids in batches (each batch: one compLock_) → { checked, fixed, entries } */
+function walletReconcileBatches_(ids) {
+
+  var out = { checked: 0, fixed: 0, entries: 0 };
+
+  for (var i = 0; i < ids.length; i += WALLET_SYNC_BATCH) {
+    var r = walletReconcileMany_(ids.slice(i, i + WALLET_SYNC_BATCH));
+    out.checked += r.checked;
+    out.entries += r.appended;
+    // one row per submission per run: rows appended = submissions fixed
+    out.fixed += r.appended;
+  }
+
+  return out;
+
+}
+
+/*
+ * One participant's submissions that can hold points (graded ones of wallet
+ * competitions, and every one the ledger already has rows for), newest
+ * first, at most WALLET_PERSON_SYNC_MAX: cheap enough for an admin screen.
+ * Never throws (a busy lock: the next look fixes it).
+ */
+function walletSyncParticipant_(pid) {
+
+  try {
+    if (!compModules_().wallet || !compSpreadsheet_(false)) return null;
+    var refs = walletSubmissionRefs_(pid);
+    WALLET_COMP_FLAGS_ = null;
+    var ids = compColumns_(compSheet_('Submissions'), ['id', 'compId', 'version', 'participantId', 'status', 'startedMs'])
+      .filter(function (r) { return r.participantId === pid && (refs[r.id] || (r.status === 'graded' && walletCompOn_(r.compId, r.version))); })
+      .sort(function (a, b) { return (Number(b.startedMs) || 0) - (Number(a.startedMs) || 0); })
+      .slice(0, WALLET_PERSON_SYNC_MAX)
+      .map(function (r) { return r.id; });
+    return walletReconcileBatches_(ids);
+  }
+  catch (error) {
+    return null;
+  }
+
+}
+
+/**
+ * «راجع النقاط»: reconciles EVERY registered submission of every wallet competition (and every
+ * submission the ledger has rows for, so a wallet switched off on a competition is reversed),
+ * in batches of 200 under compLock_, after the queued catch-up (wal:retry). Idempotent: a second
+ * run fixes nothing. Logged (points.adjust, changes.sync) only when it fixed something.
+ * → { checked, fixed, entries }
+ */
+function apiWalletSync() {
+
+  assertAdmin_();
+  walletRequireOn_();
+
+  if (!API_REQUEST_ || !API_REQUEST_.email) {
+    throw appError_('تصحيح المسابقات من لوحة التحكم الرسمية بس.', 'افتح لوحة التحكم (/admin/) وكمّل من هناك.');
+  }
+
+  var result = { checked: 0, fixed: 0, entries: 0 };
+
+  if (!compSpreadsheet_(false)) return result;
+
+  try {
+    var queued = walletReconcileMany_([]);
+    result.entries += queued.appended;
+    result.fixed += queued.appended;
+  }
+  catch (error) {
+    throw appError_('فيه ضغط على المسابقات دلوقتي.', 'استنى ثواني وجرّب تاني.');
+  }
+
+  var refs = walletSubmissionRefs_('');
+
+  WALLET_COMP_FLAGS_ = null;
+
+  var ids = compColumns_(compSheet_('Submissions'), ['id', 'compId', 'version', 'participantId', 'status'])
+    .filter(function (r) { return r.participantId && (refs[r.id] || walletCompOn_(r.compId, r.version)); })
+    .map(function (r) { return r.id; });
+
+  var done;
+
+  try {
+    done = walletReconcileBatches_(ids);
+  }
+  catch (error) {
+    throw appError_('فيه ضغط على المسابقات دلوقتي، والمراجعة وقفت في النص.', 'جرّب تاني بعد شوية: اللي اتصلح مش هيتكرر.');
+  }
+
+  result.checked = done.checked;
+  result.fixed += done.fixed;
+  result.entries += done.entries;
+
+  try {
+    log_(currentEmail_(), 'comp.wallet.sync', result.fixed + '/' + result.checked);
+  }
+  catch (ignored) {
+    // the sync stands
+  }
+
+  if (result.fixed) {
+    activity_({ action: 'points.adjust', type: 'points', id: 'sync', title: 'المحفظة', changes: { sync: result.fixed } });
+  }
+
+  return result;
 
 }
 

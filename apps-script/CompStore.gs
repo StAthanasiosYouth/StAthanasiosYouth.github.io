@@ -165,8 +165,8 @@ function compSpreadsheet_(create) {
 
   props.setProperties({ COMP_SHEET_ID: ss.getId(), COMP_SCHEMA: COMP_SCHEMA_VERSION });
 
-  // the token secret exists before any public call needs it
-  compSecret_('COMP_SECRET');
+  // the secrets exist before any public call needs them
+  compEnsureSecrets_();
 
   return ss;
 
