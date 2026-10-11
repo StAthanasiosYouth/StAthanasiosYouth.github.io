@@ -388,6 +388,9 @@ async function start() {
     return;
   }
 
+  // another device started this attempt (same participant): continue it with its key
+  if (typeof reply.attempt.clientKey === 'string' && /^[\w-]{8,64}$/.test(reply.attempt.clientKey)) S.clientKey = reply.attempt.clientKey;
+
   S.attempt = attempt;
   S.token = attempt.token;
   S.questions = questions;

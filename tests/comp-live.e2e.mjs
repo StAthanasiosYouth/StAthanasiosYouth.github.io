@@ -6,8 +6,7 @@
 // actions in a real browser. The site's Date header and the server's
 // clock are the world's clock (world.advance moves both).
 //
-// Registered mode / «نقاطي» need the Phase 2/3 server: see the skipped
-// tests at the end (same harness; fill them in after that merge).
+// Phase 2/3 (registered mode, the wallet, «نقاطي» and the store) at the end.
 //
 // Run: cd tools && node --test ../tests/comp-live.e2e.mjs
 
@@ -578,9 +577,317 @@ test('(j) a long answer waits for review: the participant sees it pending; after
 
 
 /* =========================================================
-   Phase 2 / 3 (registered mode, «نقاطي»): same harness, after that merge
+   PHASE 2 / 3: registered mode, wallet, «نقاطي» and the store
 ========================================================= */
 
-test('registered competition: code → «الكود مسجل باسم …» → start with ptoken → result (Phase 2 server)', { skip: 'needs the Phase 2 server (CompRegistry.gs) on this branch' }, async () => {});
+/** a registered competition: single (10) + truefalse (5) + number (20); long (manual, 20) optional */
+function codedLive(call, { slug, preset = 'points', long = false, overrides = {} }) {
+  const id = call('apiCompCreate', { preset, title: `مسابقة بالكود ${slug}`, slug, enabled: true, ...overrides }).comp.id;
+  const q = input => call('apiCompQuestionSave', id, input).question;
+  const questions = {
+    single: q({ type: 'single', text: 'مين بنى الفلك؟', choices: [{ text: 'نوح', correct: true }, { text: 'موسى' }], points: 10 }),
+    tf: q({ type: 'truefalse', text: 'داود قتل جليات', correct: 'صح', points: 5 }),
+    number: q({ type: 'number', text: 'كام سفر في العهد الجديد؟', correct: '27', points: 20 })
+  };
+  if (long) questions.long = q({ type: 'long', text: 'اكتب تأمل قصير', points: 20 });
+  return { id, questions };
+}
 
-test('«نقاطي»: login, history, review, wallet and store against the real server (Phase 3 server)', { skip: 'needs the Phase 2/3 server (CompRegistry.gs, CompWallet.gs, CompStoreItems.gs) on this branch' }, async () => {});
+/** the code screen (engine or portal) → the confirm screen; returns the name shown */
+async function enterCode(page, code) {
+  await waitState(page, 'code');
+  await page.$eval('#f-code', el => { el.value = ''; });
+  await page.type('#f-code', code);
+  await page.click('button[type="submit"]');
+  await waitState(page, 'confirm');
+  return textOf(page, '.who__name');
+}
+
+async function wrongCode(page, code) {
+  await waitState(page, 'code');
+  await page.$eval('#f-code', el => { el.value = ''; });
+  await page.type('#f-code', code);
+  await page.click('button[type="submit"]');
+  await page.waitForSelector('#f-code-err');
+  assert.equal(await page.$('.who__name'), null, 'no name for a wrong code');
+  return textOf(page, '#f-code-err');
+}
+
+/** a participant code that is NOT any real one (same alphabet) */
+function fakeCode(real) {
+  const alphabet = '23456789ABCDEFGHJKMNPQRSTVWXYZ';
+  for (const c of alphabet) {
+    const candidate = `ATH-${c}${c}${c}${c}-${c}${c}${c}${c}`;
+    if (!real.includes(candidate)) return candidate;
+  }
+  throw new Error('no fake code');
+}
+
+
+
+test('registered: wrong code, then «الكود مسجل باسم …», points result without answers, one attempt, another device resumes, a reset code', async () => {
+
+  const { call } = newWorld();
+  call('apiCompSettings', { registry: true, wallet: true });
+  const mina = call('apiParticipantSave', { name: 'مينا عادل جرجس', phone: '01012340001', group: 'ثانوي' }).participant;
+
+  // an import with a family sharing that phone
+  const tsv = ['الاسم بالكامل\tرقم الموبايل\tالمجموعة / الفصل', 'مريم عادل جرجس\t01012340001\tإعدادي', 'بيشوي سمير حنا\t01112345678\tثانوي'].join('\n');
+  const preview = call('apiParticipantsImportPreview', tsv);
+  assert.equal(preview.summary.new, 2);
+  assert.ok(preview.rows[0].warnings.some(w => w.kind === 'sharedPhone'), 'the shared family phone is flagged');
+  const decisions = Object.fromEntries(preview.rows.filter(r => r.tickable).map(r => [`r${r.line}`, r.choices[0].value]));
+  assert.equal(call('apiParticipantsImportApply', tsv, decisions).added, 2);
+
+  const code = call('apiParticipantCode', mina.id).code;
+  const { questions } = codedLive(call, { slug: 'coded-live', overrides: { answersShow: 'never', attempts: 1 } });
+  publish(world, call);
+  const allCodes = call('apiParticipantCodes', { all: true }).rows.map(r => r.code);
+  assert.equal(allCodes.length, 3);
+
+  // device 1: a wrong code says so (no name); the right one names the person; starts, then leaves
+  let { context, page, problems, fns } = await open('/competition/coded-live/');
+  await waitState(page, 'intro');
+  assert.match(await textOf(page, '.intro__body'), /بالكود/);
+  await page.click('[data-cta]');
+  assert.match(await wrongCode(page, fakeCode(allCodes)), /مش صحيح|مش صح/);
+  assert.equal(fns('compCode')[0].reply.code, 'code');
+  assert.equal(await enterCode(page, code.toLowerCase().replace(/-/g, ' ')), 'مينا عادل جرجس');
+  assert.equal(await textOf(page, '#comp-main h1'), 'الكود مسجل باسم');
+  await clickText(page, 'button', 'أيوه، ده أنا');
+  await waitState(page, 'question');
+  const first = fns('compStart')[0];
+  assert.equal(first.reply.ok, true);
+  assert.ok(first.arg.ptoken && !first.arg.fields, 'identity from the code only');
+  const attemptId = first.reply.attempt.id;
+  assert.deepEqual(problems, []);
+  await context.close();
+
+  // device 2: the same person gets that attempt back, answers, sends
+  ({ context, page, problems, fns } = await open('/competition/coded-live/'));
+  await page.click('[data-cta]');
+  await enterCode(page, code);
+  await clickText(page, 'button', 'أيوه، ده أنا');
+  await waitState(page, 'question');
+  assert.equal(fns('compStart')[0].reply.attempt.id, attemptId, 'the in_progress attempt, resumed on another device');
+  assert.equal(fns('compStart')[0].reply.attempt.resumed, true);
+  await answerAll(page, { extra: { 'كام سفر في العهد الجديد؟': { type: '27' }, 'مين بنى الفلك؟': { pick: ['نوح'] }, 'داود قتل جليات': { pick: ['صح'] } } });
+  await sendFromReview(page);
+  await page.waitForSelector('.result__line--points');
+  assert.equal(await textOf(page, '.result__line--points'), 'حصلت على ٣٥ نقطة');
+  assert.equal(await page.$('.result__line--score'), null, 'points only');
+  assert.equal(await page.$('.answers'), null, 'no review list (answersShow never)');
+  const sub = submissions(call, call('apiComps').comps.find(c => c.slug === 'coded-live').id).items[0];
+  assert.equal(sub.name, 'مينا عادل جرجس');
+  assert.equal(sub.score, 35);
+  assert.ok(questions.number.id);
+  assert.deepEqual(problems, []);
+  await context.close();
+
+  // device 3: one attempt only
+  ({ context, page, problems, fns } = await open('/competition/coded-live/'));
+  await page.click('[data-cta]');
+  await enterCode(page, code);
+  await clickText(page, 'button', 'أيوه، ده أنا');
+  await waitState(page, 'code');
+  assert.equal(fns('compStart')[0].reply.code, 'limit');
+  assert.match(await page.evaluate(() => (document.querySelector('#f-code-err') || document.querySelector('.alert')).textContent), /شاركت|المحاولات|الحد/);
+  await context.close();
+
+  // a reset: the old code is refused in the browser, the new one works
+  const fresh = call('apiParticipantResetCode', mina.id).code;
+  assert.notEqual(fresh, code);
+  ({ context, page, problems, fns } = await open('/competition/coded-live/'));
+  await page.click('[data-cta]');
+  assert.match(await wrongCode(page, code), /مش صحيح|مش صح/);
+  assert.equal(await enterCode(page, fresh), 'مينا عادل جرجس');
+  assert.deepEqual(problems, []);
+  await context.close();
+
+});
+
+
+test('wallet + «نقاطي»: points land in the ledger, the portal shows them, a prize is redeemed, stale requests are refused, a cancel refunds, a manual review corrects', async () => {
+
+  const { call } = newWorld();
+  call('apiCompSettings', { registry: true, wallet: true, shop: true });
+  const person = call('apiParticipantSave', { name: 'كيرلس ماجد فهمي', phone: '01212340002', group: 'جامعة' }).participant;
+  const code = call('apiParticipantCode', person.id).code;
+  codedLive(call, { slug: 'wallet-live', overrides: { answersShow: 'never' } });
+  const review = codedLive(call, { slug: 'wallet-review', long: true, overrides: { answersShow: 'never' } });
+  publish(world, call);
+
+  // play the wallet competition in the engine
+  let { context, page, problems } = await open('/competition/wallet-live/');
+  await page.click('[data-cta]');
+  await enterCode(page, code);
+  await clickText(page, 'button', 'أيوه، ده أنا');
+  await answerAll(page, { extra: { 'كام سفر في العهد الجديد؟': { type: '27' } } });
+  await sendFromReview(page);
+  await page.waitForSelector('.result__line--points');
+  assert.equal(await textOf(page, '.result__line--points'), 'حصلت على ٣٥ نقطة');
+  await context.close();
+  let wallet = call('apiWalletParticipant', person.id);
+  assert.equal(wallet.balance, 35);
+  assert.equal(wallet.entries[0].kind, 'competition');
+
+  // the store: a mug (stock 1) and a book
+  const mug = call('apiShopItemSave', { name: 'كوباية الأسرة', description: 'كوباية سيراميك', cost: 30, stock: 1, category: 'هدايا', active: true }).item;
+  const book = call('apiShopItemSave', { name: 'كتاب القديس أثناسيوس', cost: 20, stock: 5, category: 'كتب', active: true }).item;
+
+  // «نقاطي» on two devices (the second keeps a stale dashboard)
+  ({ context, page, problems } = await open('/points/'));
+  const second = await open('/points/');
+  for (const p of [page, second.page]) {
+    assert.equal(await enterCode(p, code), 'كيرلس ماجد فهمي');
+    await clickText(p, 'button', 'أيوه، ده أنا');
+    await waitState(p, 'dashboard');
+  }
+  assert.equal(await textOf(page, '.portal__name'), 'أهلًا يا كيرلس ماجد فهمي');
+  assert.equal(await page.$eval('[data-balance]', e => e.dataset.balance), '35');
+  assert.match(await textOf(page, '[data-history]'), /مسابقة بالكود wallet-live/);
+  assert.match(await page.$$eval('[data-history]', rows => rows.map(r => r.textContent).join(' | ')), /حصلت على ٣٥ نقطة/);
+  assert.deepEqual(await page.$$eval('.prow--ledger', rows => rows.map(r => [r.dataset.kind, r.querySelector('.prow__amount').textContent])), [['competition', '+٣٥']]);
+  assert.match(await textOf(page, '.prow--ledger'), /مسابقة — مسابقة بالكود wallet-live/);
+
+  // redeem the mug on device 1
+  await page.click(`[data-item="${mug.id}"] [data-order]`);
+  await page.waitForSelector('dialog.order[open]');
+  assert.equal(await textOf(page, '#order-d'), 'هيتخصم ٣٠ نقطة، رصيدك هيبقى ٥');
+  await page.click('[data-confirm-order]');
+  await page.waitForSelector('.portal__notice');
+  await page.waitForFunction(() => document.querySelector('[data-balance]')?.dataset.balance === '5');
+  await page.waitForFunction(id => document.querySelector(`[data-item="${id}"] [data-off]`)?.textContent === 'خلصت', {}, mug.id);
+  assert.equal(call('apiWalletParticipant', person.id).balance, 5);
+
+  // device 2 still thinks 35 points and a mug in stock: the server refuses both
+  const p2 = second.page;
+  await p2.click(`[data-item="${book.id}"] [data-order]`);
+  await p2.waitForSelector('dialog.order[open]');
+  await p2.click('[data-confirm-order]');
+  await p2.waitForSelector('dialog.order[open] .alert');
+  assert.equal(await textOf(p2, 'dialog.order .alert'), 'رصيدك مش كفاية');
+  await clickText(p2, 'dialog.order button', 'لا');
+  await p2.click(`[data-item="${mug.id}"] [data-order]`);
+  await p2.waitForSelector('dialog.order[open]');
+  await p2.click('[data-confirm-order]');
+  await p2.waitForSelector('dialog.order[open] .alert');
+  assert.equal(await textOf(p2, 'dialog.order .alert'), 'الجايزة دي خلصت');
+  assert.deepEqual(second.problems, []);
+  await second.context.close();
+
+  // the admin cancels the request: refund, balance back
+  const request = call('apiShopRedemptions', { status: 'all' }).items[0];
+  assert.equal(request.itemName, 'كوباية الأسرة');
+  call('apiShopRedemptionStatus', request.id, 'cancelled', 'مش متوفرة');
+  await reload(page);
+  await waitState(page, 'dashboard');
+  assert.equal(await page.$eval('[data-balance]', e => e.dataset.balance), '35');
+  assert.equal(await textOf(page, `[data-redemption="${request.id}"] .pstatus`), 'اتلغت (النقاط رجعت)');
+  const kinds = await page.$$eval('.prow--ledger', rows => rows.map(r => [r.dataset.kind, r.querySelector('.prow__amount').textContent]));
+  assert.deepEqual(kinds.slice(0, 2), [['refund', '+٣٠'], ['redeem', '−٣٠']]);
+
+  // a manual review: pending, then graded by the admin → the portal shows the new points
+  const engine = await open('/competition/wallet-review/');
+  await engine.page.click('[data-cta]');
+  await enterCode(engine.page, code);
+  await clickText(engine.page, 'button', 'أيوه، ده أنا');
+  await answerAll(engine.page, { long: 'تأملي في الفلك', extra: { 'كام سفر في العهد الجديد؟': { type: '27' } } });
+  await sendFromReview(engine.page);
+  await engine.page.waitForSelector('.result__line--pending');
+  assert.equal(await engine.page.$('.result__line--points'), null, 'no points while it waits');
+  await reload(page);
+  await waitState(page, 'dashboard');
+  assert.match(await page.$$eval('[data-history]', rows => rows[0].textContent), /مستني مراجعة/);
+  const sub = submissions(call, review.id).items[0];
+  call('apiCompGrade', sub.id, { [review.questions.long.id]: 15 });
+  wallet = call('apiWalletParticipant', person.id);
+  assert.equal(wallet.balance, 35 + 50);
+  await reload(page);
+  await waitState(page, 'dashboard');
+  assert.equal(await page.$eval('[data-balance]', e => e.dataset.balance), '85');
+  const top = await page.$eval('.prow--ledger', r => ({ kind: r.dataset.kind, amount: r.querySelector('.prow__amount').textContent, text: r.textContent }));
+  assert.equal(top.amount, '+٥٠');
+  assert.match(top.text, /wallet-review/);
+  assert.match(await page.$$eval('[data-history]', rows => rows[0].textContent), /حصلت على ٥٠ نقطة/);
+  await reload(engine.page);
+  await engine.page.waitForSelector('.result__line--points');
+  assert.equal(await textOf(engine.page, '.result__line--points'), 'حصلت على ٥٠ نقطة');
+  assert.equal(await engine.page.$('.result__line--pending'), null);
+  assert.deepEqual(engine.problems, []);
+  await engine.context.close();
+  assert.deepEqual(problems, []);
+  await context.close();
+
+});
+
+
+test('leak: no participant code or phone in any reply, served file, commit or Activity cell (only where the person typed it)', async () => {
+
+  const { call } = newWorld();
+  call('apiCompSettings', { registry: true, wallet: true, shop: true });
+  const a = call('apiParticipantSave', { name: 'أبانوب سامح نصر', phone: '01012340003', group: 'ثانوي' }).participant;
+  const b = call('apiParticipantSave', { name: 'مارينا سامح نصر', phone: '01012340003', group: 'إعدادي' }).participant;
+  const codeA = call('apiParticipantCode', a.id).code;
+  const codeB = call('apiParticipantCode', b.id).code;
+  codedLive(call, { slug: 'leak-live' });
+  call('apiShopItemSave', { name: 'قلم', cost: 5, stock: 3, active: true });
+  publish(world, call);
+  const old = codeA;
+  const codeA2 = call('apiParticipantResetCode', a.id).code;
+  const codes = [old, codeA2, codeB];
+  const forms = c => [c, c.replace(/-/g, ''), c.replace(/^ATH-/, '').replace(/-/g, '')];
+  const phones = ['01012340003', '+201012340003', '1012340003'];
+
+  const engine = await open('/competition/leak-live/');
+  await engine.page.click('[data-cta]');
+  await enterCode(engine.page, codeA2);
+  await clickText(engine.page, 'button', 'أيوه، ده أنا');
+  await answerAll(engine.page, { extra: { 'كام سفر في العهد الجديد؟': { type: '27' } } });
+  await sendFromReview(engine.page);
+  await engine.page.waitForSelector('.result__line--points');
+
+  const portal = await open('/points/');
+  await enterCode(portal.page, codeB);
+  await clickText(portal.page, 'button', 'أيوه، ده أنا');
+  await waitState(portal.page, 'dashboard');
+
+  // every reply the browser got (requests carry the typed code; replies never)
+  for (const r of [...engine.replies, ...portal.replies]) {
+    for (const c of codes) for (const f of forms(c)) assert.ok(!r.text.includes(f), `${f} in the ${r.fn} reply`);
+    for (const ph of phones) assert.ok(!r.text.includes(ph), `${ph} in the ${r.fn} reply`);
+  }
+  assert.ok(portal.replies.some(r => r.fn === 'portalMe' && r.reply.ok));
+
+  // every file the site serves or the publish committed
+  const paths = new Set(['/content.json', '/competition/leak-live/', '/competition/leak-live/comp.json', '/points/', ...served.map(s => s.path)]);
+  for (const path of paths) {
+    const body = await portal.page.evaluate(async p => (await fetch(p, { cache: 'no-store' })).text(), path);
+    for (const c of codes) for (const f of forms(c)) assert.ok(!body.includes(f), `${f} served at ${path}`);
+    for (const ph of phones) assert.ok(!body.includes(ph), `${ph} served at ${path}`);
+  }
+  for (const [path, value] of Object.entries(world.github.files())) {
+    const body = Buffer.isBuffer(value) ? '' : String(value);
+    for (const c of codes) for (const f of forms(c)) assert.ok(!body.includes(f), `${f} committed in ${path}`);
+    for (const ph of phones) assert.ok(!body.includes(ph), `${ph} committed in ${path}`);
+  }
+
+  // the Activity log (every cell) and the browser storage
+  const activity = world.spreadsheet.getSheetByName('Activity');
+  assert.ok(activity && activity.data.length > 1, 'there is an Activity log');
+  for (const row of activity.data) {
+    for (const cell of row) {
+      const text = String(cell ?? '');
+      for (const c of codes) for (const f of forms(c)) assert.ok(!text.includes(f), `${f} in an Activity cell`);
+      for (const ph of phones) assert.ok(!text.includes(ph), `${ph} in an Activity cell: ${text.slice(0, 80)}`);
+    }
+  }
+  for (const p of [engine.page, portal.page]) {
+    const stored = await p.evaluate(() => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }));
+    for (const c of codes) for (const f of forms(c)) assert.ok(!stored.includes(f), `${f} in browser storage`);
+  }
+  assert.deepEqual([...engine.problems, ...portal.problems], []);
+  await engine.context.close();
+  await portal.context.close();
+
+});

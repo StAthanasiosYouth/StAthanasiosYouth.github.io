@@ -555,7 +555,13 @@ function compStartAction_(arg) {
   // an attempt from an earlier publish is answered with ITS questions
   var served = row.version === live.version ? def : compDefinitionFor_(def.id, row.version);
 
-  return compAttemptReply_(served || def, row, resumed, now);
+  var reply = compAttemptReply_(served || def, row, resumed, now);
+
+  // the same participant on another device gets that attempt back: its key comes along
+  // (compSubmit checks the attempt's own clientKey)
+  if (resumed && row.clientKey !== arg.clientKey) reply.attempt.clientKey = row.clientKey;
+
+  return reply;
 
 }
 
