@@ -775,15 +775,11 @@ test('edit lock: another admin in the builder → read-only with who; free again
 });
 
 
-test('module switches: off until installed; then on, and the coded preset appears in the wizard', async () => {
+test('module switches: the registry on, and the coded preset appears in the wizard (Phase 2 / 3 are installed now: tests/comp-admin2.e2e.mjs)', async () => {
 
   await d.page.evaluate(() => A.go('comps', 'compsettings'));
   await $('.comp-module');
-  assert.equal(await d.page.$eval('.comp-module[class] [data-module="registry"] input', n => n.disabled), true, 'not installed: off');
-  assert.match(await d.page.$eval('.comp-modules', n => n.textContent), /لسه مش متركب/);
-
-  world.gs.compRegistryReady_ = () => true;
-  await d.page.evaluate(() => A.render());
+  assert.equal(await d.page.$eval('[data-module="wallet"] input', n => n.disabled), true, 'the wallet waits for the registry');
   await d.page.waitForFunction(() => !document.querySelector('[data-module="registry"] input').disabled, { timeout: 10000 });
   await d.page.$eval('[data-module="registry"] input', n => n.click());
   for (let i = 0; i < 40 && world.properties.get('COMP_REGISTRY') !== '1'; i++) await sleep(250);

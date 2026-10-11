@@ -1008,7 +1008,7 @@ picture is not in content.json), `Activity.gs` (summaries, push decisions),
 
 ```
 Person = { id, name, phone ('01…'), phoneIntl ('+201…'), group, church, notes, status:'active'|'inactive',
-           active, codeVersion, codeIssuedAt, hasCode, importBatch, createdAt, updatedAt }
+           active, codeVersion, codeIssuedAt, codeIssuedBy (an admin email), hasCode, importBatch, createdAt, updatedAt }
            (+ balance when the wallet is on, in apiParticipants)   ← NEVER code / codeHash / codeEnc
 apiParticipants({ q, group, status:'all'|'active'|'inactive', sort:'name'|'group'|'createdAt'|'updatedAt'|'balance',
                   dir:'asc'|'desc', offset, limit ≤ 200 })

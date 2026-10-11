@@ -81,6 +81,9 @@
   /* the help topic for the screen on now (AdminHelp) */
   A.compHelpKey = function () {
     if (A.sub.comps === 'compsettings') return 'compsettings';
+    if (A.sub.comps === 'people') return 'comp-people';
+    if (A.sub.comps === 'points') return 'comp-points';
+    if (A.sub.comps === 'shop') return 'comp-shop';
     if (!C.open) return 'comps';
     if (C.tab === 'questions') return 'comp-questions';
     if (C.tab === 'subs' || C.tab === 'review' || C.tab === 'results') return 'comp-results';
@@ -197,18 +200,22 @@
     if (reply) {
       C.data = reply;
       patchList(reply.summary);
+      if (reply.modules) C.applyModules(reply.modules);
     }
     if (inBuilder()) A.render();
   };
 
   /* apiComp again, then the builder (quietly: unsaved fields are kept by not re-rendering while dirty) */
-  C.refresh = function () {
+  /* quiet: only the tab badges follow (the live tabs keep what they show) */
+  C.refresh = function (quiet) {
     var id = C.open;
     return A.call('apiComp', id).then(function (reply) {
       if (C.open !== id) return reply;
       C.data = reply;
       patchList(reply.summary);
-      if (inBuilder() && !A.dirty) A.render();
+      if (reply.modules) C.applyModules(reply.modules);
+      if (quiet === true) C.redrawTabs();
+      else if (inBuilder() && !A.dirty) A.render();
       return reply;
     });
   };
@@ -406,6 +413,7 @@
   C.loadList = function () {
     return A.call('apiComps').then(function (reply) {
       C.list = reply;
+      C.applyModules(reply.modules);
       return reply;
     });
   };
@@ -740,6 +748,7 @@
         if (C.open !== id) return;
         C.data = reply;
         patchList(reply.summary);
+        if (reply.modules) C.applyModules(reply.modules);
         if (inBuilder()) A.render();
       }).catch(function (error) {
         if (C.open !== id) return;
@@ -809,6 +818,12 @@
     );
 
   }
+
+  /* the tab strip again (its badges: pending reviews, counts) without touching the tab under it */
+  C.redrawTabs = function () {
+    var old = document.querySelector(".comp-tabs");
+    if (old && inBuilder() && C.data) old.replaceWith(tabsNav());
+  };
 
   function tabsNav() {
 
@@ -1188,7 +1203,10 @@
       table,
       unique.node
     );
-    var registeredPart = el('p', { class: 'note', text: 'في المسابقة بالأكواد المشترك بيكتب الكود بتاعه بس، واسمه بيتجاب من سجل المشاركين — الخانات دي مبتظهرش.' });
+    var registeredPart = el('div', { class: 'note' },
+      el('p', { class: 'note__title', text: 'الشخص بيتعرف من الكود بتاعه' }),
+      el('p', { text: 'في المسابقة بالأكواد المشترك بيكتب الكود بتاعه بس (ATH-…)، والصفحة بتقوله «الكود مسجل باسم …» ويأكد. الاسم والموبايل والمجموعة بيتجابوا من «المشاركين» — الفورم ده مبيظهرش، ومحدش يقدر يشارك باسم حد تاني.' }),
+      el('p', { class: 'field__hint', text: 'المحاولات بتتحسب لكل مشترك. الأكواد بتتعمل وتتبعت من «المسابقات ← المشاركين».' }));
 
     function syncMode(value) {
       openPart.hidden = value === 'registered';
@@ -1307,18 +1325,28 @@
     var answersAt = A.dateTimeInput(comp.answersAt, { emptyText: 'حدد الميعاد', onchange: function () { sync(); } });
     var answersAtField = A.field('ميعاد ظهور الإجابات', answersAt.node);
     var showPoints = A.checkbox('اعرض درجة كل سؤال وهو بيحل', comp.showPoints, 'مثلاً «١٠ درجات» جنب السؤال');
-    var wallet = A.checkbox('النقاط تروح لمحفظة المشترك', comp.wallet, 'بعد التصحيح النهائي، الدرجة بتتضاف نقاط في «نقاطي»');
+    var wallet = A.checkbox('النقاط تروح لمحفظة المشترك', comp.wallet, 'النقاط هتتضاف لرصيد المشترك أوتوماتيك لما تتصحح (وتتعدل لوحدها لو التصحيح اتغيّر)');
+    var walletWhy = el('p', { class: 'field__hint comp-wallet-why' });
     var successText = A.counted('رسالة بعد الإرسال', comp.successText, 300, 'مثلاً: شكرًا! النتيجة هتظهر يوم الأحد', { multiline: true, rows: 2 });
     var said = el('ul', { class: 'comp-explain', 'aria-live': 'polite' });
     var scorePart = el('div', { class: 'form-group' });
 
     wallet.node.hidden = !modules.wallet && !comp.wallet;
+    walletWhy.hidden = wallet.node.hidden;
 
     function sync() {
       var on = scoring.input.checked;
       var show = resultShow.value() || 'none';
       var answers = answersShow.value() || 'never';
       scorePart.hidden = !on;
+      // the wallet needs: the switch on, a coded competition, scoring (CompModel.gs)
+      var registered = comp.participation === 'registered';
+      var walletOk = !!modules.wallet && registered && on;
+      wallet.input.disabled = !walletOk && !wallet.input.checked;
+      walletWhy.textContent = !modules.wallet ? 'المحفظة مقفولة من «المسابقات ← الإعدادات».'
+        : !registered ? 'النقاط بتشتغل في المسابقات بالأكواد بس (من «المشاركة» اختار «بكود لكل مشترك»).'
+          : !on ? 'شغّل الدرجات الأول.' : '';
+      walletWhy.hidden = wallet.node.hidden || !walletWhy.textContent;
       answersAtField.hidden = answers !== 'atDate';
       var lines = [];
       if (!on) {
@@ -1340,7 +1368,8 @@
       A.field('النتيجة', resultShow.node),
       A.field('ميعاد ظهور النتيجة', resultsAt.node, 'فاضي = على طول. «اعتماد النتائج» بيظهرها حتى لو الميعاد لسه'),
       showPoints.node,
-      wallet.node
+      wallet.node,
+      walletWhy
     );
 
     sync();
@@ -1697,10 +1726,11 @@
   ======================================================= */
 
   var MODULES = [
-    { key: 'registry', label: 'تفعيل المشاركين بالأكواد', hint: 'سجل للمشاركين، وكود خاص لكل واحد (ATH-…) بيدخل بيه المسابقات من غير ما يكتب اسمه. بيظهر «المشاركين» هنا لما يشتغل.', phase: 'المرحلة التانية' },
-    { key: 'wallet', label: 'المحفظة والنقاط', hint: 'الدرجات بتتحول نقاط في «نقاطي» لكل مشترك. محتاج المشاركين بالأكواد.', phase: 'المرحلة التالتة', needs: 'registry' },
-    { key: 'shop', label: 'متجر الجوائز', hint: 'المشتركين يبدّلوا نقاطهم بجوائز. محتاج المحفظة.', phase: 'المرحلة التالتة', needs: 'wallet' }
+    { key: 'registry', label: 'تفعيل المشاركين بالأكواد', screen: 'المشاركين', hint: 'سجل للمشاركين، وكود خاص لكل واحد (ATH-…) بيدخل بيه المسابقات من غير ما يكتب اسمه، وصفحة «نقاطي» بتاعته. بيظهر «المشاركين» هنا.' },
+    { key: 'wallet', label: 'المحفظة والنقاط', screen: 'النقاط', hint: 'الدرجات بتتحول نقاط في «نقاطي» لكل مشترك، وتقدر تزوّد أو تخصم بإيدك. بيظهر «النقاط» هنا.', needs: 'registry', needsLabel: 'المشاركين بالأكواد' },
+    { key: 'shop', label: 'متجر الجوائز', screen: 'المتجر', hint: 'المشتركين يبدّلوا نقاطهم بجوايز من «نقاطي»، وإنت بتجهّز الطلبات وتسلّمها. بيظهر «المتجر» هنا.', needs: 'wallet', needsLabel: 'المحفظة والنقاط' }
   ];
+  var DEPENDS = { registry: ['wallet', 'shop'], wallet: ['shop'], shop: [] };
 
   A.views.compsettings = function () {
 
@@ -1717,26 +1747,36 @@
           A.dirty = false;
           var input = {};
           input[m.key] = checked;
-          toggle.input.disabled = true;
-          A.call('apiCompSettings', input).then(function (result) {
-            C.list = Object.assign({}, C.list || reply, { modules: result.modules });
-            C.loadList().catch(function () {});
-            draw(Object.assign({}, reply, { modules: result.modules }));
-            A.toast(checked ? '«' + m.label + '» اشتغل ✓' : '«' + m.label + '» اتقفل — البيانات محفوظة');
-          }).catch(function (error) {
-            toggle.input.checked = !checked;
-            toggle.input.disabled = false;
-            A.fail(error);
+          // turning one off takes the ones that need it along: said first
+          var along = checked ? [] : DEPENDS[m.key].filter(function (k) { return modules[k]; });
+          var ask = along.length
+            ? A.confirm({ tone: 'warn', title: 'تقفل «' + m.label + '»؟', message: 'هيتقفل معاه: ' + along.map(function (k) { return '«' + MODULES.filter(function (x) { return x.key === k; })[0].label + '»'; }).join(' و') + '. مفيش أي بيانات هتتمسح: المشاركين والأكواد والنقاط والطلبات بيفضلوا محفوظين، وترجع تشغّلهم وقت ما تحب.', confirmLabel: 'اقفل', cancelLabel: 'لأ' })
+            : Promise.resolve(true);
+          ask.then(function (ok) {
+            if (!ok) { toggle.input.checked = !checked; return; }
+            toggle.input.disabled = true;
+            A.call('apiCompSettings', input).then(function (result) {
+              C.list = Object.assign({}, C.list || reply, { modules: result.modules });
+              C.applyModules(result.modules);
+              C.loadList().catch(function () {});
+              draw(Object.assign({}, reply, { modules: result.modules }));
+              A.toast(checked ? '«' + m.label + '» اشتغل ✓ — «' + m.screen + '» ظهرت فوق' : '«' + m.label + '» اتقفل — البيانات محفوظة');
+            }).catch(function (error) {
+              toggle.input.checked = !checked;
+              toggle.input.disabled = false;
+              A.fail(error);
+            });
           });
         });
         toggle.input.disabled = !installed[m.key] || (needsOff && !modules[m.key]);
         toggle.node.dataset.module = m.key;
-        return el('div', { class: 'comp-module' + (modules[m.key] ? ' is-on' : '') },
+        return el('div', { class: 'comp-module' + (modules[m.key] ? ' is-on' : ''), 'data-module-card': m.key },
           toggle.node,
           el('p', { class: 'field__hint', text: m.hint }),
           el('div', { class: 'item__meta' },
-            A.chip(m.phase, 'off'),
-            !installed[m.key] ? A.chip('لسه مش متركب في النسخة دي', 'gold') : modules[m.key] ? A.chip('شغال', 'ok') : needsOff ? A.chip('شغّل اللي قبله الأول', 'off') : null
+            !installed[m.key] ? A.chip('لسه مش متركب في النسخة دي', 'gold')
+              : modules[m.key] ? A.chip('شغال', 'ok')
+                : needsOff ? A.chip('محتاج «' + m.needsLabel + '» الأول', 'off') : A.chip('مقفول', 'off')
           )
         );
       }));
@@ -1752,10 +1792,69 @@
     });
 
     return [
-      A.card('أجزاء المسابقات', 'المسابقات نفسها شغالة دايمًا. الأجزاء دي اختيارية: لما تشغّل جزء، شاشاته بتظهر هنا. لما تقفله، شاشاته بتختفي والبيانات بتفضل محفوظة.', body),
-      el('p', { class: 'note', text: 'المرحلة التانية والتالتة (المشاركين بالأكواد، المحفظة، المتجر) شاشاتهم بتيجي في تحديث جاي للوحة التحكم. لحد ما تتركب، المفاتيح مقفولة.' })
+      A.card('أجزاء المسابقات', 'المسابقات نفسها شغالة دايمًا. الأجزاء دي اختيارية، وكل واحد محتاج اللي قبله: المتجر محتاج النقاط، والنقاط محتاجة المشاركين بالأكواد.', body),
+      el('p', { class: 'note', text: 'لما تقفل جزء، شاشاته بتختفي من هنا وصفحاته في الموقع بتقول إنها مش متاحة — بس مفيش أي حاجة بتتمسح: المشاركين والأكواد والنقاط والجوايز والطلبات بيفضلوا زي ما هما لحد ما تشغّله تاني.' })
     ];
 
+  };
+
+
+  /* =======================================================
+     THE MODULES' SCREENS (subs that show by switch)
+  ======================================================= */
+
+  var MODULE_SUBS = [
+    { key: 'people', label: 'المشاركين', module: 'registry' },
+    { key: 'points', label: 'النقاط', module: 'wallet' },
+    { key: 'shop', label: 'المتجر', module: 'shop' }
+  ];
+
+  C.modules = null;
+
+  /* the area's sub-tabs follow the switches (every reply that carries modules calls this) */
+  C.applyModules = function (modules) {
+    if (!modules) return;
+    var next = { registry: !!modules.registry, wallet: !!modules.wallet, shop: !!modules.shop };
+    var changed = JSON.stringify(next) !== JSON.stringify(C.modules);
+    C.modules = next;
+    if (!changed) return;
+    var area = A.AREAS.filter(function (a) { return a.key === 'comps'; })[0];
+    if (!area) return;
+    var subs = [{ key: 'comps', label: 'المسابقات' }]
+      .concat(MODULE_SUBS.filter(function (s) { return next[s.module]; }).map(function (s) { return { key: s.key, label: s.label }; }))
+      .concat([{ key: 'compsettings', label: 'الإعدادات' }]);
+    area.subs.splice.apply(area.subs, [0, area.subs.length].concat(subs));
+    A.renderNav();
+    // the home quick actions know «+ مشارك» now
+    if (A.area === 'home' && !A.dirty && !document.querySelector('dialog[open]')) A.render();
+  };
+
+  /* a module's screen while its switch is off: what to do */
+  C.moduleOff = function (key) {
+    var m = MODULES.filter(function (x) { return x.key === key; })[0];
+    return el('section', { class: 'card card--notice' },
+      el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('lock')),
+      el('div', {},
+        el('h2', { class: 'card__title', text: '«' + m.label + '» مقفول' }),
+        el('p', { class: 'card__hint', text: 'شغّله من «المسابقات ← الإعدادات». البيانات اللي اتسجلت قبل كده محفوظة.' })
+      ),
+      el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.go('comps', 'compsettings'); } }, icon('gear'), 'الإعدادات')
+    );
+  };
+
+  C.official = official;
+  C.recoveryNotice = recoveryNotice;
+
+  /* after sign-in: the switches once, quietly (the sub-tabs, the home «+ مشارك») */
+  var baseStart = A.start;
+
+  A.start = function () {
+    return Promise.resolve(baseStart.apply(this, arguments)).then(function (ok) {
+      if (ok && official() && !C.modules) {
+        setTimeout(function () { if (!C.modules) C.loadList().catch(function () {}); }, 1200);
+      }
+      return ok;
+    });
   };
 
 })();

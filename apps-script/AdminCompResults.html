@@ -47,7 +47,7 @@
 
   /* the builder's summary counts again (the tab badges), quietly */
   function refreshSummary() {
-    C.refresh().catch(function () {});
+    C.refresh(true).catch(function () {});
   }
 
 
@@ -343,6 +343,11 @@
 
       A.openSheet(s.name || 'مشاركة من غير اسم', [
         data.latest ? null : el('p', { class: 'note', text: 'المشاركة دي على نسخة أقدم من المسابقة (قبل آخر نشر): الأسئلة هنا زي ما الشخص شافها بالظبط.' }),
+        // a coded competition: who it is comes from «المشاركين»
+        s.participantId && A.compPerson ? el('div', { class: 'actions' },
+          el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'person', onclick: function () {
+            A.closeSheet().then(function (closed) { if (closed) A.compPerson(s.participantId); });
+          } }, icon('user'), 'صفحة المشترك')) : null,
         facts,
         el('p', { class: 'section-label', text: 'الإجابات بالترتيب اللي اتعرض عليه' }),
         el('ol', { class: 'comp-answers' }, data.questions.map(function (q) { return questionCard(q, data, done); }))

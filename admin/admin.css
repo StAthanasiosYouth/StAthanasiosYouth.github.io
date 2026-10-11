@@ -6690,3 +6690,424 @@ dialog .toasts[popover] {
   }
 }
 
+/* =========================================================
+   «المشاركين» / «النقاط» / «المتجر» (AdminCompPeople / Wallet / Shop),
+   and the printed codes (cards and a list)
+========================================================= */
+
+.comp-phone-said {
+  margin-top: -6px;
+  color: var(--ok);
+}
+
+.comp-phone-said.is-bad {
+  color: var(--danger);
+}
+
+.comp-wallet-why {
+  margin-top: -4px;
+  color: var(--warn);
+}
+
+/* a code: big, Latin, spaced; masked until shown */
+.comp-code {
+  display: inline-block;
+  padding: 10px 16px;
+  border-radius: 14px;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  color: var(--gold-hi);
+  background: rgba(0, 0, 0, .3);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  user-select: all;
+}
+
+.comp-code[data-masked="true"] {
+  color: var(--text-3);
+  user-select: none;
+}
+
+.comp-code--small {
+  padding: 4px 10px;
+  font-size: 1rem;
+}
+
+.comp-code--new {
+  font-size: 1.7rem;
+}
+
+.comp-code__box {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+
+.comp-code__actions {
+  flex-wrap: wrap;
+}
+
+.comp-batches {
+  display: grid;
+  gap: 8px;
+}
+
+.comp-batch .item__controls {
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+}
+
+.comp-batch-actions {
+  flex-wrap: wrap;
+}
+
+.comp-codes__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding-inline-start: 4px;
+}
+
+/* the names import */
+.comp-import__kinds .filter-chip {
+  min-height: 38px;
+}
+
+.comp-import__groups .item__meta {
+  margin-top: 4px;
+}
+
+.comp-import__typos {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.comp-import__name {
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.comp-import__who {
+  font-size: .86rem;
+  color: var(--text-2);
+}
+
+.comp-import__choices-pick {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.comp-import__choice {
+  align-items: flex-start;
+}
+
+.comp-import__fix {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, .2);
+}
+
+@media (min-width: 640px) {
+  .comp-import__fix {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.comp-import__fix-field {
+  display: grid;
+  gap: 4px;
+}
+
+.comp-import__fix-field .input {
+  min-height: 42px;
+}
+
+/* the ledger */
+.comp-adjust {
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .025);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+
+.comp-ledger {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.comp-ledger__row {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .028);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06);
+}
+
+.comp-ledger__amount {
+  font-size: 1.1rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.comp-ledger__row.is-plus .comp-ledger__amount {
+  color: var(--ok);
+}
+
+.comp-ledger__row.is-minus .comp-ledger__amount {
+  color: var(--danger);
+}
+
+.comp-ledger__main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.comp-ledger__what {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.comp-ledger__note {
+  font-size: .86rem;
+  color: var(--text-2);
+}
+
+.comp-ledger__meta {
+  font-size: .76rem;
+  color: var(--text-3);
+}
+
+/* the store's requests */
+.comp-req__who {
+  padding: 0;
+  border: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--gold-hi);
+  background: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.comp-req__cost {
+  color: var(--gold-hi);
+}
+
+.comp-req__actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.comp-req__actions .actions {
+  flex-wrap: wrap;
+}
+
+.comp-req.is-focus {
+  box-shadow: inset 0 0 0 1.5px var(--gold);
+}
+
+/* ---------- printing codes: an overlay on screen, A4 pages on paper ---------- */
+
+.print-root {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  border: 0;
+  color: #111;
+  background: #d9dde3;
+}
+
+.print-root::backdrop {
+  background: rgba(0, 0, 0, .6);
+}
+
+.print-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  color: var(--text);
+  background: var(--navy-900);
+}
+
+.print-bar__text {
+  font-size: .86rem;
+}
+
+.print-pages {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  padding: 16px 8px 40px;
+}
+
+.print-page {
+  box-sizing: border-box;
+  width: 210mm;
+  max-width: 100%;
+  min-height: 297mm;
+  padding: 10mm;
+  background: #fff;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, .4);
+}
+
+.print-page--cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(5, 1fr);
+  gap: 4mm;
+}
+
+.print-card {
+  display: grid;
+  grid-template-rows: auto auto auto 1fr auto;
+  gap: 1mm;
+  padding: 3mm 4mm;
+  border: 1px dashed #999;
+  border-radius: 3mm;
+  overflow: hidden;
+  break-inside: avoid;
+}
+
+.print-card__top {
+  display: flex;
+  align-items: center;
+  gap: 2mm;
+}
+
+.print-card__logo {
+  width: 9mm;
+  height: 9mm;
+  object-fit: contain;
+}
+
+.print-card__org {
+  font-size: 8pt;
+  font-weight: 700;
+  color: #444;
+}
+
+.print-card__name {
+  font-size: 12pt;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.print-card__group {
+  font-size: 9pt;
+  color: #555;
+}
+
+.print-card__code {
+  align-self: center;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 17pt;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-align: center;
+}
+
+.print-card__foot {
+  display: flex;
+  align-items: center;
+  gap: 2mm;
+}
+
+.print-card__qr {
+  width: 15mm;
+  height: 15mm;
+  image-rendering: pixelated;
+}
+
+.print-card__how {
+  font-size: 7pt;
+  line-height: 1.35;
+  color: #444;
+}
+
+.print-list__title {
+  margin-bottom: 4mm;
+  font-size: 14pt;
+}
+
+.print-list {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10pt;
+}
+
+.print-list th,
+.print-list td {
+  padding: 1.6mm 2mm;
+  border-bottom: 1px solid #ccc;
+  text-align: start;
+}
+
+.print-list__code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-weight: 700;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+  html.is-printing body > :not(.print-root) {
+    display: none !important;
+  }
+  html.is-printing body {
+    background: #fff;
+  }
+  .print-root {
+    position: static;
+    overflow: visible;
+    background: #fff;
+  }
+  .print-root::backdrop {
+    display: none;
+  }
+  .print-bar {
+    display: none;
+  }
+  .print-pages {
+    display: block;
+    padding: 0;
+  }
+  .print-page {
+    width: 210mm;
+    height: 297mm;
+    min-height: 0;
+    box-shadow: none;
+    break-after: page;
+  }
+}
+

@@ -360,6 +360,9 @@
         window.AdminTransport && A.compNew
           ? quick('مسابقة', 'trophy', function () { A.compNew(); })
           : items ? quick('مسابقة', 'trophy', function () { A.editors.activities(null, 'competitions'); }) : null,
+        // the registry switched on (AdminComp knows it after its first reply): a participant in one tap
+        window.AdminTransport && A.comp && A.comp.modules && A.comp.modules.registry && A.compPersonNew
+          ? quick('مشارك', 'users', function () { A.compPersonNew(); }) : null,
         items ? quick('فعالية', 'calendar', function () { A.editors.activities(null, 'activities'); }) : null,
         quick('لعبة', 'star', function () { A.editors.games(null); }),
         quick('إشعار', 'bell', function () { A.editors.notifications(null); }),

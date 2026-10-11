@@ -683,6 +683,8 @@ function regPerson_(row) {
     active: row.status !== 'inactive',
     codeVersion: Number(row.codeVersion) || 1,
     codeIssuedAt: row.codeIssuedAt || '',
+    // who made the current code (an admin's email; the admin page shows the display name)
+    codeIssuedBy: row.codeIssuedBy || '',
     hasCode: !!row.codeHash,
     importBatch: row.importBatch || '',
     createdAt: row.createdAt || '',

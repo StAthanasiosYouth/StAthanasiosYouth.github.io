@@ -98,3 +98,63 @@ test('resultsFilename is safe whatever the slug / date', () => {
   assert.equal(resultsFilename('Bible Quiz!', ''), 'bible-quiz-results.xlsx');
   assert.equal(resultsFilename('', '2026-01-02T10:00'), 'competition-results-2026-01-02.xlsx');
 });
+
+
+/* ---------------- Phase 2 / 3: names, codes, phones, messages ---------------- */
+
+test('names template: «الأسماء» with the exact headers (every column text: a phone keeps its 0), «شرح», «مثال» that the server imports', async () => {
+  const m = await import('../admin/comp-sheets.js');
+  assert.deepEqual(m.PEOPLE_HEADERS, ['الاسم بالكامل', 'رقم الموبايل', 'المجموعة / الفصل', 'الكنيسة', 'ملاحظات']);
+  const book = await readXlsx(writeXlsx(m.peopleTemplate()));
+  assert.deepEqual(book.sheets.map(s => s.name), [m.PEOPLE_SHEET, 'شرح', 'مثال']);
+  assert.deepEqual(book.sheets[0].rows, [m.PEOPLE_HEADERS]);
+  const sheet = new TextDecoder().decode((await unzip(writeXlsx(m.peopleTemplate())))['xl/worksheets/sheet1.xml']);
+  assert.match(sheet, /<col min="2" max="2" width="18"[^>]*style="2"/, 'the phone column is text');
+  const { regWorld } = await import('./fakes/reg.mjs');
+  const { call } = regWorld();
+  const preview = plain(call('apiParticipantsImportPreview', book.sheets[2].rows.map(r => r.join('\t')).join('\n')));
+  assert.deepEqual(preview.rows.map(r => r.status), ['new', 'new', 'new']);
+  assert.ok(preview.rows[2].warnings.some(w => w.kind === 'sharedPhone'), 'the example shows a family phone');
+});
+
+test('peopleText: the preview rows with fixes back into import text (only the columns the file had)', async () => {
+  const m = await import('../admin/comp-sheets.js');
+  const text = m.peopleText([{ name: 'مارك\tميلاد', phone: '01012345678', group: 'ثانوي', church: 'x', notes: 'y' }, { name: 'مريم', phone: '0112', group: '' }], ['name', 'phone', 'group']);
+  assert.equal(text, 'الاسم بالكامل\tرقم الموبايل\tالمجموعة / الفصل\nمارك ميلاد\t01012345678\tثانوي\nمريم\t0112\t');
+});
+
+test('codesBook: names, phones, groups and codes as text; the server file name', async () => {
+  const m = await import('../admin/comp-sheets.js');
+  const made = m.codesBook({ rows: [{ name: 'مارك', phone: '01012345678', group: 'ثانوي', code: 'ATH-ABCD-2345' }], filename: 'codes-2026-10-11.xlsx' });
+  assert.equal(made.filename, 'codes-2026-10-11.xlsx');
+  const rows = (await readXlsx(writeXlsx(made.book))).sheets[0].rows;
+  assert.deepEqual(rows, [['الاسم', 'الموبايل', 'المجموعة / الفصل', 'الكود'], ['مارك', '01012345678', 'ثانوي', 'ATH-ABCD-2345']]);
+});
+
+test('normPhoneEg mirrors the server (normPhoneEg_) for the live preview', async () => {
+  const m = await import('../admin/comp-sheets.js');
+  const { regWorld } = await import('./fakes/reg.mjs');
+  const { world } = regWorld();
+  for (const value of ['01012345678', '1012345678', '+20 101 234 5678', '00201012345678', '+20 0101 234 5678', '٠١٠١٢٣٤٥٦٧٨', '(010) 1234-5678', '0101234567', '010123456789', '05012345678', '+44 7700 900123', '01x12345678', '', '201012345678']) {
+    const server = plain(world.gs.normPhoneEg_(value));
+    const mine = m.normPhoneEg(value);
+    assert.deepEqual([mine.local, mine.norm, mine.problem], [server.local, server.norm, server.problem], value);
+  }
+});
+
+test('WhatsApp: the message carries the code and the portal; the wa.me link never does', async () => {
+  const m = await import('../admin/comp-sheets.js');
+  const message = m.codeMessage({ name: 'مارك ميلاد', code: 'ATH-ABCD-2345', url: 'https://stathanasiosyouth.github.io/points/' });
+  assert.match(message, /^أهلاً مارك 👋/);
+  assert.ok(message.includes('ATH-ABCD-2345') && message.includes('https://stathanasiosyouth.github.io/points/'));
+  assert.equal(m.waLink('0101 234 5678'), 'https://wa.me/201012345678');
+  assert.equal(m.waLink('123'), '');
+  assert.equal(m.MASKED_CODE, 'ATH-••••-••••');
+});
+
+test('groupTypos: a new group one letter off a known one (the file\'s bigger one or the registry\'s)', async () => {
+  const m = await import('../admin/comp-sheets.js');
+  assert.deepEqual(m.groupTypos([{ name: 'ثانوي بنين', count: 14, isNew: false }, { name: 'ثانوي بنن', count: 1, isNew: true }, { name: 'ابتدائي', count: 2, isNew: true }], []), { 'ثانوي بنن': 'ثانوي بنين' });
+  assert.deepEqual(m.groupTypos([{ name: 'اعدادي بنات', count: 1, isNew: true }], ['إعدادي بنات']), { 'اعدادي بنات': 'إعدادي بنات' });
+  assert.deepEqual(m.groupTypos([{ name: 'ثانوي', count: 3, isNew: true }, { name: 'ابتدائي', count: 3, isNew: true }], []), {});
+});

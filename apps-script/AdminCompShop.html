@@ -1,0 +1,267 @@
+<script>
+/*
+ * «المسابقات» → «المتجر» (Phase 3, docs/COMPETITIONS.md §9 + §17.4;
+ * shown while the store switch is on):
+ *  - the prizes (apiShopItems): picture, name, points, what's left, the
+ *    per-person limit, shown / hidden, order; add / edit in a sheet (the
+ *    picture from the Media Library; edit lock shopitem:<id>); delete only
+ *    while nobody asked for it
+ *  - the requests (apiShopRedemptions): by status (مستني / جاهزة / اتسلمت /
+ *    اتلغت), who, what, how many points, when; «جاهزة للاستلام»,
+ *    «اتسلمت», «إلغاء ورجّع النقاط» (the server refunds once), a note
+ */
+(function () {
+
+  'use strict';
+
+  var A = window.A;
+  var el = A.el;
+  var icon = A.icon;
+  var C = A.comp;
+  var ar = C.ar;
+
+  var S = A.compShop = { status: 'open', focusItem: '', focusRedemption: '' };
+  var STATUS_KINDS = { pending: 'gold', approved: 'info', fulfilled: 'ok', cancelled: 'off' };
+  var ACTIONS = {
+    approved: { label: 'جاهزة للاستلام', icon: 'check', kind: '' },
+    fulfilled: { label: 'اتسلمت', icon: 'gift', kind: 'btn--primary' },
+    cancelled: { label: 'إلغاء ورجّع النقاط', icon: 'close', kind: 'btn--danger' }
+  };
+
+  function adminName(email) {
+    return (A.state && A.state.names && A.state.names[email]) || String(email || '').split('@')[0];
+  }
+
+  A.views.shop = function () {
+
+    if (!C.official()) return [C.recoveryNotice()];
+    if (C.modules && !C.modules.shop) return [C.moduleOff('shop')];
+
+    var itemsBody = el('div', { class: 'comp-shop-items', 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--line' }));
+    var reqBody = el('div', { class: 'comp-redemptions', 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--line' }));
+    var chips = el('div', { class: 'filter-chips', role: 'group', 'aria-label': 'حالة الطلب' });
+    var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر باسم المشترك أو الجايزة…', 'aria-label': 'دوّر في الطلبات' });
+    var itemsBox = A.errorBox();
+    var reqBox = A.errorBox();
+    var reply = null;
+    var timer = 0;
+
+    search.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(loadRequests, 350); });
+
+    function loadItems() {
+      return A.call('apiShopItems').then(function (r) {
+        reply = r;
+        C.applyModules(r.modules);
+        if (!itemsBody.isConnected) return;
+        drawItems(r);
+        if (S.focusItem) {
+          var item = r.items.filter(function (x) { return x.id === S.focusItem; })[0];
+          S.focusItem = '';
+          if (item) openEditor(item, r);
+        }
+      }).catch(function (error) {
+        if (!itemsBody.isConnected) return;
+        itemsBody.replaceChildren();
+        A.fail(error, itemsBox);
+      });
+    }
+
+    function drawItems(r) {
+      if (!r.items.length) {
+        A.fill(itemsBody, el('div', { class: 'empty-state' },
+          el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('gift')),
+          el('p', { class: 'empty-state__title', text: 'مفيش جوايز لسه' }),
+          el('p', { class: 'empty-state__text', text: 'زوّد أول جايزة: اسم وصورة وكام نقطة.' })));
+        return;
+      }
+      A.fill(itemsBody, el('ul', { class: 'list' }, r.items.map(function (item) {
+        var chips = [
+          A.chip(ar(item.cost) + ' نقطة', 'gold'),
+          A.chip(item.stock === null ? 'من غير حد للكمية' : 'فاضل ' + ar(item.available) + ' من ' + ar(item.stock), item.available === 0 ? 'danger' : ''),
+          item.perPerson ? A.chip(ar(item.perPerson) + ' لكل مشترك') : null,
+          item.active ? A.chip('ظاهرة', 'ok') : A.chip('مخفية', 'off'),
+          item.pending ? A.chip('طلبات مستنية: ' + ar(item.pending), 'info') : null,
+          item.category ? A.chip(item.category) : null,
+          item.image && !item.imagePublished ? A.chip('الصورة بعد النشر', 'gold') : null
+        ];
+        var row = A.listItem({
+          icon: 'gift',
+          image: item.image || null,
+          title: item.name,
+          sub: item.description,
+          off: !item.active,
+          chips: chips,
+          controls: [
+            el('span', { class: 'spacer' }),
+            A.editButton(item.name, function () { openEditor(item, r); }),
+            item.redeemed ? null : A.deleteButton(item.name, function (e) { remove(item, e.currentTarget); })
+          ]
+        });
+        row.dataset.id = item.id;
+        return row;
+      })));
+    }
+
+    function loadRequests() {
+      reqBox.hidden = true;
+      return A.call('apiShopRedemptions', { status: S.status, q: search.value.trim(), limit: 100 }).then(function (r) {
+        if (!reqBody.isConnected) return;
+        var counts = r.counts || {};
+        A.fill(chips, [
+          { k: 'open', t: 'محتاجة شغل', n: (counts.pending || 0) + (counts.approved || 0) },
+          { k: 'pending', t: 'مستني', n: counts.pending || 0 },
+          { k: 'approved', t: 'جاهزة', n: counts.approved || 0 },
+          { k: 'fulfilled', t: 'اتسلمت', n: counts.fulfilled || 0 },
+          { k: 'cancelled', t: 'اتلغت', n: counts.cancelled || 0 },
+          { k: 'all', t: 'الكل', n: counts.all || 0 }
+        ].map(function (o) {
+          return el('button', { class: 'filter-chip', type: 'button', 'data-status': o.k, 'aria-pressed': String(S.status === o.k), onclick: function () { S.status = o.k; loadRequests(); } }, o.t + ' (' + ar(o.n) + ')');
+        }));
+        if (!r.items.length) {
+          A.fill(reqBody, el('p', { class: 'empty', text: S.status === 'open' ? 'مفيش طلبات مستنية ✓' : 'مفيش طلبات بالشكل ده.' }));
+          return;
+        }
+        A.fill(reqBody, el('ul', { class: 'list comp-reqs' }, r.items.map(requestRow)));
+        if (S.focusRedemption) {
+          var focus = reqBody.querySelector('[data-id="' + S.focusRedemption + '"]');
+          S.focusRedemption = '';
+          if (focus) { focus.classList.add('is-focus'); focus.scrollIntoView({ block: 'center' }); }
+        }
+      }).catch(function (error) {
+        if (!reqBody.isConnected) return;
+        reqBody.replaceChildren();
+        A.fail(error, reqBox);
+      });
+    }
+
+    function requestRow(rd) {
+      var note = el('input', { class: 'input', type: 'text', maxlength: '200', placeholder: 'ملاحظة (اختياري)', 'aria-label': 'ملاحظة على طلب ' + rd.participantName, value: '' });
+      var actions = (rd.next || []).map(function (status) {
+        var a = ACTIONS[status];
+        return el('button', { class: 'btn btn--small ' + (a.kind || ''), type: 'button', 'data-next': status, onclick: function (e) { setStatus(rd, status, note.value, e.currentTarget); } }, icon(a.icon), a.label);
+      });
+      return el('li', { class: 'item comp-req', 'data-id': rd.id, 'data-status': rd.status },
+        el('span', { class: 'item__icon', 'aria-hidden': 'true' }, icon('gift')),
+        el('div', { class: 'item__main' },
+          el('span', { class: 'item__title' }, el('bdi', { text: rd.itemName }), ' · ', el('span', { class: 'comp-req__cost', text: ar(rd.cost) + ' نقطة' })),
+          el('span', { class: 'item__sub item__sub--rtl' },
+            el('button', { class: 'comp-req__who', type: 'button', onclick: function () { if (A.compPerson) A.compPerson(rd.participantId); } }, rd.participantName),
+            rd.group ? ' · ' + rd.group : '', ' · ', C.when(rd.requestedAt)),
+          el('div', { class: 'item__meta' },
+            A.chip(rd.statusLabel, STATUS_KINDS[rd.status]),
+            rd.refunded ? A.chip('النقاط رجعت', 'gold') : null,
+            rd.handledBy ? A.chip(adminName(rd.handledBy) + ' · ' + C.when(rd.handledAt), 'off') : null),
+          rd.note ? el('p', { class: 'field__hint', text: 'ملاحظة: ' + rd.note }) : null,
+          actions.length ? el('div', { class: 'comp-req__actions' }, note, el('div', { class: 'actions' }, actions)) : null));
+    }
+
+    function setStatus(rd, status, note, button) {
+      var ask = status === 'cancelled'
+        ? A.confirm({ tone: 'warn', title: 'تلغي طلب «' + rd.itemName + '»؟', message: 'الـ' + ar(rd.cost) + ' نقطة هترجع لرصيد ' + rd.participantName + '، والجايزة ترجع متاحة في المتجر.', confirmLabel: 'إلغاء ورجّع النقاط', cancelLabel: 'لأ' })
+        : Promise.resolve(true);
+      ask.then(function (ok) {
+        if (!ok) return;
+        A.withBusy(button, A.call('apiShopRedemptionStatus', rd.id, status, note || '')).then(function (r) {
+          var words = { approved: 'الطلب جاهز للاستلام ✓', fulfilled: 'اتسلمت ✓', cancelled: 'اتلغى ✓ — ' + ar(rd.cost) + ' نقطة رجعت، الرصيد دلوقتي ' + ar(r.balance) };
+          A.toast(r.changed === false ? 'الطلب كان كده بالفعل' : words[status]);
+          loadRequests();
+          loadItems();
+        }).catch(function (error) { A.fail(error, reqBox); });
+      });
+    }
+
+    function remove(item, button) {
+      A.confirm({ tone: 'danger', title: 'تمسح «' + item.name + '»؟', message: 'مفيش حد طلبها لسه، فالمسح آمن. لو عايزها تختفي بس، شيل «ظاهرة في المتجر».', confirmLabel: 'امسح', cancelLabel: 'لأ' }).then(function (ok) {
+        if (!ok) return;
+        A.withBusy(button, A.call('apiShopItemDelete', item.id)).then(function () {
+          A.toast('اتمسحت');
+          loadItems();
+        }).catch(function (error) { A.fail(error, itemsBox); });
+      });
+    }
+
+    function openEditor(item, r) {
+      var isNew = !item;
+      item = item || { active: true };
+      var limits = (r && r.limits) || {};
+      var box = A.errorBox();
+      var name = A.counted('اسم الجايزة', item.name, limits.name || 60, 'مثلاً: كتاب «حياة القديس أثناسيوس»', { required: true });
+      var description = A.counted('الوصف', item.description, limits.description || 500, 'اختياري: بيظهر تحت الجايزة في «نقاطي»', { multiline: true, rows: 2 });
+      var image = A.imagePicker(item.image || '', { label: 'صورة الجايزة', hint: 'من مكتبة الصور أو ارفع جديدة. الصورة الجديدة بتظهر في «نقاطي» بعد ما تنشر.' });
+      var num = function (value, min, max, placeholder) { return el('input', { class: 'input comp-number', type: 'number', inputmode: 'numeric', min: String(min), max: String(max), step: '1', placeholder: placeholder || '', value: value === null || value === undefined ? '' : String(value), oninput: A.markDirty }); };
+      var cost = num(item.cost, 1, limits.cost || 1000000, '100');
+      var stock = num(item.stock, 0, limits.stock || 100000, 'من غير حد');
+      var per = num(item.perPerson, 1, limits.perPerson || 100, 'من غير حد');
+      var order = num(item.order, 0, 100000, '');
+      var cats = el('datalist', { id: A.uid('cats') }, ((r && r.categories) || []).map(function (c) { return el('option', { value: c }); }));
+      var category = A.textInput(item.category, { max: limits.category || 30, placeholder: 'مثلاً: كتب' });
+      category.setAttribute('list', cats.id);
+      var active = A.checkbox('ظاهرة في المتجر', item.active !== false, 'لو شلتها، الجايزة بتختفي من «نقاطي» والطلبات القديمة بتفضل');
+      var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
+
+      save.addEventListener('click', function () {
+        box.hidden = true;
+        if (A.uploadsInFlight > 0) { A.fail(new Error('الصورة لسه بتترفع. استنى لما يظهر «تم الرفع ✓» وبعدين احفظ.'), box); return; }
+        var input = { name: name.input.value, description: description.input.value, image: image.value(), cost: cost.value, stock: stock.value, perPerson: per.value, category: category.value, active: active.input.checked };
+        if (order.value !== '') input.order = order.value;
+        if (!isNew) input.id = item.id;
+        A.withBusy(save, A.call('apiShopItemSave', input)).then(function (res) {
+          A.dirty = false;
+          A.closeSheet();
+          var saved = res.item || {};
+          A.toast(saved.image && !saved.imagePublished ? 'اتحفظت ✓ — الصورة هتظهر في نقاطي بعد ما تنشر («راجع وانشر»)' : 'اتحفظت ✓ — ظاهرة في «نقاطي» على طول', saved.image && !saved.imagePublished ? 'info' : undefined);
+          loadItems();
+        }).catch(function (error) { A.fail(error, box); });
+      });
+
+      A.dirty = false;
+      A.openSheet(isNew ? 'جايزة جديدة' : 'تعديل: ' + item.name, [
+        box,
+        item.image && item.imagePublished === false ? el('p', { class: 'note note--warn', text: 'الصورة هتظهر في نقاطي بعد ما تنشر.' }) : null,
+        el('div', { class: 'form' },
+          name.node,
+          description.node,
+          image.node,
+          A.field('النقاط المطلوبة', cost, 'كام نقطة الجايزة دي'),
+          A.field('الكمية', stock, 'فاضي = من غير حد.' + (item.redeemed ? ' اتطلب منها ' + ar(item.redeemed) + '، فمينفعش تبقى أقل من كده.' : '')),
+          A.field('الحد لكل مشترك', per, 'فاضي = من غير حد'),
+          A.field('التصنيف', category, 'اختياري'),
+          cats,
+          A.field('الترتيب', order, 'الأصغر يظهر الأول'),
+          active.node)
+      ], A.sheetFooter(save), {
+        lock: isNew ? null : A.editLock('shopitem', item.id, 'الجايزة «' + item.name + '»', function () { A.closeSheet(); loadItems(); })
+      });
+    }
+
+    S.openEditor = function (item) { openEditor(item, reply); };
+
+    loadItems();
+    loadRequests();
+
+    return [
+      A.card('الجوايز', 'اللي المشتركين يقدروا يبدّلوا نقاطهم بيه من «نقاطي». بتتحدث هناك على طول (الصور الجديدة بعد النشر).',
+        el('div', { class: 'actions' }, el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { openEditor(null, reply); } }, icon('plus'), 'جايزة جديدة')),
+        itemsBox,
+        itemsBody),
+      A.card('الطلبات', 'كل طلب بيخصم النقاط وقت ما بيتعمل. جهّز الجايزة، سلّمها، أو الغِ الطلب وترجع النقاط.',
+        chips,
+        search,
+        reqBox,
+        reqBody)
+    ];
+
+  };
+
+  /** the store at one prize / one request (the activity log) */
+  A.compShopOpen = function (focus) {
+    focus = focus || {};
+    S.focusItem = focus.item || '';
+    S.focusRedemption = focus.redemption || '';
+    if (focus.redemption) S.status = 'all';
+    if (A.area === 'comps' && A.sub.comps === 'shop') { A.render(); return Promise.resolve(true); }
+    return A.go('comps', 'shop');
+  };
+
+})();
+</script>

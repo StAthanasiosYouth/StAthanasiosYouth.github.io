@@ -580,6 +580,17 @@ The full design and build contract is **[docs/COMPETITIONS.md](COMPETITIONS.md)*
   `frame-src 'self'`) and speaks the §13.3 protocol. The recovery admin
   shows a pointer to `/admin/` instead. Tests: `tests/comp-admin.e2e.mjs`
   (the real `.gs` on a fake world in Chrome), `tests/comp-sheets.test.mjs`.
+- **Phase 2 / 3 screens** appear as sub-tabs by switch (`A.comp.applyModules`
+  follows every reply that carries `modules`): «المشاركين»
+  (`AdminCompPeople.html`: list, add / edit, a participant's page with the
+  code — masked, shown 30 s, copied, sent to WhatsApp by copying the message
+  and opening `wa.me/<number>` with no text —, a new code, history; the
+  names import with inline fixes re-checked by the server; codes shown,
+  exported, printed as A4 cards whose QR opens «نقاطي», never the code),
+  «النقاط» (`AdminCompWallet.html`: balances, ledger, adjust, sync) and
+  «المتجر» (`AdminCompShop.html`: prizes, requests). Codes stay in page
+  memory only (never browser storage, drafts, URLs or QR codes). Tests:
+  `tests/comp-admin2.e2e.mjs`.
 
 ## Ready for later (not built yet)
 

@@ -75,20 +75,41 @@
 
   var GONE_ACTIONS = ['delete', 'media.purge'];
 
-  /* competitions are not in the panel state: a row names its id (cmp-…), or 'modules' for the switches */
-  var COMP_ENTITY = /^(cmp-[0-9a-f]{8}|modules)$/;
+  /*
+   * Competitions, participants, points, prizes, requests are not in the
+   * panel state: a row names its id — cmp-… (or 'modules' = the switches),
+   * p-… (or an import batch imp-…), i-…, r-… — and opens its screen there
+   * (a gone one says so there).
+   */
+  var COMP_ENTITY = {
+    competition: /^(cmp-[0-9a-f]{8}|modules)$/,
+    participant: /^(p-[0-9a-f]{8}|imp-[0-9a-f]{8})$/,
+    points: /^p-[0-9a-f]{8}$/,
+    shopitem: /^i-[0-9a-f]{8}$/,
+    redemption: /^r-[0-9a-f]{10}$/
+  };
 
   function compEntry(entry) {
 
-    return entry.type === 'competition' && COMP_ENTITY.test(String(entry.entityId || '')) && GONE_ACTIONS.indexOf(entry.action) === -1;
+    var pattern = COMP_ENTITY[entry.type];
+    if (!pattern || !pattern.test(String(entry.entityId || '')) || GONE_ACTIONS.indexOf(entry.action) !== -1) return false;
+    // an import undone is a deletion of its batch
+    return !(entry.type === 'participant' && /^imp-/.test(entry.entityId) && entry.action === 'delete');
 
   }
 
-  /* the builder (or the switches); a competition that is gone says so there */
-  function openComp(id) {
+  function openComp(id, type) {
 
-    if (id === 'modules') return A.go('comps', 'compsettings');
-    return A.compOpen ? A.compOpen(id) : A.go('comps', 'comps');
+    type = type || 'competition';
+    if (type === 'competition') {
+      if (id === 'modules') return A.go('comps', 'compsettings');
+      return A.compOpen ? A.compOpen(id) : A.go('comps', 'comps');
+    }
+    if (type === 'participant') return /^imp-/.test(id) || !A.compPerson ? A.go('comps', 'people') : A.compPerson(id);
+    if (type === 'points') return A.compWalletOpen ? A.compWalletOpen(id) : A.go('comps', 'points');
+    if (type === 'shopitem') return A.compShopOpen ? A.compShopOpen({ item: id }) : A.go('comps', 'shop');
+    if (type === 'redemption') return A.compShopOpen ? A.compShopOpen({ redemption: id }) : A.go('comps', 'shop');
+    return Promise.resolve(false);
 
   }
 
@@ -103,7 +124,7 @@
   /* such an item, missing from this panel's (older) copy of the data */
   function stale(entry) {
 
-    return openable(entry) && entry.type !== 'settings' && entry.type !== 'competition' && !findItem(entry.type, entry.entityId);
+    return openable(entry) && entry.type !== 'settings' && !COMP_ENTITY[entry.type] && !findItem(entry.type, entry.entityId);
 
   }
 
@@ -155,7 +176,7 @@
     }
 
     if (compEntry(entry)) {
-      return { label: 'افتح', open: function () { return openComp(entry.entityId); } };
+      return { label: 'افتح', open: function () { return openComp(entry.entityId, entry.type); } };
     }
 
     if (!KEYS[entry.type] || !entry.entityId) return null;
@@ -219,6 +240,8 @@
 
     // a competition's builder (admin push, the log): '#open/competition/cmp-…' | '#open/competition/modules'
     if ((m = /^open\/competition\/(cmp-[0-9a-f]{8}|modules)$/.exec(text))) return openComp(m[1]);
+    // participants, points, prizes, requests (admin push, the log)
+    if ((m = /^open\/(participant|points|shopitem|redemption)\/([\w-]{1,40})$/.exec(text)) && compEntry({ type: m[1], entityId: m[2], action: '' })) return openComp(m[2], m[1]);
 
     if (/^open\/settings$/.test(text)) return A.go('settings');
     if (/^open\/media(?:\/[\w-]{1,80})?$/.test(text)) return A.go('media');
@@ -278,7 +301,7 @@
 
     if (entry.type === 'settings') return A.go('settings');
     if (entry.type === 'media' && GONE_ACTIONS.indexOf(entry.action) === -1) return A.go('media');
-    if (compEntry(entry)) return openComp(entry.entityId);
+    if (compEntry(entry)) return openComp(entry.entityId, entry.type);
 
     if (KEYS[entry.type] && entry.entityId && GONE_ACTIONS.indexOf(entry.action) === -1) {
       return findFresh(entry.type, entry.entityId).then(function (row) {

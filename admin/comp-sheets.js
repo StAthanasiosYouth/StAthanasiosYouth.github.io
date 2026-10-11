@@ -135,3 +135,176 @@ export function resultsBook(exported, slug, date) {
     }
   };
 }
+
+
+/* =========================================================
+   PHASE 2 / 3: participants (the names template, the import text after
+   inline fixes, codes), WhatsApp messages, phone preview (docs/COMPETITIONS.md §7, §17.2)
+========================================================= */
+
+/* the headers CompRegistry.gs REG_IMPORT_COLUMNS reads first (aliases are accepted too) */
+export const PEOPLE_HEADERS = ['الاسم بالكامل', 'رقم الموبايل', 'المجموعة / الفصل', 'الكنيسة', 'ملاحظات'];
+export const PEOPLE_SHEET = 'الأسماء';
+const PEOPLE_KEYS = ['name', 'phone', 'group', 'church', 'notes'];
+
+/** the names template: «الأسماء» (headers, every column text so a phone keeps its 0), «شرح», «مثال» */
+export function peopleTemplate() {
+  const text = [0, 1, 2, 3, 4];
+  const widths = [30, 18, 22, 24, 34];
+  return {
+    sheets: [
+      { name: PEOPLE_SHEET, rtl: true, header: true, rows: [PEOPLE_HEADERS.slice()], widths, textColumns: text },
+      {
+        name: 'شرح', rtl: true, header: true, widths: [20, 90], textColumns: [0, 1],
+        rows: [
+          ['العمود', 'تكتب فيه إيه'],
+          ['الاسم بالكامل', 'اسم المشترك بالكامل (لازم). الاسم والرقم مع بعض هما اللي بيعرّفوا الشخص.'],
+          ['رقم الموبايل', 'موبايل مصري (لازم): 01xxxxxxxxx. لو إكسل شال الصفر مفيش مشكلة، وكمان +20 مقبولة. عمود الموبايل نص علشان الصفر ميضيعش.'],
+          ['المجموعة / الفصل', 'اختياري: مثلاً «ثانوي بنين». اكتب الاسم بنفس الشكل في كل الصفوف.'],
+          ['الكنيسة', 'اختياري.'],
+          ['ملاحظات', 'اختياري: أي حاجة للخدام بس (مش بتظهر للمشترك).'],
+          [],
+          ['ملاحظات', 'أول صف لازم يفضل العناوين. لحد ٥٠٠ اسم في المرة. قبل أي حفظ هتشوف كل صف: جديد، موجود قبل كده، مكرر في الملف، رقم مشترك، أو فيه مشكلة وسببها.'],
+          ['', 'الإخوات ممكن يبقوا على نفس رقم موبايل الأب أو الأم: ده مسموح (هيظهر «رقم مشترك» للتأكيد بس). كل واحد بياخد كود خاص بيه.']
+        ]
+      },
+      {
+        name: 'مثال', rtl: true, header: true, widths, textColumns: text,
+        rows: [PEOPLE_HEADERS.slice(),
+          ['مارك ميلاد عزيز', '01012345678', 'ثانوي بنين', 'مارجرجس', ''],
+          ['مريم عادل فهمي', '01123456789', 'إعدادي بنات', 'العدرا', 'جديدة'],
+          ['بيشوي عادل فهمي', '01123456789', 'ابتدائي', 'العدرا', 'أخو مريم: نفس رقم الأم']]
+      }
+    ]
+  };
+}
+
+/**
+ * The import rows as they would be typed (preview rows, with the admin's inline fixes) → tab-separated
+ * text with a header of the given columns (name and phone always), so the server classifies them again.
+ * rows: [{ name, phone, group, church, notes }]; columns: the keys the original file had.
+ */
+export function peopleText(rows, columns) {
+  const keys = PEOPLE_KEYS.filter(k => k === 'name' || k === 'phone' || (columns || []).indexOf(k) !== -1);
+  const clean = v => String(v === undefined || v === null ? '' : v).replace(/[\t\r\n]+/g, ' ').trim();
+  return [keys.map(k => PEOPLE_HEADERS[PEOPLE_KEYS.indexOf(k)]).join('\t')]
+    .concat((rows || []).map(r => keys.map(k => clean(r[k])).join('\t')))
+    .join('\n');
+}
+
+/** apiParticipantCodes' reply → the names-and-codes workbook (phones and codes as text) */
+export function codesBook(reply) {
+  const rows = Array.isArray(reply && reply.rows) ? reply.rows : [];
+  return {
+    filename: (reply && reply.filename) || 'codes.xlsx',
+    book: {
+      sheets: [{
+        name: 'الأكواد', rtl: true, header: true, widths: [30, 16, 22, 18], textColumns: [0, 1, 2, 3],
+        rows: [['الاسم', 'الموبايل', 'المجموعة / الفصل', 'الكود']].concat(rows.map(r => [r.name || '', r.phone || '', r.group || '', r.code || '']))
+      }]
+    }
+  };
+}
+
+const arDigits = v => String(v).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+
+/**
+ * An Egyptian mobile as the server stores it (CompRegistry.gs normPhoneEg_, mirrored for a live preview):
+ * → { local: '01…' | '', norm: '1…' | '', problem: '' | the server's reason }
+ */
+export function normPhoneEg(value) {
+  const fail = problem => ({ local: '', norm: '', problem });
+  const text = String(value === null || value === undefined ? '' : value)
+    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0))
+    .replace(/[‎‏؜‪-‮⁦-⁩﻿]/g, '')
+    .replace(/[\s \-‐-―.()/]/g, '');
+  if (!text) return fail('رقم الموبايل ناقص');
+  const plus = text.charAt(0) === '+';
+  let digits = plus ? text.slice(1) : text;
+  if (!/^\d+$/.test(digits)) return fail('رقم الموبايل فيه حروف أو رموز');
+  const notEgyptian = 'الرقم مش رقم موبايل مصري';
+  if (plus) {
+    if (digits.indexOf('20') !== 0) return fail(notEgyptian);
+    digits = digits.slice(2);
+  }
+  else if (digits.indexOf('0020') === 0) digits = digits.slice(4);
+  else if (digits.indexOf('20') === 0 && digits.length >= 11) digits = digits.slice(2);
+  if (digits.charAt(0) === '0') digits = digits.slice(1);
+  if (digits.charAt(0) !== '1') return fail(notEgyptian);
+  const count = digits.length + 1;
+  if (digits.length < 10) {
+    const missing = 10 - digits.length;
+    return fail('رقم الموبايل ناقص ' + (missing === 1 ? 'رقم' : arDigits(missing) + ' أرقام') + ' (' + arDigits(count) + ' أرقام بدل ١١)');
+  }
+  if (digits.length > 10) {
+    const extra = digits.length - 10;
+    return fail('رقم الموبايل زيادة ' + (extra === 1 ? 'رقم' : arDigits(extra) + ' أرقام') + ' (' + arDigits(count) + ' رقم بدل ١١)');
+  }
+  if (!/^1[0125]\d{8}$/.test(digits)) return fail(notEgyptian);
+  return { local: '0' + digits, norm: digits, problem: '' };
+}
+
+/** «ATH-••••-••••»: a code's shape without the code */
+export const MASKED_CODE = 'ATH-••••-••••';
+
+/** the message an admin pastes in WhatsApp (the code is in the message, never in a URL) */
+export function codeMessage({ name, code, url }) {
+  const first = String(name || '').trim().split(/\s+/)[0] || '';
+  return [
+    'أهلاً ' + first + ' 👋',
+    'ده الكود بتاعك لمسابقات أسرة البابا أثناسيوس – سفاجا:',
+    code,
+    'ادخل بيه من هنا: ' + url,
+    'الكود ده ليك إنت بس، متدّيهوش لحد. ربنا يباركك 🙏'
+  ].join('\n');
+}
+
+/** wa.me for an Egyptian mobile — the chat only, NEVER with text (the code must not travel in a URL) */
+export function waLink(phone) {
+  const n = normPhoneEg(phone);
+  return n.norm ? 'https://wa.me/20' + n.norm : '';
+}
+
+/* a group name without spaces, «ال» and the usual spelling differences (for "did you mean …") */
+function groupKey(name) {
+  return String(name || '').normalize('NFC')
+    .replace(/[ً-ْـ]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي')
+    .replace(/(^|\s)ال/g, '$1').replace(/[\s/\-_.،,]+/g, '').toLowerCase();
+}
+
+function distance(a, b) {
+  if (Math.abs(a.length - b.length) > 2) return 3;
+  const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = row[0];
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = row[j];
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = tmp;
+    }
+  }
+  return row[b.length];
+}
+
+/**
+ * The file's groups that look like a typo of another group (the file's or the registry's):
+ * groups [{ name, count, isNew }], known: [registry group names] → { '<name>': 'the likely one' }
+ */
+export function groupTypos(groups, known) {
+  const list = groups || [];
+  const all = list.map(g => g.name).concat(known || []);
+  const out = {};
+  list.forEach(g => {
+    if (!g.isNew) return;
+    const k = groupKey(g.name);
+    const like = all.find(other => other !== g.name && (groupKey(other) === k || (k.length > 3 && distance(groupKey(other), k) <= 1)));
+    if (!like) return;
+    const other = list.find(x => x.name === like);
+    // the one with more rows (or the registry's) is the likely spelling
+    if (other && other.isNew && other.count < g.count) return;
+    out[g.name] = like;
+  });
+  return out;
+}
