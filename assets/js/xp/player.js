@@ -41,7 +41,7 @@ export function play(stage, { quick, reduced, lite, sound, link, platform }) {
   const multi = items.length > 1;
   const titleOf = item => (item.own ? item.text || link.title || 'من اجتماعنا' : `${item.caption} 😂 | تحديات وألعاب أسرة البابا أثناسيوس`);
 
-  const media = item => mediaNode(item, tl, { className: 'pl-frame__media', advance: multi });
+  const media = item => mediaNode(item, tl, { className: 'pl-frame__media', frame: 16 / 9, advance: multi });
   const frame = h('span', { class: 'pl-frame', 'data-item': items[0].id }, media(items[0]));
   const playButton = h('span', { class: 'pl-play' }, '▶');
   const progress = h('span', { class: 'pl-progress' }, h('i'));

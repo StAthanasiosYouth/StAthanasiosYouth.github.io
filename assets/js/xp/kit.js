@@ -985,38 +985,73 @@ export function clipNode(clip, tl, className = '', { advance = false } = {}) {
 
 
 /**
- * A playlist item on a screen: the picture, or the clip (clipNode), over a
- * blurred copy of itself, so any ratio (9:16, 4:5, 1:1, 16:9…) shows whole
- * instead of cropped ("contain"); the bundled game clips carry their own
- * fill and cover their frame. `ratio` [min, max] (w / h): the box takes the
- * item's own shape, clamped (feeds: FEED, 4:5 to 16:9); else it fills the
- * place the scene gives it. `main`: a class for the picture / video itself.
- * `advance`: see clipNode.
+ * A playlist item on a screen: the picture, or the clip (clipNode). The one
+ * sizing rule for every scene, in three families (xp.css "PLAYLIST ITEMS"):
+ *
+ *  - a box of the item's own shape: `ratio` [min, max] (w / h), the shape
+ *    clamped to it. Feeds (FEED) fill their card's width; messages (CHAT)
+ *    hug the picture (the bubble is as wide as it). Inside the range the
+ *    picture fills the box exactly: no bands, nothing cut.
+ *  - outside the range: shown whole over a blurred copy of itself; or, with
+ *    `crop` (feeds: CROP), cut like the platform does when that loses at
+ *    most that share of it (a tall poster keeps its top: its title).
+ *  - a fixed frame (`frame`: the frame's w / h; stories, players, covers):
+ *    the frame keeps its shape; the picture sits in it at its own shape,
+ *    centered, lifted off its blurred copy (rounded, a soft shadow); within
+ *    8 % of the frame's shape it simply fills the frame.
+ *
+ * The bundled game clips carry their own fill and cover their frame.
+ * `main`: a class for the picture / video itself. `advance`: see clipNode.
  */
-export function mediaNode(item, tl, { className = '', main = '', ratio = null, advance = false, fit = item.own || item.kind === 'image' ? 'contain' : 'cover' } = {}) {
+export function mediaNode(item, tl, { className = '', main = '', ratio = null, crop = 0, frame = 0, advance = false, fit = item.own || item.kind === 'image' ? 'contain' : 'cover' } = {}) {
+
+  const own = (item.w || 1) / (item.h || 1);
+  const shape = ratio ? Math.min(ratio[1], Math.max(ratio[0], own)) : 0;
+  const modifiers = [];
+
+  // outside the box's range, a feed may cut a little off, like the platform itself
+  if (shape && crop && fit === 'contain' && Math.abs(own - shape) > 0.001 && 1 - Math.min(own, shape) / Math.max(own, shape) <= crop) {
+    fit = 'cover';
+    if (own < shape) modifiers.push('xp-media--top');
+  }
+
+  if (frame && fit === 'contain') {
+    modifiers.push(Math.abs(own / frame - 1) <= 0.08 ? 'xp-media--bleed' : 'xp-media--framed');
+  }
 
   const still = item.poster || item.src;
   const inner = item.kind === 'video'
     ? clipNode(item, tl, `xp-media__main ${main}`, { advance })
     : h('img', { class: `xp-media__main ${main}`, src: item.src, alt: '', decoding: 'async' });
-  const box = h('span', { class: `xp-media xp-media--${fit} ${className}`, 'data-kind': item.kind, 'data-id': item.id },
+  const box = h('span', { class: `xp-media xp-media--${fit} ${modifiers.join(' ')} ${className}`, 'data-kind': item.kind, 'data-id': item.id },
     fit === 'contain' && still ? h('img', { class: 'xp-media__bg', src: still, alt: '', decoding: 'async' }) : null,
     inner
   );
 
-  if (ratio) {
-    const shape = Math.min(ratio[1], Math.max(ratio[0], (item.w || 1) / (item.h || 1))).toFixed(4);
-    box.style.aspectRatio = shape;
+  // the item's own shape (a frame sizes the picture from it: xp.css)
+  box.style.setProperty('--ir', own.toFixed(4));
+
+  if (shape) {
+    box.style.aspectRatio = shape.toFixed(4);
     // (a message's picture sizes its bubble from it: xp.css)
-    box.style.setProperty('--r', shape);
+    box.style.setProperty('--r', shape.toFixed(4));
   }
 
   return box;
 
 }
 
-/* the feeds' media box: the item's own shape, between 4:5 and 16:9 */
-export const FEED = [4 / 5, 16 / 9];
+/* feed cards (Facebook, X, Threads, a channel post): the card's full width, 4:5 to a 4:1 banner */
+export const FEED = [4 / 5, 4];
+
+/* a feed cuts a picture taller than 4:5 (or wider than 4:1) when that loses at most this share */
+export const CROP = 0.3;
+
+/* a picture in a message: its own shape from a 9:16 story to a 4:1 banner */
+export const CHAT = [9 / 16, 4];
+
+/* the phone-screen frames (stories, reels, snaps): about 236 × 405 */
+export const STORY = 236 / 405;
 
 
 /**

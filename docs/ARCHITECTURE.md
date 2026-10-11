@@ -335,6 +335,31 @@ No new Sheet column, no migration (data schema stays 5); one media system.
   and numbers and adds `thumb` = the poster for code that only shows
   pictures. Playback in the scenes: `assets/js/xp/*` (separate work).
 
+## Pictures in scenes: one sizing rule
+
+Every scene shows the admin's pictures and clips through `kit.js`
+`mediaNode`, in one of three families (styles: `xp.css` "PLAYLIST ITEMS"):
+
+- **Feed cards** (Facebook, X, Threads, a Telegram channel post): the card's
+  full width, the box's height from the picture's shape (`FEED` 4:5 … 4:1).
+  No height cap: a cap is what left blurred bands beside a 4:5 poster.
+  Taller than 4:5: cut like the platforms do when that loses ≤ 30 %
+  (`CROP`), keeping the top (the poster's title); else shown whole.
+- **Messages** (WhatsApp, Messenger, Discord, Telegram chats): the picture's
+  own shape (`CHAT` 9:16 … 4:1), ≤ 170 px tall and ≤ 190 px wide; the
+  bubble hugs it.
+- **Frames** (Instagram, TikTok, Snapchat stories; the YouTube player; the
+  Spotify cover): the frame keeps the platform's shape; the picture sits in
+  it at its own shape, centered over its blurred copy, rounded with a soft
+  shadow (`--xp-frame-radius` / `--xp-frame-shadow`: flat for YouTube,
+  cover-art corners for Spotify); within 8 % of the frame's shape it fills
+  the frame.
+
+Never stretched. `tools/xp-media-matrix.mjs` (`npm run media-matrix`) draws
+every scene × 9:16 / 4:5 / 1:1 / 16:9 / 4:1 picture on a phone and a
+desktop, measures bands, cuts, stretch and gaps, and writes contact sheets to
+`tools/.cache/matrix/`; `tests/xp-media.e2e.mjs` checks the numbers.
+
 ## Push notifications (Firebase Cloud Messaging)
 
 One content system: a push is a bell item (`Notifications`) that is

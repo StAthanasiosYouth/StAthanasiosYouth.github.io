@@ -15,7 +15,7 @@
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { deck, timeline, float, floats, spray, side, climb, tickUp, playlist, cycle, mediaNode, words, fitWords, bubble, chip, pick, compact, LOGO, EASE, SPRING } from './kit.js';
+import { deck, timeline, float, floats, spray, side, climb, tickUp, playlist, cycle, mediaNode, words, fitWords, STORY, bubble, chip, pick, compact, LOGO, EASE, SPRING } from './kit.js';
 import { PAGE, QUICK, WHO } from './talk.js';
 import { ui } from './glyphs.js';
 
@@ -34,7 +34,7 @@ export function play(stage, { quick, reduced, lite, sound, link }) {
   const multi = items.length > 1;
 
   const slide = item => h('div', { class: 'tt-clip', 'data-item': item.id, 'data-kind': item.kind },
-    mediaNode(item, tl, { className: 'tt-clip__media', main: 'tt-clip__video', advance: multi })
+    mediaNode(item, tl, { className: 'tt-clip__media', main: 'tt-clip__video', frame: STORY, advance: multi })
   );
   let current = slide(items[0]);
   const clips = h('div', { class: 'tt-clips' }, current);

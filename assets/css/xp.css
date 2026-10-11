@@ -3540,20 +3540,64 @@ html[data-motion="reduced"] .ch-typing i {
   object-fit: cover;
 }
 
-/* small screens in a message: never taller than this (wider: blurred sides) */
-/* a picture in a message: its own shape, never taller than 170px; the bubble hugs it */
+/* a feed's cut of a tall poster keeps its top (the title) */
+.xp-media--top .xp-media__main {
+  object-position: 50% 18%;
+}
+
+/*
+ * ONE SIZING RULE, three families (kit.js mediaNode):
+ *  - feed cards: the card's full width, the box's height from the item's
+ *    shape (FEED 4:5 … 4:1): no height cap here, a cap is what left the
+ *    blurred bands beside a 4:5 poster;
+ *  - messages: the bubble hugs the picture (CHAT 9:16 … 4:1);
+ *  - frames (stories, players, covers): the frame keeps its shape, the
+ *    picture sits in it at its own (--ir), centered, lifted off its blurred
+ *    copy; --xp-frame-radius / --xp-frame-shadow give each platform its look.
+ */
+
+/* a picture in a message: its own shape, never taller than 170px nor wider than 190px; the bubble hugs it */
 .ch-msg__photo.xp-media,
 .wa-photo.xp-media {
   width: min(calc(var(--r, 1) * 170px), 190px);
   max-width: 100%;
 }
 
-.fd-post__photo.xp-media {
-  max-height: 180px;
+/* a channel post (Telegram): the photo is the post's full width, like a feed */
+.ch-msg--post .ch-msg__photo.xp-media {
+  width: auto;
+  margin-inline: -8px;
 }
 
-.fb-post__media.xp-media {
-  max-height: 260px;
+.xp-media.xp-media--framed {
+  container-type: size;
+}
+
+.xp-media.xp-media--framed .xp-media__main {
+  inset: 0;
+  margin: auto;
+  width: min(100cqw, calc(100cqh * var(--ir, 1)));
+  height: auto;
+  max-height: 100cqh;
+  aspect-ratio: var(--ir, 1);
+  object-fit: cover;
+  border-radius: var(--xp-frame-radius, 12px);
+  box-shadow: var(--xp-frame-shadow, 0 18px 38px -14px rgba(0, 0, 0, .85), 0 0 0 1px rgba(255, 255, 255, .07));
+}
+
+.xp-media.xp-media--bleed .xp-media__main {
+  object-fit: cover;
+}
+
+/* YouTube: a player's plain pillar / letterbox (square, flat) over the blur */
+.pl-frame {
+  --xp-frame-radius: 0;
+  --xp-frame-shadow: none;
+}
+
+/* Spotify: cover-art corners */
+.mu-cover {
+  --xp-frame-radius: 4px;
 }
 
 .wa-photo {

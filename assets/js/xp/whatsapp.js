@@ -12,7 +12,7 @@
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { deck, timeline, spray, side, playlist, cycle, mediaNode, words, fitWords, typeInto, bubble, chip, rand, pick, digits, meetingLine, LOGO, EASE, SPRING } from './kit.js';
+import { deck, timeline, spray, side, playlist, cycle, mediaNode, words, fitWords, CHAT, typeInto, bubble, chip, rand, pick, digits, meetingLine, LOGO, EASE, SPRING } from './kit.js';
 import { GROUP, MINE, REPLIES, WHO, SERVANT, nextTopic } from './talk.js';
 import { ui } from './glyphs.js';
 
@@ -49,7 +49,7 @@ function shared(item, tl, advance, i = 0) {
   const who = sender(item, i);
   return h('div', { class: `wa-msg wa-msg--${who ? 'in' : 'out'} wa-msg--media`, 'data-item': item.id },
     who ? h('b', { class: `wa-msg__who wa-who--${who === SERVANT ? 3 : i % TONES}` }, who) : null,
-    mediaNode(item, tl, { className: 'wa-photo', ratio: [9 / 16, 2], advance }),
+    mediaNode(item, tl, { className: 'wa-photo', ratio: CHAT, advance }),
     item.text ? words(item.text, { className: 'wa-text', lines: 6, more: 'اقرأ المزيد' }) : null,
     h('span', { class: 'wa-meta' }, stamp(), who ? null : h('span', { class: 'wa-ticks is-read' }, '✓✓'))
   );

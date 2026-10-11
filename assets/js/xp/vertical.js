@@ -17,7 +17,7 @@
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { deck, timeline, spray, side, floats, playlist, cycle, mediaNode, words, fitWords, typeInto, bubble, chip, pick, digits, LOGO, EASE, SPRING } from './kit.js';
+import { deck, timeline, spray, side, floats, playlist, cycle, mediaNode, words, fitWords, STORY, typeInto, bubble, chip, pick, digits, LOGO, EASE, SPRING } from './kit.js';
 import { COMMENTS, WHO } from './talk.js';
 import { ui } from './glyphs.js';
 
@@ -38,7 +38,7 @@ export function play(stage, { quick, reduced, lite, sound, link, platform }, var
   const frames = items.map((item, i) => {
     const text = item.own ? item.text : `«${item.topic}» ${snap ? '👻' : '✨'}`;
     return h('div', { class: `vt-frame vt-frame--${i % 3}`, 'data-item': item.id },
-      mediaNode(item, tl, { className: 'vt-frame__media', main: 'vt-frame__img', advance: count > 1 }),
+      mediaNode(item, tl, { className: 'vt-frame__media', main: 'vt-frame__img', frame: STORY, advance: count > 1 }),
       text ? words(text, { className: 'vt-frame__caption', lines: 3 }) : null
     );
   });

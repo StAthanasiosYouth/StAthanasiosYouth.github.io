@@ -13,7 +13,7 @@
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { deck, timeline, float, floats, spray, side, playlist, cycle, mediaNode, words, fitWords, typeInto, bubble, chip, pick, digits, LOGO, EASE, SPRING } from './kit.js';
+import { deck, timeline, float, floats, spray, side, playlist, cycle, mediaNode, words, fitWords, STORY as STORY_FRAME, typeInto, bubble, chip, pick, digits, LOGO, EASE, SPRING } from './kit.js';
 import { PAGE, COMMENTS, WHO } from './talk.js';
 import { ui } from './glyphs.js';
 
@@ -33,7 +33,7 @@ export function play(stage, { quick, reduced, lite, sound, link }) {
   const frames = items.map((item, i) => {
     const text = item.own ? item.text : item.kind === 'video' ? `${item.caption} 😂🔥` : `«${item.topic}» ✨`;
     return h('div', { class: `ig-frame ig-frame--${i % 3}${item.kind === 'video' ? ' ig-frame--reel' : ''}`, 'data-item': item.id },
-      mediaNode(item, tl, { className: 'ig-frame__media', main: item.kind === 'video' ? 'ig-frame__video' : 'ig-frame__img', advance: count > 1 }),
+      mediaNode(item, tl, { className: 'ig-frame__media', frame: STORY_FRAME, main: item.kind === 'video' ? 'ig-frame__video' : 'ig-frame__img', advance: count > 1 }),
       item.kind === 'video' ? h('span', { class: 'ig-frame__tag' }, '▶ ريلز') : null,
       text ? words(text, { className: 'ig-frame__caption', lines: 3 }) : null
     );

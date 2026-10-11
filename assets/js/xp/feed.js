@@ -17,7 +17,7 @@
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { deck, timeline, spray, side, floats, playlist, cycle, mediaNode, words as say, fitWords, FEED, bubble, chip, rand, pick, compact, meetingLine, LOGO, EASE, SPRING } from './kit.js';
+import { deck, timeline, spray, side, floats, playlist, cycle, mediaNode, words as say, fitWords, FEED, CROP, bubble, chip, rand, pick, compact, meetingLine, LOGO, EASE, SPRING } from './kit.js';
 import { PAGE, COMMENTS, WHO, TIMES, channelPosts } from './talk.js';
 import { ui } from './glyphs.js';
 
@@ -41,7 +41,7 @@ function post({ item = null, text, likes = 40, time = 'من ساعة' }, tl = nu
     h('span', { class: 'fd-post__body' },
       h('span', { class: 'fd-post__who' }, h('b', {}, PAGE.short), h('span', { class: 'fd-post__handle' }, `${HANDLE} · ${time}`)),
       say(text, { className: 'fd-post__text', lines: 7, more: '… عرض المزيد' }),
-      item && item.kind !== 'text' ? mediaNode(item, tl, { className: 'fd-post__photo', ratio: FEED, advance }) : null,
+      item && item.kind !== 'text' ? mediaNode(item, tl, { className: 'fd-post__photo', ratio: FEED, crop: CROP, advance }) : null,
       // X: reply, repost, like, views, share — Threads: like, reply, repost, send
       threads
         ? h('span', { class: 'fd-post__actions fd-post__actions--threads' },

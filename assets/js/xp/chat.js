@@ -24,7 +24,7 @@
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { deck, timeline, spray, side, playlist, cycle, mediaNode, words as say, fitWords, FEED, typeInto, bubble, chip, rand, pick, digits, compact, LOGO, EASE, SPRING } from './kit.js';
+import { deck, timeline, spray, side, playlist, cycle, mediaNode, words as say, fitWords, FEED, CROP, CHAT, typeInto, bubble, chip, rand, pick, digits, compact, LOGO, EASE, SPRING } from './kit.js';
 import { GROUP, MINE, WHO, channelPosts } from './talk.js';
 import { ui } from './glyphs.js';
 
@@ -37,8 +37,10 @@ const NAME = 'أسرة البابا أثناسيوس';
 /* an own picture or clip the admin left without words */
 const GENERIC = 'من اجتماعنا 🤍 كل أحد الساعة ٨ مساءً';
 
-/* a picture / clip in a message (its own shape, between 4:5 and 16:9) */
-const photo = (item, tl, advance) => mediaNode(item, tl, { className: 'ch-msg__photo', ratio: FEED, advance });
+/* a picture / clip in a message: its own shape, the bubble hugs it (CHAT); in a channel post: the post's full width (FEED) */
+const photo = (item, tl, advance, wide = false) => mediaNode(item, tl, wide
+  ? { className: 'ch-msg__photo', ratio: FEED, crop: CROP, advance }
+  : { className: 'ch-msg__photo', ratio: CHAT, advance });
 const text = (words, lines = 8) => say(words, { className: 'ch-msg__text', lines, more: 'اقرأ المزيد' });
 
 /* Messenger: the conversation (the page answering, the visitor asking) */
@@ -64,7 +66,7 @@ function reactions(list) {
 function post({ item = null, text: words, views, reacts, time = '٨:٠٢ م' }, tl = null, advance = false) {
 
   return h('div', { class: 'ch-msg ch-msg--post', 'data-item': item ? item.id : null },
-    item && item.kind !== 'text' ? photo(item, tl, advance) : null,
+    item && item.kind !== 'text' ? photo(item, tl, advance, true) : null,
     text(words),
     h('span', { class: 'ch-msg__meta' }, h('span', { class: 'ch-views' }, '👁 ', h('b', { 'data-n': views }, compact(views))), h('span', { class: 'ch-time' }, time)),
     reacts ? reactions(reacts) : null

@@ -16,7 +16,7 @@
 
 import { h } from '../dom.js';
 import { iconNode } from '../icons.js';
-import { deck, timeline, float, floats, spray, side, playlist, cycle, mediaNode, words, fitWords, FEED, climb, tickUp, typeInto, bubble, chip, pick, compact, digits, LOGO, EASE, SPRING } from './kit.js';
+import { deck, timeline, float, floats, spray, side, playlist, cycle, mediaNode, words, fitWords, FEED, CROP, climb, tickUp, typeInto, bubble, chip, pick, compact, digits, LOGO, EASE, SPRING } from './kit.js';
 import { PAGE, COMMENTS, PAGE_REPLIES, WHO, TIMES, pagePosts } from './talk.js';
 import { ui } from './glyphs.js';
 
@@ -38,7 +38,7 @@ function post({ item, text, time }, likes, tl, advance) {
       h('span', { class: 'fb-post__who' }, h('b', {}, PAGE.facebook), h('i', {}, `${time} · 🌐`))
     ),
     words(text, { className: 'fb-post__text', lines: 5, more: '… عرض المزيد' }),
-    item && item.kind !== 'text' ? mediaNode(item, tl, { className: 'fb-post__media', ratio: FEED, advance }) : null,
+    item && item.kind !== 'text' ? mediaNode(item, tl, { className: 'fb-post__media', ratio: FEED, crop: CROP, advance }) : null,
     h('div', { class: 'fb-post__counts' }, h('span', { class: 'fb-post__faces' }, '👍❤️'), count, h('span', { class: 'fb-post__more' }, `${digits(Math.round(likes / 9))} تعليق · ${digits(Math.round(likes / 30) + 1)} مشاركة`)),
     h('div', { class: 'fb-post__actions' }, h('span', {}, ui('thumb'), 'أعجبني'), h('span', {}, ui('talk'), 'تعليق'), h('span', {}, ui('share'), 'مشاركة'))
   );

@@ -52,7 +52,7 @@ export function play(stage, { quick, reduced, lite, sound, link, platform }) {
     title.textContent = track.title;
     if (track.item) {
       cover.classList.add('is-media');
-      cover.replaceChildren(mediaNode(track.item, tl, { className: 'mu-cover__media', advance: queue.length > 1 }));
+      cover.replaceChildren(mediaNode(track.item, tl, { className: 'mu-cover__media', frame: 1, advance: queue.length > 1 }));
     }
     else {
       cover.classList.remove('is-media');
