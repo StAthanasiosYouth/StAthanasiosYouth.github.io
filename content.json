@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "01fb351d17ff",
-  "publishedAt": "2026-10-11T00:12:13.194Z",
+  "revision": "56f36e03efa6",
+  "publishedAt": "2026-10-11T14:57:41.660Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -236,8 +236,43 @@
   "news": [],
   "games": [],
   "notifications": [],
-  "activities": [],
-  "types": [],
+  "activities": [
+    {
+      "id": "act-8282cddb",
+      "type": "competition",
+      "section": "competitions",
+      "title": "test",
+      "subtitle": "",
+      "description": "",
+      "image": {
+        "src": "media/2026/img-4f71317c.webp",
+        "thumb": "media/2026/img-4f71317c-480.webp",
+        "w": 1600,
+        "h": 400,
+        "alt": "",
+        "color": "#1b324b"
+      },
+      "cta": null,
+      "location": "",
+      "startAt": "2026-10-11T17:50",
+      "endAt": "2026-10-11T22:00",
+      "visibleFrom": "",
+      "visibleUntil": "2026-10-11T22:00",
+      "display": "",
+      "displayMobile": "",
+      "competition": "test",
+      "ctaLabel": "ابدأ المسابقة"
+    }
+  ],
+  "types": [
+    {
+      "key": "competition",
+      "label": "مسابقة",
+      "icon": "trophy",
+      "theme": "ember",
+      "banner": null
+    }
+  ],
   "layout": [
     {
       "key": "meeting",
@@ -368,6 +403,17 @@
       "banner": null,
       "visibleFrom": "",
       "visibleUntil": ""
+    }
+  ],
+  "competitions": [
+    {
+      "id": "cmp-9227de8c",
+      "slug": "test",
+      "title": "test",
+      "shortTitle": "",
+      "startAt": "2026-10-11T17:50",
+      "endAt": "2026-10-11T22:00",
+      "v": "568d58016e00c6cd"
     }
   ]
 }
