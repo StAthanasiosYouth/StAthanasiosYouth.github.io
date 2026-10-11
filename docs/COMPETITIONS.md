@@ -378,8 +378,8 @@ portalMe    { ptoken }          (Phase 3 portal; works with the registry alone,
                                  wallet/shop parts present only when enabled)
             → { ok, participant:{ name, group }, features:{ wallet, shop },
                 balance?, ledger?:[{ amount, kind, note, compTitle, createdAt }],
-                history:[{ compId, title, slug, submittedAt, status, score?, maxScore?,
-                           pointsAwarded?, pending?, canReview }],
+                history:[{ submissionId, compId, title, slug, submittedAt, status, score?, maxScore?,
+                           pointsAwarded?, pending?, canReview }],   ← submissionId: what portalReview takes
                 redemptions?:[{ id, itemName, cost, status, requestedAt }],
                 shop?:[{ id, name, description, image, cost, category, available, perPersonLeft }] }
 
@@ -609,7 +609,29 @@ Replies are re-validated (`flow.js` `cleanAttempt`, `cleanQuestions`,
 (shown when present), `field` (compStart invalid), `qid` (compSubmit invalid),
 `startAt` (not_open). A Result's `review` is rendered only when present.
 
-### 13.2 Admin preview protocol
+### 13.2 «نقاطي» (points/index.html, `assets/js/comp/portal.js` + pure `portal-model.js`)
+
+One stable page (no per-participant URL, `noindex`). Code entry and the
+«الكود مسجل باسم …» confirm are the engine's own (view.js parts). The
+`ptoken` is kept in `sessionStorage['athanasios.portal.v1']` only (this tab;
+«خروج» removes it); a `session` reply anywhere → back to code entry;
+`disabled` → «الصفحة دي مش متاحة دلوقتي». Requests (same transport as §13.1):
+```
+compCode     { code:'ATH-XXXX-XXXX' }
+portalMe     { ptoken }                       on load (token in the tab) / after confirm / quietly after a redeem
+portalReview { ptoken, submissionId }         «شوف إجاباتك» (only when history[].canReview)
+shopRedeem   { ptoken, itemId, requestKey }   requestKey = randomUUID per confirmed request, REUSED when the
+                                              previous try ended in network/busy (it may have landed); a new
+                                              key after success or a final error
+```
+Balance and ledger show only with `features.wallet`, the store with
+`features.shop` (and wallet). Store items: `available` = remaining stock
+(null = unlimited; 0 → «خلصت»), `perPersonLeft` (null = no limit; 0 →
+«وصلت للحد المسموح»). After a redeem the balance comes from the reply.
+Error words: insufficient «رصيدك مش كفاية», stock «الجايزة دي خلصت»,
+per_person «وصلت للحد المسموح من الجايزة دي».
+
+### 13.3 Admin preview protocol
 
 The admin opens `competition/index.html?preview` in a SAME-ORIGIN iframe.
 The page only enters preview mode when its parent is same-origin (else it

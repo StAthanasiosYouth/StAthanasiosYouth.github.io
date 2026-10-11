@@ -186,7 +186,7 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
       ),
       h('div', { class: 'actions' },
         btn(m.busy ? 'بنتأكد…' : 'تأكيد', null, { kind: 'primary', type: 'submit', disabled: m.busy || null }),
-        btn('رجوع', m.actions.back)
+        m.hideCodeBack ? null : btn('رجوع', m.actions.back)
       ));
       return form;
     },
@@ -578,6 +578,14 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
 
   }
 
-  return { render, update, announce };
+  /* building blocks for other pages of the engine (portal.js «نقاطي») */
+  const parts = {
+    icon, picture, btn, heading, errorBox, reviewList,
+    codeForm: m => screens.code(m),
+    confirmBox: m => screens.confirm(m),
+    homeHref
+  };
+
+  return { render, update, announce, parts };
 
 }
