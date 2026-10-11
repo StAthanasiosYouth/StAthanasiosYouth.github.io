@@ -574,6 +574,35 @@ function shopPortal_(pid) {
 }
 
 
+/*
+ * The same request again (under compLock_): a request whose charge was never linked is
+ * settled first — its ledger row (idemKey red:<id>) is linked when it exists, otherwise it
+ * is charged now, or cancelled when the balance no longer covers it.
+ */
+function shopSettle_(row, pid) {
+
+  var t = compSheet_('Redemptions');
+  var status = row.status;
+
+  if (!row.ledgerId && row.status !== 'cancelled') {
+    var rowNumber = compFindRow_(t, 'id', row.id);
+    var charged = walletLedger_().filter(function (l) { return l.idemKey === 'red:' + row.id; })[0];
+    if (!charged) {
+      var cost = Number(row.cost) || 0;
+      if (walletBalance_(pid, true) < cost) {
+        if (rowNumber) compUpdate_(t, rowNumber, { status: 'cancelled', note: 'ما اتخصمش', updatedAt: compNow_().stamp }, null);
+        return compFail_('insufficient', 'رصيدك مش كفاية.', { balance: walletBalance_(pid, true) });
+      }
+      charged = walletAppend_([{ participantId: pid, amount: -cost, kind: 'redeem', refType: 'redemption', refId: row.id, note: row.itemName, idemKey: 'red:' + row.id, actor: '' }])[0];
+    }
+    if (rowNumber) compUpdate_(t, rowNumber, { ledgerId: charged.id }, null);
+  }
+
+  return { ok: true, redemption: { id: row.id, status: status, itemName: row.itemName, cost: Number(row.cost) || 0 }, balance: walletBalance_(pid, true), replay: true };
+
+}
+
+
 /**
  * shopRedeem { ptoken, itemId, requestKey } → { ok, redemption: { id, status, itemName, cost }, balance }.
  * Everything under one compLock_: the same requestKey → the same redemption; item active; stock left;
@@ -602,10 +631,11 @@ function shopRedeemAction_(arg) {
   try {
 
     var redemptions = shopRedemptionRows_();
-    var same = redemptions.filter(function (r) { return r.participantId === pid && r.requestKey === arg.requestKey; })[0];
+    // a request that failed before it was charged (cancelled, no ledger row) is not "the same request"
+    var same = redemptions.filter(function (r) { return r.participantId === pid && r.requestKey === arg.requestKey && !(r.status === 'cancelled' && !r.ledgerId); })[0];
 
     if (same) {
-      reply = { ok: true, redemption: { id: same.id, status: same.status, itemName: same.itemName, cost: Number(same.cost) || 0 }, balance: walletBalance_(pid, true), replay: true };
+      reply = shopSettle_(same, pid);
       return reply;
     }
 
@@ -638,9 +668,10 @@ function shopRedeemAction_(arg) {
 
     var id = 'r-' + compRandomHex_(5);
     var stamp = compNow_().stamp;
-    var entry = walletAppend_([{ participantId: pid, amount: -item.cost, kind: 'redeem', refType: 'redemption', refId: id, note: item.name, idemKey: 'red:' + id, actor: '' }])[0];
+    var t = compSheet_('Redemptions');
 
-    compAppend_(compSheet_('Redemptions'), [{
+    // 1. the request (not charged yet: ledgerId empty)
+    var rowNumber = compAppend_(t, [{
       id: id,
       participantId: pid,
       itemId: item.id,
@@ -648,14 +679,38 @@ function shopRedeemAction_(arg) {
       cost: String(item.cost),
       status: 'pending',
       requestKey: arg.requestKey,
-      ledgerId: entry.id,
+      ledgerId: '',
       refundLedgerId: '',
       requestedAt: stamp,
       handledBy: '',
       handledAt: '',
       note: '',
       updatedAt: stamp
-    }]);
+    }])[0];
+
+    // 2. the charge; if it fails the request is cancelled (never an uncharged prize)
+    var entry;
+
+    try {
+      entry = walletAppend_([{ participantId: pid, amount: -item.cost, kind: 'redeem', refType: 'redemption', refId: id, note: item.name, idemKey: 'red:' + id, actor: '' }])[0];
+    }
+    catch (error) {
+      try {
+        compUpdate_(t, rowNumber, { status: 'cancelled', note: 'ما اتخصمش', updatedAt: stamp }, null);
+      }
+      catch (ignored) {
+        // a replay with the same key settles it (shopSettle_)
+      }
+      throw error;
+    }
+
+    // 3. the link (if this fails, the ledger row's refId still names the request: shopSettle_ heals it)
+    try {
+      compUpdate_(t, rowNumber, { ledgerId: entry.id }, null);
+    }
+    catch (ignored) {
+      // healed on a replay / by the ledger's refId
+    }
 
     reply = { ok: true, redemption: { id: id, status: 'pending', itemName: item.name, cost: item.cost }, balance: balance - item.cost };
 

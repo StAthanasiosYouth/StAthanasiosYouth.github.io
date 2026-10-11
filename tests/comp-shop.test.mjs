@@ -263,3 +263,35 @@ test('a store picture added after the last publish: «انشر» still uploads i
   const again = call('apiPublish', call('apiReview').revision);
   assert.equal(again.unchanged, true, 'nothing waits any more');
 });
+
+
+test('a charge that fails half-way: the request is cancelled (never an uncharged prize), the same requestKey then goes through charged once; a lost link is healed', () => {
+  const { world, mina, tokens, item } = shopWorld();
+  const mug = item({ name: 'كوباية', cost: 300 });
+  const real = world.gs.walletAppend_;
+  world.gs.walletAppend_ = () => { throw new Error('sheet down'); };
+  const key = requestKey();
+  const failed = redeem(world, tokens.mina, mug.id, key);
+  world.gs.walletAppend_ = real;
+  assert.equal(failed.code, 'busy');
+  let reds = tab(world, 'Redemptions');
+  assert.deepEqual(reds.map(r => [r.status, r.ledgerId]), [['cancelled', '']]);
+  assert.equal(world.gs.walletBalance_(mina.id, true), 500, 'nothing charged');
+  const retry = redeem(world, tokens.mina, mug.id, key);
+  assert.equal(retry.ok, true);
+  assert.equal(retry.balance, 200);
+  reds = tab(world, 'Redemptions');
+  assert.equal(reds.length, 2);
+  assert.ok(reds[1].ledgerId, 'linked');
+  assert.equal(redeem(world, tokens.mina, mug.id, key).redemption.id, retry.redemption.id, 'then a normal replay');
+  assert.equal(ledger(world).filter(r => r.kind === 'redeem').length, 1);
+
+  // the link write is lost after the charge: the replay links the existing ledger row (no second charge)
+  const sheet = world.compSpreadsheet.getSheetByName('Redemptions');
+  const col = sheet.data[0].indexOf('ledgerId');
+  sheet.data.find(r => r[0] === retry.redemption.id)[col] = '';
+  world.gs.COMP_TABS_ = {};
+  assert.equal(redeem(world, tokens.mina, mug.id, key).ok, true);
+  assert.equal(ledger(world).filter(r => r.kind === 'redeem').length, 1);
+  assert.ok(tab(world, 'Redemptions').find(r => r.id === retry.redemption.id).ledgerId);
+});

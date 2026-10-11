@@ -654,3 +654,19 @@ test('failed-code day counter: one property write per counted failure, none once
   assert.equal(writes, 0, 'no write past the cap');
   assert.equal(world.properties.get('COMP_FAIL_DAY'), today + ':1000');
 });
+
+
+test('regRowById_: the row read must carry the id looked for (rows shift after an undo), else it looks again, else null', () => {
+  const { world, call } = regWorld();
+  const a = addPerson(call, 'مينا عادل', phone(91));
+  const b = addPerson(call, 'مريم زكريا', phone(92));
+  const real = world.gs.compFindRow_;
+  let calls = 0;
+  // the first lookup lands on the wrong row (as if a row above was deleted in between)
+  world.gs.compFindRow_ = (t, column, value) => (++calls === 1 ? real(t, column, b.id) : real(t, column, value));
+  assert.equal(world.gs.regRowById_(a.id).id, a.id);
+  assert.equal(calls, 2, 'looked again');
+  world.gs.compFindRow_ = (t, column) => real(t, column, b.id);
+  assert.equal(world.gs.regRowById_(a.id), null, 'never someone else');
+  world.gs.compFindRow_ = real;
+});

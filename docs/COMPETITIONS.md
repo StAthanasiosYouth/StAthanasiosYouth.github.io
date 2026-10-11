@@ -965,14 +965,39 @@ picture is not in content.json), `Activity.gs` (summaries, push decisions),
   answer `code` «الكود ده مش صحيح. اتأكد منه وجرّب تاني.». `reg:hash` misses are
   re-checked against the tab (a stale cache never refuses a real code).
 - Wallet target per submission = (the competition's LIVE definition — else
-  the served version — has `wallet` and `scoring`) AND status `graded` ? score : 0.
+  the served version — has `wallet` and `scoring`) AND status `graded` ? score : 0,
+  and ONE attempt per (participant, competition) earns: the best graded score
+  (ties → the earliest submittedMs, then the earlier row); every other attempt's
+  target is 0. Reconciling any submission reconciles ALL of that participant's
+  submissions in that competition together under one compLock_, so a regrade /
+  void / review that changes which attempt is best moves the points with
+  correction rows (`walletTargets_`; `apiWalletSync` uses the same rule).
   Open submissions never touch the ledger. Reconcile: the candidates
-  (registered rows) are found before the lock; inside it one read of the
+  (registered rows, expanded to their whole groups) are found before the lock; inside it one read of the
   Submissions columns and of the ledger's refType / refId / amount / idemKey,
   one append block. Lock busy → the ids wait in `wal:retry` (cache, 6 h) and
   are taken along by the next reconcile or by `apiWallet`.
-- `apiWalletAdjust` refuses a result below zero («مينفعش الرصيد يبقى بالسالب …»);
-  the note is shown to the participant in «نقاطي» (ledger `note`).
+- `apiWalletAdjust` refuses a DEDUCTION that ends below zero («مينفعش الرصيد يبقى بالسالب …»);
+  an addition is always allowed (it may only raise a negative balance). The idemKey is
+  `adj:<participantId>:<adjustKey>`; the same key with another amount or another
+  participant is refused («المفتاح ده اتستخدم قبل كده.»). The note is shown to the
+  participant in «نقاطي» (ledger `note`).
+- Negative balances: a correction after spending (a regrade, a void) can leave a
+  balance below zero. The correction stays (the ledger is the truth);
+  `apiWallet` flags the row (`negative:true`, `warning:'رصيد بالسالب'`,
+  `totals.negative` = how many), «نقاطي» shows the negative balance, and
+  `shopRedeem` answers `insufficient` until it is covered again.
+- shopRedeem write order (one compLock_): 1. the Redemption (pending, ledgerId ''),
+  2. the ledger row (redeem, −cost, idemKey red:<id>) — if it fails the request is
+  marked cancelled (note «ما اتخصمش») and the call answers `busy`; the same
+  requestKey then makes a NEW request (a cancelled, never-charged one doesn't
+  count as "the same"), 3. ledgerId set. A replay of a request whose link is
+  missing settles it (`shopSettle_`): the ledger row is linked if it exists, else
+  it is charged now, or cancelled when the balance no longer covers it.
+- `regRowById_` (tokens, compCode) only returns a row whose id is the one looked
+  for (rows shift after an undone import), looking once more, else null.
+- «نقاطي» `canReview` / `portalReview` call the shared `compResult_` (CompPublic.gs):
+  the same reveal rule as `compResult`, no copy of it.
 - Store: `pending → fulfilled` directly is allowed (handing the prize over
   without the «approved» step). The same status again changes nothing
   (`changed:false`; a second cancel never refunds twice). `stock` may not go
@@ -1057,8 +1082,9 @@ apiParticipantsUndoImport(batch) → { removed, batch }   (only the participants
 
 ```
 apiWallet({ q, group, status, sort:'balance'|'earned'|'spent'|'lastAt'|'name', dir, offset, limit ≤ 200, all? })
-  → { items:[{ id, name, phone, group, status, balance, earned, adjusted, spent, entries, lastAt }], total, offset,
-      limit, totals:{ participants, balance, earned, adjusted, spent, entries }, modules }
+  → { items:[{ id, name, phone, group, status, balance, earned, adjusted, spent, entries, lastAt, negative,
+      warning ('رصيد بالسالب' | '') }], total, offset, limit,
+      totals:{ participants, balance, earned, adjusted, spent, entries, negative }, modules }
   (only participants with ledger rows unless all:true; default sort balance desc)
   earned = competition + correction, adjusted = manual, spent = −(redeem + refund)
 apiWalletParticipant(id) → { participant: Person, balance, totals, entries:[{ id, amount, kind, kindLabel, note,
@@ -1066,7 +1092,8 @@ apiWalletParticipant(id) → { participant: Person, balance, totals, entries:[{ 
                              createdAt, balanceAfter }] (newest first) }
 apiWalletAdjust(id, amount, note, adjustKey) → { entry:{ id, amount, kind:'manual', note, createdAt }, balance, replay }
   amount: non-zero integer, |amount| ≤ 1,000,000; note required ≤ 200; adjustKey /^[A-Za-z0-9_-]{8,64}$/
-  (a new key per confirmed form; the same key again → replay:true, no new row). Official admin only.
+  (a new key per confirmed form; the same key again with the same participant and amount → replay:true,
+  no new row; otherwise refused). Official admin only.
 apiWalletSync() → { checked, fixed, entries }   (official admin only; logged points.adjust with changes.sync
   «راجع النقاط مع النتايج (n مشاركة اتصلحت)» only when fixed > 0)
 ```

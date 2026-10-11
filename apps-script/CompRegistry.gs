@@ -1374,9 +1374,16 @@ function regRowById_(id) {
   if (!ss.getSheetByName('Participants')) return null;
 
   var t = regSheet_();
-  var rowNumber = compFindRow_(t, 'id', id);
 
-  return rowNumber ? compRowAt_(t, rowNumber) : null;
+  // the row read must be the one found (rows shift when an import is undone): look again once
+  for (var attempt = 0; attempt < 2; attempt++) {
+    var rowNumber = compFindRow_(t, 'id', id);
+    var row = rowNumber ? compRowAt_(t, rowNumber) : null;
+    if (!row) return null;
+    if (row.id === id) return row;
+  }
+
+  return null;
 
 }
 

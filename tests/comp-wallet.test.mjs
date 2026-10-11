@@ -163,7 +163,11 @@ test('manual adjustment: idempotent by key, never below zero, note required, log
   assert.equal(again.entry.id, first.entry.id);
   assert.equal(again.balance, 65);
   assert.equal(ledger(world).filter(r => r.kind === 'manual').length, 1, 'one row for one key');
-  assert.equal(ledger(world).find(r => r.kind === 'manual').idemKey, 'adj:adjust-key-0001');
+  assert.equal(ledger(world).find(r => r.kind === 'manual').idemKey, 'adj:' + mina.id + ':adjust-key-0001', 'scoped to the participant');
+  // the same key for another amount or another participant: refused, never another entry
+  assert.throws(() => call('apiWalletAdjust', mina.id, 60, 'حضور الاجتماع ٤ مرات', 'adjust-key-0001'), /المفتاح ده اتستخدم قبل كده/);
+  assert.throws(() => call('apiWalletAdjust', mariam.id, 50, 'حضور الاجتماع ٤ مرات', 'adjust-key-0001'), /المفتاح ده اتستخدم قبل كده/);
+  assert.equal(ledger(world).filter(r => r.kind === 'manual').length, 1);
 
   assert.throws(() => call('apiWalletAdjust', mina.id, -66, 'غلطة', 'adjust-key-0002'), /بالسالب: رصيده دلوقتي ٦٥/);
   assert.equal(call('apiWalletAdjust', mina.id, -65, 'تصحيح', 'adjust-key-0003').balance, 0);
@@ -180,7 +184,7 @@ test('manual adjustment: idempotent by key, never below zero, note required, log
 
   const list = call('apiWallet', {});
   assert.deepEqual(list.items.map(i => [i.name, i.balance]), [['مريم زكريا', 20], ['مينا عادل', 0]]);
-  assert.deepEqual(plain(list.totals), { participants: 2, balance: 20, earned: 15, adjusted: 5, spent: 0, entries: 4 });
+  assert.deepEqual(plain(list.totals), { participants: 2, balance: 20, earned: 15, adjusted: 5, spent: 0, entries: 4, negative: 0 });
   assert.equal(call('apiWallet', { q: 'مينا' }).items.length, 1);
   assert.equal(call('apiWallet', { sort: 'name' }).items[0].name, 'مريم زكريا');
 
@@ -254,4 +258,93 @@ test('drift: the wallet list heals the latest graded submissions; apiWalletSync 
   assert.equal(sync.fixed, 1);
   assert.equal(world.gs.walletBalance_(mina.id, true), 0);
   assert.equal(ledger(world).at(-1).kind, 'correction');
+});
+
+
+/* ---------------- one attempt per participant and competition earns ---------------- */
+
+/* start + submit with chosen answers: single = choice text, tf = 't' | 'f' */
+function playWith(world, ptoken, single, tf, slug = 'coded-quiz') {
+  const key = clientKey();
+  const s = pub(world, 'compStart', { slug, clientKey: key, ptoken });
+  assert.equal(s.ok, true, JSON.stringify(s));
+  const answers = {};
+  for (const q of s.questions) {
+    if (q.type === 'single') answers[q.id] = q.choices.find(c => c.text === single).id;
+    if (q.type === 'truefalse') answers[q.id] = tf;
+  }
+  const done = pub(world, 'compSubmit', { token: s.attempt.token, clientKey: key, answers });
+  assert.equal(done.ok, true, JSON.stringify(done));
+  return { id: s.attempt.id, done };
+}
+
+const pointsOf = (world, id) => world.gs.walletPointsFor_(id);
+
+test('attempts: only the best graded attempt earns (3 attempts → the best one; the others 0); idempotent', () => {
+  const { world, mina, tokens } = walletWorld({ overrides: { attempts: 3 } });
+  const a = playWith(world, tokens.mina, 'نوح', 'f');      // 10
+  assert.equal(world.gs.walletBalance_(mina.id, true), 10);
+  const b = playWith(world, tokens.mina, 'نوح', 't');      // 15: the points move here
+  const c = playWith(world, tokens.mina, 'موسى', 'f');     // 0
+  assert.deepEqual([pointsOf(world, a.id), pointsOf(world, b.id), pointsOf(world, c.id)], [0, 15, 0]);
+  assert.equal(world.gs.walletBalance_(mina.id, true), 15, 'not 25');
+  const before = ledger(world).length;
+  world.gs.walletReconcileMany_([a.id, b.id, c.id]);
+  world.gs.walletReconcile_(c.id);
+  assert.equal(ledger(world).length, before, 'idempotent');
+  // a tie: the earlier attempt keeps the points
+  const { world: w2, mina: m2, tokens: t2 } = walletWorld({ overrides: { attempts: 3 } });
+  const first = playWith(w2, t2.mina, 'نوح', 't');
+  w2.advance(60000);
+  const second = playWith(w2, t2.mina, 'نوح', 't');
+  assert.deepEqual([pointsOf(w2, first.id), pointsOf(w2, second.id)], [15, 0]);
+  assert.equal(w2.gs.walletBalance_(m2.id, true), 15);
+});
+
+test('attempts: a regrade that makes another attempt the best moves the points; voiding the best gives them to the next best; the sync agrees', () => {
+  const { world, call, mina, comp, tokens } = walletWorld({ overrides: { attempts: 3 } });
+  const a = playWith(world, tokens.mina, 'نوح', 'f');      // 10 now
+  const b = playWith(world, tokens.mina, 'موسى', 't');     // 5 now
+  assert.deepEqual([pointsOf(world, a.id), pointsOf(world, b.id)], [10, 0]);
+  // the key of the single question was موسى after all: a = 0, b = 15
+  const single = call('apiComp', comp.id).questions.find(q => q.type === 'single');
+  call('apiCompQuestionSave', comp.id, { ...single, choices: single.choices.map(ch => ({ ...ch, correct: ch.text === 'موسى' })) });
+  publish(world, call);
+  call('apiCompRegrade', comp.id);
+  assert.deepEqual([pointsOf(world, a.id), pointsOf(world, b.id)], [0, 15]);
+  assert.equal(world.gs.walletBalance_(mina.id, true), 15);
+  // void the best: the next best (a = 0 now) … so nothing; unvoid: back
+  call('apiCompVoid', b.id, true);
+  assert.equal(world.gs.walletBalance_(mina.id, true), 0);
+  const c = playWith(world, tokens.mina, 'موسى', 'f');     // 10: the best while b is void
+  assert.equal(pointsOf(world, c.id), 10);
+  call('apiCompVoid', b.id, false);
+  assert.deepEqual([pointsOf(world, a.id), pointsOf(world, b.id), pointsOf(world, c.id)], [0, 15, 0]);
+  call('apiCompVoid', b.id, true);
+  assert.deepEqual([pointsOf(world, b.id), pointsOf(world, c.id)], [0, 10], 'voiding the best: the next best earns');
+  assert.equal(world.gs.walletBalance_(mina.id, true), 10);
+  assert.equal(call('apiWalletSync').fixed, 0, 'the sync applies the same rule');
+});
+
+
+/* ---------------- negative balances ---------------- */
+
+test('a correction after spending can leave a balance below zero: kept, flagged for the admin, shown to the participant; raising it is allowed, spending is not', () => {
+  const { world, call, mina, comp, tokens } = walletWorld();
+  call('apiCompSettings', { shop: true });
+  playWith(world, tokens.mina, 'نوح', 't');                // 15
+  const item = call('apiShopItemSave', { name: 'قلم', cost: 15 }).item;
+  assert.equal(pub(world, 'shopRedeem', { ptoken: tokens.mina, itemId: item.id, requestKey: 'req-negative-0001' }).ok, true);
+  const tf = call('apiComp', comp.id).questions.find(q => q.type === 'truefalse');
+  call('apiCompQuestionSave', comp.id, { ...tf, correct: 'غلط' });
+  publish(world, call);
+  call('apiCompRegrade', comp.id);
+  assert.equal(world.gs.walletBalance_(mina.id, true), -5);
+  const row = call('apiWallet', {}).items.find(i => i.id === mina.id);
+  assert.deepEqual([row.balance, row.negative, row.warning], [-5, true, 'رصيد بالسالب']);
+  assert.equal(call('apiWallet', {}).totals.negative, 1);
+  assert.equal(pub(world, 'portalMe', { ptoken: tokens.mina }).balance, -5);
+  assert.equal(pub(world, 'shopRedeem', { ptoken: tokens.mina, itemId: item.id, requestKey: 'req-negative-0002' }).code, 'insufficient');
+  assert.throws(() => call('apiWalletAdjust', mina.id, -1, 'خصم', 'neg-key-0001'), /بالسالب/);
+  assert.equal(call('apiWalletAdjust', mina.id, 3, 'تعويض', 'neg-key-0002').balance, -2, 'raising a negative balance is fine');
 });

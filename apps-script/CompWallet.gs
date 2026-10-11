@@ -19,7 +19,7 @@
  * is busy the ids wait in wal:retry and the next reconcile takes them along.
  *
  * Admin: apiWallet, apiWalletParticipant, apiWalletAdjust (manual rows,
- * idemKey adj:<key>, never below zero, logged points.adjust).
+ * idemKey adj:<participantId>:<key>, a deduction never below zero, logged points.adjust).
  */
 
 var WALLET_KINDS = ['competition', 'correction', 'manual', 'redeem', 'refund'];
@@ -211,12 +211,43 @@ function walletCompOn_(compId, version) {
 
 }
 
-/* what the ledger should hold for one submission row */
+/* what the ledger should hold for one submission row on its own (before the one-attempt rule) */
 function walletTarget_(row) {
 
   if (!row.participantId || row.status !== 'graded') return 0;
 
   return walletCompOn_(row.compId, row.version) ? Math.max(0, Math.round(Number(row.score) || 0)) : 0;
+
+}
+
+/*
+ * ONE attempt per (participant, competition) earns: the best graded score,
+ * ties → the earliest submitted (then the earlier row). Every other attempt's
+ * target is 0, so when the best one changes (a regrade, a void, a review) the
+ * points move with correction rows. rows: ALL of a group's submissions.
+ * → { submissionId: target }
+ */
+function walletTargets_(rows) {
+
+  var targets = Object.create(null);
+  var best = Object.create(null);
+
+  rows.forEach(function (row) {
+    targets[row.id] = 0;
+    if (!row.participantId || walletTarget_(row) <= 0) return;
+    var group = row.participantId + '|' + row.compId;
+    var current = best[group];
+    var score = walletTarget_(row);
+    var better = !current ||
+      score > current.score ||
+      (score === current.score && (Number(row.submittedMs) || Infinity) < (Number(current.row.submittedMs) || Infinity)) ||
+      (score === current.score && (Number(row.submittedMs) || Infinity) === (Number(current.row.submittedMs) || Infinity) && row.__row < current.row.__row);
+    if (better) best[group] = { row: row, score: score };
+  });
+
+  Object.keys(best).forEach(function (group) { targets[best[group].row.id] = best[group].score; });
+
+  return targets;
 
 }
 
@@ -272,7 +303,13 @@ function walletReconcileMany_(ids) {
   ids.forEach(function (id) { wanted[id] = true; });
 
   // before the lock: only registered submissions can hold points (an open competition stops here)
-  var registered = compColumns_(t, ['id', 'compId', 'version', 'participantId']).filter(function (r) { return wanted[r.id] && r.participantId; });
+  var all = compColumns_(t, ['id', 'compId', 'version', 'participantId']);
+  var groups = Object.create(null);
+
+  all.forEach(function (r) { if (wanted[r.id] && r.participantId) groups[r.participantId + '|' + r.compId] = true; });
+
+  // one attempt per (participant, competition) earns: the whole group is reconciled together
+  var registered = all.filter(function (r) { return r.participantId && groups[r.participantId + '|' + r.compId]; });
 
   if (!registered.length) return result;
 
@@ -295,8 +332,9 @@ function walletReconcileMany_(ids) {
   try {
 
     // the rows as they are now (a grade may have moved since the caller wrote it)
-    var rows = compColumns_(t, ['id', 'compId', 'version', 'participantId', 'status', 'score'])
+    var rows = compColumns_(t, ['id', 'compId', 'version', 'participantId', 'status', 'score', 'submittedMs'])
       .filter(function (r) { return wanted[r.id]; });
+    var targets = walletTargets_(rows);
     var held = Object.create(null);
     var keys = Object.create(null);
 
@@ -312,7 +350,7 @@ function walletReconcileMany_(ids) {
 
     rows.forEach(function (row) {
       var h = held[row.id] || { sum: 0, n: 0 };
-      var target = walletTarget_(row);
+      var target = targets[row.id] || 0;
       result.checked++;
       // nothing ever registered and nothing to give: nothing to write (open competitions included)
       if (!row.participantId || target === h.sum) return;
@@ -400,7 +438,7 @@ function apiWallet(query) {
   var modules = compModules_();
   var limit = Math.max(1, Math.min(REG_LIMITS.pageMax, Math.floor(Number(query.limit)) || REG_LIMITS.page));
   var offset = Math.max(0, Math.floor(Number(query.offset)) || 0);
-  var result = { items: [], total: 0, offset: offset, limit: limit, totals: { participants: 0, balance: 0, earned: 0, adjusted: 0, spent: 0, entries: 0 }, modules: modules };
+  var result = { items: [], total: 0, offset: offset, limit: limit, totals: { participants: 0, balance: 0, earned: 0, adjusted: 0, spent: 0, entries: 0, negative: 0 }, modules: modules };
 
   if (!compSpreadsheet_(false)) return result;
 
@@ -430,6 +468,7 @@ function apiWallet(query) {
     return {
       id: r.id, name: r.name, phone: r.phoneNorm ? '0' + r.phoneNorm : '', group: r.group || '', status: r.status === 'inactive' ? 'inactive' : 'active',
       balance: totals.balance, earned: totals.earned, adjusted: totals.adjusted, spent: totals.spent, entries: totals.entries, lastAt: totals.lastAt,
+      negative: totals.balance < 0, warning: totals.balance < 0 ? 'رصيد بالسالب' : '',
       _norm: r.nameNorm || normName_(r.name), _phone: r.phoneNorm || '', _group: normName_(r.group)
     };
   });
@@ -442,6 +481,7 @@ function apiWallet(query) {
     result.totals.adjusted += i.adjusted;
     result.totals.spent += i.spent;
     result.totals.entries += i.entries;
+    if (i.balance < 0) result.totals.negative++;
   });
 
   var found = items.filter(function (i) {
@@ -553,9 +593,13 @@ function apiWalletAdjust(id, amount, note, adjustKey) {
 
   compLiveWrite_('points.adjust', function (email) {
 
-    var key = 'adj:' + adjustKey;
+    var key = 'adj:' + id + ':' + adjustKey;
     var rows = walletLedger_();
-    var same = rows.filter(function (l) { return l.idemKey === key; })[0];
+    var same = rows.filter(function (l) { return l.idemKey === key || l.idemKey === 'adj:' + adjustKey || (l.idemKey.indexOf('adj:') === 0 && l.idemKey.slice(-(adjustKey.length + 1)) === ':' + adjustKey); })[0];
+
+    if (same && (same.participantId !== id || Number(same.amount) !== amount)) {
+      throw appError_('المفتاح ده اتستخدم قبل كده.', 'افتح نافذة التعديل من جديد وجرّب تاني.');
+    }
 
     if (same) {
       out.entry = { id: same.id, amount: Number(same.amount) || 0, kind: same.kind, note: same.note, createdAt: same.createdAt };
@@ -565,7 +609,7 @@ function apiWalletAdjust(id, amount, note, adjustKey) {
 
     var balance = rows.reduce(function (sum, l) { return l.participantId === id ? sum + (Number(l.amount) || 0) : sum; }, 0);
 
-    if (balance + amount < 0) {
+    if (amount < 0 && balance + amount < 0) {
       throw appError_('مينفعش الرصيد يبقى بالسالب: رصيده دلوقتي ' + regAr_(balance) + ' نقطة.', 'اخصم ' + regAr_(balance) + ' أو أقل.', '', 'amount');
     }
 
