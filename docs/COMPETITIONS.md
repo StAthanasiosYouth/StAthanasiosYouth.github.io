@@ -196,6 +196,7 @@ competition's status (§2).
 - `comp:shell` → the committed `competition/index.html` (10 min, §4.3).
 - `comp:min:<minute>` (public budget), `comp:fail:<minute>` (failed codes).
 - `reg:hash` → codeHash → participantId map (chunked), dropped on any code change.
+- `wal:bal:<pid>` (a balance), `wal:retry` (reconciles that met a busy lock), `shop:img` (published store pictures) — §17.
 
 ## 2. Competition status (derived)
 
@@ -575,7 +576,7 @@ Existing participants keep id and code. One Activity entry with counts.
   (stock − non-cancelled redemptions) > 0, per-person limit, balance ≥ cost;
   then append ledger `redeem` (−cost, idemKey `red:<redemptionId>`) and a
   Redemption (status `pending`). Same requestKey → the same redemption back.
-- Admin statuses: pending → approved → fulfilled; pending|approved → cancelled
+- Admin statuses: pending → approved → fulfilled (pending → fulfilled allowed too); pending|approved → cancelled
   (appends `refund` +cost, idemKey `ref:<redemptionId>`, once). Fulfilled is
   final. Logged.
 
@@ -629,6 +630,8 @@ rows merge per admin + competition and add up `changes.answers`
 (n مشاركة اتغيرت)»; `close` / `finalize` (+ reopen / undo); `import` →
 «استورد ٥٠ سؤال في المسابقة «…»»; module switches → `settings` with title
 «المسابقات». «سجل النشاط» filter section `competitions` = all five types.
+Phase 2 / 3 as built: participant `import` and `code.export` push now; `code.reset`,
+`points.adjust`, `redemption.status` with the cooldown; `code.view` never (§17.1).
 Admin push: `competition` create / delete now, edits with the cooldown, the
 rest never (like other content).
 
@@ -900,7 +903,7 @@ own validation runs on every row.
   `portalReviewAction_(arg)` (module registry), `shopRedeemAction_(arg)`
   (module shop) — `CompPublic.gs COMP_MODULE_ACTIONS`; they run after the
   size check and the shared budget and must return the reply object.
-- `compParticipantFromToken_(ptoken)` → `{ id, name, group }` | null (registered
+- `compParticipantFromToken_(ptoken)` → `{ id, name, group, phone }` | null (registered
   compStart / compResult; null → `session`).
 - `walletReconcile_(submissionId)` (called after every grade change: submit,
   manual review, group review, regrade, void; failures are swallowed) and
@@ -911,3 +914,169 @@ own validation runs on every row.
   `compSecret_('CODE_PEPPER')`, `compEncrypt_` / `compDecrypt_`; `compSheet_('Participants')`
   etc. create the Phase 2/3 tabs on first use; `compAppend_`, `compUpdate_`,
   `compColumns_`, `compRows_` are the batched row helpers; `compLock_()`.
+
+
+## 17. Phase 2 / 3 server: implementation reference
+
+Files: `CompRegistry.gs` (pure part: `normName_`, `normPhoneEg_`, the code
+format, `regCheckPerson_`, `planParticipantImport_`; storage, codes, admin,
+`compCode`, `compParticipantFromToken_`, and the portal actions `portalMe` /
+`portalReview`, which need only the registry), `CompWallet.gs` (ledger,
+`walletReconcile_` / `walletReconcileMany_`, admin, the portal's wallet part),
+`CompStoreItems.gs` (items, redemptions, `shopRedeem`, the portal's store part).
+Small hooks: `CompPublic.gs` (registered compStart copies the registry's
+phone; `compAfterGradeMany_`), `CompAdmin.gs` (regrade / group grade reconcile
+in one batch), `CompStore.gs` (`compDraft_` carries `items`), `CompModel.gs`
+(`compBuildPublic_` adds active store pictures to the media list while the
+store is on), `Media.gs` (`mediaUsage_`: store pictures, area `competitions`,
+label «جايزة في المتجر: …»), `Publish.gs` (`mediaWaiting_`: an "unchanged"
+publish still commits when a used picture was never uploaded — a store
+picture is not in content.json), `Activity.gs` (summaries, push decisions),
+`Api.gs`. Tests: `tests/comp-registry.test.mjs`, `comp-wallet.test.mjs`,
+`comp-shop.test.mjs` (`tests/fakes/reg.mjs` = the shared set-up).
+
+### 17.1 Decisions (where the contract left room)
+
+- Admin WRITES of a module need its switch on (`«…» مش متفعّل`); reads keep
+  working while it is off (data is kept), and so do the code functions
+  (`apiParticipantCode(s)`, `apiParticipantResetCode`: admins may always
+  view / copy / reset codes). Public actions answer `disabled`.
+- Phones: `normPhoneEg_` accepts 01…, 1… (a spreadsheet dropped the 0), +20 /
+  0020 / 20 prefixes, "+20 0…", Arabic / Persian digits, spaces, dashes, dots,
+  parentheses, bidi marks; valid = `^1[0125]\d{8}$` after the prefixes;
+  stored `phone` = `+201XXXXXXXXX`, `phoneNorm` = `1XXXXXXXXX`; admin replies show
+  the local `01XXXXXXXXX` as `phone` (+ `phoneIntl`). Reasons: «رقم الموبايل ناقص»,
+  «رقم الموبايل ناقص رقم (١٠ أرقام بدل ١١)», «رقم الموبايل زيادة رقم (١٢ رقم بدل ١١)»,
+  «الرقم مش رقم موبايل مصري», «رقم الموبايل فيه حروف أو رموز».
+- Names: required, ≤ 80, ≥ 3 letters, not digits only; one word = a warning.
+  `nameNorm` = `compNormalizeText_` without punctuation. Duplicate = same
+  nameNorm + phoneNorm. A phone is required for every participant.
+- A new participant's code is NOT in the save reply: the admin page calls
+  `apiParticipantCode` (logged `code.view`). Only the reset returns a code
+  directly (once, logged `code.reset`).
+- `apiParticipantCodes({ all:true })` = ACTIVE participants (≤ 3,000);
+  `{ batch }` / `{ ids }` include inactive ones.
+- compCode: the budget is checked first (then `busy`, even for a right code);
+  malformed, unknown, inactive and wrong codes all count, pause ~300 ms and
+  answer `code` «الكود ده مش صحيح. اتأكد منه وجرّب تاني.». `reg:hash` misses are
+  re-checked against the tab (a stale cache never refuses a real code).
+- Wallet target per submission = (the competition's LIVE definition — else
+  the served version — has `wallet` and `scoring`) AND status `graded` ? score : 0.
+  Open submissions never touch the ledger. Reconcile: the candidates
+  (registered rows) are found before the lock; inside it one read of the
+  Submissions columns and of the ledger's refType / refId / amount / idemKey,
+  one append block. Lock busy → the ids wait in `wal:retry` (cache, 6 h) and
+  are taken along by the next reconcile or by `apiWallet`.
+- `apiWalletAdjust` refuses a result below zero («مينفعش الرصيد يبقى بالسالب …»);
+  the note is shown to the participant in «نقاطي» (ledger `note`).
+- Store: `pending → fulfilled` directly is allowed (handing the prize over
+  without the «approved» step). The same status again changes nothing
+  (`changed:false`; a second cancel never refunds twice). `stock` may not go
+  below the requests already taken. An item with requests can't be deleted
+  (switch it off instead).
+- Store pictures: active items of a switched-on store join the publish's
+  media list; «نقاطي» shows an image object only when `Media.publishedAt` is
+  set (cache `shop:img`, 5 min). The review may say "no changes" while a new
+  store picture waits; «انشر» still uploads it. `apiShopItems` gives
+  `imagePublished` so the admin page can say «الصورة هتظهر بعد النشر».
+- Admin push (`activityNotifyKind_`): participant `import` and `code.export` now;
+  `code.reset`, `points.adjust`, `redemption.status` with the cooldown; `code.view`
+  never; participant / store item create / update / delete never.
+- Caches added: `wal:bal:<pid>` (6 h), `wal:retry`, `shop:img` (5 min).
+
+### 17.2 Registry replies
+
+```
+Person = { id, name, phone ('01…'), phoneIntl ('+201…'), group, church, notes, status:'active'|'inactive',
+           active, codeVersion, codeIssuedAt, hasCode, importBatch, createdAt, updatedAt }
+           (+ balance when the wallet is on, in apiParticipants)   ← NEVER code / codeHash / codeEnc
+apiParticipants({ q, group, status:'all'|'active'|'inactive', sort:'name'|'group'|'createdAt'|'updatedAt'|'balance',
+                  dir:'asc'|'desc', offset, limit ≤ 200 })
+  → { ready, items:[Person], total, offset, limit, counts:{ all, active, inactive },
+      groups:[{ name, count }], batches:[{ id:'imp-…', count, at }] (≤ 20, newest first), modules }
+  q: a name (normalized, contains), any phone form (≥ 3 digits, contains), or an id
+apiParticipant(id) → { participant: Person, history:[{ submissionId, compId, title, slug, attemptNo, status,
+                       startedAt, submittedAt, score, maxScore, pending, points (null without the wallet) }],
+                       wallet:{ balance, earned, adjusted, spent, entries, lastAt } | null, modules }
+apiParticipantSave({ id?, name, phone, group, church, notes })   (fields left out keep their value on an edit)
+  → { participant: Person, created, warnings:[text] }
+  errors (appError_, .field = name|phone|group|church|notes): name/phone reasons above;
+  «المشترك ده متسجل قبل كده: … » (same name + phone). Warnings: «نفس الرقم متسجل كمان لـ: …»,
+  «فيه مشترك تاني بنفس الاسم برقم تاني», «الاسم كلمة واحدة بس: …». Edit lock participant:<id>.
+apiParticipantSetActive(id, active) → { participant: Person }   (false = code and tokens stop at once)
+apiParticipantCode(id) → { id, code:'ATH-XXXX-XXXX', codeVersion }        (logged code.view, merged 10 min)
+apiParticipantCodes({ batch } | { ids:[…] } | { all:true })
+  → { rows:[{ id, name, phone, group, code }] (by group, then name), count, filename }   (logged code.export)
+apiParticipantResetCode(id) → { id, code, codeVersion }                     (logged code.reset)
+apiParticipantsImportPreview(text)
+  → { rows:[ImportRow], summary, groups:[{ name, count, isNew }], problems:[text], columns:[key], ignored:[header],
+      fingerprint, max:500 }
+  ImportRow = { line, status:'error'|'exists'|'dup'|'new', name, phone ('01…' or as typed), group, church, notes,
+                errors:[text], warnings:[{ kind:'sharedPhone'|'sameName'|'oneWord', text,
+                candidates?:[{ id, name, phone, group, status }] }], reason (exists / dup: «نفس صف ١٢»),
+                match:{ id, name, phone, group, status } | null (exists), changes:[{ field, label, from, to }]
+                (exists with different group / church / notes = the optional update), dupOf, fp,
+                tickable, ticked (default), choices:[{ value, label }] }
+    choices.value is exactly what goes into decisions: 'add:<fp>' (new), 'update:<pid>:<fp>' (exists with
+    changes), 'phone:<pid>:<fp>' (new with a same-name registered candidate = «نفس الشخص: غيّر رقمه»).
+    Defaults: new ticked unless it has a sameName warning; updates unticked; error / exists / dup not tickable.
+  summary = { total, new, exists, update, dup, error, ticked, warnings:{ sharedPhone, sameName, oneWord } }
+  Template headers: الاسم بالكامل · رقم الموبايل · المجموعة / الفصل · الكنيسة · ملاحظات (aliases: الاسم/اسم/Name,
+  الموبايل/التليفون/Phone, المجموعة/الفصل/Group, Church, Notes); a file without a header row = that order.
+apiParticipantsImportApply(text, { 'r<line>': choice value })
+  → { added, updated, phoneUpdated, skipped:{ unticked, changed, error, exists, dup }, changed, batch ('' when none
+      added), rows:[{ line, result:'added'|'updated'|'phone'|'skipped'|'error', reason, id? }], total }
+  (re-planned under the script lock; a row applies only when its choice is still offered with the same fp)
+apiParticipantsUndoImport(batch) → { removed, batch }   (only the participants that batch ADDED; refused when
+  any of them has a submission or a ledger row)
+```
+
+### 17.3 Wallet replies
+
+```
+apiWallet({ q, group, status, sort:'balance'|'earned'|'spent'|'lastAt'|'name', dir, offset, limit ≤ 200, all? })
+  → { items:[{ id, name, phone, group, status, balance, earned, adjusted, spent, entries, lastAt }], total, offset,
+      limit, totals:{ participants, balance, earned, adjusted, spent, entries }, modules }
+  (only participants with ledger rows unless all:true; default sort balance desc)
+  earned = competition + correction, adjusted = manual, spent = −(redeem + refund)
+apiWalletParticipant(id) → { participant: Person, balance, totals, entries:[{ id, amount, kind, kindLabel, note,
+                             compId, compTitle, refType, refId, redemption:{ id, itemName, status } | null, actor,
+                             createdAt, balanceAfter }] (newest first) }
+apiWalletAdjust(id, amount, note, adjustKey) → { entry:{ id, amount, kind:'manual', note, createdAt }, balance, replay }
+  amount: non-zero integer, |amount| ≤ 1,000,000; note required ≤ 200; adjustKey /^[A-Za-z0-9_-]{8,64}$/
+  (a new key per confirmed form; the same key again → replay:true, no new row). Official admin only.
+```
+
+### 17.4 Store replies
+
+```
+AdminItem = { id:'i-…', name, description, image ('img-…'|''), imageObj (library image object | null),
+              imagePublished, cost, stock (null = unlimited), perPerson (null = no limit), category, order, active,
+              redeemed (requests not cancelled), pending, available (null = unlimited), createdAt, updatedAt }
+apiShopItems() → { ready, items:[AdminItem] (by order), categories:[text], modules, limits, statuses:{ pending:'مستني', … } }
+apiShopItemSave({ id?, name, description, image, cost, stock, perPerson, category, order, active })
+  → { item: AdminItem }   (fields left out keep their value; edit lock shopitem:<id>)
+apiShopItemDelete(id) → { deleted:true, id }   (refused when the item has any request)
+AdminRedemption = { id:'r-…', participantId, participantName, group, itemId, itemName, cost, status, statusLabel,
+                    next:[status], requestedAt, handledBy, handledAt, note, refunded }
+apiShopRedemptions({ status:'all'|'open'|'pending'|'approved'|'fulfilled'|'cancelled', participant, item, q,
+                     offset, limit ≤ 200 })
+  → { items:[AdminRedemption] (newest first), total, offset, limit, counts:{ all, pending, approved, fulfilled, cancelled } }
+apiShopRedemptionStatus(id, status:'approved'|'fulfilled'|'cancelled', note?) → { redemption: AdminRedemption, balance, changed }
+  (official admin only; cancel = refund row once)
+```
+
+### 17.5 Public replies as built
+
+- `compCode` → `{ ok, participant:{ name, group }, ptoken }`; errors `bad`, `code`, `busy`, `disabled`.
+- `portalMe` → exactly §5.1. `history` = every attempt of the participant
+  (newest first; in_progress / void included, with their status), values per
+  the result policy NOW (`score`/`maxScore`/`pending`/`pointsAwarded` only when
+  the competition shows them), `canReview` = the review is allowed now.
+  `balance`/`ledger` (≤ 200, newest first; `note` = the admin's note or the prize
+  name) with the wallet; `redemptions`/`shop` with the store (active items, by order).
+- `portalReview` → `{ ok, result }` (§5.1 Result); `not_found` for someone else's submission.
+- `shopRedeem` → `{ ok, redemption:{ id, status, itemName, cost }, balance }` (+ `replay:true` for a
+  repeated requestKey); errors `bad`, `session`, `busy`, `not_found` («الجايزة دي مش متاحة دلوقتي.»),
+  `stock` «الجايزة دي خلصت.», `per_person` «وصلت للحد المسموح من الجايزة دي.»,
+  `insufficient` «رصيدك مش كفاية.» (+ `balance`).

@@ -818,6 +818,10 @@ function mediaUsage_() {
       add(q.media, 'competitions', q.compId, 'سؤال في مسابقة: ' + (titles[q.compId] || ''));
       add(q.explanationMedia, 'competitions', q.compId, 'شرح سؤال في مسابقة: ' + (titles[q.compId] || ''));
     });
+    // the prize store (CompStoreItems.gs)
+    (comps.items || []).forEach(function (item) {
+      add(item.image, 'competitions', item.id, 'جايزة في المتجر: ' + item.name);
+    });
   }
 
   return usage;

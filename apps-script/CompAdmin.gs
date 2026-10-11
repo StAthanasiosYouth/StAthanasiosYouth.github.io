@@ -1688,7 +1688,7 @@ function apiCompGradeGroup(compId, qid, normAnswer, pts) {
 
   });
 
-  touched.forEach(compAfterGrade_);
+  compAfterGradeMany_(touched);
 
   return { updated: touched.length, queue: apiCompReviewQueue(compId, qid) };
 
@@ -1803,7 +1803,7 @@ function apiCompRegrade(compId) {
 
   });
 
-  touched.forEach(compAfterGrade_);
+  compAfterGradeMany_(touched);
 
   return report;
 

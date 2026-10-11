@@ -1117,6 +1117,13 @@ function compBuildPublic_(draft, ctx) {
 
   });
 
+  // the store's active items (CompStoreItems.gs): their pictures go to the site for «نقاطي»
+  if (modules.shop) {
+    (draft.items || []).forEach(function (item) {
+      if (item && item.active && item.image && media[item.image]) useMedia(item.image);
+    });
+  }
+
   return out;
 
 }

@@ -603,12 +603,14 @@ function compDraft_() {
     }
   }
 
-  if (!data || !Array.isArray(data.comps) || !Array.isArray(data.questions)) {
+  if (!data || !Array.isArray(data.comps) || !Array.isArray(data.questions) || !Array.isArray(data.items)) {
 
     try {
       data = {
         comps: compRows_(compSheet_('Competitions')).map(compStrip_),
-        questions: compRows_(compSheet_('Questions')).map(compStrip_)
+        questions: compRows_(compSheet_('Questions')).map(compStrip_),
+        // the store's items (CompStoreItems.gs): the pictures of active ones join the publish
+        items: typeof compShopDraftItems_ === 'function' ? compShopDraftItems_() : []
       };
     }
     catch (error) {
