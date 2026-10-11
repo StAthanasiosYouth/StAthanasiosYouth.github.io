@@ -8,7 +8,7 @@
  * Deliberately no fetch handler and no cache: every admin page, script and
  * API answer keeps coming from the network (admin data must always be live).
  * This file only
- *  - shows an admin push (apps-script/AdminPush.gs, FCM data-only message)
+ *  - shows an admin push (apps-script/AdminNotify.gs, FCM data-only message)
  *    as a notification, and
  *  - opens the admin at the item / log entry when it is tapped: an admin
  *    window already open is focused and told where to go (no second

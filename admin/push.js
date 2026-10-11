@@ -10,7 +10,7 @@
  *    replaced. The token belongs to the ADMIN worker (/admin/sw.js), so FCM
  *    gives a different token from the site's.
  *  - The token goes to the Apps Script API with the usual ID token + session
- *    (apiAdminPushSubscribe …, apps-script/AdminPush.gs): the server stores
+ *    (apiAdminPushSubscribe …, apps-script/AdminNotify.gs): the server stores
  *    it for the signed-in account. Nothing here says who the admin is.
  *  - This tab keeps only { token, at } (localStorage), to recognise this
  *    device and to rotate the token; no Google token, no email.

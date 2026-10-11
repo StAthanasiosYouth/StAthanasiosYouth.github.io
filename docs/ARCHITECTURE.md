@@ -475,7 +475,7 @@ already **live** on the site, sent once more to devices that opted in.
   CacheService for the home card and the heartbeat. `apiActivity(query)`:
   person, family, section, Cairo dates, cursor, one id; admins only.
   Not logged: reads, previews, heartbeats, drafts, sign-in/out.
-- **Admin push** (`AdminPush.gs`, tab `AdminPushSubs`: token hash, token,
+- **Admin push** (`AdminNotify.gs`, tab `AdminPushSubs`: token hash, token,
   email, device, platform, dates, failures, `prefs` for later categories).
   Subscribe / unsubscribe / devices only through the API (token + session);
   the row's email is the server's; a token already in `PushSubs` is

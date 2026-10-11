@@ -165,7 +165,7 @@ function doPost(e) {
     reply = { ok: true, result: result === undefined ? null : result };
 
     // the other admins' notifications for what just happened, outside every
-    // lock (Activity.gs, AdminPush.gs); a failure there never changes the reply
+    // lock (Activity.gs, AdminNotify.gs); a failure there never changes the reply
     try {
       activityDispatch_();
     }

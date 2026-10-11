@@ -1,5 +1,5 @@
 // Admin display names, the Activity log («سجل النشاط») and admin push
-// (apps-script/Activity.gs, apps-script/AdminPush.gs) against the fake
+// (apps-script/Activity.gs, apps-script/AdminNotify.gs) against the fake
 // Apps Script world: the actor is always the server's identity, names can't
 // be spoofed, rows are written / merged / trimmed, logging never breaks an
 // action, and admin notifications go only to OTHER, absent admins'

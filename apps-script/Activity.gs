@@ -52,7 +52,7 @@
  * Writing a row NEVER fails the action it describes: every error is
  * caught and only reported to the execution log.
  *
- * Admin push (AdminPush.gs) is decided here, sent after the action's lock
+ * Admin push (AdminNotify.gs) is decided here, sent after the action's lock
  * is released (activityDispatch_, called by doPost):
  *   now        publish, create/delete of meetings, news, games,
  *              activities, notifications; a public push send; import;
@@ -1084,7 +1084,7 @@ function apiActivity(query) {
 
 
 /* =========================================================
-   ADMIN PUSH: what to send, after the action (AdminPush.gs sends)
+   ADMIN PUSH: what to send, after the action (AdminNotify.gs sends)
 ========================================================= */
 
 /* 'now' | 'cooldown' | '' */
