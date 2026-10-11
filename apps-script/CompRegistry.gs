@@ -1389,7 +1389,7 @@ function regRowById_(id) {
 
 /**
  * compCode { code } → { ok, participant: { name, group }, ptoken }. The failure budget comes first
- * (≤ 30 / minute, ≤ 1,000 / day: then `busy`), every wrong / unknown / inactive code is counted and
+ * (≤ 60 a minute: then `busy`; no daily cap), every wrong / unknown / inactive code is counted and
  * paused (~300 ms) and gets the same answer. The code itself is never logged or echoed.
  */
 function compCodeAction_(arg) {
