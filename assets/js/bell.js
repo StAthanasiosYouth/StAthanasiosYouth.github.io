@@ -147,23 +147,34 @@ export function openBell(content, nowStamp) {
 }
 
 
+export function competitionPage(slug) {
+
+  return typeof slug === 'string' && /^[a-z0-9-]{2,40}$/.test(slug) ? `competition/${slug}/` : '';
+
+}
+
+
 function notificationRow(item, nowStamp) {
 
   const type = TYPE[item.type] || TYPE.general;
   const unread = isNew(inbox, item);
   const target = item.target;
+  const external = target && target.kind === 'url';
+  // a competition: the engine's own page, same tab (relative to the site root)
+  const page = target && target.kind === 'competition' ? competitionPage(target.slug) : '';
 
-  const row = h(target && target.kind === 'url' ? 'a' : 'button', {
+  const row = h(external || page ? 'a' : 'button', {
     class: `note-item note-item--${item.type}${unread ? ' is-new' : ''}`,
-    type: target && target.kind === 'url' ? null : 'button',
-    href: target && target.kind === 'url' ? target.url : null,
-    target: target && target.kind === 'url' ? '_blank' : null,
-    rel: target && target.kind === 'url' ? 'noopener' : null,
+    type: external || page ? null : 'button',
+    href: external ? target.url : page || null,
+    target: external ? '_blank' : null,
+    rel: external ? 'noopener' : null,
+    'data-competition': page ? target.slug : null,
     onclick: event => {
       inbox = markRead(inbox, item.id);
       saveInbox(inbox);
       row.classList.remove('is-new');
-      if (!target || target.kind === 'url') return;
+      if (!target || external || page) return;
       event.preventDefault();
       if (target.kind === 'meeting') go('meeting');
       else go(target.kind, target.id);

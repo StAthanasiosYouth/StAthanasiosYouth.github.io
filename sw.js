@@ -10,7 +10,7 @@
  *
  * Registered by assets/js/push.js when a visitor turns notifications on.
  * Payload (FCM wraps it as { data: {...}, from, ... }):
- *   { id, title, body, url: '/#news/<id>' | '/#meeting' | '/', image?, tag }
+ *   { id, title, body, url: '/#news/<id>' | '/#meeting' | '/' | '/competition/<slug>/' | '/points/', image?, tag }
  * A tap opens /index.html#… : the installed site app's own address (its
  * scope is /index.html, so the admin app at /admin/ is a separate app on
  * Android — manifest.webmanifest). '/' and '/index.html' are the same page.
@@ -24,7 +24,9 @@ const SITE_NAME = 'أسرة البابا أثناسيوس - سفاجا';
 const ICON = '/assets/img/icon-192.png';
 const BADGE = '/assets/img/push-badge.png';
 const HOME = '/index.html';
-const ROUTE = /^#(?:notifications|meeting|(?:news|game|activity)\/[\w-]{1,60})$/;
+const ROUTE = /^#(?:notifications|meeting|points|(?:news|game|activity)\/[\w-]{1,60}|competition\/[a-z0-9-]{2,40})$/;
+/* the site's other pages a tap may open: a competition (the engine) and «نقاطي» */
+const PAGE = /^\/(?:competition\/[a-z0-9-]{2,40}|points)\/$/;
 const IMAGE = /^\/media\/[\w./-]{1,200}\.(?:webp|jpe?g|png)$/;
 
 
@@ -35,12 +37,15 @@ function text(value, max) {
 }
 
 
-/* only this site's own page, with one of its deep links (anything else = the home page), as /index.html#… */
+/* only this site's own page, with one of its deep links, as /index.html#… — or a
+   competition page / «نقاطي» exactly (no query, no hash); anything else = the home page */
 function safeUrl(value) {
 
   try {
     const url = new URL(String(value || '/'), self.location.origin);
-    if (url.origin !== self.location.origin || (url.pathname !== '/' && url.pathname !== HOME)) return HOME;
+    if (url.origin !== self.location.origin) return HOME;
+    if (PAGE.test(url.pathname)) return url.pathname;
+    if (url.pathname !== '/' && url.pathname !== HOME) return HOME;
     return ROUTE.test(url.hash) ? HOME + url.hash : HOME;
   }
   catch {
@@ -112,6 +117,21 @@ self.addEventListener('notificationclick', event => {
 
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    // a competition / «نقاطي» already open on that very page: just bring it forward
+    const page = new URL(url).pathname;
+    const same = PAGE.test(page) && windows.find(client => {
+      const at = new URL(client.url);
+      return at.origin === self.location.origin && at.pathname === page;
+    });
+    if (same) {
+      try {
+        await same.focus();
+        return;
+      }
+      catch {
+        // focus refused: open it below
+      }
+    }
     // the site page already open (never the admin): bring it forward and let its router open the item
     const open = windows.find(client => {
       const at = new URL(client.url);

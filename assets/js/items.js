@@ -6,6 +6,8 @@
  * "items" section) says where it shows. Competitions open their link only
  * between startAt and endAt; for other activities the dates are the
  * event's own and the link (e.g. registration) works any time.
+ * A card linked to a competition of the engine (item.competition = slug)
+ * opens competition/<slug>/ in the same tab (docs/COMPETITIONS.md §4.5).
  */
 
 import { h, external } from './dom.js';
@@ -68,15 +70,33 @@ function stateLabel(state, competition) {
 }
 
 
+/* the engine's page for a linked competition, relative to the site root */
+export function competitionHref(item) {
+
+  return item && typeof item.competition === 'string' && /^[a-z0-9-]{2,40}$/.test(item.competition) ? `competition/${item.competition}/` : '';
+
+}
+
+
 /* the main button: competitions only while open; others any time */
 function cta(item, state, competition, small = false) {
 
-  if (!item.cta) return null;
+  const engine = competitionHref(item);
 
-  if (competition && state.state !== 'open' && state.state !== 'always') {
+  if (!item.cta && !engine) return null;
+
+  if ((competition || engine) && state.state !== 'open' && state.state !== 'always') {
     return h('span', { class: `btn ${small ? 'btn--small ' : ''}item-card__cta is-waiting`, 'aria-disabled': 'true' },
       iconNode('clock'),
       state.state === 'soon' ? 'لسه مبدأتش' : 'خلصت'
+    );
+  }
+
+  // the competition engine: same tab, our own page
+  if (engine) {
+    return h('a', { class: `btn btn--primary ${small ? 'btn--small ' : ''}item-card__cta`, href: engine, 'data-competition': item.competition },
+      (item.cta && item.cta.label) || 'ادخل المسابقة',
+      iconNode('arrow')
     );
   }
 
@@ -90,7 +110,7 @@ function cta(item, state, competition, small = false) {
 
 export function itemCard(item, type, section, nowStamp) {
 
-  const competition = section.key === 'competitions';
+  const competition = section.key === 'competitions' || !!competitionHref(item);
   const state = itemState(item, nowStamp);
   const label = stateLabel(state, competition);
   const theme = type.theme || section.theme || null;
@@ -138,7 +158,7 @@ export function itemsSection(section, items, content, nowStamp) {
 /* hero: detail.js mediaHero (the sheets' lazy module, passed in by main.js) */
 export function itemSheetContent(item, type, section, nowStamp, shareRow, hero) {
 
-  const competition = section.key === 'competitions';
+  const competition = section.key === 'competitions' || !!competitionHref(item);
   const state = itemState(item, nowStamp);
   const label = stateLabel(state, competition);
   const media = item.image || type.banner || section.banner;

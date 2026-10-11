@@ -1,0 +1,19 @@
+[
+  { "id": "q-single01", "type": "single", "text": "يونان هرب لمدينة إيه؟", "help": "", "media": null,
+    "choices": [{ "id": "c-aaaa01", "text": "نينوى" }, { "id": "c-aaaa02", "text": "ترشيش" }, { "id": "c-aaaa03", "text": "أورشليم" }],
+    "required": "1", "points": 10, "correct": "c-aaaa02", "explanation": "ركب سفينة رايحة ترشيش (يونان ١: ٣).", "review": "auto" },
+  { "id": "q-multi002", "type": "multi", "text": "مين اللي كانوا في السفينة مع يونان؟ (اختار كل اللي يصح)", "help": "ممكن أكتر من إجابة",
+    "media": { "src": "media/2026/img-5d2af330.webp", "thumb": "media/2026/img-5d2af330-480.webp", "w": 1122, "h": 1402, "alt": "سفينة في البحر" },
+    "choices": [{ "id": "c-bbbb01", "text": "النوتية" }, { "id": "c-bbbb02", "text": "رئيس النوتية" }, { "id": "c-bbbb03", "text": "ملك نينوى" }],
+    "required": "1", "points": 10, "correct": ["c-bbbb01", "c-bbbb02"], "explanation": "", "review": "auto" },
+  { "id": "q-tf000003", "type": "truefalse", "text": "يونان فضل في بطن الحوت ٣ أيام و٣ ليالي.", "help": "", "media": null, "choices": [],
+    "required": "1", "points": 5, "correct": "t", "explanation": "يونان ١: ١٧", "review": "auto" },
+  { "id": "q-info0004", "type": "info", "text": "الجزء الجاي عن نينوى بعد ما يونان كرز فيها.", "help": "", "media": null, "choices": [],
+    "required": "", "points": 0, "correct": null, "explanation": "", "review": "auto" },
+  { "id": "q-short005", "type": "short", "text": "إيه اسم النبات اللي ربنا أعده ليونان؟", "help": "كلمة واحدة", "media": null, "choices": [],
+    "required": "1", "points": 10, "correct": ["اليقطينة", "يقطينة"], "explanation": "", "review": "fallback" },
+  { "id": "q-number06", "type": "number", "text": "كام يوم إداهم يونان لأهل نينوى؟", "help": "", "media": null, "choices": [],
+    "required": "1", "points": 15, "correct": "40", "explanation": "«بعد أربعين يومًا تنقلب نينوى».", "review": "auto" },
+  { "id": "q-long0007", "type": "long", "text": "اكتب في سطرين: إيه أكتر حاجة لمستك في القصة؟", "help": "", "media": null, "choices": [],
+    "required": "", "points": 0, "correct": null, "explanation": "", "review": "manual" }
+]
