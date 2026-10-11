@@ -382,22 +382,24 @@ function startPush() {
     return;   // no storage: nothing to remember, nothing to refresh
   }
 
-  const later = run => setTimeout(() => {
+  const later = (run, delay) => setTimeout(() => {
     const idle = window.requestIdleCallback || (fn => fn());
     idle(() => import('./push.js').then(run).catch(error => console.warn(error)));
-  }, 6000);
+  }, delay);
 
   if (memo.token) {
     // subscribed: confirm the token weekly, or tidy up if it was turned off in the browser
     if (!supported || Notification.permission !== 'granted' || !(Date.now() - (Number(memo.at) || 0) < PUSH_WEEK_MS)) {
-      later(push => push.refresh());
+      later(push => push.refresh(), 6000);
     }
-    return;
+    if (supported && Notification.permission === 'granted') return;
   }
 
-  if (supported && Notification.permission === 'default' && (Number(memo.visits) || 0) >= 2 &&
-      (Number(memo.nudges) || 0) < 2 && Date.now() - (Number(memo.nudgedAt) || 0) >= PUSH_WEEK_MS) {
-    later(push => push.maybeNudge());
+  // push is off here but could be turned on (an iPhone Safari tab: via the Home Screen):
+  // the bell's hint, and the invitation card when it's due (push.js invite)
+  const appleTouch = /iPad|iPhone|iPod/.test(nav.userAgent) || (nav.platform === 'MacIntel' && nav.maxTouchPoints > 1);
+  if (supported ? Notification.permission !== 'denied' : appleTouch) {
+    later(push => push.invite(), 2500);
   }
 
 }

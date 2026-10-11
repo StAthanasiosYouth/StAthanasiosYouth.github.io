@@ -125,3 +125,153 @@
     animation: none;
   }
 }
+
+
+/* ---------- the bell's hint (push.js syncBellHint) ----------
+   Nothing here takes space in the layout: the dot sits on the bell, the
+   ripples are a shadow, the pill hangs under the bar. */
+
+.topbar__actions {
+  position: relative;
+}
+
+/* the gold dot: on the bell's lower corner, away from the red count */
+.bell__spark {
+  position: absolute;
+  bottom: 3px;
+  inset-inline-start: 3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff3d0, var(--gold-hi) 45%, var(--gold));
+  box-shadow: 0 0 0 2px var(--ink), 0 0 10px rgba(242, 210, 139, .6);
+  pointer-events: none;
+}
+
+/* a few slow gold ripples, then still */
+.bell--halo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: bell-halo 2.6s var(--ease-out) .6s 3 both;
+}
+
+@keyframes bell-halo {
+  0% {
+    box-shadow: 0 0 0 0 rgba(242, 210, 139, .5);
+  }
+
+  70%,
+  100% {
+    box-shadow: 0 0 0 13px rgba(242, 210, 139, 0);
+  }
+}
+
+/* the pill, its little arrow pointing up at the bell */
+.bell-hint {
+  position: absolute;
+  top: calc(100% + 12px);
+  inset-inline-end: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  padding-inline-start: 4px;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: 999px;
+  white-space: nowrap;
+  background: linear-gradient(180deg, var(--navy-850), var(--navy-950));
+  box-shadow: 0 14px 30px -12px rgba(0, 0, 0, .9);
+  animation: hint-in .55s var(--ease-out-expo) both;
+}
+
+.bell-hint::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  inset-inline-end: 17px;
+  width: 10px;
+  height: 10px;
+  border-top: 1px solid var(--gold-line-strong);
+  border-left: 1px solid var(--gold-line-strong);
+  background: var(--navy-850);
+  transform: rotate(45deg);
+}
+
+.bell-hint.is-leaving {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity .25s, transform .25s;
+}
+
+@keyframes hint-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+.bell-hint__go,
+.bell-hint__close {
+  border: 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  cursor: pointer;
+}
+
+.bell-hint__go {
+  min-height: 32px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: .84rem;
+  font-weight: 800;
+  color: var(--gold-hi);
+}
+
+.bell-hint__go:hover {
+  background: rgba(215, 170, 80, .1);
+}
+
+.bell-hint__close {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: var(--text-3);
+}
+
+.bell-hint__close:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, .06);
+}
+
+.bell-hint__close .icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* less motion: no ripples, no slide (the dot and the pill still say it) */
+:root[data-motion="reduced"] .bell--halo::after,
+:root[data-motion="reduced"] .bell-hint,
+:root[data-motion="reduced"] .bell-hint.is-leaving {
+  animation: none;
+  transition: none;
+}
+
+:root[data-motion="lite"] .bell--halo::after {
+  animation-iteration-count: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bell--halo::after,
+  .bell-hint,
+  .bell-hint.is-leaving {
+    animation: none;
+    transition: none;
+  }
+}

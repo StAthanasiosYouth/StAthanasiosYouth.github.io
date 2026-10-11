@@ -127,6 +127,31 @@ export function shouldNudge(memo, now) {
 }
 
 
+/**
+ * The bell's hint while this device has no notifications:
+ *   dot     a small gold dot on the bell (quiet, as long as push is off)
+ *   invite  the halo and the «فعّل الإشعارات» pill (paused for HINT_PAUSE_MS
+ *           once the bell was opened or the pill dismissed: memo.hintPausedAt)
+ * Nothing where push can't be turned on (blocked, unsupported, in-app),
+ * nothing once it is on.
+ */
+export const HINT_PAUSE_MS = 7 * 86400000;
+
+export function bellHint(env, memo, now) {
+
+  const support = pushSupport(env);
+  const permission = env.Notification ? env.Notification.permission : 'default';
+  const none = { dot: false, invite: false };
+
+  if (support !== 'ok' && support !== 'ios-install' && support !== 'ios-safari') return none;
+  if (support === 'ok' && permission === 'denied') return none;
+  if (memo.token && (support !== 'ok' || permission === 'granted')) return none;
+
+  return { dot: true, invite: !(now - (Number(memo.hintPausedAt) || 0) < HINT_PAUSE_MS) };
+
+}
+
+
 /* the POST body for PUSH_CONFIG.apiUrl (apps-script/Push.gs) */
 export function pushRequest(fn, arg) {
 

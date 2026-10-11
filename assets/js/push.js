@@ -16,7 +16,7 @@ import { h } from './dom.js';
 import { iconNode } from './icons.js';
 import { toast } from './share.js';
 import { PUSH_CONFIG } from './push-config.js';
-import { pushSupport, platformOf, loadMemo, saveMemo, shouldNudge, pushRequest, pushReplyOk } from './push-env.js';
+import { pushSupport, platformOf, loadMemo, saveMemo, shouldNudge, pushRequest, pushReplyOk, bellHint } from './push-env.js';
 
 const SW_URL = '/sw.js';
 const ICON = '/assets/img/icon-192.png';
@@ -330,11 +330,17 @@ function repaint() {
     else paint(card);
   }
 
+  // on, off, blocked: the bell's hint follows
+  if (!busy) syncBellHint();
+
 }
 
 
 /* bell.js: fills the slot at the top of the bell panel */
 export function fillPushSlot(slot) {
+
+  // the bell is open: it has been seen, so the hint calms down (the dot stays)
+  pauseBellHint();
 
   pushStyles().then(() => {
     const card = { node: h('div', { class: 'push-card', role: 'group', 'aria-label': 'إشعارات الموبايل' }), onDismiss: null, remove() {} };
@@ -355,8 +361,8 @@ export function maybeNudge() {
   const memo = loadMemo();
   const now = Date.now();
 
-  if (pushSupport() !== 'ok' || permission() !== 'default' || !shouldNudge(memo, now)) return;
-  if (document.documentElement.classList.contains('has-sheet') || document.hidden) return;
+  if (pushSupport() !== 'ok' || permission() !== 'default' || !shouldNudge(memo, now)) return false;
+  if (document.documentElement.classList.contains('has-sheet') || document.hidden) return false;
 
   saveMemo({ ...memo, nudges: (Number(memo.nudges) || 0) + 1, nudgedAt: now });
 
@@ -374,6 +380,130 @@ export function maybeNudge() {
     cards.add(card);
     paint(card);
     document.body.append(node);
+  });
+
+  return true;
+
+}
+
+
+/* =========================================================
+   THE BELL'S HINT (push-env.js bellHint)
+   A gold dot on the bell while notifications are off here; on a visit,
+   a few slow gold ripples and a small pill under the bell («فعّل
+   الإشعارات من هنا»), once per session, gone after PILL_MS. Opening the
+   bell or × pauses the ripples and the pill for a week (the dot stays);
+   turning notifications on removes all of it. Nothing moves the layout:
+   the dot and the pill are absolutely positioned (push.css).
+========================================================= */
+
+const PILL_SESSION_KEY = 'athanasios.push.hint';
+const PILL_MS = 8000;
+
+let pill = null;
+let pillTimer = 0;
+
+
+function bellButton() {
+
+  return document.getElementById('bell');
+
+}
+
+
+function hintState() {
+
+  return bellHint(globalThis, loadMemo(), Date.now());
+
+}
+
+
+function removePill() {
+
+  clearTimeout(pillTimer);
+  if (!pill) return;
+  const node = pill;
+  pill = null;
+  node.classList.add('is-leaving');
+  setTimeout(() => node.remove(), 260);
+
+}
+
+
+function showPill(bell) {
+
+  try {
+    if (sessionStorage.getItem(PILL_SESSION_KEY)) return;
+    sessionStorage.setItem(PILL_SESSION_KEY, '1');
+  }
+  catch {
+    // no storage: show it this once
+  }
+
+  pill = h('div', { class: 'bell-hint' },
+    h('button', { class: 'bell-hint__go', type: 'button', onclick: () => bell.click() }, 'فعّل الإشعارات من هنا 🔔'),
+    h('button', { class: 'bell-hint__close', type: 'button', 'aria-label': 'إخفاء', onclick: () => pauseBellHint() }, iconNode('close'))
+  );
+
+  bell.parentElement.append(pill);
+  pillTimer = setTimeout(removePill, PILL_MS);
+
+}
+
+
+/* the dot, the ripples and the pill as the state says (allowPill: a fresh visit) */
+function syncBellHint({ allowPill = false } = {}) {
+
+  const bell = bellButton();
+
+  if (!bell) return;
+
+  const state = hintState();
+  let spark = bell.querySelector('.bell__spark');
+
+  if (state.dot && !spark) {
+    spark = h('span', { class: 'bell__spark', 'aria-hidden': 'true' });
+    bell.append(spark);
+  }
+  if (!state.dot && spark) spark.remove();
+
+  // for screen readers: the dot, said once next to the bell's own label
+  let note = document.getElementById('bell-hint-note');
+  if (state.dot && !note) {
+    note = h('span', { id: 'bell-hint-note', class: 'visually-hidden' }, 'إشعارات الموبايل مش مفعّلة. افتح الجرس وفعّلها.');
+    bell.parentElement.append(note);
+    bell.setAttribute('aria-describedby', 'bell-hint-note');
+  }
+  if (!state.dot && note) {
+    note.remove();
+    bell.removeAttribute('aria-describedby');
+  }
+
+  bell.classList.toggle('bell--halo', state.invite);
+  if (!state.invite) removePill();
+  else if (allowPill && !pill) showPill(bell);
+
+}
+
+
+/* the bell was opened, or the pill dismissed: quiet for a week (the dot stays) */
+export function pauseBellHint() {
+
+  const memo = loadMemo();
+
+  if (!memo.token) saveMemo({ ...memo, hintPausedAt: Date.now() });
+  syncBellHint();
+
+}
+
+
+/* main.js, a little after load: the hint, and the invitation card when it's due (never both at once) */
+export function invite() {
+
+  return pushStyles().then(() => {
+    const due = pushSupport() === 'ok' && permission() === 'default' && shouldNudge(loadMemo(), Date.now());
+    syncBellHint({ allowPill: !due });
+    if (due) setTimeout(maybeNudge, 3500);
   });
 
 }

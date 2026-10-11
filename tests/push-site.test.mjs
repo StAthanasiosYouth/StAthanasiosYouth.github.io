@@ -8,7 +8,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import { ROOT, loadGs } from '../tools/lib/gs.mjs';
-import { pushSupport, platformOf, loadMemo, saveMemo, shouldNudge, pushRequest, pushReplyOk, MEMO_KEY } from '../assets/js/push-env.js';
+import { pushSupport, platformOf, loadMemo, saveMemo, shouldNudge, pushRequest, pushReplyOk, bellHint, MEMO_KEY } from '../assets/js/push-env.js';
 import { buildPushVendor } from '../tools/build-push-vendor.mjs';
 
 const require = createRequire(new URL('../tools/package.json', import.meta.url));
@@ -221,6 +221,29 @@ test('push-env: the invitation — from the second visit, at most twice, a week 
   assert.equal(shouldNudge({ visits: 5, nudges: 1, nudgedAt: now - week }, now), true);
   assert.equal(shouldNudge({ visits: 9, nudges: 2, nudgedAt: 0 }, now), false);
   assert.equal(shouldNudge({ visits: 9, token: 'x' }, now), false);
+});
+
+test('push-env: the bell hint — only while push is off and could be turned on', () => {
+  const now = Date.UTC(2026, 9, 11);
+  const week = 7 * 86400000;
+  const withPermission = (e, permission) => { e.Notification.permission = permission; return e; };
+  const android = permission => withPermission(env(UA.androidChrome), permission);
+  // not subscribed: dot + invitation
+  assert.deepEqual(bellHint(android('default'), {}, now), { dot: true, invite: true });
+  assert.deepEqual(bellHint(android('granted'), {}, now), { dot: true, invite: true }, 'allowed once, but no token here');
+  // subscribed: nothing at all
+  assert.deepEqual(bellHint(android('granted'), { token: 't' }, now), { dot: false, invite: false });
+  // a token left over after the permission was reset: off again, so the hint is back
+  assert.deepEqual(bellHint(android('default'), { token: 't' }, now), { dot: true, invite: true });
+  // blocked, in-app, unsupported: nothing (no nagging where it can't be turned on)
+  assert.deepEqual(bellHint(android('denied'), {}, now), { dot: false, invite: false });
+  assert.deepEqual(bellHint(env(UA.instagram), {}, now), { dot: false, invite: false });
+  assert.deepEqual(bellHint(env(UA.windows, { push: false }), {}, now), { dot: false, invite: false });
+  // iPhone Safari tab: the hint leads to the Home Screen steps
+  assert.deepEqual(bellHint(env(UA.iphoneSafari, { push: false }), {}, now), { dot: true, invite: true });
+  // the bell opened / the pill dismissed: a quiet week (the dot stays), then once more
+  assert.deepEqual(bellHint(android('default'), { hintPausedAt: now - 1000 }, now), { dot: true, invite: false });
+  assert.deepEqual(bellHint(android('default'), { hintPausedAt: now - week }, now), { dot: true, invite: true });
 });
 
 test('push-env: the memo survives broken storage; requests and replies', () => {
