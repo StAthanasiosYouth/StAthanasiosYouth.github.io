@@ -32,6 +32,8 @@
   function here() {
     if (A.area === 'content') return A.sub.content;
     if (A.area === 'page') return A.sub.page;
+    // «المسابقات»: the list, the builder's question / results tabs, the switches (AdminComp)
+    if (A.area === 'comps') return A.compHelpKey ? A.compHelpKey() : 'comps';
     return A.area || 'home';
   }
 

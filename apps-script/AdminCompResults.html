@@ -1,0 +1,579 @@
+<script>
+/*
+ * «المسابقات» → the builder's live tabs (docs/COMPETITIONS.md §16.1):
+ *  - «المشاركات»: search (name / phone) on the server, status / flag
+ *    filters, sort, pages; a row opens the submission: who, when, how long,
+ *    flags, score, and every question in the order that person saw it —
+ *    their answer, the key, ✓ / ✕ / ⏳, points, explanation — with grading
+ *    («صح» / «غلط» / points / back to review) and «إلغاء المشاركة»
+ *  - «المراجعة»: what waits for a reviewer, by question, the same answers
+ *    grouped («يوسف ×٣١ → صح»: one tap grades them all), partial points
+ *  - «النتائج»: the ranking, per-question stats (% right, the most common
+ *    wrong answer, the hardest), «إعادة التصحيح», «تصدير Excel»
+ * Grading runs only through the official admin (the server refuses it
+ * elsewhere). Phones, names and answers are shown as text only.
+ */
+(function () {
+
+  'use strict';
+
+  var A = window.A;
+  var el = A.el;
+  var icon = A.icon;
+  var C = A.comp;
+  var ar = C.ar;
+
+  var STATUS_WORDS = { in_progress: 'لسه بيحل', submitted: 'اتبعتت', pending_review: 'محتاجة مراجعة', graded: 'اتصححت', void: 'ملغية' };
+  var STATUS_KINDS = { in_progress: 'off', submitted: 'info', pending_review: 'gold', graded: 'ok', void: 'danger' };
+  var FLAG_WORDS = { fast: 'سريع جدًا', late: 'اتأخر', dupPhone: 'رقم متكرر', preview: 'تجربة' };
+  var FLAG_HINTS = { fast: 'أقل من ثانيتين في المتوسط لكل سؤال', late: 'اتبعتت في الدقايق الزيادة بعد النهاية أو بعد الوقت', dupPhone: 'الرقم ده شارك قبل كده' };
+
+  function statusChip(status) {
+    return A.chip(STATUS_WORDS[status] || status, STATUS_KINDS[status] || 'off');
+  }
+
+  function scoreText(item) {
+    // «٨ من ١٠»: words, not a slash (a slash between Arabic digits flips in RTL)
+    return ar(item.score) + ' من ' + ar(item.maxScore);
+  }
+
+  /* the participant's phone as typed by the site: +20… → 01… for reading */
+  function phoneText(phone) {
+    var p = String(phone || '');
+    return /^\+20\d{10}$/.test(p) ? '0' + p.slice(3) : p;
+  }
+
+  C.phoneText = phoneText;
+
+  /* the builder's summary counts again (the tab badges), quietly */
+  function refreshSummary() {
+    C.refresh().catch(function () {});
+  }
+
+
+  /* =======================================================
+     «المشاركات»
+  ======================================================= */
+
+  var subsQuery = { compId: '', status: 'done', q: '', flag: '', sort: 'submittedAt', dir: 'desc', offset: 0, limit: 50 };
+  var SORTS = [
+    { value: 'submittedAt:desc', label: 'الأحدث' },
+    { value: 'submittedAt:asc', label: 'الأقدم' },
+    { value: 'score:desc', label: 'أعلى درجة' },
+    { value: 'score:asc', label: 'أقل درجة' },
+    { value: 'duration:asc', label: 'الأسرع' },
+    { value: 'name:asc', label: 'الاسم' }
+  ];
+
+  C.tabs.subs = function () {
+
+    if (subsQuery.compId !== C.open) {
+      subsQuery = { compId: C.open, status: 'done', q: '', flag: '', sort: 'submittedAt', dir: 'desc', offset: 0, limit: 50 };
+    }
+
+    var scored = !!C.data.comp.scoring;
+    var chips = el('div', { class: 'filter-chips comp-subs__status', role: 'group', 'aria-label': 'الحالة' });
+    var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر بالاسم أو رقم الموبايل…', 'aria-label': 'دوّر في المشاركات', value: subsQuery.q });
+    var flag = el('select', { class: 'input', 'aria-label': 'علامات' },
+      [{ v: '', t: 'كل العلامات' }, { v: 'fast', t: 'سريع جدًا' }, { v: 'late', t: 'اتأخر' }, { v: 'dupPhone', t: 'رقم متكرر' }].map(function (o) {
+        return el('option', { value: o.v, selected: o.v === subsQuery.flag ? 'selected' : null, text: o.t });
+      }));
+    var sort = el('select', { class: 'input', 'aria-label': 'الترتيب' }, SORTS.filter(function (s) { return scored || !/^score/.test(s.value); }).map(function (s) {
+      return el('option', { value: s.value, selected: s.value === subsQuery.sort + ':' + subsQuery.dir ? 'selected' : null, text: s.label });
+    }));
+    var list = el('div', { class: 'comp-subs', 'aria-live': 'polite' });
+    var pager = el('div', { class: 'comp-pager' });
+    var box = A.errorBox();
+    var timer = 0;
+    var loading = 0;
+
+    search.addEventListener('input', function () {
+      clearTimeout(timer);
+      timer = setTimeout(function () { subsQuery.q = search.value.trim(); subsQuery.offset = 0; load(); }, 350);
+    });
+    flag.addEventListener('change', function () { subsQuery.flag = flag.value; subsQuery.offset = 0; load(); });
+    sort.addEventListener('change', function () {
+      var parts = sort.value.split(':');
+      subsQuery.sort = parts[0];
+      subsQuery.dir = parts[1];
+      subsQuery.offset = 0;
+      load();
+    });
+
+    function drawChips(counts) {
+      var options = [
+        { key: 'done', label: 'اللي بعتوا', n: counts.done },
+        { key: 'pending_review', label: 'محتاجة مراجعة', n: counts.pending_review },
+        { key: 'graded', label: 'اتصححت', n: counts.graded },
+        { key: 'submitted', label: 'اتبعتت (من غير درجات)', n: counts.submitted },
+        { key: 'in_progress', label: 'لسه بيحل', n: counts.in_progress },
+        { key: 'void', label: 'ملغية', n: counts.void },
+        { key: 'all', label: 'الكل', n: counts.all }
+      ].filter(function (o) { return o.key === 'done' || o.key === 'all' || o.n || o.key === subsQuery.status; });
+      A.fill(chips, options.map(function (o) {
+        return el('button', { class: 'filter-chip', type: 'button', 'data-status': o.key, 'aria-pressed': String(o.key === subsQuery.status), onclick: function () {
+          subsQuery.status = o.key;
+          subsQuery.offset = 0;
+          load();
+        } }, o.label + ' (' + ar(o.n || 0) + ')');
+      }));
+    }
+
+    function row(item) {
+      var flags = (item.flags || []).filter(function (f) { return f !== 'preview'; });
+      var node = el('button', { class: 'comp-sub', type: 'button', 'data-id': item.id, onclick: function () { openSubmission(item.id, load); } },
+        el('span', { class: 'comp-sub__who' },
+          el('bdi', { class: 'comp-sub__name', text: item.name || 'من غير اسم' }),
+          item.phone ? el('span', { class: 'comp-sub__phone ltr', text: phoneText(item.phone) }) : null
+        ),
+        el('span', { class: 'comp-sub__meta' },
+          statusChip(item.status),
+          scored && item.status !== 'in_progress' && item.status !== 'void' ? el('span', { class: 'comp-sub__score', text: scoreText(item) }) : null,
+          item.pendingCount ? A.chip('⏳ ' + ar(item.pendingCount), 'gold') : null,
+          flags.map(function (f) { return A.chip(FLAG_WORDS[f] || f, 'danger'); }),
+          item.attemptNo > 1 ? A.chip('محاولة ' + ar(item.attemptNo), 'off') : null
+        ),
+        el('span', { class: 'comp-sub__when' },
+          el('span', { text: item.submittedAt ? C.when(item.submittedAt) : 'بدأ ' + C.when(item.startedAt) }),
+          item.durationSec ? el('span', { text: ' · ' + C.duration(item.durationSec) }) : null
+        )
+      );
+      return node;
+    }
+
+    function load() {
+      var mine = ++loading;
+      box.hidden = true;
+      list.setAttribute('aria-busy', 'true');
+      if (!list.childElementCount) A.fill(list, el('div', { class: 'skeleton-list', 'aria-hidden': 'true' }, el('div', { class: 'skeleton skeleton--line' }), el('div', { class: 'skeleton skeleton--line' })));
+      var query = { status: subsQuery.status, q: subsQuery.q, flag: subsQuery.flag, sort: subsQuery.sort, dir: subsQuery.dir, offset: subsQuery.offset, limit: subsQuery.limit };
+      return A.call('apiCompSubmissions', C.open, query).then(function (reply) {
+        if (mine !== loading || !list.isConnected) return;
+        list.setAttribute('aria-busy', 'false');
+        drawChips(reply.counts || {});
+        if (!reply.items.length) {
+          A.fill(list, el('div', { class: 'empty-state' },
+            el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('users')),
+            el('p', { class: 'empty-state__title', text: subsQuery.q || subsQuery.flag || subsQuery.status !== 'done' ? 'مفيش مشاركات بالشكل ده' : 'مفيش مشاركات لسه' }),
+            el('p', { class: 'empty-state__text', text: subsQuery.q ? 'جرّب جزء من الاسم أو آخر ٤ أرقام من الموبايل.' : 'أول ما حد يبعت هيظهر هنا.' })));
+        }
+        else {
+          A.fill(list, reply.items.map(row));
+        }
+        var from = reply.total ? reply.offset + 1 : 0;
+        var to = Math.min(reply.total, reply.offset + reply.items.length);
+        A.fill(pager,
+          el('span', { class: 'comp-pager__text', text: reply.total ? ar(from) + '–' + ar(to) + ' من ' + ar(reply.total) : '' }),
+          el('div', { class: 'actions' },
+            el('button', { class: 'btn btn--small btn--ghost', type: 'button', disabled: reply.offset <= 0, onclick: function () { subsQuery.offset = Math.max(0, subsQuery.offset - subsQuery.limit); load(); } }, 'السابق'),
+            el('button', { class: 'btn btn--small btn--ghost', type: 'button', disabled: to >= reply.total, onclick: function () { subsQuery.offset += subsQuery.limit; load(); } }, 'التالي')
+          )
+        );
+        pager.hidden = reply.total <= subsQuery.limit && reply.offset === 0;
+      }).catch(function (error) {
+        if (mine !== loading || !list.isConnected) return;
+        list.setAttribute('aria-busy', 'false');
+        list.replaceChildren();
+        A.fail(error, box);
+      });
+    }
+
+    load();
+
+    return [
+      A.card('المشاركات', 'كل اللي شاركوا. دوس على أي واحد تشوف إجاباته وتصححها.',
+        el('div', { class: 'comp-subs__tools' }, search, flag, sort),
+        chips,
+        box,
+        list,
+        pager
+      )
+    ];
+
+  };
+
+
+  /* ---------------- one submission ---------------- */
+
+  function answerNodes(q) {
+    var answer = q.answer;
+    var nodes = [];
+    var keys = [].concat(q.correct === null || q.correct === undefined ? [] : q.correct);
+    var showKey = q.type !== 'long' && q.type !== 'info';
+
+    if (q.type === 'single' || q.type === 'multi') {
+      var picked = [].concat(answer === null || answer === undefined ? [] : answer);
+      nodes.push(el('ul', { class: 'comp-ans__choices' }, (q.choices || []).map(function (c) {
+        var mine = picked.indexOf(c.id) !== -1;
+        var right = keys.indexOf(c.id) !== -1;
+        return el('li', { class: 'comp-ans__choice' + (mine ? ' is-mine' : '') + (right ? ' is-right' : '') },
+          el('span', { class: 'comp-ans__mark', 'aria-hidden': 'true', text: right ? '✓' : mine ? '✕' : '' }),
+          el('bdi', { text: c.text }),
+          mine ? el('span', { class: 'visually-hidden', text: ' (إجابته)' }) : null,
+          right ? el('span', { class: 'visually-hidden', text: ' (الصح)' }) : null,
+          mine ? A.chip('إجابته', right ? 'ok' : 'danger') : null
+        );
+      })));
+      if (!picked.length) nodes.push(el('p', { class: 'comp-ans__none', text: 'مجاوبش' }));
+      return nodes;
+    }
+
+    nodes.push(el('div', { class: 'comp-ans__row' },
+      el('span', { class: 'comp-ans__label', text: 'إجابته' }),
+      q.answerText ? el('bdi', { class: 'comp-ans__text' + (q.type === 'long' ? ' is-long' : ''), text: q.answerText }) : el('span', { class: 'comp-ans__none', text: 'مجاوبش' })
+    ));
+
+    if (showKey && keys.length) {
+      nodes.push(el('div', { class: 'comp-ans__row' },
+        el('span', { class: 'comp-ans__label', text: q.type === 'short' ? 'المقبول' : 'الصح' }),
+        el('bdi', { class: 'comp-ans__key', text: C.keyText(q) })
+      ));
+    }
+
+    return nodes;
+  }
+
+  function gradeLine(q) {
+    var g = q.grade;
+    if (!g) return el('span', { class: 'comp-grade comp-grade--none', text: '—' });
+    var mark = g.ok === null ? '⏳ لسه بتتراجع' : g.ok ? '✓ صح' : '✕ غلط';
+    return el('span', { class: 'comp-grade comp-grade--' + (g.ok === null ? 'pending' : g.ok ? 'ok' : 'wrong') },
+      el('strong', { text: mark }),
+      g.ok !== null ? el('span', { text: ' · ' + ar(g.pts) + ' من ' + ar(q.points) }) : null,
+      g.by && g.by !== 'auto' ? el('small', { text: ' (تصحيح يدوي)' }) : null
+    );
+  }
+
+  function gradeControls(q, submission, done) {
+    var points = el('input', { class: 'input comp-number comp-grade__pts', type: 'number', inputmode: 'numeric', min: '0', max: String(q.points), step: '1', 'aria-label': 'درجة السؤال ' + ar(q.number) + ' من ' + ar(q.points), value: q.grade && q.grade.ok !== null ? String(q.grade.pts) : '' });
+    var send = function (value, button) {
+      var grades = {};
+      grades[q.id] = value;
+      A.withBusy(button, A.call('apiCompGrade', submission.id, grades)).then(function (reply) {
+        done(reply);
+        A.toast('اتصحح ✓');
+      }).catch(function (error) { A.fail(error); });
+    };
+    return el('div', { class: 'comp-grade__tools' },
+      el('button', { class: 'btn btn--small comp-grade__right', type: 'button', onclick: function (e) { send(true, e.currentTarget); } }, '✓ صح'),
+      el('button', { class: 'btn btn--small comp-grade__wrong', type: 'button', onclick: function (e) { send(false, e.currentTarget); } }, '✕ غلط'),
+      el('span', { class: 'comp-grade__partial' },
+        points,
+        el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function (e) {
+          var n = Number(points.value);
+          if (points.value === '' || !isFinite(n) || n < 0 || n > q.points) { A.toast('اكتب درجة من ٠ لـ ' + ar(q.points), 'error'); points.focus(); return; }
+          send(Math.round(n), e.currentTarget);
+        } }, 'حط الدرجة')),
+      q.grade && q.grade.ok !== null && q.grade.by !== 'auto'
+        ? el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function (e) { send(null, e.currentTarget); } }, 'رجّعها للمراجعة')
+        : null
+    );
+  }
+
+  function questionCard(q, data, done) {
+    var scored = data.comp.scoring;
+    var info = q.type === 'info';
+    var media = q.media ? C.img(C.pictureOf(q.media), 'comp-ans__pic') : null;
+    return el('li', { class: 'comp-ans' + (q.grade && q.grade.ok === null ? ' is-pending' : q.grade && q.grade.ok ? ' is-right' : q.grade && q.grade.ok === false ? ' is-wrong' : ''), 'data-qid': q.id, 'data-type': q.type },
+      el('div', { class: 'comp-ans__head' },
+        el('span', { class: 'comp-ans__n', text: info ? 'فقرة' : 'س' + ar(q.number) }),
+        C.typeBadge(q.type),
+        el('bdi', { class: 'comp-ans__q', text: q.text }),
+        !info && scored ? gradeLine(q) : null
+      ),
+      media,
+      info ? null : el('div', { class: 'comp-ans__body' }, answerNodes(q)),
+      !info && q.explanation ? el('p', { class: 'comp-ans__explain' }, el('strong', { text: 'الشرح: ' }), el('span', { text: q.explanation })) : null,
+      !info && scored && data.submission.status !== 'void' && data.submission.status !== 'in_progress' ? gradeControls(q, data.submission, done) : null
+    );
+  }
+
+  function openSubmission(id, onChange) {
+
+    A.openSheet('مشاركة', [el('div', { class: 'skeleton-list', 'aria-hidden': 'true' }, el('div', { class: 'skeleton skeleton--line' }), el('div', { class: 'skeleton skeleton--line skeleton--short' }))], null, { wide: true, className: 'sheet--comp-sub' });
+
+    A.call('apiCompSubmission', id).then(draw).catch(function (error) {
+      var box = A.errorBox();
+      A.openSheet('مشاركة', [box], [el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })], { wide: true, className: 'sheet--comp-sub' });
+      A.fail(error, box);
+    });
+
+    function done(reply) {
+      draw(reply);
+      if (onChange) onChange();
+      refreshSummary();
+    }
+
+    function draw(data) {
+
+      var s = data.submission;
+      var scored = data.comp.scoring;
+      var fields = (C.data && C.data.comp.fields) || [];
+      var labelOf = function (key) { var f = fields.filter(function (x) { return x.key === key; })[0]; return f ? f.label : key; };
+      var extra = Object.keys(s.fields || {}).filter(function (k) { return s.fields[k] !== ''; });
+      var flags = (s.flags || []).filter(function (f) { return f !== 'preview'; });
+      var pendingCount = data.questions.filter(function (q) { return q.grade && q.grade.ok === null; }).length;
+
+      var voidButton = el('button', { class: 'btn ' + (s.status === 'void' ? '' : 'btn--danger'), type: 'button' }, icon(s.status === 'void' ? 'retry' : 'close'), s.status === 'void' ? 'رجّع المشاركة' : 'إلغاء المشاركة');
+      voidButton.addEventListener('click', function () {
+        var undo = s.status === 'void';
+        (undo ? Promise.resolve(true) : A.confirm({ tone: 'warn', title: 'تلغي المشاركة دي؟', message: 'مش هتتحسب في النتايج ولا الترتيب (بتفضل محفوظة، وتقدر ترجّعها).', confirmLabel: 'الغيها', cancelLabel: 'لأ' }))
+          .then(function (ok) {
+            if (!ok) return;
+            A.withBusy(voidButton, A.call('apiCompVoid', s.id, !undo)).then(function (reply) {
+              done(reply);
+              A.toast(undo ? 'رجعت ✓' : 'اتلغت');
+            }).catch(function (error) { A.fail(error); });
+          });
+      });
+
+      var facts = el('dl', { class: 'kv comp-sub-facts' },
+        el('dt', { text: 'الحالة' }), el('dd', {}, statusChip(s.status)),
+        scored ? el('dt', { text: 'الدرجة' }) : null, scored ? el('dd', { class: 'comp-sub-facts__score', text: scoreText(s) + ' · ' + ar(s.correctCount) + ' صح من ' + ar(s.gradableCount) + (pendingCount ? ' · ' + ar(pendingCount) + ' لسه بتتراجع' : '') }) : null,
+        s.phone ? el('dt', { text: 'الموبايل' }) : null, s.phone ? el('dd', {}, el('a', { class: 'ltr', href: 'tel:' + s.phone, text: phoneText(s.phone) })) : null,
+        extra.map(function (key) { return [el('dt', { text: labelOf(key) }), el('dd', { dir: 'auto', text: String(s.fields[key]) })]; }),
+        el('dt', { text: 'بدأ' }), el('dd', { text: C.when(s.startedAt) }),
+        el('dt', { text: 'بعت' }), el('dd', { text: s.submittedAt ? C.when(s.submittedAt) : 'لسه' }),
+        el('dt', { text: 'المدة' }), el('dd', { text: C.duration(s.durationSec) }),
+        s.attemptNo > 1 ? el('dt', { text: 'المحاولة' }) : null, s.attemptNo > 1 ? el('dd', { text: ar(s.attemptNo) }) : null,
+        flags.length ? el('dt', { text: 'علامات' }) : null,
+        flags.length ? el('dd', {}, flags.map(function (f) { var chip = A.chip(FLAG_WORDS[f] || f, 'danger'); chip.title = FLAG_HINTS[f] || ''; return chip; })) : null,
+        s.reviewedBy ? el('dt', { text: 'صحّحها' }) : null, s.reviewedBy ? el('dd', { dir: 'auto', text: (A.state.names && A.state.names[s.reviewedBy]) || s.reviewedBy }) : null
+      );
+
+      A.openSheet(s.name || 'مشاركة من غير اسم', [
+        data.latest ? null : el('p', { class: 'note', text: 'المشاركة دي على نسخة أقدم من المسابقة (قبل آخر نشر): الأسئلة هنا زي ما الشخص شافها بالظبط.' }),
+        facts,
+        el('p', { class: 'section-label', text: 'الإجابات بالترتيب اللي اتعرض عليه' }),
+        el('ol', { class: 'comp-answers' }, data.questions.map(function (q) { return questionCard(q, data, done); }))
+      ], [voidButton, el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })], { wide: true, className: 'sheet--comp-sub' });
+
+    }
+
+  }
+
+  C.openSubmission = openSubmission;
+
+
+  /* =======================================================
+     «المراجعة»: grouped by the same answer
+  ======================================================= */
+
+  var reviewQid = '';
+
+  C.tabs.review = function () {
+
+    var body = el('div', { class: 'comp-review', 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--card' }));
+    var box = A.errorBox();
+
+    function load() {
+      return A.call('apiCompReviewQueue', C.open).then(function (queue) {
+        if (body.isConnected) draw(queue);
+      }).catch(function (error) {
+        if (!body.isConnected) return;
+        body.replaceChildren();
+        A.fail(error, box);
+      });
+    }
+
+    function draw(queue) {
+
+      if (!queue.total) {
+        A.fill(body, el('div', { class: 'empty-state empty-state--ok' },
+          el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('check')),
+          el('p', { class: 'empty-state__title', text: 'مفيش إجابات مستنية مراجعة ✓' }),
+          el('p', { class: 'empty-state__text', text: 'الإجابات المفتوحة والقصيرة اللي محتاجة رأيك بتظهر هنا.' })));
+        return;
+      }
+
+      var questions = queue.questions || [];
+      if (reviewQid && !questions.some(function (q) { return q.qid === reviewQid; })) reviewQid = '';
+
+      var picker = el('div', { class: 'filter-chips', role: 'group', 'aria-label': 'السؤال' },
+        [{ qid: '', number: 'كل الأسئلة', pending: queue.total }].concat(questions).map(function (q) {
+          return el('button', { class: 'filter-chip', type: 'button', 'data-qid': q.qid, 'aria-pressed': String(q.qid === reviewQid), onclick: function () { reviewQid = q.qid; draw(queue); } }, q.number + ' (' + ar(q.pending) + ')');
+        }));
+
+      var sections = questions.filter(function (q) { return !reviewQid || q.qid === reviewQid; }).map(function (q) {
+        var groups = (queue.groups || []).filter(function (g) { return g.qid === q.qid; });
+        return el('section', { class: 'comp-rq', 'data-qid': q.qid },
+          el('div', { class: 'comp-rq__head' },
+            el('span', { class: 'comp-rq__n', text: q.number }),
+            C.typeBadge(q.type),
+            el('bdi', { class: 'comp-rq__text', text: q.text }),
+            A.chip(ar(q.pending) + ' إجابة · ' + ar(q.points) + ' درجة', 'gold')
+          ),
+          el('ul', { class: 'comp-groups' }, groups.map(function (g) { return groupRow(q, g, function () { load(); }); }))
+        );
+      });
+
+      A.fill(body,
+        el('p', { class: 'field__hint', text: 'الإجابات اللي زي بعض (بعد ما الهمزات والتشكيل والمسافات تتشال) متجمعة: دوسة واحدة بتصحح المجموعة كلها.' }),
+        picker,
+        sections
+      );
+
+    }
+
+    function groupRow(q, g, after) {
+      var sample = g.sample === '' || g.sample === null || g.sample === undefined ? '(فاضي)' : String(g.sample);
+      var long = q.type === 'long' || sample.length > 80;
+      var points = el('input', { class: 'input comp-number', type: 'number', inputmode: 'numeric', min: '0', max: String(q.points), step: '1', placeholder: '٠–' + ar(q.points), 'aria-label': 'درجة جزئية للإجابة «' + sample.slice(0, 30) + '»' });
+      var send = function (pts, button) {
+        A.withBusy(button, A.call('apiCompGradeGroup', C.open, q.qid, g.key, pts)).then(function (reply) {
+          A.toast('اتصحح ' + ar(reply.updated) + ' إجابة ✓');
+          after(reply);
+          refreshSummary();
+        }).catch(function (error) { A.fail(error); });
+      };
+      return el('li', { class: 'comp-group' + (long ? ' is-long' : ''), 'data-key': g.key },
+        el('div', { class: 'comp-group__answer' },
+          el('bdi', { class: 'comp-group__sample', text: sample }),
+          g.count > 1 ? el('span', { class: 'comp-group__count', text: '×' + ar(g.count) }) : null
+        ),
+        el('div', { class: 'comp-group__tools' },
+          el('button', { class: 'btn btn--small comp-grade__right', type: 'button', onclick: function (e) { send(true, e.currentTarget); } }, '✓ صح ' + ar(q.points)),
+          el('button', { class: 'btn btn--small comp-grade__wrong', type: 'button', onclick: function (e) { send(false, e.currentTarget); } }, '✕ غلط'),
+          el('span', { class: 'comp-grade__partial' }, points,
+            el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function (e) {
+              var n = Number(points.value);
+              if (points.value === '' || !isFinite(n) || n < 0 || n > q.points) { A.toast('اكتب درجة من ٠ لـ ' + ar(q.points), 'error'); points.focus(); return; }
+              send(Math.round(n), e.currentTarget);
+            } }, 'درجة جزئية')),
+          g.ids && g.ids.length === 1 ? el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () { openSubmission(g.ids[0], load); } }, 'افتح المشاركة') : null
+        )
+      );
+    }
+
+    load();
+
+    return [A.card('المراجعة', 'الإجابات اللي محتاجة رأيك: المفتوحة، والقصيرة اللي مش مطابقة.', box, body)];
+
+  };
+
+
+  /* =======================================================
+     «النتائج»
+  ======================================================= */
+
+  C.tabs.results = function () {
+
+    var comp = C.data.comp;
+    var body = el('div', { class: 'comp-results', 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--card' }));
+    var box = A.errorBox();
+    var exportBtn = el('button', { class: 'btn btn--primary', type: 'button' }, icon('download'), 'تصدير Excel');
+    var regrade = el('button', { class: 'btn', type: 'button', disabled: !comp.liveVersion }, icon('retry'), 'إعادة التصحيح');
+    var showAll = false;
+
+    exportBtn.addEventListener('click', function () {
+      var run = Promise.all([A.call('apiCompExport', C.open), C.sheets()]).then(function (got) {
+        var made = got[1].sheets.resultsBook(got[0], comp.slug, A.cairoNow());
+        return C.download(got[1].xlsx.writeXlsx(made.book), made.filename).then(function () { return got[0].rows.length; });
+      });
+      A.withBusy(exportBtn, run).then(function (n) { A.toast('الملف نزل ✓ (' + ar(n) + ' مشاركة)'); }).catch(function (error) { A.fail(error, box); });
+    });
+
+    regrade.addEventListener('click', function () {
+      A.confirm({
+        tone: 'warn',
+        icon: 'retry',
+        title: 'تصحح كل المشاركات تاني؟',
+        message: 'هنصحح كل المشاركات اللي اتبعتت على آخر إجابات صحيحة اتنشرت (لو صلّحت إجابة وعملت «راجع وانشر»). التصحيح اليدوي اللي عملته بإيدك هيفضل زي ما هو.',
+        confirmLabel: 'صحح تاني',
+        cancelLabel: 'لأ'
+      }).then(function (ok) {
+        if (!ok) return;
+        A.withBusy(regrade, A.call('apiCompRegrade', C.open)).then(function (report) {
+          A.toast('اتصحح ' + ar(report.regraded) + ' مشاركة — ' + (report.changed ? ar(report.changed) + ' اتغيرت' : 'مفيش حاجة اتغيرت'));
+          load();
+          refreshSummary();
+        }).catch(function (error) { A.fail(error, box); });
+      });
+    });
+
+    function load() {
+      return A.call('apiCompResults', C.open).then(function (reply) {
+        if (body.isConnected) draw(reply);
+      }).catch(function (error) {
+        if (!body.isConnected) return;
+        body.replaceChildren();
+        A.fail(error, box);
+      });
+    }
+
+    function tile(label, value, tone) {
+      return el('div', { class: 'comp-tile' + (tone ? ' comp-tile--' + tone : '') }, el('span', { class: 'comp-tile__n', text: value }), el('span', { class: 'comp-tile__label', text: label }));
+    }
+
+    function draw(r) {
+
+      var st = r.stats || {};
+      var scored = !!comp.scoring;
+      var medals = ['🥇', '🥈', '🥉'];
+      var ranking = r.ranking || [];
+      var shown = showAll ? ranking : ranking.slice(0, 50);
+      var answered = (r.questions || []).filter(function (q) { return q.answered; });
+      var hardest = answered.length > 1 ? answered.slice().sort(function (a, b) { return a.rate - b.rate; })[0] : null;
+
+      var tiles = el('div', { class: 'comp-tiles' },
+        tile('مشاركين', ar(st.participants || 0)),
+        tile('مشاركات', ar(st.submissions || 0)),
+        scored ? tile('المتوسط من ' + ar(st.maxScore || 0), ar(st.average || 0)) : null,
+        scored ? tile('أعلى درجة', ar(st.top || 0)) : null,
+        tile('محتاجة مراجعة', ar(st.pending || 0), st.pending ? 'gold' : '')
+      );
+
+      var table = ranking.length
+        ? el('div', { class: 'comp-rank', role: 'table', 'aria-label': 'الترتيب' },
+          el('div', { class: 'comp-rank__row comp-rank__row--head', role: 'row' },
+            el('span', { role: 'columnheader', text: '#' }), el('span', { role: 'columnheader', text: 'الاسم' }),
+            el('span', { role: 'columnheader', text: scored ? 'الدرجة' : 'الحالة' }), el('span', { role: 'columnheader', text: 'المدة' })),
+          shown.map(function (item) {
+            return el('button', { class: 'comp-rank__row', type: 'button', role: 'row', 'data-id': item.id, onclick: function () { openSubmission(item.id, load); } },
+              el('span', { class: 'comp-rank__rank', role: 'cell', text: scored && item.rank <= 3 ? medals[item.rank - 1] : ar(item.rank) }),
+              el('span', { class: 'comp-rank__who', role: 'cell' }, el('bdi', { text: item.name || 'من غير اسم' }), item.phone ? el('small', { class: 'ltr', text: phoneText(item.phone) }) : null, item.attempts > 1 ? el('small', { text: ar(item.attempts) + ' محاولات' }) : null),
+              el('span', { class: 'comp-rank__score', role: 'cell' }, scored ? scoreText(item) : STATUS_WORDS[item.status] || item.status, item.pending ? el('small', { text: '⏳ ' + ar(item.pending) }) : null),
+              el('span', { class: 'comp-rank__time', role: 'cell', text: C.duration(item.durationSec) })
+            );
+          }),
+          ranking.length > shown.length ? el('button', { class: 'btn btn--ghost btn--small', type: 'button', onclick: function () { showAll = true; draw(r); } }, 'اعرض الكل (' + ar(ranking.length) + ')') : null)
+        : el('p', { class: 'empty', text: 'لسه مفيش مشاركات اتبعتت.' });
+
+      var stats = (r.questions || []).length
+        ? el('ol', { class: 'comp-qstats' }, r.questions.map(function (q) {
+          var wrong = (q.choices || []).filter(function (c) { return !c.correct && c.count; }).sort(function (a, b) { return b.count - a.count; })[0];
+          return el('li', { class: 'comp-qstat' + (hardest && hardest.qid === q.qid ? ' is-hardest' : ''), 'data-qid': q.qid },
+            el('div', { class: 'comp-qstat__head' },
+              el('span', { class: 'comp-qstat__n', text: q.number }),
+              el('bdi', { class: 'comp-qstat__text', text: q.text }),
+              hardest && hardest.qid === q.qid ? A.chip('الأصعب', 'danger') : null
+            ),
+            scored ? el('div', { class: 'comp-qstat__bar', role: 'img', 'aria-label': ar(q.rate) + '٪ صح' }, el('span', { class: 'comp-qstat__fill', style: 'width:' + Math.max(0, Math.min(100, q.rate)) + '%' })) : null,
+            el('p', { class: 'comp-qstat__facts', text: (scored ? ar(q.rate) + '٪ صح · ' : '') + ar(q.answered) + ' جاوبوا' + (scored ? ' · ' + ar(q.correct) + ' صح · ' + ar(q.wrong) + ' غلط' : '') + (q.pending ? ' · ' + ar(q.pending) + ' لسه بتتراجع' : '') }),
+            wrong ? el('p', { class: 'comp-qstat__wrong', text: 'أكتر إجابة غلط: «' + wrong.text + '» (' + ar(wrong.count) + ')' }) : null
+          );
+        }))
+        : el('p', { class: 'empty', text: comp.liveVersion ? 'مفيش إحصائيات لسه.' : 'الإحصائيات بتظهر بعد أول نشر.' });
+
+      A.fill(body,
+        r.finalizedAt ? el('p', { class: 'note note--ok', text: 'النتائج اتعتمدت ' + C.when(r.finalizedAt) + '.' }) : null,
+        tiles,
+        el('p', { class: 'section-label', text: 'الترتيب (أحسن محاولة لكل شخص)' }),
+        table,
+        el('p', { class: 'section-label', text: 'كل سؤال' }),
+        stats
+      );
+
+    }
+
+    load();
+
+    return [A.card('النتائج', 'الترتيب بالدرجة وبعدين الأسرع. التصدير فيه كل مشاركة بإجاباتها.',
+      el('div', { class: 'actions' }, exportBtn, regrade),
+      box,
+      body)];
+
+  };
+
+})();
+</script>

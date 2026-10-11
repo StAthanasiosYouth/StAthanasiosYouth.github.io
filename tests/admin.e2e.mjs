@@ -265,7 +265,7 @@ test('navigation: dock on phones, rail on wide screens, tabs for sub-sections', 
     assert.equal(await page.$eval(`${container} [aria-current="page"]`, b => b.dataset.area), 'content');
 
     const tabs = await page.$$eval('#subtabs .tab', t => t.map(b => b.textContent));
-    assert.deepEqual(tabs, ['الاجتماعات', 'الأخبار', 'الألعاب', 'المسابقات', 'الفعاليات', 'الإشعارات']);
+    assert.deepEqual(tabs, ['الاجتماعات', 'الأخبار', 'الألعاب', 'كروت المسابقات', 'الفعاليات', 'الإشعارات']);
     await page.click('#subtabs .tab:nth-child(6)');
     await page.waitForFunction(() => document.getElementById('page-title').textContent === 'الإشعارات');
 
@@ -619,7 +619,7 @@ test('a competition from the admin: type preset, dates in Cairo time, a notifica
   const { page, problems, close } = await open();
   await page.evaluate(() => { A.go('content', 'competitions'); });
   await page.waitForSelector('#subtabs .tab[aria-current="page"]');
-  assert.equal(await page.$eval('#page-title', n => n.textContent), 'المسابقات');
+  assert.equal(await page.$eval('#page-title', n => n.textContent), 'كروت المسابقات');
   await page.evaluate(() => [...document.querySelectorAll('.view button')].find(b => b.textContent.includes('مسابقة جديدة')).click());
   await page.waitForSelector('dialog.sheet[open] input');
 

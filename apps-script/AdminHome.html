@@ -356,7 +356,10 @@
           A.editors.sessions(next.session, next.session ? null : (next.date ? { date: next.date } : null));
         }),
         quick('خبر', 'megaphone', function () { A.editors.news(null); }),
-        items ? quick('مسابقة', 'trophy', function () { A.editors.activities(null, 'competitions'); }) : null,
+        // a competition with questions: AdminComp's wizard (the official admin); the recovery admin: a card with a link
+        window.AdminTransport && A.compNew
+          ? quick('مسابقة', 'trophy', function () { A.compNew(); })
+          : items ? quick('مسابقة', 'trophy', function () { A.editors.activities(null, 'competitions'); }) : null,
         items ? quick('فعالية', 'calendar', function () { A.editors.activities(null, 'activities'); }) : null,
         quick('لعبة', 'star', function () { A.editors.games(null); }),
         quick('إشعار', 'bell', function () { A.editors.notifications(null); }),

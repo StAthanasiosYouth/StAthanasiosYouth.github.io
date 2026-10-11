@@ -2719,7 +2719,7 @@
   function saveUi() {
 
     if (!A.keep) return;
-    A.keep.set('ui', { area: A.area, sub: { content: A.sub.content, page: A.sub.page }, y: Math.max(0, Math.round(window.scrollY || 0)), publish: publishMemo() });
+    A.keep.set('ui', { area: A.area, sub: { content: A.sub.content, page: A.sub.page, comps: A.sub.comps }, y: Math.max(0, Math.round(window.scrollY || 0)), publish: publishMemo() });
 
   }
 
@@ -2757,7 +2757,7 @@
       if (!area) return;
 
       A.area = area.key;
-      ['content', 'page'].forEach(function (key) {
+      ['content', 'page', 'comps'].forEach(function (key) {
         var owner = areaOf(key);
         var sub = ui.sub && ui.sub[key];
         if (owner && owner.subs && owner.subs.some(function (s) { return s.key === sub; })) A.sub[key] = sub;
@@ -2911,9 +2911,15 @@
       { key: 'meetings', label: 'الاجتماعات' },
       { key: 'news', label: 'الأخبار' },
       { key: 'games', label: 'الألعاب' },
-      { key: 'competitions', label: 'المسابقات' },
+      // the cards in the site's «المسابقات» section (a competition's own card follows it: AdminComp)
+      { key: 'competitions', label: 'كروت المسابقات' },
       { key: 'activities', label: 'الفعاليات' },
       { key: 'notifications', label: 'الإشعارات' }
+    ] },
+    // «المسابقات» (AdminComp*.html, docs/COMPETITIONS.md): the competitions themselves; short: the phone dock's word
+    { key: 'comps', label: 'المسابقات', short: 'مسابقات', icon: 'trophy', subs: [
+      { key: 'comps', label: 'المسابقات' },
+      { key: 'compsettings', label: 'الإعدادات' }
     ] },
     { key: 'page', label: 'الصفحة', icon: 'layers', subs: [
       { key: 'layout', label: 'ترتيب الصفحة' },
@@ -2943,7 +2949,7 @@
   };
 
   A.area = 'home';
-  A.sub = { content: 'meetings', page: 'layout' };
+  A.sub = { content: 'meetings', page: 'layout', comps: 'comps' };
 
   function areaOf(key) {
 
@@ -2999,7 +3005,8 @@
       }
     },
     el('span', { class: className + '__icon' }, icon(area.icon)),
-    el('span', { class: className + '__label', text: area.label })
+    // the dock is narrow: its own short word where there is one (the rail and the title say it in full)
+    el('span', { class: className + '__label', text: className === 'dockbtn' && area.short ? area.short : area.label })
     );
 
   }
@@ -3015,6 +3022,7 @@
     rail.replaceChildren.apply(rail, A.AREAS.map(function (area) { return navButton(area, 'navlink'); }));
     dock.replaceChildren.apply(dock, A.AREAS.map(function (area) { return navButton(area, 'dockbtn'); }));
     dock.style.setProperty('--count', String(A.AREAS.length));
+    dock.classList.toggle('dock--dense', A.AREAS.length > 6);
     dock.style.setProperty('--active', String(A.AREAS.indexOf(current)));
 
     subs.hidden = !current.subs;

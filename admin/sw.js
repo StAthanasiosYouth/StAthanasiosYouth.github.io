@@ -25,7 +25,7 @@ const APP_NAME = 'لوحة تحكم الأسرة';
 const ICON = '/admin/icon-192.png';
 const BADGE = '/assets/img/push-badge.png';
 const HOME = '/admin/';
-const ROUTE = /^#(?:open\/(?:sessions|news|games|activities|notifications|types|links|sections|contacts|media)\/[\w-]{1,80}|open\/(?:settings|media)|activity(?:\/act-[0-9a-f]{12})?)$/;
+const ROUTE = /^#(?:open\/(?:sessions|news|games|activities|notifications|types|links|sections|contacts|media|competition)\/[\w-]{1,80}|open\/(?:settings|media)|activity(?:\/act-[0-9a-f]{12})?)$/;
 
 
 function text(value, max) {

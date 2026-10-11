@@ -271,6 +271,8 @@ function apiComps() {
     ready: false,
     comps: [],
     modules: modules,
+    // which module's code is in this version (a switch can be turned on only then; «الإعدادات» says so)
+    installed: { registry: typeof compRegistryReady_ === 'function', wallet: typeof compWalletReady_ === 'function', shop: typeof compShopReady_ === 'function' },
     presets: compPresetsFor_(modules),
     limits: COMP_LIMITS,
     types: COMP_TYPE_LABELS,
@@ -1979,7 +1981,7 @@ function apiCompExport(compId) {
 
   questions.forEach(function (q, i) {
     var label = 'س' + compArabicDigits_(i + 1) + ': ' + compLine_(q.text).slice(0, 40);
-    header.push(label, label + ' (الدرجة)');
+    header.push(label, label + ' (صح؟)', label + ' (الدرجة)');
   });
 
   var out = rows.map(function (r) {
@@ -1998,7 +2000,8 @@ function apiCompExport(compId) {
       var text = compEmpty_(answer) ? '' : mine.type === 'single' ? label(answer) : mine.type === 'multi' ? [].concat(answer).map(label).join('، ')
         : mine.type === 'truefalse' ? (answer === 't' ? 'صح' : 'غلط') : String(answer);
       var g = grading[q.id];
-      line.push(text, g ? (g.ok === null ? 'مراجعة' : Number(g.pts) || 0) : '');
+      // the answer, its mark (✓ / ✕ / ⏳ = waiting for a reviewer) and the points
+      line.push(text, !g ? '' : g.ok === null ? '⏳' : g.ok ? '✓' : '✕', g ? (g.ok === null ? 'مراجعة' : Number(g.pts) || 0) : '');
     });
     return line;
   });
