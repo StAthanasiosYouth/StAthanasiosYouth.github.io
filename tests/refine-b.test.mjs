@@ -442,7 +442,8 @@ test('admin/: strict CSP, noindex, no-referrer, no inline code, no redirect, no 
   // the admin app: its own manifest and worker, from this origin only
   assert.deepEqual(rules['manifest-src'], ["'self'"]);
   assert.deepEqual(rules['worker-src'], ["'self'"]);
-  assert.deepEqual(rules['frame-src'], ['https://accounts.google.com/gsi/', 'https://www.google.com']);
+  // 'self': the competition preview (docs/COMPETITIONS.md §13.3) is competition/index.html?preview in a same-origin frame
+  assert.deepEqual(rules['frame-src'], ["'self'", 'https://accounts.google.com/gsi/', 'https://www.google.com']);
   assert.deepEqual(rules['img-src'], ["'self'", 'data:', 'blob:']);
   assert.deepEqual(rules['object-src'], ["'none'"]);
   assert.deepEqual(rules['base-uri'], ["'self'"], "'self': the preview frame's <base> points at the site (same origin)");

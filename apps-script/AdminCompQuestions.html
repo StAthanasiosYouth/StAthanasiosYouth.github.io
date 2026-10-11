@@ -1,0 +1,742 @@
+<script>
+/*
+ * «المسابقات» → the builder's «الأسئلة» tab (docs/COMPETITIONS.md §16):
+ *  - the list: type, points, required, what's missing; reorder by dragging
+ *    the handle (mouse or finger) or with ↑ / ↓; add, edit, copy, delete
+ *  - the editor (a sheet): every field of the question's type — choices
+ *    (2–8) with the right one(s) marked, accepted answers, a number,
+ *    review mode, the question and explanation pictures, enabled
+ *  - bulk: «تحميل نموذج الأسئلة» (an XLSX made here: admin/comp-sheets.js)
+ *    and «استيراد أسئلة»: a file (XLSX / CSV) or pasted rows →
+ *    apiCompImportPreview → every row with its reasons (row + column),
+ *    filters, ticks → apiCompImportApply → what happened. The same steps
+ *    and look as the meetings import (AdminContent A.openImport).
+ */
+(function () {
+
+  'use strict';
+
+  var A = window.A;
+  var el = A.el;
+  var icon = A.icon;
+  var C = A.comp;
+  var ar = C.ar;
+
+  function questions() {
+    return (C.data && C.data.questions) || [];
+  }
+
+  function scoring() {
+    return !!(C.data && C.data.comp.scoring);
+  }
+
+  /* the list changed here: the builder shows it now, then apiComp again (what's missing, counts) */
+  function changed(list) {
+    if (list) C.data.questions = list;
+    if (C.data.summary) C.data.summary.questionCount = questions().filter(function (q) { return q.type !== 'info' && q.enabled; }).length;
+    C.reload();
+    C.refreshStatus();
+    C.refresh().catch(function () { /* the next open shows it */ });
+  }
+
+  function choiceText(q, id) {
+    var c = (q.choices || []).filter(function (x) { return x.id === id; })[0];
+    return c ? c.text : '';
+  }
+
+  /* the key in words: «نوح» / «متى، مرقس» / «صح» / «التكوين | سفر التكوين» / «٢٧» */
+  C.keyText = function (q, correct) {
+    correct = correct === undefined ? q.correct : correct;
+    if (correct === null || correct === undefined || correct === '') return '';
+    if (q.type === 'single') return choiceText(q, correct);
+    if (q.type === 'multi') return [].concat(correct).map(function (id) { return choiceText(q, id); }).filter(Boolean).join('، ');
+    if (q.type === 'truefalse') return correct === 't' ? 'صح' : correct === 'f' ? 'غلط' : '';
+    if (q.type === 'short') return [].concat(correct).join(' | ');
+    return String(correct);
+  };
+
+
+  /* =======================================================
+     THE LIST
+  ======================================================= */
+
+  C.tabs.questions = function () {
+
+    var list = questions();
+    var locked = C.readOnly();
+    var add = el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { openEditor(null); } }, icon('plus'), 'سؤال جديد');
+    var imp = el('button', { class: 'btn', type: 'button', onclick: function () { openImport(); } }, icon('upload'), 'استيراد أسئلة');
+    var tpl = el('button', { class: 'btn btn--ghost', type: 'button', 'data-free': '', onclick: function (e) { downloadTemplate(e.currentTarget); } }, icon('download'), 'تحميل نموذج الأسئلة');
+    var points = list.filter(function (q) { return q.enabled && q.type !== 'info'; }).reduce(function (sum, q) { return sum + (Number(q.points) || 0); }, 0);
+    var body;
+
+    if (!list.length) {
+      body = el('div', { class: 'empty-state' },
+        el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('form')),
+        el('p', { class: 'empty-state__title', text: 'مفيش أسئلة لسه' }),
+        el('p', { class: 'empty-state__text', text: 'زوّد سؤال سؤال، أو نزّل النموذج واملاه في إكسل واستورده مرة واحدة.' }));
+    }
+    else {
+      body = el('ol', { class: 'comp-qs', 'aria-label': 'الأسئلة بالترتيب' }, list.map(function (q, i) { return questionRow(q, i, list.length, locked); }));
+      enableDrag(body);
+    }
+
+    return [
+      A.card('الأسئلة', list.length
+        ? ar(list.length) + ' سؤال' + (scoring() ? ' · مجموع الدرجات ' + ar(points) : '') + '. اسحب من ⠿ أو استخدم الأسهم علشان ترتّب.'
+        : 'كل سؤال بنوعه: اختيار، صح وغلط، إجابة قصيرة، رقم، إجابة مفتوحة، أو فقرة بين الأسئلة.',
+      el('div', { class: 'actions comp-qs__tools' }, add, imp, tpl),
+      body)
+    ];
+
+  };
+
+  function questionRow(q, index, count, locked) {
+
+    var n = index + 1;
+    var chips = [A.chip(C.TYPE_LABELS[q.type] || q.type, 'gold')];
+
+    if (q.type !== 'info' && scoring()) chips.push(A.chip(ar(q.points) + ' درجة'));
+    if (q.type !== 'info' && !q.required) chips.push(A.chip('اختياري', 'off'));
+    if (!q.enabled) chips.push(A.chip('مخفي', 'off'));
+    if (q.type === 'short' && q.review !== 'auto') chips.push(A.chip(q.review === 'manual' ? 'مراجعة يدوي' : 'مراجعة لو مش مطابق', 'info'));
+    if (q.type === 'long') chips.push(A.chip('مراجعة يدوي', 'info'));
+    if (q.media) chips.push(A.chip('📷 صورة'));
+    (q.problems || []).forEach(function (p) { chips.push(A.chip(p, 'danger')); });
+
+    var key = q.type === 'info' || q.type === 'long' ? '' : C.keyText(q);
+    var label = 'السؤال ' + n;
+
+    var row = el('li', { class: 'comp-q' + (q.enabled ? '' : ' is-off') + ((q.problems || []).length ? ' has-problem' : ''), 'data-id': q.id, 'data-type': q.type },
+      el('button', { class: 'comp-q__grip', type: 'button', 'aria-label': 'اسحب علشان تغيّر مكان ' + label, title: 'اسحب', disabled: locked || count < 2 }, icon('grip')),
+      el('span', { class: 'comp-q__n', text: q.type === 'info' ? '—' : ar(n) }),
+      C.typeBadge(q.type),
+      el('div', { class: 'comp-q__main' },
+        el('span', { class: 'comp-q__text', dir: 'auto', text: q.text || '(من غير نص)' }),
+        key ? el('span', { class: 'comp-q__key', text: '✓ ' + key }) : null,
+        el('div', { class: 'item__meta' }, chips)
+      ),
+      el('div', { class: 'comp-q__tools' },
+        el('button', { class: 'icon-btn comp-q__up', type: 'button', 'aria-label': 'قدّم ' + label + ' خطوة', disabled: locked || index === 0, onclick: function () { move(q.id, -1); } }, icon('chevron-up')),
+        el('button', { class: 'icon-btn comp-q__down', type: 'button', 'aria-label': 'أخّر ' + label + ' خطوة', disabled: locked || index === count - 1, onclick: function () { move(q.id, 1); } }, icon('chevron')),
+        el('button', { class: 'icon-btn comp-q__edit', type: 'button', 'aria-label': 'تعديل ' + label, 'data-free': '', onclick: function () { openEditor(q); } }, icon('edit')),
+        el('button', { class: 'icon-btn comp-q__copy', type: 'button', 'aria-label': 'نسخة من ' + label, disabled: locked, onclick: function (e) { duplicate(q, e.currentTarget); } }, icon('copy')),
+        el('button', { class: 'icon-btn icon-btn--danger comp-q__delete', type: 'button', 'aria-label': 'مسح ' + label, disabled: locked, onclick: function (e) { remove(q, e.currentTarget); } }, icon('trash'))
+      )
+    );
+
+    row.addEventListener('dblclick', function (event) {
+      if (!event.target.closest('button')) openEditor(q);
+    });
+
+    return row;
+
+  }
+
+
+  /* ---------------- reorder ---------------- */
+
+  var reordering = Promise.resolve();
+
+  function saveOrder(ids, focus) {
+    var before = questions().slice();
+    var byId = {};
+    before.forEach(function (q) { byId[q.id] = q; });
+    C.data.questions = ids.map(function (id) { return byId[id]; }).filter(Boolean);
+    C.reload();
+    if (focus) {
+      var row = document.querySelector('.comp-q[data-id="' + focus.id + '"]');
+      var target = row && (row.querySelector(focus.which + ':not([disabled])') || row.querySelector('.comp-q__grip'));
+      if (target) target.focus();
+    }
+    reordering = reordering.then(function () {
+      return A.call('apiCompQuestionsReorder', C.open, ids).then(function (reply) {
+        C.data.questions = reply.questions;
+        C.refreshStatus();
+      }).catch(function (error) {
+        C.data.questions = before;
+        C.reload();
+        A.fail(error);
+      });
+    });
+    return reordering;
+  }
+
+  function move(id, by) {
+    var ids = questions().map(function (q) { return q.id; });
+    var at = ids.indexOf(id);
+    var to = at + by;
+    if (at === -1 || to < 0 || to >= ids.length) return;
+    ids.splice(at, 1);
+    ids.splice(to, 0, id);
+    saveOrder(ids, { id: id, which: by < 0 ? '.comp-q__up' : '.comp-q__down' });
+  }
+
+  C.moveQuestion = move;
+
+  /* dragging by the handle: pointer events (mouse, finger, pen); the row follows, the others make room */
+  function enableDrag(listNode) {
+
+    var drag = null;
+
+    listNode.addEventListener('pointerdown', function (event) {
+      var grip = event.target.closest('.comp-q__grip');
+      if (!grip || grip.disabled || event.button > 0) return;
+      var row = grip.closest('.comp-q');
+      event.preventDefault();
+      grip.setPointerCapture(event.pointerId);
+      drag = { row: row, grip: grip, startY: event.clientY, start: Array.prototype.indexOf.call(listNode.children, row), moved: false };
+      row.classList.add('is-dragging');
+      listNode.classList.add('is-sorting');
+    });
+
+    listNode.addEventListener('pointermove', function (event) {
+      if (!drag) return;
+      var dy = event.clientY - drag.startY;
+      if (Math.abs(dy) > 4) drag.moved = true;
+      var rows = Array.prototype.slice.call(listNode.children);
+      var mine = rows.indexOf(drag.row);
+      // past the middle of the neighbour: swap places
+      var prev = rows[mine - 1];
+      var next = rows[mine + 1];
+      if (next && event.clientY > next.getBoundingClientRect().top + next.offsetHeight / 2) {
+        listNode.insertBefore(next, drag.row);
+        drag.startY += next.offsetHeight + 8;
+      }
+      else if (prev && event.clientY < prev.getBoundingClientRect().top + prev.offsetHeight / 2) {
+        listNode.insertBefore(drag.row, prev);
+        drag.startY -= prev.offsetHeight + 8;
+      }
+      drag.row.style.transform = 'translateY(' + (event.clientY - drag.startY) + 'px)';
+    });
+
+    function end() {
+      if (!drag) return;
+      var d = drag;
+      drag = null;
+      d.row.classList.remove('is-dragging');
+      d.row.style.transform = '';
+      listNode.classList.remove('is-sorting');
+      var ids = Array.prototype.map.call(listNode.children, function (r) { return r.dataset.id; });
+      var now = questions().map(function (q) { return q.id; });
+      if (ids.join() !== now.join()) saveOrder(ids, { id: d.row.dataset.id, which: '.comp-q__grip' });
+    }
+
+    listNode.addEventListener('pointerup', end);
+    listNode.addEventListener('pointercancel', end);
+
+    // keyboard on the handle: ↑ / ↓ move the question
+    listNode.addEventListener('keydown', function (event) {
+      var grip = event.target.closest('.comp-q__grip');
+      if (!grip || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
+      event.preventDefault();
+      move(grip.closest('.comp-q').dataset.id, event.key === 'ArrowUp' ? -1 : 1);
+    });
+
+  }
+
+
+  /* ---------------- copy / delete ---------------- */
+
+  function duplicate(q, button) {
+    A.withBusy(button, A.call('apiCompQuestionDuplicate', C.open, q.id)).then(function (reply) {
+      changed(reply.questions);
+      A.toast('اتعملت نسخة تحت السؤال ✓');
+    }).catch(function (error) { A.fail(error); });
+  }
+
+  function remove(q, button) {
+    var sent = C.data.summary && C.data.summary.submissions;
+    A.confirm({
+      tone: 'danger',
+      title: 'تمسح السؤال ده؟',
+      message: '«' + String(q.text || '').slice(0, 80) + '»\n' + (sent
+        ? 'المشاركات اللي اتبعتت قبل كده مش هتتأثر (محفوظة بالنسخة اللي اتحلت)، بس السؤال هيختفي من المسابقة بعد النشر الجاي. لو عايز تخفيه بس، شيل «ظاهر في المسابقة» من التعديل.'
+        : 'المسح من المسودة نهائي. لو عايز تخفيه بس، شيل «ظاهر في المسابقة» من التعديل.'),
+      confirmLabel: 'امسح',
+      cancelLabel: 'لأ، سيبه'
+    }).then(function (ok) {
+      if (!ok) return;
+      A.withBusy(button, A.call('apiCompQuestionDelete', C.open, q.id)).then(function () {
+        changed(questions().filter(function (x) { return x.id !== q.id; }));
+        A.toast('اتمسح');
+      }).catch(function (error) { A.fail(error); });
+    });
+  }
+
+
+  /* =======================================================
+     THE EDITOR
+  ======================================================= */
+
+  var TYPES = ['single', 'multi', 'truefalse', 'short', 'long', 'number', 'info'];
+
+  function openEditor(q, nextType) {
+
+    var isNew = !q;
+    var locked = C.readOnly();
+    var limits = (C.data && C.data.limits) || {};
+    var maxChoices = limits.choicesMax || 8;
+    var draft = q ? JSON.parse(JSON.stringify(q)) : { type: TYPES.indexOf(nextType) !== -1 ? nextType : 'single', text: '', help: '', media: '', choices: [{ text: '' }, { text: '' }, { text: '' }], correct: null, points: 100, required: true, explanation: '', explanationMedia: '', review: 'auto', enabled: true };
+    var box = A.errorBox();
+
+    // the choices as the editor holds them: { id?, text, correct }
+    var keySet = [].concat(draft.correct === null || draft.correct === undefined ? [] : draft.correct);
+    var choices = (draft.choices || []).map(function (c) { return { id: c.id, text: c.text, correct: keySet.indexOf(c.id) !== -1 }; });
+    while (choices.length < 2) choices.push({ text: '', correct: false });
+
+    var typeSelect = el('select', { class: 'input', 'aria-label': 'نوع السؤال' }, TYPES.map(function (t) {
+      return el('option', { value: t, selected: t === draft.type ? 'selected' : null, text: C.TYPE_GLYPHS[t] + '  ' + C.TYPE_LABELS[t] });
+    }));
+    var text = A.counted(draft.type === 'info' ? 'نص الفقرة' : 'نص السؤال', draft.text, draft.type === 'info' ? (limits.infoText || 2000) : (limits.text || 600), '', { multiline: true, rows: 3, required: true });
+    var help = A.counted('التوضيح الصغير', draft.help, limits.help || 300, 'اختياري: سطر صغير تحت السؤال (مثلاً «اختار إجابة واحدة»)');
+    var media = A.imagePicker(draft.media, { label: 'صورة السؤال', hint: 'اختياري: صورة جنب السؤال' });
+    var points = el('input', { class: 'input comp-number', type: 'number', inputmode: 'numeric', min: '0', max: String(limits.points || 10000), step: '1', value: String(draft.points === undefined || draft.points === null ? 100 : draft.points), oninput: A.markDirty });
+    var required = A.checkbox('إجباري', draft.required !== false, 'لازم يجاوب عليه علشان يبعت');
+    var explanation = A.counted('شرح الإجابة', draft.explanation, limits.explanation || 1000, 'بيظهر جنب الإجابة الصحيحة لما الإجابات تظهر', { multiline: true, rows: 2 });
+    var explanationMedia = A.imagePicker(draft.explanationMedia, { label: 'صورة الشرح', hint: 'اختياري' });
+    var enabled = A.checkbox('ظاهر في المسابقة', draft.enabled !== false, 'لو شلتها السؤال بيفضل محفوظ بس مش بيظهر');
+
+    /* per type */
+    var choiceList = el('div', { class: 'comp-choices', role: 'list' });
+    var addChoice = el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () {
+      if (choices.length >= maxChoices) return;
+      choices.push({ text: '', correct: false });
+      A.markDirty();
+      drawChoices(choices.length - 1);
+    } }, icon('plus'), 'اختيار كمان');
+    var tf = A.choices(A.uid('tf'), [{ value: 't', label: 'صح' }, { value: 'f', label: 'غلط' }], draft.type === 'truefalse' ? draft.correct : '');
+    var accepted = el('textarea', { class: 'input', rows: '3', placeholder: 'كل إجابة مقبولة في سطر\nمثلاً: التكوين\nسفر التكوين', value: draft.type === 'short' ? [].concat(draft.correct || []).join('\n') : '', oninput: A.markDirty });
+    var review = el('select', { class: 'input', onchange: A.markDirty },
+      [{ v: 'auto', t: 'تلقائي: اللي زي إجابة مقبولة صح، والباقي غلط' }, { v: 'fallback', t: 'اللي مش مطابق يستنى مراجعتي' }, { v: 'manual', t: 'يدوي: كل الإجابات تستنى مراجعتي' }].map(function (o) {
+        return el('option', { value: o.v, selected: o.v === (draft.review || 'auto') ? 'selected' : null, text: o.t });
+      }));
+    var number = el('input', { class: 'input input--ltr comp-number', type: 'text', dir: 'ltr', inputmode: 'decimal', value: draft.type === 'number' && draft.correct !== null ? String(draft.correct) : '', placeholder: '27', oninput: A.markDirty });
+
+    var parts = {
+      choices: A.field('الاختيارات', el('div', {}, choiceList, addChoice), ''),
+      tf: A.field('الإجابة الصحيحة', tf.node),
+      short: el('div', { class: 'form-group' },
+        A.field('الإجابات المقبولة', accepted, 'الهمزات والتشكيل والمسافات والحروف الكبيرة مش بتفرق'),
+        A.field('التصحيح', review)),
+      number: A.field('الإجابة الصحيحة', number, 'رقم. الأرقام العربي (٢٧) بتتقري عادي'),
+      long: el('p', { class: 'note', text: 'الإجابة المفتوحة بتتراجع بإيدك من «المراجعة»: تحط درجة كاملة أو جزء منها.' }),
+      info: el('p', { class: 'note', text: 'الفقرة كلام بين الأسئلة (عنوان جزء، قصة، تعليمات). مالهاش إجابة ولا درجة.' }),
+      graded: el('div', { class: 'form-group' }, A.field('الدرجة', points, scoring() ? 'فاضي = ١٠٠' : 'المسابقة من غير درجات دلوقتي (من «النتيجة»)'), required.node),
+      explain: el('div', { class: 'form-group' }, el('p', { class: 'section-label', text: 'الشرح (اختياري)' }), explanation.node, explanationMedia.node)
+    };
+
+    function drawChoices(focusIndex) {
+      var type = typeSelect.value;
+      var multi = type === 'multi';
+      var name = A.uid('key');
+      choiceList.replaceChildren.apply(choiceList, choices.map(function (choice, i) {
+        var mark = el('input', { type: multi ? 'checkbox' : 'radio', name: name, checked: !!choice.correct, 'aria-label': 'الاختيار ' + ar(i + 1) + ' هو الصح', onchange: function () {
+          if (!multi) choices.forEach(function (c) { c.correct = false; });
+          choice.correct = mark.checked;
+          A.markDirty();
+        } });
+        var input = el('input', { class: 'input', type: 'text', maxlength: String(limits.choice || 200), value: choice.text || '', placeholder: 'الاختيار ' + ar(i + 1), 'aria-label': 'نص الاختيار ' + ar(i + 1), oninput: function () { choice.text = input.value; A.markDirty(); } });
+        return el('div', { class: 'comp-choice' + (choice.correct ? ' is-correct' : ''), role: 'listitem' },
+          el('label', { class: 'comp-choice__mark', title: 'الإجابة الصحيحة' }, mark, el('span', { text: 'صح' })),
+          input,
+          el('div', { class: 'comp-choice__tools' },
+            el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قدّم الاختيار ' + ar(i + 1), disabled: i === 0, onclick: function () { swap(i, i - 1); } }, icon('chevron-up')),
+            el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'أخّر الاختيار ' + ar(i + 1), disabled: i === choices.length - 1, onclick: function () { swap(i, i + 1); } }, icon('chevron')),
+            el('button', { class: 'icon-btn icon-btn--danger', type: 'button', 'aria-label': 'شيل الاختيار ' + ar(i + 1), disabled: choices.length <= 2, onclick: function () { choices.splice(i, 1); A.markDirty(); drawChoices(Math.min(i, choices.length - 1)); } }, icon('close'))
+          )
+        );
+      }));
+      addChoice.disabled = choices.length >= maxChoices;
+      parts.choices.querySelector('.field__label').textContent = 'الاختيارات (' + ar(choices.length) + ' من ' + ar(maxChoices) + ') — علّم ' + (multi ? 'الصح (ممكن أكتر من واحد)' : 'الإجابة الصح');
+      if (focusIndex !== undefined) {
+        var target = choiceList.children[focusIndex];
+        if (target) target.querySelector('input[type=text]').focus();
+      }
+      Array.prototype.forEach.call(choiceList.children, function (node, i) { node.classList.toggle('is-correct', !!choices[i].correct); });
+    }
+
+    function swap(a, b) {
+      var tmp = choices[a];
+      choices[a] = choices[b];
+      choices[b] = tmp;
+      A.markDirty();
+      drawChoices(b);
+    }
+
+    function syncType() {
+      var type = typeSelect.value;
+      parts.choices.hidden = type !== 'single' && type !== 'multi';
+      parts.tf.hidden = type !== 'truefalse';
+      parts.short.hidden = type !== 'short';
+      parts.number.hidden = type !== 'number';
+      parts.long.hidden = type !== 'long';
+      parts.info.hidden = type !== 'info';
+      parts.graded.hidden = type === 'info';
+      parts.explain.hidden = type === 'info';
+      text.node.dataset.label = type === 'info' ? 'نص الفقرة' : 'نص السؤال';
+      text.node.querySelector('.field__label').textContent = text.node.dataset.label;
+      text.input.maxLength = type === 'info' ? (limits.infoText || 2000) : (limits.text || 600);
+      if (type === 'single') {
+        // one key only: keep the first marked
+        var first = true;
+        choices.forEach(function (c) { if (c.correct && first) first = false; else c.correct = false; });
+      }
+      if (type === 'single' || type === 'multi') drawChoices();
+    }
+
+    typeSelect.addEventListener('change', function () { A.markDirty(); syncType(); });
+    syncType();
+
+    function collect() {
+      var type = typeSelect.value;
+      var input = {
+        type: type,
+        text: text.input.value,
+        help: help.input.value,
+        media: media.value(),
+        points: points.value === '' ? '' : Number(points.value),
+        required: required.input.checked,
+        explanation: explanation.input.value,
+        explanationMedia: explanationMedia.value(),
+        review: type === 'short' ? review.value : type === 'long' ? 'manual' : 'auto',
+        enabled: enabled.input.checked,
+        choices: [],
+        correct: null
+      };
+      if (!isNew) input.id = q.id;
+      if (type === 'single' || type === 'multi') {
+        input.choices = choices.filter(function (c) { return String(c.text || '').trim(); }).map(function (c) {
+          var out = { text: c.text.trim() };
+          if (c.id) out.id = c.id;
+          if (c.correct) out.correct = true;
+          return out;
+        });
+      }
+      else if (type === 'truefalse') input.correct = tf.value() || null;
+      else if (type === 'short') input.correct = accepted.value.split('\n').map(function (a) { return a.trim(); }).filter(Boolean);
+      else if (type === 'number') input.correct = number.value.trim() || null;
+      return input;
+    }
+
+    var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
+    var saveAdd = isNew ? el('button', { class: 'btn', type: 'button', text: 'إضافة وسؤال كمان' }) : null;
+
+    function submit(button, again) {
+      box.hidden = true;
+      if (A.uploadsInFlight > 0) {
+        A.fail(new Error('الصورة لسه بتترفع. استنى لما يظهر «تم الرفع ✓» وبعدين احفظ.'), box);
+        return;
+      }
+      var input = collect();
+      A.withBusy(button, A.call('apiCompQuestionSave', C.open, input)).then(function (reply) {
+        A.dirty = false;
+        var list = questions().slice();
+        var at = list.map(function (x) { return x.id; }).indexOf(reply.question.id);
+        if (at === -1) list.push(reply.question);
+        else list[at] = reply.question;
+        changed(list);
+        var warn = (reply.warnings || []).length ? ' — تنبيه: ' + reply.warnings.join('، ') : '';
+        A.toast((isNew ? 'السؤال اتضاف ✓' : 'اتحفظ ✓') + warn, warn ? 'info' : undefined);
+        if (again) openEditor(null, typeSelect.value);
+        else A.closeSheet();
+      }).catch(function (error) { A.fail(error, box); });
+    }
+
+    save.addEventListener('click', function () { submit(save, false); });
+    if (saveAdd) saveAdd.addEventListener('click', function () { submit(saveAdd, true); });
+
+    var n = isNew ? questions().length + 1 : questions().map(function (x) { return x.id; }).indexOf(q.id) + 1;
+
+    A.dirty = false;
+
+    A.openSheet(isNew ? 'سؤال جديد' : 'تعديل السؤال ' + ar(n), [
+      box,
+      (q && (q.problems || []).length) ? el('div', { class: 'note note--warn' }, el('p', { class: 'note__title', text: 'ناقص قبل النشر:' }), el('ul', {}, q.problems.map(function (p) { return el('li', { text: p }); }))) : null,
+      el('div', { class: 'form comp-q-editor' },
+        // what matters first on a phone: the question and its key; the extras after
+        A.field('نوع السؤال', typeSelect),
+        text.node,
+        parts.choices,
+        parts.tf,
+        parts.short,
+        parts.number,
+        parts.long,
+        parts.info,
+        parts.graded,
+        help.node,
+        media.node,
+        parts.explain,
+        enabled.node
+      )
+    ], [save, saveAdd, el('button', { class: 'btn btn--ghost', type: 'button', text: 'إلغاء', onclick: function () { A.closeSheet(); } })].filter(Boolean), { className: 'sheet--comp-q' });
+
+    if (locked) {
+      Array.prototype.forEach.call(document.querySelectorAll('#sheet .sheet__body input, #sheet .sheet__body textarea, #sheet .sheet__body select, #sheet .sheet__body button, #sheet .sheet__foot .btn--primary, #sheet .sheet__foot .btn:not(.btn--ghost)'), function (c) { c.disabled = true; });
+    }
+
+  }
+
+  C.openQuestion = openEditor;
+
+
+  /* =======================================================
+     THE TEMPLATE (XLSX made here)
+  ======================================================= */
+
+  function downloadTemplate(button) {
+    var run = C.sheets().then(function (m) {
+      return C.download(m.xlsx.writeXlsx(m.sheets.questionTemplate()), 'نموذج-أسئلة-المسابقة.xlsx');
+    });
+    (button ? A.withBusy(button, run) : run).then(function () {
+      A.toast('النموذج نزل ✓ — املا ورقة «الأسئلة» (فيها شرح ومثال) وارفعه من «استيراد أسئلة»');
+    }).catch(function (error) { A.fail(error); });
+  }
+
+  C.downloadTemplate = downloadTemplate;
+
+
+  /* =======================================================
+     THE IMPORT (same steps as the meetings import)
+  ======================================================= */
+
+  /* a .csv as text: UTF-8 (with or without BOM), else Arabic Windows (Excel's older "CSV") */
+  function readCsv(file) {
+    return file.arrayBuffer().then(function (buffer) {
+      try {
+        return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+      }
+      catch (e) {
+        return new TextDecoder('windows-1256').decode(buffer);
+      }
+    });
+  }
+
+  /* any chosen file → the text the server reads */
+  C.readQuestionFile = function (file) {
+    if (/\.xlsx$/i.test(file.name || '') || /spreadsheetml/.test(file.type || '')) {
+      return Promise.all([C.sheets(), file.arrayBuffer()]).then(function (got) {
+        return got[0].xlsx.readXlsx(new Uint8Array(got[1])).then(function (book) { return got[0].sheets.importText(book); });
+      });
+    }
+    if (/\.(xls|ods|numbers)$/i.test(file.name || '')) {
+      return Promise.reject(new Error('الملف ده مش xlsx. من إكسل: «حفظ باسم» ← Excel Workbook (.xlsx) أو CSV.'));
+    }
+    return readCsv(file).then(function (content) { return content.replace(/^﻿/, ''); });
+  };
+
+  function openImport(prefill) {
+
+    var box = A.errorBox();
+    var text = A.textInput(prefill || '', { multiline: true, rows: 6, placeholder: 'السؤال\tالنوع\tاختيار 1\tاختيار 2\tالإجابة الصحيحة\nمين بنى الفلك؟\tاختيار واحد\tنوح\tموسى\t1' });
+    text.classList.add('import__paste');
+    text.setAttribute('dir', 'auto');
+    var file = el('input', { class: 'import__file', type: 'file', accept: '.xlsx,.csv,.tsv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain' });
+    var fileName = el('span', { class: 'field__hint' });
+
+    file.addEventListener('change', function () {
+      var chosen = file.files && file.files[0];
+      if (!chosen) return;
+      if (chosen.size > 3 * 1024 * 1024) {
+        A.fail(new Error('الملف كبير قوي. قسّمه (لحد ٣٠٠ سؤال في المرة).'), box);
+        return;
+      }
+      box.hidden = true;
+      fileName.textContent = 'بنقرا ' + chosen.name + '…';
+      C.readQuestionFile(chosen).then(function (content) {
+        text.value = content;
+        fileName.textContent = chosen.name + ' ✓';
+        A.markDirty();
+        if (content.trim()) preview.click();
+      }).catch(function (error) {
+        fileName.textContent = '';
+        A.fail(error, box);
+      });
+    });
+
+    var preview = el('button', { class: 'btn btn--primary', type: 'button' }, icon('eye'), 'معاينة');
+
+    preview.addEventListener('click', function () {
+      box.hidden = true;
+      if (!text.value.trim()) {
+        A.fail(new Error('الصق الصفوف الأول، أو اختار ملف إكسل.'), box);
+        return;
+      }
+      var source = text.value;
+      A.withBusy(preview, A.call('apiCompImportPreview', C.open, source))
+        .then(function (result) { showPreview(source, result); })
+        .catch(function (error) { A.fail(error, box); });
+    });
+
+    A.dirty = !!prefill;
+
+    A.openSheet('استيراد أسئلة', [
+      box,
+      el('div', { class: 'form' },
+        el('p', { class: 'note', text: 'نزّل النموذج، املا ورقة «الأسئلة» في إكسل أو جوجل شيت (فيه ورقة «شرح» وورقة «مثال»)، واختار الملف هنا. أو انسخ الصفوف ومعاها صف العناوين والصقها.' }),
+        el('div', { class: 'actions' },
+          el('button', { class: 'btn', type: 'button', onclick: function (e) { downloadTemplate(e.currentTarget); } }, icon('download'), 'تحميل نموذج الأسئلة')
+        ),
+        A.field('اختار ملف إكسل (xlsx) أو CSV', el('div', { class: 'import__pick' }, file, fileName)),
+        A.field('أو الصق الصفوف هنا', text, 'العناوين: ترتيب، السؤال، النوع، اختيار 1 … اختيار 8، الإجابة الصحيحة، الدرجة، إجباري، التوضيح، صورة، مراجعة'),
+        el('p', { class: 'field__hint', text: 'قبل أي حفظ هتشوف كل صف: جديد، تحذير، أو فيه مشكلة (بالصف والعمود). الاستيراد بيضيف أسئلة جديدة بس، ومش بيعدّل اللي موجود.' })
+      )
+    ], [preview, el('button', { class: 'btn btn--ghost', type: 'button', text: 'إلغاء', onclick: function () { A.closeSheet(); } })], { className: 'sheet--import' });
+
+  }
+
+  C.openImport = openImport;
+
+  function showPreview(source, result) {
+
+    var box = A.errorBox();
+    var counts = result.counts || { ok: 0, error: 0, warnings: 0 };
+    var rows = result.rows || [];
+    var ticks = [];
+    var filter = 'all';
+    var needle = '';
+
+    var summary = el('div', { class: 'import__summary' },
+      A.chip('جديد: ' + ar(counts.ok || 0), 'ok'),
+      counts.warnings ? A.chip('تحذير: ' + ar(counts.warnings), 'gold') : null,
+      counts.error ? A.chip('خطأ: ' + ar(counts.error), 'danger') : null
+    );
+
+    var items = rows.map(function (row) {
+
+      var qp = row.question || {};
+      var ok = row.status === 'ok';
+      var check = ok ? el('input', { type: 'checkbox', class: 'import__tick', checked: true, 'aria-label': 'ضيف صف ' + ar(row.line) }) : null;
+      var lines = [];
+
+      if (qp.text) lines.push(el('span', { class: 'import__topic', dir: 'auto', text: qp.text }));
+      if ((qp.choices || []).length) lines.push(el('span', { class: 'comp-import__choices', text: qp.choices.map(function (c, i) { return ar(i + 1) + ') ' + c; }).join('   ') }));
+      var key = Array.isArray(qp.correct) ? qp.correct.join(qp.type === 'short' ? ' | ' : '، ') : qp.correct;
+      if (key !== undefined && key !== null && key !== '') lines.push(el('span', { class: 'comp-import__key', text: 'الإجابة: ' + key }));
+      if (qp.type && qp.type !== 'info') lines.push(el('span', { class: 'field__hint', text: ar(qp.points) + ' درجة' + (qp.required ? '' : ' · اختياري') + (qp.review && qp.review !== 'auto' ? ' · ' + (qp.review === 'manual' ? 'مراجعة يدوي' : 'مراجعة لو مش مطابق') : '') + (qp.image ? ' · صورة ' + qp.image : '') }));
+      (row.errors || []).forEach(function (message) { lines.push(el('span', { class: 'import__error' }, icon('alert'), el('span', { text: message }))); });
+      (row.warnings || []).forEach(function (message) { lines.push(el('span', { class: 'import__warn', text: message })); });
+
+      var node = el('li', { class: 'import__row comp-import__row' + (ok ? (row.warnings.length ? ' import__row--update' : '') : ' import__row--error'), 'data-line': row.line, 'data-status': ok ? (row.warnings.length ? 'warn' : 'ok') : 'error' },
+        el('label', { class: 'import__head' },
+          check || el('span', { class: 'import__tick-space', 'aria-hidden': 'true' }),
+          el('span', { class: 'import__date', text: 'صف ' + ar(row.line) }),
+          qp.typeLabel ? A.chip(qp.typeLabel) : null,
+          ok ? (row.warnings.length ? A.chip('تحذير', 'gold') : A.chip('جديد', 'ok')) : A.chip('خطأ', 'danger')
+        ),
+        lines.length ? el('div', { class: 'import__lines' }, lines) : null
+      );
+
+      if (check) {
+        check.addEventListener('change', count);
+        ticks.push({ row: row, input: check });
+      }
+
+      return { row: row, node: node, search: (String(qp.text || '') + ' ' + (qp.choices || []).join(' ') + ' ' + ar(row.line) + ' ' + row.line).toLowerCase() };
+
+    });
+
+    var list = el('ul', { class: 'import__list' }, items.map(function (i) { return i.node; }));
+    var apply = el('button', { class: 'btn btn--primary', type: 'button' }, icon('check'), el('span', { class: 'comp-import__apply' }));
+    var back = el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { openImport(source); } }, 'رجوع');
+    var all = el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () { setAll(true); } }, 'علّم على الكل');
+    var none = el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () { setAll(false); } }, 'شيل العلامات');
+    var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر في الصفوف…', 'aria-label': 'دوّر في الصفوف' });
+    var filters = el('div', { class: 'filter-chips', role: 'group', 'aria-label': 'اعرض' }, [
+      { key: 'all', label: 'الكل (' + ar(rows.length) + ')' },
+      { key: 'ok', label: 'جديد' },
+      { key: 'warn', label: 'تحذيرات (' + ar(counts.warnings || 0) + ')' },
+      { key: 'error', label: 'أخطاء (' + ar(counts.error || 0) + ')' }
+    ].map(function (f) {
+      return el('button', { class: 'filter-chip', type: 'button', 'data-filter': f.key, 'aria-pressed': String(f.key === filter), onclick: function () {
+        filter = f.key;
+        Array.prototype.forEach.call(filters.children, function (b) { b.setAttribute('aria-pressed', String(b.dataset.filter === filter)); });
+        show();
+      } }, f.label);
+    }));
+
+    search.addEventListener('input', function () { needle = search.value.trim().toLowerCase(); show(); });
+
+    function show() {
+      items.forEach(function (i) {
+        var status = i.node.dataset.status;
+        var pass = (filter === 'all' || filter === status || (filter === 'ok' && status !== 'error')) && (!needle || i.search.indexOf(needle) !== -1);
+        i.node.hidden = !pass;
+      });
+    }
+
+    function setAll(on) {
+      ticks.forEach(function (t) { if (!t.input.closest('li').hidden) t.input.checked = on; });
+      count();
+    }
+
+    function count() {
+      var n = ticks.filter(function (t) { return t.input.checked; }).length;
+      apply.querySelector('.comp-import__apply').textContent = 'ضيف اللي متعلّم عليه (' + ar(n) + ')';
+      apply.disabled = !n;
+    }
+
+    apply.addEventListener('click', function () {
+      box.hidden = true;
+      var decisions = {};
+      ticks.forEach(function (t) { if (t.input.checked) decisions['r' + t.row.line] = 'add:' + t.row.fp; });
+      if (!Object.keys(decisions).length) {
+        A.fail(new Error('مفيش صف متعلّم عليه.'), box);
+        return;
+      }
+      A.withBusy(apply, A.call('apiCompImportApply', C.open, source, decisions))
+        .then(function (report) {
+          A.dirty = false;
+          showResult(report);
+          C.refreshStatus();
+          C.refresh().catch(function () {});
+        })
+        .catch(function (error) { A.fail(error, box); });
+    });
+
+    count();
+
+    A.dirty = true;
+
+    A.openSheet('معاينة الاستيراد', [
+      box,
+      (result.problems || []).length ? el('div', { class: 'note note--warn' }, result.problems.map(function (p) { return el('p', { text: p }); })) : null,
+      (result.ignored || []).length ? el('p', { class: 'field__hint', text: 'أعمدة مش معروفة (اتجاهلت): ' + result.ignored.join('، ') }) : null,
+      summary,
+      counts.error ? el('div', { class: 'note' },
+        el('p', { class: 'note__title', text: 'صلّح الملف وارفعه تاني' }),
+        el('p', { text: 'الصفوف اللي فيها «خطأ» مش هتتضاف: جنب كل واحد مكتوب الصف والعمود والسبب. صلّحهم في الملف وارفعه تاني — أو كمّل بالصفوف السليمة دلوقتي.' })) : null,
+      rows.length ? el('div', { class: 'comp-import__tools' }, filters, search, el('div', { class: 'actions' }, all, none)) : null,
+      rows.length ? list : el('p', { class: 'empty', text: 'مفيش صفوف.' })
+    ], [apply, back], { className: 'sheet--import' });
+
+  }
+
+  function showResult(report) {
+
+    var notable = (report.rows || []).filter(function (r) { return r.result !== 'added'; });
+
+    A.openSheet('الاستيراد خلص ✓', [
+      el('div', { class: 'import__summary' },
+        A.chip('اتضاف: ' + ar(report.added), 'ok'),
+        report.skipped ? A.chip('اتساب: ' + ar(report.skipped), 'off') : null,
+        report.errors ? A.chip('فيه مشكلة: ' + ar(report.errors), 'danger') : null
+      ),
+      el('p', { class: 'note note--ok', text: 'الأسئلة اتحفظت في المسودة (المسابقة فيها ' + ar(report.count) + ' سؤال دلوقتي) — لسه محتاجة «راجع وانشر» علشان تظهر.' }),
+      notable.length ? el('ul', { class: 'import__list' }, notable.slice(0, 120).map(function (r) {
+        var words = { skipped: 'اتساب', error: 'فيه مشكلة' };
+        return el('li', { class: 'import__row import__row--' + (r.result === 'error' ? 'error' : 'update') },
+          el('div', { class: 'import__head' },
+            el('span', { class: 'import__date', text: 'صف ' + ar(r.line) }),
+            A.chip(words[r.result] || r.result, r.result === 'error' ? 'danger' : 'off')),
+          r.reason ? el('div', { class: 'import__lines' }, el('span', { class: 'field__hint', text: r.reason })) : null
+        );
+      })) : null
+    ], [el('button', { class: 'btn btn--primary', type: 'button', text: 'تمام', onclick: function () {
+      A.closeSheet().then(function () { C.tab = 'questions'; C.reload(); });
+    } })], { className: 'sheet--import' });
+
+  }
+
+})();
+</script>

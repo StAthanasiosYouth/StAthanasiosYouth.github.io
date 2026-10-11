@@ -804,6 +804,7 @@ encryption), `CompPublic.gs` (public actions), `CompAdmin.gs` (admin API),
 
 ```
 apiComps() → { ready (spreadsheet exists), comps:[Summary], modules:{registry,wallet,shop},
+               installed:{registry,wallet,shop} (the module's code is in this version: its switch can be turned on),
                presets:[{ key, label, participation, scoring, resultShow, answersShow, wallet }],
                limits: COMP_LIMITS, types:{ single:'اختيار واحد', … }, statuses:{ in_progress:'لسه بيحل', … },
                now, siteUrl }
@@ -851,7 +852,8 @@ apiCompResults(compId) → { ranking:[{ rank, id, participantId, name, phone, sc
                            submittedAt, status, pending, attempts }], stats:{ submissions, participants,
                            average, top, maxScore, pending }, questions:[{ qid, number, text, type, points,
                            answered, correct, wrong, pending, rate, choices? }], finalizedAt }
-apiCompExport(compId) → { filename, header:[text], rows:[[cell]] }   (Arabic headers; answers as choice text)
+apiCompExport(compId) → { filename, header:[text], rows:[[cell]] }   (Arabic headers; answers as choice text;
+                         three columns per question: «س١: …», «س١: … (صح؟)» = ✓ | ✕ | ⏳ | '', «س١: … (الدرجة)»)
 ```
 
 Question input (editor and import): `{ id?, type, text, help, media, choices:

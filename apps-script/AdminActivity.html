@@ -26,13 +26,16 @@
   var TYPE_ICONS = {
     sessions: 'church', news: 'megaphone', games: 'star', activities: 'calendar', notifications: 'bell', types: 'layers',
     links: 'link', sections: 'layers', contacts: 'phone', settings: 'gear', media: 'photos', site: 'globe', admins: 'shield',
-    data: 'retry', session: 'user'
+    data: 'retry', session: 'user',
+    // competitions (docs/COMPETITIONS.md §11)
+    competition: 'trophy', participant: 'users', points: 'star', shopitem: 'gift', redemption: 'ticket'
   };
 
   var TONES = {
     create: 'ok', upload: 'ok', import: 'ok', duplicate: 'ok', 'admin.add': 'ok',
     'delete': 'danger', 'media.delete': 'danger', 'media.purge': 'danger', 'admin.remove': 'danger',
-    publish: 'gold', push: 'info', 'session.takeover': 'warn'
+    publish: 'gold', push: 'info', 'session.takeover': 'warn',
+    review: 'info', finalize: 'gold', regrade: 'warn', close: 'warn', 'code.reset': 'warn', 'code.export': 'warn'
   };
 
   var FAMILIES = [
@@ -50,7 +53,8 @@
     { key: 'sessions', label: 'الاجتماعات' },
     { key: 'news', label: 'الأخبار' },
     { key: 'games', label: 'الألعاب' },
-    { key: 'activities', label: 'المسابقات والفعاليات' },
+    { key: 'activities', label: 'الكروت والفعاليات' },
+    { key: 'competitions', label: 'المسابقات (الأسئلة والنتايج)' },
     { key: 'notifications', label: 'الإشعارات' },
     { key: 'page', label: 'الصفحة والإعدادات' },
     { key: 'media', label: 'الصور' },
@@ -62,25 +66,44 @@
   var PLACES = {
     sessions: ['content', 'meetings'], news: ['content', 'news'], games: ['content', 'games'],
     notifications: ['content', 'notifications'], links: ['page', 'links'], sections: ['page', 'layout'],
-    contacts: ['page', 'contacts'], media: ['media'], settings: ['settings']
+    contacts: ['page', 'contacts'], media: ['media'], settings: ['settings'],
+    // a competition opens its builder (AdminComp A.compOpen); its module switches, «الإعدادات»
+    competition: ['comps', 'comps']
   };
 
   var KEYS = { sessions: 'date', news: 'id', games: 'id', notifications: 'id', activities: 'id', types: 'key', links: 'id', sections: 'key', contacts: 'id', media: 'id' };
 
   var GONE_ACTIONS = ['delete', 'media.purge'];
 
+  /* competitions are not in the panel state: a row names its id (cmp-…), or 'modules' for the switches */
+  var COMP_ENTITY = /^(cmp-[0-9a-f]{8}|modules)$/;
+
+  function compEntry(entry) {
+
+    return entry.type === 'competition' && COMP_ENTITY.test(String(entry.entityId || '')) && GONE_ACTIONS.indexOf(entry.action) === -1;
+
+  }
+
+  /* the builder (or the switches); a competition that is gone says so there */
+  function openComp(id) {
+
+    if (id === 'modules') return A.go('comps', 'compsettings');
+    return A.compOpen ? A.compOpen(id) : A.go('comps', 'comps');
+
+  }
+
   /* a row about an item that can be opened (not a deletion) */
   function openable(entry) {
 
     if (GONE_ACTIONS.indexOf(entry.action) !== -1) return false;
-    return entry.type === 'settings' || entry.type === 'media' || !!(KEYS[entry.type] && entry.entityId);
+    return entry.type === 'settings' || entry.type === 'media' || compEntry(entry) || !!(KEYS[entry.type] && entry.entityId);
 
   }
 
   /* such an item, missing from this panel's (older) copy of the data */
   function stale(entry) {
 
-    return openable(entry) && entry.type !== 'settings' && !findItem(entry.type, entry.entityId);
+    return openable(entry) && entry.type !== 'settings' && entry.type !== 'competition' && !findItem(entry.type, entry.entityId);
 
   }
 
@@ -129,6 +152,10 @@
 
     if (entry.type === 'media') {
       return findItem('media', entry.entityId) ? { label: 'افتح', open: function () { return A.go('media'); } } : null;
+    }
+
+    if (compEntry(entry)) {
+      return { label: 'افتح', open: function () { return openComp(entry.entityId); } };
     }
 
     if (!KEYS[entry.type] || !entry.entityId) return null;
@@ -190,6 +217,9 @@
       });
     }
 
+    // a competition's builder (admin push, the log): '#open/competition/cmp-…' | '#open/competition/modules'
+    if ((m = /^open\/competition\/(cmp-[0-9a-f]{8}|modules)$/.exec(text))) return openComp(m[1]);
+
     if (/^open\/settings$/.test(text)) return A.go('settings');
     if (/^open\/media(?:\/[\w-]{1,80})?$/.test(text)) return A.go('media');
 
@@ -248,6 +278,7 @@
 
     if (entry.type === 'settings') return A.go('settings');
     if (entry.type === 'media' && GONE_ACTIONS.indexOf(entry.action) === -1) return A.go('media');
+    if (compEntry(entry)) return openComp(entry.entityId);
 
     if (KEYS[entry.type] && entry.entityId && GONE_ACTIONS.indexOf(entry.action) === -1) {
       return findFresh(entry.type, entry.entityId).then(function (row) {

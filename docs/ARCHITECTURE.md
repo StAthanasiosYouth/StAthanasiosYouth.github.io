@@ -565,6 +565,21 @@ The full design and build contract is **[docs/COMPETITIONS.md](COMPETITIONS.md)*
   only from `/admin/`. Cards (Activities `competition` column), bell targets
   `competition:<slug>`, media usage, the review and «سجل النشاط» know
   competitions. `apiState` reads them through a cache.
+- **The admin screens** are their own area «المسابقات» (`A.AREAS` key
+  `comps`, subs `comps` = list + builder and `compsettings` = the module
+  switches): `apps-script/AdminComp.html` (list, the «مسابقة جديدة» wizard,
+  the builder shell and its tabs نظرة عامة / الأساسيات / المشاركة / القواعد /
+  النتيجة / المعاينة / الإشعارات, the edit lock `comp:<id>`),
+  `AdminCompQuestions.html` (questions, the editor, reorder, the XLSX
+  template and the import — the meetings import's steps and look) and
+  `AdminCompResults.html` (المشاركات / المراجعة / النتائج, the XLSX export).
+  Spreadsheets are made and read in the browser by `admin/xlsx.js` and
+  `admin/comp-sheets.js` (hand-written ES modules next to the page, loaded
+  with `import()` when needed). The preview tab loads
+  `competition/index.html?preview` in a same-origin frame (the admin CSP's
+  `frame-src 'self'`) and speaks the §13.3 protocol. The recovery admin
+  shows a pointer to `/admin/` instead. Tests: `tests/comp-admin.e2e.mjs`
+  (the real `.gs` on a fake world in Chrome), `tests/comp-sheets.test.mjs`.
 
 ## Ready for later (not built yet)
 

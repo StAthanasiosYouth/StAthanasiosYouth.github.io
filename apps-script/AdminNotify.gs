@@ -37,7 +37,8 @@ var ADMIN_PUSH_MAX = 100;
 var ADMIN_PUSH_TTL = 86400;
 var ADMIN_PUSH_TITLE_MAX = 80;
 var ADMIN_PUSH_BODY_MAX = 160;
-var ADMIN_PUSH_OPEN_TYPES = ['sessions', 'news', 'games', 'activities', 'notifications', 'types', 'links', 'sections', 'contacts', 'media'];
+// 'competition': the builder (AdminComp, #open/competition/<cmp-id>)
+var ADMIN_PUSH_OPEN_TYPES = ['sessions', 'news', 'games', 'activities', 'notifications', 'types', 'links', 'sections', 'contacts', 'media', 'competition'];
 
 
 function adminPushSheet_() {

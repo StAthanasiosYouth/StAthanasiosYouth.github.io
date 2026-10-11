@@ -6,7 +6,9 @@
 //   apps-script/AdminStyles.html    → admin/admin.css (+ the site's own fonts)
 //   apps-script/Admin{Icons,Platforms,Script,Page,Content,Media,Trim,Items,
 //                     Home,Preview}.html → admin/admin-app.js
-//   (admin/vendor/mediabunny.js: tools/build-admin-vendor.mjs, loaded by AdminTrim on demand)
+//   (and every other script include of Admin.html, e.g. AdminComp*.html — «المسابقات»)
+//   (admin/vendor/mediabunny.js: tools/build-admin-vendor.mjs, loaded by AdminTrim on demand;
+//    admin/xlsx.js + admin/comp-sheets.js: hand-written modules, loaded by AdminComp* on demand)
 //
 // The <script>/<style> wrappers are stripped; the order is Admin.html's
 // include order. Hand-written (not generated): admin/boot.js (Google

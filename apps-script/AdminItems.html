@@ -14,7 +14,7 @@
   var bool = A.bool;
 
   var SECTION_INFO = {
-    competitions: { title: 'المسابقات', one: 'مسابقة', add: 'مسابقة جديدة', icon: 'trophy', hint: 'مسابقات بلينك (زي مسابقة الكتاب المقدس). الزرار بيشتغل بس من ميعاد البداية لميعاد النهاية.' },
+    competitions: { title: 'المسابقات', one: 'مسابقة', add: 'مسابقة جديدة', icon: 'trophy', hint: 'الكروت اللي في قسم «المسابقات» في الموقع. كارت بلينك برّه (زي فورم) بيتعمل هنا؛ المسابقة بأسئلة وتصحيح بتتعمل من «المسابقات» وكارتها بيظهر هنا لوحده. الزرار بيشتغل بس من ميعاد البداية لميعاد النهاية.' },
     activities: { title: 'الفعاليات', one: 'فعالية', add: 'فعالية جديدة', icon: 'calendar', hint: 'رحلات، مسرحيات، مؤتمرات، أيام روحية، حفلات… كل نوع ليه شكله. الزرار (تسجيل مثلاً) بيشتغل أي وقت.' }
   };
 
@@ -143,7 +143,19 @@
         split.showing ? null : el('p', { class: 'empty-state__text', text: 'دوس «' + meta.add + '» وابدأ.' })
       );
 
+    // the competitions themselves (questions, results) live in their own area (AdminComp)
+    var compNote = sectionKey === 'competitions' && window.AdminTransport && A.compOpen
+      ? el('section', { class: 'card card--notice comp-cards-note' },
+        el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('trophy')),
+        el('div', {},
+          el('h2', { class: 'card__title', text: 'مسابقة بأسئلة وتصحيح؟' }),
+          el('p', { class: 'card__hint', text: 'بتتعمل من «المسابقات»: الأسئلة والمشاركات والنتايج. كارتها بيظهر هنا لوحده ومبيتعدلش من هنا.' })
+        ),
+        el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.go('comps', 'comps'); } }, icon('trophy'), 'افتح المسابقات'))
+      : null;
+
     return [
+      compNote,
       A.card(meta.title, meta.hint,
         el('div', { class: 'actions' },
           types.length
@@ -154,7 +166,7 @@
         list
       ),
       typesCard(sectionKey, types)
-    ];
+    ].filter(Boolean);
 
   }
 
@@ -162,6 +174,8 @@
   A.views.activities = function () { return itemsView('activities'); };
 
   function activityItem(item, sectionKey) {
+
+    if (item.competition) return linkedItem(item, sectionKey);
 
     var enabled = bool(item.enabled);
     var type = typeByKey(item.type) || {};
@@ -188,6 +202,55 @@
         A.deleteButton(item.title, function (e) { A.deleteItem('activities', item.id, item.title, e.currentTarget); })
       ])
     });
+
+  }
+
+
+  /*
+   * A competition's own card (Activities.competition = its id, made by the
+   * builder's «اعرض كارت في قسم المسابقات»): its title, picture and dates
+   * follow the competition at publish, so here it is read-only, with the
+   * way to the competition (docs/COMPETITIONS.md §4.5).
+   */
+  function linkedItem(item, sectionKey) {
+
+    var enabled = bool(item.enabled);
+    var type = typeByKey(item.type) || {};
+    var open = window.AdminTransport && A.compOpen
+      ? el('button', { class: 'btn btn--small', type: 'button', 'aria-label': 'افتح المسابقة: ' + (item.title || ''), onclick: function () { A.compOpen(item.competition); } }, icon('trophy'), 'افتح المسابقة')
+      : null;
+
+    var row = A.listItem({
+      icon: type.icon || info(sectionKey).icon,
+      image: item.image,
+      title: item.title,
+      sub: item.subtitle,
+      off: !enabled,
+      chips: [enabled ? A.chip('ظاهر مع المسابقة', 'ok') : A.chip('مخفي', 'off'), A.chip('بيتعدل من المسابقة', 'info')],
+      controls: [el('span', { class: 'spacer' }), open]
+    });
+
+    row.classList.add('item--linked');
+    row.dataset.competition = item.competition;
+    return row;
+
+  }
+
+  /* the editor of a linked card: it says where it is edited */
+  function linkedEditor(item) {
+
+    var open = window.AdminTransport && A.compOpen
+      ? el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.closeSheet().then(function (closed) { if (closed) A.compOpen(item.competition); }); } }, icon('trophy'), 'افتح المسابقة')
+      : null;
+
+    A.dirty = false;
+    A.openSheet('كارت المسابقة: ' + (item.title || ''), [
+      el('p', { class: 'note', text: 'الكارت ده بتاع مسابقة: العنوان والوصف والصورة والمواعيد بيتاخدوا منها وقت النشر، وزراره بيفتح صفحتها. بيتعدل من «المسابقات» ← المسابقة نفسها (وبيتخفي من «اعرض كارت في قسم المسابقات»).' }),
+      el('dl', { class: 'kv' },
+        el('dt', { text: 'العنوان' }), el('dd', { text: item.title || '—' }),
+        el('dt', { text: 'المواعيد' }), el('dd', { text: (item.startAt ? A.formatWall(item.startAt) : '—') + (item.endAt ? ' ← ' + A.formatWall(item.endAt) : '') })
+      )
+    ], [open, el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })].filter(Boolean));
 
   }
 
@@ -376,6 +439,12 @@
   ======================================================= */
 
   A.editors.activities = function (item, sectionKey) {
+
+    // a competition's own card is edited from the competition
+    if (item && item.competition) {
+      linkedEditor(item);
+      return;
+    }
 
     var isNew = !item;
     var current = item ? typeByKey(item.type) : null;
