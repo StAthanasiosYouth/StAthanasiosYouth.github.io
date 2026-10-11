@@ -118,7 +118,7 @@ Questions      (draft; one row per question)
 
 Snapshots      (what is LIVE; content-addressed; never edited)
   compId | version | part | json | publishedAt | publishedBy
-  version = first 16 hex of sha256(definition JSON). json is the definition
+  version = first 16 hex of HMAC-SHA256(definition JSON, COMP_SECRET) (§4.2). json is the definition
   split into ≤ 45,000-char parts (part = 0,1,2…). Definition = §4.2.
 
 Submissions    (one row per attempt)
@@ -194,7 +194,11 @@ competition's status (§2).
   draft write and after a publish; `apiReview` / `apiPublish` drop them first
   and read the tabs themselves (never publish from a cache).
 - `comp:shell` → the committed `competition/index.html` (10 min, §4.3).
-- `comp:min:<minute>` (public budget), `comp:fail:<minute>` (failed codes).
+- `comp:min:<family>:<minute>` (public budgets: play / code / portal),
+  `comp:start:<slug>:<minute>` (starts of one competition), `comp:fail:<minute>`
+  (failed codes; no day counter, no property write).
+- `comp:mediaout` → ids of library pictures already on the site (10 min,
+  dropped by every publish): `review[].explanationMedia` only for those.
 - `reg:hash` → codeHash → participantId map (chunked), dropped on any code change.
 - `wal:bal:<pid>` (a balance), `wal:retry` (reconciles that met a busy lock), `shop:img` (published store pictures) — §17.
 
@@ -274,7 +278,11 @@ flags `scoring`, `showPoints`, `wallet`, `shuffleQ`, `shuffleC`, `uniquePhone`,
 `required` are JSON booleans; `attempts`, `timeLimit`, `maxSubmissions`, `points`
 numbers; `fields` = the full §3.3 list in open mode, `[]` in registered mode;
 `ctaLabel` defaults to «ابدأ المسابقة»; `correct` is null for long/info).
-`version` = sha256(JSON)[0..16]. Snapshot rows are written BEFORE the commit
+`version` = hex(HMAC-SHA256(JSON, `COMP_SECRET`))[0..16] (`compKeyedHash_`,
+CompCrypto.gs, passed into the pure `compVersion_`): deterministic, so
+snapshots stay content-addressed, but `v` is public (comp.json, content.json,
+the stub's `data-v`, compStart's `comp.v`) and a plain sha256 of the private
+definition would let anyone test guessed answer keys offline. Snapshot rows are written BEFORE the commit
 (content-addressed: an existing (compId, version) is left alone, one read +
 one block) and, only after the commit lands, `liveVersion` / `publishedAt` are
 set (a withdrawn competition gets `liveVersion` cleared). An "unchanged"
@@ -318,8 +326,21 @@ right after its commit.
   and a linked card (Activities) gains `"competition": "<slug>"` and
   `"ctaLabel": "<the competition's button text>"`; its `cta` is null (the
   page makes the same-tab button).
-- Media used by published competitions (banner, icon, question media,
-  explanation media) are added to the publish's media list like any image.
+- Media used by published competitions (banner, icon, question media) are
+  added to the publish's media list like any image. Question pictures are
+  public from that publish on (needed at start): the builder gets the
+  warning «صور الأسئلة بتبقى على الموقع من وقت النشر — متحطش صورة فيها الإجابة».
+  EXPLANATION pictures go out only from a publish at which the answers are
+  already revealable (`compAnswersOpen_`: immediately and started, afterClose
+  and the submissions over, atDate and passed); until then the builder sees
+  «صور شرح الإجابات مش هتتنشر غير لما الإجابات تظهر: انشر تاني بعدها علشان
+  تظهر». Such a publish commits even when the revision is unchanged (a
+  waiting picture). `review[].explanationMedia` is null until the picture is
+  on the site (the text shows regardless).
+- Publish WARNING (never blocks): an open competition that shows the score
+  right away (resultShow ≠ none, no resultsAt) unless it is uniquePhone AND
+  one attempt: «أي حد يقدر يحاول كذا مرة ويعرف الإجابات من الدرجة». Warnings
+  are in the review and in `apiComp().warnings`.
 - An unpublished competition (enabled turned off) gets
   `comp.json = { schema:1, slug, withdrawn:true }`; its stub stays (links don't 404).
 
@@ -371,8 +392,14 @@ Replies: `{ ok:true, … }` or `{ ok:false, code, message }` with Arabic
 
 Limits: request body ≤ 64 KB for these actions (checked on `e.postData.length`
 before parsing when possible, else after); budgets in CacheService:
-all comp/portal/shop calls ≤ 300/min; failed code checks ≤ 30/min and ≤ 1,000/day
-(on overflow: `busy`); a fixed ~300 ms pause after every failed code check.
+per family a minute — compStart/compSubmit/compResult ≤ 600, compCode ≤ 120,
+portal*/shop* ≤ 300 — counted only AFTER a cheap shape check (an object; a
+valid slug + clientKey / a token-shaped token / a code ≤ 40 / a ptoken
+string), so malformed calls never spend them (they answer `bad`); plus
+≤ 200 starts a minute per competition slug. Failed code checks ≤ 60 a minute
+(on overflow: `busy`), a fixed ~300 ms pause after each; NO day cap (39-bit
+codes: at 60 a minute, hitting any of a few hundred codes takes decades, and
+a day cap would let anyone lock everybody out).
 Unknown keys are ignored; every value is type/length checked.
 
 ### 5.1 Endpoints
@@ -399,6 +426,12 @@ compStart   { slug, clientKey, fields?, ptoken?, hp? }
     `resumed:true`; a registered participant with an in_progress attempt for
     the same comp+version gets that attempt back (another device)
   - attempts / maxSubmissions / uniquePhone enforced here (and again at submit)
+  - at most `COMP_MAX_OPEN_ATTEMPTS` (3,000) unsent attempts started in the
+    last 48 h per competition; beyond: `limit` «المسابقة عليها ضغط كبير دلوقتي…»
+  - registered: a clientKey that belongs to ANOTHER participant's attempt → `bad`
+  - the phone identity: every way of writing an Egyptian mobile (+20 010…,
+    0020…, 010…, 10…, Arabic digits) is stored as `+201XXXXXXXXX`
+    (`compNormPhoneEg_`, the registry's rules); other numbers as `+<digits>`
   - hp = honeypot (must be empty)
   - writes the Submissions row (status in_progress) under compLock_
   PublicQuestion = { id, type, text, help, media, choices:[{id,text}], required, points? }
@@ -439,7 +472,12 @@ Result = { status, submittedAt,
   (no resultsAt, or it passed, or the results are finalized); otherwise
   `resultsAt` is the hint. `review[].ok/pts` are null while the score is
   hidden; `correct` is null when scoring is off; info questions are not in
-  `review`. afterClose before the close gives `answersAt` = endAt as a hint.
+  `review`. afterClose opens only when nobody can still send: now > the
+  effective end (the earlier of endAt and closedAt) + `COMP_GRACE_MINUTES` +
+  the 60 s slack, or the results are finalized; a WITHDRAWN competition is
+  not «closed» (only its own endAt ends it). Before that `answersAt` = endAt
+  is the hint. The same rule (`compAnswersOpen_`, CompModel.gs) decides the
+  portal's `canReview` (it calls compResult_).
   A void submission's result is `{ status:'void', submittedAt }` only.
 
 compCode    { code }            (Phase 2)
@@ -468,9 +506,12 @@ allowed, normalized to a finite number. Missing / `''` / `[]` = unanswered.
 
 ### 5.3 Tokens (stateless, HMAC-SHA256 with Script Property `COMP_SECRET`, auto-generated)
 
-- attempt `at1.<b64url {s,c,v,d,e}>.<sig>` — submission id, comp id, version,
+- attempt `at1.<b64url {s,c,v,d,e[,p,cv]}>.<sig>` — submission id, comp id, version,
   deadlineMs, expiry = min(start + 48 h, end + grace + 15 min): kept loose so
   the server's own window check answers `closed` / `expired` precisely.
+  Registered attempts also carry `p` (participant) and `cv` (codeVersion): at
+  compSubmit the participant must still be active with the same codeVersion,
+  else `session` (a reset or a deactivation kills attempts in flight).
 - The signature is `b64url(HMAC-SHA256("<kind>.<body>", COMP_SECRET text))`
   (43 characters); tokens are ≤ 1,500 characters.
 - receipt `rc1.<b64url {s,c}>.<sig>` — kept by the page to re-check its result later.
@@ -788,7 +829,9 @@ no reply within 30 s the page shows an error. `at` shifts the page's clock
 - Server clock for every window; `closedAt` honoured immediately.
 - Idempotent start/submit/redeem; attempts, maxSubmissions, uniquePhone enforced server-side.
 - Codes: hash + encrypted copy; admin-only retrieval; never logged/exposed.
-- Code brute force: 39-bit codes + global failure budget + pause.
+- Code brute force: 39-bit codes + a 60/min failure budget + pause.
+- The public `v` is a keyed hash (no offline key brute force); explanation
+  pictures stay private until the answers open; afterClose waits for the grace.
 - Ledger append-only, unique idemKeys, every balance-changing write under compLock_.
 - Stock and balance checked and written under the same lock (no double spend).
 - No PII in content.json / comp.json / push payloads / Activity `changes`.
@@ -912,7 +955,7 @@ own validation runs on every row.
 - `walletReconcile_(submissionId)` (called after every grade change: submit,
   manual review, group review, regrade, void; failures are swallowed) and
   `walletPointsFor_(submissionId)` → number (Result.pointsAwarded).
-- Helpers ready for `compCode`: `compCodeBudgetOk_()` (≤ 30/min, ≤ 1,000/day),
+- Helpers ready for `compCode`: `compCodeBudgetOk_()` (≤ 60/min, no day cap),
   `compCodeFailed_()` (counts + 300 ms pause); `compSignToken_('pt1', { p, cv, e })`,
   `compReadToken_('pt1', token)` → `{ ok, payload }` | `{ ok:false, reason:'bad'|'expired' }`;
   `compSecret_('CODE_PEPPER')`, `compEncrypt_` / `compDecrypt_`; `compSheet_('Participants')`
@@ -1026,9 +1069,8 @@ picture is not in content.json), `Activity.gs` (summaries, push decisions),
   made with `tryLock(0)` (public paths), or without touching the lock while this
   execution holds it (`COMP_SCRIPT_LOCK_HELD_`; reentrancy is undocumented), then
   re-read. An existing secret is never replaced.
-- Property writes on public paths: only `COMP_FAIL_DAY` (one per counted wrong
-  code, never past the 1,000/day cap: the budget refuses first and
-  `compCodeFailed_` skips the write at the cap) and a secret's one-time creation.
+- Property writes on public paths: only a secret's one-time creation (failed
+  codes are counted in CacheService; `COMP_FAIL_DAY` is no longer written).
   Everything else per request is CacheService.
 
 ### 17.2 Registry replies

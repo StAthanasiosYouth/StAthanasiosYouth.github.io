@@ -123,6 +123,9 @@ function compAfterCommit_(comps, stamp) {
 
   if (!comps) return;
 
+  // pictures may have just gone to the site (explanation pictures follow it)
+  compDropMediaOut_();
+
   var live = comps.live;
   var gone = Object.create(null);
 

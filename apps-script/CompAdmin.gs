@@ -162,8 +162,10 @@ function compDraftDefinition_(compRow, questionRows, media) {
     comp: comp,
     questions: questions,
     def: def,
-    version: compVersion_(def, sha256Hex_),
-    problems: compPublishProblems_(comp, questions, compModules_(), media || compMediaIndex_())
+    // the same keyed hash the publish uses (CompCrypto.gs), so «hasChanges» compares like with like
+    version: compVersion_(def, compKeyedHash_),
+    problems: compPublishProblems_(comp, questions, compModules_(), media || compMediaIndex_()),
+    warnings: compPublishWarnings_(comp, questions, compNow_().wall)
   };
 
 }
@@ -329,6 +331,7 @@ function apiComp(id) {
     }),
     summary: compSummary_(row, questionRows, counts, draft, now),
     problems: draft.problems,
+    warnings: draft.warnings,
     draftVersion: draft.version,
     liveVersion: comp.liveVersion,
     card: card,

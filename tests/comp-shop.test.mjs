@@ -248,7 +248,8 @@ test('portalMe: registry only / + wallet / + store shapes; history with submissi
   assert.deepEqual(me.redemptions.map(x => [x.id, x.status, x.itemName, x.cost]), [[r.redemption.id, 'pending', 'كوباية', 300]]);
   assert.equal(me.ledger[0].kind, 'redeem');
   assert.equal(me.ledger[0].note, 'كوباية');
-  assert.equal(pub(world, 'portalMe', {}).code, 'session');
+  assert.equal(pub(world, 'portalMe', {}).code, 'bad', 'no token at all: refused before any budget (CompPublic.gs compShapeOk_)');
+  assert.equal(pub(world, 'portalMe', { ptoken: 'x' }).code, 'session');
 });
 
 test('a store picture added after the last publish: «انشر» still uploads it (content.json unchanged)', () => {

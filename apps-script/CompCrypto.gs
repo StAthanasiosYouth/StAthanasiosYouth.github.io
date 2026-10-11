@@ -206,6 +206,21 @@ function compSecretBytes_(name) {
 
 }
 
+/*
+ * hex(HMAC-SHA256(text, COMP_SECRET)): the competitions' version hash
+ * (CompModel.gs compVersion_). Deterministic for this deployment, so
+ * snapshots stay content-addressed, but without the secret nobody can test
+ * a guessed answer key against the public `v`.
+ */
+function compKeyedHash_(text) {
+
+  return Utilities.computeHmacSha256Signature(String(text), compSecret_('COMP_SECRET')).map(function (b) {
+    var h = (b & 255).toString(16);
+    return h.length === 1 ? '0' + h : h;
+  }).join('');
+
+}
+
 
 /* =========================================================
    TOKENS

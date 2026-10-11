@@ -257,28 +257,27 @@ test('compCode: the right code (any typed form) → name, group, a 3-hour pt1 to
   assert.equal(pub(world, 'portalMe', { ptoken: reply.ptoken }).code, 'session');
 });
 
-test('compCode brute force: every wrong code is counted and paused; 30 a minute → busy (even for the right code); the day budget too', () => {
+test('compCode brute force: every wrong code is counted and paused; 60 a minute → busy (even for the right code); no day cap', () => {
   const { world, call } = regWorld();
   const p = addPerson(call, 'مينا عادل', phone(51));
   const code = codeOf(call, p.id);
   let pauses = 0;
   world.gs.Utilities.sleep = ms => { pauses += ms; };
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 60; i++) {
     const reply = pub(world, 'compCode', { code: 'ATH-2345-' + ['6789', 'ABCD', 'EFGH'][i % 3] + (i < 3 ? '' : '') });
     assert.equal(reply.code, 'code', 'attempt ' + i);
     assert.match(reply.message, /الكود ده مش صحيح/);
   }
-  assert.equal(pauses, 30 * 300, 'a fixed pause after every failure');
+  assert.equal(pauses, 60 * 300, 'a fixed pause after every failure');
   const busy = pub(world, 'compCode', { code });
   assert.equal(busy.code, 'busy', 'the budget is global');
   assert.equal(pub(world, 'compCode', { code: 'garbage' }).code, 'busy');
   world.advance(61000);
   assert.equal(pub(world, 'compCode', { code }).ok, true, 'a new minute');
-  // the day budget
-  world.properties.set('COMP_FAIL_DAY', new Date(world.now()).toISOString().slice(0, 10) + ':1000');
-  assert.equal(pub(world, 'compCode', { code }).code, 'busy');
+  // no day cap: nobody can lock everybody out for the day
+  world.properties.set('COMP_FAIL_DAY', new Date(world.now()).toISOString().slice(0, 10) + ':100000');
+  assert.equal(pub(world, 'compCode', { code }).ok, true);
   // malformed requests
-  world.properties.delete('COMP_FAIL_DAY');
   assert.equal(pub(world, 'compCode', {}).code, 'bad');
   assert.equal(pub(world, 'compCode', { code: 'x'.repeat(41) }).code, 'bad');
 });
@@ -541,11 +540,12 @@ test('module switches: each needs the one before (chain enforced), logged; disab
   assert.equal(world.properties.get('COMP_SHOP'), '');
   assert.ok(activityRows(world).filter(r => r[5] === 'settings').length >= 1);
 
-  for (const fn of ['shopRedeem']) assert.equal(pub(world, fn, {}).code, 'disabled', fn);
+  for (const fn of ['shopRedeem']) assert.equal(pub(world, fn, { ptoken: 'pt1.x.y' }).code, 'disabled', fn);
   assert.throws(() => call('apiWalletAdjust', 'p-00000000', 5, 'x', 'adjust-key-1'), /المحفظة والنقاط» مش متفعّلة/);
   assert.throws(() => call('apiShopItemSave', { name: 'x', cost: 5 }), /متجر الجوائز» مش متفعّل/);
   call('apiCompSettings', { registry: false });
-  for (const fn of ['compCode', 'portalMe', 'portalReview', 'shopRedeem']) assert.equal(pub(world, fn, {}).code, 'disabled', fn);
+  for (const fn of ['compCode', 'portalMe', 'portalReview', 'shopRedeem']) assert.equal(pub(world, fn, { code: 'ATH-2345-6789', ptoken: 'pt1.x.y' }).code, 'disabled', fn);
+  assert.equal(pub(world, 'portalMe', {}).code, 'bad', 'a request without its token never spends a budget');
   assert.throws(() => call('apiParticipantSave', { name: 'مينا عادل', phone: phone(1) }), /المشاركين بالأكواد» مش متفعّل/);
   // reads keep working (data is kept)
   assert.equal(call('apiParticipants', {}).total, 0);
@@ -637,22 +637,17 @@ test('secrets: made eagerly before admin locks; never a blocking tryLock while t
   assert.ok(calls.slice(mark).every(c => c.op === 'try' && c.ms === 0), JSON.stringify(calls.slice(mark)));
 });
 
-test('failed-code day counter: one property write per counted failure, none once the day cap is reached', () => {
+test('failed codes are counted in CacheService only: no Script Property write per failure', () => {
   const { world, call } = regWorld();
   const p = addPerson(call, 'مينا عادل', phone(82));
-  const today = new Date(world.now()).toISOString().slice(0, 10);
-  pub(world, 'compCode', { code: 'ATH-2345-6789' });
-  assert.equal(world.properties.get('COMP_FAIL_DAY'), today + ':1');
-  world.properties.set('COMP_FAIL_DAY', today + ':1000');
   let writes = 0;
   const props = world.gs.PropertiesService.getScriptProperties;
-  world.gs.PropertiesService.getScriptProperties = () => { const p2 = props(); return { ...p2, setProperty: (k, v) => { writes++; p2.setProperty(k, v); } }; };
-  assert.equal(pub(world, 'compCode', { code: 'ATH-2345-6789' }).code, 'busy');
-  assert.equal(pub(world, 'compCode', { code: codeOf(call, p.id) }).code, 'busy');
-  world.gs.compCodeFailed_();
+  world.gs.PropertiesService.getScriptProperties = () => { const p2 = props(); return { ...p2, setProperty: (k, v) => { writes++; p2.setProperty(k, v); }, setProperties: v => { writes++; p2.setProperties(v); } }; };
+  for (let i = 0; i < 5; i++) assert.equal(pub(world, 'compCode', { code: 'ATH-2345-6789' }).code, 'code');
   world.gs.PropertiesService.getScriptProperties = props;
-  assert.equal(writes, 0, 'no write past the cap');
-  assert.equal(world.properties.get('COMP_FAIL_DAY'), today + ':1000');
+  assert.equal(writes, 0);
+  assert.equal(world.properties.get('COMP_FAIL_DAY'), undefined);
+  assert.equal(pub(world, 'compCode', { code: codeOf(call, p.id) }).ok, true);
 });
 
 

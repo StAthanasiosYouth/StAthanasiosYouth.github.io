@@ -377,6 +377,8 @@ test('result policy: resultsAt hides the score until then; answers immediately /
   assert.equal(later.result.score, 35);
   assert.equal(later.result.review, undefined, 'not closed yet');
   world.advance(31 * 60000);
+  assert.equal(pub(world, 'compResult', { receipt: done.receipt }).result.review, undefined, 'ended, but someone may still send (grace): no key yet');
+  world.advance(4 * 60000);
   const closed = pub(world, 'compResult', { receipt: done.receipt });
   assert.equal(closed.result.review.length, 6, 'every question but info');
   const single = closed.result.review.find(r => r.type === 'single');
@@ -426,9 +428,9 @@ test('survey (scoring off): status submitted, no score, no review marks', () => 
 
 /* ---------------- the transport ---------------- */
 
-test('budget: 300 calls a minute for all comp/portal/shop actions, then busy; the next minute is open', () => {
+test('budget: 600 start/submit/result calls a minute, then busy; the next minute is open', () => {
   const { world } = live();
-  world.cache.set('comp:min:' + Math.floor(world.now() / 60000), { value: '300', until: world.now() + 60000 });
+  world.cache.set('comp:min:play:' + Math.floor(world.now() / 60000), { value: '600', until: world.now() + 60000 });
   const busy = start(world);
   assert.equal(busy.code, 'busy');
   assert.match(busy.message, /ضغط/);
@@ -442,7 +444,7 @@ test('size: a request over 64 KB is refused before anything is read; unknown act
   const huge = submit(world, s, { [s.questions[0].id]: 'x'.repeat(70 * 1024) });
   assert.equal(huge.code, 'bad');
   assert.match(huge.message, /كبيرة/);
-  for (const fn of ['compCode', 'portalMe', 'portalReview', 'shopRedeem']) assert.equal(pub(world, fn, {}).code, 'disabled', fn);
+  for (const fn of ['compCode', 'portalMe', 'portalReview', 'shopRedeem']) assert.equal(pub(world, fn, { code: 'ATH-2345-6789', ptoken: 'pt1.x.y' }).code, 'disabled', fn);
   assert.equal(pub(world, 'compHack', {}).code, 'bad');
   assert.equal(pub(world, 'shopEverything', {}).code, 'bad');
 });
@@ -454,7 +456,7 @@ test('later modules plug in: a switched-on module\'s handler answers (and only t
   assert.equal(pub(world, 'compCode', { code: 'ATH' }).code, 'disabled', 'the switch is off');
   world.properties.set('COMP_REGISTRY', '1');
   assert.deepEqual(plain(pub(world, 'compCode', { code: 'ATH' })), { ok: true, echo: 'ATH' });
-  assert.equal(pub(world, 'shopRedeem', {}).code, 'disabled', 'the store needs its own module');
+  assert.equal(pub(world, 'shopRedeem', { ptoken: 'pt1.x.y' }).code, 'disabled', 'the store needs its own module');
 });
 
 test('a broken handler never throws out of doPost and never echoes the request', () => {

@@ -229,7 +229,7 @@ function sha256Hex_(text) {
 
 function cairoNow_(date) {
 
-  return Utilities.formatDate(date || new Date(), CONTENT_TIMEZONE, "yyyy-MM-dd'T'HH:mm");
+  return Utilities.formatDate(date || new Date(Date.now()), CONTENT_TIMEZONE, "yyyy-MM-dd'T'HH:mm");
 
 }
 
@@ -364,7 +364,7 @@ function apiPublish(expectedRevision) {
 
     if (typeof compDropDraft_ === 'function') compDropDraft_();
 
-    var now = new Date();
+    var now = new Date(Date.now());
     var built = buildPublicContent(readDraft_(), {
       now: cairoNow_(now),
       hash: sha256Hex_,

@@ -1102,7 +1102,9 @@ function buildPublicContent(draft, options) {
   /* ---------- competitions (CompModel.gs; the competitions spreadsheet's draft) ---------- */
 
   var competitions = draft.competitions && typeof compBuildPublic_ === 'function'
-    ? compBuildPublic_(draft.competitions, { media: mediaById, error: error, warn: warn, hash: options.hash, now: now })
+    // the version hash is KEYED (CompCrypto.gs compKeyedHash_): `v` is public, the definition is not
+    ? compBuildPublic_(draft.competitions, { media: mediaById, error: error, warn: warn, now: now,
+      hash: options.compHash || (typeof compKeyedHash_ === 'function' ? compKeyedHash_ : null) })
     : null;
 
 

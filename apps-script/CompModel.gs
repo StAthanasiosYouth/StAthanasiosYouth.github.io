@@ -225,6 +225,41 @@ function compFieldsSpec_(value, problems) {
  * A participant's form (open mode) against the live spec.
  * → { name, phone ('+…' | ''), fields: { key: value }, problem: { field, message } | null }
  */
+/**
+ * An Egyptian mobile number in any usual form → '+201XXXXXXXXX', else ''.
+ * The same rules as the registry's normPhoneEg_ (CompRegistry.gs), copied
+ * here so the engine works (and is tested) without that module: Arabic /
+ * Persian digits, spaces, dashes, dots, parentheses and bidi marks are
+ * forgiven; +20 / 0020 / 20 and the trunk 0 (also after "+20 0…") dropped.
+ */
+function compNormPhoneEg_(value) {
+
+  var text = contentDigits_(value === null || value === undefined ? '' : String(value))
+    .replace(/[‎‏؜‪-‮⁦-⁩﻿]/g, '')
+    .replace(/[\s \-‐-―.()\/]/g, '');
+  var plus = text.charAt(0) === '+';
+  var digits = plus ? text.slice(1) : text;
+
+  if (!/^\d+$/.test(digits)) return '';
+
+  if (plus) {
+    if (digits.indexOf('20') !== 0) return '';
+    digits = digits.slice(2);
+  }
+  else if (digits.indexOf('0020') === 0) {
+    digits = digits.slice(4);
+  }
+  else if (digits.indexOf('20') === 0 && digits.length >= 11) {
+    digits = digits.slice(2);
+  }
+
+  if (digits.charAt(0) === '0') digits = digits.slice(1);
+
+  return /^1[0125]\d{8}$/.test(digits) ? '+20' + digits : '';
+
+}
+
+
 function compFieldValues_(spec, input) {
 
   input = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
@@ -245,8 +280,11 @@ function compFieldValues_(spec, input) {
 
     if (field.type === 'phone') {
       var phone = normalizePhone(text);
-      if (!phone) return fail('رقم الموبايل مش صحيح (مثال: 01012345678)');
-      out.phone = '+' + phone.e164;
+      var egyptian = compNormPhoneEg_(text);
+      if (!phone && !egyptian) return fail('رقم الموبايل مش صحيح (مثال: 01012345678)');
+      // one identity per person (uniquePhone, attempts): +20 010…, 0020 10…, 010…, 10… are the same
+      // number; any other number is its digits
+      out.phone = egyptian || '+' + phone.e164;
       return false;
     }
 
@@ -751,6 +789,40 @@ function compStatus_(comp, def, now, opts) {
 }
 
 
+/*
+ * Are the submissions over for good (nobody can still send)? The effective
+ * end = the earlier of endAt and closedAt, plus the submit grace and the
+ * deadline slack (an attempt in its grace must not see the key). Finalized
+ * results count as over. No end and no close = never over by itself.
+ * def: the live definition (dates "YYYY-MM-DDTHH:MM"); state: { closedAt, finalizedAt }.
+ */
+function compSubmissionsOver_(def, state, now) {
+
+  if (state && state.finalizedAt) return true;
+
+  var ends = [def.endAt, state && state.closedAt].filter(Boolean).sort();
+
+  return !!ends.length && now > wallAdd_(ends[0], COMP_GRACE_MINUTES + 1);
+
+}
+
+/*
+ * May the answers (key, explanations) be shown now? immediately = once it
+ * started; afterClose = once the submissions are over (compSubmissionsOver_);
+ * atDate = from answersAt; never = never. The ONE rule for compResult_, the
+ * portal's «canReview» and which explanation pictures a publish sends out.
+ */
+function compAnswersOpen_(def, state, now) {
+
+  if (def.answersShow === 'immediately') return !def.startAt || now >= def.startAt;
+  if (def.answersShow === 'afterClose') return compSubmissionsOver_(def, state, now);
+  if (def.answersShow === 'atDate') return !!def.answersAt && now >= def.answersAt;
+
+  return false;
+
+}
+
+
 /* =========================================================
    DEFINITION (§4.2) AND PUBLIC FILES (§4.3)
 ========================================================= */
@@ -818,7 +890,12 @@ function compDefinition_(comp, questions, media) {
 }
 
 
-/* first 16 hex of sha256(definition JSON): content-addressed */
+/*
+ * First 16 hex of a KEYED hash of the definition JSON: content-addressed
+ * (deterministic for one deployment) but never sha256 of the private
+ * definition, which is public as `v` and could be brute-forced offline for
+ * the key. hash: CompCrypto.gs compKeyedHash_ (HMAC-SHA256 with COMP_SECRET).
+ */
 function compVersion_(def, hash) {
 
   return hash ? hash(JSON.stringify(def)).slice(0, 16) : '';
@@ -1092,13 +1169,17 @@ function compBuildPublic_(draft, ctx) {
 
     var def = compDefinition_(comp, questions, media);
     var version = compVersion_(def, ctx.hash);
+    // explanation pictures go to the (public) site only once the answers may be shown
+    var answersOpen = !!ctx.now && compAnswersOpen_(def, { closedAt: comp.closedAt, finalizedAt: comp.finalizedAt }, ctx.now);
+
+    compPublishWarnings_(comp, questions, ctx.now).forEach(function (w) { ctx.warn(where, w); });
 
     useMedia(comp.banner);
     useMedia(comp.icon);
     questions.forEach(function (q) {
       if (!q.enabled) return;
       useMedia(q.media);
-      useMedia(q.explanationMedia);
+      if (answersOpen) useMedia(q.explanationMedia);
     });
 
     out.slugs[comp.slug] = 'live';
@@ -1125,6 +1206,40 @@ function compBuildPublic_(draft, ctx) {
   }
 
   return out;
+
+}
+
+
+var COMP_WARN_QUESTION_MEDIA = 'صور الأسئلة بتبقى على الموقع من وقت النشر — متحطش صورة فيها الإجابة';
+var COMP_WARN_EXPLANATION_MEDIA = 'صور شرح الإجابات مش هتتنشر غير لما الإجابات تظهر: انشر تاني بعدها علشان تظهر';
+var COMP_WARN_RETRY = 'أي حد يقدر يحاول كذا مرة ويعرف الإجابات من الدرجة';
+
+/*
+ * What the builder should know before publishing (never blocks):
+ *  - question pictures are public from the publish on;
+ *  - explanation pictures wait for the answers (a publish after they open sends them);
+ *  - an open competition that shows the score right away, without «one
+ *    submission per number» and a single attempt, teaches the key by retries.
+ * now: "YYYY-MM-DDTHH:MM" (the explanation note only while the answers are still closed).
+ */
+function compPublishWarnings_(comp, questions, now) {
+
+  var warnings = [];
+  var live = questions.filter(function (q) { return q.enabled; });
+
+  if (live.some(function (q) { return q.media; })) warnings.push(COMP_WARN_QUESTION_MEDIA);
+
+  if (comp.answersShow !== 'never' && live.some(function (q) { return q.explanationMedia; }) &&
+      !(now && compAnswersOpen_(comp, { closedAt: comp.closedAt, finalizedAt: comp.finalizedAt }, now))) {
+    warnings.push(COMP_WARN_EXPLANATION_MEDIA);
+  }
+
+  if (comp.participation === 'open' && comp.scoring && comp.resultShow !== 'none' && !comp.resultsAt &&
+      !(comp.uniquePhone && comp.attempts === 1)) {
+    warnings.push(COMP_WARN_RETRY);
+  }
+
+  return warnings;
 
 }
 

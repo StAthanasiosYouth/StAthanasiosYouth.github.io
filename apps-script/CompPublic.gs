@@ -21,9 +21,19 @@
  */
 
 var COMP_PUBLIC_MAX_BODY = 64 * 1024;
-var COMP_PUBLIC_PER_MINUTE = 300;
-var COMP_FAIL_PER_MINUTE = 30;
-var COMP_FAIL_PER_DAY = 1000;
+/* budgets per family of actions (a minute, CacheService), counted only after the cheap shape check */
+var COMP_FAMILIES = {
+  compStart: 'play', compSubmit: 'play', compResult: 'play',
+  compCode: 'code',
+  portalMe: 'portal', portalReview: 'portal', shopRedeem: 'portal'
+};
+var COMP_FAMILY_PER_MINUTE = { play: 600, code: 120, portal: 300 };
+/* starts a minute for one competition (a flood on one slug can't starve the others) */
+var COMP_STARTS_PER_SLUG_MINUTE = 200;
+/* unsent attempts (in_progress, still within their 48 h) one competition may hold */
+var COMP_MAX_OPEN_ATTEMPTS = 3000;
+/* failed code checks a minute (39-bit codes: decades to hit any of a few hundred); then a pause each */
+var COMP_FAIL_PER_MINUTE = 60;
 var COMP_FAIL_PAUSE_MS = 300;
 var COMP_TOKEN_HOURS = 48;
 var COMP_DEADLINE_SLACK_MS = 60000;
@@ -88,24 +98,66 @@ function compArg_(arg) {
 
 }
 
-/* every comp / portal / shop call: ≤ COMP_PUBLIC_PER_MINUTE a minute */
-function compTakeBudget_() {
+/* one budget counter (a minute in CacheService): false when it is used up */
+function compTakeCounter_(key, limit) {
 
   var cache = CacheService.getScriptCache();
-  var key = 'comp:min:' + Math.floor(Date.now() / 60000);
-  var used = Number(cache.get(key)) || 0;
+  var full = key + ':' + Math.floor(Date.now() / 60000);
+  var used = Number(cache.get(full)) || 0;
 
-  if (used >= COMP_PUBLIC_PER_MINUTE) return false;
+  if (used >= limit) return false;
 
-  cache.put(key, String(used + 1), 120);
+  cache.put(full, String(used + 1), 120);
 
   return true;
 
 }
 
+/* a family's budget (play / code / portal) */
+function compTakeBudget_(family) {
+
+  return compTakeCounter_('comp:min:' + family, COMP_FAMILY_PER_MINUTE[family] || 300);
+
+}
+
+/* a pt1 / at1 / rc1 token's outline (no signature check: that is the handler's) */
+function compTokenShape_(value) {
+
+  return typeof value === 'string' && value.length <= COMP_TOKEN_MAX && /^[a-z]{2}\d\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(value);
+
+}
+
+/*
+ * The cheap outline of a request, before anything is counted or read: a
+ * malformed call never spends a budget the real ones need.
+ */
+function compShapeOk_(fn, arg) {
+
+  arg = compArg_(arg);
+
+  if (!arg) return false;
+
+  switch (fn) {
+    case 'compStart':
+      return typeof arg.slug === 'string' && COMP_SLUG.test(arg.slug) && typeof arg.clientKey === 'string' && COMP_CLIENT_KEY.test(arg.clientKey);
+    case 'compSubmit':
+      return compTokenShape_(arg.token) && typeof arg.clientKey === 'string' && COMP_CLIENT_KEY.test(arg.clientKey);
+    case 'compResult':
+      return arg.receipt !== undefined ? compTokenShape_(arg.receipt)
+        : typeof arg.ptoken === 'string' && arg.ptoken.length <= COMP_TOKEN_MAX && typeof arg.submissionId === 'string' && COMP_SUBMISSION_ID.test(arg.submissionId);
+    case 'compCode':
+      return typeof arg.code === 'string' && arg.code.length > 0 && arg.code.length <= 40;
+    default:
+      // portal / shop: a participant token of a sane size (its handler says `session` when it is wrong)
+      return typeof arg.ptoken === 'string' && arg.ptoken.length <= COMP_TOKEN_MAX;
+  }
+
+}
+
 /**
  * The public entry (Api.gs doPost). size: the request body's length.
- * Never throws; nothing about the request is logged.
+ * Never throws; nothing about the request is logged. Order: size → a known
+ * action → its outline → its family's budget → the module switch → the handler.
  */
 function publicComp_(fn, arg, size) {
 
@@ -115,17 +167,17 @@ function publicComp_(fn, arg, size) {
       return compFail_('bad', 'الإجابات كبيرة قوي.');
     }
 
-    if (!compTakeBudget_()) {
+    if (!Object.prototype.hasOwnProperty.call(COMP_FAMILIES, fn) || !compShapeOk_(fn, arg)) {
+      return compFail_('bad');
+    }
+
+    if (!compTakeBudget_(COMP_FAMILIES[fn])) {
       return compFail_('busy');
     }
 
     if (fn === 'compStart') return compStartAction_(arg);
     if (fn === 'compSubmit') return compSubmitAction_(arg);
     if (fn === 'compResult') return compResultAction_(arg);
-
-    if (!Object.prototype.hasOwnProperty.call(COMP_MODULE_ACTIONS, fn)) {
-      return compFail_('bad');
-    }
 
     var spec = COMP_MODULE_ACTIONS[fn];
     var handler = compGlobal_()[spec.handler];
@@ -147,33 +199,29 @@ function publicComp_(fn, arg, size) {
 
 /* =========================================================
    FAILED CODE CHECKS (for Phase 2's compCode; kept here, generic)
+   ≤ COMP_FAIL_PER_MINUTE failures a minute (then `busy`), a fixed pause
+   after each. No day cap: with 39-bit codes, 60 guesses a minute need
+   decades to hit any of a few hundred codes, and a day cap would only let
+   anyone lock everybody out for the day.
 ========================================================= */
 
-/* may another code be checked? (≤ 30 failures a minute, ≤ 1,000 a day) */
+/* may another code be checked? */
 function compCodeBudgetOk_() {
 
   var cache = CacheService.getScriptCache();
   var minute = Number(cache.get('comp:fail:' + Math.floor(Date.now() / 60000))) || 0;
-  var stored = String(PropertiesService.getScriptProperties().getProperty('COMP_FAIL_DAY') || '').split(':');
-  var day = stored[0] === new Date(Date.now()).toISOString().slice(0, 10) ? Number(stored[1]) || 0 : 0;
 
-  return minute < COMP_FAIL_PER_MINUTE && day < COMP_FAIL_PER_DAY;
+  return minute < COMP_FAIL_PER_MINUTE;
 
 }
 
-/* a wrong code: counted, then a fixed pause */
+/* a wrong code: counted (CacheService only), then a fixed pause */
 function compCodeFailed_() {
 
   var cache = CacheService.getScriptCache();
   var key = 'comp:fail:' + Math.floor(Date.now() / 60000);
-  var props = PropertiesService.getScriptProperties();
-  var today = new Date(Date.now()).toISOString().slice(0, 10);
-  var stored = String(props.getProperty('COMP_FAIL_DAY') || '').split(':');
-  var day = stored[0] === today ? Number(stored[1]) || 0 : 0;
 
   cache.put(key, String((Number(cache.get(key)) || 0) + 1), 120);
-  // one property write per counted failure, never past the day's cap (the budget check refuses before that)
-  if (day < COMP_FAIL_PER_DAY) props.setProperty('COMP_FAIL_DAY', today + ':' + (day + 1));
   Utilities.sleep(COMP_FAIL_PAUSE_MS);
 
 }
@@ -265,8 +313,8 @@ function compResult_(def, row, live, now) {
   }
 
   var policy = live && live.version !== row.version ? compDefinitionFor_(def.id, live.version) || def : def;
-  var comp = { liveVersion: live ? live.version : 'withdrawn', closedAt: live ? live.closedAt : '', finalizedAt: live ? live.finalizedAt : '' };
-  var phase = live ? compStatus_(comp, policy, now.wall, { live: true }) : 'closed';
+  // a withdrawn competition (live = null) is not «closed»: only its own end date ends it
+  var state = { closedAt: live ? live.closedAt : '', finalizedAt: live ? live.finalizedAt : '' };
   var finalized = !!(live && live.finalizedAt);
   var shows = function (what) { return policy.scoring && (policy.resultShow === what || policy.resultShow === 'both'); };
   var visible = !policy.resultsAt || now.wall >= policy.resultsAt || finalized;
@@ -296,10 +344,8 @@ function compResult_(def, row, live, now) {
     result.resultsAt = policy.resultsAt;
   }
 
-  var closed = phase === 'closed' || phase === 'results';
-  var allowed = policy.answersShow === 'immediately' ||
-    (policy.answersShow === 'afterClose' && closed) ||
-    (policy.answersShow === 'atDate' && !!policy.answersAt && now.wall >= policy.answersAt);
+  // afterClose: only once nobody can still send (the end, or «اقفل دلوقتي», + the grace + the slack)
+  var allowed = compAnswersOpen_(policy, state, now.wall);
 
   if (allowed) {
     result.review = compReview_(def, row, policy.scoring && visible, policy);
@@ -335,6 +381,7 @@ function compReview_(def, row, marks, keyDef) {
   }).map(function (q) {
     var g = grading[q.id] || {};
     var key = keys[q.id] || q;
+    var media = key.explanationMedia && compMediaReleased_(key.explanationMedia) ? key.explanationMedia : null;
     return {
       id: q.id,
       type: q.type,
@@ -346,7 +393,8 @@ function compReview_(def, row, marks, keyDef) {
       ok: marks && g.ok !== undefined ? g.ok : null,
       pts: marks ? Number(g.pts) || 0 : null,
       explanation: key.explanation,
-      explanationMedia: key.explanationMedia
+      // the picture only once it is on the site (a publish after the answers opened sends it)
+      explanationMedia: media
     };
   });
 
@@ -388,7 +436,8 @@ function compAfterGradeMany_(ids) {
 ========================================================= */
 
 /* the attempt as the page needs it (start, resume) */
-function compAttemptReply_(def, row, resumed, now) {
+/* cv: a registered attempt's codeVersion (from the participant's token): a code reset kills the attempt */
+function compAttemptReply_(def, row, resumed, now, cv) {
 
   var byId = Object.create(null);
 
@@ -403,11 +452,17 @@ function compAttemptReply_(def, row, resumed, now) {
   // well past the window: the window itself (closed / expired) is decided by the server clock at submit
   var end = def.endAt ? compWallMs_(def.endAt) + (COMP_GRACE_MINUTES + 15) * 60000 : Infinity;
   var expiry = Math.min(started + COMP_TOKEN_HOURS * 3600000, end);
+  var payload = { s: row.id, c: def.id, v: row.version, d: deadline, e: expiry };
+
+  if (row.participantId) {
+    payload.p = row.participantId;
+    payload.cv = cv === undefined ? null : cv;
+  }
 
   var reply = {
     ok: true,
     attempt: {
-      token: compSignToken_('at1', { s: row.id, c: def.id, v: row.version, d: deadline, e: expiry }),
+      token: compSignToken_('at1', payload),
       id: row.id,
       startedAt: contentDateTime_(row.startedAt, false) || '',
       deadlineMs: deadline,
@@ -443,6 +498,9 @@ function compStartAction_(arg) {
     return compFail_('bad');
   }
 
+  // one competition's flood can't take every start of the minute
+  if (!compTakeCounter_('comp:start:' + arg.slug, COMP_STARTS_PER_SLUG_MINUTE)) return compFail_('busy');
+
   if (!compSpreadsheet_(false)) return compFail_('not_found');
 
   var live = compLive_(arg.slug);
@@ -459,11 +517,14 @@ function compStartAction_(arg) {
   /* ---- who ---- */
 
   var who;
+  var cv;
 
   if (def.participation === 'registered') {
     if (!compModules_().registry || typeof compParticipantFromToken_ !== 'function') return compFail_('disabled');
     var participant = compParticipantFromToken_(arg.ptoken);
     if (!participant || !participant.id) return compFail_('session');
+    var pt = compReadToken_('pt1', arg.ptoken);
+    cv = pt.ok ? pt.payload.cv : undefined;
     who = { participantId: participant.id, name: String(participant.name || ''), phone: String(participant.phone || ''), fields: participant.group ? { group: String(participant.group) } : {} };
   }
   else {
@@ -486,7 +547,7 @@ function compStartAction_(arg) {
 
   try {
 
-    var mine = compColumns_(t, ['id', 'compId', 'version', 'clientKey', 'attemptNo', 'participantId', 'phone', 'status'])
+    var mine = compColumns_(t, ['id', 'compId', 'version', 'clientKey', 'attemptNo', 'participantId', 'phone', 'status', 'startedMs'])
       .filter(function (r) { return r.compId === def.id && r.status !== 'void'; });
     var same = mine.filter(function (r) { return r.clientKey === arg.clientKey; })[0];
 
@@ -495,7 +556,11 @@ function compStartAction_(arg) {
       same = mine.filter(function (r) { return r.participantId === who.participantId && r.version === live.version && r.status === 'in_progress'; })[0];
     }
 
-    if (same) {
+    if (same && who.participantId && same.participantId !== who.participantId) {
+      // another participant's attempt key: never theirs to resume
+      refused = compFail_('bad');
+    }
+    else if (same) {
       row = compRowAt_(t, same.__row);
       resumed = true;
     }
@@ -506,7 +571,13 @@ function compStartAction_(arg) {
         ? mine.filter(function (r) { return r.participantId === who.participantId; })
         : who.phone ? mine.filter(function (r) { return r.phone === who.phone; }) : [];
 
-      if (def.maxSubmissions && mine.filter(submitted).length >= def.maxSubmissions) {
+      // unsent attempts still alive (≤ 48 h): a bounded number per competition (no sheet flood)
+      var open = mine.filter(function (r) { return r.status === 'in_progress' && Number(r.startedMs) > now.ms - COMP_TOKEN_HOURS * 3600000; }).length;
+
+      if (open >= COMP_MAX_OPEN_ATTEMPTS) {
+        refused = compFail_('limit', 'المسابقة عليها ضغط كبير دلوقتي. جرّب تاني كمان شوية.');
+      }
+      else if (def.maxSubmissions && mine.filter(submitted).length >= def.maxSubmissions) {
         refused = compFail_('limit', 'المسابقة اكتملت ومش بتستقبل مشاركات تانية.');
       }
       else if (def.uniquePhone && who.phone && theirs.some(submitted)) {
@@ -555,7 +626,7 @@ function compStartAction_(arg) {
   // an attempt from an earlier publish is answered with ITS questions
   var served = row.version === live.version ? def : compDefinitionFor_(def.id, row.version);
 
-  var reply = compAttemptReply_(served || def, row, resumed, now);
+  var reply = compAttemptReply_(served || def, row, resumed, now, cv);
 
   // the same participant on another device gets that attempt back: its key comes along
   // (compSubmit checks the attempt's own clientKey)
@@ -569,6 +640,22 @@ function compStartAction_(arg) {
 /* =========================================================
    compSubmit
 ========================================================= */
+
+/*
+ * Is the participant of a registered attempt still the one the token was
+ * issued to: same id, still active, the same codeVersion (a reset or a
+ * deactivation kills attempts in flight)? Uses the registry's row lookup.
+ */
+function compParticipantStill_(pid, payload) {
+
+  if (payload.p !== pid || payload.cv === undefined || payload.cv === null) return false;
+  if (!compModules_().registry || typeof regRowById_ !== 'function') return false;
+
+  var row = regRowById_(pid);
+
+  return !!row && row.status !== 'inactive' && String(Number(row.codeVersion) || 1) === String(payload.cv);
+
+}
 
 function compSubmitAction_(arg) {
 
@@ -610,6 +697,11 @@ function compSubmitAction_(arg) {
   // sent already: the same receipt and the result as it stands now
   if (row.status !== 'in_progress') {
     return compSubmitted_(def, row, live, now);
+  }
+
+  // a registered attempt: the participant is still active and the code was not reset since
+  if (row.participantId && !compParticipantStill_(row.participantId, p)) {
+    return compFail_('session');
   }
 
   /* ---- the window (server clock) ---- */

@@ -575,6 +575,79 @@ function compDropLive_(slug) {
 
 
 /* =========================================================
+   WHICH LIBRARY PICTURES ARE ON THE SITE (explanation pictures)
+   The ids of published, not removed Media rows (content Sheet), cached 10
+   minutes under comp:mediaout and dropped by every publish.
+========================================================= */
+
+var COMP_MEDIA_OUT_ = null;
+
+function compMediaOut_() {
+
+  if (COMP_MEDIA_OUT_) return COMP_MEDIA_OUT_;
+
+  var cache = CacheService.getScriptCache();
+  var text = cache.get('comp:mediaout');
+  var ids = null;
+
+  if (text) {
+    try {
+      ids = JSON.parse(text);
+    }
+    catch (ignored) {
+      ids = null;
+    }
+  }
+
+  if (!Array.isArray(ids)) {
+    ids = readOptionalTable_('Media').filter(function (row) { return row.publishedAt && !row.deletedAt; }).map(function (row) { return row.id; });
+    try {
+      cache.put('comp:mediaout', JSON.stringify(ids), 600);
+    }
+    catch (ignored) {
+      // read again next time
+    }
+  }
+
+  COMP_MEDIA_OUT_ = Object.create(null);
+  ids.forEach(function (id) { COMP_MEDIA_OUT_[id] = true; });
+
+  return COMP_MEDIA_OUT_;
+
+}
+
+/* is this image object (definition / content.json shape) published already? Unknown → no */
+function compMediaReleased_(image) {
+
+  var match = image && typeof image.src === 'string' ? /(img-[a-z0-9]{8})/.exec(image.src) : null;
+
+  if (!match) return false;
+
+  try {
+    return !!compMediaOut_()[match[1]];
+  }
+  catch (ignored) {
+    return false;
+  }
+
+}
+
+/* a publish just changed what is on the site */
+function compDropMediaOut_() {
+
+  COMP_MEDIA_OUT_ = null;
+
+  try {
+    CacheService.getScriptCache().remove('comp:mediaout');
+  }
+  catch (ignored) {
+    // 10 minutes at most
+  }
+
+}
+
+
+/* =========================================================
    THE DRAFT (for buildPublicContent, apiState, the review)
 ========================================================= */
 
