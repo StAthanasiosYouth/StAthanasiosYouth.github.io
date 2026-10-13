@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "6054a37510c6",
-  "publishedAt": "2026-10-13T16:04:32.910Z",
+  "revision": "dd499b71b737",
+  "publishedAt": "2026-10-13T16:06:54.315Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -276,27 +276,7 @@
       }
     }
   ],
-  "sessions": [
-    {
-      "date": "2026-10-18",
-      "time": "20:00",
-      "topic": "gfndjkg",
-      "speaker": "",
-      "description": "",
-      "image": {
-        "src": "media/2026/img-b208504b.webp",
-        "thumb": "media/2026/img-b208504b-480.webp",
-        "w": 1122,
-        "h": 1402,
-        "alt": "",
-        "color": "#7b5e4b"
-      },
-      "status": "normal",
-      "note": "",
-      "visibleFrom": "2026-10-12T23:25",
-      "durationMinutes": 120
-    }
-  ],
+  "sessions": [],
   "news": [],
   "games": [],
   "notifications": [
