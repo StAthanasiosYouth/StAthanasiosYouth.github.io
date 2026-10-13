@@ -805,6 +805,11 @@
     if (!comp.enabled && !comp.archived) chips.push(A.chip(comp.liveVersion ? 'هتختفي في النشر الجاي' : 'مش هتتنشر لسه', 'off'));
     else if (summary.hasChanges && !comp.archived) chips.push(A.chip('فيه تعديلات لسه متنشرتش', 'gold'));
     if (d.card && d.card.enabled) chips.push(A.chip('كارت في قسم المسابقات', 'info'));
+    // its season (§18.6), once the seasons are known
+    if (comp.wallet && C.seasonsData) {
+      var seasonId = comp.seasonId || (C.activeSeason() || {}).id;
+      if (seasonId) chips.push(A.chip('الموسم: ' + C.seasonName(seasonId), 'gold'));
+    }
 
     return el('section', { class: 'card comp-head' },
       el('div', { class: 'comp-head__top' }, back),
@@ -1327,6 +1332,22 @@
     var showPoints = A.checkbox('اعرض درجة كل سؤال وهو بيحل', comp.showPoints, 'مثلاً «١٠ درجات» جنب السؤال');
     var wallet = A.checkbox('النقاط تروح لمحفظة المشترك', comp.wallet, 'النقاط هتتضاف لرصيد المشترك أوتوماتيك لما تتصحح (وتتعدل لوحدها لو التصحيح اتغيّر)');
     var walletWhy = el('p', { class: 'field__hint comp-wallet-why' });
+    // «الموسم» (§18.6): which season this competition's points land in (the wallet only)
+    var seasonSelect = el('select', { class: 'input', 'aria-label': 'الموسم', onchange: A.markDirty }, el('option', { value: comp.seasonId || '', text: comp.seasonId ? (C.seasonName ? C.seasonName(comp.seasonId) : comp.seasonId) || comp.seasonId : 'تلقائي (الموسم الشغال وقت البداية)' }));
+    var seasonField = A.field('الموسم', seasonSelect, 'نقاط المسابقة دي بتتحسب في الموسم ده. الموسم اللي اتقفل مبيتغيرش.');
+    seasonField.hidden = true;
+    seasonField.classList.add('comp-season-field');
+    if (modules.wallet && C.seasons) {
+      C.seasons().then(function (reply) {
+        if (!reply || !seasonSelect.isConnected) return;
+        var active = C.activeSeason();
+        var current = comp.seasonId || '';
+        A.fill(seasonSelect, [{ id: '', name: 'تلقائي — ' + (active ? '«' + active.name + '» (الشغال دلوقتي)' : 'الموسم الشغال') }].concat((reply.seasons || []).filter(function (s) { return s.status !== 'closed' || s.id === current; })).map(function (s) {
+          return el('option', { value: s.id, selected: s.id === current ? 'selected' : null, text: s.id ? s.name + (s.status === 'planned' ? ' (جاي)' : s.status === 'closed' ? ' (اتقفل)' : '') : s.name });
+        }));
+        seasonField.hidden = false;
+      }).catch(function () {});
+    }
     var successText = A.counted('رسالة بعد الإرسال', comp.successText, 300, 'مثلاً: شكرًا! النتيجة هتظهر يوم الأحد', { multiline: true, rows: 2 });
     var said = el('ul', { class: 'comp-explain', 'aria-live': 'polite' });
     var scorePart = el('div', { class: 'form-group' });
@@ -1369,7 +1390,8 @@
       A.field('ميعاد ظهور النتيجة', resultsAt.node, 'فاضي = على طول. «اعتماد النتائج» بيظهرها حتى لو الميعاد لسه'),
       showPoints.node,
       wallet.node,
-      walletWhy
+      walletWhy,
+      seasonField
     );
 
     sync();
@@ -1387,6 +1409,7 @@
         successText: successText.input.value
       };
       if (!wallet.node.hidden) fields.wallet = wallet.input.checked;
+      if (!seasonField.hidden) fields.seasonId = seasonSelect.value;
       C.save(fields, save, box);
     });
 

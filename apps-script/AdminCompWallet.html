@@ -68,6 +68,14 @@
     var timer = 0;
     var loading = 0;
     var sync = el('button', { class: 'btn', type: 'button', 'data-act': 'sync' }, icon('retry'), 'مزامنة النقاط مع النتايج');
+    // the balances are the ACTIVE season's (§18.6): said, with its name
+    var seasonSaid = el('p', { class: 'note comp-season-said', hidden: true });
+    if (C.seasons) C.seasons().then(function (reply) {
+      var season = C.activeSeason();
+      if (!reply || !season || !seasonSaid.isConnected) return;
+      seasonSaid.textContent = 'الأرصدة هنا للموسم الشغال: «' + season.name + '». أرصدة المواسم اللي خلصت محفوظة في سجلها تحت.';
+      seasonSaid.hidden = false;
+    }).catch(function () {});
 
     search.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(function () { q.q = search.value.trim(); q.offset = 0; load(); }, 350); });
     sort.addEventListener('change', function () { var p = sort.value.split(':'); q.sort = p[0]; q.dir = p[1]; q.offset = 0; load(); });
@@ -131,11 +139,14 @@
     return [
       A.card('النقاط', 'رصيد كل مشترك = كل حركاته: مكسب المسابقات، التعديلات، والجوايز. محدش بيعدّل رصيد مباشرة: كل تغيير بيبقى حركة جديدة.',
         tiles,
+        seasonSaid,
         el('div', { class: 'comp-subs__tools' }, search, sort),
         everyone.node,
         box,
         list,
         pager),
+      // «المواسم» (AdminCompSeasons, §18.6)
+      A.compSeasonsCard ? A.compSeasonsCard(function () { load(); }) : null,
       A.card('مزامنة', 'لو حاسس إن رصيد حد مش مطابق لدرجاته (مثلاً بعد ما قفلت المحفظة لمسابقة)، المزامنة بتراجع كل المشاركات وتصلّح الفرق بحركات تصحيح.',
         el('div', { class: 'actions' }, sync))
     ];
@@ -169,6 +180,13 @@
       var amount = el('input', { class: 'input comp-number', type: 'text', inputmode: 'numeric', dir: 'ltr', placeholder: '+50 أو -20', 'aria-label': 'عدد النقاط', oninput: A.markDirty });
       var note = A.counted('السبب', '', 200, 'بيظهر للمشترك في «نقاطي» (مثلاً: حضور الرحلة)', { required: true });
       var save = el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'adjust' }, icon('check'), 'سجّل التعديل');
+      // a plain adjustment, or carrying points over from a closed season (§18.6 kind 'transfer')
+      var kind = A.choices(A.uid('adj-kind'), [{ value: 'manual', label: 'تعديل عادي' }, { value: 'transfer', label: 'تحويل من موسم فات' }], 'manual', function (v) {
+        note.node.querySelector('.field__hint').textContent = v === 'transfer'
+          ? 'لازم السبب (مثلاً: رصيد موسم الصيف). النقاط بتتضاف للموسم الشغال.'
+          : 'بيظهر للمشترك في «نقاطي» (مثلاً: حضور الرحلة)';
+      });
+      kind.node.dataset.kind = 'adjust-kind';
 
       save.addEventListener('click', function () {
         box.hidden = true;
@@ -183,7 +201,13 @@
         var sig = n + '|' + note.input.value.trim();
         // the same form again (after a failure): the same key, so it can never count twice
         if (form.sig !== sig || !form.key) { form.key = newKey(); form.sig = sig; }
-        A.withBusy(save, A.call('apiWalletAdjust', id, n, note.input.value.trim(), form.key)).then(function (r) {
+        var how = kind.value() || 'manual';
+        var sigKind = how + '|' + sig;
+        if (form.kind !== sigKind) { form.key = newKey(); form.kind = sigKind; form.sig = sig; }
+        var args = ['apiWalletAdjust', id, n, note.input.value.trim(), form.key];
+        if (how === 'transfer') args.push('transfer');
+        A.withBusy(save, A.call.apply(A, args)).then(function (r) {
+          form.kind = '';
           A.dirty = false;
           form.key = '';
           form.sig = '';
@@ -196,13 +220,16 @@
       var entries = d.entries || [];
 
       A.dirty = false;
+      var activeSeason = C.activeSeason ? C.activeSeason() : null;
       A.openSheet('نقاط ' + p.name, [
+        activeSeason ? el('p', { class: 'field__hint', text: 'الرصيد والحركات دي للموسم الشغال «' + activeSeason.name + '».' }) : null,
         el('div', { class: 'comp-tiles' }, tile('الرصيد', ar(d.balance), 'gold'), tile('كسب', ar(t.earned || 0)), tile('تعديلات', signed(t.adjusted || 0)), tile('صرف', ar(t.spent || 0))),
         el('div', { class: 'actions' },
           el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () { A.closeSheet().then(function (closed) { if (closed && A.compPerson) A.compPerson(p.id); }); } }, icon('user'), 'صفحة المشترك')),
         el('section', { class: 'form-group comp-adjust' },
           el('p', { class: 'section-label', text: 'تعديل نقاط' }),
           box,
+          C.seasonsData ? A.field('نوع التعديل', kind.node) : null,
           A.field('عدد النقاط', amount, 'موجب = زيادة، سالب = خصم. الخصم اللي يخلّي الرصيد بالسالب بيترفض.'),
           note.node,
           el('div', { class: 'actions' }, save)),
@@ -214,6 +241,7 @@
             el('div', { class: 'comp-ledger__main' },
               el('span', { class: 'comp-ledger__what' }, A.chip(e.kindLabel || e.kind, e.kind === 'manual' ? 'info' : e.kind === 'redeem' ? 'danger' : e.kind === 'refund' ? 'gold' : 'ok'), what ? el('bdi', { text: ' ' + what }) : null),
               e.note ? el('span', { class: 'comp-ledger__note', text: e.note }) : null,
+              e.seasonName || (e.seasonId && C.seasonName) ? el('span', { class: 'comp-ledger__season', text: 'الموسم: ' + (e.seasonName || C.seasonName(e.seasonId)) }) : null,
               el('span', { class: 'comp-ledger__meta', text: C.when(e.createdAt) + ' · ' + adminName(e.actor) + ' · الرصيد بعدها ' + ar(e.balanceAfter) })));
         })) : el('p', { class: 'empty', text: 'مفيش حركات لسه.' })
       ], [el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })], { wide: true, className: 'sheet--comp-ledger' });
