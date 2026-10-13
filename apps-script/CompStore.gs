@@ -30,7 +30,7 @@ var COMP_TABLES = {
   Competitions: ['id', 'slug', 'title', 'shortTitle', 'description', 'instructions', 'ctaLabel', 'banner', 'icon', 'theme',
     'startAt', 'endAt', 'participation', 'scoring', 'resultShow', 'resultsAt', 'answersShow', 'answersAt', 'showPoints', 'wallet',
     'attempts', 'layout', 'shuffleQ', 'shuffleC', 'timeLimit', 'maxSubmissions', 'uniquePhone', 'fields', 'successText', 'enabled',
-    'cardId', 'liveVersion', 'publishedAt', 'closedAt', 'finalizedAt', 'archived', 'createdBy', 'createdAt', 'updatedAt'],
+    'cardId', 'liveVersion', 'publishedAt', 'closedAt', 'finalizedAt', 'archived', 'createdBy', 'createdAt', 'updatedAt', 'seasonId'],
   Questions: ['id', 'compId', 'order', 'type', 'text', 'help', 'media', 'choices', 'correct', 'points', 'required', 'explanation',
     'explanationMedia', 'review', 'enabled', 'updatedAt'],
   Snapshots: ['compId', 'version', 'part', 'json', 'publishedAt', 'publishedBy'],
@@ -40,10 +40,14 @@ var COMP_TABLES = {
   // Phase 2 / 3 (created by their modules on first use)
   Participants: ['id', 'name', 'nameNorm', 'phone', 'phoneNorm', 'group', 'church', 'notes', 'status', 'codeHash', 'codeEnc',
     'codeVersion', 'codeIssuedAt', 'codeIssuedBy', 'importBatch', 'createdBy', 'createdAt', 'updatedAt'],
-  PointsLedger: ['id', 'participantId', 'amount', 'kind', 'refType', 'refId', 'compId', 'note', 'idemKey', 'actor', 'createdAt'],
+  PointsLedger: ['id', 'participantId', 'amount', 'kind', 'refType', 'refId', 'compId', 'note', 'idemKey', 'actor', 'createdAt', 'seasonId'],
   StoreItems: ['id', 'name', 'description', 'image', 'cost', 'stock', 'perPerson', 'category', 'order', 'active', 'createdAt', 'updatedAt'],
   Redemptions: ['id', 'participantId', 'itemId', 'itemName', 'cost', 'status', 'requestKey', 'ledgerId', 'refundLedgerId',
-    'requestedAt', 'handledBy', 'handledAt', 'note', 'updatedAt']
+    'requestedAt', 'handledBy', 'handledAt', 'note', 'updatedAt', 'seasonId'],
+  // Points & Store v2 (§18.5 / §18.6)
+  PushSchedule: ['id', 'notifId', 'kind', 'refId', 'sendAt', 'status', 'result', 'sendKey', 'updatedAt'],
+  Seasons: ['id', 'name', 'startAt', 'endAt', 'status', 'notifyDays', 'closedAt', 'closedBy', 'createdAt', 'updatedAt'],
+  SeasonTotals: ['seasonId', 'pid', 'earned', 'spent', 'adjusted', 'final', 'closedAt']
 };
 
 /* made together with the spreadsheet */

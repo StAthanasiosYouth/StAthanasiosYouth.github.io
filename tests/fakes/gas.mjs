@@ -497,6 +497,8 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
   // every spreadsheet SpreadsheetApp.create made (the first is the content Sheet setup() makes)
   const spreadsheets = [];
   const flushes = { count: 0 };
+  // ScriptApp time-driven triggers: scope = the owner granted script.scriptapp (enableAutoPush)
+  const triggers = { scope: true, list: [], seq: 0 };
 
   const context = vm.createContext({
 
@@ -723,14 +725,41 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
 
     ScriptApp: {
       getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/fake/exec' }),
-      getOAuthToken: () => 'fake-oauth-token'
+      getOAuthToken: () => 'fake-oauth-token',
+      // time-driven triggers (CompSchedule.gs); triggers.scope = false: the script.scriptapp
+      // scope isn't granted, so every trigger call throws like Apps Script does
+      newTrigger: handler => {
+        if (!triggers.scope) throw new Error('Specified permissions are not sufficient to call ScriptApp.newTrigger.');
+        const spec = { handler, at: null, everyDays: 0, hour: 0 };
+        const builder = {
+          timeBased: () => builder,
+          at: date => { spec.at = date.getTime(); return builder; },
+          everyDays: n => { spec.everyDays = n; return builder; },
+          atHour: h => { spec.hour = h; return builder; },
+          create: () => {
+            const uid = 'trg-' + (++triggers.seq);
+            const trigger = { uid, ...spec, getHandlerFunction: () => handler, getUniqueId: () => uid };
+            triggers.list.push(trigger);
+            return trigger;
+          }
+        };
+        return builder;
+      },
+      getProjectTriggers: () => {
+        if (!triggers.scope) throw new Error('Specified permissions are not sufficient to call ScriptApp.getProjectTriggers.');
+        return triggers.list.slice();
+      },
+      deleteTrigger: trigger => {
+        if (!triggers.scope) throw new Error('Specified permissions are not sufficient to call ScriptApp.deleteTrigger.');
+        triggers.list = triggers.list.filter(t => t.uid !== trigger.uid);
+      }
     }
 
   });
 
   for (const file of ['Platforms.gs', 'Content.gs', 'Hub.gs', 'Review.gs', 'Seed.gs', 'Auth.gs', 'Store.gs', 'Publish.gs', 'Code.gs', 'Media.gs', 'Items.gs', 'Import.gs', 'Migrate.gs', 'Api.gs', 'Presence.gs', 'Route.gs', 'Push.gs', 'Activity.gs', 'AdminNotify.gs', 'AdminDevice.gs',
     'CompStore.gs', 'CompModel.gs', 'CompScore.gs', 'CompCrypto.gs', 'CompPublic.gs', 'CompAdmin.gs', 'CompPublish.gs',
-    'CompRegistry.gs', 'CompWallet.gs', 'CompStoreItems.gs']) {
+    'CompRegistry.gs', 'CompWallet.gs', 'CompStoreItems.gs', 'CompSchedule.gs']) {
     vm.runInContext(readFileSync(`${ROOT}apps-script/${file}`, 'utf8'), context, { filename: file });
   }
 
@@ -754,6 +783,23 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
     clock,
     scriptLock,
     userLock,
+    triggers,
+    /** runs every one-off trigger that is due by the world's clock (like Apps Script would), returns how many ran */
+    fireTriggers() {
+      let ran = 0;
+      for (const trigger of triggers.list.slice()) {
+        if (trigger.at !== null && trigger.at <= now()) {
+          triggers.list = triggers.list.filter(t => t.uid !== trigger.uid);
+          context[trigger.handler]({ triggerUid: trigger.uid });
+          ran++;
+        }
+      }
+      return ran;
+    },
+    /** runs the daily triggers once (the safety net) */
+    fireDaily() {
+      for (const trigger of triggers.list.slice()) if (trigger.everyDays) context[trigger.handler]({ triggerUid: trigger.uid });
+    },
     /** the world's clock (what Date.now gives the .gs code) */
     now,
     /** moves the world's clock (Date.now in the .gs code, cache expiry) */

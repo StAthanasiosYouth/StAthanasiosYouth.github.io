@@ -3,7 +3,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compWorld, adminApi, publish, scoredComp, pub, clientKey, errorText } from './fakes/comp.mjs';
+import { compWorld, adminApi, publish, scoredComp, pub, clientKey, errorText, ADMIN } from './fakes/comp.mjs';
 
 const phone = n => '0101234' + String(n).padStart(4, '0');
 
@@ -192,4 +192,106 @@ test('content.json `points`: only with registry + wallet; the store schedule and
   // a new schedule is a change to publish (the public widget follows it)
   call('apiShopScheduleSave', { mode: 'closed', notify: {} });
   assert.notEqual(call('apiReview').revision, before);
+});
+
+/* ---------- §18.5 the automatic push schedule ---------- */
+
+import { generateKeyPairSync } from 'node:crypto';
+
+const FCM_ACCOUNT = JSON.stringify({
+  type: 'service_account', project_id: 'athanasios-links', private_key_id: 'k1',
+  private_key: generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ type: 'pkcs8', format: 'pem' }),
+  client_email: 'push@athanasios-links.iam.gserviceaccount.com', token_uri: 'https://oauth2.googleapis.com/token'
+});
+const device = n => `d${String(n).padStart(3, '0')}Xk2:APA91b${'Q'.repeat(140)}${n}`;
+const bell = world => {
+  const sheet = world.spreadsheet.getSheetByName('Notifications');
+  const [header, ...rows] = sheet.data;
+  return rows.filter(r => r[0]).map(r => Object.fromEntries(header.map((h, i) => [h, r[i] === undefined ? '' : String(r[i]).replace(/^'/, '')])));
+};
+
+function scheduledWorld() {
+  const store = storeWorld();
+  store.world.properties.set('FCM_SERVICE_ACCOUNT', FCM_ACCOUNT);
+  assert.equal(store.world.post({ fn: 'pushSubscribe', args: [{ token: device(1), platform: 'android' }] }).ok, true);
+  return store;
+}
+
+const allMoments = { open1d: true, open1h: true, openAt: true, close24h: true, close1h: true };
+
+test('automatic push: bell items + pending entries; nothing armed until the owner enables it; saves never break', () => {
+  const { world, call } = scheduledWorld();
+  const view = call('apiShopScheduleSave', { mode: 'auto', opensAt: wallAt(world, 2 * 1440), closesAt: wallAt(world, 5 * 1440), notify: allMoments });
+  assert.equal(view.auto.authorized, false);
+  const items = bell(world).filter(n => n.target === 'points');
+  assert.equal(items.length, 5);
+  assert.ok(items.every(n => /^notif-shop-(open|close)/.test(n.id)));
+  assert.deepEqual(tab(world, 'PushSchedule').map(e => e.status), ['pending', 'pending', 'pending', 'pending', 'pending']);
+  assert.equal(world.triggers.list.length, 0, 'no trigger before enableAutoPush');
+
+  // no scope at all: still fine
+  world.triggers.scope = false;
+  assert.doesNotThrow(() => call('apiShopScheduleSave', { mode: 'auto', opensAt: wallAt(world, 2 * 1440), closesAt: wallAt(world, 5 * 1440), notify: allMoments }));
+  assert.equal(call('apiPushAuto').authorized, false);
+});
+
+test('automatic push: one trigger at the earliest moment; it sends the live item, re-arms, and only our trigger may run it', () => {
+  const { world, call } = scheduledWorld();
+  call('apiShopScheduleSave', { mode: 'auto', opensAt: wallAt(world, 2 * 1440), closesAt: wallAt(world, 5 * 1440), notify: { open1d: true, openAt: true } });
+  world.as(ADMIN).gs.enableAutoPush();
+  world.as('');
+  const ticks = () => world.triggers.list.filter(t => t.handler === 'pushScheduleTick');
+  assert.equal(world.triggers.list.filter(t => t.handler === 'pushScheduleDaily').length, 1);
+  assert.equal(ticks().length, 1);
+  assert.equal(ticks()[0].at, world.gs.pushWallMs_(wallAt(world, 1440).replace(' ', 'T')), 'armed at «قبل الفتح بيوم»');
+
+  publish(world, call);
+  world.gs.pushScheduleTick({ triggerUid: 'someone-else' });
+  assert.equal(world.fcm.sent.length, 0, 'a call that is not our trigger does nothing');
+
+  world.advance(1441 * 60000);
+  assert.equal(world.fireTriggers(), 1);
+  const sent = tab(world, 'PushSchedule').find(e => e.kind === 'shop-open-1d');
+  assert.equal(sent.status, 'sent', sent.result);
+  assert.ok(world.fcm.sent.length >= 1);
+  assert.equal(ticks().length, 1, 'armed again for «وقت الفتح»');
+  assert.equal(ticks()[0].at, world.gs.pushWallMs_(wallAt(world, 1439).replace(' ', 'T')));
+  assert.equal(world.scriptLock.lockedFetches.length, 0, 'the send held no lock');
+});
+
+test('automatic push: a moment whose bell item was never published is skipped (not live); a missed one older than 6 h too', () => {
+  const { world, call } = scheduledWorld();
+  publish(world, call);
+  call('apiShopScheduleSave', { mode: 'auto', opensAt: wallAt(world, 120), notify: { open1h: true, openAt: true } });
+  world.as(ADMIN).gs.enableAutoPush();
+  world.as('');
+  // never published: the 1 h reminder can't go out
+  world.advance(61 * 60000);
+  world.fireTriggers();
+  const first = tab(world, 'PushSchedule').find(e => e.kind === 'shop-open-1h');
+  assert.equal(first.status, 'skipped');
+  assert.match(first.result, /مش منشور/);
+  // the trigger is lost; the daily one finds «وقت الفتح» 7 h late
+  world.triggers.list = world.triggers.list.filter(t => t.handler !== 'pushScheduleTick');
+  world.advance(8 * 60 * 60000);
+  world.fireDaily();
+  const late = tab(world, 'PushSchedule').find(e => e.kind === 'shop-open');
+  assert.equal(late.status, 'skipped');
+  assert.equal(late.result, 'فات ميعاده');
+});
+
+test('automatic push: changing the times cancels the old moments (and their bell items) and makes new ones; cancel by hand', () => {
+  const { world, call } = scheduledWorld();
+  call('apiShopScheduleSave', { mode: 'auto', opensAt: wallAt(world, 3 * 1440), notify: { open1d: true } });
+  const old = tab(world, 'PushSchedule')[0];
+  call('apiShopScheduleSave', { mode: 'auto', opensAt: wallAt(world, 4 * 1440), notify: { open1d: true } });
+  const rows = tab(world, 'PushSchedule');
+  assert.equal(rows.find(e => e.id === old.id).status, 'cancelled');
+  assert.ok(!bell(world).some(n => n.id === old.notifId), 'the old bell item is gone');
+  const fresh = rows.find(e => e.status === 'pending');
+  assert.ok(fresh && fresh.notifId !== old.notifId);
+  assert.equal(call('apiPushScheduleCancel', fresh.id).entries.find(e => e.id === fresh.id).status, 'cancelled');
+  // the manual modes have no moments
+  call('apiShopScheduleSave', { mode: 'open', opensAt: wallAt(world, 4 * 1440), notify: { open1d: true } });
+  assert.ok(!tab(world, 'PushSchedule').some(e => e.status === 'pending'));
 });

@@ -161,7 +161,10 @@ function apiFunctions_() {
     apiShopRedemptions: apiShopRedemptions,
     apiShopRedemptionStatus: apiShopRedemptionStatus,
     apiShopSchedule: apiShopSchedule,
-    apiShopScheduleSave: apiShopScheduleSave
+    apiShopScheduleSave: apiShopScheduleSave,
+    apiPushAuto: apiPushAuto,
+    apiPushSchedule: apiPushSchedule,
+    apiPushScheduleCancel: apiPushScheduleCancel
   };
 
 }

@@ -76,7 +76,8 @@ const ARGS = {
   apiWallet: [{}], apiWalletParticipant: ['p-00000000'], apiWalletAdjust: ['p-00000000', 10, 'x', 'adjust-key-0001'], apiWalletSync: [],
   apiShopItems: [], apiShopItemSave: [{ name: 'x', cost: 10 }], apiShopItemDelete: ['i-00000000'],
   apiShopRedemptions: [{}], apiShopRedemptionStatus: ['r-0000000000', 'approved', ''],
-  apiShopSchedule: [], apiShopScheduleSave: [{ mode: 'auto' }]
+  apiShopSchedule: [], apiShopScheduleSave: [{ mode: 'auto' }],
+  apiPushAuto: [], apiPushSchedule: [], apiPushScheduleCancel: ['psh-0000000000']
 };
 
 /*
