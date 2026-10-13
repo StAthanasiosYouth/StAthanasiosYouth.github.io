@@ -700,8 +700,40 @@ function compDraft_() {
   }
 
   data.modules = modules;
+  data.points = compPointsDraft_(modules);
 
   return data;
+
+}
+
+
+/*
+ * The «نقاطي / المتجر» facts content.json carries (docs/COMPETITIONS.md §18.4):
+ * { url, shop: { on, mode, opensAt, closesAt } | null, season: { name, startAt, endAt } | null },
+ * or null while the registry or the wallet is off. Read fresh (Script Properties and
+ * the active season), never from the draft cache, so a schedule change shows at once.
+ */
+function compPointsDraft_(modules) {
+
+  if (!modules || !modules.registry || !modules.wallet) return null;
+
+  var shop = null;
+
+  if (modules.shop && typeof shopSettings_ === 'function') {
+    var settings = shopSettings_();
+    shop = { on: true, mode: settings.mode, opensAt: shopWall_(settings.opensAt), closesAt: shopWall_(settings.closesAt) };
+  }
+
+  var season = null;
+
+  try {
+    season = typeof walletSeasonPublic_ === 'function' ? walletSeasonPublic_() : null;
+  }
+  catch (ignored) {
+    season = null;
+  }
+
+  return { url: 'points/', shop: shop, season: season };
 
 }
 

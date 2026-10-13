@@ -923,6 +923,14 @@ function buildHub_(draft, ctx) {
         target = { kind: 'competition', slug: compMatch[1] };
       }
     }
+    else if (targetText === 'points') {
+      // «نقاطي / المتجر» (/points/): only while the page exists
+      if (!ctx.points) {
+        ctx.warn(where, 'صفحة «نقاطي» مش مفعلة، فالإشعار ده مش هيظهر');
+        return;
+      }
+      target = { kind: 'points' };
+    }
     else if (targetText === 'meeting') {
       if (!on('meeting')) {
         ctx.warn(where, 'ركن الاجتماع مخفي، فالإشعار ده مش هيظهر');
@@ -955,7 +963,7 @@ function buildHub_(draft, ctx) {
       target = { kind: 'url', url: safeHttpsUrl(targetText) };
     }
     else {
-      ctx.error(where, 'الوجهة لازم تكون meeting أو news:id أو game:id أو competition:slug أو لينك https');
+      ctx.error(where, 'الوجهة لازم تكون meeting أو news:id أو game:id أو competition:slug أو points أو لينك https');
     }
 
     notifications.push({

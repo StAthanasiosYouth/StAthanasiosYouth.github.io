@@ -527,6 +527,9 @@ var ITEM_VALIDATORS = {
         problems.push('الإشعار بيشاور على مسابقة مش موجودة');
       }
     }
+    else if (target === 'points') {
+      // «نقاطي / المتجر» (/points/): nothing to look up
+    }
     else if (safeHttpsUrl(target)) {
       target = safeHttpsUrl(target);
     }

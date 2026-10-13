@@ -461,6 +461,9 @@ function pushItemState_(content, item, now) {
     if (!found) return 'hidden';
     targetSection = target.kind === 'news' ? 'news' : target.kind === 'game' ? 'games' : found.section;
   }
+  if (target && target.kind === 'points' && !content.points) {
+    return 'hidden';
+  }
   if (target && target.kind === 'competition') {
     var published = (Array.isArray(content.competitions) ? content.competitions : []).some(function (c) { return c && c.slug === target.slug; });
     if (!published) return 'hidden';
@@ -487,6 +490,9 @@ function pushUrl_(target) {
   if (target.kind === 'competition' && /^[a-z0-9-]{2,40}$/.test(String(target.slug || ''))) {
     return '/competition/' + target.slug + '/';
   }
+
+  // «نقاطي / المتجر»
+  if (target.kind === 'points') return '/points/';
 
   // an outside link: the site's bell, where the item links out
   return '/#notifications';

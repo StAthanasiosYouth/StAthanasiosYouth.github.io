@@ -166,3 +166,30 @@ test('participant cancel: only open + allowed + own + pending; refunds once; fro
   assert.equal(call('apiShopRedemptionStatus', c.id, 'cancelled', '').redemption.status, 'cancelled', 'the admin can');
   assert.equal(world.gs.walletBalance_(mariam.id, true), 500);
 });
+
+/* ---------- §18.4 the public «نقاطي / المتجر» facts and the `points` target ---------- */
+
+test('content.json `points`: only with registry + wallet; the store schedule and the bell target travel with a publish', () => {
+  const plainWorld = compWorld();
+  const plainCall = adminApi(plainWorld);
+  scoredComp(plainCall);
+  publish(plainWorld, plainCall);
+  assert.equal(JSON.parse(plainWorld.github.files()['content.json']).points, undefined, 'no widget without the modules');
+
+  const { world, call } = storeWorld();
+  call('apiShopScheduleSave', { mode: 'auto', opensAt: wallAt(world, 60), closesAt: wallAt(world, 600), notify: {} });
+  call('apiSaveItem', 'notifications', { title: 'المتجر فتح', type: 'general', target: 'points' });
+  const before = call('apiReview').revision;
+  publish(world, call);
+  const content = JSON.parse(world.github.files()['content.json']);
+  assert.equal(content.points.url, 'points/');
+  assert.equal(content.points.shop.mode, 'auto');
+  assert.equal(content.points.shop.opensAt, wallAt(world, 60).replace(' ', 'T'));
+  const note = content.notifications.find(n => n.title === 'المتجر فتح');
+  assert.deepEqual(note.target, { kind: 'points' });
+  assert.equal(world.gs.pushUrl_(note.target), '/points/');
+
+  // a new schedule is a change to publish (the public widget follows it)
+  call('apiShopScheduleSave', { mode: 'closed', notify: {} });
+  assert.notEqual(call('apiReview').revision, before);
+});
