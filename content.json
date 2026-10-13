@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "c81c27333e7b",
-  "publishedAt": "2026-10-12T19:55:05.395Z",
+  "revision": "dd499b71b737",
+  "publishedAt": "2026-10-13T16:06:54.315Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -279,7 +279,27 @@
   "sessions": [],
   "news": [],
   "games": [],
-  "notifications": [],
+  "notifications": [
+    {
+      "id": "notif-session-2026-10-18",
+      "type": "meeting",
+      "title": "موضوع الاجتماع الجاي",
+      "message": "gfndjkg",
+      "target": {
+        "kind": "meeting"
+      },
+      "image": {
+        "src": "media/2026/img-b208504b.webp",
+        "thumb": "media/2026/img-b208504b-480.webp",
+        "w": 1122,
+        "h": 1402,
+        "alt": "",
+        "color": "#7b5e4b"
+      },
+      "publishAt": "2026-10-12T23:25",
+      "expireAt": "2026-10-18T20:00"
+    }
+  ],
   "activities": [],
   "types": [],
   "layout": [
@@ -413,5 +433,19 @@
       "visibleFrom": "",
       "visibleUntil": ""
     }
-  ]
+  ],
+  "points": {
+    "url": "points/",
+    "shop": {
+      "on": true,
+      "mode": "closed",
+      "opensAt": "",
+      "closesAt": ""
+    },
+    "season": {
+      "name": "الموسم الأول",
+      "startAt": "",
+      "endAt": ""
+    }
+  }
 }
