@@ -402,7 +402,118 @@ function recordColumns_(spec) {
  * in the Sheet but ignored. Rows with nothing in their record columns
  * (see recordColumns_) are skipped.
  */
+/*
+ * READS, REMEMBERED (speed; docs: the admin's actions take 1–2 s)
+ *
+ * TABLE_MEMO_: within one admin action (mutate_, apiState, review, publish:
+ * tableScope_), a table is read once; every write through the helpers below
+ * (and tableTouch_ elsewhere) drops it.
+ *
+ * Across requests: the admin's state after an action (apiStateFor_ via
+ * readDraft_(true)) may take a table from CacheService. Each copy is tagged
+ * with its table's version (tblv:<name>, a random token every write sets);
+ * a copy read under an older version is never used, so a race can only cost
+ * a read, never show old data. The review and the publish always read the
+ * Sheet itself. A hand edit in the Sheet shows on the next panel load.
+ */
+var TABLE_MEMO_ = null;
+var DRAFT_CACHED_ = '';
+var TABLE_CACHE_SECONDS = 600;
+var TABLE_CACHE_MAX = 90000;
+
+/* run fn with this action's memo (nested scopes share it) */
+function tableScope_(fn) {
+
+  if (TABLE_MEMO_) return fn();
+
+  TABLE_MEMO_ = Object.create(null);
+
+  try {
+    return fn();
+  }
+  finally {
+    TABLE_MEMO_ = null;
+  }
+
+}
+
+/* a write to table name: its remembered copies go */
+function tableTouch_(name) {
+
+  if (TABLE_MEMO_) {
+    delete TABLE_MEMO_[name];
+    delete TABLE_MEMO_['#header:' + name];
+  }
+
+  // a new version only where there is one: without it no copy can be valid anyway
+  try {
+    var cache = CacheService.getScriptCache();
+    if (cache.get('tblv:' + name)) cache.put('tblv:' + name, Utilities.getUuid().slice(0, 12), 21600);
+  }
+  catch (ignored) {
+    // the copies run out by themselves
+  }
+
+}
+
+function tableTouchAll_() {
+
+  Object.keys(TABLES).forEach(tableTouch_);
+
+}
+
+function rowsCopy_(rows) {
+
+  return rows.map(function (row) { return Object.assign({}, row); });
+
+}
+
 function readTable_(name) {
+
+  if (TABLE_MEMO_ && TABLE_MEMO_[name]) return rowsCopy_(TABLE_MEMO_[name]);
+
+  var cache = null;
+  var version = '';
+
+  if (DRAFT_CACHED_) {
+    try {
+      cache = CacheService.getScriptCache();
+      version = cache.get('tblv:' + name) || '';
+      if (!version) {
+        version = Utilities.getUuid().slice(0, 12);
+        cache.put('tblv:' + name, version, 21600);
+      }
+      var hit = DRAFT_CACHED_ === 'cached' ? cache.get('tbl:' + name) : null;
+      var parsed = hit ? JSON.parse(hit) : null;
+      if (parsed && parsed.v === version && Array.isArray(parsed.rows)) {
+        if (TABLE_MEMO_) TABLE_MEMO_[name] = parsed.rows;
+        return rowsCopy_(parsed.rows);
+      }
+    }
+    catch (ignored) {
+      cache = null;
+    }
+  }
+
+  var rows = readTableFresh_(name);
+
+  if (TABLE_MEMO_) TABLE_MEMO_[name] = rows;
+
+  if (cache && version) {
+    try {
+      var text = JSON.stringify({ v: version, rows: rows });
+      if (text.length < TABLE_CACHE_MAX) cache.put('tbl:' + name, text, TABLE_CACHE_SECONDS);
+    }
+    catch (ignored) {
+      // only a shortcut
+    }
+  }
+
+  return rowsCopy_(rows);
+
+}
+
+function readTableFresh_(name) {
 
   var sheet = sheet_(name);
   var values = sheet.getDataRange().getValues();
@@ -451,7 +562,22 @@ function readTable_(name) {
 
 
 /** The draft in the shape buildPublicContent() expects. */
-function readDraft_() {
+function readDraft_(mode) {
+
+  var before = DRAFT_CACHED_;
+
+  DRAFT_CACHED_ = mode === 'cached' || mode === 'fill' ? mode : '';
+
+  try {
+    return readDraftNow_();
+  }
+  finally {
+    DRAFT_CACHED_ = before;
+  }
+
+}
+
+function readDraftNow_() {
 
   var settings = Object.create(null);
 
@@ -513,6 +639,20 @@ function readOptionalTable_(name) {
 ========================================================= */
 
 function headerIndex_(sheet) {
+
+  var key = '#header:' + sheet.getName();
+
+  if (TABLE_MEMO_ && TABLE_MEMO_[key]) return TABLE_MEMO_[key];
+
+  var index = headerIndexFresh_(sheet);
+
+  if (TABLE_MEMO_) TABLE_MEMO_[key] = index;
+
+  return index;
+
+}
+
+function headerIndexFresh_(sheet) {
 
   var header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
     .map(function (cell) { return String(cell).trim(); });
@@ -606,17 +746,38 @@ function upsertRow_(name, idColumn, record) {
 
   }
 
-  Object.keys(record).forEach(function (column) {
-    if (index[column]) {
-      var cell = sheet.getRange(rowNumber, index[column]);
-      var value = record[column];
-      // keep text text: phone numbers, dates and ids must not be reinterpreted
-      if (typeof value === 'string' && (TABLES[name].text || []).indexOf(column) !== -1) {
-        cell.setNumberFormat('@');
-      }
-      cell.setValue(value);
-    }
+  // the columns this record has, in Sheet order, written as runs of neighbours: one write each
+  var isNew = !rows.some(function (row) { return row.__row === rowNumber; });
+  var text = TABLES[name].text || [];
+  var cols = Object.keys(record).filter(function (column) { return index[column]; })
+    .map(function (column) { return { col: index[column], column: column, value: record[column] }; })
+    .sort(function (a, b) { return a.col - b.col; });
+
+  var runs = [];
+
+  cols.forEach(function (c) {
+    var last = runs[runs.length - 1];
+    if (last && last[last.length - 1].col === c.col - 1) last.push(c);
+    else runs.push([c]);
   });
+
+  runs.forEach(function (run) {
+    // keep text text: phone numbers, dates and ids must not be reinterpreted. A new row gets the
+    // format on its text cells; an existing one only where the value could be read as a number / date
+    var formatted = run.filter(function (c) {
+      return typeof c.value === 'string' && text.indexOf(c.column) !== -1 && (isNew || /^[\s+\-=]*[\d.,:\/\s-]+$/.test(c.value) || /^[=+\-@]/.test(c.value));
+    });
+    var group = [];
+    formatted.forEach(function (c) {
+      var last = group[group.length - 1];
+      if (last && last[last.length - 1].col === c.col - 1) last.push(c);
+      else group.push([c]);
+    });
+    group.forEach(function (g) { sheet.getRange(rowNumber, g[0].col, 1, g.length).setNumberFormat('@'); });
+    sheet.getRange(rowNumber, run[0].col, 1, run.length).setValues([run.map(function (c) { return c.value; })]);
+  });
+
+  tableTouch_(name);
 
   return rowNumber;
 
@@ -629,6 +790,7 @@ function deleteRow_(name, idColumn, value) {
 
   if (rowNumber) {
     sheet_(name).deleteRow(rowNumber);
+    tableTouch_(name);
   }
 
   return !!rowNumber;
@@ -647,6 +809,7 @@ function writeOrder_(name, idColumn, ids) {
     rows.some(function (row) {
       if (String(row[idColumn]) === String(id)) {
         sheet.getRange(row.__row, index.order).setValue((i + 1) * 10);
+        tableTouch_(name);
         return true;
       }
       return false;
@@ -667,6 +830,7 @@ function ensureIds_(name, prefix) {
       sheet.getRange(row.__row, index.id)
         .setNumberFormat('@')
         .setValue(prefix + '-' + Utilities.getUuid().slice(0, 8));
+      tableTouch_(name);
     }
   });
 
@@ -801,6 +965,7 @@ function setup() {
 
   console.log(message);
 
+  tableTouchAll_();
   return message;
 
 }

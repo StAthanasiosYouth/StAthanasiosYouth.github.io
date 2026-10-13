@@ -579,6 +579,8 @@ function writeImportedSessions_(adds, updates) {
     });
   });
 
+  tableTouch_('Sessions');
+
   if (!adds.length) return;
 
   var width = sheet.getLastColumn();
@@ -608,5 +610,6 @@ function writeImportedSessions_(adds, updates) {
   });
 
   sheet.getRange(first, 1, adds.length, width).setValues(values);
+  tableTouch_('Sessions');
 
 }

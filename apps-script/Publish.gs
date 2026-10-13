@@ -135,24 +135,68 @@ function githubErrorMessage_(code, detail) {
  * inline; binaries ({ path: base64 }) are uploaded as blobs first.
  * Returns the commit, or null when the files are already identical.
  */
+/* several GitHub requests at once (UrlFetchApp.fetchAll): [{ method, path, body }] → parsed answers, in order */
+function githubAll_(requests) {
+
+  if (!requests.length) return [];
+
+  var config = githubConfig_();
+
+  if (!config.token || !config.repo) {
+    throw new Error('إعدادات GitHub ناقصة: لازم GITHUB_TOKEN و GITHUB_REPO في Script Properties.');
+  }
+
+  var responses = UrlFetchApp.fetchAll(requests.map(function (r) {
+    var options = {
+      url: GITHUB_API + '/repos/' + config.repo + r.path,
+      method: r.method,
+      muteHttpExceptions: true,
+      headers: { Authorization: 'Bearer ' + config.token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
+    };
+    if (r.body !== undefined) {
+      options.contentType = 'application/json';
+      options.payload = JSON.stringify(r.body);
+    }
+    return options;
+  }));
+
+  return responses.map(function (response) {
+    var code = response.getResponseCode();
+    var text = response.getContentText();
+    if (code >= 200 && code < 300) return text ? JSON.parse(text) : null;
+    var detail = '';
+    try { detail = JSON.parse(text).message || ''; } catch (ignored) { detail = ''; }
+    var error = new Error(githubErrorMessage_(code, detail));
+    error.status = code;
+    throw error;
+  });
+
+}
+
 function githubCommitFiles_(files, message, binaries) {
 
   var branch = githubConfig_().branch;
+  var paths = Object.keys(binaries || {});
 
-  // blobs are content-addressed, so they survive a retry below
-  var blobEntries = Object.keys(binaries || {}).map(function (path) {
+  paths.forEach(function (path) {
     if (!MEDIA_PATH.test(path) && !VIDEO_PATH.test(path) && !VIDEO_POSTER_PATH.test(path)) {
       throw new Error('مسار صورة مش مسموح: ' + path);
     }
-    var blob = github_('post', '/git/blobs', { content: binaries[path], encoding: 'base64' });
-    return { path: path, mode: '100644', type: 'blob', sha: blob.sha };
+  });
+
+  // blobs are content-addressed (they survive a retry below), uploaded side by side
+  var blobEntries = githubAll_(paths.map(function (path) {
+    return { method: 'post', path: '/git/blobs', body: { content: binaries[path], encoding: 'base64' } };
+  })).map(function (blob, i) {
+    return { path: paths[i], mode: '100644', type: 'blob', sha: blob.sha };
   });
 
   for (var attempt = 0; attempt < 2; attempt++) {
 
-    var ref = github_('get', '/git/ref/heads/' + encodeURIComponent(branch));
-    var parentSha = ref.object.sha;
-    var parent = github_('get', '/git/commits/' + parentSha);
+    // the branch: its head commit and that commit's tree in one answer
+    var head = github_('get', '/branches/' + encodeURIComponent(branch));
+    var parentSha = head.commit.sha;
+    var parent = { tree: { sha: head.commit.commit.tree.sha } };
 
     var tree = github_('post', '/git/trees', {
       base_tree: parent.tree.sha,
@@ -269,7 +313,45 @@ function publishStatus_(built) {
 ========================================================= */
 
 /** What publishing would change, compared with the live content.json. */
+/*
+ * The content.json this script last committed (CacheService, set by the publish), when it is
+ * still the published revision; else null (then GitHub is asked). Saves the review a round trip.
+ */
+var LAST_PUBLISHED_KEY = 'pub:content';
+
+function lastPublished_() {
+
+  try {
+    var text = CacheService.getScriptCache().get(LAST_PUBLISHED_KEY);
+    var content = text ? JSON.parse(text) : null;
+    var revision = PropertiesService.getScriptProperties().getProperty('PUBLISHED_REVISION') || '';
+    return content && revision && content.revision === revision ? content : null;
+  }
+  catch (ignored) {
+    return null;
+  }
+
+}
+
+function rememberPublished_(content) {
+
+  try {
+    var text = JSON.stringify(content);
+    if (text.length < 95000) CacheService.getScriptCache().put(LAST_PUBLISHED_KEY, text, 21600);
+  }
+  catch (ignored) {
+    // the review asks GitHub then
+  }
+
+}
+
 function apiReview() {
+
+  return tableScope_(reviewNow_);
+
+}
+
+function reviewNow_() {
 
   assertAdmin_();
 
@@ -281,7 +363,7 @@ function apiReview() {
   var githubError = '';
 
   try {
-    published = fetchPublishedContent_();
+    published = lastPublished_() || fetchPublishedContent_();
   }
   catch (error) {
     githubError = error.message;
@@ -421,6 +503,12 @@ function withScriptLock_(ms, fn) {
  */
 function apiPublish(expectedRevision) {
 
+  return tableScope_(function () { return publishNow_(expectedRevision); });
+
+}
+
+function publishNow_(expectedRevision) {
+
   var email = assertAdmin_();
   var now = new Date(Date.now());
   var stamp = Utilities.formatDate(now, CONTENT_TIMEZONE, 'yyyy-MM-dd HH:mm');
@@ -468,12 +556,14 @@ function apiPublish(expectedRevision) {
 
   try {
 
-    // B. no lock: the network work
-    var live = fetchPublishedContent_();
+    // B. no lock: the network work. What is live: the revision this script last published
+    // (asked from GitHub only when it doesn't know; a moved branch is handled by the commit itself)
+    var known = PropertiesService.getScriptProperties().getProperty('PUBLISHED_REVISION');
+    var liveRevision = known || ((fetchPublishedContent_() || {}).revision || '');
 
     // same visible content already live: no empty-change commit
     // (unless a picture still waits to go to the site: a store prize's is not in content.json)
-    if (live && live.revision === built.content.revision && !mediaWaiting_(built.media)) {
+    if (liveRevision === built.content.revision && !mediaWaiting_(built.media)) {
 
       unchanged = true;
 
@@ -497,7 +587,7 @@ function apiPublish(expectedRevision) {
 
       // competition/<slug>/index.html + comp.json (or the withdrawn comp.json): the same commit
       if (comps) {
-        var compFiles = compPublishFiles_(comps, config.siteUrl, cairoNow_(now), Object.keys(comps.live).length ? compShellText_() : '');
+        var compFiles = compPublishFiles_(comps, config.siteUrl, cairoNow_(now), Object.keys(comps.live).some(function (id) { return !comps.live[id].comp || comps.live[id].comp.liveVersion !== comps.live[id].version; }) ? compShellText_() : '');
         Object.keys(compFiles).forEach(function (path) { files[path] = compFiles[path]; });
       }
 
@@ -534,6 +624,8 @@ function apiPublish(expectedRevision) {
         activity_({ action: 'publish', type: 'site', id: built.content.revision, title: '', ref: built.content.revision, changes: { unchanged: true } });
         return;
       }
+
+      rememberPublished_(built.content);
 
       props.setProperties({
         PUBLISHED_REVISION: built.content.revision,

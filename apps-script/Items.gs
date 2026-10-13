@@ -148,7 +148,10 @@ function lazyColumns_(name, record) {
   var sheet = sheet_(name);
   var have = headerIndex_(sheet);
   var missing = wanted.filter(function (column) { return !have[column]; });
-  if (missing.length) appendColumns_(sheet, name, missing);
+  if (missing.length) {
+    appendColumns_(sheet, name, missing);
+    tableTouch_(name);
+  }
 
 }
 

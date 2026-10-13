@@ -431,6 +431,8 @@ function runMigration_(options) {
     lock.releaseLock();
   }
 
+
+  tableTouchAll_();
 }
 
 

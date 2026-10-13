@@ -12,6 +12,9 @@ import { ROOT } from '../../tools/lib/gs.mjs';
    SPREADSHEET
 ========================================================= */
 
+/* call counts for profiling (tools/profile-admin.mjs): reads / writes / formats / fetches by host */
+export const PROFILE = { reads: 0, writes: 0, formats: 0, fetches: {}, bySheet: {} };
+
 class FakeRange {
 
   constructor(sheet, row, col, rows = 1, cols = 1) {
@@ -19,6 +22,7 @@ class FakeRange {
   }
 
   getValues() {
+    PROFILE.reads++; PROFILE.bySheet[this.sheet.name] = (PROFILE.bySheet[this.sheet.name] || 0) + 1;
     this.sheet.stats.cellsRead += this.rows * this.cols;
     const out = [];
     for (let r = 0; r < this.rows; r++) {
@@ -37,12 +41,14 @@ class FakeRange {
   }
 
   setValues(values) {
+    PROFILE.writes++;
     this.sheet.stats.writes++;
     values.forEach((line, r) => line.forEach((value, c) => this.sheet.set(this.row + r, this.col + c, value)));
     return this;
   }
 
   setValue(value) {
+    PROFILE.writes++;
     this.sheet.stats.writes++;
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) this.sheet.set(this.row + r, this.col + c, value);
@@ -51,7 +57,7 @@ class FakeRange {
   }
 
   // formatting: accepted and ignored
-  setNumberFormat() { return this; }
+  setNumberFormat() { PROFILE.formats++; return this; }
   setFontWeight() { return this; }
   setFontColor() { return this; }
   setBackground() { return this; }
@@ -123,13 +129,14 @@ class FakeSheet {
   }
 
   appendRow(values) {
+    PROFILE.writes++;
     this.stats.writes++;
     const row = this.getLastRow() + 1;
     if (row > this.maxRows) this.maxRows = row;
     values.forEach((value, i) => this.set(row, i + 1, value));
   }
 
-  deleteRow(row) { this.data.splice(row - 1, 1); this.maxRows--; }
+  deleteRow(row) { PROFILE.writes++; this.data.splice(row - 1, 1); this.maxRows--; }
 
   deleteRows(row, count) { this.data.splice(row - 1, count); this.maxRows -= count; }
 
@@ -262,6 +269,11 @@ export class FakeGitHub {
 
     if (method === 'get' && path === '') {
       return this.respond(200, { full_name: this.repo, permissions: { push: true }, has_pages: true });
+    }
+
+    if (method === 'get' && path === '/branches/main') {
+      const commit = this.commits.get(this.head);
+      return this.respond(200, { name: 'main', commit: { sha: this.head, commit: { tree: { sha: commit ? commit.tree : '' } } } });
     }
 
     if (method === 'get' && path === '/git/ref/heads/main') {
@@ -657,6 +669,8 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
     UrlFetchApp: {
       fetchAll: requests => requests.map(r => context.UrlFetchApp.fetch(r.url, r)),
       fetch: (url, options) => {
+        const host = String(url).replace(/^https?:\/\//, '').split(/[/?]/)[0];
+        PROFILE.fetches[host] = (PROFILE.fetches[host] || 0) + 1;
         if (scriptLock.held > 0) {
           scriptLock.lockedFetches.push(String(url).replace(/\?.*$/, ''));
           if (scriptLock.strict) throw new Error('UrlFetch while the script lock is held: ' + String(url).replace(/\?.*$/, ''));

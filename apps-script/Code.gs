@@ -69,32 +69,43 @@ function apiState() {
   var email = assertAdmin_();
   var lock = LockService.getScriptLock();
 
-  lock.waitLock(20000);
+  return tableScope_(function () {
 
-  try {
-    assignMissingIds_();
-  }
-  finally {
-    lock.releaseLock();
-  }
+    lock.waitLock(20000);
 
-  return apiStateFor_(email);
+    try {
+      assignMissingIds_(true);
+    }
+    finally {
+      lock.releaseLock();
+    }
+
+    // a panel load: the Sheet itself (a hand edit shows), remembered for the actions that follow
+    return apiStateFor_(email, null, 'fill');
+
+  });
 
 }
 
 
 /* Rows added by hand in the Sheet get ids. Call only while holding the lock. */
-function assignMissingIds_() {
+function assignMissingIds_(now) {
+
+  var cache = CacheService.getScriptCache();
+
+  if (!now && cache.get('ids:checked')) return;
 
   ensureIds_('Links', 'link');
   ensureIds_('Contacts', 'contact');
 
+  cache.put('ids:checked', '1', 600);
+
 }
 
 
-function apiStateFor_(email, built) {
+function apiStateFor_(email, built, mode) {
 
-  var draft = readDraft_();
+  var draft = readDraft_(mode === undefined ? 'cached' : mode);
   var help = Object.create(null);
 
   SETTINGS_SPEC.forEach(function (spec) {
@@ -208,21 +219,26 @@ function mutate_(action, details, change) {
   var email = assertAdmin_();
   var lock = LockService.getScriptLock();
 
-  lock.waitLock(20000);
+  return tableScope_(function () {
 
-  try {
-    assignMissingIds_();
-    takeActivityNotes_();
-    var summary = change();
-    log_(email, action, summary || details);
-    takeActivityNotes_().forEach(function (entry) { activity_(entry); });
-  }
-  finally {
-    takeActivityNotes_();
-    lock.releaseLock();
-  }
+    lock.waitLock(20000);
 
-  return apiStateFor_(email);
+    try {
+      assignMissingIds_();
+      takeActivityNotes_();
+      var summary = change();
+      log_(email, action, summary || details);
+      takeActivityNotes_().forEach(function (entry) { activity_(entry); });
+    }
+    finally {
+      takeActivityNotes_();
+      lock.releaseLock();
+    }
+
+    // the state the page redraws: the tables this action wrote are read again, the others come from their copies
+    return apiStateFor_(email);
+
+  });
 
 }
 
@@ -1033,6 +1049,10 @@ function apiSaveSettings(values) {
       if (!row || String(row.value === null || row.value === undefined ? '' : row.value) !== String(clean[key])) {
         changed.push(key);
       }
+      // an unchanged value: nothing to write (the form sends every field)
+      else {
+        return;
+      }
 
       if (!row) {
         next = next ? next + 1 : nextRow_('Settings', rows);
@@ -1056,6 +1076,8 @@ function apiSaveSettings(values) {
       cell.setValue(clean[key]);
 
     });
+
+    if (changed.length) tableTouch_('Settings');
 
     if (changed.length) {
       var group = settingsGroups_(changed);

@@ -108,7 +108,10 @@ const refresh = page => page.evaluate(() => document.dispatchEvent(new Event('vi
 
 
 test('no `points` in content.json: no widget, no top-bar entry, no points.js request', async () => {
-  const { context, page, problems, requests } = await open(PHONE, null);
+  // the repo's content.json without its points block (the live one may have one now)
+  const repo = JSON.parse(readFileSync(new URL('../content.json', import.meta.url), 'utf8'));
+  delete repo.points;
+  const { context, page, problems, requests } = await open(PHONE, { content: repo, date: new Date().toUTCString() });
   assert.equal(await page.$('[data-area="points"]'), null);
   assert.equal(await page.$('#points-link:not([hidden])'), null);
   assert.ok(!requests.some(path => path.endsWith('/points.js')), 'the module is not loaded');

@@ -49,7 +49,7 @@ function compShellText_() {
     var text = Utilities.newBlob(Utilities.base64Decode(String(file.content).replace(/\s/g, ''))).getDataAsString('UTF-8');
     if (!compShellOk_(text)) return '';
     try {
-      cache.put('comp:shell', text, 600);
+      cache.put('comp:shell', text, 21600);
     }
     catch (ignored) {
       // too big for the cache: read again next time
@@ -75,6 +75,8 @@ function compPublishFiles_(comps, siteUrl, nowWall, shell) {
 
   Object.keys(comps.live).forEach(function (id) {
     var entry = comps.live[id];
+    // already live as it is (same version): its files are on the site, nothing to write
+    if (entry.comp && entry.comp.liveVersion === entry.version) return;
     var base = 'competition/' + entry.slug + '/';
     files[base + 'index.html'] = compStubHtml_(entry.def, siteUrl, entry.version, shell);
     files[base + 'comp.json'] = JSON.stringify(compPublicDef_(entry.def, entry.version, compPublishedAt_(entry, nowWall)), null, 2) + '\n';
