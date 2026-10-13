@@ -1,0 +1,455 @@
+<script>
+/*
+ * Points & Store v2 (docs/COMPETITIONS.md §18), the admin side:
+ *  - «مواعيد المتجر» (A.compShopScheduleCard, on «المتجر»): mode, open /
+ *    close times, the participant's own cancel, the state, the bell items
+ *    and automatic pushes it schedules (apiShopSchedule / Save), whether
+ *    the automatic sending is switched on (auto), the scheduled sends
+ *    (apiPushSchedule, cancel one)
+ *  - «المواسم» (A.compSeasonsCard, on «النقاط»): the active season (its
+ *    theoretical maximum, expected, top balance), planned ones, closed
+ *    history; add / edit; «قفل الموسم وابدأ موسم جديد» (preview → open
+ *    requests block → the next season → type the name → close)
+ *  - helpers the other screens use: C.seasons() (cached apiSeasons),
+ *    C.seasonName(id), C.v2Missing(error) (this server has no v2 yet)
+ * Nothing here deletes points: closing the store or a season keeps every
+ * row; carry-over is only the explicit «تحويل من موسم فات».
+ */
+(function () {
+
+  'use strict';
+
+  var A = window.A;
+  var el = A.el;
+  var icon = A.icon;
+  var C = A.comp;
+  var ar = C.ar;
+
+  /* an api* this server doesn't have yet (the v2 server lands separately) */
+  C.v2Missing = function (error) {
+    var parsed = A.parseError(error);
+    return /الطلب ده مش معروف|unknown function/.test(String(parsed.message) + ' ' + String(parsed.details || '') + ' ' + String(error && error.message || ''));
+  };
+
+  function v2Note(what) {
+    return el('p', { class: 'note note--warn comp-v2-missing', text: what + ' محتاج تحديث السيرفر (Points & Store v2). أول ما يتركب هيشتغل هنا لوحده.' });
+  }
+
+  /* «٣٨٠٠» → a whole number in Arabic digits */
+  function num(n) {
+    return ar(Math.round(Number(n) || 0));
+  }
+
+  /* "YYYY-MM-DD HH:MM" | "YYYY-MM-DDTHH:MM" → the stored form */
+  function stamp(value) {
+    return String(value || '').replace('T', ' ').slice(0, 16);
+  }
+
+
+  /* =======================================================
+     SEASONS: the cache the other screens read
+  ======================================================= */
+
+  var seasonsCache = null;
+
+  /** apiSeasons, cached for this page (fresh = true reads again); resolves null without v2 */
+  C.seasons = function (fresh) {
+    if (!seasonsCache || fresh) {
+      seasonsCache = A.call('apiSeasons').then(function (reply) {
+        C.seasonsData = reply;
+        return reply;
+      }, function (error) {
+        seasonsCache = null;
+        if (C.v2Missing(error)) { C.seasonsData = null; return null; }
+        throw error;
+      });
+    }
+    return seasonsCache;
+  };
+
+  C.seasonName = function (id) {
+    var list = (C.seasonsData && C.seasonsData.seasons) || [];
+    var s = list.filter(function (x) { return x.id === id; })[0];
+    return s ? s.name : (id === 'sea-first' || !id ? 'الموسم الأول' : '');
+  };
+
+  /* the active season (from a reply: `active` is its id or the season itself) */
+  function activeOf(reply) {
+    if (!reply) return null;
+    var list = reply.seasons || [];
+    var id = reply.active && typeof reply.active === 'object' ? reply.active.id : reply.active;
+    return list.filter(function (s) { return s.id === id; })[0] || list.filter(function (s) { return s.status === 'active'; })[0] || (reply.active && typeof reply.active === 'object' ? reply.active : null);
+  }
+
+  C.activeSeason = function () { return activeOf(C.seasonsData); };
+
+  var STATUS = { planned: { label: 'مخطط', kind: 'info' }, active: { label: 'شغال دلوقتي', kind: 'ok' }, closed: { label: 'اتقفل', kind: 'off' } };
+
+  function dates(s) {
+    return (s.startAt ? 'من ' + C.when(stamp(s.startAt)) : 'من غير بداية') + (s.endAt ? ' لحد ' + C.when(stamp(s.endAt)) : '');
+  }
+
+  function tile(label, value, tone) {
+    return el('div', { class: 'comp-tile' + (tone ? ' comp-tile--' + tone : '') }, el('span', { class: 'comp-tile__n', dir: 'ltr', text: value }), el('span', { class: 'comp-tile__label', text: label }));
+  }
+
+  /** «المواسم» on «النقاط» */
+  A.compSeasonsCard = function (onChange) {
+
+    var body = el('div', { class: 'comp-seasons', 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--line' }));
+    var box = A.errorBox();
+
+    function load() {
+      return C.seasons(true).then(function (reply) {
+        if (!body.isConnected) return;
+        if (!reply) { A.fill(body, v2Note('المواسم')); return; }
+        draw(reply);
+      }).catch(function (error) {
+        if (!body.isConnected) return;
+        body.replaceChildren();
+        A.fail(error, box);
+      });
+    }
+
+    function draw(reply) {
+      var list = reply.seasons || [];
+      var active = activeOf(reply);
+      var planned = list.filter(function (s) { return s.status === 'planned'; });
+      var closed = list.filter(function (s) { return s.status === 'closed'; }).sort(function (a, b) { return String(b.closedAt || b.endAt).localeCompare(String(a.closedAt || a.endAt)); });
+
+      A.fill(body,
+        active ? el('section', { class: 'comp-season comp-season--active', 'data-season': active.id },
+          el('div', { class: 'comp-season__head' },
+            el('h3', { class: 'comp-season__name', text: active.name }),
+            A.chip(STATUS.active.label, 'ok'),
+            el('span', { class: 'field__hint', text: dates(active) })),
+          el('div', { class: 'comp-tiles' },
+            tile('أقصى نقاط ممكنة', num(active.maxTheoretical), 'gold'),
+            tile('متوقع (لسه ما اتنشرتش)', active.expected ? '+' + num(active.expected) : num(0)),
+            tile('أعلى رصيد', num(active.topBalance)),
+            tile('مشاركين', num(active.participants))),
+          el('p', { class: 'field__hint comp-season__max', text: 'أقصى نقاط ممكنة: ' + num(active.maxTheoretical) + ' من ' + num(active.competitions) + ' مسابقة' + (active.expected ? ' — ومتوقع ' + num(active.expected) + ' كمان من مسابقات لسه ما اتنشرتش' : '') + '. مفيش حد أقصى للنقاط: ده بس علشان تسعّر الجوايز.' }),
+          active.notifyDays ? el('p', { class: 'field__hint', text: 'تنبيه قبل النهاية بـ' + num(active.notifyDays) + ' يوم' }) : null,
+          el('div', { class: 'actions' },
+            el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'season-edit', onclick: function () { openEditor(active, reply); } }, icon('edit'), 'تعديل'),
+            el('button', { class: 'btn btn--small btn--danger', type: 'button', 'data-act': 'season-close', onclick: function (e) { closeFlow(active, reply, e.currentTarget); } }, icon('lock'), 'قفل الموسم وابدأ موسم جديد')))
+          : el('p', { class: 'note', text: 'مفيش موسم شغال لسه: أول ما تتسجل نقاط بيتعمل «الموسم الأول» لوحده.' }),
+        planned.length ? el('div', { class: 'comp-seasons__group' },
+          el('p', { class: 'section-label', text: 'مواسم جاية' }),
+          el('ul', { class: 'list' }, planned.map(function (s) {
+            return seasonRow(s, [el('button', { class: 'btn btn--small btn--ghost', type: 'button', 'data-act': 'season-edit', onclick: function () { openEditor(s, reply); } }, icon('edit'), 'تعديل')]);
+          }))) : null,
+        closed.length ? el('div', { class: 'comp-seasons__group' },
+          el('p', { class: 'section-label', text: 'مواسم خلصت' }),
+          el('ul', { class: 'list' }, closed.map(function (s) { return seasonRow(s, []); }))) : null
+      );
+    }
+
+    function seasonRow(s, controls) {
+      var row = A.listItem({
+        icon: 'calendar',
+        title: s.name,
+        sub: dates(s),
+        off: s.status === 'closed',
+        chips: [A.chip((STATUS[s.status] || STATUS.planned).label, (STATUS[s.status] || STATUS.planned).kind),
+          s.maxTheoretical ? A.chip('أقصى ' + num(s.maxTheoretical) + ' نقطة', 'gold') : null,
+          s.expected ? A.chip('متوقع ' + num(s.expected)) : null,
+          s.status === 'closed' && s.closedAt ? A.chip('اتقفل ' + C.when(stamp(s.closedAt)), 'off') : null].filter(Boolean),
+        controls: [el('span', { class: 'spacer' })].concat(controls)
+      });
+      row.dataset.season = s.id;
+      return row;
+    }
+
+    function changed() {
+      load();
+      if (onChange) onChange();
+    }
+
+    /* add / edit: name, dates, the end-of-season reminder */
+    function openEditor(season, reply) {
+      var isNew = !season;
+      season = season || {};
+      var ebox = A.errorBox();
+      var name = A.counted('اسم الموسم', season.name, 60, 'مثلاً: موسم الصيف ٢٠٢٧', { required: true });
+      var start = A.dateTimeInput(stamp(season.startAt), { emptyText: 'من غير بداية' });
+      var end = A.dateTimeInput(stamp(season.endAt), { emptyText: 'من غير نهاية' });
+      var days = el('input', { class: 'input comp-number', type: 'number', min: '1', max: '30', step: '1', inputmode: 'numeric', value: season.notifyDays ? String(season.notifyDays) : '', placeholder: 'من غير تنبيه', oninput: A.markDirty });
+      var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
+      save.addEventListener('click', function () {
+        ebox.hidden = true;
+        var input = { name: name.input.value, startAt: start.value(), endAt: end.value(), notifyDays: days.value === '' ? '' : Number(days.value) };
+        if (!isNew) input.id = season.id;
+        A.withBusy(save, A.call('apiSeasonSave', input)).then(function () {
+          A.dirty = false;
+          A.closeSheet();
+          A.toast(isNew ? 'الموسم اتضاف ✓' : 'اتحفظ ✓');
+          C.refreshStatus();
+          changed();
+        }).catch(function (error) { A.fail(error, ebox); });
+      });
+      A.dirty = false;
+      A.openSheet(isNew ? 'موسم جديد' : 'تعديل: ' + season.name, [
+        ebox,
+        el('div', { class: 'form' },
+          name.node,
+          A.field('بيبدأ', start.node),
+          A.field('بيخلص', end.node, 'المواعيد للعرض والتنبيهات: الموسم بيتقفل لما تقفله إنت بس.'),
+          A.field('ابعت تنبيه قبل نهاية الموسم بـ … يوم', days, 'فاضي = من غير تنبيه. التنبيه بيظهر في الجرس (ولو الإرسال التلقائي متفعّل بيتبعت push).'),
+          isNew ? el('p', { class: 'note', text: 'الموسم الجديد بيبقى «مخطط» لحد ما تقفل الموسم الحالي وتختاره يبدأ.' }) : null)
+      ], A.sheetFooter(save));
+    }
+
+    /* «قفل الموسم وابدأ موسم جديد»: preview → (open requests block) → next → type the name → close */
+    function closeFlow(season, reply, button) {
+      A.withBusy(button, A.call('apiSeasonClosePreview', season.id)).then(function (preview) {
+        var totals = preview.totals || [];
+        var open = preview.openRequests || [];
+        var planned = (reply.seasons || []).filter(function (s) { return s.status === 'planned'; });
+        var fbox = A.errorBox();
+        var nextChoice = planned.length ? planned[0].id : 'new';
+        var newName = A.counted('اسم الموسم الجديد', '', 60, 'مثلاً: موسم الشتا', { required: true });
+        var newStart = A.dateTimeInput(A.cairoNow(), { emptyText: 'من دلوقتي' });
+        var newEnd = A.dateTimeInput('', { emptyText: 'من غير نهاية' });
+        var confirmInput = el('input', { class: 'input', type: 'text', autocomplete: 'off', placeholder: season.name, 'aria-label': 'اكتب اسم الموسم للتأكيد' });
+        var go = el('button', { class: 'btn btn--danger-solid', type: 'button', 'data-act': 'season-close-confirm', disabled: true }, icon('lock'), 'اقفل الموسم');
+
+        var newPart = el('div', { class: 'form-group comp-season__new' }, newName.node, A.field('بيبدأ', newStart.node), A.field('بيخلص', newEnd.node));
+        var choices = el('div', { class: 'comp-presets', role: 'radiogroup', 'aria-label': 'الموسم الجاي' },
+          planned.map(function (s) { return { value: s.id, label: s.name, sub: dates(s) }; }).concat([{ value: 'new', label: 'موسم جديد', sub: 'اكتب اسمه ومواعيده' }]).map(function (o) {
+            var input = el('input', { type: 'radio', name: 'next-season', value: o.value, checked: o.value === nextChoice, onchange: function () { nextChoice = o.value; newPart.hidden = nextChoice !== 'new'; } });
+            return el('label', { class: 'comp-preset' }, input, el('span', { class: 'comp-preset__body' }, el('strong', { text: o.label }), el('small', { text: o.sub })));
+          }));
+        newPart.hidden = nextChoice !== 'new';
+
+        confirmInput.addEventListener('input', function () { go.disabled = confirmInput.value.trim() !== season.name.trim(); });
+
+        go.addEventListener('click', function () {
+          fbox.hidden = true;
+          var next = nextChoice === 'new' ? { name: newName.input.value, startAt: newStart.value(), endAt: newEnd.value() } : nextChoice;
+          if (nextChoice === 'new' && !newName.input.value.trim()) { A.fail(new Error('اسم الموسم الجديد مطلوب'), fbox); return; }
+          A.withBusy(go, A.call('apiSeasonClose', season.id, preview.confirmKey, next)).then(function (result) {
+            A.dirty = false;
+            A.closeSheet().then(function () {
+              var nextName = result && (result.next && result.next.name || result.active && result.active.name) || (typeof next === 'object' ? next.name : C.seasonName(next));
+              A.modal({
+                tone: 'success',
+                title: '«' + season.name + '» اتقفل ✓',
+                message: 'اتحفظت أرصدة ' + num(totals.length) + ' مشترك في سجل الموسم، ومفيش حاجة اتمسحت.' + (nextName ? '\nالموسم الشغال دلوقتي: «' + nextName + '» — الأرصدة بتبدأ من صفر، واللي عايز تحوّله لحد اعمله «تحويل من موسم فات».' : ''),
+                actions: [{ label: 'تمام', value: true, kind: 'primary', autofocus: true }]
+              });
+              C.refreshStatus();
+              changed();
+            });
+          }).catch(function (error) { A.fail(error, fbox); });
+        });
+
+        var table = totals.length ? el('div', { class: 'comp-rank comp-season__totals', role: 'table', 'aria-label': 'أرصدة الموسم' },
+          el('div', { class: 'comp-rank__row comp-rank__row--head comp-season__trow', role: 'row' }, ['الاسم', 'كسب', 'صرف', 'تعديل', 'الرصيد'].map(function (h) { return el('span', { role: 'columnheader', text: h }); })),
+          totals.slice(0, 300).map(function (t) {
+            return el('div', { class: 'comp-rank__row comp-season__trow', role: 'row' },
+              el('span', { role: 'cell' }, el('bdi', { text: t.name }), t.group ? el('small', { text: ' · ' + t.group }) : null),
+              el('span', { role: 'cell', text: num(t.earned) }), el('span', { role: 'cell', text: num(t.spent) }),
+              el('span', { role: 'cell', dir: 'ltr', text: (t.adjusted > 0 ? '+' : '') + num(t.adjusted) }), el('strong', { role: 'cell', text: num(t.final) }));
+          })) : el('p', { class: 'empty', text: 'مفيش حد ليه نقاط في الموسم ده.' });
+
+        var blocked = open.length || preview.canClose === false;
+
+        A.dirty = false;
+        A.openSheet('قفل «' + season.name + '»', [
+          fbox,
+          el('p', { class: 'note', text: 'قفل الموسم بيحفظ رصيد كل مشترك في سجل الموسم وبيبدأ موسم جديد بأرصدة من صفر. مفيش أي حاجة بتتمسح، والمسابقات اللي في الموسم ده بتفضل نقاطها فيه.' }),
+          el('p', { class: 'section-label', text: 'الأرصدة اللي هتتحفظ (' + num(totals.length) + ')' }),
+          table,
+          open.length ? el('div', { class: 'note note--warn comp-season__blocked' },
+            el('p', { class: 'note__title', text: 'لازم تخلّص الطلبات دي الأول (' + num(open.length) + ')' }),
+            el('p', { text: 'كل طلب لسه «مستني» أو «جاهز» لازم يتسلّم أو يتلغى (والنقاط ترجع) قبل القفل.' }),
+            el('ul', { class: 'list' }, open.map(function (r) {
+              return el('li', { class: 'item comp-req', 'data-id': r.id },
+                el('span', { class: 'item__icon', 'aria-hidden': 'true' }, icon('gift')),
+                el('div', { class: 'item__main' },
+                  el('span', { class: 'item__title', text: (r.itemName || 'جايزة') + ' · ' + num(r.cost) + ' نقطة' }),
+                  el('span', { class: 'item__sub item__sub--rtl', text: (r.participantName || '') + (r.statusLabel ? ' · ' + r.statusLabel : '') })),
+                el('div', { class: 'item__controls' }, el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'open-request', onclick: function () {
+                  A.closeSheet().then(function (closedSheet) { if (closedSheet && A.compShopOpen) A.compShopOpen({ redemption: r.id }); });
+                } }, 'افتح الطلب')));
+            }))) : null,
+          blocked ? null : el('div', { class: 'form' },
+            el('p', { class: 'section-label', text: 'الموسم الجاي' }),
+            choices,
+            newPart,
+            A.field('اكتب اسم الموسم «' + season.name + '» للتأكيد', confirmInput))
+        ], [blocked ? null : go, el('button', { class: 'btn btn--ghost', type: 'button', text: 'رجوع', onclick: function () { A.closeSheet(); } })].filter(Boolean), { wide: true, className: 'sheet--season-close' });
+      }).catch(function (error) { A.fail(error, box); });
+    }
+
+    load();
+
+    var add = el('button', { class: 'btn', type: 'button', 'data-act': 'season-new', onclick: function () { C.seasons().then(function (r) { if (r) openEditor(null, r); }); } }, icon('plus'), 'موسم جديد');
+
+    return A.card('المواسم', 'كل موسم ليه أرصدته. الأرصدة اللي فوق هي الموسم الشغال. لما تقفل موسم، أرصدته بتتحفظ والموسم الجاي بيبدأ من صفر — والتحويل من موسم فات بيتعمل بإيدك بس.',
+      el('div', { class: 'actions' }, add),
+      box,
+      body);
+
+  };
+
+
+  /* =======================================================
+     «مواعيد المتجر» + automatic pushes
+  ======================================================= */
+
+  var MODES = [
+    { value: 'auto', label: 'تلقائي حسب المواعيد' },
+    { value: 'open', label: 'مفتوح' },
+    { value: 'closed', label: 'مقفول' }
+  ];
+  var NOTIFY = [
+    { key: 'open1d', label: 'قبل الفتح بيوم' },
+    { key: 'open1h', label: 'قبل الفتح بساعة' },
+    { key: 'openAt', label: 'وقت الفتح' },
+    { key: 'close24h', label: 'قبل القفل بـ٢٤ ساعة' },
+    { key: 'close1h', label: 'قبل القفل بساعة' }
+  ];
+  var KIND_WORDS = { 'shop-open-1d': 'قبل فتح المتجر بيوم', 'shop-open-1h': 'قبل فتح المتجر بساعة', 'shop-open': 'وقت فتح المتجر', 'shop-close-24h': 'قبل قفل المتجر بـ٢٤ ساعة', 'shop-close-1h': 'قبل قفل المتجر بساعة', 'season-end': 'قبل نهاية الموسم' };
+  var SEND_STATUS = { pending: { label: 'مستني', kind: 'gold' }, sent: { label: 'اتبعت', kind: 'ok' }, skipped: { label: 'اتخطى', kind: 'off' }, failed: { label: 'فشل', kind: 'danger' }, cancelled: { label: 'اتلغى', kind: 'off' } };
+
+  C.shopStateChip = function (state, opensAt) {
+    if (state === 'open') return A.chip('المتجر مفتوح', 'ok');
+    if (state === 'scheduled') return A.chip('هيفتح' + (opensAt ? ' ' + C.when(stamp(opensAt)) : ''), 'gold');
+    return A.chip('المتجر مقفول', 'danger');
+  };
+
+  function autoBlock(auto) {
+    auto = auto || {};
+    if (auto.authorized) {
+      return el('div', { class: 'comp-auto comp-auto--on', 'data-auto': 'on' },
+        el('div', { class: 'item__meta' }, A.chip('الإرسال التلقائي مفعّل ✓', 'ok'),
+          auto.nextDue ? A.chip('الجاي: ' + C.when(stamp(auto.nextDue)), 'info') : A.chip('مفيش حاجة مستنية', 'off'),
+          auto.pending ? A.chip(num(auto.pending) + ' مستني', 'gold') : null),
+        el('p', { class: 'field__hint', text: 'الإشعارات اللي هنا بتتبعت push لوحدها في ميعادها (لو العنصر منشور على الموقع).' }));
+    }
+    return el('div', { class: 'note note--warn comp-auto', 'data-auto': 'off' },
+      el('p', { class: 'note__title', text: 'الإرسال التلقائي مش متفعل — المالك لازم يفعّله مرة واحدة من Apps Script' }),
+      el('p', { text: 'لحد ما يتفعّل: الإشعارات بتظهر في جرس الموقع في ميعادها، بس مش بتتبعت push للموبايلات لوحدها (تقدر تبعتها بإيدك من «إرسال إشعار للمشتركين»).' }),
+      el('details', { class: 'tech' },
+        el('summary', { text: 'إزاي يتفعّل (للمالك)' }),
+        el('ol', { class: 'comp-auto__how' },
+          el('li', { text: 'افتح مشروع Apps Script بتاع لوحة التحكم بحساب المالك.' }),
+          el('li', { text: 'من القايمة فوق اختار الدالة enableAutoPush ودوس «تشغيل».' }),
+          el('li', { text: 'وافق على الصلاحية الجديدة (تشغيل المهام في مواعيدها).' }),
+          el('li', { text: 'ارجع هنا واعمل Refresh: المفروض يظهر «مفعّل ✓».' }))),
+      auto.pending ? el('p', { class: 'field__hint', text: num(auto.pending) + ' إرسال مستني التفعيل.' }) : null);
+  }
+
+  /** «مواعيد المتجر» on «المتجر» */
+  A.compShopScheduleCard = function () {
+
+    var body = el('div', { class: 'comp-shop-schedule', 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--line' }));
+    var sends = el('div', { class: 'comp-sends', 'aria-live': 'polite' });
+    var box = A.errorBox();
+
+    function load() {
+      return A.call('apiShopSchedule').then(function (reply) {
+        if (body.isConnected) draw(reply);
+        loadSends();
+      }).catch(function (error) {
+        if (!body.isConnected) return;
+        if (C.v2Missing(error)) { A.fill(body, v2Note('مواعيد المتجر')); return; }
+        body.replaceChildren();
+        A.fail(error, box);
+      });
+    }
+
+    function loadSends() {
+      return A.call('apiPushSchedule').then(function (reply) {
+        if (!sends.isConnected) return;
+        var list = Array.isArray(reply) ? reply : (reply && (reply.entries || reply.items)) || [];
+        list = list.slice().sort(function (a, b) { return String(a.sendAt).localeCompare(String(b.sendAt)); });
+        A.fill(sends,
+          el('p', { class: 'section-label', text: 'الإرسال المتجدول (' + num(list.length) + ')' }),
+          list.length ? el('ul', { class: 'list' }, list.map(function (e) {
+            var st = SEND_STATUS[e.status] || SEND_STATUS.pending;
+            var cancel = e.status === 'pending' ? el('button', { class: 'btn btn--small btn--ghost', type: 'button', 'data-act': 'send-cancel', onclick: function (ev) {
+              var button = ev.currentTarget;
+              A.confirm({ tone: 'warn', title: 'تلغي الإرسال ده؟', message: (KIND_WORDS[e.kind] || e.kind) + ' — ' + C.when(stamp(e.sendAt)) + '. الإشعار نفسه بيفضل في الجرس؛ اللي بيتلغى هو الـpush بس.', confirmLabel: 'الغيه', cancelLabel: 'لأ' }).then(function (ok) {
+                if (!ok) return;
+                A.withBusy(button, A.call('apiPushScheduleCancel', e.id)).then(function () { A.toast('اتلغى ✓'); loadSends(); }).catch(function (error) { A.fail(error, box); });
+              });
+            } }, icon('close'), 'إلغاء') : null;
+            var row = A.listItem({
+              icon: 'bell',
+              title: KIND_WORDS[e.kind] || e.kind,
+              sub: C.when(stamp(e.sendAt)),
+              off: e.status !== 'pending',
+              chips: [A.chip(st.label, st.kind), e.result ? A.chip(e.result, 'off') : null].filter(Boolean),
+              controls: [el('span', { class: 'spacer' }), cancel]
+            });
+            row.dataset.send = e.id;
+            row.dataset.status = e.status;
+            return row;
+          })) : el('p', { class: 'empty', text: 'مفيش إرسال متجدول.' }));
+      }).catch(function (error) {
+        if (!sends.isConnected) return;
+        if (C.v2Missing(error)) { sends.replaceChildren(); return; }
+        A.fail(error, box);
+      });
+    }
+
+    function draw(s) {
+      var mode = A.choices(A.uid('shop-mode'), MODES, s.mode || 'auto', function () { sync(); });
+      var opens = A.dateTimeInput(stamp(s.opensAt), { emptyText: 'من غير ميعاد فتح', presets: [A.PRESETS.now, A.PRESETS.friday] });
+      var closes = A.dateTimeInput(stamp(s.closesAt), { emptyText: 'من غير ميعاد قفل', presets: [A.PRESETS.sunday10] });
+      var allow = A.checkbox('يسمح للمشترك يلغي طلبه وهو مستني', !!s.allowCancel, 'من «نقاطي»، والنقاط بترجعله على طول. بس والمتجر مفتوح.');
+      var notify = s.notify || {};
+      var ticks = NOTIFY.map(function (n) {
+        var c = A.checkbox(n.label, !!notify[n.key]);
+        c.node.dataset.notify = n.key;
+        return { key: n.key, check: c };
+      });
+      var times = el('div', { class: 'form-group' }, A.field('بيفتح', opens.node), A.field('بيقفل', closes.node));
+      var save = el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'schedule-save', text: 'حفظ المواعيد' });
+
+      function sync() {
+        var m = mode.value() || 'auto';
+        times.classList.toggle('is-muted', m !== 'auto');
+      }
+      sync();
+
+      save.addEventListener('click', function () {
+        box.hidden = true;
+        var input = { mode: mode.value() || 'auto', opensAt: opens.value(), closesAt: closes.value(), allowCancel: allow.input.checked, notify: {} };
+        ticks.forEach(function (t) { input.notify[t.key] = t.check.input.checked; });
+        A.withBusy(save, A.call('apiShopScheduleSave', input)).then(function (reply) {
+          A.dirty = false;
+          A.toast('المواعيد اتحفظت ✓ — الإشعارات بتظهر في الجرس بعد «راجع وانشر»');
+          C.refreshStatus();
+          draw(reply && reply.mode ? reply : Object.assign({}, s, input));
+          loadSends();
+        }).catch(function (error) { A.fail(error, box); });
+      });
+
+      A.fill(body,
+        el('div', { class: 'item__meta comp-shop-state' }, C.shopStateChip(s.state, s.opensAt)),
+        el('div', { class: 'form' },
+          A.field('المتجر', mode.node, 'تلقائي = بيفتح ويقفل لوحده في المواعيد اللي تحت. مفتوح / مقفول = بإيدك لحد ما تغيّره.'),
+          times,
+          allow.node,
+          el('div', { class: 'form-group comp-notify' }, el('p', { class: 'section-label', text: 'إشعارات المتجر' }), ticks.map(function (t) { return t.check.node; }),
+            el('p', { class: 'field__hint', text: 'بتظهر في الجرس في ميعادها (بعد «راجع وانشر»)، وبتتبعت push لوحدها لو الإرسال التلقائي متفعّل.' })),
+          autoBlock(s.auto)),
+        el('div', { class: 'note comp-shop-rules' },
+          el('p', { text: 'قفل المتجر عمره ما بيصفّر النقاط. الطلبات اللي اتعملت قبل القفل بتفضل، وإنت بتكمّل تجهّزها وتسلّمها عادي.' }),
+          el('button', { class: 'btn btn--small', type: 'button', onclick: function () { A.confirmLeave().then(function (ok) { if (ok) A.openReview(); }); } }, icon('send'), 'راجع وانشر')),
+        el('div', { class: 'actions comp-save' }, save)
+      );
+    }
+
+    load();
+
+    return A.card('مواعيد المتجر', 'إمتى المشتركين يقدروا يطلبوا جوايز من «نقاطي»، والإشعارات اللي بتطلع معاها.', box, body, sends);
+
+  };
+
+})();
+</script>

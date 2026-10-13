@@ -28,6 +28,21 @@
     cancelled: { label: 'إلغاء ورجّع النقاط', icon: 'close', kind: 'btn--danger' }
   };
 
+  /* «٣٨٠٠ = ٩٠٪ من أقصى الموسم» (§18.6 pctOfMax = cost ÷ the active season's maximum) */
+  function pctText(item) {
+    var v = Number(item.pctOfMax);
+    if (item.pctOfMax === null || item.pctOfMax === undefined || !isFinite(v)) return '';
+    return ar(item.cost) + ' = ' + ar(Math.round(v * 100)) + '٪ من أقصى الموسم';
+  }
+
+  function pctChip(item) {
+    var text = pctText(item);
+    if (!text) return null;
+    var chip = A.chip(text, Number(item.pctOfMax) > 1 ? 'danger' : 'info');
+    chip.classList.add('comp-pct');
+    return chip;
+  }
+
   function adminName(email) {
     return (A.state && A.state.names && A.state.names[email]) || String(email || '').split('@')[0];
   }
@@ -82,7 +97,8 @@
           item.active ? A.chip('ظاهرة', 'ok') : A.chip('مخفية', 'off'),
           item.pending ? A.chip('طلبات مستنية: ' + ar(item.pending), 'info') : null,
           item.category ? A.chip(item.category) : null,
-          item.image && !item.imagePublished ? A.chip('الصورة بعد النشر', 'gold') : null
+          item.image && !item.imagePublished ? A.chip('الصورة بعد النشر', 'gold') : null,
+          pctChip(item)
         ];
         var row = A.listItem({
           icon: 'gift',
@@ -214,6 +230,21 @@
         }).catch(function (error) { A.fail(error, box); });
       });
 
+      // pricing against the season's theoretical maximum (§18.6; nothing shown without v2)
+      var pricing = el('p', { class: 'field__hint comp-pricing', role: 'status', 'aria-live': 'polite' });
+      var priceHint = function () {
+        var season = C.activeSeason ? C.activeSeason() : null;
+        var max = season ? Number(season.maxTheoretical) || 0 : 0;
+        var c = Number(cost.value) || 0;
+        pricing.hidden = !max;
+        if (!max) return;
+        pricing.textContent = 'أقصى نقاط ممكنة في «' + season.name + '»: ' + ar(max) + (c ? ' — يعني ' + ar(c) + ' = ' + ar(Math.round(c * 100 / max)) + '٪ منه' : '') +
+          '. الجوايز الكبيرة حطها قريبة من ٨٠–١٠٠٪ علشان توصلها بس اللي جاوب على كل حاجة تقريبًا؛ الصغيرة ١٠–٣٠٪.';
+      };
+      cost.addEventListener('input', priceHint);
+      pricing.hidden = true;
+      if (C.seasons) C.seasons().then(priceHint).catch(function () {});
+
       A.dirty = false;
       A.openSheet(isNew ? 'جايزة جديدة' : 'تعديل: ' + item.name, [
         box,
@@ -223,6 +254,7 @@
           description.node,
           image.node,
           A.field('النقاط المطلوبة', cost, 'كام نقطة الجايزة دي'),
+          pricing,
           A.field('الكمية', stock, 'فاضي = من غير حد.' + (item.redeemed ? ' اتطلب منها ' + ar(item.redeemed) + '، فمينفعش تبقى أقل من كده.' : '')),
           A.field('الحد لكل مشترك', per, 'فاضي = من غير حد'),
           A.field('التصنيف', category, 'اختياري'),
@@ -240,6 +272,8 @@
     loadRequests();
 
     return [
+      // «مواعيد المتجر» (AdminCompSeasons, §18.3 / §18.5)
+      A.compShopScheduleCard ? A.compShopScheduleCard() : null,
       A.card('الجوايز', 'اللي المشتركين يقدروا يبدّلوا نقاطهم بيه من «نقاطي». بتتحدث هناك على طول (الصور الجديدة بعد النشر).',
         el('div', { class: 'actions' }, el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { openEditor(null, reply); } }, icon('plus'), 'جايزة جديدة')),
         itemsBox,
@@ -249,7 +283,7 @@
         search,
         reqBox,
         reqBody)
-    ];
+    ].filter(Boolean);
 
   };
 

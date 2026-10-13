@@ -7111,3 +7111,117 @@ dialog .toasts[popover] {
   }
 }
 
+/* =========================================================
+   Points & Store v2 (AdminCompSeasons.html): the store's schedule and
+   its automatic pushes, seasons, pricing against the season's maximum
+========================================================= */
+
+.comp-shop-schedule .form > .form-group.is-muted {
+  opacity: .62;
+}
+
+.comp-shop-state {
+  margin-bottom: 6px;
+}
+
+.comp-shop-rules {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.comp-auto {
+  display: grid;
+  gap: 6px;
+}
+
+.comp-auto__how {
+  margin: 6px 0 0;
+  padding-inline-start: 20px;
+  font-size: .86rem;
+  color: var(--text-2);
+}
+
+.comp-sends {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.comp-pct {
+  white-space: normal;
+}
+
+.comp-pricing {
+  margin-top: -6px;
+  color: var(--gold-soft);
+}
+
+.comp-season-said {
+  margin: 0;
+}
+
+.comp-seasons {
+  display: grid;
+  gap: 14px;
+}
+
+.comp-season {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .03);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+
+.comp-season--active {
+  box-shadow: inset 0 0 0 1px rgba(90, 215, 160, .35);
+}
+
+.comp-season__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.comp-season__name {
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.comp-season__max {
+  color: var(--gold-soft);
+}
+
+.comp-seasons__group {
+  display: grid;
+  gap: 8px;
+}
+
+.comp-season__trow {
+  grid-template-columns: minmax(0, 1.6fr) repeat(4, minmax(0, .7fr));
+  cursor: default;
+}
+
+.comp-season__trow small {
+  font-size: .74rem;
+  color: var(--text-3);
+}
+
+.comp-season__totals {
+  max-height: 46vh;
+  overflow: auto;
+}
+
+.comp-season__blocked {
+  display: grid;
+  gap: 8px;
+}
+
+.comp-ledger__season {
+  font-size: .76rem;
+  color: var(--gold-soft);
+}
+
