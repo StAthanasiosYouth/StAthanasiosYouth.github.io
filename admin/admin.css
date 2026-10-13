@@ -7225,3 +7225,85 @@ dialog .toasts[popover] {
   color: var(--gold-soft);
 }
 
+/* =========================================================
+   v3 (§19): answers reveal, guests, store preview, birth dates, age rules
+========================================================= */
+
+.comp-reveal-group {
+  display: grid;
+  gap: 8px;
+}
+
+.comp-reveal {
+  border: 1px dashed var(--line, rgba(255, 255, 255, .16));
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+
+.comp-reveal > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-2);
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+
+.comp-reveal[open] > summary {
+  margin-bottom: 6px;
+}
+
+.comp-reveal__warn {
+  margin: 0 0 8px;
+}
+
+.comp-guests {
+  margin-top: 10px;
+}
+
+.comp-mode-said {
+  margin: -4px 0 4px;
+}
+
+.comp-age-rules {
+  display: grid;
+  gap: 10px;
+}
+
+.comp-age-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.comp-age-grid .input {
+  width: 100%;
+  min-width: 0;
+}
+
+.comp-age-said {
+  margin: 0;
+}
+
+.comp-birth {
+  display: grid;
+  grid-template-columns: minmax(0, .8fr) minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 6px;
+}
+
+.comp-birth .input {
+  width: 100%;
+  min-width: 0;
+}
+
+.comp-ages {
+  margin-top: 4px;
+}
+
+@media (max-width: 420px) {
+  .comp-age-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

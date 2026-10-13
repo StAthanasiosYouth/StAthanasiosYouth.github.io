@@ -64,7 +64,8 @@
     var days = [];
     for (var d = 1; d <= 31; d++) days.push({ value: (d < 10 ? '0' : '') + d, text: ar(d) });
     var years = [];
-    for (var y = now - 5; y >= now - 100; y--) years.push({ value: String(y), text: ar(y) });
+    var newest = Math.max(now, m ? Number(m[1]) : 0), oldest = Math.min(now - 100, m ? Number(m[1]) : now);
+    for (var y = newest; y >= oldest; y--) years.push({ value: String(y), text: ar(y) });
     var day = pick('اليوم', days, m ? m[3] : '');
     var month = pick('الشهر', MONTH_NAMES.map(function (n, i) { return { value: (i < 9 ? '0' : '') + (i + 1), text: n }; }), m ? m[2] : '');
     var year = pick('السنة', years, m ? m[1] : '');
@@ -82,6 +83,12 @@
     };
   };
 
+  /* a calendar date with its year: «١٥ مارس ٢٠٠٤» (birth dates, leaving the age range) */
+  function dateText(value) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ''));
+    return m ? ar(Number(m[3])) + ' ' + MONTH_NAMES[Number(m[2]) - 1] + ' ' + ar(Number(m[1])) : '';
+  }
+
   /* completed years between a 'YYYY-MM-DD' and another (or today, Cairo) */
   function yearsBetween(from, to) {
     var a = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(from || ''));
@@ -98,7 +105,7 @@
     var label = e.label;
     if (p.eligibility === 'soon' && p.leavesAt) {
       var at = yearsBetween(p.birthDate, p.leavesAt);
-      label += ' — هيكمّل ' + (at !== null ? ar(at) + ' ' : '') + C.when(p.leavesAt);
+      label += ' — هيكمّل ' + (at !== null ? ar(at) + ' سنة ' : '') + 'يوم ' + dateText(p.leavesAt);
     }
     var chip = A.chip(label, e.kind);
     chip.dataset.eligibility = p.eligibility;
@@ -517,8 +524,8 @@
         el('dt', { text: 'الموبايل' }), el('dd', {}, el('a', { class: 'ltr', href: 'tel:' + p.phoneIntl, text: p.phone })),
         p.church ? el('dt', { text: 'الكنيسة' }) : null, p.church ? el('dd', { text: p.church }) : null,
         p.notes ? el('dt', { text: 'ملاحظات' }) : null, p.notes ? el('dd', { text: p.notes }) : null,
-        el('dt', { text: 'تاريخ الميلاد' }), el('dd', { text: p.birthDate ? C.when(p.birthDate) + (ageText(p) ? ' — ' + ageText(p) : '') : 'مش متسجل' }),
-        p.leavesAt ? el('dt', { text: 'بيخرج من السن' }) : null, p.leavesAt ? el('dd', { text: C.when(p.leavesAt) }) : null,
+        el('dt', { text: 'تاريخ الميلاد' }), el('dd', { text: p.birthDate ? dateText(p.birthDate) + (ageText(p) ? ' — ' + ageText(p) : '') : 'مش متسجل' }),
+        p.leavesAt ? el('dt', { text: 'بيخرج من السن' }) : null, p.leavesAt ? el('dd', { text: dateText(p.leavesAt) }) : null,
         p.eligibility === 'out' ? el('dt', { text: 'النقاط' }) : null, p.eligibility === 'out' ? el('dd', { text: 'خارج الفئة العمرية: يشارك عادي من غير نقاط ولا جوايز. الكود والتاريخ والرصيد اللي فات محفوظين.' }) : null,
         el('dt', { text: 'اتسجل' }), el('dd', { text: C.when(p.createdAt) })
       ),
@@ -962,7 +969,7 @@
       if (row.status === 'exists') {
         lines.push(el('span', { class: 'field__hint', text: (row.reason || 'متسجل قبل كده') + (row.match ? ': ' + row.match.name + (row.match.group ? ' (' + row.match.group + ')' : '') + (row.match.status === 'inactive' ? ' — موقوف' : '') : '') }));
         (row.changes || []).forEach(function (c) {
-          lines.push(el('span', { class: 'import__change' }, el('strong', { text: c.label + ': ' }), el('del', { text: c.from || '(فاضي)' }), ' ← ', el('ins', { text: c.to })));
+          lines.push(el('span', { class: 'import__change' }, el('strong', { text: c.label + ': ' }), el('del', { text: (c.field === 'birthDate' ? dateText(c.from) : c.from) || '(فاضي)' }), ' ← ', el('ins', { text: c.field === 'birthDate' ? dateText(c.to) || c.to : c.to })));
         });
       }
       if (row.status === 'dup') lines.push(el('span', { class: 'field__hint', text: 'مكرر في الملف: ' + (row.reason || '') + ' — هيتضاف مرة واحدة بس' }));
@@ -1027,7 +1034,7 @@
           el('bdi', { class: 'comp-import__name', text: row.name || '(من غير اسم)' }),
           A.chip({ new: 'جديد', exists: row.changes && row.changes.length ? 'موجود — فيه تحديث' : 'موجود بالفعل', dup: 'مكرر', error: 'خطأ' }[row.status], { new: 'ok', exists: 'off', dup: 'off', error: 'danger' }[row.status])),
         el('div', { class: 'import__lines' },
-          el('span', { class: 'comp-import__who' }, el('span', { class: 'ltr', text: row.phone || '—' }), row.group ? ' · ' + row.group : '', row.church ? ' · ' + row.church : '', row.birthDate ? ' · مواليد ' + C.when(row.birthDate) : ''),
+          el('span', { class: 'comp-import__who' }, el('span', { class: 'ltr', text: row.phone || '—' }), row.group ? ' · ' + row.group : '', row.church ? ' · ' + row.church : '', row.birthDate ? ' · مواليد ' + dateText(row.birthDate) : ''),
           why(row),
           choiceNode(row),
           fixNode(row)));

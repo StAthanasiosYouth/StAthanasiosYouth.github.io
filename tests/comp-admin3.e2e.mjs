@@ -163,7 +163,7 @@ test('«مواعيد المتجر»: state chip, mode and times, notify choices 
   const closes = wallAt(10 * 24 * 60);
   await setDate('.comp-shop-schedule', 'بيفتح', opens);
   await setDate('.comp-shop-schedule', 'بيقفل', closes);
-  await d.page.$eval('.comp-shop-schedule .check:not([data-notify]) input', n => n.click());   // allow cancel
+  await d.page.$eval('.comp-shop-schedule .check:not([data-notify]):not([data-preview]) input', n => n.click());   // allow cancel
   for (const key of ['open1d', 'openAt', 'close1h']) await d.page.$eval(`.comp-shop-schedule [data-notify="${key}"] input`, n => n.click());
   await shot('01-schedule-form');
   await jsClick('[data-act="schedule-save"]');
@@ -182,7 +182,7 @@ test('«مواعيد المتجر»: state chip, mode and times, notify choices 
   await $('.comp-shop-schedule [data-notify="open1d"] input');
   const ticks = await d.page.$$eval('.comp-shop-schedule [data-notify] input', n => n.map(i => [i.closest('[data-notify]').dataset.notify, i.checked]));
   assert.deepEqual(Object.fromEntries(ticks), { open1d: true, open1h: false, openAt: true, close24h: false, close1h: true });
-  assert.equal(await d.page.$eval('.comp-shop-schedule .check:not([data-notify]) input', n => n.checked), true);
+  assert.equal(await d.page.$eval('.comp-shop-schedule .check:not([data-notify]):not([data-preview]) input', n => n.checked), true);
   assert.deepEqual(d.problems, []);
 
 });
