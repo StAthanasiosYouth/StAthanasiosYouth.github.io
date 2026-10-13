@@ -230,7 +230,7 @@ test('(a) open competition: form, all 7 question types, the server grades, reloa
   await answerAll(page);
   await sendFromReview(page);
   await page.waitForSelector('.result__line--score');
-  assert.equal(await textOf(page, '.result__line--score'), 'درجتك ٣٥/٤٥', 'graded by the server (the optional long one unanswered)');
+  assert.equal(await textOf(page, '.result__line--score'), 'جبت ٣٥ من ٤٥', 'graded by the server (the optional long one unanswered)');
   assert.equal(await page.$$eval('.answer', e => e.length), 6, 'review list (answersShow immediately)');
   const list = submissions(call, id);
   assert.equal(list.total, 1);
@@ -437,7 +437,7 @@ test('(f) shuffleQ + shuffleC: each attempt has its own order, grading still rig
     await answerAll(page);
     await sendFromReview(page);
     await page.waitForSelector('.result__line--score');
-    assert.equal(await textOf(page, '.result__line--score'), 'درجتك ٣٥/٤٥');
+    assert.equal(await textOf(page, '.result__line--score'), 'جبت ٣٥ من ٤٥');
     assert.deepEqual(problems, []);
     await context.close();
   }
@@ -560,7 +560,7 @@ test('(j) a long answer waits for review: the participant sees it pending; after
   await sendFromReview(page);
   await page.waitForSelector('.result__line--pending');
   assert.match(await textOf(page, '.result__line--pending'), /فيه إجابات بتتراجع/);
-  assert.equal(await textOf(page, '.result__line--score'), 'درجتك ٣٥/٤٥');
+  assert.equal(await textOf(page, '.result__line--score'), 'جبت ٣٥ من ٤٥');
 
   const sub = submissions(call, id).items[0];
   assert.equal(sub.status, 'pending_review');
@@ -568,7 +568,7 @@ test('(j) a long answer waits for review: the participant sees it pending; after
 
   await reload(page);
   await page.waitForSelector('.result__line--score');
-  assert.equal(await textOf(page, '.result__line--score'), 'درجتك ٤٥/٤٥');
+  assert.equal(await textOf(page, '.result__line--score'), 'جبت ٤٥ من ٤٥');
   assert.equal(await page.$('.result__line--pending'), null);
   assert.deepEqual(problems, []);
   await context.close();
@@ -674,7 +674,7 @@ test('registered: wrong code, then «الكود مسجل باسم …», points 
   await answerAll(page, { extra: { 'كام سفر في العهد الجديد؟': { type: '27' }, 'مين بنى الفلك؟': { pick: ['نوح'] }, 'داود قتل جليات': { pick: ['صح'] } } });
   await sendFromReview(page);
   await page.waitForSelector('.result__line--points');
-  assert.equal(await textOf(page, '.result__line--points'), 'حصلت على ٣٥ نقطة');
+  assert.equal(await textOf(page, '.result__line--points'), 'جمعت ٣٥ نقطة');
   assert.equal(await page.$('.result__line--score'), null, 'points only');
   assert.equal(await page.$('.answers'), null, 'no review list (answersShow never)');
   const sub = submissions(call, call('apiComps').comps.find(c => c.slug === 'coded-live').id).items[0];
@@ -725,7 +725,7 @@ test('wallet + «نقاطي»: points land in the ledger, the portal shows them,
   await answerAll(page, { extra: { 'كام سفر في العهد الجديد؟': { type: '27' } } });
   await sendFromReview(page);
   await page.waitForSelector('.result__line--points');
-  assert.equal(await textOf(page, '.result__line--points'), 'حصلت على ٣٥ نقطة');
+  assert.equal(await textOf(page, '.result__line--points'), 'جمعت ٣٥ نقطة');
   await context.close();
   let wallet = call('apiWalletParticipant', person.id);
   assert.equal(wallet.balance, 35);
@@ -746,7 +746,7 @@ test('wallet + «نقاطي»: points land in the ledger, the portal shows them,
   assert.equal(await textOf(page, '.portal__name'), 'أهلًا يا كيرلس ماجد فهمي');
   assert.equal(await page.$eval('[data-balance]', e => e.dataset.balance), '35');
   assert.match(await textOf(page, '[data-history]'), /مسابقة بالكود wallet-live/);
-  assert.match(await page.$$eval('[data-history]', rows => rows.map(r => r.textContent).join(' | ')), /حصلت على ٣٥ نقطة/);
+  assert.match(await page.$$eval('[data-history]', rows => rows.map(r => r.textContent).join(' | ')), /جمعت ٣٥ نقطة/);
   assert.deepEqual(await page.$$eval('.prow--ledger', rows => rows.map(r => [r.dataset.kind, r.querySelector('.prow__amount').textContent])), [['competition', '+٣٥']]);
   assert.match(await textOf(page, '.prow--ledger'), /مسابقة — مسابقة بالكود wallet-live/);
 
@@ -809,10 +809,10 @@ test('wallet + «نقاطي»: points land in the ledger, the portal shows them,
   const top = await page.$eval('.prow--ledger', r => ({ kind: r.dataset.kind, amount: r.querySelector('.prow__amount').textContent, text: r.textContent }));
   assert.equal(top.amount, '+٥٠');
   assert.match(top.text, /wallet-review/);
-  assert.match(await page.$$eval('[data-history]', rows => rows[0].textContent), /حصلت على ٥٠ نقطة/);
+  assert.match(await page.$$eval('[data-history]', rows => rows[0].textContent), /جمعت ٥٠ نقطة/);
   await reload(engine.page);
   await engine.page.waitForSelector('.result__line--points');
-  assert.equal(await textOf(engine.page, '.result__line--points'), 'حصلت على ٥٠ نقطة');
+  assert.equal(await textOf(engine.page, '.result__line--points'), 'جمعت ٥٠ نقطة');
   assert.equal(await engine.page.$('.result__line--pending'), null);
   assert.deepEqual(engine.problems, []);
   await engine.context.close();

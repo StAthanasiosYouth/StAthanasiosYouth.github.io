@@ -142,7 +142,8 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
     closed: m => introScreen(m, 'closed'),
 
     identity: m => {
-      const fields = visibleFields(m.def);
+      const guest = !!m.state.guest;
+      const fields = visibleFields(m.def, { guest });
       const errors = m.fieldErrors || {};
       const form = h('form', { class: 'step card form', novalidate: '', onsubmit: event => {
         event.preventDefault();
@@ -150,8 +151,9 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
         for (const f of fields) values[f.key] = form.elements[`f-${f.key}`].value;
         m.actions.fieldsSubmit(values, form.elements.website ? form.elements.website.value : '');
       } },
-      heading('بياناتك'),
+      heading(guest ? 'شارك من غير كود' : 'بياناتك'),
       h('p', { class: 'muted' }, 'علشان نعرف مين اللي جاوب. الحاجات اللي عليها «مطلوب» لازم تتكتب.'),
+      guest ? h('p', { class: 'note', 'data-guest-note': '' }, 'المشاركة بدون كود مفيهاش نقاط.') : null,
       errorBox(m.state.error && !m.state.field ? m.state.error : ''),
       fields.map(f => fieldControl(f, (m.fieldValues || {})[f.key] || '', errors[f.key] || (m.state.field === f.key ? m.state.error : ''))),
       // honeypot (people never see it; bots fill it)
@@ -187,7 +189,13 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
       h('div', { class: 'actions' },
         btn(m.busy ? 'بنتأكد…' : 'تأكيد', null, { kind: 'primary', type: 'submit', disabled: m.busy || null }),
         m.hideCodeBack ? null : btn('رجوع', m.actions.back)
-      ));
+      ),
+      // §19.2: a coded competition that takes guests too
+      m.def && m.def.allowGuests && m.actions.guest
+        ? h('div', { class: 'guest-offer' },
+          h('p', { class: 'muted' }, 'معندكش كود؟ تقدر تشارك عادي، بس من غير نقاط.'),
+          btn('شارك من غير كود', m.actions.guest, { 'data-guest': '', disabled: m.busy || null }))
+        : null);
       return form;
     },
 
@@ -195,6 +203,8 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
       heading('الكود مسجل باسم'),
       h('p', { class: 'who' }, h('strong', { class: 'who__name' }, m.state.participant ? m.state.participant.name : ''),
         m.state.participant && m.state.participant.group ? h('span', { class: 'who__group' }, m.state.participant.group) : null),
+      // §19.3: outside the age range — said kindly, then they continue with their code
+      m.state.participant && m.state.participant.notice ? h('p', { class: 'note note--age', role: 'status', 'data-age-notice': '' }, m.state.participant.notice) : null,
       h('p', { class: 'muted' }, 'ده إنت؟ لو مش إنت، ارجع وراجع الكود.'),
       h('div', { class: 'actions' },
         btn('أيوه، ده أنا', m.actions.confirm, { kind: 'primary' }),
@@ -450,7 +460,7 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
       return h('div', { class: 'step step--center card', 'aria-busy': 'true' }, heading('إجاباتك وصلت ✓'), h('p', { class: 'muted' }, 'بنجيب نتيجتك…'));
     }
 
-    const summary = resultSummary(m.result, m.def);
+    const summary = resultSummary(m.result, m.def, { noPoints: !!m.noPoints });
 
     return h('div', { class: 'step result' },
       h('section', { class: 'card result__card', 'aria-labelledby': 'result-t' },

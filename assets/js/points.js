@@ -4,8 +4,9 @@
  *
  * The store's state is computed here from Cairo time, the same rule as the
  * server's shopState_ (§18.3; the server enforces, this only informs):
- *   mode open   → open        mode closed → closed
- *   mode auto   → before opensAt: scheduled; from closesAt on: closed; else open
+ *   mode open → open      mode closed → closed      mode preview → preview (§19.1)
+ *   mode auto → before opensAt: preview (shop.preview) or scheduled;
+ *               from closesAt on: closed; else open
  * Loaded by render.js only when content.json has `points` (no request otherwise).
  */
 
@@ -15,13 +16,14 @@ import { DAY_NAMES, formatTime, formatDate, untilText, leftText } from './words.
 const SEASON_WARN_MINUTES = 7 * 1440;
 
 
-/** the store's state now: 'open' | 'scheduled' | 'closed' | '' (no store) */
+/** the store's state now: 'open' | 'preview' | 'scheduled' | 'closed' | '' (no store) */
 export function shopState(shop, nowStamp) {
 
   if (!shop || shop.on !== true) return '';
   if (shop.mode === 'open') return 'open';
   if (shop.mode === 'closed') return 'closed';
-  if (shop.opensAt && nowStamp < shop.opensAt) return 'scheduled';
+  if (shop.mode === 'preview') return 'preview';
+  if (shop.opensAt && nowStamp < shop.opensAt) return shop.preview === true ? 'preview' : 'scheduled';
   if (shop.closesAt && nowStamp >= shop.closesAt) return 'closed';
 
   return 'open';
@@ -64,7 +66,7 @@ export function seasonLine(season, nowStamp) {
 
 /**
  * What the widget says now:
- * { state: 'open'|'scheduled'|'closed'|'', title, headline, detail, season, key }
+ * { state: 'open'|'preview'|'scheduled'|'closed'|'', title, headline, detail, season, key }
  * key changes whenever the wording changes (the page repaints on its tick).
  */
 export function pointsWidgetState(points, nowStamp) {
@@ -81,6 +83,12 @@ export function pointsWidgetState(points, nowStamp) {
     headline = closing ? `المتجر مفتوح لحد ${whenText(closing, nowStamp)}` : 'المتجر مفتوح دلوقتي';
     const left = closing ? realMinutesBetween(nowStamp, closing) : null;
     detail = left !== null && left < 1440 ? `بيقفل ${untilText(left)} — اطلب جايزتك بنقاطك` : 'اطلب جايزتك بنقاطك';
+  }
+  else if (state === 'preview') {
+    // the prizes are on show; ordering opens later (a date only while it is ahead)
+    const opening = shop.opensAt && nowStamp < shop.opensAt ? shop.opensAt : '';
+    headline = `المتجر مفتوح للعرض — الطلب هيفتح ${opening ? whenText(opening, nowStamp) : 'قريب'}`;
+    detail = opening ? leftText(realMinutesBetween(nowStamp, opening) ?? 1) : 'اتفرج على الجوايز وجهّز نقاطك';
   }
   else if (state === 'scheduled') {
     headline = `المتجر بيفتح ${whenText(shop.opensAt, nowStamp)}`;

@@ -390,7 +390,9 @@ export function cleanPoints(raw) {
   const s = raw.shop && typeof raw.shop === 'object' ? raw.shop : null;
   const shop = s ? {
     on: s.on === true,
-    mode: ['auto', 'open', 'closed'].includes(s.mode) ? s.mode : 'auto',
+    mode: ['auto', 'open', 'preview', 'closed'].includes(s.mode) ? s.mode : 'auto',
+    // §19.1 auto only: before opensAt the prizes are on show (preview)
+    preview: s.preview === true,
     opensAt: dateTime(s.opensAt),
     closesAt: dateTime(s.closesAt)
   } : null;

@@ -23,7 +23,7 @@ test('content.json points: sanitized; url must be points/; no points → null', 
   const c = sanitizeContent({ ...seed, points: { url: 'points/', shop: { on: true, mode: 'auto', opensAt: '2026-10-17T19:00', closesAt: '2026-10-22 20:00', extra: 1 }, season: { name: ' الموسم الأول ', startAt: '2026-09-01T00:00', endAt: 'soon' } } });
   assert.deepEqual(c.points, {
     url: 'points/',
-    shop: { on: true, mode: 'auto', opensAt: '2026-10-17T19:00', closesAt: '' },
+    shop: { on: true, mode: 'auto', preview: false, opensAt: '2026-10-17T19:00', closesAt: '' },
     season: { name: 'الموسم الأول', startAt: '2026-09-01T00:00', endAt: '' }
   });
   for (const url of ['https://evil.example/', '/points/', 'points', 'javascript:alert(1)', '../points/', undefined]) {
@@ -32,7 +32,7 @@ test('content.json points: sanitized; url must be points/; no points → null', 
   assert.equal(cleanPoints(null), null);
   assert.equal(cleanPoints('points/'), null);
   assert.deepEqual(cleanPoints({ url: 'points/', shop: { on: 'yes', mode: 'sometimes' }, season: { name: '' } }), {
-    url: 'points/', shop: { on: false, mode: 'auto', opensAt: '', closesAt: '' }, season: null
+    url: 'points/', shop: { on: false, mode: 'auto', preview: false, opensAt: '', closesAt: '' }, season: null
   });
   assert.deepEqual(cleanPoints({ url: 'points/', shop: null, season: null }), { url: 'points/', shop: null, season: null });
 });
@@ -140,4 +140,27 @@ test('countdown words (shared with the portal)', () => {
   assert.equal(leftText(19 * 60 + 37), 'فاضل ١٩ ساعة');
   assert.equal(leftText(45), 'فاضل ٤٥ دقيقة');
   assert.equal(leftText(0), 'فاضل دقيقة');
+});
+
+
+test('§19.1 preview: manual mode, and auto with preview before opensAt', () => {
+  assert.deepEqual(cleanPoints({ url: 'points/', shop: { on: true, mode: 'preview', preview: true } }).shop, { on: true, mode: 'preview', preview: true, opensAt: '', closesAt: '' });
+  const auto = { ...SHOP, preview: true };
+  assert.equal(P.shopState(auto, '2026-10-13T12:00'), 'preview');
+  assert.equal(P.shopState(auto, '2026-10-17T18:59'), 'preview');
+  assert.equal(P.shopState(auto, '2026-10-17T19:00'), 'open', 'ordering opens at opensAt');
+  assert.equal(P.shopState(auto, '2026-10-22T20:00'), 'closed');
+  assert.equal(P.shopState({ ...auto, opensAt: '' }, '2026-10-13T12:00'), 'open', 'no opening date: nothing to wait for');
+  assert.equal(P.shopState({ ...SHOP, preview: false }, '2026-10-13T12:00'), 'scheduled');
+  // manual preview ignores the dates
+  assert.equal(P.shopState({ ...SHOP, mode: 'preview' }, '2026-10-19T12:00'), 'preview');
+  assert.equal(P.shopState({ ...SHOP, mode: 'preview' }, '2026-12-01T12:00'), 'preview');
+
+  let s = P.pointsWidgetState(points(auto), '2026-10-13T12:00');
+  assert.deepEqual([s.state, s.headline, s.detail], ['preview', 'المتجر مفتوح للعرض — الطلب هيفتح السبت الساعة ٧ بالليل', 'فاضل ٤ أيام']);
+  s = P.pointsWidgetState(points({ ...SHOP, mode: 'preview', opensAt: '' }), '2026-10-13T12:00');
+  assert.deepEqual([s.state, s.headline, s.detail], ['preview', 'المتجر مفتوح للعرض — الطلب هيفتح قريب', 'اتفرج على الجوايز وجهّز نقاطك']);
+  // a manual preview whose date passed: «قريب», not a date in the past
+  s = P.pointsWidgetState(points({ ...SHOP, mode: 'preview' }), '2026-10-19T12:00');
+  assert.equal(s.headline, 'المتجر مفتوح للعرض — الطلب هيفتح قريب');
 });

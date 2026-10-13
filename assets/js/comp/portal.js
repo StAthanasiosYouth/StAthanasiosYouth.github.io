@@ -17,7 +17,7 @@ import { h } from '../dom.js';
 import { COMP_CONFIG } from './config.js';
 import { createApi } from './api.js';
 import { createView } from './view.js';
-import { normalizeCode, formatCode, sanitizeResult, resultSummary, countPoints } from './flow.js';
+import { normalizeCode, formatCode, sanitizeResult, resultSummary, countPoints, eligibility } from './flow.js';
 import {
   sanitizeMe, formatAmount, dateText, historyLines, groupShop, itemAvailability, redeemPreview,
   sanitizeRedeem, redeemError, KEEP_KEY, KIND_LABELS, REDEMPTION_LABELS, HISTORY_LABELS,
@@ -141,7 +141,8 @@ async function codeSubmit(raw) {
   if (reply.ok && reply.participant && typeof reply.ptoken === 'string') {
     S.ptoken = reply.ptoken;
     S.codeValue = '';
-    S.participant = { name: String(reply.participant.name || '').slice(0, 80), group: String(reply.participant.group || '').slice(0, 60) };
+    // §19.3: the age notice shows on the «الكود مسجل باسم …» step; they continue normally
+    S.participant = { name: String(reply.participant.name || '').slice(0, 80), group: String(reply.participant.group || '').slice(0, 60), ...eligibility(reply) };
     S.screen = 'confirm';
     render();
     return;
@@ -285,6 +286,13 @@ async function confirmOrder() {
       S.ordering = null;
       showAlert(redeemError(reply));
       loadMe({ quiet: true });
+      return;
+    }
+    if (reply.code === 'not_eligible' && S.me) {
+      // §19.3: outside the age range — no orders; the server's words
+      S.me = { ...S.me, eligible: false, notice: redeemError(reply) };
+      S.ordering = null;
+      showAlert(redeemError(reply));
       return;
     }
     S.orderError = redeemError(reply);
@@ -466,21 +474,27 @@ function storeBanner(store) {
   );
 }
 
+/*
+ * open: order; preview (§19.1): the prizes on show, the order button off
+ * with its reason; scheduled and closed: no prizes, only the sentence
+ * (the requests below stay); outside the age range (§19.3): no orders.
+ */
 function shopSection(me) {
   if (!me.features.shop) return null;
   const store = me.store || { state: 'open' };
   const banner = storeBanner(store);
-  // closed: the prizes are hidden (the requests below stay)
-  if (store.state === 'closed') return section('p-shop', 'الجوايز', banner);
+  if (store.state === 'closed' || store.state === 'scheduled') return section('p-shop', 'الجوايز', banner);
   if (!me.shop.length) return section('p-shop', 'الجوايز', banner, h('p', { class: 'muted' }, 'مفيش جوايز دلوقتي، استنى الجديد.'));
-  const readOnly = store.state !== 'open';
+  const preview = store.state === 'preview';
+  const ineligible = me.eligible === false;
+  const readOnly = preview || ineligible;
   const groups = groupShop(me.shop);
   return section('p-shop', 'الجوايز', banner, groups.map(group => h('div', { class: 'shop__group' },
     group.category && groups.length > 1 ? h('h3', { class: 'shop__cat' }, group.category) : null,
     h('ul', { class: 'shop' }, group.items.map(item => {
-      const state = readOnly
-        ? { canOrder: false, reason: 'scheduled', label: 'استنى فتح المتجر', notes: itemAvailability(item, me.balance).notes }
-        : itemAvailability(item, me.balance);
+      const state = preview ? { canOrder: false, reason: 'preview', label: 'الطلب لسه مفتحش', notes: itemAvailability(item, me.balance).notes }
+        : ineligible ? { canOrder: false, reason: 'not_eligible', label: 'الطلب مش متاح ليك', notes: [] }
+          : itemAvailability(item, me.balance);
       return h('li', { class: `shop__item${state.canOrder ? '' : ' is-off'}${readOnly ? ' is-soon' : ''}`, 'data-item': item.id },
         item.image ? h('figure', { class: 'shop__media' }, picture(item.image, { sizes: '(min-width: 760px) 320px, 92vw' })) : h('div', { class: 'shop__media shop__media--art', 'aria-hidden': 'true' }, icon('trophy', 'shop__icon')),
         h('div', { class: 'shop__body' },
@@ -490,7 +504,10 @@ function shopSection(me) {
           state.notes.length ? h('p', { class: 'shop__note' }, state.notes.join(' · ')) : null,
           state.canOrder
             ? btn('اطلب', () => openOrder(item), { kind: 'primary', 'data-order': '', 'aria-label': `اطلب ${item.name}` })
-            : h('p', { class: 'shop__off', 'data-off': state.reason }, state.label)
+            : state.reason === 'preview'
+              // the order button is there, off, and says why
+              ? btn(state.label, null, { kind: 'primary', disabled: true, 'data-off': 'preview', 'aria-label': `${state.label}: ${item.name}` })
+              : h('p', { class: 'shop__off', 'data-off': state.reason }, state.label)
         )
       );
     }))
@@ -591,6 +608,8 @@ const screens = {
       ),
       S.notice ? h('p', { class: 'portal__notice', role: 'status', tabindex: '-1' }, S.notice) : null,
       S.alert ? h('p', { class: 'portal__alert', role: 'alert', tabindex: '-1' }, S.alert) : null,
+      // §19.3: kindly, not as an error
+      me.eligible === false && me.notice && me.notice !== S.alert ? h('p', { class: 'note note--age', 'data-age-notice': '' }, me.notice) : null,
       me.features.wallet ? seasonSection(me) : null,
       shopSection(me),
       redemptionsSection(me),

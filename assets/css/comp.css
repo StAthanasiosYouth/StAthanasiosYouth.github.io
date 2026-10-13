@@ -1738,3 +1738,19 @@ dialog.order[open] {
   margin-top: 4px;
   transform: rotate(-135deg);
 }
+
+/* ---------- §19.2 guests, §19.3 the age notice ---------- */
+
+.guest-offer {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--gold-line);
+}
+
+.note--age {
+  font-weight: 700;
+  line-height: 1.7;
+  color: var(--text);
+}

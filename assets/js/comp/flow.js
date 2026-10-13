@@ -244,6 +244,8 @@ export function sanitizeDefinition(raw, { withQuestions = false } = {}) {
     resultsAt: cleanStamp(raw.resultsAt),
     answersAt: cleanStamp(raw.answersAt),
     participation: raw.participation === 'registered' ? 'registered' : 'open',
+    // §19.2: a coded competition that also takes guests (the identity form, no points)
+    allowGuests: raw.participation === 'registered' && raw.allowGuests === true,
     scoring: flag(raw.scoring),
     resultShow: ['none', 'score', 'points', 'both'].includes(raw.resultShow) ? raw.resultShow : 'none',
     answersShow: ['never', 'immediately', 'afterClose', 'atDate'].includes(raw.answersShow) ? raw.answersShow : 'never',
@@ -332,6 +334,10 @@ export function sanitizeResult(raw) {
     if (cleanStamp(raw[key])) result[key] = cleanStamp(raw[key]);
   }
 
+  // §19.2 a guest's attempt / §19.3 a participant outside the age range: no points
+  if (raw.guest === true) result.guest = true;
+  if (raw.noPoints === true) result.noPoints = true;
+
   if (Array.isArray(raw.review)) {
     result.review = raw.review.slice(0, 300).map(item => {
       if (!item || typeof item !== 'object') return null;
@@ -386,8 +392,8 @@ export function compPhase(def, nowStamp) {
    PARTICIPANT FORM (open mode, §3.3) AND CODE (registered, §7)
 ========================================================= */
 
-export function visibleFields(def) {
-  return def && def.participation === 'open' ? (def.fields || []).filter(f => f.mode !== 'hidden') : [];
+export function visibleFields(def, { guest = false } = {}) {
+  return def && (def.participation === 'open' || (guest && def.allowGuests)) ? (def.fields || []).filter(f => f.mode !== 'hidden') : [];
 }
 
 /** Egyptian mobile (01xxxxxxxxx, +20 / 0020 prefixes) or an international +number. */
@@ -616,12 +622,17 @@ export function transition(state, event, ctx = {}) {
       return state.name === 'intro' ? beginStep(ctx.def) : state;
 
     case 'back':
+      // a guest's form goes back to the code screen it came from
+      if (state.name === 'identity' && state.guest) return { name: 'code' };
       if (state.name === 'identity' || state.name === 'code') return { name: 'intro' };
       if (state.name === 'confirm') return { name: 'code' };
       return state;
 
+    case 'guest':
+      return state.name === 'code' && ctx.def && ctx.def.allowGuests ? { name: 'identity', guest: true } : state;
+
     case 'fields-ok':
-      return state.name === 'identity' ? { name: 'starting', from: 'identity' } : state;
+      return state.name === 'identity' ? { name: 'starting', from: 'identity', ...(state.guest && { guest: true }) } : state;
 
     case 'code-ok':
       return state.name === 'code' ? { name: 'confirm', participant: event.participant } : state;
@@ -638,9 +649,10 @@ export function transition(state, event, ctx = {}) {
       if (code === 'not_open') return { name: 'scheduled', error: event.message };
       if (code === 'session') return { name: 'code', error: event.message };
       if (code === 'not_found' || code === 'disabled') return { name: 'unavailable', error: event.message };
-      if (code === 'invalid' && state.from === 'identity') return { name: 'identity', error: event.message, field: event.field };
+      const guest = state.guest ? { guest: true } : {};
+      if (code === 'invalid' && state.from === 'identity') return { name: 'identity', error: event.message, field: event.field, ...guest };
       const back = state.from === 'identity' ? 'identity' : state.from === 'confirm' ? 'code' : 'intro';
-      return { name: back, error: event.message };
+      return { name: back, error: event.message, ...(back === 'identity' ? guest : {}) };
     }
 
     case 'next':
@@ -755,11 +767,32 @@ export function answerText(item, value) {
 
 }
 
+/** §19.3 compCode / portalMe: { eligible, notice } — eligible unless the server says false */
+export const AGE_NOTICE = 'نأسف، سنك حاليًا خارج الفئة العمرية المخصصة لنظام نقاط الاجتماع. تقدر تشارك في المسابقة بدون نقاط.';
+
+export function eligibility(reply) {
+  if (!reply || reply.eligible !== false) return { eligible: true, notice: '' };
+  return { eligible: false, notice: text(reply.notice, 300) || AGE_NOTICE };
+}
+
+/** «جبت ٨ من ١٠» — the final score, nothing per question */
+export const scoreText = (score, maxScore) => `جبت ${ar(score)} من ${ar(maxScore)}`;
+
+/** «جمعت ٧٠٠ نقطة» */
+export const pointsText = n => `جمعت ${countPoints(n)}`;
+
+export const GUEST_RESULT = 'دي نتيجتك — المشاركة بدون كود مفيهاش نقاط';
+
 /**
  * What the result screen says, decided from what the server returned
  * (never more): { headline, lines: [{ kind, text }], review: [] | null }.
+ * Only the simple final result: «مبروك!» + «جبت ٨ من ١٠» and / or
+ * «جمعت ٧٠٠ نقطة» (whatever the server's resultShow sent), or «فيه إجابات
+ * بتتراجع». Answers, marks and explanations only inside result.review
+ * (the server sends it only when the admin opened the answers).
+ * opts.noPoints: this attempt earns no points (a participant outside the age range).
  */
-export function resultSummary(result, def = {}) {
+export function resultSummary(result, def = {}, { noPoints = false } = {}) {
 
   const r = result || { status: 'submitted' };
   const lines = [];
@@ -768,23 +801,21 @@ export function resultSummary(result, def = {}) {
     return { headline: 'المشاركة دي اتلغت', lines: [{ kind: 'hint', text: 'لو عندك سؤال كلّم الخدام.' }], review: null };
   }
 
-  const headline = def.successText || 'إجاباتك وصلت ✓ شكرًا لمشاركتك';
+  const scored = num(r.score) !== null && num(r.maxScore) !== null;
+  const points = !r.guest && !r.noPoints && !noPoints && num(r.pointsAwarded) !== null && r.pointsAwarded > 0;
+  const headline = def.successText || (scored || points ? 'مبروك!' : 'إجاباتك وصلت ✓ شكرًا لمشاركتك');
 
-  if (num(r.score) !== null && num(r.maxScore) !== null) {
-    lines.push({ kind: 'score', text: `درجتك ${ar(r.score)}/${ar(r.maxScore)}` });
-  }
+  if (r.guest) lines.push({ kind: 'guest', text: GUEST_RESULT });
 
-  if (num(r.correctCount) !== null && num(r.gradableCount) !== null && r.gradableCount > 0) {
-    lines.push({ kind: 'correct', text: `جاوبت صح على ${ar(r.correctCount)} من ${countQuestions(r.gradableCount)}` });
-  }
+  if (scored) lines.push({ kind: 'score', text: scoreText(r.score, r.maxScore) });
 
-  if (num(r.pointsAwarded) !== null) {
-    lines.push({ kind: 'points', text: `حصلت على ${countPoints(r.pointsAwarded)}` });
-  }
+  if (points) lines.push({ kind: 'points', text: pointsText(r.pointsAwarded) });
 
   if ((num(r.pending) || 0) > 0 || r.status === 'pending_review') {
     lines.push({ kind: 'pending', text: 'فيه إجابات بتتراجع، والنتيجة النهائية هتظهر بعد المراجعة.' });
   }
+
+  if (!r.guest && (r.noPoints || noPoints)) lines.push({ kind: 'hint', text: 'المشاركة دي متسجلة بالكود بتاعك من غير نقاط.' });
 
   if (r.resultsAt && num(r.score) === null && num(r.pointsAwarded) === null) {
     lines.push({ kind: 'hint', text: `النتيجة هتظهر ${formatStamp(r.resultsAt)}` });

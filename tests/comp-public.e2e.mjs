@@ -58,7 +58,9 @@ function definitions() {
     'quiz-soon': { ...BASE_DEF, slug: 'quiz-soon', id: 'cmp-soon0001', startAt: addMinutes(t, 3 * 1440 + 120), endAt: addMinutes(t, 5 * 1440), theme: 'rose' },
     'quiz-reg': { ...BASE_DEF, slug: 'quiz-reg', id: 'cmp-reg00001', participation: 'registered', resultShow: 'points', wallet: '1', answersShow: 'never', theme: 'gold' },
     'quiz-timed': { ...BASE_DEF, slug: 'quiz-timed', id: 'cmp-timed001', timeLimit: 1, answersShow: 'never' },
-    'quiz-gone': { schema: 1, slug: 'quiz-gone', withdrawn: true }
+    'quiz-gone': { schema: 1, slug: 'quiz-gone', withdrawn: true },
+    // §19.2: a coded competition that takes guests too (scores + points)
+    'quiz-guests': { ...BASE_DEF, slug: 'quiz-guests', id: 'cmp-guest001', participation: 'registered', allowGuests: true, resultShow: 'both', wallet: '1', answersShow: 'never', theme: 'azure' }
   };
 }
 
@@ -154,6 +156,8 @@ test.after(async () => {
    MOCK API (the contract's public actions, with fixture data)
 ========================================================= */
 
+const AGE_NOTICE = 'نأسف، سنك حاليًا خارج الفئة العمرية المخصصة لنظام نقاط الاجتماع. تقدر تشارك في المسابقة بدون نقاط.';
+
 const digits = s => String(s).replace(/[\u0660-\u0669]/g, d => String(d.charCodeAt(0) - 0x660));
 
 function createMock({ busyOnce = false, timedMs = 6000 } = {}) {
@@ -201,7 +205,10 @@ function createMock({ busyOnce = false, timedMs = 6000 } = {}) {
     mock.calls.push({ fn, arg });
 
     if (fn === 'compCode') {
-      return digits(arg.code).toUpperCase().replace(/[^0-9A-Z]/g, '').replace(/^ATH/, '') === '2345678A'
+      const code = digits(arg.code).toUpperCase().replace(/[^0-9A-Z]/g, '').replace(/^ATH/, '');
+      // §19.3: a participant outside the age range still logs in (with a notice)
+      if (code === '3456789B') return { ok: true, participant: { name: 'بيشوي سمير', group: 'خريجين' }, ptoken: 'pt1.old.sig', eligible: false, notice: AGE_NOTICE };
+      return code === '2345678A'
         ? { ok: true, participant: { name: 'مينا عادل', group: 'ثانوي' }, ptoken: 'pt1.good.sig' }
         : { ok: false, code: 'code', message: 'الكود ده مش صح، راجع الحروف والأرقام.' };
     }
@@ -210,10 +217,12 @@ function createMock({ busyOnce = false, timedMs = 6000 } = {}) {
       const def = defs[arg.slug];
       if (!def || def.withdrawn) return { ok: false, code: 'not_found', message: 'المسابقة مش موجودة' };
       if (def.endAt && now() > def.endAt) return { ok: false, code: 'closed', message: 'المسابقة خلصت' };
-      if (def.participation === 'registered' && arg.ptoken !== 'pt1.good.sig') return { ok: false, code: 'session', message: 'سجّل بالكود تاني' };
+      const guest = def.participation === 'registered' && !arg.ptoken && def.allowGuests === true;
+      if (def.participation === 'registered' && !guest && !['pt1.good.sig', 'pt1.old.sig'].includes(arg.ptoken)) return { ok: false, code: 'session', message: 'سجّل بالكود تاني' };
+      if (guest && !(arg.fields && arg.fields.name && arg.fields.phone)) return { ok: false, code: 'invalid', field: 'name', message: 'اكتب اسمك' };
       if (arg.hp) return { ok: false, code: 'bad', message: 'x' };
       const existing = mock.attempts.get(arg.clientKey);
-      const attempt = existing || { token: `at1.${++seq}.sig`, id: `s-${seq}`, startedAt: now(), deadlineMs: def.timeLimit ? Date.now() + timedMs : 0, slug: arg.slug };
+      const attempt = existing || { token: `at1.${++seq}.sig`, id: `s-${seq}`, startedAt: now(), deadlineMs: def.timeLimit ? Date.now() + timedMs : 0, slug: arg.slug, guest, noPoints: arg.ptoken === 'pt1.old.sig' };
       mock.attempts.set(arg.clientKey, attempt);
       return {
         ok: true,
@@ -232,6 +241,9 @@ function createMock({ busyOnce = false, timedMs = 6000 } = {}) {
       if (!attempt) return { ok: false, code: 'expired', message: 'انتهت' };
       if (!mock.results.has(attempt.token)) {
         const result = grade(defs[attempt.slug], arg.answers || {});
+        // a guest or an ineligible participant: never points (the server's rule)
+        if (attempt.guest || attempt.noPoints) delete result.pointsAwarded;
+        if (attempt.guest) result.guest = true;
         mock.results.set(attempt.token, { receipt: `rc1.${attempt.id}.sig`, result });
       }
       return { ok: true, ...mock.results.get(attempt.token) };
@@ -446,8 +458,8 @@ test('open competition, phone: intro → form → all 7 types → reload restore
   await waitState(page, 'result');
   await page.waitForSelector('.result__line--score');
   assert.equal(await textOf(page, '.result__title'), 'إجاباتك وصلت ✓ ربنا يباركك');
-  assert.equal(await textOf(page, '.result__line--score'), 'درجتك ٥٠/٥٠');
-  assert.match(await textOf(page, '.result__line--correct'), /جاوبت صح على ٥ من ٦ أسئلة/);
+  assert.equal(await textOf(page, '.result__line--score'), 'جبت ٥٠ من ٥٠');
+  assert.equal(await page.$('.result__line--correct'), null, 'only the final score, no count of right answers');
   assert.equal(await page.$('.result__line--pending'), null);
   assert.equal(await page.$$eval('.answer', els => els.length), 6, 'the review list (answersShow immediately)');
   assert.equal(await page.$$eval('.answer--ok', els => els.length), 5);
@@ -534,7 +546,7 @@ test('accessibility (axe) and layout on every screen, phone and desktop', async 
   await page.click('[data-submit]');
   await page.click('[data-confirm]');
   await page.waitForSelector('.result__line--score');
-  assert.equal(await textOf(page, '.result__line--score'), 'درجتك ٠/٥٠');
+  assert.equal(await textOf(page, '.result__line--score'), 'جبت ٠ من ٥٠');
   assert.match(await textOf(page, '.result__line--pending'), /فيه إجابات بتتراجع/);
   assert.equal(await page.$$eval('.answer--no', els => els.length) >= 4, true);
   await axe(page, 'desktop result');
@@ -573,7 +585,7 @@ test('single-page layout; the result without a review list when the server sends
   await page.click('[data-confirm]');
   await waitState(page, 'result');
   await page.waitForSelector('.result__line--score');
-  assert.equal(await textOf(page, '.result__line--score'), 'درجتك ٤٠/٥٠');
+  assert.equal(await textOf(page, '.result__line--score'), 'جبت ٤٠ من ٥٠');
   assert.equal(await page.$('.answers'), null, 'no review list (answersShow never)');
   assert.equal(mock.fns('compSubmit').length, 1);
   assert.deepEqual(problems, []);
@@ -751,7 +763,7 @@ test('registered competition: code → «الكود مسجل باسم …» → 
   await page.click('[data-submit]');
   await page.click('[data-confirm]');
   await page.waitForSelector('.result__line--points');
-  assert.equal(await textOf(page, '.result__line--points'), 'حصلت على ٥٠٠ نقطة');
+  assert.equal(await textOf(page, '.result__line--points'), 'جمعت ٥٠٠ نقطة');
   assert.equal(await page.$('.result__line--score'), null, 'points only (resultShow points)');
   assert.deepEqual(problems, []);
   await context.close();
@@ -858,7 +870,7 @@ test('admin preview: definition by postMessage, no network, no storage, result f
   await frame.click('[data-submit]');
   await frame.click('[data-confirm]');
   await frame.waitForSelector('.result__line--score');
-  assert.equal(await frame.$eval('.result__line--score', e => e.textContent), 'درجتك ٧/١٠');
+  assert.equal(await frame.$eval('.result__line--score', e => e.textContent), 'جبت ٧ من ١٠');
   const sent = await page.evaluate(() => window.lastSubmit);
   assert.deepEqual(sent.answers, { 'q-single01': 'c-aaaa02', 'q-multi002': ['c-bbbb01'], 'q-tf000003': 't' });
   assert.match(sent.id, /^[0-9a-f-]{36}$/);
@@ -893,6 +905,107 @@ test('the narrowest phones (280px): nothing wider than the screen', async () => 
   await waitState(page, 'review');
   assert.ok(await overflow(page) <= 0, 'review');
   assert.deepEqual(problems, []);
+  await context.close();
+
+});
+
+
+
+/* =========================================================
+   §19.2 GUESTS, §19.3 AGE NOTICE
+========================================================= */
+
+/** paged flow from the first question: every required answer, then send */
+async function answerAllAndSend(page) {
+  await waitState(page, 'question');
+  await clickText(page, 'label.choice', 'ترشيش');
+  await next(page);
+  await clickText(page, 'label.choice', 'النوتية');
+  await clickText(page, 'label.choice', 'رئيس النوتية');
+  await next(page);
+  await clickText(page, 'label.choice', 'صح');
+  await next(page);
+  await next(page);
+  await page.type('#a-q-short005', 'اليقطينة');
+  await next(page);
+  await page.type('#a-q-number06', '40');
+  await next(page);
+  await next(page);
+  await page.click('[data-submit]');
+  await page.click('[data-confirm]');
+  await waitState(page, 'result');
+}
+
+test('guests (allowGuests): «شارك من غير كود» → the form → compStart without a code → «دي نتيجتك…», no points', async () => {
+
+  const { context, page, problems, mock } = await open('/competition/quiz-guests/', { bypassCSP: true });
+  await waitState(page, 'intro');
+  await page.click('[data-cta]');
+  await waitState(page, 'code');
+  assert.match(await textOf(page, '.guest-offer'), /معندكش كود؟/);
+  await axe(page, 'code + guest offer');
+
+  // the form, and back to the code screen
+  await page.click('[data-guest]');
+  await waitState(page, 'identity');
+  assert.equal(await textOf(page, '#comp-main h1'), 'شارك من غير كود');
+  assert.equal(await textOf(page, '[data-guest-note]'), 'المشاركة بدون كود مفيهاش نقاط.');
+  assert.deepEqual(await page.$$eval('#comp-main input:not([name="website"]), #comp-main select', els => els.map(e => e.id)), ['f-name', 'f-phone', 'f-church']);
+  await axe(page, 'guest form');
+  await clickText(page, 'button', 'رجوع');
+  await waitState(page, 'code');
+  await page.click('[data-guest]');
+  await waitState(page, 'identity');
+
+  // a required field missing: stays on the form, nothing sent
+  await page.click('button[type="submit"]');
+  await page.waitForSelector('[aria-invalid="true"]');
+  assert.equal(mock.fns('compStart').length, 0);
+  await fillIdentity(page);
+  await answerAllAndSend(page);
+
+  const start = mock.fns('compStart')[0].arg;
+  assert.equal(start.ptoken, undefined, 'no code');
+  assert.deepEqual(start.fields, { name: 'مارك ميلاد', phone: '01012345678', church: 'أبي سيفين' });
+  assert.deepEqual(await page.$$eval('.result__line', els => els.map(e => [e.dataset.kind, e.textContent])), [
+    ['guest', 'دي نتيجتك — المشاركة بدون كود مفيهاش نقاط'],
+    ['score', 'جبت ٥٠ من ٥٠']
+  ]);
+  assert.equal(await page.$('.result__line--points'), null);
+  assert.equal(await page.$('.answers, .answer'), null, 'no answers / marks without result.review');
+  assert.equal(await overflow(page), 0);
+  await axe(page, 'guest result');
+  assert.deepEqual(problems.filter(p => !/Refused to apply inline style/.test(p)), []);
+  await context.close();
+
+  // without allowGuests: no offer
+  const plain = await open('/competition/quiz-reg/');
+  await plain.page.click('[data-cta]');
+  await waitState(plain.page, 'code');
+  assert.equal(await plain.page.$('[data-guest]'), null);
+  await plain.context.close();
+
+});
+
+test('a code outside the age range: the notice on «الكود مسجل باسم …», they continue, no points line', async () => {
+
+  const { context, page, problems, mock } = await open('/competition/quiz-guests/', { bypassCSP: true });
+  await page.click('[data-cta]');
+  await waitState(page, 'code');
+  await page.type('#f-code', 'ATH-3456-789B');
+  await page.click('button[type="submit"]');
+  await waitState(page, 'confirm');
+  assert.equal(await textOf(page, '.who__name'), 'بيشوي سمير');
+  assert.equal(await textOf(page, '[data-age-notice]'), AGE_NOTICE);
+  assert.equal(await page.$eval('[data-age-notice]', el => el.classList.contains('alert')), false, 'a notice, not an error');
+  await axe(page, 'confirm + age notice');
+  await clickText(page, 'button', 'أيوه، ده أنا');
+  await answerAllAndSend(page);
+  assert.equal(mock.fns('compStart')[0].arg.ptoken, 'pt1.old.sig', 'recorded under their code');
+  assert.equal(await textOf(page, '.result__line--score'), 'جبت ٥٠ من ٥٠');
+  assert.equal(await page.$('.result__line--points'), null);
+  assert.match(await page.$eval('.result__lines', el => el.textContent), /متسجلة بالكود بتاعك من غير نقاط/);
+  assert.deepEqual(problems.filter(p => !/Refused to apply inline style/.test(p)), []);
   await context.close();
 
 });

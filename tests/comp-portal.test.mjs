@@ -58,7 +58,7 @@ test('labels: ledger kinds, requests, history', () => {
   assert.equal(M.formatAmount(700), '+٧٠٠');
   assert.equal(M.formatAmount(-300), '−٣٠٠');
   const me = M.sanitizeMe(ME);
-  assert.deepEqual(M.historyLines(me.history[0]), ['درجتك ٧/١٠', 'حصلت على ٧٠٠ نقطة']);
+  assert.deepEqual(M.historyLines(me.history[0]), ['جبت ٧ من ١٠', 'جمعت ٧٠٠ نقطة']);
   assert.deepEqual(M.historyLines(me.history[1]), ['مستني مراجعة']);
   assert.equal(M.dateText('2026-10-11T09:00'), 'الأحد ١١ أكتوبر الساعة ٩ الصبح');
 });
@@ -199,4 +199,24 @@ test('cancel: preview, reply → balance and status, refusals, store closed', ()
   assert.match(M.cancelError({ code: 'not_allowed' }), /مينفعش يتلغي/);
   assert.equal(M.cancelError({ code: 'not_found' }), 'الطلب ده مش موجود');
   assert.equal(M.redeemError({ code: 'shop_closed' }), 'المتجر قفل دلوقتي — طلباتك محفوظة');
+});
+
+
+/* ---------- §19.1 preview, §19.3 eligibility ---------- */
+
+test('store preview: prizes on show, ordering later (with or without a date)', () => {
+  const store = M.sanitizeStore({ state: 'preview', opensAt: '2026-10-17T19:00', closesAt: '' });
+  assert.equal(store.state, 'preview');
+  assert.deepEqual(M.storeWords(store, '2026-10-15T19:00'), { headline: 'المتجر مفتوح للعرض — الطلب هيفتح يوم السبت ١٧ أكتوبر الساعة ٧ بالليل', countdown: 'فاضل يومين', due: false });
+  assert.deepEqual(M.storeWords({ ...store, opensAt: '' }, '2026-10-15T19:00'), { headline: 'المتجر مفتوح للعرض — الطلب هيفتح قريب', countdown: '', due: false });
+  assert.equal(M.storeWords(store, '2026-10-17T19:00').due, true);
+  assert.equal(M.storeWords(store, '2026-10-17T19:00').headline, 'المتجر مفتوح للعرض — الطلب هيفتح قريب');
+});
+
+test('portalMe eligible:false + notice; shopRedeem not_eligible uses the server message', () => {
+  const me = M.sanitizeMe({ ...ME, eligible: false, notice: 'نأسف، سنك…' });
+  assert.deepEqual([me.eligible, me.notice], [false, 'نأسف، سنك…']);
+  assert.deepEqual([M.sanitizeMe(ME).eligible, M.sanitizeMe(ME).notice], [true, '']);
+  assert.equal(M.redeemError({ code: 'not_eligible', message: 'سنك خارج الفئة' }), 'سنك خارج الفئة');
+  assert.match(M.redeemError({ code: 'not_eligible' }), /^نأسف، سنك حاليًا خارج الفئة العمرية/);
 });
