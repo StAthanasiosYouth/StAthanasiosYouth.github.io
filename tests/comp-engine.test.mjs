@@ -246,15 +246,23 @@ test('answers: answered / errors / payload in the contract shapes (§5.2)', () =
    RESULT WORDING (decided from what the server sent)
 ========================================================= */
 
-test('result: score, points, pending, hints and the review list only when sent', () => {
-  let s = F.resultSummary({ status: 'graded', score: 7, maxScore: 10, correctCount: 7, gradableCount: 10 }, { successText: '' });
-  assert.equal(s.headline, 'إجاباتك وصلت ✓ شكرًا لمشاركتك');
-  assert.deepEqual(s.lines.map(l => l.text), ['درجتك ٧/١٠', 'جاوبت صح على ٧ من ١٠ أسئلة']);
+test('result: only the simple final result; the review list only when sent', () => {
+  // the counts of right answers are never spelled out (only the score)
+  let s = F.resultSummary({ status: 'graded', score: 8, maxScore: 10, correctCount: 8, gradableCount: 10 }, { successText: '' });
+  assert.equal(s.headline, 'مبروك!');
+  assert.deepEqual(s.lines.map(l => l.text), ['جبت ٨ من ١٠']);
   assert.equal(s.review, null);
 
   s = F.resultSummary({ status: 'graded', pointsAwarded: 700 }, { successText: 'شكرًا!' });
   assert.equal(s.headline, 'شكرًا!');
-  assert.deepEqual(s.lines.map(l => l.text), ['حصلت على ٧٠٠ نقطة']);
+  assert.deepEqual(s.lines.map(l => l.text), ['جمعت ٧٠٠ نقطة']);
+
+  // both
+  s = F.resultSummary({ status: 'graded', score: 8, maxScore: 10, pointsAwarded: 800 }, {});
+  assert.deepEqual(s.lines.map(l => [l.kind, l.text]), [['score', 'جبت ٨ من ١٠'], ['points', 'جمعت ٨٠٠ نقطة']]);
+  // nothing to show: the plain thanks; zero points: no points line
+  assert.equal(F.resultSummary({ status: 'submitted' }, {}).headline, 'إجاباتك وصلت ✓ شكرًا لمشاركتك');
+  assert.deepEqual(F.resultSummary({ status: 'graded', pointsAwarded: 0 }, {}).lines, []);
 
   s = F.resultSummary({ status: 'pending_review', score: 5, maxScore: 10, pending: 2 }, {});
   assert.ok(s.lines.some(l => l.kind === 'pending' && l.text.startsWith('فيه إجابات بتتراجع')));
@@ -529,4 +537,47 @@ test('engine code: text only (no innerHTML / eval), no storage outside save.js',
     assert.doesNotMatch(code, /innerHTML|outerHTML|insertAdjacentHTML|document\.write|\beval\(|new Function/, file);
     if (file !== 'save.js') assert.doesNotMatch(code, /localStorage|sessionStorage/, file);
   }
+});
+
+
+/* ---------- §19.2 guests, §19.3 age eligibility ---------- */
+
+test('allowGuests: only on a registered competition; the guest steps', () => {
+  const reg = F.sanitizeDefinition({ title: 'x', participation: 'registered', allowGuests: true });
+  assert.equal(reg.allowGuests, true);
+  assert.equal(F.sanitizeDefinition({ title: 'x', participation: 'open', allowGuests: true }).allowGuests, false);
+  assert.equal(F.sanitizeDefinition({ title: 'x', participation: 'registered', allowGuests: 'yes' }).allowGuests, false);
+  assert.equal(F.sanitizeDefinition({ title: 'x', participation: 'registered' }).allowGuests, false);
+  // the guest form uses the competition's fields (name + phone by default)
+  assert.deepEqual(F.visibleFields(reg, { guest: true }).map(f => f.key), ['name', 'phone']);
+  assert.deepEqual(F.visibleFields(reg), [], 'a code login has no form');
+
+  const ctx = { def: reg, layout: 'paged', count: 3 };
+  const t = (state, event, c = ctx) => F.transition(state, event, c);
+  assert.deepEqual(t({ name: 'code' }, { type: 'guest' }), { name: 'identity', guest: true });
+  assert.deepEqual(t({ name: 'code' }, { type: 'guest' }, { ...ctx, def: { ...reg, allowGuests: false } }), { name: 'code' }, 'not offered');
+  assert.deepEqual(t({ name: 'identity', guest: true }, { type: 'back' }), { name: 'code' });
+  assert.deepEqual(t({ name: 'identity', guest: true }, { type: 'fields-ok' }), { name: 'starting', from: 'identity', guest: true });
+  assert.deepEqual(t({ name: 'starting', from: 'identity', guest: true }, { type: 'start-failed', code: 'invalid', message: 'م', field: 'phone' }), { name: 'identity', error: 'م', field: 'phone', guest: true });
+  assert.deepEqual(t({ name: 'starting', from: 'identity', guest: true }, { type: 'start-failed', code: 'limit', message: 'م' }), { name: 'identity', error: 'م', guest: true });
+});
+
+test('guest result: «دي نتيجتك…», never a points line; noPoints (age): no points line', () => {
+  const guest = F.sanitizeResult({ status: 'graded', score: 8, maxScore: 10, pointsAwarded: 800, guest: true });
+  assert.equal(guest.guest, true);
+  let s = F.resultSummary(guest, {});
+  assert.deepEqual(s.lines.map(l => l.text), ['دي نتيجتك — المشاركة بدون كود مفيهاش نقاط', 'جبت ٨ من ١٠']);
+  assert.equal(F.sanitizeResult({ status: 'graded', guest: 'yes' }).guest, undefined);
+
+  s = F.resultSummary({ status: 'graded', score: 8, maxScore: 10, pointsAwarded: 800 }, {}, { noPoints: true });
+  assert.deepEqual(s.lines.map(l => l.kind), ['score', 'hint']);
+  assert.equal(s.lines[1].text, 'المشاركة دي متسجلة بالكود بتاعك من غير نقاط.');
+  assert.ok(!F.resultSummary(F.sanitizeResult({ status: 'graded', pointsAwarded: 5, noPoints: true }), {}).lines.some(l => l.kind === 'points'));
+});
+
+test('eligibility from compCode / portalMe', () => {
+  assert.deepEqual(F.eligibility({ ok: true }), { eligible: true, notice: '' });
+  assert.deepEqual(F.eligibility({ eligible: true, notice: 'x' }), { eligible: true, notice: '' });
+  assert.deepEqual(F.eligibility({ eligible: false, notice: ' رسالة ' }), { eligible: false, notice: 'رسالة' });
+  assert.deepEqual(F.eligibility({ eligible: false }), { eligible: false, notice: F.AGE_NOTICE });
 });

@@ -239,3 +239,38 @@ test('axe phone + desktop; no horizontal scroll at 280 / 360 / 1280; touch targe
   }
 
 });
+
+
+test('§19.1 preview: auto with preview before opensAt, then open on the clock; manual preview «قريب»', async () => {
+
+  const state = { content: world({ points: { url: 'points/', shop: { ...SHOP, preview: true }, season: null } }), date: TUESDAY_NOON };
+  const { context, page, problems } = await open(PHONE, state);
+  await waitHeadline(page, /للعرض/);
+  assert.deepEqual(await words(page), {
+    shop: 'preview',
+    title: 'نقاطي والمتجر',
+    headline: 'المتجر مفتوح للعرض — الطلب هيفتح السبت الساعة ٧ بالليل',
+    detail: 'فاضل ٤ أيام',
+    season: ''
+  });
+
+  state.date = SATURDAY_OPEN;
+  await refresh(page);
+  await waitHeadline(page, /مفتوح لحد/);
+  assert.equal(await page.$eval('.points', el => el.dataset.shop), 'open');
+
+  // the admin switches to a manual preview (a publish), no date
+  state.content = world({ points: { url: 'points/', shop: { on: true, mode: 'preview', preview: false, opensAt: '', closesAt: '' }, season: null } });
+  await refresh(page);
+  await waitHeadline(page, /قريب/);
+  assert.deepEqual(await words(page), {
+    shop: 'preview',
+    title: 'نقاطي والمتجر',
+    headline: 'المتجر مفتوح للعرض — الطلب هيفتح قريب',
+    detail: 'اتفرج على الجوايز وجهّز نقاطك',
+    season: ''
+  });
+  assert.deepEqual(problems, []);
+  await context.close();
+
+});

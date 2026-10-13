@@ -8,7 +8,7 @@
  * §7.4, §8, §9.
  */
 
-import { cleanImage, cleanStamp, countPoints, ar } from './flow.js';
+import { cleanImage, cleanStamp, countPoints, ar, eligibility, scoreText, pointsText } from './flow.js';
 import { formatStamp, leftText } from '../words.js';
 import { realMinutesBetween } from '../schedule.js';
 
@@ -71,6 +71,8 @@ export function sanitizeMe(raw) {
   return {
     participant: { name, group: text(raw.participant.group, 60) },
     features: { wallet, shop },
+    // §19.3: outside the age range — history stays, no new points, no orders
+    ...eligibility(raw),
     store: shop ? sanitizeStore(raw.store) : null,
     season: wallet ? sanitizeSeason(raw.season) : null,
     seasons: wallet ? list(raw.seasons).slice(0, 100).map(cleanPastSeason).filter(Boolean) : [],
@@ -127,8 +129,8 @@ export const dateText = stamp => (stamp ? formatStamp(stamp) : '');
 /** what one history row says besides its title */
 export function historyLines(item) {
   const lines = [];
-  if (item.score !== null && item.maxScore !== null) lines.push(`درجتك ${ar(item.score)}/${ar(item.maxScore)}`);
-  if (item.pointsAwarded !== null && item.pointsAwarded > 0) lines.push(`حصلت على ${countPoints(item.pointsAwarded)}`);
+  if (item.score !== null && item.maxScore !== null) lines.push(scoreText(item.score, item.maxScore));
+  if (item.pointsAwarded !== null && item.pointsAwarded > 0) lines.push(pointsText(item.pointsAwarded));
   if ((item.pending || 0) > 0 || item.status === 'pending_review') lines.push('مستني مراجعة');
   return lines;
 }
@@ -181,7 +183,8 @@ export function sanitizeRedeem(raw) {
   };
 }
 
-export const redeemError = reply => REDEEM_ERRORS[reply && reply.code] || (reply && typeof reply.message === 'string' && reply.message.trim()) || 'حصلت مشكلة، جرّب تاني';
+export const redeemError = reply => REDEEM_ERRORS[reply && reply.code] || (reply && typeof reply.message === 'string' && reply.message.trim())
+  || (reply && reply.code === 'not_eligible' ? eligibility({ eligible: false }).notice : 'حصلت مشكلة، جرّب تاني');
 
 /** codes after which a retry must reuse the same requestKey (the order may have landed) */
 export const KEEP_KEY = new Set(['network', 'busy']);
@@ -191,7 +194,7 @@ export const KEEP_KEY = new Set(['network', 'busy']);
    v2: store schedule, cancel, seasons (docs/COMPETITIONS.md §18.3, §18.4)
 ========================================================= */
 
-const STORE_STATES = ['open', 'scheduled', 'closed'];
+const STORE_STATES = ['open', 'preview', 'scheduled', 'closed'];
 
 /** portalMe `shop` state → { state, opensAt, closesAt, allowCancel }; a server
     that doesn't send it yet (v1) = open, as before */
@@ -274,6 +277,16 @@ export function storeWords(store, nowStamp) {
     return {
       headline: store.opensAt ? `المتجر هيفتح يوم ${formatStamp(store.opensAt)}` : 'المتجر هيفتح قريب',
       countdown: minutes !== null && minutes > 0 ? leftText(minutes) : '',
+      due: minutes !== null && minutes <= 0
+    };
+  }
+  if (store.state === 'preview') {
+    // §19.1: the prizes on show, ordering opens later
+    const minutes = store.opensAt ? realMinutesBetween(nowStamp, store.opensAt) : null;
+    const later = minutes !== null && minutes > 0;
+    return {
+      headline: later ? `المتجر مفتوح للعرض — الطلب هيفتح يوم ${formatStamp(store.opensAt)}` : 'المتجر مفتوح للعرض — الطلب هيفتح قريب',
+      countdown: later ? leftText(minutes) : '',
       due: minutes !== null && minutes <= 0
     };
   }

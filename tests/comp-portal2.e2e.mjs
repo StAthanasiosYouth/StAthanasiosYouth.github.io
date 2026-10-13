@@ -1,7 +1,9 @@
 // «نقاطي» v2 (points/index.html + assets/js/comp/portal.js) in headless Chrome
 // against a MOCK of the public API (docs/COMPETITIONS.md §18.3, §18.4):
-// portalMe `store` (open / scheduled / closed), `season`, `seasons`,
-// redemptions[].canCancel, shopCancel, and shopRedeem `shop_closed`.
+// portalMe `store` (open / preview / scheduled / closed), `season`, `seasons`,
+// redemptions[].canCancel, shopCancel, and shopRedeem `shop_closed`;
+// §19.1 preview, §19.3 eligible:false + notice (compCode, portalMe) and
+// shopRedeem `not_eligible`.
 // Answered in the browser the way Apps Script does it (POST → 302 → echo).
 //
 // Run: cd tools && node --test ../tests/comp-portal2.e2e.mjs
@@ -36,6 +38,7 @@ const DESKTOP = { width: 1280, height: 800, deviceScaleFactor: 1 };
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'];
 const TOKEN = 'pt1.good.sig';
 const TOKEN_KEY = 'athanasios.portal.v1';
+const AGE_NOTICE = 'نأسف، سنك حاليًا خارج الفئة العمرية المخصصة لنظام نقاط الاجتماع. تقدر تشارك في المسابقة بدون نقاط.';
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.webp': 'image/webp', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
 const PRIVATE = /^\/(apps-script|tools|tests|docs|node_modules)(\/|$)|\/\.|\.md$/i;
@@ -80,10 +83,12 @@ test.after(async () => {
    MOCK API (v2)
 ========================================================= */
 
-function createMock({ state = 'open', opensAt = '', closesAt = '', allowCancel = true, season = true, seasons = true } = {}) {
+function createMock({ state = 'open', opensAt = '', closesAt = '', allowCancel = true, season = true, seasons = true, eligible = true } = {}) {
 
   const m = {
     calls: [], outside: [],
+    eligible,           // §19.3 what compCode / portalMe say
+    redeemIneligible: false,   // shopRedeem answers not_eligible (the rules changed meanwhile)
     store: { state, opensAt, closesAt, allowCancel },
     force: {},          // fn → error code (once)
     balance: 1550,
@@ -112,6 +117,8 @@ function createMock({ state = 'open', opensAt = '', closesAt = '', allowCancel =
     const { fn, args } = JSON.parse(body);
     const arg = args[0] || {};
     m.calls.push({ fn, arg });
+    const age = m.eligible ? {} : { eligible: false, notice: AGE_NOTICE };
+    if (fn === 'compCode') return { ok: true, participant: { name: 'مينا عادل', group: 'ثانوي' }, ptoken: TOKEN, ...age };
     if (arg.ptoken !== TOKEN) return { ok: false, code: 'session', message: 'سجّل دخولك تاني' };
     if (m.force[fn]) {
       const code = m.force[fn];
@@ -130,11 +137,13 @@ function createMock({ state = 'open', opensAt = '', closesAt = '', allowCancel =
         shop: m.items,
         store: m.store,
         season: m.season,
-        seasons: m.seasons
+        seasons: m.seasons,
+        ...age
       };
     }
     if (fn === 'shopRedeem') {
       if (m.store.state !== 'open') return { ok: false, code: 'shop_closed', message: 'المتجر مقفول' };
+      if (!m.eligible || m.redeemIneligible) return { ok: false, code: 'not_eligible', message: 'سنك حاليًا خارج الفئة العمرية، فمش هتقدر تطلب جوايز.' };
       const item = m.items.find(i => i.id === arg.itemId);
       m.balance -= item.cost;
       const redemption = { id: `r-${m.redemptions.length + 10}`, status: 'pending', itemName: item.name, cost: item.cost };
@@ -163,7 +172,7 @@ function createMock({ state = 'open', opensAt = '', closesAt = '', allowCancel =
    PAGES
 ========================================================= */
 
-async function open({ viewport = PHONE, mock = createMock(), bypassCSP = false } = {}) {
+async function open({ viewport = PHONE, mock = createMock(), bypassCSP = false, token = TOKEN } = {}) {
 
   const context = await browser.createBrowserContext();
   const page = await context.newPage();
@@ -174,7 +183,7 @@ async function open({ viewport = PHONE, mock = createMock(), bypassCSP = false }
   page.on('console', msg => { if (msg.type() === 'error' && /CSP|Content Security|Refused/i.test(msg.text())) problems.push(msg.text()); });
   page.on('pageerror', error => problems.push(`pageerror: ${error.message}`));
   await page.evaluateOnNewDocument(() => document.addEventListener('securitypolicyviolation', e => console.error(`CSP violation: ${e.violatedDirective} ${e.blockedURI}`)));
-  await page.evaluateOnNewDocument((k, v) => { try { if (location.protocol === 'http:' && !sessionStorage.getItem(k + ':seeded')) { sessionStorage.setItem(k, v); sessionStorage.setItem(k + ':seeded', '1'); } } catch { /* about:blank */ } }, TOKEN_KEY, TOKEN);
+  if (token) await page.evaluateOnNewDocument((k, v) => { try { if (location.protocol === 'http:' && !sessionStorage.getItem(k + ':seeded')) { sessionStorage.setItem(k, v); sessionStorage.setItem(k + ':seeded', '1'); } } catch { /* about:blank */ } }, TOKEN_KEY, token);
   if (bypassCSP) await page.setBypassCSP(true);
   await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
   await page.setViewport(viewport);
@@ -194,7 +203,7 @@ async function open({ viewport = PHONE, mock = createMock(), bypassCSP = false }
     return request.respond({ status: 204, body: '' });
   });
   await page.goto(`${BASE}/points/`, { waitUntil: 'networkidle0' });
-  await page.waitForFunction(() => document.getElementById('comp-main')?.dataset.state === 'dashboard', { timeout: 8000 });
+  await page.waitForFunction(n => document.getElementById('comp-main')?.dataset.state === n, { timeout: 8000 }, token ? 'dashboard' : 'code');
 
   return { context, page, problems, mock };
 
@@ -226,7 +235,7 @@ async function smallTargets(page) {
    TESTS
 ========================================================= */
 
-test('scheduled: prizes read-only with «المتجر هيفتح يوم …» and a countdown; «طلباتي» stays', async () => {
+test('scheduled: «المتجر هيفتح يوم …» and a countdown, the prizes hidden; «طلباتي» stays', async () => {
 
   const mock = createMock({ state: 'scheduled', opensAt: cairo(2 * 1440 + 90), closesAt: cairo(9 * 1440) });
   const { context, page, problems } = await open({ mock });
@@ -234,9 +243,8 @@ test('scheduled: prizes read-only with «المتجر هيفتح يوم …» an
   assert.equal(await page.$eval('[data-store]', el => el.dataset.store), 'scheduled');
   assert.match(await textOf(page, '.store-state__headline'), /^المتجر هيفتح يوم .+ الساعة .+/);
   assert.match(await textOf(page, '[data-countdown]'), /^فاضل يومين/);
-  assert.equal(await page.$$eval('.shop__item', els => els.length), 2, 'the prizes are shown');
+  assert.equal(await page.$('.shop__item'), null, 'the prizes are hidden until the store opens (§19.1)');
   assert.equal(await page.$('[data-order]'), null, 'nothing can be ordered yet');
-  assert.deepEqual(await page.$$eval('[data-off]', els => els.map(e => e.textContent)), ['استنى فتح المتجر', 'استنى فتح المتجر']);
   assert.ok(await page.$('[aria-labelledby="p-orders"] [data-redemption="r-3"]'), '«طلباتي» visible');
   assert.equal(await page.$('[data-cancel]'), null, 'no cancel while the store is not open');
   await page.screenshot({ path: `${SHOTS}portal2-mobile-scheduled.png`, fullPage: true });
@@ -394,8 +402,8 @@ test('season bar: name, dates, earned of the maximum with a meter; past seasons 
 test('v2 accessibility (axe) phone + desktop; no horizontal scroll at 280 / 360 / 1280; touch targets; no CSP violations', async () => {
 
   for (const [name, viewport] of Object.entries({ narrow: NARROW, phone: PHONE, desktop: DESKTOP })) {
-    for (const state of ['scheduled', 'open', 'closed']) {
-      const mock = createMock({ state, opensAt: state === 'scheduled' ? cairo(3000) : '', closesAt: state === 'open' ? cairo(600) : '' });
+    for (const state of ['preview', 'scheduled', 'open', 'closed']) {
+      const mock = createMock({ state, opensAt: state === 'scheduled' || state === 'preview' ? cairo(3000) : '', closesAt: state === 'open' ? cairo(600) : '' });
       const { context, page, problems } = await open({ viewport, mock, bypassCSP: name !== 'narrow' });
       await page.click('.seasons__summary');
       assert.ok(await overflow(page) <= 0, `${name} ${state} overflow`);
@@ -417,5 +425,82 @@ test('v2 accessibility (axe) phone + desktop; no horizontal scroll at 280 / 360 
       await context.close();
     }
   }
+
+});
+
+
+
+/* =========================================================
+   §19.1 PREVIEW, §19.3 AGE ELIGIBILITY
+========================================================= */
+
+test('preview: the prizes on show, the order buttons off with their reason; with or without a date', async () => {
+
+  const mock = createMock({ state: 'preview', opensAt: cairo(2 * 1440 + 90) });
+  const { context, page, problems } = await open({ mock });
+  assert.equal(await page.$eval('[data-store]', el => el.dataset.store), 'preview');
+  assert.match(await textOf(page, '.store-state__headline'), /^المتجر مفتوح للعرض — الطلب هيفتح يوم .+ الساعة .+/);
+  assert.match(await textOf(page, '[data-countdown]'), /^فاضل يومين/);
+  assert.equal(await page.$$eval('.shop__item', els => els.length), 2, 'the prizes are on show');
+  assert.equal(await page.$('[data-order]'), null);
+  assert.deepEqual(await page.$$eval('button[data-off="preview"]', els => els.map(e => [e.textContent, e.disabled, e.getAttribute('aria-label')])), [
+    ['الطلب لسه مفتحش', true, 'الطلب لسه مفتحش: كوباية الأسرة'],
+    ['الطلب لسه مفتحش', true, 'الطلب لسه مفتحش: شنطة قماش']
+  ]);
+  assert.match(await textOf(page, '[data-item="i-mug"]'), /٧٠٠ نقطة/);
+  assert.equal(await page.$('[data-cancel]'), null, 'no cancel outside open');
+  await page.screenshot({ path: `${SHOTS}portal3-mobile-preview.png`, fullPage: true });
+
+  // a manual preview without a date: «قريب», no countdown
+  mock.store = { ...mock.store, opensAt: '' };
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => document.querySelector('.store-state__headline')?.textContent === 'المتجر مفتوح للعرض — الطلب هيفتح قريب');
+  assert.equal(await textOf(page, '[data-countdown]'), '');
+  assert.deepEqual(problems, []);
+  await context.close();
+
+});
+
+
+test('age: the code login shows the notice, then the dashboard says it and the store takes no orders', async () => {
+
+  const { context, page, problems, mock } = await open({ mock: createMock({ eligible: false }), token: '', bypassCSP: true });
+  await page.type('#f-code', 'ATH-2345-678A');
+  await page.click('button[type="submit"]');
+  await page.waitForFunction(() => document.getElementById('comp-main')?.dataset.state === 'confirm');
+  assert.equal(await textOf(page, '[data-age-notice]'), AGE_NOTICE);
+  await axe(page, 'portal confirm + age notice');
+  await clickText(page, 'button', 'أيوه، ده أنا');
+  await page.waitForFunction(() => document.getElementById('comp-main')?.dataset.state === 'dashboard');
+
+  assert.equal(await textOf(page, '.portal__me ~ [data-age-notice]'), AGE_NOTICE);
+  assert.equal(await page.$('[data-order]'), null, 'no orders');
+  assert.deepEqual(await page.$$eval('[data-off="not_eligible"]', els => els.map(e => e.textContent)), ['الطلب مش متاح ليك', 'الطلب مش متاح ليك']);
+  assert.ok(await page.$('[data-history], [aria-labelledby="p-history"]'), 'the history stays');
+  assert.match(await textOf(page, '[data-balance]'), /١٥٥٠/);
+  await axe(page, 'dashboard ineligible');
+  assert.equal(mock.fns('shopRedeem').length, 0);
+  assert.deepEqual(problems.filter(p => !/Refused to apply inline style/.test(p)), []);
+  await context.close();
+
+});
+
+
+test('shopRedeem not_eligible (the rules changed meanwhile): the server\'s message, orders off', async () => {
+
+  const mock = createMock();
+  const { context, page, problems } = await open({ mock });
+  mock.redeemIneligible = true;
+  await page.click('[data-item="i-bag"] [data-order]');
+  await page.waitForSelector('dialog.order[open]');
+  await page.click('[data-confirm-order]');
+  await page.waitForSelector('.portal__alert');
+  assert.equal(await textOf(page, '.portal__alert'), 'سنك حاليًا خارج الفئة العمرية، فمش هتقدر تطلب جوايز.');
+  assert.equal(await page.$('dialog.order'), null);
+  assert.equal(await page.$('[data-order]'), null, 'no more orders');
+  assert.equal(await page.$$eval('[data-off="not_eligible"]', els => els.length), 2);
+  assert.equal(mock.balance, 1550, 'nothing charged');
+  assert.deepEqual(problems, []);
+  await context.close();
 
 });

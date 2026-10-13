@@ -252,8 +252,8 @@ test('login → dashboard with wallet and store; the token lives in this tab onl
   assert.match(await textOf(page, '.portal__balance'), /رصيدك.*١٥٥٠ نقطة/);
 
   // history: score, points, pending, a review button only where allowed
-  assert.match(await textOf(page, '[data-history="s-1"]'), /درجتك ٧\/١٠/);
-  assert.match(await textOf(page, '[data-history="s-1"]'), /حصلت على ٧٠٠ نقطة/);
+  assert.match(await textOf(page, '[data-history="s-1"]'), /جبت ٧ من ١٠/);
+  assert.match(await textOf(page, '[data-history="s-1"]'), /جمعت ٧٠٠ نقطة/);
   assert.match(await textOf(page, '[data-history="s-2"]'), /مستني مراجعة/);
   assert.ok(await page.$('[data-history="s-1"] [data-review-btn]'));
   assert.equal(await page.$('[data-history="s-2"] [data-review-btn]'), null);
@@ -300,7 +300,7 @@ test('«شوف إجاباتك»: portalReview → the engine\'s review list → 
   await waitScreen(page, 'review');
   assert.deepEqual(mock.fns('portalReview')[0].arg, { ptoken: 'pt1.good.sig', submissionId: 's-1' });
   assert.equal(await textOf(page, '#rv-t'), 'مسابقة يونان');
-  assert.equal(await textOf(page, '.result__line--score'), 'درجتك ٧/١٠');
+  assert.equal(await textOf(page, '.result__line--score'), 'جبت ٧ من ١٠');
   assert.equal(await page.$$eval('.answer', els => els.length), 2);
   assert.match(await textOf(page, '.answer--no'), /الإجابة الصح: صح/);
   await page.screenshot({ path: `${SHOTS}portal-mobile-review.png`, fullPage: true });

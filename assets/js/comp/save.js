@@ -58,7 +58,7 @@ export function cleanRecord(raw) {
     fields: {},
     ptoken: str(raw.ptoken, 4000),
     participant: raw.participant && typeof raw.participant === 'object' && typeof raw.participant.name === 'string'
-      ? { name: raw.participant.name.slice(0, 80), group: typeof raw.participant.group === 'string' ? raw.participant.group.slice(0, 60) : '' }
+      ? { name: raw.participant.name.slice(0, 80), group: typeof raw.participant.group === 'string' ? raw.participant.group.slice(0, 60) : '', noPoints: raw.participant.noPoints === true }
       : null,
     attempt: null,
     comp: raw.comp ? cleanStartComp(raw.comp) : null,

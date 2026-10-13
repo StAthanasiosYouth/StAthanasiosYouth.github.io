@@ -121,6 +121,7 @@ const S = {
   resultNote: '',
   confirming: false,
   busy: false,
+  noPoints: false,      // §19.3: a code outside the age range (the attempt counts, no points)
   queueReason: '',
   online: navigator.onLine !== false,
   warnedMinute: false, timeUpSent: false
@@ -161,6 +162,7 @@ function model() {
     resultLoading: S.resultLoading,
     resultNote: S.resultNote,
     receipt: S.receipt,
+    noPoints: S.noPoints,
     canRetry: !PREVIEW ? !!(S.def && S.def.attempts > 1 && phaseNow() === 'open' && S.result && S.result.status !== 'void') : !!(S.def && S.def.attempts > 1),
     nowStamp: nowStamp(),
     startsIn: S.def && S.def.startAt ? realMinutesBetween(nowStamp(), S.def.startAt) : undefined,
@@ -205,13 +207,14 @@ const actions = {
   },
 
   fieldsSubmit(values, hp) {
-    const fields = F.visibleFields(S.def);
+    const guest = !!S.state.guest;
+    const fields = F.visibleFields(S.def, { guest });
     const check = F.validateFields(fields, values);
     S.fieldValues = values;
     S.hp = typeof hp === 'string' ? hp : '';
     if (!check.ok) {
       S.fieldErrors = check.errors;
-      S.state = { name: 'identity', error: 'راجع الخانات اللي عليها علامة.' };
+      S.state = { name: 'identity', error: 'راجع الخانات اللي عليها علامة.', ...(guest && { guest: true }) };
       render();
       const first = document.querySelector('[aria-invalid="true"]');
       if (first) first.focus();
@@ -239,7 +242,8 @@ const actions = {
     if (reply.ok && reply.participant && typeof reply.ptoken === 'string') {
       S.ptoken = reply.ptoken;
       S.codeValue = '';
-      const participant = { name: String(reply.participant.name || '').slice(0, 80), group: String(reply.participant.group || '').slice(0, 60) };
+      const participant = { name: String(reply.participant.name || '').slice(0, 80), group: String(reply.participant.group || '').slice(0, 60), ...F.eligibility(reply) };
+      S.noPoints = participant.eligible === false;
       go({ type: 'code-ok', participant });
       return;
     }
@@ -253,6 +257,14 @@ const actions = {
   },
 
   confirm: () => go({ type: 'confirm' }),
+
+  // §19.2: «شارك من غير كود» (only when the competition allows guests)
+  guest: () => {
+    S.ptoken = '';
+    S.noPoints = false;
+    S.fieldErrors = {};
+    go({ type: 'guest' });
+  },
 
   answer(qid, value) {
     S.answers = { ...S.answers, [qid]: value };
@@ -349,7 +361,7 @@ async function start() {
 
   const arg = { slug: S.def.slug || S.slug, clientKey: ensureClientKey() };
 
-  if (S.def.participation === 'registered') arg.ptoken = S.ptoken;
+  if (S.def.participation === 'registered' && !S.state.guest) arg.ptoken = S.ptoken;
   else {
     arg.fields = S.fields;
     arg.hp = S.hp || '';
@@ -402,7 +414,7 @@ async function start() {
 
   save.write({
     clientKey: S.clientKey, token: S.token, receipt: '', answers: S.answers, step: '',
-    v: S.def.v, fields: S.fields, ptoken: S.ptoken, participant: S.state.participant || null,
+    v: S.def.v, fields: S.fields, ptoken: S.ptoken, participant: S.state.participant ? { ...S.state.participant, noPoints: S.noPoints } : null,
     attempt: { id: attempt.id, startedAt: attempt.startedAt, deadlineMs: attempt.deadlineMs },
     comp: S.comp, questions, pending: false, def: S.defRaw
   });
@@ -622,6 +634,7 @@ async function boot() {
   S.fields = record ? record.fields : {};
   S.fieldValues = { ...S.fields };
   S.ptoken = record ? record.ptoken : '';
+  S.noPoints = !!(record && record.participant && record.participant.noPoints);
 
   // an attempt in progress on this phone: continue where it was left
   if (record && record.token && record.questions.length) {
