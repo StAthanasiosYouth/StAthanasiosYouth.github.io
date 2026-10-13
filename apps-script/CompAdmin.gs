@@ -723,6 +723,9 @@ function apiCompSettings(input) {
     return changed.join(',');
   });
 
+  // the points need a season: the first one is made now, outside every lock (CompSeasons.gs)
+  if (compModules_().wallet && typeof seasonActive_ === 'function') seasonActive_();
+
   return { modules: compModules_() };
 
 }

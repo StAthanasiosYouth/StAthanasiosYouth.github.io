@@ -159,7 +159,16 @@ function apiFunctions_() {
     apiShopItemSave: apiShopItemSave,
     apiShopItemDelete: apiShopItemDelete,
     apiShopRedemptions: apiShopRedemptions,
-    apiShopRedemptionStatus: apiShopRedemptionStatus
+    apiShopRedemptionStatus: apiShopRedemptionStatus,
+    apiShopSchedule: apiShopSchedule,
+    apiShopScheduleSave: apiShopScheduleSave,
+    apiPushAuto: apiPushAuto,
+    apiPushSchedule: apiPushSchedule,
+    apiPushScheduleCancel: apiPushScheduleCancel,
+    apiSeasons: apiSeasons,
+    apiSeasonSave: apiSeasonSave,
+    apiSeasonClosePreview: apiSeasonClosePreview,
+    apiSeasonClose: apiSeasonClose
   };
 
 }

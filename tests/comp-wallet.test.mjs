@@ -139,7 +139,7 @@ test('busy live lock: the reconcile waits in a queue and the next one (or the wa
   const reconcile = world.gs.walletReconcileMany_;
   let failNext = true;
   world.gs.walletReconcileMany_ = ids => {
-    if (failNext && ids.length) { failNext = false; world.userLock.busy = true; try { return reconcile(ids); } finally { world.userLock.busy = false; } }
+    if (failNext && ids.length) { failNext = false; world.scriptLock.busy = true; try { return reconcile(ids); } finally { world.scriptLock.busy = false; } }
     return reconcile(ids);
   };
   call('apiCompGrade', a.id, { [longQ]: true });

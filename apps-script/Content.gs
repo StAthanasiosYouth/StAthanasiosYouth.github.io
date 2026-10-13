@@ -1112,6 +1112,7 @@ function buildPublicContent(draft, options) {
 
   var hub = buildHub_(draft, {
     competitions: competitions,
+    points: !!(draft.competitions && draft.competitions.points),
     now: now,
     error: error,
     warn: warn,
@@ -1190,6 +1191,26 @@ function buildPublicContent(draft, options) {
   // change to a competition's public files changes the revision.
   if (competitions && competitions.index.length) {
     content.competitions = competitions.index;
+  }
+
+  // «نقاطي / المتجر» (§18.4): only while the registry and the wallet are on
+  var points = draft.competitions && draft.competitions.points;
+
+  if (points && typeof points === 'object') {
+    content.points = {
+      url: 'points/',
+      shop: points.shop ? {
+        on: true,
+        mode: ['auto', 'open', 'closed'].indexOf(points.shop.mode) !== -1 ? points.shop.mode : 'auto',
+        opensAt: contentDateTime_(String(points.shop.opensAt || '').replace('T', ' '), false) || '',
+        closesAt: contentDateTime_(String(points.shop.closesAt || '').replace('T', ' '), false) || ''
+      } : null,
+      season: points.season && points.season.name ? {
+        name: contentLine_(points.season.name).slice(0, 60),
+        startAt: contentDateTime_(String(points.season.startAt || '').replace('T', ' '), false) || '',
+        endAt: contentDateTime_(String(points.season.endAt || '').replace('T', ' '), true) || ''
+      } : null
+    };
   }
 
   if (options.hash) {

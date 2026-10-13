@@ -160,8 +160,9 @@ function notificationRow(item, nowStamp) {
   const unread = isNew(inbox, item);
   const target = item.target;
   const external = target && target.kind === 'url';
-  // a competition: the engine's own page, same tab (relative to the site root)
-  const page = target && target.kind === 'competition' ? competitionPage(target.slug) : '';
+  // a competition: the engine's own page; «نقاطي»: points/ (same tab, relative to the site root)
+  const page = target && target.kind === 'competition' ? competitionPage(target.slug)
+    : target && target.kind === 'points' ? 'points/' : '';
 
   const row = h(external || page ? 'a' : 'button', {
     class: `note-item note-item--${item.type}${unread ? ' is-new' : ''}`,
@@ -169,7 +170,8 @@ function notificationRow(item, nowStamp) {
     href: external ? target.url : page || null,
     target: external ? '_blank' : null,
     rel: external ? 'noopener' : null,
-    'data-competition': page ? target.slug : null,
+    'data-competition': page && target.kind === 'competition' ? target.slug : null,
+    'data-points': page && target.kind === 'points' ? '' : null,
     onclick: event => {
       inbox = markRead(inbox, item.id);
       saveInbox(inbox);

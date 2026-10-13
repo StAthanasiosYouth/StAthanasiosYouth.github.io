@@ -299,22 +299,20 @@ test('void: the submission stops counting and comes back with its status; the pu
   assert.equal(questions.long.review, 'manual');
 });
 
-test('live writes: only from /admin/ (the recovery admin runs as another user lock); busy lock → a clear error', () => {
+test('live writes: only from /admin/; a busy script lock → a clear error (admin) / busy (public)', () => {
   const { world, call, id } = setup();
   publish(world, call);
   const a = play(world, 1, { long: 'x' });
   world.as(ADMIN);
   assert.throws(() => world.gs.apiCompVoid(a.id, true), /لوحة التحكم الرسمية/);
   world.as('');
-  world.userLock.busy = true;
+  world.scriptLock.busy = true;
   assert.throws(() => call('apiCompRegrade', id), /ضغط/);
   const key = clientKey();
   assert.equal(pub(world, 'compStart', { slug: 'bible-quiz', clientKey: key, fields: { name: 'x', phone: phone(5) } }).code, 'busy');
-  world.userLock.busy = false;
-  // a publish holds the SCRIPT lock: the public keeps working
-  world.scriptLock.busy = true;
-  assert.equal(pub(world, 'compStart', { slug: 'bible-quiz', clientKey: key, fields: { name: 'x', phone: phone(5) } }).ok, true);
   world.scriptLock.busy = false;
+  // free again: the same key goes through (the page retries with it)
+  assert.equal(pub(world, 'compStart', { slug: 'bible-quiz', clientKey: key, fields: { name: 'x', phone: phone(5) } }).ok, true);
 });
 
 

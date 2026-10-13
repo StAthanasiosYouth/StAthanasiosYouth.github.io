@@ -323,7 +323,7 @@ function compFieldValues_(spec, input) {
 /* the builder's columns, in Sheet order (the rest are the server's) */
 var COMP_EDITABLE = ['slug', 'title', 'shortTitle', 'description', 'instructions', 'ctaLabel', 'banner', 'icon', 'theme',
   'startAt', 'endAt', 'participation', 'scoring', 'resultShow', 'resultsAt', 'answersShow', 'answersAt', 'showPoints', 'wallet',
-  'attempts', 'layout', 'shuffleQ', 'shuffleC', 'timeLimit', 'maxSubmissions', 'uniquePhone', 'fields', 'successText', 'enabled'];
+  'attempts', 'layout', 'shuffleQ', 'shuffleC', 'timeLimit', 'maxSubmissions', 'uniquePhone', 'fields', 'successText', 'enabled', 'seasonId'];
 
 /**
  * input: the builder's fields (anything missing keeps `ctx.existing`'s value).
@@ -430,7 +430,9 @@ function compValidateComp_(input, ctx) {
     uniquePhone: compFlag_(pick('uniquePhone')),
     fields: JSON.stringify(compFieldsSpec_(pick('fields'), problems)),
     successText: block('successText', COMP_LIMITS.successText, 'رسالة بعد الإرسال'),
-    enabled: compFlag_(pick('enabled'))
+    enabled: compFlag_(pick('enabled')),
+    // the points season (CompSeasons.gs); '' = the active one when points are given
+    seasonId: /^sea-[0-9a-z]{4,12}$/.test(String(pick('seasonId') || '')) ? String(pick('seasonId')) : ''
   };
 
   // no score, nothing score-like to show

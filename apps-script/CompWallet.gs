@@ -22,8 +22,8 @@
  * idemKey adj:<participantId>:<key>, a deduction never below zero, logged points.adjust).
  */
 
-var WALLET_KINDS = ['competition', 'correction', 'manual', 'redeem', 'refund'];
-var WALLET_KIND_LABELS = { competition: 'مسابقة', correction: 'تعديل نتيجة', manual: 'تعديل من الخدام', redeem: 'جايزة', refund: 'استرجاع' };
+var WALLET_KINDS = ['competition', 'correction', 'manual', 'redeem', 'refund', 'transfer'];
+var WALLET_KIND_LABELS = { competition: 'مسابقة', correction: 'تعديل نتيجة', manual: 'تعديل من الخدام', redeem: 'جايزة', refund: 'استرجاع', transfer: 'تحويل من موسم فات' };
 var WALLET_MAX_ADJUST = 1000000;
 var WALLET_NOTE_MAX = 200;
 var WALLET_ADJUST_KEY = /^[A-Za-z0-9_-]{8,64}$/;
@@ -88,18 +88,35 @@ function walletBalances_() {
 
   if (!walletHasTab_()) return sums;
 
-  compColumns_(walletSheet_(), ['participantId', 'amount']).forEach(function (r) {
-    if (r.participantId) sums[r.participantId] = (sums[r.participantId] || 0) + (Number(r.amount) || 0);
+  var season = walletSeasonNow_();
+
+  compColumns_(walletSheet_(), ['participantId', 'amount', 'seasonId']).forEach(function (r) {
+    if (r.participantId && walletInSeason_(r, season)) sums[r.participantId] = (sums[r.participantId] || 0) + (Number(r.amount) || 0);
   });
 
   return sums;
 
 }
 
+/* the active season's id ('' when seasons aren't installed: every row counts) */
+function walletSeasonNow_() {
+
+  return typeof seasonActiveId_ === 'function' ? seasonActiveId_() : '';
+
+}
+
+/* does a ledger row belong to the season? (an empty seasonId = the first season) */
+function walletInSeason_(row, season) {
+
+  return !season || (row.seasonId || 'sea-first') === season;
+
+}
+
 /* one participant's balance: the cache, else the tab (fresh = always the tab) */
 function walletBalance_(pid, fresh) {
 
-  var key = 'wal:bal:' + pid;
+  var season = walletSeasonNow_();
+  var key = 'wal:bal:' + (season ? season + ':' : '') + pid;
 
   if (!fresh) {
     try {
@@ -114,8 +131,8 @@ function walletBalance_(pid, fresh) {
   var sum = 0;
 
   if (walletHasTab_()) {
-    compColumns_(walletSheet_(), ['participantId', 'amount']).forEach(function (r) {
-      if (r.participantId === pid) sum += Number(r.amount) || 0;
+    compColumns_(walletSheet_(), ['participantId', 'amount', 'seasonId']).forEach(function (r) {
+      if (r.participantId === pid && walletInSeason_(r, season)) sum += Number(r.amount) || 0;
     });
   }
 
@@ -156,6 +173,7 @@ function walletAppend_(records) {
     r.compId = r.compId || '';
     r.refType = r.refType || '';
     r.refId = r.refId || '';
+    r.seasonId = r.seasonId || walletSeasonNow_();
   });
 
   compAppend_(walletSheet_(), records);
@@ -320,6 +338,15 @@ function walletReconcileMany_(ids) {
   wanted = Object.create(null);
   registered.forEach(function (r) { wanted[r.id] = true; });
 
+  // seasons (CompSeasons.gs): a competition's points land in ITS season; a closed season is frozen
+  var seasonNow = walletSeasonNow_();
+  var seasonsById = typeof seasonIndex_ === 'function' ? seasonIndex_() : {};
+  var compSeason = Object.create(null);
+
+  if (seasonNow) {
+    compColumns_(compSheet_('Competitions'), ['id', 'seasonId']).forEach(function (c) { compSeason[c.id] = c.seasonId || seasonNow; });
+  }
+
   var lock = compLock_(20000);
 
   if (!lock) {
@@ -354,6 +381,9 @@ function walletReconcileMany_(ids) {
       result.checked++;
       // nothing ever registered and nothing to give: nothing to write (open competitions included)
       if (!row.participantId || target === h.sum) return;
+      var season = seasonNow ? compSeason[row.compId] || seasonNow : '';
+      // a closed season never changes again (§18.6)
+      if (season && seasonsById[season] && seasonsById[season].status === 'closed') return;
       var key = 'sub:' + row.id + ':' + h.n;
       if (keys[key]) return;
       keys[key] = true;
@@ -366,7 +396,8 @@ function walletReconcileMany_(ids) {
         compId: row.compId,
         note: '',
         idemKey: key,
-        actor: ''
+        actor: '',
+        seasonId: season
       });
     });
 
@@ -572,7 +603,7 @@ function apiWalletParticipant(id) {
  * row back). A deduction that would leave the balance below zero is refused.
  * → { entry: { id, amount, kind, note, createdAt }, balance, replay }
  */
-function apiWalletAdjust(id, amount, note, adjustKey) {
+function apiWalletAdjust(id, amount, note, adjustKey, kind) {
 
   assertAdmin_();
   walletRequireOn_();
@@ -607,18 +638,20 @@ function apiWalletAdjust(id, amount, note, adjustKey) {
       return 'replay';
     }
 
-    var balance = rows.reduce(function (sum, l) { return l.participantId === id ? sum + (Number(l.amount) || 0) : sum; }, 0);
+    var season = walletSeasonNow_();
+    var balance = rows.reduce(function (sum, l) { return l.participantId === id && walletInSeason_(l, season) ? sum + (Number(l.amount) || 0) : sum; }, 0);
+    var rowKind = kind === 'transfer' ? 'transfer' : 'manual';
 
     if (amount < 0 && balance + amount < 0) {
       throw appError_('مينفعش الرصيد يبقى بالسالب: رصيده دلوقتي ' + regAr_(balance) + ' نقطة.', 'اخصم ' + regAr_(balance) + ' أو أقل.', '', 'amount');
     }
 
-    var record = walletAppend_([{ participantId: id, amount: amount, kind: 'manual', note: text, idemKey: key, actor: email }])[0];
+    var record = walletAppend_([{ participantId: id, amount: amount, kind: rowKind, note: text, idemKey: key, actor: email }])[0];
 
-    out.entry = { id: record.id, amount: amount, kind: 'manual', note: text, createdAt: record.createdAt };
+    out.entry = { id: record.id, amount: amount, kind: rowKind, note: text, createdAt: record.createdAt };
     out.replay = false;
 
-    activityNote_({ action: 'points.adjust', type: 'points', id: id, title: person.name, changes: { amount: amount } });
+    activityNote_({ action: 'points.adjust', type: 'points', id: id, title: person.name, changes: rowKind === 'transfer' ? { amount: amount, transfer: true } : { amount: amount } });
 
     return 'ok';
 
@@ -790,7 +823,8 @@ function apiWalletSync() {
 /* { balance, ledger: [{ amount, kind, note, compTitle, createdAt }] (newest first, ≤ 200) } */
 function walletPortal_(pid) {
 
-  var rows = walletLedger_().filter(function (l) { return l.participantId === pid; });
+  var season = walletSeasonNow_();
+  var rows = walletLedger_().filter(function (l) { return l.participantId === pid && walletInSeason_(l, season); });
   var titles = rows.some(function (l) { return l.compId; }) ? walletCompTitles_() : {};
   var balance = rows.reduce(function (sum, l) { return sum + (Number(l.amount) || 0); }, 0);
 

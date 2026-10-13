@@ -1228,6 +1228,126 @@ ol {
 
 
 /* =========================================================
+   «نقاطي / المتجر» (render.js pointsWidget; the whole card opens points/)
+========================================================= */
+
+.points {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding-block: 16px;
+  border-color: var(--gold-line-strong);
+  background:
+    radial-gradient(70% 140% at 100% 0%, rgba(215, 170, 80, .16), rgba(215, 170, 80, 0) 60%),
+    var(--navy-900);
+  transition: transform .3s var(--ease-out), border-color .3s;
+}
+
+.points:hover {
+  transform: translateY(-2px);
+  border-color: rgba(242, 210, 139, .6);
+}
+
+.points:active {
+  transform: scale(.985);
+}
+
+.points:has(.stretched:focus-visible) {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: 3px;
+}
+
+.points__art {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: 50%;
+  color: var(--gold-hi);
+  background: radial-gradient(circle at 50% 40%, rgba(215, 170, 80, .32), rgba(215, 170, 80, 0) 70%), var(--navy-950);
+}
+
+.points__art .icon {
+  width: 28px;
+  height: 28px;
+}
+
+.points__body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.points__title {
+  font-size: 1.12rem;
+  font-weight: 800;
+  line-height: 1.4;
+  color: var(--gold-hi);
+}
+
+/* the state line arrives with points.js: its line is kept meanwhile */
+.points__headline {
+  min-height: 1.6em;
+  font-size: .95rem;
+  font-weight: 700;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.points__detail,
+.points__season {
+  font-size: .88rem;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+
+.points__season {
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.points__go {
+  color: var(--gold);
+}
+
+.points__go .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.points[data-shop="open"] .points__art {
+  color: var(--gold-ink);
+  background: var(--gold);
+}
+
+.points[data-shop="closed"] .points__headline {
+  color: var(--text-2);
+}
+
+.points.is-waking {
+  box-shadow: 0 0 0 1px rgba(242, 210, 139, .5), 0 0 42px -10px rgba(215, 170, 80, .6);
+}
+
+.topbar__nav {
+  display: flex;
+}
+
+.topbar__nav:has(> [hidden]) {
+  display: none;
+}
+
+.topbar__points {
+  text-decoration: none;
+}
+
+.topbar__points[hidden] {
+  display: none;
+}
+
+
+/* =========================================================
    LOCATION
 ========================================================= */
 

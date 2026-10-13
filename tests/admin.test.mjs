@@ -72,7 +72,8 @@ test('no unguarded public function slipped in', () => {
   const world = configuredWorld();
   const pure = new Set(['buildPublicContent', 'safeHttpsUrl', 'normalizePhone', 'contentRevision', 'buildMeetingIcs', 'summarizeChanges', 'describeChanges', 'seedDraft', 'doGet', 'doPost']);
   const publicFns = Object.keys(world.gs).filter(k => typeof world.gs[k] === 'function' && !k.endsWith('_'));
-  const unexpected = publicFns.filter(k => !pure.has(k) && !/^api/.test(k) && !['setup', 'checkSheet', 'clearStrayIds', 'checkMedia', 'planMigration', 'migrate'].includes(k));
+  // enableAutoPush: assertAdmin_; the two trigger handlers run only with their own trigger's uid (CompSchedule.gs, tests/points-v2)
+  const unexpected = publicFns.filter(k => !pure.has(k) && !/^api/.test(k) && !['setup', 'checkSheet', 'clearStrayIds', 'checkMedia', 'planMigration', 'migrate', 'enableAutoPush', 'pushScheduleTick', 'pushScheduleDaily'].includes(k));
   assert.deepEqual(unexpected, []);
 });
 

@@ -12,11 +12,12 @@
  * appends one block. Every written text goes through plainCell_ (no
  * formula injection) and is read back without the protecting apostrophe.
  *
- * Locks: draft tabs under the script lock (admin functions); live tabs
- * (Submissions, and later the ledger / redemptions) under compLock_():
- * LockService.getUserLock() — every API request runs as the owner, so it
- * is one shared mutex, separate from the script lock a publish holds —
- * falling back to the script lock.
+ * Locks: ONE lock, the script lock (docs/COMPETITIONS.md §18.1). Draft tabs
+ * are written by admin functions under it; live tabs (Submissions, the
+ * ledger, redemptions, seasons) under compLock_() = the same script lock,
+ * tried for up to 30 s (then the public answers busy). Critical sections
+ * are short and never make a network call: a publish holds the lock only
+ * for its two short local steps (Publish.gs A / C), never during the commit.
  *
  * Caches (CacheService, never a source of truth): comp:draft (+ comp:draftsig),
  * comp:live:<slug>, comp:def:<compId>:<version>.
@@ -29,7 +30,7 @@ var COMP_TABLES = {
   Competitions: ['id', 'slug', 'title', 'shortTitle', 'description', 'instructions', 'ctaLabel', 'banner', 'icon', 'theme',
     'startAt', 'endAt', 'participation', 'scoring', 'resultShow', 'resultsAt', 'answersShow', 'answersAt', 'showPoints', 'wallet',
     'attempts', 'layout', 'shuffleQ', 'shuffleC', 'timeLimit', 'maxSubmissions', 'uniquePhone', 'fields', 'successText', 'enabled',
-    'cardId', 'liveVersion', 'publishedAt', 'closedAt', 'finalizedAt', 'archived', 'createdBy', 'createdAt', 'updatedAt'],
+    'cardId', 'liveVersion', 'publishedAt', 'closedAt', 'finalizedAt', 'archived', 'createdBy', 'createdAt', 'updatedAt', 'seasonId'],
   Questions: ['id', 'compId', 'order', 'type', 'text', 'help', 'media', 'choices', 'correct', 'points', 'required', 'explanation',
     'explanationMedia', 'review', 'enabled', 'updatedAt'],
   Snapshots: ['compId', 'version', 'part', 'json', 'publishedAt', 'publishedBy'],
@@ -39,10 +40,14 @@ var COMP_TABLES = {
   // Phase 2 / 3 (created by their modules on first use)
   Participants: ['id', 'name', 'nameNorm', 'phone', 'phoneNorm', 'group', 'church', 'notes', 'status', 'codeHash', 'codeEnc',
     'codeVersion', 'codeIssuedAt', 'codeIssuedBy', 'importBatch', 'createdBy', 'createdAt', 'updatedAt'],
-  PointsLedger: ['id', 'participantId', 'amount', 'kind', 'refType', 'refId', 'compId', 'note', 'idemKey', 'actor', 'createdAt'],
+  PointsLedger: ['id', 'participantId', 'amount', 'kind', 'refType', 'refId', 'compId', 'note', 'idemKey', 'actor', 'createdAt', 'seasonId'],
   StoreItems: ['id', 'name', 'description', 'image', 'cost', 'stock', 'perPerson', 'category', 'order', 'active', 'createdAt', 'updatedAt'],
   Redemptions: ['id', 'participantId', 'itemId', 'itemName', 'cost', 'status', 'requestKey', 'ledgerId', 'refundLedgerId',
-    'requestedAt', 'handledBy', 'handledAt', 'note', 'updatedAt']
+    'requestedAt', 'handledBy', 'handledAt', 'note', 'updatedAt', 'seasonId'],
+  // Points & Store v2 (§18.5 / §18.6)
+  PushSchedule: ['id', 'notifId', 'kind', 'refId', 'sendAt', 'status', 'result', 'sendKey', 'updatedAt'],
+  Seasons: ['id', 'name', 'startAt', 'endAt', 'status', 'notifyDays', 'closedAt', 'closedBy', 'createdAt', 'updatedAt'],
+  SeasonTotals: ['seasonId', 'pid', 'earned', 'spent', 'adjusted', 'final', 'closedAt']
 };
 
 /* made together with the spreadsheet */
@@ -468,22 +473,16 @@ function compDeleteRows_(t, rowNumbers) {
    LOCK FOR THE LIVE TABS
 ========================================================= */
 
-/* the shared mutex for live writes, or null (busy) */
+/* how long a live write waits for the lock (public calls: then busy; pages retry with the same keys) */
+var COMP_LOCK_WAIT_MS = 30000;
+
+/* the script lock for a live write, or null (busy). §18.1: always the script lock. */
 function compLock_(ms) {
 
-  var lock = null;
+  var lock = LockService.getScriptLock();
 
   try {
-    lock = LockService.getUserLock();
-  }
-  catch (ignored) {
-    lock = null;
-  }
-
-  if (!lock) lock = LockService.getScriptLock();
-
-  try {
-    return lock.tryLock(ms || 10000) ? lock : null;
+    return lock.tryLock(ms || COMP_LOCK_WAIT_MS) ? lock : null;
   }
   catch (ignored) {
     return null;
@@ -705,8 +704,40 @@ function compDraft_() {
   }
 
   data.modules = modules;
+  data.points = compPointsDraft_(modules);
 
   return data;
+
+}
+
+
+/*
+ * The «نقاطي / المتجر» facts content.json carries (docs/COMPETITIONS.md §18.4):
+ * { url, shop: { on, mode, opensAt, closesAt } | null, season: { name, startAt, endAt } | null },
+ * or null while the registry or the wallet is off. Read fresh (Script Properties and
+ * the active season), never from the draft cache, so a schedule change shows at once.
+ */
+function compPointsDraft_(modules) {
+
+  if (!modules || !modules.registry || !modules.wallet) return null;
+
+  var shop = null;
+
+  if (modules.shop && typeof shopSettings_ === 'function') {
+    var settings = shopSettings_();
+    shop = { on: true, mode: settings.mode, opensAt: shopWall_(settings.opensAt), closesAt: shopWall_(settings.closesAt) };
+  }
+
+  var season = null;
+
+  try {
+    season = typeof walletSeasonPublic_ === 'function' ? walletSeasonPublic_() : null;
+  }
+  catch (ignored) {
+    season = null;
+  }
+
+  return { url: 'points/', shop: shop, season: season };
 
 }
 
