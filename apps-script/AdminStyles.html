@@ -7274,4 +7274,17 @@ dialog .toasts[popover] {
   .comp-subs[aria-busy="true"],
   .comp-redemptions[aria-busy="true"],
   .acts[aria-busy="true"] { opacity: .6; transition: opacity .12s ease; }
+  /* «خروج»: the tap is answered at once */
+  body.is-signing-out .shell { pointer-events: none; filter: saturate(.6); opacity: .55; transition: opacity .15s ease; }
+  .signing-out {
+    position: fixed; inset: auto 0 2rem; margin: 0 auto; width: max-content; z-index: 9999;
+    padding: .7rem 1.4rem; border-radius: 999px; background: var(--surface-2, #12385f); color: var(--text, #f5f7fb);
+    border: 1px solid var(--gold, #d7aa50); font-weight: 700; box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
+  }
+  /* the media library's top: upload, then one row of search + filters (compact) */
+  .media-upload { display: grid; gap: .6rem; padding-block-end: .9rem; border-block-end: 1px solid var(--line, rgba(215, 170, 80, .14)); }
+  .media-upload .field__hint, .media-upload .hint { font-size: .8rem; line-height: 1.6; opacity: .8; margin: 0; }
+  .media-tools { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; padding-block-start: .9rem; }
+  .media-tools > .input { flex: 1 1 14rem; min-width: 12rem; margin: 0; }
+  .media-tools > .filter-chips { flex: 0 1 auto; margin: 0; }
 </style>

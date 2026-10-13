@@ -406,8 +406,10 @@ test('Android 412×915: pull-to-refresh guarded; a reload returns to the same su
   // signing out: nothing of this admin stays in the tab (and Google won't sign in by itself)
   await page.evaluate(() => { A.dirty = false; });
   await page.evaluateOnNewDocument(() => { window.__gisSilent = false; });
-  await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.evaluate(() => A.signOut())]);
-  assert.deepEqual((await stored(page)).all, [], 'sign-out cleared it all');
+  await page.evaluate(() => { A.signOut(); });
+  await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.waitForFunction(() => [...document.querySelectorAll('dialog[open] button')].some(b => b.textContent.includes('تسجيل الخروج')), { timeout: 8000 }).then(() => page.evaluate(() => [...document.querySelectorAll('dialog[open] button')].find(b => b.textContent.includes('تسجيل الخروج')).click()))]);
+  // only the «signed out» mark stays (no session, no place, no draft): this tab never signs itself in again before Google
+  assert.deepEqual((await stored(page)).all, [['athanasios-admin.signed-out', '1']], 'sign-out cleared it all but the signed-out mark');
   await page.waitForSelector('.gate[data-state="signin"]');
   assert.equal(await page.evaluate(() => document.documentElement.classList.contains('is-restoring')), false);
 

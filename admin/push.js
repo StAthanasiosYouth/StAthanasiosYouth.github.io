@@ -78,12 +78,61 @@ export function memo() {
 
 }
 
-/** { on, devices, configured, max } — on: this device is subscribed for the signed-in admin */
-export async function status(call) {
+/**
+ * { on, devices, configured, max } — on: this device is subscribed for the signed-in admin.
+ * The truth is the browser itself, not only the remembered token: when notifications are
+ * allowed and this worker still has a push subscription, its current token is asked for
+ * (the memo may be gone: cleared storage, the app vs a tab, a rotated Firebase token), and a
+ * token the server doesn't know (anymore) is registered again, quietly. So a reopened panel
+ * never asks to turn on what already works.
+ */
+export async function status(call, reg, info, getToken = tokenFor) {
 
-  const { token } = loadMemo();
+  let { token } = loadMemo();
+  const allowed = !!(window.Notification && Notification.permission === 'granted');
+  let subscribed = false;
 
-  return call('apiAdminPushDevices', token ? { token } : {});
+  try {
+    subscribed = !!(allowed && reg && reg.pushManager && await reg.pushManager.getSubscription());
+  }
+  catch (error) {
+    subscribed = false;
+  }
+
+  if (subscribed) {
+    try {
+      // the same token Firebase keeps for this worker (a new one only if it rotated)
+      const current = await getToken(reg);
+      if (current) token = current;
+    }
+    catch (error) {
+      // keep the remembered one
+    }
+  }
+
+  let result = await call('apiAdminPushDevices', token ? { token } : {});
+
+  if (subscribed && token && result && !result.on && info) {
+    try {
+      const before = loadMemo();
+      await call('apiAdminPushSubscribe', {
+        token,
+        previous: before.token && before.token !== token ? before.token : undefined,
+        platform: info.platform,
+        device: info.device
+      });
+      result = await call('apiAdminPushDevices', { token });
+    }
+    catch (error) {
+      // shown as off; «فعّل» still works
+    }
+  }
+
+  if (result && result.on && token) saveMemo({ token, at: loadMemo().at || Date.now() });
+  // nothing here any more (turned off in the browser): the memo would only mislead
+  else if (!subscribed && loadMemo().token) saveMemo(null);
+
+  return result;
 
 }
 

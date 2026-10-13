@@ -6628,14 +6628,16 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   var library = null;     // { items, usage } from apiMediaLibrary
   var loading = null;
+  var stale = false;      // a change may have moved usage: the copy still draws at once, then a refresh
 
   function load(force) {
 
-    if (library && !force) return Promise.resolve(library);
+    if (library && !force && !stale) return Promise.resolve(library);
     if (loading && !force) return loading;
 
     loading = A.call('apiMediaLibrary').then(function (result) {
       library = result;
+      stale = false;
       loading = null;
       return result;
     }, function (error) {
@@ -6648,7 +6650,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   }
 
   /* any state change may change usage: refresh next time */
-  A.invalidateLibrary = function () { library = null; };
+  A.invalidateLibrary = function () { stale = true; };
 
   var FILTERS = [
     { key: 'all', label: 'الكل' },
@@ -6770,8 +6772,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   A.views.media = function () {
 
-    var body = el('div', { class: 'media-view' }, skeletonGrid());
-    var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر بالاسم أو الوصف أو مكان الاستخدام', value: viewQuery, 'aria-label': 'دوّر في الصور' });
+    // the last copy (if any) draws at once; skeletons only the very first time
+    var body = el('div', { class: 'media-view' }, library ? null : skeletonGrid());
+    var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر بالاسم أو الوصف…', value: viewQuery, 'aria-label': 'دوّر في الصور' });
     var chips = el('div', { class: 'filter-chips', role: 'group', 'aria-label': 'فلتر' });
     var upload = A.imageUploader(A.libraryUploaded);
     // uploads started before (another screen, an earlier visit, an editor): name, step, how it ended
@@ -6799,18 +6802,20 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     drawChips();
     drawView = draw;
 
-    load().then(draw).catch(function (error) {
+    if (library) draw();
+
+    load().then(function (result) {
+      draw();
+    }).catch(function (error) {
+      if (library && body.childElementCount) return;
       body.replaceChildren(el('div', { class: 'errors' }));
       A.fail(error, body.firstChild);
     });
 
     return [
       A.card('مكتبة الصور', 'كل البوسترات والبانرات ومقاطع المشاهد في مكان واحد. اختار من هنا بدل ما ترفع نفس الصورة كذا مرة.',
-        upload.node,
-        uploads,
-        videoNote,
-        search,
-        chips
+        el('div', { class: 'media-upload' }, upload.node, uploads, videoNote),
+        el('div', { class: 'media-tools' }, search, chips)
       ),
       el('section', { class: 'card' }, body)
     ];
@@ -15084,6 +15089,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   'use strict';
 
   var A = window.A;
+  // the activity list's last answer (same filters on reopen: drawn at once, then refreshed)
+  var ACT_LAST = { key: '', result: null };
   var el = A.el;
   var icon = A.icon;
 
@@ -15581,6 +15588,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     function loadNow(append) {
 
       var my = ++loading;
+      var cacheKey = '';
       var ask = {};
       Object.keys(query).forEach(function (k) { if (query[k]) ask[k] = query[k]; });
       if (focus && !append) ask = { id: focus };
@@ -15588,11 +15596,21 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
       box.hidden = true;
       more.disabled = true;
-      if (!append) skeleton();
+      cacheKey = JSON.stringify(ask);
+      if (!append) {
+        // the same question as last time (a reopened screen): its answer at once, the fresh one replaces it
+        if (ACT_LAST.key === cacheKey && ACT_LAST.result && !list.querySelector('.act')) {
+          list.replaceChildren();
+          drawn = ACT_LAST.result.items.slice();
+          if (drawn.length) grouped(drawn, list, focus);
+        }
+        else if (!list.querySelector('.act')) skeleton();
+      }
       list.setAttribute('aria-busy', 'true');
 
       return A.call('apiActivity', ask).then(function (result) {
         if (my !== loading) return;
+        if (!append) ACT_LAST = { key: cacheKey, result: result };
         list.setAttribute('aria-busy', 'false');
         if (!append) list.replaceChildren();
         // the people filter knows everyone on the list now
@@ -15918,7 +15936,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var progress = el('span', { class: 'chip' });
     var devices = el('ul', { class: 'admins app-devices', hidden: true, 'aria-label': 'أجهزتي اللي عليها إشعارات الإدارة' });
     var install = { done: false, state: 'desktop' };
-    var status = null;
+    // the last known notification state draws at once; status() then confirms it from this browser
+    var status = app.push && app.push.lastStatus ? app.push.lastStatus() : null;
     var busy = false;
 
     function pushBody(next) {

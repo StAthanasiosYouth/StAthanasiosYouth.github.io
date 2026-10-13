@@ -146,3 +146,33 @@ test('A.latest: one in flight, stale answers dropped, one follow-up with the lat
   assert.equal(result.n, 2);
   assert.deepEqual(result.seen, [6], 'only the newest answer is drawn');
 });
+
+test('media: the last copy draws at once on reopen (no skeletons, no second wait); upload + one compact toolbar row', async () => {
+  delay = 400;
+  await page.evaluate(() => A.go('media'));
+  await page.waitForSelector('.media-view .media-grid, .media-view .empty-state', { timeout: 15000 });
+  await page.waitForNetworkIdle({ idleTime: 300 }).catch(() => {});
+  await page.screenshot({ path: `${ROOT}tools/.cache/admin-media-desktop.png` });
+  const row = await page.evaluate(() => {
+    const tools = document.querySelector('.media-tools');
+    const search = tools.querySelector('input[type=search]');
+    const chips = tools.querySelector('.filter-chips');
+    return { same: Math.abs(search.getBoundingClientRect().top - chips.getBoundingClientRect().top) < 30, wide: document.documentElement.scrollWidth <= window.innerWidth };
+  });
+  assert.equal(row.same, true, 'search and filters share one row on a wide screen');
+  assert.equal(row.wide, true);
+
+  // away and back: drawn from the last copy at once
+  await page.evaluate(() => A.go('activity'));
+  await page.waitForSelector('.acts', { timeout: 15000 });
+  await page.evaluate(() => A.go('media'));
+  const instant = await page.evaluate(() => !!document.querySelector('.media-view .media-grid, .media-view .empty-state') && !document.querySelector('.media-view .skeleton'));
+  assert.equal(instant, true, 'no skeleton on reopen');
+
+  await page.setViewport({ width: 390, height: 844 });
+  await sleep(300);
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no sideways scroll on a phone');
+  await page.screenshot({ path: `${ROOT}tools/.cache/admin-media-phone.png` });
+  await page.setViewport({ width: 1366, height: 900 });
+  delay = 0;
+});

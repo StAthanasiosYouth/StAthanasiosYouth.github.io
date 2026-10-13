@@ -20,6 +20,8 @@
   'use strict';
 
   var A = window.A;
+  // the activity list's last answer (same filters on reopen: drawn at once, then refreshed)
+  var ACT_LAST = { key: '', result: null };
   var el = A.el;
   var icon = A.icon;
 
@@ -517,6 +519,7 @@
     function loadNow(append) {
 
       var my = ++loading;
+      var cacheKey = '';
       var ask = {};
       Object.keys(query).forEach(function (k) { if (query[k]) ask[k] = query[k]; });
       if (focus && !append) ask = { id: focus };
@@ -524,11 +527,21 @@
 
       box.hidden = true;
       more.disabled = true;
-      if (!append) skeleton();
+      cacheKey = JSON.stringify(ask);
+      if (!append) {
+        // the same question as last time (a reopened screen): its answer at once, the fresh one replaces it
+        if (ACT_LAST.key === cacheKey && ACT_LAST.result && !list.querySelector('.act')) {
+          list.replaceChildren();
+          drawn = ACT_LAST.result.items.slice();
+          if (drawn.length) grouped(drawn, list, focus);
+        }
+        else if (!list.querySelector('.act')) skeleton();
+      }
       list.setAttribute('aria-busy', 'true');
 
       return A.call('apiActivity', ask).then(function (result) {
         if (my !== loading) return;
+        if (!append) ACT_LAST = { key: cacheKey, result: result };
         list.setAttribute('aria-busy', 'false');
         if (!append) list.replaceChildren();
         // the people filter knows everyone on the list now
@@ -854,7 +867,8 @@
     var progress = el('span', { class: 'chip' });
     var devices = el('ul', { class: 'admins app-devices', hidden: true, 'aria-label': 'أجهزتي اللي عليها إشعارات الإدارة' });
     var install = { done: false, state: 'desktop' };
-    var status = null;
+    // the last known notification state draws at once; status() then confirms it from this browser
+    var status = app.push && app.push.lastStatus ? app.push.lastStatus() : null;
     var busy = false;
 
     function pushBody(next) {

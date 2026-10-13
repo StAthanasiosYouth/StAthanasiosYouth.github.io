@@ -618,7 +618,10 @@ test('stay signed in: Google once in the app → later launches open the panel w
   });
   await again.page.evaluate(token => A.call('apiAdminPushSubscribe', { token, platform: 'android' }), 'a001Xk2:APA91b' + 'Z'.repeat(140) + '1');
   assert.equal(world.spreadsheet.getSheetByName('AdminPushSubs').data.slice(1).filter(r => r[0]).length, 1);
+  // «خروج» asks first («أنت على وشك تسجيل الخروج، هل أنت متأكد؟»)
   await again.page.evaluate(() => { A.signOut(); });
+  assert.match(await again.page.waitForSelector('dialog[open]').then(d => d.evaluate(n => n.textContent)), /أنت على وشك تسجيل الخروج، هل أنت متأكد؟/);
+  await again.page.waitForFunction(() => [...document.querySelectorAll('dialog[open] button')].some(b => b.textContent.includes('تسجيل الخروج')), { timeout: 8000 }).then(() => again.page.evaluate(() => [...document.querySelectorAll('dialog[open] button')].find(b => b.textContent.includes('تسجيل الخروج')).click()));
   await again.page.waitForSelector('.gis-stub', { timeout: 15000 });
   assert.equal(devices().length, 0, 'the device credential is gone on the server');
   assert.equal(world.spreadsheet.getSheetByName('AdminPushSubs').data.slice(1).filter(r => r[0]).length, 0, 'and this device gets no admin notifications');

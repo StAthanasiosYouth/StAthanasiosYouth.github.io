@@ -369,6 +369,17 @@
       close: function () {
         closed = true;
         this.clear();
+      },
+      /* «خروج» in this tab: no automatic sign-in until Google (kept apart from clear()) */
+      signedOut: function (value) {
+        try {
+          if (value === true) window.sessionStorage.setItem(PREFIX + 'signed-out', '1');
+          else if (value === false) window.sessionStorage.removeItem(PREFIX + 'signed-out');
+          return window.sessionStorage.getItem(PREFIX + 'signed-out') === '1';
+        }
+        catch (error) {
+          return false;
+        }
       }
     };
 
@@ -1411,20 +1422,56 @@
 
   }
 
+  /* a step that may never answer (a sleeping network, a stuck worker) can't hold the sign-out */
+  function bounded(promise, ms) {
+
+    return Promise.race([
+      Promise.resolve(promise).catch(function () {}),
+      new Promise(function (resolve) { setTimeout(resolve, ms); })
+    ]);
+
+  }
+
   function signOut() {
 
     A.confirmLeave().then(function (ok) {
+      if (!ok) return false;
+      return A.confirm({
+        tone: 'warn',
+        title: 'تسجيل الخروج',
+        message: 'أنت على وشك تسجيل الخروج، هل أنت متأكد؟',
+        confirmLabel: 'تسجيل الخروج',
+        cancelLabel: 'إلغاء'
+      });
+    }).then(function (ok) {
       if (!ok) return;
       A.dirty = false;
+      // at once: the panel answers the tap; nothing else can be clicked meanwhile
+      try {
+        document.body.classList.add('is-signing-out');
+        var note = document.createElement('div');
+        note.className = 'signing-out';
+        note.setAttribute('role', 'status');
+        note.textContent = 'بنخرجك…';
+        document.body.appendChild(note);
+      }
+      catch (error) {
+        // only feedback
+      }
+      // this tab won't sign itself in again (a remembered device, a saved session) until Google
+      keep.signedOut(true);
       // «خروج» first, while the session still works: no more admin notifications on this
       // device (its subscription goes, the server's row too), and the installed app forgets
       // its device credential; then the session ends
       var live = sid && fresh(session);
-      var ending = (live ? leavePush() : Promise.resolve())
-        .then(function () { return trust.forget(); })
-        .then(function () {
-          return live ? post('apiSessionEnd', [], session.token, sid, { timeout: 4000 }).catch(function () {}) : null;
-        });
+      // the notifications and the remembered device go side by side (they still need the
+      // session), then the session ends; every step bounded: the whole sign-out stays under ~6 s
+      var ending = bounded(Promise.all([
+        bounded(live ? leavePush() : null, 3500),
+        bounded(trust.forget(), 3500)
+      ]), 3600).then(function () {
+        return bounded(live ? post('apiSessionEnd', [], session.token, sid, { timeout: 2500 }) : null, 2500);
+      });
       collab.stop();
       // nothing of this admin stays in the tab: no session to resume, no place, no drafts
       keep.close();
@@ -1438,8 +1485,8 @@
         catch (error) {
           // signed out here anyway
         }
-        // the same URL, from the start (the sign-in screen)
-        window.location.reload();
+        // the sign-in screen, from the start (no hash: nothing opens by itself)
+        window.location.replace(window.location.href.split('#')[0]);
       });
     });
 
@@ -1791,6 +1838,7 @@
     }
 
     var installedNow = false;
+    var lastPush = null;
 
     window.addEventListener('appinstalled', function () {
       installedNow = true;
@@ -1823,8 +1871,16 @@
       push: {
         support: support,
         status: function () {
-          return pushModule().then(function (m) { return m.status(A.call); });
+          // the browser's own subscription decides (push.js), so a reopened panel shows the truth
+          return Promise.all([pushModule(), registration().catch(function () { return null; })]).then(function (both) {
+            return both[0].status(A.call, both[1], info());
+          }).then(function (result) {
+            lastPush = result;
+            return result;
+          });
         },
+        /* the last known state, for an instant first draw (then status() confirms it) */
+        lastStatus: function () { return lastPush; },
         /* must be called inside the tap: the permission prompt opens first */
         enable: function () {
           var asked = window.Notification.permission === 'granted'
@@ -1972,6 +2028,7 @@
       needGoogle: function () { googleNeeded = true; },
       googleArrived: function () {
         googleNeeded = false;
+        keep.signedOut(false);
         if (phase === 'app') trustNow();
       },
       panelOpen: trustNow,
@@ -1989,6 +2046,12 @@
 
       /* the first thing on a page load: the app's device, else the usual (restore after a reload, or Google) */
       start: function () {
+        if (keep.signedOut()) {
+          // after «خروج»: the Google button, nothing automatic (whatever a cleanup step may have missed)
+          saved = null;
+          showSignIn();
+          return;
+        }
         if (!on()) {
           if (saved) restore();
           else showSignIn();

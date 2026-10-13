@@ -499,7 +499,8 @@ test('a reload mid-session (an editor open) comes back without a question, the s
   assert.equal(saved.ok, true, saved.error);
 
   // sign out, then in again: no question either
-  await Promise.all([laptop.page.waitForNavigation({ waitUntil: 'networkidle0' }), laptop.page.evaluate(() => A.signOut())]);
+  await laptop.page.evaluate(() => { A.signOut(); });
+  await Promise.all([laptop.page.waitForNavigation({ waitUntil: 'networkidle0' }), laptop.page.waitForFunction(() => [...document.querySelectorAll('dialog[open] button')].some(b => b.textContent.includes('تسجيل الخروج')), { timeout: 8000 }).then(() => laptop.page.evaluate(() => [...document.querySelectorAll('dialog[open] button')].find(b => b.textContent.includes('تسجيل الخروج')).click()))]);
   await inPanel(laptop.page);
   assert.deepEqual(laptop.problems, []);
   await laptop.close();
