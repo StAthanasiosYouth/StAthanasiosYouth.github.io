@@ -1366,3 +1366,65 @@ automatic sending on (docs/ADMIN-SETUP.md «الإرسال التلقائي»):
 Deploying a version that asks for a scope the owner hasn't granted would make
 the API answer "authorization required" for everyone, so step 2 always comes
 before step 3.
+
+## 19. Store preview, guests, birth dates and age eligibility (binding contract)
+
+### 19.1 Store preview
+
+- `SHOP_MODE` gains `preview` (manual: prizes visible, ordering off, no date
+  needed). New Script Property `SHOP_PREVIEW` '1' | '' (auto mode only: before
+  `opensAt` the state is `preview` instead of `scheduled`).
+- `shopState_` → `open` | `preview` | `scheduled` | `closed`. Only `open`
+  accepts shopRedeem / shopCancel (`shop_closed` otherwise).
+- portalMe `store: { state, opensAt, closesAt, allowCancel }` — `preview`:
+  prizes shown read-only with «المتجر مفتوح للعرض — الطلب هيفتح يوم …»
+  (or «… قريب» without opensAt); `scheduled`: prizes hidden, «المتجر هيفتح
+  يوم …»; `closed` as before.
+- content.json `points.shop`: `{ on, mode (auto|open|preview|closed), preview
+  (bool, auto only), opensAt, closesAt }`; the widget shows «المتجر مفتوح
+  للعرض — الطلب هيفتح …» in the preview state.
+- apiShopSchedule / apiShopScheduleSave: `mode` may be `preview`; new boolean
+  `preview` (auto: show the prizes before opening).
+
+### 19.2 Guests in coded competitions
+
+- Competitions column `allowGuests` '1' | '' (only meaningful when
+  `participation` is `registered`; builder label «السماح بالمشاركة بدون كود»).
+  Public comp.json gains `allowGuests` (bool) and keeps `fields` (the guest
+  form uses it; name + phone by default).
+- compStart with NO ptoken on a registered competition: allowed only when
+  `allowGuests`; validated like open mode (`fields`, phone normalized,
+  uniquePhone / attempts by phone). The Submissions row has `participantId`
+  '' and flags `guest`. The wallet never touches it (registered rows only).
+- Result gains `guest: true` for such rows → the page says «دي نتيجتك — المشاركة
+  بدون كود مفيهاش نقاط». compStart without ptoken and without allowGuests →
+  `session` (as before).
+
+### 19.3 Birth dates and age eligibility
+
+- Participants column `birthDate` 'YYYY-MM-DD' | ''. Admin add/edit takes day /
+  month / year (validated: a real date, not in the future, age 5..100). Import
+  column «تاريخ الميلاد» (aliases: الميلاد, Birth date, DOB) accepts
+  `DD/MM/YYYY`, `D-M-YYYY`, `YYYY-MM-DD`, Arabic digits; empty allowed.
+- Age rules: Script Properties `AGE_MIN` (default 18), `AGE_MAX` (default 30),
+  `AGE_WARN_DAYS` (default 60); admin `apiAgeRules()` → `{ min, max, warnDays }`,
+  `apiAgeRulesSave({ min, max, warnDays })` (0 ≤ min < max ≤ 100; warnDays
+  0..365), logged.
+- Eligibility (computed, never stored on the participant): age = completed
+  years on today's Cairo date. `ok` when min ≤ age ≤ max; `out` otherwise;
+  `soon` when ok AND the day they turn max+1 is within warnDays; `unknown`
+  when no birthDate (treated as eligible). Changing the rules changes it at once;
+  codes, history and balances never change.
+- Person (apiParticipants / apiParticipant) gains `birthDate`, `age`,
+  `eligibility` (ok|soon|out|unknown), `leavesAt` ('YYYY-MM-DD' of the
+  max+1 birthday | ''). apiParticipants query gains `eligibility`
+  (all|ok|soon|out|unknown); the reply gains `counts: { ok, soon, out, unknown }`.
+- Points: when a registered participant submits while `out`, the Submissions
+  row flags `noPoints` and the wallet target for it is 0 forever (later rule
+  changes never take or give back points already decided). Store: shopRedeem
+  for an `out` participant → `{ ok:false, code:'not_eligible', message }`.
+- compCode / portalMe for an `out` participant still succeed (the code and the
+  history are intact) and add `eligible: false` and `notice`:
+  «نأسف، سنك حاليًا خارج الفئة العمرية المخصصة لنظام نقاط الاجتماع. تقدر تشارك
+  في المسابقة بدون نقاط.» The page shows it, then continues normally (the
+  attempt is recorded under their code, with no points).
