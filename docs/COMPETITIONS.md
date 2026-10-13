@@ -1173,3 +1173,156 @@ apiShopRedemptionStatus(id, status:'approved'|'fulfilled'|'cancelled', note?) �
   repeated requestKey); errors `bad`, `session`, `busy`, `not_found` («الجايزة دي مش متاحة دلوقتي.»),
   `stock` «الجايزة دي خلصت.», `per_person` «وصلت للحد المسموح من الجايزة دي.»,
   `insufficient` «رصيدك مش كفاية.» (+ `balance`).
+
+## 18. Points & Store v2: schedule, cancel, seasons, automatic push (binding contract)
+
+Approved plan; this section is the build contract for the server, the public
+pages and the admin. Existing behaviour not mentioned here is unchanged.
+
+### 18.1 One lock, short critical sections
+
+- `compLock_()` = `LockService.getScriptLock()` ALWAYS (the user-lock path and
+  any per-execution fallback are removed). Every write that changes points,
+  stock, requests, submissions or seasons takes it: compStart/compSubmit rows,
+  shopRedeem, shopCancel, apiShopRedemptionStatus, apiWalletAdjust, wallet
+  reconcile/sync, season close/transfer.
+- NO network call (UrlFetch: GitHub, Drive, FCM, tokeninfo, routes) is ever
+  made while the script lock is held, anywhere in the project. Audit every
+  `getScriptLock` holder (Code.gs mutate_, Media.gs, Items.gs, Import.gs,
+  Push.gs, AdminNotify.gs, Activity.gs, Presence.gs, Migrate.gs, Comp*.gs).
+- Publish in three steps:
+  A. under the lock (short): build from the draft, check the reviewed
+     revision, write content-addressed snapshots, list media ids, compute
+     files, set a publish claim (CacheService `publish:claim` =
+     { token, revision }, 10 min; a second publish while claimed →
+     «فيه نشر شغال دلوقتي»); release.
+  B. no lock: fetch live, download media bytes from Drive, GitHub commit
+     (fast-forward ref update; the existing one retry on a moved ref).
+  C. under the lock (short): only if the claim is still ours — stamp media
+     `publishedAt`, set `liveVersion` / `publishedAt` of the published
+     competitions, PUBLISHED_* properties, log + activity; drop the claim.
+  A failure in B drops the claim and changes nothing local. Lock hold
+  target: < 2 s per step.
+- Public calls use `tryLock(30000)`; on timeout → `busy` (pages already retry
+  with the same idempotency keys).
+
+### 18.2 Stock: claim, then verify
+
+shopRedeem under the lock: idempotency (requestKey) → store open → item
+active → per-person → balance (active season) → APPEND the Redemption
+(pending, ledgerId '') → `SpreadsheetApp.flush()` → re-read only the
+Redemptions `itemId` + `status` columns → if the position of our row among
+this item's non-cancelled rows (sheet order) > stock → mark ours `cancelled`
+(note «الجايزة خلصت», never charged) and answer `stock`; else append the
+ledger charge and link it. shopCancel and admin cancel refund once
+(idemKey `ref:<id>`).
+
+### 18.3 Store schedule and participant cancel
+
+Script Properties (written only by `apiShopScheduleSave`, read through a 60 s
+cache `shop:settings`): `SHOP_MODE` auto|open|closed (default auto),
+`SHOP_OPENS_AT`, `SHOP_CLOSES_AT` (Cairo `YYYY-MM-DD HH:MM`, '' = no bound),
+`SHOP_ALLOW_CANCEL` '1'|''. `shopState_(now)` → `open` | `scheduled` |
+`closed` (auto: before opensAt = scheduled; after closesAt = closed; else open).
+- shopRedeem when not open → `{ ok:false, code:'shop_closed', message }`.
+- New public action `shopCancel { ptoken, redemptionId }`: allowed only when
+  SHOP_ALLOW_CANCEL, store `open`, the request is the participant's own,
+  status `pending`, and its season is the active season → status cancelled,
+  refund (same season), `{ ok, redemption, balance }`; else codes
+  `shop_closed` | `not_allowed` | `not_found`.
+- Admin can always approve / fulfil / cancel (+refund). The refund goes to
+  the request's own season, which must be active (closing a season requires
+  no open requests, §18.6), so a closed season never changes.
+
+### 18.4 Public data
+
+content.json (additive, at publish, only when registry+wallet are on):
+
+    "points": { "url": "points/",
+                "shop": { "on", "mode", "opensAt", "closesAt" } | null,
+                "season": { "name", "startAt", "endAt" } | null }
+
+(Cairo `YYYY-MM-DDTHH:MM`). The main page draws a «نقاطي / المتجر» widget
+from it with no server call; its state is computed in the browser (the
+server enforces). Notification target kind `points` → `/points/` (Hub.gs,
+Items.gs target text `points`, content.js, bell.js, sw.js safeUrl,
+Push.gs pushUrl_).
+
+portalMe adds:
+
+    shop: { state, opensAt, closesAt, allowCancel },
+    season: { id, name, startAt, endAt, earned, maxTheoretical } | null,
+    seasons: [{ id, name, startAt, endAt, final, earned, spent }]  (closed, newest first, from SeasonTotals)
+    redemptions[].canCancel (bool)
+
+`balance` and `ledger` = the ACTIVE season only.
+
+### 18.5 Automatic push schedule
+
+- Tab `PushSchedule`: `id` (psh-…), `notifId`, `kind` (shop-open-1d,
+  shop-open-1h, shop-open, shop-close-24h, shop-close-1h, season-end),
+  `refId` (season id | ''), `sendAt` (Cairo stamp), `status`
+  pending|sent|skipped|failed|cancelled, `result` (short text), `sendKey`,
+  `updatedAt`.
+- Saving the store schedule / a season with notify choices creates/syncs the
+  linked bell Notifications rows (ids `notif-shop-open-1d`,
+  `notif-shop-open-1h`, `notif-shop-open`, `notif-shop-close-24h`,
+  `notif-shop-close-1h`, `notif-season-<id>-end`; type `general`; target
+  `points`; publishAt = sendAt; sensible expireAt) and their PushSchedule
+  entries (cancelled when unticked; recomputed when times change).
+- One one-off trigger `pushScheduleTick` at the earliest pending sendAt
+  (re-armed at the end of every tick and after every schedule change;
+  deleted when nothing is pending) + one daily safety trigger
+  `pushScheduleDaily` (re-arms; sends entries overdue by < 6 h; marks older
+  ones skipped «فات ميعاده»). Never more than 2 project triggers of ours.
+- A tick sends each due entry through the SAME code path as `apiSendPush`
+  (live item check against the published site, PushLog once-per-item,
+  cooldown/daily cap, FCM fan-out), outside the lock. Not live → `skipped`
+  «مش منشور» + admin push to the admins.
+- Needs OAuth scope `https://www.googleapis.com/auth/script.scriptapp`.
+  `enableAutoPush()` (run once by the owner from the Apps Script editor)
+  authorizes it and installs the daily trigger. `apiPushAuto()` →
+  `{ authorized, daily, nextDue, pending }`. Until authorized the admin shows
+  «الإرسال التلقائي مش متفعل» and entries stay pending (bell items still
+  appear on time). Every ScriptApp call is guarded (never breaks a save).
+  Deploy note: the manifest scope is added only AFTER the owner authorizes
+  (see ADMIN-SETUP); without the scope every ScriptApp call is a guarded no-op.
+
+### 18.6 Seasons
+
+- Tab `Seasons`: `id` (sea-…), `name`, `startAt`, `endAt`, `status`
+  planned|active|closed, `notifyDays` ('' | 1..30), `closedAt`, `closedBy`,
+  `createdAt`, `updatedAt`. Exactly one `active` season. The first time the
+  wallet needs a season and none exists, «الموسم الأول» (`sea-first`) is
+  created active; ledger/redemption rows with an empty `seasonId` belong to it.
+- New column `seasonId` on PointsLedger, Redemptions and Competitions (draft;
+  copied into the snapshot definition). Builder default = the season active
+  at the competition's start (else the active one).
+- A competition's points land in ITS season. Reconcile writes nothing for a
+  competition whose season is closed (frozen). Requests spend and refund in
+  their own season. Balance = Σ ledger rows of the active season.
+- No points cap. `maxTheoretical(season)` = Σ maxScore (gradable points of
+  the published snapshot) of the season's wallet competitions (best attempt
+  only); `expected` = the same for its unpublished ones.
+- Close: `apiSeasonClosePreview(id)` → `{ season, totals:[{ pid, name, group,
+  earned, spent, adjusted, final }], openRequests:[…], canClose, confirmKey }`;
+  `apiSeasonClose(id, confirmKey, next)` (next = a planned season id or
+  `{ name, startAt, endAt }`) under the lock: refuses while the season has
+  pending/approved requests; one batch write of SeasonTotals; status closed;
+  next becomes active; logged. Nothing is deleted.
+- Carry-over only explicitly: `apiWalletAdjust` with `kind:'transfer'` (new
+  ledger kind, label «تحويل من موسم فات») in the active season, logged.
+- `SeasonTotals`: `seasonId`, `pid`, `earned`, `spent`, `adjusted`, `final`,
+  `closedAt` (frozen; written once).
+- Admin API: `apiSeasons()` → `{ active, seasons:[{ id, name, startAt, endAt,
+  status, notifyDays, closedAt, closedBy, maxTheoretical, expected,
+  competitions, topBalance, participants }] }`, `apiSeasonSave(input)`,
+  `apiSeasonClosePreview`, `apiSeasonClose`.
+- Store admin items gain `pctOfMax` (cost ÷ the active season's maxTheoretical).
+
+### 18.7 Admin API for the store schedule
+
+`apiShopSchedule()` → `{ mode, opensAt, closesAt, allowCancel, state,
+notify: { open1d, open1h, openAt, close24h, close1h }, auto: apiPushAuto() }`;
+`apiShopScheduleSave(input)` → the same shape (+ synced bell items and
+schedule); `apiPushSchedule()` → entries; `apiPushScheduleCancel(id)`.
