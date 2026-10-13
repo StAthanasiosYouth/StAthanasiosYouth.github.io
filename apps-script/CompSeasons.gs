@@ -157,7 +157,8 @@ function seasonMaxima_() {
   var points = Object.create(null);
 
   (draft.questions || []).forEach(function (q) {
-    if (q.type === 'info' || String(q.enabled) === '' && q.enabled !== undefined && q.enabled !== '1') return;
+    // info blocks give nothing; a disabled question ('' in the enabled column) is not asked
+    if (q.type === 'info' || q.enabled === '') return;
     points[q.compId] = (points[q.compId] || 0) + (Number(q.points) || 0);
   });
 
