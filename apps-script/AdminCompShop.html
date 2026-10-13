@@ -28,17 +28,17 @@
     cancelled: { label: 'إلغاء ورجّع النقاط', icon: 'close', kind: 'btn--danger' }
   };
 
-  /* «٣٨٠٠ = ٩٠٪ من أقصى الموسم» (§18.6 pctOfMax = cost ÷ the active season's maximum) */
+  /* «٣٨٠٠ = ٩٠٪ من أقصى الموسم» (§18.8 pctOfMax = round(cost × 100 ÷ the active season's maximum), a whole percent) */
   function pctText(item) {
     var v = Number(item.pctOfMax);
-    if (item.pctOfMax === null || item.pctOfMax === undefined || !isFinite(v)) return '';
-    return ar(item.cost) + ' = ' + ar(Math.round(v * 100)) + '٪ من أقصى الموسم';
+    if (item.pctOfMax === null || item.pctOfMax === undefined || item.pctOfMax === '' || !isFinite(v)) return '';
+    return ar(item.cost) + ' = ' + ar(Math.round(v)) + '٪ من أقصى الموسم';
   }
 
   function pctChip(item) {
     var text = pctText(item);
     if (!text) return null;
-    var chip = A.chip(text, Number(item.pctOfMax) > 1 ? 'danger' : 'info');
+    var chip = A.chip(text, Number(item.pctOfMax) > 100 ? 'danger' : 'info');
     chip.classList.add('comp-pct');
     return chip;
   }
@@ -234,7 +234,9 @@
       var pricing = el('p', { class: 'field__hint comp-pricing', role: 'status', 'aria-live': 'polite' });
       var priceHint = function () {
         var season = C.activeSeason ? C.activeSeason() : null;
-        var max = season ? Number(season.maxTheoretical) || 0 : 0;
+        // apiShopItems' seasonMax first (§18.8), else the season's own maximum
+        var max = (r && Number(r.seasonMax)) || (season ? Number(season.maxTheoretical) || 0 : 0);
+        season = season || { name: 'الموسم الشغال' };
         var c = Number(cost.value) || 0;
         pricing.hidden = !max;
         if (!max) return;

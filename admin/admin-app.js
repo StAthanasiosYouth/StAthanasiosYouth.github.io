@@ -12910,17 +12910,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     cancelled: { label: 'إلغاء ورجّع النقاط', icon: 'close', kind: 'btn--danger' }
   };
 
-  /* «٣٨٠٠ = ٩٠٪ من أقصى الموسم» (§18.6 pctOfMax = cost ÷ the active season's maximum) */
+  /* «٣٨٠٠ = ٩٠٪ من أقصى الموسم» (§18.8 pctOfMax = round(cost × 100 ÷ the active season's maximum), a whole percent) */
   function pctText(item) {
     var v = Number(item.pctOfMax);
-    if (item.pctOfMax === null || item.pctOfMax === undefined || !isFinite(v)) return '';
-    return ar(item.cost) + ' = ' + ar(Math.round(v * 100)) + '٪ من أقصى الموسم';
+    if (item.pctOfMax === null || item.pctOfMax === undefined || item.pctOfMax === '' || !isFinite(v)) return '';
+    return ar(item.cost) + ' = ' + ar(Math.round(v)) + '٪ من أقصى الموسم';
   }
 
   function pctChip(item) {
     var text = pctText(item);
     if (!text) return null;
-    var chip = A.chip(text, Number(item.pctOfMax) > 1 ? 'danger' : 'info');
+    var chip = A.chip(text, Number(item.pctOfMax) > 100 ? 'danger' : 'info');
     chip.classList.add('comp-pct');
     return chip;
   }
@@ -13116,7 +13116,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       var pricing = el('p', { class: 'field__hint comp-pricing', role: 'status', 'aria-live': 'polite' });
       var priceHint = function () {
         var season = C.activeSeason ? C.activeSeason() : null;
-        var max = season ? Number(season.maxTheoretical) || 0 : 0;
+        // apiShopItems' seasonMax first (§18.8), else the season's own maximum
+        var max = (r && Number(r.seasonMax)) || (season ? Number(season.maxTheoretical) || 0 : 0);
+        season = season || { name: 'الموسم الشغال' };
         var c = Number(cost.value) || 0;
         pricing.hidden = !max;
         if (!max) return;
@@ -13414,7 +13416,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           A.withBusy(go, A.call('apiSeasonClose', season.id, preview.confirmKey, next)).then(function (result) {
             A.dirty = false;
             A.closeSheet().then(function () {
-              var nextName = result && (result.next && result.next.name || result.active && result.active.name) || (typeof next === 'object' ? next.name : C.seasonName(next));
+              var now = result ? activeOf(result) : null;
+              var nextName = (now && now.name) || (result && result.next && result.next.name) || (typeof next === 'object' ? next.name : C.seasonName(next));
               A.modal({
                 tone: 'success',
                 title: '«' + season.name + '» اتقفل ✓',
@@ -13452,7 +13455,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
                 el('span', { class: 'item__icon', 'aria-hidden': 'true' }, icon('gift')),
                 el('div', { class: 'item__main' },
                   el('span', { class: 'item__title', text: (r.itemName || 'جايزة') + ' · ' + num(r.cost) + ' نقطة' }),
-                  el('span', { class: 'item__sub item__sub--rtl', text: (r.participantName || '') + (r.statusLabel ? ' · ' + r.statusLabel : '') })),
+                  el('span', { class: 'item__sub item__sub--rtl', text: (r.participantName || r.name || '') + ' · ' + (r.statusLabel || ({ pending: 'مستني', approved: 'جاهزة للاستلام' })[r.status] || r.status || '') + (r.requestedAt ? ' · ' + C.when(stamp(r.requestedAt)) : '') })),
                 el('div', { class: 'item__controls' }, el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'open-request', onclick: function () {
                   A.closeSheet().then(function (closedSheet) { if (closedSheet && A.compShopOpen) A.compShopOpen({ redemption: r.id }); });
                 } }, 'افتح الطلب')));
@@ -13518,10 +13521,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       el('details', { class: 'tech' },
         el('summary', { text: 'إزاي يتفعّل (للمالك)' }),
         el('ol', { class: 'comp-auto__how' },
-          el('li', { text: 'افتح مشروع Apps Script بتاع لوحة التحكم بحساب المالك.' }),
-          el('li', { text: 'من القايمة فوق اختار الدالة enableAutoPush ودوس «تشغيل».' }),
-          el('li', { text: 'وافق على الصلاحية الجديدة (تشغيل المهام في مواعيدها).' }),
-          el('li', { text: 'ارجع هنا واعمل Refresh: المفروض يظهر «مفعّل ✓».' }))),
+          el('li', { text: 'المسؤول عن الكود يضيف صلاحية «تشغيل المهام في مواعيدها» (script.scriptapp) لمشروع Apps Script ويعمل clasp push.' }),
+          el('li', { text: 'المالك يفتح مشروع Apps Script بحسابه، يختار الدالة enableAutoPush من فوق ويدوس «Run»، ويوافق على شاشة الصلاحيات («Allow»). السجل هيقول «الإرسال التلقائي اتفعّل ✓».' }),
+          el('li', { text: 'بعدها بس ينشر نسخة جديدة من الـAPI (الترتيب مهم: النسخة اللي بتطلب صلاحية لسه ماتوافقش عليها بتوقف لوحة التحكم).' }),
+          el('li', { text: 'ارجع هنا واعمل Refresh: المفروض يظهر «مفعّل ✓». التفاصيل في docs/ADMIN-SETUP.md (الإرسال التلقائي).' }))),
       auto.pending ? el('p', { class: 'field__hint', text: num(auto.pending) + ' إرسال مستني التفعيل.' }) : null);
   }
 
@@ -13563,7 +13566,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
             var row = A.listItem({
               icon: 'bell',
               title: KIND_WORDS[e.kind] || e.kind,
-              sub: C.when(stamp(e.sendAt)),
+              sub: C.when(stamp(e.sendAt)) + (e.title ? ' — «' + e.title + '»' : ''),
               off: e.status !== 'pending',
               chips: [A.chip(st.label, st.kind), e.result ? A.chip(e.result, 'off') : null].filter(Boolean),
               controls: [el('span', { class: 'spacer' }), cancel]

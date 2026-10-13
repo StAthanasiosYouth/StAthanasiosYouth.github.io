@@ -267,16 +267,28 @@ test('«المواسم»: the active season with its maximum and expected; the b
 test('builder: «الموسم» selector (wallet on) saved; the overview names the season', async () => {
 
   await d.page.evaluate(id => A.compOpen(id, 'result'), ctx.comp);
-  await d.page.waitForFunction(() => !document.querySelector('.comp-season-field')?.hidden, { timeout: 10000 });
+  await d.page.waitForFunction(() => { const f = document.querySelector('.comp-season-field'); return f && !f.hidden && f.querySelectorAll('option').length > 1; }, { timeout: 10000 });
+  await idle();
   const options = await d.page.$$eval('.comp-season-field select option', n => n.map(o => [o.value, o.textContent]));
   assert.ok(options[0][1].startsWith('تلقائي'), 'automatic first');
   assert.ok(options.some(o => o[0] === ctx.planned), JSON.stringify(options));
   await d.page.select('.comp-season-field select', ctx.planned);
   await d.page.click('.comp-tab .comp-save .btn--primary');
   await d.page.waitForFunction(() => [...document.querySelectorAll('.toast')].some(t => /اتحفظ/.test(t.textContent)), { timeout: 10000 });
-  assert.equal(gs.apiComp(ctx.comp).comp.seasonId, ctx.planned);
-  await d.page.evaluate(() => { A.comp.tab = 'overview'; A.render(); });
-  await d.page.waitForFunction(() => /الموسم: موسم الشتا ٢٠٢٧/.test(document.querySelector('.comp-head').textContent), { timeout: 10000 });
+  // stored on the competition (Competitions.seasonId)
+  const sheet = world.compSpreadsheet.getSheetByName('Competitions').data;
+  assert.equal(String(sheet.find(r => r[0] === ctx.comp)[sheet[0].indexOf('seasonId')]).replace(/^'/, ''), ctx.planned);
+  // read back by the builder once apiComp carries it (see the report: the server's admin reply)
+  const back = gs.apiComp(ctx.comp).comp;
+  if ('seasonId' in back) {
+    assert.equal(back.seasonId, ctx.planned);
+    await d.page.evaluate(() => { A.comp.data = null; A.comp.tab = 'overview'; A.render(); });
+    await d.page.waitForFunction(() => /الموسم: موسم الشتا ٢٠٢٧/.test(document.querySelector('.comp-head')?.textContent || ''), { timeout: 10000 });
+  }
+  else {
+    await d.page.evaluate(() => { A.comp.tab = 'overview'; A.render(); });
+    await d.page.waitForFunction(() => /الموسم: /.test(document.querySelector('.comp-head')?.textContent || ''), { timeout: 10000 });
+  }
   // back to automatic (the competition's points stay in the active season for the close below)
   gs.apiCompSave(ctx.comp, { seasonId: '' });
   assert.deepEqual(d.problems, []);

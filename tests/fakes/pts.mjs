@@ -127,7 +127,8 @@ export function installPtsFakes(world, admin) {
     },
     apiShopItems() {
       const r = plain(realItems());
-      r.items.forEach(i => { i.pctOfMax = i.cost / maxOf(); });
+      r.seasonMax = maxOf();
+      r.items.forEach(i => { i.pctOfMax = Math.round(i.cost * 100 / maxOf()); });
       return r;
     },
     apiCompSave(id, input) {
