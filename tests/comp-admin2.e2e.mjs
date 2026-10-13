@@ -313,7 +313,7 @@ test('names import: template; every kind classified with its why; filters; group
   await d.page.waitForFunction(() => A.comp.lastDownload && /الأسماء/.test(A.comp.lastDownload.filename));
   const template = await readXlsx(Uint8Array.from(await d.page.evaluate(() => Array.from(A.comp.lastDownload.bytes))));
   assert.deepEqual(template.sheets.map(s => s.name), [PEOPLE_SHEET, 'شرح', 'مثال']);
-  assert.deepEqual(template.sheets[0].rows[0], ['الاسم بالكامل', 'رقم الموبايل', 'المجموعة / الفصل', 'الكنيسة', 'ملاحظات']);
+  assert.deepEqual(template.sheets[0].rows[0], ['الاسم بالكامل', 'رقم الموبايل', 'المجموعة / الفصل', 'الكنيسة', 'تاريخ الميلاد', 'ملاحظات']);
 
   const path = `${SHOTS}names.xlsx`;
   writeFileSync(path, writeXlsx({ sheets: [{ name: PEOPLE_SHEET, rows: namesFile(), textColumns: [0, 1, 2] }] }));

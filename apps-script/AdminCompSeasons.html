@@ -297,12 +297,58 @@
 
 
   /* =======================================================
+     «الفئة العمرية لنظام النقاط» (§19.3) — on «المسابقات ← الإعدادات»
+  ======================================================= */
+
+  A.compAgeRulesCard = function () {
+    var body = el('div', { class: 'comp-age-rules', 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--line' }));
+    var box = A.errorBox();
+    var numInput = function (value, min, max, label) { return el('input', { class: 'input comp-number', type: 'number', inputmode: 'numeric', min: String(min), max: String(max), step: '1', value: value === undefined || value === null ? '' : String(value), 'aria-label': label, oninput: A.markDirty }); };
+
+    function draw(r) {
+      var min = numInput(r.min, 0, 99, 'أقل سن');
+      var max = numInput(r.max, 1, 100, 'أكبر سن');
+      var warn = numInput(r.warnDays, 0, 365, 'التنبيه قبلها بكام يوم');
+      var said = el('p', { class: 'field__hint comp-age-said', role: 'status', 'aria-live': 'polite' });
+      var sync = function () { said.textContent = 'نظام النقاط للي من ' + ar(min.value || 0) + ' لحد ' + ar(max.value || 0) + ' سنة. قبل ما حد يكمّل ' + ar((Number(max.value) || 0) + 1) + ' بـ' + ar(warn.value || 0) + ' يوم بيظهر عنده «قرب يخرج من السن».'; };
+      [min, max, warn].forEach(function (i) { i.addEventListener('input', sync); });
+      sync();
+      var save = el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'age-save', text: 'حفظ الفئة العمرية' });
+      save.addEventListener('click', function () {
+        box.hidden = true;
+        A.withBusy(save, A.call('apiAgeRulesSave', { min: Number(min.value), max: Number(max.value), warnDays: Number(warn.value) })).then(function (next) {
+          A.dirty = false;
+          A.toast('الفئة العمرية اتحفظت ✓ — اتطبقت على الكل دلوقتي');
+          draw(next && next.min !== undefined ? next : { min: Number(min.value), max: Number(max.value), warnDays: Number(warn.value) });
+        }).catch(function (error) { A.fail(error, box); });
+      });
+      A.fill(body,
+        el('div', { class: 'comp-age-grid' },
+          A.field('أقل سن', min), A.field('أكبر سن', max), A.field('التنبيه قبلها بكام يوم', warn)),
+        said,
+        el('p', { class: 'note comp-age-rules__note', text: 'تغيير الفئة بيتطبق على طول على مين «مناسب» ومين «خارج السن». الأكواد والتاريخ والمشاركات القديمة مبتتغيرش، والنقاط اللي اتاخدت قبل كده بتفضل. اللي خارج السن يقدر يشارك في المسابقات عادي، بس من غير نقاط ومن غير طلب جوايز.' }),
+        el('div', { class: 'actions comp-save' }, save));
+    }
+
+    A.call('apiAgeRules').then(function (r) { if (body.isConnected) draw(r || {}); }).catch(function (error) {
+      if (!body.isConnected) return;
+      if (C.v2Missing(error)) { A.fill(body, el('p', { class: 'note note--warn comp-v2-missing', text: 'الفئة العمرية محتاجة تحديث السيرفر. أول ما يتركب هتشتغل هنا لوحدها.' })); return; }
+      body.replaceChildren();
+      A.fail(error, box);
+    });
+
+    return A.card('الفئة العمرية لنظام النقاط', 'مين يكسب نقاط ويطلب جوايز، بالسن (من تاريخ الميلاد).', box, body);
+  };
+
+
+  /* =======================================================
      «مواعيد المتجر» + automatic pushes
   ======================================================= */
 
   var MODES = [
     { value: 'auto', label: 'تلقائي حسب المواعيد' },
     { value: 'open', label: 'مفتوح' },
+    { value: 'preview', label: 'للعرض بس (من غير طلب)' },
     { value: 'closed', label: 'مقفول' }
   ];
   var NOTIFY = [
@@ -315,8 +361,16 @@
   var KIND_WORDS = { 'shop-open-1d': 'قبل فتح المتجر بيوم', 'shop-open-1h': 'قبل فتح المتجر بساعة', 'shop-open': 'وقت فتح المتجر', 'shop-close-24h': 'قبل قفل المتجر بـ٢٤ ساعة', 'shop-close-1h': 'قبل قفل المتجر بساعة', 'season-end': 'قبل نهاية الموسم' };
   var SEND_STATUS = { pending: { label: 'مستني', kind: 'gold' }, sent: { label: 'اتبعت', kind: 'ok' }, skipped: { label: 'اتخطى', kind: 'off' }, failed: { label: 'فشل', kind: 'danger' }, cancelled: { label: 'اتلغى', kind: 'off' } };
 
+  var MODE_SAID = {
+    auto: 'تلقائي = بيفتح ويقفل لوحده في المواعيد اللي تحت (ولو علّمت «اعرض الجوايز قبل ما الطلب يفتح»، الجوايز بتبان قبل الفتح من غير طلب).',
+    open: 'مفتوح = المشتركين بيشوفوا الجوايز ويطلبوا دلوقتي، لحد ما تغيّره.',
+    preview: 'للعرض بس = الجوايز وأسعارها ظاهرة في «نقاطي»، بس الطلب مقفول لحد ما تفتحه. مناسب قبل موسم الجوايز علشان الناس تتحمس.',
+    closed: 'مقفول = الجوايز مش ظاهرة ومفيش طلبات. الطلبات القديمة بتفضل، والنقاط زي ما هي.'
+  };
+
   C.shopStateChip = function (state, opensAt) {
     if (state === 'open') return A.chip('المتجر مفتوح', 'ok');
+    if (state === 'preview') return A.chip('للعرض — الطلب ' + (opensAt ? 'هيفتح ' + C.when(stamp(opensAt)) : 'هيفتح قريب'), 'info');
     if (state === 'scheduled') return A.chip('هيفتح' + (opensAt ? ' ' + C.when(stamp(opensAt)) : ''), 'gold');
     return A.chip('المتجر مقفول', 'danger');
   };
@@ -402,24 +456,30 @@
       var opens = A.dateTimeInput(stamp(s.opensAt), { emptyText: 'من غير ميعاد فتح', presets: [A.PRESETS.now, A.PRESETS.friday] });
       var closes = A.dateTimeInput(stamp(s.closesAt), { emptyText: 'من غير ميعاد قفل', presets: [A.PRESETS.sunday10] });
       var allow = A.checkbox('يسمح للمشترك يلغي طلبه وهو مستني', !!s.allowCancel, 'من «نقاطي»، والنقاط بترجعله على طول. بس والمتجر مفتوح.');
+      // auto mode: before opening, the prizes can be shown (no ordering) instead of hidden
+      var showFirst = A.checkbox('اعرض الجوايز قبل ما الطلب يفتح', !!s.preview, 'قبل ميعاد الفتح المشتركين بيشوفوا الجوايز وأسعارها في «نقاطي» (ويجمّعوا نقاط عليها)، بس مفيش طلب لحد ما يفتح.');
+      showFirst.node.dataset.preview = '';
       var notify = s.notify || {};
       var ticks = NOTIFY.map(function (n) {
         var c = A.checkbox(n.label, !!notify[n.key]);
         c.node.dataset.notify = n.key;
         return { key: n.key, check: c };
       });
+      var modeSaid = el('p', { class: 'field__hint comp-mode-said', role: 'status', 'aria-live': 'polite' });
       var times = el('div', { class: 'form-group' }, A.field('بيفتح', opens.node), A.field('بيقفل', closes.node));
       var save = el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'schedule-save', text: 'حفظ المواعيد' });
 
       function sync() {
         var m = mode.value() || 'auto';
         times.classList.toggle('is-muted', m !== 'auto');
+        showFirst.node.hidden = m !== 'auto';
+        modeSaid.textContent = MODE_SAID[m] || '';
       }
       sync();
 
       save.addEventListener('click', function () {
         box.hidden = true;
-        var input = { mode: mode.value() || 'auto', opensAt: opens.value(), closesAt: closes.value(), allowCancel: allow.input.checked, notify: {} };
+        var input = { mode: mode.value() || 'auto', opensAt: opens.value(), closesAt: closes.value(), allowCancel: allow.input.checked, preview: showFirst.input.checked, notify: {} };
         ticks.forEach(function (t) { input.notify[t.key] = t.check.input.checked; });
         A.withBusy(save, A.call('apiShopScheduleSave', input)).then(function (reply) {
           A.dirty = false;
@@ -433,8 +493,10 @@
       A.fill(body,
         el('div', { class: 'item__meta comp-shop-state' }, C.shopStateChip(s.state, s.opensAt)),
         el('div', { class: 'form' },
-          A.field('المتجر', mode.node, 'تلقائي = بيفتح ويقفل لوحده في المواعيد اللي تحت. مفتوح / مقفول = بإيدك لحد ما تغيّره.'),
+          A.field('المتجر', mode.node),
+          modeSaid,
           times,
+          showFirst.node,
           allow.node,
           el('div', { class: 'form-group comp-notify' }, el('p', { class: 'section-label', text: 'إشعارات المتجر' }), ticks.map(function (t) { return t.check.node; }),
             el('p', { class: 'field__hint', text: 'بتظهر في الجرس في ميعادها (بعد «راجع وانشر»)، وبتتبعت push لوحدها لو الإرسال التلقائي متفعّل.' })),
