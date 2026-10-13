@@ -632,6 +632,12 @@ function shopRedeemAction_(arg) {
   if (!participant) return compFail_('session');
 
   var pid = participant.id;
+
+  // outside the points age range: the balance and history stay, ordering doesn't (§19.3)
+  if (typeof regEligibilityOf_ === 'function' && regEligibilityOf_(participant).state === 'out') {
+    return compFail_('not_eligible', REG_AGE_NOTICE);
+  }
+
   var lock = compLock_();
 
   if (!lock) return compFail_('busy');
@@ -761,7 +767,7 @@ function shopRedeemAction_(arg) {
    SCHEDULE AND PARTICIPANT CANCEL (docs/COMPETITIONS.md §18.3)
 ========================================================= */
 
-var SHOP_MODES = ['auto', 'open', 'closed'];
+var SHOP_MODES = ['auto', 'open', 'preview', 'closed'];
 var SHOP_SETTINGS_CACHE = 'shop:settings';
 var SHOP_NOTIFY_KEYS = ['open1d', 'open1h', 'openAt', 'close24h', 'close1h'];
 
@@ -795,6 +801,8 @@ function shopSettings_() {
     opensAt: String(props.getProperty('SHOP_OPENS_AT') || ''),
     closesAt: String(props.getProperty('SHOP_CLOSES_AT') || ''),
     allowCancel: props.getProperty('SHOP_ALLOW_CANCEL') === '1',
+    // auto: the prizes are shown (no ordering) before opensAt (§19.1)
+    preview: props.getProperty('SHOP_PREVIEW') === '1',
     notify: SHOP_NOTIFY_KEYS.reduce(function (out, key) { out[key] = !!notify[key]; return out; }, {})
   };
 
@@ -819,8 +827,9 @@ function shopState_(settings, nowWall) {
   var state = 'open';
 
   if (settings.mode === 'closed') state = 'closed';
+  else if (settings.mode === 'preview') state = 'preview';
   else if (settings.mode === 'auto') {
-    if (opens && nowWall < opens) state = 'scheduled';
+    if (opens && nowWall < opens) state = settings.preview ? 'preview' : 'scheduled';
     else if (closes && nowWall >= closes) state = 'closed';
   }
 
@@ -928,6 +937,7 @@ function shopScheduleView_() {
     opensAt: settings.opensAt,
     closesAt: settings.closesAt,
     allowCancel: settings.allowCancel,
+    preview: !!settings.preview,
     state: state.state,
     notify: settings.notify,
     auto: typeof pushAutoState_ === 'function' ? pushAutoState_() : null
@@ -975,6 +985,7 @@ function apiShopScheduleSave(input) {
     SHOP_OPENS_AT: opens,
     SHOP_CLOSES_AT: closes,
     SHOP_ALLOW_CANCEL: input.allowCancel ? '1' : '',
+    SHOP_PREVIEW: input.preview ? '1' : '',
     SHOP_NOTIFY: JSON.stringify(notify)
   });
 
