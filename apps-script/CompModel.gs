@@ -504,6 +504,7 @@ function compParseComp_(row) {
     fields: compFieldsSpec_(row.fields, []),
     successText: compText_(row.successText),
     enabled: compFlag_(row.enabled) === '1',
+    seasonId: /^sea-[0-9a-z]{4,12}$/.test(String(row.seasonId || '')) ? String(row.seasonId) : '',
     cardId: compLine_(row.cardId),
     liveVersion: compLine_(row.liveVersion),
     publishedAt: compLine_(row.publishedAt),

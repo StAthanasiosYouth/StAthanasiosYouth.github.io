@@ -183,7 +183,8 @@ function compAdminComp_(row) {
     showPoints: c.showPoints, wallet: c.wallet, attempts: c.attempts, layout: c.layout, shuffleQ: c.shuffleQ, shuffleC: c.shuffleC,
     timeLimit: c.timeLimit, maxSubmissions: c.maxSubmissions, uniquePhone: c.uniquePhone, fields: c.fields, successText: c.successText,
     enabled: c.enabled, cardId: c.cardId, liveVersion: c.liveVersion, publishedAt: c.publishedAt, closedAt: row.closedAt || '',
-    finalizedAt: c.finalizedAt, archived: c.archived, createdBy: c.createdBy, createdAt: c.createdAt, updatedAt: c.updatedAt
+    finalizedAt: c.finalizedAt, archived: c.archived, createdBy: c.createdBy, createdAt: c.createdAt, updatedAt: c.updatedAt,
+    seasonId: c.seasonId || ''
   };
 
 }
