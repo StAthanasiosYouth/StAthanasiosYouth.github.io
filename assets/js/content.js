@@ -308,6 +308,8 @@ function cleanHub(raw) {
       else if (t && t.kind === 'url' && safeHttps(t.url)) target = { kind: 'url', url: safeHttps(t.url) };
       // a competition opens its own page (same tab)
       else if (t && t.kind === 'competition' && compSlug(t.slug || t.id)) target = { kind: 'competition', slug: compSlug(t.slug || t.id) };
+      // «نقاطي»: its own page, points/ (same tab)
+      else if (t && t.kind === 'points') target = { kind: 'points' };
       return {
         id: cleanId(n.id),
         type: NOTIFICATION_TYPES.includes(n.type) ? n.type : 'general',
@@ -374,7 +376,29 @@ function cleanHub(raw) {
     }))
     .filter(c => c.slug && c.title && !seen.has(c.slug) && seen.add(c.slug));
 
-  return { sessions, news, games, notifications, activities, types, competitions };
+  return { sessions, news, games, notifications, activities, types, competitions, points: cleanPoints(raw.points) };
+
+}
+
+
+/* «نقاطي / المتجر» (docs/COMPETITIONS.md §18.4): the page is always points/;
+   null = no entry on the page at all */
+export function cleanPoints(raw) {
+
+  if (!raw || typeof raw !== 'object' || raw.url !== 'points/') return null;
+
+  const s = raw.shop && typeof raw.shop === 'object' ? raw.shop : null;
+  const shop = s ? {
+    on: s.on === true,
+    mode: ['auto', 'open', 'closed'].includes(s.mode) ? s.mode : 'auto',
+    opensAt: dateTime(s.opensAt),
+    closesAt: dateTime(s.closesAt)
+  } : null;
+
+  const e = raw.season && typeof raw.season === 'object' ? raw.season : null;
+  const season = e && text(e.name, 60) ? { name: text(e.name, 60), startAt: dateTime(e.startAt), endAt: dateTime(e.endAt) } : null;
+
+  return { url: 'points/', shop, season };
 
 }
 

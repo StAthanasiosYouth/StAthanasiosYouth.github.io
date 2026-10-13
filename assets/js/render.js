@@ -740,6 +740,92 @@ function liveChat(stage) {
 
 
 /* =========================================================
+   «نقاطي / المتجر» (content.points, docs/COMPETITIONS.md §18.4)
+   No server call: the store's state comes from Cairo time (points.js,
+   loaded only when content.json has `points`). The whole card opens
+   points/ in this tab.
+========================================================= */
+
+let pointsModule = null;
+
+const pointsLogic = () => (pointsModule ||= import('./points.js'));
+
+function pointsWidget(points, nowStamp) {
+
+  const title = h('a', { class: 'stretched', href: points.url, id: 'points-title', 'aria-describedby': 'points-state' }, 'نقاطي');
+  const headline = h('p', { class: 'points__headline', id: 'points-state' });
+  const detail = h('p', { class: 'points__detail', hidden: true });
+  const season = h('p', { class: 'points__season', hidden: true });
+
+  const el = h('article', { class: 'widget points', 'data-area': 'points', 'data-shop': 'none', 'aria-labelledby': 'points-title' },
+    h('span', { class: 'points__art', 'aria-hidden': 'true' }, iconNode(points.shop && points.shop.on ? 'gift' : 'star')),
+    h('div', { class: 'points__body' },
+      h('h2', { class: 'points__title' }, title),
+      headline,
+      detail,
+      season
+    ),
+    h('span', { class: 'points__go', 'aria-hidden': 'true' }, iconNode('arrow'))
+  );
+
+  let stamp = nowStamp;
+  let lastKey = null;
+  let lastState = null;
+
+  const paint = logic => {
+    const s = logic.pointsWidgetState(points, stamp);
+    if (!s || s.key === lastKey) return;
+    title.textContent = s.title;
+    headline.textContent = s.headline;
+    detail.textContent = s.detail;
+    detail.hidden = !s.detail;
+    season.textContent = s.season;
+    season.hidden = !s.season;
+    el.dataset.shop = s.state || 'none';
+    // the store opened while someone was looking
+    if (lastState !== null && lastState !== s.state && s.state === 'open') wake(el);
+    lastKey = s.key;
+    lastState = s.state;
+  };
+
+  pointsLogic().then(paint).catch(error => console.warn(error));
+
+  return {
+    el,
+    update(nextStamp) {
+      stamp = nextStamp;
+      pointsLogic().then(paint).catch(() => {});
+    }
+  };
+
+}
+
+
+/* a small «نقاطي» button in the top bar, only when the page has `points` */
+function topbarPoints(points) {
+
+  const actions = document.querySelector('.topbar__actions');
+  let link = document.getElementById('points-link');
+
+  if (!actions) return;
+
+  if (!points) {
+    if (link) link.hidden = true;
+    return;
+  }
+
+  if (!link) {
+    link = h('a', { class: 'topbar__btn topbar__points', id: 'points-link', href: points.url, 'aria-label': 'نقاطي' }, iconNode('star'));
+    // a link of the site's own: in a small navigation landmark
+    actions.prepend(h('nav', { class: 'topbar__nav', 'aria-label': 'نقاطي' }, link));
+  }
+
+  link.hidden = false;
+
+}
+
+
+/* =========================================================
    SHARE + FOOTER
 ========================================================= */
 
@@ -775,6 +861,7 @@ function footer(content) {
 ========================================================= */
 
 let meetingHandle = null;
+let pointsHandle = null;
 let currentStatus = null;
 let gameCards = [];
 let previousGameStates = new Map();
@@ -873,6 +960,7 @@ function pairUp(flow) {
     if (b && pairsWith(a, b)) {
       a.el.removeAttribute('data-wide');
       b.el.removeAttribute('data-wide');
+      a.partner = b;
       if (a.kind !== 'hero') matchBanners(a, b);
       i++;
     }
@@ -949,6 +1037,30 @@ function paintSurface(el, section) {
 }
 
 PHONE.addEventListener('change', () => surfaced.forEach(([el, section]) => paintSurface(el, section)));
+
+
+/*
+ * Where the «نقاطي» card goes: right after the competitions (and the list
+ * paired with them); else under the meeting (with its banner and live
+ * game); else first, under the hero.
+ */
+function pointsPlace(flow) {
+
+  const after = index => (flow[index].partner && flow[index + 1] === flow[index].partner ? index + 2 : index + 1);
+
+  let last = -1;
+  flow.forEach((item, i) => { if (item.section && item.section.key === 'competitions') last = i; });
+  if (last >= 0) return after(last);
+
+  const meeting = flow.findIndex(item => item.kind === 'meeting');
+  if (meeting < 0) return 0;
+
+  let end = meeting;
+  while (flow[end + 1] && ['live-game', 'banner'].includes(flow[end + 1].kind)) end++;
+
+  return end + 1;
+
+}
 
 
 export function renderPage(content, clock, actions, { animate = false } = {}) {
@@ -1075,6 +1187,16 @@ export function renderPage(content, clock, actions, { animate = false } = {}) {
 
   pairUp([{ el: hero, kind: 'hero' }, ...flow]);
 
+  // «نقاطي / المتجر»: a full row of its own, never between two partners
+  pointsHandle = null;
+  if (content.points) {
+    pointsHandle = pointsWidget(content.points, clock.stamp);
+    pointsHandle.el.setAttribute('data-wide', '');
+    flow.splice(pointsPlace(flow), 0, { el: pointsHandle.el, kind: 'points', section: null });
+  }
+
+  topbarPoints(content.points);
+
   const widgets = flow.map(item => item.el).concat(footer(content));
 
   main.querySelectorAll('[data-dynamic]').forEach(el => el.remove());
@@ -1109,6 +1231,7 @@ export function renderPage(content, clock, actions, { animate = false } = {}) {
 export function tickPage(content, clock) {
 
   meetingHandle?.update(clock.now);
+  pointsHandle?.update(clock.stamp);
 
   const states = new Map(gameStates(content, clock.stamp).map(g => [g.game.id, g]));
 

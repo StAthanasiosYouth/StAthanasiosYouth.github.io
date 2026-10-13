@@ -265,3 +265,18 @@ export function untilText(minutes) {
   return `بعد ${countDays(Math.round(minutes / 1440))}`;
 
 }
+
+
+/* A countdown in the meeting widget's words (real minutes left):
+   "فاضل ٤ أيام", "فاضل يوم و٦ ساعات", "فاضل ٣ ساعات", "فاضل ٤٥ دقيقة" */
+export function leftText(minutes) {
+
+  const left = Math.max(1, Math.round(minutes));
+
+  if (left >= 3 * 1440) return `فاضل ${countDays(Math.floor(left / 1440))}`;
+  if (left >= 1440) return `فاضل ${countDuration(left)}`;
+
+  // under a day: whole hours read better than "١٩ ساعة و٣٧ دقيقة"
+  return `فاضل ${countDuration(left >= 60 ? Math.floor(left / 60) * 60 : left)}`;
+
+}
