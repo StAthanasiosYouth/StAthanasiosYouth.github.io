@@ -75,7 +75,8 @@ const ARGS = {
   apiParticipantsImportApply: ['الاسم\tالموبايل\nمينا عادل\t01012345678', {}], apiParticipantsUndoImport: ['imp-00000000'],
   apiWallet: [{}], apiWalletParticipant: ['p-00000000'], apiWalletAdjust: ['p-00000000', 10, 'x', 'adjust-key-0001'], apiWalletSync: [],
   apiShopItems: [], apiShopItemSave: [{ name: 'x', cost: 10 }], apiShopItemDelete: ['i-00000000'],
-  apiShopRedemptions: [{}], apiShopRedemptionStatus: ['r-0000000000', 'approved', '']
+  apiShopRedemptions: [{}], apiShopRedemptionStatus: ['r-0000000000', 'approved', ''],
+  apiShopSchedule: [], apiShopScheduleSave: [{ mode: 'auto' }]
 };
 
 /*

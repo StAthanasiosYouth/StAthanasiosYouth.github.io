@@ -496,6 +496,7 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
   const userLock = { busy: false, waits: 0 };
   // every spreadsheet SpreadsheetApp.create made (the first is the content Sheet setup() makes)
   const spreadsheets = [];
+  const flushes = { count: 0 };
 
   const context = vm.createContext({
 
@@ -589,6 +590,8 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
 
     SpreadsheetApp: {
       getActiveSpreadsheet: () => null,
+      // writes here are immediate; flush only counts (claim-then-verify calls it)
+      flush: () => { flushes.count++; },
       openById: id => {
         const found = spreadsheets.find(s => s.getId() === id);
         if (!found) throw new Error('not found');

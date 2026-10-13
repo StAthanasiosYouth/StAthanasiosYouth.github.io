@@ -1530,6 +1530,7 @@ function portalMeAction_(arg) {
     var shop = shopPortal_(participant.id);
     reply.redemptions = shop.redemptions;
     reply.shop = shop.shop;
+    reply.store = shopStoreState_();
   }
 
   return reply;

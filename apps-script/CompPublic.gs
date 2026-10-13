@@ -25,7 +25,7 @@ var COMP_PUBLIC_MAX_BODY = 64 * 1024;
 var COMP_FAMILIES = {
   compStart: 'play', compSubmit: 'play', compResult: 'play',
   compCode: 'code',
-  portalMe: 'portal', portalReview: 'portal', shopRedeem: 'portal'
+  portalMe: 'portal', portalReview: 'portal', shopRedeem: 'portal', shopCancel: 'portal'
 };
 var COMP_FAMILY_PER_MINUTE = { play: 600, code: 120, portal: 300 };
 /* starts a minute for one competition (a flood on one slug can't starve the others) */
@@ -59,7 +59,9 @@ var COMP_MESSAGES = {
   session: 'محتاج تدخل بالكود بتاعك تاني.',
   insufficient: 'نقاطك مش كفاية.',
   stock: 'الحاجة دي خلصت.',
-  per_person: 'خدت أقصى عدد مسموح من الحاجة دي.'
+  per_person: 'خدت أقصى عدد مسموح من الحاجة دي.',
+  shop_closed: 'المتجر مقفول دلوقتي. طلباتك محفوظة.',
+  not_allowed: 'مينفعش تلغي الطلب ده دلوقتي.'
 };
 
 /* the later modules' public actions: the switch they need and the global function that answers */
@@ -67,7 +69,8 @@ var COMP_MODULE_ACTIONS = {
   compCode: { module: 'registry', handler: 'compCodeAction_' },
   portalMe: { module: 'registry', handler: 'portalMeAction_' },
   portalReview: { module: 'registry', handler: 'portalReviewAction_' },
-  shopRedeem: { module: 'shop', handler: 'shopRedeemAction_' }
+  shopRedeem: { module: 'shop', handler: 'shopRedeemAction_' },
+  shopCancel: { module: 'shop', handler: 'shopCancelAction_' }
 };
 
 

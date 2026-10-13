@@ -519,10 +519,7 @@ function apiShopRedemptionStatus(id, status, note) {
     if (text !== null) patch.note = text;
 
     if (status === 'cancelled' && !row.refundLedgerId) {
-      var key = 'ref:' + id;
-      var existing = walletLedger_().filter(function (l) { return l.idemKey === key; })[0];
-      var refund = existing || walletAppend_([{ participantId: row.participantId, amount: Number(row.cost) || 0, kind: 'refund', refType: 'redemption', refId: id, note: row.itemName, idemKey: key, actor: email }])[0];
-      patch.refundLedgerId = refund.id;
+      patch.refundLedgerId = shopRefund_(row, email).id;
     }
 
     compUpdate_(t, rowNumber, patch, row);
@@ -555,7 +552,7 @@ function shopPortal_(pid) {
 
   return {
     redemptions: redemptions.filter(function (r) { return r.participantId === pid; }).reverse().slice(0, 200).map(function (r) {
-      return { id: r.id, itemName: r.itemName, cost: Number(r.cost) || 0, status: r.status, requestedAt: r.requestedAt };
+      return { id: r.id, itemName: r.itemName, cost: Number(r.cost) || 0, status: r.status, requestedAt: r.requestedAt, canCancel: shopCanCancel_(r) };
     }),
     shop: shopItems_().filter(function (i) { return i.active; }).map(function (i) {
       return {
@@ -639,6 +636,12 @@ function shopRedeemAction_(arg) {
       return reply;
     }
 
+    // the store's own window (§18.3): a request that already landed is answered above even when closed
+    if (shopState_(shopSettings_(), compNow_().wall).state !== 'open') {
+      reply = compFail_('shop_closed');
+      return reply;
+    }
+
     var item = shopItems_().filter(function (i) { return i.id === arg.itemId; })[0];
 
     if (!item || !item.active) {
@@ -688,6 +691,22 @@ function shopRedeemAction_(arg) {
       updatedAt: stamp
     }])[0];
 
+    // claim, then verify (§18.2): the request is in the sheet; the sheet's own row order
+    // decides who got the last one. Counted again from the written rows: if ours is past
+    // the stock, it is cancelled here, before any point moves.
+    if (item.stock !== null) {
+      SpreadsheetApp.flush();
+      var taken = 0;
+      compColumns_(t, ['itemId', 'status']).forEach(function (r) {
+        if (r.__row <= rowNumber && r.itemId === item.id && r.status !== 'cancelled') taken++;
+      });
+      if (taken > item.stock) {
+        compUpdate_(t, rowNumber, { status: 'cancelled', note: 'الجايزة خلصت', updatedAt: stamp }, null);
+        reply = compFail_('stock', 'الجايزة دي خلصت.');
+        return reply;
+      }
+    }
+
     // 2. the charge; if it fails the request is cancelled (never an uncharged prize)
     var entry;
 
@@ -720,5 +739,254 @@ function shopRedeemAction_(arg) {
   }
 
   return reply;
+
+}
+
+
+/* =========================================================
+   SCHEDULE AND PARTICIPANT CANCEL (docs/COMPETITIONS.md §18.3)
+========================================================= */
+
+var SHOP_MODES = ['auto', 'open', 'closed'];
+var SHOP_SETTINGS_CACHE = 'shop:settings';
+var SHOP_NOTIFY_KEYS = ['open1d', 'open1h', 'openAt', 'close24h', 'close1h'];
+
+/* { mode, opensAt, closesAt ('YYYY-MM-DD HH:MM' | ''), allowCancel, notify } (Script Properties, 60 s cache) */
+function shopSettings_() {
+
+  var cache = CacheService.getScriptCache();
+  var hit = cache.get(SHOP_SETTINGS_CACHE);
+
+  if (hit) {
+    try {
+      return JSON.parse(hit);
+    }
+    catch (ignored) {
+      // read again below
+    }
+  }
+
+  var props = PropertiesService.getScriptProperties();
+  var notify = {};
+
+  try {
+    notify = JSON.parse(props.getProperty('SHOP_NOTIFY') || '{}') || {};
+  }
+  catch (ignored) {
+    notify = {};
+  }
+
+  var settings = {
+    mode: SHOP_MODES.indexOf(props.getProperty('SHOP_MODE')) !== -1 ? props.getProperty('SHOP_MODE') : 'auto',
+    opensAt: String(props.getProperty('SHOP_OPENS_AT') || ''),
+    closesAt: String(props.getProperty('SHOP_CLOSES_AT') || ''),
+    allowCancel: props.getProperty('SHOP_ALLOW_CANCEL') === '1',
+    notify: SHOP_NOTIFY_KEYS.reduce(function (out, key) { out[key] = !!notify[key]; return out; }, {})
+  };
+
+  cache.put(SHOP_SETTINGS_CACHE, JSON.stringify(settings), 60);
+
+  return settings;
+
+}
+
+/* 'YYYY-MM-DD HH:MM' → 'YYYY-MM-DDTHH:MM' ('' stays '') */
+function shopWall_(stamp) {
+
+  return stamp ? String(stamp).replace(' ', 'T') : '';
+
+}
+
+/* { state: open | scheduled | closed, opensAt, closesAt, allowCancel } at the Cairo wall time nowWall */
+function shopState_(settings, nowWall) {
+
+  var opens = shopWall_(settings.opensAt);
+  var closes = shopWall_(settings.closesAt);
+  var state = 'open';
+
+  if (settings.mode === 'closed') state = 'closed';
+  else if (settings.mode === 'auto') {
+    if (opens && nowWall < opens) state = 'scheduled';
+    else if (closes && nowWall >= closes) state = 'closed';
+  }
+
+  return { state: state, opensAt: opens, closesAt: closes, allowCancel: !!settings.allowCancel };
+
+}
+
+/* portalMe's `store` */
+function shopStoreState_() {
+
+  return shopState_(shopSettings_(), compNow_().wall);
+
+}
+
+/* may the participant cancel this request now? (the season rule comes from CompWallet.gs) */
+function shopCanCancel_(row) {
+
+  if (!row || row.status !== 'pending') return false;
+
+  var state = shopStoreState_();
+
+  if (!state.allowCancel || state.state !== 'open') return false;
+
+  return typeof walletSeasonIsActive_ !== 'function' || walletSeasonIsActive_(row.seasonId || '');
+
+}
+
+/* the refund of a request (once: idemKey ref:<id>); under compLock_ */
+function shopRefund_(row, actor) {
+
+  var key = 'ref:' + row.id;
+  var existing = walletLedger_().filter(function (l) { return l.idemKey === key; })[0];
+
+  return existing || walletAppend_([{ participantId: row.participantId, amount: Number(row.cost) || 0, kind: 'refund', refType: 'redemption', refId: row.id, note: row.itemName, idemKey: key, actor: actor || '', seasonId: row.seasonId || '' }])[0];
+
+}
+
+/**
+ * shopCancel { ptoken, redemptionId } → { ok, redemption, balance }. Only while the store is open,
+ * the setting allows it, the request is the participant's own, still pending, and in the active season.
+ */
+function shopCancelAction_(arg) {
+
+  arg = compArg_(arg);
+
+  if (!arg || typeof arg.redemptionId !== 'string' || !SHOP_REDEMPTION_ID.test(arg.redemptionId)) {
+    return compFail_('bad');
+  }
+
+  var participant = compParticipantFromToken_(arg.ptoken);
+
+  if (!participant) return compFail_('session');
+
+  var state = shopStoreState_();
+
+  if (state.state !== 'open') return compFail_('shop_closed');
+  if (!state.allowCancel) return compFail_('not_allowed');
+
+  var lock = compLock_();
+
+  if (!lock) return compFail_('busy');
+
+  try {
+
+    var t = compSheet_('Redemptions');
+    var rowNumber = compFindRow_(t, 'id', arg.redemptionId);
+    var row = rowNumber ? compRowAt_(t, rowNumber) : null;
+    var reply = function (r) {
+      return { ok: true, redemption: { id: r.id, status: 'cancelled', itemName: r.itemName, cost: Number(r.cost) || 0 }, balance: walletBalance_(participant.id, true) };
+    };
+
+    if (!row || row.participantId !== participant.id) return compFail_('not_found', 'الطلب ده مش موجود.');
+
+    // the same cancel again (a retry): its result
+    if (row.status === 'cancelled' && row.handledBy === 'participant') return reply(row);
+
+    if (!shopCanCancel_(row)) return compFail_('not_allowed');
+
+    var stamp = compNow_().stamp;
+    var patch = { status: 'cancelled', handledBy: 'participant', handledAt: stamp, note: 'لغاه المشترك', updatedAt: stamp };
+
+    // a request whose charge never landed has nothing to give back
+    if (row.ledgerId) patch.refundLedgerId = shopRefund_(row, '').id;
+
+    compUpdate_(t, rowNumber, patch, row);
+
+    return reply(row);
+
+  }
+  finally {
+    lock.releaseLock();
+  }
+
+}
+
+
+/* the admin's view of the schedule (§18.7) */
+function shopScheduleView_() {
+
+  var settings = shopSettings_();
+  var state = shopState_(settings, compNow_().wall);
+
+  return {
+    mode: settings.mode,
+    opensAt: settings.opensAt,
+    closesAt: settings.closesAt,
+    allowCancel: settings.allowCancel,
+    state: state.state,
+    notify: settings.notify,
+    auto: typeof pushAutoState_ === 'function' ? pushAutoState_() : null
+  };
+
+}
+
+function apiShopSchedule() {
+
+  assertAdmin_();
+  shopRequireOn_();
+
+  return shopScheduleView_();
+
+}
+
+/**
+ * input: { mode, opensAt, closesAt ('YYYY-MM-DD HH:MM' | ''), allowCancel,
+ * notify: { open1d, open1h, openAt, close24h, close1h } }. Never touches points
+ * or requests: closing the store keeps every request and every balance.
+ */
+function apiShopScheduleSave(input) {
+
+  assertAdmin_();
+  shopRequireOn_();
+
+  input = input || {};
+
+  var mode = SHOP_MODES.indexOf(input.mode) !== -1 ? input.mode : null;
+
+  if (!mode) throw appError_('اختار طريقة فتح المتجر.', '', '', 'mode');
+
+  var opens = shopStampIn_(input.opensAt, 'opensAt', 'ميعاد الفتح');
+  var closes = shopStampIn_(input.closesAt, 'closesAt', 'ميعاد القفل');
+
+  if (opens && closes && closes <= opens) {
+    throw appError_('ميعاد القفل لازم يكون بعد ميعاد الفتح.', '', '', 'closesAt');
+  }
+
+  var notify = SHOP_NOTIFY_KEYS.reduce(function (out, key) { out[key] = !!(input.notify && input.notify[key]); return out; }, {});
+  var before = shopSettings_();
+
+  PropertiesService.getScriptProperties().setProperties({
+    SHOP_MODE: mode,
+    SHOP_OPENS_AT: opens,
+    SHOP_CLOSES_AT: closes,
+    SHOP_ALLOW_CANCEL: input.allowCancel ? '1' : '',
+    SHOP_NOTIFY: JSON.stringify(notify)
+  });
+
+  CacheService.getScriptCache().remove(SHOP_SETTINGS_CACHE);
+
+  // the linked bell items and their automatic sends (CompSchedule.gs)
+  if (typeof pushScheduleSyncShop_ === 'function') pushScheduleSyncShop_();
+
+  activity_({ action: 'settings', type: 'shopitem', id: 'schedule', title: 'مواعيد المتجر',
+    changes: { mode: mode, opensAt: opens, closesAt: closes, allowCancel: !!input.allowCancel, was: before.mode } });
+
+  return shopScheduleView_();
+
+}
+
+/* a Cairo stamp from the admin ('' allowed) → 'YYYY-MM-DD HH:MM' */
+function shopStampIn_(value, field, label) {
+
+  var text = String(value === undefined || value === null ? '' : value).trim();
+
+  if (!text) return '';
+
+  var wall = contentDateTime_(text.replace('T', ' '), false);
+
+  if (!wall) throw appError_(label + ' مش مكتوب صح.', 'مثلاً: 2026-10-20 19:00', '', field);
+
+  return wall.replace('T', ' ');
 
 }
