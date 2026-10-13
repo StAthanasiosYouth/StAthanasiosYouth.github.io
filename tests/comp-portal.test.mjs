@@ -121,3 +121,82 @@ test('points/index.html: the site CSP, no inline code, relative URLs; sw.js allo
   self.push({ data: { json: () => ({ data: { title: 'x', url: '/points/' } }) }, waitUntil: p => { wait = p; } });
   return wait.then(() => assert.equal(self.shown.data.url, '/points/'));
 });
+
+
+/* ---------- v2: store schedule, cancel, seasons (§18.3, §18.4) ---------- */
+
+const V2 = {
+  ...ME,
+  store: { state: 'scheduled', opensAt: '2026-10-17T19:00', closesAt: '2026-10-22 20:00', allowCancel: true },
+  season: { id: 'sea-2', name: 'موسم الخريف', startAt: '2026-10-01T00:00', endAt: '2026-12-31T23:59', earned: 900, maxTheoretical: 1200 },
+  seasons: [
+    { id: 'sea-first', name: 'الموسم الأول', startAt: '2026-06-01T00:00', endAt: '2026-09-30T23:59', final: 600, earned: 900, spent: 300 },
+    { id: 'x', name: '' }
+  ],
+  redemptions: [
+    { id: 'r-1', itemName: 'كتاب', cost: 300, status: 'pending', requestedAt: '2026-10-11T09:00', canCancel: true },
+    { id: 'r-2', itemName: 'قلم', cost: 100, status: 'approved', canCancel: true },
+    { id: 'r-3', itemName: 'كاب', cost: 150, status: 'pending', canCancel: 'yes' }
+  ]
+};
+
+test('portalMe v2: store state, season, past seasons, canCancel', () => {
+  const me = M.sanitizeMe(V2);
+  assert.deepEqual(me.store, { state: 'scheduled', opensAt: '2026-10-17T19:00', closesAt: '2026-10-22T20:00', allowCancel: true });
+  assert.equal(me.shop.length, 3, 'the prizes stay in `shop`');
+  assert.deepEqual(me.season, { id: 'sea-2', name: 'موسم الخريف', startAt: '2026-10-01T00:00', endAt: '2026-12-31T23:59', earned: 900, maxTheoretical: 1200 });
+  assert.deepEqual(me.seasons, [{ id: 'sea-first', name: 'الموسم الأول', startAt: '2026-06-01T00:00', endAt: '2026-09-30T23:59', final: 600, earned: 900, spent: 300 }]);
+  assert.deepEqual(me.redemptions.map(r => r.canCancel), [true, false, false], 'only a pending request, only a real true');
+  // v1 server (no store): open as before; unknown state → open; no wallet → no seasons
+  assert.equal(M.sanitizeMe(ME).store.state, 'open');
+  assert.equal(M.sanitizeMe({ ...V2, store: { state: 'party' } }).store.state, 'open');
+  const off = M.sanitizeMe({ ...V2, features: { wallet: false, shop: false } });
+  assert.deepEqual([off.store, off.season, off.seasons], [null, null, []]);
+  assert.equal(M.sanitizeMe({ ...V2, season: { name: '', earned: 5 } }).season, null);
+  assert.equal(M.sanitizeMe({ ...V2, season: { ...V2.season, maxTheoretical: -3 } }).season.maxTheoretical, 0);
+});
+
+test('season bar words and meter; past season line; dates', () => {
+  const me = M.sanitizeMe(V2);
+  assert.deepEqual(M.seasonProgress(me.season), { text: 'جمعت ٩٠٠ نقطة من أقصى ١٢٠٠', ratio: 0.75 });
+  assert.deepEqual(M.seasonProgress({ ...me.season, maxTheoretical: 0 }), { text: 'جمعت ٩٠٠ نقطة في الموسم ده', ratio: null });
+  assert.equal(M.seasonProgress({ ...me.season, earned: 1500 }).ratio, 1, 'clamped (manual points on top)');
+  assert.equal(M.seasonProgress(null), null);
+  assert.equal(M.seasonDates(me.season), 'من الخميس ١ أكتوبر لحد الخميس ٣١ ديسمبر');
+  assert.equal(M.seasonDates({ startAt: '', endAt: '' }), '');
+  assert.equal(M.pastSeasonLine(me.seasons[0]), 'جمعت ٩٠٠ · صرفت ٣٠٠ · آخر رصيد ٦٠٠');
+});
+
+test('store words: scheduled (countdown), open until, closed; due once the time passes', () => {
+  const store = M.sanitizeStore(V2.store);
+  assert.deepEqual(M.storeWords(store, '2026-10-15T19:00'), { headline: 'المتجر هيفتح يوم السبت ١٧ أكتوبر الساعة ٧ بالليل', countdown: 'فاضل يومين', due: false });
+  assert.equal(M.storeWords(store, '2026-10-17T18:30').countdown, 'فاضل ٣٠ دقيقة');
+  assert.equal(M.storeWords(store, '2026-10-17T19:00').due, true, 'past opensAt on this clock: ask the server');
+  const open = { ...store, state: 'open' };
+  assert.deepEqual(M.storeWords(open, '2026-10-18T12:00'), { headline: 'المتجر مفتوح لحد الخميس ٢٢ أكتوبر الساعة ٨ بالليل', countdown: '', due: false });
+  assert.equal(M.storeWords(open, '2026-10-22T17:00').countdown, 'فاضل ٣ ساعات');
+  assert.equal(M.storeWords(open, '2026-10-22T20:00').due, true);
+  assert.deepEqual(M.storeWords({ ...open, closesAt: '' }, '2026-10-18T12:00'), { headline: '', countdown: '', due: false });
+  assert.equal(M.storeWords({ ...store, state: 'closed' }, '2026-10-18T12:00').headline, 'المتجر مقفول دلوقتي — طلباتك محفوظة والخدام بيسلّموها');
+  assert.equal(M.storeWords({ state: 'scheduled', opensAt: '', closesAt: '' }, '2026-10-18T12:00').headline, 'المتجر هيفتح قريب');
+});
+
+test('cancel: preview, reply → balance and status, refusals, store closed', () => {
+  const me = M.sanitizeMe(V2);
+  const r = me.redemptions[0];
+  assert.equal(M.cancelPreview(r, 1550), 'هيرجعلك ٣٠٠ نقطة، رصيدك هيبقى ١٨٥٠');
+  assert.equal(M.cancelPreview(r, null), 'هيرجعلك ٣٠٠ نقطة');
+  const after = M.applyCancel(me, 'r-1', { ok: true, redemption: { id: 'r-1', status: 'cancelled', itemName: 'كتاب', cost: 300 }, balance: 1850 });
+  assert.equal(after.balance, 1850);
+  assert.deepEqual([after.redemptions[0].status, after.redemptions[0].canCancel], ['cancelled', false]);
+  assert.equal(me.redemptions[0].status, 'pending', 'pure');
+  assert.equal(M.applyCancel(me, 'r-1', { ok: true }).balance, 1550, 'no balance in the reply: unchanged');
+  assert.equal(M.withoutCancel(me, 'r-1').redemptions[0].canCancel, false);
+  const closed = M.storeClosed(me);
+  assert.equal(closed.store.state, 'closed');
+  assert.ok(closed.redemptions.every(x => !x.canCancel));
+  assert.equal(M.cancelError({ code: 'shop_closed' }), 'المتجر قفل، مينفعش تلغي الطلب دلوقتي');
+  assert.match(M.cancelError({ code: 'not_allowed' }), /مينفعش يتلغي/);
+  assert.equal(M.cancelError({ code: 'not_found' }), 'الطلب ده مش موجود');
+  assert.equal(M.redeemError({ code: 'shop_closed' }), 'المتجر قفل دلوقتي — طلباتك محفوظة');
+});

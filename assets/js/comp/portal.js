@@ -8,7 +8,9 @@
  * (wallet on), competition history (+ «شوف إجاباتك» → portalReview), the
  * store and the requests (shop on). shopRedeem carries a requestKey made
  * once per confirmed request and reused on every retry of it.
- * Contract: docs/COMPETITIONS.md §5.1, §7.4, §8, §9.
+ * v2 (§18.3, §18.4): the store's schedule (open / scheduled / closed),
+ * «إلغاء الطلب» (shopCancel), the season bar and the past seasons.
+ * Contract: docs/COMPETITIONS.md §5.1, §7.4, §8, §9, §18.
  */
 
 import { h } from '../dom.js';
@@ -19,8 +21,11 @@ import { normalizeCode, formatCode, sanitizeResult, resultSummary, countPoints }
 import {
   sanitizeMe, formatAmount, dateText, historyLines, groupShop, itemAvailability, redeemPreview,
   sanitizeRedeem, redeemError, KEEP_KEY, KIND_LABELS, REDEMPTION_LABELS, HISTORY_LABELS,
-  readToken, writeToken, clearToken
+  readToken, writeToken, clearToken,
+  storeWords, seasonDates, seasonProgress, pastSeasonLine, cancelPreview, cancelError, applyCancel, withoutCancel, storeClosed
 } from './portal-model.js';
+import { zonedNow, stamp } from '../schedule.js';
+import { arabicDigits } from '../words.js';
 
 const ROOT = new URL('../../../', import.meta.url);
 const main = document.getElementById('comp-main');
@@ -59,6 +64,9 @@ const S = {
   notice: '',
   ordering: null,       // the item in the confirm sheet
   orderError: '',
+  cancelling: null,     // the request in the cancel sheet
+  cancelError: '',
+  alert: '',            // a warning on the dashboard (the store just closed…)
   pendingKeys: new Map() // itemId → requestKey of a request that may have landed
 };
 
@@ -72,7 +80,14 @@ function render({ focus = true } = {}) {
   const changed = S.screen !== lastScreen;
   main.dataset.state = S.screen;
   const scroll = window.scrollY;
+  // a quiet refresh keeps the focus on the message the person is reading
+  const active = document.activeElement;
+  const kept = active && main.contains(active) ? ['portal__notice', 'portal__alert'].find(c => active.classList.contains(c)) : '';
   main.replaceChildren(screens[S.screen]());
+  if (kept && !changed) {
+    const again = main.querySelector(`.${kept}`);
+    if (again) again.focus({ preventScroll: true });
+  }
   // the store's confirm sheet is a real modal dialog (focus kept inside, Esc closes)
   const sheet = main.querySelector('dialog.order');
   if (sheet && !sheet.open && typeof sheet.showModal === 'function') {
@@ -144,7 +159,7 @@ async function codeSubmit(raw) {
 
 function logout(message = '') {
   clearToken(session());
-  Object.assign(S, { ptoken: '', me: null, review: null, participant: null, error: message, screen: 'code', ordering: null });
+  Object.assign(S, { ptoken: '', me: null, review: null, participant: null, error: message, screen: 'code', ordering: null, cancelling: null, alert: '' });
   S.pendingKeys.clear();
   render();
 }
@@ -264,6 +279,14 @@ async function confirmOrder() {
       handled(reply);
       return;
     }
+    if (reply.code === 'shop_closed' && S.me) {
+      // the store closed meanwhile: show it closed, then the server's truth
+      S.me = storeClosed(S.me);
+      S.ordering = null;
+      showAlert(redeemError(reply));
+      loadMe({ quiet: true });
+      return;
+    }
     S.orderError = redeemError(reply);
     render({ focus: false });
     return;
@@ -282,6 +305,102 @@ async function confirmOrder() {
   // the truth (stock, ledger, limits) from the server, quietly
   loadMe({ quiet: true });
 }
+
+
+function showAlert(message) {
+  S.alert = message;
+  S.notice = '';
+  render({ focus: false });
+  const box = main.querySelector('.portal__alert');
+  if (box) box.focus();
+}
+
+
+/* =========================================================
+   CANCEL A REQUEST (shopCancel, §18.3)
+========================================================= */
+
+function openCancel(redemption) {
+  S.cancelling = redemption;
+  S.cancelError = '';
+  S.notice = '';
+  S.alert = '';
+  render({ focus: false });
+}
+
+function closeCancel() {
+  const r = S.cancelling;
+  S.cancelling = null;
+  S.cancelError = '';
+  render({ focus: false });
+  const back = r && main.querySelector(`[data-redemption="${r.id}"] [data-cancel]`);
+  if (back) back.focus();
+}
+
+async function confirmCancel() {
+  const r = S.cancelling;
+  if (!r || S.busy) return;
+  S.busy = true;
+  S.cancelError = '';
+  render({ focus: false });
+  const reply = await api.call('shopCancel', { ptoken: S.ptoken, redemptionId: r.id });
+  S.busy = false;
+  if (!reply.ok) {
+    if (handled(reply)) return;
+    if (reply.code === 'shop_closed' && S.me) {
+      S.me = storeClosed(S.me);
+      S.cancelling = null;
+      showAlert(cancelError(reply));
+      loadMe({ quiet: true });
+      return;
+    }
+    if ((reply.code === 'not_allowed' || reply.code === 'not_found') && S.me) {
+      S.me = withoutCancel(S.me, r.id);
+      S.cancelling = null;
+      showAlert(cancelError(reply));
+      loadMe({ quiet: true });
+      return;
+    }
+    S.cancelError = cancelError(reply);
+    render({ focus: false });
+    return;
+  }
+  S.me = applyCancel(S.me, r.id, reply);
+  S.cancelling = null;
+  S.alert = '';
+  S.notice = `اتلغى طلب «${r.itemName}» ✓ ورجعلك ${countPoints(r.cost)}.`;
+  render({ focus: false });
+  const notice = main.querySelector('.portal__notice');
+  if (notice) notice.focus();
+  announce(S.notice);
+  loadMe({ quiet: true });
+}
+
+
+/* =========================================================
+   THE STORE'S CLOCK
+   The countdown's words follow the device's clock (every 30 s, text only:
+   focus and scroll stay); once the opening / closing time passes, the
+   server is asked again (it decides).
+========================================================= */
+
+const nowStamp = () => stamp(zonedNow('Africa/Cairo'));
+let asked = '';
+
+function tickStore() {
+  if (S.screen !== 'dashboard' || !S.me || !S.me.store || document.hidden) return;
+  const words = storeWords(S.me.store, nowStamp());
+  const slot = main.querySelector('[data-countdown]');
+  if (slot && slot.textContent !== words.countdown) slot.textContent = words.countdown;
+  const key = `${S.me.store.state}|${S.me.store.opensAt}|${S.me.store.closesAt}`;
+  if (words.due && asked !== key && !S.busy && !S.ordering && !S.cancelling) {
+    asked = key;
+    loadMe({ quiet: true });
+  }
+}
+
+setInterval(tickStore, 30000);
+document.addEventListener('visibilitychange', tickStore);
 
 
 /* =========================================================
@@ -309,7 +428,7 @@ function historySection(me) {
 }
 
 function ledgerSection(me) {
-  return section('p-ledger', 'حركة النقاط', me.ledger.length
+  return section('p-ledger', me.season ? 'حركة النقاط في الموسم ده' : 'حركة النقاط', me.ledger.length
     ? h('ul', { class: 'plist' }, me.ledger.map(l => h('li', { class: 'prow prow--ledger', 'data-kind': l.kind },
       h('div', { class: 'prow__main' },
         h('p', { class: 'prow__title' }, KIND_LABELS[l.kind], l.compTitle ? ` — ${l.compTitle}` : ''),
@@ -329,20 +448,40 @@ function redemptionsSection(me) {
         h('p', { class: 'prow__title' }, r.itemName),
         h('p', { class: 'prow__meta' }, [countPoints(r.cost), dateText(r.requestedAt)].filter(Boolean).join(' · '))
       ),
-      h('p', { class: `pstatus pstatus--${r.status}` }, REDEMPTION_LABELS[r.status])
+      h('p', { class: `pstatus pstatus--${r.status}` }, REDEMPTION_LABELS[r.status]),
+      r.canCancel ? btn('إلغاء الطلب', () => openCancel(r), { kind: 'small', 'data-cancel': '', 'aria-label': `إلغاء طلب ${r.itemName}` }) : null
     )))
     : h('p', { class: 'muted' }, 'لسه مطلبتش جوايز.'));
 }
 
+function storeBanner(store) {
+  const words = storeWords(store, nowStamp());
+  if (!words.headline && !words.countdown) return null;
+  return h('div', { class: `store-state store-state--${store.state}`, 'data-store': store.state },
+    icon(store.state === 'open' ? 'clock' : 'lock', 'store-state__icon'),
+    h('div', { class: 'store-state__text' },
+      words.headline ? h('p', { class: 'store-state__headline' }, words.headline) : null,
+      h('p', { class: 'store-state__countdown', 'data-countdown': '' }, words.countdown)
+    )
+  );
+}
+
 function shopSection(me) {
   if (!me.features.shop) return null;
-  if (!me.shop.length) return section('p-shop', 'الجوايز', h('p', { class: 'muted' }, 'مفيش جوايز دلوقتي، استنى الجديد.'));
+  const store = me.store || { state: 'open' };
+  const banner = storeBanner(store);
+  // closed: the prizes are hidden (the requests below stay)
+  if (store.state === 'closed') return section('p-shop', 'الجوايز', banner);
+  if (!me.shop.length) return section('p-shop', 'الجوايز', banner, h('p', { class: 'muted' }, 'مفيش جوايز دلوقتي، استنى الجديد.'));
+  const readOnly = store.state !== 'open';
   const groups = groupShop(me.shop);
-  return section('p-shop', 'الجوايز', groups.map(group => h('div', { class: 'shop__group' },
+  return section('p-shop', 'الجوايز', banner, groups.map(group => h('div', { class: 'shop__group' },
     group.category && groups.length > 1 ? h('h3', { class: 'shop__cat' }, group.category) : null,
     h('ul', { class: 'shop' }, group.items.map(item => {
-      const state = itemAvailability(item, me.balance);
-      return h('li', { class: `shop__item${state.canOrder ? '' : ' is-off'}`, 'data-item': item.id },
+      const state = readOnly
+        ? { canOrder: false, reason: 'scheduled', label: 'استنى فتح المتجر', notes: itemAvailability(item, me.balance).notes }
+        : itemAvailability(item, me.balance);
+      return h('li', { class: `shop__item${state.canOrder ? '' : ' is-off'}${readOnly ? ' is-soon' : ''}`, 'data-item': item.id },
         item.image ? h('figure', { class: 'shop__media' }, picture(item.image, { sizes: '(min-width: 760px) 320px, 92vw' })) : h('div', { class: 'shop__media shop__media--art', 'aria-hidden': 'true' }, icon('trophy', 'shop__icon')),
         h('div', { class: 'shop__body' },
           h('h3', { class: 'shop__name' }, item.name),
@@ -372,6 +511,47 @@ function orderDialog(me) {
     )
   );
   return dialog;
+}
+
+function cancelDialog(me) {
+  const r = S.cancelling;
+  if (!r) return null;
+  return h('dialog', { class: 'order card', 'aria-labelledby': 'cancel-t', 'aria-describedby': 'cancel-d', 'data-cancel-sheet': '', oncancel: event => { event.preventDefault(); if (!S.busy) closeCancel(); } },
+    h('h2', { class: 'order__title', id: 'cancel-t' }, `تلغي طلب «${r.itemName}»؟`),
+    h('p', { class: 'order__text', id: 'cancel-d' }, cancelPreview(r, me.balance)),
+    S.cancelError ? errorBox(S.cancelError) : null,
+    h('div', { class: 'actions' },
+      btn(S.busy ? 'بنلغي…' : 'أيوه، الغي الطلب', confirmCancel, { kind: 'primary', 'data-confirm-cancel': '', disabled: S.busy || null }),
+      btn('لا، سيبه', closeCancel, { disabled: S.busy || null })
+    )
+  );
+}
+
+/* the active season (balance and ledger are its own) + the past ones, folded */
+function seasonSection(me) {
+  if (!me.season && !me.seasons.length) return null;
+  const s = me.season;
+  const progress = seasonProgress(s);
+  const past = me.seasons.length
+    ? h('details', { class: 'seasons' },
+      h('summary', { class: 'seasons__summary' }, `المواسم اللي فاتت (${arabicDigits(me.seasons.length)})`),
+      h('ul', { class: 'plist' }, me.seasons.map(p => h('li', { class: 'prow', 'data-season': p.id },
+        h('div', { class: 'prow__main' },
+          h('p', { class: 'prow__title' }, p.name),
+          seasonDates(p) ? h('p', { class: 'prow__meta' }, seasonDates(p)) : null,
+          h('p', { class: 'prow__line' }, pastSeasonLine(p))
+        )
+      ))))
+    : null;
+  return h('section', { class: 'card portal__section season', 'aria-labelledby': 'p-season' },
+    h('h2', { class: 'portal__h2', id: 'p-season' }, s ? `الموسم: ${s.name}` : 'المواسم'),
+    s && seasonDates(s) ? h('p', { class: 'muted season__dates' }, seasonDates(s)) : null,
+    progress ? h('p', { class: 'season__earned', 'data-earned': String(s.earned) }, progress.text) : null,
+    progress && progress.ratio !== null
+      ? h('meter', { class: 'season__meter', min: '0', max: String(s.maxTheoretical), value: String(Math.max(0, Math.min(s.earned, s.maxTheoretical))), 'aria-label': progress.text })
+      : null,
+    past
+  );
 }
 
 const screens = {
@@ -405,16 +585,19 @@ const screens = {
           me.participant.group ? h('p', { class: 'muted' }, me.participant.group) : null
         ),
         me.features.wallet && me.balance !== null
-          ? h('p', { class: 'portal__balance', 'data-balance': String(me.balance) }, h('span', { class: 'portal__balance-label' }, 'رصيدك'), h('strong', {}, countPoints(me.balance)))
+          ? h('p', { class: 'portal__balance', 'data-balance': String(me.balance) }, h('span', { class: 'portal__balance-label' }, me.season ? 'رصيدك في الموسم ده' : 'رصيدك'), h('strong', {}, countPoints(me.balance)))
           : null,
         btn('خروج', () => logout(), { kind: 'small', 'data-logout': '' })
       ),
       S.notice ? h('p', { class: 'portal__notice', role: 'status', tabindex: '-1' }, S.notice) : null,
+      S.alert ? h('p', { class: 'portal__alert', role: 'alert', tabindex: '-1' }, S.alert) : null,
+      me.features.wallet ? seasonSection(me) : null,
       shopSection(me),
       redemptionsSection(me),
       historySection(me),
       me.features.wallet ? ledgerSection(me) : null,
-      orderDialog(me)
+      orderDialog(me),
+      cancelDialog(me)
     );
   },
 

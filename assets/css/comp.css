@@ -1590,3 +1590,151 @@ dialog.order[open] {
 .result__lines--start {
   justify-items: start;
 }
+
+
+/* ---------- «نقاطي» v2: the store's schedule, cancel, seasons (§18.3, §18.4) ---------- */
+
+.portal__alert {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 138, 125, .5);
+  font-weight: 700;
+  color: #ffd2cc;
+  background: rgba(200, 67, 58, .14);
+}
+
+.store-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--gold-line-strong);
+  background: rgba(215, 170, 80, .08);
+}
+
+.store-state__icon {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin-top: 2px;
+  color: var(--accent-hi);
+}
+
+.store-state__text {
+  display: grid;
+  min-width: 0;
+}
+
+.store-state__headline {
+  font-weight: 800;
+  color: var(--text);
+}
+
+.store-state__countdown {
+  font-weight: 700;
+  color: var(--accent-hi);
+}
+
+.store-state__countdown:empty {
+  display: none;
+}
+
+.store-state--closed {
+  border-color: rgba(255, 255, 255, .16);
+  background: rgba(255, 255, 255, .04);
+}
+
+.store-state--closed .store-state__icon {
+  color: var(--text-2);
+}
+
+.shop__item.is-soon .shop__media {
+  opacity: .8;
+}
+
+.season__dates {
+  font-size: .92rem;
+}
+
+.season__earned {
+  font-weight: 800;
+  color: var(--accent-hi);
+}
+
+.season__meter {
+  display: block;
+  width: 100%;
+  height: 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .08);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.season__meter::-webkit-meter-bar {
+  height: 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .08);
+}
+
+.season__meter::-webkit-meter-optimum-value,
+.season__meter::-webkit-meter-suboptimum-value,
+.season__meter::-webkit-meter-even-less-good-value {
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--gold), var(--gold-hi));
+}
+
+.season__meter::-moz-meter-bar {
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--gold), var(--gold-hi));
+}
+
+.seasons__summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 4px;
+  font-weight: 800;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.seasons__summary:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.seasons[open] > .plist {
+  margin-top: 8px;
+}
+
+.seasons__summary {
+  gap: 10px;
+  list-style: none;
+}
+
+.seasons__summary::-webkit-details-marker {
+  display: none;
+}
+
+/* a small chevron: down while folded, up when open */
+.seasons__summary::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  border-inline-end: 2px solid var(--accent-hi);
+  border-block-end: 2px solid var(--accent-hi);
+  transform: rotate(45deg);
+  transition: transform .2s var(--ease-out);
+}
+
+.seasons[open] > .seasons__summary::before {
+  margin-top: 4px;
+  transform: rotate(-135deg);
+}
