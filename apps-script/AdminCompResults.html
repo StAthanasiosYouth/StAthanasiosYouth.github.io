@@ -25,8 +25,9 @@
 
   var STATUS_WORDS = { in_progress: 'لسه بيحل', submitted: 'اتبعتت', pending_review: 'محتاجة مراجعة', graded: 'اتصححت', void: 'ملغية' };
   var STATUS_KINDS = { in_progress: 'off', submitted: 'info', pending_review: 'gold', graded: 'ok', void: 'danger' };
-  var FLAG_WORDS = { fast: 'سريع جدًا', late: 'اتأخر', dupPhone: 'رقم متكرر', preview: 'تجربة' };
-  var FLAG_HINTS = { fast: 'أقل من ثانيتين في المتوسط لكل سؤال', late: 'اتبعتت في الدقايق الزيادة بعد النهاية أو بعد الوقت', dupPhone: 'الرقم ده شارك قبل كده' };
+  var FLAG_WORDS = { fast: 'سريع جدًا', late: 'اتأخر', dupPhone: 'رقم متكرر', preview: 'تجربة', guest: 'ضيف', noPoints: 'من غير نقاط (السن)' };
+  var FLAG_KINDS = { guest: 'info', noPoints: 'gold' };
+  var FLAG_HINTS = { fast: 'أقل من ثانيتين في المتوسط لكل سؤال', late: 'اتبعتت في الدقايق الزيادة بعد النهاية أو بعد الوقت', dupPhone: 'الرقم ده شارك قبل كده', guest: 'شارك من غير كود (مالوش نقاط)', noPoints: 'سنه كان خارج الفئة العمرية لنظام النقاط وقت ما بعت: المشاركة متسجلة من غير نقاط' };
 
   function statusChip(status) {
     return A.chip(STATUS_WORDS[status] || status, STATUS_KINDS[status] || 'off');
@@ -75,7 +76,7 @@
     var chips = el('div', { class: 'filter-chips comp-subs__status', role: 'group', 'aria-label': 'الحالة' });
     var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر بالاسم أو رقم الموبايل…', 'aria-label': 'دوّر في المشاركات', value: subsQuery.q });
     var flag = el('select', { class: 'input', 'aria-label': 'علامات' },
-      [{ v: '', t: 'كل العلامات' }, { v: 'fast', t: 'سريع جدًا' }, { v: 'late', t: 'اتأخر' }, { v: 'dupPhone', t: 'رقم متكرر' }].map(function (o) {
+      [{ v: '', t: 'كل العلامات' }, { v: 'fast', t: 'سريع جدًا' }, { v: 'late', t: 'اتأخر' }, { v: 'dupPhone', t: 'رقم متكرر' }, { v: 'guest', t: 'ضيوف (من غير كود)' }, { v: 'noPoints', t: 'من غير نقاط (السن)' }].map(function (o) {
         return el('option', { value: o.v, selected: o.v === subsQuery.flag ? 'selected' : null, text: o.t });
       }));
     var sort = el('select', { class: 'input', 'aria-label': 'الترتيب' }, SORTS.filter(function (s) { return scored || !/^score/.test(s.value); }).map(function (s) {
@@ -130,7 +131,7 @@
           statusChip(item.status),
           scored && item.status !== 'in_progress' && item.status !== 'void' ? el('span', { class: 'comp-sub__score', text: scoreText(item) }) : null,
           item.pendingCount ? A.chip('⏳ ' + ar(item.pendingCount), 'gold') : null,
-          flags.map(function (f) { return A.chip(FLAG_WORDS[f] || f, 'danger'); }),
+          flags.map(function (f) { var chip = A.chip(FLAG_WORDS[f] || f, FLAG_KINDS[f] || 'danger'); chip.dataset.flag = f; return chip; }),
           item.attemptNo > 1 ? A.chip('محاولة ' + ar(item.attemptNo), 'off') : null
         ),
         el('span', { class: 'comp-sub__when' },
@@ -337,7 +338,7 @@
         el('dt', { text: 'المدة' }), el('dd', { text: C.duration(s.durationSec) }),
         s.attemptNo > 1 ? el('dt', { text: 'المحاولة' }) : null, s.attemptNo > 1 ? el('dd', { text: ar(s.attemptNo) }) : null,
         flags.length ? el('dt', { text: 'علامات' }) : null,
-        flags.length ? el('dd', {}, flags.map(function (f) { var chip = A.chip(FLAG_WORDS[f] || f, 'danger'); chip.title = FLAG_HINTS[f] || ''; return chip; })) : null,
+        flags.length ? el('dd', {}, flags.map(function (f) { var chip = A.chip(FLAG_WORDS[f] || f, FLAG_KINDS[f] || 'danger'); chip.title = FLAG_HINTS[f] || ''; chip.dataset.flag = f; return chip; })) : null,
         s.reviewedBy ? el('dt', { text: 'صحّحها' }) : null, s.reviewedBy ? el('dd', { dir: 'auto', text: (A.state.names && A.state.names[s.reviewedBy]) || s.reviewedBy }) : null
       );
 

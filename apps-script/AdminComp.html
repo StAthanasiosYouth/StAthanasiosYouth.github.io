@@ -556,7 +556,7 @@
 
   var PRESET_TEXT = {
     survey: 'أسئلة من غير درجات: رأي، تسجيل، استبيان. اللي بيبعت بيشوف رسالة شكر.',
-    scored: 'أي حد يدخل باسمه وموبايله، والإجابات بتتصحح لوحدها. النتيجة بتظهر، والإجابات بعد ما تقفل.',
+    scored: 'أي حد يدخل باسمه وموبايله، والإجابات بتتصحح لوحدها، وبيشوف نتيجته النهائية بس.',
     coded: 'كل مشترك بكود خاص بيه (ATH-…)، من غير ما يكتب اسمه.',
     points: 'زي اللي بالأكواد، والدرجة بتتحول نقاط في محفظة المشترك.'
   };
@@ -1213,9 +1213,18 @@
       el('p', { text: 'في المسابقة بالأكواد المشترك بيكتب الكود بتاعه بس (ATH-…)، والصفحة بتقوله «الكود مسجل باسم …» ويأكد. الاسم والموبايل والمجموعة بيتجابوا من «المشاركين» — الفورم ده مبيظهرش، ومحدش يقدر يشارك باسم حد تاني.' }),
       el('p', { class: 'field__hint', text: 'المحاولات بتتحسب لكل مشترك. الأكواد بتتعمل وتتبعت من «المسابقات ← المشاركين».' }));
 
+    // §19.2: a coded competition may also take people without a code (they use the form above; no points)
+    var guests = A.checkbox('السماح بالمشاركة بدون كود', !!comp.allowGuests, 'اللي معاهوش كود يقدر يشارك بالفورم (الاسم والموبايل وأي خانة تانية تختارها). بيشوف نتيجته، بس مبياخدش نقاط ومش بيتسجل في «المشاركين».');
+    guests.input.addEventListener('change', function () { syncMode(mode.value() || comp.participation); });
+    var guestPart = el('div', { class: 'form-group comp-guests' }, guests.node,
+      el('p', { class: 'field__hint comp-guests__said', text: 'مشاركة الضيف بتظهر في «المشاركات» بعلامة «ضيف».' }));
+    registeredPart.appendChild(guestPart);
+
     function syncMode(value) {
-      openPart.hidden = value === 'registered';
-      registeredPart.hidden = value !== 'registered';
+      var registered = value === 'registered';
+      openPart.hidden = registered && !guests.input.checked;
+      registeredPart.hidden = !registered;
+      openPart.querySelector('.section-label').textContent = registered ? 'البيانات اللي بيكتبها الضيف (اللي من غير كود)' : 'البيانات اللي بيكتبها قبل ما يبدأ';
     }
 
     syncMode(comp.participation);
@@ -1225,6 +1234,7 @@
     save.addEventListener('click', function () {
       C.save({
         participation: mode.value() || 'open',
+        allowGuests: guests.input.checked,
         uniquePhone: unique.input.checked,
         fields: rows.map(function (r) {
           var field = { key: r.key, label: r.label.value.trim(), mode: r.mode.value };
@@ -1243,8 +1253,8 @@
         box,
         el('div', { class: 'form' },
           A.field('طريقة الاشتراك', mode.node, modules.registry ? '' : 'المسابقة بالأكواد بتتفتح لما تفعّل «المشاركين بالأكواد» من «المسابقات ← الإعدادات».'),
-          openPart,
-          registeredPart
+          registeredPart,
+          openPart
         ),
         el('div', { class: 'actions comp-save' }, save)
       )
@@ -1306,6 +1316,29 @@
 
   /* ---------------- النتيجة ---------------- */
 
+  /* «أبدًا (مُستحسن)», and the reveals tucked under «كشف الإجابات (اختياري)» with what they cost */
+  function revealChoices(current, onchange) {
+    var name = A.uid('answers');
+    var inputs = [];
+    var radio = function (value, label) {
+      var input = el('input', { type: 'radio', name: name, value: value, checked: value === current, onchange: function () { A.markDirty(); onchange(value); } });
+      inputs.push(input);
+      return el('label', { class: 'choice' }, input, el('span', { text: label }));
+    };
+    var never = radio('never', 'أبدًا (مُستحسن)');
+    var more = el('details', { class: 'comp-reveal', open: current !== 'never' ? 'open' : null },
+      el('summary', { text: 'كشف الإجابات (اختياري)' }),
+      el('p', { class: 'note note--warn comp-reveal__warn', text: 'لو كشفت الإجابات، الأسئلة مش هتنفع تتعاد تاني من غير ما تتسرب.' }),
+      el('div', { class: 'choices', role: 'group' },
+        radio('immediately', 'على طول بعد ما يبعت'),
+        radio('afterClose', 'بعد ما المسابقة تقفل'),
+        radio('atDate', 'في ميعاد بتحدده')));
+    return {
+      node: el('div', { class: 'comp-reveal-group', role: 'radiogroup', 'aria-label': 'الإجابات الصحيحة' }, el('div', { class: 'choices' }, never), more),
+      value: function () { var c = inputs.filter(function (i) { return i.checked; })[0]; return c ? c.value : 'never'; }
+    };
+  }
+
   tabBuilders.result = function () {
 
     var comp = C.data.comp;
@@ -1321,15 +1354,11 @@
     }
     var resultShow = A.choices(A.uid('show'), showOptions, comp.resultShow, function () { sync(); });
     var resultsAt = A.dateTimeInput(comp.resultsAt, { emptyText: 'على طول بعد ما يبعت', onchange: function () { sync(); } });
-    var answersShow = A.choices(A.uid('answers'), [
-      { value: 'never', label: 'مش هتظهر' },
-      { value: 'immediately', label: 'على طول بعد ما يبعت' },
-      { value: 'afterClose', label: 'بعد ما المسابقة تقفل' },
-      { value: 'atDate', label: 'في ميعاد بتحدده' }
-    ], comp.answersShow, function () { sync(); });
+    // the correct answers: never by default; showing them is an explicit, optional choice
+    var answersShow = revealChoices(comp.answersShow || 'never', function () { sync(); });
     var answersAt = A.dateTimeInput(comp.answersAt, { emptyText: 'حدد الميعاد', onchange: function () { sync(); } });
     var answersAtField = A.field('ميعاد ظهور الإجابات', answersAt.node);
-    var showPoints = A.checkbox('اعرض درجة كل سؤال وهو بيحل', comp.showPoints, 'مثلاً «١٠ درجات» جنب السؤال');
+    var showPoints = A.checkbox('تظهر درجة كل سؤال وهو بيحل', comp.showPoints, 'مقفولة افتراضيًا: الأحسن المشترك يشوف نتيجته النهائية بس. لو فتحتها، درجة كل سؤال بتبان جنبه وهو بيحل.');
     var wallet = A.checkbox('النقاط تروح لمحفظة المشترك', comp.wallet, 'النقاط هتتضاف لرصيد المشترك أوتوماتيك لما تتصحح (وتتعدل لوحدها لو التصحيح اتغيّر)');
     var walletWhy = el('p', { class: 'field__hint comp-wallet-why' });
     // «الموسم» (§18.6): which season this competition's points land in (the wallet only)
@@ -1378,7 +1407,7 @@
         else lines.push('هيشوف ' + (show === 'score' ? 'درجته' : show === 'points' ? 'النقاط اللي كسبها' : 'درجته والنقاط') + (resultsAt.value() ? ' من ' + C.when(resultsAt.value()) + ' (أو لما تعتمد النتائج)' : ' على طول بعد ما يبعت') + '.');
         lines.push('الأسئلة اللي محتاجة مراجعة بتبان «لسه بتتراجع» لحد ما تصححها.');
       }
-      lines.push(answers === 'never' ? 'الإجابات الصحيحة مش هتظهر له.'
+      lines.push(answers === 'never' ? 'مش هيشوف الإجابات الصحيحة ولا صح/غلط لكل سؤال ولا الشرح — نتيجته النهائية بس (إنت بتشوف التفاصيل كلها في «المشاركات»).'
         : answers === 'immediately' ? 'هيشوف إجاباته والإجابات الصحيحة والشرح على طول بعد ما يبعت.'
           : answers === 'afterClose' ? 'هيشوف الإجابات الصحيحة بعد ما المسابقة تقفل' + (comp.endAt ? ' (' + C.when(comp.endAt) + ')' : '') + '.'
             : 'هيشوف الإجابات الصحيحة ' + (answersAt.value() ? C.when(answersAt.value()) : 'في الميعاد اللي هتحدده') + '.');
@@ -1420,7 +1449,7 @@
         el('div', { class: 'form' },
           scoring.node,
           scorePart,
-          A.field('الإجابات الصحيحة', answersShow.node),
+          A.field('الإجابات الصحيحة', answersShow.node, 'المشترك بيشوف نتيجته النهائية بس. كشف الإجابات اختياري.'),
           answersAtField,
           successText.node,
           el('div', { class: 'note comp-explain-box' }, el('p', { class: 'note__title', text: 'المشترك هيشوف إيه؟' }), said)
@@ -1815,9 +1844,11 @@
     });
 
     return [
+      // §19.3: the age rules belong to the registry (birth dates live there)
+      C.modules && C.modules.registry && A.compAgeRulesCard ? A.compAgeRulesCard() : null,
       A.card('أجزاء المسابقات', 'المسابقات نفسها شغالة دايمًا. الأجزاء دي اختيارية، وكل واحد محتاج اللي قبله: المتجر محتاج النقاط، والنقاط محتاجة المشاركين بالأكواد.', body),
       el('p', { class: 'note', text: 'لما تقفل جزء، شاشاته بتختفي من هنا وصفحاته في الموقع بتقول إنها مش متاحة — بس مفيش أي حاجة بتتمسح: المشاركين والأكواد والنقاط والجوايز والطلبات بيفضلوا زي ما هما لحد ما تشغّله تاني.' })
-    ];
+    ].filter(Boolean);
 
   };
 

@@ -104,7 +104,7 @@ test('resultsFilename is safe whatever the slug / date', () => {
 
 test('names template: «الأسماء» with the exact headers (every column text: a phone keeps its 0), «شرح», «مثال» that the server imports', async () => {
   const m = await import('../admin/comp-sheets.js');
-  assert.deepEqual(m.PEOPLE_HEADERS, ['الاسم بالكامل', 'رقم الموبايل', 'المجموعة / الفصل', 'الكنيسة', 'ملاحظات']);
+  assert.deepEqual(m.PEOPLE_HEADERS, ['الاسم بالكامل', 'رقم الموبايل', 'المجموعة / الفصل', 'الكنيسة', 'تاريخ الميلاد', 'ملاحظات']);
   const book = await readXlsx(writeXlsx(m.peopleTemplate()));
   assert.deepEqual(book.sheets.map(s => s.name), [m.PEOPLE_SHEET, 'شرح', 'مثال']);
   assert.deepEqual(book.sheets[0].rows, [m.PEOPLE_HEADERS]);

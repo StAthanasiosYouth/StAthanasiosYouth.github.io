@@ -8919,7 +8919,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   var PRESET_TEXT = {
     survey: 'أسئلة من غير درجات: رأي، تسجيل، استبيان. اللي بيبعت بيشوف رسالة شكر.',
-    scored: 'أي حد يدخل باسمه وموبايله، والإجابات بتتصحح لوحدها. النتيجة بتظهر، والإجابات بعد ما تقفل.',
+    scored: 'أي حد يدخل باسمه وموبايله، والإجابات بتتصحح لوحدها، وبيشوف نتيجته النهائية بس.',
     coded: 'كل مشترك بكود خاص بيه (ATH-…)، من غير ما يكتب اسمه.',
     points: 'زي اللي بالأكواد، والدرجة بتتحول نقاط في محفظة المشترك.'
   };
@@ -9576,9 +9576,18 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       el('p', { text: 'في المسابقة بالأكواد المشترك بيكتب الكود بتاعه بس (ATH-…)، والصفحة بتقوله «الكود مسجل باسم …» ويأكد. الاسم والموبايل والمجموعة بيتجابوا من «المشاركين» — الفورم ده مبيظهرش، ومحدش يقدر يشارك باسم حد تاني.' }),
       el('p', { class: 'field__hint', text: 'المحاولات بتتحسب لكل مشترك. الأكواد بتتعمل وتتبعت من «المسابقات ← المشاركين».' }));
 
+    // §19.2: a coded competition may also take people without a code (they use the form above; no points)
+    var guests = A.checkbox('السماح بالمشاركة بدون كود', !!comp.allowGuests, 'اللي معاهوش كود يقدر يشارك بالفورم (الاسم والموبايل وأي خانة تانية تختارها). بيشوف نتيجته، بس مبياخدش نقاط ومش بيتسجل في «المشاركين».');
+    guests.input.addEventListener('change', function () { syncMode(mode.value() || comp.participation); });
+    var guestPart = el('div', { class: 'form-group comp-guests' }, guests.node,
+      el('p', { class: 'field__hint comp-guests__said', text: 'مشاركة الضيف بتظهر في «المشاركات» بعلامة «ضيف».' }));
+    registeredPart.appendChild(guestPart);
+
     function syncMode(value) {
-      openPart.hidden = value === 'registered';
-      registeredPart.hidden = value !== 'registered';
+      var registered = value === 'registered';
+      openPart.hidden = registered && !guests.input.checked;
+      registeredPart.hidden = !registered;
+      openPart.querySelector('.section-label').textContent = registered ? 'البيانات اللي بيكتبها الضيف (اللي من غير كود)' : 'البيانات اللي بيكتبها قبل ما يبدأ';
     }
 
     syncMode(comp.participation);
@@ -9588,6 +9597,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     save.addEventListener('click', function () {
       C.save({
         participation: mode.value() || 'open',
+        allowGuests: guests.input.checked,
         uniquePhone: unique.input.checked,
         fields: rows.map(function (r) {
           var field = { key: r.key, label: r.label.value.trim(), mode: r.mode.value };
@@ -9606,8 +9616,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         box,
         el('div', { class: 'form' },
           A.field('طريقة الاشتراك', mode.node, modules.registry ? '' : 'المسابقة بالأكواد بتتفتح لما تفعّل «المشاركين بالأكواد» من «المسابقات ← الإعدادات».'),
-          openPart,
-          registeredPart
+          registeredPart,
+          openPart
         ),
         el('div', { class: 'actions comp-save' }, save)
       )
@@ -9669,6 +9679,29 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   /* ---------------- النتيجة ---------------- */
 
+  /* «أبدًا (مُستحسن)», and the reveals tucked under «كشف الإجابات (اختياري)» with what they cost */
+  function revealChoices(current, onchange) {
+    var name = A.uid('answers');
+    var inputs = [];
+    var radio = function (value, label) {
+      var input = el('input', { type: 'radio', name: name, value: value, checked: value === current, onchange: function () { A.markDirty(); onchange(value); } });
+      inputs.push(input);
+      return el('label', { class: 'choice' }, input, el('span', { text: label }));
+    };
+    var never = radio('never', 'أبدًا (مُستحسن)');
+    var more = el('details', { class: 'comp-reveal', open: current !== 'never' ? 'open' : null },
+      el('summary', { text: 'كشف الإجابات (اختياري)' }),
+      el('p', { class: 'note note--warn comp-reveal__warn', text: 'لو كشفت الإجابات، الأسئلة مش هتنفع تتعاد تاني من غير ما تتسرب.' }),
+      el('div', { class: 'choices', role: 'group' },
+        radio('immediately', 'على طول بعد ما يبعت'),
+        radio('afterClose', 'بعد ما المسابقة تقفل'),
+        radio('atDate', 'في ميعاد بتحدده')));
+    return {
+      node: el('div', { class: 'comp-reveal-group', role: 'radiogroup', 'aria-label': 'الإجابات الصحيحة' }, el('div', { class: 'choices' }, never), more),
+      value: function () { var c = inputs.filter(function (i) { return i.checked; })[0]; return c ? c.value : 'never'; }
+    };
+  }
+
   tabBuilders.result = function () {
 
     var comp = C.data.comp;
@@ -9684,15 +9717,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
     var resultShow = A.choices(A.uid('show'), showOptions, comp.resultShow, function () { sync(); });
     var resultsAt = A.dateTimeInput(comp.resultsAt, { emptyText: 'على طول بعد ما يبعت', onchange: function () { sync(); } });
-    var answersShow = A.choices(A.uid('answers'), [
-      { value: 'never', label: 'مش هتظهر' },
-      { value: 'immediately', label: 'على طول بعد ما يبعت' },
-      { value: 'afterClose', label: 'بعد ما المسابقة تقفل' },
-      { value: 'atDate', label: 'في ميعاد بتحدده' }
-    ], comp.answersShow, function () { sync(); });
+    // the correct answers: never by default; showing them is an explicit, optional choice
+    var answersShow = revealChoices(comp.answersShow || 'never', function () { sync(); });
     var answersAt = A.dateTimeInput(comp.answersAt, { emptyText: 'حدد الميعاد', onchange: function () { sync(); } });
     var answersAtField = A.field('ميعاد ظهور الإجابات', answersAt.node);
-    var showPoints = A.checkbox('اعرض درجة كل سؤال وهو بيحل', comp.showPoints, 'مثلاً «١٠ درجات» جنب السؤال');
+    var showPoints = A.checkbox('تظهر درجة كل سؤال وهو بيحل', comp.showPoints, 'مقفولة افتراضيًا: الأحسن المشترك يشوف نتيجته النهائية بس. لو فتحتها، درجة كل سؤال بتبان جنبه وهو بيحل.');
     var wallet = A.checkbox('النقاط تروح لمحفظة المشترك', comp.wallet, 'النقاط هتتضاف لرصيد المشترك أوتوماتيك لما تتصحح (وتتعدل لوحدها لو التصحيح اتغيّر)');
     var walletWhy = el('p', { class: 'field__hint comp-wallet-why' });
     // «الموسم» (§18.6): which season this competition's points land in (the wallet only)
@@ -9741,7 +9770,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         else lines.push('هيشوف ' + (show === 'score' ? 'درجته' : show === 'points' ? 'النقاط اللي كسبها' : 'درجته والنقاط') + (resultsAt.value() ? ' من ' + C.when(resultsAt.value()) + ' (أو لما تعتمد النتائج)' : ' على طول بعد ما يبعت') + '.');
         lines.push('الأسئلة اللي محتاجة مراجعة بتبان «لسه بتتراجع» لحد ما تصححها.');
       }
-      lines.push(answers === 'never' ? 'الإجابات الصحيحة مش هتظهر له.'
+      lines.push(answers === 'never' ? 'مش هيشوف الإجابات الصحيحة ولا صح/غلط لكل سؤال ولا الشرح — نتيجته النهائية بس (إنت بتشوف التفاصيل كلها في «المشاركات»).'
         : answers === 'immediately' ? 'هيشوف إجاباته والإجابات الصحيحة والشرح على طول بعد ما يبعت.'
           : answers === 'afterClose' ? 'هيشوف الإجابات الصحيحة بعد ما المسابقة تقفل' + (comp.endAt ? ' (' + C.when(comp.endAt) + ')' : '') + '.'
             : 'هيشوف الإجابات الصحيحة ' + (answersAt.value() ? C.when(answersAt.value()) : 'في الميعاد اللي هتحدده') + '.');
@@ -9783,7 +9812,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         el('div', { class: 'form' },
           scoring.node,
           scorePart,
-          A.field('الإجابات الصحيحة', answersShow.node),
+          A.field('الإجابات الصحيحة', answersShow.node, 'المشترك بيشوف نتيجته النهائية بس. كشف الإجابات اختياري.'),
           answersAtField,
           successText.node,
           el('div', { class: 'note comp-explain-box' }, el('p', { class: 'note__title', text: 'المشترك هيشوف إيه؟' }), said)
@@ -10178,9 +10207,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     });
 
     return [
+      // §19.3: the age rules belong to the registry (birth dates live there)
+      C.modules && C.modules.registry && A.compAgeRulesCard ? A.compAgeRulesCard() : null,
       A.card('أجزاء المسابقات', 'المسابقات نفسها شغالة دايمًا. الأجزاء دي اختيارية، وكل واحد محتاج اللي قبله: المتجر محتاج النقاط، والنقاط محتاجة المشاركين بالأكواد.', body),
       el('p', { class: 'note', text: 'لما تقفل جزء، شاشاته بتختفي من هنا وصفحاته في الموقع بتقول إنها مش متاحة — بس مفيش أي حاجة بتتمسح: المشاركين والأكواد والنقاط والجوايز والطلبات بيفضلوا زي ما هما لحد ما تشغّله تاني.' })
-    ];
+    ].filter(Boolean);
 
   };
 
@@ -11014,8 +11045,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   var STATUS_WORDS = { in_progress: 'لسه بيحل', submitted: 'اتبعتت', pending_review: 'محتاجة مراجعة', graded: 'اتصححت', void: 'ملغية' };
   var STATUS_KINDS = { in_progress: 'off', submitted: 'info', pending_review: 'gold', graded: 'ok', void: 'danger' };
-  var FLAG_WORDS = { fast: 'سريع جدًا', late: 'اتأخر', dupPhone: 'رقم متكرر', preview: 'تجربة' };
-  var FLAG_HINTS = { fast: 'أقل من ثانيتين في المتوسط لكل سؤال', late: 'اتبعتت في الدقايق الزيادة بعد النهاية أو بعد الوقت', dupPhone: 'الرقم ده شارك قبل كده' };
+  var FLAG_WORDS = { fast: 'سريع جدًا', late: 'اتأخر', dupPhone: 'رقم متكرر', preview: 'تجربة', guest: 'ضيف', noPoints: 'من غير نقاط (السن)' };
+  var FLAG_KINDS = { guest: 'info', noPoints: 'gold' };
+  var FLAG_HINTS = { fast: 'أقل من ثانيتين في المتوسط لكل سؤال', late: 'اتبعتت في الدقايق الزيادة بعد النهاية أو بعد الوقت', dupPhone: 'الرقم ده شارك قبل كده', guest: 'شارك من غير كود (مالوش نقاط)', noPoints: 'سنه كان خارج الفئة العمرية لنظام النقاط وقت ما بعت: المشاركة متسجلة من غير نقاط' };
 
   function statusChip(status) {
     return A.chip(STATUS_WORDS[status] || status, STATUS_KINDS[status] || 'off');
@@ -11064,7 +11096,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var chips = el('div', { class: 'filter-chips comp-subs__status', role: 'group', 'aria-label': 'الحالة' });
     var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر بالاسم أو رقم الموبايل…', 'aria-label': 'دوّر في المشاركات', value: subsQuery.q });
     var flag = el('select', { class: 'input', 'aria-label': 'علامات' },
-      [{ v: '', t: 'كل العلامات' }, { v: 'fast', t: 'سريع جدًا' }, { v: 'late', t: 'اتأخر' }, { v: 'dupPhone', t: 'رقم متكرر' }].map(function (o) {
+      [{ v: '', t: 'كل العلامات' }, { v: 'fast', t: 'سريع جدًا' }, { v: 'late', t: 'اتأخر' }, { v: 'dupPhone', t: 'رقم متكرر' }, { v: 'guest', t: 'ضيوف (من غير كود)' }, { v: 'noPoints', t: 'من غير نقاط (السن)' }].map(function (o) {
         return el('option', { value: o.v, selected: o.v === subsQuery.flag ? 'selected' : null, text: o.t });
       }));
     var sort = el('select', { class: 'input', 'aria-label': 'الترتيب' }, SORTS.filter(function (s) { return scored || !/^score/.test(s.value); }).map(function (s) {
@@ -11119,7 +11151,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           statusChip(item.status),
           scored && item.status !== 'in_progress' && item.status !== 'void' ? el('span', { class: 'comp-sub__score', text: scoreText(item) }) : null,
           item.pendingCount ? A.chip('⏳ ' + ar(item.pendingCount), 'gold') : null,
-          flags.map(function (f) { return A.chip(FLAG_WORDS[f] || f, 'danger'); }),
+          flags.map(function (f) { var chip = A.chip(FLAG_WORDS[f] || f, FLAG_KINDS[f] || 'danger'); chip.dataset.flag = f; return chip; }),
           item.attemptNo > 1 ? A.chip('محاولة ' + ar(item.attemptNo), 'off') : null
         ),
         el('span', { class: 'comp-sub__when' },
@@ -11326,7 +11358,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         el('dt', { text: 'المدة' }), el('dd', { text: C.duration(s.durationSec) }),
         s.attemptNo > 1 ? el('dt', { text: 'المحاولة' }) : null, s.attemptNo > 1 ? el('dd', { text: ar(s.attemptNo) }) : null,
         flags.length ? el('dt', { text: 'علامات' }) : null,
-        flags.length ? el('dd', {}, flags.map(function (f) { var chip = A.chip(FLAG_WORDS[f] || f, 'danger'); chip.title = FLAG_HINTS[f] || ''; return chip; })) : null,
+        flags.length ? el('dd', {}, flags.map(function (f) { var chip = A.chip(FLAG_WORDS[f] || f, FLAG_KINDS[f] || 'danger'); chip.title = FLAG_HINTS[f] || ''; chip.dataset.flag = f; return chip; })) : null,
         s.reviewedBy ? el('dt', { text: 'صحّحها' }) : null, s.reviewedBy ? el('dd', { dir: 'auto', text: (A.state.names && A.state.names[s.reviewedBy]) || s.reviewedBy }) : null
       );
 
@@ -11612,6 +11644,84 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   var FIELD_LABELS = { name: 'الاسم', phone: 'رقم الموبايل', group: 'المجموعة', church: 'الكنيسة', notes: 'ملاحظات' };
   var STATUS_WORDS = { in_progress: 'لسه بيحل', submitted: 'اتبعتت', pending_review: 'محتاجة مراجعة', graded: 'اتصححت', void: 'ملغية' };
 
+  /* =======================================================
+     BIRTH DATES AND AGE ELIGIBILITY (§19.3)
+  ======================================================= */
+
+  var MONTH_NAMES = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  var ELIGIBILITY = {
+    ok: { label: 'مناسب', kind: 'ok' },
+    soon: { label: 'قرب يخرج من السن', kind: 'gold' },
+    out: { label: 'خارج السن', kind: 'danger' },
+    unknown: { label: 'من غير تاريخ ميلاد', kind: 'off' }
+  };
+
+  /* day / month / year selects (all optional) → { node, value() 'YYYY-MM-DD' | '' | null (half filled) } */
+  P.birthSelects = function (value) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
+    var now = Number(A.cairoNow().slice(0, 4));
+    var pick = function (label, options, current) {
+      return el('select', { class: 'input', 'aria-label': label, onchange: A.markDirty },
+        [el('option', { value: '', text: label })].concat(options.map(function (o) {
+          return el('option', { value: o.value, selected: o.value === current ? 'selected' : null, text: o.text });
+        })));
+    };
+    var days = [];
+    for (var d = 1; d <= 31; d++) days.push({ value: (d < 10 ? '0' : '') + d, text: ar(d) });
+    var years = [];
+    var newest = Math.max(now, m ? Number(m[1]) : 0), oldest = Math.min(now - 100, m ? Number(m[1]) : now);
+    for (var y = newest; y >= oldest; y--) years.push({ value: String(y), text: ar(y) });
+    var day = pick('اليوم', days, m ? m[3] : '');
+    var month = pick('الشهر', MONTH_NAMES.map(function (n, i) { return { value: (i < 9 ? '0' : '') + (i + 1), text: n }; }), m ? m[2] : '');
+    var year = pick('السنة', years, m ? m[1] : '');
+    day.dataset.birth = 'day';
+    month.dataset.birth = 'month';
+    year.dataset.birth = 'year';
+    return {
+      node: el('div', { class: 'comp-birth', role: 'group' }, day, month, year),
+      value: function () {
+        var parts = [year.value, month.value, day.value];
+        if (parts.every(function (x) { return !x; })) return '';
+        if (parts.some(function (x) { return !x; })) return null;
+        return parts.join('-');
+      }
+    };
+  };
+
+  /* a calendar date with its year: «١٥ مارس ٢٠٠٤» (birth dates, leaving the age range) */
+  function dateText(value) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ''));
+    return m ? ar(Number(m[3])) + ' ' + MONTH_NAMES[Number(m[2]) - 1] + ' ' + ar(Number(m[1])) : '';
+  }
+
+  /* completed years between a 'YYYY-MM-DD' and another (or today, Cairo) */
+  function yearsBetween(from, to) {
+    var a = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(from || ''));
+    var b = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(to || A.cairoNow()));
+    if (!a || !b) return null;
+    var years = Number(b[1]) - Number(a[1]);
+    if (b[2] + b[3] < a[2] + a[3]) years--;
+    return years;
+  }
+
+  P.eligibilityChip = function (p) {
+    var e = ELIGIBILITY[p.eligibility];
+    if (!e) return null;
+    var label = e.label;
+    if (p.eligibility === 'soon' && p.leavesAt) {
+      var at = yearsBetween(p.birthDate, p.leavesAt);
+      label += ' — هيكمّل ' + (at !== null ? ar(at) + ' سنة ' : '') + 'يوم ' + dateText(p.leavesAt);
+    }
+    var chip = A.chip(label, e.kind);
+    chip.dataset.eligibility = p.eligibility;
+    return chip;
+  };
+
+  function ageText(p) {
+    var age = p.age !== undefined && p.age !== null && p.age !== '' ? Number(p.age) : yearsBetween(p.birthDate);
+    return age === null || isNaN(age) ? '' : ar(age) + ' سنة';
+  }
+
   function siteUrl() {
     return ((C.list && C.list.siteUrl) || (A.state && A.state.config.siteUrl) || 'https://stathanasiosyouth.github.io/').replace(/\/?$/, '/');
   }
@@ -11699,6 +11809,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       ),
       el('span', { class: 'comp-sub__meta' },
         p.group ? A.chip(p.group, 'gold') : null,
+        ageText(p) ? A.chip(ageText(p)) : null,
+        P.eligibilityChip(p),
         p.active ? null : A.chip('موقوف', 'danger'),
         wallet && p.balance !== undefined ? A.chip(ar(p.balance) + ' نقطة', 'info') : null
       ),
@@ -11718,6 +11830,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       return el('option', { value: o.v, selected: o.v === q.sort + ':' + q.dir ? 'selected' : null, text: o.t });
     }));
     var chips = el('div', { class: 'filter-chips', role: 'group', 'aria-label': 'الحالة' });
+    var ages = el('div', { class: 'filter-chips comp-ages', role: 'group', 'aria-label': 'السن', hidden: true });
     var list = el('div', { class: 'comp-subs', 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--line' }));
     var pager = el('div', { class: 'comp-pager', hidden: true });
     var batches = el('div', { class: 'comp-batches' });
@@ -11735,7 +11848,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     function load() {
       var mine = ++loading;
       box.hidden = true;
-      return A.call('apiParticipants', { q: q.q, group: q.group, status: q.status, sort: q.sort, dir: q.dir, offset: q.offset, limit: q.limit }).then(function (reply) {
+      return A.call('apiParticipants', { q: q.q, group: q.group, status: q.status, eligibility: q.eligibility || 'all', sort: q.sort, dir: q.dir, offset: q.offset, limit: q.limit }).then(function (reply) {
         if (mine !== loading || !list.isConnected) return;
         P.list = reply;
         C.applyModules(reply.modules);
@@ -11743,6 +11856,14 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           return el('option', { value: g.name, selected: g.name === q.group ? 'selected' : null, text: g.name + ' (' + ar(g.count) + ')' });
         }));
         var counts = reply.counts || { all: 0, active: 0, inactive: 0 };
+        // §19.3: by age (reply.eligibility = { ok, soon, out, unknown }); shown once the server knows birth dates
+        var ec = (reply.eligibility && typeof reply.eligibility === 'object') ? reply.eligibility : (reply.eligibilityCounts || counts);
+        ages.hidden = !['ok', 'soon', 'out', 'unknown'].some(function (k) { return ec[k] !== undefined; });
+        if (!ages.hidden) {
+          A.fill(ages, [{ k: 'all', t: 'كل الأعمار' }].concat(['ok', 'soon', 'out', 'unknown'].map(function (k) { return { k: k, t: ELIGIBILITY[k].label, n: ec[k] || 0 }; })).map(function (o) {
+            return el('button', { class: 'filter-chip', type: 'button', 'data-eligibility': o.k, 'aria-pressed': String((q.eligibility || 'all') === o.k), onclick: function () { q.eligibility = o.k; q.offset = 0; load(); } }, o.t + (o.n !== undefined ? ' (' + ar(o.n) + ')' : ''));
+          }));
+        }
         A.fill(chips, [{ k: 'all', t: 'الكل', n: counts.all }, { k: 'active', t: 'نشط', n: counts.active }, { k: 'inactive', t: 'موقوف', n: counts.inactive }].map(function (o) {
           return el('button', { class: 'filter-chip', type: 'button', 'data-status': o.k, 'aria-pressed': String(q.status === o.k), onclick: function () { q.status = o.k; q.offset = 0; load(); } }, o.t + ' (' + ar(o.n) + ')');
         }));
@@ -11792,6 +11913,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         ),
         el('div', { class: 'comp-subs__tools' }, search, group, sort),
         chips,
+        ages,
         box,
         list,
         pager,
@@ -11853,6 +11975,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var group = A.textInput(person.group, { max: 40, placeholder: 'مثلاً: ثانوي بنين' });
     group.setAttribute('list', groupsList.id);
     var church = A.counted('الكنيسة', person.church, 60, 'اختياري');
+    var birth = P.birthSelects(person.birthDate);
     var notes = A.counted('ملاحظات', person.notes, 300, 'للخدام بس — مش بتظهر للمشترك', { multiline: true, rows: 2 });
 
     function preview() {
@@ -11870,7 +11993,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     save.addEventListener('click', function () {
       box.hidden = true;
-      var input = { name: name.input.value, phone: phone.value, group: group.value, church: church.input.value, notes: notes.input.value };
+      var born = birth.value();
+      if (born === null) { A.fail(new Error('تاريخ الميلاد: اختار اليوم والشهر والسنة (أو سيبهم فاضيين)'), box); return; }
+      var input = { name: name.input.value, phone: phone.value, group: group.value, church: church.input.value, notes: notes.input.value, birthDate: born };
       if (!isNew) input.id = person.id;
       A.withBusy(save, A.call('apiParticipantSave', input)).then(function (reply) {
         A.dirty = false;
@@ -11906,6 +12031,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.field('المجموعة', group, 'اختار من الموجود أو اكتب جديدة'),
         groupsList,
         church.node,
+        A.field('تاريخ الميلاد', birth.node, 'اختياري: بيحدد السن ومين مناسب لنظام النقاط (من «الإعدادات»).'),
         notes.node,
         isNew ? el('p', { class: 'note', text: 'الكود بيتعمل لوحده أول ما تحفظ، وتقدر تعرضه أو تبعته على واتساب من صفحة المشترك.' }) : null
       )
@@ -11995,6 +12121,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           el('div', { class: 'item__meta' },
             p.active ? A.chip('نشط', 'ok') : A.chip('موقوف', 'danger'),
             p.group ? A.chip(p.group, 'gold') : null,
+            P.eligibilityChip(p),
             p.importBatch ? A.chip('من استيراد', 'off') : null)
         )
       ),
@@ -12002,6 +12129,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         el('dt', { text: 'الموبايل' }), el('dd', {}, el('a', { class: 'ltr', href: 'tel:' + p.phoneIntl, text: p.phone })),
         p.church ? el('dt', { text: 'الكنيسة' }) : null, p.church ? el('dd', { text: p.church }) : null,
         p.notes ? el('dt', { text: 'ملاحظات' }) : null, p.notes ? el('dd', { text: p.notes }) : null,
+        el('dt', { text: 'تاريخ الميلاد' }), el('dd', { text: p.birthDate ? dateText(p.birthDate) + (ageText(p) ? ' — ' + ageText(p) : '') : 'مش متسجل' }),
+        p.leavesAt ? el('dt', { text: 'بيخرج من السن' }) : null, p.leavesAt ? el('dd', { text: dateText(p.leavesAt) }) : null,
+        p.eligibility === 'out' ? el('dt', { text: 'النقاط' }) : null, p.eligibility === 'out' ? el('dd', { text: 'خارج الفئة العمرية: يشارك عادي من غير نقاط ولا جوايز. الكود والتاريخ والرصيد اللي فات محفوظين.' }) : null,
         el('dt', { text: 'اتسجل' }), el('dd', { text: C.when(p.createdAt) })
       ),
       el('div', { class: 'actions' },
@@ -12444,7 +12574,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       if (row.status === 'exists') {
         lines.push(el('span', { class: 'field__hint', text: (row.reason || 'متسجل قبل كده') + (row.match ? ': ' + row.match.name + (row.match.group ? ' (' + row.match.group + ')' : '') + (row.match.status === 'inactive' ? ' — موقوف' : '') : '') }));
         (row.changes || []).forEach(function (c) {
-          lines.push(el('span', { class: 'import__change' }, el('strong', { text: c.label + ': ' }), el('del', { text: c.from || '(فاضي)' }), ' ← ', el('ins', { text: c.to })));
+          lines.push(el('span', { class: 'import__change' }, el('strong', { text: c.label + ': ' }), el('del', { text: (c.field === 'birthDate' ? dateText(c.from) : c.from) || '(فاضي)' }), ' ← ', el('ins', { text: c.field === 'birthDate' ? dateText(c.to) || c.to : c.to })));
         });
       }
       if (row.status === 'dup') lines.push(el('span', { class: 'field__hint', text: 'مكرر في الملف: ' + (row.reason || '') + ' — هيتضاف مرة واحدة بس' }));
@@ -12484,18 +12614,18 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       button.addEventListener('click', function () {
         button.hidden = true;
         holder.hidden = false;
-        var current = fixes[row.line] || { name: row.name, phone: row.phone, group: row.group, church: row.church };
+        var current = fixes[row.line] || { name: row.name, phone: row.phone, group: row.group, church: row.church, birthDate: row.birthDate || '' };
         var make = function (key, label, ltr) {
           var input = el('input', { class: 'input' + (ltr ? ' input--ltr' : ''), dir: ltr ? 'ltr' : null, value: current[key] || '', 'aria-label': label + ' (صف ' + ar(row.line) + ')', 'data-fix': key });
           input.addEventListener('input', function () {
-            fixes[row.line] = fixes[row.line] || { name: row.name, phone: row.phone, group: row.group, church: row.church };
+            fixes[row.line] = fixes[row.line] || { name: row.name, phone: row.phone, group: row.group, church: row.church, birthDate: row.birthDate || '' };
             fixes[row.line][key] = input.value;
             A.markDirty();
             count();
           });
           return el('label', { class: 'comp-import__fix-field' }, el('span', { class: 'field__label', text: label }), input);
         };
-        A.fill(holder, make('name', 'الاسم'), make('phone', 'الموبايل', true), make('group', 'المجموعة'), make('church', 'الكنيسة'));
+        A.fill(holder, make('name', 'الاسم'), make('phone', 'الموبايل', true), make('group', 'المجموعة'), make('church', 'الكنيسة'), make('birthDate', 'تاريخ الميلاد (يوم/شهر/سنة)', true));
         holder.querySelector('input').focus();
       });
       return [button, holder];
@@ -12509,7 +12639,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           el('bdi', { class: 'comp-import__name', text: row.name || '(من غير اسم)' }),
           A.chip({ new: 'جديد', exists: row.changes && row.changes.length ? 'موجود — فيه تحديث' : 'موجود بالفعل', dup: 'مكرر', error: 'خطأ' }[row.status], { new: 'ok', exists: 'off', dup: 'off', error: 'danger' }[row.status])),
         el('div', { class: 'import__lines' },
-          el('span', { class: 'comp-import__who' }, el('span', { class: 'ltr', text: row.phone || '—' }), row.group ? ' · ' + row.group : '', row.church ? ' · ' + row.church : ''),
+          el('span', { class: 'comp-import__who' }, el('span', { class: 'ltr', text: row.phone || '—' }), row.group ? ' · ' + row.group : '', row.church ? ' · ' + row.church : '', row.birthDate ? ' · مواليد ' + dateText(row.birthDate) : ''),
           why(row),
           choiceNode(row),
           fixNode(row)));
@@ -12534,11 +12664,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       var run = kit().then(function (m) {
         var edited = rows.map(function (row) {
           var fix = fixes[row.line];
-          return { name: fix ? fix.name : row.name, phone: fix ? fix.phone : row.phone, group: fix ? fix.group : row.group, church: fix ? fix.church : row.church, notes: row.notes };
+          return { name: fix ? fix.name : row.name, phone: fix ? fix.phone : row.phone, group: fix ? fix.group : row.group, church: fix ? fix.church : row.church, birthDate: fix ? fix.birthDate : (row.birthDate || ''), notes: row.notes };
         });
         var columns = (result.columns || []).slice();
         if (Object.keys(fixes).some(function (k) { return fixes[k].group; }) && columns.indexOf('group') === -1) columns.push('group');
         if (Object.keys(fixes).some(function (k) { return fixes[k].church; }) && columns.indexOf('church') === -1) columns.push('church');
+        if (Object.keys(fixes).some(function (k) { return fixes[k].birthDate; }) && columns.indexOf('birthDate') === -1) columns.push('birthDate');
         var text = m.sheets.peopleText(edited, columns);
         return A.call('apiParticipantsImportPreview', text).then(function (next) { return { text: text, next: next }; });
       });
@@ -13482,12 +13613,58 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
 
   /* =======================================================
+     «الفئة العمرية لنظام النقاط» (§19.3) — on «المسابقات ← الإعدادات»
+  ======================================================= */
+
+  A.compAgeRulesCard = function () {
+    var body = el('div', { class: 'comp-age-rules', 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--line' }));
+    var box = A.errorBox();
+    var numInput = function (value, min, max, label) { return el('input', { class: 'input comp-number', type: 'number', inputmode: 'numeric', min: String(min), max: String(max), step: '1', value: value === undefined || value === null ? '' : String(value), 'aria-label': label, oninput: A.markDirty }); };
+
+    function draw(r) {
+      var min = numInput(r.min, 0, 99, 'أقل سن');
+      var max = numInput(r.max, 1, 100, 'أكبر سن');
+      var warn = numInput(r.warnDays, 0, 365, 'التنبيه قبلها بكام يوم');
+      var said = el('p', { class: 'field__hint comp-age-said', role: 'status', 'aria-live': 'polite' });
+      var sync = function () { said.textContent = 'نظام النقاط للي من ' + ar(min.value || 0) + ' لحد ' + ar(max.value || 0) + ' سنة. قبل ما حد يكمّل ' + ar((Number(max.value) || 0) + 1) + ' بـ' + ar(warn.value || 0) + ' يوم بيظهر عنده «قرب يخرج من السن».'; };
+      [min, max, warn].forEach(function (i) { i.addEventListener('input', sync); });
+      sync();
+      var save = el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'age-save', text: 'حفظ الفئة العمرية' });
+      save.addEventListener('click', function () {
+        box.hidden = true;
+        A.withBusy(save, A.call('apiAgeRulesSave', { min: Number(min.value), max: Number(max.value), warnDays: Number(warn.value) })).then(function (next) {
+          A.dirty = false;
+          A.toast('الفئة العمرية اتحفظت ✓ — اتطبقت على الكل دلوقتي');
+          draw(next && next.min !== undefined ? next : { min: Number(min.value), max: Number(max.value), warnDays: Number(warn.value) });
+        }).catch(function (error) { A.fail(error, box); });
+      });
+      A.fill(body,
+        el('div', { class: 'comp-age-grid' },
+          A.field('أقل سن', min), A.field('أكبر سن', max), A.field('التنبيه قبلها بكام يوم', warn)),
+        said,
+        el('p', { class: 'note comp-age-rules__note', text: 'تغيير الفئة بيتطبق على طول على مين «مناسب» ومين «خارج السن». الأكواد والتاريخ والمشاركات القديمة مبتتغيرش، والنقاط اللي اتاخدت قبل كده بتفضل. اللي خارج السن يقدر يشارك في المسابقات عادي، بس من غير نقاط ومن غير طلب جوايز.' }),
+        el('div', { class: 'actions comp-save' }, save));
+    }
+
+    A.call('apiAgeRules').then(function (r) { if (body.isConnected) draw(r || {}); }).catch(function (error) {
+      if (!body.isConnected) return;
+      if (C.v2Missing(error)) { A.fill(body, el('p', { class: 'note note--warn comp-v2-missing', text: 'الفئة العمرية محتاجة تحديث السيرفر. أول ما يتركب هتشتغل هنا لوحدها.' })); return; }
+      body.replaceChildren();
+      A.fail(error, box);
+    });
+
+    return A.card('الفئة العمرية لنظام النقاط', 'مين يكسب نقاط ويطلب جوايز، بالسن (من تاريخ الميلاد).', box, body);
+  };
+
+
+  /* =======================================================
      «مواعيد المتجر» + automatic pushes
   ======================================================= */
 
   var MODES = [
     { value: 'auto', label: 'تلقائي حسب المواعيد' },
     { value: 'open', label: 'مفتوح' },
+    { value: 'preview', label: 'للعرض بس (من غير طلب)' },
     { value: 'closed', label: 'مقفول' }
   ];
   var NOTIFY = [
@@ -13500,8 +13677,16 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   var KIND_WORDS = { 'shop-open-1d': 'قبل فتح المتجر بيوم', 'shop-open-1h': 'قبل فتح المتجر بساعة', 'shop-open': 'وقت فتح المتجر', 'shop-close-24h': 'قبل قفل المتجر بـ٢٤ ساعة', 'shop-close-1h': 'قبل قفل المتجر بساعة', 'season-end': 'قبل نهاية الموسم' };
   var SEND_STATUS = { pending: { label: 'مستني', kind: 'gold' }, sent: { label: 'اتبعت', kind: 'ok' }, skipped: { label: 'اتخطى', kind: 'off' }, failed: { label: 'فشل', kind: 'danger' }, cancelled: { label: 'اتلغى', kind: 'off' } };
 
+  var MODE_SAID = {
+    auto: 'تلقائي = بيفتح ويقفل لوحده في المواعيد اللي تحت (ولو علّمت «اعرض الجوايز قبل ما الطلب يفتح»، الجوايز بتبان قبل الفتح من غير طلب).',
+    open: 'مفتوح = المشتركين بيشوفوا الجوايز ويطلبوا دلوقتي، لحد ما تغيّره.',
+    preview: 'للعرض بس = الجوايز وأسعارها ظاهرة في «نقاطي»، بس الطلب مقفول لحد ما تفتحه. مناسب قبل موسم الجوايز علشان الناس تتحمس.',
+    closed: 'مقفول = الجوايز مش ظاهرة ومفيش طلبات. الطلبات القديمة بتفضل، والنقاط زي ما هي.'
+  };
+
   C.shopStateChip = function (state, opensAt) {
     if (state === 'open') return A.chip('المتجر مفتوح', 'ok');
+    if (state === 'preview') return A.chip('للعرض — الطلب ' + (opensAt ? 'هيفتح ' + C.when(stamp(opensAt)) : 'هيفتح قريب'), 'info');
     if (state === 'scheduled') return A.chip('هيفتح' + (opensAt ? ' ' + C.when(stamp(opensAt)) : ''), 'gold');
     return A.chip('المتجر مقفول', 'danger');
   };
@@ -13587,24 +13772,30 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       var opens = A.dateTimeInput(stamp(s.opensAt), { emptyText: 'من غير ميعاد فتح', presets: [A.PRESETS.now, A.PRESETS.friday] });
       var closes = A.dateTimeInput(stamp(s.closesAt), { emptyText: 'من غير ميعاد قفل', presets: [A.PRESETS.sunday10] });
       var allow = A.checkbox('يسمح للمشترك يلغي طلبه وهو مستني', !!s.allowCancel, 'من «نقاطي»، والنقاط بترجعله على طول. بس والمتجر مفتوح.');
+      // auto mode: before opening, the prizes can be shown (no ordering) instead of hidden
+      var showFirst = A.checkbox('اعرض الجوايز قبل ما الطلب يفتح', !!s.preview, 'قبل ميعاد الفتح المشتركين بيشوفوا الجوايز وأسعارها في «نقاطي» (ويجمّعوا نقاط عليها)، بس مفيش طلب لحد ما يفتح.');
+      showFirst.node.dataset.preview = '';
       var notify = s.notify || {};
       var ticks = NOTIFY.map(function (n) {
         var c = A.checkbox(n.label, !!notify[n.key]);
         c.node.dataset.notify = n.key;
         return { key: n.key, check: c };
       });
+      var modeSaid = el('p', { class: 'field__hint comp-mode-said', role: 'status', 'aria-live': 'polite' });
       var times = el('div', { class: 'form-group' }, A.field('بيفتح', opens.node), A.field('بيقفل', closes.node));
       var save = el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'schedule-save', text: 'حفظ المواعيد' });
 
       function sync() {
         var m = mode.value() || 'auto';
         times.classList.toggle('is-muted', m !== 'auto');
+        showFirst.node.hidden = m !== 'auto';
+        modeSaid.textContent = MODE_SAID[m] || '';
       }
       sync();
 
       save.addEventListener('click', function () {
         box.hidden = true;
-        var input = { mode: mode.value() || 'auto', opensAt: opens.value(), closesAt: closes.value(), allowCancel: allow.input.checked, notify: {} };
+        var input = { mode: mode.value() || 'auto', opensAt: opens.value(), closesAt: closes.value(), allowCancel: allow.input.checked, preview: showFirst.input.checked, notify: {} };
         ticks.forEach(function (t) { input.notify[t.key] = t.check.input.checked; });
         A.withBusy(save, A.call('apiShopScheduleSave', input)).then(function (reply) {
           A.dirty = false;
@@ -13618,8 +13809,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       A.fill(body,
         el('div', { class: 'item__meta comp-shop-state' }, C.shopStateChip(s.state, s.opensAt)),
         el('div', { class: 'form' },
-          A.field('المتجر', mode.node, 'تلقائي = بيفتح ويقفل لوحده في المواعيد اللي تحت. مفتوح / مقفول = بإيدك لحد ما تغيّره.'),
+          A.field('المتجر', mode.node),
+          modeSaid,
           times,
+          showFirst.node,
           allow.node,
           el('div', { class: 'form-group comp-notify' }, el('p', { class: 'section-label', text: 'إشعارات المتجر' }), ticks.map(function (t) { return t.check.node; }),
             el('p', { class: 'field__hint', text: 'بتظهر في الجرس في ميعادها (بعد «راجع وانشر»)، وبتتبعت push لوحدها لو الإرسال التلقائي متفعّل.' })),

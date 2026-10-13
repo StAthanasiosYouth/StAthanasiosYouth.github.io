@@ -39,6 +39,84 @@
   var FIELD_LABELS = { name: 'الاسم', phone: 'رقم الموبايل', group: 'المجموعة', church: 'الكنيسة', notes: 'ملاحظات' };
   var STATUS_WORDS = { in_progress: 'لسه بيحل', submitted: 'اتبعتت', pending_review: 'محتاجة مراجعة', graded: 'اتصححت', void: 'ملغية' };
 
+  /* =======================================================
+     BIRTH DATES AND AGE ELIGIBILITY (§19.3)
+  ======================================================= */
+
+  var MONTH_NAMES = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  var ELIGIBILITY = {
+    ok: { label: 'مناسب', kind: 'ok' },
+    soon: { label: 'قرب يخرج من السن', kind: 'gold' },
+    out: { label: 'خارج السن', kind: 'danger' },
+    unknown: { label: 'من غير تاريخ ميلاد', kind: 'off' }
+  };
+
+  /* day / month / year selects (all optional) → { node, value() 'YYYY-MM-DD' | '' | null (half filled) } */
+  P.birthSelects = function (value) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
+    var now = Number(A.cairoNow().slice(0, 4));
+    var pick = function (label, options, current) {
+      return el('select', { class: 'input', 'aria-label': label, onchange: A.markDirty },
+        [el('option', { value: '', text: label })].concat(options.map(function (o) {
+          return el('option', { value: o.value, selected: o.value === current ? 'selected' : null, text: o.text });
+        })));
+    };
+    var days = [];
+    for (var d = 1; d <= 31; d++) days.push({ value: (d < 10 ? '0' : '') + d, text: ar(d) });
+    var years = [];
+    var newest = Math.max(now, m ? Number(m[1]) : 0), oldest = Math.min(now - 100, m ? Number(m[1]) : now);
+    for (var y = newest; y >= oldest; y--) years.push({ value: String(y), text: ar(y) });
+    var day = pick('اليوم', days, m ? m[3] : '');
+    var month = pick('الشهر', MONTH_NAMES.map(function (n, i) { return { value: (i < 9 ? '0' : '') + (i + 1), text: n }; }), m ? m[2] : '');
+    var year = pick('السنة', years, m ? m[1] : '');
+    day.dataset.birth = 'day';
+    month.dataset.birth = 'month';
+    year.dataset.birth = 'year';
+    return {
+      node: el('div', { class: 'comp-birth', role: 'group' }, day, month, year),
+      value: function () {
+        var parts = [year.value, month.value, day.value];
+        if (parts.every(function (x) { return !x; })) return '';
+        if (parts.some(function (x) { return !x; })) return null;
+        return parts.join('-');
+      }
+    };
+  };
+
+  /* a calendar date with its year: «١٥ مارس ٢٠٠٤» (birth dates, leaving the age range) */
+  function dateText(value) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ''));
+    return m ? ar(Number(m[3])) + ' ' + MONTH_NAMES[Number(m[2]) - 1] + ' ' + ar(Number(m[1])) : '';
+  }
+
+  /* completed years between a 'YYYY-MM-DD' and another (or today, Cairo) */
+  function yearsBetween(from, to) {
+    var a = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(from || ''));
+    var b = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(to || A.cairoNow()));
+    if (!a || !b) return null;
+    var years = Number(b[1]) - Number(a[1]);
+    if (b[2] + b[3] < a[2] + a[3]) years--;
+    return years;
+  }
+
+  P.eligibilityChip = function (p) {
+    var e = ELIGIBILITY[p.eligibility];
+    if (!e) return null;
+    var label = e.label;
+    if (p.eligibility === 'soon' && p.leavesAt) {
+      var at = yearsBetween(p.birthDate, p.leavesAt);
+      label += ' — هيكمّل ' + (at !== null ? ar(at) + ' سنة ' : '') + 'يوم ' + dateText(p.leavesAt);
+    }
+    var chip = A.chip(label, e.kind);
+    chip.dataset.eligibility = p.eligibility;
+    return chip;
+  };
+
+  function ageText(p) {
+    var age = p.age !== undefined && p.age !== null && p.age !== '' ? Number(p.age) : yearsBetween(p.birthDate);
+    return age === null || isNaN(age) ? '' : ar(age) + ' سنة';
+  }
+
   function siteUrl() {
     return ((C.list && C.list.siteUrl) || (A.state && A.state.config.siteUrl) || 'https://stathanasiosyouth.github.io/').replace(/\/?$/, '/');
   }
@@ -126,6 +204,8 @@
       ),
       el('span', { class: 'comp-sub__meta' },
         p.group ? A.chip(p.group, 'gold') : null,
+        ageText(p) ? A.chip(ageText(p)) : null,
+        P.eligibilityChip(p),
         p.active ? null : A.chip('موقوف', 'danger'),
         wallet && p.balance !== undefined ? A.chip(ar(p.balance) + ' نقطة', 'info') : null
       ),
@@ -145,6 +225,7 @@
       return el('option', { value: o.v, selected: o.v === q.sort + ':' + q.dir ? 'selected' : null, text: o.t });
     }));
     var chips = el('div', { class: 'filter-chips', role: 'group', 'aria-label': 'الحالة' });
+    var ages = el('div', { class: 'filter-chips comp-ages', role: 'group', 'aria-label': 'السن', hidden: true });
     var list = el('div', { class: 'comp-subs', 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--line' }));
     var pager = el('div', { class: 'comp-pager', hidden: true });
     var batches = el('div', { class: 'comp-batches' });
@@ -162,7 +243,7 @@
     function load() {
       var mine = ++loading;
       box.hidden = true;
-      return A.call('apiParticipants', { q: q.q, group: q.group, status: q.status, sort: q.sort, dir: q.dir, offset: q.offset, limit: q.limit }).then(function (reply) {
+      return A.call('apiParticipants', { q: q.q, group: q.group, status: q.status, eligibility: q.eligibility || 'all', sort: q.sort, dir: q.dir, offset: q.offset, limit: q.limit }).then(function (reply) {
         if (mine !== loading || !list.isConnected) return;
         P.list = reply;
         C.applyModules(reply.modules);
@@ -170,6 +251,14 @@
           return el('option', { value: g.name, selected: g.name === q.group ? 'selected' : null, text: g.name + ' (' + ar(g.count) + ')' });
         }));
         var counts = reply.counts || { all: 0, active: 0, inactive: 0 };
+        // §19.3: by age (reply.eligibility = { ok, soon, out, unknown }); shown once the server knows birth dates
+        var ec = (reply.eligibility && typeof reply.eligibility === 'object') ? reply.eligibility : (reply.eligibilityCounts || counts);
+        ages.hidden = !['ok', 'soon', 'out', 'unknown'].some(function (k) { return ec[k] !== undefined; });
+        if (!ages.hidden) {
+          A.fill(ages, [{ k: 'all', t: 'كل الأعمار' }].concat(['ok', 'soon', 'out', 'unknown'].map(function (k) { return { k: k, t: ELIGIBILITY[k].label, n: ec[k] || 0 }; })).map(function (o) {
+            return el('button', { class: 'filter-chip', type: 'button', 'data-eligibility': o.k, 'aria-pressed': String((q.eligibility || 'all') === o.k), onclick: function () { q.eligibility = o.k; q.offset = 0; load(); } }, o.t + (o.n !== undefined ? ' (' + ar(o.n) + ')' : ''));
+          }));
+        }
         A.fill(chips, [{ k: 'all', t: 'الكل', n: counts.all }, { k: 'active', t: 'نشط', n: counts.active }, { k: 'inactive', t: 'موقوف', n: counts.inactive }].map(function (o) {
           return el('button', { class: 'filter-chip', type: 'button', 'data-status': o.k, 'aria-pressed': String(q.status === o.k), onclick: function () { q.status = o.k; q.offset = 0; load(); } }, o.t + ' (' + ar(o.n) + ')');
         }));
@@ -219,6 +308,7 @@
         ),
         el('div', { class: 'comp-subs__tools' }, search, group, sort),
         chips,
+        ages,
         box,
         list,
         pager,
@@ -280,6 +370,7 @@
     var group = A.textInput(person.group, { max: 40, placeholder: 'مثلاً: ثانوي بنين' });
     group.setAttribute('list', groupsList.id);
     var church = A.counted('الكنيسة', person.church, 60, 'اختياري');
+    var birth = P.birthSelects(person.birthDate);
     var notes = A.counted('ملاحظات', person.notes, 300, 'للخدام بس — مش بتظهر للمشترك', { multiline: true, rows: 2 });
 
     function preview() {
@@ -297,7 +388,9 @@
 
     save.addEventListener('click', function () {
       box.hidden = true;
-      var input = { name: name.input.value, phone: phone.value, group: group.value, church: church.input.value, notes: notes.input.value };
+      var born = birth.value();
+      if (born === null) { A.fail(new Error('تاريخ الميلاد: اختار اليوم والشهر والسنة (أو سيبهم فاضيين)'), box); return; }
+      var input = { name: name.input.value, phone: phone.value, group: group.value, church: church.input.value, notes: notes.input.value, birthDate: born };
       if (!isNew) input.id = person.id;
       A.withBusy(save, A.call('apiParticipantSave', input)).then(function (reply) {
         A.dirty = false;
@@ -333,6 +426,7 @@
         A.field('المجموعة', group, 'اختار من الموجود أو اكتب جديدة'),
         groupsList,
         church.node,
+        A.field('تاريخ الميلاد', birth.node, 'اختياري: بيحدد السن ومين مناسب لنظام النقاط (من «الإعدادات»).'),
         notes.node,
         isNew ? el('p', { class: 'note', text: 'الكود بيتعمل لوحده أول ما تحفظ، وتقدر تعرضه أو تبعته على واتساب من صفحة المشترك.' }) : null
       )
@@ -422,6 +516,7 @@
           el('div', { class: 'item__meta' },
             p.active ? A.chip('نشط', 'ok') : A.chip('موقوف', 'danger'),
             p.group ? A.chip(p.group, 'gold') : null,
+            P.eligibilityChip(p),
             p.importBatch ? A.chip('من استيراد', 'off') : null)
         )
       ),
@@ -429,6 +524,9 @@
         el('dt', { text: 'الموبايل' }), el('dd', {}, el('a', { class: 'ltr', href: 'tel:' + p.phoneIntl, text: p.phone })),
         p.church ? el('dt', { text: 'الكنيسة' }) : null, p.church ? el('dd', { text: p.church }) : null,
         p.notes ? el('dt', { text: 'ملاحظات' }) : null, p.notes ? el('dd', { text: p.notes }) : null,
+        el('dt', { text: 'تاريخ الميلاد' }), el('dd', { text: p.birthDate ? dateText(p.birthDate) + (ageText(p) ? ' — ' + ageText(p) : '') : 'مش متسجل' }),
+        p.leavesAt ? el('dt', { text: 'بيخرج من السن' }) : null, p.leavesAt ? el('dd', { text: dateText(p.leavesAt) }) : null,
+        p.eligibility === 'out' ? el('dt', { text: 'النقاط' }) : null, p.eligibility === 'out' ? el('dd', { text: 'خارج الفئة العمرية: يشارك عادي من غير نقاط ولا جوايز. الكود والتاريخ والرصيد اللي فات محفوظين.' }) : null,
         el('dt', { text: 'اتسجل' }), el('dd', { text: C.when(p.createdAt) })
       ),
       el('div', { class: 'actions' },
@@ -871,7 +969,7 @@
       if (row.status === 'exists') {
         lines.push(el('span', { class: 'field__hint', text: (row.reason || 'متسجل قبل كده') + (row.match ? ': ' + row.match.name + (row.match.group ? ' (' + row.match.group + ')' : '') + (row.match.status === 'inactive' ? ' — موقوف' : '') : '') }));
         (row.changes || []).forEach(function (c) {
-          lines.push(el('span', { class: 'import__change' }, el('strong', { text: c.label + ': ' }), el('del', { text: c.from || '(فاضي)' }), ' ← ', el('ins', { text: c.to })));
+          lines.push(el('span', { class: 'import__change' }, el('strong', { text: c.label + ': ' }), el('del', { text: (c.field === 'birthDate' ? dateText(c.from) : c.from) || '(فاضي)' }), ' ← ', el('ins', { text: c.field === 'birthDate' ? dateText(c.to) || c.to : c.to })));
         });
       }
       if (row.status === 'dup') lines.push(el('span', { class: 'field__hint', text: 'مكرر في الملف: ' + (row.reason || '') + ' — هيتضاف مرة واحدة بس' }));
@@ -911,18 +1009,18 @@
       button.addEventListener('click', function () {
         button.hidden = true;
         holder.hidden = false;
-        var current = fixes[row.line] || { name: row.name, phone: row.phone, group: row.group, church: row.church };
+        var current = fixes[row.line] || { name: row.name, phone: row.phone, group: row.group, church: row.church, birthDate: row.birthDate || '' };
         var make = function (key, label, ltr) {
           var input = el('input', { class: 'input' + (ltr ? ' input--ltr' : ''), dir: ltr ? 'ltr' : null, value: current[key] || '', 'aria-label': label + ' (صف ' + ar(row.line) + ')', 'data-fix': key });
           input.addEventListener('input', function () {
-            fixes[row.line] = fixes[row.line] || { name: row.name, phone: row.phone, group: row.group, church: row.church };
+            fixes[row.line] = fixes[row.line] || { name: row.name, phone: row.phone, group: row.group, church: row.church, birthDate: row.birthDate || '' };
             fixes[row.line][key] = input.value;
             A.markDirty();
             count();
           });
           return el('label', { class: 'comp-import__fix-field' }, el('span', { class: 'field__label', text: label }), input);
         };
-        A.fill(holder, make('name', 'الاسم'), make('phone', 'الموبايل', true), make('group', 'المجموعة'), make('church', 'الكنيسة'));
+        A.fill(holder, make('name', 'الاسم'), make('phone', 'الموبايل', true), make('group', 'المجموعة'), make('church', 'الكنيسة'), make('birthDate', 'تاريخ الميلاد (يوم/شهر/سنة)', true));
         holder.querySelector('input').focus();
       });
       return [button, holder];
@@ -936,7 +1034,7 @@
           el('bdi', { class: 'comp-import__name', text: row.name || '(من غير اسم)' }),
           A.chip({ new: 'جديد', exists: row.changes && row.changes.length ? 'موجود — فيه تحديث' : 'موجود بالفعل', dup: 'مكرر', error: 'خطأ' }[row.status], { new: 'ok', exists: 'off', dup: 'off', error: 'danger' }[row.status])),
         el('div', { class: 'import__lines' },
-          el('span', { class: 'comp-import__who' }, el('span', { class: 'ltr', text: row.phone || '—' }), row.group ? ' · ' + row.group : '', row.church ? ' · ' + row.church : ''),
+          el('span', { class: 'comp-import__who' }, el('span', { class: 'ltr', text: row.phone || '—' }), row.group ? ' · ' + row.group : '', row.church ? ' · ' + row.church : '', row.birthDate ? ' · مواليد ' + dateText(row.birthDate) : ''),
           why(row),
           choiceNode(row),
           fixNode(row)));
@@ -961,11 +1059,12 @@
       var run = kit().then(function (m) {
         var edited = rows.map(function (row) {
           var fix = fixes[row.line];
-          return { name: fix ? fix.name : row.name, phone: fix ? fix.phone : row.phone, group: fix ? fix.group : row.group, church: fix ? fix.church : row.church, notes: row.notes };
+          return { name: fix ? fix.name : row.name, phone: fix ? fix.phone : row.phone, group: fix ? fix.group : row.group, church: fix ? fix.church : row.church, birthDate: fix ? fix.birthDate : (row.birthDate || ''), notes: row.notes };
         });
         var columns = (result.columns || []).slice();
         if (Object.keys(fixes).some(function (k) { return fixes[k].group; }) && columns.indexOf('group') === -1) columns.push('group');
         if (Object.keys(fixes).some(function (k) { return fixes[k].church; }) && columns.indexOf('church') === -1) columns.push('church');
+        if (Object.keys(fixes).some(function (k) { return fixes[k].birthDate; }) && columns.indexOf('birthDate') === -1) columns.push('birthDate');
         var text = m.sheets.peopleText(edited, columns);
         return A.call('apiParticipantsImportPreview', text).then(function (next) { return { text: text, next: next }; });
       });
