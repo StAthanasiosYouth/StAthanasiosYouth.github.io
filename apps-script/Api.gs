@@ -164,7 +164,11 @@ function apiFunctions_() {
     apiShopScheduleSave: apiShopScheduleSave,
     apiPushAuto: apiPushAuto,
     apiPushSchedule: apiPushSchedule,
-    apiPushScheduleCancel: apiPushScheduleCancel
+    apiPushScheduleCancel: apiPushScheduleCancel,
+    apiSeasons: apiSeasons,
+    apiSeasonSave: apiSeasonSave,
+    apiSeasonClosePreview: apiSeasonClosePreview,
+    apiSeasonClose: apiSeasonClose
   };
 
 }

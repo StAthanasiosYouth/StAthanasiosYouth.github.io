@@ -77,7 +77,8 @@ const ARGS = {
   apiShopItems: [], apiShopItemSave: [{ name: 'x', cost: 10 }], apiShopItemDelete: ['i-00000000'],
   apiShopRedemptions: [{}], apiShopRedemptionStatus: ['r-0000000000', 'approved', ''],
   apiShopSchedule: [], apiShopScheduleSave: [{ mode: 'auto' }],
-  apiPushAuto: [], apiPushSchedule: [], apiPushScheduleCancel: ['psh-0000000000']
+  apiPushAuto: [], apiPushSchedule: [], apiPushScheduleCancel: ['psh-0000000000'],
+  apiSeasons: [], apiSeasonSave: [{ name: 'x' }], apiSeasonClosePreview: ['sea-0000'], apiSeasonClose: ['sea-0000', 'k', {}]
 };
 
 /*

@@ -1524,6 +1524,11 @@ function portalMeAction_(arg) {
     var wallet = walletPortal_(participant.id);
     reply.balance = wallet.balance;
     reply.ledger = wallet.ledger;
+    if (typeof seasonPortal_ === 'function') {
+      var seasons = seasonPortal_(participant.id);
+      reply.season = seasons.season;
+      reply.seasons = seasons.seasons;
+    }
   }
 
   if (modules.shop && typeof shopPortal_ === 'function') {

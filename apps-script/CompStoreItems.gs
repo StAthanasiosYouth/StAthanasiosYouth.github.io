@@ -246,6 +246,19 @@ function apiShopItems() {
   mediaRows.forEach(function (r) { if (r.publishedAt && !r.deletedAt) published[r.id] = true; });
 
   result.items = items.map(function (i) { return shopAdminItem_(i, counts, library, published); });
+
+  // the price against the active season's theoretical maximum (CompSeasons.gs): for premium prizes
+  var maximum = 0;
+
+  try {
+    maximum = typeof seasonMaxima_ === 'function' && compModules_().wallet ? (seasonMaxima_()[seasonActiveId_()] || {}).max || 0 : 0;
+  }
+  catch (ignored) {
+    maximum = 0;
+  }
+
+  result.seasonMax = maximum;
+  result.items.forEach(function (i) { i.pctOfMax = maximum ? Math.round(i.cost * 100 / maximum) : null; });
   result.categories = items.map(function (i) { return i.category; }).filter(function (c, i, all) { return c && all.indexOf(c) === i; });
 
   return result;
@@ -688,7 +701,8 @@ function shopRedeemAction_(arg) {
       handledBy: '',
       handledAt: '',
       note: '',
-      updatedAt: stamp
+      updatedAt: stamp,
+      seasonId: walletSeasonNow_()
     }])[0];
 
     // claim, then verify (§18.2): the request is in the sheet; the sheet's own row order

@@ -60,7 +60,7 @@ test('a publish whose commit fails leaves nothing behind: no claim, nothing stam
 
 /* ---------- §18.2 / §18.3 the store: the last item, the schedule, the participant's cancel ---------- */
 
-import { regWorld, addPerson, codeOf, login, tab } from './fakes/reg.mjs';
+import { regWorld, addPerson, codeOf, login, tab, activityRows } from './fakes/reg.mjs';
 import { wallAt } from './fakes/comp.mjs';
 
 let reqKeys = 0;
@@ -294,4 +294,102 @@ test('automatic push: changing the times cancels the old moments (and their bell
   // the manual modes have no moments
   call('apiShopScheduleSave', { mode: 'open', opensAt: wallAt(world, 4 * 1440), notify: { open1d: true } });
   assert.ok(!tab(world, 'PushSchedule').some(e => e.status === 'pending'));
+});
+
+/* ---------- §18.6 seasons ---------- */
+
+import { codedComp, play as playCoded } from './fakes/reg.mjs';
+
+function seasonWorld() {
+  const store = storeWorld();
+  const comp = codedComp(store.world, store.call, { slug: 'season-quiz', preset: 'points' });
+  return { ...store, comp };
+}
+
+test('seasons: the first one exists by itself; points land in the competition\'s season; the maximum is the season\'s competitions', () => {
+  const { world, call, tokens, comp } = seasonWorld();
+  const seasons = call('apiSeasons');
+  assert.equal(seasons.active, 'sea-first');
+  const first = seasons.seasons.find(s => s.id === 'sea-first');
+  assert.equal(first.maxTheoretical, 15, '10 + 5 points of the published points competition');
+  assert.equal(first.competitions, 1);
+
+  playCoded(world, tokens.mina, { slug: 'season-quiz' });
+  const me = pub(world, 'portalMe', { ptoken: tokens.mina });
+  assert.equal(me.balance, 515, '500 start + 15');
+  assert.equal(me.season.id, 'sea-first');
+  assert.equal(me.season.earned, 15);
+  assert.equal(me.season.maxTheoretical, 15);
+  assert.ok(tab(world, 'PointsLedger').every(l => l.seasonId === 'sea-first'));
+  assert.equal(comp.id.startsWith('cmp-'), true);
+});
+
+test('seasons: closing is refused with open requests, then writes frozen totals once; the new season starts at 0; history stays', () => {
+  const { world, call, mina, tokens, item, redeem } = seasonWorld();
+  playCoded(world, tokens.mina, { slug: 'season-quiz' });
+  const mug = item({ name: 'كوباية', cost: 100 });
+  const request = redeem('mina', mug.id).redemption;
+
+  let preview = call('apiSeasonClosePreview', 'sea-first');
+  assert.equal(preview.canClose, false);
+  assert.equal(preview.openRequests.length, 1);
+  assert.throws(() => call('apiSeasonClose', 'sea-first', preview.confirmKey, { name: 'موسم الشتا' }), /لازم تخلّص طلبات/);
+
+  call('apiShopRedemptionStatus', request.id, 'fulfilled', '');
+  preview = call('apiSeasonClosePreview', 'sea-first');
+  assert.equal(preview.canClose, true);
+  const minaTotals = preview.totals.find(t => t.pid === mina.id);
+  assert.deepEqual([minaTotals.earned, minaTotals.spent, minaTotals.adjusted, minaTotals.final], [15, 100, 500, 415]);
+
+  // a stale preview is refused
+  call('apiWalletAdjust', mina.id, 1, 'تعديل', 'late-adjust-0001');
+  assert.throws(() => call('apiSeasonClose', 'sea-first', preview.confirmKey, { name: 'موسم الشتا' }), /اتغيرت/);
+  preview = call('apiSeasonClosePreview', 'sea-first');
+
+  const closed = call('apiSeasonClose', 'sea-first', preview.confirmKey, { name: 'موسم الشتا', endAt: wallAt(world, 60 * 1440) });
+  assert.equal(closed.closed, 'sea-first');
+  assert.notEqual(closed.active, 'sea-first');
+  assert.equal(tab(world, 'SeasonTotals').filter(r => r.seasonId === 'sea-first').length, 2);
+  assert.equal(world.gs.walletBalance_(mina.id, true), 0, 'a new season starts at 0');
+  assert.ok(tab(world, 'PointsLedger').length >= 5, 'nothing was deleted');
+
+  const me = pub(world, 'portalMe', { ptoken: login(world, codeOf(call, mina.id)) });
+  assert.equal(me.balance, 0);
+  assert.equal(me.season.name, 'موسم الشتا');
+  assert.equal(me.seasons[0].id, 'sea-first');
+  assert.equal(me.seasons[0].final, 416);
+  assert.throws(() => call('apiSeasonSave', { id: 'sea-first', name: 'تغيير' }), /اتقفل/);
+});
+
+test('seasons: a closed season is frozen (a regrade writes nothing); carry-over only by an explicit transfer', () => {
+  const { world, call, mina, tokens, comp } = seasonWorld();
+  call('apiCompSave', comp.id, { seasonId: 'sea-first' });
+  const played = playCoded(world, tokens.mina, { slug: 'season-quiz', right: 'half' });
+  const preview = call('apiSeasonClosePreview', 'sea-first');
+  call('apiSeasonClose', 'sea-first', preview.confirmKey, { name: 'الموسم التاني' });
+  const before = tab(world, 'PointsLedger').length;
+
+  // the key changes: everyone would get more, but the season is closed
+  call('apiCompQuestionSave', comp.id, { ...comp.questions.tf, correct: 'غلط' });
+  publish(world, call);
+  call('apiCompRegrade', comp.id);
+  assert.equal(tab(world, 'PointsLedger').length, before, 'frozen');
+  assert.equal(played.done.ok, true);
+
+  const moved = call('apiWalletAdjust', mina.id, 300, 'تحويل من الموسم الأول', 'transfer-key-0001', 'transfer');
+  assert.equal(moved.entry.kind, 'transfer');
+  assert.equal(moved.balance, 300);
+  assert.ok(activityRows(world).length > 0);
+});
+
+test('seasons: planned season + ending notice through the same automatic schedule', () => {
+  const { world, call } = seasonWorld();
+  const active = call('apiSeasons').active;
+  call('apiSeasonSave', { id: active, name: 'الموسم الأول', endAt: wallAt(world, 10 * 1440), notifyDays: 3 });
+  const notice = tab(world, 'PushSchedule').find(e => e.kind === 'season-end');
+  assert.ok(notice, 'a «season ends» moment');
+  assert.equal(notice.sendAt, wallAt(world, 7 * 1440));
+  assert.equal(bell(world).find(n => n.id === notice.notifId).target, 'points');
+  const planned = call('apiSeasonSave', { name: 'موسم الصيف', startAt: wallAt(world, 11 * 1440) }).season;
+  assert.equal(planned.status, 'planned');
 });
