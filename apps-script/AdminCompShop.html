@@ -119,8 +119,17 @@
     }
 
     function loadRequests() {
+      // the pressed chip changes at once; the list follows the newest choice only
+      Array.prototype.forEach.call(chips.querySelectorAll('.filter-chip'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.status === S.status)); });
+      reqBody.setAttribute('aria-busy', 'true');
+      requests();
+    }
+
+    var requests = A.latest(function () {
       reqBox.hidden = true;
-      return A.call('apiShopRedemptions', { status: S.status, q: search.value.trim(), limit: 100 }).then(function (r) {
+      return A.call('apiShopRedemptions', { status: S.status, q: search.value.trim(), limit: 100 });
+    }, function (r) {
+        reqBody.setAttribute('aria-busy', 'false');
         if (!reqBody.isConnected) return;
         var counts = r.counts || {};
         A.fill(chips, [
@@ -143,12 +152,12 @@
           S.focusRedemption = '';
           if (focus) { focus.classList.add('is-focus'); focus.scrollIntoView({ block: 'center' }); }
         }
-      }).catch(function (error) {
-        if (!reqBody.isConnected) return;
-        reqBody.replaceChildren();
-        A.fail(error, reqBox);
-      });
-    }
+    }, function (error) {
+      reqBody.setAttribute('aria-busy', 'false');
+      if (!reqBody.isConnected) return;
+      reqBody.replaceChildren();
+      A.fail(error, reqBox);
+    });
 
     function requestRow(rd) {
       var note = el('input', { class: 'input', type: 'text', maxlength: '200', placeholder: 'ملاحظة (اختياري)', 'aria-label': 'ملاحظة على طلب ' + rd.participantName, value: '' });

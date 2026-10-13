@@ -681,6 +681,8 @@ function regHashMap_(fresh) {
 /* the participant as the admin sees it (NEVER the code, its hash or its encrypted copy) */
 function regPerson_(row) {
 
+  var age = regEligibilityOf_(row);
+
   return {
     id: row.id,
     name: row.name,
@@ -700,9 +702,9 @@ function regPerson_(row) {
     createdAt: row.createdAt || '',
     updatedAt: row.updatedAt || '',
     birthDate: row.birthDate || '',
-    age: regEligibilityOf_(row).age,
-    eligibility: regEligibilityOf_(row).state,
-    leavesAt: regEligibilityOf_(row).leavesAt
+    age: age.age,
+    eligibility: age.state,
+    leavesAt: age.leavesAt
   };
 
 }
@@ -801,8 +803,10 @@ function apiParticipants(query) {
   query = query && typeof query === 'object' && !Array.isArray(query) ? query : {};
 
   var modules = compModules_();
-  var limit = Math.max(1, Math.min(REG_LIMITS.pageMax, Math.floor(Number(query.limit)) || REG_LIMITS.page));
-  var offset = Math.max(0, Math.floor(Number(query.offset)) || 0);
+  // all: the whole registry in one answer (≤ exportMax): the admin filters, searches and sorts it locally
+  var all = query.all === true;
+  var limit = all ? REG_LIMITS.exportMax : Math.max(1, Math.min(REG_LIMITS.pageMax, Math.floor(Number(query.limit)) || REG_LIMITS.page));
+  var offset = all ? 0 : Math.max(0, Math.floor(Number(query.offset)) || 0);
   var result = { ready: false, items: [], total: 0, offset: offset, limit: limit, counts: { all: 0, active: 0, inactive: 0 }, groups: [], batches: [], modules: modules };
 
   if (!compSpreadsheet_(false)) return result;

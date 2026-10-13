@@ -7307,3 +7307,7 @@ dialog .toasts[popover] {
   }
 }
 
+  /* a list whose newer answer is on its way (A.latest): a light fade, instant */
+  .comp-subs[aria-busy="true"],
+  .comp-redemptions[aria-busy="true"],
+  .acts[aria-busy="true"] { opacity: .6; transition: opacity .12s ease; }

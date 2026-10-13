@@ -116,6 +116,56 @@
 
   };
 
+  /*
+   * A list's loader: never more than ONE request in flight. A filter change
+   * while it runs only marks it stale; when it lands, that answer is dropped
+   * and exactly one more request goes out with the latest filters. So quick
+   * clicks never build a queue, and only the newest answer reaches the page.
+   *   var reload = A.latest(function () { return A.call(...); }, draw, fail);
+   *   reload();   // as often as you like
+   */
+  A.latest = function (run, apply, fail) {
+
+    var inflight = false;
+    var again = false;
+
+    function go() {
+      if (inflight) {
+        again = true;
+        return;
+      }
+      inflight = true;
+      again = false;
+      Promise.resolve().then(run).then(function (result) {
+        inflight = false;
+        if (again) return go();
+        apply(result);
+      }, function (error) {
+        inflight = false;
+        if (again) return go();
+        if (fail) fail(error);
+      });
+    }
+
+    go.busy = function () { return inflight; };
+
+    return go;
+
+  };
+
+  /* the text a local search compares (Arabic letter variants, marks, digits, spaces) */
+  A.searchKey = function (value) {
+
+    return String(value === null || value === undefined ? '' : value)
+      .replace(/[\u064B-\u0652\u0670\u0640]/g, '')
+      .replace(/[إأآٱ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي')
+      .replace(/[٠-٩]/g, function (d) { return String(d.charCodeAt(0) - 0x660); })
+      .replace(/[۰-۹]/g, function (d) { return String(d.charCodeAt(0) - 0x6F0); })
+      .replace(/[\u200e\u200f\u061c]/g, '')
+      .toLowerCase().replace(/\s+/g, ' ').trim();
+
+  };
+
   /* =======================================================
      TOASTS
      The stack is a popover (top layer), so messages show above an open

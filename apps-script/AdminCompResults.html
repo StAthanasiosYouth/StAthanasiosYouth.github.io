@@ -86,7 +86,6 @@
     var pager = el('div', { class: 'comp-pager' });
     var box = A.errorBox();
     var timer = 0;
-    var loading = 0;
 
     search.addEventListener('input', function () {
       clearTimeout(timer);
@@ -143,13 +142,19 @@
     }
 
     function load() {
-      var mine = ++loading;
-      box.hidden = true;
+      // the pressed chip changes at once; one request at a time, the newest choice wins
+      Array.prototype.forEach.call(chips.querySelectorAll('.filter-chip'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.status === subsQuery.status)); });
       list.setAttribute('aria-busy', 'true');
       if (!list.childElementCount) A.fill(list, el('div', { class: 'skeleton-list', 'aria-hidden': 'true' }, el('div', { class: 'skeleton skeleton--line' }), el('div', { class: 'skeleton skeleton--line' })));
+      fetchSubs();
+    }
+
+    var fetchSubs = A.latest(function () {
+      box.hidden = true;
       var query = { status: subsQuery.status, q: subsQuery.q, flag: subsQuery.flag, sort: subsQuery.sort, dir: subsQuery.dir, offset: subsQuery.offset, limit: subsQuery.limit };
-      return A.call('apiCompSubmissions', C.open, query).then(function (reply) {
-        if (mine !== loading || !list.isConnected) return;
+      return A.call('apiCompSubmissions', C.open, query);
+    }, function (reply) {
+        if (!list.isConnected) return;
         list.setAttribute('aria-busy', 'false');
         drawChips(reply.counts || {});
         if (!reply.items.length) {
@@ -171,13 +176,12 @@
           )
         );
         pager.hidden = reply.total <= subsQuery.limit && reply.offset === 0;
-      }).catch(function (error) {
-        if (mine !== loading || !list.isConnected) return;
-        list.setAttribute('aria-busy', 'false');
-        list.replaceChildren();
-        A.fail(error, box);
-      });
-    }
+    }, function (error) {
+      if (!list.isConnected) return;
+      list.setAttribute('aria-busy', 'false');
+      list.replaceChildren();
+      A.fail(error, box);
+    });
 
     load();
 

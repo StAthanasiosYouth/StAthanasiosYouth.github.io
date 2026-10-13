@@ -19,7 +19,8 @@ const points = (shop = SHOP, season = null) => ({ url: 'points/', shop, season }
 
 
 test('content.json points: sanitized; url must be points/; no points → null', () => {
-  assert.equal(sanitizeContent(seed).points, null, 'the seed has none: no widget');
+  const without = { ...seed }; delete without.points;
+  assert.equal(sanitizeContent(without).points, null, 'no points block: no widget (the live content.json may have one)');
   const c = sanitizeContent({ ...seed, points: { url: 'points/', shop: { on: true, mode: 'auto', opensAt: '2026-10-17T19:00', closesAt: '2026-10-22 20:00', extra: 1 }, season: { name: ' الموسم الأول ', startAt: '2026-09-01T00:00', endAt: 'soon' } } });
   assert.deepEqual(c.points, {
     url: 'points/',

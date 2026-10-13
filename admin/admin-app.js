@@ -245,6 +245,56 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   };
 
+  /*
+   * A list's loader: never more than ONE request in flight. A filter change
+   * while it runs only marks it stale; when it lands, that answer is dropped
+   * and exactly one more request goes out with the latest filters. So quick
+   * clicks never build a queue, and only the newest answer reaches the page.
+   *   var reload = A.latest(function () { return A.call(...); }, draw, fail);
+   *   reload();   // as often as you like
+   */
+  A.latest = function (run, apply, fail) {
+
+    var inflight = false;
+    var again = false;
+
+    function go() {
+      if (inflight) {
+        again = true;
+        return;
+      }
+      inflight = true;
+      again = false;
+      Promise.resolve().then(run).then(function (result) {
+        inflight = false;
+        if (again) return go();
+        apply(result);
+      }, function (error) {
+        inflight = false;
+        if (again) return go();
+        if (fail) fail(error);
+      });
+    }
+
+    go.busy = function () { return inflight; };
+
+    return go;
+
+  };
+
+  /* the text a local search compares (Arabic letter variants, marks, digits, spaces) */
+  A.searchKey = function (value) {
+
+    return String(value === null || value === undefined ? '' : value)
+      .replace(/[\u064B-\u0652\u0670\u0640]/g, '')
+      .replace(/[إأآٱ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي')
+      .replace(/[٠-٩]/g, function (d) { return String(d.charCodeAt(0) - 0x660); })
+      .replace(/[۰-۹]/g, function (d) { return String(d.charCodeAt(0) - 0x6F0); })
+      .replace(/[\u200e\u200f\u061c]/g, '')
+      .toLowerCase().replace(/\s+/g, ' ').trim();
+
+  };
+
   /* =======================================================
      TOASTS
      The stack is a popover (top layer), so messages show above an open
@@ -11106,7 +11156,6 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var pager = el('div', { class: 'comp-pager' });
     var box = A.errorBox();
     var timer = 0;
-    var loading = 0;
 
     search.addEventListener('input', function () {
       clearTimeout(timer);
@@ -11163,13 +11212,19 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
 
     function load() {
-      var mine = ++loading;
-      box.hidden = true;
+      // the pressed chip changes at once; one request at a time, the newest choice wins
+      Array.prototype.forEach.call(chips.querySelectorAll('.filter-chip'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.status === subsQuery.status)); });
       list.setAttribute('aria-busy', 'true');
       if (!list.childElementCount) A.fill(list, el('div', { class: 'skeleton-list', 'aria-hidden': 'true' }, el('div', { class: 'skeleton skeleton--line' }), el('div', { class: 'skeleton skeleton--line' })));
+      fetchSubs();
+    }
+
+    var fetchSubs = A.latest(function () {
+      box.hidden = true;
       var query = { status: subsQuery.status, q: subsQuery.q, flag: subsQuery.flag, sort: subsQuery.sort, dir: subsQuery.dir, offset: subsQuery.offset, limit: subsQuery.limit };
-      return A.call('apiCompSubmissions', C.open, query).then(function (reply) {
-        if (mine !== loading || !list.isConnected) return;
+      return A.call('apiCompSubmissions', C.open, query);
+    }, function (reply) {
+        if (!list.isConnected) return;
         list.setAttribute('aria-busy', 'false');
         drawChips(reply.counts || {});
         if (!reply.items.length) {
@@ -11191,13 +11246,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           )
         );
         pager.hidden = reply.total <= subsQuery.limit && reply.offset === 0;
-      }).catch(function (error) {
-        if (mine !== loading || !list.isConnected) return;
-        list.setAttribute('aria-busy', 'false');
-        list.replaceChildren();
-        A.fail(error, box);
-      });
-    }
+    }, function (error) {
+      if (!list.isConnected) return;
+      list.setAttribute('aria-busy', 'false');
+      list.replaceChildren();
+      A.fail(error, box);
+    });
 
     load();
 
@@ -11836,20 +11890,77 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var batches = el('div', { class: 'comp-batches' });
     var box = A.errorBox();
     var timer = 0;
-    var loading = 0;
 
+
+    // every filter, search, sort and page works on the loaded list (no server call per click)
     search.addEventListener('input', function () {
       clearTimeout(timer);
-      timer = setTimeout(function () { q.q = search.value.trim(); q.offset = 0; load(); }, 350);
+      timer = setTimeout(function () { q.q = search.value.trim(); q.offset = 0; draw(); }, 120);
     });
-    group.addEventListener('change', function () { q.group = group.value; q.offset = 0; load(); });
-    sort.addEventListener('change', function () { var p = sort.value.split(':'); q.sort = p[0]; q.dir = p[1]; q.offset = 0; load(); });
+    group.addEventListener('change', function () { q.group = group.value; q.offset = 0; draw(); });
+    sort.addEventListener('change', function () { var p = sort.value.split(':'); q.sort = p[0]; q.dir = p[1]; q.offset = 0; draw(); });
+
+    /* the whole registry, once (≤ 3,000 people: one call); a reopened screen draws the last copy at once, then refreshes */
+    var fetchAll = A.latest(function () {
+      box.hidden = true;
+      list.setAttribute('aria-busy', 'true');
+      return A.call('apiParticipants', { all: true });
+    }, function (reply) {
+      list.setAttribute('aria-busy', 'false');
+      if (!list.isConnected) return;
+      P.all = reply;
+      draw();
+    }, function (error) {
+      list.setAttribute('aria-busy', 'false');
+      if (!list.isConnected) return;
+      if (!P.all) list.replaceChildren();
+      A.fail(error, box);
+    });
 
     function load() {
-      var mine = ++loading;
-      box.hidden = true;
-      return A.call('apiParticipants', { q: q.q, group: q.group, status: q.status, eligibility: q.eligibility || 'all', sort: q.sort, dir: q.dir, offset: q.offset, limit: q.limit }).then(function (reply) {
-        if (mine !== loading || !list.isConnected) return;
+      fetchAll();
+    }
+
+    /* the loaded list → what the filters show (the same rules the server used) */
+    function view(all) {
+      var items = all.items || [];
+      var needle = A.searchKey(q.q);
+      var digits = needle.replace(/\D/g, '').replace(/^(?:0020|20|0)/, '');
+      var wantGroup = A.searchKey(q.group);
+      var counts = { all: items.length, active: 0, inactive: 0 };
+      var ages = { ok: 0, soon: 0, out: 0, unknown: 0 };
+      items.forEach(function (p) {
+        counts[p.active ? 'active' : 'inactive']++;
+        if (ages[p.eligibility] !== undefined) ages[p.eligibility]++;
+      });
+      var found = items.filter(function (p) {
+        if (q.status !== 'all' && (p.active ? 'active' : 'inactive') !== q.status) return false;
+        if (q.eligibility && q.eligibility !== 'all' && p.eligibility !== q.eligibility) return false;
+        if (wantGroup && A.searchKey(p.group) !== wantGroup) return false;
+        if (needle) {
+          var inName = A.searchKey(p.name).indexOf(needle) !== -1;
+          var inPhone = digits.length >= 3 && String(p.phone || '').replace(/\D/g, '').indexOf(digits) !== -1;
+          if (!inName && !inPhone && p.id !== q.q.trim()) return false;
+        }
+        return true;
+      });
+      var dir = q.dir === 'desc' ? -1 : 1;
+      var key = {
+        group: function (p) { return A.searchKey(p.group) + '|' + A.searchKey(p.name); },
+        createdAt: function (p) { return p.createdAt || ''; },
+        balance: function (p) { return p.balance || 0; }
+      }[q.sort] || function (p) { return A.searchKey(p.name); };
+      found.sort(function (a, b) { var x = key(a); var y = key(b); return x === y ? 0 : (x < y ? -dir : dir); });
+      return {
+        items: found.slice(q.offset, q.offset + q.limit), total: found.length, offset: q.offset,
+        counts: counts, eligibility: all.eligibility ? ages : null, groups: all.groups, batches: all.batches, modules: all.modules
+      };
+    }
+
+    function draw() {
+      if (!P.all || !list.isConnected) return;
+      var reply = view(P.all);
+      (function () {
         P.list = reply;
         C.applyModules(reply.modules);
         A.fill(group, el('option', { value: '', text: 'كل المجموعات' }), (reply.groups || []).map(function (g) {
@@ -11861,11 +11972,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         ages.hidden = !['ok', 'soon', 'out', 'unknown'].some(function (k) { return ec[k] !== undefined; });
         if (!ages.hidden) {
           A.fill(ages, [{ k: 'all', t: 'كل الأعمار' }].concat(['ok', 'soon', 'out', 'unknown'].map(function (k) { return { k: k, t: ELIGIBILITY[k].label, n: ec[k] || 0 }; })).map(function (o) {
-            return el('button', { class: 'filter-chip', type: 'button', 'data-eligibility': o.k, 'aria-pressed': String((q.eligibility || 'all') === o.k), onclick: function () { q.eligibility = o.k; q.offset = 0; load(); } }, o.t + (o.n !== undefined ? ' (' + ar(o.n) + ')' : ''));
+            return el('button', { class: 'filter-chip', type: 'button', 'data-eligibility': o.k, 'aria-pressed': String((q.eligibility || 'all') === o.k), onclick: function () { q.eligibility = o.k; q.offset = 0; draw(); } }, o.t + (o.n !== undefined ? ' (' + ar(o.n) + ')' : ''));
           }));
         }
         A.fill(chips, [{ k: 'all', t: 'الكل', n: counts.all }, { k: 'active', t: 'نشط', n: counts.active }, { k: 'inactive', t: 'موقوف', n: counts.inactive }].map(function (o) {
-          return el('button', { class: 'filter-chip', type: 'button', 'data-status': o.k, 'aria-pressed': String(q.status === o.k), onclick: function () { q.status = o.k; q.offset = 0; load(); } }, o.t + ' (' + ar(o.n) + ')');
+          return el('button', { class: 'filter-chip', type: 'button', 'data-status': o.k, 'aria-pressed': String(q.status === o.k), onclick: function () { q.status = o.k; q.offset = 0; draw(); } }, o.t + ' (' + ar(o.n) + ')');
         }));
         if (!reply.items.length) {
           A.fill(list, el('div', { class: 'empty-state' },
@@ -11881,8 +11992,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.fill(pager,
           el('span', { class: 'comp-pager__text', text: reply.total ? ar(from) + '–' + ar(to) + ' من ' + ar(reply.total) : '' }),
           el('div', { class: 'actions' },
-            el('button', { class: 'btn btn--small btn--ghost', type: 'button', disabled: reply.offset <= 0, onclick: function () { q.offset = Math.max(0, q.offset - q.limit); load(); } }, 'السابق'),
-            el('button', { class: 'btn btn--small btn--ghost', type: 'button', disabled: to >= reply.total, onclick: function () { q.offset += q.limit; load(); } }, 'التالي')));
+            el('button', { class: 'btn btn--small btn--ghost', type: 'button', disabled: reply.offset <= 0, onclick: function () { q.offset = Math.max(0, q.offset - q.limit); draw(); } }, 'السابق'),
+            el('button', { class: 'btn btn--small btn--ghost', type: 'button', disabled: to >= reply.total, onclick: function () { q.offset += q.limit; draw(); } }, 'التالي')));
         pager.hidden = reply.total <= q.limit && reply.offset === 0;
         A.fill(batches, (reply.batches || []).length ? [
           el('p', { class: 'section-label', text: 'آخر الاستيرادات' }),
@@ -11895,13 +12006,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
               el('div', { class: 'item__controls' }, batchButtons(b.id, true)));
           }))
         ] : []);
-      }).catch(function (error) {
-        if (mine !== loading || !list.isConnected) return;
-        list.replaceChildren();
-        A.fail(error, box);
-      });
+      })();
     }
 
+    // the last copy draws at once (a reopened screen); the fresh one replaces it
+    if (P.all) draw();
     load();
 
     return [
@@ -12813,7 +12922,6 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var pager = el('div', { class: 'comp-pager', hidden: true });
     var box = A.errorBox();
     var timer = 0;
-    var loading = 0;
     var sync = el('button', { class: 'btn', type: 'button', 'data-act': 'sync' }, icon('retry'), 'مزامنة النقاط مع النتايج');
     // the balances are the ACTIVE season's (§18.6): said, with its name
     var seasonSaid = el('p', { class: 'note comp-season-said', hidden: true });
@@ -12842,10 +12950,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     });
 
     function load() {
-      var mine = ++loading;
+      list.setAttribute('aria-busy', 'true');
+      fetchWallet();
+    }
+
+    // one request at a time; the newest search / sort / page wins
+    var fetchWallet = A.latest(function () {
       box.hidden = true;
-      return A.call('apiWallet', { q: q.q, sort: q.sort, dir: q.dir, offset: q.offset, limit: q.limit, all: q.all }).then(function (reply) {
-        if (mine !== loading || !list.isConnected) return;
+      return A.call('apiWallet', { q: q.q, sort: q.sort, dir: q.dir, offset: q.offset, limit: q.limit, all: q.all });
+    }, function (reply) {
+        list.setAttribute('aria-busy', 'false');
+        if (!list.isConnected) return;
         C.applyModules(reply.modules);
         var t = reply.totals || {};
         A.fill(tiles, tile('مشاركين ليهم نقاط', ar(t.participants || 0)), tile('الأرصدة كلها', ar(t.balance || 0), 'gold'), tile('اتكسب', ar(t.earned || 0)), tile('تعديلات', signed(t.adjusted || 0)), tile('اتصرف', ar(t.spent || 0)));
@@ -12874,12 +12989,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
             el('button', { class: 'btn btn--small btn--ghost', type: 'button', disabled: reply.offset <= 0, onclick: function () { q.offset = Math.max(0, q.offset - q.limit); load(); } }, 'السابق'),
             el('button', { class: 'btn btn--small btn--ghost', type: 'button', disabled: to >= reply.total, onclick: function () { q.offset += q.limit; load(); } }, 'التالي')));
         pager.hidden = reply.total <= q.limit && reply.offset === 0;
-      }).catch(function (error) {
-        if (mine !== loading || !list.isConnected) return;
-        list.replaceChildren();
-        A.fail(error, box);
-      });
-    }
+    }, function (error) {
+      list.setAttribute('aria-busy', 'false');
+      if (!list.isConnected) return;
+      list.replaceChildren();
+      A.fail(error, box);
+    });
 
     load();
 
@@ -13132,8 +13247,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
 
     function loadRequests() {
+      // the pressed chip changes at once; the list follows the newest choice only
+      Array.prototype.forEach.call(chips.querySelectorAll('.filter-chip'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.status === S.status)); });
+      reqBody.setAttribute('aria-busy', 'true');
+      requests();
+    }
+
+    var requests = A.latest(function () {
       reqBox.hidden = true;
-      return A.call('apiShopRedemptions', { status: S.status, q: search.value.trim(), limit: 100 }).then(function (r) {
+      return A.call('apiShopRedemptions', { status: S.status, q: search.value.trim(), limit: 100 });
+    }, function (r) {
+        reqBody.setAttribute('aria-busy', 'false');
         if (!reqBody.isConnected) return;
         var counts = r.counts || {};
         A.fill(chips, [
@@ -13156,12 +13280,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           S.focusRedemption = '';
           if (focus) { focus.classList.add('is-focus'); focus.scrollIntoView({ block: 'center' }); }
         }
-      }).catch(function (error) {
-        if (!reqBody.isConnected) return;
-        reqBody.replaceChildren();
-        A.fail(error, reqBox);
-      });
-    }
+    }, function (error) {
+      reqBody.setAttribute('aria-busy', 'false');
+      if (!reqBody.isConnected) return;
+      reqBody.replaceChildren();
+      A.fail(error, reqBox);
+    });
 
     function requestRow(rd) {
       var note = el('input', { class: 'input', type: 'text', maxlength: '200', placeholder: 'ملاحظة (اختياري)', 'aria-label': 'ملاحظة على طلب ' + rd.participantName, value: '' });
@@ -15446,7 +15570,15 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     }
 
+    // a filter change: one request at a time, the newest filters win (A.latest); «أكتر» pages directly
+    var reloadLatest = A.latest(function () { return loadNow(false); }, function () {}, function () {});
+
     function load(append) {
+      if (append) return loadNow(true);
+      reloadLatest();
+    }
+
+    function loadNow(append) {
 
       var my = ++loading;
       var ask = {};

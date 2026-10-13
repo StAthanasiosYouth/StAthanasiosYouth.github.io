@@ -66,7 +66,6 @@
     var pager = el('div', { class: 'comp-pager', hidden: true });
     var box = A.errorBox();
     var timer = 0;
-    var loading = 0;
     var sync = el('button', { class: 'btn', type: 'button', 'data-act': 'sync' }, icon('retry'), 'مزامنة النقاط مع النتايج');
     // the balances are the ACTIVE season's (§18.6): said, with its name
     var seasonSaid = el('p', { class: 'note comp-season-said', hidden: true });
@@ -95,10 +94,17 @@
     });
 
     function load() {
-      var mine = ++loading;
+      list.setAttribute('aria-busy', 'true');
+      fetchWallet();
+    }
+
+    // one request at a time; the newest search / sort / page wins
+    var fetchWallet = A.latest(function () {
       box.hidden = true;
-      return A.call('apiWallet', { q: q.q, sort: q.sort, dir: q.dir, offset: q.offset, limit: q.limit, all: q.all }).then(function (reply) {
-        if (mine !== loading || !list.isConnected) return;
+      return A.call('apiWallet', { q: q.q, sort: q.sort, dir: q.dir, offset: q.offset, limit: q.limit, all: q.all });
+    }, function (reply) {
+        list.setAttribute('aria-busy', 'false');
+        if (!list.isConnected) return;
         C.applyModules(reply.modules);
         var t = reply.totals || {};
         A.fill(tiles, tile('مشاركين ليهم نقاط', ar(t.participants || 0)), tile('الأرصدة كلها', ar(t.balance || 0), 'gold'), tile('اتكسب', ar(t.earned || 0)), tile('تعديلات', signed(t.adjusted || 0)), tile('اتصرف', ar(t.spent || 0)));
@@ -127,12 +133,12 @@
             el('button', { class: 'btn btn--small btn--ghost', type: 'button', disabled: reply.offset <= 0, onclick: function () { q.offset = Math.max(0, q.offset - q.limit); load(); } }, 'السابق'),
             el('button', { class: 'btn btn--small btn--ghost', type: 'button', disabled: to >= reply.total, onclick: function () { q.offset += q.limit; load(); } }, 'التالي')));
         pager.hidden = reply.total <= q.limit && reply.offset === 0;
-      }).catch(function (error) {
-        if (mine !== loading || !list.isConnected) return;
-        list.replaceChildren();
-        A.fail(error, box);
-      });
-    }
+    }, function (error) {
+      list.setAttribute('aria-busy', 'false');
+      if (!list.isConnected) return;
+      list.replaceChildren();
+      A.fail(error, box);
+    });
 
     load();
 

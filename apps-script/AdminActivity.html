@@ -506,7 +506,15 @@
 
     }
 
+    // a filter change: one request at a time, the newest filters win (A.latest); «أكتر» pages directly
+    var reloadLatest = A.latest(function () { return loadNow(false); }, function () {}, function () {});
+
     function load(append) {
+      if (append) return loadNow(true);
+      reloadLatest();
+    }
+
+    function loadNow(append) {
 
       var my = ++loading;
       var ask = {};
