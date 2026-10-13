@@ -30,7 +30,7 @@ var COMP_TABLES = {
   Competitions: ['id', 'slug', 'title', 'shortTitle', 'description', 'instructions', 'ctaLabel', 'banner', 'icon', 'theme',
     'startAt', 'endAt', 'participation', 'scoring', 'resultShow', 'resultsAt', 'answersShow', 'answersAt', 'showPoints', 'wallet',
     'attempts', 'layout', 'shuffleQ', 'shuffleC', 'timeLimit', 'maxSubmissions', 'uniquePhone', 'fields', 'successText', 'enabled',
-    'cardId', 'liveVersion', 'publishedAt', 'closedAt', 'finalizedAt', 'archived', 'createdBy', 'createdAt', 'updatedAt', 'seasonId'],
+    'cardId', 'liveVersion', 'publishedAt', 'closedAt', 'finalizedAt', 'archived', 'createdBy', 'createdAt', 'updatedAt', 'seasonId', 'allowGuests'],
   Questions: ['id', 'compId', 'order', 'type', 'text', 'help', 'media', 'choices', 'correct', 'points', 'required', 'explanation',
     'explanationMedia', 'review', 'enabled', 'updatedAt'],
   Snapshots: ['compId', 'version', 'part', 'json', 'publishedAt', 'publishedBy'],
@@ -39,7 +39,7 @@ var COMP_TABLES = {
     'correctCount', 'gradableCount', 'pendingCount', 'flags', 'answers', 'grading', 'reviewedBy', 'updatedAt'],
   // Phase 2 / 3 (created by their modules on first use)
   Participants: ['id', 'name', 'nameNorm', 'phone', 'phoneNorm', 'group', 'church', 'notes', 'status', 'codeHash', 'codeEnc',
-    'codeVersion', 'codeIssuedAt', 'codeIssuedBy', 'importBatch', 'createdBy', 'createdAt', 'updatedAt'],
+    'codeVersion', 'codeIssuedAt', 'codeIssuedBy', 'importBatch', 'createdBy', 'createdAt', 'updatedAt', 'birthDate'],
   PointsLedger: ['id', 'participantId', 'amount', 'kind', 'refType', 'refId', 'compId', 'note', 'idemKey', 'actor', 'createdAt', 'seasonId'],
   StoreItems: ['id', 'name', 'description', 'image', 'cost', 'stock', 'perPerson', 'category', 'order', 'active', 'createdAt', 'updatedAt'],
   Redemptions: ['id', 'participantId', 'itemId', 'itemName', 'cost', 'status', 'requestKey', 'ledgerId', 'refundLedgerId',
@@ -725,7 +725,7 @@ function compPointsDraft_(modules) {
 
   if (modules.shop && typeof shopSettings_ === 'function') {
     var settings = shopSettings_();
-    shop = { on: true, mode: settings.mode, opensAt: shopWall_(settings.opensAt), closesAt: shopWall_(settings.closesAt) };
+    shop = { on: true, mode: settings.mode, preview: !!settings.preview, opensAt: shopWall_(settings.opensAt), closesAt: shopWall_(settings.closesAt) };
   }
 
   var season = null;

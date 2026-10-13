@@ -78,7 +78,8 @@ const ARGS = {
   apiShopRedemptions: [{}], apiShopRedemptionStatus: ['r-0000000000', 'approved', ''],
   apiShopSchedule: [], apiShopScheduleSave: [{ mode: 'auto' }],
   apiPushAuto: [], apiPushSchedule: [], apiPushScheduleCancel: ['psh-0000000000'],
-  apiSeasons: [], apiSeasonSave: [{ name: 'x' }], apiSeasonClosePreview: ['sea-0000'], apiSeasonClose: ['sea-0000', 'k', {}]
+  apiSeasons: [], apiSeasonSave: [{ name: 'x' }], apiSeasonClosePreview: ['sea-0000'], apiSeasonClose: ['sea-0000', 'k', {}],
+  apiAgeRules: [], apiAgeRulesSave: [{ min: 18, max: 30, warnDays: 60 }]
 };
 
 /*

@@ -50,7 +50,7 @@ var COMP_SITE_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; im
 /* «مسابقة جديدة»: presets only fill defaults (§3.2); `needs` = the module it requires */
 var COMP_PRESETS = {
   survey: { label: 'استبيان بسيط', participation: 'open', scoring: '', resultShow: 'none', answersShow: 'never', wallet: '', needs: '' },
-  scored: { label: 'مسابقة عامة بدرجات', participation: 'open', scoring: '1', resultShow: 'score', answersShow: 'afterClose', wallet: '', needs: '' },
+  scored: { label: 'مسابقة عامة بدرجات', participation: 'open', scoring: '1', resultShow: 'score', answersShow: 'never', wallet: '', needs: '' },
   coded: { label: 'مسابقة بأكواد', participation: 'registered', scoring: '1', resultShow: 'both', answersShow: 'never', wallet: '', needs: 'registry' },
   points: { label: 'مسابقة نقاط', participation: 'registered', scoring: '1', resultShow: 'points', answersShow: 'never', wallet: '1', needs: 'wallet' }
 };
@@ -323,7 +323,7 @@ function compFieldValues_(spec, input) {
 /* the builder's columns, in Sheet order (the rest are the server's) */
 var COMP_EDITABLE = ['slug', 'title', 'shortTitle', 'description', 'instructions', 'ctaLabel', 'banner', 'icon', 'theme',
   'startAt', 'endAt', 'participation', 'scoring', 'resultShow', 'resultsAt', 'answersShow', 'answersAt', 'showPoints', 'wallet',
-  'attempts', 'layout', 'shuffleQ', 'shuffleC', 'timeLimit', 'maxSubmissions', 'uniquePhone', 'fields', 'successText', 'enabled', 'seasonId'];
+  'attempts', 'layout', 'shuffleQ', 'shuffleC', 'timeLimit', 'maxSubmissions', 'uniquePhone', 'fields', 'successText', 'enabled', 'seasonId', 'allowGuests'];
 
 /**
  * input: the builder's fields (anything missing keeps `ctx.existing`'s value).
@@ -432,7 +432,9 @@ function compValidateComp_(input, ctx) {
     successText: block('successText', COMP_LIMITS.successText, 'رسالة بعد الإرسال'),
     enabled: compFlag_(pick('enabled')),
     // the points season (CompSeasons.gs); '' = the active one when points are given
-    seasonId: /^sea-[0-9a-z]{4,12}$/.test(String(pick('seasonId') || '')) ? String(pick('seasonId')) : ''
+    seasonId: /^sea-[0-9a-z]{4,12}$/.test(String(pick('seasonId') || '')) ? String(pick('seasonId')) : '',
+    // a coded competition that also takes people without a code (no points for them, §19.2)
+    allowGuests: compFlag_(pick('allowGuests'))
   };
 
   // no score, nothing score-like to show
@@ -505,6 +507,7 @@ function compParseComp_(row) {
     successText: compText_(row.successText),
     enabled: compFlag_(row.enabled) === '1',
     seasonId: /^sea-[0-9a-z]{4,12}$/.test(String(row.seasonId || '')) ? String(row.seasonId) : '',
+    allowGuests: compFlag_(row.allowGuests) === '1',
     cardId: compLine_(row.cardId),
     liveVersion: compLine_(row.liveVersion),
     publishedAt: compLine_(row.publishedAt),
@@ -870,7 +873,8 @@ function compDefinition_(comp, questions, media) {
     timeLimit: comp.timeLimit,
     maxSubmissions: comp.maxSubmissions,
     uniquePhone: comp.uniquePhone,
-    fields: comp.participation === 'open' ? comp.fields : [],
+    allowGuests: comp.participation === 'registered' && !!comp.allowGuests,
+    fields: comp.participation === 'open' || comp.allowGuests ? comp.fields : [],
     successText: comp.successText,
     questions: compSortQuestions_(questions.filter(function (q) { return q.enabled; })).map(function (q) {
       return {
@@ -946,6 +950,7 @@ function compPublicDef_(def, version, publishedAt) {
     layout: def.layout,
     timeLimit: def.timeLimit,
     fields: def.fields,
+    allowGuests: !!def.allowGuests,
     successText: def.successText,
     questionCount: def.questions.filter(function (q) { return q.type !== 'info'; }).length,
     totalPoints: compTotalPoints_(def),

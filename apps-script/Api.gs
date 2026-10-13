@@ -168,7 +168,9 @@ function apiFunctions_() {
     apiSeasons: apiSeasons,
     apiSeasonSave: apiSeasonSave,
     apiSeasonClosePreview: apiSeasonClosePreview,
-    apiSeasonClose: apiSeasonClose
+    apiSeasonClose: apiSeasonClose,
+    apiAgeRules: apiAgeRules,
+    apiAgeRulesSave: apiAgeRulesSave
   };
 
 }

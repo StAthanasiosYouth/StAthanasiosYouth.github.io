@@ -35,7 +35,7 @@ var REG_HASH_SECONDS = 21600;
 var REG_IMPORT_MAX_ROWS = 500;
 var REG_IMPORT_MAX_TEXT = 300 * 1024;
 var REG_LIMITS = { name: 80, nameMin: 3, group: 40, church: 60, notes: 300, search: 60, page: 50, pageMax: 200, exportMax: 3000 };
-var REG_FIELD_LABELS = { name: 'الاسم', phone: 'رقم الموبايل', group: 'المجموعة', church: 'الكنيسة', notes: 'ملاحظات' };
+var REG_FIELD_LABELS = { name: 'الاسم', phone: 'رقم الموبايل', group: 'المجموعة', church: 'الكنيسة', notes: 'ملاحظات', birthDate: 'تاريخ الميلاد' };
 
 /* this execution's key bytes (read once) */
 var REG_KEYS_ = null;
@@ -234,6 +234,13 @@ function regCheckPerson_(input) {
     out.local = phone.local;
   }
 
+  // the birth date (optional; undefined = not given, so an edit keeps the stored one)
+  if (input.birthDate !== undefined && input.birthDate !== null) {
+    var birth = regBirthDate_(input.birthDate, compNow_().wall.slice(0, 10));
+    if (birth.problem) out.errors.push({ field: 'birthDate', message: birth.problem });
+    else out.birthDate = birth.date;
+  }
+
   ['group', 'church', 'notes'].forEach(function (key) {
     var value = key === 'notes' ? contentText_(input[key]).replace(/\s+/g, ' ').trim() : contentLine_(input[key]);
     if (value.length > REG_LIMITS[key]) out.errors.push({ field: key, message: REG_FIELD_LABELS[key] + ' أطول من ' + regAr_(REG_LIMITS[key]) + ' حرف' });
@@ -254,10 +261,11 @@ var REG_IMPORT_COLUMNS = [
   { key: 'phone', names: ['رقم الموبايل', 'الموبايل', 'موبايل', 'التليفون', 'تليفون', 'رقم التليفون', 'الرقم', 'phone', 'mobile', 'phone number'] },
   { key: 'group', names: ['المجموعة / الفصل', 'المجموعة/الفصل', 'المجموعة', 'مجموعة', 'الفصل', 'فصل', 'group', 'class'] },
   { key: 'church', names: ['الكنيسة', 'كنيسة', 'church'] },
-  { key: 'notes', names: ['ملاحظات', 'ملاحظة', 'notes', 'note'] }
+  { key: 'notes', names: ['ملاحظات', 'ملاحظة', 'notes', 'note'] },
+  { key: 'birthDate', names: ['تاريخ الميلاد', 'الميلاد', 'تاريخ ميلاد', 'birth date', 'birthdate', 'date of birth', 'dob'] }
 ];
 
-var REG_IMPORT_ORDER = ['name', 'phone', 'group', 'church', 'notes'];
+var REG_IMPORT_ORDER = ['name', 'phone', 'group', 'church', 'notes', 'birthDate'];
 
 function regImportColumnOf_(cell) {
 
@@ -345,7 +353,7 @@ function planParticipantImport_(text, existing, hash) {
 
   (existing || []).forEach(function (p) {
     var nameNorm = p.nameNorm || normName_(p.name);
-    var record = { id: p.id, name: p.name, nameNorm: nameNorm, phoneNorm: p.phoneNorm, group: p.group || '', church: p.church || '', notes: p.notes || '', status: p.status || 'active' };
+    var record = { id: p.id, name: p.name, nameNorm: nameNorm, phoneNorm: p.phoneNorm, group: p.group || '', church: p.church || '', notes: p.notes || '', birthDate: p.birthDate || '', status: p.status || 'active' };
     byKey[nameNorm + '|' + p.phoneNorm] = byKey[nameNorm + '|' + p.phoneNorm] || record;
     (byName[nameNorm] = byName[nameNorm] || []).push(record);
     (byPhone[p.phoneNorm] = byPhone[p.phoneNorm] || []).push(record);
@@ -353,7 +361,7 @@ function planParticipantImport_(text, existing, hash) {
   });
 
   /* every row checked on its own */
-  var given = { group: columns.indexOf('group') !== -1, church: columns.indexOf('church') !== -1, notes: columns.indexOf('notes') !== -1 };
+  var given = { group: columns.indexOf('group') !== -1, church: columns.indexOf('church') !== -1, notes: columns.indexOf('notes') !== -1, birthDate: columns.indexOf('birthDate') !== -1 };
 
   var rows = body.map(function (entry) {
     var raw = {};
@@ -370,6 +378,7 @@ function planParticipantImport_(text, existing, hash) {
       group: checked.group,
       church: checked.church,
       notes: checked.notes,
+      birthDate: checked.birthDate || '',
       errors: checked.errors.map(function (e) { return e.message; }),
       warnings: [],
       reason: '',
@@ -417,7 +426,7 @@ function planParticipantImport_(text, existing, hash) {
     if (match) {
       row.status = 'exists';
       row.match = match;
-      ['group', 'church', 'notes'].forEach(function (field) {
+      ['group', 'church', 'notes', 'birthDate'].forEach(function (field) {
         if (!given[field] || row[field] === '' || row[field] === match[field]) return;
         row.changes.push({ field: field, label: REG_FIELD_LABELS[field], from: match[field], to: row[field] });
       });
@@ -538,6 +547,7 @@ function regImportRowOut_(row) {
     group: row.group,
     church: row.church,
     notes: row.notes,
+    birthDate: row.birthDate || '',
     errors: row.errors,
     warnings: row.warnings,
     reason: row.reason,
@@ -688,7 +698,11 @@ function regPerson_(row) {
     hasCode: !!row.codeHash,
     importBatch: row.importBatch || '',
     createdAt: row.createdAt || '',
-    updatedAt: row.updatedAt || ''
+    updatedAt: row.updatedAt || '',
+    birthDate: row.birthDate || '',
+    age: regEligibilityOf_(row).age,
+    eligibility: regEligibilityOf_(row).state,
+    leavesAt: regEligibilityOf_(row).leavesAt
   };
 
 }
@@ -742,6 +756,7 @@ function regNewRecord_(checked, issued, email, stamp, batch) {
     group: checked.group,
     church: checked.church,
     notes: checked.notes,
+    birthDate: checked.birthDate || '',
     status: 'active',
     codeHash: issued.codeHash,
     codeEnc: issued.codeEnc,
@@ -798,6 +813,7 @@ function apiParticipants(query) {
   var phoneKey = regPhoneSearch_(search);
   var group = typeof query.group === 'string' ? normName_(query.group) : '';
   var status = query.status === 'active' || query.status === 'inactive' ? query.status : 'all';
+  var eligibility = ['ok', 'soon', 'out', 'unknown'].indexOf(query.eligibility) !== -1 ? query.eligibility : 'all';
   var balances = modules.wallet && typeof walletBalances_ === 'function' ? walletBalances_() : null;
   var groups = Object.create(null);
   var batches = Object.create(null);
@@ -820,6 +836,7 @@ function apiParticipants(query) {
 
   var found = rows.filter(function (r) {
     if (status !== 'all' && (r.status === 'inactive' ? 'inactive' : 'active') !== status) return false;
+    if (eligibility !== 'all' && regEligibilityOf_(r).state !== eligibility) return false;
     if (group && normName_(r.group) !== group) return false;
     if (search) {
       var inName = !!nameKey && (r.nameNorm || normName_(r.name)).indexOf(nameKey) !== -1;
@@ -846,6 +863,9 @@ function apiParticipants(query) {
     return person;
   });
   result.groups = Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) { return b.count - a.count; });
+  result.eligibility = { ok: 0, soon: 0, out: 0, unknown: 0 };
+  result.ageRules = regAgeRules_();
+  rows.forEach(function (r) { result.eligibility[regEligibilityOf_(r).state]++; });
   result.batches = Object.keys(batches).map(function (k) { return batches[k]; }).sort(function (a, b) { return a.at < b.at ? 1 : -1; }).slice(0, 20);
 
   return result;
@@ -951,7 +971,9 @@ function apiParticipantSave(input) {
       phone: input.phone !== undefined ? input.phone : current && current.phone,
       group: input.group !== undefined ? input.group : current && current.group,
       church: input.church !== undefined ? input.church : current && current.church,
-      notes: input.notes !== undefined ? input.notes : current && current.notes
+      notes: input.notes !== undefined ? input.notes : current && current.notes,
+      // undefined = not sent: an edit keeps the stored birth date
+      birthDate: input.birthDate !== undefined ? input.birthDate : current ? current.birthDate || '' : undefined
     };
     var checked = regCheckPerson_(merged);
 
@@ -990,6 +1012,7 @@ function apiParticipantSave(input) {
       group: checked.group,
       church: checked.church,
       notes: checked.notes,
+      birthDate: checked.birthDate === undefined ? current.birthDate || '' : checked.birthDate,
       updatedAt: stamp
     };
 
@@ -1281,7 +1304,7 @@ function apiParticipantsImportApply(text, decisions) {
 
       // the same person with a new phone: id and code stay
       var phonePatch = { phone: row.phoneIntl, phoneNorm: row.phoneNorm, updatedAt: stamp };
-      ['group', 'church', 'notes'].forEach(function (field) { if (row[field]) phonePatch[field] = row[field]; });
+      ['group', 'church', 'notes', 'birthDate'].forEach(function (field) { if (row[field]) phonePatch[field] = row[field]; });
       compUpdate_(t, target.__row, phonePatch, null);
       report.phoneUpdated++;
       report.rows.push({ line: row.line, result: 'phone', reason: 'اتغير الرقم', id: pid });
@@ -1421,11 +1444,19 @@ function compCodeAction_(arg) {
 
   if (!row || row.status === 'inactive' || !compSafeEqual_(row.codeHash, hash)) return wrong();
 
-  return {
+  var reply = {
     ok: true,
     participant: { name: row.name, group: row.group || '' },
     ptoken: compSignToken_('pt1', { p: row.id, cv: Number(row.codeVersion) || 1, e: Date.now() + REG_PTOKEN_HOURS * 3600000 })
   };
+
+  // outside the points age range: the code is fine and stays theirs (§19.3)
+  if (regEligibilityOf_(row).state === 'out') {
+    reply.eligible = false;
+    reply.notice = REG_AGE_NOTICE;
+  }
+
+  return reply;
 
 }
 
@@ -1443,7 +1474,7 @@ function compParticipantFromToken_(ptoken) {
 
   if (!row || row.status === 'inactive' || String(Number(row.codeVersion) || 1) !== String(read.payload.cv)) return null;
 
-  return { id: row.id, name: row.name, group: row.group || '', phone: row.phone || '' };
+  return { id: row.id, name: row.name, group: row.group || '', phone: row.phone || '', birthDate: row.birthDate || '' };
 
 }
 
@@ -1520,6 +1551,11 @@ function portalMeAction_(arg) {
     history: regPortalHistory_(participant.id, compNow_())
   };
 
+  if (regEligibilityOf_(participant).state === 'out') {
+    reply.eligible = false;
+    reply.notice = REG_AGE_NOTICE;
+  }
+
   if (modules.wallet && typeof walletPortal_ === 'function') {
     var wallet = walletPortal_(participant.id);
     reply.balance = wallet.balance;
@@ -1566,5 +1602,158 @@ function portalReviewAction_(arg) {
   if (!def) return compFail_('not_found', 'المشاركة دي مش موجودة.');
 
   return { ok: true, result: compResult_(def, row, compLiveFor_(def), compNow_()) };
+
+}
+
+
+/* =========================================================
+   BIRTH DATE AND AGE ELIGIBILITY (docs/COMPETITIONS.md §19.3)
+========================================================= */
+
+var REG_AGE_NOTICE = 'نأسف، سنك حاليًا خارج الفئة العمرية المخصصة لنظام نقاط الاجتماع. تقدر تشارك في المسابقة بدون نقاط.';
+var REG_AGE_DEFAULTS = { min: 18, max: 30, warnDays: 60 };
+
+/* this execution's rules (read once) */
+var REG_AGE_RULES_ = null;
+
+/*
+ * PURE. A birth date as typed (YYYY-MM-DD, DD/MM/YYYY, D-M-YYYY, Arabic digits) or
+ * { day, month, year } → { date: 'YYYY-MM-DD' | '' } | { problem }. today: 'YYYY-MM-DD'.
+ */
+function regBirthDate_(value, today) {
+
+  var y, m, d;
+
+  if (value && typeof value === 'object') {
+    y = Number(contentDigits_(String(value.year || '')));
+    m = Number(contentDigits_(String(value.month || '')));
+    d = Number(contentDigits_(String(value.day || '')));
+    if (!y && !m && !d) return { date: '' };
+  }
+  else {
+    var text = contentDigits_(String(value || '')).trim();
+    if (!text) return { date: '' };
+    var iso = /^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/.exec(text);
+    var dmy = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/.exec(text);
+    if (iso) { y = Number(iso[1]); m = Number(iso[2]); d = Number(iso[3]); }
+    else if (dmy) { d = Number(dmy[1]); m = Number(dmy[2]); y = Number(dmy[3]); }
+    else return { problem: 'تاريخ الميلاد مش مفهوم (اكتبه يوم/شهر/سنة)' };
+  }
+
+  var probe = new Date(Date.UTC(y, m - 1, d));
+
+  if (!y || !m || !d || probe.getUTCFullYear() !== y || probe.getUTCMonth() !== m - 1 || probe.getUTCDate() !== d) {
+    return { problem: 'تاريخ الميلاد مش تاريخ حقيقي' };
+  }
+
+  var date = y + '-' + (m < 10 ? '0' : '') + m + '-' + (d < 10 ? '0' : '') + d;
+
+  if (today && date > today) return { problem: 'تاريخ الميلاد في المستقبل' };
+
+  var age = regAgeOn_(date, today);
+
+  if (today && (age < 5 || age > 100)) return { problem: 'تاريخ الميلاد مش منطقي (السن ' + regAr_(age) + ')' };
+
+  return { date: date };
+
+}
+
+/* PURE: completed years on 'YYYY-MM-DD' */
+function regAgeOn_(birth, today) {
+
+  var b = birth.split('-').map(Number);
+  var t = today.split('-').map(Number);
+
+  return t[0] - b[0] - (t[1] < b[1] || (t[1] === b[1] && t[2] < b[2]) ? 1 : 0);
+
+}
+
+/* PURE: 'YYYY-MM-DD' of the birthday at that age (29 Feb → 1 Mar in other years) */
+function regBirthdayAt_(birth, age) {
+
+  var b = birth.split('-').map(Number);
+  var date = new Date(Date.UTC(b[0] + age, b[1] - 1, b[2]));
+
+  return date.toISOString().slice(0, 10);
+
+}
+
+/*
+ * PURE. { age, state: ok | soon | out | unknown, leavesAt } for a birth date under the rules
+ * { min, max, warnDays } on 'YYYY-MM-DD' today. ok = min ≤ age ≤ max; soon = ok and the
+ * (max+1)th birthday is within warnDays; no birth date = unknown (treated as eligible).
+ */
+function regEligibility_(birthDate, rules, today) {
+
+  if (!birthDate) return { age: null, state: 'unknown', leavesAt: '' };
+
+  var age = regAgeOn_(birthDate, today);
+  var leavesAt = regBirthdayAt_(birthDate, rules.max + 1);
+
+  if (age < rules.min || age > rules.max) return { age: age, state: 'out', leavesAt: leavesAt };
+
+  var days = Math.round((Date.UTC.apply(null, leavesAt.split('-').map(function (v, i) { return i === 1 ? Number(v) - 1 : Number(v); })) -
+    Date.UTC.apply(null, today.split('-').map(function (v, i) { return i === 1 ? Number(v) - 1 : Number(v); }))) / 86400000);
+
+  return { age: age, state: days <= rules.warnDays ? 'soon' : 'ok', leavesAt: leavesAt };
+
+}
+
+/* the rules now (Script Properties; defaults 18 / 30 / 60 days) */
+function regAgeRules_() {
+
+  if (REG_AGE_RULES_) return REG_AGE_RULES_;
+
+  var props = PropertiesService.getScriptProperties();
+  var read = function (key, fallback) {
+    var value = props.getProperty(key);
+    return value === null || value === '' || !isFinite(Number(value)) ? fallback : Number(value);
+  };
+
+  REG_AGE_RULES_ = { min: read('AGE_MIN', REG_AGE_DEFAULTS.min), max: read('AGE_MAX', REG_AGE_DEFAULTS.max), warnDays: read('AGE_WARN_DAYS', REG_AGE_DEFAULTS.warnDays) };
+
+  return REG_AGE_RULES_;
+
+}
+
+/* a participant row's eligibility today */
+function regEligibilityOf_(row) {
+
+  return regEligibility_(row && row.birthDate ? String(row.birthDate) : '', regAgeRules_(), compNow_().wall.slice(0, 10));
+
+}
+
+function apiAgeRules() {
+
+  assertAdmin_();
+
+  return regAgeRules_();
+
+}
+
+/* { min, max, warnDays }: 0 ≤ min < max ≤ 100, 0 ≤ warnDays ≤ 365. Codes, history and points never change. */
+function apiAgeRulesSave(input) {
+
+  assertAdmin_();
+
+  input = input || {};
+
+  var min = compInt_(input.min, 0, 99, NaN);
+  var max = compInt_(input.max, 1, 100, NaN);
+  var warn = compInt_(input.warnDays, 0, 365, NaN);
+
+  if (isNaN(min)) throw appError_('أقل سن لازم يكون رقم من ٠ لـ ٩٩.', '', '', 'min');
+  if (isNaN(max) || max <= min) throw appError_('أكبر سن لازم يكون أكبر من أقل سن (لحد ١٠٠).', '', '', 'max');
+  if (isNaN(warn)) throw appError_('التنبيه قبل الخروج من السن بين ٠ و٣٦٥ يوم.', '', '', 'warnDays');
+
+  var before = regAgeRules_();
+
+  PropertiesService.getScriptProperties().setProperties({ AGE_MIN: String(min), AGE_MAX: String(max), AGE_WARN_DAYS: String(warn) });
+  REG_AGE_RULES_ = null;
+
+  activity_({ action: 'settings', type: 'participant', id: 'age', title: 'الفئة العمرية لنظام النقاط',
+    changes: { min: min, max: max, warnDays: warn, was: before.min + '-' + before.max } });
+
+  return regAgeRules_();
 
 }

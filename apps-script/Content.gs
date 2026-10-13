@@ -1201,7 +1201,8 @@ function buildPublicContent(draft, options) {
       url: 'points/',
       shop: points.shop ? {
         on: true,
-        mode: ['auto', 'open', 'closed'].indexOf(points.shop.mode) !== -1 ? points.shop.mode : 'auto',
+        mode: ['auto', 'open', 'preview', 'closed'].indexOf(points.shop.mode) !== -1 ? points.shop.mode : 'auto',
+        preview: !!points.shop.preview,
         opensAt: contentDateTime_(String(points.shop.opensAt || '').replace('T', ' '), false) || '',
         closesAt: contentDateTime_(String(points.shop.closesAt || '').replace('T', ' '), false) || ''
       } : null,

@@ -61,6 +61,7 @@ var COMP_MESSAGES = {
   stock: 'الحاجة دي خلصت.',
   per_person: 'خدت أقصى عدد مسموح من الحاجة دي.',
   shop_closed: 'المتجر مقفول دلوقتي. طلباتك محفوظة.',
+  not_eligible: 'سنك حاليًا خارج الفئة العمرية المخصصة لنظام نقاط الاجتماع.',
   not_allowed: 'مينفعش تلغي الطلب ده دلوقتي.'
 };
 
@@ -347,6 +348,12 @@ function compResult_(def, row, live, now) {
     result.resultsAt = policy.resultsAt;
   }
 
+  // no points for this attempt: a guest, or a code outside the age range (§19.2, §19.3)
+  var rowFlags = String(row.flags || '').split(',');
+
+  if (rowFlags.indexOf('guest') !== -1) result.guest = true;
+  if (rowFlags.indexOf('noPoints') !== -1) result.noPoints = true;
+
   // afterClose: only once nobody can still send (the end, or «اقفل دلوقتي», + the grace + the slack)
   var allowed = compAnswersOpen_(policy, state, now.wall);
 
@@ -521,19 +528,24 @@ function compStartAction_(arg) {
 
   var who;
   var cv;
+  var flags = '';
 
-  if (def.participation === 'registered') {
+  // a coded competition: the code, or (when it allows guests) the form without points (§19.2)
+  if (def.participation === 'registered' && (arg.ptoken || !def.allowGuests)) {
     if (!compModules_().registry || typeof compParticipantFromToken_ !== 'function') return compFail_('disabled');
     var participant = compParticipantFromToken_(arg.ptoken);
     if (!participant || !participant.id) return compFail_('session');
     var pt = compReadToken_('pt1', arg.ptoken);
     cv = pt.ok ? pt.payload.cv : undefined;
     who = { participantId: participant.id, name: String(participant.name || ''), phone: String(participant.phone || ''), fields: participant.group ? { group: String(participant.group) } : {} };
+    // outside the age range: they take part with their code, and this attempt never earns points (§19.3)
+    if (typeof regEligibilityOf_ === 'function' && regEligibilityOf_(participant).state === 'out') flags = 'noPoints';
   }
   else {
     var values = compFieldValues_(def.fields, arg.fields);
     if (values.problem) return compFail_('invalid', values.problem.message, { field: values.problem.field });
     who = { participantId: '', name: values.name, phone: values.phone, fields: values.fields };
+    if (def.participation === 'registered') flags = 'guest';
   }
 
   /* ---- the attempt (one row, under the live lock) ---- */
@@ -609,7 +621,7 @@ function compStartAction_(arg) {
           durationSec: '',
           seed: seed,
           qids: compServedOrder_(def, seed),
-          flags: '',
+          flags: flags,
           updatedAt: now.stamp
         };
         compAppend_(t, [row]);
@@ -741,7 +753,8 @@ function compSubmitAction_(arg) {
   var graded = compGrade_(def, checked.answers, { qids: qids, at: now.stamp });
   var duration = Math.max(0, Math.round((now.ms - (Number(row.startedMs) || now.ms)) / 1000));
   var gradable = def.questions.filter(function (q) { return q.type !== 'info' && qids.indexOf(q.id) !== -1; }).length;
-  var flags = [];
+  // what start decided (guest, noPoints) stays; the submit adds its own
+  var flags = String(row.flags || '').split(',').filter(function (f) { return f === 'guest' || f === 'noPoints'; });
 
   if (gradable && duration < COMP_FAST_SECONDS * gradable) flags.push('fast');
   if (late) flags.push('late');

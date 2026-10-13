@@ -233,6 +233,8 @@ function walletCompOn_(compId, version) {
 function walletTarget_(row) {
 
   if (!row.participantId || row.status !== 'graded') return 0;
+  // decided when the attempt started (the age rule at that time): never changes later (§19.3)
+  if (String(row.flags || '').split(',').indexOf('noPoints') !== -1) return 0;
 
   return walletCompOn_(row.compId, row.version) ? Math.max(0, Math.round(Number(row.score) || 0)) : 0;
 
@@ -359,7 +361,7 @@ function walletReconcileMany_(ids) {
   try {
 
     // the rows as they are now (a grade may have moved since the caller wrote it)
-    var rows = compColumns_(t, ['id', 'compId', 'version', 'participantId', 'status', 'score', 'submittedMs'])
+    var rows = compColumns_(t, ['id', 'compId', 'version', 'participantId', 'status', 'score', 'submittedMs', 'flags'])
       .filter(function (r) { return wanted[r.id]; });
     var targets = walletTargets_(rows);
     var held = Object.create(null);
