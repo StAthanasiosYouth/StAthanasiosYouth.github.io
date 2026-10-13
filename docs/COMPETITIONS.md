@@ -1250,7 +1250,7 @@ Push.gs pushUrl_).
 
 portalMe adds:
 
-    shop: { state, opensAt, closesAt, allowCancel },
+    store: { state, opensAt, closesAt, allowCancel },   (`shop` stays the prize list)
     season: { id, name, startAt, endAt, earned, maxTheoretical } | null,
     seasons: [{ id, name, startAt, endAt, final, earned, spent }]  (closed, newest first, from SeasonTotals)
     redemptions[].canCancel (bool)
@@ -1326,3 +1326,43 @@ portalMe adds:
 notify: { open1d, open1h, openAt, close24h, close1h }, auto: apiPushAuto() }`;
 `apiShopScheduleSave(input)` → the same shape (+ synced bell items and
 schedule); `apiPushSchedule()` → entries; `apiPushScheduleCancel(id)`.
+
+### 18.8 As built (differences from the plan above)
+
+- portalMe: `shop` stays the prize list; the store's state is
+  `store: { state, opensAt, closesAt, allowCancel }`. A participant cancel is
+  `shopCancel` (family `portal`, module `shop`); new codes `shop_closed`,
+  `not_allowed`.
+- Bell item ids carry their moment so a later opening is a new item (PushLog
+  sends each item once): `notif-shop-open-1d-<yyyymmddhhmm>`, …,
+  `notif-season-end-<season>-<yyyymmddhhmm>`.
+- `pushSendItem_(id, sendKey, actor, edits)` is the one send path
+  (`apiSendPush` calls it with the admin's email; the schedule with '').
+- Trigger handlers `pushScheduleTick(e)` / `pushScheduleDaily(e)` run only
+  when `e.triggerUid` is the uid stored in `PUSH_TICK_ID` / `PUSH_DAILY_ID`
+  (they are browser-visible names, so the uid is their guard).
+- `apiWalletAdjust(id, amount, note, key, kind)`: kind `'transfer'` writes the
+  explicit carry-over row; the never-below-zero rule uses the active season.
+- `apiShopItems()` adds `seasonMax` and each item's `pctOfMax`.
+- The first season (`sea-first`) is written when the wallet is switched on
+  (outside every lock) or on first use; with no competitions spreadsheet it
+  is only virtual.
+- The fake world throws on any UrlFetch made while the script lock is held
+  (`scriptLock.strict`), and `FakeGitHub.onRequest` lets a test act in the
+  middle of a publish's commit (tests/points-v2.test.mjs).
+
+### 18.9 One-time owner step: automatic push
+
+The manifest does NOT yet request `script.scriptapp`; until it does, every
+trigger call is a guarded no-op (bell items still appear on time). To turn
+automatic sending on (docs/ADMIN-SETUP.md «الإرسال التلقائي»):
+
+1. Add `"https://www.googleapis.com/auth/script.scriptapp"` to
+   `apps-script/appsscript.json` `oauthScopes` and `clasp push` (HEAD only).
+2. The owner opens the Apps Script editor, picks `enableAutoPush`, Run, and
+   accepts Google's permission screen. This installs the daily trigger.
+3. Then deploy the API (`node deploy-api.mjs "vNN: automatic push"`).
+
+Deploying a version that asks for a scope the owner hasn't granted would make
+the API answer "authorization required" for everyone, so step 2 always comes
+before step 3.

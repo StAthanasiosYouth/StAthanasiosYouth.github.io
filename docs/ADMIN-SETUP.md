@@ -618,3 +618,31 @@ How to use it: [ADMIN-GUIDE.md](ADMIN-GUIDE.md) sections ٧–١٢.
   settings or Firebase steps. Published competitions are committed by
   «راجع وانشر» (`competition/<link>/index.html` + `comp.json`, never the
   questions or the answers).
+
+### 8.9 الإرسال التلقائي (automatic push for the store and seasons)
+
+The admin can pick moments («قبل الفتح بيوم», «قبل القفل بساعة», «قبل نهاية
+الموسم بـ … يوم»). Each becomes a bell item; the push at that moment needs
+**time triggers**, which Google lets a script use only after the **owner**
+allows it once. Until then everything else works and the bell items still
+appear on time; the admin shows «الإرسال التلقائي مش متفعل».
+
+Do this once, in this order (the order matters: an API version that asks for
+a permission the owner hasn't given stops answering everyone):
+
+1. In `apps-script/appsscript.json`, add
+   `"https://www.googleapis.com/auth/script.scriptapp"` to `oauthScopes`, then
+   from `apps-script/` run `clasp push` (this changes the editor's copy only,
+   not the live API).
+2. Open the Apps Script project (script.google.com, signed in as the owner),
+   choose the function **`enableAutoPush`** in the toolbar, press **Run**, and
+   accept Google's permission screen («Allow»). The log says
+   «الإرسال التلقائي اتفعّل ✓». This also installs one daily safety trigger.
+3. Deploy the API as usual: `cd tools && node deploy-api.mjs "vNN: automatic push"`.
+
+After that the server keeps exactly one waiting trigger (set to the next
+moment) plus the daily one; nothing runs while nothing is scheduled. Each
+send goes through the same checks as the «إرسال» button (the item must be
+published and showing on the site; once per item; at most 10 a day).
+Never delete the Script Properties `PUSH_AUTO`, `PUSH_TICK_ID`,
+`PUSH_DAILY_ID`.
