@@ -118,9 +118,9 @@ test('never an overspend: back-to-back requests under the live lock, two items t
   assert.ok(Object.values(balances).every(v => v >= 0), JSON.stringify(balances));
   // the live lock is taken by someone else: busy, nothing written
   const before = tab(world, 'Redemptions').length;
-  world.userLock.busy = true;
+  world.scriptLock.busy = true;
   assert.equal(redeem(world, tokens.mina, b.id).code, 'busy');
-  world.userLock.busy = false;
+  world.scriptLock.busy = false;
   assert.equal(tab(world, 'Redemptions').length, before);
   // a simulated race: the stock check sees the other request's row (written under the same lock)
   const one = item({ name: 'واحدة بس', cost: 1, stock: 1 });

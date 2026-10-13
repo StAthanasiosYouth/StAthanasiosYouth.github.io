@@ -251,6 +251,9 @@ export class FakeGitHub {
 
     this.requests.push({ method, url, headers: options.headers, payload: options.payload });
 
+    // a test can act in the middle of a commit (e.g. a visitor's call while a publish is in its network step)
+    if (typeof this.onRequest === 'function') this.onRequest(method, url);
+
     if (!url.startsWith(prefix)) return this.respond(404, { message: 'Not Found' });
     if ((options.headers || {}).Authorization !== `Bearer ${this.token}`) return this.respond(401, { message: 'Bad credentials' });
 
@@ -486,8 +489,10 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
   const clock = { skew: 0 };
   const now = () => Date.now() + clock.skew;
   // LockService.getScriptLock(): busy = another execution holds it (tryLock fails, waitLock throws)
-  const scriptLock = { busy: false, waits: 0 };
-  // LockService.getUserLock(): the same, for the competitions' live tabs
+  // held = acquisitions not released yet; lockedFetches = every UrlFetch made while held
+  // (docs/COMPETITIONS.md §18.1: never — strict makes it throw, so any such call fails its test)
+  const scriptLock = { busy: false, waits: 0, held: 0, lockedFetches: [], strict: true };
+  // LockService.getUserLock(): kept for completeness (the project no longer uses it)
   const userLock = { busy: false, waits: 0 };
   // every spreadsheet SpreadsheetApp.create made (the first is the content Sheet setup() makes)
   const spreadsheets = [];
@@ -555,11 +560,25 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
     },
 
     LockService: {
-      getScriptLock: () => ({
-        waitLock() { scriptLock.waits++; if (scriptLock.busy) throw new Error('Lock timeout: another process was holding the lock for too long.'); },
-        tryLock() { scriptLock.waits++; return !scriptLock.busy; },
-        releaseLock() {}
-      }),
+      getScriptLock: () => {
+        let mine = 0;
+        return {
+          waitLock() {
+            scriptLock.waits++;
+            if (scriptLock.busy) throw new Error('Lock timeout: another process was holding the lock for too long.');
+            mine++; scriptLock.held++;
+          },
+          tryLock() {
+            scriptLock.waits++;
+            if (scriptLock.busy) return false;
+            mine++; scriptLock.held++;
+            return true;
+          },
+          hasLock() { return scriptLock.held > 0; },
+          // the lock belongs to the execution: releasing through any instance releases it
+          releaseLock() { if (scriptLock.held > 0) scriptLock.held--; }
+        };
+      },
       // the owner's user lock (every API request runs as the owner): its own mutex
       getUserLock: () => ({
         waitLock() { userLock.waits++; if (userLock.busy) throw new Error('Lock timeout: another process was holding the lock for too long.'); },
@@ -633,6 +652,10 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
     UrlFetchApp: {
       fetchAll: requests => requests.map(r => context.UrlFetchApp.fetch(r.url, r)),
       fetch: (url, options) => {
+        if (scriptLock.held > 0) {
+          scriptLock.lockedFetches.push(String(url).replace(/\?.*$/, ''));
+          if (scriptLock.strict) throw new Error('UrlFetch while the script lock is held: ' + String(url).replace(/\?.*$/, ''));
+        }
         if (url === 'https://oauth2.googleapis.com/token' || String(url).startsWith('https://fcm.googleapis.com/')) return fcm.fetch(url, options);
         const site = properties.get('SITE_URL');
         if (site && String(url).startsWith(site.replace(/\/?$/, '/') + 'content.json')) {

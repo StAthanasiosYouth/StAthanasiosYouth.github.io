@@ -963,24 +963,29 @@ function apiPurgeMedia(id) {
     throw appError_('الصورة رجعت اتستخدمت، ومينفعش تتمسح.', '');
   }
 
-  return mutate_('media.purge', id, function () {
+  var state = mutate_('media.purge', id, function () {
 
     // someone else is editing it right now (Presence.gs; API mode only)
     assertUnlocked_('media:' + id);
-    [row.driveId, row.thumbDriveId].forEach(function (fileId) {
-      if (!fileId) return;
-      try {
-        drive_('delete', DRIVE_FILES + '/' + encodeURIComponent(fileId));
-      }
-      catch (error) {
-        // already gone from Drive is fine
-        if (error.driveCode !== 404) throw error;
-      }
-    });
     deleteRow_('Media', 'id', id);
     activityNote_({ action: 'media.purge', type: 'media', id: id, title: row.name || row.alt || '', sub: isVideoMedia_(row) ? 'video' : '' });
     return id + (row.publishedAt ? ' (الملف على الموقع فضل زي ما هو)' : '');
   });
+
+  // the Drive files go after the lock is released (no network call under the
+  // script lock, docs/COMPETITIONS.md §18.1); a file left behind in the app's
+  // own folder is harmless, so a failure here is only logged
+  [row.driveId, row.thumbDriveId].forEach(function (fileId) {
+    if (!fileId) return;
+    try {
+      drive_('delete', DRIVE_FILES + '/' + encodeURIComponent(fileId));
+    }
+    catch (error) {
+      if (error.driveCode !== 404) console.warn('media: purge left a Drive file behind');
+    }
+  });
+
+  return state;
 
 }
 

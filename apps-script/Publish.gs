@@ -349,6 +349,72 @@ function mediaWaiting_(usedIds) {
 }
 
 
+/*
+ * Publishing in three steps, so the script lock (which submissions,
+ * redemptions, points and seasons share) is never held during the GitHub or
+ * Drive work (docs/COMPETITIONS.md §18.1):
+ *
+ *   A. lock (short): build from the draft, check the reviewed revision,
+ *      write the competitions' snapshots, take the publish claim; release.
+ *   B. no lock: read the live site, the media bytes from Drive, the
+ *      competition shell; one GitHub commit.
+ *   C. lock (short): what happens only after the commit landed (media
+ *      publishedAt, competitions' liveVersion, PUBLISHED_*, log, activity).
+ *
+ * The claim (CacheService) keeps a second publish from starting while one is
+ * in step B; it dies by itself after PUBLISH_CLAIM_SECONDS.
+ */
+
+var PUBLISH_CLAIM_KEY = 'publish:claim';
+var PUBLISH_CLAIM_SECONDS = 600;
+
+/* the claim's token, or throws «a publish is running» */
+function publishClaim_() {
+
+  var cache = CacheService.getScriptCache();
+
+  if (cache.get(PUBLISH_CLAIM_KEY)) {
+    throw appError_('فيه نشر شغال دلوقتي.', 'استنى دقيقة وجرّب تاني.');
+  }
+
+  var token = Utilities.getUuid();
+
+  cache.put(PUBLISH_CLAIM_KEY, token, PUBLISH_CLAIM_SECONDS);
+
+  return token;
+
+}
+
+/* drops the claim if it is still ours */
+function publishDropClaim_(token) {
+
+  try {
+    var cache = CacheService.getScriptCache();
+    if (token && cache.get(PUBLISH_CLAIM_KEY) === token) cache.remove(PUBLISH_CLAIM_KEY);
+  }
+  catch (ignored) {
+    // it expires by itself
+  }
+
+}
+
+/* fn() under the script lock, released right after */
+function withScriptLock_(ms, fn) {
+
+  var lock = LockService.getScriptLock();
+
+  lock.waitLock(ms);
+
+  try {
+    return fn();
+  }
+  finally {
+    lock.releaseLock();
+  }
+
+}
+
+
 /**
  * Publishes the draft. expectedRevision is what the admin reviewed; if the
  * Sheet changed since then, publishing stops so nothing unreviewed goes live.
@@ -356,15 +422,14 @@ function mediaWaiting_(usedIds) {
 function apiPublish(expectedRevision) {
 
   var email = assertAdmin_();
-  var lock = LockService.getScriptLock();
+  var now = new Date(Date.now());
+  var stamp = Utilities.formatDate(now, CONTENT_TIMEZONE, 'yyyy-MM-dd HH:mm');
 
-  lock.waitLock(30000);
-
-  try {
+  // A. under the lock: the draft as reviewed, the snapshots, the claim
+  var prep = withScriptLock_(30000, function () {
 
     if (typeof compDropDraft_ === 'function') compDropDraft_();
 
-    var now = new Date(Date.now());
     var built = buildPublicContent(readDraft_(), {
       now: cairoNow_(now),
       hash: sha256Hex_,
@@ -381,110 +446,122 @@ function apiPublish(expectedRevision) {
       throw new Error('البيانات اتغيرت بعد ما راجعتها. افتح المراجعة تاني قبل النشر.');
     }
 
-    var config = githubConfig_();
-    var live = fetchPublishedContent_();
-
-    // competitions (CompPublish.gs): the definitions this publish makes live, before the commit
-    var stamp = Utilities.formatDate(now, CONTENT_TIMEZONE, 'yyyy-MM-dd HH:mm');
+    var token = publishClaim_();
     var comps = built.competitions || null;
 
+    // competitions (CompPublish.gs): the definitions this publish makes live
+    // (content-addressed, so writing them before the commit is harmless)
     if (comps) {
       compWriteSnapshots_(comps, email, stamp);
     }
 
-    // same visible content already live: don't make an empty-change commit
+    return { built: built, comps: comps, token: token };
+
+  });
+
+  var built = prep.built;
+  var comps = prep.comps;
+  var config = githubConfig_();
+  var commit = null;
+  var mediaIds = [];
+  var unchanged = false;
+
+  try {
+
+    // B. no lock: the network work
+    var live = fetchPublishedContent_();
+
+    // same visible content already live: no empty-change commit
     // (unless a picture still waits to go to the site: a store prize's is not in content.json)
     if (live && live.revision === built.content.revision && !mediaWaiting_(built.media)) {
-      // (an earlier publish may have stopped right after its commit)
-      if (comps) compAfterCommit_(comps, stamp);
-      PropertiesService.getScriptProperties().setProperty('PUBLISHED_REVISION', built.content.revision);
-      activity_({ action: 'publish', type: 'site', id: built.content.revision, title: '', ref: built.content.revision, changes: { unchanged: true } });
-      return {
-        revision: built.content.revision,
-        commit: '',
-        commitUrl: '',
-        siteUrl: config.siteUrl,
-        unchanged: true,
-        state: apiStateFor_(email, built)
+
+      unchanged = true;
+
+    }
+    else {
+
+      var files = {
+        'content.json': JSON.stringify(built.content, null, 2) + '\n'
       };
+
+      var ics = buildMeetingIcs(
+        built.content,
+        Utilities.formatDate(now, CONTENT_TIMEZONE, 'yyyy-MM-dd'),
+        Utilities.formatDate(now, 'UTC', "yyyyMMdd'T'HHmmss'Z'"),
+        config.siteUrl
+      );
+
+      if (ics) {
+        files['meeting.ics'] = ics;
+      }
+
+      // competition/<slug>/index.html + comp.json (or the withdrawn comp.json): the same commit
+      if (comps) {
+        var compFiles = compPublishFiles_(comps, config.siteUrl, cairoNow_(now), Object.keys(comps.live).length ? compShellText_() : '');
+        Object.keys(compFiles).forEach(function (path) { files[path] = compFiles[path]; });
+      }
+
+      // images used by the content that aren't on the site yet
+      var media = mediaForPublish_(built.media);
+
+      mediaIds = media.ids;
+
+      // no personal data in the public commit history
+      commit = githubCommitFiles_(
+        files,
+        'Publish content ' + built.content.revision + ' (' + cairoNow_(now).replace('T', ' ') + ' Cairo)',
+        media.binaries
+      );
+
     }
 
-    var files = {
-      'content.json': JSON.stringify(built.content, null, 2) + '\n'
-    };
+    // C. under the lock: only what follows a commit that landed (or an
+    // earlier publish that stopped right after its commit)
+    withScriptLock_(30000, function () {
 
-    var ics = buildMeetingIcs(
-      built.content,
-      Utilities.formatDate(now, CONTENT_TIMEZONE, 'yyyy-MM-dd'),
-      Utilities.formatDate(now, 'UTC', "yyyyMMdd'T'HHmmss'Z'"),
-      config.siteUrl
-    );
+      mediaIds.forEach(function (id) {
+        upsertRow_('Media', 'id', { id: id, publishedAt: nowStamp_() });
+      });
 
-    if (ics) {
-      files['meeting.ics'] = ics;
-    }
+      if (comps) {
+        compAfterCommit_(comps, stamp);
+      }
 
-    // competition/<slug>/index.html + comp.json (or the withdrawn comp.json): the same commit
-    if (comps) {
-      var compFiles = compPublishFiles_(comps, config.siteUrl, cairoNow_(now), Object.keys(comps.live).length ? compShellText_() : '');
-      Object.keys(compFiles).forEach(function (path) { files[path] = compFiles[path]; });
-    }
+      var props = PropertiesService.getScriptProperties();
 
-    // images used by the content that aren't on the site yet
-    var media = mediaForPublish_(built.media);
+      if (unchanged) {
+        props.setProperty('PUBLISHED_REVISION', built.content.revision);
+        activity_({ action: 'publish', type: 'site', id: built.content.revision, title: '', ref: built.content.revision, changes: { unchanged: true } });
+        return;
+      }
 
-    // no personal data in the public commit history
-    var commit = githubCommitFiles_(
-      files,
-      'Publish content ' + built.content.revision + ' (' + cairoNow_(now).replace('T', ' ') + ' Cairo)',
-      media.binaries
-    );
+      props.setProperties({
+        PUBLISHED_REVISION: built.content.revision,
+        PUBLISHED_AT: now.toISOString(),
+        PUBLISHED_COMMIT: commit ? commit.sha : (props.getProperty('PUBLISHED_COMMIT') || '')
+      });
 
-    // only after the commit landed
-    media.ids.forEach(function (id) {
-      upsertRow_('Media', 'id', { id: id, publishedAt: nowStamp_() });
+      log_(email, 'publish', built.content.revision + (commit ? ' ' + commit.sha.slice(0, 7) : ' (no file change)'));
+      activity_({ action: 'publish', type: 'site', id: built.content.revision, title: '', ref: built.content.revision + (commit ? ' ' + commit.sha.slice(0, 7) : ''), changes: commit ? activitySincePublish_() : { unchanged: true } });
+
     });
-
-    if (comps) {
-      compAfterCommit_(comps, stamp);
-    }
-
-    var props = PropertiesService.getScriptProperties();
-
-    props.setProperties({
-      PUBLISHED_REVISION: built.content.revision,
-      PUBLISHED_AT: now.toISOString(),
-      PUBLISHED_COMMIT: commit ? commit.sha : (props.getProperty('PUBLISHED_COMMIT') || '')
-    });
-
-    log_(email, 'publish', built.content.revision + (commit ? ' ' + commit.sha.slice(0, 7) : ' (no file change)'));
-    activity_({ action: 'publish', type: 'site', id: built.content.revision, title: '', ref: built.content.revision + (commit ? ' ' + commit.sha.slice(0, 7) : ''), changes: commit ? activitySincePublish_() : { unchanged: true } });
-
-    return {
-      revision: built.content.revision,
-      commit: commit ? commit.sha : '',
-      commitUrl: commit ? 'https://github.com/' + config.repo + '/commit/' + commit.sha : '',
-      siteUrl: config.siteUrl,
-      unchanged: !commit,
-      state: apiStateFor_(email, built)
-    };
 
   }
   finally {
-    lock.releaseLock();
+    publishDropClaim_(prep.token);
   }
+
+  return {
+    revision: built.content.revision,
+    commit: commit ? commit.sha : '',
+    commitUrl: commit ? 'https://github.com/' + config.repo + '/commit/' + commit.sha : '',
+    siteUrl: config.siteUrl,
+    unchanged: unchanged || !commit,
+    state: apiStateFor_(email, built)
+  };
 
 }
 
-
-/* =========================================================
-   LIVE STAGE (live.json): «دي الحالية دلوقتي» during a meeting
-   One small file at the site's root, written ONLY here, as its own
-   one-file commit (never content.json, never the draft, no review):
-     { "schema": 1, "date": "YYYY-MM-DD", "stage": <index> | null, "updatedAt": "<ISO>" }
-   stage null = back to the automatic timing (the published program).
-   The last value is kept in LIVE_STATE (Script Properties) for the panel.
-========================================================= */
 
 var LIVE_FILE = 'live.json';
 
@@ -527,38 +604,29 @@ function apiSetLiveStage(date, stage) {
     throw appError_('الفقرة دي مش موجودة في برنامج الاجتماع.', 'اعمل Refresh للصفحة.');
   }
 
-  var lock = LockService.getScriptLock();
-  var live = null;
-  var commit = null;
-
-  lock.waitLock(20000);
-
-  try {
-
-    if (index !== null) {
-      var session = readOptionalTable_('Sessions').filter(function (row) { return contentDigits_(row.date) === day; })[0];
-      var stages = session ? programStages_(session.program).stages : [];
-      if (!session || index >= stages.length) {
-        throw appError_('الفقرة دي مش موجودة في برنامج الاجتماع.', 'افتح الاجتماع وراجع برنامجه، وانشر لو لسه ما اتنشرش.');
-      }
+  if (index !== null) {
+    var session = readOptionalTable_('Sessions').filter(function (row) { return contentDigits_(row.date) === day; })[0];
+    var stages = session ? programStages_(session.program).stages : [];
+    if (!session || index >= stages.length) {
+      throw appError_('الفقرة دي مش موجودة في برنامج الاجتماع.', 'افتح الاجتماع وراجع برنامجه، وانشر لو لسه ما اتنشرش.');
     }
+  }
 
-    live = { schema: 1, date: day, stage: index, updatedAt: new Date().toISOString() };
+  var live = { schema: 1, date: day, stage: index, updatedAt: new Date().toISOString() };
 
-    // only this one file changes (base tree = the current site)
-    var files = {};
-    files[LIVE_FILE] = JSON.stringify(live, null, 2) + '\n';
+  // only this one file changes (base tree = the current site). The commit is
+  // made without the script lock (§18.1): two quick taps land in order
+  // (githubCommitFiles_ retries once on a moved ref) and the last one wins.
+  var files = {};
+  files[LIVE_FILE] = JSON.stringify(live, null, 2) + '\n';
 
-    commit = githubCommitFiles_(files, 'Live stage ' + day + ': ' + (index === null ? 'automatic' : 'stage ' + (index + 1)));
+  var commit = githubCommitFiles_(files, 'Live stage ' + day + ': ' + (index === null ? 'automatic' : 'stage ' + (index + 1)));
 
+  withScriptLock_(20000, function () {
     PropertiesService.getScriptProperties().setProperty('LIVE_STATE', JSON.stringify(live));
     log_(email, 'live.stage', day + ' ' + (index === null ? 'auto' : String(index)) + (commit ? ' ' + commit.sha.slice(0, 7) : ''));
     activity_({ action: 'live.stage', type: 'sessions', id: day, title: day, ref: commit ? commit.sha.slice(0, 7) : '', changes: { stage: index === null ? 'auto' : index + 1 } });
-
-  }
-  finally {
-    lock.releaseLock();
-  }
+  });
 
   return { live: live, commit: commit ? commit.sha : '' };
 

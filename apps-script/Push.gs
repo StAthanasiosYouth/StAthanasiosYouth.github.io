@@ -707,8 +707,22 @@ function apiSendPush(id, sendKey, edits) {
 
   var email = assertAdmin_();
 
+  return pushSendItem_(id, sendKey, email, edits);
+
+}
+
+
+/**
+ * Sends one live bell item to every subscribed device: the admin's button
+ * (apiSendPush) and the automatic schedule (CompSchedule.gs, actor '').
+ * The live site is read and the devices are reached WITHOUT the script lock
+ * (§18.1); the lock covers only the PushLog checks and the "sending" claim.
+ */
+function pushSendItem_(id, sendKey, actor, edits) {
+
   id = String(id || '');
   sendKey = String(sendKey || '');
+  actor = String(actor || '');
 
   if (!/^[\w-]{1,80}$/.test(id) || !/^[\w-]{8,64}$/.test(sendKey)) {
     throw appError_('الطلب مش مفهوم.', 'اعمل Refresh للصفحة.');
@@ -720,21 +734,48 @@ function apiSendPush(id, sendKey, edits) {
     throw pushConfigError_();
   }
 
+  // the same request again (a retry, a double click): its own result, never a second send
+  // (read-only, before anything else; checked again under the lock)
+  var early = pushRows_(pushSheet_(PUSH_LOG_SHEET, PUSH_LOG_COLUMNS), PUSH_LOG_COLUMNS)
+    .filter(function (e) { return String(e.sendKey) === sendKey; })[0];
+
+  if (early) {
+    return pushResult_(pushLogSummary_(early), { replay: true });
+  }
+
+  // the item as visitors see it now (network: no lock)
+  var content = pushLiveContent_();
+  var item = content.notifications.filter(function (n) { return n && n.id === id; })[0];
+
+  if (!item) {
+    throw appError_('الإشعار ده مش على الموقع.', 'انشر الأول، واستنى لحد ما يظهر على الموقع.');
+  }
+
+  var itemState = pushItemState_(content, item, cairoNow_());
+
+  if (itemState !== 'live') {
+    throw appError_(itemState === 'scheduled' ? 'الإشعار ده لسه معاده مجاش.' : 'الإشعار ده مش ظاهر على الموقع دلوقتي.',
+      itemState === 'scheduled' ? 'تقدر تبعته من ' + String(item.publishAt).replace('T', ' ') + '.' : 'اتأكد إنه مش منتهي وإن القسم بتاعه ظاهر.');
+  }
+
+  var message = pushMessage_(item, edits);
+
+  if (!message.title) {
+    throw appError_('العنوان فاضي.', '');
+  }
+
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
 
-  var message;
-  var item;
-  var content;
   var subs;
   var logRow;
+  var now;
 
   try {
 
     var logSheet = pushSheet_(PUSH_LOG_SHEET, PUSH_LOG_COLUMNS);
     var log = pushRows_(logSheet, PUSH_LOG_COLUMNS);
 
-    // the same request again (a retry, a double click): its own result, never a second send
     var replay = log.filter(function (e) { return String(e.sendKey) === sendKey; })[0];
     if (replay) {
       return pushResult_(pushLogSummary_(replay), { replay: true });
@@ -749,7 +790,7 @@ function apiSendPush(id, sendKey, edits) {
       throw appError_('الإشعار ده بيتبعت دلوقتي.', 'استنى دقيقة وبص على السجل.');
     }
 
-    var now = Date.now();
+    now = Date.now();
     var last = log.length ? Number(log[log.length - 1].startedAt) || 0 : 0;
     if (now - last < PUSH_SEND_COOLDOWN_MS) {
       throw appError_('استنى دقيقة بين كل إشعار والتاني.', 'باقي ' + Math.ceil((last + PUSH_SEND_COOLDOWN_MS - now) / 1000) + ' ثانية.');
@@ -760,31 +801,13 @@ function apiSendPush(id, sendKey, edits) {
       throw appError_('وصلنا للحد: ' + PUSH_SENDS_PER_DAY + ' إشعارات في اليوم.', 'الإشعارات الكتير بتخلي الناس تقفلها. كمّل بكرة.');
     }
 
-    content = pushLiveContent_();
-    item = content.notifications.filter(function (n) { return n && n.id === id; })[0];
-
-    if (!item) {
-      throw appError_('الإشعار ده مش على الموقع.', 'انشر الأول، واستنى لحد ما يظهر على الموقع.');
-    }
-
-    var state = pushItemState_(content, item, cairoNow_());
-    if (state !== 'live') {
-      throw appError_(state === 'scheduled' ? 'الإشعار ده لسه معاده مجاش.' : 'الإشعار ده مش ظاهر على الموقع دلوقتي.',
-        state === 'scheduled' ? 'تقدر تبعته من ' + String(item.publishAt).replace('T', ' ') + '.' : 'اتأكد إنه مش منتهي وإن القسم بتاعه ظاهر.');
-    }
-
-    message = pushMessage_(item, edits);
-    if (!message.title) {
-      throw appError_('العنوان فاضي.', '');
-    }
-
     subs = pushRows_(pushSheet_(PUSH_SUBS_SHEET, PUSH_SUBS_COLUMNS), PUSH_SUBS_COLUMNS);
     if (!subs.length) {
       throw appError_('مفيش مشتركين لسه.', 'أول ما حد يفعّل الإشعارات من الموقع هيظهر هنا.');
     }
 
     // claimed before anything goes out: a second request now sees "sending"
-    logSheet.appendRow([sendKey, id, 'sending', plainCell_(email), now, '', subs.length, 0, 0, 0,
+    logSheet.appendRow([sendKey, id, 'sending', plainCell_(actor || 'auto'), now, '', subs.length, 0, 0, 0,
       plainCell_(message.title), plainCell_(message.body), message.url, '']);
     logRow = logSheet.getLastRow();
 
@@ -813,10 +836,10 @@ function apiSendPush(id, sendKey, edits) {
   logSheetAfter.getRange(logRow, 6, 1, 5).setValues([[finished, subs.length, outcome.delivered.length, outcome.failed.length + outcome.skipped, removed]]);
   if (details) logSheetAfter.getRange(logRow, 14).setValue(plainCell_(details));
 
-  log_(email, 'push', id + ': ' + outcome.delivered.length + '/' + subs.length + (removed ? ', removed ' + removed : ''));
+  log_(actor || 'auto', 'push', id + ': ' + outcome.delivered.length + '/' + subs.length + (removed ? ', removed ' + removed : ''));
 
   if (status === 'sent') {
-    activity_({ action: 'push', type: 'notifications', id: id, title: message.title, ref: sendKey, changes: { sent: outcome.delivered.length, audience: subs.length, body: String(message.body || '').slice(0, 120) } });
+    activity_({ action: 'push', type: 'notifications', id: id, title: message.title, ref: sendKey, changes: { sent: outcome.delivered.length, audience: subs.length, body: String(message.body || '').slice(0, 120), auto: actor ? undefined : true } });
   }
 
   if (status === 'failed' && outcome.error) {
@@ -824,7 +847,7 @@ function apiSendPush(id, sendKey, edits) {
   }
 
   return pushResult_({
-    sendKey: sendKey, notifId: id, status: status, by: email, at: now, finishedAt: finished,
+    sendKey: sendKey, notifId: id, status: status, by: actor || 'auto', at: now, finishedAt: finished,
     audience: subs.length, sent: outcome.delivered.length, failed: outcome.failed.length + outcome.skipped, removed: removed,
     title: message.title, url: message.url
   }, {});

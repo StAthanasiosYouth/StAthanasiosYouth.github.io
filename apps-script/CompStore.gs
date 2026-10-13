@@ -12,11 +12,12 @@
  * appends one block. Every written text goes through plainCell_ (no
  * formula injection) and is read back without the protecting apostrophe.
  *
- * Locks: draft tabs under the script lock (admin functions); live tabs
- * (Submissions, and later the ledger / redemptions) under compLock_():
- * LockService.getUserLock() — every API request runs as the owner, so it
- * is one shared mutex, separate from the script lock a publish holds —
- * falling back to the script lock.
+ * Locks: ONE lock, the script lock (docs/COMPETITIONS.md §18.1). Draft tabs
+ * are written by admin functions under it; live tabs (Submissions, the
+ * ledger, redemptions, seasons) under compLock_() = the same script lock,
+ * tried for up to 30 s (then the public answers busy). Critical sections
+ * are short and never make a network call: a publish holds the lock only
+ * for its two short local steps (Publish.gs A / C), never during the commit.
  *
  * Caches (CacheService, never a source of truth): comp:draft (+ comp:draftsig),
  * comp:live:<slug>, comp:def:<compId>:<version>.
@@ -468,22 +469,16 @@ function compDeleteRows_(t, rowNumbers) {
    LOCK FOR THE LIVE TABS
 ========================================================= */
 
-/* the shared mutex for live writes, or null (busy) */
+/* how long a live write waits for the lock (public calls: then busy; pages retry with the same keys) */
+var COMP_LOCK_WAIT_MS = 30000;
+
+/* the script lock for a live write, or null (busy). §18.1: always the script lock. */
 function compLock_(ms) {
 
-  var lock = null;
+  var lock = LockService.getScriptLock();
 
   try {
-    lock = LockService.getUserLock();
-  }
-  catch (ignored) {
-    lock = null;
-  }
-
-  if (!lock) lock = LockService.getScriptLock();
-
-  try {
-    return lock.tryLock(ms || 10000) ? lock : null;
+    return lock.tryLock(ms || COMP_LOCK_WAIT_MS) ? lock : null;
   }
   catch (ignored) {
     return null;
