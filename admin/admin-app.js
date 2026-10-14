@@ -8560,9 +8560,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   };
 
   /* bytes → a download (a copy is kept on A.comp.lastDownload for tests and the console) */
-  C.download = function (bytes, filename) {
+  C.download = function (bytes, filename, type) {
     C.lastDownload = { filename: filename, bytes: bytes };
-    return C.sheets().then(function (m) { m.xlsx.download(bytes, filename); });
+    return C.sheets().then(function (m) { m.xlsx.download(bytes, filename, type); });
   };
 
   /* the spreadsheet helpers (admin/xlsx.js, admin/comp-sheets.js), loaded the first time they're needed */
@@ -11693,14 +11693,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   var ar = C.ar;
 
   var P = A.compPeople = {
-    query: { q: '', group: '', status: 'all', sort: 'name', dir: 'asc', offset: 0, limit: 50 },
+    query: { q: '', group: '', servant: '', church: '', status: 'all', sort: 'name', dir: 'asc', offset: 0, limit: 50 },
+    // «تحديد»: the ids ticked in the list (this page's memory only)
+    selecting: false,
+    selected: {},
     open: '',
     data: null,
     list: null
   };
 
   var REVEAL_MS = 30000;
-  var FIELD_LABELS = { name: 'الاسم', phone: 'رقم الموبايل', group: 'المجموعة', church: 'الكنيسة', notes: 'ملاحظات' };
+  var FIELD_LABELS = { name: 'الاسم', phone: 'رقم الموبايل', group: 'المجموعة', church: 'الكنيسة', servant: 'الخادم المسؤول', notes: 'ملاحظات' };
   var STATUS_WORDS = { in_progress: 'لسه بيحل', submitted: 'اتبعتت', pending_review: 'محتاجة مراجعة', graded: 'اتصححت', void: 'ملغية' };
 
   /* =======================================================
@@ -11861,6 +11864,14 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   };
 
   function personRow(p, wallet) {
+    if (P.selecting) {
+      var tick = el('input', { type: 'checkbox', class: 'import__tick', checked: !!P.selected[p.id], 'aria-label': 'حدد ' + p.name });
+      tick.addEventListener('change', function () { if (tick.checked) P.selected[p.id] = true; else delete P.selected[p.id]; if (P.onSelect) P.onSelect(); });
+      return el('label', { class: 'comp-sub comp-person comp-person--pick', 'data-id': p.id }, tick,
+        el('span', { class: 'comp-sub__who' }, el('bdi', { class: 'comp-sub__name', text: p.name }), el('span', { class: 'comp-sub__phone ltr', text: p.phone })),
+        el('span', { class: 'comp-sub__meta' }, p.group ? A.chip(p.group, 'gold') : null, p.active ? null : A.chip('موقوف', 'danger')),
+        el('span', { class: 'comp-sub__when', text: [p.servant, p.church].filter(Boolean).join(' · ') }));
+    }
     return el('button', { class: 'comp-sub comp-person', type: 'button', 'data-id': p.id, onclick: function () { A.compPerson(p.id); } },
       el('span', { class: 'comp-sub__who' },
         el('bdi', { class: 'comp-sub__name', text: p.name }),
@@ -11873,7 +11884,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         p.active ? null : A.chip('موقوف', 'danger'),
         wallet && p.balance !== undefined ? A.chip(ar(p.balance) + ' نقطة', 'info') : null
       ),
-      el('span', { class: 'comp-sub__when', text: p.church || '' })
+      el('span', { class: 'comp-sub__when', text: [p.servant, p.church].filter(Boolean).join(' · ') })
     );
   }
 
@@ -11883,6 +11894,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var wallet = !!(C.modules && C.modules.wallet);
     var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر بالاسم أو رقم الموبايل…', 'aria-label': 'دوّر في المشاركين', value: q.q });
     var group = el('select', { class: 'input', 'aria-label': 'المجموعة' }, el('option', { value: '', text: 'كل المجموعات' }));
+    var servantPick = el('select', { class: 'input', 'aria-label': 'الخادم المسؤول', hidden: true });
+    var churchPick = el('select', { class: 'input', 'aria-label': 'الكنيسة', hidden: true });
+    var selectBar = el('div', { class: 'comp-select-bar', hidden: true });
     var sort = el('select', { class: 'input', 'aria-label': 'الترتيب' }, [
       { v: 'name:asc', t: 'بالاسم' }, { v: 'group:asc', t: 'بالمجموعة' }, { v: 'createdAt:desc', t: 'الأحدث' }
     ].concat(wallet ? [{ v: 'balance:desc', t: 'الرصيد الأعلى' }] : []).map(function (o) {
@@ -11903,6 +11917,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       timer = setTimeout(function () { q.q = search.value.trim(); q.offset = 0; draw(); }, 120);
     });
     group.addEventListener('change', function () { q.group = group.value; q.offset = 0; draw(); });
+    servantPick.addEventListener('change', function () { q.servant = servantPick.value; q.offset = 0; draw(); });
+    churchPick.addEventListener('change', function () { q.church = churchPick.value; q.offset = 0; draw(); });
     sort.addEventListener('change', function () { var p = sort.value.split(':'); q.sort = p[0]; q.dir = p[1]; q.offset = 0; draw(); });
 
     /* the whole registry, once (≤ 3,000 people: one call); a reopened screen draws the last copy at once, then refreshes */
@@ -11932,6 +11948,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       var needle = A.searchKey(q.q);
       var digits = needle.replace(/\D/g, '').replace(/^(?:0020|20|0)/, '');
       var wantGroup = A.searchKey(q.group);
+      var wantServant = q.servant === '-' ? '-' : A.searchKey(q.servant);
+      var wantChurch = A.searchKey(q.church);
       var counts = { all: items.length, active: 0, inactive: 0 };
       var ages = { ok: 0, soon: 0, out: 0, unknown: 0 };
       items.forEach(function (p) {
@@ -11942,6 +11960,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         if (q.status !== 'all' && (p.active ? 'active' : 'inactive') !== q.status) return false;
         if (q.eligibility && q.eligibility !== 'all' && p.eligibility !== q.eligibility) return false;
         if (wantGroup && A.searchKey(p.group) !== wantGroup) return false;
+        if (wantServant === '-' ? !!p.servant : wantServant && A.searchKey(p.servant) !== wantServant) return false;
+        if (wantChurch && A.searchKey(p.church) !== wantChurch) return false;
         if (needle) {
           var inName = A.searchKey(p.name).indexOf(needle) !== -1;
           var inPhone = digits.length >= 3 && String(p.phone || '').replace(/\D/g, '').indexOf(digits) !== -1;
@@ -11957,6 +11977,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       }[q.sort] || function (p) { return A.searchKey(p.name); };
       found.sort(function (a, b) { var x = key(a); var y = key(b); return x === y ? 0 : (x < y ? -dir : dir); });
       return {
+        found: found,
         items: found.slice(q.offset, q.offset + q.limit), total: found.length, offset: q.offset,
         counts: counts, eligibility: all.eligibility ? ages : null, groups: all.groups, batches: all.batches, modules: all.modules
       };
@@ -11971,6 +11992,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.fill(group, el('option', { value: '', text: 'كل المجموعات' }), (reply.groups || []).map(function (g) {
           return el('option', { value: g.name, selected: g.name === q.group ? 'selected' : null, text: g.name + ' (' + ar(g.count) + ')' });
         }));
+        var servants = P.all.servants || [];
+        servantPick.hidden = !servants.length && !q.servant;
+        A.fill(servantPick, el('option', { value: '', text: 'كل الخدام' }), el('option', { value: '-', selected: q.servant === '-' ? 'selected' : null, text: 'من غير خادم' }), servants.map(function (s) {
+          return el('option', { value: s.name, selected: s.name === q.servant ? 'selected' : null, text: s.name + ' (' + ar(s.count) + ')' });
+        }));
+        var churches = P.all.churches || [];
+        churchPick.hidden = churches.length < 2 && !q.church;
+        A.fill(churchPick, el('option', { value: '', text: 'كل الكنايس' }), churches.map(function (c) {
+          return el('option', { value: c.name, selected: c.name === q.church ? 'selected' : null, text: c.name + ' (' + ar(c.count) + ')' });
+        }));
+        drawSelectBar(reply);
         var counts = reply.counts || { all: 0, active: 0, inactive: 0 };
         // §19.3: by age (reply.eligibility = { ok, soon, out, unknown }); shown once the server knows birth dates
         var ec = (reply.eligibility && typeof reply.eligibility === 'object') ? reply.eligibility : (reply.eligibilityCounts || counts);
@@ -12014,6 +12046,34 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       })();
     }
 
+    /* who an export / a distribution is for: the ticked ones, else what the filters show */
+    function scope() {
+      var all = (P.all && P.all.items) || [];
+      if (Object.keys(P.selected).length) {
+        var picked = all.filter(function (p) { return P.selected[p.id]; });
+        return { people: picked, label: 'المحددين (' + ar(picked.length) + ')' };
+      }
+      var found = (P.list && P.list.found) || all;
+      return { people: found, label: (found.length !== all.length ? 'اللي ظاهرين بالفلتر' : 'كل المشاركين') + ' (' + ar(found.length) + ')' };
+    }
+
+    function drawSelectBar(reply) {
+      selectBar.hidden = !P.selecting;
+      if (!P.selecting) return;
+      var n = Object.keys(P.selected).length;
+      var shown = reply.found || [];
+      var ids = function () { return Object.keys(P.selected); };
+      A.fill(selectBar,
+        el('span', { class: 'comp-select-bar__n', role: 'status', text: 'محدد: ' + ar(n) }),
+        el('div', { class: 'actions' },
+          el('button', { class: 'btn btn--small btn--ghost', type: 'button', 'data-act': 'select-shown', onclick: function () { shown.forEach(function (p) { P.selected[p.id] = true; }); draw(); } }, 'حدد اللي ظاهرين (' + ar(shown.length) + ')'),
+          n ? el('button', { class: 'btn btn--small btn--ghost', type: 'button', 'data-act': 'select-none', onclick: function () { P.selected = {}; draw(); } }, 'شيل التحديد') : null,
+          n ? el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'assign', onclick: function () { openAssign(ids(), load); } }, icon('user'), 'حدد الخادم المسؤول') : null,
+          n ? el('button', { class: 'btn btn--small btn--danger', type: 'button', 'data-act': 'reset-codes', onclick: function (e) { resetCodes(ids(), e.currentTarget, load); } }, icon('retry'), 'كود جديد للمحددين') : null));
+    }
+
+    P.onSelect = function () { if (P.list) drawSelectBar(P.list); };
+
     // the last copy draws at once (a reopened screen); the fresh one replaces it
     if (P.all) draw();
     load();
@@ -12022,10 +12082,22 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       A.card('المشاركين', 'كل مشترك ليه كود خاص بيه (ATH-…) بيدخل بيه المسابقات بالأكواد وصفحة «نقاطي».',
         el('div', { class: 'actions' },
           el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { openEditor(null); } }, icon('plus'), 'مشارك جديد'),
-          el('button', { class: 'btn', type: 'button', onclick: function () { openImport(); } }, icon('upload'), 'استيراد أسماء'),
+          el('button', { class: 'btn', type: 'button', onclick: function () { openImport(); } }, icon('upload'), 'استيراد / تحديث'),
           el('button', { class: 'btn btn--ghost', type: 'button', onclick: function (e) { downloadTemplate(e.currentTarget); } }, icon('download'), 'تحميل نموذج الأسماء')
         ),
-        el('div', { class: 'comp-subs__tools' }, search, group, sort),
+        el('div', { class: 'actions' },
+          el('button', { class: 'btn btn--ghost', type: 'button', 'data-act': 'export-data', onclick: function () { openExport(scope()); } }, icon('download'), 'تصدير البيانات الحالية'),
+          el('button', { class: 'btn btn--ghost', type: 'button', 'data-act': 'distribute', onclick: function () { openDistribute(scope()); } }, icon('whatsapp'), 'توزيع الأكواد'),
+          el('button', { class: 'btn btn--ghost', type: 'button', 'data-act': 'select', 'aria-pressed': String(P.selecting), onclick: function (e) {
+            P.selecting = !P.selecting;
+            if (!P.selecting) P.selected = {};
+            e.currentTarget.setAttribute('aria-pressed', String(P.selecting));
+            e.currentTarget.lastChild.textContent = P.selecting ? 'خلّص التحديد' : 'تحديد';
+            draw();
+          } }, icon('check'), P.selecting ? 'خلّص التحديد' : 'تحديد')
+        ),
+        el('div', { class: 'comp-subs__tools' }, search, group, servantPick, churchPick, sort),
+        selectBar,
         chips,
         ages,
         box,
@@ -12050,14 +12122,155 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     ];
   }
 
+  /* the names in use (the template's and the export's dropdowns) */
+  function lists() {
+    var names = function (key) { return ((P.all && P.all[key]) || []).map(function (x) { return x.name; }); };
+    return { groups: names('groups'), churches: names('churches'), servants: names('servants') };
+  }
+
   function downloadTemplate(button) {
-    var run = kit().then(function (m) { return C.download(m.xlsx.writeXlsx(m.sheets.peopleTemplate()), 'نموذج-الأسماء.xlsx'); });
+    var run = kit().then(function (m) { return C.download(m.xlsx.writeXlsx(m.sheets.peopleTemplate(lists())), 'نموذج-الأسماء.xlsx'); });
     A.withBusy(button, run).then(function () {
       A.toast('النموذج نزل ✓ — املا ورقة «الأسماء» (فيها شرح ومثال) وارفعه من «استيراد أسماء»');
     }).catch(function (error) { A.fail(error); });
   }
 
   P.downloadTemplate = downloadTemplate;
+
+
+  /* =======================================================
+     EXPORT → EDIT → RE-IMPORT, «توزيع الأكواد», BULK CHANGES
+  ======================================================= */
+
+  /* «تصدير البيانات الحالية»: the template's layout, matched back by «رقم المشترك»; codes only when ticked */
+  function openExport(sc) {
+    var people = sc.people || [];
+    var withCodes = el('input', { type: 'checkbox', 'data-field': 'with-codes' });
+    var warn = el('p', { class: 'note note--warn', hidden: true, text: 'الملف هيبقى فيه أكواد: متبعتوش لحد، واحفظه في مكان أمين. التصدير ده بيتسجل في «سجل النشاط» (العدد بس).' });
+    withCodes.addEventListener('change', function () { warn.hidden = !withCodes.checked; });
+    var go = el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'export-go' }, icon('download'), 'نزّل الملف');
+    go.addEventListener('click', function () {
+      if (!people.length) { A.toast('مفيش حد في الاختيار ده.', 'info'); return; }
+      var codes = withCodes.checked;
+      var run = Promise.all([kit(), codes ? A.call('apiParticipantCodes', { ids: people.map(function (p) { return p.id; }) }) : null]).then(function (got) {
+        var m = got[0];
+        var byId = null;
+        if (got[1]) { byId = {}; (got[1].rows || []).forEach(function (r) { byId[r.id] = r.code; }); }
+        return C.download(m.xlsx.writeXlsx(m.sheets.peopleBook(people, { codes: byId, lists: lists() })), m.sheets.peopleFilename(A.cairoNow(), !!byId));
+      });
+      A.withBusy(go, run).then(function () {
+        A.closeSheet();
+        A.toast(codes ? 'الملف نزل ✓ (فيه أكواد: احفظه في مكان أمين)' : 'الملف نزل ✓ — عدّله وارفعه من «استيراد / تحديث»');
+      }).catch(function (error) { A.fail(error); });
+    });
+    A.openSheet('تصدير البيانات', [
+      el('p', { class: 'note', text: 'هيتصدّر: ' + sc.label + '. نفس شكل النموذج: عدّل الأسماء والأرقام والمجموعات والخادم المسؤول في إكسل أو جوجل شيت، وارفع الملف من «استيراد / تحديث». «رقم المشترك» بيربط كل صف بصاحبه، فالكود بيفضل زي ما هو.' }),
+      el('label', { class: 'check' }, withCodes, el('span', { text: 'ضمّن الأكواد في الملف' })),
+      warn
+    ], [go, el('button', { class: 'btn btn--ghost', type: 'button', text: 'إلغاء', onclick: function () { A.closeSheet(); } })]);
+  }
+
+  /* «توزيع الأكواد»: a file per servant (or group / church) with only their people, a ready message each */
+  function openDistribute(sc) {
+    var all = sc.people || [];
+    var by = 'servant';
+    var onlyActive = el('input', { type: 'checkbox', checked: true, 'data-field': 'only-active' });
+    var bucketsNode = el('div', { class: 'comp-dist__buckets', 'aria-live': 'polite' });
+    var people = function () { return onlyActive.checked ? all.filter(function (p) { return p.active !== false; }) : all; };
+    var ids = function () { return people().map(function (p) { return p.id; }); };
+    var drawBuckets = function () {
+      kit().then(function (m) {
+        var list = m.sheets.buckets(people(), by);
+        A.fill(bucketsNode, list.length ? el('ul', { class: 'list' }, list.map(function (b) {
+          return el('li', { class: 'item', 'data-bucket': b.name },
+            el('span', { class: 'item__icon', 'aria-hidden': 'true' }, icon(by === 'servant' && !/^من غير/.test(b.name) ? 'user' : 'users')),
+            el('div', { class: 'item__main' }, el('span', { class: 'item__title', text: b.name }), el('span', { class: 'item__sub item__sub--rtl', text: ar(b.people.length) + ' مشترك' })));
+        })) : el('p', { class: 'empty', text: 'مفيش حد في الاختيار ده.' }));
+      }).catch(function () {});
+    };
+    var ways = el('div', { class: 'filter-chips', role: 'group', 'aria-label': 'قسّم حسب' }, [['servant', 'الخادم المسؤول'], ['group', 'المجموعة'], ['church', 'الكنيسة'], ['one', 'ملف واحد']].map(function (w) {
+      return el('button', { class: 'filter-chip', type: 'button', 'data-by': w[0], 'aria-pressed': String(w[0] === by), onclick: function () {
+        by = w[0];
+        Array.prototype.forEach.call(ways.children, function (b) { b.setAttribute('aria-pressed', String(b.dataset.by === by)); });
+        drawBuckets();
+      } }, w[1]);
+    }));
+    onlyActive.addEventListener('change', drawBuckets);
+    var files = el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'distribute-files' }, icon('download'), 'نزّل الملفات');
+    files.addEventListener('click', function () {
+      if (!ids().length) { A.toast('مفيش حد في الاختيار ده.', 'info'); return; }
+      var run = Promise.all([kit(), A.call('apiParticipantCodes', { ids: ids() })]).then(function (got) {
+        var m = got[0];
+        var day = A.cairoNow().slice(0, 10);
+        var made = m.sheets.distributionFiles(got[1].rows || [], { by: by, url: P.portalUrl(), date: day });
+        if (made.length === 1) return C.download(m.xlsx.writeXlsx(made[0].book), made[0].filename).then(function () { return made; });
+        var packed = m.xlsx.zip(made.map(function (f) { return { name: f.filename, data: m.xlsx.writeXlsx(f.book) }; }));
+        return C.download(packed, 'توزيع-الأكواد-' + day + '.zip', 'application/zip').then(function () { return made; });
+      });
+      A.withBusy(files, run).then(function (made) {
+        A.modal({
+          tone: 'warn',
+          title: made.length === 1 ? 'الملف نزل ✓' : ar(made.length) + ' ملف نزلوا ✓ (في ملف zip)',
+          message: 'كل ملف فيه أكواد ناس معيّنة بس: ابعت كل ملف للخادم بتاعه هو بس، ومتبعتش الـ zip كله لحد. في كل ملف رسالة واتساب جاهزة لكل واحد وطريقة الإرسال.',
+          actions: [{ label: 'تمام', value: true, kind: 'primary', autofocus: true }]
+        });
+      }).catch(function (error) { A.fail(error); });
+    });
+    var screen = el('button', { class: 'btn', type: 'button', 'data-act': 'distribute-screen' }, icon('eye'), 'اعرضهم هنا');
+    screen.addEventListener('click', function (e) {
+      if (!ids().length) { A.toast('مفيش حد في الاختيار ده.', 'info'); return; }
+      showCodes({ ids: ids() }, e.currentTarget, by);
+    });
+    drawBuckets();
+    A.openSheet('توزيع الأكواد', [
+      el('p', { class: 'note', text: 'لـ: ' + sc.label + '. كل خادم ياخد ملف فيه الناس اللي هو مسؤول عنهم بس: الاسم والموبايل والكود ورسالة واتساب جاهزة. اللي مالوش خادم بيتجمع حسب مجموعته.' }),
+      A.field('قسّم حسب', ways),
+      el('label', { class: 'check' }, onlyActive, el('span', { text: 'النشطين بس (كود الموقوف مش شغال)' })),
+      bucketsNode,
+      el('p', { class: 'field__hint', text: 'الأكواد بتظهر بس في الملفات أو الشاشة دي، ومش بتتحط في أي لينك أو QR. كل توزيع بيتسجل في «سجل النشاط» (العدد بس).' })
+    ], [files, screen, el('button', { class: 'btn btn--ghost', type: 'button', text: 'إلغاء', onclick: function () { A.closeSheet(); } })], { className: 'sheet--import' });
+  }
+
+  /* «حدد الخادم المسؤول» for the ticked ones (one write) */
+  function openAssign(ids, after) {
+    var box = A.errorBox();
+    var listNode = el('datalist', { id: A.uid('servants') }, ((P.all && P.all.servants) || []).map(function (s) { return el('option', { value: s.name }); }));
+    var input = A.textInput('', { max: 60, placeholder: 'مثلاً: أ. بيتر سمير' });
+    input.setAttribute('list', listNode.id);
+    var save = el('button', { class: 'btn btn--primary', type: 'button', text: 'احفظ' });
+    save.addEventListener('click', function () {
+      box.hidden = true;
+      var value = input.value.trim();
+      var ask = value ? Promise.resolve(true) : A.confirm({ tone: 'warn', title: 'تشيل الخادم المسؤول؟', message: 'الخانة فاضية: هيتشال الخادم المسؤول من ' + ar(ids.length) + ' مشترك.', confirmLabel: 'شيله', cancelLabel: 'لأ' });
+      ask.then(function (ok) {
+        if (!ok) return;
+        A.withBusy(save, A.call('apiParticipantsAssign', ids, { servant: value })).then(function (reply) {
+          A.dirty = false;
+          A.closeSheet();
+          A.toast(reply.count ? 'اتحدّث ' + ar(reply.count) + ' مشترك ✓' : 'مفيش حاجة اتغيرت');
+          if (after) after();
+        }).catch(function (error) { A.fail(error, box); });
+      });
+    });
+    A.openSheet('الخادم المسؤول لـ ' + ar(ids.length) + ' مشترك', [box, el('div', { class: 'form' }, A.field('الخادم المسؤول', input, 'اختار من الموجود أو اكتب اسم جديد'), listNode)], A.sheetFooter(save));
+  }
+
+  /* «كود جديد للمحددين»: the old codes stop at once (a leaked list) */
+  function resetCodes(ids, button, after) {
+    A.confirm({
+      tone: 'danger',
+      title: 'تعمل أكواد جديدة لـ ' + ar(ids.length) + ' مشترك؟',
+      message: 'أكوادهم القديمة هتبطل فورًا، واللي داخل «نقاطي» منهم هيخرج. بعدها وزّع الأكواد الجديدة من «توزيع الأكواد».',
+      confirmLabel: 'اعمل أكواد جديدة',
+      cancelLabel: 'لأ'
+    }).then(function (ok) {
+      if (!ok) return;
+      A.withBusy(button, A.call('apiParticipantsResetCodes', ids)).then(function (reply) {
+        A.toast('اتعمل ' + ar(reply.count) + ' كود جديد ✓ — وزّعهم من «توزيع الأكواد»');
+        if (after) after();
+      }).catch(function (error) { A.fail(error); });
+    });
+  }
 
 
   /* =======================================================
@@ -12086,8 +12299,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var phone = A.textInput(person.phone, { ltr: true, type: 'tel', inputmode: 'tel', placeholder: '01012345678', max: 30 });
     var said = el('span', { class: 'field__hint comp-phone-said', role: 'status', 'aria-live': 'polite' });
     var groupsList = el('datalist', { id: A.uid('groups') }, ((P.list && P.list.groups) || []).map(function (g) { return el('option', { value: g.name }); }));
-    var group = A.textInput(person.group, { max: 40, placeholder: 'مثلاً: ثانوي بنين' });
+    var group = A.textInput(person.group, { max: 40, placeholder: 'مثلاً: مجموعة الكليات' });
     group.setAttribute('list', groupsList.id);
+    var servantsList = el('datalist', { id: A.uid('servants') }, ((P.all && P.all.servants) || []).map(function (s) { return el('option', { value: s.name }); }));
+    var servant = A.textInput(person.servant, { max: 60, placeholder: 'مثلاً: أ. بيتر سمير' });
+    servant.setAttribute('list', servantsList.id);
     var church = A.counted('الكنيسة', person.church, 60, 'اختياري');
     var birth = P.birthSelects(person.birthDate);
     var notes = A.counted('ملاحظات', person.notes, 300, 'للخدام بس — مش بتظهر للمشترك', { multiline: true, rows: 2 });
@@ -12109,7 +12325,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       box.hidden = true;
       var born = birth.value();
       if (born === null) { A.fail(new Error('تاريخ الميلاد: اختار اليوم والشهر والسنة (أو سيبهم فاضيين)'), box); return; }
-      var input = { name: name.input.value, phone: phone.value, group: group.value, church: church.input.value, notes: notes.input.value, birthDate: born };
+      var input = { name: name.input.value, phone: phone.value, group: group.value, church: church.input.value, servant: servant.value, notes: notes.input.value, birthDate: born };
       if (!isNew) input.id = person.id;
       A.withBusy(save, A.call('apiParticipantSave', input)).then(function (reply) {
         A.dirty = false;
@@ -12145,6 +12361,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.field('المجموعة', group, 'اختار من الموجود أو اكتب جديدة'),
         groupsList,
         church.node,
+        A.field('الخادم المسؤول', servant, 'اختياري: اللي هيتابعه ويبعتله كوده («توزيع الأكواد»)'),
+        servantsList,
         A.field('تاريخ الميلاد', birth.node, 'اختياري: بيحدد السن ومين مناسب لنظام النقاط (من «الإعدادات»).'),
         notes.node,
         isNew ? el('p', { class: 'note', text: 'الكود بيتعمل لوحده أول ما تحفظ، وتقدر تعرضه أو تبعته على واتساب من صفحة المشترك.' }) : null
@@ -12242,6 +12460,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       el('dl', { class: 'kv' },
         el('dt', { text: 'الموبايل' }), el('dd', {}, el('a', { class: 'ltr', href: 'tel:' + p.phoneIntl, text: p.phone })),
         p.church ? el('dt', { text: 'الكنيسة' }) : null, p.church ? el('dd', { text: p.church }) : null,
+        p.servant ? el('dt', { text: 'الخادم المسؤول' }) : null, p.servant ? el('dd', { text: p.servant }) : null,
         p.notes ? el('dt', { text: 'ملاحظات' }) : null, p.notes ? el('dd', { text: p.notes }) : null,
         el('dt', { text: 'تاريخ الميلاد' }), el('dd', { text: p.birthDate ? dateText(p.birthDate) + (ageText(p) ? ' — ' + ageText(p) : '') : 'مش متسجل' }),
         p.leavesAt ? el('dt', { text: 'بيخرج من السن' }) : null, p.leavesAt ? el('dd', { text: dateText(p.leavesAt) }) : null,
@@ -12390,8 +12609,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
      CODES OF A SELECTION: shown (masked first), exported, printed
   ======================================================= */
 
-  function showCodes(sel, button) {
-    A.withBusy(button, A.call('apiParticipantCodes', sel)).then(function (reply) {
+  /* by (optional): grouped per servant / group / church, each with «نسخ كل الرسايل» */
+  function showCodes(sel, button, by) {
+    A.withBusy(button, Promise.all([A.call('apiParticipantCodes', sel), kit()])).then(function (got) {
+      var reply = got[0];
+      var m = got[1];
       var open = false;
       var rows = reply.rows || [];
       var spans = [];
@@ -12401,7 +12623,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         spans.forEach(function (s) { s.node.textContent = open ? s.code : 'ATH-••••-••••'; s.node.dataset.masked = String(!open); });
         toggle.lastChild.textContent = open ? 'خبّي الأكواد' : 'إظهار الأكواد';
       });
-      var list = el('ul', { class: 'import__list comp-codes' }, rows.map(function (r) {
+      var rowNode = function (r) {
         var code = el('span', { class: 'comp-code comp-code--small', dir: 'ltr', 'data-masked': 'true', text: 'ATH-••••-••••' });
         spans.push({ node: code, code: r.code });
         return el('li', { class: 'import__row comp-codes__row', 'data-id': r.id },
@@ -12414,7 +12636,16 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
             el('div', { class: 'actions' },
               el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'نسخ كود ' + r.name, onclick: function () { C.copy(r.code, 'الكود اتنسخ ✓'); } }, icon('copy')),
               el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'ابعت كود ' + r.name + ' على واتساب', onclick: function () { P.sendWhatsApp(r, r.code).catch(function (error) { A.fail(error); }); } }, icon('whatsapp')))));
-      }));
+      };
+      var list = by ? m.sheets.buckets(rows, by).map(function (b) {
+        return el('section', { class: 'comp-dist__bucket', 'data-bucket': b.name },
+          el('div', { class: 'comp-dist__head' },
+            el('p', { class: 'section-label', text: b.name + ' (' + ar(b.people.length) + ')' }),
+            el('button', { class: 'btn btn--small btn--ghost', type: 'button', 'data-act': 'copy-bucket', onclick: function () {
+              C.copy(m.sheets.messagesText(b.people, P.portalUrl()), 'اتنسخت رسايل «' + b.name + '» ✓ — ابعتها للخادم بتاعهم بس');
+            } }, icon('copy'), 'نسخ كل الرسايل')),
+          el('ul', { class: 'import__list comp-codes' }, b.people.map(rowNode)));
+      }) : el('ul', { class: 'import__list comp-codes' }, rows.map(rowNode));
       A.dirty = false;
       A.openSheet('الأكواد (' + ar(rows.length) + ')', [
         el('p', { class: 'note', text: 'الأكواد مستخبية لحد ما تدوس «إظهار». كل واحد يستلم كوده لوحده (نسخ أو واتساب). اللي بيشوف الأكواد بيتسجل في «سجل النشاط».' }),
@@ -12562,7 +12793,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     if (/\.xlsx$/i.test(file.name || '') || /spreadsheetml/.test(file.type || '')) {
       return Promise.all([kit(), file.arrayBuffer()]).then(function (got) {
         return got[0].xlsx.readXlsx(new Uint8Array(got[1])).then(function (book) {
-          return got[0].xlsx.rowsToTsv(got[0].xlsx.firstDataSheet(book, got[0].sheets.PEOPLE_SHEET).rows);
+          var rows = got[0].xlsx.firstDataSheet(book, got[0].sheets.PEOPLE_SHEET).rows;
+          // a «الكود» column never leaves this page (the server ignores it too)
+          var drop = (rows[0] || []).map(function (cell, i) { return /^\s*(الكود|كود|code)\s*$/i.test(String(cell)) ? i : -1; }).filter(function (i) { return i >= 0; });
+          if (drop.length) rows = rows.map(function (row) { return row.filter(function (_, i) { return drop.indexOf(i) === -1; }); });
+          P.codeColumnDropped = drop.length > 0;
+          return got[0].xlsx.rowsToTsv(rows);
         });
       });
     }
@@ -12573,7 +12809,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   function openImport(prefill) {
 
     var box = A.errorBox();
-    var text = A.textInput(prefill || '', { multiline: true, rows: 6, placeholder: 'الاسم بالكامل\tرقم الموبايل\tالمجموعة / الفصل\nمارك ميلاد عزيز\t01012345678\tثانوي بنين' });
+    if (!prefill) P.codeColumnDropped = false;
+    var text = A.textInput(prefill || '', { multiline: true, rows: 6, placeholder: 'الاسم بالكامل\tرقم الموبايل\tالمجموعة\nمارك ميلاد عزيز\t01012345678\tمجموعة الكليات' });
     text.classList.add('import__paste');
     text.setAttribute('dir', 'auto');
     var file = el('input', { class: 'import__file', type: 'file', accept: '.xlsx,.csv,.tsv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain' });
@@ -12583,7 +12820,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     file.addEventListener('change', function () {
       var chosen = file.files && file.files[0];
       if (!chosen) return;
-      if (chosen.size > 3 * 1024 * 1024) { A.fail(new Error('الملف كبير قوي. قسّمه (لحد ٥٠٠ اسم في المرة).'), box); return; }
+      if (chosen.size > 3 * 1024 * 1024) { A.fail(new Error('الملف كبير قوي. قسّمه (لحد ٣٠٠٠ اسم في المرة).'), box); return; }
       box.hidden = true;
       fileName.textContent = 'بنقرا ' + chosen.name + '…';
       P.readFile(chosen).then(function (content) {
@@ -12605,14 +12842,14 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     A.dirty = !!prefill;
 
-    A.openSheet('استيراد أسماء', [
+    A.openSheet('استيراد / تحديث', [
       box,
       el('div', { class: 'form' },
-        el('p', { class: 'note', text: 'نزّل النموذج، املا ورقة «الأسماء» (الاسم بالكامل والموبايل لازم)، واختار الملف هنا — أو انسخ الصفوف ومعاها العناوين والصقها. قبل أي حفظ هتشوف كل صف وسببه.' }),
+        el('p', { class: 'note', text: 'لأسماء جديدة: نزّل النموذج واملاه. لتعديل الموجودين: نزّل «تصدير البيانات الحالية»، عدّل في الملف (متلمسش «رقم المشترك»)، وارفعه هنا. قبل أي حفظ هتشوف كل صف وإيه اللي هيتغير.' }),
         el('div', { class: 'actions' }, el('button', { class: 'btn', type: 'button', onclick: function (e) { downloadTemplate(e.currentTarget); } }, icon('download'), 'تحميل نموذج الأسماء')),
         A.field('اختار ملف إكسل (xlsx) أو CSV', el('div', { class: 'import__pick' }, file, fileName)),
-        A.field('أو الصق الصفوف هنا', text, 'العناوين: الاسم بالكامل، رقم الموبايل، المجموعة / الفصل، الكنيسة، ملاحظات'),
-        el('p', { class: 'field__hint', text: 'كل مشترك جديد بياخد كود خاص بيه. اللي متسجلين قبل كده بيفضل كودهم زي ما هو.' })
+        A.field('أو الصق الصفوف هنا', text, 'العناوين: الاسم بالكامل، رقم الموبايل، المجموعة، الكنيسة، الخادم المسؤول، تاريخ الميلاد، ملاحظات'),
+        el('p', { class: 'field__hint', text: 'كل مشترك جديد بياخد كود خاص بيه. اللي متسجلين قبل كده بيفضل رقمهم وكودهم زي ما هما. خانة فاضية مش بتمسح حاجة؛ «-» بتمسح.' })
       )
     ], [preview, el('button', { class: 'btn btn--ghost', type: 'button', text: 'إلغاء', onclick: function () { A.closeSheet(); } })], { className: 'sheet--import' });
 
@@ -12623,6 +12860,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   var KIND_FILTERS = [
     { key: 'all', label: 'الكل' },
     { key: 'new', label: 'جديد ✓', kind: 'ok' },
+    { key: 'update', label: 'هيتحدّث', kind: 'gold' },
+    { key: 'stale', label: 'اتعدّل بعد التصدير', kind: 'gold' },
     { key: 'exists', label: 'موجود بالفعل', kind: 'off' },
     { key: 'dup', label: 'مكرر في الملف', kind: 'off' },
     { key: 'sharedPhone', label: 'رقم مشترك', kind: 'gold' },
@@ -12632,7 +12871,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   function rowIs(row, key) {
     if (key === 'all') return true;
-    if (key === 'sharedPhone' || key === 'sameName') return (row.warnings || []).some(function (w) { return w.kind === key; });
+    if (key === 'sharedPhone' || key === 'sameName' || key === 'stale') return (row.warnings || []).some(function (w) { return w.kind === key; });
+    if (key === 'update') return row.status === 'exists' && (row.changes || []).length > 0;
     return row.status === key;
   }
 
@@ -12649,7 +12889,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     rows.forEach(function (row) { picks[row.line] = row.ticked && row.choices.length ? row.choices[0].value : ''; });
 
-    var counts = { all: rows.length, new: s.new || 0, exists: s.exists || 0, dup: s.dup || 0, error: s.error || 0, sharedPhone: (s.warnings || {}).sharedPhone || 0, sameName: (s.warnings || {}).sameName || 0 };
+    var counts = { all: rows.length, new: s.new || 0, update: s.update || 0, stale: (s.warnings || {}).stale || 0, exists: rows.filter(function (r) { return r.status === 'exists'; }).length, dup: s.dup || 0, error: s.error || 0, sharedPhone: (s.warnings || {}).sharedPhone || 0, sameName: (s.warnings || {}).sameName || 0 };
     var chips = el('div', { class: 'filter-chips comp-import__kinds', role: 'group', 'aria-label': 'اعرض' }, KIND_FILTERS.filter(function (f) { return f.key === 'all' || counts[f.key]; }).map(function (f) {
       return el('button', { class: 'filter-chip', type: 'button', 'data-filter': f.key, 'aria-pressed': String(f.key === filter), onclick: function () {
         filter = f.key;
@@ -12688,7 +12928,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       if (row.status === 'exists') {
         lines.push(el('span', { class: 'field__hint', text: (row.reason || 'متسجل قبل كده') + (row.match ? ': ' + row.match.name + (row.match.group ? ' (' + row.match.group + ')' : '') + (row.match.status === 'inactive' ? ' — موقوف' : '') : '') }));
         (row.changes || []).forEach(function (c) {
-          lines.push(el('span', { class: 'import__change' }, el('strong', { text: c.label + ': ' }), el('del', { text: (c.field === 'birthDate' ? dateText(c.from) : c.from) || '(فاضي)' }), ' ← ', el('ins', { text: c.field === 'birthDate' ? dateText(c.to) || c.to : c.to })));
+          lines.push(el('span', { class: 'import__change' }, el('strong', { text: c.label + ': ' }), el('del', { text: (c.field === 'birthDate' ? dateText(c.from) : c.from) || '(فاضي)' }), ' ← ', el('ins', { text: c.to === '' ? '(هيتمسح)' : c.field === 'birthDate' ? dateText(c.to) || c.to : c.to })));
         });
       }
       if (row.status === 'dup') lines.push(el('span', { class: 'field__hint', text: 'مكرر في الملف: ' + (row.reason || '') + ' — هيتضاف مرة واحدة بس' }));
@@ -12728,18 +12968,18 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       button.addEventListener('click', function () {
         button.hidden = true;
         holder.hidden = false;
-        var current = fixes[row.line] || { name: row.name, phone: row.phone, group: row.group, church: row.church, birthDate: row.birthDate || '' };
+        var current = fixes[row.line] || { name: row.name, phone: row.phone, group: row.group, church: row.church, servant: row.servant || '', birthDate: row.birthDate || '' };
         var make = function (key, label, ltr) {
           var input = el('input', { class: 'input' + (ltr ? ' input--ltr' : ''), dir: ltr ? 'ltr' : null, value: current[key] || '', 'aria-label': label + ' (صف ' + ar(row.line) + ')', 'data-fix': key });
           input.addEventListener('input', function () {
-            fixes[row.line] = fixes[row.line] || { name: row.name, phone: row.phone, group: row.group, church: row.church, birthDate: row.birthDate || '' };
+            fixes[row.line] = fixes[row.line] || { name: row.name, phone: row.phone, group: row.group, church: row.church, servant: row.servant || '', birthDate: row.birthDate || '' };
             fixes[row.line][key] = input.value;
             A.markDirty();
             count();
           });
           return el('label', { class: 'comp-import__fix-field' }, el('span', { class: 'field__label', text: label }), input);
         };
-        A.fill(holder, make('name', 'الاسم'), make('phone', 'الموبايل', true), make('group', 'المجموعة'), make('church', 'الكنيسة'), make('birthDate', 'تاريخ الميلاد (يوم/شهر/سنة)', true));
+        A.fill(holder, make('name', 'الاسم'), make('phone', 'الموبايل', true), make('group', 'المجموعة'), make('church', 'الكنيسة'), make('servant', 'الخادم المسؤول'), make('birthDate', 'تاريخ الميلاد (يوم/شهر/سنة)', true));
         holder.querySelector('input').focus();
       });
       return [button, holder];
@@ -12778,12 +13018,13 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       var run = kit().then(function (m) {
         var edited = rows.map(function (row) {
           var fix = fixes[row.line];
-          return { name: fix ? fix.name : row.name, phone: fix ? fix.phone : row.phone, group: fix ? fix.group : row.group, church: fix ? fix.church : row.church, birthDate: fix ? fix.birthDate : (row.birthDate || ''), notes: row.notes };
+          return { id: row.id, rev: row.rev, clears: row.clears, name: fix ? fix.name : row.name, phone: fix ? fix.phone : row.phone, group: fix ? fix.group : row.group, church: fix ? fix.church : row.church, servant: fix ? fix.servant : (row.servant || ''), birthDate: fix ? fix.birthDate : (row.birthDate || ''), notes: row.notes };
         });
         var columns = (result.columns || []).slice();
         if (Object.keys(fixes).some(function (k) { return fixes[k].group; }) && columns.indexOf('group') === -1) columns.push('group');
         if (Object.keys(fixes).some(function (k) { return fixes[k].church; }) && columns.indexOf('church') === -1) columns.push('church');
         if (Object.keys(fixes).some(function (k) { return fixes[k].birthDate; }) && columns.indexOf('birthDate') === -1) columns.push('birthDate');
+        if (Object.keys(fixes).some(function (k) { return fixes[k].servant; }) && columns.indexOf('servant') === -1) columns.push('servant');
         var text = m.sheets.peopleText(edited, columns);
         return A.call('apiParticipantsImportPreview', text).then(function (next) { return { text: text, next: next }; });
       });
@@ -12817,6 +13058,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       box,
       (result.problems || []).length ? el('div', { class: 'note note--warn' }, result.problems.map(function (p) { return el('p', { text: p }); })) : null,
       (result.ignored || []).length ? el('p', { class: 'field__hint', text: 'أعمدة مش معروفة (اتجاهلت): ' + result.ignored.join('، ') }) : null,
+      result.codeIgnored || P.codeColumnDropped ? el('p', { class: 'field__hint', 'data-note': 'codes', text: 'عمود «الكود» اتجاهل: الأكواد بتتعمل من لوحة التحكم بس، ومش بتتغير من ملف.' }) : null,
+      result.hiddenSame ? el('p', { class: 'field__hint', 'data-note': 'same', text: ar(result.hiddenSame) + ' صف زي ما هما بالظبط (مش معروضين، ومش هيتغيروا).' }) : null,
+      s.update ? el('p', { class: 'note', text: 'الصفوف اللي فيها «رقم المشترك» بتتربط بنفس المشترك: الاسم والرقم ممكن يتغيروا والكود بيفضل زي ما هو. راجع التغييرات قبل التسجيل.' }) : null,
+      (s.warnings || {}).stale ? el('p', { class: 'note note--warn', text: 'فيه مشتركين اتعدّلوا في لوحة التحكم بعد ما الملف اتصدّر: مش متعلّم عليهم. قارن وعلّم بإيدك لو الملف هو الصح.' }) : null,
       chips,
       s.error ? el('div', { class: 'note' }, el('p', { class: 'note__title', text: 'صلّح الصفوف اللي فيها «خطأ»' }),
         el('p', { text: 'دوس «صلّح الصف ده» واكتب الصح، وبعدين «راجع تاني بالتعديلات» — أو صلّح الملف وارفعه تاني. الصفوف دي مش هتتسجل لحد ما تتصلح.' })) : null,

@@ -39,7 +39,7 @@ var COMP_TABLES = {
     'correctCount', 'gradableCount', 'pendingCount', 'flags', 'answers', 'grading', 'reviewedBy', 'updatedAt'],
   // Phase 2 / 3 (created by their modules on first use)
   Participants: ['id', 'name', 'nameNorm', 'phone', 'phoneNorm', 'group', 'church', 'notes', 'status', 'codeHash', 'codeEnc',
-    'codeVersion', 'codeIssuedAt', 'codeIssuedBy', 'importBatch', 'createdBy', 'createdAt', 'updatedAt', 'birthDate'],
+    'codeVersion', 'codeIssuedAt', 'codeIssuedBy', 'importBatch', 'createdBy', 'createdAt', 'updatedAt', 'birthDate', 'servant'],
   PointsLedger: ['id', 'participantId', 'amount', 'kind', 'refType', 'refId', 'compId', 'note', 'idemKey', 'actor', 'createdAt', 'seasonId'],
   StoreItems: ['id', 'name', 'description', 'image', 'cost', 'stock', 'perPerson', 'category', 'order', 'active', 'createdAt', 'updatedAt'],
   Redemptions: ['id', 'participantId', 'itemId', 'itemName', 'cost', 'status', 'requestKey', 'ledgerId', 'refundLedgerId',
@@ -442,6 +442,41 @@ function compUpdate_(t, rowNumber, record, current) {
   var line = compSheetLine_(t, record, current).slice(from - 1, to);
 
   t.sheet.getRange(rowNumber, from, 1, to - from + 1).setValues([line]);
+
+}
+
+/*
+ * Many rows' changes in ONE read and ONE write: the block from the first to the
+ * last changed row and column is read, the changes are put in, and it is
+ * written back (rows and columns in between keep what was read).
+ * updates: [{ row: rowNumber, record: { column: value } }]
+ */
+function compUpdateMany_(t, updates) {
+
+  var cols = [];
+
+  updates.forEach(function (u) {
+    Object.keys(u.record).forEach(function (c) { if (t.index[c]) cols.push(t.index[c]); });
+  });
+
+  if (!cols.length) return;
+
+  var rowNumbers = updates.map(function (u) { return u.row; });
+  var top = Math.min.apply(null, rowNumbers);
+  var bottom = Math.max.apply(null, rowNumbers);
+  var from = Math.min.apply(null, cols);
+  var to = Math.max.apply(null, cols);
+  var range = t.sheet.getRange(top, from, bottom - top + 1, to - from + 1);
+  // what was read goes back as it was written (a "+20…" phone keeps its guard)
+  var values = range.getValues().map(function (line) { return line.map(function (v) { return compCellOut_(compCellIn_(v)); }); });
+
+  updates.forEach(function (u) {
+    Object.keys(u.record).forEach(function (c) {
+      if (t.index[c]) values[u.row - top][t.index[c] - from] = compCellOut_(u.record[c]);
+    });
+  });
+
+  range.setValues(values);
 
 }
 

@@ -416,7 +416,7 @@ test('names template «تاريخ الميلاد» (DD/MM/YYYY, explained); impo
     ['مينا عادل جرجس', '01012340001', 'جامعة', youngDate]];
   const path = `${SHOTS}names.xlsx`;
   writeFileSync(path, writeXlsx({ sheets: [{ name: PEOPLE_SHEET, rows, textColumns: [0, 1, 2, 3] }] }));
-  await clickText('.view button', 'استيراد أسماء');
+  await clickText('.view button', 'استيراد / تحديث');
   await $('dialog.sheet[open] .import__file');
   await (await d.page.$('dialog.sheet[open] .import__file')).uploadFile(path);
   await d.page.waitForFunction(() => document.querySelector('dialog.sheet[open] .sheet__title')?.textContent === 'معاينة الأسماء', { timeout: 20000 });

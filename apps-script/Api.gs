@@ -149,6 +149,8 @@ function apiFunctions_() {
     apiParticipantsImportPreview: apiParticipantsImportPreview,
     apiParticipantsImportApply: apiParticipantsImportApply,
     apiParticipantsUndoImport: apiParticipantsUndoImport,
+    apiParticipantsAssign: apiParticipantsAssign,
+    apiParticipantsResetCodes: apiParticipantsResetCodes,
     // wallet (CompWallet.gs, §8)
     apiWallet: apiWallet,
     apiWalletParticipant: apiWalletParticipant,

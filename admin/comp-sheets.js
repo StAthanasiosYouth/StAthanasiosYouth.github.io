@@ -7,6 +7,8 @@
  *   questionTemplate()            → book: «الأسئلة» (headers + dropdowns), «شرح», «مثال»
  *   importText(book)              → tab-separated text of the questions sheet
  *   resultsBook(exported, slug, date) → { book, filename } from apiCompExport's reply
+ *   peopleBook / peopleTemplate     → the participants workbook (template = export layout)
+ *   distributionFiles(rows, opts)   → one codes workbook per servant / group / church
  *
  * Loaded on demand by the admin (AdminCompQuestions / AdminCompResults) with
  * import('./comp-sheets.js'); tested in Node (tests/comp-sheets.test.mjs).
@@ -142,54 +144,95 @@ export function resultsBook(exported, slug, date) {
    inline fixes, codes), WhatsApp messages, phone preview (docs/COMPETITIONS.md §7, §17.2)
 ========================================================= */
 
-/* the headers CompRegistry.gs REG_IMPORT_COLUMNS reads first (aliases are accepted too) */
-export const PEOPLE_HEADERS = ['الاسم بالكامل', 'رقم الموبايل', 'المجموعة / الفصل', 'الكنيسة', 'تاريخ الميلاد', 'ملاحظات'];
+/* the headers CompRegistry.gs REG_IMPORT_COLUMNS reads first (aliases are accepted too).
+   The template and «تصدير البيانات الحالية» are the same layout, so one file goes out and comes back. */
+export const PEOPLE_HEADERS = ['رقم المشترك', 'الاسم بالكامل', 'رقم الموبايل', 'المجموعة', 'الكنيسة', 'الخادم المسؤول', 'تاريخ الميلاد', 'ملاحظات', 'الحالة', 'نسخة البيانات'];
 export const PEOPLE_SHEET = 'الأسماء';
-const PEOPLE_KEYS = ['name', 'phone', 'group', 'church', 'birthDate', 'notes'];
+export const CODE_HEADER = 'الكود';
+const PEOPLE_KEYS = ['id', 'name', 'phone', 'group', 'church', 'servant', 'birthDate', 'notes', 'status', 'rev'];
+const PEOPLE_WIDTHS = [14, 30, 16, 22, 22, 22, 15, 30, 10, 12];
+const LISTS_SHEET = 'القوائم';
 
-/** the names template: «الأسماء» (headers, every column text so a phone keeps its 0), «شرح», «مثال» */
-export function peopleTemplate() {
-  const text = [0, 1, 2, 3, 4, 5];
-  const widths = [30, 18, 22, 24, 16, 34];
-  return {
-    sheets: [
-      { name: PEOPLE_SHEET, rtl: true, header: true, rows: [PEOPLE_HEADERS.slice()], widths, textColumns: text },
-      {
-        name: 'شرح', rtl: true, header: true, widths: [20, 90], textColumns: [0, 1],
-        rows: [
-          ['العمود', 'تكتب فيه إيه'],
-          ['الاسم بالكامل', 'اسم المشترك بالكامل (لازم). الاسم والرقم مع بعض هما اللي بيعرّفوا الشخص.'],
-          ['رقم الموبايل', 'موبايل مصري (لازم): 01xxxxxxxxx. لو إكسل شال الصفر مفيش مشكلة، وكمان +20 مقبولة. عمود الموبايل نص علشان الصفر ميضيعش.'],
-          ['المجموعة / الفصل', 'اختياري: مثلاً «ثانوي بنين». اكتب الاسم بنفس الشكل في كل الصفوف.'],
-          ['الكنيسة', 'اختياري.'],
-          ['تاريخ الميلاد', 'اختياري: يوم/شهر/سنة، مثلاً 15/03/2008 (أو 2008-03-15، والأرقام العربي مقبولة). بيحدد السن ومين مناسب لنظام النقاط. العمود نص علشان إكسل ميغيّرش شكل التاريخ.'],
-          ['ملاحظات', 'اختياري: أي حاجة للخدام بس (مش بتظهر للمشترك).'],
-          [],
-          ['ملاحظات', 'أول صف لازم يفضل العناوين. لحد ٥٠٠ اسم في المرة. قبل أي حفظ هتشوف كل صف: جديد، موجود قبل كده، مكرر في الملف، رقم مشترك، أو فيه مشكلة وسببها.'],
-          ['', 'الإخوات ممكن يبقوا على نفس رقم موبايل الأب أو الأم: ده مسموح (هيظهر «رقم مشترك» للتأكيد بس). كل واحد بياخد كود خاص بيه.']
-        ]
-      },
-      {
-        name: 'مثال', rtl: true, header: true, widths, textColumns: text,
-        rows: [PEOPLE_HEADERS.slice(),
-          ['مارك ميلاد عزيز', '01012345678', 'ثانوي بنين', 'مارجرجس', '15/03/2004', ''],
-          ['مريم عادل فهمي', '01123456789', 'إعدادي بنات', 'العدرا', '02/11/2006', 'جديدة'],
-          ['بيشوي عادل فهمي', '01123456789', 'ابتدائي', 'العدرا', '', 'أخو مريم: نفس رقم الأم']]
-      }
-    ]
-  };
+/* 'YYYY-MM-DD' → 'DD/MM/YYYY' (what the explanation asks for; the server reads both) */
+const dmy = v => (/^(\d{4})-(\d{2})-(\d{2})$/.test(String(v || '')) ? String(v).split('-').reverse().join('/') : String(v || ''));
+
+const EXPLAIN = [
+  ['العمود', 'تكتب فيه إيه'],
+  ['رقم المشترك', 'متلمسوش. ده اللي بيربط الصف بالمشترك (الكود بتاعه بيفضل زي ما هو حتى لو غيّرت الاسم أو الرقم). لشخص جديد سيبه فاضي.'],
+  ['الاسم بالكامل', 'اسم المشترك بالكامل (لازم).'],
+  ['رقم الموبايل', 'موبايل مصري (لازم): 01xxxxxxxxx. لو إكسل شال الصفر مفيش مشكلة، وكمان +20 مقبولة. العمود نص علشان الصفر ميضيعش.'],
+  ['المجموعة', 'اختياري: مثلاً «مجموعة الكليات» أو «مجموعة المغتربين» أو «مجموعة الخريجين». اكتبها بنفس الشكل في كل الصفوف (فيه قايمة بالموجود).'],
+  ['الكنيسة', 'اختياري.'],
+  ['الخادم المسؤول', 'اختياري: الخادم اللي هيتابع المشترك ويبعتله كوده. بيستخدم في «توزيع الأكواد».'],
+  ['تاريخ الميلاد', 'اختياري: يوم/شهر/سنة، مثلاً 15/03/2004 (أو 2004-03-15، والأرقام العربي مقبولة). بيحدد السن ومين مناسب لنظام النقاط.'],
+  ['ملاحظات', 'اختياري: أي حاجة للخدام بس (مش بتظهر للمشترك).'],
+  ['الحالة', 'للقراية بس (نشط / موقوف). تغييرها من الملف مش بيعمل حاجة.'],
+  [],
+  ['التحديث', 'خانة فاضية = البيانات المتسجلة بتفضل زي ما هي. علشان تمسح حاجة اكتب في الخانة «-» بس.'],
+  ['', 'مسح صف من الملف مش بيمسح المشترك ولا بيوقفه.'],
+  ['', 'لو حد اتعدّل في لوحة التحكم بعد ما الملف نزل، المعاينة هتقولك وهتستنى قرارك.'],
+  ['', 'قبل أي حفظ هتشوف كل صف: جديد، هيتحدّث (وإيه اللي هيتغير)، زي ما هو، مكرر، أو فيه مشكلة وسببها. لحد ٣٠٠٠ صف في المرة.'],
+  ['', 'الإخوات ممكن يبقوا على نفس رقم موبايل الأب أو الأم: ده مسموح. كل واحد بياخد كود خاص بيه.'],
+  ['الأكواد', 'الأكواد بتتعمل من لوحة التحكم بس. لو الملف فيه عمود «الكود» بيتجاهل في الاستيراد.']
+];
+
+/**
+ * The participants workbook: «الأسماء» (the export's rows, or none for the template; filters, frozen
+ * header, every column text, «نسخة البيانات» hidden), «شرح», «القوائم» (the groups, churches and
+ * servants in use: dropdowns that still take a new word).
+ * people: apiParticipants' items; codes: { id: 'ATH-…' } only when the admin asked for them.
+ * lists: { groups, churches, servants } (names); example: true adds the «مثال» sheet.
+ */
+export function peopleBook(people = [], { codes = null, lists = {}, example = false } = {}) {
+  const head = PEOPLE_HEADERS.concat(codes ? [CODE_HEADER] : []);
+  const rows = (people || []).map(p => [p.id || '', p.name || '', p.phone || '', p.group || '', p.church || '', p.servant || '', dmy(p.birthDate),
+    p.notes || '', p.active === false || p.status === 'inactive' ? 'موقوف' : 'نشط', p.rev || ''].concat(codes ? [codes[p.id] || ''] : []));
+  const columns = [['المجموعات', (lists || {}).groups], ['الكنايس', (lists || {}).churches], ['الخدام', (lists || {}).servants]]
+    .map(([title, names]) => [title].concat((names || []).filter(Boolean)));
+  const longest = Math.max(...columns.map(c => c.length));
+  const listRows = [];
+  for (let r = 0; r < longest; r++) listRows.push(columns.map(c => c[r] || ''));
+  const dropdowns = [3, 4, 5].map((column, i) => (columns[i].length > 1
+    ? { column, range: "'" + LISTS_SHEET + "'!$" + 'ABC'[i] + '$2:$' + 'ABC'[i] + '$' + columns[i].length, strict: false } : null)).filter(Boolean);
+  const text = head.map((_, i) => i);
+  const sheets = [
+    { name: PEOPLE_SHEET, rtl: true, header: true, filter: true, rows: [head].concat(rows), widths: PEOPLE_WIDTHS.concat(codes ? [16] : []), textColumns: text, hidden: [9], lists: dropdowns },
+    { name: 'شرح', rtl: true, header: true, widths: [20, 100], textColumns: [0, 1], rows: EXPLAIN.map(r => r.slice()) },
+    { name: LISTS_SHEET, rtl: true, header: true, widths: [26, 26, 26], textColumns: [0, 1, 2], rows: listRows }
+  ];
+  if (example) {
+    sheets.push({
+      name: 'مثال', rtl: true, header: true, widths: PEOPLE_WIDTHS, textColumns: text, hidden: [9],
+      rows: [PEOPLE_HEADERS.slice(),
+        ['', 'مارك ميلاد عزيز', '01012345678', 'مجموعة الكليات', 'مارجرجس', 'أ. بيتر سمير', '15/03/2004', '', '', ''],
+        ['', 'مريم عادل فهمي', '01123456789', 'مجموعة المغتربين', 'العدرا', 'أ. مارينا نبيل', '02/11/2001', 'جديدة', '', ''],
+        ['', 'بيشوي عادل فهمي', '01123456789', 'مجموعة الخريجين', 'العدرا', 'أ. مارينا نبيل', '', 'أخو مريم: نفس رقم الأم', '', '']]
+    });
+  }
+  return { sheets };
+}
+
+/** the names template: the export's layout with no rows, plus «مثال» */
+export function peopleTemplate(lists) {
+  return peopleBook([], { lists, example: true });
+}
+
+/** «تصدير البيانات الحالية»: the file name (a file with codes says so) */
+export function peopleFilename(date, withCodes) {
+  return (withCodes ? 'المشاركين-بالأكواد-' : 'المشاركين-') + String(date || '').slice(0, 10) + '.xlsx';
 }
 
 /**
  * The import rows as they would be typed (preview rows, with the admin's inline fixes) → tab-separated
  * text with a header of the given columns (name and phone always), so the server classifies them again.
- * rows: [{ name, phone, group, church, notes }]; columns: the keys the original file had.
+ * rows: [{ id, name, phone, group, church, servant, notes, birthDate, rev, clears }]; columns: the keys the
+ * original file had. A cleared field («-» in the file) is written as «-» again.
  */
 export function peopleText(rows, columns) {
-  const keys = PEOPLE_KEYS.filter(k => k === 'name' || k === 'phone' || (columns || []).indexOf(k) !== -1);
+  const keys = PEOPLE_KEYS.filter(k => k === 'name' || k === 'phone' || (k !== 'status' && (columns || []).indexOf(k) !== -1));
   const clean = v => String(v === undefined || v === null ? '' : v).replace(/[\t\r\n]+/g, ' ').trim();
   return [keys.map(k => PEOPLE_HEADERS[PEOPLE_KEYS.indexOf(k)]).join('\t')]
-    .concat((rows || []).map(r => keys.map(k => clean(r[k])).join('\t')))
+    .concat((rows || []).map(r => keys.map(k => ((r.clears || []).indexOf(k) !== -1 && !clean(r[k]) ? '-' : clean(r[k]))).join('\t')))
     .join('\n');
 }
 
@@ -200,11 +243,85 @@ export function codesBook(reply) {
     filename: (reply && reply.filename) || 'codes.xlsx',
     book: {
       sheets: [{
-        name: 'الأكواد', rtl: true, header: true, widths: [30, 16, 22, 18], textColumns: [0, 1, 2, 3],
-        rows: [['الاسم', 'الموبايل', 'المجموعة / الفصل', 'الكود']].concat(rows.map(r => [r.name || '', r.phone || '', r.group || '', r.code || '']))
+        name: 'الأكواد', rtl: true, header: true, filter: true, widths: [30, 16, 22, 22, 18], textColumns: [0, 1, 2, 3, 4],
+        rows: [['الاسم', 'الموبايل', 'المجموعة', 'الخادم المسؤول', 'الكود']].concat(rows.map(r => [r.name || '', r.phone || '', r.group || '', r.servant || '', r.code || '']))
       }]
     }
   };
+}
+
+
+/* =========================================================
+   «توزيع الأكواد»: one file per servant (or group / church), each with only its own people
+========================================================= */
+
+export const DISTRIBUTE_BY = { servant: 'الخادم المسؤول', group: 'المجموعة', church: 'الكنيسة', one: 'ملف واحد' };
+
+/** the bucket a person goes in: a servant (or «من غير خادم – the group»), a group, a church, or one for all */
+export function bucketOf(person, by) {
+  const p = person || {};
+  if (by === 'group') return p.group || 'من غير مجموعة';
+  if (by === 'church') return p.church || 'من غير كنيسة';
+  if (by === 'one') return 'الكل';
+  return p.servant || ('من غير خادم' + (p.group ? ' – ' + p.group : ''));
+}
+
+/** people → [{ name, people }] by bucketOf, buckets and names in Arabic order (spelling differences merged) */
+export function buckets(people, by) {
+  const map = new Map();
+  (people || []).forEach(p => {
+    const name = bucketOf(p, by);
+    const key = groupKey(name) || name;
+    if (!map.has(key)) map.set(key, { name, people: [] });
+    map.get(key).people.push(p);
+  });
+  const order = (a, b) => String(a || '').localeCompare(String(b || ''), 'ar');
+  return [...map.values()].sort((a, b) => order(a.name, b.name)).map(b => ({ name: b.name, people: b.people.slice().sort((x, y) => order(x.name, y.name)) }));
+}
+
+/* a file name part: no characters a phone or a computer refuses */
+const safePart = v => String(v || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').trim().replace(/\s+/g, '-').slice(0, 60) || 'ملف';
+
+const HOW_TO_SEND = [
+  ['إزاي تبعت الأكواد'],
+  ['١. في ورقة «الأكواد» دوس على خانة «رسالة واتساب» بتاعة الشخص وانسخها.'],
+  ['٢. افتح «فتح الشات» (أو دوّر على رقمه في واتساب).'],
+  ['٣. الصق الرسالة وابعتها لصاحبها هو بس.'],
+  [],
+  ['مهم'],
+  ['• كل كود خاص بصاحبه: متبعتوش في جروب، ومتبعتش الملف ده لحد.'],
+  ['• امسح الملف بعد ما تخلص توزيع.'],
+  ['• لو كود اتسرّب، كلّم مسؤول لوحة التحكم يعمل كود جديد.']
+];
+
+/**
+ * apiParticipantCodes' rows → one workbook per bucket: «الأكواد» (name, phone, group, code, the ready
+ * WhatsApp message, the chat link — never the code in a link) and «إزاي تبعت».
+ * → [{ name, count, filename, book }]
+ */
+export function distributionFiles(rows, { by = 'servant', url = '', date = '' } = {}) {
+  const day = String(date || '').slice(0, 10);
+  return buckets(rows, by).map(b => ({
+    name: b.name,
+    count: b.people.length,
+    filename: 'أكواد-' + safePart(b.name) + (day ? '-' + day : '') + '.xlsx',
+    book: {
+      sheets: [
+        {
+          name: 'الأكواد', rtl: true, header: true, filter: true, widths: [28, 15, 20, 16, 64, 28], textColumns: [0, 1, 2, 3, 4, 5],
+          rows: [['الاسم', 'الموبايل', 'المجموعة', 'الكود', 'رسالة واتساب', 'فتح الشات']].concat(b.people.map(r => [
+            r.name || '', r.phone || '', r.group || '', r.code || '', r.code ? codeMessage({ name: r.name, code: r.code, url }) : '', waLink(r.phone)
+          ]))
+        },
+        { name: 'إزاي تبعت', rtl: true, header: true, widths: [90], textColumns: [0], rows: HOW_TO_SEND.map(r => r.slice()) }
+      ]
+    }
+  }));
+}
+
+/** a bucket's messages as one text (the admin forwards a servant's list in one paste) */
+export function messagesText(people, url) {
+  return (people || []).filter(r => r.code).map(r => '— ' + (r.name || '') + (r.phone ? ' (' + r.phone + ')' : '') + '\n' + codeMessage({ name: r.name, code: r.code, url })).join('\n\n');
 }
 
 const arDigits = v => String(v).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);

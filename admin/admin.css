@@ -6167,8 +6167,62 @@ dialog .toasts[popover] {
 
 @media (min-width: 720px) {
   .comp-subs__tools {
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+    display: flex;
+    flex-wrap: wrap;
   }
+
+  .comp-subs__tools > * {
+    flex: 1 1 150px;
+    min-width: 0;
+  }
+
+  .comp-subs__tools > [type="search"] {
+    flex: 2 1 260px;
+  }
+}
+
+/* «تحديد»: a ticked list (export / distribute / bulk changes) */
+.comp-person--pick {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 12px;
+}
+
+.comp-person--pick > :not(.import__tick) {
+  grid-column: 2;
+}
+
+.comp-person--pick > .import__tick {
+  grid-row: 1 / span 3;
+}
+
+.comp-select-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: rgba(242, 210, 139, .08);
+  box-shadow: inset 0 0 0 1px rgba(242, 210, 139, .22);
+}
+
+.comp-select-bar__n {
+  font-weight: 800;
+}
+
+/* «توزيع الأكواد»: one block per servant / group */
+.comp-dist__bucket + .comp-dist__bucket {
+  margin-top: 14px;
+}
+
+.comp-dist__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .comp-subs {

@@ -289,7 +289,7 @@ test('the code: masked; «إظهار الكود»; copy; WhatsApp copies the mes
 /* ---------------- the names import ---------------- */
 
 function namesFile() {
-  const rows = [PEOPLE_HEADERS.slice(0, 3),
+  const rows = [PEOPLE_HEADERS.slice(1, 4),
     ['يوسف سمير نبيل', '01001112223', 'ثانوي بنين'],          // 2 new
     ['مارك ميلاد عزيز', '01012345678', 'ثانوي بنين'],         // 3 exists
     ['مريم عادل فهمي', '01123456789', 'ثانوي بنات'],          // 4 exists, another group (an update)
@@ -312,12 +312,12 @@ test('names import: template; every kind classified with its why; filters; group
   await clickText('.view button', 'تحميل نموذج الأسماء');
   await d.page.waitForFunction(() => A.comp.lastDownload && /الأسماء/.test(A.comp.lastDownload.filename));
   const template = await readXlsx(Uint8Array.from(await d.page.evaluate(() => Array.from(A.comp.lastDownload.bytes))));
-  assert.deepEqual(template.sheets.map(s => s.name), [PEOPLE_SHEET, 'شرح', 'مثال']);
-  assert.deepEqual(template.sheets[0].rows[0], ['الاسم بالكامل', 'رقم الموبايل', 'المجموعة / الفصل', 'الكنيسة', 'تاريخ الميلاد', 'ملاحظات']);
+  assert.deepEqual(template.sheets.map(s => s.name), [PEOPLE_SHEET, 'شرح', 'القوائم', 'مثال']);
+  assert.deepEqual(template.sheets[0].rows[0], PEOPLE_HEADERS);
 
   const path = `${SHOTS}names.xlsx`;
   writeFileSync(path, writeXlsx({ sheets: [{ name: PEOPLE_SHEET, rows: namesFile(), textColumns: [0, 1, 2] }] }));
-  await clickText('.view button', 'استيراد أسماء');
+  await clickText('.view button', 'استيراد / تحديث');
   await $('dialog.sheet[open] .import__file');
   await (await d.page.$('dialog.sheet[open] .import__file')).uploadFile(path);
   await d.page.waitForFunction(() => document.querySelector('dialog.sheet[open] .sheet__title')?.textContent === 'معاينة الأسماء', { timeout: 20000 });
@@ -400,9 +400,9 @@ test('after the import: codes masked until shown, export parses, printed cards (
   await jsClick(`.comp-batch[data-batch="${people.batch}"] [data-act="export"]`);
   await d.page.waitForFunction(() => A.comp.lastDownload && /^codes-/.test(A.comp.lastDownload.filename), { timeout: 10000 });
   const book = await readXlsx(Uint8Array.from(await d.page.evaluate(() => Array.from(A.comp.lastDownload.bytes))));
-  assert.deepEqual(book.sheets[0].rows[0], ['الاسم', 'الموبايل', 'المجموعة / الفصل', 'الكود']);
+  assert.deepEqual(book.sheets[0].rows[0], ['الاسم', 'الموبايل', 'المجموعة', 'الخادم المسؤول', 'الكود']);
   assert.equal(book.sheets[0].rows.length, 17);
-  assert.ok(book.sheets[0].rows.slice(1).every(r => CODE.test(r[3]) && /^01/.test(r[1])), 'codes and phones as text');
+  assert.ok(book.sheets[0].rows.slice(1).every(r => CODE.test(r[4]) && /^01/.test(r[1])), 'codes and phones as text');
 
   // printed cards
   await jsClick(`.comp-batch[data-batch="${people.batch}"] [data-act="cards"]`);

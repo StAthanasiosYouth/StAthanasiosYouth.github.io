@@ -142,9 +142,9 @@
   };
 
   /* bytes → a download (a copy is kept on A.comp.lastDownload for tests and the console) */
-  C.download = function (bytes, filename) {
+  C.download = function (bytes, filename, type) {
     C.lastDownload = { filename: filename, bytes: bytes };
-    return C.sheets().then(function (m) { m.xlsx.download(bytes, filename); });
+    return C.sheets().then(function (m) { m.xlsx.download(bytes, filename, type); });
   };
 
   /* the spreadsheet helpers (admin/xlsx.js, admin/comp-sheets.js), loaded the first time they're needed */

@@ -32,10 +32,13 @@ var REG_ID = /^p-[0-9a-f]{8}$/;
 var REG_BATCH = /^imp-[0-9a-f]{8}$/;
 var REG_PTOKEN_HOURS = 3;
 var REG_HASH_SECONDS = 21600;
-var REG_IMPORT_MAX_ROWS = 500;
-var REG_IMPORT_MAX_TEXT = 300 * 1024;
-var REG_LIMITS = { name: 80, nameMin: 3, group: 40, church: 60, notes: 300, search: 60, page: 50, pageMax: 200, exportMax: 3000 };
-var REG_FIELD_LABELS = { name: 'الاسم', phone: 'رقم الموبايل', group: 'المجموعة', church: 'الكنيسة', notes: 'ملاحظات', birthDate: 'تاريخ الميلاد' };
+var REG_IMPORT_MAX_ROWS = 3000;
+var REG_IMPORT_MAX_TEXT = 1024 * 1024;
+var REG_LIMITS = { name: 80, nameMin: 3, group: 40, church: 60, servant: 60, notes: 300, search: 60, page: 50, pageMax: 200, exportMax: 3000 };
+var REG_FIELD_LABELS = { name: 'الاسم', phone: 'رقم الموبايل', group: 'المجموعة', church: 'الكنيسة', servant: 'الخادم المسؤول', notes: 'ملاحظات', birthDate: 'تاريخ الميلاد' };
+/* the optional fields a file can set or clear («-» in a cell clears it) */
+var REG_OPTIONAL = ['group', 'church', 'servant', 'notes', 'birthDate'];
+var REG_CLEAR = /^[-–—]$/;
 
 /* this execution's key bytes (read once) */
 var REG_KEYS_ = null;
@@ -213,7 +216,7 @@ function regCheckPerson_(input) {
 
   input = input || {};
 
-  var out = { name: '', nameNorm: '', phone: '', phoneNorm: '', local: '', group: '', church: '', notes: '', errors: [], oneWord: false };
+  var out = { name: '', nameNorm: '', phone: '', phoneNorm: '', local: '', group: '', church: '', servant: '', notes: '', errors: [], oneWord: false };
   var name = contentLine_(input.name);
 
   out.name = name;
@@ -241,7 +244,7 @@ function regCheckPerson_(input) {
     else out.birthDate = birth.date;
   }
 
-  ['group', 'church', 'notes'].forEach(function (key) {
+  ['group', 'church', 'servant', 'notes'].forEach(function (key) {
     var value = key === 'notes' ? contentText_(input[key]).replace(/\s+/g, ' ').trim() : contentLine_(input[key]);
     if (value.length > REG_LIMITS[key]) out.errors.push({ field: key, message: REG_FIELD_LABELS[key] + ' أطول من ' + regAr_(REG_LIMITS[key]) + ' حرف' });
     out[key] = value;
@@ -257,15 +260,25 @@ function regCheckPerson_(input) {
 ========================================================= */
 
 var REG_IMPORT_COLUMNS = [
+  // the export's first column: an existing person is matched by it (§7.5.1)
+  { key: 'id', names: ['رقم المشترك', 'معرف المشترك', 'المعرف', 'id', 'participant id'] },
   { key: 'name', names: ['الاسم بالكامل', 'الاسم الكامل', 'الاسم', 'اسم', 'اسم المشترك', 'name', 'full name', 'fullname'] },
   { key: 'phone', names: ['رقم الموبايل', 'الموبايل', 'موبايل', 'التليفون', 'تليفون', 'رقم التليفون', 'الرقم', 'phone', 'mobile', 'phone number'] },
   { key: 'group', names: ['المجموعة / الفصل', 'المجموعة/الفصل', 'المجموعة', 'مجموعة', 'الفصل', 'فصل', 'group', 'class'] },
   { key: 'church', names: ['الكنيسة', 'كنيسة', 'church'] },
+  { key: 'servant', names: ['الخادم المسؤول', 'الخادم المسئول', 'الخادم', 'خادم', 'servant'] },
   { key: 'notes', names: ['ملاحظات', 'ملاحظة', 'notes', 'note'] },
-  { key: 'birthDate', names: ['تاريخ الميلاد', 'الميلاد', 'تاريخ ميلاد', 'birth date', 'birthdate', 'date of birth', 'dob'] }
+  { key: 'birthDate', names: ['تاريخ الميلاد', 'الميلاد', 'تاريخ ميلاد', 'birth date', 'birthdate', 'date of birth', 'dob'] },
+  // the export's own columns: «نسخة البيانات» is checked; «الحالة» and «الكود» are never read
+  { key: 'rev', names: ['نسخة البيانات', 'rev'] },
+  { key: 'status', names: ['الحالة', 'status'] },
+  { key: 'code', names: ['الكود', 'كود', 'code'] }
 ];
 
 var REG_IMPORT_ORDER = ['name', 'phone', 'group', 'church', 'notes', 'birthDate'];
+
+/* the columns a row's values are read from (never «الحالة» or «الكود») */
+var REG_IMPORT_READ = ['id', 'name', 'phone', 'group', 'church', 'servant', 'notes', 'birthDate', 'rev'];
 
 function regImportColumnOf_(cell) {
 
@@ -284,7 +297,52 @@ function regImportColumnOf_(cell) {
 /* the parts of a stored participant an import row is checked against (its fingerprint) */
 function regMatchState_(p) {
 
-  return p ? [p.id, p.nameNorm, p.phoneNorm, p.group || '', p.church || '', p.notes || '', p.status || ''] : null;
+  return p ? [p.id, p.nameNorm, p.phoneNorm, p.group || '', p.church || '', p.notes || '', p.status || '', p.servant || '', p.birthDate || '', p.updatedAt || ''] : null;
+
+}
+
+/*
+ * A person's data version: a short hash of what an export shows (a re-imported row whose
+ * person changed since the export is "stale"). Not a secret, only a change detector.
+ */
+function regRev_(p) {
+
+  var text = JSON.stringify([p.name || '', p.phoneNorm || '', p.group || '', p.church || '', p.servant || '', p.notes || '', p.birthDate || '', p.status === 'inactive' ? 'inactive' : 'active']);
+  var h = 0x811c9dc5;
+
+  for (var i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+
+  return ('0000000' + h.toString(16)).slice(-8);
+
+}
+
+/*
+ * What a file row changes on a stored person: identity = the row was matched by its id
+ * (then the name and the phone can change too). An empty cell keeps the stored value;
+ * «-» (row.clears) empties it. → [{ field, label, from, to }]
+ */
+function regChanges_(row, match, given, identity) {
+
+  var changes = [];
+
+  if (identity) {
+    if (row.name !== match.name) changes.push({ field: 'name', label: REG_FIELD_LABELS.name, from: match.name, to: row.name });
+    if (row.phoneNorm !== match.phoneNorm) changes.push({ field: 'phone', label: REG_FIELD_LABELS.phone, from: match.phoneNorm ? '0' + match.phoneNorm : '', to: row.phone });
+  }
+
+  REG_OPTIONAL.forEach(function (field) {
+    if (!given[field]) return;
+    var clear = row.clears.indexOf(field) !== -1;
+    var to = clear ? '' : row[field];
+    var from = match[field] || '';
+    if ((!clear && to === '') || to === from) return;
+    changes.push({ field: field, label: REG_FIELD_LABELS[field], from: from, to: to });
+  });
+
+  return changes;
 
 }
 
@@ -303,7 +361,7 @@ function planParticipantImport_(text, existing, hash) {
   hash = hash || sha256Hex_;
 
   if (String(text || '').length > REG_IMPORT_MAX_TEXT) {
-    out.problems.push('الملف كبير قوي (الحد ٣٠٠ كيلوبايت). قسّمه لأكتر من مرة.');
+    out.problems.push('الملف كبير قوي (الحد ١ ميجا). قسّمه لأكتر من مرة.');
     out.summary = regImportSummary_([]);
     return out;
   }
@@ -338,7 +396,9 @@ function planParticipantImport_(text, existing, hash) {
     return out;
   }
 
-  out.columns = columns.filter(Boolean);
+  out.columns = columns.filter(function (key) { return REG_IMPORT_READ.indexOf(key) !== -1; });
+  // a «الكود» column is never read (codes are made only by the panel)
+  out.codeIgnored = columns.indexOf('code') !== -1;
 
   if (body.length > REG_IMPORT_MAX_ROWS) {
     out.problems.push('الملف فيه ' + regAr_(body.length) + ' صف، والحد ' + regAr_(REG_IMPORT_MAX_ROWS) + ' في المرة. قسّمه.');
@@ -347,13 +407,16 @@ function planParticipantImport_(text, existing, hash) {
 
   /* the registry, indexed */
   var byKey = Object.create(null);
+  var byId = Object.create(null);
   var byName = Object.create(null);
   var byPhone = Object.create(null);
   var knownGroups = Object.create(null);
 
   (existing || []).forEach(function (p) {
     var nameNorm = p.nameNorm || normName_(p.name);
-    var record = { id: p.id, name: p.name, nameNorm: nameNorm, phoneNorm: p.phoneNorm, group: p.group || '', church: p.church || '', notes: p.notes || '', birthDate: p.birthDate || '', status: p.status || 'active' };
+    var record = { id: p.id, name: p.name, nameNorm: nameNorm, phoneNorm: p.phoneNorm, group: p.group || '', church: p.church || '', servant: p.servant || '', notes: p.notes || '', birthDate: p.birthDate || '', status: p.status || 'active', updatedAt: p.updatedAt || '' };
+    record.rev = regRev_(record);
+    byId[p.id] = record;
     byKey[nameNorm + '|' + p.phoneNorm] = byKey[nameNorm + '|' + p.phoneNorm] || record;
     (byName[nameNorm] = byName[nameNorm] || []).push(record);
     (byPhone[p.phoneNorm] = byPhone[p.phoneNorm] || []).push(record);
@@ -361,12 +424,24 @@ function planParticipantImport_(text, existing, hash) {
   });
 
   /* every row checked on its own */
-  var given = { group: columns.indexOf('group') !== -1, church: columns.indexOf('church') !== -1, notes: columns.indexOf('notes') !== -1, birthDate: columns.indexOf('birthDate') !== -1 };
+  var given = {};
+
+  REG_OPTIONAL.forEach(function (key) { given[key] = columns.indexOf(key) !== -1; });
 
   var rows = body.map(function (entry) {
     var raw = {};
-    columns.forEach(function (key, i) { if (key) raw[key] = entry.cells[i] === undefined ? '' : String(entry.cells[i]); });
+    var clears = [];
+    columns.forEach(function (key, i) { if (REG_IMPORT_READ.indexOf(key) !== -1) raw[key] = entry.cells[i] === undefined ? '' : String(entry.cells[i]); });
+    REG_OPTIONAL.forEach(function (key) {
+      if (raw[key] !== undefined && REG_CLEAR.test(raw[key].trim())) {
+        clears.push(key);
+        raw[key] = '';
+      }
+    });
     var checked = regCheckPerson_(raw);
+    var id = contentLine_(raw.id);
+    if (id && !REG_ID.test(id)) checked.errors.push({ field: 'id', message: 'رقم المشترك «' + id.slice(0, 20) + '» مش صحيح: سيبه زي ما اتصدّر، أو امسحه لو ده شخص جديد' });
+    else if (id && !byId[id]) checked.errors.push({ field: 'id', message: 'رقم المشترك ' + id + ' مش موجود في السجل: لو ده شخص جديد امسح رقم المشترك من الصف' });
     var row = {
       line: entry.line,
       status: checked.errors.length ? 'error' : 'new',
@@ -377,8 +452,14 @@ function planParticipantImport_(text, existing, hash) {
       phoneIntl: checked.phone,
       group: checked.group,
       church: checked.church,
+      servant: checked.servant,
       notes: checked.notes,
       birthDate: checked.birthDate || '',
+      id: id,
+      rev: contentLine_(raw.rev),
+      clears: clears,
+      fromId: false,
+      stale: false,
       errors: checked.errors.map(function (e) { return e.message; }),
       warnings: [],
       reason: '',
@@ -396,6 +477,7 @@ function planParticipantImport_(text, existing, hash) {
 
   /* in-file relations */
   var firstByKey = Object.create(null);
+  var firstById = Object.create(null);
   var fileByName = Object.create(null);
   var fileByPhone = Object.create(null);
 
@@ -412,6 +494,33 @@ function planParticipantImport_(text, existing, hash) {
     var key = row.nameNorm + '|' + row.phoneNorm;
     var earlier = firstByKey[key];
 
+    /* a row with the export's id: that person, whatever the name and phone say now */
+    if (row.id) {
+      var sameId = firstById[row.id];
+      var owner = byKey[key];
+      var earlierId = earlier ? earlier.id || (earlier.match && earlier.match.id) || '' : '';
+      if (sameId || (earlier && earlierId === row.id)) {
+        row.status = 'dup';
+        row.dupOf = (sameId || earlier).line;
+        row.reason = 'نفس المشترك في صف ' + regAr_(row.dupOf);
+        return;
+      }
+      if ((owner && owner.id !== row.id) || earlier) {
+        row.status = 'error';
+        row.errors.push('الاسم والرقم دول ' + (owner && owner.id !== row.id ? 'متسجلين لمشترك تاني: ' + owner.name + (owner.group ? ' (' + owner.group + ')' : '') : 'في صف ' + regAr_(earlier.line) + ' كمان'));
+        return;
+      }
+      firstById[row.id] = row;
+      firstByKey[key] = row;
+      row.status = 'exists';
+      row.fromId = true;
+      row.match = byId[row.id];
+      row.changes = regChanges_(row, row.match, given, true);
+      row.stale = !!(row.changes.length && row.rev && row.rev !== row.match.rev);
+      row.reason = row.changes.length ? 'فيه بيانات اتغيرت' : 'زي ما هو';
+      return;
+    }
+
     if (earlier) {
       row.status = 'dup';
       row.dupOf = earlier.line;
@@ -426,10 +535,7 @@ function planParticipantImport_(text, existing, hash) {
     if (match) {
       row.status = 'exists';
       row.match = match;
-      ['group', 'church', 'notes', 'birthDate'].forEach(function (field) {
-        if (!given[field] || row[field] === '' || row[field] === match[field]) return;
-        row.changes.push({ field: field, label: REG_FIELD_LABELS[field], from: match[field], to: row[field] });
-      });
+      row.changes = regChanges_(row, match, given, false);
       row.reason = row.changes.length ? 'متسجل، وفيه بيانات مختلفة' : 'متسجل قبل كده';
       return;
     }
@@ -467,8 +573,13 @@ function planParticipantImport_(text, existing, hash) {
       if (row.oneWord) row.warnings.push({ kind: 'oneWord', text: 'الاسم كلمة واحدة بس: الأحسن الاسم بالكامل' });
     }
 
+    if (row.stale) {
+      row.warnings.push({ kind: 'stale', text: 'المشترك ده اتعدّل في لوحة التحكم بعد ما الملف اتصدّر: قارن قبل ما تعلّم عليه' });
+    }
+
     row.fp = hash(JSON.stringify([
       row.status, row.nameNorm, row.phoneNorm, row.name, row.group, row.church, row.notes,
+      row.servant, row.birthDate, row.id, row.clears,
       regMatchState_(row.match),
       row.sameName.map(function (p) { return [p.id, p.phoneNorm, p.status]; }),
       row.sharedPhone.map(function (p) { return p.id; })
@@ -487,8 +598,10 @@ function planParticipantImport_(text, existing, hash) {
     }
 
     row.tickable = row.choices.length > 0;
-    // new rows are ticked; updates and the same-name ones wait for the admin
-    row.ticked = row.status === 'new' && !row.warnings.some(function (w) { return w.kind === 'sameName'; });
+    // new rows and the export's own rows (matched by id, not changed since) are ticked;
+    // name + phone updates, stale rows and the same-name ones wait for the admin
+    row.ticked = row.status === 'new' ? !row.warnings.some(function (w) { return w.kind === 'sameName'; })
+      : row.status === 'exists' && row.fromId && row.changes.length > 0 && !row.stale;
 
   });
 
@@ -523,7 +636,7 @@ function regCandidate_(p) {
 
 function regImportSummary_(rows) {
 
-  var s = { total: rows.length, new: 0, exists: 0, update: 0, dup: 0, error: 0, ticked: 0, warnings: { sharedPhone: 0, sameName: 0, oneWord: 0 } };
+  var s = { total: rows.length, new: 0, exists: 0, update: 0, dup: 0, error: 0, ticked: 0, warnings: { sharedPhone: 0, sameName: 0, oneWord: 0, stale: 0 } };
 
   rows.forEach(function (row) {
     s[row.status]++;
@@ -546,8 +659,13 @@ function regImportRowOut_(row) {
     phone: row.phone,
     group: row.group,
     church: row.church,
+    servant: row.servant || '',
     notes: row.notes,
     birthDate: row.birthDate || '',
+    id: row.id || '',
+    rev: row.rev || '',
+    clears: row.clears || [],
+    fromId: !!row.fromId,
     errors: row.errors,
     warnings: row.warnings,
     reason: row.reason,
@@ -690,6 +808,7 @@ function regPerson_(row) {
     phoneIntl: row.phone || '',
     group: row.group || '',
     church: row.church || '',
+    servant: row.servant || '',
     notes: row.notes || '',
     status: row.status === 'inactive' ? 'inactive' : 'active',
     active: row.status !== 'inactive',
@@ -702,6 +821,7 @@ function regPerson_(row) {
     createdAt: row.createdAt || '',
     updatedAt: row.updatedAt || '',
     birthDate: row.birthDate || '',
+    rev: regRev_(row),
     age: age.age,
     eligibility: age.state,
     leavesAt: age.leavesAt
@@ -757,6 +877,7 @@ function regNewRecord_(checked, issued, email, stamp, batch) {
     phoneNorm: checked.phoneNorm,
     group: checked.group,
     church: checked.church,
+    servant: checked.servant || '',
     notes: checked.notes,
     birthDate: checked.birthDate || '',
     status: 'active',
@@ -867,6 +988,16 @@ function apiParticipants(query) {
     return person;
   });
   result.groups = Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) { return b.count - a.count; });
+  // the churches and the responsible servants in use (filters, the editor's suggestions, distribution)
+  ['church', 'servant'].forEach(function (field) {
+    var seen = Object.create(null);
+    rows.forEach(function (r) {
+      if (!r[field]) return;
+      var k = normName_(r[field]);
+      (seen[k] = seen[k] || { name: r[field], count: 0 }).count++;
+    });
+    result[field === 'church' ? 'churches' : 'servants'] = Object.keys(seen).map(function (k) { return seen[k]; }).sort(function (a, b) { return b.count - a.count; });
+  });
   result.eligibility = { ok: 0, soon: 0, out: 0, unknown: 0 };
   result.ageRules = regAgeRules_();
   rows.forEach(function (r) { result.eligibility[regEligibilityOf_(r).state]++; });
@@ -975,6 +1106,7 @@ function apiParticipantSave(input) {
       phone: input.phone !== undefined ? input.phone : current && current.phone,
       group: input.group !== undefined ? input.group : current && current.group,
       church: input.church !== undefined ? input.church : current && current.church,
+      servant: input.servant !== undefined ? input.servant : current && current.servant,
       notes: input.notes !== undefined ? input.notes : current && current.notes,
       // undefined = not sent: an edit keeps the stored birth date
       birthDate: input.birthDate !== undefined ? input.birthDate : current ? current.birthDate || '' : undefined
@@ -1015,6 +1147,7 @@ function apiParticipantSave(input) {
       phoneNorm: checked.phoneNorm,
       group: checked.group,
       church: checked.church,
+      servant: checked.servant,
       notes: checked.notes,
       birthDate: checked.birthDate === undefined ? current.birthDate || '' : checked.birthDate,
       updatedAt: stamp
@@ -1026,8 +1159,8 @@ function apiParticipantSave(input) {
       activityNote_({ action: 'participant.phone', type: 'participant', id: id, title: checked.name });
     }
 
-    var before = { name: current.name, group: current.group, church: current.church, notes: current.notes };
-    var after = { name: checked.name, group: checked.group, church: checked.church, notes: checked.notes };
+    var before = { name: current.name, group: current.group, church: current.church, servant: current.servant || '', notes: current.notes };
+    var after = { name: checked.name, group: checked.group, church: checked.church, servant: checked.servant, notes: checked.notes };
     var diff = activityDiff_(before, after);
 
     if (diff && diff.fields && (diff.fields.length || diff.other)) {
@@ -1118,7 +1251,9 @@ function apiParticipantCodes(sel) {
     label = sel.batch;
   }
   else if (Array.isArray(sel.ids) && sel.ids.length && sel.ids.length <= REG_LIMITS.exportMax && sel.ids.every(function (x) { return typeof x === 'string' && REG_ID.test(x); })) {
-    picked = rows.filter(function (r) { return sel.ids.indexOf(r.id) !== -1; });
+    var wanted = Object.create(null);
+    sel.ids.forEach(function (x) { wanted[x] = true; });
+    picked = rows.filter(function (r) { return wanted[r.id]; });
     label = 'selected';
   }
   else if (sel.all === true) {
@@ -1136,7 +1271,7 @@ function apiParticipantCodes(sel) {
   });
 
   var out = picked.map(function (r) {
-    return { id: r.id, name: r.name, phone: r.phoneNorm ? '0' + r.phoneNorm : '', group: r.group || '', code: regCodeOf_(r) };
+    return { id: r.id, name: r.name, phone: r.phoneNorm ? '0' + r.phoneNorm : '', group: r.group || '', church: r.church || '', servant: r.servant || '', code: regCodeOf_(r) };
   });
 
   activity_({ action: 'code.export', type: 'participant', id: label, title: '', changes: { count: out.length } });
@@ -1179,6 +1314,94 @@ function apiParticipantResetCode(id) {
 }
 
 
+/* ids from the page (the selection): every one a p- id, ≤ exportMax → { id: true } */
+function regIdSet_(ids) {
+
+  if (!Array.isArray(ids) || !ids.length || ids.length > REG_LIMITS.exportMax || !ids.every(function (x) { return typeof x === 'string' && REG_ID.test(x); })) {
+    throw new Error('اختار المشتركين الأول');
+  }
+
+  var set = Object.create(null);
+
+  ids.forEach(function (x) { set[x] = true; });
+
+  return set;
+
+}
+
+/**
+ * «كود جديد للمحددين»: every selected participant gets a new code (the old ones and their
+ * tokens stop at once). One read, one write. → { count }   (never the codes: «توزيع الأكواد» shows them)
+ */
+function apiParticipantsResetCodes(ids) {
+
+  assertAdmin_();
+  regRequireOn_();
+
+  var set = regIdSet_(ids);
+
+  return regWrite_('code.reset', function (email) {
+    var t = regSheet_();
+    var rows = compRows_(t);
+    var taken = regTakenHashes_(rows);
+    var stamp = compNow_().stamp;
+    var updates = [];
+    rows.forEach(function (r) {
+      if (!set[r.id]) return;
+      var issued = regIssueCode_(taken);
+      updates.push({ row: r.__row, record: { codeHash: issued.codeHash, codeEnc: issued.codeEnc, codeVersion: String((Number(r.codeVersion) || 1) + 1), codeIssuedAt: stamp, codeIssuedBy: email, updatedAt: stamp } });
+    });
+    compUpdateMany_(t, updates);
+    if (updates.length) {
+      regDropHashes_();
+      activityNote_({ action: 'code.reset', type: 'participant', id: 'bulk-' + compRandomHex_(4), title: '', changes: { count: updates.length } });
+    }
+    return { count: updates.length, log: 'bulk ' + updates.length };
+  });
+
+}
+
+/**
+ * Sets one field for every selected participant: change = { servant } | { group } (text, '' clears).
+ * One read, one write. → { count }   (only the rows whose value changes)
+ */
+function apiParticipantsAssign(ids, change) {
+
+  assertAdmin_();
+  regRequireOn_();
+
+  var set = regIdSet_(ids);
+
+  change = change && typeof change === 'object' && !Array.isArray(change) ? change : {};
+
+  var field = change.servant !== undefined ? 'servant' : change.group !== undefined ? 'group' : '';
+
+  if (!field) throw new Error('اختار تغيّر إيه');
+
+  var value = contentLine_(change[field]);
+
+  if (value.length > REG_LIMITS[field]) throw appError_(REG_FIELD_LABELS[field] + ' أطول من ' + regAr_(REG_LIMITS[field]) + ' حرف', '', '', field);
+
+  return regWrite_('assign', function () {
+    var t = regSheet_();
+    var stamp = compNow_().stamp;
+    var updates = [];
+    compRows_(t).forEach(function (r) {
+      if (!set[r.id] || (r[field] || '') === value) return;
+      var record = { updatedAt: stamp };
+      record[field] = value;
+      updates.push({ row: r.__row, record: record });
+    });
+    compUpdateMany_(t, updates);
+    if (updates.length) {
+      activityNote_({ action: 'update', type: 'participant', id: 'bulk-' + compRandomHex_(4), title: '', changes: { bulk: updates.length, field: field } });
+    }
+    return { count: updates.length, log: field + ' ' + updates.length };
+  });
+
+}
+
+
 /* =========================================================
    ADMIN: BULK IMPORT (§7.5; same flow as Import.gs)
 ========================================================= */
@@ -1186,23 +1409,30 @@ function apiParticipantResetCode(id) {
 function regImportExisting_() {
 
   return regRows_().map(function (r) {
-    return { id: r.id, name: r.name, nameNorm: r.nameNorm || normName_(r.name), phone: r.phone, phoneNorm: r.phoneNorm, group: r.group, church: r.church, notes: r.notes, status: r.status === 'inactive' ? 'inactive' : 'active', __row: r.__row, codeHash: r.codeHash };
+    return { id: r.id, name: r.name, nameNorm: r.nameNorm || normName_(r.name), phone: r.phone, phoneNorm: r.phoneNorm, group: r.group, church: r.church, servant: r.servant, notes: r.notes, birthDate: r.birthDate, updatedAt: r.updatedAt, status: r.status === 'inactive' ? 'inactive' : 'active', __row: r.__row, codeHash: r.codeHash };
   });
 
 }
 
 /**
  * Read-only: what importing this text would do.
- * → { rows: [ImportRow], summary, groups: [{ name, count, isNew }], problems, columns, ignored, fingerprint, max: 500 }
+ * → { rows: [ImportRow], summary, groups: [{ name, count, isNew }], problems, columns, ignored, codeIgnored, fingerprint,
+ *     hiddenSame (a long file: the unchanged rows are only counted), max }
  */
 function apiParticipantsImportPreview(text) {
 
   assertAdmin_();
 
   var plan = planParticipantImport_(text, regImportExisting_(), sha256Hex_);
+  // a re-imported export: the rows that change nothing are counted, not sent
+  var long = plan.rows.length > 200;
+  var same = function (r) { return r.status === 'exists' && !r.changes.length && !r.warnings.length; };
+  var shown = long ? plan.rows.filter(function (r) { return !same(r); }) : plan.rows;
 
   return {
-    rows: plan.rows.map(regImportRowOut_),
+    rows: shown.map(regImportRowOut_),
+    hiddenSame: plan.rows.length - shown.length,
+    codeIgnored: !!plan.codeIgnored,
     summary: plan.summary,
     groups: plan.groups,
     problems: plan.problems,
@@ -1219,7 +1449,7 @@ function apiParticipantsImportPreview(text) {
  * decisions: { 'r<line>': 'add:<fp>' | 'update:<pid>:<fp>' | 'phone:<pid>:<fp>' } — what the admin ticked.
  * Under the script lock the text is planned again against the registry as it is NOW; a row is applied
  * only when its fingerprint still matches. New participants get p- ids, codes and one importBatch;
- * existing ones keep id and code. One block for the new rows, one write per changed row.
+ * existing ones keep id and code. One block for the new rows, one read + one write for the changed ones.
  * → { added, updated, phoneUpdated, skipped: { unticked, changed, error, exists, dup }, changed, batch,
  *     rows: [{ line, result: 'added' | 'updated' | 'phone' | 'skipped' | 'error', reason, id? }], total }
  */
@@ -1242,6 +1472,7 @@ function apiParticipantsImportApply(text, decisions) {
     var taken = regTakenHashes_(existing);
     var adds = [];
     var touched = Object.create(null);
+    var updates = [];
 
     if (plan.problems.length && !plan.rows.length) {
       throw appError_(plan.problems[0], '');
@@ -1263,6 +1494,8 @@ function apiParticipantsImportApply(text, decisions) {
       if (row.status === 'dup') { skip(row, 'dup', row.reason); return; }
 
       if (!wanted) {
+        // an unchanged row of a re-imported export: counted only
+        if (row.status === 'exists' && !row.changes.length) { report.skipped.exists++; return; }
         if (row.status === 'exists') skip(row, 'exists', row.reason);
         else skip(row, 'unticked', 'مش متعلّم عليه');
         return;
@@ -1299,8 +1532,12 @@ function apiParticipantsImportApply(text, decisions) {
 
       if (kind === 'update') {
         var patch = { updatedAt: stamp };
-        row.changes.forEach(function (c) { patch[c.field] = c.to; });
-        compUpdate_(t, target.__row, patch, null);
+        row.changes.forEach(function (c) {
+          if (c.field === 'name') { patch.name = row.name; patch.nameNorm = row.nameNorm; }
+          else if (c.field === 'phone') { patch.phone = row.phoneIntl; patch.phoneNorm = row.phoneNorm; }
+          else patch[c.field] = c.to;
+        });
+        updates.push({ row: target.__row, record: patch });
         report.updated++;
         report.rows.push({ line: row.line, result: 'updated', reason: row.changes.map(function (c) { return c.label; }).join('، '), id: pid });
         return;
@@ -1308,13 +1545,14 @@ function apiParticipantsImportApply(text, decisions) {
 
       // the same person with a new phone: id and code stay
       var phonePatch = { phone: row.phoneIntl, phoneNorm: row.phoneNorm, updatedAt: stamp };
-      ['group', 'church', 'notes', 'birthDate'].forEach(function (field) { if (row[field]) phonePatch[field] = row[field]; });
-      compUpdate_(t, target.__row, phonePatch, null);
+      ['group', 'church', 'servant', 'notes', 'birthDate'].forEach(function (field) { if (row[field]) phonePatch[field] = row[field]; });
+      updates.push({ row: target.__row, record: phonePatch });
       report.phoneUpdated++;
       report.rows.push({ line: row.line, result: 'phone', reason: 'اتغير الرقم', id: pid });
 
     });
 
+    compUpdateMany_(t, updates);
     compAppend_(t, adds);
 
     report.added = adds.length;

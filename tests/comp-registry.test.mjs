@@ -188,7 +188,7 @@ test('codes: view (logged, merged, no push), export (logged with the count), res
 
   const exported = call('apiParticipantCodes', { all: true });
   assert.equal(exported.count, 2);
-  assert.deepEqual(exported.rows.map(r => Object.keys(r).sort()), [['code', 'group', 'id', 'name', 'phone'], ['code', 'group', 'id', 'name', 'phone']]);
+  assert.deepEqual(exported.rows.map(r => Object.keys(r).sort()), [['church', 'code', 'group', 'id', 'name', 'phone', 'servant'], ['church', 'code', 'group', 'id', 'name', 'phone', 'servant']]);
   assert.equal(exported.rows.find(r => r.id === a.id).code, codeA);
   const exportRow = activityRows(world).find(r => r[5] === 'code.export');
   assert.equal(JSON.parse(exportRow[10]).count, 2);
@@ -355,7 +355,7 @@ test('import preview: every classification, warnings, reasons, choices, summary 
   assert.match(at(16).warnings.find(w => w.kind === 'sameName').text, /نفس الاسم في صف ١٧ برقم تاني/);
   assert.match(at(18).errors[0], /أطول من ٨٠ حرف/);
 
-  assert.deepEqual(plain(preview.summary), { total: 17, new: 7, exists: 2, update: 1, dup: 1, error: 7, ticked: 4, warnings: { sharedPhone: 3, sameName: 3, oneWord: 1 } }, 'row 2 shares its phone with row 15 too');
+  assert.deepEqual(plain(preview.summary), { total: 17, new: 7, exists: 2, update: 1, dup: 1, error: 7, ticked: 4, warnings: { sharedPhone: 3, sameName: 3, oneWord: 1, stale: 0 } }, 'row 2 shares its phone with row 15 too');
   assert.deepEqual(plain(preview.groups), [{ name: 'ثانوي', count: 5, isNew: false }, { name: 'جامعة', count: 1, isNew: false }, { name: 'خدام', count: 1, isNew: true }]);
   assert.ok(!JSON.stringify(preview).includes('codeHash'));
 });
@@ -445,7 +445,7 @@ test('undo import: removes the batch while nobody of it has played; refused afte
   assert.equal(call('apiParticipants', {}).total, 2);
 });
 
-test('import: 500 rows preview + apply in one go (timed); limits 500 rows / 300 KB; no header → the template order', () => {
+test('import: 500 rows preview + apply in one go (timed); limits 3,000 rows / 1 MB; no header → the template order', () => {
   const { call } = regWorld();
   const lines = [HEADER];
   for (let i = 0; i < 500; i++) lines.push(`مشترك رقم ${'أبجدهوزحطيكلمنسعفصقرشتثخذضظغ'[i % 28]}${'ابتثجحخدذرزسشصضطظعغفقكلمنهوي'[Math.floor(i / 28) % 28]} عائلة\t010${String(20000000 + i).padStart(8, '0')}\tمجموعة ${i % 7}\t\t`);
@@ -465,10 +465,12 @@ test('import: 500 rows preview + apply in one go (timed); limits 500 rows / 300 
   assert.equal(codes.count, 500);
   assert.equal(new Set(codes.rows.map(r => r.code)).size, 500, 'unique codes');
 
-  const tooMany = call('apiParticipantsImportPreview', lines.concat([`زيادة واحد\t01099998888\t\t\t`]).join('\n'));
-  assert.match(tooMany.problems[0], /٥٠١ صف، والحد ٥٠٠/);
-  assert.equal(tooMany.rows.length, 500);
-  assert.match(call('apiParticipantsImportPreview', 'x'.repeat(301 * 1024)).problems[0], /كبير قوي/);
+  const many = [HEADER];
+  for (let i = 0; i < 3001; i++) many.push(`مشترك رقم ${i} تجريبي\t010${String(30000000 + i).padStart(8, '0')}\t\t\t`);
+  const tooMany = call('apiParticipantsImportPreview', many.join('\n'));
+  assert.match(tooMany.problems[0], /٣٠٠١ صف، والحد ٣٠٠٠/);
+  assert.equal(tooMany.summary.total, 3000);
+  assert.match(call('apiParticipantsImportPreview', 'x'.repeat(1025 * 1024)).problems[0], /كبير قوي/);
   const bare = call('apiParticipantsImportPreview', 'مينا الجديد\t01087654321\tثانوي');
   assert.equal(bare.rows[0].status, 'new');
   assert.equal(bare.rows[0].group, 'ثانوي');

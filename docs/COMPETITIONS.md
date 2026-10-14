@@ -594,8 +594,42 @@ into tab-separated text. Classification (pure, `RegistryModel` part of
 `new` with warnings `sharedPhone`, `sameName`, `oneWord`. Defaults: new
 ticked; updates and sameName unticked; error/exists/dup not tickable.
 Decisions `{ r<line>: 'add:<fp>' | 'update:<pid>:<fp>' | 'phone:<pid>:<fp>' }`.
-Limits 500 rows / 300 KB. New rows get `p-…` ids, codes, `importBatch`.
+Limits 3,000 rows / 1 MB. New rows get `p-…` ids, codes, `importBatch`.
 Existing participants keep id and code. One Activity entry with counts.
+Writes: one append for the new rows, one read + one write (`compUpdateMany_`)
+for every changed row together.
+
+### 7.5.1 Round trip (export → edit → re-import)
+The template and «تصدير البيانات الحالية» share one layout (`peopleBook`,
+admin/comp-sheets.js): رقم المشترك · الاسم بالكامل · رقم الموبايل · المجموعة ·
+الكنيسة · الخادم المسؤول · تاريخ الميلاد · ملاحظات · الحالة · نسخة البيانات
+(hidden) [· الكود only when ticked]. The export is built in the browser from
+`apiParticipants({ all: true })` (no extra call without codes).
+- A row with an id is matched by the id only: name and phone may change
+  (`regChanges_` identity), id and code never do. Unknown / malformed id =
+  error (never a new person); the same id twice = dup; a name + phone that is
+  another participant's = error.
+- Empty cell keeps the stored value; `-` clears an optional field.
+- `rev` (`regRev_`, FNV-1a of the exported fields) ≠ the stored one with
+  changes → warning `stale`, not ticked. Id rows with changes are ticked.
+- «الحالة» and «الكود» are never read (`codeIgnored`); the page also drops a
+  code column before sending. Rows missing from the file are untouched.
+- Preview of > 200 rows sends only rows that change (`hiddenSame` = count).
+
+### 7.6 Responsible servant
+Optional `servant` (≤ 60, Participants' last column). `apiParticipants`
+returns `servants` and `churches` (name + count) next to `groups`.
+`apiParticipantsAssign(ids, { servant } | { group })` and
+`apiParticipantsResetCodes(ids)` change a selection in one write; Activity
+has counts only. Groups are general youth groupings (مجموعة الكليات …).
+
+### 7.7 «توزيع الأكواد»
+`apiParticipantCodes({ ids })` (rows now carry `church`, `servant`;
+logged `code.export` with the count) → `distributionFiles(rows, { by })`:
+one XLSX per servant (no servant → «من غير خادم – group») / group / church /
+one, each with only its people, the `codeMessage` text and `waLink` (chat
+only, never the code in a URL); several files go out as one zip. The screen
+view groups the masked codes with «نسخ كل الرسايل» per bucket.
 
 ## 8. Wallet (Phase 3)
 

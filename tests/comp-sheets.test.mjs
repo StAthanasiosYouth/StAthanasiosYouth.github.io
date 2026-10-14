@@ -102,33 +102,104 @@ test('resultsFilename is safe whatever the slug / date', () => {
 
 /* ---------------- Phase 2 / 3: names, codes, phones, messages ---------------- */
 
-test('names template: «الأسماء» with the exact headers (every column text: a phone keeps its 0), «شرح», «مثال» that the server imports', async () => {
+test('names template = the export layout: «الأسماء» (exact headers, text columns, filters, «نسخة البيانات» hidden, dropdowns from «القوائم»), «شرح», «القوائم», «مثال» that the server imports', async () => {
   const m = await import('../admin/comp-sheets.js');
-  assert.deepEqual(m.PEOPLE_HEADERS, ['الاسم بالكامل', 'رقم الموبايل', 'المجموعة / الفصل', 'الكنيسة', 'تاريخ الميلاد', 'ملاحظات']);
-  const book = await readXlsx(writeXlsx(m.peopleTemplate()));
-  assert.deepEqual(book.sheets.map(s => s.name), [m.PEOPLE_SHEET, 'شرح', 'مثال']);
+  assert.deepEqual(m.PEOPLE_HEADERS, ['رقم المشترك', 'الاسم بالكامل', 'رقم الموبايل', 'المجموعة', 'الكنيسة', 'الخادم المسؤول', 'تاريخ الميلاد', 'ملاحظات', 'الحالة', 'نسخة البيانات']);
+  const bytes = writeXlsx(m.peopleTemplate({ groups: ['مجموعة الكليات', 'مجموعة المغتربين'], churches: [], servants: ['أ. بيتر'] }));
+  const book = await readXlsx(bytes);
+  assert.deepEqual(book.sheets.map(s => s.name), [m.PEOPLE_SHEET, 'شرح', 'القوائم', 'مثال']);
   assert.deepEqual(book.sheets[0].rows, [m.PEOPLE_HEADERS]);
-  const sheet = new TextDecoder().decode((await unzip(writeXlsx(m.peopleTemplate())))['xl/worksheets/sheet1.xml']);
-  assert.match(sheet, /<col min="2" max="2" width="18"[^>]*style="2"/, 'the phone column is text');
+  assert.deepEqual(book.sheets[2].rows, [['المجموعات', 'الكنايس', 'الخدام'], ['مجموعة الكليات', '', 'أ. بيتر'], ['مجموعة المغتربين']]);
+  const files = await unzip(bytes);
+  const sheet = new TextDecoder().decode(files['xl/worksheets/sheet1.xml']);
+  assert.match(sheet, /<col min="3" max="3" width="16"[^>]*style="2"/, 'the phone column is text');
+  assert.match(sheet, /<col min="10" max="10"[^>]*hidden="1"/, '«نسخة البيانات» is hidden');
+  assert.match(sheet, /<autoFilter ref="A1:J2"\/>/);
+  assert.match(sheet, /showErrorMessage="0" sqref="D2:D1000"><formula1>'القوائم'!\$A\$2:\$A\$3<\/formula1>/, 'groups: a dropdown that takes a new word');
+  assert.match(sheet, /sqref="F2:F1000"><formula1>'القوائم'!\$C\$2:\$C\$2</, 'servants');
+  assert.doesNotMatch(sheet, /sqref="E2/, 'no churches yet: no dropdown');
+  assert.match(new TextDecoder().decode(files['xl/workbook.xml']), /<definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">'الأسماء'!\$A\$1:\$J\$2<\/definedName>/);
+  assert.doesNotMatch(JSON.stringify(book), /ثانوي|إعدادي|ابتدائي/, 'youth groups, not school years');
   const { regWorld } = await import('./fakes/reg.mjs');
   const { call } = regWorld();
-  const preview = plain(call('apiParticipantsImportPreview', book.sheets[2].rows.map(r => r.join('\t')).join('\n')));
+  const preview = plain(call('apiParticipantsImportPreview', book.sheets[3].rows.map(r => r.join('\t')).join('\n')));
   assert.deepEqual(preview.rows.map(r => r.status), ['new', 'new', 'new']);
+  assert.deepEqual(preview.rows.map(r => r.servant), ['أ. بيتر سمير', 'أ. مارينا نبيل', 'أ. مارينا نبيل']);
   assert.ok(preview.rows[2].warnings.some(w => w.kind === 'sharedPhone'), 'the example shows a family phone');
 });
 
-test('peopleText: the preview rows with fixes back into import text (only the columns the file had)', async () => {
+test('peopleBook: the export (ids, phones with their 0, DD/MM/YYYY, status, rev), codes only when given, read back by the server unchanged', async () => {
   const m = await import('../admin/comp-sheets.js');
-  const text = m.peopleText([{ name: 'مارك\tميلاد', phone: '01012345678', group: 'ثانوي', church: 'x', notes: 'y' }, { name: 'مريم', phone: '0112', group: '' }], ['name', 'phone', 'group']);
-  assert.equal(text, 'الاسم بالكامل\tرقم الموبايل\tالمجموعة / الفصل\nمارك ميلاد\t01012345678\tثانوي\nمريم\t0112\t');
+  const { regWorld, addPerson, codeOf } = await import('./fakes/reg.mjs');
+  const { call } = regWorld();
+  const a = addPerson(call, 'مينا عادل جرجس', '01012345678', { group: 'مجموعة الكليات', servant: 'أ. بيتر', birthDate: '2004-03-15' });
+  addPerson(call, 'مريم زكريا عطا', '01112345678', { church: 'العدرا' });
+  const people = call('apiParticipants', { all: true }).items;
+  const plainBook = await readXlsx(writeXlsx(m.peopleBook(people, {})));
+  const row = plainBook.sheets[0].rows.find(r => r[0] === a.id);
+  assert.deepEqual(row, [a.id, 'مينا عادل جرجس', '01012345678', 'مجموعة الكليات', '', 'أ. بيتر', '15/03/2004', '', 'نشط', people.find(p => p.id === a.id).rev]);
+  assert.equal(plainBook.sheets[0].rows[0].includes(m.CODE_HEADER), false, 'no code column unless asked');
+  const code = codeOf(call, a.id);
+  const withCodes = await readXlsx(writeXlsx(m.peopleBook(people, { codes: { [a.id]: code } })));
+  assert.equal(withCodes.sheets[0].rows[0].at(-1), 'الكود');
+  assert.equal(withCodes.sheets[0].rows.find(r => r[0] === a.id).at(-1), code);
+  // back in: nothing changes, nothing ticked, the code column ignored
+  const preview = call('apiParticipantsImportPreview', withCodes.sheets[0].rows.map(r => r.join('\t')).join('\n'));
+  assert.equal(preview.codeIgnored, true);
+  assert.deepEqual(preview.rows.map(r => [r.status, r.changes.length, r.ticked]), [['exists', 0, false], ['exists', 0, false]]);
+  assert.equal(m.peopleFilename('2026-10-14 10:00', false), 'المشاركين-2026-10-14.xlsx');
+  assert.equal(m.peopleFilename('2026-10-14', true), 'المشاركين-بالأكواد-2026-10-14.xlsx');
 });
 
-test('codesBook: names, phones, groups and codes as text; the server file name', async () => {
+test('peopleText: the preview rows with fixes back into import text (the file\'s columns; id and «-» kept)', async () => {
   const m = await import('../admin/comp-sheets.js');
-  const made = m.codesBook({ rows: [{ name: 'مارك', phone: '01012345678', group: 'ثانوي', code: 'ATH-ABCD-2345' }], filename: 'codes-2026-10-11.xlsx' });
+  const text = m.peopleText([{ name: 'مارك\tميلاد', phone: '01012345678', group: 'مجموعة الكليات', church: 'x', notes: 'y' }, { name: 'مريم', phone: '0112', group: '' }], ['name', 'phone', 'group']);
+  assert.equal(text, 'الاسم بالكامل\tرقم الموبايل\tالمجموعة\nمارك ميلاد\t01012345678\tمجموعة الكليات\nمريم\t0112\t');
+  const back = m.peopleText([{ id: 'p-0000abcd', name: 'مينا', phone: '010', church: '', clears: ['church'], rev: '1234abcd', status: 'x' }], ['id', 'name', 'phone', 'church', 'rev']);
+  assert.equal(back, 'رقم المشترك\tالاسم بالكامل\tرقم الموبايل\tالكنيسة\tنسخة البيانات\np-0000abcd\tمينا\t010\t-\t1234abcd');
+});
+
+test('codesBook: names, phones, groups, servants and codes as text; the server file name', async () => {
+  const m = await import('../admin/comp-sheets.js');
+  const made = m.codesBook({ rows: [{ name: 'مارك', phone: '01012345678', group: 'مجموعة الكليات', servant: 'أ. بيتر', code: 'ATH-ABCD-2345' }], filename: 'codes-2026-10-11.xlsx' });
   assert.equal(made.filename, 'codes-2026-10-11.xlsx');
   const rows = (await readXlsx(writeXlsx(made.book))).sheets[0].rows;
-  assert.deepEqual(rows, [['الاسم', 'الموبايل', 'المجموعة / الفصل', 'الكود'], ['مارك', '01012345678', 'ثانوي', 'ATH-ABCD-2345']]);
+  assert.deepEqual(rows, [['الاسم', 'الموبايل', 'المجموعة', 'الخادم المسؤول', 'الكود'], ['مارك', '01012345678', 'مجموعة الكليات', 'أ. بيتر', 'ATH-ABCD-2345']]);
+});
+
+test('distribution: one file per servant with only their people (no servant → by group), a ready message each, the chat link never carries the code', async () => {
+  const m = await import('../admin/comp-sheets.js');
+  const rows = [
+    { id: 'p-1', name: 'مينا عادل', phone: '01012345678', group: 'مجموعة الكليات', servant: 'أ. بيتر', code: 'ATH-AAAA-2222' },
+    { id: 'p-2', name: 'مريم زكريا', phone: '01112345678', group: 'مجموعة المغتربين', servant: 'أ. مارينا', code: 'ATH-BBBB-3333' },
+    { id: 'p-3', name: 'بيشوي سمير', phone: '01212345678', group: 'مجموعة الكليات', servant: 'أ.  بيتر', code: 'ATH-CCCC-4444' },
+    { id: 'p-4', name: 'كيرلس نبيل', phone: '01512345678', group: 'مجموعة الخريجين', servant: '', code: 'ATH-DDDD-5555' }
+  ];
+  const files = m.distributionFiles(rows, { by: 'servant', url: 'https://example.org/points/', date: '2026-10-14 09:00' });
+  assert.deepEqual(files.map(f => [f.name, f.count]), [['أ. بيتر', 2], ['أ. مارينا', 1], ['من غير خادم – مجموعة الخريجين', 1]]);
+  assert.equal(files[0].filename, 'أكواد-أ.-بيتر-2026-10-14.xlsx');
+  assert.equal(files[2].filename, 'أكواد-من-غير-خادم-–-مجموعة-الخريجين-2026-10-14.xlsx');
+  const book = await readXlsx(writeXlsx(files[0].book));
+  assert.deepEqual(book.sheets.map(s => s.name), ['الأكواد', 'إزاي تبعت']);
+  const sheet = book.sheets[0].rows;
+  assert.deepEqual(sheet[0], ['الاسم', 'الموبايل', 'المجموعة', 'الكود', 'رسالة واتساب', 'فتح الشات']);
+  assert.deepEqual(sheet.slice(1).map(r => r[0]), ['بيشوي سمير', 'مينا عادل'], 'only this servant\'s people');
+  assert.equal(JSON.stringify(book).includes('ATH-BBBB-3333'), false, 'another servant\'s code is not in the file');
+  const mina = sheet.find(r => r[0] === 'مينا عادل');
+  assert.match(mina[4], /أهلاً مينا/);
+  assert.match(mina[4], /ATH-AAAA-2222/);
+  assert.match(mina[4], /https:\/\/example\.org\/points\//);
+  assert.equal(mina[5], 'https://wa.me/201012345678', 'the chat only, no text');
+  assert.deepEqual(m.distributionFiles(rows, { by: 'group' }).map(f => [f.name, f.count]), [['مجموعة الخريجين', 1], ['مجموعة الكليات', 2], ['مجموعة المغتربين', 1]]);
+  assert.deepEqual(m.distributionFiles(rows, { by: 'one' }).map(f => f.count), [4]);
+  assert.equal(m.bucketOf({ church: '' }, 'church'), 'من غير كنيسة');
+  const text = m.messagesText(rows.slice(0, 2), 'https://example.org/points/');
+  assert.match(text, /^— مينا عادل \(01012345678\)\nأهلاً مينا/);
+  assert.match(text, /\n\n— مريم زكريا/);
+  // a zip of the files opens back into the same workbooks
+  const { zip } = await import('../admin/xlsx.js');
+  const packed = await unzip(zip(files.map(f => ({ name: f.filename, data: writeXlsx(f.book) }))));
+  assert.deepEqual(Object.keys(packed).sort(), files.map(f => f.filename).sort());
 });
 
 test('normPhoneEg mirrors the server (normPhoneEg_) for the live preview', async () => {

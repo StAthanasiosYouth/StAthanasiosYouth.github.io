@@ -491,7 +491,9 @@ function activitySummary_(entry) {
     case 'create':
       if (type === 'sessions') return 'أضاف ' + thing;
       return 'أضاف ' + noun.fresh + (title ? ' ' + quoted(title) : '');
-    case 'update': return 'عدّل ' + thing;
+    case 'update':
+      if (type === 'participant' && changes.bulk) return 'غيّر ' + ({ servant: 'الخادم المسؤول', group: 'المجموعة' }[changes.field] || 'بيانات') + ' لـ ' + activityDigits_(changes.bulk) + ' مشترك';
+      return 'عدّل ' + thing;
     case 'delete': return type === 'participant' && changes.undoImport ? 'لغى استيراد ' + activityDigits_(changes.undoImport) + ' مشترك' : 'مسح ' + thing;
     case 'archive': return 'أرشف ' + thing;
     case 'unarchive': return 'رجّع ' + thing + ' من الأرشيف';
@@ -519,7 +521,7 @@ function activitySummary_(entry) {
     case 'regrade': return 'صحّح ' + thing + ' تاني (' + activityDigits_(changes.changed || 0) + ' مشاركة اتغيرت)';
     case 'close': return changes.reopen ? 'فتح ' + thing + ' تاني' : 'قفل ' + thing;
     case 'code.view': return 'شاف كود ' + quoted(title);
-    case 'code.reset': return 'عمل كود جديد لـ ' + quoted(title);
+    case 'code.reset': return changes.count ? 'عمل أكواد جديدة لـ ' + activityDigits_(changes.count) + ' مشترك' : 'عمل كود جديد لـ ' + quoted(title);
     case 'code.export': return 'صدّر أكواد (' + activityDigits_(changes.count || 0) + ')';
     case 'participant.phone': return 'غيّر رقم ' + quoted(title);
     case 'points.adjust': if (changes.sync) return 'راجع النقاط مع النتايج (' + activityDigits_(changes.sync) + ' مشاركة اتصلحت)';

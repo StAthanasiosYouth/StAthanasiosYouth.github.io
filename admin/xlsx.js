@@ -9,8 +9,9 @@
  *
  * Sheet = { name, rows: (string|number)[][], rtl?, widths?: number[],
  *           textColumns?: number[] (0-based; cells stay text, so a phone keeps
- *           its leading 0), lists?: [{ column, values: string[] }] (dropdowns),
- *           header?: true (first row bold + frozen) }
+ *           its leading 0), lists?: [{ column, values: string[] | range, strict? }]
+ *           (dropdowns), header?: true (first row bold + frozen), filter?: true
+ *           (the header's filter buttons), hidden?: number[] (columns kept out of sight) }
  *
  * Reading keeps every cell as text exactly as shown: shared / inline strings,
  * numbers as written in the file, booleans as TRUE/FALSE. Formulas give their
@@ -280,13 +281,14 @@ function cellXml(value, ref, style) {
 
 function sheetXml(sheet) {
   const text = new Set(sheet.textColumns || []);
+  const hidden = new Set(sheet.hidden || []);
   const header = sheet.header !== false;
   const widths = sheet.widths || [];
   const count = Math.max(widths.length, ...sheet.rows.map((row) => row.length), 1);
   let cols = '';
   for (let i = 0; i < count; i++) {
     const width = widths[i] || 16;
-    cols += '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + width + '" customWidth="1"' + (text.has(i) ? ' style="2"' : '') + '/>';
+    cols += '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + width + '" customWidth="1"' + (text.has(i) ? ' style="2"' : '') + (hidden.has(i) ? ' hidden="1"' : '') + '/>';
   }
   let body = '';
   sheet.rows.forEach((row, r) => {
@@ -297,13 +299,14 @@ function sheetXml(sheet) {
     });
     body += '<row r="' + (r + 1) + '">' + cells + '</row>';
   });
-  const lists = (sheet.lists || []).filter((list) => list.values && list.values.length);
+  // a list: values (inline) or range (another sheet's cells, e.g. "'القوائم'!$A$2:$A$80"); strict: false lets new words in
+  const lists = (sheet.lists || []).filter((list) => (list.values && list.values.length) || list.range);
   let validations = '';
   if (lists.length) {
     validations = '<dataValidations count="' + lists.length + '">' + lists.map((list) => {
       const col = columnName(list.column);
-      const formula = '"' + list.values.map((v) => String(v).replace(/"/g, '""')).join(',') + '"';
-      return '<dataValidation type="list" allowBlank="1" showErrorMessage="1" sqref="' + col + '2:' + col + '1000">'
+      const formula = list.range || '"' + list.values.map((v) => String(v).replace(/"/g, '""')).join(',') + '"';
+      return '<dataValidation type="list" allowBlank="1" showErrorMessage="' + (list.strict === false ? '0' : '1') + '" sqref="' + col + '2:' + col + Math.max(1000, sheet.rows.length + 500) + '">'
         + '<formula1>' + escapeXml(formula) + '</formula1></dataValidation>';
     }).join('') + '</dataValidations>';
   }
@@ -311,7 +314,10 @@ function sheetXml(sheet) {
   return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
     + '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
     + '<sheetViews><sheetView workbookViewId="0"' + (sheet.rtl === false ? '' : ' rightToLeft="1"') + '>' + pane + '</sheetView></sheetViews>'
-    + '<cols>' + cols + '</cols><sheetData>' + body + '</sheetData>' + validations
+    + '<cols>' + cols + '</cols><sheetData>' + body + '</sheetData>'
+    // the header's filter buttons (Excel / Google Sheets / LibreOffice)
+    + (sheet.filter && header ? '<autoFilter ref="A1:' + columnName(count - 1) + Math.max(sheet.rows.length, 2) + '"/>' : '')
+    + validations
     + '</worksheet>';
 }
 
@@ -329,6 +335,17 @@ const STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
   + '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"><alignment wrapText="1" vertical="top"/></xf>'
   + '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
   + '</styleSheet>';
+
+/* the hidden names Excel keeps for each sheet's filter range */
+function filterNames(sheets) {
+  const names = sheets.map((sheet, i) => {
+    if (!sheet.filter || sheet.header === false) return '';
+    const count = Math.max((sheet.widths || []).length, ...sheet.rows.map((row) => row.length), 1);
+    const ref = "'" + sheet.name.replace(/'/g, "''") + "'!$A$1:$" + columnName(count - 1) + '$' + Math.max(sheet.rows.length, 2);
+    return '<definedName name="_xlnm._FilterDatabase" localSheetId="' + i + '" hidden="1">' + escapeXml(ref) + '</definedName>';
+  }).join('');
+  return names ? '<definedNames>' + names + '</definedNames>' : '';
+}
 
 export function writeXlsx(book) {
   const sheets = book.sheets.map((sheet, i) => ({
@@ -354,7 +371,9 @@ export function writeXlsx(book) {
     + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
     + '<bookViews><workbookView' + (sheets[0] && sheets[0].rtl === false ? '' : ' rightToLeft="1"') + '/></bookViews><sheets>'
     + sheets.map((sheet, i) => '<sheet name="' + escapeXml(sheet.name) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>').join('')
-    + '</sheets></workbook>');
+    + '</sheets>'
+    + filterNames(sheets)
+    + '</workbook>');
   add('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
     + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
     + sheets.map((_, i) => '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>').join('')
@@ -384,9 +403,9 @@ export function firstDataSheet(book, preferredName) {
   return book.sheets.find((sheet) => sheet.rows.some((row) => row.some((cell) => String(cell).trim() !== ''))) || book.sheets[0];
 }
 
-/** Save bytes as a download (browser only). */
-export function download(bytes, filename) {
-  const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+/** Save bytes as a download (browser only); type defaults to xlsx (a .zip passes application/zip). */
+export function download(bytes, filename, type) {
+  const blob = new Blob([bytes], { type: type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
