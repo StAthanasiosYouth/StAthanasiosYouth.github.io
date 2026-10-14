@@ -1,5 +1,58 @@
 {
   "schema": 1,
+  "v": "fc169da2ed75",
+  "id": "pg-0d2eeb07",
   "slug": "black-theatre",
-  "withdrawn": true
+  "title": "المسرح الأسود",
+  "tagline": "حكايات بالنور والظل… ورسالة بتوصل من غير كلام",
+  "description": "فريق المسرح الأسود بيقدم عروض قصيرة بتعتمد على الإضاءة والحركة والمؤثرات البصرية، وكل عرض بيحكي فكرة ورسالة بطريقة مختلفة ومميزة.  \nهنا هتقدر تشوف مقتطفات من عروضنا السابقة، وتتعرف أكتر على الخدمة، وتشاهد بعض الأعمال اللي قدمناها في المناسبات والاجتماعات المختلفة.  \nبعض العروض بتتقدم بالتعاون مع فريق Brave Under Grace – B.U.G.",
+  "theme": "",
+  "cover": {
+    "src": "media/2026/img-09d4476b.webp",
+    "thumb": "media/2026/img-09d4476b-480.webp",
+    "w": 1600,
+    "h": 900,
+    "alt": "",
+    "color": "#412618"
+  },
+  "hero": {
+    "src": "media/2026/img-09d4476b.webp",
+    "thumb": "media/2026/img-09d4476b-480.webp",
+    "w": 1600,
+    "h": 900,
+    "alt": "",
+    "color": "#412618"
+  },
+  "partner": null,
+  "media": [
+    {
+      "id": "pm-81b596b6",
+      "title": "🎭 ميدلي العذراء",
+      "text": "BUG – Brave Under Grace\nBlack Theater Team",
+      "duration": "",
+      "cover": {
+        "src": "media/2026/img-8ffd40eb.webp",
+        "thumb": "media/2026/img-8ffd40eb-480.webp",
+        "w": 1600,
+        "h": 900,
+        "alt": "",
+        "color": "#47372c"
+      },
+      "source": "clip",
+      "clip": {
+        "type": "video",
+        "src": "media/2026/vid-c99f046e.mp4",
+        "poster": "media/2026/vid-c99f046e-480.webp",
+        "w": 854,
+        "h": 480,
+        "alt": "",
+        "start": 0,
+        "end": 6
+      },
+      "fullUrl": "https://www.facebook.com/share/v/18JfZXsrjn/",
+      "ctaLabel": "شاهد المسرحية كاملة"
+    }
+  ],
+  "team": null,
+  "publishedAt": "2026-10-14T18:04"
 }
