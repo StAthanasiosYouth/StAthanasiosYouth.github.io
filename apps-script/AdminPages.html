@@ -362,8 +362,20 @@
         body)
     ];
 
+    /*
+     * «تعديل» opens at once from the list's own copy (apiPages carries every
+     * field the editor shows); apiPage follows in the background for the
+     * video cards, and refills the editor only if the page changed meanwhile
+     * and nothing was typed yet.
+     */
     function openPage(id) {
-      A.call('apiPage', id).then(function (r) { pageEditor(r, reply); }).catch(function (error) { A.fail(error, box); });
+      var listed = reply && reply.pages.filter(function (p) { return p.id === id; })[0];
+      if (!listed) {
+        A.call('apiPage', id).then(function (r) { pageEditor(r, reply); }).catch(function (error) { A.fail(error, box); });
+        return;
+      }
+      pageEditor({ page: listed, media: null, mediaCount: listed.mediaCount, card: listed.card, servants: reply.servants, types: reply.types, limits: reply.limits }, reply);
+      freshPage(id, listed.updatedAt);
     }
 
     P.openPage = openPage;
@@ -371,10 +383,38 @@
 
   };
 
+  function sheetOpen() {
+    var sheet = document.getElementById('sheet');
+    return !!(sheet && sheet.open);
+  }
+
+  /* the page's full copy (its video cards), once per opening; a newer page refills an untouched editor */
+  var pageFetch = { id: '', promise: null };
+
+  function freshPage(id, seenAt) {
+    var promise = A.call('apiPage', id);
+    pageFetch = { id: id, promise: promise };
+    promise.then(function (fresh) {
+      if (pageFetch.promise !== promise || P.editing !== id || !sheetOpen()) return;
+      if (fresh.page.updatedAt !== seenAt && !A.dirty) {
+        pageEditor(fresh, null);
+        A.toast('اتحدثت لآخر نسخة', 'info');
+      }
+    }).catch(function () { /* the editor works without it; the video cards ask again */ });
+  }
+
+  /* the video cards need the full copy: the one already on its way, or a new one */
+  function withMedia(r) {
+    if (r.media) return Promise.resolve(r);
+    var promise = pageFetch.id === r.page.id && pageFetch.promise ? pageFetch.promise : A.call('apiPage', r.page.id);
+    return promise;
+  }
+
   function pageEditor(r, list) {
 
     var isNew = !r;
     var page = r ? r.page : { enabled: true, cardType: 'service', home: { show: true }, team: [] };
+    P.editing = isNew ? '' : page.id;
     var limits = (r && r.limits) || (list && list.limits) || {};
     var servants = (r && r.servants) || (list && list.servants) || [];
     var types = (r && r.types) || (list && list.types) || [];
@@ -435,7 +475,12 @@
     });
 
     var controls = isNew ? [] : [
-      el('button', { class: 'btn btn--small', type: 'button', onclick: function () { A.closeSheet().then(function (closed) { if (closed) mediaSheet(r); }); } }, icon('video'), 'كروت الفيديو (' + ar(r.media.length) + ')'),
+      el('button', { class: 'btn btn--small', type: 'button', onclick: function (e) {
+        var button = e.currentTarget;
+        A.withBusy(button, withMedia(r)).then(function (full) {
+          return A.closeSheet().then(function (closed) { if (closed) mediaSheet(full); });
+        }).catch(function (error) { A.fail(error, box); });
+      } }, icon('video'), 'كروت الفيديو (' + ar(r.media ? r.media.length : r.mediaCount || 0) + ')'),
       el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () { previewSheet('page', page.id, page.title); } }, icon('eye'), 'معاينة'),
       el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function (e) {
         A.withBusy(e.currentTarget, A.call('apiPageArchive', page.id, !page.archived)).then(function () {
@@ -677,8 +722,21 @@
       })));
     }
 
+    /* like a page: at once from the list's copy; apiEvent refreshes an untouched editor if the event changed */
     function openEvent(id) {
-      A.call('apiEvent', id).then(function (r) { eventEditor(r, reply); }).catch(function (error) { A.fail(error, box); });
+      var listed = reply && reply.events.filter(function (e) { return e.id === id; })[0];
+      if (!listed) {
+        A.call('apiEvent', id).then(function (r) { eventEditor(r, reply); }).catch(function (error) { A.fail(error, box); });
+        return;
+      }
+      eventEditor({ event: listed, card: listed.card, kinds: reply.kinds, servants: reply.servants, methods: reply.methods, limits: reply.limits }, reply);
+      A.call('apiEvent', id).then(function (fresh) {
+        if (P.editing !== id || !sheetOpen()) return;
+        if (fresh.event.updatedAt !== listed.updatedAt && !A.dirty) {
+          eventEditor(fresh, reply);
+          A.toast('اتحدثت لآخر نسخة', 'info');
+        }
+      }).catch(function () { /* the editor works without it */ });
     }
 
     P.openEvent = openEvent;
@@ -752,6 +810,7 @@
 
     var isNew = !r;
     var ev = r ? r.event : { enabled: true, kind: 'trip', home: { show: true }, servants: [], booking: null };
+    P.editing = isNew ? '' : ev.id;
     var kinds = (r && r.kinds) || (list && list.kinds) || [{ key: 'trip', label: 'رحلة' }, { key: 'conference', label: 'مؤتمر' }, { key: 'funday', label: 'يوم ترفيهي' }];
     var servants = (r && r.servants) || (list && list.servants) || [];
     var methods = ((r && r.methods) || (list && list.methods) || []).filter(function (m) { return m.active !== false; });

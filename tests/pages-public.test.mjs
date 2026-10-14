@@ -5,7 +5,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import vm from 'node:vm';
 
 // icons.js builds a <template> at import time
@@ -22,7 +22,13 @@ const read = path => readFileSync(new URL(path, ROOT), 'utf8');
 const json = path => JSON.parse(read(path));
 const PAGE = json('tests/fixtures/pages/page.json');
 const EVENT = json('tests/fixtures/pages/event.json');
-const SEED = json('content.json');
+// the published content.json as a base, without what admins publish of these features
+// (so the tests don't change when a real page or event goes live)
+const SEED = (({ pages, events, partners, ...rest }) => ({
+  ...rest,
+  activities: (rest.activities || []).filter(a => !a.page && !a.event),
+  layout: Array.isArray(rest.layout) ? rest.layout.filter(s => s.key !== 'services') : rest.layout
+}))(json('content.json'));
 const IMG = { src: 'media/2026/img-ab12cd34.webp', thumb: 'media/2026/img-ab12cd34-480.webp', w: 1600, h: 900, alt: 'x' };
 const clone = value => JSON.parse(JSON.stringify(value));
 
@@ -618,40 +624,34 @@ function runCollab({ partner = 'bug', hash = '', search = '', reduced = false, h
   };
 }
 
-test('collab.js: full for the first 3 sessions, then short; once a session; never within 6 hours; never when it shouldn\'t', () => {
-  const NOW = 1_800_000_000_000;
-  const HOUR = 3_600_000;
-  const LOCAL = 'athanasios.collab.v1:bug';
-
-  // first visit: the full overlay, aria-hidden, pictures from the site root (not the page)
+test('collab.js: the ident once a session; a light version on weak phones; never when it shouldn\'t', () => {
+  // first visit: the overlay, aria-hidden, the two logos (transparent, from the site root), the session remembered
   let r = runCollab();
   assert.equal(r.mode, 'full');
   assert.equal(r.hidden, 'true');
-  assert.deepEqual(r.images, ['https://site.test/assets/img/logo-256.webp', 'https://site.test/assets/img/partners/bug-logo-720.webp']);
+  assert.deepEqual(r.images, ['https://site.test/assets/img/partners/athanasios-family-240.webp', 'https://site.test/assets/img/partners/bug-symbol-320.webp']);
   assert.equal(r.session['athanasios:collab:bug'], '1');
-  assert.deepEqual(JSON.parse(r.local[LOCAL]), { n: 1, last: NOW });
-  assert.ok(r.timers.includes(2000), 'the hard 2 s limit');
-  assert.ok(Math.max(...r.timers) <= 2000);
+  assert.deepEqual(r.local, {}, 'nothing kept beyond the session');
+  assert.ok(r.timers.includes(700), 'starts by 0.7 s even if the logos are slow');
+  assert.ok(r.timers.includes(3300), 'the hard limit');
+  assert.ok(Math.max(...r.timers) <= 3300);
   assert.deepEqual([...new Set(r.listeners)].sort(), ['keydown', 'pointerdown', 'wheel']);
+  assert.doesNotMatch(r.overlay.className, /cintro--lite/);
 
   // the same session (another B.U.G. page): nothing
   r = runCollab({ session: { 'athanasios:collab:bug': '1' } });
   assert.deepEqual([r.mode, r.overlay], ['', null]);
 
-  // sessions 2 and 3 (more than 6 h apart): full; from the 4th: short (no overlay)
-  assert.equal(runCollab({ local: { [LOCAL]: JSON.stringify({ n: 2, last: NOW - 7 * HOUR }) } }).mode, 'full');
-  r = runCollab({ local: { [LOCAL]: JSON.stringify({ n: 3, last: NOW - 7 * HOUR }) } });
-  assert.deepEqual([r.mode, r.overlay], ['short', null]);
-  assert.deepEqual(JSON.parse(r.local[LOCAL]), { n: 4, last: NOW });
+  // a new session plays it again, whatever happened before
+  assert.equal(runCollab({ local: { 'athanasios.collab.v1:bug': JSON.stringify({ n: 9, last: Date.now() }) } }).mode, 'full');
 
-  // seen less than 6 hours ago (another session): nothing, and nothing written
-  r = runCollab({ local: { [LOCAL]: JSON.stringify({ n: 1, last: NOW - 5 * HOUR }) } });
-  assert.deepEqual([r.mode, r.session['athanasios:collab:bug'], JSON.parse(r.local[LOCAL]).n], ['', undefined, 1]);
-
-  // a broken or odd record counts as never
-  for (const bad of ['{', 'null', '"x"', JSON.stringify({ n: -4, last: 'soon' }), JSON.stringify({ n: 1e9, last: NOW + 99 * HOUR })]) {
-    assert.equal(runCollab({ local: { [LOCAL]: bad } }).mode, 'full', bad);
+  // a weak phone: the same ident, light
+  for (const options of [{ cores: 4, memory: 4 }, { memory: 2 }]) {
+    r = runCollab(options);
+    assert.equal(r.mode, 'full');
+    assert.match(r.overlay.className, /cintro--lite/);
   }
+  assert.doesNotMatch(runCollab({ cores: 4, memory: 8 }).overlay.className, /cintro--lite/, '4 cores with 8 GB is fine');
 
   // storage that throws: never risks replaying on every page
   assert.equal(runCollab({ broken: true }).mode, '');
@@ -660,14 +660,13 @@ test('collab.js: full for the first 3 sessions, then short; once a session; neve
   for (const [why, options] of [
     ['no partner', { partner: '' }], ['unknown partner', { partner: 'acme' }], ['bad key', { partner: 'BUG' }],
     ['reduced motion', { reduced: true }], ['deep link', { hash: '#v/pm-clip0001' }], ['hidden tab', { hidden: true }],
-    ['framed', { framed: true }], ['weak: 4 cores and 4 GB', { cores: 4, memory: 4 }], ['weak: 2 GB', { memory: 2 }],
-    ['data saver', { saveData: true }], ['admin preview (?preview)', { search: '?preview' }], ['admin preview (data-preview)', { preview: true }],
+    ['framed', { framed: true }], ['data saver', { saveData: true }],
+    ['admin preview (?preview)', { search: '?preview' }], ['admin preview (data-preview)', { preview: true }],
     ['no getAnimations', { animations: false }]
   ]) {
     r = runCollab(options);
     assert.deepEqual([r.mode, r.overlay, r.session['athanasios:collab:bug']], ['', null, undefined], why);
   }
-  assert.equal(runCollab({ cores: 4, memory: 8 }).mode, 'full', '4 cores with 8 GB is fine');
   assert.equal(runCollab({ hash: '#' }).mode, 'full', 'an empty # is not a deep link');
 });
 
@@ -689,6 +688,11 @@ test('collab.js: a classic script in both shells\' <head>; text only; every stor
   }
   const css = read('assets/css/page.css');
   for (const rule of ['.collab {', '.collab__plate {', '.cintro {', '@keyframes cintro-out', 'html[data-collab="short"]', '--partner-plate:']) assert.ok(css.includes(rule), rule);
-  // the full version fits in 1.6 s: the last step starts at 1.25 s and lasts .35 s
-  assert.match(css, /animation: cintro-out \.35s var\(--ease-out\) 1\.25s both;/);
+  // the ident fits in 2.35 s: the last step starts at 1.95 s and lasts .4 s (collab.js FULL)
+  assert.match(css, /\.cintro\.is-go \{\r?\n  animation: cintro-out \.4s cubic-bezier\(\.4, 0, \.2, 1\) 1\.95s both;/);
+  assert.match(read('assets/js/page/collab.js'), /var FULL = 2350;/);
+  // the logos it shows are in the repository, transparent
+  for (const file of ['athanasios-family-240', 'athanasios-family-480', 'bug-symbol-320', 'bug-symbol-640']) {
+    assert.ok(existsSync(new URL(`assets/img/partners/${file}.webp`, ROOT)), file);
+  }
 });

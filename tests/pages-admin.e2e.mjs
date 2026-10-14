@@ -271,6 +271,42 @@ test('«صفحات الخدمة»: a new page with its cover, its video card; on
   assert.equal(plain(world.as(ADMIN).gs.apiPage(pages[0].id)).page.home.show, true);
 });
 
+test('«تعديل» opens the page editor at once from the list (the full copy follows; a slow server never holds the sheet)', async () => {
+  await d.page.evaluate(() => A.go('pages', 'svcpages'));
+  await d.page.waitForFunction(() => document.querySelector('.view .item [aria-label^="تعديل"]'), { timeout: 10000 });
+  // the server answers apiPage 3 s late from here on
+  await d.page.evaluate(() => {
+    const call = A.call;
+    window.__apiPageCalls = 0;
+    A.call = function (fn) {
+      if (fn === 'apiPage') {
+        window.__apiPageCalls++;
+        const answer = call.apply(A, arguments);
+        return new Promise(resolve => setTimeout(resolve, 3000)).then(() => answer);
+      }
+      return call.apply(A, arguments);
+    };
+    window.__restoreCall = () => { A.call = call; };
+  });
+  const opened = await d.page.evaluate(() => new Promise(resolve => {
+    const t0 = performance.now();
+    document.querySelector('.view .item [aria-label^="تعديل"]').click();
+    const check = () => (document.querySelector('dialog.sheet[open] .field[data-label="العنوان"] input')?.value
+      ? resolve({ ms: performance.now() - t0, title: document.querySelector('dialog.sheet[open] .field[data-label="العنوان"] input').value })
+      : requestAnimationFrame(check));
+    check();
+  }));
+  assert.ok(opened.ms < 400, `the sheet was open and filled after ${Math.round(opened.ms)} ms`);
+  assert.equal(opened.title, 'المسرح الأسود');
+  assert.equal(await d.page.evaluate(() => window.__apiPageCalls), 1, 'one background request, not one per field');
+  // «كروت الفيديو» waits for that same request (no second one), then shows the cards
+  await clickText('dialog.sheet[open] button', 'كروت الفيديو');
+  await d.page.waitForFunction(() => /كروت الفيديو/.test(document.querySelector('dialog.sheet[open] .sheet__title')?.textContent || '') && document.querySelectorAll('dialog.sheet[open] .list .item').length === 1, { timeout: 8000 });
+  assert.equal(await d.page.evaluate(() => window.__apiPageCalls), 1, 'the video cards reused the request already on its way');
+  await d.page.evaluate(() => { window.__restoreCall(); A.dirty = false; return A.closeSheet(); });
+  await sheetGone();
+});
+
 test('«الفعاليات»: a trip with prices and a servant; its card in «الفعاليات»', async () => {
   await d.page.evaluate(() => A.go('pages', 'events'));
   await $('.view .empty-state');

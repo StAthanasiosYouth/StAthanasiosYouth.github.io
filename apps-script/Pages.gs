@@ -1030,7 +1030,16 @@ function pagesCardTypes_() {
 
 }
 
+/* one read of each table for the whole answer (homeCardInfo_ per item) */
 function apiPages() {
+
+  assertAdmin_();
+
+  return tableScope_(function () { return pagesListNow_(); });
+
+}
+
+function pagesListNow_() {
 
   assertAdmin_();
 
@@ -1061,7 +1070,16 @@ function apiPages() {
 
 }
 
+/* one read of each table for the whole answer (homeCardInfo_ per item) */
 function apiPage(id) {
+
+  assertAdmin_();
+
+  return tableScope_(function () { return pageNow_(id); });
+
+}
+
+function pageNow_(id) {
 
   assertAdmin_();
   pagesValidId_(id, PAGE_ID, 'معرّف الصفحة');
@@ -1378,7 +1396,16 @@ function eventOut_(row) {
 
 }
 
+/* one read of each table for the whole answer (homeCardInfo_ per item) */
 function apiEvents() {
+
+  assertAdmin_();
+
+  return tableScope_(function () { return eventsListNow_(); });
+
+}
+
+function eventsListNow_() {
 
   assertAdmin_();
 
@@ -1399,7 +1426,16 @@ function apiEvents() {
 
 }
 
+/* one read of each table for the whole answer (homeCardInfo_ per item) */
 function apiEvent(id) {
+
+  assertAdmin_();
+
+  return tableScope_(function () { return eventNow_(id); });
+
+}
+
+function eventNow_(id) {
 
   assertAdmin_();
   pagesValidId_(id, EVENT_ID, 'معرّف الفعالية');

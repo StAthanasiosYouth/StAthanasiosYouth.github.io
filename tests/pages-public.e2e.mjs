@@ -50,7 +50,13 @@ const WITHDRAWN = JSON.parse(readFileSync(`${FIX}withdrawn.json`, 'utf8'));
 const PAGE_BUG = JSON.parse(readFileSync(`${FIX}page-partner.json`, 'utf8'));
 const EVENT_BUG = JSON.parse(readFileSync(`${FIX}event-partner.json`, 'utf8'));
 const SHELL = readFileSync(`${ROOT}pages/index.html`, 'utf8');
-const SEED = JSON.parse(readFileSync(`${ROOT}content.json`, 'utf8'));
+// the published content.json as a base, without what admins publish of these features
+// (so the tests don't change when a real page or event goes live)
+const SEED = (({ pages, events, partners, ...rest }) => ({
+  ...rest,
+  activities: (rest.activities || []).filter(a => !a.page && !a.event),
+  layout: Array.isArray(rest.layout) ? rest.layout.filter(s => s.key !== 'services') : rest.layout
+}))(JSON.parse(readFileSync(`${ROOT}content.json`, 'utf8')));
 
 // the server's clock (Cairo is UTC+3 until the end of October 2026)
 const BEFORE_OPEN = 'Fri, 09 Oct 2026 09:00:00 GMT';     // 2026-10-09T12:00 Cairo
@@ -651,7 +657,7 @@ test('B.U.G. intro: the first visit plays the full overlay, gone within 2 s onto
   const { context, page, problems } = await open('/bug-theatre/', PHONE, { reduced: false, init: recordIntro, waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__collab.added !== null, { timeout: 3000 });
   assert.equal(await page.$eval('.cintro', el => el.getAttribute('aria-hidden')), 'true');
-  await page.waitForFunction(() => performance.now() - window.__collab.added > 950);
+  await page.waitForFunction(() => performance.now() - window.__collab.added > 1700);
   await page.screenshot({ path: `${SHOTS}intro-360.png` });
   // the page renders underneath from the start (the overlay never holds it back)
   assert.equal(await page.$eval('main', el => el.dataset.state), 'ready');
@@ -659,15 +665,14 @@ test('B.U.G. intro: the first visit plays the full overlay, gone within 2 s onto
   await page.waitForFunction(() => window.__collab.removed !== null, { timeout: 3000 });
   let log = await introLog(page);
   assert.deepEqual(log.modes, ['full']);
-  assert.ok(log.removed - log.added <= 2000, `removed after ${Math.round(log.removed - log.added)} ms`);
-  assert.ok(log.removed - log.added >= 1200, 'the full version plays to its end');
+  assert.ok(log.removed - log.added <= 3300, `removed after ${Math.round(log.removed - log.added)} ms`);
+  assert.ok(log.removed - log.added >= 2200, 'the ident plays to its end (≈ 2.35 s)');
   assert.equal(log.overlay, false);
   assert.equal(log.state, 'done');
   assert.equal((await lockup(page)).inside, true, 'it lifts onto the hero lockup');
-  const stored = await page.evaluate(() => ({ session: sessionStorage.getItem('athanasios:collab:bug'), local: JSON.parse(localStorage.getItem('athanasios.collab.v1:bug')) }));
+  const stored = await page.evaluate(() => ({ session: sessionStorage.getItem('athanasios:collab:bug'), local: localStorage.getItem('athanasios.collab.v1:bug') }));
   assert.equal(stored.session, '1');
-  assert.equal(stored.local.n, 1);
-  assert.ok(stored.local.last > Date.now() - 60000);
+  assert.equal(stored.local, null, 'nothing kept beyond the session');
   await page.screenshot({ path: `${SHOTS}intro-after-360.png` });
 
   // another B.U.G. page in the same session: no intro
@@ -683,7 +688,7 @@ test('B.U.G. intro: the first visit plays the full overlay, gone within 2 s onto
 test('B.U.G. intro at 1366: the same composition, centred', async () => {
   const { context, page, problems } = await open('/events/bug-camp/', DESKTOP, { reduced: false, init: recordIntro, waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__collab.added !== null, { timeout: 3000 });
-  await page.waitForFunction(() => performance.now() - window.__collab.added > 1000);
+  await page.waitForFunction(() => performance.now() - window.__collab.added > 1700);
   await page.screenshot({ path: `${SHOTS}intro-1366.png` });
   await page.waitForFunction(() => window.__collab.removed !== null, { timeout: 3000 });
   assert.ok(await overflow(page) <= 0);
@@ -706,7 +711,7 @@ test('B.U.G. intro: a tap skips it at once and is spent on it (nothing underneat
   await context.close();
 });
 
-test('B.U.G. intro: none with reduced motion or a #hash deep link; the short version after 3 sessions; none within 6 hours', async () => {
+test('B.U.G. intro: none with reduced motion or a #hash deep link; a light version on a weak phone; again in a new session', async () => {
   // reduced motion: the static lockup
   let { context, page } = await open('/bug-theatre/', PHONE, { reduced: true, init: recordIntro });
   await ready(page);
@@ -724,24 +729,27 @@ test('B.U.G. intro: none with reduced motion or a #hash deep link; the short ver
   assert.equal(await page.evaluate(() => sessionStorage.getItem('athanasios:collab:bug')), null, 'not counted as seen');
   await context.close();
 
-  // the 4th session, 7 hours after the last: the short cross-fade, no overlay
-  const seenBefore = hours => new Function(`localStorage.setItem('athanasios.collab.v1:bug', JSON.stringify({ n: 3, last: Date.now() - ${hours} * 3600000 }));`);
-  ({ context, page } = await open('/bug-theatre/', PHONE, { reduced: false, init: [recordIntro, seenBefore(7)], waitUntil: 'domcontentloaded' }));
-  await page.waitForSelector('.phero .collab__plate', { timeout: 5000 });
-  const animated = await page.evaluate(() => document.querySelector('.collab__plate').getAnimations().map(a => a.animationName));
-  assert.ok(animated.includes('collab-plate'), `the lockup cross-fades in place (${animated})`);
+  // a weak phone (4 cores, 3 GB): the same ident, without the 3D and the blurs, to its end
+  const weakPhone = () => {
+    Object.defineProperty(Navigator.prototype, 'hardwareConcurrency', { get: () => 4, configurable: true });
+    Object.defineProperty(Navigator.prototype, 'deviceMemory', { get: () => 3, configurable: true });
+  };
+  ({ context, page } = await open('/bug-theatre/', PHONE, { reduced: false, init: [recordIntro, weakPhone], waitUntil: 'domcontentloaded' }));
+  await page.waitForSelector('.cintro.cintro--lite.is-go', { timeout: 3000 });
+  const lite = await page.evaluate(() => ({
+    blur: getComputedStyle(document.querySelector('.cintro__side--ours')).filter,
+    motes: getComputedStyle(document.querySelector('.cintro__mote')).display
+  }));
+  assert.equal(lite.blur, 'none');
+  assert.equal(lite.motes, 'none');
+  await page.waitForFunction(() => window.__collab.removed !== null, { timeout: 4000 });
   log = await introLog(page);
-  assert.deepEqual([log.added, log.modes], [null, ['short']]);
-  await page.waitForFunction(() => !document.documentElement.hasAttribute('data-collab'), { timeout: 4000 });
-  assert.equal(await page.evaluate(() => document.documentElement.dataset.collabState), 'done');
-  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('athanasios.collab.v1:bug')).n), 4);
+  assert.deepEqual(log.modes, ['full']);
   await context.close();
 
-  // seen an hour ago (another session): nothing
-  ({ context, page } = await open('/bug-theatre/', PHONE, { reduced: false, init: [recordIntro, seenBefore(1)] }));
-  await ready(page);
-  log = await introLog(page);
-  assert.deepEqual([log.added, log.modes], [null, []]);
+  // a new session (a fresh tab), whatever was seen before: it plays again
+  ({ context, page } = await open('/bug-theatre/', PHONE, { reduced: false, init: recordIntro, waitUntil: 'domcontentloaded' }));
+  await page.waitForFunction(() => window.__collab.added !== null, { timeout: 3000 });
   await context.close();
 });
 
