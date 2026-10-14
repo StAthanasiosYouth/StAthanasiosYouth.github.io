@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "v": "24e88f0d82ca",
+  "id": "pg-0d2eeb07",
+  "slug": "black-theatre",
+  "title": "المسرح الأسود",
+  "tagline": "حكايات بالنور والظل… ورسالة بتوصل من غير كلام",
+  "description": "فريق المسرح الأسود بيقدم عروض قصيرة بتعتمد على الإضاءة والحركة والمؤثرات البصرية، وكل عرض بيحكي فكرة ورسالة بطريقة مختلفة ومميزة.  \nهنا هتقدر تشوف مقتطفات من عروضنا السابقة، وتتعرف أكتر على الخدمة، وتشاهد بعض الأعمال اللي قدمناها في المناسبات والاجتماعات المختلفة.  \nبعض العروض بتتقدم بالتعاون مع فريق Brave Under Grace – B.U.G.",
+  "theme": "",
+  "cover": {
+    "src": "media/2026/img-09d4476b.webp",
+    "thumb": "media/2026/img-09d4476b-480.webp",
+    "w": 1600,
+    "h": 900,
+    "alt": "",
+    "color": "#412618"
+  },
+  "hero": {
+    "src": "media/2026/img-09d4476b.webp",
+    "thumb": "media/2026/img-09d4476b-480.webp",
+    "w": 1600,
+    "h": 900,
+    "alt": "",
+    "color": "#412618"
+  },
+  "partner": {
+    "key": "bug",
+    "name": "Brave Under Grace – B.U.G.",
+    "short": "B.U.G.",
+    "logo": {
+      "src": "assets/img/partners/bug-logo-720.webp",
+      "thumb": "assets/img/partners/bug-logo-360.webp",
+      "w": 720,
+      "h": 305,
+      "alt": "شعار Brave Under Grace – B.U.G."
+    },
+    "mark": {
+      "src": "assets/img/partners/bug-mark-96.webp",
+      "w": 306,
+      "h": 96,
+      "alt": "B.U.G."
+    },
+    "url": null
+  },
+  "media": [],
+  "team": {
+    "title": "مسؤلين خدمة المسرح الأسود",
+    "text": "عايز تنضم لفريق المسرح؟",
+    "people": [
+      {
+        "id": "srv-72accde8",
+        "name": "كريستين عماد",
+        "role": "مسرح أسود",
+        "image": null,
+        "wa": "https://wa.me/201205955243"
+      }
+    ]
+  },
+  "publishedAt": "2026-10-14T16:19"
+}
