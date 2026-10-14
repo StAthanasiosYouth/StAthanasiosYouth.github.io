@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "v": "5194386e9bdf",
+  "v": "0940baf2b07d",
   "id": "pg-0d2eeb07",
   "slug": "black-theatre",
   "title": "المسرح الأسود",
@@ -59,18 +59,53 @@
       "source": "clip",
       "clip": {
         "type": "video",
-        "src": "media/2026/vid-c99f046e.mp4",
-        "poster": "media/2026/vid-c99f046e-480.webp",
+        "src": "media/2026/vid-1dab96f8.mp4",
+        "poster": "media/2026/vid-1dab96f8-480.webp",
         "w": 854,
         "h": 480,
         "alt": "",
         "start": 0,
         "end": 6
       },
+      "audio": {
+        "mode": "custom",
+        "src": "media/2026/aud-fde40f81.mp3"
+      },
       "fullUrl": "https://www.facebook.com/share/v/18JfZXsrjn/",
+      "ctaLabel": "شاهد المسرحية كاملة"
+    },
+    {
+      "id": "pm-f641b60e",
+      "title": "جاء المخلص",
+      "text": "",
+      "duration": "",
+      "cover": {
+        "src": "media/2026/img-53ca69a3.webp",
+        "thumb": "media/2026/img-53ca69a3-480.webp",
+        "w": 1280,
+        "h": 720,
+        "alt": "",
+        "color": "#463a2f"
+      },
+      "source": "clip",
+      "clip": {
+        "type": "video",
+        "src": "media/2026/vid-91def8c7.mp4",
+        "poster": "media/2026/vid-91def8c7-480.webp",
+        "w": 854,
+        "h": 480,
+        "alt": "",
+        "start": 0,
+        "end": 6
+      },
+      "audio": {
+        "mode": "original",
+        "src": null
+      },
+      "fullUrl": "https://www.facebook.com/share/v/1F4ESNjpdd/",
       "ctaLabel": "شاهد المسرحية كاملة"
     }
   ],
   "team": null,
-  "publishedAt": "2026-10-14T18:39"
+  "publishedAt": "2026-10-15T02:45"
 }
