@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "b83656de04ee",
-  "publishedAt": "2026-10-14T15:14:45.336Z",
+  "revision": "014e69373f6b",
+  "publishedAt": "2026-10-14T15:39:37.164Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -378,7 +378,8 @@
       "displayMobile": "",
       "page": "black-theatre",
       "ctaLabel": "ادخل صفحة فريق المسرح ال",
-      "watch": true
+      "watch": true,
+      "partner": "bug"
     }
   ],
   "types": [
@@ -391,17 +392,6 @@
     }
   ],
   "layout": [
-    {
-      "key": "meeting",
-      "kind": "meeting",
-      "title": "ركن الاجتماع",
-      "subtitle": "",
-      "icon": "",
-      "theme": "",
-      "banner": null,
-      "visibleFrom": "",
-      "visibleUntil": ""
-    },
     {
       "key": "featured",
       "kind": "featured",
@@ -417,6 +407,17 @@
         "alt": "",
         "color": "#314556"
       },
+      "visibleFrom": "",
+      "visibleUntil": ""
+    },
+    {
+      "key": "meeting",
+      "kind": "meeting",
+      "title": "ركن الاجتماع",
+      "subtitle": "",
+      "icon": "",
+      "theme": "",
+      "banner": null,
       "visibleFrom": "",
       "visibleUntil": ""
     },
@@ -547,10 +548,31 @@
         "alt": "",
         "color": "#412618"
       },
-      "partner": null,
-      "v": "fc169da2ed75"
+      "partner": "bug",
+      "v": "5194386e9bdf"
     }
   ],
+  "partners": {
+    "bug": {
+      "key": "bug",
+      "name": "Brave Under Grace – B.U.G.",
+      "short": "B.U.G.",
+      "logo": {
+        "src": "assets/img/partners/bug-logo-720.webp",
+        "thumb": "assets/img/partners/bug-logo-360.webp",
+        "w": 720,
+        "h": 305,
+        "alt": "شعار Brave Under Grace – B.U.G."
+      },
+      "mark": {
+        "src": "assets/img/partners/bug-symbol-320.webp",
+        "w": 320,
+        "h": 107,
+        "alt": "B.U.G."
+      },
+      "url": null
+    }
+  },
   "points": {
     "url": "points/",
     "shop": {

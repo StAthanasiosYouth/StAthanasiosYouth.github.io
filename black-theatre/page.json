@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "v": "fc169da2ed75",
+  "v": "5194386e9bdf",
   "id": "pg-0d2eeb07",
   "slug": "black-theatre",
   "title": "المسرح الأسود",
@@ -23,7 +23,25 @@
     "alt": "",
     "color": "#412618"
   },
-  "partner": null,
+  "partner": {
+    "key": "bug",
+    "name": "Brave Under Grace – B.U.G.",
+    "short": "B.U.G.",
+    "logo": {
+      "src": "assets/img/partners/bug-logo-720.webp",
+      "thumb": "assets/img/partners/bug-logo-360.webp",
+      "w": 720,
+      "h": 305,
+      "alt": "شعار Brave Under Grace – B.U.G."
+    },
+    "mark": {
+      "src": "assets/img/partners/bug-symbol-320.webp",
+      "w": 320,
+      "h": 107,
+      "alt": "B.U.G."
+    },
+    "url": null
+  },
   "media": [
     {
       "id": "pm-81b596b6",
@@ -54,5 +72,5 @@
     }
   ],
   "team": null,
-  "publishedAt": "2026-10-14T18:04"
+  "publishedAt": "2026-10-14T18:39"
 }
