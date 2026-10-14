@@ -416,7 +416,7 @@ test('«بإشراف B.U.G.»: the page / event JSON carry the partner, the stub
   assert.equal(def.partner.key, 'bug');
   assert.equal(def.partner.name, 'Brave Under Grace – B.U.G.');
   assert.match(def.partner.logo.src, /^assets\/img\/partners\/bug-logo-720\.webp$/);
-  assert.match(def.partner.mark.src, /^assets\/img\/partners\/bug-mark-96\.webp$/);
+  assert.match(def.partner.mark.src, /^assets\/img\/partners\/bug-symbol-320\.webp$/);
   assert.match(files['black-theatre/index.html'], /data-partner="bug">/);
   assert.equal(json(files, 'events/alex-trip/event.json').partner, null);
   assert.ok(!/data-partner/.test(files['events/alex-trip/index.html']));
@@ -433,7 +433,29 @@ test('«بإشراف B.U.G.»: the page / event JSON carry the partner, the stub
   const after = json(world.github.files(), 'content.json');
   assert.equal(after.partners, undefined);
   assert.equal(json(world.github.files(), 'black-theatre/page.json').partner, null);
-  for (const path of ['assets/img/partners/bug-logo-720.webp', 'assets/img/partners/bug-logo-360.webp', 'assets/img/partners/bug-mark-96.webp']) {
+  for (const path of ['assets/img/partners/bug-logo-720.webp', 'assets/img/partners/bug-logo-360.webp', 'assets/img/partners/bug-symbol-320.webp']) {
     assert.ok(existsSync(`${ROOT_DIR}${path}`), path + ' is in the repository');
   }
+});
+
+
+/* ---------------- video cards: the cover is optional with a preview clip ---------------- */
+
+test('a video card with a preview clip and no picture shows a frame of the clip; a link-only card still needs its picture', () => {
+  const ctx = setup();
+  const { world, call, clip } = ctx;
+  const page = call('apiPageSave', null, { slug: 'silent-theatre', title: 'المسرح الصامت', cover: ctx.cover.id, home: { show: false } });
+  call('apiPageMediaSave', page.page.id, null, { title: 'مقطع من العرض', text: 'وصف قصير', source: 'clip', clip: clip.id + '@1-9', fullUrl: 'https://youtu.be/full', ctaLabel: 'شاهد العرض كامل' });
+  assert.throws(() => call('apiPageMediaSave', page.page.id, null, { title: 'لينك بس', source: 'link', fullUrl: 'https://youtu.be/x' }), /صورة الكارت مطلوبة/);
+  assert.throws(() => call('apiPageMediaSave', page.page.id, null, { title: 'من غير مقطع', source: 'clip' }), /مقطع العرض جوه الصفحة/);
+  publish(world, call);
+  const def = json(world.github.files(), 'silent-theatre/page.json');
+  assert.equal(def.media.length, 1);
+  const card = def.media[0];
+  assert.equal(card.source, 'clip');
+  assert.equal(card.cover.src, card.clip.poster, 'the clip\'s poster is the card\'s picture');
+  assert.deepEqual([card.clip.start, card.clip.end], [1, 9]);
+  assert.equal(card.text, 'وصف قصير');
+  assert.equal(card.fullUrl, 'https://youtu.be/full');
+  assert.equal(card.ctaLabel, 'شاهد العرض كامل');
 });

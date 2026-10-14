@@ -157,8 +157,14 @@ async function setField(label, value, scope = 'dialog.sheet[open]') {
   }, value);
 }
 
-async function pickImage(scopeSelector) {
-  await d.page.evaluate(s => [...document.querySelector(s).querySelectorAll('button')].find(b => b.textContent.includes('من المكتبة')).click(), scopeSelector);
+/* «من المكتبة» of the first image picker in scope, or of the one whose label is `label` */
+async function pickImage(scopeSelector, label = '') {
+  await d.page.evaluate((s, l) => {
+    const labelOf = p => ((p.parentElement && p.parentElement.querySelector(':scope > .field__label')) || {}).textContent;
+    const pickers = [...document.querySelectorAll(s)].filter(p => !l || labelOf(p) === l);
+    if (!pickers.length) throw new Error('no picker labelled ' + l);
+    [...pickers[0].querySelectorAll('button')].find(b => b.textContent.includes('من المكتبة')).click();
+  }, scopeSelector, label);
   await $('dialog.picker-dialog[open] .media-tile');
   await d.page.evaluate(() => [...document.querySelectorAll('dialog.picker-dialog[open] .media-tile')].find(t => !t.classList.contains('is-video')).click());
   await d.page.waitForFunction(() => !document.querySelector('dialog.picker-dialog'));
@@ -222,11 +228,21 @@ test('«صفحات الخدمة»: a new page with its cover, its video card; on
   // straight into its video cards
   await d.page.waitForFunction(() => /كروت الفيديو/.test(document.querySelector('dialog.sheet[open] .sheet__title')?.textContent || ''), { timeout: 10000 });
   await clickText('dialog.sheet[open] button', 'كارت جديد');
-  await setField('العنوان', 'عرض الكريسماس');
-  await setField('سطر قصير', 'أول عرض للفريق');
-  await setField('لينك المسرحية كاملة', 'https://www.youtube.com/watch?v=abc');
-  await pickImage('dialog.sheet[open] .picker');
-  await d.page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .gallery-picker button')].find(b => b.textContent.includes('زوّد')).click());
+  // the card's own labels: never mixed up with the page's banner / cover
+  const labels = await d.page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] legend, dialog.sheet[open] .field__label')].map(n => n.textContent.trim()));
+  for (const want of ['١. المقطع اللي بيشتغل جوه الصفحة', '٢. صورة الكارت', '٣. العنوان والوصف', '٤. الفيديو الكامل', 'مقطع العرض جوه الصفحة', 'أو ارفع فيديو جديد وقصّه', 'صورة الكارت', 'عنوان الفيديو', 'وصف قصير', 'لينك الفيديو الكامل', 'نص زرار الفيديو الكامل']) {
+    assert.ok(labels.some(t => t.startsWith(want)), want + ' in ' + labels.join(' | '));
+  }
+  await setField('عنوان الفيديو', 'عرض الكريسماس');
+  await setField('وصف قصير', 'أول عرض للفريق');
+  await setField('لينك الفيديو الكامل', 'https://www.youtube.com/watch?v=abc');
+  await pickImage('dialog.sheet[open] .picker', 'صورة الكارت');
+  await shot('03a-card-editor');
+  await d.page.$eval('dialog.sheet[open] .sheet__body', n => { n.scrollTop = n.scrollHeight; });
+  await shot('03b-card-editor-end');
+  await d.page.$eval('dialog.sheet[open] .sheet__body', n => { n.scrollTop = 0; });
+  assert.match(await d.page.$eval('dialog.sheet[open] .gallery-picker', n => n.textContent), /لسه مفيش مقطع/, 'the card has its own empty words');
+  await d.page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .gallery-picker button')].find(b => b.textContent.includes('اختار مقطع من المكتبة')).click());
   await $('dialog.picker-dialog[open] .media-tile.is-video');
   await d.page.evaluate(() => document.querySelector('dialog.picker-dialog[open] .media-tile.is-video').click());
   await d.page.waitForFunction(() => !document.querySelector('dialog.picker-dialog'));
@@ -291,9 +307,12 @@ test('«تعديل» opens the page editor at once from the list (the full copy 
   const opened = await d.page.evaluate(() => new Promise(resolve => {
     const t0 = performance.now();
     document.querySelector('.view .item [aria-label^="تعديل"]').click();
-    const check = () => (document.querySelector('dialog.sheet[open] .field[data-label="العنوان"] input')?.value
-      ? resolve({ ms: performance.now() - t0, title: document.querySelector('dialog.sheet[open] .field[data-label="العنوان"] input').value })
-      : requestAnimationFrame(check));
+    const check = () => {
+      const input = document.querySelector('dialog.sheet[open] .field[data-label="العنوان"] input');
+      if (input && input.value) resolve({ ms: performance.now() - t0, title: input.value });
+      else if (performance.now() - t0 > 6000) resolve({ ms: Infinity, title: '' });
+      else requestAnimationFrame(check);
+    };
     check();
   }));
   assert.ok(opened.ms < 400, `the sheet was open and filled after ${Math.round(opened.ms)} ms`);
@@ -399,7 +418,8 @@ test('publish → /black-theatre/, /events/alex-trip/ and the home page\'s cards
   await pub.goto(`${PUB}/black-theatre/`, { waitUntil: 'networkidle0' });
   await pub.waitForFunction(() => /المسرح الأسود/.test(document.body.textContent) && /عرض الكريسماس/.test(document.body.textContent), { timeout: 15000 });
   assert.equal(await pub.evaluate(() => document.documentElement.dataset.partner), 'bug');
-  await pub.waitForFunction(() => [...document.querySelectorAll('img')].some(i => i.src.includes('partners/bug-logo') && i.complete && i.naturalWidth > 0), { timeout: 10000 });
+  // the quiet co-brand line under the title, its two marks drawn
+  await pub.waitForFunction(() => [...document.querySelectorAll('.cobrand img')].length === 2 && [...document.querySelectorAll('.cobrand img')].every(i => i.complete && i.naturalWidth > 0), { timeout: 10000 });
   await pub.waitForFunction(() => !document.querySelector('.collab'), { timeout: 4000 }).catch(() => {});
   await shot('09-public-page', pub);
 

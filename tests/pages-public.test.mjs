@@ -687,7 +687,7 @@ test('collab.js: a classic script in both shells\' <head>; text only; every stor
     assert.ok(head.indexOf('page.css') < head.indexOf('collab.js'), `${file}: after the stylesheet (styled from the first paint)`);
   }
   const css = read('assets/css/page.css');
-  for (const rule of ['.collab {', '.collab__plate {', '.cintro {', '@keyframes cintro-out', 'html[data-collab="short"]', '--partner-plate:']) assert.ok(css.includes(rule), rule);
+  for (const rule of ['.cobrand {', '.cobrand__mark {', '.cintro {', '@keyframes cintro-out', '--partner-plate:']) assert.ok(css.includes(rule), rule);
   // the ident fits in 2.35 s: the last step starts at 1.95 s and lasts .4 s (collab.js FULL)
   assert.match(css, /\.cintro\.is-go \{\r?\n  animation: cintro-out \.4s cubic-bezier\(\.4, 0, \.2, 1\) 1\.95s both;/);
   assert.match(read('assets/js/page/collab.js'), /var FULL = 2350;/);

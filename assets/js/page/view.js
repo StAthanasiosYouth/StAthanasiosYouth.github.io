@@ -13,7 +13,7 @@
  *           «احجز الآن» (prices + optional counter, the window, the
  *           servants' WhatsApp), terms
  *   events  the published events (content.json events[]), upcoming first
- *   partner «بإشراف» (§12): the hero lockup on a page / an event, the
+ *   partner «بإشراف» (§12): one quiet co-brand line under the title, the
  *           chip on the list's cards (collab.js plays the intro)
  */
 
@@ -169,12 +169,21 @@ export function createView({ main, live, rootUrl, mediaUrl, onClip }) {
      HERO
   ========================================================= */
 
+  /* the blurred copy behind a banner that doesn't fill the box (its own shape is kept) */
+  const ambient = image => h('img', { class: 'phero__ambient', src: mediaUrl(image.thumb || image.src), alt: '', 'aria-hidden': 'true', decoding: 'async' });
+
+  /*
+   * A service page's banner: visual only (the words go under it), whole at
+   * its own shape on every screen (no crop), height-capped, on a blurred
+   * copy of itself; a clip loops muted (its poster under reduced motion).
+   */
   function heroMedia(hero, cover, reduced) {
 
     // a muted looping clip (poster only under reduced motion)
     if (hero && hero.type === 'video') {
       const poster = cover || { src: hero.poster, thumb: hero.poster, w: hero.w, h: hero.h, alt: hero.alt };
-      if (reduced) return { node: picture(poster, { className: 'phero__img', eager: true }) };
+      const ar = `${hero.w} / ${hero.h}`;
+      if (reduced) return { node: [ambient(poster), picture(poster, { className: 'phero__img', eager: true })], ar: `${poster.w} / ${poster.h}` };
       const fragment = hero.start || hero.end ? `#t=${hero.start}${hero.end ? `,${hero.end}` : ''}` : '';
       const video = h('video', {
         class: 'phero__img phero__video',
@@ -212,11 +221,12 @@ export function createView({ main, live, rootUrl, mediaUrl, onClip }) {
           else if (!toggle.dataset.user) video.play().catch(() => {});
         }).observe(video);
       }
-      return { node: video, toggle };
+      return { node: [ambient(poster), video], toggle, ar };
     }
 
     const image = hero || cover;
-    return { node: image ? picture(image, { className: 'phero__img', eager: true }) : art('theatre') };
+    if (!image) return { node: art('theatre') };
+    return { node: [ambient(image), picture(image, { className: 'phero__img', eager: true })], ar: `${image.w} / ${image.h}` };
 
   }
 
@@ -233,58 +243,43 @@ export function createView({ main, live, rootUrl, mediaUrl, onClip }) {
   }
 
   /*
-   * «بإشراف» a partner (§12): our arch logo · a gold hairline «×» · the
-   * partner's logo on its light plate (never on navy, never recoloured or
-   * cropped), and the caption. collab.js's intro lifts into this.
+   * «بإشراف» a partner inside the page (§12): one quiet line under the
+   * title — our seal · أسرة البابا أثناسيوس × Brave Under Grace · their
+   * letters (transparent, their own colours). The show is collab.js's intro.
    */
-  function lockup(partner) {
+  function cobrand(partner) {
     if (!partner) return null;
     const ours = path => new URL(path, rootUrl).href;
-    const logo = partner.logo;
-    const name = h('bdi', {}, partner.name);
-    return h('figure', { class: 'collab', 'data-partner': partner.key },
-      h('div', { class: 'collab__row' },
-        h('span', { class: 'collab__ours' },
-          h('img', {
-            class: 'collab__seal',
-            src: ours('assets/img/logo-128.webp'),
-            srcset: `${ours('assets/img/logo-128.webp')} 128w, ${ours('assets/img/logo-256.webp')} 256w`,
-            sizes: '56px',
-            width: 128,
-            height: 128,
-            alt: 'شعار أسرة البابا أثناسيوس',
-            decoding: 'async'
-          })
-        ),
-        h('span', { class: 'collab__x', 'aria-hidden': 'true' },
-          h('span', { class: 'collab__line' }),
-          h('span', { class: 'collab__times' }, '×'),
-          h('span', { class: 'collab__line' })
-        ),
-        h('span', { class: 'collab__plate' },
-          h('img', { class: 'collab__logo', src: mediaUrl(logo.thumb), width: logo.w, height: logo.h, alt: logo.alt || partner.name, decoding: 'async' })
-        )
-      ),
-      h('figcaption', { class: 'collab__caption' },
-        'بإشراف ',
-        partner.url
-          ? h('a', { class: 'collab__link', href: partner.url, target: '_blank', rel: 'noopener' }, name, h('span', { class: 'visually-hidden' }, ' (بيفتح في صفحة جديدة)'))
-          : name
-      )
+    const mark = partner.mark || null;
+    const name = h('bdi', { class: 'cobrand__name cobrand__name--partner' }, partner.name.replace(/\s*[–-]\s*B\.U\.G\.?$/, ''));
+    // real spaces between the parts (screen readers and copy-paste); «×» is read as «بالتعاون مع»
+    return h('p', { class: 'cobrand', 'data-partner': partner.key },
+      h('img', { class: 'cobrand__seal', src: ours('assets/img/partners/athanasios-family-240.webp'), width: 240, height: 243, alt: '', decoding: 'async' }),
+      ' ',
+      h('span', { class: 'cobrand__name' }, 'أسرة البابا أثناسيوس'),
+      ' ',
+      h('span', { class: 'cobrand__x', 'aria-hidden': 'true' }, '×'),
+      ' ',
+      h('span', { class: 'visually-hidden' }, 'بالتعاون مع'),
+      ' ',
+      partner.url ? h('a', { class: 'cobrand__link', href: partner.url, target: '_blank', rel: 'noopener' }, name) : name,
+      mark ? ' ' : null,
+      mark ? h('img', { class: 'cobrand__mark', src: mediaUrl(mark.src), width: mark.w, height: mark.h, alt: '', decoding: 'async' }) : null
     );
   }
 
-  function hero({ media, kicker, title, lead, extra, poster = false, partner = null }) {
+  /* the banner (visual only), then the words under it: kicker, title, lead, the co-brand line, extra */
+  function hero({ media, kicker, title, lead, extra, poster = false, banner = false, partner = null }) {
     const box = h('div', { class: 'phero__media' }, media.node, h('span', { class: 'phero__scrim', 'aria-hidden': 'true' }));
     if (media.ar) box.style.setProperty('--ar', media.ar);   // CSSOM (the CSP blocks style="")
-    return h('header', { class: `phero${poster ? ' phero--poster' : ''}` },
+    return h('header', { class: `phero${poster ? ' phero--poster' : ''}${banner ? ' phero--banner' : ''}` },
       box,
       media.toggle || null,
       h('div', { class: 'phero__text' },
-        lockup(partner),
         kicker || null,
         h('h1', { class: 'phero__title', id: 'page-title', tabindex: '-1' }, title),
         lead ? h('p', { class: 'phero__lead' }, lead) : null,
+        cobrand(partner),
         extra || null
       )
     );
@@ -323,20 +318,19 @@ export function createView({ main, live, rootUrl, mediaUrl, onClip }) {
 
   }
 
+  /* one person, one compact card: picture or initial · name, role (, chips) · WhatsApp */
   function person(p, { chips = null, wa = null, waLabel = 'ابعت على واتساب' } = {}) {
     const initial = Array.from(p.name.replace(/^(أ\.|م\.|د\.|ابونا|أبونا)\s*/, ''))[0] || '؟';
     return h('article', { class: 'person' },
-      h('div', { class: 'person__head' },
-        p.image
-          ? h('span', { class: 'person__avatar' }, picture(p.image, { sizes: '64px' }))
-          : h('span', { class: 'person__avatar person__avatar--initial', 'aria-hidden': 'true' }, initial),
-        h('div', { class: 'person__who' },
-          h('h3', { class: 'person__name' }, p.name),
-          p.role ? h('p', { class: 'person__role' }, p.role) : null
-        )
+      p.image
+        ? h('span', { class: 'person__avatar' }, picture(p.image, { sizes: '56px' }))
+        : h('span', { class: 'person__avatar person__avatar--initial', 'aria-hidden': 'true' }, initial),
+      h('div', { class: 'person__who' },
+        h('h3', { class: 'person__name' }, p.name),
+        p.role ? h('p', { class: 'person__role' }, p.role) : null,
+        chips
       ),
-      chips,
-      wa ? h('a', { class: 'btn btn--wa', href: wa, target: '_blank', rel: 'noopener', 'aria-label': `${waLabel} لـ${p.name}`, 'data-wa': p.id || '' }, icon('whatsapp'), waLabel) : null
+      wa ? h('a', { class: 'btn btn--wa person__wa', href: wa, target: '_blank', rel: 'noopener', 'aria-label': `${waLabel} لـ${p.name}`, 'data-wa': p.id || '' }, icon('whatsapp'), h('span', { class: 'person__wa-label' }, 'واتساب')) : null
     );
   }
 
@@ -346,7 +340,7 @@ export function createView({ main, live, rootUrl, mediaUrl, onClip }) {
 
     show('ready',
       h('article', { class: 'svc' },
-        hero({ media: heroMedia(data.hero, data.cover, reduced), title: data.title, lead: data.tagline, partner: data.partner }),
+        hero({ media: heroMedia(data.hero, data.cover, reduced), title: data.title, lead: data.tagline, partner: data.partner, banner: true }),
 
         data.description
           ? h('section', { class: 'pg-section pg-about', 'aria-label': 'عن الخدمة' }, paragraphs(data.description, 'pg-about__p'))

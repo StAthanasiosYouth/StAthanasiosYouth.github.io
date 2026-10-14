@@ -591,6 +591,42 @@ img, svg, video {
   height: 18px;
 }
 
+/* a service page's banner: visual only, whole at its own shape on every
+   screen (no crop), capped in height, on a blurred copy of itself; the
+   title, the lead and the co-brand line sit under it */
+.phero--banner .phero__media {
+  aspect-ratio: var(--ar, 16 / 9);
+  max-height: min(72vh, 680px);
+  max-height: min(72svh, 680px);
+}
+
+.phero--banner .phero__img {
+  position: relative;
+  object-fit: contain;
+}
+
+.phero--banner .phero__scrim {
+  background: linear-gradient(180deg, rgba(2, 9, 20, 0) 78%, rgba(2, 9, 20, .55) 100%);
+}
+
+.phero--banner .phero__text {
+  position: static;
+  gap: 10px;
+  padding-top: clamp(18px, 4vw, 30px);
+  padding-bottom: 4px;
+}
+
+.phero--banner .phero__title {
+  font-size: clamp(2.1rem, 9.5vw, 3.8rem);
+  text-shadow: none;
+}
+
+.phero--banner .phero__lead {
+  max-width: 52ch;
+  color: var(--text-2);
+  text-shadow: none;
+}
+
 /* an event's cover is often a poster with words: shown whole, at its own
    shape (height-capped), on a blurred copy of itself; the words go below */
 .phero--poster .phero__media {
@@ -654,6 +690,15 @@ img, svg, video {
   .phero--poster .phero__media {
     aspect-ratio: auto;
     height: min(70vh, 640px);
+  }
+
+  .phero--banner .phero__media {
+    aspect-ratio: var(--ar, 16 / 9);
+    max-height: min(72vh, 680px);
+  }
+
+  .phero--banner .phero__text {
+    padding-inline: 0;
   }
 
   .phero__text {
@@ -867,28 +912,38 @@ img, svg, video {
   color: var(--text-2);
 }
 
+/* one card a person: picture or initial · name, role · WhatsApp, in a row;
+   side by side as space allows (one a row on a phone, two from ~560px,
+   three on a computer), never stretched wider than a card should be */
 .people {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 272px), 1fr));
   gap: 12px;
+}
+
+.people:has(> li:only-child) {
+  grid-template-columns: minmax(0, 420px);
+  justify-content: center;
 }
 
 .person {
   display: grid;
-  align-content: start;
-  gap: 12px;
-  height: 100%;
-  padding: 16px;
-  border: 1px solid var(--gold-line);
-  border-radius: var(--radius-lg);
-  background: rgba(2, 9, 20, .4);
-}
-
-.person__head {
-  display: flex;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  min-width: 0;
+  height: 100%;
+  min-height: 76px;
+  padding: 12px 12px 12px 14px;
+  border: 1px solid var(--gold-line);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .035), rgba(255, 255, 255, 0) 70%),
+    rgba(2, 9, 20, .45);
+  transition: border-color .2s ease;
+}
+
+.person:hover {
+  border-color: var(--gold-line-strong);
 }
 
 /* the arch (the logo's door), smaller */
@@ -896,11 +951,11 @@ img, svg, video {
   display: grid;
   place-items: center;
   flex: none;
-  width: 56px;
-  height: 64px;
+  width: 46px;
+  height: 52px;
   overflow: hidden;
   border: 1px solid var(--gold-line-strong);
-  border-radius: 999px 999px 12px 12px;
+  border-radius: 999px 999px 10px 10px;
   background: var(--navy-800);
 }
 
@@ -912,23 +967,66 @@ img, svg, video {
 
 .person__avatar--initial {
   font-family: var(--font-display);
-  font-size: 1.7rem;
+  font-size: 1.45rem;
   color: var(--gold-hi);
 }
 
 .person__who {
+  display: grid;
+  gap: 2px;
   min-width: 0;
 }
 
+/* a long name takes two lines rather than losing its end */
 .person__name {
-  font-size: 1.05rem;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 1rem;
   font-weight: 800;
-  line-height: 1.5;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .person__role {
-  font-size: .9rem;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: .86rem;
+  line-height: 1.45;
   color: var(--text-2);
+}
+
+.person__who .chips {
+  margin-top: 4px;
+}
+
+/* WhatsApp: a compact pill at the card's end (its full words in aria-label) */
+.person__wa {
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: .9rem;
+  white-space: nowrap;
+}
+
+/* phones: the pill keeps only its icon (a round 44 px target), the name gets the room */
+@media (max-width: 479px) {
+  .person__wa {
+    width: 44px;
+    min-height: 44px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .person__wa-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
 }
 
 
@@ -1435,13 +1533,14 @@ img, svg, video {
   width: 100%;
 }
 
+/* at most ~2/3 of the screen's height: the title, the caption and the full-video button stay in view */
 .vsheet__video {
-  width: min(100%, calc(80vh * var(--arn, 1.7778)));
-  width: min(100%, calc(80dvh * var(--arn, 1.7778)));
+  width: min(100%, calc(64vh * var(--arn, 1.7778)));
+  width: min(100%, calc(64dvh * var(--arn, 1.7778)));
   height: auto;
   aspect-ratio: var(--ar, 16 / 9);
-  max-height: 80vh;
-  max-height: 80dvh;
+  max-height: 64vh;
+  max-height: 64dvh;
   background: #000;
 }
 
@@ -1509,155 +1608,85 @@ img, svg, video {
 
 /* =========================================================
    COLLAB: «بإشراف» a partner (docs/EVENTS.md §12)
-   The hero lockup (view.js), the cards' chip, and the intro overlay
-   (collab.js). The partner's colours stay inside its logo, which always
-   sits on a warm light plate; the page keeps its navy and gold.
+   The quiet co-brand line under a page's title (view.js), the cards'
+   chip, and the cinematic intro (collab.js). The partner's colours stay
+   inside its own logo; the page keeps its navy and gold.
 ========================================================= */
 
-/* ---------- the hero lockup ---------- */
+/* ---------- the co-brand line: أسرة البابا أثناسيوس × Brave Under Grace ---------- */
 
-/* a quiet navy capsule, so the hairline and the words hold over any picture */
-.collab {
-  display: grid;
-  justify-items: start;
-  gap: 7px;
-  max-width: 100%;
-  margin: 0 0 6px;
-  padding: 10px 12px 8px;
-  border-radius: 22px;
-  background: linear-gradient(180deg, rgba(6, 26, 49, .74), rgba(2, 9, 20, .66));
-  box-shadow: inset 0 0 0 1px var(--gold-line), inset 0 1px 0 rgba(242, 210, 139, .1), 0 14px 34px -18px rgba(0, 0, 0, .9);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-}
-
-.collab__row {
-  display: flex;
+.cobrand {
+  display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 6px 9px;
   max-width: 100%;
+  margin-top: 6px;
+  padding: 7px 14px 7px 12px;
+  border: 1px solid var(--gold-line);
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(215, 170, 80, .07), rgba(255, 255, 255, .02));
+  font-size: .86rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--text-2);
 }
 
-/* our seal in its arch: an iconostasis door with a double gold hairline */
-.collab__ours {
-  position: relative;
+.cobrand__seal {
+  width: 22px;
+  height: 22px;
   flex: none;
-  display: grid;
-  place-items: end center;
-  width: 52px;
-  height: 60px;
-  padding: 0 4px 4px;
-  border-radius: 999px 999px 12px 12px;
-  background:
-    radial-gradient(90% 70% at 50% 100%, rgba(215, 170, 80, .22), transparent 70%),
-    var(--navy-900);
-  box-shadow:
-    inset 0 0 0 1px var(--gold-line-strong),
-    0 0 0 3px rgba(2, 9, 20, .55),
-    0 0 0 4px var(--gold-line);
-}
-
-.collab__seal {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-}
-
-/* the gold hairline «×» */
-.collab__x {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  width: 46px;
-}
-
-.collab__line {
-  flex: 1;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(242, 210, 139, 0), var(--gold-hi));
-}
-
-.collab__line:last-child {
-  background: linear-gradient(90deg, var(--gold-hi), rgba(242, 210, 139, 0));
-}
-
-.collab__times {
-  font-size: 1rem;
-  font-weight: 300;
-  line-height: 1;
-  color: var(--gold-hi);
-}
-
-/* the partner's logo on its plate: whole, never cropped or recoloured */
-.collab__plate {
-  position: relative;
-  flex: 0 1 auto;
-  min-width: 0;
-  display: grid;
-  place-items: center;
-  padding: 7px 11px;
-  overflow: hidden;
-  border-radius: 14px;
-  background: var(--partner-plate);
-  box-shadow:
-    0 0 0 1px var(--partner-ring),
-    0 0 26px 2px var(--partner-glow),
-    0 10px 24px -14px rgba(0, 0, 0, .8);
-}
-
-.collab__logo {
-  display: block;
-  width: auto;
-  max-width: 100%;
-  height: 40px;
   object-fit: contain;
 }
 
-.collab__caption {
-  font-size: .8rem;
-  font-weight: 600;
-  line-height: 1.5;
-  color: var(--text-2);
-  text-shadow: 0 1px 8px rgba(2, 9, 20, .9);
+.cobrand__name {
+  white-space: nowrap;
 }
 
-.collab__caption bdi {
+.cobrand__name:first-of-type {
+  color: var(--gold-hi);
+}
+
+.cobrand__x {
+  color: var(--gold);
+  font-weight: 400;
+  opacity: .8;
+}
+
+.cobrand__name--partner,
+.cobrand__link {
   color: var(--text);
-  font-weight: 700;
+  letter-spacing: .01em;
 }
 
-.collab__link {
-  color: inherit;
+.cobrand__link {
   text-decoration: underline;
   text-decoration-color: var(--gold-line-strong);
   text-underline-offset: 3px;
 }
 
-@media (min-width: 1024px) {
+.cobrand__mark {
+  width: auto;
+  height: 18px;
+  flex: none;
+}
 
-  .collab__ours {
-    width: 60px;
-    height: 70px;
+/* narrow phones: their name is said by their letters (still read by screen readers), one line */
+@media (max-width: 419px) {
+  .cobrand {
+    gap: 6px 7px;
+    font-size: .82rem;
+    padding-inline: 10px;
   }
 
-  .collab__seal {
-    width: 52px;
-    height: 52px;
+  .cobrand__name--partner {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
-
-  .collab__x {
-    width: 58px;
-  }
-
-  .collab__logo {
-    height: 48px;
-  }
-
-  .collab__caption {
-    font-size: .86rem;
-  }
-
 }
 
 
@@ -2202,49 +2231,6 @@ img, svg, video {
   .cintro {
     display: none;
   }
-}
-
-
-/* ---------- the short version (≤ 0.5 s): the lockup cross-fades in place ---------- */
-
-@media (prefers-reduced-motion: no-preference) {
-
-  html[data-collab="short"] .collab__ours,
-  html[data-collab="short"] .collab__caption {
-    animation: collab-fade .45s var(--ease-out) both;
-  }
-
-  html[data-collab="short"] .collab__x {
-    animation: collab-fade .3s ease-out .08s both;
-  }
-
-  html[data-collab="short"] .collab__plate {
-    animation: collab-plate .42s var(--ease-out) .06s both;
-  }
-
-  html[data-collab="short"] .collab__plate::after {
-    content: "";
-    position: absolute;
-    inset: -20% auto -20% -40%;
-    width: 40%;
-    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .7), transparent);
-    transform: translateX(-120%) skewX(-12deg);
-    animation: cintro-glint .42s ease-in-out .08s both;
-  }
-
-  @keyframes collab-fade {
-    from {
-      opacity: 0;
-    }
-  }
-
-  @keyframes collab-plate {
-    from {
-      opacity: 0;
-      transform: scale(.96);
-    }
-  }
-
 }
 
 

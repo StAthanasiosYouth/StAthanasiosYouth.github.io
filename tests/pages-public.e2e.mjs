@@ -5,7 +5,7 @@
 // bare shell's redirect, the /events/ list, and the home page's cards
 // («خدماتنا», the automatic button through the booking window, the card
 // gone 12 h after the event, a card whose page isn't published), and the
-// B.U.G. co-branding (docs/EVENTS.md §12): the hero lockup, the cards' chip,
+// B.U.G. co-branding (docs/EVENTS.md §12): the co-brand line, the cards' chip,
 // and collab.js's intro (first visit, once a session, skipped with reduced
 // motion, a #hash, a tap, and in the preview).
 //
@@ -605,29 +605,29 @@ function recordIntro() {
 
 const introLog = page => page.evaluate(() => ({ ...window.__collab, overlay: !!document.querySelector('.cintro'), state: document.documentElement.dataset.collabState || '' }));
 
+/* the quiet co-brand line: under the title (never on the banner), inside the screen, small */
 const lockup = page => page.evaluate(() => {
-  const el = document.querySelector('.phero .collab');
+  const el = document.querySelector('.phero .cobrand');
   if (!el) return null;
   const box = el.getBoundingClientRect();
-  const plate = el.querySelector('.collab__plate');
-  const logo = el.querySelector('.collab__logo');
-  const seal = el.querySelector('.collab__seal');
-  const shown = logo.getBoundingClientRect();
+  const seal = el.querySelector('.cobrand__seal');
+  const mark = el.querySelector('.cobrand__mark');
+  const title = document.querySelector('.phero__title').getBoundingClientRect();
+  const banner = document.querySelector('.phero__media').getBoundingClientRect();
   return {
     inside: box.left >= 0 && box.right <= document.documentElement.clientWidth && box.width > 0 && box.height > 0,
-    caption: el.querySelector('.collab__caption').textContent,
-    alt: logo.alt,
-    loaded: logo.complete && logo.naturalWidth === 360 && seal.complete && seal.naturalWidth > 0,
-    // the whole logo, at its own shape (never cropped)
-    shape: Math.abs(shown.width / shown.height - 720 / 305) < 0.03,
-    plate: getComputedStyle(plate).backgroundColor,
-    x: el.querySelector('.collab__x').getAttribute('aria-hidden')
+    // what is seen (the screen reader's «بالتعاون مع» aside)
+    text: [...el.childNodes].filter(n => !(n.classList && n.classList.contains('visually-hidden'))).map(n => n.textContent).join('').replace(/\s+/g, ' ').trim(),
+    spoken: el.querySelector('.visually-hidden').textContent,
+    loaded: seal.complete && seal.naturalWidth > 0 && !!mark && mark.complete && mark.naturalWidth > 0,
+    under: box.top >= title.bottom - 1 && box.top >= banner.bottom,
+    quiet: box.height <= 72 && mark.getBoundingClientRect().height <= 20
   };
 });
 
-const LOCKUP = { inside: true, caption: 'بإشراف Brave Under Grace – B.U.G.', alt: 'شعار Brave Under Grace – B.U.G.', loaded: true, shape: true, plate: 'rgb(255, 253, 249)', x: 'true' };
+const LOCKUP = { inside: true, text: 'أسرة البابا أثناسيوس × Brave Under Grace', spoken: 'بالتعاون مع', loaded: true, under: true, quiet: true };
 
-test('B.U.G. lockup: a partnered service page and event page at 360 and 1366; the whole logo on its light plate; no overflow; axe', async () => {
+test('B.U.G. co-brand line: a partnered service page and event page at 360 and 1366; quiet, under the title, no overflow; axe', async () => {
   clock = WINDOW_OPEN;
   for (const [path, name] of [['/bug-theatre/', 'page'], ['/events/bug-camp/', 'event']]) {
     for (const viewport of [PHONE, DESKTOP]) {
@@ -635,7 +635,7 @@ test('B.U.G. lockup: a partnered service page and event page at 360 and 1366; th
       await ready(page);
       assert.equal(await page.$eval('html', el => el.dataset.partner), 'bug');
       assert.deepEqual(await lockup(page), LOCKUP, `${name} ${viewport.width}px`);
-      assert.equal(await page.$('.cintro'), null, 'reduced motion: no intro, the static lockup only');
+      assert.equal(await page.$('.cintro'), null, 'reduced motion: no intro');
       assert.ok(await overflow(page) <= 0, `${name} ${viewport.width}px: no horizontal scroll`);
       await page.screenshot({ path: `${SHOTS}partner-${name}-${viewport.width}.png` });
       if (viewport === PHONE) assert.deepEqual(await axe(page), []);
@@ -644,10 +644,10 @@ test('B.U.G. lockup: a partnered service page and event page at 360 and 1366; th
       await context.close();
     }
   }
-  // a page without a partner has no lockup
+  // a page without a partner has no co-brand line
   const plain = await open('/black-theatre/', PHONE);
   await ready(plain.page);
-  assert.equal(await plain.page.$('.collab'), null);
+  assert.equal(await plain.page.$('.cobrand'), null);
   assert.equal(await plain.page.$eval('html', el => el.dataset.partner), undefined);
   await plain.context.close();
 });
@@ -669,7 +669,7 @@ test('B.U.G. intro: the first visit plays the full overlay, gone within 2 s onto
   assert.ok(log.removed - log.added >= 2200, 'the ident plays to its end (≈ 2.35 s)');
   assert.equal(log.overlay, false);
   assert.equal(log.state, 'done');
-  assert.equal((await lockup(page)).inside, true, 'it lifts onto the hero lockup');
+  assert.equal((await lockup(page)).inside, true, 'the page underneath, with its co-brand line');
   const stored = await page.evaluate(() => ({ session: sessionStorage.getItem('athanasios:collab:bug'), local: localStorage.getItem('athanasios.collab.v1:bug') }));
   assert.equal(stored.session, '1');
   assert.equal(stored.local, null, 'nothing kept beyond the session');
@@ -712,7 +712,7 @@ test('B.U.G. intro: a tap skips it at once and is spent on it (nothing underneat
 });
 
 test('B.U.G. intro: none with reduced motion or a #hash deep link; a light version on a weak phone; again in a new session', async () => {
-  // reduced motion: the static lockup
+  // reduced motion: no intro, the co-brand line only
   let { context, page } = await open('/bug-theatre/', PHONE, { reduced: true, init: recordIntro });
   await ready(page);
   let log = await introLog(page);
@@ -763,12 +763,12 @@ test('B.U.G. in the admin preview: the lockup, never the intro; a partner logo f
     return got;
   }, data);
   assert.equal(await post(EVENT_BUG), 'athanasios:page-preview-shown');
-  assert.equal(await frame.$eval('.collab__caption', el => el.textContent), 'بإشراف Brave Under Grace – B.U.G.');
+  assert.equal(await frame.$eval('.cobrand', el => el.textContent.replace(/\s+/g, ' ').trim()), 'أسرة البابا أثناسيوس × بالتعاون مع Brave Under Grace');
   assert.equal(await frame.$('.cintro'), null);
   assert.equal(await frame.evaluate(() => document.documentElement.hasAttribute('data-collab')), false);
   const bad = { ...EVENT_BUG, partner: { ...EVENT_BUG.partner, logo: { ...EVENT_BUG.partner.logo, src: 'https://evil.example/logo.webp' } } };
   assert.equal(await post(bad), 'athanasios:page-preview-shown');
-  assert.equal(await frame.$('.collab'), null);
+  assert.equal(await frame.$('.cobrand'), null);
   assert.deepEqual(problems, []);
   await context.close();
 });
@@ -780,10 +780,10 @@ test('B.U.G. chip: «بإشراف B.U.G.» on the partnered home card and its /e
     const chip = el.querySelector('.item-card__partner');
     return chip && { entry: el.dataset.entry, text: chip.textContent.replace(/\s+/g, ' ').trim(), src: chip.querySelector('img').getAttribute('src'), alt: chip.querySelector('img').alt, plate: getComputedStyle(chip.querySelector('.partner-plate')).backgroundColor };
   }).filter(Boolean));
-  assert.deepEqual(chips, [{ entry: 'event', text: 'بإشراف B.U.G.', src: 'assets/img/partners/bug-mark-96.webp', alt: '', plate: 'rgb(255, 253, 249)' }]);
+  assert.deepEqual(chips, [{ entry: 'event', text: 'بإشراف B.U.G.', src: 'assets/img/partners/bug-symbol-320.webp', alt: '', plate: 'rgb(255, 253, 249)' }]);
   const card = await page.$('.item-card[data-entry="event"]');
   await card.scrollIntoView();
-  await page.waitForFunction(() => { const img = document.querySelector('.item-card__partner img'); return img.complete && img.naturalWidth === 306; }, { timeout: 5000 });
+  await page.waitForFunction(() => { const img = document.querySelector('.item-card__partner img'); return img.complete && img.naturalWidth === 320; }, { timeout: 5000 });
   assert.ok(await overflow(page) <= 0);
   await card.screenshot({ path: `${SHOTS}partner-card-360.png` });
   assert.deepEqual(await axe(page, '[data-key="activities"]'), []);
@@ -793,7 +793,7 @@ test('B.U.G. chip: «بإشراف B.U.G.» on the partnered home card and its /e
   const list = await open('/events/', PHONE);
   await ready(list.page);
   assert.equal(await textOf(list.page, '.ecard .pchip'), 'بإشراف B.U.G.');
-  await list.page.waitForFunction(() => { const img = document.querySelector('.pchip img'); return img.complete && img.naturalWidth === 306; }, { timeout: 5000 });
+  await list.page.waitForFunction(() => { const img = document.querySelector('.pchip img'); return img.complete && img.naturalWidth === 320; }, { timeout: 5000 });
   await list.page.screenshot({ path: `${SHOTS}partner-events-360.png` });
   assert.deepEqual(await axe(list.page), []);
   assert.deepEqual(list.problems, []);

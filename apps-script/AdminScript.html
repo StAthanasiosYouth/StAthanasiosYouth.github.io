@@ -1262,7 +1262,7 @@
     // (AdminTrim.html); options.allowUrl: «من رابط» (a direct link to a file)
     var preview = el('div', { class: 'picker__preview' });
     var file = el('input', { type: 'file', accept: options.allowVideo ? 'image/*,video/*' : 'image/*', class: 'visually-hidden', tabindex: '-1', 'aria-hidden': 'true' });
-    var chooseLabel = options.allowVideo ? 'ارفع صورة أو فيديو' : 'ارفع صورة';
+    var chooseLabel = options.chooseLabel || (options.allowVideo ? 'ارفع صورة أو فيديو' : 'ارفع صورة');
     var alt = A.textInput(media() ? media().alt : '', { max: 140, placeholder: options.allowVideo ? 'وصف لقارئ الشاشة (مثلاً: الشباب في رحلة الغردقة)' : 'وصف الصورة لقارئ الشاشة (مثلاً: بوستر رحلة الغردقة)' });
     var altField = A.field(options.allowVideo ? 'الوصف' : 'وصف الصورة', alt, 'مهم للي بيستخدم قارئ شاشة');
 
@@ -1760,7 +1760,7 @@
         markDirty();
         draw();
       });
-    } }, icon('plus'), 'زوّد صورة أو فيديو من المكتبة');
+    } }, icon('plus'), options.addLabel || 'زوّد صورة أو فيديو من المكتبة');
     var addText = el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () {
       if (items.length >= max) return;
       items.push({ id: '', text: '', from: 'us', words: true, refs: null });

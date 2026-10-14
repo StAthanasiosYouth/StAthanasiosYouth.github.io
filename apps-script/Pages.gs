@@ -76,7 +76,7 @@ var PAGE_PARTNERS = {
     name: 'Brave Under Grace – B.U.G.',
     short: 'B.U.G.',
     logo: { src: 'assets/img/partners/bug-logo-720.webp', thumb: 'assets/img/partners/bug-logo-360.webp', w: 720, h: 305, alt: 'شعار Brave Under Grace – B.U.G.' },
-    mark: { src: 'assets/img/partners/bug-mark-96.webp', w: 306, h: 96, alt: 'B.U.G.' },
+    mark: { src: 'assets/img/partners/bug-symbol-320.webp', w: 320, h: 107, alt: 'B.U.G.' },
     url: null
   }
 };
@@ -431,7 +431,7 @@ function pageInput_(input, existing, others, reserved, library, servants, proble
     title: input_(input.title, PAGE_LIMITS.title, 'العنوان', problems, true),
     tagline: input_(input.tagline, PAGE_LIMITS.tagline, 'السطر القصير', problems, false),
     description: textBlock_(input.description, PAGE_LIMITS.description, 'الوصف', problems),
-    hero: pagesTokenInput_(input.hero, 'الصورة أو الفيديو الرئيسي', library, problems, true),
+    hero: pagesTokenInput_(input.hero, 'صورة أو فيديو البانر', library, problems, true),
     cover: pagesImageInput_(input.cover, 'صورة الغلاف', library, problems, home.show),
     cardType: cardType,
     theme: SECTION_THEMES.indexOf(theme) !== -1 ? theme : '',
@@ -459,22 +459,23 @@ function pageMediaInput_(input, library, problems) {
   var fullRaw = contentLine_(input.fullUrl);
   var fullUrl = safeHttpsUrl(fullRaw);
 
-  if (fullRaw && !fullUrl) problems.push('لينك المسرحية كاملة لازم يبدأ بـ https://');
+  if (fullRaw && !fullUrl) problems.push('لينك الفيديو الكامل لازم يبدأ بـ https://');
 
-  var clip = pagesTokenInput_(input.clip, 'الفيديو', library, problems, false);
+  var clip = pagesTokenInput_(input.clip, 'مقطع العرض جوه الصفحة', library, problems, false);
 
-  if (source === 'clip' && !clip) problems.push('اختار الفيديو من المكتبة (أو خلّي الكارت «لينك بس»)');
-  if (source === 'link' && !fullUrl) problems.push('الكارت ده «لينك بس»: حط لينك المسرحية كاملة');
+  if (source === 'clip' && !clip) problems.push('مقطع العرض جوه الصفحة: اختاره من المكتبة أو ارفع فيديو وقصّه (أو خلّي الكارت «لينك بس»)');
+  if (source === 'link' && !fullUrl) problems.push('لينك الفيديو الكامل مطلوب لكارت «لينك بس»');
 
   return {
-    title: input_(input.title, PAGE_LIMITS.mediaTitle, 'العنوان', problems, true),
-    text: textBlock_(input.text, PAGE_LIMITS.mediaText, 'الكلام', problems),
+    title: input_(input.title, PAGE_LIMITS.mediaTitle, 'عنوان الفيديو', problems, true),
+    text: textBlock_(input.text, PAGE_LIMITS.mediaText, 'وصف قصير', problems),
     duration: input_(input.duration, PAGE_LIMITS.duration, 'المدة', problems, false),
-    cover: pagesImageInput_(input.cover, 'صورة الكارت', library, problems, true),
+    // optional with a preview clip: the clip's own poster stands in (pagesBuildPublic_)
+    cover: pagesImageInput_(input.cover, 'صورة الكارت', library, problems, !(source === 'clip' && clip)),
     source: source,
     clip: source === 'clip' ? clip : '',
     fullUrl: fullUrl || '',
-    ctaLabel: input_(input.ctaLabel, PAGE_LIMITS.ctaLabel, 'نص الزرار', problems, false),
+    ctaLabel: input_(input.ctaLabel, PAGE_LIMITS.ctaLabel, 'نص زرار الفيديو الكامل', problems, false),
     enabled: input.enabled !== false
   };
 
@@ -1703,10 +1704,12 @@ function pagesBuildPublic_(draft, ctx) {
     var media = pagesSortByOrder_((draft.media || []).filter(function (m) { return m.pageId === row.id && contentBool_(m.enabled); }))
       .map(function (m) {
         var mWhere = where + ' — ' + (contentLine_(m.title) || 'كارت');
-        var cover = image(m.cover, mWhere, 'صورة الكارت');
         var clip = m.source !== 'link' && m.clip ? token(m.clip, mWhere, 'الفيديو') : null;
         var fullUrl = safeHttpsUrl(contentLine_(m.fullUrl)) || null;
         if (clip && clip.type !== 'video') clip = null;
+        // no card picture: the preview clip's poster (a frame of it)
+        var cover = m.cover ? image(m.cover, mWhere, 'صورة الكارت')
+          : clip && clip.poster ? { src: clip.poster, thumb: clip.poster, w: clip.w, h: clip.h, alt: clip.alt || contentLine_(m.title) } : null;
         if (!cover || (!clip && !fullUrl)) {
           ctx.warn(mWhere, 'الكارت ناقص صورة أو فيديو/لينك، ومش هيظهر');
           return null;

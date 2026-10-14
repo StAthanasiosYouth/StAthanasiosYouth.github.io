@@ -1391,7 +1391,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     // (AdminTrim.html); options.allowUrl: «من رابط» (a direct link to a file)
     var preview = el('div', { class: 'picker__preview' });
     var file = el('input', { type: 'file', accept: options.allowVideo ? 'image/*,video/*' : 'image/*', class: 'visually-hidden', tabindex: '-1', 'aria-hidden': 'true' });
-    var chooseLabel = options.allowVideo ? 'ارفع صورة أو فيديو' : 'ارفع صورة';
+    var chooseLabel = options.chooseLabel || (options.allowVideo ? 'ارفع صورة أو فيديو' : 'ارفع صورة');
     var alt = A.textInput(media() ? media().alt : '', { max: 140, placeholder: options.allowVideo ? 'وصف لقارئ الشاشة (مثلاً: الشباب في رحلة الغردقة)' : 'وصف الصورة لقارئ الشاشة (مثلاً: بوستر رحلة الغردقة)' });
     var altField = A.field(options.allowVideo ? 'الوصف' : 'وصف الصورة', alt, 'مهم للي بيستخدم قارئ شاشة');
 
@@ -1889,7 +1889,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         markDirty();
         draw();
       });
-    } }, icon('plus'), 'زوّد صورة أو فيديو من المكتبة');
+    } }, icon('plus'), options.addLabel || 'زوّد صورة أو فيديو من المكتبة');
     var addText = el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () {
       if (items.length >= max) return;
       items.push({ id: '', text: '', from: 'us', words: true, refs: null });
@@ -14713,8 +14713,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var title = A.counted('العنوان', page.title, limits.title || 60, 'مثلاً: المسرح الأسود', { required: true });
     var tagline = A.counted('السطر القصير', page.tagline, limits.tagline || 120, 'بيظهر تحت العنوان وعلى كارت الصفحة الرئيسية');
     var description = A.counted('الوصف', page.description, limits.description || 2000, 'الخدمة دي إيه، بنعمل إيه، إمتى…', { multiline: true, rows: 5 });
-    var hero = A.galleryPicker(page.hero ? [page.hero] : [], { max: 1, label: 'الصورة أو الفيديو الرئيسي', hint: 'فوق خالص في الصفحة. فيديو بيشتغل من غير صوت ويعيد نفسه (أو صورته بس لو الجهاز طالب حركة أقل).' });
-    var cover = A.imagePicker(page.cover || '', { label: 'صورة الغلاف', hint: 'مطلوبة لكارت الصفحة الرئيسية، وبتظهر لما الفيديو الرئيسي لسه بيحمّل.' });
+    var hero = A.galleryPicker(page.hero ? [page.hero] : [], { max: 1, label: 'صورة أو فيديو البانر', addLabel: 'اختار صورة أو فيديو البانر من المكتبة', emptyText: 'لسه مفيش — البانر هيبقى صورة الغلاف', hint: 'البانر اللي فوق خالص في الصفحة، بعرضها كلها ومن غير كلام عليه (العنوان والوصف بيظهروا تحته). صورة عرضية أحسن. فيديو: بيشتغل من غير صوت ويعيد نفسه. فاضي = صورة الغلاف.' });
+    var cover = A.imagePicker(page.cover || '', { label: 'صورة الغلاف', hint: 'صورة الصفحة في الكروت: كارت «خدماتنا» في الصفحة الرئيسية، ولما حد يشارك لينك الصفحة. ومطلوبة لو الصفحة ظاهرة في الرئيسية.' });
     var cardType = select(types.map(function (t) { return { value: t.key, label: t.label + (t.section === 'services' ? ' — خدماتنا' : t.section === 'activities' ? ' — الفعاليات' : '') }; }), page.cardType || 'service', 'نوع الكارت');
     var theme = select(THEMES, page.theme, 'الشكل');
     var teamTitle = A.counted('عنوان الفريق', page.teamTitle, limits.teamTitle || 60, 'فاضي = «عايز تنضم لفريق المسرح؟»');
@@ -14896,13 +14896,38 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     m = m || { enabled: true, source: 'clip' };
     var limits = r.limits || {};
     var box = A.errorBox();
-    var title = A.counted('العنوان', m.title, limits.mediaTitle || 80, 'مثلاً: عرض الكريسماس ٢٠٢٥', { required: true });
-    var text = A.counted('سطر قصير', m.text, limits.mediaText || 300, 'اختياري', { multiline: true, rows: 2 });
+    /*
+     * One card = what the visitor sees, in the order they meet it:
+     * ① the preview clip that plays on the page (from the library, or a new
+     * video cut with the trimmer right here) · ② the card picture (optional
+     * with a clip: a frame of it) · ③ title / caption · ④ the full video.
+     */
+    var CLIP_OPTIONS = { max: 1, label: 'مقطع العرض جوه الصفحة', addLabel: 'اختار مقطع من المكتبة', emptyText: 'لسه مفيش مقطع — اختاره من المكتبة أو ارفع فيديو جديد تحت', hint: 'المقطع القصير اللي بيشتغل لما حد يدوس على الكارت. من المكتبة (تقدر تحدد «من» و«لحد»)، أو ارفع فيديو جديد تحت وقصّه.' };
+    var title = A.counted('عنوان الفيديو', m.title, limits.mediaTitle || 80, 'مثلاً: عرض الكريسماس ٢٠٢٥', { required: true });
+    var text = A.counted('وصف قصير', m.text, limits.mediaText || 300, 'اختياري: سطر بيظهر تحت العنوان على الكارت وتحت الفيديو', { multiline: true, rows: 2 });
     var duration = A.textInput(m.duration, { max: limits.duration || 10, placeholder: 'مثلاً ٣:٢٠' });
-    var cover = A.imagePicker(m.cover || '', { label: 'صورة الكارت', hint: 'مطلوبة: بتظهر زي صورة فيديو يوتيوب (عرضي ١٦:٩ أحسن).' });
-    var source = A.choices(A.uid('src'), [{ value: 'clip', label: 'فيديو من المكتبة' }, { value: 'link', label: 'لينك بس (المسرحية كاملة برّه)' }], m.source || 'clip', function (v) { clipField.hidden = v !== 'clip'; });
-    var clip = A.galleryPicker(m.clip ? [m.clip] : [], { max: 1, label: 'الفيديو', hint: 'من مكتبة الصور والفيديوهات (ارفعه من «الصور» الأول). تقدر تحدد «من» و«لحد».' });
-    var clipField = el('div', {}, clip.node);
+    var cover = A.imagePicker(m.cover || '', { label: 'صورة الكارت', hint: 'الصورة اللي بتظهر على الكارت (زي صورة فيديو يوتيوب، عرضي ١٦:٩ أحسن). اختياري لو فيه مقطع: هنستخدم صورة من المقطع نفسه.' });
+    var source = A.choices(A.uid('src'), [{ value: 'clip', label: 'مقطع بيشتغل جوه الصفحة' }, { value: 'link', label: 'لينك بس (من غير مقطع)' }], m.source || 'clip', function (v) { clipField.hidden = v !== 'clip'; });
+    var clip = A.galleryPicker(m.clip ? [m.clip] : [], CLIP_OPTIONS);
+    var clipHolder = el('div', {}, clip.node);
+    // a new video: the panel's own uploader and trimmer (the same as «الصور»), straight into this card
+    var upload = A.imagePicker('', {
+      uploadOnly: true,
+      allowVideo: true,
+      chooseLabel: 'ارفع فيديو وقصّه',
+      label: 'أو ارفع فيديو جديد وقصّه',
+      hint: 'اختار الفيديو من جهازك (حتى لو كبير)، حدد الجزء اللي عايزه (لحد ٣٠ ثانية)، والمقطع بس هو اللي بيترفع للمكتبة ويتحط هنا.',
+      onUploaded: function (id) {
+        if (!/^vid-/.test(id)) {
+          A.toast('ده اترفع كصورة — استخدمه في «صورة الكارت»', 'info');
+          return;
+        }
+        clip = A.galleryPicker([id], CLIP_OPTIONS);
+        clipHolder.replaceChildren(clip.node);
+        A.markDirty();
+      }
+    });
+    var clipField = el('div', { class: 'form' }, clipHolder, upload.node);
     var fullUrl = A.textInput(m.fullUrl, { ltr: true, type: 'url', placeholder: 'https://youtube.com/…' });
     var ctaLabel = A.textInput(m.ctaLabel, { max: limits.ctaLabel || 30, placeholder: 'شاهد المسرحية كاملة' });
     var enabled = A.checkbox('ظاهر في الصفحة', m.enabled !== false);
@@ -14929,13 +14954,24 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     A.dirty = false;
     A.openSheet(isNew ? 'كارت فيديو جديد' : 'تعديل: ' + m.title, [
       box,
+      el('p', { class: 'note', text: 'في الصفحة: الزائر بيشوف صورة الكارت ← يدوس ← المقطع يشتغل في مشغّل نضيف، وتحته العنوان والوصف وزرار بيفتح الفيديو الكامل.' }),
       el('div', { class: 'form' },
-        title.node, text.node, A.field('المدة (اختياري)', duration, 'بتظهر على الصورة زي يوتيوب'),
-        cover.node,
-        A.field('نوع الكارت', source.node || source),
-        clipField,
-        A.field('لينك المسرحية كاملة', fullUrl, 'اختياري للفيديو، مطلوب لكارت «لينك بس». يوتيوب أو فيسبوك أو درايف…'),
-        A.field('نص زرار اللينك', ctaLabel, 'فاضي = «شاهد المسرحية كاملة»'),
+        el('fieldset', { class: 'fieldset' },
+          el('legend', { text: '١. المقطع اللي بيشتغل جوه الصفحة' }),
+          A.field('نوع الكارت', source.node || source),
+          clipField),
+        el('fieldset', { class: 'fieldset' },
+          el('legend', { text: '٢. صورة الكارت' }),
+          cover.node),
+        el('fieldset', { class: 'fieldset' },
+          el('legend', { text: '٣. العنوان والوصف' }),
+          title.node,
+          text.node,
+          A.field('المدة (اختياري)', duration, 'بتظهر صغيرة على صورة الكارت، زي يوتيوب')),
+        el('fieldset', { class: 'fieldset' },
+          el('legend', { text: '٤. الفيديو الكامل' }),
+          A.field('لينك الفيديو الكامل', fullUrl, 'العرض كله على يوتيوب أو فيسبوك أو درايف. بيظهر زرار تحت المقطع بيفتحه. مطلوب لكارت «لينك بس».'),
+          A.field('نص زرار الفيديو الكامل', ctaLabel, 'فاضي = «شاهد المسرحية كاملة»')),
         enabled.node)
     ], [save, el('button', { class: 'btn btn--ghost', type: 'button', text: 'رجوع', onclick: function () { mediaSheet(r); } })], {
       lock: A.editLock('page', page.id, 'الصفحة «' + page.title + '»', function () { A.closeSheet(); })
