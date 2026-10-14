@@ -26,6 +26,7 @@ import {
 } from './portal-model.js';
 import { zonedNow, stamp } from '../schedule.js';
 import { arabicDigits } from '../words.js';
+import { soundToggle, uiSounds, cue } from '../ui-sound.js';
 
 const ROOT = new URL('../../../', import.meta.url);
 const main = document.getElementById('comp-main');
@@ -144,6 +145,7 @@ async function codeSubmit(raw) {
     // §19.3: the age notice shows on the «الكود مسجل باسم …» step; they continue normally
     S.participant = { name: String(reply.participant.name || '').slice(0, 80), group: String(reply.participant.group || '').slice(0, 60), ...eligibility(reply) };
     S.screen = 'confirm';
+    cue('pop');
     render();
     return;
   }
@@ -306,6 +308,7 @@ async function confirmOrder() {
   }
   S.ordering = null;
   S.notice = `تم طلب «${(done && done.redemption.itemName) || item.name}» ✓ هتستلمها من الخدام لما تبقى جاهزة.`;
+  cue('success');
   render({ focus: false });
   const notice = main.querySelector('.portal__notice');
   if (notice) notice.focus();
@@ -377,6 +380,7 @@ async function confirmCancel() {
   S.cancelling = null;
   S.alert = '';
   S.notice = `اتلغى طلب «${r.itemName}» ✓ ورجعلك ${countPoints(r.cost)}.`;
+  cue('pop');
   render({ focus: false });
   const notice = main.querySelector('.portal__notice');
   if (notice) notice.focus();
@@ -649,6 +653,10 @@ if (window.top !== window.self) {
     // sandboxed frame
   }
 }
+
+// the site's sound: the same toggle and taps as the home page
+soundToggle(document.querySelector('.cbar'));
+uiSounds();
 
 if (readToken(session())) loadMe();
 else {

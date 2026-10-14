@@ -454,7 +454,7 @@ test('the two shells: events/index.html is pages/index.html with data-kind="even
 test('page modules: URLs from the module, text only, no storage; page.css self-contained', () => {
   const code = file => read(`assets/js/page/${file}`);
   assert.match(code('main.js'), /new URL\('\.\.\/\.\.\/\.\.\/', import\.meta\.url\)/, 'the site root from the module, not the page');
-  for (const file of ['main.js', 'view.js', 'video.js', 'model.js']) {
+  for (const file of ['main.js', 'view.js', 'video.js', 'clip-audio.js', 'model.js']) {
     assert.doesNotMatch(code(file), /innerHTML|outerHTML|insertAdjacentHTML|document\.write|\beval\(|new Function/, file);
     assert.doesNotMatch(code(file), /localStorage|sessionStorage|indexedDB/, file);
   }
@@ -463,8 +463,11 @@ test('page modules: URLs from the module, text only, no storage; page.css self-c
   assert.match(code('video.js'), /preload: 'metadata'/);
   // the clip starts as the sheet opens (no autoplay attribute), muted when sound is refused; a hidden page stops it
   assert.doesNotMatch(code('video.js'), /autoplay:|\.autoplay\b/, 'no autoplay attribute');
-  assert.match(code('video.js'), /function autoplay\(\)[\s\S]*video\.muted = true;\s*video\.play\(\)/, 'muted retry when sound is refused');
-  assert.match(code('video.js'), /visibilitychange[\s\S]*video\.pause\(\)/, 'a hidden page pauses it');
+  assert.match(code('video.js'), /function playClip\(\)[\s\S]*video\.muted = true;\s*video\.play\(\)/, 'muted retry when sound is refused');
+  assert.match(code('video.js'), /visibilitychange[\s\S]*video\.pause\(\);\s*sound\.pause\(\)/, 'a hidden page pauses the clip and its sound');
+  // «صوت المقطع»: one source at a time, faded; the site's one sound setting wins
+  assert.match(code('clip-audio.js'), /video\.muted = mode !== 'original' \|\| !soundEnabled\(\)/, 'custom / none: the clip is never heard; sound off: nothing is');
+  assert.match(code('clip-audio.js'), /linearRampToValueAtTime/, 'fades, not cuts');
   const css = read('assets/css/page.css');
   assert.match(css, /@font-face[\s\S]*Aref Ruqaa/);
   assert.doesNotMatch(css, /@import|https?:\/\//, 'no outside requests');
@@ -612,7 +615,7 @@ function runCollab({ partner = 'bug', hash = '', search = '', reduced = false, h
     window: win, document, matchMedia: win.matchMedia, location: { hash, search },
     navigator: { hardwareConcurrency: cores, deviceMemory: memory, connection: { saveData } },
     sessionStorage: store(session), localStorage: store(local),
-    URL, URLSearchParams, JSON, Math, Number, Object, isFinite, Date: { now: () => now },
+    URL, URLSearchParams, JSON, Math, Number, Object, isFinite, Date: { now: () => now }, Promise, performance: { now: () => 0 },
     setTimeout: (fn, ms) => timers.push(ms), clearTimeout() {},
     addEventListener: win.addEventListener, removeEventListener: win.removeEventListener
   });
@@ -627,26 +630,23 @@ function runCollab({ partner = 'bug', hash = '', search = '', reduced = false, h
   };
 }
 
-test('collab.js: the ident once a session; a light version on weak phones; never when it shouldn\'t', () => {
-  // first visit: the overlay, aria-hidden, the two logos (transparent, from the site root), the session remembered
+test('collab.js: the ident every time the page is entered; a light version on weak phones; never when it shouldn\'t', () => {
+  // a visit: the overlay, aria-hidden, the two logos (transparent, from the site root), nothing remembered
   let r = runCollab();
   assert.equal(r.mode, 'full');
   assert.equal(r.hidden, 'true');
   assert.deepEqual(r.images, ['https://site.test/assets/img/partners/athanasios-family-240.webp', 'https://site.test/assets/img/partners/bug-symbol-320.webp']);
-  assert.equal(r.session['athanasios:collab:bug'], '1');
-  assert.deepEqual(r.local, {}, 'nothing kept beyond the session');
+  assert.deepEqual([r.session, r.local], [{}, {}], 'nothing stored: it plays on every entry');
   assert.ok(r.timers.includes(700), 'starts by 0.7 s even if the logos are slow');
   assert.ok(r.timers.includes(3300), 'the hard limit');
   assert.ok(Math.max(...r.timers) <= 3300);
-  assert.deepEqual([...new Set(r.listeners)].sort(), ['keydown', 'pointerdown', 'wheel']);
+  // any input skips it; leaving ends it; back from the back/forward cache plays it again
+  assert.deepEqual([...new Set(r.listeners)].sort(), ['keydown', 'pagehide', 'pageshow', 'pointerdown', 'wheel']);
   assert.doesNotMatch(r.overlay.className, /cintro--lite/);
 
-  // the same session (another B.U.G. page): nothing
-  r = runCollab({ session: { 'athanasios:collab:bug': '1' } });
-  assert.deepEqual([r.mode, r.overlay], ['', null]);
-
-  // a new session plays it again, whatever happened before
-  assert.equal(runCollab({ local: { 'athanasios.collab.v1:bug': JSON.stringify({ n: 9, last: Date.now() }) } }).mode, 'full');
+  // coming into the page again (the old once-a-session mark, anything stored): it plays again
+  assert.equal(runCollab({ session: { 'athanasios:collab:bug': '1' } }).mode, 'full');
+  assert.equal(runCollab({ local: { 'athanasios.sound': 'off' } }).mode, 'full', 'sound off: the ident still plays (silent)');
 
   // a weak phone: the same ident, light
   for (const options of [{ cores: 4, memory: 4 }, { memory: 2 }]) {
@@ -656,8 +656,8 @@ test('collab.js: the ident once a session; a light version on weak phones; never
   }
   assert.doesNotMatch(runCollab({ cores: 4, memory: 8 }).overlay.className, /cintro--lite/, '4 cores with 8 GB is fine');
 
-  // storage that throws: never risks replaying on every page
-  assert.equal(runCollab({ broken: true }).mode, '');
+  // storage that throws: it still plays (the sound setting falls back to on)
+  assert.equal(runCollab({ broken: true }).mode, 'full');
 
   // the gates
   for (const [why, options] of [
@@ -698,4 +698,19 @@ test('collab.js: a classic script in both shells\' <head>; text only; every stor
   for (const file of ['athanasios-family-240', 'athanasios-family-480', 'bug-symbol-320', 'bug-symbol-640']) {
     assert.ok(existsSync(new URL(`assets/img/partners/${file}.webp`, ROOT)), file);
   }
+});
+
+
+/* «صوت المقطع» (§17.9): what a video card plays; only this site's own sound files */
+test('model: a video card\'s audio — original by default, custom only with this site\'s own MP3 / M4A, else silence', async () => {
+  const { cleanAudio } = await import(new URL("assets/js/page/model.js", ROOT).href);
+  assert.deepEqual(cleanAudio(undefined), { mode: 'original', src: null });
+  assert.deepEqual(cleanAudio({ mode: 'original', src: 'media/2026/aud-abcd1234.mp3' }), { mode: 'original', src: null });
+  assert.deepEqual(cleanAudio({ mode: 'none' }), { mode: 'none', src: null });
+  assert.deepEqual(cleanAudio({ mode: 'custom', src: 'media/2026/aud-abcd1234.mp3' }), { mode: 'custom', src: 'media/2026/aud-abcd1234.mp3' });
+  assert.deepEqual(cleanAudio({ mode: 'custom', src: 'media/2026/aud-abcd1234.m4a' }), { mode: 'custom', src: 'media/2026/aud-abcd1234.m4a' });
+  for (const src of ['https://evil.example/a.mp3', 'media/2026/vid-abcd1234.mp4', 'media/2026/aud-abcd1234.wav', '../aud-abcd1234.mp3', 'media/2026/aud-ABCD1234.mp3', '']) {
+    assert.deepEqual(cleanAudio({ mode: 'custom', src }), { mode: 'none', src: null }, src);
+  }
+  assert.deepEqual(cleanAudio({ mode: 'loud' }), { mode: 'original', src: null });
 });

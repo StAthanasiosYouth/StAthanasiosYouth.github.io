@@ -179,8 +179,8 @@ function githubCommitFiles_(files, message, binaries) {
   var paths = Object.keys(binaries || {});
 
   paths.forEach(function (path) {
-    if (!MEDIA_PATH.test(path) && !VIDEO_PATH.test(path) && !VIDEO_POSTER_PATH.test(path)) {
-      throw new Error('مسار صورة مش مسموح: ' + path);
+    if (!MEDIA_PATH.test(path) && !VIDEO_PATH.test(path) && !VIDEO_POSTER_PATH.test(path) && !AUDIO_PATH.test(path)) {
+      throw new Error('مسار صورة أو ملف مش مسموح: ' + path);
     }
   });
 

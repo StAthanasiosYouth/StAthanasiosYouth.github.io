@@ -65,6 +65,9 @@ var HOME_SEED_TYPES = [
 var PAGE_DEFAULT_TEAM_TITLE = 'عايز تنضم لفريق المسرح؟';
 var PAGE_DEFAULT_CTA = 'شاهد المسرحية كاملة';
 
+/* a video card's «صوت المقطع»: the clip's own sound, a soundtrack of its own (aud-…), or none */
+var PAGE_AUDIO_MODES = ['original', 'custom', 'none'];
+
 /*
  * Partners a page / an event may be «بإشراف» (docs/EVENTS.md §12). One so
  * far, with its logo committed in the repository (assets/img/partners/), so
@@ -292,6 +295,22 @@ function pagesImageInput_(value, label, library, problems, required) {
 
 }
 
+/* «صوت المقطع» → { mode, id }: a soundtrack must be a sound file of the library */
+function pagesAudioInput_(modeValue, value, library, problems) {
+
+  var mode = PAGE_AUDIO_MODES.indexOf(contentLine_(modeValue)) >= 0 ? contentLine_(modeValue) : 'original';
+  if (mode !== 'custom') return { mode: mode, id: '' };
+
+  var id = contentLine_(value);
+  var row = /^aud-[a-z0-9]{8}$/.test(id) ? library[id] : null;
+
+  if (!id) problems.push('صوت المقطع: اختار ملف الموسيقى أو الصوت (أو غيّر الاختيار)');
+  else if (!row || row.deletedAt) problems.push('صوت المقطع: الملف مش موجود في المكتبة');
+
+  return { mode: mode, id: row && !row.deletedAt ? id : '' };
+
+}
+
 /* a library token (img-… or vid-…[@start-end]) → the stored token, '' when empty */
 function pagesTokenInput_(value, label, library, problems, allowImage) {
 
@@ -466,6 +485,8 @@ function pageMediaInput_(input, library, problems) {
   if (source === 'clip' && !clip) problems.push('مقطع العرض جوه الصفحة: اختاره من المكتبة أو ارفع فيديو وقصّه (أو خلّي الكارت «لينك بس»)');
   if (source === 'link' && !fullUrl) problems.push('لينك الفيديو الكامل مطلوب لكارت «لينك بس»');
 
+  var audio = pagesAudioInput_(input.audioMode, input.audio, library, problems);
+
   return {
     title: input_(input.title, PAGE_LIMITS.mediaTitle, 'عنوان الفيديو', problems, true),
     text: textBlock_(input.text, PAGE_LIMITS.mediaText, 'وصف قصير', problems),
@@ -474,6 +495,8 @@ function pageMediaInput_(input, library, problems) {
     cover: pagesImageInput_(input.cover, 'صورة الكارت', library, problems, !(source === 'clip' && clip)),
     source: source,
     clip: source === 'clip' ? clip : '',
+    audioMode: audio.mode,
+    audio: audio.id,
     fullUrl: fullUrl || '',
     ctaLabel: input_(input.ctaLabel, PAGE_LIMITS.ctaLabel, 'نص زرار الفيديو الكامل', problems, false),
     enabled: input.enabled !== false
@@ -1003,6 +1026,8 @@ function pageMediaOut_(row) {
     cover: row.cover,
     source: row.source === 'link' ? 'link' : 'clip',
     clip: row.clip,
+    audioMode: PAGE_AUDIO_MODES.indexOf(row.audioMode) >= 0 ? row.audioMode : 'original',
+    audio: row.audio || '',
     fullUrl: row.fullUrl,
     ctaLabel: row.ctaLabel
   };
@@ -1577,6 +1602,7 @@ function apiPagePreview(kind, id) {
   var built = pagesBuildPublic_(draft, {
     media: mediaIndex_(mediaRows),
     video: videoIndex_(mediaRows),
+    audio: audioIndex_(mediaRows),
     error: function () {},
     warn: function () {},
     now: cairoNow_(new Date(Date.now())),
@@ -1606,7 +1632,7 @@ function apiPagePreview(kind, id) {
 
 /* =========================================================
    PUBLISH: everything pages and events add (§17)
-   ctx = { media: mediaIndex_, video: videoIndex_, error(where, msg), warn(where, msg), now: Cairo wall, hash }
+   ctx = { media: mediaIndex_, video: videoIndex_, audio: audioIndex_, error(where, msg), warn(where, msg), now: Cairo wall, hash }
    → { pages: [index], events: [index], live: { id: { kind, slug, def, v, row } },
        withdrawn: [{ kind, id, slug }], byId: { id: card data }, media: [ids] }
 ========================================================= */
@@ -1641,6 +1667,20 @@ function pagesBuildPublic_(draft, ctx) {
     }
     use(id);
     return img;
+  };
+
+  // a video card's «صوت المقطع» (a missing soundtrack: silence, never the clip's sound by surprise)
+  var sound = function (m, where) {
+    var mode = PAGE_AUDIO_MODES.indexOf(contentLine_(m.audioMode)) >= 0 ? contentLine_(m.audioMode) : 'original';
+    if (mode !== 'custom') return { mode: mode, src: null };
+    var id = contentLine_(m.audio);
+    var file = id && ctx.audio ? ctx.audio[id] : null;
+    if (!file) {
+      ctx.warn(where, 'ملف الصوت' + (id ? ' "' + id + '"' : '') + ' مش موجود في المكتبة: المقطع هيشتغل من غير صوت');
+      return { mode: 'none', src: null };
+    }
+    use(id);
+    return { mode: 'custom', src: file.src };
   };
 
   var token = function (text, where, label) {
@@ -1722,6 +1762,7 @@ function pagesBuildPublic_(draft, ctx) {
           cover: cover,
           source: clip ? 'clip' : 'link',
           clip: clip,
+          audio: clip ? sound(m, mWhere) : { mode: 'none', src: null },
           fullUrl: fullUrl,
           ctaLabel: contentLine_(m.ctaLabel).slice(0, PAGE_LIMITS.ctaLabel) || PAGE_DEFAULT_CTA
         };

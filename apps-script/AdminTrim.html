@@ -4,7 +4,10 @@
  *
  * The admin chooses a video on this computer (any size: a 10 GB phone or
  * camera file is fine), watches it, picks «من» / «لحد» (1–30 s) and a shape,
- * and the browser makes ONLY that short clip: H.264 MP4, silent, 30 fps,
+ * and the browser makes ONLY that short clip: H.264 MP4 with the video's own
+ * sound (AAC, when it has some and the browser can encode it; else silent —
+ * a service page's video card can use it, «صوت الفيديو الأصلي»; scenes on
+ * the home page always play muted), 30 fps,
  * 540×960 (portrait, blurred fill) or 854×480, about 1.2 Mbps, with WebCodecs
  * through Mediabunny (admin/vendor/mediabunny.js, loaded with import() only
  * at this moment). Only the byte ranges of that part are read. The clip then
@@ -337,11 +340,31 @@
     return {
       input: input,
       track: track,
+      audio: await soundOf(mb, input),
       codec: codec,
       duration: await input.computeDuration(),
       width: track.displayWidth,
       height: track.displayHeight
     };
+
+  }
+
+  /* the video's own sound, when it has some and this browser can carry it into the clip (AAC); else null */
+  var SOUND_BITRATE = 96000;
+
+  async function soundOf(mb, input) {
+
+    try {
+      if (typeof AudioDecoder === 'undefined' || typeof AudioEncoder === 'undefined' || !mb.canEncodeAudio || !mb.AudioSampleSink) return null;
+      var audio = await input.getPrimaryAudioTrack();
+      if (!audio || !(await audio.canDecode())) return null;
+      var channels = Math.min(2, audio.numberOfChannels || 2);
+      var ok = await mb.canEncodeAudio('aac', { numberOfChannels: channels, sampleRate: audio.sampleRate || 48000, bitrate: SOUND_BITRATE });
+      return ok ? audio : null;
+    }
+    catch (error) {
+      return null;
+    }
 
   }
 
@@ -382,15 +405,18 @@
     var canvas = new OffscreenCanvas(W, H);
     var ctx = canvas.getContext('2d');
     var output = new mb.Output({ format: new mb.Mp4OutputFormat({ fastStart: 'in-memory' }), target: new mb.BufferTarget() });
-    // silent: no audio track is added
     var frames = new mb.CanvasSource(canvas, { codec: 'avc', bitrate: job.bitrate, keyFrameInterval: 2 });
     var total = totalFrames(job.start, job.end, fps);
     // the poster: a frame a little into the clip
     var posterAt = Math.min(total - 1, Math.round(Math.min(1, (job.end - job.start) / 3) * fps));
     var poster = null;
     var n = 0;
+    // the video's own sound (AAC), when it has some (soundOf); decoded first, then laid in with the frames
+    var voice = source.audio ? new mb.AudioSampleSource({ codec: 'aac', bitrate: SOUND_BITRATE }) : null;
+    var sounds = [];
 
     output.addVideoTrack(frames, { frameRate: fps });
+    if (voice) output.addAudioTrack(voice);
     await output.start();
 
     async function emit(count) {
@@ -398,10 +424,31 @@
         if (n === posterAt) poster = snapshot(canvas);
         await frames.add(n / fps, 1 / fps);
         n++;
+        await hear(n / fps);
+      }
+    }
+
+    // the sound up to this moment of the clip, interleaved with the frames
+    async function hear(until) {
+      while (sounds.length && sounds[0].at < until) {
+        var item = sounds.shift();
+        try { await voice.add(item.sample); }
+        finally { item.sample.close(); }
       }
     }
 
     try {
+      if (voice) {
+        var listen = new mb.AudioSampleSink(source.audio);
+        var length = job.end - job.start;
+        for await (var heard of listen.samples(job.start, job.end)) {
+          var at = heard.timestamp - job.start;
+          if (cancelled() || at >= length) { heard.close(); if (cancelled()) break; continue; }
+          heard.setTimestamp(Math.max(0, at));
+          sounds.push({ at: Math.max(0, at), sample: heard });
+        }
+      }
+
       var sink = new mb.VideoSampleSink(source.track);
       for await (var sample of sink.samples(job.start, job.end)) {
         try {
@@ -420,6 +467,7 @@
       }
 
       if (cancelled()) {
+        sounds.forEach(function (item) { item.sample.close(); });
         await output.cancel();
         return null;
       }
@@ -428,16 +476,18 @@
         throw trimError('مفيش صورة في الجزء ده من الفيديو.', 'جرّب وقت تاني.');
       }
 
-      // the last frame held to the end (a source that stops a little early)
+      // the last frame held to the end (a source that stops a little early), then the rest of the sound
       await emit(total - n);
+      if (voice) await hear(Infinity);
       await output.finalize();
     }
     catch (error) {
+      sounds.forEach(function (item) { try { item.sample.close(); } catch (ignored) { /* closed */ } });
       try { await output.cancel(); } catch (ignored) { /* already closed */ }
       throw error;
     }
 
-    return { bytes: new Uint8Array(output.target.buffer), frames: n, width: W, height: H, poster: poster || snapshot(canvas) };
+    return { bytes: new Uint8Array(output.target.buffer), frames: n, width: W, height: H, poster: poster || snapshot(canvas), sound: !!voice };
 
   }
 

@@ -19,6 +19,7 @@ import { createSave, memoryStorage, browserStorage } from './save.js';
 import * as F from './flow.js';
 import { createView } from './view.js';
 import { zonedNow, stamp, setServerTime, setClockOffset, clockOffset, cairoInstant, realMinutesBetween } from '../schedule.js';
+import { soundToggle, uiSounds, cue } from '../ui-sound.js';
 
 /* the mount points (a stub made from an older shell may only have its own <main>) */
 function mount(id, make) {
@@ -451,6 +452,7 @@ async function submit() {
     S.attempt = null;
     go({ type: 'submitted' });
     view.announce('إجاباتك وصلت');
+    cue('success');
     return;
   }
 
@@ -521,6 +523,7 @@ function tick() {
     if (left <= 60000 && !S.warnedMinute) {
       S.warnedMinute = true;
       view.announce('باقي أقل من دقيقة');
+      cue('important', { passive: true });
     }
   }
 
@@ -790,6 +793,9 @@ else {
     render({ focus: false });
   }
   else {
+    // the site's sound: the same toggle and taps as the home page
+    soundToggle(document.querySelector('.cbar'));
+    uiSounds();
     boot();
   }
 }

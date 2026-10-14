@@ -354,8 +354,86 @@ img, svg, video {
   background: rgba(6, 26, 49, .7);
 }
 
+/* the site's sound toggle (ui-sound.js): the home page's 🔊/🔇, next to «ارجع للموقع» */
+.usound {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin-inline-start: auto;
+  padding: 0;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: 999px;
+  background: rgba(6, 26, 49, .7);
+  color: var(--gold-hi);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.usound:hover {
+  background: var(--navy-800);
+}
+
+.usound:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: 2px;
+}
+
+.usound[aria-pressed="false"] {
+  color: rgba(185, 197, 213, .8);
+  border-color: rgba(185, 197, 213, .25);
+}
+
+.usound__icon {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.usound__body {
+  fill: currentColor;
+  fill-opacity: .18;
+}
+
+
 .pbar__home:hover {
   background: var(--navy-800);
+}
+
+/* one line each, next to the sound button: the name gives way first */
+.pbar__brand {
+  min-width: 0;
+}
+
+.pbar__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pbar__home {
+  flex: none;
+  white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  .pbar {
+    gap: 8px;
+  }
+
+  .pbar__home {
+    padding-inline: 12px;
+    font-size: .86rem;
+  }
+
+  .pbar__name {
+    font-size: .9rem;
+  }
 }
 
 @media (max-width: 340px) {
@@ -1767,13 +1845,19 @@ img, svg, video {
    gold and navy, the mark joins the two. */
 
 .cintro {
-  --u: min(calc((100vw - 20px) / 380), calc(100vh / 430), 2.1px);
+  --u: min(calc((100vw - 20px) / 380), calc(100vh / 430), 3px);
+  --u: min(calc((100vw - 20px) / 380), calc(100dvh / 430), 3px);
   --ours-x: 108;
   --gold-stroke: linear-gradient(90deg, transparent, rgba(242, 210, 139, .2) 12%, #f2d28b 42%, #fff4d6 50%, #d7aa50 58%, rgba(215, 170, 80, .2) 88%, transparent);
   --spectrum-stroke: linear-gradient(90deg, transparent, rgba(255, 77, 77, .25) 10%, #ff5a4a 22%, #ffb020 36%, #fff6e0 50%, #3ddc84 62%, #38b6ff 76%, #a35cff 88%, transparent);
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
   z-index: 1000;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  margin: 0;
   overflow: hidden;
   direction: ltr;
   font-family: var(--font-ui);
@@ -1798,6 +1882,7 @@ img, svg, video {
   inset-inline: 0;
   z-index: 3;
   height: 10vh;
+  height: 10dvh;
   background: #000;
   animation: cintro-bar .35s cubic-bezier(.22, 1, .36, 1) both;
 }
@@ -2029,19 +2114,33 @@ img, svg, video {
 .cintro__mote--6 { --mx: 92; --my: 4; }
 .cintro__mote--7 { --mx: 6; --my: -44; background: #e3d2ff; box-shadow: 0 0 calc(6 * var(--u)) rgba(163, 92, 255, .7); }
 
+/* «تخطي»: a quiet pill in the lower corner (any tap anywhere skips too) */
 .cintro__skip {
   position: absolute;
   z-index: 4;
-  bottom: calc(10vh + 14px);
-  left: 50%;
+  bottom: calc(10vh + 16px);
+  bottom: calc(10dvh + 16px + env(safe-area-inset-bottom));
+  right: max(16px, env(safe-area-inset-right));
+  min-height: 36px;
   margin: 0;
-  translate: -50% 0;
+  padding: 0 16px;
+  border: 1px solid rgba(242, 210, 139, .28);
+  border-radius: 999px;
+  background: rgba(1, 6, 14, .55);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   direction: rtl;
-  font-size: 12px;
+  font: 600 13px/1 var(--font-ui);
   letter-spacing: .02em;
-  color: rgba(185, 197, 213, .75);
+  color: rgba(242, 228, 196, .9);
+  cursor: pointer;
   opacity: 0;
-  animation: cintro-fade .5s ease-out .6s both;
+  animation: cintro-fade .5s ease-out .5s both;
+}
+
+.cintro__skip:hover {
+  border-color: rgba(242, 210, 139, .55);
+  color: #fff4d6;
 }
 
 /* ---- the timeline (only once both logos can be drawn) ---- */

@@ -57,6 +57,7 @@ const STAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 const IMAGE_PATH = /^media\/\d{4}\/img-[a-z0-9]{8}(-480)?\.(webp|jpg)$/;
 const VIDEO_PATH = /^media\/\d{4}\/vid-[a-z0-9]{8}\.(mp4|webm)$/;
 const POSTER_PATH = /^media\/\d{4}\/vid-[a-z0-9]{8}-480\.(webp|jpg)$/;
+const AUDIO_PATH = /^media\/\d{4}\/aud-[a-z0-9]{8}\.(m4a|mp3)$/;
 
 const isObject = value => !!value && typeof value === 'object' && !Array.isArray(value);
 const list = value => (Array.isArray(value) ? value.filter(isObject) : []);
@@ -136,6 +137,15 @@ export function cleanVideo(raw) {
 
 const cleanMedia = raw => (isObject(raw) && raw.type === 'video' ? cleanVideo(raw) : cleanImage(raw));
 
+/* a video card's «صوت المقطع»: the clip's own, a soundtrack of its own (this site's file), or none */
+export function cleanAudio(raw) {
+  if (!isObject(raw)) return { mode: 'original', src: null };
+  if (raw.mode === 'none') return { mode: 'none', src: null };
+  if (raw.mode === 'custom' && AUDIO_PATH.test(raw.src || '')) return { mode: 'custom', src: raw.src };
+  // a soundtrack whose file is missing: silence, never the clip's own sound by surprise
+  return { mode: raw.mode === 'custom' ? 'none' : 'original', src: null };
+}
+
 const theme = value => (SECTION_THEMES.includes(value) ? value : '');
 
 
@@ -209,6 +219,7 @@ function cleanMediaCard(raw) {
     cover,
     source,
     clip: source === 'clip' ? clip : null,
+    audio: cleanAudio(raw.audio),
     fullUrl,
     ctaLabel: line(raw.ctaLabel, 30) || DEFAULT_MEDIA_CTA
   };

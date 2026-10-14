@@ -53,7 +53,7 @@ var COMP_TABLES = {
   PayMethods: ['key', 'label', 'icon', 'needsProof', 'order', 'active'],
   Pages: ['id', 'slug', 'enabled', 'archived', 'order', 'title', 'tagline', 'description', 'hero', 'cover', 'cardType', 'theme',
     'partner', 'teamTitle', 'teamText', 'teamMessage', 'team', 'home', 'cardId', 'liveV', 'publishedAt', 'createdBy', 'createdAt', 'updatedAt'],
-  PageMedia: ['id', 'pageId', 'order', 'enabled', 'title', 'text', 'duration', 'cover', 'source', 'clip', 'fullUrl', 'ctaLabel', 'updatedAt'],
+  PageMedia: ['id', 'pageId', 'order', 'enabled', 'title', 'text', 'duration', 'cover', 'source', 'clip', 'fullUrl', 'ctaLabel', 'updatedAt', 'audioMode', 'audio'],
   Events: ['id', 'slug', 'kind', 'enabled', 'archived', 'title', 'shortTitle', 'summary', 'body', 'cover', 'gallery', 'startAt', 'endAt',
     'locationName', 'locationUrl', 'theme', 'partner', 'terms', 'booking', 'servants', 'home', 'cardId', 'liveV', 'publishedAt',
     'createdBy', 'createdAt', 'updatedAt']

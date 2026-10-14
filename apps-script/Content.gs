@@ -1111,7 +1111,7 @@ function buildPublicContent(draft, options) {
   /* ---------- service pages and events (Pages.gs; docs/EVENTS.md §17) ---------- */
 
   var pages = draft.pages && typeof pagesBuildPublic_ === 'function'
-    ? pagesBuildPublic_(draft.pages, { media: mediaById, video: videoById, error: error, warn: warn, now: now,
+    ? pagesBuildPublic_(draft.pages, { media: mediaById, video: videoById, audio: audioIndex_(draft.media), error: error, warn: warn, now: now,
       hash: options.hash || (typeof sha256Hex_ === 'function' ? sha256Hex_ : null) })
     : null;
 

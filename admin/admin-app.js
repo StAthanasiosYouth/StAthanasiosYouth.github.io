@@ -6672,6 +6672,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     { key: 'unused', label: 'مش مستخدمة' },
     { key: 'site', label: 'على الموقع' },
     { key: 'videos', label: 'فيديوهات' },
+    { key: 'sounds', label: 'أصوات' },
     { key: 'bin', label: 'المحذوفة' }
   ];
 
@@ -6681,6 +6682,19 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   }
 
+  /* a sound file (a video card's own soundtrack, «صوت المقطع»): no picture */
+  function isAudio(item) {
+
+    return item.kind === 'audio' || /^aud-/.test(item.id || '');
+
+  }
+
+  /* the library's copy of one item (null before it loads): its name for an editor */
+  A.libraryItem = function (id) {
+    return library ? library.items.filter(function (item) { return item.id === id; })[0] || null : null;
+  };
+  A.loadLibrary = function () { return load(); };
+
   function matches(item, filter, query) {
 
     if (filter === 'bin') { if (!item.deletedAt) return false; }
@@ -6689,9 +6703,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     if (filter === 'unused' && item.usage.length) return false;
     if (filter === 'site' && !item.publishedAt) return false;
     if (filter === 'videos' && !isVideo(item)) return false;
+    if (filter === 'sounds' && !isAudio(item)) return false;
 
     if (query) {
-      var text = (item.name + ' ' + item.alt + ' ' + (isVideo(item) ? 'فيديو مقطع video ' : 'صورة ') + item.usage.map(function (u) { return u.label; }).join(' ')).toLowerCase();
+      var text = (item.name + ' ' + item.alt + ' ' + (isAudio(item) ? 'صوت موسيقى audio ' : isVideo(item) ? 'فيديو مقطع video ' : 'صورة ') + item.usage.map(function (u) { return u.label; }).join(' ')).toLowerCase();
       if (text.indexOf(query.toLowerCase()) === -1) return false;
     }
 
@@ -6704,22 +6719,26 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var img = el('img', { class: 'media-tile__img', alt: '' });
     var video = isVideo(item);
+    var audio = isAudio(item);
     var button = el('button', {
-      class: 'media-tile' + (selected ? ' is-selected' : '') + (item.deletedAt ? ' is-deleted' : '') + (video ? ' is-video' : ''),
+      class: 'media-tile' + (selected ? ' is-selected' : '') + (item.deletedAt ? ' is-deleted' : '') + (video ? ' is-video' : '') + (audio ? ' is-audio' : ''),
       type: 'button',
       'aria-pressed': selected ? 'true' : null,
-      'aria-label': (video ? 'فيديو: ' : '') + (item.name || item.alt || item.id) + (item.usage.length ? ' — مستخدمة ' + item.usage.length : ''),
+      'aria-label': (video ? 'فيديو: ' : audio ? 'صوت: ' : '') + (item.name || item.alt || item.id) + (item.usage.length ? ' — مستخدمة ' + item.usage.length : ''),
       style: item.color ? '--tile:' + item.color : null,
       onclick: onclick
     },
-    el('span', { class: 'media-tile__frame' }, img, video ? el('span', { class: 'media-tile__play', 'aria-hidden': 'true', text: '▶' }) : null),
+    el('span', { class: 'media-tile__frame' }, audio ? el('span', { class: 'media-tile__note', 'aria-hidden': 'true', text: '♪' }) : img, video ? el('span', { class: 'media-tile__play', 'aria-hidden': 'true', text: '▶' }) : null),
     el('span', { class: 'media-tile__name', text: item.name || item.alt || 'من غير اسم' }),
     el('span', { class: 'media-tile__meta' },
       item.usage.length ? el('span', { class: 'media-tile__badge', text: 'مستخدمة ' + item.usage.length }) : null,
       item.publishedAt ? el('span', { class: 'media-tile__dot', title: 'على الموقع' }) : null
     ));
 
-    if (item.tiny) {
+    if (audio) {
+      // a sound file has no picture
+    }
+    else if (item.tiny) {
       img.src = item.tiny;
     }
     else {
@@ -6860,13 +6879,14 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var box = A.errorBox();
     var video = isVideo(item);
+    var audio = isAudio(item);
     var name = A.counted(video ? 'اسم الفيديو' : 'اسم الصورة', item.name, 80, 'علشان تلاقيه بسهولة');
     var alt = A.counted(video ? 'وصف الفيديو' : 'وصف الصورة', item.alt, 140, video ? 'للي بيستخدم قارئ شاشة (مثلاً: الشباب في رحلة الغردقة)' : 'للي بيستخدم قارئ شاشة (مثلاً: بوستر رحلة الغردقة)');
     // a video: its poster frame (the clip itself plays on the site)
     var preview = el('img', { class: 'media-detail__img', alt: '' });
     var length = el('dd', { class: 'ltr', text: '—' });
 
-    A.mediaPreview(item.id).then(function (src) { if (src) preview.src = src; }).catch(function () {
+    if (!audio) A.mediaPreview(item.id).then(function (src) { if (src) preview.src = src; }).catch(function () {
       if (item.tiny) preview.src = item.tiny;
     });
 
@@ -6875,9 +6895,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
 
     var facts = el('dl', { class: 'kv' },
-      video ? el('dt', { text: 'النوع' }) : null, video ? el('dd', { text: 'مقطع فيديو (MP4، من غير صوت)' }) : null,
+      video ? el('dt', { text: 'النوع' }) : null, video ? el('dd', { text: 'مقطع فيديو (MP4، بصوته لو الفيديو الأصلي كان فيه صوت)' }) : null,
       video ? el('dt', { text: 'المدة' }) : null, video ? length : null,
-      el('dt', { text: 'المقاس' }), el('dd', { class: 'ltr', text: item.width + ' × ' + item.height }),
+      audio ? el('dt', { text: 'النوع' }) : null, audio ? el('dd', { text: 'ملف صوت (MP3 أو M4A) — لكارت فيديو في صفحة خدمة' }) : null,
+      audio ? null : el('dt', { text: 'المقاس' }), audio ? null : el('dd', { class: 'ltr', text: item.width + ' × ' + item.height }),
       item.bytes ? el('dt', { text: 'الحجم' }) : null, item.bytes ? el('dd', { class: 'ltr', text: A.formatBytes(Number(item.bytes)) }) : null,
       el('dt', { text: 'اترفعت' }), el('dd', { text: item.uploadedAt ? A.formatWall(item.uploadedAt) : '—' }),
       el('dt', { text: 'على الموقع' }), el('dd', { text: item.publishedAt ? 'أيوه، من ' + A.formatWall(item.publishedAt) : 'لسه (هتتنشر مع أول حاجة بتستخدمها)' })
@@ -6941,7 +6962,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     A.openSheet(item.name || (video ? 'فيديو' : 'صورة'), [
       box,
-      el('div', { class: 'media-detail' + (video ? ' is-video' : ''), style: item.color ? '--tile:' + item.color : null }, preview, video ? el('span', { class: 'media-tile__play', 'aria-hidden': 'true', text: '▶' }) : null),
+      el('div', { class: 'media-detail' + (video ? ' is-video' : '') + (audio ? ' is-audio' : ''), style: item.color ? '--tile:' + item.color : null }, audio ? el('span', { class: 'media-tile__note', 'aria-hidden': 'true', text: '♪' }) : preview, video ? el('span', { class: 'media-tile__play', 'aria-hidden': 'true', text: '▶' }) : null),
       el('div', { class: 'form' }, name.node, alt.node),
       facts,
       el('div', { class: 'form-group' }, el('p', { class: 'section-label', text: 'مستخدمة في' }), usage),
@@ -6968,10 +6989,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   A.pickFromLibrary = function (currentId, options) {
 
     var videos = !!(options && options.videos);
+    // a video card's soundtrack: sound files only (and they never go anywhere else)
+    var sounds = !!(options && options.sounds);
 
     return new Promise(function (resolve) {
 
-      var dialog = el('dialog', { class: 'modal modal--wide picker-dialog', 'aria-label': videos ? 'اختار صورة أو فيديو من المكتبة' : 'اختار صورة من المكتبة' });
+      var dialog = el('dialog', { class: 'modal modal--wide picker-dialog', 'aria-label': sounds ? 'اختار ملف صوت من المكتبة' : videos ? 'اختار صورة أو فيديو من المكتبة' : 'اختار صورة من المكتبة' });
       var body = el('div', { class: 'picker-dialog__body' }, skeletonGrid());
       var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر…', 'aria-label': 'دوّر في الصور' });
       var done = false;
@@ -6986,7 +7009,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
       function draw() {
         var query = search.value.trim();
-        var items = library.items.filter(function (item) { return (videos || !isVideo(item)) && matches(item, 'all', query); });
+        var items = library.items.filter(function (item) { return (sounds ? isAudio(item) : !isAudio(item) && (videos || !isVideo(item))) && matches(item, 'all', query); });
         body.replaceChildren(grid(items, function (item) { close(item.id); }, currentId));
       }
 
@@ -7024,7 +7047,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
  *
  * The admin chooses a video on this computer (any size: a 10 GB phone or
  * camera file is fine), watches it, picks «من» / «لحد» (1–30 s) and a shape,
- * and the browser makes ONLY that short clip: H.264 MP4, silent, 30 fps,
+ * and the browser makes ONLY that short clip: H.264 MP4 with the video's own
+ * sound (AAC, when it has some and the browser can encode it; else silent —
+ * a service page's video card can use it, «صوت الفيديو الأصلي»; scenes on
+ * the home page always play muted), 30 fps,
  * 540×960 (portrait, blurred fill) or 854×480, about 1.2 Mbps, with WebCodecs
  * through Mediabunny (admin/vendor/mediabunny.js, loaded with import() only
  * at this moment). Only the byte ranges of that part are read. The clip then
@@ -7357,11 +7383,31 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return {
       input: input,
       track: track,
+      audio: await soundOf(mb, input),
       codec: codec,
       duration: await input.computeDuration(),
       width: track.displayWidth,
       height: track.displayHeight
     };
+
+  }
+
+  /* the video's own sound, when it has some and this browser can carry it into the clip (AAC); else null */
+  var SOUND_BITRATE = 96000;
+
+  async function soundOf(mb, input) {
+
+    try {
+      if (typeof AudioDecoder === 'undefined' || typeof AudioEncoder === 'undefined' || !mb.canEncodeAudio || !mb.AudioSampleSink) return null;
+      var audio = await input.getPrimaryAudioTrack();
+      if (!audio || !(await audio.canDecode())) return null;
+      var channels = Math.min(2, audio.numberOfChannels || 2);
+      var ok = await mb.canEncodeAudio('aac', { numberOfChannels: channels, sampleRate: audio.sampleRate || 48000, bitrate: SOUND_BITRATE });
+      return ok ? audio : null;
+    }
+    catch (error) {
+      return null;
+    }
 
   }
 
@@ -7402,15 +7448,18 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var canvas = new OffscreenCanvas(W, H);
     var ctx = canvas.getContext('2d');
     var output = new mb.Output({ format: new mb.Mp4OutputFormat({ fastStart: 'in-memory' }), target: new mb.BufferTarget() });
-    // silent: no audio track is added
     var frames = new mb.CanvasSource(canvas, { codec: 'avc', bitrate: job.bitrate, keyFrameInterval: 2 });
     var total = totalFrames(job.start, job.end, fps);
     // the poster: a frame a little into the clip
     var posterAt = Math.min(total - 1, Math.round(Math.min(1, (job.end - job.start) / 3) * fps));
     var poster = null;
     var n = 0;
+    // the video's own sound (AAC), when it has some (soundOf); decoded first, then laid in with the frames
+    var voice = source.audio ? new mb.AudioSampleSource({ codec: 'aac', bitrate: SOUND_BITRATE }) : null;
+    var sounds = [];
 
     output.addVideoTrack(frames, { frameRate: fps });
+    if (voice) output.addAudioTrack(voice);
     await output.start();
 
     async function emit(count) {
@@ -7418,10 +7467,31 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         if (n === posterAt) poster = snapshot(canvas);
         await frames.add(n / fps, 1 / fps);
         n++;
+        await hear(n / fps);
+      }
+    }
+
+    // the sound up to this moment of the clip, interleaved with the frames
+    async function hear(until) {
+      while (sounds.length && sounds[0].at < until) {
+        var item = sounds.shift();
+        try { await voice.add(item.sample); }
+        finally { item.sample.close(); }
       }
     }
 
     try {
+      if (voice) {
+        var listen = new mb.AudioSampleSink(source.audio);
+        var length = job.end - job.start;
+        for await (var heard of listen.samples(job.start, job.end)) {
+          var at = heard.timestamp - job.start;
+          if (cancelled() || at >= length) { heard.close(); if (cancelled()) break; continue; }
+          heard.setTimestamp(Math.max(0, at));
+          sounds.push({ at: Math.max(0, at), sample: heard });
+        }
+      }
+
       var sink = new mb.VideoSampleSink(source.track);
       for await (var sample of sink.samples(job.start, job.end)) {
         try {
@@ -7440,6 +7510,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       }
 
       if (cancelled()) {
+        sounds.forEach(function (item) { item.sample.close(); });
         await output.cancel();
         return null;
       }
@@ -7448,16 +7519,18 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         throw trimError('مفيش صورة في الجزء ده من الفيديو.', 'جرّب وقت تاني.');
       }
 
-      // the last frame held to the end (a source that stops a little early)
+      // the last frame held to the end (a source that stops a little early), then the rest of the sound
       await emit(total - n);
+      if (voice) await hear(Infinity);
       await output.finalize();
     }
     catch (error) {
+      sounds.forEach(function (item) { try { item.sample.close(); } catch (ignored) { /* closed */ } });
       try { await output.cancel(); } catch (ignored) { /* already closed */ }
       throw error;
     }
 
-    return { bytes: new Uint8Array(output.target.buffer), frames: n, width: W, height: H, poster: poster || snapshot(canvas) };
+    return { bytes: new Uint8Array(output.target.buffer), frames: n, width: W, height: H, poster: poster || snapshot(canvas), sound: !!voice };
 
   }
 
@@ -14889,6 +14962,134 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   }
 
+  /*
+   * «صوت المقطع» (§17.9): what plays when the visitor opens the card —
+   * the clip's own sound, a music / sound file of its own (the clip muted),
+   * or none. The file: uploaded here (MP3 / M4A, up to 6 MB) or picked
+   * from the library's «أصوات»; it lives in the same media library.
+   */
+  var AUDIO_MAX = 6 * 1024 * 1024;
+
+  function soundField(m) {
+
+    var mode = ['original', 'custom', 'none'].indexOf(m.audioMode) >= 0 ? m.audioMode : 'original';
+    var current = m.audio || '';
+    var uploading = false;
+    var name = el('span', { class: 'sound-pick__name' });
+    var player = el('audio', { class: 'sound-pick__player', controls: true, preload: 'none' });
+    var status = el('p', { class: 'note sound-pick__status', hidden: true });
+    var file = el('input', { type: 'file', accept: '.mp3,.m4a,audio/mpeg,audio/mp4,audio/x-m4a,audio/aac', hidden: true });
+    var up = el('button', { class: 'btn', type: 'button' }, icon('upload'), 'ارفع ملف صوت');
+    var pick = el('button', { class: 'btn btn--ghost', type: 'button' }, icon('music'), 'اختار من المكتبة');
+    var custom = el('div', { class: 'sound-pick' },
+      el('div', { class: 'sound-pick__file' }, el('span', { class: 'sound-pick__note', 'aria-hidden': 'true', text: '♪' }), name),
+      player,
+      el('div', { class: 'actions' }, up, pick),
+      file,
+      status);
+    var choice = A.choices(A.uid('aud'), [
+      { value: 'original', label: 'صوت الفيديو الأصلي' },
+      { value: 'custom', label: 'موسيقى/صوت مخصص' },
+      { value: 'none', label: 'بدون صوت' }
+    ], mode, function (v) { mode = v; custom.hidden = v !== 'custom'; });
+
+    player.hidden = true;
+    custom.hidden = mode !== 'custom';
+
+    function paint() {
+      var item = current && A.libraryItem ? A.libraryItem(current) : null;
+      name.textContent = current ? (item && item.name) || 'ملف صوت (' + current + ')' : 'لسه مفيش ملف — ارفع واحد أو اختار من المكتبة';
+      custom.classList.toggle('is-empty', !current);
+    }
+
+    function say(text, tone) {
+      status.hidden = !text;
+      status.textContent = text || '';
+      status.className = 'note sound-pick__status' + (tone ? ' is-' + tone : '');
+    }
+
+    paint();
+    if (current && A.loadLibrary) A.loadLibrary().then(paint).catch(function () {});
+
+    pick.addEventListener('click', function () {
+      A.pickFromLibrary(current, { sounds: true }).then(function (id) {
+        if (!id) return;
+        current = id;
+        player.hidden = true;
+        player.removeAttribute('src');
+        paint();
+        say('');
+        A.markDirty();
+      });
+    });
+
+    up.addEventListener('click', function () { file.click(); });
+
+    file.addEventListener('change', function () {
+      var f = file.files && file.files[0];
+      file.value = '';
+      if (!f || uploading) return;
+      var ext = (f.name.split('.').pop() || '').toLowerCase();
+      var mime = ext === 'mp3' || f.type === 'audio/mpeg' ? 'audio/mpeg'
+        : ext === 'm4a' || /^audio\/(mp4|x-m4a|aac)$/.test(f.type) ? 'audio/mp4' : '';
+      if (!mime) { say('الملف لازم يكون MP3 أو M4A. لو WAV أو غيره: حوّله MP3 الأول.', 'error'); return; }
+      if (f.size > AUDIO_MAX) { say('الملف أكبر من 6 MB (' + A.formatBytes(f.size) + '). اختار نسخة أصغر (MP3 بجودة 128) أو جزء أقصر.', 'error'); return; }
+
+      var url = URL.createObjectURL(f);
+      var probe = new Audio();
+      var seconds = new Promise(function (resolve, reject) {
+        probe.preload = 'metadata';
+        probe.onloadedmetadata = function () { resolve(probe.duration); };
+        probe.onerror = function () { reject(new Error('المتصفح مقدرش يقرا الملف ده كصوت.')); };
+        probe.src = url;
+      });
+      var bytes = new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function () { resolve(String(reader.result).replace(/^data:[^,]*,/, '')); };
+        reader.onerror = function () { reject(new Error('مقدرناش نقرا الملف.')); };
+        reader.readAsDataURL(f);
+      });
+
+      uploading = true;
+      A.uploadsInFlight = (A.uploadsInFlight || 0) + 1;
+      up.disabled = pick.disabled = true;
+      say('بيترفع… ' + A.formatBytes(f.size));
+
+      Promise.all([seconds, bytes]).then(function (got) {
+        var duration = got[0];
+        if (!(duration > 0 && duration <= 600)) throw new Error('ملف الصوت لازم يكون أقل من ١٠ دقايق.');
+        return A.call('apiUploadMedia', { kind: 'audio', audio: got[1], mime: mime, duration: Math.round(duration * 10) / 10, name: f.name.replace(/\.[^.]+$/, '').slice(0, 80) });
+      }).then(function (result) {
+        if (!result || !result.media || !result.media.id) throw new Error('الرفع خلص بس الرد رجع ناقص. جرّب تاني.');
+        if (result.state) { A.state = result.state; A.renderStatus(); }
+        current = result.media.id;
+        if (A.invalidateLibrary) A.invalidateLibrary();
+        player.src = url;
+        player.hidden = false;
+        paint();
+        name.textContent = result.media.name || f.name;
+        say(result.duplicate ? 'الملف ده موجود في المكتبة قبل كده — اتختار هو ✓' : 'اترفع ✓ — احفظ الكارت عشان يتربط', 'ok');
+        A.markDirty();
+      }).catch(function (error) {
+        URL.revokeObjectURL(url);
+        say((error && error.message) || 'الرفع موقفش صح. جرّب تاني.', 'error');
+      }).then(function () {
+        uploading = false;
+        A.uploadsInFlight = Math.max(0, (A.uploadsInFlight || 0) - 1);
+        up.disabled = pick.disabled = false;
+      });
+    });
+
+    return {
+      node: el('div', { class: 'form sound-field' },
+        A.field('صوت المقطع', choice.node, 'اللي بيتسمع لما الزائر يفتح الكارت. «صوت الفيديو الأصلي»: صوت المقطع نفسه (المقاطع اللي اتقصّت بالصوت). «موسيقى/صوت مخصص»: ملف بتختاره، والمقطع بيشتغل من غير صوته. الصوت بيظهر ويختفي بهدوء، وبيحترم زرار الصوت في الموقع.'),
+        custom),
+      value: function () { return { audioMode: mode, audio: mode === 'custom' ? current : '' }; },
+      busy: function () { return uploading; }
+    };
+
+  }
+
   function mediaEditor(r, m) {
 
     var isNew = !m;
@@ -14927,7 +15128,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.markDirty();
       }
     });
-    var clipField = el('div', { class: 'form' }, clipHolder, upload.node);
+    var sound = soundField(m);
+    var clipField = el('div', { class: 'form' }, clipHolder, upload.node, sound.node);
     var fullUrl = A.textInput(m.fullUrl, { ltr: true, type: 'url', placeholder: 'https://youtube.com/…' });
     var ctaLabel = A.textInput(m.ctaLabel, { max: limits.ctaLabel || 30, placeholder: 'شاهد المسرحية كاملة' });
     var enabled = A.checkbox('ظاهر في الصفحة', m.enabled !== false);
@@ -14937,11 +15139,13 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     save.addEventListener('click', function () {
       box.hidden = true;
-      if (A.uploadsInFlight > 0) { A.fail(new Error('الصورة لسه بتترفع. استنى لما يظهر «تم الرفع ✓» وبعدين احفظ.'), box); return; }
+      if (A.uploadsInFlight > 0 || sound.busy()) { A.fail(new Error('فيه ملف لسه بيترفع. استنى لما يظهر «اترفع ✓» وبعدين احفظ.'), box); return; }
+      var audio = sound.value();
       var input = {
         title: title.input.value, text: text.input.value, duration: duration.value, cover: cover.value(),
         source: source.value ? source.value() : (clipField.hidden ? 'link' : 'clip'),
-        clip: tokens(clip)[0] || '', fullUrl: fullUrl.value.trim(), ctaLabel: ctaLabel.value, enabled: enabled.input.checked
+        clip: tokens(clip)[0] || '', audioMode: audio.audioMode, audio: audio.audio,
+        fullUrl: fullUrl.value.trim(), ctaLabel: ctaLabel.value, enabled: enabled.input.checked
       };
       A.withBusy(save, A.call('apiPageMediaSave', page.id, isNew ? null : m.id, input)).then(function (next) {
         A.dirty = false;
@@ -14954,10 +15158,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     A.dirty = false;
     A.openSheet(isNew ? 'كارت فيديو جديد' : 'تعديل: ' + m.title, [
       box,
-      el('p', { class: 'note', text: 'في الصفحة: الزائر بيشوف صورة الكارت ← يدوس ← المقطع يشتغل في مشغّل نضيف، وتحته العنوان والوصف وزرار بيفتح الفيديو الكامل.' }),
+      el('p', { class: 'note', text: 'في الصفحة: الزائر بيشوف صورة الكارت ← يدوس ← المقطع يشتغل لوحده في شيت زي «صوتك يهمنا» (تفاعلات وكلام حوالين المقطع)، بالصوت اللي تختاره، وتحته العنوان والوصف وزرار بيفتح الفيديو الكامل.' }),
       el('div', { class: 'form' },
         el('fieldset', { class: 'fieldset' },
-          el('legend', { text: '١. المقطع اللي بيشتغل جوه الصفحة' }),
+          el('legend', { text: '١. المقطع اللي بيشتغل جوه الصفحة وصوته' }),
           A.field('نوع الكارت', source.node || source),
           clipField),
         el('fieldset', { class: 'fieldset' },

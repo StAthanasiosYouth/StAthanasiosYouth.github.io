@@ -600,6 +600,134 @@
 
   }
 
+  /*
+   * «صوت المقطع» (§17.9): what plays when the visitor opens the card —
+   * the clip's own sound, a music / sound file of its own (the clip muted),
+   * or none. The file: uploaded here (MP3 / M4A, up to 6 MB) or picked
+   * from the library's «أصوات»; it lives in the same media library.
+   */
+  var AUDIO_MAX = 6 * 1024 * 1024;
+
+  function soundField(m) {
+
+    var mode = ['original', 'custom', 'none'].indexOf(m.audioMode) >= 0 ? m.audioMode : 'original';
+    var current = m.audio || '';
+    var uploading = false;
+    var name = el('span', { class: 'sound-pick__name' });
+    var player = el('audio', { class: 'sound-pick__player', controls: true, preload: 'none' });
+    var status = el('p', { class: 'note sound-pick__status', hidden: true });
+    var file = el('input', { type: 'file', accept: '.mp3,.m4a,audio/mpeg,audio/mp4,audio/x-m4a,audio/aac', hidden: true });
+    var up = el('button', { class: 'btn', type: 'button' }, icon('upload'), 'ارفع ملف صوت');
+    var pick = el('button', { class: 'btn btn--ghost', type: 'button' }, icon('music'), 'اختار من المكتبة');
+    var custom = el('div', { class: 'sound-pick' },
+      el('div', { class: 'sound-pick__file' }, el('span', { class: 'sound-pick__note', 'aria-hidden': 'true', text: '♪' }), name),
+      player,
+      el('div', { class: 'actions' }, up, pick),
+      file,
+      status);
+    var choice = A.choices(A.uid('aud'), [
+      { value: 'original', label: 'صوت الفيديو الأصلي' },
+      { value: 'custom', label: 'موسيقى/صوت مخصص' },
+      { value: 'none', label: 'بدون صوت' }
+    ], mode, function (v) { mode = v; custom.hidden = v !== 'custom'; });
+
+    player.hidden = true;
+    custom.hidden = mode !== 'custom';
+
+    function paint() {
+      var item = current && A.libraryItem ? A.libraryItem(current) : null;
+      name.textContent = current ? (item && item.name) || 'ملف صوت (' + current + ')' : 'لسه مفيش ملف — ارفع واحد أو اختار من المكتبة';
+      custom.classList.toggle('is-empty', !current);
+    }
+
+    function say(text, tone) {
+      status.hidden = !text;
+      status.textContent = text || '';
+      status.className = 'note sound-pick__status' + (tone ? ' is-' + tone : '');
+    }
+
+    paint();
+    if (current && A.loadLibrary) A.loadLibrary().then(paint).catch(function () {});
+
+    pick.addEventListener('click', function () {
+      A.pickFromLibrary(current, { sounds: true }).then(function (id) {
+        if (!id) return;
+        current = id;
+        player.hidden = true;
+        player.removeAttribute('src');
+        paint();
+        say('');
+        A.markDirty();
+      });
+    });
+
+    up.addEventListener('click', function () { file.click(); });
+
+    file.addEventListener('change', function () {
+      var f = file.files && file.files[0];
+      file.value = '';
+      if (!f || uploading) return;
+      var ext = (f.name.split('.').pop() || '').toLowerCase();
+      var mime = ext === 'mp3' || f.type === 'audio/mpeg' ? 'audio/mpeg'
+        : ext === 'm4a' || /^audio\/(mp4|x-m4a|aac)$/.test(f.type) ? 'audio/mp4' : '';
+      if (!mime) { say('الملف لازم يكون MP3 أو M4A. لو WAV أو غيره: حوّله MP3 الأول.', 'error'); return; }
+      if (f.size > AUDIO_MAX) { say('الملف أكبر من 6 MB (' + A.formatBytes(f.size) + '). اختار نسخة أصغر (MP3 بجودة 128) أو جزء أقصر.', 'error'); return; }
+
+      var url = URL.createObjectURL(f);
+      var probe = new Audio();
+      var seconds = new Promise(function (resolve, reject) {
+        probe.preload = 'metadata';
+        probe.onloadedmetadata = function () { resolve(probe.duration); };
+        probe.onerror = function () { reject(new Error('المتصفح مقدرش يقرا الملف ده كصوت.')); };
+        probe.src = url;
+      });
+      var bytes = new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function () { resolve(String(reader.result).replace(/^data:[^,]*,/, '')); };
+        reader.onerror = function () { reject(new Error('مقدرناش نقرا الملف.')); };
+        reader.readAsDataURL(f);
+      });
+
+      uploading = true;
+      A.uploadsInFlight = (A.uploadsInFlight || 0) + 1;
+      up.disabled = pick.disabled = true;
+      say('بيترفع… ' + A.formatBytes(f.size));
+
+      Promise.all([seconds, bytes]).then(function (got) {
+        var duration = got[0];
+        if (!(duration > 0 && duration <= 600)) throw new Error('ملف الصوت لازم يكون أقل من ١٠ دقايق.');
+        return A.call('apiUploadMedia', { kind: 'audio', audio: got[1], mime: mime, duration: Math.round(duration * 10) / 10, name: f.name.replace(/\.[^.]+$/, '').slice(0, 80) });
+      }).then(function (result) {
+        if (!result || !result.media || !result.media.id) throw new Error('الرفع خلص بس الرد رجع ناقص. جرّب تاني.');
+        if (result.state) { A.state = result.state; A.renderStatus(); }
+        current = result.media.id;
+        if (A.invalidateLibrary) A.invalidateLibrary();
+        player.src = url;
+        player.hidden = false;
+        paint();
+        name.textContent = result.media.name || f.name;
+        say(result.duplicate ? 'الملف ده موجود في المكتبة قبل كده — اتختار هو ✓' : 'اترفع ✓ — احفظ الكارت عشان يتربط', 'ok');
+        A.markDirty();
+      }).catch(function (error) {
+        URL.revokeObjectURL(url);
+        say((error && error.message) || 'الرفع موقفش صح. جرّب تاني.', 'error');
+      }).then(function () {
+        uploading = false;
+        A.uploadsInFlight = Math.max(0, (A.uploadsInFlight || 0) - 1);
+        up.disabled = pick.disabled = false;
+      });
+    });
+
+    return {
+      node: el('div', { class: 'form sound-field' },
+        A.field('صوت المقطع', choice.node, 'اللي بيتسمع لما الزائر يفتح الكارت. «صوت الفيديو الأصلي»: صوت المقطع نفسه (المقاطع اللي اتقصّت بالصوت). «موسيقى/صوت مخصص»: ملف بتختاره، والمقطع بيشتغل من غير صوته. الصوت بيظهر ويختفي بهدوء، وبيحترم زرار الصوت في الموقع.'),
+        custom),
+      value: function () { return { audioMode: mode, audio: mode === 'custom' ? current : '' }; },
+      busy: function () { return uploading; }
+    };
+
+  }
+
   function mediaEditor(r, m) {
 
     var isNew = !m;
@@ -638,7 +766,8 @@
         A.markDirty();
       }
     });
-    var clipField = el('div', { class: 'form' }, clipHolder, upload.node);
+    var sound = soundField(m);
+    var clipField = el('div', { class: 'form' }, clipHolder, upload.node, sound.node);
     var fullUrl = A.textInput(m.fullUrl, { ltr: true, type: 'url', placeholder: 'https://youtube.com/…' });
     var ctaLabel = A.textInput(m.ctaLabel, { max: limits.ctaLabel || 30, placeholder: 'شاهد المسرحية كاملة' });
     var enabled = A.checkbox('ظاهر في الصفحة', m.enabled !== false);
@@ -648,11 +777,13 @@
 
     save.addEventListener('click', function () {
       box.hidden = true;
-      if (A.uploadsInFlight > 0) { A.fail(new Error('الصورة لسه بتترفع. استنى لما يظهر «تم الرفع ✓» وبعدين احفظ.'), box); return; }
+      if (A.uploadsInFlight > 0 || sound.busy()) { A.fail(new Error('فيه ملف لسه بيترفع. استنى لما يظهر «اترفع ✓» وبعدين احفظ.'), box); return; }
+      var audio = sound.value();
       var input = {
         title: title.input.value, text: text.input.value, duration: duration.value, cover: cover.value(),
         source: source.value ? source.value() : (clipField.hidden ? 'link' : 'clip'),
-        clip: tokens(clip)[0] || '', fullUrl: fullUrl.value.trim(), ctaLabel: ctaLabel.value, enabled: enabled.input.checked
+        clip: tokens(clip)[0] || '', audioMode: audio.audioMode, audio: audio.audio,
+        fullUrl: fullUrl.value.trim(), ctaLabel: ctaLabel.value, enabled: enabled.input.checked
       };
       A.withBusy(save, A.call('apiPageMediaSave', page.id, isNew ? null : m.id, input)).then(function (next) {
         A.dirty = false;
@@ -665,10 +796,10 @@
     A.dirty = false;
     A.openSheet(isNew ? 'كارت فيديو جديد' : 'تعديل: ' + m.title, [
       box,
-      el('p', { class: 'note', text: 'في الصفحة: الزائر بيشوف صورة الكارت ← يدوس ← المقطع يشتغل في مشغّل نضيف، وتحته العنوان والوصف وزرار بيفتح الفيديو الكامل.' }),
+      el('p', { class: 'note', text: 'في الصفحة: الزائر بيشوف صورة الكارت ← يدوس ← المقطع يشتغل لوحده في شيت زي «صوتك يهمنا» (تفاعلات وكلام حوالين المقطع)، بالصوت اللي تختاره، وتحته العنوان والوصف وزرار بيفتح الفيديو الكامل.' }),
       el('div', { class: 'form' },
         el('fieldset', { class: 'fieldset' },
-          el('legend', { text: '١. المقطع اللي بيشتغل جوه الصفحة' }),
+          el('legend', { text: '١. المقطع اللي بيشتغل جوه الصفحة وصوته' }),
           A.field('نوع الكارت', source.node || source),
           clipField),
         el('fieldset', { class: 'fieldset' },

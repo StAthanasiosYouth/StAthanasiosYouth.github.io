@@ -18,6 +18,7 @@ import { sanitizePage, sanitizeEvent, sanitizeEntry, bookingPhase, eventsList } 
 import { createView } from './view.js';
 import { createVideoSheet } from './video.js';
 import { zonedNow, stamp, setServerTime } from '../schedule.js';
+import { soundToggle, uiSounds } from '../ui-sound.js';
 
 const ROOT = new URL('../../../', import.meta.url);
 const html = document.documentElement;
@@ -85,7 +86,11 @@ function render(kind, data) {
 
   if (kind === 'page') {
     view.page(data, { reduced: reduced() });
-    sheet.attach(data.media);
+    sheet.attach(data.media, { title: data.title });
+    // the clip sheet's living stage, ready before the first tap
+    if (data.media.some(card => card.source === 'clip' && card.clip)) {
+      (window.requestIdleCallback || (fn => setTimeout(fn, 1200)))(() => sheet.prepare());
+    }
     phaseKey = '';
   }
   else if (kind === 'event') {
@@ -241,6 +246,9 @@ else {
       // sandboxed frame: nothing more we can do
     }
   }
+  // the site's sound: the same toggle and taps as the home page
+  soundToggle(document.querySelector('.pbar'));
+  uiSounds();
   boot();
   setInterval(tick, 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });

@@ -18,7 +18,9 @@ const esbuild = require('esbuild');
 /* what AdminTrim.html uses (keep in sync) */
 export const VENDOR_EXPORTS = [
   'Input', 'BlobSource', 'MP4', 'QTFF', 'MATROSKA', 'WEBM', 'VideoSampleSink',
-  'Output', 'Mp4OutputFormat', 'BufferTarget', 'CanvasSource', 'canEncodeVideo'
+  'Output', 'Mp4OutputFormat', 'BufferTarget', 'CanvasSource', 'canEncodeVideo',
+  // the clip keeps its own sound («صوت الفيديو الأصلي» on a service page's video card)
+  'AudioSampleSink', 'AudioSampleSource', 'canEncodeAudio'
 ];
 
 export async function buildVendor() {

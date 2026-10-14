@@ -50,6 +50,9 @@ var MEDIA_PATH = /^media\/\d{4}\/img-[a-z0-9]{8}(-480)?\.(webp|jpg)$/;
 var VIDEO_PATH = /^media\/\d{4}\/vid-[a-z0-9]{8}\.(mp4|webm)$/;
 var VIDEO_POSTER_PATH = /^media\/\d{4}\/vid-[a-z0-9]{8}-480\.(webp|jpg)$/;
 
+/* a service page video card's own soundtrack (Pages.gs «صوت المقطع»): the file only */
+var AUDIO_PATH = /^media\/\d{4}\/aud-[a-z0-9]{8}\.(m4a|mp3)$/;
+
 
 /* =========================================================
    CAIRO WALL-CLOCK ARITHMETIC
@@ -377,6 +380,26 @@ function videoIndex_(rows) {
       alt: contentLine_(row.alt).slice(0, HUB_LIMITS.alt)
     };
 
+  });
+
+  return index;
+
+}
+
+
+/**
+ * Media rows -> { id: { src } } for the library's sound files (aud-…), only
+ * ever a service page video card's own soundtrack.
+ */
+function audioIndex_(rows) {
+
+  var index = Object.create(null);
+
+  (rows || []).forEach(function (row) {
+    var id = contentLine_(row.id);
+    var path = contentLine_(row.path);
+    if (!/^aud-[a-z0-9]{8}$/.test(id) || !AUDIO_PATH.test(path) || contentLine_(row.deletedAt)) return;
+    index[id] = { src: path };
   });
 
   return index;

@@ -1655,6 +1655,84 @@ a {
   position: relative;
 }
 
+/* a library sound file (a video card's soundtrack): a note instead of a picture */
+.media-tile__note {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 90px;
+  font-size: 2rem;
+  color: var(--gold-hi);
+  background: radial-gradient(70% 70% at 50% 40%, rgba(215, 170, 80, .22), transparent 70%), var(--surface-solid);
+}
+
+.media-detail.is-audio {
+  display: grid;
+  min-height: 140px;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+/* «صوت المقطع» in a service page's video card */
+.sound-pick {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(242, 210, 139, .18);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.sound-pick__file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-weight: 700;
+}
+
+.sound-pick.is-empty .sound-pick__file {
+  font-weight: 500;
+  opacity: .8;
+}
+
+.sound-pick__note {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--gold-hi);
+  background: rgba(215, 170, 80, .16);
+  box-shadow: 0 0 0 1px rgba(242, 210, 139, .35);
+}
+
+.sound-pick__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sound-pick__player {
+  width: 100%;
+  height: 40px;
+}
+
+.sound-pick__player[hidden],
+.sound-pick[hidden] {
+  display: none;
+}
+
+.sound-pick__status.is-error {
+  color: #ffb4a8;
+}
+
+.sound-pick__status.is-ok {
+  color: #9be3b4;
+}
+
 /* «من رابط» in the library's uploader */
 .url-import {
   display: grid;

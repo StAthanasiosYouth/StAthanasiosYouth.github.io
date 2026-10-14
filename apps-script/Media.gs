@@ -28,10 +28,16 @@ var MEDIA_LIMITS = {
   videoSeconds: 600,
   // «من رابط»: what the admin may fetch (images are resized after, in the browser)
   urlImageBytes: 15 * 1024 * 1024,
-  urlVideoBytes: 8 * 1024 * 1024
+  urlVideoBytes: 8 * 1024 * 1024,
+  // a service page video card's own soundtrack (base64 must fit API_MAX_BODY)
+  audioBytes: 6 * 1024 * 1024,
+  audioSeconds: 600
 };
 
 var VIDEO_MIMES = { 'video/mp4': 'mp4', 'video/webm': 'webm' };
+
+/* sound files: MP3, or AAC in MP4 (.m4a, what phones record and export) */
+var AUDIO_MIMES = { 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a' };
 
 
 /* =========================================================
@@ -278,6 +284,32 @@ function sniffMedia_(bytes) {
 }
 
 
+/* what the first bytes say a sound file is: 'audio/mpeg', 'audio/mp4' or '' */
+function sniffAudio_(bytes) {
+
+  var b = function (i) { return bytes[i] & 0xff; };
+  var ascii = function (from, to) {
+    var out = '';
+    for (var i = from; i < to && i < bytes.length; i++) out += String.fromCharCode(b(i));
+    return out;
+  };
+
+  if (!bytes || bytes.length < 12) return '';
+  if (ascii(0, 3) === 'ID3' || (b(0) === 0xff && (b(1) & 0xe0) === 0xe0)) return 'audio/mpeg';
+  if (ascii(4, 8) === 'ftyp') return 'audio/mp4';
+  return '';
+
+}
+
+
+/* a library item is a sound file when its id says so */
+function isAudioMedia_(row) {
+
+  return /^aud-/.test(String((row && row.id) || ''));
+
+}
+
+
 /* a library item is a video when its id says so */
 function isVideoMedia_(row) {
 
@@ -315,6 +347,10 @@ function apiUploadMedia(input) {
 
   if (input.kind === 'video') {
     return uploadVideo_(email, input);
+  }
+
+  if (input.kind === 'audio') {
+    return uploadAudio_(email, input);
   }
 
   var mime = input.mime === 'image/jpeg' || input.mime === 'image/webp' ? input.mime : '';
@@ -509,6 +545,107 @@ function uploadVideo_(email, input) {
 
   return {
     media: { id: id, path: record.path, thumb: record.thumb, width: width, height: height, alt: alt, kind: 'video' },
+    state: state,
+    user: email
+  };
+
+}
+
+
+/**
+ * A sound file (a service page video card's own soundtrack, «صوت المقطع»):
+ * input = { kind: 'audio', audio: base64, mime: 'audio/mpeg'|'audio/mp4', duration (s), name }.
+ * No picture of its own; the same file uploaded twice is stored once.
+ */
+function uploadAudio_(email, input) {
+
+  var mime = AUDIO_MIMES.hasOwnProperty(input.mime) ? input.mime : '';
+
+  if (!mime) {
+    throw appError_('نوع ملف الصوت لازم يكون MP3 أو M4A.', 'لو الملف WAV أو غيره: حوّله MP3 الأول.', String(input.mime || '').slice(0, 60));
+  }
+
+  var duration = Number(input.duration);
+
+  if (!(duration > 0 && duration <= MEDIA_LIMITS.audioSeconds)) {
+    throw appError_('ملف الصوت لازم يكون أقل من ١٠ دقايق.', 'قصّ الجزء اللي عايزه بس.', 'duration ' + String(input.duration).slice(0, 20));
+  }
+
+  var base64 = input.audio;
+
+  if (typeof base64 !== 'string' || !base64 || base64.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(base64)) {
+    throw new Error('بيانات ملف الصوت مش سليمة');
+  }
+
+  if (base64.length / 4 * 3 > MEDIA_LIMITS.audioBytes + 2) {
+    throw appError_('ملف الصوت أكبر من 6 MB.', 'اختار نسخة أصغر (MP3 بجودة 128) أو جزء أقصر.', Math.round(base64.length / 4 * 3 / 1024) + ' KB');
+  }
+
+  var audio = Utilities.base64Decode(base64);
+
+  if (sniffAudio_(audio) !== mime) {
+    throw new Error('الملف مش صوت ' + (mime === 'audio/mpeg' ? 'MP3' : 'M4A'));
+  }
+
+  var hash = bytesHash_(audio);
+  var same = readOptionalTable_('Media').filter(function (row) { return row.hash === hash && !row.deletedAt && isAudioMedia_(row); })[0];
+
+  if (same) {
+    return {
+      media: { id: same.id, path: same.path, thumb: '', width: '', height: '', alt: same.alt, kind: 'audio', name: same.name || '' },
+      duplicate: true,
+      state: apiStateFor_(email),
+      user: email
+    };
+  }
+
+  var problems = [];
+  var name = input_(input.name, 80, 'اسم ملف الصوت', problems, false);
+
+  if (problems.length) {
+    fail_(problems);
+  }
+
+  var id = 'aud-' + Utilities.getUuid().replace(/-/g, '').slice(0, 8).toLowerCase();
+  var year = Utilities.formatDate(new Date(), CONTENT_TIMEZONE, 'yyyy');
+  var driveId;
+
+  try {
+    driveId = driveUpload_(audio, mime, id + '.' + AUDIO_MIMES[mime]);
+  }
+  catch (error) {
+    log_(email, 'media.upload.failed', errorDetails_(error));
+    throw error;
+  }
+
+  var record = {
+    id: id,
+    path: 'media/' + year + '/' + id + '.' + AUDIO_MIMES[mime],
+    thumb: '',
+    width: '',
+    height: '',
+    alt: '',
+    mime: mime,
+    driveId: driveId,
+    thumbDriveId: '',
+    uploadedAt: nowStamp_(),
+    publishedAt: '',
+    name: name,
+    tiny: '',
+    color: '',
+    hash: hash,
+    bytes: audio.length
+  };
+
+  var state = mutate_('media.upload', id, function () {
+    ensureTable_('Media');
+    upsertRow_('Media', 'id', record);
+    activityNote_({ action: 'upload', type: 'media', id: id, title: name || '', sub: 'audio' });
+    return id + ' ' + Math.round(audio.length / 1024) + 'KB ' + Math.round(duration) + 's';
+  });
+
+  return {
+    media: { id: id, path: record.path, thumb: '', width: '', height: '', alt: '', kind: 'audio', name: name },
     state: state,
     user: email
   };
@@ -823,6 +960,28 @@ function mediaUsage_() {
       add(item.image, 'competitions', item.id, 'جايزة في المتجر: ' + item.name);
     });
   }
+  // service pages and events (Pages.gs): banners, card pictures, clips, soundtracks, servants
+  var pages = typeof pagesDraft_ === 'function' ? pagesDraft_() : null;
+  if (pages && !pages.error) {
+    var tokenId = function (text) { var item = parseGalleryToken_(contentLine_(text)); return item ? item.id : contentLine_(text); };
+    var pageTitles = Object.create(null);
+    (pages.pages || []).forEach(function (p) {
+      pageTitles[p.id] = p.title;
+      add(tokenId(p.hero), 'pages', p.id, 'بانر صفحة: ' + p.title);
+      add(p.cover, 'pages', p.id, 'كارت صفحة: ' + p.title);
+    });
+    (pages.media || []).forEach(function (m) {
+      var where = 'كارت فيديو «' + (m.title || '') + '» في صفحة: ' + (pageTitles[m.pageId] || '');
+      add(m.cover, 'pages', m.pageId, where);
+      add(tokenId(m.clip), 'pages', m.pageId, where);
+      if (m.audioMode === 'custom') add(m.audio, 'pages', m.pageId, 'صوت ' + where);
+    });
+    (pages.events || []).forEach(function (e) {
+      add(e.cover, 'events', e.id, 'غلاف فعالية: ' + e.title);
+      (typeof pagesJson_ === 'function' ? pagesJson_(e.gallery, []) : []).forEach(function (t) { add(tokenId(t), 'events', e.id, 'صور فعالية: ' + e.title); });
+    });
+    (pages.servants || []).forEach(function (s) { add(s.image, 'servants', s.id, 'صورة خادم: ' + s.name); });
+  }
 
   return usage;
 
@@ -840,14 +999,14 @@ function apiMediaLibrary() {
     items: readOptionalTable_('Media').map(function (r) {
       return {
         id: r.id,
-        kind: isVideoMedia_(r) ? 'video' : 'image',
+        kind: isAudioMedia_(r) ? 'audio' : isVideoMedia_(r) ? 'video' : 'image',
         name: r.name || '',
         alt: r.alt || '',
         width: r.width,
         height: r.height,
         bytes: r.bytes || '',
         color: r.color || '',
-        tiny: r.tiny ? 'data:' + thumbMime_(r) + ';base64,' + r.tiny : '',
+        tiny: r.tiny && !isAudioMedia_(r) ? 'data:' + thumbMime_(r) + ';base64,' + r.tiny : '',
         uploadedAt: r.uploadedAt || '',
         publishedAt: r.publishedAt || '',
         deletedAt: r.deletedAt || '',
@@ -868,7 +1027,7 @@ function findMedia_(id) {
   var row = readOptionalTable_('Media').filter(function (r) { return r.id === id; })[0];
 
   if (!row) {
-    throw new Error(/^vid-/.test(id) ? 'الفيديو مش موجود' : 'الصورة مش موجودة');
+    throw new Error(/^vid-/.test(id) ? 'الفيديو مش موجود' : /^aud-/.test(id) ? 'ملف الصوت مش موجود' : 'الصورة مش موجودة');
   }
 
   return row;
@@ -1000,6 +1159,11 @@ function apiMediaPreview(id) {
 
   if (!row) {
     throw new Error('الصورة مش موجودة');
+  }
+
+  // a sound file has no picture
+  if (isAudioMedia_(row)) {
+    return '';
   }
 
   // a video's preview is its poster frame, never the video itself

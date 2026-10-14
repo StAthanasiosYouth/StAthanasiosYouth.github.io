@@ -957,32 +957,35 @@ only by stubs whose item has a partner). It reuses the gating from
 - the page is not the admin preview;
 - `getAnimations` is supported.
 
-*How often:*
-- `sessionStorage['athanasios:collab:<key>']`: plays **once per session per
-  partner**. Moving from one B.U.G. page to another in the same session
-  doesn't replay it.
-- `localStorage['athanasios.collab.v1:<key>']` = `{ n, last }`:
-  - the full version for the first 3 sessions;
-  - after that, the **short** version;
-  - not at all if it was seen within the last 6 hours.
+*How often (as built, pass 3):* **every time the visitor comes into a
+partnered page** — a new load, or the page coming back from the
+back/forward cache (`pageshow` with `persisted`). Nothing is stored. A
+resize, a turn of the phone or a re-render never replays it (none of them
+runs the script again). The earlier once-a-session / short-version rules
+are gone.
 
-*Full version, ≤ 1600 ms, CSS only, no sound:*
-1. 0–350 ms: our arch logo sits centred.
-2. 350–800 ms: it moves to its right-to-left side while the hairline draws.
-3. 600–1050 ms: the B.U.G. logo fades and scales in (0.96 → 1), and its halo
-   glints once.
-4. 900–1250 ms: the line «أسرة البابا أثناسيوس × Brave Under Grace».
-5. 1250–1600 ms: the overlay lifts and fades into the hero lockup, which has
-   been rendered underneath from the first frame.
+*The ident, ≈ 2.35 s, over the whole screen (`100vw × 100dvh`), motion in
+CSS (page.css INTRO), sound synthesised in collab.js on the same clock:*
+1. 0–0.35 s: letterbox bars, a low swell and a rising air.
+2. 0.20 / 0.45 s: our seal (right), then the partner's logo (left), each out
+   of the depth with a whoosh panned to its side.
+3. 1.05–1.45 s: the mark (gold × spectrum strokes): a soft hit, a sub drop,
+   a metallic shimmer, then a gold bell with the flare.
+4. 1.55–1.95 s: the light sweep and motes: an airy sweep and three sparkles.
+5. 1.95–2.35 s: the bars open, the stage lifts into the page (rendered
+   underneath from the first frame): a soft chord and a falling air.
 
-*Short version, ≤ 500 ms:* the lockup cross-fades in place, with no overlay
-movement.
+*Sound:* the site's one setting (`localStorage['athanasios.sound']`, on
+unless `'off'`); quiet (one bus, a soft room, a limiter). A browser that
+won't start audio without a tap on this page plays the ident in silence.
+Skipping fades the sound out in ~0.2 s.
 
 *Exit:*
-- Any tap or key skips it immediately (the overlay takes only that first
-  input, then removes itself).
-- Hiding the tab ends it.
-- A hard timeout of 2 s removes the overlay no matter what.
+- «تخطي» (a real button in the lower corner, never in the tab order) or any
+  tap / key skips it immediately (the overlay takes only that first input,
+  then removes itself).
+- Hiding the tab or leaving the page ends it.
+- A hard timeout of 3.3 s removes the overlay no matter what.
 
 *Accessibility:*
 - The overlay is `aria-hidden`.
@@ -1094,8 +1097,9 @@ Optional: one file per servant, zipped (the `distributionFiles` pattern).
   - the booking flow on a 360 × 740 phone, including the
     WhatsApp-then-return draft restore;
   - the video sheet (open, swipe, Android back, `#v/` deep link);
-  - the intro (plays once per session, short version after 3 sessions,
-    skipped by reduced motion and deep links, removed by 2 s).
+  - the intro (full screen; plays on every entry into a partnered page,
+    never on a resize; «تخطي»; skipped by reduced motion and deep links;
+    removed by 3.3 s).
 
 ---
 
@@ -1181,6 +1185,8 @@ Stamp = 'YYYY-MM-DDTHH:MM' Cairo                               (as content.json)
   "partner": null,
   "media": [{ "id": "pm-…", "title", "text", "duration", "cover": Image,
               "source": "clip" | "link", "clip": Video | null,
+              "audio": { "mode": "original" | "custom" | "none",
+                         "src": "media/YYYY/aud-xxxxxxxx.(m4a|mp3)" | null },
               "fullUrl": "https://…" | null, "ctaLabel": "شاهد المسرحية كاملة" }],
   "team": null | { "title", "text",
                    "people": [{ "id", "name", "role", "image": Image | null,
@@ -1278,17 +1284,48 @@ to the site root) and the label per §1.2 (an override wins):
 - `router.js` `pageForHash` maps `#event/<slug>` → `events/<slug>/` and
   `#page/<slug>` → `<slug>/`.
 
-### 17.9 Video sheet (`assets/js/page/video.js`)
+### 17.9 Clip sheet (`assets/js/page/video.js`, `clip-audio.js`, `assets/css/xp-clip.css`)
 
-- A `<dialog>` holding a `<video controls playsinline preload="metadata"
-  poster>` at the clip's own aspect ratio. `start`/`end` are honoured:
-  playback starts at `start` and pauses at `end`.
-- Then the title, the text and the CTA (when `fullUrl` is set; new tab,
-  `rel="noopener"`).
+As built (pass 3): the site's own social-sheet language, the same pieces as
+the home page's mini-experiences («صوتك يهمنا», the TikTok / Instagram
+sheets) — never a copied app frame around the video:
+- `sheet.js` (`variant: 'xp'`): springs up, drags down, its open / close
+  sounds; the head shows the page's title.
+- The real clip at its own aspect ratio in a clean rounded, gold-rimmed
+  frame (at most ~56dvh); no native controls: a tap on it pauses / plays, a
+  thin gold line shows its progress; it loops between `start` and `end`
+  (the address carries `#t=start` only).
+- The speaker in its corner (`.xp-sound`): the site's one sound setting.
+- The living stage (`xp/kit.js`, `xp.css`, loaded with the first sheet or on
+  idle): hearts and reactions rising beside the clip, short warm words
+  passing at its edges, and on a computer the same behind the sheet; nothing
+  moves with reduced motion; it all goes with the sheet.
+- Under it: the title, the text, «شاهد المسرحية كاملة» (new tab,
+  `rel="noopener"`, when `fullUrl` is set), prev / next.
+- It starts as the sheet opens (the visitor's tap); a browser that refuses
+  (a shared `#v/` link) gets it muted.
+- **«صوت المقطع»** (`audio.mode`): `original` the clip's own sound;
+  `custom` the card's soundtrack (`aud-…`, MP3 / M4A, ≤ 6 MB, the media
+  library's «أصوات») with the clip muted; `none` silence. Only ever one
+  source. Fades through the site's AudioContext: in as it opens (~0.9 s),
+  across between clips (~0.3 s out), out as it closes; a hidden tab pauses
+  everything; nothing plays after the sheet closes. The site's sound
+  setting off = everything silent. A missing soundtrack file publishes as
+  `none`. Service pages only (events never carry it).
+- The trimmer keeps a video's own sound (AAC) when it has one, so
+  `original` has something to play; clips cut before pass 3 are silent.
 - Prev / next with buttons, arrow keys and swipe.
-- Close with Escape, the button, or back: it pushes a `#v/<id>` history state.
-- Deep link `#v/<id>` opens it on load.
+- Close with Escape, the button, a tap beside it, a drag down, or back: it
+  pushes a `#v/<id>` history state. Deep link `#v/<id>` opens it on load.
 - A `link` card without a clip opens `fullUrl` in a new tab.
+
+**Site-wide UI sounds (pass 3):** `assets/js/ui-sound.js` brings the home
+page's sound system (`sound.js`: the same synthesised sounds and the same
+`athanasios.sound` setting) to the service pages, events, competitions and
+«نقاطي / المتجر»: a 🔊/🔇 button in their top bar (injected, so published
+stubs get it without a republish), a light tap for buttons and links,
+open / close for sheets, success for a sent competition or a store order,
+«important» when a competition has under a minute left.
 
 ### 17.10 Admin preview protocol (`pages/index.html?preview`, same-origin iframe only)
 

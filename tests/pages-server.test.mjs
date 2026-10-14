@@ -459,3 +459,64 @@ test('a video card with a preview clip and no picture shows a frame of the clip;
   assert.equal(card.fullUrl, 'https://youtu.be/full');
   assert.equal(card.ctaLabel, 'شاهد العرض كامل');
 });
+
+
+/* ---------------- «صوت المقطع»: a video card's sound (docs/EVENTS.md §17.9) ---------------- */
+
+const mp3 = (fill = 5) => Buffer.concat([Buffer.from('ID3'), Buffer.from([4, 0, 0, 0, 0, 0, 0]), Buffer.alloc(80, fill)]);
+
+test('«صوت المقطع»: the clip\'s own sound by default, a soundtrack of its own (an MP3 / M4A of the library) or none; published as audio', () => {
+  const ctx = setup();
+  const { world, call, clip } = ctx;
+
+  // a sound file: MP3 / M4A only, checked by its bytes, stored once
+  const sound = call('apiUploadMedia', { kind: 'audio', audio: mp3().toString('base64'), mime: 'audio/mpeg', duration: 42, name: 'موسيقى العرض' }).media;
+  assert.match(sound.id, /^aud-[a-z0-9]{8}$/);
+  assert.match(sound.path, /^media\/\d{4}\/aud-[a-z0-9]{8}\.mp3$/);
+  assert.equal(sound.kind, 'audio');
+  assert.equal(call('apiUploadMedia', { kind: 'audio', audio: mp3().toString('base64'), mime: 'audio/mpeg', duration: 42 }).duplicate, true, 'the same file is stored once');
+  assert.throws(() => call('apiUploadMedia', { kind: 'audio', audio: mp3().toString('base64'), mime: 'audio/wav', duration: 3 }), /MP3 أو M4A/);
+  assert.throws(() => call('apiUploadMedia', { kind: 'audio', audio: webp(3).toString('base64'), mime: 'audio/mpeg', duration: 3 }), /مش صوت MP3/);
+  assert.throws(() => call('apiUploadMedia', { kind: 'audio', audio: mp3().toString('base64'), mime: 'audio/mpeg', duration: 0 }), /أقل من ١٠ دقايق/);
+  const library = call('apiMediaLibrary').items.find(item => item.id === sound.id);
+  assert.deepEqual([library.kind, library.tiny], ['audio', ''], 'a sound file in the library: no picture');
+
+  const page = call('apiPageSave', null, { slug: 'silent-theatre', title: 'المسرح الصامت', cover: ctx.cover.id, home: { show: false } });
+  const pageId = page.page.id;
+  const card = extra => ({ title: 'مقطع', source: 'clip', clip: clip.id, fullUrl: 'https://youtu.be/full', ...extra });
+  call('apiPageMediaSave', pageId, null, card({ title: 'أصلي' }));
+  call('apiPageMediaSave', pageId, null, card({ title: 'موسيقى', audioMode: 'custom', audio: sound.id }));
+  call('apiPageMediaSave', pageId, null, card({ title: 'صامت', audioMode: 'none', audio: sound.id }));
+  // custom needs a sound file of the library (not a picture, not a video)
+  assert.throws(() => call('apiPageMediaSave', pageId, null, card({ audioMode: 'custom' })), /صوت المقطع: اختار ملف/);
+  assert.throws(() => call('apiPageMediaSave', pageId, null, card({ audioMode: 'custom', audio: clip.id })), /صوت المقطع: الملف مش موجود/);
+  assert.throws(() => call('apiPageMediaSave', pageId, null, card({ audioMode: 'custom', audio: 'aud-zzzzzzzz' })), /صوت المقطع: الملف مش موجود/);
+
+  // the admin reads it back as saved (none forgets the file)
+  const media = call('apiPage', pageId).media;
+  assert.deepEqual(media.map(m => [m.title, m.audioMode, m.audio]), [['أصلي', 'original', ''], ['موسيقى', 'custom', sound.id], ['صامت', 'none', '']]);
+
+  // in use: the library won't drop it
+  assert.throws(() => call('apiDeleteMedia', sound.id), /مستخدم/);
+  assert.ok(call('apiMediaLibrary').items.find(item => item.id === clip.id).usage.some(u => u.area === 'pages'), 'a clip used only by a page counts as used');
+
+  // published: the soundtrack file goes with the page; page.json says what plays
+  publish(world, call);
+  const files = world.github.files();
+  const def = json(files, 'silent-theatre/page.json');
+  assert.deepEqual(def.media.map(m => m.audio), [{ mode: 'original', src: null }, { mode: 'custom', src: sound.path }, { mode: 'none', src: null }]);
+  assert.ok(files[sound.path] !== undefined, 'the soundtrack is published with it');
+});
+
+test('«صوت المقطع»: a soundtrack that left the library plays nothing (never the clip\'s own sound by surprise), with a warning', () => {
+  const ctx = setup();
+  const { world, call, clip } = ctx;
+  const sound = call('apiUploadMedia', { kind: 'audio', audio: mp3(9).toString('base64'), mime: 'audio/mpeg', duration: 10 }).media;
+  const page = call('apiPageSave', null, { slug: 'silent-theatre', title: 'المسرح الصامت', cover: ctx.cover.id, home: { show: false } });
+  call('apiPageMediaSave', page.page.id, null, { title: 'موسيقى', source: 'clip', clip: clip.id, audioMode: 'custom', audio: sound.id });
+  // the file disappears behind the card's back (a row edited by hand)
+  world.gs.upsertRow_('Media', 'id', { id: sound.id, deletedAt: '2026-10-14T20:00' });
+  publish(world, call);
+  const def = json(world.github.files(), 'silent-theatre/page.json');
+  assert.deepEqual(def.media[0].audio, { mode: 'none', src: null });
+});

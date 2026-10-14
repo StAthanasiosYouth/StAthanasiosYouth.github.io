@@ -140,7 +140,7 @@ function driveBytes(name) {
 
 let clipId = '';
 
-test('the trimmer cuts 4 s out of a local video and uploads only that clip (H.264, silent, 540×960, faststart, poster)', { skip: !FFMPEG && 'ffmpeg not found' }, async () => {
+test('the trimmer cuts 4 s out of a local video and uploads only that clip (H.264 + its own AAC sound, 540×960, faststart, poster)', { skip: !FFMPEG && 'ffmpeg not found' }, async () => {
   const { page, problems, close } = await openAdmin();
   await page.evaluate(() => A.go('media'));
   await page.waitForSelector('.media-view');
@@ -209,7 +209,11 @@ test('the trimmer cuts 4 s out of a local video and uploads only that clip (H.26
     const info = JSON.parse(execFileSync(FFPROBE, ['-v', 'error', '-print_format', 'json', '-show_streams', '-show_format', file], { encoding: 'utf8' }));
     const videos = info.streams.filter(s => s.codec_type === 'video');
     assert.equal(videos.length, 1);
-    assert.equal(info.streams.filter(s => s.codec_type === 'audio').length, 0, 'silent');
+    // the video's own sound comes along (a service page's «صوت الفيديو الأصلي»), cut to the same 4 s
+    const audios = info.streams.filter(s => s.codec_type === 'audio');
+    assert.equal(audios.length, 1, 'its own sound');
+    assert.equal(audios[0].codec_name, 'aac');
+    assert.ok(Math.abs(Number(audios[0].duration) - 4) < 0.25, `sound duration ${audios[0].duration}`);
     assert.equal(videos[0].codec_name, 'h264');
     assert.deepEqual([videos[0].width, videos[0].height], [540, 960]);
     assert.ok(Math.abs(Number(info.format.duration) - 4) < 0.2, `duration ${info.format.duration}`);

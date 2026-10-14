@@ -14,7 +14,8 @@
 //
 // Run: cd tools && node --test --test-concurrency=1 ../tests/pages-admin.e2e.mjs
 
-import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { extname, join, normalize } from 'node:path';
@@ -23,6 +24,10 @@ import test from 'node:test';
 import { ROOT } from '../tools/lib/gs.mjs';
 import { createSiteServer, interceptGoogle, TEST_API, TEST_CLIENT, TEST_FALLBACK } from '../tools/lib/admin-server.mjs';
 import { createWorld } from './fakes/gas.mjs';
+
+/* a real (silent) MP3: MPEG-1 Layer III frames, 128 kbps, 44.1 kHz, 417 bytes each (≈ 26 ms) */
+const silentMp3 = frames => Buffer.concat(Array.from({ length: frames }, () => Buffer.concat([Buffer.from([0xff, 0xfb, 0x90, 0x00]), Buffer.alloc(413)])));
+const TMP = mkdtempSync(join(tmpdir(), 'pages-admin-'));
 
 const require = createRequire(`${ROOT}tools/package.json`);
 const puppeteer = require('puppeteer-core');
@@ -246,8 +251,24 @@ test('«صفحات الخدمة»: a new page with its cover, its video card; on
   await $('dialog.picker-dialog[open] .media-tile.is-video');
   await d.page.evaluate(() => document.querySelector('dialog.picker-dialog[open] .media-tile.is-video').click());
   await d.page.waitForFunction(() => !document.querySelector('dialog.picker-dialog'));
+
+  // «صوت المقطع»: the clip's own sound by default; a music file of its own, uploaded right here
+  const soundChoices = await d.page.$$eval('dialog.sheet[open] .sound-field .choice', l => l.map(c => [c.textContent.trim(), c.querySelector('input').checked]));
+  assert.deepEqual(soundChoices, [['صوت الفيديو الأصلي', true], ['موسيقى/صوت مخصص', false], ['بدون صوت', false]]);
+  assert.equal(await d.page.$eval('dialog.sheet[open] .sound-pick', n => n.hidden), true, 'no file to choose until «مخصص»');
+  await d.page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .sound-field .choice')].find(c => c.textContent.includes('مخصص')).querySelector('input').click());
+  assert.equal(await d.page.$eval('dialog.sheet[open] .sound-pick', n => n.hidden), false);
+  const mp3 = join(TMP, 'موسيقى العرض.mp3');
+  writeFileSync(mp3, silentMp3(120));
+  await (await $('dialog.sheet[open] .sound-pick input[type=file]')).uploadFile(mp3);
+  await d.page.waitForFunction(() => /اترفع ✓/.test(document.querySelector('dialog.sheet[open] .sound-pick__status')?.textContent || ''), { timeout: 15000 });
+  assert.equal(await d.page.$eval('dialog.sheet[open] .sound-pick__name', n => n.textContent), 'موسيقى العرض');
+  await d.page.$eval('dialog.sheet[open] .sound-field', n => n.scrollIntoView({ block: 'center' }));
+  await shot('03c-card-sound');
   await saveSheet();
   await d.page.waitForFunction(() => /كروت الفيديو/.test(document.querySelector('dialog.sheet[open] .sheet__title')?.textContent || '') && document.querySelectorAll('dialog.sheet[open] .list .item').length === 1, { timeout: 10000 });
+  const savedCard = plain(world.as(ADMIN).gs.readOptionalTable_('Media')).find(r => /^aud-/.test(r.id));
+  assert.ok(savedCard && /\.mp3$/.test(savedCard.path), 'the sound file is in the library');
   await shot('03-video-cards');
   await d.page.evaluate(() => A.closeSheet());
   await sheetGone();

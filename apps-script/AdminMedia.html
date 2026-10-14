@@ -48,6 +48,7 @@
     { key: 'unused', label: 'مش مستخدمة' },
     { key: 'site', label: 'على الموقع' },
     { key: 'videos', label: 'فيديوهات' },
+    { key: 'sounds', label: 'أصوات' },
     { key: 'bin', label: 'المحذوفة' }
   ];
 
@@ -57,6 +58,19 @@
 
   }
 
+  /* a sound file (a video card's own soundtrack, «صوت المقطع»): no picture */
+  function isAudio(item) {
+
+    return item.kind === 'audio' || /^aud-/.test(item.id || '');
+
+  }
+
+  /* the library's copy of one item (null before it loads): its name for an editor */
+  A.libraryItem = function (id) {
+    return library ? library.items.filter(function (item) { return item.id === id; })[0] || null : null;
+  };
+  A.loadLibrary = function () { return load(); };
+
   function matches(item, filter, query) {
 
     if (filter === 'bin') { if (!item.deletedAt) return false; }
@@ -65,9 +79,10 @@
     if (filter === 'unused' && item.usage.length) return false;
     if (filter === 'site' && !item.publishedAt) return false;
     if (filter === 'videos' && !isVideo(item)) return false;
+    if (filter === 'sounds' && !isAudio(item)) return false;
 
     if (query) {
-      var text = (item.name + ' ' + item.alt + ' ' + (isVideo(item) ? 'فيديو مقطع video ' : 'صورة ') + item.usage.map(function (u) { return u.label; }).join(' ')).toLowerCase();
+      var text = (item.name + ' ' + item.alt + ' ' + (isAudio(item) ? 'صوت موسيقى audio ' : isVideo(item) ? 'فيديو مقطع video ' : 'صورة ') + item.usage.map(function (u) { return u.label; }).join(' ')).toLowerCase();
       if (text.indexOf(query.toLowerCase()) === -1) return false;
     }
 
@@ -80,22 +95,26 @@
 
     var img = el('img', { class: 'media-tile__img', alt: '' });
     var video = isVideo(item);
+    var audio = isAudio(item);
     var button = el('button', {
-      class: 'media-tile' + (selected ? ' is-selected' : '') + (item.deletedAt ? ' is-deleted' : '') + (video ? ' is-video' : ''),
+      class: 'media-tile' + (selected ? ' is-selected' : '') + (item.deletedAt ? ' is-deleted' : '') + (video ? ' is-video' : '') + (audio ? ' is-audio' : ''),
       type: 'button',
       'aria-pressed': selected ? 'true' : null,
-      'aria-label': (video ? 'فيديو: ' : '') + (item.name || item.alt || item.id) + (item.usage.length ? ' — مستخدمة ' + item.usage.length : ''),
+      'aria-label': (video ? 'فيديو: ' : audio ? 'صوت: ' : '') + (item.name || item.alt || item.id) + (item.usage.length ? ' — مستخدمة ' + item.usage.length : ''),
       style: item.color ? '--tile:' + item.color : null,
       onclick: onclick
     },
-    el('span', { class: 'media-tile__frame' }, img, video ? el('span', { class: 'media-tile__play', 'aria-hidden': 'true', text: '▶' }) : null),
+    el('span', { class: 'media-tile__frame' }, audio ? el('span', { class: 'media-tile__note', 'aria-hidden': 'true', text: '♪' }) : img, video ? el('span', { class: 'media-tile__play', 'aria-hidden': 'true', text: '▶' }) : null),
     el('span', { class: 'media-tile__name', text: item.name || item.alt || 'من غير اسم' }),
     el('span', { class: 'media-tile__meta' },
       item.usage.length ? el('span', { class: 'media-tile__badge', text: 'مستخدمة ' + item.usage.length }) : null,
       item.publishedAt ? el('span', { class: 'media-tile__dot', title: 'على الموقع' }) : null
     ));
 
-    if (item.tiny) {
+    if (audio) {
+      // a sound file has no picture
+    }
+    else if (item.tiny) {
       img.src = item.tiny;
     }
     else {
@@ -236,13 +255,14 @@
 
     var box = A.errorBox();
     var video = isVideo(item);
+    var audio = isAudio(item);
     var name = A.counted(video ? 'اسم الفيديو' : 'اسم الصورة', item.name, 80, 'علشان تلاقيه بسهولة');
     var alt = A.counted(video ? 'وصف الفيديو' : 'وصف الصورة', item.alt, 140, video ? 'للي بيستخدم قارئ شاشة (مثلاً: الشباب في رحلة الغردقة)' : 'للي بيستخدم قارئ شاشة (مثلاً: بوستر رحلة الغردقة)');
     // a video: its poster frame (the clip itself plays on the site)
     var preview = el('img', { class: 'media-detail__img', alt: '' });
     var length = el('dd', { class: 'ltr', text: '—' });
 
-    A.mediaPreview(item.id).then(function (src) { if (src) preview.src = src; }).catch(function () {
+    if (!audio) A.mediaPreview(item.id).then(function (src) { if (src) preview.src = src; }).catch(function () {
       if (item.tiny) preview.src = item.tiny;
     });
 
@@ -251,9 +271,10 @@
     }
 
     var facts = el('dl', { class: 'kv' },
-      video ? el('dt', { text: 'النوع' }) : null, video ? el('dd', { text: 'مقطع فيديو (MP4، من غير صوت)' }) : null,
+      video ? el('dt', { text: 'النوع' }) : null, video ? el('dd', { text: 'مقطع فيديو (MP4، بصوته لو الفيديو الأصلي كان فيه صوت)' }) : null,
       video ? el('dt', { text: 'المدة' }) : null, video ? length : null,
-      el('dt', { text: 'المقاس' }), el('dd', { class: 'ltr', text: item.width + ' × ' + item.height }),
+      audio ? el('dt', { text: 'النوع' }) : null, audio ? el('dd', { text: 'ملف صوت (MP3 أو M4A) — لكارت فيديو في صفحة خدمة' }) : null,
+      audio ? null : el('dt', { text: 'المقاس' }), audio ? null : el('dd', { class: 'ltr', text: item.width + ' × ' + item.height }),
       item.bytes ? el('dt', { text: 'الحجم' }) : null, item.bytes ? el('dd', { class: 'ltr', text: A.formatBytes(Number(item.bytes)) }) : null,
       el('dt', { text: 'اترفعت' }), el('dd', { text: item.uploadedAt ? A.formatWall(item.uploadedAt) : '—' }),
       el('dt', { text: 'على الموقع' }), el('dd', { text: item.publishedAt ? 'أيوه، من ' + A.formatWall(item.publishedAt) : 'لسه (هتتنشر مع أول حاجة بتستخدمها)' })
@@ -317,7 +338,7 @@
 
     A.openSheet(item.name || (video ? 'فيديو' : 'صورة'), [
       box,
-      el('div', { class: 'media-detail' + (video ? ' is-video' : ''), style: item.color ? '--tile:' + item.color : null }, preview, video ? el('span', { class: 'media-tile__play', 'aria-hidden': 'true', text: '▶' }) : null),
+      el('div', { class: 'media-detail' + (video ? ' is-video' : '') + (audio ? ' is-audio' : ''), style: item.color ? '--tile:' + item.color : null }, audio ? el('span', { class: 'media-tile__note', 'aria-hidden': 'true', text: '♪' }) : preview, video ? el('span', { class: 'media-tile__play', 'aria-hidden': 'true', text: '▶' }) : null),
       el('div', { class: 'form' }, name.node, alt.node),
       facts,
       el('div', { class: 'form-group' }, el('p', { class: 'section-label', text: 'مستخدمة في' }), usage),
@@ -344,10 +365,12 @@
   A.pickFromLibrary = function (currentId, options) {
 
     var videos = !!(options && options.videos);
+    // a video card's soundtrack: sound files only (and they never go anywhere else)
+    var sounds = !!(options && options.sounds);
 
     return new Promise(function (resolve) {
 
-      var dialog = el('dialog', { class: 'modal modal--wide picker-dialog', 'aria-label': videos ? 'اختار صورة أو فيديو من المكتبة' : 'اختار صورة من المكتبة' });
+      var dialog = el('dialog', { class: 'modal modal--wide picker-dialog', 'aria-label': sounds ? 'اختار ملف صوت من المكتبة' : videos ? 'اختار صورة أو فيديو من المكتبة' : 'اختار صورة من المكتبة' });
       var body = el('div', { class: 'picker-dialog__body' }, skeletonGrid());
       var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر…', 'aria-label': 'دوّر في الصور' });
       var done = false;
@@ -362,7 +385,7 @@
 
       function draw() {
         var query = search.value.trim();
-        var items = library.items.filter(function (item) { return (videos || !isVideo(item)) && matches(item, 'all', query); });
+        var items = library.items.filter(function (item) { return (sounds ? isAudio(item) : !isAudio(item) && (videos || !isVideo(item))) && matches(item, 'all', query); });
         body.replaceChildren(grid(items, function (item) { close(item.id); }, currentId));
       }
 

@@ -385,7 +385,8 @@ function onPhone(layer, phone, x, y) {
 
 }
 
-const phoneOf = el => (el.classList.contains('xp-phone') ? el : el.querySelector(':scope > .xp-phone'));
+// the phone, or the real clip a service page shows in its place (page/video.js: .xp-clip)
+const phoneOf = el => (el.classList.contains('xp-phone') || el.classList.contains('xp-clip') ? el : el.querySelector(':scope > .xp-phone, :scope > .xp-clip'));
 
 /* the edge band (px) reactions may cross for depth; the content inside it stays clear */
 const band = g => Math.min(14, g.pw * 0.06);
@@ -613,7 +614,7 @@ export function spray(tl, stage, { items, every = 1300, max = 6, name = 'edge', 
       node.style.fontSize = spec.node ? '' : `${spec.size || rand(1.05, 1.45)}em`;
       node.replaceChildren(spec.node || spec.text || '');
 
-      const phone = stage.querySelector(':scope > .xp-phone');
+      const phone = phoneOf(stage);
       const g = geometry(layer, phone);
       // narrow margins: words would cover the screen, a small reaction frames it instead
       if (spec.node && path !== 'ring' && node.offsetWidth > (left ? g.x : g.w - g.x - g.pw) + 2) {
