@@ -47,7 +47,16 @@ var COMP_TABLES = {
   // Points & Store v2 (§18.5 / §18.6)
   PushSchedule: ['id', 'notifId', 'kind', 'refId', 'sendAt', 'status', 'result', 'sendKey', 'updatedAt'],
   Seasons: ['id', 'name', 'startAt', 'endAt', 'status', 'notifyDays', 'closedAt', 'closedBy', 'createdAt', 'updatedAt'],
-  SeasonTotals: ['seasonId', 'pid', 'earned', 'spent', 'adjusted', 'final', 'closedAt']
+  SeasonTotals: ['seasonId', 'pid', 'earned', 'spent', 'adjusted', 'final', 'closedAt'],
+  // service pages, events, servants (Pages.gs, docs/EVENTS.md §1.1; made on first use)
+  Servants: ['id', 'name', 'phone', 'role', 'image', 'active', 'publicWa', 'note', 'createdAt', 'updatedAt'],
+  PayMethods: ['key', 'label', 'icon', 'needsProof', 'order', 'active'],
+  Pages: ['id', 'slug', 'enabled', 'archived', 'order', 'title', 'tagline', 'description', 'hero', 'cover', 'cardType', 'theme',
+    'partner', 'teamTitle', 'teamText', 'teamMessage', 'team', 'home', 'cardId', 'liveV', 'publishedAt', 'createdBy', 'createdAt', 'updatedAt'],
+  PageMedia: ['id', 'pageId', 'order', 'enabled', 'title', 'text', 'duration', 'cover', 'source', 'clip', 'fullUrl', 'ctaLabel', 'updatedAt'],
+  Events: ['id', 'slug', 'kind', 'enabled', 'archived', 'title', 'shortTitle', 'summary', 'body', 'cover', 'gallery', 'startAt', 'endAt',
+    'locationName', 'locationUrl', 'theme', 'partner', 'terms', 'booking', 'servants', 'home', 'cardId', 'liveV', 'publishedAt',
+    'createdBy', 'createdAt', 'updatedAt']
 };
 
 /* made together with the spreadsheet */
@@ -584,6 +593,9 @@ function compCacheDrop_(key) {
 function compDropDraft_() {
 
   compCacheDrop_('comp:draft');
+
+  // the pages / events draft (Pages.gs) lives in the same spreadsheet: the review and the publish read it fresh too
+  if (typeof pagesDropDraft_ === 'function') pagesDropDraft_();
 
   try {
     CacheService.getScriptCache().remove('comp:draftsig');

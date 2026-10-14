@@ -80,7 +80,15 @@ const ARGS = {
   apiShopSchedule: [], apiShopScheduleSave: [{ mode: 'auto' }],
   apiPushAuto: [], apiPushSchedule: [], apiPushScheduleCancel: ['psh-0000000000'],
   apiSeasons: [], apiSeasonSave: [{ name: 'x' }], apiSeasonClosePreview: ['sea-0000'], apiSeasonClose: ['sea-0000', 'k', {}],
-  apiAgeRules: [], apiAgeRulesSave: [{ min: 18, max: 30, warnDays: 60 }]
+  apiAgeRules: [], apiAgeRulesSave: [{ min: 18, max: 30, warnDays: 60 }],
+  // service pages, events, servants (tests/pages-*.test.mjs)
+  apiPages: [], apiPage: ['pg-00000000'], apiPageSave: [null, { title: 'x', slug: 'x-page' }], apiPageSetEnabled: ['pg-00000000', false],
+  apiPageArchive: ['pg-00000000', true], apiPageDelete: ['pg-00000000'], apiPageMediaSave: ['pg-00000000', null, { title: 'x' }],
+  apiPageMediaOrder: ['pg-00000000', []], apiPageMediaDelete: ['pm-00000000'], apiPagePreview: ['page', 'pg-00000000'],
+  apiEvents: [], apiEvent: ['evt-00000000'], apiEventSave: [null, { title: 'x', slug: 'x-trip', kind: 'trip' }],
+  apiEventSetEnabled: ['evt-00000000', false], apiEventArchive: ['evt-00000000', true], apiEventDelete: ['evt-00000000'],
+  apiServants: [], apiServantSave: [null, { name: 'x' }], apiServantSetActive: ['srv-00000000', false], apiPayMethodsSave: [[]],
+  apiHomeOrder: ['activities', []]
 };
 
 /*

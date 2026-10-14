@@ -317,6 +317,12 @@ export class FakeGitHub {
       return this.respond(200, { object: { sha: body.sha } });
     }
 
+    // the repository's top level (Pages.gs: a page at /<slug>/ never takes a folder that exists)
+    if (method === 'get' && path === '/contents/?ref=main') {
+      const names = [...new Set(Object.keys(this.files()).map(p => p.split('/')[0]))];
+      return this.respond(200, names.map(name => ({ name, type: Object.keys(this.files()).some(p => p.startsWith(name + '/')) ? 'dir' : 'file' })));
+    }
+
     if (method === 'get' && (match = /^\/contents\/([\w./-]+)\?ref=main$/.exec(path))) {
       const content = this.files()[match[1]];
       return content === undefined
@@ -773,7 +779,8 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
 
   for (const file of ['Platforms.gs', 'Content.gs', 'Hub.gs', 'Review.gs', 'Seed.gs', 'Auth.gs', 'Store.gs', 'Publish.gs', 'Code.gs', 'Media.gs', 'Items.gs', 'Import.gs', 'Migrate.gs', 'Api.gs', 'Presence.gs', 'Route.gs', 'Push.gs', 'Activity.gs', 'AdminNotify.gs', 'AdminDevice.gs',
     'CompStore.gs', 'CompModel.gs', 'CompScore.gs', 'CompCrypto.gs', 'CompPublic.gs', 'CompAdmin.gs', 'CompPublish.gs',
-    'CompRegistry.gs', 'CompWallet.gs', 'CompStoreItems.gs', 'CompSchedule.gs', 'CompSeasons.gs']) {
+    'CompRegistry.gs', 'CompWallet.gs', 'CompStoreItems.gs', 'CompSchedule.gs', 'CompSeasons.gs',
+    'BookModel.gs', 'Pages.gs']) {
     vm.runInContext(readFileSync(`${ROOT}apps-script/${file}`, 'utf8'), context, { filename: file });
   }
 

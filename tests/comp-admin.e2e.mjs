@@ -819,7 +819,7 @@ test('«كروت المسابقات»: the linked card is read-only with «اف�
 });
 
 
-test('360px: the dock fits seven areas; the list, the builder tabs and screens never scroll sideways', async () => {
+test('360px: the dock fits eight areas; the list, the builder tabs and screens never scroll sideways', async () => {
 
   await d.page.setViewport(SMALL);
   await sleep(300);
@@ -827,7 +827,7 @@ test('360px: the dock fits seven areas; the list, the builder tabs and screens n
     const label = b.querySelector('.dockbtn__label');
     return { text: label.textContent, overflow: label.scrollWidth > label.clientWidth + 1 };
   }));
-  assert.equal(dock.length, 7);
+  assert.equal(dock.length, 8);
   assert.ok(dock.every(b => !b.overflow), 'dock labels fit: ' + JSON.stringify(dock));
 
   await d.page.evaluate(() => { A.comp.open = ''; return A.go('comps', 'comps'); });

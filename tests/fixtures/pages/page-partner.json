@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "v": "pvbug00001",
+  "id": "pg-bugkids1",
+  "slug": "bug-theatre",
+  "title": "مسرح الأطفال",
+  "tagline": "عروض قصيرة للصغيرين بالعرايس والنور",
+  "description": "فريق المسرح الأسود بيقدّم عروض قصيرة بالإضاءة فوق البنفسجي والعرايس، كل عرض فيه رسالة من الكتاب.\n\nبنتمرّن كل جمعة بعد القداس، وبنعرض في المناسبات والأعياد.",
+  "theme": "ember",
+  "cover": {
+    "src": "media/2026/img-b0d59876.webp",
+    "thumb": "media/2026/img-b0d59876-480.webp",
+    "w": 1600,
+    "h": 900,
+    "alt": "عرض المسرح الأسود"
+  },
+  "hero": {
+    "type": "video",
+    "src": "media/2026/vid-0e05ae88.mp4",
+    "poster": "media/2026/vid-0e05ae88-480.webp",
+    "w": 270,
+    "h": 480,
+    "alt": "",
+    "start": 0,
+    "end": 0
+  },
+  "partner": {
+    "key": "bug",
+    "name": "Brave Under Grace – B.U.G.",
+    "short": "B.U.G.",
+    "logo": {
+      "src": "assets/img/partners/bug-logo-720.webp",
+      "thumb": "assets/img/partners/bug-logo-360.webp",
+      "w": 720,
+      "h": 305,
+      "alt": "شعار Brave Under Grace – B.U.G."
+    },
+    "mark": {
+      "src": "assets/img/partners/bug-mark-96.webp",
+      "w": 306,
+      "h": 96,
+      "alt": "B.U.G."
+    },
+    "url": null
+  },
+  "media": [
+    {
+      "id": "pm-clip0001",
+      "title": "يونان في بطن الحوت",
+      "text": "عرض قصير بالإضاءة فوق البنفسجي عن قصة يونان والرحمة اللي أكبر من الهروب.",
+      "duration": "١:٢٠",
+      "cover": {
+        "src": "media/2026/img-c1308156.webp",
+        "thumb": "media/2026/img-c1308156-480.webp",
+        "w": 1600,
+        "h": 900,
+        "alt": ""
+      },
+      "source": "clip",
+      "clip": {
+        "type": "video",
+        "src": "media/2026/vid-10486833.mp4",
+        "poster": "media/2026/vid-10486833-480.webp",
+        "w": 270,
+        "h": 480,
+        "alt": "",
+        "start": 1,
+        "end": 4
+      },
+      "fullUrl": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "ctaLabel": "شاهد المسرحية كاملة"
+    },
+    {
+      "id": "pm-clip0002",
+      "title": "الابن الضال",
+      "text": "رجوع الابن وفرحة الأب، بالعرايس والنور.",
+      "duration": "٠:٤٥",
+      "cover": {
+        "src": "media/2026/img-b0d59876.webp",
+        "thumb": "media/2026/img-b0d59876-480.webp",
+        "w": 1600,
+        "h": 900,
+        "alt": ""
+      },
+      "source": "clip",
+      "clip": {
+        "type": "video",
+        "src": "media/2026/vid-16578d0e.mp4",
+        "poster": "media/2026/vid-16578d0e-480.webp",
+        "w": 270,
+        "h": 480,
+        "alt": "",
+        "start": 0,
+        "end": 0
+      },
+      "fullUrl": null,
+      "ctaLabel": "شاهد المسرحية كاملة"
+    }
+  ],
+  "team": {
+    "title": "عايز تنضم لفريق المسرح؟",
+    "text": "لو بتحب التمثيل أو الإضاءة أو العرايس، كلّمنا وتعالى أول بروفة.",
+    "people": [
+      {
+        "id": "srv-mina0001",
+        "name": "مينا عادل",
+        "role": "مسؤول الفريق",
+        "image": null,
+        "wa": "https://wa.me/201001234567?text=%D8%B9%D8%A7%D9%8A%D8%B2%20%D8%A3%D9%86%D8%B6%D9%85"
+      },
+      {
+        "id": "srv-mary0002",
+        "name": "مريم سمير",
+        "role": "الإضاءة",
+        "image": {
+          "src": "media/2026/img-bb66f2e7.webp",
+          "thumb": "media/2026/img-bb66f2e7-480.webp",
+          "w": 1289,
+          "h": 1600,
+          "alt": ""
+        },
+        "wa": "https://wa.me/201112345678"
+      }
+    ]
+  },
+  "publishedAt": "2026-10-10T20:00"
+}

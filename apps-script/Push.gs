@@ -491,6 +491,11 @@ function pushUrl_(target) {
     return '/competition/' + target.slug + '/';
   }
 
+  // a service page / an event (docs/EVENTS.md §17.8; same tab)
+  if ((target.kind === 'page' || target.kind === 'event') && COMP_SLUG.test(String(target.slug || ''))) {
+    return '/' + (target.kind === 'event' ? 'events/' : '') + target.slug + '/';
+  }
+
   // «نقاطي / المتجر»
   if (target.kind === 'points') return '/points/';
 

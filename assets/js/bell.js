@@ -18,6 +18,7 @@ import { go, leave } from './router.js';
 import { swingBell, pop } from './motion.js';
 import { play } from './sound.js';
 import { picture } from './hub.js';
+import { pageHref, eventHref } from './page/model.js';
 
 const TYPE = {
   general: { icon: 'info', label: 'إشعار' },
@@ -160,9 +161,12 @@ function notificationRow(item, nowStamp) {
   const unread = isNew(inbox, item);
   const target = item.target;
   const external = target && target.kind === 'url';
-  // a competition: the engine's own page; «نقاطي»: points/ (same tab, relative to the site root)
+  // a competition: the engine's own page; «نقاطي»: points/; a service page / an event:
+  // <slug>/ / events/<slug>/ (same tab, relative to the site root)
   const page = target && target.kind === 'competition' ? competitionPage(target.slug)
-    : target && target.kind === 'points' ? 'points/' : '';
+    : target && target.kind === 'points' ? 'points/'
+      : target && target.kind === 'page' ? pageHref(target.slug)
+        : target && target.kind === 'event' ? eventHref(target.slug) : '';
 
   const row = h(external || page ? 'a' : 'button', {
     class: `note-item note-item--${item.type}${unread ? ' is-new' : ''}`,

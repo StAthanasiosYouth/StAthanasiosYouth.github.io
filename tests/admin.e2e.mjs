@@ -265,8 +265,8 @@ test('navigation: dock on phones, rail on wide screens, tabs for sub-sections', 
     assert.equal(await page.$eval(`${container} [aria-current="page"]`, b => b.dataset.area), 'content');
 
     const tabs = await page.$$eval('#subtabs .tab', t => t.map(b => b.textContent));
-    assert.deepEqual(tabs, ['الاجتماعات', 'الأخبار', 'الألعاب', 'كروت المسابقات', 'الفعاليات', 'الإشعارات']);
-    await page.click('#subtabs .tab:nth-child(6)');
+    assert.deepEqual(tabs, ['الاجتماعات', 'الأخبار', 'الألعاب', 'كروت المسابقات', 'الفعاليات', 'كروت خدماتنا', 'الإشعارات']);
+    await page.click('#subtabs .tab:nth-child(7)');
     await page.waitForFunction(() => document.getElementById('page-title').textContent === 'الإشعارات');
 
     assert.deepEqual(problems, []);

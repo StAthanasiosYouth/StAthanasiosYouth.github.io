@@ -1,0 +1,1002 @@
+<script>
+/*
+ * «الصفحات والفعاليات» (docs/EVENTS.md §1.2, §8, §17; server: Pages.gs):
+ *  - صفحات الخدمة: permanent pages at /<slug>/ (المسرح الأسود، المسرح
+ *    الصامت…): hero, description, YouTube-style video cards, the team
+ *  - الفعاليات: trips, conferences, fun days at /events/<slug>/: details,
+ *    prices, the servants people book with (no online booking yet)
+ *  - الخدام: the one registry of servants (team contacts and booking
+ *    servants) and the payment methods
+ * Every page / event has «الصفحة الرئيسية»: its own card on the home page
+ * (show / hide, button words, shape, order) without touching the page.
+ * Official admin only (/admin/): the recovery admin says so.
+ */
+(function () {
+
+  'use strict';
+
+  var A = window.A;
+  var el = A.el;
+  var icon = A.icon;
+
+  var P = A.pages = { focusPage: '', focusEvent: '' };
+
+  var THEMES = [
+    { value: '', label: 'تلقائي' }, { value: 'gold', label: 'ذهبي' }, { value: 'ember', label: 'جمري' }, { value: 'azure', label: 'أزرق' },
+    { value: 'rose', label: 'وردي' }, { value: 'emerald', label: 'أخضر' }, { value: 'night', label: 'ليلي' }
+  ];
+  var DISPLAYS = [
+    { value: '', label: 'تلقائي' }, { value: 'compact', label: 'كارت مدمج' }, { value: 'side', label: 'صورة جنب الكلام' },
+    { value: 'banner', label: 'بانر عريض' }, { value: 'stack', label: 'صورة فوق والكلام تحت' }
+  ];
+  var DISPLAYS_MOBILE = [{ value: '', label: 'زي الكمبيوتر' }, { value: 'auto', label: 'تلقائي' }].concat(DISPLAYS.slice(1));
+  var GROUPS = [{ value: 'adult', label: 'كبار' }, { value: 'child', label: 'أطفال' }, { value: 'companion', label: 'مرافقين' }];
+  var DEVICE_SIZES = { phone: { width: 390, height: 780 }, desktop: { width: 1100, height: 760 } };
+
+  function ar(n) {
+    return String(n === null || n === undefined ? '' : n).replace(/\d/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[d]; });
+  }
+
+  function official() {
+    return !!window.AdminTransport;
+  }
+
+  function recoveryNotice() {
+    return A.card('من لوحة التحكم الرسمية بس', 'الصفحات والفعاليات والخدام بيتعملوا من لوحة التحكم الرسمية (/admin/). افتحها من Chrome وكمّل من هناك.');
+  }
+
+  function select(options, value, label) {
+    return el('select', { class: 'input', 'aria-label': label || null, onchange: A.markDirty }, options.map(function (o) {
+      return el('option', { value: o.value, selected: o.value === (value || '') ? 'selected' : null, text: o.label });
+    }));
+  }
+
+  function number(value, min, max, placeholder) {
+    return el('input', { class: 'input comp-number', type: 'number', inputmode: 'numeric', min: String(min), max: String(max), step: '1',
+      placeholder: placeholder || '', value: value === null || value === undefined ? '' : String(value), oninput: A.markDirty });
+  }
+
+  /* a gallery picker's value → stored tokens ("img-…", "vid-…@s-e") */
+  function tokens(picker) {
+    var value = picker.value();
+    var list = Array.isArray(value) ? value : String(value || '').split(',');
+    return list.map(function (v) {
+      if (v && typeof v === 'object') {
+        var timed = v.start !== undefined && v.start !== null && v.start !== '';
+        return v.id ? v.id + (timed ? '@' + v.start + '-' + v.end : '') : '';
+      }
+      return String(v || '').trim();
+    }).filter(Boolean);
+  }
+
+  /* the panel's own state (activities, types, sections) after a page / an event changed its card */
+  function refreshState() {
+    return A.call('apiState').then(function (state) { A.applyState(state); }).catch(function () {});
+  }
+
+  function siteUrl(reply) {
+    return String((reply && reply.siteUrl) || (A.state.config && A.state.config.siteUrl) || '').replace(/\/?$/, '/');
+  }
+
+  function liveChip(item) {
+    if (item.archived) return A.chip('في الأرشيف', 'off');
+    if (!item.enabled) return A.chip('مقفولة', 'off');
+    return item.live ? A.chip('منشورة', 'ok') : A.chip('لسه متنشرتش', 'gold');
+  }
+
+  function cardChip(card, home) {
+    if (!home || !home.show) return A.chip('مش في الصفحة الرئيسية', 'off');
+    if (!card) return A.chip('الكارت هيتعمل مع الحفظ', 'info');
+    return A.chip(card.show ? 'ظاهر في الرئيسية' + (card.position ? ' (رقم ' + ar(card.position) + ')' : '') : 'الكارت مخفي', card.show ? 'ok' : 'off');
+  }
+
+  function sectionTitle(key) {
+    var row = (A.state.layout || []).filter(function (s) { return s.key === key; })[0] ||
+      (A.state.draft.sections || []).filter(function (s) { return s.key === key; })[0];
+    return row && row.title ? row.title : ({ services: 'خدماتنا', activities: 'الفعاليات' })[key] || key;
+  }
+
+
+  /* =======================================================
+     «الصفحة الرئيسية»: the owner's card (§1.2)
+  ======================================================= */
+
+  function homePanel(home, card, options) {
+
+    home = home || {};
+    var show = A.checkbox('إظهار في الصفحة الرئيسية', !!home.show, 'كارت بالغلاف والعنوان والسطر القصير، زراره بيفتح الصفحة دي. تقدر تخفيه في أي وقت والصفحة نفسها تفضل شغالة.');
+    var cta = A.textInput(home.cta, { max: 24, placeholder: options.ctaHint });
+    var display = select(DISPLAYS, home.display, 'شكل الكارت');
+    var mobile = select(DISPLAYS_MOBILE, home.displayMobile, 'شكل الكارت على الموبايل');
+    var where = card && card.of
+      ? 'الكارت ' + (card.show ? 'ظاهر' : 'مخفي') + ' في قسم «' + sectionTitle(card.section) + '»' + (card.position ? ' — رقم ' + ar(card.position) + ' من ' + ar(card.of) : '')
+      : 'القسم: «' + sectionTitle(options.section) + '»';
+    var order = el('button', { class: 'btn btn--small', type: 'button', onclick: function () { orderSheet(card ? card.section : options.section, card ? card.id : ''); } }, icon('layers'), 'رتّب الكروت');
+    var extra = el('div', { class: 'form', hidden: !home.show }, A.field('نص الزرار', cta, 'فاضي = تلقائي: ' + options.ctaHint), A.field('شكل الكارت', display), A.field('شكل الكارت على الموبايل', mobile));
+
+    show.input.addEventListener('change', function () { extra.hidden = !show.input.checked; });
+
+    return {
+      node: el('fieldset', { class: 'fieldset pages-home' },
+        el('legend', { text: 'الصفحة الرئيسية' }),
+        show.node,
+        extra,
+        el('div', { class: 'actions' }, el('p', { class: 'field__hint', text: where }), card ? order : null)),
+      value: function () {
+        return { show: show.input.checked, cta: cta.value, display: display.value, displayMobile: mobile.value };
+      }
+    };
+
+  }
+
+  /* «ترتيب الكروت في الصفحة الرئيسية»: one items section's cards, ↑ / ↓, then save */
+  function orderSheet(sectionKey, focusId) {
+
+    var types = (A.state.draft.types || []).filter(function (t) { return t.section === sectionKey; }).map(function (t) { return t.key; });
+    var cards = A.byOrder((A.state.draft.activities || []).filter(function (a) { return types.indexOf(a.type) !== -1 && !A.bool(a.archived); }));
+    var list = el('ol', { class: 'list pages-order' });
+    var box = A.errorBox();
+    var save = el('button', { class: 'btn btn--primary', type: 'button', text: 'حفظ الترتيب' });
+
+    function draw() {
+      A.fill(list, cards.map(function (card, i) {
+        var linked = card.page ? 'صفحة' : card.event ? 'فعالية' : card.competition ? 'مسابقة' : '';
+        var row = A.listItem({
+          icon: 'grip',
+          image: card.image,
+          title: ar(i + 1) + '. ' + (card.title || '(من غير عنوان)'),
+          sub: card.subtitle,
+          off: !A.bool(card.enabled),
+          chips: [A.bool(card.enabled) ? A.chip('ظاهر', 'ok') : A.chip('مخفي', 'off'), linked ? A.chip(linked, 'info') : null].filter(Boolean),
+          controls: [
+            el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'لفوق: ' + card.title, disabled: i === 0 ? 'disabled' : null, onclick: function () { move(i, -1); } }, icon('chevron-up')),
+            el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'لتحت: ' + card.title, disabled: i === cards.length - 1 ? 'disabled' : null, onclick: function () { move(i, 1); } }, icon('chevron'))
+          ]
+        });
+        if (card.id === focusId) row.classList.add('is-focus');
+        return row;
+      }));
+    }
+
+    function move(i, step) {
+      var j = i + step;
+      if (j < 0 || j >= cards.length) return;
+      var t = cards[i];
+      cards[i] = cards[j];
+      cards[j] = t;
+      A.markDirty();
+      draw();
+      var buttons = list.children[j] && list.children[j].querySelectorAll('.icon-btn');
+      if (buttons && buttons.length) (buttons[step < 0 ? 0 : 1].disabled ? buttons[step < 0 ? 1 : 0] : buttons[step < 0 ? 0 : 1]).focus();
+    }
+
+    save.addEventListener('click', function () {
+      box.hidden = true;
+      A.withBusy(save, A.call('apiHomeOrder', sectionKey, cards.map(function (c) { return c.id; }))).then(function (state) {
+        A.dirty = false;
+        A.applyState(state);
+        A.closeSheet();
+        A.toast('اتحفظ الترتيب ✓ — هيظهر في الموقع بعد ما تنشر');
+        if (A.area === 'pages') A.render();
+      }).catch(function (error) { A.fail(error, box); });
+    });
+
+    draw();
+    A.dirty = false;
+    A.openSheet('ترتيب كروت «' + sectionTitle(sectionKey) + '»', [
+      box,
+      el('p', { class: 'note', text: 'نفس الترتيب اللي في الصفحة الرئيسية (الأول فوق / يمين). الكروت المخفية بتفضل في مكانها لما ترجع تظهر.' }),
+      cards.length ? list : el('p', { class: 'empty', text: 'مفيش كروت في القسم ده لسه.' })
+    ], A.sheetFooter(save));
+
+  }
+
+  P.orderSheet = orderSheet;
+
+
+  /* =======================================================
+     PREVIEW (pages/index.html?preview, §17.10)
+  ======================================================= */
+
+  function blobUrl(src) {
+    if (/^blob:/.test(src)) return src;
+    var m = /^data:([^;,]+);base64,(.*)$/.exec(src || '');
+    if (!m) return '';
+    var binary = atob(m[2]);
+    var bytes = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return URL.createObjectURL(new Blob([bytes], { type: m[1] }));
+  }
+
+  function previewSheet(kind, id, title) {
+
+    var device = matchMedia('(min-width: 900px)').matches ? 'desktop' : 'phone';
+    var frame = el('iframe', { class: 'comp-preview__frame', title: 'معاينة الصفحة', src: new URL('../pages/index.html?preview', location.href).href, referrerpolicy: 'no-referrer' });
+    var holder = el('div', { class: 'comp-preview__holder' }, frame);
+    var stage = el('div', { class: 'comp-preview__stage', 'data-device': device }, holder);
+    var status = el('p', { class: 'preview-status', role: 'status', text: 'بنجهز المعاينة…' });
+    var message = null;
+    var ready = false;
+
+    function fit() {
+      var size = DEVICE_SIZES[device];
+      var room = Math.max(280, stage.clientWidth - 16);
+      var scale = Math.min(1, room / size.width);
+      stage.dataset.device = device;
+      frame.style.width = size.width + 'px';
+      frame.style.height = size.height + 'px';
+      frame.style.transform = 'scale(' + scale + ')';
+      holder.style.width = Math.round(size.width * scale) + 'px';
+      holder.style.height = Math.round(size.height * scale) + 'px';
+    }
+
+    function send() {
+      if (ready && message && frame.contentWindow) frame.contentWindow.postMessage(message, location.origin);
+    }
+
+    function onMessage(event) {
+      if (event.source !== frame.contentWindow || event.origin !== location.origin || !event.data) return;
+      if (event.data.type === 'athanasios:page-preview-ready') { ready = true; send(); }
+      if (event.data.type === 'athanasios:page-preview-shown') status.textContent = 'دي شكل الصفحة من المسودة (لسه متنشرتش).';
+      if (event.data.type === 'athanasios:page-preview-error') status.textContent = event.data.message || 'المعاينة مشتغلتش.';
+    }
+
+    window.addEventListener('message', onMessage);
+
+    A.call('apiPagePreview', kind, id).then(function (reply) {
+      var images = {};
+      return Promise.all((reply.media || []).filter(function (m) { return !m.published && /^img-/.test(m.id); }).map(function (m) {
+        return A.mediaPreview(m.id).then(function (src) {
+          var url = src ? blobUrl(src) : '';
+          if (url) {
+            images[m.src] = url;
+            if (m.thumb) images[m.thumb] = url;
+          }
+        }).catch(function () {});
+      })).then(function () {
+        message = { type: 'athanasios:page-preview', kind: reply.kind, data: reply.data, images: images };
+        send();
+      });
+    }).catch(function (error) { status.textContent = A.parseError(error).message; });
+
+    var switcher = el('div', { class: 'segmented', role: 'group', 'aria-label': 'الجهاز' },
+      [{ value: 'phone', label: 'موبايل', icon: 'phone' }, { value: 'desktop', label: 'كمبيوتر', icon: 'layers' }].map(function (o) {
+        return el('button', { class: 'segment', type: 'button', 'aria-pressed': String(o.value === device), onclick: function (e) {
+          device = o.value;
+          Array.prototype.forEach.call(e.currentTarget.parentNode.children, function (b) { b.setAttribute('aria-pressed', String(b === e.currentTarget)); });
+          fit();
+        } }, icon(o.icon), o.label);
+      }));
+
+    A.openSheet('معاينة: ' + title, [switcher, status, stage], [el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })], { wide: true });
+
+    requestAnimationFrame(fit);
+    window.addEventListener('resize', fit);
+
+    var watch = setInterval(function () {
+      if (!frame.isConnected) {
+        clearInterval(watch);
+        window.removeEventListener('message', onMessage);
+        window.removeEventListener('resize', fit);
+      }
+    }, 1000);
+
+  }
+
+
+  /* =======================================================
+     SERVICE PAGES
+  ======================================================= */
+
+  A.views.svcpages = function () {
+
+    if (!official()) return [recoveryNotice()];
+
+    var body = el('div', { 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--line' }));
+    var box = A.errorBox();
+    var reply = null;
+
+    function load() {
+      return A.call('apiPages').then(function (r) {
+        reply = r;
+        if (!body.isConnected) return;
+        draw(r);
+        if (P.focusPage) {
+          var page = r.pages.filter(function (p) { return p.id === P.focusPage; })[0];
+          P.focusPage = '';
+          if (page) openPage(page.id);
+        }
+      }).catch(function (error) {
+        if (!body.isConnected) return;
+        body.replaceChildren();
+        A.fail(error, box);
+      });
+    }
+
+    function draw(r) {
+      var pages = r.pages.filter(function (p) { return !p.archived || P.showArchived; });
+      if (!pages.length) {
+        A.fill(body, el('div', { class: 'empty-state' },
+          el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('theatre')),
+          el('p', { class: 'empty-state__title', text: 'مفيش صفحات خدمة لسه' }),
+          el('p', { class: 'empty-state__text', text: 'زوّد صفحة زي «المسرح الأسود»: غلاف، وصف، فيديوهات، وفريق الخدمة.' })));
+        return;
+      }
+      var site = siteUrl(r);
+      A.fill(body, el('ul', { class: 'list' }, pages.map(function (page) {
+        var row = A.listItem({
+          icon: 'theatre',
+          image: page.cover || null,
+          title: page.title,
+          sub: '/' + page.slug + '/' + (page.tagline ? ' — ' + page.tagline : ''),
+          off: !page.enabled || page.archived,
+          chips: [
+            liveChip(page),
+            cardChip(page.card, page.home),
+            A.chip(ar(page.mediaCount) + ' كارت فيديو', page.mediaCount ? '' : 'gold'),
+            page.partner ? A.chip('بإشراف B.U.G.', 'info') : null
+          ].filter(Boolean),
+          controls: [
+            el('span', { class: 'spacer' }),
+            page.live ? el('a', { class: 'icon-btn', href: site + page.slug + '/', target: '_blank', rel: 'noopener', 'aria-label': 'افتح الصفحة في الموقع: ' + page.title, title: 'افتح في الموقع' }, icon('external')) : null,
+            el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'معاينة: ' + page.title, title: 'معاينة', onclick: function () { previewSheet('page', page.id, page.title); } }, icon('eye')),
+            A.editButton(page.title, function () { openPage(page.id); })
+          ]
+        });
+        row.dataset.id = page.id;
+        return row;
+      })));
+    }
+
+    load();
+
+    var archivedCount = function () { return reply ? reply.pages.filter(function (p) { return p.archived; }).length : 0; };
+
+    return [
+      A.card('صفحات الخدمة', 'صفحات ثابتة ليها رابطها الخاص (زي /black-theatre/): غلاف، وصف، كروت فيديو، وأرقام فريق الخدمة. كل صفحة ممكن يبقى ليها كارت في الصفحة الرئيسية.',
+        el('div', { class: 'actions' },
+          el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { pageEditor(null, reply); } }, icon('plus'), 'صفحة جديدة'),
+          el('button', { class: 'btn btn--ghost btn--small', type: 'button', onclick: function () { P.showArchived = !P.showArchived; if (reply) draw(reply); } }, icon('layers'), 'الأرشيف'),
+          el('button', { class: 'btn btn--ghost btn--small', type: 'button', onclick: function () { orderSheet('services', ''); } }, icon('layers'), 'ترتيب كروت «خدماتنا»')),
+        box,
+        body)
+    ];
+
+    function openPage(id) {
+      A.call('apiPage', id).then(function (r) { pageEditor(r, reply); }).catch(function (error) { A.fail(error, box); });
+    }
+
+    P.openPage = openPage;
+    P.reload = load;
+
+  };
+
+  function pageEditor(r, list) {
+
+    var isNew = !r;
+    var page = r ? r.page : { enabled: true, cardType: 'service', home: { show: true }, team: [] };
+    var limits = (r && r.limits) || (list && list.limits) || {};
+    var servants = (r && r.servants) || (list && list.servants) || [];
+    var types = (r && r.types) || (list && list.types) || [];
+    var box = A.errorBox();
+
+    var slug = A.textInput(page.slug, { ltr: true, max: 40, placeholder: 'black-theatre', required: true });
+    var title = A.counted('العنوان', page.title, limits.title || 60, 'مثلاً: المسرح الأسود', { required: true });
+    var tagline = A.counted('السطر القصير', page.tagline, limits.tagline || 120, 'بيظهر تحت العنوان وعلى كارت الصفحة الرئيسية');
+    var description = A.counted('الوصف', page.description, limits.description || 2000, 'الخدمة دي إيه، بنعمل إيه، إمتى…', { multiline: true, rows: 5 });
+    var hero = A.galleryPicker(page.hero ? [page.hero] : [], { max: 1, label: 'الصورة أو الفيديو الرئيسي', hint: 'فوق خالص في الصفحة. فيديو بيشتغل من غير صوت ويعيد نفسه (أو صورته بس لو الجهاز طالب حركة أقل).' });
+    var cover = A.imagePicker(page.cover || '', { label: 'صورة الغلاف', hint: 'مطلوبة لكارت الصفحة الرئيسية، وبتظهر لما الفيديو الرئيسي لسه بيحمّل.' });
+    var cardType = select(types.map(function (t) { return { value: t.key, label: t.label + (t.section === 'services' ? ' — خدماتنا' : t.section === 'activities' ? ' — الفعاليات' : '') }; }), page.cardType || 'service', 'نوع الكارت');
+    var theme = select(THEMES, page.theme, 'الشكل');
+    var teamTitle = A.counted('عنوان الفريق', page.teamTitle, limits.teamTitle || 60, 'فاضي = «عايز تنضم لفريق المسرح؟»');
+    var teamText = A.counted('كلام الفريق', page.teamText, limits.teamText || 300, 'اختياري', { multiline: true, rows: 2 });
+    var teamMessage = A.counted('رسالة الواتساب', page.teamMessage, limits.teamMessage || 300, 'بتتكتب جاهزة لما حد يدوس واتساب، مثلاً: عايز انضم لفريق المسرح الأسود', { multiline: true, rows: 2 });
+    var team = servants.filter(function (s) { return s.active; }).map(function (s) {
+      var box2 = A.checkbox(s.name + (s.role ? ' — ' + s.role : ''), (page.team || []).indexOf(s.id) !== -1, s.publicWa ? 'رقمه بيظهر للزوار على واتساب' : 'مش هيظهر: رقمه مش متاح للزوار (من «الخدام»)');
+      box2.input.dataset.id = s.id;
+      return box2;
+    });
+    var enabled = A.checkbox('الصفحة شغالة', page.enabled !== false, 'لو قفلتها وانشرت: الرابط بيقول «الصفحة دي مش متاحة دلوقتي» والكارت بيختفي');
+    var partner = A.checkbox('بإشراف Brave Under Grace – B.U.G.', page.partner === 'bug', 'شعار B.U.G. بيظهر جنب شعارنا فوق الصفحة، وعلامة صغيرة على كارت الصفحة الرئيسية، ومقدمة قصيرة أول ما حد يفتح الصفحة (مرة في الزيارة).');
+    var home = homePanel(page.home, r ? r.card : null, { section: 'services', ctaHint: 'شاهد (لو فيه فيديو) أو اعرف التفاصيل' });
+    var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
+
+    save.addEventListener('click', function () {
+      box.hidden = true;
+      if (A.uploadsInFlight > 0) { A.fail(new Error('الصورة لسه بتترفع. استنى لما يظهر «تم الرفع ✓» وبعدين احفظ.'), box); return; }
+      var input = {
+        slug: slug.value.trim().toLowerCase(),
+        title: title.input.value,
+        tagline: tagline.input.value,
+        description: description.input.value,
+        hero: tokens(hero)[0] || '',
+        cover: cover.value(),
+        cardType: cardType.value,
+        theme: theme.value,
+        teamTitle: teamTitle.input.value,
+        teamText: teamText.input.value,
+        teamMessage: teamMessage.input.value,
+        team: team.filter(function (t) { return t.input.checked; }).map(function (t) { return t.input.dataset.id; }),
+        enabled: enabled.input.checked,
+        partner: partner.input.checked ? 'bug' : '',
+        home: home.value()
+      };
+      A.withBusy(save, A.call('apiPageSave', isNew ? null : page.id, input)).then(function (res) {
+        A.dirty = false;
+        refreshState();
+        A.toast(isNew ? 'اتعملت ✓ — زوّد كروت الفيديو وبعدين «راجع وانشر»' : 'اتحفظت ✓ — هتظهر في الموقع بعد ما تنشر');
+        if (P.reload) P.reload();
+        if (isNew) mediaSheet(res); else A.closeSheet();
+      }).catch(function (error) {
+        var lines = String(A.parseError(error).message || '').split('\n');
+        A.fail(error, box);
+        void lines;
+      });
+    });
+
+    var controls = isNew ? [] : [
+      el('button', { class: 'btn btn--small', type: 'button', onclick: function () { A.closeSheet().then(function (closed) { if (closed) mediaSheet(r); }); } }, icon('video'), 'كروت الفيديو (' + ar(r.media.length) + ')'),
+      el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () { previewSheet('page', page.id, page.title); } }, icon('eye'), 'معاينة'),
+      el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function (e) {
+        A.withBusy(e.currentTarget, A.call('apiPageArchive', page.id, !page.archived)).then(function () {
+          A.dirty = false;
+          A.closeSheet();
+          refreshState();
+          A.toast(page.archived ? 'رجعت من الأرشيف' : 'اتأرشفت — بعد النشر الرابط هيقول إنها مش متاحة');
+          if (P.reload) P.reload();
+        }).catch(function (error) { A.fail(error, box); });
+      } }, icon(page.archived ? 'retry' : 'download'), page.archived ? 'رجّع من الأرشيف' : 'أرشيف'),
+      page.live || page.publishedAt ? null : el('button', { class: 'btn btn--small btn--danger', type: 'button', onclick: function (e) {
+        var button = e.currentTarget;
+        A.confirm({ tone: 'danger', title: 'تمسح «' + page.title + '»؟', message: 'الصفحة لسه متنشرتش، فالمسح آمن: هتتمسح هي وكروتها وكارت الصفحة الرئيسية.', confirmLabel: 'امسح', cancelLabel: 'لأ' }).then(function (ok) {
+          if (!ok) return;
+          A.withBusy(button, A.call('apiPageDelete', page.id)).then(function () {
+            A.dirty = false;
+            A.closeSheet();
+            refreshState();
+            A.toast('اتمسحت');
+            if (P.reload) P.reload();
+          }).catch(function (error) { A.fail(error, box); });
+        });
+      } }, icon('trash'), 'مسح')
+    ].filter(Boolean);
+
+    A.dirty = false;
+    A.openSheet(isNew ? 'صفحة خدمة جديدة' : 'تعديل: ' + page.title, [
+      box,
+      controls.length ? el('div', { class: 'actions' }, controls) : null,
+      el('div', { class: 'form' },
+        A.field('الرابط', slug, page.live || page.publishedAt ? 'الرابط مبيتغيرش بعد النشر' : 'حروف إنجليزي صغيرة وأرقام وشرطة، مثلاً black-theatre ← الموقع/black-theatre/'),
+        title.node,
+        tagline.node,
+        description.node,
+        hero.node,
+        cover.node,
+        A.field('نوع الكارت', cardType, 'بيحدد قسم الكارت في الصفحة الرئيسية وأيقونته'),
+        A.field('الشكل', theme),
+        el('fieldset', { class: 'fieldset' },
+          el('legend', { text: 'فريق الخدمة (آخر الصفحة)' }),
+          teamTitle.node,
+          teamText.node,
+          teamMessage.node,
+          team.length ? el('div', { class: 'pages-team' }, team.map(function (t) { return t.node; })) : el('p', { class: 'note', text: 'مفيش خدام لسه — زوّدهم من «الخدام».' })),
+        partner.node,
+        home.node,
+        enabled.node)
+    ], A.sheetFooter(save), {
+      lock: isNew ? null : A.editLock('page', page.id, 'الصفحة «' + page.title + '»', function () { A.closeSheet(); if (P.openPage) P.openPage(page.id); })
+    });
+
+  }
+
+
+  /* the page's video cards: list (↑ / ↓, edit, delete) and add */
+  function mediaSheet(r) {
+
+    var page = r.page;
+    var media = r.media.slice();
+    var box = A.errorBox();
+    var list = el('ul', { class: 'list' });
+
+    function draw() {
+      if (!media.length) {
+        A.fill(list, el('p', { class: 'empty', text: 'مفيش كروت لسه. كل كارت: صورة، عنوان، وفيديو من المكتبة أو لينك للمسرحية كاملة.' }));
+        return;
+      }
+      A.fill(list, media.map(function (m, i) {
+        return A.listItem({
+          icon: m.source === 'link' ? 'link' : 'video',
+          image: m.cover || null,
+          title: m.title,
+          sub: m.text,
+          off: !m.enabled,
+          chips: [m.source === 'link' ? A.chip('لينك بس', 'info') : A.chip('فيديو', 'gold'), m.fullUrl ? A.chip('«شاهد كاملة»') : null, m.enabled ? null : A.chip('مخفي', 'off')].filter(Boolean),
+          controls: [
+            el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'لفوق: ' + m.title, disabled: i === 0 ? 'disabled' : null, onclick: function (e) { reorder(i, -1, e.currentTarget); } }, icon('chevron-up')),
+            el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'لتحت: ' + m.title, disabled: i === media.length - 1 ? 'disabled' : null, onclick: function (e) { reorder(i, 1, e.currentTarget); } }, icon('chevron')),
+            A.editButton(m.title, function () { mediaEditor(r, m); }),
+            A.deleteButton(m.title, function (e) {
+              var button = e.currentTarget;
+              A.confirm({ tone: 'danger', title: 'تمسح كارت «' + m.title + '»؟', message: 'الفيديو نفسه بيفضل في المكتبة.', confirmLabel: 'امسح', cancelLabel: 'لأ' }).then(function (ok) {
+                if (!ok) return;
+                A.withBusy(button, A.call('apiPageMediaDelete', m.id)).then(function (next) { r = next; media = next.media.slice(); draw(); A.toast('اتمسح'); })
+                  .catch(function (error) { A.fail(error, box); });
+              });
+            })
+          ]
+        });
+      }));
+    }
+
+    function reorder(i, step, button) {
+      var j = i + step;
+      if (j < 0 || j >= media.length) return;
+      var t = media[i];
+      media[i] = media[j];
+      media[j] = t;
+      draw();
+      A.withBusy(button, A.call('apiPageMediaOrder', page.id, media.map(function (m) { return m.id; }))).then(function (next) { r = next; media = next.media.slice(); draw(); })
+        .catch(function (error) { A.fail(error, box); });
+    }
+
+    draw();
+    A.dirty = false;
+    A.openSheet('كروت الفيديو: ' + page.title, [
+      box,
+      el('p', { class: 'note', text: 'بتظهر في الصفحة زي كروت يوتيوب: صورة وعنوان وسطر. الدوسة بتفتح الفيديو نضيف من غير أي إطار، وتحته زرار «شاهد المسرحية كاملة» لو حطيت لينك.' }),
+      el('div', { class: 'actions' },
+        el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { mediaEditor(r, null); } }, icon('plus'), 'كارت جديد'),
+        el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { pageEditor(r, null); } }, icon('edit'), 'بيانات الصفحة'),
+        el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { previewSheet('page', page.id, page.title); } }, icon('eye'), 'معاينة')),
+      list
+    ], [el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })], {
+      lock: A.editLock('page', page.id, 'الصفحة «' + page.title + '»', function () { A.closeSheet(); })
+    });
+
+  }
+
+  function mediaEditor(r, m) {
+
+    var isNew = !m;
+    var page = r.page;
+    m = m || { enabled: true, source: 'clip' };
+    var limits = r.limits || {};
+    var box = A.errorBox();
+    var title = A.counted('العنوان', m.title, limits.mediaTitle || 80, 'مثلاً: عرض الكريسماس ٢٠٢٥', { required: true });
+    var text = A.counted('سطر قصير', m.text, limits.mediaText || 300, 'اختياري', { multiline: true, rows: 2 });
+    var duration = A.textInput(m.duration, { max: limits.duration || 10, placeholder: 'مثلاً ٣:٢٠' });
+    var cover = A.imagePicker(m.cover || '', { label: 'صورة الكارت', hint: 'مطلوبة: بتظهر زي صورة فيديو يوتيوب (عرضي ١٦:٩ أحسن).' });
+    var source = A.choices(A.uid('src'), [{ value: 'clip', label: 'فيديو من المكتبة' }, { value: 'link', label: 'لينك بس (المسرحية كاملة برّه)' }], m.source || 'clip', function (v) { clipField.hidden = v !== 'clip'; });
+    var clip = A.galleryPicker(m.clip ? [m.clip] : [], { max: 1, label: 'الفيديو', hint: 'من مكتبة الصور والفيديوهات (ارفعه من «الصور» الأول). تقدر تحدد «من» و«لحد».' });
+    var clipField = el('div', {}, clip.node);
+    var fullUrl = A.textInput(m.fullUrl, { ltr: true, type: 'url', placeholder: 'https://youtube.com/…' });
+    var ctaLabel = A.textInput(m.ctaLabel, { max: limits.ctaLabel || 30, placeholder: 'شاهد المسرحية كاملة' });
+    var enabled = A.checkbox('ظاهر في الصفحة', m.enabled !== false);
+    var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
+
+    clipField.hidden = (m.source || 'clip') !== 'clip';
+
+    save.addEventListener('click', function () {
+      box.hidden = true;
+      if (A.uploadsInFlight > 0) { A.fail(new Error('الصورة لسه بتترفع. استنى لما يظهر «تم الرفع ✓» وبعدين احفظ.'), box); return; }
+      var input = {
+        title: title.input.value, text: text.input.value, duration: duration.value, cover: cover.value(),
+        source: source.value ? source.value() : (clipField.hidden ? 'link' : 'clip'),
+        clip: tokens(clip)[0] || '', fullUrl: fullUrl.value.trim(), ctaLabel: ctaLabel.value, enabled: enabled.input.checked
+      };
+      A.withBusy(save, A.call('apiPageMediaSave', page.id, isNew ? null : m.id, input)).then(function (next) {
+        A.dirty = false;
+        A.toast(isNew ? 'اتضاف ✓' : 'اتحفظ ✓');
+        if (P.reload) P.reload();
+        mediaSheet(next);
+      }).catch(function (error) { A.fail(error, box); });
+    });
+
+    A.dirty = false;
+    A.openSheet(isNew ? 'كارت فيديو جديد' : 'تعديل: ' + m.title, [
+      box,
+      el('div', { class: 'form' },
+        title.node, text.node, A.field('المدة (اختياري)', duration, 'بتظهر على الصورة زي يوتيوب'),
+        cover.node,
+        A.field('نوع الكارت', source.node || source),
+        clipField,
+        A.field('لينك المسرحية كاملة', fullUrl, 'اختياري للفيديو، مطلوب لكارت «لينك بس». يوتيوب أو فيسبوك أو درايف…'),
+        A.field('نص زرار اللينك', ctaLabel, 'فاضي = «شاهد المسرحية كاملة»'),
+        enabled.node)
+    ], [save, el('button', { class: 'btn btn--ghost', type: 'button', text: 'رجوع', onclick: function () { mediaSheet(r); } })], {
+      lock: A.editLock('page', page.id, 'الصفحة «' + page.title + '»', function () { A.closeSheet(); })
+    });
+
+  }
+
+
+  /* =======================================================
+     EVENTS
+  ======================================================= */
+
+  A.views.events = function () {
+
+    if (!official()) return [recoveryNotice()];
+
+    var body = el('div', { 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--line' }));
+    var box = A.errorBox();
+    var reply = null;
+
+    function load() {
+      return A.call('apiEvents').then(function (r) {
+        reply = r;
+        if (!body.isConnected) return;
+        draw(r);
+        if (P.focusEvent) {
+          var focus = P.focusEvent;
+          P.focusEvent = '';
+          if (r.events.some(function (e) { return e.id === focus; })) openEvent(focus);
+        }
+      }).catch(function (error) {
+        if (!body.isConnected) return;
+        body.replaceChildren();
+        A.fail(error, box);
+      });
+    }
+
+    function draw(r) {
+      var events = r.events.filter(function (e) { return !e.archived || P.showArchivedEvents; });
+      if (!events.length) {
+        A.fill(body, el('div', { class: 'empty-state' },
+          el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('bus')),
+          el('p', { class: 'empty-state__title', text: 'مفيش فعاليات لسه' }),
+          el('p', { class: 'empty-state__text', text: 'رحلة، مؤتمر، أو يوم ترفيهي: صفحة بتفاصيلها وأسعارها والخدام اللي بيتحجز معاهم.' })));
+        return;
+      }
+      var site = siteUrl(r);
+      var now = A.wallMinutes(A.cairoNow());
+      A.fill(body, el('ul', { class: 'list' }, events.map(function (ev) {
+        var ended = ev.endAt ? A.wallMinutes(ev.endAt, true) < now : ev.startAt && A.wallMinutes(ev.startAt) < now;
+        var row = A.listItem({
+          icon: ev.kind === 'trip' ? 'bus' : ev.kind === 'conference' ? 'users' : 'star',
+          image: ev.cover || null,
+          title: ev.title,
+          sub: ev.kindLabel + ' · ' + (ev.startAt ? A.formatWall(ev.startAt) : '') + ' · /events/' + ev.slug + '/',
+          off: !ev.enabled || ev.archived,
+          chips: [
+            liveChip(ev),
+            cardChip(ev.card, ev.home),
+            ev.booking ? A.chip('فيه حجز' + (ev.booking.capacity ? ' · ' + ar(ev.booking.capacity) + ' مكان' : ''), 'gold') : A.chip('من غير حجز'),
+            ended ? A.chip('خلصت', 'off') : null,
+            ev.partner ? A.chip('بإشراف B.U.G.', 'info') : null
+          ].filter(Boolean),
+          controls: [
+            el('span', { class: 'spacer' }),
+            ev.live ? el('a', { class: 'icon-btn', href: site + 'events/' + ev.slug + '/', target: '_blank', rel: 'noopener', 'aria-label': 'افتح الفعالية في الموقع: ' + ev.title, title: 'افتح في الموقع' }, icon('external')) : null,
+            el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'معاينة: ' + ev.title, title: 'معاينة', onclick: function () { previewSheet('event', ev.id, ev.title); } }, icon('eye')),
+            A.editButton(ev.title, function () { openEvent(ev.id); })
+          ]
+        });
+        row.dataset.id = ev.id;
+        return row;
+      })));
+    }
+
+    function openEvent(id) {
+      A.call('apiEvent', id).then(function (r) { eventEditor(r, reply); }).catch(function (error) { A.fail(error, box); });
+    }
+
+    P.openEvent = openEvent;
+    P.reloadEvents = load;
+
+    load();
+
+    return [
+      A.card('الفعاليات', 'رحلات ومؤتمرات وأيام ترفيهية، كل واحدة ليها صفحة (الموقع/events/…) بالتفاصيل والأسعار والخدام اللي الناس بتكلمهم على واتساب علشان تحجز. الحجز من الموقع نفسه (مع إثبات الدفع) جاي في المرحلة الجاية.',
+        el('div', { class: 'actions' },
+          el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { eventEditor(null, reply); } }, icon('plus'), 'فعالية جديدة'),
+          el('button', { class: 'btn btn--ghost btn--small', type: 'button', onclick: function () { P.showArchivedEvents = !P.showArchivedEvents; if (reply) draw(reply); } }, icon('layers'), 'الأرشيف'),
+          el('button', { class: 'btn btn--ghost btn--small', type: 'button', onclick: function () { orderSheet('activities', ''); } }, icon('layers'), 'ترتيب كروت «الفعاليات»')),
+        box,
+        body)
+    ];
+
+  };
+
+  /* the prices table: rows of { label, price, group, max, seat, note }; the first is the applicant */
+  function pricingEditor(pricing) {
+
+    pricing = pricing || { mode: 'single', categories: [{ key: 'applicant', label: 'الحاجز', price: '' }] };
+    var rows = (pricing.categories || []).map(function (c) { return Object.assign({}, c); });
+    if (!rows.length) rows.push({ key: 'applicant', label: 'الحاجز', price: '' });
+    var mode = A.choices(A.uid('mode'), [{ value: 'single', label: 'الحاجز بس' }, { value: 'group', label: 'الحاجز + أفراد إضافيين / أطفال' }], pricing.mode || 'single', function (v) { more.hidden = v !== 'group'; });
+    var table = el('div', { class: 'pages-prices' });
+    var more = el('div', { hidden: (pricing.mode || 'single') !== 'group' });
+    var inputs = [];
+
+    function draw() {
+      inputs = rows.map(function (row, i) {
+        var first = i === 0;
+        var label = A.textInput(row.label, { max: 30, placeholder: first ? 'الحاجز' : 'مثلاً: طفل' });
+        var price = number(row.price, 0, 200000, 'جنيه');
+        var group = first ? null : select(GROUPS, row.group || 'adult', 'الفئة');
+        var max = first ? null : number(row.max, 1, 30, '١٠');
+        var seat = first ? null : A.checkbox('بياخد مكان', row.seat !== false);
+        var note = first ? null : A.textInput(row.note, { max: 60, placeholder: 'ملاحظة: من ٤ لـ ١٢ سنة' });
+        var remove = first ? null : el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'شيل الفئة', onclick: function () { collect(); rows.splice(i, 1); A.markDirty(); draw(); } }, icon('trash'));
+        var line = el('div', { class: 'pages-prices__row' + (first ? ' pages-prices__row--first' : '') },
+          A.field(first ? 'سعر الحاجز' : 'الفئة', label), A.field('السعر', price),
+          group ? A.field('محسوب على', group) : null, max ? A.field('أقصى عدد', max) : null, seat ? seat.node : null, note ? A.field('ملاحظة', note) : null, remove);
+        return { line: line, label: label, price: price, group: group, max: max, seat: seat, note: note, key: row.key };
+      });
+      A.fill(table, inputs[0].line);
+      A.fill(more, inputs.slice(1).map(function (x) { return x.line; }).concat([
+        rows.length < 6 ? el('button', { class: 'btn btn--ghost btn--small', type: 'button', onclick: function () { collect(); rows.push({ label: '', price: '', group: 'adult', max: 4, seat: true }); A.markDirty(); draw(); } }, icon('plus'), 'فئة سعر') : null
+      ]));
+    }
+
+    function collect() {
+      rows = inputs.map(function (x) {
+        return { key: x.key, label: x.label.value, price: x.price.value, group: x.group ? x.group.value : 'adult', max: x.max ? x.max.value : 1, seat: x.seat ? x.seat.input.checked : true, note: x.note ? x.note.value : '' };
+      });
+      return rows;
+    }
+
+    draw();
+
+    return {
+      node: el('div', { class: 'form' }, A.field('مين بيتحجز له', mode.node || mode), table, more),
+      value: function () {
+        return { mode: mode.value ? mode.value() : (more.hidden ? 'single' : 'group'), categories: collect() };
+      }
+    };
+
+  }
+
+  function eventEditor(r, list) {
+
+    var isNew = !r;
+    var ev = r ? r.event : { enabled: true, kind: 'trip', home: { show: true }, servants: [], booking: null };
+    var kinds = (r && r.kinds) || (list && list.kinds) || [{ key: 'trip', label: 'رحلة' }, { key: 'conference', label: 'مؤتمر' }, { key: 'funday', label: 'يوم ترفيهي' }];
+    var servants = (r && r.servants) || (list && list.servants) || [];
+    var methods = ((r && r.methods) || (list && list.methods) || []).filter(function (m) { return m.active !== false; });
+    var limits = (r && r.limits) || (list && list.limits) || {};
+    var booking = ev.booking || null;
+    var box = A.errorBox();
+
+    var kind = select(kinds.map(function (k) { return { value: k.key, label: k.label }; }), ev.kind, 'النوع');
+    var slug = A.textInput(ev.slug, { ltr: true, max: 40, placeholder: 'alex-trip-2026', required: true });
+    var title = A.counted('العنوان', ev.title, limits.title || 80, 'مثلاً: رحلة إسكندرية', { required: true });
+    var shortTitle = A.counted('العنوان المختصر', ev.shortTitle, limits.shortTitle || 30, 'اختياري، للأماكن الضيقة');
+    var summary = A.counted('الملخص', ev.summary, limits.summary || 200, 'سطر أو اتنين: بيظهر على الكارت وفوق الصفحة');
+    var body = A.counted('التفاصيل', ev.body, limits.body || 3000, 'البرنامج، المعاد، المطلوب…', { multiline: true, rows: 6 });
+    var cover = A.imagePicker(ev.cover || '', { label: 'صورة الغلاف', hint: 'مطلوبة لكارت الصفحة الرئيسية' });
+    var gallery = A.galleryPicker(ev.gallery || [], { max: limits.gallery || 8, label: 'صور وفيديوهات الفعالية', hint: 'اختياري' });
+    var startAt = A.dateTimeInput(ev.startAt, { emptyText: 'مطلوب', presets: [A.PRESETS.friday] });
+    var endAt = A.dateTimeInput(ev.endAt, { emptyText: 'من غير ميعاد نهاية' });
+    var locationName = A.counted('المكان', ev.locationName, limits.locationName || 80, 'مثلاً: إسكندرية — المنتزه');
+    var locationUrl = A.textInput(ev.locationUrl, { ltr: true, type: 'url', placeholder: 'https://maps.app.goo.gl/…' });
+    var theme = select(THEMES, ev.theme, 'الشكل');
+    var terms = A.counted('الشروط', ev.terms, limits.terms || 800, 'اختياري: سياسة الإلغاء، المطلوب من كل واحد…', { multiline: true, rows: 3 });
+
+    var hasBooking = A.checkbox('فيه حجز', !!booking, 'الأسعار والخدام اللي الناس بتحجز معاهم بيظهروا في الصفحة');
+    var opensAt = A.dateTimeInput(booking ? booking.opensAt : '', { emptyText: 'من وقت النشر' });
+    var closesAt = A.dateTimeInput(booking ? booking.closesAt : '', { emptyText: 'لحد ميعاد الفعالية' });
+    var capacity = number(booking ? booking.capacity : '', 1, 100000, 'من غير حد');
+    var perBooking = number(booking ? booking.perBookingMax : 10, 1, 30, '١٠');
+    var collectNames = A.checkbox('اطلب أسماء كل الأفراد', booking ? !!booking.collectNames : false);
+    var pricing = pricingEditor(booking ? booking.pricing : null);
+    var payMode = A.choices(A.uid('pay'), [{ value: 'full', label: 'الدفع كامل' }, { value: 'installments', label: 'مقدم وأقساط' }],
+      booking && booking.payment ? booking.payment.mode : 'full', function (v) { installments.hidden = v !== 'installments'; });
+    var minFirst = number(booking && booking.payment ? booking.payment.minFirst : '', 0, 1000000, 'مثلاً ٥٠٠');
+    var finalDueAt = A.dateTimeInput(booking && booking.payment ? booking.payment.finalDueAt : '', { emptyText: 'من غير ميعاد' });
+    var installments = el('div', { class: 'form', hidden: !(booking && booking.payment && booking.payment.mode === 'installments') },
+      A.field('أقل أول دفعة', minFirst, 'بالجنيه'), A.field('آخر ميعاد للدفع', finalDueAt.node));
+
+    var chosen = {};
+    (ev.servants || []).forEach(function (s) { chosen[s.id] = s.methods || []; });
+    var servantRows = servants.filter(function (s) { return s.active || chosen[s.id]; }).map(function (s) {
+      var on = A.checkbox(s.name + (s.role ? ' — ' + s.role : ''), !!chosen[s.id], s.publicWa ? 'رقمه بيظهر على واتساب' : 'مش هيظهر واتساب: رقمه مش متاح للزوار');
+      var boxes = methods.map(function (m) {
+        var b = el('input', { type: 'checkbox', checked: chosen[s.id] ? chosen[s.id].indexOf(m.key) !== -1 : m.key === 'cash', onchange: A.markDirty, 'data-key': m.key });
+        return { input: b, node: el('label', { class: 'check check--inline' }, b, el('span', { text: m.label })) };
+      });
+      return { id: s.id, on: on, boxes: boxes, node: el('div', { class: 'pages-servant' }, on.node, el('div', { class: 'pages-servant__methods', role: 'group', 'aria-label': 'طرق الدفع اللي بيقبلها ' + s.name }, boxes.map(function (b) { return b.node; }))) };
+    });
+
+    var bookingBox = el('div', { class: 'form', hidden: !booking },
+      el('div', { class: 'row' }, A.field('الحجز يفتح', opensAt.node), A.field('الحجز يقفل', closesAt.node)),
+      el('div', { class: 'row' }, A.field('العدد المتاح', capacity, 'المؤكدين بس هما اللي بياخدوا أماكن'), A.field('أقصى عدد في الحجز الواحد', perBooking)),
+      collectNames.node,
+      el('fieldset', { class: 'fieldset' }, el('legend', { text: 'الأسعار' }), pricing.node),
+      el('fieldset', { class: 'fieldset' }, el('legend', { text: 'الدفع' }), payMode.node || payMode, installments),
+      el('fieldset', { class: 'fieldset' }, el('legend', { text: 'الخدام اللي بيتحجز معاهم' }),
+        servantRows.length ? el('div', {}, servantRows.map(function (s) { return s.node; })) : el('p', { class: 'note', text: 'مفيش خدام لسه — زوّدهم من «الخدام».' })));
+
+    hasBooking.input.addEventListener('change', function () { bookingBox.hidden = !hasBooking.input.checked; });
+
+    var enabled = A.checkbox('الفعالية شغالة', ev.enabled !== false, 'لو قفلتها وانشرت: الرابط بيقول إنها مش متاحة والكارت بيختفي');
+    var partner = A.checkbox('بإشراف Brave Under Grace – B.U.G.', ev.partner === 'bug', 'شعار B.U.G. بيظهر جنب شعارنا فوق الصفحة، وعلامة صغيرة على كارت الصفحة الرئيسية، ومقدمة قصيرة أول ما حد يفتح الصفحة (مرة في الزيارة).');
+    var home = homePanel(ev.home, r ? r.card : null, { section: 'activities', ctaHint: 'احجز الآن (وقت الحجز) أو اعرف التفاصيل' });
+    var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
+
+    save.addEventListener('click', function () {
+      box.hidden = true;
+      if (A.uploadsInFlight > 0) { A.fail(new Error('الصورة لسه بتترفع. استنى لما يظهر «تم الرفع ✓» وبعدين احفظ.'), box); return; }
+      var input = {
+        kind: kind.value, slug: slug.value.trim().toLowerCase(), title: title.input.value, shortTitle: shortTitle.input.value,
+        summary: summary.input.value, body: body.input.value, cover: cover.value(), gallery: tokens(gallery),
+        startAt: startAt.value(), endAt: endAt.value(), locationName: locationName.input.value, locationUrl: locationUrl.value.trim(),
+        theme: theme.value, terms: terms.input.value, enabled: enabled.input.checked, partner: partner.input.checked ? 'bug' : '', home: home.value(),
+        booking: hasBooking.input.checked ? {
+          opensAt: opensAt.value(), closesAt: closesAt.value(), capacity: capacity.value, perBookingMax: perBooking.value,
+          collectNames: collectNames.input.checked, pricing: pricing.value(),
+          payment: { mode: payMode.value ? payMode.value() : (installments.hidden ? 'full' : 'installments'), minFirst: minFirst.value, finalDueAt: finalDueAt.value() }
+        } : null,
+        servants: servantRows.filter(function (s) { return s.on.input.checked; }).map(function (s) {
+          return { id: s.id, methods: s.boxes.filter(function (b) { return b.input.checked; }).map(function (b) { return b.input.dataset.key; }) };
+        })
+      };
+      A.withBusy(save, A.call('apiEventSave', isNew ? null : ev.id, input)).then(function () {
+        A.dirty = false;
+        A.closeSheet();
+        refreshState();
+        A.toast(isNew ? 'اتعملت ✓ — راجع وانشر علشان تظهر' : 'اتحفظت ✓ — هتظهر في الموقع بعد ما تنشر');
+        if (P.reloadEvents) P.reloadEvents();
+      }).catch(function (error) { A.fail(error, box); });
+    });
+
+    var controls = isNew ? [] : [
+      el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () { previewSheet('event', ev.id, ev.title); } }, icon('eye'), 'معاينة'),
+      el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function (e) {
+        A.withBusy(e.currentTarget, A.call('apiEventArchive', ev.id, !ev.archived)).then(function () {
+          A.dirty = false;
+          A.closeSheet();
+          refreshState();
+          A.toast(ev.archived ? 'رجعت من الأرشيف' : 'اتأرشفت — بعد النشر الرابط هيقول إنها مش متاحة');
+          if (P.reloadEvents) P.reloadEvents();
+        }).catch(function (error) { A.fail(error, box); });
+      } }, icon(ev.archived ? 'retry' : 'download'), ev.archived ? 'رجّع من الأرشيف' : 'أرشيف'),
+      ev.live || ev.publishedAt ? null : el('button', { class: 'btn btn--small btn--danger', type: 'button', onclick: function (e) {
+        var button = e.currentTarget;
+        A.confirm({ tone: 'danger', title: 'تمسح «' + ev.title + '»؟', message: 'الفعالية لسه متنشرتش، فالمسح آمن: هتتمسح هي وكارت الصفحة الرئيسية.', confirmLabel: 'امسح', cancelLabel: 'لأ' }).then(function (ok) {
+          if (!ok) return;
+          A.withBusy(button, A.call('apiEventDelete', ev.id)).then(function () {
+            A.dirty = false;
+            A.closeSheet();
+            refreshState();
+            A.toast('اتمسحت');
+            if (P.reloadEvents) P.reloadEvents();
+          }).catch(function (error) { A.fail(error, box); });
+        });
+      } }, icon('trash'), 'مسح')
+    ].filter(Boolean);
+
+    A.dirty = false;
+    A.openSheet(isNew ? 'فعالية جديدة' : 'تعديل: ' + ev.title, [
+      box,
+      controls.length ? el('div', { class: 'actions' }, controls) : null,
+      el('div', { class: 'form' },
+        A.field('النوع', kind, 'اليوم الترفيهي نوع لوحده (مش رحلة)'),
+        title.node,
+        A.field('الرابط', slug, ev.live || ev.publishedAt ? 'الرابط مبيتغيرش بعد النشر' : 'حروف إنجليزي صغيرة وأرقام وشرطة ← الموقع/events/الرابط/'),
+        shortTitle.node,
+        summary.node,
+        body.node,
+        cover.node,
+        gallery.node,
+        el('div', { class: 'row' }, A.field('بتبدأ', startAt.node), A.field('بتخلص', endAt.node)),
+        locationName.node,
+        A.field('لينك المكان', locationUrl, 'اختياري: جوجل ماب'),
+        A.field('الشكل', theme),
+        terms.node,
+        el('fieldset', { class: 'fieldset' }, el('legend', { text: 'الحجز' }), hasBooking.node, bookingBox),
+        partner.node,
+        home.node,
+        enabled.node)
+    ], A.sheetFooter(save), {
+      lock: isNew ? null : A.editLock('event', ev.id, 'الفعالية «' + ev.title + '»', function () { A.closeSheet(); if (P.openEvent) P.openEvent(ev.id); })
+    });
+
+  }
+
+
+  /* =======================================================
+     SERVANTS AND PAYMENT METHODS
+  ======================================================= */
+
+  A.views.servants = function () {
+
+    if (!official()) return [recoveryNotice()];
+
+    var body = el('div', { 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--line' }));
+    var methodsBody = el('div');
+    var box = A.errorBox();
+    var reply = null;
+
+    function load() {
+      return A.call('apiServants').then(function (r) {
+        reply = r;
+        if (!body.isConnected) return;
+        draw(r);
+      }).catch(function (error) {
+        if (!body.isConnected) return;
+        body.replaceChildren();
+        A.fail(error, box);
+      });
+    }
+
+    function draw(r) {
+      A.fill(body, r.servants.length ? el('ul', { class: 'list' }, r.servants.map(function (s) {
+        return A.listItem({
+          icon: 'user',
+          image: s.image || null,
+          title: s.name,
+          sub: [s.role, s.phone].filter(Boolean).join(' · '),
+          off: !s.active,
+          chips: [s.publicWa ? A.chip('رقمه ظاهر للزوار', 'ok') : A.chip('رقمه مش ظاهر', 'off'), s.active ? null : A.chip('موقوف', 'off')].filter(Boolean),
+          controls: [
+            el('span', { class: 'spacer' }),
+            el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function (e) {
+              A.withBusy(e.currentTarget, A.call('apiServantSetActive', s.id, !s.active)).then(function (next) { reply = next; draw(next); })
+                .catch(function (error) { A.fail(error, box); });
+            } }, s.active ? 'إيقاف' : 'تفعيل'),
+            A.editButton(s.name, function () { servantEditor(s); })
+          ]
+        });
+      })) : el('div', { class: 'empty-state' },
+        el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('users')),
+        el('p', { class: 'empty-state__title', text: 'مفيش خدام لسه' }),
+        el('p', { class: 'empty-state__text', text: 'زوّد الخدام المسؤولين عن الفعاليات وفرق الخدمة.' })));
+      drawMethods(r.methods);
+    }
+
+    function drawMethods(methods) {
+      var rows = methods.map(function (m) {
+        var label = A.textInput(m.label, { max: 24 });
+        var proof = A.checkbox('محتاج إثبات دفع', !!m.needsProof);
+        var on = A.checkbox('متاحة', m.active !== false);
+        return { key: m.key, label: label, proof: proof, on: on, node: el('div', { class: 'pages-method' }, el('code', { text: m.key }), A.field('الاسم', label), proof.node, on.node) };
+      });
+      var save = el('button', { class: 'btn btn--small btn--primary', type: 'button', text: 'حفظ طرق الدفع', onclick: function () {
+        A.withBusy(save, A.call('apiPayMethodsSave', rows.map(function (r) { return { key: r.key, label: r.label.value, needsProof: r.proof.input.checked, active: r.on.input.checked }; })))
+          .then(function (next) { A.dirty = false; reply = next; drawMethods(next.methods); A.toast('اتحفظت ✓'); })
+          .catch(function (error) { A.fail(error, box); });
+      } });
+      A.fill(methodsBody, rows.map(function (r) { return r.node; }).concat([el('div', { class: 'actions' }, save)]));
+    }
+
+    function servantEditor(s) {
+      var isNew = !s;
+      s = s || { active: true };
+      var ebox = A.errorBox();
+      var name = A.counted('الاسم', s.name, 60, 'مثلاً: مينا عادل', { required: true });
+      var phone = A.textInput(s.phone, { ltr: true, inputmode: 'tel', placeholder: '01012345678' });
+      var role = A.counted('الدور', s.role, 40, 'اختياري، مثلاً: مسؤول الرحلة');
+      var image = A.imagePicker(s.image || '', { label: 'الصورة', hint: 'اختياري' });
+      var publicWa = A.checkbox('رقمه يظهر للزوار على واتساب', !!s.publicWa, 'بموافقته بس: بيظهر زرار واتساب في صفحات الفعاليات والفرق');
+      var active = A.checkbox('متاح', s.active !== false);
+      var note = A.counted('ملاحظة (للأدمن بس)', s.note, 200, 'مبتظهرش في الموقع');
+      var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
+      save.addEventListener('click', function () {
+        ebox.hidden = true;
+        A.withBusy(save, A.call('apiServantSave', isNew ? null : s.id, { name: name.input.value, phone: phone.value, role: role.input.value, image: image.value(), publicWa: publicWa.input.checked, active: active.input.checked, note: note.input.value }))
+          .then(function () { A.dirty = false; A.closeSheet(); A.toast('اتحفظ ✓'); load(); })
+          .catch(function (error) { A.fail(error, ebox); });
+      });
+      A.dirty = false;
+      A.openSheet(isNew ? 'خادم جديد' : 'تعديل: ' + s.name, [
+        ebox,
+        el('div', { class: 'form' }, name.node, A.field('رقم الموبايل', phone, 'بيتكتب بأي شكل (010… أو +20…)'), role.node, image.node, publicWa.node, active.node, note.node)
+      ], A.sheetFooter(save), { lock: isNew ? null : A.editLock('servant', s.id, 'الخادم «' + s.name + '»', function () { A.closeSheet(); load(); }) });
+    }
+
+    load();
+
+    return [
+      A.card('الخدام', 'قائمة واحدة للخدام: المسؤولين عن الحجز في الفعاليات، وفرق الخدمة في آخر صفحات الخدمة. رقم الخادم مبيظهرش للزوار إلا بموافقته.',
+        el('div', { class: 'actions' }, el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { servantEditor(null); } }, icon('plus'), 'خادم جديد')),
+        box,
+        body),
+      A.card('طرق الدفع', 'اللي الخدام بيقبلوها (كاش، إنستاباي، محفظة…). أرقام الحسابات نفسها مبتتنشرش: الخادم بيبعتها على واتساب.', methodsBody)
+    ];
+
+  };
+
+})();
+</script>

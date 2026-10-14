@@ -60,7 +60,9 @@ var SESSION_PARK_SECONDS = 45;       // a parked session (its page reloading) ke
 var SESSION_RESUME_SECONDS = 7200;    // a parked or quiet session can be picked up again by its tab this long
 var LOCK_KINDS = ['sessions', 'news', 'games', 'notifications', 'activities', 'types', 'links', 'contacts', 'sections', 'settings', 'media',
   // competitions (docs/COMPETITIONS.md §10): the builder, a participant, a store item
-  'comp', 'participant', 'shopitem'];
+  'comp', 'participant', 'shopitem',
+  // service pages, events, servants (docs/EVENTS.md §10)
+  'page', 'event', 'servant'];
 
 
 /* =========================================================

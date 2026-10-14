@@ -10,7 +10,8 @@
  *
  * Registered by assets/js/push.js when a visitor turns notifications on.
  * Payload (FCM wraps it as { data: {...}, from, ... }):
- *   { id, title, body, url: '/#news/<id>' | '/#meeting' | '/' | '/competition/<slug>/' | '/points/', image?, tag }
+ *   { id, title, body, url: '/#news/<id>' | '/#meeting' | '/' | '/competition/<slug>/' | '/points/'
+ *                          | '/events/<slug>/' | '/<slug>/' (a service page), image?, tag }
  * A tap opens /index.html#… : the installed site app's own address (its
  * scope is /index.html, so the admin app at /admin/ is a separate app on
  * Android — manifest.webmanifest). '/' and '/index.html' are the same page.
@@ -24,9 +25,14 @@ const SITE_NAME = 'أسرة البابا أثناسيوس - سفاجا';
 const ICON = '/assets/img/icon-192.png';
 const BADGE = '/assets/img/push-badge.png';
 const HOME = '/index.html';
-const ROUTE = /^#(?:notifications|meeting|points|(?:news|game|activity)\/[\w-]{1,60}|competition\/[a-z0-9-]{2,40})$/;
-/* the site's other pages a tap may open: a competition (the engine) and «نقاطي» */
-const PAGE = /^\/(?:competition\/[a-z0-9-]{2,40}|points)\/$/;
+const ROUTE = /^#(?:notifications|meeting|points|(?:news|game|activity)\/[\w-]{1,60}|competition\/[a-z0-9-]{2,40}|(?:event|page)\/[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9]))$/;
+/* the site's other pages a tap may open: a competition (the engine), «نقاطي», an event,
+   or a service page at the top level (docs/EVENTS.md §17.8; assets/js/page/model.js) */
+const FIXED_PAGE = /^\/(?:competition\/[a-z0-9-]{2,40}|points|events\/[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9]))\/$/;
+const TOP_PAGE = /^\/([a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9]))\/$/;
+const RESERVED = ['admin', 'assets', 'media', 'points', 'competition', 'events', 'pages', 'privacy', 'terms',
+  'review', 'tools', 'docs', 'tests', 'apps-script', 'index', 'preview', 'new', 'card-athanasios'];
+const PAGE = { test: path => FIXED_PAGE.test(path) || (TOP_PAGE.test(path) && !RESERVED.includes(TOP_PAGE.exec(path)[1])) };
 const IMAGE = /^\/media\/[\w./-]{1,200}\.(?:webp|jpe?g|png)$/;
 
 
@@ -46,7 +52,8 @@ function safeUrl(value) {
     if (url.origin !== self.location.origin) return HOME;
     if (PAGE.test(url.pathname)) return url.pathname;
     if (url.pathname !== '/' && url.pathname !== HOME) return HOME;
-    return ROUTE.test(url.hash) ? HOME + url.hash : HOME;
+    const top = /^#page\/(.+)$/.exec(url.hash);
+    return ROUTE.test(url.hash) && !(top && RESERVED.includes(top[1])) ? HOME + url.hash : HOME;
   }
   catch {
     return HOME;

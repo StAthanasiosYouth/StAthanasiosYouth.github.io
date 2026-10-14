@@ -11,6 +11,7 @@
 
 import { LINK_ICON_NAMES } from './icons.js';
 import { setServerTime } from './schedule.js';
+import { pageSlug, eventSlug, eventHideAt, EVENT_KINDS, cleanPartners } from './page/model.js';
 
 const CACHE_KEY = 'athanasios.content.v1';
 
@@ -242,6 +243,91 @@ function cleanProgram(raw) {
 }
 
 
+/* =========================================================
+   SERVICE PAGES AND EVENTS (docs/EVENTS.md §17.7)
+========================================================= */
+
+const version = value => (typeof value === 'string' && /^[\w.-]{1,40}$/.test(value) ? value : '');
+
+/* a booking window: { opensAt, closesAt } ('' = from publish / until the start); null = no booking */
+function cleanWindow(raw) {
+
+  return raw && typeof raw === 'object' ? { opensAt: dateTime(raw.opensAt), closesAt: dateTime(raw.closesAt) } : null;
+
+}
+
+
+/* the published service pages: /<slug>/ */
+function cleanPages(raw, partnerOf) {
+
+  const seen = new Set();
+
+  return list(raw)
+    .map(p => ({ id: cleanId(p.id), slug: pageSlug(p.slug), title: text(p.title, 60), tagline: text(p.tagline, 120), cover: cleanImage(p.cover), v: version(p.v), ...partnerOf(p.partner) }))
+    .filter(p => p.slug && p.title && !seen.has(p.slug) && seen.add(p.slug));
+
+}
+
+
+/* the published events: /events/<slug>/ */
+function cleanEvents(raw, partnerOf) {
+
+  const seen = new Set();
+
+  return list(raw)
+    .map(e => {
+      const startAt = dateTime(e.startAt);
+      const endAt = dateTime(e.endAt);
+      return {
+        id: cleanId(e.id),
+        slug: eventSlug(e.slug),
+        kind: EVENT_KINDS.includes(e.kind) ? e.kind : '',
+        kindLabel: text(e.kindLabel, 30),
+        title: text(e.title, 80),
+        shortTitle: text(e.shortTitle, 30),
+        summary: text(e.summary, 200),
+        cover: cleanImage(e.cover),
+        startAt,
+        endAt: endAt > startAt ? endAt : '',
+        booking: cleanWindow(e.booking),
+        v: version(e.v),
+        ...partnerOf(e.partner)
+      };
+    })
+    .filter(e => e.slug && e.title && e.startAt && !seen.has(e.slug) && seen.add(e.slug));
+
+}
+
+
+/*
+ * A card's link: { page } | { event } | {} (none). A card that names a page
+ * or an event that isn't published (or names two links at once) is dropped
+ * (null), so the home page never links to a missing page.
+ */
+function linkOf(a, pageKeys, eventKeys) {
+
+  const has = value => typeof value === 'string' && value !== '';
+  const named = [has(a.page), has(a.event), has(a.competition)].filter(Boolean).length;
+
+  if (!has(a.page) && !has(a.event)) return {};
+  if (named > 1) return null;
+  if (has(a.page)) return pageKeys.has(pageSlug(a.page)) ? { page: a.page } : null;
+
+  return eventKeys.has(eventSlug(a.event)) ? { event: a.event } : null;
+
+}
+
+
+/* an event card leaves the page 12 h after the event at the latest (the publisher sets it too) */
+function eventUntil(until, event) {
+
+  const last = event ? eventHideAt(event) : '';
+
+  return last && (!until || last < until) ? last : until;
+
+}
+
+
 /* sessions, news, games, notifications (schema 2; empty for schema 1) */
 function cleanHub(raw) {
 
@@ -299,6 +385,16 @@ function cleanHub(raw) {
     }))
     .filter(g => g.id && g.title && g.url && g.startAt && g.endAt);
 
+  // partners (docs/EVENTS.md §12): a page, an event or a card names one by its key
+  const partners = cleanPartners(raw.partners);
+  const partnerOf = key => (typeof key === 'string' && Object.prototype.hasOwnProperty.call(partners, key) ? { partner: key } : {});
+
+  // service pages and events (docs/EVENTS.md §17.7; index only, each has its own JSON)
+  const pages = cleanPages(raw.pages, partnerOf);
+  const events = cleanEvents(raw.events, partnerOf);
+  const pageKeys = new Set(pages.map(p => p.slug));
+  const eventKeys = new Set(events.map(e => e.slug));
+
   const notifications = list(raw.notifications)
     .map(n => {
       const t = n.target;
@@ -310,6 +406,9 @@ function cleanHub(raw) {
       else if (t && t.kind === 'competition' && compSlug(t.slug || t.id)) target = { kind: 'competition', slug: compSlug(t.slug || t.id) };
       // «نقاطي»: its own page, points/ (same tab)
       else if (t && t.kind === 'points') target = { kind: 'points' };
+      // a service page / an event: its own page (same tab), only while it is published
+      else if (t && t.kind === 'page' && pageKeys.has(t.slug)) target = { kind: 'page', slug: t.slug };
+      else if (t && t.kind === 'event' && eventKeys.has(t.slug)) target = { kind: 'event', slug: t.slug };
       return {
         id: cleanId(n.id),
         type: NOTIFICATION_TYPES.includes(n.type) ? n.type : 'general',
@@ -339,6 +438,8 @@ function cleanHub(raw) {
   const activities = list(raw.activities)
     .map(a => {
       const url = a.cta && safeHttps(a.cta.url);
+      const linked = linkOf(a, pageKeys, eventKeys);
+      if (!linked) return null;
       return {
         id: cleanId(a.id),
         type: cleanId(a.type),
@@ -347,20 +448,25 @@ function cleanHub(raw) {
         subtitle: text(a.subtitle, 140),
         description: text(a.description, 1500),
         image: cleanImage(a.image),
-        cta: url ? { label: text(a.cta.label, 24) || 'التفاصيل', url } : null,
+        cta: url && !linked.page && !linked.event ? { label: text(a.cta.label, 24) || 'التفاصيل', url } : null,
         location: text(a.location, 120),
         startAt: dateTime(a.startAt),
         endAt: dateTime(a.endAt),
         visibleFrom: dateTime(a.visibleFrom),
-        visibleUntil: dateTime(a.visibleUntil),
+        visibleUntil: linked.event ? eventUntil(dateTime(a.visibleUntil), events.find(e => e.slug === linked.event)) : dateTime(a.visibleUntil),
         // a linked competition: the card's button opens competition/<slug>/ (same tab)
         competition: compSlug(a.competition),
-        // its button's words (from the competition; the card has no cta of its own)
-        ctaLabel: compSlug(a.competition) ? text(a.ctaLabel, 24) : '',
+        // its button's words (from the competition / page / event; the card has no cta of its own)
+        ctaLabel: compSlug(a.competition) || linked.page || linked.event ? text(a.ctaLabel, 24) : '',
+        // a service page or an event: the card opens <slug>/ or events/<slug>/ (same tab)
+        ...(linked.page && { page: linked.page, watch: a.watch === true }),
+        ...(linked.event && { event: linked.event, booking: cleanWindow(a.booking) }),
+        // «بإشراف» a partner of content.partners (the chip on the card)
+        ...partnerOf(a.partner),
         ...display(a)
       };
     })
-    .filter(a => a.id && a.title && a.section && typeKeys.has(a.type));
+    .filter(a => a && a.id && a.title && a.section && typeKeys.has(a.type));
 
   // the published competitions (index only; each has its own comp.json)
   const seen = new Set();
@@ -376,7 +482,7 @@ function cleanHub(raw) {
     }))
     .filter(c => c.slug && c.title && !seen.has(c.slug) && seen.add(c.slug));
 
-  return { sessions, news, games, notifications, activities, types, competitions, points: cleanPoints(raw.points) };
+  return { sessions, news, games, notifications, activities, types, competitions, pages, events, partners, points: cleanPoints(raw.points) };
 
 }
 

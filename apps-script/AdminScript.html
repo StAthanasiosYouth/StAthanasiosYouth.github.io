@@ -2964,12 +2964,20 @@
       // the cards in the site's «المسابقات» section (a competition's own card follows it: AdminComp)
       { key: 'competitions', label: 'كروت المسابقات' },
       { key: 'activities', label: 'الفعاليات' },
+      // the cards of «خدماتنا» (a service page's own card follows it: AdminPages)
+      { key: 'services', label: 'كروت خدماتنا' },
       { key: 'notifications', label: 'الإشعارات' }
     ] },
     // «المسابقات» (AdminComp*.html, docs/COMPETITIONS.md): the competitions themselves; short: the phone dock's word
     { key: 'comps', label: 'المسابقات', short: 'مسابقات', icon: 'trophy', subs: [
       { key: 'comps', label: 'المسابقات' },
       { key: 'compsettings', label: 'الإعدادات' }
+    ] },
+    // «الصفحات والفعاليات» (AdminPages.html, docs/EVENTS.md): service pages, events, servants
+    { key: 'pages', label: 'الصفحات والفعاليات', short: 'صفحات', icon: 'theatre', subs: [
+      { key: 'svcpages', label: 'صفحات الخدمة' },
+      { key: 'events', label: 'الفعاليات' },
+      { key: 'servants', label: 'الخدام' }
     ] },
     { key: 'page', label: 'الصفحة', icon: 'layers', subs: [
       { key: 'layout', label: 'ترتيب الصفحة' },
@@ -2992,6 +3000,10 @@
     games: ['content', 'games'],
     competitions: ['content', 'competitions'],
     activities: ['content', 'activities'],
+    services: ['content', 'services'],
+    svcpages: ['pages', 'svcpages'],
+    events: ['pages', 'events'],
+    servants: ['pages', 'servants'],
     links: ['page', 'links'],
     layout: ['page', 'layout'],
     location: ['page', 'location'],
@@ -3074,6 +3086,8 @@
     dock.style.setProperty('--count', String(A.AREAS.length));
     dock.classList.toggle('dock--dense', A.AREAS.length > 6);
     dock.style.setProperty('--active', String(A.AREAS.indexOf(current)));
+    // eight areas («الصفحات والفعاليات»): the dock goes a little wider and its words a little smaller
+    dock.classList.toggle('dock--crowded', A.AREAS.length > 7);
 
     subs.hidden = !current.subs;
     subs.replaceChildren.apply(subs, (current.subs || []).map(function (s) {

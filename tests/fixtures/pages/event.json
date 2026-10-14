@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "v": "ev1a2b3c4d",
+  "id": "evt-trip0001",
+  "slug": "ain-sokhna-trip",
+  "kind": "trip",
+  "kindLabel": "رحلة",
+  "title": "رحلة العين السخنة",
+  "shortTitle": "العين السخنة",
+  "summary": "يوم بحر ولعب وصلاة مع بعض",
+  "body": "هنتحرك من الكنيسة الساعة ٦ الصبح، ونرجع بالليل.\n\nالرحلة شاملة الأتوبيس والغدا.",
+  "theme": "azure",
+  "cover": { "src": "media/2026/img-af6b0c28.webp", "thumb": "media/2026/img-af6b0c28-480.webp", "w": 1122, "h": 1402, "alt": "بوستر الرحلة" },
+  "gallery": [
+    { "src": "media/2026/img-c1308156.webp", "thumb": "media/2026/img-c1308156-480.webp", "w": 1600, "h": 900, "alt": "البحر" },
+    { "type": "video", "src": "media/2026/vid-0e05ae88.mp4", "poster": "media/2026/vid-0e05ae88-480.webp", "w": 270, "h": 480, "alt": "من رحلة السنة اللي فاتت", "start": 0, "end": 0 }
+  ],
+  "startAt": "2026-10-24T06:00",
+  "endAt": "2026-10-24T22:00",
+  "location": { "name": "العين السخنة", "url": "https://maps.google.com/?q=Ain+Sokhna" },
+  "terms": "الحجز بيتأكد بعد الدفع.\nالفلوس مش بترجع بعد يوم ٢٠ أكتوبر.",
+  "partner": null,
+  "booking": {
+    "online": false,
+    "opensAt": "2026-10-10T19:00",
+    "closesAt": "2026-10-21T23:00",
+    "capacity": 120,
+    "perBookingMax": 6,
+    "collectNames": false,
+    "pricing": { "mode": "group", "categories": [
+      { "key": "applicant", "label": "الحاجز", "group": "adult", "price": 1500, "seat": true, "min": 1, "max": 1, "note": "" },
+      { "key": "adult", "label": "فرد إضافي", "group": "adult", "price": 1500, "seat": true, "min": 0, "max": 6, "note": "" },
+      { "key": "child", "label": "طفل", "group": "child", "price": 800, "seat": true, "min": 0, "max": 6, "note": "من ٤ لـ ١٢ سنة" },
+      { "key": "infant", "label": "أقل من ٤ سنين", "group": "child", "price": 0, "seat": false, "min": 0, "max": 4, "note": "" }
+    ] },
+    "payment": { "mode": "installments", "minFirst": 500, "finalDueAt": "2026-10-20T23:00" },
+    "methods": [
+      { "key": "cash", "label": "كاش", "icon": "" },
+      { "key": "instapay", "label": "إنستاباي", "icon": "" }
+    ],
+    "servants": [
+      { "id": "srv-mina0001", "name": "مينا عادل", "role": "أمين الرحلة", "image": null, "wa": "https://wa.me/201001234567", "methods": ["cash", "instapay"] },
+      { "id": "srv-marc0003", "name": "مرقس فادي", "role": "", "image": null, "wa": null, "methods": ["cash"] }
+    ]
+  },
+  "publishedAt": "2026-10-10T20:00"
+}

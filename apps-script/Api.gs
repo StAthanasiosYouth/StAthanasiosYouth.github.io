@@ -172,7 +172,29 @@ function apiFunctions_() {
     apiSeasonClosePreview: apiSeasonClosePreview,
     apiSeasonClose: apiSeasonClose,
     apiAgeRules: apiAgeRules,
-    apiAgeRulesSave: apiAgeRulesSave
+    apiAgeRulesSave: apiAgeRulesSave,
+    // service pages, events, servants (Pages.gs, docs/EVENTS.md §11 / §17)
+    apiPages: apiPages,
+    apiPage: apiPage,
+    apiPageSave: apiPageSave,
+    apiPageSetEnabled: apiPageSetEnabled,
+    apiPageArchive: apiPageArchive,
+    apiPageDelete: apiPageDelete,
+    apiPageMediaSave: apiPageMediaSave,
+    apiPageMediaOrder: apiPageMediaOrder,
+    apiPageMediaDelete: apiPageMediaDelete,
+    apiPagePreview: apiPagePreview,
+    apiEvents: apiEvents,
+    apiEvent: apiEvent,
+    apiEventSave: apiEventSave,
+    apiEventSetEnabled: apiEventSetEnabled,
+    apiEventArchive: apiEventArchive,
+    apiEventDelete: apiEventDelete,
+    apiServants: apiServants,
+    apiServantSave: apiServantSave,
+    apiServantSetActive: apiServantSetActive,
+    apiPayMethodsSave: apiPayMethodsSave,
+    apiHomeOrder: apiHomeOrder
   };
 
 }

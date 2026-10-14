@@ -591,6 +591,12 @@ function publishNow_(expectedRevision) {
         Object.keys(compFiles).forEach(function (path) { files[path] = compFiles[path]; });
       }
 
+      // <slug>/ and events/<slug>/: stub + page.json / event.json, or the withdrawn JSON (Pages.gs)
+      if (built.pages && typeof pagesPublishFiles_ === 'function') {
+        var pageFiles = pagesPublishFiles_(built.pages, config.siteUrl, pagesNeedFiles_(built.pages) ? pagesShellText_() : '');
+        Object.keys(pageFiles).forEach(function (path) { files[path] = pageFiles[path]; });
+      }
+
       // images used by the content that aren't on the site yet
       var media = mediaForPublish_(built.media);
 
@@ -615,6 +621,10 @@ function publishNow_(expectedRevision) {
 
       if (comps) {
         compAfterCommit_(comps, stamp);
+      }
+
+      if (built.pages && typeof pagesAfterCommit_ === 'function') {
+        pagesAfterCommit_(built.pages, stamp);
       }
 
       var props = PropertiesService.getScriptProperties();

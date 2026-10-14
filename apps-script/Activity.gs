@@ -98,13 +98,15 @@ var ACTIVITY_ACTIONS = ['create', 'update', 'delete', 'archive', 'unarchive', 'e
 
 var ACTIVITY_TYPES = ['sessions', 'news', 'games', 'activities', 'notifications', 'types', 'links', 'sections', 'contacts',
   'settings', 'media', 'site', 'admins', 'data', 'session',
-  'competition', 'participant', 'points', 'shopitem', 'redemption'];
+  'competition', 'participant', 'points', 'shopitem', 'redemption',
+  // service pages, events, servants (Pages.gs): never a phone in `changes`
+  'page', 'event', 'servant'];
 
 /* small, repeatable actions: merged into the admin's last row for the same thing */
 var ACTIVITY_MERGEABLE = ['update', 'reorder', 'settings', 'enable', 'disable', 'media.update', 'live.stage', 'review', 'code.view'];
 
 /* the content people see: create/delete notify now, edits with a cooldown */
-var ACTIVITY_CONTENT = ['sessions', 'news', 'games', 'activities', 'notifications', 'competition'];
+var ACTIVITY_CONTENT = ['sessions', 'news', 'games', 'activities', 'notifications', 'competition', 'page', 'event'];
 var ACTIVITY_PAGE_PARTS = ['links', 'sections', 'contacts'];
 
 /*
@@ -130,11 +132,15 @@ var ACTIVITY_SECTIONS = {
   media: ['media'],
   site: ['site', 'data'],
   admins: ['admins', 'session'],
-  competitions: ['competition', 'participant', 'points', 'shopitem', 'redemption']
+  competitions: ['competition', 'participant', 'points', 'shopitem', 'redemption'],
+  pages: ['page', 'event', 'servant']
 };
 
 /* how each kind of thing is named: the (title), a new one, several */
 var ACTIVITY_NOUNS = {
+  page: { one: 'صفحة الخدمة', fresh: 'صفحة خدمة جديدة', many: 'صفحات الخدمة' },
+  event: { one: 'الفعالية', fresh: 'فعالية جديدة', many: 'الفعاليات' },
+  servant: { one: 'الخادم', fresh: 'خادم جديد', many: 'الخدام' },
   competition: { one: 'المسابقة', fresh: 'مسابقة جديدة', many: 'المسابقات' },
   participant: { one: 'المشترك', fresh: 'مشترك جديد', many: 'المشتركين' },
   points: { one: 'نقاط', fresh: 'نقاط', many: 'النقاط' },

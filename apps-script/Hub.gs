@@ -766,6 +766,31 @@ function buildHub_(draft, ctx) {
       where = 'الفعاليات: ' + title;
     }
 
+    // a service page's / an event's home card (Pages.gs homeSync_, docs/EVENTS.md §1.2):
+    // it follows its owner and opens <slug>/ or events/<slug>/; an owner that is
+    // not in this publish hides it (so the page never links to a missing page)
+    var ownerKind = contentLine_(row.page) ? 'page' : contentLine_(row.event) ? 'event' : '';
+    var owner = null;
+
+    if (ownerKind && !linked) {
+      owner = ctx.pages ? ctx.pages.byId[contentLine_(row[ownerKind])] || null : null;
+      if (!owner || owner.kind !== ownerKind) {
+        if (contentBool_(row.enabled)) {
+          ctx.warn(where, 'الكارت مستخبي لأن ' + (ownerKind === 'page' ? 'الصفحة' : 'الفعالية') + ' بتاعته مش منشورة');
+        }
+        return;
+      }
+      title = owner.title;
+      where = 'الفعاليات: ' + title;
+      linked = {
+        title: owner.title,
+        subtitle: owner.subtitle,
+        bannerId: owner.imageId,
+        startAt: owner.startAt,
+        endAt: owner.endAt
+      };
+    }
+
     if (!type) {
       ctx.error(where, 'النوع "' + contentLine_(row.type) + '" مش موجود أو مقفول في شيت Types');
       return;
@@ -794,7 +819,7 @@ function buildHub_(draft, ctx) {
     var startAt = linked ? linked.startAt : dateTime(where, row.startAt, false, 'بيبدأ');
     var endAt = linked ? linked.endAt : dateTime(where, row.endAt, true, 'بيخلص');
     var visibleFrom = dateTime(where, row.visibleFrom, false, 'يظهر من');
-    var visibleUntil = dateTime(where, row.visibleUntil, true, 'يختفي بعد') || endAt;
+    var visibleUntil = owner ? owner.visibleUntil : (dateTime(where, row.visibleUntil, true, 'يختفي بعد') || endAt);
 
     if (startAt && endAt && startAt >= endAt) {
       ctx.error(where, 'ميعاد البداية بعد النهاية');
@@ -815,10 +840,10 @@ function buildHub_(draft, ctx) {
       section: type.section,
       title: ctx.limited(where, title, 80, 'العنوان'),
       subtitle: ctx.limited(where, linked ? linked.subtitle : contentLine_(row.subtitle), 140, 'السطر القصير'),
-      description: ctx.limited(where, contentText_(row.description).replace(/\n{3,}/g, '\n\n'), 1500, 'التفاصيل'),
+      description: owner ? '' : ctx.limited(where, contentText_(row.description).replace(/\n{3,}/g, '\n\n'), 1500, 'التفاصيل'),
       image: image(where, linked && linked.bannerId ? linked.bannerId : row.image),
       cta: url ? { label: ctx.limited(where, contentLine_(row.ctaLabel) || type.ctaDefault || 'التفاصيل', 24, 'نص الزرار'), url: url } : null,
-      location: ctx.limited(where, contentLine_(row.location), 120, 'المكان'),
+      location: ctx.limited(where, owner ? owner.location : contentLine_(row.location), 120, 'المكان'),
       startAt: startAt,
       endAt: endAt,
       visibleFrom: visibleFrom,
@@ -829,9 +854,18 @@ function buildHub_(draft, ctx) {
     };
 
     // the page makes its button: same tab, competition/<slug>/ (its label from the competition)
-    if (linked) {
+    if (linked && !owner) {
       card.competition = linked.slug;
       card.ctaLabel = linked.ctaLabel;
+    }
+
+    // same tab, <slug>/ or events/<slug>/; the label: the admin's, or automatic in the page (§17.7)
+    if (owner) {
+      card[ownerKind] = owner.slug;
+      card.ctaLabel = ctx.limited(where, contentLine_(row.ctaLabel), 24, 'نص الزرار');
+      if (ownerKind === 'event') card.booking = owner.booking || null;
+      if (ownerKind === 'page') card.watch = !!owner.watch;
+      if (owner.partner) card.partner = owner.partner;
     }
 
     activities.push(card);
@@ -905,9 +939,19 @@ function buildHub_(draft, ctx) {
     var target = null;
     var match = /^(news|game|activity):([\w-]{1,60})$/.exec(targetText);
     var compMatch = /^competition:([a-z0-9-]{2,40})$/.exec(targetText);
+    var pageMatch = /^(page|event):([a-z0-9-]{2,40})$/.exec(targetText);
 
     if (!targetText) {
       target = null;
+    }
+    else if (pageMatch) {
+      // a service page / an event page: { kind: 'page' | 'event', slug } → <slug>/ or events/<slug>/
+      var listed = ctx.pages ? (pageMatch[1] === 'page' ? ctx.pages.pages : ctx.pages.events) : [];
+      if (!listed.some(function (p) { return p.slug === pageMatch[2]; })) {
+        ctx.warn(where, (pageMatch[1] === 'page' ? 'الصفحة' : 'الفعالية') + ' بتاعته مش في النشر ده، فالإشعار ده مش هيظهر');
+        return;
+      }
+      target = { kind: pageMatch[1], slug: pageMatch[2] };
     }
     else if (compMatch) {
       // a competition's page: { kind: 'competition', slug } → /competition/<slug>/
@@ -963,7 +1007,7 @@ function buildHub_(draft, ctx) {
       target = { kind: 'url', url: safeHttpsUrl(targetText) };
     }
     else {
-      ctx.error(where, 'الوجهة لازم تكون meeting أو news:id أو game:id أو competition:slug أو points أو لينك https');
+      ctx.error(where, 'الوجهة لازم تكون meeting أو news:id أو game:id أو competition:slug أو page:slug أو event:slug أو points أو لينك https');
     }
 
     notifications.push({

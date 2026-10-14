@@ -8,6 +8,8 @@
  *   #meeting         the next meeting (topic, speaker, upcoming)
  *   #competition/<slug>  another page: competition/<slug>/ (the engine)
  *   #points          another page: points/ («نقاطي»)
+ *   #event/<slug>    another page: events/<slug>/ (an event)
+ *   #page/<slug>     another page: <slug>/ (a service page)
  *
  * In-app taps push a history entry, so the phone's back button closes the
  * sheet. A link opened from outside (share, notification) is cleaned up
@@ -15,6 +17,7 @@
  */
 
 import { closeSheet } from './sheet.js';
+import { pageHref, eventHref } from './page/model.js';
 
 let handler = () => {};
 let appDepth = 0;
@@ -37,7 +40,8 @@ const SLUG = /^[a-z0-9-]{2,40}$/;
 
 /**
  * Hashes that are other pages of the site, relative to the site root:
- * #competition/<slug> → 'competition/<slug>/', #points → 'points/', else ''.
+ * #competition/<slug> → 'competition/<slug>/', #points → 'points/',
+ * #event/<slug> → 'events/<slug>/', #page/<slug> → '<slug>/', else ''.
  */
 export function pageForHash(hash) {
 
@@ -45,6 +49,10 @@ export function pageForHash(hash) {
 
   if (competition) return SLUG.test(competition[1]) ? `competition/${competition[1]}/` : '';
   if (/^#points\/?$/.test(hash || '')) return 'points/';
+
+  const entry = /^#(event|page)\/([^/?#]*)\/?$/.exec(hash || '');
+
+  if (entry) return entry[1] === 'event' ? eventHref(entry[2]) : pageHref(entry[2]);
 
   return '';
 

@@ -1,0 +1,159 @@
+{
+  "schema": 1,
+  "v": "evbug00001",
+  "id": "evt-bugcamp1",
+  "slug": "bug-camp",
+  "kind": "funday",
+  "kindLabel": "يوم ترفيهي",
+  "title": "يوم ترفيهي للأطفال",
+  "shortTitle": "يوم الأطفال",
+  "summary": "يوم بحر ولعب وصلاة مع بعض",
+  "body": "هنتحرك من الكنيسة الساعة ٦ الصبح، ونرجع بالليل.\n\nالرحلة شاملة الأتوبيس والغدا.",
+  "theme": "emerald",
+  "cover": {
+    "src": "media/2026/img-af6b0c28.webp",
+    "thumb": "media/2026/img-af6b0c28-480.webp",
+    "w": 1122,
+    "h": 1402,
+    "alt": "بوستر الرحلة"
+  },
+  "gallery": [
+    {
+      "src": "media/2026/img-c1308156.webp",
+      "thumb": "media/2026/img-c1308156-480.webp",
+      "w": 1600,
+      "h": 900,
+      "alt": "البحر"
+    },
+    {
+      "type": "video",
+      "src": "media/2026/vid-0e05ae88.mp4",
+      "poster": "media/2026/vid-0e05ae88-480.webp",
+      "w": 270,
+      "h": 480,
+      "alt": "من رحلة السنة اللي فاتت",
+      "start": 0,
+      "end": 0
+    }
+  ],
+  "startAt": "2026-10-24T06:00",
+  "endAt": "2026-10-24T22:00",
+  "location": {
+    "name": "العين السخنة",
+    "url": "https://maps.google.com/?q=Ain+Sokhna"
+  },
+  "terms": "الحجز بيتأكد بعد الدفع.\nالفلوس مش بترجع بعد يوم ٢٠ أكتوبر.",
+  "partner": {
+    "key": "bug",
+    "name": "Brave Under Grace – B.U.G.",
+    "short": "B.U.G.",
+    "logo": {
+      "src": "assets/img/partners/bug-logo-720.webp",
+      "thumb": "assets/img/partners/bug-logo-360.webp",
+      "w": 720,
+      "h": 305,
+      "alt": "شعار Brave Under Grace – B.U.G."
+    },
+    "mark": {
+      "src": "assets/img/partners/bug-mark-96.webp",
+      "w": 306,
+      "h": 96,
+      "alt": "B.U.G."
+    },
+    "url": null
+  },
+  "booking": {
+    "online": false,
+    "opensAt": "2026-10-10T19:00",
+    "closesAt": "2026-10-21T23:00",
+    "capacity": 120,
+    "perBookingMax": 6,
+    "collectNames": false,
+    "pricing": {
+      "mode": "group",
+      "categories": [
+        {
+          "key": "applicant",
+          "label": "الحاجز",
+          "group": "adult",
+          "price": 1500,
+          "seat": true,
+          "min": 1,
+          "max": 1,
+          "note": ""
+        },
+        {
+          "key": "adult",
+          "label": "فرد إضافي",
+          "group": "adult",
+          "price": 1500,
+          "seat": true,
+          "min": 0,
+          "max": 6,
+          "note": ""
+        },
+        {
+          "key": "child",
+          "label": "طفل",
+          "group": "child",
+          "price": 800,
+          "seat": true,
+          "min": 0,
+          "max": 6,
+          "note": "من ٤ لـ ١٢ سنة"
+        },
+        {
+          "key": "infant",
+          "label": "أقل من ٤ سنين",
+          "group": "child",
+          "price": 0,
+          "seat": false,
+          "min": 0,
+          "max": 4,
+          "note": ""
+        }
+      ]
+    },
+    "payment": {
+      "mode": "installments",
+      "minFirst": 500,
+      "finalDueAt": "2026-10-20T23:00"
+    },
+    "methods": [
+      {
+        "key": "cash",
+        "label": "كاش",
+        "icon": ""
+      },
+      {
+        "key": "instapay",
+        "label": "إنستاباي",
+        "icon": ""
+      }
+    ],
+    "servants": [
+      {
+        "id": "srv-mina0001",
+        "name": "مينا عادل",
+        "role": "أمين الرحلة",
+        "image": null,
+        "wa": "https://wa.me/201001234567",
+        "methods": [
+          "cash",
+          "instapay"
+        ]
+      },
+      {
+        "id": "srv-marc0003",
+        "name": "مرقس فادي",
+        "role": "",
+        "image": null,
+        "wa": null,
+        "methods": [
+          "cash"
+        ]
+      }
+    ]
+  },
+  "publishedAt": "2026-10-10T20:00"
+}

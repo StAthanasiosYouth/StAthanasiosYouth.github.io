@@ -20,6 +20,7 @@ import { particles } from './motion.js';
 import { startFeel } from './feel.js';
 import { play, soundEnabled, setSoundEnabled } from './sound.js';
 import { watchInstall } from './install.js';
+import { isEntryPath } from './page/model.js';
 
 let current = null;
 let shownKey = '';
@@ -365,8 +366,8 @@ function startPush() {
       if (!data || data.type !== 'athanasios:open' || typeof data.url !== 'string') return;
       const url = new URL(data.url, location.href);
       if (url.origin !== location.origin) return;
-      // a competition / «نقاطي»: its own page, in this tab
-      if (/^\/(competition\/[a-z0-9-]{2,40}|points)\/$/.test(url.pathname)) {
+      // a competition / «نقاطي» / a service page / an event: its own page, in this tab
+      if (/^\/(competition\/[a-z0-9-]{2,40}|points)\/$/.test(url.pathname) || isEntryPath(url.pathname)) {
         location.assign(url.href);
         return;
       }

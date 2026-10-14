@@ -1108,10 +1108,19 @@ function buildPublicContent(draft, options) {
     : null;
 
 
+  /* ---------- service pages and events (Pages.gs; docs/EVENTS.md §17) ---------- */
+
+  var pages = draft.pages && typeof pagesBuildPublic_ === 'function'
+    ? pagesBuildPublic_(draft.pages, { media: mediaById, video: videoById, error: error, warn: warn, now: now,
+      hash: options.hash || (typeof sha256Hex_ === 'function' ? sha256Hex_ : null) })
+    : null;
+
+
   /* ---------- hub: sessions, news, games, notifications (Hub.gs) ---------- */
 
   var hub = buildHub_(draft, {
     competitions: competitions,
+    pages: pages,
     points: !!(draft.competitions && draft.competitions.points),
     now: now,
     error: error,
@@ -1143,6 +1152,11 @@ function buildPublicContent(draft, options) {
 
   // a competition's banner, icon, question and explanation pictures (compStart shows them)
   (competitions ? competitions.media : []).forEach(function (id) {
+    if (usedMedia.indexOf(id) === -1) usedMedia.push(id);
+  });
+
+  // the pictures and clips of service pages and events (their own JSON files show them)
+  (pages ? pages.media : []).forEach(function (id) {
     if (usedMedia.indexOf(id) === -1) usedMedia.push(id);
   });
   var banners = Object.create(null);
@@ -1193,6 +1207,20 @@ function buildPublicContent(draft, options) {
     content.competitions = competitions.index;
   }
 
+  // service pages and events (docs/EVENTS.md §17.7): same rule, `v` = each one's hash
+  if (pages && pages.pages.length) {
+    content.pages = pages.pages;
+  }
+
+  if (pages && pages.events.length) {
+    content.events = pages.events;
+  }
+
+  // the partners those pages / events are «بإشراف» (the home cards' chip; §12)
+  if (pages && pages.partners && Object.keys(pages.partners).length) {
+    content.partners = pages.partners;
+  }
+
   // «نقاطي / المتجر» (§18.4): only while the registry and the wallet are on
   var points = draft.competitions && draft.competitions.points;
 
@@ -1229,7 +1257,9 @@ function buildPublicContent(draft, options) {
     // Media ids the published content shows (their files go in the commit)
     media: usedMedia,
     // live definitions, withdrawn ones, files to write (CompPublish.gs); null without competitions
-    competitions: competitions
+    competitions: competitions,
+    // the same for service pages and events (Pages.gs); null without them
+    pages: pages
   };
 
 }

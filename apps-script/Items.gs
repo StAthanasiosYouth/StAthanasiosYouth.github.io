@@ -533,6 +533,16 @@ var ITEM_VALIDATORS = {
     else if (target === 'points') {
       // «نقاطي / المتجر» (/points/): nothing to look up
     }
+    else if (/^(page|event):[a-z0-9-]{2,40}$/.test(target)) {
+      // a service page / an event page (Pages.gs draft: the slug must exist)
+      var pagesDraft = typeof pagesDraft_ === 'function' ? pagesDraft_() : null;
+      var pageKind = target.split(':')[0];
+      var pageSlug = target.slice(pageKind.length + 1);
+      var pageRows = pagesDraft ? (pageKind === 'page' ? pagesDraft.pages : pagesDraft.events) : [];
+      if (!pageRows.some(function (p) { return p.slug === pageSlug; })) {
+        problems.push('الإشعار بيشاور على ' + (pageKind === 'page' ? 'صفحة' : 'فعالية') + ' مش موجودة');
+      }
+    }
     else if (safeHttpsUrl(target)) {
       target = safeHttpsUrl(target);
     }
@@ -843,6 +853,8 @@ function apiDeleteItem(kind, key) {
     throw appError_('النوع ده عليه فعاليات، ومينفعش يتمسح.', 'غيّر نوعها أو امسحها الأول، أو اقفل النوع بدل ما تمسحه.');
   }
 
+  homeRefuseLinked_(kind, key, 'يتمسح');
+
   return mutate_(kind + '.delete', key, function () {
 
     // someone else is editing it right now (Presence.gs; API mode only)
@@ -883,6 +895,8 @@ function apiSetItemArchived(kind, key, archived) {
   if (!spec.archive) {
     throw new Error('النوع ده مبيتأرشفش');
   }
+
+  homeRefuseLinked_(kind, key, 'يتأرشف');
 
   return mutate_(kind + (archived ? '.archive' : '.unarchive'), key, function () {
 
@@ -940,7 +954,7 @@ function apiDuplicateItem(kind, key) {
 
     TABLES[spec.table].columns.forEach(function (column) {
       // dates start empty; a copy is never linked to the original's competition
-      if (/^(publishAt|expireAt|visibleFrom|visibleUntil|startAt|endAt|competition)$/.test(column)) return;
+      if (/^(publishAt|expireAt|visibleFrom|visibleUntil|startAt|endAt|competition|page|event)$/.test(column)) return;
       copy[column] = row[column];
     });
 
@@ -987,10 +1001,15 @@ function apiSetItemEnabled(kind, key, enabled) {
       throw new Error(spec.label + ' مش موجود');
     }
 
-    var record = { enabled: enabled === true, updatedAt: nowStamp_() };
-    record[spec.key] = key;
+    // a service page's / an event's card: its «إظهار في الصفحة الرئيسية» follows (Pages.gs)
+    var linked = spec.table === 'Activities' && typeof homeSetShowFromCard_ === 'function' &&
+      (row.page || row.event) && homeSetShowFromCard_(row, enabled === true);
 
-    upsertRow_(spec.table, spec.key, record);
+    if (!linked) {
+      var record = { enabled: enabled === true, updatedAt: nowStamp_() };
+      record[spec.key] = key;
+      upsertRow_(spec.table, spec.key, record);
+    }
 
     var note = itemActivity_(kind, row, key);
     note.action = enabled === true ? 'enable' : 'disable';

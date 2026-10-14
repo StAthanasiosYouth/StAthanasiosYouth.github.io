@@ -207,12 +207,13 @@ var TABLES = {
   },
 
   Activities: {
-    columns: ['id', 'enabled', 'type', 'title', 'subtitle', 'description', 'image', 'ctaLabel', 'url', 'location', 'startAt', 'endAt', 'visibleFrom', 'visibleUntil', 'order', 'archived', 'updatedAt', 'display', 'displayMobile', 'competition'],
+    columns: ['id', 'enabled', 'type', 'title', 'subtitle', 'description', 'image', 'ctaLabel', 'url', 'location', 'startAt', 'endAt', 'visibleFrom', 'visibleUntil', 'order', 'archived', 'updatedAt', 'display', 'displayMobile', 'competition', 'page', 'event'],
     bool: ['enabled', 'archived'],
-    text: ['id', 'type', 'title', 'subtitle', 'description', 'image', 'ctaLabel', 'url', 'location', 'startAt', 'endAt', 'visibleFrom', 'visibleUntil', 'updatedAt', 'display', 'displayMobile', 'competition'],
+    text: ['id', 'type', 'title', 'subtitle', 'description', 'image', 'ctaLabel', 'url', 'location', 'startAt', 'endAt', 'visibleFrom', 'visibleUntil', 'updatedAt', 'display', 'displayMobile', 'competition', 'page', 'event'],
     // added by the first save that sets them (Items.gs lazyColumns_), never an upgrade step;
-    // competition: the linked competition's id (CompAdmin.gs compSyncCard_)
-    lazy: ['display', 'displayMobile', 'competition'],
+    // competition: the linked competition's id (CompAdmin.gs compSyncCard_);
+    // page / event: the service page's / event's id (Pages.gs homeSync_, docs/EVENTS.md §1.2)
+    lazy: ['display', 'displayMobile', 'competition', 'page', 'event'],
     notes: {
       id: 'معرّف ثابت (تلقائي)',
       enabled: 'ظاهر',
@@ -233,7 +234,9 @@ var TABLES = {
       updatedAt: 'آخر تعديل (تلقائي)',
       display: 'شكل العرض: فاضي = تلقائي، compact = كارت مدمج، side = صورة كبيرة جنب الكلام، banner = بانر عريض، stack = صورة فوق والكلام تحت',
       displayMobile: 'شكل العرض على الموبايل: فاضي = زي الكمبيوتر، auto = تلقائي، أو compact / side / banner / stack',
-      competition: 'المسابقة المربوطة بالكارت (تلقائي من صفحة المسابقة؛ العنوان والصورة والمواعيد بتيجي منها)'
+      competition: 'المسابقة المربوطة بالكارت (تلقائي من صفحة المسابقة؛ العنوان والصورة والمواعيد بتيجي منها)',
+      page: 'صفحة الخدمة المربوطة بالكارت (تلقائي من «صفحات الخدمة»)',
+      event: 'الفعالية المربوطة بالكارت (تلقائي من «الفعاليات»)'
     }
   },
 
@@ -615,7 +618,9 @@ function readDraftNow_() {
     activities: readOptionalTable_('Activities').map(strip),
     types: readOptionalTable_('Types').map(strip),
     // the competitions spreadsheet (CompStore.gs, through its cache; null = none yet)
-    competitions: typeof compDraft_ === 'function' ? compDraft_() : null
+    competitions: typeof compDraft_ === 'function' ? compDraft_() : null,
+    // service pages and events (Pages.gs, same spreadsheet; null = none yet)
+    pages: typeof pagesDraft_ === 'function' ? pagesDraft_() : null
   };
 
 }

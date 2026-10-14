@@ -17,6 +17,7 @@ var REVIEW_GROUPS = [
   { key: 'games', title: 'الألعاب', icon: 'star' },
   { key: 'competitions', title: 'المسابقات', icon: 'trophy' },
   { key: 'activities', title: 'الفعاليات', icon: 'calendar' },
+  { key: 'services', title: 'خدماتنا', icon: 'theatre' },
   { key: 'notifications', title: 'الجرس', icon: 'bell' },
   { key: 'page', title: 'شكل الصفحة', icon: 'layers' },
   { key: 'links', title: 'اللينكات', icon: 'link' },
@@ -222,12 +223,33 @@ function describeChanges(previous, next, now, info) {
     if (!typeLabels[t.key]) typeLabels[t.key] = t.label;
   });
 
+  // service pages and event pages themselves (docs/EVENTS.md §17.7: v changes with any public change)
+  diffById_(previous.pages || [], next.pages || [], function (p) { return p.id; }, {
+    added: function (p) { add('services', 'add', 'صفحة خدمة جديدة: ' + p.title + ' (/' + p.slug + '/)'); },
+    removed: function (p) { add('services', 'remove', 'صفحة خدمة هتتقفل: ' + p.title); },
+    changed: function (before, after) {
+      if (!same(before, after)) add('services', 'change', 'تعديل صفحة خدمة: ' + after.title);
+    }
+  });
+
+  diffById_(previous.events || [], next.events || [], function (e) { return e.id; }, {
+    added: function (e) { add('activities', 'add', (e.kindLabel || 'فعالية') + ' جديدة: ' + e.title, later(e.startAt).replace(/^يظهر/, 'تبدأ')); },
+    removed: function (e) { add('activities', 'remove', 'صفحة فعالية هتتقفل: ' + e.title); },
+    changed: function (before, after) {
+      if (!same(before, after)) add('activities', 'change', 'تعديل صفحة فعالية: ' + after.title);
+    }
+  });
+
   items('activities',
-    function (a) { return a.section === 'competitions' ? 'competitions' : 'activities'; },
+    function (a) { return a.section === 'competitions' ? 'competitions' : a.page ? 'services' : 'activities'; },
     function (a) {
       // the card of a competition (the competition itself is listed above)
       if (a.competition) {
         return { added: 'كارت مسابقة جديد', removed: 'كارت مسابقة هيختفي', changed: 'تعديل كارت مسابقة' };
+      }
+      // the home card of a service page / an event (the page itself is listed above)
+      if (a.page || a.event) {
+        return { added: 'كارت جديد في الصفحة الرئيسية', removed: 'كارت هيختفي من الصفحة الرئيسية', changed: 'تعديل كارت في الصفحة الرئيسية' };
       }
       if (a.section === 'competitions') {
         return { added: 'مسابقة جديدة', removed: 'مسابقة هتختفي', changed: 'تعديل مسابقة' };

@@ -15,7 +15,8 @@
 
   var SECTION_INFO = {
     competitions: { title: 'المسابقات', one: 'مسابقة', add: 'مسابقة جديدة', icon: 'trophy', hint: 'الكروت اللي في قسم «المسابقات» في الموقع. كارت بلينك برّه (زي فورم) بيتعمل هنا؛ المسابقة بأسئلة وتصحيح بتتعمل من «المسابقات» وكارتها بيظهر هنا لوحده. الزرار بيشتغل بس من ميعاد البداية لميعاد النهاية.' },
-    activities: { title: 'الفعاليات', one: 'فعالية', add: 'فعالية جديدة', icon: 'calendar', hint: 'رحلات، مسرحيات، مؤتمرات، أيام روحية، حفلات… كل نوع ليه شكله. الزرار (تسجيل مثلاً) بيشتغل أي وقت.' }
+    activities: { title: 'الفعاليات', one: 'فعالية', add: 'فعالية جديدة', icon: 'calendar', hint: 'رحلات، مسرحيات، مؤتمرات، أيام روحية، حفلات… كل نوع ليه شكله. الزرار (تسجيل مثلاً) بيشتغل أي وقت. الفعالية اللي ليها صفحة وحجز بتتعمل من «الصفحات والفعاليات» وكارتها بيظهر هنا لوحده.' },
+    services: { title: 'خدماتنا', one: 'كارت', add: 'كارت جديد', icon: 'theatre', hint: 'كروت قسم «خدماتنا» في الصفحة الرئيسية. صفحة الخدمة (زي المسرح الأسود) بتتعمل من «الصفحات والفعاليات» وكارتها بيظهر هنا لوحده.' }
   };
 
   function info(sectionKey) {
@@ -172,10 +173,12 @@
 
   A.views.competitions = function () { return itemsView('competitions'); };
   A.views.activities = function () { return itemsView('activities'); };
+  A.views.services = function () { return itemsView('services'); };
 
   function activityItem(item, sectionKey) {
 
     if (item.competition) return linkedItem(item, sectionKey);
+    if (item.page || item.event) return ownedItem(item, sectionKey);
 
     var enabled = bool(item.enabled);
     var type = typeByKey(item.type) || {};
@@ -233,6 +236,64 @@
     row.classList.add('item--linked');
     row.dataset.competition = item.competition;
     return row;
+
+  }
+
+  /*
+   * A service page's / an event's home card (Activities.page / .event, made
+   * by «إظهار في الصفحة الرئيسية», Pages.gs homeSync_): its words, picture
+   * and dates follow the page at publish, so here it can only be shown /
+   * hidden (the page's setting follows) and opened at its page.
+   */
+  function ownerOpen(item, primary) {
+
+    var isPage = !!item.page;
+    var go = function () {
+      if (!A.pages) return;
+      if (isPage) A.pages.focusPage = item.page; else A.pages.focusEvent = item.event;
+      A.go('pages', isPage ? 'svcpages' : 'events');
+    };
+
+    return el('button', { class: 'btn btn--small' + (primary ? ' btn--primary' : ''), type: 'button', 'aria-label': (isPage ? 'افتح الصفحة: ' : 'افتح الفعالية: ') + (item.title || ''),
+      onclick: function () { if (primary) A.closeSheet().then(function (closed) { if (closed) go(); }); else go(); } },
+    icon(isPage ? 'theatre' : 'calendar'), isPage ? 'افتح الصفحة' : 'افتح الفعالية');
+
+  }
+
+  function ownedItem(item, sectionKey) {
+
+    var enabled = bool(item.enabled);
+    var type = typeByKey(item.type) || {};
+    var row = A.listItem({
+      icon: type.icon || info(sectionKey).icon,
+      image: item.image,
+      title: item.title,
+      sub: item.subtitle,
+      off: !enabled,
+      chips: [A.visibilityChip(enabled, item.visibleFrom, item.visibleUntil), A.chip(item.page ? 'بيتعدل من صفحة الخدمة' : 'بيتعدل من الفعالية', 'info')],
+      controls: [
+        A.toggleItem('activities', item.id, enabled).node,
+        el('span', { class: 'spacer' }),
+        ownerOpen(item, false)
+      ]
+    });
+
+    row.classList.add('item--linked');
+    return row;
+
+  }
+
+  function ownedEditor(item) {
+
+    A.dirty = false;
+    A.openSheet('كارت ' + (item.page ? 'صفحة: ' : 'فعالية: ') + (item.title || ''), [
+      el('p', { class: 'note', text: 'الكارت ده بيتعمل لوحده من ' + (item.page ? 'صفحة الخدمة' : 'الفعالية') + ': العنوان والسطر القصير والصورة' + (item.event ? ' والمواعيد' : '') +
+        ' بيتاخدوا منها وقت النشر، وزراره بيفتحها في نفس التاب. بتخفيه أو تغيّر زراره وشكله من «الصفحة الرئيسية» جوه ' + (item.page ? 'الصفحة' : 'الفعالية') + '، وترتيبه من «رتّب الكروت».' }),
+      el('dl', { class: 'kv' },
+        el('dt', { text: 'العنوان' }), el('dd', { text: item.title || '—' }),
+        item.event ? el('dt', { text: 'المواعيد' }) : null,
+        item.event ? el('dd', { text: (item.startAt ? A.formatWall(item.startAt) : '—') + (item.endAt ? ' ← ' + A.formatWall(item.endAt) : '') }) : null)
+    ], [ownerOpen(item, true), el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })]);
 
   }
 
@@ -443,6 +504,12 @@
     // a competition's own card is edited from the competition
     if (item && item.competition) {
       linkedEditor(item);
+      return;
+    }
+
+    // a service page's / an event's card is edited from its page (AdminPages)
+    if (item && (item.page || item.event)) {
+      ownedEditor(item);
       return;
     }
 

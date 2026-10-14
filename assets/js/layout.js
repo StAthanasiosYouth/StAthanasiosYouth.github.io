@@ -15,7 +15,7 @@ export const SECTION_THEMES = ['gold', 'ember', 'azure', 'rose', 'emerald', 'nig
 
 const BEFORE_LINKS = [
   ['meeting', 'meeting'], ['featured', 'featured'], ['news', 'news'], ['games', 'games'],
-  ['competitions', 'items'], ['activities', 'items'], ['location', 'location']
+  ['competitions', 'items'], ['activities', 'items'], ['services', 'items'], ['location', 'location']
 ];
 
 const AFTER_LINKS = [['contacts', 'contacts'], ['support', 'support'], ['share', 'share']];
