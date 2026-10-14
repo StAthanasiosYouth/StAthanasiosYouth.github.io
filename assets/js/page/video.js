@@ -2,9 +2,12 @@
  * VIDEO SHEET (docs/EVENTS.md §8.3, §17.9)
  *
  * A <dialog> with a plain <video controls playsinline preload="metadata">
- * at the clip's own shape (full width, at most 80 dvh), then the title, the
- * text and «شاهد المسرحية كاملة» when the card has a full link (new tab).
- *  - playback starts only on the visitor's tap (no autoplay, sound is theirs)
+ * at the clip's own shape (full width, at most ~2/3 of the screen), then the
+ * title, the text and «شاهد المسرحية كاملة» when the card has a full link (new tab).
+ *  - the clip starts as the sheet opens (the visitor's tap on the cover):
+ *    with sound when the browser allows it, else muted (the controls unmute);
+ *    the next / previous clip starts the same way; closing the sheet or
+ *    leaving the tab stops it (nothing plays on in the background)
  *  - start / end: it starts at start and pauses at end
  *  - prev / next: the buttons, the arrow keys, a swipe (RTL: the next one
  *    comes from the left, so ← / a swipe to the right goes forward)
@@ -99,6 +102,28 @@ export function createVideoSheet({ mediaUrl, announce = () => {}, history: useHi
     if (video.currentTime < clip.start - 0.5 || (clip.end && video.currentTime >= clip.end - 0.05)) video.currentTime = clip.start;
   });
 
+  // another tab, a locked phone: the clip stops (the visitor starts it again)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && dialog.open) video.pause();
+  });
+
+  /*
+   * Play now: the tap that opened the sheet lets it start with sound; a
+   * browser that still refuses (no tap: a #v/ link, a strict policy) gets it
+   * muted, which is always allowed. A newer clip meanwhile wins (AbortError).
+   */
+  function autoplay() {
+    const wanted = clip;
+    video.muted = false;
+    const attempt = video.play();
+    if (!attempt || typeof attempt.catch !== 'function') return;
+    attempt.catch(error => {
+      if (!dialog.open || clip !== wanted || (error && error.name === 'AbortError')) return;
+      video.muted = true;
+      video.play().catch(() => {});
+    });
+  }
+
 
   /* ---------- showing a card ---------- */
 
@@ -109,6 +134,7 @@ export function createVideoSheet({ mediaUrl, announce = () => {}, history: useHi
     clip = card.clip;
 
     video.pause();
+    video.preload = 'auto';
     const fragment = clip.start || clip.end ? `#t=${clip.start}${clip.end ? `,${clip.end}` : ''}` : '';
     video.poster = mediaUrl(card.cover ? card.cover.src : clip.poster);
     video.src = `${mediaUrl(clip.src)}${fragment}`;
@@ -138,6 +164,7 @@ export function createVideoSheet({ mediaUrl, announce = () => {}, history: useHi
   function go(delta) {
     if (!dialog.open || cards.length < 2) return;
     load(index + delta);
+    autoplay();
     if (useHistory) history.replaceState(history.state, '', `#v/${cards[index].id}`);
     announce(`${arabicDigits(index + 1)} من ${arabicDigits(cards.length)}: ${cards[index].title}`);
   }
@@ -170,6 +197,7 @@ export function createVideoSheet({ mediaUrl, announce = () => {}, history: useHi
     }
     document.documentElement.classList.add('has-vsheet');
     close.focus({ preventScroll: true });
+    autoplay();
     return true;
 
   }

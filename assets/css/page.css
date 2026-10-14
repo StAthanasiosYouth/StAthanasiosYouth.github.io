@@ -600,9 +600,28 @@ img, svg, video {
   max-height: min(72svh, 680px);
 }
 
+/* a tablet: a little lower */
+@media (min-width: 640px) {
+  .phero--banner .phero__media {
+    max-height: min(62vh, 560px);
+    max-height: min(62svh, 560px);
+  }
+}
+
 .phero--banner .phero__img {
   position: relative;
   object-fit: contain;
+}
+
+/* the picture's box is the picture itself (its placeholder colour stays
+   under it): what the banner's shape leaves over is the blurred copy */
+.phero--banner .phero__img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: 100%;
+  aspect-ratio: var(--ar, 16 / 9);
+  margin-inline: auto;
 }
 
 .phero--banner .phero__scrim {
@@ -692,9 +711,19 @@ img, svg, video {
     height: min(70vh, 640px);
   }
 
+  /* a computer: never a wall of picture — at most half the screen's
+     height; a banner wider than that sits whole in the middle, its blurred
+     copy filling the sides */
   .phero--banner .phero__media {
     aspect-ratio: var(--ar, 16 / 9);
-    max-height: min(72vh, 680px);
+    max-height: min(50vh, 520px);
+    max-height: min(50svh, 520px);
+  }
+
+  /* its side edges melt into the blurred copy (no hard seam) */
+  .phero--banner .phero__img {
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
   }
 
   .phero--banner .phero__text {

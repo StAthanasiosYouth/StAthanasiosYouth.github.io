@@ -283,7 +283,7 @@ const sheetState = page => page.evaluate(() => {
   };
 });
 
-test('video sheet: tap → open (#v/<id>), ready, own shape; next by button and arrow (link cards skipped); Escape and back close it', async () => {
+test('video sheet: tap → open (#v/<id>), plays at once, own shape; next by button and arrow (link cards skipped); Escape and back close it', async () => {
   clock = WINDOW_OPEN;
   const { context, page, problems } = await open('/black-theatre/', PHONE);
   await ready(page);
@@ -297,13 +297,12 @@ test('video sheet: tap → open (#v/<id>), ready, own shape; next by button and 
   assert.match(s.src, /media\/2026\/vid-10486833\.mp4#t=1,4$/);
   assert.equal(s.controls, true);
   assert.equal(s.playsinline, true);
-  assert.equal(s.preload, 'metadata');
+  assert.equal(s.preload, 'auto');
   assert.match(s.poster, /img-c1308156\.webp$/);
-  assert.equal(s.paused, true, 'no autoplay: playback starts on the visitor\'s tap');
   assert.equal(s.focus, 'vsheet__close', 'focus moves into the dialog');
   assert.deepEqual(s.cta, { href: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', target: '_blank', rel: 'noopener' });
-  // ready to play, at its start, at the clip's own (portrait) shape
-  await page.waitForFunction(() => document.querySelector('dialog.vsheet video').readyState >= 1, { timeout: 8000 });
+  // the tap that opened it starts it (sound allowed here), from the clip's start, at its own (portrait) shape
+  await page.waitForFunction(() => { const v = document.querySelector('dialog.vsheet video'); return !v.paused && !v.muted && v.currentTime > 0; }, { timeout: 8000 });
   await page.waitForFunction(() => document.querySelector('dialog.vsheet video').currentTime >= 0.9, { timeout: 4000 });
   const box = await page.$eval('dialog.vsheet video', v => { const r = v.getBoundingClientRect(); return { w: r.width, h: r.height, vh: innerHeight }; });
   assert.ok(Math.abs(box.w / box.h - 270 / 480) < 0.03, `portrait ${box.w}x${box.h}`);
@@ -320,6 +319,12 @@ test('video sheet: tap → open (#v/<id>), ready, own shape; next by button and 
   assert.deepEqual([s.id, s.hash], ['pm-clip0004', '#v/pm-clip0004']);
   await page.keyboard.press('ArrowRight');
   assert.equal((await sheetState(page)).id, 'pm-clip0002');
+  await page.waitForFunction(() => !document.querySelector('dialog.vsheet video').paused, { timeout: 8000 });   // the next one plays too
+
+  // another tab / a locked phone: it stops
+  await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
+  assert.equal((await sheetState(page)).paused, true, 'paused when the page is hidden');
+  await page.evaluate(() => { delete document.hidden; });
 
   // Escape closes it and takes the #v/ entry back off the history
   await page.keyboard.press('Escape');
@@ -327,6 +332,7 @@ test('video sheet: tap → open (#v/<id>), ready, own shape; next by button and 
   await page.waitForFunction(() => location.hash === '');
   s = await sheetState(page);
   assert.equal(s.src, '', 'the clip is unloaded');
+  assert.equal(s.paused, true, 'nothing plays on after closing');
   assert.equal(await page.evaluate(() => document.activeElement.dataset.media), 'pm-clip0001', 'focus back on the card');
 
   // the phone's back button closes it too (and stays on the page)
@@ -354,6 +360,7 @@ test('video sheet: #v/<id> deep link opens on load; closing cleans the address; 
   await page.waitForFunction(() => document.querySelector('dialog.vsheet')?.open);
   const s = await sheetState(page);
   assert.deepEqual([s.id, s.title], ['pm-clip0002', 'الابن الضال']);
+  await page.waitForFunction(() => !document.querySelector('dialog.vsheet video').paused, { timeout: 8000 });   // a link plays too
   await page.click('.vsheet__close');
   await page.waitForFunction(() => !document.querySelector('dialog.vsheet').open);
   assert.equal(new URL(page.url()).hash, '');

@@ -461,7 +461,10 @@ test('page modules: URLs from the module, text only, no storage; page.css self-c
   assert.doesNotMatch(code('model.js'), /document\.|window\.|fetch\(/, 'model.js is pure');
   assert.match(code('main.js'), /event\.source !== window\.parent \|\| event\.origin !== location\.origin/, 'preview: same-origin parent only');
   assert.match(code('video.js'), /preload: 'metadata'/);
-  assert.doesNotMatch(code('video.js'), /autoplay:|\.autoplay|\.play\(\)/, 'the sheet never starts playing by itself');
+  // the clip starts as the sheet opens (no autoplay attribute), muted when sound is refused; a hidden page stops it
+  assert.doesNotMatch(code('video.js'), /autoplay:|\.autoplay\b/, 'no autoplay attribute');
+  assert.match(code('video.js'), /function autoplay\(\)[\s\S]*video\.muted = true;\s*video\.play\(\)/, 'muted retry when sound is refused');
+  assert.match(code('video.js'), /visibilitychange[\s\S]*video\.pause\(\)/, 'a hidden page pauses it');
   const css = read('assets/css/page.css');
   assert.match(css, /@font-face[\s\S]*Aref Ruqaa/);
   assert.doesNotMatch(css, /@import|https?:\/\//, 'no outside requests');
