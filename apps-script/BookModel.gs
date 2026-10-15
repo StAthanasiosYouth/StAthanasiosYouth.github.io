@@ -274,9 +274,11 @@ function bookPeople_(pricing, counts) {
 /**
  * event.json `booking` (§17.6) from the stored spec. servants: the event's
  * [{ id, methods }]; servantRows: the registry by id; methodRows: the
- * payment methods; image(id): a published image or null.
+ * payment methods; image(id): a published image or null. online: the
+ * Script Property BOOKING_ONLINE ('1' = the page takes bookings through the
+ * new backend, worker/BOOKING-API.md); false keeps the Phase 3 display.
  */
-function bookPublicBooking_(spec, servants, servantRows, methodRows, image) {
+function bookPublicBooking_(spec, servants, servantRows, methodRows, image, online) {
 
   if (!spec) return null;
 
@@ -307,10 +309,12 @@ function bookPublicBooking_(spec, servants, servantRows, methodRows, image) {
   var wall = function (stamp) { return stamp ? (contentDateTime_(stamp, false) || '') : ''; };
 
   return {
-    online: false,
+    online: online === true,
     opensAt: wall(spec.opensAt),
     closesAt: spec.closesAt ? (contentDateTime_(spec.closesAt, true) || '') : '',
     capacity: spec.capacity === null || spec.capacity === undefined ? null : spec.capacity,
+    showLeft: spec.showLeft !== false,
+    showLeftBelow: spec.showLeftBelow === undefined || spec.showLeftBelow === null ? 20 : spec.showLeftBelow,
     perBookingMax: spec.perBookingMax || 10,
     collectNames: !!spec.collectNames,
     pricing: {
@@ -324,7 +328,7 @@ function bookPublicBooking_(spec, servants, servantRows, methodRows, image) {
       minFirst: spec.payment && spec.payment.minFirst ? spec.payment.minFirst : 0,
       finalDueAt: spec.payment && spec.payment.finalDueAt ? (contentDateTime_(spec.payment.finalDueAt, true) || '') : ''
     },
-    methods: usedMethods.map(function (k) { return { key: k, label: contentLine_(methods[k].label) || k, icon: contentLine_(methods[k].icon) }; }),
+    methods: usedMethods.map(function (k) { return { key: k, label: contentLine_(methods[k].label) || k, icon: contentLine_(methods[k].icon), needsProof: contentBool_(methods[k].needsProof) }; }),
     servants: people
   };
 

@@ -84,7 +84,8 @@ test('upload refusals: not an image, too big, too many pixels, wrong purpose, te
   assert.equal((await up(new TextEncoder().encode('x'.repeat(100)))).status, 400);
   assert.equal((await up(jpegBytes(800, 600, 950 * 1024))).status, 413);
   assert.equal((await up(jpegBytes(3000, 600))).status, 400);
-  assert.equal((await up(jpegBytes(), {}, 'purpose=booking')).status, 400, 'booking proofs come with the pilot routes');
+  assert.equal((await up(jpegBytes(), {}, 'purpose=booking')).status, 404, 'a booking proof must name a real booking');
+  assert.equal((await up(jpegBytes(), {}, 'purpose=other')).status, 400, 'unknown purpose');
   assert.equal((await up(jpegBytes(), { 'x-test-retention-ms': '1000' })).status, 400, 'short retention: staging only');
   assert.equal(h.env.PROOFS.objects.size, 0);
 });

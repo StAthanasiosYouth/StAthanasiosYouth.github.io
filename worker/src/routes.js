@@ -16,8 +16,14 @@ import { PROOF_MAX_BYTES } from './lib/image.js';
 import { verifySync, syncStampStmt } from './lib/sync.js';
 import { housekeeping } from './scheduled.js';
 import { makeJob } from './jobs.js';
+import { bookState, bookProof, bookSubmit, bookStatus, bookWithdraw } from './book/public.js';
+import {
+  adminModule, adminModuleSet, adminEvents, adminEventRefresh, adminBookings, adminBooking, adminCreate, adminConfirm,
+  adminReject, adminCancel, adminReopen, adminUpdate, adminPaymentAdd, adminPaymentVoid, adminCancelAll, adminSummary, adminExport, proofTarget
+} from './book/admin.js';
+import { rowFromJson, saveRow } from './book/event.js';
 
-export const VERSION = '0.2.0';
+export const VERSION = '0.3.0';
 
 async function health(ctx) {
   return { service: 'athanasios-api', env: ctx.env.ENVIRONMENT || 'unknown', version: VERSION, colo: ctx.colo, time: Date.now() };
@@ -91,21 +97,23 @@ async function proofUpload(ctx) {
   await limit(ctx, 'proof.upload', ctx.actor.email, 60, 60);
   const key = idempotencyKey(ctx.request);
   const purpose = ctx.url.searchParams.get('purpose') || '';
-  if (purpose !== 'test') throw new ApiError('bad', 'purpose');
+  if (!['test', 'booking', 'payment'].includes(purpose)) throw new ApiError('bad', 'purpose');
+  // a booking's proof: kept until the event's end + 60 days (EVENTS.md §10)
+  const target = purpose === 'test' ? null : await proofTarget(ctx, ctx.url.searchParams.get('bookingId'));
 
   // staging only: a short retention so the cleanup can be tested
-  let deleteAfterMs = null;
+  let deleteAfterMs = target ? target.deleteAfterMs : null;
   const testRetention = Number(ctx.request.headers.get('x-test-retention-ms') || 0);
   if (testRetention) {
     if (ctx.env.ENVIRONMENT !== 'staging' || testRetention < 0 || testRetention > TEST_RETENTION_MAX_MS) throw new ApiError('bad', 'x-test-retention-ms');
     deleteAfterMs = Date.now() + testRetention;
   }
 
-  const started = await begin(ctx.env.DB, 'proof.upload:' + ctx.actor.email, key, { sha: await sha256Bytes(ctx.raw), purpose, testRetention });
+  const started = await begin(ctx.env.DB, 'proof.upload:' + ctx.actor.email, key, { sha: await sha256Bytes(ctx.raw), purpose, testRetention, bookingId: target ? target.bookingId : null });
   if (started.replay) return { __replay: started.replay };
   try {
     const out = await putProof(ctx.env, {
-      bytes: ctx.raw, purpose, by: ctx.actor.email, deleteAfterMs,
+      bytes: ctx.raw, purpose, bookingId: target ? target.bookingId : null, by: ctx.actor.email, deleteAfterMs,
       extra: ({ proof, duplicates }) => [
         activityStmt(ctx.env.DB, { actor: ctx.actor.email, actorName: ctx.actor.name, action: 'proof.upload', entityType: 'proof', entityId: proof.id, summary: purpose + ' · ' + proof.bytes + ' bytes' }),
         finishStmt(ctx.env.DB, started.claim, 200, { ok: true, proof, duplicates })
@@ -177,6 +185,15 @@ async function syncAdmins(ctx) {
   return { active: admins.length };
 }
 
+/* STAGING ONLY: store an event definition directly (tests own it; the site is never read for it) */
+async function diagEventFixture(ctx) {
+  if (ctx.env.ENVIRONMENT !== 'staging') throw new ApiError('notfound');
+  const row = rowFromJson(ctx.body, 'fixture');
+  if (row.withdrawn) throw new ApiError('bad', 'withdrawn');
+  await saveRow(ctx.env, row);
+  return { id: row.id, slug: row.slug, online: !!row.online };
+}
+
 export const ROUTES = [
   { method: 'GET', path: '/v1/health', auth: 'public', handler: health },
   { method: 'GET', path: '/v1/health/deep', auth: 'public', handler: healthDeep },
@@ -187,7 +204,34 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/admin/proofs', auth: 'admin', raw: true, maxBytes: PROOF_MAX_BYTES, handler: proofUpload },
   { method: 'GET', path: '/v1/admin/proofs/:id', auth: 'admin', handler: proofRead },
   { method: 'DELETE', path: '/v1/admin/proofs/:id', auth: 'admin', handler: proofDelete },
-  { method: 'POST', path: '/v1/sync/admins', auth: 'sync', raw: true, maxBytes: 16 * 1024, handler: syncAdmins }
+  { method: 'POST', path: '/v1/sync/admins', auth: 'sync', raw: true, maxBytes: 16 * 1024, handler: syncAdmins },
+  { method: 'POST', path: '/v1/admin/diag/event-fixture', auth: 'admin', handler: diagEventFixture },
+
+  // booking — public (docs/EVENTS.md §6, worker/BOOKING-API.md)
+  { method: 'GET', path: '/v1/book/state', auth: 'public', handler: bookState },
+  { method: 'POST', path: '/v1/book/proof', auth: 'public', raw: true, maxBytes: PROOF_MAX_BYTES, handler: bookProof },
+  { method: 'POST', path: '/v1/book/submit', auth: 'public', maxBytes: 16 * 1024, handler: bookSubmit },
+  { method: 'POST', path: '/v1/book/status', auth: 'public', maxBytes: 4 * 1024, handler: bookStatus },
+  { method: 'POST', path: '/v1/book/withdraw', auth: 'public', maxBytes: 4 * 1024, handler: bookWithdraw },
+
+  // booking — admin
+  { method: 'GET', path: '/v1/admin/book/module', auth: 'admin', handler: adminModule },
+  { method: 'POST', path: '/v1/admin/book/module', auth: 'admin', handler: adminModuleSet },
+  { method: 'GET', path: '/v1/admin/book/events', auth: 'admin', handler: adminEvents },
+  { method: 'POST', path: '/v1/admin/book/events/:slug/refresh', auth: 'admin', handler: adminEventRefresh },
+  { method: 'POST', path: '/v1/admin/book/events/:id/cancel-all', auth: 'admin', handler: adminCancelAll },
+  { method: 'GET', path: '/v1/admin/book/bookings', auth: 'admin', handler: adminBookings },
+  { method: 'POST', path: '/v1/admin/book/bookings', auth: 'admin', handler: adminCreate },
+  { method: 'GET', path: '/v1/admin/book/bookings/:id', auth: 'admin', handler: adminBooking },
+  { method: 'POST', path: '/v1/admin/book/bookings/:id/confirm', auth: 'admin', handler: adminConfirm },
+  { method: 'POST', path: '/v1/admin/book/bookings/:id/reject', auth: 'admin', handler: adminReject },
+  { method: 'POST', path: '/v1/admin/book/bookings/:id/cancel', auth: 'admin', handler: adminCancel },
+  { method: 'POST', path: '/v1/admin/book/bookings/:id/reopen', auth: 'admin', handler: adminReopen },
+  { method: 'POST', path: '/v1/admin/book/bookings/:id/update', auth: 'admin', handler: adminUpdate },
+  { method: 'POST', path: '/v1/admin/book/bookings/:id/payments', auth: 'admin', handler: adminPaymentAdd },
+  { method: 'POST', path: '/v1/admin/book/payments/:id/void', auth: 'admin', handler: adminPaymentVoid },
+  { method: 'GET', path: '/v1/admin/book/summary', auth: 'admin', handler: adminSummary },
+  { method: 'GET', path: '/v1/admin/book/export', auth: 'admin', handler: adminExport }
 ];
 
 const COMPILED = ROUTES.map(r => {

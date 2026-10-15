@@ -1861,7 +1861,7 @@ function pagesBuildPublic_(draft, ctx) {
       .map(function (t) { return token(t, where, 'صور الفعالية'); }).filter(Boolean);
     var spec = bookSpecParse_(row.booking);
     var booking = spec ? bookPublicBooking_(spec, pagesJson_(row.servants, []), servantsById, draft.methods || [],
-      function (id) { return image(id, where, 'صورة الخادم'); }) : null;
+      function (id) { return image(id, where, 'صورة الخادم'); }, bookOnline_()) : null;
 
     if (booking && !booking.servants.length) {
       ctx.warn(where, 'مفيش خادم مسؤول متاح للحجز، فالزوار مش هيلاقوا حد يكلموه');
@@ -2060,6 +2060,13 @@ function pageStubHead_(kind, def, siteUrl) {
  * <html … data-kind data-slug data-v>. A page at /<slug>/ sits as deep as
  * the shell (/pages/); an event at /events/<slug>/ is one level deeper.
  */
+/* Script Property BOOKING_ONLINE = '1': published events take bookings online (go-live switch; worker/BOOKING-API.md) */
+function bookOnline_() {
+
+  return PropertiesService.getScriptProperties().getProperty('BOOKING_ONLINE') === '1';
+
+}
+
 function pageStubHtml_(kind, def, siteUrl, shell) {
 
   var source = pageShellOk_(shell) ? shell : PAGE_SHELL_FALLBACK;

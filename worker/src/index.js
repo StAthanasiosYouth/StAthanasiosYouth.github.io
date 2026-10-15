@@ -40,14 +40,16 @@ export async function handle(request, env, ectx, deps = {}) {
     ctx.params = hit.params;
     if (route.auth === 'admin') await requireAdmin(ctx);
     if (route.raw) ctx.raw = await readRaw(request, route.maxBytes);
-    else ctx.body = request.method === 'POST' ? await readJson(request) : null;
+    else ctx.body = request.method === 'POST' ? await readJson(request, route.maxBytes) : null;
     const data = await route.handler(ctx);
     if (data && data.__response) {
       response = data.__response;
     } else if (data && data.__replay) {
       response = json(ctx, data.__replay.body, { status: data.__replay.status, headers: { 'idempotency-replayed': '1' } });
     } else {
-      response = json(ctx, { ok: true, ...data });
+      const cache = data && data.__cache;
+      if (cache) delete data.__cache;
+      response = json(ctx, { ok: true, ...data }, cache ? { cache } : {});
     }
   } catch (err) {
     if (!(err instanceof ApiError)) logLine({ lvl: 'error', rid: ctx.rid, route: url.pathname, err: String(err && err.stack || err).slice(0, 500) });

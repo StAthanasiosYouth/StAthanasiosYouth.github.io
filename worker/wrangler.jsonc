@@ -14,7 +14,8 @@
   "vars": {
     "ENVIRONMENT": "production",
     "ALLOWED_ORIGINS": "https://stathanasiosyouth.github.io",
-    "GOOGLE_CLIENT_ID": "246924773718-38p45gji0ouvi7an4jdjsip3obmk6ve4.apps.googleusercontent.com"
+    "GOOGLE_CLIENT_ID": "246924773718-38p45gji0ouvi7an4jdjsip3obmk6ve4.apps.googleusercontent.com",
+    "SITE_URL": "https://stathanasiosyouth.github.io"
   },
 
   "d1_databases": [
@@ -44,7 +45,8 @@
       "vars": {
         "ENVIRONMENT": "staging",
         "ALLOWED_ORIGINS": "https://stathanasiosyouth.github.io,http://localhost:8080,http://127.0.0.1:8080",
-        "GOOGLE_CLIENT_ID": "246924773718-38p45gji0ouvi7an4jdjsip3obmk6ve4.apps.googleusercontent.com"
+        "GOOGLE_CLIENT_ID": "246924773718-38p45gji0ouvi7an4jdjsip3obmk6ve4.apps.googleusercontent.com",
+        "SITE_URL": "https://stathanasiosyouth.github.io"
       },
       "r2_buckets": [
         { "binding": "PROOFS", "bucket_name": "athanasios-proofs-staging" }

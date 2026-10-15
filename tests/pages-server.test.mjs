@@ -307,6 +307,24 @@ test('an event: stub + event.json under /events/<slug>/, booking shown (online f
   assert.equal(until - end, 12 * 3600000);
 });
 
+test('BOOKING_ONLINE = 1: event.json says online, with the places-left settings and which methods need a proof', () => {
+  const ctx = setup();
+  const { world, call } = ctx;
+  trip(ctx);
+  publish(world, call);
+  const before = json(world.github.files(), 'events/alex-trip/event.json');
+  assert.equal(before.booking.online, false, 'off by default');
+  assert.equal(before.booking.showLeft, true);
+  assert.equal(before.booking.showLeftBelow, 20);
+  assert.deepEqual(before.booking.methods.map(m => [m.key, m.needsProof]), [['cash', false], ['instapay', true]]);
+
+  const on = setup();
+  on.world.properties.set('BOOKING_ONLINE', '1');
+  trip(on);
+  publish(on.world, on.call);
+  assert.equal(json(on.world.github.files(), 'events/alex-trip/event.json').booking.online, true);
+});
+
 test('the event card expires 12 hours after the event ends (the page stays)', () => {
   const ctx = setup();
   const { world, call } = ctx;

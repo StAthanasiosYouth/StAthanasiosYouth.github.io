@@ -166,7 +166,10 @@ export function amountDueOf(b) {
 
 /* { paid, balance, paymentStatus, overdue, refundOwed } */
 export function derive(b, payments, payment, now) {
-  const paid = paidOf(payments);
+  return deriveFromPaid(b, paidOf(payments), payment, now);
+}
+
+export function deriveFromPaid(b, paid, payment, now) {
   const due = amountDueOf(b);
   if (due == null) return { paid, balance: null, paymentStatus: null, overdue: false, refundOwed: Math.max(0, paid) };
   const balance = due - paid;
