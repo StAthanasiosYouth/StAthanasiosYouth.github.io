@@ -7502,3 +7502,48 @@ dialog .toasts[popover] {
     .pages-prices__row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
     .pages-servant__methods { padding-inline-start: 0; }
   }
+
+  /* ---------- «الحجوزات» (AdminBook; only while the Worker's module is on) ---------- */
+  .book-link:empty { display: none; }
+  .book-link--new { color: var(--gold-ink); background: linear-gradient(180deg, var(--gold-hi), var(--gold)); box-shadow: none; }
+  .book-head { display: grid; gap: .7rem; }
+  .book-facts, .book-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .book-row__ref { font-weight: 800; font-size: .86rem; color: var(--gold-hi); unicode-bidi: isolate; }
+  .book-flags { display: grid; gap: .3rem; margin: 0; padding: .6rem 1rem; padding-inline-start: 1.6rem; border-radius: var(--radius-sm); color: var(--warn); background: var(--warn-bg); font-size: .9rem; }
+  .book-money { margin-block: .2rem; }
+  .book-facts-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: .5rem 1rem; margin: 0; }
+  .book-fact { display: grid; gap: 1px; min-width: 0; }
+  .book-fact dt { font-size: .76rem; color: var(--text-3); }
+  .book-fact dd { margin: 0; overflow-wrap: anywhere; }
+  .book-proofs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+  .book-proof { position: relative; display: grid; place-items: center; aspect-ratio: 3 / 4; padding: 0; overflow: hidden; border: 0; border-radius: var(--radius-sm); color: inherit; background: rgba(255, 255, 255, .04); box-shadow: inset 0 0 0 1px var(--line-2); cursor: zoom-in; }
+  .book-proof img { width: 100%; height: 100%; object-fit: cover; }
+  .book-proof .chip { position: absolute; inset-block-end: 6px; inset-inline-start: 6px; }
+  .book-proof__full { display: block; max-width: 100%; max-height: 70dvh; margin-inline: auto; border-radius: var(--radius-sm); }
+  .book-pays { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+  .book-pay { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: var(--radius-sm); background: rgba(255, 255, 255, .028); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06); }
+  .book-pay__main { display: grid; gap: 2px; min-width: 0; }
+  .book-pay__amount { font-weight: 800; color: var(--text); }
+  .book-pay.is-refund .book-pay__amount { color: var(--danger); }
+  .book-pay__what, .book-pay__when { font-size: .82rem; color: var(--text-2); }
+  .book-pay__when { color: var(--text-3); }
+  .book-pay__note { font-size: .84rem; }
+  .book-pay.is-void .book-pay__amount, .book-pay.is-void .book-pay__what { text-decoration: line-through; color: var(--text-3); }
+  .book-pay__void { font-size: .82rem; color: var(--danger); }
+  .book-history { display: grid; gap: .25rem; margin: 0; padding-inline-start: 1.2rem; font-size: .88rem; color: var(--text-2); }
+  .book-warn { display: grid; gap: .6rem; padding: .9rem 1rem; border-radius: var(--radius-sm); background: var(--warn-bg); box-shadow: inset 0 0 0 1px rgba(245, 197, 107, .3); }
+  .book-warn__title { margin: 0; font-weight: 800; color: var(--warn); }
+  .book-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .5rem; }
+  .book-count { display: grid; gap: .25rem; font-size: .88rem; color: var(--text-2); }
+  .book-uploads { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .8rem; }
+  .book-upload { display: inline-flex; align-items: center; gap: .4rem; padding: 4px; padding-inline-end: 8px; border-radius: 12px; background: rgba(255, 255, 255, .04); font-size: .82rem; }
+  .book-upload img { width: 40px; height: 40px; object-fit: cover; border-radius: 8px; }
+  .book-upload.is-error { color: var(--danger); }
+  .book-servants .comp-rank__row { grid-template-columns: minmax(0, 1.6fr) repeat(4, minmax(0, 1fr)); cursor: default; }
+  .book-servants .comp-rank__row > span:first-child { display: grid; min-width: 0; }
+  .book-servants small { font-size: .74rem; color: var(--text-3); }
+  @media (max-width: 480px) {
+    .book-servants .comp-rank__row { grid-template-columns: minmax(0, 1fr) repeat(2, minmax(0, auto)); }
+    .book-servants .comp-rank__row > :nth-child(2), .book-servants .comp-rank__row > :nth-child(3) { display: none; }
+    .book-pay { align-items: flex-start; }
+  }

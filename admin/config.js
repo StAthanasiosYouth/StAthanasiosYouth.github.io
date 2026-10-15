@@ -15,8 +15,10 @@
  *             a small link; never opened by itself.
  *
  * workerUrl   The new backend (Cloudflare Worker, worker/README.md). Today the
- *             page only checks the same Google sign-in against it, quietly
- *             (boot.js checkWorker); nothing else uses it yet. '' = off.
+ *             page checks the same Google sign-in against it, quietly
+ *             (boot.js checkWorker), and «الحجوزات» talks to it (boot.js
+ *             AdminWorker, apps-script/AdminBook.html) — shown only while
+ *             the Worker says the booking module is on. '' = off.
  *
  * While apiUrl or clientId is empty, the page says it isn't set up yet and
  * offers the recovery admin. It never redirects.

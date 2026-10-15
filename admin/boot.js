@@ -13,7 +13,9 @@
  *    (doPost) as text/plain JSON { fn, args, token, sid }, no cookies. The
  *    server verifies the token with Google, checks the allowlist, and that
  *    sid is this account's one live session (apps-script/Presence.gs); this
- *    page decides nothing about access.
+ *    page decides nothing about access. window.AdminWorker: the same for
+ *    the new backend (config.workerUrl, «الحجوزات»): JSON with the Google
+ *    ID token as a Bearer header, retried with the same Idempotency-Key.
  * 4. Before the panel: the gate, always on this same URL, one stage at a
  *    time — loading Google → waiting for the sign-in → asking the server →
  *    drawing the panel. Every stage has a watchdog: "slower than usual"
@@ -1353,6 +1355,158 @@
 
   }
 
+  /*
+   * window.AdminWorker: the new backend's admin routes (worker/BOOKING-API.md),
+   * beside AdminTransport. JSON in and out (or raw bytes: a proof image up, a
+   * proof's bytes down) with this tab's GOOGLE ID token as
+   * `Authorization: Bearer`. A remembered device's token is Apps Script's
+   * own: a device session gets code 'google' («الحجوزات محتاجة دخول بحساب
+   * جوجل») and google() offers the usual Google sign-in over the panel.
+   * Timeouts like AdminTransport. Network errors, timeouts, 5xx and 'busy'
+   * are tried again (backoff) with the SAME Idempotency-Key, so a write is
+   * never made twice. A failure is an Error that A.fail / A.parseError show
+   * as is (the server's Arabic message), carrying code, field, warnings,
+   * left and the whole reply. options.quiet: never asks for a sign-in (the
+   * module check: anything wrong just hides the bookings).
+   */
+  var WORKER_BACKOFF = [700, 2000];
+
+  function workerError(message, hint, extra) {
+
+    extra = extra || {};
+    var error = appError(message, hint, extra.details);
+    error.parsed = { message: message, hint: hint || '', details: extra.details || '', field: extra.field || '' };
+    error.code = error.apiCode = extra.code || '';
+    error.field = extra.field || '';
+    error.status = extra.status || 0;
+    error.reply = extra.reply || null;
+    error.retry = !!extra.retry;
+    return error;
+
+  }
+
+  function needsGoogle() {
+
+    return workerError('الحجوزات محتاجة دخول بحساب جوجل.', 'ادخل بحساب جوجل وكمّل من مكانك.', { code: 'google' });
+
+  }
+
+  /* a fresh GOOGLE token (never the device's): Google again when this one is past its hour */
+  function googleToken(quiet) {
+
+    if (session && session.via === 'google' && fresh(session)) return Promise.resolve(session.token);
+    if (quiet || (session && session.via === 'device')) return Promise.reject(needsGoogle());
+    return signInAgain().then(function (value) {
+      if (session && session.via === 'google' && fresh(session)) return value;
+      throw needsGoogle();
+    });
+
+  }
+
+  function workerFetch(method, path, body, tokenValue, options) {
+
+    var abort = typeof AbortController === 'function' ? new AbortController() : null;
+    var timedOut = false;
+    var timer = abort ? setTimeout(function () { timedOut = true; abort.abort(); }, TIMING.fail) : null;
+    var headers = { authorization: 'Bearer ' + tokenValue, accept: options.raw ? '*/*' : 'application/json' };
+    var payload;
+
+    if (typeof Blob === 'function' && body instanceof Blob) {
+      payload = body;
+      headers['content-type'] = options.contentType || body.type || 'application/octet-stream';
+    }
+    else if (body !== undefined && body !== null) {
+      payload = JSON.stringify(body);
+      headers['content-type'] = 'application/json';
+    }
+    if (options.idempotencyKey) headers['idempotency-key'] = options.idempotencyKey;
+
+    return fetch(WORKER + path, {
+      method: method,
+      headers: headers,
+      body: payload,
+      credentials: 'omit',
+      cache: 'no-store',
+      referrerPolicy: 'no-referrer',
+      signal: abort ? abort.signal : undefined
+    }).then(function (response) {
+      if (options.raw && response.ok) return response.blob().then(function (blob) { return { blob: blob }; });
+      return response.text().then(function (text) {
+        var reply = null;
+        try { reply = JSON.parse(text); }
+        catch (ignored) { reply = null; }
+        return { status: response.status, reply: reply, text: text };
+      });
+    }).then(function (result) {
+      if (timer) clearTimeout(timer);
+      return result;
+    }, function (error) {
+      if (timer) clearTimeout(timer);
+      if (timedOut) throw workerError('الخادم مردّش في الوقت المعتاد.', 'ممكن النت ضعيف. جرّب تاني.', { code: 'timeout', retry: true, details: method + ' ' + path + ': no answer after ' + Math.round(TIMING.fail / 1000) + ' s' });
+      throw workerError('الاتصال بالإنترنت اتقطع.', 'اتأكد من النت وجرّب تاني.', { code: 'network', retry: true, details: String(error && error.message || error) });
+    });
+
+  }
+
+  function workerCall(method, path, body, options) {
+
+    options = options || {};
+
+    if (!WORKER) return Promise.reject(workerError('الحجوزات مش متاحة هنا.', '', { code: 'off' }));
+
+    var tries = 0;
+    var signedInAgain = false;
+
+    function once() {
+      return googleToken(options.quiet)
+        .then(function (value) { return workerFetch(method, path, body, value, options); })
+        .then(function (result) {
+          if (result.blob) return result.blob;
+          var reply = result.reply;
+          if (reply && reply.ok === true) return reply;
+          if (!reply || typeof reply !== 'object' || reply.ok !== false) {
+            throw workerError('رد الخادم مش مفهوم.', 'جرّب تاني بعد شوية.', { code: 'error', status: result.status, retry: result.status >= 500, details: 'HTTP ' + result.status + ' ' + String(result.text || '').slice(0, 200) });
+          }
+          throw workerError(String(reply.message || 'حصلت مشكلة غير متوقعة.'), String(reply.hint || ''), {
+            code: String(reply.code || ''), field: String(reply.field || ''), status: result.status, reply: reply,
+            retry: reply.code === 'busy' || result.status >= 500, details: reply.requestId ? 'requestId ' + reply.requestId : ''
+          });
+        })
+        .catch(function (error) {
+          // Google's token refused: sign in with Google again, then the same call (once)
+          if (error.code === 'auth' && !signedInAgain && !options.quiet && session && session.via === 'google') {
+            signedInAgain = true;
+            remember(null);
+            return once();
+          }
+          if (error.retry && tries < WORKER_BACKOFF.length) {
+            var wait = WORKER_BACKOFF[tries++];
+            return new Promise(function (resolve) { setTimeout(resolve, wait); }).then(once);
+          }
+          throw error;
+        });
+    }
+
+    return once();
+
+  }
+
+  var workerApi = {
+    available: function () { return !!WORKER; },
+    /* 'google' | 'device' | '' */
+    via: function () { return session ? session.via || '' : ''; },
+    call: function (method, path, body, options) { return workerCall(method, path, body, options); },
+    /* raw bytes up (a proof image), with its Idempotency-Key */
+    upload: function (path, blob, options) { return workerCall('POST', path, blob, options); },
+    /* raw bytes down (a proof image) → a Blob */
+    blob: function (path) { return workerCall('GET', path, undefined, { raw: true }); },
+    /* the usual Google sign-in over the panel (a device session that needs Google) */
+    google: function () {
+      trust.needGoogle();
+      return signInAgain();
+    }
+  };
+
   /* draws the panel behind the gate; the gate goes only once it is drawn */
   function openPanel(state, my) {
 
@@ -1360,6 +1514,7 @@
     checkWorker();
 
     window.AdminTransport = { call: call };
+    window.AdminWorker = WORKER ? workerApi : null;
     A.signOut = signOut;
     A.collab = collab.api;
 

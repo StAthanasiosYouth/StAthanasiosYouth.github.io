@@ -7,6 +7,8 @@
  *    prices, the servants people book with (no online booking yet)
  *  - الخدام: the one registry of servants (team contacts and booking
  *    servants) and the payment methods
+ *  - الحجوزات: AdminBook.html — a fourth tab and «الحجوزات (N جديد)» on
+ *    each bookable event, only while the Worker's booking module is on
  * Every page / event has «الصفحة الرئيسية»: its own card on the home page
  * (show / hide, button words, shape, order) without touching the page.
  * Official admin only (/admin/): the recovery admin says so.
@@ -922,6 +924,8 @@
           ].filter(Boolean),
           controls: [
             el('span', { class: 'spacer' }),
+            // «الحجوزات (N جديد)»: only while the booking module is on (AdminBook)
+            ev.booking && A.book ? A.book.eventLink(ev) : null,
             ev.live ? el('a', { class: 'icon-btn', href: site + 'events/' + ev.slug + '/', target: '_blank', rel: 'noopener', 'aria-label': 'افتح الفعالية في الموقع: ' + ev.title, title: 'افتح في الموقع' }, icon('external')) : null,
             el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'معاينة: ' + ev.title, title: 'معاينة', onclick: function () { previewSheet('event', ev.id, ev.title); } }, icon('eye')),
             A.editButton(ev.title, function () { openEvent(ev.id); })
@@ -1113,6 +1117,7 @@
     });
 
     var controls = isNew ? [] : [
+      ev.booking && A.book ? A.book.eventLink(ev) : null,
       el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () { previewSheet('event', ev.id, ev.title); } }, icon('eye'), 'معاينة'),
       el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function (e) {
         A.withBusy(e.currentTarget, A.call('apiEventArchive', ev.id, !ev.archived)).then(function () {

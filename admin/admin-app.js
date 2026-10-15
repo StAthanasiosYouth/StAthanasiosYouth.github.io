@@ -14559,6 +14559,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
  *    prices, the servants people book with (no online booking yet)
  *  - الخدام: the one registry of servants (team contacts and booking
  *    servants) and the payment methods
+ *  - الحجوزات: AdminBook.html — a fourth tab and «الحجوزات (N جديد)» on
+ *    each bookable event, only while the Worker's booking module is on
  * Every page / event has «الصفحة الرئيسية»: its own card on the home page
  * (show / hide, button words, shape, order) without touching the page.
  * Official admin only (/admin/): the recovery admin says so.
@@ -15474,6 +15476,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           ].filter(Boolean),
           controls: [
             el('span', { class: 'spacer' }),
+            // «الحجوزات (N جديد)»: only while the booking module is on (AdminBook)
+            ev.booking && A.book ? A.book.eventLink(ev) : null,
             ev.live ? el('a', { class: 'icon-btn', href: site + 'events/' + ev.slug + '/', target: '_blank', rel: 'noopener', 'aria-label': 'افتح الفعالية في الموقع: ' + ev.title, title: 'افتح في الموقع' }, icon('external')) : null,
             el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'معاينة: ' + ev.title, title: 'معاينة', onclick: function () { previewSheet('event', ev.id, ev.title); } }, icon('eye')),
             A.editButton(ev.title, function () { openEvent(ev.id); })
@@ -15665,6 +15669,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     });
 
     var controls = isNew ? [] : [
+      ev.booking && A.book ? A.book.eventLink(ev) : null,
       el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () { previewSheet('event', ev.id, ev.title); } }, icon('eye'), 'معاينة'),
       el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function (e) {
         A.withBusy(e.currentTarget, A.call('apiEventArchive', ev.id, !ev.archived)).then(function () {
@@ -17989,5 +17994,1665 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return card;
 
   };
+
+})();
+
+/* ---------- AdminBook.html ---------- */
+/*
+ * «الحجوزات» (docs/EVENTS.md §4, §5, §7.2, §9, §10, §13): the booking queue
+ * of an event, one booking's sheet (request, flags, proofs, payments, the
+ * derived totals) and every move — confirm (with the first payment),
+ * reject (with money received → refund owed), payments, refunds, voids,
+ * update, cancel with a retained fee, reopen, a manual booking, cancelling
+ * a whole event — plus the summary per servant and the XLSX.
+ *
+ * The data lives on the new backend (the Worker, worker/BOOKING-API.md),
+ * reached through window.AdminWorker (admin/boot.js) with the Google ID
+ * token. Shown ONLY when the Worker says the module is on
+ * (GET /v1/admin/book/module → on, or env 'staging'); off, unreachable,
+ * 401 or 403 → nothing appears and nothing else changes. The recovery
+ * admin (Apps Script) has no AdminWorker: nothing appears there either.
+ *
+ * Money is never optimistic: a write shows its pending button, then the
+ * server's answer (the booking detail) is drawn. Every write carries a key
+ * (book-kit keyKeeper): the same body sent again keeps its key. `version`
+ * guards a booking: «conflict» → the booking is read again. «warn» →
+ * the warnings and «سجّل برضه» (force). «needs_override» → the reason
+ * and «أكّد برضه» with a reason. Pure helpers and the workbook:
+ * admin/book-kit.js (loaded on demand, tests/book-kit.test.mjs).
+ */
+(function () {
+
+  'use strict';
+
+  var A = window.A;
+  var el = A.el;
+  var icon = A.icon;
+
+  var B = A.book = {
+    on: false,            // the Worker said the module is on (or staging)
+    off: false,           // … or that it is off (production today): nothing is drawn at all
+    checked: false,       // asked (whatever the answer)
+    needGoogle: false,    // a device session: the bookings need Google itself
+    env: '',
+    events: null,         // GET /v1/admin/book/events → events
+    eventId: '',
+    filter: 'pending',
+    q: '',
+    current: null,        // the open booking's detail
+    lastDownload: null    // { filename, bytes } of the last XLSX (tests, console)
+  };
+
+  var K = null;           // admin/book-kit.js
+
+  function ar(n) {
+    return String(n === null || n === undefined ? '' : n).replace(/\d/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[d]; });
+  }
+
+  function money(n) {
+    return K ? K.money(n) : ar(n) + ' ج';
+  }
+
+  function W() {
+    return window.AdminWorker && window.AdminWorker.available() ? window.AdminWorker : null;
+  }
+
+  function enc(value) {
+    return encodeURIComponent(String(value || ''));
+  }
+
+  /* '+201012345678' → '01012345678' (what people read and dial) */
+  function phoneText(phone) {
+    var m = /^\+20(1\d{9})$/.exec(String(phone || ''));
+    return m ? '0' + m[1] : String(phone || '');
+  }
+
+  function wallText(value) {
+    return value ? A.formatWall(String(value).replace('T', ' ')) : '—';
+  }
+
+  function sheetOpen() {
+    var sheet = document.getElementById('sheet');
+    return !!(sheet && sheet.open);
+  }
+
+
+  /* =======================================================
+     THE SWITCH: is the module on? (asked once a page load)
+  ======================================================= */
+
+  var kitLoading = null;
+
+  function kit() {
+    if (K) return Promise.resolve(K);
+    if (!kitLoading) {
+      kitLoading = import(new URL('book-kit.js', location.href).href).then(function (m) { K = m; return m; }, function (error) {
+        kitLoading = null;
+        throw error;
+      });
+    }
+    return kitLoading;
+  }
+
+  var checking = null;
+  var failedAt = 0;
+
+  /* resolves true when «الحجوزات» is on; anything wrong = off, quietly */
+  B.check = function () {
+    var w = W();
+    if (!w) return Promise.resolve(false);
+    if (B.on) return Promise.resolve(true);
+    if (checking) return checking;
+    // the Worker was unreachable a moment ago: not again for a minute
+    if (failedAt && Date.now() - failedAt < 60000) return Promise.resolve(false);
+    checking = w.call('GET', '/v1/admin/book/module', undefined, { quiet: true }).then(function (reply) {
+      B.env = String(reply && reply.env || '');
+      B.checked = true;
+      B.needGoogle = false;
+      if (!(reply && (reply.on === true || B.env === 'staging'))) {
+        B.off = true;
+        paintLinks();
+        return false;
+      }
+      return kit().then(function () {
+        B.on = true;
+        addNav();
+        loadEvents();
+        return true;
+      });
+    }).catch(function (error) {
+      B.checked = true;
+      B.on = false;
+      // a device session can't ask: Google first (the bookings screen says so); else quietly off
+      B.needGoogle = !!(error && error.code === 'google');
+      if (!B.needGoogle) failedAt = Date.now();
+      checking = null;
+      return false;
+    });
+    return checking;
+  };
+
+  /* «الحجوزات» next to «الفعاليات» and «الخدام» */
+  function addNav() {
+    var area = A.AREAS.filter(function (a) { return a.key === 'pages'; })[0];
+    if (!area || !area.subs || area.subs.some(function (s) { return s.key === 'bookings'; })) return;
+    area.subs.push({ key: 'bookings', label: 'الحجوزات' });
+    A.renderNav();
+  }
+
+  // asked once the panel is up (boot.js sets AdminWorker before A.start)
+  var start = A.start;
+  A.start = function () {
+    var drawn = start.apply(this, arguments);
+    Promise.resolve(drawn).then(function () { setTimeout(function () { B.check(); }, 300); });
+    return drawn;
+  };
+
+  // admin pushes link to /admin/#open/bookings/<eventId> (§7.3)
+  var openLink = A.openLink;
+  A.openLink = function (hash) {
+    var m = /^#?open\/bookings(?:\/(evt-[a-z0-9]{4,40}))?$/.exec(String(hash || ''));
+    if (!m) return openLink ? openLink.apply(this, arguments) : Promise.resolve(false);
+    if (!W()) return Promise.resolve(false);
+    return B.check().then(function (on) {
+      if (!on && !B.needGoogle) return false;
+      if (m[1]) B.eventId = m[1];
+      return A.go('pages', 'bookings');
+    });
+  };
+
+  /* the bookings screen of one event (from the events list, the editor, a push) */
+  B.open = function (eventId) {
+    B.eventId = eventId || B.eventId;
+    B.filter = 'pending';
+    B.q = '';
+    return (sheetOpen() ? A.closeSheet() : Promise.resolve(true)).then(function (closed) {
+      if (closed === false) return false;
+      return A.go('pages', 'bookings');
+    });
+  };
+
+
+  /* =======================================================
+     THE EVENTS THE WORKER KNOWS (published event.json, re-read on demand)
+  ======================================================= */
+
+  var eventsWatchers = [];
+
+  var loadEvents = A.latest(function () {
+    return W().call('GET', '/v1/admin/book/events');
+  }, function (reply) {
+    B.events = (reply && reply.events) || [];
+    paintLinks();
+    eventsWatchers.slice().forEach(function (fn) { fn(null); });
+  }, function (error) {
+    eventsWatchers.slice().forEach(function (fn) { fn(error); });
+  });
+
+  function eventRow(id) {
+    return (B.events || []).filter(function (e) { return e.id === id; })[0] || null;
+  }
+
+  function replaceEvent(row) {
+    if (!row || !row.id || !B.events) return;
+    var at = B.events.map(function (e) { return e.id; }).indexOf(row.id);
+    if (at === -1) B.events.push(row);
+    else B.events[at] = row;
+    paintLinks();
+  }
+
+  /* «حدّث بيانات الفعالية»: the Worker reads the published event.json now (after a publish) */
+  function refreshEvent(slug, button) {
+    return A.withBusy(button, W().call('POST', '/v1/admin/book/events/' + enc(slug) + '/refresh', {})).then(function (reply) {
+      replaceEvent(reply.event || reply.row || null);
+      configs[slug] = null;
+      A.toast('اتحدثت بيانات الفعالية ✓');
+      loadEvents();
+      return reply;
+    });
+  }
+
+
+  /* =======================================================
+     «الحجوزات (N جديد)» on each bookable event (AdminPages: list + editor)
+  ======================================================= */
+
+  var links = [];
+
+  /*
+   * ev: the Apps Script event (id, slug, booking, live). Hidden until the
+   * module is on and the Worker knows it; nothing at all (null) when there
+   * is no Worker here or it said the module is off.
+   */
+  B.eventLink = function (ev) {
+    if (!W() || B.off) return null;
+    var node = el('span', { class: 'book-link', hidden: true, 'data-event': ev.id });
+    links.push({ ev: ev, node: node, at: Date.now() });
+    if (B.on) {
+      paintLink(links[links.length - 1]);
+      if (!B.events) loadEvents();
+    }
+    else if (!B.checked) B.check();
+    return node;
+  };
+
+  function paintLinks() {
+    links = links.filter(function (l) { return l.node.isConnected || Date.now() - l.at < 3000; });
+    links.forEach(paintLink);
+  }
+
+  function paintLink(link) {
+    var ev = link.ev;
+    var row = eventRow(ev.id);
+    if (!B.on || !B.events || (!row && !(ev.booking && ev.live))) {
+      link.node.hidden = true;
+      return;
+    }
+    link.node.hidden = false;
+    if (!row) {
+      // live with booking, but the Worker hasn't read it yet: read it now
+      A.fill(link.node, el('button', { class: 'btn btn--small btn--ghost', type: 'button', 'data-act': 'book-refresh', onclick: function (e) {
+        refreshEvent(ev.slug, e.currentTarget).catch(function (error) { A.fail(error); });
+      } }, icon('retry'), 'حدّث بيانات الفعالية'));
+      return;
+    }
+    var fresh = row.counts && row.counts.pending || 0;
+    A.fill(link.node, el('button', { class: 'btn btn--small' + (fresh ? ' book-link--new' : ''), type: 'button', 'data-act': 'book-open', onclick: function () { B.open(ev.id); } },
+      icon('ticket'), 'الحجوزات' + (fresh ? ' (' + ar(fresh) + ' جديد)' : '')));
+  }
+
+
+  /* =======================================================
+     THE SCREEN
+  ======================================================= */
+
+  A.views.bookings = function () {
+
+    if (!window.AdminTransport) {
+      return [A.card('من لوحة التحكم الرسمية بس', 'الحجوزات بتتراجع من لوحة التحكم الرسمية (/admin/). افتحها من Chrome وكمّل من هناك.')];
+    }
+
+    if (!B.on) {
+      if (B.needGoogle) return [googleCard()];
+      var waiting = el('div', { class: 'skeleton skeleton--line' });
+      B.check().then(function (on) {
+        if (!waiting.isConnected) return;
+        if (on || B.needGoogle) A.render();
+        else A.fill(waiting.parentNode, el('p', { class: 'note', text: 'الحجوزات مش متاحة دلوقتي.' }));
+      });
+      return [A.card('الحجوزات', '', waiting)];
+    }
+
+    return queueView();
+
+  };
+
+  /* a device session (the installed app's remembered phone): Google itself, once */
+  function googleCard() {
+    var box = A.errorBox();
+    var go = el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'book-google' }, icon('user'), 'ادخل بحساب جوجل');
+    go.addEventListener('click', function () {
+      box.hidden = true;
+      A.withBusy(go, W().google().then(function () { return B.check(); })).then(function () {
+        if (A.area === 'pages' && A.sub.pages === 'bookings') A.render();
+      }).catch(function (error) { A.fail(error, box); });
+    });
+    return A.card('الحجوزات محتاجة دخول بحساب جوجل', 'التطبيق داخل بالجهاز المتذكَّر. الحجوزات والفلوس محتاجة حساب جوجل نفسه: ادخل مرة وكمّل من مكانك.',
+      el('div', { class: 'actions' }, go), box);
+  }
+
+  /* the last answers (memory only, this tab): a reopened screen draws at once, then refreshes quietly */
+  var queue = { last: {}, counts: {}, target: null };
+
+  function queueKey() {
+    return B.eventId + '|' + B.filter + '|' + B.q;
+  }
+
+  var loadQueue = A.latest(function () {
+    var key = queueKey();
+    var paths = K.queuePaths(B.eventId, B.filter, B.q);
+    return Promise.all(paths.map(function (path) { return W().call('GET', path); })).then(function (replies) {
+      return {
+        key: key,
+        eventId: B.eventId,
+        rows: K.mergeRows(replies.map(function (r) { return r.rows; })),
+        counts: replies[0] && replies[0].counts || null,
+        next: replies.map(function (r) { return r.next || ''; })
+      };
+    });
+  }, function (result) {
+    queue.last[result.key] = result;
+    if (result.counts) queue.counts[result.eventId] = result.counts;
+    if (queue.target && queue.target.isConnected()) queue.target.landed(result);
+  }, function (error) {
+    if (queue.target && queue.target.isConnected()) queue.target.failed(error);
+  });
+
+  /* after a write: the list and the event's counts, quietly */
+  function afterWrite() {
+    if (!B.on) return;
+    loadQueue();
+    loadEvents();
+  }
+
+  function queueView() {
+
+    var box = A.errorBox();
+    var head = el('div', { class: 'book-head' });
+    var list = el('div', { class: 'comp-subs book-list', 'aria-live': 'polite' });
+    var chips = el('div', { class: 'filter-chips book-chips', role: 'group', 'aria-label': 'الحالة' });
+    var more = el('div', { class: 'actions', hidden: true });
+    var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر برقم الحجز أو الاسم أو الموبايل…', 'aria-label': 'دوّر في الحجوزات', value: B.q });
+    var timer = 0;
+
+    search.addEventListener('input', function () {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        B.q = search.value.trim();
+        drawQueue(queue.last[queueKey()]);
+        loadQueue();
+      }, 250);
+    });
+
+    function pickEvent() {
+      var events = (B.events || []).slice().sort(function (a, b) { return String(a.startAt) < String(b.startAt) ? -1 : 1; });
+      if (!events.length) return null;
+      if (!eventRow(B.eventId)) {
+        var now = K.stamp(A.cairoNow());
+        var ahead = events.filter(function (e) { return String(e.endAt || e.startAt) >= now; });
+        B.eventId = ((ahead.filter(function (e) { return e.counts && e.counts.pending; })[0]) || ahead[0] || events[events.length - 1]).id;
+      }
+      return eventRow(B.eventId);
+    }
+
+    function drawHead() {
+      var ev = pickEvent();
+      if (!ev) {
+        A.fill(head, el('div', { class: 'empty-state' },
+          el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('ticket')),
+          el('p', { class: 'empty-state__title', text: 'مفيش فعاليات فيها حجز لسه' }),
+          el('p', { class: 'empty-state__text', text: 'الفعالية بتظهر هنا بعد ما تتنشر وفيها حجز. لو لسه ناشرها: من «الفعاليات» دوس «حدّث بيانات الفعالية».' })));
+        return null;
+      }
+      var picker = el('select', { class: 'input', 'aria-label': 'الفعالية', 'data-act': 'book-event' }, (B.events || []).map(function (e) {
+        var n = e.counts && e.counts.pending || 0;
+        return el('option', { value: e.id, selected: e.id === ev.id ? 'selected' : null, text: e.title + (n ? ' (' + ar(n) + ' جديد)' : '') });
+      }));
+      picker.addEventListener('change', function () {
+        B.eventId = picker.value;
+        B.q = '';
+        A.render();
+      });
+      var seatsText = ev.capacity === null || ev.capacity === undefined
+        ? 'المؤكدين ' + ar(ev.taken || 0) + ' — من غير حد للعدد'
+        : 'المؤكدين ' + ar(ev.taken || 0) + ' من ' + ar(ev.capacity) + ' — فاضل ' + ar(Math.max(0, ev.left === undefined || ev.left === null ? ev.capacity - (ev.taken || 0) : ev.left));
+      A.fill(head,
+        A.field('الفعالية', picker),
+        el('div', { class: 'book-facts' },
+          A.chip(seatsText, ev.left !== null && ev.left !== undefined && ev.left <= 0 ? 'danger' : 'info'),
+          A.chip(ev.online ? 'الحجز من الموقع شغال' : 'الحجز من الموقع مقفول', ev.online ? 'ok' : 'off'),
+          ev.startAt ? A.chip(wallText(ev.startAt), '') : null,
+          ev.refreshedAt ? el('span', { class: 'field__hint', text: 'بيانات الفعالية من آخر نشر' }) : null),
+        el('div', { class: 'actions' },
+          el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'book-new', onclick: function (e) { manualForm(ev, e.currentTarget); } }, icon('plus'), 'حجز يدوي'),
+          el('button', { class: 'btn', type: 'button', 'data-act': 'book-summary', onclick: function () { summarySheet(ev); } }, icon('layers'), 'الملخص والحسابات'),
+          el('button', { class: 'btn btn--ghost btn--small', type: 'button', 'data-act': 'book-refresh', onclick: function (e) {
+            refreshEvent(ev.slug, e.currentTarget).then(function () { if (head.isConnected) drawHead(); }).catch(function (error) { A.fail(error, box); });
+          } }, icon('retry'), 'حدّث بيانات الفعالية'),
+          el('button', { class: 'btn btn--ghost btn--small btn--danger', type: 'button', 'data-act': 'book-cancel-all', onclick: function () { cancelAllForm(ev); } }, icon('alert'), 'إلغاء الفعالية')));
+      return ev;
+    }
+
+    function drawChips() {
+      var counts = queue.counts[B.eventId] || (eventRow(B.eventId) ? { byStatus: eventRow(B.eventId).counts || {} } : null);
+      A.fill(chips, K.FILTERS.map(function (f) {
+        var n = counts ? K.filterCount(f.key, counts) : null;
+        return el('button', { class: 'filter-chip', type: 'button', 'data-filter': f.key, 'aria-pressed': String(B.filter === f.key), onclick: function () {
+          if (B.filter === f.key) return;
+          B.filter = f.key;
+          drawChips();
+          drawQueue(queue.last[queueKey()]);
+          loadQueue();
+        } }, f.label + (n !== null && (n || f.key !== 'overdue') ? ' (' + ar(n) + ')' : ''));
+      }));
+    }
+
+    function drawQueue(result) {
+      drawChips();
+      if (!result) {
+        A.fill(list, el('div', { class: 'skeleton skeleton--line' }), el('div', { class: 'skeleton skeleton--line' }));
+        more.hidden = true;
+        return;
+      }
+      if (!result.rows.length) {
+        A.fill(list, el('div', { class: 'empty-state' },
+          el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('ticket')),
+          el('p', { class: 'empty-state__title', text: B.q ? 'مفيش حجوزات بالشكل ده' : 'مفيش حجوزات هنا' }),
+          el('p', { class: 'empty-state__text', text: B.q ? 'جرّب رقم الحجز (B-…) أو جزء من الاسم أو آخر ٤ أرقام من الموبايل.' : 'جرّب «الكل».' })));
+      }
+      else {
+        A.fill(list, result.rows.map(bookingRow));
+      }
+      var hasMore = result.next.some(Boolean);
+      more.hidden = !hasMore;
+      if (hasMore) {
+        A.fill(more, el('button', { class: 'btn btn--ghost btn--small', type: 'button', 'data-act': 'book-more', onclick: function (e) {
+          var paths = K.queuePaths(result.eventId, B.filter, B.q, { cursors: result.next }).filter(function (p, i) { return result.next[i]; });
+          var which = result.next.map(function (c, i) { return c ? i : -1; }).filter(function (i) { return i >= 0; });
+          A.withBusy(e.currentTarget, Promise.all(paths.map(function (p) { return W().call('GET', p); }))).then(function (replies) {
+            var next = result.next.slice();
+            replies.forEach(function (r, j) { next[which[j]] = r.next || ''; });
+            var merged = { key: result.key, eventId: result.eventId, counts: result.counts, rows: K.mergeRows([result.rows].concat(replies.map(function (r) { return r.rows; }))), next: next };
+            queue.last[result.key] = merged;
+            if (list.isConnected) drawQueue(merged);
+          }).catch(function (error) { A.fail(error, box); });
+        } }, 'اعرض أكتر'));
+      }
+    }
+
+    queue.target = {
+      isConnected: function () { return list.isConnected; },
+      landed: function (result) {
+        box.hidden = true;
+        if (result.key === queueKey()) drawQueue(result);
+        else drawChips();
+      },
+      failed: function (error) {
+        if (error && error.code === 'google') {
+          A.fill(list, googleCard());
+          return;
+        }
+        if (!queue.last[queueKey()]) list.replaceChildren();
+        A.fail(error, box);
+      }
+    };
+
+    var started = false;
+
+    function ready() {
+      if (!drawHead()) {
+        list.replaceChildren();
+        chips.replaceChildren();
+        return;
+      }
+      started = true;
+      drawQueue(queue.last[queueKey()]);
+      loadQueue();
+    }
+
+    eventsWatchers = [function (error) {
+      if (!head.isConnected) return;
+      if (error) {
+        if (!B.events) {
+          head.replaceChildren();
+          A.fail(error, box);
+        }
+        return;
+      }
+      // the first events answer starts the list; later ones only refresh the head and the counts
+      if (!started) ready();
+      else {
+        drawHead();
+        drawChips();
+      }
+    }];
+
+    if (B.events) ready();
+    else {
+      head.appendChild(el('div', { class: 'skeleton skeleton--line' }));
+      loadEvents();
+    }
+    if (B.events) loadEvents();
+
+    return [
+      A.card('الحجوزات', 'طلبات الحجز من الموقع والحجوزات اليدوية: راجع الإثبات، أكّد أو ارفض، وسجّل كل دفعة ومرتجع. الفلوس محسوبة من الدفعات المسجلة بس.',
+        head, box),
+      A.card('الطلبات', '',
+        el('div', { class: 'comp-subs__tools' }, search),
+        chips,
+        list,
+        more)
+    ];
+
+  }
+
+  function bookingRow(b) {
+    var st = K.STATUS[b.status] || { label: b.status, kind: '' };
+    // closed (rejected / withdrawn / cancelled): what matters is a refund owed, not «دافع زيادة»
+    var pay = b.paymentStatus && b.status === 'confirmed' ? K.PAY_STATUS[b.paymentStatus] : null;
+    var total = b.status === 'pending' ? b.quotedTotal : b.amountDue;
+    var flags = b.flags || {};
+    return el('button', { class: 'comp-sub book-row', type: 'button', 'data-id': b.id, 'data-ref': b.ref, onclick: function () { openBooking(b.id); } },
+      el('span', { class: 'comp-sub__who' },
+        el('span', { class: 'book-row__ref', dir: 'ltr', text: b.ref }),
+        el('bdi', { class: 'comp-sub__name', text: b.name }),
+        el('span', { class: 'comp-sub__phone ltr', text: phoneText(b.phone) })),
+      el('span', { class: 'comp-sub__meta' },
+        A.chip(st.label, st.kind),
+        pay ? A.chip(pay.label, pay.kind) : null,
+        b.overdue ? A.chip('متأخر', 'danger') : null,
+        b.refundOwed > 0 ? A.chip('مرتجع مطلوب ' + money(b.refundOwed), 'danger') : null,
+        b.source === 'admin' ? A.chip('يدوي', 'info') : null,
+        flags.dupProof ? A.chip('إثبات متكرر', 'danger') : null,
+        flags.phoneTwice ? A.chip('الرقم ده عنده طلب تاني', 'gold') : null,
+        flags.priceChanged ? A.chip('السعر اتغير', 'gold') : null),
+      el('span', { class: 'comp-sub__when' },
+        K.peopleText(b.people) + ' — ' + (b.status === 'pending' ? 'السعر ' : 'المطلوب ') + money(total) +
+        ' — مدفوع ' + money(b.paid || 0) + (b.balance > 0 ? ' — باقي ' + money(b.balance) : '')));
+  }
+
+
+  /* =======================================================
+     ONE BOOKING
+  ======================================================= */
+
+  var proofUrls = {};
+
+  function proofUrl(id) {
+    if (!proofUrls[id]) {
+      proofUrls[id] = W().blob('/v1/admin/proofs/' + enc(id)).then(function (blob) { return URL.createObjectURL(blob); });
+      proofUrls[id].catch(function () { delete proofUrls[id]; });
+    }
+    return proofUrls[id];
+  }
+
+  // the proofs' bytes live only while a booking is open
+  (function () {
+    var sheet = document.getElementById('sheet');
+    if (!sheet) return;
+    sheet.addEventListener('close', function () {
+      Object.keys(proofUrls).forEach(function (id) {
+        proofUrls[id].then(function (url) { URL.revokeObjectURL(url); }, function () {});
+      });
+      proofUrls = {};
+      B.current = null;
+    });
+  })();
+
+  function openBooking(id, note) {
+    var box = A.errorBox();
+    if (!B.current || B.current.booking.id !== id) {
+      A.dirty = false;
+      A.openSheet('الحجز', [box, el('div', { class: 'skeleton skeleton--line' }), el('div', { class: 'skeleton skeleton--line' })],
+        [el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })], { wide: true, className: 'book-sheet' });
+    }
+    return W().call('GET', '/v1/admin/book/bookings/' + enc(id)).then(function (detail) {
+      if (!sheetOpen()) return;
+      drawBooking(detail, note);
+    }).catch(function (error) {
+      if (!sheetOpen()) return;
+      var target = document.querySelector('#sheet .errors') || box;
+      A.fail(error, target);
+    });
+  }
+
+  B.openBooking = openBooking;
+
+  function fact(label, value) {
+    if (value === null || value === undefined || value === '') return null;
+    return el('div', { class: 'book-fact' }, el('dt', { text: label }), el('dd', {}, value));
+  }
+
+  function tile(label, value, tone) {
+    return el('div', { class: 'comp-tile' + (tone ? ' comp-tile--' + tone : '') }, el('span', { class: 'comp-tile__n', text: value }), el('span', { class: 'comp-tile__label', text: label }));
+  }
+
+  function countsText(pricing, counts) {
+    return ((pricing && pricing.categories) || []).filter(function (c) { return Number(counts && counts[c.key]) > 0; }).map(function (c) {
+      return c.label + ' × ' + ar(counts[c.key]) + (c.price ? ' (' + money(c.price) + ')' : '');
+    }).join('، ') || '—';
+  }
+
+  function ended(ev) {
+    var end = K.stampMinutes(ev && (ev.endAt || ev.startAt));
+    return end !== null && end < K.stampMinutes(K.stamp(A.cairoNow()));
+  }
+
+  function drawBooking(d, note) {
+
+    B.current = d;
+    configs.byEvent[d.event && d.event.id] = d.event;
+    var b = d.booking;
+    var ev = d.event || {};
+    var der = d.derived || {};
+    var st = K.STATUS[b.status] || { label: b.status, kind: '' };
+    var closed = b.status === 'rejected' || b.status === 'withdrawn' || b.status === 'cancelled';
+    var pay = der.paymentStatus && b.status === 'confirmed' ? K.PAY_STATUS[der.paymentStatus] : null;
+    var flags = b.flags || {};
+    var isEnded = ended(ev);
+
+    var proofs = (d.proofs || []);
+    var proofGrid = proofs.length ? el('div', { class: 'book-proofs' }, proofs.map(function (p) {
+      var img = el('img', { alt: 'صورة إثبات الدفع', hidden: true });
+      var button = el('button', { class: 'book-proof', type: 'button', 'data-proof': p.id, 'aria-label': 'افتح صورة الإثبات' }, el('span', { class: 'spinner', 'aria-hidden': 'true' }), img,
+        p.dup ? A.chip('اتبعتت قبل كده', 'danger') : null);
+      proofUrl(p.id).then(function (url) {
+        img.src = url;
+        img.hidden = false;
+        var spin = button.querySelector('.spinner');
+        if (spin) spin.remove();
+      }).catch(function () {
+        A.fill(button, el('span', { class: 'note', text: 'الصورة مفتحتش' }));
+      });
+      button.addEventListener('click', function () {
+        proofUrl(p.id).then(function (url) {
+          A.modal({ tone: 'info', icon: 'photos', title: 'صورة الإثبات', body: el('img', { class: 'book-proof__full', src: url, alt: 'صورة إثبات الدفع' }),
+            actions: [{ label: 'قفل', value: true, kind: 'ghost', autofocus: true }] });
+        }).catch(function (error) { A.fail(error); });
+      });
+      return button;
+    })) : el('p', { class: 'note', text: 'مفيش صور إثبات.' });
+
+    var payments = d.payments || [];
+    var shown = payments.filter(function (p) { return p.kind !== 'void'; });
+    var payList = shown.length ? el('ul', { class: 'book-pays' }, shown.map(function (p) {
+      var voided = !!p.voidedBy;
+      var why = voided ? K.voidOf(p, payments) : null;
+      return el('li', { class: 'book-pay' + (voided ? ' is-void' : '') + (p.kind === 'refund' ? ' is-refund' : ''), 'data-payment': p.id },
+        el('div', { class: 'book-pay__main' },
+          el('span', { class: 'book-pay__amount', text: (p.kind === 'refund' ? '− ' : '') + money(p.amount) }),
+          el('span', { class: 'book-pay__what', text: K.KIND[p.kind] + '، ' + K.methodLabel(ev, p.method) + '، ' + (p.servantName || p.servantId || '') }),
+          el('span', { class: 'book-pay__when', text: 'استلام ' + wallText(p.receivedAt) + (p.recordedName || p.recordedBy ? '، سجلها ' + (p.recordedName || p.recordedBy) : '') + ((p.proofIds || []).length ? '، ' + ar(p.proofIds.length) + ' إثبات' : '') }),
+          p.note ? el('span', { class: 'book-pay__note', text: p.note }) : null,
+          voided ? el('span', { class: 'book-pay__void', text: 'اتلغت' + (why && why.note ? ': ' + why.note : '') }) : null),
+        voided ? null : el('button', { class: 'btn btn--small btn--ghost', type: 'button', 'data-act': 'void', 'aria-label': 'إلغاء الدفعة ' + money(p.amount), onclick: function () { voidForm(p); } }, 'إلغاء'));
+    })) : el('p', { class: 'note', text: 'مفيش دفعات مسجلة.' });
+
+    var history = (b.dueHistory || []).length ? el('ul', { class: 'book-history' }, b.dueHistory.map(function (h) {
+      return el('li', { text: money(h.from) + ' ← ' + money(h.to) + (h.reason ? ' — ' + h.reason : '') + (h.at ? ' (' + wallText(h.at) + ')' : '') });
+    })) : null;
+
+    var due = b.status === 'pending' ? null : der.paymentStatus === null ? null : b.amountDue;
+
+    var actions = [];
+    function act(key, label, kind, run) {
+      actions.push(el('button', { class: 'btn' + (kind ? ' btn--' + kind : ''), type: 'button', 'data-act': key, onclick: function (e) { run(e.currentTarget); } }, label));
+    }
+    if (b.status === 'pending' && !isEnded) {
+      act('confirm', 'تأكيد', 'primary', function () { confirmForm(d); });
+      act('reject', 'رفض', 'danger', function () { rejectForm(d); });
+    }
+    if (b.status === 'confirmed' && !isEnded) act('update', 'تعديل', '', function () { updateForm(d); });
+    if (b.status === 'rejected' && !isEnded) act('reopen', 'افتح الطلب تاني', '', function (button) { reopen(d, button); });
+    if (b.status !== 'pending') {
+      act('payment', 'إضافة دفعة', b.status === 'confirmed' ? 'primary' : '', function () { payForm(d, 'payment'); });
+      act('refund', 'تسجيل مرتجع', '', function () { payForm(d, 'refund'); });
+    }
+    if (b.status === 'confirmed') act('cancel', 'إلغاء الحجز', 'danger', function () { cancelForm(d); });
+
+    A.dirty = false;
+    A.openSheet('حجز ' + b.ref, [
+      A.errorBox(),
+      note ? el('p', { class: 'note note--warn', role: 'status', text: note }) : null,
+      el('div', { class: 'book-chips' },
+        A.chip(st.label, st.kind),
+        pay ? A.chip(pay.label, pay.kind) : null,
+        der.overdue ? A.chip('متأخر', 'danger') : null,
+        der.refundOwed > 0 ? A.chip('مرتجع مطلوب', 'danger') : null,
+        b.source === 'admin' ? A.chip('حجز يدوي', 'info') : null),
+      flags.dupProof || flags.phoneTwice || flags.priceChanged ? el('ul', { class: 'book-flags' },
+        flags.dupProof ? el('li', { text: 'صورة الإثبات دي اتبعتت قبل كده في حجز تاني.' }) : null,
+        flags.phoneTwice ? el('li', { text: 'نفس الموبايل عنده طلب تاني مستني المراجعة.' }) : null,
+        flags.priceChanged ? el('li', { text: 'السعر اتغير بعد الحجز ده.' }) : null) : null,
+      isEnded ? el('p', { class: 'note', text: 'الفعالية خلصت: الحالة مبتتغيرش، بس تقدر تسجل دفعات ومرتجعات.' }) : null,
+      el('div', { class: 'comp-tiles book-money' },
+        tile(b.status === 'pending' ? 'السعر' : 'المطلوب', money(b.status === 'pending' ? b.quotedTotal : due)),
+        tile('المدفوع', money(der.paid || 0), der.paid ? 'gold' : ''),
+        b.status === 'pending' || closed ? null : tile('الباقي', money(der.balance === null || der.balance === undefined ? 0 : Math.max(0, der.balance))),
+        der.refundOwed > 0 ? tile('مرتجع مطلوب', money(der.refundOwed), 'gold') : null),
+      el('dl', { class: 'book-facts-list' },
+        fact('الاسم', el('bdi', { text: b.name })),
+        fact('الموبايل', el('span', { class: 'ltr', text: phoneText(b.phone) })),
+        fact('الخادم المختار', b.servantName || null),
+        fact('طريقة الدفع', b.method ? K.methodLabel(ev, b.method) : null),
+        fact('الطلب', countsText(ev.pricing, b.requested)),
+        b.status === 'confirmed' || b.status === 'cancelled' ? fact('العدد الفعلي', countsText(ev.pricing, b.actual)) : null,
+        fact('الأسماء', (b.names || []).length ? b.names.join('، ') : null),
+        fact('ملاحظة الزائر', b.visitorNote || null),
+        fact('ملاحظة الأدمن', b.adminNote || null),
+        fact('سبب الرفض', b.rejectReason || null),
+        fact('سبب الإلغاء', b.cancelReason || null),
+        fact('اتأكد فوق العدد', b.capOverride ? String(b.capOverride.reason || b.capOverride) : null),
+        fact('وقت الطلب', wallText(b.createdAt)),
+        b.confirmedAt ? fact('وقت التأكيد', wallText(b.confirmedAt)) : null),
+      el('p', { class: 'section-label', text: 'صور الإثبات' }),
+      proofGrid,
+      el('p', { class: 'section-label', text: 'الدفعات' }),
+      payList,
+      history ? el('p', { class: 'section-label', text: 'تغييرات المطلوب' }) : null,
+      history
+    ], actions.concat([el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })]), { wide: true, className: 'book-sheet' });
+
+  }
+
+
+  /* =======================================================
+     A MOVE (a form in the same sheet, «رجوع» to the booking)
+  ======================================================= */
+
+  /*
+   * options: { title, intro, nodes, label, kind, prepare(extra) → { errors } | { path, body, key }, done(reply) }
+   * extra: { force } after «سجّل برضه»; { override: { pay, cap, reason } } after «أكّد برضه».
+   */
+  function moveForm(options) {
+
+    var box = A.errorBox();
+    var extraBox = el('div', { class: 'book-warn', hidden: true, role: 'alert' });
+    var submit = el('button', { class: 'btn btn--' + (options.kind || 'primary'), type: 'button', 'data-act': 'submit', text: options.label });
+    var back = el('button', { class: 'btn btn--ghost', type: 'button', 'data-act': 'back', text: 'رجوع' });
+    var owner = B.current;
+
+    back.addEventListener('click', function () {
+      A.confirmLeave().then(function (ok) {
+        if (!ok) return;
+        A.dirty = false;
+        if (options.back) options.back();
+        else if (owner) drawBooking(owner);
+        else A.closeSheet();
+      });
+    });
+
+    // «أكّد برضه» then «سجّل برضه» (or the other way round): both answers stand, until the form is changed
+    var sticky = {};
+
+    function send(extra, button) {
+      box.hidden = true;
+      var scope = document.getElementById('sheet');
+      A.clearFieldErrors(scope);
+      sticky = Object.assign({}, sticky, extra || {});
+      var plan = options.prepare(sticky);
+      if (plan.errors && plan.errors.length) {
+        showErrors(plan.errors, box);
+        return;
+      }
+      A.withBusy(button || submit, W().call('POST', plan.path, plan.body, { idempotencyKey: plan.key })).then(function (reply) {
+        A.dirty = false;
+        extraBox.hidden = true;
+        options.done(reply);
+        afterWrite();
+      }).catch(function (error) {
+        failed(error);
+      });
+    }
+
+    function failed(error) {
+      var code = error && error.code;
+      var reply = (error && error.reply) || {};
+      if (code === 'conflict' && owner) {
+        A.dirty = false;
+        A.toast('حد عدّل الحجز ده، اتحدّث', 'info');
+        openBooking(owner.booking.id, 'حد عدّل الحجز ده، اتحدّث. راجع وكمّل.');
+        afterWrite();
+        return;
+      }
+      if (code === 'warn') {
+        var again = el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'force' }, 'سجّل برضه');
+        again.addEventListener('click', function () { send({ force: true }, again); });
+        A.fill(extraBox,
+          el('p', { class: 'book-warn__title', text: error.parsed.message || 'في ملاحظات قبل التسجيل.' }),
+          warningList(reply.warnings),
+          el('p', { class: 'field__hint', text: 'راجعها، ولو متأكد سجّل برضه.' }),
+          el('div', { class: 'actions' }, again));
+        extraBox.hidden = false;
+        extraBox.scrollIntoView({ block: 'center', behavior: A.reducedMotion() ? 'auto' : 'smooth' });
+        return;
+      }
+      if (code === 'needs_override') {
+        var codes = (reply.warnings || []).map(function (w) { return String(w.code || ''); }).join(' ');
+        var pay = /pay|paid|money/i.test(codes);
+        var cap = /cap|full|seat|place/i.test(codes);
+        if (!pay && !cap) { pay = true; cap = true; }
+        var why = A.textInput('', { max: 200, placeholder: 'مثلاً: الباقي هيدفعه في الرحلة' });
+        var force = el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'override' }, 'أكّد برضه');
+        force.addEventListener('click', function () {
+          if (!why.value.trim()) {
+            A.fail(new Error(JSON.stringify({ appError: 1, message: 'سبب التأكيد برضه: اكتب السبب' })), box);
+            return;
+          }
+          send({ override: { pay: pay, cap: cap, reason: why.value.trim() } }, force);
+        });
+        A.fill(extraBox,
+          el('p', { class: 'book-warn__title', text: error.parsed.message || 'الحجز مينفعش يتأكد كده.' }),
+          warningList(reply.warnings),
+          reply.left !== undefined && reply.left !== null ? el('p', { class: 'field__hint', text: 'فاضل ' + ar(Math.max(0, reply.left)) + ' مكان بس.' }) : null,
+          A.field('سبب التأكيد برضه', why, pay ? 'زي «تأكيد من غير ما الدفع يكمل»: السبب بيتسجل مع التأكيد.' : 'السبب بيتسجل مع التأكيد فوق العدد.'),
+          el('div', { class: 'actions' }, force));
+        extraBox.hidden = false;
+        extraBox.scrollIntoView({ block: 'center', behavior: A.reducedMotion() ? 'auto' : 'smooth' });
+        return;
+      }
+      if (code === 'google') {
+        A.fail(error, box);
+        box.appendChild(el('div', { class: 'actions' }, el('button', { class: 'btn btn--small', type: 'button', onclick: function (e) {
+          A.withBusy(e.currentTarget, W().google()).then(function () { box.hidden = true; }).catch(function (err) { A.fail(err, box); });
+        } }, icon('user'), 'ادخل بحساب جوجل')));
+        return;
+      }
+      if (code === 'full' && reply.left !== undefined) {
+        A.fail(withField(error, 'actual', error.parsed.message + ' فاضل ' + ar(Math.max(0, reply.left)) + ' مكان.'), box);
+        return;
+      }
+      if (error && error.field) {
+        A.fail(withField(error, error.field, error.parsed.message), box);
+        return;
+      }
+      A.fail(error, box);
+    }
+
+    submit.addEventListener('click', function () { send({}); });
+
+    var form = el('div', { class: 'form' }, options.nodes);
+
+    function changed() {
+      sticky = {};
+      extraBox.hidden = true;
+    }
+
+    form.addEventListener('input', changed);
+    form.addEventListener('change', changed);
+
+    A.dirty = false;
+    A.openSheet(options.title, [
+      box,
+      options.intro ? el('p', { class: 'note', text: options.intro }) : null,
+      form,
+      extraBox
+    ], [submit, back], { wide: true, className: 'book-sheet' });
+
+  }
+
+  function warningList(warnings) {
+    return (warnings || []).length ? el('ul', { class: 'book-flags' }, warnings.map(function (w) { return el('li', { text: w.message || w.code }); })) : null;
+  }
+
+  /* a server error that names a field → "<label>: …" (A.fail puts it under the field) */
+  function withField(error, field, message) {
+    var copy = new Error(message);
+    copy.parsed = { message: K.fieldLine(field, message), hint: error.parsed ? error.parsed.hint : '', details: error.parsed ? error.parsed.details : '', field: field };
+    return copy;
+  }
+
+  function showErrors(list, box) {
+    var error = new Error('invalid');
+    error.parsed = { message: list.map(function (e) { return K.fieldLine(e.field, e.message); }).join('\n'), hint: '', details: '' };
+    A.fail(error, box);
+  }
+
+
+  /* ---------- form pieces ---------- */
+
+  function numberInput(value, placeholder) {
+    return el('input', { class: 'input comp-number', type: 'text', inputmode: 'numeric', dir: 'ltr', value: value === null || value === undefined ? '' : String(value), placeholder: placeholder || '', oninput: A.markDirty });
+  }
+
+  /* the people, per price category (counts within each one's min/max) */
+  function countsBlock(pricing, start, onchange) {
+    var inputs = ((pricing && pricing.categories) || []).map(function (c) {
+      var value = start && start[c.key] !== undefined ? start[c.key] : (c.min || 0);
+      var input = el('input', { class: 'input comp-number', type: 'number', inputmode: 'numeric', min: String(c.min || 0), max: String(c.max === undefined || c.max === null ? 30 : c.max), step: '1', value: String(value), 'data-cat': c.key, 'aria-label': c.label });
+      input.addEventListener('input', function () { A.markDirty(); if (onchange) onchange(); });
+      return { c: c, input: input, node: el('label', { class: 'book-count' }, el('span', { class: 'book-count__label', text: c.label + (c.price ? ' — ' + money(c.price) : '') }), input) };
+    });
+    return {
+      node: A.field('العدد', el('div', { class: 'book-counts' }, inputs.map(function (x) { return x.node; }))),
+      value: function () {
+        var out = {};
+        inputs.forEach(function (x) { out[x.c.key] = Math.round(Number(x.input.value) || 0); });
+        return out;
+      }
+    };
+  }
+
+  function select(options, value, label) {
+    return el('select', { class: 'input', 'aria-label': label, onchange: A.markDirty }, options.map(function (o) {
+      return el('option', { value: o.value, selected: o.value === value ? 'selected' : null, text: o.label });
+    }));
+  }
+
+  /* a proof image → WebP ≤ 1600 px, ≤ 600 KB (as the visitor's), then up to the Worker */
+  function prepareProof(file) {
+    if (file.type && !/^image\//.test(file.type)) return Promise.reject(new Error('الملف ده مش صورة.'));
+    var load = window.createImageBitmap ? createImageBitmap(file) : Promise.reject(new Error('المتصفح ده مش بيفتح الصور.'));
+    return load.then(function (bitmap) {
+      var canvas = A.imageKit.scaled(bitmap, 1600);
+      if (bitmap.close) bitmap.close();
+      return A.imageKit.encode(canvas, 600 * 1024);
+    }).then(function (blob) {
+      if (!blob || blob.size > 900 * 1024) throw new Error('الصورة كبيرة قوي حتى بعد الضغط.');
+      return blob;
+    });
+  }
+
+  /*
+   * One payment or refund (PayInput, §5.2): amount, servant, method, when,
+   * proofs (the visitor's ticked + new uploads, ≤ 3 in all), note.
+   * options: { kind, booking, event, prefill: { servantId, method, amount }, visitorProofs: [proof], optional, noNote }
+   */
+  function payBlock(options) {
+
+    var ev = options.event || {};
+    var b = options.booking;
+    var servants = (ev.servants || []).slice();
+    if (b.servantId && !servants.some(function (s) { return s.id === b.servantId; })) servants.unshift({ id: b.servantId, name: b.servantName || b.servantId });
+    var prefill = options.prefill || {};
+    var amount = numberInput(prefill.amount, 'بالجنيه');
+    var servant = select([{ value: '', label: 'اختار الخادم' }].concat(servants.map(function (s) { return { value: s.id, label: s.name }; })), prefill.servantId || '', 'الخادم');
+    var method = el('select', { class: 'input', 'aria-label': 'طريقة الدفع', onchange: A.markDirty });
+    var when = A.dateTimeInput(A.cairoNow(), { presets: [A.PRESETS.now], clearable: false });
+    var note = options.noNote ? null : A.textInput('', { max: 300, placeholder: 'اختياري' });
+    var uploads = [];        // { id?, blob, url, busy, error, key }
+    var visitor = (options.visitorProofs || []).map(function (p) {
+      var tick = el('input', { type: 'checkbox', checked: true, onchange: A.markDirty });
+      return { id: p.id, tick: tick };
+    });
+    var proofsHost = el('div', { class: 'book-uploads' });
+    var file = el('input', { type: 'file', accept: 'image/*', hidden: true, multiple: true });
+    var add = el('button', { class: 'btn btn--small btn--ghost', type: 'button', 'data-act': 'add-proof' }, icon('upload'), 'ارفع صورة إثبات');
+
+    function fillMethods() {
+      var keep = method.value || prefill.method || '';
+      var list = ev.methods || [];
+      var mine = K.servantMethods(ev, servant.value).map(function (m) { return m.key; });
+      A.fill(method, el('option', { value: '', text: 'اختار الطريقة' }), list.map(function (m) {
+        return el('option', { value: m.key, selected: m.key === keep ? 'selected' : null, text: m.label + (servant.value && mine.indexOf(m.key) === -1 ? ' (الخادم ده مش بيقبلها)' : '') });
+      }));
+    }
+
+    servant.addEventListener('change', fillMethods);
+    fillMethods();
+
+    function count() {
+      return visitor.filter(function (v) { return v.tick.checked; }).length + uploads.filter(function (u) { return !u.error; }).length;
+    }
+
+    function drawProofs() {
+      A.fill(proofsHost,
+        visitor.map(function (v, i) {
+          return el('label', { class: 'check check--inline' }, v.tick, el('span', { text: 'إثبات الزائر ' + ar(i + 1) }));
+        }),
+        uploads.map(function (u) {
+          return el('span', { class: 'book-upload' + (u.error ? ' is-error' : '') },
+            u.url ? el('img', { src: u.url, alt: '' }) : null,
+            el('span', { class: 'book-upload__state', text: u.busy ? 'بيترفع…' : u.error ? u.error : 'اترفع ✓' }),
+            u.error ? el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () { upload(u); } }, 'جرّب تاني') : null,
+            el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'شيل الصورة', onclick: function () {
+              uploads.splice(uploads.indexOf(u), 1);
+              if (u.url) URL.revokeObjectURL(u.url);
+              A.markDirty();
+              drawProofs();
+            } }, icon('close')));
+        }),
+        count() < 3 ? add : el('span', { class: 'field__hint', text: '٣ صور بالكتير' }));
+    }
+
+    function upload(u) {
+      u.busy = true;
+      u.error = '';
+      drawProofs();
+      W().upload('/v1/admin/proofs?purpose=payment&bookingId=' + enc(b.id), u.blob, { idempotencyKey: u.key, contentType: u.blob.type }).then(function (reply) {
+        u.id = reply.proof && reply.proof.id || reply.proofId || '';
+        u.busy = false;
+        if (!u.id) u.error = 'الرد مش مفهوم';
+        drawProofs();
+      }).catch(function (error) {
+        u.busy = false;
+        u.error = A.parseError(error).message;
+        drawProofs();
+      });
+    }
+
+    add.addEventListener('click', function () { file.click(); });
+    file.addEventListener('change', function () {
+      var files = Array.prototype.slice.call(file.files || [], 0, Math.max(0, 3 - count()));
+      file.value = '';
+      files.forEach(function (f) {
+        var u = { blob: null, url: '', busy: true, error: '', key: K.newKey('prf') };
+        uploads.push(u);
+        A.markDirty();
+        drawProofs();
+        prepareProof(f).then(function (blob) {
+          u.blob = blob;
+          u.url = URL.createObjectURL(blob);
+          upload(u);
+        }).catch(function (error) {
+          u.busy = false;
+          u.error = A.parseError(error).message;
+          drawProofs();
+        });
+      });
+    });
+
+    drawProofs();
+
+    var keys = K.keyKeeper('pay');
+
+    return {
+      node: el('fieldset', { class: 'fieldset book-payblock' },
+        options.legend ? el('legend', { text: options.legend }) : null,
+        el('div', { class: 'row' }, A.field('المبلغ', amount, options.amountHint || ''), A.field('الخادم', servant)),
+        el('div', { class: 'row' }, A.field('طريقة الدفع', method), A.field('وقت الاستلام', when.node)),
+        A.field('صور الإثبات', el('div', {}, proofsHost, file), 'اختياري — ٣ صور بالكتير'),
+        note ? A.field('ملاحظة', note) : null),
+      filled: function () { return String(amount.value).trim() !== ''; },
+      uploading: function () { return uploads.some(function (u) { return u.busy; }); },
+      /* PayInput (idemKey: the same body → the same key) */
+      value: function (force) {
+        var input = {
+          kind: options.kind || 'payment',
+          amount: K.amountOf(amount.value),
+          servantId: servant.value,
+          method: method.value,
+          receivedAt: K.stamp(when.value())
+        };
+        var ids = visitor.filter(function (v) { return v.tick.checked; }).map(function (v) { return v.id; })
+          .concat(uploads.filter(function (u) { return u.id; }).map(function (u) { return u.id; }));
+        if (ids.length) input.proofIds = ids;
+        if (note && note.value.trim()) input.note = note.value.trim();
+        if (force) input.force = true;
+        input.idemKey = keys.for(input);
+        return input;
+      },
+      typedAmount: function () { return amount.value; },
+      setAmount: function (v) { amount.value = v === null || v === undefined ? '' : String(v); },
+      check: function (input) {
+        var list = K.checkPay(Object.assign({}, input, { amount: amount.value }), { now: K.stamp(A.cairoNow()), createdAt: b.createdAt, paid: options.paid || 0 });
+        if (uploads.some(function (u) { return u.busy; })) list.push({ field: 'proofs', message: 'الصورة لسه بتترفع، استنى ثانية' });
+        return list;
+      }
+    };
+
+  }
+
+
+  /* ---------- confirm (§5.1, §5.3, §9) ---------- */
+
+  function confirmForm(d) {
+
+    var b = d.booking;
+    var ev = d.event || {};
+    var pricing = ev.pricing || {};
+    var free = K.isFree(pricing);
+    var touched = false;
+    var due = numberInput(K.quote(pricing, b.requested), '');
+    var dueReason = A.textInput('', { max: 200, placeholder: 'مثلاً: خصم إخوات' });
+    var reasonField = A.field('سبب تغيير المطلوب', dueReason, 'المطلوب مختلف عن السعر: السبب بيتسجل');
+    var counts = countsBlock(pricing, b.requested || {}, sync);
+    var quoteLine = el('p', { class: 'field__hint' });
+    var capLine = el('p', { class: 'field__hint' });
+    var names = ev.collectNames ? A.textInput((b.names || []).join('\n'), { multiline: true, rows: 3, max: 2000 }) : null;
+    var visitorProofs = (d.proofs || []).filter(function (p) { return !p.paymentId; });
+    var first = free ? null : payBlock({ kind: 'payment', booking: b, event: ev, legend: 'أول دفعة (اختياري)', prefill: { servantId: b.servantId, method: b.method }, visitorProofs: visitorProofs, paid: (d.derived && d.derived.paid) || 0,
+      amountHint: 'فاضي = من غير دفعة دلوقتي' });
+    var keys = K.keyKeeper('cnf');
+
+    due.addEventListener('input', function () { touched = true; sync(); });
+
+    function sync() {
+      var q = K.quote(pricing, counts.value());
+      if (!touched) due.value = String(q);
+      reasonField.hidden = K.amountOf(due.value) === q;
+      quoteLine.textContent = 'السعر بالعدد ده: ' + money(q) + (free ? ' (فعالية مجانية)' : '');
+      var s = K.seats(pricing, counts.value());
+      capLine.textContent = ev.capacity === null || ev.capacity === undefined ? 'الحجز ده هياخد ' + ar(s) + ' مكان.' : 'الحجز ده هياخد ' + ar(s) + ' مكان — فاضل ' + ar(Math.max(0, ev.left === undefined || ev.left === null ? ev.capacity - (ev.taken || 0) : ev.left)) + '.';
+    }
+    sync();
+
+    var rule = free ? 'فعالية مجانية: المطلوب صفر ومفيش دفعات.'
+      : ev.payment && ev.payment.mode === 'installments'
+        ? 'مقدم وأقساط: علشان يتأكد لازم المدفوع يبقى ' + money(Math.min(ev.payment.minFirst || 0, K.amountOf(due.value) || 0)) + ' على الأقل (أو «أكّد برضه» بسبب).'
+        : 'الدفع كامل: علشان يتأكد لازم المدفوع يغطي المطلوب كله (أو «أكّد برضه» بسبب).';
+
+    moveForm({
+      title: 'تأكيد ' + b.ref,
+      intro: rule,
+      label: 'تأكيد الحجز',
+      nodes: [counts.node, quoteLine, capLine, names ? A.field('الأسماء', names, 'اسم في كل سطر') : null,
+        A.field('المطلوب', due, 'بالجنيه — السعر بيتحسب لوحده من العدد'), reasonField, first ? first.node : null],
+      prepare: function (extra) {
+        var actual = counts.value();
+        var quoted = K.quote(pricing, actual);
+        var errors = K.checkConfirm({ pricing: pricing, perBookingMax: ev.perBookingMax, actual: actual, amountDue: free ? '0' : due.value, dueReason: dueReason.value, quoted: quoted });
+        var body = { version: b.version, actual: actual, amountDue: free ? 0 : K.amountOf(due.value) };
+        if (!free && body.amountDue !== quoted) body.dueReason = dueReason.value.trim();
+        if (names) body.names = names.value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+        if (first && (first.filled() || first.uploading())) {
+          var pay = first.value(extra.force);
+          errors = errors.concat(first.check(pay));
+          body.payments = [pay];
+        }
+        if (extra.override) {
+          if (extra.override.pay) body.overridePay = true;
+          if (extra.override.cap) body.overrideCap = true;
+          body.reason = extra.override.reason;
+        }
+        return { errors: errors, path: '/v1/admin/book/bookings/' + enc(b.id) + '/confirm', body: body, key: keys.for(body) };
+      },
+      done: function (reply) {
+        A.toast('اتأكد ✓');
+        drawBooking(reply);
+      }
+    });
+
+  }
+
+
+  /* ---------- reject (with money received → refund owed) ---------- */
+
+  var REJECT_REASONS = ['الدفع مش واضح', 'اكتمل العدد', 'بيانات ناقصة'];
+
+  function rejectForm(d) {
+
+    var b = d.booking;
+    var ev = d.event || {};
+    var reason = A.textInput('', { multiline: true, rows: 2, max: 200, placeholder: 'اختار سبب أو اكتب' });
+    var picks = el('div', { class: 'filter-chips', role: 'group', 'aria-label': 'أسباب جاهزة' }, REJECT_REASONS.map(function (text) {
+      return el('button', { class: 'filter-chip', type: 'button', 'data-reason': text, 'aria-pressed': 'false', onclick: function (e) {
+        reason.value = text;
+        A.markDirty();
+        Array.prototype.forEach.call(picks.children, function (c) { c.setAttribute('aria-pressed', String(c === e.currentTarget)); });
+      } }, text);
+    }));
+    var money_ = payBlock({ kind: 'payment', booking: b, event: ev, legend: 'الفلوس اللي استلمناها', prefill: { servantId: b.servantId, method: b.method },
+      visitorProofs: (d.proofs || []).filter(function (p) { return !p.paymentId; }), paid: 0 });
+    var got = A.choices(A.uid('got'), [{ value: 'no', label: 'لأ' }, { value: 'yes', label: 'أيوه، استلمنا' }], 'no', function (v) { money_.node.hidden = v !== 'yes'; });
+    money_.node.hidden = true;
+    var keys = K.keyKeeper('rej');
+
+    moveForm({
+      title: 'رفض ' + b.ref,
+      intro: 'الطلب بيترفض ومش بياخد مكان. لو استلمنا فلوس، بتتسجل الأول والحجز بيروح «مرتجعات مطلوبة».',
+      label: 'رفض الطلب',
+      kind: 'danger',
+      nodes: [A.field('السبب', el('div', {}, picks, reason)), A.field('استلمنا فلوس؟', got.node), money_.node],
+      prepare: function (extra) {
+        var errors = [];
+        if (!reason.value.trim()) errors.push({ field: 'reason', message: 'اختار سبب أو اكتبه' });
+        var body = { version: b.version, reason: reason.value.trim() };
+        if (got.value() === 'yes') {
+          var pay = money_.value(extra.force);
+          errors = errors.concat(money_.check(pay));
+          body.payments = [pay];
+        }
+        return { errors: errors, path: '/v1/admin/book/bookings/' + enc(b.id) + '/reject', body: body, key: keys.for(body) };
+      },
+      done: function (reply) {
+        var owed = reply.derived && reply.derived.refundOwed;
+        A.toast(owed > 0 ? 'اترفض — مرتجع مطلوب ' + money(owed) : 'اترفض');
+        drawBooking(reply);
+      }
+    });
+
+  }
+
+
+  /* ---------- a payment or a refund ---------- */
+
+  function payForm(d, kind) {
+
+    var b = d.booking;
+    var der = d.derived || {};
+    var refund = kind === 'refund';
+    var block = payBlock({ kind: kind, booking: b, event: d.event, prefill: { servantId: b.servantId, method: b.method, amount: refund && der.refundOwed > 0 ? der.refundOwed : '' }, paid: der.paid || 0,
+      amountHint: refund ? (der.refundOwed > 0 ? 'المرتجع المطلوب ' + money(der.refundOwed) : 'المدفوع ' + money(der.paid || 0)) : (der.balance > 0 ? 'الباقي ' + money(der.balance) : '') });
+
+    moveForm({
+      title: (refund ? 'تسجيل مرتجع: ' : 'إضافة دفعة: ') + b.ref,
+      intro: refund ? 'فلوس رجعت للزائر فعلًا: مين رجّعها وإزاي.' : 'فلوس استلمناها فعلًا: مين استلمها وإزاي.',
+      label: refund ? 'سجّل المرتجع' : 'سجّل الدفعة',
+      nodes: [block.node],
+      prepare: function (extra) {
+        var input = block.value(extra.force);
+        return { errors: block.check(input), path: '/v1/admin/book/bookings/' + enc(b.id) + '/payments', body: input, key: input.idemKey };
+      },
+      done: function (reply) {
+        A.toast(refund ? 'اتسجل المرتجع ✓' : 'اتسجلت الدفعة ✓');
+        drawBooking(reply);
+      }
+    });
+
+  }
+
+
+  /* ---------- void one payment / refund (a reason) ---------- */
+
+  function voidForm(p) {
+
+    var d = B.current;
+    var why = A.textInput('', { multiline: true, rows: 2, max: 200, placeholder: 'مثلاً: المبلغ اتكتب غلط' });
+    var keys = K.keyKeeper('void');
+
+    moveForm({
+      title: 'إلغاء ' + K.KIND[p.kind] + ' ' + money(p.amount),
+      intro: 'الصف بيفضل في السجل متشطب عليه ومبيتحسبش. لو المبلغ غلط: الغيه وسجّل الصح.',
+      label: 'إلغاء الدفعة',
+      kind: 'danger',
+      nodes: [A.field('السبب', why)],
+      prepare: function () {
+        var errors = why.value.trim() ? [] : [{ field: 'reason', message: 'اكتب سبب الإلغاء' }];
+        var body = { reason: why.value.trim() };
+        body.idemKey = keys.for(body);
+        return { errors: errors, path: '/v1/admin/book/payments/' + enc(p.id) + '/void', body: body, key: body.idemKey };
+      },
+      done: function (reply) {
+        A.toast('اتلغت ✓');
+        if (reply && reply.booking) drawBooking(reply);
+        else if (d) openBooking(d.booking.id);
+      }
+    });
+
+  }
+
+
+  /* ---------- update a confirmed booking (actual, amount due + reason, note) ---------- */
+
+  function updateForm(d) {
+
+    var b = d.booking;
+    var ev = d.event || {};
+    var pricing = ev.pricing || {};
+    var counts = countsBlock(pricing, b.actual || b.requested || {}, sync);
+    var due = numberInput(b.amountDue, '');
+    var suggest = el('button', { class: 'btn btn--small btn--ghost', type: 'button', hidden: true, 'data-act': 'use-quote' });
+    var reason = A.textInput('', { max: 200, placeholder: 'مثلاً: زوّد طفل' });
+    var note = A.textInput(b.adminNote || '', { multiline: true, rows: 2, max: 500 });
+    var names = ev.collectNames ? A.textInput((b.names || []).join('\n'), { multiline: true, rows: 3, max: 2000 }) : null;
+    var keys = K.keyKeeper('upd');
+
+    suggest.addEventListener('click', function () {
+      due.value = String(K.quote(pricing, counts.value()));
+      A.markDirty();
+      sync();
+    });
+    due.addEventListener('input', sync);
+
+    function sync() {
+      var q = K.quote(pricing, counts.value());
+      suggest.hidden = K.amountOf(due.value) === q;
+      suggest.textContent = 'السعر بالعدد ده ' + money(q) + ' — استخدمه';
+    }
+    sync();
+
+    moveForm({
+      title: 'تعديل ' + b.ref,
+      intro: 'تغيير العدد بيتراجع على الأماكن الفاضية. تغيير المطلوب محتاج سبب وبيتسجل في «تغييرات المطلوب».',
+      label: 'حفظ',
+      nodes: [counts.node, el('div', { class: 'actions' }, suggest), A.field('المطلوب', due), A.field('السبب', reason, 'مطلوب لو المطلوب اتغير'),
+        names ? A.field('الأسماء', names, 'اسم في كل سطر') : null, A.field('ملاحظة الأدمن', note, 'للأدمن بس')],
+      prepare: function (extra) {
+        var actual = counts.value();
+        var body = { version: b.version };
+        var errors = [];
+        var was = b.actual || {};
+        if (Object.keys(actual).some(function (k) { return actual[k] !== (Number(was[k]) || 0); })) {
+          var problem = K.checkCounts(pricing, ev.perBookingMax, actual);
+          if (problem) errors.push({ field: 'actual', message: problem });
+          body.actual = actual;
+        }
+        var amount = K.amountOf(due.value);
+        if (String(due.value).trim() !== String(b.amountDue)) {
+          if (isNaN(amount) || amount > 1000000) errors.push({ field: 'amountDue', message: 'رقم صحيح بالجنيه' });
+          else body.amountDue = amount;
+          if (!reason.value.trim()) errors.push({ field: 'reason', message: 'اكتب ليه المطلوب اتغير' });
+        }
+        if (reason.value.trim()) body.reason = reason.value.trim();
+        if (note.value.trim() !== String(b.adminNote || '').trim()) body.adminNote = note.value.trim();
+        if (names) {
+          var list = names.value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+          if (JSON.stringify(list) !== JSON.stringify(b.names || [])) body.names = list;
+        }
+        if (extra.override) {
+          body.overrideCap = true;
+          body.reason = [body.reason, extra.override.reason].filter(Boolean).join(' — ');
+        }
+        if (!errors.length && Object.keys(body).length === 1) errors.push({ field: '', message: 'مفيش حاجة اتغيرت.' });
+        return { errors: errors, path: '/v1/admin/book/bookings/' + enc(b.id) + '/update', body: body, key: keys.for(body) };
+      },
+      done: function (reply) {
+        A.toast('اتحفظ ✓');
+        drawBooking(reply);
+      }
+    });
+
+  }
+
+
+  /* ---------- cancel a confirmed booking (reason, retained fee) ---------- */
+
+  function cancelForm(d) {
+
+    var b = d.booking;
+    var paid = (d.derived && d.derived.paid) || 0;
+    var reason = A.textInput('', { multiline: true, rows: 2, max: 200, placeholder: 'مثلاً: اعتذر عن الرحلة' });
+    var retain = numberInput('0', '0');
+    var line = el('p', { class: 'field__hint', role: 'status' });
+    var keys = K.keyKeeper('cnl');
+
+    function sync() {
+      var kept = K.amountOf(retain.value);
+      line.textContent = isNaN(kept) ? '' : 'المرتجع المطلوب بعد الإلغاء: ' + money(Math.max(0, paid - kept));
+    }
+    retain.addEventListener('input', sync);
+    sync();
+
+    moveForm({
+      title: 'إلغاء ' + b.ref,
+      intro: 'الحجز بيتلغي ومكانه بيفضى. المدفوع ' + money(paid) + ': تقدر تخصم منه رسوم (افتراضي صفر) والباقي بيبقى مرتجع مطلوب.',
+      label: 'إلغاء الحجز',
+      kind: 'danger',
+      nodes: [A.field('السبب', reason), A.field('المبلغ اللي هيتخصم', retain, 'من صفر لحد ' + money(paid)), line],
+      prepare: function () {
+        var errors = K.checkCancel({ reason: reason.value, retain: retain.value, paid: paid });
+        var body = { version: b.version, reason: reason.value.trim(), retain: K.amountOf(retain.value) };
+        return { errors: errors, path: '/v1/admin/book/bookings/' + enc(b.id) + '/cancel', body: body, key: keys.for(body) };
+      },
+      done: function (reply) {
+        var owed = reply.derived && reply.derived.refundOwed;
+        A.toast(owed > 0 ? 'اتلغى — مرتجع مطلوب ' + money(owed) : 'اتلغى');
+        drawBooking(reply);
+      }
+    });
+
+  }
+
+
+  /* ---------- reopen a rejected request ---------- */
+
+  function reopen(d, button) {
+    var b = d.booking;
+    A.confirm({ tone: 'warn', title: 'تفتح ' + b.ref + ' تاني؟', message: 'الطلب بيرجع «جديد» ويتراجع من الأول. الدفعات المسجلة بتفضل زي ما هي.', confirmLabel: 'افتحه', cancelLabel: 'رجوع' }).then(function (ok) {
+      if (!ok) return;
+      var body = { version: b.version };
+      A.withBusy(button, W().call('POST', '/v1/admin/book/bookings/' + enc(b.id) + '/reopen', body, { idempotencyKey: K.newKey('rop') })).then(function (reply) {
+        A.toast('رجع «جديد» ✓');
+        drawBooking(reply);
+        afterWrite();
+      }).catch(function (error) {
+        if (error && error.code === 'conflict') {
+          A.toast('حد عدّل الحجز ده، اتحدّث', 'info');
+          openBooking(b.id, 'حد عدّل الحجز ده، اتحدّث. راجع وكمّل.');
+          return;
+        }
+        A.fail(error, document.querySelector('#sheet .errors'));
+      });
+    });
+  }
+
+
+  /* =======================================================
+     A MANUAL BOOKING (source admin): the visitor form, optionally confirmed
+  ======================================================= */
+
+  /* the event's published booking settings: a booking's detail already read, else its event.json on the site */
+  var configs = { byEvent: {} };
+
+  function eventConfig(ev) {
+    if (configs.byEvent[ev.id]) return Promise.resolve(configs.byEvent[ev.id]);
+    if (!configs[ev.slug]) {
+      configs[ev.slug] = fetch(new URL('../events/' + enc(ev.slug) + '/event.json', location.href).href, { cache: 'no-store', credentials: 'omit' })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (json) {
+          var bk = json && json.booking;
+          if (!bk || !bk.pricing) throw new Error('no booking');
+          return { id: ev.id, slug: ev.slug, title: json.title || ev.title, startAt: json.startAt, endAt: json.endAt, capacity: ev.capacity, taken: ev.taken, left: ev.left,
+            perBookingMax: bk.perBookingMax || 10, collectNames: !!bk.collectNames, pricing: bk.pricing, payment: bk.payment || { mode: 'full' },
+            methods: bk.methods || [], servants: (bk.servants || []).map(function (s) { return { id: s.id, name: s.name, methods: s.methods || [] }; }) };
+        });
+      configs[ev.slug].catch(function () { configs[ev.slug] = null; });
+    }
+    return configs[ev.slug];
+  }
+
+  function manualForm(evRow, button) {
+    A.withBusy(button, eventConfig(evRow)).then(function (ev) {
+      manualSheet(ev);
+    }).catch(function (error) {
+      A.toast('مقدرناش نقرا أسعار الفعالية من الموقع. اتأكد إنها منشورة وفيها حجز، وجرّب تاني.', true);
+      if (window.console) console.warn('[admin] event config', error);
+    });
+  }
+
+  function manualSheet(ev) {
+
+    var pricing = ev.pricing || {};
+    var free = K.isFree(pricing);
+    var name = A.textInput('', { max: 60, placeholder: 'الاسم بالكامل' });
+    var phone = A.textInput('', { ltr: true, inputmode: 'tel', placeholder: '01012345678' });
+    var counts = countsBlock(pricing, {}, sync);
+    var quoteLine = el('p', { class: 'field__hint' });
+    var names = ev.collectNames ? A.textInput('', { multiline: true, rows: 3, max: 2000 }) : null;
+    var servant = select([{ value: '', label: 'من غير خادم' }].concat((ev.servants || []).map(function (s) { return { value: s.id, label: s.name }; })), '', 'الخادم');
+    var method = select([{ value: '', label: 'من غير طريقة' }].concat((ev.methods || []).map(function (m) { return { value: m.key, label: m.label }; })), '', 'طريقة الدفع');
+    var note = A.textInput('', { multiline: true, rows: 2, max: 300, placeholder: 'اختياري: اتحجز بالتليفون…' });
+    var confirmNow = A.checkbox('أكّده دلوقتي', false, 'حجز اتفقنا عليه: يتأكد في نفس الخطوة');
+    var touched = false;
+    var due = numberInput('', '');
+    var dueReason = A.textInput('', { max: 200, placeholder: 'مثلاً: خصم' });
+    var reasonField = A.field('سبب تغيير المطلوب', dueReason);
+    var fake = { id: '', servantId: '', servantName: '', createdAt: '' };
+    var first = free ? null : payBlock({ kind: 'payment', booking: fake, event: ev, legend: 'أول دفعة (اختياري)', noNote: true, amountHint: 'فاضي = من غير دفعة دلوقتي' });
+    var confirmBox = el('div', { class: 'form', hidden: true }, A.field('المطلوب', due), reasonField, first ? first.node : null);
+    var requestKey = K.newKey('adm');
+    var keys = K.keyKeeper('new');
+
+    // proofs need the booking first: added later from «إضافة دفعة»
+    if (first) Array.prototype.forEach.call(first.node.querySelectorAll('.field'), function (f) { if (f.dataset.label === 'صور الإثبات') f.hidden = true; });
+
+    confirmNow.input.addEventListener('change', function () { confirmBox.hidden = !confirmNow.input.checked; });
+    due.addEventListener('input', function () { touched = true; sync(); });
+
+    function sync() {
+      var q = K.quote(pricing, counts.value());
+      quoteLine.textContent = 'السعر: ' + money(q);
+      if (!touched) due.value = String(q);
+      reasonField.hidden = K.amountOf(due.value) === q;
+    }
+    sync();
+
+    moveForm({
+      title: 'حجز يدوي: ' + ev.title,
+      intro: 'حجز بالتليفون أو حضوري: نفس بيانات الموقع. بيتعمل «جديد»، أو مؤكد على طول لو علّمت «أكّده دلوقتي».',
+      label: 'سجّل الحجز',
+      nodes: [A.field('الاسم', name), A.field('الموبايل', phone, 'بأي شكل: 010… أو +20…'), counts.node, quoteLine,
+        names ? A.field('الأسماء', names, 'اسم في كل سطر') : null, el('div', { class: 'row' }, A.field('الخادم', servant), A.field('طريقة الدفع', method)),
+        A.field('ملاحظة', note), confirmNow.node, confirmBox],
+      back: function () { A.closeSheet(); },
+      prepare: function (extra) {
+        var c = counts.value();
+        var errors = K.checkManual({ name: name.value, phone: phone.value, counts: c, pricing: pricing, perBookingMax: ev.perBookingMax, note: note.value });
+        var body = { eventId: ev.id, requestKey: requestKey, name: name.value.trim(), phone: K.normPhone(phone.value) || phone.value.trim(), counts: c };
+        if (names) body.names = names.value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+        if (servant.value) body.servantId = servant.value;
+        if (method.value) body.method = method.value;
+        if (note.value.trim()) body.note = note.value.trim();
+        if (confirmNow.input.checked) {
+          var quoted = K.quote(pricing, c);
+          var conf = { actual: c, amountDue: free ? 0 : K.amountOf(due.value) };
+          errors = errors.concat(K.checkConfirm({ pricing: pricing, perBookingMax: ev.perBookingMax, actual: c, amountDue: free ? '0' : due.value, dueReason: dueReason.value, quoted: quoted }).filter(function (e) { return e.field !== 'actual'; }));
+          if (!free && conf.amountDue !== quoted) conf.dueReason = dueReason.value.trim();
+          if (first && first.filled()) {
+            var pay = first.value(extra.force);
+            errors = errors.concat(first.check(pay));
+            conf.payments = [pay];
+          }
+          if (extra.override) {
+            if (extra.override.pay) conf.overridePay = true;
+            if (extra.override.cap) conf.overrideCap = true;
+            conf.reason = extra.override.reason;
+          }
+          body.confirm = conf;
+        }
+        return { errors: errors, path: '/v1/admin/book/bookings', body: body, key: keys.for(body) };
+      },
+      done: function (reply) {
+        A.toast(reply.booking && reply.booking.status === 'confirmed' ? 'اتسجل واتأكد ✓ ' + reply.booking.ref : 'اتسجل ✓ ' + (reply.booking ? reply.booking.ref : ''));
+        drawBooking(reply);
+      }
+    });
+
+    // its own servant/method pickers prefill the first payment
+    if (first) {
+      servant.addEventListener('change', function () {
+        var s = first.node.querySelector('select[aria-label="الخادم"]');
+        if (s && !s.value) { s.value = servant.value; s.dispatchEvent(new Event('change')); }
+      });
+      method.addEventListener('change', function () {
+        var m = first.node.querySelector('select[aria-label="طريقة الدفع"]');
+        if (m && !m.value) m.value = method.value;
+      });
+    }
+
+  }
+
+
+  /* =======================================================
+     THE EVENT IS CANCELLED: every pending and confirmed booking (§7.2)
+  ======================================================= */
+
+  function cancelAllForm(ev) {
+
+    var counts = ev.counts || {};
+    var reason = A.textInput('', { multiline: true, rows: 2, max: 200, placeholder: 'مثلاً: الرحلة اتلغت بسبب الجو' });
+    var word = A.textInput('', { max: 20, placeholder: 'إلغاء' });
+    var keys = K.keyKeeper('all');
+
+    moveForm({
+      title: 'إلغاء الفعالية: ' + ev.title,
+      intro: 'كل الطلبات الجديدة (' + ar(counts.pending || 0) + ') والحجوزات المؤكدة (' + ar(counts.confirmed || 0) + ') هتتلغي مرة واحدة، من غير خصم، وكل اللي دفع هيظهر في «مرتجعات مطلوبة». الخطوة دي مبترجعش.',
+      label: 'إلغاء كل الحجوزات',
+      kind: 'danger',
+      nodes: [A.field('السبب', reason, 'بيتسجل على كل حجز'), A.field('التأكيد', word, 'اكتب كلمة «إلغاء» علشان تتأكد')],
+      back: function () { A.closeSheet(); },
+      prepare: function () {
+        var errors = [];
+        if (!reason.value.trim()) errors.push({ field: 'reason', message: 'اكتب سبب إلغاء الفعالية' });
+        if (word.value.trim() !== 'إلغاء' && word.value.trim() !== 'الغاء') errors.push({ field: '', message: 'التأكيد: اكتب كلمة «إلغاء»' });
+        var body = { reason: reason.value.trim() };
+        body.idemKey = keys.for(body);
+        return { errors: errors, path: '/v1/admin/book/events/' + enc(ev.id) + '/cancel-all', body: body, key: body.idemKey };
+      },
+      done: function (reply) {
+        A.closeSheet();
+        A.toast('اتلغى ' + ar(reply.cancelled || 0) + ' حجز — راجع «مرتجعات مطلوبة»');
+        B.filter = 'refunds';
+        if (A.area === 'pages' && A.sub.pages === 'bookings') A.render();
+      }
+    });
+
+  }
+
+
+  /* =======================================================
+     SUMMARY + XLSX (§13)
+  ======================================================= */
+
+  function summarySheet(ev) {
+
+    var from = A.dateTimeInput('', { dateOnly: true, emptyText: 'من الأول' });
+    var to = A.dateTimeInput('', { dateOnly: true, emptyText: 'لحد دلوقتي' });
+    var body = el('div', { 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--line' }));
+    var box = A.errorBox();
+    var show = el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'summary-go' }, 'اعرض');
+    var xlsx = el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'export' }, icon('download'), 'نزّل Excel');
+
+    function range() {
+      var out = '';
+      if (from.value()) out += '&from=' + enc(from.value() + 'T00:00');
+      if (to.value()) out += '&to=' + enc(to.value() + 'T23:59');
+      return out;
+    }
+
+    function load(button) {
+      box.hidden = true;
+      // the methods' words come with the event's settings (a booking read already, else its event.json)
+      var run = Promise.all([
+        W().call('GET', '/v1/admin/book/summary?eventId=' + enc(ev.id) + range()),
+        eventConfig(ev).catch(function () { return null; })
+      ]).then(function (got) {
+        if (!got[0].event && got[1]) got[0].event = got[1];
+        return got[0];
+      });
+      (button ? A.withBusy(button, run) : run).then(function (reply) {
+        if (body.isConnected) drawSummary(reply);
+      }).catch(function (error) {
+        if (!body.isConnected) return;
+        body.replaceChildren();
+        A.fail(error, box);
+      });
+    }
+
+    function drawSummary(r) {
+      var o = r.overall || {};
+      var bk = o.bookings || {};
+      var m = o.money || {};
+      var ps = o.payStatus || {};
+      var s = o.seats || {};
+      var p = o.people || {};
+      var methods = Object.keys(m.byMethod || {});
+      var servantRows = r.servants || [];
+      A.fill(body,
+        el('p', { class: 'section-label', text: 'الحجوزات (كل الفعالية)' }),
+        el('div', { class: 'comp-tiles' },
+          tile('جديدة', ar(bk.pending || 0), bk.pending ? 'gold' : ''), tile('مؤكدة', ar(bk.confirmed || 0)), tile('مرفوضة', ar(bk.rejected || 0)),
+          tile('الزائر لغاها', ar(bk.withdrawn || 0)), tile('اتلغت', ar(bk.cancelled || 0)),
+          tile('الأماكن', s.capacity === null || s.capacity === undefined ? ar(s.taken || 0) : ar(s.taken || 0) + ' / ' + ar(s.capacity)),
+          tile('الأفراد المؤكدين', ar(p.total || 0))),
+        el('p', { class: 'section-label', text: 'الفلوس' + (from.value() || to.value() ? ' (في الفترة دي)' : '') }),
+        el('div', { class: 'comp-tiles' },
+          tile('المستلم', money(m.received || 0)), tile('المرتجع', money(m.refunded || 0)), tile('الصافي', money(m.net || 0), 'gold'),
+          tile('المطلوب', money(m.due || 0)), tile('الباقي على الناس', money(m.balance || 0)), tile('مرتجعات مطلوبة', money(m.refundsOwed || 0), m.refundsOwed ? 'gold' : '')),
+        methods.length ? el('ul', { class: 'book-history' }, methods.map(function (k) {
+          var x = m.byMethod[k];
+          return el('li', { text: (K.methodLabel(r.event || configs.byEvent[ev.id] || {}, k) || 'من غير طريقة') + ': مستلم ' + money(x.received) + '، مرتجع ' + money(x.refunded) + '، صافي ' + money(x.net) });
+        })) : null,
+        el('p', { class: 'field__hint', text: 'حالة الدفع: مجاني ' + ar(ps.free || 0) + '، لسه مدفعش ' + ar(ps.unpaid || 0) + '، جزء ' + ar(ps.partial || 0) + '، كله ' + ar(ps.paid || 0) + '، زيادة ' + ar(ps.overpaid || 0) + '، متأخر ' + ar(ps.overdue || 0) }),
+        o.pending ? el('p', { class: 'field__hint', text: 'طلبات لسه بتتراجع: ' + ar(o.pending.count || 0) + ' بقيمة ' + money(o.pending.quoted || 0) + ' (متوقع، مش فلوس)' }) : null,
+        el('p', { class: 'section-label', text: 'حسب الخادم' }),
+        servantRows.length ? el('div', { class: 'comp-rank book-servants', role: 'table', 'aria-label': 'حسب الخادم' },
+          el('div', { class: 'comp-rank__row comp-rank__row--head', role: 'row' },
+            ['الخادم', 'المستلم', 'المرتجع', 'الصافي', 'حجوزات'].map(function (h) { return el('span', { role: 'columnheader', text: h }); })),
+          servantRows.map(function (sv) {
+            return el('div', { class: 'comp-rank__row', role: 'row', 'data-servant': sv.id },
+              el('span', { role: 'cell' }, el('bdi', { text: sv.name || sv.id }), sv.active === false ? el('small', { text: 'موقوف' }) : null, el('small', { text: ar(sv.payments || 0) + ' دفعة، اختاروه ' + ar(sv.chosenBy || 0) })),
+              el('span', { role: 'cell', text: money(sv.received || 0) }),
+              el('span', { role: 'cell', text: money(sv.refunded || 0) }),
+              el('span', { role: 'cell', text: money(sv.net || 0) }),
+              el('span', { role: 'cell', text: ar(sv.bookings || 0) }));
+          })) : el('p', { class: 'note', text: 'لسه مفيش دفعات.' }));
+    }
+
+    show.addEventListener('click', function () { load(show); });
+
+    xlsx.addEventListener('click', function () {
+      A.confirm({ tone: 'warn', icon: 'phone', title: 'الملف فيه أرقام تليفونات، ماتبعتوش في جروبات', message: 'احفظه عندك أو ابعته للمسؤول بس. فيه أسماء وموبايلات وفلوس كل حجز.', confirmLabel: 'نزّل الملف', cancelLabel: 'رجوع' }).then(function (ok) {
+        if (!ok) return;
+        var fromText = from.value();
+        var toText = to.value();
+        A.withBusy(xlsx, Promise.all([
+          W().call('GET', '/v1/admin/book/export?eventId=' + enc(ev.id) + range()),
+          import(new URL('xlsx.js', location.href).href)
+        ]).then(function (got) {
+          var made = K.bookingBook(got[0], { from: fromText, to: toText, today: A.cairoNow().slice(0, 10) });
+          var bytes = got[1].writeXlsx(made.book);
+          B.lastDownload = { filename: made.filename, bytes: bytes };
+          got[1].download(bytes, made.filename);
+          return made;
+        })).then(function (made) {
+          A.toast('اتنزّل ' + made.filename);
+        }).catch(function (error) { A.fail(error, box); });
+      });
+    });
+
+    A.dirty = false;
+    A.openSheet('الملخص والحسابات: ' + ev.title, [
+      box,
+      el('p', { class: 'note', text: 'كل الفلوس هنا من الدفعات المسجلة بس (الملغية مبتتحسبش). الفترة بتفلتر الفلوس بوقت الاستلام؛ عدد الحجوزات دايمًا للفعالية كلها.' }),
+      el('div', { class: 'row' }, A.field('من يوم', from.node), A.field('لحد يوم', to.node)),
+      el('div', { class: 'actions' }, show),
+      body
+    ], [xlsx, el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })], { wide: true, className: 'book-sheet' });
+
+    load();
+
+  }
 
 })();

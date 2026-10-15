@@ -191,8 +191,11 @@ export const GIS_STUB = `(function () {
  * POST <TEST_API> → world.post(body), served the way Apps Script does it:
  * a 302 to script.googleusercontent.com, whose GET returns the JSON.
  * Everything else outside the local site is refused (and recorded).
+ * handle(request) (optional) answers first: a puppeteer respond() object,
+ * 'abort' (a network failure), or null to go on as usual
+ * (tests/book-admin.e2e.mjs: the Worker, mocked).
  */
-export async function interceptGoogle(page, world, { outside = [], calls = [], site = null, gisHangs = () => false } = {}) {
+export async function interceptGoogle(page, world, { outside = [], calls = [], site = null, gisHangs = () => false, handle = null } = {}) {
 
   const echoes = new Map();
   let echo = 0;
@@ -202,6 +205,9 @@ export async function interceptGoogle(page, world, { outside = [], calls = [], s
   page.on('request', async request => {
     const url = request.url();
     try {
+      const own = handle ? await handle(request) : null;
+      if (own === 'abort') return request.abort('failed');
+      if (own) return request.respond(own);
       // site = { origin: 'https://stathanasiosyouth.github.io', local: 'http://localhost:4540' }:
       // the real address, answered by the local site server
       if (site && url.startsWith(site.origin + '/')) {
