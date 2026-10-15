@@ -1,5 +1,5 @@
--- DRAFT — NOT APPLIED. Booking pilot schema (docs/EVENTS.md §1, D1 storage).
--- Moves to migrations/0002_bookings.sql only when the pilot is approved.
+-- DRAFT — NOT APPLIED (becomes migrations/0003_bookings.sql). Booking pilot schema (docs/EVENTS.md §1, D1 storage).
+-- Moves to migrations/ only when the pilot is approved.
 -- Columns mirror the EVENTS.md tabs so a reverse export to Sheets is a straight copy.
 -- Money: integer EGP. Times: *_ms epoch ms + Cairo text where the contract shows stamps.
 
@@ -81,21 +81,8 @@ CREATE INDEX payments_booking ON payments (booking_id);
 CREATE INDEX payments_event ON payments (event_id);
 CREATE UNIQUE INDEX payments_one_void ON payments (voids_id) WHERE voids_id IS NOT NULL;
 
-CREATE TABLE proofs (
-  id              TEXT PRIMARY KEY,          -- prf-…
-  booking_id      TEXT NOT NULL,
-  payment_id      TEXT,
-  r2_key          TEXT NOT NULL,             -- private bucket object (was driveId)
-  mime            TEXT NOT NULL, bytes INTEGER NOT NULL, sha256 TEXT NOT NULL,
-  width INTEGER, height INTEGER,
-  by              TEXT NOT NULL,             -- visitor | admin email
-  at              TEXT NOT NULL, at_ms INTEGER NOT NULL,
-  delete_after_ms INTEGER,                   -- event end + 60 days
-  deleted_at      TEXT
-);
-CREATE INDEX proofs_booking ON proofs (booking_id);
-CREATE INDEX proofs_sha ON proofs (sha256);
-CREATE INDEX proofs_retention ON proofs (delete_after_ms) WHERE deleted_at IS NULL;
+-- Proof files: the shared `proofs` table (migrations/0002_proofs.sql, purpose
+-- booking | payment, booking_id / payment_id) + the private R2 bucket.
 
 -- Capacity guard used at confirm (EVENTS.md §9), one statement under D1's single writer:
 --   UPDATE bookings SET status='confirmed', actual=?, seats_actual=?, amount_due=?, … , version=version+1

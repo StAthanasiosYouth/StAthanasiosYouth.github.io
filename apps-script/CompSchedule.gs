@@ -317,6 +317,9 @@ function pushScheduleDaily(e) {
 
   if (!pushFromOurTrigger_(e)) return;
 
+  // once a day the new backend's admin list is refreshed too (WorkerSync.gs)
+  workerSyncAdmins_(true);
+
   pushScheduleRun_();
 
 }

@@ -69,7 +69,7 @@ export function preflight(request, env) {
     headers: {
       ...SECURITY_HEADERS,
       ...cors,
-      'access-control-allow-methods': 'GET, POST, OPTIONS',
+      'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
       'access-control-allow-headers': 'authorization, content-type, idempotency-key, x-request-id',
       'access-control-max-age': '7200'
     }
@@ -100,6 +100,36 @@ export function errorResponse(ctx, err) {
   const headers = {};
   if (code === 'rate' && err.extra && err.extra.retryAfter) headers['retry-after'] = String(err.extra.retryAfter);
   return json(ctx, body, { status, headers });
+}
+
+/*
+ * A private file for an admin (proofs): never cached, never sniffed, never
+ * rendered as a page (sandboxed), shown inline as an image only.
+ */
+export function fileResponse(ctx, body, { contentType, length, filename }) {
+  return new Response(body, {
+    status: 200,
+    headers: {
+      ...SECURITY_HEADERS,
+      'content-security-policy': "default-src 'none'; img-src 'self'; sandbox",
+      'content-type': contentType,
+      ...(length ? { 'content-length': String(length) } : {}),
+      'content-disposition': `inline; filename="${filename}"`,
+      'cache-control': 'private, no-store',
+      'cross-origin-resource-policy': 'same-site',
+      'x-request-id': ctx.rid,
+      ...corsHeaders(ctx.request, ctx.env)
+    }
+  });
+}
+
+/* Raw body (uploads) with a hard size cap. */
+export async function readRaw(request, limit) {
+  const declared = Number(request.headers.get('content-length') || 0);
+  if (declared > limit) throw new ApiError('toolarge');
+  const buf = await request.arrayBuffer();
+  if (buf.byteLength > limit) throw new ApiError('toolarge');
+  return buf;
 }
 
 /* JSON body with a hard size cap (Content-Length can be absent or wrong). */

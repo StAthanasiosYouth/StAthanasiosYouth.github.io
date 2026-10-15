@@ -7,7 +7,7 @@
  * line (+ api_log row for errors / slow requests, after the response).
  */
 
-import { ApiError, errorResponse, json, preflight, readJson } from './lib/http.js';
+import { ApiError, errorResponse, json, preflight, readJson, readRaw } from './lib/http.js';
 import { requireAdmin } from './lib/auth.js';
 import { pseudonym } from './lib/hash.js';
 import { logLine, persistIfNotable } from './lib/log.js';
@@ -25,6 +25,8 @@ export async function handle(request, env, ectx, deps = {}) {
     fetch: deps.fetch || fetch,
     actor: null,
     body: null,
+    raw: null,
+    params: {},
     defer: p => ectx.waitUntil(Promise.resolve(p).catch(err => logLine({ lvl: 'warn', rid: ctx.rid, msg: 'deferred failed', err: String(err && err.message).slice(0, 200) })))
   };
   let response;
@@ -33,11 +35,16 @@ export async function handle(request, env, ectx, deps = {}) {
 
   try {
     if (request.method === 'OPTIONS') return preflight(request, env);
-    route = match(request.method, url.pathname);
+    const hit = match(request.method, url.pathname);
+    route = hit.route;
+    ctx.params = hit.params;
     if (route.auth === 'admin') await requireAdmin(ctx);
-    ctx.body = request.method === 'POST' ? await readJson(request) : null;
+    if (route.raw) ctx.raw = await readRaw(request, route.maxBytes);
+    else ctx.body = request.method === 'POST' ? await readJson(request) : null;
     const data = await route.handler(ctx);
-    if (data && data.__replay) {
+    if (data && data.__response) {
+      response = data.__response;
+    } else if (data && data.__replay) {
       response = json(ctx, data.__replay.body, { status: data.__replay.status, headers: { 'idempotency-replayed': '1' } });
     } else {
       response = json(ctx, { ok: true, ...data });

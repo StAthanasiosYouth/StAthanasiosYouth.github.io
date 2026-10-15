@@ -195,6 +195,7 @@ function apiAddAdmin(value) {
     emails.push(email);
     PropertiesService.getScriptProperties().setProperty('ADMIN_EMAILS', emails.join(', '));
     forgetAdminEmails_();
+    workerSyncSoon_();
     log_(me, 'admins.add', email);
     activity_({ action: 'admin.add', type: 'admins', id: email, title: email });
 
@@ -250,6 +251,7 @@ function apiRemoveAdmin(value) {
     var shown = displayName_(email);
     PropertiesService.getScriptProperties().setProperty('ADMIN_EMAILS', emails.join(', '));
     forgetAdminEmails_();
+    workerSyncSoon_();
     log_(me, 'admins.remove', email);
     // no name and no admin notifications left behind for someone who isn't an admin any more
     try { forgetAdminName_(email); } catch (ignored) { console.warn('admins: name not removed'); }

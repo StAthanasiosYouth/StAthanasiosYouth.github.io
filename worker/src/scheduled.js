@@ -4,6 +4,7 @@
  */
 
 import { logLine } from './lib/log.js';
+import { sweepProofs } from './lib/proofs.js';
 
 const DAY = 24 * 3600 * 1000;
 export const RETENTION = {
@@ -29,5 +30,9 @@ export async function housekeeping(env, now = Date.now()) {
 }
 
 export async function scheduled(controller, env) {
-  await housekeeping(env, controller.scheduledTime || Date.now());
+  const now = controller.scheduledTime || Date.now();
+  await housekeeping(env, now);
+  // proofs past their retention date, and R2 objects no row names (> 24 h)
+  const proofs = await sweepProofs(env, { now });
+  logLine({ kind: 'cron', job: 'proofs', ...proofs });
 }

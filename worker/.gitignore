@@ -6,3 +6,4 @@ backup-*.sql
 backup-*.age
 .staging-test-key.pem
 load-results-*.json
+.staging-sync-secret

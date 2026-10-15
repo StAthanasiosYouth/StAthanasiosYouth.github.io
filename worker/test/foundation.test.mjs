@@ -48,7 +48,7 @@ test('unknown route 404, wrong method 405, Arabic message + requestId', async ()
 });
 
 test('deep health reports DB and migrations; storage not configured without R2', async () => {
-  const h = harness();
+  const h = harness({ env: { PROOFS: undefined } });
   const r = await h.call('/v1/health/deep');
   assert.equal(r.body.db.ok, true);
   assert.ok(r.body.db.migrations >= 1);

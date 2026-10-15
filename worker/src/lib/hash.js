@@ -29,6 +29,19 @@ export async function pseudonym(env, value) {
   return hex(sig).slice(0, 16);
 }
 
+export async function sha256Bytes(bytes) {
+  return hex(await crypto.subtle.digest('SHA-256', bytes));
+}
+
+/* prefix + n lowercase base32 chars (EVENTS.md §1 id format) */
+export function base32Id(prefix, n = 8) {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz234567';
+  const b = crypto.getRandomValues(new Uint8Array(n));
+  let out = '';
+  for (let i = 0; i < n; i++) out += alphabet[b[i] & 31];
+  return prefix + out;
+}
+
 export function randomId(prefix, bytes = 6) {
   const b = crypto.getRandomValues(new Uint8Array(bytes));
   return prefix + hex(b);

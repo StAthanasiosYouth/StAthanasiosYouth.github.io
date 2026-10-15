@@ -51,7 +51,7 @@ capacity and accounting, and runs in Apps Script and Node (tests), like
 > **Revised 2026-10-15 (backend migration, docs/BACKEND-MIGRATION.md).**
 > The booking engine is built on the Cloudflare Worker, not Apps Script.
 > - **Data:** Bookings, Payments and Proofs live in **D1**
->   (`worker/drafts/0002_bookings.sql`, applied when the pilot is approved).
+>   (`worker/drafts/0003_bookings.sql`, applied when the pilot is approved).
 > - **Proof files:** in the private **R2** bucket `athanasios-private`, not Drive.
 > - **Events, Servants, PayMethods** stay edited in the Sheet (Apps Script)
 >   for now. Their bookable part is synced to D1 (`event_cfg`, `servants`,

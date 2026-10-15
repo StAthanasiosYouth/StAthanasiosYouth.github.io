@@ -3,7 +3,7 @@
 The new backend, built next to Apps Script and migrated to module by module
 (docs/BACKEND-MIGRATION.md).
 
-**Status (Phase 1 foundation):**
+**Status (Phase 1 foundation, 2026-10-15):**
 - Live and healthy.
 - **No production module uses it yet.** The site and admin still call Apps
   Script only.
@@ -19,7 +19,7 @@ All resources live in Cloudflare account `menazakmena@gmail.com` (workers.dev su
 | Worker | `athanasios-api` → https://athanasios-api.menazak-lab.workers.dev | `athanasios-api-staging` → https://athanasios-api-staging.menazak-lab.workers.dev |
 | D1 (location `eeur`) | `athanasios-prod` | `athanasios-staging` |
 | Queue / dead letters | `athanasios-jobs` / `athanasios-jobs-dlq` | `athanasios-jobs-staging` / `…-staging-dlq` |
-| R2 (private) | `athanasios-private` — **pending: R2 not enabled on the account** | `athanasios-private-staging` (pending) |
+| R2 (private, `eeur`, Standard, r2.dev off) | `athanasios-proofs-prod` | `athanasios-proofs-staging` |
 | Cron | `17 1 * * *` housekeeping | `47 1 * * *` |
 
 ### Bindings (names the code uses; keep them when moving accounts)
@@ -28,7 +28,7 @@ All resources live in Cloudflare account `menazakmena@gmail.com` (workers.dev su
 | --- | --- | --- |
 | `DB` | D1 | all data |
 | `JOBS` | Queue producer | background jobs (`src/jobs.js`) |
-| `PRIVATE` | R2 | proofs, media originals. Optional until R2 is enabled; `/v1/health/deep` reports `storage` |
+| `PROOFS` | R2 | private proof files (`src/lib/proofs.js`). `/v1/health/deep` reports `storage` (read-only probe) |
 
 ### Variables (`wrangler.jsonc`, public)
 
@@ -43,12 +43,12 @@ All resources live in Cloudflare account `menazakmena@gmail.com` (workers.dev su
 | Name | Where | Purpose |
 | --- | --- | --- |
 | `LOG_SALT` | both | HMAC salt for pseudonymous actor/IP hashes in logs and rate-limit keys. Random 32 bytes |
-| `ADMIN_EMAILS` | both | Bootstrap admin allowlist (comma list). Each admin's row is created and its Google `sub` bound on first sign-in. **Not set in production yet** (no admin can use it: intended) |
+| `SYNC_SECRET` | both | HMAC key for Apps Script → Worker sync (`src/lib/sync.js`). Production: the same value as the Apps Script Script Property `WORKER_SYNC_SECRET`. Staging: `.staging-sync-secret` (gitignored) |
+| `ADMIN_EMAILS` | staging only | Bootstrap allowlist for tests. **Production does not use it**: its admins are copied from Apps Script (see "Admin allowlist") |
 | `STAGING_TEST_JWK` | **staging only** | Public JWK of the load-test signing key (`.staging-test-key.pem`, gitignored). Ignored unless `ENVIRONMENT === 'staging'` |
 
 **Later phases add:**
 - `COMP_SECRET`, `CODE_PEPPER`, `CODE_KEY` (copied from Apps Script, so codes and tokens keep working)
-- `SYNC_SECRET` (Apps Script → Worker sync)
 - `FCM_SERVICE_ACCOUNT`, `GITHUB_TOKEN`, `TURNSTILE_SECRET`, `ORS_API_KEY`
 
 ## API (foundation)
@@ -60,6 +60,11 @@ All resources live in Cloudflare account `menazakmena@gmail.com` (workers.dev su
 | `GET /v1/admin/whoami` | admin | the verified admin |
 | `GET /v1/admin/activity?before&limit` | admin | audit log, newest first |
 | `POST /v1/admin/diag/echo` | admin + `Idempotency-Key` | foundation check: one audit row + one queue job, exactly once |
+| `POST /v1/admin/diag/housekeeping` | admin, 6/min | run the daily cleanup now (retention, orphans) |
+| `POST /v1/admin/proofs?purpose=test` | admin + `Idempotency-Key`, 60/min | upload a proof image (raw body). Until the booking pilot only `test` proofs |
+| `GET /v1/admin/proofs/:id` | admin, 300/min | the file, streamed (`private, no-store`, sandboxed) |
+| `DELETE /v1/admin/proofs/:id` | admin | deletes the file; the row stays with `deleted_at` |
+| `POST /v1/sync/admins` | signed by Apps Script | the admin allowlist |
 
 **Envelope:**
 - Success: `{ ok: true, … }`.
@@ -87,6 +92,54 @@ All resources live in Cloudflare account `menazakmena@gmail.com` (workers.dev su
 - One JSON line per request (Workers Logs): request id, route, status, ms, colo, pseudonymous actor.
 - Never bodies, emails, IPs or tokens.
 - Errors and slow requests (≥ 1.5 s) are also kept in D1 `api_log` for 30 days.
+
+## Private proofs (R2)
+
+**Rules:**
+- The bucket is private: r2.dev access disabled, no custom domain, no presigned URLs.
+- Bytes leave R2 **only** through `GET /v1/admin/proofs/:id` after admin sign-in.
+- Replies never contain a URL or storage key.
+- D1 `proofs` (migration 0002) keeps only the reference: id, `r2_key`, mime, bytes, sha256, width/height, who, when, retention date, deletion.
+
+**Accepted files** (EVENTS.md §6):
+- JPEG or WebP, **decided by the file's first bytes**, not the Content-Type.
+- ≤ 900 KB and ≤ 2400 px on the longest side.
+- The same image uploaded twice is reported in `duplicates` and still accepted.
+
+**Write order:**
+1. Write to R2.
+2. Write the D1 row together with its audit row and idempotency answer, in one batch.
+3. If the row fails, the object is deleted again.
+
+**Retention** (daily cron + `POST /v1/admin/diag/housekeeping`):
+- Files past `delete_after_ms` are deleted, and the row is marked `deleted_by = 'retention'`. The default is 60 days; booking proofs will use the event's end + 60 days.
+- R2 objects that no row names and are older than 24 h (orphans) are deleted.
+
+**Tests:**
+- `test/proofs.test.mjs` (in-memory R2).
+- `node scripts/proof-check.mjs`: live **staging** check with real JPEG/WebP covering upload, replay, read, auth, delete, refusals, retention, orphans and r2.dev.
+
+## Admin allowlist (copied from Apps Script)
+
+Admins are still added and removed in the existing Admin («صلاحيات لوحة التحكم», Script Property `ADMIN_EMAILS`). `apps-script/WorkerSync.gs` copies that list to the Worker's `admins` table.
+
+**How it works:**
+- Signed (`SYNC_SECRET` = Script Property `WORKER_SYNC_SECRET`), checked within ±5 min, with replays refused.
+- Sent from the background only:
+  - after an admin's heartbeat, at most every 10 min, and right away after an allowlist change;
+  - from the daily trigger;
+  - only when the list changed (plus a 6-hour refresh).
+- Listed emails are active; removed ones become inactive. Rows are kept, so each admin's Google `sub` binding stays.
+- `/v1/health/deep` shows `admins.active` and `admins.syncedAt`.
+
+**First deploy of the secret (done 2026-10-15):**
+- The value went into the Worker (`wrangler secret put SYNC_SECRET`) and into a git-ignored `apps-script/WorkerSyncSeed.local.gs` pushed with the API deploy.
+- On the first sync, `WorkerSync.gs` copies it into the Script Property.
+- **After `admins.syncedAt` appears:** delete the local seed file and redeploy the API, so the value then lives only in Script Properties.
+
+**To rotate:**
+1. Set a new `SYNC_SECRET` on the Worker.
+2. Set the same value in Apps Script → Project Settings → Script Properties → `WORKER_SYNC_SECRET`.
 
 ## Develop and test
 
@@ -173,7 +226,7 @@ Everything except data and secrets is in git. To move:
 4. Move the data:
    - `npx wrangler d1 export athanasios-prod --remote --output prod.sql` from the **old** account;
    - `npx wrangler d1 execute athanasios-prod --remote --file prod.sql` into the **new** one.
-   - R2: copy the objects (rclone with S3 credentials, or a one-off Worker).
+   - R2: copy the objects of `athanasios-proofs-*` (rclone with S3 credentials, or a one-off Worker). Keys are stored in D1 `proofs.r2_key`, so the same keys must be kept.
 5. `npm run deploy:staging`, `npm run deploy:production`, then run both smoke tests.
 6. Point the site's API URL (later: `admin/config.js` / site config) at the new `workers.dev` URL. Update the GitHub secrets.
 7. Keep the old account read-only for 30 days, then delete it.
@@ -195,6 +248,8 @@ Everything except data and secrets is in git. To move:
 | `src/jobs.js` | queue consumer + dead letters |
 | `src/scheduled.js` | daily housekeeping (retention) |
 | `migrations/` | D1 schema, versioned, forward-only |
-| `drafts/0002_bookings.sql` | booking pilot schema, **not applied** until the pilot is approved |
-| `scripts/` | `setup-resources`, `smoke`, `load` (staging), `backup` (age keygen/encrypt/decrypt) |
+| `drafts/0003_bookings.sql` | booking pilot schema, **not applied** until the pilot is approved |
+| `scripts/` | `setup-resources`, `smoke`, `load` + `proof-check` (staging), `backup` (age keygen/encrypt/decrypt) |
+| `src/lib/proofs.js`, `src/lib/image.js` | private proofs in R2, image checks |
+| `src/lib/sync.js` | signed Apps Script → Worker sync |
 | `test/` | `node --test` on `node:sqlite` (`d1-sqlite.mjs` adapter) |

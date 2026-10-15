@@ -289,6 +289,8 @@ function doPost(e) {
     // lock (Activity.gs activityPending_, AdminNotify.gs); a failure there never changes the reply
     try {
       activityPending_(request.fn);
+      // the new backend's copy of the allowlist (WorkerSync.gs), from the background
+      if (request.fn === 'apiHeartbeat') workerSyncAdmins_(false);
     }
     catch (error) {
       console.warn('api: admin push dispatch failed');

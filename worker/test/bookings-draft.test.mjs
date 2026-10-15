@@ -1,4 +1,4 @@
-// Booking pilot readiness: the DRAFT schema (drafts/0002_bookings.sql) and the
+// Booking pilot readiness: the DRAFT schema (drafts/0003_bookings.sql) and the
 // guarded statements the pilot will use. Real SQLite, same rules as D1.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,7 +7,7 @@ import { migratedDb } from './d1-sqlite.mjs';
 
 function db() {
   const d = migratedDb();
-  d.raw.exec(readFileSync(new URL('../drafts/0002_bookings.sql', import.meta.url), 'utf8'));
+  d.raw.exec(readFileSync(new URL('../drafts/0003_bookings.sql', import.meta.url), 'utf8'));
   d.raw.exec("INSERT INTO event_cfg (id, slug, title, booking, capacity, price_rev, revision, published, synced_at) VALUES ('evt-1', 'trip', 'Trip', '{}', 5, 'p1', 'r1', 1, 0)");
   return d;
 }

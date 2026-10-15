@@ -21,9 +21,11 @@
     { "binding": "DB", "database_name": "athanasios-prod", "database_id": "95048f59-4c05-4e76-9f86-7c8c1c2360d3", "migrations_dir": "migrations" }
   ],
 
-  // R2 (private proofs, media originals): bucket "athanasios-private".
-  // Not bound yet — R2 must first be enabled on the account (dashboard).
-  // Then add:  "r2_buckets": [{ "binding": "PRIVATE", "bucket_name": "athanasios-private" }]
+  // R2, PRIVATE (no r2.dev URL, no custom domain, no presigned URLs): proof
+  // files are streamed only through admin routes (src/lib/proofs.js).
+  "r2_buckets": [
+    { "binding": "PROOFS", "bucket_name": "athanasios-proofs-prod" }
+  ],
 
   "queues": {
     "producers": [{ "binding": "JOBS", "queue": "athanasios-jobs" }],
@@ -44,6 +46,9 @@
         "ALLOWED_ORIGINS": "https://stathanasiosyouth.github.io,http://localhost:8080,http://127.0.0.1:8080",
         "GOOGLE_CLIENT_ID": "246924773718-38p45gji0ouvi7an4jdjsip3obmk6ve4.apps.googleusercontent.com"
       },
+      "r2_buckets": [
+        { "binding": "PROOFS", "bucket_name": "athanasios-proofs-staging" }
+      ],
       "d1_databases": [
         { "binding": "DB", "database_name": "athanasios-staging", "database_id": "e0efb231-9048-48f2-8db7-0657781cfe27", "migrations_dir": "migrations" }
       ],
