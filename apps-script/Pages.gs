@@ -1947,6 +1947,12 @@ function pagesBuildPublic_(draft, ctx) {
    PUBLISH: FILES AND AFTER THE COMMIT
 ========================================================= */
 
+/* the page shell's CSP: the site's, plus the booking API (worker/BOOKING-API.md) — as pages/index.html */
+var PAGE_SITE_CSP = COMP_SITE_CSP.replace(
+  "https://fcmregistrations.googleapis.com;",
+  "https://fcmregistrations.googleapis.com https://athanasios-api.menazak-lab.workers.dev https://athanasios-api-staging.menazak-lab.workers.dev;"
+);
+
 var PAGE_SHELL_FALLBACK = [
   '<!doctype html>',
   '<html lang="ar" dir="rtl">',
@@ -1955,7 +1961,7 @@ var PAGE_SHELL_FALLBACK = [
   '',
   '  <meta charset="utf-8">',
   '  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">',
-  '  <meta http-equiv="Content-Security-Policy" content="' + COMP_SITE_CSP + '">',
+  '  <meta http-equiv="Content-Security-Policy" content="' + PAGE_SITE_CSP + '">',
   '  <meta name="referrer" content="strict-origin-when-cross-origin">',
   '  <title>أسرة البابا أثناسيوس</title>',
   '  <meta name="theme-color" content="#020914">',

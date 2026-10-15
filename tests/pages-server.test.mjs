@@ -7,7 +7,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { compWorld, adminApi, publish, webp, wallAt, plain } from './fakes/comp.mjs';
 import { ROOT as ROOT_DIR } from '../tools/lib/gs.mjs';
 
@@ -323,6 +323,13 @@ test('BOOKING_ONLINE = 1: event.json says online, with the places-left settings 
   trip(on);
   publish(on.world, on.call);
   assert.equal(json(on.world.github.files(), 'events/alex-trip/event.json').booking.online, true);
+});
+
+test('the fallback shell (GitHub unreachable) carries the same CSP as the committed pages/index.html', () => {
+  const ctx = setup();
+  const shell = readFileSync(new URL('../pages/index.html', import.meta.url), 'utf8');
+  const csp = html => (/http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(html) || [])[1];
+  assert.equal(csp(ctx.world.gs.PAGE_SHELL_FALLBACK), csp(shell));
 });
 
 test('the event card expires 12 hours after the event ends (the page stays)', () => {
