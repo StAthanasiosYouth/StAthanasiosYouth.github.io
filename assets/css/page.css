@@ -2416,3 +2416,601 @@ img, svg, video {
   }
 
 }
+
+
+/* =========================================================
+   ONLINE BOOKING (booking.js, status.js; docs/EVENTS.md §7.1)
+   Only when event.json says booking.online. The Phase 3 area stays
+   underneath; while the live state says «open» the flow takes the place
+   of the WhatsApp counter and the servants list (back on a fallback).
+========================================================= */
+
+.book.is-online[data-live="open"] > .prices > .prices__hint,
+.book.is-online[data-live="open"] > .prices > .prices__total,
+.book.is-online[data-live="open"] > .prices .stepper,
+.book.is-online[data-live="open"] > .book__line,
+.book.is-online[data-live="open"] > .people--servants {
+  display: none;
+}
+
+.bk {
+  display: grid;
+  gap: 14px;
+}
+
+.bk__left {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--accent-hi);
+}
+
+.bk__state {
+  font-weight: 800;
+  color: var(--text);
+}
+
+.bk__mine {
+  display: grid;
+  gap: 8px;
+}
+
+/* «حجزك B-XXXXX: قيد المراجعة» → the status view */
+.bk-mine {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: var(--radius-md);
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+  background: rgba(2, 9, 20, .5);
+}
+
+.bk-mine:hover {
+  border-color: var(--accent);
+}
+
+.bk-mine__status {
+  color: var(--accent-hi);
+}
+
+.bk-mine__go {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-inline-start: auto;
+  color: var(--accent-hi);
+}
+
+.bk-start {
+  width: 100%;
+}
+
+.bk-note {
+  font-size: .95rem;
+  color: var(--text-2);
+}
+
+.bk-note--strong {
+  font-weight: 800;
+  color: var(--text);
+}
+
+.bk-link {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  min-height: 44px;
+  padding: 6px 2px;
+  border: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--accent-hi);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  background: none;
+  cursor: pointer;
+}
+
+/* ---------- the steps ---------- */
+
+.bk-flow {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: var(--radius-lg);
+  background: rgba(2, 9, 20, .55);
+  scroll-margin-top: 70px;
+}
+
+.bk-flow__progress {
+  font-size: .85rem;
+  font-weight: 700;
+  color: var(--text-3);
+}
+
+.bk-flow__title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  line-height: 1.4;
+  color: var(--gold-hi);
+}
+
+.bk-alert {
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 138, 125, .5);
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  color: var(--carmine-hi);
+  background: rgba(200, 67, 58, .12);
+}
+
+.bk-alert[data-tone="info"] {
+  border-color: var(--gold-line-strong);
+  color: var(--accent-hi);
+  background: rgba(215, 170, 80, .08);
+}
+
+.bk-form {
+  display: grid;
+  gap: 18px;
+}
+
+.bk-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.bk-field__label {
+  padding: 0;
+  font-weight: 800;
+}
+
+.bk-field__hint {
+  font-size: .88rem;
+  color: var(--text-3);
+}
+
+.bk-field__err {
+  font-size: .9rem;
+  font-weight: 700;
+  color: var(--carmine-hi);
+}
+
+.bk-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, .2);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  color: var(--text);
+  background: var(--navy-850);
+}
+
+.bk-input:focus-visible {
+  outline: 2px solid var(--accent-hi);
+  outline-offset: 1px;
+}
+
+.bk-input[aria-invalid="true"] {
+  border-color: var(--carmine-hi);
+}
+
+/* a phone number reads left to right, lined up with the words */
+.bk-input--ltr {
+  text-align: right;
+}
+
+.bk-textarea {
+  min-height: 96px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.bk-prices {
+  padding: 12px;
+}
+
+.bk-names {
+  display: grid;
+  gap: 10px;
+}
+
+.bk-names__row {
+  display: grid;
+  gap: 4px;
+}
+
+/* the honeypot: never seen, never reached */
+.bk-hp {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.bk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.bk-actions > .btn {
+  flex: 1 1 140px;
+}
+
+.bk-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 800;
+}
+
+.bk-total strong {
+  font-size: 1.25rem;
+  color: var(--gold-hi);
+}
+
+/* a servant / a method: the whole card is the choice (the radio inside, out of sight) */
+.bk-picks {
+  display: grid;
+  gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .bk-picks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.bk-pick,
+.bk-chip {
+  position: relative;
+  cursor: pointer;
+}
+
+.bk-pick input,
+.bk-chip input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.bk-pick {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 68px;
+  padding: 10px 14px;
+  border: 1px solid var(--gold-line);
+  border-radius: var(--radius-md);
+  background: rgba(2, 9, 20, .45);
+}
+
+.bk-pick:hover {
+  border-color: var(--gold-line-strong);
+}
+
+.bk-pick:has(input:checked) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--navy-900));
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.bk-pick:has(input:focus-visible),
+.bk-chip:has(input:focus-visible) {
+  outline: 2px solid var(--accent-hi);
+  outline-offset: 3px;
+}
+
+.bk-pick__who {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bk-pick__name {
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.bk-pick__role,
+.bk-pick__methods {
+  font-size: .86rem;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+
+.bk-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bk-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 6px 18px;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: 999px;
+  font-weight: 800;
+  background: var(--navy-850);
+}
+
+.bk-chip:has(input:checked) {
+  border-color: transparent;
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+
+.bk-wa {
+  display: grid;
+  gap: 8px;
+}
+
+/* ---------- proof pictures ---------- */
+
+.bk-proofs {
+  display: grid;
+  gap: 8px;
+}
+
+.bk-proofs:empty {
+  display: none;
+}
+
+.bk-proof {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid var(--gold-line);
+  border-radius: var(--radius-md);
+  background: rgba(2, 9, 20, .45);
+}
+
+.bk-proof[data-state="failed"] {
+  border-color: rgba(255, 138, 125, .5);
+}
+
+.bk-proof__img {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--navy-800);
+}
+
+.bk-proof__img--none {
+  display: grid;
+  place-items: center;
+  color: var(--text-3);
+}
+
+.bk-proof__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bk-proof__name {
+  font-weight: 800;
+}
+
+.bk-proof__state {
+  font-size: .86rem;
+  color: var(--text-2);
+}
+
+.bk-proof[data-state="done"] .bk-proof__state,
+.bk-proof[data-state="saved"] .bk-proof__state {
+  color: var(--ok-hi);
+}
+
+.bk-proof[data-state="failed"] .bk-proof__state {
+  color: var(--carmine-hi);
+}
+
+.bk-proof__bar {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--accent);
+}
+
+.bk-proof__acts {
+  display: grid;
+  gap: 6px;
+}
+
+.bk-proof__btn {
+  min-height: 44px;
+  padding: 6px 14px;
+  font-size: .9rem;
+}
+
+.bk-add {
+  justify-self: start;
+}
+
+.bk-add .ic {
+  width: 20px;
+  height: 20px;
+}
+
+.bk-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.bk-check input {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.bk-sum {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--gold-line);
+  border-radius: var(--radius-md);
+  background: rgba(2, 9, 20, .35);
+}
+
+.bk-sum > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 12px;
+}
+
+.bk-sum dt {
+  color: var(--text-2);
+}
+
+.bk-sum dd {
+  margin: 0;
+  font-weight: 800;
+}
+
+/* ---------- done, and the status view ---------- */
+
+.bk-done__ref {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.bk-done__code {
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  color: var(--gold-hi);
+}
+
+.bk-done__status,
+.bstat__chip {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  min-height: 32px;
+  padding: 2px 14px;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: 999px;
+  font-size: .9rem;
+  font-weight: 800;
+  color: var(--accent-hi);
+  background: rgba(6, 26, 49, .8);
+}
+
+.bstat__chip[data-status="confirmed"] {
+  border-color: transparent;
+  color: #04190f;
+  background: var(--ok);
+}
+
+.bstat__chip[data-status="rejected"],
+.bstat__chip[data-status="cancelled"],
+.bstat__chip[data-status="withdrawn"] {
+  color: var(--text-2);
+  background: rgba(255, 255, 255, .06);
+}
+
+.bk-done__copy {
+  display: flex;
+  gap: 8px;
+}
+
+.bk-done__copy .bk-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: .85rem;
+}
+
+.bk-copy {
+  flex: none;
+}
+
+.bstat {
+  display: grid;
+  gap: 12px;
+  padding: clamp(18px, 5vw, 28px) var(--pad);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(80% 60% at 50% -20%, var(--accent-glow), transparent 70%),
+    var(--navy-900);
+  scroll-margin-top: 70px;
+}
+
+.bstat__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.bstat__title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1.4;
+  color: var(--gold-hi);
+}
+
+.bstat__reason > span {
+  color: var(--text-2);
+}
+
+.bstat__cancel {
+  border-color: rgba(255, 138, 125, .45);
+  color: var(--carmine-hi);
+}
+
+.bstat__yes {
+  border-color: transparent;
+  color: #fff;
+  background: var(--carmine);
+}
+
+.bstat__yes:hover {
+  border-color: transparent;
+  background: #b23a32;
+}
+
+.bstat__confirm {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+.bstat__ask {
+  font-weight: 800;
+}

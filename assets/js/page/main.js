@@ -12,6 +12,8 @@
  *
  *  ?preview  the draft arrives by postMessage from the same-origin parent;
  *            no network, no storage, no history (protocol: §17.10)
+ *  booking.online  an event's «احجز الآن» goes live (booking.js, status.js,
+ *            loaded only then; §7.1); otherwise the servants' WhatsApp
  */
 
 import { sanitizePage, sanitizeEvent, sanitizeEntry, bookingPhase, eventsList } from './model.js';
@@ -95,6 +97,7 @@ function render(kind, data) {
   }
   else if (kind === 'event') {
     phaseKey = view.event(data, nowStamp(), { reduced: reduced() }).phase;
+    online(data);
   }
   else {
     const list = eventsList(data, nowStamp());
@@ -111,8 +114,57 @@ const listKey = events => eventsList(events, nowStamp()).map(e => `${e.slug}:${b
 /* once a minute: a booking window that opens / closes, an event that ends */
 function tick() {
   if (!shown || !shown.data || shown.data.withdrawn) return;
-  if (shown.kind === 'event' && shown.data.booking && bookingPhase(shown.data.booking, shown.data.startAt, nowStamp()) !== phaseKey) render('event', shown.data);
+  if (shown.kind === 'event' && shown.data.booking) {
+    const phase = bookingPhase(shown.data.booking, shown.data.startAt, nowStamp());
+    if (phase !== phaseKey) {
+      // online: the Worker's state decides, and nothing is redrawn under the visitor's hands
+      if (shown.data.booking.online) {
+        phaseKey = phase;
+        if (booker) booker.refresh({ force: true });
+      }
+      else render('event', shown.data);
+    }
+  }
   if (shown.kind === 'events' && listKey(shown.data) !== phaseKey) render('events', shown.data);
+}
+
+
+/* =========================================================
+   ONLINE BOOKING (docs/EVENTS.md §7.1): only when event.json says
+   booking.online. Its modules load only then; the Phase 3 area (the
+   servants' WhatsApp) is drawn first and stays whenever the API can't help.
+========================================================= */
+
+let booker = null;    // booking.js on screen
+let statusPanel = null;    // status.js: #b/<token>
+
+function online(data) {
+  if (booker) booker.destroy();
+  booker = null;
+  if (!data.booking || !data.booking.online) return;
+  if (PREVIEW) {
+    // the online look, still: no API, no storage (§17.10)
+    import('./booking.js').then(m => { if (shown && shown.data === data) m.previewBooking(); }).catch(() => {});
+    return;
+  }
+  import('./booking.js').then(m => {
+    if (shown && shown.data === data) booker = m.mountBooking({ event: data, rootUrl: ROOT, announce: view.announce, reduced: reduced() });
+  }).catch(() => {});
+  bookingStatus();
+}
+
+/* /events/<slug>/#b/<token>: the visitor's booking, under the hero */
+function bookingStatus() {
+  if (PREVIEW || !shown || shown.kind !== 'event' || !shown.data || !shown.data.booking || !shown.data.booking.online) return;
+  const data = shown.data;
+  if (!/^#b\//.test(location.hash)) {
+    if (statusPanel) statusPanel.close();
+    statusPanel = null;
+    return;
+  }
+  import('./status.js').then(m => {
+    if (shown && shown.data === data) statusPanel = m.showStatus({ event: data, announce: view.announce, reduced: reduced(), onChange: () => booker && booker.refreshMine() });
+  }).catch(() => {});
 }
 
 
@@ -251,5 +303,11 @@ else {
   uiSounds();
   boot();
   setInterval(tick, 60000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    tick();
+    // back from WhatsApp or another tab: the live state again
+    if (booker) booker.refresh();
+  });
+  if (KIND === 'event') addEventListener('hashchange', bookingStatus);
 }
