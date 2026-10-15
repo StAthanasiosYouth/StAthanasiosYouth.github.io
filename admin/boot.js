@@ -605,6 +605,8 @@
 
     if (sidValue) body.sid = sidValue;
 
+    lastCall = Date.now();
+
     if (abort && options.signal) {
       if (options.signal.aborted) abort.abort();
       else options.signal.addEventListener('abort', function () { abort.abort(); });
@@ -654,6 +656,45 @@
         if (error && error.name === 'AbortError') error.aborted = true;
         throw error;
       });
+
+  }
+
+  /*
+   * Wakes the API's runtime (Apps Script starts cold after a quiet while:
+   * 5–15 s) so the real calls find it warm: fn 'warm' is answered at the top
+   * of doPost, before any token, Sheet or property. Fire and forget: sent at
+   * once on load (Google sign-in is still on screen), and again when the tab
+   * comes back after WARM_IDLE without a request.
+   */
+  var WARM_IDLE = 5 * 60000;
+  var lastCall = 0;
+
+  function warm() {
+
+    if (!API || typeof fetch !== 'function') return;
+
+    lastCall = Date.now();
+
+    try {
+      fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: '{"fn":"warm"}',
+        credentials: 'omit',
+        cache: 'no-store',
+        redirect: 'follow',
+        referrerPolicy: 'no-referrer'
+      }).catch(function () {});
+    }
+    catch (ignored) {
+      // only a head start
+    }
+
+  }
+
+  function warmIfIdle() {
+
+    if (document.visibilityState !== 'hidden' && Date.now() - lastCall > WARM_IDLE) warm();
 
   }
 
@@ -2101,6 +2142,11 @@
     if (fresh(session)) enter();
     else showSignIn();
   });
+
+  // the API wakes up while Google signs in (and after a quiet while away)
+  warm();
+  window.addEventListener('focus', warmIfIdle);
+  document.addEventListener('visibilitychange', warmIfIdle);
 
   // a reload of a tab that had a session: the same session again; else the sign-in
   saved = savedSession();
