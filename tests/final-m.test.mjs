@@ -219,11 +219,23 @@ test('Route.gs: at most 30 upstream calls a minute and 1,500 a day (cached answe
   world.advance(61 * 1000);
   assert.equal(route({ profile: 'driving-car', from: start(31) }).ok, true, 'the next minute');
   const today = new Date(Date.now() + world.clock.skew).toISOString().slice(0, 10);
-  assert.equal(world.properties.get('ROUTE_DAY_COUNT'), `${today}:31`);
-  world.properties.set('ROUTE_DAY_COUNT', `${today}:1500`);
+  // the day's count lives in CacheService; the Script Property is a copy written every 10 counts
+  const day = () => world.cache.get('daycount:ROUTE_DAY_COUNT').value;
+  const setDay = value => world.cache.set('daycount:ROUTE_DAY_COUNT', { value, until: Infinity, seconds: 21600 });
+  assert.equal(day(), `${today}:31`);
+  assert.equal(world.properties.get('ROUTE_DAY_COUNT'), `${today}:30`);
+  // the cache lost the count: it carries on from the copy (a few counts at most are forgotten)
+  world.cache.delete('daycount:ROUTE_DAY_COUNT');
   world.advance(61 * 1000);
+  assert.equal(route({ profile: 'driving-car', from: start(39) }).ok, true);
+  assert.equal(day(), `${today}:31`);
+  setDay(`${today}:1500`);
   assert.equal(route({ profile: 'driving-car', from: start(40) }).code, 'busy', 'the day budget');
-  world.properties.set('ROUTE_DAY_COUNT', `1999-01-01:1500`);
+  // a spent day is copied at once: an evicted cache does not reopen it
+  world.cache.delete('daycount:ROUTE_DAY_COUNT');
+  world.properties.set('ROUTE_DAY_COUNT', `${today}:1500`);
+  assert.equal(route({ profile: 'driving-car', from: start(40) }).code, 'busy', 'the day budget, from the copy');
+  setDay(`1999-01-01:1500`);
   assert.equal(route({ profile: 'driving-car', from: start(41) }).ok, true, 'a new day');
   world.scriptLock.busy = true;
   world.advance(61 * 1000);

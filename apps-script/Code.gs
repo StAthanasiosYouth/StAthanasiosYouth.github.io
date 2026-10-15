@@ -401,6 +401,49 @@ function nowStamp_() {
 }
 
 
+/*
+ * A public daily budget (Push.gs, Route.gs): "YYYY-MM-DD:n" for the UTC day,
+ * kept in CacheService so a visitor's call costs no Script Property read or
+ * write. The Script Property `name` is only a backing copy: written every
+ * DAY_COUNT_FLUSH counts (and when the day is spent), read only when the
+ * cache lost the key (an eviction, or six quiet hours). Such a loss forgets at
+ * most the last DAY_COUNT_FLUSH - 1 counts; the budgets sit well under the
+ * plans' own limits, so that costs nothing.
+ * true = counted; false = the day's budget is spent (nothing counted).
+ */
+var DAY_COUNT_FLUSH = 10;
+
+function takeDayCount_(cache, name, limit) {
+
+  var today = new Date(Date.now()).toISOString().slice(0, 10);
+  var key = 'daycount:' + name;
+  var text = cache.get(key);
+  var properties = null;
+
+  if (!text) {
+    properties = PropertiesService.getScriptProperties();
+    text = properties.getProperty(name) || '';
+  }
+
+  var stored = String(text).split(':');
+  var count = stored[0] === today ? Number(stored[1]) || 0 : 0;
+
+  if (count >= limit) {
+    return false;
+  }
+
+  count += 1;
+  cache.put(key, today + ':' + count, 21600);
+
+  if (count % DAY_COUNT_FLUSH === 0 || count >= limit) {
+    (properties || PropertiesService.getScriptProperties()).setProperty(name, today + ':' + count);
+  }
+
+  return true;
+
+}
+
+
 /* =========================================================
    LINKS
 ========================================================= */

@@ -156,7 +156,9 @@ test('public budget: at most 60 writes a minute, then "busy"; the next minute is
   assert.equal(unsubscribe(world, { token: deviceToken(1) }).code, 'busy');
   world.advance(61000);
   assert.equal(subscribe(world, { token: deviceToken(99) }).ok, true);
-  assert.match(world.properties.get('PUSH_DAY_COUNT'), /^\d{4}-\d{2}-\d{2}:61$/);
+  // the day's count: CacheService, with a Script Property copy every 10 counts (takeDayCount_, Code.gs)
+  assert.match(world.cache.get('daycount:PUSH_DAY_COUNT').value, /^\d{4}-\d{2}-\d{2}:61$/);
+  assert.match(world.properties.get('PUSH_DAY_COUNT'), /^\d{4}-\d{2}-\d{2}:60$/);
 });
 
 test('the public actions never read anything back and never touch admin data', () => {

@@ -35,7 +35,8 @@
  *                        Messaging API Admin). Read here only; never logged,
  *                        never returned, never sent anywhere but Google's
  *                        token endpoint (as a signature, not the key).
- * Written here: PUSH_DAY_COUNT ("YYYY-MM-DD:n", the public budget).
+ * Written here: PUSH_DAY_COUNT ("YYYY-MM-DD:n", the public budget's backing copy:
+ * the live count is in CacheService, takeDayCount_ in Code.gs).
  */
 
 var PUSH_SUBS_SHEET = 'PushSubs';
@@ -193,23 +194,17 @@ function pushHash_(token) {
 }
 
 
-/* the shared public budget (a minute in CacheService, the UTC day in PUSH_DAY_COUNT) */
+/* the shared public budget (a minute in CacheService, the UTC day via takeDayCount_: PUSH_DAY_COUNT) */
 function pushTakeQuota_(cache) {
 
-  var now = Date.now();
-  var minuteKey = 'push:minute:' + Math.floor(now / 60000);
-  var today = new Date(now).toISOString().slice(0, 10);
-  var properties = PropertiesService.getScriptProperties();
+  var minuteKey = 'push:minute:' + Math.floor(Date.now() / 60000);
   var minute = Number(cache.get(minuteKey)) || 0;
-  var stored = String(properties.getProperty('PUSH_DAY_COUNT') || '').split(':');
-  var day = stored[0] === today ? Number(stored[1]) || 0 : 0;
 
-  if (minute >= PUSH_PUBLIC_PER_MINUTE || day >= PUSH_PUBLIC_PER_DAY) {
+  if (minute >= PUSH_PUBLIC_PER_MINUTE || !takeDayCount_(cache, 'PUSH_DAY_COUNT', PUSH_PUBLIC_PER_DAY)) {
     return false;
   }
 
   cache.put(minuteKey, String(minute + 1), 120);
-  properties.setProperty('PUSH_DAY_COUNT', today + ':' + (day + 1));
 
   return true;
 

@@ -17,8 +17,8 @@
  *  - answers are cached for 6 h per profile + rounded start (CacheService);
  *  - at most ROUTE_PER_MINUTE upstream calls a minute and ROUTE_PER_DAY a
  *    day (the free plan allows 40 and 2,000); beyond that: 'busy' (the
- *    minute in CacheService, the UTC day in the Script Property
- *    ROUTE_DAY_COUNT = "YYYY-MM-DD:n");
+ *    minute in CacheService, the UTC day too, backed by the Script Property
+ *    ROUTE_DAY_COUNT = "YYYY-MM-DD:n": takeDayCount_ in Code.gs);
  *  - the visitor's coordinates are never logged or stored anywhere else;
  *    replies carry only the fields above (never the key or upstream text).
  */
@@ -217,11 +217,8 @@ function routeChurch_() {
  */
 function routeTakeQuota_(cache) {
 
-  var now = Date.now();
-  var minuteKey = 'route:minute:' + Math.floor(now / 60000);
-  // the day's count outlives the cache's 6 h: a Script Property "YYYY-MM-DD:n" (UTC day)
-  var today = new Date(now).toISOString().slice(0, 10);
-  var properties = PropertiesService.getScriptProperties();
+  var minuteKey = 'route:minute:' + Math.floor(Date.now() / 60000);
+  // the day's count: CacheService, backed by the Script Property ROUTE_DAY_COUNT (takeDayCount_, Code.gs)
   var lock = LockService.getScriptLock();
   var locked = false;
 
@@ -234,13 +231,10 @@ function routeTakeQuota_(cache) {
 
   try {
     var minute = Number(cache.get(minuteKey)) || 0;
-    var stored = String(properties.getProperty('ROUTE_DAY_COUNT') || '').split(':');
-    var day = stored[0] === today ? Number(stored[1]) || 0 : 0;
-    if (minute >= ROUTE_PER_MINUTE || day >= ROUTE_PER_DAY) {
+    if (minute >= ROUTE_PER_MINUTE || !takeDayCount_(cache, 'ROUTE_DAY_COUNT', ROUTE_PER_DAY)) {
       return false;
     }
     cache.put(minuteKey, String(minute + 1), 120);
-    properties.setProperty('ROUTE_DAY_COUNT', today + ':' + (day + 1));
     return true;
   }
   finally {
