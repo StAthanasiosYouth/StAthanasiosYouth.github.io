@@ -28,12 +28,13 @@ const newsIds = w => w.spreadsheet.getSheetByName('News').data.slice(1).filter(r
 test('a save is one row write, not one per cell; the state after it is read mostly from the copies', () => {
   const { w, call } = world();
   const add = counted(() => call('apiSaveItem', 'news', { title: 'خبر جديد', summary: 'ملخص', body: 'تفاصيل' }));
-  assert.ok(add.writes <= 6, `add: ${add.writes} writes (was 21: one per cell)`);
-  assert.ok(add.formats <= 3, `add: ${add.formats} format calls (was 12)`);
-  assert.ok(add.reads <= 10, `add: ${add.reads} reads (was 22: every tab again)`);
+  // (the other admins' push is sent after the reply, by a heartbeat: not counted here)
+  assert.ok(add.writes <= 3, `add: ${add.writes} writes (was 21: one per cell, then 4)`);
+  assert.ok(add.formats <= 2, `add: ${add.formats} format calls (was 12)`);
+  assert.ok(add.reads <= 4, `add: ${add.reads} reads (was 22: every tab again, then 8)`);
   const id = newsIds(w).pop();
   const edit = counted(() => call('apiSaveItem', 'news', { id, title: 'خبر متعدل', summary: 'ملخص', body: 'تفاصيل' }));
-  assert.ok(edit.writes <= 8 && edit.reads <= 10, JSON.stringify(edit));
+  assert.ok(edit.writes <= 4 && edit.reads <= 5, JSON.stringify(edit));
   // and the state is current
   const state = edit.value;
   const json = JSON.stringify(state);
