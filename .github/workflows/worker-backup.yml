@@ -25,6 +25,7 @@ jobs:
     steps:
       - name: Cloudflare credentials present?
         id: creds
+        working-directory: .
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "::warning::Cloudflare credentials not set — backup skipped"
