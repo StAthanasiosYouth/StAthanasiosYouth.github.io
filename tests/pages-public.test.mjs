@@ -152,8 +152,8 @@ test('links: https only; WhatsApp only wa.me/<digits> (a ?text= only where the c
    event.json
 ========================================================= */
 
-test('event.json: the fixture as published; online is always false in this build', () => {
-  const e = M.sanitizeEvent({ ...EVENT, booking: { ...EVENT.booking, online: true } });
+test('event.json: the fixture as published; online only when it says exactly true (the online fields default as the Worker does)', () => {
+  const e = M.sanitizeEvent(EVENT);
   assert.equal(e.slug, 'ain-sokhna-trip');
   assert.equal(e.kind, 'trip');
   assert.equal(e.kindLabel, 'رحلة');
@@ -165,6 +165,22 @@ test('event.json: the fixture as published; online is always false in this build
   assert.equal(e.booking.pricing.categories.length, 4);
   assert.equal(e.booking.payment.mode, 'installments');
   assert.deepEqual(e.booking.servants.map(s => [s.name, s.wa, s.methods]), [['مينا عادل', 'https://wa.me/201001234567', ['cash', 'instapay']], ['مرقس فادي', null, ['cash']]]);
+  // missing → online false, showLeft true, showLeftBelow 20, needsProof false
+  assert.equal(e.booking.showLeft, true);
+  assert.equal(e.booking.showLeftBelow, 20);
+  assert.deepEqual(e.booking.methods.map(m => m.needsProof), [false, false]);
+  for (const online of [false, 'true', 1, null, undefined, {}]) {
+    assert.equal(M.sanitizeEvent({ ...EVENT, booking: { ...EVENT.booking, online } }).booking.online, false, String(online));
+  }
+  const on = M.sanitizeEvent({
+    ...EVENT,
+    booking: { ...EVENT.booking, online: true, showLeft: false, showLeftBelow: 5, methods: EVENT.booking.methods.map(m => ({ ...m, needsProof: m.key === 'instapay' })) }
+  });
+  assert.equal(on.booking.online, true);
+  assert.equal(on.booking.showLeft, false);
+  assert.equal(on.booking.showLeftBelow, 5);
+  assert.deepEqual(on.booking.methods.map(m => [m.key, m.needsProof]), [['cash', false], ['instapay', true]]);
+  assert.equal(M.sanitizeEvent({ ...EVENT, booking: { ...EVENT.booking, methods: [{ key: 'cash', label: 'كاش', needsProof: '1' }] } }).booking.methods[0].needsProof, false, 'true only');
 });
 
 test('event.json: every field validated', () => {
@@ -419,9 +435,13 @@ test('sw.js: /events/<slug>/ and a non-reserved /<slug>/ open exactly; #event/ #
 const csp = html => /<meta http-equiv="Content-Security-Policy" content="([^"]+)">/.exec(html)[1];
 
 for (const file of ['pages/index.html', 'events/index.html']) {
-  test(`${file}: the site CSP, no inline code, relative URLs one level up, the page module`, () => {
+  test(`${file}: the site CSP (+ the booking Worker in connect-src only), no inline code, relative URLs one level up, the page module`, () => {
     const shell = read(file);
-    assert.equal(csp(shell), csp(read('index.html')));
+    // the site's policy, with the booking API (production, and staging for a developer's machine) added to connect-src
+    const WORKERS = ' https://athanasios-api.menazak-lab.workers.dev https://athanasios-api-staging.menazak-lab.workers.dev';
+    const site = csp(read('index.html'));
+    assert.equal(csp(shell), site.replace(/(connect-src [^;]+)/, `$1${WORKERS}`));
+    assert.notEqual(csp(shell), site);
     assert.doesNotMatch(shell, /<script(?![^>]*\bsrc=)[^>]*>/, 'no inline script');
     assert.doesNotMatch(shell, /<style|\sstyle="/, 'no inline style');
     assert.doesNotMatch(shell, /<html[^>]*data-(slug|v)=/, 'the shell itself has no slug');

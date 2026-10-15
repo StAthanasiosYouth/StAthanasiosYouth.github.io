@@ -301,7 +301,7 @@ function cleanBooking(raw) {
 
   const methodKeys = new Set();
   const methods = list(raw.methods)
-    .map(m => ({ key: key(m.key), label: line(m.label, 24), icon: id(m.icon) }))
+    .map(m => ({ key: key(m.key), label: line(m.label, 24), icon: id(m.icon), needsProof: m.needsProof === true }))
     .filter(m => m.key && m.label && !methodKeys.has(m.key) && methodKeys.add(m.key))
     .slice(0, 8);
 
@@ -319,8 +319,10 @@ function cleanBooking(raw) {
   const capacity = int(raw.capacity, 1, 100000);
 
   return {
-    // this build has no booking engine: the area is always the servants' WhatsApp (§17)
-    online: false,
+    // online booking (booking.js) only when the publish says so; otherwise the servants' WhatsApp (§17.6)
+    online: raw.online === true,
+    showLeft: raw.showLeft !== false,
+    showLeftBelow: int(raw.showLeftBelow, 0, 100000) ?? 20,
     opensAt: stamp(raw.opensAt),
     closesAt: stamp(raw.closesAt),
     capacity,
