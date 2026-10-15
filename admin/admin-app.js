@@ -18031,6 +18031,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   var B = A.book = {
     on: false,            // the Worker said the module is on (or staging)
+    off: false,           // … or that it is off (production today): nothing is drawn at all
     checked: false,       // asked (whatever the answer)
     needGoogle: false,    // a device session: the bookings need Google itself
     env: '',
@@ -18108,7 +18109,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       B.env = String(reply && reply.env || '');
       B.checked = true;
       B.needGoogle = false;
-      if (!(reply && (reply.on === true || B.env === 'staging'))) return false;
+      if (!(reply && (reply.on === true || B.env === 'staging'))) {
+        B.off = true;
+        paintLinks();
+        return false;
+      }
       return kit().then(function () {
         B.on = true;
         addNav();
@@ -18214,8 +18219,13 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   var links = [];
 
-  /* ev: the Apps Script event (id, slug, booking, live). Hidden until the module is on and the Worker knows it */
+  /*
+   * ev: the Apps Script event (id, slug, booking, live). Hidden until the
+   * module is on and the Worker knows it; nothing at all (null) when there
+   * is no Worker here or it said the module is off.
+   */
   B.eventLink = function (ev) {
+    if (!W() || B.off) return null;
     var node = el('span', { class: 'book-link', hidden: true, 'data-event': ev.id });
     links.push({ ev: ev, node: node, at: Date.now() });
     if (B.on) {
@@ -18742,11 +18752,15 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       });
     });
 
+    // «أكّد برضه» then «سجّل برضه» (or the other way round): both answers stand, until the form is changed
+    var sticky = {};
+
     function send(extra, button) {
       box.hidden = true;
       var scope = document.getElementById('sheet');
       A.clearFieldErrors(scope);
-      var plan = options.prepare(extra || {});
+      sticky = Object.assign({}, sticky, extra || {});
+      var plan = options.prepare(sticky);
       if (plan.errors && plan.errors.length) {
         showErrors(plan.errors, box);
         return;
@@ -18827,11 +18841,21 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     submit.addEventListener('click', function () { send({}); });
 
+    var form = el('div', { class: 'form' }, options.nodes);
+
+    function changed() {
+      sticky = {};
+      extraBox.hidden = true;
+    }
+
+    form.addEventListener('input', changed);
+    form.addEventListener('change', changed);
+
     A.dirty = false;
     A.openSheet(options.title, [
       box,
       options.intro ? el('p', { class: 'note', text: options.intro }) : null,
-      el('div', { class: 'form' }, options.nodes),
+      form,
       extraBox
     ], [submit, back], { wide: true, className: 'book-sheet' });
 
@@ -19258,7 +19282,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         var actual = counts.value();
         var body = { version: b.version };
         var errors = [];
-        if (JSON.stringify(actual) !== JSON.stringify(b.actual || {})) {
+        var was = b.actual || {};
+        if (Object.keys(actual).some(function (k) { return actual[k] !== (Number(was[k]) || 0); })) {
           var problem = K.checkCounts(pricing, ev.perBookingMax, actual);
           if (problem) errors.push({ field: 'actual', message: problem });
           body.actual = actual;
@@ -19538,7 +19563,14 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     function load(button) {
       box.hidden = true;
-      var run = W().call('GET', '/v1/admin/book/summary?eventId=' + enc(ev.id) + range());
+      // the methods' words come with the event's settings (a booking read already, else its event.json)
+      var run = Promise.all([
+        W().call('GET', '/v1/admin/book/summary?eventId=' + enc(ev.id) + range()),
+        eventConfig(ev).catch(function () { return null; })
+      ]).then(function (got) {
+        if (!got[0].event && got[1]) got[0].event = got[1];
+        return got[0];
+      });
       (button ? A.withBusy(button, run) : run).then(function (reply) {
         if (body.isConnected) drawSummary(reply);
       }).catch(function (error) {

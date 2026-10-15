@@ -227,11 +227,12 @@ test('module off (and 401 / 403 / unreachable): no «الحجوزات» anywhere
   freshWorker({ module: { on: false, env: 'production' } });
   const d = await open();
   await signIn(d.page);
+  await d.page.waitForFunction(() => A.book.off === true, { timeout: 8000 });
   await d.page.evaluate(() => A.go('pages', 'events'));
   await d.page.waitForSelector(`.item`);
   await sleep(900);
   assert.deepEqual(await subtabs(d.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام']);
-  assert.equal(await d.page.$('.book-link:not([hidden]) button'), null, 'no booking button on the event');
+  assert.equal(await d.page.$('.book-link'), null, 'not even a hidden slot on the event');
   // (besides boot.js's quiet sign-in check, unchanged)
   const asked = fake.state.calls.filter(c => c.path !== '/v1/admin/whoami');
   assert.deepEqual(asked.map(c => `${c.method} ${c.path}`), ['GET /v1/admin/book/module'], 'one quiet question, nothing else');
@@ -502,6 +503,30 @@ test('reject with money → «مرتجعات مطلوبة» → refund (a proof 
   await d.page.waitForFunction(() => /جديد/.test(document.querySelector('#sheet .book-chips').innerText), { timeout: 8000 });
   assert.equal(fake.find('B-BBBB2').status, 'pending');
   assert.ok(await d.page.$('#sheet [data-act="confirm"]'), 'pending again: confirm / reject');
+  await closeSheet(d.page);
+
+  // update a confirmed booking: one more child → the new quote offered → amount due with a reason, the admin note
+  await d.page.click('[data-filter="confirmed"]');
+  await waitRows(d.page, ['B-CCCC3', 'B-EEEE5']);
+  await d.page.click('.book-row[data-ref="B-EEEE5"]');
+  await sheetTitle(d.page, 'حجز B-EEEE5');
+  await clickAct(d.page, 'update');
+  await d.page.$eval('#sheet input[data-cat="child"]', n => { n.value = '1'; n.dispatchEvent(new Event('input')); });
+  await d.page.waitForFunction(() => /السعر بالعدد ده ٢٬٣٠٠ ج — استخدمه/.test(document.querySelector('#sheet [data-act="use-quote"]').textContent));
+  await d.page.click('#sheet [data-act="use-quote"]');
+  assert.equal(await d.page.$eval('#sheet .field[data-label="المطلوب"] input', n => n.value), '2300');
+  await fill(d.page, 'ملاحظة الأدمن', 'هيركب من الغردقة');
+  await clickAct(d.page, 'submit');
+  await d.page.waitForSelector('#sheet .field--invalid[data-label="السبب"]');
+  await fill(d.page, 'السبب', 'زوّد طفل');
+  await clickAct(d.page, 'submit');
+  await sheetTitle(d.page, 'حجز B-EEEE5');
+  const update = lastWrite(/\/update$/);
+  assert.deepEqual(update.body, { version: 1, actual: { applicant: 1, adult: 0, child: 1 }, amountDue: 2300, reason: 'زوّد طفل', adminNote: 'هيركب من الغردقة' });
+  assert.equal((await tiles(d.page))['المطلوب'], '٢٬٣٠٠ ج');
+  assert.equal((await tiles(d.page))['الباقي'], '٨٠٠ ج');
+  assert.match(await sheetText(d.page), /١٬٥٠٠ ج ← ٢٬٣٠٠ ج — زوّد طفل/);
+  assert.match(await sheetText(d.page), /هيركب من الغردقة/);
   assert.deepEqual(d.problems, []);
   await d.context.close();
 });
