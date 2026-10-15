@@ -99,9 +99,14 @@
 
     var toggle = A.switchInput('ظاهر', enabled, function (checked) {
       A.dirty = false;
-      A.call('apiSetLinkEnabled', link.id, checked)
-        .then(function (next) { A.applyState(next); A.toast(checked ? 'الرابط هيظهر بعد النشر' : 'الرابط هيستخبى بعد النشر'); })
-        .catch(function (error) { toggle.input.checked = !checked; A.fail(error); });
+      // shown at once; the server's answer (or its refusal) follows (A.draftChange)
+      A.draftChange({
+        apply: function (state) {
+          state.draft.links.forEach(function (row) { if (row.id === link.id) row.enabled = checked; });
+        },
+        run: function () { return A.call('apiSetLinkEnabled', link.id, checked); },
+        done: function () { A.toast(checked ? 'الرابط هيظهر بعد النشر' : 'الرابط هيستخبى بعد النشر'); }
+      });
     });
 
     var item = A.listItem({
@@ -582,9 +587,12 @@
 
     var toggle = A.switchInput('ظاهر', enabled, function (checked) {
       A.dirty = false;
-      A.call('apiSetSectionEnabled', s.key, checked)
-        .then(function (next) { A.applyState(next); A.toast(checked ? 'القسم هيظهر بعد النشر' : 'القسم هيختفي بعد النشر'); })
-        .catch(function (error) { toggle.input.checked = !checked; A.fail(error); });
+      // shown at once; the server's answer (or its refusal) follows (A.draftChange)
+      A.draftChange({
+        apply: function (state) { A.sectionEnabledLocally(state, s.key, checked); },
+        run: function () { return A.call('apiSetSectionEnabled', s.key, checked); },
+        done: function () { A.toast(checked ? 'القسم هيظهر بعد النشر' : 'القسم هيختفي بعد النشر'); }
+      });
     });
 
     toggle.input.disabled = locked;

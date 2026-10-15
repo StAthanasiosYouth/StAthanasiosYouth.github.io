@@ -234,12 +234,19 @@
 
     var toggle = A.switchInput('إظهار ركن الاجتماع', on, function (checked) {
       A.dirty = false;
-      var call = upgraded
-        ? A.call('apiSetSectionEnabled', 'meeting', checked)
-        : A.call('apiSaveSettings', { 'meeting.enabled': checked });
-      call.then(function (next) {
+      var done = function () { A.toast(checked ? 'ركن الاجتماع هيظهر بعد النشر' : 'ركن الاجتماع هيختفي بعد النشر — بكل مواضيعه'); };
+      if (upgraded) {
+        // shown at once; the server's answer (or its refusal) follows (A.draftChange)
+        A.draftChange({
+          apply: function (state) { A.sectionEnabledLocally(state, 'meeting', checked); },
+          run: function () { return A.call('apiSetSectionEnabled', 'meeting', checked); },
+          done: done
+        });
+        return;
+      }
+      A.call('apiSaveSettings', { 'meeting.enabled': checked }).then(function (next) {
         A.applyState(next);
-        A.toast(checked ? 'ركن الاجتماع هيظهر بعد النشر' : 'ركن الاجتماع هيختفي بعد النشر — بكل مواضيعه');
+        done();
       }).catch(function (error) { toggle.input.checked = !checked; A.fail(error); });
     });
 

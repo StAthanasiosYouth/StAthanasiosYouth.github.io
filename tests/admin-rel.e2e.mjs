@@ -65,13 +65,18 @@ let gisHangs = false;
  * hanging server); mute = requests of that account never come back (its
  * phone lost the network: its heartbeat stops).
  */
-const api = { hold: false, held: [], mute: '' };
+const api = { hold: false, held: [], mute: '', refuse: '' };
 
 function post(body) {
   let email = '';
   try { email = world.idTokens.get(JSON.parse(body).token)?.email || ''; }
   catch { email = ''; }
   if (api.mute && email === api.mute) return new Promise(() => {});
+  // refuse = an api function the server turns down (as a lock or a check would)
+  if (api.refuse && JSON.parse(body).fn === api.refuse) {
+    const refusal = { ok: false, error: JSON.stringify({ appError: 1, message: 'حد تاني بيعدّل ده دلوقتي.' }), code: '' };
+    return api.hold ? new Promise(resolve => api.held.push(() => resolve(refusal))) : refusal;
+  }
   if (api.hold) return new Promise(resolve => api.held.push(() => resolve(world.post(body))));
   return world.post(body);
 }
@@ -101,6 +106,7 @@ function freshWorld() {
   api.hold = false;
   api.held = [];
   api.mute = '';
+  api.refuse = '';
   gisHangs = false;
 }
 
@@ -567,5 +573,82 @@ test('no horizontal overflow at 360 and 390 px: the gate, every area and sub-tab
     assert.deepEqual(phone.problems, []);
     await phone.close();
   }
+
+});
+
+
+/* ---------------- speed: warm-up, draft changes that show at once ---------------- */
+
+test('speed: the API is warmed before sign-in; show/hide and up/down show at once, in order, and a refusal rolls back with «جرّب تاني»', async () => {
+
+  freshWorld();
+  const laptop = await device({ viewport: DESKTOP });
+  const { page, calls } = laptop;
+  // the very first request, before any Google token: the no-op warm-up
+  assert.equal(calls[0] && calls[0].fn, 'warm');
+  await signIn(page, ADMIN);
+  await inPanel(page);
+
+  // a news item hidden while the server is slow: hidden on screen at once
+  await page.evaluate(() => A.go('content', 'news'));
+  const newsSwitch = title => page.evaluate(t => {
+    const item = [...document.querySelectorAll('#view .item')].find(li => li.querySelector('.item__title').textContent === t);
+    return item ? { checked: item.querySelector('input[role="switch"]').checked, off: item.classList.contains('item--off') } : null;
+  }, title);
+  const flip = title => page.evaluate(t => {
+    const item = [...document.querySelectorAll('#view .item')].find(li => li.querySelector('.item__title').textContent === t);
+    item.querySelector('input[role="switch"]').click();
+  }, title);
+  assert.deepEqual(await newsSwitch('رحلة الغردقة'), { checked: true, off: false });
+  api.hold = true;
+  await flip('رحلة الغردقة');
+  assert.deepEqual(await newsSwitch('رحلة الغردقة'), { checked: false, off: true }, 'drawn at once');
+  release();
+  await page.waitForFunction(() => !document.querySelector('.toast--error'), { timeout: 3000 });
+  await sleep(600);
+  assert.equal(world.gs.readTable_('News').find(r => r.id === 'news-aaaa1111').enabled, false, 'the server has it');
+  assert.deepEqual(await newsSwitch('رحلة الغردقة'), { checked: false, off: true });
+
+  // refused (an edit lock, a check): it rolls back on screen, the usual error with «جرّب تاني»
+  api.hold = true;
+  api.refuse = 'apiSetItemEnabled';
+  await flip('مسابقة الكتاب المقدس');
+  assert.deepEqual(await newsSwitch('مسابقة الكتاب المقدس'), { checked: false, off: true });
+  release();
+  await page.waitForSelector('.toast--error .toast__action');
+  assert.deepEqual(await newsSwitch('مسابقة الكتاب المقدس'), { checked: true, off: false }, 'rolled back to the server');
+  assert.match(await page.$eval('.toast--error', t => t.textContent), /حد تاني بيعدّل ده دلوقتي/);
+  api.refuse = '';
+  await page.evaluate(() => document.querySelector('.toast--error .toast__action').click());
+  assert.deepEqual(await newsSwitch('مسابقة الكتاب المقدس'), { checked: false, off: true }, 'retried: shown at once');
+  await page.waitForFunction(() => true);
+  await sleep(1200);
+  assert.equal(world.gs.readTable_('News').find(r => r.id === 'news-bbbb2222').enabled, false);
+
+  // links: two quick steps down while the server is slow; the page and then the server agree
+  await page.evaluate(() => A.go('page', 'links'));
+  const order = () => page.evaluate(() => A.byOrder(A.state.draft.links.filter(l => !A.bool(l.featured) && l.section === A.state.draft.links.filter(x => !A.bool(x.featured))[0].section)).map(l => l.id));
+  const before = await order();
+  assert.ok(before.length >= 3, 'a group of three links at least');
+  api.hold = true;
+  const down = id => page.evaluate(linkId => {
+    const link = A.state.draft.links.find(l => l.id === linkId);
+    const item = [...document.querySelectorAll('#view .item')].find(li => li.querySelector('.item__title').textContent === link.title);
+    item.querySelector('button[aria-label="لتحت"]').click();
+  }, id);
+  await down(before[0]);
+  await down(before[0]);
+  const expected = [before[1], before[2], before[0]].concat(before.slice(3));
+  assert.deepEqual(await order(), expected, 'both steps drawn at once');
+  release();
+  await sleep(1500);
+  release();
+  await sleep(1500);
+  assert.deepEqual(await order(), expected);
+  const server = Array.from(world.gs.sortRows_(world.gs.readTable_('Links')), l => String(l.id)).filter(id => before.includes(id));
+  assert.deepEqual(server, expected, 'the server did the same, in the same order');
+
+  assert.deepEqual(laptop.problems, []);
+  await laptop.close();
 
 });

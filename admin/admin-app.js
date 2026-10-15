@@ -3281,7 +3281,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   A.applyState = function (next) {
 
-    A.state = next;
+    // the server's state, plus the draft changes still on their way (DRAFT CHANGES below)
+    drafts.server = next;
+    A.state = drafts.drawn = withPending(next);
     // usage counts may have changed
     if (A.invalidateLibrary) A.invalidateLibrary();
     A.renderStatus();
@@ -3372,9 +3374,149 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   };
 
+  /* =======================================================
+     DRAFT CHANGES THAT SHOW AT ONCE (show/hide, up/down, archive)
+     Only draft content: nothing is live before «راجع وانشر», and the
+     server still decides everything (its edit locks, its checks).
+     - the change is drawn at once (change.apply on a copy of the state);
+     - the server calls go ONE AT A TIME, in click order: an older answer
+       never lands over a newer one;
+     - what the page shows = the last server state + the changes still on
+       their way (each apply sets absolute values, so applying one the
+       server already has changes nothing);
+     - a refusal drops that change (it rolls back on screen) and shows the
+       usual error with «جرّب تاني».
+     Never for money, points, the store, codes, imports, live competition
+     actions, seasons, admins, devices, publish or deletes: those wait for
+     the server as before.
+  ======================================================= */
+
+  var drafts = { pending: [], server: null, drawn: null, lane: Promise.resolve() };
+
+  /* the server state with the changes still on their way */
+  function withPending(base) {
+
+    if (!drafts.pending.length) return base;
+
+    var copy = JSON.parse(JSON.stringify(base));
+
+    drafts.pending.forEach(function (change) {
+      try { change.apply(copy); }
+      catch (ignored) { /* gone from the state: the server's answer decides */ }
+    });
+
+    return copy;
+
+  }
+
+  function drawPending() {
+
+    // a state someone else put in place meanwhile (a save, a refresh) is the newest server state
+    if (A.state !== drafts.drawn || !drafts.server) drafts.server = A.state;
+    A.state = drafts.drawn = withPending(drafts.server);
+    A.renderStatus();
+    renderNav();
+    A.render();
+
+  }
+
+  /*
+   * change: { apply(state), run() → promise of the next state, done(next)?, retry? }
+   */
+  A.draftChange = function (change) {
+
+    drafts.pending.push(change);
+    drawPending();
+
+    var settle = function () {
+      drafts.pending = drafts.pending.filter(function (c) { return c !== change; });
+    };
+
+    drafts.lane = drafts.lane.then(function () {
+      return Promise.resolve().then(change.run).then(function (next) {
+        settle();
+        A.applyState(next);
+        if (change.done) change.done(next);
+      }, function (error) {
+        settle();
+        drawPending();
+        var parsed = A.parseError(error);
+        if (window.console) console.warn('[admin]', parsed.message, parsed.details || '');
+        A.toast(parsed.message + (parsed.hint ? '\n' + parsed.hint : ''), true, change.retry === false ? null : {
+          label: 'جرّب تاني',
+          onclick: function () { A.draftChange(change); }
+        });
+      });
+    });
+
+    return drafts.lane;
+
+  };
+
+  /* a row of a draft list by its key (sessions: the date) */
+  function draftRow(state, kind, key) {
+
+    return ((state.draft && state.draft[kind]) || []).filter(function (row) {
+      return String(kind === 'sessions' ? row.date : row.id) === String(key);
+    })[0];
+
+  }
+
+  /* a section shown/hidden: its page-order row and its Sheet row (apiSetSectionEnabled) */
+  A.sectionEnabledLocally = function (state, key, enabled) {
+
+    (state.layout || []).concat((state.draft && state.draft.sections) || []).forEach(function (row) {
+      if (row.key === key) row.enabled = enabled;
+    });
+
+  };
+
+  /* the absolute order after one step up/down (the server's moveWithin_ / writeOrder_) */
+  function orderAfterMove(rows, id, direction) {
+
+    var ids = A.byOrder(rows).map(function (row) { return row.id; });
+    var from = ids.indexOf(id);
+    var to = from + (direction < 0 ? -1 : 1);
+
+    if (from === -1 || to < 0 || to >= ids.length) return null;
+
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    return ids;
+
+  }
+
   A.move = function (api, id, direction, button) {
 
-    A.withBusy(button, A.call(api, id, direction)).then(A.applyState).catch(function (error) { A.fail(error); });
+    var kind = api === 'apiMoveLink' ? 'links' : api === 'apiMoveContact' ? 'contacts' : '';
+    var rows = kind ? A.state.draft[kind] : null;
+    var target = kind ? draftRow(A.state, kind, id) : null;
+
+    // sections: the page order is the server's layout (A.state.layout): wait for it
+    if (!target) {
+      A.withBusy(button, A.call(api, id, direction)).then(A.applyState).catch(function (error) { A.fail(error); });
+      return;
+    }
+
+    // a link moves within its group: the featured ones, or its section (apiMoveLink)
+    if (kind === 'links') {
+      rows = rows.filter(function (row) {
+        return A.bool(target.featured) ? A.bool(row.featured) : !A.bool(row.featured) && row.section === target.section;
+      });
+    }
+
+    var ids = orderAfterMove(rows, id, direction);
+
+    if (!ids) return;
+
+    A.draftChange({
+      apply: function (state) {
+        ids.forEach(function (rowId, i) {
+          var row = draftRow(state, kind, rowId);
+          if (row) row.order = (i + 1) * 10;
+        });
+      },
+      run: function () { return A.call(api, id, direction); }
+    });
 
   };
 
@@ -3427,9 +3569,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var toggle = A.switchInput('ظاهر', enabled, function (checked) {
       A.dirty = false;
-      A.call('apiSetItemEnabled', kind, key, checked)
-        .then(function (next) { A.applyState(next); })
-        .catch(function (error) { toggle.input.checked = !checked; A.fail(error); });
+      // shown at once; the server's answer (or its refusal) follows (DRAFT CHANGES)
+      A.draftChange({
+        apply: function (state) { var row = draftRow(state, kind, key); if (row) row.enabled = checked; },
+        run: function () { return A.call('apiSetItemEnabled', kind, key, checked); }
+      });
     });
 
     return toggle;
@@ -4190,9 +4334,14 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var toggle = A.switchInput('ظاهر', enabled, function (checked) {
       A.dirty = false;
-      A.call('apiSetLinkEnabled', link.id, checked)
-        .then(function (next) { A.applyState(next); A.toast(checked ? 'الرابط هيظهر بعد النشر' : 'الرابط هيستخبى بعد النشر'); })
-        .catch(function (error) { toggle.input.checked = !checked; A.fail(error); });
+      // shown at once; the server's answer (or its refusal) follows (A.draftChange)
+      A.draftChange({
+        apply: function (state) {
+          state.draft.links.forEach(function (row) { if (row.id === link.id) row.enabled = checked; });
+        },
+        run: function () { return A.call('apiSetLinkEnabled', link.id, checked); },
+        done: function () { A.toast(checked ? 'الرابط هيظهر بعد النشر' : 'الرابط هيستخبى بعد النشر'); }
+      });
     });
 
     var item = A.listItem({
@@ -4673,9 +4822,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var toggle = A.switchInput('ظاهر', enabled, function (checked) {
       A.dirty = false;
-      A.call('apiSetSectionEnabled', s.key, checked)
-        .then(function (next) { A.applyState(next); A.toast(checked ? 'القسم هيظهر بعد النشر' : 'القسم هيختفي بعد النشر'); })
-        .catch(function (error) { toggle.input.checked = !checked; A.fail(error); });
+      // shown at once; the server's answer (or its refusal) follows (A.draftChange)
+      A.draftChange({
+        apply: function (state) { A.sectionEnabledLocally(state, s.key, checked); },
+        run: function () { return A.call('apiSetSectionEnabled', s.key, checked); },
+        done: function () { A.toast(checked ? 'القسم هيظهر بعد النشر' : 'القسم هيختفي بعد النشر'); }
+      });
     });
 
     toggle.input.disabled = locked;
@@ -5506,12 +5658,19 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var toggle = A.switchInput('إظهار ركن الاجتماع', on, function (checked) {
       A.dirty = false;
-      var call = upgraded
-        ? A.call('apiSetSectionEnabled', 'meeting', checked)
-        : A.call('apiSaveSettings', { 'meeting.enabled': checked });
-      call.then(function (next) {
+      var done = function () { A.toast(checked ? 'ركن الاجتماع هيظهر بعد النشر' : 'ركن الاجتماع هيختفي بعد النشر — بكل مواضيعه'); };
+      if (upgraded) {
+        // shown at once; the server's answer (or its refusal) follows (A.draftChange)
+        A.draftChange({
+          apply: function (state) { A.sectionEnabledLocally(state, 'meeting', checked); },
+          run: function () { return A.call('apiSetSectionEnabled', 'meeting', checked); },
+          done: done
+        });
+        return;
+      }
+      A.call('apiSaveSettings', { 'meeting.enabled': checked }).then(function (next) {
         A.applyState(next);
-        A.toast(checked ? 'ركن الاجتماع هيظهر بعد النشر' : 'ركن الاجتماع هيختفي بعد النشر — بكل مواضيعه');
+        done();
       }).catch(function (error) { toggle.input.checked = !checked; A.fail(error); });
     });
 
@@ -7942,10 +8101,15 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         class: 'icon-btn', type: 'button',
         'aria-label': (archived ? 'رجّع من الأرشيف: ' : 'أرشفة: ') + label,
         title: archived ? 'رجّع' : 'أرشيف',
-        onclick: function (e) {
-          A.withBusy(e.currentTarget, A.call('apiSetItemArchived', kind, item.id, !archived))
-            .then(function (next) { A.applyState(next); A.toast(archived ? 'رجع للقايمة' : 'اتأرشف — مش هيظهر في الموقع، وتقدر ترجعه'); })
-            .catch(function (error) { A.fail(error); });
+        onclick: function () {
+          // shown at once (it leaves this list); the server's answer (or its refusal) follows (A.draftChange)
+          A.draftChange({
+            apply: function (state) {
+              ((state.draft && state.draft[kind]) || []).forEach(function (row) { if (row.id === item.id) row.archived = !archived; });
+            },
+            run: function () { return A.call('apiSetItemArchived', kind, item.id, !archived); },
+            done: function () { A.toast(archived ? 'رجع للقايمة' : 'اتأرشف — مش هيظهر في الموقع، وتقدر ترجعه'); }
+          });
         }
       }, icon(archived ? 'retry' : 'download')),
       el('button', {

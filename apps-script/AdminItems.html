@@ -82,10 +82,15 @@
         class: 'icon-btn', type: 'button',
         'aria-label': (archived ? 'رجّع من الأرشيف: ' : 'أرشفة: ') + label,
         title: archived ? 'رجّع' : 'أرشيف',
-        onclick: function (e) {
-          A.withBusy(e.currentTarget, A.call('apiSetItemArchived', kind, item.id, !archived))
-            .then(function (next) { A.applyState(next); A.toast(archived ? 'رجع للقايمة' : 'اتأرشف — مش هيظهر في الموقع، وتقدر ترجعه'); })
-            .catch(function (error) { A.fail(error); });
+        onclick: function () {
+          // shown at once (it leaves this list); the server's answer (or its refusal) follows (A.draftChange)
+          A.draftChange({
+            apply: function (state) {
+              ((state.draft && state.draft[kind]) || []).forEach(function (row) { if (row.id === item.id) row.archived = !archived; });
+            },
+            run: function () { return A.call('apiSetItemArchived', kind, item.id, !archived); },
+            done: function () { A.toast(archived ? 'رجع للقايمة' : 'اتأرشف — مش هيظهر في الموقع، وتقدر ترجعه'); }
+          });
         }
       }, icon(archived ? 'retry' : 'download')),
       el('button', {
