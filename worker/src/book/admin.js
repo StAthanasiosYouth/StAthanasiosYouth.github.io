@@ -303,8 +303,16 @@ export async function adminBooking(ctx) {
 export async function adminCreate(ctx) {
   const body = ctx.body;
   if (!KEY.test(String(body.requestKey || ''))) throw invalid('requestKey');
-  const twin = await retry(() => ctx.env.DB.prepare('SELECT id FROM bookings WHERE request_key = ?').bind(body.requestKey).first());
-  if (twin) return detail(ctx, twin.id);
+  const twin = await retry(() => ctx.env.DB.prepare('SELECT id, status, version FROM bookings WHERE request_key = ?').bind(body.requestKey).first());
+  if (twin) {
+    // the same form sent again after a warn / needs_override on its confirm part: confirm now
+    if (body.confirm && typeof body.confirm === 'object' && twin.status === 'pending') {
+      ctx.params = { id: twin.id };
+      ctx.body = { ...body.confirm, version: twin.version };
+      return adminConfirm(ctx);
+    }
+    return detail(ctx, twin.id);
+  }
 
   const event = await eventById(ctx, body.eventId);
   const b = event.booking;

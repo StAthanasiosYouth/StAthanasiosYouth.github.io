@@ -181,6 +181,18 @@ test('manual booking (source admin), confirmed in the same call; cancel-all; sum
   assert.equal((await w.admin('GET', '/v1/admin/book/bookings?eventId=evt-alex01&refunds=1')).body.rows.length, 1, 'the paid one owes a refund');
 });
 
+test('manual booking: a confirm refused (needs_override) is retried with the same requestKey → confirmed, one booking', async () => {
+  const w = await bookWorld();                                     // full payment mode
+  const form = { eventId: 'evt-alex01', requestKey: 'adm-req-retry1', name: 'حجز تليفون', phone: '01055556666', counts: { applicant: 1 }, servantId: 'srv-aaaa1111', method: 'cash' };
+  const first = await w.admin('POST', '/v1/admin/book/bookings', { ...form, confirm: { payments: [pay({ amount: 500, idemKey: 'adm-pay-retry1' })] } });
+  assert.equal(first.body.code, 'needs_override');
+  const second = await w.admin('POST', '/v1/admin/book/bookings', { ...form, confirm: { overridePay: true, reason: 'هيكمّل يوم الرحلة', payments: [pay({ amount: 500, idemKey: 'adm-pay-retry1' })] } });
+  assert.equal(second.status, 200, JSON.stringify(second.body));
+  assert.equal(second.body.booking.status, 'confirmed');
+  assert.equal(second.body.payments.length, 1);
+  assert.equal((await w.db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE request_key = 'adm-req-retry1'").first()).n, 1);
+});
+
 test('admin proofs for a booking: upload (purpose payment) → attach to a payment; module switch is primary-only outside staging', async () => {
   const w = await bookWorld({ event: eventJson({}, { payment: { mode: 'installments', minFirst: 0, finalDueAt: '' } }) });
   const b = await pending(w);
