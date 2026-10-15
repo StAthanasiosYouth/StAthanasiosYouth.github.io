@@ -39,6 +39,8 @@ Production keeps both **off** until go-live.
 | `warn` | 409 | payment warnings; `warnings: [{ code, message }]`. Repeat the same call with `force: true` |
 | `needs_override` | 409 | confirm blocked by §5.1 (payment) or §9 (capacity); `warnings` says which. Repeat with `overridePay` / `overrideCap` = true plus `reason` |
 | `auth` / `denied` | 401 / 403 | admin sign-in (Google ID token only; a remembered-device token is refused) |
+| `turnstile` | 403 | submit: the Turnstile token is missing or siteverify refused it; `reasons` = siteverify's error codes. Get a fresh token and send again |
+| `locked` | 409 | admin write: another admin page holds this booking's edit lock; `holder: { name, since }` (seconds) |
 
 **Retries:** every write carries a key (`requestKey`, `idemKey`, or the `Idempotency-Key` header). Retrying with the same key returns the same answer and never writes twice. Retry network errors, 5xx and `busy` with backoff.
 
@@ -57,7 +59,8 @@ PayInput   { kind: 'payment'|'refund', amount, servantId, method, receivedAt: St
 ## Public (no sign-in; CORS for the site only)
 
 ### `GET /v1/book/state?slug=<slug>`
-Returns `{ open, reason?: 'not_open'|'closed'|'full'|'disabled', opensAt, closesAt, left: n|null, revision }`.
+Returns `{ open, reason?: 'not_open'|'closed'|'full'|'disabled', opensAt, closesAt, left: n|null, revision, turnstile: siteKey|null }`.
+- `turnstile`: the Cloudflare Turnstile site key when the Worker checks Turnstile (see below); the page then shows the check on the send step.
 - `left` is null when the event is unlimited, or when `showLeft` is off and left > `showLeftBelow`.
 - `Cache-Control: max-age=15`.
 
@@ -72,7 +75,8 @@ Returns `{ open, reason?: 'not_open'|'closed'|'full'|'disabled', opensAt, closes
 ```
 { slug, requestKey (8–100 [A-Za-z0-9_.:-]), name (2–60), phone (Egyptian mobile, any format),
   counts: Counts, names?: [string ≤60] (when collectNames), servantId?, method?,
-  note? (≤300), proofs?: [{ proofId, claim }] (≤3), hp: '' (honeypot), revision }
+  note? (≤300), proofs?: [{ proofId, claim }] (≤3), hp: '' (honeypot), revision,
+  turnstile? (the widget's token, when the state named a site key) }
 ```
 **Reply:** `{ ref: 'B-XXXXX', status: 'pending', token, quotedTotal, replay?: true, priceChanged?: true }`.
 
@@ -83,6 +87,15 @@ Returns `{ open, reason?: 'not_open'|'closed'|'full'|'disabled', opensAt, closes
 - A method with `needsProof` requires 1–3 proofs.
 - Pending bookings don't take places. `full` applies when `seats(counts) > left`.
 - At most 2 pending bookings per phone per event (`limit`).
+
+**Turnstile** (`src/book/turnstile.js`):
+- `TURNSTILE_SECRET` set → every new submit needs `turnstile`, checked once with Cloudflare siteverify (production also checks the token's hostname = `SITE_URL`'s). Missing or refused → `turnstile` (403); siteverify unreachable → `busy`.
+- Checked after validation and before the write; a `requestKey` replay is answered before it (a retry never needs a new token).
+- Tokens are single use: after ANY failed send the page resets the widget for a fresh one.
+- Not set: production refuses every submit (`disabled`, fail closed); elsewhere skipped.
+- `GET /v1/book/state` names the site key only when both `TURNSTILE_SECRET` and `TURNSTILE_SITEKEY` are set.
+- Proof uploads are not gated (they come before the token): 10 / 10 min per IP; unclaimed ones are deleted after 24 h.
+- Staging: Cloudflare's published TEST keys (site key `1x00000000000000000000AA`, secret `1x…AA` = always passes; `2x…AA` = always fails, used by `scripts/book-ops-check.mjs --turnstile-fails`).
 
 ### `POST /v1/book/status` — `{ token }`
 Returns:
@@ -125,7 +138,9 @@ Returns `{ status: 'withdrawn' }`. Allowed while pending only; otherwise `final`
 **`GET /v1/admin/book/bookings/<id>`**
 ```
 { booking: BookingRow + { requested, actual, names, visitorNote, adminNote, rejectReason,
-                         cancelReason, capOverride, dueHistory, priceRev, closedAt, closedBy },
+                         cancelReason, capOverride, dueHistory, priceRev, closedAt, closedBy,
+                         phoneBlanked },
+  lock: null | { mine: bool, holder: { name, since } },
   payments: [{ id, kind, amount, servantId, servantName, method, receivedAt, recordedAt,
                recordedBy, recordedName, proofIds, note, voidsId, voidedBy }],
   proofs: [{ id, purpose, paymentId, by, at, bytes, width, height, dup }],
@@ -149,6 +164,38 @@ Returns `{ status: 'withdrawn' }`. Allowed while pending only; otherwise `final`
 | `POST /v1/admin/book/payments/<paymentId>/void` | `{ reason, idemKey }` | |
 
 Every write returns the booking detail.
+
+### Edit locks (`src/book/locks.js`)
+
+One admin page edits a booking at a time. Every admin call carries `x-edit-session: <random id per admin page load>` (admin/boot.js).
+
+| Route | Returns |
+| --- | --- |
+| `POST /v1/admin/book/bookings/<id>/lock` | `{ granted, holder?: { name, since }, ttl: 90000, renew: 30000 }` — take or renew (granted when free, expired or already this session's) |
+| `DELETE /v1/admin/book/bookings/<id>/lock` | `{ released }` — only this session's own |
+
+- The open booking sheet takes the lock, renews it every `renew` ms and gives it back on close; a dead page's lock lapses after `ttl`.
+- While a lock lives, confirm / reject / cancel / reopen / update / payments / void from ANY other session (or a call without the header) → `locked` (+ `holder`), nothing written.
+- No live lock → writes need none. The booking `version` still guards every write either way.
+- `cancel-all` ignores locks (one admin decision over many bookings); open sheets then get `conflict` and re-read.
+- The admin shows a held booking read only: «<name> بيعدّل الحجز ده دلوقتي (…)», then «افتح آخر نسخة» once it is free.
+
+### Phone retention (EVENTS.md §10)
+
+The daily cron (`scheduled.js blankPhones`) blanks `phone` ('') 12 months after the event's end (`event_cfg.end_ms`; a booking whose event row is gone: 12 months after its creation) and sets `phone_blanked_ms`. Name, counts and money stay for accounting. One audit row `booking.retention` with the count. The detail says `phoneBlanked: true`.
+
+### New bookings → admin push (EVENTS.md §7.3)
+
+The Worker counts visitor bookings per event (`book_news`, in the booking's own batch; admin-made bookings are not news). Apps Script (`apps-script/BookNotify.gs`, a 5-minute trigger while `BOOKING_ONLINE` = 1) claims them:
+
+| Route | Auth | Returns |
+| --- | --- | --- |
+| `POST /v1/sync/book-news` | signed like `/v1/sync/admins` (`SYNC_SECRET`, kind `booknews`) | `{ groups: [{ eventId, slug, title, count, pending, firstAt, lastAt }] }` |
+
+- Each event is handed out at most once per 10 minutes; bookings in between wait for the next group. At most once (a lost reply loses that push, never doubles it).
+- No names, phones or refs ever cross.
+- Apps Script writes ONE Activity row per group (system actor `visitor`, action `booking.new`, type `bookings`) — the toast for admins with the panel open — and ONE push to every other admin's devices: «٣ حجوزات جديدة – رحلة الإسكندرية», body «مستنيين المراجعة: N», link `/admin/#open/bookings/<eventId>`.
+- Staging only: `GET /v1/admin/diag/book-news?eventId=` shows what waits (no claim); `POST /v1/admin/diag/retention { eventId, atMs }` runs the phone retention for one event as if at `atMs`.
 
 ### Proofs
 

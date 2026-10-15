@@ -19,6 +19,7 @@ import { randomId } from '../lib/hash.js';
 import { begin, finishStmt, abandon, idempotencyKey } from '../lib/idempotency.js';
 import { loadEvent, eventById, seatsTaken, rowToEvent } from './event.js';
 import { forgetModule, bookingOn } from './public.js';
+import { assertUnlocked, lockInfo, lockTake, lockDrop } from './locks.js';
 import {
   checkCounts, normPhone, cleanText, quote, seats, people, deriveFromPaid, derive, paidOf, amountDueOf,
   confirmPaymentOk, newRef, summary, stampMs, msStamp, isLive, LIMITS, STATUSES
@@ -79,6 +80,7 @@ export async function detail(ctx, id) {
     flagsFor(env, b, event),
     seatsTaken(env, event.id)
   ]);
+  const lock = await lockInfo(ctx, b.id);
   const now = Date.now();
   const bk = event.booking || {};
   return {
@@ -87,8 +89,10 @@ export async function detail(ctx, id) {
       requested: JSON.parse(b.requested), actual: b.actual ? JSON.parse(b.actual) : null, names: b.names ? JSON.parse(b.names) : null,
       visitorNote: b.visitor_note, adminNote: b.admin_note, rejectReason: b.reject_reason, cancelReason: b.cancel_reason,
       capOverride: b.cap_override ? JSON.parse(b.cap_override) : null, payOverride: b.pay_override ? JSON.parse(b.pay_override) : null,
-      dueHistory: JSON.parse(b.due_history || '[]'), priceRev: b.price_rev, closedAt: b.closed_at, closedBy: b.closed_by
+      dueHistory: JSON.parse(b.due_history || '[]'), priceRev: b.price_rev, closedAt: b.closed_at, closedBy: b.closed_by,
+      phoneBlanked: !!b.phone_blanked_ms
     },
+    lock,
     payments: pays.map(p => ({
       id: p.id, kind: p.kind, amount: p.amount, servantId: p.servant_id, servantName: p.servant_name, method: p.method,
       receivedAt: p.received_at, recordedAt: p.recorded_at, recordedBy: p.recorded_by, recordedName: p.recorded_name,
@@ -298,6 +302,16 @@ export async function adminBooking(ctx) {
   return detail(ctx, ctx.params.id);
 }
 
+/* POST | DELETE /v1/admin/book/bookings/:id/lock (book/locks.js) */
+export async function adminLock(ctx) {
+  const b = await bookingRow(ctx.env, ctx.params.id);
+  return lockTake(ctx, b.id);
+}
+export async function adminUnlock(ctx) {
+  if (!/^bkg-[a-z0-9]{6,}$/.test(String(ctx.params.id || ''))) throw new ApiError('not_found', 'id');
+  return lockDrop(ctx, ctx.params.id);
+}
+
 /* ---------- create (source admin) ---------- */
 
 export async function adminCreate(ctx) {
@@ -373,6 +387,7 @@ export async function adminConfirm(ctx) {
   const body = ctx.body;
   const version = requireVersion(body);
   const b = await bookingRow(env, ctx.params.id);
+  await assertUnlocked(ctx, b.id);
   const event = await eventById(ctx, b.event_id);
   const bk = event.booking;
   const now = Date.now();
@@ -450,6 +465,7 @@ export async function adminReject(ctx) {
   const body = ctx.body;
   const version = requireVersion(body);
   const b = await bookingRow(env, ctx.params.id);
+  await assertUnlocked(ctx, b.id);
   const event = await eventById(ctx, b.event_id);
   const now = Date.now();
   const pays = await paymentsOf(env, b.id);
@@ -481,6 +497,7 @@ export async function adminCancel(ctx) {
   const body = ctx.body;
   const version = requireVersion(body);
   const b = await bookingRow(env, ctx.params.id);
+  await assertUnlocked(ctx, b.id);
   if (b.version !== version) throw new ApiError('conflict', 'version', { version: b.version });
   if (b.status !== 'confirmed') throw new ApiError('final', b.status);
   const reason = cleanText(body.reason, LIMITS.reason);
@@ -504,6 +521,7 @@ export async function adminReopen(ctx) {
   const env = ctx.env;
   const version = requireVersion(ctx.body);
   const b = await bookingRow(env, ctx.params.id);
+  await assertUnlocked(ctx, b.id);
   const event = await eventById(ctx, b.event_id);
   if (b.version !== version) throw new ApiError('conflict', 'version', { version: b.version });
   if (b.status !== 'rejected') throw new ApiError('final', b.status);
@@ -525,6 +543,7 @@ export async function adminUpdate(ctx) {
   const body = ctx.body;
   const version = requireVersion(body);
   const b = await bookingRow(env, ctx.params.id);
+  await assertUnlocked(ctx, b.id);
   const event = await eventById(ctx, b.event_id);
   const bk = event.booking;
   if (b.version !== version) throw new ApiError('conflict', 'version', { version: b.version });
@@ -597,6 +616,7 @@ export async function adminPaymentAdd(ctx) {
   const pays = await paymentsOf(env, b.id);
   const twin = pays.find(p => p.idem_key === ctx.body.idemKey);
   if (twin) return detail(ctx, b.id);
+  await assertUnlocked(ctx, b.id);
   const other = KEY.test(String(ctx.body.idemKey || '')) ? await env.DB.prepare('SELECT booking_id FROM payments WHERE idem_key = ?').bind(ctx.body.idemKey).first() : null;
   if (other) throw new ApiError('conflict', 'idemKey used');
   if (b.status === 'pending') throw new ApiError('final', 'pending: use confirm or reject');
@@ -631,6 +651,7 @@ export async function adminPaymentVoid(ctx) {
     throw new ApiError('conflict', 'idemKey used');
   }
   if (target.kind === 'void' || target.voided_by) throw new ApiError('final', 'already voided');
+  await assertUnlocked(ctx, target.booking_id);
   const reason = cleanText(body.reason, LIMITS.reason);
   if (reason.length < 2) throw invalid('reason');
   const now = Date.now();

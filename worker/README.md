@@ -46,11 +46,12 @@ All resources live in Cloudflare account `menazakmena@gmail.com` (workers.dev su
 | `SYNC_SECRET` | both | HMAC key for Apps Script → Worker sync (`src/lib/sync.js`). Production: the same value as the Apps Script Script Property `WORKER_SYNC_SECRET`. Staging: `.staging-sync-secret` (gitignored) |
 | `ADMIN_EMAILS` | staging only | Bootstrap allowlist for tests. **Production does not use it**: its admins are copied from Apps Script (see "Admin allowlist") |
 | `BOOK_SECRET` | both (production: at go-live) | HMAC for visitor booking status links and proof claims (≥ 32 chars). Staging: `.staging-book-secret` |
+| `TURNSTILE_SECRET` | both (production: at go-live) | Cloudflare Turnstile secret for `POST /v1/book/submit` (`src/book/turnstile.js`). **Production without it refuses every submit.** Staging: Cloudflare's always-pass TEST secret `1x0000000000000000000000000000000AA`. The site key is the var `TURNSTILE_SITEKEY` (wrangler.jsonc; staging: the TEST key `1x00000000000000000000AA`) |
 | `STAGING_TEST_JWK` | **staging only** | Public JWK of the load-test signing key (`.staging-test-key.pem`, gitignored). Ignored unless `ENVIRONMENT === 'staging'` |
 
 **Later phases add:**
 - `COMP_SECRET`, `CODE_PEPPER`, `CODE_KEY` (copied from Apps Script, so codes and tokens keep working)
-- `FCM_SERVICE_ACCOUNT`, `GITHUB_TOKEN`, `TURNSTILE_SECRET`, `ORS_API_KEY`
+- `FCM_SERVICE_ACCOUNT`, `GITHUB_TOKEN`, `ORS_API_KEY`
 
 ## API (foundation)
 
@@ -146,8 +147,9 @@ Admins are still added and removed in the existing Admin («صلاحيات لو�
 
 **Where things are:**
 - Contract: `BOOKING-API.md` (transport) + `docs/EVENTS.md` (product).
-- Code: `src/book/` — `model.js` (pure rules, pricing checked against `apps-script/BookModel.gs`), `event.js`, `token.js`, `public.js`, `admin.js`.
-- Schema: migration `0003_bookings.sql`.
+- Code: `src/book/` — `model.js` (pure rules, pricing checked against `apps-script/BookModel.gs`), `event.js`, `token.js`, `public.js`, `admin.js`, `turnstile.js`, `locks.js`, `news.js`.
+- Schema: migrations `0003_bookings.sql`, `0004_booking_ops.sql` (phone retention, edit locks, the new-bookings counters).
+- Operations (BOOKING-API.md): Turnstile on submit, edit locks on bookings, the grouped new-bookings feed for the admin push (Apps Script `BookNotify.gs` pulls `POST /v1/sync/book-news`), phones blanked 12 months after the event (daily cron).
 
 **Event settings:**
 - The bookable definition of an event is its **published** `events/<slug>/event.json` on the site (`SITE_URL`).
@@ -170,6 +172,14 @@ Admins are still added and removed in the existing Admin («صلاحيات لو�
 **Staging only:**
 - `POST /v1/admin/diag/event-fixture` stores a test event.
 - `node scripts/book-check.mjs` runs the whole flow and the races on staging: same requestKey, same phone, IP budget, last places, parallel payments, competing voids.
+- `node scripts/book-ops-check.mjs` checks Turnstile (no token refused, the test token passes), edit locks, the new-bookings feed (signed sync, grouping, cooldown) and the 12-month phone retention. With the staging secret switched to the always-fail TEST secret: `--turnstile-fails`.
+- `node scripts/book-ui-staging.mjs <out>` (the event page in real Chrome, with the real Turnstile widget) and `cd tools && node ../tests/book-admin-staging.mjs` (the real admin, edit locks included). Run the UI check ≥ 10 min after book-check: book-check spends the per-IP budgets.
+
+**Go-live (production), in order — none of it done yet:**
+1. `wrangler secret put BOOK_SECRET` and `TURNSTILE_SECRET` (a real Turnstile widget for stathanasiosyouth.github.io); its site key as `TURNSTILE_SITEKEY` in the production vars.
+2. Push to main (deploys the Worker: migrations 0003 + 0004) and deploy Apps Script (BookModel online switch, BookNotify.gs, AdminNotify/Activity changes).
+3. Apps Script editor: Run ▸ `enableBookingAlerts` once (the 5-minute new-bookings trigger).
+4. `POST /v1/admin/book/module { on: true }` (primary admin), Script Property `BOOKING_ONLINE` = 1, republish the events.
 
 ## Develop and test
 

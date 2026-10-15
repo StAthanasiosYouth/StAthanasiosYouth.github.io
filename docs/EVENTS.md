@@ -712,6 +712,16 @@ A new booking creates Activity `booking.new` with the system actor
 **Grouping:** pushes are grouped per event over 10 minutes («٣ حجوزات جديدة –
 رحلة الإسكندرية»). Each push links to `/admin/#open/bookings/<eventId>`.
 
+**As built (2026-10-15, booking pilot):** the bookings live on the Worker,
+which only counts them per event; `apps-script/BookNotify.gs` (a 5-minute
+trigger, installed once with `enableBookingAlerts`, active only while
+`BOOKING_ONLINE` = 1) claims the groups over the signed sync channel
+(`POST /v1/sync/book-news`, worker/BOOKING-API.md) and writes one Activity
+row per group with the system actor `visitor` («زوار بعتوا ٣ طلبات حجز في
+«…»») — no general `activity_` change — plus one push to the absent admins
+(`adminPushNotify_`; body «مستنيين المراجعة: N»). Latency: ≤ 5 minutes,
+then ≤ one group per event per 10 minutes.
+
 ---
 
 ## 8. Service / media pages
@@ -861,7 +871,8 @@ A committed-file scan test, like `comp-security.test.mjs`, enforces this.
   `deletedAt` is set and the row is kept). The same run sweeps orphan proofs.
 - Bookings and payments are kept for accounting.
 - Phone numbers are blanked **12 months** after the event ends (see
-  decisions).
+  decisions). As built: the Worker's daily cron (`scheduled.js blankPhones`)
+  sets `phone` to '' and `phone_blanked_ms`; one audit row with the count.
 
 **Public endpoints:**
 - Body ≤ `BOOK_MAX_BODY`, checked on the request size before field
@@ -882,6 +893,10 @@ A committed-file scan test, like `comp-security.test.mjs`, enforces this.
 - Booking and payment writes go through `compLiveWrite_` (official `/admin/`
   only; the recovery admin shows «استخدم /admin/»).
 - Edit locks use the new `LOCK_KINDS` `event`, `booking`, `servant`, `page`.
+  As built for bookings: the lock lives on the Worker (`edit_locks`,
+  `src/book/locks.js`) and is enforced there: a lease per admin page
+  session (90 s, renewed every 30 s by the open sheet); every other session's
+  booking write is refused with `locked` (worker/BOOKING-API.md «Edit locks»).
 
 **XLSX:** built in the browser from API rows and contains phones. The export
 button shows «الملف فيه أرقام تليفونات، ماتبعتوش في جروبات».

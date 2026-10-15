@@ -14,6 +14,11 @@
  * 401 or 403 → nothing appears and nothing else changes. The recovery
  * admin (Apps Script) has no AdminWorker: nothing appears there either.
  *
+ * Edit locks (worker/src/book/locks.js): the open booking sheet holds its
+ * booking (taken on open, renewed every ~30 s, given back on close). Held by
+ * another admin: «<name> بيعدّل الحجز ده دلوقتي», read only (their moves
+ * would be refused with «locked» anyway), and «افتح آخر نسخة» once free.
+ *
  * Money is never optimistic: a write shows its pending button, then the
  * server's answer (the booking detail) is drawn. Every write carries a key
  * (book-kit keyKeeper): the same body sent again keeps its key. `version`
@@ -567,8 +572,115 @@
       });
       proofUrls = {};
       B.current = null;
+      stopLock(true);
     });
   })();
+
+
+  /* =======================================================
+     EDIT LOCKS (one admin edits a booking at a time)
+  ======================================================= */
+
+  var lock = { id: '', timer: 0, granted: null, holder: null, wasLocked: false };
+  B.lock = function () { return { id: lock.id, granted: lock.granted, holder: lock.holder }; };   // tests, console
+
+  function lockPath(id) {
+    return '/v1/admin/book/bookings/' + enc(id) + '/lock';
+  }
+
+  function stopLock(release) {
+    var id = lock.id;
+    clearTimeout(lock.timer);
+    lock = { id: '', timer: 0, granted: null, holder: null, wasLocked: false };
+    if (release && id && W()) W().call('DELETE', lockPath(id), undefined, { quiet: true }).catch(function () {});
+  }
+
+  /* the open booking's lock: taken once per booking, renewed while it stays open; known = the detail's lock */
+  function holdLock(id, known) {
+    if (lock.id === id) return;
+    stopLock(true);
+    lock.id = id;
+    if (known && known.mine === false) {
+      lock.granted = false;
+      lock.holder = known.holder || null;
+      lock.wasLocked = true;
+    }
+    takeLock();
+  }
+
+  function takeLock() {
+    var id = lock.id;
+    var w = W();
+    if (!id || !w) return;
+    w.call('POST', lockPath(id), {}, { quiet: true }).then(function (reply) {
+      if (lock.id !== id) return;
+      lock.granted = !!(reply && reply.granted);
+      // free again: keep who had it («<name> خلّص التعديل»)
+      if (!lock.granted) {
+        lock.holder = (reply && reply.holder) || lock.holder;
+        lock.wasLocked = true;
+      }
+      paintLock();
+      lock.timer = setTimeout(takeLock, Math.max(5000, Number(reply && reply.renew) || 30000));
+    }).catch(function () {
+      // quiet: the server still guards every move; ask again later
+      if (lock.id === id) lock.timer = setTimeout(takeLock, 30000);
+    });
+  }
+
+  function lockBanner(banner, free) {
+    var holder = lock.holder || {};
+    var who = holder.name || 'أدمن تاني';
+    var id = lock.id;
+    banner.className = 'lock-banner' + (free ? ' lock-banner--free' : '');
+    banner.setAttribute('data-lock', free ? 'free' : 'held');
+    A.fill(banner,
+      el('span', { class: 'lock-banner__icon', 'aria-hidden': 'true' }, icon(free ? 'check' : 'lock')),
+      el('div', { class: 'lock-banner__text' },
+        el('p', { class: 'lock-banner__title', text: free ? who + ' خلّص التعديل.' : who + ' بيعدّل الحجز ده دلوقتي (' + A.ago(holder.since) + ')' }),
+        el('p', { class: 'lock-banner__hint', text: free ? 'ممكن يكون غيّر حاجات — افتح آخر نسخة وكمّل منها.' : 'مفتوح للقراءة بس. التعديل هيتفتح أول ما يخلّص.' })),
+      free ? el('button', { class: 'btn btn--primary btn--small', type: 'button', 'data-lock-refresh': '1', onclick: function () {
+        lock.wasLocked = false;
+        A.dirty = false;
+        openBooking(id);
+      } }, icon('retry'), 'افتح آخر نسخة') : null);
+  }
+
+  /* the sheet as the lock says: held by someone else → read only + who; free again → «افتح آخر نسخة» */
+  function paintLock() {
+    var sheet = document.getElementById('sheet');
+    if (!sheet || !sheet.open || !B.current || B.current.booking.id !== lock.id) return;
+    var body = sheet.querySelector('.sheet__body');
+    if (!body) return;
+    var banner = body.querySelector('.lock-banner');
+    if (lock.granted === false) {
+      sheet.classList.add('is-locked');
+      A.dirty = false;
+      if (!banner) {
+        banner = el('div', { class: 'lock-banner', role: 'status' });
+        body.prepend(banner);
+      }
+      lockBanner(banner, false);
+      // every move off (the proofs stay viewable; «قفل» and «رجوع» stay)
+      Array.prototype.forEach.call(sheet.querySelectorAll('.sheet__foot [data-act], .sheet__body [data-act], .sheet__body input, .sheet__body textarea, .sheet__body select'), function (control) {
+        if (banner.contains(control) || control.getAttribute('data-act') === 'back') return;
+        control.disabled = true;
+      });
+      return;
+    }
+    if (lock.granted && lock.wasLocked && banner) lockBanner(banner, true);
+  }
+
+  /* a move refused with «locked»: who has it, and the booking as it is now */
+  function lockedOut(error, id) {
+    var holder = error && error.reply && error.reply.holder;
+    lock.granted = false;
+    lock.holder = holder || lock.holder;
+    lock.wasLocked = true;
+    A.dirty = false;
+    A.toast(((holder && holder.name) || 'أدمن تاني') + ' بيعدّل الحجز ده دلوقتي', 'info');
+    openBooking(id);
+  }
 
   function openBooking(id, note) {
     var box = A.errorBox();
@@ -724,6 +836,9 @@
       history
     ], actions.concat([el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })]), { wide: true, className: 'book-sheet' });
 
+    holdLock(b.id, d.lock);
+    paintLock();
+
   }
 
 
@@ -779,6 +894,10 @@
     function failed(error) {
       var code = error && error.code;
       var reply = (error && error.reply) || {};
+      if (code === 'locked' && owner) {
+        lockedOut(error, owner.booking.id);
+        return;
+      }
       if (code === 'conflict' && owner) {
         A.dirty = false;
         A.toast('حد عدّل الحجز ده، اتحدّث', 'info');
@@ -859,6 +978,7 @@
       form,
       extraBox
     ], [submit, back], { wide: true, className: 'book-sheet' });
+    paintLock();
 
   }
 
@@ -1368,6 +1488,10 @@
         drawBooking(reply);
         afterWrite();
       }).catch(function (error) {
+        if (error && error.code === 'locked') {
+          lockedOut(error, b.id);
+          return;
+        }
         if (error && error.code === 'conflict') {
           A.toast('حد عدّل الحجز ده، اتحدّث', 'info');
           openBooking(b.id, 'حد عدّل الحجز ده، اتحدّث. راجع وكمّل.');

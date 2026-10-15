@@ -44,12 +44,15 @@ const MESSAGES = {
   final: ['الحجز ده مينفعش يتغير كده دلوقتي.', ''],
   expired: ['الرابط ده مش صالح أو انتهى.', ''],
   warn: ['في ملاحظات قبل التسجيل.', 'راجعها، ولو متأكد سجّل برضه.'],
-  needs_override: ['الحجز مينفعش يتأكد كده.', 'راجع السبب، ولو لازم أكّده مع كتابة السبب.']
+  needs_override: ['الحجز مينفعش يتأكد كده.', 'راجع السبب، ولو لازم أكّده مع كتابة السبب.'],
+  locked: ['أدمن تاني بيعدّل الحجز ده دلوقتي.', 'استنى لحد ما يخلّص، وبعدين افتح آخر نسخة.'],
+  turnstile: ['محتاجين نتأكد إنك مش روبوت.', 'كمّل علامة التأكيد وابعت تاني.']
 };
 
 const STATUS = {
   auth: 401, denied: 403, origin: 403, bad: 400, toolarge: 413, rate: 429, conflict: 409, busy: 409, disabled: 403, notfound: 404, method: 405, error: 500,
-  not_found: 404, invalid: 400, proof: 400, not_open: 409, closed: 409, full: 409, limit: 429, final: 409, expired: 401, warn: 409, needs_override: 409
+  not_found: 404, invalid: 400, proof: 400, not_open: 409, closed: 409, full: 409, limit: 429, final: 409, expired: 401, warn: 409, needs_override: 409,
+  locked: 409, turnstile: 403
 };
 
 export class ApiError extends Error {
@@ -85,7 +88,7 @@ export function preflight(request, env) {
       ...SECURITY_HEADERS,
       ...cors,
       'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
-      'access-control-allow-headers': 'authorization, content-type, idempotency-key, x-request-id',
+      'access-control-allow-headers': 'authorization, content-type, idempotency-key, x-request-id, x-edit-session',
       'access-control-max-age': '7200'
     }
   });

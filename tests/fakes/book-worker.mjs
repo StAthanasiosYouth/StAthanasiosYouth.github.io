@@ -20,9 +20,10 @@ const MESSAGES = {
   final: 'الحجز ده مينفعش يتغير كده دلوقتي.',
   not_found: 'مش لاقيين الفعالية أو الحجز ده.',
   auth: 'لازم تدخل بحساب جوجل تاني.',
-  denied: 'مش مسموح لك تستخدم لوحة التحكم.'
+  denied: 'مش مسموح لك تستخدم لوحة التحكم.',
+  locked: 'أدمن تاني بيعدّل الحجز ده دلوقتي.'
 };
-const STATUS = { conflict: 409, warn: 409, needs_override: 409, busy: 409, invalid: 400, final: 409, not_found: 404, auth: 401, denied: 403, error: 500 };
+const STATUS = { conflict: 409, warn: 409, needs_override: 409, busy: 409, invalid: 400, final: 409, not_found: 404, auth: 401, denied: 403, error: 500, locked: 409 };
 
 class Fail extends Error {
   constructor(code, extra = {}) {
@@ -44,7 +45,10 @@ export function createBookWorker({ event, origin, proofBytes, now = () => '2026-
     seq: 0,
     idem: new Map(),
     calls: [],
-    inject: []                         // [{ match(method, path), code, extra, times }]
+    inject: [],                        // [{ match(method, path), code, extra, times }]
+    lockHolder: null,                  // { name, since }: another admin's page holds every booking (edit locks)
+    lockRenew: 30000,                  // what POST …/lock says about renewing
+    sessions: new Set()                // the x-edit-session values seen
   };
 
   const id = prefix => `${prefix}-${String(++state.seq).padStart(4, '0')}`;
@@ -96,6 +100,7 @@ export function createBookWorker({ event, origin, proofBytes, now = () => '2026-
       booking: { ...row(b), requested: b.requested, actual: b.actual, names: b.names || [], visitorNote: b.visitorNote || '', adminNote: b.adminNote || '',
         rejectReason: b.rejectReason || '', cancelReason: b.cancelReason || '', capOverride: b.capOverride || null, dueHistory: b.dueHistory || [], priceRev: 'abcd1234', closedAt: '', closedBy: '' },
       payments: clone(paysOf(b)),
+      lock: state.lockHolder ? { mine: false, holder: clone(state.lockHolder) } : { mine: true, holder: { name: 'Me', since: 0 } },
       proofs: clone(state.proofs.filter(p => p.bookingId === b.id)),
       derived: derived(b),
       event: { ...clone(ev()), taken: taken(), left: left() }
@@ -230,6 +235,11 @@ export function createBookWorker({ event, origin, proofBytes, now = () => '2026-
       return { rows, counts, next: '' };
     }],
     ['GET', /^\/v1\/admin\/book\/bookings\/(bk-\d+)$/, m => detail(find(m[1]))],
+    ['POST', /^\/v1\/admin\/book\/bookings\/(bk-\d+)\/lock$/, m => {
+      find(m[1]);
+      return state.lockHolder ? { granted: false, holder: clone(state.lockHolder), ttl: 90000, renew: state.lockRenew } : { granted: true, ttl: 90000, renew: state.lockRenew };
+    }],
+    ['DELETE', /^\/v1\/admin\/book\/bookings\/(bk-\d+)\/lock$/, () => ({ released: !state.lockHolder })],
     ['POST', /^\/v1\/admin\/book\/bookings$/, (m, body) => {
       if (!body.requestKey) throw new Fail('invalid', { field: 'name', message: 'requestKey' });
       const phone = normPhone(body.phone);
@@ -380,7 +390,7 @@ export function createBookWorker({ event, origin, proofBytes, now = () => '2026-
     if (url.origin !== WORKER_URL) return null;
     const method = request.method();
     if (method === 'OPTIONS') {
-      return { status: 204, headers: { ...cors, 'access-control-allow-methods': 'GET, POST', 'access-control-allow-headers': 'authorization, content-type, idempotency-key, accept', 'access-control-max-age': '600' }, body: '' };
+      return { status: 204, headers: { ...cors, 'access-control-allow-methods': 'GET, POST, DELETE', 'access-control-allow-headers': 'authorization, content-type, idempotency-key, accept, x-edit-session', 'access-control-max-age': '600' }, body: '' };
     }
     const headers = request.headers();
     const raw = request.hasPostData() ? (request.postData() ?? await request.fetchPostData()) ?? '' : '';
@@ -390,8 +400,9 @@ export function createBookWorker({ event, origin, proofBytes, now = () => '2026-
       try { body = JSON.parse(raw); } catch { body = null; }
     }
     const key = headers['idempotency-key'] || '';
-    const call = { method, path: url.pathname, query: url.search, body, key, auth: headers.authorization || '', contentType: headers['content-type'] || '' };
+    const call = { method, path: url.pathname, query: url.search, body, key, auth: headers.authorization || '', contentType: headers['content-type'] || '', session: headers['x-edit-session'] || '' };
     state.calls.push(call);
+    if (call.session) state.sessions.add(call.session);
 
     try {
       if (!/^Bearer \S+/.test(call.auth)) throw new Fail('auth');
@@ -403,6 +414,11 @@ export function createBookWorker({ event, origin, proofBytes, now = () => '2026-
         injected.times--;
         if (injected.before) injected.before();
         throw new Fail(injected.code, injected.extra || {});
+      }
+
+      // another admin's page holds the booking: every move on it is refused (worker/src/book/locks.js)
+      if (state.lockHolder && method === 'POST' && /^\/v1\/admin\/book\/(bookings\/[^/]+\/(confirm|reject|cancel|reopen|update|payments)|payments\/[^/]+\/void)$/.test(url.pathname)) {
+        throw new Fail('locked', { holder: clone(state.lockHolder) });
       }
 
       if (method === 'GET' && /^\/v1\/admin\/proofs\/(prf-\d+)$/.test(url.pathname)) {

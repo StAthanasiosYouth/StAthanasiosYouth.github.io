@@ -435,12 +435,13 @@ test('sw.js: /events/<slug>/ and a non-reserved /<slug>/ open exactly; #event/ #
 const csp = html => /<meta http-equiv="Content-Security-Policy" content="([^"]+)">/.exec(html)[1];
 
 for (const file of ['pages/index.html', 'events/index.html']) {
-  test(`${file}: the site CSP (+ the booking Worker in connect-src only), no inline code, relative URLs one level up, the page module`, () => {
+  test(`${file}: the site CSP (+ the booking Worker in connect-src, Turnstile in script-src and frame-src), no inline code, relative URLs one level up, the page module`, () => {
     const shell = read(file);
     // the site's policy, with the booking API (production, and staging for a developer's machine) added to connect-src
     const WORKERS = ' https://athanasios-api.menazak-lab.workers.dev https://athanasios-api-staging.menazak-lab.workers.dev';
     const site = csp(read('index.html'));
-    assert.equal(csp(shell), site.replace(/(connect-src [^;]+)/, `$1${WORKERS}`));
+    const TURNSTILE = ' https://challenges.cloudflare.com';
+    assert.equal(csp(shell), site.replace(/(connect-src [^;]+)/, `$1${WORKERS}`).replace(/(script-src [^;]+)/, `$1${TURNSTILE}`).replace(/(frame-src [^;]+)/, `$1${TURNSTILE}`));
     assert.notEqual(csp(shell), site);
     assert.doesNotMatch(shell, /<script(?![^>]*\bsrc=)[^>]*>/, 'no inline script');
     assert.doesNotMatch(shell, /<style|\sstyle="/, 'no inline style');

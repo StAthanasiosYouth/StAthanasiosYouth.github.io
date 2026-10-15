@@ -1371,6 +1371,14 @@
    */
   var WORKER_BACKOFF = [700, 2000];
 
+  // this page load's edit session (x-edit-session): the booking edit locks
+  // (worker/src/book/locks.js) belong to it, and its own writes pass them
+  var EDIT_SESSION = (function () {
+    var bytes = new Uint8Array(12);
+    window.crypto.getRandomValues(bytes);
+    return 'es' + Array.prototype.map.call(bytes, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+  })();
+
   function workerError(message, hint, extra) {
 
     extra = extra || {};
@@ -1420,6 +1428,7 @@
       headers['content-type'] = 'application/json';
     }
     if (options.idempotencyKey) headers['idempotency-key'] = options.idempotencyKey;
+    headers['x-edit-session'] = EDIT_SESSION;
 
     return fetch(WORKER + path, {
       method: method,
@@ -1495,6 +1504,8 @@
     available: function () { return !!WORKER; },
     /* 'google' | 'device' | '' */
     via: function () { return session ? session.via || '' : ''; },
+    /* this page's edit session (the booking locks) */
+    editSession: function () { return EDIT_SESSION; },
     call: function (method, path, body, options) { return workerCall(method, path, body, options); },
     /* raw bytes up (a proof image), with its Idempotency-Key */
     upload: function (path, blob, options) { return workerCall('POST', path, blob, options); },

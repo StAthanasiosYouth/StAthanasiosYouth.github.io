@@ -46,7 +46,10 @@
         "ENVIRONMENT": "staging",
         "ALLOWED_ORIGINS": "https://stathanasiosyouth.github.io,http://localhost:8080,http://127.0.0.1:8080",
         "GOOGLE_CLIENT_ID": "246924773718-38p45gji0ouvi7an4jdjsip3obmk6ve4.apps.googleusercontent.com",
-        "SITE_URL": "https://stathanasiosyouth.github.io"
+        "SITE_URL": "https://stathanasiosyouth.github.io",
+        // Cloudflare's published Turnstile TEST site key (always passes; the secret is the matching test secret).
+        // Production gets its own widget's key at go-live (worker/README.md); without TURNSTILE_SECRET production refuses every submit.
+        "TURNSTILE_SITEKEY": "1x00000000000000000000AA"
       },
       "r2_buckets": [
         { "binding": "PROOFS", "bucket_name": "athanasios-proofs-staging" }

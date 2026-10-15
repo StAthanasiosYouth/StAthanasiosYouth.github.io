@@ -95,6 +95,11 @@ try {
   await page.waitForSelector('.bk-proof[data-state="done"]', { timeout: 30000 });
   ok(`phone-size screenshot prepared in the browser + uploaded to staging R2 (${Date.now() - t1} ms)`, true);
   if (!(await page.$eval('#bk-agree', e => e.checked))) await page.click('label[for="bk-agree"]');
+  // the REAL Turnstile widget (Cloudflare's script, staging's always-pass test site key; its iframe sits in a closed shadow root): its token before the send
+  const t3 = Date.now();
+  await page.waitForFunction(() => { const i = document.querySelector('#bk-turnstile input[name="cf-turnstile-response"]'); return i && i.value; }, { timeout: 30000 });
+  ok(`Turnstile widget loaded under the page CSP and issued a token (${Date.now() - t3} ms)`, true);
+  await (await page.$('[data-field="turnstile"]')).screenshot({ path: OUT + '/turnstile.png' });
   const t2 = Date.now();
   await page.click('.bk-send');
   await step('done');

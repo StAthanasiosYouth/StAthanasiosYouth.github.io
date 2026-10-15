@@ -96,13 +96,17 @@ var ACTIVITY_ACTIONS = ['create', 'update', 'delete', 'archive', 'unarchive', 'e
   'publish', 'push', 'upload', 'media.update', 'media.delete', 'media.restore', 'media.purge', 'import', 'live.stage',
   'admin.add', 'admin.remove', 'admin.rename', 'migrate', 'session.takeover',
   // competitions (docs/COMPETITIONS.md §11): never a code, a phone or an answer in `changes`
-  'review', 'finalize', 'regrade', 'close', 'code.view', 'code.reset', 'code.export', 'participant.phone', 'points.adjust', 'redemption.status'];
+  'review', 'finalize', 'regrade', 'close', 'code.view', 'code.reset', 'code.export', 'participant.phone', 'points.adjust', 'redemption.status',
+  // new visitor bookings, written by BookNotify.gs only (system actor «visitor»)
+  'booking.new'];
 
 var ACTIVITY_TYPES = ['sessions', 'news', 'games', 'activities', 'notifications', 'types', 'links', 'sections', 'contacts',
   'settings', 'media', 'site', 'admins', 'data', 'session',
   'competition', 'participant', 'points', 'shopitem', 'redemption',
   // service pages, events, servants (Pages.gs): never a phone in `changes`
-  'page', 'event', 'servant'];
+  'page', 'event', 'servant',
+  // an event's bookings (BookNotify.gs): counts only
+  'bookings'];
 
 /* small, repeatable actions: merged into the admin's last row for the same thing */
 var ACTIVITY_MERGEABLE = ['update', 'reorder', 'settings', 'enable', 'disable', 'media.update', 'live.stage', 'review', 'code.view'];
@@ -919,7 +923,9 @@ function compactActivity_(row) {
   return {
     id: row.id, at: row.at, cairo: row.cairo, actor: row.actor, action: row.action, type: row.type,
     entityId: row.entityId, title: row.title, summary: row.summary, count: row.count,
-    sub: row.changes && row.changes.sub ? row.changes.sub : ''
+    sub: row.changes && row.changes.sub ? row.changes.sub : '',
+    // a system actor (new bookings: «زائر» / «زوار», BookNotify.gs) keeps the name it was written with
+    actorName: String(row.actor).indexOf('@') === -1 ? row.actorName || '' : undefined
   };
 
 }

@@ -12,7 +12,8 @@
  *          «الحجز اتقفل» / «اكتمل العدد»
  *   flow   a  who's coming: name, phone, counts (+ names)
  *          b  servant and method, «كلّم الخادم على واتساب» (paid events)
- *          c  proof pictures (uploaded one by one, right away), note, terms
+ *          c  proof pictures (uploaded one by one, right away), note, terms,
+ *             the Turnstile check when the state names a site key (turnstile.js)
  *          → POST /v1/book/submit with the draft's requestKey
  *          done: the reference, the status link («انسخ الرابط»)
  *   mine   «حجزك B-XXXXX: قيد المراجعة» for this device's bookings here
@@ -35,6 +36,7 @@ import { prepareImage, UNSUPPORTED } from './image.js';
 import { createBookApi } from './book-api.js';
 import { bookApiUrl } from './book-config.js';
 import { icon } from './view.js';
+import { mountTurnstile } from './turnstile.js';
 
 const PROOF_ID = /^prf-[a-z2-7]{8}$/;
 
@@ -120,6 +122,12 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
   let lastRefresh = 0;
   let saveTimer = 0;
   let destroyed = false;
+  let captcha = null;         // the send step's Turnstile (mountTurnstile), while it is drawn
+
+  function dropCaptcha() {
+    if (captcha) captcha.remove();
+    captcha = null;
+  }
 
   function nextId() {
     nextId.n = (nextId.n || 0) + 1;
@@ -158,6 +166,7 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
     if (heroCta && heroCta.firstChild) heroCta.firstChild.textContent = original.cta;
     leftEl.hidden = true;
     stateEl.hidden = true;
+    dropCaptcha();
     flowEl.replaceChildren();
     block.hidden = mineEl.hidden;
     block.dataset.live = 'fallback';
@@ -254,6 +263,7 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
 
   function renderStart() {
     mode = 'start';
+    dropCaptcha();
     const start = h('button', { class: 'btn btn--primary bk-start', type: 'button' }, draft ? 'كمّل حجزك' : 'احجز الآن', icon('arrow'));
     start.addEventListener('click', () => {
       if (!draft) draft = emptyDraft(booking, randomKey(), Date.now());
@@ -357,6 +367,7 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
 
   function renderStep({ focus = true, notice = '' } = {}) {
 
+    dropCaptcha();
     const step = draft.step;
     const at = steps.indexOf(step);
     const title = step === 'c' && free ? 'تأكيد الطلب' : STEP_TITLES[step];
@@ -758,12 +769,24 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
       paid && method ? h('div', {}, h('dt', {}, 'طريقة الدفع'), h('dd', {}, method.label)) : null
     );
 
+    // Turnstile (the Worker asks for it): a token before the send
+    let checkBox = null;
+    if (live && live.turnstile) {
+      const widget = h('div', { class: 'bk-turnstile', id: 'bk-turnstile' });
+      checkBox = group('turnstile', 'تأكيد سريع إنك مش روبوت', widget);
+      captcha = mountTurnstile(widget, live.turnstile, {
+        onChange: token => { if (token) showErrors({}, { focus: false, only: ['turnstile'] }); },
+        onError: () => showErrors({ turnstile: 'علامة التأكيد ما اشتغلتش. حدّث الصفحة أو جرّب نت تاني.' }, { focus: false, only: ['turnstile'] })
+      });
+    }
+
     sendButton = h('button', { class: 'btn btn--primary bk-send', type: 'submit' }, 'ابعت طلب الحجز');
     const form = h('form', { class: 'bk-form', novalidate: true },
       summary,
       proofsBox,
       field('note', 'ملاحظة للخادم (اختياري)', note),
       terms,
+      checkBox,
       h('p', { class: 'bk-note bk-note--strong' }, paid ? 'مكانك بيتأكد بعد مراجعة الدفع.' : 'مكانك بيتأكد بعد مراجعة الطلب.'),
       actions(backButton('رجوع', () => go(steps[steps.indexOf('c') - 1])), sendButton)
     );
@@ -783,7 +806,7 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
     if (sending) return;
     syncProofs();
     const uploading = proofs.filter(p => p.state === 'preparing' || p.state === 'uploading').length;
-    const problems = checkSend(booking, { method: draft.method, proofs: draft.proofs, agreed: draft.agreed, uploading }, event.terms);
+    const problems = checkSend(booking, { method: draft.method, proofs: draft.proofs, agreed: draft.agreed, uploading, captcha: captcha ? { required: true, token: captcha.token() } : null }, event.terms);
     if (proofs.some(p => p.state === 'failed') && !problems.proofs) problems.proofs = 'شيل الصورة اللي ماترفعتش أو جرّبها تاني.';
     if (!showErrors(problems)) return;
 
@@ -795,7 +818,7 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
     saveNow();
 
     const hp = document.getElementById('bk-hp');
-    const reply = await api.submit(submitBody(event, draft, { hp: hp ? hp.value : '', revision: live && live.revision }));
+    const reply = await api.submit(submitBody(event, draft, { hp: hp ? hp.value : '', revision: live && live.revision, turnstile: captcha ? captcha.token() : '' }));
     sending = false;
     if (destroyed) return;
 
@@ -803,6 +826,8 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
       finish(reply);
       return;
     }
+    // a Turnstile token is good for one try: a fresh one for the next
+    if (captcha) captcha.reset();
 
     sendButton.disabled = false;
     sendButton.removeAttribute('aria-busy');
@@ -851,6 +876,7 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
 
     done = reply;
     mode = 'done';
+    dropCaptcha();
     clearTimeout(saveTimer);
     clearDraft(slug);
     for (const p of proofs) if (p.url) URL.revokeObjectURL(p.url);
@@ -917,6 +943,7 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
     destroy() {
       destroyed = true;
       saveNow();
+      dropCaptcha();
       removeEventListener('pagehide', saveNow);
     }
   };

@@ -39,8 +39,9 @@ var ADMIN_PUSH_TITLE_MAX = 80;
 var ADMIN_PUSH_BODY_MAX = 160;
 // 'competition': the builder (AdminComp, #open/competition/<cmp-id>)
 // competitions and their modules: the admin's own screens (AdminComp*, #open/<type>/<id>)
+// 'bookings': an event's booking queue (AdminBook, #open/bookings/<evt-id>; new bookings, BookNotify.gs)
 var ADMIN_PUSH_OPEN_TYPES = ['sessions', 'news', 'games', 'activities', 'notifications', 'types', 'links', 'sections', 'contacts', 'media', 'competition',
-  'participant', 'points', 'shopitem', 'redemption'];
+  'participant', 'points', 'shopitem', 'redemption', 'bookings'];
 
 
 function adminPushSheet_() {
@@ -295,6 +296,19 @@ function adminPushUrl_(row) {
 
 /* the message: «مينا زكريا عدّل اجتماع الأحد ١٢ أكتوبر» (+ a detail line) */
 function adminPushMessage_(row) {
+
+  // new bookings (BookNotify.gs): «٣ حجوزات جديدة – رحلة الإسكندرية», no admin in front
+  if (row.action === 'booking.new') {
+    var news = row.changes || {};
+    return {
+      kind: 'admin',
+      id: row.id,
+      title: bookNewsTitle_({ count: Number(news.count) || 1, title: row.title }),
+      body: activityText_(news.pending > 0 ? 'مستنيين المراجعة: ' + activityDigits_(news.pending) : 'افتح الحجوزات', ADMIN_PUSH_BODY_MAX),
+      url: adminPushUrl_(row),
+      tag: ('adm-bookings-' + String(row.entityId || row.id)).replace(/[^\w-]/g, '').slice(0, 80)
+    };
+  }
 
   var title = activityText_(displayName_(row.actor) + ' ' + row.summary, ADMIN_PUSH_TITLE_MAX);
   var body = '';

@@ -71,6 +71,24 @@ const PREVIEW_PARENT = `<!doctype html><html lang="en"><head><meta charset="utf-
 
 const OPEN = { ok: true, open: true, left: 12, opensAt: '', closesAt: '2026-10-21T23:00', revision: 'rev-1' };
 
+const TURNSTILE_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+// what the page sees as window.turnstile: render() draws a button; each click → a new token
+const FAKE_TURNSTILE = `window.turnstile = {
+  n: 0, widgets: {},
+  render(box, o) {
+    const id = 'w' + (++this.n);
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'fake-ts'; b.textContent = 'أنا مش روبوت';
+    b.addEventListener('click', () => { window.__ts = (window.__ts || 0) + 1; o.callback('tok-' + window.__ts); });
+    box.appendChild(b);
+    this.widgets[id] = box;
+    (window.__tsRendered = window.__tsRendered || []).push({ sitekey: o.sitekey, action: o.action, language: o.language });
+    return id;
+  },
+  reset() { window.__tsResets = (window.__tsResets || 0) + 1; },
+  remove(id) { if (this.widgets[id]) this.widgets[id].replaceChildren(); delete this.widgets[id]; window.__tsRemoved = (window.__tsRemoved || 0) + 1; }
+};`;
+
 let mock;
 
 function resetMock() {
@@ -192,6 +210,11 @@ async function open(path, { init = null } = {}) {
       if (mock.down) return request.abort('connectionrefused');
       const { status, body } = answer(call);
       return request.respond({ status, headers: cors, contentType: 'application/json; charset=utf-8', body: JSON.stringify(body) });
+    }
+    // Turnstile: a stand-in widget instead of Cloudflare's script (a button that hands out tokens)
+    if (url.href === TURNSTILE_SRC) {
+      mock.turnstileLoads = (mock.turnstileLoads || 0) + 1;
+      return request.respond({ status: 200, contentType: 'text/javascript; charset=utf-8', body: FAKE_TURNSTILE });
     }
     if (url.hostname !== 'localhost' && url.protocol !== 'data:' && url.protocol !== 'blob:') {
       outside.push(url.href);
@@ -652,6 +675,74 @@ test('preview (?preview): an online event shows the online look, still — no re
   await new Promise(resolve => setTimeout(resolve, 500));
   assert.deepEqual(apiCalls, [], 'no API call');
   assert.deepEqual(await frame.evaluate(() => Object.keys(localStorage)), []);
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+
+test('Turnstile: the state names a site key → the check on the send step; no token, no send; its token goes once; a refused one → a fresh one', async () => {
+  resetMock();
+  mock.state = { status: 200, body: { ...OPEN, turnstile: '0x4AAAAAAAsitekey' } };
+  const { context, page, problems, outside } = await open('/events/online-trip/');
+  await ready(page);
+  await live(page, 'open');
+  assert.equal(mock.turnstileLoads || 0, 0, 'not loaded before the send step');
+  await page.click('.bk-start');
+  await fillWho(page);
+  await choosePay(page, 'cash');
+  await agree(page);
+  await page.waitForSelector('#bk-turnstile .fake-ts');
+  assert.equal(mock.turnstileLoads, 1);
+  assert.deepEqual(await page.evaluate(() => window.__tsRendered), [{ sitekey: '0x4AAAAAAAsitekey', action: 'book', language: 'ar' }]);
+  assert.equal(await textOf(page, '[data-field="turnstile"] legend'), 'تأكيد سريع إنك مش روبوت');
+
+  // no token yet: told under the check, nothing sent
+  await page.click('.bk-send');
+  await page.waitForSelector('[data-field="turnstile"].is-invalid');
+  assert.match(await textOf(page, '#bk-turnstile-err'), /علامة التأكيد/);
+  assert.equal(calls('/v1/book/submit').length, 0);
+
+  // a token: the error goes, the send carries it
+  await page.click('#bk-turnstile .fake-ts');
+  await page.waitForFunction(() => !document.querySelector('[data-field="turnstile"].is-invalid'));
+  mock.submit = json(403, { ok: false, code: 'turnstile', reasons: ['timeout-or-duplicate'], message: 'x' });
+  await page.click('.bk-send');
+  await page.waitForSelector('[data-field="turnstile"].is-invalid');
+  assert.equal(JSON.parse(calls('/v1/book/submit')[0].body).turnstile, 'tok-1');
+  assert.match(await textOf(page, '#bk-turnstile-err'), /روبوت/);
+  assert.equal(await page.evaluate(() => window.__tsResets), 1, 'the used token is dropped');
+
+  // the same token is never sent twice: a new one first
+  await page.click('.bk-send');
+  assert.equal(calls('/v1/book/submit').length, 1);
+  await page.click('#bk-turnstile .fake-ts');
+  mock.submit = null;
+  await page.click('.bk-send');
+  await page.waitForSelector('.bk-flow[data-step="done"]');
+  const sent = calls('/v1/book/submit').map(c => JSON.parse(c.body));
+  assert.deepEqual(sent.map(b => b.turnstile), ['tok-1', 'tok-2']);
+  assert.equal(new Set(sent.map(b => b.requestKey)).size, 1, 'the same requestKey');
+  assert.ok((await page.evaluate(() => window.__tsRemoved)) >= 1, 'the widget is removed once done');
+  assert.ok(await overflow(page) <= 0);
+  assert.deepEqual(outside, []);
+  assert.deepEqual(problems, [], 'no CSP violation, no page error');
+  await context.close();
+});
+
+test('Turnstile: no site key in the state (today) → no script, no check, the send as before', async () => {
+  resetMock();
+  const { context, page, problems } = await open('/events/online-trip/');
+  await ready(page);
+  await live(page, 'open');
+  await page.click('.bk-start');
+  await fillWho(page);
+  await choosePay(page, 'cash');
+  await agree(page);
+  assert.equal(await page.$('[data-field="turnstile"]'), null);
+  await page.click('.bk-send');
+  await page.waitForSelector('.bk-flow[data-step="done"]');
+  assert.equal('turnstile' in JSON.parse(calls('/v1/book/submit')[0].body), false);
+  assert.equal(mock.turnstileLoads || 0, 0);
   assert.deepEqual(problems, []);
   await context.close();
 });

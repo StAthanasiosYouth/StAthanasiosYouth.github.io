@@ -1,8 +1,9 @@
 /*
  * Public booking routes (docs/EVENTS.md §6, worker/BOOKING-API.md).
  * Order for a write: switch → budget → shape → event published & open
- * (server clock) → requestKey replay → validation → server price → places →
- * one atomic batch (per-phone limit inside the INSERT) → reply.
+ * (server clock) → requestKey replay → validation → Turnstile → server price
+ * → places → one atomic batch (per-phone limit inside the INSERT; the
+ * grouped «new bookings» counter for the admin push) → reply.
  * Nothing here reveals a phone, a full name, a proof or a payment row.
  */
 
@@ -14,6 +15,7 @@ import { randomId } from '../lib/hash.js';
 import { putProof } from '../lib/proofs.js';
 import { loadEvent, seatsTaken } from './event.js';
 import { statusToken, readStatusToken, proofClaim, checkProofClaim } from './token.js';
+import { checkTurnstile, turnstileSiteKey } from './turnstile.js';
 import {
   checkCounts, normPhone, cleanText, quote, seats, people, windowState, publicLeft,
   derive, amountDueOf, newRef, LIMITS, stampMs
@@ -55,7 +57,7 @@ export async function bookState(ctx) {
   await limit(ctx, 'book.state', clientIp(ctx.request), 120, 60);
   const event = await loadEvent(ctx, ctx.url.searchParams.get('slug'));
   const w = windowState(event, Date.now());
-  const base = { opensAt: w.opensAt, closesAt: w.closesAt, revision: event.revision, left: null };
+  const base = { opensAt: w.opensAt, closesAt: w.closesAt, revision: event.revision, left: null, turnstile: turnstileSiteKey(ctx.env) };
   if (!w.open) return { __cache: 'public, max-age=15', open: false, reason: w.reason, ...base };
   const taken = await seatsTaken(ctx.env, event.id);
   if (event.booking.capacity != null && event.booking.capacity - taken <= 0) return { __cache: 'public, max-age=15', open: false, reason: 'full', ...base, left: 0 };
@@ -144,6 +146,8 @@ export async function bookSubmit(ctx) {
     }
   }
 
+  await checkTurnstile(ctx, body.turnstile, ip);
+
   if (b.capacity != null) {
     const left = b.capacity - await seatsTaken(ctx.env, event.id);
     if (seatCount > left) throw new ApiError('full', 'seats', { left: Math.max(0, left) });
@@ -173,6 +177,12 @@ export async function bookSubmit(ctx) {
     stmts.push(db.prepare(`INSERT INTO activity (id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary)
         SELECT ?, ?, ?, 'visitor', 'زائر', 'booking.new', 'booking', ?, ?, ? WHERE EXISTS (SELECT 1 FROM bookings WHERE id = ?)`)
       .bind(randomId('act-'), now, createdAt, id, ref, event.title.slice(0, 80) + ' · ' + ppl.total + ' أفراد', id));
+    // §7.3: one more booking for this event's next grouped admin push (POST /v1/sync/book-news)
+    stmts.push(db.prepare(`INSERT INTO book_news (event_id, title, unsent, first_ms, last_ms)
+        SELECT ?, ?, 1, ?, ? WHERE EXISTS (SELECT 1 FROM bookings WHERE id = ?)
+        ON CONFLICT(event_id) DO UPDATE SET unsent = book_news.unsent + 1, title = excluded.title,
+          first_ms = COALESCE(book_news.first_ms, excluded.first_ms), last_ms = excluded.last_ms`)
+      .bind(event.id, event.title.slice(0, 120), now, now, id));
     try {
       const r = await retry(() => db.batch(stmts));
       if (r[0].meta.changes === 1) {

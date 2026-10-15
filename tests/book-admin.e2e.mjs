@@ -603,6 +603,57 @@ test('a manual booking confirmed in the same dialog; summary + XLSX (the phone w
   await d.context.close();
 });
 
+test('edit locks: another admin holds the booking → who and since when, read only, no move sent; free again → «افتح آخر نسخة»; refused mid-way → told; closing gives it back', async () => {
+  freshWorker();
+  fake.state.lockHolder = { name: 'فادي يوسف', since: 125 };
+  fake.state.lockRenew = 1200;
+  const d = await open();
+  await signIn(d.page);
+  await openBookings(d.page);
+  await d.page.click('.book-row[data-ref="B-AAAA1"]');
+  await sheetTitle(d.page, 'حجز B-AAAA1');
+  await d.page.waitForSelector('#sheet.is-locked .lock-banner[data-lock="held"]');
+  assert.equal(await d.page.$eval('#sheet .lock-banner__title', n => n.textContent), 'فادي يوسف بيعدّل الحجز ده دلوقتي (من دقيقتين)');
+  for (const act of ['confirm', 'reject']) assert.equal(await d.page.$eval(`#sheet [data-act="${act}"]`, n => n.disabled), true, act);
+  assert.equal(await d.page.$eval('#sheet .book-proof', n => n.disabled), false, 'the proofs stay viewable');
+  await shot(d.page, '09-locked');
+  const lockCalls = () => fake.state.calls.filter(c => /\/lock$/.test(c.path));
+  await d.page.waitForFunction(() => true);
+  assert.equal(lockCalls()[0].method, 'POST');
+  assert.equal(fake.writes().filter(c => !/\/lock$/.test(c.path)).length, 0, 'nothing sent');
+  // one edit session per page load, on every Worker call
+  assert.equal(fake.state.sessions.size, 1);
+  assert.match([...fake.state.sessions][0], /^es[0-9a-f]{24}$/);
+
+  // the other admin is done: the next renewal says free → «افتح آخر نسخة» → the sheet as it is now, moves back
+  fake.state.lockHolder = null;
+  await d.page.waitForSelector('#sheet .lock-banner[data-lock="free"] [data-lock-refresh]', { timeout: 6000 });
+  assert.equal(await d.page.$eval('#sheet .lock-banner__title', n => n.textContent), 'فادي يوسف خلّص التعديل.');
+  await d.page.click('#sheet [data-lock-refresh]');
+  await d.page.waitForFunction(() => { const s = document.getElementById('sheet'); return s.open && !s.classList.contains('is-locked') && !s.querySelector('.lock-banner'); });
+  assert.equal(await d.page.$eval('#sheet [data-act="confirm"]', n => n.disabled), false);
+
+  // taken in between (the server refuses the move): told who, the booking again, read only
+  await clickAct(d.page, 'reject');
+  await sheetTitle(d.page, 'رفض B-AAAA1');
+  await fill(d.page, 'السبب', 'مكرر');
+  fake.state.lockHolder = { name: 'فادي يوسف', since: 3 };
+  await d.page.click('#sheet [data-act="submit"]');
+  await sheetTitle(d.page, 'حجز B-AAAA1');
+  await d.page.waitForSelector('#sheet.is-locked .lock-banner[data-lock="held"]');
+  assert.equal(await d.page.$eval('#sheet .lock-banner__title', n => n.textContent), 'فادي يوسف بيعدّل الحجز ده دلوقتي (من أقل من دقيقة)');
+  assert.equal(fake.find('B-AAAA1').status, 'pending');
+
+  // closing the sheet gives the lock back
+  fake.state.lockHolder = null;
+  await closeSheet(d.page);
+  await d.page.waitForFunction(() => true);
+  await sleep(300);
+  assert.equal(lockCalls().at(-1).method, 'DELETE');
+  assert.deepEqual(d.problems, []);
+  await d.context.close();
+});
+
 test('360px: the queue and the booking sheet fit (no sideways scroll)', async () => {
   freshWorker();
   const d = await open({ viewport: { width: 360, height: 760, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, ua: ANDROID });

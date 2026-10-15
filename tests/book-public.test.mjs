@@ -315,7 +315,7 @@ test('transport: the envelope; network, 5xx and busy tried again with the same b
 
 test('booking modules: text only; storage only in book-store.js and always inside try; loaded only for an online event', () => {
   const code = file => read(`assets/js/page/${file}`);
-  for (const file of ['booking.js', 'status.js', 'book-model.js', 'book-api.js', 'book-store.js', 'book-config.js', 'image.js']) {
+  for (const file of ['booking.js', 'status.js', 'book-model.js', 'book-api.js', 'book-store.js', 'book-config.js', 'image.js', 'turnstile.js']) {
     assert.doesNotMatch(code(file), /innerHTML|outerHTML|insertAdjacentHTML|document\.write|\beval\(|new Function/, file);
   }
   for (const file of ['booking.js', 'status.js', 'book-model.js', 'book-api.js', 'image.js', 'main.js', 'view.js', 'model.js']) {
@@ -336,4 +336,84 @@ test('booking modules: text only; storage only in book-store.js and always insid
   assert.match(code('book-api.js'), /referrerPolicy: 'no-referrer'/);
   assert.match(code('book-api.js'), /credentials: 'omit'/);
   assert.doesNotMatch(code('booking.js') + code('status.js'), /[?&](token|phone|name)=/);
+});
+
+
+/* =========================================================
+   TURNSTILE (worker/BOOKING-API.md «Turnstile»)
+========================================================= */
+
+test('turnstile: the site key from the state (checked), required before the send, sent once, its error → the send step', () => {
+  assert.equal(B.liveState({ ok: true, open: true, left: 3, turnstile: '0x4AAAAAAA-good_key' }).turnstile, '0x4AAAAAAA-good_key');
+  for (const bad of [undefined, '', 'short', '<script>', 5, 'x'.repeat(81)]) {
+    assert.equal(B.liveState({ ok: true, open: true, left: 3, turnstile: bad }).turnstile, '', String(bad));
+  }
+  const base = { method: 'cash', proofs: [], agreed: true };
+  assert.deepEqual(B.checkSend(BOOKING, base), {}, 'no check asked: nothing to wait for');
+  assert.equal(B.checkSend(BOOKING, { ...base, captcha: { required: true, token: '' } }).turnstile, 'استنى علامة التأكيد تخلص، أو اضغط عليها.');
+  assert.deepEqual(B.checkSend(BOOKING, { ...base, captcha: { required: true, token: 'tok' } }), {});
+
+  const draft = { ...B.emptyDraft(BOOKING, 'web.abcdefgh12', NOW), fields: { name: 'مينا', phone: '01012345678' }, counts: { applicant: 1 }, servantId: 'srv-mina0001', method: 'cash' };
+  assert.equal(B.submitBody(EVENT, draft, { turnstile: 'tok-1' }).turnstile, 'tok-1');
+  assert.equal('turnstile' in B.submitBody(EVENT, draft, {}), false, 'no token: no field');
+
+  const e = B.bookingError({ ok: false, code: 'turnstile', reasons: ['timeout-or-duplicate'] });
+  assert.deepEqual([e.action, e.step, e.field], ['field', 'c', 'turnstile']);
+  assert.match(e.message, /روبوت/);
+});
+
+test('turnstile.js: one script from challenges.cloudflare.com, explicit render with the site key, tokens in and out, reset, remove', async () => {
+  const T = await import('../assets/js/page/turnstile.js');
+  const added = [];
+  const listeners = {};
+  const doc = {
+    head: { appendChild: el => { added.push(el); setTimeout(() => { win.turnstile = fake; listeners.load(); }, 0); } },
+    createElement: () => ({ addEventListener: (type, fn) => { listeners[type] = fn; } })
+  };
+  const calls = [];
+  let options = null;
+  const fake = {
+    render: (box, o) => { options = o; calls.push(['render', box]); return 'w1'; },
+    reset: id => calls.push(['reset', id]),
+    remove: id => calls.push(['remove', id])
+  };
+  const win = {};
+  const seen = [];
+  const box = { id: 'bk-turnstile' };
+  const handle = T.mountTurnstile(box, '0x4AAAAAAAkey', { doc, win, onChange: t => seen.push(t) });
+  await handle.ready;
+  assert.equal(added.length, 1);
+  assert.equal(added[0].src, 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit');
+  assert.equal(options.sitekey, '0x4AAAAAAAkey');
+  assert.equal(options.action, 'book');
+  assert.equal(options.language, 'ar');
+  options.callback('tok-1');
+  assert.equal(handle.token(), 'tok-1');
+  options['expired-callback']();
+  assert.equal(handle.token(), '');
+  options.callback('tok-2');
+  handle.reset();
+  assert.equal(handle.token(), '', 'a reset forgets the used token');
+  handle.remove();
+  assert.deepEqual(calls.map(c => c[0]), ['render', 'reset', 'remove']);
+  assert.deepEqual(seen, ['tok-1', '', 'tok-2', '']);
+  // a second widget reuses the loaded script
+  await T.mountTurnstile(box, '0x4AAAAAAAkey', { doc, win }).ready;
+  assert.equal(added.length, 1);
+
+  // blocked script → onChange('') + onError, no throw
+  const blockedDoc = { head: { appendChild: () => setTimeout(() => blockedListeners.error(), 0) }, createElement: () => ({ addEventListener: (t, fn) => { blockedListeners[t] = fn; } }) };
+  const blockedListeners = {};
+  let errored = false;
+  await T.mountTurnstile(box, '0x4AAAAAAAkey', { doc: blockedDoc, win: {}, onError: () => { errored = true; } }).ready;
+  assert.equal(errored, true);
+});
+
+test('the event page shells allow Turnstile (script + frame) and nothing else from Cloudflare', () => {
+  for (const file of ['pages/index.html', 'events/index.html']) {
+    const policy = /Content-Security-Policy" content="([^"]+)"/.exec(read(file))[1];
+    assert.ok(policy.includes("script-src 'self' https://challenges.cloudflare.com;"), file);
+    assert.ok(policy.includes('frame-src https://www.google.com https://challenges.cloudflare.com;'), file);
+    assert.equal(policy.match(/cloudflare/g).length, 2, file);
+  }
 });

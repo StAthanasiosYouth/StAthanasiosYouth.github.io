@@ -31,8 +31,9 @@ function token() {
   const h = e({ alg: 'RS256', kid: 'staging-test' }) + '.' + e({ iss: 'https://accounts.google.com', aud: '246924773718-38p45gji0ouvi7an4jdjsip3obmk6ve4.apps.googleusercontent.com', sub: 'loadtest-1', email: 'loadtest@staging.invalid', email_verified: true, name: 'Load Test', iat: n, exp: n + 3600 });
   return h + '.' + createSign('RSA-SHA256').update(h).sign(PEM).toString('base64url');
 }
-async function api(method, path, body, raw) {
+async function api(method, path, body, raw, session = '') {
   const headers = { origin: LOCAL, authorization: 'Bearer ' + token() };
+  if (session) headers['x-edit-session'] = session;
   if (raw) headers['content-type'] = 'image/jpeg', headers['idempotency-key'] = 'stg-' + randomUUID();
   else if (body) headers['content-type'] = 'application/json';
   return (await fetch(STAGING + path, { method, headers, body: raw || (body ? JSON.stringify(body) : undefined) })).json();
@@ -134,6 +135,35 @@ try {
   await page.waitForFunction(r => { const t = document.querySelector('#sheet[open] .sheet__title'); return t && t.textContent === 'حجز ' + r && /مؤكد/.test(document.querySelector('#sheet .book-chips').innerText); }, { timeout: 20000 }, ref);
   ok('confirmed from the admin UI with a 3000 payment (full mode)', true);
   await page.screenshot({ path: SHOTS + '2-confirmed.png' });
+
+  // edit locks against the real Worker: the open sheet holds the booking …
+  const OTHER = 'sid-other-page-' + RUN;
+  const held = await api('POST', `/v1/admin/book/bookings/${made.booking.id}/lock`, {}, null, OTHER);
+  ok('while the sheet is open, another page is refused the lock (holder named)', held.ok && held.granted === false && held.holder && held.holder.name === 'Load Test', held);
+  // … gives it back on close; another page takes it; reopened → read only with who
+  await page.evaluate(() => A.closeSheet());
+  await page.waitForFunction(() => !document.getElementById('sheet').open);
+  let taken = null;
+  for (let i = 0; i < 20 && !(taken && taken.granted); i++) {
+    await new Promise(r => setTimeout(r, 300));
+    taken = await api('POST', `/v1/admin/book/bookings/${made.booking.id}/lock`, {}, null, OTHER);
+  }
+  ok('closing the sheet released it: the other page takes it', taken && taken.granted === true, taken);
+  // (confirmed now: not in the «جديد» queue) the booking opened directly, as a push link would
+  await page.evaluate(id => A.book.openBooking(id), made.booking.id);
+  await page.waitForSelector('#sheet.is-locked .lock-banner[data-lock="held"]', { timeout: 15000 });
+  const lockText = await page.$eval('#sheet .lock-banner__title', n => n.textContent);
+  const lockedActs = await page.$$eval('#sheet [data-act]', ns => ns.filter(n => n.getAttribute('data-act') !== 'back').map(n => n.disabled));
+  ok('reopened while held elsewhere: «… بيعدّل الحجز ده دلوقتي», every move off', /^Load Test بيعدّل الحجز ده دلوقتي/.test(lockText) && lockedActs.length > 0 && lockedActs.every(Boolean), { lockText, lockedActs });
+  await page.screenshot({ path: SHOTS + '3-locked.png' });
+  const refused = await page.evaluate(id => window.AdminWorker.call('POST', '/v1/admin/book/bookings/' + id + '/payments', { kind: 'payment', amount: 10, servantId: 'srv-mina0001', method: 'cash', receivedAt: '2026-01-01T10:00', idemKey: 'lockchk-' + Date.now() }).then(() => 'ok', e => e.code), made.booking.id);
+  ok('a move from this page anyway → the Worker says locked', refused === 'locked', refused);
+  await api('DELETE', `/v1/admin/book/bookings/${made.booking.id}/lock`, undefined, null, OTHER);
+  await page.waitForSelector('#sheet .lock-banner[data-lock="free"] [data-lock-refresh]', { timeout: 45000 });
+  ok('the other page let go: the next renewal offers «افتح آخر نسخة»', true);
+  await page.click('#sheet [data-lock-refresh]');
+  await page.waitForFunction(() => { const s = document.getElementById('sheet'); return s.open && !s.classList.contains('is-locked') && !s.querySelector('.lock-banner'); }, { timeout: 15000 });
+  ok('… the latest booking, moves back on', true);
   ok('no page errors / CSP refusals', problems.length === 0, problems);
 } catch (err) {
   log.push('FAIL ' + err.message.split('\n')[0]);

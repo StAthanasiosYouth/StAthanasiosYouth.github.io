@@ -31,6 +31,8 @@ const AUTH = 'Bearer ' + token();
 async function call(method, path, body, { admin = false, headers = {}, raw = null } = {}) {
   const t = performance.now();
   const h = { origin: ORIGIN, ...headers };
+  // staging runs Turnstile with Cloudflare's always-pass TEST secret: a submit carries the test token (book-ops-check.mjs checks the refusals)
+  if (path === '/v1/book/submit' && body && !('turnstile' in body)) body = { ...body, turnstile: 'XXXX.DUMMY.TOKEN.XXXX' };
   if (admin) h.authorization = AUTH;
   let payload;
   if (raw) { payload = raw; h['content-type'] = h['content-type'] || 'image/jpeg'; } else if (body !== undefined) { payload = JSON.stringify(body); h['content-type'] = 'application/json'; }

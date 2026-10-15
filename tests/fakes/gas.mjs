@@ -755,6 +755,7 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
           timeBased: () => builder,
           at: date => { spec.at = date.getTime(); return builder; },
           everyDays: n => { spec.everyDays = n; return builder; },
+          everyMinutes: n => { spec.everyMinutes = n; return builder; },
           atHour: h => { spec.hour = h; return builder; },
           create: () => {
             const uid = 'trg-' + (++triggers.seq);
@@ -780,7 +781,7 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
   for (const file of ['Platforms.gs', 'Content.gs', 'Hub.gs', 'Review.gs', 'Seed.gs', 'Auth.gs', 'Store.gs', 'Publish.gs', 'Code.gs', 'Media.gs', 'Items.gs', 'Import.gs', 'Migrate.gs', 'Api.gs', 'Presence.gs', 'Route.gs', 'Push.gs', 'Activity.gs', 'AdminNotify.gs', 'AdminDevice.gs',
     'CompStore.gs', 'CompModel.gs', 'CompScore.gs', 'CompCrypto.gs', 'CompPublic.gs', 'CompAdmin.gs', 'CompPublish.gs',
     'CompRegistry.gs', 'CompWallet.gs', 'CompStoreItems.gs', 'CompSchedule.gs', 'CompSeasons.gs',
-    'BookModel.gs', 'Pages.gs', 'WorkerSync.gs']) {
+    'BookModel.gs', 'Pages.gs', 'WorkerSync.gs', 'BookNotify.gs']) {
     vm.runInContext(readFileSync(`${ROOT}apps-script/${file}`, 'utf8'), context, { filename: file });
   }
 

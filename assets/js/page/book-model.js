@@ -65,7 +65,9 @@ export function liveState(reply, booking = null) {
   const left = Number.isInteger(reply.left) && reply.left >= 0 ? reply.left : null;
   const opensAt = stamp(reply.opensAt) || (booking && stamp(booking.opensAt)) || '';
   const revision = typeof reply.revision === 'string' ? reply.revision.slice(0, 80) : '';
-  const base = { left, opensAt, revision };
+  // the Worker's Turnstile site key: the send step shows the check (turnstile.js)
+  const turnstile = typeof reply.turnstile === 'string' && /^[0-9A-Za-z_-]{10,80}$/.test(reply.turnstile) ? reply.turnstile : '';
+  const base = { left, opensAt, revision, turnstile };
 
   if (reply.open) {
     if (left === 0) return { ...base, live: 'full', chip: 'اكتمل العدد', line: 'اكتمل العدد. لو حد اعتذر هيفضى مكان.' };
@@ -174,7 +176,7 @@ export function needsProof(booking, method) {
 }
 
 /** step c: the proofs (paid events only) and the terms */
-export function checkSend(booking, { method, proofs, agreed, uploading = 0 }, terms = '') {
+export function checkSend(booking, { method, proofs, agreed, uploading = 0, captcha = null }, terms = '') {
   const problems = {};
   if (uploading) problems.proofs = 'استنى الصور لحد ما تترفع.';
   else if (!isFree(booking)) {
@@ -183,6 +185,8 @@ export function checkSend(booking, { method, proofs, agreed, uploading = 0 }, te
     else if (!n && needsProof(booking, method)) problems.proofs = 'ارفع صورة التحويل (سكرين شوت).';
   }
   if (terms && !agreed) problems.agreed = 'لازم توافق على الشروط الأول.';
+  // captcha: { required, token } — the Turnstile check is still running (or failed)
+  if (captcha && captcha.required && !captcha.token) problems.turnstile = 'استنى علامة التأكيد تخلص، أو اضغط عليها.';
   return problems;
 }
 
@@ -195,7 +199,7 @@ export function newRequestKey(bytes) {
 }
 
 /** POST /v1/book/submit's body */
-export function submitBody(event, draft, { hp = '', revision = '' } = {}) {
+export function submitBody(event, draft, { hp = '', revision = '', turnstile = '' } = {}) {
   const booking = event.booking;
   const counts = cleanCounts(booking, draft.counts);
   const body = {
@@ -210,6 +214,7 @@ export function submitBody(event, draft, { hp = '', revision = '' } = {}) {
   if (booking.collectNames) body.names = (draft.names || []).slice(0, peopleCount(booking, counts)).map(n => line(n, NAME_MAX));
   const note = line(draft.note, NOTE_MAX);
   if (note) body.note = note;
+  if (turnstile) body.turnstile = String(turnstile).slice(0, 2048);
   if (!isFree(booking)) {
     body.servantId = draft.servantId;
     body.method = draft.method;
@@ -394,6 +399,8 @@ export function bookingError(reply) {
       return { action: 'fallback', step: '', field: '', left, message: 'الحجز أونلاين مش متاح دلوقتي. كلّم خادم من دول على واتساب.' };
     case 'proof':
       return { action: 'field', step: 'c', field: 'proofs', left, message: 'صورة من الصور فيها مشكلة. شيلها وارفعها تاني (سكرين شوت).' };
+    case 'turnstile':
+      return { action: 'field', step: 'c', field: 'turnstile', left, message: 'التأكيد إنك مش روبوت ما نفعش. كمّله تاني وابعت.' };
     case 'rate':
       return { action: 'retry', step: '', field: '', left, message: 'طلبات كتير ورا بعض. استنى دقيقة وجرّب تاني.' };
     case 'toolarge':

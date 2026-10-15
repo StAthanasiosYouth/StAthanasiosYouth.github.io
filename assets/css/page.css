@@ -2640,6 +2640,13 @@ img, svg, video {
   white-space: nowrap;
 }
 
+/* the Turnstile check (turnstile.js): its iframe fills the row; room kept so the send button doesn't jump */
+.bk-turnstile {
+  min-height: 65px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
 .bk-actions {
   display: flex;
   flex-wrap: wrap;

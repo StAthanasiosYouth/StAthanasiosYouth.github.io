@@ -14,14 +14,15 @@ import { sha256Bytes } from './lib/hash.js';
 import { putProof, readProof, deleteProof, sweepProofs } from './lib/proofs.js';
 import { PROOF_MAX_BYTES } from './lib/image.js';
 import { verifySync, syncStampStmt } from './lib/sync.js';
-import { housekeeping } from './scheduled.js';
+import { housekeeping, blankPhones } from './scheduled.js';
 import { makeJob } from './jobs.js';
 import { bookState, bookProof, bookSubmit, bookStatus, bookWithdraw } from './book/public.js';
 import {
   adminModule, adminModuleSet, adminEvents, adminEventRefresh, adminBookings, adminBooking, adminCreate, adminConfirm,
-  adminReject, adminCancel, adminReopen, adminUpdate, adminPaymentAdd, adminPaymentVoid, adminCancelAll, adminSummary, adminExport, proofTarget
+  adminReject, adminCancel, adminReopen, adminUpdate, adminPaymentAdd, adminPaymentVoid, adminCancelAll, adminSummary, adminExport, adminLock, adminUnlock, proofTarget
 } from './book/admin.js';
 import { rowFromJson, saveRow } from './book/event.js';
+import { syncBookNews, diagNews } from './book/news.js';
 
 export const VERSION = '0.3.0';
 
@@ -194,6 +195,19 @@ async function diagEventFixture(ctx) {
   return { id: row.id, slug: row.slug, online: !!row.online };
 }
 
+/*
+ * STAGING ONLY: the phone retention (scheduled.js blankPhones) for ONE event,
+ * as if run at `atMs` — so the 12-month rule is checked without waiting.
+ */
+async function diagRetention(ctx) {
+  if (ctx.env.ENVIRONMENT !== 'staging') throw new ApiError('notfound');
+  const eventId = String(ctx.body.eventId || '');
+  if (!/^evt-[a-z0-9-]{2,60}$/.test(eventId)) throw new ApiError('bad', 'eventId');
+  const at = Number(ctx.body.atMs);
+  if (!Number.isFinite(at)) throw new ApiError('bad', 'atMs');
+  return { blanked: await blankPhones(ctx.env, at, { eventId }) };
+}
+
 export const ROUTES = [
   { method: 'GET', path: '/v1/health', auth: 'public', handler: health },
   { method: 'GET', path: '/v1/health/deep', auth: 'public', handler: healthDeep },
@@ -206,6 +220,9 @@ export const ROUTES = [
   { method: 'DELETE', path: '/v1/admin/proofs/:id', auth: 'admin', handler: proofDelete },
   { method: 'POST', path: '/v1/sync/admins', auth: 'sync', raw: true, maxBytes: 16 * 1024, handler: syncAdmins },
   { method: 'POST', path: '/v1/admin/diag/event-fixture', auth: 'admin', handler: diagEventFixture },
+  { method: 'POST', path: '/v1/admin/diag/retention', auth: 'admin', handler: diagRetention },
+  { method: 'GET', path: '/v1/admin/diag/book-news', auth: 'admin', handler: diagNews },
+  { method: 'POST', path: '/v1/sync/book-news', auth: 'sync', raw: true, maxBytes: 4 * 1024, handler: syncBookNews },
 
   // booking — public (docs/EVENTS.md §6, worker/BOOKING-API.md)
   { method: 'GET', path: '/v1/book/state', auth: 'public', handler: bookState },
@@ -223,6 +240,8 @@ export const ROUTES = [
   { method: 'GET', path: '/v1/admin/book/bookings', auth: 'admin', handler: adminBookings },
   { method: 'POST', path: '/v1/admin/book/bookings', auth: 'admin', handler: adminCreate },
   { method: 'GET', path: '/v1/admin/book/bookings/:id', auth: 'admin', handler: adminBooking },
+  { method: 'POST', path: '/v1/admin/book/bookings/:id/lock', auth: 'admin', handler: adminLock },
+  { method: 'DELETE', path: '/v1/admin/book/bookings/:id/lock', auth: 'admin', handler: adminUnlock },
   { method: 'POST', path: '/v1/admin/book/bookings/:id/confirm', auth: 'admin', handler: adminConfirm },
   { method: 'POST', path: '/v1/admin/book/bookings/:id/reject', auth: 'admin', handler: adminReject },
   { method: 'POST', path: '/v1/admin/book/bookings/:id/cancel', auth: 'admin', handler: adminCancel },
