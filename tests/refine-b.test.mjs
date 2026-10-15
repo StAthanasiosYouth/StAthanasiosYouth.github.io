@@ -458,7 +458,9 @@ test('admin/: strict CSP, noindex, no-referrer, no inline code, no redirect, no 
   assert.deepEqual(rules['script-src'], ["'self'", 'https://accounts.google.com/gsi/client']);
   assert.deepEqual(rules['style-src'], ["'self'", 'https://accounts.google.com/gsi/style']);
   assert.deepEqual(rules['connect-src'], ["'self'", 'https://script.google.com', 'https://script.googleusercontent.com', 'https://accounts.google.com/gsi/',
-    'https://firebaseinstallations.googleapis.com', 'https://fcmregistrations.googleapis.com']);
+    'https://firebaseinstallations.googleapis.com', 'https://fcmregistrations.googleapis.com',
+    // the new backend: today only a quiet sign-in check (boot.js checkWorker)
+    'https://athanasios-api.menazak-lab.workers.dev']);
   // the admin app: its own manifest and worker, from this origin only
   assert.deepEqual(rules['manifest-src'], ["'self'"]);
   assert.deepEqual(rules['worker-src'], ["'self'"]);
@@ -502,7 +504,8 @@ test('admin/config.js: the one public config place — no secrets, the right sha
   const sandbox = {};
   new Function('window', text)(sandbox);
   const config = sandbox.ADMIN_CONFIG;
-  assert.deepEqual(Object.keys(config).sort(), ['apiUrl', 'clientId', 'fallbackUrl']);
+  assert.deepEqual(Object.keys(config).sort(), ['apiUrl', 'clientId', 'fallbackUrl', 'workerUrl']);
+  assert.match(config.workerUrl, /^https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev$/);
   assert.ok(config.apiUrl === '' || /^https:\/\/script\.google\.com\/macros\/s\/[\w-]{20,}\/exec$/.test(config.apiUrl), 'apiUrl: empty or an /exec URL');
   assert.match(config.clientId, /^[\w-]+\.apps\.googleusercontent\.com$/, 'the OAuth client ID (public)');
   assert.match(config.fallbackUrl, /^https:\/\/script\.google\.com\/macros\/s\/AKfycbwhHMp54vLJLK5UuwH_7zByzkPRkQErcUQdvZ1ad2_AxpasNWzShoh1CT3AIOrB8Rtbvw\/exec$/);

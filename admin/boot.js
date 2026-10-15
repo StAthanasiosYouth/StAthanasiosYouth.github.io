@@ -78,6 +78,7 @@
   var API = EXEC.test(config.apiUrl || '') ? config.apiUrl : '';
   var CLIENT = CLIENT_ID.test(config.clientId || '') ? config.clientId : '';
   var FALLBACK = EXEC.test(config.fallbackUrl || '') ? config.fallbackUrl : '';
+  var WORKER = /^https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev$/.test(config.workerUrl || '') ? config.workerUrl : '';
   var TIMING = timing(config.timing);
 
   var A = window.A;
@@ -1325,10 +1326,38 @@
 
   }
 
+  /*
+   * The new backend (worker/, docs/BACKEND-MIGRATION.md) checks the same
+   * Google sign-in: one quiet call per page, after the panel opens. Nothing
+   * is shown and nothing waits on it; it binds this Google account to its
+   * admin row there. A remembered device's token is Apps Script's own: skipped.
+   */
+  var workerChecked = false;
+
+  function checkWorker() {
+
+    if (workerChecked || !WORKER || !session || session.via !== 'google' || typeof fetch !== 'function') return;
+    workerChecked = true;
+
+    try {
+      fetch(WORKER + '/v1/admin/whoami', {
+        headers: { authorization: 'Bearer ' + session.token },
+        credentials: 'omit',
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer'
+      }).catch(function () {});
+    }
+    catch (ignored) {
+      // only a check
+    }
+
+  }
+
   /* draws the panel behind the gate; the gate goes only once it is drawn */
   function openPanel(state, my) {
 
     progress('بنجهز اللوحة…', 'dashboard');
+    checkWorker();
 
     window.AdminTransport = { call: call };
     A.signOut = signOut;

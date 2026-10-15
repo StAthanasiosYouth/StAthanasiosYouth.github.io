@@ -14,6 +14,10 @@
  * fallbackUrl The recovery admin (the Apps Script admin, unchanged). Shown as
  *             a small link; never opened by itself.
  *
+ * workerUrl   The new backend (Cloudflare Worker, worker/README.md). Today the
+ *             page only checks the same Google sign-in against it, quietly
+ *             (boot.js checkWorker); nothing else uses it yet. '' = off.
+ *
  * While apiUrl or clientId is empty, the page says it isn't set up yet and
  * offers the recovery admin. It never redirects.
  */
@@ -21,5 +25,6 @@
 window.ADMIN_CONFIG = Object.freeze({
   apiUrl: 'https://script.google.com/macros/s/AKfycbxJjDyktRi6VlwRGSrF-H_KzN-vkw9QaFCiLD1TlqgrppKs4CHfmOBE4cKEd6AZ9Km1/exec',
   clientId: '246924773718-38p45gji0ouvi7an4jdjsip3obmk6ve4.apps.googleusercontent.com',
-  fallbackUrl: 'https://script.google.com/macros/s/AKfycbwhHMp54vLJLK5UuwH_7zByzkPRkQErcUQdvZ1ad2_AxpasNWzShoh1CT3AIOrB8Rtbvw/exec'
+  fallbackUrl: 'https://script.google.com/macros/s/AKfycbwhHMp54vLJLK5UuwH_7zByzkPRkQErcUQdvZ1ad2_AxpasNWzShoh1CT3AIOrB8Rtbvw/exec',
+  workerUrl: 'https://athanasios-api.menazak-lab.workers.dev'
 });
