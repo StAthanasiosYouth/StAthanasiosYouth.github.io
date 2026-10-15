@@ -52,8 +52,9 @@
  * Writing a row NEVER fails the action it describes: every error is
  * caught and only reported to the execution log.
  *
- * Admin push (AdminNotify.gs) is decided here, sent after the action's lock
- * is released (activityDispatch_, called by doPost):
+ * Admin push (AdminNotify.gs) is decided here; in an admin request it is
+ * sent after the reply, by the next heartbeat (activityPending_: DEFERRED
+ * ADMIN PUSH below), elsewhere at once (activityDispatch_):
  *   now        publish, create/delete of meetings, news, games,
  *              activities, notifications; a public push send; import;
  *              admin add / remove
@@ -82,6 +83,7 @@ var ACTIVITY_PAGE_MAX = 100;
 var ACTIVITY_CHUNK = 400;
 var ACTIVITY_RECENT = 30;
 var ACTIVITY_RECENT_KEY = 'adm:act:recent';
+var ACTIVITY_TRIM_KEY = 'adm:act:trim';
 var ACTIVITY_CHANGES_MAX = 1000;
 var ACTIVITY_TITLE_MAX = 80;
 var ACTIVITY_COOLDOWN_MS = 30 * 60000;
@@ -735,6 +737,7 @@ function activity_(entry) {
     var sub = entry.sub === 'competitions' || entry.sub === 'video' ? entry.sub : '';
     var changes = entry.changes && typeof entry.changes === 'object' ? entry.changes : null;
     var merged = null;
+    var decision = '';
 
     if (sub) {
       changes = changes || {};
@@ -755,20 +758,25 @@ function activity_(entry) {
       var summary = activitySummary_({ action: action, type: entry.type, title: mergedTitle, sub: sub || (merged.record.changes && merged.record.changes.sub), changes: mergedChanges || {} });
       var count = merged.record.count + 1;
 
-      sheet.getRange(merged.row, 2, 1, 2).setValues([[now, activityCairo_(now)]]);
-      sheet.getRange(merged.row, 9, 1, 4).setValues([[plainCell_(mergedTitle), plainCell_(summary), activityChanges_(mergedChanges), plainCell_(activityText_(entry.ref, 120) || merged.record.ref)]]);
-      sheet.getRange(merged.row, 13).setValue(count);
-
       row = merged.record;
       row.at = now;
       row.cairo = activityCairo_(now);
       row.title = mergedTitle;
       row.summary = summary;
       row.changes = mergedChanges;
+      row.ref = activityText_(entry.ref, 120) || merged.record.ref;
       row.count = count;
       row.merged = true;
       row.sheetRow = merged.row;
       row.action = action;
+
+      // a push due for it is sent later (activityPending_): marked on the row
+      decision = activityNotifyKind_(row, entry);
+      if (decision && API_REQUEST_) row.notified = activityPendingMark_(row.notified, decision);
+
+      // one write: columns at … notified (actor, type and id are the same; the action stays)
+      sheet.getRange(merged.row, 2, 1, 13).setValues([[now, row.cairo, row.actor, plainCell_(row.actorName), row.action, row.type, plainCell_(row.entityId),
+        plainCell_(mergedTitle), plainCell_(summary), activityChanges_(mergedChanges), plainCell_(row.ref), count, plainCell_(row.notified)]]);
     }
     else {
       row = {
@@ -789,22 +797,28 @@ function activity_(entry) {
         device: activityDevice_(actor)
       };
 
+      decision = activityNotifyKind_(row, entry);
+      if (decision && API_REQUEST_) row.notified = activityPendingMark_('', decision);
+
       sheet.appendRow([row.id, row.at, row.cairo, row.actor, plainCell_(row.actorName), row.action, row.type, plainCell_(row.entityId),
-        plainCell_(row.title), plainCell_(row.summary), activityChanges_(row.changes), plainCell_(row.ref), 1, '', plainCell_(row.device)]);
-      row.sheetRow = sheet.getLastRow();
+        plainCell_(row.title), plainCell_(row.summary), activityChanges_(row.changes), plainCell_(row.ref), 1, row.notified, plainCell_(row.device)]);
 
       activityTrim_(sheet, now);
-      row.sheetRow = activityRowOf_(sheet, row.id, row.sheetRow);
+      // the trim never takes the last row: it is this one (the dispatch checks the id again)
+      row.sheetRow = sheet.getLastRow();
     }
 
     rememberActivity_(row);
 
-    var decision = activityNotifyKind_(row, entry);
-
-    if (decision) {
+    if (decision && API_REQUEST_) {
+      // an admin's request: the reply does not wait for the push. The row
+      // says «pending»; the next heartbeat (or a later quiet call) sends it
+      activityPendingFlag_();
+    }
+    else if (decision) {
+      // no doPost around it (the recovery admin, a trigger): send now
       ACTIVITY_QUEUE_.push({ row: row, kind: decision, actor: actor });
-      // the recovery admin has no doPost around it: send now
-      if (!API_REQUEST_) activityDispatch_();
+      activityDispatch_();
     }
 
     return publicActivity_(row);
@@ -871,6 +885,11 @@ function activityTrim_(sheet, now) {
   }
 
   if (rows < 1) return;
+
+  // the age check reads the Sheet: at most once an hour (rows a year old can wait that long)
+  var cache = CacheService.getScriptCache();
+  if (cache.get(ACTIVITY_TRIM_KEY)) return;
+  cache.put(ACTIVITY_TRIM_KEY, '1', 3600);
 
   var cutoff = now - ACTIVITY_MAX_DAYS * 86400000;
   var first = Number(sheet.getRange(2, 2).getValue()) || 0;
@@ -1193,8 +1212,27 @@ function activityDispatch_() {
     try {
       if (outcome && item.row.sheetRow) {
         var sheet = activitySheet_();
-        var at = activityRowOf_(sheet, item.row.id, item.row.sheetRow);
-        if (at) sheet.getRange(at, 14).setValue(plainCell_(String(outcome)));
+        var at = 0;
+        var current = '';
+        if (item.claimed) {
+          // one read: the id (did the row move?) and what it says now
+          var cells = item.row.sheetRow <= sheet.getLastRow() ? sheet.getRange(item.row.sheetRow, 1, 1, 14).getValues()[0] : [];
+          if (String(cells[0]) === item.row.id) {
+            at = item.row.sheetRow;
+            current = activityCell_(cells[13]);
+          }
+          else {
+            at = activityRowOf_(sheet, item.row.id, 0);
+            current = at ? activityCell_(sheet.getRange(at, 14).getValue()) : '';
+          }
+        }
+        else {
+          at = activityRowOf_(sheet, item.row.id, item.row.sheetRow);
+        }
+        // a claimed row edited again meanwhile («pending» again): its next send records it
+        if (at && !/^pending:/.test(current)) {
+          sheet.getRange(at, 14).setValue(plainCell_(String(outcome)));
+        }
       }
     }
     catch (ignored) {
@@ -1202,6 +1240,122 @@ function activityDispatch_() {
     }
 
   });
+
+}
+
+/* =========================================================
+   DEFERRED ADMIN PUSH: an admin's reply never waits for FCM
+   ---------------------------------------------------------
+   In an admin request (doPost) a due push is not sent before the reply:
+   the row's `notified` says «pending:now» / «pending:cooldown» (written with
+   the row itself, no extra write) and a CacheService flag
+   (ACTIVITY_PENDING_KEY = when the oldest one was queued) tells the
+   dispatcher there is work. activityPending_ sends them: on every
+   apiHeartbeat (any open panel beats every ~25 s) and on a quiet call
+   (ACTIVITY_LATE_FNS) when one has waited ACTIVITY_LATE_MS. So the other
+   admins hear about it ≤ ~30 s later; their presence, the cooldown and the
+   rate limit are judged at send time.
+   Exactly once: the rows are claimed («sending») under the script lock,
+   then sent outside it. The flag is cleared BEFORE the rows are read, so a
+   row written after that read always leaves the flag set behind it.
+   A run that dies mid-send leaves «sending»: never sent twice.
+   (If the cache loses the flag the rows wait for the next push's flag.)
+========================================================= */
+
+var ACTIVITY_PENDING_KEY = 'adm:act:pending';
+var ACTIVITY_PENDING_SCAN = 100;
+var ACTIVITY_LATE_MS = 60000;
+var ACTIVITY_LATE_FNS = ['apiActivity', 'apiAdmins', 'apiAdminPushDevices', 'apiPushState', 'apiMediaLibrary', 'apiComps',
+  'apiPages', 'apiEvents', 'apiServants', 'apiParticipants', 'apiWallet', 'apiShopItems', 'apiShopRedemptions', 'apiShopSchedule',
+  'apiSeasons', 'apiPushSchedule'];
+
+/* «pending:now» beats «pending:cooldown» (a merged edit of a row that is still waiting) */
+function activityPendingMark_(current, kind) {
+
+  return /^pending:now$/.test(String(current || '')) ? 'pending:now' : 'pending:' + kind;
+
+}
+
+/* there is a row to send (keeps the oldest time; never throws) */
+function activityPendingFlag_() {
+
+  try {
+    var cache = CacheService.getScriptCache();
+    if (!cache.get(ACTIVITY_PENDING_KEY)) cache.put(ACTIVITY_PENDING_KEY, String(Date.now()), 21600);
+  }
+  catch (error) {
+    console.warn('activity: pending flag not kept');
+  }
+
+}
+
+/*
+ * doPost, after the call: sends the waiting admin pushes when this call may
+ * carry them (a heartbeat: any; a quiet call: once one waited
+ * ACTIVITY_LATE_MS). Never throws; returns how many rows it sent.
+ */
+function activityPending_(fn) {
+
+  try {
+    var since = Number(CacheService.getScriptCache().get(ACTIVITY_PENDING_KEY)) || 0;
+    if (!since) return 0;
+    if (fn !== 'apiHeartbeat' && !(ACTIVITY_LATE_FNS.indexOf(fn) !== -1 && Date.now() - since >= ACTIVITY_LATE_MS)) return 0;
+    return activityDispatchPending_();
+  }
+  catch (error) {
+    console.warn('activity: pending pushes not sent');
+    return 0;
+  }
+
+}
+
+function activityDispatchPending_() {
+
+  var lock = LockService.getScriptLock();
+  var claimed = [];
+
+  // a publish holds the lock: the next beat sends them
+  if (!lock.tryLock(3000)) return 0;
+
+  try {
+
+    // first (see above): a row written after the read below sets it again
+    CacheService.getScriptCache().remove(ACTIVITY_PENDING_KEY);
+
+    var sheet = spreadsheet_().getSheetByName(ACTIVITY_SHEET);
+    var last = sheet ? sheet.getLastRow() : 0;
+
+    if (last < 2) return 0;
+
+    var count = Math.min(ACTIVITY_PENDING_SCAN, last - 1);
+    var first = last - count + 1;
+    var values = sheet.getRange(first, 1, count, ACTIVITY_COLUMNS.length).getValues();
+
+    values.forEach(function (value, i) {
+      var record = activityRecord_(value);
+      var match = /^pending:(now|cooldown)$/.exec(record.notified);
+      if (!record.id || !match) return;
+      record.sheetRow = first + i;
+      claimed.push({ row: record, kind: match[1], actor: record.actor, claimed: true });
+    });
+
+    // claimed: no other dispatcher sends them again
+    claimed.forEach(function (item) {
+      sheet.getRange(item.row.sheetRow, 14).setValue('sending');
+    });
+
+  }
+  finally {
+    lock.releaseLock();
+  }
+
+  if (!claimed.length) return 0;
+
+  // sent outside the lock, oldest first (the rate limit counts in order)
+  ACTIVITY_QUEUE_ = ACTIVITY_QUEUE_.concat(claimed);
+  activityDispatch_();
+
+  return claimed.length;
 
 }
 

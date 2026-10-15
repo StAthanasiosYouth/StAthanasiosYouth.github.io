@@ -214,6 +214,13 @@ function doPost(e) {
 
     var request = readApiRequest_(e);
 
+    // a warm-up (the admin page sends it while Google sign-in is still on
+    // screen): it only starts this script's runtime so the real calls find it
+    // warm. No token, no Sheet, no property, nothing read or written.
+    if (request.fn === 'warm') {
+      return jsonOutput_({ ok: true });
+    }
+
     // a public action: a visitor's route to the church (Route.gs). No
     // token, no session, no admin data: its own validation, cache and daily
     // budget; the openrouteservice key never leaves the server.
@@ -277,10 +284,11 @@ function doPost(e) {
 
     reply = { ok: true, result: result === undefined ? null : result };
 
-    // the other admins' notifications for what just happened, outside every
-    // lock (Activity.gs, AdminNotify.gs); a failure there never changes the reply
+    // the other admins' notifications: never before this reply. A heartbeat
+    // (or a quiet call, after a while) sends the ones waiting, outside every
+    // lock (Activity.gs activityPending_, AdminNotify.gs); a failure there never changes the reply
     try {
-      activityDispatch_();
+      activityPending_(request.fn);
     }
     catch (error) {
       console.warn('api: admin push dispatch failed');

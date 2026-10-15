@@ -391,6 +391,8 @@ function pushWorld() {
   return { world, mina: { leave() {} } };
 }
 
+// the pushes waiting after the replies go out (what the next heartbeat does: activityPending_)
+const send = world => world.gs.activityPending_('apiHeartbeat');
 const sentTo = (world, from = 0) => fcmSent(world).slice(from).map(m => m.message.token);
 
 test('admin push: a create goes to the OTHER admins now, never to the actor; the message names the actor and deep-links', () => {
@@ -405,6 +407,9 @@ test('admin push: a create goes to the OTHER admins now, never to the actor; the
   const quiet = tab(world, ADMIN).start();
   quiet.ok('apiSaveItem', 'news', { title: 'خبر جديد للكل', summary: 'x' });
   quiet.leave();
+  assert.equal(fcmSent(world).length, before, 'the reply never waits for the push');
+  assert.equal(rows(world).at(-1).notified, 'pending:now');
+  send(world);
 
   const to = sentTo(world, before);
   assert.deepEqual(to.sort(), [deviceToken(2), deviceToken(3)].sort());
@@ -423,12 +428,14 @@ test('admin push: edits have a 30-minute cooldown per admin and item; a create c
   const state = actor.ok('apiSaveItem', 'news', { title: 'خبر', summary: 'x' });
   const id = state.draft.news.find(n => n.title === 'خبر').id;
   actor.leave();
+  send(world);
   const afterCreate = fcmSent(world).length;
 
   world.advance(12 * 60_000);
   const again = tab(world, ADMIN).start();
   again.ok('apiSaveItem', 'news', { id, title: 'خبر', summary: 'y' });
   again.leave();
+  send(world);
   assert.equal(fcmSent(world).length, afterCreate, 'edit right after a create: no push');
   assert.equal(rows(world).at(-1).notified, 'cooldown');
 
@@ -436,11 +443,13 @@ test('admin push: edits have a 30-minute cooldown per admin and item; a create c
   const later = tab(world, ADMIN).start();
   later.ok('apiSaveItem', 'news', { id, title: 'خبر', summary: 'z' });
   later.leave();
+  send(world);
   assert.equal(fcmSent(world).length, afterCreate + 2, 'after the cooldown: one push to each other admin');
 
   const now = tab(world, ADMIN).start();
   now.ok('apiDeleteItem', 'news', id);
   now.leave();
+  send(world);
   assert.equal(fcmSent(world).length, afterCreate + 4, 'delete: immediate');
 
   // log-only actions: never a push
@@ -448,6 +457,7 @@ test('admin push: edits have a 30-minute cooldown per admin and item; a create c
   quiet.ok('apiMoveLink', 'facebook', 1);
   quiet.ok('apiSetLinkEnabled', 'facebook', false);
   quiet.leave();
+  send(world);
   assert.equal(fcmSent(world).length, afterCreate + 4);
 });
 
@@ -462,6 +472,7 @@ test('admin push: an admin with the panel open gets a toast from the heartbeat i
   const actor = tab(world, ADMIN).start();
   actor.ok('apiSaveItem', 'news', { title: 'خبر من مينا', summary: 'x' });
   actor.leave();
+  send(world);
 
   assert.deepEqual(sentTo(world, before), [deviceToken(3)], 'only the absent admin\'s phone');
 
@@ -484,12 +495,14 @@ test('admin push: removed admins get nothing; the allowlist is read again for ev
   const actor = tab(world, ADMIN).start();
   actor.ok('apiSaveItem', 'news', { title: 'خبر', summary: 'x' });
   actor.leave();
+  send(world);
   assert.deepEqual(sentTo(world, before), [deviceToken(2)]);
 
   world.properties.delete('FCM_SERVICE_ACCOUNT');
   const quiet = tab(world, ADMIN).start();
   const reply = quiet.call('apiSaveItem', 'news', { title: 'خبر تاني', summary: 'x' });
   assert.equal(reply.ok, true, 'saving still works');
+  send(world);
   assert.equal(rows(world).at(-1).notified, 'off');
 });
 
@@ -501,11 +514,13 @@ test('admin push: FCM failing never breaks the save; dead admin tokens are remov
   const actor = tab(world, ADMIN).start();
   const reply = actor.call('apiSaveItem', 'news', { title: 'خبر', summary: 'x' });
   assert.equal(reply.ok, true);
+  send(world);
   assert.equal(adminSubs(world).some(r => r[1] === deviceToken(2)), false, 'the dead token is gone');
 
   world.fcm.revoked = true;   // Google refuses every send
   const again = actor.call('apiSaveItem', 'news', { title: 'خبر ٢', summary: 'x' });
   assert.equal(again.ok, true, 'still saved');
+  send(world);
   assert.equal(rows(world).at(-1).notified, 'error');
 });
 
@@ -514,9 +529,11 @@ test('admin push: a public push send tells the other admins; publish too', () =>
   mina.leave();
   const actor = tab(world, ADMIN).start();
   actor.ok('apiSaveItem', 'news', { title: 'خبر للنشر', summary: 'x' });
+  send(world);
   const before = fcmSent(world).length;
   actor.ok('apiPublish', actor.ok('apiReview').revision);
   actor.leave();
+  send(world);
   const publish = fcmSent(world).slice(before);
   assert.equal(publish.length, 2);
   assert.equal(publish[0].message.data.title, 'مينا زكريا نشر تحديث الموقع');
@@ -528,10 +545,12 @@ test('admin push: at most 6 from one admin in 10 minutes — a publish still goe
   const { world } = pushWorld();
   const actor = tab(world, ADMIN).start();
   for (let i = 0; i < 8; i++) actor.ok('apiSaveItem', 'news', { title: `خبر ${i}`, summary: 'x' });
+  send(world);
   const log = rows(world).filter(r => r.action === 'create');
   assert.deepEqual(log.slice(0, 6).map(r => r.notified), ['2', '2', '2', '2', '2', '2']);
   assert.deepEqual(log.slice(6).map(r => r.notified), ['rate', 'rate']);
   actor.ok('apiPublish', actor.ok('apiReview').revision);
+  send(world);
   assert.equal(rows(world).at(-1).action, 'publish');
   assert.equal(rows(world).at(-1).notified, '2', 'the publish is never held back');
 });
@@ -549,8 +568,82 @@ test('admin push: none of the actor\'s devices (phone, PC…) hears about the ac
   const pc = tab(world, ADMIN, 'كمبيوتر').start();
   pc.ok('apiSaveItem', 'news', { title: 'من الكمبيوتر', summary: 'x' });
   pc.leave();
+  send(world);
   const to = sentTo(world, before);
   assert.equal(to.includes(deviceToken(1)), false, 'not his PC');
   assert.equal(to.includes(deviceToken(4)), false, 'not his phone');
   assert.deepEqual(to.sort(), [deviceToken(2), deviceToken(3)].sort(), 'the other admins only');
+});
+
+
+/* ---------------- deferred admin push (the reply never waits for FCM) ---------------- */
+
+test('admin push after the reply: the save sends nothing; another admin\'s next heartbeat sends it', () => {
+  const { world, mina } = pushWorld();
+  mina.leave();
+  const fady = tab(world, SECOND).start();
+  const before = fcmSent(world).length;
+  const actor = tab(world, ADMIN).start();
+  actor.ok('apiSaveItem', 'news', { title: 'خبر مؤجل', summary: 'x' });
+  assert.equal(fcmSent(world).length, before, 'nothing sent before the reply');
+  assert.equal(rows(world).at(-1).notified, 'pending:now');
+  // the actor's own later save does not carry it either
+  actor.ok('apiSaveItem', 'news', { title: 'خبر تاني', summary: 'x' });
+  assert.equal(fcmSent(world).length, before);
+  // any open panel's heartbeat does (Fady is in the panel: only the absent admin's phone)
+  fady.ok('apiHeartbeat', { area: 'home' });
+  assert.deepEqual(sentTo(world, before), [deviceToken(3), deviceToken(3)]);
+  assert.deepEqual(rows(world).filter(r => r.action === 'create').slice(-2).map(r => r.notified), ['1', '1']);
+  // nothing waits any more: the next beat sends nothing
+  fady.ok('apiHeartbeat', { area: 'home' });
+  assert.equal(fcmSent(world).length, before + 2);
+});
+
+test('admin push after the reply: exactly once — a claimed row is never sent again, a busy lock waits for the next beat', () => {
+  const { world, mina } = pushWorld();
+  mina.leave();
+  const actor = tab(world, ADMIN).start();
+  actor.ok('apiSaveItem', 'news', { title: 'مرة واحدة', summary: 'x' });
+  actor.leave();
+  const before = fcmSent(world).length;
+  world.scriptLock.busy = true;
+  assert.equal(send(world), 0, 'a publish holds the lock: not now');
+  world.scriptLock.busy = false;
+  assert.equal(send(world), 1);
+  assert.equal(send(world), 0, 'the second dispatcher finds nothing');
+  assert.equal(fcmSent(world).length, before + 2);
+  // a run that died after claiming: the row says «sending», nobody sends it again
+  const again = tab(world, ADMIN).start();
+  again.ok('apiSaveItem', 'news', { title: 'اتقطع', summary: 'x' });
+  again.leave();
+  const sheet = world.spreadsheet.getSheetByName('Activity');
+  sheet.data[sheet.data.length - 1][13] = 'sending';
+  assert.equal(send(world), 0);
+  assert.equal(fcmSent(world).length, before + 2);
+});
+
+test('admin push after the reply: with no heartbeat, a quiet call sends what waited a minute; a save never does', () => {
+  const { world, mina } = pushWorld();
+  mina.leave();
+  const actor = tab(world, ADMIN).start();
+  const before = fcmSent(world).length;
+  actor.ok('apiSaveItem', 'news', { title: 'خبر', summary: 'x' });
+  actor.ok('apiActivity', {});
+  assert.equal(fcmSent(world).length, before, 'not yet: a heartbeat may still come');
+  world.advance(61_000);
+  actor.ok('apiSaveItem', 'news', { title: 'خبر ٢', summary: 'x' });
+  assert.equal(fcmSent(world).length, before, 'a save never carries it');
+  actor.ok('apiActivity', {});
+  assert.equal(fcmSent(world).length, before + 4, 'both rows, to the two other admins');
+});
+
+test('warm: a public no-op — no token, nothing read or written', () => {
+  const world = apiWorld();
+  const sheets = JSON.stringify(world.spreadsheet.getSheets().map(s => [s.name, s.data]));
+  const props = JSON.stringify([...world.properties.entries()]);
+  const reply = world.post({ fn: 'warm', args: [] });
+  assert.equal(reply.ok, true);
+  assert.deepEqual(Object.keys(reply).sort(), ['mime', 'ok']);
+  assert.equal(JSON.stringify(world.spreadsheet.getSheets().map(s => [s.name, s.data])), sheets);
+  assert.equal(JSON.stringify([...world.properties.entries()]), props);
 });
