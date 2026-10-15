@@ -32,10 +32,25 @@ const MESSAGES = {
   notfound: ['الطلب ده مش معروف.', ''],
   method: ['الطلب ده مش معروف.', ''],
   origin: ['الطلب ده مش مسموح من المكان ده.', ''],
-  error: ['حصلت مشكلة عندنا. جرّب تاني بعد شوية.', '']
+  error: ['حصلت مشكلة عندنا. جرّب تاني بعد شوية.', ''],
+  // booking (docs/EVENTS.md §6, worker/BOOKING-API.md)
+  not_found: ['مش لاقيين الفعالية أو الحجز ده.', ''],
+  invalid: ['في بيانات محتاجة تتصلح.', ''],
+  proof: ['صورة الإثبات دي مش مقبولة.', 'ابعت سكرين شوت واضح (صورة عادية).'],
+  not_open: ['الحجز لسه ما فتحش.', ''],
+  closed: ['الحجز اتقفل.', ''],
+  full: ['مفيش أماكن كفاية.', ''],
+  limit: ['عندك طلبين حجز لسه بيتراجعوا للفعالية دي.', 'استنى لحد ما الخادم يراجعهم.'],
+  final: ['الحجز ده مينفعش يتغير كده دلوقتي.', ''],
+  expired: ['الرابط ده مش صالح أو انتهى.', ''],
+  warn: ['في ملاحظات قبل التسجيل.', 'راجعها، ولو متأكد سجّل برضه.'],
+  needs_override: ['الحجز مينفعش يتأكد كده.', 'راجع السبب، ولو لازم أكّده مع كتابة السبب.']
 };
 
-const STATUS = { auth: 401, denied: 403, origin: 403, bad: 400, toolarge: 413, rate: 429, conflict: 409, busy: 409, disabled: 403, notfound: 404, method: 405, error: 500 };
+const STATUS = {
+  auth: 401, denied: 403, origin: 403, bad: 400, toolarge: 413, rate: 429, conflict: 409, busy: 409, disabled: 403, notfound: 404, method: 405, error: 500,
+  not_found: 404, invalid: 400, proof: 400, not_open: 409, closed: 409, full: 409, limit: 429, final: 409, expired: 401, warn: 409, needs_override: 409
+};
 
 export class ApiError extends Error {
   constructor(code, detail, extra) {
