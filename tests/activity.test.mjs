@@ -406,9 +406,9 @@ test('admin push: a create goes to the OTHER admins now, never to the actor; the
   actor.leave();   // even with no panel open, never the actor's own devices
   const quiet = tab(world, ADMIN).start();
   quiet.ok('apiSaveItem', 'news', { title: 'خبر جديد للكل', summary: 'x' });
-  quiet.leave();
   assert.equal(fcmSent(world).length, before, 'the reply never waits for the push');
   assert.equal(rows(world).at(-1).notified, 'pending:now');
+  quiet.leave();   // the closing panel's beacon (apiSessionEnd) carries it
   send(world);
 
   const to = sentTo(world, before);
@@ -604,7 +604,6 @@ test('admin push after the reply: exactly once — a claimed row is never sent a
   mina.leave();
   const actor = tab(world, ADMIN).start();
   actor.ok('apiSaveItem', 'news', { title: 'مرة واحدة', summary: 'x' });
-  actor.leave();
   const before = fcmSent(world).length;
   world.scriptLock.busy = true;
   assert.equal(send(world), 0, 'a publish holds the lock: not now');
@@ -613,9 +612,7 @@ test('admin push after the reply: exactly once — a claimed row is never sent a
   assert.equal(send(world), 0, 'the second dispatcher finds nothing');
   assert.equal(fcmSent(world).length, before + 2);
   // a run that died after claiming: the row says «sending», nobody sends it again
-  const again = tab(world, ADMIN).start();
-  again.ok('apiSaveItem', 'news', { title: 'اتقطع', summary: 'x' });
-  again.leave();
+  actor.ok('apiSaveItem', 'news', { title: 'اتقطع', summary: 'x' });
   const sheet = world.spreadsheet.getSheetByName('Activity');
   sheet.data[sheet.data.length - 1][13] = 'sending';
   assert.equal(send(world), 0);
@@ -635,6 +632,24 @@ test('admin push after the reply: with no heartbeat, a quiet call sends what wai
   assert.equal(fcmSent(world).length, before, 'a save never carries it');
   actor.ok('apiActivity', {});
   assert.equal(fcmSent(world).length, before + 4, 'both rows, to the two other admins');
+});
+
+test('admin push after the reply: a lost cache flag is swept by a heartbeat; the closing panel\'s beacon carries it', () => {
+  const { world, mina } = pushWorld();
+  mina.leave();
+  const actor = tab(world, ADMIN).start();
+  const before = fcmSent(world).length;
+  actor.ok('apiSaveItem', 'news', { title: 'العلم ضاع', summary: 'x' });
+  world.gs.CacheService.getScriptCache().remove('adm:act:pending');   // evicted
+  world.gs.CacheService.getScriptCache().remove('adm:act:sweep');     // last sweep window over
+  assert.equal(world.gs.activityPending_('apiActivity'), 0, 'a quiet call does not scan');
+  assert.equal(world.gs.activityPending_('apiHeartbeat'), 1, 'the heartbeat sweeps the tail');
+  assert.equal(fcmSent(world).length, before + 2);
+  assert.equal(world.gs.activityPending_('apiHeartbeat'), 0, 'swept at most every 10 minutes');
+
+  actor.ok('apiSaveItem', 'news', { title: 'وقفل على طول', summary: 'x' });
+  assert.equal(world.gs.activityPending_('apiSessionEnd'), 1, 'the closing beacon sends it');
+  assert.equal(fcmSent(world).length, before + 4);
 });
 
 test('warm: a public no-op — no token, nothing read or written', () => {

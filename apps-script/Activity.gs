@@ -1259,12 +1259,16 @@ function activityDispatch_() {
    then sent outside it. The flag is cleared BEFORE the rows are read, so a
    row written after that read always leaves the flag set behind it.
    A run that dies mid-send leaves «sending»: never sent twice.
-   (If the cache loses the flag the rows wait for the next push's flag.)
+   If the cache loses the flag, a heartbeat still scans the tail every
+   ACTIVITY_SWEEP_S; the closing panel's apiSessionEnd beacon carries too.
 ========================================================= */
 
 var ACTIVITY_PENDING_KEY = 'adm:act:pending';
 var ACTIVITY_PENDING_SCAN = 100;
 var ACTIVITY_LATE_MS = 60000;
+var ACTIVITY_CARRIER_FNS = ['apiHeartbeat', 'apiSessionEnd'];
+var ACTIVITY_SWEEP_KEY = 'adm:act:sweep';
+var ACTIVITY_SWEEP_S = 600;
 var ACTIVITY_LATE_FNS = ['apiActivity', 'apiAdmins', 'apiAdminPushDevices', 'apiPushState', 'apiMediaLibrary', 'apiComps',
   'apiPages', 'apiEvents', 'apiServants', 'apiParticipants', 'apiWallet', 'apiShopItems', 'apiShopRedemptions', 'apiShopSchedule',
   'apiSeasons', 'apiPushSchedule'];
@@ -1297,9 +1301,19 @@ function activityPendingFlag_() {
 function activityPending_(fn) {
 
   try {
-    var since = Number(CacheService.getScriptCache().get(ACTIVITY_PENDING_KEY)) || 0;
-    if (!since) return 0;
-    if (fn !== 'apiHeartbeat' && !(ACTIVITY_LATE_FNS.indexOf(fn) !== -1 && Date.now() - since >= ACTIVITY_LATE_MS)) return 0;
+    var cache = CacheService.getScriptCache();
+    var since = Number(cache.get(ACTIVITY_PENDING_KEY)) || 0;
+    // a heartbeat, or the beacon of a closing panel (an admin who acts and
+    // closes the tab at once still gets the push out)
+    var carrier = ACTIVITY_CARRIER_FNS.indexOf(fn) !== -1;
+    if (!since) {
+      // the cache can drop the flag: a carrier still looks at the tail every
+      // ACTIVITY_SWEEP_S, so a «pending» row never waits for the next push
+      if (!carrier || cache.get(ACTIVITY_SWEEP_KEY)) return 0;
+      cache.put(ACTIVITY_SWEEP_KEY, '1', ACTIVITY_SWEEP_S);
+      return activityDispatchPending_();
+    }
+    if (!carrier && !(ACTIVITY_LATE_FNS.indexOf(fn) !== -1 && Date.now() - since >= ACTIVITY_LATE_MS)) return 0;
     return activityDispatchPending_();
   }
   catch (error) {
