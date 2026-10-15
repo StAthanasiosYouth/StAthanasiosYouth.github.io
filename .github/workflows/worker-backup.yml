@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   backup:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # pinned: the image these ran on before ubuntu-latest moves to 26
     defaults:
       run:
         working-directory: worker
@@ -34,9 +34,9 @@ jobs:
             echo "ok=true" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.creds.outputs.ok == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - if: steps.creds.outputs.ok == 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -53,7 +53,7 @@ jobs:
           shred -u backup.sql
           ls -la backup-*.sql.age
       - if: steps.creds.outputs.ok == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: d1-backup-${{ github.run_id }}
           path: worker/backup-*.sql.age
