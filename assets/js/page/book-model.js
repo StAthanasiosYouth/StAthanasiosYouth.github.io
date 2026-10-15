@@ -1,0 +1,481 @@
+/**
+ * ONLINE BOOKING — pure model (docs/EVENTS.md §6, §7.1, §9;
+ * worker/BOOKING-API.md)
+ *
+ * No DOM, no network, no storage: runs in the browser and in Node (tests).
+ *  - the live state (GET /v1/book/state) → what the booking area says
+ *  - the steps of the visitor's flow, the phone check, the request key
+ *  - the draft (localStorage athanasios.book.v1:<slug>) and «حجوزاتي»
+ *    (athanasios.bookings.v1): their shapes, checked on every read
+ *  - the status token from the address fragment (#b/<token>)
+ *  - the API's error codes → a step, a field and words for the visitor
+ *  - the status view's words
+ * The counts and money come from model.js (the same arithmetic as the
+ * Phase 3 counter): startCounts, stepCount, totalOf, seatsOf, money.
+ */
+
+import { formatStamp, arabicDigits } from '../words.js';
+import { totalOf, seatsOf, money, line } from './model.js';
+
+export const DRAFT_PREFIX = 'athanasios.book.v1:';
+export const MINE_KEY = 'athanasios.bookings.v1';
+export const DRAFT_LIFE_MS = 7 * 24 * 3600 * 1000;
+export const MINE_MAX = 20;
+export const PROOFS_MAX = 3;
+export const NOTE_MAX = 300;
+export const NAME_MAX = 60;
+
+const STAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+const KEY = /^[A-Za-z0-9_.:-]{8,100}$/;
+const PROOF_ID = /^prf-[a-z2-7]{8}$/;
+const REF = /^B-[A-Z0-9]{3,12}$/;
+const TOKEN = /^bk1\.[A-Za-z0-9_-]{2,400}\.[A-Za-z0-9_-]{8,200}$/;
+const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])$/;
+const STEPS = ['a', 'b', 'c'];
+
+const isObject = value => !!value && typeof value === 'object' && !Array.isArray(value);
+const stamp = value => (typeof value === 'string' && STAMP.test(value) ? value : '');
+
+export const draftKey = slug => `${DRAFT_PREFIX}${slug}`;
+
+
+/* =========================================================
+   LIVE STATE (§7.1 step 1, §9)
+========================================================= */
+
+/** «فاضل مكان واحد», «فاضل مكانين», «فاضل ٥ أماكن», «فاضل ١٢ مكان» */
+export function leftText(left) {
+  if (!Number.isInteger(left) || left <= 0) return '';
+  if (left === 1) return 'فاضل مكان واحد';
+  if (left === 2) return 'فاضل مكانين';
+  return `فاضل ${arabicDigits(left)} ${left <= 10 ? 'أماكن' : 'مكان'}`;
+}
+
+/**
+ * The state reply → what the booking area shows:
+ *   { live: 'open'|'not_open'|'closed'|'full'|'fallback', chip, line, left, opensAt, revision }
+ * 'fallback' (API down, booking switched off, an odd reply): the Phase 3
+ * display (the servants' WhatsApp) stays as it is.
+ */
+export function liveState(reply, booking = null) {
+
+  const fallback = { live: 'fallback', chip: '', line: '', left: null, opensAt: '', revision: '' };
+  if (!isObject(reply) || reply.ok === false || typeof reply.open !== 'boolean') return fallback;
+
+  const left = Number.isInteger(reply.left) && reply.left >= 0 ? reply.left : null;
+  const opensAt = stamp(reply.opensAt) || (booking && stamp(booking.opensAt)) || '';
+  const revision = typeof reply.revision === 'string' ? reply.revision.slice(0, 80) : '';
+  const base = { left, opensAt, revision };
+
+  if (reply.open) {
+    if (left === 0) return { ...base, live: 'full', chip: 'اكتمل العدد', line: 'اكتمل العدد. لو حد اعتذر هيفضى مكان.' };
+    return { ...base, live: 'open', chip: 'الحجز مفتوح', line: leftText(left) };
+  }
+  if (reply.reason === 'not_open') return { ...base, live: 'not_open', chip: 'لسه ما فتحش', line: opensAt ? `الحجز يفتح ${formatStamp(opensAt)}` : 'الحجز لسه ما فتحش' };
+  if (reply.reason === 'closed') return { ...base, live: 'closed', chip: 'الحجز اتقفل', line: '' };
+  if (reply.reason === 'full') return { ...base, left: 0, live: 'full', chip: 'اكتمل العدد', line: 'اكتمل العدد. لو حد اعتذر هيفضى مكان.' };
+  return fallback;
+
+}
+
+
+/* =========================================================
+   THE FLOW (§7.1)
+========================================================= */
+
+/** a free event (every price 0) skips the servant/method step (§3) */
+export const isFree = booking => booking.pricing.categories.every(c => !c.price);
+
+/** the steps a visitor goes through: who → (servant and method) → proof and send */
+export function stepsFor(booking) {
+  return isFree(booking) ? ['a', 'c'] : ['a', 'b', 'c'];
+}
+
+/** the people a booking counts (every category, seat or not) */
+export function peopleCount(booking, counts) {
+  return booking.pricing.categories.reduce((sum, c) => sum + (counts[c.key] || 0), 0);
+}
+
+/** counts → { adult, child, companion, total } (the Worker's people()) */
+export function peopleOf(booking, counts) {
+  const out = { adult: 0, child: 0, companion: 0, total: 0 };
+  for (const c of booking.pricing.categories) {
+    const n = counts[c.key] || 0;
+    out[c.group] += n;
+    out.total += n;
+  }
+  return out;
+}
+
+/** counts as the visitor left them, back inside each category's limits */
+export function cleanCounts(booking, raw) {
+  const counts = {};
+  for (const c of booking.pricing.categories) {
+    const n = isObject(raw) && Number.isInteger(raw[c.key]) ? raw[c.key] : c.min;
+    counts[c.key] = Math.min(c.max, Math.max(c.min, n));
+  }
+  // over the seats of one booking: back to the minimum
+  if (seatsOf(booking, counts) > booking.perBookingMax) for (const c of booking.pricing.categories) counts[c.key] = c.min;
+  return counts;
+}
+
+/** Egyptian mobile, any way it's written → '+201xxxxxxxxx', or '' (the Worker's normPhone) */
+export function normPhone(value) {
+  const text = String(value == null ? '' : value)
+    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06f0))
+    .replace(/[‎‏؜‪-‮⁦-⁩﻿]/g, '')
+    .replace(/[\s \-‐-―.()/]/g, '');
+  const plus = text.charAt(0) === '+';
+  let digits = plus ? text.slice(1) : text;
+  if (!/^\d+$/.test(digits)) return '';
+  if (plus) {
+    if (!digits.startsWith('20')) return '';
+    digits = digits.slice(2);
+  }
+  else if (digits.startsWith('0020')) digits = digits.slice(4);
+  else if (digits.startsWith('20') && digits.length >= 11) digits = digits.slice(2);
+  if (digits.charAt(0) === '0') digits = digits.slice(1);
+  return /^1[0125]\d{8}$/.test(digits) ? `+20${digits}` : '';
+}
+
+/**
+ * Step a's fields → { field: words } for each problem ({} = fine).
+ * Gentle: the Worker checks again and has the last word.
+ */
+export function checkWho(booking, { name, phone, counts, names }, left = null) {
+  const problems = {};
+  const clean = line(name, NAME_MAX);
+  if (clean.length < 2) problems.name = 'اكتب اسمك (حرفين على الأقل).';
+  if (!normPhone(phone)) problems.phone = 'اكتب رقم موبايل مصري صح، زي 01012345678';
+  const seats = seatsOf(booking, counts);
+  if (seats > booking.perBookingMax) problems.counts = `أقصى عدد في الحجز الواحد ${arabicDigits(booking.perBookingMax)}.`;
+  else if (Number.isInteger(left) && seats > left) problems.counts = left > 0 ? `${leftText(left)} بس. قلّل العدد.` : 'اكتمل العدد.';
+  if (booking.collectNames) {
+    const want = peopleCount(booking, counts);
+    const given = (names || []).slice(0, want).map(n => line(n, NAME_MAX));
+    if (given.length < want || given.some(n => n.length < 2)) problems.names = 'اكتب اسم كل واحد جاي.';
+  }
+  return problems;
+}
+
+/** step b: a servant of this event, and one of that servant's methods */
+export function checkPay(booking, { servantId, method }) {
+  const servant = booking.servants.find(s => s.id && s.id === servantId && s.methods.length);
+  if (!servant) return { servantId: 'اختار الخادم اللي هتدفع له.' };
+  if (!servant.methods.includes(method)) return { method: 'اختار طريقة الدفع.' };
+  return {};
+}
+
+/** does this method need a proof picture (§6: needsProof → 1–3) */
+export function needsProof(booking, method) {
+  const m = booking.methods.find(x => x.key === method);
+  return !!(m && m.needsProof);
+}
+
+/** step c: the proofs (paid events only) and the terms */
+export function checkSend(booking, { method, proofs, agreed, uploading = 0 }, terms = '') {
+  const problems = {};
+  if (uploading) problems.proofs = 'استنى الصور لحد ما تترفع.';
+  else if (!isFree(booking)) {
+    const n = (proofs || []).length;
+    if (n > PROOFS_MAX) problems.proofs = 'لحد ٣ صور بس.';
+    else if (!n && needsProof(booking, method)) problems.proofs = 'ارفع صورة التحويل (سكرين شوت).';
+  }
+  if (terms && !agreed) problems.agreed = 'لازم توافق على الشروط الأول.';
+  return problems;
+}
+
+/** a request key: made once at step a, kept in the draft (a repeat never books twice) */
+export function newRequestKey(bytes) {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let out = 'web.';
+  for (const b of bytes) out += alphabet[b % alphabet.length];
+  return out;
+}
+
+/** POST /v1/book/submit's body */
+export function submitBody(event, draft, { hp = '', revision = '' } = {}) {
+  const booking = event.booking;
+  const counts = cleanCounts(booking, draft.counts);
+  const body = {
+    slug: event.slug,
+    requestKey: draft.requestKey,
+    name: line(draft.fields.name, NAME_MAX),
+    phone: String(draft.fields.phone || '').trim().slice(0, 30),
+    counts,
+    hp,
+    revision: revision || event.v || ''
+  };
+  if (booking.collectNames) body.names = (draft.names || []).slice(0, peopleCount(booking, counts)).map(n => line(n, NAME_MAX));
+  const note = line(draft.note, NOTE_MAX);
+  if (note) body.note = note;
+  if (!isFree(booking)) {
+    body.servantId = draft.servantId;
+    body.method = draft.method;
+    body.proofs = (draft.proofs || []).slice(0, PROOFS_MAX).map(p => ({ proofId: p.proofId, claim: p.claim }));
+  }
+  return body;
+}
+
+/** the WhatsApp message to the chosen servant: the event, the visitor's name, the people and the total */
+export function payMessage(event, servant, { name, counts, method }) {
+  const booking = event.booking;
+  const lines = [`سلام يا ${servant.name}، أنا ${line(name, NAME_MAX)} وعايز أحجز في «${event.title}».`];
+  for (const c of booking.pricing.categories) {
+    const n = counts[c.key] || 0;
+    if (n) lines.push(`- ${c.label}: ${arabicDigits(n)}`);
+  }
+  lines.push(`الإجمالي: ${money(totalOf(booking, counts))}`);
+  const m = booking.methods.find(x => x.key === method);
+  if (m) lines.push(`هدفع ${m.label}.`);
+  return lines.join('\n');
+}
+
+
+/* =========================================================
+   THE DRAFT (§7.1): never file bytes, never past 7 days
+========================================================= */
+
+export function emptyDraft(booking, requestKey, now) {
+  return {
+    step: 'a',
+    fields: { name: '', phone: '' },
+    counts: cleanCounts(booking, null),
+    names: [],
+    servantId: '',
+    method: '',
+    note: '',
+    agreed: false,
+    requestKey,
+    proofs: [],
+    savedAt: now
+  };
+}
+
+/** a stored draft (parsed JSON) → the draft, or null (missing, broken, too old) */
+export function readDraft(raw, booking, now) {
+  if (!isObject(raw) || !KEY.test(String(raw.requestKey || ''))) return null;
+  const savedAt = Number(raw.savedAt);
+  if (!Number.isFinite(savedAt) || now - savedAt > DRAFT_LIFE_MS || savedAt - now > 24 * 3600 * 1000) return null;
+  const fields = isObject(raw.fields) ? raw.fields : {};
+  const steps = stepsFor(booking);
+  return {
+    step: STEPS.includes(raw.step) && steps.includes(raw.step) ? raw.step : 'a',
+    fields: { name: line(fields.name, NAME_MAX), phone: line(fields.phone, 30) },
+    counts: cleanCounts(booking, raw.counts),
+    names: Array.isArray(raw.names) ? raw.names.slice(0, 50).map(n => line(n, NAME_MAX)) : [],
+    servantId: line(raw.servantId, 60),
+    method: line(raw.method, 20),
+    note: typeof raw.note === 'string' ? raw.note.slice(0, NOTE_MAX) : '',
+    agreed: false,
+    requestKey: raw.requestKey,
+    proofs: (Array.isArray(raw.proofs) ? raw.proofs : [])
+      .filter(p => isObject(p) && PROOF_ID.test(String(p.proofId)) && typeof p.claim === 'string' && p.claim.length <= 400)
+      .slice(0, PROOFS_MAX)
+      .map(p => ({ proofId: p.proofId, claim: p.claim })),
+    savedAt
+  };
+}
+
+/** what is written: the same shape, stamped now (never the pictures; «موافق» is asked again) */
+export function storeDraft(draft, now) {
+  return {
+    step: draft.step,
+    fields: { name: draft.fields.name, phone: draft.fields.phone },
+    counts: draft.counts,
+    names: draft.names,
+    servantId: draft.servantId,
+    method: draft.method,
+    note: draft.note,
+    requestKey: draft.requestKey,
+    proofs: draft.proofs.map(p => ({ proofId: p.proofId, claim: p.claim })),
+    savedAt: now
+  };
+}
+
+
+/* =========================================================
+   «حجوزاتي» (§7.1): [{ slug, ref, token }], the newest first, ≤ 20
+========================================================= */
+
+export function readMine(raw) {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set();
+  return raw
+    .filter(e => isObject(e) && SLUG.test(String(e.slug)) && REF.test(String(e.ref)) && TOKEN.test(String(e.token)))
+    .filter(e => !seen.has(e.token) && seen.add(e.token))
+    .slice(0, MINE_MAX)
+    .map(e => ({ slug: e.slug, ref: e.ref, token: e.token }));
+}
+
+export function addMine(list, entry) {
+  return readMine([entry, ...readMine(list).filter(e => e.token !== entry.token && !(e.slug === entry.slug && e.ref === entry.ref))]);
+}
+
+export function dropMine(list, token) {
+  return readMine(list).filter(e => e.token !== token);
+}
+
+export const mineFor = (list, slug) => readMine(list).filter(e => e.slug === slug);
+
+
+/* =========================================================
+   THE STATUS LINK: /events/<slug>/#b/<token> (the token never leaves the fragment)
+========================================================= */
+
+export function tokenFromHash(hash) {
+  const m = /^#b\/(.+)$/.exec(typeof hash === 'string' ? hash : '');
+  if (!m) return '';
+  let token = m[1];
+  try {
+    token = decodeURIComponent(token);
+  }
+  catch {
+    return '';
+  }
+  return TOKEN.test(token) ? token : '';
+}
+
+export const isToken = value => typeof value === 'string' && TOKEN.test(value);
+export const isRef = value => typeof value === 'string' && REF.test(value);
+
+export function statusHref(siteRoot, slug, token) {
+  return `${new URL(`events/${slug}/`, siteRoot).href}#b/${token}`;
+}
+
+
+/* =========================================================
+   ERRORS → a step, a field and words (BOOKING-API.md «Envelope and errors»)
+========================================================= */
+
+const FIELD_STEP = { name: 'a', phone: 'a', counts: 'a', names: 'a', servantId: 'b', method: 'b', proofs: 'c', note: 'c' };
+
+const FIELD_WORDS = {
+  name: 'الاسم مش مظبوط. اكتب اسمك (من ٢ لـ ٦٠ حرف).',
+  phone: 'رقم الموبايل مش مظبوط. اكتب رقم مصري زي 01012345678',
+  counts: 'العدد مش مظبوط. راجع عدد الأفراد.',
+  names: 'راجع أسماء اللي جايين.',
+  servantId: 'اختار الخادم تاني.',
+  method: 'اختار طريقة الدفع تاني.',
+  proofs: 'ارفع صورة التحويل (من ١ لـ ٣ صور).',
+  note: 'الملاحظة طويلة شوية. خليها أقصر.'
+};
+
+/**
+ * A failed reply → { action, step, field, message, left }
+ *   action: 'field'    show it on that step's field
+ *           'fallback' booking is off: the servants' WhatsApp
+ *           'refresh'  the window moved: read the state again
+ *           'retry'    the same request can be sent again (same requestKey)
+ *           'stop'     nothing to do but read the words
+ */
+export function bookingError(reply) {
+  const r = isObject(reply) ? reply : {};
+  const code = typeof r.code === 'string' ? r.code : 'network';
+  const left = Number.isInteger(r.left) && r.left >= 0 ? r.left : null;
+  switch (code) {
+    case 'invalid': {
+      const field = Object.prototype.hasOwnProperty.call(FIELD_STEP, r.field) ? r.field : '';
+      return field
+        ? { action: 'field', step: FIELD_STEP[field], field, message: FIELD_WORDS[field], left }
+        : { action: 'stop', step: '', field: '', message: 'فيه حاجة مش مظبوطة في الطلب. راجع البيانات وجرّب تاني.', left };
+    }
+    case 'full':
+      return { action: 'field', step: 'a', field: 'counts', left, message: left ? `مفيش أماكن كفاية: ${leftText(left)} بس. قلّل العدد.` : 'اكتمل العدد، مفيش أماكن تانية دلوقتي.' };
+    case 'limit':
+      return { action: 'stop', step: '', field: '', left, message: 'عندك طلبين مستنيين المراجعة للفعالية دي. استنى رد الخادم، أو الغي طلب منهم.' };
+    case 'not_open':
+      return { action: 'refresh', step: '', field: '', left, message: stamp(r.opensAt) ? `الحجز لسه ما فتحش. بيفتح ${formatStamp(r.opensAt)}.` : 'الحجز لسه ما فتحش.' };
+    case 'closed':
+      return { action: 'refresh', step: '', field: '', left, message: 'الحجز اتقفل.' };
+    case 'disabled':
+    case 'not_found':
+      return { action: 'fallback', step: '', field: '', left, message: 'الحجز أونلاين مش متاح دلوقتي. كلّم خادم من دول على واتساب.' };
+    case 'proof':
+      return { action: 'field', step: 'c', field: 'proofs', left, message: 'صورة من الصور فيها مشكلة. شيلها وارفعها تاني (سكرين شوت).' };
+    case 'rate':
+      return { action: 'retry', step: '', field: '', left, message: 'طلبات كتير ورا بعض. استنى دقيقة وجرّب تاني.' };
+    case 'toolarge':
+      return { action: 'field', step: 'c', field: 'proofs', left, message: 'الصورة كبيرة قوي. ابعت سكرين شوت.' };
+    case 'expired':
+      return { action: 'stop', step: '', field: '', left, message: 'الرابط ده انتهى أو مش صحيح.' };
+    case 'final':
+      return { action: 'refresh', step: '', field: '', left, message: 'الطلب ده ماينفعش يتغير دلوقتي.' };
+    case 'network':
+    case 'busy':
+    case 'error':
+      return { action: 'retry', step: '', field: '', left, message: 'مقدرناش نوصل. اتأكد من النت وجرّب تاني.' };
+    default:
+      return { action: 'retry', step: '', field: '', left, message: 'حصلت مشكلة. جرّب تاني بعد شوية.' };
+  }
+}
+
+
+/* =========================================================
+   THE STATUS VIEW (§4, §7.1)
+========================================================= */
+
+export const STATUS_WORDS = {
+  pending: 'قيد المراجعة',
+  confirmed: 'اتأكد',
+  rejected: 'اترفض',
+  withdrawn: 'اتلغى بطلبك',
+  cancelled: 'اتلغى'
+};
+
+export const statusWord = status => STATUS_WORDS[status] || 'غير معروف';
+
+/** { adult, child, companion, total } → «٣ أفراد: ٢ كبار، ١ طفل» */
+export function peopleText(people) {
+  if (!isObject(people)) return '';
+  const n = key => (Number.isInteger(people[key]) && people[key] > 0 ? people[key] : 0);
+  const total = n('total') || n('adult') + n('child') + n('companion');
+  if (!total) return '';
+  const head = total === 1 ? 'فرد واحد' : total === 2 ? 'فردين' : `${arabicDigits(total)} ${total <= 10 ? 'أفراد' : 'فرد'}`;
+  const parts = [
+    n('adult') ? `${arabicDigits(n('adult'))} ${n('adult') === 1 ? 'كبير' : 'كبار'}` : '',
+    n('child') ? `${arabicDigits(n('child'))} ${n('child') === 1 ? 'طفل' : 'أطفال'}` : '',
+    n('companion') ? `${arabicDigits(n('companion'))} ${n('companion') === 1 ? 'مرافق' : 'مرافقين'}` : ''
+  ].filter(Boolean);
+  return parts.length > 1 ? `${head}: ${parts.join('، ')}` : head;
+}
+
+const amount = value => (Number.isInteger(value) && value >= 0 ? value : null);
+
+/**
+ * The status reply → the rows the status view shows:
+ * { ref, status, word, rows: [[label, value]], reason, canWithdraw }
+ */
+export function statusView(reply) {
+  if (!isObject(reply) || reply.ok === false || !isRef(reply.ref)) return null;
+  const status = Object.prototype.hasOwnProperty.call(STATUS_WORDS, reply.status) ? reply.status : '';
+  const rows = [];
+  const people = peopleText(reply.people);
+  if (people) rows.push(['الأفراد', people]);
+  if (status === 'confirmed' || (status === 'cancelled' && amount(reply.paid))) {
+    const due = amount(reply.amountDue);
+    const paid = amount(reply.paid) ?? 0;
+    if (due !== null) rows.push(['المطلوب', due ? money(due) : 'مجانًا']);
+    if (due) {
+      rows.push(['اتدفع', paid ? money(paid) : 'لسه']);
+      const balance = Number.isInteger(reply.balance) ? reply.balance : due - paid;
+      rows.push(['الباقي', balance > 0 ? money(balance) : 'مفيش']);
+      if (balance > 0 && stamp(reply.finalDueAt)) rows.push(['آخر معاد للباقي', formatStamp(reply.finalDueAt)]);
+    }
+  }
+  else if (status === 'pending' && amount(reply.quotedTotal) !== null) {
+    rows.push(['الإجمالي', money(reply.quotedTotal)]);
+  }
+  return {
+    ref: reply.ref,
+    status,
+    word: statusWord(status),
+    firstName: line(reply.firstName, 40),
+    title: isObject(reply.event) ? line(reply.event.title, 80) : '',
+    rows,
+    overdue: status === 'confirmed' && reply.overdue === true,
+    reason: (status === 'rejected' || status === 'cancelled') ? line(reply.reason, 200) : '',
+    canWithdraw: status === 'pending'
+  };
+}
