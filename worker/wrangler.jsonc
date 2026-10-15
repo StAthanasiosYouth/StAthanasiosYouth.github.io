@@ -1,0 +1,60 @@
+{
+  // athanasios-api — Cloudflare Worker (see worker/README.md).
+  // Portable: no account_id here. Locally wrangler uses the logged-in account;
+  // CI uses CLOUDFLARE_ACCOUNT_ID. The database_id values are per account —
+  // recreate with `node scripts/setup-resources.mjs` and paste the new IDs.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "athanasios-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+
+  "vars": {
+    "ENVIRONMENT": "production",
+    "ALLOWED_ORIGINS": "https://stathanasiosyouth.github.io",
+    "GOOGLE_CLIENT_ID": "246924773718-38p45gji0ouvi7an4jdjsip3obmk6ve4.apps.googleusercontent.com"
+  },
+
+  "d1_databases": [
+    { "binding": "DB", "database_name": "athanasios-prod", "database_id": "95048f59-4c05-4e76-9f86-7c8c1c2360d3", "migrations_dir": "migrations" }
+  ],
+
+  // R2 (private proofs, media originals): bucket "athanasios-private".
+  // Not bound yet — R2 must first be enabled on the account (dashboard).
+  // Then add:  "r2_buckets": [{ "binding": "PRIVATE", "bucket_name": "athanasios-private" }]
+
+  "queues": {
+    "producers": [{ "binding": "JOBS", "queue": "athanasios-jobs" }],
+    "consumers": [
+      { "queue": "athanasios-jobs", "max_batch_size": 10, "max_batch_timeout": 2, "max_retries": 5, "dead_letter_queue": "athanasios-jobs-dlq" },
+      { "queue": "athanasios-jobs-dlq", "max_batch_size": 10, "max_batch_timeout": 30 }
+    ]
+  },
+
+  // daily housekeeping 01:17 UTC (≈ 04:17 Cairo)
+  "triggers": { "crons": ["17 1 * * *"] },
+
+  "env": {
+    "staging": {
+      "name": "athanasios-api-staging",
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "ALLOWED_ORIGINS": "https://stathanasiosyouth.github.io,http://localhost:8080,http://127.0.0.1:8080",
+        "GOOGLE_CLIENT_ID": "246924773718-38p45gji0ouvi7an4jdjsip3obmk6ve4.apps.googleusercontent.com"
+      },
+      "d1_databases": [
+        { "binding": "DB", "database_name": "athanasios-staging", "database_id": "e0efb231-9048-48f2-8db7-0657781cfe27", "migrations_dir": "migrations" }
+      ],
+      "queues": {
+        "producers": [{ "binding": "JOBS", "queue": "athanasios-jobs-staging" }],
+        "consumers": [
+          { "queue": "athanasios-jobs-staging", "max_batch_size": 10, "max_batch_timeout": 2, "max_retries": 5, "dead_letter_queue": "athanasios-jobs-staging-dlq" },
+          { "queue": "athanasios-jobs-staging-dlq", "max_batch_size": 10, "max_batch_timeout": 30 }
+        ]
+      },
+      "triggers": { "crons": ["47 1 * * *"] }
+    }
+  }
+}

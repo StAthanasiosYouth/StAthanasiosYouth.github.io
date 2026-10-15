@@ -48,7 +48,28 @@ capacity and accounting, and runs in Apps Script and Node (tests), like
 
 ## 1. Storage
 
-**Spreadsheet.** All tabs below live in the existing private module
+> **Revised 2026-10-15 (backend migration, docs/BACKEND-MIGRATION.md).**
+> The booking engine is built on the Cloudflare Worker, not Apps Script.
+> - **Data:** Bookings, Payments and Proofs live in **D1**
+>   (`worker/drafts/0002_bookings.sql`, applied when the pilot is approved).
+> - **Proof files:** in the private **R2** bucket `athanasios-private`, not Drive.
+> - **Events, Servants, PayMethods** stay edited in the Sheet (Apps Script)
+>   for now. Their bookable part is synced to D1 (`event_cfg`, `servants`,
+>   `pay_methods`) on save/publish.
+>
+> **What stays binding:** the tab and column names below. D1 columns are their
+> snake_case twins, so a reverse export to Sheets is a straight copy.
+> Statuses, rules and error codes are unchanged.
+>
+> **What the Worker replaces:**
+> - `compLock_` → guarded single statements / atomic batches + UNIQUE keys
+>   (`worker/test/bookings-draft.test.mjs`).
+> - `driveId` → `r2_key`.
+> - The `book*` doPost actions → Worker routes with the same names and replies.
+>
+> The original Sheets wording follows for reference.
+
+**Spreadsheet (original plan, superseded).** All tabs below live in the existing private module
 spreadsheet (`COMP_SHEET_ID`, `compSpreadsheet_()`), in a new list
 `BOOK_TABLES` next to `COMP_TABLES`:
 
@@ -57,7 +78,7 @@ spreadsheet (`COMP_SHEET_ID`, `compSpreadsheet_()`), in a new list
 - writes are batched (`compAppend_` / `compUpdate_`);
 - every text cell goes through `plainCell_`.
 
-**Locks.**
+**Locks (original plan, superseded — see the note above).**
 - Every booking-state, payment and capacity write runs under `compLock_`.
 - Drive uploads always run outside the lock (§18.1 of `COMPETITIONS.md`).
 
@@ -826,15 +847,17 @@ files, push payloads, the Activity `changes` JSON or the logs):
 A committed-file scan test, like `comp-security.test.mjs`, enforces this.
 
 **Proofs:**
-- Stored in a private Drive folder: Script Property `BOOK_PROOF_FOLDER`,
-  created over REST with the `drive.file` scope, never shared.
+- Stored in the private R2 bucket `athanasios-private` (revised 2026-10-15;
+  originally a private Drive folder, `BOOK_PROOF_FOLDER`). No public URL ever
+  exists; only an admin can stream one through the Worker.
 - Never added to the `Media` tab or library and never published.
 - Viewed only through `apiBookingProof(id)`, which returns base64 to an
   admin.
 
 **Retention:**
 - Proof files are deleted **60 days after the event's `endAt`** by the
-  existing daily trigger (`PUSH_DAILY_HANDLER`, 06:00, `CompSchedule.gs`;
+  Worker's daily cron (`worker/src/scheduled.js`; originally the Apps Script
+  `PUSH_DAILY_HANDLER`;
   `deletedAt` is set and the row is kept). The same run sweeps orphan proofs.
 - Bookings and payments are kept for accounting.
 - Phone numbers are blanked **12 months** after the event ends (see

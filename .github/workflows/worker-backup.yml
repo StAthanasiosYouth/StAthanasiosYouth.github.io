@@ -1,0 +1,60 @@
+# Nightly off-Cloudflare backup of the production D1 database.
+# The dump is encrypted with age to a PUBLIC recipient before it leaves the
+# runner; only the offline identity (two admins' password managers) can read
+# it. Kept as a workflow artifact for 30 days. Restore: worker/README.md.
+name: Worker backup (D1)
+
+on:
+  schedule:
+    - cron: '23 0 * * *'     # 00:23 UTC ≈ 03:23 Cairo
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      BACKUP_AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT || 'age1ag4ayardafxfq6ajft0aqlq7rdtkzky6m6j9gdljrhujqunjl96qyss68x' }}
+    steps:
+      - name: Cloudflare credentials present?
+        id: creds
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::Cloudflare credentials not set — backup skipped"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.creds.outputs.ok == 'true'
+        uses: actions/checkout@v4
+      - if: steps.creds.outputs.ok == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      - if: steps.creds.outputs.ok == 'true'
+        run: npm ci
+      - name: Export + encrypt
+        if: steps.creds.outputs.ok == 'true'
+        run: |
+          set -euo pipefail
+          npx wrangler d1 export athanasios-prod --remote --output backup.sql
+          name="backup-$(date -u +%Y%m%dT%H%MZ).sql.age"
+          node scripts/backup.mjs encrypt backup.sql "$name"
+          shred -u backup.sql
+          ls -la backup-*.sql.age
+      - if: steps.creds.outputs.ok == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-backup-${{ github.run_id }}
+          path: worker/backup-*.sql.age
+          retention-days: 30
+          if-no-files-found: error

@@ -37,3 +37,4 @@ review/
 
 # moved-in worktree folders (never part of the site)
 /athanasios-*/
+.wrangler/

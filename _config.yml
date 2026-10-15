@@ -10,3 +10,4 @@ exclude:
   - PRODUCT.md
   - DESIGN.md
   - node_modules
+  - worker
