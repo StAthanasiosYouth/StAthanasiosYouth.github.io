@@ -45,6 +45,7 @@ All resources live in Cloudflare account `menazakmena@gmail.com` (workers.dev su
 | `LOG_SALT` | both | HMAC salt for pseudonymous actor/IP hashes in logs and rate-limit keys. Random 32 bytes |
 | `SYNC_SECRET` | both | HMAC key for Apps Script → Worker sync (`src/lib/sync.js`). Production: the same value as the Apps Script Script Property `WORKER_SYNC_SECRET`. Staging: `.staging-sync-secret` (gitignored) |
 | `ADMIN_EMAILS` | staging only | Bootstrap allowlist for tests. **Production does not use it**: its admins are copied from Apps Script (see "Admin allowlist") |
+| `BOOK_SECRET` | both (production: at go-live) | HMAC for visitor booking status links and proof claims (≥ 32 chars). Staging: `.staging-book-secret` |
 | `STAGING_TEST_JWK` | **staging only** | Public JWK of the load-test signing key (`.staging-test-key.pem`, gitignored). Ignored unless `ENVIRONMENT === 'staging'` |
 
 **Later phases add:**
@@ -140,6 +141,35 @@ Admins are still added and removed in the existing Admin («صلاحيات لو�
 **To rotate:**
 1. Set a new `SYNC_SECRET` on the Worker.
 2. Set the same value in Apps Script → Project Settings → Script Properties → `WORKER_SYNC_SECRET`.
+
+## Booking pilot (Phase 1)
+
+**Where things are:**
+- Contract: `BOOKING-API.md` (transport) + `docs/EVENTS.md` (product).
+- Code: `src/book/` — `model.js` (pure rules, pricing checked against `apps-script/BookModel.gs`), `event.js`, `token.js`, `public.js`, `admin.js`.
+- Schema: migration `0003_bookings.sql`.
+
+**Event settings:**
+- The bookable definition of an event is its **published** `events/<slug>/event.json` on the site (`SITE_URL`).
+- It is read on demand and kept in `event_cfg` (re-read when older than 60 s, or on «حدّث بيانات الفعالية»).
+- Admins keep editing events in the existing Admin, then publish.
+
+**Switches** (production: both OFF until go-live):
+1. Worker `settings.BOOKING_MODULE` = `'1'` (`POST /v1/admin/book/module`, primary admin only).
+2. Apps Script Script Property `BOOKING_ONLINE` = `'1'`, so the next publish writes `booking.online: true` into event.json.
+
+**Atomic writes:**
+- Each state change is one D1 batch whose first statement is guarded by the booking `version`. Confirm and update also recount the places in the same statement.
+- Payments and audit rows land only when that guarded statement did (`EXISTS` on the new version).
+- Payment `idem_key` and booking `request_key` are UNIQUE.
+- Payments are append-only; a void is a row (`payments_one_void`).
+
+**Secrets:**
+- `BOOK_SECRET`: HMAC for visitor status links and proof claims. Staging: `.staging-book-secret` (gitignored). **Production: not set yet** (set at go-live).
+
+**Staging only:**
+- `POST /v1/admin/diag/event-fixture` stores a test event.
+- `node scripts/book-check.mjs` runs the whole flow and the races on staging: same requestKey, same phone, IP budget, last places, parallel payments, competing voids.
 
 ## Develop and test
 
