@@ -77,24 +77,31 @@
   /*
    * A list that opens at once from its last answer (memory only, this tab)
    * and refreshes quietly behind it: one request at a time (A.latest); a
-   * view drawn while one is on its way (or right after one landed: a save
-   * redraws the panel after its own reload) uses that one instead of sending
+   * view drawn while one is on its way (or right after a save's reload()
+   * landed: the save redraws the panel too) uses that one instead of sending
    * another; reload() after a save always asks again.
    */
   function quietList(fn) {
-    var list = { last: null, target: null, at: 0 };
+    var list = { last: null, target: null, reloading: false, fresh: 0 };
     var go = A.latest(function () { return A.call(fn); }, function (r) {
       list.last = r;
-      list.at = Date.now();
+      list.fresh = list.reloading ? Date.now() : 0;
+      list.reloading = false;
       if (list.target && list.target.body.isConnected) list.target.landed(r);
     }, function (error) {
       if (list.target && list.target.body.isConnected) list.target.failed(error);
     });
     list.load = function (target) {
       list.target = target;
-      if (!go.busy() && Date.now() - list.at > 5000) go();
+      if (go.busy()) return;
+      if (Date.now() - list.fresh > 5000) { go(); return; }
+      list.fresh = 0;
+      // a save's reload just landed: that answer is the fresh one (the view is on the page a moment later)
+      setTimeout(function () {
+        if (list.target === target && target.body.isConnected) target.landed(list.last);
+      }, 0);
     };
-    list.reload = function () { go(); };
+    list.reload = function () { list.reloading = true; go(); };
     return list;
   }
 
@@ -378,6 +385,10 @@
       })));
     }
 
+    // (these sat after the return below, so they were never set: a save never reloaded this list)
+    P.openPage = openPage;
+    P.reload = pagesList.reload;
+
     if (reply) draw(reply);
     else body.appendChild(el('div', { class: 'skeleton skeleton--line' }));
     load();
@@ -409,9 +420,6 @@
       pageEditor({ page: listed, media: null, mediaCount: listed.mediaCount, card: listed.card, servants: reply.servants, types: reply.types, limits: reply.limits }, reply);
       freshPage(id, listed.updatedAt);
     }
-
-    P.openPage = openPage;
-    P.reload = pagesList.reload;
 
   };
 

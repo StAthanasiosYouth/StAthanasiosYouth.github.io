@@ -385,9 +385,9 @@ Already created. For the record, or to make it again:
 | `ADMIN_PRIMARY`   | optional; default `menazakmena@gmail.com`. The account that can never be removed from the allowlist |
 | `ADMIN_EMAILS`    | unchanged (now also editable from **الإعدادات → صلاحيات لوحة التحكم**) |
 | `ORS_API_KEY`     | optional: an openrouteservice.org API key (free Standard plan, no card) for routes inside the site's map card («الاتجاهات», `Route.gs`). Missing or rejected = the card says the in-site route isn't available and offers Google Maps. Never shown to the browser |
-| `ROUTE_DAY_COUNT` | written by `Route.gs` (`YYYY-MM-DD:n`, the day's upstream route calls, capped at 1,500); leave it alone |
+| `ROUTE_DAY_COUNT` | written by `Route.gs` (`YYYY-MM-DD:n`, the day's upstream route calls, capped at 1,500): a backing copy, updated every 10 calls; the live count is in CacheService. Leave it alone |
 | `FCM_SERVICE_ACCOUNT` | **secret.** The whole JSON key of the `push-sender` service account (push notifications, `Push.gs`; see 8.5). Never in the repository or the browser |
-| `PUSH_DAY_COUNT`  | written by `Push.gs` (`YYYY-MM-DD:n`, the day's public subscribe/unsubscribe calls, capped at 5,000); leave it alone |
+| `PUSH_DAY_COUNT`  | written by `Push.gs` (`YYYY-MM-DD:n`, the day's public subscribe/unsubscribe calls, capped at 5,000): a backing copy, updated every 10 calls; the live count is in CacheService. Leave it alone |
 
 If the server's client ID (property or default) differs from `clientId`, or the property is malformed, every API call is refused
 (the page says «جوجل دخّلك، بس خادم لوحة التحكم مقبلش الدخول»).

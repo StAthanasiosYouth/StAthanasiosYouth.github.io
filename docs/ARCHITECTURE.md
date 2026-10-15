@@ -498,8 +498,12 @@ already **live** on the site, sent once more to devices that opted in.
   Subscribe / unsubscribe / devices only through the API (token + session);
   the row's email is the server's; a token already in `PushSubs` is
   refused; ≤ 5 devices per admin (the oldest makes room), ≤ 100 in all;
-  removing an admin deletes their devices and name. Sending happens in
-  `doPost` after the function returned (outside every lock): now for
+  removing an admin deletes their devices and name. Sending never delays
+  the admin's reply: the Activity row is marked `pending:now|cooldown` and
+  the next `apiHeartbeat` from any open panel (~25 s), or a quiet list call
+  once one waited 60 s, claims the rows under the script lock («sending»)
+  and sends them outside it (`activityPending_`, exactly once; triggers
+  and the recovery admin still send at once): now for
   publish, create/delete of content, a public push send, import, admin
   add/remove; with a 30-minute cooldown per (admin, item) for edits, links,
   sections, contacts, settings; never for the rest. At most 6 per admin per
