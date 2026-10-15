@@ -82,3 +82,13 @@ test('review and publish read the Sheet itself; the publish asks GitHub only wha
   assert.equal(again.value.unchanged, true);
   assert.equal(again.github, 0);
 });
+
+test('the session\'s first state carries the competitions\' switches (no apiComps just for the sub-tabs)', () => {
+  const w = compWorld();
+  const call = adminApi(w);
+  call('apiCompSettings', { registry: true, wallet: true, shop: false });
+  const token = w.issueToken({ email: 'menazakmena@gmail.com', exp: String(Math.floor(w.now() / 1000) + 3600) });
+  const started = w.post({ fn: 'apiSessionStart', args: [{ device: 'test', force: true }], token });
+  assert.equal(started.ok, true, started.error);
+  assert.deepEqual({ ...started.result.state.modules }, { registry: true, wallet: true, shop: false });
+});

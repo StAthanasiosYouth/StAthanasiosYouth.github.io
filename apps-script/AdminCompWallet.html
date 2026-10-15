@@ -103,9 +103,26 @@
       box.hidden = true;
       return A.call('apiWallet', { q: q.q, sort: q.sort, dir: q.dir, offset: q.offset, limit: q.limit, all: q.all });
     }, function (reply) {
+      // kept for the next visit (memory only): the same search draws at once, then this refreshes
+      W.last = { key: queryKey(), reply: reply };
+      draw(reply);
+    }, function (error) {
+      list.setAttribute('aria-busy', 'false');
+      if (!list.isConnected) return;
+      list.replaceChildren();
+      A.fail(error, box);
+    });
+
+    function queryKey() {
+      return JSON.stringify([q.q, q.sort, q.dir, q.offset, q.limit, q.all]);
+    }
+
+    /* building: the view is not on the page yet (the last answer, drawn at once) */
+    function draw(reply, building) {
         list.setAttribute('aria-busy', 'false');
-        if (!list.isConnected) return;
-        C.applyModules(reply.modules);
+        if (!list.isConnected && !building) return;
+        // (the module switches: from a fresh answer only; it may redraw the panel)
+        if (!building) C.applyModules(reply.modules);
         var t = reply.totals || {};
         A.fill(tiles, tile('مشاركين ليهم نقاط', ar(t.participants || 0)), tile('الأرصدة كلها', ar(t.balance || 0), 'gold'), tile('اتكسب', ar(t.earned || 0)), tile('تعديلات', signed(t.adjusted || 0)), tile('اتصرف', ar(t.spent || 0)));
         if (!reply.items.length) {
@@ -133,13 +150,9 @@
             el('button', { class: 'btn btn--small btn--ghost', type: 'button', disabled: reply.offset <= 0, onclick: function () { q.offset = Math.max(0, q.offset - q.limit); load(); } }, 'السابق'),
             el('button', { class: 'btn btn--small btn--ghost', type: 'button', disabled: to >= reply.total, onclick: function () { q.offset += q.limit; load(); } }, 'التالي')));
         pager.hidden = reply.total <= q.limit && reply.offset === 0;
-    }, function (error) {
-      list.setAttribute('aria-busy', 'false');
-      if (!list.isConnected) return;
-      list.replaceChildren();
-      A.fail(error, box);
-    });
+    }
 
+    if (W.last && W.last.key === queryKey()) draw(W.last.reply, true);
     load();
 
     return [

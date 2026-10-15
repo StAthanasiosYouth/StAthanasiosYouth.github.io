@@ -1866,7 +1866,7 @@
   C.modules = null;
 
   /* the area's sub-tabs follow the switches (every reply that carries modules calls this) */
-  C.applyModules = function (modules) {
+  C.applyModules = function (modules, quiet) {
     if (!modules) return;
     var next = { registry: !!modules.registry, wallet: !!modules.wallet, shop: !!modules.shop };
     var changed = JSON.stringify(next) !== JSON.stringify(C.modules);
@@ -1878,6 +1878,8 @@
       .concat(MODULE_SUBS.filter(function (s) { return next[s.module]; }).map(function (s) { return { key: s.key, label: s.label }; }))
       .concat([{ key: 'compsettings', label: 'الإعدادات' }]);
     area.subs.splice.apply(area.subs, [0, area.subs.length].concat(subs));
+    // quiet: before the panel's first drawing (A.start draws it all)
+    if (quiet) return;
     A.renderNav();
     // the home quick actions know «+ مشارك» now
     if (A.area === 'home' && !A.dirty && !document.querySelector('dialog[open]')) A.render();
@@ -1899,10 +1901,12 @@
   C.official = official;
   C.recoveryNotice = recoveryNotice;
 
-  /* after sign-in: the switches once, quietly (the sub-tabs, the home «+ مشارك») */
+  /* after sign-in: the switches once, quietly (the sub-tabs, the home «+ مشارك»):
+     from the session's state when it carries them, else apiComps a moment later */
   var baseStart = A.start;
 
-  A.start = function () {
+  A.start = function (preloaded) {
+    if (preloaded && preloaded.modules && official()) C.applyModules(preloaded.modules, true);
     return Promise.resolve(baseStart.apply(this, arguments)).then(function (ok) {
       if (ok && official() && !C.modules) {
         setTimeout(function () { if (!C.modules) C.loadList().catch(function () {}); }, 1200);

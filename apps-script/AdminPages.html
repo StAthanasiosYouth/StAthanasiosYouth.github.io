@@ -74,6 +74,33 @@
     return A.call('apiState').then(function (state) { A.applyState(state); }).catch(function () {});
   }
 
+  /*
+   * A list that opens at once from its last answer (memory only, this tab)
+   * and refreshes quietly behind it: one request at a time (A.latest); a
+   * view drawn while one is on its way (or right after one landed: a save
+   * redraws the panel after its own reload) uses that one instead of sending
+   * another; reload() after a save always asks again.
+   */
+  function quietList(fn) {
+    var list = { last: null, target: null, at: 0 };
+    var go = A.latest(function () { return A.call(fn); }, function (r) {
+      list.last = r;
+      list.at = Date.now();
+      if (list.target && list.target.body.isConnected) list.target.landed(r);
+    }, function (error) {
+      if (list.target && list.target.body.isConnected) list.target.failed(error);
+    });
+    list.load = function (target) {
+      list.target = target;
+      if (!go.busy() && Date.now() - list.at > 5000) go();
+    };
+    list.reload = function () { go(); };
+    return list;
+  }
+
+  var pagesList = quietList('apiPages');
+  var eventsList = quietList('apiEvents');
+
   function siteUrl(reply) {
     return String((reply && reply.siteUrl) || (A.state.config && A.state.config.siteUrl) || '').replace(/\/?$/, '/');
   }
@@ -292,24 +319,27 @@
 
     if (!official()) return [recoveryNotice()];
 
-    var body = el('div', { 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--line' }));
+    var body = el('div', { 'aria-live': 'polite' });
     var box = A.errorBox();
-    var reply = null;
+    // the last answer draws at once (no skeleton); the fresh one replaces it (quietList)
+    var reply = pagesList.last;
 
     function load() {
-      return A.call('apiPages').then(function (r) {
-        reply = r;
-        if (!body.isConnected) return;
-        draw(r);
-        if (P.focusPage) {
-          var page = r.pages.filter(function (p) { return p.id === P.focusPage; })[0];
-          P.focusPage = '';
-          if (page) openPage(page.id);
+      pagesList.load({
+        body: body,
+        landed: function (r) {
+          reply = r;
+          draw(r);
+          if (P.focusPage) {
+            var page = r.pages.filter(function (p) { return p.id === P.focusPage; })[0];
+            P.focusPage = '';
+            if (page) openPage(page.id);
+          }
+        },
+        failed: function (error) {
+          if (!reply) body.replaceChildren();
+          A.fail(error, box);
         }
-      }).catch(function (error) {
-        if (!body.isConnected) return;
-        body.replaceChildren();
-        A.fail(error, box);
       });
     }
 
@@ -348,6 +378,8 @@
       })));
     }
 
+    if (reply) draw(reply);
+    else body.appendChild(el('div', { class: 'skeleton skeleton--line' }));
     load();
 
     var archivedCount = function () { return reply ? reply.pages.filter(function (p) { return p.archived; }).length : 0; };
@@ -379,7 +411,7 @@
     }
 
     P.openPage = openPage;
-    P.reload = load;
+    P.reload = pagesList.reload;
 
   };
 
@@ -830,24 +862,27 @@
 
     if (!official()) return [recoveryNotice()];
 
-    var body = el('div', { 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--line' }));
+    var body = el('div', { 'aria-live': 'polite' });
     var box = A.errorBox();
-    var reply = null;
+    // the last answer draws at once (no skeleton); the fresh one replaces it (quietList)
+    var reply = eventsList.last;
 
     function load() {
-      return A.call('apiEvents').then(function (r) {
-        reply = r;
-        if (!body.isConnected) return;
-        draw(r);
-        if (P.focusEvent) {
-          var focus = P.focusEvent;
-          P.focusEvent = '';
-          if (r.events.some(function (e) { return e.id === focus; })) openEvent(focus);
+      eventsList.load({
+        body: body,
+        landed: function (r) {
+          reply = r;
+          draw(r);
+          if (P.focusEvent) {
+            var focus = P.focusEvent;
+            P.focusEvent = '';
+            if (r.events.some(function (e) { return e.id === focus; })) openEvent(focus);
+          }
+        },
+        failed: function (error) {
+          if (!reply) body.replaceChildren();
+          A.fail(error, box);
         }
-      }).catch(function (error) {
-        if (!body.isConnected) return;
-        body.replaceChildren();
-        A.fail(error, box);
       });
     }
 
@@ -907,8 +942,10 @@
     }
 
     P.openEvent = openEvent;
-    P.reloadEvents = load;
+    P.reloadEvents = eventsList.reload;
 
+    if (reply) draw(reply);
+    else body.appendChild(el('div', { class: 'skeleton skeleton--line' }));
     load();
 
     return [

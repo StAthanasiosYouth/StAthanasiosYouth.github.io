@@ -351,7 +351,7 @@ function apiSessionStart(options) {
 
   API_REQUEST_.sid = sid;
 
-  return { sid: sid, device: device, state: withState ? apiStateFor_(email) : null };
+  return { sid: sid, device: device, state: withState ? sessionState_(email) : null };
 
 }
 
@@ -435,7 +435,7 @@ function apiSessionResume(options) {
 
   console.log('api: session resumed after a reload');
 
-  return { sid: sid, device: device, resumed: true, state: withState ? apiStateFor_(email) : null };
+  return { sid: sid, device: device, resumed: true, state: withState ? sessionState_(email) : null };
 
 }
 
@@ -496,6 +496,27 @@ function apiSessionEnd(options) {
  * info: { area, view, item: { kind, id, label } | null, locks: ['<kind>:<key>', …] }
  * → { locks: { key: { granted } | { granted: false, holder } }, others: [...], busy? }
  */
+/*
+ * The panel's first state (apiSessionStart / apiSessionResume), plus the
+ * competitions' module switches: the page draws its sub-tabs from them at
+ * once instead of asking apiComps for them after it opened.
+ */
+function sessionState_(email) {
+
+  var state = apiStateFor_(email);
+
+  try {
+    if (typeof compModules_ === 'function') state.modules = compModules_();
+  }
+  catch (ignored) {
+    // the page asks apiComps as before
+  }
+
+  return state;
+
+}
+
+
 function apiHeartbeat(info) {
 
   var email = assertAdmin_();

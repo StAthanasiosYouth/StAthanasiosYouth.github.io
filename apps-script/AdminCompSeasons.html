@@ -51,14 +51,19 @@
   ======================================================= */
 
   var seasonsCache = null;
+  var seasonsFlight = false;
 
   /** apiSeasons, cached for this page (fresh = true reads again); resolves null without v2 */
-  C.seasons = function (fresh) {
-    if (!seasonsCache || fresh) {
+  C.seasons = function (fresh, share) {
+    // share: a fresh copy, but one already on its way (just asked) will do
+    if (!seasonsCache || (fresh && !(share && seasonsFlight))) {
+      seasonsFlight = true;
       seasonsCache = A.call('apiSeasons').then(function (reply) {
+        seasonsFlight = false;
         C.seasonsData = reply;
         return reply;
       }, function (error) {
+        seasonsFlight = false;
         seasonsCache = null;
         if (C.v2Missing(error)) { C.seasonsData = null; return null; }
         throw error;
@@ -99,8 +104,9 @@
     var body = el('div', { class: 'comp-seasons', 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--line' }));
     var box = A.errorBox();
 
-    function load() {
-      return C.seasons(true).then(function (reply) {
+    // first: a fresh copy, or the one the screen just asked for; after a change: always again
+    function load(first) {
+      return C.seasons(true, first === true).then(function (reply) {
         if (!body.isConnected) return;
         if (!reply) { A.fill(body, v2Note('المواسم')); return; }
         draw(reply);
@@ -284,7 +290,7 @@
       }).catch(function (error) { A.fail(error, box); });
     }
 
-    load();
+    load(true);
 
     var add = el('button', { class: 'btn', type: 'button', 'data-act': 'season-new', onclick: function () { C.seasons().then(function (r) { if (r) openEditor(null, r); }); } }, icon('plus'), 'موسم جديد');
 
@@ -405,9 +411,12 @@
     var box = A.errorBox();
 
     function load() {
+      // both asked at once (the sends list is drawn once the schedule is there, as before)
+      var sendsReply = A.call('apiPushSchedule');
+      sendsReply.catch(function () { /* drawn (or not) by loadSends */ });
       return A.call('apiShopSchedule').then(function (reply) {
         if (body.isConnected) draw(reply);
-        loadSends();
+        loadSends(sendsReply);
       }).catch(function (error) {
         if (!body.isConnected) return;
         if (C.v2Missing(error)) { A.fill(body, v2Note('مواعيد المتجر')); return; }
@@ -416,8 +425,8 @@
       });
     }
 
-    function loadSends() {
-      return A.call('apiPushSchedule').then(function (reply) {
+    function loadSends(early) {
+      return (early || A.call('apiPushSchedule')).then(function (reply) {
         if (!sends.isConnected) return;
         var list = Array.isArray(reply) ? reply : (reply && (reply.entries || reply.items)) || [];
         list = list.slice().sort(function (a, b) { return String(a.sendAt).localeCompare(String(b.sendAt)); });

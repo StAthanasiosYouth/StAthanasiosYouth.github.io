@@ -10602,7 +10602,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   C.modules = null;
 
   /* the area's sub-tabs follow the switches (every reply that carries modules calls this) */
-  C.applyModules = function (modules) {
+  C.applyModules = function (modules, quiet) {
     if (!modules) return;
     var next = { registry: !!modules.registry, wallet: !!modules.wallet, shop: !!modules.shop };
     var changed = JSON.stringify(next) !== JSON.stringify(C.modules);
@@ -10614,6 +10614,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       .concat(MODULE_SUBS.filter(function (s) { return next[s.module]; }).map(function (s) { return { key: s.key, label: s.label }; }))
       .concat([{ key: 'compsettings', label: 'الإعدادات' }]);
     area.subs.splice.apply(area.subs, [0, area.subs.length].concat(subs));
+    // quiet: before the panel's first drawing (A.start draws it all)
+    if (quiet) return;
     A.renderNav();
     // the home quick actions know «+ مشارك» now
     if (A.area === 'home' && !A.dirty && !document.querySelector('dialog[open]')) A.render();
@@ -10635,10 +10637,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   C.official = official;
   C.recoveryNotice = recoveryNotice;
 
-  /* after sign-in: the switches once, quietly (the sub-tabs, the home «+ مشارك») */
+  /* after sign-in: the switches once, quietly (the sub-tabs, the home «+ مشارك»):
+     from the session's state when it carries them, else apiComps a moment later */
   var baseStart = A.start;
 
-  A.start = function () {
+  A.start = function (preloaded) {
+    if (preloaded && preloaded.modules && official()) C.applyModules(preloaded.modules, true);
     return Promise.resolve(baseStart.apply(this, arguments)).then(function (ok) {
       if (ok && official() && !C.modules) {
         setTimeout(function () { if (!C.modules) C.loadList().catch(function () {}); }, 1200);
@@ -13527,9 +13531,26 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       box.hidden = true;
       return A.call('apiWallet', { q: q.q, sort: q.sort, dir: q.dir, offset: q.offset, limit: q.limit, all: q.all });
     }, function (reply) {
+      // kept for the next visit (memory only): the same search draws at once, then this refreshes
+      W.last = { key: queryKey(), reply: reply };
+      draw(reply);
+    }, function (error) {
+      list.setAttribute('aria-busy', 'false');
+      if (!list.isConnected) return;
+      list.replaceChildren();
+      A.fail(error, box);
+    });
+
+    function queryKey() {
+      return JSON.stringify([q.q, q.sort, q.dir, q.offset, q.limit, q.all]);
+    }
+
+    /* building: the view is not on the page yet (the last answer, drawn at once) */
+    function draw(reply, building) {
         list.setAttribute('aria-busy', 'false');
-        if (!list.isConnected) return;
-        C.applyModules(reply.modules);
+        if (!list.isConnected && !building) return;
+        // (the module switches: from a fresh answer only; it may redraw the panel)
+        if (!building) C.applyModules(reply.modules);
         var t = reply.totals || {};
         A.fill(tiles, tile('مشاركين ليهم نقاط', ar(t.participants || 0)), tile('الأرصدة كلها', ar(t.balance || 0), 'gold'), tile('اتكسب', ar(t.earned || 0)), tile('تعديلات', signed(t.adjusted || 0)), tile('اتصرف', ar(t.spent || 0)));
         if (!reply.items.length) {
@@ -13557,13 +13578,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
             el('button', { class: 'btn btn--small btn--ghost', type: 'button', disabled: reply.offset <= 0, onclick: function () { q.offset = Math.max(0, q.offset - q.limit); load(); } }, 'السابق'),
             el('button', { class: 'btn btn--small btn--ghost', type: 'button', disabled: to >= reply.total, onclick: function () { q.offset += q.limit; load(); } }, 'التالي')));
         pager.hidden = reply.total <= q.limit && reply.offset === 0;
-    }, function (error) {
-      list.setAttribute('aria-busy', 'false');
-      if (!list.isConnected) return;
-      list.replaceChildren();
-      A.fail(error, box);
-    });
+    }
 
+    if (W.last && W.last.key === queryKey()) draw(W.last.reply, true);
     load();
 
     return [
@@ -14059,14 +14076,19 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   ======================================================= */
 
   var seasonsCache = null;
+  var seasonsFlight = false;
 
   /** apiSeasons, cached for this page (fresh = true reads again); resolves null without v2 */
-  C.seasons = function (fresh) {
-    if (!seasonsCache || fresh) {
+  C.seasons = function (fresh, share) {
+    // share: a fresh copy, but one already on its way (just asked) will do
+    if (!seasonsCache || (fresh && !(share && seasonsFlight))) {
+      seasonsFlight = true;
       seasonsCache = A.call('apiSeasons').then(function (reply) {
+        seasonsFlight = false;
         C.seasonsData = reply;
         return reply;
       }, function (error) {
+        seasonsFlight = false;
         seasonsCache = null;
         if (C.v2Missing(error)) { C.seasonsData = null; return null; }
         throw error;
@@ -14107,8 +14129,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var body = el('div', { class: 'comp-seasons', 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--line' }));
     var box = A.errorBox();
 
-    function load() {
-      return C.seasons(true).then(function (reply) {
+    // first: a fresh copy, or the one the screen just asked for; after a change: always again
+    function load(first) {
+      return C.seasons(true, first === true).then(function (reply) {
         if (!body.isConnected) return;
         if (!reply) { A.fill(body, v2Note('المواسم')); return; }
         draw(reply);
@@ -14292,7 +14315,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       }).catch(function (error) { A.fail(error, box); });
     }
 
-    load();
+    load(true);
 
     var add = el('button', { class: 'btn', type: 'button', 'data-act': 'season-new', onclick: function () { C.seasons().then(function (r) { if (r) openEditor(null, r); }); } }, icon('plus'), 'موسم جديد');
 
@@ -14413,9 +14436,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var box = A.errorBox();
 
     function load() {
+      // both asked at once (the sends list is drawn once the schedule is there, as before)
+      var sendsReply = A.call('apiPushSchedule');
+      sendsReply.catch(function () { /* drawn (or not) by loadSends */ });
       return A.call('apiShopSchedule').then(function (reply) {
         if (body.isConnected) draw(reply);
-        loadSends();
+        loadSends(sendsReply);
       }).catch(function (error) {
         if (!body.isConnected) return;
         if (C.v2Missing(error)) { A.fill(body, v2Note('مواعيد المتجر')); return; }
@@ -14424,8 +14450,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       });
     }
 
-    function loadSends() {
-      return A.call('apiPushSchedule').then(function (reply) {
+    function loadSends(early) {
+      return (early || A.call('apiPushSchedule')).then(function (reply) {
         if (!sends.isConnected) return;
         var list = Array.isArray(reply) ? reply : (reply && (reply.entries || reply.items)) || [];
         list = list.slice().sort(function (a, b) { return String(a.sendAt).localeCompare(String(b.sendAt)); });
@@ -14599,6 +14625,33 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   function refreshState() {
     return A.call('apiState').then(function (state) { A.applyState(state); }).catch(function () {});
   }
+
+  /*
+   * A list that opens at once from its last answer (memory only, this tab)
+   * and refreshes quietly behind it: one request at a time (A.latest); a
+   * view drawn while one is on its way (or right after one landed: a save
+   * redraws the panel after its own reload) uses that one instead of sending
+   * another; reload() after a save always asks again.
+   */
+  function quietList(fn) {
+    var list = { last: null, target: null, at: 0 };
+    var go = A.latest(function () { return A.call(fn); }, function (r) {
+      list.last = r;
+      list.at = Date.now();
+      if (list.target && list.target.body.isConnected) list.target.landed(r);
+    }, function (error) {
+      if (list.target && list.target.body.isConnected) list.target.failed(error);
+    });
+    list.load = function (target) {
+      list.target = target;
+      if (!go.busy() && Date.now() - list.at > 5000) go();
+    };
+    list.reload = function () { go(); };
+    return list;
+  }
+
+  var pagesList = quietList('apiPages');
+  var eventsList = quietList('apiEvents');
 
   function siteUrl(reply) {
     return String((reply && reply.siteUrl) || (A.state.config && A.state.config.siteUrl) || '').replace(/\/?$/, '/');
@@ -14818,24 +14871,27 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     if (!official()) return [recoveryNotice()];
 
-    var body = el('div', { 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--line' }));
+    var body = el('div', { 'aria-live': 'polite' });
     var box = A.errorBox();
-    var reply = null;
+    // the last answer draws at once (no skeleton); the fresh one replaces it (quietList)
+    var reply = pagesList.last;
 
     function load() {
-      return A.call('apiPages').then(function (r) {
-        reply = r;
-        if (!body.isConnected) return;
-        draw(r);
-        if (P.focusPage) {
-          var page = r.pages.filter(function (p) { return p.id === P.focusPage; })[0];
-          P.focusPage = '';
-          if (page) openPage(page.id);
+      pagesList.load({
+        body: body,
+        landed: function (r) {
+          reply = r;
+          draw(r);
+          if (P.focusPage) {
+            var page = r.pages.filter(function (p) { return p.id === P.focusPage; })[0];
+            P.focusPage = '';
+            if (page) openPage(page.id);
+          }
+        },
+        failed: function (error) {
+          if (!reply) body.replaceChildren();
+          A.fail(error, box);
         }
-      }).catch(function (error) {
-        if (!body.isConnected) return;
-        body.replaceChildren();
-        A.fail(error, box);
       });
     }
 
@@ -14874,6 +14930,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       })));
     }
 
+    if (reply) draw(reply);
+    else body.appendChild(el('div', { class: 'skeleton skeleton--line' }));
     load();
 
     var archivedCount = function () { return reply ? reply.pages.filter(function (p) { return p.archived; }).length : 0; };
@@ -14905,7 +14963,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
 
     P.openPage = openPage;
-    P.reload = load;
+    P.reload = pagesList.reload;
 
   };
 
@@ -15356,24 +15414,27 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     if (!official()) return [recoveryNotice()];
 
-    var body = el('div', { 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--line' }));
+    var body = el('div', { 'aria-live': 'polite' });
     var box = A.errorBox();
-    var reply = null;
+    // the last answer draws at once (no skeleton); the fresh one replaces it (quietList)
+    var reply = eventsList.last;
 
     function load() {
-      return A.call('apiEvents').then(function (r) {
-        reply = r;
-        if (!body.isConnected) return;
-        draw(r);
-        if (P.focusEvent) {
-          var focus = P.focusEvent;
-          P.focusEvent = '';
-          if (r.events.some(function (e) { return e.id === focus; })) openEvent(focus);
+      eventsList.load({
+        body: body,
+        landed: function (r) {
+          reply = r;
+          draw(r);
+          if (P.focusEvent) {
+            var focus = P.focusEvent;
+            P.focusEvent = '';
+            if (r.events.some(function (e) { return e.id === focus; })) openEvent(focus);
+          }
+        },
+        failed: function (error) {
+          if (!reply) body.replaceChildren();
+          A.fail(error, box);
         }
-      }).catch(function (error) {
-        if (!body.isConnected) return;
-        body.replaceChildren();
-        A.fail(error, box);
       });
     }
 
@@ -15433,8 +15494,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
 
     P.openEvent = openEvent;
-    P.reloadEvents = load;
+    P.reloadEvents = eventsList.reload;
 
+    if (reply) draw(reply);
+    else body.appendChild(el('div', { class: 'skeleton skeleton--line' }));
     load();
 
     return [
