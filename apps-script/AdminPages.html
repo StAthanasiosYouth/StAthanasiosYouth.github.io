@@ -919,6 +919,9 @@
             liveChip(ev),
             cardChip(ev.card, ev.home),
             ev.booking ? A.chip('فيه حجز' + (ev.booking.capacity ? ' · ' + ar(ev.booking.capacity) + ' مكان' : ''), 'gold') : A.chip('من غير حجز'),
+            // the booking window ends at «الحجز يقفل», or when the event STARTS (EVENTS.md §3): say so,
+            // so a started event isn't mistaken for a broken booking
+            ev.booking && bookingClosedNow(ev) ? A.chip('الحجز قفل: ' + (ev.booking.closesAt ? 'عدّى ميعاد القفل' : 'الفعالية بدأت'), 'danger') : null,
             ended ? A.chip('خلصت', 'off') : null,
             ev.partner ? A.chip('بإشراف B.U.G.', 'info') : null
           ].filter(Boolean),
@@ -1075,7 +1078,7 @@
     });
 
     var bookingBox = el('div', { class: 'form', hidden: !booking },
-      el('div', { class: 'row' }, A.field('الحجز يفتح', opensAt.node), A.field('الحجز يقفل', closesAt.node)),
+      el('div', { class: 'row' }, A.field('الحجز يفتح', opensAt.node), A.field('الحجز يقفل', closesAt.node, 'آخره ميعاد بداية الفعالية: بعد ما تبدأ الحجز من الموقع بيقفل')),
       el('div', { class: 'row' }, A.field('العدد المتاح', capacity, 'المؤكدين بس هما اللي بياخدوا أماكن'), A.field('أقصى عدد في الحجز الواحد', perBooking)),
       collectNames.node,
       el('fieldset', { class: 'fieldset' }, el('legend', { text: 'الأسعار' }), pricing.node),
@@ -1175,6 +1178,13 @@
   /* =======================================================
      SERVANTS AND PAYMENT METHODS
   ======================================================= */
+
+  /* Cairo 'YYYY-MM-DD HH:MM' / 'YYYY-MM-DDTHH:MM' of now ≥ the booking's end (closesAt, else the event's start)? */
+  function bookingClosedNow(ev) {
+    var end = String((ev.booking && ev.booking.closesAt) || ev.startAt || '').replace('T', ' ').slice(0, 16);
+    var now = String(A.cairoNow() || '').replace('T', ' ').slice(0, 16);
+    return !!end && !!now && now >= end;
+  }
 
   /* the payment methods that carry a number (PayDest.gs PAY_DEST_METHODS) */
   var PAY_LABELS = { instapay: 'إنستاباي', wallet: 'المحفظة' };

@@ -75,6 +75,23 @@ Plan: `docs/BOOKING-PHASE1-COMPLETION-PLAN.md` rev. 4, §6 step 10. Event: the t
 - Every launch still waits for one Apps Script call (~2–4 s). Fully instant launch needs Phase 3 (sessions on the Worker).
 - Bookings, approvals and accounting never depend on notifications: everything is in «الحجوزات» and «سجل النشاط».
 
+## Final Phase 1 fixes (second real test)
+
+- **`/events/test/` «الحجز اتقفل»: configuration, not a bug.** The event starts 19 Oct 21:07 (Cairo), and an empty «الحجز يقفل» means «until the event starts» (EVENTS.md §3). An explicit «يقفل» after the start is refused at save. The live `event.json`, the Worker copy and the Egypt time (UTC+3) all agree.
+  - **Fix:** move «بتبدأ» later (or set «يقفل» before it) and publish.
+  - **Added in the admin:** a red chip «الحجز قفل: الفعالية بدأت / عدّى ميعاد القفل» on the event, and a hint under «الحجز يقفل».
+- **«This operation is not supported for this document»:** Google's transient spreadsheet error while another execution holds the file (the 5-minute trigger, a publish). Read-only API calls are now retried once on a fresh handle. Writes are never retried.
+- **Badges:** «الحجوزات» (Worker); competition answers waiting for review on «المسابقات»; store requests on «المتجر». The parent areas (rail and dock) show the sum. The comps / store numbers come with the heartbeat, cached 60 s.
+
+**Deferred to the Cloudflare phases (documented, not patched again here):**
+
+| Limitation (Apps Script) | Seen as | Planned fix |
+| --- | --- | --- |
+| Cold start (5–10 s) plus one call per launch | First launch ~12 s, reopen ~4 s | Phase 3: sessions / bootstrap on the Worker |
+| Push sent by a 5-minute trigger or a panel heartbeat | Notifications 0–5 min late | Phase 6: push via Worker Queues + cron |
+| Transient spreadsheet errors under concurrent runs | Rare «حصلت مشكلة» | Phases 4–5: data in D1 |
+| Badge counts from Sheets (cached 60 s) | Numbers up to ~1 min old | Phases 5–6 |
+
 ## 6. After the test
 - Leave the test event open (the site isn't launched).
 - Send me what failed. I'll fix it on a branch, verify on staging and ask before deploying.

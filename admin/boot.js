@@ -1782,6 +1782,8 @@
 
     function apply(result) {
       if (A.renderPresence) A.renderPresence(result.others || []);
+      // the menu's numbers: competitions to review, store requests (Presence.gs adminBadges_)
+      if (result.badges && A.setBadges) A.setBadges(result.badges);
       // what the other admins just did (instead of a push while this panel is open)
       if (result.activity && A.activityToasts) {
         try { A.activityToasts(result.activity); }

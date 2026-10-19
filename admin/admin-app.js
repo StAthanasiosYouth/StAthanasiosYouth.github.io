@@ -3211,7 +3211,38 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   }
 
+  /*
+   * The numbers that wait for an admin, from the heartbeat (Presence.gs adminBadges_):
+   * competitions to review on «المسابقات», store requests on «المتجر», both summed on
+   * the area. Kept here so sub-tabs drawn again (a module switched on) get them back.
+   * «الحجوزات» sets its own (AdminBook, from the Worker).
+   */
+  var badgeCounts = { comps: 0, shop: 0 };
+
+  function applyBadges() {
+
+    var area = areaOf('comps');
+    if (!area || !area.subs) return;
+    area.subs.forEach(function (s) {
+      if (s.key === 'comps') s.badge = badgeCounts.comps;
+      if (s.key === 'shop') s.badge = badgeCounts.shop;
+    });
+    area.badge = badgeCounts.comps + (area.subs.some(function (s) { return s.key === 'shop'; }) ? badgeCounts.shop : 0);
+
+  }
+
+  A.setBadges = function (b) {
+
+    var next = { comps: Math.max(0, Number(b && b.comps) || 0), shop: Math.max(0, Number(b && b.shop) || 0) };
+    if (next.comps === badgeCounts.comps && next.shop === badgeCounts.shop) return;
+    badgeCounts = next;
+    renderNav();
+
+  };
+
   function renderNav() {
+
+    applyBadges();
 
     var rail = document.getElementById('rail-nav');
     var dock = document.getElementById('dock');
@@ -15480,6 +15511,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
             liveChip(ev),
             cardChip(ev.card, ev.home),
             ev.booking ? A.chip('فيه حجز' + (ev.booking.capacity ? ' · ' + ar(ev.booking.capacity) + ' مكان' : ''), 'gold') : A.chip('من غير حجز'),
+            // the booking window ends at «الحجز يقفل», or when the event STARTS (EVENTS.md §3): say so,
+            // so a started event isn't mistaken for a broken booking
+            ev.booking && bookingClosedNow(ev) ? A.chip('الحجز قفل: ' + (ev.booking.closesAt ? 'عدّى ميعاد القفل' : 'الفعالية بدأت'), 'danger') : null,
             ended ? A.chip('خلصت', 'off') : null,
             ev.partner ? A.chip('بإشراف B.U.G.', 'info') : null
           ].filter(Boolean),
@@ -15636,7 +15670,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     });
 
     var bookingBox = el('div', { class: 'form', hidden: !booking },
-      el('div', { class: 'row' }, A.field('الحجز يفتح', opensAt.node), A.field('الحجز يقفل', closesAt.node)),
+      el('div', { class: 'row' }, A.field('الحجز يفتح', opensAt.node), A.field('الحجز يقفل', closesAt.node, 'آخره ميعاد بداية الفعالية: بعد ما تبدأ الحجز من الموقع بيقفل')),
       el('div', { class: 'row' }, A.field('العدد المتاح', capacity, 'المؤكدين بس هما اللي بياخدوا أماكن'), A.field('أقصى عدد في الحجز الواحد', perBooking)),
       collectNames.node,
       el('fieldset', { class: 'fieldset' }, el('legend', { text: 'الأسعار' }), pricing.node),
@@ -15736,6 +15770,13 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   /* =======================================================
      SERVANTS AND PAYMENT METHODS
   ======================================================= */
+
+  /* Cairo 'YYYY-MM-DD HH:MM' / 'YYYY-MM-DDTHH:MM' of now ≥ the booking's end (closesAt, else the event's start)? */
+  function bookingClosedNow(ev) {
+    var end = String((ev.booking && ev.booking.closesAt) || ev.startAt || '').replace('T', ' ').slice(0, 16);
+    var now = String(A.cairoNow() || '').replace('T', ' ').slice(0, 16);
+    return !!end && !!now && now >= end;
+  }
 
   /* the payment methods that carry a number (PayDest.gs PAY_DEST_METHODS) */
   var PAY_LABELS = { instapay: 'إنستاباي', wallet: 'المحفظة' };

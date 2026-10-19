@@ -281,7 +281,21 @@ function doPost(e) {
       API_REQUEST_.sid = request.sid;
     }
 
-    var result = functions[request.fn].apply(null, request.args);
+    var result;
+    try {
+      result = functions[request.fn].apply(null, request.args);
+    }
+    catch (error) {
+      // Google's spreadsheet service sometimes refuses a read while another execution (the
+      // 5-minute trigger, a publish) holds the file: «This operation is not supported for this
+      // document» / «Service Spreadsheets failed». A READ is tried once more on a fresh handle;
+      // a write never is (it could land twice).
+      if (API_READ_FNS.indexOf(request.fn) === -1 || !API_TRANSIENT.test(String((error && error.message) || error))) throw error;
+      console.warn('api: transient spreadsheet error on ' + request.fn + ', retried');
+      Utilities.sleep(1200);
+      apiForgetSpreadsheets_();
+      result = functions[request.fn].apply(null, request.args);
+    }
 
     reply = { ok: true, result: result === undefined ? null : result };
 
@@ -477,5 +491,21 @@ function runsAsOwner_() {
   var runner = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
 
   return !visitor || visitor !== runner;
+
+}
+
+
+/* read-only API calls: tried once more after Google's transient spreadsheet errors (doPost) */
+var API_READ_FNS = ['apiState', 'apiEvents', 'apiEvent', 'apiPages', 'apiPage', 'apiServants', 'apiActivity', 'apiAdmins',
+  'apiAdminPushDevices', 'apiPushState', 'apiMediaLibrary', 'apiComps', 'apiParticipants', 'apiWallet', 'apiShopItems',
+  'apiShopRedemptions', 'apiShopSchedule', 'apiSeasons', 'apiPushSchedule', 'apiReview'];
+var API_TRANSIENT = /not supported for this document|Service Spreadsheets failed|Service error: Spreadsheets|timed out while accessing document/i;
+
+/* the next read opens the spreadsheets again (Store.gs / CompStore.gs keep a handle per request) */
+function apiForgetSpreadsheets_() {
+
+  openSpreadsheet_ = null;
+  COMP_SS_ = null;
+  if (typeof PAGES_DRAFT_ !== 'undefined') PAGES_DRAFT_ = null;
 
 }

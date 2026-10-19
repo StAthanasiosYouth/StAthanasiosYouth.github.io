@@ -3082,7 +3082,38 @@
 
   }
 
+  /*
+   * The numbers that wait for an admin, from the heartbeat (Presence.gs adminBadges_):
+   * competitions to review on «المسابقات», store requests on «المتجر», both summed on
+   * the area. Kept here so sub-tabs drawn again (a module switched on) get them back.
+   * «الحجوزات» sets its own (AdminBook, from the Worker).
+   */
+  var badgeCounts = { comps: 0, shop: 0 };
+
+  function applyBadges() {
+
+    var area = areaOf('comps');
+    if (!area || !area.subs) return;
+    area.subs.forEach(function (s) {
+      if (s.key === 'comps') s.badge = badgeCounts.comps;
+      if (s.key === 'shop') s.badge = badgeCounts.shop;
+    });
+    area.badge = badgeCounts.comps + (area.subs.some(function (s) { return s.key === 'shop'; }) ? badgeCounts.shop : 0);
+
+  }
+
+  A.setBadges = function (b) {
+
+    var next = { comps: Math.max(0, Number(b && b.comps) || 0), shop: Math.max(0, Number(b && b.shop) || 0) };
+    if (next.comps === badgeCounts.comps && next.shop === badgeCounts.shop) return;
+    badgeCounts = next;
+    renderNav();
+
+  };
+
   function renderNav() {
+
+    applyBadges();
 
     var rail = document.getElementById('rail-nav');
     var dock = document.getElementById('dock');

@@ -588,6 +588,9 @@ function apiHeartbeat(info) {
 
   result.others = othersOnline_(email, presenceNow_());
 
+  // the menu's numbers (things waiting for an admin), cached for everyone a minute
+  result.badges = adminBadges_();
+
   // what the others did since this page last asked: in-panel toasts (Activity.gs)
   if (info.since !== undefined) {
     try {
@@ -745,5 +748,47 @@ function settingsLockKeys_(values) {
   });
 
   return keys;
+
+}
+
+
+/* =========================================================
+   THE MENU'S NUMBERS: what waits for an admin (the heartbeat brings them)
+   - comps: competition answers waiting for a manual review (pending_review)
+   - shop:  store redemptions waiting (pending)
+   Bookings come from the Worker (AdminBook.html). Cached ADMIN_BADGES_SECONDS
+   for all admins; null when they can't be read (the menu keeps the last ones).
+========================================================= */
+
+var ADMIN_BADGES_KEY = 'adm:badges';
+var ADMIN_BADGES_SECONDS = 60;
+
+function adminBadges_() {
+
+  try {
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get(ADMIN_BADGES_KEY);
+    if (cached) return JSON.parse(cached);
+
+    var out = { comps: 0, shop: 0 };
+    if (typeof compSpreadsheet_ === 'function' && compSpreadsheet_(false)) {
+      try {
+        var counts = compSubmissionCounts_();
+        Object.keys(counts).forEach(function (id) { out.comps += Number(counts[id].pending) || 0; });
+      }
+      catch (ignored) { /* no competitions tab yet */ }
+      try {
+        if (typeof shopRedemptionRows_ === 'function') {
+          shopRedemptionRows_().forEach(function (r) { if (r.status === 'pending') out.shop++; });
+        }
+      }
+      catch (ignored) { /* the store is off */ }
+    }
+    cache.put(ADMIN_BADGES_KEY, JSON.stringify(out), ADMIN_BADGES_SECONDS);
+    return out;
+  }
+  catch (error) {
+    return null;
+  }
 
 }
