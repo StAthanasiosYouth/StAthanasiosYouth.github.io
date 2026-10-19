@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "v": "335b89f07694",
+  "v": "8855583a90f6",
   "id": "evt-4011914c",
   "slug": "booking-test-temp",
   "kind": "trip",
@@ -54,13 +54,15 @@
         "key": "cash",
         "label": "كاش",
         "icon": "",
-        "needsProof": false
+        "needsProof": false,
+        "online": false
       },
       {
         "key": "instapay",
         "label": "إنستاباي",
         "icon": "",
-        "needsProof": true
+        "needsProof": true,
+        "online": true
       }
     ],
     "servants": [
@@ -77,5 +79,5 @@
       }
     ]
   },
-  "publishedAt": "2026-10-19T16:04"
+  "publishedAt": "2026-10-19T19:49"
 }
