@@ -110,3 +110,34 @@ function workerSyncSoon_() {
   }
 
 }
+
+
+/* =========================================================
+   THE PANEL'S SESSION FOR THE WORKER (worker/src/lib/auth.js verifyWorkerToken)
+   ---------------------------------------------------------
+   A signed-in panel (Google, or the installed app's trusted device) asks for
+   a short-lived token the Worker checks by itself, so «الحجوزات» and the
+   other Worker sections use the SAME admin session — no second Google
+   sign-in. HMAC with WORKER_SYNC_SECRET over "wk1." + payload (the sync's
+   messages are "<ts>.<body>": never the same shape). It carries only the
+   email, how the panel signed in, and the times; the Worker still checks the
+   allowlist on every call. Requires the panel's live session (doPost).
+========================================================= */
+
+var WORKER_TOKEN_SECONDS = 15 * 60;
+
+function apiWorkerSession() {
+
+  var email = assertAdmin_();
+  var secret = workerSyncSecret_();
+
+  if (!secret) throw appError_('الحجوزات مش متاحة دلوقتي.', 'WORKER_SYNC_SECRET ناقص في Script Properties.');
+
+  var now = Math.floor(Date.now() / 1000);
+  var exp = now + WORKER_TOKEN_SECONDS;
+  var via = API_REQUEST_ && API_REQUEST_.via === 'device' ? 'device' : 'google';
+  var payload = Utilities.base64EncodeWebSafe(JSON.stringify({ e: email, x: exp, v: via, i: now }), Utilities.Charset.UTF_8).replace(/=+$/, '');
+
+  return { token: 'wk1.' + payload + '.' + hmacHex_(secret, 'wk1.' + payload), exp: exp };
+
+}

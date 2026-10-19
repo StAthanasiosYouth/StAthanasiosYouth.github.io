@@ -87,7 +87,7 @@ const ARGS = {
   apiPageMediaOrder: ['pg-00000000', []], apiPageMediaDelete: ['pm-00000000'], apiPagePreview: ['page', 'pg-00000000'],
   apiEvents: [], apiEvent: ['evt-00000000'], apiEventSave: [null, { title: 'x', slug: 'x-trip', kind: 'trip' }],
   apiEventSetEnabled: ['evt-00000000', false], apiEventArchive: ['evt-00000000', true], apiEventDelete: ['evt-00000000'],
-  apiServants: [], apiServantSave: [null, { name: 'x' }], apiServantSetActive: ['srv-00000000', false], apiPayMethodsSave: [[]], apiServantPayApprove: ['srv-00000000', 'instapay', '01012345678'],
+  apiServants: [], apiServantSave: [null, { name: 'x' }], apiServantSetActive: ['srv-00000000', false], apiPayMethodsSave: [[]], apiServantPayApprove: ['srv-00000000', 'instapay', '01012345678'], apiWorkerSession: [],
   apiHomeOrder: ['activities', []]
 };
 

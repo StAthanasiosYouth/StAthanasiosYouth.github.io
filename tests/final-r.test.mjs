@@ -282,7 +282,9 @@ test('boot.js keeps only the sid (+ page load id), "ui" and "draft" in sessionSt
   // signing out clears it all
   assert.match(boot, /keep\.close\(\);/);
   // the token still in memory only
-  assert.match(boot, /function remember\(value\) \{\s+session = value;\s+\}/);
+  // (the Worker credential of an old account goes with it — memory only too)
+  assert.match(boot, /function remember\(value\) \{\s+session = value;\s+\/\/[^\n]*\n\s+if \(!value[^\n]*wkCache = null;\s+\}/);
+  assert.doesNotMatch(boot, /keep\.set\('[^']*', [^;]*wk/, 'the Worker credential is never stored');
 
   // restore.js only reads the session entry, to decide the compact gate
   const early = readFileSync(`${ROOT}admin/restore.js`, 'utf8');

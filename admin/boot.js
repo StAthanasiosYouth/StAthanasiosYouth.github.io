@@ -309,6 +309,8 @@
   function remember(value) {
 
     session = value;
+    // signed out / another account: the Worker credential of the old one goes with it
+    if (!value || (wkCache && wkCache.email && wkCache.email !== value.email)) wkCache = null;
 
   }
 
@@ -1399,6 +1401,46 @@
 
   }
 
+  /*
+   * The Worker's credential for this panel: the panel's OWN session turned into a
+   * short-lived signed token (Apps Script apiWorkerSession, ~15 min, memory only),
+   * whether the panel signed in with Google or as the installed app's trusted
+   * device. So «الحجوزات» never asks for Google again while the panel is signed
+   * in. Renewed a minute before it ends; Google is asked only when the panel's
+   * own session can't give one (it ended, or the server says so).
+   */
+  var wkCache = null;      // { token, exp (ms) }
+  var wkPending = null;
+
+  function forgetWorkerSession() {
+    wkCache = null;
+  }
+
+  function workerSession() {
+
+    if (wkCache && wkCache.exp - Date.now() > 60000) return Promise.resolve(wkCache.token);
+    if (wkPending) return wkPending;
+    if (!sid || !session) return Promise.reject(needsGoogle());
+
+    // the panel's own token first (a device's renews silently; a Google one may need the usual renewal)
+    var own = fresh(session) ? Promise.resolve(session.token)
+      : session.via === 'device' ? trust.signIn().then(function (value) { if (!value) throw needsGoogle(); return value; })
+        : Promise.reject(needsGoogle());
+
+    wkPending = own.then(function (value) {
+      return post('apiWorkerSession', [], value, sid, { timeout: TIMING.fail });
+    }).then(function (reply) {
+      var r = reply && reply.ok && reply.result;
+      if (!r || !/^wk1\./.test(String(r.token)) || !isFinite(Number(r.exp))) throw needsGoogle();
+      wkCache = { token: String(r.token), exp: Number(r.exp) * 1000, email: session ? session.email : '' };
+      return wkCache.token;
+    });
+    wkPending.then(function () { wkPending = null; }, function () { wkPending = null; });
+
+    return wkPending;
+
+  }
+
   /* a fresh GOOGLE token (never the device's): Google again when this one is past its hour */
   function googleToken(quiet) {
 
@@ -1467,7 +1509,11 @@
     var signedInAgain = false;
 
     function once() {
-      return googleToken(options.quiet)
+      // the panel's own session first; Google itself only if that can't give one
+      return workerSession().catch(function (error) {
+        if (session && session.via === 'google') return googleToken(options.quiet);
+        throw error;
+      })
         .then(function (value) { return workerFetch(method, path, body, value, options); })
         .then(function (result) {
           if (result.blob) return result.blob;
@@ -1483,9 +1529,10 @@
         })
         .catch(function (error) {
           // Google's token refused: sign in with Google again, then the same call (once)
-          if (error.code === 'auth' && !signedInAgain && !options.quiet && session && session.via === 'google') {
+          // the Worker refused the credential (ended, or the allowlist changed): a fresh one, once
+          if (error.code === 'auth' && !signedInAgain) {
             signedInAgain = true;
-            remember(null);
+            forgetWorkerSession();
             return once();
           }
           if (error.retry && tries < WORKER_BACKOFF.length) {

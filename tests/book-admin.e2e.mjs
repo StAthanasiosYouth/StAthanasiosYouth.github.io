@@ -81,6 +81,8 @@ function freshWorld() {
   world.properties.set('SITE_URL', `${SITE}/`);
   world.properties.set('ADMIN_CLIENT_ID', TEST_CLIENT);
   world.properties.set('ADMIN_EMAILS', ADMIN);
+  // the panel's session credential for the Worker (WorkerSync.gs apiWorkerSession)
+  world.properties.set('WORKER_SYNC_SECRET', 's'.repeat(48));
   world.properties.set('ADMIN_NAMES', JSON.stringify({ [ADMIN]: 'مينا زكريا' }));
   world.gs.SESSION_STALE_SECONDS = 0;
   // the event as the admin made it (Apps Script); the Worker knows it by the same id
@@ -717,7 +719,7 @@ function stage() {
   })();`;
 }
 
-test('device session (the app\'s remembered phone): «الحجوزات محتاجة دخول بحساب جوجل» → Google → the queue; no device token ever reaches the Worker', async () => {
+test('device session (the app\'s remembered phone): «الحجوزات» opens with the panel session, no Google prompt; the Worker gets wk1, never the device token', async () => {
   freshWorker();
   const context = await browser.createBrowserContext();
   const devices = () => [...world.properties.keys()].filter(k => k.startsWith('ADMIN_DEVICE_'));
@@ -744,25 +746,16 @@ test('device session (the app\'s remembered phone): «الحجوزات محتا�
   const again = await open({ context, viewport: PHONE, ua: ANDROID, path: '?app=admin', before: stage() });
   await again.page.waitForFunction(() => window.A && A.state && !document.getElementById('shell').hidden, { timeout: 15000 });
   assert.equal(await again.page.$('.gis-stub'), null, 'in with the device, no Google');
-  await sleep(800);
-  assert.equal(fake.state.calls.length, 0, 'the device token is never sent to the Worker');
+  // the bookings open with the panel's OWN session: no Google prompt, ever
   await again.page.evaluate(() => A.go('pages', 'events'));
-  // B1: the way in still shows (this phone last saw the module on): the tab and the event's button
-  await again.page.waitForSelector('[data-act="book-open"]', { visible: true, timeout: 8000 });
-  assert.deepEqual(await subtabs(again.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام', 'الحجوزات']);
-  assert.equal(fake.state.calls.length, 0);
-
-  // the event's button → the bookings ask for Google first (a push link does the same)
+  await again.page.waitForSelector('[data-act="book-open"]', { visible: true, timeout: 12000 });
   await again.page.click('[data-act="book-open"]');
-  await again.page.waitForSelector('[data-act="book-google"]');
-  assert.match(await again.page.$eval('#view', n => n.innerText), /الحجوزات محتاجة دخول بحساب جوجل/);
-  await shot(again.page, '10-device-google');
-  await again.page.click('[data-act="book-google"]');
-  await again.page.waitForSelector('dialog.reauth[open] .gis-stub', { timeout: 8000 });
-  await again.page.click('dialog.reauth[open] .gis-stub');
-  await again.page.waitForSelector('.book-row', { timeout: 10000 });
+  await again.page.waitForSelector('.book-row', { timeout: 12000 });
+  assert.equal(await again.page.$('[data-act="book-google"]'), null, 'never «ادخل بحساب جوجل»');
+  assert.equal(await again.page.$('dialog.reauth[open]'), null);
   assert.deepEqual((await rows(again.page)).sort(), ['B-AAAA1', 'B-BBBB2']);
-  assert.ok(fake.state.calls.length > 0 && fake.state.calls.every(c => /^Bearer \S+/.test(c.auth)));
+  assert.ok(fake.state.calls.length > 0 && fake.state.calls.every(c => /^Bearer wk1\.[A-Za-z0-9_-]+\.[0-9a-f]{64}$/.test(c.auth)), 'the panel session credential');
+  assert.ok(fake.state.calls.every(c => !/adm1\./.test(c.auth)), 'the device token never reaches the Worker');
   assert.deepEqual(await subtabs(again.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام', 'الحجوزات٢']);
   assert.deepEqual(again.problems, []);
   await context.close();

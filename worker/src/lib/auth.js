@@ -122,6 +122,8 @@ export async function requireAdmin(ctx) {
   const header = ctx.request.headers.get('authorization') || '';
   const token = /^Bearer\s+(.+)$/i.exec(header);
   if (!token) throw new ApiError('auth', 'no bearer');
+  // the admin panel's own session (Apps Script apiWorkerToken): one sign-in for every section
+  if (/^wk1\./.test(token[1].trim())) return requireAdminSession(ctx, token[1].trim());
   const testKey = await stagingTestKey(ctx.env);
   const claims = await verifyGoogleIdToken(token[1].trim(), {
     clientId: ctx.env.GOOGLE_CLIENT_ID,
@@ -148,4 +150,54 @@ export async function requireAdmin(ctx) {
   if (!admin) throw new ApiError('denied', 'not on allowlist');
   ctx.actor = admin;
   return admin;
+}
+
+/*
+ * The admin panel's session token for the Worker (Phase 1): issued by Apps
+ * Script (apps-script/WorkerSync.gs apiWorkerToken) to a signed-in panel —
+ * via Google or via the installed app's trusted device — so «الحجوزات» never
+ * asks for Google again while the panel's session is valid.
+ *
+ *   wk1.<b64url {"e": email, "x": exp (epoch s), "v": "google"|"device", "i": issued (s)}>.<hex HMAC-SHA256>
+ *
+ * HMAC key: SYNC_SECRET (the same secret as the signed sync), over
+ * "wk1." + payload — a different message shape from the sync's "<ts>.<body>",
+ * so neither can stand for the other. Short-lived (≤ WK_MAX_S); the admin must
+ * still be ACTIVE in D1 (the synced allowlist) at every call. Nothing about
+ * Google is inside; the email is the only identity.
+ */
+export const WK_MAX_S = 20 * 60;
+
+async function wkHmac(secret, text) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(text)));
+  return Array.from(sig, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function sameHex(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+
+export async function verifyWorkerToken(env, token, now = Date.now()) {
+  if (!env.SYNC_SECRET) throw new ApiError('auth', 'wk disabled');
+  const m = /^wk1\.([A-Za-z0-9_-]{10,600})\.([0-9a-f]{64})$/.exec(String(token || ''));
+  if (!m) throw new ApiError('auth', 'wk shape');
+  if (!sameHex(await wkHmac(env.SYNC_SECRET, 'wk1.' + m[1]), m[2])) throw new ApiError('auth', 'wk signature');
+  let c;
+  try { c = b64urlJson(m[1]); } catch { throw new ApiError('auth', 'wk payload'); }
+  const s = Math.floor(now / 1000);
+  const email = String(c.e || '').toLowerCase();
+  if (!email || !(Number(c.x) > s - SKEW_S) || Number(c.x) - Number(c.i) > WK_MAX_S || Number(c.i) > s + SKEW_S) throw new ApiError('auth', 'wk expired');
+  return { email, via: c.v === 'google' ? 'google' : 'device', exp: Number(c.x) };
+}
+
+async function requireAdminSession(ctx, token) {
+  const claims = await verifyWorkerToken(ctx.env, token);
+  const row = await retry(() => ctx.env.DB.prepare('SELECT email, name, role, active FROM admins WHERE email = ?').bind(claims.email).first());
+  if (!row || !row.active) throw new ApiError('denied', 'not on allowlist');
+  ctx.actor = { email: claims.email, name: row.name || '', role: row.role, via: claims.via };
+  return ctx.actor;
 }
