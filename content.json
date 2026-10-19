@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "b55551437794",
-  "publishedAt": "2026-10-19T22:29:03.968Z",
+  "revision": "c2a655bbba18",
+  "publishedAt": "2026-10-19T23:42:11.730Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -586,7 +586,7 @@
         "closesAt": ""
       },
       "partner": "bug",
-      "v": "52b9e93ee3d9"
+      "v": "e1fd49e72c21"
     },
     {
       "id": "evt-4011914c",
@@ -604,7 +604,7 @@
         "closesAt": "2026-10-30T22:00"
       },
       "partner": null,
-      "v": "f7aa26b9cccf"
+      "v": "fc3c13bd4896"
     }
   ],
   "partners": {

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "v": "f7aa26b9cccf",
+  "v": "fc3c13bd4896",
   "id": "evt-4011914c",
   "slug": "booking-test-temp",
   "kind": "trip",
@@ -29,6 +29,7 @@
     "showLeftBelow": 20,
     "perBookingMax": 2,
     "collectNames": false,
+    "participants": false,
     "pricing": {
       "mode": "single",
       "categories": [
@@ -79,5 +80,5 @@
       }
     ]
   },
-  "publishedAt": "2026-10-19T20:04"
+  "publishedAt": "2026-10-20T02:42"
 }

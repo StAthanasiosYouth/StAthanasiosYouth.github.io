@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "v": "52b9e93ee3d9",
+  "v": "e1fd49e72c21",
   "id": "evt-59f41592",
   "slug": "test",
   "kind": "trip",
@@ -46,11 +46,12 @@
     "online": true,
     "opensAt": "2026-10-20T00:00",
     "closesAt": "",
-    "capacity": null,
+    "capacity": 2,
     "showLeft": true,
     "showLeftBelow": 20,
-    "perBookingMax": 20,
+    "perBookingMax": 5,
     "collectNames": true,
+    "participants": true,
     "pricing": {
       "mode": "group",
       "categories": [
@@ -60,8 +61,8 @@
           "group": "adult",
           "price": 100,
           "seat": true,
-          "min": 1,
-          "max": 1,
+          "min": 0,
+          "max": 5,
           "note": ""
         }
       ]
@@ -101,5 +102,5 @@
       }
     ]
   },
-  "publishedAt": "2026-10-20T01:29"
+  "publishedAt": "2026-10-20T02:42"
 }
