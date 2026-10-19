@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "v": "29973fb59faa",
+  "v": "865d19823c4a",
   "id": "evt-59f41592",
   "slug": "test",
   "kind": "trip",
@@ -44,7 +44,7 @@
   },
   "booking": {
     "online": true,
-    "opensAt": "",
+    "opensAt": "2026-10-19T00:00",
     "closesAt": "",
     "capacity": null,
     "showLeft": true,
@@ -101,5 +101,5 @@
       }
     ]
   },
-  "publishedAt": "2026-10-19T21:11"
+  "publishedAt": "2026-10-19T21:21"
 }
