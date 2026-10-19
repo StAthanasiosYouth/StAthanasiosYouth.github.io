@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "v": "865d19823c4a",
+  "v": "52b9e93ee3d9",
   "id": "evt-59f41592",
   "slug": "test",
   "kind": "trip",
@@ -19,8 +19,8 @@
     "color": "#463a2f"
   },
   "gallery": [],
-  "startAt": "2026-10-19T21:07",
-  "endAt": "2026-11-06T23:59",
+  "startAt": "2026-10-23T10:00",
+  "endAt": "2026-11-24T23:59",
   "location": null,
   "terms": "",
   "partner": {
@@ -44,7 +44,7 @@
   },
   "booking": {
     "online": true,
-    "opensAt": "2026-10-19T00:00",
+    "opensAt": "2026-10-20T00:00",
     "closesAt": "",
     "capacity": null,
     "showLeft": true,
@@ -101,5 +101,5 @@
       }
     ]
   },
-  "publishedAt": "2026-10-19T21:21"
+  "publishedAt": "2026-10-20T01:29"
 }

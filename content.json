@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "3ad236ca9897",
-  "publishedAt": "2026-10-19T18:21:49.521Z",
+  "revision": "b55551437794",
+  "publishedAt": "2026-10-19T22:29:03.968Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -352,16 +352,16 @@
       },
       "cta": null,
       "location": "",
-      "startAt": "2026-10-19T21:07",
-      "endAt": "2026-11-06T23:59",
+      "startAt": "2026-10-23T10:00",
+      "endAt": "2026-11-24T23:59",
       "visibleFrom": "",
-      "visibleUntil": "2026-11-07T11:59",
+      "visibleUntil": "2026-11-25T11:59",
       "display": "",
       "displayMobile": "",
       "event": "test",
       "ctaLabel": "",
       "booking": {
-        "opensAt": "2026-10-19T00:00",
+        "opensAt": "2026-10-20T00:00",
         "closesAt": ""
       },
       "partner": "bug"
@@ -579,14 +579,14 @@
         "alt": "",
         "color": "#463a2f"
       },
-      "startAt": "2026-10-19T21:07",
-      "endAt": "2026-11-06T23:59",
+      "startAt": "2026-10-23T10:00",
+      "endAt": "2026-11-24T23:59",
       "booking": {
-        "opensAt": "2026-10-19T00:00",
+        "opensAt": "2026-10-20T00:00",
         "closesAt": ""
       },
       "partner": "bug",
-      "v": "865d19823c4a"
+      "v": "52b9e93ee3d9"
     },
     {
       "id": "evt-4011914c",
