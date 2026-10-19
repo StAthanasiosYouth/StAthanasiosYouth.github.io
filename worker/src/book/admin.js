@@ -92,7 +92,9 @@ export async function detail(ctx, id) {
       visitorNote: b.visitor_note, adminNote: b.admin_note, rejectReason: b.reject_reason, cancelReason: b.cancel_reason,
       capOverride: b.cap_override ? JSON.parse(b.cap_override) : null, payOverride: b.pay_override ? JSON.parse(b.pay_override) : null,
       dueHistory: JSON.parse(b.due_history || '[]'), priceRev: b.price_rev, closedAt: b.closed_at, closedBy: b.closed_by,
-      phoneBlanked: !!b.phone_blanked_ms
+      phoneBlanked: !!b.phone_blanked_ms,
+      // «كل فرد باسمه وسنه»: [{ name, age, cat }] as the visitor sent them (priced on the server)
+      participants: b.participants ? JSON.parse(b.participants) : null
     },
     lock,
     payments: pays.map(p => ({
@@ -769,6 +771,7 @@ export async function adminExport(ctx) {
     bookings: bookings.map(b => ({
       ...listRow(b, event, paidOf(byBooking.get(b.id) || []), {}, now),
       requested: JSON.parse(b.requested), actual: b.actual ? JSON.parse(b.actual) : null, names: b.names ? JSON.parse(b.names) : [],
+      participants: b.participants ? JSON.parse(b.participants) : null,
       visitorNote: b.visitor_note, adminNote: b.admin_note, rejectReason: b.reject_reason, cancelReason: b.cancel_reason
     })),
     payments: payments.filter(p => (range.from == null || p.received_ms >= range.from) && (range.to == null || p.received_ms <= range.to)).map(p => ({

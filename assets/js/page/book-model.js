@@ -254,6 +254,49 @@ export function newRequestKey(bytes) {
 }
 
 /** POST /v1/book/submit's body */
+/*
+ * «كل فرد باسمه وسنه»: the same rule as the Worker (worker/src/book/model.js):
+ * the first category after the first whose age range holds the age, else the
+ * first (the normal price). Only to SHOW the total — the server prices it.
+ */
+export function categoryForAge(booking, age) {
+  const cats = booking.pricing.categories;
+  const hit = cats.slice(1).find(c => (c.ageMin != null || c.ageMax != null) && (c.ageMin == null || age >= c.ageMin) && (c.ageMax == null || age <= c.ageMax));
+  return hit || cats[0];
+}
+
+/** the people list → counts (someone without a valid age yet counts at the normal price) */
+export function peopleCounts(booking, people) {
+  const counts = Object.fromEntries(booking.pricing.categories.map(c => [c.key, 0]));
+  for (const p of people || []) {
+    const age = Number(p && p.age);
+    const known = p && String(p.age).trim() !== '' && Number.isInteger(age);
+    counts[(known ? categoryForAge(booking, age) : booking.pricing.categories[0]).key]++;
+  }
+  return counts;
+}
+
+/** how many people this booking may hold (the per-booking limit, and the places left when known) */
+export function peopleRoom(booking, left = null) {
+  const cap = booking.perBookingMax || 10;
+  return left === null || left === undefined ? cap : Math.max(0, Math.min(cap, left));
+}
+
+/** step a, participants mode → { people: message } or {} */
+export function checkPeople(booking, people, left = null) {
+  const list = people || [];
+  if (!list.length) return { participants: 'زوّد فرد واحد على الأقل.' };
+  if (list.length > peopleRoom(booking, left)) {
+    return { participants: left !== null && left !== undefined && left < (booking.perBookingMax || 10) ? `فاضل ${arabicDigits(Math.max(0, left))} مكان بس.` : `أقصى عدد في الحجز الواحد ${arabicDigits(booking.perBookingMax || 10)}.` };
+  }
+  for (const [i, p] of list.entries()) {
+    if (line(p.name, NAME_MAX).length < 2) return { participants: `اكتب اسم الفرد ${arabicDigits(i + 1)}.` };
+    const age = Number(p.age);
+    if (String(p.age).trim() === '' || !Number.isInteger(age) || age < 0 || age > 120) return { participants: `اكتب سن الفرد ${arabicDigits(i + 1)} (رقم).` };
+  }
+  return {};
+}
+
 export function submitBody(event, draft, { hp = '', revision = '', turnstile = '' } = {}) {
   const booking = event.booking;
   const counts = cleanCounts(booking, draft.counts);
@@ -266,7 +309,11 @@ export function submitBody(event, draft, { hp = '', revision = '', turnstile = '
     hp,
     revision: revision || event.v || ''
   };
-  if (booking.collectNames) body.names = (draft.names || []).slice(0, peopleCount(booking, counts)).map(n => line(n, NAME_MAX));
+  if (booking.participants) {
+    body.participants = (draft.people || []).map(p => ({ name: line(p.name, NAME_MAX), age: Number(p.age) }));
+    body.counts = peopleCounts(booking, draft.people);
+  }
+  else if (booking.collectNames) body.names = (draft.names || []).slice(0, peopleCount(booking, counts)).map(n => line(n, NAME_MAX));
   const note = line(draft.note, NOTE_MAX);
   if (note) body.note = note;
   if (turnstile) body.turnstile = String(turnstile).slice(0, 2048);
@@ -306,6 +353,7 @@ export function emptyDraft(booking, requestKey, now) {
     servantId: '',
     method: '',
     pay: '',
+    people: [],
     note: '',
     agreed: false,
     requestKey,
@@ -330,6 +378,7 @@ export function readDraft(raw, booking, now) {
     method: line(raw.method, 20),
     // reached the payment card (shown) / copied the number (copied): a return from the app lands there
     pay: raw.pay === 'copied' || raw.pay === 'shown' ? raw.pay : '',
+    people: Array.isArray(raw.people) ? raw.people.slice(0, 50).map(p => ({ name: line(isObject(p) ? p.name : '', NAME_MAX), age: isObject(p) && /^\d{0,3}$/.test(String(p.age)) ? String(p.age) : '' })) : [],
     note: typeof raw.note === 'string' ? raw.note.slice(0, NOTE_MAX) : '',
     agreed: false,
     requestKey: raw.requestKey,
@@ -351,6 +400,7 @@ export function storeDraft(draft, now) {
     servantId: draft.servantId,
     method: draft.method,
     pay: draft.pay || '',
+    people: (draft.people || []).map(p => ({ name: p.name, age: String(p.age) })),
     note: draft.note,
     requestKey: draft.requestKey,
     proofs: draft.proofs.map(p => ({ proofId: p.proofId, claim: p.claim })),
@@ -413,13 +463,14 @@ export function statusHref(siteRoot, slug, token) {
    ERRORS → a step, a field and words (BOOKING-API.md «Envelope and errors»)
 ========================================================= */
 
-const FIELD_STEP = { name: 'a', phone: 'a', counts: 'a', names: 'a', servantId: 'b', method: 'b', proofs: 'c', note: 'c' };
+const FIELD_STEP = { name: 'a', phone: 'a', counts: 'a', names: 'a', participants: 'a', servantId: 'b', method: 'b', proofs: 'c', note: 'c' };
 
 const FIELD_WORDS = {
   name: 'الاسم مش مظبوط. اكتب اسمك (من ٢ لـ ٦٠ حرف).',
   phone: 'رقم الموبايل مش مظبوط. اكتب رقم مصري زي 01012345678',
   counts: 'العدد مش مظبوط. راجع عدد الأفراد.',
   names: 'راجع أسماء اللي جايين.',
+  participants: 'راجع الأفراد: اسم كل واحد (حرفين على الأقل) وسنه.',
   servantId: 'اختار الخادم تاني.',
   method: 'اختار طريقة الدفع تاني.',
   proofs: 'ارفع صورة التحويل (من ١ لـ ٣ صور).',

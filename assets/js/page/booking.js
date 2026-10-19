@@ -29,7 +29,7 @@ import { stepCount, canStep, totalOf, money, waWithText } from './model.js';
 import {
   liveState, stepsFor, isFree, peopleCount, peopleOf, peopleText, normPhone, checkWho, checkPay, checkSend,
   needsProof, newRequestKey, submitBody, payMessage, emptyDraft, bookingError, statusWord, statusHref,
-  mineFor, isRef, isToken, PROOFS_MAX, NOTE_MAX, NAME_MAX,
+  mineFor, isRef, isToken, PROOFS_MAX, NOTE_MAX, NAME_MAX, peopleCounts, peopleRoom, checkPeople, categoryForAge,
   methodOnline, onlineMethodsOf, offlineServants, payCopyText, payGrouped, cashMessage
 } from './book-model.js';
 import { loadDraft, saveDraft, clearDraft, loadMine, rememberBooking, forgetBooking } from './book-store.js';
@@ -428,6 +428,12 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
     const name = h('input', { class: 'bk-input', id: 'bk-name', name: 'name', type: 'text', autocomplete: 'name', maxlength: NAME_MAX, required: true, value: draft.fields.name });
     const phone = h('input', { class: 'bk-input bk-input--ltr', id: 'bk-phone', name: 'phone', type: 'tel', inputmode: 'tel', autocomplete: 'tel', dir: 'ltr', maxlength: 20, required: true, value: draft.fields.phone });
     name.addEventListener('input', () => {
+      // «إضافة فرد»: the first card is the booker — it follows the name until it's edited by hand
+      if (booking.participants && draft.people && draft.people[0] && (!draft.people[0].name || draft.people[0].name === draft.fields.name)) {
+        draft.people[0].name = name.value;
+        const first = flowEl.querySelector('#bk-person-name-0');
+        if (first) first.value = name.value;
+      }
       draft.fields.name = name.value;
       saveSoon();
       if (name.getAttribute('aria-invalid') && name.value.trim().length >= 2) showErrors({}, { focus: false, only: ['name'] });
@@ -502,6 +508,81 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
       booking.perBookingMax ? h('p', { class: 'prices__note' }, `أقصى عدد في الحجز الواحد ${arabicDigits(booking.perBookingMax)}.`) : null
     );
 
+    /*
+     * «كل فرد باسمه وسنه»: a card per person (name + age), «إضافة فرد» up to the
+     * per-booking limit and the places left; each card shows its price (by age),
+     * the total follows. The counts are derived from the list (the server does
+     * the same and its price wins).
+     */
+    const peopleList = h('ol', { class: 'bk-people', 'aria-label': 'الأفراد' });
+    const peopleTotal = h('output', { class: 'prices__total-n', 'aria-live': 'polite' });
+    const roomLine = h('p', { class: 'prices__note bk-people__room' });
+    const addPerson = h('button', { class: 'btn bk-add', type: 'button', 'data-act': 'add-person' }, icon('plus'), h('span', {}, 'إضافة فرد'));
+
+    function syncPeople() {
+      draft.counts = peopleCounts(booking, draft.people);
+      peopleTotal.textContent = money(totalOf(booking, draft.counts));
+      const room = peopleRoom(booking, live ? live.left : null);
+      addPerson.disabled = draft.people.length >= room;
+      const left = room - draft.people.length;
+      roomLine.textContent = left > 0 ? `تقدر تزوّد ${arabicDigits(left)} ${left === 1 ? 'فرد' : 'أفراد'} كمان.` : 'وصلت لأقصى عدد متاح.';
+    }
+
+    function personCard(p, i) {
+      const n = arabicDigits(i + 1);
+      const pName = h('input', { class: 'bk-input', id: `bk-person-name-${i}`, type: 'text', maxlength: NAME_MAX, autocomplete: i === 0 ? 'name' : 'off', value: p.name });
+      const pAge = h('input', { class: 'bk-input bk-input--ltr bk-person__age', id: `bk-person-age-${i}`, type: 'number', inputmode: 'numeric', min: 0, max: 120, dir: 'ltr', value: p.age });
+      const price = h('span', { class: 'bk-person__price' });
+      const showPrice = () => {
+        const age = Number(p.age);
+        const cat = String(p.age).trim() !== '' && Number.isInteger(age) ? categoryForAge(booking, age) : null;
+        price.textContent = cat ? `${cat.label} · ${money(cat.price)}` : 'اكتب السن';
+      };
+      pName.addEventListener('input', () => { p.name = pName.value; saveSoon(); });
+      pAge.addEventListener('input', () => { p.age = pAge.value.replace(/[^0-9]/g, '').slice(0, 3); showPrice(); syncPeople(); saveSoon(); });
+      const remove = draft.people.length > 1
+        ? h('button', { class: 'btn bk-proof__btn', type: 'button', 'aria-label': `شيل الفرد ${n}`, 'data-act': 'remove-person', onclick: () => { draft.people.splice(i, 1); renderPeople(); saveSoon(); announce('اتشال فرد'); } }, 'شيل')
+        : null;
+      showPrice();
+      return h('li', { class: 'bk-person', 'data-i': i },
+        h('p', { class: 'bk-person__head' }, h('strong', {}, i === 0 ? `الفرد ${n} (انت)` : `الفرد ${n}`), price, remove),
+        h('div', { class: 'bk-person__fields' },
+          h('div', { class: 'bk-field' }, h('label', { class: 'bk-field__label', for: pName.id }, 'الاسم'), pName),
+          h('div', { class: 'bk-field bk-person__age-field' }, h('label', { class: 'bk-field__label', for: pAge.id }, 'السن'), pAge)));
+    }
+
+    function renderPeople() {
+      if (!booking.participants) return;
+      if (!Array.isArray(draft.people) || !draft.people.length) draft.people = [{ name: draft.fields.name || '', age: '' }];
+      peopleList.replaceChildren(...draft.people.map(personCard));
+      syncPeople();
+    }
+
+    addPerson.addEventListener('click', () => {
+      if (draft.people.length >= peopleRoom(booking, live ? live.left : null)) return;
+      draft.people.push({ name: '', age: '' });
+      renderPeople();
+      saveSoon();
+      flowEl.querySelector(`#bk-person-name-${draft.people.length - 1}`)?.focus();
+      announce(`اتضاف فرد. الإجمالي ${money(totalOf(booking, draft.counts))}`);
+    });
+
+    const priceRules = booking.pricing.categories.map((c, i) => h('li', { class: 'price' },
+      h('div', { class: 'price__who' },
+        h('span', { class: 'price__label' }, c.label),
+        i > 0 && (c.ageMin != null || c.ageMax != null)
+          ? h('span', { class: 'price__note' }, c.ageMin != null && c.ageMax != null ? `من ${arabicDigits(c.ageMin)} لـ ${arabicDigits(c.ageMax)} سنة` : c.ageMin != null ? `من ${arabicDigits(c.ageMin)} سنة` : `لحد ${arabicDigits(c.ageMax)} سنة`)
+          : i === 0 && booking.pricing.categories.length > 1 ? h('span', { class: 'price__note' }, 'باقي الأعمار') : (c.note ? h('span', { class: 'price__note' }, c.note) : null)),
+      h('span', { class: 'price__amount' }, money(c.price))));
+
+    const peopleBlock = booking.participants ? group('participants', 'الأفراد',
+      h('ul', { class: 'prices__list', 'aria-label': 'الأسعار حسب السن' }, priceRules),
+      peopleList,
+      addPerson,
+      roomLine,
+      h('p', { class: 'prices__total' }, h('span', {}, 'الإجمالي'), peopleTotal)
+    ) : null;
+
     // a bot fills every box; a person never sees this one
     const hp = h('div', { class: 'bk-hp', 'aria-hidden': 'true' },
       h('label', { for: 'bk-hp' }, 'سيب الخانة دي فاضية'),
@@ -512,8 +593,8 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
     const form = h('form', { class: 'bk-form', novalidate: true },
       field('name', 'اسمك', name),
       field('phone', 'رقم موبايلك', phone, 'الخادم هيكلمك عليه، ومش بيظهر لحد.'),
-      h('div', { class: 'prices bk-prices' }, counts),
-      booking.collectNames ? group('names', 'أسماء اللي جايين', h('p', { class: 'bk-field__hint' }, 'اسم كل واحد جاي، وانت منهم.'), namesBox) : null,
+      booking.participants ? h('div', { class: 'prices bk-prices' }, peopleBlock) : h('div', { class: 'prices bk-prices' }, counts),
+      !booking.participants && booking.collectNames ? group('names', 'أسماء اللي جايين', h('p', { class: 'bk-field__hint' }, 'اسم كل واحد جاي، وانت منهم.'), namesBox) : null,
       hp,
       actions(backButton('رجوع', () => { saveNow(); renderStart(); flowEl.querySelector('.bk-start')?.focus(); }), next)
     );
@@ -522,14 +603,26 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
       submitEvent.preventDefault();
       draft.fields.name = name.value;
       draft.fields.phone = phone.value;
+      if (booking.participants) {
+        draft.counts = peopleCounts(booking, draft.people);
+        const who = checkWho({ ...booking, collectNames: false }, { name: name.value, phone: phone.value, counts: draft.counts, names: [] }, live ? live.left : null);
+        delete who.counts;
+        const problems = { ...who, ...checkPeople(booking, draft.people, live ? live.left : null) };
+        if (!showErrors(problems)) return;
+        go(steps[steps.indexOf('a') + 1]);
+        return;
+      }
       if (booking.collectNames) draft.names = [...namesBox.querySelectorAll('input')].map(input => input.value);
       const problems = checkWho(booking, { name: name.value, phone: phone.value, counts: draft.counts, names: draft.names }, live ? live.left : null);
       if (!showErrors(problems)) return;
       go(steps[steps.indexOf('a') + 1]);
     });
 
-    refreshCounts();
-    renderNames();
+    if (booking.participants) renderPeople();
+    else {
+      refreshCounts();
+      renderNames();
+    }
     return form;
 
   }

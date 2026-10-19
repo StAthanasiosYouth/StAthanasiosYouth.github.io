@@ -150,6 +150,15 @@ function bookPricingInput_(value, problems) {
       max = 10;
     }
 
+    // an age range (participants mode, «كل فرد باسمه وسنه»): this price for ages inside it
+    var ageMin = first ? '' : bookWhole_(raw.ageMin);
+    var ageMax = first ? '' : bookWhole_(raw.ageMax);
+    if ((ageMin !== '' && (isNaN(ageMin) || ageMin > 120)) || (ageMax !== '' && (isNaN(ageMax) || ageMax > 120))) {
+      problems.push(where + 'السن لازم يكون رقم من ٠ لـ ١٢٠');
+      ageMin = ageMax = '';
+    }
+    if (ageMin !== '' && ageMax !== '' && ageMin > ageMax) problems.push(where + 'السن «من» لازم يكون أصغر من «لحد»');
+
     var note = contentLine_(raw.note);
 
     if (note.length > BOOK_LIMITS.categoryNote) problems.push(where + 'الملاحظة أطول من ' + BOOK_LIMITS.categoryNote + ' حرف');
@@ -162,7 +171,9 @@ function bookPricingInput_(value, problems) {
       seat: first ? true : raw.seat !== false,
       min: min,
       max: max,
-      note: note.slice(0, BOOK_LIMITS.categoryNote)
+      note: note.slice(0, BOOK_LIMITS.categoryNote),
+      ageMin: ageMin === '' ? null : ageMin,
+      ageMax: ageMax === '' ? null : ageMax
     });
 
   });
@@ -225,6 +236,8 @@ function bookBookingInput_(value, startAt, problems) {
     capacity: capacity === '' ? null : capacity,
     perBookingMax: perBookingMax === '' ? 10 : perBookingMax,
     collectNames: value.collectNames === true,
+    // «كل فرد باسمه وسنه»: the visitor adds people one by one (name + age); each is priced by age
+    participants: value.participants === true,
     showLeft: value.showLeft !== false,
     showLeftBelow: showLeftBelow === '' || isNaN(showLeftBelow) ? 20 : Math.min(showLeftBelow, BOOK_LIMITS.capacity),
     pricing: pricing,
@@ -334,11 +347,18 @@ function bookPublicBooking_(spec, servants, servantRows, methodRows, image, onli
     showLeft: spec.showLeft !== false,
     showLeftBelow: spec.showLeftBelow === undefined || spec.showLeftBelow === null ? 20 : spec.showLeftBelow,
     perBookingMax: spec.perBookingMax || 10,
-    collectNames: !!spec.collectNames,
+    collectNames: !!spec.collectNames || !!spec.participants,
+    participants: !!spec.participants,
     pricing: {
       mode: spec.pricing.mode,
       categories: spec.pricing.categories.map(function (c) {
-        return { key: c.key, label: c.label, group: c.group, price: c.price, seat: c.seat, min: c.min, max: c.max, note: c.note };
+        // participants mode: the counts come from the people list (each priced by age), so no category
+        // limits but the booking's own; the age range says which price applies
+        var people = !!spec.participants;
+        var out = { key: c.key, label: c.label, group: c.group, price: c.price, seat: c.seat, min: people ? 0 : c.min, max: people ? (spec.perBookingMax || 10) : c.max, note: c.note };
+        if (c.ageMin !== null && c.ageMin !== undefined) out.ageMin = c.ageMin;
+        if (c.ageMax !== null && c.ageMax !== undefined) out.ageMax = c.ageMax;
+        return out;
       })
     },
     payment: {

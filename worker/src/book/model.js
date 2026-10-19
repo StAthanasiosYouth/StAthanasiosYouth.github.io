@@ -120,6 +120,34 @@ export function normPhone(value) {
   return /^1[0125]\d{8}$/.test(digits) ? '+20' + digits : '';
 }
 
+/*
+ * «كل فرد باسمه وسنه»: the people list → { counts, list } or { problem }.
+ * Each person takes the first category (after the first) whose age range holds
+ * their age; everyone else the FIRST category (the normal price). The counts
+ * then go through checkCounts / quote / seats as usual (server price only).
+ */
+export function participantCounts(booking, input) {
+  const cats = (booking && booking.pricing && booking.pricing.categories) || [];
+  if (!cats.length || !Array.isArray(input) || input.length < 1 || input.length > (booking.perBookingMax || 10)) return { problem: 'participants' };
+  const counts = Object.fromEntries(cats.map(c => [c.key, 0]));
+  const list = [];
+  for (const p of input) {
+    const name = cleanText(p && p.name, LIMITS.names);
+    const age = Number(p && p.age);
+    if (name.length < 2 || !Number.isInteger(age) || age < 0 || age > 120) return { problem: 'participants' };
+    const cat = categoryForAge(booking.pricing, age);
+    counts[cat.key]++;
+    list.push({ name, age, cat: cat.key });
+  }
+  return { counts, list };
+}
+
+export function categoryForAge(pricing, age) {
+  const cats = (pricing && pricing.categories) || [];
+  const hit = cats.slice(1).find(c => (c.ageMin != null || c.ageMax != null) && (c.ageMin == null || age >= c.ageMin) && (c.ageMax == null || age <= c.ageMax));
+  return hit || cats[0];
+}
+
 /* '+201XXXXXXXXX' (or anything normPhone takes) → '01XXXXXXXXX', the form people read, dial and paste; '' if not a mobile */
 export function localPhone(value) {
   const e164 = normPhone(value);

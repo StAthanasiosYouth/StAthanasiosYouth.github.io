@@ -52,6 +52,15 @@ const ONLINE = {
     methods: EVENT.booking.methods.map(m => ({ ...m, needsProof: m.key === 'instapay', online: m.key !== 'cash' })).concat([{ key: 'transfer', label: 'تحويل بنكي', icon: '', needsProof: false, online: true }]),
     servants: EVENT.booking.servants.map(s => (s.id === 'srv-mina0001' ? { ...s, methods: s.methods.concat(['transfer']) } : s)) }
 };
+// «كل فرد باسمه وسنه»: people one by one, each priced by age (child 4–12 at 50, everyone else 100)
+const PEOPLE = {
+  ...ONLINE, slug: 'people-trip', v: 'pp1a2b3c4d',
+  booking: { ...ONLINE.booking, participants: true, collectNames: true, perBookingMax: 4, payment: { mode: 'full', minFirst: 0, finalDueAt: '' },
+    pricing: { mode: 'group', categories: [
+      { key: 'applicant', label: 'فرد', group: 'adult', price: 100, seat: true, min: 0, max: 4, note: '' },
+      { key: 'child', label: 'طفل', group: 'child', price: 50, seat: true, min: 0, max: 4, note: '', ageMin: 4, ageMax: 12 }
+    ] } }
+};
 const SHELL = readFileSync(`${ROOT}pages/index.html`, 'utf8');
 const TOKEN = 'bk1.eyJiIjoiYmtnLWFiY2RlZiIsImUiOjE3OTk5OTk5OTk5OTl9.c2lnbmF0dXJlLXNpZ25hdHVyZS1zaWduYXR1cmU';
 const JPEG = `${SHOTS}proof.jpg`;
@@ -166,6 +175,8 @@ test.before(async () => {
     if (path === '/__test/preview-parent.html') return send(TYPES['.html'], PREVIEW_PARENT);
     if (/^\/events\/online-trip\/(index\.html)?$/.test(path)) return send(TYPES['.html'], stub(ONLINE.slug, ONLINE.v));
     if (path === '/events/online-trip/event.json') return send(TYPES['.json'], JSON.stringify(ONLINE));
+    if (/^\/events\/people-trip\/(index\.html)?$/.test(path)) return send(TYPES['.html'], stub(PEOPLE.slug, PEOPLE.v));
+    if (path === '/events/people-trip/event.json') return send(TYPES['.json'], JSON.stringify(PEOPLE));
     if (/^\/events\/ain-sokhna-trip\/(index\.html)?$/.test(path)) return send(TYPES['.html'], stub(EVENT.slug, EVENT.v));
     if (path === '/events/ain-sokhna-trip/event.json') return send(TYPES['.json'], JSON.stringify(EVENT));
     try {
@@ -619,6 +630,55 @@ test('InstaPay not available with this servant (no approved number): told, «ت�
   await page.click('label[for="bk-method-transfer"]');
   await page.waitForFunction(() => !document.querySelector('.bk-next').disabled);
   assert.equal(await textOf(page, '.bk-next'), 'دفعت، كمّل');
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+
+test('«إضافة فرد»: a card per person (name + age), priced by age, the total follows; the limit and the places left; sent as participants', async () => {
+  resetMock();
+  mock.state = { status: 200, body: { ...OPEN, left: 3 } };
+  const { context, page, problems } = await open('/events/people-trip/');
+  await ready(page);
+  await live(page, 'open');
+  await page.click('.bk-start');
+  await step(page, 'a');
+  await typeInto(page, '#bk-name', 'مينا عادل');
+  await typeInto(page, '#bk-phone', '01012345678');
+  // the first card is the booker
+  assert.equal(await page.$eval('#bk-person-name-0', el => el.value), 'مينا عادل');
+  await typeInto(page, '#bk-person-age-0', '30');
+  await page.click('[data-act="add-person"]');
+  await typeInto(page, '#bk-person-name-1', 'مريم');
+  await typeInto(page, '#bk-person-age-1', '8');
+  assert.match(await textOf(page, '.bk-person[data-i="1"] .bk-person__price'), /طفل · ٥٠ جنيه/);
+  assert.equal(await textOf(page, '[data-field="participants"] .prices__total-n'), '١٥٠ جنيه', '100 + 50');
+  await page.click('[data-act="add-person"]');
+  await typeInto(page, '#bk-person-name-2', 'يوسف');
+  await typeInto(page, '#bk-person-age-2', '40');
+  assert.equal(await textOf(page, '[data-field="participants"] .prices__total-n'), '٢٥٠ جنيه');
+  // 3 places left: no fourth
+  assert.equal(await page.$eval('[data-act="add-person"]', el => el.disabled), true);
+  assert.match(await textOf(page, '.bk-people__room'), /وصلت لأقصى عدد متاح/);
+  // a person removed: the total follows, «إضافة فرد» is back
+  await page.click('.bk-person[data-i="2"] [data-act="remove-person"]');
+  assert.equal(await textOf(page, '[data-field="participants"] .prices__total-n'), '١٥٠ جنيه');
+  assert.equal(await page.$eval('[data-act="add-person"]', el => el.disabled), false);
+  assert.ok(await overflow(page) <= 0);
+  assert.deepEqual(await axe(page, '#book'), []);
+  await page.click('.bk-flow .bk-next');
+  await step(page, 'b');
+  assert.equal(await textOf(page, '.bk-total strong'), '١٥٠ جنيه');
+  await page.click('label[for="bk-servant-srv-mina0001"]');
+  await page.click('label[for="bk-method-transfer"]');
+  await page.click('.bk-flow .bk-next');
+  await step(page, 'c');
+  await agree(page);
+  await page.click('.bk-send');
+  await page.waitForFunction(() => document.querySelector('.bk-done, .bk-flow[data-step="done"], [data-done]') || /B-7K2QX/.test(document.body.innerText), { timeout: 8000 });
+  const sent = JSON.parse(calls('/v1/book/submit')[0].body);
+  assert.deepEqual(sent.participants, [{ name: 'مينا عادل', age: 30 }, { name: 'مريم', age: 8 }]);
+  assert.deepEqual(sent.counts, { applicant: 1, child: 1 });
   assert.deepEqual(problems, []);
   await context.close();
 });

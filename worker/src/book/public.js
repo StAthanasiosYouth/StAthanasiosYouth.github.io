@@ -19,7 +19,7 @@ import { checkTurnstile, turnstileSiteKey } from './turnstile.js';
 import { payDestRequired, payDest } from './pay.js';
 import {
   checkCounts, normPhone, cleanText, quote, seats, people, windowState, publicLeft,
-  derive, amountDueOf, newRef, LIMITS, stampMs, methodOnline
+  derive, amountDueOf, newRef, LIMITS, stampMs, methodOnline, participantCounts
 } from './model.js';
 
 const KEY = /^[A-Za-z0-9_.:-]{8,100}$/;
@@ -114,12 +114,19 @@ export async function bookSubmit(ctx) {
   if (name.length < 2) throw invalid('name');
   const phone = normPhone(body.phone);
   if (!phone) throw invalid('phone');
-  const checked = checkCounts(b, body.counts);
-  if (checked.problem) throw invalid('counts');
+  // «كل فرد باسمه وسنه»: the counts come from the people list (each priced by age, server side)
+  let party = null;
+  if (b.participants) {
+    party = participantCounts(b, body.participants);
+    if (party.problem) throw invalid('participants');
+  }
+  const checked = checkCounts(b, party ? party.counts : body.counts);
+  if (checked.problem) throw invalid(party ? 'participants' : 'counts');
   const counts = checked.counts;
   const ppl = people(b.pricing, counts);
   let names = null;
-  if (b.collectNames) {
+  if (party) names = party.list.map(p => p.name);
+  else if (b.collectNames) {
     if (!Array.isArray(body.names) || body.names.length > ppl.total) throw invalid('names');
     names = body.names.map(n => cleanText(n, LIMITS.names)).filter(Boolean);
   }
@@ -168,12 +175,12 @@ export async function bookSubmit(ctx) {
     const stmts = [
       // at most 2 PENDING bookings per phone per event, decided inside the write
       db.prepare(`INSERT INTO bookings (id, ref, event_id, source, status, name, phone, servant_id, method, requested, seats_requested, names,
-          quoted_total, price_rev, visitor_note, request_key, created_at, created_ms, updated_ms)
-        SELECT ?, ?, ?, 'site', 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          quoted_total, price_rev, visitor_note, request_key, created_at, created_ms, updated_ms, participants)
+        SELECT ?, ?, ?, 'site', 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         WHERE (SELECT COUNT(*) FROM bookings WHERE event_id = ? AND phone = ? AND status = 'pending') < ?
         ON CONFLICT(request_key) DO NOTHING`).bind(
         id, ref, event.id, name, phone, servantId, method, JSON.stringify(counts), seatCount, names ? JSON.stringify(names) : null,
-        total, event.priceRev, note, body.requestKey, createdAt, now, now, event.id, phone, LIMITS.pendingPerPhone)
+        total, event.priceRev, note, body.requestKey, createdAt, now, now, party ? JSON.stringify(party.list) : null, event.id, phone, LIMITS.pendingPerPhone)
     ];
     if (proofs.length) {
       stmts.push(db.prepare(`UPDATE proofs SET booking_id = ?, delete_after_ms = ? WHERE id IN (${proofs.map(() => '?').join(',')}) AND booking_id IS NULL AND EXISTS (SELECT 1 FROM bookings WHERE id = ?)`)

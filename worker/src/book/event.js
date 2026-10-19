@@ -40,9 +40,11 @@ export function rowFromJson(json, source, now = Date.now()) {
     showLeftBelow: b.showLeftBelow == null ? 20 : Number(b.showLeftBelow),
     perBookingMax: Number(b.perBookingMax) || 10,
     collectNames: b.collectNames === true,
+    participants: b.participants === true,
     pricing: { mode: b.pricing.mode === 'group' ? 'group' : 'single', categories: b.pricing.categories.map(c => ({
       key: String(c.key), label: String(c.label || c.key), group: ['adult', 'child', 'companion'].includes(c.group) ? c.group : 'adult',
-      price: Math.max(0, Math.floor(Number(c.price) || 0)), seat: c.seat !== false, min: Number(c.min) || 0, max: c.max == null ? 30 : Number(c.max), note: String(c.note || '')
+      price: Math.max(0, Math.floor(Number(c.price) || 0)), seat: c.seat !== false, min: Number(c.min) || 0, max: c.max == null ? 30 : Number(c.max), note: String(c.note || ''),
+      ageMin: Number.isInteger(c.ageMin) ? c.ageMin : null, ageMax: Number.isInteger(c.ageMax) ? c.ageMax : null
     })) },
     payment: { mode: b.payment && b.payment.mode === 'installments' ? 'installments' : 'full', minFirst: Number(b.payment && b.payment.minFirst) || 0, finalDueAt: (b.payment && b.payment.finalDueAt) || '' },
     methods: (b.methods || []).map(m => ({ key: String(m.key), label: String(m.label || m.key), needsProof: m.needsProof === true, online: methodOnline(m) })),

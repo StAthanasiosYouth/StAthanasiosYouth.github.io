@@ -285,7 +285,10 @@ function cleanCategory(raw) {
   if (!k || !label || price === null) return null;
   const min = int(raw.min, 0, 50) ?? 0;
   const max = Math.max(min, int(raw.max, 0, 50) ?? min);
-  return { key: k, label, group: GROUPS.includes(raw.group) ? raw.group : 'adult', price, seat: raw.seat !== false, min, max, note: line(raw.note, 60) };
+  // an age range («كل فرد باسمه وسنه»: this price for these ages)
+  const ageMin = int(raw.ageMin, 0, 120);
+  const ageMax = int(raw.ageMax, 0, 120);
+  return { key: k, label, group: GROUPS.includes(raw.group) ? raw.group : 'adult', price, seat: raw.seat !== false, min, max, note: line(raw.note, 60), ageMin, ageMax };
 }
 
 function cleanBooking(raw) {
@@ -329,6 +332,8 @@ function cleanBooking(raw) {
     capacity,
     perBookingMax: int(raw.perBookingMax, 1, 50) ?? 10,
     collectNames: raw.collectNames === true,
+    // «إضافة فرد»: people one by one (name + age), each priced by age
+    participants: raw.participants === true,
     pricing: { mode, categories },
     payment: {
       mode: pay.mode === 'installments' ? 'installments' : 'full',

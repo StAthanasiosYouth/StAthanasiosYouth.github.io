@@ -171,7 +171,7 @@ test('the submit body and the WhatsApp text: server-shaped, no extras; a free ev
 test('draft: 7 days, the same step and requestKey back, everything checked; never picture bytes or «موافق»', () => {
   const draft = { ...B.emptyDraft(BOOKING, 'web.abcdefghij', NOW), step: 'b', fields: { name: 'مينا', phone: '010' }, servantId: 'srv-mina0001', method: 'cash', agreed: true, proofs: [{ proofId: 'prf-abcdefgh', claim: 'x', blob: 'BYTES', url: 'blob:x' }] };
   const stored = JSON.parse(JSON.stringify(B.storeDraft(draft, NOW)));
-  assert.deepEqual(Object.keys(stored).sort(), ['counts', 'fields', 'method', 'names', 'note', 'pay', 'proofs', 'requestKey', 'savedAt', 'servantId', 'step'].sort());
+  assert.deepEqual(Object.keys(stored).sort(), ['counts', 'fields', 'method', 'names', 'note', 'pay', 'people', 'proofs', 'requestKey', 'savedAt', 'servantId', 'step'].sort());
   assert.deepEqual(stored.proofs, [{ proofId: 'prf-abcdefgh', claim: 'x' }]);
   assert.doesNotMatch(JSON.stringify(stored), /BYTES|blob:/);
 

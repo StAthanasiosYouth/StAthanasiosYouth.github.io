@@ -995,11 +995,15 @@
         var max = first ? null : number(row.max, 1, 30, '١٠');
         var seat = first ? null : A.checkbox('بياخد مكان', row.seat !== false);
         var note = first ? null : A.textInput(row.note, { max: 60, placeholder: 'ملاحظة: من ٤ لـ ١٢ سنة' });
+        // with «كل فرد باسمه وسنه»: the price for these ages (everyone else pays the first price)
+        var ageMin = first ? null : number(row.ageMin, 0, 120, 'من سن');
+        var ageMax = first ? null : number(row.ageMax, 0, 120, 'لحد سن');
         var remove = first ? null : el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'شيل الفئة', onclick: function () { collect(); rows.splice(i, 1); A.markDirty(); draw(); } }, icon('trash'));
         var line = el('div', { class: 'pages-prices__row' + (first ? ' pages-prices__row--first' : '') },
           A.field(first ? 'سعر الحاجز' : 'الفئة', label), A.field('السعر', price),
-          group ? A.field('محسوب على', group) : null, max ? A.field('أقصى عدد', max) : null, seat ? seat.node : null, note ? A.field('ملاحظة', note) : null, remove);
-        return { line: line, label: label, price: price, group: group, max: max, seat: seat, note: note, key: row.key };
+          group ? A.field('محسوب على', group) : null, max ? A.field('أقصى عدد', max) : null, seat ? seat.node : null,
+          ageMin ? A.field('من سن', ageMin, 'للحجز بالأفراد') : null, ageMax ? A.field('لحد سن', ageMax) : null, note ? A.field('ملاحظة', note) : null, remove);
+        return { line: line, label: label, price: price, group: group, max: max, seat: seat, note: note, ageMin: ageMin, ageMax: ageMax, key: row.key };
       });
       A.fill(table, inputs[0].line);
       A.fill(more, inputs.slice(1).map(function (x) { return x.line; }).concat([
@@ -1009,7 +1013,7 @@
 
     function collect() {
       rows = inputs.map(function (x) {
-        return { key: x.key, label: x.label.value, price: x.price.value, group: x.group ? x.group.value : 'adult', max: x.max ? x.max.value : 1, seat: x.seat ? x.seat.input.checked : true, note: x.note ? x.note.value : '' };
+        return { key: x.key, label: x.label.value, price: x.price.value, group: x.group ? x.group.value : 'adult', max: x.max ? x.max.value : 1, seat: x.seat ? x.seat.input.checked : true, note: x.note ? x.note.value : '', ageMin: x.ageMin ? x.ageMin.value : '', ageMax: x.ageMax ? x.ageMax.value : '' };
       });
       return rows;
     }
@@ -1058,6 +1062,7 @@
     var capacity = number(booking ? booking.capacity : '', 1, 100000, 'من غير حد');
     var perBooking = number(booking ? booking.perBookingMax : 10, 1, 30, '١٠');
     var collectNames = A.checkbox('اطلب أسماء كل الأفراد', booking ? !!booking.collectNames : false);
+    var participants = A.checkbox('كل فرد باسمه وسنه («إضافة فرد»)', booking ? !!booking.participants : false, 'الزائر بيضيف الأفراد واحد واحد؛ السعر بيتحسب لكل فرد حسب سنه («من سن / لحد سن» في الفئات)، والباقي بالسعر الأول');
     var pricing = pricingEditor(booking ? booking.pricing : null);
     var payMode = A.choices(A.uid('pay'), [{ value: 'full', label: 'الدفع كامل' }, { value: 'installments', label: 'مقدم وأقساط' }],
       booking && booking.payment ? booking.payment.mode : 'full', function (v) { installments.hidden = v !== 'installments'; });
@@ -1081,6 +1086,7 @@
       el('div', { class: 'row' }, A.field('الحجز يفتح', opensAt.node), A.field('الحجز يقفل', closesAt.node, 'آخره ميعاد بداية الفعالية: بعد ما تبدأ الحجز من الموقع بيقفل')),
       el('div', { class: 'row' }, A.field('العدد المتاح', capacity, 'المؤكدين بس هما اللي بياخدوا أماكن'), A.field('أقصى عدد في الحجز الواحد', perBooking)),
       collectNames.node,
+      participants.node,
       el('fieldset', { class: 'fieldset' }, el('legend', { text: 'الأسعار' }), pricing.node),
       el('fieldset', { class: 'fieldset' }, el('legend', { text: 'الدفع' }), payMode.node || payMode, installments),
       el('fieldset', { class: 'fieldset' }, el('legend', { text: 'الخدام اللي بيتحجز معاهم' }),
@@ -1103,7 +1109,7 @@
         theme: theme.value, terms: terms.input.value, enabled: enabled.input.checked, partner: partner.input.checked ? 'bug' : '', home: home.value(),
         booking: hasBooking.input.checked ? {
           opensAt: opensAt.value(), closesAt: closesAt.value(), capacity: capacity.value, perBookingMax: perBooking.value,
-          collectNames: collectNames.input.checked, pricing: pricing.value(),
+          collectNames: collectNames.input.checked, participants: participants.input.checked, pricing: pricing.value(),
           payment: { mode: payMode.value ? payMode.value() : (installments.hidden ? 'full' : 'installments'), minFirst: minFirst.value, finalDueAt: finalDueAt.value() }
         } : null,
         servants: servantRows.filter(function (s) { return s.on.input.checked; }).map(function (s) {

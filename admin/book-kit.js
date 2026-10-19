@@ -480,7 +480,8 @@ export function bookingBook(exported, { from = '', to = '', today = '' } = {}) {
       .filter(Boolean).join(' — ');
     return [
       row.ref || '', (STATUS[row.status] || { label: row.status }).label, row.name || '', localPhone(row.phone), row.servantName || '', row.method ? label(row.method) : '',
-      p.adult || 0, p.child || 0, p.companion || 0, p.total || 0, (row.names || []).join('، '),
+      p.adult || 0, p.child || 0, p.companion || 0, p.total || 0,
+      (row.participants || []).length ? row.participants.map(x => x.name + ' (' + x.age + ')').join('، ') : (row.names || []).join('، '),
       row.amountDue === null || row.amountDue === undefined ? '' : row.amountDue, row.paid || 0,
       row.balance === null || row.balance === undefined ? '' : row.balance,
       row.paymentStatus ? (PAY_STATUS[row.paymentStatus] || { label: row.paymentStatus }).label : '',

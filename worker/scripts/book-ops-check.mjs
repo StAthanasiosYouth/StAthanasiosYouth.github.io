@@ -129,6 +129,19 @@ check('v2: ack ends the claim', ack.body && ack.body.acked === 1, ack.body);
 const left2 = await A('GET', '/v1/admin/diag/book-news?eventId=' + ev2.id);
 check('v2: nothing left for that event', left2.body.news && left2.body.news.unsent === 0, left2.body);
 
+// Phase 1, «كل فرد باسمه وسنه»: people priced by age on the server
+const ev3 = { ...event, id: 'evt-q' + RUN, slug: 'ops3-' + RUN, title: 'تجربة أفراد ' + RUN,
+  booking: { ...event.booking, participants: true, perBookingMax: 4, pricing: { mode: 'group', categories: [
+    { key: 'applicant', label: 'فرد', group: 'adult', price: 100, seat: true, min: 0, max: 4 },
+    { key: 'child', label: 'طفل', group: 'child', price: 50, seat: true, min: 0, max: 4, ageMin: 4, ageMax: 12 }] } } };
+check('participants fixture stored', (await A('POST', '/v1/admin/diag/event-fixture', ev3)).status === 200);
+const party = await call('POST', '/v1/book/submit', { slug: ev3.slug, requestKey: 'rk-' + randomUUID(), name: 'أفراد', phone: phone(21), counts: { applicant: 9 }, servantId: 'srv-aaaa1111', method: 'transfer', hp: '', turnstile: TEST_TOKEN,
+  participants: [{ name: 'مينا', age: 30 }, { name: 'مريم', age: 8 }, { name: 'يوسف', age: 40 }] });
+check('participants: server price 100 + 50 + 100 = 250 (the counts sent ignored)', party.status === 200 && party.body.quotedTotal === 250, party.body);
+const tooMany = await call('POST', '/v1/book/submit', { slug: ev3.slug, requestKey: 'rk-' + randomUUID(), name: 'أفراد', phone: phone(22), counts: {}, servantId: 'srv-aaaa1111', method: 'transfer', hp: '', turnstile: TEST_TOKEN,
+  participants: Array.from({ length: 5 }, (_, i) => ({ name: 'فرد ' + i, age: 20 })) });
+check('participants: over the per-booking limit → invalid(participants)', tooMany.body.code === 'invalid' && tooMany.body.field === 'participants', tooMany.body);
+
 // Phase 1, cash + the payment card
 const cash = await submit(13, { method: 'cash', turnstile: TEST_TOKEN });
 check('cash from the site → invalid(method)', cash.body.code === 'invalid' && cash.body.field === 'method', cash.body);

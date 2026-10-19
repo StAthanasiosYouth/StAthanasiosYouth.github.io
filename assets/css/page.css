@@ -3136,3 +3136,42 @@ img, svg, video {
   min-height: 40px;
   font-size: .9rem;
 }
+
+/* ---------- «إضافة فرد»: a card per person (name + age) ---------- */
+
+.bk-people {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bk-person {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--gold-line);
+  border-radius: var(--radius-md);
+  background: rgba(2, 9, 20, .45);
+}
+
+.bk-person__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin: 0;
+}
+
+.bk-person__price {
+  margin-inline-start: auto;
+  color: var(--gold-hi);
+  font-size: .9rem;
+}
+
+.bk-person__fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6.5rem;
+  gap: 8px;
+}

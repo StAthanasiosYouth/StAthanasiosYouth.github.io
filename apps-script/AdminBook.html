@@ -1033,7 +1033,8 @@
         fact('طريقة الدفع', b.method ? K.methodLabel(ev, b.method) : null),
         fact('الطلب', countsText(ev.pricing, b.requested)),
         b.status === 'confirmed' || b.status === 'cancelled' ? fact('العدد الفعلي', countsText(ev.pricing, b.actual)) : null,
-        fact('الأسماء', (b.names || []).length ? b.names.join('، ') : null),
+        // «كل فرد باسمه وسنه»: each person with their age (the price was set by it)
+        (b.participants || []).length ? fact('الأفراد', b.participants.map(function (p) { return p.name + ' (' + ar(p.age) + ')'; }).join('، ')) : fact('الأسماء', (b.names || []).length ? b.names.join('، ') : null),
         fact('ملاحظة الزائر', b.visitorNote || null),
         fact('ملاحظة الأدمن', b.adminNote || null),
         fact('سبب الرفض', b.rejectReason || null),
