@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "v": "0940baf2b07d",
+  "v": "5bf0b59d54ba",
   "id": "pg-0d2eeb07",
   "slug": "black-theatre",
   "title": "المسرح الأسود",
@@ -96,7 +96,7 @@
         "h": 480,
         "alt": "",
         "start": 0,
-        "end": 6
+        "end": 22.5
       },
       "audio": {
         "mode": "original",
@@ -107,5 +107,5 @@
     }
   ],
   "team": null,
-  "publishedAt": "2026-10-15T02:45"
+  "publishedAt": "2026-10-19T11:13"
 }
