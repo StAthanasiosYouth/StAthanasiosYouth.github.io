@@ -197,3 +197,25 @@ function enableBookingAlerts() {
   return 'تنبيهات الحجوزات الجديدة اتفعّلت ✓ (كل ' + activityDigits_(BOOK_NEWS_EVERY_MIN) + ' دقايق، لما الحجز أونلاين يشتغل)';
 
 }
+
+/**
+ * The go-live switch BOOKING_ONLINE, run by the owner from the Apps Script
+ * editor (Run ▸ bookingOnlineOn / bookingOnlineOff). Project Settings can't
+ * add it while other properties hold an empty value (SHOP_* do on purpose:
+ * the editor refuses to save). Takes effect at the next publish.
+ */
+function bookingOnlineOn() {
+
+  assertAdmin_();
+  PropertiesService.getScriptProperties().setProperty('BOOKING_ONLINE', '1');
+  return 'BOOKING_ONLINE = 1 ✓ (انشر علشان الفعاليات تاخد الحجز أونلاين)';
+
+}
+
+function bookingOnlineOff() {
+
+  assertAdmin_();
+  PropertiesService.getScriptProperties().deleteProperty('BOOKING_ONLINE');
+  return 'BOOKING_ONLINE اتشال ✓ (انشر علشان الفعاليات ترجع للحجز مع الخدام)';
+
+}

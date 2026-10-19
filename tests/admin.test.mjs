@@ -57,7 +57,7 @@ test('every browser-callable data function rejects non-admins', () => {
     apiDeleteLink: ['facebook'], apiMoveLink: ['facebook', 1], apiSaveSection: [{ key: 'x', title: 'x' }, true],
     apiDeleteSection: ['links'], apiMoveSection: ['social', 1], apiSaveContact: [{ name: 'x', phone: '01012345678', method: 'call' }],
     apiDeleteContact: ['tech-support'], apiMoveContact: ['tech-support', -1], apiSaveSettings: [{ 'site.tagline': 'x' }],
-    apiResolveMapsUrl: ['https://maps.app.goo.gl/x'], setup: [], checkSheet: [], clearStrayIds: []
+    apiResolveMapsUrl: ['https://maps.app.goo.gl/x'], setup: [], checkSheet: [], clearStrayIds: [], bookingOnlineOn: [], bookingOnlineOff: []
   };
   for (const [name, args] of Object.entries(calls)) {
     assert.throws(() => world.gs[name](...args), /مش مسموح/, name);
@@ -67,13 +67,21 @@ test('every browser-callable data function rejects non-admins', () => {
   assert.equal(stateOf(world).draft.links.length, 5);
 });
 
+test('bookingOnlineOn / bookingOnlineOff: an admin sets and clears the go-live switch', () => {
+  const world = configuredWorld().as(ADMIN);
+  world.gs.bookingOnlineOn();
+  assert.equal(world.properties.get('BOOKING_ONLINE'), '1');
+  world.gs.bookingOnlineOff();
+  assert.ok(!world.properties.get('BOOKING_ONLINE'));
+});
+
 test('no unguarded public function slipped in', () => {
   // public = callable from the browser through google.script.run
   const world = configuredWorld();
   const pure = new Set(['buildPublicContent', 'safeHttpsUrl', 'normalizePhone', 'contentRevision', 'buildMeetingIcs', 'summarizeChanges', 'describeChanges', 'seedDraft', 'doGet', 'doPost']);
   const publicFns = Object.keys(world.gs).filter(k => typeof world.gs[k] === 'function' && !k.endsWith('_'));
   // enableAutoPush: assertAdmin_; the two trigger handlers run only with their own trigger's uid (CompSchedule.gs, tests/points-v2)
-  const unexpected = publicFns.filter(k => !pure.has(k) && !/^api/.test(k) && !['setup', 'checkSheet', 'clearStrayIds', 'checkMedia', 'planMigration', 'migrate', 'enableAutoPush', 'pushScheduleTick', 'pushScheduleDaily', 'enableBookingAlerts', 'bookNewsTick'].includes(k));
+  const unexpected = publicFns.filter(k => !pure.has(k) && !/^api/.test(k) && !['setup', 'checkSheet', 'clearStrayIds', 'checkMedia', 'planMigration', 'migrate', 'enableAutoPush', 'pushScheduleTick', 'pushScheduleDaily', 'enableBookingAlerts', 'bookNewsTick', 'bookingOnlineOn', 'bookingOnlineOff'].includes(k));
   assert.deepEqual(unexpected, []);
 });
 
