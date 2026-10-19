@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "c66b81beae14",
-  "publishedAt": "2026-10-19T09:20:08.269Z",
+  "revision": "05a9d4be3464",
+  "publishedAt": "2026-10-19T13:04:59.684Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -522,6 +522,26 @@
       },
       "partner": "bug",
       "v": "5bf0b59d54ba"
+    }
+  ],
+  "events": [
+    {
+      "id": "evt-4011914c",
+      "slug": "booking-test-temp",
+      "kind": "trip",
+      "kindLabel": "رحلة",
+      "title": "اختبار نظام الحجز - مؤقت",
+      "shortTitle": "اختبار حجز",
+      "summary": "اختبار داخلي مؤقت للنظام — مش فعالية حقيقية، متحجزش.",
+      "cover": null,
+      "startAt": "2026-10-31T18:00",
+      "endAt": "2026-10-31T20:00",
+      "booking": {
+        "opensAt": "",
+        "closesAt": "2026-10-30T22:00"
+      },
+      "partner": null,
+      "v": "335b89f07694"
     }
   ],
   "partners": {

@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "v": "335b89f07694",
+  "id": "evt-4011914c",
+  "slug": "booking-test-temp",
+  "kind": "trip",
+  "kindLabel": "رحلة",
+  "title": "اختبار نظام الحجز - مؤقت",
+  "shortTitle": "اختبار حجز",
+  "summary": "اختبار داخلي مؤقت للنظام — مش فعالية حقيقية، متحجزش.",
+  "body": "صفحة اختبار مؤقتة لنظام الحجز الجديد. هتتقفل خلال ساعات. مش فعالية حقيقية.",
+  "theme": "",
+  "cover": null,
+  "gallery": [],
+  "startAt": "2026-10-31T18:00",
+  "endAt": "2026-10-31T20:00",
+  "location": {
+    "name": "اختبار",
+    "url": null
+  },
+  "terms": "",
+  "partner": null,
+  "booking": {
+    "online": true,
+    "opensAt": "",
+    "closesAt": "2026-10-30T22:00",
+    "capacity": 2,
+    "showLeft": true,
+    "showLeftBelow": 20,
+    "perBookingMax": 2,
+    "collectNames": false,
+    "pricing": {
+      "mode": "single",
+      "categories": [
+        {
+          "key": "applicant",
+          "label": "الحاجز",
+          "group": "adult",
+          "price": 100,
+          "seat": true,
+          "min": 1,
+          "max": 1,
+          "note": ""
+        }
+      ]
+    },
+    "payment": {
+      "mode": "installments",
+      "minFirst": 50,
+      "finalDueAt": "2026-10-30T22:00"
+    },
+    "methods": [
+      {
+        "key": "cash",
+        "label": "كاش",
+        "icon": "",
+        "needsProof": false
+      },
+      {
+        "key": "instapay",
+        "label": "إنستاباي",
+        "icon": "",
+        "needsProof": true
+      }
+    ],
+    "servants": [
+      {
+        "id": "srv-6e32247c",
+        "name": "اختبار الحجز - مؤقت",
+        "role": "اختبار مؤقت",
+        "image": null,
+        "wa": null,
+        "methods": [
+          "cash",
+          "instapay"
+        ]
+      }
+    ]
+  },
+  "publishedAt": "2026-10-19T16:04"
+}
