@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "cmp-9227de8c",
   "slug": "test",
-  "v": "c32ec192bef65b1b",
+  "v": "af9742f9476a7f6e",
   "title": "test",
   "shortTitle": "",
   "description": "",
@@ -18,8 +18,8 @@
   },
   "icon": null,
   "theme": "",
-  "startAt": "2026-10-11T17:50",
-  "endAt": "2026-10-11T22:00",
+  "startAt": "2026-10-19T12:12",
+  "endAt": "",
   "resultsAt": "",
   "participation": "registered",
   "scoring": true,
@@ -36,5 +36,5 @@
   "successText": "",
   "questionCount": 10,
   "totalPoints": 100,
-  "publishedAt": "2026-10-19T11:13"
+  "publishedAt": "2026-10-19T12:20"
 }
