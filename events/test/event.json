@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "v": "659b59710d29",
+  "v": "29973fb59faa",
   "id": "evt-59f41592",
   "slug": "test",
   "kind": "trip",
@@ -20,7 +20,7 @@
   },
   "gallery": [],
   "startAt": "2026-10-19T21:07",
-  "endAt": "",
+  "endAt": "2026-11-06T23:59",
   "location": null,
   "terms": "",
   "partner": {
@@ -101,5 +101,5 @@
       }
     ]
   },
-  "publishedAt": "2026-10-19T21:08"
+  "publishedAt": "2026-10-19T21:11"
 }
