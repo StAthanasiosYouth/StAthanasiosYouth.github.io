@@ -167,7 +167,7 @@ Admins are still added and removed in the existing Admin («صلاحيات لو�
 - Payments are append-only; a void is a row (`payments_one_void`).
 
 **Secrets:**
-- `BOOK_SECRET`: HMAC for visitor status links and proof claims. Staging: `.staging-book-secret` (gitignored). **Production: not set yet** (set at go-live).
+- `BOOK_SECRET`: HMAC for visitor status links and proof claims. Staging: `.staging-book-secret` (gitignored). Production: set (2026-10-19).
 
 **Staging only:**
 - `POST /v1/admin/diag/event-fixture` stores a test event.
@@ -175,9 +175,9 @@ Admins are still added and removed in the existing Admin («صلاحيات لو�
 - `node scripts/book-ops-check.mjs` checks Turnstile (no token refused, the test token passes), edit locks, the new-bookings feed (signed sync, grouping, cooldown) and the 12-month phone retention. With the staging secret switched to the always-fail TEST secret: `--turnstile-fails`.
 - `node scripts/book-ui-staging.mjs <out>` (the event page in real Chrome, with the real Turnstile widget) and `cd tools && node ../tests/book-admin-staging.mjs` (the real admin, edit locks included). Run the UI check ≥ 10 min after book-check: book-check spends the per-IP budgets.
 
-**Go-live (production), in order — none of it done yet:**
-1. `wrangler secret put BOOK_SECRET` and `TURNSTILE_SECRET` (a real Turnstile widget for stathanasiosyouth.github.io); its site key as `TURNSTILE_SITEKEY` in the production vars.
-2. Push to main (deploys the Worker: migrations 0003 + 0004) and deploy Apps Script (BookModel online switch, BookNotify.gs, AdminNotify/Activity changes).
+**Go-live (production), in order:**
+1. Done 2026-10-19: `BOOK_SECRET` and `TURNSTILE_SECRET` (the «Athanasios booking» widget for stathanasiosyouth.github.io); its site key as `TURNSTILE_SITEKEY` in the production vars.
+2. Done 2026-10-19 (Worker + migrations 0003 + 0004). Push to main and deploy Apps Script (BookModel online switch, BookNotify.gs, AdminNotify/Activity changes).
 3. Apps Script editor: Run ▸ `enableBookingAlerts` once (the 5-minute new-bookings trigger).
 4. `POST /v1/admin/book/module { on: true }` (primary admin), Script Property `BOOKING_ONLINE` = 1, republish the events.
 

@@ -15,7 +15,9 @@
     "ENVIRONMENT": "production",
     "ALLOWED_ORIGINS": "https://stathanasiosyouth.github.io",
     "GOOGLE_CLIENT_ID": "246924773718-38p45gji0ouvi7an4jdjsip3obmk6ve4.apps.googleusercontent.com",
-    "SITE_URL": "https://stathanasiosyouth.github.io"
+    "SITE_URL": "https://stathanasiosyouth.github.io",
+    // The «Athanasios booking» Turnstile widget (stathanasiosyouth.github.io); its secret is TURNSTILE_SECRET.
+    "TURNSTILE_SITEKEY": "0x4AAAAAAFXKmirGDFqXzeNL"
   },
 
   "d1_databases": [
