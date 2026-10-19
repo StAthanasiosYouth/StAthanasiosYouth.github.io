@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "v": "8855583a90f6",
+  "v": "f7aa26b9cccf",
   "id": "evt-4011914c",
   "slug": "booking-test-temp",
   "kind": "trip",
@@ -71,7 +71,7 @@
         "name": "اختبار الحجز - مؤقت",
         "role": "اختبار مؤقت",
         "image": null,
-        "wa": null,
+        "wa": "https://wa.me/201276162016",
         "methods": [
           "cash",
           "instapay"
@@ -79,5 +79,5 @@
       }
     ]
   },
-  "publishedAt": "2026-10-19T19:49"
+  "publishedAt": "2026-10-19T20:04"
 }
