@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "3cead1de7de3",
-  "publishedAt": "2026-10-19T17:04:52.505Z",
+  "revision": "21dd49853dc5",
+  "publishedAt": "2026-10-19T18:08:37.233Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -334,6 +334,37 @@
       "ctaLabel": "ادخل صفحة فريق المسرح ال",
       "watch": true,
       "partner": "bug"
+    },
+    {
+      "id": "act-5079631e",
+      "type": "trip",
+      "section": "activities",
+      "title": "test",
+      "subtitle": "",
+      "description": "",
+      "image": {
+        "src": "media/2026/img-53ca69a3.webp",
+        "thumb": "media/2026/img-53ca69a3-480.webp",
+        "w": 1280,
+        "h": 720,
+        "alt": "",
+        "color": "#463a2f"
+      },
+      "cta": null,
+      "location": "",
+      "startAt": "2026-10-19T21:07",
+      "endAt": "",
+      "visibleFrom": "",
+      "visibleUntil": "2026-10-20T09:07",
+      "display": "",
+      "displayMobile": "",
+      "event": "test",
+      "ctaLabel": "",
+      "booking": {
+        "opensAt": "",
+        "closesAt": ""
+      },
+      "partner": "bug"
     }
   ],
   "types": [
@@ -349,6 +380,13 @@
       "label": "مسرح أسود",
       "icon": "theatre",
       "theme": "night",
+      "banner": null
+    },
+    {
+      "key": "trip",
+      "label": "رحلة",
+      "icon": "bus",
+      "theme": "azure",
       "banner": null
     }
   ],
@@ -525,6 +563,31 @@
     }
   ],
   "events": [
+    {
+      "id": "evt-59f41592",
+      "slug": "test",
+      "kind": "trip",
+      "kindLabel": "رحلة",
+      "title": "test",
+      "shortTitle": "",
+      "summary": "",
+      "cover": {
+        "src": "media/2026/img-53ca69a3.webp",
+        "thumb": "media/2026/img-53ca69a3-480.webp",
+        "w": 1280,
+        "h": 720,
+        "alt": "",
+        "color": "#463a2f"
+      },
+      "startAt": "2026-10-19T21:07",
+      "endAt": "",
+      "booking": {
+        "opensAt": "",
+        "closesAt": ""
+      },
+      "partner": "bug",
+      "v": "659b59710d29"
+    },
     {
       "id": "evt-4011914c",
       "slug": "booking-test-temp",

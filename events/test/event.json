@@ -1,0 +1,105 @@
+{
+  "schema": 1,
+  "v": "659b59710d29",
+  "id": "evt-59f41592",
+  "slug": "test",
+  "kind": "trip",
+  "kindLabel": "رحلة",
+  "title": "test",
+  "shortTitle": "",
+  "summary": "",
+  "body": "fds",
+  "theme": "",
+  "cover": {
+    "src": "media/2026/img-53ca69a3.webp",
+    "thumb": "media/2026/img-53ca69a3-480.webp",
+    "w": 1280,
+    "h": 720,
+    "alt": "",
+    "color": "#463a2f"
+  },
+  "gallery": [],
+  "startAt": "2026-10-19T21:07",
+  "endAt": "",
+  "location": null,
+  "terms": "",
+  "partner": {
+    "key": "bug",
+    "name": "Brave Under Grace – B.U.G.",
+    "short": "B.U.G.",
+    "logo": {
+      "src": "assets/img/partners/bug-logo-720.webp",
+      "thumb": "assets/img/partners/bug-logo-360.webp",
+      "w": 720,
+      "h": 305,
+      "alt": "شعار Brave Under Grace – B.U.G."
+    },
+    "mark": {
+      "src": "assets/img/partners/bug-symbol-320.webp",
+      "w": 320,
+      "h": 107,
+      "alt": "B.U.G."
+    },
+    "url": null
+  },
+  "booking": {
+    "online": true,
+    "opensAt": "",
+    "closesAt": "",
+    "capacity": null,
+    "showLeft": true,
+    "showLeftBelow": 20,
+    "perBookingMax": 20,
+    "collectNames": true,
+    "pricing": {
+      "mode": "group",
+      "categories": [
+        {
+          "key": "applicant",
+          "label": "الحاجز",
+          "group": "adult",
+          "price": 100,
+          "seat": true,
+          "min": 1,
+          "max": 1,
+          "note": ""
+        }
+      ]
+    },
+    "payment": {
+      "mode": "full",
+      "minFirst": 0,
+      "finalDueAt": ""
+    },
+    "methods": [
+      {
+        "key": "cash",
+        "label": "كاش",
+        "icon": "",
+        "needsProof": false,
+        "online": false
+      },
+      {
+        "key": "instapay",
+        "label": "إنستاباي",
+        "icon": "",
+        "needsProof": true,
+        "online": true
+      }
+    ],
+    "servants": [
+      {
+        "id": "srv-6e32247c",
+        "name": "اختبار الحجز - مؤقت",
+        "role": "اختبار مؤقت",
+        "image": null,
+        "wa": "https://wa.me/201276162016",
+        "methods": [
+          "cash",
+          "instapay"
+        ]
+      }
+    ]
+  },
+  "publishedAt": "2026-10-19T21:08"
+}
