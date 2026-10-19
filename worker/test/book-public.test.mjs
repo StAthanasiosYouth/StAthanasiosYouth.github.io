@@ -24,7 +24,7 @@ test('state: open with places hidden above showLeftBelow; disabled when the modu
 
 test('submit → pending with ref + token; the same requestKey replays the same answer; nothing private in the reply', async () => {
   const w = await bookWorld();
-  const body = { slug: 'alex-trip', requestKey: 'rq-same-000001', name: '  مينا   زكريا ', phone: '010 1234 5678', counts: { applicant: 1, adult: 1, child: 1 }, servantId: 'srv-aaaa1111', method: 'cash', hp: '', revision: 'rev1' };
+  const body = { slug: 'alex-trip', requestKey: 'rq-same-000001', name: '  مينا   زكريا ', phone: '010 1234 5678', counts: { applicant: 1, adult: 1, child: 1 }, servantId: 'srv-aaaa1111', method: 'transfer', hp: '', revision: 'rev1' };
   const a = await w.pub('POST', '/v1/book/submit', body);
   assert.equal(a.status, 200, JSON.stringify(a.body));
   assert.match(a.body.ref, /^B-[0-9A-Z]{5}$/);

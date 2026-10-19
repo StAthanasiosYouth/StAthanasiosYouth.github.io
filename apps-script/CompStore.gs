@@ -49,8 +49,10 @@ var COMP_TABLES = {
   Seasons: ['id', 'name', 'startAt', 'endAt', 'status', 'notifyDays', 'closedAt', 'closedBy', 'createdAt', 'updatedAt'],
   SeasonTotals: ['seasonId', 'pid', 'earned', 'spent', 'adjusted', 'final', 'closedAt'],
   // service pages, events, servants (Pages.gs, docs/EVENTS.md §1.1; made on first use)
-  Servants: ['id', 'name', 'phone', 'role', 'image', 'active', 'publicWa', 'note', 'createdAt', 'updatedAt'],
-  PayMethods: ['key', 'label', 'icon', 'needsProof', 'order', 'active'],
+  Servants: ['id', 'name', 'phone', 'role', 'image', 'active', 'publicWa', 'note', 'createdAt', 'updatedAt',
+    // InstaPay / wallet destinations (PayDest.gs): optional own numbers, the beneficiary, and the PRIMARY admin's approval of the exact number shown
+    'instapayNumber', 'walletNumber', 'payName', 'instapayApproved', 'instapayApprovedAt', 'instapayApprovedBy', 'walletApproved', 'walletApprovedAt', 'walletApprovedBy'],
+  PayMethods: ['key', 'label', 'icon', 'needsProof', 'order', 'active', 'online'],
   Pages: ['id', 'slug', 'enabled', 'archived', 'order', 'title', 'tagline', 'description', 'hero', 'cover', 'cardType', 'theme',
     'partner', 'teamTitle', 'teamText', 'teamMessage', 'team', 'home', 'cardId', 'liveV', 'publishedAt', 'createdBy', 'createdAt', 'updatedAt'],
   PageMedia: ['id', 'pageId', 'order', 'enabled', 'title', 'text', 'duration', 'cover', 'source', 'clip', 'fullUrl', 'ctaLabel', 'updatedAt', 'audioMode', 'audio'],

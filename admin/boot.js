@@ -1844,6 +1844,12 @@
       }
       else {
         clearTimeout(timer);
+        // tell the server the panel is out of sight: admin pushes reach this
+        // device again at once, not ~70 s later (AdminNotify.gs adminPresent_)
+        if (sid && fresh(session)) {
+          post('apiHeartbeat', [{ area: place.area, view: place.view, item: editing(), locks: lockKeys(), hidden: true }], session.token, sid, { timeout: TIMING.beatFail })
+            .catch(function () { /* the panel then counts as away after ~70 s anyway */ });
+        }
       }
     });
 

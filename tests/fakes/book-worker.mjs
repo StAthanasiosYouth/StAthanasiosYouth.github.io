@@ -249,6 +249,8 @@ export function createBookWorker({ event, origin, proofBytes, now = () => '2026-
         try { confirm(b, { ...body.confirm, version: b.version }); }
         catch (error) { state.bookings.splice(state.bookings.indexOf(b), 1); throw error; }
       }
+      // pending, with the money received recorded now (Phase 1: a servant's cash)
+      else (body.payments || []).forEach(p => addPayment(b, p, { warn: false }));
       bump(b);
       return detail(b);
     }],

@@ -132,6 +132,57 @@ test('book news: an admin with the panel open gets the toast from the heartbeat,
   assert.equal(toast.text, 'زائر بعت طلب حجز في «رحلة الإسكندرية»');
 });
 
+const payloadOf = call => JSON.parse(Buffer.from(call.options.payload.map(b => (b < 0 ? b + 256 : b))).toString('utf8'));
+
+test('book news v2 (B7): asks with v 2, acks what it announced; the same claim handed out again is acked, never pushed twice', () => {
+  const claim = 'nc-0123456789abcdef';
+  const { world } = newsWorld({ groups: [{ claimId: claim, eventId: 'evt-alex01', title: 'رحلة الإسكندرية', count: 2, pending: 2 }] });
+  const before = fcmSent(world).length;
+  assert.equal(tick(world), 1);
+  const calls = newsCalls(world);
+  assert.deepEqual(calls.map(payloadOf), [{ v: 2 }, { v: 2, ack: [claim] }]);
+  const pushed = fcmSent(world).length - before;
+  assert.equal(pushed, 3);
+
+  // the ack was lost: the Worker hands out the same claim again → no new push, no new row, acked again
+  const rows = activityRows(world).length;
+  assert.equal(tick(world), 0);
+  assert.equal(fcmSent(world).length - before, pushed, 'not pushed twice');
+  assert.equal(activityRows(world).length, rows);
+  assert.deepEqual(newsCalls(world).slice(2).map(payloadOf), [{ v: 2 }, { v: 2, ack: [claim] }]);
+});
+
+test('book news (B8): the panel open on the PC spares only the PC; the phone still rings; a hidden panel spares nothing', () => {
+  const { world } = newsWorld({ groups: [{ eventId: 'evt-alex01', title: 'رحلة الإسكندرية', count: 1, pending: 1 }] });
+  const now = Math.floor((Date.now() + world.clock.skew) / 1000);
+  const token = world.issueToken({ email: SECOND, iat: String(now), exp: String(now + 3600) });
+  const start = world.post({ fn: 'apiSessionStart', args: [{ device: 'Chrome · Windows', force: true, state: false }], token });
+  assert.equal(start.ok, true, start.error);
+  const sid = start.result.sid;
+  const beat = info => assert.equal(world.post({ fn: 'apiHeartbeat', args: [info], token, sid }).ok, true);
+  // Fady's PC (panel in sight) and his phone, both named; deviceToken(2) has no name («جهاز»): can't tell, spared as before
+  for (const [n, platform, device] of [[9, 'windows', 'Chrome · Windows'], [8, 'android', 'Chrome · Android']]) {
+    assert.equal(world.post({ fn: 'apiAdminPushSubscribe', args: [{ token: deviceToken(n), platform, device }], token, sid }).ok, true);
+    world.fcm.devices.set(deviceToken(n), 'ok');
+  }
+  beat({ area: 'home' });
+  world.as('');
+  world.gs.API_REQUEST_ = null;
+
+  let before = fcmSent(world).length;
+  assert.equal(tick(world), 1);
+  assert.deepEqual(fcmSent(world).slice(before).map(m => m.message.token).sort(), [1, 3, 8].map(deviceToken).sort(), 'the phone rings; only the PC in sight (and the unnamed device) is spared');
+
+  // the PC panel goes out of sight (boot.js sends a hidden beat) → the PC gets it too
+  beat({ area: 'home', hidden: true });
+  world.as('');
+  world.gs.API_REQUEST_ = null;
+  world.advance(11 * 60_000);
+  before = fcmSent(world).length;
+  assert.equal(tick(world), 1);
+  assert.ok(fcmSent(world).slice(before).some(m => m.message.token === deviceToken(9)), 'hidden = not looking');
+});
+
 test('book news: odd groups are skipped; a Worker that fails or answers nothing never throws', () => {
   const { world } = newsWorld({ groups: [{ eventId: 'not-an-event', count: 2 }, { eventId: 'evt-alex01', count: 0 }, null, { eventId: 'evt-ok01', title: '', count: 2, pending: -1 }] });
   assert.equal(tick(world), 1);

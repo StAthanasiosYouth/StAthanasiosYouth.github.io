@@ -47,7 +47,10 @@ const ONLINE = {
   ...EVENT,
   slug: 'online-trip',
   v: 'on1a2b3c4d',
-  booking: { ...EVENT.booking, online: true, showLeft: true, showLeftBelow: 20, methods: EVENT.booking.methods.map(m => ({ ...m, needsProof: m.key === 'instapay' })) }
+  // cash: servant-assisted (online false: the «كاش مع الخادم» card); «تحويل بنكي»: online without a picture (most tests)
+  booking: { ...EVENT.booking, online: true, showLeft: true, showLeftBelow: 20,
+    methods: EVENT.booking.methods.map(m => ({ ...m, needsProof: m.key === 'instapay', online: m.key !== 'cash' })).concat([{ key: 'transfer', label: 'تحويل بنكي', icon: '', needsProof: false, online: true }]),
+    servants: EVENT.booking.servants.map(s => (s.id === 'srv-mina0001' ? { ...s, methods: s.methods.concat(['transfer']) } : s)) }
 };
 const SHELL = readFileSync(`${ROOT}pages/index.html`, 'utf8');
 const TOKEN = 'bk1.eyJiIjoiYmtnLWFiY2RlZiIsImUiOjE3OTk5OTk5OTk5OTl9.c2lnbmF0dXJlLXNpZ25hdHVyZS1zaWduYXR1cmU';
@@ -98,6 +101,8 @@ function resetMock() {
     submit: null,          // null: success
     status: 'pending',
     proofs: 0,
+    // POST /v1/book/pay: off by default (the number then comes from the servant on WhatsApp, as before)
+    pay: { status: 403, body: { ok: false, code: 'disabled', message: 'x' } },
     calls: []              // { method, path, body, type }
   };
 }
@@ -124,6 +129,7 @@ function answer({ method, path, body }) {
       status: mock.status, firstName: 'مينا', people: { adult: 2, child: 0, companion: 0, total: 2 }, quotedTotal: 3000, createdAt: '2026-10-13T12:00'
     });
   }
+  if (url.pathname === '/v1/book/pay') return mock.pay;
   if (url.pathname === '/v1/book/withdraw') {
     mock.status = 'withdrawn';
     return json(200, { ok: true, status: 'withdrawn' });
@@ -349,6 +355,8 @@ test('happy path at 360×740: state → who → servant + WhatsApp → a real JP
   await step(page, 'b');
   await page.click('label[for="bk-servant-srv-mina0001"]');
   await page.click('label[for="bk-method-instapay"]');
+  // the payment card is off (PAY_DEST): the number comes from the servant on WhatsApp, as before
+  await page.waitForSelector('.bk-wa__btn');
   const wa = await page.$eval('.bk-wa__btn', a => ({ href: a.href, target: a.target, rel: a.rel }));
   assert.deepEqual([wa.target, wa.rel], ['_blank', 'noopener']);
   const text = new URL(wa.href).searchParams.get('text');
@@ -470,12 +478,12 @@ test('back from WhatsApp: the page opens on the same step with the same requestK
   await fillWho(page);
   await step(page, 'b');
   await page.click('label[for="bk-servant-srv-mina0001"]');
-  await page.click('label[for="bk-method-cash"]');
+  await page.click('label[for="bk-method-transfer"]');
   // the visitor taps WhatsApp (the draft is saved right then); the phone drops the page meanwhile
   await page.evaluate(() => { document.querySelector('.bk-wa__btn').addEventListener('click', e => e.preventDefault()); });
   await page.click('.bk-wa__btn');
   const before = (await storage(page))[DRAFT];
-  assert.deepEqual([before.step, before.servantId, before.method, before.fields.name], ['b', 'srv-mina0001', 'cash', 'مينا عادل']);
+  assert.deepEqual([before.step, before.servantId, before.method, before.fields.name], ['b', 'srv-mina0001', 'transfer', 'مينا عادل']);
   assert.equal(JSON.stringify(before).includes('blob'), false);
 
   await page.reload({ waitUntil: 'networkidle0' });
@@ -483,7 +491,7 @@ test('back from WhatsApp: the page opens on the same step with the same requestK
   await step(page, 'b');
   assert.equal(await textOf(page, '.bk-alert'), 'كمّلنا من مكان ما وقفت.');
   assert.equal(await page.$eval('#bk-servant-srv-mina0001', el => el.checked), true);
-  assert.equal(await page.$eval('#bk-method-cash', el => el.checked), true);
+  assert.equal(await page.$eval('#bk-method-transfer', el => el.checked), true);
   assert.equal((await storage(page))[DRAFT].requestKey, before.requestKey);
   // back to a: the name and the counts are still there
   await page.click('.bk-back');
@@ -502,6 +510,113 @@ test('back from WhatsApp: the page opens on the same step with the same requestK
   assert.equal(await again.page.$('.bk-flow'), null);
   assert.equal((await storage(again.page))[DRAFT], undefined);
   await again.context.close();
+});
+
+
+/* =========================================================
+   CASH WITH THE SERVANT, AND THE INSTAPAY / WALLET PAYMENT CARD (Phase 1)
+========================================================= */
+
+test('cash is for information: no cash choice, the «كاش مع الخادم» card with WhatsApp (consent only) prefilled for this event', async () => {
+  resetMock();
+  const { context, page, problems } = await open('/events/online-trip/');
+  await ready(page);
+  await live(page, 'open');
+  await page.click('.bk-start');
+  await fillWho(page);
+  await step(page, 'b');
+  // only the servant with an online method can be picked; cash is never a choice
+  assert.deepEqual(await page.$$eval('.bk-picks input', els => els.map(e => e.value)), ['srv-mina0001']);
+  await page.click('label[for="bk-servant-srv-mina0001"]');
+  assert.deepEqual(await page.$$eval('.bk-chips input[name="bk-method"]', els => els.map(e => e.value)), ['instapay', 'transfer']);
+  assert.equal(await page.$('#bk-method-cash'), null);
+  // the card: both servants who take cash; WhatsApp only for the one who agreed (wa in event.json)
+  assert.match(await textOf(page, '.bk-cash'), /هتدفع كاش؟/);
+  assert.match(await textOf(page, '.bk-cash'), /هو اللي بيسجّل حجزك بعد ما يستلم/);
+  const links = await page.$$eval('.bk-cash .bk-cash__wa', els => els.map(a => a.href));
+  assert.equal(links.length, 1);
+  const text = decodeURIComponent(new URL(links[0]).searchParams.get('text'));
+  assert.match(text, new RegExp(`«${ONLINE.title}»`));
+  assert.match(text, /كاش/);
+  assert.match(text, /مينا عادل/, 'the visitor\'s name from step a');
+  assert.match(await textOf(page, '.bk-cash'), /مرقس فادي — كلّمه في الكنيسة/);
+  assert.ok(await overflow(page) <= 0);
+  assert.deepEqual(await axe(page, '#book'), []);
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('InstaPay payment card: the approved number + amount + «نسخ الرقم» (plain 01… digits) → app and back → «تم التحويل» → a screenshot is required', async () => {
+  resetMock();
+  mock.pay = json(200, { ok: true, method: 'instapay', number: '01198765432', name: 'Mina Adel', amount: 3000, mode: 'full', minFirst: null, finalDueAt: '' });
+  const { context, page, problems } = await open('/events/online-trip/');
+  await context.overridePermissions(BASE, ['clipboard-read', 'clipboard-write', 'clipboard-sanitized-write']);
+  await ready(page);
+  await live(page, 'open');
+  await page.click('.bk-start');
+  await fillWho(page);
+  await step(page, 'b');
+  await page.click('label[for="bk-servant-srv-mina0001"]');
+  await page.click('label[for="bk-method-instapay"]');
+  await page.waitForSelector('.bk-paycard');
+  const [ask] = calls('/v1/book/pay');
+  assert.deepEqual(JSON.parse(ask.body), { slug: 'online-trip', servantId: 'srv-mina0001', method: 'instapay', counts: { applicant: 1, adult: 1, child: 0, infant: 0 } });
+  assert.match(await textOf(page, '.bk-paycard__amount'), /المطلوب تحوّله: ٣٬٠٠٠ جنيه/);
+  assert.equal(await textOf(page, '.bk-paycard__number'), '011 9876 5432');
+  assert.equal(await page.$eval('.bk-paycard__number', el => el.dir), 'ltr');
+  assert.match(await textOf(page, '.bk-paycard__name'), /Mina Adel/);
+  assert.equal(await textOf(page, '.bk-next'), 'تم التحويل');
+  // the number is never in the stored draft
+  assert.equal(JSON.stringify(await storage(page)).includes('9876'), false);
+
+  await page.click('[data-act="copy-number"]');
+  await page.waitForFunction(() => /اتنسخ الرقم/.test(document.querySelector('[data-act="copy-number"]').textContent));
+  assert.equal(await page.evaluate(() => navigator.clipboard.readText()), '01198765432', 'ASCII digits, local form: what InstaPay takes');
+  assert.equal((await storage(page))[DRAFT].pay, 'copied');
+  await page.screenshot({ path: `${SHOTS}11-paycard.png` });
+  assert.ok(await overflow(page) <= 0);
+  assert.deepEqual(await axe(page, '#book'), []);
+
+  // off to the app; the page goes to the background (saved), the phone drops it, the visitor comes back
+  await page.evaluate(() => { Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true }); document.dispatchEvent(new Event('visibilitychange')); });
+  await page.reload({ waitUntil: 'networkidle0' });
+  await ready(page);
+  await step(page, 'b');
+  await page.waitForSelector('.bk-paycard');
+  assert.equal(await page.$eval('#bk-method-instapay', el => el.checked), true);
+  assert.match(await textOf(page, '.bk-paycard'), /رجعت؟ لو حوّلت دوس «تم التحويل»/);
+  await page.click('.bk-flow .bk-next');
+  await step(page, 'c');
+  assert.match(await textOf(page, '[data-field="proofs"]'), /صورة التحويل/);
+  await agree(page);
+  await page.click('.bk-send');
+  await page.waitForFunction(() => document.querySelector('[data-field="proofs"] .bk-field__err:not([hidden])'));
+  assert.equal(calls('/v1/book/submit').length, 0, 'no screenshot, no send');
+  assert.match(await textOf(page, '.bk-flow'), /مكانك بيتأكد بعد مراجعة الدفع/);
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('InstaPay not available with this servant (no approved number): told, «تم التحويل» stays off; the Worker unreachable → «جرّب تاني»', async () => {
+  resetMock();
+  mock.pay = json(400, { ok: false, code: 'invalid', field: 'method', message: 'x' });
+  const { context, page, problems } = await open('/events/online-trip/');
+  await ready(page);
+  await live(page, 'open');
+  await page.click('.bk-start');
+  await fillWho(page);
+  await step(page, 'b');
+  await page.click('label[for="bk-servant-srv-mina0001"]');
+  await page.click('label[for="bk-method-instapay"]');
+  await page.waitForSelector('.bk-pay .bk-alert');
+  assert.match(await textOf(page, '.bk-pay .bk-alert'), /إنستاباي مش متاح مع مينا عادل دلوقتي/);
+  assert.equal(await page.$eval('.bk-next', el => el.disabled), true);
+  // another method works as before
+  await page.click('label[for="bk-method-transfer"]');
+  await page.waitForFunction(() => !document.querySelector('.bk-next').disabled);
+  assert.equal(await textOf(page, '.bk-next'), 'دفعت، كمّل');
+  assert.deepEqual(problems, []);
+  await context.close();
 });
 
 
@@ -540,7 +655,7 @@ test('submit errors: invalid field → that step and field; full → the counts 
   await live(page, 'open');
   await page.click('.bk-start');
   await fillWho(page);
-  await choosePay(page, 'cash');                                  // cash: the picture is optional
+  await choosePay(page, 'transfer');                                  // no picture needed for this method
   await agree(page);
 
   mock.submit = json(400, { ok: false, code: 'invalid', field: 'phone', message: 'x' });
@@ -553,7 +668,7 @@ test('submit errors: invalid field → that step and field; full → the counts 
 
   mock.submit = json(409, { ok: false, code: 'full', left: 1, message: 'x' });
   await page.click('.bk-flow .bk-next');
-  await choosePay(page, 'cash');
+  await choosePay(page, 'transfer');
   await agree(page);
   await page.click('.bk-send');
   await step(page, 'a');
@@ -563,7 +678,7 @@ test('submit errors: invalid field → that step and field; full → the counts 
   mock.submit = json(429, { ok: false, code: 'limit', message: 'x' });
   await page.click('.bk-flow [aria-label="قلّل فرد إضافي"]');
   await page.click('.bk-flow .bk-next');
-  await choosePay(page, 'cash');
+  await choosePay(page, 'transfer');
   await agree(page);
   await page.click('.bk-send');
   await page.waitForFunction(() => /طلبين/.test(document.querySelector('.bk-alert')?.textContent || ''));
@@ -590,7 +705,7 @@ test('not open at submit: the words with the date, the state read again', async 
   await live(page, 'open');
   await page.click('.bk-start');
   await fillWho(page);
-  await choosePay(page, 'cash');
+  await choosePay(page, 'transfer');
   await agree(page);
   mock.submit = json(409, { ok: false, code: 'not_open', opensAt: '2026-10-15T19:00', message: 'x' });
   mock.state = { status: 200, body: { ok: true, open: false, reason: 'not_open', opensAt: '2026-10-15T19:00', closesAt: '', left: null, revision: 'r' } };
@@ -641,7 +756,7 @@ test('submit says disabled → the WhatsApp display, the draft kept', async () =
   await live(page, 'open');
   await page.click('.bk-start');
   await fillWho(page);
-  await choosePay(page, 'cash');
+  await choosePay(page, 'transfer');
   await agree(page);
   mock.submit = json(403, { ok: false, code: 'disabled', message: 'x' });
   await page.click('.bk-send');
@@ -689,7 +804,7 @@ test('Turnstile: the state names a site key → the check on the send step; no t
   assert.equal(mock.turnstileLoads || 0, 0, 'not loaded before the send step');
   await page.click('.bk-start');
   await fillWho(page);
-  await choosePay(page, 'cash');
+  await choosePay(page, 'transfer');
   await agree(page);
   await page.waitForSelector('#bk-turnstile .fake-ts');
   assert.equal(mock.turnstileLoads, 1);
@@ -736,7 +851,7 @@ test('Turnstile: no site key in the state (today) → no script, no check, the s
   await live(page, 'open');
   await page.click('.bk-start');
   await fillWho(page);
-  await choosePay(page, 'cash');
+  await choosePay(page, 'transfer');
   await agree(page);
   assert.equal(await page.$('[data-field="turnstile"]'), null);
   await page.click('.bk-send');

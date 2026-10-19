@@ -560,6 +560,10 @@ function apiHeartbeat(info) {
       record.seen = now;
       // a page back from the back/forward cache: it is here after all
       delete record.parked;
+      // the panel went out of sight (boot.js, visibilitychange): still the live session, but not "looking"
+      // — admin pushes reach this device again (AdminNotify.gs adminPresent_)
+      if (info.hidden === true) record.hidden = now;
+      else delete record.hidden;
       // the panel is drawn and alive (apiSessionStart: a confirmed session is never taken silently)
       record.beats = Math.min(Number(record.beats || 0) + 1, 1000000);
       record.area = cleanPlace_(info.area);

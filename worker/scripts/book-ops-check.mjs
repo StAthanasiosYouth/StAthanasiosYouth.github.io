@@ -11,6 +11,8 @@ import { createSign, createHmac, randomUUID } from 'node:crypto';
 
 const base = 'https://athanasios-api-staging.menazak-lab.workers.dev';
 const FAILS = process.argv.includes('--turnstile-fails');
+// --pay-on: staging's settings PAY_DEST was set to '1' first (the payment card answers)
+const PAY_ON = process.argv.includes('--pay-on');
 const PEM = readFileSync(new URL('../.staging-test-key.pem', import.meta.url), 'utf8');
 const SYNC = readFileSync(new URL('../.staging-sync-secret', import.meta.url), 'utf8').trim();
 const ORIGIN = 'https://stathanasiosyouth.github.io';
@@ -40,8 +42,9 @@ async function call(method, path, body, { admin = false, headers = {} } = {}) {
   return { status: res.status, body: await res.json().catch(() => null) };
 }
 const A = (m, p, b, sid) => call(m, p, b, { admin: true, headers: sid ? { 'x-edit-session': sid } : {} });
-async function sync(path) {
-  const body = '{}';
+async function sync(path, payload = {}) {
+  const body = JSON.stringify(payload);
+  await new Promise(r => setTimeout(r, 3));    // each signed call needs a newer ts than the last of its kind
   const ts = String(Date.now());
   const sig = 'v1=' + createHmac('sha256', SYNC).update(ts + '.' + body).digest('hex');
   return call('POST', path, body, { headers: { 'x-sync-ts': ts, 'x-sync-signature': sig } });
@@ -62,11 +65,11 @@ const event = {
     online: true, opensAt: stamp(now - DAY), closesAt: '', capacity: 30, showLeft: true, showLeftBelow: 5, perBookingMax: 6, collectNames: false,
     pricing: { mode: 'group', categories: [{ key: 'applicant', label: 'الحاجز', group: 'adult', price: 1000, seat: true, min: 1, max: 1 }] },
     payment: { mode: 'full', minFirst: 0, finalDueAt: '' },
-    methods: [{ key: 'cash', label: 'كاش', needsProof: false }],
-    servants: [{ id: 'srv-aaaa1111', name: 'مينا عادل', methods: ['cash'] }]
+    methods: [{ key: 'cash', label: 'كاش', needsProof: false, online: false }, { key: 'transfer', label: 'تحويل', needsProof: false, online: true }],
+    servants: [{ id: 'srv-aaaa1111', name: 'مينا عادل', methods: ['cash', 'transfer'] }]
   }
 };
-const submit = (i, over = {}) => call('POST', '/v1/book/submit', { slug, requestKey: 'rk-' + randomUUID(), name: 'تشغيل ' + i, phone: phone(i), counts: { applicant: 1 }, servantId: 'srv-aaaa1111', method: 'cash', hp: '', ...over });
+const submit = (i, over = {}) => call('POST', '/v1/book/submit', { slug, requestKey: 'rk-' + randomUUID(), name: 'تشغيل ' + i, phone: phone(i), counts: { applicant: 1 }, servantId: 'srv-aaaa1111', method: 'transfer', hp: '', ...over });
 
 check('module on (staging)', (await A('POST', '/v1/admin/book/module', { on: true })).body.on === true);
 check('fixture event stored', (await A('POST', '/v1/admin/diag/event-fixture', event)).status === 200);
@@ -109,6 +112,33 @@ check('a bad signature → 401', badSig.status === 401, badSig.body);
 const adminMade = await A('POST', '/v1/admin/book/bookings', { eventId: evId, requestKey: 'adm-' + RUN, name: 'يدوي', phone: phone(9), counts: { applicant: 1 }, servantId: 'srv-aaaa1111', method: 'cash' });
 const after = await A('GET', '/v1/admin/diag/book-news?eventId=' + evId);
 check('an admin-made booking is not news', adminMade.status === 200 && after.body.news.unsent === 1, after.body);
+
+// Phase 1, B7: v2 — a claim stays until acked (a second event: the first is in its 10-minute cooldown)
+const ev2 = { ...event, id: 'evt-p' + RUN, slug: 'ops2-' + RUN, title: 'تجربة تشغيل ٢ ' + RUN };
+check('second fixture event stored', (await A('POST', '/v1/admin/diag/event-fixture', ev2)).status === 200);
+const sub2 = (i) => call('POST', '/v1/book/submit', { slug: ev2.slug, requestKey: 'rk-' + randomUUID(), name: 'تشغيل ' + i, phone: phone(i), counts: { applicant: 1 }, servantId: 'srv-aaaa1111', method: 'transfer', hp: '', turnstile: TEST_TOKEN });
+await sub2(11);
+await sub2(12);
+const v2 = await sync('/v1/sync/book-news', { v: 2 });
+const g2 = v2.body && v2.body.groups && v2.body.groups.find(g => g.eventId === ev2.id);
+check('v2: ONE group with a claimId, count 2', g2 && /^nc-[0-9a-f]{16}$/.test(g2.claimId) && g2.count === 2, v2.body);
+const v2again = await sync('/v1/sync/book-news', { v: 2 });
+check('v2: an open claim is not handed out again before its TTL', !v2again.body.groups.some(g => g.eventId === ev2.id), v2again.body);
+const ack = await sync('/v1/sync/book-news', { v: 2, ack: [g2 && g2.claimId] });
+check('v2: ack ends the claim', ack.body && ack.body.acked === 1, ack.body);
+const left2 = await A('GET', '/v1/admin/diag/book-news?eventId=' + ev2.id);
+check('v2: nothing left for that event', left2.body.news && left2.body.news.unsent === 0, left2.body);
+
+// Phase 1, cash + the payment card
+const cash = await submit(13, { method: 'cash', turnstile: TEST_TOKEN });
+check('cash from the site → invalid(method)', cash.body.code === 'invalid' && cash.body.field === 'method', cash.body);
+const dests = await sync('/v1/sync/pay-dest', { dests: [{ servantId: 'srv-aaaa1111', method: 'transfer', number: '01000000001', name: 'تجربة', source: 'own', approvedAt: Date.now() - 1000, approvedBy: 'loadtest@staging.invalid' }] });
+check('pay-dest: the approved set is taken (signed)', dests.status === 200 && dests.body.approved === 1, dests.body);
+const badDest = await sync('/v1/sync/pay-dest', { dests: [{ servantId: 'srv-aaaa1111', method: 'transfer', number: '123', source: 'own', approvedAt: 1, approvedBy: 'x' }] });
+check('pay-dest: a bad number is refused', badDest.status === 400, badDest.body);
+const card = await call('POST', '/v1/book/pay', { slug, servantId: 'srv-aaaa1111', method: 'transfer', counts: { applicant: 1 } });
+check(PAY_ON ? 'payment card (PAY_DEST = 1): the approved number, the amount' : 'payment card off (PAY_DEST = 0) → disabled',
+  PAY_ON ? card.body.number === '01000000001' && card.body.amount === 1000 : card.body.code === 'disabled', card.body);
 
 // ---------------- edit locks ----------------
 const q = await A('GET', '/v1/admin/book/bookings?eventId=' + evId + '&status=pending');

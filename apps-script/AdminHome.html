@@ -380,6 +380,8 @@
     return el('div', { class: 'dash' },
       siteCard(),
       A.setupNudge ? A.setupNudge() : null,
+      // «الحجوزات»: new requests waiting (AdminBook; hidden while the module is off)
+      A.bookCard ? A.bookCard() : null,
       meetingCard(),
       bellCard(),
       quickCard(),

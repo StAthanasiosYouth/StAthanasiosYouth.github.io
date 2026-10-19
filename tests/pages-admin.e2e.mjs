@@ -213,6 +213,38 @@ test('«الخدام»: a servant with his WhatsApp shown (by consent), and the 
   await shot('01-servants');
 });
 
+test('«أرقام الدفع»: an own InstaPay number, the wallet from the phone; the primary admin approves the number shown («اعتمد رقم الدفع ده»)', async () => {
+  await d.page.evaluate(() => A.go('pages', 'servants'));
+  await d.page.waitForFunction(() => /مينا عادل/.test(document.querySelector('.view').textContent), { timeout: 10000 });
+  await d.page.evaluate(() => [...document.querySelectorAll('.view .item')].find(i => i.textContent.includes('مينا عادل')).querySelector('.icon-btn[aria-label^="تعديل"]').click());
+  await $('dialog.sheet[open] [data-pay]');
+  // before: the wallet would come from his phone, not approved
+  assert.match(await d.page.$eval('dialog.sheet[open] .pay-dest[data-method="wallet"]', n => n.textContent), /010 1234 5678.*من رقم الموبايل/);
+  assert.match(await d.page.$eval('dialog.sheet[open] .pay-dest[data-method="wallet"]', n => n.textContent), /مش ظاهر للزوار/);
+  await setField('رقم إنستاباي', '01122233344');
+  await setField('اسم المستفيد', 'Mina Adel');
+  assert.match(await d.page.$eval('dialog.sheet[open] [data-pay]', n => n.textContent), /احفظ الأول/, 'a changed number is approved only after saving');
+  await saveSheet();
+  await sheetGone();
+  await d.page.waitForFunction(() => /إنستاباي محتاج اعتماد/.test(document.querySelector('.view').textContent), { timeout: 10000 });
+
+  await d.page.evaluate(() => [...document.querySelectorAll('.view .item')].find(i => i.textContent.includes('مينا عادل')).querySelector('.icon-btn[aria-label^="تعديل"]').click());
+  await $('dialog.sheet[open] [data-act="pay-approve"][data-method="instapay"]');
+  assert.match(await d.page.$eval('dialog.sheet[open] .pay-dest[data-method="instapay"]', n => n.textContent), /011 2223 3344/);
+  await d.page.click('dialog.sheet[open] [data-act="pay-approve"][data-method="instapay"]');
+  await $('dialog.modal[open]');
+  assert.match(await d.page.$eval('dialog.modal[open]', n => n.textContent), /اتأكد بنفسك إنه بيستقبل تحويلات/);
+  await d.page.click('dialog.modal[open] .btn--primary');
+  await d.page.waitForFunction(() => /معتمد للزوار/.test(document.querySelector('dialog.sheet[open] .pay-dest[data-method="instapay"]')?.textContent || ''), { timeout: 10000 });
+  const mina = plain(world.as(ADMIN).gs.apiServants()).servants.find(s => s.name === 'مينا عادل');
+  const instapay = mina.pay.find(p => p.method === 'instapay');
+  assert.deepEqual([instapay.number, instapay.source, instapay.approved, instapay.approvedBy], ['01122233344', 'own', true, ADMIN]);
+  assert.equal(mina.pay.find(p => p.method === 'wallet').approved, false, 'each number is approved on its own');
+  await shot('01b-servant-pay');
+  await d.page.evaluate(() => A.closeSheet());
+  await sheetGone();
+});
+
 test('«صفحات الخدمة»: a new page with its cover, its video card; one card in «خدماتنا», read-only there', async () => {
   await d.page.evaluate(() => A.go('pages', 'svcpages'));
   await $('.view .empty-state');

@@ -385,7 +385,14 @@ content.json  events[]           card summary only: { id, slug, kind, title, sho
 
 - `wa` is present only when the servant has `publicWa = '1'` (§10).
 - **No account numbers** (InstaPay handles, wallet numbers, IBAN) are ever
-  published. The servant sends them in the WhatsApp chat.
+  written into event.json (published files stay in the public GitHub
+  history). Phase 1 (docs/BOOKING-PHASE1-COMPLETION-PLAN.md §4.7): an
+  InstaPay / wallet number the PRIMARY admin approved is shown live at the
+  payment step only (`POST /v1/book/pay`, apps-script/PayDest.gs); without
+  one, the servant sends it in the WhatsApp chat as before.
+- `methods[].online`: false = servant-assisted (cash): shown for
+  information, never submitted by a visitor; a servant registers it from
+  the admin.
 - Live state (places left, open/closed) is **not** in the JSON. It comes from
   `bookState` (§6), so the page is right without a re-publish.
 

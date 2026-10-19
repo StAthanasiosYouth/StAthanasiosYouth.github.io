@@ -17,11 +17,29 @@ var EVENT_KINDS = {
   funday: { label: 'يوم ترفيهي', icon: 'star', theme: 'emerald', cta: 'احجز الآن' }
 };
 
+/* online: may a VISITOR pay this way on the site ('1' / '0'; cash is servant-assisted, Phase 1) */
 var PAY_METHOD_SEED = [
-  { key: 'cash', label: 'كاش', icon: '', needsProof: '' },
-  { key: 'instapay', label: 'إنستاباي', icon: '', needsProof: '1' },
-  { key: 'wallet', label: 'محفظة', icon: '', needsProof: '1' }
+  { key: 'cash', label: 'كاش', icon: '', needsProof: '', online: '0' },
+  { key: 'instapay', label: 'إنستاباي', icon: '', needsProof: '1', online: '1' },
+  { key: 'wallet', label: 'محفظة', icon: '', needsProof: '1', online: '1' }
 ];
+
+/*
+ * Is a PayMethods row an online one (the visitor pays on the site and sends
+ * a proof)? '1' / '0' as saved; a row from before the column (blank): a
+ * method that needs a proof is online, one that doesn't (cash) isn't — the
+ * same rule as the Worker's methodOnline (worker/src/book/model.js).
+ */
+function bookMethodOnline_(m) {
+
+  var value = m ? m.online : '';
+
+  if (value === true || value === '1' || value === 1) return true;
+  if (value === false || value === '0' || value === 0) return false;
+
+  return !!m && contentBool_(m.needsProof);
+
+}
 
 var BOOK_LIMITS = {
   title: 80,
@@ -328,7 +346,7 @@ function bookPublicBooking_(spec, servants, servantRows, methodRows, image, onli
       minFirst: spec.payment && spec.payment.minFirst ? spec.payment.minFirst : 0,
       finalDueAt: spec.payment && spec.payment.finalDueAt ? (contentDateTime_(spec.payment.finalDueAt, true) || '') : ''
     },
-    methods: usedMethods.map(function (k) { return { key: k, label: contentLine_(methods[k].label) || k, icon: contentLine_(methods[k].icon), needsProof: contentBool_(methods[k].needsProof) }; }),
+    methods: usedMethods.map(function (k) { return { key: k, label: contentLine_(methods[k].label) || k, icon: contentLine_(methods[k].icon), needsProof: contentBool_(methods[k].needsProof), online: bookMethodOnline_(methods[k]) }; }),
     servants: people
   };
 

@@ -128,7 +128,7 @@ function pagesMethods_(rows) {
   }
 
   return PAY_METHOD_SEED.map(function (m, i) {
-    return { key: m.key, label: m.label, icon: m.icon, needsProof: m.needsProof, order: String((i + 1) * 10), active: '1' };
+    return { key: m.key, label: m.label, icon: m.icon, needsProof: m.needsProof, order: String((i + 1) * 10), active: '1', online: m.online };
   });
 
 }
@@ -589,6 +589,15 @@ function servantInput_(input, library, problems) {
 
   if (publicWa && !phone) problems.push('علشان رقمه يظهر للزوار على واتساب، لازم رقم موبايل');
 
+  // optional own InstaPay / wallet numbers (PayDest.gs): Egyptian mobiles, stored '+20…' like the phone
+  var payNumber = function (value, label) {
+    var raw = contentLine_(value);
+    if (!raw) return '';
+    var e164 = compNormPhoneEg_(raw);
+    if (!e164) problems.push('رقم ' + label + ' لازم يكون رقم موبايل مصري صحيح (010 / 011 / 012 / 015)');
+    return e164 || '';
+  };
+
   return {
     name: input_(input.name, PAGE_LIMITS.servantName, 'الاسم', problems, true),
     phone: phone ? '+' + phone.e164 : '',
@@ -596,7 +605,10 @@ function servantInput_(input, library, problems) {
     image: pagesImageInput_(input.image, 'الصورة', library, problems, false),
     active: input.active !== false,
     publicWa: publicWa,
-    note: input_(input.note, PAGE_LIMITS.note, 'الملاحظة', problems, false)
+    note: input_(input.note, PAGE_LIMITS.note, 'الملاحظة', problems, false),
+    instapayNumber: payNumber(input.instapayNumber, 'إنستاباي'),
+    walletNumber: payNumber(input.walletNumber, 'المحفظة'),
+    payName: input_(input.payName, PAGE_LIMITS.servantName, 'اسم المستفيد', problems, false)
   };
 
 }
@@ -855,20 +867,27 @@ function servantOut_(row) {
     active: contentBool_(row.active),
     publicWa: contentBool_(row.publicWa),
     note: row.note,
-    updatedAt: row.updatedAt
+    updatedAt: row.updatedAt,
+    instapayNumber: row.instapayNumber ? payLocal_(row.instapayNumber) : '',
+    walletNumber: row.walletNumber ? payLocal_(row.walletNumber) : '',
+    payName: row.payName || '',
+    // what a visitor would see, and whether the primary admin approved it (PayDest.gs)
+    pay: payDestsOut_(row)
   };
 
 }
 
 function apiServants() {
 
-  assertAdmin_();
+  var me = assertAdmin_();
 
   var draft = pagesDraft_() || { servants: [], methods: pagesMethods_([]) };
 
   return {
+    // payment numbers: edited and approved by the primary admin only (Phase 1, PayDest.gs)
+    payAdmin: me === primaryAdmin_(),
     servants: draft.servants.map(servantOut_).sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; }),
-    methods: draft.methods.map(function (m) { return { key: m.key, label: m.label, needsProof: contentBool_(m.needsProof), active: contentBool_(m.active) }; }),
+    methods: draft.methods.map(function (m) { return { key: m.key, label: m.label, needsProof: contentBool_(m.needsProof), online: bookMethodOnline_(m), active: contentBool_(m.active) }; }),
     limits: PAGE_LIMITS
   };
 
@@ -882,6 +901,8 @@ function apiServantSave(id, input) {
 
   input = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
 
+  var me = currentEmail_();
+
   var savedId = pagesWrite_('servant.save', function () {
 
     var t = compSheet_('Servants');
@@ -891,6 +912,16 @@ function apiServantSave(id, input) {
 
     if (id && !found) throw new Error('الخادم مش موجود');
     if (id) assertUnlocked_('servant:' + id);
+
+    // the payment numbers and the beneficiary: the primary admin only (Phase 1); others keep what is there
+    if (me !== primaryAdmin_()) {
+      ['instapayNumber', 'walletNumber', 'payName'].forEach(function (field) {
+        var was = found ? String(found.row[field] || '') : '';
+        if (input[field] !== undefined && String(record[field] || '') !== was) problems.push('أرقام الدفع واسم المستفيد بيغيّرها الأدمن الرئيسي بس');
+        record[field] = was;
+      });
+      problems = problems.filter(function (p, i) { return problems.indexOf(p) === i; });
+    }
     if (!id && compRows_(t).length >= PAGE_LIMITS.servants) problems.push('القائمة فيها ' + PAGE_LIMITS.servants + ' خادم بالفعل');
     if (problems.length) fail_(problems);
 
@@ -915,6 +946,9 @@ function apiServantSave(id, input) {
 
   var row = pagesFind_('Servants', savedId).row;
 
+  // the approved InstaPay / wallet set to the Worker (a changed number is no longer approved)
+  payDestSync_();
+
   return { servant: servantOut_(row) };
 
 }
@@ -930,6 +964,9 @@ function apiServantSetActive(id, on) {
     compUpdate_(found.t, found.row.__row, { active: on === true, updatedAt: compNow_().stamp }, found.row);
     activityNote_({ action: on === true ? 'enable' : 'disable', type: 'servant', id: id, title: found.row.name });
   });
+
+  // an inactive servant's numbers leave the booking page
+  payDestSync_();
 
   return apiServants();
 
@@ -959,7 +996,9 @@ function apiPayMethodsSave(list) {
         icon: '',
         needsProof: m.needsProof === true,
         order: String((i + 1) * 10),
-        active: m.active !== false
+        active: m.active !== false,
+        // visitors may pay this way on the site (else: shown for information, a servant registers it from the admin)
+        online: m.online === true ? '1' : m.online === false ? '0' : (m.needsProof === true ? '1' : '0')
       };
     });
 

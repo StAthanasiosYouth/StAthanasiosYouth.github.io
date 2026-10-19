@@ -120,6 +120,24 @@ export function normPhone(value) {
   return /^1[0125]\d{8}$/.test(digits) ? '+20' + digits : '';
 }
 
+/* '+201XXXXXXXXX' (or anything normPhone takes) → '01XXXXXXXXX', the form people read, dial and paste; '' if not a mobile */
+export function localPhone(value) {
+  const e164 = normPhone(value);
+  return e164 ? '0' + e164.slice(3) : '';
+}
+
+/*
+ * May a VISITOR pay this way on the site? (PayMethods `online`, Phase 1:
+ * cash is servant-assisted only — visitors see it, a servant registers it
+ * from the admin.) An event.json published before the flag existed: a
+ * method that needs a proof is an online one, one that doesn't (cash) isn't.
+ */
+export function methodOnline(m) {
+  if (!m) return false;
+  if (m.online === true || m.online === false) return m.online;
+  return m.needsProof === true;
+}
+
 /* one line of plain text: trimmed, control characters and markup brackets gone, clipped */
 export function cleanText(value, max) {
   return String(value == null ? '' : value).replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);

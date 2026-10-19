@@ -85,8 +85,18 @@ Returns `{ open, reason?: 'not_open'|'closed'|'full'|'disabled', opensAt, closes
 - Server price only. When `revision` differs from the published one, the server price still wins and `priceChanged` is set.
 - Free events ignore servant, method and proofs.
 - A method with `needsProof` requires 1–3 proofs.
+- **Only online methods** (Phase 1): a method whose event.json `online` is false — cash, servant-assisted — is refused (`invalid`, `field: 'method'`). An event.json from before the flag: a method that needs a proof is online, one that doesn't isn't.
+- With settings `PAY_DEST` = `'1'`: an InstaPay / wallet choice needs an approved destination for that servant (below), else `invalid` / `method`.
 - Pending bookings don't take places. `full` applies when `seats(counts) > left`.
 - At most 2 pending bookings per phone per event (`limit`).
+
+### `POST /v1/book/pay` — `{ slug, servantId, method, counts? }` (Phase 1)
+The payment card's destination (src/book/pay.js). Never in event.json.
+- Returns `{ method, number: '01xxxxxxxxx', name, amount: n|null, mode: 'full'|'installments', minFirst: n|null, finalDueAt }`. `amount` is the server quote for `counts` (null without them). `Cache-Control: no-store`.
+- Only with `BOOKING_MODULE` and `PAY_DEST` on (else `disabled`), while the window is open, for a servant attached to the event with that online method, and only when the PRIMARY admin approved that servant's number for it (else `invalid`, `field: 'method'`).
+- Limit: 30 per 10 min per IP.
+
+**Destinations** come from Apps Script (apps-script/PayDest.gs), signed like `/v1/sync/admins` (kind `paydest`): `POST /v1/sync/pay-dest { dests: [{ servantId, method, number, name, source: 'own'|'phone', approvedAt, approvedBy }] }` — the whole approved set replaces the table `pay_dest`. A servant's own InstaPay / wallet number, else their phone; shown only while it equals the number the primary admin approved (any change → hidden until approved again). Audited as a count only.
 
 **Turnstile** (`src/book/turnstile.js`):
 - `TURNSTILE_SECRET` set → every new submit needs `turnstile`, checked once with Cloudflare siteverify (production also checks the token's hostname = `SITE_URL`'s). Missing or refused → `turnstile` (403); siteverify unreachable → `busy`.
@@ -154,7 +164,7 @@ Returns `{ status: 'withdrawn' }`. Allowed while pending only; otherwise `final`
 
 | Route | Body | Notes |
 | --- | --- | --- |
-| `POST /v1/admin/book/bookings` | `{ eventId, requestKey, name, phone, counts, names?, servantId?, method?, note?, confirm?: ConfirmBody }` | `source: admin`. Returns the detail |
+| `POST /v1/admin/book/bookings` | `{ eventId, requestKey, name, phone, counts, names?, servantId?, method?, note?, confirm?: ConfirmBody, payments?: [PayInput] }` | `source: admin` (any method, cash included). With `confirm`: confirmed at once (its payments in the confirm body). Without it, `payments` (kind `payment` only, no proofs) are recorded with the booking that stays **pending** — the money a servant took; confirming later counts them. Returns the detail (+ `history`: the booking's audit rows) |
 | `POST /v1/admin/book/bookings/<id>/confirm` | `ConfirmBody = { version, actual: Counts, names?, amountDue, dueReason?, payments?: [PayInput], overrideCap?, overridePay?, reason? }` | §5.1, §9 |
 | `POST /v1/admin/book/bookings/<id>/reject` | `{ version, reason, payments?: [PayInput] }` | money received → refund owed |
 | `POST /v1/admin/book/bookings/<id>/cancel` | `{ version, reason, retain }` | confirmed only; `retain` ≤ paid |
@@ -192,7 +202,10 @@ The Worker counts visitor bookings per event (`book_news`, in the booking's own 
 | --- | --- | --- |
 | `POST /v1/sync/book-news` | signed like `/v1/sync/admins` (`SYNC_SECRET`, kind `booknews`) | `{ groups: [{ eventId, slug, title, count, pending, firstAt, lastAt }] }` |
 
-- Each event is handed out at most once per 10 minutes; bookings in between wait for the next group. At most once (a lost reply loses that push, never doubles it).
+- Each event is handed out at most once per 10 minutes; bookings in between wait for the next group.
+- **v1** (body `{}`): at most once (a lost reply loses that push, never doubles it).
+- **v2** (body `{ v: 2 }`, Phase 1, B7): each group carries `claimId`; Apps Script announces it and acks with `{ v: 2, ack: [claimId…] }` → `{ acked }`. An unacked claim is handed out again after 12 min with the SAME id and count; Apps Script remembers the ids it announced (6 h) and only acks a repeat — at least once, never pushed twice.
+- Push recipients (AdminNotify.gs): every admin except the actor; only the device whose admin panel is OPEN AND IN SIGHT gets the in-panel toast instead (a hidden panel tells the server at once). Their other devices still ring (B8). The Activity row's `notified` (sent:N / present / none / off / error) shows in «سجل النشاط».
 - No names, phones or refs ever cross.
 - Apps Script writes ONE Activity row per group (system actor `visitor`, action `booking.new`, type `bookings`) — the toast for admins with the panel open — and ONE push to every other admin's devices: «٣ حجوزات جديدة – رحلة الإسكندرية», body «مستنيين المراجعة: N», link `/admin/#open/bookings/<eventId>`.
 - Staging only: `GET /v1/admin/diag/book-news?eventId=` shows what waits (no claim); `POST /v1/admin/diag/retention { eventId, atMs }` runs the phone retention for one event as if at `atMs`.

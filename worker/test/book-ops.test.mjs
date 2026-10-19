@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { bookWorld, eventJson, pay } from './book-helpers.mjs';
 import { msStamp } from '../src/book/model.js';
 import { blankPhones, RETENTION } from '../src/scheduled.js';
-import { claimNews, NEWS_COOLDOWN_MS } from '../src/book/news.js';
+import { claimNews, claimNewsV2, NEWS_COOLDOWN_MS, CLAIM_TTL_MS } from '../src/book/news.js';
 import { LOCK_TTL_MS } from '../src/book/locks.js';
 import { signSync } from '../src/lib/sync.js';
 import { SITEVERIFY } from '../src/book/turnstile.js';
@@ -211,6 +211,46 @@ test('news: admin bookings are not news; a refused booking adds nothing', async 
   assert.equal(g[0].count, 2);
 });
 
+test('news v2: a claim stays until acked; unacked → the SAME claim again after the TTL; ack ends it; new bookings wait', async () => {
+  const w = await bookWorld();
+  await pending(w);
+  await pending(w);
+  let ts = Date.now();
+  const first = await syncCall(w, '{"v":2}', { ts });
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  assert.equal(first.body.groups.length, 1);
+  const g = first.body.groups[0];
+  assert.match(g.claimId, /^nc-[0-9a-f]{16}$/);
+  assert.equal(g.count, 2);
+  assert.doesNotMatch(JSON.stringify(first.body), /مينا|\+20|B-[0-9A-Z]{5}/, 'still nothing personal');
+
+  // an open claim isn't handed out again before the TTL, even with new bookings
+  await pending(w);
+  assert.deepEqual((await syncCall(w, '{"v":2}', { ts: ++ts })).body.groups, []);
+  // the reply was lost (no ack): after the TTL the same claim comes back, same id, same count
+  const again = await claimNewsV2(w.env, Date.now() + CLAIM_TTL_MS + 1000);
+  assert.equal(again.length, 1);
+  assert.equal(again[0].claimId, g.claimId);
+  assert.equal(again[0].count, 2);
+
+  // ack → done; the booking that came during the claim waits for the next one (cooldown)
+  const ack = await syncCall(w, JSON.stringify({ v: 2, ack: [g.claimId, 'nc-0000000000000000', 'junk'] }), { ts: ++ts });
+  assert.equal(ack.status, 200, JSON.stringify(ack.body));
+  assert.equal(ack.body.acked, 1);
+  const row = await w.db.prepare('SELECT unsent, claim_id, sent_ms FROM book_news').first();
+  assert.equal(row.unsent, 1);
+  assert.equal(row.claim_id, null);
+  assert.ok(row.sent_ms);
+  assert.equal((await syncCall(w, JSON.stringify({ v: 2, ack: [g.claimId] }), { ts: ++ts })).body.acked, 0, 'acking twice changes nothing');
+  assert.deepEqual(await claimNewsV2(w.env, Date.now() + 60_000), [], 'cooldown');
+  const next = await claimNewsV2(w.env, Date.now() + NEWS_COOLDOWN_MS + 1000);
+  assert.equal(next.length, 1);
+  assert.equal(next[0].count, 1);
+  assert.notEqual(next[0].claimId, g.claimId);
+  // v1 callers never take a v2-claimed row
+  assert.deepEqual(await claimNews(w.env, Date.now() + 2 * NEWS_COOLDOWN_MS), []);
+});
+
 test('news: the sync channel refuses bad signatures, old timestamps and replays', async () => {
   const w = await bookWorld();
   assert.equal((await syncCall(w, '{}', { secret: 'wrong-secret' })).status, 401);
@@ -242,7 +282,7 @@ async function tsWorld(env = {}, answer = { success: true, hostname: 'stathanasi
   const pub = (method, path, body, ip = '198.51.100.7') => w.call(path, { method, body, headers: { 'cf-connecting-ip': ip }, fetch: f });
   const submit = (over = {}) => pub('POST', '/v1/book/submit', {
     slug: 'alex-trip', requestKey: w.key('rq'), name: 'مينا زكريا', phone: phone(), counts: { applicant: 1, adult: 1 },
-    servantId: 'srv-aaaa1111', method: 'cash', hp: '', revision: 'rev1', ...over
+    servantId: 'srv-aaaa1111', method: 'transfer', hp: '', revision: 'rev1', ...over
   });
   return { w, f, pub, submit };
 }
@@ -279,7 +319,7 @@ test('turnstile: a token siteverify refuses → turnstile (reasons), nothing sto
   const down = await bookWorld({ env: { TURNSTILE_SECRET: 'ts-secret', TURNSTILE_SITEKEY: 'k' } });
   const res = await down.call('/v1/book/submit', {
     method: 'POST', fetch: async () => { throw new Error('network'); }, headers: { 'cf-connecting-ip': '198.51.100.9' },
-    body: { slug: 'alex-trip', requestKey: down.key('rq'), name: 'مينا زكريا', phone: phone(), counts: { applicant: 1 }, servantId: 'srv-aaaa1111', method: 'cash', hp: '', turnstile: 't' }
+    body: { slug: 'alex-trip', requestKey: down.key('rq'), name: 'مينا زكريا', phone: phone(), counts: { applicant: 1 }, servantId: 'srv-aaaa1111', method: 'transfer', hp: '', turnstile: 't' }
   });
   assert.equal(res.body.code, 'busy');
 });

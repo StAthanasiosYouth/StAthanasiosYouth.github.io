@@ -266,15 +266,29 @@ function forgetAdminDevices_(email) {
    SENDING
 ========================================================= */
 
-/* is this admin in the panel right now (a heartbeat a moment ago, not left)? */
+/* is this admin LOOKING at the panel right now (a heartbeat a moment ago, not left, not hidden)? */
 function adminPresent_(email, now) {
+
+  return adminPresentDevice_(email, now) !== null;
+
+}
+
+/*
+ * → the device label of the admin's panel when it is open AND in sight right
+ *   now (heartbeat < PRESENCE_ONLINE_SECONDS, not parked, not hidden), else null.
+ *   Only THAT device is spared the push (the panel shows the toast there);
+ *   their other devices — the phone in a pocket while the PC panel is open —
+ *   still get it (B8: before, any open panel silenced every device).
+ */
+function adminPresentDevice_(email, now) {
 
   try {
     var record = readCached_(sessionCacheKey_(email));
-    return !!(record && record.sid && !record.parked && now - Number(record.seen) < PRESENCE_ONLINE_SECONDS * 1000);
+    if (!(record && record.sid && !record.parked && !record.hidden && now - Number(record.seen) < PRESENCE_ONLINE_SECONDS * 1000)) return null;
+    return String(cleanLabel_(record.device, 40) || '').toLowerCase();
   }
   catch (ignored) {
-    return false;
+    return null;
   }
 
 }
@@ -366,15 +380,25 @@ function adminPushNotify_(row, actor) {
   forgetAdminEmails_();
   var admins = adminEmails_();
   var present = {};
+  var spared = 0;
   var rows = pushRows_(sheet, ADMIN_PUSH_COLUMNS).filter(function (sub) {
     var email = String(sub.email).toLowerCase();
     if (email === actor || admins.indexOf(email) === -1) return false;
-    if (present[email] === undefined) present[email] = adminPresent_(email, now);
-    return !present[email];
+    if (present[email] === undefined) present[email] = adminPresentDevice_(email, now);
+    // the device whose panel is in sight gets the in-panel toast instead; a device we can't tell
+    // apart (no label, or the default «جهاز») counts as that one, as before
+    var looking = present[email];
+    var device = String(cleanLabel_(sub.device, 40) || '').toLowerCase();
+    if (device === 'جهاز') device = '';
+    if (looking !== null && (!device || !looking || looking === 'جهاز' || device === looking)) {
+      spared++;
+      return false;
+    }
+    return true;
   });
 
   if (!rows.length) {
-    return { sent: 0, reason: Object.keys(present).some(function (k) { return present[k]; }) ? 'present' : 'none' };
+    return { sent: 0, reason: spared ? 'present' : 'none' };
   }
 
   var outcome;

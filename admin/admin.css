@@ -7506,6 +7506,16 @@ dialog .toasts[popover] {
   /* ---------- «الحجوزات» (AdminBook; only while the Worker's module is on) ---------- */
   .book-link:empty { display: none; }
   .book-link--new { color: var(--gold-ink); background: linear-gradient(180deg, var(--gold-hi), var(--gold)); box-shadow: none; }
+  .dash-book__list { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0 0 .6rem; padding: 0; list-style: none; }
+  .book-kpis { margin-block: .2rem; }
+  .book-phone { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .35rem; }
+  .book-log { margin-block-start: .4rem; }
+  .book-log summary { cursor: pointer; font-weight: 700; color: var(--text-2); }
+  .book-log__list { display: grid; gap: .3rem; margin: .5rem 0 0; padding-inline-start: 1.2rem; font-size: .88rem; color: var(--text-2); }
+  .book-log__when { color: var(--text-3); }
+  .pay-dests { display: grid; gap: .6rem; }
+  .pay-dest { display: grid; gap: .25rem; padding: .6rem .8rem; border: 1px solid var(--line-2); border-radius: var(--radius-sm); }
+  .pay-dest__head { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; }
   .book-head { display: grid; gap: .7rem; }
   .book-facts, .book-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .book-row__ref { font-weight: 800; font-size: .86rem; color: var(--gold-hi); unicode-bidi: isolate; }

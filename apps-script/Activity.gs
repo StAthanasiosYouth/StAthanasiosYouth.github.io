@@ -98,7 +98,9 @@ var ACTIVITY_ACTIONS = ['create', 'update', 'delete', 'archive', 'unarchive', 'e
   // competitions (docs/COMPETITIONS.md §11): never a code, a phone or an answer in `changes`
   'review', 'finalize', 'regrade', 'close', 'code.view', 'code.reset', 'code.export', 'participant.phone', 'points.adjust', 'redemption.status',
   // new visitor bookings, written by BookNotify.gs only (system actor «visitor»)
-  'booking.new'];
+  'booking.new',
+  // the primary admin approves / takes back a servant's InstaPay / wallet number (PayDest.gs): never the number
+  'pay.approve'];
 
 var ACTIVITY_TYPES = ['sessions', 'news', 'games', 'activities', 'notifications', 'types', 'links', 'sections', 'contacts',
   'settings', 'media', 'site', 'admins', 'data', 'session',
@@ -173,6 +175,7 @@ var ACTIVITY_FIELDS = {
   image: 'الصورة', banner: 'البانر', gallery: 'الصور', url: 'الرابط', linkUrl: 'الرابط', ctaLabel: 'الزرار', buttonLabel: 'الزرار',
   cta: 'الزرار', linkLabel: 'الزرار', location: 'المكان', program: 'البرنامج', status: 'الحالة', enabled: 'الظهور',
   publishAt: 'ميعاد الظهور', expireAt: 'ميعاد الاختفاء', visibleFrom: 'يظهر من', visibleUntil: 'يختفي بعد', startAt: 'البداية',
+  instapayNumber: 'رقم إنستاباي', walletNumber: 'رقم المحفظة', payName: 'اسم المستفيد',
   endAt: 'النهاية', durationMinutes: 'المدة', phone: 'الرقم', role: 'الدور', method: 'طريقة التواصل', icon: 'الأيقونة',
   theme: 'الشكل', badge: 'الشارة', section: 'القسم', type: 'النوع', target: 'بيفتح', featured: 'مميز', pinned: 'متثبت',
   tone: 'اللون', display: 'العرض', displayMobile: 'العرض على الموبايل', style: 'الشكل', experience: 'التجربة',
@@ -540,6 +543,7 @@ function activitySummary_(entry) {
       return 'عدّل نقاط ' + quoted(title) + (typeof changes.amount === 'number' ? ' (' + (changes.amount > 0 ? '+' : '−') + activityDigits_(Math.abs(changes.amount)) + ')' : '');
     case 'redemption.status': return 'غيّر حالة ' + thing + ({ approved: ' لـ «جاهزة للاستلام»', fulfilled: ' لـ «اتسلمت»', cancelled: ' لـ «اتلغت»' }[changes.status] || '');
     case 'live.stage': return 'غيّر الفقرة الحالية في ' + thing;
+    case 'pay.approve': return (changes.off ? 'شال اعتماد رقم ' : 'اعتمد رقم ') + activityText_(changes.method || 'الدفع', 20) + ' بتاع ' + quoted(title);
     case 'admin.add': return 'ضاف ' + quoted(title) + ' للوحة التحكم';
     case 'admin.remove': return 'شال صلاحية ' + quoted(changes.name || title);
     case 'admin.rename': return 'غيّر اسم ' + quoted(title) + ' لـ ' + quoted(changes.to || title);

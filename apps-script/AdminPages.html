@@ -1176,6 +1176,15 @@
      SERVANTS AND PAYMENT METHODS
   ======================================================= */
 
+  /* the payment methods that carry a number (PayDest.gs PAY_DEST_METHODS) */
+  var PAY_LABELS = { instapay: 'إنستاباي', wallet: 'المحفظة' };
+
+  /* '01012345678' → '010 1234 5678' (for reading; the number itself is never changed) */
+  function groupedNumber(local) {
+    var t = String(local || '');
+    return /^01\d{9}$/.test(t) ? t.slice(0, 3) + ' ' + t.slice(3, 7) + ' ' + t.slice(7) : t;
+  }
+
   A.views.servants = function () {
 
     if (!official()) return [recoveryNotice()];
@@ -1205,7 +1214,10 @@
           title: s.name,
           sub: [s.role, s.phone].filter(Boolean).join(' · '),
           off: !s.active,
-          chips: [s.publicWa ? A.chip('رقمه ظاهر للزوار', 'ok') : A.chip('رقمه مش ظاهر', 'off'), s.active ? null : A.chip('موقوف', 'off')].filter(Boolean),
+          chips: [s.publicWa ? A.chip('رقمه ظاهر للزوار', 'ok') : A.chip('رقمه مش ظاهر', 'off'), s.active ? null : A.chip('موقوف', 'off')]
+            .concat((s.pay || []).filter(function (p) { return p.number; }).map(function (p) {
+              return p.approved ? A.chip(PAY_LABELS[p.method] + ' معتمد', 'ok') : A.chip(PAY_LABELS[p.method] + ' محتاج اعتماد', 'gold');
+            })).filter(Boolean),
           controls: [
             el('span', { class: 'spacer' }),
             el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function (e) {
@@ -1226,11 +1238,12 @@
       var rows = methods.map(function (m) {
         var label = A.textInput(m.label, { max: 24 });
         var proof = A.checkbox('محتاج إثبات دفع', !!m.needsProof);
+        var online = A.checkbox('الزوار يدفعوا بيها من الموقع', m.online === true, 'مقفولة: بتظهر للزوار للمعلومة بس (زي الكاش)، والخادم يسجّل الحجز من لوحة التحكم بعد ما يستلم');
         var on = A.checkbox('متاحة', m.active !== false);
-        return { key: m.key, label: label, proof: proof, on: on, node: el('div', { class: 'pages-method' }, el('code', { text: m.key }), A.field('الاسم', label), proof.node, on.node) };
+        return { key: m.key, label: label, proof: proof, online: online, on: on, node: el('div', { class: 'pages-method' }, el('code', { text: m.key }), A.field('الاسم', label), proof.node, online.node, on.node) };
       });
       var save = el('button', { class: 'btn btn--small btn--primary', type: 'button', text: 'حفظ طرق الدفع', onclick: function () {
-        A.withBusy(save, A.call('apiPayMethodsSave', rows.map(function (r) { return { key: r.key, label: r.label.value, needsProof: r.proof.input.checked, active: r.on.input.checked }; })))
+        A.withBusy(save, A.call('apiPayMethodsSave', rows.map(function (r) { return { key: r.key, label: r.label.value, needsProof: r.proof.input.checked, online: r.online.input.checked, active: r.on.input.checked }; })))
           .then(function (next) { A.dirty = false; reply = next; drawMethods(next.methods); A.toast('اتحفظت ✓'); })
           .catch(function (error) { A.fail(error, box); });
       } });
@@ -1248,18 +1261,85 @@
       var publicWa = A.checkbox('رقمه يظهر للزوار على واتساب', !!s.publicWa, 'بموافقته بس: بيظهر زرار واتساب في صفحات الفعاليات والفرق');
       var active = A.checkbox('متاح', s.active !== false);
       var note = A.counted('ملاحظة (للأدمن بس)', s.note, 200, 'مبتظهرش في الموقع');
+
+      // «أرقام الدفع» (PayDest.gs): own numbers or the phone; shown to visitors only once the primary admin approves
+      var payAdmin = !!(reply && reply.payAdmin);
+      var instapay = A.textInput(s.instapayNumber || '', { ltr: true, inputmode: 'tel', placeholder: 'فاضي = رقم الموبايل' });
+      var wallet = A.textInput(s.walletNumber || '', { ltr: true, inputmode: 'tel', placeholder: 'فاضي = رقم الموبايل' });
+      var payName = A.textInput(s.payName || '', { max: 60, placeholder: 'اختياري: الاسم اللي بيظهر في التحويل' });
+      [instapay, wallet, payName].forEach(function (input) {
+        input.disabled = !payAdmin;
+        input.addEventListener('input', function () { payBox.dataset.changed = '1'; drawPay(s.pay); });
+      });
+      var payBox = el('div', { class: 'pay-dests', 'data-pay': '1' });
+
+      function drawPay(list) {
+        var changed = payBox.dataset.changed === '1' || phone.value !== (s.phone || '');
+        A.fill(payBox, (list || []).map(function (p) {
+          var label = PAY_LABELS[p.method] || p.method;
+          var line = p.number
+            ? el('span', {}, el('bdi', { class: 'ltr', dir: 'ltr', text: groupedNumber(p.number) }), p.source === 'phone' ? ' (من رقم الموبايل)' : '')
+            : el('span', { text: 'مفيش رقم' });
+          var approve = !isNew && payAdmin && p.number && !p.approved
+            ? el('button', { class: 'btn btn--small btn--primary', type: 'button', 'data-act': 'pay-approve', 'data-method': p.method, disabled: changed ? 'disabled' : null, onclick: function (e) { decide(p, true, e.currentTarget); } }, icon('check'), 'اعتمد رقم الدفع ده')
+            : null;
+          var revoke = !isNew && payAdmin && p.approved
+            ? el('button', { class: 'btn btn--small btn--ghost', type: 'button', 'data-act': 'pay-revoke', 'data-method': p.method, onclick: function (e) { decide(p, false, e.currentTarget); } }, 'شيل الاعتماد')
+            : null;
+          return el('div', { class: 'pay-dest', 'data-method': p.method },
+            el('p', { class: 'pay-dest__head' }, el('strong', { text: label + ': ' }), line, ' ',
+              p.approved ? A.chip('معتمد للزوار', 'ok') : p.number ? A.chip('مش ظاهر للزوار', 'gold') : A.chip('مقفول', 'off')),
+            p.problem ? el('p', { class: 'field__hint', text: p.problem }) : null,
+            el('div', { class: 'actions' }, approve, revoke));
+        }), changed && payAdmin && !isNew ? el('p', { class: 'note', text: 'احفظ الأول، وبعدين اعتمد الرقم الجديد.' }) : null);
+      }
+
+      function decide(p, on, button) {
+        ebox.hidden = true;
+        var go = function () {
+          A.withBusy(button, A.call('apiServantPayApprove', s.id, p.method, p.number, on)).then(function (next) {
+            reply = next;
+            var fresh = (next.servants || []).filter(function (x) { return x.id === s.id; })[0];
+            if (fresh) { s = fresh; drawPay(fresh.pay); }
+            A.toast(on ? 'الرقم اتعتمد ✓ وبقى بيظهر للزوار في خطوة الدفع' : 'الاعتماد اتشال');
+            draw(next);
+          }).catch(function (error) { A.fail(error, ebox); });
+        };
+        if (!on) return go();
+        A.confirm({
+          title: 'تعتمد ' + groupedNumber(p.number) + ' رقم ' + (PAY_LABELS[p.method] || '') + ' لـ ' + s.name + '؟',
+          message: 'الزوار هيحوّلوا الفلوس على الرقم ده. اتأكد بنفسك إنه بيستقبل تحويلات.',
+          confirmLabel: 'اعتمد'
+        }).then(function (ok) { if (ok) go(); });
+      }
+
+      drawPay(s.pay || []);
+
       var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
       save.addEventListener('click', function () {
         ebox.hidden = true;
-        A.withBusy(save, A.call('apiServantSave', isNew ? null : s.id, { name: name.input.value, phone: phone.value, role: role.input.value, image: image.value(), publicWa: publicWa.input.checked, active: active.input.checked, note: note.input.value }))
+        var input = { name: name.input.value, phone: phone.value, role: role.input.value, image: image.value(), publicWa: publicWa.input.checked, active: active.input.checked, note: note.input.value };
+        if (payAdmin) {
+          input.instapayNumber = instapay.value;
+          input.walletNumber = wallet.value;
+          input.payName = payName.value;
+        }
+        A.withBusy(save, A.call('apiServantSave', isNew ? null : s.id, input))
           .then(function () { A.dirty = false; A.closeSheet(); A.toast('اتحفظ ✓'); load(); })
           .catch(function (error) { A.fail(error, ebox); });
       });
       A.dirty = false;
       A.openSheet(isNew ? 'خادم جديد' : 'تعديل: ' + s.name, [
         ebox,
-        el('div', { class: 'form' }, name.node, A.field('رقم الموبايل', phone, 'بيتكتب بأي شكل (010… أو +20…)'), role.node, image.node, publicWa.node, active.node, note.node)
+        el('div', { class: 'form' }, name.node, A.field('رقم الموبايل', phone, 'بيتكتب بأي شكل (010… أو +20…)'), role.node, image.node, publicWa.node, active.node, note.node,
+          el('p', { class: 'section-label', text: 'أرقام الدفع (إنستاباي والمحفظة)' }),
+          el('p', { class: 'field__hint', text: payAdmin
+            ? 'لو سبت الرقم فاضي بيتاخد رقم الموبايل. الرقم مبيظهرش للزوار في خطوة الدفع غير بعد ما تعتمده بنفسك، وأي تغيير فيه محتاج اعتماد تاني. مستقل عن ظهور الواتساب.'
+            : 'أرقام الدفع بيغيّرها ويعتمدها الأدمن الرئيسي بس.' }),
+          A.field('رقم إنستاباي', instapay, 'اختياري'), A.field('رقم المحفظة', wallet, 'اختياري'), A.field('اسم المستفيد', payName, 'اختياري: بيظهر للزوار جنب الرقم'),
+          payBox)
       ], A.sheetFooter(save), { lock: isNew ? null : A.editLock('servant', s.id, 'الخادم «' + s.name + '»', function () { A.closeSheet(); load(); }) });
+      phone.addEventListener('input', function () { drawPay(s.pay || []); });
     }
 
     load();
@@ -1269,7 +1349,7 @@
         el('div', { class: 'actions' }, el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { servantEditor(null); } }, icon('plus'), 'خادم جديد')),
         box,
         body),
-      A.card('طرق الدفع', 'اللي الخدام بيقبلوها (كاش، إنستاباي، محفظة…). أرقام الحسابات نفسها مبتتنشرش: الخادم بيبعتها على واتساب.', methodsBody)
+      A.card('طرق الدفع', 'اللي الخدام بيقبلوها (كاش، إنستاباي، محفظة…). الكاش للمعلومة بس في الموقع: الخادم يسجّل الحجز بعد ما يستلم. أرقام إنستاباي والمحفظة بتظهر في خطوة الدفع بس بعد اعتماد الأدمن الرئيسي، ومبتتنشرش في الموقع.', methodsBody)
     ];
 
   };

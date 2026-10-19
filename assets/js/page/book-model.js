@@ -163,10 +163,65 @@ export function checkWho(booking, { name, phone, counts, names }, left = null) {
 
 /** step b: a servant of this event, and one of that servant's methods */
 export function checkPay(booking, { servantId, method }) {
-  const servant = booking.servants.find(s => s.id && s.id === servantId && s.methods.length);
+  const servant = booking.servants.find(s => s.id && s.id === servantId && onlineMethodsOf(booking, s).length);
   if (!servant) return { servantId: 'اختار الخادم اللي هتدفع له.' };
   if (!servant.methods.includes(method)) return { method: 'اختار طريقة الدفع.' };
+  if (!methodOnline(booking.methods.find(m => m.key === method))) return { method: 'الطريقة دي بتتدفع مع الخادم نفسه: كلّمه وهو هيسجّل حجزك.' };
   return {};
+}
+
+/*
+ * May a visitor pay this way on the site? (event.json `online`; cash is
+ * servant-assisted — shown for information, registered by the servant.)
+ * An event.json from before the flag: a method that needs a proof is online.
+ * The same rule as the Worker (worker/src/book/model.js methodOnline).
+ */
+export function methodOnline(m) {
+  if (!m) return false;
+  if (m.online === true || m.online === false) return m.online;
+  return m.needsProof === true;
+}
+
+/** the servant's methods a visitor can pick on the site */
+export function onlineMethodsOf(booking, servant) {
+  return servant ? servant.methods.filter(k => methodOnline(booking.methods.find(m => m.key === k))) : [];
+}
+
+/** the servants who take a method visitors can't pay online (cash): the «كاش مع الخادم» card */
+export function offlineServants(booking) {
+  const offline = new Set(booking.methods.filter(m => !methodOnline(m)).map(m => m.key));
+  return booking.servants.filter(s => s.id && s.methods.some(k => offline.has(k)))
+    .map(s => ({ ...s, offline: s.methods.filter(k => offline.has(k)) }));
+}
+
+/*
+ * A payment number as apps take it when pasted: ASCII digits only, local
+ * form 01XXXXXXXXX — no +20, no spaces, no Arabic-Indic digits, no bidi
+ * marks (InstaPay's and the wallets' «mobile number» fields). '' if not a mobile.
+ */
+export function payCopyText(value) {
+  const e164 = normPhone(value);
+  return e164 ? '0' + e164.slice(3) : '';
+}
+
+/** '01012345678' → '010 1234 5678' (for reading only; the copy is the plain digits) */
+export function payGrouped(local) {
+  const t = payCopyText(local);
+  return t ? `${t.slice(0, 3)} ${t.slice(3, 7)} ${t.slice(7)}` : '';
+}
+
+/** the cash card's WhatsApp text: this event, this visitor, cash with the servant */
+export function cashMessage(event, servant, { name, counts }) {
+  const booking = event.booking;
+  const who = line(name, NAME_MAX);
+  const lines = [`سلام يا ${servant.name}، ${who ? `أنا ${who} و` : ''}عايز أحجز في «${event.title}» وأدفع كاش.`];
+  for (const c of booking.pricing.categories) {
+    const n = (counts && counts[c.key]) || 0;
+    if (n) lines.push(`- ${c.label}: ${arabicDigits(n)}`);
+  }
+  if (counts && Object.keys(counts).some(k => counts[k])) lines.push(`الإجمالي: ${money(totalOf(booking, counts))}`);
+  lines.push('ممكن تسجّل حجزي لما أدفعلك؟');
+  return lines.join('\n');
 }
 
 /** does this method need a proof picture (§6: needsProof → 1–3) */
@@ -250,6 +305,7 @@ export function emptyDraft(booking, requestKey, now) {
     names: [],
     servantId: '',
     method: '',
+    pay: '',
     note: '',
     agreed: false,
     requestKey,
@@ -272,6 +328,8 @@ export function readDraft(raw, booking, now) {
     names: Array.isArray(raw.names) ? raw.names.slice(0, 50).map(n => line(n, NAME_MAX)) : [],
     servantId: line(raw.servantId, 60),
     method: line(raw.method, 20),
+    // reached the payment card (shown) / copied the number (copied): a return from the app lands there
+    pay: raw.pay === 'copied' || raw.pay === 'shown' ? raw.pay : '',
     note: typeof raw.note === 'string' ? raw.note.slice(0, NOTE_MAX) : '',
     agreed: false,
     requestKey: raw.requestKey,
@@ -292,6 +350,7 @@ export function storeDraft(draft, now) {
     names: draft.names,
     servantId: draft.servantId,
     method: draft.method,
+    pay: draft.pay || '',
     note: draft.note,
     requestKey: draft.requestKey,
     proofs: draft.proofs.map(p => ({ proofId: p.proofId, claim: p.claim })),

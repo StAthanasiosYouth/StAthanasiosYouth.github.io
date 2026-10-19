@@ -301,7 +301,8 @@ function cleanBooking(raw) {
 
   const methodKeys = new Set();
   const methods = list(raw.methods)
-    .map(m => ({ key: key(m.key), label: line(m.label, 24), icon: id(m.icon), needsProof: m.needsProof === true }))
+    // online: visitors pay this way on the site (false: cash with the servant, for information); absent → «needs a proof»
+    .map(m => ({ key: key(m.key), label: line(m.label, 24), icon: id(m.icon), needsProof: m.needsProof === true, online: m.online === true || m.online === false ? m.online : m.needsProof === true }))
     .filter(m => m.key && m.label && !methodKeys.has(m.key) && methodKeys.add(m.key))
     .slice(0, 8);
 

@@ -194,6 +194,7 @@ function apiFunctions_() {
     apiServantSave: apiServantSave,
     apiServantSetActive: apiServantSetActive,
     apiPayMethodsSave: apiPayMethodsSave,
+    apiServantPayApprove: apiServantPayApprove,
     apiHomeOrder: apiHomeOrder
   };
 

@@ -29,7 +29,8 @@ import { stepCount, canStep, totalOf, money, waWithText } from './model.js';
 import {
   liveState, stepsFor, isFree, peopleCount, peopleOf, peopleText, normPhone, checkWho, checkPay, checkSend,
   needsProof, newRequestKey, submitBody, payMessage, emptyDraft, bookingError, statusWord, statusHref,
-  mineFor, isRef, isToken, PROOFS_MAX, NOTE_MAX, NAME_MAX
+  mineFor, isRef, isToken, PROOFS_MAX, NOTE_MAX, NAME_MAX,
+  methodOnline, onlineMethodsOf, offlineServants, payCopyText, payGrouped, cashMessage
 } from './book-model.js';
 import { loadDraft, saveDraft, clearDraft, loadMine, rememberBooking, forgetBooking } from './book-store.js';
 import { prepareImage, UNSUPPORTED } from './image.js';
@@ -40,7 +41,7 @@ import { mountTurnstile } from './turnstile.js';
 
 const PROOF_ID = /^prf-[a-z2-7]{8}$/;
 
-const STEP_TITLES = { a: 'مين جاي؟', b: 'الدفع للخادم', c: 'صورة الدفع وتأكيد الطلب' };
+const STEP_TITLES = { a: 'مين جاي؟', b: 'الدفع', c: 'صورة التحويل وتأكيد الطلب' };
 
 const SECTION_CLASS = { open: 'is-open', not_open: 'is-before', closed: 'is-closed', full: 'is-closed' };
 
@@ -116,6 +117,8 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
   let mode = 'start';         // start | flow | done
   let draft = loadDraft(slug, booking);
   let resumed = !!draft;
+  // back from the payment app after copying the number: the card says «رجعت؟»
+  const backFromApp = !!(draft && draft.pay === 'copied');
   let proofs = (draft ? draft.proofs : []).map(p => ({ id: nextId(), state: 'saved', proofId: p.proofId, claim: p.claim, url: '', blob: null, error: '' }));
   let done = null;            // the submit reply
   let sending = false;
@@ -154,6 +157,21 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
   }
 
   addEventListener('pagehide', saveNow);
+
+  // off to InstaPay / the wallet / WhatsApp and back: iOS doesn't always fire pagehide on an app
+  // switch, so the draft is also saved when the page goes out of sight; back after a while,
+  // the Turnstile token (≈5 min) is renewed before the send
+  let hiddenAt = 0;
+  function onVisibility() {
+    if (document.visibilityState === 'hidden') {
+      hiddenAt = Date.now();
+      saveNow();
+    }
+    else if (hiddenAt && Date.now() - hiddenAt > 4 * 60 * 1000 && captcha) {
+      captcha.reset();
+    }
+  }
+  document.addEventListener('visibilitychange', onVisibility);
 
 
   /* ---------- the live state ---------- */
@@ -518,30 +536,167 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
 
   /* ---------- b: servant and method ---------- */
 
+  /*
+   * Online methods only are picked here (cash is servant-assisted: the
+   * «كاش مع الخادم» card under it, WhatsApp prefilled, the servant registers
+   * the booking). InstaPay / a wallet: the payment card — the amount, the
+   * number the primary admin approved (POST /v1/book/pay: never in
+   * event.json), «نسخ الرقم», what to do in the app, then «تم التحويل» → the
+   * screenshot step. Another online method: talk to the servant as before.
+   */
+  const PAY_CARD = new Set(['instapay', 'wallet']);
+  const payCache = new Map();         // `${servant}|${method}|${counts}` → the /v1/book/pay reply
+
+  async function copyNumber(text, button, help) {
+    let ok = false;
+    try {
+      if (navigator.clipboard && globalThis.isSecureContext !== false) {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      }
+    }
+    catch {
+      ok = false;
+    }
+    if (!ok) {
+      // older browsers: a hidden field + the copy command
+      const area = h('textarea', { class: 'bk-copy-field', readonly: true, 'aria-hidden': 'true', tabindex: '-1' });
+      area.value = text;
+      document.body.append(area);
+      area.select();
+      try { ok = document.execCommand('copy'); }
+      catch { ok = false; }
+      area.remove();
+    }
+    if (ok) {
+      const label = button.lastChild;
+      label.textContent = 'اتنسخ الرقم ✓';
+      button.classList.add('is-done');
+      setTimeout(() => { label.textContent = 'نسخ الرقم'; button.classList.remove('is-done'); }, 2000);
+      help.textContent = '';
+      announce('اتنسخ الرقم');
+      draft.pay = 'copied';
+      saveNow();
+    }
+    else {
+      // nothing could copy: select the number for a long-press copy
+      const number = button.closest('.bk-paycard').querySelector('.bk-paycard__number');
+      const range = document.createRange();
+      range.selectNodeContents(number);
+      const sel = getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      help.textContent = 'مقدرناش ننسخ لوحدنا: اضغط على الرقم كتير واختار «نسخ».';
+    }
+    return ok;
+  }
+
   function stepPay() {
 
-    const servants = booking.servants.filter(s => s.id && s.methods.length);
-    const methodLabel = new Map(booking.methods.map(m => [m.key, m.label]));
+    const methodOf = new Map(booking.methods.map(m => [m.key, m]));
+    const servants = booking.servants.filter(s => s.id && onlineMethodsOf(booking, s).length);
+    const cashServants = offlineServants(booking);
     const methodsBox = h('div', { class: 'bk-choices' });
-    const waBox = h('div', { class: 'bk-wa' });
+    const payBox = h('div', { class: 'bk-wa bk-pay', 'aria-live': 'polite' });
+    const next = h('button', { class: 'btn btn--primary bk-next', type: 'submit' }, h('span', {}, 'دفعت، كمّل'), icon('arrow'));
+    let ready = true;                 // the next button may go on
 
     function servantOf() {
       return servants.find(s => s.id === draft.servantId) || null;
     }
 
-    function renderWa() {
-      const servant = servantOf();
-      if (!servant) {
-        waBox.replaceChildren();
-        return;
-      }
+    function setNext(label, on) {
+      next.firstChild.textContent = label;
+      next.disabled = !on;
+      ready = on;
+    }
+
+    function talkToServant(servant) {
       const href = servant.wa ? waWithText(servant.wa, payMessage(event, servant, { name: draft.fields.name, counts: draft.counts, method: draft.method })) : '';
-      waBox.replaceChildren(
+      payBox.replaceChildren(
         href
           ? h('a', { class: 'btn btn--wa bk-wa__btn', href, target: '_blank', rel: 'noopener', onclick: saveNow }, icon('whatsapp'), 'كلّم الخادم على واتساب', h('span', { class: 'visually-hidden' }, ' (بيفتح واتساب)'))
           : h('p', { class: 'bk-note' }, `اتفق مع ${servant.name} على الدفع.`),
         h('p', { class: 'bk-note bk-note--strong' }, 'بعد ما تدفع ارجع هنا وكمّل الحجز.')
       );
+      setNext('دفعت، كمّل', true);
+    }
+
+    function amountLine(reply) {
+      const total = reply && Number.isFinite(reply.amount) ? reply.amount : totalOf(booking, draft.counts);
+      if (reply && reply.mode === 'installments' && reply.minFirst > 0 && reply.minFirst < total) {
+        return h('p', { class: 'bk-paycard__amount' }, 'حوّل مقدم ', h('strong', {}, `${money(reply.minFirst)} على الأقل`), ` من الإجمالي ${money(total)}`);
+      }
+      return h('p', { class: 'bk-paycard__amount' }, 'المطلوب تحوّله: ', h('strong', {}, money(total)));
+    }
+
+    function payCard(servant, method, reply) {
+      const m = methodOf.get(method);
+      const label = (m && m.label) || method;
+      const number = payCopyText(reply.number);
+      const help = h('p', { class: 'bk-field__hint bk-paycard__help', role: 'status' });
+      const copy = h('button', { class: 'btn bk-copy', type: 'button', 'data-act': 'copy-number' }, icon('copy'), h('span', {}, 'نسخ الرقم'));
+      copy.addEventListener('click', () => copyNumber(number, copy, help));
+      payBox.replaceChildren(h('div', { class: 'bk-paycard', 'data-method': method },
+        amountLine(reply),
+        h('p', { class: 'bk-paycard__label' }, `رقم ${label} بتاع ${servant.name}`),
+        h('p', { class: 'bk-paycard__number', dir: 'ltr', translate: 'no' }, payGrouped(number)),
+        reply.name ? h('p', { class: 'bk-paycard__name' }, 'الاسم اللي هيظهرلك: ', h('bdi', {}, reply.name)) : null,
+        copy,
+        help,
+        h('ol', { class: 'bk-paycard__steps' },
+          h('li', {}, `انسخ الرقم وافتح تطبيق ${method === 'wallet' ? 'المحفظة' : 'إنستاباي'}.`),
+          h('li', {}, 'حوّل المبلغ للرقم ده.'),
+          h('li', {}, 'خد سكرين شوت للتحويل.'),
+          h('li', {}, 'ارجع هنا ودوس «تم التحويل» وارفع الصورة.')),
+        draft.pay === 'copied' && backFromApp ? h('p', { class: 'bk-note bk-note--strong' }, 'رجعت؟ لو حوّلت دوس «تم التحويل».') : null
+      ));
+      if (draft.pay !== 'copied') draft.pay = 'shown';
+      saveSoon();
+      setNext('تم التحويل', true);
+    }
+
+    async function renderPay() {
+      const servant = servantOf();
+      const method = draft.method;
+      if (!servant || !method) {
+        payBox.replaceChildren();
+        setNext('دفعت، كمّل', true);
+        return;
+      }
+      if (!PAY_CARD.has(method)) {
+        talkToServant(servant);
+        return;
+      }
+      const key = `${servant.id}|${method}|${JSON.stringify(draft.counts)}`;
+      let reply = payCache.get(key);
+      if (!reply) {
+        payBox.replaceChildren(h('p', { class: 'bk-note' }, 'بنجيب رقم التحويل…'));
+        setNext('تم التحويل', false);
+        reply = await api.pay(slug, servant.id, method, draft.counts);
+        if (reply.ok || reply.code === 'invalid' || reply.code === 'disabled') payCache.set(key, reply);
+      }
+      // the visitor picked something else meanwhile
+      if (servantOf() !== servant || draft.method !== method || destroyed) return;
+      if (reply.ok && payCopyText(reply.number)) {
+        payCard(servant, method, reply);
+        return;
+      }
+      if (reply.code === 'disabled') {
+        // the payment card isn't switched on: the number comes from the servant, as before
+        talkToServant(servant);
+        return;
+      }
+      const label = (methodOf.get(method) || {}).label || method;
+      if (reply.code === 'invalid') {
+        payBox.replaceChildren(h('p', { class: 'bk-alert', role: 'alert' }, `${label} مش متاح مع ${servant.name} دلوقتي. اختار خادم تاني أو طريقة تانية${cashServants.length ? '، أو ادفع كاش مع الخادم' : ''}.`));
+        setNext('تم التحويل', false);
+        return;
+      }
+      const again = h('button', { class: 'btn', type: 'button' }, 'جرّب تاني');
+      again.addEventListener('click', () => { payCache.delete(key); renderPay(); });
+      payBox.replaceChildren(h('p', { class: 'bk-alert', role: 'alert' }, bookingError(reply).message || 'مقدرناش نجيب رقم التحويل. جرّب تاني.'), again);
+      setNext('تم التحويل', false);
     }
 
     function renderMethods() {
@@ -550,19 +705,45 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
         methodsBox.replaceChildren();
         return;
       }
-      if (!servant.methods.includes(draft.method)) draft.method = servant.methods.length === 1 ? servant.methods[0] : '';
+      const keys = onlineMethodsOf(booking, servant);
+      if (!keys.includes(draft.method)) draft.method = keys.length === 1 ? keys[0] : '';
       methodsBox.replaceChildren(group('method', 'هتدفع إزاي؟',
-        h('div', { class: 'bk-chips' }, servant.methods.map(key => {
+        h('div', { class: 'bk-chips' }, keys.map(key => {
           const input = h('input', { type: 'radio', name: 'bk-method', value: key, id: `bk-method-${key}`, checked: draft.method === key });
           input.addEventListener('change', () => {
             draft.method = key;
+            draft.pay = '';
             showErrors({}, { focus: false, only: ['method'] });
-            renderWa();
+            renderPay();
             saveSoon();
           });
-          return h('label', { class: 'bk-chip', for: input.id }, input, h('span', {}, methodLabel.get(key) || key));
+          return h('label', { class: 'bk-chip', for: input.id }, input, h('span', {}, (methodOf.get(key) || {}).label || key));
         }))
       ));
+    }
+
+    // «كاش مع الخادم»: for information — the servant registers the booking after taking the money
+    const cashLabel = booking.methods.filter(m => !methodOnline(m)).map(m => m.label).join(' / ') || 'كاش';
+    const cashCard = cashServants.length ? h('div', { class: 'bk-cash', 'data-cash': '1' },
+      h('p', { class: 'bk-cash__title' }, `هتدفع ${cashLabel}؟`),
+      h('p', { class: 'bk-note' }, 'بتدفع للخادم نفسه، وهو اللي بيسجّل حجزك بعد ما يستلم. مش محتاج تبعت الطلب من هنا.'),
+      h('ul', { class: 'bk-cash__list' }, cashServants.map(s => h('li', { class: 'bk-cash__who' },
+        h('span', { class: 'bk-pick__name' }, s.name),
+        s.role ? h('span', { class: 'bk-pick__role' }, ` · ${s.role}`) : null,
+        // the WhatsApp link only with the servant's consent (publicWa → event.json `wa`)
+        s.wa
+          ? h('a', { class: 'btn btn--wa bk-cash__wa', href: waWithText(s.wa, cashMessage(event, s, { name: draft.fields.name, counts: draft.counts })), target: '_blank', rel: 'noopener', onclick: saveNow },
+            icon('whatsapp'), `واتساب ${s.name}`, h('span', { class: 'visually-hidden' }, ' (بيفتح واتساب)'))
+          : h('span', { class: 'bk-note' }, ' — كلّمه في الكنيسة')
+      )))
+    ) : null;
+
+    if (!servants.length) {
+      // nothing to pay online here: the cash card is the way
+      return h('div', { class: 'bk-form' },
+        h('p', { class: 'bk-total' }, h('span', {}, 'المطلوب'), h('strong', {}, money(totalOf(booking, draft.counts)))),
+        cashCard || h('p', { class: 'bk-note' }, 'الدفع للفعالية دي مع الخادم مباشرة.'),
+        actions(backButton('رجوع', () => go('a')), null));
     }
 
     const picks = group('servantId', 'هتدفع لمين؟',
@@ -570,9 +751,10 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
         const input = h('input', { type: 'radio', name: 'bk-servant', value: s.id, id: `bk-servant-${s.id}`, checked: draft.servantId === s.id });
         input.addEventListener('change', () => {
           draft.servantId = s.id;
+          draft.pay = '';
           showErrors({}, { focus: false, only: ['servantId', 'method'] });
           renderMethods();
-          renderWa();
+          renderPay();
           saveSoon();
         });
         const initial = Array.from(s.name.replace(/^(أ\.|م\.|د\.|ابونا|أبونا)\s*/, ''))[0] || '؟';
@@ -582,29 +764,30 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
           h('span', { class: 'bk-pick__who' },
             h('span', { class: 'bk-pick__name' }, s.name),
             s.role ? h('span', { class: 'bk-pick__role' }, s.role) : null,
-            h('span', { class: 'bk-pick__methods' }, s.methods.map(k => methodLabel.get(k)).filter(Boolean).join(' · '))
+            h('span', { class: 'bk-pick__methods' }, onlineMethodsOf(booking, s).map(k => (methodOf.get(k) || {}).label).filter(Boolean).join(' · '))
           )
         );
       }))
     );
 
-    const next = h('button', { class: 'btn btn--primary bk-next', type: 'submit' }, 'دفعت، كمّل', icon('arrow'));
     const form = h('form', { class: 'bk-form', novalidate: true },
       h('p', { class: 'bk-total' }, h('span', {}, 'المطلوب'), h('strong', {}, money(totalOf(booking, draft.counts)))),
       picks,
       methodsBox,
-      waBox,
-      actions(backButton('رجوع', () => go('a')), next)
+      payBox,
+      actions(backButton('رجوع', () => go('a')), next),
+      cashCard
     );
 
     form.addEventListener('submit', submitEvent => {
       submitEvent.preventDefault();
+      if (!ready) return;
       if (!showErrors(checkPay(booking, draft))) return;
       go('c');
     });
 
     renderMethods();
-    renderWa();
+    renderPay();
     return form;
 
   }
@@ -945,6 +1128,7 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
       saveNow();
       dropCaptcha();
       removeEventListener('pagehide', saveNow);
+      document.removeEventListener('visibilitychange', onVisibility);
     }
   };
 

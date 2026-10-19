@@ -6,6 +6,7 @@
  *   submit(body)              POST /v1/book/submit
  *   status(token)             POST /v1/book/status
  *   withdraw(token, key)      POST /v1/book/withdraw
+ *   pay(slug, servant, method, counts)  POST /v1/book/pay → { number, name, amount, mode, minFirst }
  *
  * Every answer is the envelope: { ok: true, … } or { ok: false, code, message, … }.
  * A network failure, a 5xx or `busy` is tried again (the writes carry
@@ -74,7 +75,9 @@ export function createBookApi({ base, fetchImpl = (...args) => fetch(...args), s
     proof: (slug, blob) => call(`/v1/book/proof?slug=${encodeURIComponent(slug)}`, { body: blob, type: blob.type || 'image/jpeg' }),
     submit: body => call('/v1/book/submit', { json: body }),
     status: token => call('/v1/book/status', { json: { token } }),
-    withdraw: (token, requestKey) => call('/v1/book/withdraw', { json: { token, requestKey } })
+    withdraw: (token, requestKey) => call('/v1/book/withdraw', { json: { token, requestKey } }),
+    // the payment card's approved InstaPay / wallet number (never in event.json)
+    pay: (slug, servantId, method, counts) => call('/v1/book/pay', { json: { slug, servantId, method, counts } })
   };
 
 }

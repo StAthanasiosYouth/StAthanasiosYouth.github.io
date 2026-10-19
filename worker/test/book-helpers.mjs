@@ -3,6 +3,7 @@
 import { harness, fakeGoogle, jpegBytes } from './helpers.mjs';
 import { rowFromJson, saveRow } from '../src/book/event.js';
 import { forgetModule } from '../src/book/public.js';
+import { forgetPayDest } from '../src/book/pay.js';
 import { msStamp } from '../src/book/model.js';
 
 const DAY = 24 * 3600 * 1000;
@@ -22,8 +23,10 @@ export function eventJson(over = {}, bookingOver = {}) {
         { key: 'infant', label: 'رضيع', group: 'child', price: 0, seat: false, min: 0, max: 3, note: '' }
       ] },
       payment: { mode: 'full', minFirst: 0, finalDueAt: '' },
-      methods: [{ key: 'cash', label: 'كاش', needsProof: false }, { key: 'instapay', label: 'إنستاباي', needsProof: true }],
-      servants: [{ id: 'srv-aaaa1111', name: 'مينا عادل', methods: ['cash', 'instapay'] }, { id: 'srv-bbbb2222', name: 'مرقس فادي', methods: ['cash'] }],
+      // cash: servant-assisted (no `online`: inferred offline, as in an event.json published before the flag);
+      // `transfer`: an online method without a proof, so most tests can submit without uploading one
+      methods: [{ key: 'cash', label: 'كاش', needsProof: false }, { key: 'instapay', label: 'إنستاباي', needsProof: true }, { key: 'transfer', label: 'تحويل', needsProof: false, online: true }],
+      servants: [{ id: 'srv-aaaa1111', name: 'مينا عادل', methods: ['cash', 'instapay', 'transfer'] }, { id: 'srv-bbbb2222', name: 'مرقس فادي', methods: ['cash'] }],
       ...bookingOver
     },
     ...over
@@ -32,6 +35,7 @@ export function eventJson(over = {}, bookingOver = {}) {
 
 export async function bookWorld({ event = eventJson(), moduleOn = true, env = {} } = {}) {
   forgetModule();
+  forgetPayDest();
   const h = harness({ env: { BOOK_SECRET: 'b'.repeat(40), ENVIRONMENT: 'test', ...env } });
   if (moduleOn) await h.db.prepare("UPDATE settings SET value = '1' WHERE key = 'BOOKING_MODULE'").run();
   if (event) await saveRow(h.env, rowFromJson(event, 'fixture'));
@@ -43,7 +47,7 @@ export async function bookWorld({ event = eventJson(), moduleOn = true, env = {}
   const key = p => (p || 'k') + '-' + String(++n).padStart(6, '0') + '-' + Math.random().toString(36).slice(2, 8);
   const submit = (over = {}, ip) => pub('POST', '/v1/book/submit', {
     slug: 'alex-trip', requestKey: key('rq'), name: 'مينا زكريا', phone: '01012345678', counts: { applicant: 1, adult: 1 },
-    servantId: 'srv-aaaa1111', method: 'cash', hp: '', revision: 'rev1', ...over
+    servantId: 'srv-aaaa1111', method: 'transfer', hp: '', revision: 'rev1', ...over
   }, ip);
   return { ...h, g, auth, admin, pub, key, submit, jpeg: jpegBytes };
 }

@@ -384,6 +384,20 @@
 
   }
 
+  /* «sent:3» / «present» / «none» / «off» / «error» → a short line ('' for anything else) */
+  function pushText(notified) {
+
+    var value = String(notified || '');
+    var sent = /^sent:(\d+)$/.exec(value);
+    if (sent) return 'الإشعار وصل لـ ' + digits(Number(sent[1])) + (Number(sent[1]) === 1 ? ' جهاز' : ' أجهزة');
+    if (value === 'present') return 'من غير إشعار: الأدمن كانت اللوحة قدامه (ظهرله جواها)';
+    if (value === 'none') return 'من غير إشعار: مفيش جهاز متفعّل عليه إشعارات الأدمن';
+    if (value === 'off') return 'من غير إشعار: إشعارات الموبايل مش متظبطة';
+    if (value === 'error') return 'الإشعار فشل';
+    return '';
+
+  }
+
   function entryNode(entry, options) {
 
     options = options || {};
@@ -395,6 +409,8 @@
 
     if (entry.count > 1) meta.push(digits(entry.count) + ' مرات');
     if (options.full && entry.device) meta.push(entry.device);
+    // what happened to the admin push (AdminNotify.gs adminPushNotify_ → the row's `notified`)
+    if (options.full && pushText(entry.notified)) meta.push(pushText(entry.notified));
 
     var text = el('p', { class: 'act__text' },
       el('strong', { class: 'act__who', dir: 'auto', text: entry.actorName }),

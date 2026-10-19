@@ -50,16 +50,30 @@ function bookNewsRun_(fetchGroups) {
 
     if (!bookOnline_()) return -1;
 
+    // an approved InstaPay / wallet set that didn't reach the Worker earlier goes again (PayDest.gs)
+    if (!fetchGroups) payDestRetry_();
+
     var groups = (fetchGroups || bookNewsFetch_)();
     if (!groups || !groups.length) return 0;
 
     var n = 0;
+    var acks = [];
     groups.slice(0, BOOK_NEWS_MAX).forEach(function (group) {
       var clean = bookNewsGroup_(group);
       if (!clean) return;
+      // v2 (at least once): a claim handed out again after a lost ack is acked, never pushed twice
+      if (clean.claimId && bookNewsAnnounced_(clean.claimId)) {
+        acks.push(clean.claimId);
+        return;
+      }
       bookNewsAnnounce_(clean);
+      if (clean.claimId) {
+        bookNewsRemember_(clean.claimId);
+        acks.push(clean.claimId);
+      }
       n++;
     });
+    if (acks.length) (fetchGroups && fetchGroups.ack ? fetchGroups.ack : bookNewsAck_)(acks);
     return n;
 
   }
@@ -70,13 +84,16 @@ function bookNewsRun_(fetchGroups) {
 
 }
 
-/* POST /v1/sync/book-news, signed → the groups (or [] on any doubt) */
-function bookNewsFetch_() {
+/* POST /v1/sync/book-news, signed → the reply (or null on any doubt) */
+function bookNewsPost_(payload) {
 
   var secret = workerSyncSecret_();
-  if (!secret) return [];
+  if (!secret) {
+    console.warn('book news: WORKER_SYNC_SECRET missing');
+    return null;
+  }
 
-  var body = '{}';
+  var body = JSON.stringify(payload);
   var ts = String(Date.now());
   var response = UrlFetchApp.fetch(WORKER_API_URL + '/v1/sync/book-news', {
     method: 'post',
@@ -89,11 +106,58 @@ function bookNewsFetch_() {
 
   if (response.getResponseCode() !== 200) {
     console.warn('book news: HTTP ' + response.getResponseCode());
-    return [];
+    return null;
   }
 
   var reply = JSON.parse(response.getContentText());
-  return reply && reply.ok === true && Array.isArray(reply.groups) ? reply.groups : [];
+  return reply && reply.ok === true ? reply : null;
+
+}
+
+/* v2: the groups, each with its claimId (acked after the announce) */
+function bookNewsFetch_() {
+
+  var reply = bookNewsPost_({ v: 2 });
+  return reply && Array.isArray(reply.groups) ? reply.groups : [];
+
+}
+
+/* v2: these claims were announced (a lost ack: the Worker hands them out again, bookNewsAnnounced_ skips the push) */
+function bookNewsAck_(ids) {
+
+  try {
+    // the sync stamp must move forward: never the same millisecond as the claim
+    Utilities.sleep(5);
+    bookNewsPost_({ v: 2, ack: ids });
+  }
+  catch (error) {
+    console.warn('book news: ack failed: ' + ((error && error.message) || error));
+  }
+
+}
+
+/* the claims this project announced lately (6 h: well past the Worker's re-hand time) */
+var BOOK_NEWS_SEEN_SECONDS = 6 * 3600;
+
+function bookNewsAnnounced_(claimId) {
+
+  try {
+    return CacheService.getScriptCache().get('booknews:' + claimId) === '1';
+  }
+  catch (ignored) {
+    return false;
+  }
+
+}
+
+function bookNewsRemember_(claimId) {
+
+  try {
+    CacheService.getScriptCache().put('booknews:' + claimId, '1', BOOK_NEWS_SEEN_SECONDS);
+  }
+  catch (ignored) {
+    // at worst one push twice after a lost ack
+  }
 
 }
 
@@ -105,8 +169,10 @@ function bookNewsGroup_(group) {
   var count = Math.floor(Number(group.count));
   if (!/^evt-[a-z0-9-]{2,60}$/.test(eventId) || !(count >= 1 && count <= 100000)) return null;
   var pending = Math.floor(Number(group.pending));
+  var claimId = /^nc-[0-9a-f]{16}$/.test(String(group.claimId || '')) ? String(group.claimId) : '';
 
   return {
+    claimId: claimId,
     eventId: eventId,
     title: activityText_(group.title, ACTIVITY_TITLE_MAX) || 'فعالية',
     count: count,

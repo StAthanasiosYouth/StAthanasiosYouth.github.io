@@ -2768,9 +2768,118 @@ img, svg, video {
   background: var(--accent);
 }
 
-.bk-wa {
+.bk-wa,
+.bk-pay {
   display: grid;
   gap: 8px;
+}
+
+/* ---------- the payment card (InstaPay / wallet: the approved number) ---------- */
+
+.bk-paycard {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: var(--radius-md);
+  background: rgba(2, 9, 20, .55);
+}
+
+.bk-paycard__amount {
+  margin: 0;
+}
+
+.bk-paycard__amount strong {
+  color: var(--gold-hi);
+}
+
+.bk-paycard__label,
+.bk-paycard__name {
+  margin: 0;
+  font-size: .92rem;
+  opacity: .85;
+}
+
+.bk-paycard__number {
+  margin: 0;
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: center;
+  font-size: clamp(1.5rem, 6vw, 1.9rem);
+  font-weight: 800;
+  letter-spacing: .06em;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold-hi);
+  user-select: all;
+  -webkit-user-select: all;
+}
+
+.bk-copy {
+  justify-self: center;
+  min-height: 44px;
+  min-width: 11rem;
+}
+
+.bk-copy.is-done {
+  border-color: transparent;
+  color: var(--gold-ink);
+  background: var(--gold);
+}
+
+.bk-paycard__help:empty {
+  display: none;
+}
+
+.bk-paycard__steps {
+  margin: 0;
+  padding-inline-start: 1.3rem;
+  display: grid;
+  gap: 4px;
+  font-size: .92rem;
+}
+
+.bk-copy-field {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+/* ---------- cash with the servant (for information) ---------- */
+
+.bk-cash {
+  display: grid;
+  gap: 8px;
+  margin-block-start: 6px;
+  padding: 12px 14px;
+  border: 1px dashed var(--gold-line-strong);
+  border-radius: var(--radius-md);
+}
+
+.bk-cash__title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.bk-cash__list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bk-cash__who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.bk-cash__wa {
+  min-height: 40px;
 }
 
 /* ---------- proof pictures ---------- */

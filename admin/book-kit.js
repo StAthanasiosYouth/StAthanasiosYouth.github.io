@@ -357,6 +357,12 @@ export const FIXED_SHEETS = ['ملخص', 'حسب الخادم', 'الحجوزا�
 
 const wall = value => String(value || '').replace('T', ' ');
 
+/* '+201012345678' → '01012345678': the form people read and dial (kept as TEXT in the workbook, so the leading 0 stays) */
+export function localPhone(value) {
+  const m = /^\+20(1\d{9})$/.exec(String(value || ''));
+  return m ? '0' + m[1] : String(value || '');
+}
+
 /* 'حجوزات-<slug>-<YYYY-MM-DD>.xlsx' */
 export function bookingFilename(slug, today) {
   return 'حجوزات-' + String(slug || 'event').replace(/[^a-z0-9-]/gi, '') + '-' + String(today || '').slice(0, 10) + '.xlsx';
@@ -473,7 +479,7 @@ export function bookingBook(exported, { from = '', to = '', today = '' } = {}) {
     const notes = [row.visitorNote, row.adminNote, row.rejectReason && 'سبب الرفض: ' + row.rejectReason, row.cancelReason && 'سبب الإلغاء: ' + row.cancelReason]
       .filter(Boolean).join(' — ');
     return [
-      row.ref || '', (STATUS[row.status] || { label: row.status }).label, row.name || '', row.phone || '', row.servantName || '', row.method ? label(row.method) : '',
+      row.ref || '', (STATUS[row.status] || { label: row.status }).label, row.name || '', localPhone(row.phone), row.servantName || '', row.method ? label(row.method) : '',
       p.adult || 0, p.child || 0, p.companion || 0, p.total || 0, (row.names || []).join('، '),
       row.amountDue === null || row.amountDue === undefined ? '' : row.amountDue, row.paid || 0,
       row.balance === null || row.balance === undefined ? '' : row.balance,

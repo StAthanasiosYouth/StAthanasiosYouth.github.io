@@ -273,7 +273,14 @@ test('module on: the tab, «الحجوزات (٢ جديد)», chips with counts,
   await signIn(d.page);
   await d.page.evaluate(() => A.go('pages', 'events'));
   await d.page.waitForFunction(() => { const b = document.querySelector('[data-act="book-open"]'); return b && /الحجوزات \(٢ جديد\)/.test(b.textContent); }, { timeout: 8000 });
-  assert.deepEqual(await subtabs(d.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام', 'الحجوزات']);
+  // the menu tab carries the new requests of all the events
+  assert.deepEqual(await subtabs(d.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام', 'الحجوزات (٢ جديد)']);
+  // the home card «الحجوزات»: what waits, per event
+  await d.page.evaluate(() => A.go('home'));
+  await d.page.waitForFunction(() => { const c = document.getElementById('dash-book'); return c && !c.hidden && /مستنيين المراجعة: ٢/.test(c.innerText); }, { timeout: 8000 });
+  assert.ok(await d.page.$(`#dash-book [data-act="book-home-event"][data-event="${eventId}"]`));
+  await d.page.evaluate(() => A.go('pages', 'events'));
+  await d.page.waitForSelector('[data-act="book-open"]', { visible: true });
   await d.page.click('[data-act="book-open"]');
   await waitRows(d.page, ['B-AAAA1', 'B-BBBB2']);
   assert.equal(await d.page.evaluate(() => A.sub.pages), 'bookings');
@@ -578,7 +585,7 @@ test('a manual booking confirmed in the same dialog; summary + XLSX (the phone w
   assert.deepEqual(book.sheets.map(s => s.name), ['ملخص', 'حسب الخادم', 'الحجوزات', 'الدفعات', 'مينا عادل', 'فادي يوسف']);
   assert.deepEqual(book.sheets[2].rows[0].slice(0, 4), ['الرقم', 'الحالة', 'الاسم', 'الموبايل']);
   assert.equal(book.sheets[2].rows.length, 1 + 6);
-  assert.ok(book.sheets[2].rows.some(r => r[3] === '+201098765432'), 'the phone as text');
+  assert.ok(book.sheets[2].rows.some(r => r[3] === '01098765432'), 'the phone as text, local form, leading 0 kept');
   assert.deepEqual(book.sheets[3].rows[0].slice(0, 3), ['رقم الدفعة', 'رقم الحجز', 'الاسم']);
   assert.equal(book.sheets[4].rows.at(-1)[0], 'الإجمالي');
   await closeSheet(d.page);
@@ -599,6 +606,36 @@ test('a manual booking confirmed in the same dialog; summary + XLSX (the phone w
   assert.equal(all.key, all.body.idemKey);
   await d.page.waitForSelector('[data-filter="refunds"][aria-pressed="true"]');
   assert.deepEqual(fake.state.bookings.map(b => b.status).sort(), ['cancelled', 'cancelled', 'cancelled', 'cancelled', 'cancelled', 'rejected']);
+  assert.deepEqual(d.problems, []);
+  await d.context.close();
+});
+
+test('cash with a servant: registered «جديد» with the money recorded (no confirm); the sheet shows it paid, waiting for approval', async () => {
+  freshWorker();
+  const d = await open();
+  await signIn(d.page);
+  await openBookings(d.page);
+  await d.page.click('[data-act="book-new"]');
+  await sheetTitle(d.page, 'حجز يدوي: رحلة إسكندرية');
+  await fill(d.page, 'الاسم', 'كيرلس كاش');
+  await fill(d.page, 'الموبايل', '01055554444');
+  await pick(d.page, 'الخادم', 'srv-mina');
+  await pick(d.page, 'طريقة الدفع', 'cash');
+  // «أكّده دلوقتي» left off: the payment block is there anyway
+  await fill(d.page, 'المبلغ', '500');
+  await clickAct(d.page, 'submit');
+  await d.page.waitForFunction(() => /^حجز B-ADM/.test((document.querySelector('#sheet[open] .sheet__title') || {}).textContent || ''), { timeout: 8000 });
+  const made = lastWrite(/^\/v1\/admin\/book\/bookings$/);
+  assert.equal(made.body.confirm, undefined, 'not confirmed');
+  assert.equal(made.body.payments.length, 1);
+  assert.equal(made.body.payments[0].amount, 500);
+  assert.equal(made.body.payments[0].servantId, 'srv-mina');
+  const text = await sheetText(d.page);
+  assert.match(text, /جديد/);
+  assert.match(text, /٥٠٠ ج/);
+  // the booking sheet: call / WhatsApp the participant, and «السجل»
+  assert.ok(await d.page.$('#sheet a[data-act="book-call"][href="tel:01055554444"]'));
+  assert.ok(await d.page.$('#sheet a[data-act="book-wa"][href="https://wa.me/201055554444"]'));
   assert.deepEqual(d.problems, []);
   await d.context.close();
 });
@@ -710,12 +747,13 @@ test('device session (the app\'s remembered phone): «الحجوزات محتا�
   await sleep(800);
   assert.equal(fake.state.calls.length, 0, 'the device token is never sent to the Worker');
   await again.page.evaluate(() => A.go('pages', 'events'));
-  await sleep(300);
-  assert.deepEqual(await subtabs(again.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام']);
+  // B1: the way in still shows (this phone last saw the module on): the tab and the event's button
+  await again.page.waitForSelector('[data-act="book-open"]', { visible: true, timeout: 8000 });
+  assert.deepEqual(await subtabs(again.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام', 'الحجوزات']);
   assert.equal(fake.state.calls.length, 0);
 
-  // the admin push link → the bookings ask for Google first
-  await again.page.evaluate(id => A.openLink('#open/bookings/' + id), eventId);
+  // the event's button → the bookings ask for Google first (a push link does the same)
+  await again.page.click('[data-act="book-open"]');
   await again.page.waitForSelector('[data-act="book-google"]');
   assert.match(await again.page.$eval('#view', n => n.innerText), /الحجوزات محتاجة دخول بحساب جوجل/);
   await shot(again.page, '10-device-google');
@@ -725,7 +763,33 @@ test('device session (the app\'s remembered phone): «الحجوزات محتا�
   await again.page.waitForSelector('.book-row', { timeout: 10000 });
   assert.deepEqual((await rows(again.page)).sort(), ['B-AAAA1', 'B-BBBB2']);
   assert.ok(fake.state.calls.length > 0 && fake.state.calls.every(c => /^Bearer \S+/.test(c.auth)));
-  assert.deepEqual(await subtabs(again.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام', 'الحجوزات']);
+  assert.deepEqual(await subtabs(again.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام', 'الحجوزات (٢ جديد)']);
+  assert.deepEqual(again.problems, []);
+  await context.close();
+});
+
+test('B2: the Worker stops answering after the module was seen on → the way in stays, «جرّب تاني» brings the queue back', async () => {
+  freshWorker();
+  const context = await browser.createBrowserContext();
+  const first = await open({ context });
+  await signIn(first.page);
+  await first.page.waitForFunction(() => A.book.on === true, { timeout: 8000 });
+  await first.page.close();
+
+  abortModule = true;
+  const again = await open({ context });
+  await signIn(again.page);
+  await again.page.waitForFunction(() => A.book.failed, { timeout: 12000 });
+  await again.page.evaluate(() => A.go('pages', 'events'));
+  await again.page.waitForSelector('[data-act="book-open"]', { visible: true, timeout: 8000 });
+  await again.page.click('[data-act="book-open"]');
+  await again.page.waitForSelector('[data-act="book-retry"]');
+  assert.match(await again.page.$eval('#view', n => n.innerText), /الحجوزات مش بتحمّل دلوقتي/);
+  assert.equal(await again.page.$('.toast--error'), null, 'no error toast, the screen says it');
+  abortModule = false;
+  await again.page.click('[data-act="book-retry"]');
+  await again.page.waitForSelector('.book-row', { timeout: 12000 });
+  assert.deepEqual((await rows(again.page)).sort(), ['B-AAAA1', 'B-BBBB2']);
   assert.deepEqual(again.problems, []);
   await context.close();
 });

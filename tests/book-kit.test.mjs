@@ -175,7 +175,7 @@ test('the workbook (§13): ملخص, حسب الخادم, الحجوزات, ال
   assert.deepEqual(bookings.rows[0], K.BOOKING_HEADERS);
   assert.deepEqual(K.BOOKING_HEADERS, ['الرقم', 'الحالة', 'الاسم', 'الموبايل', 'الخادم المختار', 'طريقة الدفع', 'كبار', 'أطفال', 'مرافقين', 'الإجمالي',
     'الأسماء', 'المطلوب', 'المدفوع', 'الباقي', 'حالة الدفع', 'متأخر', 'تاريخ الطلب', 'تاريخ التأكيد', 'ملاحظات']);
-  assert.deepEqual(bookings.rows[1].slice(0, 6), ['B-7K2QX', 'مؤكد', 'مريم سمير', '+201012345678', 'مينا عادل', 'إنستاباي']);
+  assert.deepEqual(bookings.rows[1].slice(0, 6), ['B-7K2QX', 'مؤكد', 'مريم سمير', '01012345678', 'مينا عادل', 'إنستاباي']);
   assert.equal(bookings.rows[1][15], 'نعم', 'overdue');
   assert.match(bookings.rows[2][18], /سبب الرفض: اكتمل العدد/);
 
@@ -191,7 +191,7 @@ test('the workbook (§13): ملخص, حسب الخادم, الحجوزات, ال
   assert.equal(fady.rows.find(r => r[0] === 'pay-6')[4], '-500');
   assert.equal(mina.rows.at(-1)[4], '1200');
 
-  // RTL on every sheet; the phone and the ref are text cells (the + and the digits stay as written)
+  // RTL on every sheet; the phone and the ref are text cells (the leading 0 stays)
   const files = await unzip(bytes);
   const workbook = new TextDecoder().decode(files['xl/workbook.xml']);
   assert.match(workbook, /rightToLeft="1"/);
@@ -200,6 +200,30 @@ test('the workbook (§13): ملخص, حسب الخادم, الحجوزات, ال
   assert.match(sheet3, /<c r="D2"[^>]*t="(s|inlineStr|str)"/, 'the phone is text');
   assert.match(sheet3, /<c r="A2"[^>]*t="(s|inlineStr|str)"/, 'the ref is text');
   assert.match(sheet3, /autoFilter/, 'header filters');
+});
+
+test('the workbook is formula-proof: visitor text starting with = + - @ TAB CR stays text (never a formula), phones keep their leading 0', async () => {
+  const data = exported();
+  const evil = ['=HYPERLINK("http://x","y")', '+cmd|" /C calc"!A0', '-2+3', '@SUM(1,2)', '\t=1+1', '\r=1+1'];
+  data.bookings[0].name = evil[0];
+  data.bookings[0].visitorNote = evil[1];
+  data.bookings[1].name = evil[2];
+  data.bookings[1].adminNote = evil[3] + ' ' + evil[4] + evil[5];
+  data.payments[0].note = evil[3];
+  const bytes = writeXlsx(K.bookingBook(data, { today: '2026-10-15' }).book);
+  const files = await unzip(bytes);
+  for (const [name, file] of Object.entries(files)) {
+    if (!/^xl\/worksheets\/sheet\d+\.xml$/.test(name)) continue;
+    const xml = new TextDecoder().decode(file);
+    assert.doesNotMatch(xml, /<f[ >]/, name + ': no formula cell');
+  }
+  const book = await readXlsx(bytes);
+  const rows = book.sheets[2].rows;
+  assert.equal(rows[1][2], evil[0], 'kept as the text it was');
+  assert.equal(rows[2][2], evil[2]);
+  assert.equal(rows[1][3], '01012345678');
+  assert.equal(K.localPhone('+201112223334'), '01112223334');
+  assert.equal(K.localPhone(''), '');
 });
 
 test('the workbook with a period: payment sheets keep only rows received inside it; the summary says so; servant names are unique sheet names', async () => {

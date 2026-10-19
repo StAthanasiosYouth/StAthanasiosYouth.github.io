@@ -9,7 +9,7 @@
 
 import { ApiError } from '../lib/http.js';
 import { retry } from '../lib/db.js';
-import { stampMs, priceRev } from './model.js';
+import { stampMs, priceRev, methodOnline } from './model.js';
 
 const SLUG = /^[a-z0-9][a-z0-9-]{1,39}$/;
 export const FRESH_MS = 60 * 1000;
@@ -45,7 +45,7 @@ export function rowFromJson(json, source, now = Date.now()) {
       price: Math.max(0, Math.floor(Number(c.price) || 0)), seat: c.seat !== false, min: Number(c.min) || 0, max: c.max == null ? 30 : Number(c.max), note: String(c.note || '')
     })) },
     payment: { mode: b.payment && b.payment.mode === 'installments' ? 'installments' : 'full', minFirst: Number(b.payment && b.payment.minFirst) || 0, finalDueAt: (b.payment && b.payment.finalDueAt) || '' },
-    methods: (b.methods || []).map(m => ({ key: String(m.key), label: String(m.label || m.key), needsProof: m.needsProof === true })),
+    methods: (b.methods || []).map(m => ({ key: String(m.key), label: String(m.label || m.key), needsProof: m.needsProof === true, online: methodOnline(m) })),
     servants: (b.servants || []).map(s => ({ id: String(s.id), name: String(s.name || ''), methods: (s.methods || []).map(String) }))
   } : null;
   return {

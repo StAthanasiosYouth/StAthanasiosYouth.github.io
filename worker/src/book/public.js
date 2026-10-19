@@ -16,9 +16,10 @@ import { putProof } from '../lib/proofs.js';
 import { loadEvent, seatsTaken } from './event.js';
 import { statusToken, readStatusToken, proofClaim, checkProofClaim } from './token.js';
 import { checkTurnstile, turnstileSiteKey } from './turnstile.js';
+import { payDestRequired, payDest } from './pay.js';
 import {
   checkCounts, normPhone, cleanText, quote, seats, people, windowState, publicLeft,
-  derive, amountDueOf, newRef, LIMITS, stampMs
+  derive, amountDueOf, newRef, LIMITS, stampMs, methodOnline
 } from './model.js';
 
 const KEY = /^[A-Za-z0-9_.:-]{8,100}$/;
@@ -134,6 +135,10 @@ export async function bookSubmit(ctx) {
     if (!servant.methods.includes(body.method)) throw invalid('method');
     method = body.method;
     const m = b.methods.find(x => x.key === method) || {};
+    // cash (any offline method) is servant-assisted: visitors can't book with it (Phase 1, B4)
+    if (!methodOnline(m)) throw invalid('method');
+    // InstaPay / wallet: only to a destination the primary admin approved (§4.7), once the set is synced
+    if (await payDestRequired(ctx.env) && !(await payDest(ctx.env, servant.id, method))) throw invalid('method');
     const list = Array.isArray(body.proofs) ? body.proofs : [];
     if (list.length > LIMITS.proofs || (m.needsProof && list.length < 1)) throw invalid('proofs');
     for (const p of list) {

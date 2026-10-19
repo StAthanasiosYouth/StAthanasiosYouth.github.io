@@ -15728,6 +15728,15 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
      SERVANTS AND PAYMENT METHODS
   ======================================================= */
 
+  /* the payment methods that carry a number (PayDest.gs PAY_DEST_METHODS) */
+  var PAY_LABELS = { instapay: 'إنستاباي', wallet: 'المحفظة' };
+
+  /* '01012345678' → '010 1234 5678' (for reading; the number itself is never changed) */
+  function groupedNumber(local) {
+    var t = String(local || '');
+    return /^01\d{9}$/.test(t) ? t.slice(0, 3) + ' ' + t.slice(3, 7) + ' ' + t.slice(7) : t;
+  }
+
   A.views.servants = function () {
 
     if (!official()) return [recoveryNotice()];
@@ -15757,7 +15766,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           title: s.name,
           sub: [s.role, s.phone].filter(Boolean).join(' · '),
           off: !s.active,
-          chips: [s.publicWa ? A.chip('رقمه ظاهر للزوار', 'ok') : A.chip('رقمه مش ظاهر', 'off'), s.active ? null : A.chip('موقوف', 'off')].filter(Boolean),
+          chips: [s.publicWa ? A.chip('رقمه ظاهر للزوار', 'ok') : A.chip('رقمه مش ظاهر', 'off'), s.active ? null : A.chip('موقوف', 'off')]
+            .concat((s.pay || []).filter(function (p) { return p.number; }).map(function (p) {
+              return p.approved ? A.chip(PAY_LABELS[p.method] + ' معتمد', 'ok') : A.chip(PAY_LABELS[p.method] + ' محتاج اعتماد', 'gold');
+            })).filter(Boolean),
           controls: [
             el('span', { class: 'spacer' }),
             el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function (e) {
@@ -15778,11 +15790,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       var rows = methods.map(function (m) {
         var label = A.textInput(m.label, { max: 24 });
         var proof = A.checkbox('محتاج إثبات دفع', !!m.needsProof);
+        var online = A.checkbox('الزوار يدفعوا بيها من الموقع', m.online === true, 'مقفولة: بتظهر للزوار للمعلومة بس (زي الكاش)، والخادم يسجّل الحجز من لوحة التحكم بعد ما يستلم');
         var on = A.checkbox('متاحة', m.active !== false);
-        return { key: m.key, label: label, proof: proof, on: on, node: el('div', { class: 'pages-method' }, el('code', { text: m.key }), A.field('الاسم', label), proof.node, on.node) };
+        return { key: m.key, label: label, proof: proof, online: online, on: on, node: el('div', { class: 'pages-method' }, el('code', { text: m.key }), A.field('الاسم', label), proof.node, online.node, on.node) };
       });
       var save = el('button', { class: 'btn btn--small btn--primary', type: 'button', text: 'حفظ طرق الدفع', onclick: function () {
-        A.withBusy(save, A.call('apiPayMethodsSave', rows.map(function (r) { return { key: r.key, label: r.label.value, needsProof: r.proof.input.checked, active: r.on.input.checked }; })))
+        A.withBusy(save, A.call('apiPayMethodsSave', rows.map(function (r) { return { key: r.key, label: r.label.value, needsProof: r.proof.input.checked, online: r.online.input.checked, active: r.on.input.checked }; })))
           .then(function (next) { A.dirty = false; reply = next; drawMethods(next.methods); A.toast('اتحفظت ✓'); })
           .catch(function (error) { A.fail(error, box); });
       } });
@@ -15800,18 +15813,85 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       var publicWa = A.checkbox('رقمه يظهر للزوار على واتساب', !!s.publicWa, 'بموافقته بس: بيظهر زرار واتساب في صفحات الفعاليات والفرق');
       var active = A.checkbox('متاح', s.active !== false);
       var note = A.counted('ملاحظة (للأدمن بس)', s.note, 200, 'مبتظهرش في الموقع');
+
+      // «أرقام الدفع» (PayDest.gs): own numbers or the phone; shown to visitors only once the primary admin approves
+      var payAdmin = !!(reply && reply.payAdmin);
+      var instapay = A.textInput(s.instapayNumber || '', { ltr: true, inputmode: 'tel', placeholder: 'فاضي = رقم الموبايل' });
+      var wallet = A.textInput(s.walletNumber || '', { ltr: true, inputmode: 'tel', placeholder: 'فاضي = رقم الموبايل' });
+      var payName = A.textInput(s.payName || '', { max: 60, placeholder: 'اختياري: الاسم اللي بيظهر في التحويل' });
+      [instapay, wallet, payName].forEach(function (input) {
+        input.disabled = !payAdmin;
+        input.addEventListener('input', function () { payBox.dataset.changed = '1'; drawPay(s.pay); });
+      });
+      var payBox = el('div', { class: 'pay-dests', 'data-pay': '1' });
+
+      function drawPay(list) {
+        var changed = payBox.dataset.changed === '1' || phone.value !== (s.phone || '');
+        A.fill(payBox, (list || []).map(function (p) {
+          var label = PAY_LABELS[p.method] || p.method;
+          var line = p.number
+            ? el('span', {}, el('bdi', { class: 'ltr', dir: 'ltr', text: groupedNumber(p.number) }), p.source === 'phone' ? ' (من رقم الموبايل)' : '')
+            : el('span', { text: 'مفيش رقم' });
+          var approve = !isNew && payAdmin && p.number && !p.approved
+            ? el('button', { class: 'btn btn--small btn--primary', type: 'button', 'data-act': 'pay-approve', 'data-method': p.method, disabled: changed ? 'disabled' : null, onclick: function (e) { decide(p, true, e.currentTarget); } }, icon('check'), 'اعتمد رقم الدفع ده')
+            : null;
+          var revoke = !isNew && payAdmin && p.approved
+            ? el('button', { class: 'btn btn--small btn--ghost', type: 'button', 'data-act': 'pay-revoke', 'data-method': p.method, onclick: function (e) { decide(p, false, e.currentTarget); } }, 'شيل الاعتماد')
+            : null;
+          return el('div', { class: 'pay-dest', 'data-method': p.method },
+            el('p', { class: 'pay-dest__head' }, el('strong', { text: label + ': ' }), line, ' ',
+              p.approved ? A.chip('معتمد للزوار', 'ok') : p.number ? A.chip('مش ظاهر للزوار', 'gold') : A.chip('مقفول', 'off')),
+            p.problem ? el('p', { class: 'field__hint', text: p.problem }) : null,
+            el('div', { class: 'actions' }, approve, revoke));
+        }), changed && payAdmin && !isNew ? el('p', { class: 'note', text: 'احفظ الأول، وبعدين اعتمد الرقم الجديد.' }) : null);
+      }
+
+      function decide(p, on, button) {
+        ebox.hidden = true;
+        var go = function () {
+          A.withBusy(button, A.call('apiServantPayApprove', s.id, p.method, p.number, on)).then(function (next) {
+            reply = next;
+            var fresh = (next.servants || []).filter(function (x) { return x.id === s.id; })[0];
+            if (fresh) { s = fresh; drawPay(fresh.pay); }
+            A.toast(on ? 'الرقم اتعتمد ✓ وبقى بيظهر للزوار في خطوة الدفع' : 'الاعتماد اتشال');
+            draw(next);
+          }).catch(function (error) { A.fail(error, ebox); });
+        };
+        if (!on) return go();
+        A.confirm({
+          title: 'تعتمد ' + groupedNumber(p.number) + ' رقم ' + (PAY_LABELS[p.method] || '') + ' لـ ' + s.name + '؟',
+          message: 'الزوار هيحوّلوا الفلوس على الرقم ده. اتأكد بنفسك إنه بيستقبل تحويلات.',
+          confirmLabel: 'اعتمد'
+        }).then(function (ok) { if (ok) go(); });
+      }
+
+      drawPay(s.pay || []);
+
       var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
       save.addEventListener('click', function () {
         ebox.hidden = true;
-        A.withBusy(save, A.call('apiServantSave', isNew ? null : s.id, { name: name.input.value, phone: phone.value, role: role.input.value, image: image.value(), publicWa: publicWa.input.checked, active: active.input.checked, note: note.input.value }))
+        var input = { name: name.input.value, phone: phone.value, role: role.input.value, image: image.value(), publicWa: publicWa.input.checked, active: active.input.checked, note: note.input.value };
+        if (payAdmin) {
+          input.instapayNumber = instapay.value;
+          input.walletNumber = wallet.value;
+          input.payName = payName.value;
+        }
+        A.withBusy(save, A.call('apiServantSave', isNew ? null : s.id, input))
           .then(function () { A.dirty = false; A.closeSheet(); A.toast('اتحفظ ✓'); load(); })
           .catch(function (error) { A.fail(error, ebox); });
       });
       A.dirty = false;
       A.openSheet(isNew ? 'خادم جديد' : 'تعديل: ' + s.name, [
         ebox,
-        el('div', { class: 'form' }, name.node, A.field('رقم الموبايل', phone, 'بيتكتب بأي شكل (010… أو +20…)'), role.node, image.node, publicWa.node, active.node, note.node)
+        el('div', { class: 'form' }, name.node, A.field('رقم الموبايل', phone, 'بيتكتب بأي شكل (010… أو +20…)'), role.node, image.node, publicWa.node, active.node, note.node,
+          el('p', { class: 'section-label', text: 'أرقام الدفع (إنستاباي والمحفظة)' }),
+          el('p', { class: 'field__hint', text: payAdmin
+            ? 'لو سبت الرقم فاضي بيتاخد رقم الموبايل. الرقم مبيظهرش للزوار في خطوة الدفع غير بعد ما تعتمده بنفسك، وأي تغيير فيه محتاج اعتماد تاني. مستقل عن ظهور الواتساب.'
+            : 'أرقام الدفع بيغيّرها ويعتمدها الأدمن الرئيسي بس.' }),
+          A.field('رقم إنستاباي', instapay, 'اختياري'), A.field('رقم المحفظة', wallet, 'اختياري'), A.field('اسم المستفيد', payName, 'اختياري: بيظهر للزوار جنب الرقم'),
+          payBox)
       ], A.sheetFooter(save), { lock: isNew ? null : A.editLock('servant', s.id, 'الخادم «' + s.name + '»', function () { A.closeSheet(); load(); }) });
+      phone.addEventListener('input', function () { drawPay(s.pay || []); });
     }
 
     load();
@@ -15821,7 +15901,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         el('div', { class: 'actions' }, el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { servantEditor(null); } }, icon('plus'), 'خادم جديد')),
         box,
         body),
-      A.card('طرق الدفع', 'اللي الخدام بيقبلوها (كاش، إنستاباي، محفظة…). أرقام الحسابات نفسها مبتتنشرش: الخادم بيبعتها على واتساب.', methodsBody)
+      A.card('طرق الدفع', 'اللي الخدام بيقبلوها (كاش، إنستاباي، محفظة…). الكاش للمعلومة بس في الموقع: الخادم يسجّل الحجز بعد ما يستلم. أرقام إنستاباي والمحفظة بتظهر في خطوة الدفع بس بعد اعتماد الأدمن الرئيسي، ومبتتنشرش في الموقع.', methodsBody)
     ];
 
   };
@@ -16210,6 +16290,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return el('div', { class: 'dash' },
       siteCard(),
       A.setupNudge ? A.setupNudge() : null,
+      // «الحجوزات»: new requests waiting (AdminBook; hidden while the module is off)
+      A.bookCard ? A.bookCard() : null,
       meetingCard(),
       bellCard(),
       quickCard(),
@@ -17322,6 +17404,20 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   }
 
+  /* «sent:3» / «present» / «none» / «off» / «error» → a short line ('' for anything else) */
+  function pushText(notified) {
+
+    var value = String(notified || '');
+    var sent = /^sent:(\d+)$/.exec(value);
+    if (sent) return 'الإشعار وصل لـ ' + digits(Number(sent[1])) + (Number(sent[1]) === 1 ? ' جهاز' : ' أجهزة');
+    if (value === 'present') return 'من غير إشعار: الأدمن كانت اللوحة قدامه (ظهرله جواها)';
+    if (value === 'none') return 'من غير إشعار: مفيش جهاز متفعّل عليه إشعارات الأدمن';
+    if (value === 'off') return 'من غير إشعار: إشعارات الموبايل مش متظبطة';
+    if (value === 'error') return 'الإشعار فشل';
+    return '';
+
+  }
+
   function entryNode(entry, options) {
 
     options = options || {};
@@ -17333,6 +17429,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     if (entry.count > 1) meta.push(digits(entry.count) + ' مرات');
     if (options.full && entry.device) meta.push(entry.device);
+    // what happened to the admin push (AdminNotify.gs adminPushNotify_ → the row's `notified`)
+    if (options.full && pushText(entry.notified)) meta.push(pushText(entry.notified));
 
     var text = el('p', { class: 'act__text' },
       el('strong', { class: 'act__who', dir: 'auto', text: entry.actorName }),
@@ -18102,23 +18200,65 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   var checking = null;
   var failedAt = 0;
 
-  /* resolves true when «الحجوزات» is on; anything wrong = off, quietly */
+  /*
+   * The Worker's last answer about the module, remembered on this device.
+   * A device session (the installed app's remembered phone) can't ask the
+   * Worker at all, and a Worker hiccup can't either: the way in («الحجوزات»
+   * in the menu, on each event, on the home page) then still shows unless the
+   * Worker last said the module is OFF; the screen asks for Google / offers
+   * «جرّب تاني» (bug B1/B2: before, nothing at all was drawn).
+   */
+  var KNOWN_KEY = 'athanasios.admin.book.v1';
+
+  function knownOn() {
+    try {
+      var value = JSON.parse(localStorage.getItem(KNOWN_KEY) || 'null');
+      return value && typeof value.on === 'boolean' ? value.on : null;
+    }
+    catch (ignored) {
+      return null;
+    }
+  }
+
+  function rememberOn(on) {
+    try { localStorage.setItem(KNOWN_KEY, JSON.stringify({ on: !!on, at: Date.now() })); }
+    catch (ignored) { /* private mode: only this tab knows */ }
+  }
+
+  /*
+   * The way in shows: the module is on; or this is a device session (it can
+   * never ask) and the module wasn't last seen off; or the Worker didn't
+   * answer and the module was last seen on. 401 / 403 (not an admin there)
+   * hide it like «off».
+   */
+  function entryShown() {
+    if (B.on) return true;
+    if (B.off) return false;
+    if (B.needGoogle) return knownOn() !== false;
+    return !!B.failed && knownOn() === true;
+  }
+  B.entryShown = entryShown;
+
+  /* resolves true when «الحجوزات» is on; anything wrong = off (but the way in may still show: entryShown) */
   B.check = function () {
     var w = W();
     if (!w) return Promise.resolve(false);
     if (B.on) return Promise.resolve(true);
     if (checking) return checking;
-    // the Worker was unreachable a moment ago: not again for a minute
+    // the Worker was unreachable a moment ago: not again for a minute (unless «جرّب تاني»)
     if (failedAt && Date.now() - failedAt < 60000) return Promise.resolve(false);
     checking = w.call('GET', '/v1/admin/book/module', undefined, { quiet: true }).then(function (reply) {
       B.env = String(reply && reply.env || '');
       B.checked = true;
       B.needGoogle = false;
+      B.failed = null;
       if (!(reply && (reply.on === true || B.env === 'staging'))) {
         B.off = true;
+        rememberOn(false);
         paintLinks();
         return false;
       }
+      rememberOn(true);
       return kit().then(function () {
         B.on = true;
         addNav();
@@ -18128,20 +18268,48 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }).catch(function (error) {
       B.checked = true;
       B.on = false;
-      // a device session can't ask: Google first (the bookings screen says so); else quietly off
-      B.needGoogle = !!(error && error.code === 'google');
+      // a device session can't ask: Google first (the bookings screen says so); else «جرّب تاني»
+      var code = error && error.code;
+      B.needGoogle = code === 'google';
+      // not an admin on the Worker (or no Worker here): like «off», nothing to retry
+      if (code === 'auth' || code === 'denied' || code === 'off') B.off = true;
+      B.failed = B.needGoogle || B.off ? null : (error || new Error('unreachable'));
       if (!B.needGoogle) failedAt = Date.now();
       checking = null;
+      if (entryShown()) addNav();
+      paintLinks();
       return false;
     });
     return checking;
   };
 
-  /* «الحجوزات» next to «الفعاليات» and «الخدام» */
+  /* «جرّب تاني» after a Worker hiccup: ask again now */
+  B.retry = function () {
+    failedAt = 0;
+    checking = null;
+    B.off = false;
+    return B.check();
+  };
+
+  /* all the events' new requests (the menu tab and the home card) */
+  function pendingTotal() {
+    return (B.events || []).reduce(function (sum, e) { return sum + (e.counts && e.counts.pending || 0); }, 0);
+  }
+
+  function navLabel() {
+    var n = B.on ? pendingTotal() : 0;
+    return 'الحجوزات' + (n ? ' (' + ar(n) + ' جديد)' : '');
+  }
+
+  /* «الحجوزات» next to «الفعاليات» and «الخدام» (with the number of new requests) */
   function addNav() {
     var area = A.AREAS.filter(function (a) { return a.key === 'pages'; })[0];
-    if (!area || !area.subs || area.subs.some(function (s) { return s.key === 'bookings'; })) return;
-    area.subs.push({ key: 'bookings', label: 'الحجوزات' });
+    if (!area || !area.subs) return;
+    var sub = area.subs.filter(function (s) { return s.key === 'bookings'; })[0];
+    var label = navLabel();
+    if (sub && sub.label === label) return;
+    if (sub) sub.label = label;
+    else area.subs.push({ key: 'bookings', label: label });
     A.renderNav();
   }
 
@@ -18238,18 +18406,33 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       if (!B.events) loadEvents();
     }
     else if (!B.checked) B.check();
+    // asked already and not on: a device session / a hiccup may still show the way in
+    else paintLink(links[links.length - 1]);
     return node;
   };
 
   function paintLinks() {
     links = links.filter(function (l) { return l.node.isConnected || Date.now() - l.at < 3000; });
     links.forEach(paintLink);
+    if (B.on) addNav();
+    paintCard();
   }
 
   function paintLink(link) {
     var ev = link.ev;
+    if (!B.on) {
+      // can't ask the Worker right now (a device session, a hiccup): the way in still shows on a live booking event
+      if (!entryShown() || !ev.booking) {
+        link.node.hidden = true;
+        return;
+      }
+      link.node.hidden = false;
+      A.fill(link.node, el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'book-open', onclick: function () { B.open(ev.id); } },
+        icon(B.needGoogle ? 'lock' : 'ticket'), 'الحجوزات'));
+      return;
+    }
     var row = eventRow(ev.id);
-    if (!B.on || !B.events || (!row && !(ev.booking && ev.live))) {
+    if (!B.events || (!row && !(ev.booking && ev.live))) {
       link.node.hidden = true;
       return;
     }
@@ -18279,10 +18462,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     if (!B.on) {
       if (B.needGoogle) return [googleCard()];
+      if (B.failed) return [retryCard()];
       var waiting = el('div', { class: 'skeleton skeleton--line' });
       B.check().then(function (on) {
         if (!waiting.isConnected) return;
-        if (on || B.needGoogle) A.render();
+        if (on || B.needGoogle || B.failed) A.render();
         else A.fill(waiting.parentNode, el('p', { class: 'note', text: 'الحجوزات مش متاحة دلوقتي.' }));
       });
       return [A.card('الحجوزات', '', waiting)];
@@ -18291,6 +18475,67 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return queueView();
 
   };
+
+  /* the Worker didn't answer: say so, and «جرّب تاني» (B2: before, the bookings just vanished for a minute) */
+  function retryCard() {
+    var box = A.errorBox();
+    var again = el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'book-retry' }, icon('retry'), 'جرّب تاني');
+    again.addEventListener('click', function () {
+      box.hidden = true;
+      A.withBusy(again, B.retry()).then(function (on) {
+        if (A.area === 'pages' && A.sub.pages === 'bookings') {
+          if (on || B.needGoogle) A.render();
+          else if (B.failed) A.fail(B.failed, box);
+          else A.render();
+        }
+      });
+    });
+    var card = A.card('الحجوزات مش بتحمّل دلوقتي', 'مش قادرين نوصل لسيرفر الحجوزات. ممكن النت ضعيف أو السيرفر مشغول لحظة. الحجوزات نفسها محفوظة.',
+      el('div', { class: 'actions' }, again), box);
+    if (B.failed) setTimeout(function () { if (box.isConnected) A.fail(B.failed, box); }, 0);
+    return card;
+  }
+
+
+  /* =======================================================
+     THE HOME CARD «مستنيين المراجعة» (AdminHome: A.bookCard)
+  ======================================================= */
+
+  var cardNode = null;
+
+  A.bookCard = function () {
+    cardNode = el('section', { class: 'card dash-card dash-book', id: 'dash-book', 'aria-labelledby': 'dash-book-title', hidden: true });
+    paintCard();
+    if (!B.checked && W()) B.check();
+    return cardNode;
+  };
+
+  function paintCard() {
+    if (!cardNode) return;
+    if (!entryShown()) {
+      cardNode.hidden = true;
+      return;
+    }
+    cardNode.hidden = false;
+    var head = el('div', { class: 'dash-card__head' },
+      el('span', { class: 'dash-card__icon', 'aria-hidden': 'true' }, icon('ticket')),
+      el('h2', { class: 'card__title', id: 'dash-book-title', text: 'الحجوزات' }));
+    if (!B.on) {
+      A.fill(cardNode, head,
+        el('p', { class: 'card__hint', text: B.needGoogle ? 'الحجوزات والفلوس محتاجة دخول بحساب جوجل.' : 'سيرفر الحجوزات مش بيرد دلوقتي.' }),
+        el('div', { class: 'actions' }, el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'book-home', onclick: function () { B.open(''); } }, icon(B.needGoogle ? 'lock' : 'retry'), 'افتح الحجوزات')));
+      return;
+    }
+    var waiting = (B.events || []).filter(function (e) { return e.counts && e.counts.pending; });
+    var total = pendingTotal();
+    A.fill(cardNode, head,
+      el('p', { class: 'card__hint', text: !B.events ? 'بنجيب الحجوزات…' : total ? 'مستنيين المراجعة: ' + ar(total) + (total === 1 ? ' طلب' : ' طلبات') : 'مفيش طلبات حجز مستنية مراجعة ✓' }),
+      waiting.length ? el('ul', { class: 'dash-book__list' }, waiting.slice(0, 5).map(function (e) {
+        return el('li', {}, el('button', { class: 'btn btn--ghost btn--small', type: 'button', 'data-act': 'book-home-event', 'data-event': e.id, onclick: function () { B.open(e.id); } },
+          el('bdi', { text: e.title }), ' (' + ar(e.counts.pending) + ' جديد)'));
+      })) : null,
+      el('div', { class: 'actions' }, el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'book-home', onclick: function () { B.open(''); } }, icon('ticket'), 'كل الحجوزات')));
+  }
 
   /* a device session (the installed app's remembered phone): Google itself, once */
   function googleCard() {
@@ -18398,6 +18643,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           A.chip(ev.online ? 'الحجز من الموقع شغال' : 'الحجز من الموقع مقفول', ev.online ? 'ok' : 'off'),
           ev.startAt ? A.chip(wallText(ev.startAt), '') : null,
           ev.refreshedAt ? el('span', { class: 'field__hint', text: 'بيانات الفعالية من آخر نشر' }) : null),
+        kpis(ev),
         el('div', { class: 'actions' },
           el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'book-new', onclick: function (e) { manualForm(ev, e.currentTarget); } }, icon('plus'), 'حجز يدوي'),
           el('button', { class: 'btn', type: 'button', 'data-act': 'book-summary', onclick: function () { summarySheet(ev); } }, icon('layers'), 'الملخص والحسابات'),
@@ -18521,6 +18767,46 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   }
 
+  /*
+   * The event at a glance (§13 summary, the same numbers as «الملخص والحسابات»):
+   * requests, places, money. Drawn from the last answer at once, refreshed
+   * quietly; a failure just leaves the tiles out.
+   */
+  var kpiLast = {};
+
+  /* a method's name, once the event's definition was read (else nothing) */
+  function methodName(eventId, key) {
+    var ev = configs.byEvent[eventId];
+    var m = key && ev ? (ev.methods || []).filter(function (x) { return x.key === key; })[0] : null;
+    return m ? m.label : '';
+  }
+
+  function kpis(ev) {
+    var box = el('div', { class: 'comp-tiles book-kpis', 'data-kpis': ev.id, 'aria-live': 'polite' });
+    var fill = function (s) {
+      var o = (s && s.overall) || {};
+      var b = o.bookings || {};
+      var seatsInfo = o.seats || {};
+      var m = o.money || {};
+      var counts = ev.counts || {};
+      A.fill(box,
+        tile('جديدة', ar(counts.pending || b.pending || 0), (counts.pending || b.pending) ? 'gold' : ''),
+        tile('مؤكدة', ar(counts.confirmed || b.confirmed || 0), ''),
+        tile('مرفوضة / ملغية', ar((counts.rejected || 0) + (counts.withdrawn || 0) + (counts.cancelled || 0)), ''),
+        tile('الأماكن الفاضية', seatsInfo.capacity === null || seatsInfo.capacity === undefined ? (ev.capacity == null ? 'من غير حد' : ar(Math.max(0, ev.left == null ? ev.capacity - (ev.taken || 0) : ev.left))) : ar(Math.max(0, seatsInfo.left || 0)), ''),
+        s ? tile('المطلوب', money(m.due || 0), '') : null,
+        s ? tile('المستلم (صافي)', money(m.net || 0), m.net ? 'gold' : '') : null,
+        s ? tile('الباقي على الناس', money(m.balance || 0), m.balance > 0 ? 'danger' : '') : null,
+        s && m.refundsOwed ? tile('مرتجعات مطلوبة', money(m.refundsOwed), 'danger') : null);
+    };
+    fill(kpiLast[ev.id] || null);
+    W().call('GET', '/v1/admin/book/summary?eventId=' + enc(ev.id), undefined, { quiet: true }).then(function (s) {
+      kpiLast[ev.id] = s;
+      if (box.isConnected) fill(s);
+    }).catch(function () { /* the tiles from the list are enough */ });
+    return box;
+  }
+
   function bookingRow(b) {
     var st = K.STATUS[b.status] || { label: b.status, kind: '' };
     // closed (rejected / withdrawn / cancelled): what matters is a refund owed, not «دافع زيادة»
@@ -18538,6 +18824,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         b.overdue ? A.chip('متأخر', 'danger') : null,
         b.refundOwed > 0 ? A.chip('مرتجع مطلوب ' + money(b.refundOwed), 'danger') : null,
         b.source === 'admin' ? A.chip('يدوي', 'info') : null,
+        b.proofs > 0 ? A.chip('فيه إثبات تحويل', 'info') : null,
+        methodName(b.eventId, b.method) ? A.chip(methodName(b.eventId, b.method), '') : null,
         flags.dupProof ? A.chip('إثبات متكرر', 'danger') : null,
         flags.phoneTwice ? A.chip('الرقم ده عنده طلب تاني', 'gold') : null,
         flags.priceChanged ? A.chip('السعر اتغير', 'gold') : null),
@@ -18720,6 +19008,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return end !== null && end < K.stampMinutes(K.stamp(A.cairoNow()));
   }
 
+  var LOG_WORDS = {
+    'booking.new': 'بعت طلب الحجز', 'booking.create': 'سجّل الحجز', 'booking.confirm': 'أكّد الحجز', 'booking.reject': 'رفض الحجز',
+    'booking.cancel': 'لغى الحجز', 'booking.reopen': 'رجّعه للمراجعة', 'booking.update': 'عدّل', 'booking.withdraw': 'الزائر لغى الطلب',
+    'payment.add': 'سجّل دفعة', 'payment.refund': 'سجّل مرتجع', 'payment.void': 'لغى دفعة', 'event.cancelAll': 'لغى الفعالية كلها'
+  };
+
+  function logText(h) {
+    var word = LOG_WORDS[h.action] || h.action;
+    return h.summary ? word + ' (' + h.summary + ')' : word;
+  }
+
   function drawBooking(d, note) {
 
     B.current = d;
@@ -18814,7 +19113,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         der.refundOwed > 0 ? tile('مرتجع مطلوب', money(der.refundOwed), 'gold') : null),
       el('dl', { class: 'book-facts-list' },
         fact('الاسم', el('bdi', { text: b.name })),
-        fact('الموبايل', el('span', { class: 'ltr', text: phoneText(b.phone) })),
+        fact('الموبايل', b.phone ? el('span', { class: 'book-phone' },
+          el('span', { class: 'ltr', text: phoneText(b.phone) }), ' ',
+          // call / WhatsApp the participant from the phone (the number stays inside the admin)
+          el('a', { class: 'btn btn--small btn--ghost', href: 'tel:' + phoneText(b.phone), 'data-act': 'book-call', 'aria-label': 'اتصل بـ ' + b.name }, icon('phone'), 'اتصال'),
+          /^\+20\d{10}$/.test(b.phone) ? el('a', { class: 'btn btn--small btn--ghost', href: 'https://wa.me/' + b.phone.slice(1), target: '_blank', rel: 'noopener noreferrer', 'data-act': 'book-wa', 'aria-label': 'واتساب لـ ' + b.name }, icon('whatsapp'), 'واتساب') : null)
+          : el('span', { text: b.phoneBlanked ? 'اتشال بعد سنة من الفعالية' : '—' })),
         fact('الخادم المختار', b.servantName || null),
         fact('طريقة الدفع', b.method ? K.methodLabel(ev, b.method) : null),
         fact('الطلب', countsText(ev.pricing, b.requested)),
@@ -18832,7 +19136,13 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       el('p', { class: 'section-label', text: 'الدفعات' }),
       payList,
       history ? el('p', { class: 'section-label', text: 'تغييرات المطلوب' }) : null,
-      history
+      history,
+      // «السجل»: every move on this booking, newest first (the Worker's audit rows)
+      (d.history || []).length ? el('details', { class: 'book-log' },
+        el('summary', { text: 'السجل (' + ar(d.history.length) + ')' }),
+        el('ul', { class: 'book-log__list' }, d.history.map(function (h) {
+          return el('li', {}, el('span', { class: 'book-log__when', text: wallText(h.at) }), ' — ', el('bdi', { text: h.by }), ': ', el('span', { text: logText(h) }));
+        }))) : null
     ], actions.concat([el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })]), { wide: true, className: 'book-sheet' });
 
     holdLock(b.id, d.lock);
@@ -19201,8 +19511,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var capLine = el('p', { class: 'field__hint' });
     var names = ev.collectNames ? A.textInput((b.names || []).join('\n'), { multiline: true, rows: 3, max: 2000 }) : null;
     var visitorProofs = (d.proofs || []).filter(function (p) { return !p.paymentId; });
-    var first = free ? null : payBlock({ kind: 'payment', booking: b, event: ev, legend: 'أول دفعة (اختياري)', prefill: { servantId: b.servantId, method: b.method }, visitorProofs: visitorProofs, paid: (d.derived && d.derived.paid) || 0,
-      amountHint: 'فاضي = من غير دفعة دلوقتي' });
+    // money already recorded with the booking (a servant's cash registered «جديد»): counted, never typed again
+    var paidBefore = (d.derived && d.derived.paid) || 0;
+    var first = free ? null : payBlock({ kind: 'payment', booking: b, event: ev, legend: paidBefore ? 'دفعة كمان (اختياري)' : 'أول دفعة (اختياري)', prefill: { servantId: b.servantId, method: b.method }, visitorProofs: visitorProofs, paid: paidBefore,
+      amountHint: paidBefore ? 'متسجل قبل كده ' + money(paidBefore) + ' — فاضي = مفيش دفعة جديدة' : 'فاضي = من غير دفعة دلوقتي' });
     var keys = K.keyKeeper('cnf');
 
     due.addEventListener('input', function () { touched = true; sync(); });
@@ -19221,6 +19533,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       : ev.payment && ev.payment.mode === 'installments'
         ? 'مقدم وأقساط: علشان يتأكد لازم المدفوع يبقى ' + money(Math.min(ev.payment.minFirst || 0, K.amountOf(due.value) || 0)) + ' على الأقل (أو «أكّد برضه» بسبب).'
         : 'الدفع كامل: علشان يتأكد لازم المدفوع يغطي المطلوب كله (أو «أكّد برضه» بسبب).';
+    if (paidBefore) rule += ' المدفوع المتسجل لحد دلوقتي: ' + money(paidBefore) + '.';
 
     moveForm({
       title: 'تأكيد ' + b.ref,
@@ -19553,8 +19866,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var dueReason = A.textInput('', { max: 200, placeholder: 'مثلاً: خصم' });
     var reasonField = A.field('سبب تغيير المطلوب', dueReason);
     var fake = { id: '', servantId: '', servantName: '', createdAt: '' };
-    var first = free ? null : payBlock({ kind: 'payment', booking: fake, event: ev, legend: 'أول دفعة (اختياري)', noNote: true, amountHint: 'فاضي = من غير دفعة دلوقتي' });
-    var confirmBox = el('div', { class: 'form', hidden: true }, A.field('المطلوب', due), reasonField, first ? first.node : null);
+    // the money received with it (cash from the servant): recorded now whether it is confirmed now or later
+    var first = free ? null : payBlock({ kind: 'payment', booking: fake, event: ev, legend: 'الفلوس اللي اتسلمت (اختياري)', noNote: true, amountHint: 'فاضي = من غير دفعة دلوقتي' });
+    var confirmBox = el('div', { class: 'form', hidden: true }, A.field('المطلوب', due), reasonField);
     var requestKey = K.newKey('adm');
     var keys = K.keyKeeper('new');
 
@@ -19574,11 +19888,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     moveForm({
       title: 'حجز يدوي: ' + ev.title,
-      intro: 'حجز بالتليفون أو حضوري: نفس بيانات الموقع. بيتعمل «جديد»، أو مؤكد على طول لو علّمت «أكّده دلوقتي».',
+      intro: 'حجز بالتليفون أو حضوري (زي الكاش مع الخادم): نفس بيانات الموقع. لو استلمت فلوس سجّلها هنا. بيتعمل «جديد» والدفعة متسجلة لحد ما حد يأكّده، أو مؤكد على طول لو علّمت «أكّده دلوقتي».',
       label: 'سجّل الحجز',
       nodes: [A.field('الاسم', name), A.field('الموبايل', phone, 'بأي شكل: 010… أو +20…'), counts.node, quoteLine,
         names ? A.field('الأسماء', names, 'اسم في كل سطر') : null, el('div', { class: 'row' }, A.field('الخادم', servant), A.field('طريقة الدفع', method)),
-        A.field('ملاحظة', note), confirmNow.node, confirmBox],
+        A.field('ملاحظة', note), first ? first.node : null, confirmNow.node, confirmBox],
       back: function () { A.closeSheet(); },
       prepare: function (extra) {
         var c = counts.value();
@@ -19605,10 +19919,19 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           }
           body.confirm = conf;
         }
+        else if (first && first.filled()) {
+          // pending, with the money recorded now: whoever confirms later finds it counted
+          var early = first.value(extra.force);
+          errors = errors.concat(first.check(early));
+          body.payments = [early];
+        }
         return { errors: errors, path: '/v1/admin/book/bookings', body: body, key: keys.for(body) };
       },
       done: function (reply) {
-        A.toast(reply.booking && reply.booking.status === 'confirmed' ? 'اتسجل واتأكد ✓ ' + reply.booking.ref : 'اتسجل ✓ ' + (reply.booking ? reply.booking.ref : ''));
+        var b = reply.booking || {};
+        var paid = reply.derived && reply.derived.paid || 0;
+        A.toast(b.status === 'confirmed' ? 'اتسجل واتأكد ✓ ' + b.ref
+          : paid ? 'اتسجل ✓ ' + (b.ref || '') + ' — الدفعة (' + money(paid) + ') متسجلة والحجز مستني التأكيد' : 'اتسجل ✓ ' + (b.ref || ''));
         drawBooking(reply);
       }
     });

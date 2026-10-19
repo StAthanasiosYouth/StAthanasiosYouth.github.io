@@ -37,7 +37,8 @@ var DEVICE_MAX = 50;
 var DEVICE_SKEW_MS = 10 * 60000;
 var DEVICE_TOKEN_SECONDS = 3600;
 var DEVICE_FAIL_MAX = 10;
-var GOOGLE_ONLY_FUNCTIONS = ['apiAddAdmin', 'apiRemoveAdmin', 'apiTrustDevice'];
+// approving a payment number redirects real money (PayDest.gs): Google itself, never a remembered device
+var GOOGLE_ONLY_FUNCTIONS = ['apiAddAdmin', 'apiRemoveAdmin', 'apiTrustDevice', 'apiServantPayApprove'];
 
 
 function deviceKey_(id) {

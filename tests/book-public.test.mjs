@@ -116,7 +116,17 @@ test('step checks: name, an Egyptian mobile (gently, any format), seats vs place
   assert.deepEqual(B.checkWho(named, { name: 'مينا', phone: '01012345678', counts, names: ['مينا', 'مرقس', 'بيتر'] }), {});
 
   assert.ok(B.checkPay(BOOKING, { servantId: '', method: 'cash' }).servantId);
-  assert.ok(B.checkPay(BOOKING, { servantId: 'srv-marc0003', method: 'instapay' }).method, 'not one of that servant\'s methods');
+  // Phase 1: a servant with cash only can't be picked on the site (the «كاش مع الخادم» card), and cash is never a choice
+  assert.ok(B.checkPay(BOOKING, { servantId: 'srv-marc0003', method: 'instapay' }).servantId, 'no online method with this servant');
+  assert.match(B.checkPay(BOOKING, { servantId: 'srv-mina0001', method: 'cash' }).method, /مع الخادم نفسه/);
+  assert.deepEqual(B.onlineMethodsOf(BOOKING, BOOKING.servants[0]), ['instapay']);
+  assert.deepEqual(B.offlineServants(BOOKING).map(s => [s.id, s.offline]), [['srv-mina0001', ['cash']], ['srv-marc0003', ['cash']]]);
+  assert.equal(B.methodOnline({ needsProof: false }), false);
+  assert.equal(B.methodOnline({ needsProof: false, online: true }), true);
+  assert.equal(B.payCopyText('+20 10 1234 5678'), '01012345678');
+  assert.equal(B.payCopyText('‏٠١٠١٢٣٤٥٦٧٨'), '01012345678');
+  assert.equal(B.payGrouped('01012345678'), '010 1234 5678');
+  assert.match(B.cashMessage(EVENT, BOOKING.servants[0], { name: 'مرقس', counts: { applicant: 1 } }), /عايز أحجز في «.+» وأدفع كاش/);
   assert.deepEqual(B.checkPay(BOOKING, { servantId: 'srv-mina0001', method: 'instapay' }), {});
 
   assert.equal(B.needsProof(BOOKING, 'instapay'), true);
@@ -161,7 +171,7 @@ test('the submit body and the WhatsApp text: server-shaped, no extras; a free ev
 test('draft: 7 days, the same step and requestKey back, everything checked; never picture bytes or «موافق»', () => {
   const draft = { ...B.emptyDraft(BOOKING, 'web.abcdefghij', NOW), step: 'b', fields: { name: 'مينا', phone: '010' }, servantId: 'srv-mina0001', method: 'cash', agreed: true, proofs: [{ proofId: 'prf-abcdefgh', claim: 'x', blob: 'BYTES', url: 'blob:x' }] };
   const stored = JSON.parse(JSON.stringify(B.storeDraft(draft, NOW)));
-  assert.deepEqual(Object.keys(stored).sort(), ['counts', 'fields', 'method', 'names', 'note', 'proofs', 'requestKey', 'savedAt', 'servantId', 'step'].sort());
+  assert.deepEqual(Object.keys(stored).sort(), ['counts', 'fields', 'method', 'names', 'note', 'pay', 'proofs', 'requestKey', 'savedAt', 'servantId', 'step'].sort());
   assert.deepEqual(stored.proofs, [{ proofId: 'prf-abcdefgh', claim: 'x' }]);
   assert.doesNotMatch(JSON.stringify(stored), /BYTES|blob:/);
 

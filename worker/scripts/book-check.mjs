@@ -60,8 +60,9 @@ function event(slug, id, booking = {}) {
         { key: 'child', label: 'طفل', group: 'child', price: 800, seat: true, min: 0, max: 5 }
       ] },
       payment: { mode: 'installments', minFirst: 500, finalDueAt: '' },
-      methods: [{ key: 'cash', label: 'كاش', needsProof: false }, { key: 'instapay', label: 'إنستاباي', needsProof: true }],
-      servants: [{ id: 'srv-aaaa1111', name: 'مينا عادل', methods: ['cash', 'instapay'] }, { id: 'srv-bbbb2222', name: 'مرقس فادي', methods: ['cash'] }],
+      // cash: servant-assisted (refused on the site, Phase 1); transfer: online without a picture
+      methods: [{ key: 'cash', label: 'كاش', needsProof: false, online: false }, { key: 'instapay', label: 'إنستاباي', needsProof: true, online: true }, { key: 'transfer', label: 'تحويل', needsProof: false, online: true }],
+      servants: [{ id: 'srv-aaaa1111', name: 'مينا عادل', methods: ['cash', 'instapay'] }, { id: 'srv-bbbb2222', name: 'مرقس فادي', methods: ['cash', 'transfer'] }],
       ...booking
     }
   };
@@ -94,6 +95,11 @@ const stat = time('status', await call('POST', '/v1/book/status', { token: s1.bo
 check('status view: first name, people, no phone', stat.body.status === 'pending' && stat.body.people.total === 3 && !JSON.stringify(stat.body).includes(phone(1).slice(3)), stat.body);
 const noProof = await call('POST', '/v1/book/submit', { ...sub, requestKey: 'rk-' + randomUUID(), phone: phone(2), proofs: [] });
 check('instapay without a proof → invalid(proofs)', noProof.body.code === 'invalid' && noProof.body.field === 'proofs', noProof.body);
+// Phase 1: cash is servant-assisted — a visitor can't send it; the payment card is off until PAY_DEST = 1
+const cash = await call('POST', '/v1/book/submit', { ...sub, requestKey: 'rk-' + randomUUID(), phone: phone(3), method: 'cash', proofs: [] });
+check('cash from the site → invalid(method)', cash.body.code === 'invalid' && cash.body.field === 'method', cash.body);
+const payCard = await call('POST', '/v1/book/pay', { slug: slugA, servantId: 'srv-aaaa1111', method: 'instapay', counts: { applicant: 1 } });
+check('payment card off by default → disabled, no number', payCard.body.code === 'disabled' && !('number' in payCard.body), payCard.body);
 
 // ---------------- admin flow ----------------
 const q = time('admin queue', await A('GET', '/v1/admin/book/bookings?eventId=' + evA + '&status=pending'));
@@ -127,7 +133,7 @@ check('visitor status after confirm: paid', pubSt.body.status === 'confirmed' &&
 
 // ---------------- concurrency ----------------
 await nextMinute();
-const sameKey = { slug: slugB, requestKey: 'rk-same-' + RUN, name: 'سباق', phone: phone(10), counts: { applicant: 1 }, servantId: 'srv-bbbb2222', method: 'cash', hp: '', revision: '' };
+const sameKey = { slug: slugB, requestKey: 'rk-same-' + RUN, name: 'سباق', phone: phone(10), counts: { applicant: 1 }, servantId: 'srv-bbbb2222', method: 'transfer', hp: '', revision: '' };
 const same = await Promise.all(Array.from({ length: 8 }, () => call('POST', '/v1/book/submit', sameKey)));
 const refs = new Set(same.filter(r => r.status === 200).map(r => r.body.ref));
 check('8× same requestKey at once → exactly 1 booking', refs.size === 1, same.map(r => r.status + ':' + (r.body.ref || r.body.code)));

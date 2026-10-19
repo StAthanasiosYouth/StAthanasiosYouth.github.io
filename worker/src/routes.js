@@ -23,6 +23,7 @@ import {
 } from './book/admin.js';
 import { rowFromJson, saveRow } from './book/event.js';
 import { syncBookNews, diagNews } from './book/news.js';
+import { syncPayDest, bookPay } from './book/pay.js';
 
 export const VERSION = '0.3.0';
 
@@ -223,6 +224,7 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/admin/diag/retention', auth: 'admin', handler: diagRetention },
   { method: 'GET', path: '/v1/admin/diag/book-news', auth: 'admin', handler: diagNews },
   { method: 'POST', path: '/v1/sync/book-news', auth: 'sync', raw: true, maxBytes: 4 * 1024, handler: syncBookNews },
+  { method: 'POST', path: '/v1/sync/pay-dest', auth: 'sync', raw: true, maxBytes: 64 * 1024, handler: syncPayDest },
 
   // booking — public (docs/EVENTS.md §6, worker/BOOKING-API.md)
   { method: 'GET', path: '/v1/book/state', auth: 'public', handler: bookState },
@@ -230,6 +232,7 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/book/submit', auth: 'public', maxBytes: 16 * 1024, handler: bookSubmit },
   { method: 'POST', path: '/v1/book/status', auth: 'public', maxBytes: 4 * 1024, handler: bookStatus },
   { method: 'POST', path: '/v1/book/withdraw', auth: 'public', maxBytes: 4 * 1024, handler: bookWithdraw },
+  { method: 'POST', path: '/v1/book/pay', auth: 'public', maxBytes: 4 * 1024, handler: bookPay },
 
   // booking — admin
   { method: 'GET', path: '/v1/admin/book/module', auth: 'admin', handler: adminModule },

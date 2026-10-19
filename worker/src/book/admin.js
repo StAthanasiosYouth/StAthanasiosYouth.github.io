@@ -74,11 +74,13 @@ export async function detail(ctx, id) {
   const env = ctx.env;
   const b = await bookingRow(env, id);
   const event = await eventById(ctx, b.event_id);
-  const [pays, proofs, flags, taken] = await Promise.all([
+  const [pays, proofs, flags, taken, history] = await Promise.all([
     paymentsOf(env, b.id),
     retry(() => env.DB.prepare('SELECT p.id, p.purpose, p.payment_id, p.by, p.at, p.bytes, p.width, p.height, (SELECT COUNT(*) FROM proofs q WHERE q.sha256 = p.sha256 AND q.booking_id IS NOT NULL AND q.booking_id <> p.booking_id) AS dups FROM proofs p WHERE p.booking_id = ? AND p.deleted_at IS NULL ORDER BY p.at_ms').bind(b.id).all()),
     flagsFor(env, b, event),
-    seatsTaken(env, event.id)
+    seatsTaken(env, event.id),
+    // «السجل»: every move on this booking (the audit rows written with each write; no private data)
+    retry(() => env.DB.prepare("SELECT at, cairo, actor, actor_name, action, summary FROM activity WHERE entity_type = 'booking' AND entity_id = ? ORDER BY at DESC LIMIT 50").bind(b.id).all())
   ]);
   const lock = await lockInfo(ctx, b.id);
   const now = Date.now();
@@ -99,6 +101,7 @@ export async function detail(ctx, id) {
       proofIds: p.proof_ids ? JSON.parse(p.proof_ids) : [], note: p.note, voidsId: p.voids_id, voidedBy: p.voided_by
     })),
     proofs: proofs.results.map(p => ({ id: p.id, purpose: p.purpose, paymentId: p.payment_id, by: p.by, at: p.at, bytes: p.bytes, width: p.width, height: p.height, dup: p.dups > 0 })),
+    history: history.results.map(h => ({ at: h.cairo, by: h.actor_name || (h.actor === 'visitor' ? 'زائر' : h.actor), action: h.action, summary: h.summary || '' })),
     derived: derive(b, pays, bk.payment, now),
     event: {
       id: event.id, slug: event.slug, title: event.title, startAt: event.startAt, endAt: event.endAt,
@@ -266,17 +269,23 @@ export async function adminBookings(ctx) {
   const q = ctx.url.searchParams;
   const event = await eventById(ctx, q.get('eventId'));
   const env = ctx.env;
-  const [bs, paid, dups] = await env.DB.batch([
+  const [bs, paid, dups, proofCounts] = await env.DB.batch([
     env.DB.prepare('SELECT * FROM bookings WHERE event_id = ? ORDER BY created_ms DESC, id').bind(event.id),
     env.DB.prepare("SELECT booking_id, SUM(CASE kind WHEN 'payment' THEN amount WHEN 'refund' THEN -amount ELSE 0 END) AS paid FROM payments WHERE event_id = ? AND voided_by IS NULL AND kind <> 'void' GROUP BY booking_id").bind(event.id),
-    env.DB.prepare('SELECT DISTINCT p.booking_id FROM proofs p JOIN bookings b ON b.id = p.booking_id WHERE b.event_id = ? AND p.deleted_at IS NULL AND EXISTS (SELECT 1 FROM proofs q WHERE q.sha256 = p.sha256 AND q.booking_id IS NOT NULL AND q.booking_id <> p.booking_id)').bind(event.id)
+    env.DB.prepare('SELECT DISTINCT p.booking_id FROM proofs p JOIN bookings b ON b.id = p.booking_id WHERE b.event_id = ? AND p.deleted_at IS NULL AND EXISTS (SELECT 1 FROM proofs q WHERE q.sha256 = p.sha256 AND q.booking_id IS NOT NULL AND q.booking_id <> p.booking_id)').bind(event.id),
+    // the queue shows which bookings came with a transfer screenshot
+    env.DB.prepare('SELECT p.booking_id, COUNT(*) AS n FROM proofs p JOIN bookings b ON b.id = p.booking_id WHERE b.event_id = ? AND p.deleted_at IS NULL GROUP BY p.booking_id').bind(event.id)
   ]);
   const paidBy = new Map(paid.results.map(r => [r.booking_id, r.paid]));
   const dupSet = new Set(dups.results.map(r => r.booking_id));
+  const proofsBy = new Map(proofCounts.results.map(r => [r.booking_id, r.n]));
   const phones = new Map();
   bs.results.forEach(b => { if (b.status === 'pending' || b.status === 'confirmed') phones.set(b.phone, (phones.get(b.phone) || 0) + 1); });
   const now = Date.now();
-  let rows = bs.results.map(b => listRow(b, event, paidBy.get(b.id) || 0, { dupProof: dupSet.has(b.id), phoneTwice: (phones.get(b.phone) || 0) >= 2, priceChanged: b.price_rev !== event.priceRev }, now));
+  let rows = bs.results.map(b => ({
+    ...listRow(b, event, paidBy.get(b.id) || 0, { dupProof: dupSet.has(b.id), phoneTwice: (phones.get(b.phone) || 0) >= 2, priceChanged: b.price_rev !== event.priceRev }, now),
+    proofs: proofsBy.get(b.id) || 0
+  }));
 
   const counts = { byStatus: Object.fromEntries(STATUSES.map(s => [s, 0])), overdue: 0, refunds: 0 };
   rows.forEach(r => { counts.byStatus[r.status]++; if (r.overdue) counts.overdue++; if (r.refundOwed > 0) counts.refunds++; });
@@ -354,8 +363,25 @@ export async function adminCreate(ctx) {
   const names = b.collectNames && Array.isArray(body.names) ? body.names.map(n => cleanText(n, LIMITS.names)).filter(Boolean) : null;
   const id = randomId('bkg-', 6);
   const db = ctx.env.DB;
+
+  /*
+   * Money received with a booking that stays PENDING (Phase 1, decision 5):
+   * a servant who took the cash registers the booking and the payment now;
+   * whoever approves confirms later with that payment already counted (no
+   * one types the money twice). Payments only — no refunds, no proofs here.
+   * With `confirm`, the payments go in the confirm body as before.
+   */
+  let early = { rows: [] };
+  const wantsEarly = !(body.confirm && typeof body.confirm === 'object') && Array.isArray(body.payments) && body.payments.length;
+  if (wantsEarly) {
+    if (body.payments.some(p => !p || p.kind !== 'payment' || (Array.isArray(p.proofIds) && p.proofIds.length))) throw invalid('payments');
+    early = await checkPays(ctx, body.payments, { event, booking: { id, event_id: event.id, created_ms: now }, paid: 0, due: null, existing: [], now });
+    if (early.warnings.length) throw new ApiError('warn', 'payments', { warnings: early.warnings });
+  }
+
   for (let attempt = 0; attempt < 3; attempt++) {
     const ref = newRef();
+    const made = "EXISTS (SELECT 1 FROM bookings WHERE id = ? AND request_key = ?)";
     try {
       await retry(() => db.batch([
         db.prepare(`INSERT INTO bookings (id, ref, event_id, source, status, name, phone, servant_id, method, requested, seats_requested, names,
@@ -363,7 +389,12 @@ export async function adminCreate(ctx) {
           VALUES (?, ?, ?, 'admin', 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(request_key) DO NOTHING`).bind(
           id, ref, event.id, name, phone, servantId, method, JSON.stringify(counts), seats(b.pricing, counts), names ? JSON.stringify(names) : null,
           total, event.priceRev, cleanText(body.note, LIMITS.adminNote) || null, body.requestKey, cairoText(now), now, now),
-        activityStmt(db, { actor: ctx.actor.email, actorName: ctx.actor.name, action: 'booking.create', entityType: 'booking', entityId: id, entityTitle: ref, summary: event.title.slice(0, 80) })
+        activityStmt(db, { actor: ctx.actor.email, actorName: ctx.actor.name, action: 'booking.create', entityType: 'booking', entityId: id, entityTitle: ref, summary: event.title.slice(0, 80),
+          changes: early.rows.length ? { payments: early.rows.length, paid: early.rows.reduce((s, r) => s + r.amount, 0) } : null }),
+        ...paymentStmts(db, early.rows, { id, event_id: event.id }, ctx.actor, now, made, [id, body.requestKey]),
+        ...early.rows.map(r => db.prepare(`INSERT INTO activity (id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary)
+          SELECT ?, ?, ?, ?, ?, 'payment.add', 'booking', ?, ?, ? WHERE EXISTS (SELECT 1 FROM payments WHERE id = ?)`).bind(
+          randomId('act-'), now, cairoText(now), ctx.actor.email, ctx.actor.name || null, id, ref, r.method + ' · ' + r.servantName + ' · لسه مستني التأكيد', r.id))
       ]));
       break;
     } catch (err) {
