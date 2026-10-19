@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "d5e7cf18e6b3",
-  "publishedAt": "2026-10-14T23:45:00.208Z",
+  "revision": "213de3c5fe1e",
+  "publishedAt": "2026-10-19T08:13:51.130Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -276,82 +276,10 @@
       }
     }
   ],
-  "sessions": [
-    {
-      "date": "2026-10-18",
-      "time": "20:00",
-      "topic": "الكسل الروحى",
-      "speaker": "فادى يوسف",
-      "description": "",
-      "image": {
-        "src": "media/2026/img-ce20a15c.webp",
-        "thumb": "media/2026/img-ce20a15c-480.webp",
-        "w": 1283,
-        "h": 1600,
-        "alt": "",
-        "color": "#7b7161"
-      },
-      "status": "normal",
-      "note": "",
-      "visibleFrom": "2026-10-14T18:13",
-      "durationMinutes": 120,
-      "program": [
-        {
-          "title": "صلاة",
-          "start": "2026-10-18T20:00",
-          "end": "2026-10-18T20:10"
-        },
-        {
-          "title": "ترانيم",
-          "start": "2026-10-18T20:10",
-          "end": "2026-10-18T20:20"
-        },
-        {
-          "title": "النعمة والجهاد الروحى",
-          "start": "2026-10-18T20:20",
-          "end": "2026-10-18T20:30"
-        },
-        {
-          "title": "ورشة عمل",
-          "start": "2026-10-18T20:30",
-          "end": "2026-10-18T20:40"
-        },
-        {
-          "title": "فقرة تاريخ كنيسة او طقس",
-          "start": "2026-10-18T20:40",
-          "end": "2026-10-18T20:50"
-        },
-        {
-          "title": "الكلمة",
-          "start": "2026-10-18T20:50",
-          "end": "2026-10-18T22:00"
-        }
-      ]
-    }
-  ],
+  "sessions": [],
   "news": [],
   "games": [],
-  "notifications": [
-    {
-      "id": "notif-session-2026-10-18",
-      "type": "meeting",
-      "title": "موضوع الاجتماع الجاي",
-      "message": "الكسل الروحى — ابونا فيلوباتير رومانى",
-      "target": {
-        "kind": "meeting"
-      },
-      "image": {
-        "src": "media/2026/img-ce20a15c.webp",
-        "thumb": "media/2026/img-ce20a15c-480.webp",
-        "w": 1283,
-        "h": 1600,
-        "alt": "",
-        "color": "#7b7161"
-      },
-      "publishAt": "2026-10-14T18:13",
-      "expireAt": "2026-10-18T20:00"
-    }
-  ],
+  "notifications": [],
   "activities": [
     {
       "id": "act-2f7f8204",
@@ -534,6 +462,17 @@
       "visibleUntil": ""
     }
   ],
+  "competitions": [
+    {
+      "id": "cmp-9227de8c",
+      "slug": "test",
+      "title": "test",
+      "shortTitle": "",
+      "startAt": "2026-10-11T17:50",
+      "endAt": "2026-10-11T22:00",
+      "v": "c32ec192bef65b1b"
+    }
+  ],
   "pages": [
     {
       "id": "pg-0d2eeb07",
@@ -549,7 +488,7 @@
         "color": "#412618"
       },
       "partner": "bug",
-      "v": "0940baf2b07d"
+      "v": "5bf0b59d54ba"
     }
   ],
   "partners": {
