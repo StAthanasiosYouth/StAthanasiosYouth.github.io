@@ -274,7 +274,7 @@ test('module on: the tab, «الحجوزات (٢ جديد)», chips with counts,
   await d.page.evaluate(() => A.go('pages', 'events'));
   await d.page.waitForFunction(() => { const b = document.querySelector('[data-act="book-open"]'); return b && /الحجوزات \(٢ جديد\)/.test(b.textContent); }, { timeout: 8000 });
   // the menu tab carries the new requests of all the events
-  assert.deepEqual(await subtabs(d.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام', 'الحجوزات (٢ جديد)']);
+  assert.deepEqual(await subtabs(d.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام', 'الحجوزات٢']);
   // the home card «الحجوزات»: what waits, per event
   await d.page.evaluate(() => A.go('home'));
   await d.page.waitForFunction(() => { const c = document.getElementById('dash-book'); return c && !c.hidden && /مستنيين المراجعة: ٢/.test(c.innerText); }, { timeout: 8000 });
@@ -763,7 +763,7 @@ test('device session (the app\'s remembered phone): «الحجوزات محتا�
   await again.page.waitForSelector('.book-row', { timeout: 10000 });
   assert.deepEqual((await rows(again.page)).sort(), ['B-AAAA1', 'B-BBBB2']);
   assert.ok(fake.state.calls.length > 0 && fake.state.calls.every(c => /^Bearer \S+/.test(c.auth)));
-  assert.deepEqual(await subtabs(again.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام', 'الحجوزات (٢ جديد)']);
+  assert.deepEqual(await subtabs(again.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام', 'الحجوزات٢']);
   assert.deepEqual(again.problems, []);
   await context.close();
 });

@@ -594,7 +594,8 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
   function stepPay() {
 
     const methodOf = new Map(booking.methods.map(m => [m.key, m]));
-    const servants = booking.servants.filter(s => s.id && onlineMethodsOf(booking, s).length);
+    // every servant with a method; cash is a choice too, but only shows its information box (no send)
+    const servants = booking.servants.filter(s => s.id && s.methods.length);
     const cashServants = offlineServants(booking);
     const methodsBox = h('div', { class: 'bk-choices' });
     const payBox = h('div', { class: 'bk-wa bk-pay', 'aria-live': 'polite' });
@@ -605,10 +606,26 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
       return servants.find(s => s.id === draft.servantId) || null;
     }
 
-    function setNext(label, on) {
+    function setNext(label, on, hidden = false) {
       next.firstChild.textContent = label;
       next.disabled = !on;
+      next.hidden = hidden;
       ready = on;
+    }
+
+    /* cash (any offline method): the servant registers the booking after taking the money — information only */
+    function cashInfo(servant) {
+      const label = (methodOf.get(draft.method) || {}).label || 'كاش';
+      payBox.replaceChildren(h('div', { class: 'bk-cash', 'data-cash': '1' },
+        h('p', { class: 'bk-cash__title' }, `الدفع ${label} مع ${servant.name}`),
+        h('p', { class: 'bk-note' }, `بتدفع لـ${servant.name} نفسه، وهو اللي بيسجّل حجزك بعد ما يستلم. مش محتاج تبعت الطلب من هنا.`),
+        // the WhatsApp link only with the servant's consent (publicWa → event.json `wa`)
+        servant.wa
+          ? h('a', { class: 'btn btn--wa bk-cash__wa', href: waWithText(servant.wa, cashMessage(event, servant, { name: draft.fields.name, counts: draft.counts })), target: '_blank', rel: 'noopener', onclick: saveNow },
+            icon('whatsapp'), `كلّم ${servant.name} على واتساب`, h('span', { class: 'visually-hidden' }, ' (بيفتح واتساب)'))
+          : h('p', { class: 'bk-note' }, `كلّم ${servant.name} في الكنيسة.`)
+      ));
+      setNext('دفعت، كمّل', false, true);
     }
 
     function talkToServant(servant) {
@@ -649,7 +666,10 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
           h('li', {}, 'حوّل المبلغ للرقم ده.'),
           h('li', {}, 'خد سكرين شوت للتحويل.'),
           h('li', {}, 'ارجع هنا ودوس «تم التحويل» وارفع الصورة.')),
-        draft.pay === 'copied' && backFromApp ? h('p', { class: 'bk-note bk-note--strong' }, 'رجعت؟ لو حوّلت دوس «تم التحويل».') : null
+        draft.pay === 'copied' && backFromApp ? h('p', { class: 'bk-note bk-note--strong' }, 'رجعت؟ لو حوّلت دوس «تم التحويل».') : null,
+        // optional: ask the servant first (consent-only link); the draft is saved before leaving
+        servant.wa ? h('a', { class: 'btn btn--ghost bk-paycard__ask', href: waWithText(servant.wa, payMessage(event, servant, { name: draft.fields.name, counts: draft.counts, method })), target: '_blank', rel: 'noopener', 'data-act': 'ask-servant', onclick: saveNow },
+          icon('whatsapp'), 'عايز تتأكد قبل التحويل؟ تواصل مع المسؤول', h('span', { class: 'visually-hidden' }, ' (بيفتح واتساب)')) : null
       ));
       if (draft.pay !== 'copied') draft.pay = 'shown';
       saveSoon();
@@ -662,6 +682,10 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
       if (!servant || !method) {
         payBox.replaceChildren();
         setNext('دفعت، كمّل', true);
+        return;
+      }
+      if (!methodOnline(methodOf.get(method))) {
+        cashInfo(servant);
         return;
       }
       if (!PAY_CARD.has(method)) {
@@ -705,7 +729,7 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
         methodsBox.replaceChildren();
         return;
       }
-      const keys = onlineMethodsOf(booking, servant);
+      const keys = servant.methods;
       if (!keys.includes(draft.method)) draft.method = keys.length === 1 ? keys[0] : '';
       methodsBox.replaceChildren(group('method', 'هتدفع إزاي؟',
         h('div', { class: 'bk-chips' }, keys.map(key => {
@@ -722,27 +746,9 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
       ));
     }
 
-    // «كاش مع الخادم»: for information — the servant registers the booking after taking the money
-    const cashLabel = booking.methods.filter(m => !methodOnline(m)).map(m => m.label).join(' / ') || 'كاش';
-    const cashCard = cashServants.length ? h('div', { class: 'bk-cash', 'data-cash': '1' },
-      h('p', { class: 'bk-cash__title' }, `هتدفع ${cashLabel}؟`),
-      h('p', { class: 'bk-note' }, 'بتدفع للخادم نفسه، وهو اللي بيسجّل حجزك بعد ما يستلم. مش محتاج تبعت الطلب من هنا.'),
-      h('ul', { class: 'bk-cash__list' }, cashServants.map(s => h('li', { class: 'bk-cash__who' },
-        h('span', { class: 'bk-pick__name' }, s.name),
-        s.role ? h('span', { class: 'bk-pick__role' }, ` · ${s.role}`) : null,
-        // the WhatsApp link only with the servant's consent (publicWa → event.json `wa`)
-        s.wa
-          ? h('a', { class: 'btn btn--wa bk-cash__wa', href: waWithText(s.wa, cashMessage(event, s, { name: draft.fields.name, counts: draft.counts })), target: '_blank', rel: 'noopener', onclick: saveNow },
-            icon('whatsapp'), `واتساب ${s.name}`, h('span', { class: 'visually-hidden' }, ' (بيفتح واتساب)'))
-          : h('span', { class: 'bk-note' }, ' — كلّمه في الكنيسة')
-      )))
-    ) : null;
-
     if (!servants.length) {
-      // nothing to pay online here: the cash card is the way
       return h('div', { class: 'bk-form' },
-        h('p', { class: 'bk-total' }, h('span', {}, 'المطلوب'), h('strong', {}, money(totalOf(booking, draft.counts)))),
-        cashCard || h('p', { class: 'bk-note' }, 'الدفع للفعالية دي مع الخادم مباشرة.'),
+        h('p', { class: 'bk-note' }, 'الدفع للفعالية دي مع الخادم مباشرة.'),
         actions(backButton('رجوع', () => go('a')), null));
     }
 
@@ -764,7 +770,7 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
           h('span', { class: 'bk-pick__who' },
             h('span', { class: 'bk-pick__name' }, s.name),
             s.role ? h('span', { class: 'bk-pick__role' }, s.role) : null,
-            h('span', { class: 'bk-pick__methods' }, onlineMethodsOf(booking, s).map(k => (methodOf.get(k) || {}).label).filter(Boolean).join(' · '))
+            h('span', { class: 'bk-pick__methods' }, s.methods.map(k => (methodOf.get(k) || {}).label).filter(Boolean).join(' · '))
           )
         );
       }))
@@ -775,8 +781,7 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
       picks,
       methodsBox,
       payBox,
-      actions(backButton('رجوع', () => go('a')), next),
-      cashCard
+      actions(backButton('رجوع', () => go('a')), next)
     );
 
     form.addEventListener('submit', submitEvent => {

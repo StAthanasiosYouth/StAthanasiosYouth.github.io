@@ -7469,6 +7469,10 @@ dialog .toasts[popover] {
   /* ---------- «الحجوزات» (AdminBook; only while the Worker's module is on) ---------- */
   .book-link:empty { display: none; }
   .book-link--new { color: var(--gold-ink); background: linear-gradient(180deg, var(--gold-hi), var(--gold)); box-shadow: none; }
+  .nav-badge { display: inline-grid; place-items: center; min-width: 1.15rem; height: 1.15rem; padding: 0 .3rem; border-radius: 999px; font-size: .68rem; font-weight: 800; line-height: 1; color: var(--gold-ink); background: var(--gold); }
+  .navlink__icon, .dockbtn__icon { position: relative; }
+  .navlink__badge, .dockbtn__badge { position: absolute; inset-block-start: -.35rem; inset-inline-end: -.55rem; }
+  .tab__badge { margin-inline-start: .35rem; vertical-align: 1px; }
   .dash-book__list { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0 0 .6rem; padding: 0; list-style: none; }
   .book-kpis { margin-block: .2rem; }
   .book-phone { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .35rem; }

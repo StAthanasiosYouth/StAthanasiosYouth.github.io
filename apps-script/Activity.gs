@@ -1276,7 +1276,10 @@ function activityDispatch_() {
 var ACTIVITY_PENDING_KEY = 'adm:act:pending';
 var ACTIVITY_PENDING_SCAN = 100;
 var ACTIVITY_LATE_MS = 60000;
-var ACTIVITY_CARRIER_FNS = ['apiHeartbeat', 'apiSessionEnd'];
+// 'trigger': the 5-minute time trigger (BookNotify.gs bookNewsTick) — an admin who saves and
+// swipes the app away with nobody else in the panel still gets the push out within minutes
+// (before, such a row waited for the next heartbeat: «sometimes it arrives, sometimes not»)
+var ACTIVITY_CARRIER_FNS = ['apiHeartbeat', 'apiSessionEnd', 'trigger'];
 var ACTIVITY_SWEEP_KEY = 'adm:act:sweep';
 var ACTIVITY_SWEEP_S = 600;
 var ACTIVITY_LATE_FNS = ['apiActivity', 'apiAdmins', 'apiAdminPushDevices', 'apiPushState', 'apiMediaLibrary', 'apiComps',

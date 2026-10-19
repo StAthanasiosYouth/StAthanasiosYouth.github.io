@@ -3195,10 +3195,19 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         if (area.key !== A.area) A.go(area.key);
       }
     },
-    el('span', { class: className + '__icon' }, icon(area.icon)),
+    el('span', { class: className + '__icon' }, icon(area.icon), navBadge(area.badge, className + '__badge')),
     // the dock is narrow: its own short word where there is one (the rail and the title say it in full)
     el('span', { class: className + '__label', text: className === 'dockbtn' && area.short ? area.short : area.label })
     );
+
+  }
+
+  /* a number on a menu item (e.g. «الحجوزات»: bookings waiting); nothing for 0 */
+  function navBadge(n, cls) {
+
+    n = Number(n) || 0;
+    if (n <= 0) return null;
+    return el('span', { class: 'nav-badge ' + cls, 'aria-label': n + ' جديد', text: n > 99 ? '٩٩+' : String(n).replace(/\d/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[d]; }) });
 
   }
 
@@ -3224,7 +3233,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         class: 'tab', type: 'button',
         'aria-current': s.key === A.sub[A.area] ? 'page' : null,
         onclick: function () { if (s.key !== A.sub[A.area]) A.go(A.area, s.key); }
-      }, s.label);
+      }, s.label, navBadge(s.badge, 'tab__badge'));
     }));
 
     document.getElementById('crumb').textContent = sub ? current.label : 'لوحة التحكم';
@@ -18296,22 +18305,29 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return (B.events || []).reduce(function (sum, e) { return sum + (e.counts && e.counts.pending || 0); }, 0);
   }
 
-  function navLabel() {
-    var n = B.on ? pendingTotal() : 0;
-    return 'الحجوزات' + (n ? ' (' + ar(n) + ' جديد)' : '');
-  }
-
-  /* «الحجوزات» next to «الفعاليات» and «الخدام» (with the number of new requests) */
+  /*
+   * «الحجوزات» in the menu with a NUMBER badge (bookings waiting for approval, all events),
+   * on the sub-tab and on «الصفحات والفعاليات» itself (the phone's dock shows only areas).
+   * Refreshed after every write, on each events answer, and every 60 s while the panel is in sight.
+   */
   function addNav() {
     var area = A.AREAS.filter(function (a) { return a.key === 'pages'; })[0];
     if (!area || !area.subs) return;
     var sub = area.subs.filter(function (s) { return s.key === 'bookings'; })[0];
-    var label = navLabel();
-    if (sub && sub.label === label) return;
-    if (sub) sub.label = label;
-    else area.subs.push({ key: 'bookings', label: label });
+    var n = B.on ? pendingTotal() : 0;
+    if (sub && sub.badge === n && area.badge === n) return;
+    if (!sub) area.subs.push(sub = { key: 'bookings', label: 'الحجوزات' });
+    sub.badge = n;
+    area.badge = n;
     A.renderNav();
   }
+
+  setInterval(function () {
+    if (B.on && document.visibilityState === 'visible' && !sheetOpen()) loadEvents();
+  }, 60000);
+  document.addEventListener('visibilitychange', function () {
+    if (B.on && document.visibilityState === 'visible') loadEvents();
+  });
 
   // asked once the panel is up (boot.js sets AdminWorker before A.start)
   var start = A.start;

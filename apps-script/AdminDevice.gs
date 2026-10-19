@@ -269,7 +269,15 @@ function publicDeviceSignIn_(request) {
     device.last = now;
     PropertiesService.getScriptProperties().setProperty(deviceKey_(id), JSON.stringify(device));
 
-    return { ok: true, token: token, exp: exp, email: device.email };
+    var reply = { ok: true, token: token, exp: exp, email: device.email };
+
+    // the app's launch: the panel's session too, in the SAME round trip (before: deviceSignIn,
+    // then apiSessionStart — two Apps Script waits behind «جاري استعادة الجلسة»)
+    if (request.start && typeof request.start === 'object') {
+      reply.session = deviceStartSession_(device.email, id, request.start);
+    }
+
+    return reply;
 
   }
   catch (error) {
@@ -279,6 +287,32 @@ function publicDeviceSignIn_(request) {
 
 }
 
+
+/*
+ * apiSessionStart for a device that just proved itself: as that admin, with
+ * this device credential's id on the session. The app swiped away earlier
+ * leaves its session "live" for a while (no beacon on a phone): the SAME
+ * device credential takes its own session over without the «another device»
+ * question; any other device still gets it. → apiSessionStart's answer
+ * ({ sid, state } | { active }), or { error } (the client then starts the usual way).
+ */
+function deviceStartSession_(email, deviceId, start) {
+
+  var before = API_REQUEST_;
+
+  try {
+    API_REQUEST_ = { email: normalizeEmail_(email), via: 'device', sid: '' };
+    return apiSessionStart({ device: start.device, tab: start.tab, force: start.force === true, state: true }, { deviceId: deviceId });
+  }
+  catch (error) {
+    console.warn('device: session not started: ' + ((error && error.message) || error));
+    return { error: true };
+  }
+  finally {
+    API_REQUEST_ = before;
+  }
+
+}
 
 /* doPost: the email of a device access token ('adm1.…'), or an 'auth' error */
 function verifyDeviceToken_(token) {

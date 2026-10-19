@@ -183,6 +183,20 @@ test('book news (B8): the panel open on the PC spares only the PC; the phone sti
   assert.ok(fcmSent(world).slice(before).some(m => m.message.token === deviceToken(9)), 'hidden = not looking');
 });
 
+test('deferred admin push: an admin saves and closes the app with nobody else in the panel → the 5-minute trigger sends it', () => {
+  const { world } = newsWorld({ groups: [] });
+  const fady = tab(world, SECOND).start();
+  fady.ok('apiSaveItem', 'news', { title: 'خبر والتطبيق اتقفل', summary: 'x' });
+  world.as('');
+  world.gs.API_REQUEST_ = null;
+  const rows = () => world.spreadsheet.getSheetByName('Activity').data;
+  assert.ok(rows().some(r => r.includes('pending:now')), 'waiting for a carrier');
+  const before = fcmSent(world).length;
+  tick(world);
+  assert.ok(fcmSent(world).length > before, 'sent by the trigger, no heartbeat needed');
+  assert.equal(rows().some(r => r.includes('pending:now')), false);
+});
+
 test('book news: odd groups are skipped; a Worker that fails or answers nothing never throws', () => {
   const { world } = newsWorld({ groups: [{ eventId: 'not-an-event', count: 2 }, { eventId: 'evt-alex01', count: 0 }, null, { eventId: 'evt-ok01', title: '', count: 2, pending: -1 }] });
   assert.equal(tick(world), 1);

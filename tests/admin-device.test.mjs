@@ -79,6 +79,49 @@ test('device sign-in: a right signature → a short-lived access token that work
   assert.equal(activity[3], ADMIN);
 });
 
+/* deviceSignIn with { start }: the app's launch in ONE round trip */
+function launch(world, device, start = { device: 'موبايل أندرويد – التطبيق', tab: 't' + Math.random().toString(36).slice(2, 10) }) {
+  const ts = Date.now() + world.clock.skew;
+  const nonce = randomBytes(16).toString('hex');
+  const sig = createHmac('sha256', Buffer.from(device.secret, 'utf8')).update(`${device.deviceId}.${ts}.${nonce}`, 'utf8').digest('hex');
+  return world.post({ fn: 'deviceSignIn', args: [{ deviceId: device.deviceId, ts, nonce, sig, start }] });
+}
+
+test('app launch: the token AND the panel session + state in one answer; the same phone takes its own swiped-away session silently, another phone still asks', () => {
+  const world = apiWorld();
+  const device = googleTab(world, ADMIN).call('apiTrustDevice', {}).result;
+  const first = launch(world, device);
+  assert.equal(first.ok, true);
+  assert.match(first.token, /^adm1\./);
+  assert.match(first.session.sid, /^[0-9a-f-]{36}$/);
+  assert.equal(first.session.state.user, ADMIN, 'the panel state came with it');
+  // it works as a session right away
+  const beat = world.post({ fn: 'apiHeartbeat', args: [{ area: 'home' }], token: first.token, sid: first.session.sid });
+  assert.equal(beat.ok, true, beat.error);
+
+  // the app swiped away (no beacon), opened again a moment later: no «another device» question
+  world.advance(10_000);
+  const again = launch(world, device);
+  assert.equal(again.ok, true);
+  assert.ok(again.session.sid && again.session.sid !== first.session.sid, 'a new session, no takeover question');
+  assert.equal(world.post({ fn: 'apiHeartbeat', args: [{ area: 'home' }], token: first.token, sid: first.session.sid }).code, 'session_replaced');
+
+  // a DIFFERENT trusted phone of the same admin while this one is live: still the question
+  world.post({ fn: 'apiHeartbeat', args: [{ area: 'home' }], token: again.token, sid: again.session.sid });
+  const other = googleTab(world, ADMIN);
+  void other;
+  const phone2 = googleTab(world, ADMIN).call('apiTrustDevice', {}).result;
+  const live = launch(world, device);    // takes it back (same device)
+  world.post({ fn: 'apiHeartbeat', args: [{ area: 'home' }], token: live.token, sid: live.session.sid });
+  const asked = launch(world, phone2);
+  assert.ok(asked.session.active, 'another device: the takeover question');
+});
+
+test('pending admin pushes: the 5-minute trigger carries them (nobody left in the panel)', () => {
+  const world = apiWorld();
+  assert.ok(world.gs.ACTIVITY_CARRIER_FNS.includes('trigger'));
+});
+
 test('device sign-in: wrong secret, old time, a replayed nonce, an unknown device — all refused alike; ten bad tries end the device', () => {
   const world = apiWorld();
   const device = googleTab(world, ADMIN).call('apiTrustDevice', {}).result;

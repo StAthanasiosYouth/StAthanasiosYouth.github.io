@@ -3066,10 +3066,19 @@
         if (area.key !== A.area) A.go(area.key);
       }
     },
-    el('span', { class: className + '__icon' }, icon(area.icon)),
+    el('span', { class: className + '__icon' }, icon(area.icon), navBadge(area.badge, className + '__badge')),
     // the dock is narrow: its own short word where there is one (the rail and the title say it in full)
     el('span', { class: className + '__label', text: className === 'dockbtn' && area.short ? area.short : area.label })
     );
+
+  }
+
+  /* a number on a menu item (e.g. «الحجوزات»: bookings waiting); nothing for 0 */
+  function navBadge(n, cls) {
+
+    n = Number(n) || 0;
+    if (n <= 0) return null;
+    return el('span', { class: 'nav-badge ' + cls, 'aria-label': n + ' جديد', text: n > 99 ? '٩٩+' : String(n).replace(/\d/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[d]; }) });
 
   }
 
@@ -3095,7 +3104,7 @@
         class: 'tab', type: 'button',
         'aria-current': s.key === A.sub[A.area] ? 'page' : null,
         onclick: function () { if (s.key !== A.sub[A.area]) A.go(A.area, s.key); }
-      }, s.label);
+      }, s.label, navBadge(s.badge, 'tab__badge'));
     }));
 
     document.getElementById('crumb').textContent = sub ? current.label : 'لوحة التحكم';

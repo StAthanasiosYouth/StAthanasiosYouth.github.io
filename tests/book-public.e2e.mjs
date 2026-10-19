@@ -517,7 +517,7 @@ test('back from WhatsApp: the page opens on the same step with the same requestK
    CASH WITH THE SERVANT, AND THE INSTAPAY / WALLET PAYMENT CARD (Phase 1)
 ========================================================= */
 
-test('cash is for information: no cash choice, the «كاش مع الخادم» card with WhatsApp (consent only) prefilled for this event', async () => {
+test('cash: a choice that only shows its box (the servant, WhatsApp by consent, prefilled for this event) and never sends', async () => {
   resetMock();
   const { context, page, problems } = await open('/events/online-trip/');
   await ready(page);
@@ -525,21 +525,23 @@ test('cash is for information: no cash choice, the «كاش مع الخادم» 
   await page.click('.bk-start');
   await fillWho(page);
   await step(page, 'b');
-  // only the servant with an online method can be picked; cash is never a choice
-  assert.deepEqual(await page.$$eval('.bk-picks input', els => els.map(e => e.value)), ['srv-mina0001']);
+  assert.equal(await page.$('.bk-cash'), null, 'no cash box before cash is chosen');
   await page.click('label[for="bk-servant-srv-mina0001"]');
-  assert.deepEqual(await page.$$eval('.bk-chips input[name="bk-method"]', els => els.map(e => e.value)), ['instapay', 'transfer']);
-  assert.equal(await page.$('#bk-method-cash'), null);
-  // the card: both servants who take cash; WhatsApp only for the one who agreed (wa in event.json)
-  assert.match(await textOf(page, '.bk-cash'), /هتدفع كاش؟/);
-  assert.match(await textOf(page, '.bk-cash'), /هو اللي بيسجّل حجزك بعد ما يستلم/);
-  const links = await page.$$eval('.bk-cash .bk-cash__wa', els => els.map(a => a.href));
-  assert.equal(links.length, 1);
-  const text = decodeURIComponent(new URL(links[0]).searchParams.get('text'));
-  assert.match(text, new RegExp(`«${ONLINE.title}»`));
+  await page.click('label[for="bk-method-instapay"]');
+  await page.waitForSelector('.bk-wa__btn');
+  assert.equal(await page.$('.bk-cash'), null, 'InstaPay: no cash box');
+  await page.click('label[for="bk-method-cash"]');
+  await page.waitForSelector('.bk-cash');
+  assert.match(await textOf(page, '.bk-cash'), /الدفع كاش مع مينا عادل/);
+  const href = await page.$eval('.bk-cash .bk-cash__wa', a => a.href);
+  const text = decodeURIComponent(new URL(href).searchParams.get('text'));
+  assert.ok(text.includes("«" + ONLINE.title + "»"), text);
   assert.match(text, /كاش/);
-  assert.match(text, /مينا عادل/, 'the visitor\'s name from step a');
-  assert.match(await textOf(page, '.bk-cash'), /مرقس فادي — كلّمه في الكنيسة/);
+  assert.equal(await page.$eval('.bk-next', el => el.hidden), true, 'cash is never sent from the site');
+  // a cash-only servant without consent: name only
+  await page.click('label[for="bk-servant-srv-marc0003"]');
+  await page.waitForFunction(() => /كلّم مرقس فادي في الكنيسة/.test(document.querySelector('.bk-cash')?.textContent || ''));
+  assert.equal(await page.$('.bk-cash .bk-cash__wa'), null);
   assert.ok(await overflow(page) <= 0);
   assert.deepEqual(await axe(page, '#book'), []);
   assert.deepEqual(problems, []);
@@ -566,6 +568,8 @@ test('InstaPay payment card: the approved number + amount + «نسخ الرقم�
   assert.equal(await page.$eval('.bk-paycard__number', el => el.dir), 'ltr');
   assert.match(await textOf(page, '.bk-paycard__name'), /Mina Adel/);
   assert.equal(await textOf(page, '.bk-next'), 'تم التحويل');
+  // optional: ask the servant before transferring (his WhatsApp, by consent)
+  assert.match(await textOf(page, '[data-act="ask-servant"]'), /عايز تتأكد قبل التحويل؟ تواصل مع المسؤول/);
   // the number is never in the stored draft
   assert.equal(JSON.stringify(await storage(page)).includes('9876'), false);
 

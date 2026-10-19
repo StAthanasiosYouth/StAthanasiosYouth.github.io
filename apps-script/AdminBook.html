@@ -199,22 +199,29 @@
     return (B.events || []).reduce(function (sum, e) { return sum + (e.counts && e.counts.pending || 0); }, 0);
   }
 
-  function navLabel() {
-    var n = B.on ? pendingTotal() : 0;
-    return 'الحجوزات' + (n ? ' (' + ar(n) + ' جديد)' : '');
-  }
-
-  /* «الحجوزات» next to «الفعاليات» and «الخدام» (with the number of new requests) */
+  /*
+   * «الحجوزات» in the menu with a NUMBER badge (bookings waiting for approval, all events),
+   * on the sub-tab and on «الصفحات والفعاليات» itself (the phone's dock shows only areas).
+   * Refreshed after every write, on each events answer, and every 60 s while the panel is in sight.
+   */
   function addNav() {
     var area = A.AREAS.filter(function (a) { return a.key === 'pages'; })[0];
     if (!area || !area.subs) return;
     var sub = area.subs.filter(function (s) { return s.key === 'bookings'; })[0];
-    var label = navLabel();
-    if (sub && sub.label === label) return;
-    if (sub) sub.label = label;
-    else area.subs.push({ key: 'bookings', label: label });
+    var n = B.on ? pendingTotal() : 0;
+    if (sub && sub.badge === n && area.badge === n) return;
+    if (!sub) area.subs.push(sub = { key: 'bookings', label: 'الحجوزات' });
+    sub.badge = n;
+    area.badge = n;
     A.renderNav();
   }
+
+  setInterval(function () {
+    if (B.on && document.visibilityState === 'visible' && !sheetOpen()) loadEvents();
+  }, 60000);
+  document.addEventListener('visibilitychange', function () {
+    if (B.on && document.visibilityState === 'visible') loadEvents();
+  });
 
   // asked once the panel is up (boot.js sets AdminWorker before A.start)
   var start = A.start;

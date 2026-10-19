@@ -289,7 +289,7 @@ function endSession_(record, replaced) {
  * options.force   true: end the other session now
  * options.state   false: no panel state in the answer (a quiet restart)
  */
-function apiSessionStart(options) {
+function apiSessionStart(options, internal) {
 
   var email = assertAdmin_();
 
@@ -320,8 +320,12 @@ function apiSessionStart(options) {
     // reloads a tab it put away while Google's sign-in was in front). Not
     // "another device": no question.
     var unconfirmed = live && !current.beats && cleanLabel_(current.device, 40) === device;
+    // the installed app on the SAME trusted device (AdminDevice.gs deviceStartSession_): its own earlier
+    // session (the app swiped away, no beacon) — not «another device»
+    var deviceId = internal && typeof internal.deviceId === 'string' ? internal.deviceId : '';
+    var sameDevice = live && !!deviceId && current.deviceId === deviceId;
 
-    if (live && options.force !== true && !(tab && current.tab === tab) && !unconfirmed) {
+    if (live && options.force !== true && !(tab && current.tab === tab) && !unconfirmed && !sameDevice) {
       return { active: { device: cleanLabel_(current.device, 40), since: ageSeconds_(current.since, now), seen: ageSeconds_(current.seen, now) } };
     }
 
@@ -336,7 +340,7 @@ function apiSessionStart(options) {
     sid = Utilities.getUuid();
 
     writeCached_(key, {
-      sid: sid, email: email, tab: tab, device: device,
+      sid: sid, email: email, tab: tab, device: device, deviceId: deviceId,
       since: now, seen: now, area: '', view: '', item: null, locks: []
     }, SESSION_KEEP_SECONDS);
 

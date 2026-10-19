@@ -2195,6 +2195,7 @@
     var googleNeeded = false;
     var trusting = false;
     var current = '';      // this phone's device id (replaced by the next Google sign-in)
+    var started = null;    // the session deviceSignIn opened with the token (a launch: one round trip)
 
     function on() {
       return appMode() === 'admin-app';
@@ -2209,7 +2210,7 @@
     }
 
     /* a fresh access token from this phone's device credential, or null (none, gone, not the app, trouble) */
-    function signIn() {
+    function signIn(start) {
 
       if (!on() || googleNeeded) return Promise.resolve(null);
       if (pending) return pending;
@@ -2220,10 +2221,15 @@
           if (!record) return null;
           current = record.deviceId;
           return m.challenge(record)
-            .then(function (payload) { return post('deviceSignIn', [payload], '', '', { timeout: TIMING.fail }); })
+            .then(function (payload) {
+              // a launch without a session in this tab: the panel's session comes back in the same answer
+              if (start) payload.start = start;
+              return post('deviceSignIn', [payload], '', '', { timeout: TIMING.fail });
+            })
             .then(function (reply) {
               if (reply && reply.ok && reply.token && isFinite(Number(reply.exp))) {
                 remember({ token: reply.token, email: String(reply.email || '').toLowerCase(), exp: Number(reply.exp), via: 'device' });
+                started = start && reply.session && typeof reply.session === 'object' ? reply.session : null;
                 return reply.token;
               }
               // the server says this device is no more: forget it here too, then Google as usual
@@ -2304,11 +2310,20 @@
         var stopSlow = watchdog(TIMING.slow, function () {
           if (my === attempt) view.slow('بياخد وقت أطول من العادي… الخادم بيصحى لو بقاله فترة من غير استخدام.');
         });
-        signIn().then(function (value) {
+        signIn(saved ? null : { device: DEVICE, tab: TAB }).then(function (value) {
           stopSlow();
           if (my !== attempt) return;
+          var opened = started;
+          started = null;
           if (value) {
             if (saved) resume();
+            // the session came with the token: straight into the panel (no second wait)
+            else if (opened && opened.sid && opened.state) {
+              sid = opened.sid;
+              storeSession();
+              openPanel(opened.state, my);
+            }
+            else if (opened && opened.active) showSessionActive(opened.active);
             else enter();
             return;
           }

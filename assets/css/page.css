@@ -3130,3 +3130,9 @@ img, svg, video {
 .bstat__ask {
   font-weight: 800;
 }
+
+.bk-paycard__ask {
+  justify-self: center;
+  min-height: 40px;
+  font-size: .9rem;
+}

@@ -39,6 +39,14 @@ function bookNewsTick(e) {
   var uid = e && e.triggerUid ? String(e.triggerUid) : '';
   if (!uid || uid !== PropertiesService.getScriptProperties().getProperty('BOOK_NEWS_TRIGGER_ID')) return -2;
 
+  // admin pushes still waiting for a panel's heartbeat go out now (Activity.gs, deferred push)
+  try {
+    activityPending_('trigger');
+  }
+  catch (error) {
+    console.warn('activity: pending pushes not sent from the trigger');
+  }
+
   return bookNewsRun_();
 
 }
