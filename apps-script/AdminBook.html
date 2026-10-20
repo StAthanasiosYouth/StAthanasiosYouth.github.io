@@ -2437,7 +2437,8 @@
     var box = A.errorBox();
     var events = B.events || [];
     var picks = events.map(function (e) {
-      var c = A.checkbox(e.title + (e.startAt ? ' — ' + String(e.startAt).slice(0, 10) : ''), true);
+      // the date in words («الأربعاء ٤ نوفمبر»): a bare 2026-11-04 reads backwards in RTL
+      var c = A.checkbox(e.title + (e.startAt ? ' — ' + A.formatWall(String(e.startAt).slice(0, 10), false) : ''), true);
       return { id: e.id, input: c.input, node: c.node };
     });
     var from = A.textInput('', { ltr: true });
@@ -2456,6 +2457,13 @@
     var method = el('select', { class: 'input', 'data-act': 'report-method' }, [el('option', { value: '', text: 'كل طرق الدفع' })]
       .concat(Object.keys(methods).map(function (k) { return el('option', { value: k, text: methods[k] }); })));
     var go = el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'report-download' }, icon('download'), 'نزّل التقرير المجمّع (Excel)');
+    var toggle = el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'report-toggle' }, 'شيل الكل');
+    toggle.addEventListener('click', function () {
+      var on = !picks.every(function (p) { return p.input.checked; });
+      picks.forEach(function (p) { p.input.checked = on; });
+      toggle.textContent = on ? 'شيل الكل' : 'اختار الكل';
+    });
+    toggle.hidden = picks.length < 2;
 
     go.addEventListener('click', function () {
       box.hidden = true;
@@ -2492,7 +2500,9 @@
 
     var card = A.card('التقرير المجمّع', 'كل الفعاليات أو اللي تختارها في ملف Excel واحد: ملخص عام، حسب الفعالية، حسب الخادم، الحجوزات، الدفعات، والأقساط المتأخرة.',
       box,
-      el('fieldset', { class: 'grants__group' }, el('legend', { text: 'الفعاليات' }), picks.length ? picks.map(function (p) { return p.node; }) : el('p', { class: 'note', text: 'مفيش فعاليات.' })),
+      el('fieldset', { class: 'grants__group' }, el('legend', { text: 'الفعاليات' }), toggle,
+        // the list scrolls inside the card (a long season stays one screen tall)
+        el('div', { class: 'report-events' }, picks.length ? picks.map(function (p) { return p.node; }) : el('p', { class: 'note', text: B.events ? 'مفيش فعاليات.' : 'بنجيب الفعاليات…' }))),
       el('div', { class: 'fin-filters' }, A.field('من يوم', from), A.field('لحد يوم', to), A.field('الحالة', status), A.field('الخادم', servant), A.field('طريقة الدفع', method)),
       el('div', { class: 'actions' }, go),
       el('p', { class: 'fin-hint', text: 'الفلوس بتظهر بس لو عندك صلاحية «يشوف · الفلوس»، والموبايلات بس لو عندك «يصدّر بأرقام التليفونات».' })

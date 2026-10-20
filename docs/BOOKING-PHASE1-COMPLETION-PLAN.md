@@ -31,12 +31,17 @@ All three are additive and touch different tables, so applying `0011` before `00
 | 5 Router + outbox + acknowledged push claim (`0012`) | ✔ installed, **off** | `NOTIFY_ROUTER=0` (Apps Script keeps its own pushes) |
 | 6 Gmail sender, quotas, summaries, templates | ✔ installed, **off** | `NOTIFY_EMAIL=0`; production Gmail consent pending (staging connected, Inbox test passed) |
 | 7 «إعدادات الإشعارات», «تنبيهاتي», «حالة النظام» | ✔ live | |
-| 8 Combined export + filters + PII grant | next | |
+| 8 Combined export + filters + PII grant | ✔ staging (QA passed) | awaiting release approval, with the rolling-24h email budget fix |
 | 9 Stage-1 checks + staging rehearsal | after 8 | |
 | 10–11 Age eligibility, payment requests | planned | |
 
 Release 2026-10-20: Worker `44c932ae` (migration `0012`; same code as `e11a506e`, redeployed by CI), Apps Script API @51, site `main` `6d72366`.
 Rollback: Worker `7ff63d61`, Apps Script @50, `main` `639b07b`, D1 bookmark `0000011b-00000000-0000510a-d550a1509e061e1a14861a06b74b0f80` (migrations are additive).
+
+**Backlog (not scheduled):**
+- **Booking filter «عليه باقي»**: confirmed bookings with an outstanding installment balance (balance > 0, e.g. EGP 40 left),
+  in the queue chips and the report filters. Not the same as «مستني مراجعة الدفع» (a visitor's transfer claim or proof
+  waiting for an admin): this one is money still owed after the recorded payments. Owner request 2026-10-20.
 
 Phase 1 status (rev. 5): **complete, deployed and manually verified** (production `main` @ `f24e425`). Sections 1, 2 and the
 Phase 1 order in §6 describe the state **before** Phase 1 and are kept as history. The official public launch (§6 launch gate,
