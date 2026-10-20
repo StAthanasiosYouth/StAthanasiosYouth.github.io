@@ -46,7 +46,10 @@ export async function sources(db, ids) {
   const unique = [...new Set(ids)];
   for (let i = 0; i < unique.length; i += 80) {
     const part = unique.slice(i, i + 80);
-    const r = await retry(() => db.prepare(`SELECT id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary, changes FROM activity WHERE id IN (${part.map(() => '?').join(',')})`).bind(...part).all());
+    // a booking's event title, for the message (never the visitor's data)
+    const r = await retry(() => db.prepare(`SELECT a.id, a.at, a.cairo, a.actor, a.actor_name, a.action, a.entity_type, a.entity_id, a.entity_title, a.summary, a.changes,
+        (SELECT e.title FROM bookings b JOIN event_cfg e ON e.id = b.event_id WHERE a.entity_type = 'booking' AND b.id = a.entity_id) AS event_title
+      FROM activity a WHERE a.id IN (${part.map(() => '?').join(',')})`).bind(...part).all());
     for (const row of r.results) out.set(row.id, row);
   }
   const names = Object.fromEntries((await retry(() => db.prepare('SELECT email, name FROM admins WHERE name IS NOT NULL').all())).results.map(a => [a.email, a.name]));

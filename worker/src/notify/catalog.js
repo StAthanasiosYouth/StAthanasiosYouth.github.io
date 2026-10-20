@@ -122,16 +122,17 @@ export function messageOf(type, rows, names = {}) {
   const who = r => (r.actor === 'visitor' ? 'زائر' : r.actor === 'system' ? 'النظام' : names[r.actor] || r.actor_name || String(r.actor).split('@')[0]);
   const lineOf = r => {
     if (r.action === 'booking.new') return 'حجز جديد ' + (r.entity_title || '');
-    if (ACTION_TEXT[r.action]) return (r.actor === 'system' ? '' : who(r) + ' ') + ACTION_TEXT[r.action] + (r.entity_title && r.action.startsWith('booking') ? ' ' + r.entity_title : '');
+    if (ACTION_TEXT[r.action]) return (r.actor === 'system' ? '' : who(r) + ' ') + ACTION_TEXT[r.action] + (r.entity_title && /^(booking|payment)./.test(r.action) ? ' ' + r.entity_title : '');
     return who(r) + ' ' + (r.summary || r.action);
   };
   let title;
   let body = '';
+  const event = last.event_title || (last.action === 'booking.new' ? String(last.summary || '').split(' · ')[0] : '') || '';
   if (type.key === 'booking.new' || type.key === 'booking.create') {
-    const event = String(last.summary || '').split(' · ')[0] || 'فعالية';
     const n = rows.length;
-    title = (n === 1 ? 'حجز جديد' : arabicDigits(n) + ' حجوزات جديدة') + ' – ' + event;
-    body = 'مستنيين المراجعة';
+    const cash = type.key === 'booking.create';
+    title = (n === 1 ? (cash ? 'حجز كاش جديد' : 'حجز جديد') : arabicDigits(n) + (cash ? ' حجوزات كاش جديدة' : ' حجوزات جديدة')) + (event ? ' – ' + event : '');
+    body = cash ? 'مستني الاعتماد' : 'مستنيين المراجعة';
   } else {
     title = lineOf(last);
     const changes = parse(last.changes) || {};
@@ -143,6 +144,12 @@ export function messageOf(type, rows, names = {}) {
     body: clip(body || 'لوحة تحكم الأسرة', 160),
     url: '/admin/#activity/' + last.id,
     tag: ('adm-' + type.key + '-' + (last.entity_id || last.id)).replace(/[^\w-]/g, '').slice(0, 80),
-    lines: rows.map(r => ({ text: clip(lineOf(r), 200), cairo: r.cairo, id: r.id }))
+    lines: rows.map(r => ({ text: clip(lineOf(r), 200), cairo: r.cairo, id: r.id })),
+    // for the email templates: the event itself (names and references only)
+    ctx: {
+      key: type.key, count: rows.length, event: event || undefined,
+      ref: String(last.action || '').startsWith('booking') || String(last.action || '').startsWith('payment') ? last.entity_title || undefined : undefined,
+      target: String(last.action || '').startsWith('accounts.') ? last.entity_id || undefined : undefined
+    }
   };
 }

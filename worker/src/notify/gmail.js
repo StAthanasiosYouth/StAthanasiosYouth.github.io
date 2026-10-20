@@ -7,10 +7,13 @@
  * The access token lives in this isolate's memory (~1 h).
  */
 
+import { BRAND } from './templates.js';
+
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SEND_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send';
 export const SENDER = 'athanasius.youth.safaga@gmail.com';
-export const SENDER_NAME = 'شباب أثناسيوس';
+// the visible sender name: the service's brand (templates.js), the same in the heading and footer
+export const SENDER_NAME = BRAND;
 
 let fetchFn = (...args) => fetch(...args);
 const cache = { token: null, exp: 0 };
