@@ -571,3 +571,124 @@ export function rosterBook(exported, { statuses = ['confirmed'], today = '' } = 
   const sheet = { name: 'قايمة الأفراد', rows, rtl: true, header: true, filter: true, widths: [6, 12, 34], textColumns: [1, 2] };
   return { book: { sheets: [sheet] }, filename: 'أفراد-' + String(event.slug || 'event').replace(/[^a-z0-9-]/gi, '') + '-' + String(today || '').slice(0, 10) + '.xlsx' };
 }
+
+/*
+ * «التقرير المجمّع» (Phase 1.5 step 8): GET /v1/admin/book/report →
+ * one workbook over several events, filtered on the server. The server already
+ * removed what this admin may not see (report.access: money / pii), so the
+ * money sheets and columns appear only with money, and masked phones stay
+ * masked. Every user text cell stays inlineStr (the xlsx.js injection guard).
+ *   ملخص عام · حسب الفعالية · حسب الخادم · الحجوزات (+ الفعالية)
+ *   · الدفعات (+ حالة الأقساط) · الأقساط المتأخرة — all RTL
+ * → { book: { sheets }, filename }
+ */
+export function reportBook(report, { today = '', filterText = '' } = {}) {
+  const data = report || {};
+  const access = data.access || {};
+  const money = !!access.money;
+  const parts = Array.isArray(data.events) ? data.events : [];
+  const sheet = (name, rows, textColumns, extra) => Object.assign({ name, rows, rtl: true, header: true, filter: true, widths: widths(rows), textColumns }, extra || {});
+  const sum = (list, f) => list.reduce((n, x) => n + (Number(f(x)) || 0), 0);
+  const overall = p => (p.summary && p.summary.overall) || {};
+  const bookingsAll = parts.flatMap(p => (p.bookings || []).map(b => ({ b, p })));
+  const label = (p, key) => methodLabel(p.event || {}, key) || key || '';
+
+  /* «ملخص عام» */
+  const count = st => bookingsAll.filter(x => x.b.status === st).length;
+  const conf = bookingsAll.filter(x => x.b.status === 'confirmed');
+  const general = [
+    ['البند', 'القيمة'],
+    ['الفعاليات', parts.length],
+    ['الفلاتر', filterText || 'من غير فلاتر'],
+    ['تاريخ التقرير', today],
+    ['', ''],
+    ['حجوزات جديدة', count('pending')],
+    ['حجوزات مؤكدة', count('confirmed')],
+    ['حجوزات مرفوضة', count('rejected')],
+    ['الزائر لغاها', count('withdrawn')],
+    ['حجوزات اتلغت', count('cancelled')],
+    ['إجمالي الأفراد (المؤكدين)', sum(conf, x => (x.b.people || {}).total)]
+  ];
+  if (money) {
+    const m = p => overall(p).money || {};
+    general.push(['', ''], ['المطلوب', sum(parts, p => m(p).due)], ['المستلم', sum(parts, p => m(p).received)], ['المرتجع', sum(parts, p => m(p).refunded)],
+      ['الصافي', sum(parts, p => m(p).net)], ['الباقي على الناس', sum(parts, p => m(p).balance)], ['مرتجعات مطلوبة', sum(parts, p => m(p).refundsOwed)]);
+  }
+  general.push(['', ''], ['ملاحظة', [money ? '' : 'الفلوس مش ظاهرة (محتاجة صلاحية «يشوف · الفلوس»).', access.pii ? '' : 'أرقام الموبايل متخبية (محتاجة صلاحية «يصدّر بأرقام التليفونات»).'].filter(Boolean).join(' ') || '—']);
+
+  /* «حسب الفعالية» */
+  const perEventHeaders = ['الفعالية', 'بتبدأ', 'جديد', 'مؤكد', 'مرفوض', 'اتلغى', 'الأفراد (المؤكدين)', 'الأماكن الفاضية'].concat(money ? ['المطلوب', 'المستلم', 'الصافي', 'الباقي'] : []);
+  const perEvent = [perEventHeaders].concat(parts.map(p => {
+    const o = overall(p);
+    const b = o.bookings || {};
+    const s = o.seats || {};
+    const m = o.money || {};
+    return [p.event.title || '', wall(p.event.startAt), b.pending || 0, b.confirmed || 0, b.rejected || 0, b.cancelled || 0, (o.people || {}).total || 0,
+      s.left === null || s.left === undefined ? 'من غير حد' : s.left].concat(money ? [m.due || 0, m.received || 0, m.net || 0, m.balance || 0] : []);
+  }));
+
+  /* «حسب الخادم»: across the events, by servant id */
+  const byServant = new Map();
+  for (const p of parts) {
+    for (const sv of (p.summary && p.summary.servants) || []) {
+      const key = sv.id || sv.name;
+      const t = byServant.get(key) || { name: sv.name || sv.id || '', chosenBy: 0, bookings: 0, received: 0, refunded: 0, net: 0 };
+      t.chosenBy += sv.chosenBy || 0;
+      t.bookings += sv.bookings || 0;
+      t.received += sv.received || 0;
+      t.refunded += sv.refunded || 0;
+      t.net += sv.net || 0;
+      byServant.set(key, t);
+    }
+  }
+  const servantRows = [['الخادم', 'اختاروه', 'حجوزات دفع فيها'].concat(money ? ['المستلم', 'المرتجع', 'الصافي'] : [])]
+    .concat([...byServant.values()].map(t => [t.name, t.chosenBy, t.bookings].concat(money ? [t.received, t.refunded, t.net] : [])));
+
+  /* «الحجوزات» (+ the event); money columns only with money */
+  const moneyCols = new Set(['المطلوب', 'المدفوع', 'الباقي', 'حالة الدفع', 'متأخر']);
+  const keepCol = BOOKING_HEADERS.map(h => money || !moneyCols.has(h));
+  const bookingRows = [['الفعالية'].concat(BOOKING_HEADERS.filter((_, i) => keepCol[i]))].concat(bookingsAll.map(({ b, p }) => {
+    const ppl = b.people || {};
+    const notes = [b.visitorNote, b.adminNote, b.rejectReason && 'سبب الرفض: ' + b.rejectReason, b.cancelReason && 'سبب الإلغاء: ' + b.cancelReason].filter(Boolean).join(' — ');
+    const full = [
+      b.ref || '', (STATUS[b.status] || { label: b.status }).label, b.name || '', localPhone(b.phone), b.servantName || '', b.method ? label(p, b.method) : '',
+      ppl.adult || 0, ppl.child || 0, ppl.companion || 0, ppl.total || 0,
+      (b.participants || []).length ? b.participants.map(x => x.name + ' (' + x.age + ')').join('، ') : (b.names || []).join('، '),
+      b.amountDue === null || b.amountDue === undefined ? '' : b.amountDue, b.paid || 0, b.balance === null || b.balance === undefined ? '' : b.balance,
+      b.paymentStatus ? (PAY_STATUS[b.paymentStatus] || { label: b.paymentStatus }).label : '', b.overdue ? 'نعم' : '', wall(b.createdAt), wall(b.confirmedAt), notes
+    ];
+    return [p.event.title || ''].concat(full.filter((_, i) => keepCol[i]));
+  }));
+  const textOf = (headers, names) => names.map(n => headers.indexOf(n)).filter(i => i >= 0);
+  const bh = bookingRows[0];
+
+  const sheets = [
+    sheet('ملخص عام', general, [0, 1], { filter: false }),
+    sheet('حسب الفعالية', perEvent, [0, 1]),
+    sheet('حسب الخادم', servantRows, [0]),
+    sheet('الحجوزات', bookingRows, textOf(bh, ['الفعالية', 'الرقم', 'الاسم', 'الموبايل', 'الأسماء', 'ملاحظات']))
+  ];
+
+  if (money) {
+    /* «الدفعات» (+ the event and the booking's installment status) */
+    const statusOf = new Map(bookingsAll.map(({ b }) => [b.id, b]));
+    const payHeaders = ['الفعالية'].concat(PAYMENT_HEADERS, ['حالة الأقساط']);
+    const payRows = [payHeaders].concat(parts.flatMap(p => (p.payments || []).map(x => {
+      const bk = statusOf.get(x.bookingId) || {};
+      return [p.event.title || '', x.id || '', x.ref || bk.ref || '', x.name || bk.name || '', KIND[x.kind] || x.kind || '', x.amount || 0, label(p, x.method),
+        x.servantName || x.servantId || '', wall(x.receivedAt), wall(x.recordedAt), x.recordedBy || '', x.kind === 'void' ? '' : x.voided ? 'نعم' : 'لا', x.voidReason || '',
+        x.hasProof ? 'نعم' : 'لا', bk.paymentStatus ? (PAY_STATUS[bk.paymentStatus] || { label: bk.paymentStatus }).label : ''];
+    })));
+    sheets.push(sheet('الدفعات', payRows, textOf(payHeaders, ['الفعالية', 'رقم الدفعة', 'رقم الحجز', 'الاسم', 'سبب الإلغاء'])));
+
+    /* «الأقساط المتأخرة»: confirmed bookings past their final date with money still owed */
+    const lateHeaders = ['الفعالية', 'الرقم', 'الاسم', 'الموبايل', 'الخادم', 'المطلوب', 'المدفوع', 'الباقي', 'آخر ميعاد للدفع'];
+    const lateRows = [lateHeaders].concat(bookingsAll.filter(({ b }) => b.overdue && (b.balance || 0) > 0).map(({ b, p }) => [
+      p.event.title || '', b.ref || '', b.name || '', localPhone(b.phone), b.servantName || '', b.amountDue || 0, b.paid || 0, b.balance || 0,
+      wall((p.event.payment || {}).finalDueAt || '')
+    ]));
+    sheets.push(sheet('الأقساط المتأخرة', lateRows, textOf(lateHeaders, ['الفعالية', 'الرقم', 'الاسم', 'الموبايل'])));
+  }
+
+  return { book: { sheets }, filename: 'تقرير-الحجوزات-' + String(today || '').slice(0, 10) + '.xlsx' };
+}

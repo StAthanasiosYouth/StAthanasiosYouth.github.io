@@ -20816,7 +20816,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return A.confirm({ tone: 'warn', icon: 'phone', title: 'الملف فيه أرقام تليفونات، ماتبعتوش في جروبات', message: 'احفظه عندك أو ابعته للمسؤول بس. فيه أسماء وموبايلات وفلوس كل حجز.', confirmLabel: 'نزّل الملف', cancelLabel: 'رجوع' }).then(function (ok) {
       if (!ok) return;
       return A.withBusy(button, Promise.all([
-        W().call('GET', '/v1/admin/book/export?eventId=' + enc(eventId) + (range || '')),
+        // download=1: the Worker records the download in «سجل النشاط» (Phase 1.5 step 8)
+        W().call('GET', '/v1/admin/book/export?eventId=' + enc(eventId) + (range || '') + '&download=1'),
         import(new URL('xlsx.js', location.href).href)
       ]).then(function (got) {
         var made = K.bookingBook(got[0], { from: fromText || '', to: toText || '', today: A.cairoNow().slice(0, 10) });
@@ -21202,8 +21203,86 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       box,
       el('div', { class: 'fin-filters' }, A.field('الفعالية', picker), A.field('الخادم', who)),
       el('div', { class: 'fin-exports' }, el('div', { class: 'actions' }, roster, report), exportHint),
-      body)];
+      body), combinedReportCard()];
 
   };
+
+
+  /*
+   * «التقرير المجمّع» (Phase 1.5 step 8): several events in one Excel file,
+   * filtered on the Worker (GET /v1/admin/book/report). What the admin may
+   * not see never arrives: money needs «يشوف · الفلوس», phones need «يصدّر
+   * بأرقام التليفونات» (masked otherwise). Every download is in «سجل النشاط»;
+   * one with phones is an important alert for the Primary Admin.
+   */
+  function combinedReportCard() {
+
+    var box = A.errorBox();
+    var events = B.events || [];
+    var picks = events.map(function (e) {
+      var c = A.checkbox(e.title + (e.startAt ? ' — ' + String(e.startAt).slice(0, 10) : ''), true);
+      return { id: e.id, input: c.input, node: c.node };
+    });
+    var from = A.textInput('', { ltr: true });
+    var to = A.textInput('', { ltr: true });
+    from.type = to.type = 'date';
+    var status = el('select', { class: 'input', 'data-act': 'report-status' }, [['', 'كل الحالات']].concat(Object.keys(K.STATUS).map(function (k) { return [k, K.STATUS[k].label]; }))
+      .map(function (o) { return el('option', { value: o[0], text: o[1] }); }));
+    var servants = {};
+    var methods = {};
+    events.forEach(function (e) {
+      (e.servants || []).forEach(function (s) { servants[s.id] = s.name; });
+      (e.methods || []).forEach(function (m) { methods[m.key] = m.label || m.key; });
+    });
+    var servant = el('select', { class: 'input', 'data-act': 'report-servant' }, [el('option', { value: '', text: 'كل الخدام' })]
+      .concat(Object.keys(servants).map(function (id) { return el('option', { value: id, text: servants[id] }); })));
+    var method = el('select', { class: 'input', 'data-act': 'report-method' }, [el('option', { value: '', text: 'كل طرق الدفع' })]
+      .concat(Object.keys(methods).map(function (k) { return el('option', { value: k, text: methods[k] }); })));
+    var go = el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'report-download' }, icon('download'), 'نزّل التقرير المجمّع (Excel)');
+
+    go.addEventListener('click', function () {
+      box.hidden = true;
+      var chosen = picks.filter(function (p) { return p.input.checked; }).map(function (p) { return p.id; });
+      if (!chosen.length) { A.fail(new Error('اختار فعالية واحدة على الأقل.'), box); return; }
+      if (from.value && to.value && from.value > to.value) { A.fail(new Error('«من يوم» لازم يبقى قبل «لحد يوم».'), box); return; }
+      var q = ['events=' + (chosen.length === picks.length ? 'all' : chosen.map(enc).join(','))];
+      var text = [chosen.length === picks.length ? 'كل الفعاليات' : chosen.length + ' فعاليات'];
+      if (from.value) { q.push('from=' + enc(from.value)); text.push('من ' + from.value); }
+      if (to.value) { q.push('to=' + enc(to.value)); text.push('لحد ' + to.value); }
+      if (status.value) { q.push('status=' + enc(status.value)); text.push(K.STATUS[status.value].label); }
+      if (servant.value) { q.push('servantId=' + enc(servant.value)); text.push(servants[servant.value]); }
+      if (method.value) { q.push('method=' + enc(method.value)); text.push(methods[method.value]); }
+      A.confirm({
+        tone: 'warn', icon: 'phone', title: 'الملف ممكن يكون فيه أرقام تليفونات وفلوس',
+        message: 'حسب صلاحياتك. احفظه عندك أو ابعته للمسؤول بس، وماتبعتوش في جروبات. التنزيل بيتسجل في «سجل النشاط».',
+        confirmLabel: 'نزّل الملف', cancelLabel: 'رجوع'
+      }).then(function (ok) {
+        if (!ok) return;
+        A.withBusy(go, Promise.all([
+          W().call('GET', '/v1/admin/book/report?' + q.join('&')),
+          import(new URL('xlsx.js', location.href).href)
+        ]).then(function (got) {
+          var made = K.reportBook(got[0], { today: A.cairoNow().slice(0, 10), filterText: text.join(' · ') });
+          var bytes = got[1].writeXlsx(made.book);
+          B.lastDownload = { filename: made.filename, bytes: bytes };
+          got[1].download(bytes, made.filename);
+          return { made: made, access: got[0].access || {} };
+        })).then(function (r) {
+          A.toast('اتنزّل ' + r.made.filename + (r.access.pii ? '' : ' (الموبايلات متخبية)') + (r.access.money ? '' : ' (من غير فلوس)'));
+        }).catch(function (error) { A.fail(error, box); });
+      });
+    });
+
+    var card = A.card('التقرير المجمّع', 'كل الفعاليات أو اللي تختارها في ملف Excel واحد: ملخص عام، حسب الفعالية، حسب الخادم، الحجوزات، الدفعات، والأقساط المتأخرة.',
+      box,
+      el('fieldset', { class: 'grants__group' }, el('legend', { text: 'الفعاليات' }), picks.length ? picks.map(function (p) { return p.node; }) : el('p', { class: 'note', text: 'مفيش فعاليات.' })),
+      el('div', { class: 'fin-filters' }, A.field('من يوم', from), A.field('لحد يوم', to), A.field('الحالة', status), A.field('الخادم', servant), A.field('طريقة الدفع', method)),
+      el('div', { class: 'actions' }, go),
+      el('p', { class: 'fin-hint', text: 'الفلوس بتظهر بس لو عندك صلاحية «يشوف · الفلوس»، والموبايلات بس لو عندك «يصدّر بأرقام التليفونات».' })
+    );
+    card.classList.add('card--report');
+    return card;
+
+  }
 
 })();

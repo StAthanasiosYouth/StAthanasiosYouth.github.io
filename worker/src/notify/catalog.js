@@ -27,6 +27,8 @@ const SPECIAL = {
   'payment.void': ['critical', 'finance.manage'],
   'event.cancelAll': ['critical', 'bookings.manage'],
   'code.export': ['critical', 'participants.manage'],
+  'export.pii': ['critical', 'exports.export_pii'],
+  'export.bookings': ['routine', 'exports.export'],
   'migrate': ['critical', 'system.manage'],
   'job.failed': ['critical', 'system.manage'],
   'notify.failed': ['critical', 'system.manage', { email: false }],

@@ -16,7 +16,8 @@ import { ApiError } from '../lib/http.js';
 import { retry, cairoText } from '../lib/db.js';
 import { activityStmt } from '../lib/activity.js';
 import { randomId } from '../lib/hash.js';
-import { requirePerm } from '../lib/perms.js';
+import { requirePerm, heldScope } from '../lib/perms.js';
+import { limit } from '../lib/ratelimit.js';
 import { begin, finishStmt, abandon, idempotencyKey } from '../lib/idempotency.js';
 import { loadEvent, eventById, seatsTaken, rowToEvent } from './event.js';
 import { forgetModule, bookingOn } from './public.js';
@@ -257,7 +258,11 @@ export async function adminEvents(ctx) {
       let taken = 0;
       counts.results.filter(x => x.event_id === e.id).forEach(x => { c[x.status] = x.n; taken += x.seats || 0; });
       const cap = e.booking && e.booking.capacity != null ? e.booking.capacity : null;
-      return { id: e.id, slug: e.slug, title: e.title, startAt: e.startAt, endAt: e.endAt, capacity: cap, taken, left: cap == null ? null : cap - taken, online: e.online, counts: c, refreshedAt: e.fetchedAt };
+      return { id: e.id, slug: e.slug, title: e.title, startAt: e.startAt, endAt: e.endAt, capacity: cap, taken, left: cap == null ? null : cap - taken, online: e.online, counts: c, refreshedAt: e.fetchedAt,
+        // for the report filters (names and keys only)
+        servants: ((e.booking && e.booking.servants) || []).map(s => ({ id: s.id, name: s.name })),
+        methods: ((e.booking && e.booking.methods) || []).map(m => ({ key: m.key, label: m.label }))
+      };
     })
   };
 }
@@ -863,19 +868,77 @@ export async function adminSummary(ctx) {
   return summary(event, bookings, payments, (event.booking && event.booking.servants) || [], rangeOf(ctx.url.searchParams), Date.now(), handovers);
 }
 
-export async function adminExport(ctx) {
-  const event = await eventById(ctx, ctx.url.searchParams.get('eventId'));
-  const range = rangeOf(ctx.url.searchParams);
-  const { bookings, payments, handovers } = await eventRows(ctx.env, event.id);
+/*
+ * Exports (Phase 1.5 step 8, BOOKING-PHASE1-COMPLETION-PLAN §4.5):
+ * - money (amounts, balances, payments, handovers, the money summary) only
+ *   with finance.view; phones only with exports.export_pii (else masked);
+ * - a download (?download=1, the Excel buttons; /report always) is audited:
+ *   events, filters, row counts — critical when it carried phones;
+ * - downloads are rate-limited per admin.
+ */
+const BOOKING_PUBLIC = ['id', 'ref', 'eventId', 'status', 'source', 'name', 'phone', 'servantId', 'servantName', 'method', 'people', 'seats', 'payPlan',
+  'createdAt', 'confirmedAt', 'flags', 'version', 'requested', 'actual', 'names', 'participants', 'visitorNote', 'adminNote', 'rejectReason', 'cancelReason'];
+const pick = (o, keys) => Object.fromEntries(keys.filter(k => k in o).map(k => [k, o[k]]));
+const EXPORT_STATUSES = ['pending', 'confirmed', 'rejected', 'cancelled', 'withdrawn'];
+
+/* '+201012345678' → '010•••••678' (enough to tell two people apart, not to call) */
+export function maskPhone(value) {
+  const digits = String(value || '').replace(/^\+20/, '0').replace(/\D/g, '');
+  return digits.length >= 7 ? digits.slice(0, 3) + '•'.repeat(digits.length - 6) + digits.slice(-3) : (digits ? '•••' : '');
+}
+
+async function exportAccess(ctx) {
+  return { money: (await heldScope(ctx, 'finance.view')) !== '', pii: (await heldScope(ctx, 'exports.export_pii')) !== '' };
+}
+
+/* one event's export payload → what this admin may see */
+function maskExport(p, { money, pii }) {
+  const out = { ...p, bookings: p.bookings.map(b => {
+    const r = money ? { ...b } : pick(b, BOOKING_PUBLIC);
+    if (!pii) r.phone = maskPhone(r.phone);
+    return r;
+  }) };
+  if (!money) {
+    const o = (p.summary && p.summary.overall) || {};
+    out.payments = [];
+    out.handovers = [];
+    out.summary = {
+      overall: { bookings: o.bookings, seats: o.seats, people: o.people, pending: { count: (o.pending || {}).count || 0 } },
+      servants: ((p.summary && p.summary.servants) || []).map(s => ({ id: s.id, name: s.name, bookings: s.bookings, chosenBy: s.chosenBy }))
+    };
+    out.event = { ...p.event, pricing: undefined };
+  }
+  return out;
+}
+
+function exportFilters(q) {
+  const status = q.get('status') || '';
+  const servantId = q.get('servantId') || '';
+  const method = q.get('method') || '';
+  if (status && !EXPORT_STATUSES.includes(status)) throw invalid('status');
+  if (servantId && !/^srv-[a-z0-9-]{2,40}$/.test(servantId)) throw invalid('servantId');
+  if (method && !/^[a-z0-9_-]{1,30}$/.test(method)) throw invalid('method');
+  return { status, servantId, method };
+}
+
+/* one event, filtered (status / servant / method; payments also by the period) → the export payload */
+async function exportOf(ctx, event, range, filters = {}) {
+  const rows = await eventRows(ctx.env, event.id);
+  const keep = b => (!filters.status || b.status === filters.status) && (!filters.servantId || b.servant_id === filters.servantId) && (!filters.method || b.method === filters.method);
+  const bookings = rows.bookings.filter(keep);
+  const kept = new Set(bookings.map(b => b.id));
+  // a payment: of a kept booking (status filter), received by that servant, by that method
+  const payments = rows.payments.filter(p => (!filters.status || kept.has(p.booking_id)) && (!filters.servantId || p.servant_id === filters.servantId) && (!filters.method || p.method === filters.method));
+  const handovers = rows.handovers.filter(h => !filters.servantId || h.servant_id === filters.servantId);
   const now = Date.now();
   const bk = event.booking || {};
   const byBooking = new Map();
   payments.forEach(p => { if (!byBooking.has(p.booking_id)) byBooking.set(p.booking_id, []); byBooking.get(p.booking_id).push(p); });
   const proofs = (await ctx.env.DB.prepare('SELECT DISTINCT payment_id FROM proofs p JOIN payments x ON x.id = p.payment_id WHERE x.event_id = ? AND p.deleted_at IS NULL').bind(event.id).all()).results;
   const withProof = new Set(proofs.map(p => p.payment_id));
-  const refs = new Map(bookings.map(b => [b.id, b]));
+  const refs = new Map(rows.bookings.map(b => [b.id, b]));
   return {
-    event: { id: event.id, slug: event.slug, title: event.title, startAt: event.startAt, endAt: event.endAt, capacity: bk.capacity == null ? null : bk.capacity, methods: bk.methods || [], pricing: bk.pricing },
+    event: { id: event.id, slug: event.slug, title: event.title, startAt: event.startAt, endAt: event.endAt, capacity: bk.capacity == null ? null : bk.capacity, methods: bk.methods || [], pricing: bk.pricing, payment: bk.payment || null },
     bookings: bookings.map(b => ({
       ...listRow(b, event, paidOf(byBooking.get(b.id) || []), {}, now),
       requested: JSON.parse(b.requested), actual: b.actual ? JSON.parse(b.actual) : null, names: b.names ? JSON.parse(b.names) : [],
@@ -892,6 +955,61 @@ export async function adminExport(ctx) {
     summary: summary(event, bookings, payments, bk.servants || [], range, now, handovers),
     handovers: handovers.map(handoverOut)
   };
+}
+
+/* one audit row per download: what, which filters, how many rows; critical when phones went out */
+function exportAudit(ctx, parts, access, filters, range) {
+  const bookings = parts.reduce((n, p) => n + p.bookings.length, 0);
+  const payments = parts.reduce((n, p) => n + p.payments.length, 0);
+  const pii = access.pii && bookings > 0;
+  return activityStmt(ctx.env.DB, {
+    actor: ctx.actor.email, actorName: ctx.actor.name, action: pii ? 'export.pii' : 'export.bookings', entityType: 'bookings',
+    entityId: parts.length === 1 ? parts[0].event.id : 'events:' + parts.length, entityTitle: parts.length === 1 ? parts[0].event.title : parts.length + ' فعاليات',
+    summary: 'نزّل تقرير الحجوزات (' + bookings + ' حجز' + (access.money ? '، ' + payments + ' دفعة' : '') + (pii ? '، بالتليفونات' : '') + ')',
+    changes: { events: parts.map(p => p.event.id).slice(0, 20), filters, from: range.from, to: range.to, bookings, payments, phones: pii, money: access.money },
+    severity: pii ? 'critical' : 'routine'
+  });
+}
+
+/* GET /v1/admin/book/export?eventId&from&to[&status&servantId&method][&download=1] — one event (the screens and the Excel buttons) */
+export async function adminExport(ctx) {
+  const q = ctx.url.searchParams;
+  const download = q.get('download') === '1';
+  if (download) await limit(ctx, 'export', ctx.actor.email, 20, 600);
+  const event = await eventById(ctx, q.get('eventId'));
+  const range = rangeOf(q);
+  const filters = exportFilters(q);
+  const access = await exportAccess(ctx);
+  const part = maskExport(await exportOf(ctx, event, range, filters), access);
+  if (download) await retry(() => exportAudit(ctx, [part], access, filters, range).run());
+  return { ...part, access };
+}
+
+/*
+ * GET /v1/admin/book/report?events=<all|evt-a,evt-b>&from&to&status&servantId&method
+ * The combined report (always a download: audited, rate-limited), one block
+ * per event, filtered on the server, masked by the admin's grants.
+ */
+export async function adminReport(ctx) {
+  await limit(ctx, 'export', ctx.actor.email, 20, 600);
+  const q = ctx.url.searchParams;
+  const want = String(q.get('events') || 'all');
+  let events;
+  if (want === 'all') {
+    events = (await retry(() => ctx.env.DB.prepare('SELECT * FROM event_cfg WHERE withdrawn = 0 ORDER BY start_at DESC LIMIT 50').all())).results.map(rowToEvent);
+  } else {
+    const ids = [...new Set(want.split(','))];
+    if (!ids.length || ids.length > 50 || ids.some(id => !/^evt-[a-z0-9-]{2,60}$/.test(id))) throw invalid('events');
+    events = [];
+    for (const id of ids) events.push(await eventById(ctx, id));
+  }
+  const range = rangeOf(q);
+  const filters = exportFilters(q);
+  const access = await exportAccess(ctx);
+  const parts = [];
+  for (const event of events) parts.push(maskExport(await exportOf(ctx, event, range, filters), access));
+  await retry(() => exportAudit(ctx, parts, access, filters, range).run());
+  return { access, filters, from: range.from, to: range.to, events: parts };
 }
 
 /* ---------- admin proof upload for a booking (purpose booking | payment) ---------- */

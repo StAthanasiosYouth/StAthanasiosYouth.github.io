@@ -99,6 +99,7 @@ export const ROUTE_PERMS = Object.freeze({
   'POST /v1/admin/book/payments/:id/void': 'finance.manage',
   'GET /v1/admin/book/summary': 'bookings.view',
   'GET /v1/admin/book/export': 'exports.export',
+  'GET /v1/admin/book/report': 'exports.export',
   'GET /v1/admin/book/events/:id/handovers': 'finance.view',
   'GET /v1/admin/book/finance': 'finance.view',
   'GET /v1/admin/book/events/:id/reminders': 'bookings.view',
