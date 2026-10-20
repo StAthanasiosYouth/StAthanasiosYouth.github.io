@@ -3,12 +3,13 @@
  * docs: worker/README.md, docs/BACKEND-MIGRATION.md
  *
  * Request flow: CORS preflight → route match → (admin) Google token +
- * allowlist → handler → one JSON envelope with security headers → one log
+ * allowlist + route permission → handler → one JSON envelope with security headers → one log
  * line (+ api_log row for errors / slow requests, after the response).
  */
 
 import { ApiError, errorResponse, json, preflight, readJson, readRaw } from './lib/http.js';
 import { requireAdmin } from './lib/auth.js';
+import { requireRoutePerm } from './lib/perms.js';
 import { pseudonym } from './lib/hash.js';
 import { logLine, persistIfNotable } from './lib/log.js';
 import { match } from './routes.js';
@@ -38,7 +39,10 @@ export async function handle(request, env, ectx, deps = {}) {
     const hit = match(request.method, url.pathname);
     route = hit.route;
     ctx.params = hit.params;
-    if (route.auth === 'admin') await requireAdmin(ctx);
+    if (route.auth === 'admin') {
+      await requireAdmin(ctx);
+      ctx.perm = await requireRoutePerm(ctx, route);   // lib/perms.js ROUTE_PERMS
+    }
     if (route.raw) ctx.raw = await readRaw(request, route.maxBytes);
     else ctx.body = request.method === 'POST' ? await readJson(request, route.maxBytes) : null;
     const data = await route.handler(ctx);
