@@ -20,6 +20,24 @@ Phase 5A (`docs/YOUTH-ACCOUNTS-PLAN.md` rev. 4), which takes over the booker's a
 All three are additive and touch different tables, so applying `0011` before `0010` (if step 11 ships first) is safe;
 `wrangler d1 migrations` tracks them by name. Any later migration takes `0012` onward.
 
+**Phase 1.5 status (2026-10-20, production):**
+
+| Step | State | Production |
+| --- | --- | --- |
+| 1 Grants schema +  () | ✔ live |  |
+| 2 , ,  mirror | ✔ live | Apps Script v50+ |
+| 3 «الصلاحيات» + Primary protections + audit | ✔ live | |
+| 4 Activity forwarding + unified «سجل النشاط» | ✔ live | the Cairo-time fix is live; ~152 rows forwarded before it keep a broken  text (repair pending owner approval) |
+| 5 Router + outbox + acknowledged push claim () | ✔ installed, **off** |  (Apps Script keeps its own pushes) |
+| 6 Gmail sender, quotas, summaries, templates | ✔ installed, **off** | ; production Gmail consent pending (staging connected, Inbox test passed) |
+| 7 «إعدادات الإشعارات», «تنبيهاتي», «حالة النظام» | ✔ live | |
+| 8 Combined export + filters + PII grant | next | |
+| 9 Stage-1 checks + staging rehearsal | after 8 | |
+| 10–11 Age eligibility, payment requests | planned | |
+
+Release 2026-10-20: Worker  (migration ), Apps Script API @51, site  .
+Rollback: Worker , Apps Script @50,  , D1 bookmark  (migrations are additive).
+
 Phase 1 status (rev. 5): **complete, deployed and manually verified** (production `main` @ `f24e425`). Sections 1, 2 and the
 Phase 1 order in §6 describe the state **before** Phase 1 and are kept as history. The official public launch (§6 launch gate,
 test-data cleanup) has not happened yet; Phase 1.5 has not started.
