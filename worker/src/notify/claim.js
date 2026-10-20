@@ -48,7 +48,8 @@ export async function sources(db, ids) {
     const part = unique.slice(i, i + 80);
     // a booking's event title, for the message (never the visitor's data)
     const r = await retry(() => db.prepare(`SELECT a.id, a.at, a.cairo, a.actor, a.actor_name, a.action, a.entity_type, a.entity_id, a.entity_title, a.summary, a.changes,
-        (SELECT e.title FROM bookings b JOIN event_cfg e ON e.id = b.event_id WHERE a.entity_type = 'booking' AND b.id = a.entity_id) AS event_title
+        (SELECT e.title FROM bookings b JOIN event_cfg e ON e.id = b.event_id WHERE a.entity_type = 'booking' AND b.id = a.entity_id) AS event_title,
+        (SELECT b.event_id FROM bookings b WHERE a.entity_type = 'booking' AND b.id = a.entity_id) AS event_id
       FROM activity a WHERE a.id IN (${part.map(() => '?').join(',')})`).bind(...part).all());
     for (const row of r.results) out.set(row.id, row);
   }

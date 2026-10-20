@@ -118,6 +118,33 @@ function parse(text) {
   try { return text ? JSON.parse(text) : null; } catch { return null; }
 }
 
+/*
+ * An admin account in a panel link: never its email (docs/EMAIL-DEEP-LINKS.md §2),
+ * a short key of it. Two 32-bit FNV-1a hashes of the lower-case address; the
+ * panel computes the same key (AdminPage.html accountKey) to find the row.
+ */
+export function accountKey(email) {
+  const s = String(email || '').trim().toLowerCase();
+  const fnv = seed => { let h = seed >>> 0; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h.toString(16).padStart(8, '0'); };
+  return 'acc-' + fnv(0x811c9dc5) + fnv(0x01000193);
+}
+
+/*
+ * Where an admin notification opens (docs/EMAIL-DEEP-LINKS.md §1): the exact
+ * record — the booking, its payments, the event's queue for new bookings, the
+ * admin account — else the activity entry.
+ */
+function linkOf(key, rows) {
+  const last = rows[rows.length - 1];
+  const booking = last.entity_type === 'booking' && /^bkg-[a-z0-9]{4,40}$/.test(String(last.entity_id || '')) ? last.entity_id : '';
+  const event = /^evt-[a-z0-9]{4,40}$/.test(String(last.event_id || '')) ? last.event_id : '';
+  if ((key === 'booking.new' || key === 'booking.create') && rows.length > 1 && event) return '/admin/#open/bookings/' + event;
+  if (booking && /^(payment|pay)\./.test(String(last.action))) return '/admin/#open/payments/' + booking;
+  if (booking) return '/admin/#open/booking/' + booking;
+  if (/^(accounts|admin)\./.test(String(last.action)) && last.entity_type === 'admin' && last.entity_id) return '/admin/#open/account/' + accountKey(last.entity_id);
+  return '/admin/#activity/' + last.id;
+}
+
 /* rows (newest last) → { title, body, url, tag, lines } — names only, no PII */
 export function messageOf(type, rows, names = {}) {
   const last = rows[rows.length - 1];
@@ -144,7 +171,7 @@ export function messageOf(type, rows, names = {}) {
   return {
     title: clip(title, 80),
     body: clip(body || 'لوحة تحكم الأسرة', 160),
-    url: '/admin/#activity/' + last.id,
+    url: linkOf(type.key, rows),
     tag: ('adm-' + type.key + '-' + (last.entity_id || last.id)).replace(/[^\w-]/g, '').slice(0, 80),
     lines: rows.map(r => ({ text: clip(lineOf(r), 200), cairo: r.cairo, id: r.id, action: r.action, who: who(r) })),
     // for the email templates: the event itself (names and references only)

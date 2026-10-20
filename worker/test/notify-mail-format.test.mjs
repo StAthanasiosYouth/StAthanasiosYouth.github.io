@@ -272,3 +272,36 @@ test('booking emails open that booking (docs/EMAIL-DEEP-LINKS.md): the exact lin
   assert.ok(e.text.includes(SITE + '/#me/bookings/B-7QK2M'));
   assert.throws(() => booking({ url: SITE + '/#b/abcdef0123456789' }), /status-token/);
 });
+
+test('admin alerts open the exact record (docs/EMAIL-DEEP-LINKS.md): booking, payments, the event queue, the account; never an email in the link', async () => {
+  const { accountKey } = await import('../src/notify/catalog.js');
+  const urlOf = (action, rows) => msg(action, rows).url;
+  assert.equal(urlOf('booking.confirm', [act('booking.confirm', { entity_id: 'bkg-7qk2ma' })]), '/admin/#open/booking/bkg-7qk2ma');
+  assert.equal(urlOf('booking.new', [act('booking.new', { entity_id: 'bkg-7qk2ma', actor: 'visitor' })]), '/admin/#open/booking/bkg-7qk2ma', 'one new booking: that booking');
+  assert.equal(urlOf('booking.new', [act('booking.new', { entity_id: 'bkg-aaaa11', event_id: 'evt-trip26' }), act('booking.new', { entity_id: 'bkg-bbbb22', event_id: 'evt-trip26' })]), '/admin/#open/bookings/evt-trip26', 'several: the event queue');
+  assert.equal(urlOf('payment.add', [act('payment.add', { entity_id: 'bkg-7qk2ma' })]), '/admin/#open/payments/bkg-7qk2ma');
+  assert.equal(urlOf('payment.void', [act('payment.void', { entity_id: 'bkg-7qk2ma' })]), '/admin/#open/payments/bkg-7qk2ma');
+  const acc = urlOf('accounts.grants', [act('accounts.grants', { entity_type: 'admin', entity_id: 'Servant@Example.com', entity_title: 'servant@example.com' })]);
+  assert.equal(acc, '/admin/#open/account/' + accountKey('servant@example.com'));
+  assert.match(accountKey('servant@example.com'), /^acc-[0-9a-f]{16}$/);
+  assert.equal(accountKey('a@example.com'), accountKey(' A@Example.com '));
+  assert.notEqual(accountKey('a@example.com'), accountKey('b@example.com'));
+  assert.doesNotMatch(acc, /@|example/);
+  assert.match(urlOf('publish', [act('publish', { entity_type: 'site', entity_id: '' })]), /^\/admin\/#activity\/act-/, 'other kinds: the activity entry');
+  assert.match(urlOf('booking.confirm', [act('booking.confirm', { entity_id: 'bad id!' })]), /^\/admin\/#activity\//, 'a malformed id never reaches a link');
+  const e = alertEmail(msg('payment.add', [act('payment.add', { entity_id: 'bkg-7qk2ma' })]));
+  assert.ok(ownLinks(e).includes(SITE + '/admin/#open/payments/bkg-7qk2ma'));
+});
+
+test('the panel finds the account a link names: its accountKey matches the Worker\'s', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { accountKey } = await import('../src/notify/catalog.js');
+  const page = readFileSync(new URL('../../apps-script/AdminPage.html', import.meta.url), 'utf8');
+  const src = /A\.accountKey = (function \(email\) \{[\s\S]*?\n  \});/.exec(page)[1];
+  const panelKey = new Function('return ' + src)();
+  for (const e of ['menazakmena@gmail.com', 'Servant.One@Example.com', 'x@y.co', 'أ@example.com']) assert.equal(panelKey(e), accountKey(e), e);
+  const activity = readFileSync(new URL('../../apps-script/AdminActivity.html', import.meta.url), 'utf8');
+  const book = readFileSync(new URL('../../apps-script/AdminBook.html', import.meta.url), 'utf8');
+  assert.ok(activity.includes(String.raw`open\/account\/(acc-[0-9a-f]{16})`), 'AdminActivity: #open/account/<key>');
+  assert.ok(book.includes(String.raw`open\/(booking|payments)\/(bkg-[a-z0-9]{4,40})`), 'AdminBook: #open/booking|payments/<id>');
+});

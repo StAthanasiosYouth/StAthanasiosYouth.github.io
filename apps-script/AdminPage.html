@@ -1024,6 +1024,22 @@
 
   }
 
+  /*
+   * An admin account in a link (never its email): the Worker's accountKey
+   * (worker/src/notify/catalog.js) — two 32-bit FNV-1a hashes of the lower-case address.
+   */
+  A.accountKey = function (email) {
+
+    var s = String(email || '').trim().toLowerCase();
+    function fnv(seed) {
+      var h = seed >>> 0;
+      for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+      return ('0000000' + h.toString(16)).slice(-8);
+    }
+    return 'acc-' + fnv(0x811c9dc5) + fnv(0x01000193);
+
+  };
+
   function adminsCard() {
 
     var box = A.errorBox();
@@ -1125,6 +1141,7 @@
       // D1 decides who is in; until it answers (or in the emergency panel), the allowlist here
       var emails = acc ? acc.admins.map(function (a) { return a.email; }) : data.emails;
       A.fill(list, emails.map(row));
+      focusAccount(emails);
       count.textContent = emails.length + ' / ' + data.max;
       addRow.hidden = !(acc && acc.canManage);
       add.disabled = emails.length >= data.max;
@@ -1133,6 +1150,25 @@
         : acc && !acc.canManage
           ? 'إضافة الأدمنز وتغيير صلاحياتهم للحساب الأساسي ومن معاه صلاحية «يدير · الحسابات والصلاحيات».'
           : 'كل تغيير في الحسابات والصلاحيات بيتسجل في «سجل النشاط» ويوصل للحساب الأساسي.';
+
+    }
+
+    /* an email / push link to one account (#open/account/<key>, AdminActivity): that row, highlighted */
+    function focusAccount(emails) {
+
+      var key = A.accountFocus;
+      if (!key) return;
+      var email = emails.filter(function (e) { return A.accountKey(e) === key; })[0];
+      if (!email) {
+        // not in the list yet: the Worker's answer may still come; otherwise it was removed
+        if (acc) { A.accountFocus = ''; A.toast('الحساب ده مبقاش في لوحة التحكم', 'info'); }
+        return;
+      }
+      A.accountFocus = '';
+      var li = list.querySelector('[data-email="' + email.replace(/["\\]/g, '') + '"]');
+      if (!li) return;
+      li.classList.add('is-focus');
+      setTimeout(function () { if (li.scrollIntoView) li.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 60);
 
     }
 

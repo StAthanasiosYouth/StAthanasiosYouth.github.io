@@ -232,9 +232,23 @@
     return drawn;
   };
 
-  // admin pushes link to /admin/#open/bookings/<eventId> (§7.3)
+  // admin pushes and emails link to /admin/#open/bookings/<eventId> (§7.3), and to the exact
+  // booking: #open/booking/<bookingId>, its payments: #open/payments/<bookingId> (docs/EMAIL-DEEP-LINKS.md)
   var openLink = A.openLink;
   A.openLink = function (hash) {
+    var one = /^#?open\/(booking|payments)\/(bkg-[a-z0-9]{4,40})$/.exec(String(hash || ''));
+    if (one) {
+      if (!W()) return Promise.resolve(false);
+      return B.check().then(function (on) {
+        if (!on && !B.needGoogle) return false;
+        // the Worker checks the admin's access; a booking that is gone answers «مش لاقيين» in the sheet
+        return openBooking(one[2]).then(function () {
+          var target = one[1] === 'payments' && document.querySelector('#sheet [data-anchor="payments"]');
+          if (target && target.scrollIntoView) target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+          return true;
+        });
+      });
+    }
     var m = /^#?open\/bookings(?:\/(evt-[a-z0-9]{4,40}))?$/.exec(String(hash || ''));
     if (!m) return openLink ? openLink.apply(this, arguments) : Promise.resolve(false);
     if (!W()) return Promise.resolve(false);
@@ -1047,7 +1061,7 @@
         b.confirmedAt ? fact('وقت التأكيد', wallText(b.confirmedAt)) : null),
       el('p', { class: 'section-label', text: 'صور الإثبات' }),
       proofGrid,
-      el('p', { class: 'section-label', text: 'الدفعات' }),
+      el('p', { class: 'section-label', text: 'الدفعات', 'data-anchor': 'payments' }),
       payList,
       history ? el('p', { class: 'section-label', text: 'تغييرات المطلوب' }) : null,
       history,

@@ -5098,6 +5098,12 @@ dialog .toasts[popover] {
 .act--info::before { background: var(--info); }
 .act--warn::before { background: var(--warn); }
 
+.admin.is-focus {
+  border-radius: 12px;
+  background: linear-gradient(90deg, rgba(215, 170, 80, .1), transparent 75%);
+  box-shadow: 0 0 0 2px rgba(215, 170, 80, .45);
+}
+
 .act.is-focus {
   border-color: var(--line-strong);
   background:

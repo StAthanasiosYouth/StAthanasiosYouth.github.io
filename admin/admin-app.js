@@ -5299,6 +5299,22 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   }
 
+  /*
+   * An admin account in a link (never its email): the Worker's accountKey
+   * (worker/src/notify/catalog.js) — two 32-bit FNV-1a hashes of the lower-case address.
+   */
+  A.accountKey = function (email) {
+
+    var s = String(email || '').trim().toLowerCase();
+    function fnv(seed) {
+      var h = seed >>> 0;
+      for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+      return ('0000000' + h.toString(16)).slice(-8);
+    }
+    return 'acc-' + fnv(0x811c9dc5) + fnv(0x01000193);
+
+  };
+
   function adminsCard() {
 
     var box = A.errorBox();
@@ -5400,6 +5416,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       // D1 decides who is in; until it answers (or in the emergency panel), the allowlist here
       var emails = acc ? acc.admins.map(function (a) { return a.email; }) : data.emails;
       A.fill(list, emails.map(row));
+      focusAccount(emails);
       count.textContent = emails.length + ' / ' + data.max;
       addRow.hidden = !(acc && acc.canManage);
       add.disabled = emails.length >= data.max;
@@ -5408,6 +5425,25 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         : acc && !acc.canManage
           ? 'إضافة الأدمنز وتغيير صلاحياتهم للحساب الأساسي ومن معاه صلاحية «يدير · الحسابات والصلاحيات».'
           : 'كل تغيير في الحسابات والصلاحيات بيتسجل في «سجل النشاط» ويوصل للحساب الأساسي.';
+
+    }
+
+    /* an email / push link to one account (#open/account/<key>, AdminActivity): that row, highlighted */
+    function focusAccount(emails) {
+
+      var key = A.accountFocus;
+      if (!key) return;
+      var email = emails.filter(function (e) { return A.accountKey(e) === key; })[0];
+      if (!email) {
+        // not in the list yet: the Worker's answer may still come; otherwise it was removed
+        if (acc) { A.accountFocus = ''; A.toast('الحساب ده مبقاش في لوحة التحكم', 'info'); }
+        return;
+      }
+      A.accountFocus = '';
+      var li = list.querySelector('[data-email="' + email.replace(/["\\]/g, '') + '"]');
+      if (!li) return;
+      li.classList.add('is-focus');
+      setTimeout(function () { if (li.scrollIntoView) li.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 60);
 
     }
 
@@ -17960,6 +17996,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     if ((m = /^open\/(participant|points|shopitem|redemption)\/([\w-]{1,40})$/.exec(text)) && compEntry({ type: m[1], entityId: m[2], action: '' })) return openComp(m[2], m[1]);
 
     if (/^open\/settings$/.test(text)) return A.go('settings');
+    // one admin account (email / push about accounts): «الصلاحيات» on the settings page, that row (AdminPage)
+    if ((m = /^open\/account\/(acc-[0-9a-f]{16})$/.exec(text))) {
+      A.accountFocus = m[1];
+      return A.go('settings');
+    }
     if (/^open\/media(?:\/[\w-]{1,80})?$/.test(text)) return A.go('media');
 
     if ((m = /^activity(?:\/(act-[0-9a-f]{12}))?$/.exec(text))) {
@@ -19015,9 +19056,23 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return drawn;
   };
 
-  // admin pushes link to /admin/#open/bookings/<eventId> (§7.3)
+  // admin pushes and emails link to /admin/#open/bookings/<eventId> (§7.3), and to the exact
+  // booking: #open/booking/<bookingId>, its payments: #open/payments/<bookingId> (docs/EMAIL-DEEP-LINKS.md)
   var openLink = A.openLink;
   A.openLink = function (hash) {
+    var one = /^#?open\/(booking|payments)\/(bkg-[a-z0-9]{4,40})$/.exec(String(hash || ''));
+    if (one) {
+      if (!W()) return Promise.resolve(false);
+      return B.check().then(function (on) {
+        if (!on && !B.needGoogle) return false;
+        // the Worker checks the admin's access; a booking that is gone answers «مش لاقيين» in the sheet
+        return openBooking(one[2]).then(function () {
+          var target = one[1] === 'payments' && document.querySelector('#sheet [data-anchor="payments"]');
+          if (target && target.scrollIntoView) target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+          return true;
+        });
+      });
+    }
     var m = /^#?open\/bookings(?:\/(evt-[a-z0-9]{4,40}))?$/.exec(String(hash || ''));
     if (!m) return openLink ? openLink.apply(this, arguments) : Promise.resolve(false);
     if (!W()) return Promise.resolve(false);
@@ -19830,7 +19885,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         b.confirmedAt ? fact('وقت التأكيد', wallText(b.confirmedAt)) : null),
       el('p', { class: 'section-label', text: 'صور الإثبات' }),
       proofGrid,
-      el('p', { class: 'section-label', text: 'الدفعات' }),
+      el('p', { class: 'section-label', text: 'الدفعات', 'data-anchor': 'payments' }),
       payList,
       history ? el('p', { class: 'section-label', text: 'تغييرات المطلوب' }) : null,
       history,

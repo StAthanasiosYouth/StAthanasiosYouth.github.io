@@ -279,6 +279,11 @@
     if ((m = /^open\/(participant|points|shopitem|redemption)\/([\w-]{1,40})$/.exec(text)) && compEntry({ type: m[1], entityId: m[2], action: '' })) return openComp(m[2], m[1]);
 
     if (/^open\/settings$/.test(text)) return A.go('settings');
+    // one admin account (email / push about accounts): «الصلاحيات» on the settings page, that row (AdminPage)
+    if ((m = /^open\/account\/(acc-[0-9a-f]{16})$/.exec(text))) {
+      A.accountFocus = m[1];
+      return A.go('settings');
+    }
     if (/^open\/media(?:\/[\w-]{1,80})?$/.test(text)) return A.go('media');
 
     if ((m = /^activity(?:\/(act-[0-9a-f]{12}))?$/.exec(text))) {
