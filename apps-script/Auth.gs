@@ -130,6 +130,13 @@ function assertAdmin_() {
     throw new Error('مش مسموح لك تستخدم لوحة التحكم.');
   }
 
+  // the recovery panel (HtmlService) has no per-function permission check:
+  // while permissions are enforced (Grants.gs) it is the Primary Admin's only
+  if (!API_REQUEST_ && email !== primaryAdmin_()) {
+    var grants = grantsSnapshot_();
+    if (grants && grants.enforce) throw new Error('مش مسموح لك تستخدم لوحة التحكم.');
+  }
+
   return email;
 
 }
@@ -196,6 +203,7 @@ function apiAddAdmin(value) {
     PropertiesService.getScriptProperties().setProperty('ADMIN_EMAILS', emails.join(', '));
     forgetAdminEmails_();
     workerSyncSoon_();
+    adminsChangedHere_();
     log_(me, 'admins.add', email);
     activity_({ action: 'admin.add', type: 'admins', id: email, title: email });
 
@@ -252,6 +260,7 @@ function apiRemoveAdmin(value) {
     PropertiesService.getScriptProperties().setProperty('ADMIN_EMAILS', emails.join(', '));
     forgetAdminEmails_();
     workerSyncSoon_();
+    adminsChangedHere_();
     log_(me, 'admins.remove', email);
     // no name and no admin notifications left behind for someone who isn't an admin any more
     try { forgetAdminName_(email); } catch (ignored) { console.warn('admins: name not removed'); }

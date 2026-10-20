@@ -87,6 +87,12 @@ export const ROUTE_PERMS = Object.freeze({
   'POST /v1/admin/book/handovers/:id/void': 'finance.manage'
 });
 
+/*
+ * Routes whose handler limits itself to the admin's own servant (ctx.perm.servantId).
+ * Every other route needs scope 'all', so an 'own' grant never reaches a handler that ignores it.
+ */
+export const OWN_SCOPE_ROUTES = Object.freeze(['POST /v1/admin/book/bookings']);
+
 export function routePerm(route) {
   return ROUTE_PERMS[route.method + ' ' + route.path];
 }
@@ -142,9 +148,41 @@ export async function requirePerm(ctx, perm, { scope = 'own' } = {}) {
 
 /* The route-level check (index.js): an unmapped admin route is denied while enforcing. */
 export async function requireRoutePerm(ctx, route) {
-  const perm = routePerm(route);
-  if (perm !== undefined) return requirePerm(ctx, perm);
+  const key = route.method + ' ' + route.path;
+  const perm = ROUTE_PERMS[key];
+  if (perm !== undefined) return requirePerm(ctx, perm, { scope: OWN_SCOPE_ROUTES.includes(key) ? 'own' : 'all' });
   const a = await loadAccess(ctx);
   if (a.enforce && !a.primary) throw new ApiError('denied', 'route unmapped');
   return null;
+}
+
+/*
+ * The grants as Apps Script reads them (POST /v1/sync/grants; apps-script/Grants.gs):
+ * active admins only, each admin's grants as one letter per catalog entry
+ * ('A' all, 'O' own, '-' none) so the last-good copy fits one Script Property.
+ * `adminsSyncTs`: the last allowlist push from Apps Script D1 accepted (the mirror's guard).
+ */
+export async function grantsSnapshot(db) {
+  const [admins, grants, settings] = await retry(() => db.batch([
+    db.prepare('SELECT email, name, role, servant_id FROM admins WHERE active = 1 ORDER BY email'),
+    db.prepare('SELECT g.email, g.perm, g.scope FROM admin_grants g JOIN admins a ON a.email = g.email AND a.active = 1'),
+    db.prepare("SELECT key, value FROM settings WHERE key IN ('PERMS_ENFORCE', 'SYNC_TS_admins')")
+  ]));
+  const by = new Map();
+  for (const g of grants.results) {
+    if (!by.has(g.email)) by.set(g.email, new Map());
+    by.get(g.email).set(g.perm, g.scope === 'own' ? 'O' : 'A');
+  }
+  const set = Object.fromEntries(settings.results.map(r => [r.key, r.value]));
+  return {
+    v: 1,
+    enforce: set.PERMS_ENFORCE === '1',
+    adminsSyncTs: Number(set.SYNC_TS_admins) || 0,
+    perms: PERMS,
+    primaryDefault: PRIMARY_DEFAULT,
+    admins: admins.results.map(a => {
+      const mine = by.get(a.email) || new Map();
+      return { email: a.email, name: a.name || '', primary: a.role === 'primary', servantId: a.servant_id || null, g: PERMS.map(p => mine.get(p) || '-').join('') };
+    })
+  };
 }

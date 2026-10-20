@@ -16,6 +16,7 @@ import { ApiError } from '../lib/http.js';
 import { retry, cairoText } from '../lib/db.js';
 import { activityStmt } from '../lib/activity.js';
 import { randomId } from '../lib/hash.js';
+import { requirePerm } from '../lib/perms.js';
 import { begin, finishStmt, abandon, idempotencyKey } from '../lib/idempotency.js';
 import { loadEvent, eventById, seatsTaken, rowToEvent } from './event.js';
 import { forgetModule, bookingOn } from './public.js';
@@ -329,8 +330,23 @@ export async function adminUnlock(ctx) {
 
 /* ---------- create (source admin) ---------- */
 
+/*
+ * Cash bookings by grant (§4.2): `bookings.create_cash` (the route) registers;
+ * confirming at once also needs `bookings.approve`. With an 'own' grant the
+ * payments' servant must be the admin's linked servant, unless `finance.manage`.
+ */
+async function createGate(ctx, body) {
+  const confirm = body.confirm && typeof body.confirm === 'object' ? body.confirm : null;
+  if (confirm) await requirePerm(ctx, 'bookings.approve');
+  if (!ctx.perm || ctx.perm.scope !== 'own') return;
+  const pays = [].concat(Array.isArray(body.payments) ? body.payments : [], confirm && Array.isArray(confirm.payments) ? confirm.payments : []);
+  if (pays.every(p => p && p.servantId === ctx.perm.servantId)) return;
+  await requirePerm(ctx, 'finance.manage', { scope: 'all' });
+}
+
 export async function adminCreate(ctx) {
   const body = ctx.body;
+  await createGate(ctx, body);
   if (!KEY.test(String(body.requestKey || ''))) throw invalid('requestKey');
   const twin = await retry(() => ctx.env.DB.prepare('SELECT id, status, version FROM bookings WHERE request_key = ?').bind(body.requestKey).first());
   if (twin) {

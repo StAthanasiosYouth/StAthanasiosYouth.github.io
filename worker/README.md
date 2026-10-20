@@ -67,6 +67,12 @@ All resources live in Cloudflare account `menazakmena@gmail.com` (workers.dev su
 | `GET /v1/admin/proofs/:id` | admin, 300/min | the file, streamed (`private, no-store`, sandboxed) |
 | `DELETE /v1/admin/proofs/:id` | admin | deletes the file; the row stays with `deleted_at` |
 | `POST /v1/sync/admins` | signed by Apps Script | the admin allowlist |
+| `POST /v1/sync/grants` | signed by Apps Script, 120/min | the grants snapshot Apps Script caches 60 s (`apps-script/Grants.gs`) |
+
+**Permissions (Phase 1.5):** every admin route needs the permission in `src/lib/perms.js` `ROUTE_PERMS`
+(grants in D1 `admin_grants`). Switch `settings.PERMS_ENFORCE`: `'0'` (default, rollback) = every active
+admin holds everything except `accounts.manage`, `notifications.manage`, `participants.manage`; `'1'` = grants only.
+The Primary Admin always holds everything. A denial is `denied 403` with `perm`.
 
 **Envelope:**
 - Success: `{ ok: true, … }`.

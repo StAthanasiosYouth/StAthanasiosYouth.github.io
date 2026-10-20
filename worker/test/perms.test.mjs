@@ -6,7 +6,9 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { harness, fakeGoogle } from './helpers.mjs';
 import { D1Sqlite, migratedDb } from './d1-sqlite.mjs';
 import { ROUTES } from '../src/routes.js';
-import { PERMS, PRIMARY_DEFAULT, ANY_ADMIN, ROUTE_PERMS, routePerm, requirePerm } from '../src/lib/perms.js';
+import { PERMS, PRIMARY_DEFAULT, ANY_ADMIN, ROUTE_PERMS, OWN_SCOPE_ROUTES, routePerm, requirePerm, requireRoutePerm } from '../src/lib/perms.js';
+import { signSync } from '../src/lib/sync.js';
+import { bookWorld, pay } from './book-helpers.mjs';
 
 const DIR = new URL('../migrations/', import.meta.url);
 const FILES = readdirSync(DIR).filter(f => f.endsWith('.sql')).sort();
@@ -190,4 +192,82 @@ test('HTTP: Primary-only handler checks still apply on top of grants (module swi
   assert.equal((await post('/v1/admin/book/module', { on: false })).status, 403, 'a granted non-primary admin still cannot switch it');
   await h.db.prepare("INSERT INTO admins (email, role, active, created_at) VALUES ('admin@example.com', 'primary', 1, 0) ON CONFLICT(email) DO UPDATE SET role = 'primary'").run();
   assert.equal((await post('/v1/admin/book/module', { on: false })).status, 200);
+});
+
+// ---------- step 2: /v1/sync/grants, route scope, cash rules (§4.2) ----------
+
+async function syncGrants(h, { ts = Date.now(), secret = 'sync-test-secret' } = {}) {
+  const raw = '{"v":1}';
+  return h.call('/v1/sync/grants', { method: 'POST', body: raw, headers: { 'x-sync-ts': String(ts), 'x-sync-signature': await signSync(secret, String(ts), raw) } });
+}
+
+test('sync/grants: signed only, no replays; active admins with one letter per permission; switch + allowlist stamp', async () => {
+  const h = harness();
+  await addAdmin(h.db, 'p@example.com', 'primary');
+  await addAdmin(h.db, 'a@example.com', 'admin', 'srv-1');
+  await h.db.prepare("INSERT INTO admins (email, role, active, created_at) VALUES ('gone@example.com', 'admin', 0, 0)").run();
+  await grant(h.db, 'a@example.com', 'bookings.view');
+  await grant(h.db, 'a@example.com', 'bookings.create_cash', 'own');
+  await grant(h.db, 'gone@example.com', 'bookings.view');
+  await h.db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('SYNC_TS_admins', '1234', 0)").run();
+
+  assert.equal((await syncGrants(h, { secret: 'wrong' })).status, 401);
+  const t = Date.now();
+  const r = await syncGrants(h, { ts: t });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.v, 1);
+  assert.equal(r.body.enforce, false);
+  assert.equal(r.body.adminsSyncTs, 1234);
+  assert.deepEqual(r.body.perms, [...PERMS]);
+  assert.deepEqual(r.body.primaryDefault, [...PRIMARY_DEFAULT]);
+  assert.deepEqual(r.body.admins.map(a => a.email), ['a@example.com', 'p@example.com'], 'inactive left out');
+  const a = r.body.admins[0];
+  assert.equal(a.servantId, 'srv-1');
+  assert.equal(a.g.length, PERMS.length);
+  assert.equal(a.g[PERMS.indexOf('bookings.view')], 'A');
+  assert.equal(a.g[PERMS.indexOf('bookings.create_cash')], 'O');
+  assert.equal(a.g.replace(/-/g, '').length, 2);
+  assert.equal(r.body.admins[1].primary, true);
+  assert.equal((await syncGrants(h, { ts: t })).status, 409, 'replay refused');
+  await setEnforce(h.db, '1');
+  assert.equal((await syncGrants(h, { ts: t + 1 })).body.enforce, true);
+});
+
+test('route scope: an own grant passes only routes whose handler limits itself (cash create)', async () => {
+  const db = migratedDb();
+  await addAdmin(db, 's@example.com', 'admin', 'srv-1');
+  await setEnforce(db, '1');
+  await grant(db, 's@example.com', 'bookings.view', 'own');
+  await grant(db, 's@example.com', 'bookings.create_cash', 'own');
+  const route = (method, path) => ({ method, path });
+  await denied(requireRoutePerm(ctxFor(db, 's@example.com'), route('GET', '/v1/admin/book/bookings')), 'bookings.view');
+  assert.deepEqual(await requireRoutePerm(ctxFor(db, 's@example.com'), route('POST', '/v1/admin/book/bookings')), { perm: 'bookings.create_cash', scope: 'own', servantId: 'srv-1' });
+  assert.deepEqual(OWN_SCOPE_ROUTES, ['POST /v1/admin/book/bookings']);
+});
+
+test('cash create (§4.2): create_cash alone = pending only; confirm needs approve; own servant unless finance.manage', async () => {
+  const w = await bookWorld();
+  const phone = () => '010' + String(Math.floor(Math.random() * 1e8)).padStart(8, '0');
+  await w.db.prepare("INSERT INTO admins (email, name, role, active, created_at, servant_id) VALUES ('admin@example.com', 'A', 'admin', 1, 0, 'srv-bbbb2222')").run();
+  await setEnforce(w.db, '1');
+  await grant(w.db, 'admin@example.com', 'bookings.create_cash', 'own');
+  const form = (over = {}) => ({ eventId: 'evt-alex01', requestKey: w.key('c'), name: 'حجز كاش', phone: phone(), counts: { applicant: 1 }, servantId: 'srv-bbbb2222', method: 'cash', ...over });
+
+  const pending = await w.admin('POST', '/v1/admin/book/bookings', form({ payments: [pay({ amount: 500, servantId: 'srv-bbbb2222' })] }));
+  assert.equal(pending.status, 200, JSON.stringify(pending.body));
+  assert.equal(pending.body.booking.status, 'pending');
+
+  const other = await w.admin('POST', '/v1/admin/book/bookings', form({ payments: [pay({ amount: 500, servantId: 'srv-aaaa1111' })] }));
+  assert.equal(other.status, 403, 'another servant\'s money needs finance.manage');
+  assert.equal(other.body.perm, 'finance.manage');
+
+  const confirm = await w.admin('POST', '/v1/admin/book/bookings', form({ confirm: { payments: [pay({ amount: 1500, servantId: 'srv-bbbb2222' })] } }));
+  assert.equal(confirm.status, 403);
+  assert.equal(confirm.body.perm, 'bookings.approve');
+
+  await grant(w.db, 'admin@example.com', 'bookings.approve');
+  await grant(w.db, 'admin@example.com', 'finance.manage');
+  const both = await w.admin('POST', '/v1/admin/book/bookings', form({ confirm: { payments: [pay({ amount: 1500, servantId: 'srv-aaaa1111' })] } }));
+  assert.equal(both.status, 200, JSON.stringify(both.body));
+  assert.equal(both.body.booking.status, 'confirmed');
 });

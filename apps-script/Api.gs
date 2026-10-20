@@ -282,6 +282,9 @@ function doPost(e) {
       API_REQUEST_.sid = request.sid;
     }
 
+    // the permission this function needs (Grants.gs API_PERMS; unmapped = refused)
+    assertApiPerm_(request.fn);
+
     var result;
     try {
       result = functions[request.fn].apply(null, request.args);

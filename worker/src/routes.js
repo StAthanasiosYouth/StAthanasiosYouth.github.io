@@ -14,6 +14,7 @@ import { sha256Bytes } from './lib/hash.js';
 import { putProof, readProof, deleteProof, sweepProofs } from './lib/proofs.js';
 import { PROOF_MAX_BYTES } from './lib/image.js';
 import { verifySync, syncStampStmt } from './lib/sync.js';
+import { grantsSnapshot } from './lib/perms.js';
 import { housekeeping, blankPhones } from './scheduled.js';
 import { makeJob } from './jobs.js';
 import { bookState, bookProof, bookSubmit, bookStatus, bookWithdraw } from './book/public.js';
@@ -187,6 +188,19 @@ async function syncAdmins(ctx) {
   return { active: admins.length };
 }
 
+/*
+ * POST /v1/sync/grants  (signed by Apps Script, lib/sync.js) → the grants snapshot
+ * D1 owns admins + grants from Phase 1.5 (BOOKING-PHASE1-COMPLETION-PLAN §4.3): Apps
+ * Script pulls this, caches it 60 s, keeps a last-good copy (apps-script/Grants.gs).
+ */
+async function syncGrants(ctx) {
+  await limit(ctx, 'sync.grants', clientIp(ctx.request), 120, 60);
+  const raw = new TextDecoder().decode(ctx.raw);
+  const { ts } = await verifySync(ctx.env, ctx.request, raw, 'grants');
+  await retry(() => syncStampStmt(ctx.env.DB, 'grants', ts).run());
+  return grantsSnapshot(ctx.env.DB);
+}
+
 /* STAGING ONLY: store an event definition directly (tests own it; the site is never read for it) */
 async function diagEventFixture(ctx) {
   if (ctx.env.ENVIRONMENT !== 'staging') throw new ApiError('notfound');
@@ -224,6 +238,7 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/admin/diag/retention', auth: 'admin', handler: diagRetention },
   { method: 'GET', path: '/v1/admin/diag/book-news', auth: 'admin', handler: diagNews },
   { method: 'POST', path: '/v1/sync/book-news', auth: 'sync', raw: true, maxBytes: 4 * 1024, handler: syncBookNews },
+  { method: 'POST', path: '/v1/sync/grants', auth: 'sync', raw: true, maxBytes: 1024, handler: syncGrants },
   { method: 'POST', path: '/v1/sync/pay-dest', auth: 'sync', raw: true, maxBytes: 64 * 1024, handler: syncPayDest },
 
   // booking — public (docs/EVENTS.md §6, worker/BOOKING-API.md)
