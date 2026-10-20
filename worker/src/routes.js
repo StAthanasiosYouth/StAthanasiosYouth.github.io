@@ -17,6 +17,7 @@ import { verifySync, syncStampStmt } from './lib/sync.js';
 import { grantsSnapshot } from './lib/perms.js';
 import { accountsList, accountAdd, accountUpdate, accountRemove } from './lib/accounts.js';
 import { notifyClaim } from './notify/claim.js';
+import { tokenHealth } from './notify/email.js';
 import { notifySettingsGet, notifySettingsSave, notifyMeGet, notifyMeSave, notifyStatus, notifyDismiss } from './notify/settings.js';
 import { housekeeping, blankPhones } from './scheduled.js';
 import { makeJob } from './jobs.js';
@@ -227,6 +228,17 @@ async function syncActivity(ctx) {
   return { stored: rows.length };
 }
 
+/*
+ * STAGING ONLY: the hourly Gmail token check, now. simulate: 'revoked' runs it with a
+ * refresh token Google refuses (as after a password change) — the real secret is
+ * never touched; the next plain call (or the next hour) restores the health.
+ */
+async function diagGmailHealth(ctx) {
+  if (ctx.env.ENVIRONMENT !== 'staging') throw new ApiError('notfound');
+  const simulate = ctx.body && ctx.body.simulate === 'revoked';
+  return { simulated: simulate, health: await tokenHealth(simulate ? { ...ctx.env, GMAIL_REFRESH_TOKEN: 'revoked-rehearsal' } : ctx.env) };
+}
+
 /* STAGING ONLY: store an event definition directly (tests own it; the site is never read for it) */
 async function diagEventFixture(ctx) {
   if (ctx.env.ENVIRONMENT !== 'staging') throw new ApiError('notfound');
@@ -271,6 +283,7 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/admin/notify/outbox/:id/dismiss', auth: 'admin', handler: notifyDismiss },
   { method: 'POST', path: '/v1/sync/admins', auth: 'sync', raw: true, maxBytes: 16 * 1024, handler: syncAdmins },
   { method: 'POST', path: '/v1/admin/diag/event-fixture', auth: 'admin', handler: diagEventFixture },
+  { method: 'POST', path: '/v1/admin/diag/gmail-health', auth: 'admin', handler: diagGmailHealth },
   { method: 'POST', path: '/v1/admin/diag/retention', auth: 'admin', handler: diagRetention },
   { method: 'GET', path: '/v1/admin/diag/book-news', auth: 'admin', handler: diagNews },
   { method: 'POST', path: '/v1/sync/book-news', auth: 'sync', raw: true, maxBytes: 4 * 1024, handler: syncBookNews },

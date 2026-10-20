@@ -91,3 +91,13 @@ test('unified log: Worker + Apps Script rows together, newest first, names from 
   assert.equal(page.more, true);
   assert.deepEqual((await get('?view=log&limit=2&before=' + page.next)).items.map(i => i.action), ['update']);
 });
+
+test('sync/activity: rows arrive notified while the router is off (Apps Script pushes), waiting for the router once it is on', async () => {
+  const h = harness();
+  await push(h, [row({ id: 'act-111111111111' })]);
+  await h.db.prepare("UPDATE settings SET value = '1' WHERE key = 'NOTIFY_ROUTER'").run();
+  await push(h, [row({ id: 'act-222222222222', at: row().at + 1 })], { ts: Date.now() + 5 });
+  await push(h, [row({ id: 'act-111111111111', count: 2 })], { ts: Date.now() + 6 });   // a merge of the old row
+  const n = Object.fromEntries((await all(h)).map(r => [r.id, r.notified]));
+  assert.deepEqual(n, { 'act-111111111111': 1, 'act-222222222222': 0 }, 'the merge never re-opens a sent row');
+});

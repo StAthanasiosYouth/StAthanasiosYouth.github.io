@@ -32,7 +32,7 @@ All three are additive and touch different tables, so applying `0011` before `00
 | 6 Gmail sender, quotas, summaries, templates | ✔ installed, **off** | `NOTIFY_EMAIL=0`; production Gmail consent pending (staging connected, Inbox test passed) |
 | 7 «إعدادات الإشعارات», «تنبيهاتي», «حالة النظام» | ✔ live | |
 | 8 Combined export + filters + PII grant | ✔ live | «التقرير المجمّع»; downloads audited; also live: the rolling-24h email budget |
-| 9 Stage-1 checks + staging rehearsal | after 8 | |
+| 9 Stage-1 checks + staging rehearsal | ✔ staging rehearsal 57/57 (`worker/scripts/rehearsal.mjs`) | pending: real test emails (owner approval), real-device push in production (router window) |
 | 10–11 Age eligibility, payment requests | planned | |
 
 Release 2026-10-20: Worker `44c932ae` (migration `0012`; same code as `e11a506e`, redeployed by CI), Apps Script API @51, site `main` `6d72366`.

@@ -120,8 +120,10 @@ export async function queryActivity(db, q = {}) {
  * One Apps Script Activity row into D1 (POST /v1/sync/activity): an upsert by
  * its id, so a resend or a merged row (Activity.gs merges small edits into the
  * same id) updates it — never a second row. A Worker row is never overwritten.
- * Apps Script still delivers its own admin pushes (AdminNotify.gs), so these
- * rows are stored as notified (the step-5 router takes over later). The Cairo
+ * While NOTIFY_ROUTER is off Apps Script delivers its own admin pushes
+ * (AdminNotify.gs), so a new row is stored as notified; once the router is on
+ * (Apps Script then stays quiet, NotifyClaim.gs) it is stored waiting, for the
+ * router. A resend or a merge never changes notified (no second notification). The Cairo
  * wall-clock text is always made here from `at`: a Sheet hands its own column
  * back as a Date, so the value Apps Script sends is never trusted.
  */
@@ -129,7 +131,8 @@ export function forwardedStmt(db, r) {
   let changes = r.changes == null ? null : JSON.stringify(r.changes);
   if (changes && changes.length > 1024) changes = null;
   return db.prepare('INSERT INTO activity (id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary, changes, ref, count, notified, device, severity, source) ' +
-    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 'apps-script') " +
+    // notified: 1 while the router is off (Apps Script pushes itself), 0 once it is on (the router sends it)
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT CASE WHEN value = '1' THEN 0 ELSE 1 END FROM settings WHERE key = 'NOTIFY_ROUTER'), 1), ?, ?, 'apps-script') " +
     'ON CONFLICT(id) DO UPDATE SET at = excluded.at, cairo = excluded.cairo, actor_name = excluded.actor_name, action = excluded.action, ' +
     'entity_title = excluded.entity_title, summary = excluded.summary, changes = excluded.changes, ref = excluded.ref, count = excluded.count, ' +
     "device = excluded.device, severity = excluded.severity WHERE activity.source = 'apps-script'").bind(

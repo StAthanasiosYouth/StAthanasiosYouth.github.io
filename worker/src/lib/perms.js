@@ -75,6 +75,7 @@ export const ROUTE_PERMS = Object.freeze({
   'POST /v1/admin/diag/housekeeping': 'system.manage',
   'POST /v1/admin/diag/event-fixture': 'system.manage',
   'POST /v1/admin/diag/retention': 'system.manage',
+  'POST /v1/admin/diag/gmail-health': 'system.manage',
   'GET /v1/admin/diag/book-news': 'system.view',
   'POST /v1/admin/proofs': 'bookings.edit',
   'GET /v1/admin/proofs/:id': 'bookings.view',
