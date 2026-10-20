@@ -470,6 +470,8 @@ const BOOKING = {
 export function bookingEmail(b) {
   const s = BOOKING[b.status];
   if (!s) throw new Error('unknown booking status: ' + b.status);
+  // the button opens that booking for its signed-in owner (docs/EMAIL-DEEP-LINKS.md), never a status-token link
+  if (b.url && /#b\//.test(b.url)) throw new Error('a booking status-token link in an email');
   const total = Number(b.total) || 0;
   const paid = Number(b.paid) || 0;
   const owes = total > paid && b.status !== 'cancelled';

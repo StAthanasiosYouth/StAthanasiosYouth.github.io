@@ -186,7 +186,7 @@ test('layout escapes everything it is given', () => {
 
 /* ---------- the Azure Crest design: email-safe structure and fallbacks ---------- */
 
-const booking = over => bookingEmail({ status: 'balance', name: 'مارك', event: 'رحلة الإسكندرية الصيفية', when: 'الجمعة ١٤ نوفمبر · التجمع ٦:٠٠ ص', ref: 'B-7QK2M', people: 3, total: 900, paid: 600, due: 'الأربعاء ١٢ نوفمبر', next: 'ادفع الباقي بإنستاباي أو كاش مع خادم الحجوزات قبل الميعاد.', url: SITE + '/', ...over });
+const booking = over => bookingEmail({ status: 'balance', name: 'مارك', event: 'رحلة الإسكندرية الصيفية', when: 'الجمعة ١٤ نوفمبر · التجمع ٦:٠٠ ص', ref: 'B-7QK2M', people: 3, total: 900, paid: 600, due: 'الأربعاء ١٢ نوفمبر', next: 'ادفع الباقي بإنستاباي أو كاش مع خادم الحجوزات قبل الميعاد.', url: SITE + '/#me/bookings/B-7QK2M', ...over });
 const every = () => [
   alertEmail(msg('booking.new', [act('booking.new', { actor: 'visitor', actor_name: 'زائر' })])),
   alertEmail(msg('accounts.grants', [act('accounts.grants', { entity_type: 'admin', entity_id: 'a@example.com', entity_title: 'a@example.com' })]), { level: 'critical' }),
@@ -264,4 +264,11 @@ test('mail samples: every sample renders; the send route is staging only', async
     assert.ok(['otp', 'critical', 'important'].includes(level));
   }
   await assert.rejects(diagMailSample({ env: { ENVIRONMENT: 'production' }, body: { name: 'otp' } }), e => e.code === 'notfound' || /notfound/.test(e.message + e.code));
+});
+
+test('booking emails open that booking (docs/EMAIL-DEEP-LINKS.md): the exact link, never a status token', () => {
+  const e = booking();
+  assert.deepEqual(ownLinks(e).filter(h => !SOCIALS.includes(h) && h !== SITE + '/'), [SITE + '/#me/bookings/B-7QK2M']);
+  assert.ok(e.text.includes(SITE + '/#me/bookings/B-7QK2M'));
+  assert.throws(() => booking({ url: SITE + '/#b/abcdef0123456789' }), /status-token/);
 });

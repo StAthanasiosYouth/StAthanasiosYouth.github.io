@@ -19,7 +19,7 @@ const line = (text, time, action) => ({ text, cairo: '2026-10-20 ' + time, actio
 /* name → [level, () => { subject, html, text }] */
 export const SAMPLES = {
   'otp': ['otp', () => otpEmail({ code: '482913', minutes: 10 })],
-  'booking-balance': ['important', () => bookingEmail({ status: 'balance', name: 'مارك', event: 'رحلة الإسكندرية الصيفية', when: 'الجمعة ١٤ نوفمبر ٢٠٢٦ · التجمع ٦:٠٠ ص قدام الكنيسة', ref: 'B-7QK2M', people: 3, total: 900, paid: 600, due: 'الأربعاء ١٢ نوفمبر', next: 'ادفع الباقي بإنستاباي من صفحة الحجز، أو كاش مع خادم الحجوزات قبل ميعاد الدفع.', url: SITE + '/' })],
+  'booking-balance': ['important', () => bookingEmail({ status: 'balance', name: 'مارك', event: 'رحلة الإسكندرية الصيفية', when: 'الجمعة ١٤ نوفمبر ٢٠٢٦ · التجمع ٦:٠٠ ص قدام الكنيسة', ref: 'B-7QK2M', people: 3, total: 900, paid: 600, due: 'الأربعاء ١٢ نوفمبر', next: 'ادفع الباقي بإنستاباي من صفحة الحجز، أو كاش مع خادم الحجوزات قبل ميعاد الدفع.', url: SITE + '/#me/bookings/B-7QK2M' })],
   'alert-critical': ['critical', () => alertEmail(msg('pay.approve', [act('pay.approve', { entity_type: 'servant', entity_id: 'srv-aaaa1111', entity_title: 'مينا عادل', summary: 'اعتمد رقم إنستاباي الخادم «مينا عادل»', event_title: null })]), { level: 'critical' })],
   'alert-booking': ['important', () => alertEmail(msg('booking.new', [act('booking.new', { actor: 'visitor', actor_name: 'زائر', summary: 'رحلة الإسكندرية الصيفية · 3 أفراد' }), act('booking.new', { actor: 'visitor', actor_name: 'زائر', entity_title: 'B-4TR8N', cairo: '2026-10-20 21:20' })]))],
   'summary': ['important', () => summaryEmail({ lines: [
