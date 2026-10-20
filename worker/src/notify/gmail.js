@@ -49,27 +49,59 @@ export async function accessToken(env, { force = false, now = Date.now() } = {})
 }
 
 const b64 = text => {
-  const bytes = new TextEncoder().encode(text);
+  const bytes = typeof text === 'string' ? new TextEncoder().encode(text) : text;
   let bin = '';
   for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
   return btoa(bin);
 };
 const b64url = text => b64(text).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-const word = text => '=?UTF-8?B?' + b64(text) + '?=';
 const wrap = s => (s.match(/.{1,76}/g) || ['']).join('\r\n');
-const clean = s => String(s || '').replace(/[\r\n]+/g, ' ').trim();
+const clean = s => String(s || '').replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim();
+const ASCII = /^[\x20-\x7e]*$/;
 
-/* { to, subject, text, html } → the RFC 5322 message, base64url (Gmail's `raw`) */
-export function mime({ to, subject, text, html }) {
+/*
+ * RFC 2047 encoded-words, each ≤ 75 characters (≤ 39 UTF-8 bytes of text: 64),
+ * never splitting a character, folded onto continuation lines so no header
+ * line passes 78 characters (RFC 5322 §2.1.1). Plain ASCII stays as it is.
+ */
+export function encodeWords(text) {
+  const value = clean(text);
+  if (ASCII.test(value)) return [value];
+  const words = [];
+  let chunk = '';
+  for (const ch of value) {
+    if (new TextEncoder().encode(chunk + ch).length > 39) { words.push(chunk); chunk = ''; }
+    chunk += ch;
+  }
+  if (chunk) words.push(chunk);
+  return words.map(w => '=?UTF-8?B?' + b64(w) + '?=');
+}
+
+/* "Name: word1\r\n word2…" — one encoded-word per line after the first */
+const header = (name, words) => name + ': ' + words.join('\r\n ');
+
+/* RFC 5322 date: "Tue, 20 Oct 2026 08:16:00 +0000" */
+export const rfcDate = (now = Date.now()) => new Date(now).toUTCString().replace(/GMT$/, '+0000');
+
+/*
+ * { to, subject, text, html } → the RFC 5322 message, base64url (Gmail's `raw`).
+ * multipart/alternative: the plain text first, the HTML last (the preferred
+ * one). Auto-Submitted marks it as an automatic notification (RFC 3834: no
+ * auto-replies loop back). Gmail adds its own Message-ID; the sender is the
+ * real account, with no Reply-To elsewhere.
+ */
+export function mime({ to, subject, text, html, now = Date.now() }) {
   const boundary = 'b' + crypto.randomUUID().replace(/-/g, '');
-  const from = word(SENDER_NAME) + ' <' + SENDER + '>';
   const lines = [
-    'From: ' + from,
-    'Reply-To: ' + from,
+    header('From', [...encodeWords(SENDER_NAME), '<' + SENDER + '>']),
     'To: ' + clean(to),
-    'Subject: ' + word(clean(subject)),
+    header('Subject', encodeWords(subject)),
+    'Date: ' + rfcDate(now),
     'MIME-Version: 1.0',
-    'Content-Type: multipart/alternative; boundary="' + boundary + '"',
+    'Content-Language: ar',
+    'Auto-Submitted: auto-generated',
+    'Content-Type: multipart/alternative;',
+    ' boundary="' + boundary + '"',
     '',
     '--' + boundary,
     'Content-Type: text/plain; charset="UTF-8"',

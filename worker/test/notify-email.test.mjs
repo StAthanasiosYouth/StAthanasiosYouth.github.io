@@ -9,8 +9,8 @@ import { activityStmt } from '../src/lib/activity.js';
 import { route } from '../src/notify/router.js';
 import { notifyTick } from '../src/notify/tick.js';
 import { JOB_TYPES } from '../src/jobs.js';
-import { setGmailFetch, mime, SENDER } from '../src/notify/gmail.js';
-import { allowed, budget, render, sendRows, tokenHealth } from '../src/notify/email.js';
+import { setGmailFetch } from '../src/notify/gmail.js';
+import { allowed, budget, tokenHealth } from '../src/notify/email.js';
 
 const P = 'p@example.com', M = 'm@example.com';
 const SECRETS = { GMAIL_CLIENT_ID: 'cid', GMAIL_CLIENT_SECRET: 'cs', GMAIL_REFRESH_TOKEN: 'rt' };
@@ -55,18 +55,7 @@ async function deliver(h, now = Date.now()) {
   for (const job of h.sent.filter(j => j.type === 'notify.email')) await JOB_TYPES['notify.email'](h.env, job.payload);
 }
 
-test('mime: Arabic RTL, a named sender, encoded subject, text + html, a panel link with no token, no visitor data', () => {
-  const m = render({ title: 'مرقس نشر الموقع', body: 'لوحة تحكم الأسرة', url: '/admin/#activity/act-1', lines: [{ text: 'مرقس نشر الموقع', cairo: '2026-10-20 10:00' }] });
-  const mail = Buffer.from(mime({ to: P, ...m }).replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
-  const d = decode(mail);
-  assert.match(d.head, new RegExp('From: =\\?UTF-8\\?B\\?[^?]+\\?= <' + SENDER.replace('.', '\\.') + '>'));
-  assert.match(d.head, /Subject: =\?UTF-8\?B\?/);
-  assert.match(d.head, /To: p@example\.com/);
-  assert.match(d.html, /dir="rtl"/);
-  assert.match(d.html, /href="https:\/\/stathanasiosyouth\.github\.io\/admin\/#activity\/act-1"/);
-  assert.match(d.text, /مرقس نشر الموقع — 2026-10-20 10:00/);
-  assert.equal(render({ title: '<b>x</b>', body: '', url: '/', lines: [] }).html.includes('<b>x</b>'), false, 'escaped');
-});
+// (MIME and templates: notify-mail-format.test.mjs)
 
 test('email: nothing while NOTIFY_EMAIL is off or Gmail is not set up; on → queued job → sent once, counted', async () => {
   const off = await world({ email: '0' });

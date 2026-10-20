@@ -14,9 +14,9 @@
  *   reserve, then waits as deferred_quota (retried each window, never
  *   expires; it also went by push).
  * - Retries: backoff, dead after 5 → a critical «notify.failed» (push only).
- * - Content: Arabic RTL, short HTML + plain text: who, what, when (Cairo),
- *   changed field NAMES, one link to the panel (no token in it). No visitor
- *   name, phone, payment number or amount. The outbox keeps no body.
+ * - Content: templates.js (Arabic RTL, HTML + plain text, who / what / when,
+ *   one visible panel link, why the reader gets it). No visitor name, phone,
+ *   payment number or amount. The outbox keeps no body.
  */
 
 import { retry, cairoText } from '../lib/db.js';
@@ -24,13 +24,12 @@ import { activityStmt } from '../lib/activity.js';
 import { readSettings, nextSummaryMs } from './router.js';
 import { sources, messageFor, deadStmts, backoffMs, MAX_ATTEMPTS } from './claim.js';
 import { gmailConfigured, sendMail, accessToken, GmailError } from './gmail.js';
+import { alertEmail, summaryEmail } from './templates.js';
 
 export const SEND_BATCH = 10;
 export const LEASE_MS = 10 * 60000;
-const PANEL = 'https://stathanasiosyouth.github.io';
 const HOUR = 3600000;
 
-const esc = s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const num = (v, d) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : d);
 
 export function budget(s) {
@@ -50,32 +49,9 @@ export function allowed(level, q, b) {
   return adminNonCritical < Math.max(0, b.admin - b.critical) && q.total < b.target - b.otp - b.critical;
 }
 
-/* the email of one outbox row: { subject, text, html } */
-export function render(m, { summary = false } = {}) {
-  const link = PANEL + m.url;
-  const lines = summary ? m.lines : m.lines.slice(-5);
-  const subject = summary ? 'ملخص النهارده في لوحة التحكم (' + m.lines.length + ')' : 'لوحة التحكم: ' + m.title;
-  const text = [
-    summary ? 'ملخص النشاط في لوحة تحكم الأسرة:' : m.title,
-    summary ? '' : m.body,
-    '',
-    ...lines.map(l => '• ' + l.text + (l.cairo ? ' — ' + l.cairo : '')),
-    '',
-    'افتح لوحة التحكم: ' + link,
-    '',
-    'إيميل تلقائي من لوحة تحكم شباب أثناسيوس. تقدر تغيّر اللي يوصلك من «تنبيهاتي».'
-  ].join('\n');
-  const html = '<!doctype html><html lang="ar" dir="rtl"><body style="margin:0;padding:16px;background:#f6f4ef;font-family:Tahoma,Arial,sans-serif;color:#1d2433;direction:rtl;text-align:right">' +
-    '<div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:20px;border:1px solid #e6e1d6">' +
-    '<p style="margin:0 0 6px;font-size:13px;color:#8a6d1f">لوحة تحكم شباب أثناسيوس</p>' +
-    '<h1 style="margin:0 0 8px;font-size:18px;line-height:1.5">' + esc(summary ? 'ملخص النشاط' : m.title) + '</h1>' +
-    (summary ? '' : '<p style="margin:0 0 12px;font-size:14px;color:#4a5263">' + esc(m.body) + '</p>') +
-    '<ul style="margin:0 0 16px;padding:0 18px 0 0;font-size:14px;line-height:1.8">' +
-    lines.map(l => '<li>' + esc(l.text) + (l.cairo ? ' <span style="color:#8a8f99">— ' + esc(l.cairo) + '</span>' : '') + '</li>').join('') + '</ul>' +
-    '<a href="' + esc(link) + '" style="display:inline-block;background:#c9a24a;color:#1d2433;text-decoration:none;font-weight:bold;padding:10px 18px;border-radius:10px">افتح لوحة التحكم</a>' +
-    '<p style="margin:16px 0 0;font-size:12px;color:#8a8f99">إيميل تلقائي. تقدر تغيّر اللي يوصلك من «تنبيهاتي».</p>' +
-    '</div></body></html>';
-  return { subject, text, html };
+/* the email of one outbox row: { subject, text, html } (templates.js) */
+export function render(m, { summary = false, level = 'important', kind = '', day = '' } = {}) {
+  return summary ? summaryEmail(m, day) : alertEmail(m, { level, kind });
 }
 
 async function quotaOf(db, day) {
@@ -123,7 +99,7 @@ async function sendSummary(env, row, now, s) {
     await retry(() => db.prepare(`UPDATE notify_outbox SET next_ms = ? WHERE id IN (${all.map(() => '?').join(',')})`).bind(nextSummaryMs(s.NOTIFY_SUMMARY_TIME, nextDayMs(now)), ...all.map(p => p.id)).run());
     return 'deferred';
   }
-  await sendMail(env, { to: row.recipient, ...render(m, { summary: true }) });
+  await sendMail(env, { to: row.recipient, ...render(m, { summary: true, day: cairoText(now).slice(0, 10) }) });
   await retry(() => db.batch([
     db.prepare(`UPDATE notify_outbox SET status = 'sent', sent_ms = ?, error = NULL WHERE id IN (${all.map(() => '?').join(',')})`).bind(now, ...all.map(p => p.id)),
     countStmt(db, day, 'important')
@@ -168,7 +144,7 @@ export async function sendRows(env, ids, now = Date.now()) {
         out.dismissed++;
         continue;
       }
-      await sendMail(env, { to: row.recipient, ...render(m) });
+      await sendMail(env, { to: row.recipient, ...render(m, { level, kind: row.kind }) });
       await retry(() => db.batch([
         db.prepare("UPDATE notify_outbox SET status = 'sent', sent_ms = ?, attempts = attempts + 1, error = NULL WHERE id = ?").bind(now, row.id),
         countStmt(db, day, level)
