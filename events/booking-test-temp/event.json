@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "v": "fc3c13bd4896",
+  "v": "3ba97839f59e",
   "id": "evt-4011914c",
   "slug": "booking-test-temp",
   "kind": "trip",
@@ -10,7 +10,14 @@
   "summary": "اختبار داخلي مؤقت للنظام — مش فعالية حقيقية، متحجزش.",
   "body": "صفحة اختبار مؤقتة لنظام الحجز الجديد. هتتقفل خلال ساعات. مش فعالية حقيقية.",
   "theme": "",
-  "cover": null,
+  "cover": {
+    "src": "media/2026/img-8ffd40eb.webp",
+    "thumb": "media/2026/img-8ffd40eb-480.webp",
+    "w": 1600,
+    "h": 900,
+    "alt": "",
+    "color": "#47372c"
+  },
   "gallery": [],
   "startAt": "2026-10-31T18:00",
   "endAt": "2026-10-31T20:00",
@@ -19,7 +26,25 @@
     "url": null
   },
   "terms": "",
-  "partner": null,
+  "partner": {
+    "key": "bug",
+    "name": "Brave Under Grace – B.U.G.",
+    "short": "B.U.G.",
+    "logo": {
+      "src": "assets/img/partners/bug-logo-720.webp",
+      "thumb": "assets/img/partners/bug-logo-360.webp",
+      "w": 720,
+      "h": 305,
+      "alt": "شعار Brave Under Grace – B.U.G."
+    },
+    "mark": {
+      "src": "assets/img/partners/bug-symbol-320.webp",
+      "w": 320,
+      "h": 107,
+      "alt": "B.U.G."
+    },
+    "url": null
+  },
   "booking": {
     "online": true,
     "opensAt": "",
@@ -28,10 +53,12 @@
     "showLeft": true,
     "showLeftBelow": 20,
     "perBookingMax": 2,
-    "collectNames": false,
-    "participants": false,
+    "collectNames": true,
+    "participants": true,
+    "contactOnPage": true,
+    "contactAfter": true,
     "pricing": {
-      "mode": "single",
+      "mode": "group",
       "categories": [
         {
           "key": "applicant",
@@ -39,8 +66,8 @@
           "group": "adult",
           "price": 100,
           "seat": true,
-          "min": 1,
-          "max": 1,
+          "min": 0,
+          "max": 2,
           "note": ""
         }
       ]
@@ -77,8 +104,18 @@
           "cash",
           "instapay"
         ]
+      },
+      {
+        "id": "srv-ea2aaa46",
+        "name": "مينا زكريا عطاالله متى",
+        "role": "مشرف عام",
+        "image": null,
+        "wa": "https://wa.me/201276162016",
+        "methods": [
+          "cash"
+        ]
       }
     ]
   },
-  "publishedAt": "2026-10-20T02:42"
+  "publishedAt": "2026-10-20T05:16"
 }

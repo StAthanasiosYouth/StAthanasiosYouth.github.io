@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "v": "e1fd49e72c21",
+  "v": "2b7e85892546",
   "id": "evt-59f41592",
   "slug": "test",
   "kind": "trip",
@@ -52,6 +52,8 @@
     "perBookingMax": 5,
     "collectNames": true,
     "participants": true,
+    "contactOnPage": true,
+    "contactAfter": false,
     "pricing": {
       "mode": "group",
       "categories": [
@@ -102,5 +104,5 @@
       }
     ]
   },
-  "publishedAt": "2026-10-20T02:42"
+  "publishedAt": "2026-10-20T05:16"
 }

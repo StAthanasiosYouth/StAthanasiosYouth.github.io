@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "c2a655bbba18",
-  "publishedAt": "2026-10-19T23:42:11.730Z",
+  "revision": "9f090c8e567a",
+  "publishedAt": "2026-10-20T02:16:30.434Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -365,6 +365,37 @@
         "closesAt": ""
       },
       "partner": "bug"
+    },
+    {
+      "id": "act-ce15d7c6",
+      "type": "trip",
+      "section": "activities",
+      "title": "اختبار نظام الحجز - مؤقت",
+      "subtitle": "اختبار داخلي مؤقت للنظام — مش فعالية حقيقية، متحجزش.",
+      "description": "",
+      "image": {
+        "src": "media/2026/img-8ffd40eb.webp",
+        "thumb": "media/2026/img-8ffd40eb-480.webp",
+        "w": 1600,
+        "h": 900,
+        "alt": "",
+        "color": "#47372c"
+      },
+      "cta": null,
+      "location": "اختبار",
+      "startAt": "2026-10-31T18:00",
+      "endAt": "2026-10-31T20:00",
+      "visibleFrom": "",
+      "visibleUntil": "2026-11-01T08:00",
+      "display": "",
+      "displayMobile": "",
+      "event": "booking-test-temp",
+      "ctaLabel": "",
+      "booking": {
+        "opensAt": "",
+        "closesAt": "2026-10-30T22:00"
+      },
+      "partner": "bug"
     }
   ],
   "types": [
@@ -586,7 +617,7 @@
         "closesAt": ""
       },
       "partner": "bug",
-      "v": "e1fd49e72c21"
+      "v": "2b7e85892546"
     },
     {
       "id": "evt-4011914c",
@@ -596,15 +627,22 @@
       "title": "اختبار نظام الحجز - مؤقت",
       "shortTitle": "اختبار حجز",
       "summary": "اختبار داخلي مؤقت للنظام — مش فعالية حقيقية، متحجزش.",
-      "cover": null,
+      "cover": {
+        "src": "media/2026/img-8ffd40eb.webp",
+        "thumb": "media/2026/img-8ffd40eb-480.webp",
+        "w": 1600,
+        "h": 900,
+        "alt": "",
+        "color": "#47372c"
+      },
       "startAt": "2026-10-31T18:00",
       "endAt": "2026-10-31T20:00",
       "booking": {
         "opensAt": "",
         "closesAt": "2026-10-30T22:00"
       },
-      "partner": null,
-      "v": "fc3c13bd4896"
+      "partner": "bug",
+      "v": "3ba97839f59e"
     }
   ],
   "partners": {
