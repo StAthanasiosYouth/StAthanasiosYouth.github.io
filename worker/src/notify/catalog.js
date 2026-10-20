@@ -146,7 +146,7 @@ export function messageOf(type, rows, names = {}) {
     body: clip(body || 'لوحة تحكم الأسرة', 160),
     url: '/admin/#activity/' + last.id,
     tag: ('adm-' + type.key + '-' + (last.entity_id || last.id)).replace(/[^\w-]/g, '').slice(0, 80),
-    lines: rows.map(r => ({ text: clip(lineOf(r), 200), cairo: r.cairo, id: r.id })),
+    lines: rows.map(r => ({ text: clip(lineOf(r), 200), cairo: r.cairo, id: r.id, action: r.action, who: who(r) })),
     // for the email templates: the event itself (names and references only)
     ctx: {
       key: type.key, count: rows.length, event: event || undefined,

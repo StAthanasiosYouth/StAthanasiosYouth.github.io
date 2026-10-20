@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mime, encodeWords, rfcDate, SENDER, SENDER_NAME } from '../src/notify/gmail.js';
-import { alertEmail, summaryEmail, otpEmail, securityEmail, layout, fill, SITE, BRAND } from '../src/notify/templates.js';
+import { alertEmail, summaryEmail, otpEmail, securityEmail, bookingEmail, layout, fill, SITE, BRAND } from '../src/notify/templates.js';
 import { messageOf, typeOf } from '../src/notify/catalog.js';
 import { render } from '../src/notify/email.js';
 
@@ -66,7 +66,7 @@ test('MIME: text/plain then text/html (both UTF-8, base64 lines ≤ 76), the sam
   assert.equal(parts[0].body, m.text);
   assert.equal(parts[1].body, m.html);
   assert.match(parts[0].body, /مرقس نشر الموقع/);
-  assert.match(parts[1].body, /<html lang="ar" dir="rtl">/);
+  assert.match(parts[1].body, /<html lang="ar" dir="rtl"[ >]/);
   assert.match(parts[1].body, /<meta charset="utf-8">/);
 });
 
@@ -76,16 +76,19 @@ const msg = (action, rows) => messageOf(typeOf(rows[0]), rows, { 'm@example.com'
 const allLinks = e => [...e.html.matchAll(/href="([^"]+)"/g)].map(x => x[1]);
 
 test('sender identity: the exact display name in From, heading and footer; the real address', () => {
-  assert.equal(BRAND, 'أسرة البابا أثناسيوس الرسولي لشباب-سفاجا');
+  assert.equal(BRAND, 'أسرة البابا أثناسيوس الرسولي لشباب سفاجا');
   assert.equal(SENDER_NAME, BRAND);
   assert.equal(SENDER, 'athanasius.youth.safaga@gmail.com');
   const e = alertEmail(msg('booking.confirm', [act('booking.confirm')]));
   const { headers } = parse(mime({ to: 'a@example.com', ...e }));
-  assert.equal(headers.from, 'أسرة البابا أثناسيوس الرسولي لشباب-سفاجا <athanasius.youth.safaga@gmail.com>');
-  for (const x of [e.text, e.html]) assert.match(x, /الدعم الفني: مينا زكريا – 01276162016/);
+  assert.equal(headers.from, 'أسرة البابا أثناسيوس الرسولي لشباب سفاجا <athanasius.youth.safaga@gmail.com>');
+  assert.match(e.text, /الدعم الفني: مينا زكريا – 01276162016/);
+  assert.match(e.html, /الدعم الفني: مينا زكريا/);
+  assert.match(e.html, /href="https:\/\/wa\.me\/201276162016"/);
+  assert.match(e.html, /href="mailto:menazakmena@gmail\.com"/);
   assert.match(otpEmail({ code: '123456' }).text, /الدعم الفني: مينا زكريا/, 'in member emails too');
   assert.ok(e.text.startsWith(BRAND));
-  assert.equal((e.html.match(new RegExp(BRAND, 'g')) || []).length, 2, 'the heading line and the footer');
+  assert.equal((e.html.match(new RegExp(BRAND, 'g')) || []).length, 3, 'the logo alt, the header and the footer');
 });
 
 test('fill: values replaced and length-capped; optional parts dropped when empty; a missing required value throws', () => {
@@ -118,15 +121,22 @@ test('admin subjects follow the event: new bookings (grouped), cash, confirm, ca
   assert.match(cases[5][0].text, /المبلغ والتفاصيل في لوحة التحكم/);
 });
 
-test('admin emails: one panel link (address shown), no images / tracking / hidden text, why they get it; never visitor data or amounts', () => {
+/* the fixed footer links every email may carry */
+const FOOTER = new Set(['https://wa.me/201276162016', 'mailto:menazakmena@gmail.com', SITE + '/privacy/']);
+const SOCIALS = ['https://www.facebook.com/Pope.Athanasius.The.Apostolic.Safaga', 'https://www.instagram.com/pope.athanasiustheapostolic/', 'https://www.tiktok.com/@stathanasios.safaga'];
+const ownLinks = e => allLinks(e).filter(h => !FOOTER.has(h));
+
+test('admin emails: one panel link (address shown) plus the support / privacy footer, no tracking / hidden text, why they get it; never visitor data or amounts', () => {
   const rows = [act('payment.add', { summary: '1500 جنيه كاش من سارة 01012345678', changes: JSON.stringify({ amount: 1500, phone: '01012345678' }) })];
   for (const e of [alertEmail(msg('payment.add', rows)), alertEmail(msg('booking.confirm', [act('booking.confirm')]), { level: 'critical' }), summaryEmail({ lines: [{ text: 'مرقس أكّد حجز B-7QK2M', cairo: '2026-10-20 10:00' }] }, '2026-10-20')]) {
-    const hrefs = allLinks(e);
+    const hrefs = ownLinks(e);
     assert.equal(hrefs.length, 1);
     assert.ok(hrefs[0].startsWith(SITE + '/admin/'), hrefs[0]);
+    assert.deepEqual(allLinks(e).filter(h => FOOTER.has(h)), [...FOOTER], 'support (WhatsApp, email) and the privacy policy');
+    assert.ok(!SOCIALS.some(s => e.html.includes(s)), 'no social links in admin emails');
     assert.ok(e.html.includes('>' + hrefs[0] + '<'), 'the address is shown, not only behind the button');
     assert.ok(e.text.includes(hrefs[0]));
-    assert.doesNotMatch(e.html, /<img|<script|display:\s*none|visibility:\s*hidden|font-size:\s*0|utm_|[?&](token|sid)=/i);
+    assert.doesNotMatch(e.html, /<script|display:\s*none|visibility:\s*hidden|font-size:\s*0|utm_|[?&](token|sid)=/i);
     assert.doesNotMatch(e.html + e.text + e.subject, /1500|01012345678|سارة/, 'no amounts, phones or visitor names');
     assert.match(e.text, /وصلك الإيميل ده لأنك من خدام لوحة التحكم/);
     assert.doesNotMatch(e.subject, /!{2,}|عاجل|مجاني|اضغط هنا|[A-Z]{6,}/);
@@ -141,9 +151,11 @@ test('member codes (Phase 5A, not wired): verify / recovery — the code and exp
     const e = otpEmail({ code: '482913', minutes: 15, purpose });
     assert.equal(e.subject, subject);
     assert.doesNotMatch(e.subject, /\d/);
-    assert.equal(allLinks(e).length, 0);
+    assert.deepEqual(ownLinks(e), [], 'no service link: support and privacy only');
+    assert.ok(!SOCIALS.some(s => e.html.includes(s)), 'no social links in a code email');
     assert.doesNotMatch(e.text, /https?:\/\//);
     assert.match(e.text, /482913/);
+    assert.match(e.html, /dir="ltr"><tr>(<td class="tile"[^>]*>\d<\/td>(<td width="\d+"[^>]*>&nbsp;<\/td>)?){6}<\/tr>/, 'six digit tiles, left to right');
     assert.match(e.text, /١٥ دقايق/);
     assert.match(e.text, /محدش من الخدمة هيطلبه منك/);
     assert.match(e.text, /لو مش انت، تجاهله/);
@@ -156,9 +168,9 @@ test('member codes (Phase 5A, not wired): verify / recovery — the code and exp
 test('member security notices (Phase 5A, not wired): what changed and when; help on the public site only, never an admin link', () => {
   const e = securityEmail({ kind: 'password_changed', cairo: '2026-10-20 10:00', device: 'موبايل أندرويد' });
   assert.equal(e.subject, 'الباسورد بتاع حسابك اتغير – ' + BRAND);
-  assert.match(e.text, /2026-10-20 10:00/);
+  assert.match(e.text, /الثلاثاء ٢٠ أكتوبر · ١٠:٠٠ ص/);
   assert.match(e.text, /موبايل أندرويد/);
-  assert.deepEqual(allLinks(e), [SITE + '/']);
+  assert.deepEqual(ownLinks(e), [SITE + '/', SITE + '/'], 'the site: the button and the footer');
   assert.doesNotMatch(e.html + e.text, /\/admin/);
   for (const kind of ['email_changed', 'recovery_used', 'new_signin']) assert.ok(securityEmail({ kind, cairo: '2026-10-20 10:00' }).subject.endsWith(BRAND));
   assert.throws(() => securityEmail({ kind: 'nope' }));
@@ -170,4 +182,76 @@ test('layout escapes everything it is given', () => {
   const e = layout({ heading: '<script>x</script>', intro: '"><img src=x>', items: [{ text: '<b>', meta: '&' }], link: { label: 'a', url: SITE + '/admin/?a="b"' } });
   assert.doesNotMatch(e.html, /<script>x|<img src=x|<b>/);
   assert.match(e.html, /&lt;script&gt;/);
+});
+
+/* ---------- the Azure Crest design: email-safe structure and fallbacks ---------- */
+
+const booking = over => bookingEmail({ status: 'balance', name: 'مارك', event: 'رحلة الإسكندرية الصيفية', when: 'الجمعة ١٤ نوفمبر · التجمع ٦:٠٠ ص', ref: 'B-7QK2M', people: 3, total: 900, paid: 600, due: 'الأربعاء ١٢ نوفمبر', next: 'ادفع الباقي بإنستاباي أو كاش مع خادم الحجوزات قبل الميعاد.', url: SITE + '/', ...over });
+const every = () => [
+  alertEmail(msg('booking.new', [act('booking.new', { actor: 'visitor', actor_name: 'زائر' })])),
+  alertEmail(msg('accounts.grants', [act('accounts.grants', { entity_type: 'admin', entity_id: 'a@example.com', entity_title: 'a@example.com' })]), { level: 'critical' }),
+  summaryEmail({ lines: Array.from({ length: 60 }, (_, i) => ({ text: 'مرقس أكّد حجز B-7QK2M رقم ' + i, cairo: '2026-10-20 10:0' + (i % 10), action: i % 3 ? 'booking.confirm' : 'payment.add' })) }, '2026-10-20'),
+  otpEmail({ code: '482913' }), securityEmail({ kind: 'new_signin', cairo: '2026-10-20 10:00' }), booking()
+];
+
+test('email-safe HTML: tables + inline styles, a solid colour under every gradient, VML header for Outlook, under Gmail\'s clipping size', () => {
+  for (const e of every()) {
+    assert.ok(Buffer.byteLength(e.html) < 60 * 1024, 'well under the ~102 KB Gmail clips at: ' + Buffer.byteLength(e.html));
+    assert.doesNotMatch(e.html, /<script|<svg|<form|<iframe|<video|position:\s*(absolute|fixed)|display:\s*(flex|grid)|var\(--/i, 'no scripts, SVG, forms or layout CSS clients drop');
+    for (const style of e.html.match(/style="[^"]*gradient[^"]*"/g) || []) assert.match(style, /background-color:#[0-9A-F]{6}/i, 'gradient without a solid fallback: ' + style.slice(0, 80));
+    assert.match(e.html, /bgcolor="#0D3F98" background="https:\/\/stathanasiosyouth\.github\.io\/assets\/email\/header\.jpg"/, 'header: navy with images off');
+    assert.match(e.html, /<!--\[if gte mso 9\]><v:rect[^>]*><v:fill type="frame" src="[^"]+header\.jpg" color="#0D3F98"\/>/, 'Outlook: VML background');
+    assert.match(e.html, /role="presentation"/);
+    assert.match(e.html, /<meta name="color-scheme" content="light">/);
+  }
+});
+
+test('images: only the service site\'s email assets, each with size and alt; the logo carries the brand name', () => {
+  for (const e of every()) {
+    const imgs = [...e.html.matchAll(/<img [^>]*>/g)].map(x => x[0]);
+    assert.ok(imgs.length >= 3);
+    for (const i of imgs) {
+      assert.match(i, /src="https:\/\/stathanasiosyouth\.github\.io\/assets\/email\/[a-z-]+\.(png|jpg)"/, i);
+      assert.match(i, /width="\d+" height="\d+"/, i);
+      assert.match(i, / alt="[^"]*"/, i);
+    }
+    assert.match(e.html, /logo\.png" width="74" height="74" alt="شعار أسرة البابا/);
+  }
+});
+
+test('member booking notice (Phase 5A design, not wired): status, reference, paid, remaining, due date, next step, social footer', () => {
+  const e = booking();
+  assert.equal(e.subject, 'تذكير بالمبلغ الباقي في حجزك B-7QK2M – رحلة الإسكندرية الصيفية');
+  for (const s of ['B-7QK2M', 'مؤكد', 'عليه باقي', '٩٠٠ ج.م', '٦٠٠ ج.م', '٣٠٠ ج.م', 'الأربعاء ١٢ نوفمبر', 'الخطوة الجاية', 'أهلاً يا مارك']) {
+    assert.ok(e.html.includes(s), 'html: ' + s);
+    assert.ok(e.text.includes(s), 'text: ' + s);
+  }
+  assert.match(e.html, /<td width="67%" height="8"/, 'paid share of the bar');
+  for (const s of SOCIALS) { assert.ok(e.html.includes('href="' + s + '"'), s); assert.ok(e.text.includes(s), s); }
+  assert.doesNotMatch(e.html + e.text, /\/admin/);
+  const paid = booking({ status: 'confirmed', paid: 900, next: '' });
+  assert.doesNotMatch(paid.html + paid.text, /عليه باقي|آخر ميعاد للدفع|الباقي/);
+  assert.doesNotMatch(booking({ status: 'cancelled' }).html, /عليه باقي/);
+  assert.throws(() => booking({ status: 'nope' }));
+  assert.throws(() => booking({ ref: '' }), /ref/);
+  assert.throws(() => layout({ heading: 'x', social: true }), /member booking/);
+});
+
+test('alerts and summaries: priority bar for critical only, facts with the event context, the summary grouped by family', () => {
+  const crit = alertEmail(msg('payment.void', [act('payment.void')]), { level: 'critical' });
+  const norm = alertEmail(msg('booking.confirm', [act('booking.confirm')]));
+  assert.match(crit.html, /bgcolor="#B42318"/);
+  assert.match(crit.text, /\[تنبيه مهم · محتاج مراجعة\]/);
+  assert.doesNotMatch(norm.html, /#B42318/);
+  for (const s of ['بواسطة: مرقس', 'الفعالية: رحلة الإسكندرية', 'رقم الحجز: B-7QK2M', 'الوقت: الثلاثاء ٢٠ أكتوبر · ١٠:٠٠ ص']) assert.ok(norm.text.includes(s), s);
+  assert.match(norm.html, /<span dir="ltr">B-7QK2M<\/span>/, 'references stay left to right');
+  const s = summaryEmail({ lines: [
+    { text: 'مرقس أكّد حجز B-1', cairo: '2026-10-20 14:10', action: 'booking.confirm' },
+    { text: 'مرقس سجّل دفعة في حجز B-1', cairo: '2026-10-20 14:12', action: 'payment.add' },
+    { text: 'كيرلس عدّل خبر', cairo: '2026-10-20 17:02', action: 'update' }] }, '2026-10-20');
+  assert.match(s.text, /الحجوزات:\n• مرقس أكّد حجز B-1 \(٢:١٠ م\)/);
+  assert.match(s.text, /المدفوعات:\n• مرقس سجّل دفعة/);
+  assert.match(s.text, /المحتوى:\n• كيرلس/);
+  assert.match(s.html, /الثلاثاء ٢٠ أكتوبر ٢٠٢٦/);
+  assert.match(summaryEmail({ lines: [] }, '2026-10-20').text, /مفيش نشاط جديد/);
 });
