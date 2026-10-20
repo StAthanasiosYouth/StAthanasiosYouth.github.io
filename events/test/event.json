@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "v": "2b7e85892546",
+  "v": "9fa1204142b7",
   "id": "evt-59f41592",
   "slug": "test",
   "kind": "trip",
@@ -9,7 +9,7 @@
   "shortTitle": "",
   "summary": "",
   "body": "fds",
-  "theme": "",
+  "theme": "azure",
   "cover": {
     "src": "media/2026/img-53ca69a3.webp",
     "thumb": "media/2026/img-53ca69a3-480.webp",
@@ -104,5 +104,5 @@
       }
     ]
   },
-  "publishedAt": "2026-10-20T05:16"
+  "publishedAt": "2026-10-20T06:20"
 }
