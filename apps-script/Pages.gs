@@ -1642,6 +1642,7 @@ function apiPagePreview(kind, id) {
     media: mediaIndex_(mediaRows),
     video: videoIndex_(mediaRows),
     audio: audioIndex_(mediaRows),
+    types: readOptionalTable_('Types'),
     error: function () {},
     warn: function () {},
     now: cairoNow_(new Date(Date.now())),
@@ -1738,6 +1739,12 @@ function pagesBuildPublic_(draft, ctx) {
   };
 
   var wall = function (stamp, endOfDay) { return stamp ? (contentDateTime_(stamp, endOfDay) || '') : ''; };
+  // an event with no colour of its own takes its type's (the home card uses the type's): one colour everywhere
+  var typeTheme = function (kind) {
+    var row = (ctx.types || []).filter(function (t) { return contentLine_(t.key).toLowerCase() === kind && contentBool_(t.enabled); })[0];
+    var theme = row ? contentLine_(row.theme) : '';
+    return SECTION_THEMES.indexOf(theme) !== -1 ? theme : '';
+  };
   var servantsById = Object.create(null);
 
   (draft.servants || []).forEach(function (s) { servantsById[s.id] = s; });
@@ -1925,7 +1932,7 @@ function pagesBuildPublic_(draft, ctx) {
       shortTitle: contentLine_(row.shortTitle).slice(0, BOOK_LIMITS.shortTitle),
       summary: contentLine_(row.summary).slice(0, BOOK_LIMITS.summary),
       body: contentText_(row.body).replace(/\n{3,}/g, '\n\n').slice(0, BOOK_LIMITS.body),
-      theme: SECTION_THEMES.indexOf(row.theme) !== -1 ? row.theme : '',
+      theme: SECTION_THEMES.indexOf(row.theme) !== -1 ? row.theme : typeTheme(kind),
       cover: cover,
       gallery: gallery,
       startAt: startAt,

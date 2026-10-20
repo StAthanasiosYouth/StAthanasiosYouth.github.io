@@ -545,3 +545,12 @@ test('«صوت المقطع»: a soundtrack that left the library plays nothing 
   const def = json(world.github.files(), 'silent-theatre/page.json');
   assert.deepEqual(def.media[0].audio, { mode: 'none', src: null });
 });
+
+test('an event with no colour of its own takes its card type\'s (the home card\'s colour): one colour on both', () => {
+  const ctx = setup();
+  const { world, call } = ctx;
+  trip(ctx);
+  world.gs.upsertRow_('Types', 'key', { key: 'trip', theme: 'azure', enabled: true });
+  publish(world, call);
+  assert.equal(json(world.github.files(), 'events/alex-trip/event.json').theme, 'azure');
+});
