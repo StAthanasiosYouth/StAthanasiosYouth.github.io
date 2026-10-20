@@ -5245,7 +5245,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       )
       : null;
 
-    return [A.appCard ? A.appCard() : null, siteCard, A.state.hubReady ? hubCard : null, guideCard, upgradeCard, publishCard, adminsCard(), mediaCard, accountCard].filter(Boolean);
+    return [A.appCard ? A.appCard() : null, siteCard, A.state.hubReady ? hubCard : null, guideCard, upgradeCard, publishCard, adminsCard()].concat(notifyCards(), [mediaCard, accountCard]).filter(Boolean);
 
   };
 
@@ -5696,6 +5696,366 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return card;
 
   }
+
+
+  /* =======================================================
+     NOTIFICATIONS (Phase 1.5 step 7, BOOKING-PHASE1-COMPLETION-PLAN §4.4):
+     «إعدادات الإشعارات» (Primary), «تنبيهاتي» (every admin), «حالة النظام»
+     (delivery monitoring). All on the Worker (worker/src/notify/settings.js);
+     the emergency panel (no Worker) shows none of them.
+  ======================================================= */
+
+  var NT_MODULES = {
+    content: 'المحتوى', publish: 'النشر', events: 'الفعاليات والخدام', bookings: 'الحجوزات', finance: 'الفلوس',
+    exports: 'التصدير', competitions: 'المسابقات', store: 'المتجر', points: 'النقاط', participants: 'المشتركين',
+    media: 'الصور', push: 'الإشعارات', accounts: 'الحسابات والصلاحيات', activity: 'سجل النشاط',
+    notifications: 'إعدادات الإشعارات', system: 'النظام'
+  };
+  var NT_SPECIAL = {
+    'accounts.add': 'أدمن جديد اتضاف', 'accounts.grants': 'صلاحيات أدمن اتغيرت', 'accounts.remove': 'أدمن اتشال',
+    'admin.add': 'أدمن اتضاف (النظام القديم)', 'admin.remove': 'أدمن اتشال (النظام القديم)', 'notify.settings': 'إعدادات الإشعارات اتغيرت',
+    'pay.approve': 'اعتماد رقم دفع لخادم', 'payment.void': 'إلغاء دفعة', 'event.cancelAll': 'إلغاء كل حجوزات فعالية',
+    'code.export': 'تصدير أكواد المشتركين', migrate: 'نقل البيانات', 'job.failed': 'مهمة في الخلفية فشلت',
+    'notify.failed': 'إشعار أو إيميل مقدرش يتبعت', 'gmail.token': 'إرسال الإيميلات واقف',
+    'booking.new': 'حجوزات جديدة من الموقع', 'booking.create': 'حجز كاش من أدمن', publish: 'نشر الموقع', push: 'إشعار للزوار',
+    'import': 'استيراد', finalize: 'اعتماد نتيجة مسابقة', 'points.adjust': 'تعديل نقاط', 'redemption.status': 'طلبات المتجر',
+    'booking.confirm': 'تأكيد حجز', 'booking.reject': 'رفض حجز', 'booking.cancel': 'إلغاء حجز', 'booking.reopen': 'رجوع حجز',
+    'booking.update': 'تعديل حجز', 'booking.withdraw': 'زائر لغى طلبه', 'booking.remind': 'تذكير بالدفع', 'payment.add': 'دفعة اتسجلت',
+    'payment.refund': 'استرداد', 'handover.add': 'تسليم فلوس للخدمة', 'handover.void': 'إلغاء تسليم فلوس', 'modules.book': 'تشغيل/قفل الحجز',
+    'admin.rename': 'اسم أدمن اتغير', 'session.takeover': 'دخول من جهاز تاني'
+  };
+  var NT_ENTITIES = {
+    sessions: 'الاجتماعات', news: 'الأخبار', games: 'الألعاب', activities: 'الكروت والفعاليات', notifications: 'إشعارات الصفحة', types: 'أنواع الكروت',
+    links: 'الروابط', sections: 'الأقسام', contacts: 'أرقام التواصل', settings: 'الإعدادات', site: 'الموقع', data: 'البيانات', media: 'الصور',
+    competition: 'المسابقات', participant: 'المشتركين', points: 'النقاط', shopitem: 'المتجر', redemption: 'طلبات المتجر',
+    page: 'صفحات الخدمة', event: 'الفعاليات', servant: 'الخدام'
+  };
+  var NT_FAMILIES = { add: 'إضافة', edit: 'تعديل', remove: 'مسح' };
+  var NT_LEVELS = { critical: ['مهم جدًا', 'danger'], important: ['مهم', 'gold'], routine: ['عادي', 'off'] };
+  var NT_EMAIL = [{ key: 'off', label: 'من غير إيميل' }, { key: 'immediate', label: 'إيميل على طول' }, { key: 'summary', label: 'في ملخص اليوم' }];
+  var NT_STATUS = { sent: 'اتبعت', queued: 'مستني', failed: 'هيتعاد', deferred: 'في الملخص', deferred_quota: 'مستني الحصة', dead: 'فشل', dismissed: 'اتشال' };
+
+  function ntLabel(key) {
+
+    if (NT_SPECIAL[key]) return NT_SPECIAL[key];
+    var parts = key.split('.');
+    return (NT_FAMILIES[parts[1]] || parts[1]) + ' · ' + (NT_ENTITIES[parts[0]] || parts[0]);
+
+  }
+
+  function ntSelect(options, value, label) {
+
+    return el('select', { class: 'input', 'aria-label': label }, options.map(function (o) {
+      return el('option', { value: o.key, selected: o.key === value ? 'selected' : null, text: o.label });
+    }));
+
+  }
+
+  function ntWhen(ms) {
+
+    if (!ms) return '—';
+    var parts = {};
+    new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(new Date(ms)).forEach(function (p) { parts[p.type] = p.value; });
+    return A.formatWall(parts.year + '-' + parts.month + '-' + parts.day + 'T' + (parts.hour === '24' ? '00' : parts.hour) + ':' + parts.minute, true);
+
+  }
+
+  /* the types grouped by module, newest first: [{ module, types }] */
+  function ntGroups(types) {
+
+    var order = [];
+    var by = {};
+    types.forEach(function (t) {
+      if (!by[t.module]) { by[t.module] = []; order.push(t.module); }
+      by[t.module].push(t);
+    });
+    return order.map(function (m) { return { module: m, types: by[m] }; });
+
+  }
+
+  /* «تنبيهاتي»: my own choices, within what the Primary Admin allows */
+  function myNotifyCard(W) {
+
+    var box = A.errorBox();
+    var body = el('div', { class: 'grants', 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
+    var save = el('button', { class: 'btn btn--primary', type: 'button', disabled: true }, 'احفظ اختياراتي');
+    var controls = {};
+
+    function draw(data) {
+
+      controls = {};
+      body.setAttribute('aria-busy', 'false');
+      if (!data.router) {
+        A.fill(body, [el('p', { class: 'note' }, 'الإشعارات الجديدة لسه متشغلتش. لحد ما الأدمن الأساسي يشغلها، بيوصلك اللي بيوصل دلوقتي.')]);
+      }
+      var groups = ntGroups(data.types).map(function (g) {
+        return el('fieldset', { class: 'grants__group' },
+          el('legend', { text: NT_MODULES[g.module] || g.module }),
+          g.types.map(function (t) {
+            var push = ntSelect([{ key: 'immediate', label: 'إشعار' }, { key: 'off', label: 'من غير إشعار' }], t.push, 'إشعار ' + ntLabel(t.key));
+            var mail = ntSelect(NT_EMAIL, t.emailMode, 'إيميل ' + ntLabel(t.key));
+            push.disabled = t.locked || !t.pushAllowed;
+            mail.disabled = t.locked || !data.email;
+            controls[t.key] = { push: push, email: mail, locked: t.locked };
+            return el('div', { class: 'nt-row' },
+              el('span', { class: 'nt-row__name' }, ntLabel(t.key), ' ', A.chip(NT_LEVELS[t.level][0], NT_LEVELS[t.level][1]), t.locked ? A.chip('إجباري', 'info') : null),
+              push, mail);
+          }));
+      });
+      if (data.router) A.fill(body, groups);
+      else groups.forEach(function (g) { body.appendChild(g); });
+      save.disabled = false;
+
+    }
+
+    function load() {
+
+      W.call('GET', '/v1/admin/notify/me', undefined, { quiet: true }).then(draw).catch(function (error) {
+        body.setAttribute('aria-busy', 'false');
+        A.fail(error, box);
+      });
+
+    }
+
+    save.addEventListener('click', function () {
+
+      box.hidden = true;
+      var prefs = {};
+      Object.keys(controls).forEach(function (key) {
+        var c = controls[key];
+        if (c.locked) return;
+        prefs[key] = { push: c.push.value, email: c.email.value };
+      });
+      A.withBusy(save, W.call('POST', '/v1/admin/notify/me', { prefs: prefs }))
+        .then(function (data) { A.dirty = false; draw(data); A.toast('اتحفظت اختياراتك ✓'); })
+        .catch(function (error) { A.fail(error, box); });
+
+    });
+
+    var card = A.card('تنبيهاتي', 'إيه اللي يوصلك إشعار أو إيميل. اللي عليه «إجباري» حدده الأدمن الأساسي.', box, body, el('div', { class: 'actions' }, save));
+    card.classList.add('card--notify-me');
+    load();
+    return card;
+
+  }
+
+  /* «إعدادات الإشعارات»: every type, the switches, the budget (Primary Admin) */
+  function notifySettingsCard(W) {
+
+    var box = A.errorBox();
+    var body = el('div', { 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
+    var save = el('button', { class: 'btn btn--primary', type: 'button', disabled: true }, 'احفظ الإعدادات');
+    var data = null;
+    var rows = {};
+    var top = {};
+
+    function recipientsButton(t, state) {
+
+      var button = el('button', { class: 'btn btn--small', type: 'button' }, state.mode === 'named' ? 'ناس محددين (' + state.include.length + ')' : (state.exclude.length ? 'الكل ما عدا ' + state.exclude.length : 'كل اللي عندهم الصلاحية'));
+      button.addEventListener('click', function () {
+        var mode = A.choices(A.uid('rcp'), [{ value: 'all', label: 'كل اللي عندهم الصلاحية' }, { value: 'named', label: 'ناس محددين بس' }], state.mode);
+        var boxes = data.admins.map(function (a) {
+          var on = state.mode === 'named' ? state.include.indexOf(a.email) !== -1 : state.exclude.indexOf(a.email) === -1;
+          var c = A.checkbox(a.name + (a.primary ? ' (الأساسي)' : ''), on, a.email);
+          return { email: a.email, input: c.input, node: c.node };
+        });
+        A.modal({
+          tone: 'info', icon: 'users', title: 'مين يوصله «' + ntLabel(t.key) + '»؟',
+          message: 'بس اللي عنده صلاحية «' + t.perm + '» يقدر يوصله، مهما اخترت هنا.',
+          body: el('div', { class: 'grants' }, mode.node, boxes.map(function (b) { return b.node; })),
+          actions: [{ label: 'إلغاء', value: false, kind: 'ghost' }, { label: 'تمام', value: true, kind: 'primary' }]
+        }).then(function (ok) {
+          A.dirty = false;
+          if (!ok) return;
+          state.mode = mode.value() === 'named' ? 'named' : 'all';
+          state.include = state.mode === 'named' ? boxes.filter(function (b) { return b.input.checked; }).map(function (b) { return b.email; }) : [];
+          state.exclude = state.mode === 'all' ? boxes.filter(function (b) { return !b.input.checked; }).map(function (b) { return b.email; }) : [];
+          state.dirty = true;
+          button.textContent = state.mode === 'named' ? 'ناس محددين (' + state.include.length + ')' : (state.exclude.length ? 'الكل ما عدا ' + state.exclude.length : 'كل اللي عندهم الصلاحية');
+        });
+      });
+      return button;
+
+    }
+
+    function draw(next) {
+
+      data = next;
+      rows = {};
+      body.setAttribute('aria-busy', 'false');
+      var manage = data.canManage;
+
+      top.router = A.checkbox('شغّل الإشعارات الجديدة', data.router, 'إشعارات وإيميلات لكل الأقسام حسب الصلاحيات. أول ما تتشغل، النشاط القديم مش هيتبعت.');
+      top.email = A.checkbox('شغّل الإيميلات', data.email, data.gmail ? 'من athanasius.youth.safaga@gmail.com' : 'محتاج موافقة جيميل الأول (مرة واحدة من صاحب الحساب).');
+      top.time = A.textInput(data.summaryTime, { ltr: true, max: 5, placeholder: '21:00' });
+      top.time.type = 'time';
+      top.target = A.textInput(String(data.budget.target), { ltr: true, max: 3 });
+      top.admin = A.textInput(String(data.budget.admin), { ltr: true, max: 3 });
+      top.critical = A.textInput(String(data.budget.critical), { ltr: true, max: 3 });
+      top.otp = A.textInput(String(data.budget.otp), { ltr: true, max: 3 });
+      ['target', 'admin', 'critical', 'otp'].forEach(function (k) { top[k].type = 'number'; top[k].min = '0'; });
+
+      var groups = ntGroups(data.types).map(function (g) {
+        return el('fieldset', { class: 'grants__group' },
+          el('legend', { text: NT_MODULES[g.module] || g.module }),
+          g.types.map(function (t) {
+            var state = { mode: t.mode, include: t.include.slice(), exclude: t.exclude.slice(), dirty: false };
+            var push = A.checkbox('إشعار', t.push);
+            var mail = ntSelect(NT_EMAIL, t.email, 'إيميل ' + ntLabel(t.key));
+            var lock = A.checkbox('إجباري', t.locked);
+            rows[t.key] = { t: t, push: push.input, email: mail, locked: lock.input, state: state };
+            [push.input, mail, lock.input].forEach(function (c) { c.disabled = !manage; });
+            return el('div', { class: 'nt-row' },
+              el('span', { class: 'nt-row__name' }, ntLabel(t.key), ' ', A.chip(NT_LEVELS[t.level][0], NT_LEVELS[t.level][1])),
+              push.node, mail, lock.node, manage ? recipientsButton(t, state) : null);
+          }));
+      });
+
+      A.fill(body, [
+        top.router.node, top.email.node,
+        A.field('ميعاد ملخص اليوم', top.time, 'بتوقيت القاهرة.'),
+        el('details', { class: 'nt-budget' },
+          el('summary', { text: 'حصة الإيميلات اليومية' }),
+          A.field('الهدف اليومي (كل الإيميلات)', top.target, 'في حدود جيميل الحقيقي (~٥٠٠ في اليوم).'),
+          A.field('إيميلات الأدمنز', top.admin, ''),
+          A.field('محجوز للمهم جدًا', top.critical, ''),
+          A.field('محجوز لأكواد التأكيد (بعدين)', top.otp, '')
+        ),
+        el('div', { class: 'grants' }, groups)
+      ]);
+      [top.router.input, top.email.input, top.time, top.target, top.admin, top.critical, top.otp].forEach(function (c) { c.disabled = !manage; });
+      save.hidden = !manage;
+      save.disabled = false;
+
+    }
+
+    function load() {
+
+      W.call('GET', '/v1/admin/notify/settings', undefined, { quiet: true }).then(draw).catch(function (error) {
+        body.setAttribute('aria-busy', 'false');
+        A.fail(error, box);
+      });
+
+    }
+
+    save.addEventListener('click', function () {
+
+      box.hidden = true;
+      var types = {};
+      Object.keys(rows).forEach(function (key) {
+        var r = rows[key];
+        var changed = r.push.checked !== r.t.push || r.email.value !== r.t.email || r.locked.checked !== r.t.locked || r.state.dirty;
+        if (changed) types[key] = { push: r.push.checked, email: r.email.value, locked: r.locked.checked, mode: r.state.mode, include: r.state.include, exclude: r.state.exclude };
+      });
+      var body_ = {
+        types: types, router: top.router.input.checked, email: top.email.input.checked, summaryTime: top.time.value,
+        budget: { target: Number(top.target.value), admin: Number(top.admin.value), critical: Number(top.critical.value), otp: Number(top.otp.value) }
+      };
+      var turningOn = body_.router && !data.router;
+      (turningOn ? A.confirm({
+        tone: 'info', icon: 'bell', title: 'تشغّل الإشعارات الجديدة؟',
+        message: 'هتوصل كل الأدمنز حسب صلاحياتهم، من دلوقتي بس (النشاط القديم مش هيتبعت). إشعارات النظام القديم هتقف علشان مفيش حاجة توصل مرتين.',
+        confirmLabel: 'شغّل', cancelLabel: 'لأ، رجوع'
+      }) : Promise.resolve(true)).then(function (ok) {
+        if (!ok) return;
+        A.withBusy(save, W.call('POST', '/v1/admin/notify/settings', body_))
+          .then(function (next) { A.dirty = false; draw(next); A.toast('اتحفظت إعدادات الإشعارات ✓'); })
+          .catch(function (error) { A.fail(error, box); });
+      });
+
+    });
+
+    var card = A.card('إعدادات الإشعارات', 'إيه اللي يتبعت لمين، إشعار ولا إيميل ولا في ملخص اليوم. للأدمن الأساسي.', box, body, el('div', { class: 'actions' }, save));
+    card.classList.add('card--notify-settings');
+    load();
+    return card;
+
+  }
+
+  /* «حالة النظام»: what went out, what failed, Gmail, the quota, critical waiting */
+  function systemStatusCard(W) {
+
+    var box = A.errorBox();
+    var body = el('div', { 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
+
+    function count(day, channel, status) { return (day && day[channel] && day[channel][status]) || 0; }
+
+    function draw(s) {
+
+      body.setAttribute('aria-busy', 'false');
+      var today = s.days[0] || null;
+      var tiles = el('div', { class: 'nt-tiles' }, [
+        ['إشعارات اتبعتت', count(today, 'push', 'sent')], ['إيميلات اتبعتت', count(today, 'email', 'sent')],
+        ['هيتعاد', count(today, 'push', 'failed') + count(today, 'email', 'failed')], ['فشل', count(today, 'push', 'dead') + count(today, 'email', 'dead')],
+        ['الإيميلات النهارده', s.quota.total + ' / ' + s.quota.target]
+      ].map(function (t) { return el('div', { class: 'nt-tile' }, el('strong', { text: String(t[1]) }), el('span', { text: t[0] })); }));
+      var gmail = !s.gmail.configured ? A.chip('جيميل مش متوصل', 'off') : s.gmail.ok ? A.chip('جيميل شغال', 'ok') : A.chip('جيميل واقف: محتاج موافقة تاني', 'danger');
+      var critical = s.critical.length ? el('div', { class: 'nt-critical' },
+        el('p', { class: 'nt-critical__title' }, icon('alert'), 'تنبيهات مهمة جدًا مستنية (' + s.critical.length + ')'),
+        el('ul', {}, s.critical.map(function (c) {
+          return el('li', {},
+            el('span', { text: c.title + ' — ' + c.recipient + ' (' + (c.channel === 'email' ? 'إيميل' : 'إشعار') + '، ' + (NT_STATUS[c.status] || c.status) + ')' }),
+            s.canManage ? el('button', { class: 'btn btn--small', type: 'button', onclick: function (event) {
+              A.confirm({ tone: 'danger', icon: 'trash', title: 'تشيل التنبيه ده من القايمة؟', message: 'مش هيتبعت تاني. ده بيتسجل في «سجل النشاط».', confirmLabel: 'شيله', cancelLabel: 'لأ' })
+                .then(function (ok) {
+                  if (!ok) return;
+                  A.withBusy(event.target, W.call('POST', '/v1/admin/notify/outbox/' + encodeURIComponent(c.id) + '/dismiss', {})).then(draw).catch(function (error) { A.fail(error, box); });
+                });
+            } }, 'شيله') : null);
+        }))) : el('p', { class: 'note' }, 'مفيش تنبيهات مهمة مستنية.');
+      A.fill(body, [
+        el('p', {}, s.router ? A.chip('الإشعارات الجديدة شغالة', 'ok') : A.chip('الإشعارات الجديدة مقفولة', 'off'), ' ', s.email ? A.chip('الإيميلات شغالة', 'ok') : A.chip('الإيميلات مقفولة', 'off'), ' ', gmail),
+        tiles,
+        el('p', { class: 'note' }, 'آخر إشعار اتبعت: ' + ntWhen(s.lastSuccess.push) + ' · آخر إيميل: ' + ntWhen(s.lastSuccess.email)),
+        critical
+      ]);
+
+    }
+
+    W.call('GET', '/v1/admin/notify/status', undefined, { quiet: true }).then(draw).catch(function (error) {
+      body.setAttribute('aria-busy', 'false');
+      A.fail(error, box);
+    });
+
+    var card = A.card('حالة النظام', 'الإشعارات والإيميلات: اللي اتبعت، اللي مستني، واللي فشل.', box, body);
+    card.classList.add('card--system-status');
+    return card;
+
+  }
+
+  /* the settings page's notification cards (only with the Worker) */
+  function notifyCards() {
+
+    var W = window.AdminWorker;
+    if (!W) return [];
+    return [myNotifyCard(W), notifySettingsCard(W), systemStatusCard(W)];
+
+  }
+
+  /*
+   * Home: a red banner while critical rows wait (quota, Gmail stopped, dead),
+   * for whoever manages the notifications (the Primary Admin). Quiet: nothing
+   * when the Worker can't be reached or nothing waits.
+   */
+  A.criticalBanner = function () {
+
+    var W = window.AdminWorker;
+    if (!W) return null;
+    var slot = el('div', { class: 'nt-banner', hidden: true, role: 'alert' });
+    W.call('GET', '/v1/admin/notify/status', undefined, { quiet: true }).then(function (s) {
+      var stopped = s.email && s.gmail.configured && !s.gmail.ok;
+      if (!s.canManage || (!s.critical.length && !stopped)) return;
+      A.fill(slot, [
+        icon('alert'),
+        el('span', { text: stopped ? 'الإيميلات واقفة: صلاحية جيميل محتاجة تتجدد.' : 'فيه ' + s.critical.length + ' تنبيه مهم جدًا لسه متبعتش.' }),
+        el('button', { class: 'btn btn--small', type: 'button', onclick: function () { A.go('settings'); } }, 'شوف «حالة النظام»')
+      ]);
+      slot.hidden = false;
+    }, function () { /* quiet */ });
+    return slot;
+
+  };
 
 })();
 
@@ -16588,6 +16948,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     return el('div', { class: 'dash' },
       siteCard(),
+      // critical notifications waiting (AdminPage: «حالة النظام»), for the Primary Admin
+      A.criticalBanner ? A.criticalBanner() : null,
       A.setupNudge ? A.setupNudge() : null,
       // «الحجوزات»: new requests waiting (AdminBook; hidden while the module is off)
       A.bookCard ? A.bookCard() : null,

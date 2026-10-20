@@ -78,5 +78,15 @@ check('acknowledged → sent', sql(`SELECT status FROM notify_outbox WHERE id IN
 sql("UPDATE settings SET value = '0' WHERE key = 'NOTIFY_ROUTER'");
 await call(P, 'POST', `/v1/admin/accounts/${encodeURIComponent(OTHER)}/remove`, {});
 check('switched back off', (await claim()).body.router === false);
+// step 7: the screens' routes (the Primary), the switch through the API
+const st = await call(P, 'GET', '/v1/admin/notify/settings');
+check('«إعدادات الإشعارات»: the Primary manages', st.status === 200 && st.body.canManage === true && st.body.types.length > 40, st.body);
+const sv = await call(P, 'POST', '/v1/admin/notify/settings', { types: { publish: { push: true, email: 'summary', locked: false } }, summaryTime: '21:00' });
+check('… saves a type', sv.status === 200 && sv.body.types.find(t => t.key === 'publish').email === 'summary', sv.body);
+await call(P, 'POST', '/v1/admin/notify/settings', { types: { publish: { reset: true } } });
+check('«تنبيهاتي»', (await call(P, 'GET', '/v1/admin/notify/me')).status === 200);
+const stat = await call(P, 'GET', '/v1/admin/notify/status');
+check('«حالة النظام»', stat.status === 200 && Array.isArray(stat.body.days) && stat.body.quota.target > 0, stat.body);
+
 console.log(failed ? `\n${failed} FAILED` : '\nall ok');
 process.exit(failed ? 1 : 0);

@@ -17,6 +17,7 @@ import { verifySync, syncStampStmt } from './lib/sync.js';
 import { grantsSnapshot } from './lib/perms.js';
 import { accountsList, accountAdd, accountUpdate, accountRemove } from './lib/accounts.js';
 import { notifyClaim } from './notify/claim.js';
+import { notifySettingsGet, notifySettingsSave, notifyMeGet, notifyMeSave, notifyStatus, notifyDismiss } from './notify/settings.js';
 import { housekeeping, blankPhones } from './scheduled.js';
 import { makeJob } from './jobs.js';
 import { bookState, bookProof, bookSubmit, bookStatus, bookWithdraw } from './book/public.js';
@@ -262,6 +263,12 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/admin/accounts', auth: 'admin', maxBytes: 8 * 1024, handler: accountAdd },
   { method: 'POST', path: '/v1/admin/accounts/:email', auth: 'admin', maxBytes: 8 * 1024, handler: accountUpdate },
   { method: 'POST', path: '/v1/admin/accounts/:email/remove', auth: 'admin', handler: accountRemove },
+  { method: 'GET', path: '/v1/admin/notify/settings', auth: 'admin', handler: notifySettingsGet },
+  { method: 'POST', path: '/v1/admin/notify/settings', auth: 'admin', maxBytes: 64 * 1024, handler: notifySettingsSave },
+  { method: 'GET', path: '/v1/admin/notify/me', auth: 'admin', handler: notifyMeGet },
+  { method: 'POST', path: '/v1/admin/notify/me', auth: 'admin', maxBytes: 32 * 1024, handler: notifyMeSave },
+  { method: 'GET', path: '/v1/admin/notify/status', auth: 'admin', handler: notifyStatus },
+  { method: 'POST', path: '/v1/admin/notify/outbox/:id/dismiss', auth: 'admin', handler: notifyDismiss },
   { method: 'POST', path: '/v1/sync/admins', auth: 'sync', raw: true, maxBytes: 16 * 1024, handler: syncAdmins },
   { method: 'POST', path: '/v1/admin/diag/event-fixture', auth: 'admin', handler: diagEventFixture },
   { method: 'POST', path: '/v1/admin/diag/retention', auth: 'admin', handler: diagRetention },

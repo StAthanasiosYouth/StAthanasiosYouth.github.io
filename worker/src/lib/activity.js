@@ -54,7 +54,8 @@ export const SECTIONS = {
   admins: ['admins', 'session', 'admin'],
   competitions: ['competition', 'participant', 'points', 'shopitem', 'redemption'],
   pages: ['page', 'event', 'servant'],
-  bookings: ['booking', 'bookings', 'proof', 'handover']
+  bookings: ['booking', 'bookings', 'proof', 'handover'],
+  delivery: ['notify']
 };
 const TECHNICAL = ['diag.echo', 'diag.queue', 'booknews.claim', 'booknews.ack', 'admins.sync', 'paydest.sync', 'job.failed', 'booking.retention'];
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;

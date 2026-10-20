@@ -379,6 +379,8 @@
 
     return el('div', { class: 'dash' },
       siteCard(),
+      // critical notifications waiting (AdminPage: «حالة النظام»), for the Primary Admin
+      A.criticalBanner ? A.criticalBanner() : null,
       A.setupNudge ? A.setupNudge() : null,
       // «الحجوزات»: new requests waiting (AdminBook; hidden while the module is off)
       A.bookCard ? A.bookCard() : null,

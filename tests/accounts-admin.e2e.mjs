@@ -12,6 +12,7 @@ import { ROOT } from '../tools/lib/gs.mjs';
 import { createSiteServer, interceptGoogle, TEST_API, TEST_CLIENT, TEST_FALLBACK } from '../tools/lib/admin-server.mjs';
 import { createWorld } from './fakes/gas.mjs';
 import { PERMS, PRESETS, PRIMARY_DEFAULT } from '../worker/src/lib/perms.js';
+import { allTypes, defaultsOf } from '../worker/src/notify/catalog.js';
 
 const require = createRequire(`${ROOT}tools/package.json`);
 const puppeteer = require('puppeteer-core');
@@ -41,6 +42,7 @@ const fake = {
   admins: [],
   reset() {
     this.calls = [];
+    this.notify = notifyFake();
     this.activityDown = false;
     const at = Date.now() - 60000;
     this.activity = [
@@ -57,6 +59,21 @@ const fake = {
   }
 };
 
+/* the Worker's notification routes (worker/src/notify/settings.js), in memory */
+function notifyFake() {
+  const types = allTypes().map(t => ({ ...t, ...defaultsOf(t.level), mode: 'all', include: [], exclude: [], locked: false, custom: false }));
+  const n = {
+    router: false, email: false, prefs: {}, saved: [],
+    critical: [{ id: 'ntf-0000aaaa', recipient: ADMIN, channel: 'email', status: 'deferred_quota', attempts: 1, error: 'quota', at: Date.now(), title: 'النظام نقل البيانات' }],
+    settings: () => ({ ok: true, canManage: true, router: n.router, email: n.email, gmail: false, summaryTime: '21:00', budget: { target: 400, admin: 150, critical: 50, otp: 50 },
+      admins: [{ email: ADMIN, name: 'مينا زكريا', primary: true }, { email: SECOND, name: 'فادي يوسف', primary: false }], types }),
+    apply: body => { n.saved.push(body); n.router = body.router; n.email = body.email; for (const [k, v] of Object.entries(body.types || {})) Object.assign(types.find(t => t.key === k), v, { custom: true }); },
+    me: () => ({ ok: true, router: n.router, email: n.email, types: types.slice(0, 8).map(t => ({ key: t.key, level: t.level, module: t.module, locked: t.level === 'critical', push: (n.prefs[t.key] && n.prefs[t.key].push) || (t.push ? 'immediate' : 'off'), pushAllowed: t.push, emailMode: (n.prefs[t.key] && n.prefs[t.key].email) || t.email })) }),
+    status: () => ({ ok: true, canManage: true, router: n.router, email: n.email, days: [{ day: '2026-10-20', push: { sent: 3 }, email: { sent: 1, failed: 1 } }], lastSuccess: { push: Date.now() - 60000 }, gmail: { ok: false, configured: false }, quota: { total: 1, critical: 0, otp: 0, target: 400, admin: 150 }, critical: n.critical })
+  };
+  return n;
+}
+
 const cors = { 'access-control-allow-origin': LOCAL };
 const json = (status, body) => ({ status, headers: { ...cors, 'content-type': 'application/json; charset=utf-8' }, body: JSON.stringify(body) });
 
@@ -72,6 +89,11 @@ async function handle(request) {
   fake.calls.push({ method, path: url.pathname, body, auth });
   if (url.pathname === '/v1/admin/book/module') return json(200, { ok: true, on: false, env: 'production' });
   if (url.pathname === '/v1/admin/accounts' && method === 'GET') return json(200, fake.listing());
+  if (url.pathname === '/v1/admin/notify/settings' && method === 'GET') return json(200, fake.notify.settings());
+  if (url.pathname === '/v1/admin/notify/settings' && method === 'POST') { fake.notify.apply(body); return json(200, fake.notify.settings()); }
+  if (url.pathname === '/v1/admin/notify/me') { if (method === 'POST') fake.notify.prefs = body.prefs; return json(200, fake.notify.me()); }
+  if (url.pathname === '/v1/admin/notify/status') return json(200, fake.notify.status());
+  if (url.pathname.startsWith('/v1/admin/notify/outbox/') && url.pathname.endsWith('/dismiss')) { fake.notify.critical = []; return json(200, fake.notify.status()); }
   if (url.pathname === '/v1/admin/activity' && method === 'GET') {
     if (fake.activityDown) return json(500, { ok: false, code: 'error', message: 'x' });
     return json(200, { ok: true, items: fake.activity, more: false, next: 0, admins: [{ email: ADMIN, name: 'مينا زكريا' }], families: ['add'], sections: ['bookings'] });
@@ -225,6 +247,63 @@ test('«سجل النشاط» reads the unified log from D1 (Worker + Apps Scrip
   await page.evaluate(() => A.go('home'));
   await page.evaluate(() => A.go('activity'));
   await page.waitForFunction(() => /خبر من الشيت/.test(document.body.innerText), { timeout: 8000 });
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('notifications: «تنبيهاتي», «إعدادات الإشعارات» (switch on with a confirm), «حالة النظام» (dismiss), the home banner', async () => {
+  fake.reset();
+  const { context, page, problems } = await openSettings();
+  await page.waitForSelector('.card--notify-settings .nt-row');
+  await page.waitForSelector('.card--system-status .nt-critical');
+  await page.waitForSelector('.card--notify-me .nt-row');
+  await page.screenshot({ path: `${SHOTS}notify-settings.png`, fullPage: true });
+
+  // «إعدادات الإشعارات»: publish → no push, summary email; then the switch on (asks first)
+  await page.evaluate(() => {
+    const row = [...document.querySelectorAll('.card--notify-settings .nt-row')].find(r => r.textContent.includes('نشر الموقع'));
+    row.querySelector('.check input').click();
+    const sel = row.querySelector('select'); sel.value = 'summary'; sel.dispatchEvent(new Event('change'));
+    const on = [...document.querySelectorAll('.card--notify-settings .check')].find(c => c.textContent.includes('شغّل الإشعارات الجديدة'));
+    on.querySelector('input').click();
+  });
+  await page.click('.card--notify-settings .actions .btn--primary');
+  await clickDialogButton(page, 'شغّل');
+  await page.waitForFunction(() => /اتحفظت إعدادات الإشعارات/.test(document.body.innerText), { timeout: 8000 });
+  const sent = fake.notify.saved[0];
+  assert.equal(sent.router, true);
+  assert.deepEqual([sent.types.publish.push, sent.types.publish.email], [false, 'summary']);
+  assert.equal(Object.keys(sent.types).length, 1, 'only what changed');
+
+  // «تنبيهاتي»: a choice saved; critical ones locked
+  assert.equal(await page.$$eval('.card--notify-me .nt-row', rows => rows.filter(r => r.textContent.includes('إجباري')).every(r => [...r.querySelectorAll('select')].every(s => s.disabled))), true);
+  await page.click('.card--notify-me .actions .btn--primary');
+  await page.waitForFunction(() => /اتحفظت اختياراتك/.test(document.body.innerText), { timeout: 8000 });
+  assert.ok(fake.notify.prefs && typeof fake.notify.prefs === 'object');
+
+  // «حالة النظام»: the waiting critical row, dismissed on purpose
+  await page.evaluate(() => [...document.querySelectorAll('.card--system-status .nt-critical button')][0].click());
+  await clickDialogButton(page, 'شيله');
+  await page.waitForFunction(() => /مفيش تنبيهات مهمة مستنية/.test(document.querySelector('.card--system-status').innerText), { timeout: 8000 });
+
+  // the home banner (before the dismiss there was one critical waiting)
+  fake.notify.critical = [{ id: 'ntf-0000bbbb', recipient: ADMIN, channel: 'email', status: 'deferred_quota', attempts: 1, error: '', at: Date.now(), title: 'x' }];
+  await page.evaluate(() => A.go('home'));
+  await page.waitForSelector('.nt-banner:not([hidden])', { timeout: 8000 });
+  assert.match(await page.$eval('.nt-banner', n => n.innerText), /تنبيه مهم جدًا/);
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('notifications on a phone: no page overflow in the settings page', async () => {
+  fake.reset();
+  const { context, page, problems } = await openSettings({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+  await page.waitForSelector('.card--notify-settings .nt-row');
+  await page.evaluate(() => document.querySelector('.card--notify-settings .grants').scrollIntoView({ block: 'start' }));
+  await sleep(300);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
+  await page.screenshot({ path: `${SHOTS}notify-phone.png` });
+  assert.equal(overflow, false);
   assert.deepEqual(problems, []);
   await context.close();
 });
