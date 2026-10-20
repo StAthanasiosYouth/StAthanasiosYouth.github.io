@@ -19065,7 +19065,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       if (!W()) return Promise.resolve(false);
       return B.check().then(function (on) {
         if (!on && !B.needGoogle) return false;
-        // the Worker checks the admin's access; a booking that is gone answers «مش لاقيين» in the sheet
+        // the Worker checks the admin's access; a booking that is gone answers «مش لاقيين» in the sheet.
+        // B.current outlives a closed sheet: forget it, or the same booking would not open again
+        if (!sheetOpen()) B.current = null;
         return openBooking(one[2]).then(function () {
           var target = one[1] === 'payments' && document.querySelector('#sheet [data-anchor="payments"]');
           if (target && target.scrollIntoView) target.scrollIntoView({ block: 'start', behavior: 'smooth' });

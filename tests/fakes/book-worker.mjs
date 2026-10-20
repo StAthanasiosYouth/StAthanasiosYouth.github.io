@@ -234,12 +234,12 @@ export function createBookWorker({ event, origin, proofBytes, now = () => '2026-
       const counts = { byStatus: eventRow().counts, overdue: state.bookings.map(row).filter(r => r.overdue).length, refunds: state.bookings.map(row).filter(r => r.refundOwed > 0).length };
       return { rows, counts, next: '' };
     }],
-    ['GET', /^\/v1\/admin\/book\/bookings\/(bk-\d+)$/, m => detail(find(m[1]))],
-    ['POST', /^\/v1\/admin\/book\/bookings\/(bk-\d+)\/lock$/, m => {
+    ['GET', /^\/v1\/admin\/book\/bookings\/(bk-\d+|bkg-[a-z0-9]{4,40})$/, m => detail(find(m[1]))],
+    ['POST', /^\/v1\/admin\/book\/bookings\/(bk-\d+|bkg-[a-z0-9]{4,40})\/lock$/, m => {
       find(m[1]);
       return state.lockHolder ? { granted: false, holder: clone(state.lockHolder), ttl: 90000, renew: state.lockRenew } : { granted: true, ttl: 90000, renew: state.lockRenew };
     }],
-    ['DELETE', /^\/v1\/admin\/book\/bookings\/(bk-\d+)\/lock$/, () => ({ released: !state.lockHolder })],
+    ['DELETE', /^\/v1\/admin\/book\/bookings\/(bk-\d+|bkg-[a-z0-9]{4,40})\/lock$/, () => ({ released: !state.lockHolder })],
     ['POST', /^\/v1\/admin\/book\/bookings$/, (m, body) => {
       if (!body.requestKey) throw new Fail('invalid', { field: 'name', message: 'requestKey' });
       const phone = normPhone(body.phone);
@@ -254,14 +254,14 @@ export function createBookWorker({ event, origin, proofBytes, now = () => '2026-
       bump(b);
       return detail(b);
     }],
-    ['POST', /^\/v1\/admin\/book\/bookings\/(bk-\d+)\/confirm$/, (m, body) => {
+    ['POST', /^\/v1\/admin\/book\/bookings\/(bk-\d+|bkg-[a-z0-9]{4,40})\/confirm$/, (m, body) => {
       const b = find(m[1]);
       guard(b, body);
       confirm(b, body);
       bump(b);
       return detail(b);
     }],
-    ['POST', /^\/v1\/admin\/book\/bookings\/(bk-\d+)\/reject$/, (m, body) => {
+    ['POST', /^\/v1\/admin\/book\/bookings\/(bk-\d+|bkg-[a-z0-9]{4,40})\/reject$/, (m, body) => {
       const b = find(m[1]);
       guard(b, body);
       if (b.status !== 'pending') throw new Fail('final');
@@ -272,7 +272,7 @@ export function createBookWorker({ event, origin, proofBytes, now = () => '2026-
       bump(b);
       return detail(b);
     }],
-    ['POST', /^\/v1\/admin\/book\/bookings\/(bk-\d+)\/cancel$/, (m, body) => {
+    ['POST', /^\/v1\/admin\/book\/bookings\/(bk-\d+|bkg-[a-z0-9]{4,40})\/cancel$/, (m, body) => {
       const b = find(m[1]);
       guard(b, body);
       if (b.status !== 'confirmed') throw new Fail('final');
@@ -283,7 +283,7 @@ export function createBookWorker({ event, origin, proofBytes, now = () => '2026-
       bump(b);
       return detail(b);
     }],
-    ['POST', /^\/v1\/admin\/book\/bookings\/(bk-\d+)\/reopen$/, (m, body) => {
+    ['POST', /^\/v1\/admin\/book\/bookings\/(bk-\d+|bkg-[a-z0-9]{4,40})\/reopen$/, (m, body) => {
       const b = find(m[1]);
       guard(b, body);
       if (b.status !== 'rejected') throw new Fail('final');
@@ -292,7 +292,7 @@ export function createBookWorker({ event, origin, proofBytes, now = () => '2026-
       bump(b);
       return detail(b);
     }],
-    ['POST', /^\/v1\/admin\/book\/bookings\/(bk-\d+)\/update$/, (m, body) => {
+    ['POST', /^\/v1\/admin\/book\/bookings\/(bk-\d+|bkg-[a-z0-9]{4,40})\/update$/, (m, body) => {
       const b = find(m[1]);
       guard(b, body);
       if (b.status !== 'confirmed') throw new Fail('final');
@@ -309,7 +309,7 @@ export function createBookWorker({ event, origin, proofBytes, now = () => '2026-
       bump(b);
       return detail(b);
     }],
-    ['POST', /^\/v1\/admin\/book\/bookings\/(bk-\d+)\/payments$/, (m, body) => {
+    ['POST', /^\/v1\/admin\/book\/bookings\/(bk-\d+|bkg-[a-z0-9]{4,40})\/payments$/, (m, body) => {
       const b = find(m[1]);
       if (b.status === 'pending') throw new Fail('final');
       addPayment(b, body);

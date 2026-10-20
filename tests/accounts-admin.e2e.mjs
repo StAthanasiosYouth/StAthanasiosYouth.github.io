@@ -307,3 +307,25 @@ test('notifications on a phone: no page overflow in the settings page', async ()
   assert.deepEqual(problems, []);
   await context.close();
 });
+
+test('an email / push link to one account (#open/account/<key>) opens «الصلاحيات» on that row; never the email in the link', async () => {
+  fake.reset();
+  const { accountKey } = await import('../worker/src/notify/catalog.js');
+  const { context, page, problems } = await openSettings();
+  await page.evaluate(() => A.go('home'));
+  await page.evaluate(key => { window.location.hash = '#open/account/' + key; }, accountKey(SECOND));
+  await page.waitForFunction(email => {
+    const row = document.querySelector('.card--admins .admin.is-focus');
+    return row && row.getAttribute('data-email') === email;
+  }, { timeout: 8000 }, SECOND);
+  assert.equal(await page.$$eval('.card--admins .admin.is-focus', n => n.length), 1, 'only that row');
+  assert.equal(await page.evaluate(() => window.location.hash), '', 'the link leaves the address bar at once');
+  await page.screenshot({ path: `${SHOTS}account-link.png` });
+  // a key that matches nobody (the account was removed since): a short note, nothing highlighted
+  await page.evaluate(() => A.go('home'));
+  await page.evaluate(() => { window.location.hash = '#open/account/acc-0000000000000000'; });
+  await page.waitForFunction(() => /مبقاش في لوحة التحكم/.test(document.body.innerText), { timeout: 8000 });
+  assert.equal(await page.$$eval('.card--admins .admin.is-focus', n => n.length), 0);
+  assert.deepEqual(problems, []);
+  await context.close();
+});

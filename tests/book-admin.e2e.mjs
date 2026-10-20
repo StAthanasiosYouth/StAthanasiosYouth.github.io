@@ -835,3 +835,39 @@ test('B2: the Worker stops answering after the module was seen on → the way in
   assert.deepEqual(again.problems, []);
   await context.close();
 });
+
+test('email / push links open the exact booking (#open/booking/<id>) and its payments (#open/payments/<id>); a booking that is gone says so', async () => {
+  freshWorker();
+  // real booking ids look like bkg-xxxxxx (worker/src/book): give B-AAAA1 one
+  const b = fake.state.bookings.find(x => x.ref === 'B-AAAA1');
+  const old = b.id;
+  b.id = 'bkg-aaaa01';
+  for (const list of [fake.state.payments, fake.state.proofs]) for (const p of list || []) if (p.bookingId === old) p.bookingId = b.id;
+  const d = await open();
+  await signIn(d.page);
+  await d.page.evaluate(() => { window.location.hash = '#open/booking/bkg-aaaa01'; });
+  await sheetTitle(d.page, 'حجز B-AAAA1');
+  assert.equal(await d.page.evaluate(() => window.location.hash), '', 'the link leaves the address bar');
+  assert.ok(fake.state.calls.some(c => c.path === '/v1/admin/book/bookings/bkg-aaaa01'), 'the Worker is asked for that booking (it checks access)');
+  await closeSheet(d.page);
+
+  await d.page.evaluate(() => { window.location.hash = '#open/payments/bkg-aaaa01'; });
+  await sheetTitle(d.page, 'حجز B-AAAA1');
+  await d.page.waitForFunction(() => {
+    const label = document.querySelector('#sheet [data-anchor="payments"]');
+    const body = document.querySelector('#sheet .sheet__body') || document.querySelector('#sheet');
+    if (!label) return false;
+    // «الدفعات» in view inside the sheet (scrolled to when the sheet is taller than the screen)
+    const r = label.getBoundingClientRect();
+    const box = body.getBoundingClientRect();
+    return r.top >= box.top - 2 && r.bottom <= box.bottom + 2;
+  }, { timeout: 8000 });
+  await shot(d.page, 'link-payments');
+  await closeSheet(d.page);
+
+  // gone (or another event's, or no access): the Worker answers not_found → the sheet says so
+  await d.page.evaluate(() => { window.location.hash = '#open/booking/bkg-zzzz99'; });
+  await d.page.waitForFunction(() => { const s = document.getElementById('sheet'); return s.open && /مش لاقيين/.test(s.innerText); }, { timeout: 8000 });
+  assert.deepEqual(d.problems, []);
+  await d.context.close();
+});

@@ -24,10 +24,11 @@ Admin emails (panel, `/admin/`; the route permission decides what opens):
 
 | Email | Button opens | Link |
 | --- | --- | --- |
-| New booking(s), cash booking | the event's booking queue, filtered to the new ones | `#open/bookings/<event-id>` |
+| One new booking, one cash booking | that booking | `#open/booking/<booking-id>` |
+| Several new bookings (grouped) | the event's booking queue | `#open/bookings/<event-id>` |
 | Booking status change | that booking | `#open/booking/<booking-id>` |
-| Payment recorded / voided / refund | that booking's payments | `#open/booking/<booking-id>/payments` |
-| Accounts and permissions | that admin account in «الصلاحيات» | `#open/account/<admin-id>` |
+| Payment recorded / voided / refund | that booking, scrolled to «الدفعات» | `#open/payments/<booking-id>` |
+| Accounts and permissions | that admin account in «الصلاحيات», highlighted | `#open/account/<key>`: a hash of the address (`accountKey`), never the email |
 | Content, settings, system | the changed item, else the activity entry | `#open/<kind>/<id>`, `#activity/<id>` |
 | Daily summary | the activity log | `#activity` |
 
@@ -51,7 +52,10 @@ The route names above are the target shape; the exact names are fixed when each 
 
 ## 4. Status (2026-10-21)
 
-- **Admin emails (active templates, router and email switches off):** buttons open the activity entry (`#activity/<id>`). The panel already supports `#open/<kind>/<id>` and `#open/bookings/<event-id>`. A follow-up, before the router is switched on, points booking, payment and account alerts at their exact records (§1).
+- **Admin emails and pushes (router and email switches off):** booking, payment and account alerts open their exact records (§1).
+  - Built by `linkOf` in `worker/src/notify/catalog.js`, used for both pushes and emails.
+  - Opened by the panel's `A.openLink`: `AdminBook` (`#open/booking|payments/`) and `AdminActivity` + `AdminPage` (`#open/account/`).
+  - A malformed ID falls back to the activity entry. Other kinds still open the activity entry (`#activity/<id>`).
 - **Member emails (Phase 5A/5B, not wired):** every template takes the exact link from its caller. `bookingEmail` refuses `#b/` status-token links. The member pages and the return-to-destination flow are built with the member accounts (5A-4 bookings, 5B results, points, store).
 
 ## 5. Tests (with each phase)
