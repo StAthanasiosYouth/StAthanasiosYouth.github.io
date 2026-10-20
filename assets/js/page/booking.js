@@ -23,14 +23,15 @@
  */
 
 import { h } from '../dom.js';
-import { arabicDigits } from '../words.js';
+import { arabicDigits, formatStamp } from '../words.js';
 import { cue } from '../ui-sound.js';
 import { stepCount, canStep, totalOf, money, waWithText, seatsOf } from './model.js';
 import {
   liveState, stepsFor, isFree, peopleCount, peopleOf, peopleText, normPhone, checkWho, checkPay, checkSend,
   needsProof, newRequestKey, submitBody, payMessage, emptyDraft, bookingError, statusWord, statusHref,
   mineFor, isRef, isToken, PROOFS_MAX, NOTE_MAX, NAME_MAX, peopleCounts, peopleRoom, checkPeople, categoryForAge,
-  methodOnline, onlineMethodsOf, offlineServants, payCopyText, payGrouped, cashMessage
+  methodOnline, onlineMethodsOf, offlineServants, payCopyText, payGrouped, cashMessage,
+  partAllowed, minPart, partAmount, partProblem
 } from './book-model.js';
 import { loadDraft, saveDraft, clearDraft, loadMine, rememberBooking, forgetBooking } from './book-store.js';
 import { prepareImage, UNSUPPORTED } from './image.js';
@@ -711,7 +712,9 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
     const servants = booking.servants.filter(s => s.id && s.methods.length);
     const cashServants = offlineServants(booking);
     const methodsBox = h('div', { class: 'bk-choices' });
+    const planBox = h('div', { class: 'bk-plan-wrap' });
     const payBox = h('div', { class: 'bk-wa bk-pay', 'aria-live': 'polite' });
+    let amountEl = null;              // the pay card's «حوّل …» line, kept in step with the plan
     const next = h('button', { class: 'btn btn--primary bk-next', type: 'submit' }, h('span', {}, 'دفعت، كمّل'), icon('arrow'));
     let ready = true;                 // the next button may go on
 
@@ -752,12 +755,92 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
       setNext('دفعت، كمّل', true);
     }
 
-    function amountLine(reply) {
-      const total = reply && Number.isFinite(reply.amount) ? reply.amount : totalOf(booking, draft.counts);
-      if (reply && reply.mode === 'installments' && reply.minFirst > 0 && reply.minFirst < total) {
-        return h('p', { class: 'bk-paycard__amount' }, 'حوّل مقدم ', h('strong', {}, `${money(reply.minFirst)} على الأقل`), ` من الإجمالي ${money(total)}`);
+    function totalNow() {
+      return totalOf(booking, draft.counts);
+    }
+
+    /* what to send now: the whole total, or the installment typed (when it is a valid one) */
+    function amountLine() {
+      const total = totalNow();
+      const part = partAllowed(booking, total) && draft.payPlan === 'part';
+      const n = partAmount(draft.payAmount);
+      if (part && !partProblem(booking, total, draft.payAmount)) {
+        return h('p', { class: 'bk-paycard__amount' }, 'حوّل دلوقتي: ', h('strong', {}, money(n)), h('span', { class: 'bk-paycard__rest' }, `والباقي ${money(total - n)}`));
       }
+      if (part) return h('p', { class: 'bk-paycard__amount' }, 'اكتب مبلغ القسط فوق الأول.');
       return h('p', { class: 'bk-paycard__amount' }, 'المطلوب تحوّله: ', h('strong', {}, money(total)));
+    }
+
+    function refreshAmount() {
+      if (!amountEl || !amountEl.isConnected) return;
+      const fresh = amountLine();
+      amountEl.replaceWith(fresh);
+      amountEl = fresh;
+    }
+
+    /* «دفع كامل» / «دفع قسط»: where the event takes installments, for an online method */
+    function renderPlan() {
+      const total = totalNow();
+      const m = methodOf.get(draft.method);
+      if (!servantOf() || !draft.method || !methodOnline(m) || !partAllowed(booking, total)) {
+        planBox.replaceChildren();
+        return;
+      }
+      const min = minPart(booking, total);
+      const pay = booking.payment || {};
+      const choice = (value, title, sub) => {
+        const input = h('input', { type: 'radio', name: 'bk-plan', value, id: `bk-plan-${value}`, checked: (draft.payPlan || 'full') === value });
+        input.addEventListener('change', () => {
+          draft.payPlan = value;
+          if (value === 'part' && !draft.payAmount) draft.payAmount = String(min);
+          showErrors({}, { focus: false, only: ['payPlan', 'payAmount'] });
+          renderPlan();
+          refreshAmount();
+          saveSoon();
+        });
+        return h('label', { class: 'bk-plan', for: input.id }, input,
+          h('span', { class: 'bk-plan__title' }, title), h('span', { class: 'bk-plan__sub' }, sub));
+      };
+      const part = draft.payPlan === 'part';
+      let details = null;
+      if (part) {
+        const input = h('input', {
+          class: 'bk-input bk-plan__input', id: 'bk-pay-amount', type: 'text', inputmode: 'numeric', autocomplete: 'off', dir: 'ltr',
+          value: draft.payAmount, 'aria-describedby': 'bk-pay-amount-hint bk-payAmount-err'
+        });
+        const rows = h('dl', { class: 'bk-plan__sum' });
+        const paint = () => {
+          const n = partAmount(draft.payAmount);
+          const ok = !partProblem(booking, total, draft.payAmount);
+          rows.replaceChildren(
+            h('div', {}, h('dt', {}, 'الإجمالي'), h('dd', {}, money(total))),
+            h('div', {}, h('dt', {}, 'هتحوّل دلوقتي'), h('dd', {}, ok ? money(n) : '—')),
+            h('div', { class: 'bk-plan__rest' }, h('dt', {}, 'الباقي'), h('dd', {}, ok ? money(total - n) : '—')));
+        };
+        input.addEventListener('input', () => {
+          draft.payAmount = input.value.trim().slice(0, 7);
+          showErrors({}, { focus: false, only: ['payAmount'] });
+          paint();
+          refreshAmount();
+          saveSoon();
+        });
+        input.addEventListener('blur', () => {
+          const problem = partProblem(booking, total, draft.payAmount);
+          showErrors(problem ? { payAmount: problem } : {}, { focus: false, only: ['payAmount'] });
+        });
+        paint();
+        details = h('div', { class: 'bk-plan__box' },
+          group('payAmount', 'هتحوّل كام دلوقتي؟',
+            input,
+            h('p', { class: 'bk-field__hint', id: 'bk-pay-amount-hint' }, `أقل قسط ${money(min)} · أقل من الإجمالي ${money(total)}`)),
+          rows,
+          h('p', { class: 'bk-plan__note' }, `الخدمة هتتواصل معاك بخصوص الباقي${pay.finalDueAt ? ` (لازم يتدفع قبل ${formatStamp(pay.finalDueAt)})` : ''}. وتقدر تشوف المدفوع والباقي في «حجوزاتي» من نفس الموبايل.`));
+      }
+      planBox.replaceChildren(group('payPlan', 'هتدفع كام دلوقتي؟',
+        h('div', { class: 'bk-plans' },
+          choice('full', 'دفع كامل', money(total)),
+          choice('part', 'دفع قسط', `من ${money(min)}`))),
+        details);
     }
 
     function payCard(servant, method, reply) {
@@ -767,8 +850,9 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
       const help = h('p', { class: 'bk-field__hint bk-paycard__help', role: 'status' });
       const copy = h('button', { class: 'btn bk-copy', type: 'button', 'data-act': 'copy-number' }, icon('copy'), h('span', {}, 'نسخ الرقم'));
       copy.addEventListener('click', () => copyNumber(number, copy, help));
+      amountEl = amountLine();
       payBox.replaceChildren(h('div', { class: 'bk-paycard', 'data-method': method },
-        amountLine(reply),
+        amountEl,
         h('p', { class: 'bk-paycard__label' }, `رقم ${label} بتاع ${servant.name}`),
         h('p', { class: 'bk-paycard__number', dir: 'ltr', translate: 'no' }, payGrouped(number)),
         reply.name ? h('p', { class: 'bk-paycard__name' }, 'الاسم اللي هيظهرلك: ', h('bdi', {}, reply.name)) : null,
@@ -790,6 +874,7 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
     }
 
     async function renderPay() {
+      renderPlan();
       const servant = servantOf();
       const method = draft.method;
       if (!servant || !method) {
@@ -893,6 +978,7 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
       h('p', { class: 'bk-total' }, h('span', {}, 'المطلوب'), h('strong', {}, money(totalOf(booking, draft.counts)))),
       picks,
       methodsBox,
+      planBox,
       payBox,
       actions(backButton('رجوع', () => go('a')), next)
     );
@@ -1173,10 +1259,13 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
 
   /* ---------- done ---------- */
 
+  let lastServantId = '';
+
   function finish(reply) {
 
     done = reply;
     mode = 'done';
+    lastServantId = draft ? draft.servantId : '';
     dropCaptcha();
     clearTimeout(saveTimer);
     clearDraft(slug);
@@ -1223,7 +1312,8 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
         h('div', { class: 'bk-done__copy' }, linkInput, copy),
         h('p', { class: 'bk-field__hint' }, 'احتفظ بالرابط ده: منه تتابع حجزك أو تلغيه.')
       ),
-      h('a', { class: 'btn btn--primary bk-done__status-link', href: `#b/${reply.token}` }, 'شوف حالة الحجز')
+      h('a', { class: 'btn btn--primary bk-done__status-link', href: `#b/${reply.token}` }, 'شوف حالة الحجز'),
+      doneContact(reply)
     ));
     heading.focus({ preventScroll: true });
     flowEl.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
@@ -1231,6 +1321,18 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
     cue('success');
     refreshMine();
 
+  }
+
+
+  /* «طلبك وصل»: the chosen servant's WhatsApp, when the event allows it and the number is public */
+  function doneContact(reply) {
+    const servant = booking.contactAfter ? booking.servants.find(s => s.id === lastServantId) : null;
+    if (!servant || !servant.wa) return null;
+    const text = `سلام، أنا حجزت في «${event.title}» ورقم الحجز ${reply.ref}.`;
+    return h('div', { class: 'bk-done__contact' },
+      h('p', { class: 'bk-note' }, `عندك سؤال؟ كلّم ${servant.name}.`),
+      h('a', { class: 'btn btn--wa', href: waWithText(servant.wa, text), target: '_blank', rel: 'noopener', 'data-act': 'done-wa' },
+        icon('whatsapp'), `كلّم ${servant.name} على واتساب`, h('span', { class: 'visually-hidden' }, ' (بيفتح واتساب)')));
   }
 
 

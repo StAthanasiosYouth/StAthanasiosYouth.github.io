@@ -31,7 +31,7 @@ test('servant money: cash vs online, owed, handover, still to hand over; a void 
 
   // more than he actually holds → refused server-side, force or not; per method too (the 500 transfer isn't his)
   for (const extra of [{}, { force: true }]) {
-    const over = await w.admin('POST', H, { servantId: 'srv-aaaa1111', amount: 1001, handedAt: msStamp(Date.now() - 1000), idemKey: w.key('h'), ...extra });
+    const over = await w.admin('POST', H, { servantId: 'srv-aaaa1111', method: 'cash', amount: 1001, handedAt: msStamp(Date.now() - 1000), idemKey: w.key('h'), ...extra });
     assert.deepEqual([over.status, over.body.code], [409, 'over']);
   }
   const notHis = await w.admin('POST', H, { servantId: 'srv-aaaa1111', amount: 100, method: 'transfer', handedAt: msStamp(Date.now() - 1000), idemKey: w.key('h') });

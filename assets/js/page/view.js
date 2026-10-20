@@ -487,7 +487,7 @@ export function createView({ main, live, rootUrl, mediaUrl, onClip }) {
       ),
       h('p', { class: 'book__pay' }, payText),
       booking.capacity ? h('p', { class: 'book__cap' }, 'الأماكن محدودة، احجز بدري.') : null,
-      servants.length
+      servants.length && booking.contactOnPage !== false
         ? [h('p', { class: 'book__line' }, STATE[2]), h('ul', { class: 'people people--servants' }, servants)]
         : null
     );

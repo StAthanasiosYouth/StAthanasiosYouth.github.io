@@ -598,8 +598,39 @@ test('a manual booking confirmed in the same dialog; summary + XLSX (the phone w
   assert.ok(await d.page.$('.book-servants [data-servant="srv-mina"] [data-act="handover"]'), 'one event picked: a handover can be recorded');
   assert.ok(fake.state.calls.some(c => c.path === '/v1/admin/book/finance' && new URLSearchParams(c.query).get('eventId') === eventId));
   await shot(d.page, '08b-finance');
+  await sleep(300);
+  await d.page.screenshot({ path: `${SHOTS}08c-finance-full.png`, fullPage: true });
+  // the servant filter: one card, the methods open, the summary is his
+  await d.page.select('[data-act="finance-servant"]', 'srv-mina');
+  await d.page.waitForFunction(() => document.querySelectorAll('.fin-card').length === 1 && document.querySelector('.fin-methods[open]'));
+  assert.match(await d.page.$eval('#fin-sum-h', n => n.textContent), /مينا/);
+  // exports sit on the page (one event picked)
+  assert.equal(await d.page.$eval('[data-act="fin-roster"]', n => n.disabled), false);
+  assert.equal(await d.page.$eval('[data-act="fin-report"]', n => n.disabled), false);
+  // the handover dialog: one method, the balance shown, more than it can't be sent
+  await d.page.click('.fin-card [data-act="handover"]');
+  await d.page.waitForSelector('dialog.modal[open] .fin-avail strong');
+  assert.match(await d.page.$eval('dialog.modal[open] .fin-avail', n => n.textContent), /٤٬٣٠٠/);
+  await d.page.$eval('dialog.modal[open] .fin-handover input[inputmode="numeric"]', n => { n.value = '999999'; n.dispatchEvent(new Event('input', { bubbles: true })); });
+  assert.equal(await d.page.$eval('dialog.modal[open] [data-fin-send]', n => n.disabled), true, 'more than he holds: the button is off');
+  await d.page.$eval('dialog.modal[open] .fin-handover input[inputmode="numeric"]', n => { n.value = '0'; n.dispatchEvent(new Event('input', { bubbles: true })); });
+  assert.equal(await d.page.$eval('dialog.modal[open] [data-fin-send]', n => n.disabled), true, 'zero: off');
+  await d.page.$eval('dialog.modal[open] .fin-handover input[inputmode="numeric"]', n => { n.value = '300'; n.dispatchEvent(new Event('input', { bubbles: true })); });
+  assert.equal(await d.page.$eval('dialog.modal[open] [data-fin-send]', n => n.disabled), false);
+  await shot(d.page, '08d-handover');
+  await d.page.click('dialog.modal[open] .btn--ghost');
+  await d.page.waitForFunction(() => !document.querySelector('dialog.modal[open]'));
+  // reminders: the section is there (with or without anyone owing)
+  await d.page.waitForSelector('[data-reminders] .fin-log, [data-reminders] .fin-hint');
+  // phone width: no sideways scroll
+  await d.page.setViewport({ width: 390, height: 844 });
+  await sleep(400);
+  assert.ok(await d.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'no horizontal scroll on a phone');
+  await d.page.screenshot({ path: `${SHOTS}08e-finance-phone.png`, fullPage: true });
+  await d.page.setViewport({ width: 1366, height: 900 });
+  await d.page.select('[data-act="finance-servant"]', '');
   await d.page.select('[data-act="finance-event"]', 'all');
-  await d.page.waitForFunction(() => document.querySelector('.book-servants [data-servant="srv-mina"]') && !document.querySelector('.book-servants [data-act="handover"]'));
+  await d.page.waitForFunction(() => document.querySelector('.book-servants [data-servant="srv-mina"]') && !document.querySelector('.book-servants [data-act="handover"]'), { polling: 100, timeout: 8000 });
   assert.ok(fake.state.calls.some(c => c.path === '/v1/admin/book/finance' && new URLSearchParams(c.query).get('eventId') === 'all'));
   await d.page.evaluate(() => A.book.open(A.book.eventId));
   await d.page.waitForSelector('[data-act="book-cancel-all"]');

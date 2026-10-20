@@ -334,6 +334,9 @@ function cleanBooking(raw) {
     collectNames: raw.collectNames === true,
     // «إضافة فرد»: people one by one (name + age), each priced by age
     participants: raw.participants === true,
+    // the servants' WhatsApp (approved public contact only): on the page (default on) / after booking (default off)
+    contactOnPage: raw.contactOnPage !== false,
+    contactAfter: raw.contactAfter === true,
     pricing: { mode, categories },
     payment: {
       mode: pay.mode === 'installments' ? 'installments' : 'full',

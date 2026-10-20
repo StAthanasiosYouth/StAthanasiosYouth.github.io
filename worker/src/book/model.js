@@ -397,3 +397,25 @@ export function summary(event, bookings, payments, servants, { from = null, to =
     handovers: { total: handedTotal, held: [...perServant.values()].reduce((t, s) => t + (s.held || 0), 0), toHandOver: [...perServant.values()].reduce((t, s) => t + (s.held || 0), 0) - handedTotal }
   };
 }
+
+/*
+ * The visitor's payment choice (Phase 1 final): «دفع كامل» → the total;
+ * «دفع قسط» → only when the event takes installments, at least the first
+ * minimum (never above the total) and less than the total. A claim the admin
+ * checks against the proof — never recorded money. No choice sent (an older
+ * page) → nothing claimed.
+ */
+export function payClaim(payment, total, plan, amount) {
+  if (plan == null || plan === '') return { plan: null, claim: null };
+  if (plan === 'full') return { plan: 'full', claim: total };
+  if (plan !== 'part' || !payment || payment.mode !== 'installments' || total <= 1) return { problem: 'payPlan' };
+  const min = minPart(payment, total);
+  const n = Number(amount);
+  if (!Number.isInteger(n) || n < min || n >= total) return { problem: 'payAmount' };
+  return { plan: 'part', claim: n };
+}
+
+/** the least a first installment may be: the event's minimum (at least 1), never the whole total */
+export function minPart(payment, total) {
+  return Math.max(1, Math.min((payment && payment.minFirst) || 1, total - 1));
+}

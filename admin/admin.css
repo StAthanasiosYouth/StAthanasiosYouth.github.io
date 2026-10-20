@@ -7562,3 +7562,77 @@ dialog .toasts[popover] {
     .book-servants .comp-rank__row > :nth-child(2), .book-servants .comp-rank__row > :nth-child(4), .book-servants .comp-rank__row > :nth-child(5), .book-servants .comp-rank__row > :nth-child(6) { display: none; }
     .book-pay { align-items: flex-start; }
   }
+
+  /* «الحسابات المالية للخدام»: filters, summary stats, a card per servant, methods, logs */
+  .fin { display: grid; gap: 22px; margin-top: 8px; }
+  .fin-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .fin-exports { display: grid; gap: 6px; padding: 12px 14px; border-radius: 16px; background: rgba(255, 255, 255, .03); box-shadow: inset 0 0 0 1px var(--line-2); }
+  .fin-exports .actions { margin: 0; flex-wrap: wrap; }
+  .fin-hint { margin: 0; font-size: .95rem; line-height: 1.7; color: var(--text-2); }
+  .fin-section { display: grid; gap: 12px; }
+  .fin-h { margin: 0; font-size: 1.12rem; font-weight: 800; color: var(--gold-hi); }
+  .fin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .fin-stat { display: grid; gap: 4px; align-content: start; padding: 12px 14px; border-radius: 14px; background: rgba(255, 255, 255, .03); box-shadow: inset 0 0 0 1px var(--line-2); min-width: 0; }
+  .fin-stat__label { font-size: .95rem; color: var(--text-2); }
+  .fin-stat__value { font-size: 1.35rem; font-weight: 800; line-height: 1.3; color: var(--text); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .fin-stat__hint { font-size: .85rem; color: var(--text-3); line-height: 1.5; }
+  .fin-stats--main .fin-stat__value { font-size: 1.6rem; }
+  .fin-stat--gold .fin-stat__value { color: var(--gold-hi); }
+  .fin-stat--warn { box-shadow: inset 0 0 0 1px var(--gold); }
+  .fin-stat--warn .fin-stat__value { color: var(--gold-hi); }
+  .fin-stat--danger { box-shadow: inset 0 0 0 1px var(--danger); }
+  .fin-stat--danger .fin-stat__value { color: var(--danger); }
+  .fin-events { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+  .fin-event { display: grid; gap: 6px; text-align: start; padding: 12px 14px; border: 0; border-radius: 14px; background: rgba(255, 255, 255, .03); box-shadow: inset 0 0 0 1px var(--line-2); color: var(--text); font: inherit; cursor: pointer; }
+  .fin-event:hover { box-shadow: inset 0 0 0 1px var(--gold); }
+  .fin-event__title { font-weight: 800; font-size: 1.02rem; }
+  .fin-event__nums { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .95rem; color: var(--text-2); }
+  .fin-cards { display: grid; gap: 14px; }
+  .fin-card { display: grid; gap: 14px; padding: 16px; border-radius: 18px; background: rgba(255, 255, 255, .025); box-shadow: inset 0 0 0 1px var(--line-2); }
+  .fin-card__head { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; }
+  .fin-card__who { display: grid; gap: 2px; min-width: 0; }
+  .fin-card__name { font-size: 1.2rem; font-weight: 800; }
+  .fin-card__meta { font-size: .92rem; color: var(--text-2); }
+  .fin-card__due { display: grid; justify-items: end; gap: 0; }
+  .fin-card__due-label { font-size: .9rem; color: var(--text-2); }
+  .fin-card__due-value { font-size: 1.5rem; font-weight: 800; color: var(--gold-hi); font-variant-numeric: tabular-nums; }
+  .fin-stats--card { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+  .fin-stats--card .fin-stat__value { font-size: 1.15rem; }
+  .fin-methods > summary { cursor: pointer; font-weight: 700; font-size: 1rem; padding: 6px 0; }
+  .fin-method-list { display: grid; gap: 10px; margin-top: 8px; }
+  .fin-method { display: grid; gap: 10px; padding: 12px 14px; border-radius: 14px; background: rgba(2, 9, 20, .45); box-shadow: inset 0 0 0 1px var(--line-2); }
+  .fin-method__head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .fin-method__name { font-size: 1.08rem; }
+  .fin-method__due { font-weight: 700; color: var(--gold-hi); }
+  .fin-method__nums { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px 14px; margin: 0; }
+  .fin-method__nums > div { display: grid; gap: 2px; }
+  .fin-method__nums dt { font-size: .88rem; color: var(--text-2); }
+  .fin-method__nums dd { margin: 0; font-weight: 700; font-size: 1.02rem; font-variant-numeric: tabular-nums; }
+  .fin-method__warn dd { color: var(--danger); }
+  .fin-method > .btn { justify-self: start; }
+  .fin-refs:empty { display: none; }
+  .fin-refs__list, .fin-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .fin-refs__list > li { display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .03); }
+  .fin-refs__top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .fin-refs__nums { font-size: .95rem; }
+  .fin-refs__pays { font-size: .9rem; color: var(--text-2); }
+  .fin-log__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'main act' 'meta act'; align-items: center; gap: 4px 12px; padding: 12px 14px; border-radius: 14px; background: rgba(255, 255, 255, .03); box-shadow: inset 0 0 0 1px var(--line-2); }
+  .fin-log__main { grid-area: main; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; font-size: 1rem; }
+  .fin-log__meta { grid-area: meta; font-size: .9rem; color: var(--text-2); }
+  .fin-log__row > .btn, .fin-log__row > .chip, .fin-log__row > .fin-hint { grid-area: act; }
+  .fin-log__row.is-void { opacity: .6; }
+  .fin-avail { margin: 0; font-size: 1.02rem; }
+  .fin-avail strong { color: var(--gold-hi); font-size: 1.15rem; }
+  .fin-problem { margin: 0; color: var(--danger); font-weight: 700; }
+  .fin-problem[hidden] { display: none; }
+  @media (max-width: 560px) {
+    .fin-filters { grid-template-columns: 1fr; }
+    .fin-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .fin-stats--main .fin-stat__value { font-size: 1.3rem; }
+    .fin-card { padding: 14px 12px; }
+    .fin-card__head { grid-template-columns: minmax(0, 1fr) auto; }
+    .fin-card__head > .btn { grid-column: 1 / -1; justify-self: stretch; }
+    .fin-method__nums { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .fin-log__row { grid-template-columns: 1fr; grid-template-areas: 'main' 'meta' 'act'; }
+    .fin-log__row > .btn { justify-self: start; }
+  }

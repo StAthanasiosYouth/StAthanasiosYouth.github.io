@@ -417,7 +417,7 @@ test('happy path at 360×740: state → who → servant + WhatsApp → a real JP
   assert.deepEqual(body, {
     slug: 'online-trip', requestKey: key, name: 'مينا عادل', phone: '01012345678',
     counts: { applicant: 1, adult: 1, child: 0, infant: 0 }, hp: '', revision: 'rev-1',
-    note: 'هنركب من الكنيسة', servantId: 'srv-mina0001', method: 'instapay', proofs: [{ proofId: 'prf-abcdefgh', claim: 'claim-0' }]
+    note: 'هنركب من الكنيسة', servantId: 'srv-mina0001', method: 'instapay', proofs: [{ proofId: 'prf-abcdefgh', claim: 'claim-0' }], payPlan: 'full'
   });
   assert.equal(await textOf(page, '.bk-done__code'), 'B-7K2QX');
   assert.equal(await textOf(page, '.bk-done__status'), 'قيد المراجعة');
@@ -578,6 +578,18 @@ test('InstaPay payment card: the approved number + amount + «نسخ الرقم�
   assert.equal(await textOf(page, '.bk-paycard__number'), '011 9876 5432');
   assert.equal(await page.$eval('.bk-paycard__number', el => el.dir), 'ltr');
   assert.match(await textOf(page, '.bk-paycard__name'), /Mina Adel/);
+  // «دفع قسط»: the amount, the minimum, what's left; the pay card follows; back to «دفع كامل»
+  await page.click('label[for="bk-plan-part"]');
+  await page.waitForSelector('#bk-pay-amount');
+  await page.$eval('#bk-pay-amount', n => { n.value = ''; });
+  await page.type('#bk-pay-amount', '١٢٠٠');
+  assert.match(await textOf(page, '.bk-plan__sum'), /الباقي.*١٬٨٠٠/s);
+  assert.match(await textOf(page, '.bk-paycard__amount'), /حوّل دلوقتي: ١٬٢٠٠ جنيه/);
+  await page.screenshot({ path: `${SHOTS}pay-part.png`, fullPage: true });
+  await page.$eval('#bk-pay-amount', n => { n.value = '3000'; n.dispatchEvent(new Event('input', { bubbles: true })); n.dispatchEvent(new Event('blur')); });
+  assert.match(await textOf(page, '[data-field="payAmount"] .bk-field__err'), /دفع كامل/);
+  await page.click('label[for="bk-plan-full"]');
+  assert.match(await textOf(page, '.bk-paycard__amount'), /المطلوب تحوّله: ٣٬٠٠٠ جنيه/);
   assert.equal(await textOf(page, '.bk-next'), 'تم التحويل');
   // optional: ask the servant before transferring (his WhatsApp, by consent)
   assert.match(await textOf(page, '[data-act="ask-servant"]'), /عايز تتأكد قبل التحويل؟ تواصل مع المسؤول/);

@@ -1064,6 +1064,9 @@
     var collectNames = A.checkbox('اطلب أسماء كل الأفراد', booking ? !!booking.collectNames : false);
     var participants = A.checkbox('كل فرد باسمه وسنه («إضافة فرد»)', booking ? !!booking.participants : false, 'الزائر بيضيف الأفراد واحد واحد؛ السعر بيتحسب لكل فرد حسب سنه («من سن / لحد سن» في الفئات)، والباقي بالسعر الأول');
     var pricing = pricingEditor(booking ? booking.pricing : null);
+    // where the servants' WhatsApp shows (only servants whose number is approved for visitors, from «الخدام»)
+    var contactOnPage = A.checkbox('واتساب الخادم يظهر في صفحة الفعالية', booking ? booking.contactOnPage !== false : true, 'في كل الأوقات: قبل الحجز، وبعد ما الحجز يقفل أو العدد يكمل');
+    var contactAfter = A.checkbox('واتساب الخادم يظهر بعد ما الزائر يخلّص الحجز', booking ? booking.contactAfter === true : false, 'زرار «كلّم الخادم» في شاشة «طلبك وصل» للخادم اللي اختاره');
     var payMode = A.choices(A.uid('pay'), [{ value: 'full', label: 'الدفع كامل' }, { value: 'installments', label: 'مقدم وأقساط' }],
       booking && booking.payment ? booking.payment.mode : 'full', function (v) { installments.hidden = v !== 'installments'; });
     var minFirst = number(booking && booking.payment ? booking.payment.minFirst : '', 0, 1000000, 'مثلاً ٥٠٠');
@@ -1090,7 +1093,9 @@
       el('fieldset', { class: 'fieldset' }, el('legend', { text: 'الأسعار' }), pricing.node),
       el('fieldset', { class: 'fieldset' }, el('legend', { text: 'الدفع' }), payMode.node || payMode, installments),
       el('fieldset', { class: 'fieldset' }, el('legend', { text: 'الخدام اللي بيتحجز معاهم' }),
-        servantRows.length ? el('div', {}, servantRows.map(function (s) { return s.node; })) : el('p', { class: 'note', text: 'مفيش خدام لسه — زوّدهم من «الخدام».' })));
+        servantRows.length ? el('div', {}, servantRows.map(function (s) { return s.node; })) : el('p', { class: 'note', text: 'مفيش خدام لسه — زوّدهم من «الخدام».' }),
+        el('p', { class: 'note', text: 'رقم التواصل بيظهر بس للخادم اللي رقمه متاح للزوار (من «الخدام»). أرقام الدفع والأرقام الخاصة عمرها ما بتظهر هنا.' }),
+        contactOnPage.node, contactAfter.node));
 
     hasBooking.input.addEventListener('change', function () { bookingBox.hidden = !hasBooking.input.checked; });
 
@@ -1110,6 +1115,7 @@
         booking: hasBooking.input.checked ? {
           opensAt: opensAt.value(), closesAt: closesAt.value(), capacity: capacity.value, perBookingMax: perBooking.value,
           collectNames: collectNames.input.checked, participants: participants.input.checked, pricing: pricing.value(),
+          contactOnPage: contactOnPage.input.checked, contactAfter: contactAfter.input.checked,
           payment: { mode: payMode.value ? payMode.value() : (installments.hidden ? 'full' : 'installments'), minFirst: minFirst.value, finalDueAt: finalDueAt.value() }
         } : null,
         servants: servantRows.filter(function (s) { return s.on.input.checked; }).map(function (s) {

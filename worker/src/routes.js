@@ -19,7 +19,7 @@ import { makeJob } from './jobs.js';
 import { bookState, bookProof, bookSubmit, bookStatus, bookWithdraw } from './book/public.js';
 import {
   adminModule, adminModuleSet, adminEvents, adminEventRefresh, adminBookings, adminBooking, adminCreate, adminConfirm,
-  adminReject, adminCancel, adminReopen, adminUpdate, adminPaymentAdd, adminPaymentVoid, adminCancelAll, adminSummary, adminExport, adminLock, adminUnlock, proofTarget, adminHandovers, adminHandoverAdd, adminHandoverVoid, adminFinance
+  adminReject, adminCancel, adminReopen, adminUpdate, adminPaymentAdd, adminPaymentVoid, adminCancelAll, adminSummary, adminExport, adminLock, adminUnlock, proofTarget, adminHandovers, adminHandoverAdd, adminHandoverVoid, adminFinance, adminReminders, adminReminderAdd
 } from './book/admin.js';
 import { rowFromJson, saveRow } from './book/event.js';
 import { syncBookNews, diagNews } from './book/news.js';
@@ -257,6 +257,8 @@ export const ROUTES = [
   // per-servant accounting: money handed over to the service (append-only, voidable)
   { method: 'GET', path: '/v1/admin/book/events/:id/handovers', auth: 'admin', handler: adminHandovers },
   { method: 'GET', path: '/v1/admin/book/finance', auth: 'admin', handler: adminFinance },
+  { method: 'GET', path: '/v1/admin/book/events/:id/reminders', auth: 'admin', handler: adminReminders },
+  { method: 'POST', path: '/v1/admin/book/events/:id/reminders', auth: 'admin', handler: adminReminderAdd },
   { method: 'POST', path: '/v1/admin/book/events/:id/handovers', auth: 'admin', handler: adminHandoverAdd },
   { method: 'POST', path: '/v1/admin/book/handovers/:id/void', auth: 'admin', handler: adminHandoverVoid }
 ];

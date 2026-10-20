@@ -338,6 +338,13 @@ export function createBookWorker({ event, origin, proofBytes, now = () => '2026-
     }],
     ['GET', /^\/v1\/admin\/book\/summary$/, () => summary()],
     ['GET', /^\/v1\/admin\/book\/events\/[^/]+\/handovers$/, () => ({ handovers: [], servants: [], totals: { total: 0, held: 0, toHandOver: 0 } })],
+    ['GET', /^\/v1\/admin\/book\/events\/[^/]+\/reminders$/, () => ({ reminders: clone(state.reminders || []), gapMs: 20 * 3600 * 1000 })],
+    ['POST', /^\/v1\/admin\/book\/events\/[^/]+\/reminders$/, (m, body) => {
+      state.reminders = state.reminders || [];
+      if (state.reminders.some(r => r.bookingId === body.bookingId)) throw new Fail('recent', { message: 'recent' });
+      state.reminders.unshift({ id: id('rmd'), bookingId: body.bookingId, channel: 'whatsapp', balance: 1, sentAt: now(), sentMs: Date.now(), sentName: 'مينا' });
+      return { reminders: clone(state.reminders), gapMs: 20 * 3600 * 1000 };
+    }],
     // the finance page: the same per-servant lines, one event (the fake has one)
     ['GET', /^\/v1\/admin\/book\/finance$/, () => {
       const s = summary();

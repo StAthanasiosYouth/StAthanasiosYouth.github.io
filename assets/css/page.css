@@ -3180,3 +3180,178 @@ img, svg, video {
   color: var(--gold-hi);
   font-weight: 700;
 }
+
+/* «دفع كامل» / «دفع قسط» (installments): two big choices, then the amount and what's left */
+.bk-plan-wrap:empty {
+  display: none;
+}
+
+.bk-plans {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bk-plan {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  min-height: 72px;
+  padding: 12px 16px;
+  border: 1px solid var(--gold-line);
+  border-radius: var(--radius-md);
+  background: rgba(2, 9, 20, .45);
+  cursor: pointer;
+}
+
+.bk-plan input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.bk-plan:has(input:checked) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--navy-900));
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.bk-plan:has(input:focus-visible) {
+  outline: 2px solid var(--accent-hi);
+  outline-offset: 3px;
+}
+
+.bk-plan__title {
+  font-size: 1.08rem;
+  font-weight: 800;
+}
+
+.bk-plan__sub {
+  font-size: .95rem;
+  color: var(--gold-hi);
+}
+
+.bk-plan__box {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, .04);
+}
+
+.bk-plan__input {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  max-width: 220px;
+}
+
+.bk-plan__sum {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.bk-plan__sum > div {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(2, 9, 20, .5);
+}
+
+.bk-plan__sum dt {
+  font-size: .9rem;
+  opacity: .85;
+}
+
+.bk-plan__sum dd {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.bk-plan__rest dd {
+  color: var(--gold-hi);
+}
+
+.bk-plan__note {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.bk-paycard__amount {
+  font-size: 1.08rem;
+}
+
+.bk-paycard__rest {
+  margin-inline-start: .5em;
+  font-size: .95rem;
+  opacity: .85;
+}
+
+@media (max-width: 420px) {
+  .bk-plan__sum {
+    grid-template-columns: 1fr;
+  }
+  .bk-plan__sum > div {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+}
+
+/* Phase 1 final polish: calmer rhythm in «احجز الآن» and the payment step (no redesign) */
+.book__pay,
+.book__cap {
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.book__line {
+  margin-top: 14px;
+}
+
+/* one servant: lined up with the text above (not floating in the middle) */
+.people.people--servants:has(> li:only-child) {
+  justify-content: start;
+}
+
+.bk-form {
+  row-gap: 20px;
+}
+
+.bk-paycard {
+  gap: 10px;
+  padding: 18px 16px;
+}
+
+.bk-paycard__steps {
+  gap: 6px;
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.bk-paycard__label,
+.bk-paycard__name {
+  font-size: 1rem;
+}
+
+.bk-total {
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: rgba(2, 9, 20, .45);
+}
+
+.bk-done__contact {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  margin-top: 6px;
+}

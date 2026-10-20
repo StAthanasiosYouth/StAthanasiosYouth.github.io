@@ -58,6 +58,8 @@ function listRow(b, event, paid, flags, now) {
     servantId: b.servant_id, servantName: servantName(event, b.servant_id), method: b.method,
     people: people(event.booking && event.booking.pricing, counts), seats: b.status === 'confirmed' ? b.seats_actual : b.seats_requested,
     quotedTotal: b.quoted_total, amountDue: amountDueOf(b), ...d,
+    // the visitor's choice: «دفع كامل» / «دفع قسط» and the amount they said they sent (a claim, not money)
+    payPlan: b.pay_plan || null, payClaim: b.pay_claim == null ? null : b.pay_claim,
     createdAt: b.created_at, confirmedAt: b.confirmed_at || null, flags, version: b.version
   };
 }
@@ -778,11 +780,12 @@ export async function adminHandoverAdd(ctx) {
   const now = Date.now();
   const handedMs = stampMs(String(body.handedAt || '').replace(' ', 'T'));
   if (!handedMs || handedMs > now + RECEIVED_SKEW_MS) throw invalid('handedAt');
+  // one payment method per handover: the cap is what the servant holds BY that method
   const method = String(body.method || '');
-  if (method && !((event.booking && event.booking.methods) || []).some(m => m.key === method)) throw invalid('method');
+  if (!((event.booking && event.booking.methods) || []).some(m => m.key === method)) throw invalid('method');
   const { bookings, payments, handovers } = await eventRows(env, event.id);
   const s = summary(event, bookings, payments, event.booking.servants || [], {}, now, handovers).servants.find(x => x.id === servant.id) || { toHandOver: 0, methods: [] };
-  const holds = method ? ((s.methods.find(m => m.method === method) || {}).toHandOver || 0) : s.toHandOver;
+  const holds = Math.min((s.methods.find(m => m.method === method) || {}).toHandOver || 0, s.toHandOver);
   if (amount > holds) throw new ApiError('over', 'handover', { field: 'amount', holds: Math.max(0, holds), method });
   const handedSeen = handovers.filter(h => h.kind === 'handover' && !h.voided_by && h.servant_id === servant.id).reduce((t, h) => t + h.amount, 0);
   const id = randomId('hnd-', 6);
@@ -929,4 +932,61 @@ export async function adminFinance(ctx) {
     totals,
     servants: [...combined.values()].map(c => ({ ...c, methods: [...c.methods.values()] }))
   };
+}
+
+/*
+ * Payment reminders (Phase 1 final). An admin reminds a participant who still
+ * owes money on a CONFIRMED booking: the admin's own WhatsApp opens with a
+ * message (built by the panel: booking ref, event, no amounts, no numbers);
+ * the Worker checks the booking really owes, refuses a second reminder for the
+ * same booking within REMIND_GAP_MS, and logs every reminder (append-only).
+ * Push to the visitor is Phase 6: a booking ref alone is never a subscription.
+ */
+const REMIND_GAP_MS = 20 * 3600 * 1000;
+
+const reminderOut = r => ({
+  id: r.id, bookingId: r.booking_id, kind: r.kind, channel: r.channel, balance: r.balance,
+  sentAt: r.sent_at, sentMs: r.sent_ms, sentBy: r.sent_by, sentName: r.sent_name || ''
+});
+
+/* GET /v1/admin/book/events/:id/reminders → { reminders (newest first), gapMs } */
+export async function adminReminders(ctx) {
+  const event = await eventById(ctx, ctx.params.id);
+  const rows = (await retry(() => ctx.env.DB.prepare('SELECT * FROM reminders WHERE event_id = ? ORDER BY sent_ms DESC LIMIT 500').bind(event.id).all())).results;
+  return { reminders: rows.map(reminderOut), gapMs: REMIND_GAP_MS };
+}
+
+/* POST /v1/admin/book/events/:id/reminders { bookingId, idemKey } */
+export async function adminReminderAdd(ctx) {
+  const env = ctx.env;
+  const body = ctx.body || {};
+  const event = await eventById(ctx, ctx.params.id);
+  if (!KEY.test(String(body.idemKey || ''))) throw invalid('idemKey');
+  const twin = await env.DB.prepare('SELECT id FROM reminders WHERE idem_key = ?').bind(body.idemKey).first();
+  if (twin) return adminReminders(ctx);
+  const b = await env.DB.prepare('SELECT * FROM bookings WHERE id = ? AND event_id = ?').bind(String(body.bookingId || ''), event.id).first();
+  if (!b) throw new ApiError('not_found', 'booking');
+  if (b.status !== 'confirmed') throw invalid('bookingId');
+  const pays = (await env.DB.prepare('SELECT kind, amount, voided_by FROM payments WHERE booking_id = ?').bind(b.id).all()).results;
+  const now = Date.now();
+  const d = derive(b, pays, event.booking && event.booking.payment, now);
+  if (!(d.balance > 0)) throw invalid('bookingId');
+  const at = cairoText(now);
+  const id = randomId('rmd-', 6);
+  // at most one reminder per booking per gap, decided inside the write
+  const r = await retry(() => env.DB.batch([
+    env.DB.prepare(`INSERT INTO reminders (id, event_id, booking_id, kind, channel, balance, sent_at, sent_ms, sent_by, sent_name, idem_key)
+      SELECT ?, ?, ?, 'balance', 'whatsapp', ?, ?, ?, ?, ?, ?
+      WHERE NOT EXISTS (SELECT 1 FROM reminders WHERE booking_id = ? AND sent_ms > ?)
+      ON CONFLICT(idem_key) DO NOTHING`).bind(id, event.id, b.id, d.balance, at, now, ctx.actor.email, ctx.actor.name || null, body.idemKey, b.id, now - REMIND_GAP_MS),
+    env.DB.prepare(`INSERT INTO activity (id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary)
+      SELECT ?, ?, ?, ?, ?, 'booking.remind', 'booking', ?, ?, ? WHERE EXISTS (SELECT 1 FROM reminders WHERE id = ?)`).bind(
+      randomId('act-'), now, at, ctx.actor.email, ctx.actor.name || null, b.id, b.ref, 'تذكير بالباقي (واتساب)', id)
+  ]));
+  if (r[0].meta.changes !== 1) {
+    const last = await env.DB.prepare('SELECT * FROM reminders WHERE booking_id = ? OR idem_key = ? ORDER BY sent_ms DESC LIMIT 1').bind(b.id, body.idemKey).first();
+    if (last && last.idem_key === body.idemKey) return adminReminders(ctx);
+    throw new ApiError('recent', 'reminder', { last: last ? reminderOut(last) : null });
+  }
+  return adminReminders(ctx);
 }

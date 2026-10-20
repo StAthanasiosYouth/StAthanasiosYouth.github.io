@@ -152,7 +152,8 @@ test('the submit body and the WhatsApp text: server-shaped, no extras; a free ev
   assert.deepEqual(B.submitBody(EVENT, draft, { revision: 'r9' }), {
     slug: 'ain-sokhna-trip', requestKey: key, name: 'مينا عادل', phone: '01012345678',
     counts: { applicant: 1, adult: 1, child: 1, infant: 0 }, hp: '', revision: 'r9',
-    note: 'هنركب من الكنيسة', servantId: 'srv-mina0001', method: 'instapay', proofs: [{ proofId: 'prf-abcdefgh', claim: 'c1' }]
+    note: 'هنركب من الكنيسة', servantId: 'srv-mina0001', method: 'instapay', proofs: [{ proofId: 'prf-abcdefgh', claim: 'c1' }],
+    payPlan: 'full'
   });
   const free = B.submitBody({ ...EVENT, booking: FREE }, { ...draft, note: '' }, {});
   assert.deepEqual(Object.keys(free).sort(), ['counts', 'hp', 'name', 'phone', 'requestKey', 'revision', 'slug']);
@@ -171,7 +172,7 @@ test('the submit body and the WhatsApp text: server-shaped, no extras; a free ev
 test('draft: 7 days, the same step and requestKey back, everything checked; never picture bytes or «موافق»', () => {
   const draft = { ...B.emptyDraft(BOOKING, 'web.abcdefghij', NOW), step: 'b', fields: { name: 'مينا', phone: '010' }, servantId: 'srv-mina0001', method: 'cash', agreed: true, proofs: [{ proofId: 'prf-abcdefgh', claim: 'x', blob: 'BYTES', url: 'blob:x' }] };
   const stored = JSON.parse(JSON.stringify(B.storeDraft(draft, NOW)));
-  assert.deepEqual(Object.keys(stored).sort(), ['counts', 'fields', 'method', 'names', 'note', 'pay', 'people', 'proofs', 'requestKey', 'savedAt', 'servantId', 'step'].sort());
+  assert.deepEqual(Object.keys(stored).sort(), ['counts', 'fields', 'method', 'names', 'note', 'pay', 'payAmount', 'payPlan', 'people', 'proofs', 'requestKey', 'savedAt', 'servantId', 'step'].sort());
   assert.deepEqual(stored.proofs, [{ proofId: 'prf-abcdefgh', claim: 'x' }]);
   assert.doesNotMatch(JSON.stringify(stored), /BYTES|blob:/);
 
@@ -426,4 +427,17 @@ test('the event page shells allow Turnstile (script + frame) and nothing else fr
     assert.ok(policy.includes('frame-src https://www.google.com https://challenges.cloudflare.com;'), file);
     assert.equal(policy.match(/cloudflare/g).length, 2, file);
   }
+});
+
+test('«دفع كامل» / «دفع قسط»: only with installments; the installment is checked like the Worker', () => {
+  const inst = { ...BOOKING, payment: { mode: 'installments', minFirst: 500, finalDueAt: '' } };
+  assert.equal(B.partAllowed({ ...BOOKING, payment: { mode: 'full', minFirst: 0 } }, 2000), false);
+  assert.equal(B.partAllowed(inst, 2000), true);
+  assert.equal(B.minPart(inst, 2000), 500);
+  assert.equal(B.minPart(inst, 300), 299, 'a minimum above the total never blocks an installment');
+  assert.equal(B.partAmount('٧٥٠'), 750);
+  assert.ok(Number.isNaN(B.partAmount('7a')));
+  assert.match(B.partProblem(inst, 2000, '499'), /^أقل قسط/);
+  assert.match(B.partProblem(inst, 2000, '2000'), /دفع كامل/);
+  assert.equal(B.partProblem(inst, 2000, '750'), '');
 });

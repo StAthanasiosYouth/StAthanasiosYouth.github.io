@@ -238,6 +238,9 @@ function bookBookingInput_(value, startAt, problems) {
     collectNames: value.collectNames === true,
     // «كل فرد باسمه وسنه»: the visitor adds people one by one (name + age); each is priced by age
     participants: value.participants === true,
+    // the servants' WhatsApp (their approved public contact only): on the event page / after a booking
+    contactOnPage: value.contactOnPage !== false,
+    contactAfter: value.contactAfter === true,
     showLeft: value.showLeft !== false,
     showLeftBelow: showLeftBelow === '' || isNaN(showLeftBelow) ? 20 : Math.min(showLeftBelow, BOOK_LIMITS.capacity),
     pricing: pricing,
@@ -349,6 +352,8 @@ function bookPublicBooking_(spec, servants, servantRows, methodRows, image, onli
     perBookingMax: spec.perBookingMax || 10,
     collectNames: !!spec.collectNames || !!spec.participants,
     participants: !!spec.participants,
+    contactOnPage: spec.contactOnPage !== false,
+    contactAfter: spec.contactAfter === true,
     pricing: {
       mode: spec.pricing.mode,
       categories: spec.pricing.categories.map(function (c) {

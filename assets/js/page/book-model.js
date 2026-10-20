@@ -161,13 +161,50 @@ export function checkWho(booking, { name, phone, counts, names }, left = null) {
   return problems;
 }
 
-/** step b: a servant of this event, and one of that servant's methods */
-export function checkPay(booking, { servantId, method }) {
+/** step b: a servant of this event, one of that servant's methods, and (installments) «كامل» or «قسط» */
+export function checkPay(booking, { servantId, method, payPlan, payAmount, counts }) {
   const servant = booking.servants.find(s => s.id && s.id === servantId && onlineMethodsOf(booking, s).length);
   if (!servant) return { servantId: 'اختار الخادم اللي هتدفع له.' };
   if (!servant.methods.includes(method)) return { method: 'اختار طريقة الدفع.' };
   if (!methodOnline(booking.methods.find(m => m.key === method))) return { method: 'الطريقة دي بتتدفع مع الخادم نفسه: كلّمه وهو هيسجّل حجزك.' };
+  const total = totalOf(booking, counts || {});
+  if (partAllowed(booking, total)) {
+    // nothing picked = «دفع كامل» (preselected)
+    if (payPlan && payPlan !== 'full' && payPlan !== 'part') return { payPlan: 'اختار: هتدفع المبلغ كله ولا قسط؟' };
+    if (payPlan === 'part') {
+      const problem = partProblem(booking, total, payAmount);
+      if (problem) return { payAmount: problem };
+    }
+  }
   return {};
+}
+
+/*
+ * «دفع قسط»: only when the event takes installments. The first part is at least
+ * the event's minimum (never the whole total) and less than the total — the same
+ * rule as the Worker (worker/src/book/model.js payClaim / minPart).
+ */
+export function partAllowed(booking, total) {
+  return !!(booking.payment && booking.payment.mode === 'installments' && total > 1);
+}
+
+export function minPart(booking, total) {
+  return Math.max(1, Math.min((booking.payment && booking.payment.minFirst) || 1, total - 1));
+}
+
+/** the amount typed (Arabic digits too) → a whole number, or NaN */
+export function partAmount(value) {
+  const text = String(value == null ? '' : value).trim().replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+  return /^\d{1,7}$/.test(text) ? Number(text) : NaN;
+}
+
+export function partProblem(booking, total, value) {
+  const n = partAmount(value);
+  const min = minPart(booking, total);
+  if (!Number.isInteger(n)) return 'اكتب المبلغ اللي هتحوّله بالأرقام.';
+  if (n < min) return `أقل قسط ${money(min)}.`;
+  if (n >= total) return `ده المبلغ كله (${money(total)}): اختار «دفع كامل».`;
+  return '';
 }
 
 /*
@@ -321,6 +358,11 @@ export function submitBody(event, draft, { hp = '', revision = '', turnstile = '
     body.servantId = draft.servantId;
     body.method = draft.method;
     body.proofs = (draft.proofs || []).slice(0, PROOFS_MAX).map(p => ({ proofId: p.proofId, claim: p.claim }));
+    // «دفع كامل» / «دفع قسط» (the Worker checks it again): only where installments are offered
+    if (partAllowed(booking, totalOf(booking, body.counts))) {
+      body.payPlan = draft.payPlan === 'part' ? 'part' : 'full';
+      if (body.payPlan === 'part') body.payAmount = partAmount(draft.payAmount);
+    }
   }
   return body;
 }
@@ -353,6 +395,8 @@ export function emptyDraft(booking, requestKey, now) {
     servantId: '',
     method: '',
     pay: '',
+    payPlan: '',
+    payAmount: '',
     people: [],
     note: '',
     agreed: false,
@@ -378,6 +422,8 @@ export function readDraft(raw, booking, now) {
     method: line(raw.method, 20),
     // reached the payment card (shown) / copied the number (copied): a return from the app lands there
     pay: raw.pay === 'copied' || raw.pay === 'shown' ? raw.pay : '',
+    payPlan: raw.payPlan === 'full' || raw.payPlan === 'part' ? raw.payPlan : '',
+    payAmount: /^[0-9٠-٩]{0,7}$/.test(String(raw.payAmount || '')) ? String(raw.payAmount || '') : '',
     people: Array.isArray(raw.people) ? raw.people.slice(0, 50).map(p => ({ name: line(isObject(p) ? p.name : '', NAME_MAX), age: isObject(p) && /^\d{0,3}$/.test(String(p.age)) ? String(p.age) : '' })) : [],
     note: typeof raw.note === 'string' ? raw.note.slice(0, NOTE_MAX) : '',
     agreed: false,
@@ -400,6 +446,8 @@ export function storeDraft(draft, now) {
     servantId: draft.servantId,
     method: draft.method,
     pay: draft.pay || '',
+    payPlan: draft.payPlan || '',
+    payAmount: draft.payAmount || '',
     people: (draft.people || []).map(p => ({ name: p.name, age: String(p.age) })),
     note: draft.note,
     requestKey: draft.requestKey,
@@ -463,7 +511,7 @@ export function statusHref(siteRoot, slug, token) {
    ERRORS → a step, a field and words (BOOKING-API.md «Envelope and errors»)
 ========================================================= */
 
-const FIELD_STEP = { name: 'a', phone: 'a', counts: 'a', names: 'a', participants: 'a', servantId: 'b', method: 'b', proofs: 'c', note: 'c' };
+const FIELD_STEP = { name: 'a', phone: 'a', counts: 'a', names: 'a', participants: 'a', servantId: 'b', method: 'b', payPlan: 'b', payAmount: 'b', proofs: 'c', note: 'c' };
 
 const FIELD_WORDS = {
   name: 'الاسم مش مظبوط. اكتب اسمك (من ٢ لـ ٦٠ حرف).',
@@ -473,6 +521,8 @@ const FIELD_WORDS = {
   participants: 'راجع الأفراد: اسم كل واحد (حرفين على الأقل) وسنه.',
   servantId: 'اختار الخادم تاني.',
   method: 'اختار طريقة الدفع تاني.',
+  payPlan: 'اختار تاني: دفع كامل ولا قسط.',
+  payAmount: 'مبلغ القسط مش مظبوط. راجع أقل وأقصى مبلغ.',
   proofs: 'ارفع صورة التحويل (من ١ لـ ٣ صور).',
   note: 'الملاحظة طويلة شوية. خليها أقصر.'
 };

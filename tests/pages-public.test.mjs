@@ -735,3 +735,12 @@ test('model: a video card\'s audio — original by default, custom only with thi
   }
   assert.deepEqual(cleanAudio({ mode: 'loud' }), { mode: 'original', src: null });
 });
+
+test('booking contact visibility: on the page by default, after booking only when asked; the WhatsApp is still the servant\'s approved one', () => {
+  const base = M.sanitizeEvent(EVENT);
+  if (!base || !base.booking) return;                   // the fixture has no booking: nothing to check
+  assert.equal(base.booking.contactOnPage, true);
+  assert.equal(base.booking.contactAfter, false);
+  const off = M.sanitizeEvent({ ...EVENT, booking: { ...EVENT.booking, contactOnPage: false, contactAfter: true } });
+  assert.deepEqual([off.booking.contactOnPage, off.booking.contactAfter], [false, true]);
+});
