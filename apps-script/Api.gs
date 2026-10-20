@@ -310,6 +310,8 @@ function doPost(e) {
       activityPending_(request.fn);
       // the new backend's copy of the allowlist (WorkerSync.gs), from the background
       if (request.fn === 'apiHeartbeat') workerSyncAdmins_(false);
+      // «سجل النشاط» in D1 (WorkerSync.gs): critical rows at once, the rest once a minute
+      activityForward_(!!API_REQUEST_.forwardNow);
     }
     catch (error) {
       console.warn('api: admin push dispatch failed');

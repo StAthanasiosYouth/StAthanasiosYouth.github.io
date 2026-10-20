@@ -818,6 +818,12 @@ function activity_(entry) {
 
     rememberActivity_(row);
 
+    // D1's copy (WorkerSync.gs activityForward_): a critical row right after the reply, or now outside a request
+    if (activitySeverity_(row) === 'critical') {
+      if (API_REQUEST_) API_REQUEST_.forwardNow = true;
+      else activityForward_(true);
+    }
+
     if (decision && API_REQUEST_) {
       // an admin's request: the reply does not wait for the push. The row
       // says «pending»; the next heartbeat (or a later quiet call) sends it

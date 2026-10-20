@@ -6,7 +6,7 @@
  */
 
 import { ApiError, fileResponse } from './lib/http.js';
-import { listActivity, activityStmt } from './lib/activity.js';
+import { queryActivity, activityStmt, forwardedStmt } from './lib/activity.js';
 import { begin, finishStmt, abandon, idempotencyKey } from './lib/idempotency.js';
 import { limit, clientIp } from './lib/ratelimit.js';
 import { retry } from './lib/db.js';
@@ -59,9 +59,10 @@ async function whoami(ctx) {
   return { email: ctx.actor.email, name: ctx.actor.name, role: ctx.actor.role };
 }
 
+/* GET /v1/admin/activity?limit&before&actor&family&section&from&to&id&view=log — the unified «سجل النشاط» (lib/activity.js) */
 async function activity(ctx) {
-  const items = await retry(() => listActivity(ctx.env.DB, { before: ctx.url.searchParams.get('before'), limit: ctx.url.searchParams.get('limit') }));
-  return { items };
+  const q = Object.fromEntries(['limit', 'before', 'actor', 'family', 'section', 'from', 'to', 'id', 'view'].map(k => [k, ctx.url.searchParams.get(k) || '']));
+  return retry(() => queryActivity(ctx.env.DB, q));
 }
 
 /*
@@ -202,6 +203,28 @@ async function syncGrants(ctx) {
   return grantsSnapshot(ctx.env.DB);
 }
 
+/*
+ * POST /v1/sync/activity  (signed by Apps Script; apps-script/WorkerSync.gs activityForward_)
+ * body: { rows: [{ id, at, cairo, actor, actorName, action, type, entityId, title, summary, changes, ref, count, device, severity }] }
+ * Upserts by id (lib/activity.js forwardedStmt): resends and merged rows never duplicate.
+ */
+const ACT_ID = /^act-[0-9a-f]{12}$/;
+const ACT_NAME = /^[a-z][a-zA-Z._]{1,59}$/;
+async function syncActivity(ctx) {
+  await limit(ctx, 'sync.activity', clientIp(ctx.request), 60, 60);
+  const raw = new TextDecoder().decode(ctx.raw);
+  const { body, ts } = await verifySync(ctx.env, ctx.request, raw, 'activity');
+  const rows = Array.isArray(body.rows) ? body.rows : null;
+  if (!rows || rows.length > 250) throw new ApiError('bad', 'rows');
+  for (const r of rows) {
+    if (!r || !ACT_ID.test(String(r.id)) || !Number.isFinite(Number(r.at)) || Number(r.at) <= 0 || !ACT_NAME.test(String(r.action)) || !r.actor) throw new ApiError('bad', 'row');
+    r.at = Number(r.at);
+  }
+  const db = ctx.env.DB;
+  await retry(() => db.batch([...rows.map(r => forwardedStmt(db, r)), syncStampStmt(db, 'activity', ts)]));
+  return { stored: rows.length };
+}
+
 /* STAGING ONLY: store an event definition directly (tests own it; the site is never read for it) */
 async function diagEventFixture(ctx) {
   if (ctx.env.ENVIRONMENT !== 'staging') throw new ApiError('notfound');
@@ -243,6 +266,7 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/admin/diag/retention', auth: 'admin', handler: diagRetention },
   { method: 'GET', path: '/v1/admin/diag/book-news', auth: 'admin', handler: diagNews },
   { method: 'POST', path: '/v1/sync/book-news', auth: 'sync', raw: true, maxBytes: 4 * 1024, handler: syncBookNews },
+  { method: 'POST', path: '/v1/sync/activity', auth: 'sync', raw: true, maxBytes: 512 * 1024, handler: syncActivity },
   { method: 'POST', path: '/v1/sync/grants', auth: 'sync', raw: true, maxBytes: 1024, handler: syncGrants },
   { method: 'POST', path: '/v1/sync/pay-dest', auth: 'sync', raw: true, maxBytes: 64 * 1024, handler: syncPayDest },
 

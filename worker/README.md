@@ -68,6 +68,13 @@ All resources live in Cloudflare account `menazakmena@gmail.com` (workers.dev su
 | `DELETE /v1/admin/proofs/:id` | admin | deletes the file; the row stays with `deleted_at` |
 | `POST /v1/sync/admins` | signed by Apps Script | the admin allowlist |
 | `POST /v1/sync/grants` | signed by Apps Script, 120/min | the grants snapshot Apps Script caches 60 s (`apps-script/Grants.gs`) |
+| `POST /v1/sync/activity` | signed by Apps Script, 60/min, ≤ 250 rows | Activity tab rows into D1, upserted by id (resends / merged rows never duplicate; Worker rows never overwritten) |
+
+**Unified «سجل النشاط»:** `GET /v1/admin/activity?view=log&limit&before&actor&family&section&from&to&id` returns the
+Worker's rows and the forwarded Apps Script rows together, in the shape of Apps Script `apiActivity`
+(`view=log` hides diagnostics / feeds / syncs). Forwarding: `apps-script/WorkerSync.gs activityForward_` (history once,
+then new rows; critical rows at once). Forwarded rows are stored `notified = 1`: Apps Script still sends its own admin
+pushes until the step-5 router. Live check: `node scripts/activity-check.mjs` (staging).
 
 **Permissions (Phase 1.5):** every admin route needs the permission in `src/lib/perms.js` `ROUTE_PERMS`
 (grants in D1 `admin_grants`). Switch `settings.PERMS_ENFORCE`: `'0'` (default, rollback) = every active

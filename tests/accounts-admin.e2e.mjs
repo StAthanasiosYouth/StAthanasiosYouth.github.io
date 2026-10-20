@@ -41,6 +41,12 @@ const fake = {
   admins: [],
   reset() {
     this.calls = [];
+    this.activityDown = false;
+    const at = Date.now() - 60000;
+    this.activity = [
+      { id: 'act-w00000000001', at, cairo: '2026-10-20 10:00', actor: ADMIN, actorName: 'مينا زكريا', action: 'booking.confirm', type: 'booking', entityId: 'bkg-1', title: 'B-AAAA1', summary: 'أكّد الحجز B-AAAA1', text: 'مينا زكريا أكّد الحجز B-AAAA1', changes: null, ref: '', count: 1, device: '', severity: 'routine', source: 'worker' },
+      { id: 'act-a00000000001', at: at - 1000, cairo: '2026-10-20 09:59', actor: ADMIN, actorName: 'مينا زكريا', action: 'accounts.add', type: 'admin', entityId: NEW, title: NEW, summary: 'ضاف «' + NEW + '» للوحة التحكم', text: '', changes: null, ref: '', count: 1, device: '', severity: 'critical', source: 'worker' }
+    ];
     this.admins = [
       { email: ADMIN, name: '', primary: true, active: true, servantId: null, lastSeen: null, grants: {} },
       { email: SECOND, name: '', primary: false, active: true, servantId: null, lastSeen: null, grants: { 'bookings.view': 'all' } }
@@ -66,6 +72,10 @@ async function handle(request) {
   fake.calls.push({ method, path: url.pathname, body, auth });
   if (url.pathname === '/v1/admin/book/module') return json(200, { ok: true, on: false, env: 'production' });
   if (url.pathname === '/v1/admin/accounts' && method === 'GET') return json(200, fake.listing());
+  if (url.pathname === '/v1/admin/activity' && method === 'GET') {
+    if (fake.activityDown) return json(500, { ok: false, code: 'error', message: 'x' });
+    return json(200, { ok: true, items: fake.activity, more: false, next: 0, admins: [{ email: ADMIN, name: 'مينا زكريا' }], families: ['add'], sections: ['bookings'] });
+  }
   if (method === 'POST' && url.pathname.startsWith('/v1/admin/accounts')) {
     // like the Worker: changes need a Google ID token, never the panel's session token
     if (/^Bearer wk1\./.test(auth)) return json(403, { ok: false, code: 'google', message: 'محتاجين نتأكد إنه انت.' });
@@ -194,6 +204,27 @@ test('«الصلاحيات» on a phone: the grants form scrolls inside the dial
   });
   await page.screenshot({ path: `${SHOTS}phone-grants.png` });
   assert.deepEqual(fit, { inside: true, overflowX: false, scrolls: 'auto' });
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('«سجل النشاط» reads the unified log from D1 (Worker + Apps Script rows); the Activity tab when the Worker is away', async () => {
+  fake.reset();
+  const { context, page, problems } = await openSettings();
+  await page.evaluate(() => A.go('activity'));
+  await page.waitForFunction(() => /أكّد الحجز B-AAAA1/.test(document.body.innerText), { timeout: 8000 });
+  assert.match(await page.evaluate(() => document.body.innerText), /للوحة التحكم/);
+  const asked = fake.calls.find(c => c.path === '/v1/admin/activity');
+  assert.ok(asked, 'asked the Worker');
+  await page.screenshot({ path: `${SHOTS}activity-unified.png` });
+
+  // the Worker away: the same screen from the Activity tab (Apps Script)
+  fake.activityDown = true;
+  world.as(ADMIN).gs.activity_({ action: 'create', type: 'news', id: 'n-1', title: 'خبر من الشيت' });
+  world.as('');
+  await page.evaluate(() => A.go('home'));
+  await page.evaluate(() => A.go('activity'));
+  await page.waitForFunction(() => /خبر من الشيت/.test(document.body.innerText), { timeout: 8000 });
   assert.deepEqual(problems, []);
   await context.close();
 });

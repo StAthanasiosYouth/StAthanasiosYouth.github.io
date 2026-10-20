@@ -17351,14 +17351,19 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     // competitions (docs/COMPETITIONS.md §11)
     competition: 'trophy', participant: 'users', points: 'star', shopitem: 'gift', redemption: 'ticket',
     // Points & Store v2 (§18): whatever the server names them, a row of these kinds gets its icon
-    season: 'calendar', seasons: 'calendar', shop: 'gift', shopschedule: 'clock', schedule: 'clock', pushschedule: 'bell', push: 'bell'
+    season: 'calendar', seasons: 'calendar', shop: 'gift', shopschedule: 'clock', schedule: 'clock', pushschedule: 'bell', push: 'bell',
+    // the Worker's own rows (bookings, money, accounts), read from D1 with the rest
+    booking: 'ticket', bookings: 'ticket', proof: 'photos', handover: 'retry', admin: 'shield'
   };
 
   var TONES = {
     create: 'ok', upload: 'ok', import: 'ok', duplicate: 'ok', 'admin.add': 'ok',
     'delete': 'danger', 'media.delete': 'danger', 'media.purge': 'danger', 'admin.remove': 'danger',
     publish: 'gold', push: 'info', 'session.takeover': 'warn',
-    review: 'info', finalize: 'gold', regrade: 'warn', close: 'warn', 'code.reset': 'warn', 'code.export': 'warn'
+    review: 'info', finalize: 'gold', regrade: 'warn', close: 'warn', 'code.reset': 'warn', 'code.export': 'warn',
+    'booking.create': 'ok', 'booking.confirm': 'ok', 'payment.add': 'ok', 'accounts.add': 'ok',
+    'booking.cancel': 'danger', 'booking.reject': 'danger', 'payment.void': 'danger', 'event.cancelAll': 'danger', 'accounts.remove': 'danger',
+    'accounts.grants': 'warn', 'pay.approve': 'gold'
   };
 
   var FAMILIES = [
@@ -17382,7 +17387,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     { key: 'page', label: 'الصفحة والإعدادات' },
     { key: 'media', label: 'الصور' },
     { key: 'site', label: 'النشر' },
-    { key: 'admins', label: 'لوحة التحكم' }
+    { key: 'bookings', label: 'الحجوزات والفلوس' },
+    { key: 'admins', label: 'لوحة التحكم والصلاحيات' }
   ];
 
   /* where each kind of item lives in the panel */
@@ -17397,6 +17403,25 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   var KEYS = { sessions: 'date', news: 'id', games: 'id', notifications: 'id', activities: 'id', types: 'key', links: 'id', sections: 'key', contacts: 'id', media: 'id' };
 
   var GONE_ACTIONS = ['delete', 'media.purge'];
+
+  /*
+   * The unified log (Phase 1.5 step 4): D1 holds the Worker's rows and the
+   * Apps Script rows it is sent (WorkerSync.gs activityForward_), read through
+   * GET /v1/admin/activity in the same shape as apiActivity. The emergency
+   * panel (no Worker) or a Worker that can't be reached: the Activity tab here.
+   */
+  function activityFrom(ask) {
+
+    var W = window.AdminWorker;
+    if (!W) return A.call('apiActivity', ask);
+    var params = ['view=log'].concat(Object.keys(ask).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(ask[k]); }));
+    return W.call('GET', '/v1/admin/activity?' + params.join('&'), undefined, { quiet: true }).then(function (result) {
+      return result;
+    }, function () {
+      return A.call('apiActivity', ask);
+    });
+
+  }
 
   /*
    * Competitions, participants, points, prizes, requests are not in the
@@ -17874,7 +17899,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       }
       list.setAttribute('aria-busy', 'true');
 
-      return A.call('apiActivity', ask).then(function (result) {
+      return activityFrom(ask).then(function (result) {
         if (my !== loading) return;
         if (!append) ACT_LAST = { key: cacheKey, result: result };
         list.setAttribute('aria-busy', 'false');

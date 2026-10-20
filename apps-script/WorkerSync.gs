@@ -141,3 +141,144 @@ function apiWorkerSession() {
   return { token: 'wk1.' + payload + '.' + hmacHex_(secret, 'wk1.' + payload), exp: exp };
 
 }
+
+
+/* =========================================================
+   ACTIVITY → D1 (Phase 1.5 step 4, BOOKING-PHASE1-COMPLETION-PLAN §4.4)
+   ---------------------------------------------------------
+   The Activity tab's rows go to the Worker (POST /v1/sync/activity, signed
+   like the allowlist), where «سجل النشاط» reads them together with the
+   Worker's own rows (bookings, money, accounts). D1 upserts by the row's id:
+   a resend or a merged row (ACTIVITY_MERGE_MS) updates it, never a copy.
+
+   - What D1 has: the Script Property ACTIVITY_FWD { at, sent: { id: at } }.
+     A tick sends the rows newer than `at` minus a 2-minute overlap whose
+     (id, at) D1 doesn't have yet — a row written by a parallel execution a
+     moment "in the past" is still caught. Oldest first, 200 per call.
+   - History: until the whole tab was sent once (`done`), a tick reads the
+     whole tab; after that only its last ACTIVITY_CHUNK rows.
+   - When: critical rows right after the reply (doPost) or at once (triggers);
+     the rest at most once a minute after any panel call, and from the
+     5-minute booking trigger. Never on anyone's wait; never throws.
+   - Not sent: «booking.new» (BookNotify.gs): D1 has those bookings itself.
+========================================================= */
+
+var ACTIVITY_FWD_KEY = 'ACTIVITY_FWD';
+var ACTIVITY_FWD_CHECK = 'worker:act:check';
+var ACTIVITY_FWD_EVERY_S = 60;
+var ACTIVITY_FWD_BATCH = 200;
+var ACTIVITY_FWD_OVERLAP_MS = 2 * 60000;
+var ACTIVITY_FWD_SKIP = ['booking.new'];
+
+/* critical | important | routine (the notification levels, §4.4) */
+function activitySeverity_(row) {
+
+  var action = row.action;
+
+  if (action === 'pay.approve' || action === 'code.export' || action === 'migrate' || action === 'admin.add' || action === 'admin.remove') return 'critical';
+  if (action === 'publish' || action === 'push' || action === 'import' || action === 'finalize' || action === 'points.adjust' ||
+    action === 'redemption.status' || action === 'session.takeover') return 'important';
+  if ((action === 'create' || action === 'delete') && ACTIVITY_CONTENT.indexOf(row.type) !== -1) return 'important';
+  return 'routine';
+
+}
+
+function activityForwardMark_() {
+
+  try {
+    var mark = JSON.parse(PropertiesService.getScriptProperties().getProperty(ACTIVITY_FWD_KEY) || 'null');
+    if (mark && typeof mark.at === 'number' && mark.sent && typeof mark.sent === 'object') return mark;
+  }
+  catch (ignored) {
+    // a broken mark: send again from the start (D1 upserts, nothing doubles)
+  }
+  return { at: 0, sent: {}, done: false };
+
+}
+
+/* rows D1 doesn't have yet, oldest first */
+function activityForwardDue_(mark) {
+
+  var sheet = spreadsheet_().getSheetByName(ACTIVITY_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+
+  var last = sheet.getLastRow();
+  var first = mark.done ? Math.max(2, last - ACTIVITY_CHUNK + 1) : 2;
+  var cutoff = mark.at - ACTIVITY_FWD_OVERLAP_MS;
+
+  return sheet.getRange(first, 1, last - first + 1, ACTIVITY_COLUMNS.length).getValues()
+    .map(activityRecord_)
+    .filter(function (row) {
+      return /^act-[0-9a-f]{12}$/.test(row.id) && row.at > cutoff && mark.sent[row.id] !== row.at && ACTIVITY_FWD_SKIP.indexOf(row.action) === -1;
+    })
+    .sort(function (a, b) { return a.at - b.at; });
+
+}
+
+/* Sends what D1 is missing (`force`: now, else at most once a minute). The number of rows D1 took. */
+function activityForward_(force) {
+
+  try {
+
+    var cache = CacheService.getScriptCache();
+    if (!force && cache.get(ACTIVITY_FWD_CHECK)) return 0;
+    cache.put(ACTIVITY_FWD_CHECK, '1', ACTIVITY_FWD_EVERY_S);
+
+    var secret = workerSyncSecret_();
+    if (!secret) return 0;
+
+    var mark = activityForwardMark_();
+    var due = activityForwardDue_(mark);
+    var batch = due.slice(0, ACTIVITY_FWD_BATCH);
+    var props = PropertiesService.getScriptProperties();
+
+    if (!batch.length) {
+      if (!mark.done) {
+        mark.done = true;
+        props.setProperty(ACTIVITY_FWD_KEY, JSON.stringify(mark));
+      }
+      return 0;
+    }
+
+    var body = JSON.stringify({ rows: batch.map(function (row) {
+      return {
+        id: row.id, at: row.at, cairo: row.cairo, actor: row.actor, actorName: row.actorName, action: row.action, type: row.type,
+        entityId: row.entityId, title: row.title, summary: row.summary, changes: row.changes || null, ref: row.ref,
+        count: row.count, device: row.device, severity: activitySeverity_(row)
+      };
+    }) });
+    var ts = String(Date.now());
+    var response = UrlFetchApp.fetch(WORKER_API_URL + '/v1/sync/activity', {
+      method: 'post',
+      contentType: 'application/json; charset=utf-8',
+      payload: Utilities.newBlob(body).getBytes(),
+      headers: { 'x-sync-ts': ts, 'x-sync-signature': 'v1=' + hmacHex_(secret, ts + '.' + body) },
+      muteHttpExceptions: true,
+      followRedirects: false
+    });
+
+    if (response.getResponseCode() !== 200) {
+      console.warn('activity forward: HTTP ' + response.getResponseCode());
+      cache.remove(ACTIVITY_FWD_CHECK);
+      return 0;
+    }
+
+    batch.forEach(function (row) {
+      mark.sent[row.id] = row.at;
+      if (row.at > mark.at) mark.at = row.at;
+    });
+    // only the overlap window is remembered (older rows are below the cutoff anyway)
+    Object.keys(mark.sent).forEach(function (id) {
+      if (mark.sent[id] <= mark.at - ACTIVITY_FWD_OVERLAP_MS) delete mark.sent[id];
+    });
+    if (due.length <= ACTIVITY_FWD_BATCH) mark.done = true;
+    props.setProperty(ACTIVITY_FWD_KEY, JSON.stringify(mark));
+    return batch.length;
+
+  }
+  catch (error) {
+    console.warn('activity forward: not sent');
+    return 0;
+  }
+
+}

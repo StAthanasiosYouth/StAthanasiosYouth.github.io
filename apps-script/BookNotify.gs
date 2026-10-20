@@ -47,6 +47,9 @@ function bookNewsTick(e) {
     console.warn('activity: pending pushes not sent from the trigger');
   }
 
+  // the Activity tab's new rows reach D1 even when no panel is open (WorkerSync.gs)
+  activityForward_(false);
+
   return bookNewsRun_();
 
 }

@@ -170,7 +170,7 @@ export async function accountAdd(ctx) {
   await checkGrantable(ctx, {}, grants);
   await retry(() => ctx.env.DB.batch(writeStmts(ctx.env.DB, ctx, {
     email, name, servantId, grants, add: true, action: 'accounts.add',
-    summary: Object.keys(grants).length + ' permissions', changes: { after: digest(grants), servant: servantId }
+    summary: 'ضاف «' + email + '» للوحة التحكم (' + Object.keys(grants).length + ' صلاحية)', changes: { after: digest(grants), servant: servantId }
   })));
   return listing(ctx);
 }
@@ -194,7 +194,7 @@ export async function accountUpdate(ctx) {
   if (!Object.keys(added).length && !Object.keys(removed).length && servantId === row.servantId && (name === null || name === row.name)) return listing(ctx);
   await retry(() => ctx.env.DB.batch(writeStmts(ctx.env.DB, ctx, {
     email, name, servantId, grants, action: 'accounts.grants',
-    summary: '+' + Object.keys(added).length + ' −' + Object.keys(removed).length,
+    summary: 'غيّر صلاحيات «' + email + '» (+' + Object.keys(added).length + ' −' + Object.keys(removed).length + ')',
     changes: { added: digest(added), removed: digest(removed), servant: servantId === row.servantId ? undefined : { from: row.servantId, to: servantId } }
   })));
   return listing(ctx);
@@ -212,7 +212,7 @@ export async function accountRemove(ctx) {
   if (email === ctx.actor.email) throw protect('self');
   checkManagers(all, email, null);
   await retry(() => ctx.env.DB.batch(writeStmts(ctx.env.DB, ctx, {
-    email, grants: null, action: 'accounts.remove', summary: 'removed', changes: { before: digest(row.grants) }
+    email, grants: null, action: 'accounts.remove', summary: 'شال صلاحية «' + email + '»', changes: { before: digest(row.grants) }
   })));
   return listing(ctx);
 }

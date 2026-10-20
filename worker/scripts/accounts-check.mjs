@@ -75,7 +75,7 @@ check('remove', rm.status === 200 && !rm.body.admins.some(a => a.email === NEW),
 check('removed: refused at the next call', (await call(N, 'GET', '/v1/admin/whoami')).status === 403);
 
 const acts = await call(P, 'GET', '/v1/admin/activity?limit=20');
-const mineActs = (acts.body.items || []).filter(a => a.entity_id === NEW).map(a => a.action);
+const mineActs = (acts.body.items || []).filter(a => a.entityId === NEW).map(a => a.action);
 check('audit: add, change, remove', ['accounts.add', 'accounts.grants', 'accounts.remove'].every(a => mineActs.includes(a)), mineActs);
 
 console.log(failed ? `\n${failed} FAILED` : '\nall ok');
