@@ -76,12 +76,14 @@ const msg = (action, rows) => messageOf(typeOf(rows[0]), rows, { 'm@example.com'
 const allLinks = e => [...e.html.matchAll(/href="([^"]+)"/g)].map(x => x[1]);
 
 test('sender identity: the exact display name in From, heading and footer; the real address', () => {
-  assert.equal(BRAND, 'خدمة البابا أثناسيوس الرسولي لشباب');
+  assert.equal(BRAND, 'أسرة البابا أثناسيوس الرسولي لشباب-سفاجا');
   assert.equal(SENDER_NAME, BRAND);
   assert.equal(SENDER, 'athanasius.youth.safaga@gmail.com');
   const e = alertEmail(msg('booking.confirm', [act('booking.confirm')]));
   const { headers } = parse(mime({ to: 'a@example.com', ...e }));
-  assert.equal(headers.from, 'خدمة البابا أثناسيوس الرسولي لشباب <athanasius.youth.safaga@gmail.com>');
+  assert.equal(headers.from, 'أسرة البابا أثناسيوس الرسولي لشباب-سفاجا <athanasius.youth.safaga@gmail.com>');
+  for (const x of [e.text, e.html]) assert.match(x, /الدعم الفني: مينا زكريا – 01276162016/);
+  assert.match(otpEmail({ code: '123456' }).text, /الدعم الفني: مينا زكريا/, 'in member emails too');
   assert.ok(e.text.startsWith(BRAND));
   assert.equal((e.html.match(new RegExp(BRAND, 'g')) || []).length, 2, 'the heading line and the footer');
 });

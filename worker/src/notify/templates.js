@@ -18,8 +18,10 @@
  * - no visitor names, phones, payment numbers or amounts.
  */
 
-export const BRAND = 'خدمة البابا أثناسيوس الرسولي لشباب';
-export const SERVICE = 'كنيسة أبي سيفين – سفاجا';
+export const BRAND = 'أسرة البابا أثناسيوس الرسولي لشباب-سفاجا';
+export const SERVICE = 'كنيسة أبي سيفين';
+// who to call when something looks wrong (every email, small, under the sender's name; plain text, no link)
+export const SUPPORT = 'الدعم الفني: مينا زكريا – 01276162016';
 export const SITE = 'https://stathanasiosyouth.github.io';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -62,6 +64,7 @@ export function layout({ audience = 'admin', heading, intro = '', items = [], li
     '',
     '—',
     BRAND + ' · ' + SERVICE,
+    SUPPORT + ' (لو في أي مشكلة أو حاجة مش مفهومة)',
     why
   ].filter((l, i, all) => l !== '' || (i > 0 && all[i - 1] !== '')).join('\n');
 
@@ -81,6 +84,7 @@ export function layout({ audience = 'admin', heading, intro = '', items = [], li
     notes.map(n => p(n, 'font-size:13px;color:#3d4452')).join('') +
     '<hr style="border:0;border-top:1px solid #e4dfd3;margin:16px 0">' +
     '<p style="margin:0 0 4px;font-size:12px;color:#7d8391">' + esc(BRAND) + ' · ' + esc(SERVICE) + '</p>' +
+    '<p style="margin:0 0 4px;font-size:11px;color:#7d8391">' + esc(SUPPORT) + ' <span>(لو في أي مشكلة أو حاجة مش مفهومة)</span></p>' +
     '<p style="margin:0;font-size:12px;color:#7d8391">' + esc(why) + '</p>' +
     '</div></body></html>';
   return { html, text };
