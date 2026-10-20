@@ -25,6 +25,8 @@ test('sync/activity: signed, stored once as apps-script + notified; a resend or 
   assert.equal(rows.length, 2);
   assert.deepEqual([rows[0].source, rows[0].notified, rows[0].severity, rows[1].severity], ['apps-script', 1, 'routine', 'important']);
   assert.deepEqual(JSON.parse(rows[0].changes), { fields: ['العنوان'] });
+  assert.equal(rows[0].cairo, '2026-10-18 13:00', 'the Cairo text made from at');
+
 
   assert.equal((await push(h, [row()], { ts: t })).status, 409, 'replay refused');
   // the same row sent again, then merged (Activity.gs: same id, later `at`, count 3)
@@ -34,6 +36,11 @@ test('sync/activity: signed, stored once as apps-script + notified; a resend or 
   assert.equal(rows.length, 2, 'never a second row');
   const merged = rows.find(r => r.id === 'act-0123456789ab');
   assert.deepEqual([merged.count, merged.cairo, merged.summary], [3, '2026-10-18 13:05', 'عدّل «خبر» ٣ مرات']);
+
+  // a Sheet cell read back as a Date: the text sent is ignored
+  await push(h, [row({ id: 'act-ffffffffffff', cairo: 'Mon Oct 12 2026 20:00:00 GMT+0300 (Eastern European Summer Time)' })], { ts: t + 3 });
+  assert.equal((await h.db.prepare("SELECT cairo FROM activity WHERE id = 'act-ffffffffffff'").first()).cairo, '2026-10-18 13:00');
+  await h.db.prepare("DELETE FROM activity WHERE id = 'act-ffffffffffff'").run();
 });
 
 test('sync/activity: a Worker row with the same id is never overwritten; bad rows refuse the whole call', async () => {

@@ -120,7 +120,9 @@ export async function queryActivity(db, q = {}) {
  * its id, so a resend or a merged row (Activity.gs merges small edits into the
  * same id) updates it — never a second row. A Worker row is never overwritten.
  * Apps Script still delivers its own admin pushes (AdminNotify.gs), so these
- * rows are stored as notified (the step-5 router takes over later).
+ * rows are stored as notified (the step-5 router takes over later). The Cairo
+ * wall-clock text is always made here from `at`: a Sheet hands its own column
+ * back as a Date, so the value Apps Script sends is never trusted.
  */
 export function forwardedStmt(db, r) {
   let changes = r.changes == null ? null : JSON.stringify(r.changes);
@@ -130,7 +132,7 @@ export function forwardedStmt(db, r) {
     'ON CONFLICT(id) DO UPDATE SET at = excluded.at, cairo = excluded.cairo, actor_name = excluded.actor_name, action = excluded.action, ' +
     'entity_title = excluded.entity_title, summary = excluded.summary, changes = excluded.changes, ref = excluded.ref, count = excluded.count, ' +
     "device = excluded.device, severity = excluded.severity WHERE activity.source = 'apps-script'").bind(
-    r.id, r.at, clip(r.cairo, 20) || cairoText(r.at), clip(r.actor, 200), clip(r.actorName, 120), clip(r.action, 60), clip(r.type, 40), clip(r.entityId, 80),
+    r.id, r.at, cairoText(r.at), clip(r.actor, 200), clip(r.actorName, 120), clip(r.action, 60), clip(r.type, 40), clip(r.entityId, 80),
     clip(r.title, 200), clip(r.summary, 300), changes, clip(r.ref, 120), Math.max(1, Math.min(10000, Math.floor(Number(r.count)) || 1)), clip(r.device, 40),
     SEVERITY.has(r.severity) ? r.severity : 'routine'
   );
