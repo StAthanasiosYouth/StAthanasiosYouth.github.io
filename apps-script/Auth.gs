@@ -171,108 +171,32 @@ function apiAdmins() {
 }
 
 
-/** Allows one more Google email. */
+/*
+ * Phase 1.5 (docs/BOOKING-PHASE1-COMPLETION-PLAN.md §4.3): D1 owns the admin
+ * accounts. Adding and removing happen in «الصلاحيات» (the Worker,
+ * worker/src/lib/accounts.js) with the Primary Admin protections and the audit;
+ * ADMIN_EMAILS follows D1 within a minute (Grants.gs grantsMirror_). These two
+ * stay listed (older panels still call them) and only point there.
+ */
 function apiAddAdmin(value) {
 
-  var me = assertAdmin_();
-  var email = normalizeEmail_(value);
-
-  if (!email) {
-    throw appError_('الإيميل ده مش مكتوب صح.', 'اكتب إيميل جوجل كامل، مثلاً name@gmail.com', '', 'الإيميل');
-  }
-
-  var lock = LockService.getScriptLock();
-
-  lock.waitLock(20000);
-
-  try {
-
-    // read again under the lock (not this request's earlier read)
-    forgetAdminEmails_();
-    var emails = adminEmails_();
-
-    if (emails.indexOf(email) !== -1) {
-      throw appError_('الإيميل ده مسموح له قبل كده.', '');
-    }
-
-    if (emails.length >= MAX_ADMINS) {
-      throw appError_('وصلت لأقصى عدد (' + MAX_ADMINS + ').', 'شيل إيميل مش محتاجه الأول.');
-    }
-
-    emails.push(email);
-    PropertiesService.getScriptProperties().setProperty('ADMIN_EMAILS', emails.join(', '));
-    forgetAdminEmails_();
-    workerSyncSoon_();
-    adminsChangedHere_();
-    log_(me, 'admins.add', email);
-    activity_({ action: 'admin.add', type: 'admins', id: email, title: email });
-
-  }
-  finally {
-    lock.releaseLock();
-  }
-
-  return adminList_(me);
+  assertAdmin_();
+  throw appError_('إضافة الأدمنز بقت من «الصلاحيات».', 'افتح «الصلاحيات» في لوحة التحكم وضيفه من هناك مع صلاحياته.');
 
 }
 
-
-/** Takes a Google email off the list (never the primary, never the last one, never yourself). */
 function apiRemoveAdmin(value) {
 
-  var me = assertAdmin_();
-  var email = normalizeEmail_(value);
+  assertAdmin_();
+  throw appError_('شيل الأدمنز بقى من «الصلاحيات».', 'افتح «الصلاحيات» في لوحة التحكم وشيله من هناك.');
 
-  if (!email) {
-    throw appError_('الإيميل ده مش مكتوب صح.', '');
-  }
+}
 
-  if (email === primaryAdmin_()) {
-    throw appError_('ده الحساب الأساسي ومينفعش يتشال.', 'الحساب الأساسي بيفضل مسموح له دايمًا.');
-  }
+/* what goes with an admin who is off the list (Grants.gs mirror): their name, admin push devices, trusted devices */
+function adminCleanup_(email) {
 
-  if (email === me) {
-    throw appError_('مينفعش تشيل نفسك.', 'لو لازم، أدمن تاني يشيلك.');
-  }
-
-  var lock = LockService.getScriptLock();
-
-  lock.waitLock(20000);
-
-  try {
-
-    // read again under the lock (not this request's earlier read)
-    forgetAdminEmails_();
-    var emails = adminEmails_();
-    var index = emails.indexOf(email);
-
-    if (index === -1) {
-      throw appError_('الإيميل ده مش في القايمة.', 'اعمل Refresh للصفحة.');
-    }
-
-    emails.splice(index, 1);
-
-    if (!emails.length) {
-      throw appError_('القايمة مينفعش تفضل فاضية.', '');
-    }
-
-    var shown = displayName_(email);
-    PropertiesService.getScriptProperties().setProperty('ADMIN_EMAILS', emails.join(', '));
-    forgetAdminEmails_();
-    workerSyncSoon_();
-    adminsChangedHere_();
-    log_(me, 'admins.remove', email);
-    // no name and no admin notifications left behind for someone who isn't an admin any more
-    try { forgetAdminName_(email); } catch (ignored) { console.warn('admins: name not removed'); }
-    forgetAdminDevices_(email);
-    forgetTrustedDevices_(email);
-    activity_({ action: 'admin.remove', type: 'admins', id: email, title: email, changes: { name: shown } });
-
-  }
-  finally {
-    lock.releaseLock();
-  }
-
-  return adminList_(me);
+  try { forgetAdminName_(email); } catch (ignored) { console.warn('admins: name not removed'); }
+  try { forgetAdminDevices_(email); } catch (ignored) { console.warn('admins: devices not removed'); }
+  try { forgetTrustedDevices_(email); } catch (ignored) { console.warn('admins: trusted devices not removed'); }
 
 }

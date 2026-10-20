@@ -141,22 +141,24 @@ async function sync(h, body, { ts = Date.now(), secret = 'sync-test-secret' } = 
   return h.call('/v1/sync/admins', { method: 'POST', body: raw, headers: { 'x-sync-ts': String(ts), 'x-sync-signature': await signSync(secret, String(ts), raw) } });
 }
 
-test('admin sync: signed list becomes the allowlist; removed admins deactivated; sub binding kept', async () => {
+test('admin sync (Phase 1.5): names only — never adds, removes, re-activates or demotes (D1 owns admins)', async () => {
   const g = await fakeGoogle();
   const h = harness({ env: { ADMIN_EMAILS: '' } });
+  await h.db.prepare("INSERT INTO admins (email, name, role, active, created_at) VALUES ('admin@example.com', 'old', 'admin', 1, 0), ('b@example.com', 'B', 'admin', 0, 0)").run();
   const t = Date.now();
-  const r = await sync(h, { admins: [{ email: 'Admin@Example.com', name: 'مينا', primary: true }, { email: 'b@example.com', name: 'B' }] }, { ts: t });
+  const r = await sync(h, { admins: [{ email: 'Admin@Example.com', name: 'مينا', primary: true }, { email: 'b@example.com', name: 'B2' }, { email: 'new@example.com', name: 'N' }] }, { ts: t });
   assert.equal(r.status, 200, JSON.stringify(r.body));
-  assert.equal((await h.call('/v1/admin/whoami', { headers: await admin(h, g), fetch: g.fetch })).status, 200, 'synced admin can sign in');
-  const bound = await h.db.prepare("SELECT google_sub, role FROM admins WHERE email = 'admin@example.com'").first();
-  assert.equal(bound.google_sub, '1001');
-  assert.equal(bound.role, 'primary');
+  assert.equal(r.body.active, 1);
+  assert.equal((await h.call('/v1/admin/whoami', { headers: await admin(h, g), fetch: g.fetch })).status, 200);
+  const a = await h.db.prepare("SELECT google_sub, role, name FROM admins WHERE email = 'admin@example.com'").first();
+  assert.deepEqual({ ...a }, { google_sub: '1001', role: 'primary', name: 'مينا' }, 'name refreshed; primary marked on a D1 without one');
+  assert.equal((await h.db.prepare("SELECT active FROM admins WHERE email = 'b@example.com'").first()).active, 0, 'not re-activated');
+  assert.equal(await h.db.prepare("SELECT COUNT(*) AS n FROM admins WHERE email = 'new@example.com'").first('n'), 0, 'not added');
 
-  // B removed in Apps Script → inactive here; A's binding untouched
-  await sync(h, { admins: [{ email: 'admin@example.com', name: 'مينا', primary: true }] }, { ts: t + 1 });
-  const b = await h.db.prepare("SELECT active FROM admins WHERE email = 'b@example.com'").first();
-  assert.equal(b.active, 0);
-  assert.equal((await h.db.prepare("SELECT google_sub FROM admins WHERE email = 'admin@example.com'").first()).google_sub, '1001');
+  // a list without A: A stays active (removal is «الصلاحيات»'s job)
+  await sync(h, { admins: [{ email: 'b@example.com', name: 'B', primary: true }] }, { ts: t + 1 });
+  assert.equal((await h.db.prepare("SELECT active, role FROM admins WHERE email = 'admin@example.com'").first()).active, 1);
+  assert.equal((await h.db.prepare("SELECT role FROM admins WHERE email = 'b@example.com'").first()).role, 'admin', 'never a second primary');
   const deep = await h.call('/v1/health/deep');
   assert.equal(deep.body.admins.active, 1);
   assert.equal(deep.body.admins.syncedAt, t + 1);

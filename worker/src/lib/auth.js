@@ -137,12 +137,12 @@ export async function requireAdmin(ctx) {
   if (row) {
     if (!row.active) throw new ApiError('denied', 'inactive');
     if (row.google_sub && row.google_sub !== claims.sub) throw new ApiError('denied', 'sub mismatch');
-    admin = { email, name: row.name || claims.name || '', role: row.role };
+    admin = { email, name: row.name || claims.name || '', role: row.role, via: 'google-id' };
     if (!row.google_sub) {
       ctx.defer(ctx.env.DB.prepare('UPDATE admins SET google_sub = ?, last_seen = ? WHERE email = ? AND google_sub IS NULL').bind(claims.sub, Date.now(), email).run());
     }
   } else if (bootstrapList(ctx.env).includes(email)) {
-    admin = { email, name: claims.name || '', role: 'admin' };
+    admin = { email, name: claims.name || '', role: 'admin', via: 'google-id' };
     // first sign-in of a bootstrap admin: create the row and bind sub
     ctx.defer(ctx.env.DB.prepare('INSERT INTO admins (email, google_sub, name, role, active, created_at, last_seen) VALUES (?, ?, ?, \'admin\', 1, ?, ?) ON CONFLICT(email) DO NOTHING')
       .bind(email, claims.sub, claims.name || '', Date.now(), Date.now()).run());

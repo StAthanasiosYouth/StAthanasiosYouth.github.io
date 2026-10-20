@@ -15,17 +15,17 @@
    - API_PERMS: one api* function → permission table. doPost (Api.gs) checks
      it for every call; a function missing here is refused (default-deny;
      tests/grants.test.mjs checks the table against apiFunctions_());
-   - the ADMIN_EMAILS mirror: when D1's active admins differ from ADMIN_EMAILS
-     and D1 has already seen this script's latest allowlist change, D1's list
-     is written to ADMIN_EMAILS, so the login gate (isAdmin_) is unchanged.
-     Never empty, never without the Primary Admin, never over MAX_ADMINS.
+   - the ADMIN_EMAILS mirror: D1 owns the accounts («الصلاحيات»); when its
+     active admins differ from ADMIN_EMAILS, D1's list is written there, so the
+     login gate (isAdmin_) is unchanged. Whoever left loses their name, admin
+     push devices and trusted devices (adminCleanup_, Auth.gs). Never empty,
+     never without the Primary Admin, never over MAX_ADMINS.
 ========================================================= */
 
 var GRANTS_CACHE_KEY = 'grants:v1';
 var GRANTS_CACHE_S = 60;
 var GRANTS_MISS = 'miss';                         // the Worker didn't answer: last-good until the next minute
 var GRANTS_LAST_GOOD_KEY = 'GRANTS_LAST_GOOD';
-var ADMINS_CHANGED_KEY = 'ADMINS_CHANGED_MS';    // when apiAddAdmin / apiRemoveAdmin last changed ADMIN_EMAILS
 var GRANTS_PRIMARY_DEFAULT = ['accounts.manage', 'notifications.manage', 'participants.manage'];
 var ANY_ADMIN_PERM = '*';
 
@@ -237,27 +237,12 @@ function assertApiPerm_(fn) {
 
 }
 
-/* the allowlist was changed here: the mirror waits until D1 has seen it */
-function adminsChangedHere_() {
-
-  try {
-    PropertiesService.getScriptProperties().setProperty(ADMINS_CHANGED_KEY, String(Date.now()));
-  }
-  catch (ignored) {
-    console.warn('grants: change time not kept');
-  }
-
-}
-
-/* ADMIN_EMAILS ← D1's active admins, when they differ and D1 is not behind this script. True when written. */
+/* ADMIN_EMAILS ← D1's active admins, when they differ. True when written. */
 function grantsMirror_(snapshot) {
 
   try {
 
     var props = PropertiesService.getScriptProperties();
-    var changed = Number(props.getProperty(ADMINS_CHANGED_KEY) || 0);
-    if (!snapshot.adminsSyncTs || snapshot.adminsSyncTs < changed) return false;
-
     var emails = snapshot.admins.map(function (a) { return normalizeEmail_(a.email); });
     var current = adminEmails_();
     var same = emails.length === current.length && emails.every(function (e) { return current.indexOf(e) !== -1; });
@@ -268,9 +253,14 @@ function grantsMirror_(snapshot) {
       return false;
     }
 
+    var gone = current.filter(function (e) { return emails.indexOf(e) === -1; });
+    var added = emails.filter(function (e) { return current.indexOf(e) === -1; });
+
     props.setProperty('ADMIN_EMAILS', emails.join(', '));
     forgetAdminEmails_();
-    activity_({ action: 'admins.mirror', type: 'admins', id: 'ADMIN_EMAILS', title: emails.length + ' admins' });
+    gone.forEach(adminCleanup_);
+    // the audit row is D1's (accounts.add / accounts.remove, the unified «سجل النشاط»): none here
+    console.log('grants: ADMIN_EMAILS mirrored (+' + added.length + ' −' + gone.length + ')');
     return true;
 
   }

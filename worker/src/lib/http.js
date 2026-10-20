@@ -48,13 +48,16 @@ const MESSAGES = {
   recent: ['الحجز ده اتبعتله تذكير قريب.', 'استنى يوم قبل ما تفكّره تاني.'],
   over: ['المبلغ أكبر من اللي مع الخادم فعلًا.', 'سجّل مبلغ أقل، ولو معاه فعلًا أكتر سجّل الدفعة الأول.'],
   locked: ['أدمن تاني بيعدّل الحجز ده دلوقتي.', 'استنى لحد ما يخلّص، وبعدين افتح آخر نسخة.'],
-  turnstile: ['محتاجين نتأكد إنك مش روبوت.', 'كمّل علامة التأكيد وابعت تاني.']
+  turnstile: ['محتاجين نتأكد إنك مش روبوت.', 'كمّل علامة التأكيد وابعت تاني.'],
+  // admin accounts (BOOKING-PHASE1-COMPLETION-PLAN §4.3)
+  google: ['محتاجين نتأكد إنه انت.', 'ادخل بحساب جوجل وكمّل.'],
+  protected: ['التغيير ده مش مسموح.', 'ده بيحمي الحساب الأساسي ومسؤول الحسابات الأخير.']
 };
 
 const STATUS = {
   auth: 401, denied: 403, origin: 403, bad: 400, toolarge: 413, rate: 429, conflict: 409, busy: 409, disabled: 403, notfound: 404, method: 405, error: 500,
   not_found: 404, invalid: 400, proof: 400, not_open: 409, closed: 409, full: 409, limit: 429, final: 409, expired: 401, warn: 409, needs_override: 409, over: 409, recent: 409,
-  locked: 409, turnstile: 403
+  locked: 409, turnstile: 403, google: 403, protected: 403
 };
 
 export class ApiError extends Error {

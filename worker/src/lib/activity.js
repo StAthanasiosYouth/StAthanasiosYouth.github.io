@@ -8,6 +8,7 @@
 import { randomId } from './hash.js';
 import { cairoText } from './db.js';
 
+const SEVERITY = new Set(['critical', 'important', 'routine']);
 const clip = (v, n) => (v == null ? null : String(v).slice(0, n));
 
 export function activityStmt(db, a) {
@@ -15,10 +16,11 @@ export function activityStmt(db, a) {
   let changes = a.changes == null ? null : JSON.stringify(a.changes);
   if (changes && changes.length > 1024) changes = changes.slice(0, 1021) + '…';
   return db.prepare(
-    (a.orIgnore ? 'INSERT OR IGNORE' : 'INSERT') + ' INTO activity (id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary, changes, ref, device) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    (a.orIgnore ? 'INSERT OR IGNORE' : 'INSERT') + ' INTO activity (id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary, changes, ref, device, severity, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   ).bind(
     a.id || randomId('act-'), at, cairoText(at), clip(a.actor || 'system', 200), clip(a.actorName, 120), clip(a.action, 60),
-    clip(a.entityType, 40), clip(a.entityId, 80), clip(a.entityTitle, 200), clip(a.summary, 300), changes, clip(a.ref, 120), clip(a.device, 40)
+    clip(a.entityType, 40), clip(a.entityId, 80), clip(a.entityTitle, 200), clip(a.summary, 300), changes, clip(a.ref, 120), clip(a.device, 40),
+    SEVERITY.has(a.severity) ? a.severity : 'routine', a.source === 'apps-script' || a.source === 'system' ? a.source : 'worker'
   );
 }
 

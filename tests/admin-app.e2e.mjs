@@ -605,8 +605,8 @@ test('stay signed in: Google once in the app → later launches open the panel w
   await again.page.evaluate(() => { window.__added = A.call('apiAddAdmin', 'new.admin@gmail.com').then(() => 'ok', e => A.parseError(e).message); });
   await again.page.waitForSelector('dialog.reauth[open] .gis-stub', { timeout: 8000 });
   await again.page.click('dialog.reauth[open] .gis-stub');
-  assert.equal(await again.page.evaluate(() => window.__added), 'ok');
-  assert.match(world.properties.get('ADMIN_EMAILS'), /new\.admin/);
+  // (adding admins moved to «الصلاحيات» on the Worker: after Google, the server points there)
+  assert.match(await again.page.evaluate(() => window.__added), /الصلاحيات/);
 
   // admin notifications on this device (the server's row), then «خروج»
   const sid = await again.page.evaluate(() => A.state && true);

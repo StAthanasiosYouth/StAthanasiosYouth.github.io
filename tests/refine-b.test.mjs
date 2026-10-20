@@ -363,62 +363,21 @@ test('owner mode without the API: google.script.run-style calls get nobody (Sess
 
 /* ---------------- the allowlist («صلاحيات لوحة التحكم») ---------------- */
 
-test('allowlist: list, add (validated, lower-cased, logged), remove (logged)', () => {
-  const world = htmlWorld();
-  const gs = world.as(ADMIN).gs;
-
-  let list = plain(gs.apiAdmins());
-  assert.deepEqual(list, { emails: [ADMIN], names: { [ADMIN]: 'menazakmena' }, stored: {}, primary: ADMIN, me: ADMIN, max: 20 });
-
-  list = plain(gs.apiAddAdmin('  Second.Admin@GMAIL.com '));
-  assert.deepEqual(list.emails, [ADMIN, SECOND]);
-  assert.equal(world.properties.get('ADMIN_EMAILS'), `${ADMIN}, ${SECOND}`);
-  assert.doesNotThrow(() => world.as(SECOND).gs.apiState(), 'the new admin gets in');
-
-  for (const bad of ['', 'nope', 'a@b', 'a b@gmail.com', 'x@gmail.com, y@gmail.com', 'x@gmail.com;y@gmail.com', '<x@gmail.com>', 'x'.repeat(250) + '@gmail.com', null, 42, {}]) {
-    assert.throws(() => world.as(ADMIN).gs.apiAddAdmin(bad), /مش مكتوب صح/, String(bad));
-  }
-  assert.throws(() => world.as(ADMIN).gs.apiAddAdmin(SECOND.toUpperCase()), /قبل كده/);
-  assert.equal(world.properties.get('ADMIN_EMAILS'), `${ADMIN}, ${SECOND}`, 'refused adds change nothing');
-
-  list = plain(world.as(ADMIN).gs.apiRemoveAdmin('SECOND.admin@gmail.com'));
-  assert.deepEqual(list.emails, [ADMIN]);
-  assert.throws(() => world.as(SECOND).gs.apiState(), /مش مسموح/, 'removed: out at once');
-  assert.throws(() => world.as(ADMIN).gs.apiRemoveAdmin(SECOND), /مش في القايمة/);
-
-  const log = world.spreadsheet.getSheetByName('Log').data.map(r => [r[1], r[2], r[3]]);
-  assert.deepEqual(log.filter(r => /^admins\./.test(r[1])), [[ADMIN, 'admins.add', SECOND], [ADMIN, 'admins.remove', SECOND]]);
-});
-
-test('allowlist: the primary admin can never be removed, the list never empty, nobody removes themselves', () => {
+test('allowlist: listed with names and the primary; adding / removing moved to «الصلاحيات» (D1): refused here, nothing changes', () => {
   const world = htmlWorld();
   world.properties.set('ADMIN_EMAILS', `${ADMIN}, ${SECOND}`);
+  const gs = world.as(ADMIN).gs;
 
-  assert.throws(() => world.as(SECOND).gs.apiRemoveAdmin(ADMIN), /الحساب الأساسي/);
-  assert.throws(() => world.as(SECOND).gs.apiRemoveAdmin(' MenaZakMena@gmail.com '), /الحساب الأساسي/);
-  assert.throws(() => world.as(SECOND).gs.apiRemoveAdmin(SECOND), /تشيل نفسك/);
+  const list = plain(gs.apiAdmins());
+  assert.deepEqual(list, { emails: [ADMIN, SECOND], names: { [ADMIN]: 'menazakmena', [SECOND]: 'second.admin' }, stored: {}, primary: ADMIN, me: ADMIN, max: 20 });
+
+  assert.throws(() => world.as(ADMIN).gs.apiAddAdmin('new@gmail.com'), /الصلاحيات/);
+  assert.throws(() => world.as(ADMIN).gs.apiRemoveAdmin(SECOND), /الصلاحيات/);
   assert.equal(world.properties.get('ADMIN_EMAILS'), `${ADMIN}, ${SECOND}`);
-
-  // the primary is a Script Property (default menazakmena@gmail.com)
-  world.properties.set('ADMIN_PRIMARY', SECOND);
-  assert.equal(plain(world.as(ADMIN).gs.apiAdmins()).primary, SECOND);
-  assert.throws(() => world.as(ADMIN).gs.apiRemoveAdmin(SECOND), /الحساب الأساسي/);
-  assert.doesNotThrow(() => world.as(SECOND).gs.apiRemoveAdmin(ADMIN), 'the old primary is an ordinary admin now');
-  assert.equal(world.properties.get('ADMIN_EMAILS'), SECOND);
-
-  // never empty: a lone admin who isn't the primary still can't empty it
-  world.properties.set('ADMIN_PRIMARY', 'nobody@gmail.com');
-  assert.throws(() => world.as(SECOND).gs.apiRemoveAdmin(SECOND), /تشيل نفسك/);
-  world.properties.set('ADMIN_EMAILS', `${SECOND}, ${STRANGER}`);
-  world.as(SECOND).gs.apiRemoveAdmin(STRANGER);
-  assert.equal(world.properties.get('ADMIN_EMAILS'), SECOND, 'never below one');
-
-  // the limit
-  world.properties.set('ADMIN_EMAILS', Array.from({ length: 20 }, (_, i) => i ? `a${i}@gmail.com` : SECOND).join(','));
-  assert.throws(() => world.as(SECOND).gs.apiAddAdmin('one-more@gmail.com'), /أقصى عدد/);
+  assert.doesNotThrow(() => world.as(SECOND).gs.apiState());
 });
 
-test('allowlist: only admins can read or change it — in both deployments', () => {
+test('allowlist: only admins can read it (or reach the moved functions) — in both deployments', () => {
   const world = htmlWorld();
   for (const [fn, args] of [['apiAdmins', []], ['apiAddAdmin', [STRANGER]], ['apiRemoveAdmin', [ADMIN]]]) {
     assert.throws(() => world.as(STRANGER).gs[fn](...args), /مش مسموح/, fn);
@@ -429,12 +388,6 @@ test('allowlist: only admins can read or change it — in both deployments', () 
   const outsider = api.issueToken({ email: STRANGER });
   assert.equal(api.post({ fn: 'apiAddAdmin', args: [STRANGER], token: outsider }).code, 'denied');
   assert.equal(api.properties.get('ADMIN_EMAILS'), ADMIN);
-  const admin = api.issueToken({ email: ADMIN });
-  const added = signedIn(api, admin)('apiAddAdmin', [STRANGER]);
-  assert.deepEqual(added.result.emails, [ADMIN, STRANGER]);
-  const asOutsider = signedIn(api, outsider);
-  assert.equal(asOutsider('apiState').ok, true, 'and now they get in');
-  assert.equal(asOutsider('apiRemoveAdmin', [ADMIN]).ok, false, 'but can\'t remove the primary');
 });
 
 

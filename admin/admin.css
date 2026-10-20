@@ -4724,6 +4724,29 @@ dialog .toasts[popover] {
   }
 }
 
+/* «الصلاحيات»: the grants form inside the modal (existing check/field components) */
+.grants {
+  display: grid;
+  gap: 12px;
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+  text-align: start;
+}
+
+.grants__group {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line, rgba(127, 127, 127, .25));
+  border-radius: 12px;
+}
+
+.grants__group legend {
+  padding: 0 4px;
+  font-weight: 700;
+}
+
 
 /* =========================================================
    SCROLLBARS — mouse and trackpad only (touch keeps the native ones).

@@ -149,7 +149,9 @@ test('doPost, enforce off: today\'s access, except account management (Primary o
   const call = tab(w, B);
   assert.equal(call('apiAdmins').ok, true);
   assert.equal(call('apiAddAdmin', 'c@example.com').code, 'perm');
-  assert.equal(tab(w, OWNER)('apiAddAdmin', 'c@example.com').ok, true);
+  const moved = tab(w, OWNER)('apiAddAdmin', 'c@example.com');
+  assert.equal(moved.ok, false);
+  assert.match(moved.error, /الصلاحيات/, 'the Primary is pointed to «الصلاحيات» (D1 owns accounts)');
 });
 
 test('recovery panel (HtmlService): open to the allowlist while not enforcing; Primary only while enforcing', () => {
@@ -167,29 +169,19 @@ test('recovery panel (HtmlService): open to the allowlist while not enforcing; P
 
 const adminsOf = (...emails) => emails.map((email, i) => ({ email, name: '', primary: email === OWNER, servantId: null, g: g(i ? '-' : 'A') }));
 
-test('mirror: D1\'s active admins → ADMIN_EMAILS once D1 has seen this script\'s latest change; guarded', () => {
-  const w = world(snap({ admins: adminsOf(OWNER, B, 'c@example.com'), adminsSyncTs: 5000 }));
-  w.properties.set('ADMINS_CHANGED_MS', '9000');
+test('mirror: D1 active admins → ADMIN_EMAILS; guarded (never empty, never without the Primary, never over 20)', () => {
+  const w = world(snap({ admins: adminsOf(OWNER, B, 'c@example.com') }));
   w.gs.grantsSnapshot_();
-  assert.equal(w.properties.get('ADMIN_EMAILS'), `${OWNER}, ${B}`, 'D1 behind a local change: no mirror');
-
-  w.properties.set('ADMINS_CHANGED_MS', '4000');
-  w.advance(61 * 1000); w.gs.API_REQUEST_ = null; w.gs.grantsSnapshot_();
   assert.equal(w.properties.get('ADMIN_EMAILS'), `${OWNER}, ${B}, c@example.com`, 'mirrored');
 
   for (const bad of [adminsOf(B), [], adminsOf(OWNER, ...Array.from({ length: 25 }, (_, i) => `x${i}@example.com`))]) {
-    w.web[URL_] = { status: 200, body: JSON.stringify(snap({ admins: bad, adminsSyncTs: 5000 })) };
+    w.web[URL_] = { status: 200, body: JSON.stringify(snap({ admins: bad })) };
     w.advance(61 * 1000); w.gs.API_REQUEST_ = null; w.gs.grantsSnapshot_();
     assert.equal(w.properties.get('ADMIN_EMAILS'), `${OWNER}, ${B}, c@example.com`, 'refused: no primary / empty / too many');
   }
-});
 
-test('mirror: a local add marks the change time, so a stale D1 list never removes the new admin', () => {
-  const w = world(snap({ admins: adminsOf(OWNER, B), adminsSyncTs: Date.now() - 60000 }));
-  const call = tab(w, OWNER);
-  assert.equal(call('apiAddAdmin', 'c@example.com').ok, true);
-  assert.ok(Number(w.properties.get('ADMINS_CHANGED_MS')) > 0);
-  w.advance(61 * 1000);
-  call('apiAdmins');
-  assert.match(w.properties.get('ADMIN_EMAILS'), /c@example\.com/, 'kept until D1 has the push');
+  w.web[URL_] = { status: 200, body: JSON.stringify(snap({ admins: adminsOf(OWNER) })) };
+  w.advance(61 * 1000); w.gs.API_REQUEST_ = null; w.gs.grantsSnapshot_();
+  assert.equal(w.properties.get('ADMIN_EMAILS'), OWNER, 'removals follow D1');
+  assert.equal(w.gs.isAdmin_(B), false);
 });

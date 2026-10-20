@@ -142,7 +142,7 @@ test('names: no two admins can look the same, no hidden direction tricks, no ema
   assert.equal(rows(world).at(-1).actor, ADMIN);
 });
 
-test('names: removing an admin removes their name and their admin devices; the primary is never touched', () => {
+test('names: an admin removed in «الصلاحيات» (D1 → ADMIN_EMAILS mirror) loses their name and admin devices', () => {
   const world = apiWorld();
   const mina = tab(world, ADMIN).start();
   const fady = tab(world, SECOND, 'موبايل أندرويد – Chrome').start();
@@ -150,11 +150,15 @@ test('names: removing an admin removes their name and their admin devices; the p
   fady.ok('apiAdminPushSubscribe', { token: deviceToken(1), platform: 'android', device: 'موبايل' });
   assert.equal(adminSubs(world).length, 1);
 
-  mina.ok('apiRemoveAdmin', SECOND);
-  assert.equal(JSON.parse(world.properties.get('ADMIN_NAMES'))[SECOND], undefined);
+  world.properties.set('WORKER_SYNC_SECRET', 's'.repeat(48));
+  world.web['https://athanasios-api.menazak-lab.workers.dev/v1/sync/grants'] = { status: 200, body: JSON.stringify({
+    ok: true, v: 1, enforce: false, perms: ['content.view'], admins: [{ email: ADMIN, primary: true, g: 'A' }]
+  }) };
+  world.gs.API_REQUEST_ = null;
+  world.gs.grantsSnapshot_();
+  assert.equal(world.properties.get('ADMIN_EMAILS'), ADMIN);
+  assert.equal(JSON.parse(world.properties.get('ADMIN_NAMES') || '{}')[SECOND], undefined);
   assert.equal(adminSubs(world).length, 0, 'their devices are gone');
-  const removed = rows(world).find(r => r.action === 'admin.remove');
-  assert.match(removed.summary, /شال صلاحية «فادي يوسف»/, 'named as they were');
 });
 
 
@@ -320,9 +324,6 @@ test('activity: publish, public push send, import, admin changes and a takeover 
 
   mina.ok('apiPublish', mina.ok('apiReview').revision);
   assert.equal(rows(world).at(-1).summary, 'نشر من غير تغييرات جديدة');
-
-  mina.ok('apiAddAdmin', 'new.one@gmail.com');
-  assert.equal(rows(world).at(-1).action, 'admin.add');
 
   // a takeover by the same account from another device
   tab(world, ADMIN, 'موبايل أندرويد – Chrome').start();

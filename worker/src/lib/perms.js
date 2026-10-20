@@ -40,6 +40,16 @@ const KNOWN = new Set(PERMS);
 /* Never granted by default: the Primary Admin's, until they grant them (§4.3; YOUTH-ACCOUNTS-PLAN §12.2). */
 export const PRIMARY_DEFAULT = Object.freeze(['accounts.manage', 'notifications.manage', 'participants.manage']);
 
+/* «الصلاحيات» presets: they only pre-fill the checkboxes (§4.3). perm → scope. */
+const views = PERMS.filter(p => p.endsWith('.view') && p !== 'accounts.view' && p !== 'notifications.view');
+const allOf = list => Object.fromEntries(list.map(p => [p, 'all']));
+export const PRESETS = Object.freeze({
+  treasurer: { label: 'أمين الصندوق', grants: allOf(['bookings.view', 'events.view', 'finance.view', 'finance.manage', 'exports.export', 'activity.view']) },
+  servant_bookings: { label: 'خادم – حجوزات', grants: { 'bookings.view': 'all', 'events.view': 'all', 'bookings.create_cash': 'own' } },
+  content_editor: { label: 'محرر المحتوى', grants: allOf(['content.view', 'content.edit', 'content.delete', 'publish.publish', 'events.view', 'events.add', 'events.edit', 'media.view', 'media.add', 'media.delete', 'push.view']) },
+  viewer: { label: 'مشاهد', grants: allOf(views) }
+});
+
 /* Any active admin, no grant needed. */
 export const ANY_ADMIN = '*';
 
@@ -51,6 +61,10 @@ export const ANY_ADMIN = '*';
 export const ROUTE_PERMS = Object.freeze({
   'GET /v1/admin/whoami': ANY_ADMIN,
   'GET /v1/admin/activity': 'activity.view',
+  'GET /v1/admin/accounts': 'accounts.view',
+  'POST /v1/admin/accounts': 'accounts.manage',
+  'POST /v1/admin/accounts/:email': 'accounts.manage',
+  'POST /v1/admin/accounts/:email/remove': 'accounts.manage',
   'POST /v1/admin/diag/echo': 'system.manage',
   'POST /v1/admin/diag/housekeeping': 'system.manage',
   'POST /v1/admin/diag/event-fixture': 'system.manage',
@@ -144,6 +158,14 @@ export async function requirePerm(ctx, perm, { scope = 'own' } = {}) {
     }
   }
   return { perm, scope: held, servantId: held === 'own' ? a.servantId : null };
+}
+
+/* 'all' | 'own' | '' — what the signed-in admin holds of `perm` (never throws denied) */
+export async function heldScope(ctx, perm) {
+  const a = await loadAccess(ctx);
+  if (a.primary) return 'all';
+  if (a.grants.has(perm)) return a.grants.get(perm);
+  return !a.enforce && !PRIMARY_DEFAULT.includes(perm) ? 'all' : '';
 }
 
 /* The route-level check (index.js): an unmapped admin route is denied while enforcing. */

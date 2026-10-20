@@ -74,6 +74,16 @@ All resources live in Cloudflare account `menazakmena@gmail.com` (workers.dev su
 admin holds everything except `accounts.manage`, `notifications.manage`, `participants.manage`; `'1'` = grants only.
 The Primary Admin always holds everything. A denial is `denied 403` with `perm`.
 
+**Accounts («الصلاحيات», `src/lib/accounts.js`):** D1 owns the admins and their grants; Apps Script mirrors
+the active list into `ADMIN_EMAILS` within a minute (`apps-script/Grants.gs`), and `/v1/sync/admins` only
+refreshes names. `GET /v1/admin/accounts` (accounts.view); `POST /v1/admin/accounts`,
+`POST /v1/admin/accounts/:email`, `POST /v1/admin/accounts/:email/remove` (accounts.manage, **a Google ID
+token**, not the panel's `wk1` token → `google 403`). Refusals: `protected 403` with `reason`
+(`primary` | `self` | `last` | `max`), `denied 403` with the `perm` the actor doesn't hold. Every change
+writes a `critical` activity row. Live check: `node scripts/accounts-check.mjs` (staging).
+Emergency (no panel): `wrangler d1 execute <db> --remote --command "UPDATE admins SET active = 1 WHERE email = '…'"`;
+`ADMIN_EMAILS` follows on the next grants pull.
+
 **Envelope:**
 - Success: `{ ok: true, … }`.
 - Failure: `{ ok: false, code, message, hint?, requestId }`, with Arabic messages in the Apps Script voice.

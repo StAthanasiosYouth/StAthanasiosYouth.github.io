@@ -1509,11 +1509,13 @@
     var signedInAgain = false;
 
     function once() {
-      // the panel's own session first; Google itself only if that can't give one
-      return workerSession().catch(function (error) {
+      // the panel's own session first; Google itself only if that can't give one.
+      // options.google: Google itself always (account and permission changes, «الصلاحيات»)
+      var credential = options.google ? googleToken(true) : workerSession().catch(function (error) {
         if (session && session.via === 'google') return googleToken(options.quiet);
         throw error;
-      })
+      });
+      return credential
         .then(function (value) { return workerFetch(method, path, body, value, options); })
         .then(function (result) {
           if (result.blob) return result.blob;

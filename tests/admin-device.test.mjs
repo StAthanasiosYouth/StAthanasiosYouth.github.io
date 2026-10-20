@@ -170,7 +170,13 @@ test('it ends: logout, the end date (never extended by use), the admin removed �
   // the admin removed
   const fady = googleTab(world, SECOND).call('apiTrustDevice', {}).result;
   const fadyApp = deviceTab(world, signIn(world, fady).token);
-  googleTab(world, ADMIN).call('apiRemoveAdmin', SECOND);
+  // removed in «الصلاحيات»: D1's list reaches ADMIN_EMAILS (Grants.gs mirror)
+  world.properties.set('WORKER_SYNC_SECRET', 's'.repeat(48));
+  world.web['https://athanasios-api.menazak-lab.workers.dev/v1/sync/grants'] = { status: 200, body: JSON.stringify({
+    ok: true, v: 1, enforce: false, perms: ['content.view'], admins: [{ email: ADMIN, primary: true, g: 'A' }]
+  }) };
+  world.gs.API_REQUEST_ = null;
+  world.gs.grantsSnapshot_();
   assert.equal(signIn(world, fady).ok, false);
   assert.equal(fadyApp.call('apiState').ok, false);
 });

@@ -976,14 +976,53 @@
 
 
   /* =======================================================
-     «صلاحيات لوحة التحكم»: the Google emails allowed in, and the name
-     each admin is shown with (presence, «سجل النشاط», notifications).
-     The server decides everything (Auth.gs, Activity.gs): the email is
-     who someone is; the name is only how they're shown. Any admin may
-     rename any admin; two admins can never have the same name.
+     «الصلاحيات» (Phase 1.5, docs/BOOKING-PHASE1-COMPLETION-PLAN.md §4.3):
+     the admin accounts and their grants live on the Worker (D1,
+     worker/src/lib/accounts.js); Apps Script's ADMIN_EMAILS follows within a
+     minute (Grants.gs). The names stay here (Auth.gs, Activity.gs): any
+     admin may rename any admin; two admins can never have the same name.
+     Everything is decided on the server: this screen only shows and asks.
+     Adding, changing and removing need Google itself (not a remembered device).
   ======================================================= */
 
   var EMAIL = /^[^@\s,;<>"]+@[^@\s,;<>"]+\.[a-z]{2,}$/i;
+
+  var PERM_MODULES = {
+    content: 'المحتوى', publish: 'النشر', events: 'الفعاليات والخدام', bookings: 'الحجوزات', finance: 'الفلوس',
+    exports: 'التصدير', competitions: 'المسابقات', store: 'المتجر', points: 'النقاط', participants: 'المشتركين',
+    media: 'الصور والفيديو', push: 'الإشعارات', accounts: 'الحسابات والصلاحيات', activity: 'سجل النشاط',
+    notifications: 'إعدادات الإشعارات', system: 'النظام'
+  };
+  var PERM_ACTIONS = {
+    view: 'يشوف', add: 'يضيف', edit: 'يعدّل', delete: 'يمسح', approve: 'يعتمد', publish: 'ينشر',
+    export: 'يصدّر', export_pii: 'يصدّر بأرقام التليفونات', manage: 'يدير', create_cash: 'يسجّل حجز كاش'
+  };
+  var PROTECTED_REASONS = {
+    primary: 'ده الحساب الأساسي: صلاحياته كاملة ومينفعش يتغير أو يتشال.',
+    self: 'مينفعش تشيل نفسك أو تشيل صلاحية إدارة الحسابات من نفسك.',
+    last: 'لازم يفضل حد يقدر يدير الحسابات.',
+    max: 'وصلت لأقصى عدد أدمنز.'
+  };
+
+  function permLabel(perm) {
+
+    var parts = perm.split('.');
+    return (PERM_ACTIONS[parts[1]] || parts[1]) + ' · ' + (PERM_MODULES[parts[0]] || parts[0]);
+
+  }
+
+  /* the Worker's errors in this screen's words */
+  function accountsError(error) {
+
+    if (error && error.code === 'protected' && error.reply && PROTECTED_REASONS[error.reply.reason]) {
+      return new Error(PROTECTED_REASONS[error.reply.reason]);
+    }
+    if (error && error.code === 'denied' && error.reply && error.reply.perm) {
+      return new Error('مش عندك صلاحية «' + permLabel(error.reply.perm) + '»، فمينفعش تديها لحد.');
+    }
+    return error;
+
+  }
 
   function adminsCard() {
 
@@ -995,16 +1034,47 @@
     var count = el('span', { class: 'admins__count', dir: 'ltr' });
     var input = A.textInput('', { type: 'email', ltr: true, max: 254, placeholder: 'name@gmail.com', inputmode: 'email' });
     var add = el('button', { class: 'btn btn--primary', type: 'button' }, icon('plus'), 'ضيف');
-    var data = null;
+    var addRow = el('div', { class: 'admins__add' },
+      A.field('الإيميل', input, 'حساب جوجل (Gmail أو حساب شغل على جوجل)'),
+      el('div', { class: 'actions' }, add)
+    );
+    var note = el('p', { class: 'note' });
+    var data = null;       // apiAdmins: names, primary, me
+    var acc = null;        // GET /v1/admin/accounts: admins + grants, catalog, presets, canManage
+    var servants = null;   // apiServants (for «خادم مربوط»), loaded once
+    var W = window.AdminWorker;
 
     input.setAttribute('autocomplete', 'off');
     input.setAttribute('spellcheck', 'false');
     input.setAttribute('autocapitalize', 'off');
 
+    function accountOf(email) {
+
+      return acc ? acc.admins.filter(function (a) { return a.email === email; })[0] || null : null;
+
+    }
+
+    function grantsChip(account) {
+
+      if (!account) return null;
+      if (account.primary) return A.chip('كل الصلاحيات', 'gold');
+      var keys = Object.keys(account.grants || {});
+      if (!keys.length) return A.chip('من غير صلاحيات', 'off');
+      var preset = Object.keys(acc.presets).filter(function (k) {
+        var p = acc.presets[k].grants;
+        var pk = Object.keys(p);
+        return pk.length === keys.length && pk.every(function (perm) { return account.grants[perm] === p[perm]; });
+      })[0];
+      return A.chip(preset ? acc.presets[preset].label : keys.length === 1 ? 'صلاحية واحدة' : keys.length === 2 ? 'صلاحيتين' : keys.length + ' صلاحيات', 'info');
+
+    }
+
     function row(email) {
 
-      var primary = email === data.primary;
+      var account = accountOf(email);
+      var primary = email === data.primary || !!(account && account.primary);
       var me = email === data.me;
+      var manage = !!(acc && acc.canManage && !primary);
 
       var shown = (data.names && data.names[email]) || email.split('@')[0];
       var named = !!(data.stored && data.stored[email]);
@@ -1014,10 +1084,11 @@
         el('span', { class: 'admin__main' },
           el('span', { class: 'admin__name' + (named ? '' : ' is-unnamed'), dir: 'auto', text: named ? shown : shown + ' (من غير اسم)' }),
           el('span', { class: 'admin__email ltr', text: email }),
-          primary || me ? el('span', { class: 'admin__chips' },
+          el('span', { class: 'admin__chips' },
             primary ? A.chip('الحساب الأساسي', 'gold') : null,
-            me ? A.chip('انت', 'info') : null
-          ) : null
+            me ? A.chip('انت', 'info') : null,
+            primary ? null : grantsChip(account)
+          )
         ),
         el('button', {
           class: 'icon-btn',
@@ -1026,36 +1097,198 @@
           title: 'غيّر الاسم',
           onclick: function (event) { rename(email, named ? shown : '', event.currentTarget); }
         }, icon('edit')),
+        manage && account ? el('button', {
+          class: 'icon-btn',
+          type: 'button',
+          'aria-label': 'صلاحيات ' + email,
+          title: 'الصلاحيات',
+          onclick: function (event) { editGrants(account, event.currentTarget); }
+        }, icon('shield')) : null,
         primary
           ? el('span', { class: 'admin__lock', role: 'img', 'aria-label': 'محمي: مينفعش يتشال', title: 'محمي: مينفعش يتشال' }, icon('lock'))
-          : me
-            ? null
-            : el('button', {
+          : manage && !me
+            ? el('button', {
               class: 'icon-btn icon-btn--danger',
               type: 'button',
               'aria-label': 'شيل صلاحية ' + email,
               onclick: function (event) { remove(email, event.currentTarget); }
             }, icon('trash'))
+            : null
       );
 
     }
 
-    function draw(next) {
+    function draw() {
 
-      data = next;
+      if (!data) return;
       list.setAttribute('aria-busy', 'false');
-      A.fill(list, data.emails.map(row));
-      count.textContent = data.emails.length + ' / ' + data.max;
-      add.disabled = data.emails.length >= data.max;
+      // D1 decides who is in; until it answers (or in the emergency panel), the allowlist here
+      var emails = acc ? acc.admins.map(function (a) { return a.email; }) : data.emails;
+      A.fill(list, emails.map(row));
+      count.textContent = emails.length + ' / ' + data.max;
+      addRow.hidden = !(acc && acc.canManage);
+      add.disabled = emails.length >= data.max;
+      note.textContent = !W
+        ? 'الإضافة والصلاحيات من لوحة التحكم الأساسية (stathanasiosyouth.github.io/admin).'
+        : acc && !acc.canManage
+          ? 'إضافة الأدمنز وتغيير صلاحياتهم للحساب الأساسي ومن معاه صلاحية «يدير · الحسابات والصلاحيات».'
+          : 'كل تغيير في الحسابات والصلاحيات بيتسجل في «سجل النشاط» ويوصل للحساب الأساسي.';
+
+    }
+
+    /* GET /v1/admin/accounts; quiet when the Worker can't be reached (the allowlist still shows) */
+    function loadAccounts() {
+
+      if (!W) return Promise.resolve(null);
+      return W.call('GET', '/v1/admin/accounts', undefined, { quiet: true }).then(function (reply) {
+        acc = reply;
+        draw();
+      }, function (error) {
+        acc = null;
+        draw();
+        A.fail(error, box);
+      });
 
     }
 
     function load() {
 
-      A.call('apiAdmins').then(draw).catch(function (error) {
+      A.call('apiAdmins').then(function (next) {
+        data = next;
+        draw();
+      }).catch(function (error) {
         list.setAttribute('aria-busy', 'false');
         list.replaceChildren();
         A.fail(error, box);
+      });
+      loadAccounts();
+
+    }
+
+    /*
+     * A change on the Worker with Google itself: a device session (or an
+     * expired Google token) is asked for Google first, then the same call once.
+     */
+    function change(path, body, button) {
+
+      function send() {
+        return W.call('POST', path, body, { google: true });
+      }
+
+      return A.withBusy(button, send().catch(function (error) {
+        if (!error || error.code !== 'google') throw error;
+        return A.confirm({
+          tone: 'info',
+          icon: 'shield',
+          title: 'محتاجين نتأكد إنه انت',
+          message: 'تغيير الحسابات والصلاحيات محتاج دخول بحساب جوجل نفسه، مش الجهاز المحفوظ.',
+          confirmLabel: 'ادخل بحساب جوجل',
+          cancelLabel: 'لأ، رجوع'
+        }).then(function (ok) {
+          if (!ok) throw new Error('اتلغى: محتاج دخول بحساب جوجل.');
+          return W.google().then(send);
+        });
+      })).then(function (reply) {
+        acc = reply;
+        draw();
+        return reply;
+      }).catch(function (error) {
+        throw accountsError(error);
+      });
+
+    }
+
+    function loadServants() {
+
+      if (servants) return Promise.resolve(servants);
+      return A.call('apiServants').then(function (reply) {
+        servants = (reply && reply.servants || []).filter(function (s) { return s.active !== false; });
+        return servants;
+      }, function () { return []; });
+
+    }
+
+    /* the grants form: a preset pre-fills, the boxes decide (the server checks again) */
+    function grantsForm(account) {
+
+      var current = account ? account.grants || {} : {};
+      var boxes = {};
+      var groups = [];
+      var byModule = {};
+
+      acc.perms.forEach(function (perm) {
+        var m = perm.split('.')[0];
+        (byModule[m] = byModule[m] || []).push(perm);
+      });
+
+      Object.keys(byModule).forEach(function (m) {
+        groups.push(el('fieldset', { class: 'grants__group' },
+          el('legend', { text: PERM_MODULES[m] || m }),
+          byModule[m].map(function (perm) {
+            var hint = perm === 'bookings.create_cash' ? 'لو اخترت «الخادم المربوط بس» تحت: يسجّل كاش باسم خادمه هو بس.' : '';
+            if (acc.primaryDefault.indexOf(perm) !== -1) hint = 'صلاحية حساسة: للحساب الأساسي أساسًا.';
+            var box = A.checkbox(PERM_ACTIONS[perm.split('.')[1]] || perm, !!current[perm], hint);
+            boxes[perm] = box.input;
+            return box.node;
+          })
+        ));
+      });
+
+      var own = A.checkbox('تسجيل الكاش للخادم المربوط بس', current['bookings.create_cash'] === 'own', 'من غير ده: يسجّل كاش باسم أي خادم.');
+      var servant = el('select', { class: 'input' }, el('option', { value: '', text: 'من غير خادم مربوط' }));
+      var preset = A.choices(A.uid('preset'), [{ value: '', label: 'مخصص' }].concat(Object.keys(acc.presets).map(function (k) {
+        return { value: k, label: acc.presets[k].label };
+      })), '', function (k) {
+        if (!k) return;
+        var g = acc.presets[k].grants;
+        Object.keys(boxes).forEach(function (perm) { boxes[perm].checked = !!g[perm]; });
+        own.input.checked = g['bookings.create_cash'] === 'own';
+      });
+
+      loadServants().then(function (all) {
+        all.forEach(function (s) {
+          servant.appendChild(el('option', { value: s.id, text: s.name, selected: account && account.servantId === s.id }));
+        });
+      });
+
+      return {
+        node: el('div', { class: 'grants' },
+          A.field('ابدأ من', preset.node, 'بيعلّم الخانات بس؛ تقدر تعدّل بعدها.'),
+          A.field('الخادم المربوط', servant, 'الخادم اللي الأدمن ده بيستلم الفلوس باسمه.'),
+          own.node,
+          groups
+        ),
+        value: function () {
+          var grants = {};
+          Object.keys(boxes).forEach(function (perm) {
+            if (boxes[perm].checked) grants[perm] = perm === 'bookings.create_cash' && own.input.checked ? 'own' : 'all';
+          });
+          return { grants: grants, servantId: servant.value || null };
+        }
+      };
+
+    }
+
+    function editGrants(account, button) {
+
+      box.hidden = true;
+      var form = grantsForm(account);
+      A.modal({
+        tone: 'info',
+        icon: 'shield',
+        title: 'صلاحيات «' + ((data.names && data.names[account.email]) || account.email) + '»',
+        message: 'علّم اللي يقدر يعمله. مش هتقدر تدي صلاحية مش عندك.',
+        body: form.node,
+        actions: [
+          { label: 'إلغاء', value: false, kind: 'ghost' },
+          { label: 'احفظ الصلاحيات', value: true, kind: 'primary' }
+        ]
+      }).then(function (ok) {
+        A.dirty = false;
+        if (!ok) return;
+        change('/v1/admin/accounts/' + encodeURIComponent(account.email), form.value(), button)
+          .then(function () { A.toast('اتحفظت الصلاحيات ✓'); })
+          .catch(function (error) { A.fail(error, box); });
       });
 
     }
@@ -1084,7 +1317,8 @@
         if (!ok) return;
         A.withBusy(button, A.call('apiSetAdminName', email, field.value))
           .then(function (next) {
-            draw(next);
+            data = next;
+            draw();
             // presence, the rail and the log use the names: the state learns them too
             if (A.state) {
               A.state.names = next.names;
@@ -1107,16 +1341,13 @@
         tone: 'danger',
         icon: 'user',
         title: 'تشيل صلاحية «' + email + '»؟',
-        message: 'مش هيقدر يدخل لوحة التحكم تاني بالحساب ده. تقدر تضيفه تاني في أي وقت.',
+        message: 'مش هيقدر يدخل لوحة التحكم تاني بالحساب ده، وصلاحياته كلها بتتشال. تقدر تضيفه تاني في أي وقت.',
         confirmLabel: 'شيل الصلاحية',
         cancelLabel: 'لأ، سيبه'
       }).then(function (ok) {
         if (!ok) return;
-        A.withBusy(button, A.call('apiRemoveAdmin', email))
-          .then(function (next) {
-            draw(next);
-            A.toast('اتشالت صلاحية ' + email);
-          })
+        change('/v1/admin/accounts/' + encodeURIComponent(email) + '/remove', {}, button)
+          .then(function () { A.toast('اتشالت صلاحية ' + email); })
           .catch(function (error) { A.fail(error, box); });
       });
 
@@ -1134,26 +1365,33 @@
         return;
       }
 
-      if (data && data.emails.indexOf(email) !== -1) {
+      if (accountOf(email)) {
         A.fail(new Error('الإيميل ده مسموح له قبل كده.'), box);
         return;
       }
 
-      A.confirm({
+      var form = grantsForm(null);
+      A.modal({
         tone: 'info',
         icon: 'shield',
         title: 'تدّي «' + email + '» صلاحية لوحة التحكم؟',
-        message: 'هيقدر يدخل بحساب جوجل ده ويعدّل المسودة وينشر على الموقع.',
-        confirmLabel: 'ضيف',
-        cancelLabel: 'لأ، رجوع'
+        message: 'هيقدر يدخل بحساب جوجل ده ويعمل اللي هتعلّمه بس.',
+        body: form.node,
+        actions: [
+          { label: 'لأ، رجوع', value: false, kind: 'ghost' },
+          { label: 'ضيف', value: true, kind: 'primary' }
+        ]
       }).then(function (ok) {
+        A.dirty = false;
         if (!ok) return;
-        A.withBusy(add, A.call('apiAddAdmin', email))
-          .then(function (next) {
+        var value = form.value();
+        value.email = email;
+        change('/v1/admin/accounts', value, add)
+          .then(function () {
             input.value = '';
-            A.dirty = false;
-            draw(next);
             A.toast('اتضاف ' + email + ' ✓');
+            // the name directory (Apps Script) learns the new admin within a minute
+            setTimeout(function () { A.call('apiAdmins').then(function (next) { data = next; draw(); }); }, 1500);
           })
           .catch(function (error) { A.fail(error, box); });
       });
@@ -1167,17 +1405,16 @@
       }
     });
 
-    var card = A.card('صلاحيات لوحة التحكم', 'حسابات جوجل اللي تقدر تدخل لوحة التحكم. من غير باسوردات: كل واحد بيدخل بحساب جوجل بتاعه.',
+    var card = A.card('الصلاحيات', 'حسابات جوجل اللي تقدر تدخل لوحة التحكم، وكل واحد يقدر يعمل إيه. من غير باسوردات: كل واحد بيدخل بحساب جوجل بتاعه.',
       box,
       el('div', { class: 'admins__head' }, el('span', { class: 'section-label', text: 'مسموح لهم' }), count),
       list,
-      el('div', { class: 'admins__add' },
-        A.field('الإيميل', input, 'حساب جوجل (Gmail أو حساب شغل على جوجل)'),
-        el('div', { class: 'actions' }, add)
-      ),
+      addRow,
+      note,
       el('p', { class: 'note' }, 'لو هيستخدم لوحة الطوارئ (رابط Apps Script)، شارك معاه الشيت كمان من «افتح الشيت».')
     );
 
+    addRow.hidden = true;
     card.classList.add('card--admins');
     load();
 

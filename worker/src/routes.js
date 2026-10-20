@@ -15,6 +15,7 @@ import { putProof, readProof, deleteProof, sweepProofs } from './lib/proofs.js';
 import { PROOF_MAX_BYTES } from './lib/image.js';
 import { verifySync, syncStampStmt } from './lib/sync.js';
 import { grantsSnapshot } from './lib/perms.js';
+import { accountsList, accountAdd, accountUpdate, accountRemove } from './lib/accounts.js';
 import { housekeeping, blankPhones } from './scheduled.js';
 import { makeJob } from './jobs.js';
 import { bookState, bookProof, bookSubmit, bookStatus, bookWithdraw } from './book/public.js';
@@ -162,8 +163,11 @@ const EMAIL_RE = /^[^@\s]{1,64}@[^@\s]{1,190}\.[^@\s]{2,}$/;
 /*
  * POST /v1/sync/admins  (signed by Apps Script, lib/sync.js)
  * body: { admins: [{ email, name, primary }] }
- * The Apps Script allowlist is the source of truth: listed → active, the
- * rest → inactive (rows kept: their Google sub binding stays).
+ * Phase 1.5: D1 owns admins + grants («الصلاحيات», lib/accounts.js) and Apps
+ * Script mirrors D1 (apps-script/Grants.gs). An older Apps Script still pushing
+ * here only refreshes the names of existing rows (and, on a D1 without any
+ * Primary Admin yet, marks the listed primary): it never adds, removes,
+ * re-activates or demotes anyone.
  */
 async function syncAdmins(ctx) {
   await limit(ctx, 'sync', clientIp(ctx.request), 30, 60);
@@ -176,16 +180,13 @@ async function syncAdmins(ctx) {
   if (admins.filter(a => a.primary).length > 1) throw new ApiError('bad', 'primary');
 
   const db = ctx.env.DB;
-  const now = Date.now();
-  const emails = admins.map(a => a.email);
-  const stmts = admins.map(a => db.prepare(
-    "INSERT INTO admins (email, name, role, active, created_at) VALUES (?, ?, ?, 1, ?) ON CONFLICT(email) DO UPDATE SET name = excluded.name, role = excluded.role, active = 1"
-  ).bind(a.email, a.name, a.primary ? 'primary' : 'admin', now));
-  stmts.push(db.prepare(`UPDATE admins SET active = 0 WHERE email NOT IN (${emails.map(() => '?').join(',')})`).bind(...emails));
+  const stmts = admins.filter(a => a.name).map(a => db.prepare('UPDATE admins SET name = ? WHERE email = ?').bind(a.name, a.email));
+  const primary = admins.find(a => a.primary);
+  if (primary) stmts.push(db.prepare("UPDATE admins SET role = 'primary' WHERE email = ? AND active = 1 AND NOT EXISTS (SELECT 1 FROM admins WHERE role = 'primary')").bind(primary.email));
   stmts.push(syncStampStmt(db, 'admins', ts));
-  stmts.push(activityStmt(db, { actor: 'apps-script', action: 'admins.sync', entityType: 'admins', summary: admins.length + ' active' }));
+  stmts.push(activityStmt(db, { actor: 'apps-script', action: 'admins.sync', entityType: 'admins', summary: admins.length + ' listed (names only)', source: 'apps-script' }));
   await retry(() => db.batch(stmts));
-  return { active: admins.length };
+  return { active: await retry(() => db.prepare('SELECT COUNT(*) AS n FROM admins WHERE active = 1').first('n')) };
 }
 
 /*
@@ -233,6 +234,10 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/admin/proofs', auth: 'admin', raw: true, maxBytes: PROOF_MAX_BYTES, handler: proofUpload },
   { method: 'GET', path: '/v1/admin/proofs/:id', auth: 'admin', handler: proofRead },
   { method: 'DELETE', path: '/v1/admin/proofs/:id', auth: 'admin', handler: proofDelete },
+  { method: 'GET', path: '/v1/admin/accounts', auth: 'admin', handler: accountsList },
+  { method: 'POST', path: '/v1/admin/accounts', auth: 'admin', maxBytes: 8 * 1024, handler: accountAdd },
+  { method: 'POST', path: '/v1/admin/accounts/:email', auth: 'admin', maxBytes: 8 * 1024, handler: accountUpdate },
+  { method: 'POST', path: '/v1/admin/accounts/:email/remove', auth: 'admin', handler: accountRemove },
   { method: 'POST', path: '/v1/sync/admins', auth: 'sync', raw: true, maxBytes: 16 * 1024, handler: syncAdmins },
   { method: 'POST', path: '/v1/admin/diag/event-fixture', auth: 'admin', handler: diagEventFixture },
   { method: 'POST', path: '/v1/admin/diag/retention', auth: 'admin', handler: diagRetention },
