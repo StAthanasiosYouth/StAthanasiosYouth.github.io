@@ -42,6 +42,8 @@ const MESSAGES = {
   full: ['مفيش أماكن كفاية.', ''],
   limit: ['عندك طلبين حجز لسه بيتراجعوا للفعالية دي.', 'استنى لحد ما الخادم يراجعهم.'],
   final: ['الحجز ده مينفعش يتغير كده دلوقتي.', ''],
+  // event age eligibility (§4.9): the reply's `message` says which rule
+  age: ['السن مش مناسب للفعالية دي.', ''],
   expired: ['الرابط ده مش صالح أو انتهى.', ''],
   warn: ['في ملاحظات قبل التسجيل.', 'راجعها، ولو متأكد سجّل برضه.'],
   needs_override: ['الحجز مينفعش يتأكد كده.', 'راجع السبب، ولو لازم أكّده مع كتابة السبب.'],
@@ -57,7 +59,7 @@ const MESSAGES = {
 const STATUS = {
   auth: 401, denied: 403, origin: 403, bad: 400, toolarge: 413, rate: 429, conflict: 409, busy: 409, disabled: 403, notfound: 404, method: 405, error: 500,
   not_found: 404, invalid: 400, proof: 400, not_open: 409, closed: 409, full: 409, limit: 429, final: 409, expired: 401, warn: 409, needs_override: 409, over: 409, recent: 409,
-  locked: 409, turnstile: 403, google: 403, protected: 403
+  locked: 409, turnstile: 403, google: 403, protected: 403, age: 400
 };
 
 export class ApiError extends Error {

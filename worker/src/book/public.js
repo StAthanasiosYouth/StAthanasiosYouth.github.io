@@ -21,6 +21,7 @@ import {
   checkCounts, normPhone, cleanText, quote, seats, people, windowState, publicLeft,
   derive, amountDueOf, newRef, LIMITS, stampMs, methodOnline, participantCounts, payClaim
 } from './model.js';
+import { checkBooker, checkCompanions, ageRule } from './age.js';
 
 const KEY = /^[A-Za-z0-9_.:-]{8,100}$/;
 const TOKEN_LIFE_MS = 60 * 24 * 3600 * 1000;      // §6: event end + 60 days
@@ -114,14 +115,23 @@ export async function bookSubmit(ctx) {
   if (name.length < 2) throw invalid('name');
   const phone = normPhone(body.phone);
   if (!phone) throw invalid('phone');
+  // age eligibility (§4.9): the booker's date of birth, judged at the event's start (Cairo)
+  const booker = checkBooker(b, event.startAt, body.bookerDob, now);
+  if (booker.problem) throw new ApiError('age', booker.problem.field, { field: booker.problem.field, message: booker.problem.message });
   // «كل فرد باسمه وسنه»: the counts come from the people list (each priced by age, server side)
   let party = null;
   if (b.participants) {
-    party = participantCounts(b, body.participants);
+    // the booker is person #1: with a date of birth, their age is the computed one, never the typed one
+    const input = Array.isArray(body.participants) && booker.age != null
+      ? body.participants.map((p, i) => (i === 0 ? { ...p, age: booker.age } : p)) : body.participants;
+    party = participantCounts(b, input);
     if (party.problem) throw invalid('participants');
   }
   const checked = checkCounts(b, party ? party.counts : body.counts);
   if (checked.problem) throw invalid(party ? 'participants' : 'counts');
+  const refused = checkCompanions(b, party ? { list: party.list } : { counts: checked.counts });
+  if (refused) throw new ApiError('age', refused.field, refused);
+  const rule = ageRule(b);
   const counts = checked.counts;
   const ppl = people(b.pricing, counts);
   let names = null;
@@ -178,12 +188,15 @@ export async function bookSubmit(ctx) {
     const stmts = [
       // at most 2 PENDING bookings per phone per event, decided inside the write
       db.prepare(`INSERT INTO bookings (id, ref, event_id, source, status, name, phone, servant_id, method, requested, seats_requested, names,
-          quoted_total, price_rev, visitor_note, request_key, created_at, created_ms, updated_ms, participants, pay_plan, pay_claim)
-        SELECT ?, ?, ?, 'site', 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          quoted_total, price_rev, visitor_note, request_key, created_at, created_ms, updated_ms, participants, pay_plan, pay_claim,
+          booker_dob, booker_age, age_source, age_rule)
+        SELECT ?, ?, ?, 'site', 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         WHERE (SELECT COUNT(*) FROM bookings WHERE event_id = ? AND phone = ? AND status = 'pending') < ?
         ON CONFLICT(request_key) DO NOTHING`).bind(
         id, ref, event.id, name, phone, servantId, method, JSON.stringify(counts), seatCount, names ? JSON.stringify(names) : null,
-        total, event.priceRev, note, body.requestKey, createdAt, now, now, party ? JSON.stringify(party.list) : null, plan.plan, plan.claim, event.id, phone, LIMITS.pendingPerPhone)
+        total, event.priceRev, note, body.requestKey, createdAt, now, now, party ? JSON.stringify(party.list) : null, plan.plan, plan.claim,
+        booker.dob || null, booker.age == null ? null : booker.age, booker.dob ? 'self' : null, rule ? JSON.stringify(rule) : null,
+        event.id, phone, LIMITS.pendingPerPhone)
     ];
     if (proofs.length) {
       stmts.push(db.prepare(`UPDATE proofs SET booking_id = ?, delete_after_ms = ? WHERE id IN (${proofs.map(() => '?').join(',')}) AND booking_id IS NULL AND EXISTS (SELECT 1 FROM bookings WHERE id = ?)`)

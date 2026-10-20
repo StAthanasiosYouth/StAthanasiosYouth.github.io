@@ -10,6 +10,7 @@
 import { ApiError } from '../lib/http.js';
 import { retry } from '../lib/db.js';
 import { stampMs, priceRev, methodOnline } from './model.js';
+import { parseBookerAge } from './age.js';
 
 const SLUG = /^[a-z0-9][a-z0-9-]{1,39}$/;
 export const FRESH_MS = 60 * 1000;
@@ -41,10 +42,14 @@ export function rowFromJson(json, source, now = Date.now()) {
     perBookingMax: Number(b.perBookingMax) || 10,
     collectNames: b.collectNames === true,
     participants: b.participants === true,
+    // age eligibility (§4.9): absent on older events = no limits, every category allowed
+    bookerAge: parseBookerAge(b.bookerAge),
+    ageStrict: b.ageStrict === true,
     pricing: { mode: b.pricing.mode === 'group' ? 'group' : 'single', categories: b.pricing.categories.map(c => ({
       key: String(c.key), label: String(c.label || c.key), group: ['adult', 'child', 'companion'].includes(c.group) ? c.group : 'adult',
       price: Math.max(0, Math.floor(Number(c.price) || 0)), seat: c.seat !== false, min: Number(c.min) || 0, max: c.max == null ? 30 : Number(c.max), note: String(c.note || ''),
-      ageMin: Number.isInteger(c.ageMin) ? c.ageMin : null, ageMax: Number.isInteger(c.ageMax) ? c.ageMax : null
+      ageMin: Number.isInteger(c.ageMin) ? c.ageMin : null, ageMax: Number.isInteger(c.ageMax) ? c.ageMax : null,
+      allowed: c.allowed !== false
     })) },
     payment: { mode: b.payment && b.payment.mode === 'installments' ? 'installments' : 'full', minFirst: Number(b.payment && b.payment.minFirst) || 0, finalDueAt: (b.payment && b.payment.finalDueAt) || '' },
     methods: (b.methods || []).map(m => ({ key: String(m.key), label: String(m.label || m.key), needsProof: m.needsProof === true, online: methodOnline(m) })),

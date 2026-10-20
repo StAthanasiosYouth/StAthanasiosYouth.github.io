@@ -51,7 +51,7 @@ export async function blankPhones(env, now = Date.now(), { eventId = null } = {}
   const only = eventId ? ' AND event_id = ?' : '';
   const args = eventId ? [eventId] : [];
   const stmts = [
-    db.prepare(`UPDATE bookings SET phone = '', phone_blanked_ms = ?
+    db.prepare(`UPDATE bookings SET phone = '', booker_dob = NULL, phone_blanked_ms = ?
       WHERE phone <> ''${only} AND (
         event_id IN (SELECT id FROM event_cfg WHERE end_ms < ?)
         OR (event_id NOT IN (SELECT id FROM event_cfg) AND created_ms < ?))`).bind(now, ...args, cutoff, cutoff)

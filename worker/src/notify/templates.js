@@ -295,6 +295,7 @@ const SUBJECTS = {
   'booking.cancel': 'إلغاء حجز {ref}[ – {event}]',
   'booking.reopen': 'رجوع حجز {ref}[ – {event}]',
   'booking.update': 'تعديل حجز {ref}[ – {event}]',
+  'booking.ageOverride': 'تجاوز شرط السن في حجز {ref}[ – {event}]',
   'booking.withdraw': 'الزائر لغى طلب الحجز {ref}[ – {event}]',
   'booking.remind': 'تذكير بالدفع في حجز {ref}[ – {event}]',
   'payment.add': 'دفعة جديدة في حجز {ref}[ – {event}]',

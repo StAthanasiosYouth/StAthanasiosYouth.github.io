@@ -46,6 +46,7 @@ const SPECIAL = {
   'booking.cancel': ['routine', 'bookings.view'],
   'booking.reopen': ['routine', 'bookings.view'],
   'booking.update': ['routine', 'bookings.view'],
+  'booking.ageOverride': ['important', 'bookings.view'],
   'booking.withdraw': ['routine', 'bookings.view'],
   'booking.remind': ['routine', 'bookings.view'],
   'payment.add': ['routine', 'finance.view'],
@@ -105,7 +106,7 @@ export function defaultsOf(level) {
 
 const ACTION_TEXT = {
   'booking.create': 'سجّل حجز', 'booking.confirm': 'أكّد حجز', 'booking.reject': 'رفض حجز', 'booking.cancel': 'لغى حجز',
-  'booking.reopen': 'رجّع حجز', 'booking.update': 'عدّل حجز', 'booking.withdraw': 'الزائر لغى طلب', 'booking.remind': 'فكّر بالدفع في حجز',
+  'booking.reopen': 'رجّع حجز', 'booking.update': 'عدّل حجز', 'booking.ageOverride': 'تجاوز شرط السن في حجز', 'booking.withdraw': 'الزائر لغى طلب', 'booking.remind': 'فكّر بالدفع في حجز',
   'payment.add': 'سجّل دفعة في حجز', 'payment.refund': 'سجّل استرداد في حجز', 'payment.void': 'لغى دفعة في حجز',
   'handover.add': 'سجّل تسليم فلوس', 'handover.void': 'لغى تسليم فلوس', 'event.cancelAll': 'لغى كل حجوزات فعالية',
   'modules.book': 'غيّر حالة الحجز', 'job.failed': 'مهمة في الخلفية فشلت', 'notify.failed': 'إشعار مقدرش يتبعت',

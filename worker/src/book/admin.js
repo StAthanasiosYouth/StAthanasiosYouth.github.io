@@ -26,6 +26,7 @@ import {
   checkCounts, normPhone, cleanText, quote, seats, people, deriveFromPaid, derive, paidOf, amountDueOf,
   confirmPaymentOk, newRef, summary, stampMs, msStamp, isLive, LIMITS, STATUSES, methodOnline, custodyOf
 } from './model.js';
+import { checkBooker, checkCompanions, ageRule, AGE_MSG } from './age.js';
 
 const KEY = /^[A-Za-z0-9_.:-]{8,100}$/;
 const PROOF_LIFE_MS = 60 * 24 * 3600 * 1000;
@@ -95,6 +96,13 @@ export async function detail(ctx, id) {
       requested: JSON.parse(b.requested), actual: b.actual ? JSON.parse(b.actual) : null, names: b.names ? JSON.parse(b.names) : null,
       visitorNote: b.visitor_note, adminNote: b.admin_note, rejectReason: b.reject_reason, cancelReason: b.cancel_reason,
       capOverride: b.cap_override ? JSON.parse(b.cap_override) : null, payOverride: b.pay_override ? JSON.parse(b.pay_override) : null,
+      // age eligibility (§4.9): the age at the event (never the date of birth itself), the override, and
+      // whether the event's rule changed since (the booking keeps the rule it was checked against)
+      age: b.age_rule || b.booker_age != null || b.age_override ? {
+        booker: b.booker_age, source: b.age_source || null,
+        override: b.age_override ? JSON.parse(b.age_override) : null,
+        ruleChanged: JSON.stringify(b.age_rule ? JSON.parse(b.age_rule) : null) !== JSON.stringify(ageRule(event.booking))
+      } : (ageRule(event.booking) ? { booker: null, source: null, override: null, ruleChanged: true } : null),
       dueHistory: JSON.parse(b.due_history || '[]'), priceRev: b.price_rev, closedAt: b.closed_at, closedBy: b.closed_by,
       phoneBlanked: !!b.phone_blanked_ms,
       // «كل فرد باسمه وسنه»: [{ name, age, cat }] as the visitor sent them (priced on the server)
@@ -349,6 +357,45 @@ async function createGate(ctx, body) {
   await requirePerm(ctx, 'finance.manage', { scope: 'all' });
 }
 
+/*
+ * Age eligibility for admin bookings and edits of a booking's people (§4.9.4):
+ * the same rule as the public form. Outside it → needs_override; holders of
+ * `bookings.manage` may go ahead with `overrideAge: true` and a reason
+ * (`ageReason`). → { booker, rule, override } (override: JSON text or null).
+ * `bookerDob` is checked only when sent or required (the event has a booker range).
+ */
+async function ageGate(ctx, b, event, body, counts, now, { withBooker = true } = {}) {
+  const rule = ageRule(b);
+  const problems = [];
+  let booker = {};
+  if (withBooker && (b.bookerAge || body.bookerDob)) {
+    booker = checkBooker(b.bookerAge ? b : { ...b, bookerAge: { min: null, max: null } }, event.startAt, body.bookerDob, now);
+    if (booker.problem) problems.push(booker.problem.message);
+  }
+  const refused = counts ? checkCompanions(b, { counts }) : null;
+  if (refused) problems.push(refused.message);
+  if (!problems.length) return { booker, rule, override: null };
+  if (body.overrideAge !== true) {
+    throw new ApiError('needs_override', 'age', { warnings: problems.map(message => ({ code: 'age', message })) });
+  }
+  await requirePerm(ctx, 'bookings.manage', { scope: 'all' });
+  const reason = cleanText(body.ageReason, LIMITS.reason);
+  if (reason.length < 2) throw invalid('ageReason');
+  // the booker's DOB, when given, is still stored (a wrong one is refused above as 'dob', never stored)
+  if (booker.problem && booker.problem.message === AGE_MSG.dob) booker = {};
+  else if (booker.problem) booker = { dob: booker.dob, age: booker.age };
+  return { booker, rule, override: JSON.stringify({ by: ctx.actor.email, at: cairoText(now), reason, problems }) };
+}
+
+/* the activity row (and important notification) of an age override */
+function ageOverrideStmt(db, ctx, bookingId, ref, override, now, guard, guardArgs) {
+  const o = JSON.parse(override);
+  return db.prepare(`INSERT INTO activity (id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary, changes, severity)
+    SELECT ?, ?, ?, ?, ?, 'booking.ageOverride', 'booking', ?, ?, ?, ?, 'important' WHERE ${guard}`).bind(
+    randomId('act-'), now, cairoText(now), ctx.actor.email, ctx.actor.name || null, bookingId, ref, ('تجاوز شرط السن: ' + o.reason).slice(0, 200),
+    JSON.stringify({ problems: o.problems }), ...guardArgs);
+}
+
 export async function adminCreate(ctx) {
   const body = ctx.body;
   await createGate(ctx, body);
@@ -376,6 +423,7 @@ export async function adminCreate(ctx) {
   const checked = checkCounts(b, body.counts);
   if (checked.problem) throw invalid('counts');
   const counts = checked.counts;
+  const age = await ageGate(ctx, b, event, body, counts, now);
   const total = quote(b.pricing, counts);
   let servantId = null, method = null;
   if (body.servantId) {
@@ -412,10 +460,12 @@ export async function adminCreate(ctx) {
     try {
       await retry(() => db.batch([
         db.prepare(`INSERT INTO bookings (id, ref, event_id, source, status, name, phone, servant_id, method, requested, seats_requested, names,
-            quoted_total, price_rev, admin_note, request_key, created_at, created_ms, updated_ms)
-          VALUES (?, ?, ?, 'admin', 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(request_key) DO NOTHING`).bind(
+            quoted_total, price_rev, admin_note, request_key, created_at, created_ms, updated_ms, booker_dob, booker_age, age_source, age_rule, age_override)
+          VALUES (?, ?, ?, 'admin', 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(request_key) DO NOTHING`).bind(
           id, ref, event.id, name, phone, servantId, method, JSON.stringify(counts), seats(b.pricing, counts), names ? JSON.stringify(names) : null,
-          total, event.priceRev, cleanText(body.note, LIMITS.adminNote) || null, body.requestKey, cairoText(now), now, now),
+          total, event.priceRev, cleanText(body.note, LIMITS.adminNote) || null, body.requestKey, cairoText(now), now, now,
+          age.booker.dob || null, age.booker.age == null ? null : age.booker.age, age.booker.dob ? 'admin' : null, age.rule ? JSON.stringify(age.rule) : null, age.override),
+        ...(age.override ? [ageOverrideStmt(db, ctx, id, ref, age.override, now, made, [id, body.requestKey])] : []),
         activityStmt(db, { actor: ctx.actor.email, actorName: ctx.actor.name, action: 'booking.create', entityType: 'booking', entityId: id, entityTitle: ref, summary: event.title.slice(0, 80),
           changes: early.rows.length ? { payments: early.rows.length, paid: early.rows.reduce((s, r) => s + r.amount, 0) } : null }),
         ...paymentStmts(db, early.rows, { id, event_id: event.id }, ctx.actor, now, made, [id, body.requestKey]),
@@ -615,10 +665,15 @@ export async function adminUpdate(ctx) {
   const history = JSON.parse(b.due_history || '[]');
   const changed = [];
 
+  let ageOverride = b.age_override;
+  let newOverride = null;
   if (body.actual !== undefined) {
     if (b.status !== 'confirmed') throw new ApiError('final', b.status);
     const checked = checkCounts(bk, body.actual);
     if (checked.problem) throw invalid('actual');
+    // a category switched off for this event (§4.9.4): bookings.manage + a reason
+    newOverride = (await ageGate(ctx, bk, event, body, checked.counts, now, { withBooker: false })).override;
+    if (newOverride) ageOverride = newOverride;
     actual = checked.counts;
     seatCount = seats(bk.pricing, actual);
     changed.push('actual');
@@ -649,15 +704,16 @@ export async function adminUpdate(ctx) {
   const capOverride = grow && body.overrideCap === true ? JSON.stringify({ by: ctx.actor.email, at, reason }) : b.cap_override;
 
   const r = await retry(() => env.DB.batch([
-    env.DB.prepare(`UPDATE bookings SET actual = ?, seats_actual = ?, amount_due = ?, due_history = ?, admin_note = ?, names = ?, cap_override = ?, updated_ms = ?, version = version + 1
+    env.DB.prepare(`UPDATE bookings SET actual = ?, seats_actual = ?, amount_due = ?, due_history = ?, admin_note = ?, names = ?, cap_override = ?, age_override = ?, updated_ms = ?, version = version + 1
       WHERE id = ? AND version = ?
         AND (? = 0 OR ? = 1 OR (SELECT capacity FROM event_cfg WHERE id = bookings.event_id) IS NULL
              OR (SELECT COALESCE(SUM(b2.seats_actual), 0) FROM bookings b2 WHERE b2.event_id = bookings.event_id AND b2.status = 'confirmed') - bookings.seats_actual + ?
                 <= (SELECT capacity FROM event_cfg WHERE id = bookings.event_id))`).bind(
-      actual ? JSON.stringify(actual) : null, b.status === 'confirmed' ? seatCount : b.seats_actual, amountDue, JSON.stringify(history), adminNote, names, capOverride, now,
+      actual ? JSON.stringify(actual) : null, b.status === 'confirmed' ? seatCount : b.seats_actual, amountDue, JSON.stringify(history), adminNote, names, capOverride, ageOverride || null, now,
       b.id, version, grow ? 1 : 0, body.overrideCap === true ? 1 : 0, seatCount),
     env.DB.prepare(`INSERT INTO activity (id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary, changes)
-      SELECT ?, ?, ?, ?, ?, 'booking.update', 'booking', ?, ?, ?, ? WHERE changes() = 1`).bind(randomId('act-'), now, at, ctx.actor.email, ctx.actor.name || null, b.id, b.ref, changed.join('، '), JSON.stringify({ fields: changed }))
+      SELECT ?, ?, ?, ?, ?, 'booking.update', 'booking', ?, ?, ?, ? WHERE changes() = 1`).bind(randomId('act-'), now, at, ctx.actor.email, ctx.actor.name || null, b.id, b.ref, changed.join('، '), JSON.stringify({ fields: changed })),
+    ...(newOverride ? [ageOverrideStmt(env.DB, ctx, b.id, b.ref, newOverride, now, 'EXISTS (SELECT 1 FROM bookings WHERE id = ? AND version = ?)', [b.id, version + 1])] : [])
   ]));
   if (r[0].meta.changes !== 1) {
     await explainMiss(ctx, b.id, version, null);
