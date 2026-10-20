@@ -676,6 +676,15 @@ test('«إضافة فرد»: a card per person (name + age), priced by age, the 
   await page.click('.bk-person[data-i="2"] [data-act="remove-person"]');
   assert.equal(await textOf(page, '[data-field="participants"] .prices__total-n'), '١٥٠ جنيه');
   assert.equal(await page.$eval('[data-act="add-person"]', el => el.disabled), false);
+  // a missing age: that box is marked, says why, and has the focus (not a general error)
+  await page.$eval('#bk-person-age-1', el => { el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.click('.bk-flow .bk-next');
+  await page.waitForSelector('#bk-person-age-1[aria-invalid="true"]');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'bk-person-age-1');
+  assert.match(await textOf(page, '#bk-person-age-1-err'), /اكتب سن الفرد ٢/);
+  assert.equal(await page.$eval('#bk-person-name-0', el => el.getAttribute('aria-invalid')), null, 'only the wrong box');
+  await typeInto(page, '#bk-person-age-1', '8');
+  assert.equal(await page.$('#bk-person-age-1-err'), null);
   assert.ok(await overflow(page) <= 0);
   assert.deepEqual(await axe(page, '#book'), []);
   await page.click('.bk-flow .bk-next');

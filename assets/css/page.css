@@ -2477,6 +2477,17 @@ img, svg, video {
   color: var(--accent-hi);
 }
 
+/* the same colours as the status view (.bstat__chip): confirmed green, closed ones muted */
+.bk-mine[data-status="confirmed"] .bk-mine__status {
+  color: var(--ok);
+}
+
+.bk-mine[data-status="rejected"] .bk-mine__status,
+.bk-mine[data-status="cancelled"] .bk-mine__status,
+.bk-mine[data-status="withdrawn"] .bk-mine__status {
+  color: var(--text-2);
+}
+
 .bk-mine__go {
   flex: none;
   width: 20px;

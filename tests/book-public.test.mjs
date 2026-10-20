@@ -441,3 +441,10 @@ test('«دفع كامل» / «دفع قسط»: only with installments; the insta
   assert.match(B.partProblem(inst, 2000, '2000'), /دفع كامل/);
   assert.equal(B.partProblem(inst, 2000, '750'), '');
 });
+
+test('personProblemAt: the first person with a missing name or age, and which box', () => {
+  assert.equal(B.personProblemAt([{ name: 'مينا', age: '30' }]), null);
+  assert.deepEqual(B.personProblemAt([{ name: 'مينا', age: '30' }, { name: 'م', age: '8' }]).index, 1);
+  assert.equal(B.personProblemAt([{ name: 'مينا', age: '30' }, { name: 'م', age: '8' }]).part, 'name');
+  assert.equal(B.personProblemAt([{ name: 'مينا', age: '' }]).part, 'age');
+});

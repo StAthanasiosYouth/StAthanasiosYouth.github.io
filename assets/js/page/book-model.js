@@ -326,12 +326,18 @@ export function checkPeople(booking, people, left = null) {
   if (list.length > peopleRoom(booking, left)) {
     return { participants: left !== null && left !== undefined && left < (booking.perBookingMax || 10) ? `فاضل ${arabicDigits(Math.max(0, left))} مكان بس.` : `أقصى عدد في الحجز الواحد ${arabicDigits(booking.perBookingMax || 10)}.` };
   }
-  for (const [i, p] of list.entries()) {
-    if (line(p.name, NAME_MAX).length < 2) return { participants: `اكتب اسم الفرد ${arabicDigits(i + 1)}.` };
+  const at = personProblemAt(list);
+  return at ? { participants: at.message } : {};
+}
+
+/** the first person with a missing name or age: { index, part: 'name' | 'age', message }, or null */
+export function personProblemAt(people) {
+  for (const [i, p] of (people || []).entries()) {
+    if (line(p.name, NAME_MAX).length < 2) return { index: i, part: 'name', message: `اكتب اسم الفرد ${arabicDigits(i + 1)}.` };
     const age = Number(p.age);
-    if (String(p.age).trim() === '' || !Number.isInteger(age) || age < 0 || age > 120) return { participants: `اكتب سن الفرد ${arabicDigits(i + 1)} (رقم).` };
+    if (String(p.age).trim() === '' || !Number.isInteger(age) || age < 0 || age > 120) return { index: i, part: 'age', message: `اكتب سن الفرد ${arabicDigits(i + 1)} (رقم).` };
   }
-  return {};
+  return null;
 }
 
 export function submitBody(event, draft, { hp = '', revision = '', turnstile = '' } = {}) {

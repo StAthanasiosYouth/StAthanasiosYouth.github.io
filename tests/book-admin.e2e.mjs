@@ -629,6 +629,12 @@ test('a manual booking confirmed in the same dialog; summary + XLSX (the phone w
   await d.page.screenshot({ path: `${SHOTS}08e-finance-phone.png`, fullPage: true });
   await d.page.setViewport({ width: 1366, height: 900 });
   await d.page.select('[data-act="finance-servant"]', '');
+  // coming back to the page reads the bookings again (reminders never use an older copy)
+  const exportsBefore = fake.state.calls.filter(c => c.path === '/v1/admin/book/export').length;
+  await d.page.evaluate(() => A.book.openFinance(A.book.eventId));
+  await d.page.waitForFunction(() => document.querySelector('[data-reminders] .fin-log, [data-reminders] .fin-hint'), { polling: 100, timeout: 8000 });
+  await sleep(500);
+  assert.ok(fake.state.calls.filter(c => c.path === '/v1/admin/book/export').length > exportsBefore, 'the export is read again');
   await d.page.select('[data-act="finance-event"]', 'all');
   await d.page.waitForFunction(() => document.querySelector('.book-servants [data-servant="srv-mina"]') && !document.querySelector('.book-servants [data-act="handover"]'), { polling: 100, timeout: 8000 });
   assert.ok(fake.state.calls.some(c => c.path === '/v1/admin/book/finance' && new URLSearchParams(c.query).get('eventId') === 'all'));

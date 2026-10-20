@@ -20271,6 +20271,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     function load() {
       var id = finance.eventId;
       paintExports();
+      // the bookings list (reminders, drill-down) is read fresh with the totals: never an older copy
+      delete finance.exports[id];
       if (finance.last[id]) draw(finance.last[id]);
       else A.fill(body, el('div', { class: 'skeleton skeleton--line' }), el('div', { class: 'skeleton skeleton--line' }));
       box.hidden = true;

@@ -29,7 +29,7 @@ import { stepCount, canStep, totalOf, money, waWithText, seatsOf } from './model
 import {
   liveState, stepsFor, isFree, peopleCount, peopleOf, peopleText, normPhone, checkWho, checkPay, checkSend,
   needsProof, newRequestKey, submitBody, payMessage, emptyDraft, bookingError, statusWord, statusHref,
-  mineFor, isRef, isToken, PROOFS_MAX, NOTE_MAX, NAME_MAX, peopleCounts, peopleRoom, checkPeople, categoryForAge,
+  mineFor, isRef, isToken, PROOFS_MAX, NOTE_MAX, NAME_MAX, peopleCounts, peopleRoom, checkPeople, personProblemAt, categoryForAge,
   methodOnline, onlineMethodsOf, offlineServants, payCopyText, payGrouped, cashMessage,
   partAllowed, minPart, partAmount, partProblem
 } from './book-model.js';
@@ -629,7 +629,11 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
         const who = checkWho({ ...booking, collectNames: false }, { name: name.value, phone: phone.value, counts: draft.counts, names: [] }, live ? live.left : null);
         delete who.counts;
         const problems = { ...who, ...checkPeople(booking, draft.people, live ? live.left : null) };
-        if (!showErrors(problems)) return;
+        if (!showErrors(problems, { focus: !!(problems.name || problems.phone) || !personProblemAt(draft.people) })) {
+          // a missing name / age: that exact box is marked, says why, and gets the focus
+          markPerson(personProblemAt(draft.people), !(problems.name || problems.phone));
+          return;
+        }
         go(steps[steps.indexOf('a') + 1]);
         return;
       }
@@ -638,6 +642,33 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
       if (!showErrors(problems)) return;
       go(steps[steps.indexOf('a') + 1]);
     });
+
+    /* the one person's box that is wrong (not the whole list) */
+    function markPerson(at, focus) {
+      for (const input of peopleList.querySelectorAll('input')) input.removeAttribute('aria-invalid');
+      for (const old of peopleList.querySelectorAll('.bk-person__err')) old.remove();
+      for (const field of peopleList.querySelectorAll('.bk-field.is-invalid')) field.classList.remove('is-invalid');
+      if (!at) return;
+      const input = peopleList.querySelector(`#bk-person-${at.part}-${at.index}`);
+      if (!input) return;
+      const field = input.closest('.bk-field');
+      const err = h('p', { class: 'bk-field__err bk-person__err', id: `${input.id}-err` }, at.message);
+      field.classList.add('is-invalid');
+      field.append(err);
+      input.setAttribute('aria-invalid', 'true');
+      input.setAttribute('aria-describedby', err.id);
+      input.addEventListener('input', () => {
+        if (String(input.value).trim() === '') return;
+        input.removeAttribute('aria-invalid');
+        field.classList.remove('is-invalid');
+        err.remove();
+        showErrors({}, { focus: false, only: ['participants'] });
+      }, { once: true });
+      if (focus) {
+        input.focus({ preventScroll: true });
+        input.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
+      }
+    }
 
     if (booking.participants) renderPeople();
     else {
