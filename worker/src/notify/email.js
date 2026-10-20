@@ -6,7 +6,9 @@
  * - When: the minute cron (tick.js) leases due rows (10 min) and hands them
  *   to a queue job ('notify.email', jobs.js); without a queue, it sends them
  *   itself. A row is idempotent: only a leased, unsent row is sent.
- * - Budget per Cairo day (notify_quota): target MAIL_DAILY_TARGET (~400,
+ * - Budget over a ROLLING 24 hours, like Gmail's own limit (notify_quota keeps
+ *   one row per UTC hour, 'h:YYYY-MM-DDTHH'; the window is the last 24 rows):
+ *   target MAIL_DAILY_TARGET (~400,
  *   within Gmail's real limit), MAIL_RESERVE_OTP kept for verification codes
  *   (Phase 5A), MAIL_RESERVE_CRITICAL kept for critical rows; admin mail that
  *   isn't critical stays within MAIL_ADMIN_BUDGET − the critical reserve.
@@ -54,9 +56,17 @@ export function render(m, { summary = false, level = 'important', kind = '', day
   return summary ? summaryEmail(m, day) : alertEmail(m, { level, kind });
 }
 
-async function quotaOf(db, day) {
-  return (await retry(() => db.prepare('SELECT total, critical, otp FROM notify_quota WHERE day = ?').bind(day).first())) || { total: 0, critical: 0, otp: 0 };
+/* the hour bucket of a moment (UTC): 'h:2026-10-20T08' */
+export const hourKey = ms => 'h:' + new Date(ms).toISOString().slice(0, 13);
+
+/* emails sent in the rolling 24 hours ending now (this hour + the 23 before it) → { total, critical, otp } */
+export async function quotaOf(db, now = Date.now()) {
+  const r = await retry(() => db.prepare("SELECT COALESCE(SUM(total), 0) AS total, COALESCE(SUM(critical), 0) AS critical, COALESCE(SUM(otp), 0) AS otp FROM notify_quota WHERE day LIKE 'h:%' AND day >= ?")
+    .bind(hourKey(now - 23 * HOUR)).first());
+  return r || { total: 0, critical: 0, otp: 0 };
 }
+/* the next moment the window frees room: the oldest hour leaves it */
+const nextWindowMs = now => (Math.floor(now / HOUR) + 1) * HOUR + 60000;
 const countStmt = (db, day, level) => db.prepare(`INSERT INTO notify_quota (day, total, critical, otp) VALUES (?, 1, ?, 0)
   ON CONFLICT(day) DO UPDATE SET total = total + 1, critical = critical + excluded.critical`).bind(day, level === 'critical' ? 1 : 0);
 
@@ -93,8 +103,7 @@ async function sendSummary(env, row, now, s) {
     await retry(() => db.prepare(`UPDATE notify_outbox SET status = 'dismissed', error = 'activity gone' WHERE id IN (${all.map(() => '?').join(',')})`).bind(...all.map(p => p.id)).run());
     return 'dismissed';
   }
-  const day = cairoText(now).slice(0, 10);
-  if (!allowed('important', await quotaOf(db, day), budget(s))) {
+  if (!allowed('important', await quotaOf(db, now), budget(s))) {
     // even the summary waits for tomorrow's budget
     await retry(() => db.prepare(`UPDATE notify_outbox SET next_ms = ? WHERE id IN (${all.map(() => '?').join(',')})`).bind(nextSummaryMs(s.NOTIFY_SUMMARY_TIME, nextDayMs(now)), ...all.map(p => p.id)).run());
     return 'deferred';
@@ -102,7 +111,7 @@ async function sendSummary(env, row, now, s) {
   await sendMail(env, { to: row.recipient, ...render(m, { summary: true, day: cairoText(now).slice(0, 10) }) });
   await retry(() => db.batch([
     db.prepare(`UPDATE notify_outbox SET status = 'sent', sent_ms = ?, error = NULL WHERE id IN (${all.map(() => '?').join(',')})`).bind(now, ...all.map(p => p.id)),
-    countStmt(db, day, 'important')
+    countStmt(db, hourKey(now), 'important')
   ]));
   return 'sent';
 }
@@ -117,7 +126,6 @@ export async function sendRows(env, ids, now = Date.now()) {
   const rows = (await retry(() => db.prepare(`SELECT * FROM notify_outbox WHERE id IN (${ids.map(() => '?').join(',')}) AND channel = 'email' AND status IN ('queued', 'failed', 'deferred', 'deferred_quota')`).bind(...ids).all())).results;
   const summarized = new Set();
   for (const row of rows) {
-    const day = cairoText(now).slice(0, 10);
     try {
       if (row.status === 'deferred') {
         // one summary per recipient: it takes all their due rows at once
@@ -127,9 +135,9 @@ export async function sendRows(env, ids, now = Date.now()) {
         continue;
       }
       const level = row.level || 'routine';
-      if (!allowed(level, await quotaOf(db, day), b)) {
+      if (!allowed(level, await quotaOf(db, now), b)) {
         if (level === 'critical') {
-          await retry(() => db.prepare("UPDATE notify_outbox SET status = 'deferred_quota', next_ms = ?, error = 'quota' WHERE id = ?").bind(nextDayMs(now), row.id).run());
+          await retry(() => db.prepare("UPDATE notify_outbox SET status = 'deferred_quota', next_ms = ?, error = 'quota' WHERE id = ?").bind(nextWindowMs(now), row.id).run());
         } else {
           // into the recipient's summary (routine first, then important: the budget order)
           await retry(() => db.prepare("UPDATE notify_outbox SET status = 'deferred', next_ms = ?, error = 'quota → summary' WHERE id = ?").bind(nextSummaryMs(s.NOTIFY_SUMMARY_TIME, now), row.id).run());
@@ -147,7 +155,7 @@ export async function sendRows(env, ids, now = Date.now()) {
       await sendMail(env, { to: row.recipient, ...render(m, { level, kind: row.kind }) });
       await retry(() => db.batch([
         db.prepare("UPDATE notify_outbox SET status = 'sent', sent_ms = ?, attempts = attempts + 1, error = NULL WHERE id = ?").bind(now, row.id),
-        countStmt(db, day, level)
+        countStmt(db, hourKey(now), level)
       ]));
       out.sent++;
     } catch (err) {

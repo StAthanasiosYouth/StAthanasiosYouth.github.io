@@ -28,7 +28,9 @@ export async function housekeeping(env, now = Date.now()) {
     env.DB.prepare('DELETE FROM api_log WHERE at < ?').bind(now - RETENTION.apiLogMs),
     env.DB.prepare('DELETE FROM activity WHERE at < ?').bind(now - RETENTION.activityMs),
     env.DB.prepare('DELETE FROM activity WHERE id IN (SELECT id FROM activity ORDER BY at DESC LIMIT -1 OFFSET ?)').bind(RETENTION.activityRows),
-    env.DB.prepare("DELETE FROM notify_outbox WHERE created_ms < ? AND (status IN ('sent', 'dead', 'dismissed') OR level <> 'critical')").bind(now - RETENTION.outboxMs)
+    env.DB.prepare("DELETE FROM notify_outbox WHERE created_ms < ? AND (status IN ('sent', 'dead', 'dismissed') OR level <> 'critical')").bind(now - RETENTION.outboxMs),
+    // email counters: hour buckets older than 2 days (and the old per-day rows) are no longer in any window
+    env.DB.prepare('DELETE FROM notify_quota WHERE day < ?').bind('h:' + new Date(now - 2 * DAY).toISOString().slice(0, 13))
   ]);
   const removed = r.map(x => x.meta.changes);
   logLine({ kind: 'cron', job: 'housekeeping', removed });

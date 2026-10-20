@@ -20,7 +20,7 @@ import { activityStmt } from '../lib/activity.js';
 import { heldScope } from '../lib/perms.js';
 import { allTypes, defaultsOf } from './catalog.js';
 import { readSettings } from './router.js';
-import { budget } from './email.js';
+import { budget, quotaOf } from './email.js';
 import { gmailConfigured } from './gmail.js';
 import { sources, messageFor } from './claim.js';
 
@@ -196,10 +196,10 @@ export async function notifyStatus(ctx) {
   const now = Date.now();
   const s = await retry(() => readSettings(db));
   const since = now - 7 * DAY;
-  const [perDay, last, quota, waiting, health] = await retry(() => db.batch([
+  const quotaNow = await quotaOf(db, now);
+  const [perDay, last, waiting, health] = await retry(() => db.batch([
     db.prepare("SELECT strftime('%Y-%m-%d', created_ms / 1000, 'unixepoch') AS day, channel, status, COUNT(*) AS n FROM notify_outbox WHERE created_ms >= ? GROUP BY day, channel, status ORDER BY day DESC").bind(since),
     db.prepare("SELECT channel, MAX(sent_ms) AS at FROM notify_outbox WHERE status = 'sent' GROUP BY channel"),
-    db.prepare('SELECT total, critical, otp FROM notify_quota WHERE day = ?').bind(cairoText(now).slice(0, 10)),
     db.prepare("SELECT id, recipient, channel, kind, status, attempts, error, created_ms, activity_ids, level FROM notify_outbox WHERE level = 'critical' AND status IN ('queued', 'failed', 'deferred_quota', 'dead') ORDER BY created_ms DESC LIMIT 30"),
     db.prepare("SELECT value FROM settings WHERE key = 'GMAIL_HEALTH'")
   ]));
@@ -217,7 +217,8 @@ export async function notifyStatus(ctx) {
     days: Object.values(days),
     lastSuccess: Object.fromEntries(last.results.map(r => [r.channel, r.at])),
     gmail,
-    quota: { ...(quota.results[0] || { total: 0, critical: 0, otp: 0 }), ...budget(s) },
+    // the last 24 hours (rolling, like Gmail's own limit)
+    quota: { ...quotaNow, ...budget(s), window: 'rolling-24h' },
     critical: waiting.results.map(r => {
       const m = messageFor(r, src);
       return { id: r.id, recipient: r.recipient, channel: r.channel, status: r.status, attempts: r.attempts, error: r.error || '', at: r.created_ms, title: m ? m.title : r.kind };

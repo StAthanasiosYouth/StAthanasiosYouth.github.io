@@ -10,7 +10,7 @@ import { route } from '../src/notify/router.js';
 import { notifyTick } from '../src/notify/tick.js';
 import { JOB_TYPES } from '../src/jobs.js';
 import { setGmailFetch } from '../src/notify/gmail.js';
-import { allowed, budget, tokenHealth } from '../src/notify/email.js';
+import { allowed, budget, tokenHealth, quotaOf, hourKey } from '../src/notify/email.js';
 
 const P = 'p@example.com', M = 'm@example.com';
 const SECRETS = { GMAIL_CLIENT_ID: 'cid', GMAIL_CLIENT_SECRET: 'cs', GMAIL_REFRESH_TOKEN: 'rt' };
@@ -104,8 +104,7 @@ test('budget short: important goes into the summary; critical waits as deferred_
   await set(h, 'MAIL_RESERVE_CRITICAL', '50');      // no room for non-critical admin mail
   await set(h, 'MAIL_DAILY_TARGET', '101');
   await set(h, 'MAIL_RESERVE_OTP', '50');
-  const day = (await h.db.prepare("SELECT strftime('%Y-%m-%d', 'now') d").first()).d;
-  await h.db.prepare('INSERT INTO notify_quota (day, total, critical, otp) VALUES (?, 51, 0, 0)').bind(day).run().catch(() => {});
+  await h.db.prepare('INSERT INTO notify_quota (day, total, critical, otp) VALUES (?, 51, 0, 0)').bind(hourKey(Date.now())).run();
   await publish(h, 'act-pub00000e004');
   await critical(h, 'act-mig00000e001');
   await deliver(h);
@@ -181,4 +180,20 @@ test('token health: fine → no alarm; revoked → ONE critical gmail.token row;
   assert.equal((await tokenHealth(unset.env)).configured, false);
   assert.equal(await unset.db.prepare("SELECT COUNT(*) n FROM activity WHERE action = 'gmail.token'").first('n'), 0);
   setGmailFetch(null);
+});
+
+test('rolling 24 hours (like Gmail): yesterday evening counts after midnight; an hour older than 24 h drops out', async () => {
+  const h = await world();
+  const at = Date.UTC(2026, 9, 20, 1, 30);                 // 01:30 UTC
+  const put = (ms, n, c = 0) => h.db.prepare('INSERT INTO notify_quota (day, total, critical, otp) VALUES (?, ?, ?, 0)').bind(hourKey(ms), n, c).run();
+  await put(at - 2 * 3600000, 200, 10);                    // 23:30 the evening before
+  await put(at - 3600000, 150);                            // 00:30
+  await put(at - 25 * 3600000, 999);                       // older than the window
+  await h.db.prepare("INSERT INTO notify_quota (day, total, critical, otp) VALUES ('2026-10-20', 999, 0, 0)").run();   // an old per-day row is ignored
+  assert.deepEqual({ ...(await quotaOf(h.db, at)) }, { total: 350, critical: 10, otp: 0 });
+  const b = budget({});
+  assert.equal(allowed('important', await quotaOf(h.db, at), b), false, 'a new calendar day does not reset the budget');
+  assert.equal(allowed('critical', await quotaOf(h.db, at), b), false, '350 = target − OTP reserve');
+  assert.equal(allowed('otp', await quotaOf(h.db, at), b), true, 'the OTP reserve stays free');
+  assert.equal((await quotaOf(h.db, at + 22 * 3600000)).total, 150, 'the 23:30 hour left the window, 00:30 still in');
 });
