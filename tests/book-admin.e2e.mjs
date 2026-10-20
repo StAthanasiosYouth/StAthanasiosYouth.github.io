@@ -276,7 +276,7 @@ test('module on: the tab, «الحجوزات (٢ جديد)», chips with counts,
   await d.page.evaluate(() => A.go('pages', 'events'));
   await d.page.waitForFunction(() => { const b = document.querySelector('[data-act="book-open"]'); return b && /الحجوزات \(٢ جديد\)/.test(b.textContent); }, { timeout: 8000 });
   // the menu tab carries the new requests of all the events
-  assert.deepEqual(await subtabs(d.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام', 'الحجوزات٢']);
+  assert.deepEqual(await subtabs(d.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام', 'الحجوزات٢', 'حسابات الخدام']);
   // the home card «الحجوزات»: what waits, per event
   await d.page.evaluate(() => A.go('home'));
   await d.page.waitForFunction(() => { const c = document.getElementById('dash-book'); return c && !c.hidden && /مستنيين المراجعة: ٢/.test(c.innerText); }, { timeout: 8000 });
@@ -287,7 +287,7 @@ test('module on: the tab, «الحجوزات (٢ جديد)», chips with counts,
   await waitRows(d.page, ['B-AAAA1', 'B-BBBB2']);
   assert.equal(await d.page.evaluate(() => A.sub.pages), 'bookings');
   const chips = await d.page.$$eval('.book-chips .filter-chip', n => n.map(x => x.textContent));
-  assert.deepEqual(chips, ['الجديدة (٢)', 'المؤكدة (٢)', 'متأخر (١)', 'مرتجعات مطلوبة (١)', 'المرفوضة والملغية (١)', 'الكل (٥)']);
+  assert.deepEqual(chips, ['مستنية المراجعة (٢)', 'المؤكدة (٢)', 'متأخر (١)', 'مرتجعات مطلوبة (١)', 'المرفوضة والملغية (١)', 'الكل (٥)']);
   const first = await d.page.$eval('.book-row[data-ref="B-AAAA1"]', n => n.innerText);
   assert.match(first, /مريم سمير/);
   assert.match(first, /01012345678/);
@@ -573,8 +573,8 @@ test('a manual booking confirmed in the same dialog; summary + XLSX (the phone w
   // summary per servant, then the XLSX after the phone warning
   await d.page.click('[data-act="book-summary"]');
   await sheetTitle(d.page, 'الملخص والحسابات: رحلة إسكندرية');
-  await d.page.waitForSelector('#sheet .book-servants [data-servant="srv-mina"]');
-  assert.match(await d.page.$eval('#sheet .book-servants [data-servant="srv-mina"]', n => n.innerText), /٤٬٣٠٠ ج/);
+  await d.page.waitForSelector('#sheet [data-act="open-finance"]');
+  assert.equal(await d.page.$('#sheet .book-servants'), null, 'the servant accounts live on their own page now');
   await shot(d.page, '08-summary');
   await clickAct(d.page, 'export');
   await d.page.waitForSelector('dialog.modal[open]');
@@ -590,7 +590,19 @@ test('a manual booking confirmed in the same dialog; summary + XLSX (the phone w
   assert.ok(book.sheets[2].rows.some(r => r[3] === '01098765432'), 'the phone as text, local form, leading 0 kept');
   assert.deepEqual(book.sheets[3].rows[0].slice(0, 3), ['رقم الدفعة', 'رقم الحجز', 'الاسم']);
   assert.equal(book.sheets[4].rows.at(-1)[0], 'الإجمالي');
-  await closeSheet(d.page);
+
+  // «الحسابات المالية للخدام»: its own page (next to «الحجوزات»), opened on this event
+  await clickAct(d.page, 'open-finance');
+  await d.page.waitForSelector('.book-servants [data-servant="srv-mina"]');
+  assert.match(await d.page.$eval('.book-servants [data-servant="srv-mina"]', n => n.innerText), /٤٬٣٠٠ ج/);
+  assert.ok(await d.page.$('.book-servants [data-servant="srv-mina"] [data-act="handover"]'), 'one event picked: a handover can be recorded');
+  assert.ok(fake.state.calls.some(c => c.path === '/v1/admin/book/finance' && new URLSearchParams(c.query).get('eventId') === eventId));
+  await shot(d.page, '08b-finance');
+  await d.page.select('[data-act="finance-event"]', 'all');
+  await d.page.waitForFunction(() => document.querySelector('.book-servants [data-servant="srv-mina"]') && !document.querySelector('.book-servants [data-act="handover"]'));
+  assert.ok(fake.state.calls.some(c => c.path === '/v1/admin/book/finance' && new URLSearchParams(c.query).get('eventId') === 'all'));
+  await d.page.evaluate(() => A.book.open(A.book.eventId));
+  await d.page.waitForSelector('[data-act="book-cancel-all"]');
 
   // the event is cancelled: a typed confirmation and a reason; everyone who paid → «مرتجعات مطلوبة»
   await d.page.click('[data-act="book-cancel-all"]');
@@ -756,7 +768,7 @@ test('device session (the app\'s remembered phone): «الحجوزات» opens w
   assert.deepEqual((await rows(again.page)).sort(), ['B-AAAA1', 'B-BBBB2']);
   assert.ok(fake.state.calls.length > 0 && fake.state.calls.every(c => /^Bearer wk1\.[A-Za-z0-9_-]+\.[0-9a-f]{64}$/.test(c.auth)), 'the panel session credential');
   assert.ok(fake.state.calls.every(c => !/adm1\./.test(c.auth)), 'the device token never reaches the Worker');
-  assert.deepEqual(await subtabs(again.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام', 'الحجوزات٢']);
+  assert.deepEqual(await subtabs(again.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام', 'الحجوزات٢', 'حسابات الخدام']);
   assert.deepEqual(again.problems, []);
   await context.close();
 });

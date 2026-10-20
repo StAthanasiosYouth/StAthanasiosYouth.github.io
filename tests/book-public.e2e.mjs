@@ -659,7 +659,7 @@ test('«إضافة فرد»: a card per person (name + age), priced by age, the 
   assert.equal(await textOf(page, '[data-field="participants"] .prices__total-n'), '٢٥٠ جنيه');
   // 3 places left: no fourth
   assert.equal(await page.$eval('[data-act="add-person"]', el => el.disabled), true);
-  assert.match(await textOf(page, '.bk-people__room'), /وصلت لأقصى عدد متاح/);
+  assert.match(await textOf(page, '[data-field="participants"] .bk-people__room'), /مش هتقدر تزوّد أكتر: فاضل ٣ مكان بس في الفعالية/);
   // a person removed: the total follows, «إضافة فرد» is back
   await page.click('.bk-person[data-i="2"] [data-act="remove-person"]');
   assert.equal(await textOf(page, '[data-field="participants"] .prices__total-n'), '١٥٠ جنيه');

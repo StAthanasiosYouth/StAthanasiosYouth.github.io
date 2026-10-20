@@ -337,6 +337,16 @@ export function createBookWorker({ event, origin, proofBytes, now = () => '2026-
       return { proof };
     }],
     ['GET', /^\/v1\/admin\/book\/summary$/, () => summary()],
+    ['GET', /^\/v1\/admin\/book\/events\/[^/]+\/handovers$/, () => ({ handovers: [], servants: [], totals: { total: 0, held: 0, toHandOver: 0 } })],
+    // the finance page: the same per-servant lines, one event (the fake has one)
+    ['GET', /^\/v1\/admin\/book\/finance$/, () => {
+      const s = summary();
+      const servants = s.servants.map(x => ({ ...x, held: x.net, handedOver: 0, toHandOver: x.net, owed: 0, pendingQuoted: 0, events: 1,
+        methods: Object.keys(x.byMethod).map(k => ({ method: k, received: x.byMethod[k], refunded: 0, net: x.byMethod[k], held: x.byMethod[k], pendingCount: 0, pendingQuoted: 0, owed: 0, handedOver: 0, toHandOver: x.byMethod[k], bookingIds: [] })) }));
+      const held = servants.reduce((a, x) => a + x.held, 0);
+      return { scope: 'all', events: [{ id: ev().id, title: ev().title, money: s.overall.money, totals: { total: 0, held, toHandOver: held }, servants }],
+        money: s.overall.money, totals: { total: 0, held, toHandOver: held }, servants };
+    }],
     ['GET', /^\/v1\/admin\/book\/export$/, () => ({
       event: clone(ev()),
       bookings: state.bookings.map(b => detail(b).booking),

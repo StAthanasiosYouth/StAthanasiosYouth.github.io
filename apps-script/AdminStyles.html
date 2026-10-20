@@ -7516,12 +7516,13 @@ dialog .toasts[popover] {
   .book-upload { display: inline-flex; align-items: center; gap: .4rem; padding: 4px; padding-inline-end: 8px; border-radius: 12px; background: rgba(255, 255, 255, .04); font-size: .82rem; }
   .book-upload img { width: 40px; height: 40px; object-fit: cover; border-radius: 8px; }
   .book-upload.is-error { color: var(--danger); }
-  .book-servants .comp-rank__row { grid-template-columns: minmax(0, 1.6fr) repeat(4, minmax(0, 1fr)); cursor: default; }
+  .book-servants .comp-rank__row { grid-template-columns: minmax(0, 1.6fr) repeat(6, minmax(0, 1fr)); cursor: default; align-items: center; }
   .book-servants .comp-rank__row > span:first-child { display: grid; min-width: 0; }
   .book-servants small { font-size: .74rem; color: var(--text-3); }
   @media (max-width: 480px) {
     .book-servants .comp-rank__row { grid-template-columns: minmax(0, 1fr) repeat(2, minmax(0, auto)); }
-    .book-servants .comp-rank__row > :nth-child(2), .book-servants .comp-rank__row > :nth-child(3) { display: none; }
+    /* phone: the name, «في عهدته» and «لسه معاه»; the rest is in the per-method lines */
+    .book-servants .comp-rank__row > :nth-child(2), .book-servants .comp-rank__row > :nth-child(4), .book-servants .comp-rank__row > :nth-child(5), .book-servants .comp-rank__row > :nth-child(6) { display: none; }
     .book-pay { align-items: flex-start; }
   }
 </style>

@@ -247,7 +247,28 @@ export function newRef() {
 
 /* ---------- summary (§13) ---------- */
 
-export function summary(event, bookings, payments, servants, { from = null, to = null } = {}, now = Date.now()) {
+/*
+ * The summary (§13) + per-servant accounting (Phase 1): what each servant
+ * received (payments they took, cash vs online by the methods' «online» flag),
+ * what participants who chose them still owe, what they handed over to the
+ * service (handovers, append-only) and what is still to hand over.
+ * Every amount comes from ONE ledger row once: payments by their servant,
+ * handovers by theirs — nothing is counted twice.
+ */
+/*
+ * Custody of a payment: who actually holds the money. Cash: the servant who took
+ * it. A transfer (an online method): the servant only when it went to THEIR OWN
+ * approved number (pay_dest), else the service. Stamped on the row when it is
+ * recorded (payments.custody); an older row is worked out the same way now.
+ */
+export function custodyOf(p, booking, dests) {
+  if (p.custody === 'servant' || p.custody === 'service') return p.custody;
+  const m = (booking.methods || []).find(x => x.key === p.method);
+  if (!methodOnline(m)) return 'servant';
+  return dests && dests.has((p.servant_id || '') + '|' + (p.method || '')) ? 'servant' : 'service';
+}
+
+export function summary(event, bookings, payments, servants, { from = null, to = null } = {}, now = Date.now(), handovers = [], dests = null) {
   const booking = event.booking || {};
   const inRange = p => (from == null || p.received_ms >= from) && (to == null || p.received_ms <= to);
   const byBooking = new Map();
@@ -257,12 +278,24 @@ export function summary(event, bookings, payments, servants, { from = null, to =
   const ppl = { adult: 0, child: 0, companion: 0, total: 0 };
   const payStatus = { free: 0, unpaid: 0, partial: 0, paid: 0, overpaid: 0, overdue: 0 };
   let taken = 0, due = 0, balance = 0, refundsOwed = 0, pendingQuoted = 0;
+  const owedBy = new Map();
+  // servant × method: pending verification (expected, not money) and what participants still owe
+  const cell = new Map();
+  const cellOf = (sid, method) => {
+    const k = (sid || '') + '|' + (method || '');
+    if (!cell.has(k)) cell.set(k, { method: method || '', received: 0, refunded: 0, net: 0, held: 0, pendingCount: 0, pendingQuoted: 0, owed: 0, handedOver: 0, bookings: new Set() });
+    return cell.get(k);
+  };
 
   for (const b of bookings) {
     counts[b.status]++;
     const pays = byBooking.get(b.id) || [];
     const d = derive(b, pays, booking.payment, now);
-    if (b.status === 'pending') { pendingQuoted += b.quoted_total; continue; }
+    if (b.status === 'pending') {
+      pendingQuoted += b.quoted_total;
+      if (b.servant_id) { const c = cellOf(b.servant_id, b.method); c.pendingCount++; c.pendingQuoted += b.quoted_total; c.bookings.add(b.id); }
+      continue;
+    }
     if (b.status === 'confirmed') {
       taken += b.seats_actual;
       const pp = people(booking.pricing, JSON.parse(b.actual || '{}'));
@@ -270,6 +303,12 @@ export function summary(event, bookings, payments, servants, { from = null, to =
     }
     due += amountDueOf(b);
     balance += Math.max(0, d.balance || 0);
+    if (b.status === 'confirmed' && b.servant_id && d.balance > 0) {
+      owedBy.set(b.servant_id, (owedBy.get(b.servant_id) || 0) + d.balance);
+      const c = cellOf(b.servant_id, b.method);
+      c.owed += d.balance;
+      c.bookings.add(b.id);
+    }
     refundsOwed += d.refundOwed;
     if (d.paymentStatus) payStatus[d.paymentStatus]++;
     if (d.overdue) payStatus.overdue++;
@@ -294,8 +333,27 @@ export function summary(event, bookings, payments, servants, { from = null, to =
     s.net += sign * p.amount;
     s.byMethod[p.method || ''] = (s.byMethod[p.method || ''] || 0) + sign * p.amount;
     s.bookingIds.add(p.booking_id);
+    const c = cellOf(p.servant_id, p.method);
+    if (sign > 0) c.received += p.amount; else c.refunded += p.amount;
+    c.net += sign * p.amount;
+    if (custodyOf(p, booking, dests) === 'servant') {
+      c.held += sign * p.amount;
+      s.held = (s.held || 0) + sign * p.amount;
+    }
+    c.bookings.add(p.booking_id);
   }
   money.net = money.received - money.refunded;
+
+  // handovers: live rows only (a void row cancels its target, never counts itself)
+  let handedTotal = 0;
+  for (const h of handovers || []) {
+    if (h.kind !== 'handover' || h.voided_by) continue;
+    const s = servantRow(h.servant_id, h.servant_name);
+    s.handedOver = (s.handedOver || 0) + h.amount;
+    handedTotal += h.amount;
+    cellOf(h.servant_id, h.method || '').handedOver += h.amount;
+  }
+  const offline = new Set((booking.methods || []).filter(m => !methodOnline(m)).map(m => m.key));
   for (const b of bookings) {
     if ((b.status === 'pending' || b.status === 'confirmed') && b.servant_id) servantRow(b.servant_id).chosenBy++;
   }
@@ -310,6 +368,24 @@ export function summary(event, bookings, payments, servants, { from = null, to =
       payStatus,
       pending: { count: counts.pending, quoted: pendingQuoted }
     },
-    servants: [...perServant.values()].map(s => ({ id: s.id, name: s.name, active: s.active, payments: s.payments, received: s.received, refunded: s.refunded, net: s.net, byMethod: s.byMethod, bookings: s.bookingIds.size, chosenBy: s.chosenBy }))
+    servants: [...perServant.values()].map(s => {
+      const cash = Object.keys(s.byMethod).filter(k => offline.has(k)).reduce((t, k) => t + s.byMethod[k], 0);
+      const handedOver = s.handedOver || 0;
+      const held = s.held || 0;
+      const methods = [...cell.values()].filter((c, i) => [...cell.keys()][i].startsWith(s.id + '|')).map(c => ({
+        method: c.method, received: c.received, refunded: c.refunded, net: c.net, held: c.held,
+        pendingCount: c.pendingCount, pendingQuoted: c.pendingQuoted, owed: c.owed, handedOver: c.handedOver, toHandOver: c.held - c.handedOver,
+        bookingIds: [...c.bookings]
+      }));
+      return {
+        id: s.id, name: s.name, active: s.active, payments: s.payments, received: s.received, refunded: s.refunded, net: s.net, byMethod: s.byMethod,
+        bookings: s.bookingIds.size, chosenBy: s.chosenBy,
+        // verified money (recorded payments) by kind, and CUSTODY: only what the servant actually holds is theirs to hand over
+        cash, online: s.net - cash, held, owed: owedBy.get(s.id) || 0, handedOver, toHandOver: held - handedOver,
+        pendingQuoted: methods.reduce((t, m) => t + m.pendingQuoted, 0),
+        methods
+      };
+    }),
+    handovers: { total: handedTotal, held: [...perServant.values()].reduce((t, s) => t + (s.held || 0), 0), toHandOver: [...perServant.values()].reduce((t, s) => t + (s.held || 0), 0) - handedTotal }
   };
 }

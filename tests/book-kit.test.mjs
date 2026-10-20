@@ -23,7 +23,7 @@ const PRICING = {
 };
 
 test('the chips: one request per status, «المرفوضة والملغية» = three lists merged; counts from the reply', () => {
-  assert.deepEqual(K.FILTERS.map(f => f.label), ['الجديدة', 'المؤكدة', 'متأخر', 'مرتجعات مطلوبة', 'المرفوضة والملغية', 'الكل']);
+  assert.deepEqual(K.FILTERS.map(f => f.label), ['مستنية المراجعة', 'المؤكدة', 'متأخر', 'مرتجعات مطلوبة', 'المرفوضة والملغية', 'الكل']);
   const [pending] = K.queuePaths('evt-abcd1234', 'pending', '');
   assert.equal(pending, '/v1/admin/book/bookings?eventId=evt-abcd1234&status=pending&limit=50');
   assert.match(K.queuePaths('evt-abcd1234', 'overdue', '')[0], /status=all&overdue=1/);
@@ -237,4 +237,37 @@ test('the workbook with a period: payment sheets keep only rows received inside 
   assert.deepEqual(book.sheets.map(s => s.name).slice(4), ['فادي يوسف', 'مينا عادل']);
   const all = await readXlsx(writeXlsx(K.bookingBook(data, { today: '2026-10-15' }).book));
   assert.deepEqual(all.sheets.map(s => s.name).slice(4), ['مينا عادل', 'فادي يوسف', 'مينا عادل 2'], 'two servants with one name: two sheets');
+});
+
+test('roster: names + booking refs only, confirmed by default — no phones, money or notes', async () => {
+  const data = exported();
+  data.bookings[0].participants = [{ name: 'مريم سمير', age: 30 }, { name: 'يوسف', age: 7 }];
+  const made = K.rosterBook(data, { today: '2026-10-20' });
+  assert.match(made.filename, /^أفراد-alex-trip-2026-10-20\.xlsx$/);
+  const bytes = writeXlsx(made.book);
+  const book = await readXlsx(bytes);
+  assert.deepEqual(book.sheets.map(s => s.name), ['قايمة الأفراد']);
+  const rows = book.sheets[0].rows;
+  assert.deepEqual(rows[0], ['#', 'رقم الحجز', 'الاسم']);
+  const confirmed = data.bookings.filter(b => b.status === 'confirmed');
+  assert.ok(rows.length - 1 >= confirmed.length);
+  assert.deepEqual(rows.slice(1, 3).map(r => r.slice(1)), [['B-7K2QX', 'مريم سمير'], ['B-7K2QX', 'يوسف']]);
+  const text = JSON.stringify(rows);
+  assert.doesNotMatch(text, /\+20|01\d{9}|ج\b|سبب|instapay|إنستاباي/);
+});
+
+test('detailed report: «حسابات الخدام» (servant × method, custody, pending, owed, handed over) and «التسليمات»', async () => {
+  const data = exported();
+  data.summary.servants[0].methods = [{ method: 'cash', net: 1000, held: 1000, pendingCount: 1, pendingQuoted: 3000, owed: 500, handedOver: 800, toHandOver: 200 }];
+  Object.assign(data.summary.servants[0], { held: 1000, handedOver: 800, toHandOver: 200, owed: 500, pendingQuoted: 3000 });
+  data.summary.handovers = { total: 800, held: 1000, toHandOver: 200 };
+  data.handovers = [{ id: 'hnd-1', kind: 'handover', servantName: 'مينا عادل', method: 'cash', amount: 800, handedAt: '2026-10-15T10:00', receivedBy: 'أمين الصندوق', recordedName: 'مينا زكريا' }];
+  const book = await readXlsx(writeXlsx(K.bookingBook(data, { today: '2026-10-20' }).book));
+  const names = book.sheets.map(s => s.name);
+  assert.equal(names[2], 'حسابات الخدام');
+  assert.ok(names.includes('التسليمات'));
+  const acct = book.sheets[2].rows;
+  assert.deepEqual(acct[0], K.ACCOUNT_HEADERS);
+  assert.deepEqual(acct[1].slice(2), ['1000', '1000', '1', '3000', '500', '800', '200']);
+  assert.deepEqual(book.sheets.find(s => s.name === 'التسليمات').rows[1].slice(0, 5), ['hnd-1', 'تسليم', 'مينا عادل', 'كاش', '800']);
 });

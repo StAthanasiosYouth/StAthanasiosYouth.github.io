@@ -34,7 +34,7 @@ export const KIND = { payment: 'دفعة', refund: 'مرتجع', void: 'إلغا
 
 /* the queue's chips (§7.2): which list request(s) each one is */
 export const FILTERS = [
-  { key: 'pending', label: 'الجديدة', sources: [{ status: 'pending' }] },
+  { key: 'pending', label: 'مستنية المراجعة', sources: [{ status: 'pending' }] },
   { key: 'confirmed', label: 'المؤكدة', sources: [{ status: 'confirmed' }] },
   { key: 'overdue', label: 'متأخر', sources: [{ status: 'all', overdue: '1' }] },
   { key: 'refunds', label: 'مرتجعات مطلوبة', sources: [{ status: 'all', refunds: '1' }] },
@@ -520,5 +520,54 @@ export function bookingBook(exported, { from = '', to = '', today = '' } = {}) {
     sheets.push(sheet(sheetName(name, taken), rows, [0, 1, 2, 8]));
   });
 
+  /*
+   * «حسابات الخدام»: servant × payment method — verified (recorded payments),
+   * in their custody (cash, or transfers to THEIR own number), pending
+   * verification (expected, not money), owed by participants, handed over,
+   * still to hand over. Every number from one ledger row once (the Worker's summary).
+   */
+  const acct = [ACCOUNT_HEADERS];
+  for (const sv of servants) {
+    for (const m of sv.methods || []) {
+      acct.push([sv.name || sv.id, label(m.method), m.net || 0, m.held || 0, m.pendingCount || 0, m.pendingQuoted || 0, m.owed || 0, m.handedOver || 0, m.toHandOver || 0]);
+    }
+    if ((sv.methods || []).length) acct.push([(sv.name || sv.id) + ' — الإجمالي', '', sv.net || 0, sv.held || 0, '', sv.pendingQuoted || 0, sv.owed || 0, sv.handedOver || 0, sv.toHandOver || 0]);
+  }
+  if (acct.length > 1) {
+    const t = summary.handovers || {};
+    acct.push(['', '', '', '', '', '', '', '', ''], ['الخدمة استلمت (تسليمات)', '', '', t.held || 0, '', '', '', t.total || 0, t.toHandOver || 0]);
+    sheets.splice(2, 0, sheet('حسابات الخدام', acct, [0, 1]));
+  }
+
+  /* «التسليمات»: every handover to the service, voids included (the audit trail) */
+  const hands = Array.isArray(data.handovers) ? data.handovers : [];
+  if (hands.length) {
+    sheets.push(sheet('التسليمات', [HANDOVER_HEADERS].concat(hands.map(h => [
+      h.id || '', h.kind === 'void' ? 'إلغاء' : 'تسليم', h.servantName || h.servantId || '', h.method ? label(h.method) : 'كل الطرق', h.amount || 0,
+      wall(h.handedAt), h.receivedBy || '', h.recordedName || '', h.kind === 'void' ? '' : h.voidedBy ? 'نعم' : 'لا', h.note || ''
+    ])), [0, 2, 6, 7, 9]));
+  }
+
   return { book: { sheets }, filename: bookingFilename(event.slug, today) };
+}
+
+export const ACCOUNT_HEADERS = ['الخادم', 'الطريقة', 'متأكد (صافي)', 'في عهدته', 'طلبات مستنية التأكيد', 'قيمتها (متوقع)', 'لسه على الناس', 'سلّم للخدمة', 'لسه معاه'];
+export const HANDOVER_HEADERS = ['رقم التسليم', 'النوع', 'الخادم', 'الطريقة', 'المبلغ', 'وقت التسليم', 'استلمها', 'سجّلها', 'ملغي؟', 'ملاحظة'];
+
+/*
+ * «قايمة الأفراد»: a roster to SHARE (WhatsApp group, the bus list): the
+ * booking reference and each person's name — confirmed bookings only by
+ * default. No phones, no money, no links, no notes.
+ */
+export function rosterBook(exported, { statuses = ['confirmed'], today = '' } = {}) {
+  const data = exported || {};
+  const event = data.event || {};
+  const rows = [['#', 'رقم الحجز', 'الاسم']];
+  let n = 0;
+  for (const b of (Array.isArray(data.bookings) ? data.bookings : []).filter(x => statuses.includes(x.status))) {
+    const people = (b.participants || []).length ? b.participants.map(p => p.name) : (b.names || []).length ? b.names : [b.name];
+    for (const name of people) rows.push([++n, b.ref || '', String(name || '')]);
+  }
+  const sheet = { name: 'قايمة الأفراد', rows, rtl: true, header: true, filter: true, widths: [6, 12, 34], textColumns: [1, 2] };
+  return { book: { sheets: [sheet] }, filename: 'أفراد-' + String(event.slug || 'event').replace(/[^a-z0-9-]/gi, '') + '-' + String(today || '').slice(0, 10) + '.xlsx' };
 }

@@ -3175,3 +3175,8 @@ img, svg, video {
   grid-template-columns: minmax(0, 1fr) 6.5rem;
   gap: 8px;
 }
+
+.bk-people__room.is-full {
+  color: var(--gold-hi);
+  font-weight: 700;
+}

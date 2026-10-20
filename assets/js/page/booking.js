@@ -25,7 +25,7 @@
 import { h } from '../dom.js';
 import { arabicDigits } from '../words.js';
 import { cue } from '../ui-sound.js';
-import { stepCount, canStep, totalOf, money, waWithText } from './model.js';
+import { stepCount, canStep, totalOf, money, waWithText, seatsOf } from './model.js';
 import {
   liveState, stepsFor, isFree, peopleCount, peopleOf, peopleText, normPhone, checkWho, checkPay, checkSend,
   needsProof, newRequestKey, submitBody, payMessage, emptyDraft, bookingError, statusWord, statusHref,
@@ -453,13 +453,24 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
     const steppers = [];
     const namesBox = h('div', { class: 'bk-names' });
 
+    const capLine = h('p', { class: 'prices__note bk-people__room', 'aria-live': 'polite' });
+
     function refreshCounts() {
       total.textContent = money(totalOf(booking, draft.counts));
+      const placesLeft = live && Number.isInteger(live.left) ? live.left : null;
+      let blocked = false;
       for (const s of steppers) {
         s.out.textContent = arabicDigits(draft.counts[s.key] || 0);
         s.minus.disabled = !canStep(booking, draft.counts, s.key, -1);
-        s.plus.disabled = !canStep(booking, draft.counts, s.key, +1);
+        // never more seats than the places left (the server refuses it anyway: «full»)
+        const next = stepCount(booking, draft.counts, s.key, +1);
+        const over = placesLeft !== null && next !== draft.counts && seatsOf(booking, next) > placesLeft;
+        if (over) blocked = true;
+        s.plus.disabled = !canStep(booking, draft.counts, s.key, +1) || over;
       }
+      capLine.textContent = placesLeft === null ? '' : blocked
+        ? `مش هتقدر تزوّد أكتر: فاضل ${arabicDigits(placesLeft)} مكان بس في الفعالية.`
+        : `فاضل ${arabicDigits(placesLeft)} مكان في الفعالية.`;
     }
 
     function stepper(c) {
@@ -505,7 +516,8 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
     const counts = group('counts', 'العدد',
       h('ul', { class: 'prices__list bk-counts', 'aria-label': 'الأسعار' }, rows),
       h('p', { class: 'prices__total' }, h('span', {}, 'الإجمالي'), total),
-      booking.perBookingMax ? h('p', { class: 'prices__note' }, `أقصى عدد في الحجز الواحد ${arabicDigits(booking.perBookingMax)}.`) : null
+      booking.perBookingMax ? h('p', { class: 'prices__note' }, `أقصى عدد في الحجز الواحد ${arabicDigits(booking.perBookingMax)}.`) : null,
+      capLine
     );
 
     /*
@@ -522,10 +534,18 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
     function syncPeople() {
       draft.counts = peopleCounts(booking, draft.people);
       peopleTotal.textContent = money(totalOf(booking, draft.counts));
-      const room = peopleRoom(booking, live ? live.left : null);
+      const placesLeft = live && Number.isInteger(live.left) ? live.left : null;
+      const room = peopleRoom(booking, placesLeft);
       addPerson.disabled = draft.people.length >= room;
-      const left = room - draft.people.length;
-      roomLine.textContent = left > 0 ? `تقدر تزوّد ${arabicDigits(left)} ${left === 1 ? 'فرد' : 'أفراد'} كمان.` : 'وصلت لأقصى عدد متاح.';
+      const more = room - draft.people.length;
+      // say WHY it stops: the places left in the event, or the per-booking limit
+      const byPlaces = placesLeft !== null && placesLeft < (booking.perBookingMax || 10);
+      roomLine.textContent = more > 0
+        ? `تقدر تزوّد ${arabicDigits(more)} ${more === 1 ? 'فرد' : 'أفراد'} كمان${byPlaces ? ` (فاضل ${arabicDigits(placesLeft)} مكان في الفعالية)` : ''}.`
+        : byPlaces
+          ? `مش هتقدر تزوّد أكتر: فاضل ${arabicDigits(placesLeft)} مكان بس في الفعالية.`
+          : `مش هتقدر تزوّد أكتر: أقصى عدد في الحجز الواحد ${arabicDigits(booking.perBookingMax || 10)}.`;
+      roomLine.classList.toggle('is-full', more <= 0);
     }
 
     function personCard(p, i) {

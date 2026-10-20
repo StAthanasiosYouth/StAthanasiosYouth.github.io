@@ -18364,6 +18364,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var n = B.on ? pendingTotal() : 0;
     if (sub && sub.badge === n && area.badge === n) return;
     if (!sub) area.subs.push(sub = { key: 'bookings', label: 'الحجوزات' });
+    if (!area.subs.some(function (s) { return s.key === 'finance'; })) area.subs.push({ key: 'finance', label: 'حسابات الخدام' });
     sub.badge = n;
     area.badge = n;
     A.renderNav();
@@ -18727,7 +18728,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           drawChips();
           drawQueue(queue.last[queueKey()]);
           loadQueue();
-        } }, f.label + (n !== null && (n || f.key !== 'overdue') ? ' (' + ar(n) + ')' : ''));
+        } }, f.label + (n !== null && (n || ['pending', 'confirmed', 'all'].indexOf(f.key) !== -1) ? ' (' + ar(n) + ')' : ''));
       }));
     }
 
@@ -18853,7 +18854,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       var m = o.money || {};
       var counts = ev.counts || {};
       A.fill(box,
-        tile('جديدة', ar(counts.pending || b.pending || 0), (counts.pending || b.pending) ? 'gold' : ''),
+        tile('مستنية المراجعة', ar(counts.pending || b.pending || 0), (counts.pending || b.pending) ? 'gold' : ''),
         tile('مؤكدة', ar(counts.confirmed || b.confirmed || 0), ''),
         tile('مرفوضة / ملغية', ar((counts.rejected || 0) + (counts.withdrawn || 0) + (counts.cancelled || 0)), ''),
         tile('الأماكن الفاضية', seatsInfo.capacity === null || seatsInfo.capacity === undefined ? (ev.capacity == null ? 'من غير حد' : ar(Math.max(0, ev.left == null ? ev.capacity - (ev.taken || 0) : ev.left))) : ar(Math.max(0, seatsInfo.left || 0)), ''),
@@ -20063,7 +20064,21 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var body = el('div', { 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--line' }));
     var box = A.errorBox();
     var show = el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'summary-go' }, 'اعرض');
-    var xlsx = el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'export' }, icon('download'), 'نزّل Excel');
+    var xlsx = el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'export' }, icon('download'), 'التقرير الكامل (Excel)');
+    // shareable: names + booking refs only (confirmed), no phones, no money
+    var roster = el('button', { class: 'btn', type: 'button', 'data-act': 'export-roster' }, icon('users'), 'قايمة الأفراد (للمشاركة)');
+    roster.addEventListener('click', function () {
+      A.withBusy(roster, Promise.all([
+        W().call('GET', '/v1/admin/book/export?eventId=' + enc(ev.id)),
+        import(new URL('xlsx.js', location.href).href)
+      ]).then(function (got) {
+        var made = K.rosterBook(got[0], { today: A.cairoNow().slice(0, 10) });
+        var bytes = got[1].writeXlsx(made.book);
+        B.lastDownload = { filename: made.filename, bytes: bytes };
+        got[1].download(bytes, made.filename);
+        return made;
+      })).then(function (made) { A.toast('اتنزّل ' + made.filename); }).catch(function (error) { A.fail(error, box); });
+    });
 
     function range() {
       var out = '';
@@ -20099,11 +20114,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       var s = o.seats || {};
       var p = o.people || {};
       var methods = Object.keys(m.byMethod || {});
-      var servantRows = r.servants || [];
       A.fill(body,
         el('p', { class: 'section-label', text: 'الحجوزات (كل الفعالية)' }),
         el('div', { class: 'comp-tiles' },
-          tile('جديدة', ar(bk.pending || 0), bk.pending ? 'gold' : ''), tile('مؤكدة', ar(bk.confirmed || 0)), tile('مرفوضة', ar(bk.rejected || 0)),
+          tile('مستنية المراجعة', ar(bk.pending || 0), bk.pending ? 'gold' : ''), tile('مؤكدة', ar(bk.confirmed || 0)), tile('مرفوضة', ar(bk.rejected || 0)),
           tile('الزائر لغاها', ar(bk.withdrawn || 0)), tile('اتلغت', ar(bk.cancelled || 0)),
           tile('الأماكن', s.capacity === null || s.capacity === undefined ? ar(s.taken || 0) : ar(s.taken || 0) + ' / ' + ar(s.capacity)),
           tile('الأفراد المؤكدين', ar(p.total || 0))),
@@ -20117,18 +20131,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         })) : null,
         el('p', { class: 'field__hint', text: 'حالة الدفع: مجاني ' + ar(ps.free || 0) + '، لسه مدفعش ' + ar(ps.unpaid || 0) + '، جزء ' + ar(ps.partial || 0) + '، كله ' + ar(ps.paid || 0) + '، زيادة ' + ar(ps.overpaid || 0) + '، متأخر ' + ar(ps.overdue || 0) }),
         o.pending ? el('p', { class: 'field__hint', text: 'طلبات لسه بتتراجع: ' + ar(o.pending.count || 0) + ' بقيمة ' + money(o.pending.quoted || 0) + ' (متوقع، مش فلوس)' }) : null,
-        el('p', { class: 'section-label', text: 'حسب الخادم' }),
-        servantRows.length ? el('div', { class: 'comp-rank book-servants', role: 'table', 'aria-label': 'حسب الخادم' },
-          el('div', { class: 'comp-rank__row comp-rank__row--head', role: 'row' },
-            ['الخادم', 'المستلم', 'المرتجع', 'الصافي', 'حجوزات'].map(function (h) { return el('span', { role: 'columnheader', text: h }); })),
-          servantRows.map(function (sv) {
-            return el('div', { class: 'comp-rank__row', role: 'row', 'data-servant': sv.id },
-              el('span', { role: 'cell' }, el('bdi', { text: sv.name || sv.id }), sv.active === false ? el('small', { text: 'موقوف' }) : null, el('small', { text: ar(sv.payments || 0) + ' دفعة، اختاروه ' + ar(sv.chosenBy || 0) })),
-              el('span', { role: 'cell', text: money(sv.received || 0) }),
-              el('span', { role: 'cell', text: money(sv.refunded || 0) }),
-              el('span', { role: 'cell', text: money(sv.net || 0) }),
-              el('span', { role: 'cell', text: ar(sv.bookings || 0) }));
-          })) : el('p', { class: 'note', text: 'لسه مفيش دفعات.' }));
+        el('p', { class: 'section-label', text: 'حسابات الخدام' }),
+        el('p', { class: 'field__hint', text: 'فلوس كل خادم حسب طريقة الدفع والتسليمات للخدمة بقت في صفحة لوحدها.' }),
+        el('div', { class: 'actions' }, el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'open-finance', onclick: function () { B.openFinance(ev.id); } }, 'افتح الحسابات المالية للخدام')));
     }
 
     show.addEventListener('click', function () { load(show); });
@@ -20160,10 +20165,223 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       el('div', { class: 'row' }, A.field('من يوم', from.node), A.field('لحد يوم', to.node)),
       el('div', { class: 'actions' }, show),
       body
-    ], [xlsx, el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })], { wide: true, className: 'book-sheet' });
+    ], [xlsx, roster, el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })], { wide: true, className: 'book-sheet' });
 
     load();
 
   }
+
+
+  /* =======================================================
+     «الحسابات المالية للخدام» (its own page, next to «الحجوزات»)
+     One event or all of them (GET /v1/admin/book/finance): per servant and
+     per payment method — confirmed, in their custody, pending verification,
+     owed by participants, handed over, still to hand over; the bookings
+     behind each line; handovers recorded and voided per event.
+     Phase 1: any admin. Phase 1.5: a servant sees only their own.
+  ======================================================= */
+
+  var finance = { eventId: 'all', last: {} };
+
+  B.openFinance = function (eventId) {
+    finance.eventId = eventId || 'all';
+    return (sheetOpen() ? A.closeSheet() : Promise.resolve(true)).then(function (closed) {
+      if (closed === false) return false;
+      return A.go('pages', 'finance');
+    });
+  };
+
+  A.views.finance = function () {
+
+    if (!window.AdminTransport) {
+      return [A.card('من لوحة التحكم الرسمية بس', 'الحسابات بتتراجع من لوحة التحكم الرسمية (/admin/).')];
+    }
+
+    if (!B.on) {
+      if (B.needGoogle) return [googleCard()];
+      if (B.failed) return [retryCard()];
+      var waiting = el('div', { class: 'skeleton skeleton--line' });
+      B.check().then(function (on) {
+        if (!waiting.isConnected) return;
+        if (on || B.needGoogle || B.failed) A.render();
+        else A.fill(waiting.parentNode, el('p', { class: 'note', text: 'الحسابات مش متاحة دلوقتي.' }));
+      });
+      return [A.card('الحسابات المالية للخدام', '', waiting)];
+    }
+
+    var box = A.errorBox();
+    var body = el('div', { 'aria-live': 'polite' });
+    var picker = el('select', { class: 'input', 'aria-label': 'الفعالية', 'data-act': 'finance-event' },
+      [el('option', { value: 'all', text: 'كل الفعاليات (مجمّع)' })].concat((B.events || []).map(function (e) {
+        return el('option', { value: e.id, text: e.title, selected: e.id === finance.eventId ? 'selected' : null });
+      })));
+    picker.value = (B.events || []).some(function (e) { return e.id === finance.eventId; }) ? finance.eventId : 'all';
+    picker.addEventListener('change', function () { finance.eventId = picker.value; load(); });
+
+    function evRow() { return eventRow(finance.eventId) || null; }
+
+    function load() {
+      var id = finance.eventId;
+      if (finance.last[id]) draw(finance.last[id]);
+      else A.fill(body, el('div', { class: 'skeleton skeleton--line' }), el('div', { class: 'skeleton skeleton--line' }));
+      box.hidden = true;
+      var calls = [W().call('GET', '/v1/admin/book/finance?eventId=' + enc(id))];
+      if (id !== 'all') calls.push(W().call('GET', '/v1/admin/book/events/' + enc(id) + '/handovers').catch(function () { return { handovers: [] }; }));
+      if (id !== 'all' && evRow()) calls.push(eventConfig(evRow()).catch(function () { return null; }));
+      Promise.all(calls).then(function (got) {
+        var r = got[0];
+        r.handoverRows = got[1] ? got[1].handovers || [] : [];
+        finance.last[id] = r;
+        if (body.isConnected && finance.eventId === id) draw(r);
+      }).catch(function (error) { if (body.isConnected) A.fail(error, box); });
+    }
+
+    function label(key) {
+      var ev = finance.eventId !== 'all' ? configs.byEvent[finance.eventId] : null;
+      var found = ev ? K.methodLabel(ev, key) : '';
+      return found && found !== key ? found : ({ cash: 'كاش', instapay: 'إنستاباي', wallet: 'محفظة' }[key] || key || 'من غير طريقة');
+    }
+
+    function draw(r) {
+      var one = finance.eventId !== 'all';
+      var t = r.totals || {};
+      var m = r.money || {};
+      var servants = r.servants || [];
+      A.fill(body,
+        el('div', { class: 'comp-tiles' },
+          tile('الصافي المتأكد', money(m.net || 0), 'gold'),
+          tile('في عهدة الخدام', money(t.held || 0)),
+          tile('اتسلّم للخدمة', money(t.total || 0)),
+          tile('لسه مع الخدام', money(t.toHandOver || 0), t.toHandOver > 0 ? 'danger' : ''),
+          tile('لسه على الناس', money(m.balance || 0)),
+          tile('مستني التأكيد', money(servants.reduce(function (s, x) { return s + (x.pendingQuoted || 0); }, 0)))),
+        el('p', { class: 'field__hint', text: '«متأكد» = دفعات سجّلها أدمن. «في عهدته» = الكاش اللي استلمه + التحويلات اللي راحت على رقمه هو بس. «مستني التأكيد» = طلبات فيها إثبات لسه متراجعتش (متوقع، مش فلوس). «لسه معاه» = في عهدته − اللي سلّمه.' }),
+        !one ? el('p', { class: 'note', text: 'المجمّع لكل الفعاليات. لتسجيل تسليم أو فتح الحجوزات ورا كل رقم اختار فعالية.' }) : null,
+        // per event (combined view): one line each, a click narrows the page to it
+        !one && (r.events || []).length > 1 ? el('ul', { class: 'book-log__list', 'data-finance-events': '' }, r.events.map(function (e) {
+          var et = e.totals || {};
+          return el('li', { 'data-event': e.id },
+            el('button', { class: 'btn btn--small btn--ghost', type: 'button', 'data-act': 'finance-pick', onclick: function () { finance.eventId = e.id; picker.value = e.id; load(); } }, el('bdi', { text: e.title || e.slug || e.id })),
+            ' الصافي ' + money((e.money || {}).net || 0) + ' · في عهدة الخدام ' + money(et.held || 0) + ' · لسه مع الخدام ' + money(et.toHandOver || 0));
+        })) : null,
+        servants.length ? el('div', { class: 'comp-rank book-servants', role: 'table', 'aria-label': 'حسابات الخدام' },
+          el('div', { class: 'comp-rank__row comp-rank__row--head', role: 'row' },
+            ['الخادم', 'متأكد', 'في عهدته', 'مستني التأكيد', 'لسه على الناس', 'سلّم للخدمة', 'لسه معاه'].map(function (h) { return el('span', { role: 'columnheader', text: h }); })),
+          servants.map(function (sv) {
+            return el('div', { class: 'comp-rank__row', role: 'row', 'data-servant': sv.id },
+              el('span', { role: 'cell' }, el('bdi', { text: sv.name || sv.id }), sv.active === false ? el('small', { text: 'موقوف' }) : null,
+                el('small', { text: (!one && sv.events ? ar(sv.events) + ' فعالية، ' : '') + ar(sv.bookings || 0) + ' حجز، ' + ar(sv.payments || 0) + ' دفعة' }),
+                one ? el('button', { class: 'btn btn--small btn--ghost', type: 'button', 'data-act': 'handover', onclick: function (e) { handoverForm(sv, e.currentTarget); } }, icon('plus'), 'سلّم فلوس') : null),
+              el('span', { role: 'cell', text: money(sv.net || 0) }),
+              el('span', { role: 'cell', text: money(sv.held || 0) }),
+              el('span', { role: 'cell', text: money(sv.pendingQuoted || 0) }),
+              el('span', { role: 'cell', text: money(sv.owed || 0) }),
+              el('span', { role: 'cell', text: money(sv.handedOver || 0) }),
+              el('span', { role: 'cell', 'data-to-hand': String(sv.toHandOver || 0), text: money(sv.toHandOver || 0) }));
+          })) : el('p', { class: 'note', text: 'لسه مفيش دفعات.' }),
+        servants.filter(function (sv) { return (sv.methods || []).length; }).map(function (sv) {
+          return el('details', { class: 'book-log book-servant-methods', 'data-servant-methods': sv.id },
+            el('summary', { text: 'حسب طريقة الدفع: ' + (sv.name || sv.id) }),
+            el('ul', { class: 'book-log__list' }, sv.methods.map(function (mm) {
+              var refs = el('div', { class: 'field__hint', 'data-refs': mm.method });
+              return el('li', { 'data-method': mm.method },
+                el('strong', { text: label(mm.method) + ': ' }),
+                'متأكد ' + money(mm.net) + ' · في عهدته ' + money(mm.held) + ' · مستني التأكيد ' + money(mm.pendingQuoted) + ' (' + ar(mm.pendingCount) + ')' +
+                ' · لسه على الناس ' + money(mm.owed) + ' · سلّم ' + money(mm.handedOver) + ' · لسه معاه ' + money(mm.toHandOver) + ' ',
+                one && (mm.bookingIds || []).length ? el('button', { class: 'btn btn--small btn--ghost', type: 'button', 'data-act': 'drill', onclick: function (e) { drill(mm.bookingIds, refs, e.currentTarget); } }, 'الحجوزات (' + ar(mm.bookingIds.length) + ')') : null,
+                refs);
+            })));
+        }),
+        one && (r.handoverRows || []).length ? el('p', { class: 'section-label', text: 'التسليمات للخدمة' }) : null,
+        one && (r.handoverRows || []).length ? el('ul', { class: 'book-log__list' }, r.handoverRows.filter(function (h) { return h.kind === 'handover'; }).map(function (h) {
+          return el('li', { 'data-handover': h.id },
+            el('span', { text: wallText(h.handedAt) + ' — ' }), el('bdi', { text: h.servantName || '' }), ' سلّم ' + money(h.amount) + (h.method ? ' (' + label(h.method) + ')' : '') +
+            (h.receivedBy ? ' لـ ' + h.receivedBy : '') + (h.note ? ' — ' + h.note : '') + ' — سجّلها ' + (h.recordedName || ''),
+            h.voidedBy ? A.chip('اتلغت', 'off') : el('button', { class: 'btn btn--small btn--ghost', type: 'button', 'data-act': 'handover-void', onclick: function (e) { voidHandover(h, e.currentTarget); } }, 'إلغاء'));
+        })) : null);
+    }
+
+    var exportCache = {};
+    function drill(ids, box2, button) {
+      var id = finance.eventId;
+      var get = exportCache[id] || (exportCache[id] = W().call('GET', '/v1/admin/book/export?eventId=' + enc(id)));
+      A.withBusy(button, get).then(function (x) {
+        var byId = {};
+        (x.bookings || []).forEach(function (b) { byId[b.id] = b; });
+        A.fill(box2, el('ul', { class: 'book-log__list' }, ids.map(function (bid) {
+          var b = byId[bid] || {};
+          var pays = (x.payments || []).filter(function (p) { return p.bookingId === bid; });
+          return el('li', {},
+            el('button', { class: 'book-row__ref btn btn--small btn--ghost', type: 'button', dir: 'ltr', text: b.ref || bid, onclick: function () { openBooking(bid); } }), ' ', el('bdi', { text: b.name || '' }),
+            ' — ' + ((K.STATUS[b.status] || {}).label || b.status || '') + ' · المطلوب ' + money(b.amountDue == null ? b.quotedTotal || 0 : b.amountDue) + ' · مدفوع ' + money(b.paid || 0) + (b.balance > 0 ? ' · باقي ' + money(b.balance) : ''),
+            pays.length ? el('small', { text: ' — ' + pays.map(function (p) { return (p.kind === 'refund' ? 'مرتجع ' : p.kind === 'void' ? 'إلغاء ' : '') + money(p.amount) + ' ' + wallText(p.receivedAt) + (p.custody === 'service' ? ' (لحساب الخدمة)' : '') + (p.voidedBy ? ' (اتلغت)' : ''); }).join('، ') }) : null);
+        })));
+      }).catch(function (error) { delete exportCache[id]; A.fail(error, box); });
+    }
+
+    function reload() {
+      delete finance.last[finance.eventId];
+      exportCache = {};
+      load();
+    }
+
+    function handoverForm(sv, button) {
+      var held = (sv.methods || []).filter(function (x) { return x.toHandOver > 0; });
+      var method = select([{ value: '', label: 'كل الطرق' }].concat((sv.methods || []).map(function (x) {
+        return { value: x.method, label: label(x.method) + ' (معاه ' + ar(Math.max(0, x.toHandOver)) + ')' };
+      })), held.length === 1 ? held[0].method : '', 'الطريقة');
+      var amount = numberInput(sv.toHandOver > 0 ? sv.toHandOver : '', '');
+      var by = A.textInput('', { max: 60, placeholder: 'مثلاً: أمين الصندوق' });
+      var note = A.textInput('', { max: 300, placeholder: 'اختياري' });
+      var keys = K.keyKeeper('hnd');
+      A.modal({
+        tone: 'info', icon: 'check', title: 'تسليم فلوس من ' + (sv.name || ''),
+        message: 'معاه دلوقتي ' + money(sv.toHandOver || 0) + ' (في عهدته ' + money(sv.held || 0) + ' − اللي سلّمه ' + money(sv.handedOver || 0) + ').',
+        details: el('div', { class: 'form' }, A.field('طريقة الفلوس اللي سلّمها', method), A.field('المبلغ', amount), A.field('استلمها', by), A.field('ملاحظة', note)),
+        actions: [{ label: 'سجّل التسليم', value: true, kind: 'primary' }, { label: 'رجوع', value: false, kind: 'ghost' }]
+      }).then(function (ok) {
+        if (!ok) return;
+        var send = function (force) {
+          var b = { servantId: sv.id, method: method.value, amount: K.amountOf(amount.value), handedAt: K.stamp(A.cairoNow()), receivedBy: by.value.trim(), note: note.value.trim() };
+          b.idemKey = keys.for(b);
+          if (force) b.force = true;
+          return W().call('POST', '/v1/admin/book/events/' + enc(finance.eventId) + '/handovers', b);
+        };
+        A.withBusy(button, send(false).catch(function (error) {
+          if (error && error.code === 'warn') {
+            return A.confirm({ title: 'المبلغ أكبر من اللي معاه', message: ((error.reply && error.reply.warnings) || []).map(function (w) { return w.message; }).join(' '), confirmLabel: 'سجّل برضه' })
+              .then(function (yes) { return yes ? send(true) : null; });
+          }
+          throw error;
+        })).then(function (done) {
+          if (done) { A.toast('اتسجل التسليم ✓'); reload(); }
+        }).catch(function (error) { A.fail(error, box); });
+      });
+    }
+
+    function voidHandover(h, button) {
+      A.confirm({ tone: 'danger', title: 'تلغي التسليم ده؟', message: money(h.amount) + ' من ' + (h.servantName || '') + '. بيفضل في السجل متعلّم «اتلغت».', confirmLabel: 'إلغاء التسليم' }).then(function (ok) {
+        if (!ok) return;
+        A.withBusy(button, W().call('POST', '/v1/admin/book/handovers/' + enc(h.id) + '/void', { reason: 'إلغاء من الحسابات', idemKey: K.newKey('hvd') }))
+          .then(function () { A.toast('التسليم اتلغى'); reload(); })
+          .catch(function (error) { A.fail(error, box); });
+      });
+    }
+
+    if (!B.events) {
+      // the picker fills once the events arrive
+      var watch = function () {
+        eventsWatchers.splice(eventsWatchers.indexOf(watch), 1);
+        if (picker.isConnected && B.events) A.render();
+      };
+      eventsWatchers.push(watch);
+      loadEvents();
+    }
+    load();
+
+    return [A.card('الحسابات المالية للخدام', 'فلوس كل خادم حسب طريقة الدفع (كاش / إنستاباي / محفظة): اللي اتأكد، اللي في عهدته، اللي سلّمه للخدمة، واللي لسه معاه.',
+      A.field('الفعالية', picker), box, body)];
+
+  };
 
 })();

@@ -22,7 +22,7 @@ import { forgetModule, bookingOn } from './public.js';
 import { assertUnlocked, lockInfo, lockTake, lockDrop } from './locks.js';
 import {
   checkCounts, normPhone, cleanText, quote, seats, people, deriveFromPaid, derive, paidOf, amountDueOf,
-  confirmPaymentOk, newRef, summary, stampMs, msStamp, isLive, LIMITS, STATUSES
+  confirmPaymentOk, newRef, summary, stampMs, msStamp, isLive, LIMITS, STATUSES, methodOnline, custodyOf
 } from './model.js';
 
 const KEY = /^[A-Za-z0-9_.:-]{8,100}$/;
@@ -157,7 +157,9 @@ async function checkPay(ctx, input, { event, booking, paid, due, existing, now }
     warnings: input.force === true ? [] : warnings,
     row: {
       id: randomId('pay-', 6), kind, amount, servantId: servant.id, servantName: servant.name, method: method.key,
-      receivedAt: msStamp(receivedMs).replace('T', ' '), receivedMs, note, proofIds, idemKey: input.idemKey
+      receivedAt: msStamp(receivedMs).replace('T', ' '), receivedMs, note, proofIds, idemKey: input.idemKey,
+      // who holds this money (custodyOf): cash → the servant; a transfer → the servant only to their own approved number
+      custody: methodOnline(method) ? (await ctx.env.DB.prepare('SELECT 1 AS y FROM pay_dest WHERE servant_id = ? AND method = ?').bind(servant.id, method.key).first() ? 'servant' : 'service') : 'servant'
     },
     delta: kind === 'payment' ? amount : -amount
   };
@@ -184,11 +186,11 @@ function paymentStmts(db, rows, booking, actor, now, guard, guardArgs) {
   const stmts = [];
   for (const r of rows) {
     stmts.push(db.prepare(`INSERT INTO payments (id, booking_id, event_id, kind, amount, servant_id, servant_name, method, received_at, received_ms,
-        recorded_at, recorded_ms, recorded_by, recorded_name, proof_ids, note, idem_key)
-      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${guard}
+        recorded_at, recorded_ms, recorded_by, recorded_name, proof_ids, note, idem_key, custody)
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${guard}
       ON CONFLICT(idem_key) DO NOTHING`).bind(
       r.id, booking.id, booking.event_id, r.kind, r.amount, r.servantId, r.servantName, r.method, r.receivedAt, r.receivedMs,
-      cairoText(now), now, actor.email, actor.name || null, r.proofIds.length ? JSON.stringify(r.proofIds) : null, r.note, r.idemKey, ...guardArgs));
+      cairoText(now), now, actor.email, actor.name || null, r.proofIds.length ? JSON.stringify(r.proofIds) : null, r.note, r.idemKey, r.custody || null, ...guardArgs));
     if (r.proofIds.length) {
       stmts.push(db.prepare(`UPDATE proofs SET payment_id = ?, purpose = 'payment' WHERE id IN (${r.proofIds.map(() => '?').join(',')}) AND booking_id = ? AND payment_id IS NULL AND EXISTS (SELECT 1 FROM payments WHERE id = ?)`)
         .bind(r.id, ...r.proofIds, booking.id, r.id));
@@ -742,23 +744,105 @@ function rangeOf(q) {
 }
 
 async function eventRows(env, eventId) {
-  const [bs, ps] = await env.DB.batch([
+  const [bs, ps, hs] = await env.DB.batch([
     env.DB.prepare('SELECT * FROM bookings WHERE event_id = ? ORDER BY created_ms').bind(eventId),
-    env.DB.prepare('SELECT * FROM payments WHERE event_id = ? ORDER BY received_ms, recorded_ms').bind(eventId)
+    env.DB.prepare('SELECT * FROM payments WHERE event_id = ? ORDER BY received_ms, recorded_ms').bind(eventId),
+    env.DB.prepare('SELECT * FROM handovers WHERE event_id = ? ORDER BY handed_ms, recorded_ms').bind(eventId)
   ]);
-  return { bookings: bs.results, payments: ps.results };
+  const dests = new Set((await env.DB.prepare('SELECT servant_id, method FROM pay_dest').all()).results.map(d => d.servant_id + '|' + d.method));
+  return { bookings: bs.results, payments: ps.results, handovers: hs.results, dests };
+}
+
+const handoverOut = h => ({
+  id: h.id, kind: h.kind, servantId: h.servant_id, servantName: h.servant_name, method: h.method || '', amount: h.amount, handedAt: h.handed_at,
+  receivedBy: h.received_by || '', note: h.note || '', recordedAt: h.recorded_at, recordedName: h.recorded_name || h.recorded_by,
+  voidsId: h.voids_id || null, voidedBy: h.voided_by || null
+});
+
+/*
+ * POST /v1/admin/book/events/:id/handovers { servantId, amount, handedAt, receivedBy?, note?, idemKey, force? }
+ * A servant hands money over to the service. More than they still hold → 'warn' (force to record anyway).
+ */
+export async function adminHandoverAdd(ctx) {
+  const env = ctx.env;
+  const body = ctx.body || {};
+  const event = await eventById(ctx, ctx.params.id);
+  if (!KEY.test(String(body.idemKey || ''))) throw invalid('idemKey');
+  const twin = await env.DB.prepare('SELECT id FROM handovers WHERE idem_key = ?').bind(body.idemKey).first();
+  if (twin) return adminHandovers(ctx);
+  const servant = ((event.booking && event.booking.servants) || []).find(s => s.id === body.servantId);
+  if (!servant) throw invalid('servantId');
+  const amount = Number(body.amount);
+  if (!Number.isInteger(amount) || amount <= 0 || amount > LIMITS.amount) throw invalid('amount');
+  const now = Date.now();
+  const handedMs = stampMs(String(body.handedAt || '').replace(' ', 'T'));
+  if (!handedMs || handedMs > now + RECEIVED_SKEW_MS) throw invalid('handedAt');
+  const method = String(body.method || '');
+  if (method && !((event.booking && event.booking.methods) || []).some(m => m.key === method)) throw invalid('method');
+  const { bookings, payments, handovers, dests } = await eventRows(env, event.id);
+  const s = summary(event, bookings, payments, event.booking.servants || [], {}, now, handovers, dests).servants.find(x => x.id === servant.id) || { toHandOver: 0, methods: [] };
+  const holds = method ? ((s.methods.find(m => m.method === method) || {}).toHandOver || 0) : s.toHandOver;
+  if (amount > holds && body.force !== true) {
+    throw new ApiError('warn', 'handover', { warnings: [{ code: 'over', message: `المبلغ أكبر من اللي مع الخادم${method ? ' بالطريقة دي' : ''} (${Math.max(0, holds)} ج).` }] });
+  }
+  const id = randomId('hnd-', 6);
+  const at = cairoText(now);
+  await retry(() => env.DB.batch([
+    env.DB.prepare(`INSERT INTO handovers (id, event_id, kind, servant_id, servant_name, amount, handed_at, handed_ms, received_by, note, recorded_at, recorded_ms, recorded_by, recorded_name, idem_key, method)
+      VALUES (?, ?, 'handover', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(idem_key) DO NOTHING`).bind(
+      id, event.id, servant.id, servant.name, amount, msStamp(handedMs).replace('T', ' '), handedMs, cleanText(body.receivedBy, 60) || null,
+      cleanText(body.note, LIMITS.note) || null, at, now, ctx.actor.email, ctx.actor.name || null, body.idemKey, method),
+    env.DB.prepare(`INSERT INTO activity (id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary)
+      SELECT ?, ?, ?, ?, ?, 'handover.add', 'event', ?, ?, ? WHERE EXISTS (SELECT 1 FROM handovers WHERE id = ?)`).bind(
+      randomId('act-'), now, at, ctx.actor.email, ctx.actor.name || null, event.id, event.title.slice(0, 80), servant.name + ' سلّم ' + amount + ' ج', id)
+  ]));
+  return adminHandovers(ctx);
+}
+
+/* POST /v1/admin/book/handovers/:id/void { reason, idemKey } — once per row */
+export async function adminHandoverVoid(ctx) {
+  const env = ctx.env;
+  const body = ctx.body || {};
+  const target = await env.DB.prepare("SELECT * FROM handovers WHERE id = ? AND kind = 'handover'").bind(String(ctx.params.id || '')).first();
+  if (!target) throw new ApiError('not_found', 'handover');
+  const reason = cleanText(body.reason, LIMITS.reason);
+  if (reason.length < 2) throw invalid('reason');
+  if (!KEY.test(String(body.idemKey || ''))) throw invalid('idemKey');
+  ctx.params = { id: target.event_id };
+  if (target.voided_by) return adminHandovers(ctx);
+  const now = Date.now();
+  const at = cairoText(now);
+  const voidId = randomId('hnd-', 6);
+  await retry(() => env.DB.batch([
+    env.DB.prepare(`INSERT INTO handovers (id, event_id, kind, servant_id, servant_name, amount, handed_at, handed_ms, note, recorded_at, recorded_ms, recorded_by, recorded_name, voids_id, idem_key)
+      SELECT ?, event_id, 'void', servant_id, servant_name, amount, ?, ?, ?, ?, ?, ?, ?, id, ? FROM handovers WHERE id = ? AND voided_by IS NULL
+      ON CONFLICT DO NOTHING`).bind(voidId, at, now, reason, at, now, ctx.actor.email, ctx.actor.name || null, body.idemKey, target.id),
+    env.DB.prepare('UPDATE handovers SET voided_by = ? WHERE id = ? AND voided_by IS NULL AND EXISTS (SELECT 1 FROM handovers WHERE id = ?)').bind(voidId, target.id, voidId),
+    env.DB.prepare(`INSERT INTO activity (id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary)
+      SELECT ?, ?, ?, ?, ?, 'handover.void', 'event', ?, ?, ? WHERE EXISTS (SELECT 1 FROM handovers WHERE id = ?)`).bind(
+      randomId('act-'), now, at, ctx.actor.email, ctx.actor.name || null, target.event_id, target.servant_name || '', reason, voidId)
+  ]));
+  return adminHandovers(ctx);
+}
+
+/* GET /v1/admin/book/events/:id/handovers → { handovers, servants (accounting) } */
+export async function adminHandovers(ctx) {
+  const event = await eventById(ctx, ctx.params.id);
+  const { bookings, payments, handovers, dests } = await eventRows(ctx.env, event.id);
+  const s = summary(event, bookings, payments, (event.booking && event.booking.servants) || [], {}, Date.now(), handovers, dests);
+  return { handovers: handovers.map(handoverOut), servants: s.servants, totals: s.handovers };
 }
 
 export async function adminSummary(ctx) {
   const event = await eventById(ctx, ctx.url.searchParams.get('eventId'));
-  const { bookings, payments } = await eventRows(ctx.env, event.id);
-  return summary(event, bookings, payments, (event.booking && event.booking.servants) || [], rangeOf(ctx.url.searchParams));
+  const { bookings, payments, handovers, dests } = await eventRows(ctx.env, event.id);
+  return summary(event, bookings, payments, (event.booking && event.booking.servants) || [], rangeOf(ctx.url.searchParams), Date.now(), handovers, dests);
 }
 
 export async function adminExport(ctx) {
   const event = await eventById(ctx, ctx.url.searchParams.get('eventId'));
   const range = rangeOf(ctx.url.searchParams);
-  const { bookings, payments } = await eventRows(ctx.env, event.id);
+  const { bookings, payments, handovers, dests } = await eventRows(ctx.env, event.id);
   const now = Date.now();
   const bk = event.booking || {};
   const byBooking = new Map();
@@ -776,12 +860,13 @@ export async function adminExport(ctx) {
     })),
     payments: payments.filter(p => (range.from == null || p.received_ms >= range.from) && (range.to == null || p.received_ms <= range.to)).map(p => ({
       id: p.id, bookingId: p.booking_id, ref: refs.get(p.booking_id) ? refs.get(p.booking_id).ref : '', name: refs.get(p.booking_id) ? refs.get(p.booking_id).name : '',
-      kind: p.kind, amount: p.amount, method: p.method, servantId: p.servant_id, servantName: p.servant_name, receivedAt: p.received_at,
+      kind: p.kind, amount: p.amount, method: p.method, custody: custodyOf(p, bk, dests), servantId: p.servant_id, servantName: p.servant_name, receivedAt: p.received_at,
       recordedAt: p.recorded_at, recordedBy: p.recorded_name || p.recorded_by, voided: !!p.voided_by || p.kind === 'void',
       voidReason: p.kind === 'void' ? p.note : (p.voided_by ? (payments.find(v => v.id === p.voided_by) || {}).note || '' : ''), hasProof: withProof.has(p.id)
     })),
     servants: (bk.servants || []).map(s => ({ id: s.id, name: s.name, methods: s.methods })),
-    summary: summary(event, bookings, payments, bk.servants || [], range, now)
+    summary: summary(event, bookings, payments, bk.servants || [], range, now, handovers, dests),
+    handovers: handovers.map(handoverOut)
   };
 }
 
@@ -791,4 +876,52 @@ export async function proofTarget(ctx, bookingId) {
   const b = await bookingRow(ctx.env, bookingId);
   const event = await eventById(ctx, b.event_id);
   return { bookingId: b.id, deleteAfterMs: event.endMs + PROOF_LIFE_MS };
+}
+
+/*
+ * GET /v1/admin/book/finance?eventId=<evt-…|all>  — «الحسابات المالية للخدام»
+ * The same per-event summary() (custody, servant × method, pending
+ * verification, owed, handovers), for one event or added up over all the
+ * booking events. Read only. Phase 1.5 will narrow it to a servant's own
+ * events / records by their permissions; for now any admin (the allowlist).
+ */
+const SUM_FIELDS = ['payments', 'received', 'refunded', 'net', 'bookings', 'chosenBy', 'cash', 'online', 'held', 'owed', 'handedOver', 'toHandOver', 'pendingQuoted'];
+const METHOD_FIELDS = ['received', 'refunded', 'net', 'held', 'pendingCount', 'pendingQuoted', 'owed', 'handedOver', 'toHandOver'];
+
+export async function adminFinance(ctx) {
+  const want = String(ctx.url.searchParams.get('eventId') || 'all');
+  const events = want === 'all'
+    ? (await retry(() => ctx.env.DB.prepare("SELECT * FROM event_cfg WHERE booking IS NOT NULL AND withdrawn = 0 ORDER BY start_at DESC").all())).results.map(rowToEvent)
+    : [await eventById(ctx, want)];
+  const now = Date.now();
+  const perEvent = [];
+  const combined = new Map();
+  const money = { due: 0, received: 0, refunded: 0, net: 0, balance: 0, refundsOwed: 0 };
+  const totals = { total: 0, held: 0, toHandOver: 0 };
+  for (const event of events) {
+    const { bookings, payments, handovers, dests } = await eventRows(ctx.env, event.id);
+    const s = summary(event, bookings, payments, (event.booking && event.booking.servants) || [], {}, now, handovers, dests);
+    perEvent.push({ id: event.id, slug: event.slug, title: event.title, startAt: event.startAt, money: s.overall.money, bookings: s.overall.bookings, totals: s.handovers, servants: s.servants });
+    Object.keys(money).forEach(k => { money[k] += s.overall.money[k] || 0; });
+    Object.keys(totals).forEach(k => { totals[k] += s.handovers[k] || 0; });
+    for (const sv of s.servants) {
+      const c = combined.get(sv.id) || { id: sv.id, name: sv.name, active: sv.active, events: 0, methods: new Map(), ...Object.fromEntries(SUM_FIELDS.map(f => [f, 0])) };
+      c.events++;
+      SUM_FIELDS.forEach(f => { c[f] += sv[f] || 0; });
+      for (const m of sv.methods || []) {
+        const cm = c.methods.get(m.method) || { method: m.method, ...Object.fromEntries(METHOD_FIELDS.map(f => [f, 0])) };
+        METHOD_FIELDS.forEach(f => { cm[f] += m[f] || 0; });
+        cm.bookingIds = (cm.bookingIds || []).concat(m.bookingIds || []);
+        c.methods.set(m.method, cm);
+      }
+      combined.set(sv.id, c);
+    }
+  }
+  return {
+    scope: want,
+    events: perEvent,
+    money,
+    totals,
+    servants: [...combined.values()].map(c => ({ ...c, methods: [...c.methods.values()] }))
+  };
 }

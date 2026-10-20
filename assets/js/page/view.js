@@ -402,7 +402,8 @@ export function createView({ main, live, rootUrl, mediaUrl, onClip }) {
 
     const booking = event.booking;
     const phase = bookingPhase(booking, event.startAt, nowStamp);
-    const group = booking.pricing.mode === 'group';
+    // «إضافة فرد»: people are added one by one in the booking itself — no counter here, just the prices (with their ages)
+    const group = booking.pricing.mode === 'group' && !booking.participants;
     const methodLabel = new Map(booking.methods.map(m => [m.key, m.label]));
 
     let counts = startCounts(booking);
@@ -443,7 +444,9 @@ export function createView({ main, live, rootUrl, mediaUrl, onClip }) {
     const rows = booking.pricing.categories.map(c => h('li', { class: 'price' },
       h('div', { class: 'price__who' },
         h('span', { class: 'price__label' }, c.label),
-        c.note ? h('span', { class: 'price__note' }, c.note) : null
+        booking.participants && (c.ageMin != null || c.ageMax != null)
+          ? h('span', { class: 'price__note' }, c.ageMin != null && c.ageMax != null ? `من ${arabicDigits(c.ageMin)} لـ ${arabicDigits(c.ageMax)} سنة` : c.ageMin != null ? `من ${arabicDigits(c.ageMin)} سنة` : `لحد ${arabicDigits(c.ageMax)} سنة`)
+          : c.note ? h('span', { class: 'price__note' }, c.note) : null
       ),
       h('span', { class: 'price__amount' }, money(c.price)),
       group && c.min !== c.max ? stepper(c) : group ? h('span', { class: 'stepper stepper--fixed' }, arabicDigits(c.min)) : null
