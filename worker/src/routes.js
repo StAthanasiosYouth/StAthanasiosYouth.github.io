@@ -18,6 +18,7 @@ import { grantsSnapshot } from './lib/perms.js';
 import { accountsList, accountAdd, accountUpdate, accountRemove } from './lib/accounts.js';
 import { notifyClaim } from './notify/claim.js';
 import { tokenHealth } from './notify/email.js';
+import { diagMailSample } from './notify/samples.js';
 import { notifySettingsGet, notifySettingsSave, notifyMeGet, notifyMeSave, notifyStatus, notifyDismiss } from './notify/settings.js';
 import { housekeeping, blankPhones } from './scheduled.js';
 import { makeJob } from './jobs.js';
@@ -284,6 +285,7 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/sync/admins', auth: 'sync', raw: true, maxBytes: 16 * 1024, handler: syncAdmins },
   { method: 'POST', path: '/v1/admin/diag/event-fixture', auth: 'admin', handler: diagEventFixture },
   { method: 'POST', path: '/v1/admin/diag/gmail-health', auth: 'admin', handler: diagGmailHealth },
+  { method: 'POST', path: '/v1/admin/diag/mail-sample', auth: 'admin', handler: diagMailSample },
   { method: 'POST', path: '/v1/admin/diag/retention', auth: 'admin', handler: diagRetention },
   { method: 'GET', path: '/v1/admin/diag/book-news', auth: 'admin', handler: diagNews },
   { method: 'POST', path: '/v1/sync/book-news', auth: 'sync', raw: true, maxBytes: 4 * 1024, handler: syncBookNews },

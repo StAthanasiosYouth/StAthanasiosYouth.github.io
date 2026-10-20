@@ -255,3 +255,13 @@ test('alerts and summaries: priority bar for critical only, facts with the event
   assert.match(s.html, /الثلاثاء ٢٠ أكتوبر ٢٠٢٦/);
   assert.match(summaryEmail({ lines: [] }, '2026-10-20').text, /مفيش نشاط جديد/);
 });
+
+test('mail samples: every sample renders; the send route is staging only', async () => {
+  const { SAMPLES, diagMailSample } = await import('../src/notify/samples.js');
+  for (const [name, [level, make]] of Object.entries(SAMPLES)) {
+    const m = make();
+    assert.ok(m.subject && m.html.length > 1000 && m.text.length > 100, name);
+    assert.ok(['otp', 'critical', 'important'].includes(level));
+  }
+  await assert.rejects(diagMailSample({ env: { ENVIRONMENT: 'production' }, body: { name: 'otp' } }), e => e.code === 'notfound' || /notfound/.test(e.message + e.code));
+});

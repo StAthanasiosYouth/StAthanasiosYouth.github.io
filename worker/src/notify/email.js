@@ -67,7 +67,7 @@ export async function quotaOf(db, now = Date.now()) {
 }
 /* the next moment the window frees room: the oldest hour leaves it */
 const nextWindowMs = now => (Math.floor(now / HOUR) + 1) * HOUR + 60000;
-const countStmt = (db, day, level) => db.prepare(`INSERT INTO notify_quota (day, total, critical, otp) VALUES (?, 1, ?, 0)
+export const countStmt = (db, day, level) => db.prepare(`INSERT INTO notify_quota (day, total, critical, otp) VALUES (?, 1, ?, 0)
   ON CONFLICT(day) DO UPDATE SET total = total + 1, critical = critical + excluded.critical`).bind(day, level === 'critical' ? 1 : 0);
 
 /* the next Cairo midnight after `now` (a new budget) */
