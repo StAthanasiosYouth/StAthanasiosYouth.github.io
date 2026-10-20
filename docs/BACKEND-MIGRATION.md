@@ -539,12 +539,84 @@ Usage at this scale is < 10% of every free limit. **No surprise bills:** Workers
 | **5 Registry + points + store + competitions runtime** | Data migration (dry run → freeze → copy → verify → flip; spread over days for write limits) | Public bursts and all those screens ~0.1–0.5 s; no `busy` | Balances/stock/codes verified equal |
 | **6 Competition authoring, seasons, push, route** | Push via Queues + cron; schedule; openrouteservice | Push no longer blocks; everything off Apps Script | Apps Script has no live callers |
 | **7 Retirement** | Remove `script.google.com` from config/CSP, undeploy, delete triggers, archive Sheets/Drive read-only, keep the project 90 days | — | §25 checklist |
-| 8 (optional) Custom domain | Whole site on Workers Static Assets | Instant new-slug previews | Only if wanted |
+| **8 Complete Admin UI/UX redesign** (after 7 / 7a and retirement) | Visual and interaction redesign of every Admin module on the finished backend. Spec: §22.1 | Clearer, faster admin work; no backend effect | §22.1 acceptance criteria |
+| Optional: custom domain (unnumbered; was "Phase 8") | Whole site on Workers Static Assets | Instant new-slug previews | Only if wanted; best done early (§18) |
 
 **Rules across all phases:**
 - **One writer per module at any moment.** No dual writes.
 - Each phase ships behind a switch.
 - Production is changed only at the phase's cutover step.
+
+### 22.1 Phase 8 — Complete Admin UI/UX redesign
+
+Decided 2026-10-20 (owner). No further Admin modules are planned, so all functional work and the Cloudflare migration finish first. The full visual redesign is done once, at the end, on a stable backend. Planning only: nothing is built until a separate execution approval.
+
+**Until Phase 8 (Phases 1–7):**
+- Build new functionality normally, **with the existing admin components only** (buttons, sheets, tabs, cards, chips). No new one-off visual patterns. This keeps Phase 8 a restyle of a few patterns instead of many.
+- Fix only **essential usability issues**: an issue that blocks a task, invites a wrong or destructive click, hides or truncates data, or blocks keyboard/screen-reader use. Everything else goes into the Phase 8 backlog (below).
+- Already known essential items (each still needs its own approval):
+  - native date/time fields truncated in the event editor sheet (`10/31/20`, `08:00 P!`);
+  - the handover list uses a plain-text «إلغاء» for a destructive void, the same word as the sheets' Cancel. Needs a distinct label (for example «إلغاء التسليم») and a confirm.
+- Phase 1.5 builds the **permission-aware navigation model** (which modules a user sees) as data/logic. Phase 8 only restyles it.
+- Phase 4 builds the **R2 media upload flow** functionally (direct upload, progress, errors). Phase 8 redesigns its presentation.
+- The **public (visitor) InstaPay/wallet payment step** stays in Phase 1 §4.7 (BOOKING-PHASE1-COMPLETION-PLAN). It is not Admin and is not deferred.
+
+**Dependencies:**
+- Hard: Phase 6 done (every Admin screen exists) and Phase 7a done (notification audit).
+- Preferred, as decided: Phase 7b retirement done. The admin then has a single transport (Worker), so the Apps Script call paths are gone from `admin-app.js` before its UI is reworked.
+- Not dependent on the optional custom domain.
+
+**Prerequisites (first step of Phase 8):**
+- Screenshot baselines of every Admin screen at 3 widths (phone 375, tablet 768, desktop 1440+), extending `admin/layout-check.js`.
+- A feature-parity inventory: every action per screen (add, edit, delete, save, export, approve, publish…), checked off again at the end.
+- The Phase 8 backlog collected during Phases 1–7.
+
+**Scope:**
+1. **Design system:** tokens for typography, spacing, radius, elevation and motion on the existing navy/gold identity (DESIGN.md); one icon set; cards; responsive grid; `prefers-reduced-motion` respected.
+2. **Action hierarchy:** primary / secondary / quiet / destructive buttons with consistent icons for Add, Edit, Delete, Save, Export, Approve; an in-app confirm dialog replacing native `confirm()` (32 calls today); an undo toast where the action is reversible.
+3. **Shell:** collapsible rail (icons-only / expanded, remembered per device), clearer grouping, spacing and active states; mobile dock and drawer behavior.
+4. **Branding:** the family logo replaces the decorative cross mark (`.brand__cross`; it is not an Add button, so no feature is lost); a Settings gear in the header replaces the «الإعدادات» rail item.
+5. **Layouts and editors:** wider content area (today ~790px on 1920px screens); three editor sizes by task: centered dialog (short forms, confirmations), wide two-column panel (servant, payment method, contact), full-page editor with a section index and a fixed save bar (events, pages, competitions); unsaved-changes guard; Ctrl+S / Esc / focus trap.
+6. **Controls:** brand-consistent dropdowns (`appearance: base-select` where supported, native fallback; a custom listbox only for options with icons); themed date/time fields; toggle rows instead of checkbox cards.
+7. **Media library:** grid that uses the width, readable titles instead of raw file names, lightbox preview, bulk select, upload queue and progress, loading/empty/error states.
+8. **Payment UI (Admin):** InstaPay mark per its brand guidelines, a generic wallet icon; payment-methods settings as cards with readable names (no raw `cash`/`instapay`/`wallet` keys) that save like every other editor.
+9. **Data screens:** finance and booking tables with tabular numerals and cards on mobile; long explanations moved into collapsible help; one numeral style per context.
+10. **Accessibility:** WCAG 2.2 AA contrast, focus order, labels, right-to-left icon mirroring, 44px touch targets.
+11. **Image or icon:** every image field that represents content (cover image, home card, page/section banner, link and contact tiles; not posters, galleries or proof uploads) offers a choice: «صورة» or «أيقونة».
+    - **Icon picker:** a curated, licensed SVG set in one stroke style, plus a small family set (cross, church, Bible, candle, Coptic motifs); search in Arabic and English, categories, recent picks; a live preview of the result at its real size; keyboard and touch friendly; full-screen sheet on mobile.
+    - **Display:** the icon is rendered as a branded tile wherever the image would appear (navy surface, gold glyph, the arch/hairline frame from DESIGN.md), scaled per slot (card, banner, list thumbnail, admin list row), with an optional accent from the existing tokens. No blurry raster fallback.
+    - **Data:** additive and backward compatible: an optional icon key next to the existing image field; image wins if both exist; old content renders unchanged. The public renderers (home cards, event/page headers) learn the icon tile in the same slice.
+    - **Rules:** the alt-text field is hidden for icons (the title is the label); share previews (OG) still need an image, so an icon-only item falls back to the site's default share image, and the editor says so; where an image is required today (the home card cover), an icon satisfies the requirement.
+12. **Smart form validation (every Admin form, desktop and mobile):**
+    - On save, validate first. If anything is missing or invalid: scroll to the **first** invalid field (smooth, or instant with reduced motion), focus it, highlight it (red border + icon), and show a clear inline message under the field saying what is wrong and how to fix it. Never jump to the top, and never show only a field name in a toast.
+    - Collapsed sections, tabs or steps that contain the invalid field open automatically. Fields inside a scrolled sheet scroll within that sheet.
+    - The save bar shows a short summary («٢ حقول محتاجة تتصلح») with next/previous links between invalid fields; a live region announces it for screen readers (`aria-invalid`, `aria-describedby`).
+    - Mobile: the scroll accounts for the fixed header, the save bar and the on-screen keyboard (`scroll-margin`, `visualViewport`), so the field and its message stay visible.
+    - Errors returned by the server are mapped to the same field when the response names one, and otherwise shown in the save bar; the user's input is never cleared. Each message clears as soon as the field becomes valid.
+    - Built once as a shared form layer used by every editor (same rules, same messages), not per form.
+
+**Order:** baselines + inventory → design system + action hierarchy + confirm dialog → shell + branding → controls + shared form validation → icon set + picker + public icon tile → editors per module (events/pages → servants/payment → content → competitions → points/store → settings) → media library → data screens → accessibility and real-device pass.
+Each module slice ships as its own commit and deploy; each prod deploy needs explicit owner approval.
+
+**Effort:** ~30–39 dev-days: ~25–32 for items 1–10 (the earlier split estimate of ~20–27, plus the screens added in Phases 1.5–6, minus the work no longer done twice), plus ~3–4 for the image-or-icon option (set, picker, public tile, data field) and ~2–3 for the shared form validation.
+
+**Risks:**
+- Regressions in the 20k-line `admin-app.js`. Mitigation: baselines, the parity inventory, one module per slice.
+- Usability debt while waiting. Mitigation: the essential-fix rule above.
+- Patterns drifting during Phases 1–7. Mitigation: the existing-components-only rule.
+- The Phase 7a real-device audit checks notification delivery, not visuals. Phase 8 runs its own real-device pass.
+- The icon option touches the public site, not only the Admin. Mitigation: additive field, image-first rule, public pages tested in the same slice, OG fallback.
+
+**Acceptance criteria:**
+- Every item of the parity inventory works as before (no lost functionality).
+- No native `confirm()` and no unstyled native dropdown left in the Admin.
+- Every screen passes the baseline review at 375 / 768 / 1440+ with no horizontal scroll and no truncated fields.
+- axe: no serious/critical issues on any screen; full keyboard path through every editor.
+- One button hierarchy and one icon set across all modules; destructive actions always confirmed and visually distinct.
+- Real-device pass on Android Chrome (installed app), the iOS home-screen app, and desktop Chrome/Edge.
+- Every content image field listed in item 11 offers «صورة / أيقونة»; a chosen icon shows as the branded tile in every slot where the image appeared, in the Admin and on the public site; existing content renders unchanged.
+- In every Admin form, saving with an invalid field brings that exact field into view (also with the on-screen keyboard open on a phone), focuses it and shows its inline message; no form scrolls to the top or reports errors only by field name.
+- Owner sign-off per module slice.
 
 ---
 
@@ -559,7 +631,8 @@ Usage at this scale is < 10% of every free limit. **No surprise bills:** Workers
 | 3 | Flip the module map back; Apps Script session code untouched until stable | minutes |
 | 4–6 | Frozen tabs + a **tested reverse export** (D1 → original Sheets columns) kept for 4 weeks per phase, rehearsed before cutover; then flip the map back | < 1 h |
 | 7 | Apps Script project kept (undeployed) 90 days; redeploy is possible, but only meaningful together with a reverse export | hours |
-| 8 | Remove the custom domain → github.io serves again (push re-subscription does not roll back) | minutes |
+| 8 | Static admin files: revert the slice's commit (GitHub Pages) | minutes |
+| Custom domain (optional) | Remove the custom domain → github.io serves again (push re-subscription does not roll back) | minutes |
 | Bad deploy | `wrangler rollback` to the previous Worker version | seconds |
 | Bad data | D1 Time Travel restore, or the nightly backup | minutes |
 
