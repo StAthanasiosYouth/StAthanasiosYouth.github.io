@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "v": "3ba97839f59e",
+  "v": "7758d71a99b9",
   "id": "evt-4011914c",
   "slug": "booking-test-temp",
   "kind": "trip",
@@ -9,7 +9,7 @@
   "shortTitle": "اختبار حجز",
   "summary": "اختبار داخلي مؤقت للنظام — مش فعالية حقيقية، متحجزش.",
   "body": "صفحة اختبار مؤقتة لنظام الحجز الجديد. هتتقفل خلال ساعات. مش فعالية حقيقية.",
-  "theme": "",
+  "theme": "azure",
   "cover": {
     "src": "media/2026/img-8ffd40eb.webp",
     "thumb": "media/2026/img-8ffd40eb-480.webp",
@@ -49,7 +49,7 @@
     "online": true,
     "opensAt": "",
     "closesAt": "2026-10-30T22:00",
-    "capacity": 2,
+    "capacity": 30,
     "showLeft": true,
     "showLeftBelow": 20,
     "perBookingMax": 2,
@@ -117,5 +117,5 @@
       }
     ]
   },
-  "publishedAt": "2026-10-20T05:16"
+  "publishedAt": "2026-10-20T06:20"
 }
