@@ -32,7 +32,7 @@ All three are additive and touch different tables, so applying `0011` before `00
 | 6 Gmail sender, quotas, summaries, templates | ✔ installed, **off** | `NOTIFY_EMAIL=0`; production Gmail consent pending (staging connected, Inbox test passed) |
 | 7 «إعدادات الإشعارات», «تنبيهاتي», «حالة النظام» | ✔ live | |
 | 8 Combined export + filters + PII grant | ✔ live | «التقرير المجمّع»; downloads audited; also live: the rolling-24h email budget |
-| 9 Stage-1 checks + staging rehearsal | ✔ staging rehearsal 58/58 (`worker/scripts/rehearsal.mjs`, 2026-10-21: + exact-record links) | real emails ✔ (Azure Crest: OTP, booking, admin alert, summary in the owner's Inbox); fix ceee106 and admin exact-record links live (main a26b359, Worker 22cbe8eb, rollback 2340727b); prod outbox empty; **pending: real-device push in production (router window, owner approval) — Step 9 not complete** |
+| 9 Stage-1 checks + staging rehearsal | ✔ **completed except one deferred test** (2026-10-21): staging rehearsal 58/58 (`worker/scripts/rehearsal.mjs`, incl. exact-record links); real emails ✔ (Azure Crest: OTP, booking, admin alert, summary in the owner's Inbox); real-device push #1 ✔ (B-QSSR5, app in the background: routed to the Primary only, delivered); the tap fallback it found is fixed (`admin/sw.js` allow-list, main 9f52775) | **deferred to Phase 6/7A:** real-device push with the app **closed** + tap opens the exact booking. Test #2 (B-NA4VS): the Worker routed it (one row, Primary only), Apps Script claimed it and acknowledged it as sent to FCM at 23:33:34 UTC, but nothing showed on the phone. The lost hop is the Apps Script → FCM → device bridge, which Phase 6 replaces (push on the Worker), so it is re-run there (Stage 2 matrix). Production switches restored to 0. Live: main 9f52775, Worker 22cbe8eb |
 | 10–11 Age eligibility, payment requests | planned | |
 
 Release 2026-10-20: Worker `44c932ae` (migration `0012`; same code as `e11a506e`, redeployed by CI), Apps Script API @51, site `main` `6d72366`.
@@ -384,6 +384,7 @@ Keep the current RTL design and components.
   - delivery monitoring shows all of it.
 
 **Stage 2: final project stage (after Phase 6, when push runs on the Worker; the gate before retirement in Phase 7).**
+- **Deferred from Phase 1.5 step 9:** an admin push with the installed app **closed**, and the tap opening the exact booking (`#open/booking/<id>`, `admin/sw.js`). Under the Apps Script bridge, test #2 (B-NA4VS) was acknowledged as sent but never shown on the phone.
 - **Real-device matrix:**
   - Android Chrome + installed app;
   - iOS 16.4+ home-screen app (web push needs it installed);
