@@ -529,13 +529,13 @@ export function bookingBook(exported, { from = '', to = '', today = '' } = {}) {
   const acct = [ACCOUNT_HEADERS];
   for (const sv of servants) {
     for (const m of sv.methods || []) {
-      acct.push([sv.name || sv.id, label(m.method), m.net || 0, m.held || 0, m.pendingCount || 0, m.pendingQuoted || 0, m.owed || 0, m.handedOver || 0, m.toHandOver || 0]);
+      acct.push([sv.name || sv.id, label(m.method), m.net || 0, m.held || 0, m.pendingCount || 0, m.pendingQuoted || 0, m.owed || 0, m.handedOver || 0, m.toHandOver || 0, m.unreconciled || 0]);
     }
-    if ((sv.methods || []).length) acct.push([(sv.name || sv.id) + ' — الإجمالي', '', sv.net || 0, sv.held || 0, '', sv.pendingQuoted || 0, sv.owed || 0, sv.handedOver || 0, sv.toHandOver || 0]);
+    if ((sv.methods || []).length) acct.push([(sv.name || sv.id) + ' — الإجمالي', '', sv.net || 0, sv.held || 0, '', sv.pendingQuoted || 0, sv.owed || 0, sv.handedOver || 0, sv.toHandOver || 0, sv.unreconciled || 0]);
   }
   if (acct.length > 1) {
     const t = summary.handovers || {};
-    acct.push(['', '', '', '', '', '', '', '', ''], ['الخدمة استلمت (تسليمات)', '', '', t.held || 0, '', '', '', t.total || 0, t.toHandOver || 0]);
+    acct.push(['', '', '', '', '', '', '', '', '', ''], ['الخدمة استلمت (تسليمات)', '', '', t.held || 0, '', '', '', t.total || 0, t.toHandOver || 0, (summary.overall && summary.overall.money && summary.overall.money.unreconciled) || 0]);
     sheets.splice(2, 0, sheet('حسابات الخدام', acct, [0, 1]));
   }
 
@@ -551,7 +551,7 @@ export function bookingBook(exported, { from = '', to = '', today = '' } = {}) {
   return { book: { sheets }, filename: bookingFilename(event.slug, today) };
 }
 
-export const ACCOUNT_HEADERS = ['الخادم', 'الطريقة', 'متأكد (صافي)', 'في عهدته', 'طلبات مستنية التأكيد', 'قيمتها (متوقع)', 'لسه على الناس', 'سلّم للخدمة', 'لسه معاه'];
+export const ACCOUNT_HEADERS = ['الخادم', 'الطريقة', 'متأكد (صافي)', 'في عهدته', 'طلبات مستنية التأكيد', 'قيمتها (متوقع)', 'لسه على الناس', 'سلّم للخدمة', 'لسه معاه', 'محتاج مراجعة (تحويل قديم)'];
 export const HANDOVER_HEADERS = ['رقم التسليم', 'النوع', 'الخادم', 'الطريقة', 'المبلغ', 'وقت التسليم', 'استلمها', 'سجّلها', 'ملغي؟', 'ملاحظة'];
 
 /*

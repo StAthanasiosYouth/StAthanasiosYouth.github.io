@@ -2101,8 +2101,9 @@
           tile('اتسلّم للخدمة', money(t.total || 0)),
           tile('لسه مع الخدام', money(t.toHandOver || 0), t.toHandOver > 0 ? 'danger' : ''),
           tile('لسه على الناس', money(m.balance || 0)),
-          tile('مستني التأكيد', money(servants.reduce(function (s, x) { return s + (x.pendingQuoted || 0); }, 0)))),
-        el('p', { class: 'field__hint', text: '«متأكد» = دفعات سجّلها أدمن. «في عهدته» = الكاش اللي استلمه + التحويلات اللي راحت على رقمه هو بس. «مستني التأكيد» = طلبات فيها إثبات لسه متراجعتش (متوقع، مش فلوس). «لسه معاه» = في عهدته − اللي سلّمه.' }),
+          tile('مستني التأكيد', money(servants.reduce(function (s, x) { return s + (x.pendingQuoted || 0); }, 0))),
+          m.unreconciled ? tile('محتاج مراجعة', money(m.unreconciled), 'danger') : null),
+        el('p', { class: 'field__hint', text: '«متأكد» = دفعات سجّلها أدمن. «في عهدته» = الكاش اللي استلمه + التحويلات اللي راحت على رقمه هو بس. «مستني التأكيد» = طلبات فيها إثبات لسه متراجعتش (متوقع، مش فلوس). «لسه معاه» = في عهدته − اللي سلّمه. «محتاج مراجعة» = تحويلات اتسجلت قبل ما نسجّل كانت رايحة على أنهي رقم: مش محسوبة على حد لحد ما تتراجع.' }),
         !one ? el('p', { class: 'note', text: 'المجمّع لكل الفعاليات. لتسجيل تسليم أو فتح الحجوزات ورا كل رقم اختار فعالية.' }) : null,
         // per event (combined view): one line each, a click narrows the page to it
         !one && (r.events || []).length > 1 ? el('ul', { class: 'book-log__list', 'data-finance-events': '' }, r.events.map(function (e) {
@@ -2134,7 +2135,7 @@
               return el('li', { 'data-method': mm.method },
                 el('strong', { text: label(mm.method) + ': ' }),
                 'متأكد ' + money(mm.net) + ' · في عهدته ' + money(mm.held) + ' · مستني التأكيد ' + money(mm.pendingQuoted) + ' (' + ar(mm.pendingCount) + ')' +
-                ' · لسه على الناس ' + money(mm.owed) + ' · سلّم ' + money(mm.handedOver) + ' · لسه معاه ' + money(mm.toHandOver) + ' ',
+                ' · لسه على الناس ' + money(mm.owed) + ' · سلّم ' + money(mm.handedOver) + ' · لسه معاه ' + money(mm.toHandOver) + (mm.unreconciled ? ' · محتاج مراجعة ' + money(mm.unreconciled) : '') + ' ',
                 one && (mm.bookingIds || []).length ? el('button', { class: 'btn btn--small btn--ghost', type: 'button', 'data-act': 'drill', onclick: function (e) { drill(mm.bookingIds, refs, e.currentTarget); } }, 'الحجوزات (' + ar(mm.bookingIds.length) + ')') : null,
                 refs);
             })));
@@ -2161,7 +2162,7 @@
           return el('li', {},
             el('button', { class: 'book-row__ref btn btn--small btn--ghost', type: 'button', dir: 'ltr', text: b.ref || bid, onclick: function () { openBooking(bid); } }), ' ', el('bdi', { text: b.name || '' }),
             ' — ' + ((K.STATUS[b.status] || {}).label || b.status || '') + ' · المطلوب ' + money(b.amountDue == null ? b.quotedTotal || 0 : b.amountDue) + ' · مدفوع ' + money(b.paid || 0) + (b.balance > 0 ? ' · باقي ' + money(b.balance) : ''),
-            pays.length ? el('small', { text: ' — ' + pays.map(function (p) { return (p.kind === 'refund' ? 'مرتجع ' : p.kind === 'void' ? 'إلغاء ' : '') + money(p.amount) + ' ' + wallText(p.receivedAt) + (p.custody === 'service' ? ' (لحساب الخدمة)' : '') + (p.voidedBy ? ' (اتلغت)' : ''); }).join('، ') }) : null);
+            pays.length ? el('small', { text: ' — ' + pays.map(function (p) { return (p.kind === 'refund' ? 'مرتجع ' : p.kind === 'void' ? 'إلغاء ' : '') + money(p.amount) + ' ' + wallText(p.receivedAt) + (p.custody === 'service' ? ' (لحساب الخدمة)' : p.custody === 'unknown' ? ' (محتاج مراجعة: مش معروف راح على أنهي رقم)' : '') + (p.voidedBy ? ' (اتلغت)' : ''); }).join('، ') }) : null);
         })));
       }).catch(function (error) { delete exportCache[id]; A.fail(error, box); });
     }
@@ -2188,19 +2189,10 @@
         actions: [{ label: 'سجّل التسليم', value: true, kind: 'primary' }, { label: 'رجوع', value: false, kind: 'ghost' }]
       }).then(function (ok) {
         if (!ok) return;
-        var send = function (force) {
-          var b = { servantId: sv.id, method: method.value, amount: K.amountOf(amount.value), handedAt: K.stamp(A.cairoNow()), receivedBy: by.value.trim(), note: note.value.trim() };
-          b.idemKey = keys.for(b);
-          if (force) b.force = true;
-          return W().call('POST', '/v1/admin/book/events/' + enc(finance.eventId) + '/handovers', b);
-        };
-        A.withBusy(button, send(false).catch(function (error) {
-          if (error && error.code === 'warn') {
-            return A.confirm({ title: 'المبلغ أكبر من اللي معاه', message: ((error.reply && error.reply.warnings) || []).map(function (w) { return w.message; }).join(' '), confirmLabel: 'سجّل برضه' })
-              .then(function (yes) { return yes ? send(true) : null; });
-          }
-          throw error;
-        })).then(function (done) {
+        // never more than he actually holds: the Worker refuses it ('over'), no override
+        var b = { servantId: sv.id, method: method.value, amount: K.amountOf(amount.value), handedAt: K.stamp(A.cairoNow()), receivedBy: by.value.trim(), note: note.value.trim() };
+        b.idemKey = keys.for(b);
+        A.withBusy(button, W().call('POST', '/v1/admin/book/events/' + enc(finance.eventId) + '/handovers', b)).then(function (done) {
           if (done) { A.toast('اتسجل التسليم ✓'); reload(); }
         }).catch(function (error) { A.fail(error, box); });
       });

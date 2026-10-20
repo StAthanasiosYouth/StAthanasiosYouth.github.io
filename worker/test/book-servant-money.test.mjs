@@ -29,9 +29,14 @@ test('servant money: cash vs online, owed, handover, still to hand over; a void 
   const pays = (await w.admin('GET', '/v1/admin/book/export?eventId=evt-alex01')).body.payments;
   assert.deepEqual(pays.filter(p => p.servantId === 'srv-aaaa1111').map(p => p.custody).sort(), ['servant', 'service']);
 
-  // more than he holds → warn; then 1200 handed over
-  const over = await w.admin('POST', H, { servantId: 'srv-aaaa1111', amount: 2000, handedAt: msStamp(Date.now() - 1000), idemKey: w.key('h') });
-  assert.equal(over.body.code, 'warn');
+  // more than he actually holds → refused server-side, force or not; per method too (the 500 transfer isn't his)
+  for (const extra of [{}, { force: true }]) {
+    const over = await w.admin('POST', H, { servantId: 'srv-aaaa1111', amount: 1001, handedAt: msStamp(Date.now() - 1000), idemKey: w.key('h'), ...extra });
+    assert.deepEqual([over.status, over.body.code], [409, 'over']);
+  }
+  const notHis = await w.admin('POST', H, { servantId: 'srv-aaaa1111', amount: 100, method: 'transfer', handedAt: msStamp(Date.now() - 1000), idemKey: w.key('h') });
+  assert.equal(notHis.body.code, 'over');
+  assert.equal((await w.db.prepare('SELECT COUNT(*) AS n FROM handovers').first()).n, 0);
   const key = w.key('h');
   r = await w.admin('POST', H, { servantId: 'srv-aaaa1111', amount: 800, method: 'cash', handedAt: msStamp(Date.now() - 1000), receivedBy: 'أمين الصندوق', idemKey: key });
   assert.equal(r.status, 200, JSON.stringify(r.body));
@@ -92,4 +97,25 @@ test('finance: one event or all of them added up (same summary), servant × meth
 
   const one = await w.admin('GET', '/v1/admin/book/finance?eventId=evt-second01');
   assert.equal(one.body.servants.find(s => s.id === 'srv-aaaa1111').toHandOver, 700);
+});
+
+test('legacy rows: custody is never re-derived from today\'s numbers — an unstamped transfer is «unknown» (to reconcile), not held; owed (confirmed) apart from pending', async () => {
+  const w = await bookWorld();
+  const a = await w.admin('POST', '/v1/admin/book/bookings', { eventId: 'evt-alex01', requestKey: w.key('a'), name: 'أ ب', phone: phone(), counts: { applicant: 1, adult: 1 }, servantId: 'srv-aaaa1111', method: 'cash',
+    confirm: { overridePay: true, reason: 'مقدم', payments: [pay({ amount: 1000 }), pay({ amount: 500, method: 'transfer', receivedAt: msStamp(Date.now() - 120000) })] } });
+  assert.equal(a.status, 200, JSON.stringify(a.body));
+  // as if recorded before migration 0007; and the servant's number approved only today
+  await w.db.prepare('UPDATE payments SET custody = NULL').run();
+  await w.db.prepare("INSERT INTO pay_dest (servant_id, method, number, name, source, approved_ms, approved_by, synced_ms) VALUES ('srv-aaaa1111', 'transfer', '01012345678', '', 'own', 1, 'p', 1)").run();
+  await w.submit({ phone: phone() });        // pending request (quoted 3000): expected, never owed
+  const r = await w.admin('GET', H);
+  const mina = r.body.servants.find(s => s.id === 'srv-aaaa1111');
+  const t = mina.methods.find(m => m.method === 'transfer');
+  assert.deepEqual([t.net, t.held, t.unreconciled, t.toHandOver], [500, 0, 500, 0]);
+  assert.deepEqual([mina.held, mina.unreconciled, mina.owed], [1000, 500, 1500], 'owed = the confirmed booking only');
+  assert.deepEqual([t.pendingCount, t.pendingQuoted, t.owed], [1, 3000, 0], 'pending = expected, kept apart from owed');
+  const sum = (await w.admin('GET', '/v1/admin/book/summary?eventId=evt-alex01')).body.overall;
+  assert.deepEqual([sum.money.balance, sum.money.unreconciled, sum.pending.quoted], [1500, 500, 3000]);
+  const pays = (await w.admin('GET', '/v1/admin/book/export?eventId=evt-alex01')).body.payments;
+  assert.deepEqual(pays.map(p => p.custody).sort(), ['servant', 'unknown']);
 });

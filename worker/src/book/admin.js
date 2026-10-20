@@ -749,8 +749,7 @@ async function eventRows(env, eventId) {
     env.DB.prepare('SELECT * FROM payments WHERE event_id = ? ORDER BY received_ms, recorded_ms').bind(eventId),
     env.DB.prepare('SELECT * FROM handovers WHERE event_id = ? ORDER BY handed_ms, recorded_ms').bind(eventId)
   ]);
-  const dests = new Set((await env.DB.prepare('SELECT servant_id, method FROM pay_dest').all()).results.map(d => d.servant_id + '|' + d.method));
-  return { bookings: bs.results, payments: ps.results, handovers: hs.results, dests };
+  return { bookings: bs.results, payments: ps.results, handovers: hs.results };
 }
 
 const handoverOut = h => ({
@@ -761,7 +760,9 @@ const handoverOut = h => ({
 
 /*
  * POST /v1/admin/book/events/:id/handovers { servantId, amount, handedAt, receivedBy?, note?, idemKey, force? }
- * A servant hands money over to the service. More than they still hold → 'warn' (force to record anyway).
+ * A servant hands money over to the service. Never more than they actually hold
+ * (per method when one is given) → 'over'; no override. The insert is guarded by
+ * the servant's handed total as read, so two admins at once can't both pass.
  */
 export async function adminHandoverAdd(ctx) {
   const env = ctx.env;
@@ -779,23 +780,27 @@ export async function adminHandoverAdd(ctx) {
   if (!handedMs || handedMs > now + RECEIVED_SKEW_MS) throw invalid('handedAt');
   const method = String(body.method || '');
   if (method && !((event.booking && event.booking.methods) || []).some(m => m.key === method)) throw invalid('method');
-  const { bookings, payments, handovers, dests } = await eventRows(env, event.id);
-  const s = summary(event, bookings, payments, event.booking.servants || [], {}, now, handovers, dests).servants.find(x => x.id === servant.id) || { toHandOver: 0, methods: [] };
+  const { bookings, payments, handovers } = await eventRows(env, event.id);
+  const s = summary(event, bookings, payments, event.booking.servants || [], {}, now, handovers).servants.find(x => x.id === servant.id) || { toHandOver: 0, methods: [] };
   const holds = method ? ((s.methods.find(m => m.method === method) || {}).toHandOver || 0) : s.toHandOver;
-  if (amount > holds && body.force !== true) {
-    throw new ApiError('warn', 'handover', { warnings: [{ code: 'over', message: `المبلغ أكبر من اللي مع الخادم${method ? ' بالطريقة دي' : ''} (${Math.max(0, holds)} ج).` }] });
-  }
+  if (amount > holds) throw new ApiError('over', 'handover', { field: 'amount', holds: Math.max(0, holds), method });
+  const handedSeen = handovers.filter(h => h.kind === 'handover' && !h.voided_by && h.servant_id === servant.id).reduce((t, h) => t + h.amount, 0);
   const id = randomId('hnd-', 6);
   const at = cairoText(now);
   await retry(() => env.DB.batch([
     env.DB.prepare(`INSERT INTO handovers (id, event_id, kind, servant_id, servant_name, amount, handed_at, handed_ms, received_by, note, recorded_at, recorded_ms, recorded_by, recorded_name, idem_key, method)
-      VALUES (?, ?, 'handover', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(idem_key) DO NOTHING`).bind(
+      SELECT ?, ?, 'handover', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      WHERE (SELECT COALESCE(SUM(amount), 0) FROM handovers WHERE event_id = ? AND servant_id = ? AND kind = 'handover' AND voided_by IS NULL) = ?
+      ON CONFLICT(idem_key) DO NOTHING`).bind(
       id, event.id, servant.id, servant.name, amount, msStamp(handedMs).replace('T', ' '), handedMs, cleanText(body.receivedBy, 60) || null,
-      cleanText(body.note, LIMITS.note) || null, at, now, ctx.actor.email, ctx.actor.name || null, body.idemKey, method),
+      cleanText(body.note, LIMITS.note) || null, at, now, ctx.actor.email, ctx.actor.name || null, body.idemKey, method,
+      event.id, servant.id, handedSeen),
     env.DB.prepare(`INSERT INTO activity (id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary)
       SELECT ?, ?, ?, ?, ?, 'handover.add', 'event', ?, ?, ? WHERE EXISTS (SELECT 1 FROM handovers WHERE id = ?)`).bind(
       randomId('act-'), now, at, ctx.actor.email, ctx.actor.name || null, event.id, event.title.slice(0, 80), servant.name + ' سلّم ' + amount + ' ج', id)
   ]));
+  const wrote = await env.DB.prepare('SELECT id FROM handovers WHERE id = ? OR idem_key = ?').bind(id, body.idemKey).first();
+  if (!wrote) throw new ApiError('conflict', 'handover');
   return adminHandovers(ctx);
 }
 
@@ -828,21 +833,21 @@ export async function adminHandoverVoid(ctx) {
 /* GET /v1/admin/book/events/:id/handovers → { handovers, servants (accounting) } */
 export async function adminHandovers(ctx) {
   const event = await eventById(ctx, ctx.params.id);
-  const { bookings, payments, handovers, dests } = await eventRows(ctx.env, event.id);
-  const s = summary(event, bookings, payments, (event.booking && event.booking.servants) || [], {}, Date.now(), handovers, dests);
+  const { bookings, payments, handovers } = await eventRows(ctx.env, event.id);
+  const s = summary(event, bookings, payments, (event.booking && event.booking.servants) || [], {}, Date.now(), handovers);
   return { handovers: handovers.map(handoverOut), servants: s.servants, totals: s.handovers };
 }
 
 export async function adminSummary(ctx) {
   const event = await eventById(ctx, ctx.url.searchParams.get('eventId'));
-  const { bookings, payments, handovers, dests } = await eventRows(ctx.env, event.id);
-  return summary(event, bookings, payments, (event.booking && event.booking.servants) || [], rangeOf(ctx.url.searchParams), Date.now(), handovers, dests);
+  const { bookings, payments, handovers } = await eventRows(ctx.env, event.id);
+  return summary(event, bookings, payments, (event.booking && event.booking.servants) || [], rangeOf(ctx.url.searchParams), Date.now(), handovers);
 }
 
 export async function adminExport(ctx) {
   const event = await eventById(ctx, ctx.url.searchParams.get('eventId'));
   const range = rangeOf(ctx.url.searchParams);
-  const { bookings, payments, handovers, dests } = await eventRows(ctx.env, event.id);
+  const { bookings, payments, handovers } = await eventRows(ctx.env, event.id);
   const now = Date.now();
   const bk = event.booking || {};
   const byBooking = new Map();
@@ -860,12 +865,12 @@ export async function adminExport(ctx) {
     })),
     payments: payments.filter(p => (range.from == null || p.received_ms >= range.from) && (range.to == null || p.received_ms <= range.to)).map(p => ({
       id: p.id, bookingId: p.booking_id, ref: refs.get(p.booking_id) ? refs.get(p.booking_id).ref : '', name: refs.get(p.booking_id) ? refs.get(p.booking_id).name : '',
-      kind: p.kind, amount: p.amount, method: p.method, custody: custodyOf(p, bk, dests), servantId: p.servant_id, servantName: p.servant_name, receivedAt: p.received_at,
+      kind: p.kind, amount: p.amount, method: p.method, custody: custodyOf(p, bk), servantId: p.servant_id, servantName: p.servant_name, receivedAt: p.received_at,
       recordedAt: p.recorded_at, recordedBy: p.recorded_name || p.recorded_by, voided: !!p.voided_by || p.kind === 'void',
       voidReason: p.kind === 'void' ? p.note : (p.voided_by ? (payments.find(v => v.id === p.voided_by) || {}).note || '' : ''), hasProof: withProof.has(p.id)
     })),
     servants: (bk.servants || []).map(s => ({ id: s.id, name: s.name, methods: s.methods })),
-    summary: summary(event, bookings, payments, bk.servants || [], range, now, handovers, dests),
+    summary: summary(event, bookings, payments, bk.servants || [], range, now, handovers),
     handovers: handovers.map(handoverOut)
   };
 }
@@ -885,8 +890,8 @@ export async function proofTarget(ctx, bookingId) {
  * booking events. Read only. Phase 1.5 will narrow it to a servant's own
  * events / records by their permissions; for now any admin (the allowlist).
  */
-const SUM_FIELDS = ['payments', 'received', 'refunded', 'net', 'bookings', 'chosenBy', 'cash', 'online', 'held', 'owed', 'handedOver', 'toHandOver', 'pendingQuoted'];
-const METHOD_FIELDS = ['received', 'refunded', 'net', 'held', 'pendingCount', 'pendingQuoted', 'owed', 'handedOver', 'toHandOver'];
+const SUM_FIELDS = ['payments', 'received', 'refunded', 'net', 'bookings', 'chosenBy', 'cash', 'online', 'held', 'owed', 'handedOver', 'toHandOver', 'pendingQuoted', 'unreconciled'];
+const METHOD_FIELDS = ['received', 'refunded', 'net', 'held', 'pendingCount', 'pendingQuoted', 'owed', 'handedOver', 'toHandOver', 'unreconciled'];
 
 export async function adminFinance(ctx) {
   const want = String(ctx.url.searchParams.get('eventId') || 'all');
@@ -899,8 +904,8 @@ export async function adminFinance(ctx) {
   const money = { due: 0, received: 0, refunded: 0, net: 0, balance: 0, refundsOwed: 0 };
   const totals = { total: 0, held: 0, toHandOver: 0 };
   for (const event of events) {
-    const { bookings, payments, handovers, dests } = await eventRows(ctx.env, event.id);
-    const s = summary(event, bookings, payments, (event.booking && event.booking.servants) || [], {}, now, handovers, dests);
+    const { bookings, payments, handovers } = await eventRows(ctx.env, event.id);
+    const s = summary(event, bookings, payments, (event.booking && event.booking.servants) || [], {}, now, handovers);
     perEvent.push({ id: event.id, slug: event.slug, title: event.title, startAt: event.startAt, money: s.overall.money, bookings: s.overall.bookings, totals: s.handovers, servants: s.servants });
     Object.keys(money).forEach(k => { money[k] += s.overall.money[k] || 0; });
     Object.keys(totals).forEach(k => { totals[k] += s.handovers[k] || 0; });

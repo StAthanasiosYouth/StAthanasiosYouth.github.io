@@ -268,6 +268,6 @@ test('detailed report: «حسابات الخدام» (servant × method, custody
   assert.ok(names.includes('التسليمات'));
   const acct = book.sheets[2].rows;
   assert.deepEqual(acct[0], K.ACCOUNT_HEADERS);
-  assert.deepEqual(acct[1].slice(2), ['1000', '1000', '1', '3000', '500', '800', '200']);
+  assert.deepEqual(acct[1].slice(2), ['1000', '1000', '1', '3000', '500', '800', '200', '0']);
   assert.deepEqual(book.sheets.find(s => s.name === 'التسليمات').rows[1].slice(0, 5), ['hnd-1', 'تسليم', 'مينا عادل', 'كاش', '800']);
 });

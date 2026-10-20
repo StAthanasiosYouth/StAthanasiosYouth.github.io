@@ -259,16 +259,17 @@ export function newRef() {
  * Custody of a payment: who actually holds the money. Cash: the servant who took
  * it. A transfer (an online method): the servant only when it went to THEIR OWN
  * approved number (pay_dest), else the service. Stamped on the row when it is
- * recorded (payments.custody); an older row is worked out the same way now.
+ * recorded (payments.custody) and never re-derived: a row from before the stamp
+ * is cash → the servant, a transfer → 'unknown' (to reconcile), because today's
+ * numbers say nothing about where an old transfer went.
  */
-export function custodyOf(p, booking, dests) {
+export function custodyOf(p, booking) {
   if (p.custody === 'servant' || p.custody === 'service') return p.custody;
   const m = (booking.methods || []).find(x => x.key === p.method);
-  if (!methodOnline(m)) return 'servant';
-  return dests && dests.has((p.servant_id || '') + '|' + (p.method || '')) ? 'servant' : 'service';
+  return methodOnline(m) ? 'unknown' : 'servant';
 }
 
-export function summary(event, bookings, payments, servants, { from = null, to = null } = {}, now = Date.now(), handovers = [], dests = null) {
+export function summary(event, bookings, payments, servants, { from = null, to = null } = {}, now = Date.now(), handovers = []) {
   const booking = event.booking || {};
   const inRange = p => (from == null || p.received_ms >= from) && (to == null || p.received_ms <= to);
   const byBooking = new Map();
@@ -283,7 +284,7 @@ export function summary(event, bookings, payments, servants, { from = null, to =
   const cell = new Map();
   const cellOf = (sid, method) => {
     const k = (sid || '') + '|' + (method || '');
-    if (!cell.has(k)) cell.set(k, { method: method || '', received: 0, refunded: 0, net: 0, held: 0, pendingCount: 0, pendingQuoted: 0, owed: 0, handedOver: 0, bookings: new Set() });
+    if (!cell.has(k)) cell.set(k, { method: method || '', received: 0, refunded: 0, net: 0, held: 0, pendingCount: 0, pendingQuoted: 0, owed: 0, handedOver: 0, unreconciled: 0, bookings: new Set() });
     return cell.get(k);
   };
 
@@ -314,7 +315,8 @@ export function summary(event, bookings, payments, servants, { from = null, to =
     if (d.overdue) payStatus.overdue++;
   }
 
-  const money = { due, received: 0, refunded: 0, net: 0, balance, refundsOwed, byMethod: {} };
+  // balance = still owed on CONFIRMED/decided bookings; pending requests are only in overall.pending (expected, not owed)
+  const money = { due, received: 0, refunded: 0, net: 0, balance, refundsOwed, unreconciled: 0, byMethod: {} };
   const perServant = new Map((servants || []).map(s => [s.id, { id: s.id, name: s.name, active: s.active !== false, payments: 0, received: 0, refunded: 0, net: 0, byMethod: {}, bookingIds: new Set(), chosenBy: 0 }]));
   const servantRow = (id, name) => {
     if (!perServant.has(id)) perServant.set(id, { id, name: name || id, active: false, payments: 0, received: 0, refunded: 0, net: 0, byMethod: {}, bookingIds: new Set(), chosenBy: 0 });
@@ -336,9 +338,15 @@ export function summary(event, bookings, payments, servants, { from = null, to =
     const c = cellOf(p.servant_id, p.method);
     if (sign > 0) c.received += p.amount; else c.refunded += p.amount;
     c.net += sign * p.amount;
-    if (custodyOf(p, booking, dests) === 'servant') {
+    const custody = custodyOf(p, booking);
+    if (custody === 'servant') {
       c.held += sign * p.amount;
       s.held = (s.held || 0) + sign * p.amount;
+    } else if (custody === 'unknown') {
+      // legacy transfer: not counted as held until reconciled
+      c.unreconciled += sign * p.amount;
+      s.unreconciled = (s.unreconciled || 0) + sign * p.amount;
+      money.unreconciled += sign * p.amount;
     }
     c.bookings.add(p.booking_id);
   }
@@ -374,14 +382,14 @@ export function summary(event, bookings, payments, servants, { from = null, to =
       const held = s.held || 0;
       const methods = [...cell.values()].filter((c, i) => [...cell.keys()][i].startsWith(s.id + '|')).map(c => ({
         method: c.method, received: c.received, refunded: c.refunded, net: c.net, held: c.held,
-        pendingCount: c.pendingCount, pendingQuoted: c.pendingQuoted, owed: c.owed, handedOver: c.handedOver, toHandOver: c.held - c.handedOver,
+        pendingCount: c.pendingCount, pendingQuoted: c.pendingQuoted, owed: c.owed, handedOver: c.handedOver, toHandOver: c.held - c.handedOver, unreconciled: c.unreconciled,
         bookingIds: [...c.bookings]
       }));
       return {
         id: s.id, name: s.name, active: s.active, payments: s.payments, received: s.received, refunded: s.refunded, net: s.net, byMethod: s.byMethod,
         bookings: s.bookingIds.size, chosenBy: s.chosenBy,
         // verified money (recorded payments) by kind, and CUSTODY: only what the servant actually holds is theirs to hand over
-        cash, online: s.net - cash, held, owed: owedBy.get(s.id) || 0, handedOver, toHandOver: held - handedOver,
+        cash, online: s.net - cash, held, owed: owedBy.get(s.id) || 0, handedOver, toHandOver: held - handedOver, unreconciled: s.unreconciled || 0,
         pendingQuoted: methods.reduce((t, m) => t + m.pendingQuoted, 0),
         methods
       };
