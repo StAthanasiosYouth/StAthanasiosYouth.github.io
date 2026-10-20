@@ -18648,6 +18648,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       if (support === 'denied') {
         return el('p', { class: 'note note--warn', text: 'الإشعارات مقفولة للموقع ده من إعدادات المتصفح. افتحها من إعدادات الموقع (القفل جنب العنوان، أو معلومات التطبيق ← الإشعارات) وارجع هنا.' });
       }
+      // not known yet on this device (first opening): say so, never «not on» with a button that asks again
+      if (!status) {
+        return el('p', { class: 'setup__text', role: 'status', text: 'بنتأكد من الإشعارات على الجهاز ده…' });
+      }
 
       return el('div', {},
         el('p', { class: on ? 'note note--ok' : 'setup__text', text: on
@@ -18679,7 +18683,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       var nextInstall = !install.done;
       var nextPush = install.done && !pushOn;
 
-      progress.textContent = done === 3 ? 'جاهز ✓' : digits(done) + ' من ٣';
+      progress.textContent = done === 3 ? 'جاهز ✓' : !status && install.done ? 'لحظة…' : digits(done) + ' من ٣';
       progress.className = 'chip' + (done === 3 ? ' chip--ok' : ' chip--gold');
 
       A.fill(steps,
@@ -18727,6 +18731,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           draw();
         }).catch(function (error) {
           A.fail(error, box);
+          // couldn't ask: keep what this device showed last; else offer the button again (no endless «بنتأكد»)
+          if (!status) { status = { on: false }; draw(); }
         });
 
       return Promise.all([installing, pushing]);
@@ -18751,6 +18757,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     card.classList.add('card--app');
     card.id = 'app-setup';
     draw();
+    // this browser's own quick answer first (permission + subscription), then the full check
+    if (!status && app.push.quickStatus && app.push.support() === 'ok') {
+      app.push.quickStatus().then(function (quick) { if (quick && !status) { status = quick; draw(); } });
+    }
     refresh();
 
     return card;

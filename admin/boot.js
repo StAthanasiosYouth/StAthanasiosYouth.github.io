@@ -2172,6 +2172,20 @@
             return result;
           });
         },
+        /*
+         * A first answer in milliseconds, from this browser alone (no server, nothing stored):
+         * notifications allowed + a push subscription on the admin worker → { on: true, quick: true };
+         * anything else → null («بنتأكد…» until status() answers). status() always has the last word.
+         */
+        quickStatus: function () {
+          if (lastPush) return Promise.resolve(lastPush);
+          if (!window.Notification || window.Notification.permission !== 'granted' || !('serviceWorker' in navigator)) return Promise.resolve(null);
+          return navigator.serviceWorker.getRegistration('./').then(function (reg) {
+            return reg && reg.pushManager ? reg.pushManager.getSubscription() : null;
+          }).then(function (sub) {
+            return sub ? { on: true, quick: true } : null;
+          }, function () { return null; });
+        },
         /* the last known state, for an instant first draw (then status() confirms it) */
         lastStatus: function () { return lastPush; },
         /* must be called inside the tap: the permission prompt opens first */
