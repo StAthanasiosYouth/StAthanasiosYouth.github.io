@@ -78,6 +78,15 @@ pushes). The first tick after switching on stamps `NOTIFY_SINCE` and marks older
 Pushes: claimed by Apps Script, acknowledged, retried with backoff, dead after 5 → a critical `notify.failed` row.
 Live check: `node scripts/notify-check.mjs` (staging, ~3 min).
 
+**Email (Phase 1.5 step 6, `src/notify/gmail.js`, `email.js`):** Gmail API as `athanasius.youth.safaga@gmail.com`, scope
+`gmail.send` only. Secrets `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` (both envs), put by the owner with
+`node scripts/gmail-consent.mjs staging|production` (consent screen «In production»; re-run after a password change).
+Switch `NOTIFY_EMAIL` (default `0`). The minute cron leases due rows → queue job `notify.email`. Budget per Cairo day
+(`notify_quota`): `MAIL_DAILY_TARGET` 400, `MAIL_ADMIN_BUDGET` 150, `MAIL_RESERVE_CRITICAL` 50, `MAIL_RESERVE_OTP` 50; short →
+routine/important into the daily summary (`NOTIFY_SUMMARY_TIME` 21:00), critical → `deferred_quota` (never expires).
+Retries with backoff, dead after 5 → critical `notify.failed` (push). Hourly token health → `GMAIL_HEALTH`; broken → one
+critical `gmail.token` push.
+
 **Unified «سجل النشاط»:** `GET /v1/admin/activity?view=log&limit&before&actor&family&section&from&to&id` returns the
 Worker's rows and the forwarded Apps Script rows together, in the shape of Apps Script `apiActivity`
 (`view=log` hides diagnostics / feeds / syncs). Forwarding: `apps-script/WorkerSync.gs activityForward_` (history once,

@@ -11,12 +11,18 @@
 import { randomId } from './lib/hash.js';
 import { logLine } from './lib/log.js';
 import { activityStmt } from './lib/activity.js';
+import { sendRows } from './notify/email.js';
 
 export const JOB_TYPES = {
   // diagnostics: proves enqueue → consume → D1 write end to end
   async 'diag.ping'(env, payload) {
     const ref = String(payload.ref || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 30);
     await activityStmt(env.DB, { id: 'act-q' + ref, orIgnore: true, actor: 'system', action: 'diag.queue', summary: 'queue round trip' }).run();
+  },
+  // leased email rows (notify/tick.js): each row records its own result, so the job never retries
+  async 'notify.email'(env, payload) {
+    const ids = Array.isArray(payload.ids) ? payload.ids.filter(id => /^ntf-[0-9a-f]{6,}$/.test(String(id))).slice(0, 20) : [];
+    await sendRows(env, ids);
   }
 };
 
