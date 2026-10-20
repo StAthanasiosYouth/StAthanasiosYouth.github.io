@@ -141,6 +141,12 @@ test('admin/sw.js: an admin push becomes an Arabic RTL notification; links only 
     '/admin/#activity': '/admin/#activity',
     '/admin/#open/settings': '/admin/#open/settings',
     '/admin/#open/news/news-ab12cd34': '/admin/#open/news/news-ab12cd34',
+    // the exact records of admin alerts (docs/EMAIL-DEEP-LINKS.md)
+    '/admin/#open/booking/bkg-fcaa44d738df': '/admin/#open/booking/bkg-fcaa44d738df',
+    '/admin/#open/payments/bkg-fcaa44d738df': '/admin/#open/payments/bkg-fcaa44d738df',
+    '/admin/#open/account/acc-0123456789abcdef': '/admin/#open/account/acc-0123456789abcdef',
+    '/admin/#open/booking/B-QSSR5': '/admin/',
+    '/admin/#open/account/someone@example.com': '/admin/',
     '/#news/news-ab12cd34': '/admin/',
     '/admin/#open/news/<script>': '/admin/',
     'https://evil.example/admin/#activity': '/admin/',
