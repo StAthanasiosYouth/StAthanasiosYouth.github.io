@@ -2293,6 +2293,16 @@ ol {
   color: var(--gold-soft);
 }
 
+.footer__links {
+  margin-top: 6px;
+}
+
+.footer__links a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 
 /* ---------- toast ---------- */
 

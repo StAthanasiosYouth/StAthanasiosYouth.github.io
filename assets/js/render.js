@@ -850,7 +850,13 @@ function footer(content) {
   return h('footer', { class: 'footer', 'data-area': 'footer' },
     iconNode('cross', 'footer__cross'),
     h('p', { class: 'footer__name' }, content.site.name),
-    content.location ? h('p', {}, content.location.name) : null
+    content.location ? h('p', {}, content.location.name) : null,
+    // the legal pages (Google sign-in / Gmail need the privacy policy linked from the home page)
+    h('p', { class: 'footer__links' },
+      h('a', { href: 'privacy/' }, 'سياسة الخصوصية'),
+      ' · ',
+      h('a', { href: 'terms/' }, 'شروط الاستخدام')
+    )
   );
 
 }
