@@ -32,7 +32,7 @@ All three are additive and touch different tables, so applying `0011` before `00
 | 6 Gmail sender, quotas, summaries, templates | ✔ installed, **off** | `NOTIFY_EMAIL=0`; production Gmail consent pending (staging connected, Inbox test passed) |
 | 7 «إعدادات الإشعارات», «تنبيهاتي», «حالة النظام» | ✔ live | |
 | 8 Combined export + filters + PII grant | ✔ live | «التقرير المجمّع»; downloads audited; also live: the rolling-24h email budget |
-| 9 Stage-1 checks + staging rehearsal | ✔ staging rehearsal 57/57 (`worker/scripts/rehearsal.mjs`) | real emails ✔ (critical alert, booking notice, daily summary: all in the owner's Inbox, 2026-10-20); fix ceee106 live in the production Worker 75348989 (rollback dee47eed), not yet on main; pending: real-device push in production (router window) |
+| 9 Stage-1 checks + staging rehearsal | ✔ staging rehearsal 58/58 (`worker/scripts/rehearsal.mjs`, 2026-10-21: + exact-record links) | real emails ✔ (Azure Crest: OTP, booking, admin alert, summary in the owner's Inbox); fix ceee106 and admin exact-record links live (main a26b359, Worker 22cbe8eb, rollback 2340727b); prod outbox empty; **pending: real-device push in production (router window, owner approval) — Step 9 not complete** |
 | 10–11 Age eligibility, payment requests | planned | |
 
 Release 2026-10-20: Worker `44c932ae` (migration `0012`; same code as `e11a506e`, redeployed by CI), Apps Script API @51, site `main` `6d72366`.

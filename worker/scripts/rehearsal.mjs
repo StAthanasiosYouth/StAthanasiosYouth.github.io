@@ -173,6 +173,8 @@ try {
   const claim1 = await signed('/v1/sync/notify-claim', { v: 1, ack: [] });
   const items = (claim1.body && claim1.body.items) || [];
   check('claim: items handed out, critical first, with real messages', items.length >= 4 && items[0].level === 'critical' && items.every(i => i.title && i.url.startsWith('/admin/')), items.map(i => i.level + ' ' + i.title));
+  // docs/EMAIL-DEEP-LINKS.md: booking / payment items open their exact record, never an email in a link
+  check('claim: booking and payment items open the exact record', items.filter(i => /حجز|دفع/.test(i.title)).every(i => /^\/admin\/#open\/(booking|payments|bookings)\/(bkg|evt)-[a-z0-9]+$/.test(i.url)) && items.every(i => !/@/.test(i.url)), items.map(i => i.url));
   const victim = items.find(i => /نشر/.test(i.title)) || items[items.length - 1];
   await signed('/v1/sync/notify-claim', { v: 1, ack: items.map(i => ({ id: i.id, claim: i.claim, ok: i.id !== victim.id, reason: i.id === victim.id ? 'error' : 'rehearsal' })) });
   for (let i = 0; i < 4; i++) {
