@@ -6,6 +6,7 @@
 import { logLine } from './lib/log.js';
 import { sweepProofs } from './lib/proofs.js';
 import { activityStmt } from './lib/activity.js';
+import { notifyTick } from './notify/tick.js';
 
 const DAY = 24 * 3600 * 1000;
 export const RETENTION = {
@@ -15,7 +16,8 @@ export const RETENTION = {
   activityMs: 365 * DAY,
   activityRows: 5250,
   phoneMs: 365 * DAY,           // EVENTS.md §10: phones blanked 12 months after the event ends
-  locksMs: DAY                  // edit locks long expired (book/locks.js)
+  locksMs: DAY,                 // edit locks long expired (book/locks.js)
+  outboxMs: 30 * DAY            // §4.4: the outbox is kept 30 days (a critical row never expires unsent)
 };
 
 export async function housekeeping(env, now = Date.now()) {
@@ -25,7 +27,8 @@ export async function housekeeping(env, now = Date.now()) {
     env.DB.prepare('DELETE FROM idempotency WHERE created_at < ?').bind(now - RETENTION.idempotencyMs),
     env.DB.prepare('DELETE FROM api_log WHERE at < ?').bind(now - RETENTION.apiLogMs),
     env.DB.prepare('DELETE FROM activity WHERE at < ?').bind(now - RETENTION.activityMs),
-    env.DB.prepare('DELETE FROM activity WHERE id IN (SELECT id FROM activity ORDER BY at DESC LIMIT -1 OFFSET ?)').bind(RETENTION.activityRows)
+    env.DB.prepare('DELETE FROM activity WHERE id IN (SELECT id FROM activity ORDER BY at DESC LIMIT -1 OFFSET ?)').bind(RETENTION.activityRows),
+    env.DB.prepare("DELETE FROM notify_outbox WHERE created_ms < ? AND (status IN ('sent', 'dead', 'dismissed') OR level <> 'critical')").bind(now - RETENTION.outboxMs)
   ]);
   const removed = r.map(x => x.meta.changes);
   logLine({ kind: 'cron', job: 'housekeeping', removed });
@@ -61,8 +64,13 @@ export async function blankPhones(env, now = Date.now(), { eventId = null } = {}
   return blanked;
 }
 
+/* wrangler.jsonc: '* * * * *' = the notifications (notify/tick.js); the other cron = the daily housekeeping */
 export async function scheduled(controller, env) {
   const now = controller.scheduledTime || Date.now();
+  if (controller.cron === '* * * * *') {
+    await notifyTick(env, now);
+    return;
+  }
   await housekeeping(env, now);
   await blankPhones(env, now);
   // proofs past their retention date, and R2 objects no row names (> 24 h)

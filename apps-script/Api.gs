@@ -312,6 +312,8 @@ function doPost(e) {
       if (request.fn === 'apiHeartbeat') workerSyncAdmins_(false);
       // «سجل النشاط» in D1 (WorkerSync.gs): critical rows at once, the rest once a minute
       activityForward_(!!API_REQUEST_.forwardNow);
+      // the router's pushes (NotifyClaim.gs): once a minute
+      notifyClaimRun_(false);
     }
     catch (error) {
       console.warn('api: admin push dispatch failed');

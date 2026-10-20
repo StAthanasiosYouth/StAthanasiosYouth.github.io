@@ -779,7 +779,8 @@ function activity_(entry) {
       row.action = action;
 
       // a push due for it is sent later (activityPending_): marked on the row
-      decision = activityNotifyKind_(row, entry);
+      // the Worker's router sends admin pushes while it is on (NotifyClaim.gs): none from here then
+      decision = notifyRouterOn_() ? '' : activityNotifyKind_(row, entry);
       if (decision && API_REQUEST_) row.notified = activityPendingMark_(row.notified, decision);
 
       // one write: columns at … notified (actor, type and id are the same; the action stays)
@@ -805,7 +806,8 @@ function activity_(entry) {
         device: activityDevice_(actor)
       };
 
-      decision = activityNotifyKind_(row, entry);
+      // the Worker's router sends admin pushes while it is on (NotifyClaim.gs): none from here then
+      decision = notifyRouterOn_() ? '' : activityNotifyKind_(row, entry);
       if (decision && API_REQUEST_) row.notified = activityPendingMark_('', decision);
 
       sheet.appendRow([row.id, row.at, row.cairo, row.actor, plainCell_(row.actorName), row.action, row.type, plainCell_(row.entityId),

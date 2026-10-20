@@ -50,6 +50,14 @@ function bookNewsTick(e) {
   // the Activity tab's new rows reach D1 even when no panel is open (WorkerSync.gs)
   activityForward_(false);
 
+  // the Worker's router, when on, sends the booking pushes itself (NotifyClaim.gs)
+  notifyClaimRun_(true);
+  if (notifyRouterOn_()) {
+    // (the book-news feed is the router's now; an approved payment number still goes again)
+    try { if (bookOnline_()) payDestRetry_(); } catch (ignored) { console.warn('pay dest: retry failed'); }
+    return 0;
+  }
+
   return bookNewsRun_();
 
 }

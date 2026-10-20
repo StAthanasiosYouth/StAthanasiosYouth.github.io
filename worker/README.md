@@ -68,7 +68,15 @@ All resources live in Cloudflare account `menazakmena@gmail.com` (workers.dev su
 | `DELETE /v1/admin/proofs/:id` | admin | deletes the file; the row stays with `deleted_at` |
 | `POST /v1/sync/admins` | signed by Apps Script | the admin allowlist |
 | `POST /v1/sync/grants` | signed by Apps Script, 120/min | the grants snapshot Apps Script caches 60 s (`apps-script/Grants.gs`) |
+| `POST /v1/sync/notify-claim` | signed by Apps Script, 60/min | the router's push rows (leased 3 min) + the answers to the last claim (`apps-script/NotifyClaim.gs`) |
 | `POST /v1/sync/activity` | signed by Apps Script, 60/min, ≤ 250 rows | Activity tab rows into D1, upserted by id (resends / merged rows never duplicate; Worker rows never overwritten) |
+
+**Notification router (Phase 1.5 step 5, `src/notify/`):** cron `* * * * *` routes new activity rows into `notify_outbox`
+(catalog → level + permission; recipients = holders, never the actor, the Primary always for critical; type settings +
+own preferences; `dedupe_key` UNIQUE, 10-minute grouping). Switch `NOTIFY_ROUTER` (default `0`: Apps Script keeps its own
+pushes). The first tick after switching on stamps `NOTIFY_SINCE` and marks older waiting rows `notified = 3` (no flood).
+Pushes: claimed by Apps Script, acknowledged, retried with backoff, dead after 5 → a critical `notify.failed` row.
+Live check: `node scripts/notify-check.mjs` (staging, ~3 min).
 
 **Unified «سجل النشاط»:** `GET /v1/admin/activity?view=log&limit&before&actor&family&section&from&to&id` returns the
 Worker's rows and the forwarded Apps Script rows together, in the shape of Apps Script `apiActivity`

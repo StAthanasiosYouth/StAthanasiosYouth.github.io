@@ -40,7 +40,7 @@ test('0009 is the next number and every migration applies in order', () => {
   const cols = t => db.raw.prepare(`PRAGMA table_info(${t})`).all().map(r => r.name);
   assert.ok(cols('admins').includes('servant_id'));
   for (const c of ['severity', 'source', 'notified']) assert.ok(cols('activity').includes(c), c);
-  assert.deepEqual(cols('notify_outbox'), ['id', 'dedupe_key', 'recipient', 'channel', 'kind', 'activity_ids', 'status', 'attempts', 'next_ms', 'sent_ms', 'error', 'created_ms']);
+  assert.deepEqual(cols('notify_outbox'), ['id', 'dedupe_key', 'recipient', 'channel', 'kind', 'activity_ids', 'status', 'attempts', 'next_ms', 'sent_ms', 'error', 'created_ms', 'level', 'claim_id'], '0012 adds level + claim_id');
   assert.equal(db.raw.prepare("SELECT value FROM settings WHERE key = 'PERMS_ENFORCE'").get().value, '0');
 });
 

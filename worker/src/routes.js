@@ -16,6 +16,7 @@ import { PROOF_MAX_BYTES } from './lib/image.js';
 import { verifySync, syncStampStmt } from './lib/sync.js';
 import { grantsSnapshot } from './lib/perms.js';
 import { accountsList, accountAdd, accountUpdate, accountRemove } from './lib/accounts.js';
+import { notifyClaim } from './notify/claim.js';
 import { housekeeping, blankPhones } from './scheduled.js';
 import { makeJob } from './jobs.js';
 import { bookState, bookProof, bookSubmit, bookStatus, bookWithdraw } from './book/public.js';
@@ -266,6 +267,7 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/admin/diag/retention', auth: 'admin', handler: diagRetention },
   { method: 'GET', path: '/v1/admin/diag/book-news', auth: 'admin', handler: diagNews },
   { method: 'POST', path: '/v1/sync/book-news', auth: 'sync', raw: true, maxBytes: 4 * 1024, handler: syncBookNews },
+  { method: 'POST', path: '/v1/sync/notify-claim', auth: 'sync', raw: true, maxBytes: 32 * 1024, handler: notifyClaim },
   { method: 'POST', path: '/v1/sync/activity', auth: 'sync', raw: true, maxBytes: 512 * 1024, handler: syncActivity },
   { method: 'POST', path: '/v1/sync/grants', auth: 'sync', raw: true, maxBytes: 1024, handler: syncGrants },
   { method: 'POST', path: '/v1/sync/pay-dest', auth: 'sync', raw: true, maxBytes: 64 * 1024, handler: syncPayDest },
