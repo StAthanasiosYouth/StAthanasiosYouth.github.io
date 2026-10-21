@@ -3187,6 +3187,17 @@ img, svg, video {
   gap: 8px;
 }
 
+/* the booker's date of birth (age eligibility): day · month · year in one row */
+.bk-dob {
+  display: grid;
+  grid-template-columns: minmax(0, 4.5rem) minmax(0, 1fr) minmax(0, 6rem);
+  gap: 8px;
+}
+
+.bk-person__age[readonly] {
+  opacity: .75;
+}
+
 .bk-people__room.is-full {
   color: var(--gold-hi);
   font-weight: 700;

@@ -915,6 +915,12 @@
 
   B.openBooking = openBooking;
 
+  function ageRangeText(r) {
+    if (!r) return '';
+    if (r.min != null && r.max != null) return 'من ' + ar(r.min) + ' لـ ' + ar(r.max) + ' سنة';
+    return r.min != null ? 'من ' + ar(r.min) + ' سنة وأكبر' : 'لحد ' + ar(r.max) + ' سنة';
+  }
+
   function fact(label, value) {
     if (value === null || value === undefined || value === '') return null;
     return el('div', { class: 'book-fact' }, el('dt', { text: label }), el('dd', {}, value));
@@ -1059,6 +1065,9 @@
         fact('سبب الرفض', b.rejectReason || null),
         fact('سبب الإلغاء', b.cancelReason || null),
         fact('اتأكد فوق العدد', b.capOverride ? String(b.capOverride.reason || b.capOverride) : null),
+        b.age && b.age.booker != null ? fact('سن الحاجز يوم الفعالية', ar(b.age.booker) + (b.age.source === 'admin' ? ' (من الأدمن)' : '')) : null,
+        b.age && b.age.override ? fact('تجاوز شرط السن', String(b.age.override.reason || '') + (b.age.override.by ? ' — ' + b.age.override.by : '')) : null,
+        b.age && b.age.ruleChanged ? fact('شروط السن', 'شروط السن اتغيرت بعد الحجز ده') : null,
         fact('وقت الطلب', wallText(b.createdAt)),
         b.confirmedAt ? fact('وقت التأكيد', wallText(b.confirmedAt)) : null),
       el('p', { class: 'section-label', text: 'صور الإثبات' }),
@@ -1160,7 +1169,8 @@
         var codes = (reply.warnings || []).map(function (w) { return String(w.code || ''); }).join(' ');
         var pay = /pay|paid|money/i.test(codes);
         var cap = /cap|full|seat|place/i.test(codes);
-        if (!pay && !cap) { pay = true; cap = true; }
+        var age = /age/i.test(codes);
+        if (!pay && !cap && !age) { pay = true; cap = true; }
         var why = A.textInput('', { max: 200, placeholder: 'مثلاً: الباقي هيدفعه في الرحلة' });
         var force = el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'override' }, 'أكّد برضه');
         force.addEventListener('click', function () {
@@ -1168,13 +1178,13 @@
             A.fail(new Error(JSON.stringify({ appError: 1, message: 'سبب التأكيد برضه: اكتب السبب' })), box);
             return;
           }
-          send({ override: { pay: pay, cap: cap, reason: why.value.trim() } }, force);
+          send({ override: { pay: pay, cap: cap, age: age, reason: why.value.trim() } }, force);
         });
         A.fill(extraBox,
           el('p', { class: 'book-warn__title', text: error.parsed.message || 'الحجز مينفعش يتأكد كده.' }),
           warningList(reply.warnings),
           reply.left !== undefined && reply.left !== null ? el('p', { class: 'field__hint', text: 'فاضل ' + ar(Math.max(0, reply.left)) + ' مكان بس.' }) : null,
-          A.field('سبب التأكيد برضه', why, pay ? 'زي «تأكيد من غير ما الدفع يكمل»: السبب بيتسجل مع التأكيد.' : 'السبب بيتسجل مع التأكيد فوق العدد.'),
+          A.field(age && !pay && !cap ? 'سبب تجاوز شرط السن' : 'سبب التأكيد برضه', why, age && !pay && !cap ? 'محتاج صلاحية «يدير · الحجوزات». السبب بيتسجل في سجل الحجز ويوصل كإشعار.' : pay ? 'زي «تأكيد من غير ما الدفع يكمل»: السبب بيتسجل مع التأكيد.' : 'السبب بيتسجل مع التأكيد فوق العدد.'),
           el('div', { class: 'actions' }, force));
         extraBox.hidden = false;
         extraBox.scrollIntoView({ block: 'center', behavior: A.reducedMotion() ? 'auto' : 'smooth' });
@@ -1663,7 +1673,11 @@
           var list = names.value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
           if (JSON.stringify(list) !== JSON.stringify(b.names || [])) body.names = list;
         }
-        if (extra.override) {
+        if (extra.override && extra.override.age) {
+          body.overrideAge = true;
+          body.ageReason = extra.override.reason;
+        }
+        if (extra.override && (extra.override.cap || !extra.override.age)) {
           body.overrideCap = true;
           body.reason = [body.reason, extra.override.reason].filter(Boolean).join(' — ');
         }
@@ -1761,7 +1775,7 @@
           var bk = json && json.booking;
           if (!bk || !bk.pricing) throw new Error('no booking');
           return { id: ev.id, slug: ev.slug, title: json.title || ev.title, startAt: json.startAt, endAt: json.endAt, capacity: ev.capacity, taken: ev.taken, left: ev.left,
-            perBookingMax: bk.perBookingMax || 10, collectNames: !!bk.collectNames, pricing: bk.pricing, payment: bk.payment || { mode: 'full' },
+            perBookingMax: bk.perBookingMax || 10, collectNames: !!bk.collectNames, bookerAge: bk.bookerAge || null, ageStrict: !!bk.ageStrict, pricing: bk.pricing, payment: bk.payment || { mode: 'full' },
             methods: bk.methods || [], servants: (bk.servants || []).map(function (s) { return { id: s.id, name: s.name, methods: s.methods || [] }; }) };
         });
       configs[ev.slug].catch(function () { configs[ev.slug] = null; });
@@ -1791,6 +1805,8 @@
     var method = select([{ value: '', label: 'من غير طريقة' }].concat((ev.methods || []).map(function (m) { return { value: m.key, label: m.label }; })), '', 'طريقة الدفع');
     var note = A.textInput('', { multiline: true, rows: 2, max: 300, placeholder: 'اختياري: اتحجز بالتليفون…' });
     var confirmNow = A.checkbox('أكّده دلوقتي', false, 'حجز اتفقنا عليه: يتأكد في نفس الخطوة');
+    // age eligibility (§4.9): the booker's date of birth, only when the event has an age range
+    var dob = ev.bookerAge ? el('input', { class: 'input input--ltr', type: 'date', dir: 'ltr', max: new Date().toISOString().slice(0, 10) }) : null;
     var touched = false;
     var due = numberInput('', '');
     var dueReason = A.textInput('', { max: 200, placeholder: 'مثلاً: خصم' });
@@ -1822,6 +1838,7 @@
       label: 'سجّل الحجز',
       nodes: [A.field('الاسم', name), A.field('الموبايل', phone, 'بأي شكل: 010… أو +20…'), counts.node, quoteLine,
         names ? A.field('الأسماء', names, 'اسم في كل سطر') : null, el('div', { class: 'row' }, A.field('الخادم', servant), A.field('طريقة الدفع', method)),
+        dob ? A.field('تاريخ ميلاد الحاجز', dob, 'الفعالية دي لسن ' + ageRangeText(ev.bookerAge) + ' يوم الفعالية') : null,
         A.field('ملاحظة', note), first ? first.node : null, confirmNow.node, confirmBox],
       back: function () { A.closeSheet(); },
       prepare: function (extra) {
@@ -1832,6 +1849,11 @@
         if (servant.value) body.servantId = servant.value;
         if (method.value) body.method = method.value;
         if (note.value.trim()) body.note = note.value.trim();
+        if (dob && dob.value) body.bookerDob = dob.value;
+        if (extra.override && extra.override.age) {
+          body.overrideAge = true;
+          body.ageReason = extra.override.reason;
+        }
         if (confirmNow.input.checked) {
           var quoted = K.quote(pricing, c);
           var conf = { actual: c, amountDue: free ? 0 : K.amountOf(due.value) };

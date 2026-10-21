@@ -61,6 +61,12 @@ const PEOPLE = {
       { key: 'child', label: 'طفل', group: 'child', price: 50, seat: true, min: 0, max: 4, note: '', ageMin: 4, ageMax: 12 }
     ] } }
 };
+// age eligibility (§4.9): the booker 18–30 on the event's day (a date of birth), children switched off
+const AGED = {
+  ...PEOPLE, slug: 'aged-trip', v: 'ag1a2b3c4d',
+  booking: { ...PEOPLE.booking, bookerAge: { min: 18, max: 30 }, ageStrict: false,
+    pricing: { mode: 'group', categories: [PEOPLE.booking.pricing.categories[0], { ...PEOPLE.booking.pricing.categories[1], allowed: false }] } }
+};
 const SHELL = readFileSync(`${ROOT}pages/index.html`, 'utf8');
 const TOKEN = 'bk1.eyJiIjoiYmtnLWFiY2RlZiIsImUiOjE3OTk5OTk5OTk5OTl9.c2lnbmF0dXJlLXNpZ25hdHVyZS1zaWduYXR1cmU';
 const JPEG = `${SHOTS}proof.jpg`;
@@ -177,6 +183,8 @@ test.before(async () => {
     if (path === '/events/online-trip/event.json') return send(TYPES['.json'], JSON.stringify(ONLINE));
     if (/^\/events\/people-trip\/(index\.html)?$/.test(path)) return send(TYPES['.html'], stub(PEOPLE.slug, PEOPLE.v));
     if (path === '/events/people-trip/event.json') return send(TYPES['.json'], JSON.stringify(PEOPLE));
+    if (/^\/events\/aged-trip\/(index\.html)?$/.test(path)) return send(TYPES['.html'], stub(AGED.slug, AGED.v));
+    if (path === '/events/aged-trip/event.json') return send(TYPES['.json'], JSON.stringify(AGED));
     if (/^\/events\/ain-sokhna-trip\/(index\.html)?$/.test(path)) return send(TYPES['.html'], stub(EVENT.slug, EVENT.v));
     if (path === '/events/ain-sokhna-trip/event.json') return send(TYPES['.json'], JSON.stringify(EVENT));
     try {
@@ -700,6 +708,55 @@ test('«إضافة فرد»: a card per person (name + age), priced by age, the 
   const sent = JSON.parse(calls('/v1/book/submit')[0].body);
   assert.deepEqual(sent.participants, [{ name: 'مينا عادل', age: 30 }, { name: 'مريم', age: 8 }]);
   assert.deepEqual(sent.counts, { applicant: 1, child: 1 });
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+
+test('age eligibility: the booker date of birth (bday selects), judged on the event day; person #1 takes that age; a switched-off category refused; sent as bookerDob', async () => {
+  resetMock();
+  mock.state = { status: 200, body: { ...OPEN, left: 6 } };
+  const { context, page, problems } = await open('/events/aged-trip/');
+  await ready(page);
+  await live(page, 'open');
+  await page.click('.bk-start');
+  await step(page, 'a');
+  await typeInto(page, '#bk-name', 'مينا عادل');
+  await typeInto(page, '#bk-phone', '01012345678');
+  assert.match(await textOf(page, '[data-field="dob"]'), /الفعالية دي للسن من ١٨ لـ ٣٠ سنة يوم الفعالية/);
+  assert.deepEqual(await page.evaluate(() => Array.from(document.querySelectorAll('[data-field="dob"] select'), x => x.getAttribute('autocomplete'))), ['bday-day', 'bday-month', 'bday-year']);
+  // too young on the event's day: the message, no step b
+  const year = Number(AGED.startAt.slice(0, 4));
+  await page.select('#bk-dob-d', '1');
+  await page.select('#bk-dob-m', '1');
+  await page.select('#bk-dob-y', String(year - 12));
+  await page.click('.bk-flow .bk-next');
+  await page.waitForFunction(() => /الفعالية دي للسن من ١٨ لـ ٣٠ سنة\./.test(document.querySelector('[data-field="dob"]').innerText));
+  // person #1's age follows the date of birth and can't be typed
+  assert.equal(await page.$eval('#bk-person-age-0', el => el.readOnly), true);
+  await page.select('#bk-dob-y', String(year - 25));
+  assert.equal(await page.$eval('#bk-person-age-0', el => el.value), '25');
+  // a child (the child category is switched off for this event): that person's box says so
+  await page.click('[data-act="add-person"]');
+  await typeInto(page, '#bk-person-name-1', 'مريم');
+  await typeInto(page, '#bk-person-age-1', '8');
+  await page.click('.bk-flow .bk-next');
+  await page.waitForSelector('#bk-person-age-1[aria-invalid="true"]');
+  assert.match(await textOf(page, '#bk-person-age-1-err'), /السن ده مش مسموح للمرافقين/);
+  await page.click('.bk-person[data-i="1"] [data-act="remove-person"]');
+  await page.click('.bk-flow .bk-next');
+  await step(page, 'b');
+  await page.click('label[for="bk-servant-srv-mina0001"]');
+  await page.click('label[for="bk-method-transfer"]');
+  await page.click('.bk-flow .bk-next');
+  await step(page, 'c');
+  await agree(page);
+  await page.click('.bk-send');
+  await page.waitForFunction(() => /B-7K2QX/.test(document.body.innerText), { timeout: 8000 });
+  const sent = JSON.parse(calls('/v1/book/submit')[0].body);
+  assert.equal(sent.bookerDob, `${year - 25}-01-01`);
+  assert.deepEqual(sent.participants, [{ name: 'مينا عادل', age: 25 }]);
+  assert.ok(await overflow(page) <= 0);
   assert.deepEqual(problems, []);
   await context.close();
 });

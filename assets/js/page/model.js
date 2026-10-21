@@ -288,7 +288,18 @@ function cleanCategory(raw) {
   // an age range («كل فرد باسمه وسنه»: this price for these ages)
   const ageMin = int(raw.ageMin, 0, 120);
   const ageMax = int(raw.ageMax, 0, 120);
-  return { key: k, label, group: GROUPS.includes(raw.group) ? raw.group : 'adult', price, seat: raw.seat !== false, min, max, note: line(raw.note, 60), ageMin, ageMax };
+  // allowed: false = this event refuses companions in this category (age eligibility)
+  return { key: k, label, group: GROUPS.includes(raw.group) ? raw.group : 'adult', price, seat: raw.seat !== false, min, max, note: line(raw.note, 60), ageMin, ageMax, allowed: raw.allowed !== false };
+}
+
+/* { min, max } (either may be empty) → the range, or null for none / nonsense */
+function cleanAgeRange(raw) {
+  if (!isObject(raw)) return null;
+  const min = int(raw.min, 0, 120);
+  const max = int(raw.max, 0, 120);
+  if (min === null && max === null) return null;
+  if (min !== null && max !== null && min > max) return null;
+  return { min, max };
 }
 
 function cleanBooking(raw) {
@@ -334,6 +345,9 @@ function cleanBooking(raw) {
     collectNames: raw.collectNames === true,
     // «إضافة فرد»: people one by one (name + age), each priced by age
     participants: raw.participants === true,
+    // age eligibility: the main booker's age range at the event (a date of birth on the form), strict companions
+    bookerAge: cleanAgeRange(raw.bookerAge),
+    ageStrict: raw.ageStrict === true,
     // the servants' WhatsApp (approved public contact only): on the page (default on) / after booking (default off)
     contactOnPage: raw.contactOnPage !== false,
     contactAfter: raw.contactAfter === true,

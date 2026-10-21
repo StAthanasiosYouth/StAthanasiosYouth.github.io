@@ -29,7 +29,7 @@ import { stepCount, canStep, totalOf, money, waWithText, seatsOf } from './model
 import {
   liveState, stepsFor, isFree, peopleCount, peopleOf, peopleText, normPhone, checkWho, checkPay, checkSend,
   needsProof, newRequestKey, submitBody, payMessage, emptyDraft, bookingError, statusWord, statusHref,
-  mineFor, isRef, isToken, PROOFS_MAX, NOTE_MAX, NAME_MAX, peopleCounts, peopleRoom, checkPeople, personProblemAt, categoryForAge,
+  mineFor, isRef, isToken, PROOFS_MAX, NOTE_MAX, NAME_MAX, peopleCounts, peopleRoom, checkPeople, personProblemAt, categoryForAge, bookerAgeProblem, companionProblemAt, dobText, ageOnDay,
   methodOnline, onlineMethodsOf, offlineServants, payCopyText, payGrouped, cashMessage,
   partAllowed, minPart, partAmount, partProblem
 } from './book-model.js';
@@ -450,6 +450,43 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
       if (phone.value.trim() && !normPhone(phone.value)) showErrors({ phone: 'اكتب رقم موبايل مصري صح، زي 01012345678' }, { focus: false, only: ['phone'] });
     });
 
+    /*
+     * Age eligibility (§4.9): only when the event has a booker age range — the booker's date of
+     * birth (three selects, the browser's bday-* autofill). Private: it goes with the request only.
+     * With «كل فرد باسمه وسنه» the booker's age (person #1) is the one computed from it.
+     */
+    if (!draft.fields.dob) draft.fields.dob = { d: '', m: '', y: '' };
+    const startAt = event.startAt || '';
+    const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+    const thisYear = new Date().getFullYear();
+    const dobSelect = (part, label, options, autocomplete) => {
+      const select = h('select', { class: 'bk-input bk-dob__select', id: `bk-dob-${part}`, 'aria-label': label, autocomplete },
+        h('option', { value: '' }, label), ...options.map(([value, text]) => h('option', { value: String(value), selected: String(draft.fields.dob[part]) === String(value) || null }, text)));
+      select.addEventListener('change', () => {
+        draft.fields.dob[part] = select.value;
+        saveSoon();
+        bookerAgeChanged();
+      });
+      return select;
+    };
+    const dobBlock = booking.bookerAge ? group('dob', 'تاريخ ميلادك',
+      h('p', { class: 'bk-field__hint' }, `الفعالية دي للسن ${booking.bookerAge.min != null && booking.bookerAge.max != null ? `من ${arabicDigits(booking.bookerAge.min)} لـ ${arabicDigits(booking.bookerAge.max)} سنة` : booking.bookerAge.min != null ? `من ${arabicDigits(booking.bookerAge.min)} سنة وأكبر` : `لحد ${arabicDigits(booking.bookerAge.max)} سنة`} يوم الفعالية. تاريخ ميلادك مش بيظهر لحد.`),
+      h('div', { class: 'bk-dob', dir: 'rtl' },
+        dobSelect('d', 'اليوم', Array.from({ length: 31 }, (_, i) => [i + 1, arabicDigits(i + 1)]), 'bday-day'),
+        dobSelect('m', 'الشهر', MONTHS.map((m, i) => [i + 1, m]), 'bday-month'),
+        dobSelect('y', 'السنة', Array.from({ length: 96 }, (_, i) => [thisYear - 5 - i, arabicDigits(thisYear - 5 - i)]), 'bday-year'))) : null;
+    /* the booker's age from the DOB (person #1 in «كل فرد باسمه وسنه»); the message goes once it's right */
+    function bookerAgeChanged() {
+      const age = ageOnDay(dobText(draft.fields.dob), startAt);
+      if (booking.participants && draft.people && draft.people[0]) {
+        draft.people[0].age = age == null ? '' : String(age);
+        const first = flowEl.querySelector('#bk-person-age-0');
+        if (first) first.value = draft.people[0].age;
+        if (typeof syncPeople === 'function' && peopleList.isConnected) renderPeople();
+      }
+      if (!bookerAgeProblem(booking, startAt, draft.fields.dob)) showErrors({}, { focus: false, only: ['dob'] });
+    }
+
     const total = h('output', { class: 'prices__total-n', 'aria-live': 'polite' }, money(totalOf(booking, draft.counts)));
     const steppers = [];
     const namesBox = h('div', { class: 'bk-names' });
@@ -493,7 +530,7 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
       return h('div', { class: 'stepper', role: 'group', 'aria-label': `عدد ${c.label}` }, minus, out, plus);
     }
 
-    const rows = booking.pricing.categories.map(c => h('li', { class: 'price' },
+    const rows = booking.pricing.categories.filter(c => c.allowed !== false).map(c => h('li', { class: 'price' },
       h('div', { class: 'price__who' },
         h('span', { class: 'price__label' }, c.label),
         c.note ? h('span', { class: 'price__note' }, c.note) : null
@@ -552,7 +589,8 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
     function personCard(p, i) {
       const n = arabicDigits(i + 1);
       const pName = h('input', { class: 'bk-input', id: `bk-person-name-${i}`, type: 'text', maxlength: NAME_MAX, autocomplete: i === 0 ? 'name' : 'off', value: p.name });
-      const pAge = h('input', { class: 'bk-input bk-input--ltr bk-person__age', id: `bk-person-age-${i}`, type: 'number', inputmode: 'numeric', min: 0, max: 120, dir: 'ltr', value: p.age });
+      const fromDob = i === 0 && !!booking.bookerAge;
+      const pAge = h('input', { class: 'bk-input bk-input--ltr bk-person__age', id: `bk-person-age-${i}`, type: 'number', inputmode: 'numeric', min: 0, max: 120, dir: 'ltr', value: p.age, readonly: fromDob || null, 'aria-readonly': fromDob ? 'true' : null, title: fromDob ? 'من تاريخ ميلادك' : null });
       const price = h('span', { class: 'bk-person__price' });
       const showPrice = () => {
         const age = Number(p.age);
@@ -575,6 +613,8 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
     function renderPeople() {
       if (!booking.participants) return;
       if (!Array.isArray(draft.people) || !draft.people.length) draft.people = [{ name: draft.fields.name || '', age: '' }];
+      // the booker's age is the one from the date of birth (§4.9)
+      if (booking.bookerAge) { const age = ageOnDay(dobText(draft.fields.dob), event.startAt || ''); draft.people[0].age = age == null ? '' : String(age); }
       peopleList.replaceChildren(...draft.people.map(personCard));
       syncPeople();
     }
@@ -614,6 +654,7 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
     const form = h('form', { class: 'bk-form', novalidate: true },
       field('name', 'اسمك', name),
       field('phone', 'رقم موبايلك', phone, 'الخادم هيكلمك عليه، ومش بيظهر لحد.'),
+      dobBlock,
       booking.participants ? h('div', { class: 'prices bk-prices' }, peopleBlock) : h('div', { class: 'prices bk-prices' }, counts),
       !booking.participants && booking.collectNames ? group('names', 'أسماء اللي جايين', h('p', { class: 'bk-field__hint' }, 'اسم كل واحد جاي، وانت منهم.'), namesBox) : null,
       hp,
@@ -629,6 +670,13 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
         const who = checkWho({ ...booking, collectNames: false }, { name: name.value, phone: phone.value, counts: draft.counts, names: [] }, live ? live.left : null);
         delete who.counts;
         const problems = { ...who, ...checkPeople(booking, draft.people, live ? live.left : null) };
+        const dobWrong = bookerAgeProblem(booking, startAt, draft.fields.dob);
+        if (dobWrong) problems.dob = dobWrong;
+        const refused = !problems.participants && companionProblemAt(booking, draft.people);
+        if (refused) {
+          problems.participants = refused.message;
+          if (!showErrors(problems, { focus: false })) { markPerson(refused, !(problems.name || problems.phone || problems.dob)); return; }
+        }
         if (!showErrors(problems, { focus: !!(problems.name || problems.phone) || !personProblemAt(draft.people) })) {
           // a missing name / age: that exact box is marked, says why, and gets the focus
           markPerson(personProblemAt(draft.people), !(problems.name || problems.phone));
@@ -639,6 +687,8 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
       }
       if (booking.collectNames) draft.names = [...namesBox.querySelectorAll('input')].map(input => input.value);
       const problems = checkWho(booking, { name: name.value, phone: phone.value, counts: draft.counts, names: draft.names }, live ? live.left : null);
+      const dobWrong = bookerAgeProblem(booking, startAt, draft.fields.dob);
+      if (dobWrong) problems.dob = dobWrong;
       if (!showErrors(problems)) return;
       go(steps[steps.indexOf('a') + 1]);
     });

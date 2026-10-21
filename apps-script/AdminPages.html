@@ -994,6 +994,8 @@
         var group = first ? null : select(GROUPS, row.group || 'adult', 'الفئة');
         var max = first ? null : number(row.max, 1, 30, '١٠');
         var seat = first ? null : A.checkbox('بياخد مكان', row.seat !== false);
+        // age eligibility (§4.9): switched off = companions in this category are refused (the price stays for the record)
+        var allowed = first ? null : A.checkbox('متاحة في الفعالية دي', row.allowed !== false);
         var note = first ? null : A.textInput(row.note, { max: 60, placeholder: 'ملاحظة: من ٤ لـ ١٢ سنة' });
         // with «كل فرد باسمه وسنه»: the price for these ages (everyone else pays the first price)
         var ageMin = first ? null : number(row.ageMin, 0, 120, 'من سن');
@@ -1001,9 +1003,9 @@
         var remove = first ? null : el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'شيل الفئة', onclick: function () { collect(); rows.splice(i, 1); A.markDirty(); draw(); } }, icon('trash'));
         var line = el('div', { class: 'pages-prices__row' + (first ? ' pages-prices__row--first' : '') },
           A.field(first ? 'سعر الحاجز' : 'الفئة', label), A.field('السعر', price),
-          group ? A.field('محسوب على', group) : null, max ? A.field('أقصى عدد', max) : null, seat ? seat.node : null,
+          group ? A.field('محسوب على', group) : null, max ? A.field('أقصى عدد', max) : null, seat ? seat.node : null, allowed ? allowed.node : null,
           ageMin ? A.field('من سن', ageMin, 'للحجز بالأفراد') : null, ageMax ? A.field('لحد سن', ageMax) : null, note ? A.field('ملاحظة', note) : null, remove);
-        return { line: line, label: label, price: price, group: group, max: max, seat: seat, note: note, ageMin: ageMin, ageMax: ageMax, key: row.key };
+        return { line: line, label: label, price: price, group: group, max: max, seat: seat, allowed: allowed, note: note, ageMin: ageMin, ageMax: ageMax, key: row.key };
       });
       A.fill(table, inputs[0].line);
       A.fill(more, inputs.slice(1).map(function (x) { return x.line; }).concat([
@@ -1013,7 +1015,7 @@
 
     function collect() {
       rows = inputs.map(function (x) {
-        return { key: x.key, label: x.label.value, price: x.price.value, group: x.group ? x.group.value : 'adult', max: x.max ? x.max.value : 1, seat: x.seat ? x.seat.input.checked : true, note: x.note ? x.note.value : '', ageMin: x.ageMin ? x.ageMin.value : '', ageMax: x.ageMax ? x.ageMax.value : '' };
+        return { key: x.key, label: x.label.value, price: x.price.value, group: x.group ? x.group.value : 'adult', max: x.max ? x.max.value : 1, seat: x.seat ? x.seat.input.checked : true, allowed: x.allowed ? x.allowed.input.checked : true, note: x.note ? x.note.value : '', ageMin: x.ageMin ? x.ageMin.value : '', ageMax: x.ageMax ? x.ageMax.value : '' };
       });
       return rows;
     }
@@ -1064,6 +1066,10 @@
     var collectNames = A.checkbox('اطلب أسماء كل الأفراد', booking ? !!booking.collectNames : false);
     var participants = A.checkbox('كل فرد باسمه وسنه («إضافة فرد»)', booking ? !!booking.participants : false, 'الزائر بيضيف الأفراد واحد واحد؛ السعر بيتحسب لكل فرد حسب سنه («من سن / لحد سن» في الفئات)، والباقي بالسعر الأول');
     var pricing = pricingEditor(booking ? booking.pricing : null);
+    // age eligibility (§4.9): the main booker's age at the event (a date of birth on the form); empty = no limit
+    var bookerMin = number(booking && booking.bookerAge ? booking.bookerAge.min : '', 0, 120, 'من غير حد');
+    var bookerMax = number(booking && booking.bookerAge ? booking.bookerAge.max : '', 0, 120, 'من غير حد');
+    var ageStrict = A.checkbox('المرافقين لازم سنهم يطابق فئة متاحة', booking ? booking.ageStrict === true : false, 'مع «كل فرد باسمه وسنه»: اللي سنه برّه كل الفئات المتاحة بيترفض (الفئة اللي من غير سن بتقبل أي سن)');
     // where the servants' WhatsApp shows (only servants whose number is approved for visitors, from «الخدام»)
     var contactOnPage = A.checkbox('واتساب الخادم يظهر في صفحة الفعالية', booking ? booking.contactOnPage !== false : true, 'في كل الأوقات: قبل الحجز، وبعد ما الحجز يقفل أو العدد يكمل');
     var contactAfter = A.checkbox('واتساب الخادم يظهر بعد ما الزائر يخلّص الحجز', booking ? booking.contactAfter === true : false, 'زرار «كلّم الخادم» في شاشة «طلبك وصل» للخادم اللي اختاره');
@@ -1091,6 +1097,10 @@
       collectNames.node,
       participants.node,
       el('fieldset', { class: 'fieldset' }, el('legend', { text: 'الأسعار' }), pricing.node),
+      el('fieldset', { class: 'fieldset' }, el('legend', { text: 'شروط السن' }),
+        el('div', { class: 'row' }, A.field('سن الحاجز من', bookerMin, 'يوم الفعالية'), A.field('لحد', bookerMax)),
+        el('p', { class: 'note', text: 'لو حطيت سن للحاجز، الحاجز بيكتب تاريخ ميلاده والحجز اللي برّه السن بيترفض. الفئة اللي تقفل «متاحة في الفعالية دي» بترفض المرافقين اللي فيها. الأدمن بصلاحية «يدير · الحجوزات» يقدر يتجاوز مع كتابة السبب.' }),
+        ageStrict.node),
       el('fieldset', { class: 'fieldset' }, el('legend', { text: 'الدفع' }), payMode.node || payMode, installments),
       el('fieldset', { class: 'fieldset' }, el('legend', { text: 'الخدام اللي بيتحجز معاهم' }),
         servantRows.length ? el('div', {}, servantRows.map(function (s) { return s.node; })) : el('p', { class: 'note', text: 'مفيش خدام لسه — زوّدهم من «الخدام».' }),
@@ -1115,6 +1125,7 @@
         booking: hasBooking.input.checked ? {
           opensAt: opensAt.value(), closesAt: closesAt.value(), capacity: capacity.value, perBookingMax: perBooking.value,
           collectNames: collectNames.input.checked, participants: participants.input.checked, pricing: pricing.value(),
+          bookerAge: { min: bookerMin.value, max: bookerMax.value }, ageStrict: ageStrict.input.checked,
           contactOnPage: contactOnPage.input.checked, contactAfter: contactAfter.input.checked,
           payment: { mode: payMode.value ? payMode.value() : (installments.hidden ? 'full' : 'installments'), minFirst: minFirst.value, finalDueAt: finalDueAt.value() }
         } : null,

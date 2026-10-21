@@ -330,6 +330,68 @@ export function checkPeople(booking, people, left = null) {
   return at ? { participants: at.message } : {};
 }
 
+/*
+ * Event age eligibility (docs/BOOKING-PHASE1-COMPLETION-PLAN.md §4.9), the same rules as
+ * worker/src/book/age.js — here only for a fast message; the server decides.
+ */
+const rangeText = (min, max) => (min != null && max != null ? `من ${arabicDigits(min)} لـ ${arabicDigits(max)} سنة` : min != null ? `من ${arabicDigits(min)} سنة وأكبر` : `لحد ${arabicDigits(max)} سنة`);
+export const AGE_WORDS = {
+  dob: 'اكتب تاريخ ميلادك صح.',
+  companion: 'السن ده مش مسموح للمرافقين في الفعالية دي — كلّم الخادم المسؤول.',
+  category: 'الفئة دي مش متاحة في الفعالية دي — كلّم الخادم المسؤول.',
+  booker: (min, max) => `الفعالية دي للسن ${rangeText(min, max)}.`
+};
+
+/** { d, m, y } (numbers or strings) → 'YYYY-MM-DD' for a real date, else '' */
+/* the date-of-birth selects as kept in the draft: digits only */
+function cleanDob(v) {
+  const pick = (x, n) => (/^\d{1,4}$/.test(String(x == null ? '' : x)) ? String(x).slice(0, n) : '');
+  return { d: pick(v && v.d, 2), m: pick(v && v.m, 2), y: pick(v && v.y, 4) };
+}
+
+export function dobText(dob) {
+  const d = Number(dob && dob.d), m = Number(dob && dob.m), y = Number(dob && dob.y);
+  if (!Number.isInteger(d) || !Number.isInteger(m) || !Number.isInteger(y)) return '';
+  const date = new Date(Date.UTC(y, m - 1, d));
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) return '';
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+/** full years on the event's start day ('YYYY-MM-DD…' Cairo wall date) */
+export function ageOnDay(dob, startAt) {
+  const a = /^(\d{4})-(\d{2})-(\d{2})/.exec(dob || '');
+  const s = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(startAt || ''));
+  if (!a || !s) return null;
+  const [y, m, d] = [+a[1], +a[2], +a[3]];
+  return +s[1] - y - (+s[2] < m || (+s[2] === m && +s[3] < d) ? 1 : 0);
+}
+
+/** the booker's date of birth against the event's range → '' or the words to show */
+export function bookerAgeProblem(booking, startAt, dob, now = Date.now()) {
+  const r = booking && booking.bookerAge;
+  if (!r) return '';
+  const text = dobText(dob);
+  const age = ageOnDay(text, startAt);
+  if (!text || Date.parse(text) > now || age == null || age < 5 || age > 100) return AGE_WORDS.dob;
+  if ((r.min != null && age < r.min) || (r.max != null && age > r.max)) return AGE_WORDS.booker(r.min, r.max);
+  return '';
+}
+
+/** companions (people after the booker) against the allowed categories / strict rule → { index, message } or null */
+export function companionProblemAt(booking, people) {
+  const cats = booking.pricing.categories;
+  const allowed = cats.filter(c => c.allowed !== false);
+  const fits = (c, age) => (c.ageMin == null && c.ageMax == null) || ((c.ageMin == null || age >= c.ageMin) && (c.ageMax == null || age <= c.ageMax));
+  for (const [i, p] of (people || []).entries()) {
+    if (i === 0) continue;
+    const age = Number(p && p.age);
+    if (String(p && p.age).trim() === '' || !Number.isInteger(age)) continue;
+    if (categoryForAge(booking, age).allowed === false || (booking.ageStrict && !allowed.some(c => fits(c, age)))) return { index: i, part: 'age', message: AGE_WORDS.companion };
+  }
+  return null;
+}
+
+
 /** the first person with a missing name or age: { index, part: 'name' | 'age', message }, or null */
 export function personProblemAt(people) {
   for (const [i, p] of (people || []).entries()) {
@@ -352,6 +414,7 @@ export function submitBody(event, draft, { hp = '', revision = '', turnstile = '
     hp,
     revision: revision || event.v || ''
   };
+  if (booking.bookerAge) body.bookerDob = dobText(draft.fields.dob);
   if (booking.participants) {
     body.participants = (draft.people || []).map(p => ({ name: line(p.name, NAME_MAX), age: Number(p.age) }));
     body.counts = peopleCounts(booking, draft.people);
@@ -395,7 +458,7 @@ export function payMessage(event, servant, { name, counts, method }) {
 export function emptyDraft(booking, requestKey, now) {
   return {
     step: 'a',
-    fields: { name: '', phone: '' },
+    fields: { name: '', phone: '', dob: { d: '', m: '', y: '' } },
     counts: cleanCounts(booking, null),
     names: [],
     servantId: '',
@@ -421,7 +484,7 @@ export function readDraft(raw, booking, now) {
   const steps = stepsFor(booking);
   return {
     step: STEPS.includes(raw.step) && steps.includes(raw.step) ? raw.step : 'a',
-    fields: { name: line(fields.name, NAME_MAX), phone: line(fields.phone, 30) },
+    fields: { name: line(fields.name, NAME_MAX), phone: line(fields.phone, 30), dob: cleanDob(fields.dob) },
     counts: cleanCounts(booking, raw.counts),
     names: Array.isArray(raw.names) ? raw.names.slice(0, 50).map(n => line(n, NAME_MAX)) : [],
     servantId: line(raw.servantId, 60),
@@ -446,7 +509,7 @@ export function readDraft(raw, booking, now) {
 export function storeDraft(draft, now) {
   return {
     step: draft.step,
-    fields: { name: draft.fields.name, phone: draft.fields.phone },
+    fields: { name: draft.fields.name, phone: draft.fields.phone, dob: cleanDob(draft.fields.dob) },
     counts: draft.counts,
     names: draft.names,
     servantId: draft.servantId,
@@ -517,7 +580,7 @@ export function statusHref(siteRoot, slug, token) {
    ERRORS → a step, a field and words (BOOKING-API.md «Envelope and errors»)
 ========================================================= */
 
-const FIELD_STEP = { name: 'a', phone: 'a', counts: 'a', names: 'a', participants: 'a', servantId: 'b', method: 'b', payPlan: 'b', payAmount: 'b', proofs: 'c', note: 'c' };
+const FIELD_STEP = { dob: 'a', name: 'a', phone: 'a', counts: 'a', names: 'a', participants: 'a', servantId: 'b', method: 'b', payPlan: 'b', payAmount: 'b', proofs: 'c', note: 'c' };
 
 const FIELD_WORDS = {
   name: 'الاسم مش مظبوط. اكتب اسمك (من ٢ لـ ٦٠ حرف).',
@@ -551,6 +614,10 @@ export function bookingError(reply) {
       return field
         ? { action: 'field', step: FIELD_STEP[field], field, message: FIELD_WORDS[field], left }
         : { action: 'stop', step: '', field: '', message: 'فيه حاجة مش مظبوطة في الطلب. راجع البيانات وجرّب تاني.', left };
+    }
+    case 'age': {
+      const field = r.field === 'bookerDob' ? 'dob' : r.field === 'counts' ? 'counts' : 'participants';
+      return { action: 'field', step: 'a', field, left, message: typeof r.message === 'string' && r.message ? r.message : AGE_WORDS.dob };
     }
     case 'full':
       return { action: 'field', step: 'a', field: 'counts', left, message: left ? `مفيش أماكن كفاية: ${leftText(left)} بس. قلّل العدد.` : 'اكتمل العدد، مفيش أماكن تانية دلوقتي.' };

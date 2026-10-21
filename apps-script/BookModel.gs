@@ -173,7 +173,9 @@ function bookPricingInput_(value, problems) {
       max: max,
       note: note.slice(0, BOOK_LIMITS.categoryNote),
       ageMin: ageMin === '' ? null : ageMin,
-      ageMax: ageMax === '' ? null : ageMax
+      ageMax: ageMax === '' ? null : ageMax,
+      // age eligibility (§4.9): a category switched off refuses companions priced into it (the booker's is always on)
+      allowed: first ? true : raw.allowed !== false
     });
 
   });
@@ -230,7 +232,20 @@ function bookBookingInput_(value, startAt, problems) {
 
   var pricing = bookPricingInput_(value.pricing, problems);
 
+  // age eligibility (§4.9): the main booker's age range at the event (empty = no limit)
+  var age = value.bookerAge && typeof value.bookerAge === 'object' ? value.bookerAge : {};
+  var ageMin = bookWhole_(age.min);
+  var ageMax = bookWhole_(age.max);
+  if ((ageMin !== '' && (isNaN(ageMin) || ageMin > 120)) || (ageMax !== '' && (isNaN(ageMax) || ageMax > 120))) {
+    problems.push('سن الحاجز لازم يكون رقم من ٠ لـ ١٢٠');
+    ageMin = ageMax = '';
+  }
+  if (ageMin !== '' && ageMax !== '' && ageMin > ageMax) problems.push('سن الحاجز: «من» لازم يكون أصغر من «لحد»');
+  var bookerAge = ageMin === '' && ageMax === '' ? null : { min: ageMin === '' ? null : ageMin, max: ageMax === '' ? null : ageMax };
+
   return {
+    bookerAge: bookerAge,
+    ageStrict: value.ageStrict === true,
     opensAt: opensAt,
     closesAt: closesAt,
     capacity: capacity === '' ? null : capacity,
@@ -352,6 +367,9 @@ function bookPublicBooking_(spec, servants, servantRows, methodRows, image, onli
     perBookingMax: spec.perBookingMax || 10,
     collectNames: !!spec.collectNames || !!spec.participants,
     participants: !!spec.participants,
+    // age eligibility (§4.9): only when set, so older events publish exactly as before
+    bookerAge: spec.bookerAge ? { min: spec.bookerAge.min, max: spec.bookerAge.max } : undefined,
+    ageStrict: spec.ageStrict === true ? true : undefined,
     contactOnPage: spec.contactOnPage !== false,
     contactAfter: spec.contactAfter === true,
     pricing: {
@@ -363,6 +381,7 @@ function bookPublicBooking_(spec, servants, servantRows, methodRows, image, onli
         var out = { key: c.key, label: c.label, group: c.group, price: c.price, seat: c.seat, min: people ? 0 : c.min, max: people ? (spec.perBookingMax || 10) : c.max, note: c.note };
         if (c.ageMin !== null && c.ageMin !== undefined) out.ageMin = c.ageMin;
         if (c.ageMax !== null && c.ageMax !== undefined) out.ageMax = c.ageMax;
+        if (c.allowed === false) out.allowed = false;
         return out;
       })
     },

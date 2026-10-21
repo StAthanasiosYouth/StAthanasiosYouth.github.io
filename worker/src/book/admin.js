@@ -121,6 +121,7 @@ export async function detail(ctx, id) {
       id: event.id, slug: event.slug, title: event.title, startAt: event.startAt, endAt: event.endAt,
       capacity: bk.capacity == null ? null : bk.capacity, taken, left: bk.capacity == null ? null : bk.capacity - taken,
       perBookingMax: bk.perBookingMax, collectNames: !!bk.collectNames, pricing: bk.pricing, payment: bk.payment,
+      bookerAge: bk.bookerAge || null, ageStrict: !!bk.ageStrict,
       methods: bk.methods || [], servants: (bk.servants || []).map(s => ({ id: s.id, name: s.name, methods: s.methods }))
     }
   };
