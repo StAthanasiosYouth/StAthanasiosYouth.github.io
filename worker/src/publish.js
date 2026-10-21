@@ -65,7 +65,7 @@ export function pathKind(path) {
   return null;
 }
 
-function slugOk(slug) {
+export function slugOk(slug) {
   return SLUG.test(slug) && !/--/.test(slug);
 }
 
@@ -140,7 +140,7 @@ export async function syncPublish(ctx) {
     await retry(() => syncStampStmt(db, 'publish', ts).run());
     return { ...JSON.parse(known.result), replayed: true };
   }
-  const newer = await retry(() => db.prepare('SELECT id FROM publish_jobs WHERE at > ? LIMIT 1').bind(at).first());
+  const newer = await retry(() => db.prepare("SELECT id FROM publish_jobs WHERE at > ? AND mode <> 'seed' LIMIT 1").bind(at).first());
   if (newer) throw new ApiError('conflict', 'a newer publish is already stored');
 
   // what is live now, and the last rev of each (kind, key): a small table, read once
@@ -161,26 +161,34 @@ export async function syncPublish(ctx) {
     changed: changed.map(f => ({ path: f.path, kind: f.kind, key: f.key, rev: f.rev, hash: f.hash }))
   };
 
-  // new rows (not live yet), a few per statement: a big first publish stays within D1's per-call statement limit
-  const stmts = chunks(changed.map(f => ({ id: f.id, kind: f.kind, key: f.key, rev: f.rev, hash: f.hash, body: f.body, withdrawn: f.withdrawn })))
-    .map(chunk => db.prepare(
-      'INSERT INTO published_revisions (id, kind, key, rev, hash, body, withdrawn, live, publish_id, published_by, published_at) ' +
-      "SELECT json_extract(value, '$.id'), json_extract(value, '$.kind'), json_extract(value, '$.key'), json_extract(value, '$.rev'), " +
-      "json_extract(value, '$.hash'), json_extract(value, '$.body'), json_extract(value, '$.withdrawn'), 0, ?, ?, ? FROM json_each(?)"
-    ).bind(id, by || null, now, chunk));
-  if (changed.length) {
-    // the old live rows of the same (kind, key) step down, then the new ones go live (the unique live index holds throughout)
-    stmts.push(db.prepare(
-      'UPDATE published_revisions SET live = 0 WHERE live = 1 AND EXISTS (SELECT 1 FROM published_revisions n WHERE n.publish_id = ? AND n.kind = published_revisions.kind AND n.key = published_revisions.key)'
-    ).bind(id));
-    stmts.push(db.prepare('UPDATE published_revisions SET live = 1 WHERE publish_id = ?').bind(id));
-  }
+  const stmts = liveStmts(db, id, by, now, changed);
   stmts.push(db.prepare(
     "INSERT INTO publish_jobs (id, mode, revision, hash, state, files, changed, result, by, at, created_at, updated_at) VALUES (?, ?, ?, ?, 'live', ?, ?, ?, ?, ?, ?, ?)"
   ).bind(id, mode, revision, setHash, files.length, changed.length, JSON.stringify(result), by || null, at, now, now));
   stmts.push(syncStampStmt(db, 'publish', ts));
   await retry(() => db.batch(stmts));
   return result;
+}
+
+/*
+ * The statements that store `rows` ({ id, kind, key, rev, hash, body, withdrawn }) under
+ * publishId and make them live: new rows first (not live, a few per statement, so a big
+ * publish stays within D1's per-call statement limit), then the old live rows of the same
+ * (kind, key) step down and the new ones go up (the unique live index holds throughout).
+ */
+export function liveStmts(db, publishId, by, now, rows) {
+  if (!rows.length) return [];
+  const stmts = chunks(rows.map(f => ({ id: f.id, kind: f.kind, key: f.key, rev: f.rev, hash: f.hash, body: f.body, withdrawn: f.withdrawn })))
+    .map(chunk => db.prepare(
+      'INSERT INTO published_revisions (id, kind, key, rev, hash, body, withdrawn, live, publish_id, published_by, published_at) ' +
+      "SELECT json_extract(value, '$.id'), json_extract(value, '$.kind'), json_extract(value, '$.key'), json_extract(value, '$.rev'), " +
+      "json_extract(value, '$.hash'), json_extract(value, '$.body'), json_extract(value, '$.withdrawn'), 0, ?, ?, ? FROM json_each(?)"
+    ).bind(publishId, by || null, now, chunk));
+  stmts.push(db.prepare(
+    'UPDATE published_revisions SET live = 0 WHERE live = 1 AND EXISTS (SELECT 1 FROM published_revisions n WHERE n.publish_id = ? AND n.kind = published_revisions.kind AND n.key = published_revisions.key)'
+  ).bind(publishId));
+  stmts.push(db.prepare('UPDATE published_revisions SET live = 1 WHERE publish_id = ?').bind(publishId));
+  return stmts;
 }
 
 /* rows → JSON arrays of at most INSERT_CHUNK_BYTES each (a single bigger row gets its own) */

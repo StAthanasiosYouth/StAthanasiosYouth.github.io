@@ -4,9 +4,28 @@ Rev. 1, 2026-10-21. This is the execution contract for Phase 2. The approved spe
 §22 (row 2), §5, §6, §15, §19 and §23. This file does not change that spec. It fixes the order, the switches and the
 contracts each step builds against.
 
-**Status (2026-10-21).** P2-1 done on **staging only**: migration `0013` applied to `athanasios-staging`, Worker
-`94e8ba6d` (staging), Worker tests 192/192, `worker/scripts/publish-check.mjs` 21/21. Production: untouched
-(no migration, no deploy). Next: P2-2 (needs the owner's approval for its production step).
+**Status (2026-10-21).** P2-1 and P2-2 built and tested on **staging only**: migrations `0013` + `0014` applied to
+`athanasios-staging`, Worker `d33fc92c` (staging); Worker tests 199/199, site/admin unit 728/731 (the 3 known
+pre-existing failures); `worker/scripts/publish-check.mjs` 21/21, `worker/scripts/shadow-check.mjs` all ok against
+the real Pages site. Production: untouched (no migration, no Worker deploy, no Apps Script deploy, `PUBLISH_MODE`
+not set). Next: the P2-2 production step **[owner]**, then the 1–2 week shadow period.
+
+### P2-2 as built
+
+- Apps Script (`WorkerSync.gs` `publishShadow_`, called from `Publish.gs` step D after the commit landed, under the
+  publish claim): only when `PUBLISH_MODE='shadow'`. It posts the commit's text files with id
+  `pub-<revision>-<start ms>`, one retry on 5xx/429/network, never throws. The outcome is kept in the Script Property
+  `PUBLISH_SHADOW_LAST`. Any other value (unset, `github`, `worker`) posts nothing.
+- Worker (`src/publish-shadow.js`): every 15 minutes on the per-minute cron, only once a publish has been posted, and
+  not within 10 minutes of the last one (Pages build). It reads `content.json`, `meeting.ics` and every page, event
+  and competition `content.json` lists from the site (≤ 40 reads), and compares each with the live D1 revision:
+  `equal` · `lag` · `mismatch` · `missing` · `error`. One `shadow_checks` row per run (kept 60 days).
+- `POST /v1/admin/publish/shadow-check` (`system.manage`, `{ seed: true }` copies the files D1 lacks from the site as
+  live revisions, publish id `seed-…`). `GET /v1/admin/publish/status` (`system.view`): the last jobs, the last
+  run, `cleanSince` / `cleanDays` (the gate).
+- Production step (owner): apply `0013` + `0014` to `athanasios-prod`, deploy the Worker, deploy Apps Script,
+  run one `seed` check, then set `PUBLISH_MODE='shadow'`. Rollback: delete `PUBLISH_MODE` (visitors are never
+  affected: they still read GitHub Pages).
 
 **Rules.** All work is done and tested on staging first. Production changes (D1 migration, Worker, Apps Script deploy,
 site push, any switch) need the owner's explicit approval at the step marked **[owner]**. Phase 1.5 features and the

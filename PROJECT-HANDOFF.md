@@ -14,7 +14,7 @@ a notification system. Repository `StAthanasiosYouth/StAthanasiosYouth.github.io
 | Admin panel (PWA) | `admin/` — `admin/admin-app.js` is **built** from `apps-script/*.html` by `node tools/build-admin.mjs`; `admin/boot.js`, `admin/sw.js` are hand-written | GitHub Pages from `main` |
 | Apps Script API (legacy backend, Sheets/Drive) | `apps-script/*.gs` | `cd tools && node deploy-api.mjs "vNN: …"` (updates the one API deployment in place) |
 | Cloudflare Worker + D1 (new backend) | `worker/` | CI (`.github/workflows/worker.yml`) deploys production on a push to `main` touching `worker/**`. Staging: `cd worker && npx wrangler deploy --env staging` |
-| D1 migrations | `worker/migrations/0001`–`0013` (`0013` = Phase 2, staging only so far; next free: **`0014`**) | `npx wrangler d1 migrations apply athanasios-prod --remote` (staging: `athanasios-staging --remote --env staging`) — always before the Worker that needs them; additive only |
+| D1 migrations | `worker/migrations/0001`–`0014` (`0013`–`0014` = Phase 2, staging only so far; next free: **`0015`**) | `npx wrangler d1 migrations apply athanasios-prod --remote` (staging: `athanasios-staging --remote --env staging`) — always before the Worker that needs them; additive only |
 
 APIs: production `https://athanasios-api.menazak-lab.workers.dev`, staging `https://athanasios-api-staging.menazak-lab.workers.dev`.
 
@@ -45,7 +45,7 @@ when to turn the router/email/`PAY_REQUESTS` on; test-data cleanup before launch
 ## 4. Next: Phase 2 — publish separation
 
 Spec: `docs/BACKEND-MIGRATION.md` §22 (row 2), rollback §23, and the sections it references.
-Execution plan + status: **`docs/PUBLISH-SEPARATION-PLAN.md`** (P2-1 done on staging, 2026-10-21).
+Execution plan + status: **`docs/PUBLISH-SEPARATION-PLAN.md`** (P2-1 + P2-2 done on staging, 2026-10-21; production step awaits the owner).
 Scope: `published_revisions`, public loaders (Worker + static fallback), Apps Script publish posts its build to the Worker,
 background GitHub mirror, `404.html` shell, browser-side Review, revision restore. Goal: publish visible at once
 (~7 s + 60 s → ~3 s). Gate: 1–2 weeks of equal shadow hashes. Rollback: `CONTENT_SOURCE='static'` + `PUBLISH_MODE='github'`.

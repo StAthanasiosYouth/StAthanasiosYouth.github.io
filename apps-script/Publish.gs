@@ -553,6 +553,7 @@ function publishNow_(expectedRevision) {
   var commit = null;
   var mediaIds = [];
   var unchanged = false;
+  var files = null;
 
   try {
 
@@ -570,7 +571,7 @@ function publishNow_(expectedRevision) {
     }
     else {
 
-      var files = {
+      files = {
         'content.json': JSON.stringify(built.content, null, 2) + '\n'
       };
 
@@ -647,6 +648,11 @@ function publishNow_(expectedRevision) {
       activity_({ action: 'publish', type: 'site', id: built.content.revision, title: '', ref: built.content.revision + (commit ? ' ' + commit.sha.slice(0, 7) : ''), changes: commit ? activitySincePublish_() : { unchanged: true } });
 
     });
+
+    // D. PUBLISH_MODE='shadow' (Phase 2): the same files to the Worker, still under the claim; never fails the publish
+    if (commit && files) {
+      publishShadow_(files, built.content.revision, now.getTime(), email);
+    }
 
   }
   finally {

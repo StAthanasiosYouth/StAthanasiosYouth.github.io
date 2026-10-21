@@ -32,6 +32,18 @@ import { rowFromJson, saveRow } from './book/event.js';
 import { syncBookNews, diagNews } from './book/news.js';
 import { syncPayDest, bookPay } from './book/pay.js';
 import { syncPublish, publicContent, publicPage, publicEvent, publicComp, publicIcs, PUBLISH_MAX_BYTES } from './publish.js';
+import { shadowCheck, shadowStatus } from './publish-shadow.js';
+
+/* GET /v1/admin/publish/status — the last publishes + the shadow gate (docs/PUBLISH-SEPARATION-PLAN.md P2-2) */
+async function publishStatus(ctx) {
+  return shadowStatus(ctx.env.DB);
+}
+
+/* POST /v1/admin/publish/shadow-check { seed } — one comparison now (seed: copy files D1 lacks from the site) */
+async function publishShadowCheck(ctx) {
+  await limit(ctx, 'publish.shadow', ctx.actor.email, 6, 60);
+  return shadowCheck(ctx.env, { fetchImpl: ctx.fetch, seed: ctx.body && ctx.body.seed === true, settle: false });
+}
 
 export const VERSION = '0.3.0';
 
@@ -303,6 +315,8 @@ export const ROUTES = [
   { method: 'GET', path: '/v1/public/event/:slug', auth: 'public', handler: publicEvent },
   { method: 'GET', path: '/v1/public/comp/:slug', auth: 'public', handler: publicComp },
   { method: 'GET', path: '/v1/public/ics', auth: 'public', handler: publicIcs },
+  { method: 'GET', path: '/v1/admin/publish/status', auth: 'admin', handler: publishStatus },
+  { method: 'POST', path: '/v1/admin/publish/shadow-check', auth: 'admin', handler: publishShadowCheck },
 
   // booking — public (docs/EVENTS.md §6, worker/BOOKING-API.md)
   { method: 'GET', path: '/v1/book/state', auth: 'public', handler: bookState },

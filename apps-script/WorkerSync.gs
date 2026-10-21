@@ -282,3 +282,89 @@ function activityForward_(force) {
   }
 
 }
+
+
+/* =========================================================
+   PUBLISH SHADOW (Phase 2 step 2, docs/PUBLISH-SEPARATION-PLAN.md)
+   ---------------------------------------------------------
+   PUBLISH_MODE (Script Property): 'github' (default, today) or 'shadow'.
+   In shadow mode the files of a commit that just landed go to the Worker
+   too (POST /v1/sync/publish, signed like every sync). Visitors still read
+   GitHub Pages; the Worker compares the two every 15 minutes. A failed post
+   never fails the publish: it is logged, kept in PUBLISH_SHADOW_LAST, and
+   shows up in the Worker's comparison as a lag/missing file.
+   ('worker' arrives with P2-4; until then any other value means 'github'.)
+========================================================= */
+
+var PUBLISH_SHADOW_LAST = 'PUBLISH_SHADOW_LAST';
+
+function publishMode_() {
+
+  var mode = PropertiesService.getScriptProperties().getProperty('PUBLISH_MODE') || 'github';
+  return mode === 'shadow' ? 'shadow' : 'github';
+
+}
+
+/* files: { path: text } of the commit; true when the Worker stored them */
+function publishShadow_(files, revision, at, email) {
+
+  if (publishMode_() !== 'shadow') return false;
+
+  var props = PropertiesService.getScriptProperties();
+  var outcome = 'not sent';
+
+  try {
+
+    var secret = workerSyncSecret_();
+
+    if (!secret) {
+      outcome = 'no secret';
+    }
+    else {
+
+      // one id per publish; a retry below reuses it, so the Worker stores it once
+      var body = JSON.stringify({ id: 'pub-' + revision + '-' + at, mode: 'shadow', by: email || '', at: at, files: files });
+
+      for (var attempt = 0; attempt < 2; attempt++) {
+
+        var ts = String(Date.now());
+        var response = UrlFetchApp.fetch(WORKER_API_URL + '/v1/sync/publish', {
+          method: 'post',
+          contentType: 'application/json; charset=utf-8',
+          payload: Utilities.newBlob(body).getBytes(),   // UTF-8 bytes: exactly what was signed
+          headers: { 'x-sync-ts': ts, 'x-sync-signature': 'v1=' + hmacHex_(secret, ts + '.' + body) },
+          muteHttpExceptions: true,
+          followRedirects: false
+        });
+        var code = response.getResponseCode();
+
+        if (code === 200) {
+          outcome = 'ok';
+          break;
+        }
+
+        outcome = 'HTTP ' + code;
+        if (code < 500 && code !== 429) break;     // refused: a retry would be refused too
+        Utilities.sleep(800);
+
+      }
+
+    }
+
+  }
+  catch (error) {
+    outcome = 'network';
+  }
+
+  if (outcome !== 'ok') console.warn('publish shadow: ' + outcome);
+
+  try {
+    props.setProperty(PUBLISH_SHADOW_LAST, JSON.stringify({ at: at, revision: revision, outcome: outcome }));
+  }
+  catch (ignored) {
+    // only a note for the diagnostics
+  }
+
+  return outcome === 'ok';
+
+}

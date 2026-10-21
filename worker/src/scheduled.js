@@ -7,6 +7,7 @@ import { logLine } from './lib/log.js';
 import { sweepProofs } from './lib/proofs.js';
 import { activityStmt } from './lib/activity.js';
 import { notifyTick } from './notify/tick.js';
+import { shadowCheck, SHADOW_EVERY_MIN } from './publish-shadow.js';
 
 const DAY = 24 * 3600 * 1000;
 export const RETENTION = {
@@ -17,7 +18,8 @@ export const RETENTION = {
   activityRows: 5250,
   phoneMs: 365 * DAY,           // EVENTS.md §10: phones blanked 12 months after the event ends
   locksMs: DAY,                 // edit locks long expired (book/locks.js)
-  outboxMs: 30 * DAY            // §4.4: the outbox is kept 30 days (a critical row never expires unsent)
+  outboxMs: 30 * DAY,           // §4.4: the outbox is kept 30 days (a critical row never expires unsent)
+  shadowMs: 60 * DAY            // Phase 2 shadow comparison runs (the gate looks back 1–2 weeks)
 };
 
 export async function housekeeping(env, now = Date.now()) {
@@ -30,7 +32,8 @@ export async function housekeeping(env, now = Date.now()) {
     env.DB.prepare('DELETE FROM activity WHERE id IN (SELECT id FROM activity ORDER BY at DESC LIMIT -1 OFFSET ?)').bind(RETENTION.activityRows),
     env.DB.prepare("DELETE FROM notify_outbox WHERE created_ms < ? AND (status IN ('sent', 'dead', 'dismissed') OR level <> 'critical')").bind(now - RETENTION.outboxMs),
     // email counters: hour buckets older than 2 days (and the old per-day rows) are no longer in any window
-    env.DB.prepare('DELETE FROM notify_quota WHERE day < ?').bind('h:' + new Date(now - 2 * DAY).toISOString().slice(0, 13))
+    env.DB.prepare('DELETE FROM notify_quota WHERE day < ?').bind('h:' + new Date(now - 2 * DAY).toISOString().slice(0, 13)),
+    env.DB.prepare('DELETE FROM shadow_checks WHERE at < ?').bind(now - RETENTION.shadowMs)
   ]);
   const removed = r.map(x => x.meta.changes);
   logLine({ kind: 'cron', job: 'housekeeping', removed });
@@ -71,6 +74,10 @@ export async function scheduled(controller, env) {
   const now = controller.scheduledTime || Date.now();
   if (controller.cron === '* * * * *') {
     await notifyTick(env, now);
+    // Phase 2: the shadow comparison every 15 minutes (nothing until a publish was posted)
+    if (new Date(now).getUTCMinutes() % SHADOW_EVERY_MIN === 0) {
+      await shadowCheck(env, { now }).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'shadow', err: String(err && err.message).slice(0, 200) }));
+    }
     return;
   }
   await housekeeping(env, now);
