@@ -80,7 +80,7 @@ export async function saveRow(env, row) {
 /* the live event.json revision of a worker-mode publish (parsed), or undefined (then the site decides) */
 async function publishedEvent(env, slug) {
   const row = await retry(() => env.DB.prepare(
-    "SELECT r.body FROM published_revisions r JOIN publish_jobs j ON j.id = r.publish_id WHERE r.kind = 'event' AND r.key = ? AND r.live = 1 AND j.mode = 'worker'"
+    "SELECT r.body FROM published_revisions r JOIN publish_jobs j ON j.id = r.publish_id WHERE r.kind = 'event' AND r.key = ? AND r.live = 1 AND j.mode IN ('worker', 'restore')"
   ).bind(slug).first());
   if (!row) return undefined;
   try { return JSON.parse(row.body); } catch { return undefined; }

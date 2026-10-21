@@ -34,6 +34,7 @@ import { syncPayDest, bookPay } from './book/pay.js';
 import { syncPublish, publicContent, publicPage, publicEvent, publicComp, publicIcs, PUBLISH_MAX_BYTES } from './publish.js';
 import { shadowCheck, shadowStatus } from './publish-shadow.js';
 import { mirrorStatus } from './publish-mirror.js';
+import { publishRevisions, publishRestore } from './publish-restore.js';
 
 /* GET /v1/admin/publish/status — the last publishes + the shadow gate (docs/PUBLISH-SEPARATION-PLAN.md P2-2) */
 async function publishStatus(ctx) {
@@ -318,6 +319,8 @@ export const ROUTES = [
   { method: 'GET', path: '/v1/public/ics', auth: 'public', handler: publicIcs },
   { method: 'GET', path: '/v1/admin/publish/status', auth: 'admin', handler: publishStatus },
   { method: 'POST', path: '/v1/admin/publish/shadow-check', auth: 'admin', handler: publishShadowCheck },
+  { method: 'GET', path: '/v1/admin/publish/revisions', auth: 'admin', handler: publishRevisions },
+  { method: 'POST', path: '/v1/admin/publish/restore', auth: 'admin', maxBytes: 1024, handler: publishRestore },
 
   // booking — public (docs/EVENTS.md §6, worker/BOOKING-API.md)
   { method: 'GET', path: '/v1/book/state', auth: 'public', handler: bookState },

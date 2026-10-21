@@ -4,7 +4,7 @@
  * With PUBLISH_MODE='worker' the publish is live once D1 has it; GitHub gets
  * the same files afterwards, as history and as the static fallback. The
  * mirror commits the CURRENT live snapshot: every live revision of a
- * worker-mode publish not mirrored yet, in one commit. Several publishes in
+ * worker-mode publish (or restore) not mirrored yet, in one commit. Several publishes in
  * a row coalesce; a retry never commits an older text over a newer one.
  * Shadow/seed revisions are never mirrored (Apps Script committed those).
  *
@@ -34,7 +34,7 @@ export function revisionPath(kind, key) {
   return '';
 }
 
-const PENDING = "FROM published_revisions r JOIN publish_jobs j ON j.id = r.publish_id WHERE r.live = 1 AND r.mirrored_at IS NULL AND j.mode = 'worker'";
+const PENDING = "FROM published_revisions r JOIN publish_jobs j ON j.id = r.publish_id WHERE r.live = 1 AND r.mirrored_at IS NULL AND j.mode IN ('worker', 'restore')";
 
 async function last(db) {
   const row = await retry(() => db.prepare('SELECT value FROM settings WHERE key = ?').bind(LAST_KEY).first());
@@ -86,7 +86,7 @@ export async function mirrorPending(env, { now = Date.now(), fetchImpl = fetch }
       const error = String(err && err.message).slice(0, 200);
       await retry(() => db.batch([
         setStmt(db, LAST_KEY, JSON.stringify({ at: now, ok: false, fails, error }), now),
-        db.prepare("UPDATE publish_jobs SET state = 'failed', error = ?, updated_at = ? WHERE mode = 'worker' AND state IN ('live', 'failed') AND EXISTS (SELECT 1 FROM published_revisions r WHERE r.publish_id = publish_jobs.id AND r.live = 1 AND r.mirrored_at IS NULL)").bind(error, now)
+        db.prepare("UPDATE publish_jobs SET state = 'failed', error = ?, updated_at = ? WHERE mode IN ('worker', 'restore') AND state IN ('live', 'failed') AND EXISTS (SELECT 1 FROM published_revisions r WHERE r.publish_id = publish_jobs.id AND r.live = 1 AND r.mirrored_at IS NULL)").bind(error, now)
       ]));
       logLine({ lvl: 'warn', kind: 'mirror', files: rows.length, fails, err: error });
       return { failed: error, fails };
@@ -96,8 +96,8 @@ export async function mirrorPending(env, { now = Date.now(), fetchImpl = fetch }
     await retry(() => db.batch([
       db.prepare('UPDATE published_revisions SET mirrored_at = ?, github_commit = ? WHERE id IN (SELECT value FROM json_each(?))').bind(now, out.sha, ids),
       // older worker revisions that never made it out on their own: their newer text just did
-      db.prepare("UPDATE published_revisions SET mirrored_at = ? WHERE live = 0 AND mirrored_at IS NULL AND publish_id IN (SELECT id FROM publish_jobs WHERE mode = 'worker')").bind(now),
-      db.prepare("UPDATE publish_jobs SET state = 'mirrored', error = NULL, updated_at = ? WHERE mode = 'worker' AND state IN ('live', 'failed') AND NOT EXISTS (SELECT 1 FROM published_revisions r WHERE r.publish_id = publish_jobs.id AND r.live = 1 AND r.mirrored_at IS NULL)").bind(now),
+      db.prepare("UPDATE published_revisions SET mirrored_at = ? WHERE live = 0 AND mirrored_at IS NULL AND publish_id IN (SELECT id FROM publish_jobs WHERE mode IN ('worker', 'restore'))").bind(now),
+      db.prepare("UPDATE publish_jobs SET state = 'mirrored', error = NULL, updated_at = ? WHERE mode IN ('worker', 'restore') AND state IN ('live', 'failed') AND NOT EXISTS (SELECT 1 FROM published_revisions r WHERE r.publish_id = publish_jobs.id AND r.live = 1 AND r.mirrored_at IS NULL)").bind(now),
       setStmt(db, LAST_KEY, JSON.stringify({ at: now, ok: true, fails: 0, sha: out.sha, unchanged: out.unchanged, files: rows.length }), now)
     ]));
     logLine({ kind: 'mirror', files: rows.length, sha: out.sha.slice(0, 7), unchanged: out.unchanged });

@@ -396,3 +396,65 @@ function publishToWorker_(files, revision, at, email) {
   );
 
 }
+
+
+/* =========================================================
+   WHAT IS LIVE, IN 'worker' MODE (Phase 2 P2-7)
+   ---------------------------------------------------------
+   With PUBLISH_MODE='worker' the Worker is the truth: GitHub's content.json
+   follows through the mirror (a minute later), and a restore («ارجع للنسخة
+   دي», P2-8) changes what is live without this script. So the review's
+   diff, the publish's "already live?" check and the status read the live
+   revision from the Worker (GET /v1/public/content, public, no secret):
+   fresh for the review and the publish, else a 20-s cached copy.
+========================================================= */
+
+var WORKER_LIVE_KEY = 'pub:worker:live';
+var WORKER_LIVE_SECONDS = 20;
+
+/* the Worker's live content.json (parsed), or null when it can't say (then GitHub / the property decide) */
+function workerLiveContent_(fresh) {
+
+  var cache = CacheService.getScriptCache();
+
+  if (!fresh) {
+    var cached = cache.get(WORKER_LIVE_KEY);
+    if (cached) {
+      try { return JSON.parse(cached); } catch (ignored) { /* fetch below */ }
+    }
+  }
+
+  try {
+    var response = UrlFetchApp.fetch(WORKER_API_URL + '/v1/public/content', { method: 'get', muteHttpExceptions: true, followRedirects: false });
+    if (response.getResponseCode() !== 200) return null;
+    var text = response.getContentText();
+    var content = JSON.parse(text);
+    if (!content || typeof content.revision !== 'string') return null;
+    try { if (text.length < 95000) cache.put(WORKER_LIVE_KEY, text, WORKER_LIVE_SECONDS); } catch (ignored) { /* next call asks again */ }
+    return content;
+  }
+  catch (error) {
+    return null;
+  }
+
+}
+
+/* the live revision as the status shows it: the Worker's in 'worker' mode, else what this script last published */
+function liveRevision_() {
+
+  var known = PropertiesService.getScriptProperties().getProperty('PUBLISHED_REVISION') || '';
+
+  if (publishMode_() !== 'worker') return known;
+
+  var live = workerLiveContent_(false);
+  return live ? live.revision : known;
+
+}
+
+/* the panel after a restore: drop the cached live copy, then the usual state */
+function apiPublishRefresh() {
+
+  try { CacheService.getScriptCache().remove(WORKER_LIVE_KEY); } catch (ignored) { /* expires in 20 s anyway */ }
+  return apiState();
+
+}

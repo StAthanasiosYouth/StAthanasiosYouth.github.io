@@ -5250,7 +5250,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       )
       : null;
 
-    return [A.appCard ? A.appCard() : null, siteCard, A.state.hubReady ? hubCard : null, guideCard, upgradeCard, publishCard, adminsCard()].concat(notifyCards(), [mediaCard, accountCard]).filter(Boolean);
+    return [A.appCard ? A.appCard() : null, siteCard, A.state.hubReady ? hubCard : null, guideCard, upgradeCard, publishCard, publishHistoryCard(), adminsCard()].concat(notifyCards(), [mediaCard, accountCard]).filter(Boolean);
 
   };
 
@@ -6061,6 +6061,81 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var card = A.card('حالة النظام', 'الإشعارات والإيميلات: اللي اتبعت، اللي مستني، واللي فشل.', box, body);
     card.classList.add('card--system-status');
+    return card;
+
+  }
+
+  /*
+   * «نسخ النشر» (Phase 2 P2-8): the last publishes from the Worker; while the
+   * Worker is the truth (PUBLISH_MODE 'worker') each one can be made live again.
+   * Hidden without the Worker or without the publish permission.
+   */
+  var PUBLISH_KINDS = { worker: 'نشر', restore: 'رجوع لنسخة', shadow: 'نشر (GitHub)', seed: 'البداية' };
+
+  function publishHistoryCard() {
+
+    var W = window.AdminWorker;
+    if (!W) return null;
+
+    var box = A.errorBox();
+    var body = el('div', { 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
+    var card = A.card('نسخ النشر', 'آخر مرات النشر. لما النشر يبقى من السيرفر الجديد تقدر ترجّع الموقع لأي نسخة منهم.', box, body);
+    card.classList.add('card--publish-history');
+
+    function restore(job, live, button) {
+      box.hidden = true;
+      A.confirm({
+        tone: 'danger',
+        icon: 'retry',
+        title: 'ترجّع الموقع للنسخة دي؟',
+        message: 'الزوار هيشوفوا النسخة اللي اتنشرت ' + ntWhen(job.at) + ' فوراً، ونسخة GitHub هتتحدث بعدها. المسودة في لوحة التحكم مش هتتغير: أول «راجع وانشر» بعد كده هينشر اللي في المسودة تاني.',
+        confirmLabel: 'رجّع النسخة دي',
+        cancelLabel: 'لأ'
+      }).then(function (ok) {
+        if (!ok) return;
+        A.withBusy(button, W.call('POST', '/v1/admin/publish/restore', { to: job.id, expect: live }))
+          .then(function (out) {
+            A.toast(out.unchanged ? 'الموقع أصلاً على النسخة دي.' : 'رجع الموقع للنسخة دي ✓');
+            // the panel's status follows the Worker (WorkerSync.gs), then this list (once the page is drawn again)
+            return A.call('apiPublishRefresh')
+              .then(function (next) { if (A.applyState) A.applyState(next); })
+              .catch(function () { /* the status catches up within 20 s */ })
+              .then(function () { if (card.isConnected) load(); });
+          })
+          .catch(function (error) { A.fail(error, box, { fields: false }); });
+      });
+    }
+
+    function draw(data) {
+      body.setAttribute('aria-busy', 'false');
+      var names = (A.state && A.state.names) || {};
+      A.fill(body, [
+        data.enabled ? null : el('p', { class: 'note' }, 'الرجوع لنسخة قديمة بيشتغل لما النشر يبقى من السيرفر الجديد. دلوقتي الموقع بيتنشر من GitHub.'),
+        data.jobs.length ? el('ul', { class: 'admins' }, data.jobs.map(function (job) {
+          return el('li', { class: 'admin', 'data-publish': job.id },
+            el('div', { class: 'admin__body' },
+              el('p', { class: 'admin__name', text: (PUBLISH_KINDS[job.mode] || job.mode) + ' · ' + ntWhen(job.at) }),
+              el('p', { class: 'admin__email', dir: 'auto', text: (names[job.by] || job.by || '') + (job.revision ? ' · ' + job.revision : '') }),
+              job.live ? A.chip('الحالية', 'ok') : null
+            ),
+            data.enabled && !job.live
+              ? el('button', { class: 'btn btn--small', type: 'button', onclick: function (event) { restore(job, data.live, event.currentTarget); } }, 'ارجع للنسخة دي')
+              : null
+          );
+        })) : el('p', { class: 'note' }, 'لسه مفيش نشر من السيرفر الجديد.')
+      ]);
+    }
+
+    function load() {
+      W.call('GET', '/v1/admin/publish/revisions', undefined, { quiet: true }).then(draw).catch(function (error) {
+        // no publish permission, or the Worker away: the card stays out of the way
+        if (error && (error.code === 'perm' || error.code === 'denied' || error.status === 403)) { card.hidden = true; return; }
+        body.setAttribute('aria-busy', 'false');
+        A.fail(error, box, { fields: false });
+      });
+    }
+
+    load();
     return card;
 
   }

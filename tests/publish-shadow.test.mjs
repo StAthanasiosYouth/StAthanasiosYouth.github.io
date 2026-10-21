@@ -143,3 +143,44 @@ test('worker: a new picture is committed to GitHub first (binaries only), then t
   const sent = JSON.parse(bodyOf(posts(w)[0]));
   assert.ok(!Object.keys(sent.files).some(p => p.startsWith('media/')), 'no binaries to the Worker');
 });
+
+// ---------- P2-7: in 'worker' mode the review, the publish and the status follow the Worker's live revision ----------
+
+const LIVE_URL = 'https://athanasios-api.menazak-lab.workers.dev/v1/public/content';
+
+test('worker: after a restore on the Worker, the draft is not "already live": the review diffs against the Worker and the publish goes through', () => {
+  const w = world('worker');
+  w.web[URL_] = ok('a');
+  const first = publish(w);                                          // r1 live (the Worker took it)
+  const gs = w.as(ADMIN).gs;
+  // the Worker serves an older revision now (a restore, P2-8): this script still remembers r1
+  w.web[LIVE_URL] = { status: 200, body: JSON.stringify({ revision: 'older-rev', meeting: {}, sections: [] }) };
+  assert.equal(w.properties.get('PUBLISHED_REVISION'), first.revision);
+  const state = plain(gs.apiPublishRefresh());
+  assert.equal(state.status.publishedRevision, 'older-rev', 'the status follows the Worker');
+  assert.equal(state.status.hasChanges, true);
+  const review = plain(gs.apiReview());
+  assert.ok(review.changes.length > 0, 'a real diff against the Worker, not "nothing changed"');
+  const again = plain(gs.apiPublish(review.revision));
+  assert.deepEqual([again.unchanged, again.mirror], [false, 'pending'], 'published again, not skipped as unchanged');
+  assert.equal(posts(w).length, 2);
+});
+
+test('worker: the Worker cannot say what is live → the property decides (as before)', () => {
+  const w = world('worker');
+  w.web[URL_] = ok('a');
+  const first = publish(w);
+  w.web[LIVE_URL] = { status: 503, body: 'down' };
+  const state = plain(w.as(ADMIN).gs.apiPublishRefresh());
+  assert.equal(state.status.publishedRevision, first.revision);
+});
+
+test('github / shadow mode: never asks the Worker what is live', () => {
+  for (const mode of [null, 'shadow']) {
+    const w = world(mode);
+    publish(w);
+    plain(w.as(ADMIN).gs.apiState());
+    plain(w.as(ADMIN).gs.apiReview());
+    assert.equal(w.webRequests.filter(r => r.url === LIVE_URL).length, 0, String(mode));
+  }
+});

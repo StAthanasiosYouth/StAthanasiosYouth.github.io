@@ -47,7 +47,7 @@ var API_PERMS = {
   apiPageSave: 'content.edit', apiPageSetEnabled: 'content.edit', apiPageArchive: 'content.edit', apiPageMediaSave: 'content.edit', apiPageMediaOrder: 'content.edit',
   apiDeleteLink: 'content.delete', apiDeleteSection: 'content.delete', apiDeleteContact: 'content.delete', apiDeleteItem: 'content.delete',
   apiPageDelete: 'content.delete', apiPageMediaDelete: 'content.delete',
-  apiPublish: 'publish.publish',
+  apiPublish: 'publish.publish', apiPublishRefresh: 'content.view',
 
   // media
   apiCheckMedia: 'media.view', apiMediaLibrary: 'media.view', apiMediaPreview: 'media.view',

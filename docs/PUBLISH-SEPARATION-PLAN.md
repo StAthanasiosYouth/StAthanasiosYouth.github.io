@@ -18,6 +18,31 @@ return the same sha-256 as the site, ETag 304 ok. **Left: the owner sets the Scr
 (Apps Script editor → Project Settings → Script Properties); the 15-minute comparison starts with the first shadow
 publish after that. Rollback: delete `PUBLISH_MODE`; Worker `wrangler rollback e2673438`; Apps Script @53.
 
+### P2-7 and P2-8 as built (2026-10-21, staging / local only; nothing released)
+
+- **P2-7, what was built** (`WorkerSync.gs` `workerLiveContent_` / `liveRevision_`, `Publish.gs`): in `worker` mode the
+  review's diff, the publish's "already live?" check and the panel status use the Worker's live revision
+  (`GET /v1/public/content`; fresh for review/publish, a 20-s cached copy for the status; if the Worker can't say,
+  GitHub / the property decide as before). Needed: GitHub's `content.json` lags behind the mirror, and a restore
+  changes what is live without Apps Script. github/shadow mode never asks the Worker.
+- **P2-7, what was not built: the review computed in the browser.** The browser does not hold the pages and
+  competitions drafts (Sheets), and the builders (`Content.gs`, `Pages.gs`, `CompPublish.gs`, `Review.gs`) move to the
+  Worker in Phase 4 anyway (§22 row 4). Doing it in the browser now would mean shipping those drafts and ~5k lines of
+  builders to the admin, then replacing them in Phase 4. **Owner decision pending:** defer it to Phase 4, or build it
+  now.
+- **P2-8** (`worker/src/publish-restore.js`): `GET /v1/admin/publish/revisions` (the last 15 publishes, which is live,
+  whether restore is on) and `POST /v1/admin/publish/restore { to, expect }` (`publish.publish`). A restore is a new
+  publish (mode `restore`) of the texts that were live right after the chosen one; pages/events/competitions added
+  since get their withdrawn JSON; stubs stay; history is never rewritten. Only while the Worker is the truth (the
+  latest publish `worker`/`restore`); `expect` refuses a stale view. Live at once; the booking re-reads a changed
+  event; the mirror commits it; one activity row («رجّع الموقع للنسخة اللي اتنشرت …», important). The panel: the
+  «نسخ النشر» card in Settings (existing components), a confirm that says the draft is not changed and the next
+  publish brings it back, then `apiPublishRefresh` (the status follows the Worker).
+- Tests: Worker 215/215 (`publish-restore` 3/3), Apps Script `publish-shadow` 10/10 (3 new for P2-7), accounts e2e 8/8
+  (the «نسخ النشر» card; the rename test's typing race fixed), unit 748/751 (3 known). Staging Worker `815d2f1b`:
+  `worker/scripts/restore-check.mjs` 10/10 (restore ≈ 0.8 s, live at once, stale view refused, mirrored to the test
+  repository, commit `e4b5d84`). Production repository untouched.
+
 ### P2-4 real check on staging (2026-10-21)
 
 The owner set the staging secret `GITHUB_TOKEN` (fine-grained, the test repository

@@ -80,6 +80,8 @@ export const ROUTE_PERMS = Object.freeze({
   'GET /v1/admin/diag/book-news': 'system.view',
   'GET /v1/admin/publish/status': 'system.view',
   'POST /v1/admin/publish/shadow-check': 'system.manage',
+  'GET /v1/admin/publish/revisions': 'publish.publish',
+  'POST /v1/admin/publish/restore': 'publish.publish',
   'POST /v1/admin/proofs': 'bookings.edit',
   'GET /v1/admin/proofs/:id': 'bookings.view',
   'DELETE /v1/admin/proofs/:id': 'bookings.manage',

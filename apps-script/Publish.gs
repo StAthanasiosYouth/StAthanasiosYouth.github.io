@@ -291,7 +291,7 @@ function buildDraft_() {
 function publishStatus_(built) {
 
   var props = PropertiesService.getScriptProperties();
-  var published = props.getProperty('PUBLISHED_REVISION') || '';
+  var published = liveRevision_();      // 'worker' mode: the Worker's (WorkerSync.gs)
 
   built = built || buildDraft_();
 
@@ -363,7 +363,8 @@ function reviewNow_() {
   var githubError = '';
 
   try {
-    published = lastPublished_() || fetchPublishedContent_();
+    // 'worker' mode: the diff is against what the Worker serves (GitHub follows a minute later; a restore changes it)
+    published = (publishMode_() === 'worker' ? workerLiveContent_(true) : null) || lastPublished_() || fetchPublishedContent_();
   }
   catch (error) {
     githubError = error.message;
@@ -563,7 +564,9 @@ function publishNow_(expectedRevision) {
     // B. no lock: the network work. What is live: the revision this script last published
     // (asked from GitHub only when it doesn't know; a moved branch is handled by the commit itself)
     var known = PropertiesService.getScriptProperties().getProperty('PUBLISHED_REVISION');
-    var liveRevision = known || ((fetchPublishedContent_() || {}).revision || '');
+    // 'worker' mode: the Worker says (a restore may have changed it since this script's last publish)
+    var workerLive = mode === 'worker' ? workerLiveContent_(true) : null;
+    var liveRevision = workerLive ? workerLive.revision : known || ((fetchPublishedContent_() || {}).revision || '');
 
     // same visible content already live: no empty-change commit
     // (unless a picture still waits to go to the site: a store prize's is not in content.json)
@@ -615,6 +618,7 @@ function publishNow_(expectedRevision) {
           githubCommitFiles_({}, 'Publish media for ' + built.content.revision + ' (' + cairoNow_(now).replace('T', ' ') + ' Cairo)', media.binaries);
         }
         worker = publishToWorker_(files, built.content.revision, now.getTime(), email);
+        try { CacheService.getScriptCache().remove(WORKER_LIVE_KEY); } catch (ignored) { /* 20 s */ }
       }
       else {
         // no personal data in the public commit history

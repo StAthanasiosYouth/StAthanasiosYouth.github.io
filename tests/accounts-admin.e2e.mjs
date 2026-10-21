@@ -44,6 +44,7 @@ const fake = {
     this.calls = [];
     this.notify = notifyFake();
     this.activityDown = false;
+    this.publish = { enabled: false, live: null, jobs: [] };
     const at = Date.now() - 60000;
     this.activity = [
       { id: 'act-w00000000001', at, cairo: '2026-10-20 10:00', actor: ADMIN, actorName: 'مينا زكريا', action: 'booking.confirm', type: 'booking', entityId: 'bkg-1', title: 'B-AAAA1', summary: 'أكّد الحجز B-AAAA1', text: 'مينا زكريا أكّد الحجز B-AAAA1', changes: null, ref: '', count: 1, device: '', severity: 'routine', source: 'worker' },
@@ -93,6 +94,13 @@ async function handle(request) {
   if (url.pathname === '/v1/admin/notify/settings' && method === 'POST') { fake.notify.apply(body); return json(200, fake.notify.settings()); }
   if (url.pathname === '/v1/admin/notify/me') { if (method === 'POST') fake.notify.prefs = body.prefs; return json(200, fake.notify.me()); }
   if (url.pathname === '/v1/admin/notify/status') return json(200, fake.notify.status());
+  if (url.pathname === '/v1/admin/publish/revisions') return json(200, { ok: true, ...fake.publish, jobs: fake.publish.jobs.map(j => ({ ...j, live: j.id === fake.publish.live })) });
+  if (url.pathname === '/v1/admin/publish/restore' && method === 'POST') {
+    const id = 'restore-' + fake.publish.jobs.length;
+    fake.publish.jobs.unshift({ id, mode: 'restore', revision: 'r1', by: ADMIN, at: Date.now(), files: 1, changed: 1, state: 'live' });
+    fake.publish.live = id;
+    return json(200, { ok: true, id, to: body.to, unchanged: false });
+  }
   if (url.pathname.startsWith('/v1/admin/notify/outbox/') && url.pathname.endsWith('/dismiss')) { fake.notify.critical = []; return json(200, fake.notify.status()); }
   if (url.pathname === '/v1/admin/activity' && method === 'GET') {
     if (fake.activityDown) return json(500, { ok: false, code: 'error', message: 'x' });
@@ -339,6 +347,9 @@ test('rename an account Apps Script does not know yet: the error stays in the ca
   const rename = async name => {
     await page.click(`.card--admins .admin[data-email="${NEW}"] [title="غيّر الاسم"]`);
     await page.waitForSelector('dialog.modal input');
+    // the dialog focuses and selects its field itself (30 ms later): type after that, or the selection eats the text
+    await page.waitForFunction(() => document.activeElement && document.activeElement.matches('dialog.modal input'), { timeout: 3000 });
+    await new Promise(r => setTimeout(r, 50));
     await page.type('dialog.modal input', name);
     await clickDialogButton(page, 'احفظ الاسم');
   };
@@ -361,6 +372,41 @@ test('rename an account Apps Script does not know yet: the error stays in the ca
   assert.ok(world.properties.get('ADMIN_EMAILS').includes(NEW), 'ADMIN_EMAILS follows D1');
 
   delete world.web['https://athanasios-api.menazak-lab.workers.dev/v1/sync/grants'];
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('«نسخ النشر»: the last publishes; while the Worker is the truth one goes live again after a clear confirm', async () => {
+  fake.reset();
+  const t = Date.now() - 3600e3;
+  fake.publish = { enabled: false, live: 'pub-2', jobs: [
+    { id: 'pub-2', mode: 'shadow', revision: 'r2', by: ADMIN, at: t + 1000, files: 2, changed: 2, state: 'live' },
+    { id: 'pub-1', mode: 'shadow', revision: 'r1', by: ADMIN, at: t, files: 2, changed: 2, state: 'live' }
+  ] };
+  let { context, page, problems } = await openSettings();
+  await page.waitForFunction(() => document.querySelector('.card--publish-history [data-publish]'), { timeout: 8000 });
+  let text = await page.$eval('.card--publish-history', n => n.innerText);
+  assert.match(text, /بيشتغل لما النشر يبقى من السيرفر الجديد/);
+  assert.match(text, /الحالية/);
+  assert.equal(await page.$$eval('.card--publish-history button', n => n.length), 0, 'github/shadow mode: no restore button');
+  await context.close();
+
+  fake.publish = { ...fake.publish, enabled: true, jobs: fake.publish.jobs.map(j => ({ ...j, mode: 'worker' })) };
+  ({ context, page, problems } = await openSettings());
+  await page.waitForSelector('.card--publish-history [data-publish="pub-1"] button');
+  assert.equal(await page.$$eval('.card--publish-history [data-publish="pub-2"] button', n => n.length), 0, 'the live one has none');
+  await page.click('.card--publish-history [data-publish="pub-1"] button');
+  await page.waitForFunction(() => /المسودة في لوحة التحكم مش هتتغير/.test(document.querySelector('dialog.modal').innerText), { timeout: 5000 });
+  await page.screenshot({ path: `${SHOTS}restore-confirm.png` });
+  await clickDialogButton(page, 'رجّع النسخة دي');
+  await page.waitForFunction(() => /رجع الموقع للنسخة دي/.test(document.body.innerText), { timeout: 8000 });
+  const call = fake.calls.find(c => c.path === '/v1/admin/publish/restore');
+  assert.deepEqual(call.body, { to: 'pub-1', expect: 'pub-2' });
+  // the new restore row, live (after the panel redraws)
+  await page.waitForFunction(() => {
+    const row = document.querySelector('.card--publish-history [data-publish^="restore-"]');
+    return row && /رجوع لنسخة/.test(row.innerText) && /الحالية/.test(row.innerText);
+  }, { timeout: 8000 });
   assert.deepEqual(problems, []);
   await context.close();
 });

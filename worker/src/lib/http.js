@@ -53,13 +53,15 @@ const MESSAGES = {
   turnstile: ['محتاجين نتأكد إنك مش روبوت.', 'كمّل علامة التأكيد وابعت تاني.'],
   // admin accounts (BOOKING-PHASE1-COMPLETION-PLAN §4.3)
   google: ['محتاجين نتأكد إنه انت.', 'ادخل بحساب جوجل وكمّل.'],
-  protected: ['التغيير ده مش مسموح.', 'ده بيحمي الحساب الأساسي ومسؤول الحسابات الأخير.']
+  protected: ['التغيير ده مش مسموح.', 'ده بيحمي الحساب الأساسي ومسؤول الحسابات الأخير.'],
+  // Phase 2 restore (publish-restore.js)
+  mode: ['الرجوع لنسخة قديمة متاح بس لما النشر يبقى من السيرفر الجديد.', 'دلوقتي الموقع بيتنشر من GitHub، فالرجوع بيبقى من هناك.']
 };
 
 const STATUS = {
   auth: 401, denied: 403, origin: 403, bad: 400, toolarge: 413, rate: 429, conflict: 409, busy: 409, disabled: 403, notfound: 404, method: 405, error: 500,
   not_found: 404, invalid: 400, proof: 400, not_open: 409, closed: 409, full: 409, limit: 429, final: 409, expired: 401, warn: 409, needs_override: 409, over: 409, recent: 409,
-  locked: 409, turnstile: 403, google: 403, protected: 403, age: 400
+  locked: 409, turnstile: 403, google: 403, protected: 403, age: 400, mode: 409
 };
 
 export class ApiError extends Error {

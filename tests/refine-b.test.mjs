@@ -41,7 +41,7 @@ function htmlWorld() {
 }
 
 const ARGS = {
-  apiState: [], apiReview: [], apiPreview: [], apiPublish: ['x'], apiCheckGithub: [],
+  apiState: [], apiReview: [], apiPreview: [], apiPublish: ['x'], apiPublishRefresh: [], apiCheckGithub: [],
   apiSaveLink: [{ title: 'x', url: 'https://a.com', section: 'social' }], apiSetLinkEnabled: ['facebook', false],
   apiDeleteLink: ['facebook'], apiMoveLink: ['facebook', 1], apiSaveSection: [{ key: 'xx', title: 'x' }, true],
   apiSetSectionEnabled: ['social', false], apiDeleteSection: ['social'], apiMoveSection: ['social', 1],

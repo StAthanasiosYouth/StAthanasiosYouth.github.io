@@ -58,6 +58,7 @@ function apiFunctions_() {
     apiReview: apiReview,
     apiPreview: apiPreview,
     apiPublish: apiPublish,
+    apiPublishRefresh: apiPublishRefresh,
     apiCheckGithub: apiCheckGithub,
     apiSaveLink: apiSaveLink,
     apiSetLinkEnabled: apiSetLinkEnabled,
