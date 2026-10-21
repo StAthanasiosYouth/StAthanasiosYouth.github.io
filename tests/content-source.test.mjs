@@ -11,14 +11,18 @@ const loc = (url) => new URL(url);
 const store = (map = {}) => ({ getItem: k => (k in map ? map[k] : null) });
 const WORKER = { mode: 'worker', api: STAGING };
 
-test('the switch ships off: static everywhere; overrides only on localhost', () => {
-  assert.equal(CONTENT_SOURCE, 'static');
-  assert.deepEqual(resolveContentSource(loc('https://stathanasiosyouth.github.io/?content=worker&api=https://evil.example'), store({ 'athanasios.content.source': 'worker' })), { mode: 'static', api: PROD });
+test('the switch: static (the default and the rollback) or worker (the P2-9 cutover); overrides only on localhost', () => {
+  assert.ok(['static', 'worker'].includes(CONTENT_SOURCE), CONTENT_SOURCE);
+  const other = CONTENT_SOURCE === 'static' ? 'worker' : 'static';
+  assert.deepEqual(resolveContentSource(loc(`https://stathanasiosyouth.github.io/?content=${other}&api=https://evil.example`), store({ 'athanasios.content.source': other })), { mode: CONTENT_SOURCE, api: PROD }, 'the site: the switch, never an override');
   assert.deepEqual(resolveContentSource(loc('http://localhost:8080/?content=worker'), store()), { mode: 'worker', api: PROD });
   assert.deepEqual(resolveContentSource(loc(`http://127.0.0.1:8080/?content=worker&api=${STAGING}`), store()), { mode: 'worker', api: STAGING });
   assert.deepEqual(resolveContentSource(loc('http://localhost:8080/'), store({ 'athanasios.content.source': 'worker', 'athanasios.book.api': STAGING })), { mode: 'worker', api: STAGING });
+  // on this machine: the repo's files unless asked (local previews and tests never read the live Worker)
+  assert.equal(resolveContentSource(loc('http://localhost:8080/'), store()).mode, 'static');
   assert.equal(resolveContentSource(loc('http://localhost:8080/?content=nonsense'), store()).mode, 'static');
-  assert.equal(resolveContentSource(null, null).mode, 'static');
+  assert.equal(resolveContentSource(loc('http://localhost:8080/?content=static'), store({ 'athanasios.content.source': 'worker' })).mode, 'static');
+  assert.equal(resolveContentSource(null, null).mode, CONTENT_SOURCE, 'no location (not a browser): the switch');
   assert.equal(resolveContentSource(loc('http://localhost:8080/'), { getItem() { throw new Error('blocked'); } }).mode, 'static');
 });
 

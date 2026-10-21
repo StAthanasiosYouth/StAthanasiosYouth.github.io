@@ -10,7 +10,9 @@
  *             revision yet never stops the page
  *
  * It changes only at the cutover (P2-9, owner approval). On a developer's
- * machine (localhost / 127.0.0.1) a page load can try the other source:
+ * machine (localhost / 127.0.0.1) the default is always 'static' (the repo's
+ * own files: local previews and tests never read the live Worker), and a
+ * page load can try the Worker:
  *   ?content=worker | ?content=static           this page load
  *   localStorage['athanasios.content.source']   until removed
  * and the Worker address follows the booking's override (?api= /
@@ -61,7 +63,7 @@ export function resolveContentSource(loc, storage) {
   if (!wanted) {
     try { wanted = storage ? storage.getItem(SOURCE_KEY) || '' : ''; } catch { wanted = ''; }
   }
-  const mode = wanted === 'worker' || wanted === 'static' ? wanted : CONTENT_SOURCE;
+  const mode = wanted === 'worker' ? 'worker' : 'static';
   return { mode, api: apiFor(loc, storage) };
 }
 

@@ -13,6 +13,7 @@ import { createRequire } from 'node:module';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { ROOT } from '../tools/lib/gs.mjs';
+import { CONTENT_SOURCE } from '../assets/js/content-source.js';
 
 const require = createRequire(`${ROOT}tools/package.json`);
 const puppeteer = require('puppeteer-core');
@@ -69,7 +70,8 @@ test.after(async () => {
 });
 
 async function open(path) {
-  const page = await browser.newPage();
+  // a rare puppeteer hiccup ("Session with given id not found") on a new tab: once more
+  const page = await browser.newPage().catch(() => browser.newPage());
   const problems = [];
   page.on('pageerror', e => problems.push('pageerror: ' + e.message));
   page.on('console', m => { if (m.type() === 'error' && /Content Security Policy/.test(m.text())) problems.push('csp: ' + m.text()); });
@@ -133,10 +135,20 @@ for (const mode of ['down', 'off', 'empty', 'slow']) {
   });
 }
 
-test('without ?content=worker (the shipped switch): no request to the Worker for content', async () => {
+test(`without ?content= on this machine (switch ${CONTENT_SOURCE}): the repo's files, no request to the Worker`, async () => {
   worker = 'serve'; seen.length = 0;
   for (const [, path] of CASES) {
     const { page } = await open(path.replace('?content=worker', ''));
+    await page.waitForNetworkIdle({ idleTime: 400, timeout: 8000 });
+    await page.close();
+  }
+  assert.deepEqual(seen, [], 'local previews and tests stay on the repo (the site itself follows the switch: unit test)');
+});
+
+test('?content=static on this machine: the static files only (the rollback path)', async () => {
+  worker = 'serve'; seen.length = 0;
+  for (const [, path] of CASES) {
+    const { page } = await open(path.replace('?content=worker', '?content=static'));
     await page.waitForNetworkIdle({ idleTime: 400, timeout: 8000 });
     await page.close();
   }
