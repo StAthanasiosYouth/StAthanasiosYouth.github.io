@@ -1,5 +1,13 @@
 # Phase 2 — publish separation: execution plan
 
+**PHASE 2 DONE — 2026-10-22 (owner approved the cutover, the shadow duration waived).** `main` `1058b6a`
+(`CONTENT_SOURCE='worker'`, static first) + owner `PUBLISH_MODE=worker`. First worker publish `258646becddf`
+(test-1 → test-2 on `events/test`): live at once from D1, mirrored to `main` as `1de5669` 3.8 s later (4 files, the
+fixed identity), Pages equal to the Worker afterwards, booking state on the new revision. Live checks after the
+switch: home, a page, an event with booking, the events list and a competition read both sources, no console error.
+Rollback order: §9 "Rollback" (`CONTENT_SERVE=0` → `PUBLISH_MODE=shadow` → revert `1058b6a` → Worker `6094eb69` /
+Apps Script @56). Next: Phase 3 (`PROJECT-HANDOFF.md` §5).
+
 Rev. 1, 2026-10-21. This is the execution contract for Phase 2. The approved spec is `docs/BACKEND-MIGRATION.md`
 §22 (row 2), §5, §6, §15, §19 and §23. This file does not change that spec. It fixes the order, the switches and the
 contracts each step builds against.
