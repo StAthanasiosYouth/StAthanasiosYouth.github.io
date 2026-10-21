@@ -28,8 +28,11 @@ publish after that. Rollback: delete `PUBLISH_MODE`; Worker `wrangler rollback e
 - **P2-7, what was not built: the review computed in the browser.** The browser does not hold the pages and
   competitions drafts (Sheets), and the builders (`Content.gs`, `Pages.gs`, `CompPublish.gs`, `Review.gs`) move to the
   Worker in Phase 4 anyway (§22 row 4). Doing it in the browser now would mean shipping those drafts and ~5k lines of
-  builders to the admin, then replacing them in Phase 4. **Owner decision pending:** defer it to Phase 4, or build it
-  now.
+  builders to the admin, then replacing them in Phase 4. **Owner decision 2026-10-21: moved to Phase 4**
+  (BACKEND-MIGRATION §22 rows 2 and 4 amended). **P2-7 is complete in this reduced scope.**
+- **Nothing of today's Review is lost:** `apiReview` is unchanged (the same builders, errors, warnings, grouped
+  changes, revision guard, competition info); only its comparison point changes, and only in `worker` mode (the
+  Worker's live revision, else GitHub as before). github/shadow mode never asks the Worker (tested).
 - **P2-8** (`worker/src/publish-restore.js`): `GET /v1/admin/publish/revisions` (the last 15 publishes, which is live,
   whether restore is on) and `POST /v1/admin/publish/restore { to, expect }` (`publish.publish`). A restore is a new
   publish (mode `restore`) of the texts that were live right after the chosen one; pages/events/competitions added
@@ -223,3 +226,54 @@ Publish events go to `activity` (and, per the roadmap, can feed the router later
 ## 8. Out of scope
 
 Drafts in D1 and the builders on the Worker (Phase 4), media to R2 (Phase 4), admin chrome (Phase 3), any UI redesign (Phase 8).
+
+## 9. P2-9 — staging rehearsal and the production cutover runbook
+
+Status 2026-10-21: P2-1 … P2-8 built and checked on staging (P2-7 in the reduced scope above). **Nothing of P2-3 …
+P2-8 is in production yet.** Every production step below needs the owner's explicit approval, one at a time.
+
+### Gate (before any cutover step)
+
+| Check | Today (2026-10-21) | Needed |
+| --- | --- | --- |
+| `PUBLISH_MODE='shadow'` set in production (Script Property, owner) | 0 shadow publishes in production D1 (not set yet, or no publish since) | set, then normal publishing |
+| Shadow comparison clean | 0 runs | `GET /v1/admin/publish/status` → `cleanDays` ≥ 7–14, `lastDirtyAt` explained |
+| Launch gate (BOOKING-PHASE1-COMPLETION-PLAN §6) | open | closed, or the owner decides the cutover goes first |
+| Production `GITHUB_TOKEN` (owner) | not set | fine-grained, **Contents read/write on the site repo only**, `npx wrangler secret put GITHUB_TOKEN` (no `--env`) |
+
+### Staging rehearsal (repeat right before the cutover)
+
+- `cd worker && node scripts/phase2-rehearsal.mjs` → publish-check, shadow-check, mirror-check, restore-check (wait ~10
+  min between two runs: staging rate limits).
+- Local (Chrome): `cd tools && node --test --test-concurrency=1 ../tests/content-source.e2e.mjs ../tests/not-found.e2e.mjs
+  ../tests/accounts-admin.e2e.mjs ../tests/pages-public.e2e.mjs ../tests/book-public.e2e.mjs ../tests/comp-public.e2e.mjs`.
+- Unit: `cd worker && npm test`; `cd tools && npm test` (only the 3 known failures).
+
+### Production steps (each one: owner approval → do → verify → report)
+
+1. **Release R1 — code, switches unchanged.** Cherry-pick P2-3 … P2-8 onto `origin/main` (temporary worktree), push →
+   CI deploys the Worker; Apps Script deploy (`@56`: worker mode code, `COMP_SITE_CSP`, `apiPublishRefresh`).
+   Visitors: no change (`CONTENT_SOURCE='static'`, `PUBLISH_MODE` stays `shadow`). Verify: site, booking, Worker
+   health, the next shadow publish and comparison.
+2. **Re-stub (one maintenance commit).** The stubs committed before the new CSP (`black-theatre/index.html`,
+   `competition/test/index.html`; re-list with the loop in this file's history) get the shell's CSP line, nothing
+   else. Until then those pages use their static file (safe, tested).
+3. **Production token** (owner, `wrangler secret put GITHUB_TOKEN`). The mirror stays idle: nothing is in `worker` mode.
+4. **Cutover (one short window, the owner present):**
+   a. site push `CONTENT_SOURCE = 'worker'` (`assets/js/content-source.js`; Pages ~1 min) — visitors read the Worker,
+      which equals the site (the shadow gate);
+   b. owner sets `PUBLISH_MODE='worker'` (Script Property);
+   c. one small real publish: visible at once on the site; «نسخة GitHub اتحدثت ✓» within ~2 min; the mirror commit on
+      `main`; booking state of a published event; `GET /v1/admin/publish/status` → `mirror.pending` 0.
+5. **Watch** for a few days: `mirror.late`, the activity log, booking.
+
+### Rollback (fastest first)
+
+| Problem | Action | Time |
+| --- | --- | --- |
+| The Worker serves something wrong | D1 `CONTENT_SERVE='0'` → every page uses its static file at once | seconds |
+| Publishing through the Worker misbehaves | `PUBLISH_MODE='shadow'` (Apps Script commits again; D1 still follows); `'github'` only once `mirror.pending` is 0 | 1 min |
+| Back to static for good | site push `CONTENT_SOURCE = 'static'` | ~1 min (Pages) |
+| A bad Worker release | `wrangler rollback <previous version>` | seconds |
+| A bad Apps Script release | redeploy the previous version (`@55`) | minutes |
+| A wrong publish | «نسخ النشر» → «ارجع للنسخة دي» (worker mode), or the previous GitHub commit (github mode) | seconds |

@@ -619,9 +619,9 @@ Only **admins + grants** and **unified activity** move. Sessions, presence, edit
 | **1 Foundation + booking pilot** ✔ | As built + §6 Phase 1 (B1–B8, cash policy, InstaPay/wallet UX + Primary-approved numbers, stage-1 notification checks); go-live test #2 | Extended; done and deployed (rev. 5) |
 | **1.5 Admin access & notifications foundation** (new) | Grants in D1 + enforcement in both runtimes, Primary protections, unified activity, global Gmail + Push router with Primary settings, summaries, quotas, monitoring, combined export; (rev. 5) event age eligibility §4.9 + remaining-balance payment requests §4.10 | Pulled forward: admins + activity (Phase 3), outbox + Gmail sender (Phase 5A) |
 | **Launch gate** | Test-data cleanup → official launch of the site + booking | New |
-| 2 Publish separation | Unchanged | Publish events feed the router |
+| 2 Publish separation | Unchanged, except the browser-side Review → Phase 4 (owner 2026-10-21). Execution: `docs/PUBLISH-SEPARATION-PLAN.md` | Publish events feed the router |
 | 3 Admin platform | Sessions, presence, edit locks (other modules), devices, bootstrap | Smaller |
-| 4 Content + pages/events + media | Unchanged | PayMethods `online`, servant pay fields + approvals move to D1 with Events/Servants |
+| 4 Content + pages/events + media | + the browser-side Review (from Phase 2) | PayMethods `online`, servant pay fields + approvals move to D1 with Events/Servants |
 | 5 Registry + points + store + competitions runtime (5A first) | Unchanged; 5A per YOUTH-ACCOUNTS-PLAN rev. 4 | 5A reuses the outbox/sender; 5A takes over the booker's age from the account DOB (§4.9.5) |
 | 6 Competition authoring, seasons, push, route | Unchanged | The push channel moves to Worker FCM; the claim feed is retired |
 | **7 Final notifications audit → Retirement** | 7a: the §4.8 stage-2 real-device audit + report + fixes; 7b: retirement as planned | Audit added as the retirement gate |

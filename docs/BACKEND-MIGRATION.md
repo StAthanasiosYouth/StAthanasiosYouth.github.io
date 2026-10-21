@@ -2,7 +2,8 @@
 
 Rev. 3, 2026-10-15. Supersedes rev. 1–2 (study, publish separation, site-wide target), which are folded in here.
 Status (2026-10-15): **Phase 0 done. Phase 0.5 and Phase 1 *foundation* in progress/done — see `worker/README.md`.** Booking pilot not enabled (needs review + R2).
-Approved 2026-10-15: implementation on Cloudflare account `menazakmena@gmail.com`; booking storage D1 + R2 (EVENTS.md §1 revised).
+Amended 2026-10-21 (owner): the browser-side Review moves from Phase 2 to Phase 4 (it needs the pages/competitions drafts and the builders, which move to the Worker in Phase 4); Phase 2 keeps today's server-side Review, diffed against the Worker's live revision in `worker` mode. Plan: `docs/PUBLISH-SEPARATION-PLAN.md`.
+Amended 2026-10-21: Phase 9 native mobile apps on Cloudflare account `menazakmena@gmail.com`; booking storage D1 + R2 (EVENTS.md §1 revised).
 Code base inspected: `origin/main` @ `1ce107b`. Limits and prices come from official pages fetched 2026-10-14/15 (sources at the end).
 
 Approved earlier (2026-10-14):
@@ -533,9 +534,9 @@ Usage at this scale is < 10% of every free limit. **No surprise bills:** Workers
 | **0 ✔ Spike** | Isolated Worker/D1/queue, benchmarks | — | Passed (§1) |
 | **0.5 Front-end quick wins** (alongside Phase 1) | Optimistic draft saves, stale-while-revalidate on every list, pre-warm call on admin open, admin push moved off the reply path (1 small Apps Script change). Front-end work carries over unchanged | **First felt win: days, not weeks** | Drafts feel instant |
 | **1 Foundation + booking pilot** | Production Worker (church account), D1 `eeur`, R2, CI deploy, nightly backup, auth + allowlist sync, admin transport routing, CSP, retries. EVENTS.md 4–6 on the Worker; event config synced from Apps Script; public seats/status reads. **One small event first** | Bookings born fast | One real event clean; restore drill |
-| **2 Publish separation** | `published_revisions`, public loaders (Worker + static fallback), Apps Script publish posts its build to the Worker, background GitHub mirror, `404.html` shell, browser-side Review, revision restore | **Publish visible at once; ~7 s + 60 s → ~3 s** | 1–2 weeks of equal shadow hashes |
+| **2 Publish separation** | `published_revisions`, public loaders (Worker + static fallback), Apps Script publish posts its build to the Worker, background GitHub mirror, `404.html` shell, Review diffed against the live revision (the browser-side Review moved to Phase 4), revision restore | **Publish visible at once; ~7 s + 60 s → ~3 s** | 1–2 weeks of equal shadow hashes |
 | **3 Admin platform** | Sessions, presence, edit locks, activity, admins, devices, bootstrap call | Panel load < 1 s; no heartbeat contention | Admin chrome off Apps Script |
-| **4 Content + pages/events + media** | Draft tables + the pure builders in the Worker; publish fully in the Worker; Drive library → R2 one-time copy; upload-time GitHub commits | **Biggest everyday win: every content save ~3.6 s → ~0.15 s; publish < 0.4 s** | Content tabs frozen |
+| **4 Content + pages/events + media** | Draft tables + the pure builders in the Worker; publish fully in the Worker; browser-side Review (moved from Phase 2, owner 2026-10-21: the same builders, same outputs as today's Review); Drive library → R2 one-time copy; upload-time GitHub commits | **Biggest everyday win: every content save ~3.6 s → ~0.15 s; publish < 0.4 s** | Content tabs frozen |
 | **5 Registry + points + store + competitions runtime** | Data migration (dry run → freeze → copy → verify → flip; spread over days for write limits) | Public bursts and all those screens ~0.1–0.5 s; no `busy` | Balances/stock/codes verified equal |
 | **6 Competition authoring, seasons, push, route** | Push via Queues + cron; schedule; openrouteservice | Push no longer blocks; everything off Apps Script | Apps Script has no live callers |
 | **7 Retirement** | Remove `script.google.com` from config/CSP, undeploy, delete triggers, archive Sheets/Drive read-only, keep the project 90 days | — | §25 checklist |
