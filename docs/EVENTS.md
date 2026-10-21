@@ -729,6 +729,25 @@ row per group with the system actor `visitor` («زوار بعتوا ٣ طلبا
 (`adminPushNotify_`; body «مستنيين المراجعة: N»). Latency: ≤ 5 minutes,
 then ≤ one group per event per 10 minutes.
 
+### 7.4 Booker email (Phase 5A-4, plan 2026-10-20)
+
+Contract: `docs/MEMBER-NOTIFICATIONS-PLAN.md` §4.2. Separate from the admin push/email above.
+
+- **Only bookings linked to a youth account** (`participant_id`, YOUTH-ACCOUNTS-PLAN §18.1) whose email is verified
+  (OTP or admin). The public form still collects **no email**; bookings without an account keep the status view,
+  «حجوزاتي» and the servant's WhatsApp.
+- **Automatic after the server state commits** (the outbox row is in the same batch): request received
+  («قيد المراجعة — ده مش تأكيد»), confirmed, rejected, cancelled, event cancelled (`event.cancelAll`), payment
+  recorded / voided / refund, amount due changed, payment request received / rejected (§4.10 of the booking plan).
+- Content includes the booking ref, event, date, places, **amount due, paid, remaining and the final due date**.
+  Never payment destination numbers, proofs, the status token or a `#b/<token>` link (links go to «حجوزاتي»,
+  sign-in required), servant phones or companions' names.
+- **Deadline reminders:** per-event switch (off by default), `finalDueAt` − 3 days and on the day, confirmed +
+  balance > 0, skipped while a payment request is open or within 20 h of a WhatsApp reminder.
+- **Event date / time / place changes** are emailed only when an admin presses «بلّغ الحاجزين» (pending + confirmed
+  bookers of that event); ordinary event edits send nothing.
+- New events and announcements: push + bell only, never email.
+
 ---
 
 ## 8. Service / media pages

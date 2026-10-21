@@ -644,6 +644,9 @@ view groups the masked codes with «نسخ كل الرسايل» per bucket.
 - Manual adjustment `apiWalletAdjust(pid, amount, note, adjustKey)` → `manual`
   row, idemKey `adj:<adjustKey>`, logged.
 - The ledger is append-only. There is no editable balance.
+- Phase 5B (Worker): auto-graded points are credited at submit, manual points when graded, display held until
+  the result is visible (§20). A manual **deduction** emails the member (note shown only when the admin ticks
+  «يظهر للمخدوم», a new field); additions and transfers don't (`docs/MEMBER-NOTIFICATIONS-PLAN.md` §4.4).
 
 ## 9. Store (Phase 3)
 
@@ -654,6 +657,9 @@ view groups the masked codes with «نسخ كل الرسايل» per bucket.
 - Admin statuses: pending → approved → fulfilled (pending → fulfilled allowed too); pending|approved → cancelled
   (appends `refund` +cost, idemKey `ref:<redemptionId>`, once). Fulfilled is
   final. Logged.
+- Phase 5B (Worker) member emails, written in the same batch as the change: request received (receipt), approved
+  («استلمها من الخادم …» — `approved` doubles as "ready to collect"; no new status), cancelled by an admin with the
+  refund. Fulfilled and member self-cancel send nothing (`docs/MEMBER-NOTIFICATIONS-PLAN.md` §4.4).
 
 ## 10. Admin API (all api*, in apiFunctions_, admin token + session)
 
@@ -1462,3 +1468,45 @@ before step 3.
   «نأسف، سنك حاليًا خارج الفئة العمرية المخصصة لنظام نقاط الاجتماع. تقدر تشارك
   في المسابقة بدون نقاط.» The page shows it, then continues normally (the
   attempt is recorded under their code, with no points).
+
+## 20. Worker runtime (Phase 5B): crediting, result visibility and member email (binding plan, 2026-10-20)
+
+Owner decision D3 (final). This section binds the **Phase 5B Worker port**; the Apps Script build above (§8, §17)
+stays as built until that cutover. Member email contract: `docs/MEMBER-NOTIFICATIONS-PLAN.md` §4.3.
+
+### 20.1 Crediting (no admin approval)
+
+- **Auto-gradable answers** (choice, true/false, exact-match short answers, …) are graded at submit and their points are
+  **credited to the wallet at once**, without any admin approval.
+- **Manual answers** (essay, review = manual, fallback with no match) earn their points when a servant grades them.
+- **Mixed competitions** credit the automatic part at submit and the manual part as it is graded.
+- Change from §8: the reconcile target becomes `Σ points of the questions graded so far` (pending answers count 0) for
+  wallet competitions, no longer `0 until the whole submission is graded`. Guests (`noPoints`) stay 0.
+- Corrections stay **idempotent**: one `competition` row, then `correction` rows with `idem_key = sub:<id>:<n>`;
+  reconciling twice adds nothing. Regrade, void and wallet-off reverse through the same path.
+- `finalizedAt` («اعتماد النتائج») is **not** a crediting gate; it only affects visibility (§2, §20.2).
+
+### 20.2 Visibility hold (no spoilers)
+
+- The ledger row is written at once (the truth), but what the **member** sees follows the result policy:
+  a competition's credits are **held** until its release moment.
+- **Release moment** = the first moment the policy lets the member see this submission's result: right after submit
+  when `resultShow ≠ none` and there is no `resultsAt`; otherwise `resultsAt` or `finalizedAt`, whichever comes first.
+  With `resultShow = none` the points (never the score) are released at `finalizedAt`, or at `endAt` + grace if the
+  competition is never finalized.
+- Until then the member's «نقاطي» balance, ledger and **spendable** balance exclude held credits; the competition
+  shows «النتيجة هتظهر …» with no number. Admins always see everything.
+- Fixes the current Apps Script behaviour, where a graded wallet row appears in `portalMe.ledger` / `balance`
+  before `resultsAt` (a spoiler). Not changed in Apps Script (5B replaces it).
+
+### 20.3 Member emails (MEMBER-NOTIFICATIONS-PLAN §4.3)
+
+- **One personal result email per submission** at its release moment (Tier 2, on by default, gradual
+  ~30/hour): title, score/max only when `resultShow` allows, points credited (or «بدون نقاط»), balance at send time,
+  and «لسه فيه أسئلة بتتصحح» if manual answers are pending.
+- **One completion email** when the last manual answer of an already-emailed submission is graded (merged 24 h).
+- **Corrections** after the result email: one merged email per 24 h with old → new points; none when the net change is 0.
+- Nothing is emailed for submit, pending review or individual grade changes before the release moment.
+- Dedupe keys `res:<subId>`, `res-done:<subId>`, `pts:<subId>:<ledgerSeq>`; the outbox row is written in the same
+  batch as the ledger change or, for time-based releases, by the minute cron that detects the release.
+- New competitions, schedules and closings: push + bell only (D5; §12, §18.5), never email.

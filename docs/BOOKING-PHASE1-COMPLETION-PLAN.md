@@ -7,7 +7,12 @@ Phase 1.5 (steps 1–11) is still plan only.
 Rev. 5, 2026-10-20 (owner: roadmap locked). Phase 1 is complete, deployed and manually verified.
 Phase 1.5 steps 1–9 are unchanged. Two additions: **step 10, event age eligibility** (§4.9) and
 **step 11, paying a remaining balance through the existing booking** (§4.10). Youth Accounts stay in
-Phase 5A (`docs/YOUTH-ACCOUNTS-PLAN.md` rev. 4), which takes over the booker's age from the account (§4.9.5).
+Phase 5A (`docs/YOUTH-ACCOUNTS-PLAN.md` rev. 4, now rev. 5), which takes over the booker's age from the account (§4.9.5).
+
+Amended 2026-10-22 (owner): no plan step or phase is gated or scheduled by a number of days. Progress = steps done and their checks passing; effort estimates in dev-days were removed from every plan. Functional time rules stay (retention, token/session/OTP expiry, reminder timing, rollback retention windows, provider deadlines).
+
+Rev. 6, 2026-10-20 (owner, member notifications D1–D5): youth-member email is planned in `docs/MEMBER-NOTIFICATIONS-PLAN.md`,
+**separate from this plan's admin router**. Here only the shared budget rule (§4.4, rev. 6), the roadmap rows (§10) and decisions 22–25 (§11) change. Phase 1.5 steps 1–11 are unchanged.
 **Migration numbers (rev. 5, checked against `worker/migrations/` and `origin/main`):** Phase 1 used `0001`–`0008`
 (`0005_booking_phase1` includes `pay_dest`; `0008_installments_reminders` is the last). Phase 1.5 reserves, one number each, never reused:
 
@@ -84,7 +89,7 @@ Remaining issues and gaps (none blocks Phase 2):
 
 Phase 1 status (rev. 5): **complete, deployed and manually verified** (production `main` @ `f24e425`). Sections 1, 2 and the
 Phase 1 order in §6 describe the state **before** Phase 1 and are kept as history. The official public launch (§6 launch gate,
-test-data cleanup) has not happened yet; Phase 1.5 has not started.
+test-data cleanup) has not happened yet. (Written at rev. 5; Phase 1.5 has since been completed, §0.1.)
 
 Code inspected: `origin/main` @ `3c029b1` (production) plus the worker worktree
 (`feat/worker-foundation` @ `d059ad0`, one unpushed commit: `bookingOnlineOn/Off`).
@@ -107,8 +112,8 @@ Related contracts (not reopened unless a technical reason is given):
 - **Push to the Primary Admin:** the code has six possible silent-drop paths (§2.2). The most likely causes are the presence filter
   and a missing admin-push subscription on the device. A read-only production check decides between them.
 - **Approach: Recommended (§5).**
-  - **Phase 1:** close the pilot with targeted fixes + the payment UX (~9–12 dev-days). **Done (rev. 5): deployed and verified.**
-  - **Phase 1.5 (new), before Phase 2:** admins + permissions, unified activity, and the **global** Gmail + Push notification system (~15–19 dev-days), plus (rev. 5) event age eligibility and remaining-balance payments (~4.5–6 dev-days; ~19.5–25 in total).
+  - **Phase 1:** close the pilot with targeted fixes + the payment UX. **Done (rev. 5): deployed and verified.**
+  - **Phase 1.5 (new), before Phase 2:** admins + permissions, unified activity, and the **global** Gmail + Push notification system, plus (rev. 5) event age eligibility and remaining-balance payments. **Done (all 11 steps in production, 2026-10-21).**
   - **Final project stage:** a full real-device notifications audit (§4.8).
 - **Not officially launched yet** (still true at rev. 5). The test event stays available, test records are kept until testing ends, no real money moves during tests,
   and the test data is cleaned before the official launch (§3).
@@ -322,6 +327,8 @@ cron (1 min) sweeps activity.notified = 0 ─▶ router: catalog + settings + gr
 **Quotas: critical is never silently discarded.**
 - Consumer Gmail allows ~500 recipients a day. Own daily budget 150 for admin mail, shared later with the Phase 5A account mail, with **50 reserved for critical**.
   - Rev. 5 (owner): the shared total is a **configurable target of ~400/day**, always within Gmail's real limit. Reserves are kept for critical notifications and, from Phase 5A, a separate reserve for verification codes (OTP).
+  - Rev. 6 (owner D4, 2026-10-20; applied in Phase 5A-1, `docs/MEMBER-NOTIFICATIONS-PLAN.md` §5): rolling 24 h, target ~400, **reservations in priority order, not rigid caps**: OTP ~100 (absolute precedence; nothing else uses its reserve) · critical 50 · member transactional 100 · admin important 120 · remainder for member bulk and admin routine/summaries. Until 5A-1 the live values (admin 150, critical 50, OTP 50) and today's `allowed()` stay unchanged.
+  - **Member mail is not routed here.** This router, its catalog and «إعدادات الإشعارات» stay admin-only; youth-member email has its own outbox and switches (MEMBER-NOTIFICATIONS-PLAN §2) and only shares the sender and the budget window.
 - When the budget is short:
   - routine moves into the summary first, then important does;
   - critical uses the reserve;
@@ -505,9 +512,8 @@ The status token (HMAC, fragment only, valid until event end + 60 days) proves p
 | | Minimal | **Recommended** | Comprehensive |
 | --- | --- | --- | --- |
 | Scope | B1/B2, push diagnosis, cash flag, `01x` phones, payment card | Phase 1 (§6) + Phase 1.5: grants, global notifications (Gmail + Push, settings), unified log, combined export, UI; final audit | Recommended + per-event scopes, treasurer handover, installment schedules + reminders, the whole of Phase 3, admin push on the Worker now, report builder |
-| Effort | 7–9 days | 9–12 + 15–19 days (+ final audit 2–3 days + fixes) | 40–52 days |
 | Servants can be onboarded | No | Yes, after 1.5 | Yes |
-| Rework before Phase 2 | High | Low | Low, but Phase 2 is delayed by 4–6 weeks |
+| Rework before Phase 2 | High | Low | Low, but Phase 2 waits for the whole of Phase 3 |
 
 **Pick: Recommended.**
 
@@ -515,22 +521,22 @@ The status token (HMAC, fragment only, valid until event end + 60 days) proves p
 
 ## 6. Implementation order
 
-### Phase 1 — close the pilot, ~9–12 dev-days (✔ done, rev. 5)
+### Phase 1 — close the pilot (✔ done, rev. 5)
 1. Owner: the §2.2 read-only checks (the test event stays open).
-2. B1/B2: entry points always visible, Google card in device sessions, visible error + retry (0.5–1 d).
-3. B7/B8: acknowledged claim + dedupe, presence = visible panel, `notified` reason in the log (1–1.5 d).
+2. B1/B2: entry points always visible, Google card in device sessions, visible error + retry.
+3. B7/B8: acknowledged claim + dedupe, presence = visible panel, `notified` reason in the log.
 4. Cash:
-   - `online` flag, informational public card, Worker refusal (1–1.5 d);
-   - Worker: payments on create for admin cash bookings (pending + payment recorded) (0.5 d).
-5. Dashboard header, rows, booking history, mobile sheet (1.5–2 d).
-6. Export: `01x` text phones + injection test (0.5 d).
+   - `online` flag, informational public card, Worker refusal;
+   - Worker: payments on create for admin cash bookings (pending + payment recorded).
+5. Dashboard header, rows, booking history, mobile sheet.
+6. Export: `01x` text phones + injection test.
 7. InstaPay/wallet (§4.7):
-   - servant fields + Primary approval + preview (1 d);
-   - `pay-dest` sync, D1 `pay_dest` (migration `0005a`; built as part of `0005_booking_phase1`), `/v1/book/pay`, submit check (1–1.5 d);
-   - payment card, copy, guide, «تم التحويل», draft (1–1.5 d);
-   - tests (0.5 d).
-8. Stage-1 notification checks for Phase 1 (§4.8) (0.5 d).
-9. Staging: extended `book-check` / `book-ops-check`, admin + public e2e (0.5–1 d).
+   - servant fields + Primary approval + preview;
+   - `pay-dest` sync, D1 `pay_dest` (migration `0005a`; built as part of `0005_booking_phase1`), `/v1/book/pay`, submit check;
+   - payment card, copy, guide, «تم التحويل», draft;
+   - tests.
+8. Stage-1 notification checks for Phase 1 (§4.8).
+9. Staging: extended `book-check` / `book-ops-check`, admin + public e2e.
 10. Go-live test #2 on the test event, **without real money** (§3):
     - a full InstaPay booking on a phone (paste into the app, cancel before sending, sample screenshot, admin confirms with «تجربة»);
     - a cash booking with immediate confirm;
@@ -538,19 +544,19 @@ The status token (HMAC, fragment only, valid until event end + 60 days) proves p
     - the export;
     - booking push.
 
-### Phase 1.5 — Admin access & notifications foundation, ~15–19 dev-days (+ steps 10–11: ~19.5–25 in total)
-1. Migration `0009_admin_grants_notify` + `requirePerm` on the Worker (2–3 d).
-2. `/v1/sync/grants`, `API_PERMS` + default-deny + completeness test, `ADMIN_EMAILS` mirror (2–3 d). Needs step 1.
-3. «الصلاحيات» UI + Primary protections + audit (1.5–2 d). Needs step 2.
-4. Activity forwarding + unified «سجل النشاط» (1.5–2 d). Needs step 1.
-5. Router + outbox + acknowledged push claim (2–3 d). Needs steps 1 and 4.
-6. Gmail OAuth (owner consent) + sender + quota/reserve + summaries + templates (1.5–2 d). Needs step 5.
-7. «إعدادات الإشعارات» + «تنبيهاتي» + «حالة النظام» (1.5–2 d). Needs steps 5–6.
-8. Combined export + filters + PII grant (1.5–2 d). Needs step 1.
-9. Stage-1 checks for Phase 1.5 + staging rehearsal (permission matrix, real emails to test inboxes, quota, token revoked) (1–1.5 d).
+### Phase 1.5 — Admin access & notifications foundation, steps 1–11 (✔ done 2026-10-21)
+1. Migration `0009_admin_grants_notify` + `requirePerm` on the Worker.
+2. `/v1/sync/grants`, `API_PERMS` + default-deny + completeness test, `ADMIN_EMAILS` mirror. Needs step 1.
+3. «الصلاحيات» UI + Primary protections + audit. Needs step 2.
+4. Activity forwarding + unified «سجل النشاط». Needs step 1.
+5. Router + outbox + acknowledged push claim. Needs steps 1 and 4.
+6. Gmail OAuth (owner consent) + sender + quota/reserve + summaries + templates. Needs step 5.
+7. «إعدادات الإشعارات» + «تنبيهاتي» + «حالة النظام». Needs steps 5–6.
+8. Combined export + filters + PII grant. Needs step 1.
+9. Stage-1 checks for Phase 1.5 + staging rehearsal (permission matrix, real emails to test inboxes, quota, token revoked).
 
-10. (rev. 5) Event age eligibility (§4.9): event config + parser, booker DOB field, server check, snapshot, admin override with `bookings.manage`, migration `0010_booking_age` (2–2.5 d). Independent of steps 2–9 except the permission key from step 1.
-11. (rev. 5) Remaining-balance payment requests (§4.10): migration `0011_payment_claims`, `/v1/book/pay-request`, status-view flow, admin review → prefilled «إضافة دفعة» (2.5–3.5 d). Needs step 1 (permissions) and step 5 (notification router).
+10. (rev. 5) Event age eligibility (§4.9): event config + parser, booker DOB field, server check, snapshot, admin override with `bookings.manage`, migration `0010_booking_age`. Independent of steps 2–9 except the permission key from step 1.
+11. (rev. 5) Remaining-balance payment requests (§4.10): migration `0011_payment_claims`, `/v1/book/pay-request`, status-view flow, admin review → prefilled «إضافة دفعة». Needs step 1 (permissions) and step 5 (notification router).
 
 Steps 4 and 8 can run alongside steps 2–3. Step 10 can run alongside steps 2–9. The first limited servant is onboarded only after step 3 passes.
 Steps 10–11 are covered by the step-9 staging rehearsal (extended with their checks).
@@ -611,21 +617,22 @@ Only **admins + grants** and **unified activity** move. Sessions, presence, edit
 
 ---
 
-## 10. Revised roadmap (Phases 1–7)
+## 10. Revised roadmap (Phases 1–9)
 
 | Phase | Scope | Change from BACKEND-MIGRATION rev. 3 |
 | --- | --- | --- |
-| 0 ✔ / 0.5 | Spike / front-end quick wins | — |
+| 0 ✔ / 0.5 ✔ | Spike / front-end quick wins | — |
 | **1 Foundation + booking pilot** ✔ | As built + §6 Phase 1 (B1–B8, cash policy, InstaPay/wallet UX + Primary-approved numbers, stage-1 notification checks); go-live test #2 | Extended; done and deployed (rev. 5) |
 | **1.5 Admin access & notifications foundation** (new) | Grants in D1 + enforcement in both runtimes, Primary protections, unified activity, global Gmail + Push router with Primary settings, summaries, quotas, monitoring, combined export; (rev. 5) event age eligibility §4.9 + remaining-balance payment requests §4.10 | Pulled forward: admins + activity (Phase 3), outbox + Gmail sender (Phase 5A) |
 | **Launch gate** | Test-data cleanup → official launch of the site + booking | New |
-| 2 Publish separation | Unchanged, except the browser-side Review → Phase 4 (owner 2026-10-21). Execution: `docs/PUBLISH-SEPARATION-PLAN.md` | Publish events feed the router |
+| 2 ✔ Publish separation (2026-10-22) | Unchanged, except the browser-side Review → Phase 4 (owner 2026-10-21). Execution: `docs/PUBLISH-SEPARATION-PLAN.md` | Publish events feed the router |
 | 3 Admin platform | Sessions, presence, edit locks (other modules), devices, bootstrap | Smaller |
 | 4 Content + pages/events + media | + the browser-side Review (from Phase 2) | PayMethods `online`, servant pay fields + approvals move to D1 with Events/Servants |
-| 5 Registry + points + store + competitions runtime (5A first) | Unchanged; 5A per YOUTH-ACCOUNTS-PLAN rev. 4 | 5A reuses the outbox/sender; 5A takes over the booker's age from the account DOB (§4.9.5) |
-| 6 Competition authoring, seasons, push, route | Unchanged | The push channel moves to Worker FCM; the claim feed is retired |
-| **7 Final notifications audit → Retirement** | 7a: the §4.8 stage-2 real-device audit + report + fixes; 7b: retirement as planned | Audit added as the retirement gate |
+| 5 Registry + points + store + competitions runtime (5A first) | Unchanged; 5A per YOUTH-ACCOUNTS-PLAN rev. 5; member email per MEMBER-NOTIFICATIONS-PLAN (5A-1 core, 5A-4 bookings/payments, 5B results/points/store) | 5A reuses the Gmail sender and budget window, **not** the admin router/outbox; 5A takes over the booker's age from the account DOB (§4.9.5) |
+| 6 Competition authoring, seasons, push, route | Unchanged | The push channel moves to Worker FCM; the claim feed is retired; announcements / new events / competitions stay push + bell only (D5); native-app push groundwork (BACKEND-MIGRATION §22.2.4) |
+| **7 Final notifications audit → Retirement** | 7a: the §4.8 stage-2 real-device audit + report + fixes, including member email; 7b: retirement as planned | Audit added as the retirement gate |
 | **8 Complete Admin UI/UX redesign** | After 7 / 7a and retirement. Until then: essential usability fixes only, existing components only. Scope, effort and acceptance criteria: BACKEND-MIGRATION §22.1 | Added 2026-10-20 (owner decision) |
+| **9 Native mobile apps** | After 8. Admin + Youth Portal via Capacitor + native FCM, Android first, iOS after; web/PWA kept on the same backend. Spec: BACKEND-MIGRATION §22.2 | Added 2026-10-21 (owner decision) |
 | Optional: custom domain | Unnumbered (was Phase 8); best done early | Renumbered |
 
 ---
@@ -651,6 +658,14 @@ Only **admins + grants** and **unified activity** move. Sessions, presence, edit
 | 19 | Step 11: remaining-balance payment requests on the existing booking; confirmed + balance > 0; one open request; amount 1…balance; review by `bookings.approve` + `finance.manage`; no new booking or seat (§4.10) |
 | 20 | Email budget: ~400/day as a configurable target within Gmail's real limit; reserves kept for critical notifications and (Phase 5A) verification codes |
 | 21 | Phase 5A: account DOB controls the booker's eligibility for future bookings; existing bookings keep their snapshots (§4.9.5) |
+
+### Final (rev. 6, 2026-10-20; member notifications, D1–D5 — `docs/MEMBER-NOTIFICATIONS-PLAN.md` §0)
+| # | Decision |
+| --- | --- |
+| 22 | Member email is a separate pipeline; this plan's router stays admin-only (§4.4) |
+| 23 | Booking/payment member emails (account-linked bookings only, 5A-4): automatic after the state change commits; include paid / remaining / due date; never payment numbers, proofs or status tokens. Event-change notices only on an explicit admin «بلّغ الحاجزين» |
+| 24 | Email budget refined (decision 20): reservations in priority order, OTP ~100 first, critical 50, member transactional 100, admin 120, remainder bulk (§4.4, rev. 6) |
+| 25 | Announcements, new events and new competitions: push + bell only, no broadcast email |
 
 ### Recommended defaults, kept (no conflict with your clarifications)
 | # | Default |

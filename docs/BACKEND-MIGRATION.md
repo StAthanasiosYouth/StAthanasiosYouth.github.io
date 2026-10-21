@@ -2,8 +2,11 @@
 
 Rev. 3, 2026-10-15. Supersedes rev. 1–2 (study, publish separation, site-wide target), which are folded in here.
 Status (2026-10-15): **Phase 0 done. Phase 0.5 and Phase 1 *foundation* in progress/done — see `worker/README.md`.** Booking pilot not enabled (needs review + R2).
+Amended 2026-10-20: Phase 5 = 5A accounts-first (`docs/YOUTH-ACCOUNTS-PLAN.md` rev. 5) + member email (`docs/MEMBER-NOTIFICATIONS-PLAN.md`); Phase 1.5 and the current roadmap table: `docs/BOOKING-PHASE1-COMPLETION-PLAN.md` §10.
 Amended 2026-10-21 (owner): the browser-side Review moves from Phase 2 to Phase 4 (it needs the pages/competitions drafts and the builders, which move to the Worker in Phase 4); Phase 2 keeps today's server-side Review, diffed against the Worker's live revision in `worker` mode. Plan: `docs/PUBLISH-SEPARATION-PLAN.md`.
-Amended 2026-10-21: Phase 9 native mobile apps on Cloudflare account `menazakmena@gmail.com`; booking storage D1 + R2 (EVENTS.md §1 revised).
+Amended 2026-10-21: Phase 9 native mobile apps (Admin + Youth Portal, Capacitor + native FCM, web/PWA kept) added after Phase 8; groundwork in Phase 6 (§22.2).
+Approved 2026-10-15: implementation on Cloudflare account `menazakmena@gmail.com`; booking storage D1 + R2 (EVENTS.md §1 revised).
+Amended 2026-10-22 (owner): no plan step or phase is gated or scheduled by a number of days. Progress = steps done and their checks passing; effort estimates in dev-days were removed from every plan. Functional time rules stay (retention, token/session/OTP expiry, reminder timing, rollback retention windows, provider deadlines).
 Code base inspected: `origin/main` @ `1ce107b`. Limits and prices come from official pages fetched 2026-10-14/15 (sources at the end).
 
 Approved earlier (2026-10-14):
@@ -26,7 +29,7 @@ Approved earlier (2026-10-14):
 | Hosting | **GitHub Pages on `stathanasiosyouth.github.io` stays.** It serves code, assets, page shells and public media. Published *content* comes from the Worker, with a static fallback. A custom domain is optional later |
 | Measured speed-up | Every API action **~0.1 s** warm from here (p50 88–148 ms), against an Apps Script floor of **1.9–3.4 s** for an empty call. That is ~20× |
 | Cost at our scale (~300 public users, ~7 admins) | **$0.** All usage is below ~10% of free limits. Optional $5/mo Workers Paid for 30-day backups |
-| Biggest speed win first | Fastest felt win: Phase 0.5 front-end quick wins (days). Biggest structural wins: Phase 2 (publish visible instantly) and Phase 4 (every content save ~3.6 s → ~0.15 s) |
+| Biggest speed win first | Fastest felt win: Phase 0.5 front-end quick wins (done). Biggest structural wins: Phase 2 (publish visible instantly) and Phase 4 (every content save ~3.6 s → ~0.15 s) |
 | Exact next phase | **Phase 1 — Foundation + booking pilot**, after the 3 decisions in §26 |
 
 ---
@@ -152,7 +155,7 @@ During migration it keeps every module that has not moved yet, plus the publish 
 
 ### 3.2 Is full removal worth it?
 
-Yes, at the end. The cost is ~1–2 days for the last jobs (push, triggers, route) once everything else has moved. What it buys:
+Yes, at the end. The last jobs (push, triggers, route) are small once everything else has moved. What it buys:
 - one runtime, one deploy, one test stack, one auth path;
 - no 2 s floor anywhere;
 - no Google quota surprises (UrlFetch 20k/day, 30 concurrent executions);
@@ -270,6 +273,8 @@ undo     «ارجع للنسخة اللي قبلها»: flip `live` to an older 
 
 **Scheduled pushes** come from a 1-minute cron that reads `push_schedule`.
 
+**Native apps (Phase 9).** The same FCM v1 path also serves native Android/iOS tokens from the Capacitor apps. Phase 6 makes the device registry and payload builder platform-aware (§22.2.4).
+
 **Watch item:** FCM is moving web registration to Firebase Installation IDs and a new `register()` API. Legacy IID topic endpoints shut down on 2027-09-29. We don't use topics, and per-token v1 sends are unaffected. Adopt the new client API when convenient (Phase 6).
 
 ---
@@ -311,6 +316,8 @@ undo     «ارجع للنسخة اللي قبلها»: flip `live` to an older 
 
 Codes, hashes and the same secrets carry over unchanged, so **every printed code keeps working**.
 
+> **Superseded (2026-10-20):** Phase 5 starts with **5A, accounts-first**: the participant row is the youth account (email + generated password, no codes, no migration). Schema: `docs/YOUTH-ACCOUNTS-PLAN.md` rev. 5 §20, including `member_outbox` and `member_prefs` for member email (`docs/MEMBER-NOTIFICATIONS-PLAN.md`).
+
 ### Competitions (Phases 5–6)
 
 | Table | Contents |
@@ -337,6 +344,8 @@ Codes, hashes and the same secrets carry over unchanged, so **every printed code
 | `store_settings` | — |
 
 Redeem = one guarded `INSERT … SELECT` + ledger charge in one batch (Phase 0 test).
+
+Member email for points, store and competition results (2026-10-20): the outbox row is written in the **same batch** as the ledger / redemption / grading change it reports; auto-graded points are credited at once and their display follows result visibility (`docs/COMPETITIONS.md` §20, `docs/MEMBER-NOTIFICATIONS-PLAN.md` §3–§4).
 
 ### Activity (Phase 3)
 
@@ -532,15 +541,16 @@ Usage at this scale is < 10% of every free limit. **No surprise bills:** Workers
 | Phase | Scope | Speed effect | Gate |
 | --- | --- | --- | --- |
 | **0 ✔ Spike** | Isolated Worker/D1/queue, benchmarks | — | Passed (§1) |
-| **0.5 Front-end quick wins** (alongside Phase 1) | Optimistic draft saves, stale-while-revalidate on every list, pre-warm call on admin open, admin push moved off the reply path (1 small Apps Script change). Front-end work carries over unchanged | **First felt win: days, not weeks** | Drafts feel instant |
-| **1 Foundation + booking pilot** | Production Worker (church account), D1 `eeur`, R2, CI deploy, nightly backup, auth + allowlist sync, admin transport routing, CSP, retries. EVENTS.md 4–6 on the Worker; event config synced from Apps Script; public seats/status reads. **One small event first** | Bookings born fast | One real event clean; restore drill |
-| **2 ✔ Publish separation** (done 2026-10-22; shadow duration waived by the owner, `docs/PUBLISH-SEPARATION-PLAN.md`) | `published_revisions`, public loaders (Worker + static fallback), Apps Script publish posts its build to the Worker, background GitHub mirror, `404.html` shell, Review diffed against the live revision (the browser-side Review moved to Phase 4), revision restore | **Publish visible at once; ~7 s + 60 s → ~3 s** | 1–2 weeks of equal shadow hashes |
-| **3 Admin platform** | Sessions, presence, edit locks, activity, admins, devices, bootstrap call | Panel load < 1 s; no heartbeat contention | Admin chrome off Apps Script |
+| **0.5 ✔ Front-end quick wins** (alongside Phase 1; shipped, `perf/phase05` merged) | Optimistic draft saves, stale-while-revalidate on every list, pre-warm call on admin open, admin push moved off the reply path (1 small Apps Script change). Front-end work carries over unchanged | **First felt win** | Drafts feel instant |
+| **1 ✔ Foundation + booking pilot** (+ **1.5 ✔** admin access & notifications, `docs/BOOKING-PHASE1-COMPLETION-PLAN.md` §10) | Production Worker (church account), D1 `eeur`, R2, CI deploy, nightly backup, auth + allowlist sync, admin transport routing, CSP, retries. EVENTS.md 4–6 on the Worker; event config synced from Apps Script; public seats/status reads. **One small event first** | Bookings born fast | One real event clean; restore drill (launch gate still open: BOOKING-PHASE1 §6) |
+| **2 ✔ Publish separation** (done 2026-10-22; shadow duration waived by the owner, `docs/PUBLISH-SEPARATION-PLAN.md`) | `published_revisions`, public loaders (Worker + static fallback), Apps Script publish posts its build to the Worker, background GitHub mirror, `404.html` shell, Review diffed against the live revision (the browser-side Review moved to Phase 4), revision restore | **Publish visible at once; ~7 s + 60 s → ~3 s** | Equal shadow hashes, staging rehearsal and rollback drills passed (the original 1–2 week duration was waived by the owner 2026-10-21) |
+| **3 Admin platform** (next; plan for the owner first) | Sessions, presence, edit locks, activity, admins, devices, bootstrap call | Panel load < 1 s; no heartbeat contention | Admin chrome off Apps Script |
 | **4 Content + pages/events + media** | Draft tables + the pure builders in the Worker; publish fully in the Worker; browser-side Review (moved from Phase 2, owner 2026-10-21: the same builders, same outputs as today's Review); Drive library → R2 one-time copy; upload-time GitHub commits | **Biggest everyday win: every content save ~3.6 s → ~0.15 s; publish < 0.4 s** | Content tabs frozen |
-| **5 Registry + points + store + competitions runtime** | Data migration (dry run → freeze → copy → verify → flip; spread over days for write limits) | Public bursts and all those screens ~0.1–0.5 s; no `busy` | Balances/stock/codes verified equal |
-| **6 Competition authoring, seasons, push, route** | Push via Queues + cron; schedule; openrouteservice | Push no longer blocks; everything off Apps Script | Apps Script has no live callers |
+| **5 Registry + points + store + competitions runtime** | 5A accounts-first (YOUTH-ACCOUNTS-PLAN rev. 5; no participant migration) incl. member email core + booking/payment emails (MEMBER-NOTIFICATIONS-PLAN); 5B points, store, competitions on the Worker incl. results/points/store emails. Data migration of the remaining modules (dry run → freeze → copy → verify → flip; copied in batches that stay under the D1 write limits) | Public bursts and all those screens ~0.1–0.5 s; no `busy` | Balances/stock verified equal; member email staging rehearsal |
+| **6 Competition authoring, seasons, push, route** | Push via Queues + cron; schedule; openrouteservice; **native-app push groundwork (§22.2.4)** | Push no longer blocks; everything off Apps Script | Apps Script has no live callers |
 | **7 Retirement** | Remove `script.google.com` from config/CSP, undeploy, delete triggers, archive Sheets/Drive read-only, keep the project 90 days | — | §25 checklist |
 | **8 Complete Admin UI/UX redesign** (after 7 / 7a and retirement) | Visual and interaction redesign of every Admin module on the finished backend. Spec: §22.1 | Clearer, faster admin work; no backend effect | §22.1 acceptance criteria |
+| **9 Native mobile apps** (after 8) | Admin and Youth Portal as installable apps: Capacitor + native FCM, Android first, iOS after. Web/PWA stays, same backend. Spec: §22.2 | Reliable background push; no backend effect | §22.2 acceptance criteria |
 | Optional: custom domain (unnumbered; was "Phase 8") | Whole site on Workers Static Assets | Instant new-slug previews | Only if wanted; best done early (§18) |
 
 **Rules across all phases:**
@@ -599,7 +609,7 @@ Decided 2026-10-20 (owner). No further Admin modules are planned, so all functio
 **Order:** baselines + inventory → design system + action hierarchy + confirm dialog → shell + branding → controls + shared form validation → icon set + picker + public icon tile → editors per module (events/pages → servants/payment → content → competitions → points/store → settings) → media library → data screens → accessibility and real-device pass.
 Each module slice ships as its own commit and deploy; each prod deploy needs explicit owner approval.
 
-**Effort:** ~30–39 dev-days: ~25–32 for items 1–10 (the earlier split estimate of ~20–27, plus the screens added in Phases 1.5–6, minus the work no longer done twice), plus ~3–4 for the image-or-icon option (set, picker, public tile, data field) and ~2–3 for the shared form validation.
+**Size:** the largest phase; progress is counted in module slices signed off (the order above), not in days.
 
 **Risks:**
 - Regressions in the 20k-line `admin-app.js`. Mitigation: baselines, the parity inventory, one module per slice.
@@ -618,6 +628,57 @@ Each module slice ships as its own commit and deploy; each prod deploy needs exp
 - Every content image field listed in item 11 offers «صورة / أيقونة»; a chosen icon shows as the branded tile in every slot where the image appeared, in the Admin and on the public site; existing content renders unchanged.
 - In every Admin form, saving with an invalid field brings that exact field into view (also with the on-screen keyboard open on a phone), focuses it and shows its inline message; no form scrolls to the top or reports errors only by field name.
 - Owner sign-off per module slice.
+
+### 22.2 Phase 9 — Native mobile apps (Admin + Youth Portal)
+
+Approved 2026-10-21 (owner). Roadmap only; no implementation without a separate execution approval.
+
+**22.2.1 Goal.** Offer the Admin Panel and the public Youth Portal as real installable apps, mainly for reliable background push. Both apps use **Capacitor + native FCM** (TWA rejected: a TWA still depends on Chrome web push).
+
+**22.2.2 Coexistence (fixed rules).**
+- The web/PWA versions stay as they are, fully supported. The apps are an extra channel, not a replacement.
+- One frontend, one Worker, one D1, one R2, one auth (Bearer tokens). No app-only backend, API or data copy.
+- The app shell loads the live site (Capacitor `server.url`) with a small bundled offline fallback. A web deploy updates the apps; a store release is needed only for shell, plugin or SDK changes.
+- Native code is limited to: push registration and taps, deep links (Android App Links / iOS Universal Links), status bar / safe areas / back button, and app-icon badge.
+
+**22.2.3 Channel policy (unchanged from MEMBER-NOTIFICATIONS-PLAN D5).**
+- **Gmail:** personal transactions only: bookings, payments (including the personal payment deadline reminder), competitions results, points, store. Plus OTP / security mail.
+- **Push only (+ website bell):** public announcements, new events, new competitions, and general scheduled reminders (store opens, competition closes, season ends). No email for these.
+- Native and web push are the same channel: one message, sent to every registered device of the recipient, whatever its platform.
+
+**22.2.4 Groundwork in Phase 6** (built with the Worker push move; backend + web only, no app project, no store accounts):
+1. Device registry gets `platform` (`web` / `android` / `ios`) and `app_version`. One registration endpoint accepts web and native FCM tokens with the same auth; admin devices and member/anonymous devices use the same table shape.
+2. The sender builds the FCM HTTP v1 payload per platform from one message model: `webpush` for web, `android` (high priority for urgent admin alerts, notification channel id) and `apns` blocks for native. Dead-token pruning is unchanged.
+3. Every push carries a **path** link (`/admin/…`, `/events/…`), not a full web URL. One shared route table opens the same record on web, Android and iOS (EMAIL-DEEP-LINKS rule).
+4. Public push subscriptions: anonymous device rows for announcements, linked to the account after 5A sign-in. Topic preferences (announcements, events, competitions, reminders) are stored server-side, not in the service worker, so both channels honour them.
+5. Allowed origins and the CSP origin list stay config-driven, so Phase 9 only adds `https://localhost` (Android) and `capacitor://localhost` (iOS) by config.
+6. Adopt the new FCM web client API (§10 watch item) in the same slice.
+7. Badge count and notification-group fields exist in the message model (ignored on web until Phase 9).
+
+Done when: the items above pass their Worker tests and a staging check with one web and one simulated native token.
+
+**22.2.5 Steps.**
+
+| Step | Scope | Done when |
+| --- | --- | --- |
+| 9A Android Admin app | Capacitor shell, native FCM, App Links (`assetlinks.json`), notification channels, back-button / safe-area handling, Play internal testing → production | Store review passed; §22.2.8 checks pass on Android |
+| 9B Android Youth Portal app | Same shell pattern; in-app account deletion entry (store rule), Play Data Safety form, Families-policy check for users under 13, store listing | Store review + Data Safety accepted; §22.2.8 checks pass |
+| 9C iOS (both apps) | APNs key in Firebase, Universal Links (AASA), push permission flow, TestFlight → App Store; Apple guideline 4.2 review risk mitigated by native push + deep links + offline fallback | App Store review passed; §22.2.8 checks pass on iPhone |
+
+**22.2.6 Prerequisites.**
+- Hard: Phase 6 groundwork done (§22.2.4), Phase 7a notification audit done (baseline to compare against), Phase 8 done (final Admin UI, so the shells and store screenshots are made once).
+- 9B also needs 5A accounts live.
+- Owner: Google Play developer account ($25 once); for 9C an Apple Developer account ($99/year) and a Mac or a cloud build service.
+
+**22.2.7 Limits that remain.**
+- OEM battery savers (Xiaomi, Oppo, Samsung, …) can still delay pushes; the apps show a one-time «allow background» hint on those devices.
+- Yearly maintenance: Android target-API and iOS SDK bumps, Capacitor / Firebase plugin updates, store policy forms.
+
+**22.2.8 Acceptance criteria.**
+- Push arrives with the app closed / swiped away on the 7a device set (Android) and on iPhone (9C); a tap opens the exact record.
+- Web/PWA push and behaviour unchanged (no regression in the 7a checks).
+- No API, schema or business logic exists only for the apps beyond §22.2.4.
+- Store review passed; owner sign-off per app.
 
 ---
 
@@ -641,7 +702,7 @@ Each module slice ships as its own commit and deploy; each prod deploy needs exp
 
 ## 24. Which phase gives the biggest speed improvement first
 
-1. **Phase 0.5** gives the earliest *felt* improvement. Draft saves and toggles respond instantly and lists never block, within days, on the current backend.
+1. **Phase 0.5** gives the earliest *felt* improvement. Draft saves and toggles respond instantly and lists never block, on the current backend (shipped).
 2. **Phase 2** removes the worst single wait: publish is visible immediately instead of ~1 min.
 3. **Phase 4** is the largest everyday improvement. Content saves are the most frequent admin action, and the 2–4 s floor disappears from them.
 4. **Phase 5** removes the public-burst `busy` errors and speeds up participants, points and store.
@@ -657,7 +718,7 @@ The migration is finished when **all** of these are true:
 1. No file in the repo references `script.google.com`, and the CSP no longer allows it.
 2. The Apps Script project has no active deployment and no triggers.
 3. Sheets and Drive are archived read-only; no code reads or writes them.
-4. Every admin and public dynamic action is served by the Worker, and `api_log` shows **p95 < 600 ms** for routine actions over 2 consecutive weeks.
+4. Every admin and public dynamic action is served by the Worker, and `api_log` shows **p95 < 600 ms** for every routine action, measured after the last cutover over a sample large enough for a stable p95 (sample size set in the Phase 7 plan).
 5. Content publishing never waits for a GitHub Pages deploy. Only code changes (and background stubs/snapshots) build Pages.
 6. A nightly off-Cloudflare encrypted backup exists, and a restore drill has passed after the last phase.
 7. Two named owners on the Cloudflare account, 2FA on; a runbook in `docs/` (deploy, rollback, restore, rotate secrets).

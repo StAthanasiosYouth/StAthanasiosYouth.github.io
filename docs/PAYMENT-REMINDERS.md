@@ -24,3 +24,12 @@ A booking ref (or the status token) is **not** a Push subscription. A safe desig
 5. The same dedupe and log as WhatsApp reminders (`reminders.channel = 'push'`, which needs a CHECK change in a new migration).
 
 Until then, the reliable fallback is the WhatsApp reminder above, plus the status page («حجوزاتي») on the visitor's phone.
+
+## Email to the booker: Phase 5A-4 (planned 2026-10-20, not built)
+
+Contract: `docs/MEMBER-NOTIFICATIONS-PLAN.md` §4.2, `docs/EVENTS.md` §7.4.
+
+- Only for bookings **linked to a youth account** with a verified email. Unlike the WhatsApp text, the email **includes paid, remaining and the due date** (owner D2): it goes to the account's own verified address. Never payment numbers, proofs or the status token.
+- **Payment recorded / voided** and **amount due changed** are emailed automatically after the admin action commits; «اتدفع بالكامل» is a variant of the payment email, not a separate one.
+- **Deadline reminders** by email: a per-event switch (off by default), at `finalDueAt` − 3 days and on the day; confirmed + balance > 0 only; skipped while a payment request is open; never within 20 h of a WhatsApp reminder for the same booking (the same `reminders` log with `channel = 'email'`, which needs the CHECK change of a new migration, together with `push`).
+- Channel policy (Phase 6): push for the short nudge, email for the record of money.

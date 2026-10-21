@@ -1,6 +1,13 @@
 # تغيير طريقة تسجيل المخدوم في المسابقة — Youth Account redesign (PLAN ONLY)
 
-Rev. 4, 2026-10-20 (owner: **final, roadmap locked**). **Study and plan only.** Nothing here has been implemented, migrated, configured or deployed.
+Rev. 5, 2026-10-20 (owner: **final**). **Study and plan only.** Nothing here has been implemented, migrated, configured or deployed.
+
+Rev. 5 (owner decisions D1–D5, final; member email contract in `docs/MEMBER-NOTIFICATIONS-PLAN.md`):
+- **Admin-created accounts are administratively verified at once**, without OTP (`email_verified_via = 'admin'`), with email-entry confirmation, a creation notice to the address, audit, and a critical alert on the first self-recovery (§6.5, §15). This replaces the rev. 4 "admin-entered emails stay unverified" rule; the OTP is still used only for self-registration and recovery.
+- Self-service recovery therefore also works for admin-verified emails (§10).
+- Accounts receive **transactional member email** (account security, bookings and payments with amounts and due dates, store status, personal results and points), on a pipeline **separate from the admin router**, to verified emails only. No promotional or broadcast email ever (§14, §22).
+- Budget: OTP reserve ~100 with absolute precedence; member transactional reservation 100 (§14).
+- Everything else in rev. 4 stays.
 
 Rev. 4 (owner decisions, final):
 - Still **Phase 5A**. No real legacy youth accounts exist: no migration, no claim flow.
@@ -193,7 +200,7 @@ Browser (GitHub Pages: /competition/<slug>/, /points/)
   │                                           never the password)
   ▼
 Cloudflare Worker  /v1/account/*  (public; invisible Turnstile; D1 rate limits; uniform timing)
-  ├─ D1 participants (= accounts), account_sessions, pending_registrations, otp_codes, email_outbox,
+  ├─ D1 participants (= accounts), account_sessions, pending_registrations, otp_codes, member_outbox (rev. 5), member_prefs,
   │      participant_audit, settings (age rules, switches)
   ├─ secrets: PW_PEPPER (hash), PW_KEY (AES-GCM, view), OTP_PEPPER (codes), TURNSTILE_SECRET, GMAIL_*
   ├─ Queue: email jobs (outside the request; retries; daily cap)
@@ -276,12 +283,13 @@ Entry: the sign-in form (§8) answers «مفيش حساب بالإيميل ده�
 
 Rev. 4: **authorized admins** (`participants.add`, §12.2) create an account in the admin **without OTP**, with the same fields and validation (name, unique phone, unique email, DOB).
 - The account is **active at once** (`status = active`, `created_via = admin`).
-- Its email is recorded as `email_source = admin`, `email_verified_at = NULL`. **Activation and email verification are separate**: an unverified email blocks nothing (login, competitions, points, store, bookings) except self-service password recovery (§10).
+- Rev. 5 (D1): its email is **administratively verified at once**: `email_source = admin`, `email_verified_at = now`, `email_verified_via = 'admin'`. No OTP.
+- **Email-entry confirmation** (MEMBER-NOTIFICATIONS-PLAN §6): typed twice (no paste in the second field), read back to the person, and one confirmation method ticked (`in_person_readback` | `member_typed` | `confirmed_by_whatsapp`), stored in the audit. Typo hints and the disposable-domain list apply.
 - The generated password is shown to the admin, who hands it over in person or privately by WhatsApp. The Primary Admin can view it later at any time (§12.3).
-- The editor says «راجع الإيميل مع الشخص قبل الحفظ», because a mistyped email can't be used for recovery.
-- No welcome or verification email is sent (OTP is self-service only).
-- Audited `register.admin` (actor, no secret).
-- An email becomes verified only through the self-registration OTP, so admin-entered emails stay unverified. Recovery for these accounts is always Technical Support (§11). The state is informational and never limits the account.
+- A **creation notice** goes to the address (no name, no password; «لو مش انت كلّم الدعم الفني»), so a mistyped address is noticed. No welcome or verification email beyond it.
+- Audited `register.admin` (actor, check method, no secret).
+- Self-service recovery (§10) works for it. The **first** successful recovery on an admin-verified email sends a `recovery_used` notice and a **critical** admin notification, then sets `email_verified_via = 'otp'`.
+- (Rev. 4 text "admin-entered emails stay unverified; recovery always through support" is retired by D1.)
 
 ### 6.6 Email OTP (rev. 4: registration and verified-email recovery only)
 
@@ -534,7 +542,7 @@ Rev. 4: **6-digit email OTP, for verified emails only** (replaces the rev. 2 con
 
 1. «نسيت الباسورد؟» → the email (prefilled from the form) + invisible Turnstile → `POST /v1/account/forgot`.
 2. The reply is **always the same**, and the support contact is always visible under it: «لو الإيميل ده متأكد وعليه حساب، هيوصلك كود من ٦ أرقام خلال دقايق. مش واصلك؟ كلّم الدعم الفني.»
-3. A code (§6.6) is sent **only if** an account exists, is not blocked, **has `email_verified_at` set**, and is within limits. Otherwise nothing is sent and no email budget is spent (unverified, unknown or blocked emails → the same neutral reply; the person contacts support, §11).
+3. A code (§6.6) is sent **only if** an account exists, is not blocked, **has `email_verified_at` set** (OTP- or, rev. 5, admin-verified; the first recovery on an admin-verified email also alerts, §6.5), and is within limits. Otherwise nothing is sent and no email budget is spent (unverified, unknown or blocked emails → the same neutral reply; the person contacts support, §11).
    - **Nothing changes yet.** The old password still works, so someone who only knows the email cannot force resets on a victim.
 4. The OTP view (same as §6, step 4) → `POST /v1/account/forgot/verify { email, code }`. A correct code:
    - generates a **new password** (`pw_hash`, `pw_enc`);
@@ -558,7 +566,7 @@ Rev. 4 (owner, final): **Technical Support is the only recovery path** when the 
 2. A support admin with **`participants.manage`** verifies the person **manually**, person to person: known in person, or name + DOB + group match the account, or a call/WhatsApp **from support** to the number already on the account. This is a manual identity check by support, not a self-service method. The **check used** (in person / details match / support call) is a required field in the audit.
 3. Support actions on the **same account**:
    - **Reset the password**: a new generated password, `pw_version + 1`, all sessions revoked. Support gives it **privately by WhatsApp** (or in person). It is **never emailed**.
-   - **Correct the email** (optional): the new email must be unused; it is stored as `email_source = admin`, unverified (§6.5).
+   - **Correct the email** (optional): the new email must be unused; it is stored as `email_source = admin`, administratively verified with the entry confirmation of §6.5 (rev. 5), and gets the creation-style notice.
    - Reason + check method required for each.
 4. If the old email was verified, it gets «تم تغيير الإيميل المرتبط بحسابك. لو مش إنت، كلّم الدعم الفني فورًا.» (notice only, no link, no password).
 5. Same id, points, history and Store data.
@@ -593,7 +601,7 @@ Rev. 4: permissions use the Phase 1.5 grants (`participants` module; BOOKING-PHA
 | **View the current password** | **Primary Admin only** | **Any time, unlimited, never changes it** (§12.3). Logged |
 | Create an account without OTP (§6.5) | `participants.add` | same validation as registration; password shown once to the creator |
 | Edit profile: name, group, church, servant, notes | `participants.edit` | reason for name changes; old → new in audit |
-| Correct email / phone | `participants.manage` | reason; uniqueness; email becomes unverified (`email_source = admin`); sessions revoked; old-email notice when it was verified; critical notification |
+| Correct email / phone | `participants.manage` | reason; uniqueness; the new email is admin-verified with the entry confirmation (rev. 5, §6.5) + a notice to it; sessions revoked; old-email notice when it was verified; critical notification |
 | **Correct DOB** (participants can never change it) | `participants.manage` | reason; old → new in audit; eligibility (points, store, **future** bookings) recomputed for the future only; past submissions, orders and bookings keep their snapshots; critical notification |
 | Eligibility override: guest / eligible / auto | `participants.manage` | reason |
 | Reset / generate a new password | `participants.manage` | reason; kills sessions; the new password is shown to that admin once and can be given privately by WhatsApp; never emailed. **Separate from viewing** |
@@ -727,36 +735,38 @@ Re-checked for rev. 2. No materially better free option was found.
 **Flow:**
 
 ```
-handler → INSERT email_outbox → Queue job → daily cap check → build Arabic text + simple HTML →
+handler → INSERT member_outbox (rev. 5; OTP also sent inline) → Queue job → budget check → build Arabic text + simple HTML →
 OAuth token (cached ~1 h) → gmail.users.messages.send → sent / retry with backoff / dead-letter after 5
 ```
 
-**Our own caps (rev. 4, owner final):**
-- The shared daily total (admin notifications + account mail) is a **configurable target of ~400/day**, always within Gmail's real limit (~500). Overflow of non-critical mail waits for the next window and the admin sees it.
-- **Reserves:** the existing critical-notification reserve (BOOKING-PHASE1-COMPLETION-PLAN §4.4) and a separate **verification-code (OTP) reserve**, so registrations at a youth meeting never starve critical admin mail, and the reverse.
-- OTP mail is sent at once (highest queue priority after critical); per email ≤ 5 codes a day (§6.6).
+**Our own caps (rev. 5, owner final D4; details MEMBER-NOTIFICATIONS-PLAN §5):**
+- The shared rolling-24h total (admin notifications + member mail) is a **configurable target of ~400**, always within Gmail's real limit (~500).
+- **Reservations, in priority order** (they protect room; they are not rigid caps): OTP ~100 · admin critical 50 · member transactional 100 · admin important 120 · the remainder for member bulk (results, gradual) and admin routine/summaries.
+- **OTP always has precedence**: it may use any free room; no other class may use the OTP reserve.
+- OTP mail is sent **inline at once** (not on the minute cron), after a Gmail health check; per email ≤ 5 codes a day (§6.6).
+- Member mail uses its own outbox and switches (`MEMBER_EMAIL`, `OTP_EMAIL`), never the admin router (MEMBER-NOTIFICATIONS-PLAN §2).
 
 **Content:**
 - Arabic, short, links only to `stathanasiosyouth.github.io`, no shorteners. OTP emails carry no link at all.
 - A stable subject per kind, and a monitored `Reply-To`.
 - The outbox never stores bodies, codes or passwords. **No email ever contains a password** (rev. 4).
 
-**Volume (no claim campaign):** registrations come in bursts at youth meetings, about 1 email per new account (the OTP; more on resend). Admin-created accounts send none. Hundreds a day at most on launch day, normally a handful. If a burst would exceed the OTP reserve, the message «وصلت للحد اليومي للأكواد… كلّم الدعم الفني» appears and admins can still create accounts without OTP (§6.5).
+**Volume (no claim campaign; rev. 5):** registrations come in bursts at youth meetings, typically ≤ 60–70 a day: ~1.3 OTP per self-registration (resends) ≈ 90–100 codes on a busy day; admin-created accounts send one creation notice (member transactional). Transactional member mail (bookings, store, security) is usually < 50 a day; personal results go out gradually (~30/hour). If a burst would exceed the OTP reserve, the message «وصلت للحد اليومي للأكواد… كلّم الدعم الفني» appears and admins can still create accounts without OTP (§6.5).
 
-## 15. Email verification (rev. 4, final)
+## 15. Email verification (rev. 5, final)
 
 Free and reliable through the same Gmail path. No SMS.
 
 **Rules:**
-1. **Self-registration:** the 6-digit OTP (§6.6) verifies the email **before** the account exists; the account is created verified (`email_source = self`).
-2. **Admin-created accounts:** created without OTP and active at once; the email stays unverified (`email_source = admin`). Activation and verification are separate (§6.5).
+1. **Self-registration:** the 6-digit OTP (§6.6) verifies the email **before** the account exists; the account is created verified (`email_source = self`, `email_verified_via = 'otp'`).
+2. **Admin-created accounts and admin email corrections (rev. 5, D1):** administratively verified at once, without OTP (`email_source = admin`, `email_verified_via = 'admin'`), with the entry confirmation, creation notice and audit of §6.5.
 3. **Verification gates nothing in everyday use**: no OTP and no verification check for login, bookings, competitions, store orders, points or installment payments. (The rev. 3 "verified email before the first Store order" rule, old §28 #3, is retired.)
-4. The **only** thing that depends on verification is self-service password recovery (§10). Unverified accounts recover through Technical Support (§11).
-5. The person sheet shows «متأكد» / «اتسجل من الأدمن — مش متأكد».
+4. What depends on verification: self-service password recovery (§10) and **member email** (MEMBER-NOTIFICATIONS-PLAN §2: sent only to verified addresses). An address can lose verification only by an admin clearing it (bounce reported); such accounts recover through Technical Support (§11).
+5. The person sheet shows «متأكد بالكود» / «متأكد من الأدمن (طريقة التأكيد)».
 
 **Also:**
 - domain-typo hints (`gmial.com` → «قصدك gmail.com؟»);
-- a small static disposable-domain block list (self-registration only).
+- a small static disposable-domain block list (self-registration and, rev. 5, admin entry).
 
 ---
 
@@ -902,7 +912,8 @@ CREATE TABLE participants (
   id TEXT PRIMARY KEY,                       -- p-xxxxxxxx
   name TEXT NOT NULL, name_norm TEXT NOT NULL,
   email TEXT NOT NULL, email_canon TEXT NOT NULL, email_verified_at INTEGER,
-  email_source TEXT NOT NULL,                -- 'self' (OTP-verified at registration) | 'admin' (entered by an admin, unverified)
+  email_source TEXT NOT NULL,                -- 'self' (OTP-verified at registration) | 'admin' (entered by an admin)
+  email_verified_via TEXT,                   -- rev. 5: 'otp' | 'admin' (administratively verified, §6.5); NULL = not verified
   phone TEXT NOT NULL, phone_norm TEXT NOT NULL,
   birth_date TEXT NOT NULL,                  -- YYYY-MM-DD, locked (only admin corrections)
   eligibility_override TEXT,                 -- NULL | 'guest' | 'eligible'
@@ -942,11 +953,18 @@ CREATE TABLE otp_codes (                      -- forgot password (verified email
 );
 -- The plain code exists only in the Queue message (or the inline send); never in D1, logs or the outbox.
 
-CREATE TABLE email_outbox (
-  id TEXT PRIMARY KEY, participant_id TEXT, kind TEXT NOT NULL,   -- otp_register | otp_recover | email_changed (never a password)
-  ref TEXT, pw_version INTEGER, status TEXT NOT NULL,             -- queued | sent | skipped | failed | deferred
-  attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT, created_at INTEGER NOT NULL, sent_at INTEGER,
-  idem_key TEXT UNIQUE
+-- rev. 5: the member outbox (MEMBER-NOTIFICATIONS-PLAN §2) replaces the rev. 4 `email_outbox`; one table for every member email
+CREATE TABLE member_outbox (
+  id TEXT PRIMARY KEY, participant_id TEXT, kind TEXT NOT NULL,   -- otp_register | otp_recover | acct.* | book.* | pay.* | res.* | store.* … (never a password)
+  entity_type TEXT, entity_id TEXT, entity_version INTEGER,       -- what the email reports; re-checked at send (superseded)
+  tier INTEGER NOT NULL, class TEXT NOT NULL,                     -- 0..3; otp | member_tx | member_bulk
+  dedupe_key TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL,       -- queued | sent | failed | dead | deferred | expired | superseded | suppressed
+  attempts INTEGER NOT NULL DEFAULT 0, next_ms INTEGER, expires_ms INTEGER, sent_ms INTEGER, error TEXT, created_ms INTEGER NOT NULL
+);
+CREATE TABLE member_prefs (                    -- rev. 5: Tier 2 mute / Tier 3 opt-in (MEMBER-NOTIFICATIONS-PLAN §8)
+  participant_id TEXT NOT NULL, grp TEXT NOT NULL, mode TEXT NOT NULL, updated_at INTEGER NOT NULL,
+  PRIMARY KEY (participant_id, grp)
 );
 
 CREATE TABLE participant_audit (             -- PRIVATE, admin only
@@ -956,6 +974,7 @@ CREATE TABLE participant_audit (             -- PRIVATE, admin only
                           -- | profile.edit | session.revoke | transfer
   field TEXT, old_value TEXT, new_value TEXT, reason TEXT,
   check_method TEXT       -- support recovery: in_person | details_match | support_call (rev. 4)
+                          -- admin email entry (rev. 5): in_person_readback | member_typed | confirmed_by_whatsapp
 );
 CREATE INDEX participant_audit_p ON participant_audit(participant_id, at);
 ```
@@ -972,7 +991,7 @@ Other tables:
 - `settings` rows:
   - `age_min`, `age_max`, `age_warn_days`;
   - `accounts_mode` (off | on);
-  - `email_daily_cap` (target ~400, shared), `otp_reserve`, `otp_daily_cap_per_email`;
+  - `email_daily_cap` (target ~400, shared), `otp_reserve`, `otp_daily_cap_per_email`; rev. 5: these are the existing `MAIL_DAILY_TARGET`, `MAIL_RESERVE_OTP` (→ 100), plus `MAIL_RESERVE_MEMBER` (100), `MAIL_BULK_PER_HOUR` (30), `MEMBER_EMAIL`, `OTP_EMAIL` (MEMBER-NOTIFICATIONS-PLAN §5);
   - `support_contact_id` (the Technical Support WhatsApp contact, §11);
   - `session_days_device`, `session_hours_shared`;
   - `discovery_daily_cap`.
@@ -1003,6 +1022,8 @@ Write budget: about 6–8 rows written per registration including index entries.
 | Bots testing email lists | Turnstile on every discovery; 10 per 10 min / 40 a day per IP; 400 a day globally with an admin alert |
 | Duplicate registrations | UNIQUE `email_canon` + `phone_norm`; idempotency key per form |
 | Recovery abuse / mass email | OTP reset on verified emails only (nothing changes until the code is verified), a neutral reply, per-email/IP/global caps, OTP reserve, outbox daily cap |
+| Mistyped admin-entered email → a stranger recovers the account (rev. 5, D1) | Entry typed twice + read back + confirmation method in the audit; a creation notice to the address («لو مش انت كلّم الدعم الفني»); the first self-recovery on an admin-verified email alerts the Primary Admin (critical) and the address; support can block at once |
+| Member email leaking data (rev. 5) | Verified recipients only; no tokens, payment numbers, phones, DOB or admin identities in any member email; content-scan test (MEMBER-NOTIFICATIONS-PLAN §7, §12) |
 | OTP guessing | 6 digits, 5 tries per code, 10-min life, 5 codes/email/day, hashed with `OTP_PEPPER`, constant-time compare |
 | Email squatting at registration | No account row before OTP verification (§6.7) |
 | Account takeover through support | `participants.manage` only, manual identity check + check method + reason in the audit, old-email notice, 7-day change limit, order warning, critical notification |
@@ -1038,7 +1059,7 @@ Write budget: about 6–8 rows written per registration including index entries.
 - Update `privacy/` to say:
   - what is collected and why;
   - that **leaders can view or reset your password** and correct your data;
-  - that email is used only for account messages;
+  - (rev. 5) that email is used only for **service messages about your own account**: codes, security notices, your bookings and payments (with amounts and due dates), your store requests, your results and points; never for announcements or promotion; optional kinds can be muted in «إشعاراتي»;
   - what this device remembers (first name + email for «متابعة», and the session), and how to make it forget;
   - retention, and how to ask for deletion.
 - Retention defaults:
@@ -1046,7 +1067,7 @@ Write budget: about 6–8 rows written per registration including index entries.
   | Data | Kept |
   | --- | --- |
   | `reg_ip_hash` | 90 days |
-  | `email_outbox` | 30 days |
+  | `member_outbox` (rev. 5; no bodies) | 30 days |
   | `pending_registrations` / `otp_codes` | 30 min / 1 day after expiry or use |
   | Expired sessions | 30 days |
   | `participant_audit` | 3 years |
@@ -1066,11 +1087,11 @@ All behind `accounts_mode`, on **staging first**. No claim campaign.
 | Step | Scope | Gate |
 | --- | --- | --- |
 | **5A-0 Prep** (can start any time, no production change) | Owner tasks (§28.2); privacy text; archive the test/demo data; decide §28 | Decisions answered |
-| **5A-1 Server** | Accounts schema incl. `pending_registrations`, `otp_codes`, `email_source`; `/v1/account/*` (signin incl. discovery, register/start + register/verify (OTP), me, logout, forgot + forgot/verify (OTP, verified emails only)); sessions; Turnstile; rate limits; uniform timing; OTP templates + reserve on the Phase 1.5 outbox/Gmail sender; admin endpoints per the grant split (sheet, create without OTP, profile edit, email/phone/DOB corrections, eligibility, view-password, reset-password, support recovery with check method, block, transfer, audit, review list) | Unit + Worker tests; staging race/limit checks |
-| **5A-2 Public UI** | `assets/js/account/` (two-field form, register + OTP view, password view, forgot + OTP, remembered-account card, shared-device mode, Technical Support links); Store guest lock + frozen balance; wording | E2E + device matrix (§25) |
-| **5A-3 Admin UI** | Person sheet (verified / admin-entered email), review list, create-account dialog, view-password and reset dialogs (separate), corrections with reason, support recovery with check method, Excel columns. Existing admin components only (Phase 8 rule) | Admin e2e |
-| **5A-4 Booking age sync** (§18.1) | Booking submit with a session: DOB from the account, age at the event date, `age_source = 'account'`, `requireAccount` per event, confirm-time DOB-changed warning, booking ↔ account linking via status link or admin | Worker + e2e |
-| **5B…** (the rest of Phase 5) | Points, store and competitions runtime on the Worker, written against sessions from the start | Phase 5 gates |
+| **5A-1 Server** | Accounts schema incl. `pending_registrations`, `otp_codes`, `email_source`; `/v1/account/*` (signin incl. discovery, register/start + register/verify (OTP), me, logout, forgot + forgot/verify (OTP, verified emails only)); sessions; Turnstile; rate limits; uniform timing; OTP templates + reserve on the Phase 1.5 outbox/Gmail sender; admin endpoints per the grant split (sheet, create without OTP, profile edit, email/phone/DOB corrections, eligibility, view-password, reset-password, support recovery with check method, block, transfer, audit, review list). **Rev. 5:** member email core (MEMBER-NOTIFICATIONS-PLAN §2–§9, §11): `member_outbox`, member catalog, `MEMBER_EMAIL` / `OTP_EMAIL`, inline OTP with Gmail health check, the priority/reservation budget + per-class counters, expiry/supersede, verified-only recipients, admin-verified emails (D1), Tier 0 notices, templates ported to Azure Crest | Unit + Worker tests; staging race/limit checks |
+| **5A-2 Public UI** | `assets/js/account/` (two-field form, register + OTP view, password view, forgot + OTP, remembered-account card, shared-device mode, Technical Support links); Store guest lock + frozen balance; wording; rev. 5: «إشعاراتي» member preferences (Tier 2 mute / Tier 3 opt-in) | E2E + device matrix (§25) |
+| **5A-3 Admin UI** | Person sheet (verified / admin-entered email), review list, create-account dialog, view-password and reset dialogs (separate), corrections with reason, support recovery with check method, Excel columns; rev. 5: email entry confirmation (twice + read-back + method), manual resend of one Tier 1 email, member mail counts in «حالة النظام». Existing admin components only (Phase 8 rule) | Admin e2e |
+| **5A-4 Booking age sync** (§18.1) | Booking submit with a session: DOB from the account, age at the event date, `age_source = 'account'`, `requireAccount` per event, confirm-time DOB-changed warning, booking ↔ account linking via status link or admin; rev. 5: booking and payment member emails for linked bookings, per-event deadline-reminder switch, «بلّغ الحاجزين» (MEMBER-NOTIFICATIONS-PLAN §4.2, EVENTS §7.4) | Worker + e2e |
+| **5B…** (the rest of Phase 5) | Points, store and competitions runtime on the Worker, written against sessions from the start. Rev. 5: immediate crediting of auto-graded answers + the result-visibility hold (COMPETITIONS §20); personal result / completion / correction emails (gradual), points-deducted, store status and age-out emails (MEMBER-NOTIFICATIONS-PLAN §4.3–§4.4) | Phase 5 gates |
 | **Staging rehearsal** | Fresh fixture accounts (eligible, soon, guest, frozen); real emails to Gmail/Yahoo/Outlook test inboxes; device matrix | Deliverability OK; no PII in logs |
 | **Launch** | `accounts_mode = on` in production, then open competitions (all account-only) to youth (between competitions) | First real competition clean |
 
@@ -1080,7 +1101,7 @@ All behind `accounts_mode`, on **staging first**. No claim campaign.
 - After launch:
   - `wrangler rollback` for a bad deploy (seconds);
   - D1 Time Travel (7 days) or the nightly encrypted backup for bad data;
-  - `email_daily_cap = 0` pauses mail (reset falls back to the admin);
+  - `email_daily_cap = 0` pauses mail (reset falls back to the admin); rev. 5: `MEMBER_EMAIL = 0` stops every member email except codes, `OTP_EMAIL = 0` stops codes (registration then needs an admin);
   - `accounts_mode = off` shows «تسجيل الدخول متوقف مؤقتًا» on **every** competition and on the Store. Data is kept. There is no anonymous fallback mode by design.
 - There is no code-login fallback (nothing to fall back to). Schema changes are forward-only.
 
@@ -1099,7 +1120,8 @@ All behind `accounts_mode`, on **staging first**. No claim campaign.
 - signin: discovery exists / missing, login right / wrong / missing / blocked;
 - register: phone and email in use (support message), guest creation; **no participant row before a correct OTP**; OTP wrong ×5 → dead; expiry; resend cooldown and daily cap; a new code cancels the old one;
 - forgot: neutral reply for unknown / unverified / blocked emails **and no email sent**; verified email → OTP; the old password still works until the code is verified; a correct code rotates `pw_version` and kills sessions; **no outbox row ever contains a password**;
-- admin create without OTP → active, `email_source = admin`, unverified; forgot on it sends nothing;
+- admin create without OTP → active, `email_source = admin`, `email_verified_via = 'admin'` (rev. 5); the entry confirmation (twice + method) is required; a creation notice row is written; forgot on it sends a code, and the first successful recovery writes the `recovery_used` notice + a critical admin alert and flips `via` to `otp`;
+- member email (rev. 5): MEMBER-NOTIFICATIONS-PLAN §12;
 - view-password: Primary only, returns the current password, unlimited calls, `pw_version` and sessions unchanged, every call logged; reset is a separate endpoint and does rotate;
 - grant split: each admin action refused without its grant (§12.2);
 - support recovery: check method + reason required; critical notification;
@@ -1146,35 +1168,38 @@ Check on each:
 
 **Email:** staging sends to Gmail, Yahoo and Outlook test inboxes (inbox vs spam, Arabic rendering, OTP arrival time, cap and reserve behaviour). The OTP field's `one-time-code` autofill is checked on iPhone and Android.
 
-## 26. Effort and risk
+## 26. Scope and risk
 
-| Part | Rev. 1 | Rev. 2 |
+Amended 2026-10-22 (owner): no plan step or phase is gated or scheduled by a number of days. Progress = steps done and their checks passing; effort estimates in dev-days were removed from every plan. Functional time rules stay (retention, token/session/OTP expiry, reminder timing, rollback retention windows, provider deadlines). The day figures of rev. 1–4 are removed; the part list stays as the scope checklist.
+
+| Part | Rev. 1 | Rev. 2 (current scope) |
 | --- | --- | --- |
-| Worker account module, schema, sessions, rate limits, Turnstile, timing | 4–6 | 4–5 |
-| Claim flow, legacy code coexistence, shared-phone handling, sunset | (≈ 3–4, inside the rows above and below) | **0** |
-| Email outbox + Gmail sender + templates | 1.5–2.5 | 1.5–2 |
-| Admin endpoints | 3–4 (incl. merge) | 2.5–3 (no merge tool) |
-| Public UI (two-field form, register, password view, forgot, remembered card, Store guest lock) | 4–5 | 4–5 |
-| Admin UI + Excel | 4–5 | 3–4 (no claim lists or distribution) |
-| Tests | 3–4 | 3–4 |
-| Staging rehearsal + device matrix | 2–3 | 2 |
-| Claim campaign (calendar) | 1–3 weeks | **0** |
-| **Total** | ~22–30 dev days + a campaign | **~16–21 dev days (~3–4 calendar weeks), no campaign** |
+| Worker account module, schema, sessions, rate limits, Turnstile, timing | in scope | in scope |
+| Claim flow, legacy code coexistence, shared-phone handling, sunset | in scope | **dropped** |
+| Email outbox + Gmail sender + templates | in scope | in scope (member email: MEMBER-NOTIFICATIONS-PLAN) |
+| Admin endpoints | incl. merge | no merge tool |
+| Public UI (two-field form, register, password view, forgot, remembered card, Store guest lock) | in scope | in scope |
+| Admin UI + Excel | in scope | no claim lists or distribution |
+| Tests | in scope | in scope |
+| Staging rehearsal + device matrix | in scope | in scope |
+| Claim campaign | needed | **none** |
+| **Result** | accounts + a claim campaign | **accounts, no claim, no campaign** |
 
-Extra saving inside Phase 5: these **are never ported** to the Worker, about 3–4 dev days off Phase 5's own registry and competitions port:
+Extra saving inside Phase 5: these **are never ported** to the Worker (less work in Phase 5's own registry and competitions port):
 - the code login, `pt1` tokens, code export and distribution files;
 - (rev. 3) the whole no-account competition path: open mode, `allowGuests`, the open form, phone-based limits.
 
-The builder change (removing the participation choice and the open form; presets reduced) is about 0.5 day inside the admin UI row. Rev. 3 does not change the 16–21 day total.
+The builder change (removing the participation choice and the open form; presets reduced) sits inside the admin UI row.
 
-**Rev. 4 (final): ~19–25 dev days.**
+**Done when (rev. 5):** the §25 tests pass, the staging rehearsal + device matrix pass, and the Phase 5 gates in BACKEND-MIGRATION §22 hold.
 - OTP registration + recovery (pending registrations, codes, OTP views, reserve): +1–1.5;
 - admin account control without OTP + grant split + `email_source`: +1–1.5;
+- (rev. 5) member email: +5.5–8 across 5A-1…5A-4 and +2–3 in 5B (MEMBER-NOTIFICATIONS-PLAN §11);
 - support-only recovery tool (check method, WhatsApp contact setting): +0.5;
 - view-password as a separate unlimited action: ±0 (replaces the reveal);
 - booking age sync (5A-4): +1.5–2;
 - removed: the verify link, the store verification gate, emailed passwords: −0.5 to −1.
-- The Gmail sender and outbox are built in Phase 1.5, so 5A only adds templates and the OTP reserve.
+- The Gmail sender is built in Phase 1.5. Rev. 5: the admin outbox is **not** reused for members; 5A adds the separate member outbox and pipeline (counted above).
 
 **Risk: low–medium.** No data migration risk. The remaining risks are:
 - password-manager quirks on iOS (mitigated by the copy button and the visible password);
@@ -1231,13 +1256,18 @@ Settled by the owner:
 | 10 | Forgot-password reply | **Always neutral** + the support contact; codes only to verified emails |
 | 11 | Booking `requireAccount` (5A) | **On by default for events with a booker age range**, off otherwise |
 | 12 | Pending booking whose account DOB changed | **Warning at confirmation only** |
+| 13 (rev. 5, D1) | Email of admin-created / admin-corrected accounts | **Administratively verified at once**, no OTP; entry confirmation, creation notice, audit, critical alert on the first self-recovery |
+| 14 (rev. 5, D2) | Amounts in booking/payment emails | **Paid, remaining and due dates included**, to verified emails only; never payment numbers or tokens |
+| 15 (rev. 5, D3) | Personal results emails | **On by default, gradual**; auto-graded points credited at once, manual after grading; emails follow result visibility (COMPETITIONS §20) |
+| 16 (rev. 5, D4) | Email budget | ~400 rolling 24 h: OTP ~100 (absolute precedence), critical 50, member transactional 100, admin 120, remainder bulk; reservations, not caps |
+| 17 (rev. 5, D5) | Announcements, new events / competitions | **Push + bell only**; never promotional or broadcast email |
 
 Background for #1–9 from the revision that introduced them (the table above is authoritative):
 
 1. **Launch order.** If competitions start with codes for real youth before accounts exist, real legacy data appears and a claim flow comes back.
    - *Example:* a points competition next month using printed codes.
    - *Recommended:* hold competitions with real youth until accounts launch. If something must run earlier, a one-off survey on today's system is fine as a throw-away (it creates no identities). Its data is not carried into the account system.
-   - *Technically:* yes = no claim work; no = add the rev. 1 claim flow (+3–4 days + a campaign).
+   - *Technically:* yes = no claim work; no = add the rev. 1 claim flow back (+ a campaign).
 2. **Password length.** *Example:* `K7QM-4RTX-9PHA` (12) vs `K7QM-4RTX-9P` (10). *Recommended:* 12. *Technically:* one constant; 10 is slightly easier to type, 12 is far harder to guess.
 3. **(Retired in rev. 4.) Verify the email before the first order (eligible accounts).** *Example:* Mina registers, plays and earns 200 points; his first prize order asks him to click the email link first. *Recommended:* yes. *Technically:* a flag check in `shopRedeem` + a resend button; off = no check.
 4. **Guests in the admin ranking.** *Example:* a 32-year-old guest scores highest in a quiz. *Recommended:* show them with «ضيف» but without a rank number, so eligible people keep places 1, 2, 3. *Technically:* a sort/filter in `apiCompResults` and the XLSX.
@@ -1268,9 +1298,10 @@ Background for #1–9 from the revision that introduced them (the table above is
 - **Accounts only:** every competition participant has an account; there is no anonymous mode. Each account is **eligible** or **guest**, decided automatically from its DOB and the age range currently set in Admin.
 - **Guests:** play and browse the Store; no earning, ordering or spending; earlier points frozen (derived, not deleted). Eligibility is recomputed from DOB + current settings, and history is protected by per-row snapshots.
 - **Rev. 4:** 6-digit email OTP only for self-registration (before activation) and verified-email recovery; admins create/edit without OTP per grants; Technical Support (WhatsApp) is the only other recovery; passwords never emailed; Primary Admin views current passwords any time without resetting; account DOB drives future booking eligibility (§18.1).
+- **Rev. 5:** admin-created emails administratively verified (§6.5); transactional member email on its own pipeline, verified recipients only, no broadcasts (`docs/MEMBER-NOTIFICATIONS-PLAN.md`).
 - **Migration:** none. Logic is reused, test data archived, no claim.
 - **When:** Phase 5, step 5A (after Phase 1.5 provides grants and the Gmail sender).
-- **Effort:** ~19–25 dev days, low–medium risk.
+- **Risk:** low–medium. Progress = 5A steps done and their checks passing (no day estimate).
 - **Open:** none (§28.1 final); owner tasks in §28.2.
 
 ### Sources (fetched 2026-10-19)

@@ -1,6 +1,7 @@
 # Project handoff — start of Phase 3
 
-Written 2026-10-21 at the close of Phase 1.5; updated 2026-10-22 at the close of Phase 2. Read this first in a fresh session, then the docs it names.
+Written 2026-10-21 at the close of Phase 1.5; updated 2026-10-22 at the close of Phase 2, then by the plan review of Phases 0–9 (§4.1). Read this first in a fresh session, then the docs it names.
+Progress rule (owner, 2026-10-22): nothing is gated or scheduled by a number of days. A step is done when its checks pass; functional time rules (retention, expiry, reminders, provider deadlines) stay.
 Owner: Mena Zakaria. The owner approves every production release; nothing reaches production without an explicit "approved".
 
 ## 1. What this project is
@@ -65,11 +66,51 @@ the reduced scope (Review diffs against the Worker's live revision; the browser-
 checks (staging rehearsal, bookings, rollback drills, a clean shadow so far); the accepted risks are written in the plan.
 A network finding (slow path to `workers.dev` from Egypt) was fixed before the cutover: pages draw the static file first.
 
-**Watch for a few days:** «نسخة GitHub متأخرة» in the publish sheet, `GET /v1/admin/publish/status` (`mirror.late`,
+**Watch over the next real publishes (until three in a row are mirrored clean):** «نسخة GitHub متأخرة» in the publish sheet, `GET /v1/admin/publish/status` (`mirror.late`,
 `mirror.access.ok`), the booking pages. `node worker/scripts/shadow-watch.mjs` is read-only (the comparison keeps
 running: the site and D1 should stay equal once the mirror has committed).
 
 **Booking launch gate: still open and separate** (go-live test #2, test-data cleanup with the owner's go, real events).
+
+### 4.1 Plan review, Phases 0–9 (2026-10-22, read-only against code, git, production and staging)
+
+Checked: `origin/main` = `475404a` (production); work branch `a80d099` differs from it only by the mirrored content
+files and the docs below. Production and staging Worker `/v1/health` ok (`0.3.0`). Production D1 `settings`:
+`NOTIFY_ROUTER=0`, `NOTIFY_EMAIL=0`, `PERMS_ENFORCE=0`, `PAY_REQUESTS` unset (= off), `CONTENT_SERVE` unset (= serving),
+`BOOKING_MODULE=1`, `PAY_DEST=1`, `MIRROR_ACCESS.ok=true`. Last `publish_jobs` row: `worker`, `mirrored`, no error.
+Not checked here: the GitHub Actions runs (nightly backup, Worker CI) — `gh` is not installed in this checkout.
+
+| Phase | State |
+| --- | --- |
+| 0 Spike | ✔ done |
+| 0.5 Front-end quick wins | ✔ done (`perf/phase05` merged); was not marked done in the roadmap, now marked |
+| 1 Foundation + booking pilot | ✔ built and verified; restore drill done (2026-10-15, `worker/README.md`). **Partial:** the launch gate (go-live test #2, test-data cleanup, real events) is open |
+| 1.5 Admin access & notifications | ✔ 11/11 in production, all switches off. Deferred: closed-app push (→ Phase 6/7A). Deviations: no `AGE_RULES` switch (plan §8 had one); `PAY_REQUESTS` has no admin toggle |
+| 2 Publish separation | ✔ done; P2-7 reduced (browser Review → Phase 4, owner); shadow duration waived. Open: watch the next publishes (above) |
+| 3 Admin platform | not started — next |
+| 4–7 | not started (as planned) |
+| 8 Admin redesign, 9 Native apps | planning only (as planned). Essential admin fixes listed in BACKEND-MIGRATION §22.1 still wait for approval |
+
+Found in the review (not in the plans before):
+1. **Roadmap docs on `main` are behind and one is damaged.** `docs/MEMBER-NOTIFICATIONS-PLAN.md` does not exist on `main`;
+   `docs/BACKEND-MIGRATION.md` on `main` lacks the 5A/Phase 9 amendments and has a merged, wrong header line
+   ("Phase 9 native mobile apps on Cloudflare account …"); `YOUTH-ACCOUNTS-PLAN.md`, `COMPETITIONS.md` §20, `EVENTS.md`,
+   `PAYMENT-REMINDERS.md` also differ. The work branch holds the correct copies. A docs-only release to `main` needs the owner's approval.
+2. **Slow path from Egypt to `workers.dev`** (found at the Phase 2 cutover; pages now draw static first). Phase 3's
+   "panel load < 1 s" target depends on the same path: measure it from Egypt in the Phase 3 plan; the optional custom domain is the lever.
+3. **Gmail branding verification fails on the github.io homepage** (Phase 1.5): also points to the custom-domain decision (owner).
+4. **Staging `GITHUB_TOKEN` expires 2026-11-20** (functional date): renew before any staging publish/mirror rehearsal after it.
+5. **§25 "finished" item 7** (second Cloudflare owner + 2FA + runbook) has no owner action recorded yet.
+6. The local `main` in this checkout is 235 commits behind `origin/main`: always compare with `origin/main`.
+7. Stale text fixed in this review: BOOKING-PHASE1 "Phase 1.5 has not started"; Phase 0.5/1/1.5/2 marks in the roadmap tables.
+
+Day-based estimates and gates were removed from BACKEND-MIGRATION, BOOKING-PHASE1-COMPLETION-PLAN, YOUTH-ACCOUNTS-PLAN and
+MEMBER-NOTIFICATIONS-PLAN (replaced by "done when" checks). No requirement was removed; the historical record of the waived
+Phase 2 shadow duration stays in PUBLISH-SEPARATION-PLAN.
+
+**Before Phase 3 starts** (none needs code): (a) owner approval of the docs-only release that fixes item 1; (b) the Phase 2 watch
+above closes clean; (c) a Phase 3 plan for the owner (sessions, presence, edit locks, devices, bootstrap; switch + rollback;
+measured from Egypt). The booking launch gate and the open owner items (§3) run in parallel and do not block Phase 3.
 
 ## 5. Next: Phase 3 — admin platform
 
