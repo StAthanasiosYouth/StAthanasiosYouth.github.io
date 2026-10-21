@@ -241,6 +241,13 @@ P2-8 is in production yet.** Every production step below needs the owner's expli
 | Launch gate (BOOKING-PHASE1-COMPLETION-PLAN §6) | open | closed, or the owner decides the cutover goes first |
 | Production `GITHUB_TOKEN` (owner) | not set | fine-grained, **Contents read/write on the site repo only**, `npx wrangler secret put GITHUB_TOKEN` (no `--env`) |
 
+2026-10-21 evening: R1 live; shadow counting since 17:15 Cairo (clean so far); production `GITHUB_TOKEN` set by the owner
+(secret listed). Its access is proven by the hourly **token check** (`mirrorAccess`, commit `299be21`, cron minute 07 UTC):
+GET the branch, then POST /git/trees with the head's own tree and one file unchanged → GitHub returns the head's tree
+(Contents write proven; no commit, no new object, the ref unmoved). Result in D1 `settings.MIRROR_ACCESS` and
+`GET /v1/admin/publish/status` → `mirror.access` (`ok`, `head`, `expires`). Staging 2026-10-21 16:07 UTC: ok, head =
+the last mirror commit (unchanged). Production: needs this Worker release (R1.1), then read `MIRROR_ACCESS`.
+
 ### Staging rehearsal (repeat right before the cutover)
 
 - `cd worker && node scripts/phase2-rehearsal.mjs` → publish-check, shadow-check, mirror-check, restore-check (wait ~10
