@@ -1591,24 +1591,29 @@
 
     if (name === 'apiSessionStart' || name === 'apiSessionResume') {
       var start = name === 'apiSessionStart';
-      var body = start ? { device: a.device, tab: a.tab, force: a.force === true }
-        : { sid: sidValue, device: a.device, tab: a.tab, prev: a.prev, left: a.left === true };
+      var withState = a.state !== false;
+      // P3-7: the Worker's answer brings the panel's opening data (boot: who, permissions, activity, modules)
+      var body = start ? { device: a.device, tab: a.tab, force: a.force === true, boot: withState }
+        : { sid: sidValue, device: a.device, tab: a.tab, prev: a.prev, left: a.left === true, boot: withState };
+      // … and the content state (still Apps Script's) is asked AT THE SAME TIME with the Google token
+      // (read-only; a device's token can't: then it is asked right after, with the panel token)
+      var early = withState && session && session.via === 'google' && tokenValue === session.token ? post('apiState', [], tokenValue, '', options) : null;
+      if (early) early.catch(function () {});
       return workerFetch('POST', start ? '/v1/admin/session/start' : '/v1/admin/session/resume', body, tokenValue, options).then(function (result) {
         var out = envelope(result);
         if (!out.ok || !out.result.sid) return out;
         var r = out.result;
         keepPanel(r, r.sid);
         var answer = { sid: r.sid, device: r.device, resumed: r.resumed === true, state: null };
-        if (a.state === false) return { ok: true, result: answer };
-        // the panel's state (Apps Script, with the new panel token) and the home card's activity (D1), side by side
-        return Promise.all([
-          post('apiState', [], r.token, r.sid, options),
-          workerFetch('GET', '/v1/admin/activity?limit=6&view=log', null, r.token, {})
-            .then(function (x) { return x.reply && x.reply.ok && Array.isArray(x.reply.items) ? x.reply.items : null; }, function () { return null; })
-        ]).then(function (both) {
-          if (!both[0].ok) return both[0];
-          var state = both[0].result;
-          if (state && both[1]) state.activity = { recent: both[1].slice(0, 6), latest: both[1].length ? both[1][0].at : 0, now: Date.now() };
+        if (!withState) return { ok: true, result: answer };
+        var late = function () { return post('apiState', [], r.token, r.sid, options); };
+        return (early ? early.then(function (st) { return st.ok ? st : late(); }, late) : late()).then(function (st) {
+          if (!st.ok) return st;
+          var state = st.result;
+          var boot = r.boot || {};
+          // the home card and the toasts' starting point: D1's unified activity
+          if (state && boot.activity) state.activity = boot.activity;
+          if (state && boot.me) state.platform = { me: boot.me, modules: boot.modules || {} };
           answer.state = state;
           return { ok: true, result: answer };
         });

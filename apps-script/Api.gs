@@ -292,6 +292,11 @@ function doPost(e) {
     if (request.fn === 'apiSessionResume') {
       API_REQUEST_.sid = request.sid;
     }
+    // Phase 3: the panel's first state, asked with the Google token beside the Worker's session start
+    // (read-only; apiSessionStart gave the same state on a Google token alone before)
+    else if (request.fn === 'apiState' && !request.sid && !panel && !viaDevice && adminPlatformWorker_()) {
+      API_REQUEST_.sid = '';
+    }
     else if (request.fn !== 'apiSessionStart') {
       requireSession_(email, request.sid, request.fn);
       API_REQUEST_.sid = request.sid;

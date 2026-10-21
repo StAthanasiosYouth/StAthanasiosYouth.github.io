@@ -247,7 +247,10 @@ function parkedOut_(record, now) {
 function requireSession_(email, sid, fn) {
 
   // Phase 3: the Worker owns the sessions (AdminPlatform.gs); a write asks fresh, with every lock
-  if (adminPlatformWorker_()) return requireWorkerSession_(email, sid, !!fn && API_READ_FNS.indexOf(fn) === -1);
+  var write = !!fn && API_READ_FNS.indexOf(fn) === -1;
+  if (workerSessionsHere_()) return requireWorkerSession_(email, sid, write);
+  // the cutover's 'both': a page that still runs these sessions also sees the Worker's locks
+  if (write && adminPlatformMode_() === 'both') platformHoldersOnly_(email);
 
   sid = typeof sid === 'string' ? sid : '';
 
@@ -297,7 +300,7 @@ function apiSessionStart(options, internal) {
   var email = assertAdmin_();
 
   // Phase 3: the Worker has the sessions now (AdminPlatform.gs) — an older panel page reloads
-  if (adminPlatformWorker_()) throw platformMovedError_();
+  if (adminPlatformMode_() === 'worker') throw platformMovedError_();
 
   if (!presenceMode_()) {
     return { off: true };
@@ -379,7 +382,7 @@ function apiSessionResume(options) {
 
   var email = assertAdmin_();
 
-  if (adminPlatformWorker_()) throw platformMovedError_();
+  if (adminPlatformMode_() === 'worker') throw platformMovedError_();
 
   if (!presenceMode_()) {
     return { off: true };
@@ -461,7 +464,7 @@ function apiSessionEnd(options) {
 
   var email = assertAdmin_();
 
-  if (adminPlatformWorker_()) throw platformMovedError_();
+  if (adminPlatformMode_() === 'worker') throw platformMovedError_();
 
   if (!presenceMode_()) {
     return { off: true };
@@ -535,7 +538,7 @@ function apiHeartbeat(info) {
 
   var email = assertAdmin_();
 
-  if (adminPlatformWorker_()) throw platformMovedError_();
+  if (adminPlatformMode_() === 'worker') throw platformMovedError_();
 
   if (!presenceMode_()) {
     return { off: true };
@@ -741,14 +744,16 @@ function lockHolder_(key, now) {
   // a key nobody could have locked (locks are taken only with clean keys)
   if (!cleanLockKey_(key)) return null;
 
-  // Phase 3: the locks are the Worker's (AdminPlatform.gs)
-  if (adminPlatformWorker_()) return workerLockHolder_(key);
+  // Phase 3: the locks are the Worker's (AdminPlatform.gs); during the cutover ('both') either side's lock counts
+  var mode = adminPlatformMode_();
+  if (mode === 'worker') return workerLockHolder_(key);
 
   now = now || presenceNow_();
 
   var current = readCached_(lockCacheKey_(key));
+  var here = current && current.sid !== API_REQUEST_.sid && lockAlive_(current, now) ? holderOf_(current, now) : null;
 
-  return current && current.sid !== API_REQUEST_.sid && lockAlive_(current, now) ? holderOf_(current, now) : null;
+  return here || (mode === 'both' ? workerLockHolder_(key) : null);
 
 }
 

@@ -18,8 +18,13 @@
      under the lock);
    - shows the admins' names from D1 (the grants snapshot).
 
+   'both' (the cutover window, while browsers still hold the old admin/boot.js
+   for up to ~10 min of Pages cache): panel tokens are taken as above, AND a
+   page still on the Apps Script sessions keeps working; a lock on either
+   side refuses the other side's save.
+
    Anything else (absent, 'apps') = today's behaviour, unchanged. Rollback:
-   delete the property (the panel's config goes back first, see the plan).
+   'both' first (both kinds of page work), then delete the property.
    A panel token is never a Google token: GOOGLE_ONLY_FUNCTIONS still answer
    'reauth' to it.
 ========================================================= */
@@ -27,21 +32,45 @@
 var ADMIN_PLATFORM_KEY = 'ADMIN_PLATFORM';
 var SESSION_CHECK_S = 20;
 
-/* true while the Worker owns the panel's sessions */
-function adminPlatformWorker_() {
+/* 'worker' | 'both' | '' (off) — read once per request */
+function adminPlatformMode_() {
 
   if (API_REQUEST_ && API_REQUEST_.platform !== undefined) return API_REQUEST_.platform;
 
-  var on = false;
+  var mode = '';
   try {
-    on = PropertiesService.getScriptProperties().getProperty(ADMIN_PLATFORM_KEY) === 'worker';
+    mode = String(PropertiesService.getScriptProperties().getProperty(ADMIN_PLATFORM_KEY) || '');
   }
   catch (ignored) {
-    on = false;
+    mode = '';
   }
+  mode = mode === 'worker' || mode === 'both' ? mode : '';
 
-  if (API_REQUEST_) API_REQUEST_.platform = on;
-  return on;
+  if (API_REQUEST_) API_REQUEST_.platform = mode;
+  return mode;
+
+}
+
+/* panel tokens are taken and the names are D1's ('worker' or 'both') */
+function adminPlatformWorker_() {
+
+  return adminPlatformMode_() !== '';
+
+}
+
+/* this request's session is the Worker's: always in 'worker'; in 'both' when it came with a panel token */
+function workerSessionsHere_() {
+
+  var mode = adminPlatformMode_();
+  return mode === 'worker' || (mode === 'both' && !!API_REQUEST_ && API_REQUEST_.via === 'panel');
+
+}
+
+/* 'both', a write from a page on the Apps Script sessions: the Worker's locks too (asked now, outside the lock) */
+function platformHoldersOnly_(email) {
+
+  var reply = workerSessionAsk_(email, '', [], true);
+  if (reply && API_REQUEST_) API_REQUEST_.platformHolders = reply.holders || {};
 
 }
 

@@ -27,6 +27,7 @@ import { retry } from '../lib/db.js';
 import { activityStmt } from '../lib/activity.js';
 import { mintPanelToken, verifyWorkerToken } from '../lib/auth.js';
 import { verifySync } from '../lib/sync.js';
+import { bootPayload } from './bootstrap.js';
 
 export const STALE_MS = 90 * 1000;          // no heartbeat this long: taken over without asking
 export const ONLINE_MS = 70 * 1000;         // shown as online
@@ -117,8 +118,9 @@ function viaOf(actor) {
 }
 
 /*
- * POST /v1/admin/session/start { device, tab, force } (Google token, or a device's token)
- * → { sid, token, exp, device } | { active: { device, since, seen } }
+ * POST /v1/admin/session/start { device, tab, force, boot } (Google token, or a device's token)
+ * → { sid, token, exp, device, boot? } | { active: { device, since, seen } }
+ * boot: true → the panel's opening data in the same answer (bootstrap.js)
  * ctx.deviceId: set by the device sign-in (the same trusted device takes its own session over).
  */
 export async function sessionStart(ctx, now = Date.now()) {
@@ -158,8 +160,8 @@ export async function sessionStart(ctx, now = Date.now()) {
   if (r[r.length - 1].meta.changes !== 1) throw new ApiError('busy', 'session raced');
 
   ctx.defer(db.prepare('UPDATE admins SET last_seen = ? WHERE email = ?').bind(now, email).run());
-  const t = await tokenFor(ctx, sid, viaOf(ctx.actor));
-  return { sid, token: t.token, exp: t.exp, device };
+  const [t, boot] = await Promise.all([tokenFor(ctx, sid, viaOf(ctx.actor)), b.boot === true ? bootPayload(ctx, now) : null]);
+  return boot ? { sid, token: t.token, exp: t.exp, device, boot } : { sid, token: t.token, exp: t.exp, device };
 }
 
 /*
@@ -192,8 +194,8 @@ export async function sessionResume(ctx, now = Date.now()) {
   const r = await retry(() => db.prepare('UPDATE admin_sessions SET parked_ms = NULL, tab = ?, device = ?, seen_ms = ? WHERE email = ? AND sid = ?')
     .bind(tab, device, now, email, sid).run());
   if (r.meta.changes !== 1) throw replaced();
-  const t = await tokenFor(ctx, sid, viaOf(ctx.actor));
-  return { sid, token: t.token, exp: t.exp, device, resumed: true };
+  const [t, boot] = await Promise.all([tokenFor(ctx, sid, viaOf(ctx.actor)), b.boot === true ? bootPayload(ctx, now) : null]);
+  return boot ? { sid, token: t.token, exp: t.exp, device, resumed: true, boot } : { sid, token: t.token, exp: t.exp, device, resumed: true };
 }
 
 /*

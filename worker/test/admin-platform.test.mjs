@@ -264,3 +264,21 @@ test('Apps Script check with all: every live panel lock of the OTHER sessions (a
   assert.equal(r.body.state, 'live');
   assert.deepEqual(Object.keys(r.body.holders).sort(), ['news:n1', 'page:pg-2']);
 });
+
+test('P3-7 bootstrap: start / resume with boot → me + permissions, the home card activity, modules, in the same answer', async () => {
+  const w = await world();
+  await w.h.db.prepare("INSERT INTO activity (id, at, cairo, actor, action, summary, severity, source) VALUES ('act-0000000000aa', ?, 'x', ?, 'update', 'عدّل', 'routine', 'worker')").bind(Date.now() - 1000, P).run();
+  const s = await w.start(M, { boot: true });
+  assert.equal(s.status, 200, JSON.stringify(s.body));
+  assert.equal(s.body.boot.me.email, M);
+  assert.equal(s.body.boot.me.perms['content.edit'], 'all');
+  assert.deepEqual(s.body.boot.activity.recent.map(r => r.id), ['act-0000000000aa']);
+  assert.equal(s.body.boot.activity.latest, s.body.boot.activity.recent[0].at);
+  assert.equal(typeof s.body.boot.modules.book, 'boolean');
+  assert.ok(!(await w.start(P)).body.boot, 'only when asked');
+  await w.call('Bearer ' + s.body.token, 'POST', '/v1/admin/session/heartbeat', {});
+  await w.h.db.prepare('UPDATE admin_sessions SET parked_ms = ? WHERE email = ?').bind(Date.now(), M).run();
+  const r = await w.call(await w.google(M), 'POST', '/v1/admin/session/resume', { sid: s.body.sid, tab: TAB2, boot: true });
+  assert.equal(r.body.resumed, true);
+  assert.equal(r.body.boot.me.email, M);
+});

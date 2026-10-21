@@ -58,7 +58,12 @@ const add = await call(P, 'POST', '/v1/admin/accounts', { email: NEW, grants: { 
 check('test admin added', add.status === 200, add.body);
 
 // --- sessions
-const p1 = await call(P, 'POST', '/v1/admin/session/start', { device: 'Check A', tab: TAB(1), force: true }, 'start');
+const p1 = await call(P, 'POST', '/v1/admin/session/start', { device: 'Check A', tab: TAB(1), force: true, boot: true }, 'start+boot');
+check('P3-7 bootstrap in the same answer: me + permissions, activity, modules',
+  !!(p1.body && p1.body.boot && p1.body.boot.me && p1.body.boot.me.perms['accounts.manage'] === 'all' && p1.body.boot.activity && typeof p1.body.boot.modules.book === 'boolean'), p1.body && p1.body.boot);
+// timing from this network: a few more warm starts with the bootstrap (same tab: no question)
+for (let i = 0; i < 9; i++) await call(P, 'POST', '/v1/admin/session/start', { device: 'Check A', tab: TAB(1), boot: true }, 'start+boot');
+Object.assign(p1.body, (await call(P, 'POST', '/v1/admin/session/start', { device: 'Check A', tab: TAB(1) })).body);
 check('start: sid + panel token', p1.status === 200 && /^wk1\./.test(p1.body.token) && p1.body.sid, p1.body);
 const n1 = await call(N, 'POST', '/v1/admin/session/start', { device: 'Check B', tab: TAB(2) }, 'start');
 check('second admin starts too', n1.status === 200 && n1.body.sid, n1.body);

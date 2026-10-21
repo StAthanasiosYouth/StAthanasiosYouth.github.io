@@ -148,3 +148,40 @@ test('off: names and rename unchanged (ADMIN_NAMES)', () => {
   w.gs.API_REQUEST_ = null;
   assert.equal(w.gs.displayName_(B), 'b');
 });
+
+test('P3-7: apiState with the Google token and no sid (beside the Worker start) — on only; other functions still need the session', () => {
+  const w = world();
+  const now = Math.floor((Date.now() + w.clock.skew) / 1000);
+  const google = w.issueToken({ email: OWNER, iat: String(now), exp: String(now + 3600) });
+  const st = w.post({ fn: 'apiState', args: [], token: google });
+  assert.equal(st.ok, true, st.error);
+  assert.equal(st.result.user, OWNER);
+  assert.equal(asks(w).length, 0, 'no session asked');
+  worker(w, { state: 'expired', holders: {} });
+  assert.equal(w.post({ fn: 'apiActivity', args: [{}], token: google }).ok, false);
+  const off = world({ on: false });
+  const g2 = off.issueToken({ email: OWNER, iat: String(now), exp: String(now + 3600) });
+  assert.equal(off.post({ fn: 'apiState', args: [], token: g2 }).ok, false, 'off: unchanged (a session first)');
+});
+
+test('P3-8 cutover mode both: old pages keep their Apps Script sessions, panel tokens work too, a lock on either side refuses the other', () => {
+  const w = world();
+  w.properties.set('ADMIN_PLATFORM', 'both');
+  const now = Math.floor((Date.now() + w.clock.skew) / 1000);
+  const google = w.issueToken({ email: B, iat: String(now), exp: String(now + 3600) });
+  // an old page: its own session, its own lock (Apps Script heartbeat)
+  const started = w.post({ fn: 'apiSessionStart', args: [{ device: 'old', force: true, state: false }], token: google });
+  assert.equal(started.ok, true, started.error);
+  const oldSid = started.result.sid;
+  assert.equal(w.post({ fn: 'apiHeartbeat', args: [{ locks: ['news:n-old'] }], token: google, sid: oldSid }).result.locks['news:n-old'].granted, true);
+  // a new page (panel token): the Worker says live, and it holds news:n-new
+  worker(w, { state: 'live', holders: { 'news:n-new': { email: OWNER, name: 'مينا', device: 'Laptop', since: 5 } } });
+  const token = panelToken(w);
+  assert.equal(w.post({ fn: 'apiState', args: [], token, sid: SID }).ok, true);
+  const blockedNew = w.post({ fn: 'apiSaveItem', args: ['news', { id: 'n-old', title: 'x', summary: 'y' }], token, sid: SID });
+  assert.equal(blockedNew.ok, false);
+  assert.match(blockedNew.error, /بيعدّل ده دلوقتي/, 'the old page\'s lock refuses the new page');
+  const blockedOld = w.post({ fn: 'apiSaveItem', args: ['news', { id: 'n-new', title: 'x', summary: 'y' }], token: google, sid: oldSid });
+  assert.equal(blockedOld.ok, false);
+  assert.match(blockedOld.error, /مينا بيعدّل ده دلوقتي/, 'the Worker\'s lock refuses the old page');
+});

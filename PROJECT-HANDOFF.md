@@ -87,7 +87,7 @@ Not checked here: the GitHub Actions runs (nightly backup, Worker CI) — `gh` i
 | 1 Foundation + booking pilot | ✔ built and verified; restore drill done (2026-10-15, `worker/README.md`). **Partial:** the launch gate (go-live test #2, test-data cleanup, real events) is open |
 | 1.5 Admin access & notifications | ✔ 11/11 in production, all switches off. Deferred: closed-app push (→ Phase 6/7A). Deviations: no `AGE_RULES` switch (plan §8 had one); `PAY_REQUESTS` has no admin toggle |
 | 2 Publish separation | ✔ done; P2-7 reduced (browser Review → Phase 4, owner); shadow duration waived. Open: watch the next publishes (above) |
-| 3 Admin platform | in progress — batches 1–2 (P3-1…P3-6) done on staging: `docs/ADMIN-PLATFORM-PLAN.md` |
+| 3 Admin platform | in progress — P3-1…P3-7 done on staging, P3-8 cutover prepared (waits for approval): `docs/ADMIN-PLATFORM-PLAN.md` |
 | 4–7 | not started (as planned) |
 | 8 Admin redesign, 9 Native apps | planning only (as planned). Essential admin fixes listed in BACKEND-MIGRATION §22.1 still wait for approval |
 
