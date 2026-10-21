@@ -276,6 +276,12 @@ function adminNames_() {
     });
   }
 
+  // Phase 3 P3-3: D1 owns the names (AdminPlatform.gs); ADMIN_NAMES only fills the gaps
+  if (adminPlatformWorker_()) {
+    var d1 = platformNames_();
+    Object.keys(d1).forEach(function (email) { names[email] = d1[email]; });
+  }
+
   if (API_REQUEST_) {
     API_REQUEST_.names = names;
   }
@@ -334,6 +340,11 @@ function apiSetAdminName(value, name) {
   var me = assertAdmin_();
   var email = normalizeEmail_(value);
   var clean = cleanDisplayName_(name);
+
+  // Phase 3 P3-3: the names are D1's (POST /v1/admin/accounts/:email/name)
+  if (adminPlatformWorker_()) {
+    throw appError_('تغيير الأسماء بقى من «الصلاحيات».', 'اعمل Refresh للصفحة وجرّب تاني.');
+  }
 
   if (!email) {
     throw appError_('الإيميل ده مش مكتوب صح.', '');

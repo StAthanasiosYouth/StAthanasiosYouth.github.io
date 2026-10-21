@@ -16,6 +16,8 @@ import { PROOF_MAX_BYTES } from './lib/image.js';
 import { verifySync, syncStampStmt } from './lib/sync.js';
 import { grantsSnapshot } from './lib/perms.js';
 import { accountsList, accountAdd, accountUpdate, accountRemove } from './lib/accounts.js';
+import { sessionStart, sessionResume, sessionEnd, sessionPark, sessionHeartbeat, syncSession } from './admin/session.js';
+import { adminMe, adminRename } from './admin/me.js';
 import { notifyClaim } from './notify/claim.js';
 import { tokenHealth } from './notify/email.js';
 import { diagMailSample } from './notify/samples.js';
@@ -292,6 +294,16 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/admin/accounts', auth: 'admin', maxBytes: 8 * 1024, handler: accountAdd },
   { method: 'POST', path: '/v1/admin/accounts/:email', auth: 'admin', maxBytes: 8 * 1024, handler: accountUpdate },
   { method: 'POST', path: '/v1/admin/accounts/:email/remove', auth: 'admin', handler: accountRemove },
+  { method: 'POST', path: '/v1/admin/accounts/:email/name', auth: 'admin', maxBytes: 1024, handler: adminRename },
+  { method: 'GET', path: '/v1/admin/me', auth: 'admin', handler: adminMe },
+
+  // Phase 3 admin platform (admin/session.js, docs/ADMIN-PLATFORM-PLAN.md): off until ADMIN_PLATFORM = '1'
+  { method: 'POST', path: '/v1/admin/session/start', auth: 'admin', anySession: true, maxBytes: 2048, handler: sessionStart },
+  { method: 'POST', path: '/v1/admin/session/resume', auth: 'admin', anySession: true, maxBytes: 2048, handler: sessionResume },
+  { method: 'POST', path: '/v1/admin/session/heartbeat', auth: 'admin', needSession: true, maxBytes: 4096, handler: sessionHeartbeat },
+  { method: 'POST', path: '/v1/admin/session/end', auth: 'admin', anySession: true, handler: sessionEnd },
+  { method: 'POST', path: '/v1/admin/session/park', auth: 'public', raw: true, maxBytes: 4096, handler: sessionPark },
+  { method: 'POST', path: '/v1/sync/session', auth: 'sync', raw: true, maxBytes: 4096, handler: syncSession },
   { method: 'GET', path: '/v1/admin/notify/settings', auth: 'admin', handler: notifySettingsGet },
   { method: 'POST', path: '/v1/admin/notify/settings', auth: 'admin', maxBytes: 64 * 1024, handler: notifySettingsSave },
   { method: 'GET', path: '/v1/admin/notify/me', auth: 'admin', handler: notifyMeGet },

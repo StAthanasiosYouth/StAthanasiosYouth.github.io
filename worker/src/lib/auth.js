@@ -191,13 +191,45 @@ export async function verifyWorkerToken(env, token, now = Date.now()) {
   const s = Math.floor(now / 1000);
   const email = String(c.e || '').toLowerCase();
   if (!email || !(Number(c.x) > s - SKEW_S) || Number(c.x) - Number(c.i) > WK_MAX_S || Number(c.i) > s + SKEW_S) throw new ApiError('auth', 'wk expired');
-  return { email, via: c.v === 'google' ? 'google' : 'device', exp: Number(c.x) };
+  const sid = typeof c.s === 'string' && /^[\w-]{16,64}$/.test(c.s) ? c.s : '';
+  return { email, via: c.v === 'google' ? 'google' : 'device', exp: Number(c.x), sid };
+}
+
+/*
+ * Phase 3 (docs/ADMIN-PLATFORM-PLAN.md): the Worker mints the panel token
+ * itself when it owns the sessions (admin/session.js) — the same wk1 shape,
+ * plus `s`: the admin session id. A token with `s` is good only while that
+ * sid is its account's live session (session_replaced / session_expired);
+ * Apps Script checks it the same way (POST /v1/sync/session).
+ */
+export const PANEL_TOKEN_S = 15 * 60;
+
+export async function mintPanelToken(env, { email, sid, via }, now = Date.now()) {
+  if (!env.SYNC_SECRET) throw new ApiError('disabled', 'SYNC_SECRET not set');
+  const i = Math.floor(now / 1000);
+  const exp = i + PANEL_TOKEN_S;
+  const json = JSON.stringify({ e: email, x: exp, v: via === 'device' ? 'device' : 'google', i, s: sid });
+  const payload = btoa(String.fromCharCode(...new TextEncoder().encode(json))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return { token: 'wk1.' + payload + '.' + await wkHmac(env.SYNC_SECRET, 'wk1.' + payload), exp };
 }
 
 async function requireAdminSession(ctx, token) {
   const claims = await verifyWorkerToken(ctx.env, token);
-  const row = await retry(() => ctx.env.DB.prepare('SELECT email, name, role, active FROM admins WHERE email = ?').bind(claims.email).first());
+  const db = ctx.env.DB;
+  const row = await retry(() => db.prepare(
+    'SELECT a.email, a.name, a.role, a.active, s.sid, s.via AS s_via, s.parked_ms, s.seen_ms FROM admins a LEFT JOIN admin_sessions s ON s.email = a.email WHERE a.email = ?'
+  ).bind(claims.email).first());
   if (!row || !row.active) throw new ApiError('denied', 'not on allowlist');
   ctx.actor = { email: claims.email, name: row.name || '', role: row.role, via: claims.via };
+  ctx.tokenExp = claims.exp;
+  if (claims.sid) {
+    // a panel token: good only while its sid is the account's one live session (start/resume take any)
+    if (row.sid === claims.sid) ctx.session = { email: claims.email, sid: row.sid, via: row.s_via, parked_ms: row.parked_ms, seen_ms: row.seen_ms };
+    else if (!(ctx.route && ctx.route.anySession)) {
+      const gone = await retry(() => db.prepare('SELECT 1 AS x FROM admin_sessions_gone WHERE sid = ?').bind(claims.sid).first());
+      throw new ApiError(row.sid || gone ? 'session_replaced' : 'session_expired', 'panel session');
+    }
+  }
+  if (!ctx.session && ctx.route && ctx.route.needSession) throw new ApiError('session_expired', 'no panel session');
   return ctx.actor;
 }

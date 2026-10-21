@@ -55,13 +55,18 @@ const MESSAGES = {
   google: ['محتاجين نتأكد إنه انت.', 'ادخل بحساب جوجل وكمّل.'],
   protected: ['التغيير ده مش مسموح.', 'ده بيحمي الحساب الأساسي ومسؤول الحسابات الأخير.'],
   // Phase 2 restore (publish-restore.js)
-  mode: ['الرجوع لنسخة قديمة متاح بس لما النشر يبقى من السيرفر الجديد.', 'دلوقتي الموقع بيتنشر من GitHub، فالرجوع بيبقى من هناك.']
+  mode: ['الرجوع لنسخة قديمة متاح بس لما النشر يبقى من السيرفر الجديد.', 'دلوقتي الموقع بيتنشر من GitHub، فالرجوع بيبقى من هناك.'],
+  // Phase 3 admin platform (admin/session.js): the same words as apps-script/Presence.gs
+  session_replaced: ['الجلسة اتقفلت لأنك دخلت من جهاز تاني.', 'لو عايز تكمّل من هنا، ادخل تاني — الجهاز التاني هيخرج.'],
+  session_expired: ['الجلسة انتهت.', 'ادخل تاني.'],
+  off: ['الجزء ده لسه مش شغال على الخادم الجديد.', '']
 };
 
 const STATUS = {
   auth: 401, denied: 403, origin: 403, bad: 400, toolarge: 413, rate: 429, conflict: 409, busy: 409, disabled: 403, notfound: 404, method: 405, error: 500,
   not_found: 404, invalid: 400, proof: 400, not_open: 409, closed: 409, full: 409, limit: 429, final: 409, expired: 401, warn: 409, needs_override: 409, over: 409, recent: 409,
-  locked: 409, turnstile: 403, google: 403, protected: 403, age: 400, mode: 409
+  locked: 409, turnstile: 403, google: 403, protected: 403, age: 400, mode: 409,
+  session_replaced: 401, session_expired: 401, off: 409
 };
 
 export class ApiError extends Error {

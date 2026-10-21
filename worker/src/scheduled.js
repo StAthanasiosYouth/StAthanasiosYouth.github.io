@@ -9,6 +9,7 @@ import { activityStmt } from './lib/activity.js';
 import { notifyTick } from './notify/tick.js';
 import { shadowCheck, SHADOW_EVERY_MIN } from './publish-shadow.js';
 import { mirrorDue, mirrorPending, mirrorAccess, ACCESS_MINUTE } from './publish-mirror.js';
+import { sessionSweepStmts } from './admin/session.js';
 
 const DAY = 24 * 3600 * 1000;
 export const RETENTION = {
@@ -34,7 +35,9 @@ export async function housekeeping(env, now = Date.now()) {
     env.DB.prepare("DELETE FROM notify_outbox WHERE created_ms < ? AND (status IN ('sent', 'dead', 'dismissed') OR level <> 'critical')").bind(now - RETENTION.outboxMs),
     // email counters: hour buckets older than 2 days (and the old per-day rows) are no longer in any window
     env.DB.prepare('DELETE FROM notify_quota WHERE day < ?').bind('h:' + new Date(now - 2 * DAY).toISOString().slice(0, 13)),
-    env.DB.prepare('DELETE FROM shadow_checks WHERE at < ?').bind(now - RETENTION.shadowMs)
+    env.DB.prepare('DELETE FROM shadow_checks WHERE at < ?').bind(now - RETENTION.shadowMs),
+    // Phase 3: forgotten admin sessions, old replaced sids, used device nonces
+    ...sessionSweepStmts(env.DB, now)
   ]);
   const removed = r.map(x => x.meta.changes);
   logLine({ kind: 'cron', job: 'housekeeping', removed });

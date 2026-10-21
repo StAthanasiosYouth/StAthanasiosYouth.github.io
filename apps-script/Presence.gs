@@ -246,6 +246,9 @@ function parkedOut_(record, now) {
  */
 function requireSession_(email, sid) {
 
+  // Phase 3: the Worker owns the sessions (AdminPlatform.gs)
+  if (adminPlatformWorker_()) return requireWorkerSession_(email, sid);
+
   sid = typeof sid === 'string' ? sid : '';
 
   if (!/^[\w-]{16,64}$/.test(sid)) {
@@ -292,6 +295,9 @@ function endSession_(record, replaced) {
 function apiSessionStart(options, internal) {
 
   var email = assertAdmin_();
+
+  // Phase 3: the Worker has the sessions now (AdminPlatform.gs) — an older panel page reloads
+  if (adminPlatformWorker_()) throw platformMovedError_();
 
   if (!presenceMode_()) {
     return { off: true };
@@ -373,6 +379,8 @@ function apiSessionResume(options) {
 
   var email = assertAdmin_();
 
+  if (adminPlatformWorker_()) throw platformMovedError_();
+
   if (!presenceMode_()) {
     return { off: true };
   }
@@ -453,6 +461,8 @@ function apiSessionEnd(options) {
 
   var email = assertAdmin_();
 
+  if (adminPlatformWorker_()) throw platformMovedError_();
+
   if (!presenceMode_()) {
     return { off: true };
   }
@@ -524,6 +534,8 @@ function sessionState_(email) {
 function apiHeartbeat(info) {
 
   var email = assertAdmin_();
+
+  if (adminPlatformWorker_()) throw platformMovedError_();
 
   if (!presenceMode_()) {
     return { off: true };
@@ -728,6 +740,9 @@ function lockHolder_(key, now) {
 
   // a key nobody could have locked (locks are taken only with clean keys)
   if (!cleanLockKey_(key)) return null;
+
+  // Phase 3: the locks are the Worker's (AdminPlatform.gs)
+  if (adminPlatformWorker_()) return workerLockHolder_(key);
 
   now = now || presenceNow_();
 

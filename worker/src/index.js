@@ -38,6 +38,7 @@ export async function handle(request, env, ectx, deps = {}) {
     if (request.method === 'OPTIONS') return preflight(request, env);
     const hit = match(request.method, url.pathname);
     route = hit.route;
+    ctx.route = route;
     ctx.params = hit.params;
     if (route.auth === 'admin') {
       await requireAdmin(ctx);

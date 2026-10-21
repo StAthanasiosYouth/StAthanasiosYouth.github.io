@@ -29,14 +29,15 @@ export async function signSync(secret, ts, raw) {
 }
 
 /* Returns the parsed body; throws auth on any doubt. */
-export async function verifySync(env, request, raw, kind, now = Date.now()) {
+export async function verifySync(env, request, raw, kind, now = Date.now(), { monotonic = true } = {}) {
   if (!env.SYNC_SECRET) throw new ApiError('disabled', 'SYNC_SECRET not set');
   const ts = Number(request.headers.get('x-sync-ts'));
   const sig = request.headers.get('x-sync-signature') || '';
   if (!ts || Math.abs(now - ts) > SKEW_MS) throw new ApiError('auth', 'sync ts');
   if (!safeEqual(sig, await signSync(env.SYNC_SECRET, String(ts), raw))) throw new ApiError('auth', 'sync signature');
 
-  const last = await env.DB.prepare('SELECT value FROM settings WHERE key = ?').bind('SYNC_TS_' + kind).first();
+  // a read-only question (monotonic: false) may repeat; a change never does
+  const last = monotonic ? await env.DB.prepare('SELECT value FROM settings WHERE key = ?').bind('SYNC_TS_' + kind).first() : null;
   if (last && Number(last.value) >= ts) throw new ApiError('conflict', 'sync replay');
 
   let body;

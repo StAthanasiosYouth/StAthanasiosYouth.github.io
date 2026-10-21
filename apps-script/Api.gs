@@ -249,10 +249,17 @@ function doPost(e) {
     }
 
     // a Google ID token, or the access token a trusted device got (AdminDevice.gs)
+    // or, while the Worker owns the sessions (AdminPlatform.gs), the Worker's panel token
     var viaDevice = /^adm1\./.test(request.token);
-    var email = viaDevice ? verifyDeviceToken_(request.token) : verifyIdToken_(request.token);
+    var panel = /^wk1\./.test(request.token) && adminPlatformWorker_() ? verifyPanelToken_(request.token) : null;
+    var email = panel ? panel.email : viaDevice ? verifyDeviceToken_(request.token) : verifyIdToken_(request.token);
 
-    API_REQUEST_.via = viaDevice ? 'device' : 'google';
+    // a panel token is never Google itself: GOOGLE_ONLY_FUNCTIONS answer 'reauth' to it
+    API_REQUEST_.via = panel ? 'panel' : viaDevice ? 'device' : 'google';
+
+    if (panel && panel.sid !== request.sid) {
+      throw apiError_('session_replaced', 'الصفحة دي محتاجة تتفتح من جديد.', 'اعمل Refresh للصفحة وادخل تاني.');
+    }
 
     // a session starts: ADMIN_EMAILS follows D1 first (60-s cache), so someone removed in «الصلاحيات» is refused now
     if (request.fn === 'apiSessionStart') {
@@ -272,7 +279,7 @@ function doPost(e) {
     }
 
     // a few things always want Google itself, not a remembered device
-    if (viaDevice && GOOGLE_ONLY_FUNCTIONS.indexOf(request.fn) !== -1) {
+    if ((viaDevice || panel) && GOOGLE_ONLY_FUNCTIONS.indexOf(request.fn) !== -1) {
       throw apiError_('reauth', 'محتاجين نتأكد إنه انت.', 'ادخل بحساب جوجل وكمّل.');
     }
 
