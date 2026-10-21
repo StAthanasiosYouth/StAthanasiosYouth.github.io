@@ -752,6 +752,7 @@
         b.refundOwed > 0 ? A.chip('مرتجع مطلوب ' + money(b.refundOwed), 'danger') : null,
         b.source === 'admin' ? A.chip('يدوي', 'info') : null,
         b.proofs > 0 ? A.chip('فيه إثبات تحويل', 'info') : null,
+        b.claim > 0 ? A.chip('طلب دفع ' + money(b.claim), 'gold') : null,
         methodName(b.eventId, b.method) ? A.chip(methodName(b.eventId, b.method), '') : null,
         flags.dupProof ? A.chip('إثبات متكرر', 'danger') : null,
         flags.phoneTwice ? A.chip('الرقم ده عنده طلب تاني', 'gold') : null,
@@ -1074,6 +1075,7 @@
       proofGrid,
       el('p', { class: 'section-label', text: 'الدفعات', 'data-anchor': 'payments' }),
       payList,
+      claimsBlock(d),
       history ? el('p', { class: 'section-label', text: 'تغييرات المطلوب' }) : null,
       history,
       // «السجل»: every move on this booking, newest first (the Worker's audit rows)
@@ -1560,21 +1562,25 @@
 
   /* ---------- a payment or a refund ---------- */
 
-  function payForm(d, kind) {
+  function payForm(d, kind, claim) {
 
     var b = d.booking;
     var der = d.derived || {};
     var refund = kind === 'refund';
-    var block = payBlock({ kind: kind, booking: b, event: d.event, prefill: { servantId: b.servantId, method: b.method, amount: refund && der.refundOwed > 0 ? der.refundOwed : '' }, paid: der.paid || 0,
+    var prefill = claim ? { servantId: claim.servantId, method: claim.method, amount: claim.amount }
+      : { servantId: b.servantId, method: b.method, amount: refund && der.refundOwed > 0 ? der.refundOwed : '' };
+    var block = payBlock({ kind: kind, booking: b, event: d.event, prefill: prefill, paid: der.paid || 0,
       amountHint: refund ? (der.refundOwed > 0 ? 'المرتجع المطلوب ' + money(der.refundOwed) : 'المدفوع ' + money(der.paid || 0)) : (der.balance > 0 ? 'الباقي ' + money(der.balance) : '') });
 
     moveForm({
-      title: (refund ? 'تسجيل مرتجع: ' : 'إضافة دفعة: ') + b.ref,
-      intro: refund ? 'فلوس رجعت للزائر فعلًا: مين رجّعها وإزاي.' : 'فلوس استلمناها فعلًا: مين استلمها وإزاي.',
+      title: (claim ? 'قبول طلب الدفع: ' : refund ? 'تسجيل مرتجع: ' : 'إضافة دفعة: ') + b.ref,
+      intro: claim ? 'اتأكد إن التحويل وصل فعلًا (المبلغ والرقم) قبل ما تسجّله. صور التحويل اللي بعتها المشترك بتتسجل مع الدفعة.'
+        : refund ? 'فلوس رجعت للزائر فعلًا: مين رجّعها وإزاي.' : 'فلوس استلمناها فعلًا: مين استلمها وإزاي.',
       label: refund ? 'سجّل المرتجع' : 'سجّل الدفعة',
       nodes: [block.node],
       prepare: function (extra) {
         var input = block.value(extra.force);
+        if (claim) input.claimId = claim.id;
         return { errors: block.check(input), path: '/v1/admin/book/bookings/' + enc(b.id) + '/payments', body: input, key: input.idemKey };
       },
       done: function (reply) {
@@ -1583,6 +1589,54 @@
       }
     });
 
+  }
+
+
+  /* ---------- the participant's payment requests (§4.10) ---------- */
+
+  var CLAIM_STATUS = { pending: ['قيد المراجعة', 'gold'], accepted: ['اتقبل', 'ok'], rejected: ['اترفض', 'danger'], withdrawn: ['المشترك سحبه', ''] };
+
+  function claimsBlock(d) {
+    var list = d.claims || [];
+    if (!list.length) return null;
+    var ev = d.event || {};
+    return el('div', { class: 'book-claims' },
+      el('p', { class: 'section-label', text: 'طلبات دفع من المشترك' }),
+      el('ul', { class: 'book-pays' }, list.map(function (c) {
+        var st = CLAIM_STATUS[c.status] || [c.status, ''];
+        var servant = (ev.servants || []).filter(function (s) { return s.id === c.servantId; })[0];
+        var pending = c.status === 'pending';
+        return el('li', { class: 'book-pay book-claim', 'data-claim': c.id },
+          el('div', { class: 'book-pay__main' },
+            el('span', { class: 'book-pay__amount', text: money(c.amount) }),
+            el('span', { class: 'book-pay__what', text: K.methodLabel(ev, c.method) + '، ' + (servant ? servant.name : c.servantId) + '، ' + ar(c.proofIds.length) + ' صورة تحويل' }),
+            el('span', { class: 'book-pay__when', text: 'اتبعت ' + wallText(c.createdAt) + (c.decidedAt ? '، ' + st[0] + ' ' + wallText(c.decidedAt) : '') }),
+            c.reason ? el('span', { class: 'book-pay__note', text: 'السبب: ' + c.reason }) : null,
+            A.chip(st[0], st[1])),
+          pending ? el('div', { class: 'actions' },
+            el('button', { class: 'btn btn--primary btn--small', type: 'button', 'data-act': 'claim-accept', onclick: function () { payForm(d, 'payment', c); } }, 'اقبل وسجّل الدفعة'),
+            el('button', { class: 'btn btn--small btn--ghost', type: 'button', 'data-act': 'claim-reject', onclick: function () { claimRejectForm(d, c); } }, 'ارفض')) : null);
+      })));
+  }
+
+  function claimRejectForm(d, c) {
+    var b = d.booking;
+    var why = A.textInput('', { multiline: true, rows: 2, max: 200, placeholder: 'مثلاً: الصورة مش واضحة، أو التحويل موصلش' });
+    moveForm({
+      title: 'رفض طلب الدفع: ' + b.ref,
+      intro: 'المشترك هيشوف السبب في صفحة حجزه ويقدر يبعت طلب تاني. الحجز نفسه مبيتغيرش.',
+      label: 'ارفض الطلب',
+      nodes: [A.field('السبب (بيظهر للمشترك)', why)],
+      prepare: function () {
+        var reason = why.value.trim();
+        return { errors: reason.length < 2 ? [{ field: 'reason', message: 'اكتب السبب' }] : [], path: '/v1/admin/book/claims/' + enc(c.id) + '/reject', body: { reason: reason }, key: 'rej-' + c.id };
+      },
+      done: function () {
+        A.toast('اترفض طلب الدفع');
+        B.current = null;
+        openBooking(b.id);
+      }
+    });
   }
 
 

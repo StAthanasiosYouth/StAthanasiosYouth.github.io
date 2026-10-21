@@ -26,6 +26,7 @@ import { activityStmt } from '../lib/activity.js';
 import { verifySync, syncStampStmt } from '../lib/sync.js';
 import { loadEvent } from './event.js';
 import { bookingOn } from './public.js';
+import { bookingForToken, payableWhy } from './claims.js';
 import { localPhone, methodOnline, checkCounts, quote, windowState, stampMs } from './model.js';
 
 const SERVANT_RE = /^srv-[a-z0-9]{4,40}$/;
@@ -93,7 +94,11 @@ export async function bookPay(ctx) {
   const event = await loadEvent(ctx, body.slug);
   const now = Date.now();
   const w = windowState(event, now);
-  if (!w.open) throw new ApiError(w.reason === 'not_open' ? 'not_open' : w.reason === 'closed' ? 'closed' : 'disabled', 'window', w.reason === 'not_open' ? { opensAt: w.opensAt } : {});
+  // a confirmed participant paying what is left (§4.10): their status token opens the card after booking
+  // closed, and the amount is what they still owe (server-derived)
+  const payer = body.token ? await bookingForToken(ctx, body.token).catch(() => null) : null;
+  const paying = !!(payer && payer.b.event_id === event.id && !payableWhy(payer));
+  if (!w.open && !paying) throw new ApiError(w.reason === 'not_open' ? 'not_open' : w.reason === 'closed' ? 'closed' : 'disabled', 'window', w.reason === 'not_open' ? { opensAt: w.opensAt } : {});
   const b = event.booking;
   const servant = b.servants.find(s => s.id === body.servantId);
   if (!servant) throw new ApiError('invalid', 'servantId', { field: 'servantId' });
@@ -103,7 +108,7 @@ export async function bookPay(ctx) {
   if (!dest) throw new ApiError('invalid', 'method', { field: 'method', reason: 'unavailable' });
 
   const checked = body.counts ? checkCounts(b, body.counts) : { problem: 'none' };
-  const amount = checked.problem ? null : quote(b.pricing, checked.counts);
+  const amount = paying ? payer.balance : checked.problem ? null : quote(b.pricing, checked.counts);
   const finalDueMs = b.payment.finalDueAt ? stampMs(b.payment.finalDueAt) : null;
   return {
     __cache: 'no-store',

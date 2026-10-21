@@ -141,10 +141,20 @@ function answer({ method, path, body }) {
     if (data.token !== TOKEN) return json(401, { ok: false, code: 'expired', message: 'x' });
     return json(200, {
       ok: true, ref: 'B-7K2QX', event: { slug: 'online-trip', title: ONLINE.title, startAt: ONLINE.startAt },
-      status: mock.status, firstName: 'مينا', people: { adult: 2, child: 0, companion: 0, total: 2 }, quotedTotal: 3000, createdAt: '2026-10-13T12:00'
+      status: mock.status, firstName: 'مينا', people: { adult: 2, child: 0, companion: 0, total: 2 }, quotedTotal: 3000, createdAt: '2026-10-13T12:00',
+      // confirmed with 2000 still owed (§4.10): «ادفع الباقي» until a request is open
+      ...(mock.status === 'confirmed' ? { amountDue: 3000, paid: 1000, balance: 2000, paymentStatus: 'partial', overdue: false, request: mock.claim || null, canPay: !(mock.claim && mock.claim.status === 'pending') } : {})
     });
   }
   if (url.pathname === '/v1/book/pay') return mock.pay;
+  if (url.pathname === '/v1/book/pay-request') {
+    mock.claim = { status: 'pending', amount: JSON.parse(body || '{}').amount, reason: '' };
+    return json(200, { ok: true, request: { status: 'pending', amount: mock.claim.amount } });
+  }
+  if (url.pathname === '/v1/book/pay-request/withdraw') {
+    mock.claim = null;
+    return json(200, { ok: true, withdrawn: true });
+  }
   if (url.pathname === '/v1/book/withdraw') {
     mock.status = 'withdrawn';
     return json(200, { ok: true, status: 'withdrawn' });
@@ -227,8 +237,8 @@ async function open(path, { init = null } = {}) {
   page.on('request', request => {
     const url = new URL(request.url());
     if (url.origin === API) {
-      const call = { method: request.method(), path: `${url.pathname}${url.search}`, body: request.postData() || '', type: request.headers()['content-type'] || '' };
-      const cors = { 'Access-Control-Allow-Origin': BASE, 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'content-type', Vary: 'Origin' };
+      const call = { method: request.method(), path: `${url.pathname}${url.search}`, body: request.postData() || '', type: request.headers()['content-type'] || '', token: request.headers()['x-status-token'] || '' };
+      const cors = { 'Access-Control-Allow-Origin': BASE, 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'content-type, x-status-token', Vary: 'Origin' };
       if (call.method === 'OPTIONS') return request.respond({ status: 204, headers: cors, body: '' });
       mock.calls.push(call);
       apiCalls.push(call);
@@ -760,6 +770,45 @@ test('age eligibility: the booker date of birth (bday selects), judged on the ev
   assert.equal(sent.bookerDob, `${year - 25}-01-01`);
   assert.deepEqual(sent.participants, [{ name: 'مينا عادل', age: 25 }]);
   assert.ok(await overflow(page) <= 0);
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+
+test('pay what is left (§4.10): confirmed with 2000 owed → «ادفع الباقي» → servant + InstaPay card → amount + a screenshot (with the status token) → a request under review → withdraw', async () => {
+  resetMock();
+  mock.status = 'confirmed';
+  mock.pay = json(200, { ok: true, method: 'instapay', number: '01012345678', name: 'مينا عادل', amount: 2000, mode: 'full' });
+  const { context, page, problems } = await open(`/events/online-trip/#b/${TOKEN}`);
+  await page.waitForSelector('#bstat [data-act="pay-open"]');
+  assert.match(await textOf(page, '#bstat .bstat__pay'), /المتبقي عليك ٢٬?٠٠٠ جنيه/);
+  await page.click('#bstat [data-act="pay-open"]');
+  await page.select('#bpay-servant', 'srv-mina0001');
+  await page.select('#bpay-method', 'instapay');
+  await page.waitForSelector('#bstat .bstat__number');
+  assert.equal(await textOf(page, '#bstat .bstat__number'), '01012345678');
+  const card = JSON.parse(calls('/v1/book/pay').at(-1).body);
+  assert.deepEqual(card, { slug: 'online-trip', servantId: 'srv-mina0001', method: 'instapay', token: TOKEN }, 'the card is asked with the token: the server knows the balance');
+  await page.$eval('#bpay-amount', el => { el.value = '1500'; });
+  const input = await page.$('#bpay-files');
+  await input.uploadFile(JPEG);
+  await page.waitForFunction(() => document.querySelectorAll('#bstat .bstat__proofs li').length === 1);
+  assert.ok(await overflow(page) <= 0);
+  await page.screenshot({ path: `${SHOTS}pay-rest-form-360.png`, fullPage: true });
+  await page.click('#bstat [data-act="pay-send"]');
+  await page.waitForSelector('#bstat [data-req="pending"]');
+  const up = calls('/v1/book/proof').at(-1);
+  assert.equal(up.token, TOKEN, 'the upload names the booking by header');
+  assert.ok(!up.path.includes(TOKEN), 'never in an address');
+  const sent = JSON.parse(calls('/v1/book/pay-request').at(-1).body);
+  assert.deepEqual([sent.token, sent.servantId, sent.method, sent.amount, sent.proofs.length], [TOKEN, 'srv-mina0001', 'instapay', 1500, 1]);
+  assert.match(sent.requestKey, /^web\./);
+  assert.match(await textOf(page, '#bstat [data-req="pending"]'), /قيد المراجعة/);
+  assert.equal(await page.$('#bstat [data-act="pay-open"]'), null, 'no second request while one is open');
+  await page.screenshot({ path: `${SHOTS}pay-rest-pending-360.png`, fullPage: true });
+  await page.click('#bstat [data-act="pay-withdraw"]');
+  await page.waitForSelector('#bstat [data-act="pay-open"]');
+  assert.equal(calls('/v1/book/pay-request/withdraw').length, 1);
   assert.deepEqual(problems, []);
   await context.close();
 });

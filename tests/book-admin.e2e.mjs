@@ -287,7 +287,7 @@ test('module on: the tab, «الحجوزات (٢ جديد)», chips with counts,
   await waitRows(d.page, ['B-AAAA1', 'B-BBBB2']);
   assert.equal(await d.page.evaluate(() => A.sub.pages), 'bookings');
   const chips = await d.page.$$eval('.book-chips .filter-chip', n => n.map(x => x.textContent));
-  assert.deepEqual(chips, ['مستنية المراجعة (٢)', 'المؤكدة (٢)', 'متأخر (١)', 'مرتجعات مطلوبة (١)', 'المرفوضة والملغية (١)', 'الكل (٥)']);
+  assert.deepEqual(chips, ['مستنية المراجعة (٢)', 'المؤكدة (٢)', 'متأخر (١)', 'مرتجعات مطلوبة (١)', 'طلبات دفع', 'المرفوضة والملغية (١)', 'الكل (٥)']);
   const first = await d.page.$eval('.book-row[data-ref="B-AAAA1"]', n => n.innerText);
   assert.match(first, /مريم سمير/);
   assert.match(first, /01012345678/);
@@ -871,3 +871,49 @@ test('email / push links open the exact booking (#open/booking/<id>) and its pay
   assert.deepEqual(d.problems, []);
   await d.context.close();
 });
+
+test('payment requests (§4.10): the «طلبات دفع» chip, the request in the sheet, accept = «إضافة دفعة» prefilled with the claim, reject with a reason', async () => {
+  freshWorker();
+  const c3 = fake.state.bookings.find(x => x.ref === 'B-CCCC3');
+  fake.state.proofs.push({ id: 'prf-claim001', purpose: 'booking', paymentId: '', by: 'visitor', at: '2026-10-15T10:00', bytes: 1000, width: 40, height: 60, dup: false, bookingId: c3.id });
+  fake.state.claims.push({ id: 'pcl-aaaa01', bookingId: c3.id, status: 'pending', amount: 2000, servantId: 'srv-mina', method: 'instapay', proofIds: ['prf-claim001'], reason: '', createdAt: '2026-10-15T10:00', decidedAt: '' });
+  const d = await open();
+  await signIn(d.page);
+  await openBookings(d.page);
+  await d.page.waitForFunction(() => [...document.querySelectorAll('.filter-chip')].some(c => /طلبات دفع/.test(c.textContent) && /١/.test(c.textContent)), { timeout: 8000 });
+  await d.page.click('.filter-chip[data-filter="claims"]');
+  await waitRows(d.page, ['B-CCCC3']);
+  assert.match(await d.page.$eval('.book-row[data-ref="B-CCCC3"]', n => n.innerText), /طلب دفع/);
+  await d.page.click('.book-row[data-ref="B-CCCC3"]');
+  await sheetTitle(d.page, 'حجز B-CCCC3');
+  await d.page.waitForSelector('#sheet [data-claim="pcl-aaaa01"]');
+  assert.match(await d.page.$eval('#sheet [data-claim="pcl-aaaa01"]', n => n.innerText), /قيد المراجعة/);
+  await shot(d.page, 'claim-sheet');
+  await clickAct(d.page, 'claim-accept');
+  await d.page.waitForFunction(() => /قبول طلب الدفع/.test(document.querySelector('#sheet[open] .sheet__title').textContent));
+  assert.equal(await d.page.$eval('#sheet .field[data-label="المبلغ"] input', n => n.value), '2000', 'prefilled from the request');
+  await clickAct(d.page, 'submit');
+  await d.page.waitForFunction(() => document.querySelector('#sheet [data-claim="pcl-aaaa01"]') && /اتقبل/.test(document.querySelector('#sheet [data-claim="pcl-aaaa01"]').innerText), { timeout: 8000 });
+  const sent = lastWrite(/\/payments$/);
+  assert.equal(sent.body.claimId, 'pcl-aaaa01');
+  assert.equal(sent.body.amount, 2000);
+  assert.equal(fake.state.payments.at(-1).proofIds[0], 'prf-claim001', 'the screenshot is the payment\'s proof');
+  await closeSheet(d.page);
+
+  // a second request, rejected with a reason
+  fake.state.claims.push({ id: 'pcl-bbbb02', bookingId: c3.id, status: 'pending', amount: 300, servantId: 'srv-mina', method: 'instapay', proofIds: [], reason: '', createdAt: '2026-10-15T11:00', decidedAt: '' });
+  await d.page.click('.filter-chip[data-filter="all"]');
+  await d.page.waitForSelector('.book-row[data-ref="B-CCCC3"]');
+  await d.page.click('.book-row[data-ref="B-CCCC3"]');
+  await d.page.waitForSelector('#sheet [data-claim="pcl-bbbb02"] [data-act="claim-reject"]');
+  await clickAct(d.page, 'claim-reject');
+  await clickAct(d.page, 'submit');
+  await d.page.waitForSelector('#sheet .field-error, #sheet [aria-invalid="true"], #sheet .errors:not([hidden])');
+  await d.page.type('#sheet textarea', 'الصورة مش واضحة');
+  await clickAct(d.page, 'submit');
+  await d.page.waitForFunction(() => document.querySelector('#sheet [data-claim="pcl-bbbb02"]') && /اترفض/.test(document.querySelector('#sheet [data-claim="pcl-bbbb02"]').innerText), { timeout: 8000 });
+  assert.equal(lastWrite(/\/claims\/pcl-bbbb02\/reject$/).body.reason, 'الصورة مش واضحة');
+  assert.deepEqual(d.problems, []);
+  await d.context.close();
+});
+

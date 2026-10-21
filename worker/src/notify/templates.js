@@ -301,6 +301,7 @@ const SUBJECTS = {
   'payment.add': 'دفعة جديدة في حجز {ref}[ – {event}]',
   'payment.refund': 'استرداد في حجز {ref}[ – {event}]',
   'payment.void': 'إلغاء دفعة في حجز {ref}[ – {event}]',
+  'payment.request': 'طلب دفع الباقي في حجز {ref}[ – {event}]',
   'event.cancelAll': 'إلغاء كل الحجوزات[ – {event}]',
   'accounts.add': 'أدمن جديد في لوحة التحكم[: {target}]',
   'accounts.grants': 'تغيير صلاحيات[ {target}]',
@@ -318,6 +319,7 @@ const INTROS = {
   'payment.add': 'اتسجلت دفعة جديدة. المبلغ والتفاصيل في لوحة التحكم.',
   'payment.refund': 'اتسجل استرداد. المبلغ والتفاصيل في لوحة التحكم.',
   'payment.void': 'اتلغت دفعة. راجع الحجز في لوحة التحكم.',
+  'payment.request': 'مشترك بعت صورة تحويل للمبلغ الباقي. راجعها واقبلها أو ارفضها من الحجز.',
   'event.cancelAll': 'كل حجوزات الفعالية اتلغت. راجع اللي محتاج يرجعله فلوس في «الحجوزات».'
 };
 

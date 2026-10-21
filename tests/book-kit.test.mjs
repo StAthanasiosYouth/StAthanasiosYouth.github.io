@@ -23,7 +23,7 @@ const PRICING = {
 };
 
 test('the chips: one request per status, «المرفوضة والملغية» = three lists merged; counts from the reply', () => {
-  assert.deepEqual(K.FILTERS.map(f => f.label), ['مستنية المراجعة', 'المؤكدة', 'متأخر', 'مرتجعات مطلوبة', 'المرفوضة والملغية', 'الكل']);
+  assert.deepEqual(K.FILTERS.map(f => f.label), ['مستنية المراجعة', 'المؤكدة', 'متأخر', 'مرتجعات مطلوبة', 'طلبات دفع', 'المرفوضة والملغية', 'الكل']);
   const [pending] = K.queuePaths('evt-abcd1234', 'pending', '');
   assert.equal(pending, '/v1/admin/book/bookings?eventId=evt-abcd1234&status=pending&limit=50');
   assert.match(K.queuePaths('evt-abcd1234', 'overdue', '')[0], /status=all&overdue=1/);
@@ -36,7 +36,7 @@ test('the chips: one request per status, «المرفوضة والملغية» =
   assert.equal(new URL(closed[0], 'https://x').searchParams.get('cursor'), null);
 
   const counts = { byStatus: { pending: 3, confirmed: 5, rejected: 1, withdrawn: 2, cancelled: 1 }, overdue: 2, refunds: 1 };
-  assert.deepEqual(K.FILTERS.map(f => K.filterCount(f.key, counts)), [3, 5, 2, 1, 4, 12]);
+  assert.deepEqual(K.FILTERS.map(f => K.filterCount(f.key, counts)), [3, 5, 2, 1, 0, 4, 12]);
 
   const merged = K.mergeRows([[{ id: 'a', createdAt: '2026-10-01T10:00' }], [{ id: 'b', createdAt: '2026-10-03T10:00' }, { id: 'a', createdAt: '2026-10-01T10:00' }]]);
   assert.deepEqual(merged.map(r => r.id), ['b', 'a'], 'newest first, each once');

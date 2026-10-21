@@ -22,6 +22,7 @@ import {
   derive, amountDueOf, newRef, LIMITS, stampMs, methodOnline, participantCounts, payClaim
 } from './model.js';
 import { checkBooker, checkCompanions, ageRule } from './age.js';
+import { bookingForToken, payableWhy, claimForStatus } from './claims.js';
 
 const KEY = /^[A-Za-z0-9_.:-]{8,100}$/;
 const TOKEN_LIFE_MS = 60 * 24 * 3600 * 1000;      // §6: event end + 60 days
@@ -71,7 +72,11 @@ export async function bookProof(ctx) {
   await requireOn(ctx);
   await limit(ctx, 'book.proof', clientIp(ctx.request), 10, 600);
   const event = await loadEvent(ctx, ctx.url.searchParams.get('slug'));
-  openOrThrow(event, Date.now());
+  // a confirmed participant paying what is left (§4.10) may upload after booking closed: their status token
+  // (a header, never the URL) for a booking of this event that still owes money
+  const statusTok = ctx.request.headers.get('x-status-token');
+  const payer = statusTok ? await bookingForToken(ctx, statusTok).catch(() => null) : null;
+  if (!(payer && payer.b.event_id === event.id && !payableWhy(payer))) openOrThrow(event, Date.now());
   let out;
   try {
     out = await putProof(ctx.env, { bytes: ctx.raw, purpose: 'booking', by: 'visitor', deleteAfterMs: Date.now() + UNCLAIMED_MS });
@@ -263,6 +268,11 @@ export async function bookStatus(ctx) {
   }
   if (b.status === 'rejected' && b.reject_reason) out.reason = b.reject_reason;
   if (b.status === 'cancelled' && b.cancel_reason) out.reason = b.cancel_reason;
+  // paying what is left (§4.10): the open (or last decided) request, and whether «ادفع الباقي» shows
+  if (b.status === 'confirmed') {
+    out.request = await claimForStatus(ctx.env, b.id);
+    out.canPay = out.balance > 0 && !(out.request && out.request.status === 'pending') && (booking.methods || []).some(m => methodOnline(m));
+  }
   return out;
 }
 

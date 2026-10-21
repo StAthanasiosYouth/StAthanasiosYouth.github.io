@@ -716,6 +716,11 @@ export function statusView(reply) {
     rows,
     overdue: status === 'confirmed' && reply.overdue === true,
     reason: (status === 'rejected' || status === 'cancelled') ? line(reply.reason, 200) : '',
-    canWithdraw: status === 'pending'
+    canWithdraw: status === 'pending',
+    // paying what is left (§4.10): the balance, «ادفع الباقي», and the open / last request
+    balance: status === 'confirmed' && Number.isInteger(reply.balance) && reply.balance > 0 ? reply.balance : 0,
+    canPay: status === 'confirmed' && reply.canPay === true && Number.isInteger(reply.balance) && reply.balance > 0,
+    request: status === 'confirmed' && isObject(reply.request) && ['pending', 'accepted', 'rejected'].includes(reply.request.status)
+      ? { status: reply.request.status, amount: amount(reply.request.amount) ?? 0, reason: line(reply.request.reason, 200) } : null
   };
 }

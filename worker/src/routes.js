@@ -19,6 +19,7 @@ import { accountsList, accountAdd, accountUpdate, accountRemove } from './lib/ac
 import { notifyClaim } from './notify/claim.js';
 import { tokenHealth } from './notify/email.js';
 import { diagMailSample } from './notify/samples.js';
+import { bookPayRequest, bookPayRequestWithdraw, adminClaimReject } from './book/claims.js';
 import { notifySettingsGet, notifySettingsSave, notifyMeGet, notifyMeSave, notifyStatus, notifyDismiss } from './notify/settings.js';
 import { housekeeping, blankPhones } from './scheduled.js';
 import { makeJob } from './jobs.js';
@@ -301,6 +302,8 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/book/status', auth: 'public', maxBytes: 4 * 1024, handler: bookStatus },
   { method: 'POST', path: '/v1/book/withdraw', auth: 'public', maxBytes: 4 * 1024, handler: bookWithdraw },
   { method: 'POST', path: '/v1/book/pay', auth: 'public', maxBytes: 4 * 1024, handler: bookPay },
+  { method: 'POST', path: '/v1/book/pay-request', auth: 'public', maxBytes: 8 * 1024, handler: bookPayRequest },
+  { method: 'POST', path: '/v1/book/pay-request/withdraw', auth: 'public', maxBytes: 4 * 1024, handler: bookPayRequestWithdraw },
 
   // booking — admin
   { method: 'GET', path: '/v1/admin/book/module', auth: 'admin', handler: adminModule },
@@ -319,6 +322,7 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/admin/book/bookings/:id/reopen', auth: 'admin', handler: adminReopen },
   { method: 'POST', path: '/v1/admin/book/bookings/:id/update', auth: 'admin', handler: adminUpdate },
   { method: 'POST', path: '/v1/admin/book/bookings/:id/payments', auth: 'admin', handler: adminPaymentAdd },
+  { method: 'POST', path: '/v1/admin/book/claims/:id/reject', auth: 'admin', handler: adminClaimReject },
   { method: 'POST', path: '/v1/admin/book/payments/:id/void', auth: 'admin', handler: adminPaymentVoid },
   { method: 'GET', path: '/v1/admin/book/summary', auth: 'admin', handler: adminSummary },
   { method: 'GET', path: '/v1/admin/book/export', auth: 'admin', handler: adminExport },

@@ -38,6 +38,8 @@ export const FILTERS = [
   { key: 'confirmed', label: 'المؤكدة', sources: [{ status: 'confirmed' }] },
   { key: 'overdue', label: 'متأخر', sources: [{ status: 'all', overdue: '1' }] },
   { key: 'refunds', label: 'مرتجعات مطلوبة', sources: [{ status: 'all', refunds: '1' }] },
+  // participants who sent a transfer for what is left (§4.10): waiting for review
+  { key: 'claims', label: 'طلبات دفع', sources: [{ status: 'all', claims: '1' }] },
   // the API takes one status at a time: three lists, merged
   { key: 'closed', label: 'المرفوضة والملغية', sources: [{ status: 'rejected' }, { status: 'withdrawn' }, { status: 'cancelled' }] },
   { key: 'all', label: 'الكل', sources: [{ status: 'all' }] }
@@ -52,6 +54,7 @@ export function filterCount(key, counts) {
     case 'confirmed': return n('confirmed');
     case 'overdue': return Number(counts && counts.overdue) || 0;
     case 'refunds': return Number(counts && counts.refunds) || 0;
+    case 'claims': return Number(counts && counts.claims) || 0;
     case 'closed': return n('rejected') + n('withdrawn') + n('cancelled');
     default: return n('pending') + n('confirmed') + n('rejected') + n('withdrawn') + n('cancelled');
   }

@@ -51,6 +51,10 @@ const SPECIAL = {
   'booking.remind': ['routine', 'bookings.view'],
   'payment.add': ['routine', 'finance.view'],
   'payment.refund': ['routine', 'finance.view'],
+  // a participant's request to pay what is left (§4.10): someone has to review it
+  'payment.request': ['important', 'finance.manage'],
+  'payment.requestReject': ['routine', 'finance.view'],
+  'payment.requestWithdraw': ['routine', 'finance.view'],
   'handover.add': ['routine', 'finance.view'],
   'handover.void': ['routine', 'finance.view'],
   'modules.book': ['important', 'bookings.manage'],
@@ -107,7 +111,7 @@ export function defaultsOf(level) {
 const ACTION_TEXT = {
   'booking.create': 'سجّل حجز', 'booking.confirm': 'أكّد حجز', 'booking.reject': 'رفض حجز', 'booking.cancel': 'لغى حجز',
   'booking.reopen': 'رجّع حجز', 'booking.update': 'عدّل حجز', 'booking.ageOverride': 'تجاوز شرط السن في حجز', 'booking.withdraw': 'الزائر لغى طلب', 'booking.remind': 'فكّر بالدفع في حجز',
-  'payment.add': 'سجّل دفعة في حجز', 'payment.refund': 'سجّل استرداد في حجز', 'payment.void': 'لغى دفعة في حجز',
+  'payment.add': 'سجّل دفعة في حجز', 'payment.refund': 'سجّل استرداد في حجز', 'payment.void': 'لغى دفعة في حجز', 'payment.request': 'طلب دفع الباقي في حجز', 'payment.requestReject': 'رفض طلب دفع في حجز', 'payment.requestWithdraw': 'سحب طلب دفع في حجز',
   'handover.add': 'سجّل تسليم فلوس', 'handover.void': 'لغى تسليم فلوس', 'event.cancelAll': 'لغى كل حجوزات فعالية',
   'modules.book': 'غيّر حالة الحجز', 'job.failed': 'مهمة في الخلفية فشلت', 'notify.failed': 'إشعار مقدرش يتبعت',
   'gmail.token': 'إرسال الإيميلات واقف: صلاحية جيميل محتاجة تتجدد'

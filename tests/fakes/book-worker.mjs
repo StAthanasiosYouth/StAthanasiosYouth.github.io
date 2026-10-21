@@ -42,6 +42,7 @@ export function createBookWorker({ event, origin, proofBytes, now = () => '2026-
     bookings: [],
     payments: [],
     proofs: [],
+    claims: [],                        // participants' payment requests (§4.10): { id, bookingId, status, amount, servantId, method, proofIds, reason }
     seq: 0,
     idem: new Map(),
     calls: [],
@@ -83,6 +84,7 @@ export function createBookWorker({ event, origin, proofBytes, now = () => '2026-
     return {
       id: b.id, ref: b.ref, eventId: ev().id, status: b.status, source: b.source, name: b.name, phone: b.phone,
       servantId: b.servantId, servantName: servant ? servant.name : '', method: b.method, people: people(counts), seats: seats(counts),
+      claim: (state.claims.find(c => c.bookingId === b.id && c.status === 'pending') || {}).amount || 0,
       quotedTotal: b.quotedTotal, amountDue: dueOf(b), ...derived(b), createdAt: b.createdAt, confirmedAt: b.confirmedAt || '',
       flags: { ...b.flags }, version: b.version
     };
@@ -103,6 +105,7 @@ export function createBookWorker({ event, origin, proofBytes, now = () => '2026-
       lock: state.lockHolder ? { mine: false, holder: clone(state.lockHolder) } : { mine: true, holder: { name: 'Me', since: 0 } },
       proofs: clone(state.proofs.filter(p => p.bookingId === b.id)),
       derived: derived(b),
+      claims: clone(state.claims.filter(c => c.bookingId === b.id)),
       event: { ...clone(ev()), taken: taken(), left: left() }
     };
   }
@@ -226,12 +229,14 @@ export function createBookWorker({ event, origin, proofBytes, now = () => '2026-
       if (status !== 'all') rows = rows.filter(r => r.status === status);
       if (query.get('overdue') === '1') rows = rows.filter(r => r.overdue);
       if (query.get('refunds') === '1') rows = rows.filter(r => r.refundOwed > 0);
+      if (query.get('claims') === '1') rows = rows.filter(r => r.claim > 0);
       if (q) {
         const digits = q.replace(/\D/g, '').replace(/^0/, '');
         rows = rows.filter(r => r.ref === q.toUpperCase() || r.name.includes(q) || (digits.length >= 3 && r.phone.includes(digits)));
       }
       rows.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-      const counts = { byStatus: eventRow().counts, overdue: state.bookings.map(row).filter(r => r.overdue).length, refunds: state.bookings.map(row).filter(r => r.refundOwed > 0).length };
+      const counts = { byStatus: eventRow().counts, overdue: state.bookings.map(row).filter(r => r.overdue).length, refunds: state.bookings.map(row).filter(r => r.refundOwed > 0).length,
+        claims: state.claims.filter(c => c.status === 'pending').length };
       return { rows, counts, next: '' };
     }],
     ['GET', /^\/v1\/admin\/book\/bookings\/(bk-\d+|bkg-[a-z0-9]{4,40})$/, m => detail(find(m[1]))],
@@ -312,9 +317,21 @@ export function createBookWorker({ event, origin, proofBytes, now = () => '2026-
     ['POST', /^\/v1\/admin\/book\/bookings\/(bk-\d+|bkg-[a-z0-9]{4,40})\/payments$/, (m, body) => {
       const b = find(m[1]);
       if (b.status === 'pending') throw new Fail('final');
-      addPayment(b, body);
+      // accepting a participant's request: its screenshots become the payment's proofs
+      const claim = body.claimId ? state.claims.find(c => c.id === body.claimId && c.bookingId === b.id) : null;
+      if (body.claimId && (!claim || claim.status !== 'pending')) throw new Fail('final');
+      addPayment(b, claim ? { ...body, proofIds: claim.proofIds } : body);
+      if (claim) { claim.status = 'accepted'; claim.paymentId = state.payments[state.payments.length - 1].id; claim.decidedAt = now(); }
       bump(b);
       return detail(b);
+    }],
+    ['POST', /^\/v1\/admin\/book\/claims\/(pcl-[a-z0-9]+)\/reject$/, (m, body) => {
+      const c = state.claims.find(x => x.id === m[1]);
+      if (!c) throw new Fail('not_found');
+      if (String(body.reason || '').trim().length < 2) throw new Fail('invalid', { field: 'reason', message: 'السبب مطلوب.' });
+      if (c.status !== 'pending') throw new Fail('final');
+      Object.assign(c, { status: 'rejected', reason: body.reason, decidedAt: now() });
+      return { claim: { id: c.id, status: 'rejected', reason: c.reason }, bookingId: c.bookingId };
     }],
     ['POST', /^\/v1\/admin\/book\/payments\/(pay-\d+)\/void$/, (m, body) => {
       const p = state.payments.find(x => x.id === m[1]);

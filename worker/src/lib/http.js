@@ -95,7 +95,7 @@ export function preflight(request, env) {
       ...SECURITY_HEADERS,
       ...cors,
       'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
-      'access-control-allow-headers': 'authorization, content-type, idempotency-key, x-request-id, x-edit-session',
+      'access-control-allow-headers': 'authorization, content-type, idempotency-key, x-request-id, x-edit-session, x-status-token',
       'access-control-max-age': '7200'
     }
   });
