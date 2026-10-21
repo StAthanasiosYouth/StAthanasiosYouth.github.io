@@ -398,6 +398,18 @@ test('«الفعاليات»: a trip with prices and a servant; its card in «ا
   await d.page.$eval('dialog.sheet[open] .field[data-label="السعر"] input', n => { n.value = '1500'; n.dispatchEvent(new Event('input', { bubbles: true })); });
   await d.page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .pages-servant .check')][0].querySelector('input').click());
   await shot('05-event-editor');
+  // age eligibility (§4.9): the booker 18–30; a child category switched off for this event
+  await d.page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] label')].find(l => l.textContent.includes('الحاجز + أفراد إضافيين')).click());
+  await d.page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] button')].find(b => b.textContent.includes('فئة سعر')).click());
+  await d.page.$eval('dialog.sheet[open] .pages-prices__row:not(.pages-prices__row--first) .field[data-label="الفئة"] input', n => { n.value = 'طفل'; n.dispatchEvent(new Event('input', { bubbles: true })); });
+  await d.page.$eval('dialog.sheet[open] .pages-prices__row:not(.pages-prices__row--first) .field[data-label="السعر"] input', n => { n.value = '800'; n.dispatchEvent(new Event('input', { bubbles: true })); });
+  await d.page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .pages-prices__row .check')].find(c => c.textContent.includes('متاحة في الفعالية دي')).querySelector('input').click());
+  await d.page.$eval('dialog.sheet[open] .field[data-label="سن الحاجز من"] input', n => { n.value = '18'; n.dispatchEvent(new Event('input', { bubbles: true })); });
+  await d.page.$eval('dialog.sheet[open] .field[data-label="لحد"] input', n => { n.value = '30'; n.dispatchEvent(new Event('input', { bubbles: true })); });
+  await d.page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] legend')].find(l => l.textContent === 'الأسعار').scrollIntoView({ block: 'start' }));
+  await shot('05b-event-editor-ages');
+  await d.page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] legend')].find(l => l.textContent === 'شروط السن').scrollIntoView({ block: 'start' }));
+  await shot('05c-event-editor-age-rule');
   await saveSheet();
   await sheetGone();
   await d.page.waitForFunction(() => /رحلة إسكندرية/.test(document.querySelector('.view').textContent), { timeout: 10000 });
@@ -407,6 +419,8 @@ test('«الفعاليات»: a trip with prices and a servant; its card in «ا
   assert.equal(events[0].kind, 'trip');
   assert.equal(events[0].booking.capacity, 50);
   assert.equal(events[0].booking.pricing.categories[0].price, 1500);
+  assert.deepEqual(events[0].booking.bookerAge, { min: 18, max: 30 });
+  assert.equal(events[0].booking.pricing.categories[1].allowed, false, 'the child category switched off');
   assert.deepEqual(events[0].servants.map(s => s.methods), [['cash']], 'cash is ticked by default');
   const card = plain(world.as(ADMIN).gs.readOptionalTable_('Activities')).find(a => a.event === events[0].id);
   assert.ok(card && card.enabled, 'its home card');

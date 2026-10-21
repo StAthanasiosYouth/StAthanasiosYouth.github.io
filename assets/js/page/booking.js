@@ -628,13 +628,14 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
       announce(`اتضاف فرد. الإجمالي ${money(totalOf(booking, draft.counts))}`);
     });
 
-    const priceRules = booking.pricing.categories.map((c, i) => h('li', { class: 'price' },
+    // a category switched off for this event (age eligibility) isn't offered
+    const priceRules = booking.pricing.categories.map((c, i) => (c.allowed === false ? null : h('li', { class: 'price' },
       h('div', { class: 'price__who' },
         h('span', { class: 'price__label' }, c.label),
         i > 0 && (c.ageMin != null || c.ageMax != null)
           ? h('span', { class: 'price__note' }, c.ageMin != null && c.ageMax != null ? `من ${arabicDigits(c.ageMin)} لـ ${arabicDigits(c.ageMax)} سنة` : c.ageMin != null ? `من ${arabicDigits(c.ageMin)} سنة` : `لحد ${arabicDigits(c.ageMax)} سنة`)
-          : i === 0 && booking.pricing.categories.length > 1 ? h('span', { class: 'price__note' }, 'باقي الأعمار') : (c.note ? h('span', { class: 'price__note' }, c.note) : null)),
-      h('span', { class: 'price__amount' }, money(c.price))));
+          : i === 0 && booking.pricing.categories.filter(x => x.allowed !== false).length > 1 ? h('span', { class: 'price__note' }, 'باقي الأعمار') : (c.note ? h('span', { class: 'price__note' }, c.note) : null)),
+      h('span', { class: 'price__amount' }, money(c.price))))).filter(Boolean);
 
     const peopleBlock = booking.participants ? group('participants', 'الأفراد',
       h('ul', { class: 'prices__list', 'aria-label': 'الأسعار حسب السن' }, priceRules),

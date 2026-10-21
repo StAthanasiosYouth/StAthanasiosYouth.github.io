@@ -3190,8 +3190,14 @@ img, svg, video {
 /* the booker's date of birth (age eligibility): day · month · year in one row */
 .bk-dob {
   display: grid;
-  grid-template-columns: minmax(0, 4.5rem) minmax(0, 1fr) minmax(0, 6rem);
+  grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr) minmax(0, 1fr);
   gap: 8px;
+}
+
+/* the browser's own arrow, and just enough room for «سبتمبر» / «٢٠٠١» at 360px */
+.bk-dob__select {
+  padding-inline: 8px;
+  text-overflow: clip;
 }
 
 .bk-person__age[readonly] {

@@ -732,10 +732,13 @@ test('age eligibility: the booker date of birth (bday selects), judged on the ev
   await page.select('#bk-dob-y', String(year - 12));
   await page.click('.bk-flow .bk-next');
   await page.waitForFunction(() => /الفعالية دي للسن من ١٨ لـ ٣٠ سنة\./.test(document.querySelector('[data-field="dob"]').innerText));
+  await page.screenshot({ path: `${SHOTS}age-dob-refused-360.png`, fullPage: false });
   // person #1's age follows the date of birth and can't be typed
   assert.equal(await page.$eval('#bk-person-age-0', el => el.readOnly), true);
   await page.select('#bk-dob-y', String(year - 25));
   assert.equal(await page.$eval('#bk-person-age-0', el => el.value), '25');
+  await page.$eval('[data-field="dob"]', el => el.scrollIntoView({ block: 'start' }));
+  await page.screenshot({ path: `${SHOTS}age-dob-ok-360.png`, fullPage: false });
   // a child (the child category is switched off for this event): that person's box says so
   await page.click('[data-act="add-person"]');
   await typeInto(page, '#bk-person-name-1', 'مريم');
