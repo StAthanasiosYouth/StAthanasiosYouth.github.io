@@ -7,8 +7,16 @@ contracts each step builds against.
 **Status (2026-10-21).** P2-1 and P2-2 built and tested on **staging only**: migrations `0013` + `0014` applied to
 `athanasios-staging`, Worker `d33fc92c` (staging); Worker tests 199/199, site/admin unit 728/731 (the 3 known
 pre-existing failures); `worker/scripts/publish-check.mjs` 21/21, `worker/scripts/shadow-check.mjs` all ok against
-the real Pages site. Production: untouched (no migration, no Worker deploy, no Apps Script deploy, `PUBLISH_MODE`
-not set). Next: the P2-2 production step **[owner]**, then the 1–2 week shadow period.
+the real Pages site.
+
+**Production release 2026-10-21 (owner approved):** D1 bookmark before the migrations
+`00000124-00000079-0000510b-9ef1b1f0f5f0f8821aecc38da08bfcf5`; `0013` + `0014` applied to `athanasios-prod`;
+`main` `99d69cc` → Worker `497cdad3` via CI (previous: `e2673438`); Apps Script API @54 (previous: @53). Seed: the 6
+files Pages served (content, ics, black-theatre, events test + booking-test-temp, comp test) stored as live
+revisions with `worker/scripts/shadow-seed-sql.mjs` (the admin route needs a Google session); the 6 public reads
+return the same sha-256 as the site, ETag 304 ok. **Left: the owner sets the Script Property `PUBLISH_MODE=shadow`**
+(Apps Script editor → Project Settings → Script Properties); the 15-minute comparison starts with the first shadow
+publish after that. Rollback: delete `PUBLISH_MODE`; Worker `wrangler rollback e2673438`; Apps Script @53.
 
 ### P2-2 as built
 
