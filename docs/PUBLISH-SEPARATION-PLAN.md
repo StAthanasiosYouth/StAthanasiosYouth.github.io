@@ -314,10 +314,16 @@ the last mirror commit (unchanged). Production: needs this Worker release (R1.1)
   pages-public, book-public, comp-public). Worker 216/216.
 - **Rollback drills (staging):** `CONTENT_SERVE=0` → 403 `disabled` at once, back to 200 when removed; `wrangler rollback`
   to the previous version and forward again, both 200. Production token: `MIRROR_ACCESS` ok (read + write, nothing committed).
-- **Risk found: the workers.dev network path is slow from here.** Health (no D1) TTFB 0.9–3 s, TLS 0.5–2 s, outliers 10–30 s;
-  GitHub Pages and cloudflare.com 0.2 s from the same machine. Server side is fast (no public request ≥ 1.5 s in prod
-  `api_log`). With `CONTENT_SOURCE=worker` each page load waits for the Worker up to 2 s (then the static file): pages
-  stay correct but can open up to ~2 s slower than today on such networks.
+- **Found, then fixed before the cutover: the workers.dev network path is slow from here.** Health (no D1) TTFB 0.9–3 s,
+  outliers 10–30 s; GitHub Pages 0.2 s from the same machine; server side fast (no public request ≥ 1.5 s in `api_log`).
+  **Fix (owner approved, commit `b071a84`, before the switch commit):** static first. In `worker` mode the page asks the
+  static file and the Worker at once and draws the static file; a Worker answer within 300 ms is used instead, a later
+  different answer is swapped in (home, events list, pages, events without online booking) — never under a booking, a
+  status panel, a sheet or a competition (those show it on the next load). A missing static file (published a minute ago)
+  waits up to 8 s for the Worker. Tests: unit 9/9 (content-source), e2e 13/13 incl. a late Worker; all suites with the
+  switch flipped: unit 750/753 (the 3 known), e2e 77/77. Staging (real Worker, localhost:8080): pages drawn from the
+  static file in 2–3 ms while the Worker answered in 0.4–0.8 s; the home page took the Worker's newer revision after
+  1.4 s; booking state read as before; a blocked Worker (CORS) → the static page, nothing else.
 - **Risks accepted with the waiver:** a mismatch that shows only after days of real publishes (the D1 kill switch and
   `PUBLISH_MODE=shadow` undo it in seconds / a minute); one real shadow publish only (shapes of every file kind checked on
   staging); the static fallback lags a worker publish by the mirror (~1 min) + Pages (~1 min).
