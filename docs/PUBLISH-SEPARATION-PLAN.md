@@ -293,3 +293,29 @@ P2-8 is in production yet.** Every production step below needs the owner's expli
 - **Following it (read-only):** `cd worker && node scripts/shadow-watch.mjs` (production; `--staging` for staging):
   shadow publishes, runs, the clean streak against the 7–14 day gate, and the files of the last run that was not clean.
   `lag` within ~10 minutes of a publish is normal; a `mismatch` or a `missing` needs a look before the gate counts.
+
+### Release R1 — ready, waiting for the owner's approval (2026-10-21)
+
+- **Branch `release/p2-r1`** (local worktree `D:\private_projects\athanasios-p2-r1`, not pushed): `origin/main`
+  (`e988343`) + P2-3 … P2-8 + the docs + the localhost/test fix + the re-stub commit (`603bbf0`). Its code is identical
+  to the tested branch (only the two re-stubbed files differ). The roadmap files were merged onto `main`'s own
+  versions (the Phase 2 amendments only).
+- **What R1 changes for visitors: nothing visible.** `CONTENT_SOURCE='static'`, `PUBLISH_MODE` stays `shadow`.
+  New: the Worker origins in the CSP; `404.html` (a missing `/<slug>/` shows the page shell's «مش متاحة» instead of
+  GitHub's 404 page; other paths a plain 404); the two re-stubbed pages: CSP line only.
+- **Admin:** the «نسخ النشر» card (a list; no restore button while not in `worker` mode); the publish sheet texts for
+  `worker` mode (unused until then).
+- **Worker (CI):** the mirror (idle: no token, nothing in `worker` mode), restore (refused: not `worker` mode), booking
+  reads D1 only for `worker`/`restore` revisions (none), `date` exposed over CORS. No migration.
+- **Apps Script @56:** worker mode (inert unless `PUBLISH_MODE='worker'`), `COMP_SITE_CSP`, `apiPublishRefresh`; in
+  shadow mode nothing changes (tested: never asks the Worker what is live).
+- **Order:** push `release/p2-r1` to `main` (CI: Worker; Pages: site + admin), then `node deploy-api.mjs "v56: …"`.
+  The «نسخ النشر» card may show an error for a minute if Pages is faster than the Worker deploy.
+- **Rollback:** revert the merge on `main` (Pages ~1 min) + `wrangler rollback 56d44915` + Apps Script @55.
+- **Checks after R1:** site pages and booking unchanged; `shadow-watch.mjs` keeps counting (R1 does not reset the
+  gate); the next real publish still makes a shadow post.
+- **Cutover commit, prepared and not applied:** `release/p2-cutover` (`583cd2f`) = one line
+  (`CONTENT_SOURCE = 'worker'`). Rehearsed locally with the switch flipped: unit 748/751 (3 known), e2e 68/68.
+- **Staging rehearsal on this code:** Worker 215/215; `phase2-rehearsal.mjs` 4/4 (one earlier run had restore-check
+  fail once and pass on two reruns; the output of that run was not kept — most likely the mirror timing right after
+  mirror-check).
