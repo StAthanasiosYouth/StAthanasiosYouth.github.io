@@ -12,8 +12,10 @@
    - asks the Worker whether that sid is still the account's live session
      (POST /v1/sync/session, signed; the answer cached SESSION_CHECK_S per
      sid) — requireSession_ in Presence.gs;
-   - asks the Worker who holds an edit lock before a save (lockHolder_ /
-     assertUnlocked_, never cached);
+   - before every write, asks the Worker once, OUTSIDE the script lock:
+     the session (fresh) and every live edit lock of the other sessions;
+     lockHolder_ / assertUnlocked_ then read that answer (never a fetch
+     under the lock);
    - shows the admins' names from D1 (the grants snapshot).
 
    Anything else (absent, 'apps') = today's behaviour, unchanged. Rollback:
@@ -74,13 +76,13 @@ function verifyPanelToken_(token) {
 }
 
 /* POST /v1/sync/session → { state, holders } or null (the Worker can't be asked) */
-function workerSessionAsk_(email, sid, locks) {
+function workerSessionAsk_(email, sid, locks, all) {
 
   var secret = workerSyncSecret_();
   if (!secret) return null;
 
   try {
-    var body = JSON.stringify({ email: email, sid: sid, locks: locks || [] });
+    var body = JSON.stringify(all ? { email: email, sid: sid, all: true } : { email: email, sid: sid, locks: locks || [] });
     var ts = String(Date.now());
     var response = UrlFetchApp.fetch(WORKER_API_URL + '/v1/sync/session', {
       method: 'post',
@@ -110,7 +112,7 @@ function workerSessionAsk_(email, sid, locks) {
  * the Worker unreachable = refused (fails closed: 'session_expired' makes the
  * page start again, through the Worker).
  */
-function requireWorkerSession_(email, sid) {
+function requireWorkerSession_(email, sid, write) {
 
   if (!/^[\w-]{16,64}$/.test(String(sid || ''))) {
     throw apiError_('session_replaced', 'الصفحة دي محتاجة تتفتح من جديد.', 'اعمل Refresh للصفحة وادخل تاني.');
@@ -119,13 +121,20 @@ function requireWorkerSession_(email, sid) {
   var cache = CacheService.getScriptCache();
   var key = 'adm:wsc:' + sha256Hex_(email + '|' + sid).slice(0, 40);
 
-  if (cache.get(key) === 'live') return { sid: sid, email: email };
+  if (!write && cache.get(key) === 'live') return { sid: sid, email: email };
 
-  var reply = workerSessionAsk_(email, sid, []);
+  var reply = workerSessionAsk_(email, sid, [], write);
   var state = reply ? reply.state : '';
 
   if (state === 'live') {
     cache.put(key, 'live', SESSION_CHECK_S);
+    // the locks this write will check (lockHolder_), asked now and not under the lock
+    if (write && API_REQUEST_) API_REQUEST_.platformHolders = reply.holders || {};
+    // the names (D1, through the grants snapshot) read now too, never first under the script lock
+    if (write) {
+      try { adminNames_(); }
+      catch (ignored) { /* shown as the email's local part */ }
+    }
     return { sid: sid, email: email };
   }
   if (state === 'replaced') throw replacedError_();
@@ -135,17 +144,17 @@ function requireWorkerSession_(email, sid) {
 
 }
 
-/* lockHolder_ while the Worker owns the locks: another live session's holder, else null */
+/* lockHolder_ while the Worker owns the locks: another live session's holder, else null (from the write's own check) */
 function workerLockHolder_(key) {
 
-  var reply = workerSessionAsk_(API_REQUEST_.email, API_REQUEST_.sid, [key]);
+  var holders = API_REQUEST_ && API_REQUEST_.platformHolders;
 
-  // the Worker can't be asked: refuse the change rather than overwrite someone's open editor
-  if (!reply) {
+  // no answer for this write (not asked, or the Worker away): refuse rather than overwrite someone's open editor
+  if (!holders) {
     throw apiError_('busy', 'مقدرناش نتأكد إن محدش بيعدّل ده دلوقتي.', 'جرّب تاني كمان شوية.');
   }
 
-  var h = reply.holders && reply.holders[key];
+  var h = holders[key];
 
   return h ? { email: h.email, name: h.name || nameOf_(h.email), device: cleanLabel_(h.device, 40), since: Number(h.since) || 0 } : null;
 
@@ -174,5 +183,16 @@ function platformNames_() {
   catch (ignored) {
     return {};
   }
+
+}
+
+/*
+ * The menu's numbers (Presence.gs adminBadges_: competitions to review, store
+ * requests) for a panel whose heartbeat is the Worker's: asked every few beats.
+ */
+function apiBadges() {
+
+  assertAdmin_();
+  return adminBadges_();
 
 }

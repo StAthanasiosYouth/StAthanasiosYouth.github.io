@@ -106,13 +106,32 @@ test('on: edit locks are the Worker\'s — another session\'s holder refuses the
   const w = world();
   worker(w, { state: 'live', holders: { 'links:l-1': { email: B, name: 'بيشوي', device: 'Android', since: 120 } } });
   w.gs.API_REQUEST_ = { email: OWNER, sid: SID };
+  // a write asks once, fresh, for every lock — before the script lock
+  w.gs.requireSession_(OWNER, SID, 'apiSaveLink');
+  const asked = JSON.parse(Buffer.from(asks(w).at(-1).options.payload.map(b => (b < 0 ? b + 256 : b))).toString('utf8'));
+  assert.equal(asked.all, true);
   assert.equal(w.gs.lockHolder_('links:l-1').name, 'بيشوي');
+  assert.equal(w.gs.lockHolder_('links:l-2'), null);
   assert.throws(() => w.gs.assertUnlocked_('links:l-1'), /بيشوي بيعدّل ده دلوقتي/);
-  worker(w, { state: 'live', holders: {} });
-  assert.equal(w.gs.lockHolder_('links:l-1'), null);
-  worker(w, {}, 500);
+  // a write never reuses a cached «live»
+  w.gs.API_REQUEST_ = { email: OWNER, sid: SID };
+  w.gs.requireSession_(OWNER, SID, 'apiSaveLink');
+  assert.equal(asks(w).length, 2);
+  // not asked for this write, or the Worker away: refused, never a save over an open editor
+  w.gs.API_REQUEST_ = { email: OWNER, sid: SID };
   assert.throws(() => w.gs.lockHolder_('links:l-1'), /مقدرناش نتأكد/);
+  worker(w, {}, 500);
+  assert.throws(() => w.gs.requireSession_(OWNER, SID, 'apiSaveLink'), /مقدرناش نتأكد من الجلسة/);
   w.gs.API_REQUEST_ = null;
+});
+
+test('on: a real save through doPost — no Worker call under the script lock', () => {
+  const w = world();
+  worker(w, { state: 'live', holders: {} });
+  w.scriptLock.strict = true;
+  const r = w.post({ fn: 'apiSaveItem', args: ['news', { title: 'خبر', summary: 'تجربة' }], token: panelToken(w), sid: SID });
+  assert.equal(r.ok, true, r.error);
+  assert.deepEqual(w.scriptLock.lockedFetches, []);
 });
 
 test('P3-3 on: the names come from D1; the Apps Script rename points to «الصلاحيات»', () => {

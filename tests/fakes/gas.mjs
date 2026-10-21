@@ -694,7 +694,8 @@ export function createWorld({ owner = 'menazakmena@gmail.com', github = new Fake
         if (url.startsWith('https://www.googleapis.com/')) return drive.fetch(url, options);
         if (Object.prototype.hasOwnProperty.call(web, url)) {
           webRequests.push({ url, options });
-          const page = web[url];
+          // a function answers per request (tests/admin-platform.e2e.mjs: the real Worker's session check)
+          const page = typeof web[url] === 'function' ? web[url](options) : web[url];
           const body = Buffer.isBuffer(page.body) ? page.body : Buffer.from(String(page.body || ''), 'utf8');
           return {
             getResponseCode: () => page.status || 200,

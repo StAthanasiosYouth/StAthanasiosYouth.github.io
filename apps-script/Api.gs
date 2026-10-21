@@ -197,6 +197,7 @@ function apiFunctions_() {
     apiPayMethodsSave: apiPayMethodsSave,
     apiServantPayApprove: apiServantPayApprove,
     apiWorkerSession: apiWorkerSession,
+    apiBadges: apiBadges,
     apiHomeOrder: apiHomeOrder
   };
 
@@ -292,7 +293,7 @@ function doPost(e) {
       API_REQUEST_.sid = request.sid;
     }
     else if (request.fn !== 'apiSessionStart') {
-      requireSession_(email, request.sid);
+      requireSession_(email, request.sid, request.fn);
       API_REQUEST_.sid = request.sid;
     }
 

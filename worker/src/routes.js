@@ -16,7 +16,8 @@ import { PROOF_MAX_BYTES } from './lib/image.js';
 import { verifySync, syncStampStmt } from './lib/sync.js';
 import { grantsSnapshot } from './lib/perms.js';
 import { accountsList, accountAdd, accountUpdate, accountRemove } from './lib/accounts.js';
-import { sessionStart, sessionResume, sessionEnd, sessionPark, sessionHeartbeat, syncSession } from './admin/session.js';
+import { sessionStart, sessionResume, sessionRenew, sessionEnd, sessionPark, sessionHeartbeat, syncSession } from './admin/session.js';
+import { deviceTrust, deviceForget, deviceSignIn } from './admin/devices.js';
 import { adminMe, adminRename } from './admin/me.js';
 import { notifyClaim } from './notify/claim.js';
 import { tokenHealth } from './notify/email.js';
@@ -301,7 +302,11 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/admin/session/start', auth: 'admin', anySession: true, maxBytes: 2048, handler: sessionStart },
   { method: 'POST', path: '/v1/admin/session/resume', auth: 'admin', anySession: true, maxBytes: 2048, handler: sessionResume },
   { method: 'POST', path: '/v1/admin/session/heartbeat', auth: 'admin', needSession: true, maxBytes: 4096, handler: sessionHeartbeat },
+  { method: 'POST', path: '/v1/admin/session/renew', auth: 'admin', anySession: true, maxBytes: 1024, handler: sessionRenew },
   { method: 'POST', path: '/v1/admin/session/end', auth: 'admin', anySession: true, handler: sessionEnd },
+  { method: 'POST', path: '/v1/admin/devices/trust', auth: 'admin', anySession: true, maxBytes: 1024, handler: deviceTrust },
+  { method: 'POST', path: '/v1/admin/devices/forget', auth: 'admin', anySession: true, maxBytes: 1024, handler: deviceForget },
+  { method: 'POST', path: '/v1/public/device/sign-in', auth: 'public', maxBytes: 2048, handler: deviceSignIn },
   { method: 'POST', path: '/v1/admin/session/park', auth: 'public', raw: true, maxBytes: 4096, handler: sessionPark },
   { method: 'POST', path: '/v1/sync/session', auth: 'sync', raw: true, maxBytes: 4096, handler: syncSession },
   { method: 'GET', path: '/v1/admin/notify/settings', auth: 'admin', handler: notifySettingsGet },

@@ -57,7 +57,7 @@ test('API_PERMS covers every api* function (in apiFunctions_ and in every .gs fi
   for (const [fn, p] of Object.entries(table)) assert.ok(p === '*' || PERMS.includes(p), fn + ' → ' + p);
   // write functions never open to any admin by default, except the admin's own session / devices / name
   const any = Object.entries(table).filter(([, p]) => p === '*').map(([fn]) => fn).sort();
-  assert.deepEqual(any, ['apiAdminPushDevices', 'apiAdminPushRemoveDevice', 'apiAdminPushSubscribe', 'apiAdminPushUnsubscribe', 'apiForgetDevice',
+  assert.deepEqual(any, ['apiAdminPushDevices', 'apiAdminPushRemoveDevice', 'apiAdminPushSubscribe', 'apiAdminPushUnsubscribe', 'apiBadges', 'apiForgetDevice',
     'apiHeartbeat', 'apiSessionEnd', 'apiSessionResume', 'apiSessionStart', 'apiSetAdminName', 'apiState', 'apiTrustDevice', 'apiWorkerSession']);
   assert.equal(table.apiAddAdmin, 'accounts.manage');
   assert.equal(table.apiRemoveAdmin, 'accounts.manage');

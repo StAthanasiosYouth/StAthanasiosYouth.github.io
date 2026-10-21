@@ -11,10 +11,10 @@ Owner rule: staging first; nothing on production without an explicit "approved".
 | 1 | P3-1 | D1 migration `0015_admin_platform` (`admin_sessions`, `admin_sessions_gone`, `admin_devices`, `admin_device_nonces`, setting `ADMIN_PLATFORM='0'`); Worker routes under `/v1/admin/session/*`, `/v1/sync/session` | ✔ staging |
 | 1 | P3-2 | Sessions on the Worker (`worker/src/admin/session.js`, port of `Presence.gs`): one live session per account, takeover question / force, park / resume, end, heartbeat (locks + presence + activity in one D1 batch), panel token `wk1` with the sid inside (`lib/auth.js mintPanelToken`, checked on every Worker call). Apps Script bridge `apps-script/AdminPlatform.gs` (dormant): takes the panel token, asks the Worker for the session and the locks | ✔ staging (Worker); bridge tested, **not deployed** |
 | 1 | P3-3 | `GET /v1/admin/me` (effective permissions = the panel's navigation model), rename on the Worker (`POST /v1/admin/accounts/:email/name`, rules of `Activity.gs`), Apps Script names follow D1 while the switch is on | ✔ staging (Worker); bridge not deployed |
-| 2 | P3-4 | Trusted devices (`admin_devices`, `DEVICE_KEY` secret) | next |
-| 2 | P3-5 | Presence + edit locks in the panel (`admin/boot.js` collab → Worker heartbeat) | next |
-| 2 | P3-6 | Activity: heartbeat toasts and the home card from D1 | next |
-| 3 | P3-7 | Bootstrap call + the panel's session wiring (`admin/boot.js`, `admin/config.js platform`) | later |
+| 2 | P3-4 | Trusted devices on the Worker (`worker/src/admin/devices.js`, port of `AdminDevice.gs`): trust (Google only; binds the open session to the device), signed sign-in (+ session in the same round trip), device tokens checked against D1 on every call, forget ends the device's session, removal in «الصلاحيات» ends devices + session + locks. Secret AES-GCM with `DEVICE_KEY` | ✔ staging |
+| 2 | P3-5 | The panel on the Worker (`admin/boot.js`, `config.platform: 'worker'`; absent = today): session start/resume/end/park, heartbeat (presence + locks), renew, device sign-in/trust/forget go to the Worker; Apps Script calls carry the panel token; a write asks the Worker once, outside the script lock (all live locks); `apiBadges` keeps the menu numbers | ✔ tests (not on Pages) |
+| 2 | P3-6 | Activity from D1: heartbeat toasts (others since a time), the home card (`/v1/admin/activity?limit=6`), the takeover row written by the Worker | ✔ tests + staging |
+| 3 | P3-7 | Bootstrap call (fewer round trips to open the panel), Egypt timing | later |
 | 3 | P3-8 | Final tests, Egypt timing, production cutover (approval) | later |
 
 Accounts + grants and the unified activity log were already moved in Phase 1.5.
@@ -37,6 +37,15 @@ The panel's own switch (`admin/config.js`, P3-7) decides which side the page tal
 - Staging: migration `0015` applied, Worker `ba201557` deployed, `ADMIN_PLATFORM='1'` on staging only. `node worker/scripts/platform-check.mjs`: 19/19.
 - Server round trips from this network (staging, median): session start 249 ms, heartbeat 203 ms (Apps Script heartbeat today: ~2–3 s under the script lock), resume 248 ms, rename 323 ms.
 - Production: untouched (no migration, no deploy, no Apps Script deploy, no push to `main`).
+
+## Batch 2 results (2026-10-22)
+
+- Worker tests: 244/244 (12 new: `admin-devices.test.mjs`, more in `admin-platform.test.mjs`).
+- Bridge unit tests: 9/9 (`tests/admin-platform.test.mjs`), incl. "no Worker call under the script lock".
+- e2e `tests/admin-platform.e2e.mjs`: 4/4 — a real browser, the REAL Worker on SQLite, the real .gs code in worker mode: sign-in, presence + locks + a save refused by Apps Script because of a D1 lock, takeover + reload resume, «خليك داخل» relaunch with no Google and «خروج».
+- Found and fixed while testing: (1) Apps Script asked the Worker about a lock while holding its script lock (contention) → one fresh check per write, before the lock; (2) the installed app reopened on the same phone was asked «جهاز تاني» when its first session was a Google one → trusting the device binds the open session; (3) «خروج» on the app left the session open (its token named the deleted device) → forget ends the device's session.
+- Staging: `DEVICE_KEY` set (staging only), Worker `f78a9d8a`; `platform-check.mjs` 25/25. Median round trips: start 198 ms, heartbeat 179 ms, device sign-in 314 ms, activity head 156 ms.
+- Production: untouched. `admin/boot.js` and the .gs bridge are committed on the work branch only (not on `main`, no Apps Script deploy).
 
 ## Notes for the next batches
 

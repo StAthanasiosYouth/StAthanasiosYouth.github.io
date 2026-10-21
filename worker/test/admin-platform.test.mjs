@@ -253,3 +253,14 @@ test('P3-3 rename: rules of Activity.gs (length, characters, unique by reading),
   assert.equal(clear.body.name, 'p');
   assert.equal(nameKey('أحمد'), nameKey('احمد'));
 });
+
+test('Apps Script check with all: every live panel lock of the OTHER sessions (asked once before a write)', async () => {
+  const w = await world();
+  const m = await w.start(M);
+  const p = await w.start(P);
+  await w.call('Bearer ' + m.body.token, 'POST', '/v1/admin/session/heartbeat', { locks: ['news:n1', 'page:pg-2'] });
+  await w.call('Bearer ' + p.body.token, 'POST', '/v1/admin/session/heartbeat', { locks: ['links:l-9'] });
+  const r = await syncCheck(w.h, { email: P, sid: p.body.sid, all: true });
+  assert.equal(r.body.state, 'live');
+  assert.deepEqual(Object.keys(r.body.holders).sort(), ['news:n1', 'page:pg-2']);
+});

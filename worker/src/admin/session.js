@@ -107,8 +107,9 @@ function endStmts(db, row, now, remember) {
   return out;
 }
 
-async function tokenFor(env, actor, sid, via) {
-  return mintPanelToken(env, { email: actor.email, sid, via });
+/* the panel token keeps naming the trusted device it came from (lib/auth.js checks it every call) */
+async function tokenFor(ctx, sid, via) {
+  return mintPanelToken(ctx.env, { email: ctx.actor.email, sid, via, deviceId: ctx.deviceId || '' });
 }
 
 function viaOf(actor) {
@@ -157,7 +158,7 @@ export async function sessionStart(ctx, now = Date.now()) {
   if (r[r.length - 1].meta.changes !== 1) throw new ApiError('busy', 'session raced');
 
   ctx.defer(db.prepare('UPDATE admins SET last_seen = ? WHERE email = ?').bind(now, email).run());
-  const t = await tokenFor(ctx.env, ctx.actor, sid, viaOf(ctx.actor));
+  const t = await tokenFor(ctx, sid, viaOf(ctx.actor));
   return { sid, token: t.token, exp: t.exp, device };
 }
 
@@ -191,8 +192,23 @@ export async function sessionResume(ctx, now = Date.now()) {
   const r = await retry(() => db.prepare('UPDATE admin_sessions SET parked_ms = NULL, tab = ?, device = ?, seen_ms = ? WHERE email = ? AND sid = ?')
     .bind(tab, device, now, email, sid).run());
   if (r.meta.changes !== 1) throw replaced();
-  const t = await tokenFor(ctx.env, ctx.actor, sid, viaOf(ctx.actor));
+  const t = await tokenFor(ctx, sid, viaOf(ctx.actor));
   return { sid, token: t.token, exp: t.exp, device, resumed: true };
+}
+
+/*
+ * POST /v1/admin/session/renew { sid } — a fresh panel token for the open panel
+ * (its token ran out while the tab was hidden: no heartbeat renewed it).
+ * Auth: Google, a device token, or the panel token itself. Only the account's live sid.
+ */
+export async function sessionRenew(ctx) {
+  await requireOn(ctx.env);
+  const b = ctx.body || {};
+  const sid = typeof b.sid === 'string' && SID_RE.test(b.sid) ? b.sid : '';
+  const row = await sessionRow(ctx.env.DB, ctx.actor.email);
+  if (!sid || !row || row.sid !== sid) throw row ? replaced() : await goneError(ctx.env.DB, sid);
+  const t = await tokenFor(ctx, sid, row.via === 'device' ? 'device' : 'google');
+  return { sid, token: t.token, exp: t.exp };
 }
 
 /* POST /v1/admin/session/end — sign out: the session and its locks end now */
@@ -297,7 +313,7 @@ export async function sessionHeartbeat(ctx, now = Date.now()) {
     });
   }
   if (ctx.tokenExp && ctx.tokenExp - Math.floor(now / 1000) < RENEW_BEFORE_S) {
-    const t = await tokenFor(ctx.env, ctx.actor, me.sid, me.via === 'device' ? 'device' : 'google');
+    const t = await tokenFor(ctx, me.sid, me.via === 'device' ? 'device' : 'google');
     out.token = t.token;
     out.exp = t.exp;
   }
@@ -305,23 +321,25 @@ export async function sessionHeartbeat(ctx, now = Date.now()) {
 }
 
 /*
- * POST /v1/sync/session (Apps Script, signed): { email, sid, locks?: ['<kind>:<key>'] }
+ * POST /v1/sync/session (Apps Script, signed): { email, sid, locks?: ['<kind>:<key>'], all?: true }
  * → { state: 'live' | 'replaced' | 'expired', holders: { key: { email, name, device, since } } }
  * What apps-script/Presence.gs requireSession_ / assertUnlocked_ ask while the
  * Worker owns the sessions. Read-only (no replay stamp: an answer, never a change).
+ * all: every live panel lock (Apps Script asks once BEFORE a write, outside its script lock).
  */
 export async function syncSession(ctx, now = Date.now()) {
   const { body } = await verifySync(ctx.env, ctx.request, new TextDecoder().decode(ctx.raw), 'session', now, { monotonic: false });
   const email = String(body.email || '').toLowerCase();
   const sid = typeof body.sid === 'string' && SID_RE.test(body.sid) ? body.sid : '';
   const keys = (Array.isArray(body.locks) ? body.locks : []).map(cleanLockKey).filter(Boolean).slice(0, 20);
+  const all = body.all === true;
   const db = ctx.env.DB;
   const [s, gone, l] = await retry(() => db.batch([
     db.prepare('SELECT sid FROM admin_sessions WHERE email = ?').bind(email),
     db.prepare('SELECT 1 AS x FROM admin_sessions_gone WHERE sid = ?').bind(sid),
     db.prepare('SELECT l.kind, l.id, l.sid, l.email, l.since_ms, l.expires_ms, s.device, s.parked_ms, a.name FROM edit_locks l ' +
       'JOIN admin_sessions s ON s.sid = l.sid LEFT JOIN admins a ON a.email = l.email ' +
-      "WHERE l.kind <> 'booking' AND (l.kind || ':' || l.id) IN (SELECT value FROM json_each(?))").bind(JSON.stringify(keys))
+      "WHERE l.kind <> 'booking' AND (? OR (l.kind || ':' || l.id) IN (SELECT value FROM json_each(?)))").bind(all ? 1 : 0, JSON.stringify(keys))
   ]));
   const live = s.results[0] && s.results[0].sid;
   const state = sid && live === sid ? 'live' : live || gone.results.length ? 'replaced' : 'expired';

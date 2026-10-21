@@ -81,6 +81,9 @@
   var CLIENT = CLIENT_ID.test(config.clientId || '') ? config.clientId : '';
   var FALLBACK = EXEC.test(config.fallbackUrl || '') ? config.fallbackUrl : '';
   var WORKER = /^https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev$/.test(config.workerUrl || '') ? config.workerUrl : '';
+  // Phase 3 (docs/ADMIN-PLATFORM-PLAN.md): 'worker' = the session, presence, locks and the
+  // trusted device are the Worker's; Apps Script then takes the Worker's panel token
+  var PLATFORM = config.platform === 'worker' && !!WORKER;
   var TIMING = timing(config.timing);
 
   var A = window.A;
@@ -603,6 +606,9 @@
 
     options = options || {};
 
+    // the session, presence and device calls go to the Worker (same reply shape)
+    if (PLATFORM && Object.prototype.hasOwnProperty.call(PLATFORM_FNS, name)) return platformPost(name, args, tokenValue, sidValue, options);
+
     var abort = typeof AbortController === 'function' ? new AbortController() : null;
     var timedOut = false;
     var timer = null;
@@ -728,8 +734,14 @@
       return Promise.reject(appError('لوحة التحكم مقفولة دلوقتي.', 'ادخل تاني.'));
     }
 
-    return token()
-      .then(function (value) { return post(name, args, value, sid); })
+    // the Worker's platform: Apps Script takes the panel token (Google itself only after 'reauth')
+    var credential = PLATFORM && !retried.reauth ? panelToken().catch(function (error) {
+      if (error.code === 'session_replaced' || error.code === 'session_expired') return { reply: { ok: false, code: error.code, error: error.message } };
+      throw error;
+    }) : token();
+
+    return credential
+      .then(function (value) { return typeof value === 'object' && value.reply ? value.reply : post(name, args, value, sid); })
       .then(function (reply) {
         if (reply.ok) return reply.result;
         if (reply.code === 'reauth' && !retried.reauth) {
@@ -1340,7 +1352,7 @@
 
   function checkWorker() {
 
-    if (workerChecked || !WORKER || !session || session.via !== 'google' || typeof fetch !== 'function') return;
+    if (PLATFORM || workerChecked || !WORKER || !session || session.via !== 'google' || typeof fetch !== 'function') return;
     workerChecked = true;
 
     try {
@@ -1417,6 +1429,9 @@
   }
 
   function workerSession() {
+
+    // the Worker's platform: the panel token itself
+    if (PLATFORM) return panelToken();
 
     if (wkCache && wkCache.exp - Date.now() > 60000) return Promise.resolve(wkCache.token);
     if (wkPending) return wkPending;
@@ -1496,6 +1511,154 @@
       if (timedOut) throw workerError('الخادم مردّش في الوقت المعتاد.', 'ممكن النت ضعيف. جرّب تاني.', { code: 'timeout', retry: true, details: method + ' ' + path + ': no answer after ' + Math.round(TIMING.fail / 1000) + ' s' });
       throw workerError('الاتصال بالإنترنت اتقطع.', 'اتأكد من النت وجرّب تاني.', { code: 'network', retry: true, details: String(error && error.message || error) });
     });
+
+  }
+
+  /*
+   * Phase 3 (docs/ADMIN-PLATFORM-PLAN.md, worker/src/admin/session.js and
+   * devices.js): with config.platform 'worker', the session, heartbeat,
+   * device and Worker-token calls go to the Worker. platformPost answers in
+   * post()'s own shape ({ ok, result } | { ok: false, code, error }), so the
+   * gate, the heartbeat and the trusted device above work unchanged. The
+   * Worker's panel token (wk1 with this tab's sid) is kept in wkCache: the
+   * heartbeat renews it, else session/renew with the sign-in's own token.
+   * The panel's state is still Apps Script's (content: Phase 4), asked with
+   * the panel token; the home card's activity comes from D1.
+   */
+  var PLATFORM_FNS = { apiSessionStart: 1, apiSessionResume: 1, apiSessionEnd: 1, apiHeartbeat: 1, deviceSignIn: 1, apiTrustDevice: 1, apiForgetDevice: 1, apiWorkerSession: 1 };
+  var badgeBeats = 0;
+
+  function panelFresh() {
+
+    return !!(wkCache && wkCache.sid && wkCache.sid === sid && wkCache.exp - Date.now() > 60000);
+
+  }
+
+  function keepPanel(reply, sidValue) {
+
+    if (reply && /^wk1\./.test(String(reply.token)) && isFinite(Number(reply.exp))) {
+      wkCache = { token: String(reply.token), exp: Number(reply.exp) * 1000, email: session ? session.email : '', sid: sidValue };
+    }
+
+  }
+
+  /* a Worker answer → the reply shape of post() */
+  function envelope(result) {
+
+    var reply = result.reply;
+    if (reply && reply.ok === true) return { ok: true, result: reply };
+    if (reply && reply.ok === false) {
+      return { ok: false, code: String(reply.code || ''), error: JSON.stringify({ appError: 1, message: String(reply.message || 'حصلت مشكلة غير متوقعة.'),
+        hint: String(reply.hint || ''), details: reply.requestId ? 'requestId ' + reply.requestId : '', field: String(reply.field || '') }) };
+    }
+    return { ok: false, code: 'error', error: appError('رد الخادم مش مفهوم.', 'جرّب تاني بعد شوية.', 'HTTP ' + result.status).message };
+
+  }
+
+  /* this tab's panel token: fresh, or renewed with the sign-in's own token (Google / the device) */
+  function panelToken() {
+
+    if (panelFresh()) return Promise.resolve(wkCache.token);
+    if (wkPending) return wkPending;
+    if (!sid) return Promise.reject(workerError('لوحة التحكم مقفولة دلوقتي.', 'ادخل تاني.', { code: 'session_expired' }));
+
+    var mySid = sid;
+    wkPending = token().then(function (value) {
+      return workerFetch('POST', '/v1/admin/session/renew', { sid: mySid }, value, {});
+    }).then(function (result) {
+      var out = envelope(result);
+      if (!out.ok) throw workerError(parsed(failure(out)).message, '', { code: out.code });
+      keepPanel(out.result, mySid);
+      return wkCache.token;
+    });
+    wkPending.then(function () { wkPending = null; }, function () { wkPending = null; });
+
+    return wkPending;
+
+  }
+
+  /* a refused panel token (replaced / ended) as a reply, like the server's own */
+  function asReply(error) {
+
+    if (error && (error.code === 'session_replaced' || error.code === 'session_expired')) return { ok: false, code: error.code, error: error.message };
+    throw error;
+
+  }
+
+  function platformPost(name, args, tokenValue, sidValue, options) {
+
+    var a = (args && args[0]) || {};
+
+    if (name === 'apiSessionStart' || name === 'apiSessionResume') {
+      var start = name === 'apiSessionStart';
+      var body = start ? { device: a.device, tab: a.tab, force: a.force === true }
+        : { sid: sidValue, device: a.device, tab: a.tab, prev: a.prev, left: a.left === true };
+      return workerFetch('POST', start ? '/v1/admin/session/start' : '/v1/admin/session/resume', body, tokenValue, options).then(function (result) {
+        var out = envelope(result);
+        if (!out.ok || !out.result.sid) return out;
+        var r = out.result;
+        keepPanel(r, r.sid);
+        var answer = { sid: r.sid, device: r.device, resumed: r.resumed === true, state: null };
+        if (a.state === false) return { ok: true, result: answer };
+        // the panel's state (Apps Script, with the new panel token) and the home card's activity (D1), side by side
+        return Promise.all([
+          post('apiState', [], r.token, r.sid, options),
+          workerFetch('GET', '/v1/admin/activity?limit=6&view=log', null, r.token, {})
+            .then(function (x) { return x.reply && x.reply.ok && Array.isArray(x.reply.items) ? x.reply.items : null; }, function () { return null; })
+        ]).then(function (both) {
+          if (!both[0].ok) return both[0];
+          var state = both[0].result;
+          if (state && both[1]) state.activity = { recent: both[1].slice(0, 6), latest: both[1].length ? both[1][0].at : 0, now: Date.now() };
+          answer.state = state;
+          return { ok: true, result: answer };
+        });
+      });
+    }
+
+    if (name === 'apiHeartbeat') {
+      return panelToken().then(function (value) {
+        return workerFetch('POST', '/v1/admin/session/heartbeat', a, value, options);
+      }).then(function (result) {
+        var out = envelope(result);
+        if (out.ok) {
+          keepPanel(out.result, sid);
+          // the menu's numbers for competitions and the store are still Apps Script's: every ~4th beat, quietly
+          if (!a.hidden && badgeBeats++ % 4 === 0 && A.setBadges && window.AdminTransport) {
+            window.AdminTransport.call('apiBadges').then(function (badges) { if (badges) A.setBadges(badges); }, function () {});
+          }
+        }
+        return out;
+      }, asReply);
+    }
+
+    if (name === 'apiSessionEnd') {
+      return panelToken().then(function (value) {
+        return workerFetch('POST', '/v1/admin/session/end', {}, value, options).then(envelope);
+      }, asReply);
+    }
+
+    if (name === 'deviceSignIn') {
+      // the Worker's own reply is already { ok, token, exp, email } | { ok: false, code }
+      return workerFetch('POST', '/v1/public/device/sign-in', a, '', options).then(function (result) {
+        return result.reply && typeof result.reply === 'object' ? result.reply : { ok: false, code: 'error' };
+      });
+    }
+
+    if (name === 'apiTrustDevice') {
+      // Google itself (the Worker refuses any other token); this tab's session is bound to the new device
+      return workerFetch('POST', '/v1/admin/devices/trust', { label: a.label, previous: a.previous, sid: sidValue }, tokenValue, options).then(envelope);
+    }
+
+    if (name === 'apiForgetDevice') {
+      return panelToken().then(function (value) {
+        return workerFetch('POST', '/v1/admin/devices/forget', a, value, options).then(envelope);
+      }, asReply);
+    }
+
+    // apiWorkerSession: the panel token is the Worker's own credential
+    return panelToken().then(function (value) {
+      return { ok: true, result: { token: value, exp: Math.floor(wkCache.exp / 1000) } };
+    }, asReply);
 
   }
 
@@ -1748,7 +1911,7 @@
       // «خروج» first, while the session still works: no more admin notifications on this
       // device (its subscription goes, the server's row too), and the installed app forgets
       // its device credential; then the session ends
-      var live = sid && fresh(session);
+      var live = sid && (fresh(session) || (PLATFORM && panelFresh()));
       // the notifications and the remembered device go side by side (they still need the
       // session), then the session ends; every step bounded: the whole sign-out stays under ~6 s
       var ending = bounded(Promise.all([
@@ -1859,7 +2022,8 @@
       if (inflight) { again = true; return; }
       // never a sign-in prompt from the background: the next thing the admin does renews the token
       // (the installed app's device renews silently, so its heartbeat goes on)
-      if (!fresh(session)) {
+      // (the Worker's platform: a fresh panel token is enough; the heartbeat itself renews it)
+      if (!fresh(session) && !(PLATFORM && panelFresh())) {
         if (session && session.via === 'device') trust.signIn().then(function (value) { schedule(value ? 0 : TIMING.beat); });
         else schedule(TIMING.beat);
         return;
@@ -1897,7 +2061,7 @@
         clearTimeout(timer);
         // tell the server the panel is out of sight: admin pushes reach this
         // device again at once, not ~70 s later (AdminNotify.gs adminPresent_)
-        if (sid && fresh(session)) {
+        if (sid && (fresh(session) || (PLATFORM && panelFresh()))) {
           post('apiHeartbeat', [{ area: place.area, view: place.view, item: editing(), locks: lockKeys(), hidden: true }], session.token, sid, { timeout: TIMING.beatFail })
             .catch(function () { /* the panel then counts as away after ~70 s anyway */ });
         }
@@ -1912,8 +2076,14 @@
     window.addEventListener('pagehide', function () {
       if (!sid) return;
       storeSession(true);
-      if (!fresh(session) || !navigator.sendBeacon) return;
+      if (!navigator.sendBeacon) return;
       try {
+        // the Worker's platform: the panel token says who and which session (a beacon has no headers)
+        if (PLATFORM) {
+          if (wkCache && wkCache.sid === sid && wkCache.exp > Date.now()) navigator.sendBeacon(WORKER + '/v1/admin/session/park', new Blob([JSON.stringify({ token: wkCache.token, tab: TAB })], { type: 'text/plain;charset=utf-8' }));
+          return;
+        }
+        if (!fresh(session)) return;
         navigator.sendBeacon(API, new Blob([JSON.stringify({ fn: 'apiSessionEnd', args: [{ park: true, tab: TAB }], token: session.token, sid: sid })], { type: 'text/plain;charset=utf-8' }));
       }
       catch (ignored) {
@@ -2288,7 +2458,8 @@
           return m.challenge(record)
             .then(function (payload) {
               // a launch without a session in this tab: the panel's session comes back in the same answer
-              if (start) payload.start = start;
+              // (the Worker's sign-in brings no panel state: the gate opens the session itself)
+              if (start && !PLATFORM) payload.start = start;
               return post('deviceSignIn', [payload], '', '', { timeout: TIMING.fail });
             })
             .then(function (reply) {

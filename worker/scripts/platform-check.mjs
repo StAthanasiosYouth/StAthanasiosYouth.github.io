@@ -5,7 +5,7 @@
 // admin and removes it again. Signs with the staging test key; never production.
 // Needs settings.ADMIN_PLATFORM = '1' on staging. Run: node scripts/platform-check.mjs
 import { readFileSync } from 'node:fs';
-import { createSign } from 'node:crypto';
+import { createSign, createHmac, randomBytes } from 'node:crypto';
 import { signSync } from '../src/lib/sync.js';
 
 const base = process.argv[2] || 'https://athanasios-api-staging.menazak-lab.workers.dev';
@@ -92,8 +92,31 @@ check('resume after a reload: the same sid', res.status === 200 && res.body.sid 
 const ren = await call(bearer(n1.body.token), 'POST', '/v1/admin/accounts/' + encodeURIComponent(NEW) + '/name', { name: 'تجربة ' + RUN.slice(-4).replace(/\d/g, 'ا') }, 'rename');
 check('rename (any admin, panel token)', ren.status === 200 && ren.body.name.startsWith('تجربة'), ren.body);
 
+// P3-4: trusted device (trust with Google, signed sign-in + start, the token, forget)
+const trust = await call(N, 'POST', '/v1/admin/devices/trust', { label: 'Check phone', sid: n1.body.sid }, 'trust');
+check('device trust (Google)', trust.status === 200 && /^[0-9a-f]{24}$/.test(trust.body.deviceId), trust.body);
+const viaPanel = await call(bearer(n1.body.token), 'POST', '/v1/admin/devices/trust', {});
+check('device trust with a panel token → google', viaPanel.body && viaPanel.body.code === 'google', viaPanel.body);
+const sign = async (over = {}) => {
+  const ts = Date.now(), nonce = randomBytes(16).toString('hex');
+  const sig = createHmac('sha256', over.secret || trust.body.secret).update(trust.body.deviceId + '.' + ts + '.' + nonce).digest('hex');
+  return call(null, 'POST', '/v1/public/device/sign-in', { deviceId: trust.body.deviceId, ts, nonce, sig, start: { device: 'Check phone', tab: TAB(5) } }, 'device sign-in');
+};
+const bad = await sign({ secret: 'f'.repeat(64) });
+check('device sign-in: a bad signature → device', bad.body && bad.body.code === 'device', bad.body);
+const dsi = await sign();
+check('device sign-in + the session in one round trip (same device: no question)', dsi.status === 200 && dsi.body.session && dsi.body.session.sid, dsi.body);
+const forget = await call(bearer(dsi.body.token), 'POST', '/v1/admin/devices/forget', {});
+check('forget: the device and its session end', forget.body && forget.body.forgotten === true && (await call(bearer(dsi.body.session.token), 'GET', '/v1/admin/whoami')).body.code === 'auth', forget.body);
+
+// P3-6: the activity the panel shows (heartbeat toasts since a time, the home card)
+const head = await call(P, 'GET', '/v1/admin/activity?limit=6&view=log', null, 'activity head');
+check('activity head for the home card (takeover + rename rows there)', head.status === 200 && head.body.items.some(i => i.action === 'session.takeover') && head.body.items.some(i => i.action === 'admin.rename'), head.body && head.body.items && head.body.items.map(i => i.action));
+
 // end
-const e1 = await call(bearer(n1.body.token), 'POST', '/v1/admin/session/end', {});
+const n2 = await call(N, 'POST', '/v1/admin/session/start', { device: 'Check B', tab: TAB(6), force: true });
+n1.body.token = n2.body.token;
+const e1 =await call(bearer(n1.body.token), 'POST', '/v1/admin/session/end', {});
 const e2 = await call(bearer(res.body.token), 'POST', '/v1/admin/session/end', {});
 check('end both sessions', e1.body.ended === true && e2.body.ended === true, [e1.body, e2.body]);
 check('after end: session_expired', (await call(bearer(res.body.token), 'GET', '/v1/admin/whoami')).body.code === 'session_expired');

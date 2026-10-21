@@ -35,6 +35,7 @@ var API_PERMS = {
   apiState: '*', apiSessionStart: '*', apiSessionResume: '*', apiHeartbeat: '*', apiSessionEnd: '*',
   apiSetAdminName: '*', apiAdminPushSubscribe: '*', apiAdminPushUnsubscribe: '*', apiAdminPushDevices: '*',
   apiAdminPushRemoveDevice: '*', apiTrustDevice: '*', apiForgetDevice: '*',
+  apiBadges: '*',                                 // the menu's numbers (AdminPlatform.gs), what the heartbeat brought before
   apiWorkerSession: '*',                          // the Worker checks its own routes (ROUTE_PERMS)
 
   // content, home, pages

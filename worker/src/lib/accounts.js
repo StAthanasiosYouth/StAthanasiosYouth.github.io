@@ -137,6 +137,10 @@ function writeStmts(db, ctx, { email, name, servantId, grants, action, summary, 
     stmts.push(db.prepare("UPDATE admins SET servant_id = ?, name = COALESCE(?, name) WHERE email = ? AND role != 'primary'").bind(servantId, name, email));
   } else {
     stmts.push(db.prepare("UPDATE admins SET active = 0 WHERE email = ? AND role != 'primary'").bind(email));
+    // Phase 3: their trusted devices, their panel session and its locks end with them
+    stmts.push(db.prepare('DELETE FROM admin_devices WHERE email = ?').bind(email));
+    stmts.push(db.prepare("DELETE FROM edit_locks WHERE kind <> 'booking' AND sid IN (SELECT sid FROM admin_sessions WHERE email = ?)").bind(email));
+    stmts.push(db.prepare('DELETE FROM admin_sessions WHERE email = ?').bind(email));
   }
   stmts.push(db.prepare('DELETE FROM admin_grants WHERE email = ?').bind(email));
   for (const [p, s] of Object.entries(grants || {})) {

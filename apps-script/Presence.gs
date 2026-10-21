@@ -244,10 +244,10 @@ function parkedOut_(record, now) {
  *  - 'session_expired' when the account has no session any more (ended,
  *    or forgotten by the cache): the page starts a new one by itself.
  */
-function requireSession_(email, sid) {
+function requireSession_(email, sid, fn) {
 
-  // Phase 3: the Worker owns the sessions (AdminPlatform.gs)
-  if (adminPlatformWorker_()) return requireWorkerSession_(email, sid);
+  // Phase 3: the Worker owns the sessions (AdminPlatform.gs); a write asks fresh, with every lock
+  if (adminPlatformWorker_()) return requireWorkerSession_(email, sid, !!fn && API_READ_FNS.indexOf(fn) === -1);
 
   sid = typeof sid === 'string' ? sid : '';
 

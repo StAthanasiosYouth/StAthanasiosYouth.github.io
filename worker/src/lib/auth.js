@@ -192,7 +192,8 @@ export async function verifyWorkerToken(env, token, now = Date.now()) {
   const email = String(c.e || '').toLowerCase();
   if (!email || !(Number(c.x) > s - SKEW_S) || Number(c.x) - Number(c.i) > WK_MAX_S || Number(c.i) > s + SKEW_S) throw new ApiError('auth', 'wk expired');
   const sid = typeof c.s === 'string' && /^[\w-]{16,64}$/.test(c.s) ? c.s : '';
-  return { email, via: c.v === 'google' ? 'google' : 'device', exp: Number(c.x), sid };
+  const deviceId = typeof c.d === 'string' && /^[0-9a-f]{24}$/.test(c.d) ? c.d : '';
+  return { email, via: c.v === 'google' ? 'google' : 'device', exp: Number(c.x), sid, deviceId };
 }
 
 /*
@@ -204,11 +205,15 @@ export async function verifyWorkerToken(env, token, now = Date.now()) {
  */
 export const PANEL_TOKEN_S = 15 * 60;
 
-export async function mintPanelToken(env, { email, sid, via }, now = Date.now()) {
+export async function mintPanelToken(env, { email, sid, via, deviceId }, now = Date.now()) {
   if (!env.SYNC_SECRET) throw new ApiError('disabled', 'SYNC_SECRET not set');
   const i = Math.floor(now / 1000);
   const exp = i + PANEL_TOKEN_S;
-  const json = JSON.stringify({ e: email, x: exp, v: via === 'device' ? 'device' : 'google', i, s: sid });
+  // s: the admin session (absent = a device's sign-in token, before its session); d: the trusted device
+  const claims = { e: email, x: exp, v: via === 'device' ? 'device' : 'google', i };
+  if (sid) claims.s = sid;
+  if (deviceId) claims.d = deviceId;
+  const json = JSON.stringify(claims);
   const payload = btoa(String.fromCharCode(...new TextEncoder().encode(json))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   return { token: 'wk1.' + payload + '.' + await wkHmac(env.SYNC_SECRET, 'wk1.' + payload), exp };
 }
@@ -217,10 +222,15 @@ async function requireAdminSession(ctx, token) {
   const claims = await verifyWorkerToken(ctx.env, token);
   const db = ctx.env.DB;
   const row = await retry(() => db.prepare(
-    'SELECT a.email, a.name, a.role, a.active, s.sid, s.via AS s_via, s.parked_ms, s.seen_ms FROM admins a LEFT JOIN admin_sessions s ON s.email = a.email WHERE a.email = ?'
-  ).bind(claims.email).first());
+    'SELECT a.email, a.name, a.role, a.active, s.sid, s.via AS s_via, s.parked_ms, s.seen_ms, ' +
+    '(SELECT COUNT(*) FROM admin_devices d WHERE d.id = ? AND d.email = a.email AND d.until_ms > ?) AS device_ok ' +
+    'FROM admins a LEFT JOIN admin_sessions s ON s.email = a.email WHERE a.email = ?'
+  ).bind(claims.deviceId, Date.now(), claims.email).first());
   if (!row || !row.active) throw new ApiError('denied', 'not on allowlist');
+  // a token from a trusted device: only while that device is still trusted (forgotten / removed / ended → at once)
+  if (claims.deviceId && !row.device_ok) throw new ApiError('auth', 'device gone');
   ctx.actor = { email: claims.email, name: row.name || '', role: row.role, via: claims.via };
+  ctx.deviceId = claims.deviceId || null;
   ctx.tokenExp = claims.exp;
   if (claims.sid) {
     // a panel token: good only while its sid is the account's one live session (start/resume take any)

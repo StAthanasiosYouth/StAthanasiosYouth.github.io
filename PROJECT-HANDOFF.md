@@ -15,7 +15,7 @@ a notification system. Repository `StAthanasiosYouth/StAthanasiosYouth.github.io
 | Admin panel (PWA) | `admin/` — `admin/admin-app.js` is **built** from `apps-script/*.html` by `node tools/build-admin.mjs`; `admin/boot.js`, `admin/sw.js` are hand-written | GitHub Pages from `main` |
 | Apps Script API (legacy backend, Sheets/Drive) | `apps-script/*.gs` | `cd tools && node deploy-api.mjs "vNN: …"` (updates the one API deployment in place) |
 | Cloudflare Worker + D1 (new backend) | `worker/` | CI (`.github/workflows/worker.yml`) deploys production on a push to `main` touching `worker/**`. Staging: `cd worker && npx wrangler deploy --env staging` |
-| D1 migrations | `worker/migrations/0001`–`0015` (`0001`–`0014` in production; `0015` = Phase 3, staging only; next free: **`0016`**) | `npx wrangler d1 migrations apply athanasios-prod --remote` (staging: `athanasios-staging --remote --env staging`) — always before the Worker that needs them; additive only |
+| D1 migrations | `worker/migrations/0001`–`0015` (`0001`–`0014` in production; `0015` = Phase 3, staging only; next free: **`0016`**; staging secret `DEVICE_KEY` set, production needs its own at the cutover) | `npx wrangler d1 migrations apply athanasios-prod --remote` (staging: `athanasios-staging --remote --env staging`) — always before the Worker that needs them; additive only |
 
 APIs: production `https://athanasios-api.menazak-lab.workers.dev`, staging `https://athanasios-api-staging.menazak-lab.workers.dev`.
 
@@ -87,7 +87,7 @@ Not checked here: the GitHub Actions runs (nightly backup, Worker CI) — `gh` i
 | 1 Foundation + booking pilot | ✔ built and verified; restore drill done (2026-10-15, `worker/README.md`). **Partial:** the launch gate (go-live test #2, test-data cleanup, real events) is open |
 | 1.5 Admin access & notifications | ✔ 11/11 in production, all switches off. Deferred: closed-app push (→ Phase 6/7A). Deviations: no `AGE_RULES` switch (plan §8 had one); `PAY_REQUESTS` has no admin toggle |
 | 2 Publish separation | ✔ done; P2-7 reduced (browser Review → Phase 4, owner); shadow duration waived. Open: watch the next publishes (above) |
-| 3 Admin platform | in progress — batch 1 (P3-1…P3-3) done on staging: `docs/ADMIN-PLATFORM-PLAN.md` |
+| 3 Admin platform | in progress — batches 1–2 (P3-1…P3-6) done on staging: `docs/ADMIN-PLATFORM-PLAN.md` |
 | 4–7 | not started (as planned) |
 | 8 Admin redesign, 9 Native apps | planning only (as planned). Essential admin fixes listed in BACKEND-MIGRATION §22.1 still wait for approval |
 
