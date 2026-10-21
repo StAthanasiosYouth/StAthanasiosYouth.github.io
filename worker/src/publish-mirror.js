@@ -15,11 +15,13 @@
  */
 
 import { retry, cairoText } from './lib/db.js';
-import { githubConfig, commitFiles } from './lib/github.js';
+import { githubConfig, commitFiles, checkAccess } from './lib/github.js';
 import { logLine } from './lib/log.js';
 
 const CLAIM_KEY = 'MIRROR_CLAIM';
 const LAST_KEY = 'MIRROR_LAST';
+const ACCESS_KEY = 'MIRROR_ACCESS';
+export const ACCESS_MINUTE = 7;               // the hourly token check (cron, UTC minute)
 const CLAIM_MS = 2 * 60 * 1000;
 export const MIRROR_LATE_MS = 5 * 60 * 1000;
 
@@ -36,8 +38,8 @@ export function revisionPath(kind, key) {
 
 const PENDING = "FROM published_revisions r JOIN publish_jobs j ON j.id = r.publish_id WHERE r.live = 1 AND r.mirrored_at IS NULL AND j.mode IN ('worker', 'restore')";
 
-async function last(db) {
-  const row = await retry(() => db.prepare('SELECT value FROM settings WHERE key = ?').bind(LAST_KEY).first());
+async function last(db, key = LAST_KEY) {
+  const row = await retry(() => db.prepare('SELECT value FROM settings WHERE key = ?').bind(key).first());
   try { return row ? JSON.parse(row.value) : null; } catch { return null; }
 }
 
@@ -107,6 +109,26 @@ export async function mirrorPending(env, { now = Date.now(), fetchImpl = fetch }
   }
 }
 
+/*
+ * Hourly (cron): can GITHUB_TOKEN still read and write the mirror's branch?
+ * Changes nothing on GitHub (lib/github.js checkAccess). Kept in settings
+ * MIRROR_ACCESS, so a token that expired or lost access shows before a
+ * publish needs it. → { ok, at, head, expires } | { ok: false, error } | { skipped }
+ */
+export async function mirrorAccess(env, { now = Date.now(), fetchImpl = fetch } = {}) {
+  const cfg = githubConfig(env);
+  if (cfg.error) return { skipped: cfg.error };
+  let out;
+  try {
+    out = { ok: true, at: now, repo: cfg.repo, branch: cfg.branch, ...(await checkAccess(cfg, fetchImpl)) };
+  } catch (err) {
+    out = { ok: false, at: now, repo: cfg.repo, branch: cfg.branch, error: String(err && err.message).slice(0, 200) };
+  }
+  await retry(() => setStmt(env.DB, ACCESS_KEY, JSON.stringify(out), now).run());
+  logLine({ ...(out.ok ? {} : { lvl: 'warn', err: out.error }), kind: 'mirror', job: 'access', ok: out.ok });
+  return out;
+}
+
 /* for the admin: what is waiting, since when, the last run */
 export async function mirrorStatus(env, now = Date.now()) {
   const db = env.DB;
@@ -118,6 +140,7 @@ export async function mirrorStatus(env, now = Date.now()) {
     pending: pending.n,
     since: pending.since || null,
     late: !!pending.n && now - pending.since > MIRROR_LATE_MS,
-    last: await last(db)
+    last: await last(db),
+    access: await last(db, ACCESS_KEY)
   };
 }

@@ -36,7 +36,7 @@ export function githubConfig(env) {
   return { repo, branch, token: env.GITHUB_TOKEN };
 }
 
-async function gh(cfg, fetchImpl, method, path, body) {
+async function gh(cfg, fetchImpl, method, path, body, meta = null) {
   const res = await fetchImpl(`${API}/repos/${cfg.repo}${path}`, {
     method,
     headers: {
@@ -49,6 +49,7 @@ async function gh(cfg, fetchImpl, method, path, body) {
     body: body ? JSON.stringify(body) : undefined
   });
   const text = await res.text();
+  if (meta) meta.expires = res.headers.get('github-authentication-token-expiration') || '';
   if (res.ok) return text ? JSON.parse(text) : null;
   let detail = '';
   try { detail = JSON.parse(text).message || ''; } catch { detail = ''; }
@@ -76,4 +77,23 @@ export async function commitFiles(cfg, files, message, fetchImpl = fetch) {
     }
   }
   throw new GitHubError(422, 'branch moved twice');
+}
+
+/*
+ * Can the token read and write the branch, without changing anything?
+ * Read: the branch head. Write: POST /git/trees (Contents write) with the
+ * head's own tree and one of its files unchanged → GitHub answers with the
+ * head's tree itself (content-addressed: no new object, no commit, no ref
+ * moved). → { head, expires } (the token's expiry date when GitHub sends it).
+ */
+export async function checkAccess(cfg, fetchImpl = fetch) {
+  const meta = {};
+  const head = await gh(cfg, fetchImpl, 'GET', '/branches/' + encodeURIComponent(cfg.branch), null, meta);
+  const baseTree = head.commit.commit.tree.sha;
+  const listing = await gh(cfg, fetchImpl, 'GET', '/git/trees/' + baseTree);
+  const blob = (listing.tree || []).find(e => e.type === 'blob');
+  if (!blob) throw new GitHubError(0, 'the branch has no file to check with');
+  const tree = await gh(cfg, fetchImpl, 'POST', '/git/trees', { base_tree: baseTree, tree: [{ path: blob.path, mode: blob.mode, type: 'blob', sha: blob.sha }] });
+  if (tree.sha !== baseTree) throw new GitHubError(0, 'the unchanged tree came back different');
+  return { head: head.commit.sha, expires: meta.expires || '' };
 }

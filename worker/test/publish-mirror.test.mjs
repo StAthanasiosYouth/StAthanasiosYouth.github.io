@@ -4,8 +4,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { harness } from './helpers.mjs';
 import { signSync } from '../src/lib/sync.js';
-import { mirrorPending, mirrorDue, mirrorStatus, revisionPath } from '../src/publish-mirror.js';
-import { githubConfig, commitFiles, PRODUCTION_REPO } from '../src/lib/github.js';
+import { mirrorPending, mirrorDue, mirrorStatus, mirrorAccess, revisionPath } from '../src/publish-mirror.js';
+import { githubConfig, commitFiles, checkAccess, PRODUCTION_REPO } from '../src/lib/github.js';
 import { scheduled } from '../src/scheduled.js';
 import { consume } from '../src/jobs.js';
 
@@ -13,7 +13,7 @@ const REPO = 'StAthanasiosYouth/publish-mirror-staging';
 const ENV = { ENVIRONMENT: 'staging', GITHUB_REPO: REPO, GITHUB_BRANCH: 'main', GITHUB_TOKEN: 'ghp_test' };
 
 /* a tiny GitHub: commits are { tree: { path: text }, parent } */
-function fakeGitHub({ down = false } = {}) {
+function fakeGitHub({ down = false, readOnly = false } = {}) {
   let n = 0;
   const commits = new Map([['c0', { files: { 'README.md': 'x' }, parent: null }]]);
   const trees = new Map([['t-c0', { 'README.md': 'x' }]]);
@@ -26,9 +26,14 @@ function fakeGitHub({ down = false } = {}) {
     if (gh.down) return new Response('{"message":"Server Error"}', { status: 502 });
     const json = (status, value) => new Response(JSON.stringify(value), { status });
     if (init.method === 'GET' && path === '/branches/main') return json(200, { commit: { sha: gh.head, commit: { tree: { sha: 't-' + gh.head } } } });
+    if (init.method === 'GET' && path.startsWith('/git/trees/')) {
+      const files = trees.get(path.slice('/git/trees/'.length)) || {};
+      return json(200, { tree: Object.keys(files).map(p => ({ path: p, mode: '100644', type: 'blob', sha: 'b:' + files[p] })) });
+    }
     if (init.method === 'POST' && path === '/git/trees') {
+      if (readOnly) return json(403, { message: 'Resource not accessible by personal access token' });
       const files = { ...trees.get(body.base_tree) };
-      for (const e of body.tree) files[e.path] = e.content;
+      for (const e of body.tree) files[e.path] = e.sha ? e.sha.slice(2) : e.content;
       const same = JSON.stringify(Object.entries(files).sort()) === JSON.stringify(Object.entries(trees.get(body.base_tree)).sort());
       const sha = same ? body.base_tree : 't-new' + (++n);
       trees.set(sha, files);
@@ -203,4 +208,23 @@ test('the queue job and the per-minute cron both run it', async () => {
   } finally {
     globalThis.fetch = real;
   }
+});
+
+test('the hourly token check: read + write proven with no commit, no new tree, the ref unmoved; failures kept for the admin', async () => {
+  const gh = fakeGitHub();
+  const before = { head: gh.head, commits: gh.commits.size };
+  const cfg = githubConfig(ENV);
+  assert.deepEqual(await checkAccess(cfg, gh.fetch), { head: 'c0', expires: '' });
+  assert.equal(gh.head, before.head);
+  assert.equal(gh.commits.size, before.commits);
+  assert.deepEqual(gh.calls.map(c => c.method + ' ' + c.path), ['GET /branches/main', 'GET /git/trees/t-c0', 'POST /git/trees']);
+  await assert.rejects(checkAccess(cfg, fakeGitHub({ readOnly: true }).fetch), /GitHub 403/);
+
+  const h = await harness({ env: ENV });
+  assert.equal((await mirrorAccess(h.env, { now: 1000, fetchImpl: gh.fetch })).ok, true);
+  assert.equal((await mirrorStatus(h.env)).access.head, 'c0');
+  const bad = await mirrorAccess(h.env, { now: 2000, fetchImpl: fakeGitHub({ readOnly: true }).fetch });
+  assert.equal(bad.ok, false);
+  assert.match((await mirrorStatus(h.env)).access.error, /403/);
+  assert.deepEqual(await mirrorAccess({ ...h.env, GITHUB_TOKEN: '' }), { skipped: 'GITHUB_TOKEN not set' });
 });
