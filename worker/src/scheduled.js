@@ -8,6 +8,7 @@ import { sweepProofs } from './lib/proofs.js';
 import { activityStmt } from './lib/activity.js';
 import { notifyTick } from './notify/tick.js';
 import { shadowCheck, SHADOW_EVERY_MIN } from './publish-shadow.js';
+import { mirrorDue, mirrorPending } from './publish-mirror.js';
 
 const DAY = 24 * 3600 * 1000;
 export const RETENTION = {
@@ -77,6 +78,10 @@ export async function scheduled(controller, env) {
     // Phase 2: the shadow comparison every 15 minutes (nothing until a publish was posted)
     if (new Date(now).getUTCMinutes() % SHADOW_EVERY_MIN === 0) {
       await shadowCheck(env, { now }).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'shadow', err: String(err && err.message).slice(0, 200) }));
+    }
+    // Phase 2 P2-4: the GitHub mirror, while something is pending (with backoff after a failure)
+    if (await mirrorDue(env.DB, now).catch(() => false)) {
+      await mirrorPending(env, { now }).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'mirror', err: String(err && err.message).slice(0, 200) }));
     }
     return;
   }

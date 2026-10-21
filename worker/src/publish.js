@@ -21,6 +21,7 @@ import { retry } from './lib/db.js';
 import { sha256, randomId } from './lib/hash.js';
 import { limit, clientIp } from './lib/ratelimit.js';
 import { verifySync, syncStampStmt } from './lib/sync.js';
+import { makeJob } from './jobs.js';
 
 export const PUBLISH_MAX_BYTES = 2 * 1024 * 1024;
 const FILE_MAX_BYTES = 256 * 1024;
@@ -167,6 +168,8 @@ export async function syncPublish(ctx) {
   ).bind(id, mode, revision, setHash, files.length, changed.length, JSON.stringify(result), by || null, at, now, now));
   stmts.push(syncStampStmt(db, 'publish', ts));
   await retry(() => db.batch(stmts));
+  // PUBLISH_MODE='worker': live now; GitHub follows in the background (publish-mirror.js; the cron retries)
+  if (mode === 'worker' && changed.length && ctx.env.JOBS) ctx.defer(ctx.env.JOBS.send(makeJob('publish.mirror', { id })));
   return result;
 }
 

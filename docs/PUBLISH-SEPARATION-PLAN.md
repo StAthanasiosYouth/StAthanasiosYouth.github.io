@@ -18,6 +18,32 @@ return the same sha-256 as the site, ETag 304 ok. **Left: the owner sets the Scr
 (Apps Script editor → Project Settings → Script Properties); the 15-minute comparison starts with the first shadow
 publish after that. Rollback: delete `PUBLISH_MODE`; Worker `wrangler rollback e2673438`; Apps Script @53.
 
+### P2-4 as built (2026-10-21, staging only; nothing released)
+
+- Apps Script `PUBLISH_MODE='worker'` (`WorkerSync.gs` `publishToWorker_`, `Publish.gs` step B): new pictures are
+  committed to GitHub first (binaries only), then the text files go to the Worker (mode `worker`) and are live at
+  once. If the Worker does not take them (5xx/429/network after one retry, or a refusal) the publish fails with a
+  clear message and nothing is recorded; there is **never** a GitHub commit instead (one writer). The panel says
+  «اتنشر على السيرفر الجديد ✓ ونسخة GitHub بتتحدث في الخلفية», then «نسخة GitHub اتحدثت ✓», or «نسخة GitHub متأخرة»
+  when Pages has not shown it after ~3.5 minutes.
+- Worker (`src/publish-mirror.js`, `src/lib/github.js`): the mirror commits the **current live snapshot** (every live
+  revision of a worker-mode publish not mirrored yet) in one fast-forward commit, with the same non-personal identity
+  as Apps Script. Publishes in a row coalesce; an older text is never committed over a newer one; shadow/seed
+  revisions are never mirrored. Runs from the queue job `publish.mirror` right after the publish, and from the
+  per-minute cron while something is pending (backoff 1 → 2 → 4 … 15 min after failures). One run at a time (a
+  `MIRROR_CLAIM` in settings, taken over after 2 min). `GET /v1/admin/publish/status` → `mirror`: `configured`,
+  `pending`, `since`, `late` (> 5 min), `last`.
+- Config: vars `GITHUB_REPO` / `GITHUB_BRANCH` (production: the site repo, `main`; staging:
+  `StAthanasiosYouth/publish-mirror-staging`, `main`), secret `GITHUB_TOKEN`. Outside production the production
+  repository is refused in code. Without the secret the mirror only reports «GITHUB_TOKEN not set».
+- **Rollback order:** `PUBLISH_MODE='shadow'` first (each publish is committed by Apps Script and also updates D1, so
+  nothing the mirror still holds can come back over it), then `'github'` once `mirror.pending` is 0.
+- Tests: Worker 208/208 (`publish-mirror` 9/9: one commit with exactly the live files, coalescing, never older,
+  shadow never mirrored, GitHub down + backoff, a push in between, not configured, a busy claim, queue + cron),
+  Apps Script `publish-shadow` 7/7 (worker mode: no text commit, refusal → no fallback commit, picture first), unit
+  742/745 (3 known), `admin.e2e` unchanged (the 6 pre-existing media failures). Staging Worker `051c8047`:
+  `worker/scripts/mirror-check.mjs` → live at once (≈ 0.5 s); the real commit part waits for the staging token.
+
 ### P2-3 as built (2026-10-21, staging / local only; nothing released)
 
 - `assets/js/content-source.js`: `CONTENT_SOURCE = 'static'` (shipped). In `'worker'` mode the first, revalidating

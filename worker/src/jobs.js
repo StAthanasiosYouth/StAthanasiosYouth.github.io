@@ -12,6 +12,7 @@ import { randomId } from './lib/hash.js';
 import { logLine } from './lib/log.js';
 import { activityStmt } from './lib/activity.js';
 import { sendRows } from './notify/email.js';
+import { mirrorPending } from './publish-mirror.js';
 
 export const JOB_TYPES = {
   // diagnostics: proves enqueue → consume → D1 write end to end
@@ -23,6 +24,10 @@ export const JOB_TYPES = {
   async 'notify.email'(env, payload) {
     const ids = Array.isArray(payload.ids) ? payload.ids.filter(id => /^ntf-[0-9a-f]{6,}$/.test(String(id))).slice(0, 20) : [];
     await sendRows(env, ids);
+  },
+  // Phase 2 P2-4: the GitHub mirror of the live snapshot (idempotent; a failure is recorded, the cron retries)
+  async 'publish.mirror'(env) {
+    await mirrorPending(env);
   }
 };
 

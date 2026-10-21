@@ -554,6 +554,9 @@ function publishNow_(expectedRevision) {
   var mediaIds = [];
   var unchanged = false;
   var files = null;
+  var mode = publishMode_();          // github | shadow | worker (WorkerSync.gs)
+  var worker = null;                  // 'worker': the Worker's reply (live there; GitHub follows)
+  var landed = false;                 // the visible content changed (a commit, or new files on the Worker)
 
   try {
 
@@ -603,14 +606,24 @@ function publishNow_(expectedRevision) {
 
       mediaIds = media.ids;
 
-      // no personal data in the public commit history
-      commit = githubCommitFiles_(
-        files,
-        'Publish content ' + built.content.revision + ' (' + cairoNow_(now).replace('T', ' ') + ' Cairo)',
-        media.binaries
-      );
+      var message = 'Publish content ' + built.content.revision + ' (' + cairoNow_(now).replace('T', ' ') + ' Cairo)';
+
+      if (mode === 'worker') {
+        // pictures first, so the live revision never points at an image the site doesn't have yet;
+        // then the Worker makes it live and commits the text files in the background (its mirror)
+        if (Object.keys(media.binaries).length) {
+          githubCommitFiles_({}, 'Publish media for ' + built.content.revision + ' (' + cairoNow_(now).replace('T', ' ') + ' Cairo)', media.binaries);
+        }
+        worker = publishToWorker_(files, built.content.revision, now.getTime(), email);
+      }
+      else {
+        // no personal data in the public commit history
+        commit = githubCommitFiles_(files, message, media.binaries);
+      }
 
     }
+
+    landed = !!commit || !!(worker && !worker.unchanged);
 
     // C. under the lock: only what follows a commit that landed (or an
     // earlier publish that stopped right after its commit)
@@ -644,8 +657,8 @@ function publishNow_(expectedRevision) {
         PUBLISHED_COMMIT: commit ? commit.sha : (props.getProperty('PUBLISHED_COMMIT') || '')
       });
 
-      log_(email, 'publish', built.content.revision + (commit ? ' ' + commit.sha.slice(0, 7) : ' (no file change)'));
-      activity_({ action: 'publish', type: 'site', id: built.content.revision, title: '', ref: built.content.revision + (commit ? ' ' + commit.sha.slice(0, 7) : ''), changes: commit ? activitySincePublish_() : { unchanged: true } });
+      log_(email, 'publish', built.content.revision + (commit ? ' ' + commit.sha.slice(0, 7) : worker ? ' (worker)' : ' (no file change)'));
+      activity_({ action: 'publish', type: 'site', id: built.content.revision, title: '', ref: built.content.revision + (commit ? ' ' + commit.sha.slice(0, 7) : ''), changes: landed ? activitySincePublish_() : { unchanged: true } });
 
     });
 
@@ -664,7 +677,9 @@ function publishNow_(expectedRevision) {
     commit: commit ? commit.sha : '',
     commitUrl: commit ? 'https://github.com/' + config.repo + '/commit/' + commit.sha : '',
     siteUrl: config.siteUrl,
-    unchanged: unchanged || !commit,
+    unchanged: unchanged || !landed,
+    // 'worker': live now; GitHub (the history and the static fallback) follows within a minute
+    mirror: worker && !worker.unchanged ? 'pending' : '',
     state: apiStateFor_(email, built)
   };
 

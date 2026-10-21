@@ -33,10 +33,11 @@ import { syncBookNews, diagNews } from './book/news.js';
 import { syncPayDest, bookPay } from './book/pay.js';
 import { syncPublish, publicContent, publicPage, publicEvent, publicComp, publicIcs, PUBLISH_MAX_BYTES } from './publish.js';
 import { shadowCheck, shadowStatus } from './publish-shadow.js';
+import { mirrorStatus } from './publish-mirror.js';
 
 /* GET /v1/admin/publish/status — the last publishes + the shadow gate (docs/PUBLISH-SEPARATION-PLAN.md P2-2) */
 async function publishStatus(ctx) {
-  return shadowStatus(ctx.env.DB);
+  return { ...(await shadowStatus(ctx.env.DB)), mirror: await mirrorStatus(ctx.env) };
 }
 
 /* POST /v1/admin/publish/shadow-check { seed } — one comparison now (seed: copy files D1 lacks from the site) */

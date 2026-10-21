@@ -29,7 +29,7 @@ function publish(w) {
 }
 
 test('shadow: default (github) and unknown modes post nothing; the publish is unchanged', () => {
-  for (const mode of [null, 'github', 'worker', 'SHADOW']) {
+  for (const mode of [null, 'github', 'SHADOW', 'nonsense']) {
     const w = world(mode);
     const result = publish(w);
     assert.ok(result.commit, 'the commit landed');
@@ -85,4 +85,61 @@ test('shadow: no secret → nothing sent, the publish succeeds', () => {
   assert.ok(publish(w).commit);
   assert.equal(posts(w).length, 0);
   assert.equal(JSON.parse(w.properties.get('PUBLISH_SHADOW_LAST')).outcome, 'no secret');
+});
+
+// ---------- PUBLISH_MODE='worker' (P2-4): live on the Worker, GitHub follows (the Worker's mirror) ----------
+
+const webp = fill => Buffer.concat([Buffer.from('RIFF'), Buffer.from([0x20, 0, 0, 0]), Buffer.from('WEBPVP8L'), Buffer.alloc(40, fill)]);
+const ok = id => ({ status: 200, body: JSON.stringify({ ok: true, id, unchanged: false, files: 2, changed: [] }) });
+
+test('worker: no text commit; the files go to the Worker as mode worker; the publish is recorded; mirror pending', () => {
+  const w = world('worker');
+  w.web[URL_] = ok('x');
+  const head = w.github.head;
+  const result = publish(w);
+  assert.equal(w.github.head, head, 'GitHub untouched (no new picture): the mirror commits later');
+  assert.equal(posts(w).length, 1);
+  const body = JSON.parse(bodyOf(posts(w)[0]));
+  assert.equal(body.mode, 'worker');
+  assert.ok(body.files['content.json'] && body.files['meeting.ics'] !== undefined);
+  assert.equal(JSON.parse(body.files['content.json']).revision, result.revision);
+  assert.deepEqual([result.commit, result.unchanged, result.mirror], ['', false, 'pending']);
+  assert.equal(w.properties.get('PUBLISHED_REVISION'), result.revision);
+  assert.ok(!w.properties.get('PUBLISH_SHADOW_LAST'), 'no shadow post on top');
+});
+
+test('worker: the Worker refuses or is down → the publish fails clearly; nothing recorded; never a GitHub commit instead', () => {
+  for (const reply of [{ status: 503, body: 'down' }, { status: 409, body: '{"ok":false,"code":"conflict"}' }]) {
+    const w = world('worker');
+    w.web[URL_] = reply;
+    const gs = w.as(ADMIN).gs;
+    const head = w.github.head;
+    const revision = plain(gs.apiReview()).revision;
+    assert.throws(() => gs.apiPublish(revision), /النشر ما اتمش: السيرفر الجديد مردش \(HTTP (503|409)\)/);
+    assert.equal(w.github.head, head, 'no fallback commit (one writer)');
+    assert.ok(!w.properties.get('PUBLISHED_REVISION'));
+    assert.equal(posts(w).length, reply.status === 503 ? 2 : 1, 'one retry only when it may help');
+    // the claim was released: a second try works once the Worker is back
+    w.web[URL_] = ok('y');
+    assert.equal(plain(gs.apiPublish(revision)).mirror, 'pending');
+  }
+});
+
+test('worker: a new picture is committed to GitHub first (binaries only), then the text goes to the Worker', () => {
+  const w = world('worker');
+  w.web[URL_] = ok('z');
+  const gs = w.as(ADMIN).gs;
+  const banner = plain(gs.apiUploadMedia({ full: webp(7).toString('base64'), thumb: webp(7).toString('base64'), tiny: webp(7).toString('base64'), tinyMime: 'image/webp',
+    color: '#1D3557', name: 'بوستر', mime: 'image/webp', width: 1200, height: 1500, alt: 'وصف' })).media;
+  gs.apiSaveItem('news', { title: 'رحلة', summary: 'x' });
+  gs.apiSaveSection({ key: 'news', title: 'جديد الأسرة', theme: 'ember', banner: banner.id });
+  const head = w.github.head;
+  publish(w);
+  const files = w.github.files();
+  assert.notEqual(w.github.head, head, 'one media commit');
+  assert.ok(files[banner.path] && files[banner.thumb], 'the picture is on the site before the content points at it');
+  assert.ok(!files['content.json'], 'content.json is not committed by Apps Script');
+  assert.match(w.github.commits.get(w.github.head).message, /^Publish media for /);
+  const sent = JSON.parse(bodyOf(posts(w)[0]));
+  assert.ok(!Object.keys(sent.files).some(p => p.startsWith('media/')), 'no binaries to the Worker');
 });

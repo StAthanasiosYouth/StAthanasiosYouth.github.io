@@ -285,72 +285,85 @@ function activityForward_(force) {
 
 
 /* =========================================================
-   PUBLISH SHADOW (Phase 2 step 2, docs/PUBLISH-SEPARATION-PLAN.md)
+   PUBLISH → WORKER (Phase 2, docs/PUBLISH-SEPARATION-PLAN.md)
    ---------------------------------------------------------
-   PUBLISH_MODE (Script Property): 'github' (default, today) or 'shadow'.
-   In shadow mode the files of a commit that just landed go to the Worker
-   too (POST /v1/sync/publish, signed like every sync). Visitors still read
-   GitHub Pages; the Worker compares the two every 15 minutes. A failed post
-   never fails the publish: it is logged, kept in PUBLISH_SHADOW_LAST, and
-   shows up in the Worker's comparison as a lag/missing file.
-   ('worker' arrives with P2-4; until then any other value means 'github'.)
+   PUBLISH_MODE (Script Property):
+   - 'github' (default): one GitHub commit, as always; nothing to the Worker.
+   - 'shadow' (P2-2): the commit as always, then the same files to the Worker
+     (POST /v1/sync/publish). Visitors read GitHub Pages; the Worker compares
+     the two every 15 minutes. A failed post never fails the publish (kept in
+     PUBLISH_SHADOW_LAST; the comparison shows it as lag/missing).
+   - 'worker' (P2-4): new pictures are committed first, then the files go to
+     the Worker and are live there at once; GitHub follows in the background
+     (the Worker's mirror). If the Worker does not take them, the publish
+     fails with a clear message — never a GitHub commit instead (that would
+     be a second writer). Rollback: 'shadow' (D1 follows every publish, so
+     nothing the mirror still holds can come back), then 'github'.
+   Any other value means 'github'.
 ========================================================= */
 
 var PUBLISH_SHADOW_LAST = 'PUBLISH_SHADOW_LAST';
+var PUBLISH_MODES = ['github', 'shadow', 'worker'];
 
 function publishMode_() {
 
   var mode = PropertiesService.getScriptProperties().getProperty('PUBLISH_MODE') || 'github';
-  return mode === 'shadow' ? 'shadow' : 'github';
+  return PUBLISH_MODES.indexOf(mode) === -1 ? 'github' : mode;
 
 }
 
-/* files: { path: text } of the commit; true when the Worker stored them */
+/* the signed post, one retry on 5xx / 429 / network → { outcome: 'ok' | 'no secret' | 'HTTP n' | 'network', reply } */
+function publishPost_(mode, files, revision, at, email) {
+
+  var secret = workerSyncSecret_();
+  if (!secret) return { outcome: 'no secret', reply: null };
+
+  // one id per publish; the retry reuses it, so the Worker stores it once
+  var body = JSON.stringify({ id: 'pub-' + revision + '-' + at, mode: mode, by: email || '', at: at, files: files });
+  var outcome = 'network';
+  var reply = null;
+
+  for (var attempt = 0; attempt < 2; attempt++) {
+
+    if (attempt) Utilities.sleep(800);
+
+    try {
+      var ts = String(Date.now());
+      var response = UrlFetchApp.fetch(WORKER_API_URL + '/v1/sync/publish', {
+        method: 'post',
+        contentType: 'application/json; charset=utf-8',
+        payload: Utilities.newBlob(body).getBytes(),   // UTF-8 bytes: exactly what was signed
+        headers: { 'x-sync-ts': ts, 'x-sync-signature': 'v1=' + hmacHex_(secret, ts + '.' + body) },
+        muteHttpExceptions: true,
+        followRedirects: false
+      });
+      var code = response.getResponseCode();
+      if (code === 200) {
+        try { reply = JSON.parse(response.getContentText()); } catch (ignored) { reply = null; }
+        return { outcome: 'ok', reply: reply };
+      }
+      outcome = 'HTTP ' + code;
+      if (code < 500 && code !== 429) break;     // refused: a retry would be refused too
+    }
+    catch (error) {
+      outcome = 'network';
+    }
+
+  }
+
+  return { outcome: outcome, reply: reply };
+
+}
+
+/* 'shadow': files of the commit that just landed; true when the Worker stored them (never throws) */
 function publishShadow_(files, revision, at, email) {
 
   if (publishMode_() !== 'shadow') return false;
 
-  var props = PropertiesService.getScriptProperties();
   var outcome = 'not sent';
 
   try {
-
-    var secret = workerSyncSecret_();
-
-    if (!secret) {
-      outcome = 'no secret';
-    }
-    else {
-
-      // one id per publish; a retry below reuses it, so the Worker stores it once
-      var body = JSON.stringify({ id: 'pub-' + revision + '-' + at, mode: 'shadow', by: email || '', at: at, files: files });
-
-      for (var attempt = 0; attempt < 2; attempt++) {
-
-        var ts = String(Date.now());
-        var response = UrlFetchApp.fetch(WORKER_API_URL + '/v1/sync/publish', {
-          method: 'post',
-          contentType: 'application/json; charset=utf-8',
-          payload: Utilities.newBlob(body).getBytes(),   // UTF-8 bytes: exactly what was signed
-          headers: { 'x-sync-ts': ts, 'x-sync-signature': 'v1=' + hmacHex_(secret, ts + '.' + body) },
-          muteHttpExceptions: true,
-          followRedirects: false
-        });
-        var code = response.getResponseCode();
-
-        if (code === 200) {
-          outcome = 'ok';
-          break;
-        }
-
-        outcome = 'HTTP ' + code;
-        if (code < 500 && code !== 429) break;     // refused: a retry would be refused too
-        Utilities.sleep(800);
-
-      }
-
-    }
-
+    outcome = publishPost_('shadow', files, revision, at, email).outcome;
   }
   catch (error) {
     outcome = 'network';
@@ -359,12 +372,27 @@ function publishShadow_(files, revision, at, email) {
   if (outcome !== 'ok') console.warn('publish shadow: ' + outcome);
 
   try {
-    props.setProperty(PUBLISH_SHADOW_LAST, JSON.stringify({ at: at, revision: revision, outcome: outcome }));
+    PropertiesService.getScriptProperties().setProperty(PUBLISH_SHADOW_LAST, JSON.stringify({ at: at, revision: revision, outcome: outcome }));
   }
   catch (ignored) {
     // only a note for the diagnostics
   }
 
   return outcome === 'ok';
+
+}
+
+/* 'worker': the publish itself. → the Worker's reply; throws (Arabic, for the panel) when it was not taken */
+function publishToWorker_(files, revision, at, email) {
+
+  var sent = publishPost_('worker', files, revision, at, email);
+
+  if (sent.outcome === 'ok') return sent.reply || {};
+
+  console.warn('publish worker: ' + sent.outcome);
+  throw appError_(
+    'النشر ما اتمش: السيرفر الجديد مردش (' + sent.outcome + ').',
+    'مفيش حاجة اتغيرت في الموقع. جرّب تاني بعد دقيقة، ولو فضلت المشكلة قول للأدمن الأساسي.'
+  );
 
 }

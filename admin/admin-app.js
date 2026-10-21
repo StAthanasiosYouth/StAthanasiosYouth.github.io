@@ -4056,15 +4056,19 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var result = job.result || {};
     var siteUrl = result.siteUrl || A.state.config.siteUrl || '';
     var live = null;
+    // PUBLISH_MODE 'worker' (Phase 2): live on the Worker already; the GitHub copy follows (its mirror, then Pages)
+    var mirror = result.mirror === 'pending';
 
     if (siteUrl) {
       live = job.step === 4
-        ? el('div', { class: 'note note--ok', role: 'status' }, 'ظهر على الموقع ✓ ', el('a', { href: siteUrl, target: '_blank', rel: 'noopener', text: 'افتح الموقع' }))
+        ? el('div', { class: 'note note--ok', role: 'status' }, mirror ? 'نسخة GitHub اتحدثت ✓ ' : 'ظهر على الموقع ✓ ', el('a', { href: siteUrl, target: '_blank', rel: 'noopener', text: 'افتح الموقع' }))
         : job.slow
-          ? el('div', { class: 'note note--warn', role: 'status', text: 'لسه مظهرش. GitHub Pages أحياناً بياخد كام دقيقة — افتح الموقع بعد شوية.' })
+          ? el('div', { class: 'note note--warn', role: 'status', text: mirror
+            ? 'نسخة GitHub متأخرة. النشر نفسه تم على السيرفر، والنسخة هتتحدث لوحدها.'
+            : 'لسه مظهرش. GitHub Pages أحياناً بياخد كام دقيقة — افتح الموقع بعد شوية.' })
           : el('div', { class: 'note', role: 'status' },
             el('span', { class: 'spinner spinner--inline', 'aria-hidden': 'true' }),
-            'جاري انتظار GitHub Pages… (عادةً أقل من دقيقة)'
+            mirror ? 'جاري تحديث نسخة GitHub… (عادةً دقيقة أو اتنين)' : 'جاري انتظار GitHub Pages… (عادةً أقل من دقيقة)'
           );
     }
 
@@ -4077,7 +4081,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     A.openSheet('تم النشر ✓', [
       stepper(siteUrl ? job.step : 3),
-      el('p', { class: 'note note--ok', 'data-publish-job': '', text: result.unchanged ? 'الملفات على GitHub زي ما هي.' : 'التغييرات اتبعتت لـ GitHub.' }),
+      el('p', { class: 'note note--ok', 'data-publish-job': '', text: result.unchanged ? 'الملفات على GitHub زي ما هي.' : mirror ? 'اتنشر على السيرفر الجديد ✓ ونسخة GitHub بتتحدث في الخلفية.' : 'التغييرات اتبعتت لـ GitHub.' }),
       result.commitUrl ? el('a', { class: 'link-row', href: result.commitUrl, target: '_blank', rel: 'noopener' }, icon('external'), 'شوف الكوميت على GitHub') : null,
       live,
       push
