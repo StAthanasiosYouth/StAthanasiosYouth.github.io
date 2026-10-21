@@ -22,7 +22,7 @@
  * without online booking loads no booking module (tests/book-public.e2e.mjs).
  */
 
-export const CONTENT_SOURCE = 'static';
+export const CONTENT_SOURCE = 'worker';
 export const WORKER_TIMEOUT_MS = 8000;   // how long the Worker's answer is still taken
 export const WORKER_GRACE_MS = 300;      // the static file arrived: the Worker's answer is still taken this long
 export const CONTENT_API_URL = 'https://athanasios-api.menazak-lab.workers.dev';
