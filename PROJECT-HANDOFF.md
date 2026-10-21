@@ -136,6 +136,11 @@ Spec: `docs/BACKEND-MIGRATION.md` §22 (row 4). Draft tables + the pure builders
 the browser-side Review (moved from Phase 2), Drive library → R2, upload-time GitHub commits. It also brings the panel's
 content state to D1, which is what the < 1 s panel open still waits for. Start with a plan for the owner, not code.
 
+Requirement added by the owner 2026-10-22 (document it in the Phase 4 plan, inside the step for the browser-side Review
+and publish in the Worker): the «راجع وانشر» dialog goes from 4 steps (مراجعة → نشر على GitHub → انتظار GitHub Pages →
+ظهر على الموقع) to 3 (Review → Publish → Live on the site). No GitHub or GitHub Pages wait in the UI; the GitHub mirror
+keeps running in the background. Not started.
+
 ## 6. Working rules (owner's standing instructions)
 
 - No production deploy, migration, Apps Script deploy or push to `main` without the owner's explicit approval. Staging first, report, pause.
