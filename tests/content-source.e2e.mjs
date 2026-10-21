@@ -41,7 +41,8 @@ const WORKER_FILES = {
 
 let server;
 let browser;
-let worker = 'serve';          // serve | down | off | slow | empty
+let worker = 'serve';          // serve | late | down | off | slow | empty
+const LATE_MS = 1500;
 let freshStubs = true;         // the committed stubs predate the Worker in the CSP: serve them as a re-publish would make them
 const SITE_CSP = /<meta http-equiv="Content-Security-Policy" content="([^"]+)">/.exec(read('index.html'))[1];
 const STUB_CSP = { '/black-theatre/index.html': /<meta http-equiv="Content-Security-Policy" content="([^"]+)">/.exec(read('pages/index.html'))[1], '/competition/test/index.html': SITE_CSP };
@@ -88,12 +89,14 @@ async function open(path) {
     const p = new URL(url).pathname;
     if (!p.startsWith('/v1/public/')) { request.respond({ status: 404, headers: cors, contentType: 'application/json', body: '{"ok":false}' }); return; }
     seen.push(p);
-    if (worker === 'slow') return;                // never answers: the page's 2-s timeout
+    if (worker === 'slow') return;                // never answers: the page does not wait for it
     if (worker === 'down') { request.respond({ status: 503, headers: cors, body: 'down' }); return; }
     if (worker === 'off') { request.respond({ status: 403, headers: cors, contentType: 'application/json', body: '{"ok":false,"code":"disabled"}' }); return; }
     const body = worker === 'empty' ? null : WORKER_FILES[p];
     if (!body) { request.respond({ status: 404, headers: cors, contentType: 'application/json', body: '{"ok":false,"code":"not_found"}' }); return; }
-    request.respond({ status: 200, headers: { ...cors, etag: '"x"', 'cache-control': 'no-cache' }, contentType: 'application/json; charset=utf-8', body });
+    const answer = () => request.respond({ status: 200, headers: { ...cors, etag: '"x"', 'cache-control': 'no-cache' }, contentType: 'application/json; charset=utf-8', body });
+    if (worker === 'late') setTimeout(answer, LATE_MS);   // a slow network to the Worker: after the page is drawn
+    else answer();
   });
   await page.goto(BASE + path, { waitUntil: 'domcontentloaded' });
   return { page, problems };
@@ -128,12 +131,36 @@ for (const mode of ['down', 'off', 'empty', 'slow']) {
       await shows(page, staticText, 9000);
       assert.ok(!(await page.evaluate(() => document.body.innerText)).includes(MARK), name + ': nothing from the Worker');
       assert.ok(seen.includes(route), name + ': the Worker was asked first');
-      if (mode === 'slow') assert.ok(Date.now() - t0 < 8000, name + ': within the timeout');
+      if (mode === 'slow') assert.ok(Date.now() - t0 < 4000, name + ': drawn without waiting for the Worker');
       assert.deepEqual(problems, [], name);
       await page.close();
     }
   });
 }
+
+test('the Worker late (slow network): the static file drawn at once, then the newer file swapped in, never under the visitor\'s hands', async () => {
+  worker = 'late';
+  for (const [name, path, route, staticText] of CASES) {
+    seen.length = 0;
+    const t0 = Date.now();
+    const { page, problems } = await open(path);
+    await shows(page, staticText, 9000);
+    const drawn = Date.now() - t0;
+    assert.ok(!(await page.evaluate(() => document.body.innerText)).includes(MARK), name + ': the static file first');
+    assert.ok(drawn < LATE_MS + 500, name + ': not waiting for the Worker (' + drawn + ' ms)');
+    // a competition, and an event with online booking (events/test): never redrawn under the visitor's hands
+    if (name === 'a competition' || name === 'an event') {
+      await new Promise(r => setTimeout(r, LATE_MS + 800));
+      assert.ok(!(await page.evaluate(() => document.body.innerText)).includes(MARK), name + ': kept as drawn (the next load has it)');
+    }
+    else {
+      await shows(page, MARK, LATE_MS + 4000);
+    }
+    assert.ok(seen.includes(route), name + ': the Worker was asked');
+    assert.deepEqual(problems, [], name);
+    await page.close();
+  }
+});
 
 test(`without ?content= on this machine (switch ${CONTENT_SOURCE}): the repo's files, no request to the Worker`, async () => {
   worker = 'serve'; seen.length = 0;

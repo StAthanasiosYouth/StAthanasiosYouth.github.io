@@ -63,7 +63,12 @@ async function load() {
   }
 
   try {
-    const fresh = await fetchContent();
+    // the Worker's newer file, when it comes after the page is drawn (content-source.js)
+    const fresh = await fetchContent({
+      onNewer: later => {
+        if (current && JSON.stringify(later) !== JSON.stringify(current)) show(later, false);
+      }
+    });
     // compare the content itself, not just the revision label of the cached copy
     if (!current || JSON.stringify(fresh) !== JSON.stringify(current)) {
       const first = !current;

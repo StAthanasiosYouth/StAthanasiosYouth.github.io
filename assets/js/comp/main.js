@@ -568,6 +568,7 @@ async function fetchDefinition(slug) {
 
   for (const cache of ['no-cache', 'force-cache']) {
     try {
+      // no onNewer: a competition is never swapped under the player (a later edit shows on the next load)
       const response = await fetchPublished(url, { cache, credentials: 'same-origin' }, { kind: 'comp', slug });
       if (response.status === 404) return { missing: true };
       if (!response.ok) continue;

@@ -173,6 +173,19 @@ function bookingStatus() {
    LIVE
 ========================================================= */
 
+/* the Worker's newer file after the page is drawn (content-source.js) → apply(raw); a broken one changes nothing */
+const newer = apply => async response => {
+  try {
+    await apply(await response.json());
+  }
+  catch {
+    // the page keeps what it shows
+  }
+};
+
+/* redraw only when nothing is in the visitor's hands: no booking on screen, no status panel, no sheet (#…) */
+const quiet = kind => !!shown && shown.kind === kind && !booker && !statusPanel && !sheet.isOpen && !location.hash;
+
 /* the page's JSON, next to the page (or the Worker's live revision: content-source.js); the server's clock corrects a wrong device clock */
 async function fetchJson(url, published) {
 
@@ -198,7 +211,14 @@ async function boot() {
   view.loading();
 
   if (KIND === 'events') {
-    const loaded = await fetchJson(new URL('content.json', ROOT), { kind: 'content' });
+    const loaded = await fetchJson(new URL('content.json', ROOT), { kind: 'content', onNewer: newer(async raw => {
+      const { sanitizeContent } = await import('../content.js');
+      const content = sanitizeContent(raw);
+      if (quiet('events')) {
+        listPartners = content.partners || {};
+        render('events', content.events);
+      }
+    }) });
     if (loaded.raw) {
       try {
         // the home page's own sanitizer (loaded only here)
@@ -218,7 +238,10 @@ async function boot() {
 
   const v = html.dataset.v || '';
   const file = KIND === 'page' ? 'page.json' : 'event.json';
-  const loaded = await fetchJson(new URL(`${file}${v ? `?v=${encodeURIComponent(v)}` : ''}`, location.href), { kind: KIND, slug: html.dataset.slug || '' });
+  const loaded = await fetchJson(new URL(`${file}${v ? `?v=${encodeURIComponent(v)}` : ''}`, location.href), { kind: KIND, slug: html.dataset.slug || '', onNewer: newer(raw => {
+    const data = (KIND === 'page' ? sanitizePage : sanitizeEvent)(raw);
+    if (data && quiet(KIND) && (data.withdrawn || data.slug === (html.dataset.slug || ''))) render(KIND, data);
+  }) });
 
   if (loaded.failed) {
     view.error('مش قادرين نحمّل الصفحة. اتأكد من النت وجرّب تاني.', boot);

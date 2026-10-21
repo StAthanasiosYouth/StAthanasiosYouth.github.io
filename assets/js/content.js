@@ -675,10 +675,23 @@ function writeCache(raw) {
 
 /* "no-cache" revalidates with the server every time (cheap 304s), so a
    publish shows up as soon as GitHub Pages has deployed it (or, with
-   CONTENT_SOURCE 'worker', at once: content-source.js, static fallback). */
-export async function fetchContent() {
+   CONTENT_SOURCE 'worker', at once: content-source.js; a newer file the
+   Worker sends after the page is drawn goes to onNewer(content)). */
+export async function fetchContent({ onNewer = null } = {}) {
 
-  const response = await fetchPublished('content.json', { cache: 'no-cache' }, { kind: 'content' });
+  const newer = onNewer && (async later => {
+    try {
+      const raw = await later.json();
+      const content = sanitizeContent(raw);
+      writeCache(raw);
+      onNewer(content);
+    }
+    catch {
+      // a broken late answer: the page keeps what it shows
+    }
+  });
+
+  const response = await fetchPublished('content.json', { cache: 'no-cache' }, { kind: 'content', onNewer: newer });
 
   if (!response.ok) {
     throw new Error(`content.json: HTTP ${response.status}`);
