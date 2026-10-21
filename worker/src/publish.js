@@ -167,6 +167,11 @@ export async function syncPublish(ctx) {
     "INSERT INTO publish_jobs (id, mode, revision, hash, state, files, changed, result, by, at, created_at, updated_at) VALUES (?, ?, ?, ?, 'live', ?, ?, ?, ?, ?, ?, ?)"
   ).bind(id, mode, revision, setHash, files.length, changed.length, JSON.stringify(result), by || null, at, now, now));
   stmts.push(syncStampStmt(db, 'publish', ts));
+  // 'worker': the booking's copy of a changed event is re-read on its next use (book/event.js reads this revision)
+  const events = changed.filter(f => f.kind === 'event').map(f => f.key);
+  if (mode === 'worker' && events.length) {
+    stmts.push(db.prepare("UPDATE event_cfg SET fetched_at = 0 WHERE source <> 'fixture' AND slug IN (SELECT value FROM json_each(?))").bind(JSON.stringify(events)));
+  }
   await retry(() => db.batch(stmts));
   // PUBLISH_MODE='worker': live now; GitHub follows in the background (publish-mirror.js; the cron retries)
   if (mode === 'worker' && changed.length && ctx.env.JOBS) ctx.defer(ctx.env.JOBS.send(makeJob('publish.mirror', { id })));

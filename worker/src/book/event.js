@@ -1,8 +1,12 @@
 /*
  * The bookable definition of an event = its PUBLISHED event.json (what the
- * visitor saw: prices, capacity, window, servants, methods). Read from the
- * site and kept in D1 `event_cfg`; re-read when older than maxAgeMs, or on
- * an admin's «حدّث بيانات الفعالية» after a publish. Never edited here.
+ * visitor saw: prices, capacity, window, servants, methods). Kept in D1
+ * `event_cfg`; re-read when older than maxAgeMs, or on an admin's «حدّث
+ * بيانات الفعالية» after a publish. Never edited here. Read from:
+ *  - the live D1 revision, when a PUBLISH_MODE='worker' publish made it
+ *    (Phase 2 P2-6: D1 is then the truth and GitHub only follows — the
+ *    visitor sees it at once, so the booking must too);
+ *  - else the site's event.json (github / shadow mode: the site is the truth).
  *
  * Staging tests may store a fixture instead (POST /v1/admin/diag/event-fixture).
  */
@@ -73,6 +77,15 @@ export async function saveRow(env, row) {
   ).bind(row.id, row.slug, row.title, row.start_at, row.end_at, row.end_ms, row.booking, row.online, row.capacity, row.price_rev, row.revision, row.withdrawn, row.source, row.fetched_at).run());
 }
 
+/* the live event.json revision of a worker-mode publish (parsed), or undefined (then the site decides) */
+async function publishedEvent(env, slug) {
+  const row = await retry(() => env.DB.prepare(
+    "SELECT r.body FROM published_revisions r JOIN publish_jobs j ON j.id = r.publish_id WHERE r.kind = 'event' AND r.key = ? AND r.live = 1 AND j.mode = 'worker'"
+  ).bind(slug).first());
+  if (!row) return undefined;
+  try { return JSON.parse(row.body); } catch { return undefined; }
+}
+
 async function fetchFromSite(env, slug, fetchImpl) {
   const site = String(env.SITE_URL || 'https://stathanasiosyouth.github.io').replace(/\/$/, '');
   // a unique query: past any CDN copy, so a fresh publish counts within a minute
@@ -96,17 +109,24 @@ export async function loadEvent(ctx, slug, { maxAgeMs = FRESH_MS, force = false 
     return rowToEvent(row);
   }
   let json;
-  try {
-    json = await fetchFromSite(ctx.env, slug, ctx.fetch);
-  } catch (err) {
-    if (row && !row.withdrawn) return rowToEvent(row);      // the site is slow: the last copy will do
-    throw err;
+  let source = 'site';
+  const published = await publishedEvent(ctx.env, slug);
+  if (published !== undefined) {
+    json = published;
+    source = 'published';
+  } else {
+    try {
+      json = await fetchFromSite(ctx.env, slug, ctx.fetch);
+    } catch (err) {
+      if (row && !row.withdrawn) return rowToEvent(row);      // the site is slow: the last copy will do
+      throw err;
+    }
   }
   if (!json) {
     if (row) await ctx.env.DB.prepare('UPDATE event_cfg SET withdrawn = 1, fetched_at = ? WHERE id = ?').bind(now, row.id).run();
     throw new ApiError('not_found', 'no event.json');
   }
-  const next = rowFromJson(json, 'site', now);
+  const next = rowFromJson(json, source, now);
   if (next.withdrawn) {
     if (row) await ctx.env.DB.prepare('UPDATE event_cfg SET withdrawn = 1, fetched_at = ? WHERE id = ?').bind(now, row.id).run();
     throw new ApiError('not_found', 'withdrawn');

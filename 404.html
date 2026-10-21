@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-shell="404">
+
+<head>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <!-- CSP: the page shell's (pages/index.html), so the shell written in by not-found.js runs under the same policy. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data: blob: https://tile.openstreetmap.org; font-src 'self'; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com https://athanasios-api.menazak-lab.workers.dev https://athanasios-api-staging.menazak-lab.workers.dev; frame-src https://www.google.com https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
+
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+
+  <!--
+    GitHub Pages serves this for every missing path. A new page, event or
+    competition that is live on the Worker but whose stub has not reached
+    GitHub yet: assets/js/not-found.js writes the right shell in (Phase 2 P2-5,
+    docs/PUBLISH-SEPARATION-PLAN.md). Anything else: the message below.
+    URLs are absolute: this file answers at any depth.
+  -->
+  <meta name="robots" content="noindex">
+
+  <title>الصفحة دي مش موجودة | أسرة البابا أثناسيوس</title>
+
+  <meta name="theme-color" content="#020914">
+  <meta name="color-scheme" content="dark">
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png">
+  <link rel="stylesheet" href="/assets/css/page.css">
+
+  <script type="module" src="/assets/js/not-found.js"></script>
+
+</head>
+
+<body>
+
+  <header class="pbar">
+    <p class="pbar__brand">
+      <img src="/assets/img/logo-128.webp" width="34" height="34" alt="">
+      <span class="pbar__name">أسرة البابا أثناسيوس</span>
+    </p>
+    <a class="pbar__home" href="/">ارجع للموقع</a>
+  </header>
+
+  <main id="page-main" class="pg" tabindex="-1">
+    <p class="pg-note">الصفحة دي مش موجودة، أو الرابط اتكتب غلط.</p>
+    <p class="pg-note"><a href="/">افتح الصفحة الرئيسية</a></p>
+  </main>
+
+</body>
+
+</html>

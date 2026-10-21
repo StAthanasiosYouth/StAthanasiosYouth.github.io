@@ -18,6 +18,32 @@ return the same sha-256 as the site, ETag 304 ok. **Left: the owner sets the Scr
 (Apps Script editor → Project Settings → Script Properties); the 15-minute comparison starts with the first shadow
 publish after that. Rollback: delete `PUBLISH_MODE`; Worker `wrangler rollback e2673438`; Apps Script @53.
 
+### P2-4 real check on staging (2026-10-21)
+
+The owner set the staging secret `GITHUB_TOKEN` (fine-grained, the test repository
+`StAthanasiosYouth/publish-mirror-staging` only). `worker/scripts/mirror-check.mjs`: a worker-mode publish live at once,
+mirrored in 7 s by the queue job (commit `680e83c`). Retry, for real: staging deployed with a branch that does not
+exist → the publish stayed live, the job `failed` («GitHub 404: Branch not found», 2 attempts); the correct config
+deployed again → the cron retried after its backoff, commit `8e45f7f`, job `mirrored`. Three publishes in a row of one
+event → one commit with the newest text (`b149b83`). The production repository was never written (`main` still
+`000fe84`; GitHub does not know these commits there).
+
+### P2-5 and P2-6 as built (2026-10-21, staging / local only; nothing released)
+
+- **P2-6** (`worker/src/book/event.js`): the booking reads an event from its live D1 revision when a worker-mode
+  publish made it (`event_cfg.source = 'published'`), else from the site as before (github / shadow mode). A
+  worker-mode publish expires the booking's copy of a changed event, so the next request already uses it; a withdrawn
+  revision is not bookable; staging fixtures are never replaced. Tests: `book-published` 4/4, Worker 212/212. Staging
+  (`a5b04517`): publish v1 → `book/state` v1; v2 seconds later → v2 at once; withdrawn → `not_found`.
+- **P2-5** (`404.html` + `assets/js/not-found.js`): GitHub Pages serves `404.html` for every missing path. For
+  `/<slug>/`, `/events/<slug>/`, `/competition/<slug>/` (reserved folders excluded; with or without the slash) it
+  fetches the matching shell, makes its URLs absolute, adds `data-kind` / `data-slug` as a stub would and writes it in;
+  the page engine then loads the content (the Worker when `CONTENT_SOURCE='worker'`, else the static file — which a
+  new slug does not have yet, so before the cutover it shows «not available»). Any other path: a plain «الصفحة دي مش
+  موجودة» page. Its CSP is the page shell's (a superset of the site's and the competition shell's). Tests:
+  `not-found` unit 3/3, e2e 6/6 (event, page, competition, no trailing slash, Worker down, other paths); unit 745/748
+  (3 known).
+
 ### P2-4 as built (2026-10-21, staging only; nothing released)
 
 - Apps Script `PUBLISH_MODE='worker'` (`WorkerSync.gs` `publishToWorker_`, `Publish.gs` step B): new pictures are
