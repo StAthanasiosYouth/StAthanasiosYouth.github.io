@@ -34,12 +34,48 @@ All three are additive and touch different tables, so applying `0011` before `00
 | 8 Combined export + filters + PII grant | ✔ live | «التقرير المجمّع»; downloads audited; also live: the rolling-24h email budget |
 | 9 Stage-1 checks + staging rehearsal | ✔ **completed except one deferred test** (2026-10-21): staging rehearsal 58/58 (`worker/scripts/rehearsal.mjs`, incl. exact-record links); real emails ✔ (Azure Crest: OTP, booking, admin alert, summary in the owner's Inbox); real-device push #1 ✔ (B-QSSR5, app in the background: routed to the Primary only, delivered); the tap fallback it found is fixed (`admin/sw.js` allow-list, main 9f52775) | **deferred to Phase 6/7A:** real-device push with the app **closed** + tap opens the exact booking. Test #2 (B-NA4VS): the Worker routed it (one row, Primary only), Apps Script claimed it and acknowledged it as sent to FCM at 23:33:34 UTC, but nothing showed on the phone. The lost hop is the Apps Script → FCM → device bridge, which Phase 6 replaces (push on the Worker), so it is re-run there (Stage 2 matrix). Production switches restored to 0. Live: main 9f52775, Worker 22cbe8eb |
 | 10 Age eligibility (§4.9, migration `0010`) | ✔ **live** (2026-10-21): D1 `0010` applied, Worker `89f5fb76` (CI, main `fe40316`), Apps Script @52, site | staging check 9/9 (`worker/scripts/age-check.mjs`); Worker 173/173, booking e2e incl. the DOB flow; rollback: Worker `22cbe8eb`, Apps Script @51, main `a23ad20`, D1 bookmark `00000122-0000001a-0000510b-359369c080cff188b17d0ee4b57ffc27` (additive: old code ignores the columns) |
-| 11 Payment requests (§4.10, migration `0011`) | ✔ **staging** (2026-10-21): Worker e9347f3c, staging D1 migrated; `worker/scripts/claims-check.mjs` 21/21; Worker 181/181 (incl. `book-claims` 8/8); e2e: the status view «ادفع الباقي» flow, the admin accept/reject | production pending owner approval: D1 `0011` (additive), Worker, site (status view + admin), Apps Script (admin sheet). Rollback: the previous Worker ignores the table; check `SELECT COUNT(*) FROM payment_claims WHERE status = 'pending'` first (open requests would wait unseen until re-release) |
+| 11 Payment requests (§4.10, migration `0011`) | ✔ **live, switch off** (2026-10-21): D1 `0011` applied, Worker via CI (main `dc1fc38`, then the `PAY_REQUESTS` switch: see the release lines below), Apps Script @53, site | staging `claims-check.mjs` 23/23 (incl. switch off); Worker 182/182 (`book-claims` 9/9); e2e: the status view «ادفع الباقي» flow, the admin accept/reject. «ادفع الباقي» stays hidden until the owner sets `PAY_REQUESTS=1`. Rollback: `PAY_REQUESTS=0` (instant); a Worker rollback only after `SELECT COUNT(*) FROM payment_claims WHERE status = 'pending'` is 0 |
 
 Release 2026-10-20: Worker `44c932ae` (migration `0012`; same code as `e11a506e`, redeployed by CI), Apps Script API @51, site `main` `6d72366`.
 Rollback: Worker `7ff63d61`, Apps Script @50, `main` `639b07b`, D1 bookmark `0000011b-00000000-0000510a-d550a1509e061e1a14861a06b74b0f80` (migrations are additive).
 Release 2026-10-20 (Step 8, email sender + rolling budget): Worker `dee47eed` (CI, same code as `70527492`), site `main` `b59e8da`; no migration, Apps Script unchanged (@51).
 Rollback: Worker `235ff53f`, `main` `2107c53`.
+Release 2026-10-21 (Step 11): D1 `0011` applied to production (bookmark before it `00000123-000000a0-0000510b-9675d9bf63e2b9f0f033cb7430b62463`),
+Worker `ff2b8736` (CI, main `dc1fc38`), Apps Script API @53 (admin sheet), site + admin from `main`.
+Then the `PAY_REQUESTS` switch (plan §8; missing = off): Worker `e2673438` (CI, main `cd18002`).
+Rollback: Worker `89f5fb76`, Apps Script @52, `main` `09129ba`; the `0011` table is additive and ignored by the older Worker.
+Production smoke (read-only, no booking written): health 200; CORS allows `x-status-token`; `pay-request` / `withdraw` / `status`
+with a bad token → `expired`; admin `claims/:id/reject` without sign-in → 401; live `status.js`, `book-api.js`, `admin-app.js`,
+`book-kit.js` carry the Step 11 code; `payment_claims` empty; switches 0; outbox: 2 old `sent` rows (Step 9 push tests), none pending.
+
+### 0.1 Phase 1.5 closure audit (2026-10-21)
+
+**Result: Phase 1.5 is complete.** Steps 1–11 are in production. Every switch is off by default
+(`NOTIFY_ROUTER=0`, `NOTIFY_EMAIL=0`, `PERMS_ENFORCE=0`, `PAY_REQUESTS` off). Each release has its rollback recorded above.
+
+Deferred (by owner decision, not a defect of Phase 1.5):
+- **Closed-app push + tap to the exact booking** (Step 9, test #2, B-NA4VS): the Worker routed it and the Apps Script bridge
+  acknowledged it to FCM, but the phone showed nothing. The lost hop belongs to the temporary Apps Script → FCM bridge,
+  which Phase 6 replaces (push on the Worker); re-run there as part of the stage-2 real-device matrix (§4.8). Background-app
+  push and its tap (test #1, B-QSSR5) passed.
+
+Remaining issues and gaps (none blocks Phase 2):
+1. **No `AGE_RULES` switch.** §8 lists one; Step 10 shipped without it. Age rules apply only to events that set an age range or
+   switch a category off, so old events are unaffected. Rollback for a bad age rule: edit the event; for bad code: the Worker rollback above.
+   Add the switch only if the owner asks.
+2. **`PAY_REQUESTS` has no admin toggle.** It is a D1 `settings` row; turning «ادفع الباقي» on is one command, run with the owner's approval.
+   A toggle in «إعدادات» can come with Phase 8 (or sooner if asked).
+3. **~152 old activity rows** keep a broken `cairo` text (Step 4, from before the fix). Repair waits for the owner's approval; old records are untouched.
+4. **Test bookings B-QSSR5 and B-NA4VS** on the test event: the owner rejects them; all test data goes in the launch-gate cleanup (§6, owner's explicit go).
+5. **`ADMIN_EMAILS` mirror lag:** the Primary's own calls skip the grants pull, so a removal reaches Apps Script on the next non-primary admin call
+   (the Worker applies it at once). Candidate: refresh grants from `bookNewsTick`.
+6. **Email at volume:** Gmail production is connected and tested. 100/day is a conditional go; OTP bursts are a no-go until Phase 5A's immediate OTP path.
+   Google branding verification fails on the github.io homepage; a custom domain is recommended (owner decision, not bought).
+7. **Backlog «عليه باقي»** (balance still owed, §backlog above): not built. Step 11's «طلبات دفع» is a different queue (requests waiting for review).
+8. **Step 6 row text** says "production Gmail consent pending"; production Gmail has since been connected (health ok). The router and email stay off.
+9. **Known test failures, pre-existing:** unit #2 (competition/trip), #191 (content.js competitions), #558 (seasons); e2e "module off" in
+   `book-admin.e2e`; a date-boundary flake in final-m `Route.gs`.
+10. **Launch gate (§6) still open:** go-live test #2, test-data cleanup, real events.
 
 **Backlog (not scheduled):**
 - **Booking filter «عليه باقي»**: confirmed bookings with an outstanding installment balance (balance > 0, e.g. EGP 40 left),
