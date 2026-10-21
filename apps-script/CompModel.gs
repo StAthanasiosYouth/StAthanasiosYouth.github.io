@@ -45,7 +45,7 @@ var COMP_SITE_URL = 'https://stathanasiosyouth.github.io/';
 var COMP_SITE_NAME = 'أسرة البابا أثناسيوس – سفاجا';
 
 /* the public site's Content-Security-Policy (index.html): stubs carry exactly the same one (tested) */
-var COMP_SITE_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://tile.openstreetmap.org; font-src 'self'; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com; frame-src https://www.google.com; object-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests";
+var COMP_SITE_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://tile.openstreetmap.org; font-src 'self'; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com https://athanasios-api.menazak-lab.workers.dev https://athanasios-api-staging.menazak-lab.workers.dev; frame-src https://www.google.com; object-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests";
 
 /* «مسابقة جديدة»: presets only fill defaults (§3.2); `needs` = the module it requires */
 var COMP_PRESETS = {

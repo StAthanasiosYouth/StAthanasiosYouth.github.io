@@ -20,6 +20,7 @@ import { sanitizePage, sanitizeEvent, sanitizeEntry, bookingPhase, eventsList } 
 import { createView } from './view.js';
 import { createVideoSheet } from './video.js';
 import { zonedNow, stamp, setServerTime } from '../schedule.js';
+import { fetchPublished } from '../content-source.js';
 import { soundToggle, uiSounds } from '../ui-sound.js';
 
 const ROOT = new URL('../../../', import.meta.url);
@@ -172,12 +173,12 @@ function bookingStatus() {
    LIVE
 ========================================================= */
 
-/* the page's JSON, next to the page; GitHub Pages' clock corrects a wrong device clock */
-async function fetchJson(url) {
+/* the page's JSON, next to the page (or the Worker's live revision: content-source.js); the server's clock corrects a wrong device clock */
+async function fetchJson(url, published) {
 
   for (const cache of ['no-cache', 'force-cache']) {
     try {
-      const response = await fetch(url, { cache, credentials: 'same-origin' });
+      const response = await fetchPublished(url, { cache, credentials: 'same-origin' }, published);
       if (response.status === 404) return { missing: true };
       if (!response.ok) continue;
       if (cache === 'no-cache') setServerTime(response.headers.get('Date'));
@@ -197,7 +198,7 @@ async function boot() {
   view.loading();
 
   if (KIND === 'events') {
-    const loaded = await fetchJson(new URL('content.json', ROOT));
+    const loaded = await fetchJson(new URL('content.json', ROOT), { kind: 'content' });
     if (loaded.raw) {
       try {
         // the home page's own sanitizer (loaded only here)
@@ -217,7 +218,7 @@ async function boot() {
 
   const v = html.dataset.v || '';
   const file = KIND === 'page' ? 'page.json' : 'event.json';
-  const loaded = await fetchJson(new URL(`${file}${v ? `?v=${encodeURIComponent(v)}` : ''}`, location.href));
+  const loaded = await fetchJson(new URL(`${file}${v ? `?v=${encodeURIComponent(v)}` : ''}`, location.href), { kind: KIND, slug: html.dataset.slug || '' });
 
   if (loaded.failed) {
     view.error('مش قادرين نحمّل الصفحة. اتأكد من النت وجرّب تاني.', boot);

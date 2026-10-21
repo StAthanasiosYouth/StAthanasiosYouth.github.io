@@ -81,7 +81,8 @@ export function corsHeaders(request, env) {
   return {
     'access-control-allow-origin': origin,
     'access-control-allow-credentials': 'false',
-    'access-control-expose-headers': 'x-request-id, idempotency-replayed, etag',
+    // date: the site corrects a wrong device clock with it (assets/js/schedule.js setServerTime)
+    'access-control-expose-headers': 'x-request-id, idempotency-replayed, etag, date',
     vary: 'Origin'
   };
 }

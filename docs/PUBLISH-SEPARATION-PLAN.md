@@ -18,6 +18,28 @@ return the same sha-256 as the site, ETag 304 ok. **Left: the owner sets the Scr
 (Apps Script editor → Project Settings → Script Properties); the 15-minute comparison starts with the first shadow
 publish after that. Rollback: delete `PUBLISH_MODE`; Worker `wrangler rollback e2673438`; Apps Script @53.
 
+### P2-3 as built (2026-10-21, staging / local only; nothing released)
+
+- `assets/js/content-source.js`: `CONTENT_SOURCE = 'static'` (shipped). In `'worker'` mode the first, revalidating
+  load asks `GET /v1/public/…` (credential-less CORS, `no-cache`); anything but a 200 within 2 s (404, 403
+  `CONTENT_SERVE=0`, 5xx, network, CSP refusal, timeout) falls back to the static file with the page's own init. The
+  offline `force-cache` retry stays static. Localhost only: `?content=worker|static` (or
+  `localStorage['athanasios.content.source']`) and `?api=` (the booking's override key). It imports nothing, so a page
+  without online booking still loads no booking module.
+- Loaders: `content.js` (home), `page/main.js` (page, event, the events list), `comp/main.js` (comp.json).
+- CSP: the Worker origins are in `connect-src` of `index.html`, `competition/index.html`, `points/index.html` and the
+  Apps Script built-in stub policy (`COMP_SITE_CSP`; `PAGE_SITE_CSP` no longer adds them twice). The Worker now
+  exposes `date` over CORS (the device-clock correction).
+- **Cutover prerequisite (P2-9):** stubs committed before this change (today `black-theatre/`, `competition/test/`)
+  still carry the old CSP. There the browser refuses the Worker request and the page uses its static file (tested:
+  no breakage). They get the new CSP when their page is next published, or all at once with the P2-4 mirror. The
+  Apps Script change (`COMP_SITE_CSP`) ships with the next Apps Script deploy.
+- Tests: `tests/content-source.test.mjs` 7/7, `tests/content-source.e2e.mjs` 11/11 (Worker served / down / off /
+  empty / slow; the shipped switch makes no request; an old stub), `pages-public` 19/19, `book-public` 17/17,
+  `comp-public` 14/14; unit 738/741 (the 3 known). `browser.e2e` 5 failures are pre-existing (the same without this
+  change). Real check: the local site on `:8080` against the staging Worker (`b68525ad`): home and `events/test`
+  read their live revision (≈ 110 ms), no static request.
+
 ### P2-2 as built
 
 - Apps Script (`WorkerSync.gs` `publishShadow_`, called from `Publish.gs` step D after the commit landed, under the

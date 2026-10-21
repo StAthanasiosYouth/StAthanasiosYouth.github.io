@@ -20,6 +20,7 @@ import * as F from './flow.js';
 import { createView } from './view.js';
 import { zonedNow, stamp, setServerTime, setClockOffset, clockOffset, cairoInstant, realMinutesBetween } from '../schedule.js';
 import { soundToggle, uiSounds, cue } from '../ui-sound.js';
+import { fetchPublished } from '../content-source.js';
 
 /* the mount points (a stub made from an older shell may only have its own <main>) */
 function mount(id, make) {
@@ -567,10 +568,10 @@ async function fetchDefinition(slug) {
 
   for (const cache of ['no-cache', 'force-cache']) {
     try {
-      const response = await fetch(url, { cache, credentials: 'same-origin' });
+      const response = await fetchPublished(url, { cache, credentials: 'same-origin' }, { kind: 'comp', slug });
       if (response.status === 404) return { missing: true };
       if (!response.ok) continue;
-      // GitHub Pages' clock corrects a wrong device clock (countdown, windows)
+      // GitHub Pages' (or the Worker's) clock corrects a wrong device clock (countdown, windows)
       if (cache === 'no-cache') setServerTime(response.headers.get('Date'));
       const raw = await response.json();
       return { raw };

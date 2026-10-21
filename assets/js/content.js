@@ -11,6 +11,7 @@
 
 import { LINK_ICON_NAMES } from './icons.js';
 import { setServerTime } from './schedule.js';
+import { fetchPublished } from './content-source.js';
 import { pageSlug, eventSlug, eventHideAt, EVENT_KINDS, cleanPartners } from './page/model.js';
 
 const CACHE_KEY = 'athanasios.content.v1';
@@ -673,10 +674,11 @@ function writeCache(raw) {
 
 
 /* "no-cache" revalidates with the server every time (cheap 304s), so a
-   publish shows up as soon as GitHub Pages has deployed it. */
+   publish shows up as soon as GitHub Pages has deployed it (or, with
+   CONTENT_SOURCE 'worker', at once: content-source.js, static fallback). */
 export async function fetchContent() {
 
-  const response = await fetch('content.json', { cache: 'no-cache' });
+  const response = await fetchPublished('content.json', { cache: 'no-cache' }, { kind: 'content' });
 
   if (!response.ok) {
     throw new Error(`content.json: HTTP ${response.status}`);

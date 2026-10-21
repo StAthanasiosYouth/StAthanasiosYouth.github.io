@@ -1993,11 +1993,8 @@ function pagesBuildPublic_(draft, ctx) {
    PUBLISH: FILES AND AFTER THE COMMIT
 ========================================================= */
 
-/* the page shell's CSP: the site's, plus the booking API and its Turnstile check (worker/BOOKING-API.md) — as pages/index.html */
+/* the page shell's CSP: the site's (which allows the Worker since Phase 2), plus the booking Turnstile check (worker/BOOKING-API.md) — as pages/index.html */
 var PAGE_SITE_CSP = COMP_SITE_CSP.replace(
-  "https://fcmregistrations.googleapis.com;",
-  "https://fcmregistrations.googleapis.com https://athanasios-api.menazak-lab.workers.dev https://athanasios-api-staging.menazak-lab.workers.dev;"
-).replace(
   "script-src 'self';",
   "script-src 'self' https://challenges.cloudflare.com;"
 ).replace(
