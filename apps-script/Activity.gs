@@ -347,6 +347,11 @@ function apiSetAdminName(value, name) {
     throw appError_('الاسم ده مش مقبول.', 'اكتب الاسم بالحروف العربي أو الإنجليزي، من غير إيميل أو رموز.', '', 'الاسم');
   }
 
+  // just added in «الصلاحيات» (D1): the allowlist here may not know it yet — ask D1 first, never under the lock (Grants.gs)
+  if (adminEmails_().indexOf(email) === -1) {
+    grantsRefreshAllowlist_(true);
+  }
+
   var lock = LockService.getScriptLock();
   var before = '';
 

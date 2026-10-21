@@ -1324,7 +1324,7 @@
         if (!ok) return;
         change('/v1/admin/accounts/' + encodeURIComponent(account.email), form.value(), button)
           .then(function () { A.toast('اتحفظت الصلاحيات ✓'); })
-          .catch(function (error) { A.fail(error, box); });
+          .catch(function (error) { A.fail(error, box, { fields: false }); });
       });
 
     }
@@ -1363,7 +1363,7 @@
             }
             A.toast(field.value.trim() ? 'اتحفظ الاسم ✓' : 'رجع لأول الإيميل');
           })
-          .catch(function (error) { A.fail(error, box); });
+          .catch(function (error) { A.fail(error, box, { fields: false }); });
       });
 
       setTimeout(function () { field.focus(); field.select(); }, 30);
@@ -1384,7 +1384,7 @@
         if (!ok) return;
         change('/v1/admin/accounts/' + encodeURIComponent(email) + '/remove', {}, button)
           .then(function () { A.toast('اتشالت صلاحية ' + email); })
-          .catch(function (error) { A.fail(error, box); });
+          .catch(function (error) { A.fail(error, box, { fields: false }); });
       });
 
     }

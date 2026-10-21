@@ -143,7 +143,7 @@ test.after(async () => {
   await new Promise(resolve => (server ? server.close(resolve) : resolve()));
 });
 
-async function openSettings(viewport = { width: 1366, height: 900 }) {
+async function openSettings(viewport = { width: 1366, height: 900 }, rows = 2) {
   const context = await browser.createBrowserContext();
   const page = await context.newPage();
   const problems = [];
@@ -156,7 +156,7 @@ async function openSettings(viewport = { width: 1366, height: 900 }) {
   await page.click('.gis-stub');
   await page.waitForFunction(() => window.A && A.state && !document.getElementById('shell').hidden, { timeout: 15000 });
   await page.evaluate(() => A.go('settings'));
-  await page.waitForFunction(() => document.querySelectorAll('.card--admins .admin').length === 2 && /صلاحية واحدة/.test(document.querySelector('.card--admins').innerText), { timeout: 8000 });
+  await page.waitForFunction(n => document.querySelectorAll('.card--admins .admin').length === n && /صلاحية واحدة/.test(document.querySelector('.card--admins').innerText), { timeout: 8000 }, rows);
   return { context, page, problems };
 }
 
@@ -326,6 +326,41 @@ test('an email / push link to one account (#open/account/<key>) opens «الصل
   await page.evaluate(() => { window.location.hash = '#open/account/acc-0000000000000000'; });
   await page.waitForFunction(() => /مبقاش في لوحة التحكم/.test(document.body.innerText), { timeout: 8000 });
   assert.equal(await page.$$eval('.card--admins .admin.is-focus', n => n.length), 0);
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('rename an account Apps Script does not know yet: the error stays in the card (never under the add form email); D1 known → renamed', async () => {
+  fake.reset();
+  fake.admins.push({ email: NEW, name: '', primary: false, active: true, servantId: null, lastSeen: null, grants: { 'bookings.view': 'all' } });
+  const { context, page, problems } = await openSettings(undefined, 3);
+  await page.waitForFunction(email => document.querySelector('.card--admins').innerText.includes(email), { timeout: 8000 }, NEW);
+
+  const rename = async name => {
+    await page.click(`.card--admins .admin[data-email="${NEW}"] [title="غيّر الاسم"]`);
+    await page.waitForSelector('dialog.modal input');
+    await page.type('dialog.modal input', name);
+    await clickDialogButton(page, 'احفظ الاسم');
+  };
+
+  // the grants pull is not reachable: Apps Script cannot learn the account → refused, shown in the card's box
+  await rename('خدمة الشباب');
+  await page.waitForFunction(() => /مش في القايمة/.test(document.querySelector('.card--admins').innerText), { timeout: 8000 });
+  assert.equal(await page.$$eval('.card--admins .admins__add .field--invalid, .card--admins .admins__add [aria-invalid="true"]', n => n.length), 0, 'the add form email is not marked');
+  await page.screenshot({ path: `${SHOTS}rename-unknown.png` });
+
+  // D1 answers with the account: the rename asks it first and goes through
+  world.web['https://athanasios-api.menazak-lab.workers.dev/v1/sync/grants'] = { status: 200, body: JSON.stringify({
+    ok: true, v: 1, enforce: false, adminsSyncTs: 1, perms: PERMS, primaryDefault: PRIMARY_DEFAULT,
+    admins: [ADMIN, SECOND, NEW].map(email => ({ email, name: '', primary: email === ADMIN, servantId: null, g: PERMS.map(() => '-').join('') }))
+  }) };
+  world.advance(61 * 1000);
+  await rename('خدمة الشباب');
+  await page.waitForFunction(() => /اتحفظ الاسم/.test(document.body.innerText), { timeout: 8000 });
+  assert.match(await cardText(page), /خدمة الشباب/);
+  assert.ok(world.properties.get('ADMIN_EMAILS').includes(NEW), 'ADMIN_EMAILS follows D1');
+
+  delete world.web['https://athanasios-api.menazak-lab.workers.dev/v1/sync/grants'];
   assert.deepEqual(problems, []);
   await context.close();
 });

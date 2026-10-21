@@ -363,7 +363,8 @@
 
   };
 
-  A.fail = function (error, box) {
+  /* options.fields false: never put the message under a field of the card (an action on a list row, not its form) */
+  A.fail = function (error, box, options) {
 
     var parsed = A.parseError(error);
 
@@ -383,7 +384,7 @@
     // validation lines that name a field ("العنوان مطلوب") go under that field
     var scope = box.closest('dialog, .card, .view') || document;
     var lines = String(parsed.message).split('\n').filter(Boolean);
-    var rest = A.showFieldErrors(scope, lines);
+    var rest = options && options.fields === false ? lines : A.showFieldErrors(scope, lines);
     var placed = lines.length - rest.length;
 
     A.fill(box,

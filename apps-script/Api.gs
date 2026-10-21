@@ -253,7 +253,13 @@ function doPost(e) {
 
     API_REQUEST_.via = viaDevice ? 'device' : 'google';
 
-    if (!isAdmin_(email)) {
+    // a session starts: ADMIN_EMAILS follows D1 first (60-s cache), so someone removed in «الصلاحيات» is refused now
+    if (request.fn === 'apiSessionStart') {
+      grantsRefreshAllowlist_(false);
+    }
+
+    // not on ADMIN_EMAILS: maybe just added in «الصلاحيات» (D1) — ask D1 once before refusing (Grants.gs)
+    if (!isAdmin_(email) && !(email && grantsRefreshAllowlist_(true) && isAdmin_(email))) {
       console.warn('api: not on the allowlist: ' + email);
       throw apiError_('denied', 'مش مسموح لك تستخدم لوحة التحكم.', 'الحساب ده (' + email + ') مش في قايمة الصلاحيات. اطلب من أدمن يضيفه، أو ادخل بحساب تاني.');
     }

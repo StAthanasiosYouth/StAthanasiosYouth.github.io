@@ -166,7 +166,9 @@ function adminList_(me) {
 /** The allowed Google emails (admins only). */
 function apiAdmins() {
 
-  return adminList_(assertAdmin_());
+  var me = assertAdmin_();
+  grantsRefreshAllowlist_(true);   // «الصلاحيات» asks right after an add or a removal: follow D1 now (Grants.gs)
+  return adminList_(me);
 
 }
 
@@ -175,7 +177,8 @@ function apiAdmins() {
  * Phase 1.5 (docs/BOOKING-PHASE1-COMPLETION-PLAN.md §4.3): D1 owns the admin
  * accounts. Adding and removing happen in «الصلاحيات» (the Worker,
  * worker/src/lib/accounts.js) with the Primary Admin protections and the audit;
- * ADMIN_EMAILS follows D1 within a minute (Grants.gs grantsMirror_). These two
+ * ADMIN_EMAILS follows D1 (Grants.gs grantsMirror_: on a grants pull, and at once
+ * at the sign-in gate, the rename and the admins list: grantsRefreshAllowlist_). These two
  * stay listed (older panels still call them) and only point there.
  */
 function apiAddAdmin(value) {

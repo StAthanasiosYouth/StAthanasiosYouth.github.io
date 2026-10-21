@@ -149,27 +149,7 @@ function grantsSnapshot_() {
 
   if (API_REQUEST_ && API_REQUEST_.grants !== undefined) return API_REQUEST_.grants;
 
-  var snapshot = null;
-  var cache = CacheService.getScriptCache();
-  var cached = cache.get(GRANTS_CACHE_KEY);
-
-  if (cached && cached !== GRANTS_MISS) {
-    try { snapshot = JSON.parse(cached); } catch (ignored) { snapshot = null; }
-  }
-
-  if (!snapshot && cached !== GRANTS_MISS) {
-    snapshot = grantsFetch_();
-    var props = PropertiesService.getScriptProperties();
-    if (snapshot) {
-      var text = JSON.stringify(snapshot);
-      try { cache.put(GRANTS_CACHE_KEY, text, GRANTS_CACHE_S); } catch (ignored) { /* next call fetches again */ }
-      try { if (props.getProperty(GRANTS_LAST_GOOD_KEY) !== text) props.setProperty(GRANTS_LAST_GOOD_KEY, text); } catch (ignored) { console.warn('grants: last-good not kept'); }
-      grantsMirror_(snapshot);
-    }
-    else {
-      try { cache.put(GRANTS_CACHE_KEY, GRANTS_MISS, GRANTS_CACHE_S); } catch (ignored) { /* fine */ }
-    }
-  }
+  var snapshot = grantsFresh_();
 
   if (!snapshot) {
     try {
@@ -183,6 +163,75 @@ function grantsSnapshot_() {
 
   if (API_REQUEST_) API_REQUEST_.grants = snapshot;
   return snapshot;
+
+}
+
+/* this minute's snapshot: the 60-s cache, else the Worker (kept + mirrored); never the last-good copy */
+function grantsFresh_() {
+
+  var snapshot = null;
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get(GRANTS_CACHE_KEY);
+
+  if (cached && cached !== GRANTS_MISS) {
+    try { snapshot = JSON.parse(cached); } catch (ignored) { snapshot = null; }
+  }
+
+  if (!snapshot && cached !== GRANTS_MISS) {
+    if (!workerSyncSecret_()) return null;      // not set up: nothing to ask, nothing to remember as a miss
+    snapshot = grantsFetch_();
+    var props = PropertiesService.getScriptProperties();
+    if (snapshot) {
+      var text = JSON.stringify(snapshot);
+      try { cache.put(GRANTS_CACHE_KEY, text, GRANTS_CACHE_S); } catch (ignored) { /* next call fetches again */ }
+      try { if (props.getProperty(GRANTS_LAST_GOOD_KEY) !== text) props.setProperty(GRANTS_LAST_GOOD_KEY, text); } catch (ignored) { console.warn('grants: last-good not kept'); }
+      grantsMirror_(snapshot);
+    }
+    else {
+      try { cache.put(GRANTS_CACHE_KEY, GRANTS_MISS, GRANTS_CACHE_S); } catch (ignored) { /* fine */ }
+    }
+  }
+
+  return snapshot;
+
+}
+
+var GRANTS_RECHECK_KEY = 'grants:recheck';
+
+/*
+ * ADMIN_EMAILS ← D1 now, whoever is asking. The mirror used to run only when a
+ * non-primary admin's call needed a permission (the Primary never pulls), so
+ * an account added in «الصلاحيات» could stay unknown here: refused at sign-in,
+ * «مش في القايمة» on rename. Called where a missing email matters (the sign-in
+ * gate, the rename, the admins list). force: skip the 60-s cache, at most once
+ * a minute (a stranger signing in again and again costs one pull a minute).
+ * Only a fresh snapshot counts, never the last-good copy (it could bring back
+ * someone already removed). True when ADMIN_EMAILS changed.
+ */
+function grantsRefreshAllowlist_(force) {
+
+  try {
+
+    var cache = CacheService.getScriptCache();
+    var before = adminEmails_().join(',');
+
+    if (force && !cache.get(GRANTS_RECHECK_KEY)) {
+      cache.put(GRANTS_RECHECK_KEY, '1', GRANTS_CACHE_S);
+      cache.remove(GRANTS_CACHE_KEY);
+    }
+
+    var snapshot = grantsFresh_();     // a pull mirrors by itself; a cached one is mirrored here
+    if (!snapshot) return false;
+    if (API_REQUEST_) API_REQUEST_.grants = snapshot;
+    grantsMirror_(snapshot);
+    forgetAdminEmails_();
+    return adminEmails_().join(',') !== before;
+
+  }
+  catch (error) {
+    console.warn('grants: allowlist not refreshed');
+    return false;
+  }
 
 }
 

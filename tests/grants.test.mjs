@@ -185,3 +185,66 @@ test('mirror: D1 active admins → ADMIN_EMAILS; guarded (never empty, never wit
   assert.equal(w.properties.get('ADMIN_EMAILS'), OWNER, 'removals follow D1');
   assert.equal(w.gs.isAdmin_(B), false);
 });
+
+// ---------- an account added in «الصلاحيات» while only the Primary uses the panel (bugfix 2026-10-21) ----------
+
+const NEW = 'athanasius.youth.safaga@gmail.com';
+function signIn(w, email) {
+  const now = Math.floor((Date.now() + w.clock.skew) / 1000);
+  const token = w.issueToken({ email, iat: String(now), exp: String(now + 3600) });
+  return { token, started: w.post({ fn: 'apiSessionStart', args: [{ device: 'test', force: true, state: false }], token }) };
+}
+
+test('added in D1, only the Primary active: the newcomer signs in at once; the Primary can rename them', () => {
+  const w = world(snap({ admins: adminsOf(OWNER, B, NEW) }));
+  const owner = tab(w, OWNER);
+  // before the fix the Primary never pulled: ADMIN_EMAILS stayed without the newcomer
+  owner('apiState'); owner('apiHeartbeat');
+  w.advance(61 * 1000);
+
+  const { started } = signIn(w, NEW);
+  assert.equal(started.ok, true, JSON.stringify(started.error));
+  assert.ok(w.properties.get('ADMIN_EMAILS').split(', ').includes(NEW));
+
+  const renamed = owner('apiSetAdminName', NEW, 'خدمة الشباب');
+  assert.equal(renamed.ok, true, JSON.stringify(renamed.error));
+  assert.equal(renamed.result.names[NEW], 'خدمة الشباب');
+});
+
+test('rename right after an add: the allowlist learns the account first (no «مش في القايمة»)', () => {
+  const w = world(snap({ admins: adminsOf(OWNER, B) }));
+  const owner = tab(w, OWNER);
+  w.web[URL_] = { status: 200, body: JSON.stringify(snap({ admins: adminsOf(OWNER, B, NEW) })) };   // added in «الصلاحيات»
+  const r = owner('apiSetAdminName', NEW, 'خدمة الشباب');
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+  const list = owner('apiAdmins');
+  assert.ok(list.result.emails.includes(NEW));
+});
+
+test('a stranger is still refused; repeated tries cost at most one Worker pull a minute; no last-good mirror', () => {
+  const w = world(snap({ admins: adminsOf(OWNER, B) }));
+  for (let i = 0; i < 5; i++) {
+    const { started } = signIn(w, 'stranger@example.com');
+    assert.equal(started.ok, false);
+    assert.equal(started.code, 'denied');
+  }
+  assert.ok(pulls(w).length <= 2, 'pulls: ' + pulls(w).length);
+  assert.ok(!w.properties.get('ADMIN_EMAILS').includes('stranger'));
+
+  // the Worker down: the last-good copy never adds anyone (it could be stale)
+  w.properties.set('GRANTS_LAST_GOOD', JSON.stringify(snap({ admins: adminsOf(OWNER, B, NEW) })));
+  w.web[URL_] = { status: 503, body: 'down' };
+  w.advance(61 * 1000);
+  assert.equal(signIn(w, NEW).started.ok, false, 'not from last-good');
+});
+
+test('removed in D1: refused at the next sign-in, even with only the Primary active', () => {
+  const w = world(snap({ admins: adminsOf(OWNER, B) }));
+  tab(w, OWNER)('apiState');
+  w.web[URL_] = { status: 200, body: JSON.stringify(snap({ admins: adminsOf(OWNER) })) };    // B removed in «الصلاحيات»
+  w.advance(61 * 1000);
+  const { started } = signIn(w, B);
+  assert.equal(started.ok, false);
+  assert.equal(started.code, 'denied');
+  assert.equal(w.properties.get('ADMIN_EMAILS'), OWNER);
+});

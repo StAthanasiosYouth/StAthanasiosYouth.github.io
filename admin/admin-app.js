@@ -492,7 +492,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   };
 
-  A.fail = function (error, box) {
+  /* options.fields false: never put the message under a field of the card (an action on a list row, not its form) */
+  A.fail = function (error, box, options) {
 
     var parsed = A.parseError(error);
 
@@ -512,7 +513,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     // validation lines that name a field ("العنوان مطلوب") go under that field
     var scope = box.closest('dialog, .card, .view') || document;
     var lines = String(parsed.message).split('\n').filter(Boolean);
-    var rest = A.showFieldErrors(scope, lines);
+    var rest = options && options.fields === false ? lines : A.showFieldErrors(scope, lines);
     var placed = lines.length - rest.length;
 
     A.fill(box,
@@ -5599,7 +5600,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         if (!ok) return;
         change('/v1/admin/accounts/' + encodeURIComponent(account.email), form.value(), button)
           .then(function () { A.toast('اتحفظت الصلاحيات ✓'); })
-          .catch(function (error) { A.fail(error, box); });
+          .catch(function (error) { A.fail(error, box, { fields: false }); });
       });
 
     }
@@ -5638,7 +5639,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
             }
             A.toast(field.value.trim() ? 'اتحفظ الاسم ✓' : 'رجع لأول الإيميل');
           })
-          .catch(function (error) { A.fail(error, box); });
+          .catch(function (error) { A.fail(error, box, { fields: false }); });
       });
 
       setTimeout(function () { field.focus(); field.select(); }, 30);
@@ -5659,7 +5660,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         if (!ok) return;
         change('/v1/admin/accounts/' + encodeURIComponent(email) + '/remove', {}, button)
           .then(function () { A.toast('اتشالت صلاحية ' + email); })
-          .catch(function (error) { A.fail(error, box); });
+          .catch(function (error) { A.fail(error, box, { fields: false }); });
       });
 
     }
