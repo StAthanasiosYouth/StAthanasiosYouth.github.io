@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "142da9cfe93b",
-  "publishedAt": "2026-10-21T13:56:04.987Z",
+  "revision": "258646becddf",
+  "publishedAt": "2026-10-21T21:18:26.671Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -339,7 +339,7 @@
       "id": "act-5079631e",
       "type": "trip",
       "section": "activities",
-      "title": "test-1",
+      "title": "test-2",
       "subtitle": "",
       "description": "",
       "image": {
@@ -599,7 +599,7 @@
       "slug": "test",
       "kind": "trip",
       "kindLabel": "رحلة",
-      "title": "test-1",
+      "title": "test-2",
       "shortTitle": "",
       "summary": "",
       "cover": {
@@ -617,7 +617,7 @@
         "closesAt": ""
       },
       "partner": "bug",
-      "v": "7ca89222f0c3"
+      "v": "63330331c328"
     },
     {
       "id": "evt-4011914c",

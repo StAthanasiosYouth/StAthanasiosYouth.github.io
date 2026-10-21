@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "v": "7ca89222f0c3",
+  "v": "63330331c328",
   "id": "evt-59f41592",
   "slug": "test",
   "kind": "trip",
   "kindLabel": "رحلة",
-  "title": "test-1",
+  "title": "test-2",
   "shortTitle": "",
   "summary": "",
   "body": "fds",
@@ -104,5 +104,5 @@
       }
     ]
   },
-  "publishedAt": "2026-10-21T16:56"
+  "publishedAt": "2026-10-22T00:18"
 }
