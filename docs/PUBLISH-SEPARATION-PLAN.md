@@ -301,6 +301,27 @@ the last mirror commit (unchanged). Production: needs this Worker release (R1.1)
   shadow publishes, runs, the clean streak against the 7–14 day gate, and the files of the last run that was not clean.
   `lag` within ~10 minutes of a publish is normal; a `mismatch` or a `missing` needs a look before the gate counts.
 
+### Cutover readiness — 2026-10-21 (owner waived the 7–14 day shadow duration, alternative checks below)
+
+- **Waiver:** the owner accepts the cutover before 7–14 clean days, on the condition that the checks below pass and the
+  risks are written down. The booking launch gate is separate and stays open for its own tasks.
+- **Shadow so far:** 22+ runs since 17:15 Cairo, 0 not clean, every run 6/6 equal (one real shadow publish).
+- **Staging rehearsal (final):** `phase2-rehearsal.mjs` 4/4; restore-check rerun alone 13 s, all ok. The 411 s of the
+  first run were gaps between the script's requests (publish_jobs: every server step ≤ 7 s, the restore itself 843 ms).
+- **Bookings (staging):** `book-check.mjs` all ok (flow, money, 8 race checks). One earlier run (and book-ops-check right
+  after it) died on a client `UND_ERR_HEADERS_TIMEOUT`: the same slow-network effect as below.
+- **Local, switch flipped to worker:** tools unit 748/751 (the 3 known), e2e 76/76 (content-source, not-found, accounts-admin,
+  pages-public, book-public, comp-public). Worker 216/216.
+- **Rollback drills (staging):** `CONTENT_SERVE=0` → 403 `disabled` at once, back to 200 when removed; `wrangler rollback`
+  to the previous version and forward again, both 200. Production token: `MIRROR_ACCESS` ok (read + write, nothing committed).
+- **Risk found: the workers.dev network path is slow from here.** Health (no D1) TTFB 0.9–3 s, TLS 0.5–2 s, outliers 10–30 s;
+  GitHub Pages and cloudflare.com 0.2 s from the same machine. Server side is fast (no public request ≥ 1.5 s in prod
+  `api_log`). With `CONTENT_SOURCE=worker` each page load waits for the Worker up to 2 s (then the static file): pages
+  stay correct but can open up to ~2 s slower than today on such networks.
+- **Risks accepted with the waiver:** a mismatch that shows only after days of real publishes (the D1 kill switch and
+  `PUBLISH_MODE=shadow` undo it in seconds / a minute); one real shadow publish only (shapes of every file kind checked on
+  staging); the static fallback lags a worker publish by the mirror (~1 min) + Pages (~1 min).
+
 ### Release R1 — released 2026-10-21 (owner approved)
 
 - **Live:** `main` `a593948` (fast-forward from `e988343`), Worker `d644a5e8` (CI), Apps Script @56. Switches
