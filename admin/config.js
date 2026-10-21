@@ -20,6 +20,11 @@
  *             AdminWorker, apps-script/AdminBook.html) — shown only while
  *             the Worker says the booking module is on. '' = off.
  *
+ * platform    'worker' (Phase 3, docs/ADMIN-PLATFORM-PLAN.md): the panel's session,
+ *             presence, edit locks and trusted device are the Worker's; Apps
+ *             Script takes the Worker's panel token. Absent = the Apps Script
+ *             sessions (the rollback: remove this line).
+ *
  * While apiUrl or clientId is empty, the page says it isn't set up yet and
  * offers the recovery admin. It never redirects.
  */
@@ -28,5 +33,6 @@ window.ADMIN_CONFIG = Object.freeze({
   apiUrl: 'https://script.google.com/macros/s/AKfycbxJjDyktRi6VlwRGSrF-H_KzN-vkw9QaFCiLD1TlqgrppKs4CHfmOBE4cKEd6AZ9Km1/exec',
   clientId: '246924773718-38p45gji0ouvi7an4jdjsip3obmk6ve4.apps.googleusercontent.com',
   fallbackUrl: 'https://script.google.com/macros/s/AKfycbwhHMp54vLJLK5UuwH_7zByzkPRkQErcUQdvZ1ad2_AxpasNWzShoh1CT3AIOrB8Rtbvw/exec',
-  workerUrl: 'https://athanasios-api.menazak-lab.workers.dev'
+  workerUrl: 'https://athanasios-api.menazak-lab.workers.dev',
+  platform: 'worker'
 });
