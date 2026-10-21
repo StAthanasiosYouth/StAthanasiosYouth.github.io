@@ -294,7 +294,14 @@ P2-8 is in production yet.** Every production step below needs the owner's expli
   shadow publishes, runs, the clean streak against the 7–14 day gate, and the files of the last run that was not clean.
   `lag` within ~10 minutes of a publish is normal; a `mismatch` or a `missing` needs a look before the gate counts.
 
-### Release R1 — ready, waiting for the owner's approval (2026-10-21)
+### Release R1 — released 2026-10-21 (owner approved)
+
+- **Live:** `main` `a593948` (fast-forward from `e988343`), Worker `d644a5e8` (CI), Apps Script @56. Switches
+  unchanged (`CONTENT_SOURCE=static`, `PUBLISH_MODE=shadow`). Smoke checks: Worker health 200, public content 200,
+  admin publish routes 401 without auth, Pages home / a page / `content.json` 200 from the static files with no
+  console errors, a missing slug shows «مش متاحة» (status 404), admin bundle has «نسخ النشر», Apps Script API answers,
+  booking state reads for both events, the 18:45 Cairo shadow run on the new Worker 6/6 equal (streak not reset).
+- Below: the package as prepared.
 
 - **Branch `release/p2-r1`** (local worktree `D:\private_projects\athanasios-p2-r1`, not pushed): `origin/main`
   (`e988343`) + P2-3 … P2-8 + the docs + the localhost/test fix + the re-stub commit (`603bbf0`). Its code is identical

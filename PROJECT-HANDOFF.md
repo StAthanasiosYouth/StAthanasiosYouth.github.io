@@ -24,6 +24,8 @@ APIs: production `https://athanasios-api.menazak-lab.workers.dev`, staging `http
   2026-10-21: Phase 2 P2-2 (`99d69cc`, Worker `497cdad3`, Apps Script @54, migrations `0013`–`0014`), then the
   admins bugfix `000fe84` (Apps Script @55; Worker `56d44915` = same code, CI redeploy). Rollback refs: Worker
   `e2673438`, Apps Script @53 / @54. `PUBLISH_MODE` (Script Property) is set by the owner.
+  2026-10-21: Phase 2 **Release R1** (`a593948`, Worker `d644a5e8`, Apps Script @56; switches unchanged:
+  `CONTENT_SOURCE=static`, `PUBLISH_MODE=shadow`). Rollback: revert on `main` + Worker `56d44915` + Apps Script @55.
 - Worker, Apps Script version, D1 bookmark and rollback refs: the status table at the top of
   `docs/BOOKING-PHASE1-COMPLETION-PLAN.md` (one row per step, with rollback for each release).
 - D1 `settings` switches — **all OFF, keep them OFF unless the owner says otherwise:**
