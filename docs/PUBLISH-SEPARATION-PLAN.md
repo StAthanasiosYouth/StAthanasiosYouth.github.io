@@ -277,3 +277,19 @@ P2-8 is in production yet.** Every production step below needs the owner's expli
 | A bad Worker release | `wrangler rollback <previous version>` | seconds |
 | A bad Apps Script release | redeploy the previous version (`@55`) | minutes |
 | A wrong publish | «نسخ النشر» → «ارجع للنسخة دي» (worker mode), or the previous GitHub commit (github mode) | seconds |
+
+### Shadow period: starting and following it (2026-10-21)
+
+- **Why production shows 0 shadow publishes:** nobody has published since the shadow code went live. The last
+  «Publish content» commit on `main` is `b64edca` (2026-10-20 06:20 Cairo); Apps Script @54 (with shadow mode) went out
+  on 2026-10-21. Production D1 has no `SYNC_TS_publish` and no `/v1/sync/publish` in `api_log`: the Worker never got a
+  post. Whether the Script Property `PUBLISH_MODE` is set can only be seen in the Apps Script editor (Project Settings →
+  Script Properties); no tool here reads Script Properties without running code.
+- **To start it:** `PUBLISH_MODE` = `shadow` (owner, in the editor), then a **real** publish with a real change («راجع
+  وانشر»). A publish with nothing new makes no commit, so it posts nothing. Visitors: no change (GitHub Pages, as
+  always); the post to the Worker runs after the commit and never fails the publish.
+- **After that,** the Worker compares every 15 minutes, also between publishes (≈ 96 runs a day; ≈ 6 site reads per
+  run).
+- **Following it (read-only):** `cd worker && node scripts/shadow-watch.mjs` (production; `--staging` for staging):
+  shadow publishes, runs, the clean streak against the 7–14 day gate, and the files of the last run that was not clean.
+  `lag` within ~10 minutes of a publish is normal; a `mismatch` or a `missing` needs a look before the gate counts.
