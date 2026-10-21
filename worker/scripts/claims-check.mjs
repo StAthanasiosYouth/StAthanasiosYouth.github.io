@@ -2,7 +2,8 @@
 // a fixture event, a visitor booking confirmed with part paid, then the participant's
 // payment request from the status token (proof upload, duplicate refused, resend
 // harmless), the admin's accept through «إضافة دفعة», a second request rejected with a
-// reason, a third withdrawn. Staging only; no switch is touched; no money moves.
+// reason, a third withdrawn. Staging only; PAY_REQUESTS is on for the run and left at '0';
+// the notification switches are not touched; no money moves.
 //   node scripts/claims-check.mjs
 import { readFileSync } from 'node:fs';
 import { createSign } from 'node:crypto';
@@ -63,7 +64,11 @@ const fixture = {
 const upload = async tok => (await call('POST', '/v1/book/proof?slug=' + SLUG, null, { auth: false, raw: jpeg(), headers: { 'x-status-token': tok } })).body;
 const ask = (tok, over = {}) => call('POST', '/v1/book/pay-request', { token: tok, requestKey: 'pr-' + Math.random().toString(36).slice(2, 12), servantId: SRV, method: 'transfer', amount: 400, turnstile: 'XXXX.DUMMY.TOKEN.XXXX', ...over }, { auth: false });
 
-check('fixture event (installments, 1000)', (await call('POST', '/v1/admin/diag/event-fixture', fixture)).status === 200);
+// «ادفع الباقي» is off unless PAY_REQUESTS = '1': on for this run, back to '0' at the end
+const setSwitch = v => sql(`INSERT INTO settings (key, value, updated_at) VALUES ('PAY_REQUESTS', '${v}', ${Date.now()}) ON CONFLICT(key) DO UPDATE SET value = excluded.value`);
+setSwitch('1');
+await new Promise(r => setTimeout(r, 11_000));   // the Worker caches the switch 10 s
+check('fixture event (installments, 1000)',(await call('POST', '/v1/admin/diag/event-fixture', fixture)).status === 200);
 const sub = await call('POST', '/v1/book/submit', { slug: SLUG, requestKey: 'pay-sub-' + RUN, name: 'زائر الباقي', phone: '0101' + String(Math.floor(Math.random() * 1e7)).padStart(7, '0'),
   counts: { applicant: 1 }, servantId: SRV, method: 'transfer', hp: '', revision: 'rev1', turnstile: 'XXXX.DUMMY.TOKEN.XXXX' }, { auth: false });
 check('visitor booking', sub.status === 200, sub.body);
@@ -111,6 +116,12 @@ check('reject with a reason', r3.status === 200 && rej.status === 200, rej.body)
 st = await call('POST', '/v1/book/status', { token: tok }, { auth: false });
 check('status: the reason shown, «ادفع الباقي» back', st.body && st.body.request && st.body.request.status === 'rejected' && /مش واضحة/.test(st.body.request.reason) && st.body.canPay === true, st.body);
 check('activity: payment.request important', (sql(`SELECT severity FROM activity WHERE action = 'payment.request' AND entity_id = '${id}' LIMIT 1`)[0] || {}).severity === 'important');
+setSwitch('0');
+await new Promise(r => setTimeout(r, 11_000));
+st = await call('POST', '/v1/book/status', { token: tok }, { auth: false });
+check('switch off: «ادفع الباقي» hidden', st.body && st.body.canPay === false, st.body);
+const off = await ask(tok, { amount: 100, proofs: [{ proofId: 'prf-aaaaaaaa', claim: 'x' }] });
+check('switch off: a new request refused', off.body && off.body.code === 'disabled', off.body);
 const sw = Object.fromEntries(sql("SELECT key, value FROM settings WHERE key IN ('NOTIFY_ROUTER', 'NOTIFY_EMAIL', 'PERMS_ENFORCE')").map(r => [r.key, r.value]));
 check('switches untouched (all 0)', sw.NOTIFY_ROUTER === '0' && sw.NOTIFY_EMAIL === '0' && sw.PERMS_ENFORCE === '0', sw);
 console.log(failed ? `\n${failed} FAILED` : '\nall ok');

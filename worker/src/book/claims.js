@@ -27,6 +27,19 @@ const PROOF_KEEP_MS = 60 * 24 * 3600 * 1000;    // like the booking's own proofs
 
 const invalid = field => new ApiError('invalid', field, { field });
 
+let switchCache = { at: 0, on: false };
+
+/* is «ادفع الباقي» on? (settings PAY_REQUESTS = '1'; missing or '0' = off, cached 10 s).
+   Off: no new request, no card or upload by the status token; open requests can still
+   be withdrawn by the participant and decided by an admin. */
+export async function payRequestsOn(env, now = Date.now()) {
+  if (now - switchCache.at < 10_000) return switchCache.on;
+  const row = await retry(() => env.DB.prepare("SELECT value FROM settings WHERE key = 'PAY_REQUESTS'").first());
+  switchCache = { at: now, on: !!row && row.value === '1' };
+  return switchCache.on;
+}
+export function forgetPayRequests() { switchCache = { at: 0, on: false }; }
+
 /*
  * The booking a status token names, with its event and money now:
  * { b, event (parsed booking config), ev (row), balance, paid }.
@@ -40,12 +53,12 @@ export async function bookingForToken(ctx, token) {
   const booking = ev && ev.booking ? JSON.parse(ev.booking) : null;
   const pays = (await retry(() => db.prepare('SELECT kind, amount, voided_by FROM payments WHERE booking_id = ?').bind(b.id).all())).results;
   const d = derive(b, pays, booking ? booking.payment : null, Date.now());
-  return { b, ev, booking, balance: d.balance, paid: d.paid };
+  return { b, ev, booking, balance: d.balance, paid: d.paid, on: await payRequestsOn(ctx.env) };
 }
 
 /* may this booking take a balance payment now? → '' or why not */
 export function payableWhy(x) {
-  if (!x.booking) return 'disabled';
+  if (!x.on || !x.booking) return 'disabled';
   if (x.b.status !== 'confirmed') return 'status';
   if (!(x.balance > 0)) return 'paid';
   return '';
@@ -79,6 +92,7 @@ export async function bookPayRequest(ctx) {
   await limit(ctx, 'book.payreq', ip, 10, 600);
   if (!KEY.test(String(body.requestKey || ''))) throw invalid('requestKey');
   const x = await bookingForToken(ctx, body.token);
+  if (!x.on) throw new ApiError('disabled', 'pay requests off');
   const db = ctx.env.DB;
 
   // the same request sent again (a retry after a lost answer): its answer, nothing new

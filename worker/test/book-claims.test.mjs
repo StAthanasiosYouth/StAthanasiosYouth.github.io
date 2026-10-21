@@ -8,12 +8,18 @@ import { bookWorld, eventJson, pay } from './book-helpers.mjs';
 import { saveRow, rowFromJson } from '../src/book/event.js';
 import { msStamp } from '../src/book/model.js';
 import { forgetPayDest } from '../src/book/pay.js';
+import { forgetPayRequests } from '../src/book/claims.js';
 
 /* the payment card needs an approved destination (§4.7): the servant's own number */
 async function approveDest(w) {
   await w.db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('PAY_DEST', '1', 0) ON CONFLICT(key) DO UPDATE SET value = '1'").run();
   for (const m of ['instapay', 'transfer']) await w.db.prepare("INSERT OR REPLACE INTO pay_dest (servant_id, method, number, name, source, approved_ms, approved_by, synced_ms) VALUES ('srv-aaaa1111', ?, '01012345678', 'مينا', 'own', 1, 'p', 1)").bind(m).run();
   forgetPayDest();
+}
+/* «ادفع الباقي» is off until settings PAY_REQUESTS = '1' */
+async function switchTo(w, on) {
+  await w.db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('PAY_REQUESTS', ?, 0) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(on ? '1' : '0').run();
+  forgetPayRequests();
 }
 
 const A = 'admin@example.com';
@@ -22,6 +28,7 @@ const DAY = 864e5;
 /* a confirmed booking (3000 due) with 1000 paid; → { w, id, token } */
 async function owing({ event } = {}) {
   const w = await bookWorld(event ? { event } : {});
+  await switchTo(w, true);
   const r = await w.submit({ counts: { applicant: 1, adult: 1 } });
   assert.equal(r.status, 200, JSON.stringify(r.body));
   const id = (await w.db.prepare('SELECT id FROM bookings').first()).id;
@@ -87,6 +94,7 @@ test('duplicates and bad requests: one open per booking, the same key answers ag
   assert.equal((await bad({ proofs: [{ proofId: 'prf-aaaaaaaa', claim: 'x' }] })).code, 'proof');
 
   const pending = await bookWorld();
+  await switchTo(pending, true);
   const pr = await pending.submit({ counts: { applicant: 1 } });
   const refused = await request(pending, pr.body.token, { amount: 100, proofs: [await proof(pending, pr.body.token).catch(() => ({ proofId: 'prf-aaaaaaaa', claim: 'x' }))] });
   assert.equal(refused.body.code, 'final', 'a pending booking has nothing to pay through here');
@@ -172,4 +180,30 @@ test('after booking closed: the status token still opens the card and the upload
   assert.equal(card.status, 200, JSON.stringify(card.body));
   const noToken = await w.pub('POST', '/v1/book/pay', { slug: 'alex-trip', servantId: 'srv-aaaa1111', method: 'transfer' });
   assert.equal(noToken.body.code, 'closed');
+});
+
+test('the PAY_REQUESTS switch: off (missing or 0) hides «ادفع الباقي» and refuses new requests and token uploads; an open request can still be withdrawn or decided', async () => {
+  const { w, id, token } = await owing();
+  await approveDest(w);
+  const open = await request(w, token, { amount: 500, proofs: [await proof(w, token)] });
+  assert.equal(open.status, 200, JSON.stringify(open.body));
+  await switchTo(w, false);
+  const s = await status(w, token);
+  assert.equal(s.body.canPay, false);
+  assert.equal(s.body.request.status, 'pending', 'the open request still shows');
+  await w.db.prepare("DELETE FROM settings WHERE key = 'PAY_REQUESTS'").run();
+  forgetPayRequests();
+  assert.equal((await status(w, token)).body.canPay, false, 'missing = off');
+  const closed = eventJson({ v: 'rev2' }, { opensAt: msStamp(Date.now() - 3 * DAY), closesAt: msStamp(Date.now() - DAY) });
+  await saveRow(w.env, rowFromJson(closed, 'fixture'));
+  const up = await w.call('/v1/book/proof?slug=alex-trip', { method: 'POST', body: w.jpeg(900, 600), headers: { 'x-status-token': token, 'cf-connecting-ip': '198.51.100.9' } });
+  assert.equal(up.body.code, 'closed', 'the token no longer opens the upload');
+  const card = await w.pub('POST', '/v1/book/pay', { slug: 'alex-trip', servantId: 'srv-aaaa1111', method: 'transfer', token });
+  assert.equal(card.body.code, 'closed', 'nor the payment card');
+  const claimId = (await w.db.prepare("SELECT id FROM payment_claims WHERE status = 'pending'").first()).id;
+  const rej = await w.admin('POST', '/v1/admin/book/claims/' + claimId + '/reject', { reason: 'الخدمة متوقفة مؤقتًا' });
+  assert.equal(rej.status, 200, JSON.stringify(rej.body));
+  const again = await request(w, token, { amount: 500, proofs: [{ proofId: 'prf-aaaaaaaa', claim: 'x' }] });
+  assert.equal(again.body.code, 'disabled');
+  assert.equal((await w.db.prepare('SELECT COUNT(*) n FROM payments WHERE booking_id = ?').bind(id).first()).n, 1);
 });
