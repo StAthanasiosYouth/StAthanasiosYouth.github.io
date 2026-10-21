@@ -148,6 +148,24 @@ export function fileResponse(ctx, body, { contentType, length, filename }) {
   });
 }
 
+/*
+ * A published public file (content.json, event.json, meeting.ics…): the exact
+ * text, revalidated on every load (ETag → 304), readable by the site's origins.
+ */
+export function publicFileResponse(ctx, body, { contentType, etag, status = 200 }) {
+  return new Response(status === 304 ? null : body, {
+    status,
+    headers: {
+      ...SECURITY_HEADERS,
+      'content-type': contentType,
+      'cache-control': 'no-cache',
+      etag,
+      'x-request-id': ctx.rid,
+      ...corsHeaders(ctx.request, ctx.env)
+    }
+  });
+}
+
 /* Raw body (uploads) with a hard size cap. */
 export async function readRaw(request, limit) {
   const declared = Number(request.headers.get('content-length') || 0);

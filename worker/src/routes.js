@@ -31,6 +31,7 @@ import {
 import { rowFromJson, saveRow } from './book/event.js';
 import { syncBookNews, diagNews } from './book/news.js';
 import { syncPayDest, bookPay } from './book/pay.js';
+import { syncPublish, publicContent, publicPage, publicEvent, publicComp, publicIcs, PUBLISH_MAX_BYTES } from './publish.js';
 
 export const VERSION = '0.3.0';
 
@@ -294,6 +295,14 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/sync/activity', auth: 'sync', raw: true, maxBytes: 512 * 1024, handler: syncActivity },
   { method: 'POST', path: '/v1/sync/grants', auth: 'sync', raw: true, maxBytes: 1024, handler: syncGrants },
   { method: 'POST', path: '/v1/sync/pay-dest', auth: 'sync', raw: true, maxBytes: 64 * 1024, handler: syncPayDest },
+
+  // published content (Phase 2, docs/PUBLISH-SEPARATION-PLAN.md §5)
+  { method: 'POST', path: '/v1/sync/publish', auth: 'sync', raw: true, maxBytes: PUBLISH_MAX_BYTES, handler: syncPublish },
+  { method: 'GET', path: '/v1/public/content', auth: 'public', handler: publicContent },
+  { method: 'GET', path: '/v1/public/page/:slug', auth: 'public', handler: publicPage },
+  { method: 'GET', path: '/v1/public/event/:slug', auth: 'public', handler: publicEvent },
+  { method: 'GET', path: '/v1/public/comp/:slug', auth: 'public', handler: publicComp },
+  { method: 'GET', path: '/v1/public/ics', auth: 'public', handler: publicIcs },
 
   // booking — public (docs/EVENTS.md §6, worker/BOOKING-API.md)
   { method: 'GET', path: '/v1/book/state', auth: 'public', handler: bookState },
