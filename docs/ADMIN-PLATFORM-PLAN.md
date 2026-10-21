@@ -15,7 +15,7 @@ Owner rule: staging first; nothing on production without an explicit "approved".
 | 2 | P3-5 | The panel on the Worker (`admin/boot.js`, `config.platform: 'worker'`; absent = today): session start/resume/end/park, heartbeat (presence + locks), renew, device sign-in/trust/forget go to the Worker; Apps Script calls carry the panel token; a write asks the Worker once, outside the script lock (all live locks); `apiBadges` keeps the menu numbers | ✔ tests (not on Pages) |
 | 2 | P3-6 | Activity from D1: heartbeat toasts (others since a time), the home card (`/v1/admin/activity?limit=6`), the takeover row written by the Worker | ✔ tests + staging |
 | 3 | P3-7 | Bootstrap: `session/start` and `resume` with `boot: true` bring who / permissions / the home card's activity / modules in the same answer (`worker/src/admin/bootstrap.js`); the page asks Apps Script's content state AT THE SAME TIME with the Google token (read-only `apiState` without a sid, worker mode only) instead of after | ✔ tests + staging |
-| 3 | P3-8 | Cutover: transition mode `both` (Apps Script), local release branch, runbook below. **Waits for the owner's "approved"** | prepared, not run |
+| 3 | P3-8 | Cutover: transition mode `both`, release, runbook below | ✔ production 2026-10-22 |
 
 Accounts + grants and the unified activity log were already moved in Phase 1.5.
 
@@ -56,7 +56,22 @@ The panel's own switch (`admin/config.js`, P3-7) decides which side the page tal
 - Timing from this machine (the admin's network) to staging `workers.dev`, median warm: session start **with** the bootstrap 244 ms (n=10), heartbeat 156 ms, resume 180 ms, device sign-in 370 ms; a plain `/v1/health` 69–295 ms (median ~100 ms).
 - **The < 1 s panel open is not reachable in Phase 3.** With the platform on, opening = max(Worker start + bootstrap ≈ 0.25 s, Apps Script `apiState` ≈ 2–3 s warm, more when cold). The Worker part is done; the remaining ~2 s is the content state read from Sheets, which moves to D1 in Phase 4 (§22 row 4). What Phase 3 removes: the Apps Script session round trip (state came with it before, now in parallel), every heartbeat's 2–3 s under the global script lock (now ~0.16 s, no lock), and the device sign-in's Apps Script wait.
 
-## P3-8 — production cutover runbook (prepared; nothing below has run)
+## P3-8 — cutover record (production, 2026-10-22, owner's "approved")
+
+| # | Done | Check |
+| --- | --- | --- |
+| 1 | `main` `af8541b..4dcfde7`; CI applied `0015`, Worker `eb0ca214` | health ok; D1 `ADMIN_PLATFORM='0'`; session route needs auth; device sign-in `off`; other switches unchanged; owner: panel as before |
+| 2 | `DEVICE_KEY` (random, never printed) → Worker `3a9f9c4d` (same code) | health ok |
+| 3 | Apps Script **@57** | API answers; a bad token is refused (`auth`) |
+| 4 | D1 `ADMIN_PLATFORM='1'` | device sign-in answers (`bad`, was `off`) |
+| 5 | Script Property `both` (owner) | — |
+| 6 | `admin/config.js` `platform: 'worker'` (`a6a7a18`), Pages live in ~1 min | owner's account: sign-in → D1 session (Google), `/me` Primary 46 permissions, bookings (2 events, 0.2 s), an edit lock in D1 granted and released, a reload → `resume` with the same sid (0.47 s), no 5xx |
+| 7 | Script Property `worker` (owner), > 15 min after step 6 | the open panel: `apiBadges` via the panel token ok, activity from D1 0.19 s, lock granted/released, heartbeats going on (52), no 5xx |
+
+Timing on the owner's account (browser, this network): session start 0.61 s, resume 0.47 s, heartbeat 0.24 s, Worker reads ~0.2 s;
+`apiState` (Apps Script, content) 9–15 s warm — the panel open waits for it (Phase 4).
+
+## P3-8 — production cutover runbook (as planned; run as recorded above)
 
 Release = cherry-pick the Phase 3 commits onto a fresh `origin/main` (the publish mirror commits there: rebase right before the push). Prepared locally as branch `release/phase3` (not pushed). Quiet time; one admin watching.
 

@@ -1,6 +1,6 @@
-# Project handoff — start of Phase 3
+# Project handoff — start of Phase 4
 
-Written 2026-10-21 at the close of Phase 1.5; updated 2026-10-22 at the close of Phase 2, then by the plan review of Phases 0–9 (§4.1). Read this first in a fresh session, then the docs it names.
+Written 2026-10-21 at the close of Phase 1.5; updated 2026-10-22 at the close of Phase 2, then by the plan review of Phases 0–9 (§4.1), then at the close of Phase 3 (§4.2). Read this first in a fresh session, then the docs it names.
 Progress rule (owner, 2026-10-22): nothing is gated or scheduled by a number of days. A step is done when its checks pass; functional time rules (retention, expiry, reminders, provider deadlines) stay.
 Owner: Mena Zakaria. The owner approves every production release; nothing reaches production without an explicit "approved".
 
@@ -19,7 +19,7 @@ a notification system. Repository `StAthanasiosYouth/StAthanasiosYouth.github.io
 
 APIs: production `https://athanasios-api.menazak-lab.workers.dev`, staging `https://athanasios-api-staging.menazak-lab.workers.dev`.
 
-## 2. Production state (2026-10-22, end of Phase 2)
+## 2. Production state (2026-10-22, end of Phase 3)
 
 - `main`: see `git log origin/main -3` (Step 11 = `dc1fc38`, `PAY_REQUESTS` switch = `cd18002`).
   2026-10-21: Phase 2 P2-2 (`99d69cc`, Worker `497cdad3`, Apps Script @54, migrations `0013`–`0014`), then the
@@ -39,6 +39,11 @@ APIs: production `https://athanasios-api.menazak-lab.workers.dev`, staging `http
   the owner checks it in GitHub). The staging token expires 2026-11-20.
 - Worker, Apps Script version, D1 bookmark and rollback refs: the status table at the top of
   `docs/BOOKING-PHASE1-COMPLETION-PLAN.md` (one row per step, with rollback for each release).
+- **Phase 3 cutover** (2026-10-22, `docs/ADMIN-PLATFORM-PLAN.md`): `main` `4dcfde7` (code, migration `0015` by CI, Worker `eb0ca214`),
+  `DEVICE_KEY` secret (Worker `3a9f9c4d`), Apps Script **@57**, D1 `ADMIN_PLATFORM='1'`, Script Property `ADMIN_PLATFORM=worker`
+  (owner), `admin/config.js` `platform: 'worker'` (`a6a7a18`). The panel's sessions, presence, edit locks and trusted devices
+  are the Worker's (D1). Rollback (reverse): Script Property `both` → revert `a6a7a18` → delete the property → D1 `'0'` →
+  Worker `6094eb69` / Apps Script @56.
 - D1 `settings` switches — **all OFF, keep them OFF unless the owner says otherwise:**
   `NOTIFY_ROUTER=0`, `NOTIFY_EMAIL=0`, `PERMS_ENFORCE=0`, `PAY_REQUESTS` (missing/0 = off).
   On: `BOOKING_MODULE=1`, `PAY_DEST=1` (approved payment numbers shown).
@@ -87,7 +92,7 @@ Not checked here: the GitHub Actions runs (nightly backup, Worker CI) — `gh` i
 | 1 Foundation + booking pilot | ✔ built and verified; restore drill done (2026-10-15, `worker/README.md`). **Partial:** the launch gate (go-live test #2, test-data cleanup, real events) is open |
 | 1.5 Admin access & notifications | ✔ 11/11 in production, all switches off. Deferred: closed-app push (→ Phase 6/7A). Deviations: no `AGE_RULES` switch (plan §8 had one); `PAY_REQUESTS` has no admin toggle |
 | 2 Publish separation | ✔ done; P2-7 reduced (browser Review → Phase 4, owner); shadow duration waived. Open: watch the next publishes (above) |
-| 3 Admin platform | in progress — P3-1…P3-7 done on staging, P3-8 cutover prepared (waits for approval): `docs/ADMIN-PLATFORM-PLAN.md` |
+| 3 Admin platform | ✔ done 2026-10-22 (cutover P3-8; §4.2). The < 1 s panel open moves with the content state to Phase 4 |
 | 4–7 | not started (as planned) |
 | 8 Admin redesign, 9 Native apps | planning only (as planned). Essential admin fixes listed in BACKEND-MIGRATION §22.1 still wait for approval |
 
@@ -112,13 +117,24 @@ Phase 2 shadow duration stays in PUBLISH-SEPARATION-PLAN.
 above closes clean; (c) a Phase 3 plan for the owner (sessions, presence, edit locks, devices, bootstrap; switch + rollback;
 measured from Egypt). The booking launch gate and the open owner items (§3) run in parallel and do not block Phase 3.
 
-## 5. Next: Phase 3 — admin platform
+### 4.2 Phase 3 closure (admin platform) — done 2026-10-22
 
-Spec: `docs/BACKEND-MIGRATION.md` §22 (row 3) and the sections it references (sessions, presence and edit locks §6.x,
-"Phase 3" notes). Already moved earlier (Phase 1.5): **admins + grants** and **unified activity**. Left for Phase 3:
-sessions, presence, edit locks for the other modules, devices, the bootstrap call. Goal: panel load < 1 s, no heartbeat
-contention. Gate: the admin chrome is off Apps Script. Ships behind a switch; production changes only at its cutover.
-Start with a plan for the owner, not code.
+Record, tests, runbook and rollback: `docs/ADMIN-PLATFORM-PLAN.md`. P3-1 … P3-8 done; production checks on the owner's account
+after the cutover: sign-in, D1 session + heartbeat, permissions (`/me`), bookings, an edit lock taken and released, a reload
+resuming the same sid, no 5xx in `api_log`. Gate met: the admin chrome (session, presence, locks, devices, activity, names)
+is off Apps Script; Apps Script now only serves the content modules, with the Worker's panel token.
+
+Not met in Phase 3, moved to Phase 4: **panel open < 1 s**. The Worker part answers in ~0.2–0.6 s; the content state
+(`apiState`, Sheets) took 9–15 s warm on the owner's account (it was inside `apiSessionStart` before, so not new).
+
+Open items: old `ADMIN_DEVICE_*` Script Properties (remove with the owner); `AdminNotify.gs adminPresent_` no longer sees
+open panels (temporary bridge → Phase 6/7A); the Apps Script session code stays until Phase 7 retirement (rollback path).
+
+## 5. Next: Phase 4 — content + pages/events + media
+
+Spec: `docs/BACKEND-MIGRATION.md` §22 (row 4). Draft tables + the pure builders in the Worker, publish fully in the Worker,
+the browser-side Review (moved from Phase 2), Drive library → R2, upload-time GitHub commits. It also brings the panel's
+content state to D1, which is what the < 1 s panel open still waits for. Start with a plan for the owner, not code.
 
 ## 6. Working rules (owner's standing instructions)
 
