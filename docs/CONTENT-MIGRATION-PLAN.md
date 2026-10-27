@@ -332,3 +332,15 @@ before batch 3 (checked on a clean worktree of `01aa3a3`): not from Phase 4.
 Found and fixed during the batch: the review kit's load order (CompModel before Pages) and its Apps Script time helper;
 a publish claim left held when Apps Script was unreachable (now always released); a page shell never cached when the
 repository has none (fetched every publish).
+
+### 14.1 Production release (2026-10-27, owner approved: code only, no Apps Script, no cutover)
+
+`main` **`fb3f4f2`** (= work branch `01aa3a3` docs + `c11a420` batch 3); no new migration. CI deployed Worker
+**`4e61c607`** (previous: `0a63c6b1`); GitHub Pages serves the new `admin/boot.js` (content routing),
+`admin/admin-app.js` (3-step dialog) and `admin/review-kit.js`. Checks after: `/v1/health` ok, `/v1/health/deep`
+17 migrations, storage ok; content call / media upload 401 without auth; public content 200; no 5xx in `api_log`;
+switches unchanged (`CONTENT_DRAFTS=0`, `NOTIFY_ROUTER=0`, `NOTIFY_EMAIL=0`, `PERMS_ENFORCE=0`,
+`PAY_REQUESTS`/`CONTENT_SERVE` unset, `BOOKING_MODULE=1`, `PAY_DEST=1`, `ADMIN_PLATFORM=1`, `PUBLISH_CLAIM` empty).
+Apps Script **not deployed** (still @57): the admin keeps its 4-step dialog and all content calls go to Apps Script
+until @58 is deployed (then 3 steps) and the cutover (§13) flips the writer.
+Rollback: Worker `0a63c6b1` (`wrangler rollback`); admin files: revert `fb3f4f2` on `main` (Pages ~1 min).
