@@ -145,3 +145,14 @@ Local: Worker 262/262; site/admin 761/764 (the 3 known failures, files untouched
 Production release when approved (changes nothing visible; every switch stays off): migration `0016` on
 `athanasios-prod` → Worker via `main` (CI). Apps Script (`ContentExport.gs`, `Activity.gs` hook) can wait for
 the cutover step that uses it.
+
+### 7.1 Production release (2026-10-27, owner approved)
+
+`main` `265f590` (= work branch `ce69a75` + `4771343`): migration `0016` applied to `athanasios-prod` first (D1
+bookmark before it: `00000163-00000196-00005111-fb7b644cbc8f72750017eab5a9b6ae96`), then CI deployed Worker
+**`30f6cbc0`** (previous: `3a9f9c4d`). Checks after: `/v1/health` ok, `/v1/health/deep` 16 migrations, storage ok;
+`/v1/admin/content/call` and `/v1/sync/content-import` refuse without auth (401); public content 200; no 5xx in
+`api_log`; site and admin 200. Switches unchanged: `CONTENT_DRAFTS=0` (new), `NOTIFY_ROUTER=0`, `NOTIFY_EMAIL=0`,
+`PERMS_ENFORCE=0`, `PAY_REQUESTS`/`CONTENT_SERVE` unset, `BOOKING_MODULE=1`, `PAY_DEST=1`, `ADMIN_PLATFORM=1`.
+New tables empty (no copy made). Apps Script not deployed (still @57; `ContentExport.gs` waits for the cutover).
+Rollback: Worker `3a9f9c4d` (`wrangler rollback`); the migration is additive and nothing reads it while the switch is `0`.
