@@ -119,6 +119,26 @@ export async function syncPublish(ctx) {
   const raw = new TextDecoder().decode(ctx.raw);
   const { body, ts } = await verifySync(ctx.env, ctx.request, raw, 'publish');
 
+  const db = ctx.env.DB;
+  const prepared = await preparePublish(db, body);
+  if (prepared.replayed) {
+    await retry(() => syncStampStmt(db, 'publish', ts).run());
+    return prepared.result;
+  }
+  const { result, stmts, mode } = prepared;
+  stmts.push(syncStampStmt(db, 'publish', ts));
+  await retry(() => db.batch(stmts));
+  // PUBLISH_MODE='worker': live now; GitHub follows in the background (publish-mirror.js; the cron retries)
+  if (mode === 'worker' && result.changed.length && ctx.env.JOBS) ctx.defer(ctx.env.JOBS.send(makeJob('publish.mirror', { id: result.id })));
+  return result;
+}
+
+/*
+ * One publish, checked and turned into statements (the caller runs them in ITS batch, so a
+ * Worker publish stores the revisions and the drafts' after-publish changes together, Phase 4).
+ * body: { id, mode, by, at, files } → { result, stmts, mode, events } or { replayed: true, result }.
+ */
+export async function preparePublish(db, body, now = Date.now()) {
   const id = String(body.id || '');
   if (!PUBLISH_ID.test(id)) throw new ApiError('bad', 'id');
   const mode = body.mode;
@@ -134,12 +154,10 @@ export async function syncPublish(ctx) {
   const setHash = await sha256(files.map(f => f.path + '\n' + f.hash).join('\n'));
   const revision = (files.find(f => f.kind === 'content') || {}).revision || null;
 
-  const db = ctx.env.DB;
   const known = await retry(() => db.prepare('SELECT hash, result FROM publish_jobs WHERE id = ?').bind(id).first());
   if (known) {
     if (known.hash !== setHash) throw new ApiError('conflict', 'publish id reused with other files');
-    await retry(() => syncStampStmt(db, 'publish', ts).run());
-    return { ...JSON.parse(known.result), replayed: true };
+    return { replayed: true, result: { ...JSON.parse(known.result), replayed: true } };
   }
   const newer = await retry(() => db.prepare("SELECT id FROM publish_jobs WHERE at > ? AND mode <> 'seed' LIMIT 1").bind(at).first());
   if (newer) throw new ApiError('conflict', 'a newer publish is already stored');
@@ -149,7 +167,6 @@ export async function syncPublish(ctx) {
     'SELECT kind, key, MAX(rev) AS rev, MAX(CASE WHEN live = 1 THEN hash END) AS live FROM published_revisions GROUP BY kind, key'
   ).all());
   const byKey = new Map(current.results.map(r => [r.kind + '\u0000' + r.key, r]));
-  const now = Date.now();
   const changed = [];
   for (const f of files) {
     const cur = byKey.get(f.kind + '\u0000' + f.key);
@@ -166,16 +183,12 @@ export async function syncPublish(ctx) {
   stmts.push(db.prepare(
     "INSERT INTO publish_jobs (id, mode, revision, hash, state, files, changed, result, by, at, created_at, updated_at) VALUES (?, ?, ?, ?, 'live', ?, ?, ?, ?, ?, ?, ?)"
   ).bind(id, mode, revision, setHash, files.length, changed.length, JSON.stringify(result), by || null, at, now, now));
-  stmts.push(syncStampStmt(db, 'publish', ts));
   // 'worker': the booking's copy of a changed event is re-read on its next use (book/event.js reads this revision)
   const events = changed.filter(f => f.kind === 'event').map(f => f.key);
   if (mode === 'worker' && events.length) {
     stmts.push(db.prepare("UPDATE event_cfg SET fetched_at = 0 WHERE source <> 'fixture' AND slug IN (SELECT value FROM json_each(?))").bind(JSON.stringify(events)));
   }
-  await retry(() => db.batch(stmts));
-  // PUBLISH_MODE='worker': live now; GitHub follows in the background (publish-mirror.js; the cron retries)
-  if (mode === 'worker' && changed.length && ctx.env.JOBS) ctx.defer(ctx.env.JOBS.send(makeJob('publish.mirror', { id })));
-  return result;
+  return { result, stmts, mode, events };
 }
 
 /*

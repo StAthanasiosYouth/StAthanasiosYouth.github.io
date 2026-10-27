@@ -60,8 +60,13 @@ async function gh(cfg, fetchImpl, method, path, body, meta = null) {
  * files: { path: text }. → { sha, unchanged: false } for a new commit, or
  * { sha: head, unchanged: true } when the branch already has exactly these files.
  */
-export async function commitFiles(cfg, files, message, fetchImpl = fetch) {
+export async function commitFiles(cfg, files, message, fetchImpl = fetch, binaries = {}) {
   const entries = Object.keys(files).sort().map(path => ({ path, mode: '100644', type: 'blob', content: files[path] }));
+  // pictures / videos (Phase 4 media): one blob each, base64
+  for (const path of Object.keys(binaries).sort()) {
+    const blob = await gh(cfg, fetchImpl, 'POST', '/git/blobs', { content: toBase64(binaries[path]), encoding: 'base64' });
+    entries.push({ path, mode: '100644', type: 'blob', sha: blob.sha });
+  }
   for (let attempt = 0; attempt < 2; attempt++) {
     const head = await gh(cfg, fetchImpl, 'GET', '/branches/' + encodeURIComponent(cfg.branch));
     const parent = head.commit.sha;
@@ -96,4 +101,31 @@ export async function checkAccess(cfg, fetchImpl = fetch) {
   const tree = await gh(cfg, fetchImpl, 'POST', '/git/trees', { base_tree: baseTree, tree: [{ path: blob.path, mode: blob.mode, type: 'blob', sha: blob.sha }] });
   if (tree.sha !== baseTree) throw new GitHubError(0, 'the unchanged tree came back different');
   return { head: head.commit.sha, expires: meta.expires || '' };
+}
+
+function toBase64(bytes) {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+/* one text file of the branch, or '' when it is missing / unreadable (the page and competition shells) */
+export async function readText(cfg, path, fetchImpl = fetch) {
+  try {
+    const file = await gh(cfg, fetchImpl, 'GET', '/contents/' + path.split('/').map(encodeURIComponent).join('/') + '?ref=' + encodeURIComponent(cfg.branch));
+    const raw = atob(String(file.content || '').replace(/\s/g, ''));
+    return new TextDecoder().decode(Uint8Array.from(raw, c => c.charCodeAt(0)));
+  } catch {
+    return '';
+  }
+}
+
+/* the branch's top-level names (the page slug check), or null */
+export async function rootNames(cfg, fetchImpl = fetch) {
+  try {
+    const list = await gh(cfg, fetchImpl, 'GET', '/contents/?ref=' + encodeURIComponent(cfg.branch));
+    return Array.isArray(list) ? list.map(e => String(e.name || '').toLowerCase()) : null;
+  } catch {
+    return null;
+  }
 }

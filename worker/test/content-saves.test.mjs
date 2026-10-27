@@ -251,7 +251,7 @@ test('permissions: the Apps Script table decides (PERMS_ENFORCE = 1, no grant â†
   await w.h.db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('PERMS_ENFORCE', '1', 0) ON CONFLICT(key) DO UPDATE SET value = '1'").run();
   const denied = await w.call('apiSaveLink', [{ title: 'x', url: 'https://a.com', section: 'social' }], { as: SECOND });
   assert.equal(denied.status, 403);
-  const odd = await w.call('apiPublish', ['x']);
+  const odd = await w.call('apiCheckGithub', []);
   assert.equal(odd.status, 400);
   const media = await w.call('apiUploadMedia', [{}]);
   assert.equal(media.status, 400, 'media stays on Apps Script until P4-5');

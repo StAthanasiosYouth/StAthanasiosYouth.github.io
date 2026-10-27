@@ -174,6 +174,66 @@ function contentRestoreApply() {
   console.log(JSON.stringify(contentRestore_('apply')));
 }
 
+function mediaCopyDryRun() {
+  console.log(JSON.stringify(mediaCopy_('dry')));
+}
+
+function mediaCopyApply() {
+  console.log(JSON.stringify(mediaCopy_('apply')));
+}
+
+
+/* =========================================================
+   THE MEDIA LIBRARY: DRIVE → R2 (P4-5, one time)
+   ---------------------------------------------------------
+   Every Media row's Drive files (the full file and the small one) go to the
+   Worker one by one (signed, POST /v1/sync/media-copy), each with its SHA-256;
+   the Worker checks it (a picture's full file also against the row's own
+   hash), stores it in R2 and points D1's row at it. Run after the content
+   copy (contentMigrateApply): D1's Media rows must exist. Safe to run again
+   (a stored file is not sent twice by the Worker; a row copied again from the
+   Sheets is pointed at R2 again). 'dry' lists what would be sent.
+========================================================= */
+
+function mediaCopy_(mode) {
+
+  var email = contentAssertOwner_();
+
+  if (mode !== 'dry' && mode !== 'apply') throw new Error('mode');
+
+  var rows = readOptionalTable_('Media');
+  var report = { rows: rows.length, files: 0, sent: 0, stored: 0, skipped: 0, failed: [] };
+
+  rows.forEach(function (row) {
+    [['full', row.driveId], ['thumb', row.thumbDriveId]].forEach(function (pair) {
+      var part = pair[0];
+      var fileId = String(pair[1] || '');
+      if (!fileId || /^r2:/.test(fileId)) {
+        report.skipped++;
+        return;
+      }
+      report.files++;
+      if (mode === 'dry') return;
+      try {
+        var base64 = driveDownloadBase64_(fileId);
+        var bytes = Utilities.base64Decode(base64);
+        var mime = part === 'thumb' ? thumbMime_(row) : String(row.mime || '');
+        var reply = contentWorkerPost_('/v1/sync/media-copy', { id: row.id, part: part, mime: mime, data: base64, sha256: bytesHash_(bytes) });
+        report.sent++;
+        if (reply.stored) report.stored++;
+      }
+      catch (error) {
+        report.failed.push(row.id + ':' + part + ' ' + errorDetails_(error).slice(0, 120));
+      }
+    });
+  });
+
+  log_(email, 'media.copy', mode + ' ' + JSON.stringify({ files: report.files, sent: report.sent, failed: report.failed.length }));
+
+  return report;
+
+}
+
 
 /* =========================================================
    ROLLBACK: D1 → THE SHEETS

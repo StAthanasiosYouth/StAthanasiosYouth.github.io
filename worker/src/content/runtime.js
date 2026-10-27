@@ -26,6 +26,11 @@ import { createGs, GS_SOURCE } from './gs.gen.js';
 import { MemSpreadsheet, Utilities, memCache, memProperties, LockService, offline } from './services.js';
 import { KINDS, KIND_NAMES } from './kinds.js';
 import { draftsWriter } from './store.js';
+import { setupBuild } from './publishing.js';
+import { compView } from './comps.js';
+import { setupMedia, mirrorMedia, MEDIA_CALLS, MEDIA_UPLOAD_MAX_BYTES } from './media.js';
+
+export { MEDIA_UPLOAD_MAX_BYTES };
 
 const CONTENT_ID = 'd1-content';
 const COMP_ID = 'd1-comp';
@@ -40,7 +45,11 @@ export const CONTENT_CALLS = new Set([
   'apiHomeOrder', 'apiServants', 'apiServantSave', 'apiServantSetActive', 'apiPayMethodsSave', 'apiServantPayApprove',
   'apiPages', 'apiPage', 'apiPageSave', 'apiPageSetEnabled', 'apiPageArchive', 'apiPageDelete',
   'apiPageMediaSave', 'apiPageMediaOrder', 'apiPageMediaDelete', 'apiPagePreview',
-  'apiEvents', 'apiEvent', 'apiEventSave', 'apiEventSetEnabled', 'apiEventArchive', 'apiEventDelete'
+  'apiEvents', 'apiEvent', 'apiEventSave', 'apiEventSetEnabled', 'apiEventArchive', 'apiEventDelete',
+  // P4-4 / P4-6: the review, the preview, the publish (publishing.js)
+  'apiReview', 'apiPreview', 'apiPublish',
+  // P4-5: the media library, its bytes on R2 (media.js)
+  ...MEDIA_CALLS
 ]);
 
 /* the page calls that check a slug against the repository's top-level folders (Pages.gs pagesRepoRoots_) */
@@ -49,7 +58,7 @@ const NEEDS_ROOTS = new Set(['apiPageSave', 'apiEventSave']);
 /* Apps Script's own codes that the Worker's envelope knows */
 const PASS_CODES = new Set(['locked', 'busy', 'session_expired', 'session_replaced']);
 
-async function loadAll(db, sid, now) {
+async function loadAll(db, sid, now, { activityRows = 15, activityMs = 10 * 60_000 } = {}) {
   const [rows, kinds, admins, locks, router, recent] = await retry(() => db.batch([
     db.prepare('SELECT kind, id, pos, version, data, hash FROM draft_rows WHERE deleted_ms IS NULL ORDER BY kind, pos, id'),
     db.prepare('SELECT kind, version FROM draft_kinds'),
@@ -58,7 +67,8 @@ async function loadAll(db, sid, now) {
       "JOIN admin_sessions s ON s.sid = l.sid LEFT JOIN admins a ON a.email = l.email WHERE l.kind <> 'booking' AND l.expires_ms > ?").bind(now),
     db.prepare("SELECT value FROM settings WHERE key = 'NOTIFY_ROUTER'"),
     // the rows Activity.gs may merge a repeat edit into (its window: 10 minutes, the last 15 rows)
-    db.prepare('SELECT id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary, changes, ref, count, device FROM activity WHERE at > ? ORDER BY at DESC LIMIT 15').bind(now - 10 * 60_000)
+    // a publish reads further back: «what changed since the last publish» (Activity.gs activitySincePublish_, 300 rows)
+    db.prepare('SELECT id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary, changes, ref, count, device FROM activity WHERE at > ? ORDER BY at DESC LIMIT ?').bind(now - activityMs, activityRows)
   ]));
   const byKind = Object.fromEntries(KIND_NAMES.map(k => [k, []]));
   for (const r of rows.results) if (byKind[r.kind]) byKind[r.kind].push({ id: r.id, pos: r.pos, version: r.version, hash: r.hash, data: JSON.parse(r.data) });
@@ -121,7 +131,16 @@ export async function runContentCall(ctx, fn, args, { expect = {}, now = Date.no
 
   const email = ctx.actor.email;
   const sid = ctx.session && ctx.session.sid || '';
-  const [loaded, roots] = await Promise.all([loadAll(db, sid, now), NEEDS_ROOTS.has(fn) ? repoRoots(ctx) : null]);
+  // a publish never moves bytes: library files still waiting for the site go first (like Publish.gs, a failure stops it)
+  if (fn === 'apiPublish') {
+    for (let round = 0; round < 5; round++) {
+      let r;
+      try { r = await mirrorMedia(ctx.env, ctx.fetch, now); } catch (err) { throw new ApiError('error', 'media not on the site yet: ' + String(err && err.message).slice(0, 120)); }
+      if (!r.mirrored) break;
+    }
+  }
+  const history = fn === 'apiPublish' ? { activityRows: 300, activityMs: 30 * 86400_000 } : {};
+  const [loaded, roots] = await Promise.all([loadAll(db, sid, now, history), NEEDS_ROOTS.has(fn) ? repoRoots(ctx) : null]);
   const primary = (loaded.admins.find(a => a.role === 'primary') || {}).email || '';
   const names = Object.fromEntries(loaded.admins.filter(a => a.name).map(a => [a.email, a.name]));
   const sheets = sheetsFrom(loaded);
@@ -186,6 +205,23 @@ export async function runContentCall(ctx, fn, args, { expect = {}, now = Date.no
   hooks.use('adminDirectory_', () => ({ ...names }));
   hooks.use('displayName_', who => names[who] || String(who || '').split('@')[0]);
 
+  // the competitions stay on Apps Script: what this code reads of them is their view (comps.js)
+  const { view } = await compView(ctx.env);
+  hooks.use('compDraft_', () => (view ? JSON.parse(JSON.stringify({ ...view, points: null, modules: {} })) : null));
+  // a picture a competition uses is never purged: without the view the Worker can't tell
+  if (fn === 'apiPurgeMedia' && !view) throw new ApiError('comps', 'the competitions view is not known yet');
+
+  const media = await setupMedia(ctx, { fn, args, hooks, loaded });
+  const build = await setupBuild(ctx, { fn, g, hooks, services, email });
+  try {
+    return await runAndSave(ctx, { fn, args, expect, now, g, hooks, sheets, loaded, noted, email, build, media, payDest: () => payDest });
+  } finally {
+    if (build) await build.release();
+  }
+}
+
+async function runAndSave(ctx, { fn, args, expect, now, g, hooks, sheets, loaded, noted, email, build, media, payDest: payDestOf }) {
+  const db = ctx.env.DB;
   let result;
   try {
     result = g[fn](...args);
@@ -276,7 +312,7 @@ export async function runContentCall(ctx, fn, args, { expect = {}, now = Date.no
     }
   }
   const servantsMoved = plan.some(p => p.kind === 'servants');
-  if (payDest || servantsMoved) {
+  if (payDestOf() || servantsMoved) {
     g.pagesDropDraft_();
     // like payDestSync_: a set the booking side would refuse never blocks the save (the old set stays)
     try {
@@ -286,6 +322,12 @@ export async function runContentCall(ctx, fn, args, { expect = {}, now = Date.no
     }
   }
 
+  // a publish: its revisions in the same batch as the drafts it changed (pages' liveV, Activity)
+  if (build) stmts.push(...await build.statements());
+  // new library files: in R2 before the rows that point at them
+  const mediaPlan = plan.find(p => p.kind === 'media');
+  if (media && mediaPlan) await media.beforeBatch(db, stmts, mediaPlan.ops.filter(o => o.data).map(o => o.data), now);
+
   if (plan.length || noted.length || stmts.length) {
     try {
       await retry(() => db.batch(stmts));
@@ -294,9 +336,13 @@ export async function runContentCall(ctx, fn, args, { expect = {}, now = Date.no
       throw err;
     }
   }
+  if (build) await build.finish();
+  if (media) await media.afterBatch(db, now);
 
   const versions = { ...loaded.versions };
   for (const p of plan) versions[p.kind] = (versions[p.kind] || 0) + 1;
+  // the whole panel state is not rebuilt here (the panel reads the drafts' delta)
+  if (result && typeof result === 'object' && result.state && result.state.__state) delete result.state;
   return {
     result: result && result.__state ? null : result === undefined ? null : JSON.parse(JSON.stringify(result)),
     changed: plan.map(p => p.kind),
@@ -314,6 +360,12 @@ export async function adminContentCall(ctx) {
   if (!perm) throw new ApiError('denied', 'perm unmapped');
   await requirePerm(ctx, perm === '*' ? '*' : perm, { scope: 'all' });
   return runContentCall(ctx, fn, Array.isArray(body.args) ? body.args : [], { expect: body.expect && typeof body.expect === 'object' ? body.expect : {} });
+}
+
+/* POST /v1/admin/media/upload { …apiUploadMedia's input } — the same call, a body big enough for a video */
+export async function adminMediaUpload(ctx) {
+  await requirePerm(ctx, API_PERM.apiUploadMedia || 'media.add', { scope: 'all' });
+  return runContentCall(ctx, 'apiUploadMedia', [ctx.body || {}]);
 }
 
 /* read once from the bundle: the same table doPost checks */

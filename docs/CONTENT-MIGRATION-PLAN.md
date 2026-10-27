@@ -156,3 +156,76 @@ bookmark before it: `00000163-00000196-00005111-fb7b644cbc8f72750017eab5a9b6ae96
 `PERMS_ENFORCE=0`, `PAY_REQUESTS`/`CONTENT_SERVE` unset, `BOOKING_MODULE=1`, `PAY_DEST=1`, `ADMIN_PLATFORM=1`.
 New tables empty (no copy made). Apps Script not deployed (still @57; `ContentExport.gs` waits for the cutover).
 Rollback: Worker `3a9f9c4d` (`wrangler rollback`); the migration is additive and nothing reads it while the switch is `0`.
+
+## 8. Competitions in the Worker's publish (batch 2; owner decision 2026-10-27: hybrid, one button)
+
+Competitions stay on Apps Script until Phase 5–6 (their draft, the keyed version hash with their secret, Snapshots,
+`liveVersion`). Apps Script builds their part (`apps-script/WorkerComp.gs compPackage_`: `compBuildPublic_` with the
+Worker's own library index, their files with the shell, the review words) and the Worker keeps the last one
+(`comp_package`, migration `0017`). It asks again only when:
+
+- the competitions' draft changed — Apps Script pushes its signature after each admin call
+  (`compSigPush_` → `POST /v1/sync/comp-sig`; the signature ignores `liveVersion` / `publishedAt` / `updatedAt`,
+  so a publish does not invalidate it);
+- the library rows it was built against changed; a competition time it depends on has passed (`stableUntil`);
+- a publish needs it prepared (Snapshots written: mode `prepare`) and the kept one is not.
+
+Worker → Apps Script: `POST <APPS_SCRIPT_URL> { fn: 'workerSync', args: [{ ts, sig, payload }] }` (HMAC with the
+shared sync secret, ±5 min, each signature answered once). After the publish went live the Worker tells Apps Script
+what went live (`compCommit` → `compAfterCommit_`); a failure is retried by the queue (`comp.commit`).
+A publish whose competitions' part cannot be had is refused (`comps`, 503) — never published without them.
+Staging (no Apps Script of its own): `COMPS_SOURCE=none` builds without competitions; ignored in production.
+Speed: a publish without competition changes never waits for Apps Script; one after a competition change does
+(Apps Script build + Snapshots, a few seconds), like today.
+
+## 9. Review and publish on the Worker (P4-4, P4-6)
+
+- **Server:** `apiReview` / `apiPreview` / `apiPublish` run through `POST /v1/admin/content/call` — the same
+  `reviewNow_` / `publishNow_` code (`content/publishing.js` hooks): what is live = `published_revisions`; files go
+  to `preparePublish` (Phase 2's checks: paths, private keys, sizes) and are stored **in the same D1 batch** as the
+  drafts the publish changes (pages' / events' `liveV`, Activity «نشر»); the GitHub mirror follows in the background.
+  One publish at a time: `settings.PUBLISH_CLAIM` (2-minute claim). The reviewed revision must still be the built one.
+- **Browser (moved from Phase 2):** `admin/review-kit.js` (built by `tools/build-review-kit.mjs` from the pure
+  builders) computes the review from `GET /v1/admin/content/review-input` (drafts as the builders read them, the live
+  content.json, the competitions' part when current). Same result as the Worker's review (test). When the
+  competitions' part is not current, the panel asks the Worker's review instead. Wiring into «راجع وانشر»: P4-7.
+
+## 10. Media library on R2 (P4-5)
+
+- Bucket binding `MEDIA` (`athanasios-media-staging` / `athanasios-media-prod` — **the production bucket must be
+  created before the production deploy**). Rows keep `r2:media/<name>` in `driveId` / `thumbDriveId`.
+- Upload: `POST /v1/admin/media/upload` (the same `apiUploadMedia`, 12 MB body for a video + poster): bytes to R2
+  before the D1 batch; `media_files` rows; GitHub copy at upload time in the background (`media.mirror` job), then
+  `publishedAt`. A publish first sends anything still waiting (a failure stops the publish, as with Apps Script).
+- Preview reads R2; purge deletes the R2 objects. Library rows/flows otherwise unchanged (Media.gs).
+- One-time copy: `mediaCopyDryRun` / `mediaCopyApply` (Apps Script editor, owner) after `contentMigrateApply`;
+  each file SHA-256-checked (a picture's full file also against the row's own hash), stored once, the row pointed
+  at R2. `GET /v1/admin/content/media-status` shows rows still on Drive and files waiting for the site.
+
+## 11. Batch 2 staging record (2026-10-27)
+
+Staging Worker **`87e0098c`** (migration `0017` applied to `athanasios-staging`; bucket `athanasios-media-staging`
+created and bound as `MEDIA`). Production untouched. `CONTENT_DRAFTS=1` on staging for the checks only, back to `'0'`
+after; staging `pay_dest` restored from the snapshot taken before.
+
+| Check | Result |
+| --- | --- |
+| `scripts/content-publish-check.mjs` (upload → R2, preview, background GitHub copy + `publishedAt`, Worker review, browser kit = Worker review, stale refused, publish live at once, repeat publish, mirror caught up) | 11/11 ok — upload 0.9–1.1 s, review 0.24–0.30 s, kit 35 ms (+ input 0.22 s), publish 0.9–1.25 s, repeat 0.65–0.73 s, GitHub copy 7–10 s in the background |
+| `scripts/content-saves-check.mjs` (P4-2/P4-3 regression) | 32/32 ok — median 215 ms, p90 245 ms |
+| `scripts/publish-check.mjs` (Phase 2 path after the `preparePublish` refactor) | 21/21 ok |
+| `book-check`, `age-check`, `platform-check` | 31, 9, 26 ok |
+| `claims-check`, `rehearsal` | 23, 58 ok (re-run 10 minutes apart: back-to-back runs hit the staging booking rate limit — expected, as the handoff notes) |
+
+Found and fixed on staging: a background Media update (`publishedAt`, the Drive copy's R2 refs) bumped the kind's
+version but not its hash — the integrity check caught it; `updateMediaRow` now rewrites the kind hash in the same
+guarded batch (local test added).
+
+Not met yet: **publish < 0.4 s** — 0.9–1.25 s on staging (the first includes reading `pages/index.html` from
+GitHub, then cached). P4-7 is where this is tuned (it was planned there: "optimize real-world publishing").
+Staging has no competitions (`COMPS_SOURCE=none`): the hybrid path is covered by the local tests against the real
+`.gs` (review, prepare, commit, reuse, unreachable → refused).
+
+Production release (when approved) needs, in order: R2 bucket `athanasios-media-prod` created → migration `0017` →
+Worker via `main` (wrangler.jsonc adds `MEDIA` + `APPS_SCRIPT_URL`). Every switch stays as it is; nothing reads the new
+code while `CONTENT_DRAFTS=0`. Apps Script (`WorkerComp.gs`, the `Api.gs` hooks, `ContentExport.gs` media copy)
+ships at the cutover.

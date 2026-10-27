@@ -127,7 +127,7 @@ check('page deleted', (await run('apiPageDelete', [pageId])).status === 200, nul
 /* ---------- permissions ---------- */
 check('no token → 401', (await call(null, 'POST', '/v1/admin/content/call', { fn: 'apiPages', args: [] })).status === 401, null);
 check('not an admin → 403', (await call(google('stranger-' + RUN + '@staging.invalid', 'x-' + RUN), 'POST', '/v1/admin/content/call', { fn: 'apiPages', args: [] })).status === 403, null);
-check('a call outside the list → 400', (await run('apiPublish', ['x'])).status === 400, null);
+check('a call outside the list → 400', (await run('apiCheckGithub', [])).status === 400, null);
 
 /* ---------- Activity + pushes ---------- */
 const act = await call(P, 'GET', '/v1/admin/activity?limit=100');

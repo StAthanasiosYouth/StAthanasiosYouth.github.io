@@ -225,6 +225,11 @@ function doPost(e) {
       return jsonOutput_({ ok: true });
     }
 
+    // the Worker's signed questions about the competitions (WorkerComp.gs; off before the Phase 4 cutover)
+    if (request.fn === 'workerSync') {
+      return jsonOutput_(workerSyncCall_(request.args && request.args[0]));
+    }
+
     // a public action: a visitor's route to the church (Route.gs). No
     // token, no session, no admin data: its own validation, cache and daily
     // budget; the openrouteservice key never leaves the server.
@@ -334,6 +339,8 @@ function doPost(e) {
       activityForward_(!!API_REQUEST_.forwardNow);
       // the router's pushes (NotifyClaim.gs): once a minute
       notifyClaimRun_(false);
+      // the competitions' draft changed: the Worker's next publish asks for their part (WorkerComp.gs)
+      compSigPush_();
     }
     catch (error) {
       console.warn('api: admin push dispatch failed');

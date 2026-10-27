@@ -13,6 +13,8 @@ import { logLine } from './lib/log.js';
 import { activityStmt } from './lib/activity.js';
 import { sendRows } from './notify/email.js';
 import { mirrorPending } from './publish-mirror.js';
+import { commitComps } from './content/comps.js';
+import { mirrorMedia } from './content/media.js';
 
 export const JOB_TYPES = {
   // diagnostics: proves enqueue → consume → D1 write end to end
@@ -28,6 +30,14 @@ export const JOB_TYPES = {
   // Phase 2 P2-4: the GitHub mirror of the live snapshot (idempotent; a failure is recorded, the cron retries)
   async 'publish.mirror'(env) {
     await mirrorPending(env);
+  },
+  // Phase 4: Apps Script told which competitions a Worker publish made live (content/comps.js; retried)
+  async 'comp.commit'(env, payload) {
+    await commitComps({ env, fetch: (...a) => fetch(...a) }, { live: payload.live || {}, withdrawn: payload.withdrawn || [] }, String(payload.stamp || ''));
+  },
+  // Phase 4 P4-5: the library's new files → the site's repository (content/media.js; idempotent)
+  async 'media.mirror'(env) {
+    await mirrorMedia(env);
   }
 };
 

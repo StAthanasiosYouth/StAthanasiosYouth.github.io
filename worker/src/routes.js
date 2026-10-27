@@ -38,8 +38,10 @@ import { syncPublish, publicContent, publicPage, publicEvent, publicComp, public
 import { shadowCheck, shadowStatus } from './publish-shadow.js';
 import { mirrorStatus } from './publish-mirror.js';
 import { publishRevisions, publishRestore } from './publish-restore.js';
-import { syncContentImport, syncContentExport, syncContentNotify, adminDrafts, adminDraftsExport, adminDraftsStatus, IMPORT_MAX_BYTES } from './content/routes.js';
-import { adminContentCall } from './content/runtime.js';
+import { syncContentImport, syncContentExport, syncContentNotify, adminDrafts, adminDraftsExport, adminDraftsStatus, adminReviewInput, IMPORT_MAX_BYTES } from './content/routes.js';
+import { adminContentCall, adminMediaUpload, MEDIA_UPLOAD_MAX_BYTES } from './content/runtime.js';
+import { syncCompSig } from './content/comps.js';
+import { syncMediaCopy, adminMediaStatus } from './content/media.js';
 
 /* GET /v1/admin/publish/status — the last publishes + the shadow gate (docs/PUBLISH-SEPARATION-PLAN.md P2-2) */
 async function publishStatus(ctx) {
@@ -349,6 +351,11 @@ export const ROUTES = [
   { method: 'GET', path: '/v1/admin/content/export', auth: 'admin', handler: adminDraftsExport },
   { method: 'GET', path: '/v1/admin/content/status', auth: 'admin', handler: adminDraftsStatus },
   { method: 'POST', path: '/v1/admin/content/call', auth: 'admin', needSession: true, maxBytes: 256 * 1024, handler: adminContentCall },
+  { method: 'POST', path: '/v1/sync/comp-sig', auth: 'sync', raw: true, maxBytes: 1024, handler: syncCompSig },
+  { method: 'POST', path: '/v1/admin/media/upload', auth: 'admin', needSession: true, maxBytes: MEDIA_UPLOAD_MAX_BYTES, handler: adminMediaUpload },
+  { method: 'POST', path: '/v1/sync/media-copy', auth: 'sync', raw: true, maxBytes: MEDIA_UPLOAD_MAX_BYTES, handler: syncMediaCopy },
+  { method: 'GET', path: '/v1/admin/content/media-status', auth: 'admin', handler: adminMediaStatus },
+  { method: 'GET', path: '/v1/admin/content/review-input', auth: 'admin', handler: adminReviewInput },
 
   // booking — public (docs/EVENTS.md §6, worker/BOOKING-API.md)
   { method: 'GET', path: '/v1/book/state', auth: 'public', handler: bookState },

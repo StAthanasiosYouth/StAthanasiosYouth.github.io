@@ -11,9 +11,41 @@
 import { ApiError } from '../lib/http.js';
 import { limit, clientIp } from '../lib/ratelimit.js';
 import { verifySync, syncStampStmt } from '../lib/sync.js';
-import { retry } from '../lib/db.js';
+import { retry, cairoText } from '../lib/db.js';
 import { importDrafts, readDrafts, exportDrafts, draftsStatus, IMPORT_MAX_BYTES } from './store.js';
 import { KINDS, KIND_NAMES } from './kinds.js';
+
+/*
+ * GET /v1/admin/content/review-input — what the browser-side «راجع» needs (admin/review-kit.js, P4-4):
+ * every draft as the builders read it (a servant's phone only when they agreed to show it; never
+ * payment numbers or Drive ids), the live content.json, the competitions' part when the one kept is
+ * current (else null: the panel asks the Worker's review instead), and the Cairo time.
+ */
+export async function adminReviewInput(ctx) {
+  const db = ctx.env.DB;
+  const { kinds } = await readDrafts(db, { includePrivate: true });
+  for (const r of kinds.servants.rows) {
+    const d = r.data;
+    const shown = d.publicWa === true || d.publicWa === '1' || d.publicWa === 'TRUE';
+    for (const c of KINDS.servants.private) if (c !== 'phone' || !shown) d[c] = d[c] === '' ? '' : true;
+  }
+  for (const r of kinds.media.rows) for (const c of KINDS.media.private) r.data[c] = r.data[c] === '' ? '' : true;
+  const now = Date.now();
+  const wall = cairoText(now).replace(' ', 'T');
+  const [live, pkg, sig] = await retry(() => db.batch([
+    db.prepare("SELECT body FROM published_revisions WHERE kind = 'content' AND key = 'site' AND live = 1"),
+    db.prepare("SELECT sig, data FROM comp_package WHERE id = 'current'"),
+    db.prepare("SELECT value FROM settings WHERE key = 'COMP_SIG'")
+  ]));
+  let comps = null;
+  if (ctx.env.COMPS_SOURCE === 'none' && ctx.env.ENVIRONMENT !== 'production') {
+    comps = { none: true, built: null, errors: [], warnings: [], points: null, modules: {}, files: {}, reviewInfo: {}, stableUntil: '' };
+  } else if (pkg.results[0] && sig.results[0] && pkg.results[0].sig === sig.results[0].value) {
+    const data = JSON.parse(pkg.results[0].data);
+    if (!data.stableUntil || wall < data.stableUntil) comps = data;
+  }
+  return { kinds, live: live.results[0] ? JSON.parse(live.results[0].body) : null, comps, now: wall };
+}
 
 export { IMPORT_MAX_BYTES };
 
