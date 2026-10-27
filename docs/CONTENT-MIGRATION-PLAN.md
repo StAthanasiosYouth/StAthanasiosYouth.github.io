@@ -380,3 +380,8 @@ media-copy editor functions (owner-only, run by hand). Cost while inert: one Scr
 `workerSync` → `{"ok":false,"error":"off"}` (bridges inert) ✓; (4) Worker `api_log` no 5xx, `CONTENT_DRAFTS=0`,
 `PUBLISH_CLAIM` empty ✓ — the Activity forwarding part of (4) waits for the owner's save in step (3).
 Rollback: `clasp deploy -i AKfycbxJjDyktRi6VlwRGSrF-H_KzN-vkw9QaFCiLD1TlqgrppKs4CHfmOBE4cKEd6AZ9Km1 -V 57`.
+Owner's step (3), 2026-10-27: panel opened, a save worked, «راجع وانشر» showed 3 steps, publish showed
+«ظهر على الموقع ✓» at once. Step (4) completed after it: the save («المسرح الأسود1», page update) and the publish
+reached D1's Activity (`source = apps-script`); publish `pub-be078c1a9a7c-…` mode `worker`, state `mirrored`
+(GitHub copy 16.7 s later, in the background), 4 files changed; the Worker and GitHub Pages both serve revision
+`be078c1a9a7c`; no 5xx since the deploy. **@58 accepted.**
