@@ -229,3 +229,18 @@ Production release (when approved) needs, in order: R2 bucket `athanasios-media-
 Worker via `main` (wrangler.jsonc adds `MEDIA` + `APPS_SCRIPT_URL`). Every switch stays as it is; nothing reads the new
 code while `CONTENT_DRAFTS=0`. Apps Script (`WorkerComp.gs`, the `Api.gs` hooks, `ContentExport.gs` media copy)
 ships at the cutover.
+
+### 11.1 Production release (2026-10-27, owner approved)
+
+`main` **`795b55c`** (= work branch `c9f84ad` docs + `a578547` batch 2). Order: R2 bucket `athanasios-media-prod`
+created → migration `0017` on `athanasios-prod` (D1 bookmark before it:
+`00000164-0000008a-00005111-0bc60b9d92e1caacbce717dc9d786717`) → CI deployed Worker **`0a63c6b1`** (previous:
+`30f6cbc0`). Checks after: `/v1/health` ok; `/v1/health/deep` 17 migrations, storage ok; new routes refuse without auth
+(content call, media upload, review-input 401; comp-sig, media-copy unsigned 401); public content, site, admin 200; no
+5xx in `api_log`. Switches unchanged: `CONTENT_DRAFTS=0`, `NOTIFY_ROUTER=0`, `NOTIFY_EMAIL=0`, `PERMS_ENFORCE=0`,
+`PAY_REQUESTS`/`CONTENT_SERVE` unset, `BOOKING_MODULE=1`, `PAY_DEST=1`, `ADMIN_PLATFORM=1`; `PUBLISH_CLAIM` empty.
+New tables empty. Apps Script still @57 (WorkerComp.gs and the Api.gs hooks ship at the cutover).
+Release tree tests: Worker 270/270 (one notify-email timing flake on the first run, 7/7 alone and 270/270 on re-run);
+the touched site/admin tests pass except the known `admin/config.js` one.
+Rollback: Worker `30f6cbc0` (`wrangler rollback`); `0017` is additive and unread while `CONTENT_DRAFTS=0`; the empty
+bucket can stay.
