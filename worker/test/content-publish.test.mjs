@@ -167,6 +167,7 @@ test('staging without competitions (COMPS_SOURCE=none) publishes; production ign
   assert.equal((await w.h.db.prepare("SELECT COUNT(*) AS n FROM published_revisions WHERE kind = 'comp'").first()).n, 0);
 
   const prod = await worker(world, { ENVIRONMENT: 'production', COMPS_SOURCE: 'none', APPS_SCRIPT_URL: '' });
+  await prod.h.db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('BOOKING_ONLINE', '1', 0)").run();
   const r = await prod.call('apiReview');
   assert.equal(r.status, 503, 'production never builds without the competitions');
 });
@@ -189,7 +190,7 @@ test('browser-side «راجع» (admin/review-kit.js): the same review as the Wo
   assert.ok(input.comps, 'the competitions\' part is current (no Apps Script round trip in the browser)');
   assert.ok(!JSON.stringify(input.kinds.servants).includes('instapay') || true);
   const t0 = performance.now();
-  const browser = globalThis.ReviewKit.review({ drafts: input.kinds, live: input.live, comps: input.comps, now: input.now });
+  const browser = globalThis.ReviewKit.review({ drafts: input.kinds, live: input.live, comps: input.comps, now: input.now, props: input.props });
   const ms = performance.now() - t0;
   assert.equal(browser.revision, server.revision);
   assert.deepEqual(browser.groups, server.groups);
@@ -225,4 +226,37 @@ test('panel state (P4-7): the Worker\'s apiState = Apps Script\'s — drafts, la
   const saved = await w.call('apiSaveLink', { title: 'من غير Apps Script', url: 'https://example.com/x', section: 'social' });
   assert.equal(saved.status, 200, JSON.stringify(saved.body));
   assert.ok(saved.body.result.draft.links.some(l => l.title === 'من غير Apps Script'));
+});
+
+test('online booking (BOOKING_ONLINE): the Worker\'s event.json = Apps Script\'s with the switch on; production refuses to build without it', async () => {
+  const { world, call } = sheets();
+  const servant = plain(world.gs.pagesDraft_()).servants[0];
+  world.properties.delete('CONTENT_WRITER');   // the Sheets still write in this fixture (the cutover's own guard refuses otherwise)
+  call('apiEventSave', null, {
+    slug: 'online-trip', kind: 'trip', title: 'رحلة أونلاين', summary: 'حجز', cover: plain(world.gs.readOptionalTable_('Media'))[0].id,
+    startAt: wallAt(world, 5 * 1440), endAt: wallAt(world, 5 * 1440 + 600), locationName: 'سفاجا',
+    booking: { opensAt: wallAt(world, -60), closesAt: wallAt(world, 4 * 1440), capacity: 30, pricing: { mode: 'group', categories: [{ label: 'الحاجز', price: 500 }] }, payment: { mode: 'full' } },
+    servants: [{ id: servant.id, methods: ['cash', 'instapay'] }]
+  });
+  world.properties.set('CONTENT_WRITER', 'worker');
+  world.properties.set('BOOKING_ONLINE', '1');
+  const gsBuilt = plain(world.gs.buildPublicContent(world.gs.readDraft_(), { now: world.gs.cairoNow_(), hash: world.gs.sha256Hex_ }));
+  const gsFiles = plain(world.gs.pagesPublishFiles_(gsBuilt.pages, 'https://stathanasiosyouth.github.io/', ''));
+  const gsEvent = JSON.parse(gsFiles['events/online-trip/event.json']);
+  assert.equal(gsEvent.booking.online, true, 'Apps Script: online');
+
+  const w = await worker(world);
+  await w.h.db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('BOOKING_ONLINE', '1', 0)").run();
+  const review = (await w.call('apiReview')).body.result;
+  assert.equal((await w.call('apiPublish', review.revision)).status, 200);
+  const live = await w.h.db.prepare("SELECT body FROM published_revisions WHERE live = 1 AND kind = 'event' AND key = 'online-trip'").first();
+  const event = JSON.parse(live.body);
+  assert.equal(event.booking.online, true, 'the Worker keeps online booking on');
+  const strip = e => JSON.parse(JSON.stringify(e, (k, v) => (k === 'v' || k === 'publishedAt' ? undefined : v)));
+  assert.deepEqual(strip(event.booking), strip(gsEvent.booking), 'the same booking block as Apps Script');
+
+  const prod = await worker(world, { ENVIRONMENT: 'production' });
+  const refused = await prod.call('apiReview');
+  assert.equal(refused.status, 500);
+  assert.match(JSON.stringify(refused.body), /error/);
 });

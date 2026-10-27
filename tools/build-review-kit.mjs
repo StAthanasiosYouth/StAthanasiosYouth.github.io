@@ -63,6 +63,9 @@ const RUNTIME = String.raw`
     }
     return h.map(function (x) { return ('00000000' + x.toString(16)).slice(-8); }).join('');
   }
+  /* the Script Properties a build reads (Pages.gs bookOnline_): from the review input (props) */
+  var PROPS_ = {};
+  var PropertiesService = { getScriptProperties: function () { return { getProperty: function (k) { return Object.prototype.hasOwnProperty.call(PROPS_, k) ? String(PROPS_[k]) : null; } }; } };
   var COMPS_ = null;
   var EMPTY_COMPS_ = { index: [], live: {}, withdrawn: [], byId: {}, slugs: {}, media: [] };
   function compBuildPublic_(draft, ctx) {
@@ -91,6 +94,7 @@ const RUNTIME = String.raw`
 
   function review_(input) {
     COMPS_ = input.comps || null;
+    PROPS_ = input.props || {};
     var built = buildPublicContent(draftOf_(input.drafts || {}), { now: input.now, hash: sha256Hex_ });
     var entries = describeChanges(input.live || null, built.content, input.now, { competitions: compReviewInfo_(built.competitions) });
     return {

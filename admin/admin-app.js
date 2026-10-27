@@ -3967,7 +3967,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return Promise.all([reviewKit(), worker.call('GET', '/v1/admin/content/review-input')]).then(function (both) {
       var input = both[1];
       if (!input || !input.comps) throw new Error('competitions part not current');
-      return both[0].review({ drafts: input.kinds, live: input.live, comps: input.comps, now: input.now });
+      return both[0].review({ drafts: input.kinds, live: input.live, comps: input.comps, now: input.now, props: input.props });
     }).catch(function () {
       return A.call('apiReview');
     });

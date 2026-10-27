@@ -68,7 +68,7 @@ check('Worker review (' + r1.ms + ' ms)', r1.status === 200 && r1.body.result.re
 const input = await call(P, 'GET', '/v1/admin/content/review-input');
 await import('../../admin/review-kit.js');
 const t0 = performance.now();
-const kit = globalThis.ReviewKit.review({ drafts: input.body.kinds, live: input.body.live, comps: input.body.comps, now: input.body.now });
+const kit = globalThis.ReviewKit.review({ drafts: input.body.kinds, live: input.body.live, comps: input.body.comps, now: input.body.now, props: input.body.props });
 check('browser review = Worker review (' + Math.round(performance.now() - t0) + ' ms in Node, input ' + input.ms + ' ms)', kit.revision === r1.body.result.revision && JSON.stringify(kit.groups) === JSON.stringify(r1.body.result.groups), { kit: kit.revision, worker: r1.body.result.revision });
 
 /* P4-6: publish */

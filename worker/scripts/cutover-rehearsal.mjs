@@ -104,7 +104,7 @@ try {
   check('4 review on the Worker', review.status === 200 && !review.body.result.errors.length, review.body && review.body.result && review.body.result.errors);
   const input = await time('review input (browser kit)', () => call(W, 'GET', '/v1/admin/content/review-input'));
   await import('../../admin/review-kit.js');
-  const kit = await time('review in the browser kit', async () => globalThis.ReviewKit.review({ drafts: input.body.kinds, live: input.body.live, comps: input.body.comps, now: input.body.now }));
+  const kit = await time('review in the browser kit', async () => globalThis.ReviewKit.review({ drafts: input.body.kinds, live: input.body.live, comps: input.body.comps, now: input.body.now, props: input.body.props }));
   check('4 browser review = server review', kit.revision === review.body.result.revision, { kit: kit.revision, server: review.body.result.revision });
   const before = (await call(P, 'GET', '/v1/admin/publish/revisions')).body;
   const pub = await time('publish (warm)', () => run('apiPublish', review.body.result.revision));

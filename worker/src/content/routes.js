@@ -32,10 +32,11 @@ export async function adminReviewInput(ctx) {
   for (const r of kinds.media.rows) for (const c of KINDS.media.private) r.data[c] = r.data[c] === '' ? '' : true;
   const now = Date.now();
   const wall = cairoText(now).replace(' ', 'T');
-  const [live, pkg, sig] = await retry(() => db.batch([
+  const [live, pkg, sig, online] = await retry(() => db.batch([
     db.prepare("SELECT body FROM published_revisions WHERE kind = 'content' AND key = 'site' AND live = 1"),
     db.prepare("SELECT sig, data FROM comp_package WHERE id = 'current'"),
-    db.prepare("SELECT value FROM settings WHERE key = 'COMP_SIG'")
+    db.prepare("SELECT value FROM settings WHERE key = 'COMP_SIG'"),
+    db.prepare("SELECT value FROM settings WHERE key = 'BOOKING_ONLINE'")
   ]));
   let comps = null;
   if (ctx.env.COMPS_SOURCE === 'none' && ctx.env.ENVIRONMENT !== 'production') {
@@ -44,7 +45,9 @@ export async function adminReviewInput(ctx) {
     const data = JSON.parse(pkg.results[0].data);
     if (!data.stableUntil || wall < data.stableUntil) comps = data;
   }
-  return { kinds, live: live.results[0] ? JSON.parse(live.results[0].body) : null, comps, now: wall };
+  // the Script Properties the builders read (Pages.gs bookOnline_): the online-booking switch, now in D1
+  const props = { BOOKING_ONLINE: online.results[0] && online.results[0].value === '1' ? '1' : '0' };
+  return { kinds, live: live.results[0] ? JSON.parse(live.results[0].body) : null, comps, now: wall, props };
 }
 
 export { IMPORT_MAX_BYTES };

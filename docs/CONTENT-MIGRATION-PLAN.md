@@ -385,3 +385,36 @@ Owner's step (3), 2026-10-27: panel opened, a save worked, «راجع وانشر
 reached D1's Activity (`source = apps-script`); publish `pub-be078c1a9a7c-…` mode `worker`, state `mirrored`
 (GitHub copy 16.7 s later, in the background), 4 files changed; the Worker and GitHub Pages both serve revision
 `be078c1a9a7c`; no 5xx since the deploy. **@58 accepted.**
+
+## 16. Production cutover — preparation record (2026-10-27)
+
+Done (owner approved the cutover; activation still needs its own approval):
+- **Backups:** D1 bookmark `00000165-000000a2-00005111-f70d459858fc00565521cec08858a8ff`; an extra encrypted export of
+  `athanasios-prod` (age, the nightly backup's public key; plaintext deleted at once); the owner made copies of the
+  content Sheet and the competitions spreadsheet.
+- **Baseline** (counts/hashes, no personal data): bookings 9 (4 confirmed, 1 pending, 4 withdrawn), payments 4 (460),
+  proofs 11, pay_dest 2, event_cfg 2, admins 3 / grants 135, live files 8 (revision `be078c1a9a7c`), switches as before.
+- **Copy (owner, Apps Script editor):** `contentMigrateDryRun` ok → `contentMigrateApply` ok — all 16 kinds equal the
+  Sheets (hash per kind): settings 24, sections 13, links 5, contacts 2, sessions 1, news 0, games 0, notifications 1,
+  media 32, activities 4, types 12, pages 1, page_media 2, events 2, servants 3, pay_methods 3.
+- **Media (owner):** `mediaCopyDryRun` → `mediaCopyApply`: 32 rows, 0 left on Drive; R2 holds 32 full + 31 small files
+  (33.9 MB), every file SHA-256-checked. 28 already on the site; **4 never published and unused** (img-9cbd2410,
+  vid-bb74aed0, vid-508104a5, vid-fb156999; ~6.7 MB) — the first Worker publish sends them to the site's repository
+  (upload-time rule, §8) unless the owner removes them first.
+- **Independent parity:** the content rebuilt from D1 with the browser kit equals the live site except the
+  competition's home card (my stand-in lacked the competitions' card data Apps Script supplies after the switch).
+- **Found and fixed before activation:** the page/event build reads the Script Property `BOOKING_ONLINE`
+  (`Pages.gs bookOnline_`, '1' in production: both events take bookings online). The Worker now reads
+  `settings.BOOKING_ONLINE` (refuses to build in production when it is missing) and so does the browser kit;
+  test added (the Worker's event.json = Apps Script's with the switch on). Worker 274/274; site 761/764 (known 3);
+  e2e 5/5; staging `e60d9786` publish check ok. Known display gap: the live-meeting stage chosen by hand
+  (`LIVE_STATE`) shows as «تلقائي» in the panel until chosen again.
+
+**Activation steps (each after the owner's approval), in this order:**
+1. Release the fix (Worker via `main` + `admin/review-kit.js`, `admin/admin-app.js`); verify.
+2. D1: `INSERT INTO settings (key, value, updated_at, updated_by) VALUES ('BOOKING_ONLINE', '1', …)` — the Script Property's value.
+3. Owner: `contentMigrateDryRun` again → every kind `d1Before.same = true` (no Sheet edit since the copy), else `contentMigrateApply` (+ `mediaCopyApply`).
+4. Owner: Script Property `CONTENT_WRITER = worker`.
+5. D1: `CONTENT_DRAFTS = '1'`.
+6. Owner: reload `/admin/` and test (panel, save, review, publish); I compare with the baseline.
+Rollback: §13 (CONTENT_DRAFTS '0' → contentRestoreApply → delete CONTENT_WRITER), rehearsed on staging.

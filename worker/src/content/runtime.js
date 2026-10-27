@@ -58,7 +58,7 @@ const NEEDS_ROOTS = new Set(['apiPageSave', 'apiEventSave']);
 const PASS_CODES = new Set(['locked', 'busy', 'session_expired', 'session_replaced']);
 
 async function loadAll(db, sid, now, { activityRows = 15, activityMs = 10 * 60_000 } = {}) {
-  const [rows, kinds, admins, locks, router, recent, writer, view, waiting] = await retry(() => db.batch([
+  const [rows, kinds, admins, locks, router, recent, writer, view, waiting, online] = await retry(() => db.batch([
     db.prepare('SELECT kind, id, pos, version, data, hash FROM draft_rows WHERE deleted_ms IS NULL ORDER BY kind, pos, id'),
     db.prepare('SELECT kind, version FROM draft_kinds'),
     db.prepare('SELECT email, name, role FROM admins WHERE active = 1 ORDER BY email'),
@@ -74,7 +74,9 @@ async function loadAll(db, sid, now, { activityRows = 15, activityMs = 10 * 60_0
     // in the same round trip: the one-writer switch, the competitions' view, library files waiting for the site
     db.prepare("SELECT value FROM settings WHERE key = 'CONTENT_DRAFTS'"),
     db.prepare("SELECT data FROM comp_package WHERE id = 'view'"),
-    db.prepare('SELECT COUNT(*) AS n FROM media_files WHERE mirrored_ms IS NULL AND deleted_ms IS NULL AND site_path IS NOT NULL')
+    db.prepare('SELECT COUNT(*) AS n FROM media_files WHERE mirrored_ms IS NULL AND deleted_ms IS NULL AND site_path IS NOT NULL'),
+    // Pages.gs bookOnline_: the online-booking go-live switch (was the Script Property BOOKING_ONLINE)
+    db.prepare("SELECT value FROM settings WHERE key = 'BOOKING_ONLINE'")
   ]));
   const byKind = Object.fromEntries(KIND_NAMES.map(k => [k, []]));
   for (const r of rows.results) if (byKind[r.kind]) byKind[r.kind].push({ id: r.id, pos: r.pos, version: r.version, hash: r.hash, data: JSON.parse(r.data) });
@@ -92,7 +94,8 @@ async function loadAll(db, sid, now, { activityRows = 15, activityMs = 10 * 60_0
     recent: recent.results.reverse(),
     writer: writer.results[0] && writer.results[0].value === '1' ? 'worker' : 'sheets',
     view: view.results[0] ? JSON.parse(view.results[0].data) : null,
-    waiting: waiting.results[0] ? waiting.results[0].n : 0
+    waiting: waiting.results[0] ? waiting.results[0].n : 0,
+    bookingOnline: online.results[0] ? online.results[0].value : null
   };
 }
 
@@ -145,6 +148,8 @@ export async function runContentCall(ctx, fn, args, { expect = {}, now = Date.no
   const history = fn === 'apiPublish' ? { activityRows: 300, activityMs: 30 * 86400_000 } : {};
   let [loaded, roots] = await Promise.all([loadAll(db, sid, now, history), NEEDS_ROOTS.has(fn) ? repoRoots(ctx) : null]);
   if (loaded.writer !== 'worker') throw new ApiError('writer', 'CONTENT_DRAFTS is not 1: the Sheets are the writer');
+  // never guessed in production: a missing switch would publish every event without online booking
+  if (loaded.bookingOnline === null && ctx.env.ENVIRONMENT === 'production') throw new ApiError('error', 'settings.BOOKING_ONLINE is not set (copy it from the Script Property at the cutover)');
   // a publish never moves bytes: library files still waiting for the site go first (like Publish.gs, a failure stops it)
   if (fn === 'apiPublish' && loaded.waiting) {
     for (let round = 0; round < 5; round++) {
@@ -194,7 +199,8 @@ export async function runContentCall(ctx, fn, args, { expect = {}, now = Date.no
     // NotifyClaim.gs notifyRouterOn_: the router's switch as Apps Script last heard it (D1 is the truth here)
     ADMIN_PLATFORM: 'worker', NOTIFY_ROUTER_ON: loaded.notifyRouter ? '1' : '0',
     GITHUB_REPO: ctx.env.GITHUB_REPO || '', GITHUB_BRANCH: ctx.env.GITHUB_BRANCH || 'main',
-    SITE_URL: (ctx.env.SITE_URL || '').replace(/\/?$/, '/')
+    SITE_URL: (ctx.env.SITE_URL || '').replace(/\/?$/, '/'),
+    BOOKING_ONLINE: loaded.bookingOnline === '1' ? '1' : '0'
   });
   const g = createGs(services, h => { hooks = h; });
   // the Activity tab as Activity.gs reads it for a merge: the recent D1 rows, oldest first
