@@ -344,3 +344,39 @@ switches unchanged (`CONTENT_DRAFTS=0`, `NOTIFY_ROUTER=0`, `NOTIFY_EMAIL=0`, `PE
 Apps Script **not deployed** (still @57): the admin keeps its 4-step dialog and all content calls go to Apps Script
 until @58 is deployed (then 3 steps) and the cutover (§13) flips the writer.
 Rollback: Worker `0a63c6b1` (`wrangler rollback`); admin files: revert `fb3f4f2` on `main` (Pages ~1 min).
+
+## 15. Apps Script @58 deploy plan (prepared 2026-10-27; waits for the owner's approval)
+
+**What goes out:** `apps-script/` as on `main` `fb3f4f2` (this checkout = `main`, no local change, no stray file;
+no `.claspignore`: `clasp push` sends the whole folder). Against what @57 runs (`4dcfde7`): 8 files —
+new `WorkerComp.gs`, `ContentExport.gs`; small hooks in `Api.gs`, `Activity.gs`, `Code.gs`, `Pages.gs`,
+`Publish.gs`; the dialog in `AdminScript.html` (the official admin's copy is already on Pages since `fb3f4f2`).
+Deployments: API `AKfycbxJj…Km1` @57 → @58; the recovery admin `AKfycbwhH…bvw` is pinned @14 (unchanged);
+`@HEAD` (dev) follows the push.
+
+**What admins see:** «راجع وانشر» becomes 3 steps (مراجعة → نشر → ظهر على الموقع) and ends at «ظهر على الموقع ✓» as
+soon as the Worker answers — no «انتظار GitHub Pages» (status.mode = 'worker' because PUBLISH_MODE = worker since
+Phase 2). Nothing else: content still saves to the Sheets (the Worker says content: sheets), the review is still
+Apps Script's. Inert until the cutover's Script Property `CONTENT_WRITER = worker`: the one-writer guards, the
+competitions' signature push, the content-push pull, the `workerSync` entry (answers `off`), the copy/restore and
+media-copy editor functions (owner-only, run by hand). Cost while inert: one Script Property read per admin call.
+
+**Deploy:** `cd tools && node deploy-api.mjs "v58: Phase 4 — 3-step publish status, content + competitions bridges (inert until CONTENT_WRITER)"`
+
+**Verify (in order):**
+1. `cd apps-script && clasp deployments` → the API id at @58.
+2. API `POST {fn:'warm'}` → `{"ok":true}`; `POST {fn:'workerSync',args:[{}]}` → `{"ok":false,"error":"off"}` (bridges inert).
+3. Owner, `/admin/` (reload): the panel opens; a small save works (Apps Script); «راجع وانشر» shows 3 steps; publish →
+   «ظهر على الموقع ✓» at once; the site shows it; `GET /v1/admin/publish/status` → the mirror catches up (not late).
+4. Worker `api_log`: no 5xx; the save's Activity row arrives in D1 (`source = apps-script`).
+
+**Rollback (seconds, no code push):** `cd apps-script && clasp deploy -i AKfycbxJjDyktRi6VlwRGSrF-H_KzN-vkw9QaFCiLD1TlqgrppKs4CHfmOBE4cKEd6AZ9Km1 -V 57 -d "rollback to @57"`
+— the admin files on Pages work with @57 (they fall back to 4 steps without status.mode).
+
+### 15.1 Deployed 2026-10-27 (owner approved; no CONTENT_WRITER, no cutover)
+
+`node deploy-api.mjs "v58: …"` → API deployment `AKfycbxJj…Km1` **@58** (from @57); repository manifest restored
+(no local diff); recovery admin still @14. Checks: (1) `clasp deployments` @58 ✓; (2) `warm` → `{"ok":true}`,
+`workerSync` → `{"ok":false,"error":"off"}` (bridges inert) ✓; (4) Worker `api_log` no 5xx, `CONTENT_DRAFTS=0`,
+`PUBLISH_CLAIM` empty ✓ — the Activity forwarding part of (4) waits for the owner's save in step (3).
+Rollback: `clasp deploy -i AKfycbxJjDyktRi6VlwRGSrF-H_KzN-vkw9QaFCiLD1TlqgrppKs4CHfmOBE4cKEd6AZ9Km1 -V 57`.
