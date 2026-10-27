@@ -5,6 +5,7 @@ Status (2026-10-15): **Phase 0 done. Phase 0.5 and Phase 1 *foundation* in progr
 Amended 2026-10-20: Phase 5 = 5A accounts-first (`docs/YOUTH-ACCOUNTS-PLAN.md` rev. 5) + member email (`docs/MEMBER-NOTIFICATIONS-PLAN.md`); Phase 1.5 and the current roadmap table: `docs/BOOKING-PHASE1-COMPLETION-PLAN.md` §10.
 Amended 2026-10-21 (owner): the browser-side Review moves from Phase 2 to Phase 4 (it needs the pages/competitions drafts and the builders, which move to the Worker in Phase 4); Phase 2 keeps today's server-side Review, diffed against the Worker's live revision in `worker` mode. Plan: `docs/PUBLISH-SEPARATION-PLAN.md`.
 Amended 2026-10-21: Phase 9 native mobile apps (Admin + Youth Portal, Capacitor + native FCM, web/PWA kept) added after Phase 8; groundwork in Phase 6 (§22.2).
+Amended 2026-10-27 (owner): Phase 10 interactive games platform added after Phase 9 as a documented future phase (§22.3). Planning only; it does not change Phases 1–9.
 Approved 2026-10-15: implementation on Cloudflare account `menazakmena@gmail.com`; booking storage D1 + R2 (EVENTS.md §1 revised).
 Amended 2026-10-22 (owner): no plan step or phase is gated or scheduled by a number of days. Progress = steps done and their checks passing; effort estimates in dev-days were removed from every plan. Functional time rules stay (retention, token/session/OTP expiry, reminder timing, rollback retention windows, provider deadlines).
 Code base inspected: `origin/main` @ `1ce107b`. Limits and prices come from official pages fetched 2026-10-14/15 (sources at the end).
@@ -551,6 +552,7 @@ Usage at this scale is < 10% of every free limit. **No surprise bills:** Workers
 | **7 Retirement** | Remove `script.google.com` from config/CSP, undeploy, delete triggers, archive Sheets/Drive read-only, keep the project 90 days | — | §25 checklist |
 | **8 Complete Admin UI/UX redesign** (after 7 / 7a and retirement) | Visual and interaction redesign of every Admin module on the finished backend. Spec: §22.1 | Clearer, faster admin work; no backend effect | §22.1 acceptance criteria |
 | **9 Native mobile apps** (after 8) | Admin and Youth Portal as installable apps: Capacitor + native FCM, Android first, iOS after. Web/PWA stays, same backend. Spec: §22.2 | Reliable background push; no backend effect | §22.2 acceptance criteria |
+| **10 Interactive games platform** (last, lowest priority; after 9 is officially closed and only on the owner's explicit order) | Six ready-made games on one shared engine (Durable Object per live session) + the Admin «الألعاب» area + separate Host accounts; sub-phases 10.0–10.4. Spec: §22.3 | New feature; no effect on existing screens | §22.3 acceptance criteria |
 | Optional: custom domain (unnumbered; was "Phase 8") | Whole site on Workers Static Assets | Instant new-slug previews | Only if wanted; best done early (§18) |
 
 **Rules across all phases:**
@@ -680,6 +682,119 @@ Done when: the items above pass their Worker tests and a staging check with one 
 - No API, schema or business logic exists only for the apps beyond §22.2.4.
 - Store review passed; owner sign-off per app.
 
+### 22.3 Phase 10 — Interactive games platform
+
+Approved 2026-10-27 (owner) as a **documented future phase**: the last phase and the lowest priority. Nothing is built until Phase 9 is officially closed **and** the owner gives an explicit order to start Phase 10. Saving this plan is not an approval to start any part of it. Basis: the owner's games brief and the study rev. 2 (2026-10-27). Rules marked *proposal* below are technical proposals to be tested in their sub-phase, not final decisions.
+
+**22.3.1 Fixed decisions.**
+- Six approved games. **In the meeting:** Quiz, Buzzer Battle («الجرس السريع»), Mystery Identity («مين الشخصية؟»). **After / outside the meeting:** the Social Deduction family («المافيوسو والمتخفي»), Different Question («مين المختلف؟»), Treasure Hunt («رحلة الاستكشاف في الكنيسة»). No further games without the owner's approval.
+- A new, required Admin area **«الألعاب»** prepares, manages and publishes the ready-made games. The existing external game links (`games` in `content.json`) stay unchanged.
+- The **no-code «اختراع الألعاب» area is cancelled.** Instead: one shared engine + one module per game; a new game is a new code module that does not rebuild the engine. Each module may expose settings (variants) the Admin can use without code.
+- **Published snapshots:** publishing a game freezes an immutable, content-addressed version; a session is bound to one version, so editing a game never changes a running session (the competitions snapshot pattern).
+- **Host ≠ Admin.** The Admin (or an authorised servant) prepares and publishes games and creates **Host operator accounts** (username + password). A player can never obtain Host control.
+- **Host flow:** sign in → library of published games → preview → session settings → create a session with its own join code and QR → lobby.
+- **A display screen separate from the Host console** (its own link and read-only token), so secrets (roles, individual votes, correct answers, grading) never reach the projector. In-meeting games rely on the projector; after-meeting games use it only where the game needs it.
+- Players join with a **name only** (from their phone, no account, no login). Team mode = **one phone per team**; the team name and its members' names are entered once, and only the team name shows during play.
+- Expected size: **10–20 players** per session. Existing site and Cloudflare account; **no new domain is bought**.
+- **Game points and member rewards are separate.** In-game ranking points never touch a member's wallet. A reward reaches a wallet only when an Admin matches the person to an account, sets the amount and approves it (§22.3.4). No automatic credit anywhere.
+- Claude may propose a new, professional design per game at execution time; the old game HTML designs are not binding. Arabic RTL, phone first, site identity, Phase 8 design system for the Admin.
+
+**22.3.2 Architecture.**
+- **Shared engine (built once):**
+  - One **Durable Object per live session** (WebSocket, hibernation): the single source of truth for state, phases, timers, votes, buzzer order and scores. Sessions are isolated from each other; the same snapshot can run in several sessions without mixing results.
+  - Roles `host` / `player` / `display`, each with its own token; the role is checked on **every** action.
+  - **Per-role projection:** each device receives only what it may see. Secret roles, individual votes and correct answers never leave the server to a device that is not entitled to them (automated payload test, like the competitions "no answers in public files" test).
+  - Reconnect: a device token returns a player to the same seat after a screen lock or network drop, with a full state resync.
+  - Shared primitives: server timer, secret vote, buzzer, teams, ranking, event log, results archive in D1 (written at checkpoints, not per message).
+- **Game module** = content schema + Admin editor settings + server rules (actions, phases, scoring) + Host / Player / Display views + its own tests. Registered in the engine; no engine change for a new game.
+- **Treasure Hunt** needs no live socket: plain HTTP + D1 + R2; the Host dashboard refreshes every 10–15 s.
+- **Host accounts:** own table; password stored as a hash (WebCrypto); the Admin can reset a password, not view it; scope per game/library; attempt limit + temporary lockout; disable at once; optional expiry; every Host action written to the activity log.
+- **Reused:** Worker, D1, R2 (private bucket, signed short-lived URLs), CI and the switch model; the competitions question model and XLSX import (Quiz content); the Phase 5B wallet ledger with idempotent keys (rewards); the Phase 4 browser-side image compression and upload flow; QR generation; the Phase 3 admin platform (permissions, edit locks, activity); the Phase 8 design system.
+- Tables and migrations are designed at the start of 10.0 (next free migration number at that time); none exist before then.
+
+**22.3.3 The six games — core requirements.**
+
+1. **Quiz (first priority).** Game flow and results very close to Kahoot, with an original design.
+   - Question and choices on the projector; the phone shows the answer buttons, each with a **colour and a symbol**.
+   - Points are computed automatically from correctness and speed (Kahoot style). After each question: the correct answer, the answer distribution, then the updated ranking. After the last question: a celebratory podium.
+   - The Host picks **Solo** or **Team** before the session (Team = one phone per team, members discuss and answer together; only the team name is shown).
+   - *Proposal (tested in 10.1, revisable):* answer time measured on the phone from the moment its buttons were enabled, bounded by the server's own clock; a short "read the question" phase before the choices appear; correct answers score 500–1000 by speed, wrong 0.
+   - Optional per quiz: **linked to member rewards** or **entertainment only** (§22.3.4).
+2. **Buzzer Battle.** A separate fast-buzzer game: the Host opens the buzzer, sees who was really first, stops it, gives the turn, marks right/wrong, moves on. Early presses are locked out. The hybrid fairness rule C (short window after the first press, lowest on-device reaction time inside it) is accepted **for study and testing**; the final rule follows real-network tests in 10.2. It must not add complexity or cost to Quiz.
+3. **Mystery Identity.** Progressive clues from least to most revealing. The **Admin sets the answer method per question**: typing the name on the phone, buzzer + oral answer to the Host, or both; the system applies it automatically (the Host does not choose during play). Arabic name variants are normalised (أ/إ/ا, ة/ه, ى/ي, «ال») with an accepted-names list and manual Host acceptance. *Proposals (tested in 10.2):* in "both" mode a buzz pauses typing for everyone until the Host judges; one attempt per player per clue; points fall with each revealed clue.
+4. **Social Deduction family.** One family with modes on a shared base (secret roles on phones, discussion, secret vote).
+   - **Case mode («المافيوسو / القضية») — final rules:**
+     - The Admin writes the case, the professions/roles and the clues, and marks each role innocent or criminal (one or more criminals). Option: criminals know their partners (each sees the partner's name and role, secretly).
+     - Players join with the session code and their names. The Host assigns the roles to names; roles stay hidden during assignment and are revealed to everyone at once when the Host presses reveal. Each player sees only their own card.
+     - Clues are shared by everyone (never per role). The Host chooses where a clue shows (Host only / projector / phones).
+     - Each round = one clue → discussion → secret vote for one suspect → optional suspense countdown → result → **the accused is eliminated**. A clue is never consumed without a decided accusation. If the vote time ends with no result, the Host extends it or reopens the vote.
+     - The Host sets discussion and vote times freely (or no timer) and controls start / end / pause / extend / skip manually. The Host sees who voted for whom, their roles and the totals; players never see individual votes.
+     - **Tie:** each tied player gives one oral defence; the other (not tied) players discuss and agree orally; the Host records the chosen name in the console. No second electronic vote. A tie among three or more works the same way. If the tie covers **everyone** still in, a general discussion is held and the Host records the final decision; the round is never dropped automatically.
+     - An eliminated player becomes a **silent spectator**: no vote, no part in later discussions.
+     - **Win:** innocents win when every criminal is out. Criminals win when they are equal to or more than the innocents still in, or when the vote of the last clue ends with a criminal still in.
+     - **Validity checks before the session starts:** every criminal role is assigned; criminals fewer than innocents at the start; clues ≥ criminals (the Admin editor warns when the margin is small); innocent roles may repeat or stay unassigned, and clues should not depend on an innocent role being present (Admin guidance + warning).
+   - **Imposter / unknown-word modes.** Two ideas are supported: (a) one player gets a different but related word; (b) one player gets no word and tries to find the topic and blend in from the others' hints. Their win, vote and elimination rules are presented as **proposals at the start of 10.3** for the owner's review. The case-mode rules are not imposed on them.
+5. **Different Question.** Not the imposter mode.
+   - The Admin prepares pairs: a main question and a different one whose answer looks similar or has the same shape.
+   - Most players get the main question; one player, chosen by the Host, gets the different one. Everyone writes the answer secretly. When answering ends, the questions disappear from every phone and only the answers stay.
+   - The Host reads the main question aloud; each player shows only their answer; discussion; secret vote; result. No elimination, no case.
+   - After each round the Host either continues with the same players or brings in a new group, under the same session code.
+   - **No in-game points and no visible score.** A player sees that they won a round when they win. Round winners and results are saved to the Admin, where the owner can later (even after the meeting) review them and add member rewards manually (§22.3.4). No automatic reward, and no reward per round is required.
+6. **Treasure Hunt.**
+   - **Admin:** per clue, two images: the real object's original reference photo and the sketch («الكروكي») the team sees; clue sets and optional packs; any number of clues. The original is never shown to teams during play.
+   - **Host:** starts the session and follows registered teams. **Team** is the main mode, Solo optional; one phone per team. Distribution: the same clues in the same order, the same clues in a random order per team, or packs assigned to teams by the Host.
+   - **Team:** registers its name and members once; sees the sketch only; photographs the object and uploads the photo directly to the site (no WhatsApp). Online-first: upload with a simple retry on failure, no offline engineering. Photo states: not sent / sent, awaiting review / reviewed (secretly). A successful upload shows "received" only; the team never sees right/wrong during play, even after grading. When all clues are sent: «برجاء التوجه للخادم المسؤول عن المسابقة», and the Host is notified with the time.
+   - **Secret grading:** per photo the Host sees the team name, the real clue (whatever its order for the team), the sketch, the original, the team's photo, the send time and the time elapsed since the shared start; the verdict is right/wrong only.
+   - **Dashboard:** per team: total, received, remaining, right, wrong, awaiting review, finish time; sorting and comparison. Unreviewed photos are not wrong. **No automatic points, ranking or winner:** the Host chooses winners and places manually.
+   - **After the hunt:** the Host may announce winners manually, publish a per-team grading report (sketch + original + team photo + right/wrong per clue), both, or nothing. Nothing is shown before the Host decides.
+   - **Participant photos** (private R2): after the final close, either deleted or kept privately in the Admin until deleted manually, per the setting. Clue originals and sketches belonging to published content are never deleted by this cleanup.
+
+**22.3.4 Member rewards (Quiz and Different Question).**
+- Off by default; set per quiz («مرتبطة بنقاط المخدومين» / «للترفيه فقط»). Different Question always saves its round winners for later review.
+- When on, after the session the results (winners, and team members' names) arrive in an Admin queue. The Admin matches names to member accounts **manually** (the screen may suggest matches), sets each amount and approves it. Only the approval writes to the wallet (Phase 5B ledger, idempotent key per session and member).
+- Players are never required to sign in with a member account. No automatic credit.
+
+**22.3.5 Sub-phases.**
+
+| Sub-phase | Scope | Depends on | Tests | Done when |
+| --- | --- | --- | --- | --- |
+| **10.0 Foundation** (not released alone; ships to production with 10.1) | Engine, Durable Object sessions, Host accounts, library + preview, published snapshots, join code + QR, separate display screen, reconnect, the «الألعاب» Admin shell, a 20-client simulator | Phases 4–9 done (R2 flow, 5B wallet, Phase 8 design system) | Role/permission tests (a player token cannot run a Host action), projection payload scan, two parallel sessions, reconnect after lock/drop, latency measured from Egypt to `workers.dev` on Wi-Fi and mobile data | A test module runs end to end on staging with 20 simulated clients and real phones; all security tests pass; the latency numbers are reported to the owner |
+| **10.1 Quiz** | Solo + Team, full display (answers, distribution, ranking, podium), speed scoring; the rewards bridge behind its own switch | 10.0; Phase 5B for rewards | Scoring tests, timing tests on real networks, Team mode, reward queue (no wallet write before approval) | A real meeting with 10–20 phones runs clean; the owner approves a reward from the queue on staging |
+| **10.2 Buzzer + Mystery Identity** | Buzzer primitive, fairness options tested (A/B/C), progressive clues, Arabic name matching, the three answer methods | 10.0 (Mystery's buzzer method needs the buzzer) | Field fairness test on church networks; normalisation tests; "both" mode concurrency | The fairness rule is chosen from real test numbers; a real session of each game |
+| **10.3 Social Deduction + Different Question** | 10.3a: case mode (roles, partners, rounds, elimination, ties, win rules, validity checks) + Different Question (groups, saved winners). 10.3b: imposter / unknown-word modes after their rules are approved | 10.0; 10.1 rewards queue (for saved winners) | Automated simulation of every win/tie/elimination path; projection scan for secret roles and votes | A real session of each mode; no secret in any payload |
+| **10.4 Treasure Hunt** | Uploads to R2 with retry, secret grading, dashboard + comparison, reports, participant-photo cleanup | 10.0 only (no live socket); may move before 10.2 if an event needs it | Upload/retry on weak networks; cleanup deletes participant photos only; no verdict reaches a team before the Host publishes | A real event with several teams; the owner signs off the dashboard and the report flow |
+
+Each sub-phase ships behind a switch (e.g. `GAMES_MODULE` and one per game), staging first, production only with the owner's approval (project rules).
+
+**22.3.6 Performance, security and cost (10–20 players).**
+- Load is small: a 20-player, 20-question quiz is a few thousand socket messages per session. D1 is written at checkpoints only.
+- **Main performance risk:** the slow path from Egypt to `workers.dev` (TLS 0.5–2 s, outliers up to 30 s, see Phase 2), with no new domain. Mitigation: one WebSocket opened in the lobby, on-device timing with server bounds, numbers measured in 10.0 and reported to the owner before any further decision.
+- **Cost:** Durable Objects (SQLite storage) have a free allowance and socket messages are billed at a reduced ratio, but the daily request limit is **shared with the whole site**, and limits and prices change. Check the account's plan, the current limits and prices at the start of 10.0; do not assume "free". R2 is already enabled; Treasure Hunt photos (tens of ~300 KB images per event) are far below its free tier.
+- Security: role check on every action, per-role projection, Host account lockout, signed short-lived photo URLs, participant photos in a private prefix separate from published clue images.
+
+**22.3.7 Deferred decisions (decided in the named sub-phase; they do not block this plan).**
+- 10.0: table/migration design; Host account scopes and expiry defaults; display-screen pairing method.
+- 10.1: final speed-measurement method and scoring constants after tests; streak bonus or not; reward-queue screen details.
+- 10.2: final buzzer fairness rule (A / B / C) from field tests; "both" mode concurrency and attempt limits.
+- 10.3: imposter and unknown-word rules (proposals for the owner); case-mode edge cases found in simulation, solved without changing the rules above.
+- 10.4: default retention setting for participant photos; report delivery details.
+- All: the final UI design per game (proposed by Claude, approved by the owner).
+
+**22.3.8 Risks.**
+- Network latency from Egypt (above) — measured early, fairness-sensitive rules kept testable.
+- Secrets on the projector — mitigated by the separate display screen and the projection test.
+- Church Wi-Fi and phones locking — reconnect built into the foundation, tested on Wi-Fi and mobile data.
+- Scope: six games is a large surface — one sub-phase at a time, each closed by a real session before the next.
+- Arabic answer matching — normalisation + manual Host acceptance.
+
+**22.3.9 Acceptance criteria.**
+- The six games run as specified in §22.3.3, each signed off by the owner after a real session.
+- No player can obtain Host control; no secret (roles, individual votes, correct answers, grading) appears in any payload to an unentitled device or on the display screen.
+- A running session is unaffected by editing or republishing its game.
+- No wallet credit happens without an Admin approval; game points and member rewards stay separate.
+- The external game links area is unchanged.
+- Participant-photo cleanup never deletes published clue images.
+
 ---
 
 ## 23. Rollback per phase
@@ -694,6 +809,7 @@ Done when: the items above pass their Worker tests and a staging check with one 
 | 4–6 | Frozen tabs + a **tested reverse export** (D1 → original Sheets columns) kept for 4 weeks per phase, rehearsed before cutover; then flip the map back | < 1 h |
 | 7 | Apps Script project kept (undeployed) 90 days; redeploy is possible, but only meaningful together with a reverse export | hours |
 | 8 | Static admin files: revert the slice's commit (GitHub Pages) | minutes |
+| 10 | Games switch off (`GAMES_MODULE` / per game); the rest of the site is untouched. Bad deploy: `wrangler rollback` | seconds–minutes |
 | Custom domain (optional) | Remove the custom domain → github.io serves again (push re-subscription does not roll back) | minutes |
 | Bad deploy | `wrangler rollback` to the previous Worker version | seconds |
 | Bad data | D1 Time Travel restore, or the nightly backup | minutes |
