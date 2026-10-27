@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "258646becddf",
-  "publishedAt": "2026-10-21T21:18:26.671Z",
+  "revision": "be078c1a9a7c",
+  "publishedAt": "2026-10-27T11:50:11.135Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -311,7 +311,7 @@
       "id": "act-2f7f8204",
       "type": "black-theatre",
       "section": "activities",
-      "title": "المسرح الأسود",
+      "title": "المسرح الأسود1",
       "subtitle": "حكايات بالنور والظل… ورسالة بتوصل من غير كلام",
       "description": "",
       "image": {
@@ -579,7 +579,7 @@
     {
       "id": "pg-0d2eeb07",
       "slug": "black-theatre",
-      "title": "المسرح الأسود",
+      "title": "المسرح الأسود1",
       "tagline": "حكايات بالنور والظل… ورسالة بتوصل من غير كلام",
       "cover": {
         "src": "media/2026/img-09d4476b.webp",
@@ -590,7 +590,7 @@
         "color": "#412618"
       },
       "partner": "bug",
-      "v": "5bf0b59d54ba"
+      "v": "daa5ef81e2b6"
     }
   ],
   "events": [
