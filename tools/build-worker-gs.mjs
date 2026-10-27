@@ -39,7 +39,8 @@ export function build() {
   const parts = [];
   const names = new Set();
   for (const file of FILES) {
-    const code = readFileSync(`${ROOT}apps-script/${file}`, 'utf8');
+    // LF whatever the checkout: the source hash is the same on Windows and in CI
+    const code = readFileSync(`${ROOT}apps-script/${file}`, 'utf8').replace(/\r\n/g, '\n');
     for (const m of code.matchAll(/^function ([A-Za-z_$][\w$]*)\s*\(/gm)) names.add(m[1]);
     parts.push(`/* ---- apps-script/${file} ---- */\n${code}`);
   }
