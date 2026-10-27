@@ -66,9 +66,14 @@ function viewStmt(db, sig, view) {
  * staging without competitions: an empty one.
  */
 export async function compView(env) {
-  if (staticNone(env)) return { view: { comps: [], questions: [], items: [] } };
+  if (staticNone(env)) return { view: staticView(env) };
   const row = await retry(() => env.DB.prepare("SELECT data FROM comp_package WHERE id = 'view'").first());
   return { view: row ? JSON.parse(row.data) : null };
+}
+
+/* staging without competitions: an empty view (else null: the view kept in D1 applies) */
+export function staticView(env) {
+  return staticNone(env) ? { comps: [], questions: [], items: [] } : null;
 }
 
 function staticNone(env) {
@@ -102,6 +107,13 @@ export async function askAppsScript(ctx, payload) {
 export async function compPackage(ctx, { mode, now, media, by }) {
   if (staticNone(ctx.env)) return { ...NONE, sig: 'none', prepared: true, fresh: false };
   const db = ctx.env.DB;
+  // the panel's state (P4-7: after a save, on open): the part kept, never a wait for Apps Script —
+  // a save never depends on it; the review and the publish ask when it is not current
+  if (mode === 'state') {
+    const kept = await retry(() => db.prepare("SELECT sig, data, prepared FROM comp_package WHERE id = 'current'").first());
+    if (kept) return { ...JSON.parse(kept.data), sig: kept.sig, prepared: kept.prepared === 1, fresh: false };
+    return { ...NONE, none: false, sig: '', prepared: false, fresh: false, unknown: true };
+  }
   const mediaSig = await sha256(JSON.stringify(media || {}));
   const [row, sigRow] = await Promise.all([
     retry(() => db.prepare("SELECT sig, media_sig, data, prepared FROM comp_package WHERE id = 'current'").first()),

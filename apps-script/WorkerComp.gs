@@ -30,6 +30,19 @@ function contentWriterWorker_() {
 
 }
 
+/*
+ * One writer (BACKEND-MIGRATION §22): after the cutover the content drafts are the Worker's, so a
+ * content change or a publish from here (an old open panel, the recovery admin) is refused — the
+ * Sheets are a frozen copy then. The Worker runs this same code without the property: never refused there.
+ */
+function contentWriterGuard_() {
+
+  if (contentWriterWorker_()) {
+    throw apiError_('moved', 'المحتوى بقى بيتحفظ على السيرفر الجديد.', 'اعمل Refresh للصفحة وكمّل من هناك.');
+  }
+
+}
+
 /* the competitions' draft as the build reads it, without what a publish writes → hex */
 function compPackageSig_() {
 

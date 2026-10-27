@@ -19,15 +19,14 @@
 
 import { ApiError } from '../lib/http.js';
 import { retry } from '../lib/db.js';
-import { contentActivityStmt } from '../lib/activity.js';
+import { contentActivityStmt, queryActivity } from '../lib/activity.js';
 import { requirePerm } from '../lib/perms.js';
 import { cleanDests, payDestStmts } from '../book/pay.js';
 import { createGs, GS_SOURCE } from './gs.gen.js';
 import { MemSpreadsheet, Utilities, memCache, memProperties, LockService, offline } from './services.js';
 import { KINDS, KIND_NAMES } from './kinds.js';
-import { draftsWriter } from './store.js';
 import { setupBuild } from './publishing.js';
-import { compView } from './comps.js';
+import { staticView } from './comps.js';
 import { setupMedia, mirrorMedia, MEDIA_CALLS, MEDIA_UPLOAD_MAX_BYTES } from './media.js';
 
 export { MEDIA_UPLOAD_MAX_BYTES };
@@ -46,8 +45,8 @@ export const CONTENT_CALLS = new Set([
   'apiPages', 'apiPage', 'apiPageSave', 'apiPageSetEnabled', 'apiPageArchive', 'apiPageDelete',
   'apiPageMediaSave', 'apiPageMediaOrder', 'apiPageMediaDelete', 'apiPagePreview',
   'apiEvents', 'apiEvent', 'apiEventSave', 'apiEventSetEnabled', 'apiEventArchive', 'apiEventDelete',
-  // P4-4 / P4-6: the review, the preview, the publish (publishing.js)
-  'apiReview', 'apiPreview', 'apiPublish',
+  // P4-4 / P4-6: the review, the preview, the publish (publishing.js); P4-7: the panel's state
+  'apiReview', 'apiPreview', 'apiPublish', 'apiState',
   // P4-5: the media library, its bytes on R2 (media.js)
   ...MEDIA_CALLS
 ]);
@@ -59,7 +58,7 @@ const NEEDS_ROOTS = new Set(['apiPageSave', 'apiEventSave']);
 const PASS_CODES = new Set(['locked', 'busy', 'session_expired', 'session_replaced']);
 
 async function loadAll(db, sid, now, { activityRows = 15, activityMs = 10 * 60_000 } = {}) {
-  const [rows, kinds, admins, locks, router, recent] = await retry(() => db.batch([
+  const [rows, kinds, admins, locks, router, recent, writer, view, waiting] = await retry(() => db.batch([
     db.prepare('SELECT kind, id, pos, version, data, hash FROM draft_rows WHERE deleted_ms IS NULL ORDER BY kind, pos, id'),
     db.prepare('SELECT kind, version FROM draft_kinds'),
     db.prepare('SELECT email, name, role FROM admins WHERE active = 1 ORDER BY email'),
@@ -67,8 +66,15 @@ async function loadAll(db, sid, now, { activityRows = 15, activityMs = 10 * 60_0
       "JOIN admin_sessions s ON s.sid = l.sid LEFT JOIN admins a ON a.email = l.email WHERE l.kind <> 'booking' AND l.expires_ms > ?").bind(now),
     db.prepare("SELECT value FROM settings WHERE key = 'NOTIFY_ROUTER'"),
     // the rows Activity.gs may merge a repeat edit into (its window: 10 minutes, the last 15 rows)
-    // a publish reads further back: «what changed since the last publish» (Activity.gs activitySincePublish_, 300 rows)
-    db.prepare('SELECT id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary, changes, ref, count, device FROM activity WHERE at > ? ORDER BY at DESC LIMIT ?').bind(now - activityMs, activityRows)
+    // a publish reads further back: «what changed since the last publish» (Activity.gs activitySincePublish_ stops at
+    // the last «publish» row, at most 300): from that row on — or, for a save, the merge window
+    db.prepare('SELECT id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary, changes, ref, count, device FROM activity ' +
+      "WHERE at > ? AND (? = 0 OR at >= COALESCE((SELECT MAX(at) FROM activity WHERE action = 'publish'), 0)) ORDER BY at DESC LIMIT ?")
+      .bind(now - activityMs, activityRows > 15 ? 1 : 0, activityRows),
+    // in the same round trip: the one-writer switch, the competitions' view, library files waiting for the site
+    db.prepare("SELECT value FROM settings WHERE key = 'CONTENT_DRAFTS'"),
+    db.prepare("SELECT data FROM comp_package WHERE id = 'view'"),
+    db.prepare('SELECT COUNT(*) AS n FROM media_files WHERE mirrored_ms IS NULL AND deleted_ms IS NULL AND site_path IS NOT NULL')
   ]));
   const byKind = Object.fromEntries(KIND_NAMES.map(k => [k, []]));
   for (const r of rows.results) if (byKind[r.kind]) byKind[r.kind].push({ id: r.id, pos: r.pos, version: r.version, hash: r.hash, data: JSON.parse(r.data) });
@@ -83,7 +89,10 @@ async function loadAll(db, sid, now, { activityRows = 15, activityMs = 10 * 60_0
     admins: admins.results,
     holders,
     notifyRouter: !!(router.results[0] && router.results[0].value === '1'),
-    recent: recent.results.reverse()
+    recent: recent.results.reverse(),
+    writer: writer.results[0] && writer.results[0].value === '1' ? 'worker' : 'sheets',
+    view: view.results[0] ? JSON.parse(view.results[0].data) : null,
+    waiting: waiting.results[0] ? waiting.results[0].n : 0
   };
 }
 
@@ -127,20 +136,26 @@ export async function runContentCall(ctx, fn, args, { expect = {}, now = Date.no
   const db = ctx.env.DB;
   if (!CONTENT_CALLS.has(fn)) throw new ApiError('bad', 'fn');
   if (!Array.isArray(args) || args.length > 6) throw new ApiError('bad', 'args');
-  if ((await draftsWriter(db)) !== 'worker') throw new ApiError('writer', 'CONTENT_DRAFTS is not 1: the Sheets are the writer');
+  const t0 = Date.now();
+  const timing = {};
+  const mark = k => { timing[k] = Date.now() - t0; };
 
   const email = ctx.actor.email;
   const sid = ctx.session && ctx.session.sid || '';
+  const history = fn === 'apiPublish' ? { activityRows: 300, activityMs: 30 * 86400_000 } : {};
+  let [loaded, roots] = await Promise.all([loadAll(db, sid, now, history), NEEDS_ROOTS.has(fn) ? repoRoots(ctx) : null]);
+  if (loaded.writer !== 'worker') throw new ApiError('writer', 'CONTENT_DRAFTS is not 1: the Sheets are the writer');
   // a publish never moves bytes: library files still waiting for the site go first (like Publish.gs, a failure stops it)
-  if (fn === 'apiPublish') {
+  if (fn === 'apiPublish' && loaded.waiting) {
     for (let round = 0; round < 5; round++) {
       let r;
       try { r = await mirrorMedia(ctx.env, ctx.fetch, now); } catch (err) { throw new ApiError('error', 'media not on the site yet: ' + String(err && err.message).slice(0, 120)); }
       if (!r.mirrored) break;
     }
+    loaded = await loadAll(db, sid, now, history);
+    mark('media');
   }
-  const history = fn === 'apiPublish' ? { activityRows: 300, activityMs: 30 * 86400_000 } : {};
-  const [loaded, roots] = await Promise.all([loadAll(db, sid, now, history), NEEDS_ROOTS.has(fn) ? repoRoots(ctx) : null]);
+  mark('load');
   const primary = (loaded.admins.find(a => a.role === 'primary') || {}).email || '';
   const names = Object.fromEntries(loaded.admins.filter(a => a.name).map(a => [a.email, a.name]));
   const sheets = sheetsFrom(loaded);
@@ -206,25 +221,34 @@ export async function runContentCall(ctx, fn, args, { expect = {}, now = Date.no
   hooks.use('displayName_', who => names[who] || String(who || '').split('@')[0]);
 
   // the competitions stay on Apps Script: what this code reads of them is their view (comps.js)
-  const { view } = await compView(ctx.env);
+  const view = staticView(ctx.env) || loaded.view;
   hooks.use('compDraft_', () => (view ? JSON.parse(JSON.stringify({ ...view, points: null, modules: {} })) : null));
   // a picture a competition uses is never purged: without the view the Worker can't tell
   if (fn === 'apiPurgeMedia' && !view) throw new ApiError('comps', 'the competitions view is not known yet');
 
   const media = await setupMedia(ctx, { fn, args, hooks, loaded });
   const build = await setupBuild(ctx, { fn, g, hooks, services, email });
+  mark('setup');
+  // P4-7: these calls answer with the whole panel state, built here as Apps Script built it
+  if (build) {
+    hooks.use('apiStateFor_', g.apiStateFor_);
+    // the home card's rows and where the toasts start: D1's unified activity (as the session's boot)
+    const activity = await retry(() => queryActivity(db, { limit: 6, view: 'log' })).catch(() => null);
+    hooks.use('activityState_', () => (activity ? { recent: activity.items, latest: activity.items.length ? activity.items[0].at : 0, now } : null));
+  }
   try {
-    return await runAndSave(ctx, { fn, args, expect, now, g, hooks, sheets, loaded, noted, email, build, media, payDest: () => payDest });
+    return await runAndSave(ctx, { fn, args, expect, now, g, hooks, sheets, loaded, noted, email, build, media, payDest: () => payDest, mark, timing });
   } finally {
     if (build) await build.release();
   }
 }
 
-async function runAndSave(ctx, { fn, args, expect, now, g, hooks, sheets, loaded, noted, email, build, media, payDest: payDestOf }) {
+async function runAndSave(ctx, { fn, args, expect, now, g, hooks, sheets, loaded, noted, email, build, media, payDest: payDestOf, mark, timing }) {
   const db = ctx.env.DB;
   let result;
   try {
     result = g[fn](...args);
+    mark('run');
   } catch (err) {
     const message = String(err && err.message || err || '');
     const code = err && err.apiCode && PASS_CODES.has(err.apiCode) ? err.apiCode : 'invalid';
@@ -324,6 +348,7 @@ async function runAndSave(ctx, { fn, args, expect, now, g, hooks, sheets, loaded
 
   // a publish: its revisions in the same batch as the drafts it changed (pages' liveV, Activity)
   if (build) stmts.push(...await build.statements());
+  mark('prepare');
   // new library files: in R2 before the rows that point at them
   const mediaPlan = plan.find(p => p.kind === 'media');
   if (media && mediaPlan) await media.beforeBatch(db, stmts, mediaPlan.ops.filter(o => o.data).map(o => o.data), now);
@@ -336,6 +361,7 @@ async function runAndSave(ctx, { fn, args, expect, now, g, hooks, sheets, loaded
       throw err;
     }
   }
+  mark('write');
   if (build) await build.finish();
   if (media) await media.afterBatch(db, now);
 
@@ -347,7 +373,9 @@ async function runAndSave(ctx, { fn, args, expect, now, g, hooks, sheets, loaded
     result: result && result.__state ? null : result === undefined ? null : JSON.parse(JSON.stringify(result)),
     changed: plan.map(p => p.kind),
     versions,
-    source: GS_SOURCE
+    source: GS_SOURCE,
+    // where the time went (ms since the call started): load, setup, run, prepare, write
+    timing
   };
 }
 

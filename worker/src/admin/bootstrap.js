@@ -15,16 +15,20 @@ import { queryActivity } from '../lib/activity.js';
 import { retry } from '../lib/db.js';
 import { bookingOn } from '../book/public.js';
 import { adminMe } from './me.js';
+import { draftsWriter } from '../content/store.js';
 
 export async function bootPayload(ctx, now = Date.now()) {
-  const [me, activity, book] = await Promise.all([
+  const [me, activity, book, writer] = await Promise.all([
     adminMe(ctx),
     retry(() => queryActivity(ctx.env.DB, { limit: 6, view: 'log' })).catch(() => null),
-    bookingOn(ctx.env).catch(() => null)
+    bookingOn(ctx.env).catch(() => null),
+    draftsWriter(ctx.env.DB).catch(() => 'sheets')
   ]);
   return {
     me,
     activity: activity ? { recent: activity.items, latest: activity.items.length ? activity.items[0].at : 0, now } : null,
-    modules: { book: book === null ? null : !!book }
+    modules: { book: book === null ? null : !!book },
+    // Phase 4: who writes the content drafts (settings.CONTENT_DRAFTS) — the page sends its content calls there
+    content: writer
   };
 }

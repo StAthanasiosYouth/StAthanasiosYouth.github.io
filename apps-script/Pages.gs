@@ -195,6 +195,9 @@ function pagesDropDraft_() {
  */
 function pagesWrite_(label, change) {
 
+  // after the Phase 4 cutover the Worker writes the drafts (WorkerComp.gs)
+  contentWriterGuard_();
+
   var email = currentEmail_();
   var lock = LockService.getScriptLock();
   var result;

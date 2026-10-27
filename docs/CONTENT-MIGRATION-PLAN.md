@@ -244,3 +244,91 @@ Release tree tests: Worker 270/270 (one notify-email timing flake on the first r
 the touched site/admin tests pass except the known `admin/config.js` one.
 Rollback: Worker `30f6cbc0` (`wrangler rollback`); `0017` is additive and unread while `CONTENT_DRAFTS=0`; the empty
 bucket can stay.
+
+## 12. Admin integration and speed (P4-7)
+
+- **One switch decides, the page follows.** The Worker's session answer carries `boot.content` = `'worker'` while
+  `settings.CONTENT_DRAFTS = '1'`, else `'sheets'`. `admin/boot.js` then sends the content calls (`CONTENT_FNS`, the
+  same list as the Worker's `CONTENT_CALLS`, a test compares them) to `POST /v1/admin/content/call` (an upload to
+  `/v1/admin/media/upload`), with the same names, arguments and answers; `apiPublishRefresh` → `apiState`. Otherwise
+  everything goes to Apps Script as today. The page decides nothing about who writes.
+- **The panel state comes from the Worker**: `apiState` and every save answer with the full `apiStateFor_` state,
+  built there (drafts from D1, activity from D1, status with the kept competitions' part — a save never waits for
+  or fails on Apps Script; only the review and the publish ask it when the competitions changed).
+- **«راجع وانشر» — 3 steps** (owner 2026-10-22): مراجعة → نشر → ظهر على الموقع whenever the publish is the Worker's
+  (`status.mode = 'worker'` or content on the Worker). No GitHub / GitHub Pages wait; the mirror stays in the
+  background (its lateness shows in the status pill, as in Phase 2). The 4-step flow remains only for
+  `PUBLISH_MODE = github` (the Phase 2 rollback).
+- **The review in the page**: `admin/review-kit.js` (loaded on first use) from `/v1/admin/content/review-input`;
+  falls back to the Worker's review when the competitions' part is not current or anything fails.
+- **One writer on the Apps Script side**: with the Script Property `CONTENT_WRITER = worker`, `mutate_`,
+  `pagesWrite_` and `publishNow_` refuse (`moved`: «المحتوى بقى بيتحفظ على السيرفر الجديد») — an old open tab or
+  the recovery admin can't write the frozen Sheets.
+- **Speed** (staging, from this machine; network round trip 80–260 ms):
+
+  | | server | client |
+  | --- | --- | --- |
+  | panel state (`apiState`) | 70–130 ms | 180–300 ms |
+  | save | ~100 ms | 300–390 ms |
+  | review (Worker) | ~75 ms | 250–300 ms |
+  | review (browser kit) | — | 10–35 ms + 0.22–0.29 s input |
+  | publish (changed) | 160–200 ms | **336–403 ms** |
+
+  Done for it: one D1 round trip for the load (writer switch, competitions view, media waiting folded in), the
+  claim taken in the read batch and released in the write batch, only live hashes read (not every file body), the
+  page shell kept in D1, Apps Script told about competitions after the answer, Activity read only since the last
+  publish. A publish right after library uploads first sends the waiting pictures to GitHub (by design, once).
+  Every content reply carries `timing` (server phases) for later checks.
+- Browser e2e `tests/content-worker.e2e.mjs` (real Chrome, real Worker in process): panel 149 ms, save via the
+  Worker (Sheets untouched), review computed in the page, 3 steps, publish click → live 46 ms; the switch back.
+
+## 13. Production cutover runbook (P4-8) — needs the owner's approval for every step
+
+**Before (no visible change; all dormant):**
+1. Release batch 3 to `main` (Worker + admin files) — owner approval. `CONTENT_DRAFTS` stays `'0'`.
+2. Apps Script deploy (@58: `WorkerComp.gs`, `ContentExport.gs`, the `Api.gs` / `Activity.gs` / `Code.gs` /
+   `Pages.gs` / `Publish.gs` hooks) — owner approval. Inert until `CONTENT_WRITER` is set.
+3. Production `GITHUB_TOKEN` (Worker) can write the site repository (it already mirrors Phase 2 publishes).
+
+**Cutover (owner present; tell the admins not to edit for ~10 minutes):**
+1. Apps Script editor → `contentMigrateDryRun` → every kind `ok`, `problems` empty.
+2. `contentMigrateApply` → `state: ok`, every kind `ok` (D1 = the Sheets, hash per kind).
+3. `mediaCopyDryRun` → the file count; `mediaCopyApply` → `failed: []`; `GET /v1/admin/content/media-status` → `onDrive: 0`.
+4. Script Property **`CONTENT_WRITER = worker`** (Apps Script stops writing content; the competitions' signature push starts).
+5. D1: `wrangler d1 execute athanasios-prod --remote --command "UPDATE settings SET value='1' WHERE key='CONTENT_DRAFTS'"`.
+6. Owner reloads `/admin/`: the panel opens from the Worker; one small save; «راجع وانشر» (3 steps); publish; the site shows it.
+7. Watch: `api_log` (no 5xx), the publish status pill (mirror not late), `content_notify` drained by Apps Script, a booking page.
+
+**Rollback (any time; rehearsed on staging — §14):**
+1. D1 `CONTENT_DRAFTS = '0'` (seconds): the Worker refuses content calls; admins reloading go back to Apps Script —
+   which still refuses writes (step 4 below not yet), so nothing can be lost in between.
+2. Apps Script editor → `contentRestoreDryRun` → `contentRestoreApply`: D1 → the Sheets (every kind re-hashed equal,
+   the edits made on the Worker included).
+3. Delete the Script Property `CONTENT_WRITER`: Apps Script writes and publishes again (PUBLISH_MODE stays `worker`).
+4. If the published site must go back too: «ارجع للنسخة دي» (Phase 2 restore) to the publish before the cutover.
+5. Code: `wrangler rollback` to the Worker before batch 3 only if the code itself is the problem (with
+   `CONTENT_DRAFTS = '0'` it is inert anyway).
+Known limit after a rollback: pictures uploaded while the Worker wrote are on GitHub (published at upload) and in R2,
+not in Drive: Apps Script's library preview can't show their draft thumbnails; publishing them is unaffected
+(`publishedAt` is set).
+
+## 14. Batch 3 staging record (2026-10-27)
+
+Staging Worker **`aeefdba0`**. Production untouched. Staging `CONTENT_DRAFTS` set to `'1'` only for the runs, back to
+`'0'`; `PUBLISH_CLAIM` empty; staging `pay_dest` restored from its snapshot.
+
+| Check | Result |
+| --- | --- |
+| `scripts/cutover-rehearsal.mjs` — copy → media copy → switch on → panel / save / review (server + kit) / publish → reverse copy into the Sheets (= D1, Worker edits included) → switch off (Worker refuses content: one writer) → «ارجع للنسخة دي» | all ok. Timings: copy dry 1.1 s, apply 1.6 s, media copy 1.2 s, panel state 0.18–0.27 s, save 0.39 s, review 0.30 s, kit 10 ms, publish after uploads 3.4 s (one-time GitHub copy of waiting pictures), next publish 0.69 s, reverse export 0.21 s, Sheets written 11 ms, publish restore 0.52 s |
+| timing probe (§12 table) | publish 160–200 ms server / 336–403 ms client |
+| `content-publish-check`, `content-saves-check`, Phase 2 `publish-check` | all ok |
+| `book-check`, `platform-check`, `claims-check`, `rehearsal` | 31, 26, 23, 58 ok (spaced 10 min: staging rate limits) |
+| `age-check` | 9 ok (re-run spaced; the first run hit the rate limit right after book-check) |
+
+Local: Worker 273/273; site/admin 761/764 (the 3 known); browser e2e 19/19 (`content-worker`, `admin-platform`,
+`admin-app`). The other admin e2e failures (media upload / library / hub, 8 tests) fail the same way on the code
+before batch 3 (checked on a clean worktree of `01aa3a3`): not from Phase 4.
+
+Found and fixed during the batch: the review kit's load order (CompModel before Pages) and its Apps Script time helper;
+a publish claim left held when Apps Script was unreachable (now always released); a page shell never cached when the
+repository has none (fetched every publish).

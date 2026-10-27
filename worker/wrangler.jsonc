@@ -63,7 +63,8 @@
         // Production gets its own widget's key at go-live (worker/README.md); without TURNSTILE_SECRET production refuses every submit.
         "TURNSTILE_SITEKEY": "1x00000000000000000000AA",
         // staging has no Apps Script of its own: its builds have no competitions (never honoured in production)
-        "COMPS_SOURCE": "none"
+        "COMPS_SOURCE": "none",
+        "APPS_SCRIPT_URL": ""
       },
       "r2_buckets": [
         { "binding": "PROOFS", "bucket_name": "athanasios-proofs-staging" },

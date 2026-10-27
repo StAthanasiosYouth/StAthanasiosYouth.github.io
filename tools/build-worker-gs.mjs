@@ -34,6 +34,8 @@ export const REPLACEABLE = ['assertAdmin_', 'currentEmail_', 'log_', 'rememberAc
   'workerLiveContent_', 'publishMode_', 'compDraft_', 'compBuildPublic_', 'compPublishFiles_', 'compReviewInfo_', 'compWriteSnapshots_',
   'compAfterCommit_', 'publishClaim_', 'publishDropClaim_', 'mediaForPublish_', 'githubCommitFiles_', 'publishToWorker_', 'publishShadow_',
   'fetchPublishedContent_', 'lastPublished_',
+  // the panel state (P4-7): its activity from D1
+  'activityState_',
   // the media library's bytes (P4-5): R2 instead of Drive
   'driveUpload_', 'driveDownloadBase64_', 'drive_'];
 
@@ -42,7 +44,8 @@ export const REPLACEABLE = ['assertAdmin_', 'currentEmail_', 'log_', 'rememberAc
 //   compPublishFiles_, compReviewInfo_, compWriteSnapshots_, compAfterCommit_ (CompPublish.gs) — the competitions' part
 //     of a publish is built by Apps Script (apps-script/WorkerComp.gs); the Worker hands over what it answered
 //   compShellText_ (CompPublish.gs) — publishNow_ reads the competitions' shell for their files; Apps Script did that already
-export const STUBS = ['compEnsureSecrets_', 'compPublishFiles_', 'compReviewInfo_', 'compWriteSnapshots_', 'compAfterCommit_', 'compShellText_'];
+//   contentWriterGuard_ (WorkerComp.gs) — Apps Script refuses content writes after the cutover; the Worker IS the writer
+export const STUBS = ['compEnsureSecrets_', 'compPublishFiles_', 'compReviewInfo_', 'compWriteSnapshots_', 'compAfterCommit_', 'compShellText_', 'contentWriterGuard_'];
 
 export function build() {
   const parts = [];

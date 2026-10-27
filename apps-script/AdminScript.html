@@ -3722,10 +3722,39 @@
     { key: 'live', label: 'ظهر على الموقع' }
   ];
 
+  /* the Worker publishes (PUBLISH_MODE 'worker', Phase 2/4): live the moment it answers — the
+     GitHub copy follows in the background, nobody waits for it (owner 2026-10-22: 3 steps) */
+  var PUBLISH_STEPS_LIVE = [
+    { key: 'review', label: 'مراجعة' },
+    { key: 'publish', label: 'نشر' },
+    { key: 'live', label: 'ظهر على الموقع' }
+  ];
+
+  function liveAtOnce() {
+
+    var st = A.state || {};
+    return !!(st.status && st.status.mode === 'worker') || !!(window.AdminWorker && window.AdminWorker.content && window.AdminWorker.content());
+
+  }
+
+  function publishSteps() {
+
+    return liveAtOnce() ? PUBLISH_STEPS_LIVE : PUBLISH_STEPS;
+
+  }
+
+  /* the stepper index of a publish job's step (1 publishing, 2 waiting for Pages, 4 live) */
+  function jobStep(job) {
+
+    if (job.step === 4) return publishSteps().length - 1;
+    return Math.min(job.step, publishSteps().length - 1);
+
+  }
+
   /* step: index of the current step; failed: that step failed */
   function stepper(step, failed) {
 
-    return el('ol', { class: 'stepper', 'aria-label': 'خطوات النشر', 'data-publish': '' }, PUBLISH_STEPS.map(function (s, i) {
+    return el('ol', { class: 'stepper', 'aria-label': 'خطوات النشر', 'data-publish': '' }, publishSteps().map(function (s, i) {
       var state = i < step ? 'done' : i === step ? (failed ? 'failed' : 'current') : 'todo';
       return el('li', { class: 'stepper__step is-' + state, 'aria-current': i === step ? 'step' : null },
         el('span', { class: 'stepper__dot', 'aria-hidden': 'true' }, state === 'done' ? icon('check') : state === 'failed' ? icon('alert') : String(i + 1)),
@@ -3762,7 +3791,7 @@
     publishJob = null;
     A.openSheet('مراجعة قبل النشر', reviewSkeleton());
 
-    A.call('apiReview')
+    reviewNow()
       .then(renderReview)
       .catch(function (error) {
         var box = A.errorBox();
@@ -3772,6 +3801,47 @@
         ]);
         A.fail(error, box);
       });
+
+  }
+
+  /*
+   * The review (Phase 4 P4-4, docs/CONTENT-MIGRATION-PLAN.md §9): with the content on the Worker,
+   * computed in this page by the same builders (admin/review-kit.js, loaded once) from the
+   * drafts + the live site + the competitions' part (GET /v1/admin/content/review-input).
+   * When the kit can't (the competitions' part is not current, an error, an old browser), the
+   * Worker's own review — same result. The publish checks the revision on the server anyway.
+   */
+  var reviewKitLoading = null;
+
+  function reviewKit() {
+
+    if (window.ReviewKit) return Promise.resolve(window.ReviewKit);
+    if (reviewKitLoading) return reviewKitLoading;
+    reviewKitLoading = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = 'review-kit.js';
+      s.async = true;
+      s.onload = function () { if (window.ReviewKit) resolve(window.ReviewKit); else reject(new Error('review kit')); };
+      s.onerror = function () { reviewKitLoading = null; reject(new Error('review kit')); };
+      document.head.appendChild(s);
+    });
+    return reviewKitLoading;
+
+  }
+
+  function reviewNow() {
+
+    var worker = window.AdminWorker;
+    // only while the Worker writes the content: its D1 drafts are then THE drafts
+    if (!worker || !worker.available() || !worker.content || !worker.content()) return A.call('apiReview');
+
+    return Promise.all([reviewKit(), worker.call('GET', '/v1/admin/content/review-input')]).then(function (both) {
+      var input = both[1];
+      if (!input || !input.comps) throw new Error('competitions part not current');
+      return both[0].review({ drafts: input.kinds, live: input.live, comps: input.comps, now: input.now });
+    }).catch(function () {
+      return A.call('apiReview');
+    });
 
   }
 
@@ -3886,12 +3956,18 @@
     return A.call('apiPublish', revision).then(function (result) {
       if (publishJob !== job) return result;
       job.result = result;
-      job.step = result.siteUrl ? 2 : 4;
-      A.applyState(result.state);
+      // live at once on the Worker (its answer IS the live site): no GitHub / Pages wait in the panel
+      var now = liveAtOnce() || result.mirror === 'pending';
+      job.step = now || !result.siteUrl ? 4 : 2;
+      if (result.state) A.applyState(result.state);
       saveUi();
+      if (now) {
+        A.renderStatus('live');
+        setTimeout(function () { A.renderStatus(); }, 6000);
+      }
       if (publishShowing()) renderJob();
-      else A.toast(result.siteUrl ? 'اتنشر على GitHub ✓ — مستنيين GitHub Pages' : 'اتنشر ✓');
-      if (result.siteUrl) waitForSite(job, result.siteUrl);
+      else A.toast(now ? 'ظهر على الموقع ✓' : result.siteUrl ? 'اتنشر على GitHub ✓ — مستنيين GitHub Pages' : 'اتنشر ✓');
+      if (!now && result.siteUrl) waitForSite(job, result.siteUrl);
       return result;
     }, function (error) {
       if (publishJob === job) {
@@ -3919,7 +3995,7 @@
         stepper(1),
         el('p', { class: 'loading-text', role: 'status', 'data-publish-job': '' },
           el('span', { class: 'spinner spinner--inline', 'aria-hidden': 'true' }),
-          'بنبعت التغييرات لـ GitHub… النشر شغال حتى لو قفلت الشاشة دي.')
+          liveAtOnce() ? 'بننشر التغييرات… النشر شغال حتى لو قفلت الشاشة دي.' : 'بنبعت التغييرات لـ GitHub… النشر شغال حتى لو قفلت الشاشة دي.')
       ], [el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })]);
       return;
     }
@@ -3930,7 +4006,11 @@
     // PUBLISH_MODE 'worker' (Phase 2): live on the Worker already; the GitHub copy follows (its mirror, then Pages)
     var mirror = result.mirror === 'pending';
 
-    if (siteUrl) {
+    if (siteUrl && liveAtOnce() && job.step === 4) {
+      // 3 steps: live now; the GitHub copy is the server's background job (its status pill says if it is late)
+      live = el('div', { class: 'note note--ok', role: 'status' }, 'ظهر على الموقع ✓ ', el('a', { href: siteUrl, target: '_blank', rel: 'noopener', text: 'افتح الموقع' }));
+    }
+    else if (siteUrl) {
       live = job.step === 4
         ? el('div', { class: 'note note--ok', role: 'status' }, mirror ? 'نسخة GitHub اتحدثت ✓ ' : 'ظهر على الموقع ✓ ', el('a', { href: siteUrl, target: '_blank', rel: 'noopener', text: 'افتح الموقع' }))
         : job.slow
@@ -3951,8 +4031,10 @@
       : null;
 
     A.openSheet('تم النشر ✓', [
-      stepper(siteUrl ? job.step : 3),
-      el('p', { class: 'note note--ok', 'data-publish-job': '', text: result.unchanged ? 'الملفات على GitHub زي ما هي.' : mirror ? 'اتنشر على السيرفر الجديد ✓ ونسخة GitHub بتتحدث في الخلفية.' : 'التغييرات اتبعتت لـ GitHub.' }),
+      stepper(siteUrl ? jobStep(job) : publishSteps().length - 1),
+      el('p', { class: 'note note--ok', 'data-publish-job': '', text: liveAtOnce()
+        ? (result.unchanged ? 'الموقع كان متحدث بالفعل.' : 'التغييرات على الموقع دلوقتي ✓ — مش محتاج تستنى حاجة.')
+        : result.unchanged ? 'الملفات على GitHub زي ما هي.' : mirror ? 'اتنشر على السيرفر الجديد ✓ ونسخة GitHub بتتحدث في الخلفية.' : 'التغييرات اتبعتت لـ GitHub.' }),
       result.commitUrl ? el('a', { class: 'link-row', href: result.commitUrl, target: '_blank', rel: 'noopener' }, icon('external'), 'شوف الكوميت على GitHub') : null,
       live,
       push

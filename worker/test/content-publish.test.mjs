@@ -197,3 +197,32 @@ test('browser-side «راجع» (admin/review-kit.js): the same review as the Wo
   assert.deepEqual(browser.warnings, server.warnings);
   console.log('browser review ms', Math.round(ms));
 });
+
+test('panel state (P4-7): the Worker\'s apiState = Apps Script\'s — drafts, layout, meta, status — and a save answers with it', async () => {
+  const { world, call } = sheets();
+  const gsState = call('apiState');
+  const w = await worker(world);
+  await w.call('apiReview');   // the competitions' part kept (a state never asks Apps Script for it)
+  const t0 = Date.now();
+  const r = await w.call('apiState');
+  const ms = Date.now() - t0;
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const st = r.body.result;
+  const mask = v => JSON.parse(ids(JSON.stringify(v)).replace(/\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/g, 'T'));
+  for (const key of ['settings', 'sections', 'links', 'contacts', 'sessions', 'news', 'games', 'notifications', 'activities', 'types']) {
+    assert.deepEqual(mask(st.draft[key]), mask(gsState.draft[key]), 'draft.' + key);
+  }
+  assert.deepEqual(mask(st.layout), mask(gsState.layout), 'layout');
+  assert.deepEqual(st.meta, gsState.meta, 'meta');
+  assert.equal(st.status.draftRevision, gsState.status.draftRevision, 'the same build revision');
+  assert.deepEqual(st.status.errors, gsState.status.errors);
+  assert.equal(st.status.mode, 'worker', '«راجع وانشر» has 3 steps');
+  assert.equal(st.hubReady, true);
+  console.log('panel state (in-process) ms', ms);
+
+  // Apps Script unreachable: a save still works (its state uses the kept competitions' part)
+  w.down(true);
+  const saved = await w.call('apiSaveLink', { title: 'من غير Apps Script', url: 'https://example.com/x', section: 'social' });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.ok(saved.body.result.draft.links.some(l => l.title === 'من غير Apps Script'));
+});

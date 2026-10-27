@@ -217,6 +217,8 @@ function adminLayout_(draft) {
 function mutate_(action, details, change) {
 
   var email = assertAdmin_();
+  // after the Phase 4 cutover the Worker writes the drafts (WorkerComp.gs)
+  contentWriterGuard_();
   var lock = LockService.getScriptLock();
 
   return tableScope_(function () {

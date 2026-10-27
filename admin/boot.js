@@ -608,6 +608,10 @@
 
     // the session, presence and device calls go to the Worker (same reply shape)
     if (PLATFORM && Object.prototype.hasOwnProperty.call(PLATFORM_FNS, name)) return platformPost(name, args, tokenValue, sidValue, options);
+    // Phase 4: the content calls too, once the Worker writes the drafts (its session answer says so)
+    if (PLATFORM && contentWorker && (Object.prototype.hasOwnProperty.call(CONTENT_FNS, name) || Object.prototype.hasOwnProperty.call(CONTENT_ALIASES, name))) {
+      return contentPost(name, args, tokenValue, options);
+    }
 
     var abort = typeof AbortController === 'function' ? new AbortController() : null;
     var timedOut = false;
@@ -1528,6 +1532,54 @@
   var PLATFORM_FNS = { apiSessionStart: 1, apiSessionResume: 1, apiSessionEnd: 1, apiHeartbeat: 1, deviceSignIn: 1, apiTrustDevice: 1, apiForgetDevice: 1, apiWorkerSession: 1 };
   var badgeBeats = 0;
 
+  /*
+   * Phase 4 (docs/CONTENT-MIGRATION-PLAN.md §12): when the Worker writes the content drafts — its
+   * session answer says boot.content 'worker' (settings.CONTENT_DRAFTS = '1', the owner's switch) —
+   * the content calls go to the Worker: POST /v1/admin/content/call { fn, args } (an upload:
+   * /v1/admin/media/upload), the same names, arguments and answers as Apps Script (it runs the same
+   * code). The server decides; this page only follows. The list = worker/src/content/runtime.js
+   * CONTENT_CALLS (tests/admin-content-routing.test.mjs compares them).
+   */
+  var CONTENT_FNS = {
+    apiState: 1, apiReview: 1, apiPreview: 1, apiPublish: 1,
+    apiSaveLink: 1, apiSetLinkEnabled: 1, apiDeleteLink: 1, apiMoveLink: 1,
+    apiSaveSection: 1, apiSetSectionEnabled: 1, apiDeleteSection: 1, apiMoveSection: 1,
+    apiSaveContact: 1, apiDeleteContact: 1, apiMoveContact: 1, apiSaveSettings: 1,
+    apiSaveItem: 1, apiDeleteItem: 1, apiSetItemArchived: 1, apiDuplicateItem: 1, apiSetItemEnabled: 1,
+    apiImportPreview: 1, apiImportApply: 1,
+    apiHomeOrder: 1, apiServants: 1, apiServantSave: 1, apiServantSetActive: 1, apiPayMethodsSave: 1, apiServantPayApprove: 1,
+    apiPages: 1, apiPage: 1, apiPageSave: 1, apiPageSetEnabled: 1, apiPageArchive: 1, apiPageDelete: 1,
+    apiPageMediaSave: 1, apiPageMediaOrder: 1, apiPageMediaDelete: 1, apiPagePreview: 1,
+    apiEvents: 1, apiEvent: 1, apiEventSave: 1, apiEventSetEnabled: 1, apiEventArchive: 1, apiEventDelete: 1,
+    apiUploadMedia: 1, apiMediaLibrary: 1, apiUpdateMedia: 1, apiDeleteMedia: 1, apiRestoreMedia: 1, apiPurgeMedia: 1,
+    apiMediaPreview: 1, apiSetMediaAlt: 1
+  };
+  // Apps Script names whose Worker answer is another call's
+  var CONTENT_ALIASES = { apiPublishRefresh: 'apiState' };
+  var contentWorker = false;
+
+  function contentPost(name, args, tokenValue, options) {
+
+    var fn = CONTENT_ALIASES[name] || name;
+    var upload = fn === 'apiUploadMedia';
+    // the session's own panel token when the caller has it (the state asked right after the sign-in, before `sid` is set)
+    var credential = /^wk1\./.test(String(tokenValue || '')) ? Promise.resolve(tokenValue) : panelToken();
+
+    return credential.then(function (value) {
+      return workerFetch('POST', upload ? '/v1/admin/media/upload' : '/v1/admin/content/call',
+        upload ? ((args && args[0]) || {}) : { fn: fn, args: args || [] }, value, options || {});
+    }).then(function (result) {
+      var reply = result.reply;
+      if (reply && reply.ok === true) return { ok: true, result: reply.result === undefined ? null : reply.result };
+      // the code's own refusal travels as `error`: the same words the panel showed before
+      if (reply && reply.ok === false && typeof reply.error === 'string' && reply.error) {
+        return { ok: false, code: String(reply.apiCode || reply.code || ''), error: reply.error };
+      }
+      return envelope(result);
+    }, asReply);
+
+  }
+
   function panelFresh() {
 
     return !!(wkCache && wkCache.sid && wkCache.sid === sid && wkCache.exp - Date.now() > 60000);
@@ -1604,16 +1656,20 @@
         if (!out.ok || !out.result.sid) return out;
         var r = out.result;
         keepPanel(r, r.sid);
+        // Phase 4: the server says who writes the content (it can change at the cutover or a rollback)
+        if (r.boot && (r.boot.content === 'worker' || r.boot.content === 'sheets')) contentWorker = r.boot.content === 'worker';
         var answer = { sid: r.sid, device: r.device, resumed: r.resumed === true, state: null };
         if (!withState) return { ok: true, result: answer };
         var late = function () { return post('apiState', [], r.token, r.sid, options); };
+        // the early Apps Script state is only good while Apps Script writes the content
+        if (early && contentWorker) early = null;
         return (early ? early.then(function (st) { return st.ok ? st : late(); }, late) : late()).then(function (st) {
           if (!st.ok) return st;
           var state = st.result;
           var boot = r.boot || {};
           // the home card and the toasts' starting point: D1's unified activity
           if (state && boot.activity) state.activity = boot.activity;
-          if (state && boot.me) state.platform = { me: boot.me, modules: boot.modules || {} };
+          if (state && boot.me) state.platform = { me: boot.me, modules: boot.modules || {}, content: contentWorker ? 'worker' : 'sheets' };
           answer.state = state;
           return { ok: true, result: answer };
         });
@@ -1719,6 +1775,8 @@
 
   var workerApi = {
     available: function () { return !!WORKER; },
+    /* Phase 4: does the Worker write the content (the last session answer said so)? */
+    content: function () { return contentWorker; },
     /* 'google' | 'device' | '' */
     via: function () { return session ? session.via || '' : ''; },
     /* this page's edit session (the booking locks) */

@@ -302,7 +302,9 @@ function publishStatus_(built) {
     publishedCommit: props.getProperty('PUBLISHED_COMMIT') || '',
     hasChanges: built.content.revision !== published,
     errors: built.errors,
-    warnings: built.warnings
+    warnings: built.warnings,
+    // 'worker': a publish is live at once (the «راجع وانشر» dialog has 3 steps, no GitHub wait)
+    mode: publishMode_()
   };
 
 }
@@ -511,6 +513,8 @@ function apiPublish(expectedRevision) {
 function publishNow_(expectedRevision) {
 
   var email = assertAdmin_();
+  // after the Phase 4 cutover the Worker publishes (WorkerComp.gs)
+  contentWriterGuard_();
   var now = new Date(Date.now());
   var stamp = Utilities.formatDate(now, CONTENT_TIMEZONE, 'yyyy-MM-dd HH:mm');
 

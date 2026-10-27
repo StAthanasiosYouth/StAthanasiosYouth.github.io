@@ -154,18 +154,18 @@ export async function preparePublish(db, body, now = Date.now()) {
   const setHash = await sha256(files.map(f => f.path + '\n' + f.hash).join('\n'));
   const revision = (files.find(f => f.kind === 'content') || {}).revision || null;
 
-  const known = await retry(() => db.prepare('SELECT hash, result FROM publish_jobs WHERE id = ?').bind(id).first());
+  // one round trip: this id already stored? a newer publish? what is live now and the last rev of each (kind, key)
+  const [knownR, newerR, current] = await retry(() => db.batch([
+    db.prepare('SELECT hash, result FROM publish_jobs WHERE id = ?').bind(id),
+    db.prepare("SELECT id FROM publish_jobs WHERE at > ? AND mode <> 'seed' LIMIT 1").bind(at),
+    db.prepare('SELECT kind, key, MAX(rev) AS rev, MAX(CASE WHEN live = 1 THEN hash END) AS live FROM published_revisions GROUP BY kind, key')
+  ]));
+  const known = knownR.results[0];
   if (known) {
     if (known.hash !== setHash) throw new ApiError('conflict', 'publish id reused with other files');
     return { replayed: true, result: { ...JSON.parse(known.result), replayed: true } };
   }
-  const newer = await retry(() => db.prepare("SELECT id FROM publish_jobs WHERE at > ? AND mode <> 'seed' LIMIT 1").bind(at).first());
-  if (newer) throw new ApiError('conflict', 'a newer publish is already stored');
-
-  // what is live now, and the last rev of each (kind, key): a small table, read once
-  const current = await retry(() => db.prepare(
-    'SELECT kind, key, MAX(rev) AS rev, MAX(CASE WHEN live = 1 THEN hash END) AS live FROM published_revisions GROUP BY kind, key'
-  ).all());
+  if (newerR.results[0]) throw new ApiError('conflict', 'a newer publish is already stored');
   const byKey = new Map(current.results.map(r => [r.kind + '\u0000' + r.key, r]));
   const changed = [];
   for (const f of files) {

@@ -236,7 +236,9 @@ test('after a save: the panel reads only what changed (delta), Activity has the 
   const before = (await w.h.call('/v1/admin/content/drafts?kinds=links,news', { headers: { authorization: 'Bearer ' + await g.sign(g.claims({ email: ADMIN, sub: 'sub-' + ADMIN })) }, fetch: g.fetch })).body.kinds;
   const r = await w.call('apiSaveLink', [{ title: 'جديد', url: 'https://example.com/n', section: 'social' }]);
   assert.equal(r.status, 200);
-  assert.equal(r.body.result, null, 'the panel state is not rebuilt here');
+  // P4-7: a save answers with the panel state, as Apps Script does (the page redraws from it)
+  assert.ok(r.body.result.draft.links.some(l => l.title === 'جديد'), 'the state after the save has it');
+  assert.ok(r.body.result.status && r.body.result.layout, 'status and layout as in Apps Script');
   assert.equal(r.body.versions.links, before.links.version + 1);
   const delta = (await w.h.call(`/v1/admin/content/drafts?kinds=links,news&since=links:${before.links.version},news:${before.news.version}`, { headers: { authorization: 'Bearer ' + await g.sign(g.claims({ email: ADMIN, sub: 'sub-' + ADMIN })) }, fetch: g.fetch })).body.kinds;
   assert.equal(delta.news.same, true);
