@@ -1338,6 +1338,8 @@ function activityPendingFlag_() {
 function activityPending_(fn) {
 
   try {
+    // content saved on the Worker (ContentExport.gs; off before the Phase 4 cutover): its decided pushes go out now
+    if (contentNotifyPull_() > 0) return activityDispatchPending_();
     var cache = CacheService.getScriptCache();
     var since = Number(cache.get(ACTIVITY_PENDING_KEY)) || 0;
     // a heartbeat, or the beacon of a closing panel (an admin who acts and

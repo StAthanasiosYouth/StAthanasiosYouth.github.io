@@ -141,3 +141,21 @@ export function forwardedStmt(db, r) {
     SEVERITY.has(r.severity) ? r.severity : 'routine'
   );
 }
+
+/*
+ * A content save's Activity row (Phase 4, content/runtime.js), written by the bundled Apps Script code:
+ * a new row, or — when Activity.gs merged a repeat edit into a recent row — that row updated (same id).
+ * notified: like a forwarded row (1 while the router is off: the push goes through Apps Script).
+ */
+export function contentActivityStmt(db, r, severity) {
+  let changes = r.changes == null ? null : JSON.stringify(r.changes);
+  if (changes && changes.length > 1024) changes = changes.slice(0, 1021) + '…';
+  return db.prepare('INSERT INTO activity (id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary, changes, ref, count, notified, device, severity, source) ' +
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT CASE WHEN value = '1' THEN 0 ELSE 1 END FROM settings WHERE key = 'NOTIFY_ROUTER'), 1), ?, ?, 'worker') " +
+    'ON CONFLICT(id) DO UPDATE SET at = excluded.at, cairo = excluded.cairo, actor_name = excluded.actor_name, action = excluded.action, ' +
+    'entity_title = excluded.entity_title, summary = excluded.summary, changes = excluded.changes, ref = excluded.ref, count = excluded.count, device = excluded.device').bind(
+    r.id, r.at, cairoText(r.at), clip(r.actor, 200), clip(r.actorName, 120), clip(r.action, 60), clip(r.type, 40), clip(r.entityId, 80),
+    clip(r.title, 200), clip(r.summary, 300), changes, clip(r.ref, 120), Math.max(1, Math.min(10000, Math.floor(Number(r.count)) || 1)), clip(r.device, 40),
+    SEVERITY.has(severity) ? severity : 'routine'
+  );
+}

@@ -91,6 +91,11 @@ export const ROUTE_PERMS = Object.freeze({
   'POST /v1/admin/publish/shadow-check': 'system.manage',
   'GET /v1/admin/publish/revisions': 'publish.publish',
   'POST /v1/admin/publish/restore': 'publish.publish',
+  'GET /v1/admin/content/drafts': 'content.view',
+  'GET /v1/admin/content/export': 'system.manage',
+  'GET /v1/admin/content/status': 'system.view',
+  // each call is checked inside against Grants.gs API_PERMS (content/runtime.js), the same table doPost uses
+  'POST /v1/admin/content/call': ANY_ADMIN,
   'POST /v1/admin/proofs': 'bookings.edit',
   'GET /v1/admin/proofs/:id': 'bookings.view',
   'DELETE /v1/admin/proofs/:id': 'bookings.manage',

@@ -49,16 +49,11 @@ export async function payDest(env, servantId, method) {
   return retry(() => env.DB.prepare('SELECT servant_id, method, number, name, source FROM pay_dest WHERE servant_id = ? AND method = ?').bind(String(servantId || ''), String(method || '')).first());
 }
 
-/* POST /v1/sync/pay-dest (signed by Apps Script): the whole approved set replaces the old one */
-export async function syncPayDest(ctx) {
-  await limit(ctx, 'sync.pay', clientIp(ctx.request), 30, 60);
-  const raw = new TextDecoder().decode(ctx.raw);
-  const { body, ts } = await verifySync(ctx.env, ctx.request, raw, 'paydest');
-  const list = Array.isArray(body.dests) ? body.dests : null;
-  if (!list || list.length > MAX_DESTS) throw new ApiError('bad', 'dests');
-  const now = Date.now();
+/* the approved set (Apps Script's payDestPayload_ shape) → checked rows; throws bad on any doubt */
+export function cleanDests(list) {
+  if (!Array.isArray(list) || list.length > MAX_DESTS) throw new ApiError('bad', 'dests');
   const seen = new Set();
-  const dests = list.map(d => {
+  return list.map(d => {
     const servantId = String(d && d.servantId || '');
     const method = String(d && d.method || '');
     const number = localPhone(d && d.number);
@@ -71,13 +66,27 @@ export async function syncPayDest(ctx) {
     seen.add(key);
     return { servantId, method, number, name: String(d.name || '').replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, 60), source, approvedMs, approvedBy };
   });
+}
 
-  const db = ctx.env.DB;
+/* the whole approved set replaces the old one (one batch with the caller's other statements) */
+export function payDestStmts(db, dests, now = Date.now()) {
   const stmts = [db.prepare('DELETE FROM pay_dest')];
   for (const d of dests) {
     stmts.push(db.prepare('INSERT INTO pay_dest (servant_id, method, number, name, source, approved_ms, approved_by, synced_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .bind(d.servantId, d.method, d.number, d.name, d.source, d.approvedMs, d.approvedBy, now));
   }
+  return stmts;
+}
+
+/* POST /v1/sync/pay-dest (signed by Apps Script): the whole approved set replaces the old one */
+export async function syncPayDest(ctx) {
+  await limit(ctx, 'sync.pay', clientIp(ctx.request), 30, 60);
+  const raw = new TextDecoder().decode(ctx.raw);
+  const { body, ts } = await verifySync(ctx.env, ctx.request, raw, 'paydest');
+  const dests = cleanDests(body.dests);
+  const now = Date.now();
+  const db = ctx.env.DB;
+  const stmts = payDestStmts(db, dests, now);
   stmts.push(syncStampStmt(db, 'paydest', ts));
   // counts only: never a number in the audit
   stmts.push(activityStmt(db, { actor: 'apps-script', action: 'paydest.sync', entityType: 'settings', entityId: 'pay_dest', summary: dests.length + ' approved' }));

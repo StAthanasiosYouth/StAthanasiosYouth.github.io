@@ -38,6 +38,8 @@ import { syncPublish, publicContent, publicPage, publicEvent, publicComp, public
 import { shadowCheck, shadowStatus } from './publish-shadow.js';
 import { mirrorStatus } from './publish-mirror.js';
 import { publishRevisions, publishRestore } from './publish-restore.js';
+import { syncContentImport, syncContentExport, syncContentNotify, adminDrafts, adminDraftsExport, adminDraftsStatus, IMPORT_MAX_BYTES } from './content/routes.js';
+import { adminContentCall } from './content/runtime.js';
 
 /* GET /v1/admin/publish/status — the last publishes + the shadow gate (docs/PUBLISH-SEPARATION-PLAN.md P2-2) */
 async function publishStatus(ctx) {
@@ -338,6 +340,15 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/admin/publish/shadow-check', auth: 'admin', handler: publishShadowCheck },
   { method: 'GET', path: '/v1/admin/publish/revisions', auth: 'admin', handler: publishRevisions },
   { method: 'POST', path: '/v1/admin/publish/restore', auth: 'admin', maxBytes: 1024, handler: publishRestore },
+
+  // Phase 4 — content drafts in D1 (docs/CONTENT-MIGRATION-PLAN.md)
+  { method: 'POST', path: '/v1/sync/content-import', auth: 'sync', raw: true, maxBytes: IMPORT_MAX_BYTES, handler: syncContentImport },
+  { method: 'POST', path: '/v1/sync/content-export', auth: 'sync', raw: true, maxBytes: 1024, handler: syncContentExport },
+  { method: 'POST', path: '/v1/sync/content-notify', auth: 'sync', raw: true, maxBytes: 1024, handler: syncContentNotify },
+  { method: 'GET', path: '/v1/admin/content/drafts', auth: 'admin', handler: adminDrafts },
+  { method: 'GET', path: '/v1/admin/content/export', auth: 'admin', handler: adminDraftsExport },
+  { method: 'GET', path: '/v1/admin/content/status', auth: 'admin', handler: adminDraftsStatus },
+  { method: 'POST', path: '/v1/admin/content/call', auth: 'admin', needSession: true, maxBytes: 256 * 1024, handler: adminContentCall },
 
   // booking — public (docs/EVENTS.md §6, worker/BOOKING-API.md)
   { method: 'GET', path: '/v1/book/state', auth: 'public', handler: bookState },
