@@ -23,7 +23,8 @@ export async function handle(request, env, ectx, deps = {}) {
     request, env, url,
     rid: (request.headers.get('cf-ray') || crypto.randomUUID()).slice(0, 36),
     colo: request.cf && request.cf.colo,
-    fetch: deps.fetch || fetch,
+    // a wrapper, not the global itself: a Workers fetch called as ctx.fetch(...) throws «Illegal invocation»
+    fetch: deps.fetch || ((...a) => fetch(...a)),
     actor: null,
     body: null,
     raw: null,

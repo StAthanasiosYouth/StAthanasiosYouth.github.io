@@ -57,7 +57,7 @@ async function worker(world, env = {}) {
   const start = await h.call('/v1/admin/session/start', { method: 'POST', body: { device: 'كمبيوتر', tab: 'tab-aaaaaaaaaaaaaaaa' }, headers: { authorization: 'Bearer ' + await g.sign(g.claims({ email: ADMIN, sub: 's1' })) }, fetch });
   assert.equal(start.status, 200, JSON.stringify(start.body));
   const call = (fn, ...args) => h.call('/v1/admin/content/call', { method: 'POST', body: { fn, args }, headers: { authorization: 'Bearer ' + start.body.token }, fetch });
-  return { h, g, sync, call, asks, down: v => { appsDown = v; } };
+  return { h, g, sync, call, asks, fetch, token: start.body.token, down: v => { appsDown = v; } };
 }
 
 const ids = text => text.replace(/\b(?:link|news|pg|pm|evt|srv|img|cmp|act|q)-[a-z0-9]{6,12}\b/g, 'ID');
@@ -259,4 +259,23 @@ test('online booking (BOOKING_ONLINE): the Worker\'s event.json = Apps Script\'s
   const refused = await prod.call('apiReview');
   assert.equal(refused.status, 500);
   assert.match(JSON.stringify(refused.body), /error/);
+});
+
+test('the Worker\'s own fetch (none injected): asking Apps Script works with a Workers-strict global fetch', async () => {
+  // regression: ctx.fetch was the global fetch itself, and a Workers fetch called as ctx.fetch(...) throws
+  // «Illegal invocation» (production, the first review after the cutover: «مقدرناش نجيب المسابقات دلوقتي»)
+  const { world } = sheets();
+  const w = await worker(world);
+  const real = globalThis.fetch;
+  globalThis.fetch = function (url, init) {
+    if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
+    return w.fetch(url, init);
+  };
+  try {
+    const r = await w.h.call('/v1/admin/content/call', { method: 'POST', body: { fn: 'apiReview', args: [] }, headers: { authorization: 'Bearer ' + w.token } });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.deepEqual(w.asks, ['compPackage:review']);
+  } finally {
+    globalThis.fetch = real;
+  }
 });
