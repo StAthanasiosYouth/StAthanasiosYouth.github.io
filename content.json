@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "0f43703a9927",
-  "publishedAt": "2026-10-28T03:50:05.597Z",
+  "revision": "c66b81beae14",
+  "publishedAt": "2026-10-28T04:19:24.341Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -311,7 +311,7 @@
       "id": "act-2f7f8204",
       "type": "black-theatre",
       "section": "activities",
-      "title": "المسرح الأسود2",
+      "title": "المسرح الأسود",
       "subtitle": "حكايات بالنور والظل… ورسالة بتوصل من غير كلام",
       "description": "",
       "image": {
@@ -334,68 +334,6 @@
       "ctaLabel": "ادخل صفحة فريق المسرح ال",
       "watch": true,
       "partner": "bug"
-    },
-    {
-      "id": "act-5079631e",
-      "type": "trip",
-      "section": "activities",
-      "title": "test-2",
-      "subtitle": "",
-      "description": "",
-      "image": {
-        "src": "media/2026/img-53ca69a3.webp",
-        "thumb": "media/2026/img-53ca69a3-480.webp",
-        "w": 1280,
-        "h": 720,
-        "alt": "",
-        "color": "#463a2f"
-      },
-      "cta": null,
-      "location": "",
-      "startAt": "2026-10-23T10:00",
-      "endAt": "2026-11-24T23:59",
-      "visibleFrom": "",
-      "visibleUntil": "2026-11-25T11:59",
-      "display": "",
-      "displayMobile": "",
-      "event": "test",
-      "ctaLabel": "",
-      "booking": {
-        "opensAt": "2026-10-20T00:00",
-        "closesAt": ""
-      },
-      "partner": "bug"
-    },
-    {
-      "id": "act-ce15d7c6",
-      "type": "trip",
-      "section": "activities",
-      "title": "اختبار نظام الحجز - مؤقت",
-      "subtitle": "اختبار داخلي مؤقت للنظام — مش فعالية حقيقية، متحجزش.",
-      "description": "",
-      "image": {
-        "src": "media/2026/img-8ffd40eb.webp",
-        "thumb": "media/2026/img-8ffd40eb-480.webp",
-        "w": 1600,
-        "h": 900,
-        "alt": "",
-        "color": "#47372c"
-      },
-      "cta": null,
-      "location": "اختبار",
-      "startAt": "2026-10-31T18:00",
-      "endAt": "2026-10-31T20:00",
-      "visibleFrom": "",
-      "visibleUntil": "2026-11-01T08:00",
-      "display": "",
-      "displayMobile": "",
-      "event": "booking-test-temp",
-      "ctaLabel": "",
-      "booking": {
-        "opensAt": "",
-        "closesAt": "2026-10-30T22:00"
-      },
-      "partner": "bug"
     }
   ],
   "types": [
@@ -411,13 +349,6 @@
       "label": "مسرح أسود",
       "icon": "theatre",
       "theme": "night",
-      "banner": null
-    },
-    {
-      "key": "trip",
-      "label": "رحلة",
-      "icon": "bus",
-      "theme": "azure",
       "banner": null
     }
   ],
@@ -579,7 +510,7 @@
     {
       "id": "pg-0d2eeb07",
       "slug": "black-theatre",
-      "title": "المسرح الأسود2",
+      "title": "المسرح الأسود",
       "tagline": "حكايات بالنور والظل… ورسالة بتوصل من غير كلام",
       "cover": {
         "src": "media/2026/img-09d4476b.webp",
@@ -590,59 +521,7 @@
         "color": "#412618"
       },
       "partner": "bug",
-      "v": "9a8b1a5b3aa7"
-    }
-  ],
-  "events": [
-    {
-      "id": "evt-59f41592",
-      "slug": "test",
-      "kind": "trip",
-      "kindLabel": "رحلة",
-      "title": "test-2",
-      "shortTitle": "",
-      "summary": "",
-      "cover": {
-        "src": "media/2026/img-53ca69a3.webp",
-        "thumb": "media/2026/img-53ca69a3-480.webp",
-        "w": 1280,
-        "h": 720,
-        "alt": "",
-        "color": "#463a2f"
-      },
-      "startAt": "2026-10-23T10:00",
-      "endAt": "2026-11-24T23:59",
-      "booking": {
-        "opensAt": "2026-10-20T00:00",
-        "closesAt": ""
-      },
-      "partner": "bug",
-      "v": "63330331c328"
-    },
-    {
-      "id": "evt-4011914c",
-      "slug": "booking-test-temp",
-      "kind": "trip",
-      "kindLabel": "رحلة",
-      "title": "اختبار نظام الحجز - مؤقت",
-      "shortTitle": "اختبار حجز",
-      "summary": "اختبار داخلي مؤقت للنظام — مش فعالية حقيقية، متحجزش.",
-      "cover": {
-        "src": "media/2026/img-8ffd40eb.webp",
-        "thumb": "media/2026/img-8ffd40eb-480.webp",
-        "w": 1600,
-        "h": 900,
-        "alt": "",
-        "color": "#47372c"
-      },
-      "startAt": "2026-10-31T18:00",
-      "endAt": "2026-10-31T20:00",
-      "booking": {
-        "opensAt": "",
-        "closesAt": "2026-10-30T22:00"
-      },
-      "partner": "bug",
-      "v": "7758d71a99b9"
+      "v": "5bf0b59d54ba"
     }
   ],
   "partners": {
