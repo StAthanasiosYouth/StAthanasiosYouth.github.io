@@ -418,3 +418,50 @@ Done (owner approved the cutover; activation still needs its own approval):
 5. D1: `CONTENT_DRAFTS = '1'`.
 6. Owner: reload `/admin/` and test (panel, save, review, publish); I compare with the baseline.
 Rollback: §13 (CONTENT_DRAFTS '0' → contentRestoreApply → delete CONTENT_WRITER), rehearsed on staging.
+
+### 16.1 Final verification before activation (2026-10-27 16:07 Cairo)
+
+- BOOKING_ONLINE fix released: `main` `1d6cb04`, Worker `4e639208`; review kit with props on Pages; no 5xx.
+- Owner purged library items and re-ran the copy (dry ok, apply ok: 16 kinds equal, media 27 rows; media copy 53 files,
+  `failed: []`). 5 rows left the Sheets, not 4: the planned `img-9cbd2410`, `vid-bb74aed0`, `vid-508104a5`, plus two
+  items already in the library trash since 2026-10-12 (`img-af6b0c28`, `vid-55f81cd6`; unused; their published files
+  stay on the site). `vid-fb156999` («مسرح اسود» 854×480) was not purged: still in the library, unpublished.
+- Cleaned: the 10 R2 copies of the 5 purged items deleted, their `media_files` rows marked deleted (the 3 never
+  published would otherwise have been sent to GitHub by the first publish).
+- D1: 16 kinds / 100 rows, every row hash and kind hash recomputed and equal; 27 library rows, 0 on Drive, 0 refs
+  without an R2 file; 53 active files (27.0 MB), all 53 objects present in R2; only `vid-fb156999` waits for the site.
+- Production unchanged vs the baseline: bookings, payments, proofs, pay_dest, event_cfg, admins/grants, the 8 live
+  files, every switch.
+- Final backup: D1 bookmark `00000166-00000010-00005111-6a38e68f04dc6aeeb20b0e84ed7bca66` + encrypted export (904 KB).
+
+### 16.2 The media difference before activation (2026-10-27 15:12–15:20 Cairo)
+
+The owner's dry run showed `media` different (27 rows both sides). Checked: (a) every D1 media row had changed since the
+copy only through `mediaCopyApply` (the two R2 columns); (b) the Sheet's own media hash had ALSO changed since the copy
+(every other kind unchanged) → re-copy, then a column-by-column diff against a snapshot: the only change was
+`vid-fb156999` («مسرح اسود» 854×480) leaving the library — the 4th planned purge, done by the owner after the copy.
+Its two R2 copies deleted, rows marked. (`news` / `games` "different" with 0 rows on both sides is an artifact of the
+dry-run report: an empty kind is compared as '' on the D1 side.)
+State now: 16 kinds / 99 rows, every hash recomputed and equal; library 26 rows, 51 files (25.8 MB) all in R2, 0 waiting
+for the site; bookings, payments, proofs, pay_dest, event_cfg, admins/grants, live files and switches = the baseline;
+`BOOKING_ONLINE = 1` in D1 (owner approved).
+
+### 16.3 Activation and closure (2026-10-28, owner approved)
+
+- 03:31Z owner dry run = the 13:17Z copy for every kind (no Sheet change since). Owner set `CONTENT_WRITER = worker`
+  (an unsigned `workerSync` now answers `auth`, not `off`). 03:3xZ `CONTENT_DRAFTS = 1` in D1 (owner approved).
+- First «راجع وانشر» failed: 503 `comps` in ~80 ms. Cause: the Worker's `ctx.fetch` was the bare global `fetch`;
+  called as `ctx.fetch(...)` Cloudflare throws «Illegal invocation», so the Worker never reached Apps Script (staging
+  has no competitions source; the tests inject their own fetch). Same cause made `repoRoots` (the repository-name slug
+  check) silently return nothing. Fix: `ctx.fetch` is an unbound wrapper (`worker/src/index.js`); regression test with a
+  Workers-strict global fetch. Staging: old code reproduced the 503 in 108 ms; fixed code reached Apps Script (3.2 s,
+  refused `auth` for the staging secret); publish and saves checks all ok. Released (owner approved): `main` f09e111,
+  Worker `f9c3bc83`. No switch changed, no data re-copied.
+- Owner production tests, verified in D1: reviews 200 (competitions asked once, `comp_package` current + view stored);
+  saves (a page, an activity); publish `pub-0f43703a9927` (content, ics, the page and its stub) live at 03:50:05Z,
+  mirrored 03:50:09Z, claim released; media upload `img-3efb3209` → R2 → on the site 4 s later (both files 200);
+  booking page checked by the owner. No 5xx.
+- After: 16 kinds / 100 rows, every row and kind hash recomputed and equal. Bookings 9 (4/1/4), payments 4 (460),
+  proofs 11, pay_dest 2, event_cfg 2, admins 3 / grants 135 = the baseline.
+- **Phase 4 closed.** Rollback path stays as §13 (CONTENT_DRAFTS 0 → contentRestore → remove CONTENT_WRITER) until
+  Phase 7 retires the Apps Script content code.

@@ -93,7 +93,8 @@ Not checked here: the GitHub Actions runs (nightly backup, Worker CI) — `gh` i
 | 1.5 Admin access & notifications | ✔ 11/11 in production, all switches off. Deferred: closed-app push (→ Phase 6/7A). Deviations: no `AGE_RULES` switch (plan §8 had one); `PAY_REQUESTS` has no admin toggle |
 | 2 Publish separation | ✔ done; P2-7 reduced (browser Review → Phase 4, owner); shadow duration waived. Open: watch the next publishes (above) |
 | 3 Admin platform | ✔ done 2026-10-22 (cutover P3-8; §4.2). The < 1 s panel open moves with the content state to Phase 4 |
-| 4–7 | not started (as planned) |
+| 4 Content + pages/events + media | ✔ done 2026-10-28 (cutover `docs/CONTENT-MIGRATION-PLAN.md` §16–16.3): drafts in D1, publish + review on the Worker, media on R2. Open: measure the panel open from Egypt |
+| 5–7 | not started (as planned) |
 | 8 Admin redesign, 9 Native apps | planning only (as planned). Essential admin fixes listed in BACKEND-MIGRATION §22.1 still wait for approval |
 
 Found in the review (not in the plans before):
@@ -130,7 +131,13 @@ Not met in Phase 3, moved to Phase 4: **panel open < 1 s**. The Worker part answ
 Open items: old `ADMIN_DEVICE_*` Script Properties (remove with the owner); `AdminNotify.gs adminPresent_` no longer sees
 open panels (temporary bridge → Phase 6/7A); the Apps Script session code stays until Phase 7 retirement (rollback path).
 
-## 5. Next: Phase 4 — content + pages/events + media
+## 5. Phase 4 — content + pages/events + media (closed 2026-10-28)
+
+Closed: `CONTENT_WRITER = worker` (Apps Script) and `CONTENT_DRAFTS = 1` (D1) live; production tests passed (review,
+save, 3-step publish, media upload, booking page), baseline unchanged. Record and rollback: `docs/CONTENT-MIGRATION-PLAN.md`
+§13, §16–16.3. Open: measure the panel open (< 1 s target) on the owner's account from Egypt. Next per the roadmap: Phase 5.
+
+Original brief (kept for the record):
 
 Spec: `docs/BACKEND-MIGRATION.md` §22 (row 4). Draft tables + the pure builders in the Worker, publish fully in the Worker,
 the browser-side Review (moved from Phase 2), Drive library → R2, upload-time GitHub commits. It also brings the panel's
