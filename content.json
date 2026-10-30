@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "f8948ee61ccb",
-  "publishedAt": "2026-10-30T12:35:24.324Z",
+  "revision": "0d2cc47b7c93",
+  "publishedAt": "2026-10-30T14:52:59.630Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -282,32 +282,6 @@
   "notifications": [],
   "activities": [
     {
-      "id": "act-8282cddb",
-      "type": "competition",
-      "section": "competitions",
-      "title": "test",
-      "subtitle": "",
-      "description": "",
-      "image": {
-        "src": "media/2026/img-4f71317c.webp",
-        "thumb": "media/2026/img-4f71317c-480.webp",
-        "w": 1600,
-        "h": 400,
-        "alt": "",
-        "color": "#1b324b"
-      },
-      "cta": null,
-      "location": "",
-      "startAt": "2026-10-19T12:12",
-      "endAt": "",
-      "visibleFrom": "",
-      "visibleUntil": "",
-      "display": "",
-      "displayMobile": "",
-      "competition": "test",
-      "ctaLabel": "ابدأ المسابقة"
-    },
-    {
       "id": "act-2f7f8204",
       "type": "black-theatre",
       "section": "activities",
@@ -337,13 +311,6 @@
     }
   ],
   "types": [
-    {
-      "key": "competition",
-      "label": "مسابقة",
-      "icon": "trophy",
-      "theme": "ember",
-      "banner": null
-    },
     {
       "key": "black-theatre",
       "label": "مسرح أسود",
@@ -493,17 +460,6 @@
       "banner": null,
       "visibleFrom": "",
       "visibleUntil": ""
-    }
-  ],
-  "competitions": [
-    {
-      "id": "cmp-9227de8c",
-      "slug": "test",
-      "title": "test",
-      "shortTitle": "",
-      "startAt": "2026-10-19T12:12",
-      "endAt": "",
-      "v": "af9742f9476a7f6e"
     }
   ],
   "pages": [
