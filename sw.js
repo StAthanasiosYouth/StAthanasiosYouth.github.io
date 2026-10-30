@@ -31,7 +31,7 @@ const ROUTE = /^#(?:notifications|meeting|points|(?:news|game|activity)\/[\w-]{1
 const FIXED_PAGE = /^\/(?:competition\/[a-z0-9-]{2,40}|points|events\/[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9]))\/$/;
 const TOP_PAGE = /^\/([a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9]))\/$/;
 const RESERVED = ['admin', 'assets', 'media', 'points', 'competition', 'events', 'pages', 'privacy', 'terms',
-  'review', 'tools', 'docs', 'tests', 'apps-script', 'index', 'preview', 'new', 'card-athanasios'];
+  'review', 'tools', 'docs', 'tests', 'apps-script', 'index', 'preview', 'new', 'card-athanasios', 'account'];
 const PAGE = { test: path => FIXED_PAGE.test(path) || (TOP_PAGE.test(path) && !RESERVED.includes(TOP_PAGE.exec(path)[1])) };
 const IMAGE = /^\/media\/[\w./-]{1,200}\.(?:webp|jpe?g|png)$/;
 

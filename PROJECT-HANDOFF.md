@@ -137,6 +137,8 @@ Closed: `CONTENT_WRITER = worker` (Apps Script) and `CONTENT_DRAFTS = 1` (D1) li
 save, 3-step publish, media upload, booking page), baseline unchanged. Record and rollback: `docs/CONTENT-MIGRATION-PLAN.md`
 §13, §16–16.3. Open: measure the panel open (< 1 s target) on the owner's account from Egypt. Next per the roadmap: Phase 5.
 
+**Phase 5 started 2026-10-30** (`docs/PHASE5-PLAN.md`: five batches, each needs the owner's choice to start and separate approval for production). Batch 1 (P5-1 + P5-2: accounts foundation, sign-in) is verified on staging; not on `main`, not in production. Next: batch 2, only on the owner's choice.
+
 Original brief (kept for the record):
 
 Spec: `docs/BACKEND-MIGRATION.md` §22 (row 4). Draft tables + the pure builders in the Worker, publish fully in the Worker,
@@ -155,7 +157,7 @@ keeps running in the background. Not started.
 - Never print or expose secrets/tokens. Do not modify OAuth credentials, the Gmail setup, or buy a domain / switch email providers.
 - Do not weaken authentication; do not repeatedly request notification permission.
 - Issues caused only by the temporary Apps Script bridge → document and defer to Phase 6/7A.
-- Roadmap decisions are final (2026-10-20); do not reopen them. Phase 5A (accounts/member email) is not started.
+- Roadmap decisions are final (2026-10-20); do not reopen them. Phase 5A is in progress on the batch system of `docs/PHASE5-PLAN.md`.
 - New admin UI uses existing components only; the redesign is Phase 8 (`docs/BACKEND-MIGRATION.md` §22.1).
 - Avoid unnecessary repeated tests and token use.
 

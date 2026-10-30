@@ -40,7 +40,7 @@ export function loadTurnstile(doc = document, win = window) {
   return promise;
 }
 
-export function mountTurnstile(box, siteKey, { onChange = () => {}, onError = () => {}, doc = document, win = window } = {}) {
+export function mountTurnstile(box, siteKey, { action = 'book', onChange = () => {}, onError = () => {}, doc = document, win = window } = {}) {
   let id = null;
   let value = '';
   let gone = false;
@@ -52,7 +52,7 @@ export function mountTurnstile(box, siteKey, { onChange = () => {}, onError = ()
     if (gone) return;
     id = ts.render(box, {
       sitekey: siteKey,
-      action: 'book',
+      action,
       language: 'ar',
       theme: 'auto',
       // flexible needs ≥ 300 px; a phone's form is narrower (≈ 260 px at 360): compact, never clipped

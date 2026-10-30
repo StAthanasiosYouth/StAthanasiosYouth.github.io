@@ -1,0 +1,195 @@
+/* =========================================================
+   أسرة البابا أثناسيوس — the youth account (account/index.html).
+   On top of comp.css: its tokens, buttons and fields.
+========================================================= */
+
+.acct {
+  display: grid;
+  gap: 16px;
+}
+
+.acct__title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.acct__title:focus {
+  outline: none;
+}
+
+.acct__lead {
+  margin: 0;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+.acct__notice {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+
+.acct__notice:empty {
+  display: none;
+}
+
+.acct__pwrow {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.acct__pwrow .field__input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.acct__eye {
+  flex: none;
+  min-height: 52px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, .2);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, .05);
+  font-weight: 700;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+/* the email-first guidance is only visual: the field stays usable, so password managers can fill it (§13.2) */
+.acct__pw.is-muted .field__label,
+.acct__pw.is-muted .field__input {
+  opacity: .7;
+}
+
+.acct__none {
+  display: grid;
+  gap: 12px;
+}
+
+.acct__none p {
+  margin: 0;
+  font-weight: 700;
+}
+
+.acct__none[hidden],
+.acct__pw[hidden],
+.btn[hidden] {
+  display: none;
+}
+
+.acct__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.acct__row input[type="checkbox"] {
+  flex: none;
+  width: 22px;
+  height: 22px;
+}
+
+.acct__link {
+  justify-self: start;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-weight: 700;
+  color: var(--accent-hi);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.acct__link:disabled {
+  color: var(--text-3);
+  text-decoration: none;
+  cursor: default;
+}
+
+.acct__support {
+  margin: 0;
+  font-size: .9rem;
+  color: var(--text-3);
+}
+
+.acct__support a {
+  color: var(--accent-hi);
+}
+
+.acct__email {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
+.acct__dob {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.acct__dob legend {
+  padding: 0;
+  margin-bottom: 6px;
+}
+
+.acct__dobrow {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr 1.1fr;
+  gap: 8px;
+}
+
+.acct__dobrow select.field__input {
+  padding-inline-start: 26px;
+  padding-inline-end: 6px;
+  background-position: 14px 50%, 8px 50%;
+  font-size: 1rem;
+}
+
+.acct__password {
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: var(--radius-sm);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: clamp(1.15rem, 6vw, 1.6rem);
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-align: center;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.acct__check:empty {
+  display: none;
+}
+
+.acct__hints {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.acct__hint {
+  display: grid;
+  gap: 10px;
+}
+
+.acct__hintname {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

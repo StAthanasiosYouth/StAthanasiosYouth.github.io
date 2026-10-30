@@ -65,14 +65,28 @@ const MESSAGES = {
   writer: ['المحتوى بيتحفظ دلوقتي في مكان تاني.', 'حدّث الصفحة وكمّل.'],
   stale: ['حد عدّل ده قبلك.', 'افتح آخر نسخة وكمّل عليها.'],
   // Phase 4 publish (content/comps.js): the competitions' part comes from Apps Script
-  comps: ['مقدرناش نجيب المسابقات دلوقتي، فمفيش حاجة اتنشرت.', 'جرّب تاني بعد دقيقة.']
+  comps: ['مقدرناش نجيب المسابقات دلوقتي، فمفيش حاجة اتنشرت.', 'جرّب تاني بعد دقيقة.'],
+  // Phase 5 youth accounts (account/routes.js, docs/YOUTH-ACCOUNTS-PLAN.md §6, §8, §16.4)
+  accounts_off: ['تسجيل الدخول متوقف مؤقتًا.', 'جرّب تاني بعد شوية.'],
+  session: ['لازم تسجّل دخولك تاني.', ''],
+  password: ['الباسورد مش صحيح. اتأكد منه وجرّب تاني.', ''],
+  blocked: ['الحساب ده موقوف. كلّم الخدمة.', ''],
+  dup_phone: ['رقم الموبايل ده مسجّل بالفعل في حساب تاني.', 'لو ده رقمك ومش قادر تدخل، كلّم الدعم الفني.'],
+  dup_email: ['الإيميل ده عليه حساب بالفعل.', 'سجّل دخول، ولو مش فاكر الباسورد استخدم «نسيت الباسورد» أو كلّم الدعم الفني.'],
+  otp_bad: ['الكود غلط.', ''],
+  otp_dead: ['الكود اتقفل، اطلب كود جديد.', ''],
+  otp_expired: ['الكود انتهى، اطلب كود جديد.', ''],
+  otp_wait: ['استنى ٦٠ ثانية قبل ما تطلب كود تاني.', ''],
+  otp_limit: ['وصلت للحد اليومي للأكواد، جرّب بكرة أو كلّم الدعم الفني.', ''],
+  mail_down: ['مش قادرين نبعت الكود دلوقتي.', 'جرّب بعد شوية أو كلّم الدعم الفني.']
 };
 
 const STATUS = {
   auth: 401, denied: 403, origin: 403, bad: 400, toolarge: 413, rate: 429, conflict: 409, busy: 409, disabled: 403, notfound: 404, method: 405, error: 500,
   not_found: 404, invalid: 400, proof: 400, not_open: 409, closed: 409, full: 409, limit: 429, final: 409, expired: 401, warn: 409, needs_override: 409, over: 409, recent: 409,
   locked: 409, turnstile: 403, google: 403, protected: 403, age: 400, mode: 409,
-  session_replaced: 401, session_expired: 401, off: 409, device: 401, writer: 409, stale: 409, comps: 503
+  session_replaced: 401, session_expired: 401, off: 409, device: 401, writer: 409, stale: 409, comps: 503,
+  accounts_off: 503, session: 401, password: 401, blocked: 403, dup_phone: 409, dup_email: 409, otp_bad: 400, otp_dead: 400, otp_expired: 400, otp_wait: 429, otp_limit: 429, mail_down: 503
 };
 
 export class ApiError extends Error {

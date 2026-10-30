@@ -16,7 +16,7 @@
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])$/;
 // top-level folders that are never a page (Pages.gs PAGE_RESERVED_SLUGS, the site's own folders)
 const RESERVED = ['admin', 'assets', 'media', 'points', 'competition', 'competitions', 'events', 'event', 'pages', 'page',
-  'privacy', 'terms', 'review', 'tools', 'docs', 'tests', 'apps-script', 'index', 'preview', 'new', 'card-athanasios',
+  'privacy', 'terms', 'review', 'tools', 'docs', 'tests', 'apps-script', 'index', 'preview', 'new', 'card-athanasios', 'account',
   'graphify-out', 'node-modules', 'content', 'manifest', 'sw', 'robots', 'meeting', 'live', 'favicon', 'api', '404'];
 
 const ok = slug => SLUG.test(slug) && !/--/.test(slug);

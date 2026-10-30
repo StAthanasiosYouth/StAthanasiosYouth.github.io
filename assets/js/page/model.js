@@ -21,7 +21,7 @@ export const PAGE_SLUG = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])$/;
 /* top-level names a service page can never take (Pages.gs PAGE_RESERVED; sw.js has its own copy) */
 export const PAGE_RESERVED = [
   'admin', 'assets', 'media', 'points', 'competition', 'events', 'pages', 'privacy', 'terms',
-  'review', 'tools', 'docs', 'tests', 'apps-script', 'index', 'preview', 'new', 'card-athanasios'
+  'review', 'tools', 'docs', 'tests', 'apps-script', 'index', 'preview', 'new', 'card-athanasios', 'account'
 ];
 
 export const EVENT_KINDS = ['trip', 'conference', 'funday'];

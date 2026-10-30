@@ -47,6 +47,7 @@ All resources live in Cloudflare account `menazakmena@gmail.com` (workers.dev su
 | `ADMIN_EMAILS` | staging only | Bootstrap allowlist for tests. **Production does not use it**: its admins are copied from Apps Script (see "Admin allowlist") |
 | `BOOK_SECRET` | both (production: at go-live) | HMAC for visitor booking status links and proof claims (≥ 32 chars). Staging: `.staging-book-secret` |
 | `TURNSTILE_SECRET` | both (production: at go-live) | Cloudflare Turnstile secret for `POST /v1/book/submit` (`src/book/turnstile.js`). **Production without it refuses every submit.** Staging: Cloudflare's always-pass TEST secret `1x0000000000000000000000000000000AA`. The site key is the var `TURNSTILE_SITEKEY` (wrangler.jsonc; staging: the TEST key `1x00000000000000000000AA`) |
+| `PW_PEPPER`, `PW_KEY`, `OTP_PEPPER` | both (production: with Phase 5 batch 1's release) | Youth accounts (`src/account/secret.js`, `docs/PHASE5-PLAN.md`): password hash, the encrypted copy (base64, 32 bytes), code hash. `node scripts/account-secrets.mjs [--production]` generates and pipes them, printing nothing, and refuses to run twice: new values would make every password unusable |
 | `STAGING_TEST_JWK` | **staging only** | Public JWK of the load-test signing key (`.staging-test-key.pem`, gitignored). Ignored unless `ENVIRONMENT === 'staging'` |
 
 **Later phases add:**

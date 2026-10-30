@@ -29,6 +29,11 @@ export async function pseudonym(env, value) {
   return hex(sig).slice(0, 16);
 }
 
+/* HMAC-SHA256 as hex (the account credentials, account/secret.js) */
+export async function hmacHex(secret, value) {
+  return hex(await crypto.subtle.sign('HMAC', await hmacKey(secret), enc.encode(String(value))));
+}
+
 export async function sha256Bytes(bytes) {
   return hex(await crypto.subtle.digest('SHA-256', bytes));
 }

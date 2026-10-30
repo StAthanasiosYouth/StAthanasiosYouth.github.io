@@ -1,0 +1,695 @@
+/**
+ * YOUTH ACCOUNT: sign-in, registration and recovery (docs/YOUTH-ACCOUNTS-PLAN.md
+ * §6, §8, §10, §13; API: worker/src/account/routes.js).
+ *
+ * One real two-field form, both fields always usable, so a password manager can
+ * fill it at any moment: email only → «متابعة» asks whether it has an account;
+ * email + password → signs in directly. The password never reaches storage.
+ * The server decides everything; this page only draws its answers.
+ *
+ * mountAccount(main, { onSignedIn }) is what competition/ and points/ will use.
+ */
+
+import { h } from '../dom.js';
+import { bookApiUrl } from '../page/book-config.js';
+import { mountTurnstile } from '../page/turnstile.js';
+import {
+  validEmail, emailTypo, maskEmail, submitLabel, arDigits, monthNames, dateText, birthDateOf, birthYears,
+  readHints, addHint, removeHint, writeHints, readSession, writeSession, clearSession
+} from './model.js';
+
+const safeStore = name => {
+  try {
+    return window[name];
+  }
+  catch {
+    return null;
+  }
+};
+
+export function mountAccount(main, { onSignedIn = null } = {}) {
+
+  const local = safeStore('localStorage');
+  const tab = safeStore('sessionStorage');
+  const api = bookApiUrl();
+
+  const S = {
+    config: null,
+    email: '',
+    error: '',
+    notice: '',
+    known: new Map(),      // email → exists, so going back and forth costs nothing
+    asked: null,           // the email the last discovery answered for
+    exists: null,
+    shared: false,
+    form: { phone: '', name: '', year: '', month: '', day: '' },
+    pendingId: '',
+    fieldErrors: {},
+    otp: { kind: '', minutes: 10, wait: 0 },
+    issued: null,          // { email, password, firstName, eligible, first }
+    account: null
+  };
+
+  let captcha = null;
+  let timer = null;
+  let seq = 0;
+
+  /* ---------- the request ---------- */
+
+  async function call(method, path, body, token) {
+    const headers = {};
+    if (body) headers['content-type'] = 'application/json';
+    if (token) headers.authorization = 'Bearer ' + token;
+    try {
+      const res = await fetch(api + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+      const data = await res.json();
+      return { status: res.status, ...data };
+    }
+    catch {
+      return { ok: false, code: 'network', message: 'النت قطع. اتأكد من الاتصال وجرّب تاني.' };
+    }
+  }
+
+  /* a fresh Turnstile token (single use), waiting for the widget when needed */
+  function turnstileToken() {
+    if (!captcha) return Promise.resolve('');
+    if (captcha.token()) return Promise.resolve(captcha.token());
+    return new Promise(resolve => {
+      const started = Date.now();
+      const look = () => {
+        if (!captcha || captcha.token() || Date.now() - started > 8000) resolve(captcha ? captcha.token() : '');
+        else setTimeout(look, 100);
+      };
+      look();
+    });
+  }
+
+  function mountCheck(box) {
+    if (captcha) captcha.remove();
+    captcha = null;
+    const key = S.config && S.config.turnstile;
+    if (!key) return;
+    captcha = mountTurnstile(box, key, {
+      action: 'account',
+      onError: () => showError('علامة التأكيد ما اشتغلتش. حدّث الصفحة أو جرّب نت تاني.')
+    });
+  }
+
+  const showError = text => {
+    const box = main.querySelector('[data-error]');
+    if (box) {
+      box.textContent = text;
+      box.hidden = !text;
+    }
+  };
+
+  /* ---------- small parts ---------- */
+
+  const card = (...kids) => h('div', { class: 'card step acct' }, ...kids);
+  const title = text => h('h1', { class: 'acct__title', tabindex: '-1' }, text);
+  const errorLine = () => h('p', { class: 'field__error', 'data-error': '', role: 'alert', hidden: !S.error || null }, S.error);
+  const noticeLine = () => (S.notice ? h('p', { class: 'acct__notice', role: 'status' }, S.notice) : null);
+  const check = () => h('div', { class: 'acct__check', 'data-check': '' });
+  const textBtn = (label, onclick, attrs = {}) => h('button', { type: 'button', class: 'acct__link', onclick, ...attrs }, label);
+
+  function field(label, input, { hint = '', error = '', id = '' } = {}) {
+    return h('div', { class: 'field' + (error ? ' has-error' : ''), 'data-field': id || null },
+      h('label', { class: 'field__label', for: input.id }, label),
+      input,
+      hint ? h('p', { class: 'field__hint' }, hint) : null,
+      error ? h('p', { class: 'field__error', role: 'alert' }, error) : null);
+  }
+
+  function support(lead = 'مش قادر توصل للإيميل بتاعك؟') {
+    const s = S.config && S.config.support;
+    if (!s) return null;
+    return h('p', { class: 'acct__support' }, lead + ' ',
+      h('a', { href: s.whatsapp, target: '_blank', rel: 'noopener' }, 'كلّم الدعم الفني على واتساب'));
+  }
+
+  function show(view, focus) {
+    if (captcha) {
+      captcha.remove();
+      captcha = null;
+    }
+    clearInterval(timer);
+    main.dataset.state = 'ready';
+    main.replaceChildren(view);
+    const box = view.querySelector('[data-check]');
+    if (box) mountCheck(box);
+    const target = focus ? view.querySelector(focus) : view.querySelector('.acct__title');
+    if (target) target.focus({ preventScroll: false });
+  }
+
+  /* ---------- the two-field form (§8.1, §8.2) ---------- */
+
+  function viewSignin({ prefill = '', focusPassword = false } = {}) {
+    if (prefill) S.email = prefill;
+    const email = h('input', {
+      class: 'field__input', type: 'email', name: 'email', id: 'acct-email', autocomplete: 'username', inputmode: 'email',
+      autocapitalize: 'off', spellcheck: 'false', dir: 'ltr', required: true, value: S.email
+    });
+    const password = h('input', {
+      class: 'field__input', type: 'password', name: 'password', id: 'acct-password', autocomplete: 'current-password', dir: 'ltr'
+    });
+    const toggle = h('button', { type: 'button', class: 'acct__eye', 'aria-pressed': 'false', 'aria-label': 'إظهار الباسورد' }, 'إظهار');
+    toggle.addEventListener('click', () => {
+      const showing = password.type === 'text';
+      password.type = showing ? 'password' : 'text';
+      toggle.textContent = showing ? 'إظهار' : 'إخفاء';
+      toggle.setAttribute('aria-pressed', String(!showing));
+      password.focus();
+    });
+    const hint = h('p', { class: 'field__hint', 'data-pw-hint': '' });
+    const pwField = h('div', { class: 'field acct__pw', 'data-pw': '' },
+      h('label', { class: 'field__label', for: 'acct-password' }, 'الباسورد بتاعك'),
+      h('div', { class: 'acct__pwrow' }, password, toggle),
+      hint);
+    const none = h('div', { class: 'acct__none', 'data-none': '', hidden: true },
+      h('p', {}, 'مفيش حساب بالإيميل ده.'),
+      h('div', { class: 'actions' },
+        h('button', { type: 'button', class: 'btn btn--primary', 'data-create': '', onclick: () => openRegister(email.value) }, 'إنشاء حساب جديد'),
+        h('button', { type: 'button', class: 'btn', onclick: () => { setNone(false); email.select(); email.focus(); } }, 'جرّب إيميل تاني')));
+    const submit = h('button', { class: 'btn btn--primary', type: 'submit' }, 'متابعة');
+    const sharedBox = h('input', { type: 'checkbox', id: 'acct-shared', checked: S.shared || null });
+    sharedBox.addEventListener('change', () => { S.shared = sharedBox.checked; });
+
+    const paint = busy => {
+      submit.textContent = submitLabel({ busy, password: password.value });
+      submit.disabled = !!busy;
+    };
+    const setNone = on => {
+      none.hidden = !on;
+      pwField.hidden = on;
+      submit.hidden = on;
+    };
+    const setHint = () => {
+      hint.textContent = S.exists && S.asked === email.value.trim() ? 'أهلاً بيك تاني — اكتب الباسورد بتاعك' : 'اكتب الإيميل الأول ودوس متابعة';
+      pwField.classList.toggle('is-muted', !(S.exists && S.asked === email.value.trim()) && !password.value);
+    };
+
+    email.addEventListener('input', () => {
+      seq++;   // a stale answer is ignored
+      S.email = email.value;
+      setNone(false);
+      setHint();
+      showError('');
+    });
+    password.addEventListener('input', () => {
+      paint(false);
+      setHint();
+    });
+
+    const form = h('form', { class: 'form', method: 'post', novalidate: true },
+      field('الإيميل', email, { id: 'email' }), pwField, none, errorLine(), check(), submit);
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const address = email.value.trim();
+      const typed = password.value;
+      S.error = '';
+      showError('');
+      if (!validEmail(address)) {
+        showError('اكتب إيميلك صح.');
+        email.focus();
+        return;
+      }
+      S.email = address;
+      // the answer is already known: no request for going back and forth
+      if (!typed && S.known.has(address)) {
+        answer(address, S.known.get(address));
+        return;
+      }
+      const mine = ++seq;
+      paint(true);
+      const token = await turnstileToken();
+      const reply = await call('POST', '/v1/account/signin', { email: address, password: typed || undefined, turnstile: token, shared: S.shared });
+      if (captcha) captcha.reset();
+      if (mine !== seq) {
+        paint(false);
+        return;
+      }
+      paint(false);
+      if (reply.session) {
+        await signedIn(reply, address, typed);
+        return;
+      }
+      if (reply.ok && typeof reply.exists === 'boolean') {
+        S.known.set(address, reply.exists);
+        answer(address, reply.exists);
+        return;
+      }
+      if (reply.code === 'password') {
+        S.known.set(address, true);
+        showError(reply.message);
+        if (reply.challenge) form.querySelector('[data-check]').classList.add('is-visible');
+        password.select();
+        password.focus();
+        return;
+      }
+      showError(reply.message || 'حصلت مشكلة. جرّب تاني.');
+    });
+
+    function answer(address, exists) {
+      S.asked = address;
+      S.exists = exists;
+      if (exists) {
+        setNone(false);
+        setHint();
+        password.focus();
+      }
+      else {
+        setNone(true);
+        none.querySelector('[data-create]').focus();
+      }
+    }
+
+    paint(false);
+    setHint();
+    if (S.asked === S.email && S.exists === false) setNone(true);
+
+    show(card(
+      title('سجّل دخولك'),
+      h('p', { class: 'acct__lead' }, 'سجّل دخولك بالإيميل والباسورد بتوعك.'),
+      noticeLine(),
+      form,
+      h('div', { class: 'acct__row' },
+        sharedBox,
+        h('label', { for: 'acct-shared' }, 'ده جهاز مشترك (متفتكرنيش هنا)')),
+      S.shared ? h('p', { class: 'field__hint' }, 'لو مش جهازك، متحفظش الباسورد.') : null,
+      textBtn('نسيت الباسورد؟', () => viewForgot(email.value), { 'data-forgot': '' }),
+      support()
+    ), focusPassword ? '#acct-password' : '#acct-email');
+    S.notice = '';
+  }
+
+  /* ---------- after a right password (§13.5) ---------- */
+
+  async function signedIn(reply, email, password) {
+    const kind = reply.session.kind;
+    writeSession(local, tab, { token: reply.session.token, email: reply.account.email }, kind);
+    if (kind !== 'shared' && local) writeHints(local, addHint(readHints(local), { firstName: reply.account.firstName, email: reply.account.email }));
+    // the explicit save prompt where the browser has one; the form is replaced right after (the others take that as a login)
+    if (password && window.PasswordCredential && navigator.credentials) {
+      try {
+        await navigator.credentials.store(new window.PasswordCredential({ id: email, password, name: reply.account.firstName }));
+      }
+      catch { /* the browser's own prompt still has its chance */ }
+    }
+    S.account = reply.account;
+    history.replaceState(null, '', location.pathname + location.search);
+    viewHome();
+    if (onSignedIn) onSignedIn(reply.account);
+  }
+
+  /* ---------- register (§6) ---------- */
+
+  function openRegister(email) {
+    S.email = String(email || S.email).trim();
+    S.fieldErrors = {};
+    S.error = '';
+    viewRegister();
+  }
+
+  function viewRegister() {
+    const F = S.form;
+    const errs = S.fieldErrors;
+    const phone = h('input', { class: 'field__input', type: 'tel', name: 'phone', id: 'acct-phone', autocomplete: 'tel', inputmode: 'tel', dir: 'ltr', value: F.phone });
+    const name = h('input', { class: 'field__input', type: 'text', name: 'name', id: 'acct-name', autocomplete: 'name', maxlength: '80', value: F.name });
+    const options = (list, chosen, none) => [
+      h('option', { value: '' }, none),
+      ...list.map(([value, label]) => h('option', { value, selected: String(chosen) === String(value) || null }, label))
+    ];
+    const day = h('select', { class: 'field__input', id: 'acct-day', name: 'bday-day', autocomplete: 'bday-day', 'aria-label': 'اليوم' },
+      ...options(Array.from({ length: 31 }, (_, i) => [i + 1, arDigits(i + 1)]), F.day, 'اليوم'));
+    const month = h('select', { class: 'field__input', id: 'acct-month', name: 'bday-month', autocomplete: 'bday-month', 'aria-label': 'الشهر' },
+      ...options(monthNames().map((m, i) => [i + 1, m]), F.month, 'الشهر'));
+    const year = h('select', { class: 'field__input', id: 'acct-year', name: 'bday-year', autocomplete: 'bday-year', 'aria-label': 'السنة' },
+      ...options(birthYears().map(y => [y, arDigits(y)]), F.year, 'السنة'));
+    const hp = h('div', { class: 'hp', 'aria-hidden': 'true' }, h('input', { type: 'text', name: 'website', tabindex: '-1', autocomplete: 'off' }));
+
+    const typo = emailTypo(S.email);
+    const form = h('form', { class: 'form', method: 'post', novalidate: true },
+      h('div', { class: 'acct__email' },
+        h('span', { dir: 'ltr', 'data-reg-email': '' }, S.email),
+        textBtn('تعديل', () => viewSignin({ prefill: S.email }))),
+      typo ? h('p', { class: 'acct__notice', role: 'status' }, 'قصدك ', h('span', { dir: 'ltr' }, typo), '؟ ', textBtn('أيوه، صلّحه', () => { S.email = typo; viewRegister(); })) : null,
+      errs.email ? h('p', { class: 'field__error', role: 'alert' }, errs.email) : null,
+      field('رقم الموبايل', phone, { id: 'phone', error: errs.phone }),
+      field('الاسم الثلاثي أو الرباعي', name, { id: 'name', error: errs.name }),
+      h('fieldset', { class: 'acct__dob', 'data-field': 'birthDate' },
+        h('legend', { class: 'field__label' }, 'تاريخ الميلاد'),
+        h('div', { class: 'acct__dobrow' }, day, month, year),
+        h('p', { class: 'field__hint' }, 'التاريخ مش هيتغير بعد إنشاء الحساب، فاكتبه صح.'),
+        errs.birthDate ? h('p', { class: 'field__error', role: 'alert' }, errs.birthDate) : null),
+      hp,
+      errorLine(),
+      h('div', { class: 'actions' }, h('button', { class: 'btn btn--primary', type: 'submit' }, 'متابعة')));
+
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      Object.assign(F, { phone: phone.value, name: name.value, day: day.value, month: month.value, year: year.value });
+      S.hp = hp.querySelector('input').value;
+      S.fieldErrors = {};
+      S.error = '';
+      if (!birthDateOf(F.year, F.month, F.day)) {
+        S.fieldErrors = { birthDate: 'اختار اليوم والشهر والسنة.' };
+        viewRegister();
+        return;
+      }
+      viewConfirm();
+    });
+
+    show(card(title('إنشاء حساب جديد'), form, support('محتاج مساعدة؟')), errs.phone ? '#acct-phone' : errs.name ? '#acct-name' : '#acct-phone');
+  }
+
+  function viewConfirm() {
+    const F = S.form;
+    const birth = birthDateOf(F.year, F.month, F.day);
+    const go = h('button', { class: 'btn btn--primary', type: 'button', 'data-send': '' }, 'ابعت كود التحقق');
+    go.addEventListener('click', async () => {
+      go.disabled = true;
+      go.textContent = 'بنبعت…';
+      const token = await turnstileToken();
+      const reply = await call('POST', '/v1/account/register/start', { email: S.email, phone: F.phone, name: F.name, birthDate: birth, hp: S.hp || '', turnstile: token });
+      go.disabled = false;
+      go.textContent = 'ابعت كود التحقق';
+      if (captcha) captcha.reset();
+      if (reply.ok) {
+        S.pendingId = reply.pendingId;
+        S.otp = { kind: 'register', minutes: reply.minutes, wait: reply.resendAfter, testCode: reply.testCode || '' };
+        S.error = '';
+        viewOtp();
+        return;
+      }
+      if (reply.code === 'invalid' && reply.field) {
+        S.fieldErrors = { [reply.field]: reply.message };
+        viewRegister();
+        return;
+      }
+      showError([reply.message, reply.hint].filter(Boolean).join(' '));
+    });
+    show(card(
+      title('راجع بياناتك'),
+      h('p', { class: 'acct__lead', 'data-confirm': '' }, 'تاريخ ميلادك ' + dateText(birth) + ' ورقمك ', h('span', { dir: 'ltr' }, F.phone), ' — صح؟'),
+      h('p', { class: 'field__hint' }, 'تاريخ الميلاد مش هيتغير بعد كده.'),
+      errorLine(),
+      check(),
+      h('div', { class: 'actions' }, go, h('button', { class: 'btn', type: 'button', onclick: viewRegister }, 'تعديل')),
+      support('محتاج مساعدة؟')
+    ));
+  }
+
+  /* ---------- the code (§6.6): registration and recovery share it ---------- */
+
+  function viewOtp() {
+    const O = S.otp;
+    const input = h('input', {
+      class: 'field__input field__input--code', id: 'acct-code', name: 'code', autocomplete: 'one-time-code', inputmode: 'numeric', maxlength: '6', dir: 'ltr', required: true
+    });
+    const submit = h('button', { class: 'btn btn--primary', type: 'submit' }, 'تأكيد');
+    const resend = h('button', { type: 'button', class: 'acct__link', 'data-resend': '', disabled: true });
+    const form = h('form', { class: 'form', method: 'post', novalidate: true },
+      field('الكود', input, { id: 'code', hint: 'الكود شغال ' + arDigits(O.minutes) + ' دقايق. الرسالة ممكن تتأخر دقيقة؛ بص في Spam كمان.' }),
+      errorLine(),
+      check(),
+      h('div', { class: 'actions' }, submit));
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const code = input.value.trim();
+      if (!code) {
+        showError('اكتب الكود.');
+        return;
+      }
+      submit.disabled = true;
+      const reply = O.kind === 'register'
+        ? await call('POST', '/v1/account/register/verify', { pendingId: S.pendingId, code })
+        : await call('POST', '/v1/account/forgot/verify', { email: S.email, code });
+      submit.disabled = false;
+      if (reply.ok) {
+        S.issued = { email: reply.email, password: reply.password, firstName: reply.firstName, eligible: reply.eligible, first: O.kind === 'register' };
+        viewPassword();
+        return;
+      }
+      showError([reply.message, reply.hint].filter(Boolean).join(' '));
+      input.select();
+    });
+
+    let wait = O.wait;
+    const tick = () => {
+      resend.disabled = wait > 0;
+      resend.textContent = wait > 0 ? 'ابعت الكود تاني بعد ' + arDigits(wait) + ' ثانية' : 'ابعت الكود تاني';
+      wait--;
+      if (wait < 0) clearInterval(timer);
+    };
+    resend.addEventListener('click', async () => {
+      resend.disabled = true;
+      const token = await turnstileToken();
+      const F = S.form;
+      const reply = O.kind === 'register'
+        ? await call('POST', '/v1/account/register/start', { email: S.email, phone: F.phone, name: F.name, birthDate: birthDateOf(F.year, F.month, F.day), hp: S.hp || '', turnstile: token })
+        : await call('POST', '/v1/account/forgot', { email: S.email, turnstile: token });
+      if (captcha) captcha.reset();
+      if (reply.ok) {
+        O.testCode = reply.testCode || '';
+        wait = reply.resendAfter;
+        clearInterval(timer);
+        tick();
+        timer = setInterval(tick, 1000);
+        showError('');
+        const note = main.querySelector('[data-sent]');
+        if (note) note.textContent = 'بعتنا كود جديد.';
+        return;
+      }
+      if (reply.retryAfter) wait = reply.retryAfter;
+      tick();
+      showError(reply.message || 'حصلت مشكلة. جرّب تاني.');
+    });
+
+    show(card(
+      title(O.kind === 'register' ? 'تأكيد الإيميل' : 'كود الاسترجاع'),
+      h('p', { class: 'acct__lead' }, O.kind === 'register'
+        ? 'بعتنالك كود من ٦ أرقام على '
+        : 'لو الإيميل ده متأكد وعليه حساب، هيوصلك كود من ٦ أرقام خلال دقايق على ', h('span', { dir: 'ltr' }, S.email)),
+      h('p', { class: 'acct__notice', 'data-sent': '', role: 'status' }),
+      O.testCode ? h('p', { class: 'acct__notice', 'data-test-code': O.testCode }, 'Staging: الكود ', h('span', { dir: 'ltr' }, O.testCode)) : null,
+      form,
+      resend,
+      textBtn(O.kind === 'register' ? 'تعديل الإيميل' : 'ارجع لتسجيل الدخول', () => viewSignin({ prefill: S.email })),
+      support('الكود مش واصلك؟')
+    ), '#acct-code');
+    tick();
+    timer = setInterval(tick, 1000);
+  }
+
+  /* ---------- «ده الباسورد بتاعك»: a real sign-in form, so the browser offers to save (§13.5) ---------- */
+
+  function viewPassword() {
+    const I = S.issued;
+    const email = h('input', { class: 'field__input', type: 'email', name: 'email', id: 'acct-email', autocomplete: 'username', dir: 'ltr', value: I.email });
+    const password = h('input', { class: 'field__input', type: 'password', name: 'password', id: 'acct-password', autocomplete: 'current-password', dir: 'ltr', value: I.password });
+    const copied = h('p', { class: 'acct__notice', role: 'status' });
+    const copy = h('button', { type: 'button', class: 'btn', 'data-copy': '' }, 'نسخ');
+    copy.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(I.password);
+        copied.textContent = 'اتنسخ.';
+      }
+      catch {
+        copied.textContent = 'مقدرناش ننسخ. اكتبه عندك من فوق.';
+      }
+    });
+    const submit = h('button', { class: 'btn btn--primary', type: 'submit', 'data-enter': '' }, 'احفظه وادخل');
+    const form = h('form', { class: 'form', method: 'post', novalidate: true },
+      field('الإيميل', email), field('الباسورد بتاعك', password), errorLine(), check(),
+      h('div', { class: 'actions' }, submit, copy), copied);
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      submit.disabled = true;
+      const token = await turnstileToken();
+      const reply = await call('POST', '/v1/account/signin', { email: email.value.trim(), password: password.value, turnstile: token, shared: S.shared });
+      submit.disabled = false;
+      if (reply.session) {
+        const pw = password.value;
+        S.issued = null;
+        await signedIn(reply, email.value.trim(), pw);
+        return;
+      }
+      if (captcha) captcha.reset();
+      showError(reply.message || 'حصلت مشكلة. جرّب تاني.');
+    });
+
+    show(card(
+      title(I.first ? 'أهلاً بيك يا ' + I.firstName + ' ❤️' : 'باسورد جديد لحسابك'),
+      I.first && I.eligible === false
+        ? h('p', { class: 'acct__notice', 'data-guest': '' }, 'حسابك اتعمل بنجاح، لكن سنك خارج النطاق العمري للخدمة، لذلك تقدر تشارك في المسابقات كضيف بدون احتساب نقاط.')
+        : null,
+      h('p', { class: 'acct__lead' }, 'ده الباسورد بتاعك.'),
+      h('p', { class: 'acct__password', dir: 'ltr', 'data-password': '' }, I.password),
+      h('p', { class: 'acct__lead' }, 'احتفظ بيه في مكان آمن لأنه هيكون وسيلة دخولك للمسابقات والنقط والمتجر والخدمات المرتبطة بحسابك.'),
+      form
+    ));
+  }
+
+  /* ---------- forgot (§10): the reply is always the same ---------- */
+
+  function viewForgot(prefill) {
+    if (prefill) S.email = prefill.trim();
+    const email = h('input', {
+      class: 'field__input', type: 'email', name: 'email', id: 'acct-forgot', autocomplete: 'username', inputmode: 'email', autocapitalize: 'off', spellcheck: 'false', dir: 'ltr', value: S.email
+    });
+    const submit = h('button', { class: 'btn btn--primary', type: 'submit' }, 'ابعت الكود');
+    const form = h('form', { class: 'form', method: 'post', novalidate: true },
+      field('الإيميل', email), errorLine(), check(), h('div', { class: 'actions' }, submit));
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const address = email.value.trim();
+      if (!validEmail(address)) {
+        showError('اكتب إيميلك صح.');
+        return;
+      }
+      submit.disabled = true;
+      const token = await turnstileToken();
+      const reply = await call('POST', '/v1/account/forgot', { email: address, turnstile: token });
+      submit.disabled = false;
+      if (captcha) captcha.reset();
+      if (reply.ok) {
+        S.email = address;
+        S.otp = { kind: 'recover', minutes: reply.minutes, wait: reply.resendAfter, testCode: reply.testCode || '' };
+        viewOtp();
+        return;
+      }
+      showError(reply.message || 'حصلت مشكلة. جرّب تاني.');
+    });
+    show(card(
+      title('نسيت الباسورد؟'),
+      h('p', { class: 'acct__lead' }, 'اكتب إيميلك وهنبعتلك كود تعمل بيه باسورد جديد. الباسورد القديم هيفضل شغال لحد ما تأكد الكود.'),
+      form,
+      textBtn('ارجع لتسجيل الدخول', () => viewSignin({ prefill: email.value })),
+      support()
+    ), '#acct-forgot');
+  }
+
+  /* ---------- the same device (§8.5) ---------- */
+
+  function viewHints(hints) {
+    const rows = hints.map(hint => h('li', { class: 'acct__hint', 'data-hint': '' },
+      h('p', { class: 'acct__hintname' }, h('strong', {}, hint.firstName), ' · ', h('span', { dir: 'ltr' }, maskEmail(hint.email))),
+      h('div', { class: 'actions' },
+        h('button', { type: 'button', class: 'btn btn--primary', 'data-continue': '', onclick: () => continueAs(hint) }, 'متابعة'),
+        h('button', { type: 'button', class: 'btn', 'aria-label': 'انسَ الحساب ده على الجهاز ده', 'data-forget': '', onclick: () => forget(hint) }, '✕ انسَ الحساب ده على الجهاز ده'))));
+    show(card(
+      title('هل تريد المتابعة بالحساب الذي استخدمته سابقًا؟'),
+      h('ul', { class: 'acct__hints' }, ...rows),
+      h('button', { type: 'button', class: 'btn', 'data-other': '', onclick: () => viewSignin() }, 'استخدام حساب آخر')
+    ));
+  }
+
+  async function continueAs(hint) {
+    const saved = readSession(local, tab);
+    if (saved && saved.email && saved.email.toLowerCase() === hint.email.toLowerCase()) {
+      const reply = await call('GET', '/v1/account/me', null, saved.token);
+      if (reply.ok) {
+        S.account = reply.account;
+        viewHome();
+        if (onSignedIn) onSignedIn(reply.account);
+        return;
+      }
+      if (reply.code === 'session') clearSession(local, tab);
+    }
+    // the session has ended: the form, the email in place, the password manager's turn
+    S.asked = hint.email;
+    S.exists = true;
+    viewSignin({ prefill: hint.email, focusPassword: true });
+  }
+
+  function forget(hint) {
+    const saved = readSession(local, tab);
+    if (saved && saved.email && saved.email.toLowerCase() === hint.email.toLowerCase()) {
+      call('POST', '/v1/account/logout', {}, saved.token);
+      clearSession(local, tab);
+    }
+    const left = removeHint(readHints(local), hint.email);
+    writeHints(local, left);
+    if (left.length) viewHints(left);
+    else viewSignin();
+  }
+
+  /* ---------- signed in ---------- */
+
+  function viewHome() {
+    const A = S.account;
+    const guest = A.eligibility && A.eligibility.state === 'guest';
+    const logout = async forgetDevice => {
+      const saved = readSession(local, tab);
+      if (saved) await call('POST', '/v1/account/logout', {}, saved.token);
+      clearSession(local, tab);
+      if (forgetDevice) writeHints(local, removeHint(readHints(local), A.email));
+      S.account = null;
+      S.email = forgetDevice ? '' : A.email;
+      S.notice = forgetDevice ? 'خرجت، والجهاز ده نسي الحساب. الباسورد المحفوظ في المتصفح بيتمسح من إعدادات المتصفح.' : 'خرجت من حسابك.';
+      S.asked = null;
+      S.exists = null;
+      viewSignin();
+    };
+    show(card(
+      title('أهلاً بيك يا ' + A.firstName),
+      h('p', { class: 'acct__lead', 'data-home': '' }, h('span', { dir: 'ltr' }, A.email)),
+      guest ? h('p', { class: 'acct__notice', 'data-guest': '' }, 'حسابك خارج النطاق العمري للخدمة، فتقدر تشارك كضيف بدون نقاط.') : null,
+      A.eligibility && A.eligibility.soon ? h('p', { class: 'acct__notice' }, 'سنك قرب يخرج من النطاق العمري للخدمة.') : null,
+      h('div', { class: 'actions' },
+        h('button', { type: 'button', class: 'btn', 'data-logout': '', onclick: () => logout(false) }, 'خروج'),
+        h('button', { type: 'button', class: 'btn', 'data-logout-forget': '', onclick: () => logout(true) }, 'خروج وانسَ الجهاز ده'))
+    ));
+  }
+
+  function viewOff() {
+    show(card(title('تسجيل الدخول متوقف مؤقتًا'), h('p', { class: 'acct__lead' }, 'جرّب تاني بعد شوية.'), support('محتاج مساعدة؟')));
+  }
+
+  function viewBroken() {
+    show(card(
+      title('مقدرناش نفتح الصفحة'),
+      h('p', { class: 'acct__lead' }, 'اتأكد من النت وجرّب تاني.'),
+      h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn btn--primary', onclick: start }, 'جرّب تاني'))
+    ));
+  }
+
+  /* ---------- start ---------- */
+
+  async function start() {
+    main.dataset.state = 'loading';
+    const config = await call('GET', '/v1/account/config');
+    if (!config.ok) {
+      viewBroken();
+      return;
+    }
+    S.config = config;
+    if (config.mode !== 'on') {
+      viewOff();
+      return;
+    }
+    const saved = readSession(local, tab);
+    const hints = readHints(local);
+    if (hints.length) {
+      viewHints(hints);
+      return;
+    }
+    if (saved) {
+      // a shared-device session in this tab: no card, it simply goes on
+      const reply = await call('GET', '/v1/account/me', null, saved.token);
+      if (reply.ok) {
+        S.account = reply.account;
+        viewHome();
+        if (onSignedIn) onSignedIn(reply.account);
+        return;
+      }
+      if (reply.code === 'session') clearSession(local, tab);
+    }
+    viewSignin();
+  }
+
+  start();
+}

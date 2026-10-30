@@ -10,6 +10,7 @@ import { notifyTick } from './notify/tick.js';
 import { shadowCheck, SHADOW_EVERY_MIN } from './publish-shadow.js';
 import { mirrorDue, mirrorPending, mirrorAccess, ACCESS_MINUTE } from './publish-mirror.js';
 import { sessionSweepStmts } from './admin/session.js';
+import { accountSweepStmts, pendingSweepStmt } from './account/session.js';
 
 const DAY = 24 * 3600 * 1000;
 export const RETENTION = {
@@ -37,7 +38,9 @@ export async function housekeeping(env, now = Date.now()) {
     env.DB.prepare('DELETE FROM notify_quota WHERE day < ?').bind('h:' + new Date(now - 2 * DAY).toISOString().slice(0, 13)),
     env.DB.prepare('DELETE FROM shadow_checks WHERE at < ?').bind(now - RETENTION.shadowMs),
     // Phase 3: forgotten admin sessions, old replaced sids, used device nonces
-    ...sessionSweepStmts(env.DB, now)
+    ...sessionSweepStmts(env.DB, now),
+    // Phase 5: account sessions, codes, the member outbox, registration IP hashes
+    ...accountSweepStmts(env.DB, now)
   ]);
   const removed = r.map(x => x.meta.changes);
   logLine({ kind: 'cron', job: 'housekeeping', removed });
@@ -89,6 +92,8 @@ export async function scheduled(controller, env) {
     // and once an hour: can the token still read and write the branch (changes nothing on GitHub)
     if (new Date(now).getUTCMinutes() === ACCESS_MINUTE) {
       await mirrorAccess(env, { now }).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'access', err: String(err && err.message).slice(0, 200) }));
+      // Phase 5: an unconfirmed registration keeps its private data 30 minutes at most
+      await pendingSweepStmt(env.DB, now).run().catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'pending', err: String(err && err.message).slice(0, 200) }));
     }
     return;
   }

@@ -29,7 +29,7 @@ var SERVANT_ID = /^srv-[a-z0-9]{8}$/;
 
 /* top-level paths a page can never take (the repository's own folders join them at save) */
 var PAGE_RESERVED_SLUGS = ['admin', 'assets', 'media', 'points', 'competition', 'competitions', 'events', 'event', 'pages', 'page',
-  'privacy', 'terms', 'review', 'tools', 'docs', 'tests', 'apps-script', 'index', 'preview', 'new', 'card-athanasios',
+  'privacy', 'terms', 'review', 'tools', 'docs', 'tests', 'apps-script', 'index', 'preview', 'new', 'card-athanasios', 'account',
   'graphify-out', 'node-modules', 'content', 'manifest', 'sw', 'robots', 'meeting', 'live', 'favicon', 'api'];
 
 var PAGE_LIMITS = {
