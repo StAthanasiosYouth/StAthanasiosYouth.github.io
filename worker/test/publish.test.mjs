@@ -10,7 +10,8 @@ import { pathKind, privateKey } from '../src/publish.js';
 const repo = p => readFileSync(new URL('../../' + p, import.meta.url), 'utf8');
 const SITE = {
   'content.json': repo('content.json'),
-  'events/test/event.json': repo('events/test/event.json'),
+  // its own event, not the repository's: the mirror can withdraw that one, as it did on main
+  'events/test/event.json': JSON.stringify({ schema: 1, slug: 'test', title: 'تجربة' }),
   'events/test/index.html': repo('events/test/index.html'),
   'black-theatre/page.json': repo('black-theatre/page.json'),
   'black-theatre/index.html': repo('black-theatre/index.html'),
