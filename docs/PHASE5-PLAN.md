@@ -321,6 +321,20 @@ Owner approved step 2 and ran `workerRuntimeSeed()` from the editor.
 
 **Not limited to owners:** the runbook says "for owners only", but nothing enforces it. Any visitor who reaches `/account/` or `points/` can register during this test.
 
+## 3m. Step 4: owner's first tests and two small changes (2026-10-31)
+
+**Owner's tests on production, as reported:** registration, email confirmation, sign-in and sign-out, forgot password, Turnstile, and the account in the admin and on the member page all work. The logs agree: 1 account, 2 code emails sent, no 5xx on account routes.
+
+**`MEMBER_EMAIL = 1`:** on, since the codes arrive. No member email other than the codes has gone out yet, so delivery is still unproven.
+
+**Released:** `main` `8e713d7`, Worker `4e725bb7` (rollback `bcfaad19`).
+- «إنشاء حساب جديد» on the first screen; the register form asks for the email when it has none.
+- The support link names the person. `/v1/account/config` has a default name, and the admin's account settings edit the name and number or fill them from a contact. The Apps Script copy of the admin wasn't redeployed, because it's only the recovery path.
+
+**Password viewing, reviewed, nothing changed:** every password today is generated (register, forgot, admin reset), and no route lets a member choose one. The Primary Admin's view reads `pw_enc`, is logged, closes after 60 seconds, has no rate limit, and doesn't tell the member. If members may choose passwords later, they may reuse them on other services, so that choice needs its own decision first.
+
+**Remaining before step 5:** a real member email; the support name edited in the admin; one booking; one test competition; the device matrix. A prize request waits for the store to open.
+
 ## 4. Rollback (batches 1–5)
 
 - Batch 4 extra: `accounts_mode = off` returns `competition/` and `points/` to Apps Script at once and refuses every `/v1/comp/*`, `/v1/shop/*` route. Worker rows stay. After launch that fallback serves only the old code login, so it is a stop, not a way back.
