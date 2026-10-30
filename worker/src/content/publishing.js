@@ -24,6 +24,7 @@ import { preparePublish, pathKind } from '../publish.js';
 import { makeJob } from '../jobs.js';
 import { compPackage, compCommitOf, commitComps } from './comps.js';
 import { sha256Sync } from './services.js';
+import { runtimePoints } from '../store/shop.js';
 
 export const BUILD_CALLS = new Set(['apiReview', 'apiPreview', 'apiPublish']);
 
@@ -120,7 +121,8 @@ export async function setupBuild(ctx, { fn, g, hooks, services, email }) {
     hooks.use('lastPublished_', () => null);
     hooks.use('fetchPublishedContent_', () => null);
 
-    hooks.use('compDraft_', () => (pkg.none ? null : { points: pkg.points, modules: pkg.modules }));
+    const points = await runtimePoints(ctx.env.DB, pkg.none ? null : pkg.points);
+    hooks.use('compDraft_', () => (pkg.none && !points ? null : { points, modules: pkg.modules }));
     hooks.use('compBuildPublic_', (draft, c) => {
       (pkg.errors || []).forEach(e => c.error(e.where, e.message));
       (pkg.warnings || []).forEach(w => c.warn(w.where, w.message));

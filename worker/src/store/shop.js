@@ -50,6 +50,23 @@ export async function storeOf(db, wall) {
   return { state: stateOf(s, wall), opensAt: s.SHOP_OPENS_AT || '', closesAt: s.SHOP_CLOSES_AT || '', allowCancel: s.SHOP_ALLOW_CANCEL === '1' };
 }
 
+/*
+ * The home page's «نقاطي / المتجر» widget reads points from the build (COMPETITIONS §18.4). Once accounts are on, the
+ * store's schedule and the season are the Worker's, so they replace what Apps Script put there. Off: unchanged.
+ */
+export async function runtimePoints(db, points) {
+  const on = await retry(() => db.prepare("SELECT value FROM settings WHERE key = 'accounts_mode'").first('value'));
+  if (on !== 'on') return points;
+  const s = await storeSettings(db);
+  const season = await activeSeason(db);
+  const mode = MODES.includes(s.SHOP_MODE) ? s.SHOP_MODE : 'auto';
+  return {
+    url: 'points/',
+    shop: { on: true, mode, preview: mode === 'preview', opensAt: s.SHOP_OPENS_AT || '', closesAt: s.SHOP_CLOSES_AT || '' },
+    season: season ? { name: season.name, startAt: season.start_at || '', endAt: season.end_at || '' } : null
+  };
+}
+
 const parseImage = text => {
   try {
     return text ? JSON.parse(text) : null;

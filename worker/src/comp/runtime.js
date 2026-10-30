@@ -23,7 +23,7 @@ import { storeOf, shopForMember, redemptionsOf } from '../store/shop.js';
 import { compValidateAnswers_, compGrade_, compEmpty_ } from './score.gen.js';
 import {
   GRACE_MINUTES, TOKEN_HOURS, DEADLINE_SLACK_MS, TIMEUP_EARLY_MS, FAST_SECONDS, MAX_OPEN_ATTEMPTS, SENT, SLUG, CLIENT_KEY, SUBMISSION_ID,
-  wallOf, compStatus, servedOrder, publicQuestion, releaseAt, resultOf
+  wallOf, compStatus, servedOrder, publicQuestion, releaseAt, resultOf, metaOf, historyLine
 } from './model.js';
 
 const AGE_NOTICE = 'حسابك خارج النطاق العمري للخدمة، فتقدر تشارك كضيف بدون نقاط.';
@@ -247,34 +247,30 @@ export async function compMe(ctx) {
   const state = eligibility(account, rulesFrom(settings), now).state;
   const season = await activeSeason(db);
   const seasonId = season ? season.id : '';
-  const [ledger, totals, subs] = await retry(() => db.batch([
+  const [ledger, totals, subs, sums] = await retry(() => db.batch([
     db.prepare(`SELECT l.* FROM points_ledger l WHERE l.participant_id = ? AND l.season_id = ?
       AND NOT EXISTS (SELECT 1 FROM submissions s WHERE 'sub:' || s.id = l.ref AND s.released_ms IS NULL) ORDER BY l.created_ms DESC, l.id DESC LIMIT 500`).bind(account.id, seasonId),
     db.prepare('SELECT t.season_id, s.name, s.start_at, s.end_at, t.earned, t.spent, t.final FROM season_totals t JOIN seasons s ON s.id = t.season_id WHERE t.participant_id = ? ORDER BY t.closed_ms DESC').bind(account.id),
-    db.prepare(`SELECT * FROM submissions WHERE participant_id = ? AND status IN ${SENT_SQL} ORDER BY submitted_ms DESC LIMIT 200`).bind(account.id)
+    // one query for the whole history: the metas of each version served and of the live one, never the questions
+    db.prepare(`SELECT s.id, s.comp_id, s.status, s.submitted_ms, s.score, s.max_score, s.pending_count, s.released_ms, v.meta, l.closed_at, l.finalized_at, lv.meta AS live_meta
+      FROM submissions s JOIN comp_versions v ON v.comp_id = s.comp_id AND v.version = s.version
+      LEFT JOIN comp_live l ON l.comp_id = s.comp_id LEFT JOIN comp_versions lv ON lv.comp_id = l.comp_id AND lv.version = l.version
+      WHERE s.participant_id = ? AND s.status IN ${SENT_SQL} ORDER BY s.submitted_ms DESC LIMIT 200`).bind(account.id),
+    db.prepare("SELECT ref, SUM(amount) AS n FROM points_ledger WHERE participant_id = ? AND ref LIKE 'sub:%' GROUP BY ref").bind(account.id)
   ]));
-  const defs = new Map();
-  const defOf = async r => {
-    const key = r.comp_id + '|' + r.version;
-    if (!defs.has(key)) defs.set(key, await versionDef(db, r.comp_id, r.version));
-    return defs.get(key);
-  };
-  const lives = new Map();
-  const liveOf = async id => {
-    if (!lives.has(id)) lives.set(id, await liveById(db, id));
-    return lives.get(id);
+  const pointsBy = new Map(sums.results.map(s => [s.ref, s.n]));
+  const metas = new Map();
+  const parsed = text => {
+    if (!text) return null;
+    if (!metas.has(text)) metas.set(text, JSON.parse(text));
+    return metas.get(text);
   };
   const history = [];
   for (const r of subs.results) {
-    const def = await defOf(r);
-    if (!def) continue;
-    const live = await liveOf(r.comp_id);
-    const result = await resultFor(db, def, r, live, now);
-    history.push({
-      submissionId: r.id, compId: r.comp_id, title: def.shortTitle || def.title, slug: def.slug, submittedAt: wallOf(r.submitted_ms), status: r.status,
-      score: result.score === undefined ? null : result.score, maxScore: result.maxScore === undefined ? null : result.maxScore,
-      pointsAwarded: result.pointsAwarded === undefined ? null : result.pointsAwarded, pending: result.pending === undefined ? null : result.pending, canReview: !!result.review
-    });
+    const meta = parsed(r.meta);
+    if (!meta) continue;
+    const live = r.closed_at !== undefined && r.live_meta ? { closedAt: r.closed_at || '', finalizedAt: r.finalized_at || '' } : null;
+    history.push(historyLine(meta, parsed(r.live_meta) || meta, r, live, wall, pointsBy.get('sub:' + r.id)));
   }
   const titles = new Map(history.map(h => [h.compId, h.title]));
   const balance = visibleBalance(ledger.results);
@@ -333,7 +329,7 @@ export async function syncCompLive(ctx) {
   const stmts = [];
   for (const c of comps) {
     if (!c || !SLUG.test(String(c.slug)) || !c.compId || !c.version || !c.def || !Array.isArray(c.def.questions)) throw new ApiError('bad', 'comp');
-    stmts.push(db.prepare('INSERT OR IGNORE INTO comp_versions (comp_id, version, slug, def, synced_ms) VALUES (?, ?, ?, ?, ?)').bind(String(c.compId), String(c.version), c.slug, JSON.stringify(c.def), now));
+    stmts.push(db.prepare('INSERT OR IGNORE INTO comp_versions (comp_id, version, slug, def, meta, synced_ms) VALUES (?, ?, ?, ?, ?, ?)').bind(String(c.compId), String(c.version), c.slug, JSON.stringify(c.def), JSON.stringify(metaOf(c.def)), now));
     // a competition renamed: its old slug goes
     stmts.push(db.prepare('DELETE FROM comp_live WHERE comp_id = ? AND slug <> ?').bind(String(c.compId), c.slug));
     stmts.push(db.prepare(`INSERT INTO comp_live (slug, comp_id, version, closed_at, finalized_at, updated_ms) VALUES (?, ?, ?, ?, ?, ?)

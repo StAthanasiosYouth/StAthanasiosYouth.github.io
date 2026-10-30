@@ -87,7 +87,7 @@ const RUNTIME = String.raw`
     return {
       settings: settings, sections: rows('sections'), links: rows('links'), contacts: rows('contacts'), sessions: rows('sessions'),
       news: rows('news'), games: rows('games'), notifications: rows('notifications'), media: rows('media'), activities: rows('activities'), types: rows('types'),
-      competitions: COMPS_ && !COMPS_.none ? { points: COMPS_.points || null, modules: COMPS_.modules || {} } : null,
+      competitions: COMPS_ && (!COMPS_.none || COMPS_.points) ? { points: COMPS_.points || null, modules: COMPS_.modules || {} } : null,
       pages: { pages: plain('pages'), media: plain('page_media'), events: plain('events'), servants: plain('servants'), methods: pagesMethods_(plain('pay_methods')) }
     };
   }

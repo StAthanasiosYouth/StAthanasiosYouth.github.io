@@ -203,9 +203,66 @@ Staging: migration `0021`, Worker `0635ae1b`; `accounts_mode = on`, `OTP_EMAIL =
 
 **Not verified (planned for P5-9):** the Apps Script side (`compRuntimePush_`, `workerRuntimeSeed`): staging has no Apps Script, so definitions were pushed by a signed script, and these functions have only loaded in the tests' fake; a real email; real Turnstile on the way back from `/account/`; the device matrix.
 
-One test in `tests/points-widget.e2e.mjs` («placement», the home page's order of sections) fails. No file of the home page changed in this batch; comparing with the previous commit wasn't possible (the old checkout's test didn't load), so it is reported, not explained.
+One test in `tests/points-widget.e2e.mjs` («placement», the home page's order of sections) fails. No file of the home page changed in this batch; comparing with the previous commit wasn't possible (the old checkout's test didn't load), so it is reported, not explained. **Explained in batch 5:** it fails the same way on the commit before Phase 5 (`afd64d1`), so it is not from this phase.
 
-## 4. Rollback (batches 1–4)
+## 3g. Batch 5, P5-9: full tests (2026-10-30)
+
+**Found and fixed by the load check** (`worker/scripts/comp-load.mjs`: 40 accounts at once, real-size definitions, CPU from the Worker's own traces):
+- `POST /v1/comp/me` for a member with 30 competitions: **64 ms CPU and 3.8 s** → **9 ms and 0.33 s**. It parsed every question of every competition and made a read per submission. It now reads the metas in one query (migration `0022`), and builds no review for a list.
+
+**Closed open items**
+- The home widget (§3e): once accounts are on, the Worker's build replaces `points` with its own schedule and season (`runtimePoints`). The change shows at the next publish, like every home-page change. The §18.5 automatic pushes stay on Apps Script until Phase 6: **keep their dates the same as the store's** (ADMIN-GUIDE §١٣).
+- One writer: Script Property `COMP_RUNTIME = worker` makes every public competition, «نقاطي» and store action on Apps Script answer `disabled`.
+- The Apps Script side now runs in a test (`worker/test/comp-runtime-push.test.mjs`): real `.gs` code in the fake, its signed call through the real `verifySync` into the real Worker code, then an account plays and is graded with the pushed key; finalize; the seed.
+- Privacy text drafted (`docs/PRIVACY-ACCOUNTS-DRAFT.md`), admin guide §١٣ written.
+
+**Load results on staging** (from Egypt, Worker + D1 in Eastern Europe)
+
+| Route | Wall p50 / p95 | CPU p50 / p95 |
+| --- | --- | --- |
+| Burst of 40: `comp/start` | ≈ 1.3 s / 1.4 s | 7 / 24 ms |
+| Burst of 40: `comp/submit` (20 questions) | ≈ 1.1 s / 1.2 s | 13 / 24 ms |
+| `comp/me`, 30 competitions | 0.33 s / 0.40 s | 9 / 14 ms |
+| Store race, 30 at once, stock 5 | ≈ 1.4 s | 6 / 14 ms |
+
+No request failed: every outcome `ok`, stock exact. **Still over 10 ms at times:** `submit` sits a little above the Free plan's CPU limit and new isolates reach 28 ms. Cloudflare didn't refuse any here, but a limit that is enforced under sustained load wouldn't show in a burst this short. The first real competition must be watched (`wrangler tail`); the Workers Paid plan removes the question if it ever refuses.
+
+## 3h. P5-10: the launch runbook
+
+Each step needs the owner's explicit approval. Steps 1–2 change nothing anyone can see.
+
+1. **Release the code, dormant.** Work branch → `main` (site, admin, docs), CI deploys the Worker; migrations `0018`–`0022`; `node scripts/account-secrets.mjs --production`. Check: `/v1/account/config` says `off`; bookings, publish and the panel as before; baseline hashes equal. Back: `wrangler rollback`; the schema additions stay unused.
+2. **Apps Script deploy** (`compRuntimePush_`, `workerRuntimeSeed`; inert for visitors). Run `workerRuntimeSeed()` once from the editor. Check: `comp_live` and `store_items` hold the live competitions and prizes. Back: `clasp deploy -i <API id> -V <previous>`.
+3. **Owner, before step 4:** 2-Step Verification on the youth Gmail; archive the test data from the competitions spreadsheet (YOUTH §7); approve the privacy text; pick the support contact (after step 4, in «الإعدادات»).
+4. **Accounts on, in production, for owners only.** `accounts_mode = on`, `OTP_EMAIL = 1`. Visible at once: `/account/` works, `competition/` and `points/` ask for a sign-in, ranged events ask for an account. Owners test here: a real code to a real inbox, real Turnstile, one competition, one prize, one booking, the device matrix (YOUTH §25). `MEMBER_EMAIL = 1` once the codes arrive. Back: `accounts_mode = off`.
+5. **One writer.** Script Property `COMP_RUNTIME = worker`. Back: delete it.
+6. **The first real competition**, watched with `wrangler tail`. Close Phase 5 when it is clean.
+
+**A real inbox before step 1 is possible** on staging: `OTP_EMAIL = 1` and one registration with an address the owner names (see §3i).
+
+## 3i. Batch 5 results
+
+| Check | Result |
+| --- | --- |
+| Worker tests | 386/386 (with the Apps Script → Worker test) |
+| Site unit tests | 771 pass, 3 failures known from before Phase 5 (competition + trip sections, `content.js` competitions index, `admin/config.js` shapes) |
+| Staging, accounts on | account, member, participants, comp, accounts, activity, platform, notify, content, content-saves, content-publish, book, claims: all pass |
+| Staging, accounts off | age, book-ops: all pass (see below) |
+| Browser, same test on `afd64d1` and now | no new failure from Phase 5 |
+| Load | §3g |
+| Production | Unchanged: Worker `4408fb3a`, no migration, nothing pushed |
+
+Staging: migrations up to `0022`, Worker `1cedc03a`; `accounts_mode = on`, `OTP_EMAIL = 0`, `MEMBER_EMAIL = 0`, `CONTENT_DRAFTS = 0` left on staging.
+
+**Found and fixed in these runs:** the browser review and the Worker's review differed once accounts were on, because `runtimePoints` reached only the Worker's build. `adminReviewInput` now sends the same points to the kit. `content-publish-check` caught it and passes.
+
+**Why two checks run with accounts off:** `age-check` and `book-ops-check` make visitor bookings. With accounts on, an event with an age range refuses a visitor by design (`account_required`, YOUTH §18.1 #5), and `participants-check` covers that path. So they test the booking code as it runs until launch, and `age-check`'s visitor path is not a test of accounts-on behaviour.
+
+**Browser failures, the same on `afd64d1` (not from Phase 5):** `browser.e2e` #1, 2, 3, 7, 8; seven admin media tests (media, 12 MP, small image, Drive failure, library, «من المكتبة», section banner); `points-widget` «placement». **Seen once, then passed on rerun:** B.U.G. intro, admin-app «names», admin «unsaved changes». **Not run to the end:** comp-admin 1–4 (cut by the time limit).
+
+**Not verified, and stays so until the owner acts (§3h):** a real email in a real inbox; real Turnstile; the device matrix on real phones; the real Apps Script deploy (only the test's fake so far). **Not ported:** group grading stays on Apps Script. **Risk to watch:** `comp/submit` CPU slightly above 10 ms (§3g).
+
+## 4. Rollback (batches 1–5)
 
 - Batch 4 extra: `accounts_mode = off` returns `competition/` and `points/` to Apps Script at once and refuses every `/v1/comp/*`, `/v1/shop/*` route. Worker rows stay. After launch that fallback serves only the old code login, so it is a stop, not a way back.
 
@@ -219,6 +276,6 @@ One test in `tests/points-widget.e2e.mjs` («placement», the home page's order 
 
 ## 5. Before production (needs the owner)
 
-Production release of batches 1–4 is a separate approval: `main`, migrations `0018`–`0021`, the Apps Script deploy (`compRuntimePush_`), the deploy, and `node scripts/account-secrets.mjs --production`. Accounts stay dormant with `accounts_mode = off`; the new budget rule applies to admin mail at once (§3a).
+Production release of batches 1–4 is a separate approval: `main`, migrations `0018`–`0022`, the Apps Script deploy (`compRuntimePush_`), the deploy, and `node scripts/account-secrets.mjs --production`. Accounts stay dormant with `accounts_mode = off`; the new budget rule applies to admin mail at once (§3a).
 
 Owner tasks from YOUTH §28.2, needed by P5-10 at the latest: 2-Step Verification on the youth Gmail account; privacy text approval; pick the support contact (batch 3); archive the test data from the competitions spreadsheet (before batch 3).

@@ -14,6 +14,7 @@ import { verifySync, syncStampStmt } from '../lib/sync.js';
 import { retry, cairoText } from '../lib/db.js';
 import { importDrafts, readDrafts, exportDrafts, draftsStatus, IMPORT_MAX_BYTES } from './store.js';
 import { KINDS, KIND_NAMES } from './kinds.js';
+import { runtimePoints } from '../store/shop.js';
 
 /*
  * GET /v1/admin/content/review-input — what the browser-side «راجع» needs (admin/review-kit.js, P4-4):
@@ -45,6 +46,8 @@ export async function adminReviewInput(ctx) {
     const data = JSON.parse(pkg.results[0].data);
     if (!data.stableUntil || wall < data.stableUntil) comps = data;
   }
+  // the same points the Worker's own build uses (content/publishing.js), or the two reviews would differ
+  if (comps) comps = { ...comps, points: await runtimePoints(db, comps.none ? null : comps.points) };
   // the Script Properties the builders read (Pages.gs bookOnline_): the online-booking switch, now in D1
   const props = { BOOKING_ONLINE: online.results[0] && online.results[0].value === '1' ? '1' : '0' };
   return { kinds, live: live.results[0] ? JSON.parse(live.results[0].body) : null, comps, now: wall, props };

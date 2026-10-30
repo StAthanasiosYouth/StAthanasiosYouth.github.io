@@ -167,6 +167,11 @@ function publicComp_(fn, arg, size) {
 
   try {
 
+    // one writer (docs/PHASE5-PLAN.md P5-10): once the runtime is the Worker's, nothing here takes a code or an answer
+    if (PropertiesService.getScriptProperties().getProperty('COMP_RUNTIME') === 'worker') {
+      return compFail_('disabled');
+    }
+
     if (Number(size) > COMP_PUBLIC_MAX_BODY) {
       return compFail_('bad', 'الإجابات كبيرة قوي.');
     }

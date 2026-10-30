@@ -121,6 +121,28 @@ function review(def, row, marks, keyDef) {
   });
 }
 
+/* the definition without its questions: what a list of many competitions reads (comp_versions.meta) */
+export function metaOf(def) {
+  const { questions, ...meta } = def;
+  return meta;
+}
+
+/*
+ * One line of «نقاطي»'s history (§5.1, §20.2), from the metas only: no questions parsed, no review built.
+ * The same rules as resultOf for what shows.
+ */
+export function historyLine(meta, policy, row, live, now, pointsAwarded) {
+  const state = { closedAt: live ? live.closedAt : '', finalizedAt: live ? live.finalizedAt : '' };
+  const visible = !policy.resultsAt || now >= policy.resultsAt || !!state.finalizedAt;
+  const score = shows(policy, 'score') && visible;
+  return {
+    submissionId: row.id, compId: row.comp_id, title: meta.shortTitle || meta.title, slug: meta.slug, submittedAt: wallOf(row.submitted_ms), status: row.status,
+    score: score ? row.score : null, maxScore: score ? row.max_score : null, pending: score ? row.pending_count : null,
+    pointsAwarded: policy.wallet && shows(policy, 'points') && visible && row.released_ms ? Number(pointsAwarded) || 0 : null,
+    canReview: answersOpen(policy, state, now)
+  };
+}
+
 /*
  * Result (§5.1): the questions and answers are the version served (def); the policy is the live one (policy).
  * pointsAwarded: the ledger's sum for this submission, shown only once released.

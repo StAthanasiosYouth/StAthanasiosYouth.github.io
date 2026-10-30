@@ -12,6 +12,7 @@ import { ageOutNotices } from '../src/account/age-out.js';
 import { setGmailFetch } from '../src/notify/gmail.js';
 import { resultEmail, storeEmail, ageOutEmail } from '../src/notify/templates.js';
 import { buildScore } from '../../tools/build-worker-score.mjs';
+import { runtimePoints } from '../src/store/shop.js';
 
 const KEYS = { PW_PEPPER: 'pepper-test', PW_KEY: Buffer.alloc(32, 7).toString('base64'), OTP_PEPPER: 'otp-test', ACCOUNT_PAD_MS: '0' };
 const P = 'p@example.com';
@@ -381,6 +382,17 @@ test('the schedule decides; items import once; an item with requests is only swi
   assert.equal((await w.admin('POST', 'store/items/i-11111111/delete', {})).body.kept, false);
   assert.equal((await w.admin('GET', 'store/items')).body.items.length, 0);
   assert.equal(a.id.length > 0, true);
+});
+
+test('the home widget follows the Worker once accounts are on; off, what Apps Script built stays', async () => {
+  const w = await world();
+  await w.admin('POST', 'store/schedule', { mode: 'auto', opensAt: '2026-12-01T10:00', closesAt: '2026-12-02T10:00' });
+  const made = await runtimePoints(w.db, { url: 'points/', shop: { on: true, mode: 'closed', opensAt: '', closesAt: '' }, season: null });
+  assert.deepEqual(made.shop, { on: true, mode: 'auto', preview: false, opensAt: '2026-12-01T10:00', closesAt: '2026-12-02T10:00' });
+  assert.equal(made.season.name, 'الموسم الأول');
+  await w.db.prepare("UPDATE settings SET value = 'off' WHERE key = 'accounts_mode'").run();
+  const asIs = { url: 'points/', shop: null, season: null };
+  assert.equal(await runtimePoints(w.db, asIs), asIs);
 });
 
 /* ---------- sync ---------- */
