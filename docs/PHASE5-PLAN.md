@@ -337,6 +337,16 @@ Owner approved step 2 and ran `workerRuntimeSeed()` from the editor.
 
 **Remaining before step 5:** a real member email; the support name edited in the admin; one booking; one test competition; the device matrix. A prize request waits for the store to open.
 
+## 3n. Runbook step 5: one writer (2026-10-31)
+
+Owner approved and set the Script Property `COMP_RUNTIME = worker` in the editor.
+
+**Checked:** `compStart`, `compSubmit`, `compResult`, `compCode`, `portalMe` and `shopRedeem` on Apps Script answer `disabled`; `warm` still answers. The Worker's `/v1/comp/me` answers `session`; smoke passes; `points/` goes to `/account/`; no new 5xx. `comp-accounts` 3/3 and `comp-runtime-push` 3/3 before the switch.
+
+**Back:** delete the property. From now on `accounts_mode = off` alone only closes competitions, points and the store; a full way back needs both.
+
+**Phase 5 stays open.** Step 6 closes it: a competition watched with `wrangler tail`. No submission has reached the Worker on production yet, and no member email other than codes has gone out. The owner's accounts improvements batch comes after the close, before Phase 6.
+
 ## 4. Rollback (batches 1–5)
 
 - Batch 4 extra: `accounts_mode = off` returns `competition/` and `points/` to Apps Script at once and refuses every `/v1/comp/*`, `/v1/shop/*` route. Worker rows stay. After launch that fallback serves only the old code login, so it is a stop, not a way back.
