@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "0d2cc47b7c93",
-  "publishedAt": "2026-10-30T14:52:59.630Z",
+  "revision": "4017b3ad3b6d",
+  "publishedAt": "2026-10-30T21:54:46.112Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -460,6 +460,17 @@
       "banner": null,
       "visibleFrom": "",
       "visibleUntil": ""
+    }
+  ],
+  "competitions": [
+    {
+      "id": "cmp-9308ac4d",
+      "slug": "tgrba-tshghyl",
+      "title": "تجربة تشغيل",
+      "shortTitle": "",
+      "startAt": "2026-10-30T23:51",
+      "endAt": "2026-11-01T22:00",
+      "v": "dcea1facb6f062df"
     }
   ],
   "pages": [
