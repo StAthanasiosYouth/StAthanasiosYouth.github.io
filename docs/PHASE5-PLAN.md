@@ -299,7 +299,7 @@ Owner approved step 2 and ran `workerRuntimeSeed()` from the editor.
 
 **Owner's production test on Worker `bcfaad19`, read from D1:** a save at 14:33 Cairo («المسرح الأسود2») and a publish at 14:35 (`pub-f8948ee61ccb`, 4 files), mirrored to `main` as `57d12e2`. This covers the §3j item left open. The admins hash also changed in the same window; its count stays 3. The cause wasn't read, and the sign-in is the likely one.
 
-**Before step 4:** `test` is test data. Withdrawing it in the admin and publishing removes it from `comp_live` (`compAfterCommit_` → `withdrawn`); running the seed again doesn't, because the seed only adds. Decide the same for «محفظة».
+**Before step 4:** the owner withdrew `test` the same day (`pub-0d2cc47b7c93`), and `comp_live` is empty. Running the seed again wouldn't have removed it, because the seed only adds. «محفظة» is test data too, and stays until Phase 7c with the rest of the test data (`docs/PHASE5-CLEANUP-PLAN.md`). `auto` with no dates means an open store, so on the owner's decision `SHOP_MODE = closed` on production (2026-10-30). The owner opens the store when real prizes exist.
 
 **Also seen, not from this release:** `api_log` has one 500 on `/v1/sync/content-notify` on 2026-10-29 07:13 UTC, on Worker `4408fb3a`. Not investigated. The two 503 `accounts_off` on 2026-10-30 are my own checks.
 
