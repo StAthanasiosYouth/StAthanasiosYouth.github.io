@@ -33,7 +33,7 @@ import {
   methodOnline, onlineMethodsOf, offlineServants, payCopyText, payGrouped, cashMessage,
   partAllowed, minPart, partAmount, partProblem
 } from './book-model.js';
-import { loadDraft, saveDraft, clearDraft, loadMine, rememberBooking, forgetBooking } from './book-store.js';
+import { accountSession, keepSignInReturn, loadDraft, saveDraft, clearDraft, loadMine, rememberBooking, forgetBooking } from './book-store.js';
 import { prepareImage, UNSUPPORTED } from './image.js';
 import { createBookApi } from './book-api.js';
 import { bookApiUrl } from './book-config.js';
@@ -93,6 +93,25 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
   const booking = event.booking;
   const slug = event.slug;
   const api = createBookApi({ base: bookApiUrl() });
+
+  /* the signed-in account, when accounts are on (docs/YOUTH-ACCOUNTS-PLAN.md §18.1): form prefilled, no DOB field */
+  const session = accountSession();
+  let account = null;
+  let accountAsked = false;
+  async function loadAccount(state) {
+    if (accountAsked || !state || !state.account || !state.account.on || !session) return;
+    accountAsked = true;
+    try {
+      const res = await fetch(bookApiUrl() + '/v1/account/me', { headers: { Authorization: 'Bearer ' + session.token }, credentials: 'omit' });
+      const reply = await res.json();
+      if (reply && reply.ok) account = reply.account;
+    }
+    catch { /* the form stays as it is; the server decides at the send */ }
+  }
+  function goSignIn() {
+    keepSignInReturn(location.pathname + location.search);
+    location.href = rootUrl + 'account/';
+  }
   const steps = stepsFor(booking);
   const free = isFree(booking);
 
@@ -234,11 +253,16 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
 
   }
 
+  let accountNeeded = false;
+
   async function refresh({ force = false } = {}) {
     if (destroyed || (!force && Date.now() - lastRefresh < 10000)) return;
     lastRefresh = Date.now();
     const reply = await api.state(slug);
     if (destroyed) return;
+    await loadAccount(reply);
+    if (destroyed) return;
+    accountNeeded = !!(reply && reply.account && reply.account.required && !account);
     applyState(liveState(reply, booking));
     refreshMine();
   }
@@ -283,8 +307,12 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
   function renderStart() {
     mode = 'start';
     dropCaptcha();
-    const start = h('button', { class: 'btn btn--primary bk-start', type: 'button' }, draft ? 'كمّل حجزك' : 'احجز الآن', icon('arrow'));
+    const start = accountNeeded ? h('button', { class: 'btn btn--primary bk-start', type: 'button', 'data-book-signin': '' }, 'سجّل دخولك واحجز') : h('button', { class: 'btn btn--primary bk-start', type: 'button' }, draft ? 'كمّل حجزك' : 'احجز الآن', icon('arrow'));
     start.addEventListener('click', () => {
+      if (accountNeeded) {
+        goSignIn();
+        return;
+      }
       if (!draft) draft = emptyDraft(booking, randomKey(), Date.now());
       openFlow(draft.step, { focus: true });
     });
@@ -426,6 +454,10 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
 
   function stepWho() {
 
+    if (account) {
+      if (!draft.fields.name) draft.fields.name = account.name;
+      if (!draft.fields.phone) draft.fields.phone = account.phone;
+    }
     const name = h('input', { class: 'bk-input', id: 'bk-name', name: 'name', type: 'text', autocomplete: 'name', maxlength: NAME_MAX, required: true, value: draft.fields.name });
     const phone = h('input', { class: 'bk-input bk-input--ltr', id: 'bk-phone', name: 'phone', type: 'tel', inputmode: 'tel', autocomplete: 'tel', dir: 'ltr', maxlength: 20, required: true, value: draft.fields.phone });
     name.addEventListener('input', () => {
@@ -456,6 +488,11 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
      * With «كل فرد باسمه وسنه» the booker's age (person #1) is the one computed from it.
      */
     if (!draft.fields.dob) draft.fields.dob = { d: '', m: '', y: '' };
+    if (account) {
+      // from the account: the page only uses it for the age shown; the server reads its own copy
+      const [y, m, d] = String(account.birthDate || '').split('-').map(Number);
+      draft.fields.dob = { d: String(d || ''), m: String(m || ''), y: String(y || '') };
+    }
     const startAt = event.startAt || '';
     const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
     const thisYear = new Date().getFullYear();
@@ -469,7 +506,8 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
       });
       return select;
     };
-    const dobBlock = booking.bookerAge ? group('dob', 'تاريخ ميلادك',
+    const dobBlock = booking.bookerAge && account ? group('dob', 'تاريخ ميلادك',
+      h('p', { class: 'bk-field__hint' }, 'بنحسب سنك من حسابك. لو تاريخ ميلادك غلط، كلّم الدعم الفني.')) : booking.bookerAge ? group('dob', 'تاريخ ميلادك',
       h('p', { class: 'bk-field__hint' }, `الفعالية دي للسن ${booking.bookerAge.min != null && booking.bookerAge.max != null ? `من ${arabicDigits(booking.bookerAge.min)} لـ ${arabicDigits(booking.bookerAge.max)} سنة` : booking.bookerAge.min != null ? `من ${arabicDigits(booking.bookerAge.min)} سنة وأكبر` : `لحد ${arabicDigits(booking.bookerAge.max)} سنة`} يوم الفعالية. تاريخ ميلادك مش بيظهر لحد.`),
       h('div', { class: 'bk-dob', dir: 'rtl' },
         dobSelect('d', 'اليوم', Array.from({ length: 31 }, (_, i) => [i + 1, arabicDigits(i + 1)]), 'bday-day'),
@@ -1287,7 +1325,7 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
     saveNow();
 
     const hp = document.getElementById('bk-hp');
-    const reply = await api.submit(submitBody(event, draft, { hp: hp ? hp.value : '', revision: live && live.revision, turnstile: captcha ? captcha.token() : '' }));
+    const reply = await api.submit(submitBody(event, draft, { hp: hp ? hp.value : '', revision: live && live.revision, turnstile: captcha ? captcha.token() : '' }), account && session ? session.token : '');
     sending = false;
     if (destroyed) return;
 
@@ -1303,6 +1341,11 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
     sendButton.textContent = 'ابعت طلب الحجز';
 
     const problem = reply.ok ? bookingError({ code: 'bad' }) : bookingError(reply);
+    if (problem.signIn) {
+      saveNow();
+      goSignIn();
+      return;
+    }
     if (problem.action === 'fallback') {
       saveNow();
       fallback();

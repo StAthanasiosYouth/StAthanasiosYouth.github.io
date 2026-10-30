@@ -28,6 +28,7 @@ import {
 } from './model.js';
 import { checkBooker, checkCompanions, ageRule, AGE_MSG } from './age.js';
 import { claimsOf, claimToAccept, claimAcceptStmt } from './claims.js';
+import { bookMailStmts, adminEventNotify } from './account.js';
 
 const KEY = /^[A-Za-z0-9_.:-]{8,100}$/;
 const PROOF_LIFE_MS = 60 * 24 * 3600 * 1000;
@@ -93,6 +94,7 @@ export async function detail(ctx, id) {
   const lock = await lockInfo(ctx, b.id);
   const now = Date.now();
   const bk = event.booking || {};
+  const accountDob = b.participant_id ? await retry(() => ctx.env.DB.prepare('SELECT birth_date FROM participants WHERE id = ?').bind(b.participant_id).first('birth_date')) : null;
   return {
     booking: {
       ...listRow(b, event, paidOf(pays), flags, now),
@@ -104,8 +106,12 @@ export async function detail(ctx, id) {
       age: b.age_rule || b.booker_age != null || b.age_override ? {
         booker: b.booker_age, source: b.age_source || null,
         override: b.age_override ? JSON.parse(b.age_override) : null,
-        ruleChanged: JSON.stringify(b.age_rule ? JSON.parse(b.age_rule) : null) !== JSON.stringify(ageRule(event.booking))
+        ruleChanged: JSON.stringify(b.age_rule ? JSON.parse(b.age_rule) : null) !== JSON.stringify(ageRule(event.booking)),
+        // §18.1 #4: the account's date of birth was corrected after this booking: a warning at confirmation, no automatic action
+        dobChanged: !!(accountDob && b.booker_dob && accountDob !== b.booker_dob),
+        mismatch: !!b.dob_mismatch
       } : (ageRule(event.booking) ? { booker: null, source: null, override: null, ruleChanged: true } : null),
+      participantId: b.participant_id || null,
       dueHistory: JSON.parse(b.due_history || '[]'), priceRev: b.price_rev, closedAt: b.closed_at, closedBy: b.closed_by,
       phoneBlanked: !!b.phone_blanked_ms,
       // «كل فرد باسمه وسنه»: [{ name, age, cat }] as the visitor sent them (priced on the server)
@@ -565,7 +571,8 @@ export async function adminConfirm(ctx) {
       SELECT ?, ?, ?, ?, ?, 'booking.confirm', 'booking', ?, ?, ?, ? WHERE ${guard}`).bind(
       randomId('act-'), now, at, ctx.actor.email, ctx.actor.name || null, b.id, b.ref,
       `${people(bk.pricing, actual).total} أفراد` + (capOverride || payOverride ? ' · ' + reason : ''),
-      JSON.stringify({ payments: checkedPays.rows.length, overrideCap: !!capOverride, overridePay: !!payOverride }), b.id, version + 1)
+      JSON.stringify({ payments: checkedPays.rows.length, overrideCap: !!capOverride, overridePay: !!payOverride }), b.id, version + 1),
+    ...bookMailStmts(db, b, 'book.confirmed', { guard, guardBinds: [b.id, version + 1], dedupe: `book:confirmed:${b.id}:${version + 1}`, now, entityVersion: version + 1 })
   ];
   const r = await retry(() => db.batch(stmts));
   if (r[0].meta.changes !== 1) {
@@ -604,7 +611,8 @@ export async function adminReject(ctx) {
       .bind(reason, at, ctx.actor.email, now, b.id, version),
     ...paymentStmts(db, checkedPays.rows, b, ctx.actor, now, guard, [b.id, version + 1]),
     db.prepare(`INSERT INTO activity (id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary)
-      SELECT ?, ?, ?, ?, ?, 'booking.reject', 'booking', ?, ?, ? WHERE ${guard}`).bind(randomId('act-'), now, at, ctx.actor.email, ctx.actor.name || null, b.id, b.ref, reason, b.id, version + 1)
+      SELECT ?, ?, ?, ?, ?, 'booking.reject', 'booking', ?, ?, ? WHERE ${guard}`).bind(randomId('act-'), now, at, ctx.actor.email, ctx.actor.name || null, b.id, b.ref, reason, b.id, version + 1),
+    ...bookMailStmts(db, b, 'book.rejected', { guard, guardBinds: [b.id, version + 1], dedupe: `book:rejected:${b.id}:${version + 1}`, now, entityVersion: version + 1 })
   ]));
   if (r[0].meta.changes !== 1) await explainMiss(ctx, b.id, version, ['pending']);
   return detail(ctx, b.id);
@@ -629,7 +637,8 @@ export async function adminCancel(ctx) {
     env.DB.prepare("UPDATE bookings SET status = 'cancelled', amount_due = ?, cancel_reason = ?, closed_at = ?, closed_by = ?, updated_ms = ?, version = version + 1 WHERE id = ? AND status = 'confirmed' AND version = ?")
       .bind(retain, reason, at, ctx.actor.email, now, b.id, version),
     env.DB.prepare(`INSERT INTO activity (id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary)
-      SELECT ?, ?, ?, ?, ?, 'booking.cancel', 'booking', ?, ?, ? WHERE changes() = 1`).bind(randomId('act-'), now, at, ctx.actor.email, ctx.actor.name || null, b.id, b.ref, reason)
+      SELECT ?, ?, ?, ?, ?, 'booking.cancel', 'booking', ?, ?, ? WHERE changes() = 1`).bind(randomId('act-'), now, at, ctx.actor.email, ctx.actor.name || null, b.id, b.ref, reason),
+    ...bookMailStmts(env.DB, b, 'book.cancelled', { guard: "EXISTS (SELECT 1 FROM bookings WHERE id = ? AND version = ? AND status = 'cancelled')", guardBinds: [b.id, version + 1], dedupe: `book:cancelled:${b.id}:${version + 1}`, now, entityVersion: version + 1 })
   ]));
   if (r[0].meta.changes !== 1) await explainMiss(ctx, b.id, version, ['confirmed']);
   return detail(ctx, b.id);
@@ -723,7 +732,8 @@ export async function adminUpdate(ctx) {
       b.id, version, grow ? 1 : 0, body.overrideCap === true ? 1 : 0, seatCount),
     env.DB.prepare(`INSERT INTO activity (id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary, changes)
       SELECT ?, ?, ?, ?, ?, 'booking.update', 'booking', ?, ?, ?, ? WHERE changes() = 1`).bind(randomId('act-'), now, at, ctx.actor.email, ctx.actor.name || null, b.id, b.ref, changed.join('، '), JSON.stringify({ fields: changed })),
-    ...(newOverride ? [ageOverrideStmt(env.DB, ctx, b.id, b.ref, newOverride, now, 'EXISTS (SELECT 1 FROM bookings WHERE id = ? AND version = ?)', [b.id, version + 1])] : [])
+    ...(newOverride ? [ageOverrideStmt(env.DB, ctx, b.id, b.ref, newOverride, now, 'EXISTS (SELECT 1 FROM bookings WHERE id = ? AND version = ?)', [b.id, version + 1])] : []),
+    ...(changed.includes('amountDue') ? bookMailStmts(env.DB, b, 'book.due', { guard: 'EXISTS (SELECT 1 FROM bookings WHERE id = ? AND version = ?)', guardBinds: [b.id, version + 1], dedupe: `book:due:${b.id}:${version + 1}`, now, entityVersion: version + 1 }) : [])
   ]));
   if (r[0].meta.changes !== 1) {
     await explainMiss(ctx, b.id, version, null);
@@ -761,7 +771,8 @@ export async function adminPaymentAdd(ctx) {
     db.prepare('UPDATE bookings SET version = version + 1, updated_ms = ? WHERE id = ? AND EXISTS (SELECT 1 FROM payments WHERE id = ?)').bind(now, b.id, row.id),
     db.prepare(`INSERT INTO activity (id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary)
       SELECT ?, ?, ?, ?, ?, ?, 'booking', ?, ?, ? WHERE EXISTS (SELECT 1 FROM payments WHERE id = ?)`).bind(
-      randomId('act-'), now, cairoText(now), ctx.actor.email, ctx.actor.name || null, row.kind === 'refund' ? 'payment.refund' : 'payment.add', b.id, b.ref, row.method + ' · ' + row.servantName, row.id)
+      randomId('act-'), now, cairoText(now), ctx.actor.email, ctx.actor.name || null, row.kind === 'refund' ? 'payment.refund' : 'payment.add', b.id, b.ref, row.method + ' · ' + row.servantName, row.id),
+    ...bookMailStmts(db, b, 'pay.recorded', { guard: 'EXISTS (SELECT 1 FROM payments WHERE id = ?)', guardBinds: [row.id], dedupe: 'pay:' + row.id, now, entityType: 'payment', entityId: row.id })
   ]));
   return detail(ctx, b.id);
 }
@@ -786,6 +797,7 @@ export async function adminPaymentVoid(ctx) {
   const now = Date.now();
   const at = cairoText(now);
   const voidId = randomId('pay-', 6);
+  const linked = await retry(() => env.DB.prepare('SELECT id, participant_id FROM bookings WHERE id = ?').bind(target.booking_id).first());
   const r = await retry(() => env.DB.batch([
     env.DB.prepare(`INSERT INTO payments (id, booking_id, event_id, kind, amount, servant_id, servant_name, method, received_at, received_ms, recorded_at, recorded_ms, recorded_by, recorded_name, note, voids_id, idem_key)
       SELECT ?, t.booking_id, t.event_id, 'void', t.amount, t.servant_id, t.servant_name, t.method, t.received_at, t.received_ms, ?, ?, ?, ?, ?, t.id, ?
@@ -795,7 +807,8 @@ export async function adminPaymentVoid(ctx) {
     env.DB.prepare('UPDATE bookings SET version = version + 1, updated_ms = ? WHERE id = ? AND EXISTS (SELECT 1 FROM payments WHERE id = ?)').bind(now, target.booking_id, voidId),
     env.DB.prepare(`INSERT INTO activity (id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary)
       SELECT ?, ?, ?, ?, ?, 'payment.void', 'booking', ?, (SELECT ref FROM bookings WHERE id = ?), ? WHERE EXISTS (SELECT 1 FROM payments WHERE id = ?)`).bind(
-      randomId('act-'), now, at, ctx.actor.email, ctx.actor.name || null, target.booking_id, target.booking_id, reason, voidId)
+      randomId('act-'), now, at, ctx.actor.email, ctx.actor.name || null, target.booking_id, target.booking_id, reason, voidId),
+    ...bookMailStmts(env.DB, linked || {}, 'pay.voided', { guard: 'EXISTS (SELECT 1 FROM payments WHERE id = ?)', guardBinds: [voidId], dedupe: 'pay:' + voidId, now, entityType: 'payment', entityId: voidId })
   ]));
   if (r[0].meta.changes !== 1) throw new ApiError('final', 'already voided');
   return detail(ctx, target.booking_id);
@@ -816,10 +829,12 @@ export async function adminCancelAll(ctx) {
     const now = Date.now();
     const at = cairoText(now);
     const n = (await env.DB.prepare("SELECT COUNT(*) AS n FROM bookings WHERE event_id = ? AND status IN ('pending', 'confirmed')").bind(event.id).first()).n;
+    const linked = (await retry(() => env.DB.prepare("SELECT id, participant_id FROM bookings WHERE event_id = ? AND status IN ('pending', 'confirmed') AND participant_id IS NOT NULL").bind(event.id).all())).results;
     await retry(() => env.DB.batch([
       env.DB.prepare("UPDATE bookings SET status = 'cancelled', amount_due = 0, cancel_reason = ?, closed_at = ?, closed_by = ?, updated_ms = ?, version = version + 1 WHERE event_id = ? AND status IN ('pending', 'confirmed')")
         .bind(reason, at, ctx.actor.email, now, event.id),
       activityStmt(env.DB, { actor: ctx.actor.email, actorName: ctx.actor.name, action: 'event.cancelAll', entityType: 'event', entityId: event.id, entityTitle: event.title.slice(0, 80), summary: n + ' حجز اتلغى · ' + reason, changes: { cancelled: n } }),
+      ...linked.flatMap(l => bookMailStmts(env.DB, l, 'book.eventCancelled', { dedupe: `book:evcancel:${l.id}:${key}`, now })),
       finishStmt(env.DB, started.claim, 200, { ok: true, cancelled: n })
     ]));
     return { cancelled: n };
@@ -827,6 +842,11 @@ export async function adminCancelAll(ctx) {
     await abandon(env.DB, started.claim).catch(() => {});
     throw err;
   }
+}
+
+/* POST /v1/admin/book/events/:id/notify: «بلّغ الحاجزين» (book/account.js) */
+export async function adminNotifyBookers(ctx) {
+  return adminEventNotify(ctx, await eventById(ctx, ctx.params.id));
 }
 
 /* ---------- reports (§13) ---------- */

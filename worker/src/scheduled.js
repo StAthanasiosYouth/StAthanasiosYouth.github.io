@@ -11,6 +11,7 @@ import { shadowCheck, SHADOW_EVERY_MIN } from './publish-shadow.js';
 import { mirrorDue, mirrorPending, mirrorAccess, ACCESS_MINUTE } from './publish-mirror.js';
 import { sessionSweepStmts } from './admin/session.js';
 import { accountSweepStmts, pendingSweepStmt } from './account/session.js';
+import { bookingReminders } from './book/account.js';
 
 const DAY = 24 * 3600 * 1000;
 export const RETENTION = {
@@ -94,6 +95,8 @@ export async function scheduled(controller, env) {
       await mirrorAccess(env, { now }).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'access', err: String(err && err.message).slice(0, 200) }));
       // Phase 5: an unconfirmed registration keeps its private data 30 minutes at most
       await pendingSweepStmt(env.DB, now).run().catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'pending', err: String(err && err.message).slice(0, 200) }));
+      // Phase 5: the bookers' deadline reminders, once a day in the Cairo morning (dedupe makes a repeat harmless)
+      if (new Date(now).getUTCHours() === 7) await bookingReminders(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'reminders', err: String(err && err.message).slice(0, 200) }));
     }
     return;
   }

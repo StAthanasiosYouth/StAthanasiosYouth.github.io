@@ -15,7 +15,7 @@ import { bookApiUrl } from '../page/book-config.js';
 import { mountTurnstile } from '../page/turnstile.js';
 import {
   validEmail, emailTypo, maskEmail, submitLabel, arDigits, monthNames, dateText, birthDateOf, birthYears,
-  readHints, addHint, removeHint, writeHints, readSession, writeSession, clearSession, cleanRoute, keepDest, takeDest
+  readHints, addHint, removeHint, writeHints, readSession, writeSession, clearSession, cleanRoute, keepDest, takeDest, RETURN_KEY, cleanReturn
 } from './model.js';
 
 const safeStore = name => {
@@ -312,6 +312,8 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
     const route = cleanRoute(location.hash);
     if (route === '#me/security') viewSecurity();
     else if (route === '#me/notifications') viewPrefs();
+    else if (route === '#me/points') viewPoints();
+    else if (route.startsWith('#me/bookings')) viewBookings(route.split('/')[2] || '');
     else viewHome();
   }
 
@@ -672,12 +674,83 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
         fact('الموبايل', A.phone, true),
         fact('تاريخ الميلاد', dateText(A.birthDate))),
       support('بياناتك محتاجة تتصلح؟'),
+      returnLink(),
       h('nav', { class: 'acct__nav', 'aria-label': 'حسابي' },
+        h('a', { class: 'btn', href: '#me/bookings', 'data-nav': 'bookings' }, 'حجوزاتي'),
+        h('a', { class: 'btn', href: '#me/points', 'data-nav': 'points' }, 'نقاطي'),
         h('a', { class: 'btn', href: '#me/notifications', 'data-nav': 'notifications' }, 'إشعاراتي'),
         h('a', { class: 'btn', href: '#me/security', 'data-nav': 'security' }, 'أمان الحساب')),
       h('div', { class: 'actions' },
         h('button', { type: 'button', class: 'btn', 'data-logout': '', onclick: () => logout(false) }, 'خروج'),
         h('button', { type: 'button', class: 'btn', 'data-logout-forget': '', onclick: () => logout(true) }, 'خروج وانسَ الجهاز ده'))
+    ));
+  }
+
+  /* came from a booking page that asked for a sign-in: back to it */
+  function returnLink() {
+    let path = '';
+    try {
+      path = cleanReturn(tab ? tab.getItem(RETURN_KEY) : '');
+    }
+    catch { path = ''; }
+    return path ? h('a', { class: 'btn btn--primary', href: path, 'data-return': '', onclick: () => { try { tab.removeItem(RETURN_KEY); } catch { /* nothing kept */ } } }, 'ارجع وكمّل الحجز') : null;
+  }
+
+  const money = n => arDigits(Number(n) || 0) + ' جنيه';
+  const BOOKING_STATUS = { pending: 'قيد المراجعة', confirmed: 'مؤكد', rejected: 'مرفوض', cancelled: 'ملغي', withdrawn: 'اتسحب' };
+
+  /* #me/bookings[/REF]: an unknown ref and someone else's look the same: not in the list */
+  async function viewBookings(ref) {
+    main.dataset.state = 'loading';
+    const reply = await authed('GET', '/v1/account/bookings');
+    if (reply.code === 'session') {
+      sessionOver();
+      return;
+    }
+    if (!reply.ok) {
+      show(card(title('حجوزاتي'), h('p', { class: 'field__error', role: 'alert' }, reply.message || 'حصلت مشكلة. جرّب تاني.'), backToAccount()));
+      return;
+    }
+    const shown = ref ? reply.bookings.filter(b => b.ref === ref) : reply.bookings;
+    show(card(
+      title('حجوزاتي'),
+      ref && !shown.length ? h('p', { class: 'acct__notice' }, 'مش لاقيين ده.') : null,
+      !ref && !shown.length ? h('p', { class: 'acct__lead' }, 'مفيش حجوزات مربوطة بحسابك لسه. لو حجزت قبل كده من غير حساب، افتح رابط حالة الحجز ودوس «اربطه بحسابي».') : null,
+      h('ul', { class: 'acct__sessions', 'data-bookings': '' }, ...shown.map(b => h('li', { class: 'acct__booking' },
+        h('strong', {}, b.event), ' · ', h('span', { dir: 'ltr' }, b.ref),
+        h('p', { class: 'field__hint' }, BOOKING_STATUS[b.status] || b.status),
+        ['confirmed', 'pending'].includes(b.status) ? h('p', {}, 'المطلوب ' + money(b.total) + ' · المدفوع ' + money(b.paid) + (b.left > 0 ? ' · الباقي ' + money(b.left) : '')) : null,
+        b.reason ? h('p', { class: 'field__hint' }, b.reason) : null))),
+      ref ? h('a', { class: 'acct__link', href: '#me/bookings' }, 'كل حجوزاتي') : null,
+      backToAccount()
+    ));
+  }
+
+  const KIND_WORDS = { earn: 'نقاط مسابقة', manual: 'تعديل من الخدمة', transfer: 'نقل', spend: 'طلب من المتجر', refund: 'رجوع نقاط' };
+
+  /* #me/points: the active season's balance and movements; closed seasons below */
+  async function viewPoints() {
+    main.dataset.state = 'loading';
+    const reply = await authed('GET', '/v1/account/points');
+    if (reply.code === 'session') {
+      sessionOver();
+      return;
+    }
+    if (!reply.ok) {
+      show(card(title('نقاطي'), h('p', { class: 'field__error', role: 'alert' }, reply.message || 'حصلت مشكلة. جرّب تاني.'), backToAccount()));
+      return;
+    }
+    show(card(
+      title('نقاطي'),
+      h('p', { class: 'acct__password', 'data-balance': '' }, arDigits(reply.balance) + ' نقطة'),
+      reply.season ? h('p', { class: 'field__hint' }, reply.season.name) : null,
+      reply.frozen ? h('p', { class: 'acct__notice', 'data-frozen': '' }, 'رصيدك متجمد: النقط اللي جمعتها محفوظة، بس مش هتقدر تستخدمها طول ما سنك خارج النطاق العمري للخدمة. لو بياناتك غلط، كلّم الخدمة.') : null,
+      reply.ledger.length
+        ? h('ul', { class: 'acct__sessions', 'data-ledger': '' }, ...reply.ledger.map(l => h('li', {},
+          h('strong', { dir: 'ltr' }, (l.amount > 0 ? '+' : '') + arDigits(l.amount)), ' ' + (KIND_WORDS[l.kind] || ''), l.note ? ' — ' + l.note : '')))
+        : h('p', { class: 'acct__lead' }, 'لسه مفيش نقط في الموسم ده.'),
+      reply.seasons.length ? h('p', { class: 'field__hint' }, 'مواسم فاتت: ' + reply.seasons.map(s => s.name + ' (' + arDigits(s.final) + ')').join('، ')) : null,
+      backToAccount()
     ));
   }
 

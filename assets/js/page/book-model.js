@@ -632,6 +632,9 @@ export function bookingError(reply) {
       return { action: 'fallback', step: '', field: '', left, message: 'الحجز أونلاين مش متاح دلوقتي. كلّم خادم من دول على واتساب.' };
     case 'proof':
       return { action: 'field', step: 'c', field: 'proofs', left, message: 'صورة من الصور فيها مشكلة. شيلها وارفعها تاني (سكرين شوت).' };
+    case 'account_required':
+    case 'session':
+      return { action: 'stop', step: '', field: '', left, message: 'الفعالية دي محتاجة تسجيل دخول. سجّل دخولك وكمّل الحجز.', signIn: true };
     case 'turnstile':
       return { action: 'field', step: 'c', field: 'turnstile', left, message: 'التأكيد إنك مش روبوت ما نفعش. كمّله تاني وابعت.' };
     case 'rate':

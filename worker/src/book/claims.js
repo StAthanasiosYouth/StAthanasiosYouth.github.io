@@ -16,6 +16,7 @@ import { retry, cairoText } from '../lib/db.js';
 import { limit, clientIp } from '../lib/ratelimit.js';
 import { randomId } from '../lib/hash.js';
 import { readStatusToken, checkProofClaim } from './token.js';
+import { bookMailStmts } from './account.js';
 import { checkTurnstile } from './turnstile.js';
 import { payDestRequired, payDest } from './pay.js';
 import { bookingOn } from './public.js';
@@ -137,7 +138,8 @@ export async function bookPayRequest(ctx) {
         .bind(x.b.id, (x.ev ? x.ev.end_ms : now) + PROOF_KEEP_MS, ...proofs, id),
       db.prepare(`INSERT INTO activity (id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary, changes, severity)
         SELECT ?, ?, ?, 'visitor', 'زائر', 'payment.request', 'booking', ?, ?, ?, ?, 'important' WHERE ${made}`).bind(
-        randomId('act-'), now, at, x.b.id, x.b.ref, 'طلب دفع الباقي · ' + m.key + ' · ' + servant.name, JSON.stringify({ amount }), id)
+        randomId('act-'), now, at, x.b.id, x.b.ref, 'طلب دفع الباقي · ' + m.key + ' · ' + servant.name, JSON.stringify({ amount }), id),
+      ...bookMailStmts(db, x.b, 'pay.request', { guard: made, guardBinds: [id], dedupe: 'pay:req:' + id, now, entityType: 'claim', entityId: id })
     ]));
   } catch (err) {
     // the UNIQUE partial index: another request is already open for this booking
@@ -171,7 +173,7 @@ export async function adminClaimReject(ctx) {
   const reason = cleanText((ctx.body || {}).reason, LIMITS.reason);
   if (reason.length < 2) throw invalid('reason');
   const db = ctx.env.DB;
-  const c = await retry(() => db.prepare('SELECT c.*, b.ref FROM payment_claims c JOIN bookings b ON b.id = c.booking_id WHERE c.id = ?').bind(id).first());
+  const c = await retry(() => db.prepare('SELECT c.*, b.ref, b.participant_id FROM payment_claims c JOIN bookings b ON b.id = c.booking_id WHERE c.id = ?').bind(id).first());
   if (!c) throw new ApiError('not_found', 'claim');
   if (c.status !== 'pending') throw new ApiError('final', c.status);
   const now = Date.now();
@@ -180,7 +182,8 @@ export async function adminClaimReject(ctx) {
       .bind(reason, cairoText(now), now, ctx.actor.email, id),
     db.prepare(`INSERT INTO activity (id, at, cairo, actor, actor_name, action, entity_type, entity_id, entity_title, summary)
       SELECT ?, ?, ?, ?, ?, 'payment.requestReject', 'booking', ?, ?, ? WHERE changes() = 1`).bind(
-      randomId('act-'), now, cairoText(now), ctx.actor.email, ctx.actor.name || null, c.booking_id, c.ref, ('رفض طلب الدفع: ' + reason).slice(0, 200))
+      randomId('act-'), now, cairoText(now), ctx.actor.email, ctx.actor.name || null, c.booking_id, c.ref, ('رفض طلب الدفع: ' + reason).slice(0, 200)),
+    ...bookMailStmts(db, c, 'pay.requestRejected', { guard: "EXISTS (SELECT 1 FROM payment_claims WHERE id = ? AND status = 'rejected')", guardBinds: [id], dedupe: 'pay:reqrej:' + id, now, entityType: 'claim', entityId: id })
   ]));
   if (r[0].meta.changes !== 1) throw new ApiError('final', 'moved');
   return { claim: { id, status: 'rejected', reason }, bookingId: c.booking_id };

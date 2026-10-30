@@ -21,7 +21,7 @@ import { money } from './model.js';
 import { arabicDigits } from '../words.js';
 import { prepareImage, UNSUPPORTED } from './image.js';
 import { mountTurnstile } from './turnstile.js';
-import { rememberBooking } from './book-store.js';
+import { rememberBooking, accountSession } from './book-store.js';
 import { createBookApi } from './book-api.js';
 import { bookApiUrl } from './book-config.js';
 
@@ -252,6 +252,24 @@ export function showStatus({ event, announce = () => {}, reduced = false, onChan
   }
 
 
+  /* signed in on this device: this booking can join the account (possession of this link; YOUTH-ACCOUNTS-PLAN §18.1) */
+  function linkButton() {
+    const session = accountSession();
+    if (!session) return null;
+    const button = h('button', { class: 'btn', type: 'button', 'data-link-account': '' }, 'اربطه بحسابي');
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      let done = false;
+      try {
+        const res = await fetch(bookApiUrl() + '/v1/account/bookings/link', { method: 'POST', headers: { Authorization: 'Bearer ' + session.token, 'Content-Type': 'application/json' }, credentials: 'omit', body: JSON.stringify({ token }) });
+        done = !!(await res.json()).linked;
+      }
+      catch { done = false; }
+      button.textContent = done ? 'اتربط بحسابك ✓' : 'مقدرناش نربطه';
+    });
+    return button;
+  }
+
   function render(view, { notice = '' } = {}) {
 
     const rows = view.rows.map(([label, value]) => h('div', {}, h('dt', {}, label), h('dd', {}, value)));
@@ -260,7 +278,7 @@ export function showStatus({ event, announce = () => {}, reduced = false, onChan
     function idle() {
       const cancel = view.canWithdraw ? h('button', { class: 'btn bstat__cancel', type: 'button' }, 'إلغاء الطلب') : null;
       if (cancel) cancel.addEventListener('click', ask);
-      actionsEl.replaceChildren(...[cancel, back()].filter(Boolean));
+      actionsEl.replaceChildren(...[cancel, linkButton(), back()].filter(Boolean));
     }
 
     function ask() {

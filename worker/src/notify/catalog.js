@@ -59,6 +59,13 @@ const SPECIAL = {
   'handover.void': ['routine', 'finance.view'],
   'modules.book': ['important', 'bookings.manage'],
   'member.mail.dead': ['routine', 'notifications.view'],
+  'participant.email': ['critical', 'participants.view'],
+  'participant.phoneFix': ['critical', 'participants.view'],
+  'participant.dob': ['critical', 'participants.view'],
+  'participant.reset': ['critical', 'participants.view'],
+  'participant.block': ['critical', 'participants.view'],
+  'account.recovery.first': ['critical', 'participants.view'],
+  'participant.settings': ['important', 'participants.manage'],
   'account.discover.high': ['important', 'participants.view'],
   'admin.rename': ['routine', 'accounts.view'],
   'session.takeover': ['routine', 'accounts.view']

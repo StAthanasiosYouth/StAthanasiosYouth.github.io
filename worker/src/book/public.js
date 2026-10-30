@@ -15,6 +15,7 @@ import { randomId } from '../lib/hash.js';
 import { putProof } from '../lib/proofs.js';
 import { loadEvent, seatsTaken } from './event.js';
 import { statusToken, readStatusToken, proofClaim, checkProofClaim } from './token.js';
+import { accountsOn, needsAccount, bookerAccount, bookMailStmts } from './account.js';
 import { checkTurnstile, turnstileSiteKey } from './turnstile.js';
 import { payDestRequired, payDest } from './pay.js';
 import {
@@ -60,7 +61,8 @@ export async function bookState(ctx) {
   await limit(ctx, 'book.state', clientIp(ctx.request), 120, 60);
   const event = await loadEvent(ctx, ctx.url.searchParams.get('slug'));
   const w = windowState(event, Date.now());
-  const base = { opensAt: w.opensAt, closesAt: w.closesAt, revision: event.revision, left: null, turnstile: turnstileSiteKey(ctx.env) };
+  const accountOn = await accountsOn(ctx.env);
+  const base = { opensAt: w.opensAt, closesAt: w.closesAt, revision: event.revision, left: null, turnstile: turnstileSiteKey(ctx.env), account: { on: accountOn, required: accountOn && needsAccount(event.booking) } };
   if (!w.open) return { __cache: 'public, max-age=15', open: false, reason: w.reason, ...base };
   const taken = await seatsTaken(ctx.env, event.id);
   if (event.booking.capacity != null && event.booking.capacity - taken <= 0) return { __cache: 'public, max-age=15', open: false, reason: 'full', ...base, left: 0 };
@@ -115,13 +117,15 @@ export async function bookSubmit(ctx) {
   const now = Date.now();
   openOrThrow(event, now);
   const b = event.booking;
+  // §18.1: a signed-in booker's date of birth comes from the account only; what the page sent is ignored
+  const account = await bookerAccount(ctx, b);
 
   const name = cleanText(body.name, LIMITS.name);
   if (name.length < 2) throw invalid('name');
   const phone = normPhone(body.phone);
   if (!phone) throw invalid('phone');
   // age eligibility (§4.9): the booker's date of birth, judged at the event's start (Cairo)
-  const booker = checkBooker(b, event.startAt, body.bookerDob, now);
+  const booker = checkBooker(b, event.startAt, account ? account.birth_date : body.bookerDob, now);
   if (booker.problem) throw new ApiError('age', booker.problem.field, { field: booker.problem.field, message: booker.problem.message });
   // «كل فرد باسمه وسنه»: the counts come from the people list (each priced by age, server side)
   let party = null;
@@ -194,13 +198,13 @@ export async function bookSubmit(ctx) {
       // at most 2 PENDING bookings per phone per event, decided inside the write
       db.prepare(`INSERT INTO bookings (id, ref, event_id, source, status, name, phone, servant_id, method, requested, seats_requested, names,
           quoted_total, price_rev, visitor_note, request_key, created_at, created_ms, updated_ms, participants, pay_plan, pay_claim,
-          booker_dob, booker_age, age_source, age_rule)
-        SELECT ?, ?, ?, 'site', 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          booker_dob, booker_age, age_source, age_rule, participant_id)
+        SELECT ?, ?, ?, 'site', 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         WHERE (SELECT COUNT(*) FROM bookings WHERE event_id = ? AND phone = ? AND status = 'pending') < ?
         ON CONFLICT(request_key) DO NOTHING`).bind(
         id, ref, event.id, name, phone, servantId, method, JSON.stringify(counts), seatCount, names ? JSON.stringify(names) : null,
         total, event.priceRev, note, body.requestKey, createdAt, now, now, party ? JSON.stringify(party.list) : null, plan.plan, plan.claim,
-        booker.dob || null, booker.age == null ? null : booker.age, booker.dob ? 'self' : null, rule ? JSON.stringify(rule) : null,
+        booker.dob || null, booker.age == null ? null : booker.age, booker.dob ? (account ? 'account' : 'self') : null, rule ? JSON.stringify(rule) : null, account ? account.id : null,
         event.id, phone, LIMITS.pendingPerPhone)
     ];
     if (proofs.length) {
@@ -216,6 +220,7 @@ export async function bookSubmit(ctx) {
         ON CONFLICT(event_id) DO UPDATE SET unsent = book_news.unsent + 1, title = excluded.title,
           first_ms = COALESCE(book_news.first_ms, excluded.first_ms), last_ms = excluded.last_ms`)
       .bind(event.id, event.title.slice(0, 120), now, now, id));
+    stmts.push(...bookMailStmts(db, { id, participant_id: account ? account.id : null }, 'book.received', { guard: 'EXISTS (SELECT 1 FROM bookings WHERE id = ?)', guardBinds: [id], dedupe: 'book:received:' + id, now }));
     try {
       const r = await retry(() => db.batch(stmts));
       if (r[0].meta.changes === 1) {

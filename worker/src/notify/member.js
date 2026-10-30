@@ -13,12 +13,13 @@
  */
 
 import { retry, cairoText } from '../lib/db.js';
+import { people, paidOf, amountDueOf } from '../book/model.js';
 import { randomId } from '../lib/hash.js';
 import { activityStmt } from '../lib/activity.js';
 import { gmailConfigured, sendMail, GmailError } from './gmail.js';
 import { allowed, budget, quotaOf, hourKey, countStmt } from './email.js';
 import { backoffMs, MAX_ATTEMPTS } from './claim.js';
-import { securityEmail } from './templates.js';
+import { securityEmail, bookingEmail, pointsEmail, dayText, whenText, SITE } from './templates.js';
 import { isTestInbox } from '../account/mail.js';
 
 const HOUR = 3600000;
@@ -44,20 +45,37 @@ export const KINDS = {
   'acct.new': { tier: 0, cls: 'member_tx', ttl: 72 * HOUR, notice: 'account_created' },
   'acct.pw': { tier: 0, cls: 'member_tx', ttl: 72 * HOUR, notice: 'password_reset_support', fresh: (p, row) => p.pw_version === row.entity_version },
   'acct.rec1': { tier: 0, cls: 'member_tx', ttl: 72 * HOUR, notice: 'recovery_used' },
-  'acct.dev': { tier: 3, cls: 'member_tx', ttl: 72 * HOUR, group: 'security', notice: 'new_signin' }
+  'acct.email': { tier: 0, cls: 'member_tx', ttl: 72 * HOUR, notice: 'email_changed' },
+  'acct.dev': { tier: 3, cls: 'member_tx', ttl: 72 * HOUR, group: 'security', notice: 'new_signin' },
+
+  // bookings and payments, only for a booking linked to the account (§4.2; book/account.js)
+  'book.received': { tier: 2, cls: 'member_tx', ttl: 72 * HOUR, group: 'bookings', book: 'pending', still: ['pending'] },
+  'book.confirmed': { tier: 1, cls: 'member_tx', ttl: 72 * HOUR, book: 'confirmed', still: ['confirmed'] },
+  'book.rejected': { tier: 1, cls: 'member_tx', ttl: 72 * HOUR, book: 'rejected', still: ['rejected'] },
+  'book.cancelled': { tier: 1, cls: 'member_tx', ttl: 72 * HOUR, book: 'cancelled', still: ['cancelled'] },
+  'book.eventCancelled': { tier: 1, cls: 'member_tx', ttl: 72 * HOUR, book: 'event_cancelled', still: ['cancelled'] },
+  'book.due': { tier: 1, cls: 'member_tx', ttl: 72 * HOUR, book: 'due_changed', still: ['confirmed'] },
+  'book.eventChange': { tier: 1, cls: 'member_tx', ttl: 72 * HOUR, book: 'event_change', still: ['pending', 'confirmed'] },
+  'book.reminder': { tier: 2, cls: 'member_tx', ttl: 7 * DAY, group: 'bookings', book: 'balance', still: ['confirmed'], owing: true },
+  'pay.recorded': { tier: 1, cls: 'member_tx', ttl: 72 * HOUR, book: 'payment_recorded' },
+  'pay.voided': { tier: 1, cls: 'member_tx', ttl: 72 * HOUR, book: 'payment_voided' },
+  'pay.request': { tier: 2, cls: 'member_tx', ttl: 72 * HOUR, group: 'bookings', book: 'request_received' },
+  'pay.requestRejected': { tier: 1, cls: 'member_tx', ttl: 72 * HOUR, book: 'request_rejected' },
+
+  'pts.deduct': { tier: 1, cls: 'member_tx', ttl: 72 * HOUR, points: true }
 };
 
 /* the outbox row: goes in the SAME batch as the state change it reports (§3). A replay changes nothing. */
-export function memberEmailStmt(db, { kind, participantId, entityType = null, entityId = null, entityVersion = null, dedupeKey, now = Date.now() }) {
+export function memberEmailStmt(db, { kind, participantId, entityType = null, entityId = null, entityVersion = null, dedupeKey, now = Date.now(), guard = '', guardBinds = [], toEmail = null, expires = null }) {
   const k = KINDS[kind];
   if (!k) throw new Error('unknown member email: ' + kind);
-  return db.prepare(`INSERT OR IGNORE INTO member_outbox (id, participant_id, kind, entity_type, entity_id, entity_version, tier, class, dedupe_key, status, next_ms, expires_ms, created_ms)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?)`)
-    .bind(randomId('mo-', 8), participantId, kind, entityType, entityId, entityVersion, k.tier, k.cls, dedupeKey, now, now + k.ttl, now);
+  return db.prepare(`INSERT OR IGNORE INTO member_outbox (id, participant_id, kind, entity_type, entity_id, entity_version, tier, class, dedupe_key, status, next_ms, expires_ms, created_ms, to_email)
+    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?${guard ? ' WHERE ' + guard : ''}`)
+    .bind(randomId('mo-', 8), participantId, kind, entityType, entityId, entityVersion, k.tier, k.cls, dedupeKey, now, expires || now + k.ttl, now, toEmail, ...guardBinds);
 }
 
 async function memberSettings(db) {
-  const { results } = await retry(() => db.prepare("SELECT key, value FROM settings WHERE key LIKE 'MAIL_%' OR key IN ('MEMBER_EMAIL', 'accounts_mode', 'GMAIL_HEALTH')").all());
+  const { results } = await retry(() => db.prepare("SELECT key, value FROM settings WHERE key LIKE 'MAIL_%' OR key IN ('MEMBER_EMAIL', 'accounts_mode', 'GMAIL_HEALTH', 'support_contact')").all());
   return Object.fromEntries(results.map(r => [r.key, r.value]));
 }
 
@@ -80,14 +98,68 @@ export async function memberLease(env, now = Date.now()) {
   return ids;
 }
 
-/* the email of one row, read at send time (§3) */
-async function render(db, row) {
-  const k = KINDS[row.kind];
-  let device = '';
-  if (row.entity_type === 'session' && row.entity_id) {
-    device = await retry(() => db.prepare('SELECT device FROM account_sessions WHERE id = ?').bind(row.entity_id).first('device')) || '';
+const account = hash => SITE + '/account/#me/' + hash;
+const plainStart = s => String(s || '').replace('T', ' ');
+
+/* the booking a row speaks about, read at send time (§3): values and state as they are now */
+async function bookingOf(db, row) {
+  let bookingId = row.entity_id;
+  let payment = null;
+  let notice = null;
+  if (row.entity_type === 'payment') {
+    payment = await retry(() => db.prepare('SELECT * FROM payments WHERE id = ?').bind(row.entity_id).first());
+    bookingId = payment ? payment.booking_id : '';
+  } else if (row.entity_type === 'claim') {
+    const claim = await retry(() => db.prepare('SELECT * FROM payment_claims WHERE id = ?').bind(row.entity_id).first());
+    bookingId = claim ? claim.booking_id : '';
+    payment = claim ? { amount: claim.amount, claim } : null;
+  } else if (row.entity_type === 'notice') {
+    const [noticeId, id] = String(row.entity_id).split(':');
+    bookingId = id;
+    notice = await retry(() => db.prepare('SELECT * FROM event_notices WHERE id = ?').bind(noticeId).first());
   }
-  return securityEmail({ kind: k.notice, cairo: cairoText(row.created_ms), device, prefs: k.tier >= 2 });
+  const b = bookingId ? await retry(() => db.prepare('SELECT * FROM bookings WHERE id = ?').bind(bookingId).first()) : null;
+  if (!b) return null;
+  const [e, pays, claims] = await retry(() => db.batch([
+    db.prepare('SELECT title, start_at, booking FROM event_cfg WHERE id = ?').bind(b.event_id),
+    db.prepare('SELECT * FROM payments WHERE booking_id = ?').bind(b.id),
+    db.prepare("SELECT COUNT(*) AS n FROM payment_claims WHERE booking_id = ? AND status = 'pending'").bind(b.id)
+  ]));
+  let cfg = null;
+  try { cfg = e.results[0] && e.results[0].booking ? JSON.parse(e.results[0].booking) : null; } catch { cfg = null; }
+  const total = amountDueOf(b);
+  return { b, event: e.results[0] || {}, cfg, total, paid: paidOf(pays.results), payment, notice, openClaim: claims.results[0].n > 0 };
+}
+
+/* the email of one row, read at send time (§3) */
+async function render(db, row, p, support, entity) {
+  const k = KINDS[row.kind];
+  const prefs = k.tier >= 2;
+  if (k.notice) {
+    let device = '';
+    if (row.entity_type === 'session' && row.entity_id) {
+      device = await retry(() => db.prepare('SELECT device FROM account_sessions WHERE id = ?').bind(row.entity_id).first('device')) || '';
+    }
+    return securityEmail({ kind: k.notice, cairo: cairoText(row.created_ms), device, prefs, support });
+  }
+  if (k.points) {
+    const l = await retry(() => db.prepare('SELECT * FROM points_ledger WHERE id = ?').bind(row.entity_id).first());
+    const balance = await retry(() => db.prepare('SELECT COALESCE(SUM(amount), 0) AS n FROM points_ledger WHERE participant_id = ? AND season_id = ?').bind(p.id, l.season_id).first('n'));
+    return pointsEmail({ amount: Math.abs(l.amount), balance, note: l.note_public ? l.note : '', url: account('points'), support });
+  }
+  const x = entity;
+  const counts = JSON.parse(x.b.actual || x.b.requested || '{}');
+  return bookingEmail({
+    status: k.book, name: p.name.split(/\s+/)[0], event: x.event.title || '', when: x.event.start_at ? whenText(plainStart(x.event.start_at)) : '', ref: x.b.ref,
+    people: x.cfg ? people(x.cfg.pricing, counts).total : x.b.seats_requested, total: x.total, paid: x.paid,
+    due: x.cfg && x.cfg.payment && x.cfg.payment.mode === 'installments' && x.cfg.payment.finalDueAt ? dayText(plainStart(x.cfg.payment.finalDueAt)) : '',
+    reason: k.book === 'rejected' ? x.b.reject_reason : k.book === 'cancelled' || k.book === 'event_cancelled' ? x.b.cancel_reason : k.book === 'request_rejected' && x.payment && x.payment.claim ? x.payment.claim.reason : '',
+    amount: x.payment ? x.payment.amount : null,
+    refund: row.kind === 'pay.recorded' && x.payment && x.payment.kind === 'refund',
+    changes: x.notice ? JSON.parse(x.notice.changes) : null,
+    url: account('bookings/' + x.b.ref + (row.kind.startsWith('pay.') || k.book === 'balance' ? '/payments' : '')),
+    prefs, support
+  });
 }
 
 const setStatus = (db, id, status, error, next = null) => retry(() => db.prepare('UPDATE member_outbox SET status = ?, error = ?, next_ms = COALESCE(?, next_ms) WHERE id = ?').bind(status, error, next, id).run());
@@ -106,6 +178,8 @@ export async function memberSend(env, ids, now = Date.now()) {
   const s = await memberSettings(db);
   if (s.MEMBER_EMAIL !== '1' || s.accounts_mode !== 'on') return out;
   const b = budget(s);
+  let support = null;
+  try { support = s.support_contact ? JSON.parse(s.support_contact) : null; } catch { support = null; }
   const rows = (await retry(() => db.prepare(`SELECT * FROM member_outbox WHERE id IN (${ids.map(() => '?').join(',')}) AND class <> 'otp' AND status IN ('queued', 'failed', 'deferred')`).bind(...ids).all())).results;
   for (const row of rows) {
     const k = KINDS[row.kind];
@@ -116,6 +190,18 @@ export async function memberSend(env, ids, now = Date.now()) {
         await setStatus(db, row.id, 'suppressed', 'recipient');
         out.suppressed++;
         continue;
+      }
+      let entity = null;
+      if (k.book) {
+        entity = await bookingOf(db, row);
+        const stale = !entity || entity.b.participant_id !== p.id
+          || (k.still && !k.still.includes(entity.b.status))
+          || (k.owing && (entity.total - entity.paid <= 0 || entity.openClaim));
+        if (stale) {
+          await setStatus(db, row.id, 'superseded', null);
+          out.superseded++;
+          continue;
+        }
       }
       if (k.fresh && !k.fresh(p, row)) {
         await setStatus(db, row.id, 'superseded', null);
@@ -140,8 +226,9 @@ export async function memberSend(env, ids, now = Date.now()) {
           continue;
         }
       }
-      if (isTestInbox(env, p.email)) {
-        await retry(() => db.prepare("UPDATE member_outbox SET status = 'sent', sent_ms = ?, attempts = attempts + 1, error = 'test inbox' WHERE id = ?").bind(now, row.id).run());
+      const to = row.to_email || p.email;
+      if (isTestInbox(env, to)) {
+        await retry(() => db.prepare("UPDATE member_outbox SET status = 'sent', sent_ms = ?, attempts = attempts + 1, error = 'test inbox', to_email = NULL WHERE id = ?").bind(now, row.id).run());
         out.sent++;
         continue;
       }
@@ -164,9 +251,9 @@ export async function memberSend(env, ids, now = Date.now()) {
           continue;
         }
       }
-      await sendMail(env, { to: p.email, ...(await render(db, row)), now });
+      await sendMail(env, { to, ...(await render(db, row, p, support, entity)), now });
       await retry(() => db.batch([
-        db.prepare("UPDATE member_outbox SET status = 'sent', sent_ms = ?, attempts = attempts + 1, error = NULL WHERE id = ?").bind(now, row.id),
+        db.prepare("UPDATE member_outbox SET status = 'sent', sent_ms = ?, attempts = attempts + 1, error = NULL, to_email = NULL WHERE id = ?").bind(now, row.id),
         countStmt(db, hourKey(now), k.cls)
       ]));
       out.sent++;

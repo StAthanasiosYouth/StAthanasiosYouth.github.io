@@ -104,7 +104,59 @@ Staging: migration `0019`, Worker `cafe2c46`; `accounts_mode = on`, `OTP_EMAIL =
 
 **Not verified (planned for P5-9):** a real member email through real Gmail to a real inbox (staging used the test inbox; Gmail is covered by unit tests with a fake). The budget's full-window behaviour is unit-tested only.
 
-## 4. Rollback (batches 1–2)
+## 3c. Batch 3 (P5-5 + P5-6 + 5A-4): what was built
+
+Status: **implemented and verified on staging, 2026-10-30. Not on `main`, not in production.**
+
+**P5-5 participants** (`worker/src/account/admin.js`, `/v1/admin/participants/*`, grants in `lib/perms.js`)
+- List and search (name, email, any phone format), «حسابات جديدة» with its flags, Excel export (no credential).
+- Create without OTP: email typed twice, a confirmation method, verified by admin, a creation notice, the password once to the creator.
+- Corrections with a reason and old → new in the audit: profile, email (7-day rule, Primary override, both addresses told), phone, DOB, eligibility override. Block (edit or higher), unblock (manage), end all sessions.
+- Viewing and resetting are separate. View: Primary only, unlimited, changes nothing, logged. Reset: new password once, sessions end, a notice, never emailed; support reset needs a check method.
+- Critical notifications: email, phone, DOB, reset, block, first recovery on an admin-entered email. That first recovery also sends `acct.rec1` and marks the address proven.
+- Manual resend of one Tier 1 email once a day. Settings: the Admin age range and the Technical Support contact, which now reaches the page and every member email.
+- Admin screen `apps-script/AdminAccounts.html` «حسابات الشباب», existing components only. **The tab appears only when `accounts_mode = on`**, so the panel doesn't change before launch.
+
+**P5-6 points** (`worker/src/points/ledger.js`, migration `0020`)
+- Append-only ledger, balance from the active season, never below zero (decided inside the write), idempotent keys, a note the member sees only when marked, `pts.deduct` email.
+- Frozen is derived; freezing writes nothing. Transfer between duplicates: both rows or neither, audited.
+- Seasons: planned / active / closed, close with a preview key (moved numbers refuse), totals frozen, frozen balances shown apart, the next season starts at 0.
+- Member view `GET /v1/account/points` and `/account/#me/points`.
+
+**5A-4 bookings and accounts** (`worker/src/book/account.js`, §18.1)
+- Signed-in booker: the DOB comes from the account only, a client one is ignored; the booking stores `participant_id`, `age_source = 'account'` and its snapshot. A later correction changes future bookings only; the admin booking shows a warning.
+- `requireAccount`: on by default for an event with a booker range, off otherwise, the event's choice wins. **Only while accounts are on: with `accounts_mode = off` bookings behave exactly as today.**
+- Linking an older booking: its status link or an admin, never by phone; different dates of birth raise a flag.
+- `/account/#me/bookings[/REF]`, «اربطه بحسابي» on the status page, «سجّل دخولك واحجز» and back on the event page, the form prefilled with no DOB field.
+- Email for linked bookings only, in the same batch as the change: received, confirmed, rejected, cancelled, event cancelled, payment recorded / voided, due changed, payment request received / rejected, deadline reminder (per-event switch), «بلّغ الحاجزين».
+
+**Boundaries**
+- Crediting from competitions and spending in the store: P5-7, P5-8, on `ledgerStmt`. The rule «a season can't close with open store requests» arrives with the store.
+- `competition/` and `points/` still use today's Apps Script code login, and the old «المشاركين» / «النقاط» screens stay until they move in batch 4.
+- Reservations and switches stay as batch 2. No test data is migrated (YOUTH §7).
+
+## 3d. Batch 3 results (2026-10-30)
+
+| Check | Result |
+| --- | --- |
+| Worker unit tests, 32 new in `test/participants.test.mjs` | 362 / 362 |
+| Site unit tests | 771 pass; the same 3 known failures |
+| Admin e2e `tests/youth-admin.e2e.mjs` (new) and `tests/accounts-admin.e2e.mjs` | 4 / 4 and 8 / 8 |
+| Public booking e2e `tests/book-public.e2e.mjs` (1 new) | 18 / 18 |
+| Staging `node scripts/participants-check.mjs` (real cron + queue) | 56 / 56 |
+| Staging `member-check.mjs`, `account-check.mjs` (earlier batches again) | All passed |
+| Staging account page in a browser (`#me/points`, `#me/bookings`, an unknown ref) | Passed |
+| Production | Unchanged: Worker `4408fb3a`, no migration, nothing pushed |
+
+Staging: migration `0020`, Worker `264fe9ef`; `accounts_mode = on`, `OTP_EMAIL = 0`, `MEMBER_EMAIL = 0` left on staging.
+
+**Not verified (planned for P5-9):** a real email to a real inbox; a signed-in booking on a real event page against staging (the API is checked live, the page against a mock); the deadline reminder through the real daily cron (unit-tested with a clock); the admin screen against the live Worker with a real Google sign-in (its e2e uses a fake of the routes).
+
+**Before launch, owner:** archive the test data from the competitions spreadsheet (YOUTH §7), as it is still open.
+
+## 4. Rollback (batches 1–3)
+
+- Batch 3 extra: everything stays behind `accounts_mode`. A booking already linked keeps working if it goes off, and `POST /v1/admin/book/bookings/:id/link { participantId: null }` unlinks one. Schema additions are unused while off.
 
 - Batch 2 extra: `MEMBER_EMAIL = 0` stops every member email except codes (tested). Rows wait until they expire. The budget rule change rolls back with `wrangler rollback`; the migration's added columns and settings stay harmless. To restore the old defaults: `MAIL_RESERVE_OTP = 50`, `MAIL_ADMIN_BUDGET = 150`.
 
@@ -114,6 +166,6 @@ Staging: migration `0019`, Worker `cafe2c46`; `accounts_mode = on`, `OTP_EMAIL =
 
 ## 5. Before production (needs the owner)
 
-Production release of batches 1–2 is a separate approval: `main`, migrations `0018` + `0019`, the deploy, and `node scripts/account-secrets.mjs --production`. Accounts stay dormant with `accounts_mode = off`; the new budget rule applies to admin mail at once (§3a).
+Production release of batches 1–3 is a separate approval: `main`, migrations `0018`–`0020`, the deploy, and `node scripts/account-secrets.mjs --production`. Accounts stay dormant with `accounts_mode = off`; the new budget rule applies to admin mail at once (§3a).
 
 Owner tasks from YOUTH §28.2, needed by P5-10 at the latest: 2-Step Verification on the youth Gmail account; privacy text approval; pick the support contact (batch 3); archive the test data from the competitions spreadsheet (before batch 3).

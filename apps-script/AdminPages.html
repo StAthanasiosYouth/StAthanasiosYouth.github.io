@@ -1069,6 +1069,13 @@
     // age eligibility (§4.9): the main booker's age at the event (a date of birth on the form); empty = no limit
     var bookerMin = number(booking && booking.bookerAge ? booking.bookerAge.min : '', 0, 120, 'من غير حد');
     var bookerMax = number(booking && booking.bookerAge ? booking.bookerAge.max : '', 0, 120, 'من غير حد');
+    var requireAccount = el('select', { class: 'input', 'aria-label': 'الحجز محتاج حساب' }, [
+      { v: '', t: 'تلقائي: لو فيه سن للحاجز' }, { v: 'yes', t: 'أيوه، لازم حساب' }, { v: 'no', t: 'لأ، مفتوح للكل' }
+    ].map(function (o) {
+      var saved = booking && booking.requireAccount === true ? 'yes' : booking && booking.requireAccount === false ? 'no' : '';
+      return el('option', { value: o.v, selected: o.v === saved ? 'selected' : null, text: o.t });
+    }));
+    var mailReminders = A.checkbox('تذكير بالإيميل قبل آخر ميعاد للدفع', !!(booking && booking.mailReminders), 'للي حاجزين بحساب بس: قبلها بـ٣ أيام ويوم الميعاد.');
     var ageStrict = A.checkbox('المرافقين لازم سنهم يطابق فئة متاحة', booking ? booking.ageStrict === true : false, 'مع «كل فرد باسمه وسنه»: اللي سنه برّه كل الفئات المتاحة بيترفض (الفئة اللي من غير سن بتقبل أي سن)');
     // where the servants' WhatsApp shows (only servants whose number is approved for visitors, from «الخدام»)
     var contactOnPage = A.checkbox('واتساب الخادم يظهر في صفحة الفعالية', booking ? booking.contactOnPage !== false : true, 'في كل الأوقات: قبل الحجز، وبعد ما الحجز يقفل أو العدد يكمل');
@@ -1100,8 +1107,9 @@
       el('fieldset', { class: 'fieldset' }, el('legend', { text: 'شروط السن' }),
         el('div', { class: 'row' }, A.field('سن الحاجز من', bookerMin), A.field('لحد', bookerMax)),
         el('p', { class: 'note', text: 'لو حطيت سن للحاجز (سنه يوم الفعالية)، الحاجز بيكتب تاريخ ميلاده والحجز اللي برّه السن بيترفض. الفئة اللي تقفل «متاحة في الفعالية دي» بترفض المرافقين اللي فيها. الأدمن بصلاحية «يدير · الحجوزات» يقدر يتجاوز مع كتابة السبب.' }),
-        ageStrict.node),
-      el('fieldset', { class: 'fieldset' }, el('legend', { text: 'الدفع' }), payMode.node || payMode, installments),
+        ageStrict.node,
+        A.field('الحجز محتاج حساب؟', requireAccount)),
+      el('fieldset', { class: 'fieldset' }, el('legend', { text: 'الدفع' }), payMode.node || payMode, installments, mailReminders.node),
       el('fieldset', { class: 'fieldset' }, el('legend', { text: 'الخدام اللي بيتحجز معاهم' }),
         servantRows.length ? el('div', {}, servantRows.map(function (s) { return s.node; })) : el('p', { class: 'note', text: 'مفيش خدام لسه — زوّدهم من «الخدام».' }),
         el('p', { class: 'note', text: 'رقم التواصل بيظهر بس للخادم اللي رقمه متاح للزوار (من «الخدام»). أرقام الدفع والأرقام الخاصة عمرها ما بتظهر هنا.' }),
@@ -1126,6 +1134,7 @@
           opensAt: opensAt.value(), closesAt: closesAt.value(), capacity: capacity.value, perBookingMax: perBooking.value,
           collectNames: collectNames.input.checked, participants: participants.input.checked, pricing: pricing.value(),
           bookerAge: { min: bookerMin.value, max: bookerMax.value }, ageStrict: ageStrict.input.checked,
+          requireAccount: requireAccount.value === 'yes' ? true : requireAccount.value === 'no' ? false : null, mailReminders: mailReminders.input.checked,
           contactOnPage: contactOnPage.input.checked, contactAfter: contactAfter.input.checked,
           payment: { mode: payMode.value ? payMode.value() : (installments.hidden ? 'full' : 'installments'), minFirst: minFirst.value, finalDueAt: finalDueAt.value() }
         } : null,

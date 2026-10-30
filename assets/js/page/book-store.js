@@ -9,6 +9,7 @@
  * the admin preview (main.js never loads the booking there).
  */
 
+import { readSession, RETURN_KEY } from '../account/model.js';
 import { draftKey, readDraft, storeDraft, readMine, addMine, dropMine, MINE_KEY } from './book-model.js';
 
 function store() {
@@ -18,6 +19,24 @@ function store() {
   catch {
     return null;
   }
+}
+
+/* the youth account signed in on this device, or null (docs/YOUTH-ACCOUNTS-PLAN.md §18.1) */
+export function accountSession() {
+  try {
+    return readSession(store(), typeof sessionStorage === 'undefined' ? null : sessionStorage);
+  }
+  catch {
+    return null;
+  }
+}
+
+/* where to come back after signing in: this tab only */
+export function keepSignInReturn(path) {
+  try {
+    sessionStorage.setItem(RETURN_KEY, path);
+  }
+  catch { /* the account page still opens */ }
 }
 
 function readJson(key) {

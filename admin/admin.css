@@ -4771,6 +4771,20 @@ dialog .toasts[popover] {
   flex: 0 0 auto;
 }
 
+.youth-password {
+  margin: 12px 0;
+  padding: 14px;
+  border: 1px solid var(--line, #d7dee8);
+  border-radius: 12px;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-align: center;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 .nt-member {
   margin-top: 16px;
 }

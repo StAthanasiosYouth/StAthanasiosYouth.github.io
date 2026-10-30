@@ -49,6 +49,10 @@ export function rowFromJson(json, source, now = Date.now()) {
     // age eligibility (§4.9): absent on older events = no limits, every category allowed
     bookerAge: parseBookerAge(b.bookerAge),
     ageStrict: b.ageStrict === true,
+    // YOUTH-ACCOUNTS-PLAN §18.1: true / false as the admin chose; null = on when there is a booker range
+    requireAccount: b.requireAccount === true ? true : b.requireAccount === false ? false : null,
+    // MEMBER-NOTIFICATIONS-PLAN §4.2: the deadline reminder emails (off by default)
+    mailReminders: b.mailReminders === true,
     pricing: { mode: b.pricing.mode === 'group' ? 'group' : 'single', categories: b.pricing.categories.map(c => ({
       key: String(c.key), label: String(c.label || c.key), group: ['adult', 'child', 'companion'].includes(c.group) ? c.group : 'adult',
       price: Math.max(0, Math.floor(Number(c.price) || 0)), seat: c.seat !== false, min: Number(c.min) || 0, max: c.max == null ? 30 : Number(c.max), note: String(c.note || ''),

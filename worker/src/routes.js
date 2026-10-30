@@ -29,7 +29,7 @@ import { makeJob } from './jobs.js';
 import { bookState, bookProof, bookSubmit, bookStatus, bookWithdraw } from './book/public.js';
 import {
   adminModule, adminModuleSet, adminEvents, adminEventRefresh, adminBookings, adminBooking, adminCreate, adminConfirm,
-  adminReject, adminCancel, adminReopen, adminUpdate, adminPaymentAdd, adminPaymentVoid, adminCancelAll, adminSummary, adminExport, adminReport, adminLock, adminUnlock, proofTarget, adminHandovers, adminHandoverAdd, adminHandoverVoid, adminFinance, adminReminders, adminReminderAdd
+  adminReject, adminCancel, adminReopen, adminUpdate, adminPaymentAdd, adminPaymentVoid, adminCancelAll, adminSummary, adminExport, adminReport, adminLock, adminUnlock, proofTarget, adminHandovers, adminHandoverAdd, adminHandoverVoid, adminFinance, adminReminders, adminReminderAdd, adminNotifyBookers
 } from './book/admin.js';
 import { rowFromJson, saveRow } from './book/event.js';
 import { syncBookNews, diagNews } from './book/news.js';
@@ -42,7 +42,14 @@ import { syncContentImport, syncContentExport, syncContentNotify, adminDrafts, a
 import { adminContentCall, adminMediaUpload, MEDIA_UPLOAD_MAX_BYTES } from './content/runtime.js';
 import { syncCompSig } from './content/comps.js';
 import { syncMediaCopy, adminMediaStatus } from './content/media.js';
-import { accountConfig, accountSignin, accountRegisterStart, accountRegisterVerify, accountMe, accountSecurity, accountPrefs, accountPrefsSave, accountLogout, accountForgot, accountForgotVerify } from './account/routes.js';
+import {
+  adminParticipants, adminParticipantsReview, adminParticipantsExport, adminParticipantCreate, adminParticipant, adminParticipantProfile, adminParticipantEmail, adminParticipantPhone,
+  adminParticipantDob, adminParticipantEligibility, adminParticipantViewPassword, adminParticipantResetPassword, adminParticipantBlock, adminParticipantUnblock, adminParticipantRevoke,
+  adminParticipantResend, adminParticipantSettings, adminParticipantSettingsSave
+} from './account/admin.js';
+import { adminPointsAdjust, adminPointsTransfer, adminSeasons, adminSeasonSave, adminSeasonPreview, adminSeasonClose } from './points/ledger.js';
+import { adminBookingLink } from './book/account.js';
+import { accountConfig, accountSignin, accountRegisterStart, accountRegisterVerify, accountMe, accountBookingsList, accountBookingsLink, accountPoints, accountSecurity, accountPrefs, accountPrefsSave, accountLogout, accountForgot, accountForgotVerify } from './account/routes.js';
 
 /* GET /v1/admin/publish/status — the last publishes + the shadow gate (docs/PUBLISH-SEPARATION-PLAN.md P2-2) */
 async function publishStatus(ctx) {
@@ -364,12 +371,43 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/account/register/start', auth: 'public', maxBytes: 8 * 1024, handler: accountRegisterStart },
   { method: 'POST', path: '/v1/account/register/verify', auth: 'public', maxBytes: 1024, handler: accountRegisterVerify },
   { method: 'GET', path: '/v1/account/me', auth: 'public', handler: accountMe },
+  { method: 'GET', path: '/v1/account/bookings', auth: 'public', handler: accountBookingsList },
+  { method: 'POST', path: '/v1/account/bookings/link', auth: 'public', maxBytes: 4 * 1024, handler: accountBookingsLink },
+  { method: 'GET', path: '/v1/account/points', auth: 'public', handler: accountPoints },
   { method: 'GET', path: '/v1/account/security', auth: 'public', handler: accountSecurity },
   { method: 'GET', path: '/v1/account/prefs', auth: 'public', handler: accountPrefs },
   { method: 'POST', path: '/v1/account/prefs', auth: 'public', maxBytes: 1024, handler: accountPrefsSave },
   { method: 'POST', path: '/v1/account/logout', auth: 'public', maxBytes: 1024, handler: accountLogout },
   { method: 'POST', path: '/v1/account/forgot', auth: 'public', maxBytes: 4 * 1024, handler: accountForgot },
   { method: 'POST', path: '/v1/account/forgot/verify', auth: 'public', maxBytes: 1024, handler: accountForgotVerify },
+
+  // Phase 5 — accounts in the admin (account/admin.js), points and seasons (points/ledger.js)
+  { method: 'GET', path: '/v1/admin/participants', auth: 'admin', handler: adminParticipants },
+  { method: 'POST', path: '/v1/admin/participants', auth: 'admin', maxBytes: 8 * 1024, handler: adminParticipantCreate },
+  { method: 'GET', path: '/v1/admin/participants/review', auth: 'admin', handler: adminParticipantsReview },
+  { method: 'GET', path: '/v1/admin/participants/export', auth: 'admin', handler: adminParticipantsExport },
+  { method: 'GET', path: '/v1/admin/participants/settings', auth: 'admin', handler: adminParticipantSettings },
+  { method: 'POST', path: '/v1/admin/participants/settings', auth: 'admin', maxBytes: 4 * 1024, handler: adminParticipantSettingsSave },
+  { method: 'GET', path: '/v1/admin/participants/:id', auth: 'admin', handler: adminParticipant },
+  { method: 'POST', path: '/v1/admin/participants/:id/profile', auth: 'admin', maxBytes: 8 * 1024, handler: adminParticipantProfile },
+  { method: 'POST', path: '/v1/admin/participants/:id/email', auth: 'admin', maxBytes: 4 * 1024, handler: adminParticipantEmail },
+  { method: 'POST', path: '/v1/admin/participants/:id/phone', auth: 'admin', maxBytes: 4 * 1024, handler: adminParticipantPhone },
+  { method: 'POST', path: '/v1/admin/participants/:id/dob', auth: 'admin', maxBytes: 4 * 1024, handler: adminParticipantDob },
+  { method: 'POST', path: '/v1/admin/participants/:id/eligibility', auth: 'admin', maxBytes: 4 * 1024, handler: adminParticipantEligibility },
+  { method: 'POST', path: '/v1/admin/participants/:id/view-password', auth: 'admin', maxBytes: 1024, handler: adminParticipantViewPassword },
+  { method: 'POST', path: '/v1/admin/participants/:id/reset-password', auth: 'admin', maxBytes: 4 * 1024, handler: adminParticipantResetPassword },
+  { method: 'POST', path: '/v1/admin/participants/:id/block', auth: 'admin', maxBytes: 4 * 1024, handler: adminParticipantBlock },
+  { method: 'POST', path: '/v1/admin/participants/:id/unblock', auth: 'admin', maxBytes: 4 * 1024, handler: adminParticipantUnblock },
+  { method: 'POST', path: '/v1/admin/participants/:id/sessions/revoke', auth: 'admin', maxBytes: 1024, handler: adminParticipantRevoke },
+  { method: 'POST', path: '/v1/admin/participants/:id/resend', auth: 'admin', maxBytes: 1024, handler: adminParticipantResend },
+  { method: 'POST', path: '/v1/admin/participants/:id/points', auth: 'admin', maxBytes: 4 * 1024, handler: adminPointsAdjust },
+  { method: 'POST', path: '/v1/admin/participants/:id/transfer', auth: 'admin', maxBytes: 4 * 1024, handler: adminPointsTransfer },
+  { method: 'GET', path: '/v1/admin/points/seasons', auth: 'admin', handler: adminSeasons },
+  { method: 'POST', path: '/v1/admin/points/seasons', auth: 'admin', maxBytes: 4 * 1024, handler: adminSeasonSave },
+  { method: 'GET', path: '/v1/admin/points/seasons/:id/preview', auth: 'admin', handler: adminSeasonPreview },
+  { method: 'POST', path: '/v1/admin/points/seasons/:id/close', auth: 'admin', maxBytes: 4 * 1024, handler: adminSeasonClose },
+  { method: 'POST', path: '/v1/admin/book/bookings/:id/link', auth: 'admin', maxBytes: 1024, handler: adminBookingLink },
+  { method: 'POST', path: '/v1/admin/book/events/:id/notify', auth: 'admin', maxBytes: 8 * 1024, handler: adminNotifyBookers },
 
   // booking — public (docs/EVENTS.md §6, worker/BOOKING-API.md)
   { method: 'GET', path: '/v1/book/state', auth: 'public', handler: bookState },

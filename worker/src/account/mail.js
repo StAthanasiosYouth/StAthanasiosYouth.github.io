@@ -41,7 +41,7 @@ export function codeRow(db, { kind, participantId = null, dedupeKey, now = Date.
 }
 
 /* the send itself, after the reply (ctx.defer): the row says how it went */
-export function sendCode(ctx, { to, code, purpose, outboxId, now = Date.now() }) {
+export function sendCode(ctx, { to, code, purpose, outboxId, support = null, now = Date.now() }) {
   const db = ctx.env.DB;
   ctx.defer((async () => {
     if (isTestInbox(ctx.env, to)) {
@@ -49,7 +49,7 @@ export function sendCode(ctx, { to, code, purpose, outboxId, now = Date.now() })
       return;
     }
     try {
-      await sendMail(ctx.env, { to, ...otpEmail({ code, minutes: CODE_MINUTES, purpose }), now });
+      await sendMail(ctx.env, { to, ...otpEmail({ code, minutes: CODE_MINUTES, purpose, support }), now });
       await retry(() => db.batch([
         db.prepare("UPDATE member_outbox SET status = 'sent', sent_ms = ?, attempts = 1 WHERE id = ?").bind(now, outboxId),
         countStmt(db, hourKey(now), 'otp')

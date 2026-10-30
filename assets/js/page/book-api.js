@@ -75,7 +75,8 @@ export function createBookApi({ base, fetchImpl = (...args) => fetch(...args), s
     state: slug => call(`/v1/book/state?slug=${encodeURIComponent(slug)}`, { method: 'GET' }),
     // token: a confirmed participant paying what is left (§4.10) — a header, never in the address
     proof: (slug, blob, token = '') => call(`/v1/book/proof?slug=${encodeURIComponent(slug)}`, { body: blob, type: blob.type || 'image/jpeg', extra: token ? { 'X-Status-Token': token } : null }),
-    submit: body => call('/v1/book/submit', { json: body }),
+    // a signed-in booker's session (assets/js/account/model.js): the server takes the date of birth from the account
+    submit: (body, sessionToken = '') => call('/v1/book/submit', { json: body, extra: sessionToken ? { Authorization: 'Bearer ' + sessionToken } : null }),
     status: token => call('/v1/book/status', { json: { token } }),
     withdraw: (token, requestKey) => call('/v1/book/withdraw', { json: { token, requestKey } }),
     // the payment card's approved InstaPay / wallet number (never in event.json)

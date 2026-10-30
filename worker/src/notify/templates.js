@@ -167,7 +167,8 @@ function codeBlock(code) {
     `<table ${T} align="center" dir="ltr"><tr>` + ds.map((d, i) => tile(d) + (i === ds.length - 1 ? '' : gap(i === 2 ? 14 : 6))).join('') + '</tr></table></td></tr></table>';
 }
 
-function footer({ social, mini, why, prefs }) {
+function footer({ social, mini, why, prefs, support }) {
+  const contact = supportOf(support);
   const chipLink = (href, icon, label) => `<a href="${esc(href)}" style="display:inline-block;margin:8px 3px 0;padding:5px 14px;border-radius:999px;background-color:#1B3E7C;border:1px solid #34558F;color:#EAF2FC;font-family:${FONT};font-size:13px;line-height:1.7;text-decoration:none">` +
     `<img src="${IMG + icon}" width="16" height="16" alt="" style="border:0;vertical-align:middle;margin-left:6px">${label}</a>`;
   const socials = social ? `<table ${T} align="center" style="margin-top:16px"><tr>` + SOCIAL.map(s =>
@@ -175,12 +176,17 @@ function footer({ social, mini, why, prefs }) {
   return `<tr><td height="18" bgcolor="${C.canvas}" style="background-color:${C.canvas};height:18px;line-height:18px">&nbsp;</td></tr>` +
     `<tr><td align="center" bgcolor="${C.navy}" style="background-color:${C.navy};background-image:linear-gradient(180deg,#0B2A66,#061A44);border-radius:0 0 20px 20px;padding:24px 22px 22px;text-align:center;color:#A9BEDF;font-family:${FONT};font-size:12.5px;line-height:1.8">` +
     `<table ${T} width="100%"><tr><td align="center" bgcolor="#15356F" style="background-color:#15356F;border:1px solid #2A4A85;border-radius:16px;padding:12px 10px">` +
-    `<div style="color:#FFFFFF;font-size:14px;font-weight:800">محتاج مساعدة؟ <span style="color:#A9C6EC;font-size:12.5px;font-weight:400">تواصل مع الدعم الفني: مينا زكريا</span></div>` +
-    chipLink(SUPPORT_WHATSAPP, 'i-whatsapp.png', 'واتساب ' + ltr(SUPPORT_PHONE)) + chipLink('mailto:' + SUPPORT_EMAIL, 'i-mail.png', ltr(SUPPORT_EMAIL)) +
+    `<div style="color:#FFFFFF;font-size:14px;font-weight:800">محتاج مساعدة؟ <span style="color:#A9C6EC;font-size:12.5px;font-weight:400">تواصل مع الدعم الفني: ${esc(contact.name)}</span></div>` +
+    chipLink(contact.whatsapp, 'i-whatsapp.png', 'واتساب ' + ltr(contact.phone)) + chipLink('mailto:' + SUPPORT_EMAIL, 'i-mail.png', ltr(SUPPORT_EMAIL)) +
     `</td></tr></table>${socials}` +
     `<div style="margin-top:16px;padding-top:12px;border-top:1px solid #1E3C74;color:#C7D6EE;font-size:12px"><b style="color:#FFFFFF">${esc(BRAND)}</b><br>${esc(SERVICE)}</div>` +
     `<div style="margin-top:4px">${mini ? '' : `<a href="${SITE}/" style="color:#E2C27A;font-weight:700;text-decoration:none">موقع الخدمة</a> · `}<a href="${PRIVACY}" style="color:#E2C27A;font-weight:700;text-decoration:none">سياسة الخصوصية</a>${prefs ? ` · <a href="${PREFS_URL}" style="color:#E2C27A;font-weight:700;text-decoration:none">إعدادات الإشعارات</a>` : ''}</div>` +
     `<div style="margin-top:8px;color:#8296BE;font-size:11.5px">${esc(why)}</div></td></tr>`;
+}
+
+/* the configured Technical Support contact (settings support_contact, YOUTH-ACCOUNTS-PLAN §11), else the default */
+function supportOf(s) {
+  return s && s.name && s.phone && s.whatsapp ? s : { name: SUPPORT.split(':')[1].split('–')[0].trim(), phone: SUPPORT_PHONE, whatsapp: SUPPORT_WHATSAPP };
 }
 
 /* the plain-text twin: the same content, in reading order */
@@ -195,7 +201,7 @@ function plain(o) {
     const t = o.ticket;
     out.push('', t.event + (t.when ? ' – ' + t.when : ''), 'رقم الحجز: ' + t.ref + ' (' + t.pills.map(p => p.text).join('، ') + ')',
       'عدد الأفراد: ' + digits(t.people), 'إجمالي الحجز: ' + money(t.total), 'المدفوع: ' + money(t.paid));
-    if (t.total > t.paid) out.push('الباقي: ' + money(t.total - t.paid));
+    if (t.total > t.paid && !t.closed) out.push('الباقي: ' + money(t.total - t.paid));
     if (t.due) out.push('آخر ميعاد للدفع: ' + t.due);
   }
   for (const [k, v] of o.facts || []) out.push(k + ': ' + v);
@@ -206,8 +212,9 @@ function plain(o) {
   if (o.warn) out.push('', o.warn.title + ' ' + o.warn.text);
   for (const n of o.notes || []) out.push(n);
   if (o.link) out.push('', o.link.label + ': ' + o.link.url);
-  out.push('', '—', 'محتاج مساعدة؟ ' + SUPPORT + ' (لو في أي مشكلة أو حاجة مش مفهومة)',
-    o.code ? 'واتساب: ' + SUPPORT_PHONE + ' · إيميل: ' + SUPPORT_EMAIL : 'واتساب: ' + SUPPORT_WHATSAPP + ' · إيميل: ' + SUPPORT_EMAIL);
+  const contact = supportOf(o.support);
+  out.push('', '—', 'محتاج مساعدة؟ الدعم الفني: ' + contact.name + ' – ' + contact.phone + ' (لو في أي مشكلة أو حاجة مش مفهومة)',
+    o.code ? 'واتساب: ' + contact.phone + ' · إيميل: ' + SUPPORT_EMAIL : 'واتساب: ' + contact.whatsapp + ' · إيميل: ' + SUPPORT_EMAIL);
   if (o.social) out.push(SOCIAL.map(s => s.name + ': ' + s.url).join('\n'));
   if (!o.code) out.push('سياسة الخصوصية: ' + PRIVACY);
   if (o.prefs) out.push('إعدادات الإشعارات: ' + PREFS_URL);
@@ -259,7 +266,7 @@ export function layout(o) {
     `<!--[if mso]><table ${T} width="600" align="center"><tr><td><![endif]-->` +
     `<table ${T} width="100%" dir="rtl" style="max-width:600px;margin:0 auto">` +
     header(o.kicker, o.priority ? RED : '#FFFFFF') + (o.priority ? priorityBar(o.priority) : '') + card(body) +
-    footer({ social: !!o.social, mini: audience === 'admin' || !!o.code, why, prefs: !!o.prefs }) +
+    footer({ social: !!o.social, mini: audience === 'admin' || !!o.code, why, prefs: !!o.prefs, support: o.support }) +
     '</table><!--[if mso]></td></tr></table><![endif]--></td></tr></table></body></html>';
   return { html, text: plain({ ...o, why, facts: (o.facts || []).map(([k, v]) => [k, factText(v)]) }) };
 }
@@ -279,7 +286,7 @@ function ticketHtml(t) {
     (t.when ? `<div style="color:${C.slate};font-size:13px">${esc(t.when)}</div>` : '') +
     `<div style="margin-top:8px;color:${C.slate};font-size:12.5px">رقم الحجز <span dir="ltr" style="display:inline-block;margin:0 4px;background-color:#FFFFFF;border:1px solid #CFE3F6;border-radius:8px;padding:0 9px;color:${C.navy};font-family:${MONO};font-size:14px;font-weight:700;letter-spacing:.6px">${esc(t.ref)}</span> ${pills}</div></td></tr>` +
     `<tr><td style="padding:10px 16px 14px">${kv(rows)}${bar}` +
-    (t.total > t.paid ? kv([[t.remainingLabel || 'الباقي', `<span style="color:${C.royal}">${esc(money(t.total - t.paid))}</span>`]], 0) : '') +
+    (t.total > t.paid && !t.closed ? kv([[t.remainingLabel || 'الباقي', `<span style="color:${C.royal}">${esc(money(t.total - t.paid))}</span>`]], 0) : '') +
     (t.due ? `<table ${T} width="100%" style="margin-top:8px"><tr><td bgcolor="#FFF8EA" style="background-color:#FFF8EA;border:1px solid #F0DFB4;border-radius:12px;padding:7px 12px;color:#6B4A0E;font-size:13px">` +
       `<img src="${IMG}i-clock.png" width="16" height="16" alt="" style="border:0;vertical-align:middle;margin-left:6px">آخر ميعاد للدفع: <b>${esc(t.due)}</b></td></tr></table>` : '') +
     '</td></tr></table></td></tr></table>';
@@ -313,6 +320,12 @@ const SUBJECTS = {
   'notify.failed': 'إشعار مقدرش يتبعت',
   'gmail.token': 'إرسال الإيميلات واقف',
   'member.mail.dead': 'إيميل لعضو مقدرش يتبعت',
+  'participant.email': 'تغيير إيميل حساب',
+  'participant.phoneFix': 'تغيير موبايل حساب',
+  'participant.dob': 'تصحيح تاريخ ميلاد حساب',
+  'participant.reset': 'باسورد جديد لحساب',
+  'participant.block': 'حساب اتوقف',
+  'account.recovery.first': 'أول استرجاع بإيميل دخّله أدمن',
   'account.discover.high': 'محاولات كتير على نموذج الدخول',
   'job.failed': 'مهمة في الخلفية فشلت'
 };
@@ -417,7 +430,7 @@ const CODE_PURPOSE = {
 };
 
 /* a one-time code: no service link at all, the code only in the body (never the subject), the expiry, what to do if unasked */
-export function otpEmail({ code, minutes = 10, purpose = 'verify' }) {
+export function otpEmail({ code, minutes = 10, purpose = 'verify', support = null }) {
   if (!/^\d{6}$/.test(String(code))) throw new Error('otp code must be 6 digits');
   const t = CODE_PURPOSE[purpose];
   if (!t) throw new Error('unknown code purpose: ' + purpose);
@@ -433,7 +446,8 @@ export function otpEmail({ code, minutes = 10, purpose = 'verify' }) {
       code: String(code),
       minutes,
       warn: { title: 'متشاركش الكود مع أي حد.', text: 'محدش من الخدمة هيطلبه منك أبداً، ولا حتى الخدام.' },
-      why: WHY.code
+      why: WHY.code,
+      support
     })
   };
 }
@@ -448,7 +462,7 @@ const SECURITY = {
 };
 
 /* a security notice to the account's owner: what changed, when, from where; help through the public site only */
-export function securityEmail({ kind, cairo, device = '', prefs = false }) {
+export function securityEmail({ kind, cairo, device = '', prefs = false, support = null }) {
   const t = SECURITY[kind];
   if (!t) throw new Error('unknown security notice: ' + kind);
   return {
@@ -463,6 +477,7 @@ export function securityEmail({ kind, cairo, device = '', prefs = false }) {
       // the account's security section (docs/EMAIL-DEEP-LINKS.md); a creation notice may reach a stranger: the site only
       link: t.site ? { label: 'موقع الخدمة', url: SITE + '/' } : { label: 'أمان حسابك', url: ACCOUNT + '#me/security' },
       prefs,
+      support,
       why: WHY.security
     })
   };
@@ -477,8 +492,34 @@ const BOOKING = {
   confirmed: { subject: 'حجزك اتأكد', title: 'حجزك اتأكد', sub: 'مكانك محجوز.', icon: 'i-check.png', pill: ['مؤكد', '#DDF5EA', '#0F6B45'] },
   pending: { subject: 'استلمنا طلب حجزك', title: 'استلمنا طلب حجزك', sub: 'الخدام هيراجعوه ويأكدوه قريب.', pill: ['قيد المراجعة', '#EAF4FE', '#1259C3'] },
   balance: { subject: 'تذكير بالمبلغ الباقي في حجزك', title: 'فاضل جزء من مبلغ الحجز', sub: 'حجزك مؤكد، والباقي مستني قبل الميعاد.', icon: 'i-check.png', pill: ['مؤكد', '#DDF5EA', '#0F6B45'] },
-  cancelled: { subject: 'حجزك اتلغى', title: 'حجزك اتلغى', sub: 'لو ده مش متوقع، كلّم الدعم الفني.', pill: ['ملغي', '#FDECEA', '#9B1C1C'] }
+  cancelled: { subject: 'حجزك اتلغى', title: 'حجزك اتلغى', sub: 'لو ده مش متوقع، كلّم الدعم الفني.', pill: ['ملغي', '#FDECEA', '#9B1C1C'], closed: true },
+  rejected: { subject: 'طلب حجزك اترفض', title: 'طلب حجزك اترفض', sub: 'لو دفعت حاجة، الخادم هيتواصل معاك.', pill: ['مرفوض', '#FDECEA', '#9B1C1C'], closed: true },
+  event_cancelled: { subject: 'الفعالية اتلغت', title: 'الفعالية اتلغت', sub: 'لو دفعت حاجة، الخادم هيتواصل معاك.', pill: ['ملغي', '#FDECEA', '#9B1C1C'], closed: true },
+  payment_recorded: { subject: 'اتسجلت دفعة في حجزك', title: 'اتسجلت دفعة في حجزك', sub: 'شكرًا، الدفعة وصلت الخدمة.', icon: 'i-check.png', pill: ['مؤكد', '#DDF5EA', '#0F6B45'], amountLabel: 'الدفعة' },
+  payment_voided: { subject: 'حصل تصحيح في مدفوعات حجزك', title: 'حصل تصحيح في مدفوعات حجزك', sub: 'الأرقام تحت هي الصحيحة دلوقتي.', pill: ['تصحيح', '#EAF4FE', '#1259C3'] },
+  due_changed: { subject: 'مبلغ حجزك اتغير', title: 'مبلغ حجزك اتغير', sub: 'الأرقام تحت هي الصحيحة دلوقتي.', pill: ['تعديل', '#EAF4FE', '#1259C3'] },
+  request_received: { subject: 'استلمنا طلب دفعتك', title: 'استلمنا طلب دفعتك', sub: 'صورة التحويل مش تأكيد للدفع: الخدام هيراجعوها.', pill: ['قيد المراجعة', '#EAF4FE', '#1259C3'], amountLabel: 'المبلغ' },
+  request_rejected: { subject: 'طلب دفعتك اترفض', title: 'طلب دفعتك اترفض', sub: 'الدفعة دي ما اتسجلتش.', pill: ['مرفوض', '#FDECEA', '#9B1C1C'] },
+  event_change: { subject: 'تغيير في ميعاد أو مكان الفعالية', title: 'في تغيير في الفعالية', sub: 'راجع التفاصيل الجديدة.', pill: ['تغيير', '#FFF3D9', '#7A5614'] }
 };
+const CHANGE_LABELS = { date: 'التاريخ', time: 'الميعاد', place: 'المكان' };
+
+/* a deduction from the member's wallet (§4.4): the note only when the admin marked it for them */
+export function pointsEmail({ amount, balance, note = '', url, support = null }) {
+  return {
+    subject: 'اتخصم من نقطك – ' + BRAND,
+    ...layout({
+      audience: 'member',
+      kicker: 'نقطك',
+      heading: 'اتخصم من نقطك',
+      intro: 'اتخصم من رصيد نقطك في الموسم الحالي.',
+      facts: [['اتخصم', digits(amount) + ' نقطة'], ['رصيدك دلوقتي (وقت الإرسال)', digits(balance) + ' نقطة']].concat(note ? [['السبب', clip(note, 200)]] : []),
+      link: { label: 'شوف نقطك', url },
+      support,
+      why: WHY.security
+    })
+  };
+}
 export function bookingEmail(b) {
   const s = BOOKING[b.status];
   if (!s) throw new Error('unknown booking status: ' + b.status);
@@ -486,7 +527,7 @@ export function bookingEmail(b) {
   if (b.url && /#b\//.test(b.url)) throw new Error('a booking status-token link in an email');
   const total = Number(b.total) || 0;
   const paid = Number(b.paid) || 0;
-  const owes = total > paid && b.status !== 'cancelled';
+  const owes = total > paid && !s.closed;
   const pills = [{ text: s.pill[0], bg: s.pill[1], color: s.pill[2] }].concat(owes ? [{ text: 'عليه باقي', bg: '#FFF3D9', color: '#7A5614' }] : []);
   return {
     subject: fill(s.subject + ' {ref}[ – {event}]', b),
@@ -494,11 +535,16 @@ export function bookingEmail(b) {
       audience: 'member',
       heading: s.title,
       hero: { title: s.title, sub: (b.name ? 'أهلاً يا ' + clip(b.name, 30) + '، ' : '') + s.sub, icon: s.icon },
-      ticket: { event: b.event, when: b.when, ref: b.ref, people: Number(b.people) || 1, total, paid, due: owes ? b.due : '', pills },
-      facts: [],
-      next: b.next ? { title: 'الخطوة الجاية', text: b.next } : null,
+      ticket: { event: b.event, when: b.when, ref: b.ref, people: Number(b.people) || 1, total, paid, due: owes ? b.due : '', pills, closed: !!s.closed },
+      facts: [
+        ...(s.amountLabel && b.amount ? [[b.refund ? 'مرتجع' : s.amountLabel, money(Number(b.amount))]] : []),
+        ...(Array.isArray(b.changes) ? b.changes.map(c => [CHANGE_LABELS[c.field] || c.field, (c.from ? clip(c.from, 80) + ' ← ' : '') + clip(c.to, 80)]) : [])
+      ],
+      next: b.reason ? { title: 'السبب', text: clip(b.reason, 200) } : b.next ? { title: 'الخطوة الجاية', text: b.next } : null,
       link: { label: 'عرض تفاصيل الحجز', url: b.url && b.url.startsWith(SITE + '/') ? b.url : SITE + '/' },
       social: true,
+      prefs: !!b.prefs,
+      support: b.support || null,
       why: WHY.booking
     })
   };

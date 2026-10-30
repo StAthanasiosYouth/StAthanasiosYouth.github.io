@@ -1,0 +1,420 @@
+<script>
+/*
+ * «المسابقات» → «حسابات الشباب» (docs/PHASE5-PLAN.md P5-5, P5-6; docs/YOUTH-ACCOUNTS-PLAN.md §12):
+ * the accounts on the Worker. The list, «حسابات جديدة» (what looks odd), the person sheet with its
+ * corrections, viewing and resetting the password (separate), points and seasons, the age range and the
+ * support contact. Existing components only (the redesign is Phase 8). The tab shows once accounts are on.
+ * A password is only ever on screen: never in storage, lists, URLs or history, and it goes by itself after 60 s.
+ */
+(function () {
+
+  'use strict';
+
+  var A = window.A;
+  var el = A.el;
+  var icon = A.icon;
+  var C = A.comp;
+  var ar = C.ar;
+
+  var Y = A.compYouth = { view: 'list', id: '', q: '', state: '', offset: 0 };
+
+  var FLAGS = {
+    same_name_dob: 'نفس الاسم وتاريخ الميلاد في حساب تاني', same_name: 'نفس الاسم في حساب تاني', near_edge: 'تاريخ الميلاد قريب من حد السن',
+    many_from_one_source: 'حسابات كتير من نفس المصدر في ساعة', after_guest_same_source: 'اتعمل بعد حساب ضيف من نفس المصدر'
+  };
+  var EMAIL_CHECKS = [['in_person_readback', 'قريته على الشخص قدامي'], ['member_typed', 'الشخص كتبه بنفسه'], ['confirmed_by_whatsapp', 'أكده على واتساب']];
+  var SUPPORT_CHECKS = [['in_person', 'أعرفه شخصيًا / قدامي'], ['details_match', 'الاسم والميلاد والمجموعة مطابقين'], ['support_call', 'كلمته على الرقم اللي في الحساب']];
+  var AUDIT = {
+    register: 'اتعمل بنفسه', 'register.admin': 'اتعمل من الأدمن', 'email.change': 'تغيير الإيميل', 'phone.change': 'تغيير الموبايل', 'dob.correct': 'تصحيح تاريخ الميلاد', eligibility: 'تغيير الأهلية',
+    block: 'إيقاف', unblock: 'رجوع', 'password.reset': 'باسورد جديد', 'password.reset.self': 'باسورد جديد بكود', 'password.reset.support': 'باسورد جديد من الدعم', 'password.view': 'عرض الباسورد',
+    'profile.edit': 'تعديل البيانات', 'session.revoke': 'خروج من كل الأجهزة', transfer: 'نقل نقاط'
+  };
+  var LEDGER = { earn: 'نقاط مسابقة', manual: 'تعديل يدوي', transfer: 'نقل', spend: 'طلب من المتجر', refund: 'رجوع نقاط' };
+  var STATUS = { pending: 'قيد المراجعة', confirmed: 'مؤكد', rejected: 'مرفوض', cancelled: 'ملغي', withdrawn: 'اتسحب' };
+  var MAIL = { queued: 'مستني', sent: 'اتبعت', failed: 'هيتعاد', dead: 'فشل', deferred: 'مؤجل', expired: 'انتهى', superseded: 'اتلغى', suppressed: 'اتمنع' };
+
+  function api(method, path, body) { return window.AdminWorker.call(method, '/v1/admin/' + path, body, { quiet: true }); }
+  function when(ms) { return ms ? new Date(ms).toLocaleString('ar-EG', { timeZone: 'Africa/Cairo', dateStyle: 'medium', timeStyle: 'short' }) : '—'; }
+  function newKey() { return (window.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2)).replace(/[^A-Za-z0-9_-]/g, ''); }
+
+  function eligibilityChip(p) {
+    var e = p.eligibility || {};
+    if (p.status === 'blocked' || e.state === 'blocked') return A.chip('موقوف', 'danger');
+    if (e.state === 'guest') return A.chip('ضيف' + (e.source === 'override' ? ' (يدوي)' : ''), 'off');
+    return A.chip('مؤهل' + (e.source === 'override' ? ' (يدوي)' : '') + (e.soon ? ' · قرب يخرج' : ''), e.soon ? 'gold' : 'ok');
+  }
+
+  function fact(label, value) {
+    if (value === null || value === undefined || value === '') return null;
+    return el('div', { class: 'comp-fact' }, el('dt', { text: label }), el('dd', { dir: 'auto' }, value));
+  }
+
+  function select(options, value, label) {
+    return el('select', { class: 'input', 'aria-label': label }, options.map(function (o) {
+      return el('option', { value: o[0], selected: o[0] === value ? 'selected' : null, text: o[1] });
+    }));
+  }
+
+  /*
+   * One small form in the editor: fields + reason, sent once; the server's answer redraws the sheet.
+   * fields: [{ key, label, input (.value), hint }]. reason: the mandatory reason field.
+   */
+  function formSheet(options) {
+    var box = A.errorBox();
+    var reason = options.reason === false ? null : A.textInput('', { multiline: true, rows: 2, max: 300, placeholder: options.reasonHint || 'السبب بيتسجل في تاريخ الحساب' });
+    var save = el('button', { class: 'btn btn--' + (options.kind || 'primary'), type: 'button', 'data-act': 'youth-save', text: options.label || 'حفظ' });
+    save.addEventListener('click', function () {
+      var body = options.extra ? options.extra() : {};
+      options.fields.forEach(function (f) { body[f.key] = f.get ? f.get() : f.input.value; });
+      if (reason) body.reason = reason.value.trim();
+      A.withBusy(save, api('POST', options.path, body)).then(function (reply) {
+        A.dirty = false;
+        return A.closeSheet().then(function () {
+          if (options.done) options.done(reply);
+          else A.toast('اتحفظ ✓');
+          if (A.area === 'comps' && A.sub.comps === 'youth') A.render();
+        });
+      }).catch(function (error) { A.fail(error, box, { fields: false }); });
+    });
+    A.dirty = false;
+    A.openSheet(options.title, [
+      box,
+      options.intro ? el('p', { class: 'note', text: options.intro }) : null,
+      el('div', { class: 'form' },
+        options.fields.map(function (f) { return f.node || A.field(f.label, f.input, f.hint || ''); }),
+        reason ? A.field('السبب', reason, '') : null)
+    ], A.sheetFooter(save));
+  }
+
+  /* the password, on screen only; viewing changes nothing, a reset already did */
+  function showPassword(title, password, note) {
+    var text = el('p', { class: 'youth-password ltr', 'data-youth-password': '', text: password });
+    var copy = el('button', { class: 'btn btn--primary', type: 'button', text: 'نسخ' });
+    copy.addEventListener('click', function () {
+      if (!navigator.clipboard) return;
+      navigator.clipboard.writeText(password).then(function () { A.toast('اتنسخ ✓'); }).catch(function () { A.toast('مقدرناش ننسخ', 'error'); });
+    });
+    var timer = setTimeout(function () { text.textContent = ''; A.closeSheet(); }, 60000);
+    var close = el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { clearTimeout(timer); text.textContent = ''; A.closeSheet(); } });
+    A.dirty = false;
+    A.openSheet(title, [el('p', { class: 'note', text: note }), text], [copy, close]);
+  }
+
+  /* =======================================================
+     THE LIST
+  ======================================================= */
+
+  function personRow(p) {
+    return el('button', { class: 'comp-sub comp-person', type: 'button', 'data-youth': p.id, onclick: function () { Y.view = 'person'; Y.id = p.id; A.render(); } },
+      el('span', { class: 'comp-sub__who' }, el('bdi', { class: 'comp-sub__name', text: p.name }), el('span', { class: 'comp-sub__phone ltr', text: p.phone })),
+      el('span', { class: 'comp-sub__meta' },
+        eligibilityChip(p),
+        p.emailVerified ? null : A.chip('الإيميل مش متأكد', 'danger'),
+        p.balance ? A.chip(ar(p.balance) + ' نقطة' + (p.eligibility.state === 'guest' ? ' · متجمد' : ''), p.eligibility.state === 'guest' ? 'off' : 'info') : null,
+        (p.flags || []).map(function (f) { return A.chip(FLAGS[f] || f, 'gold'); })),
+      el('span', { class: 'comp-sub__when ltr', text: p.email }));
+  }
+
+  function listView() {
+    var box = A.errorBox();
+    var rows = el('div', { class: 'comp-list', 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
+    var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر بالاسم أو الإيميل أو الموبايل…', 'aria-label': 'بحث', value: Y.q });
+    var state = select([['', 'الكل'], ['eligible', 'مؤهل'], ['guest', 'ضيف'], ['blocked', 'موقوف']], Y.state, 'الأهلية');
+    var tools = el('div', { class: 'actions' });
+
+    function load() {
+      var q = 'q=' + encodeURIComponent(Y.q) + '&offset=' + Y.offset + (Y.state === 'blocked' ? '&status=blocked' : Y.state ? '&state=' + Y.state : '');
+      api('GET', 'participants?' + q).then(function (d) {
+        rows.setAttribute('aria-busy', 'false');
+        A.fill(rows, d.people.length ? d.people.map(personRow) : el('p', { class: 'note', text: Y.q ? 'مفيش نتايج.' : 'لسه مفيش حسابات.' }),
+          d.total > Y.offset + d.limit ? el('button', { class: 'btn btn--ghost', type: 'button', text: 'اللي بعدهم', onclick: function () { Y.offset += d.limit; load(); } }) : null);
+        A.fill(tools,
+          d.can.add ? el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'youth-add', onclick: addForm }, icon('plus'), 'حساب جديد') : null,
+          el('button', { class: 'btn', type: 'button', 'data-act': 'youth-review', onclick: function () { Y.view = 'review'; A.render(); } }, 'حسابات جديدة'),
+          el('button', { class: 'btn', type: 'button', 'data-act': 'youth-seasons', onclick: function () { Y.view = 'seasons'; A.render(); } }, 'المواسم'),
+          d.can.manage ? el('button', { class: 'btn', type: 'button', 'data-act': 'youth-settings', onclick: settingsForm }, icon('gear'), 'الإعدادات') : null,
+          d.can.export ? el('button', { class: 'btn btn--ghost', type: 'button', 'data-act': 'youth-export', onclick: exportBook }, 'تصدير Excel') : null);
+      }).catch(function (error) {
+        rows.setAttribute('aria-busy', 'false');
+        A.fill(rows);
+        A.fail(error, box);
+      });
+    }
+
+    var typing = null;
+    search.addEventListener('input', function () {
+      clearTimeout(typing);
+      typing = setTimeout(function () { Y.q = search.value.trim(); Y.offset = 0; load(); }, 300);
+    });
+    state.addEventListener('change', function () { Y.state = state.value; Y.offset = 0; load(); });
+    load();
+    return [A.card('حسابات الشباب', 'كل حساب: إيميل وباسورد مولّد. الأهلية بتتحسب لوحدها من السن والنطاق العمري.', box, tools, el('div', { class: 'row' }, search, state), rows)];
+  }
+
+  function reviewView() {
+    var box = A.errorBox();
+    var rows = el('div', { class: 'comp-list', 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
+    api('GET', 'participants/review').then(function (d) {
+      rows.setAttribute('aria-busy', 'false');
+      A.fill(rows, d.people.length ? d.people.map(personRow) : el('p', { class: 'note', text: 'مفيش حسابات جديدة.' }));
+    }).catch(function (error) { rows.setAttribute('aria-busy', 'false'); A.fill(rows); A.fail(error, box); });
+    return [A.card('حسابات جديدة', 'اللي سجلوا بنفسهم، الأحدث الأول. العلامات للمراجعة بس، مش بتمنع حد.', box, backButton(), rows)];
+  }
+
+  function backButton() {
+    return el('button', { class: 'btn btn--ghost btn--small', type: 'button', 'data-act': 'youth-back', onclick: function () { Y.view = 'list'; A.render(); } }, icon('prev'), 'رجوع للحسابات');
+  }
+
+  function addForm() {
+    var name = A.textInput('', { max: 80 });
+    var email = A.textInput('', { ltr: true, max: 200 });
+    var confirm = A.textInput('', { ltr: true, max: 200 });
+    confirm.addEventListener('paste', function (event) { event.preventDefault(); });
+    var phone = A.textInput('', { ltr: true, max: 20 });
+    var birth = el('input', { class: 'input', type: 'date', 'aria-label': 'تاريخ الميلاد' });
+    var check = select([['', 'اختار…']].concat(EMAIL_CHECKS), '', 'اتأكدت إزاي');
+    formSheet({
+      title: 'حساب جديد', label: 'اعمل الحساب', reason: false, path: 'participants',
+      intro: 'الحساب بيتفعل على طول من غير كود. اقرا الإيميل للشخص، وهيوصله إشعار بالإنشاء.',
+      fields: [
+        { key: 'name', label: 'الاسم الثلاثي أو الرباعي', input: name }, { key: 'email', label: 'الإيميل', input: email },
+        { key: 'emailConfirm', label: 'الإيميل تاني (من غير لصق)', input: confirm }, { key: 'checkMethod', label: 'اتأكدت من الإيميل إزاي؟', input: check },
+        { key: 'phone', label: 'رقم الموبايل', input: phone }, { key: 'birthDate', label: 'تاريخ الميلاد', input: birth }
+      ],
+      done: function (reply) {
+        Y.view = 'person';
+        Y.id = reply.id;
+        showPassword('الباسورد بتاع الحساب الجديد', reply.password, 'سلّمه للشخص قدامك أو على واتساب خاص. عمره ما بيتبعت بالإيميل.');
+      }
+    });
+  }
+
+  function settingsForm() {
+    api('GET', 'participants/settings').then(function (s) {
+      var min = A.textInput(String(s.ageMin), { ltr: true, max: 3 });
+      var max = A.textInput(String(s.ageMax), { ltr: true, max: 3 });
+      var warn = A.textInput(String(s.warnDays), { ltr: true, max: 3 });
+      var contacts = (A.state && A.state.contacts) || [];
+      var pick = select([['', 'الرقم الافتراضي']].concat(contacts.map(function (c) { return [c.id, c.name]; })), s.support && s.support.id || '', 'الدعم الفني');
+      formSheet({
+        title: 'إعدادات الحسابات', reason: false, path: 'participants/settings',
+        intro: 'النطاق العمري بيتطبق على طول على كل الحسابات. الدعم الفني بيظهر في صفحة الدخول وفي الإيميلات.',
+        fields: [{ key: 'ageMin', label: 'السن من', input: min }, { key: 'ageMax', label: 'لحد', input: max }, { key: 'warnDays', label: 'ينبّه قبل الخروج من النطاق بكام يوم', input: warn },
+          { key: 'support', label: 'الدعم الفني (من جهات التواصل)', input: pick, get: function () {
+            var c = contacts.filter(function (x) { return x.id === pick.value; })[0];
+            return c ? { id: c.id, name: c.name, phone: c.phone } : null;
+          } }]
+      });
+    }).catch(function (error) { A.fail(error); });
+  }
+
+  function exportBook(event) {
+    var run = Promise.all([api('GET', 'participants/export'), C.sheets()]).then(function (got) {
+      var head = ['رقم المشترك', 'الاسم', 'الإيميل', 'اتأكد الإيميل', 'الموبايل', 'تاريخ الميلاد', 'السن', 'الأهلية', 'مصدرها', 'متجمد', 'الحالة', 'المجموعة', 'الكنيسة', 'الخادم المسؤول', 'ملاحظات'];
+      var rows = got[0].rows.map(function (p) {
+        return [p.id, p.name, p.email, p.emailVerified ? 'أيوه' : 'لأ', p.phone, p.birthDate, p.age, p.eligibility === 'guest' ? 'ضيف' : p.eligibility === 'blocked' ? 'موقوف' : 'مؤهل', p.eligibilitySource === 'override' ? 'يدوي' : 'تلقائي', p.frozen, p.status === 'blocked' ? 'موقوف' : 'نشط', p.group, p.church, p.servant, p.notes];
+      });
+      var book = { sheets: [{ name: 'الحسابات', rows: [head].concat(rows), rtl: true, header: true, filter: true, textColumns: [4, 5] }] };
+      return C.download(got[1].xlsx.writeXlsx(book), 'حسابات-الشباب.xlsx');
+    });
+    A.withBusy(event.currentTarget, run).catch(function (error) { A.fail(error); });
+  }
+
+  /* =======================================================
+     THE PERSON SHEET (§12.1)
+  ======================================================= */
+
+  function personView() {
+    var box = A.errorBox();
+    var main = el('div', { 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
+    api('GET', 'participants/' + encodeURIComponent(Y.id)).then(function (d) {
+      main.setAttribute('aria-busy', 'false');
+      A.fill(main, personBody(d));
+    }).catch(function (error) { main.setAttribute('aria-busy', 'false'); A.fill(main); A.fail(error, box); });
+    return [A.card('حساب', '', box, backButton(), main)];
+  }
+
+  function emailForm(p, can) {
+    var email = A.textInput('', { ltr: true, max: 200 });
+    var confirm = A.textInput('', { ltr: true, max: 200 });
+    confirm.addEventListener('paste', function (event) { event.preventDefault(); });
+    var check = select([['', 'اختار…']].concat(EMAIL_CHECKS), '', 'اتأكدت إزاي');
+    var override = can.viewPassword && p.emailChangedRecently ? A.checkbox('غيّره رغم إنه اتغير من أقل من ٧ أيام', false) : null;
+    formSheet({
+      title: 'تصحيح الإيميل', path: 'participants/' + p.id + '/email',
+      intro: 'الجديد بيتأكد إداريًا، وكل الأجهزة بتخرج، وبيوصل إشعار للإيميل القديم والجديد.',
+      extra: function () { return override && override.input.checked ? { override: true } : {}; },
+      fields: [{ key: 'email', label: 'الإيميل الجديد', input: email }, { key: 'emailConfirm', label: 'الإيميل تاني (من غير لصق)', input: confirm }, { key: 'checkMethod', label: 'اتأكدت منه إزاي؟', input: check }]
+        .concat(override ? [{ key: 'x', node: override.node, get: function () { return undefined; } }] : [])
+    });
+  }
+
+  function personBody(d) {
+    var p = d.person;
+    var can = d.can;
+    var path = 'participants/' + p.id + '/';
+    var edit = can.edit ? el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-edit', onclick: function () {
+      var name = A.textInput(p.name, { max: 80 });
+      var group = A.textInput(p.group, { max: 120 });
+      var church = A.textInput(p.church, { max: 120 });
+      var servant = A.textInput(p.servant, { max: 120 });
+      var notes = A.textInput(p.notes, { multiline: true, rows: 2, max: 500 });
+      formSheet({ title: 'تعديل البيانات', path: path + 'profile', reasonHint: 'لازم سبب لو الاسم اتغير', fields: [
+        { key: 'name', label: 'الاسم', input: name }, { key: 'group', label: 'المجموعة', input: group }, { key: 'church', label: 'الكنيسة', input: church }, { key: 'servant', label: 'الخادم المسؤول', input: servant }, { key: 'notes', label: 'ملاحظات (للأدمن بس)', input: notes }
+      ] });
+    } }, 'تعديل البيانات') : null;
+
+    var manage = can.manage ? [
+      el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-email', onclick: function () { emailForm(p, can); } }, 'تصحيح الإيميل'),
+      el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-phone', onclick: function () {
+        formSheet({ title: 'تصحيح الموبايل', path: path + 'phone', fields: [{ key: 'phone', label: 'الرقم الجديد', input: A.textInput('', { ltr: true, max: 20 }) }] });
+      } }, 'تصحيح الموبايل'),
+      el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-dob', onclick: function () {
+        formSheet({ title: 'تصحيح تاريخ الميلاد', path: path + 'dob', intro: 'بيأثر على الجاي بس: النقط والحجوزات اللي فاتت بتفضل زي ما هي.', fields: [{ key: 'birthDate', label: 'التاريخ الصح', input: el('input', { class: 'input', type: 'date', value: p.birthDate, 'aria-label': 'تاريخ الميلاد' }) }] });
+      } }, 'تصحيح الميلاد'),
+      el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-eligibility', onclick: function () {
+        formSheet({ title: 'الأهلية', path: path + 'eligibility', fields: [{ key: 'override', label: 'الأهلية', input: select([['auto', 'تلقائي من السن'], ['eligible', 'مؤهل (يدوي)'], ['guest', 'ضيف (يدوي)']], p.eligibility.override || 'auto', 'الأهلية') }] });
+      } }, 'الأهلية'),
+      el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-reset', onclick: function () {
+        var check = select([['', 'مش من الدعم الفني']].concat(SUPPORT_CHECKS), '', 'التحقق');
+        formSheet({
+          title: 'باسورد جديد', kind: 'danger', label: 'اعمل باسورد جديد', path: path + 'reset-password',
+          intro: 'الباسورد القديم بيقف وكل الأجهزة بتخرج. مبيتبعتش بالإيميل أبدًا.',
+          extra: function () { return check.value ? { support: true } : {}; },
+          fields: [{ key: 'checkMethod', label: 'لو ده طلب من الدعم الفني: اتأكدت من الشخص إزاي؟', input: check }],
+          done: function (reply) { showPassword('الباسورد الجديد', reply.password, 'بيظهر للي عمله دلوقتي. سلّمه للشخص على واتساب خاص أو قدامك.'); }
+        });
+      } }, 'باسورد جديد'),
+      el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-revoke', onclick: function (event) {
+        A.withBusy(event.currentTarget, api('POST', path + 'sessions/revoke', {})).then(function () { A.toast('خرج من كل الأجهزة ✓'); A.render(); }).catch(function (error) { A.fail(error); });
+      } }, 'اخرج من كل الأجهزة')
+    ] : [];
+
+    var blocked = p.status === 'blocked';
+    var blockBtn = (blocked ? can.manage : can.edit) ? el('button', { class: 'btn btn--small btn--danger', type: 'button', 'data-act': blocked ? 'youth-unblock' : 'youth-block', onclick: function () {
+      formSheet({ title: blocked ? 'رجوع الحساب' : 'إيقاف الحساب', kind: blocked ? 'primary' : 'danger', label: blocked ? 'رجّعه' : 'وقّفه', path: path + (blocked ? 'unblock' : 'block'), fields: [] });
+    } }, blocked ? 'رجّع الحساب' : 'وقّف الحساب') : null;
+
+    var view = can.viewPassword ? el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-view-password', onclick: function (event) {
+      A.withBusy(event.currentTarget, api('POST', path + 'view-password', {})).then(function (reply) {
+        showPassword('الباسورد الحالي', reply.password, 'مفيش حاجة اتغيرت، والعرض ده اتسجل.');
+      }).catch(function (error) { A.fail(error); });
+    } }, 'شوف الباسورد') : null;
+
+    var points = d.points;
+    var adjust = can.points ? el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-points', onclick: function () {
+      var amount = A.textInput('', { ltr: true, max: 8, placeholder: '+50 أو -20' });
+      var note = A.textInput('', { max: 200 });
+      var show = A.checkbox('يظهر للمشترك', false, 'السبب بيظهر له في «نقاطي» وفي الإيميل لو اتخصم.');
+      var key = newKey();
+      formSheet({ title: 'تعديل نقاط', reason: false, path: path + 'points', extra: function () { return { key: key, notePublic: show.input.checked }; }, fields: [
+        { key: 'amount', label: 'عدد النقاط', input: amount, get: function () { return Number(amount.value); } }, { key: 'note', label: 'السبب', input: note }, { key: 'x', node: show.node, get: function () { return undefined; } }
+      ] });
+    } }, 'تعديل نقاط') : null;
+    var transfer = can.transfer ? el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-transfer', onclick: function () {
+      var to = A.textInput('', { ltr: true, max: 12, placeholder: 'p-…' });
+      var amount = A.textInput('', { ltr: true, max: 8 });
+      var note = A.textInput('', { max: 200 });
+      var key = newKey();
+      formSheet({ title: 'نقل نقاط لحساب تاني', reason: false, path: path + 'transfer', intro: 'للحسابات المكررة: وقّف المكرر وانقل نقطه للحساب الصح.', extra: function () { return { key: key }; }, fields: [
+        { key: 'to', label: 'رقم الحساب الصح', input: to }, { key: 'amount', label: 'عدد النقاط', input: amount, get: function () { return Number(amount.value); } }, { key: 'note', label: 'السبب', input: note }
+      ] });
+    } }, 'نقل نقاط') : null;
+
+    return [
+      el('h2', { class: 'card__title', dir: 'auto', text: p.name }),
+      el('p', {}, eligibilityChip(p), ' ', p.emailChangedRecently ? A.chip('الإيميل اتغير من قريب', 'gold') : null),
+      el('dl', { class: 'comp-facts', 'data-youth-facts': '' },
+        fact('رقم الحساب', p.id), fact('الإيميل', el('span', { class: 'ltr', text: p.email })),
+        fact('تأكيد الإيميل', !p.emailVerified ? 'مش متأكد' : p.emailVia === 'admin' ? 'متأكد من الأدمن' : 'متأكد بالكود'),
+        fact('الموبايل', el('span', { class: 'ltr', text: p.phone })), fact('تاريخ الميلاد', p.birthDate + (p.age != null ? ' (' + ar(p.age) + ' سنة)' : '')),
+        fact('المجموعة', p.group), fact('الكنيسة', p.church), fact('الخادم المسؤول', p.servant), fact('ملاحظات', p.notes),
+        fact('سبب الإيقاف', p.blockedReason), fact('اتعمل', (p.createdVia === 'self' ? 'بنفسه' : 'من الأدمن') + ' · ' + when(p.createdAt))),
+      el('div', { class: 'actions' }, edit, view, manage, blockBtn),
+      el('h3', { class: 'section-label', text: 'النقاط' + (points.season ? ' · ' + points.season.name : '') }),
+      el('p', { 'data-youth-balance': '' }, ar(points.balance) + ' نقطة', points.frozen ? ' ' : null, points.frozen ? A.chip('متجمد', 'off') : null),
+      el('div', { class: 'actions' }, adjust, transfer),
+      points.ledger.length ? el('ul', { class: 'comp-ledger' }, points.ledger.map(function (l) {
+        return el('li', {}, el('strong', { class: 'ltr', text: (l.amount > 0 ? '+' : '') + l.amount }), ' ' + (LEDGER[l.kind] || l.kind) + (l.note ? ' — ' + l.note : '') + ' · ' + when(l.at));
+      })) : el('p', { class: 'note', text: 'مفيش حركات في الموسم ده.' }),
+      points.seasons.length ? el('p', { class: 'note', text: 'مواسم فاتت: ' + points.seasons.map(function (s) { return s.name + ' (' + ar(s.final) + ')'; }).join('، ') }) : null,
+      el('h3', { class: 'section-label', text: 'الأجهزة' }),
+      d.sessions.length ? el('ul', {}, d.sessions.map(function (s) { return el('li', { dir: 'auto', text: s.device + ' · ' + when(s.lastSeen) }); })) : el('p', { class: 'note', text: 'مش داخل من أي جهاز دلوقتي.' }),
+      el('h3', { class: 'section-label', text: 'الحجوزات' }),
+      d.bookings.length ? el('ul', {}, d.bookings.map(function (b) {
+        return el('li', { dir: 'auto', text: b.ref + ' · ' + b.event + ' · ' + (STATUS[b.status] || b.status) + (b.mismatch ? ' · تاريخ الميلاد مختلف عن الحجز' : '') });
+      })) : el('p', { class: 'note', text: 'مفيش حجوزات مربوطة.' }),
+      el('h3', { class: 'section-label', text: 'الإيميلات' }),
+      d.mail.length ? el('ul', {}, d.mail.map(function (m) {
+        return el('li', {}, m.kind + ' · ' + (MAIL[m.status] || m.status) + ' · ' + when(m.at) + ' ',
+          m.tier === 1 && can.manage ? el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function (event) {
+            A.withBusy(event.currentTarget, api('POST', path + 'resend', { outboxId: m.id })).then(function () { A.toast('هيتبعت تاني ✓'); }).catch(function (error) { A.fail(error); });
+          } }, 'ابعته تاني') : null);
+      })) : el('p', { class: 'note', text: 'مفيش إيميلات.' }),
+      el('h3', { class: 'section-label', text: 'تاريخ الحساب' }),
+      el('ul', { class: 'comp-audit', 'data-youth-audit': '' }, d.audit.map(function (a) {
+        var change = a.field && a.field !== 'pw' ? (a.field + ': ' + (a.oldValue || '—') + ' ← ' + (a.newValue || '—')) : '';
+        return el('li', { dir: 'auto', text: (AUDIT[a.action] || a.action) + ' · ' + a.actor + ' · ' + when(a.at) + (change ? ' · ' + change : '') + (a.reason ? ' · ' + a.reason : '') + (a.check ? ' · ' + a.check : '') });
+      }))
+    ];
+  }
+
+  /* =======================================================
+     SEASONS
+  ======================================================= */
+
+  function seasonsView() {
+    var box = A.errorBox();
+    var rows = el('div', { 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
+
+    function closeForm(s, button) {
+      A.withBusy(button, api('GET', 'points/seasons/' + encodeURIComponent(s.id) + '/preview')).then(function (pre) {
+        var name = A.textInput('', { max: 80, placeholder: 'اسم الموسم الجاي' });
+        formSheet({
+          title: 'قفل الموسم: ' + s.name, kind: 'danger', label: 'اقفل الموسم', reason: false, path: 'points/seasons/' + encodeURIComponent(s.id) + '/close',
+          intro: ar(pre.participants) + ' مشترك، إجمالي ' + ar(pre.total) + ' نقطة' + (pre.frozen.participants ? '، منهم ' + ar(pre.frozen.participants) + ' متجمدين بـ' + ar(pre.frozen.total) + ' نقطة' : '') + '. الأرصدة بتتحفظ والموسم الجاي بيبدأ من صفر.',
+          extra: function () { return { key: pre.key }; },
+          fields: [{ key: 'next', label: 'الموسم الجاي', input: name, get: function () { return { name: name.value.trim() }; } }]
+        });
+      }).catch(function (error) { A.fail(error, box); });
+    }
+
+    api('GET', 'points/seasons').then(function (d) {
+      rows.setAttribute('aria-busy', 'false');
+      A.fill(rows,
+        el('ul', { class: 'admins' }, d.seasons.map(function (s) {
+          return el('li', { class: 'admin', 'data-season': s.id },
+            el('div', { class: 'admin__body' }, el('p', { class: 'admin__name', text: s.name }), s.status === 'active' ? A.chip('الحالي', 'ok') : s.status === 'planned' ? A.chip('جاي', 'info') : A.chip('اتقفل', 'off')),
+            s.status === 'active' ? el('button', { class: 'btn btn--small btn--danger', type: 'button', 'data-act': 'season-close', onclick: function (event) { closeForm(s, event.currentTarget); } }, 'اقفل الموسم') : null);
+        })));
+    }).catch(function (error) { rows.setAttribute('aria-busy', 'false'); A.fill(rows); A.fail(error, box); });
+    return [A.card('المواسم', 'الرصيد بتاع الموسم الحالي بس. القفل بيحفظ الأرصدة ومبيمسحش حاجة.', box, backButton(), rows)];
+  }
+
+  A.views.youth = function () {
+    if (!window.AdminWorker) return [A.card('من لوحة التحكم الرسمية بس', 'الحسابات بتتراجع من لوحة التحكم على الموقع.')];
+    if (Y.view === 'person' && Y.id) return personView();
+    if (Y.view === 'review') return reviewView();
+    if (Y.view === 'seasons') return seasonsView();
+    return listView();
+  };
+
+  /* the tab appears when accounts are on (GET /v1/account/config); nothing changes for the panel before that */
+  var tries = 0;
+  function lookForAccounts() {
+    if (tries++ > 40 || C.youthOn) return;
+    var W = window.AdminWorker;
+    if (!W || !A.AREAS) { setTimeout(lookForAccounts, 1500); return; }
+    W.call('GET', '/v1/account/config', undefined, { quiet: true }).then(function (config) {
+      if (config.mode !== 'on') return;
+      C.youthOn = true;
+      var area = A.AREAS.filter(function (a) { return a.key === 'comps'; })[0];
+      if (!area || area.subs.some(function (s) { return s.key === 'youth'; })) return;
+      area.subs.splice(Math.max(0, area.subs.length - 1), 0, { key: 'youth', label: 'حسابات الشباب' });
+      A.renderNav();
+    }).catch(function () { setTimeout(lookForAccounts, 3000); });
+  }
+  lookForAccounts();
+
+})();
+</script>

@@ -577,6 +577,7 @@
           el('button', { class: 'btn btn--ghost btn--small', type: 'button', 'data-act': 'book-refresh', onclick: function (e) {
             refreshEvent(ev.slug, e.currentTarget).then(function () { if (head.isConnected) drawHead(); }).catch(function (error) { A.fail(error, box); });
           } }, icon('retry'), 'حدّث بيانات الفعالية'),
+          el('button', { class: 'btn btn--ghost btn--small', type: 'button', 'data-act': 'book-notify', onclick: function () { notifyForm(ev); } }, icon('bell'), 'بلّغ الحاجزين'),
           el('button', { class: 'btn btn--ghost btn--small btn--danger', type: 'button', 'data-act': 'book-cancel-all', onclick: function () { cancelAllForm(ev); } }, icon('alert'), 'إلغاء الفعالية')));
       return ev;
     }
@@ -1069,6 +1070,9 @@
         b.age && b.age.booker != null ? fact('سن الحاجز يوم الفعالية', ar(b.age.booker) + (b.age.source === 'admin' ? ' (من الأدمن)' : '')) : null,
         b.age && b.age.override ? fact('تجاوز شرط السن', String(b.age.override.reason || '') + (b.age.override.by ? ' — ' + b.age.override.by : '')) : null,
         b.age && b.age.ruleChanged ? fact('شروط السن', 'شروط السن اتغيرت بعد الحجز ده') : null,
+        b.age && b.age.dobChanged ? fact('تنبيه السن', 'السن اتغير بعد الحجز ده: تاريخ ميلاد الحساب اتصحح. راجعه قبل التأكيد.') : null,
+        b.age && b.age.mismatch ? fact('تنبيه السن', 'تاريخ الميلاد في الحجز مختلف عن الحساب المربوط.') : null,
+        b.participantId ? fact('الحساب', b.participantId) : null,
         fact('وقت الطلب', wallText(b.createdAt)),
         b.confirmedAt ? fact('وقت التأكيد', wallText(b.confirmedAt)) : null),
       el('p', { class: 'section-label', text: 'صور الإثبات' }),
@@ -1960,6 +1964,35 @@
   /* =======================================================
      THE EVENT IS CANCELLED: every pending and confirmed booking (§7.2)
   ======================================================= */
+
+  /* «بلّغ الحاجزين» (docs/MEMBER-NOTIFICATIONS-PLAN.md §4.2): only on this press; pending + confirmed bookers with an account */
+  function notifyForm(ev) {
+
+    var rows = [['date', 'التاريخ'], ['time', 'الميعاد'], ['place', 'المكان']].map(function (f) {
+      return { field: f[0], label: f[1], from: A.textInput('', { max: 80, placeholder: 'كان' }), to: A.textInput('', { max: 80, placeholder: 'بقى' }) };
+    });
+    var keys = K.keyKeeper('notify');
+
+    moveForm({
+      title: 'بلّغ الحاجزين: ' + ev.title,
+      intro: 'إيميل لكل اللي حاجزين بحساب (قيد المراجعة والمؤكدين). اكتب اللي اتغير بس.',
+      label: 'ابعت التبليغ',
+      nodes: rows.map(function (r) { return el('div', { class: 'row' }, A.field(r.label + ' كان', r.from), A.field('بقى', r.to)); }),
+      back: function () { A.closeSheet(); },
+      prepare: function () {
+        var changes = rows.filter(function (r) { return r.to.value.trim(); }).map(function (r) { return { field: r.field, from: r.from.value.trim(), to: r.to.value.trim() }; });
+        var errors = changes.length ? [] : [{ field: '', message: 'اكتب اللي اتغير' }];
+        var body = { changes: changes };
+        body.idemKey = keys.for(body);
+        return { errors: errors, path: '/v1/admin/book/events/' + enc(ev.id) + '/notify', body: body, key: body.idemKey };
+      },
+      done: function (reply) {
+        A.closeSheet();
+        A.toast('اتبلّغ ' + ar(reply.notified || 0) + ' حاجز');
+      }
+    });
+
+  }
 
   function cancelAllForm(ev) {
 

@@ -246,6 +246,8 @@ function bookBookingInput_(value, startAt, problems) {
   return {
     bookerAge: bookerAge,
     ageStrict: value.ageStrict === true,
+    requireAccount: value.requireAccount === true ? true : value.requireAccount === false ? false : null,
+    mailReminders: value.mailReminders === true,
     opensAt: opensAt,
     closesAt: closesAt,
     capacity: capacity === '' ? null : capacity,
@@ -370,6 +372,8 @@ function bookPublicBooking_(spec, servants, servantRows, methodRows, image, onli
     // age eligibility (§4.9): only when set, so older events publish exactly as before
     bookerAge: spec.bookerAge ? { min: spec.bookerAge.min, max: spec.bookerAge.max } : undefined,
     ageStrict: spec.ageStrict === true ? true : undefined,
+    requireAccount: spec.requireAccount === true || spec.requireAccount === false ? spec.requireAccount : undefined,
+    mailReminders: spec.mailReminders === true ? true : undefined,
     contactOnPage: spec.contactOnPage !== false,
     contactAfter: spec.contactAfter === true,
     pricing: {

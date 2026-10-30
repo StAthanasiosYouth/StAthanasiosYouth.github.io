@@ -24,9 +24,11 @@ import {
 import { newSession, requireAccount, endSession, revokeAllStmt } from './session.js';
 import { CODE_MINUTES, isTestInbox, codesReady, codeRow, sendCode } from './mail.js';
 import { memberEmailStmt, GROUPS, ALWAYS_ON } from '../notify/member.js';
+import { memberPoints } from '../points/ledger.js';
+import { accountBookings, accountBookingLink } from '../book/account.js';
 
 const SETTINGS = ['accounts_mode', 'OTP_EMAIL', 'age_min', 'age_max', 'age_warn_days', 'session_days_device', 'session_hours_shared', 'discovery_daily_cap',
-  'GMAIL_HEALTH', 'MAIL_DAILY_TARGET', 'MAIL_ADMIN_BUDGET', 'MAIL_RESERVE_CRITICAL', 'MAIL_RESERVE_OTP'];
+  'GMAIL_HEALTH', 'MAIL_DAILY_TARGET', 'MAIL_ADMIN_BUDGET', 'MAIL_RESERVE_CRITICAL', 'MAIL_RESERVE_OTP', 'MAIL_RESERVE_MEMBER', 'support_contact'];
 const CODE_TTL_MS = CODE_MINUTES * 60000;
 const PENDING_TTL_MS = 30 * 60000;
 const RESEND_MS = 60000;
@@ -47,6 +49,14 @@ async function readSettings(db) {
 }
 
 const configured = env => !!(env.PW_PEPPER && env.PW_KEY && env.OTP_PEPPER);
+
+const supportOf = settings => {
+  try {
+    return settings.support_contact ? JSON.parse(settings.support_contact) : null;
+  } catch {
+    return null;
+  }
+};
 
 /* every route but config: off, or missing a key → «تسجيل الدخول متوقف مؤقتًا» */
 async function gate(ctx) {
@@ -107,7 +117,7 @@ export async function accountConfig(ctx) {
   return {
     mode: settings.accounts_mode === 'on' && configured(ctx.env) ? 'on' : 'off',
     turnstile: turnstileSiteKey(ctx.env),
-    support: { whatsapp: SUPPORT_WHATSAPP, phone: SUPPORT_PHONE, email: SUPPORT_EMAIL }
+    support: { whatsapp: SUPPORT_WHATSAPP, phone: SUPPORT_PHONE, email: SUPPORT_EMAIL, ...(supportOf(settings) || {}) }
   };
 }
 
@@ -242,7 +252,7 @@ export async function accountRegisterStart(ctx) {
       .bind(id, canon, data, await codeHash(ctx.env, 'register', id, code), now + CODE_TTL_MS, sends, now, await pseudonym(ctx.env, ip), now),
     row.stmt
   ]));
-  sendCode(ctx, { to: email, code, purpose: 'verify', outboxId: row.id, now });
+  sendCode(ctx, { to: email, code, purpose: 'verify', outboxId: row.id, support: supportOf(settings), now });
   return { pendingId: id, email, minutes: CODE_MINUTES, resendAfter: RESEND_MS / 1000, ...(testInbox ? { testCode: code } : {}) };
 }
 
@@ -314,6 +324,27 @@ export async function accountMe(ctx) {
   const settings = await gate(ctx);
   const { account } = await requireAccount(ctx, settings);
   return { account: accountView(account, settings) };
+}
+
+/* GET /v1/account/bookings: this account's bookings */
+export async function accountBookingsList(ctx) {
+  const settings = await gate(ctx);
+  const { account } = await requireAccount(ctx, settings);
+  return accountBookings(ctx, account);
+}
+
+/* POST /v1/account/bookings/link { token } */
+export async function accountBookingsLink(ctx) {
+  const settings = await gate(ctx);
+  const { account } = await requireAccount(ctx, settings);
+  return accountBookingLink(ctx, account);
+}
+
+/* GET /v1/account/points: «نقاطي» */
+export async function accountPoints(ctx) {
+  const settings = await gate(ctx);
+  const { account } = await requireAccount(ctx, settings);
+  return memberPoints(ctx, account, settings);
 }
 
 /* GET /v1/account/security: where this account is signed in. Device families only. */
@@ -402,7 +433,7 @@ export async function accountForgot(ctx) {
         .bind(account.id, await codeHash(ctx.env, 'recover', account.id, code), now + CODE_TTL_MS, now),
       row.stmt
     ]));
-    sendCode(ctx, { to: account.email, code, purpose: 'recovery', outboxId: row.id, now });
+    sendCode(ctx, { to: account.email, code, purpose: 'recovery', outboxId: row.id, support: supportOf(settings), now });
     return { ...reply, ...(testInbox ? { testCode: code } : {}) };
   });
 }
@@ -439,7 +470,14 @@ export async function accountForgotVerify(ctx) {
     }
     const password = generatePassword();
     const version = account.pw_version + 1;
+    // §6.5: the first recovery on an admin-entered email proves the mailbox, and is told: to it, and to the Primary Admin
+    const firstRecovery = account.email_verified_via === 'admin';
     await retry(async () => db.batch([
+      ...(firstRecovery ? [
+        db.prepare("UPDATE participants SET email_verified_via = 'otp' WHERE id = ?").bind(account.id),
+        memberEmailStmt(db, { kind: 'acct.rec1', participantId: account.id, dedupeKey: 'acct:rec1:' + account.id, now }),
+        activityStmt(db, { at: now, actor: 'account', action: 'account.recovery.first', entityType: 'participant', entityId: account.id, severity: 'critical', summary: 'أول استرجاع بإيميل دخّله أدمن' })
+      ] : []),
       db.prepare("UPDATE participants SET pw_hash = ?, pw_enc = ?, pw_version = ?, pw_issued_at = ?, pw_issued_by = 'reset', updated_at = ?, version = version + 1 WHERE id = ?")
         .bind(await passwordHash(ctx.env, password), await passwordEncrypt(ctx.env, account.id, version, password), version, now, now, account.id),
       revokeAllStmt(db, account.id, now),

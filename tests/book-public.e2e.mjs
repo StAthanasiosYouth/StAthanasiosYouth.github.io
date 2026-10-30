@@ -127,6 +127,7 @@ const json = (status, body) => ({ status, body });
 
 function answer({ method, path, body }) {
   const url = new URL(path, API);
+  if (url.pathname === '/v1/account/me') return mock.me || json(401, { ok: false, code: 'session', message: 'x' });
   if (url.pathname === '/v1/book/state') return mock.state.status ? mock.state : json(200, mock.state);
   if (url.pathname === '/v1/book/proof') {
     const n = mock.proofs++;
@@ -237,8 +238,8 @@ async function open(path, { init = null } = {}) {
   page.on('request', request => {
     const url = new URL(request.url());
     if (url.origin === API) {
-      const call = { method: request.method(), path: `${url.pathname}${url.search}`, body: request.postData() || '', type: request.headers()['content-type'] || '', token: request.headers()['x-status-token'] || '' };
-      const cors = { 'Access-Control-Allow-Origin': BASE, 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'content-type, x-status-token', Vary: 'Origin' };
+      const call = { auth: request.headers().authorization || '', method: request.method(), path: `${url.pathname}${url.search}`, body: request.postData() || '', type: request.headers()['content-type'] || '', token: request.headers()['x-status-token'] || '' };
+      const cors = { 'Access-Control-Allow-Origin': BASE, 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'authorization, content-type, x-status-token', Vary: 'Origin' };
       if (call.method === 'OPTIONS') return request.respond({ status: 204, headers: cors, body: '' });
       mock.calls.push(call);
       apiCalls.push(call);
@@ -1052,6 +1053,37 @@ test('Turnstile: no site key in the state (today) → no script, no check, the s
   await page.waitForSelector('.bk-flow[data-step="done"]');
   assert.equal('turnstile' in JSON.parse(calls('/v1/book/submit')[0].body), false);
   assert.equal(mock.turnstileLoads || 0, 0);
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('accounts (YOUTH-ACCOUNTS-PLAN §18.1): a required account sends the visitor to sign in; signed in, no date-of-birth field, the form prefilled, the session goes with the send', async () => {
+  resetMock();
+  const required = { ...OPEN, left: 6, account: { on: true, required: true } };
+  mock.state = { status: 200, body: required };
+  const first = await open('/events/aged-trip/');
+  await ready(first.page);
+  await live(first.page, 'open');
+  assert.equal(await textOf(first.page, '.bk-start'), 'سجّل دخولك واحجز');
+  await Promise.all([first.page.waitForNavigation({ waitUntil: 'domcontentloaded' }), first.page.click('.bk-start')]);
+  assert.match(first.page.url(), /\/account\/$/);
+  assert.equal(await first.page.evaluate(() => sessionStorage.getItem('athanasios.account.return.v1')), '/events/aged-trip/');
+  await first.context.close();
+
+  resetMock();
+  mock.state = { status: 200, body: required };
+  mock.me = json(200, { ok: true, account: { name: 'مينا زكريا فؤاد', phone: '01012345678', birthDate: '2000-03-12', firstName: 'مينا' } });
+  const { context, page, problems } = await open('/events/aged-trip/', { init: new Function("localStorage.setItem('athanasios.account.v1', JSON.stringify({ token: 'as1.abcdefghijklmnopqrstuvwxyz0123456789', email: 'a@example.com' }))") });
+  await ready(page);
+  await live(page, 'open');
+  assert.equal(await textOf(page, '.bk-start'), 'احجز الآن');
+  await page.click('.bk-start');
+  await step(page, 'a');
+  assert.equal(await page.$eval('#bk-name', n => n.value), 'مينا زكريا فؤاد');
+  assert.equal(await page.$eval('#bk-phone', n => n.value), '01012345678');
+  assert.equal(await page.$$eval('[data-field="dob"] select', n => n.length), 0, 'no date-of-birth field');
+  assert.match(await textOf(page, '[data-field="dob"]'), /بنحسب سنك من حسابك/);
+  assert.ok(calls('/v1/account/me').some(c => /^Bearer as1./.test(c.auth)));
   assert.deepEqual(problems, []);
   await context.close();
 });
