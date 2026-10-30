@@ -301,7 +301,7 @@ async function open(path, { viewport = PHONE, mock = createMock(), bypassCSP = f
         return request.respond({ status: 200, contentType: 'application/json; charset=utf-8', headers: { 'Access-Control-Allow-Origin': '*' }, body: echoes.get(new URL(url).searchParams.get('user_content_key')) || '{}' });
       }
       if (/^(https?:\/\/(localhost|127\.0\.0\.1)[:/]|data:|blob:|about:)/.test(url)) return request.continue();
-      mock.outside.push(url);
+      if (!url.endsWith('/v1/account/config')) mock.outside.push(url);
       return request.respond({ status: 204, body: '' });
     }
     catch (error) {

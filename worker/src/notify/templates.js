@@ -504,6 +504,82 @@ const BOOKING = {
 };
 const CHANGE_LABELS = { date: 'التاريخ', time: 'الميعاد', place: 'المكان' };
 
+const RESULT = {
+  result: { subject: 'نتيجتك في', heading: 'نتيجتك ظهرت', intro: 'نتيجة مشاركتك في المسابقة ظهرت.' },
+  done: { subject: 'خلص تصحيح إجاباتك في', heading: 'خلص تصحيح إجاباتك', intro: 'كل إجاباتك اتصححت.' },
+  points: { subject: 'زادت نقطك من', heading: 'زادت نقطك', intro: 'اتصححت إجابات ليك وزادت نقطك.' },
+  correction: { subject: 'تصحيح في نتيجتك في', heading: 'حصل تصحيح في نتيجتك', intro: 'الأرقام تحت هي الصحيحة دلوقتي.' }
+};
+
+/* a result (§4.3, COMPETITIONS §20.3): the score only when the policy shows it; never answers or anyone else's rank */
+export function resultEmail({ kind, title, score = null, max = null, points = null, noPoints = false, wallet = false, balance = null, pending = 0, url, prefs = false, support = null }) {
+  const t = RESULT[kind];
+  if (!t) throw new Error('unknown result email: ' + kind);
+  return {
+    subject: t.subject + ' «' + clip(title, 60) + '» – ' + BRAND,
+    ...layout({
+      audience: 'member',
+      kicker: 'نتيجتك',
+      heading: t.heading,
+      intro: t.intro,
+      facts: [
+        ['المسابقة', clip(title, 80)],
+        ...(score !== null ? [['الدرجة', digits(score) + ' من ' + digits(max)]] : []),
+        ...(noPoints ? [['النقط', 'بدون نقاط']] : points !== null ? [['النقط', digits(points) + ' نقطة']] : []),
+        ...(wallet && balance !== null && !noPoints ? [['رصيدك (وقت الإرسال)', digits(balance) + ' نقطة']] : [])
+      ],
+      notes: pending > 0 ? ['لسه فيه أسئلة بتتصحح.'] : [],
+      link: { label: 'شوف نتيجتك', url },
+      prefs,
+      support,
+      why: WHY.security
+    })
+  };
+}
+
+const STORE = {
+  requested: { subject: 'استلمنا طلبك من المتجر', intro: 'طلبك وصل، والخدام هيراجعوه.' },
+  approved: { subject: 'طلبك من المتجر جاهز', intro: 'طلبك جاهز للاستلام من الخادم.' },
+  cancelled: { subject: 'طلبك من المتجر اتلغى', intro: 'طلبك اتلغى والنقط رجعتلك.' }
+};
+
+/* a store request's state (§4.4): a receipt, so a stolen session that spends points is noticed */
+export function storeEmail({ kind, item, cost, balance, note = '', url, prefs = false, support = null }) {
+  const t = STORE[kind];
+  if (!t) throw new Error('unknown store email: ' + kind);
+  return {
+    subject: t.subject + ' – ' + BRAND,
+    ...layout({
+      audience: 'member',
+      kicker: 'المتجر',
+      heading: t.subject,
+      intro: t.intro,
+      facts: [['الجايزة', clip(item, 60)], [kind === 'cancelled' ? 'النقط اللي رجعت' : 'النقط', digits(cost) + ' نقطة'], ['رصيدك (وقت الإرسال)', digits(balance) + ' نقطة']].concat(note ? [['السبب', clip(note, 200)]] : []),
+      link: { label: 'شوف طلبك', url },
+      prefs,
+      support,
+      why: WHY.security
+    })
+  };
+}
+
+/* about to leave the age range (§4.1): the date only, never an age */
+export function ageOutEmail({ date, url, prefs = false, support = null }) {
+  return {
+    subject: 'استخدم نقطك قبل ' + dayText(date) + ' – ' + BRAND,
+    ...layout({
+      audience: 'member',
+      kicker: 'نقطك',
+      heading: 'نقطك هتتجمد قريب',
+      intro: 'من يوم ' + dayText(date, { year: true }) + ' هتفضل تشارك في المسابقات كضيف، ونقطك هتفضل محفوظة بس مش هتقدر تستخدمها. استخدمها قبلها.',
+      link: { label: 'شوف نقطك', url },
+      prefs,
+      support,
+      why: WHY.security
+    })
+  };
+}
+
 /* a deduction from the member's wallet (§4.4): the note only when the admin marked it for them */
 export function pointsEmail({ amount, balance, note = '', url, support = null }) {
   return {

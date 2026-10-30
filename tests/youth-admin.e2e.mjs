@@ -40,6 +40,10 @@ const fake = {
     this.calls = [];
     this.people = [person({ id: 'p-bbbbbbbb', name: 'سارة عادل نبيل', email: 'sara@example.com', phone: '01112345678', eligibility: { state: 'guest', source: 'auto', soon: false, leavesAt: null, override: null }, balance: 40 })];
     this.points = {};
+    this.orders = [{ id: 'r-0000000001', itemName: 'كتاب هدية', cost: 30, status: 'pending', person: 'مينا زكريا', requestedAt: Date.now(), emailChangedRecently: true, next: ['approved', 'fulfilled', 'cancelled'] }];
+    this.gradedWith = null;
+    this.savedItem = null;
+    this.schedule = null;
   },
   sheet(id) {
     const p = this.people.find(x => x.id === id);
@@ -78,6 +82,29 @@ async function handle(request) {
     if (body.email !== body.emailConfirm) return json(400, { ok: false, code: 'invalid', field: 'emailConfirm', message: 'الإيميل مش زي اللي فوق. اكتبه تاني.' });
     fake.people.unshift(person({ name: body.name, email: body.email, phone: body.phone, birthDate: body.birthDate }));
     return json(200, { ok: true, id: 'p-aaaaaaaa', password: 'ABCD-EFGH-JKMN' });
+  }
+  if (path === '/v1/admin/comp') return json(200, { ok: true, comps: [{ id: 'c-a', slug: 'quiz', title: 'مسابقة الكتاب', sent: 2, pending: 1, closedAt: '', finalizedAt: '' }] });
+  if (path === '/v1/admin/comp/c-a/submissions') return json(200, { ok: true, submissions: [
+    { id: 's-000000000001', name: 'مينا زكريا', phone: '01012345678', status: 'pending_review', score: 10, maxScore: 15, pending: 1, guest: false, rank: 1 },
+    { id: 's-000000000002', name: 'سارة عادل', phone: '01112345678', status: 'graded', score: 15, maxScore: 15, pending: 0, guest: true, rank: null }] });
+  if (path === '/v1/admin/comp/c-a/regrade') return json(200, { ok: true, checked: 2, changed: 1 });
+  if (path.startsWith('/v1/admin/comp/submissions/')) {
+    const graded = path.endsWith('/grade');
+    if (graded) fake.gradedWith = body.grades;
+    return json(200, { ok: true, submission: { id: 's-000000000001', name: 'مينا زكريا', status: graded ? 'graded' : 'pending_review', score: graded ? 15 : 10, maxScore: 15, pending: graded ? 0 : 1, guest: false }, questions: [{ id: 'q2', type: 'long', text: 'اكتب مقال', points: 5, choices: [], answer: 'إجابة المشترك', grade: graded ? { ok: true, pts: 5 } : { ok: null, pts: 0 } }] });
+  }
+  if (path === '/v1/admin/store/items') {
+    if (method === 'POST') fake.savedItem = body;
+    return json(200, { ok: true, items: [{ id: 'i-00000001', name: 'كتاب هدية', cost: 30, stock: 5, perPerson: 1, available: 4, redeemed: 1, active: true, category: '', order: 0, description: '' }] });
+  }
+  if (path === '/v1/admin/store/schedule') {
+    if (method === 'POST') fake.schedule = body;
+    return json(200, { ok: true, mode: 'auto', state: 'open', opensAt: '', closesAt: '', allowCancel: false });
+  }
+  if (path === '/v1/admin/store/redemptions') return json(200, { ok: true, redemptions: fake.orders });
+  if (path.startsWith('/v1/admin/store/redemptions/')) {
+    fake.orders = fake.orders.map(o => ({ ...o, status: body.status, next: [] }));
+    return json(200, { ok: true, redemptions: fake.orders });
   }
   if (path === '/v1/admin/points/seasons') return json(200, { ok: true, seasons: [{ id: 'sea-first', name: 'الموسم الأول', status: 'active' }] });
   if (path === '/v1/admin/points/seasons/sea-first/preview') return json(200, { ok: true, participants: 2, total: 110, frozen: { participants: 1, total: 40 }, key: 'k1', season: {} });
@@ -272,6 +299,61 @@ test('seasons: the preview shows frozen points apart; review list; settings; exp
   await click(page, '[data-act="youth-export"]');
   await page.waitForFunction(() => window.A.comp.lastDownload, { timeout: 8000 });
   assert.equal(await page.evaluate(() => A.comp.lastDownload.filename), 'حسابات-الشباب.xlsx');
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('results: a guest has no place number; a servant grades; the store: a prize, a request, the schedule', async () => {
+  fake.reset();
+  const { context, page, problems } = await open();
+  await goYouth(page);
+  await click(page, '[data-act="youth-results"]');
+  await page.waitForSelector('[data-comp="c-a"]', { timeout: 8000 });
+  await click(page, '[data-comp="c-a"]');
+  await page.waitForSelector('[data-submission]', { timeout: 8000 });
+  const list = await textOf(page, '#view');
+  assert.match(list, /١. /);
+  assert.match(list, /ضيف/);
+  await click(page, '[data-submission="s-000000000001"]');
+  await page.waitForSelector('[data-question="q2"]', { timeout: 8000 });
+  assert.match(await sheetText(page), /إجابة المشترك/);
+  await click(page, '[data-grade="q2:true"]');
+  await page.waitForFunction(() => /١٥ من ١٥/.test(document.querySelector('[data-sub-score]').innerText), { timeout: 5000 });
+  assert.deepEqual(fake.gradedWith, { q2: true });
+  await page.evaluate(() => [...document.querySelectorAll('#sheet .btn')].find(b => b.textContent.trim() === 'قفل').click());
+  await page.waitForFunction(() => !document.querySelector('#sheet').open, { timeout: 5000 });
+
+  await page.evaluate(() => { A.compYouth.view = 'store'; A.render(); });
+  await page.waitForSelector('[data-order="r-0000000001"]', { timeout: 8000 });
+  assert.match(await textOf(page, '#view'), /الإيميل اتغير من قريب/);
+  await click(page, '[data-order-act="approved"]');
+  await page.waitForFunction(() => /جاهزة للاستلام/.test(document.querySelector('[data-order]').innerText), { timeout: 5000 });
+  await click(page, '[data-act="item-add"]');
+  await page.waitForSelector('#sheet[open] [data-act="youth-save"]');
+  const fields = await page.$$('#sheet .form input:not([type="checkbox"]):not([type="file"])');
+  await fields[0].type('جايزة جديدة');
+  await page.$$eval('#sheet .form input', ns => { const c = ns.find(n => n.getAttribute('inputmode') !== 'x' && n.value === ''); return !!c; });
+  await page.evaluate(() => { const inputs = [...document.querySelectorAll('#sheet .form input:not([type="checkbox"]):not([type="file"])')]; inputs[1].value = '40'; inputs[1].dispatchEvent(new Event('input', { bubbles: true })); });
+  await saveSheet(page);
+  await page.waitForFunction(() => !document.querySelector('#sheet').open, { timeout: 5000 });
+  assert.equal(fake.savedItem.name, 'جايزة جديدة');
+  assert.equal(fake.savedItem.active, true);
+  await page.waitForSelector('[data-act="store-schedule"]', { timeout: 8000 });
+  await click(page, '[data-act="store-schedule"]');
+  await page.waitForFunction(() => true);
+  await new Promise(r => setTimeout(r, 300));
+  assert.equal(fake.schedule.mode, 'auto');
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('accounts on: the old people / points / store tabs give way to «حسابات الشباب»', async () => {
+  fake.reset();
+  const { context, page, problems } = await open();
+  await goYouth(page);
+  const keys = await subs(page);
+  assert.ok(keys.includes('youth'));
+  for (const old of ['people', 'points', 'shop']) assert.ok(!keys.includes(old), old);
   assert.deepEqual(problems, []);
   await context.close();
 });

@@ -154,7 +154,60 @@ Staging: migration `0020`, Worker `264fe9ef`; `accounts_mode = on`, `OTP_EMAIL =
 
 **Before launch, owner:** archive the test data from the competitions spreadsheet (YOUTH §7), as it is still open.
 
-## 4. Rollback (batches 1–3)
+## 3e. Batch 4 (P5-7 + P5-8): what was built
+
+Status: **implemented and verified on staging, 2026-10-30. Not on `main`, not in production.**
+
+**P5-8 competitions runtime** (`worker/src/comp/`, migration `0021`)
+- `POST /v1/comp/start`, `submit`, `result`, `me`: every attempt belongs to a signed-in account. No code login, no form, no guest row. The key never leaves the Worker before the policy allows it.
+- Grading is one source: `score.gen.js` is generated from `apps-script/CompScore.gs` (`tools/build-worker-score.mjs`; a test fails when stale). The rest is ported from `CompPublic.gs` and `CompModel.gs`.
+- Crediting (COMPETITIONS §20.1): automatic part at submit, manual part as graded, best attempt only, `sub:<id>:<n>` idempotent, void and regrade reverse through the same path.
+- Visibility hold (§20.2): the ledger row is written at once and hidden from the member, the spendable balance included, until `released_ms`. The minute cron releases at `resultsAt`, on finalize, or at the end when nothing shows.
+- Eligibility is stamped at submit with the range used (§9.1). A guest plays and earns nothing; ranking gives a badge and no place number.
+- Email: one result per submission at release, completion, merged corrections, the age-out notice.
+- Authoring stays on Apps Script until Phase 6 (owner's hybrid decision): `compRuntimePush_` sends each live definition at publish, close and finalize to `POST /v1/sync/comp-live`, signed, immutable per version.
+
+**P5-7 store** (`worker/src/store/shop.js`)
+- `POST /v1/shop/redeem`, `cancel`: the request and its charge are one batch, with stock, per-person and spendable balance decided inside the write. Guests browse and are refused on the server. Orders placed before aging out are honoured.
+- Admin: prizes, requests (approve, fulfil, cancel + one refund), schedule. A season with open requests can't close. Prizes move once with `workerRuntimeSeed()`.
+- Email: request receipt, approved, cancelled + refund.
+
+**Pages**
+- `competition/` and `points/` keep their screens. With accounts on they use `assets/js/comp/accounts.js`: same reply shapes, signed in, sign-in on `/account/` and straight back. With accounts off they stay exactly as today (one extra config read; its last answer is remembered).
+- `/account/`: `#me/results`, `#me/orders`.
+- Admin «حسابات الشباب»: «النتايج» and «المتجر». With accounts on, the old «المشاركين», «النقاط», «المتجر» tabs give way to it.
+
+**Changed from the Apps Script build (on purpose or by limit)**
+- By contract: credits are no longer visible before release; points no longer wait for the whole submission.
+- **Not ported:** grading a group of identical answers at once (`apiCompGradeGroup`, the review queue). Answers are graded one submission at a time. It's a convenience, and belongs with the Phase 8 screen unless the owner wants it sooner.
+- **The explanation picture** no longer waits for its file to be on the site (`compMediaReleased_`): the review shows what the definition names.
+
+**Open before launch (P5-9, P5-10)**
+- **The home page's store widget** reads `points.shop` from `content.json`, which Apps Script builds from its own schedule, and the automatic store and season pushes (§18.5) stay there until Phase 6. After the move, a schedule saved on the Worker doesn't reach them. Needs a decision at launch: keep both schedules aligned by hand, or send the Worker's into the build.
+- `/v1/comp/me` reads a lot in one request; measure it against the Free plan's 10 ms CPU limit under load.
+
+## 3f. Batch 4 results (2026-10-30)
+
+| Check | Result |
+| --- | --- |
+| Worker unit tests, 20 new in `test/comp-runtime.test.mjs` | 382 / 382 |
+| **End to end, real pages + real Worker code on SQLite** `tests/comp-accounts.e2e.mjs` | 2 / 2: signed out → `/account/` → back → answers → points → store; a guest locked |
+| Admin e2e `tests/youth-admin.e2e.mjs` (2 new) | 6 / 6 |
+| Existing competition e2e (code login, accounts off) `comp-public`, `comp-portal`, `comp-portal2` | Pass |
+| Site unit tests | 771 pass; the same 3 known failures |
+| Staging `node scripts/comp-check.mjs` (real cron + queue) | 39 / 39 |
+| Staging `participants-check`, `member-check`, `account-check` (earlier batches again) | All passed |
+| Production | Unchanged: Worker `4408fb3a`, no migration, nothing pushed |
+
+Staging: migration `0021`, Worker `0635ae1b`; `accounts_mode = on`, `OTP_EMAIL = 0`, `MEMBER_EMAIL = 0` left on staging.
+
+**Not verified (planned for P5-9):** the Apps Script side (`compRuntimePush_`, `workerRuntimeSeed`): staging has no Apps Script, so definitions were pushed by a signed script, and these functions have only loaded in the tests' fake; a real email; real Turnstile on the way back from `/account/`; the device matrix.
+
+One test in `tests/points-widget.e2e.mjs` («placement», the home page's order of sections) fails. No file of the home page changed in this batch; comparing with the previous commit wasn't possible (the old checkout's test didn't load), so it is reported, not explained.
+
+## 4. Rollback (batches 1–4)
+
+- Batch 4 extra: `accounts_mode = off` returns `competition/` and `points/` to Apps Script at once and refuses every `/v1/comp/*`, `/v1/shop/*` route. Worker rows stay. After launch that fallback serves only the old code login, so it is a stop, not a way back.
 
 - Batch 3 extra: everything stays behind `accounts_mode`. A booking already linked keeps working if it goes off, and `POST /v1/admin/book/bookings/:id/link { participantId: null }` unlinks one. Schema additions are unused while off.
 
@@ -166,6 +219,6 @@ Staging: migration `0020`, Worker `264fe9ef`; `accounts_mode = on`, `OTP_EMAIL =
 
 ## 5. Before production (needs the owner)
 
-Production release of batches 1–3 is a separate approval: `main`, migrations `0018`–`0020`, the deploy, and `node scripts/account-secrets.mjs --production`. Accounts stay dormant with `accounts_mode = off`; the new budget rule applies to admin mail at once (§3a).
+Production release of batches 1–4 is a separate approval: `main`, migrations `0018`–`0021`, the Apps Script deploy (`compRuntimePush_`), the deploy, and `node scripts/account-secrets.mjs --production`. Accounts stay dormant with `accounts_mode = off`; the new budget rule applies to admin mail at once (§3a).
 
 Owner tasks from YOUTH §28.2, needed by P5-10 at the latest: 2-Step Verification on the youth Gmail account; privacy text approval; pick the support contact (batch 3); archive the test data from the competitions spreadsheet (before batch 3).

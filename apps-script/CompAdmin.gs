@@ -660,6 +660,8 @@ function apiCompClose(id, open) {
     return id;
   });
 
+  if (typeof compRuntimePush_ === 'function') compRuntimePush_([id], []);
+
   return apiComp(id);
 
 }
@@ -679,6 +681,8 @@ function apiCompFinalize(id, final) {
     activityNote_({ action: 'finalize', type: 'competition', id: id, title: row.title, changes: final === false ? { undo: true } : null });
     return id;
   });
+
+  if (typeof compRuntimePush_ === 'function') compRuntimePush_([id], []);
 
   return apiComp(id);
 

@@ -15,6 +15,7 @@
 
 import { COMP_CONFIG } from './config.js';
 import { createApi } from './api.js';
+import { accountsOn, createWorkerApi, accountSummary, goSignIn, accountSession } from './accounts.js';
 import { createSave, memoryStorage, browserStorage } from './save.js';
 import * as F from './flow.js';
 import { createView } from './view.js';
@@ -84,7 +85,7 @@ const MESSAGES = {
   not_open: 'المسابقة لسه مبدأتش.',
   limit: 'إنت شاركت في المسابقة دي قبل كده.',
   invalid: 'راجع البيانات وجرّب تاني.',
-  session: 'سجّل بالكود بتاعك تاني.',
+  session: 'سجّل دخولك تاني.',
   disabled: 'المسابقة دي مش متاحة دلوقتي.',
   not_found: 'المسابقة دي مش متاحة دلوقتي.',
   code: 'الكود ده مش صح، راجع الحروف والأرقام.',
@@ -178,7 +179,31 @@ function model() {
 }
 
 function render(options = {}) {
+  // accounts on: there is no code screen: the signed-in account goes straight on (§18)
+  if (accountsMode && S.state.name === 'code') {
+    enterWithAccount();
+    return;
+  }
   view.render({ ...model(), ...options });
+}
+
+let accountsMode = false;
+let entering = false;
+
+async function enterWithAccount() {
+  if (entering) return;
+  entering = true;
+  const account = accountSession() ? await accountSummary() : null;
+  entering = false;
+  if (!account) {
+    goSignIn(new URL('../../../', import.meta.url));
+    return;
+  }
+  const eligible = account.eligible !== false;
+  S.ptoken = '';
+  S.noPoints = !eligible;
+  go({ type: 'code-ok', participant: { name: String(account.firstName || '').slice(0, 80), group: '', eligible, noPoints: !eligible } });
+  go({ type: 'confirm' });
 }
 
 /** a step change through the machine (+ its side effects) */
@@ -589,7 +614,8 @@ async function fetchDefinition(slug) {
 function applyDefinition(raw) {
   const def = F.sanitizeDefinition(raw);
   if (!def || (def.slug && def.slug !== S.slug)) return false;
-  S.def = def;
+  // §18: with accounts on, every competition needs one: no form, no guests, whatever an older definition says
+  S.def = accountsMode ? { ...def, participation: 'registered', allowGuests: false } : def;
   S.defRaw = def.withdrawn ? null : raw;
   if (def.theme) html.dataset.theme = def.theme;
   if (!def.withdrawn) document.title = `${def.title} – مسابقات أسرة البابا أثناسيوس`;
@@ -599,7 +625,8 @@ function applyDefinition(raw) {
 async function boot() {
 
   S.slug = F.slugFrom({ dataSlug: html.dataset.slug || '', search: location.search });
-  api = createApi({ url: COMP_CONFIG.apiUrl });
+  accountsMode = await accountsOn();
+  api = accountsMode ? createWorkerApi() : createApi({ url: COMP_CONFIG.apiUrl });
   save = createSave(S.slug, browserStorage);
 
   if (!S.slug) {

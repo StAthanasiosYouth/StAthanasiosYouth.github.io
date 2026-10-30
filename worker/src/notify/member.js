@@ -19,7 +19,7 @@ import { activityStmt } from '../lib/activity.js';
 import { gmailConfigured, sendMail, GmailError } from './gmail.js';
 import { allowed, budget, quotaOf, hourKey, countStmt } from './email.js';
 import { backoffMs, MAX_ATTEMPTS } from './claim.js';
-import { securityEmail, bookingEmail, pointsEmail, dayText, whenText, SITE } from './templates.js';
+import { securityEmail, bookingEmail, pointsEmail, resultEmail, storeEmail, ageOutEmail, dayText, whenText, SITE } from './templates.js';
 import { isTestInbox } from '../account/mail.js';
 
 const HOUR = 3600000;
@@ -62,7 +62,21 @@ export const KINDS = {
   'pay.request': { tier: 2, cls: 'member_tx', ttl: 72 * HOUR, group: 'bookings', book: 'request_received' },
   'pay.requestRejected': { tier: 1, cls: 'member_tx', ttl: 72 * HOUR, book: 'request_rejected' },
 
-  'pts.deduct': { tier: 1, cls: 'member_tx', ttl: 72 * HOUR, points: true }
+  'pts.deduct': { tier: 1, cls: 'member_tx', ttl: 72 * HOUR, points: true },
+
+  // results and points (§4.3, COMPETITIONS §20.3): gradual; only after the release moment
+  'res.result': { tier: 2, cls: 'member_bulk', ttl: 7 * DAY, group: 'results', res: 'result' },
+  'res.done': { tier: 2, cls: 'member_bulk', ttl: 7 * DAY, group: 'results', res: 'done' },
+  'res.points': { tier: 2, cls: 'member_bulk', ttl: 7 * DAY, group: 'results', res: 'points' },
+  'res.correction': { tier: 2, cls: 'member_tx', ttl: 7 * DAY, group: 'results', res: 'correction' },
+
+  // the store (§4.4)
+  'store.requested': { tier: 2, cls: 'member_tx', ttl: 72 * HOUR, group: 'store', store: 'requested' },
+  'store.approved': { tier: 1, cls: 'member_tx', ttl: 72 * HOUR, store: 'approved', stillStore: ['approved'] },
+  'store.cancelled': { tier: 1, cls: 'member_tx', ttl: 72 * HOUR, store: 'cancelled', stillStore: ['cancelled'] },
+
+  // about to leave the age range: once, while the points can still be used (§4.1)
+  'acct.age': { tier: 2, cls: 'member_bulk', ttl: 60 * DAY, group: 'results', age: true }
 };
 
 /* the outbox row: goes in the SAME batch as the state change it reports (§3). A replay changes nothing. */
@@ -147,6 +161,26 @@ async function render(db, row, p, support, entity) {
     const balance = await retry(() => db.prepare('SELECT COALESCE(SUM(amount), 0) AS n FROM points_ledger WHERE participant_id = ? AND season_id = ?').bind(p.id, l.season_id).first('n'));
     return pointsEmail({ amount: Math.abs(l.amount), balance, note: l.note_public ? l.note : '', url: account('points'), support });
   }
+  if (k.res) {
+    const s = entity;
+    const def = s.def;
+    const shows = what => def.scoring && (def.resultShow === what || def.resultShow === 'both');
+    const pointsSum = await retry(() => db.prepare('SELECT COALESCE(SUM(amount), 0) AS n FROM points_ledger WHERE ref = ?').bind('sub:' + s.row.id).first('n'));
+    const season = await retry(() => db.prepare("SELECT id FROM seasons WHERE status = 'active'").first('id'));
+    const balance = season ? await retry(() => db.prepare("SELECT COALESCE(SUM(l.amount), 0) AS n FROM points_ledger l WHERE l.participant_id = ? AND l.season_id = ? AND NOT EXISTS (SELECT 1 FROM submissions x WHERE 'sub:' || x.id = l.ref AND x.released_ms IS NULL)").bind(p.id, season).first('n')) : null;
+    return resultEmail({
+      kind: k.res, title: def.title, score: shows('score') ? s.row.score : null, max: shows('score') ? s.row.max_score : null,
+      points: def.wallet && shows('points') ? pointsSum : null, noPoints: !!s.row.no_points, wallet: !!def.wallet, balance, pending: s.row.pending_count,
+      url: account('results/' + def.slug), prefs, support
+    });
+  }
+  if (k.store) {
+    const r = entity;
+    const season = r.season_id;
+    const balance = await retry(() => db.prepare("SELECT COALESCE(SUM(l.amount), 0) AS n FROM points_ledger l WHERE l.participant_id = ? AND l.season_id = ? AND NOT EXISTS (SELECT 1 FROM submissions x WHERE 'sub:' || x.id = l.ref AND x.released_ms IS NULL)").bind(p.id, season).first('n'));
+    return storeEmail({ kind: k.store, item: r.item_name, cost: r.cost, balance, note: k.store === 'cancelled' ? r.note : '', url: account('orders/' + r.id), prefs, support });
+  }
+  if (k.age) return ageOutEmail({ date: row.entity_id, url: account('points'), prefs, support });
   const x = entity;
   const counts = JSON.parse(x.b.actual || x.b.requested || '{}');
   return bookingEmail({
@@ -192,6 +226,24 @@ export async function memberSend(env, ids, now = Date.now()) {
         continue;
       }
       let entity = null;
+      if (k.res) {
+        const sub = await retry(() => db.prepare('SELECT * FROM submissions WHERE id = ?').bind(row.entity_id).first());
+        const def = sub ? await retry(() => db.prepare('SELECT def FROM comp_versions WHERE comp_id = ? AND version = ?').bind(sub.comp_id, sub.version).first('def')) : null;
+        if (!sub || !def || sub.status === 'void' || sub.participant_id !== p.id || !sub.released_ms) {
+          await setStatus(db, row.id, 'superseded', null);
+          out.superseded++;
+          continue;
+        }
+        entity = { row: sub, def: JSON.parse(def) };
+      }
+      if (k.store) {
+        entity = await retry(() => db.prepare('SELECT * FROM redemptions WHERE id = ?').bind(row.entity_id).first());
+        if (!entity || entity.participant_id !== p.id || (k.stillStore && !k.stillStore.includes(entity.status))) {
+          await setStatus(db, row.id, 'superseded', null);
+          out.superseded++;
+          continue;
+        }
+      }
       if (k.book) {
         entity = await bookingOf(db, row);
         const stale = !entity || entity.b.participant_id !== p.id

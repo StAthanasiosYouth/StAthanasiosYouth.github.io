@@ -74,6 +74,13 @@ const MESSAGES = {
   dup_phone: ['رقم الموبايل ده مسجّل بالفعل في حساب تاني.', 'لو ده رقمك ومش قادر تدخل، كلّم الدعم الفني.'],
   dup_email: ['الإيميل ده عليه حساب بالفعل.', 'سجّل دخول، ولو مش فاكر الباسورد استخدم «نسيت الباسورد» أو كلّم الدعم الفني.'],
   account_required: ['الفعالية دي محتاجة تسجيل دخول.', 'سجّل دخولك وكمّل الحجز.'],
+  // the competitions and the store on the Worker (comp/runtime.js, store/shop.js): each reply brings its own words
+  not_eligible: ['حسابك خارج النطاق العمري للخدمة.', ''],
+  shop_closed: ['المتجر مقفول دلوقتي.', ''],
+  not_allowed: ['ده مش مسموح دلوقتي.', ''],
+  stock: ['الجايزة دي خلصت.', ''],
+  per_person: ['وصلت للحد المسموح من الجايزة دي.', ''],
+  insufficient: ['رصيدك مش كفاية.', ''],
   otp_bad: ['الكود غلط.', ''],
   otp_dead: ['الكود اتقفل، اطلب كود جديد.', ''],
   otp_expired: ['الكود انتهى، اطلب كود جديد.', ''],
@@ -87,7 +94,7 @@ const STATUS = {
   not_found: 404, invalid: 400, proof: 400, not_open: 409, closed: 409, full: 409, limit: 429, final: 409, expired: 401, warn: 409, needs_override: 409, over: 409, recent: 409,
   locked: 409, turnstile: 403, google: 403, protected: 403, age: 400, mode: 409,
   session_replaced: 401, session_expired: 401, off: 409, device: 401, writer: 409, stale: 409, comps: 503,
-  accounts_off: 503, account_required: 401, session: 401, password: 401, blocked: 403, dup_phone: 409, dup_email: 409, otp_bad: 400, otp_dead: 400, otp_expired: 400, otp_wait: 429, otp_limit: 429, mail_down: 503
+  not_eligible: 403, shop_closed: 409, not_allowed: 409, stock: 409, per_person: 409, insufficient: 409, accounts_off: 503, account_required: 401, session: 401, password: 401, blocked: 403, dup_phone: 409, dup_email: 409, otp_bad: 400, otp_dead: 400, otp_expired: 400, otp_wait: 429, otp_limit: 429, mail_down: 503
 };
 
 export class ApiError extends Error {

@@ -49,6 +49,9 @@ import {
 } from './account/admin.js';
 import { adminPointsAdjust, adminPointsTransfer, adminSeasons, adminSeasonSave, adminSeasonPreview, adminSeasonClose } from './points/ledger.js';
 import { adminBookingLink } from './book/account.js';
+import { compStart, compSubmit, compResult, compMe, syncCompLive } from './comp/runtime.js';
+import { adminComps, adminCompSubmissions, adminCompSubmission, adminCompGrade, adminCompVoid, adminCompRegrade } from './comp/admin.js';
+import { shopRedeem, shopCancel, adminStoreItems, adminStoreItemSave, adminStoreItemDelete, adminRedemptions, adminRedemptionStatus, adminStoreSchedule, adminStoreScheduleSave, syncStoreImport } from './store/shop.js';
 import { accountConfig, accountSignin, accountRegisterStart, accountRegisterVerify, accountMe, accountBookingsList, accountBookingsLink, accountPoints, accountSecurity, accountPrefs, accountPrefsSave, accountLogout, accountForgot, accountForgotVerify } from './account/routes.js';
 
 /* GET /v1/admin/publish/status — the last publishes + the shadow gate (docs/PUBLISH-SEPARATION-PLAN.md P2-2) */
@@ -408,6 +411,29 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/admin/points/seasons/:id/close', auth: 'admin', maxBytes: 4 * 1024, handler: adminSeasonClose },
   { method: 'POST', path: '/v1/admin/book/bookings/:id/link', auth: 'admin', maxBytes: 1024, handler: adminBookingLink },
   { method: 'POST', path: '/v1/admin/book/events/:id/notify', auth: 'admin', maxBytes: 8 * 1024, handler: adminNotifyBookers },
+
+  // Phase 5B — competitions and the store: signed-in members (comp/runtime.js, store/shop.js)
+  { method: 'POST', path: '/v1/comp/start', auth: 'public', maxBytes: 4 * 1024, handler: compStart },
+  { method: 'POST', path: '/v1/comp/submit', auth: 'public', maxBytes: 64 * 1024, handler: compSubmit },
+  { method: 'POST', path: '/v1/comp/result', auth: 'public', maxBytes: 1024, handler: compResult },
+  { method: 'POST', path: '/v1/comp/me', auth: 'public', maxBytes: 1024, handler: compMe },
+  { method: 'POST', path: '/v1/shop/redeem', auth: 'public', maxBytes: 1024, handler: shopRedeem },
+  { method: 'POST', path: '/v1/shop/cancel', auth: 'public', maxBytes: 1024, handler: shopCancel },
+  { method: 'POST', path: '/v1/sync/comp-live', auth: 'sync', raw: true, maxBytes: 2 * 1024 * 1024, handler: syncCompLive },
+  { method: 'POST', path: '/v1/sync/store-import', auth: 'sync', raw: true, maxBytes: 512 * 1024, handler: syncStoreImport },
+  { method: 'GET', path: '/v1/admin/comp', auth: 'admin', handler: adminComps },
+  { method: 'GET', path: '/v1/admin/comp/submissions/:id', auth: 'admin', handler: adminCompSubmission },
+  { method: 'POST', path: '/v1/admin/comp/submissions/:id/grade', auth: 'admin', maxBytes: 16 * 1024, handler: adminCompGrade },
+  { method: 'POST', path: '/v1/admin/comp/submissions/:id/void', auth: 'admin', maxBytes: 1024, handler: adminCompVoid },
+  { method: 'GET', path: '/v1/admin/comp/:id/submissions', auth: 'admin', handler: adminCompSubmissions },
+  { method: 'POST', path: '/v1/admin/comp/:id/regrade', auth: 'admin', maxBytes: 1024, handler: adminCompRegrade },
+  { method: 'GET', path: '/v1/admin/store/items', auth: 'admin', handler: adminStoreItems },
+  { method: 'POST', path: '/v1/admin/store/items', auth: 'admin', maxBytes: 16 * 1024, handler: adminStoreItemSave },
+  { method: 'POST', path: '/v1/admin/store/items/:id/delete', auth: 'admin', maxBytes: 1024, handler: adminStoreItemDelete },
+  { method: 'GET', path: '/v1/admin/store/redemptions', auth: 'admin', handler: adminRedemptions },
+  { method: 'POST', path: '/v1/admin/store/redemptions/:id/status', auth: 'admin', maxBytes: 1024, handler: adminRedemptionStatus },
+  { method: 'GET', path: '/v1/admin/store/schedule', auth: 'admin', handler: adminStoreSchedule },
+  { method: 'POST', path: '/v1/admin/store/schedule', auth: 'admin', maxBytes: 1024, handler: adminStoreScheduleSave },
 
   // booking — public (docs/EVENTS.md §6, worker/BOOKING-API.md)
   { method: 'GET', path: '/v1/book/state', auth: 'public', handler: bookState },

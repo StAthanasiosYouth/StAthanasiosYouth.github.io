@@ -27,6 +27,7 @@ import {
 import { zonedNow, stamp } from '../schedule.js';
 import { arabicDigits } from '../words.js';
 import { soundToggle, uiSounds, cue } from '../ui-sound.js';
+import { accountsOn, createWorkerApi, goSignIn, accountSession, dropAccountSession } from './accounts.js';
 
 const ROOT = new URL('../../../', import.meta.url);
 const main = document.getElementById('comp-main');
@@ -35,7 +36,8 @@ const live = document.getElementById('comp-live');
 const view = createView({ main, live, timer: null, net: null, rootUrl: ROOT, mediaUrl: src => new URL(src, ROOT).href });
 const { icon, picture, btn, heading, errorBox, reviewList, codeForm, confirmBox, homeHref } = view.parts;
 
-const api = createApi({ url: COMP_CONFIG.apiUrl });
+let api = createApi({ url: COMP_CONFIG.apiUrl });
+let accountsMode = false;
 
 const session = () => {
   try {
@@ -161,6 +163,11 @@ async function codeSubmit(raw) {
 }
 
 function logout(message = '') {
+  if (accountsMode) {
+    dropAccountSession();
+    goSignIn(ROOT);
+    return;
+  }
   clearToken(session());
   Object.assign(S, { ptoken: '', me: null, review: null, participant: null, error: message, screen: 'code', ordering: null, cancelling: null, alert: '' });
   S.pendingKeys.clear();
@@ -188,7 +195,11 @@ function handled(reply) {
 ========================================================= */
 
 async function loadMe({ quiet = false } = {}) {
-  const ptoken = readToken(session()) || S.ptoken;
+  const ptoken = accountsMode ? (accountSession() ? 'account' : '') : readToken(session()) || S.ptoken;
+  if (!ptoken && accountsMode) {
+    goSignIn(ROOT);
+    return;
+  }
   if (!ptoken) {
     S.screen = 'code';
     render();
@@ -658,9 +669,17 @@ if (window.top !== window.self) {
 soundToggle(document.querySelector('.cbar'));
 uiSounds();
 
-if (readToken(session())) loadMe();
-else {
-  S.screen = 'code';
-  render({ focus: false });
-}
+accountsOn().then(on => {
+  accountsMode = on;
+  if (on) {
+    api = createWorkerApi();
+    loadMe();
+    return;
+  }
+  if (readToken(session())) loadMe();
+  else {
+    S.screen = 'code';
+    render({ focus: false });
+  }
+});
 

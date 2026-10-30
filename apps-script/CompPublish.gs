@@ -135,6 +135,9 @@ function compAfterCommit_(comps, stamp) {
 
   if (!Object.keys(live).length && !comps.withdrawn.length) return;
 
+  var pushRuntime = function () {
+    if (typeof compRuntimePush_ === 'function') compRuntimePush_(Object.keys(live), comps.withdrawn.map(function (w) { return { slug: w.slug }; }));
+  };
   var t = compSheet_('Competitions');
   var changed = false;
 
@@ -156,6 +159,8 @@ function compAfterCommit_(comps, stamp) {
   });
 
   if (changed) compDropDraft_();
+
+  pushRuntime();
 
 }
 

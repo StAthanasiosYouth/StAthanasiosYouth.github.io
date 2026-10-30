@@ -11462,7 +11462,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var area = A.AREAS.filter(function (a) { return a.key === 'comps'; })[0];
     if (!area) return;
     var subs = [{ key: 'comps', label: 'المسابقات' }]
-      .concat(MODULE_SUBS.filter(function (s) { return next[s.module]; }).map(function (s) { return { key: s.key, label: s.label }; }))
+      .concat(C.youthOn ? [] : MODULE_SUBS.filter(function (s) { return next[s.module]; }).map(function (s) { return { key: s.key, label: s.label }; }))
       .concat(C.youthOn ? [{ key: 'youth', label: 'حسابات الشباب' }] : [])
       .concat([{ key: 'compsettings', label: 'الإعدادات' }]);
     area.subs.splice.apply(area.subs, [0, area.subs.length].concat(subs));
@@ -15535,6 +15535,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.fill(tools,
           d.can.add ? el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'youth-add', onclick: addForm }, icon('plus'), 'حساب جديد') : null,
           el('button', { class: 'btn', type: 'button', 'data-act': 'youth-review', onclick: function () { Y.view = 'review'; A.render(); } }, 'حسابات جديدة'),
+          el('button', { class: 'btn', type: 'button', 'data-act': 'youth-results', onclick: function () { Y.view = 'results'; Y.comp = ''; A.render(); } }, 'النتايج'),
+          el('button', { class: 'btn', type: 'button', 'data-act': 'youth-store', onclick: function () { Y.view = 'store'; A.render(); } }, 'المتجر'),
           el('button', { class: 'btn', type: 'button', 'data-act': 'youth-seasons', onclick: function () { Y.view = 'seasons'; A.render(); } }, 'المواسم'),
           d.can.manage ? el('button', { class: 'btn', type: 'button', 'data-act': 'youth-settings', onclick: settingsForm }, icon('gear'), 'الإعدادات') : null,
           d.can.export ? el('button', { class: 'btn btn--ghost', type: 'button', 'data-act': 'youth-export', onclick: exportBook }, 'تصدير Excel') : null);
@@ -15795,11 +15797,176 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return [A.card('المواسم', 'الرصيد بتاع الموسم الحالي بس. القفل بيحفظ الأرصدة ومبيمسحش حاجة.', box, backButton(), rows)];
   }
 
+  /* =======================================================
+     RESULTS (comp/admin.js): submissions on the Worker. Writing a competition,
+     closing it and «اعتماد النتائج» stay in «المسابقات» until Phase 6.
+  ======================================================= */
+
+  var SUB_STATUS = { submitted: 'اتبعتت', pending_review: 'مستني مراجعة', graded: 'اتصححت', void: 'ملغية' };
+
+  function answerText(q) {
+    if (q.answer === null || q.answer === undefined) return '—';
+    var ids = [].concat(q.answer);
+    var named = (q.choices || []).filter(function (c) { return ids.indexOf(c.id) !== -1; }).map(function (c) { return c.text; });
+    if (q.type === 'truefalse') return q.answer === 't' ? 'صح' : 'غلط';
+    return named.length ? named.join('، ') : String(q.answer);
+  }
+
+  function submissionSheet(id) {
+    var box = A.errorBox();
+    var body = el('div', { 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
+    function draw(d) {
+      var s = d.submission;
+      body.setAttribute('aria-busy', 'false');
+      A.fill(body,
+        el('p', {}, el('bdi', { text: s.name }), ' ', s.guest ? A.chip('ضيف', 'off') : null, ' ', A.chip(SUB_STATUS[s.status] || s.status, s.status === 'void' ? 'danger' : 'info')),
+        el('p', { 'data-sub-score': '', text: 'الدرجة: ' + ar(s.score) + ' من ' + ar(s.maxScore) + (s.pending ? ' · مستني ' + ar(s.pending) : '') }),
+        d.questions.map(function (q) {
+          var g = q.grade || {};
+          var marks = q.type === 'info' ? null : el('div', { class: 'actions' },
+            el('button', { class: 'btn btn--small', type: 'button', 'data-grade': q.id + ':true', onclick: function (event) { grade(event.currentTarget, q.id, true); } }, 'صح'),
+            el('button', { class: 'btn btn--small', type: 'button', 'data-grade': q.id + ':false', onclick: function (event) { grade(event.currentTarget, q.id, false); } }, 'غلط'));
+          return el('div', { class: 'comp-sub', 'data-question': q.id },
+            el('p', { dir: 'auto', text: q.text }),
+            el('p', { class: 'note', dir: 'auto', text: 'إجابته: ' + answerText(q) }),
+            el('p', { class: 'note', text: g.ok === null ? 'لسه بتتراجع' : (g.ok ? 'صح' : 'غلط') + ' · ' + ar(g.pts || 0) + ' من ' + ar(q.points || 0) }),
+            marks);
+        }),
+        el('div', { class: 'actions' }, el('button', { class: 'btn btn--small btn--danger', type: 'button', 'data-act': 'sub-void', onclick: function (event) {
+          A.withBusy(event.currentTarget, api('POST', 'comp/submissions/' + encodeURIComponent(id) + '/void', { voided: s.status !== 'void' })).then(draw).catch(function (error) { A.fail(error, box); });
+        } }, s.status === 'void' ? 'رجّع المشاركة' : 'الغي المشاركة')));
+    }
+    function grade(button, qid, value) {
+      var grades = {};
+      grades[qid] = value;
+      A.withBusy(button, api('POST', 'comp/submissions/' + encodeURIComponent(id) + '/grade', { grades: grades })).then(draw).catch(function (error) { A.fail(error, box); });
+    }
+    api('GET', 'comp/submissions/' + encodeURIComponent(id)).then(draw).catch(function (error) { body.setAttribute('aria-busy', 'false'); A.fail(error, box); });
+    A.dirty = false;
+    A.openSheet('مشاركة', [box, body], [el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet().then(function () { A.render(); }); } })]);
+  }
+
+  function resultsView() {
+    var box = A.errorBox();
+    var rows = el('div', { 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
+    if (Y.comp) {
+      api('GET', 'comp/' + encodeURIComponent(Y.comp) + '/submissions').then(function (d) {
+        rows.setAttribute('aria-busy', 'false');
+        A.fill(rows,
+          el('div', { class: 'actions' },
+            el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'comp-regrade', onclick: function (event) {
+              A.withBusy(event.currentTarget, api('POST', 'comp/' + encodeURIComponent(Y.comp) + '/regrade', {})).then(function (r) { A.toast('اتصحح تاني: ' + ar(r.changed) + ' اتغيرت'); A.render(); }).catch(function (error) { A.fail(error, box); });
+            } }, 'صحّح تاني بالإجابات الحالية'),
+            el('button', { class: 'btn btn--small btn--ghost', type: 'button', 'data-act': 'comp-export', onclick: function (event) {
+              var run = C.sheets().then(function (m) {
+                var head = ['الترتيب', 'الاسم', 'الموبايل', 'الدرجة', 'من', 'الحالة', 'ضيف'];
+                var lines = d.submissions.map(function (s) { return [s.rank === null ? '' : s.rank, s.name, s.phone, s.score, s.maxScore, SUB_STATUS[s.status] || s.status, s.guest ? 'ضيف' : '']; });
+                return C.download(m.xlsx.writeXlsx({ sheets: [{ name: 'النتايج', rows: [head].concat(lines), rtl: true, header: true, filter: true, textColumns: [2] }] }), 'نتايج-' + Y.comp + '.xlsx');
+              });
+              A.withBusy(event.currentTarget, run).catch(function (error) { A.fail(error, box); });
+            } }, 'تصدير Excel')),
+          d.submissions.length ? el('div', { class: 'comp-list' }, d.submissions.map(function (s) {
+            return el('button', { class: 'comp-sub', type: 'button', 'data-submission': s.id, onclick: function () { submissionSheet(s.id); } },
+              el('span', { class: 'comp-sub__who' }, s.rank !== null ? el('strong', { text: ar(s.rank) + '. ' }) : null, el('bdi', { class: 'comp-sub__name', text: s.name })),
+              el('span', { class: 'comp-sub__meta' }, s.guest ? A.chip('ضيف', 'off') : null, A.chip(ar(s.score) + ' / ' + ar(s.maxScore), 'info'), s.pending ? A.chip('مستني ' + ar(s.pending), 'gold') : null, s.status === 'void' ? A.chip('ملغية', 'danger') : null));
+          })) : el('p', { class: 'note', text: 'لسه مفيش مشاركات.' }));
+      }).catch(function (error) { rows.setAttribute('aria-busy', 'false'); A.fill(rows); A.fail(error, box); });
+      return [A.card('النتايج', 'الضيوف بعلامة ومن غير ترتيب.', box, el('button', { class: 'btn btn--ghost btn--small', type: 'button', onclick: function () { Y.comp = ''; A.render(); } }, icon('prev'), 'كل المسابقات'), rows)];
+    }
+    api('GET', 'comp').then(function (d) {
+      rows.setAttribute('aria-busy', 'false');
+      A.fill(rows, d.comps.length ? el('div', { class: 'comp-list' }, d.comps.map(function (c) {
+        return el('button', { class: 'comp-sub', type: 'button', 'data-comp': c.id, onclick: function () { Y.comp = c.id; A.render(); } },
+          el('span', { class: 'comp-sub__who' }, el('bdi', { class: 'comp-sub__name', text: c.title })),
+          el('span', { class: 'comp-sub__meta' }, A.chip(ar(c.sent) + ' مشاركة', 'info'), c.pending ? A.chip('مستني ' + ar(c.pending), 'gold') : null, c.finalizedAt ? A.chip('النتايج اتعتمدت', 'ok') : c.closedAt ? A.chip('اتقفلت', 'off') : null));
+      })) : el('p', { class: 'note', text: 'مفيش مسابقات منشورة.' }));
+    }).catch(function (error) { rows.setAttribute('aria-busy', 'false'); A.fill(rows); A.fail(error, box); });
+    return [A.card('النتايج', 'كتابة المسابقات وقفلها واعتماد النتايج لسه من «المسابقات».', box, backButton(), rows)];
+  }
+
+  /* =======================================================
+     THE STORE (store/shop.js)
+  ======================================================= */
+
+  var ORDER_STATUS = { pending: 'مستني', approved: 'جاهزة للاستلام', fulfilled: 'اتسلمت', cancelled: 'اتلغت' };
+  var ORDER_ACT = { approved: 'جاهزة', fulfilled: 'اتسلمت', cancelled: 'الغي ورجّع النقط' };
+
+  function itemForm(item) {
+    var i = item || {};
+    var name = A.textInput(i.name || '', { max: 60 });
+    var description = A.textInput(i.description || '', { multiline: true, rows: 2, max: 500 });
+    var cost = A.textInput(i.cost ? String(i.cost) : '', { ltr: true, max: 8 });
+    var stock = A.textInput(i.stock === null || i.stock === undefined ? '' : String(i.stock), { ltr: true, max: 6, placeholder: 'من غير حد' });
+    var per = A.textInput(i.perPerson === null || i.perPerson === undefined ? '' : String(i.perPerson), { ltr: true, max: 4, placeholder: 'من غير حد' });
+    var category = A.textInput(i.category || '', { max: 30 });
+    var order = A.textInput(String(i.order || 0), { ltr: true, max: 4 });
+    var active = A.checkbox('معروضة في المتجر', i.active !== false);
+    var picture = A.imagePicker ? A.imagePicker(i.image || null, { label: 'الصورة' }) : null;
+    formSheet({
+      title: item ? 'تعديل جايزة' : 'جايزة جديدة', reason: false, path: 'store/items',
+      extra: function () { return { id: i.id || undefined, active: active.input.checked, image: picture && picture.value ? picture.value() : i.image || null }; },
+      fields: [
+        { key: 'name', label: 'الاسم', input: name }, { key: 'description', label: 'الوصف', input: description }, { key: 'cost', label: 'النقاط', input: cost },
+        { key: 'stock', label: 'المتاح', input: stock }, { key: 'perPerson', label: 'الحد لكل شخص', input: per }, { key: 'category', label: 'التصنيف', input: category }, { key: 'order', label: 'الترتيب', input: order },
+        { key: 'x', node: active.node, get: function () { return undefined; } }
+      ].concat(picture ? [{ key: 'y', node: picture.node, get: function () { return undefined; } }] : [])
+    });
+  }
+
+  function storeView() {
+    var box = A.errorBox();
+    var items = el('div', { 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
+    var orders = el('div', { 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
+    var schedule = el('div');
+    function loadOrders() {
+      api('GET', 'store/redemptions').then(function (d) {
+        orders.setAttribute('aria-busy', 'false');
+        A.fill(orders, d.redemptions.length ? el('ul', { class: 'admins' }, d.redemptions.map(function (r) {
+          return el('li', { class: 'admin', 'data-order': r.id },
+            el('div', { class: 'admin__body' },
+              el('p', { class: 'admin__name', dir: 'auto', text: r.itemName + ' · ' + ar(r.cost) + ' نقطة' }),
+              el('p', { class: 'admin__email', dir: 'auto', text: r.person + ' · ' + when(r.requestedAt) }),
+              A.chip(ORDER_STATUS[r.status] || r.status, r.status === 'cancelled' ? 'off' : 'info'), ' ', r.emailChangedRecently ? A.chip('الإيميل اتغير من قريب', 'gold') : null),
+            r.next.map(function (next) {
+              return el('button', { class: 'btn btn--small' + (next === 'cancelled' ? ' btn--danger' : ''), type: 'button', 'data-order-act': next, onclick: function (event) {
+                A.withBusy(event.currentTarget, api('POST', 'store/redemptions/' + encodeURIComponent(r.id) + '/status', { status: next })).then(loadOrders).catch(function (error) { A.fail(error, box); });
+              } }, ORDER_ACT[next]);
+            }));
+        })) : el('p', { class: 'note', text: 'مفيش طلبات.' }));
+      }).catch(function (error) { orders.setAttribute('aria-busy', 'false'); A.fail(error, box); });
+    }
+    api('GET', 'store/items').then(function (d) {
+      items.setAttribute('aria-busy', 'false');
+      A.fill(items,
+        el('div', { class: 'actions' }, el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'item-add', onclick: function () { itemForm(null); } }, icon('plus'), 'جايزة جديدة')),
+        el('ul', { class: 'admins' }, d.items.map(function (i) {
+          return el('li', { class: 'admin', 'data-item': i.id },
+            el('div', { class: 'admin__body' }, el('p', { class: 'admin__name', dir: 'auto', text: i.name + ' · ' + ar(i.cost) + ' نقطة' }),
+              el('p', { class: 'admin__email', text: (i.available === null ? 'من غير حد' : 'متاح ' + ar(i.available)) + ' · اتطلب ' + ar(i.redeemed || 0) }), i.active ? null : A.chip('مقفولة', 'off')),
+            el('button', { class: 'btn btn--small', type: 'button', 'data-item-edit': i.id, onclick: function () { itemForm(i); } }, 'تعديل'));
+        })));
+    }).catch(function (error) { items.setAttribute('aria-busy', 'false'); A.fail(error, box); });
+    api('GET', 'store/schedule').then(function (s) {
+      var mode = select([['auto', 'بالمواعيد'], ['open', 'مفتوح'], ['preview', 'للفرجة بس'], ['closed', 'مقفول']], s.mode, 'حالة المتجر');
+      var opens = el('input', { class: 'input', type: 'datetime-local', value: s.opensAt || '', 'aria-label': 'يفتح' });
+      var closes = el('input', { class: 'input', type: 'datetime-local', value: s.closesAt || '', 'aria-label': 'يقفل' });
+      var cancel = A.checkbox('المشترك يقدر يلغي طلبه', s.allowCancel);
+      A.fill(schedule, el('div', { class: 'row' }, A.field('الحالة', mode), A.field('يفتح', opens), A.field('يقفل', closes)), cancel.node,
+        el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'store-schedule', onclick: function (event) {
+          A.withBusy(event.currentTarget, api('POST', 'store/schedule', { mode: mode.value, opensAt: opens.value, closesAt: closes.value, allowCancel: cancel.input.checked })).then(function () { A.toast('اتحفظ ✓'); }).catch(function (error) { A.fail(error, box); });
+        } }, 'احفظ المواعيد'));
+    }).catch(function (error) { A.fail(error, box); });
+    loadOrders();
+    return [A.card('المتجر', 'الجوايز والطلبات والمواعيد.', box, backButton(), schedule), A.card('الجوايز', '', items), A.card('الطلبات', 'كل طلب محتاج أدمن يوافق عليه. الإلغاء بيرجّع النقط مرة واحدة.', orders)];
+  }
+
   A.views.youth = function () {
     if (!window.AdminWorker) return [A.card('من لوحة التحكم الرسمية بس', 'الحسابات بتتراجع من لوحة التحكم على الموقع.')];
     if (Y.view === 'person' && Y.id) return personView();
     if (Y.view === 'review') return reviewView();
     if (Y.view === 'seasons') return seasonsView();
+    if (Y.view === 'results') return resultsView();
+    if (Y.view === 'store') return storeView();
     return listView();
   };
 
@@ -15814,6 +15981,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       C.youthOn = true;
       var area = A.AREAS.filter(function (a) { return a.key === 'comps'; })[0];
       if (!area || area.subs.some(function (s) { return s.key === 'youth'; })) return;
+      // the old people / points / store screens read Apps Script: with accounts on, this tab holds them
+      for (var i = area.subs.length - 1; i >= 0; i--) if (['people', 'points', 'shop'].indexOf(area.subs[i].key) !== -1) area.subs.splice(i, 1);
       area.subs.splice(Math.max(0, area.subs.length - 1), 0, { key: 'youth', label: 'حسابات الشباب' });
       A.renderNav();
     }).catch(function () { setTimeout(lookForAccounts, 3000); });

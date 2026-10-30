@@ -12,6 +12,8 @@ import { mirrorDue, mirrorPending, mirrorAccess, ACCESS_MINUTE } from './publish
 import { sessionSweepStmts } from './admin/session.js';
 import { accountSweepStmts, pendingSweepStmt } from './account/session.js';
 import { bookingReminders } from './book/account.js';
+import { compReleaseTick } from './comp/runtime.js';
+import { ageOutNotices } from './account/age-out.js';
 
 const DAY = 24 * 3600 * 1000;
 export const RETENTION = {
@@ -82,6 +84,8 @@ export async function scheduled(controller, env) {
   const now = controller.scheduledTime || Date.now();
   if (controller.cron === '* * * * *') {
     await notifyTick(env, now);
+    // Phase 5B: results whose release moment has come (COMPETITIONS §20.2)
+    await compReleaseTick(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'comp.release', err: String(err && err.message).slice(0, 200) }));
     // Phase 2: the shadow comparison every 15 minutes (nothing until a publish was posted)
     if (new Date(now).getUTCMinutes() % SHADOW_EVERY_MIN === 0) {
       await shadowCheck(env, { now }).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'shadow', err: String(err && err.message).slice(0, 200) }));
@@ -96,7 +100,10 @@ export async function scheduled(controller, env) {
       // Phase 5: an unconfirmed registration keeps its private data 30 minutes at most
       await pendingSweepStmt(env.DB, now).run().catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'pending', err: String(err && err.message).slice(0, 200) }));
       // Phase 5: the bookers' deadline reminders, once a day in the Cairo morning (dedupe makes a repeat harmless)
-      if (new Date(now).getUTCHours() === 7) await bookingReminders(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'reminders', err: String(err && err.message).slice(0, 200) }));
+      if (new Date(now).getUTCHours() === 7) {
+        await bookingReminders(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'reminders', err: String(err && err.message).slice(0, 200) }));
+        await ageOutNotices(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'age-out', err: String(err && err.message).slice(0, 200) }));
+      }
     }
     return;
   }

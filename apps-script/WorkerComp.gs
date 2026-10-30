@@ -223,3 +223,68 @@ function workerSyncCall_(arg) {
   return { ok: false, error: 'call' };
 
 }
+
+
+/* =========================================================
+   THE RUNTIME ON THE WORKER (Phase 5B, docs/PHASE5-PLAN.md P5-8)
+   ---------------------------------------------------------
+   The competitions run on the Worker; their definitions are written here until
+   Phase 6. Each live definition (with its key: a signed call, kept private there)
+   goes over when it goes live, closes or is finalized. Never fails the caller: a
+   lost push is sent again by the next change, or by workerRuntimeSeed().
+========================================================= */
+
+function compRuntimeEntry_(row) {
+
+  var def = compDefinitionFor_(row.id, row.liveVersion);
+
+  if (!def) return null;
+
+  return {
+    slug: row.slug,
+    compId: row.id,
+    version: row.liveVersion,
+    def: def,
+    closedAt: row.closedAt ? compWall_(row.closedAt) : '',
+    finalizedAt: row.finalizedAt ? compWall_(row.finalizedAt) : ''
+  };
+
+}
+
+/* the live ones among these ids (none = all); withdrawn: [{ slug }] */
+function compRuntimePush_(ids, withdrawn) {
+
+  try {
+
+    if (!contentWriterWorker_()) return;
+
+    var wanted = ids ? ids.reduce(function (map, id) { map[id] = true; return map; }, Object.create(null)) : null;
+    var comps = compRows_(compSheet_('Competitions')).filter(function (row) {
+      return row.liveVersion && (!wanted || wanted[row.id]);
+    }).map(compRuntimeEntry_).filter(Boolean);
+
+    if (!comps.length && !(withdrawn && withdrawn.length)) return;
+
+    contentWorkerPost_('/v1/sync/comp-live', { comps: comps, withdrawn: withdrawn || [] });
+
+  }
+  catch (error) {
+    console.warn('comp: runtime push failed');
+  }
+
+}
+
+/* once, from the editor, at the move: every live competition and the store's prizes */
+function workerRuntimeSeed() {
+
+  assertAdmin_();
+
+  compRuntimePush_(null, []);
+
+  contentWorkerPost_('/v1/sync/store-import', {
+    items: shopItems_().map(function (i) {
+      return { id: i.id, name: i.name, description: i.description, cost: i.cost, stock: i.stock, perPerson: i.perPerson, category: i.category, order: i.order, active: i.active };
+    })
+  });
+
+}

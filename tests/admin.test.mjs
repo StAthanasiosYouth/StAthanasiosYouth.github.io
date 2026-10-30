@@ -83,7 +83,7 @@ test('no unguarded public function slipped in', () => {
   const publicFns = Object.keys(world.gs).filter(k => typeof world.gs[k] === 'function' && !k.endsWith('_'));
   // enableAutoPush: assertAdmin_; the two trigger handlers run only with their own trigger's uid (CompSchedule.gs, tests/points-v2)
   const unexpected = publicFns.filter(k => !pure.has(k) && !/^api/.test(k) && !['setup', 'checkSheet', 'clearStrayIds', 'checkMedia', 'planMigration', 'migrate', 'enableAutoPush', 'pushScheduleTick', 'pushScheduleDaily', 'enableBookingAlerts', 'bookNewsTick', 'bookingOnlineOn', 'bookingOnlineOff',
-    'contentMigrateDryRun', 'contentMigrateApply', 'contentRestoreDryRun', 'contentRestoreApply', 'mediaCopyDryRun', 'mediaCopyApply'].includes(k));
+    'workerRuntimeSeed', 'contentMigrateDryRun', 'contentMigrateApply', 'contentRestoreDryRun', 'contentRestoreApply', 'mediaCopyDryRun', 'mediaCopyApply'].includes(k));
   assert.deepEqual(unexpected, []);
 });
 

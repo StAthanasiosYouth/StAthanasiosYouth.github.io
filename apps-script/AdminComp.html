@@ -1875,7 +1875,7 @@
     var area = A.AREAS.filter(function (a) { return a.key === 'comps'; })[0];
     if (!area) return;
     var subs = [{ key: 'comps', label: 'المسابقات' }]
-      .concat(MODULE_SUBS.filter(function (s) { return next[s.module]; }).map(function (s) { return { key: s.key, label: s.label }; }))
+      .concat(C.youthOn ? [] : MODULE_SUBS.filter(function (s) { return next[s.module]; }).map(function (s) { return { key: s.key, label: s.label }; }))
       .concat(C.youthOn ? [{ key: 'youth', label: 'حسابات الشباب' }] : [])
       .concat([{ key: 'compsettings', label: 'الإعدادات' }]);
     area.subs.splice.apply(area.subs, [0, area.subs.length].concat(subs));

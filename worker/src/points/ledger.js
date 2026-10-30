@@ -26,12 +26,20 @@ export async function balanceOf(db, participantId, seasonId) {
   return retry(() => db.prepare('SELECT COALESCE(SUM(amount), 0) AS n FROM points_ledger WHERE participant_id = ? AND season_id = ?').bind(participantId, seasonId).first('n'));
 }
 
-/* one ledger row, written only when the balance stays at or above zero (decided inside the write) */
-export function ledgerStmt(db, { id = randomId('led-', 8), participantId, seasonId, amount, kind, note = null, notePublic = false, ref = null, idemKey, actor, now = Date.now() }) {
-  return db.prepare(`INSERT INTO points_ledger (id, participant_id, season_id, amount, kind, note, note_public, ref, idem_key, actor, created_ms)
-    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-    WHERE ? >= 0 OR (SELECT COALESCE(SUM(amount), 0) FROM points_ledger WHERE participant_id = ? AND season_id = ?) + ? >= 0
-    ON CONFLICT(idem_key) DO NOTHING`).bind(id, participantId, seasonId, amount, kind, note, notePublic ? 1 : 0, ref, idemKey, actor, now, amount, participantId, seasonId, amount);
+/* COMPETITIONS §20.2: a row a member may count: not a credit still held back. Alias the ledger as l. */
+export const HELD_SQL = "NOT EXISTS (SELECT 1 FROM submissions s WHERE 'sub:' || s.id = l.ref AND s.released_ms IS NULL)";
+export const visibleBalance = rows => rows.reduce((n, l) => n + l.amount, 0);
+
+/*
+ * One ledger row, written only when the balance stays at or above zero (decided inside the write).
+ * force: a correction may go below zero (points already spent: the balance tells the truth).
+ * guard: an extra condition, for a row that depends on the rest of its batch.
+ */
+export function ledgerStmt(db, { id = randomId('led-', 8), participantId, seasonId, amount, kind, note = null, notePublic = false, ref = null, compId = null, idemKey, actor, now = Date.now(), force = false, guard = '', guardBinds = [] }) {
+  return db.prepare(`INSERT INTO points_ledger (id, participant_id, season_id, amount, kind, note, note_public, ref, comp_id, idem_key, actor, created_ms)
+    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+    WHERE (? >= 0 OR (SELECT COALESCE(SUM(amount), 0) FROM points_ledger WHERE participant_id = ? AND season_id = ?) + ? >= 0)${guard ? ' AND ' + guard : ''}
+    ON CONFLICT(idem_key) DO NOTHING`).bind(id, participantId, seasonId, amount, kind, note, notePublic ? 1 : 0, ref, compId, idemKey, actor, now, force ? 0 : amount, participantId, seasonId, amount, ...guardBinds);
 }
 
 const entryView = (l, admin) => ({
@@ -61,8 +69,9 @@ export async function memberPoints(ctx, account, settings) {
   const db = ctx.env.DB;
   const state = eligibility(account, rulesFrom(settings)).state;
   const p = await pointsOf(db, account.id, state);
-  const rows = (await retry(() => db.prepare('SELECT * FROM points_ledger WHERE participant_id = ? AND season_id = ? ORDER BY created_ms DESC, id DESC LIMIT 100').bind(account.id, p.season ? p.season.id : '').all())).results;
-  return { season: p.season, balance: p.balance, frozen: p.frozen, eligible: state === 'eligible', ledger: rows.map(l => entryView(l, false)), seasons: p.seasons.map(s => ({ name: s.name, earned: s.earned, spent: s.spent, final: s.final })) };
+  const rows = (await retry(() => db.prepare(`SELECT * FROM points_ledger l WHERE l.participant_id = ? AND l.season_id = ? AND ${HELD_SQL} ORDER BY l.created_ms DESC, l.id DESC LIMIT 100`).bind(account.id, p.season ? p.season.id : '').all())).results;
+  const balance = p.season ? await retry(() => db.prepare(`SELECT COALESCE(SUM(l.amount), 0) AS n FROM points_ledger l WHERE l.participant_id = ? AND l.season_id = ? AND ${HELD_SQL}`).bind(account.id, p.season.id).first('n')) : 0;
+  return { season: p.season, balance, frozen: state === 'guest' && balance > 0, eligible: state === 'eligible', ledger: rows.map(l => entryView(l, false)), seasons: p.seasons.map(s => ({ name: s.name, earned: s.earned, spent: s.spent, final: s.final })) };
 }
 
 function adjustInput(body) {
@@ -187,7 +196,7 @@ export async function adminSeasonSave(ctx) {
 
 async function totalsOf(db, seasonId) {
   const rows = (await retry(() => db.prepare(`SELECT participant_id,
-      COALESCE(SUM(CASE WHEN kind = 'earn' THEN amount END), 0) AS earned,
+      COALESCE(SUM(CASE WHEN kind IN ('earn', 'competition', 'correction') THEN amount END), 0) AS earned,
       COALESCE(SUM(CASE WHEN kind IN ('spend', 'refund') THEN amount END), 0) AS spent,
       COALESCE(SUM(CASE WHEN kind IN ('manual', 'transfer') THEN amount END), 0) AS adjusted,
       SUM(amount) AS final
@@ -223,6 +232,9 @@ export async function adminSeasonClose(ctx) {
   const season = SEASON_ID.test(id) ? await retry(() => db.prepare('SELECT * FROM seasons WHERE id = ?').bind(id).first()) : null;
   if (!season) throw new ApiError('not_found', 'season');
   if (season.status !== 'active') throw new ApiError('final', season.status);
+  // §18.6: an open request's refund must still have a season to land in
+  const open = await retry(() => db.prepare("SELECT COUNT(*) AS n FROM redemptions WHERE season_id = ? AND status IN ('pending', 'approved')").bind(id).first('n'));
+  if (open) throw new ApiError('final', 'open requests', { message: 'لازم تخلّص طلبات الجوايز اللي في الموسم ده الأول.', hint: 'سلّمها أو الغيها (النقاط هترجع في نفس الموسم)، وبعدين اقفله.', openRequests: open });
   const { rows, key } = await totalsOf(db, id);
   if (String(body.key || '') !== key) throw new ApiError('stale', 'totals');
   const now = Date.now();

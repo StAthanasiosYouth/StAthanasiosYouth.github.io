@@ -5,7 +5,7 @@
  * to the single test address the owner set (settings MAIL_TEST_TO), and only
  * while NOTIFY_EMAIL is on.
  */
-import { alertEmail, summaryEmail, otpEmail, securityEmail, bookingEmail, SITE } from './templates.js';
+import { alertEmail, summaryEmail, otpEmail, securityEmail, bookingEmail, resultEmail, storeEmail, ageOutEmail, SITE } from './templates.js';
 import { messageOf, typeOf } from './catalog.js';
 import { sendMail } from './gmail.js';
 import { countStmt, hourKey, quotaOf, budget, allowed } from './email.js';
@@ -27,6 +27,9 @@ export const SAMPLES = {
     line('مينا عادل سجّل حجز كاش B-9PX3A', '18:20', 'booking.create'), line('بيشوي سمير سجّل دفعة في حجز B-4TR8N', '14:12', 'payment.add'),
     line('مرقس فادي اعتمد دفعة إنستاباي في حجز B-7QK2M', '20:05', 'payment.add'), line('كيرلس عماد عدّل خبر «اجتماع الشباب»', '17:02', 'update')] }, '2026-10-20')],
   'security': ['important', () => securityEmail({ kind: 'new_signin', cairo: '2026-10-20 21:40', device: 'موبايل أندرويد · كروم', prefs: true })],
+  'result': ['important', () => resultEmail({ kind: 'result', title: 'مسابقة الكتاب المقدس', score: 8, max: 10, points: 80, wallet: true, balance: 180, pending: 1, url: SITE + '/account/#me/results/bible', prefs: true })],
+  'store': ['important', () => storeEmail({ kind: 'approved', item: 'كتاب المقدس', cost: 100, balance: 80, url: SITE + '/account/#me/orders/r-1' })],
+  'age-out': ['important', () => ageOutEmail({ date: '2026-12-01', url: SITE + '/account/#me/points', prefs: true })],
   'security-created': ['important', () => securityEmail({ kind: 'account_created', cairo: '2026-10-20 21:40' })],
   'security-support': ['important', () => securityEmail({ kind: 'password_reset_support', cairo: '2026-10-20 21:40' })],
   'security-recovery': ['important', () => securityEmail({ kind: 'recovery_used', cairo: '2026-10-20 21:40' })]

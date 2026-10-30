@@ -302,6 +302,17 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
   /* signed in: the page a link was going to, once; else the account's first page */
   function enter(account) {
     S.account = account;
+    // came from a page that asked for a sign-in: straight back to it
+    let back = '';
+    try {
+      back = cleanReturn(tab ? tab.getItem(RETURN_KEY) : '');
+      if (back) tab.removeItem(RETURN_KEY);
+    }
+    catch { back = ''; }
+    if (back) {
+      location.replace(back);
+      return;
+    }
     const dest = takeDest(tab) || (cleanRoute(location.hash) === '#me' ? '' : cleanRoute(location.hash));
     history.replaceState(null, '', location.pathname + location.search + dest);
     openRoute();
@@ -314,6 +325,8 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
     else if (route === '#me/notifications') viewPrefs();
     else if (route === '#me/points') viewPoints();
     else if (route.startsWith('#me/bookings')) viewBookings(route.split('/')[2] || '');
+    else if (route.startsWith('#me/results')) viewResults(route.split('/')[2] || '');
+    else if (route.startsWith('#me/orders')) viewOrders(route.split('/')[2] || '');
     else viewHome();
   }
 
@@ -674,10 +687,11 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
         fact('الموبايل', A.phone, true),
         fact('تاريخ الميلاد', dateText(A.birthDate))),
       support('بياناتك محتاجة تتصلح؟'),
-      returnLink(),
       h('nav', { class: 'acct__nav', 'aria-label': 'حسابي' },
         h('a', { class: 'btn', href: '#me/bookings', 'data-nav': 'bookings' }, 'حجوزاتي'),
         h('a', { class: 'btn', href: '#me/points', 'data-nav': 'points' }, 'نقاطي'),
+        h('a', { class: 'btn', href: '#me/results', 'data-nav': 'results' }, 'نتايجي'),
+        h('a', { class: 'btn', href: '#me/orders', 'data-nav': 'orders' }, 'طلباتي'),
         h('a', { class: 'btn', href: '#me/notifications', 'data-nav': 'notifications' }, 'إشعاراتي'),
         h('a', { class: 'btn', href: '#me/security', 'data-nav': 'security' }, 'أمان الحساب')),
       h('div', { class: 'actions' },
@@ -686,14 +700,53 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
     ));
   }
 
-  /* came from a booking page that asked for a sign-in: back to it */
-  function returnLink() {
-    let path = '';
-    try {
-      path = cleanReturn(tab ? tab.getItem(RETURN_KEY) : '');
+  const HISTORY_WORDS = { submitted: 'اتبعتت', pending_review: 'مستني مراجعة', graded: 'اتصححت' };
+  const ORDER_WORDS = { pending: 'مستني', approved: 'جاهزة للاستلام', fulfilled: 'اتسلمت', cancelled: 'اتلغت' };
+
+  async function viewMine(titleText, draw) {
+    main.dataset.state = 'loading';
+    const reply = await authed('POST', '/v1/comp/me', {});
+    if (reply.code === 'session') {
+      sessionOver();
+      return;
     }
-    catch { path = ''; }
-    return path ? h('a', { class: 'btn btn--primary', href: path, 'data-return': '', onclick: () => { try { tab.removeItem(RETURN_KEY); } catch { /* nothing kept */ } } }, 'ارجع وكمّل الحجز') : null;
+    if (!reply.ok) {
+      show(card(title(titleText), h('p', { class: 'field__error', role: 'alert' }, reply.message || 'حصلت مشكلة. جرّب تاني.'), backToAccount()));
+      return;
+    }
+    show(card(title(titleText), ...draw(reply), backToAccount()));
+  }
+
+  /* #me/results[/slug]: what the policy lets the member see now; a number only when it may show */
+  function viewResults(slug) {
+    return viewMine('نتايجي', me => {
+      const list = slug ? me.history.filter(x => x.slug === slug) : me.history;
+      return [
+        slug && !list.length ? h('p', { class: 'acct__notice' }, 'مش لاقيين ده.') : null,
+        !slug && !list.length ? h('p', { class: 'acct__lead' }, 'لسه ما شاركتش في مسابقات.') : null,
+        h('ul', { class: 'acct__sessions', 'data-results': '' }, ...list.map(x => h('li', {},
+          h('strong', {}, x.title),
+          h('p', { class: 'field__hint' }, HISTORY_WORDS[x.status] || ''),
+          x.score !== null ? h('p', {}, 'الدرجة ' + arDigits(x.score) + ' من ' + arDigits(x.maxScore)) : h('p', { class: 'field__hint' }, 'النتيجة هتظهر قريب.'),
+          x.pointsAwarded ? h('p', {}, arDigits(x.pointsAwarded) + ' نقطة') : null))),
+        h('a', { class: 'btn', href: new URL('../points/', location.href).href }, 'نقاطي والمتجر')
+      ];
+    });
+  }
+
+  /* #me/orders[/id] */
+  function viewOrders(id) {
+    return viewMine('طلباتي', me => {
+      const list = id ? me.redemptions.filter(x => x.id === id) : me.redemptions;
+      return [
+        id && !list.length ? h('p', { class: 'acct__notice' }, 'مش لاقيين ده.') : null,
+        !id && !list.length ? h('p', { class: 'acct__lead' }, 'لسه ما طلبتش حاجة من المتجر.') : null,
+        h('ul', { class: 'acct__sessions', 'data-orders': '' }, ...list.map(x => h('li', {},
+          h('strong', {}, x.itemName), ' · ' + arDigits(x.cost) + ' نقطة',
+          h('p', { class: 'field__hint' }, ORDER_WORDS[x.status] || '')))),
+        h('a', { class: 'btn', href: new URL('../points/', location.href).href }, 'نقاطي والمتجر')
+      ];
+    });
   }
 
   const money = n => arDigits(Number(n) || 0) + ' جنيه';

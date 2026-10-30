@@ -43,7 +43,7 @@ const DUMMY_PASSWORD = 'not-a-real-password';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function readSettings(db) {
+export async function readSettings(db) {
   const { results } = await retry(() => db.prepare(`SELECT key, value FROM settings WHERE key IN (${SETTINGS.map(() => '?').join(',')})`).bind(...SETTINGS).all());
   return Object.fromEntries(results.map(r => [r.key, r.value]));
 }
@@ -59,7 +59,7 @@ const supportOf = settings => {
 };
 
 /* every route but config: off, or missing a key → «تسجيل الدخول متوقف مؤقتًا» */
-async function gate(ctx) {
+export async function gate(ctx) {
   const settings = await readSettings(ctx.env.DB);
   if (settings.accounts_mode !== 'on' || !configured(ctx.env)) throw new ApiError('accounts_off');
   return settings;
