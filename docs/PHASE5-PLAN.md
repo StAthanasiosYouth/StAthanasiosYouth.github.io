@@ -262,6 +262,27 @@ Staging: migrations up to `0022`, Worker `1cedc03a`; `accounts_mode = on`, `OTP_
 
 **Not verified, and stays so until the owner acts (§3h):** a real email in a real inbox; real Turnstile; the device matrix on real phones; the real Apps Script deploy (only the test's fake so far). **Not ported:** group grading stays on Apps Script. **Risk to watch:** `comp/submit` CPU slightly above 10 ms (§3g).
 
+## 3j. Runbook step 1: production release record (2026-10-30)
+
+Owner approved step 1. Dormant: `accounts_mode = off`, `OTP_EMAIL = 0`, `MEMBER_EMAIL = 0`.
+
+| Item | Value |
+| --- | --- |
+| `main` | `211b5d4` → `50236b8` (cherry-picks of the batches, plus the test fix below) |
+| Worker | `4408fb3a` → `bcfaad19` (CI). Rollback target: `4408fb3a` |
+| Migrations | `0018`–`0022` applied |
+| Secrets | `PW_PEPPER`, `PW_KEY`, `OTP_PEPPER` set |
+| D1 bookmark before the migrations | `00000179-00000648-00005114-5f40b6c11b31b1743aa5ad8cbc6af181` |
+| Apps Script | Not deployed (step 2) |
+
+**Checked:** baseline equal before and after: bookings 9, payments 4, proofs 11, pay_dest 1, event_cfg 2, admins 3, grants 135, 100 draft rows in 16 kinds, 28 revisions, 65 media files, and the hashes of these and of the live files. `/v1/account/config` says `off`; `/v1/comp/me` and `/v1/account/signin` answer `accounts_off`; smoke passes. In a browser: the home page, `/account/` («تسجيل الدخول متوقف مؤقتًا»), `competition/`, `points/` (the old code login, as before) and the `/admin/` sign-in page load, with no site errors.
+
+**One live value changed, as batch 2 planned:** `MAIL_RESERVE_OTP` 50 → 100, `MAIL_ADMIN_BUDGET` 150 → 120. To restore the old values, see §4.
+
+**Found during the release:** `worker/test/publish.test.mjs` read `events/test/event.json` from the repository. The mirror withdrew that event on `main` on 2026-10-28, so the test failed there and would have stopped the CI deploy. CI hadn't seen it because mirror commits don't touch `worker/`. The test now has its own fixture.
+
+**Not checked:** the signed-in panel, a real save, review and publish on production, because they need the owner's Google account.
+
 ## 4. Rollback (batches 1–5)
 
 - Batch 4 extra: `accounts_mode = off` returns `competition/` and `points/` to Apps Script at once and refuses every `/v1/comp/*`, `/v1/shop/*` route. Worker rows stay. After launch that fallback serves only the old code login, so it is a stop, not a way back.

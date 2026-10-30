@@ -137,7 +137,7 @@ Closed: `CONTENT_WRITER = worker` (Apps Script) and `CONTENT_DRAFTS = 1` (D1) li
 save, 3-step publish, media upload, booking page), baseline unchanged. Record and rollback: `docs/CONTENT-MIGRATION-PLAN.md`
 §13, §16–16.3. Open: measure the panel open (< 1 s target) on the owner's account from Egypt. Next per the roadmap: Phase 5.
 
-**Phase 5 started 2026-10-30** (`docs/PHASE5-PLAN.md`: five batches, each needs the owner's choice to start and separate approval for production). Batches 1–4 (P5-1…P5-8: accounts, sign-in, profile, member email, participants in the admin, booking age sync, points, store, competitions runtime) are verified on staging; not on `main`, not in production. Batch 5: P5-9 full tests done on staging (`docs/PHASE5-PLAN.md` §3g, §3i); P5-10 is the runbook in §3h, and every step of it needs the owner's explicit approval. Nothing of it has run yet.
+**Phase 5 started 2026-10-30** (`docs/PHASE5-PLAN.md`: five batches, each needs the owner's choice to start and separate approval for production). Batches 1–4 (P5-1…P5-8: accounts, sign-in, profile, member email, participants in the admin, booking age sync, points, store, competitions runtime) are verified on staging; not on `main`, not in production. Batch 5: P5-9 full tests done on staging (`docs/PHASE5-PLAN.md` §3g, §3i); P5-10 is the runbook in §3h, and every step of it needs the owner's explicit approval. Step 1 done 2026-10-30: `main` `50236b8`, Worker `bcfaad19` (rollback `4408fb3a`), migrations to `0022`, secrets set, accounts off (§3j). Next: step 2, Apps Script deploy, on approval.
 
 Original brief (kept for the record):
 
