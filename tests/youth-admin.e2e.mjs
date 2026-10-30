@@ -52,7 +52,7 @@ const fake = {
       points: { season: { id: 'sea-first', name: 'الموسم الأول' }, balance: p.balance, frozen: p.eligibility.state === 'guest' && p.balance > 0, ledger: [{ id: 'l1', amount: p.balance, kind: 'manual', at: Date.now(), note: 'حفظ', notePublic: true, actor: ADMIN, ref: null }], seasons: [] },
       sessions: [{ device: 'Android Chrome', kind: 'device', lastSeen: Date.now() }], audit: [{ at: Date.now(), actor: ADMIN, action: 'register.admin', field: null, oldValue: null, newValue: null, reason: null, check: 'in_person_readback' }],
       bookings: [{ id: 'bkg-1', ref: 'B-AAAA1', status: 'confirmed', event: 'رحلة', age: 26, ageSource: 'account', mismatch: true }], mail: [{ id: 'mo-1', kind: 'book.confirmed', tier: 1, status: 'sent', at: Date.now(), sentAt: Date.now() }],
-      can: { edit: true, manage: true, viewPassword: true, points: true, transfer: true }
+      can: { edit: true, manage: true, viewPassword: fake.primary !== false, points: true, transfer: true }
     };
   }
 };
@@ -231,15 +231,28 @@ test('the sheet: viewing and resetting are separate; a reset needs its reason on
   assert.match(body, /تاريخ الميلاد مختلف عن الحجز/);
   assert.match(body, /اتعمل من الأدمن/);
 
-  await click(page, '[data-act="youth-view-password"]');
-  await page.waitForSelector('[data-youth-password]');
-  assert.equal(await textOf(page, '[data-youth-password]'), 'CURR-ENTP-ASS2');
-  assert.match(await sheetText(page), /مفيش حاجة اتغيرت/);
-  await page.evaluate(() => [...document.querySelectorAll('#sheet .btn')].find(b => b.textContent.trim() === 'قفل').click());
-  assert.ok(fake.calls.some(c => c.path.endsWith('/view-password')));
+  // the Primary Admin sees it among the facts, with no click; one logged call per view; no reset
+  await page.waitForSelector('[data-youth-current-value]', { timeout: 5000 });
+  assert.equal(await textOf(page, '[data-youth-current-value]'), 'CURR-ENTP-ASS2');
+  const views = () => fake.calls.filter(c => c.path.endsWith('/view-password')).length;
+  assert.equal(views(), 1);
   assert.ok(!fake.calls.some(c => c.path.endsWith('/reset-password')), 'viewing never resets');
+  assert.ok(!await page.$('[data-act="youth-view-password"]'), 'no extra button');
+  assert.match(await textOf(page, '[data-act="youth-reset"]'), /توليد باسورد جديد/);
+  assert.equal(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }).includes('CURR-ENTP-ASS2')), false, 'never kept in the browser');
 
-  await page.waitForFunction(() => !document.querySelector('#sheet').open, { timeout: 5000 });
+  // it leaves the page by itself; showing it again is another logged view
+  await page.evaluate(() => { const set = window.setTimeout; window.setTimeout = (f, ms, ...rest) => set(f, ms === 300000 ? 30 : ms, ...rest); });
+  await page.evaluate(() => A.render());
+  await page.waitForSelector('[data-act="youth-password-again"]', { timeout: 5000 });
+  assert.ok(!(await textOf(page, '#view')).includes('CURR-ENTP-ASS2'));
+  const before = views();
+  await click(page, '[data-act="youth-password-again"]');
+  await page.waitForSelector('[data-youth-current-value]', { timeout: 5000 });
+  assert.equal(views(), before + 1);
+  await page.evaluate(() => A.render());
+  await page.waitForSelector('[data-youth-facts]', { timeout: 8000 });
+
   await click(page, '[data-act="youth-reset"]');
   await page.waitForSelector('#sheet[open] [data-act="youth-save"]');
   await page.type('#sheet .form textarea', 'نسي الباسورد');
@@ -356,5 +369,24 @@ test('accounts on: the old people / points / store tabs give way to «حسابا
   assert.ok(keys.includes('youth'));
   for (const old of ['people', 'points', 'shop']) assert.ok(!keys.includes(old), old);
   assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('not the Primary Admin: no password row, no call for it, and the separate reset stays', async () => {
+  fake.reset();
+  fake.people.unshift(person({ balance: 70 }));
+  fake.primary = false;
+  fake.calls.length = 0;
+  const { context, page, problems } = await open();
+  await goYouth(page);
+  await page.waitForSelector('[data-youth="p-aaaaaaaa"]', { timeout: 8000 });
+  await click(page, '[data-youth="p-aaaaaaaa"]');
+  await page.waitForSelector('[data-youth-facts]', { timeout: 8000 });
+  assert.ok(!await page.$('[data-youth-current]'));
+  assert.ok(!(await textOf(page, '#view')).includes('الباسورد الحالي'));
+  assert.ok(!fake.calls.some(c => c.path.endsWith('/view-password')), 'never asked for');
+  assert.ok(await page.$('[data-act="youth-reset"]'));
+  assert.deepEqual(problems, []);
+  fake.primary = true;
   await context.close();
 });

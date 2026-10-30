@@ -100,6 +100,36 @@
     A.openSheet(title, [el('p', { class: 'note', text: note }), text], [copy, close]);
   }
 
+  /*
+   * The current password in the person's facts, Primary Admin only (the server refuses anyone else). It isn't part
+   * of the sheet's reply: this separate call is what the server logs, once per view. It leaves the page by itself.
+   */
+  var YOUTH_PASSWORD_MS = 5 * 60000;
+
+  function currentPassword(path) {
+    var holder = el('span', { class: 'youth-current', 'data-youth-current': '' });
+    function again(message) {
+      A.fill(holder, [
+        message ? el('span', { text: message }) : null,
+        el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-password-again', onclick: load }, 'إظهار تاني')
+      ]);
+    }
+    function load() {
+      A.fill(holder, el('span', { class: 'note', text: 'بنجيبه…' }));
+      api('POST', path + 'view-password', {}).then(function (reply) {
+        var copy = el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-password-copy', text: 'نسخ' });
+        copy.addEventListener('click', function () {
+          if (!navigator.clipboard) return;
+          navigator.clipboard.writeText(reply.password).then(function () { A.toast('اتنسخ ✓'); }).catch(function () { A.toast('مقدرناش ننسخ', 'error'); });
+        });
+        A.fill(holder, [el('span', { class: 'ltr', 'data-youth-current-value': '', text: reply.password }), ' ', copy]);
+        setTimeout(function () { again(''); }, YOUTH_PASSWORD_MS);
+      }).catch(function () { again('مقدرناش نعرضه.'); });
+    }
+    load();
+    return holder;
+  }
+
   /* =======================================================
      THE LIST
   ======================================================= */
@@ -292,7 +322,7 @@
           fields: [{ key: 'checkMethod', label: 'لو ده طلب من الدعم الفني: اتأكدت من الشخص إزاي؟', input: check }],
           done: function (reply) { showPassword('الباسورد الجديد', reply.password, 'بيظهر للي عمله دلوقتي. سلّمه للشخص على واتساب خاص أو قدامك.'); }
         });
-      } }, 'باسورد جديد'),
+      } }, 'توليد باسورد جديد'),
       el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-revoke', onclick: function (event) {
         A.withBusy(event.currentTarget, api('POST', path + 'sessions/revoke', {})).then(function () { A.toast('خرج من كل الأجهزة ✓'); A.render(); }).catch(function (error) { A.fail(error); });
       } }, 'اخرج من كل الأجهزة')
@@ -302,12 +332,6 @@
     var blockBtn = (blocked ? can.manage : can.edit) ? el('button', { class: 'btn btn--small btn--danger', type: 'button', 'data-act': blocked ? 'youth-unblock' : 'youth-block', onclick: function () {
       formSheet({ title: blocked ? 'رجوع الحساب' : 'إيقاف الحساب', kind: blocked ? 'primary' : 'danger', label: blocked ? 'رجّعه' : 'وقّفه', path: path + (blocked ? 'unblock' : 'block'), fields: [] });
     } }, blocked ? 'رجّع الحساب' : 'وقّف الحساب') : null;
-
-    var view = can.viewPassword ? el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-view-password', onclick: function (event) {
-      A.withBusy(event.currentTarget, api('POST', path + 'view-password', {})).then(function (reply) {
-        showPassword('الباسورد الحالي', reply.password, 'مفيش حاجة اتغيرت، والعرض ده اتسجل.');
-      }).catch(function (error) { A.fail(error); });
-    } }, 'شوف الباسورد') : null;
 
     var points = d.points;
     var adjust = can.points ? el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-points', onclick: function () {
@@ -335,10 +359,11 @@
       el('dl', { class: 'comp-facts', 'data-youth-facts': '' },
         fact('رقم الحساب', p.id), fact('الإيميل', el('span', { class: 'ltr', text: p.email })),
         fact('تأكيد الإيميل', !p.emailVerified ? 'مش متأكد' : p.emailVia === 'admin' ? 'متأكد من الأدمن' : 'متأكد بالكود'),
+        can.viewPassword ? fact('الباسورد الحالي (ليك إنت بس، وكل عرض بيتسجل)', currentPassword(path)) : null,
         fact('الموبايل', el('span', { class: 'ltr', text: p.phone })), fact('تاريخ الميلاد', p.birthDate + (p.age != null ? ' (' + ar(p.age) + ' سنة)' : '')),
         fact('المجموعة', p.group), fact('الكنيسة', p.church), fact('الخادم المسؤول', p.servant), fact('ملاحظات', p.notes),
         fact('سبب الإيقاف', p.blockedReason), fact('اتعمل', (p.createdVia === 'self' ? 'بنفسه' : 'من الأدمن') + ' · ' + when(p.createdAt))),
-      el('div', { class: 'actions' }, edit, view, manage, blockBtn),
+      el('div', { class: 'actions' }, edit, manage, blockBtn),
       el('h3', { class: 'section-label', text: 'النقاط' + (points.season ? ' · ' + points.season.name : '') }),
       el('p', { 'data-youth-balance': '' }, ar(points.balance) + ' نقطة', points.frozen ? ' ' : null, points.frozen ? A.chip('متجمد', 'off') : null),
       el('div', { class: 'actions' }, adjust, transfer),

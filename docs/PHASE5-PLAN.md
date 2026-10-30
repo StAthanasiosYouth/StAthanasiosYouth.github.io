@@ -333,6 +333,8 @@ Owner approved step 2 and ran `workerRuntimeSeed()` from the editor.
 
 **Password viewing, reviewed, nothing changed:** every password today is generated (register, forgot, admin reset), and no route lets a member choose one. The Primary Admin's view reads `pw_enc`, is logged, closes after 60 seconds, has no rate limit, and doesn't tell the member. If members may choose passwords later, they may reuse them on other services, so that choice needs its own decision first.
 
+**Current password in the person's facts (owner's request, 2026-10-31):** for the Primary Admin only, the sheet shows it with no click, through the existing `view-password` call. The sheet's own reply never carries it; the server refuses anyone else; each view writes `participant_audit` and `activity`. It leaves the page after 5 minutes, and «إظهار تاني» is another logged view. «توليد باسورد جديد» stays separate. Storage is unchanged. Only `menazakmena@gmail.com` is Primary, so «حساب الأسرة» doesn't see it.
+
 **Remaining before step 5:** a real member email; the support name edited in the admin; one booking; one test competition; the device matrix. A prize request waits for the store to open.
 
 ## 4. Rollback (batches 1–5)

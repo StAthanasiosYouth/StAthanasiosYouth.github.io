@@ -122,6 +122,14 @@ test('view password: Primary only, unlimited, changes nothing, every view logged
   assert.equal((await w.h.db.prepare("SELECT COUNT(*) AS n FROM participant_audit WHERE action = 'password.view'").first()).n, 12);
   const act = await w.h.db.prepare("SELECT * FROM activity WHERE action = 'password.view' LIMIT 1").first();
   assert.ok(!JSON.stringify(act).includes(a.password));
+  // the sheet never carries it, not even to the Primary: only the logged call does
+  const stored = await w.h.db.prepare('SELECT pw_hash, pw_enc FROM participants WHERE id = ?').bind(a.id).first();
+  for (const who of [undefined, A]) {
+    const whole = JSON.stringify((await w.call(who || P, 'GET', '/v1/admin/participants/' + a.id)).body);
+    for (const secret of [a.password, stored.pw_hash, stored.pw_enc]) assert.ok(!whole.includes(secret));
+  }
+  assert.equal((await sheet(w, a.id)).body.can.viewPassword, true);
+  assert.equal((await w.call(A, 'GET', '/v1/admin/participants/' + a.id)).body.can.viewPassword, false);
 });
 
 test('reset: a new password, sessions gone, a notice and never the password; support needs a check method', async () => {
