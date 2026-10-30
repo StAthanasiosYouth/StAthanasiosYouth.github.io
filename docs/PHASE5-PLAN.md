@@ -303,6 +303,24 @@ Owner approved step 2 and ran `workerRuntimeSeed()` from the editor.
 
 **Also seen, not from this release:** `api_log` has one 500 on `/v1/sync/content-notify` on 2026-10-29 07:13 UTC, on Worker `4408fb3a`. Not investigated. The two 503 `accounts_off` on 2026-10-30 are my own checks.
 
+## 3l. Runbook steps 3–4 record (2026-10-30)
+
+**Step 3, as the owner reported:** 2-Step Verification on, OAuth consent screen In production, test address named. The owner takes the Gmail recovery details and the backup key on themselves. The test data cleanup is deferred to Phase 7c. Privacy text live on `main` `8d97849`.
+
+**Step 4, owner approved:** `accounts_mode = on`, `OTP_EMAIL = 1`. `MEMBER_EMAIL` stays `0` until the codes arrive. `SHOP_MODE = closed`, and `COMP_RUNTIME` isn't set (step 5).
+
+| Item | Value |
+| --- | --- |
+| D1 bookmark before the switch | `0000017b-000001bc-00005114-dc8b324b4a5c76de0ab75ba145673bc3` |
+| Worker | `bcfaad19`, unchanged |
+| Back | `accounts_mode = off` |
+
+**Checked:** `/v1/account/config` says `on`, `/v1/comp/me` answers `session`, smoke passes. In a browser: `/account/` shows the sign-in form with the Turnstile script loaded, `points/` goes to `/account/`, and the home page and «المسرح الأسود» load, with no site errors.
+
+**Not checked, left to the owner's tests:** a real code email, Turnstile passing with a real token, registration and sign-in, one booking, the device matrix. No form was submitted. With no competition live, playing one needs a new published test competition. With the store closed, a prize request needs the store opened.
+
+**Not limited to owners:** the runbook says "for owners only", but nothing enforces it. Any visitor who reaches `/account/` or `points/` can register during this test.
+
 ## 4. Rollback (batches 1–5)
 
 - Batch 4 extra: `accounts_mode = off` returns `competition/` and `points/` to Apps Script at once and refuses every `/v1/comp/*`, `/v1/shop/*` route. Worker rows stay. After launch that fallback serves only the old code login, so it is a stop, not a way back.
