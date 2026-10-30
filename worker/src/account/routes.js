@@ -14,7 +14,7 @@ import { randomId, base32Id, pseudonym } from '../lib/hash.js';
 import { activityStmt } from '../lib/activity.js';
 import { hit, limit, clientIp } from '../lib/ratelimit.js';
 import { checkTurnstile, turnstileSiteKey } from '../book/turnstile.js';
-import { SUPPORT_PHONE, SUPPORT_WHATSAPP, SUPPORT_EMAIL } from '../notify/templates.js';
+import { SUPPORT_NAME, SUPPORT_PHONE, SUPPORT_WHATSAPP, SUPPORT_EMAIL } from '../notify/templates.js';
 import {
   cleanEmail, validEmail, disposableEmail, canonEmail, phoneParts, checkName, normName, firstName, checkBirthDate, rulesFrom, eligibility
 } from './model.js';
@@ -117,7 +117,7 @@ export async function accountConfig(ctx) {
   return {
     mode: settings.accounts_mode === 'on' && configured(ctx.env) ? 'on' : 'off',
     turnstile: turnstileSiteKey(ctx.env),
-    support: { whatsapp: SUPPORT_WHATSAPP, phone: SUPPORT_PHONE, email: SUPPORT_EMAIL, ...(supportOf(settings) || {}) }
+    support: { name: SUPPORT_NAME, whatsapp: SUPPORT_WHATSAPP, phone: SUPPORT_PHONE, email: SUPPORT_EMAIL, ...(supportOf(settings) || {}) }
   };
 }
 

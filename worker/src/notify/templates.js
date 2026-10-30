@@ -31,6 +31,7 @@ export const BRAND = 'أسرة البابا أثناسيوس الرسولي لش
 export const SERVICE = 'كنيسة أبي سيفين – سفاجا';
 // technical support: the owner's own contacts (the service inbox is not read for support)
 export const SUPPORT = 'الدعم الفني: مينا زكريا – 01276162016';
+export const SUPPORT_NAME = SUPPORT.split(':')[1].split('–')[0].trim();
 export const SUPPORT_PHONE = '01276162016';
 export const SUPPORT_WHATSAPP = 'https://wa.me/201276162016';
 export const SUPPORT_EMAIL = 'menazakmena@gmail.com';
@@ -186,7 +187,7 @@ function footer({ social, mini, why, prefs, support }) {
 
 /* the configured Technical Support contact (settings support_contact, YOUTH-ACCOUNTS-PLAN §11), else the default */
 function supportOf(s) {
-  return s && s.name && s.phone && s.whatsapp ? s : { name: SUPPORT.split(':')[1].split('–')[0].trim(), phone: SUPPORT_PHONE, whatsapp: SUPPORT_WHATSAPP };
+  return s && s.name && s.phone && s.whatsapp ? s : { name: SUPPORT_NAME, phone: SUPPORT_PHONE, whatsapp: SUPPORT_WHATSAPP };
 }
 
 /* the plain-text twin: the same content, in reading order */

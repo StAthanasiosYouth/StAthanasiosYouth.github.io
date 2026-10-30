@@ -5,6 +5,7 @@
  * row without personal data; replies carry a password only to the admin who just issued or viewed it.
  */
 
+import { SUPPORT_NAME, SUPPORT_PHONE } from '../notify/templates.js';
 import { ApiError } from '../lib/http.js';
 import { retry } from '../lib/db.js';
 import { randomId, base32Id } from '../lib/hash.js';
@@ -449,7 +450,7 @@ export async function adminParticipantSettings(ctx) {
   const s = await settingsOf(ctx.env.DB);
   let support = null;
   try { support = s.support_contact ? JSON.parse(s.support_contact) : null; } catch { support = null; }
-  return { ageMin: Number(s.age_min), ageMax: Number(s.age_max), warnDays: Number(s.age_warn_days), support };
+  return { ageMin: Number(s.age_min), ageMax: Number(s.age_max), warnDays: Number(s.age_warn_days), support, supportDefault: { name: SUPPORT_NAME, phone: SUPPORT_PHONE } };
 }
 
 export async function adminParticipantSettingsSave(ctx) {

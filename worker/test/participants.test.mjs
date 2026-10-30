@@ -280,6 +280,9 @@ test('settings: the Admin range drives eligibility; the support contact reaches 
   const a = await created(w, { birthDate: '1995-01-01' });
   const before = await sheet(w, a.id);
   assert.equal(before.body.person.eligibility.state, 'guest');
+  assert.equal((await w.h.call('/v1/account/config')).body.support.name, 'مينا زكريا', 'the default has a name too');
+  assert.equal((await w.call(P, 'GET', '/v1/admin/participants/settings')).body.supportDefault.name, 'مينا زكريا');
+  assert.equal((await w.call(P, 'POST', '/v1/admin/participants/settings', { support: { name: 'ج', phone: '01011112222' } })).status, 400, 'a name of one letter');
   assert.equal((await w.call(P, 'POST', '/v1/admin/participants/settings', { ageMin: 40, ageMax: 20 })).status, 400);
   const saved = await w.call(P, 'POST', '/v1/admin/participants/settings', { ageMin: 18, ageMax: 32, support: { id: 'c1', name: 'جرجس', phone: '01011112222' } });
   assert.equal(saved.status, 200);

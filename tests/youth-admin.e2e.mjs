@@ -70,7 +70,7 @@ async function handle(request) {
   fake.calls.push({ method, path, body });
   if (path === '/v1/account/config') return json(200, { ok: true, mode: fake.mode, turnstile: null, support: {} });
   if (path === '/v1/admin/book/module') return json(200, { ok: true, on: false, env: 'production' });
-  if (path === '/v1/admin/participants/settings') return json(200, { ok: true, ageMin: 18, ageMax: 30, warnDays: 60, support: null });
+  if (path === '/v1/admin/participants/settings') return json(200, { ok: true, ageMin: 18, ageMax: 30, warnDays: 60, support: null, supportDefault: { name: 'مينا زكريا', phone: '01276162016' } });
   if (path === '/v1/admin/participants/review') return json(200, { ok: true, people: [{ ...fake.people[0], flags: ['same_name_dob'] }] });
   if (path === '/v1/admin/participants/export') return json(200, { ok: true, rows: fake.people.map(p => ({ id: p.id, name: p.name, email: p.email, emailVerified: true, phone: p.phone, birthDate: p.birthDate, age: p.age, eligibility: p.eligibility.state, eligibilitySource: 'auto', frozen: 0, status: p.status, group: '', church: '', servant: '', notes: '' })) });
   if (path === '/v1/admin/participants' && method === 'GET') {
@@ -289,11 +289,12 @@ test('seasons: the preview shows frozen points apart; review list; settings; exp
   await page.waitForSelector('[data-act="youth-settings"]', { timeout: 8000 });
   await click(page, '[data-act="youth-settings"]');
   await page.waitForSelector('#sheet[open] [data-act="youth-save"]');
-  assert.match(await sheetText(page), /الدعم الفني/);
+  assert.match(await sheetText(page), /اسم مسؤول الدعم الفني/);
   await saveSheet(page);
   await page.waitForFunction(() => !document.querySelector('#sheet').open, { timeout: 5000 });
   const saved = fake.calls.find(c => c.path === '/v1/admin/participants/settings' && c.method === 'POST');
   assert.deepEqual([saved.body.ageMin, saved.body.ageMax], ['18', '30']);
+  assert.deepEqual(saved.body.support, { id: null, name: 'مينا زكريا', phone: '01276162016' }, 'the name and number are shown and saved');
 
   await page.waitForSelector('[data-act="youth-export"]', { timeout: 8000 });
   await click(page, '[data-act="youth-export"]');

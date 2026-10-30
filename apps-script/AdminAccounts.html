@@ -197,14 +197,20 @@
       var max = A.textInput(String(s.ageMax), { ltr: true, max: 3 });
       var warn = A.textInput(String(s.warnDays), { ltr: true, max: 3 });
       var contacts = (A.state && A.state.contacts) || [];
-      var pick = select([['', 'الرقم الافتراضي']].concat(contacts.map(function (c) { return [c.id, c.name]; })), s.support && s.support.id || '', 'الدعم الفني');
+      var shown = s.support || s.supportDefault || {};
+      var pick = select([['', 'من غير اختيار']].concat(contacts.map(function (c) { return [c.id, c.name]; })), s.support && s.support.id || '', 'اختار من جهات التواصل');
+      var supportName = A.textInput(shown.name || '', { max: 60 });
+      var supportPhone = A.textInput(shown.phone || '', { ltr: true, max: 20 });
+      pick.addEventListener('change', function () {
+        var c = contacts.filter(function (x) { return x.id === pick.value; })[0];
+        if (c) { supportName.value = c.name; supportPhone.value = c.phone; }
+      });
       formSheet({
         title: 'إعدادات الحسابات', reason: false, path: 'participants/settings',
         intro: 'النطاق العمري بيتطبق على طول على كل الحسابات. الدعم الفني بيظهر في صفحة الدخول وفي الإيميلات.',
         fields: [{ key: 'ageMin', label: 'السن من', input: min }, { key: 'ageMax', label: 'لحد', input: max }, { key: 'warnDays', label: 'ينبّه قبل الخروج من النطاق بكام يوم', input: warn },
-          { key: 'support', label: 'الدعم الفني (من جهات التواصل)', input: pick, get: function () {
-            var c = contacts.filter(function (x) { return x.id === pick.value; })[0];
-            return c ? { id: c.id, name: c.name, phone: c.phone } : null;
+          { key: 'support', node: el('div', {}, [A.field('الدعم الفني: اختار من جهات التواصل', pick, ''), A.field('اسم مسؤول الدعم الفني', supportName, 'بيظهر جنب لينك الواتساب.'), A.field('رقم واتساب الدعم الفني', supportPhone, '')]), get: function () {
+            return { id: pick.value || null, name: supportName.value.trim(), phone: supportPhone.value.trim() };
           } }]
       });
     }).catch(function (error) { A.fail(error); });

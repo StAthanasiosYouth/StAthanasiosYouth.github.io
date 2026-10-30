@@ -128,6 +128,51 @@ async function register(page, { birth = ['12', '3', '2003'] } = {}) {
   await page.$eval('form', f => f.requestSubmit());
 }
 
+test('a new person starts from the first screen: the button, the email on the form, the support name, and back to sign in', async () => {
+  const { context, page, problems } = await open('/account/');
+  await page.waitForSelector('[data-create-new]', { timeout: 10000 });
+  assert.match(await page.$eval('[data-support]', n => n.textContent), /مينا زكريا/);
+  await page.click('[data-create-new]');
+  await page.waitForSelector('#acct-reg-email');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'acct-reg-email');
+  await page.$eval('form', f => f.requestSubmit());
+  await page.waitForSelector('[data-field="email"] .field__error');
+  const set = (selector, value) => page.$eval(selector, (n, v) => { n.value = v; n.dispatchEvent(new Event('input', { bubbles: true })); n.dispatchEvent(new Event('change', { bubbles: true })); }, value);
+  const email = `first${Date.now()}@staging.invalid`;
+  await set('#acct-reg-email', email);
+  await set('#acct-phone', '011' + String(10000000 + (++tick)));
+  await set('#acct-name', 'مينا زكريا فؤاد');
+  await set('#acct-day', '12');
+  await set('#acct-month', '3');
+  await set('#acct-year', '2003');
+  await page.$eval('form', f => f.requestSubmit());
+  await page.waitForSelector('[data-send]');
+  await page.click('[data-send]');
+  await page.waitForSelector('[data-test-code]', { timeout: 8000 });
+  assert.deepEqual(problems, []);
+  await context.close();
+
+  const again = await open('/account/');
+  await again.page.waitForSelector('[data-create-new]', { timeout: 10000 });
+  await again.page.click('[data-create-new]');
+  await again.page.waitForSelector('#acct-reg-email');
+  const typed = (selector, value) => again.page.$eval(selector, (n, v) => { n.value = v; n.dispatchEvent(new Event('change', { bubbles: true })); }, value);
+  await typed('#acct-reg-email', 'someone@gmial.com');
+  await typed('#acct-phone', '01112345678');
+  await typed('#acct-name', 'مينا زكريا فؤاد');
+  await typed('#acct-day', '12');
+  await typed('#acct-month', '3');
+  await typed('#acct-year', '2003');
+  await again.page.$eval('form', f => f.requestSubmit());
+  await again.page.waitForFunction(() => /قصدك/.test(document.body.innerText), { timeout: 5000 });
+  assert.equal(await again.page.$eval('#acct-phone', n => n.value), '01112345678', 'what was typed stays');
+  await again.page.waitForSelector('[data-have-account]');
+  await again.page.click('[data-have-account]');
+  await again.page.waitForSelector('#acct-email');
+  assert.equal(await again.page.$eval('#acct-email', n => n.value), 'someone@gmial.com', 'the email typed comes along');
+  await again.context.close();
+});
+
 test('signed out at a competition → /account/ → back to it → answers → result with points; «نقاطي» and the store follow', async () => {
   const { context, page, problems } = await open(`/competition/${COMP.slug}/`);
   await page.waitForFunction(() => /ابدأ/.test(document.body.innerText), { timeout: 10000 });

@@ -124,7 +124,7 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
     const s = S.config && S.config.support;
     if (!s) return null;
     return h('p', { class: 'acct__support' }, lead + ' ',
-      h('a', { href: s.whatsapp, target: '_blank', rel: 'noopener' }, 'كلّم الدعم الفني على واتساب'));
+      h('a', { href: s.whatsapp, target: '_blank', rel: 'noopener', 'data-support': '' }, s.name ? 'كلّم ' + s.name + ' من الدعم الفني على واتساب' : 'كلّم الدعم الفني على واتساب'));
   }
 
   function show(view, focus) {
@@ -171,6 +171,8 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
         h('button', { type: 'button', class: 'btn btn--primary', 'data-create': '', onclick: () => openRegister(email.value) }, 'إنشاء حساب جديد'),
         h('button', { type: 'button', class: 'btn', onclick: () => { setNone(false); email.select(); email.focus(); } }, 'جرّب إيميل تاني')));
     const submit = h('button', { class: 'btn btn--primary', type: 'submit' }, 'متابعة');
+    const create = h('div', { class: 'actions' },
+      h('button', { type: 'button', class: 'btn', 'data-create-new': '', onclick: () => openRegister(email.value) }, 'إنشاء حساب جديد'));
     const sharedBox = h('input', { type: 'checkbox', id: 'acct-shared', checked: S.shared || null });
     sharedBox.addEventListener('change', () => { S.shared = sharedBox.checked; });
 
@@ -182,6 +184,7 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
       none.hidden = !on;
       pwField.hidden = on;
       submit.hidden = on;
+      create.hidden = on;
     };
     const setHint = () => {
       hint.textContent = S.exists && S.asked === email.value.trim() ? 'أهلاً بيك تاني — اكتب الباسورد بتاعك' : 'اكتب الإيميل الأول ودوس متابعة';
@@ -273,6 +276,7 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
       h('p', { class: 'acct__lead' }, 'سجّل دخولك بالإيميل والباسورد بتوعك.'),
       noticeLine(),
       form,
+      create,
       h('div', { class: 'acct__row' },
         sharedBox,
         h('label', { for: 'acct-shared' }, 'ده جهاز مشترك (متفتكرنيش هنا)')),
@@ -371,13 +375,20 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
       ...options(birthYears().map(y => [y, arDigits(y)]), F.year, 'السنة'));
     const hp = h('div', { class: 'hp', 'aria-hidden': 'true' }, h('input', { type: 'text', name: 'website', tabindex: '-1', autocomplete: 'off' }));
 
-    const typo = emailTypo(S.email);
+    const needEmail = !validEmail(S.email);
+    const address = needEmail ? h('input', {
+      class: 'field__input', type: 'email', name: 'email', id: 'acct-reg-email', autocomplete: 'username', inputmode: 'email',
+      autocapitalize: 'off', spellcheck: 'false', dir: 'ltr', value: S.email
+    }) : null;
+    const typo = needEmail ? null : emailTypo(S.email);
     const form = h('form', { class: 'form', method: 'post', novalidate: true },
-      h('div', { class: 'acct__email' },
-        h('span', { dir: 'ltr', 'data-reg-email': '' }, S.email),
-        textBtn('تعديل', () => viewSignin({ prefill: S.email }))),
+      needEmail
+        ? field('الإيميل', address, { id: 'email', error: errs.email })
+        : h('div', { class: 'acct__email' },
+          h('span', { dir: 'ltr', 'data-reg-email': '' }, S.email),
+          textBtn('تعديل', () => viewSignin({ prefill: S.email }))),
       typo ? h('p', { class: 'acct__notice', role: 'status' }, 'قصدك ', h('span', { dir: 'ltr' }, typo), '؟ ', textBtn('أيوه، صلّحه', () => { S.email = typo; viewRegister(); })) : null,
-      errs.email ? h('p', { class: 'field__error', role: 'alert' }, errs.email) : null,
+      errs.email && !needEmail ? h('p', { class: 'field__error', role: 'alert' }, errs.email) : null,
       field('رقم الموبايل', phone, { id: 'phone', error: errs.phone }),
       field('الاسم الثلاثي أو الرباعي', name, { id: 'name', error: errs.name }),
       h('fieldset', { class: 'acct__dob', 'data-field': 'birthDate' },
@@ -395,6 +406,19 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
       S.hp = hp.querySelector('input').value;
       S.fieldErrors = {};
       S.error = '';
+      if (needEmail) {
+        S.email = address.value.trim();
+        if (!validEmail(S.email)) {
+          S.fieldErrors = { email: 'اكتب إيميلك صح.' };
+          viewRegister();
+          return;
+        }
+        // the form's own hint: «قصدك …؟» once, with a way to fix it
+        if (emailTypo(S.email)) {
+          viewRegister();
+          return;
+        }
+      }
       if (!birthDateOf(F.year, F.month, F.day)) {
         S.fieldErrors = { birthDate: 'اختار اليوم والشهر والسنة.' };
         viewRegister();
@@ -405,7 +429,8 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
 
     show(card(title('إنشاء حساب جديد'), form,
       h('p', { class: 'acct__support' }, 'بنتعامل مع بياناتك حسب ', h('a', { href: '../privacy/#accounts' }, 'سياسة الخصوصية'), '.'),
-      support('محتاج مساعدة؟')), errs.phone ? '#acct-phone' : errs.name ? '#acct-name' : '#acct-phone');
+      textBtn('عندي حساب، سجّل دخول', () => viewSignin({ prefill: validEmail(S.email) ? S.email : '' }), { 'data-have-account': '' }),
+      support('محتاج مساعدة؟')), needEmail ? '#acct-reg-email' : errs.phone ? '#acct-phone' : errs.name ? '#acct-name' : '#acct-phone');
   }
 
   function viewConfirm() {
