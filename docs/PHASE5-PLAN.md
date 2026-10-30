@@ -283,6 +283,26 @@ Owner approved step 1. Dormant: `accounts_mode = off`, `OTP_EMAIL = 0`, `MEMBER_
 
 **Not checked:** the signed-in panel, a real save, review and publish on production, because they need the owner's Google account.
 
+## 3k. Runbook step 2: Apps Script record (2026-10-30)
+
+Owner approved step 2 and ran `workerRuntimeSeed()` from the editor.
+
+| Item | Value |
+| --- | --- |
+| API deployment | `AKfycbxJj…Km1` @58 → **@59**; recovery admin still @14 |
+| Rollback | `clasp deploy -i <API id> -V 58` |
+| `comp_live` | 1 row: `test` (`cmp-9227de8c`, version `af9742f9476a7f6e`, closed, finalized). Same id and version as `content.json`, its only competition |
+| `comp_versions` | 1 row, with its meta |
+| `store_items` | 1 row: «محفظة», cost 30, stock 1, active. Not compared with the sheet by me: the owner confirms |
+
+**Checked:** `warm` answers `{"ok":true}`; `compStart` still answers from Apps Script, not `disabled`; `accounts_mode` still `off`; no 5xx in `api_log` from this step or from the owner's publish. Bookings, payments, proofs, pay_dest, event_cfg and grants equal the baseline.
+
+**Owner's production test on Worker `bcfaad19`, read from D1:** a save at 14:33 Cairo («المسرح الأسود2») and a publish at 14:35 (`pub-f8948ee61ccb`, 4 files), mirrored to `main` as `57d12e2`. This covers the §3j item left open. The admins hash also changed in the same window; its count stays 3. The cause wasn't read, and the sign-in is the likely one.
+
+**Before step 4:** `test` is test data. Withdrawing it in the admin and publishing removes it from `comp_live` (`compAfterCommit_` → `withdrawn`); running the seed again doesn't, because the seed only adds. Decide the same for «محفظة».
+
+**Also seen, not from this release:** `api_log` has one 500 on `/v1/sync/content-notify` on 2026-10-29 07:13 UTC, on Worker `4408fb3a`. Not investigated. The two 503 `accounts_off` on 2026-10-30 are my own checks.
+
 ## 4. Rollback (batches 1–5)
 
 - Batch 4 extra: `accounts_mode = off` returns `competition/` and `points/` to Apps Script at once and refuses every `/v1/comp/*`, `/v1/shop/*` route. Worker rows stay. After launch that fallback serves only the old code login, so it is a stop, not a way back.
