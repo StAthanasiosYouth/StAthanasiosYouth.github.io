@@ -214,7 +214,7 @@ One test in `tests/points-widget.e2e.mjs` («placement», the home page's order 
 - The home widget (§3e): once accounts are on, the Worker's build replaces `points` with its own schedule and season (`runtimePoints`). The change shows at the next publish, like every home-page change. The §18.5 automatic pushes stay on Apps Script until Phase 6: **keep their dates the same as the store's** (ADMIN-GUIDE §١٣).
 - One writer: Script Property `COMP_RUNTIME = worker` makes every public competition, «نقاطي» and store action on Apps Script answer `disabled`.
 - The Apps Script side now runs in a test (`worker/test/comp-runtime-push.test.mjs`): real `.gs` code in the fake, its signed call through the real `verifySync` into the real Worker code, then an account plays and is graded with the pushed key; finalize; the seed.
-- Privacy text drafted (`docs/PRIVACY-ACCOUNTS-DRAFT.md`), admin guide §١٣ written.
+- Privacy text shortened in `privacy/index.html` on the owner's request (2026-10-30), linked from the register form, admin guide §١٣ written.
 
 **Load results on staging** (from Egypt, Worker + D1 in Eastern Europe)
 

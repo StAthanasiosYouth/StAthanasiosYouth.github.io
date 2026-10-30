@@ -403,7 +403,9 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
       viewConfirm();
     });
 
-    show(card(title('إنشاء حساب جديد'), form, support('محتاج مساعدة؟')), errs.phone ? '#acct-phone' : errs.name ? '#acct-name' : '#acct-phone');
+    show(card(title('إنشاء حساب جديد'), form,
+      h('p', { class: 'acct__support' }, 'بنتعامل مع بياناتك حسب ', h('a', { href: '../privacy/#accounts' }, 'سياسة الخصوصية'), '.'),
+      support('محتاج مساعدة؟')), errs.phone ? '#acct-phone' : errs.name ? '#acct-name' : '#acct-phone');
   }
 
   function viewConfirm() {
