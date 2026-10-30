@@ -1,6 +1,10 @@
-# Phase 5: test data cleanup, inventory and plan
+# Test data cleanup, inventory and plan
 
-**Status: waiting for the owner's approval. Nothing has been deleted.** Inventory taken 2026-10-30 with read-only queries on production. Names and phones are left out on purpose.
+**Status: deferred to Phase 7c (BACKEND-MIGRATION §22.4) by the owner, 2026-10-30. Nothing has been deleted.** The owner first approved stages A and B, then deferred the cleanup before stage B ran. Running it in Phase 7c needs a fresh inventory, fresh backups and a new approval, because the counts below will have changed.
+
+**Done from stage A:** steps 1–3 only, kept encrypted outside the repository in `D:/private_projects/athanasios-backups/2026-10-30-pre-cleanup/`. Steps 4–5 and stages B and C did not run.
+
+Inventory taken 2026-10-30 with read-only queries on production. Names and phones are left out on purpose.
 
 Owner's rule: bookings, payments and their proofs are all test data (confirmed by the owner). Keep all media and files, all links, «المسرح الأسود», settings, admins, grants, and the booking and payment system itself.
 
