@@ -26,7 +26,10 @@ export const SAMPLES = {
     line('بيشوي سمير أكّد حجز B-4TR8N', '14:10', 'booking.confirm'), line('٣ حجوزات جديدة · رحلة الإسكندرية', '15:45', 'booking.new'),
     line('مينا عادل سجّل حجز كاش B-9PX3A', '18:20', 'booking.create'), line('بيشوي سمير سجّل دفعة في حجز B-4TR8N', '14:12', 'payment.add'),
     line('مرقس فادي اعتمد دفعة إنستاباي في حجز B-7QK2M', '20:05', 'payment.add'), line('كيرلس عماد عدّل خبر «اجتماع الشباب»', '17:02', 'update')] }, '2026-10-20')],
-  'security': ['important', () => securityEmail({ kind: 'new_signin', cairo: '2026-10-20 21:40', device: 'موبايل أندرويد · كروم' })]
+  'security': ['important', () => securityEmail({ kind: 'new_signin', cairo: '2026-10-20 21:40', device: 'موبايل أندرويد · كروم', prefs: true })],
+  'security-created': ['important', () => securityEmail({ kind: 'account_created', cairo: '2026-10-20 21:40' })],
+  'security-support': ['important', () => securityEmail({ kind: 'password_reset_support', cairo: '2026-10-20 21:40' })],
+  'security-recovery': ['important', () => securityEmail({ kind: 'recovery_used', cairo: '2026-10-20 21:40' })]
 };
 
 /* STAGING ONLY: send ONE sample (body { name }) to MAIL_TEST_TO; refused unless NOTIFY_EMAIL is on; counted in the budget */
@@ -35,7 +38,7 @@ export async function diagMailSample(ctx) {
   const name = ctx.body && ctx.body.name;
   if (!SAMPLES[name]) throw new ApiError('bad', 'sample', { names: Object.keys(SAMPLES) });
   const db = ctx.env.DB;
-  const s = Object.fromEntries((await retry(() => db.prepare("SELECT key, value FROM settings WHERE key IN ('NOTIFY_EMAIL', 'MAIL_TEST_TO', 'MAIL_DAILY_TARGET', 'MAIL_ADMIN_BUDGET', 'MAIL_RESERVE_CRITICAL', 'MAIL_RESERVE_OTP')").all())).results.map(r => [r.key, r.value]));
+  const s = Object.fromEntries((await retry(() => db.prepare("SELECT key, value FROM settings WHERE key IN ('NOTIFY_EMAIL', 'MAIL_TEST_TO', 'MAIL_DAILY_TARGET', 'MAIL_ADMIN_BUDGET', 'MAIL_RESERVE_CRITICAL', 'MAIL_RESERVE_OTP', 'MAIL_RESERVE_MEMBER')").all())).results.map(r => [r.key, r.value]));
   if (s.NOTIFY_EMAIL !== '1') throw new ApiError('bad', 'email off');
   if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(s.MAIL_TEST_TO || '')) throw new ApiError('bad', 'no test address');
   const [level, make] = SAMPLES[name];

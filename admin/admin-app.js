@@ -6017,6 +6017,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       top.admin = A.textInput(String(data.budget.admin), { ltr: true, max: 3 });
       top.critical = A.textInput(String(data.budget.critical), { ltr: true, max: 3 });
       top.otp = A.textInput(String(data.budget.otp), { ltr: true, max: 3 });
+      top.member = A.textInput(String(data.budget.member), { ltr: true, max: 3 });
       ['target', 'admin', 'critical', 'otp'].forEach(function (k) { top[k].type = 'number'; top[k].min = '0'; });
 
       var groups = ntGroups(data.types).map(function (g) {
@@ -6043,11 +6044,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           A.field('الهدف اليومي (كل الإيميلات)', top.target, 'في حدود جيميل الحقيقي (~٥٠٠ في اليوم).'),
           A.field('إيميلات الأدمنز', top.admin, ''),
           A.field('محجوز للمهم جدًا', top.critical, ''),
-          A.field('محجوز لأكواد التأكيد (بعدين)', top.otp, '')
+          A.field('محجوز لأكواد التأكيد', top.otp, ''),
+          A.field('محجوز لإيميلات الأعضاء', top.member, '')
         ),
         el('div', { class: 'grants' }, groups)
       ]);
-      [top.router.input, top.email.input, top.time, top.target, top.admin, top.critical, top.otp].forEach(function (c) { c.disabled = !manage; });
+      [top.router.input, top.email.input, top.time, top.target, top.admin, top.critical, top.otp, top.member].forEach(function (c) { c.disabled = !manage; });
       save.hidden = !manage;
       save.disabled = false;
 
@@ -6073,7 +6075,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       });
       var body_ = {
         types: types, router: top.router.input.checked, email: top.email.input.checked, summaryTime: top.time.value,
-        budget: { target: Number(top.target.value), admin: Number(top.admin.value), critical: Number(top.critical.value), otp: Number(top.otp.value) }
+        budget: { target: Number(top.target.value), admin: Number(top.admin.value), critical: Number(top.critical.value), otp: Number(top.otp.value), member: Number(top.member.value) }
       };
       var turningOn = body_.router && !data.router;
       (turningOn ? A.confirm({
@@ -6104,6 +6106,19 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     function count(day, channel, status) { return (day && day[channel] && day[channel][status]) || 0; }
 
+    /* the youth accounts' email and sign-in form, last 24 hours (docs/MEMBER-NOTIFICATIONS-PLAN.md §9) */
+    function memberStatusPart(m) {
+      if (!m) return null;
+      var sum = function (status) { return ['otp', 'member_tx', 'member_bulk'].reduce(function (n, c) { return n + ((m.classes[c] && m.classes[c][status]) || 0); }, 0); };
+      return el('div', { class: 'nt-member' },
+        el('p', { class: 'nt-critical__title', text: 'حسابات الشباب' }),
+        el('p', {}, m.accounts ? A.chip('الحسابات شغالة', 'ok') : A.chip('الحسابات مقفولة', 'off'), ' ', m.codes ? A.chip('أكواد التأكيد شغالة', 'ok') : A.chip('أكواد التأكيد مقفولة', 'off'), ' ', m.on ? A.chip('إيميلات الأعضاء شغالة', 'ok') : A.chip('إيميلات الأعضاء مقفولة', 'off')),
+        el('div', { class: 'nt-tiles' }, [
+          ['اتبعتت', sum('sent')], ['مستنية', sum('queued') + sum('deferred') + sum('failed')], ['انتهت', sum('expired')], ['اتمنعت باختيار العضو', sum('suppressed')], ['فشل', sum('dead')]
+        ].map(function (t) { return el('div', { class: 'nt-tile' }, el('strong', { text: String(t[1]) }), el('span', { text: t[0] })); })),
+        el('p', { class: 'note' }, 'نموذج الدخول النهارده: ' + m.discovery.today + ' / ' + m.discovery.cap + ' محاولة، منهم ' + m.discovery.noAccount + ' إيميل من غير حساب.' + (m.discovery.wideSources ? ' تحذير: ' + m.discovery.wideSources + ' مصدر بيجرّب إيميلات كتير.' : '')));
+    }
+
     function draw(s) {
 
       body.setAttribute('aria-busy', 'false');
@@ -6131,7 +6146,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         el('p', {}, s.router ? A.chip('الإشعارات الجديدة شغالة', 'ok') : A.chip('الإشعارات الجديدة مقفولة', 'off'), ' ', s.email ? A.chip('الإيميلات شغالة', 'ok') : A.chip('الإيميلات مقفولة', 'off'), ' ', gmail),
         tiles,
         el('p', { class: 'note' }, 'آخر إشعار اتبعت: ' + ntWhen(s.lastSuccess.push) + ' · آخر إيميل: ' + ntWhen(s.lastSuccess.email)),
-        critical
+        critical,
+        memberStatusPart(s.member)
       ]);
 
     }

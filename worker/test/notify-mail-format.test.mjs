@@ -165,12 +165,14 @@ test('member codes (Phase 5A, not wired): verify / recovery — the code and exp
   assert.throws(() => otpEmail({ code: '123456', minutes: 600 }));
 });
 
-test('member security notices (Phase 5A, not wired): what changed and when; help on the public site only, never an admin link', () => {
+test('member security notices (Phase 5A): what changed and when; help on the public site only, never an admin link', () => {
   const e = securityEmail({ kind: 'password_changed', cairo: '2026-10-20 10:00', device: 'موبايل أندرويد' });
   assert.equal(e.subject, 'الباسورد بتاع حسابك اتغير – ' + BRAND);
   assert.match(e.text, /الثلاثاء ٢٠ أكتوبر · ١٠:٠٠ ص/);
   assert.match(e.text, /موبايل أندرويد/);
-  assert.deepEqual(ownLinks(e), [SITE + '/', SITE + '/'], 'the site: the button and the footer');
+  assert.deepEqual(ownLinks(e), [SITE + '/account/#me/security', SITE + '/'], 'the security section; the footer');
+  assert.deepEqual(ownLinks(securityEmail({ kind: 'account_created', cairo: '2026-10-20 10:00' })), [SITE + '/', SITE + '/'], 'a creation notice may reach a stranger: the site only');
+  assert.match(securityEmail({ kind: 'new_signin', cairo: '2026-10-20 10:00', prefs: true }).text, /إعدادات الإشعارات: .*#me\/notifications/);
   assert.doesNotMatch(e.html + e.text, /\/admin/);
   for (const kind of ['email_changed', 'recovery_used', 'new_signin']) assert.ok(securityEmail({ kind, cairo: '2026-10-20 10:00' }).subject.endsWith(BRAND));
   assert.throws(() => securityEmail({ kind: 'nope' }));

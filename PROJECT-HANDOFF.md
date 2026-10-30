@@ -137,7 +137,7 @@ Closed: `CONTENT_WRITER = worker` (Apps Script) and `CONTENT_DRAFTS = 1` (D1) li
 save, 3-step publish, media upload, booking page), baseline unchanged. Record and rollback: `docs/CONTENT-MIGRATION-PLAN.md`
 §13, §16–16.3. Open: measure the panel open (< 1 s target) on the owner's account from Egypt. Next per the roadmap: Phase 5.
 
-**Phase 5 started 2026-10-30** (`docs/PHASE5-PLAN.md`: five batches, each needs the owner's choice to start and separate approval for production). Batch 1 (P5-1 + P5-2: accounts foundation, sign-in) is verified on staging; not on `main`, not in production. Next: batch 2, only on the owner's choice.
+**Phase 5 started 2026-10-30** (`docs/PHASE5-PLAN.md`: five batches, each needs the owner's choice to start and separate approval for production). Batches 1–2 (P5-1…P5-4: accounts foundation, sign-in, profile, member email) are verified on staging; not on `main`, not in production. Next: batch 3, only on the owner's choice.
 
 Original brief (kept for the record):
 

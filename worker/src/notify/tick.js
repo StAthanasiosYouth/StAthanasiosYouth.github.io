@@ -2,7 +2,7 @@
  * The notifications' minute (cron '* * * * *', scheduled.js): route new
  * activity rows into the outbox (router.js); lease the due email rows and
  * hand them to the queue ('notify.email', or send them here without one:
- * email.js); once an hour, the Gmail token's health. Pushes leave through
+ * email.js); the same for member email (member.js); once an hour, the Gmail token's health. Pushes leave through
  * Apps Script's claim (claim.js). Never throws: a bad minute is logged and the
  * next one picks up where it stopped (rows stay notified = 0).
  */
@@ -10,6 +10,7 @@
 import { logLine } from '../lib/log.js';
 import { route } from './router.js';
 import { leaseDue, sendRows, tokenHealth } from './email.js';
+import { memberLease, memberSend } from './member.js';
 import { makeJob } from '../jobs.js';
 
 export async function notifyTick(env, now = Date.now()) {
@@ -27,6 +28,14 @@ export async function notifyTick(env, now = Date.now()) {
     if (new Date(now).getUTCMinutes() === 0) out.gmail = (await tokenHealth(env, now)).ok;
   } catch (err) {
     out.emailError = String(err && err.message).slice(0, 200);
+  }
+  try {
+    const ids = await memberLease(env, now);
+    if (ids.length && env.JOBS) await env.JOBS.send(makeJob('member.email', { ids }));
+    else if (ids.length) out.member = await memberSend(env, ids, now);
+    out.memberLeased = ids.length;
+  } catch (err) {
+    out.memberError = String(err && err.message).slice(0, 200);
   }
   logLine({ kind: 'cron', job: 'notify', ...out });
   return out;

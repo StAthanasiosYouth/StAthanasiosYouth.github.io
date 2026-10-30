@@ -12,6 +12,7 @@ import { randomId } from './lib/hash.js';
 import { logLine } from './lib/log.js';
 import { activityStmt } from './lib/activity.js';
 import { sendRows } from './notify/email.js';
+import { memberSend } from './notify/member.js';
 import { mirrorPending } from './publish-mirror.js';
 import { commitComps } from './content/comps.js';
 import { mirrorMedia } from './content/media.js';
@@ -26,6 +27,11 @@ export const JOB_TYPES = {
   async 'notify.email'(env, payload) {
     const ids = Array.isArray(payload.ids) ? payload.ids.filter(id => /^ntf-[0-9a-f]{6,}$/.test(String(id))).slice(0, 20) : [];
     await sendRows(env, ids);
+  },
+  // leased member email rows (notify/member.js): the same, on their own pipeline
+  async 'member.email'(env, payload) {
+    const ids = Array.isArray(payload.ids) ? payload.ids.filter(id => /^mo-[0-9a-f]{6,}$/.test(String(id))).slice(0, 20) : [];
+    await memberSend(env, ids);
   },
   // Phase 2 P2-4: the GitHub mirror of the live snapshot (idempotent; a failure is recorded, the cron retries)
   async 'publish.mirror'(env) {

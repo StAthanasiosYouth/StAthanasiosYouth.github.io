@@ -25,7 +25,7 @@ test('settings: every type with its defaults; the Primary manages, others only l
   assert.deepEqual([r.body.router, r.body.email, r.body.summaryTime], [false, false, '21:00']);
   const publish = r.body.types.find(t => t.key === 'publish');
   assert.deepEqual([publish.level, publish.push, publish.email, publish.locked], ['important', true, 'immediate', false]);
-  assert.deepEqual(r.body.budget, { target: 400, admin: 150, critical: 50, otp: 50 });
+  assert.deepEqual(r.body.budget, { target: 400, admin: 120, critical: 50, otp: 100, member: 100, bulkPerHour: 30 });
   const m = await call(M, 'GET', '/v1/admin/notify/settings');
   assert.equal(m.status, 200);
   assert.equal(m.body.canManage, false);
@@ -39,12 +39,12 @@ test('settings: a type\'s channels, list and lock; the switches; budget checks; 
   await h.db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('NOTIFY_SINCE', '1', 0)").run();
   const r = await call(P, 'POST', '/v1/admin/notify/settings', {
     types: { publish: { push: false, email: 'summary', locked: true, mode: 'named', include: [M], exclude: [] } },
-    router: true, email: true, summaryTime: '20:30', budget: { target: 300, admin: 120 }
+    router: true, email: true, summaryTime: '20:30', budget: { target: 380, admin: 120 }
   });
   assert.equal(r.status, 200, JSON.stringify(r.body));
   const publish = r.body.types.find(t => t.key === 'publish');
   assert.deepEqual([publish.push, publish.email, publish.locked, publish.mode, publish.include], [false, 'summary', true, 'named', [M]]);
-  assert.deepEqual([r.body.router, r.body.email, r.body.summaryTime, r.body.budget.target], [true, true, '20:30', 300]);
+  assert.deepEqual([r.body.router, r.body.email, r.body.summaryTime, r.body.budget.target], [true, true, '20:30', 380]);
   assert.equal(await h.db.prepare("SELECT COUNT(*) n FROM settings WHERE key = 'NOTIFY_SINCE'").first('n'), 0, 'switched on: the next tick marks the backlog');
   const audit = await h.db.prepare("SELECT severity, changes FROM activity WHERE action = 'notify.settings'").first();
   assert.equal(audit.severity, 'critical');

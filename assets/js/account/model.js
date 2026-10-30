@@ -67,6 +67,39 @@ export function birthYears(now = new Date()) {
   return Array.from({ length: 96 }, (_, i) => top - i);
 }
 
+/* ---------- where a link was going (docs/EMAIL-DEEP-LINKS.md §3) ---------- */
+
+export const DEST_KEY = 'athanasios.account.dest.v1';
+const DEST_MS = 30 * 60000;
+
+/* the page's own hash routes only: anything else (an address, script) is dropped */
+export function cleanRoute(hash) {
+  const value = String(hash || '');
+  if (/^#me\/(?:security|notifications)$/.test(value)) return value;
+  // a section this version doesn't have yet opens the account's first page
+  return /^#me(?:\/[\w/-]{0,80})?$/.test(value) ? '#me' : '';
+}
+
+/* this tab only, for 30 minutes, opened once */
+export function keepDest(tab, route, now = Date.now()) {
+  if (!tab || !cleanRoute(route) || cleanRoute(route) === '#me') return;
+  try {
+    tab.setItem(DEST_KEY, JSON.stringify({ route: cleanRoute(route), at: now }));
+  }
+  catch { /* the account's first page opens instead */ }
+}
+
+export function takeDest(tab, now = Date.now()) {
+  if (!tab) return '';
+  const value = read(tab, DEST_KEY);
+  try {
+    tab.removeItem(DEST_KEY);
+  }
+  catch { /* nothing kept */ }
+  if (!value || typeof value.at !== 'number' || now - value.at > DEST_MS) return '';
+  return cleanRoute(value.route);
+}
+
 /* ---------- what this device remembers (never the password) ---------- */
 
 function read(storage, key) {

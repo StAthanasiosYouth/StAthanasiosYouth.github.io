@@ -23,6 +23,7 @@ import {
 } from './secret.js';
 import { newSession, requireAccount, endSession, revokeAllStmt } from './session.js';
 import { CODE_MINUTES, isTestInbox, codesReady, codeRow, sendCode } from './mail.js';
+import { memberEmailStmt, GROUPS, ALWAYS_ON } from '../notify/member.js';
 
 const SETTINGS = ['accounts_mode', 'OTP_EMAIL', 'age_min', 'age_max', 'age_warn_days', 'session_days_device', 'session_hours_shared', 'discovery_daily_cap',
   'GMAIL_HEALTH', 'MAIL_DAILY_TARGET', 'MAIL_ADMIN_BUDGET', 'MAIL_RESERVE_CRITICAL', 'MAIL_RESERVE_OTP'];
@@ -136,9 +137,13 @@ export async function accountSignin(ctx) {
     const db = ctx.env.DB;
     const account = await findByCanon(db, canonEmail(email));
     const hash = await passwordHash(ctx.env, password || DUMMY_PASSWORD);   // the same work either way
-    if (!password) return { exists: !!account };
+    if (!password) {
+      if (!account) await noAccountCount(ctx);
+      return { exists: !!account };
+    }
     if (!account) {
       await discoveryBudget(ctx, ip, settings);
+      await noAccountCount(ctx);
       return { exists: false };
     }
     const fails = await peek(ctx, 'acct.login.fail', account.id, FAIL_WINDOW_S);
@@ -152,17 +157,35 @@ export async function accountSignin(ctx) {
     if (account.status === 'blocked') throw new ApiError('blocked');
     const now = Date.now();
     const session = await newSession(ctx, account, body.shared === true ? 'shared' : 'device', settings, now);
-    await retry(() => session.stmt.run());
+    const signinStmts = [session.stmt];
+    // a device this account never used (§4.1, opt-in; the sender checks the choice at send time)
+    const seen = await retry(() => db.prepare('SELECT COUNT(*) AS total, COALESCE(SUM(device = ?), 0) AS same FROM account_sessions WHERE participant_id = ?').bind(session.device, account.id).first());
+    if (seen.total > 0 && !seen.same) {
+      signinStmts.push(memberEmailStmt(db, { kind: 'acct.dev', participantId: account.id, entityType: 'session', entityId: session.id, dedupeKey: 'acct:dev:' + session.id, now }));
+    }
+    await retry(() => db.batch(signinStmts));
     return { exists: true, session: { token: session.token, kind: session.kind, expiresAt: session.expiresAt }, account: accountView(account, settings, now) };
   });
 }
 
-/* §21.4: per IP 10 / 10 min and 40 / day; everyone 400 / day */
+/* §21.4: per IP 10 / 10 min and 40 / day; everyone 400 / day, with one admin alert at half of it (§8.4) */
 async function discoveryBudget(ctx, ip, settings) {
   await limit(ctx, 'acct.discover', ip, 10, 600);
   await limit(ctx, 'acct.discover.day', ip, 40, 86400);
-  await limit(ctx, 'acct.discover.all', 'all', Number(settings.discovery_daily_cap) || 400, 86400);
+  const cap = Number(settings.discovery_daily_cap) || 400;
+  const all = await failHit(ctx, 'acct.discover.all', 'all', cap, 86400);
+  if (!all.ok) throw new ApiError('rate', 'acct.discover.all', { retryAfter: all.retryAfter });
+  if (all.count === Math.ceil(cap / 2)) {
+    const day = Math.floor(Date.now() / 86400000);
+    ctx.defer(retry(() => activityStmt(ctx.env.DB, {
+      id: 'act-ad' + day, orIgnore: true, actor: 'system', action: 'account.discover.high', entityType: 'notify', severity: 'important',
+      summary: 'نص الحد اليومي لنموذج الدخول اتستهلك'
+    }).run()));
+  }
 }
+
+/* «حالة النظام»: how many asked about an email with no account today */
+const noAccountCount = ctx => failHit(ctx, 'acct.discover.none', 'all', Number.MAX_SAFE_INTEGER, 86400);
 
 /* per IP; per email 5 a day (over either: the friendly limit message) */
 async function codeBudget(ctx, ip, canon) {
@@ -291,6 +314,49 @@ export async function accountMe(ctx) {
   const settings = await gate(ctx);
   const { account } = await requireAccount(ctx, settings);
   return { account: accountView(account, settings) };
+}
+
+/* GET /v1/account/security: where this account is signed in. Device families only. */
+export async function accountSecurity(ctx) {
+  const settings = await gate(ctx);
+  const { account, session } = await requireAccount(ctx, settings);
+  const now = Date.now();
+  const { results } = await retry(() => ctx.env.DB.prepare('SELECT id, device, kind, last_seen FROM account_sessions WHERE participant_id = ? AND revoked_at IS NULL AND expires_at > ? AND pw_version = ? ORDER BY last_seen DESC LIMIT 30').bind(account.id, now, account.pw_version).all());
+  return { sessions: results.map(r => ({ device: r.device || 'جهاز', kind: r.kind, lastSeen: r.last_seen, current: r.id === session.id })) };
+}
+
+/* GET /v1/account/prefs: «إشعاراتي» (§8) */
+export async function accountPrefs(ctx) {
+  const settings = await gate(ctx);
+  const { account } = await requireAccount(ctx, settings);
+  return prefsView(ctx, account);
+}
+
+async function prefsView(ctx, account) {
+  const { results } = await retry(() => ctx.env.DB.prepare('SELECT grp, mode FROM member_prefs WHERE participant_id = ?').bind(account.id).all());
+  const saved = Object.fromEntries(results.map(r => [r.grp, r.mode]));
+  return {
+    groups: Object.entries(GROUPS).map(([key, g]) => ({ key, label: g.label, optIn: g.tier === 3, on: saved[key] ? saved[key] === 'on' : g.tier === 2 })),
+    always: ALWAYS_ON
+  };
+}
+
+/* POST /v1/account/prefs { prefs: { group: true|false } }: only the member changes these, never an admin */
+export async function accountPrefsSave(ctx) {
+  const settings = await gate(ctx);
+  const { account } = await requireAccount(ctx, settings);
+  await limit(ctx, 'acct.prefs', account.id, 30, 60);
+  const prefs = ctx.body && ctx.body.prefs;
+  if (!prefs || typeof prefs !== 'object' || Array.isArray(prefs)) throw new ApiError('bad', 'prefs');
+  const db = ctx.env.DB;
+  const now = Date.now();
+  const stmts = [];
+  for (const [key, on] of Object.entries(prefs)) {
+    if (!GROUPS[key] || typeof on !== 'boolean') throw new ApiError('bad', 'prefs');
+    stmts.push(db.prepare('INSERT INTO member_prefs (participant_id, grp, mode, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(participant_id, grp) DO UPDATE SET mode = excluded.mode, updated_at = excluded.updated_at').bind(account.id, key, on ? 'on' : 'off', now));
+  }
+  if (stmts.length) await retry(() => db.batch(stmts));
+  return prefsView(ctx, account);
 }
 
 /* POST /v1/account/logout { all? }: this device, or every device. Quiet without a session. */

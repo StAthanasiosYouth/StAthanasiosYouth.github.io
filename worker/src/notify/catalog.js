@@ -58,6 +58,8 @@ const SPECIAL = {
   'handover.add': ['routine', 'finance.view'],
   'handover.void': ['routine', 'finance.view'],
   'modules.book': ['important', 'bookings.manage'],
+  'member.mail.dead': ['routine', 'notifications.view'],
+  'account.discover.high': ['important', 'participants.view'],
   'admin.rename': ['routine', 'accounts.view'],
   'session.takeover': ['routine', 'accounts.view']
 };

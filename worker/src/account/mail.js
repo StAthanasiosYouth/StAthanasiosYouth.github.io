@@ -11,7 +11,7 @@
 import { retry } from '../lib/db.js';
 import { randomId } from '../lib/hash.js';
 import { gmailConfigured, sendMail } from '../notify/gmail.js';
-import { allowed, budget, quotaOf, hourKey } from '../notify/email.js';
+import { allowed, budget, quotaOf, hourKey, countStmt } from '../notify/email.js';
 import { otpEmail } from '../notify/templates.js';
 
 export const CODE_MINUTES = 10;
@@ -40,9 +40,6 @@ export function codeRow(db, { kind, participantId = null, dedupeKey, now = Date.
   };
 }
 
-const otpCountStmt = (db, now) => db.prepare(`INSERT INTO notify_quota (day, total, critical, otp) VALUES (?, 1, 0, 1)
-  ON CONFLICT(day) DO UPDATE SET total = total + 1, otp = otp + 1`).bind(hourKey(now));
-
 /* the send itself, after the reply (ctx.defer): the row says how it went */
 export function sendCode(ctx, { to, code, purpose, outboxId, now = Date.now() }) {
   const db = ctx.env.DB;
@@ -55,7 +52,7 @@ export function sendCode(ctx, { to, code, purpose, outboxId, now = Date.now() })
       await sendMail(ctx.env, { to, ...otpEmail({ code, minutes: CODE_MINUTES, purpose }), now });
       await retry(() => db.batch([
         db.prepare("UPDATE member_outbox SET status = 'sent', sent_ms = ?, attempts = 1 WHERE id = ?").bind(now, outboxId),
-        otpCountStmt(db, now)
+        countStmt(db, hourKey(now), 'otp')
       ]));
     } catch (err) {
       await retry(() => db.prepare("UPDATE member_outbox SET status = 'failed', attempts = 1, error = ? WHERE id = ?").bind(String(err.message || err).slice(0, 200), outboxId).run());

@@ -193,3 +193,55 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+.acct__facts {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.acct__fact dt {
+  font-size: .86rem;
+  color: var(--text-3);
+}
+
+.acct__fact dd {
+  margin: 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.acct__fact dd[dir="ltr"] {
+  text-align: right;
+}
+
+.acct__nav {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.acct__sessions,
+.acct__prefs,
+.acct__always {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.acct__always {
+  gap: 4px;
+  font-size: .9rem;
+  color: var(--text-2);
+}
+
+.acct__always li::before {
+  content: "✓ ";
+  color: var(--accent-hi);
+}
+
+.acct__prefs label {
+  cursor: pointer;
+}

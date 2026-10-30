@@ -19,13 +19,15 @@ const sessionMs = (settings, kind) => (kind === 'shared'
   ? Math.max(1, Number(settings.session_hours_shared) || 12) * HOUR
   : Math.max(1, Number(settings.session_days_device) || 30) * DAY);
 
-/* → { token, stmt, kind, expiresAt }: the row goes in the caller's batch */
+/* → { id, token, stmt, kind, expiresAt, device }: the row goes in the caller's batch */
 export async function newSession(ctx, account, kind, settings, now = Date.now()) {
   const token = generateToken();
   const expiresAt = now + sessionMs(settings, kind);
+  const id = randomId('ses-', 8);
+  const device = deviceLabel(ctx.request.headers.get('user-agent'));
   const stmt = ctx.env.DB.prepare('INSERT INTO account_sessions (id, participant_id, token_hash, pw_version, kind, created_at, last_seen, expires_at, device) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .bind(randomId('ses-', 8), account.id, await tokenHash(token), account.pw_version, kind, now, now, expiresAt, deviceLabel(ctx.request.headers.get('user-agent')));
-  return { token, stmt, kind, expiresAt };
+    .bind(id, account.id, await tokenHash(token), account.pw_version, kind, now, now, expiresAt, device);
+  return { id, token, stmt, kind, expiresAt, device };
 }
 
 const bearer = request => {

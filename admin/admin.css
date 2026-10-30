@@ -4771,6 +4771,10 @@ dialog .toasts[popover] {
   flex: 0 0 auto;
 }
 
+.nt-member {
+  margin-top: 16px;
+}
+
 .nt-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));

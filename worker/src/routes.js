@@ -42,7 +42,7 @@ import { syncContentImport, syncContentExport, syncContentNotify, adminDrafts, a
 import { adminContentCall, adminMediaUpload, MEDIA_UPLOAD_MAX_BYTES } from './content/runtime.js';
 import { syncCompSig } from './content/comps.js';
 import { syncMediaCopy, adminMediaStatus } from './content/media.js';
-import { accountConfig, accountSignin, accountRegisterStart, accountRegisterVerify, accountMe, accountLogout, accountForgot, accountForgotVerify } from './account/routes.js';
+import { accountConfig, accountSignin, accountRegisterStart, accountRegisterVerify, accountMe, accountSecurity, accountPrefs, accountPrefsSave, accountLogout, accountForgot, accountForgotVerify } from './account/routes.js';
 
 /* GET /v1/admin/publish/status — the last publishes + the shadow gate (docs/PUBLISH-SEPARATION-PLAN.md P2-2) */
 async function publishStatus(ctx) {
@@ -364,6 +364,9 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/account/register/start', auth: 'public', maxBytes: 8 * 1024, handler: accountRegisterStart },
   { method: 'POST', path: '/v1/account/register/verify', auth: 'public', maxBytes: 1024, handler: accountRegisterVerify },
   { method: 'GET', path: '/v1/account/me', auth: 'public', handler: accountMe },
+  { method: 'GET', path: '/v1/account/security', auth: 'public', handler: accountSecurity },
+  { method: 'GET', path: '/v1/account/prefs', auth: 'public', handler: accountPrefs },
+  { method: 'POST', path: '/v1/account/prefs', auth: 'public', maxBytes: 1024, handler: accountPrefsSave },
   { method: 'POST', path: '/v1/account/logout', auth: 'public', maxBytes: 1024, handler: accountLogout },
   { method: 'POST', path: '/v1/account/forgot', auth: 'public', maxBytes: 4 * 1024, handler: accountForgot },
   { method: 'POST', path: '/v1/account/forgot/verify', auth: 'public', maxBytes: 1024, handler: accountForgotVerify },

@@ -15,7 +15,7 @@ import { bookApiUrl } from '../page/book-config.js';
 import { mountTurnstile } from '../page/turnstile.js';
 import {
   validEmail, emailTypo, maskEmail, submitLabel, arDigits, monthNames, dateText, birthDateOf, birthYears,
-  readHints, addHint, removeHint, writeHints, readSession, writeSession, clearSession
+  readHints, addHint, removeHint, writeHints, readSession, writeSession, clearSession, cleanRoute, keepDest, takeDest
 } from './model.js';
 
 const safeStore = name => {
@@ -296,11 +296,39 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
       }
       catch { /* the browser's own prompt still has its chance */ }
     }
-    S.account = reply.account;
-    history.replaceState(null, '', location.pathname + location.search);
-    viewHome();
-    if (onSignedIn) onSignedIn(reply.account);
+    enter(reply.account);
   }
+
+  /* signed in: the page a link was going to, once; else the account's first page */
+  function enter(account) {
+    S.account = account;
+    const dest = takeDest(tab) || (cleanRoute(location.hash) === '#me' ? '' : cleanRoute(location.hash));
+    history.replaceState(null, '', location.pathname + location.search + dest);
+    openRoute();
+    if (onSignedIn) onSignedIn(account);
+  }
+
+  function openRoute() {
+    const route = cleanRoute(location.hash);
+    if (route === '#me/security') viewSecurity();
+    else if (route === '#me/notifications') viewPrefs();
+    else viewHome();
+  }
+
+  /* the session ended while the page was open: sign in, then back here */
+  function sessionOver() {
+    keepDest(tab, location.hash);
+    clearSession(local, tab);
+    S.email = S.account ? S.account.email : S.email;
+    S.account = null;
+    S.notice = 'لازم تسجّل دخولك تاني.';
+    viewSignin();
+  }
+
+  const authed = (method, path, body) => {
+    const saved = readSession(local, tab);
+    return call(method, path, body, saved ? saved.token : '');
+  };
 
   /* ---------- register (§6) ---------- */
 
@@ -592,9 +620,7 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
     if (saved && saved.email && saved.email.toLowerCase() === hint.email.toLowerCase()) {
       const reply = await call('GET', '/v1/account/me', null, saved.token);
       if (reply.ok) {
-        S.account = reply.account;
-        viewHome();
-        if (onSignedIn) onSignedIn(reply.account);
+        enter(reply.account);
         return;
       }
       if (reply.code === 'session') clearSession(local, tab);
@@ -634,14 +660,107 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
       S.exists = null;
       viewSignin();
     };
+    const fact = (label, value, ltr) => h('div', { class: 'acct__fact' },
+      h('dt', {}, label), h('dd', { dir: ltr ? 'ltr' : null }, value));
     show(card(
       title('أهلاً بيك يا ' + A.firstName),
-      h('p', { class: 'acct__lead', 'data-home': '' }, h('span', { dir: 'ltr' }, A.email)),
       guest ? h('p', { class: 'acct__notice', 'data-guest': '' }, 'حسابك خارج النطاق العمري للخدمة، فتقدر تشارك كضيف بدون نقاط.') : null,
       A.eligibility && A.eligibility.soon ? h('p', { class: 'acct__notice' }, 'سنك قرب يخرج من النطاق العمري للخدمة.') : null,
+      h('dl', { class: 'acct__facts', 'data-home': '' },
+        fact('الاسم', A.name),
+        fact('الإيميل', A.email, true),
+        fact('الموبايل', A.phone, true),
+        fact('تاريخ الميلاد', dateText(A.birthDate))),
+      support('بياناتك محتاجة تتصلح؟'),
+      h('nav', { class: 'acct__nav', 'aria-label': 'حسابي' },
+        h('a', { class: 'btn', href: '#me/notifications', 'data-nav': 'notifications' }, 'إشعاراتي'),
+        h('a', { class: 'btn', href: '#me/security', 'data-nav': 'security' }, 'أمان الحساب')),
       h('div', { class: 'actions' },
         h('button', { type: 'button', class: 'btn', 'data-logout': '', onclick: () => logout(false) }, 'خروج'),
         h('button', { type: 'button', class: 'btn', 'data-logout-forget': '', onclick: () => logout(true) }, 'خروج وانسَ الجهاز ده'))
+    ));
+  }
+
+  const backToAccount = () => h('a', { class: 'acct__link', href: '#me', 'data-back': '' }, 'ارجع لحسابي');
+
+  /* #me/security: where this account is signed in; a security notice's button opens this */
+  async function viewSecurity() {
+    main.dataset.state = 'loading';
+    const reply = await authed('GET', '/v1/account/security');
+    if (reply.code === 'session') {
+      sessionOver();
+      return;
+    }
+    if (!reply.ok) {
+      show(card(title('أمان الحساب'), h('p', { class: 'field__error', role: 'alert' }, reply.message || 'حصلت مشكلة. جرّب تاني.'), backToAccount()));
+      return;
+    }
+    const everywhere = h('button', { type: 'button', class: 'btn', 'data-logout-all': '' }, 'اخرج من كل الأجهزة');
+    everywhere.addEventListener('click', async () => {
+      everywhere.disabled = true;
+      await authed('POST', '/v1/account/logout', { all: true });
+      clearSession(local, tab);
+      S.email = S.account.email;
+      S.account = null;
+      S.notice = 'خرجت من كل الأجهزة.';
+      history.replaceState(null, '', location.pathname + location.search);
+      viewSignin();
+    });
+    show(card(
+      title('أمان الحساب'),
+      h('p', { class: 'acct__lead' }, 'الأجهزة اللي حسابك مفتوح عليها دلوقتي:'),
+      h('ul', { class: 'acct__sessions', 'data-sessions': '' }, ...reply.sessions.map(s => h('li', {},
+        h('strong', { dir: 'ltr' }, s.device),
+        s.current ? ' (الجهاز ده)' : '',
+        s.kind === 'shared' ? ' · جهاز مشترك' : ''))),
+      h('p', { class: 'field__hint' }, 'لو في جهاز مش بتاعك، اخرج من كل الأجهزة وكلّم الدعم الفني.'),
+      h('div', { class: 'actions' }, everywhere),
+      support('محتاج مساعدة؟'),
+      backToAccount()
+    ));
+  }
+
+  /* #me/notifications: «إشعاراتي». Each tap saves; the server's answer is what stays drawn */
+  async function viewPrefs() {
+    main.dataset.state = 'loading';
+    const reply = await authed('GET', '/v1/account/prefs');
+    if (reply.code === 'session') {
+      sessionOver();
+      return;
+    }
+    if (!reply.ok) {
+      show(card(title('إشعاراتي'), h('p', { class: 'field__error', role: 'alert' }, reply.message || 'حصلت مشكلة. جرّب تاني.'), backToAccount()));
+      return;
+    }
+    const row = group => {
+      const box = h('input', { type: 'checkbox', id: 'pref-' + group.key, 'data-pref': group.key, checked: group.on || null });
+      box.addEventListener('change', async () => {
+        const wanted = box.checked;
+        box.disabled = true;
+        showError('');
+        const saved = await authed('POST', '/v1/account/prefs', { prefs: { [group.key]: wanted } });
+        box.disabled = false;
+        if (saved.code === 'session') {
+          sessionOver();
+          return;
+        }
+        if (!saved.ok) {
+          box.checked = !wanted;
+          showError(saved.message || 'مقدرناش نحفظ. جرّب تاني.');
+          return;
+        }
+        box.checked = saved.groups.find(g => g.key === group.key).on;
+      });
+      return h('li', { class: 'acct__row' }, box, h('label', { for: 'pref-' + group.key }, group.label));
+    };
+    show(card(
+      title('إشعاراتي'),
+      h('p', { class: 'acct__lead' }, 'الإيميلات اللي تحب توصلك عن حسابك. عمرنا ما هنبعتلك إعلانات.'),
+      h('ul', { class: 'acct__prefs', 'data-prefs': '' }, ...reply.groups.map(row)),
+      errorLine(),
+      h('p', { class: 'field__hint' }, 'دول بيوصلوك على طول:'),
+      h('ul', { class: 'acct__always', 'data-always': '' }, ...reply.always.map(text => h('li', {}, text))),
+      backToAccount()
     ));
   }
 
@@ -681,9 +800,7 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
       // a shared-device session in this tab: no card, it simply goes on
       const reply = await call('GET', '/v1/account/me', null, saved.token);
       if (reply.ok) {
-        S.account = reply.account;
-        viewHome();
-        if (onSignedIn) onSignedIn(reply.account);
+        enter(reply.account);
         return;
       }
       if (reply.code === 'session') clearSession(local, tab);
@@ -691,5 +808,11 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
     viewSignin();
   }
 
+  window.addEventListener('hashchange', () => {
+    if (S.account) openRoute();
+    else keepDest(tab, location.hash);
+  });
+
+  keepDest(tab, location.hash);
   start();
 }

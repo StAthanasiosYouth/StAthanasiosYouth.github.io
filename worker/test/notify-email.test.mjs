@@ -86,15 +86,26 @@ test('email: nothing while NOTIFY_EMAIL is off or Gmail is not set up; on → qu
   assert.equal(g.tokens, 1, 'the access token is reused');
 });
 
-test('budget: non-critical stops at the admin budget minus the critical reserve; critical uses the reserve; OTP keeps its own', () => {
-  const b = budget({ MAIL_DAILY_TARGET: '400', MAIL_ADMIN_BUDGET: '150', MAIL_RESERVE_CRITICAL: '50', MAIL_RESERVE_OTP: '50' });
-  assert.equal(allowed('important', { total: 99, critical: 0, otp: 0 }, b), true);
-  assert.equal(allowed('important', { total: 100, critical: 0, otp: 0 }, b), false);
-  assert.equal(allowed('critical', { total: 100, critical: 0, otp: 0 }, b), true);
-  assert.equal(allowed('critical', { total: 349, critical: 249, otp: 0 }, b), true);
-  assert.equal(allowed('critical', { total: 350, critical: 250, otp: 0 }, b), false, 'the OTP reserve is never taken');
-  assert.equal(allowed('otp', { total: 399, critical: 0, otp: 399 }, b), true);
-  assert.equal(allowed('otp', { total: 400, critical: 0, otp: 400 }, b), false);
+test('budget (owner D4): reservations in priority order, not caps; OTP looks only at the target', () => {
+  const b = budget({});
+  assert.deepEqual({ ...b }, { target: 400, admin: 120, critical: 50, otp: 100, member: 100, bulkPerHour: 30 });
+  const empty = { total: 0, critical: 0, otp: 0, admin: 0, member_tx: 0, member_bulk: 0 };
+  // room held above each class while nothing of it was used
+  assert.equal(allowed('critical', { ...empty, total: 299 }, b), true);
+  assert.equal(allowed('critical', { ...empty, total: 300 }, b), false, 'never the OTP reserve');
+  assert.equal(allowed('member_tx', { ...empty, total: 249 }, b), true);
+  assert.equal(allowed('member_tx', { ...empty, total: 250 }, b), false, 'nor the critical one');
+  assert.equal(allowed('important', { ...empty, total: 149 }, b), true);
+  assert.equal(allowed('important', { ...empty, total: 150 }, b), false);
+  assert.equal(allowed('member_bulk', { ...empty, total: 29 }, b), true);
+  assert.equal(allowed('member_bulk', { ...empty, total: 30 }, b), false, 'the remainder');
+  assert.equal(allowed('routine', { ...empty, total: 30 }, b), false);
+  // a used reservation holds nothing back
+  assert.equal(allowed('critical', { ...empty, total: 399, otp: 100 }, b), true);
+  assert.equal(allowed('member_tx', { ...empty, total: 399, otp: 100, critical: 50 }, b), true, 'a class is never capped while room is free');
+  // OTP takes any free room, others' reservations included
+  assert.equal(allowed('otp', { ...empty, total: 399 }, b), true);
+  assert.equal(allowed('otp', { ...empty, total: 400 }, b), false);
 });
 
 test('budget short: important goes into the summary; critical waits as deferred_quota (never lost, never expires)', async () => {
@@ -190,10 +201,10 @@ test('rolling 24 hours (like Gmail): yesterday evening counts after midnight; an
   await put(at - 3600000, 150);                            // 00:30
   await put(at - 25 * 3600000, 999);                       // older than the window
   await h.db.prepare("INSERT INTO notify_quota (day, total, critical, otp) VALUES ('2026-10-20', 999, 0, 0)").run();   // an old per-day row is ignored
-  assert.deepEqual({ ...(await quotaOf(h.db, at)) }, { total: 350, critical: 10, otp: 0 });
+  assert.deepEqual({ ...(await quotaOf(h.db, at)) }, { total: 350, critical: 10, otp: 0, admin: 0, member_tx: 0, member_bulk: 0 });
   const b = budget({});
   assert.equal(allowed('important', await quotaOf(h.db, at), b), false, 'a new calendar day does not reset the budget');
-  assert.equal(allowed('critical', await quotaOf(h.db, at), b), false, '350 = target − OTP reserve');
+  assert.equal(allowed('critical', await quotaOf(h.db, at), b), false, 'over target − the OTP reserve');
   assert.equal(allowed('otp', await quotaOf(h.db, at), b), true, 'the OTP reserve stays free');
   assert.equal((await quotaOf(h.db, at + 22 * 3600000)).total, 150, 'the 23:30 hour left the window, 00:30 still in');
 });

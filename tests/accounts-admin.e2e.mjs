@@ -70,7 +70,7 @@ function notifyFake() {
       admins: [{ email: ADMIN, name: 'مينا زكريا', primary: true }, { email: SECOND, name: 'فادي يوسف', primary: false }], types }),
     apply: body => { n.saved.push(body); n.router = body.router; n.email = body.email; for (const [k, v] of Object.entries(body.types || {})) Object.assign(types.find(t => t.key === k), v, { custom: true }); },
     me: () => ({ ok: true, router: n.router, email: n.email, types: types.slice(0, 8).map(t => ({ key: t.key, level: t.level, module: t.module, locked: t.level === 'critical', push: (n.prefs[t.key] && n.prefs[t.key].push) || (t.push ? 'immediate' : 'off'), pushAllowed: t.push, emailMode: (n.prefs[t.key] && n.prefs[t.key].email) || t.email })) }),
-    status: () => ({ ok: true, canManage: true, router: n.router, email: n.email, days: [{ day: '2026-10-20', push: { sent: 3 }, email: { sent: 1, failed: 1 } }], lastSuccess: { push: Date.now() - 60000 }, gmail: { ok: false, configured: false }, quota: { total: 1, critical: 0, otp: 0, target: 400, admin: 150 }, critical: n.critical })
+    status: () => ({ ok: true, member: { on: false, codes: true, accounts: true, classes: { otp: { sent: 4 }, member_tx: { sent: 2, suppressed: 1, dead: 1 } }, lastSent: Date.now(), discovery: { today: 12, cap: 400, noAccount: 3, wideSources: 1 } }, canManage: true, router: n.router, email: n.email, days: [{ day: '2026-10-20', push: { sent: 3 }, email: { sent: 1, failed: 1 } }], lastSuccess: { push: Date.now() - 60000 }, gmail: { ok: false, configured: false }, quota: { total: 1, critical: 0, otp: 0, target: 400, admin: 150 }, critical: n.critical })
   };
   return n;
 }
@@ -264,6 +264,11 @@ test('notifications: «تنبيهاتي», «إعدادات الإشعارات»
   const { context, page, problems } = await openSettings();
   await page.waitForSelector('.card--notify-settings .nt-row');
   await page.waitForSelector('.card--system-status .nt-critical');
+  const memberPart = await page.evaluate(() => document.querySelector('.card--system-status .nt-member').innerText);
+  assert.match(memberPart, /الحسابات شغالة/);
+  assert.match(memberPart, /إيميلات الأعضاء مقفولة/);
+  assert.match(memberPart, /12 \/ 400/);
+  assert.match(memberPart, /مصدر بيجرّب إيميلات كتير/);
   await page.waitForSelector('.card--notify-me .nt-row');
   await page.screenshot({ path: `${SHOTS}notify-settings.png`, fullPage: true });
 

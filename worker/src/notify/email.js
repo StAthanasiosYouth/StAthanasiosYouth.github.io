@@ -8,10 +8,9 @@
  *   itself. A row is idempotent: only a leased, unsent row is sent.
  * - Budget over a ROLLING 24 hours, like Gmail's own limit (notify_quota keeps
  *   one row per UTC hour, 'h:YYYY-MM-DDTHH'; the window is the last 24 rows):
- *   target MAIL_DAILY_TARGET (~400,
- *   within Gmail's real limit), MAIL_RESERVE_OTP kept for verification codes
- *   (Phase 5A), MAIL_RESERVE_CRITICAL kept for critical rows; admin mail that
- *   isn't critical stays within MAIL_ADMIN_BUDGET − the critical reserve.
+ *   target MAIL_DAILY_TARGET (~400, within Gmail's real limit), shared with
+ *   member email. Reservations in priority order, not caps (allowed() below;
+ *   docs/MEMBER-NOTIFICATIONS-PLAN.md §5).
  *   Short: routine, then important, go into the summary; critical uses the
  *   reserve, then waits as deferred_quota (retried each window, never
  *   expires; it also went by push).
@@ -37,18 +36,30 @@ const num = (v, d) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) 
 export function budget(s) {
   return {
     target: num(s.MAIL_DAILY_TARGET, 400),
-    admin: num(s.MAIL_ADMIN_BUDGET, 150),
+    admin: num(s.MAIL_ADMIN_BUDGET, 120),
     critical: num(s.MAIL_RESERVE_CRITICAL, 50),
-    otp: num(s.MAIL_RESERVE_OTP, 50)
+    otp: num(s.MAIL_RESERVE_OTP, 100),
+    member: num(s.MAIL_RESERVE_MEMBER, 100),
+    bulkPerHour: num(s.MAIL_BULK_PER_HOUR, 30)
   };
 }
 
-/* may one more email of `level` go today? q = { total, critical, otp } */
+/* the classes that hold room, highest first; member_bulk and admin routine share what is left */
+const RESERVED = [['otp', 'otp', 'otp'], ['critical', 'critical', 'critical'], ['member_tx', 'member_tx', 'member'], ['important', 'admin', 'admin']];
+
+/*
+ * May one more email of this class go? (§5, owner D4.) Allowed while the total stays under the
+ * target minus the UNUSED reservations of every class above it. A reservation protects room;
+ * it never caps its class while room is free. OTP looks only at the target.
+ */
 export function allowed(level, q, b) {
   if (level === 'otp') return q.total < b.target;
-  if (level === 'critical') return q.total < b.target - b.otp;
-  const adminNonCritical = q.total - q.critical - q.otp;
-  return adminNonCritical < Math.max(0, b.admin - b.critical) && q.total < b.target - b.otp - b.critical;
+  let held = 0;
+  for (const [cls, counter, reserve] of RESERVED) {
+    if (cls === level) break;
+    held += Math.max(0, b[reserve] - (q[counter] || 0));
+  }
+  return q.total < b.target - held;
 }
 
 /* the email of one outbox row: { subject, text, html } (templates.js) */
@@ -59,16 +70,21 @@ export function render(m, { summary = false, level = 'important', kind = '', day
 /* the hour bucket of a moment (UTC): 'h:2026-10-20T08' */
 export const hourKey = ms => 'h:' + new Date(ms).toISOString().slice(0, 13);
 
-/* emails sent in the rolling 24 hours ending now (this hour + the 23 before it) → { total, critical, otp } */
+/* emails sent in the rolling 24 hours ending now (this hour + the 23 before it), per class */
 export async function quotaOf(db, now = Date.now()) {
-  const r = await retry(() => db.prepare("SELECT COALESCE(SUM(total), 0) AS total, COALESCE(SUM(critical), 0) AS critical, COALESCE(SUM(otp), 0) AS otp FROM notify_quota WHERE day LIKE 'h:%' AND day >= ?")
+  const r = await retry(() => db.prepare("SELECT COALESCE(SUM(total), 0) AS total, COALESCE(SUM(critical), 0) AS critical, COALESCE(SUM(otp), 0) AS otp, COALESCE(SUM(admin), 0) AS admin, COALESCE(SUM(member_tx), 0) AS member_tx, COALESCE(SUM(member_bulk), 0) AS member_bulk FROM notify_quota WHERE day LIKE 'h:%' AND day >= ?")
     .bind(hourKey(now - 23 * HOUR)).first());
-  return r || { total: 0, critical: 0, otp: 0 };
+  return r || { total: 0, critical: 0, otp: 0, admin: 0, member_tx: 0, member_bulk: 0 };
 }
 /* the next moment the window frees room: the oldest hour leaves it */
 const nextWindowMs = now => (Math.floor(now / HOUR) + 1) * HOUR + 60000;
-export const countStmt = (db, day, level) => db.prepare(`INSERT INTO notify_quota (day, total, critical, otp) VALUES (?, 1, ?, 0)
-  ON CONFLICT(day) DO UPDATE SET total = total + 1, critical = critical + excluded.critical`).bind(day, level === 'critical' ? 1 : 0);
+const COUNTER = { critical: 'critical', otp: 'otp', important: 'admin', member_tx: 'member_tx', member_bulk: 'member_bulk' };
+export const countStmt = (db, day, level) => {
+  const col = COUNTER[level];
+  return col
+    ? db.prepare(`INSERT INTO notify_quota (day, total, ${col}) VALUES (?, 1, 1) ON CONFLICT(day) DO UPDATE SET total = total + 1, ${col} = ${col} + 1`).bind(day)
+    : db.prepare('INSERT INTO notify_quota (day, total) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET total = total + 1').bind(day);
+};
 
 /* the next Cairo midnight after `now` (a new budget) */
 function nextDayMs(now) {

@@ -36,6 +36,8 @@ export const SUPPORT_WHATSAPP = 'https://wa.me/201276162016';
 export const SUPPORT_EMAIL = 'menazakmena@gmail.com';
 export const SITE = 'https://stathanasiosyouth.github.io';
 export const PRIVACY = SITE + '/privacy/';
+const ACCOUNT = SITE + '/account/';
+const PREFS_URL = ACCOUNT + '#me/notifications';
 export const SOCIAL = Object.freeze([
   { name: 'فيسبوك', icon: 'facebook', url: 'https://www.facebook.com/Pope.Athanasius.The.Apostolic.Safaga' },
   { name: 'إنستجرام', icon: 'instagram', url: 'https://www.instagram.com/pope.athanasiustheapostolic/' },
@@ -165,7 +167,7 @@ function codeBlock(code) {
     `<table ${T} align="center" dir="ltr"><tr>` + ds.map((d, i) => tile(d) + (i === ds.length - 1 ? '' : gap(i === 2 ? 14 : 6))).join('') + '</tr></table></td></tr></table>';
 }
 
-function footer({ social, mini, why }) {
+function footer({ social, mini, why, prefs }) {
   const chipLink = (href, icon, label) => `<a href="${esc(href)}" style="display:inline-block;margin:8px 3px 0;padding:5px 14px;border-radius:999px;background-color:#1B3E7C;border:1px solid #34558F;color:#EAF2FC;font-family:${FONT};font-size:13px;line-height:1.7;text-decoration:none">` +
     `<img src="${IMG + icon}" width="16" height="16" alt="" style="border:0;vertical-align:middle;margin-left:6px">${label}</a>`;
   const socials = social ? `<table ${T} align="center" style="margin-top:16px"><tr>` + SOCIAL.map(s =>
@@ -177,7 +179,7 @@ function footer({ social, mini, why }) {
     chipLink(SUPPORT_WHATSAPP, 'i-whatsapp.png', 'واتساب ' + ltr(SUPPORT_PHONE)) + chipLink('mailto:' + SUPPORT_EMAIL, 'i-mail.png', ltr(SUPPORT_EMAIL)) +
     `</td></tr></table>${socials}` +
     `<div style="margin-top:16px;padding-top:12px;border-top:1px solid #1E3C74;color:#C7D6EE;font-size:12px"><b style="color:#FFFFFF">${esc(BRAND)}</b><br>${esc(SERVICE)}</div>` +
-    `<div style="margin-top:4px">${mini ? '' : `<a href="${SITE}/" style="color:#E2C27A;font-weight:700;text-decoration:none">موقع الخدمة</a> · `}<a href="${PRIVACY}" style="color:#E2C27A;font-weight:700;text-decoration:none">سياسة الخصوصية</a></div>` +
+    `<div style="margin-top:4px">${mini ? '' : `<a href="${SITE}/" style="color:#E2C27A;font-weight:700;text-decoration:none">موقع الخدمة</a> · `}<a href="${PRIVACY}" style="color:#E2C27A;font-weight:700;text-decoration:none">سياسة الخصوصية</a>${prefs ? ` · <a href="${PREFS_URL}" style="color:#E2C27A;font-weight:700;text-decoration:none">إعدادات الإشعارات</a>` : ''}</div>` +
     `<div style="margin-top:8px;color:#8296BE;font-size:11.5px">${esc(why)}</div></td></tr>`;
 }
 
@@ -208,6 +210,7 @@ function plain(o) {
     o.code ? 'واتساب: ' + SUPPORT_PHONE + ' · إيميل: ' + SUPPORT_EMAIL : 'واتساب: ' + SUPPORT_WHATSAPP + ' · إيميل: ' + SUPPORT_EMAIL);
   if (o.social) out.push(SOCIAL.map(s => s.name + ': ' + s.url).join('\n'));
   if (!o.code) out.push('سياسة الخصوصية: ' + PRIVACY);
+  if (o.prefs) out.push('إعدادات الإشعارات: ' + PREFS_URL);
   out.push(BRAND + ' · ' + SERVICE, o.why);
   return out.filter(l => l != null).filter((l, i, all) => l !== '' || (i > 0 && all[i - 1] !== '')).join('\n');
 }
@@ -256,7 +259,7 @@ export function layout(o) {
     `<!--[if mso]><table ${T} width="600" align="center"><tr><td><![endif]-->` +
     `<table ${T} width="100%" dir="rtl" style="max-width:600px;margin:0 auto">` +
     header(o.kicker, o.priority ? RED : '#FFFFFF') + (o.priority ? priorityBar(o.priority) : '') + card(body) +
-    footer({ social: !!o.social, mini: audience === 'admin' || !!o.code, why }) +
+    footer({ social: !!o.social, mini: audience === 'admin' || !!o.code, why, prefs: !!o.prefs }) +
     '</table><!--[if mso]></td></tr></table><![endif]--></td></tr></table></body></html>';
   return { html, text: plain({ ...o, why, facts: (o.facts || []).map(([k, v]) => [k, factText(v)]) }) };
 }
@@ -309,6 +312,8 @@ const SUBJECTS = {
   'notify.settings': 'تغيير إعدادات الإشعارات',
   'notify.failed': 'إشعار مقدرش يتبعت',
   'gmail.token': 'إرسال الإيميلات واقف',
+  'member.mail.dead': 'إيميل لعضو مقدرش يتبعت',
+  'account.discover.high': 'محاولات كتير على نموذج الدخول',
   'job.failed': 'مهمة في الخلفية فشلت'
 };
 
@@ -329,7 +334,7 @@ const FAMILIES = [
   ['money', 'المدفوعات', a => /^(payment|pay|handover|finance)\./.test(a)],
   ['accounts', 'الحسابات والصلاحيات', a => /^(accounts|admin|session)\./.test(a)],
   ['content', 'المحتوى', a => /^(update|create|delete|publish|news|content|media|program|comp|points|store|redemption)\b/.test(a)],
-  ['system', 'النظام', a => /^(notify|gmail|job|modules|export|code)\./.test(a)]
+  ['system', 'النظام', a => /^(notify|gmail|job|modules|export|code|member|account)\./.test(a)]
 ];
 const familyOf = action => FAMILIES.find(f => f[2](String(action || ''))) || ['other', 'نشاط تاني'];
 
@@ -404,7 +409,7 @@ export function summaryEmail(m, day) {
   };
 }
 
-/* ---------------- member (Phase 5A; not sent by anything yet) ---------------- */
+/* ---------------- member (Phase 5A: account/mail.js, member.js) ---------------- */
 
 const CODE_PURPOSE = {
   verify: { subject: 'كود تأكيد الإيميل لحسابك', kicker: 'تأكيد الحساب', heading: 'كود تأكيد الإيميل', intro: 'اكتب الكود ده في صفحة التسجيل علشان تأكد إيميلك وتكمّل:' },
@@ -434,6 +439,8 @@ export function otpEmail({ code, minutes = 10, purpose = 'verify' }) {
 }
 
 const SECURITY = {
+  account_created: { subject: 'اتعمل حساب بالإيميل ده', text: 'اتعمل حساب على موقع الخدمة بالإيميل ده.', site: true },
+  password_reset_support: { subject: 'الباسورد بتاع حسابك اتغير من الدعم الفني', text: 'الدعم الفني غيّر الباسورد بتاع حسابك.' },
   password_changed: { subject: 'الباسورد بتاع حسابك اتغير', text: 'الباسورد بتاع حسابك اتغير.' },
   email_changed: { subject: 'الإيميل بتاع حسابك اتغير', text: 'الإيميل المسجل في حسابك اتغير.' },
   recovery_used: { subject: 'حسابك اتسترجع بكود', text: 'حد استخدم كود استرجاع ودخل حسابك.' },
@@ -441,7 +448,7 @@ const SECURITY = {
 };
 
 /* a security notice to the account's owner: what changed, when, from where; help through the public site only */
-export function securityEmail({ kind, cairo, device = '' }) {
+export function securityEmail({ kind, cairo, device = '', prefs = false }) {
   const t = SECURITY[kind];
   if (!t) throw new Error('unknown security notice: ' + kind);
   return {
@@ -453,7 +460,9 @@ export function securityEmail({ kind, cairo, device = '' }) {
       intro: t.text,
       facts: [cairo ? ['امتى', whenText(cairo)] : null, device ? ['الجهاز', clip(device, 60)] : null].filter(Boolean),
       notes: ['لو ده انت، مش محتاج تعمل حاجة.', 'لو مش انت، كلّم الدعم الفني على طول (واتساب أو إيميل تحت).'],
-      link: { label: 'موقع الخدمة', url: SITE + '/' },
+      // the account's security section (docs/EMAIL-DEEP-LINKS.md); a creation notice may reach a stranger: the site only
+      link: t.site ? { label: 'موقع الخدمة', url: SITE + '/' } : { label: 'أمان حسابك', url: ACCOUNT + '#me/security' },
+      prefs,
       why: WHY.security
     })
   };

@@ -65,6 +65,21 @@ test('a shared device keeps the session in this tab only', () => {
   assert.equal(M.readSession(local, tab), null, 'not one of ours');
 });
 
+test('a link\'s destination: own routes only, this tab, 30 minutes, once', () => {
+  assert.equal(M.cleanRoute('#me/security'), '#me/security');
+  assert.equal(M.cleanRoute('#me/notifications'), '#me/notifications');
+  assert.equal(M.cleanRoute('#me/bookings/B-7QK2M'), '#me', 'a later section: the first page for now');
+  for (const bad of ['#//evil.example', 'javascript:alert(1)', 'https://evil.example', '#me/<x>', '#mee', '']) assert.equal(M.cleanRoute(bad), '', bad);
+  const tab = store();
+  M.keepDest(tab, 'https://evil.example', 1000);
+  assert.equal(M.takeDest(tab, 1000), '');
+  M.keepDest(tab, '#me/security', 1000);
+  assert.equal(M.takeDest(tab, 2000), '#me/security');
+  assert.equal(M.takeDest(tab, 2000), '', 'once');
+  M.keepDest(tab, '#me/security', 1000);
+  assert.equal(M.takeDest(tab, 1000 + 31 * 60000), '', 'too old');
+});
+
 test('the form follows the password-manager rules (§13.1)', () => {
   const src = readFileSync(new URL('../assets/js/account/app.js', import.meta.url), 'utf8');
   assert.ok(src.includes("autocomplete: 'username'"));

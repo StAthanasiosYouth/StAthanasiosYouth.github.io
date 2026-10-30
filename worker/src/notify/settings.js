@@ -23,10 +23,11 @@ import { readSettings } from './router.js';
 import { budget, quotaOf } from './email.js';
 import { gmailConfigured } from './gmail.js';
 import { sources, messageFor } from './claim.js';
+import { memberStatus } from './member.js';
 
 const EMAIL_MODES = ['off', 'immediate', 'summary'];
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
-const BUDGET_KEYS = { target: 'MAIL_DAILY_TARGET', admin: 'MAIL_ADMIN_BUDGET', critical: 'MAIL_RESERVE_CRITICAL', otp: 'MAIL_RESERVE_OTP' };
+const BUDGET_KEYS = { target: 'MAIL_DAILY_TARGET', admin: 'MAIL_ADMIN_BUDGET', critical: 'MAIL_RESERVE_CRITICAL', otp: 'MAIL_RESERVE_OTP', member: 'MAIL_RESERVE_MEMBER', bulkPerHour: 'MAIL_BULK_PER_HOUR' };
 const invalid = field => new ApiError('invalid', field, { field });
 const DAY = 864e5;
 
@@ -126,7 +127,7 @@ export async function notifySettingsSave(ctx) {
     }
     const all = budget({ ...(await readSettings(db)), ...Object.fromEntries(Object.entries(BUDGET_KEYS).filter(([k]) => b[k] !== undefined).map(([k, key]) => [key, String(b[k])])) });
     // Gmail's own limit is ~500 a day; the reserves must fit inside the target
-    if (all.target > 450 || all.critical + all.otp > all.target || all.admin > all.target) throw invalid('budget');
+    if (all.target > 450 || all.critical + all.otp + all.member + all.admin > all.target) throw invalid('budget');
   }
   if (!changed.length) return notifySettingsGet(ctx);
   stmts.push(activityStmt(db, {
@@ -219,6 +220,7 @@ export async function notifyStatus(ctx) {
     gmail,
     // the last 24 hours (rolling, like Gmail's own limit)
     quota: { ...quotaNow, ...budget(s), window: 'rolling-24h' },
+    member: await memberStatus(ctx.env, now),
     critical: waiting.results.map(r => {
       const m = messageFor(r, src);
       return { id: r.id, recipient: r.recipient, channel: r.channel, status: r.status, attempts: r.attempts, error: r.error || '', at: r.created_ms, title: m ? m.title : r.kind };

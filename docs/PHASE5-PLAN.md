@@ -64,7 +64,49 @@ Staging: migration `0018` applied; Worker version `a69f6f79` (with the three sec
 - Password-manager save and fill on real devices (the device matrix, YOUTH §25).
 - The Excel, admin and points parts: later batches.
 
-## 4. Rollback (batch 1)
+## 3a. Batch 2 (P5-3 + P5-4): what was built
+
+Status: **implemented and verified on staging, 2026-10-30. Not on `main`, not in production.**
+
+**P5-4 member email**
+- `worker/migrations/0019_member_email.sql`: counters per class (`admin`, `member_tx`, `member_bulk`), `MAIL_RESERVE_MEMBER` 100, `MAIL_BULK_PER_HOUR` 30; `MAIL_RESERVE_OTP` 50 → 100 and `MAIL_ADMIN_BUDGET` 150 → 120 only where the old default is still there.
+- `worker/src/notify/email.js`: the owner's D4 rule replaces the hard caps. A class may send while the total stays under the target minus the unused reservations above it; OTP looks only at the target.
+- `worker/src/notify/member.js`: kinds, `memberEmailStmt` (the row goes in the state change's batch), the cron's lease by priority, re-check at send (`superseded`), verified-only recipient, preferences, 10 receipts a day, drip, expiry, retries, one dead-mail alert an hour. Queue job `member.email`.
+- Templates: `account_created`, `password_reset_support`; security notices open `#me/security` (a creation notice only the site, since it may reach a stranger); Tier 2–3 carry the «إعدادات الإشعارات» link.
+- Live trigger: `acct.dev` (a device this account never used; opt-in).
+
+**P5-3 profile**
+- Routes `GET /v1/account/security`, `GET` + `POST /v1/account/prefs`.
+- `/account/`: profile (read-only; corrections go through support), `#me/notifications` «إشعاراتي», `#me/security` (devices, «اخرج من كل الأجهزة»). A link's destination survives sign-in once, for 30 minutes, in this tab, own routes only (EMAIL-DEEP-LINKS §3).
+
+**Monitoring:** «حالة النظام» shows the three switches, member mail in the last 24 hours, and the sign-in form's daily count, no-account answers and wide sources. One important admin alert at half of the daily form budget. «إعدادات الإشعارات» gains the member reservation.
+
+**Boundaries inside batch 2**
+- The Tier 0 notices `acct.new`, `acct.pw`, `acct.rec1` are built and tested, but their triggers are admin actions, so they fire from P5-5. `acct.email` is not built yet: it needs the correction flow and a way to reach the old address.
+- Manual resend (MEMBER §9) needs the person sheet: P5-5. Age-out email: P5-8, with the other 5B mail (MEMBER §10).
+- There is no admin switch for `accounts_mode`, `OTP_EMAIL`, `MEMBER_EMAIL`: they are shown, and changed at launch by SQL on the owner's approval (P5-10).
+
+**Takes effect for admin mail too, on release.** The D4 rule also governs admin notifications: an important one was held from a total of 100 and is now held from 150 while reservations are unused. «إعدادات الإشعارات» now refuses reservations that add up to more than the target. Both come from the signed-off plan (MEMBER §5).
+
+## 3b. Batch 2 results (2026-10-30)
+
+| Check | Result |
+| --- | --- |
+| Worker unit tests, 22 new in `test/member-email.test.mjs` | 330 / 330 |
+| Site unit tests | 771 pass; the same 3 known failures |
+| Admin e2e `tests/accounts-admin.e2e.mjs` (includes the new status part) | 8 / 8 |
+| Staging `node scripts/member-check.mjs` (real cron + queue) | 20 / 20 |
+| Staging `node scripts/account-check.mjs` (batch 1 again) | All passed |
+| Staging page in a browser | Passed: link kept through registration, «إشعاراتي» saved and reloaded, devices, logout everywhere, a foreign hash ignored, no overflow |
+| Production | Unchanged: Worker `4408fb3a`, no migration, nothing pushed |
+
+Staging: migration `0019`, Worker `cafe2c46`; `accounts_mode = on`, `OTP_EMAIL = 0`, `MEMBER_EMAIL = 0` left on staging.
+
+**Not verified (planned for P5-9):** a real member email through real Gmail to a real inbox (staging used the test inbox; Gmail is covered by unit tests with a fake). The budget's full-window behaviour is unit-tested only.
+
+## 4. Rollback (batches 1–2)
+
+- Batch 2 extra: `MEMBER_EMAIL = 0` stops every member email except codes (tested). Rows wait until they expire. The budget rule change rolls back with `wrangler rollback`; the migration's added columns and settings stay harmless. To restore the old defaults: `MAIL_RESERVE_OTP = 50`, `MAIL_ADMIN_BUDGET = 150`.
 
 - Staging: `UPDATE settings SET value = 'off' WHERE key = 'accounts_mode'` (tested by the check script: every route answers `accounts_off`) or `wrangler rollback --env staging`.
 - Production (when released): the schema is additive and unused while `accounts_mode = off`; `wrangler rollback` to the previous version for a bad deploy. Migrations are forward-only (YOUTH §24).
@@ -72,6 +114,6 @@ Staging: migration `0018` applied; Worker version `a69f6f79` (with the three sec
 
 ## 5. Before production (needs the owner)
 
-Production release of batch 1 is a separate approval: `main`, migration `0018`, the deploy, and `node scripts/account-secrets.mjs --production`. Everything stays dormant with `accounts_mode = off`.
+Production release of batches 1–2 is a separate approval: `main`, migrations `0018` + `0019`, the deploy, and `node scripts/account-secrets.mjs --production`. Accounts stay dormant with `accounts_mode = off`; the new budget rule applies to admin mail at once (§3a).
 
 Owner tasks from YOUTH §28.2, needed by P5-10 at the latest: 2-Step Verification on the youth Gmail account; privacy text approval; pick the support contact (batch 3); archive the test data from the competitions spreadsheet (before batch 3).
