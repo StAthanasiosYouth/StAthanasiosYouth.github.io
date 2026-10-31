@@ -155,7 +155,10 @@ test('member codes (Phase 5A, not wired): verify / recovery — the code and exp
     assert.ok(!SOCIALS.some(s => e.html.includes(s)), 'no social links in a code email');
     assert.doesNotMatch(e.text, /https?:\/\//);
     assert.match(e.text, /482913/);
-    assert.match(e.html, /dir="ltr"><tr>(<td class="tile"[^>]*>\d<\/td>(<td width="\d+"[^>]*>&nbsp;<\/td>)?){6}<\/tr>/, 'six digit tiles, left to right');
+    assert.match(e.html, /<span class="code" dir="ltr"[^>]*>482913<\/span>/, 'one run of six digits, left to right');
+    assert.doesNotMatch(e.html, /class="tile"/);
+    assert.match(e.html, /Verification code/);
+    assert.match(e.text, /Verification code: 482913/);
     assert.match(e.text, /١٥ دقايق/);
     assert.match(e.text, /محدش من الخدمة هيطلبه منك/);
     assert.match(e.text, /لو مش انت، تجاهله/);
@@ -204,7 +207,8 @@ test('email-safe HTML: tables + inline styles, a solid colour under every gradie
     assert.match(e.html, /bgcolor="#0D3F98" background="https:\/\/stathanasiosyouth\.github\.io\/assets\/email\/header\.jpg"/, 'header: navy with images off');
     assert.match(e.html, /<!--\[if gte mso 9\]><v:rect[^>]*><v:fill type="frame" src="[^"]+header\.jpg" color="#0D3F98"\/>/, 'Outlook: VML background');
     assert.match(e.html, /role="presentation"/);
-    assert.match(e.html, /<meta name="color-scheme" content="light">/);
+    assert.match(e.html, /<meta name="color-scheme" content="light dark">/);
+    assert.match(e.html, /@media \(prefers-color-scheme:dark\)/, 'the white parts have a night colour');
   }
 });
 
@@ -228,7 +232,7 @@ test('member booking notice (Phase 5A design, not wired): status, reference, pai
     assert.ok(e.html.includes(s), 'html: ' + s);
     assert.ok(e.text.includes(s), 'text: ' + s);
   }
-  assert.match(e.html, /<td width="67%" height="8"/, 'paid share of the bar');
+  assert.match(e.html, /<td class="e-bar" width="67%" height="8"/, 'paid share of the bar');
   for (const s of SOCIALS) { assert.ok(e.html.includes('href="' + s + '"'), s); assert.ok(e.text.includes(s), s); }
   assert.doesNotMatch(e.html + e.text, /\/admin/);
   const paid = booking({ status: 'confirmed', paid: 900, next: '' });

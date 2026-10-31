@@ -5,8 +5,8 @@
  *
  *   admin    the panel's servants (active now): notifications, critical alerts,
  *            booking notices, the daily summary. One link, to the panel.
- *   member   youth accounts (Phase 5A, NOT sent by anything yet): verification
- *            codes, password recovery, security notices, booking notices.
+ *   member   youth accounts: verification codes, password recovery, security
+ *            notices, bookings, results, points, the store.
  *            Never an admin link; a code email has no service link at all.
  *
  * What every email keeps to (Gmail sender guidelines; plain, honest mail):
@@ -100,49 +100,59 @@ const C = { navy: '#0A2559', royal: '#1259C3', ink: '#0F2340', slate: '#4E6488',
 const T = 'role="presentation" cellpadding="0" cellspacing="0" border="0"';
 const ltr = s => '<span dir="ltr">' + esc(s) + '</span>';
 const img = (name, w, h, alt, style = '') => `<img src="${IMG + name}" width="${w}" height="${h}" alt="${esc(alt)}" style="display:block;border:0;outline:none;${style}">`;
-const gut = inner => `<tr><td class="gut" bgcolor="${C.canvas}" style="background-color:${C.canvas};padding:0 14px">${inner}</td></tr>`;
 
 function head(title) {
   return '<!doctype html>\n<html lang="ar" dir="rtl" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"><head>' +
-    '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light">' +
-    '<meta name="supported-color-schemes" content="light"><meta name="x-apple-disable-message-reformatting"><title>' + esc(title) + '</title>' +
+    '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark">' +
+    '<meta name="supported-color-schemes" content="light dark"><meta name="x-apple-disable-message-reformatting"><title>' + esc(title) + '</title>' +
     '<style>body{margin:0;padding:0;-webkit-text-size-adjust:100%}a{text-decoration:none}' +
-    '@media (max-width:480px){.wrap{padding:10px 4px!important}.gut{padding-left:8px!important;padding-right:8px!important}' +
-    '.card{padding-left:18px!important;padding-right:18px!important}.tile{width:34px!important;font-size:25px!important}.h1{font-size:19px!important}}</style>' +
+    '@media (max-width:480px){.wrap{padding:0!important}.shell{border-radius:0!important}.top{border-radius:0!important}.foot{border-radius:0!important}' +
+    '.card{padding-left:18px!important;padding-right:18px!important}.code{font-size:36px!important;letter-spacing:4px!important}.h1{font-size:19px!important}}' +
+    // the same blue design at night: the header, the code and the footer stay, the white parts go dark (Apple Mail, Outlook; Gmail decides by itself)
+    '@media (prefers-color-scheme:dark){body,.e-page{background-color:#07101F!important}' +
+    '.e-card,.e-cap{background-color:#10233D!important}.e-card td{background-color:transparent!important}.e-card,.e-card td,.e-card h1,.e-card p,.e-card div,.e-card span,.e-card b{color:#EAF1FB!important}' +
+    '.e-card table{border-color:#27466F!important}.e-card td{border-color:#27466F!important}.e-card .e-muted,.e-card td.e-muted{color:#B4C6DE!important}' +
+    '.e-card td.e-panel{background-color:#16304F!important;background-image:none!important;border-color:#27466F!important}.e-card .e-chip{background-color:#1D3B63!important;color:#CFE3F8!important}' +
+    '.e-card td.e-warm{background-color:#2B2412!important;border-color:#5C4A1E!important}.e-card td.e-warm,.e-card td.e-warm b{color:#F2D28B!important}' +
+    '.e-card td.e-track{background-color:#27466F!important}.e-card td.e-bar{background-color:#4F9BE3!important}.e-card td.e-kpi{background-color:#0D3F98!important}' +
+    '.e-card td.e-code{background-color:#0D3F98!important}.e-card td.e-cta{background-color:#1259C3!important}.e-card .e-url{color:#8FA6C6!important}.e-card .e-ok{color:#7FE0B0!important}}</style>' +
     '<!--[if mso]><style>body,table,td,a,span,div,p{font-family:Tahoma,Arial,sans-serif!important}</style><![endif]--></head>';
 }
 
-/* the header: the artwork (solid navy without images), the logo, the names, the kicker; then the card's top edge */
+/* the header: the artwork (solid navy without images), the logo on the right beside the names, the kicker; then the white card's rounded top, as wide as the mail */
 function header(kicker, cap) {
   const bg = IMG + 'header.jpg';
-  return `<tr><td align="center" bgcolor="#0D3F98" background="${bg}" style="background-color:#0D3F98;background-image:url('${bg}');background-position:center bottom;background-size:600px auto;background-repeat:no-repeat;border-radius:20px 20px 0 0;padding:26px 0 0">` +
+  return `<tr><td align="center" bgcolor="#0D3F98" background="${bg}" style="background-color:#0D3F98;background-image:url('${bg}');background-position:center bottom;background-size:600px auto;background-repeat:no-repeat;border-radius:20px 20px 0 0;padding:24px 0 0" class="top">` +
     `<!--[if gte mso 9]><v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:600px;mso-fit-shape-to-text:true"><v:fill type="frame" src="${bg}" color="#0D3F98"/><v:textbox inset="0,0,0,0"><![endif]-->` +
-    `<table ${T} align="center"><tr><td align="center">${img('logo.png', 74, 74, 'شعار ' + BRAND, 'margin:0 auto')}</td></tr></table>` +
-    `<div style="margin:8px 16px 0;color:#FFFFFF;font-family:${FONT};font-size:16px;font-weight:800;line-height:1.5">${esc(BRAND)}</div>` +
-    `<div style="margin:0 16px;color:#C9E3F8;font-family:${FONT};font-size:13px;line-height:1.6">${esc(SERVICE)}</div>` +
-    (kicker ? `<table ${T} align="center" style="margin-top:8px"><tr><td bgcolor="#2A5DB0" style="background-color:#2A5DB0;border:1px solid #4F7FCC;border-radius:999px;padding:1px 14px;color:#FFFFFF;font-family:${FONT};font-size:12px;font-weight:700;line-height:1.8">${esc(kicker)}</td></tr></table>` : '') +
-    // room for the gold line, then the white card's rounded top edge over the artwork
-    `<div style="height:62px;line-height:62px">&nbsp;</div>` +
-    `<table ${T} width="100%"><tr><td class="gut" style="padding:0 14px"><table ${T} width="100%"><tr>` +
-    `<td height="22" bgcolor="${cap}" style="background-color:${cap};height:22px;line-height:22px;border-radius:20px 20px 0 0">&nbsp;</td></tr></table></td></tr></table>` +
+    `<table ${T} width="100%" dir="rtl"><tr>` +
+    `<td width="74" valign="middle" style="padding:0 20px 0 0">${img('logo.png', 74, 74, 'شعار ' + BRAND)}</td>` +
+    `<td valign="middle" style="padding:0 12px 0 16px;text-align:right">` +
+    `<div style="color:#FFFFFF;font-family:${FONT};font-size:16px;font-weight:800;line-height:1.5">${esc(BRAND)}</div>` +
+    `<div style="color:#C9E3F8;font-family:${FONT};font-size:13px;line-height:1.6">${esc(SERVICE)}</div>` +
+    (kicker ? `<table ${T} style="margin-top:6px"><tr><td bgcolor="#2A5DB0" style="background-color:#2A5DB0;border:1px solid #4F7FCC;border-radius:999px;padding:1px 14px;color:#FFFFFF;font-family:${FONT};font-size:12px;font-weight:700;line-height:1.8">${esc(kicker)}</td></tr></table>` : '') +
+    `</td></tr></table>` +
+    // room for the gold line, then the white card's rounded top edge: the full width, so nothing steps at its sides
+    `<div style="height:46px;line-height:46px">&nbsp;</div>` +
+    `<table ${T} width="100%"><tr>` +
+    `<td class="${cap === RED ? '' : 'e-cap'}" height="22" bgcolor="${cap}" style="background-color:${cap};height:22px;line-height:22px;border-radius:20px 20px 0 0">&nbsp;</td></tr></table>` +
     `<!--[if gte mso 9]></v:textbox></v:rect><![endif]--></td></tr>`;
 }
 
 const RED = '#B42318';
-const priorityBar = text => gut(`<table ${T} width="100%"><tr><td bgcolor="${RED}" style="background-color:${RED};background-image:linear-gradient(120deg,#8E1B12,#C8372B);padding:0 22px 11px;color:#FFFFFF;font-family:${FONT};font-size:13px;font-weight:700;line-height:1.6">● ${esc(text)}</td></tr></table>`);
+const priorityBar = text => `<tr><td bgcolor="${RED}" style="background-color:${RED};background-image:linear-gradient(120deg,#8E1B12,#C8372B);padding:0 26px 11px;color:#FFFFFF;font-family:${FONT};font-size:13px;font-weight:700;line-height:1.6;text-align:right">● ${esc(text)}</td></tr>`;
 
-const card = inner => gut(`<table ${T} width="100%"><tr><td class="card" bgcolor="#FFFFFF" style="background-color:#FFFFFF;border-radius:0 0 20px 20px;padding:4px 26px 28px;direction:rtl;text-align:right;color:${C.ink};font-family:${FONT};font-size:14px;line-height:1.75">${inner}</td></tr></table>`);
+const card = inner => `<tr><td class="card e-card" bgcolor="#FFFFFF" style="background-color:#FFFFFF;padding:4px 26px 28px;direction:rtl;text-align:right;color:${C.ink};font-family:${FONT};font-size:14px;line-height:1.75">${inner}</td></tr>`;
 
-const button = link => `<table ${T} align="center" style="margin:22px auto 0"><tr><td align="center" bgcolor="${C.royal}" style="background-color:${C.royal};background-image:linear-gradient(120deg,#0A2F7A,#1259C3 55%,#1E8FD6);border-radius:999px">` +
+const button = link => `<table ${T} align="center" style="margin:22px auto 0"><tr><td class="e-cta" align="center" bgcolor="${C.royal}" style="background-color:${C.royal};background-image:linear-gradient(120deg,#0A2F7A,#1259C3 55%,#1E8FD6);border-radius:999px">` +
   `<a href="${esc(link.url)}" style="display:inline-block;padding:13px 34px;color:#FFFFFF;font-family:${FONT};font-size:15px;font-weight:700;line-height:1.5;text-decoration:none;border-radius:999px">${esc(link.label)}</a></td></tr></table>` +
-  `<p style="margin:8px 0 0;text-align:center;font-family:${MONO};font-size:11.5px;color:#7A8DAE;word-break:break-all" dir="ltr">${esc(link.url)}</p>`;
+  `<p class="e-url" style="margin:8px 0 0;text-align:center;font-family:${MONO};font-size:11.5px;color:#7A8DAE;word-break:break-all" dir="ltr">${esc(link.url)}</p>`;
 
-const chip = (bg, color, text) => `<span style="display:inline-block;background-color:${bg};color:${color};border-radius:999px;padding:1px 11px;font-family:${FONT};font-size:12px;font-weight:700;line-height:1.8">${text}</span>`;
+const chip = (bg, color, text) => `<span class="e-chip" style="display:inline-block;background-color:${bg};color:${color};border-radius:999px;padding:1px 11px;font-family:${FONT};font-size:12px;font-weight:700;line-height:1.8">${text}</span>`;
 const h1 = text => `<h1 class="h1" style="margin:12px 0 6px;color:${C.navy};font-family:${FONT};font-size:21px;font-weight:800;line-height:1.45">${esc(text)}</h1>`;
-const para = (text, style = '') => `<p style="margin:0 0 14px;color:${C.slate};font-size:14px;${style}">${esc(text)}</p>`;
-const panel = (inner, style = '') => `<table ${T} width="100%" style="margin-top:14px"><tr><td bgcolor="${C.mist}" style="background-color:${C.mist};border:1px solid ${C.line};border-radius:16px;padding:6px 16px;${style}">${inner}</td></tr></table>`;
+const para = (text, style = '') => `<p class="e-muted" style="margin:0 0 14px;color:${C.slate};font-size:14px;${style}">${esc(text)}</p>`;
+const panel = (inner, style = '') => `<table ${T} width="100%" style="margin-top:14px"><tr><td class="e-panel" bgcolor="${C.mist}" style="background-color:${C.mist};border:1px solid ${C.line};border-radius:16px;padding:6px 16px;${style}">${inner}</td></tr></table>`;
 const kv = (rows, big) => `<table ${T} width="100%">` + rows.map(([k, v], i) =>
-  `<tr><td style="padding:8px 0;${i ? 'border-top:1px solid #E2EEF9;' : ''}color:${C.slate};font-size:13.5px">${esc(k)}</td>` +
+  `<tr><td class="e-muted" style="padding:8px 0;${i ? 'border-top:1px solid #E2EEF9;' : ''}color:${C.slate};font-size:13.5px">${esc(k)}</td>` +
   `<td align="left" style="padding:8px 0 8px 0;${i ? 'border-top:1px solid #E2EEF9;' : ''}color:${C.ink};font-size:${big === i ? 19 : 13.5}px;font-weight:700;text-align:left">${v}</td></tr>`).join('') + '</table>';
 const timeline = rows => `<table ${T} width="100%">` + rows.map((r, i) =>
   `<tr><td style="padding:7px 0;${i ? 'border-top:1px solid #EEF5FC;' : ''}font-size:13.5px;color:${C.ink}">${esc(r.text)}</td>` +
@@ -153,19 +163,23 @@ const sectionTitle = t => `<table ${T}><tr><td width="4" bgcolor="${C.royal}" st
 function kpiRow(kpis) {
   const cells = kpis.map(([n, label], i) => {
     const first = i === 0;
-    return `<td width="${Math.floor(100 / kpis.length)}%" align="center" bgcolor="${first ? '#0D3F98' : C.mist}" style="background-color:${first ? '#0D3F98' : C.mist};${first ? 'background-image:linear-gradient(135deg,#061A44,#0D3F98 55%,#1A7FD0);' : 'border:1px solid ' + C.line + ';'}border-radius:16px;padding:10px 4px">` +
+    return `<td class="${first ? 'e-kpi' : 'e-panel'}" width="${Math.floor(100 / kpis.length)}%" align="center" bgcolor="${first ? '#0D3F98' : C.mist}" style="background-color:${first ? '#0D3F98' : C.mist};${first ? 'background-image:linear-gradient(135deg,#061A44,#0D3F98 55%,#1A7FD0);' : 'border:1px solid ' + C.line + ';'}border-radius:16px;padding:10px 4px">` +
       `<div style="font-size:26px;font-weight:800;line-height:1.2;color:${first ? '#FFFFFF' : C.royal}">${esc(digits(n))}</div>` +
       `<div style="font-size:11.5px;color:${first ? '#D6E6FA' : C.slate}">${esc(label)}</div></td>`;
   });
   return `<table ${T} width="100%" style="margin-top:12px"><tr>${cells.join('<td width="8" style="font-size:8px">&nbsp;</td>')}</tr></table>`;
 }
 
+/*
+ * The code: ONE run of six digits, so a long press or a double click takes all of them in any mail app, and the words
+ * beside it are what mail apps look for to recognise a code. No copy button: scripts don't run in mail, and a link
+ * would carry the code. No spaces and no cell per digit.
+ */
 function codeBlock(code) {
-  const tile = d => `<td class="tile" width="40" align="center" bgcolor="#2453A8" style="background-color:#2453A8;border:1px solid #4A74C0;border-radius:11px;color:#FFFFFF;font-family:${MONO};font-size:30px;font-weight:800;line-height:52px">${d}</td>`;
-  const gap = w => `<td width="${w}" style="font-size:8px">&nbsp;</td>`;
-  const ds = String(code).split('');
-  return `<table ${T} width="100%" style="margin:6px 0 14px"><tr><td align="center" bgcolor="#0D3F98" style="background-color:#0D3F98;background-image:linear-gradient(135deg,#061A44,#0D3F98 50%,#1A7FD0);border-radius:18px;padding:14px 8px">` +
-    `<table ${T} align="center" dir="ltr"><tr>` + ds.map((d, i) => tile(d) + (i === ds.length - 1 ? '' : gap(i === 2 ? 14 : 6))).join('') + '</tr></table></td></tr></table>';
+  return `<table ${T} width="100%" style="margin:6px 0 8px"><tr><td class="e-code" align="center" bgcolor="#0D3F98" style="background-color:#0D3F98;background-image:linear-gradient(135deg,#061A44,#0D3F98 50%,#1A7FD0);border-radius:18px;padding:12px 8px 14px">` +
+    `<div style="color:#C9E3F8;font-family:${FONT};font-size:12px;line-height:1.6">كود التأكيد · <span dir="ltr">Verification code</span></div>` +
+    `<span class="code" dir="ltr" style="display:inline-block;color:#FFFFFF;font-family:${MONO};font-size:42px;font-weight:800;line-height:1.25;letter-spacing:6px;-webkit-user-select:all;user-select:all;white-space:nowrap">${esc(code)}</span></td></tr></table>` +
+    `<p class="e-muted" style="margin:0 0 14px;text-align:center;color:${C.slate};font-size:12.5px">عشان تنسخه: دوس على الرقم دوسة طويلة، أو دوستين على الكمبيوتر</p>`;
 }
 
 function footer({ social, mini, why, prefs, support }) {
@@ -174,8 +188,7 @@ function footer({ social, mini, why, prefs, support }) {
     `<img src="${IMG + icon}" width="16" height="16" alt="" style="border:0;vertical-align:middle;margin-left:6px">${label}</a>`;
   const socials = social ? `<table ${T} align="center" style="margin-top:16px"><tr>` + SOCIAL.map(s =>
     `<td style="padding:0 5px"><a href="${esc(s.url)}">${img('s-' + s.icon + '.png', 36, 36, s.name)}</a></td>`).join('') + '</tr></table>' : '';
-  return `<tr><td height="18" bgcolor="${C.canvas}" style="background-color:${C.canvas};height:18px;line-height:18px">&nbsp;</td></tr>` +
-    `<tr><td align="center" bgcolor="${C.navy}" style="background-color:${C.navy};background-image:linear-gradient(180deg,#0B2A66,#061A44);border-radius:0 0 20px 20px;padding:24px 22px 22px;text-align:center;color:#A9BEDF;font-family:${FONT};font-size:12.5px;line-height:1.8">` +
+  return `<tr><td class="foot" align="center" bgcolor="${C.navy}" style="background-color:${C.navy};background-image:linear-gradient(180deg,#0B2A66,#061A44);border-radius:0 0 20px 20px;padding:24px 22px 22px;text-align:center;color:#A9BEDF;font-family:${FONT};font-size:12.5px;line-height:1.8">` +
     `<table ${T} width="100%"><tr><td align="center" bgcolor="#15356F" style="background-color:#15356F;border:1px solid #2A4A85;border-radius:16px;padding:12px 10px">` +
     `<div style="color:#FFFFFF;font-size:14px;font-weight:800">محتاج مساعدة؟ <span style="color:#A9C6EC;font-size:12.5px;font-weight:400">تواصل مع الدعم الفني: ${esc(contact.name)}</span></div>` +
     chipLink(contact.whatsapp, 'i-whatsapp.png', 'واتساب ' + ltr(contact.phone)) + chipLink('mailto:' + SUPPORT_EMAIL, 'i-mail.png', ltr(SUPPORT_EMAIL)) +
@@ -196,7 +209,7 @@ function plain(o) {
   if (o.priority) out.push('[' + o.priority + ']');
   if (o.hero) out.push(o.hero.title + (o.hero.sub ? ' – ' + o.hero.sub : ''));
   if (o.intro) out.push(o.intro);
-  if (o.code) out.push('', o.code, '');
+  if (o.code) out.push('', 'Verification code: ' + o.code, '');
   if (o.minutes) out.push('الكود صالح لمدة ' + digits(o.minutes) + ' دقايق، ولمرة واحدة.');
   if (o.ticket) {
     const t = o.ticket;
@@ -242,14 +255,14 @@ export function layout(o) {
     body += `<table ${T} width="100%" style="border-bottom:1px solid #E6F0FA"><tr>` +
       (o.hero.icon ? `<td width="56" valign="middle" style="padding:6px 0 14px">${img(o.hero.icon, 46, 46, '')}</td>` : '') +
       `<td valign="middle" style="padding:6px ${o.hero.icon ? '12px' : '0'} 14px 0"><div style="color:${C.navy};font-size:19px;font-weight:800;line-height:1.35">${esc(o.hero.title)}</div>` +
-      (o.hero.sub ? `<div style="color:${C.slate};font-size:13px">${esc(o.hero.sub)}</div>` : '') + '</td></tr></table>';
+      (o.hero.sub ? `<div class="e-muted" style="color:${C.slate};font-size:13px">${esc(o.hero.sub)}</div>` : '') + '</td></tr></table>';
   }
   if (o.icon) body += `<table ${T} align="center" style="margin:16px auto 0"><tr><td>${img(o.icon, 54, 54, '')}</td></tr></table>`;
   if (o.label || o.date) body += `<div style="margin-top:16px">${o.label ? chip('#EAF4FE', C.royal, esc(o.label)) : ''}${o.date ? chip('#FFF6E2', '#7A5614', esc(o.date)) : ''}</div>`;
   if (!o.hero) body += h1(o.heading);
   if (o.intro) body += para(o.intro, o.code ? 'text-align:center' : '');
   if (o.code) body += codeBlock(o.code);
-  if (o.minutes) body += `<table ${T} align="center"><tr><td bgcolor="#FFF7E6" style="background-color:#FFF7E6;border:1px solid #F0DFB4;border-radius:999px;padding:3px 14px;color:${C.navy};font-size:13.5px">` +
+  if (o.minutes) body += `<table ${T} align="center"><tr><td class="e-warm" bgcolor="#FFF7E6" style="background-color:#FFF7E6;border:1px solid #F0DFB4;border-radius:999px;padding:3px 14px;color:${C.navy};font-size:13.5px">` +
     `<img src="${IMG}i-clock.png" width="16" height="16" alt="" style="border:0;vertical-align:middle;margin-left:6px">صالح لمدة <b>${digits(o.minutes)} دقايق</b> · لمرة واحدة بس</td></tr></table>`;
   if (o.ticket) body += ticketHtml(o.ticket);
   if (o.facts && o.facts.length) body += panel(kv(o.facts.map(([k, v]) => [k, factHtml(v)])));
@@ -258,14 +271,14 @@ export function layout(o) {
   if (o.items && o.items.length) body += panel(timeline(o.items), 'padding:4px 16px');
   if (o.next) body += panel(`<div style="color:${C.navy};font-weight:800">${esc(o.next.title)}</div><div style="color:#2E4466;font-size:13.5px">${esc(o.next.text)}</div>`, 'padding:12px 16px;background-color:#EEF6FE');
   if (o.warn) body += panel(`<table ${T} width="100%"><tr><td width="26" valign="top" style="padding-top:4px">${img('i-shield.png', 18, 18, '')}</td>` +
-    `<td style="color:#2E4466;font-size:13px"><b style="color:${C.navy}">${esc(o.warn.title)}</b><br>${esc(o.warn.text)}</td></tr></table>`, 'padding:12px 14px');
-  for (const n of o.notes || []) body += `<p style="margin:14px 0 0;color:#5A6F92;font-size:12.5px">${esc(n)}</p>`;
+    `<td class="e-muted" style="color:#2E4466;font-size:13px"><b style="color:${C.navy}">${esc(o.warn.title)}</b><br>${esc(o.warn.text)}</td></tr></table>`, 'padding:12px 14px');
+  for (const n of o.notes || []) body += `<p class="e-muted" style="margin:14px 0 0;color:#5A6F92;font-size:12.5px">${esc(n)}</p>`;
   if (link) body += button(link);
 
-  const html = head(o.heading) + `<body style="margin:0;padding:0;background-color:${C.page}" dir="rtl">` +
-    `<table ${T} width="100%" bgcolor="${C.page}" style="background-color:${C.page}"><tr><td class="wrap" align="center" style="padding:24px 12px">` +
+  const html = head(o.heading) + `<body class="e-page" style="margin:0;padding:0;background-color:${C.page}" dir="rtl">` +
+    `<table ${T} class="e-page" width="100%" bgcolor="${C.page}" style="background-color:${C.page}"><tr><td class="wrap" align="center" style="padding:24px 12px">` +
     `<!--[if mso]><table ${T} width="600" align="center"><tr><td><![endif]-->` +
-    `<table ${T} width="100%" dir="rtl" style="max-width:600px;margin:0 auto">` +
+    `<table ${T} class="shell" width="100%" dir="rtl" style="max-width:600px;margin:0 auto;border-radius:20px;overflow:hidden">` +
     header(o.kicker, o.priority ? RED : '#FFFFFF') + (o.priority ? priorityBar(o.priority) : '') + card(body) +
     footer({ social: !!o.social, mini: audience === 'admin' || !!o.code, why, prefs: !!o.prefs, support: o.support }) +
     '</table><!--[if mso]></td></tr></table><![endif]--></td></tr></table></body></html>';
@@ -276,19 +289,19 @@ export function layout(o) {
 function ticketHtml(t) {
   const pct = t.total > 0 ? Math.max(0, Math.min(100, Math.round((t.paid / t.total) * 100))) : 0;
   const bar = `<table ${T} width="100%" style="margin:6px 0"><tr>` +
-    (pct > 0 ? `<td width="${pct}%" height="8" bgcolor="${C.royal}" style="background-color:${C.royal};background-image:linear-gradient(270deg,#0A2F7A,#1E8FD6);border-radius:9px;font-size:6px;line-height:8px">&nbsp;</td>` : '') +
-    (pct < 100 ? `<td height="8" bgcolor="#DCEBF8" style="background-color:#DCEBF8;border-radius:9px;font-size:6px;line-height:8px">&nbsp;</td>` : '') + '</tr></table>';
+    (pct > 0 ? `<td class="e-bar" width="${pct}%" height="8" bgcolor="${C.royal}" style="background-color:${C.royal};background-image:linear-gradient(270deg,#0A2F7A,#1E8FD6);border-radius:9px;font-size:6px;line-height:8px">&nbsp;</td>` : '') +
+    (pct < 100 ? `<td class="e-track" height="8" bgcolor="#DCEBF8" style="background-color:#DCEBF8;border-radius:9px;font-size:6px;line-height:8px">&nbsp;</td>` : '') + '</tr></table>';
   const pills = t.pills.map(p => chip(p.bg, p.color, esc(p.text))).join(' ');
   const rows = [['عدد الأفراد', esc(digits(t.people)) + ' ' + (t.people === 1 ? 'فرد' : 'أفراد')], ['إجمالي الحجز', esc(money(t.total))],
-    ['المدفوع', `<span style="color:#0F6B45">${esc(money(t.paid))}</span>`]];
-  return `<table ${T} width="100%" style="margin-top:16px"><tr><td bgcolor="${C.mist}" style="background-color:${C.mist};border:1px solid ${C.line};border-radius:18px">` +
+    ['المدفوع', `<span class="e-ok" style="color:#0F6B45">${esc(money(t.paid))}</span>`]];
+  return `<table ${T} width="100%" style="margin-top:16px"><tr><td class="e-panel" bgcolor="${C.mist}" style="background-color:${C.mist};border:1px solid ${C.line};border-radius:18px">` +
     `<table ${T} width="100%"><tr><td style="padding:14px 16px;border-bottom:2px dashed #CFE3F6">` +
     `<div style="color:${C.navy};font-size:17px;font-weight:800">${esc(t.event)}</div>` +
-    (t.when ? `<div style="color:${C.slate};font-size:13px">${esc(t.when)}</div>` : '') +
-    `<div style="margin-top:8px;color:${C.slate};font-size:12.5px">رقم الحجز <span dir="ltr" style="display:inline-block;margin:0 4px;background-color:#FFFFFF;border:1px solid #CFE3F6;border-radius:8px;padding:0 9px;color:${C.navy};font-family:${MONO};font-size:14px;font-weight:700;letter-spacing:.6px">${esc(t.ref)}</span> ${pills}</div></td></tr>` +
+    (t.when ? `<div class="e-muted" style="color:${C.slate};font-size:13px">${esc(t.when)}</div>` : '') +
+    `<div class="e-muted" style="margin-top:8px;color:${C.slate};font-size:12.5px">رقم الحجز <span class="e-chip" dir="ltr" style="display:inline-block;margin:0 4px;background-color:#FFFFFF;border:1px solid #CFE3F6;border-radius:8px;padding:0 9px;color:${C.navy};font-family:${MONO};font-size:14px;font-weight:700;letter-spacing:.6px">${esc(t.ref)}</span> ${pills}</div></td></tr>` +
     `<tr><td style="padding:10px 16px 14px">${kv(rows)}${bar}` +
     (t.total > t.paid && !t.closed ? kv([[t.remainingLabel || 'الباقي', `<span style="color:${C.royal}">${esc(money(t.total - t.paid))}</span>`]], 0) : '') +
-    (t.due ? `<table ${T} width="100%" style="margin-top:8px"><tr><td bgcolor="#FFF8EA" style="background-color:#FFF8EA;border:1px solid #F0DFB4;border-radius:12px;padding:7px 12px;color:#6B4A0E;font-size:13px">` +
+    (t.due ? `<table ${T} width="100%" style="margin-top:8px"><tr><td class="e-warm" bgcolor="#FFF8EA" style="background-color:#FFF8EA;border:1px solid #F0DFB4;border-radius:12px;padding:7px 12px;color:#6B4A0E;font-size:13px">` +
       `<img src="${IMG}i-clock.png" width="16" height="16" alt="" style="border:0;vertical-align:middle;margin-left:6px">آخر ميعاد للدفع: <b>${esc(t.due)}</b></td></tr></table>` : '') +
     '</td></tr></table></td></tr></table>';
 }

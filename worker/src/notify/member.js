@@ -3,7 +3,10 @@
  * router; it shares only the Gmail sender and the rolling budget.
  *
  *   state change ─ same D1 batch ─▶ member_outbox row (memberEmailStmt; no body)
- *   cron (tick.js) ─▶ lease due rows by priority ─▶ re-check ─▶ budget ─▶ prefs ─▶ Gmail
+ *   right after the reply (memberKick) or the cron (tick.js) ─▶ lease due rows by priority ─▶ queue
+ *   ─▶ claim one row ─▶ re-check ─▶ budget ─▶ prefs ─▶ Gmail
+ *
+ * The lease and the claim are one statement each, so two paths or a repeated job can't send a row twice.
  *
  * Recipient: the account's own email, only when verified and the account active.
  * Switches: MEMBER_EMAIL (everything here), and accounts_mode. The codes (OTP) are not
@@ -64,10 +67,11 @@ export const KINDS = {
 
   'pts.deduct': { tier: 1, cls: 'member_tx', ttl: 72 * HOUR, points: true },
 
-  // results and points (§4.3, COMPETITIONS §20.3): gradual; only after the release moment
-  'res.result': { tier: 2, cls: 'member_bulk', ttl: 7 * DAY, group: 'results', res: 'result' },
-  'res.done': { tier: 2, cls: 'member_bulk', ttl: 7 * DAY, group: 'results', res: 'done' },
-  'res.points': { tier: 2, cls: 'member_bulk', ttl: 7 * DAY, group: 'results', res: 'points' },
+  // results and points (§4.3, COMPETITIONS §20.3): only after the release moment. Transactional: as bulk they got
+  // what the reservations leave, 30 a day. They still can't take the codes' or the critical alerts' room (allowed())
+  'res.result': { tier: 2, cls: 'member_tx', ttl: 7 * DAY, group: 'results', res: 'result' },
+  'res.done': { tier: 2, cls: 'member_tx', ttl: 7 * DAY, group: 'results', res: 'done' },
+  'res.points': { tier: 2, cls: 'member_tx', ttl: 7 * DAY, group: 'results', res: 'points' },
   'res.correction': { tier: 2, cls: 'member_tx', ttl: 7 * DAY, group: 'results', res: 'correction' },
 
   // the store (§4.4)
@@ -98,18 +102,28 @@ const gmailOk = (env, s) => {
   try { return !s.GMAIL_HEALTH || JSON.parse(s.GMAIL_HEALTH).ok !== false; } catch { return true; }
 };
 
-/* the minute cron: expired rows are marked, due rows leased by priority → [ids] */
-export async function memberLease(env, now = Date.now()) {
+/*
+ * Expired rows are marked, a send that never finished goes back in line, due rows are leased by priority → [ids].
+ * One statement: a row leased here can't also be leased by the other path. fresh: only rows never tried (memberKick).
+ */
+export async function memberLease(env, now = Date.now(), { fresh = false } = {}) {
   const db = env.DB;
-  await retry(() => db.prepare("UPDATE member_outbox SET status = 'expired', error = NULL WHERE status IN ('queued', 'failed', 'deferred') AND expires_ms < ?").bind(now).run());
+  await retry(() => db.batch([
+    db.prepare("UPDATE member_outbox SET status = 'failed', error = 'send not finished' WHERE status = 'sending' AND next_ms <= ?").bind(now),
+    db.prepare("UPDATE member_outbox SET status = 'expired', error = NULL WHERE status IN ('queued', 'failed', 'deferred') AND expires_ms < ?").bind(now)
+  ]));
   const s = await memberSettings(db);
   if (s.MEMBER_EMAIL !== '1' || s.accounts_mode !== 'on') return [];
-  const rows = (await retry(() => db.prepare(`SELECT id FROM member_outbox WHERE class <> 'otp' AND status IN ('queued', 'failed', 'deferred') AND next_ms <= ?
-    ORDER BY CASE class WHEN 'member_tx' THEN 0 ELSE 1 END, tier, created_ms LIMIT ?`).bind(now, SEND_BATCH).all())).results;
-  if (!rows.length) return [];
-  const ids = rows.map(r => r.id);
-  await retry(() => db.prepare(`UPDATE member_outbox SET next_ms = ? WHERE id IN (${ids.map(() => '?').join(',')})`).bind(now + LEASE_MS, ...ids).run());
-  return ids;
+  const states = fresh ? "('queued')" : "('queued', 'failed', 'deferred')";
+  const rows = (await retry(() => db.prepare(`UPDATE member_outbox SET next_ms = ? WHERE id IN (
+      SELECT id FROM member_outbox WHERE class <> 'otp' AND status IN ${states} AND next_ms <= ?
+      ORDER BY CASE class WHEN 'member_tx' THEN 0 ELSE 1 END, tier, created_ms LIMIT ?)
+    RETURNING id, class, tier, created_ms`).bind(now + LEASE_MS, now, SEND_BATCH).all())).results;
+  const rank = r => [r.class === 'member_tx' ? 0 : 1, r.tier, r.created_ms];
+  return rows.sort((a, b) => {
+    const [x, y] = [rank(a), rank(b)];
+    return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
+  }).map(r => r.id);
 }
 
 const account = hash => SITE + '/account/#me/' + hash;
@@ -214,8 +228,10 @@ export async function memberSend(env, ids, now = Date.now()) {
   const b = budget(s);
   let support = null;
   try { support = s.support_contact ? JSON.parse(s.support_contact) : null; } catch { support = null; }
-  const rows = (await retry(() => db.prepare(`SELECT * FROM member_outbox WHERE id IN (${ids.map(() => '?').join(',')}) AND class <> 'otp' AND status IN ('queued', 'failed', 'deferred')`).bind(...ids).all())).results;
-  for (const row of rows) {
+  for (const id of ids) {
+    // the claim: whoever turns the row to 'sending' sends it; a repeated job finds nothing to do
+    const row = await retry(() => db.prepare("UPDATE member_outbox SET status = 'sending', next_ms = ? WHERE id = ? AND class <> 'otp' AND status IN ('queued', 'failed', 'deferred') RETURNING *").bind(now + LEASE_MS, id).first());
+    if (!row) continue;
     const k = KINDS[row.kind];
     try {
       if (!k) throw new GmailError('rejected', 'unknown kind');
@@ -270,8 +286,8 @@ export async function memberSend(env, ids, now = Date.now()) {
         }
       }
       // receipts a member can trigger themselves stay bounded (§9)
-      if (k.tier === 2 && k.cls === 'member_tx') {
-        const n = await retry(() => db.prepare("SELECT COUNT(*) AS n FROM member_outbox WHERE participant_id = ? AND tier = 2 AND class = 'member_tx' AND status = 'sent' AND sent_ms >= ?").bind(p.id, now - DAY).first('n'));
+      if (k.tier === 2 && k.cls === 'member_tx' && !k.res) {
+        const n = await retry(() => db.prepare("SELECT COUNT(*) AS n FROM member_outbox WHERE participant_id = ? AND tier = 2 AND class = 'member_tx' AND kind NOT LIKE 'res.%' AND status = 'sent' AND sent_ms >= ?").bind(p.id, now - DAY).first('n'));
         if (n >= MAX_RECEIPTS_PER_DAY) {
           await setStatus(db, row.id, 'suppressed', 'receipts');
           out.suppressed++;
@@ -280,7 +296,7 @@ export async function memberSend(env, ids, now = Date.now()) {
       }
       const to = row.to_email || p.email;
       if (isTestInbox(env, to)) {
-        await retry(() => db.prepare("UPDATE member_outbox SET status = 'sent', sent_ms = ?, attempts = attempts + 1, error = 'test inbox', to_email = NULL WHERE id = ?").bind(now, row.id).run());
+        await retry(() => db.prepare("UPDATE member_outbox SET status = 'sent', sent_ms = ?, attempts = attempts + 1, error = 'test inbox', to_email = NULL WHERE id = ?").bind(Math.max(now, Date.now()), row.id).run());
         out.sent++;
         continue;
       }
@@ -305,7 +321,7 @@ export async function memberSend(env, ids, now = Date.now()) {
       }
       await sendMail(env, { to, ...(await render(db, row, p, support, entity)), now });
       await retry(() => db.batch([
-        db.prepare("UPDATE member_outbox SET status = 'sent', sent_ms = ?, attempts = attempts + 1, error = NULL, to_email = NULL WHERE id = ?").bind(now, row.id),
+        db.prepare("UPDATE member_outbox SET status = 'sent', sent_ms = ?, attempts = attempts + 1, error = NULL, to_email = NULL WHERE id = ?").bind(Math.max(now, Date.now()), row.id),
         countStmt(db, hourKey(now), k.cls)
       ]));
       out.sent++;

@@ -2,7 +2,7 @@
 // and bookings linked to accounts (YOUTH-ACCOUNTS-PLAN §18.1, MEMBER-NOTIFICATIONS-PLAN §4.2).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { harness, fakeGoogle } from './helpers.mjs';
+import { harness, fakeGoogle, kicked } from './helpers.mjs';
 import { bookWorld, eventJson, pay } from './book-helpers.mjs';
 import { rowFromJson, saveRow } from '../src/book/event.js';
 import { msStamp } from '../src/book/model.js';
@@ -521,7 +521,7 @@ async function emailWorld(event) {
   return w;
 }
 async function deliver(w, now = Date.now()) {
-  const ids = await memberLease(w.env, now);
+  const ids = [...kicked(w.env), ...await memberLease(w.env, now)];
   return memberSend(w.env, ids, now);
 }
 const kinds = async w => (await outbox(w)).map(r => r.kind).filter(k => /^(book|pay)\./.test(k));

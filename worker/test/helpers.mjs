@@ -74,13 +74,21 @@ export function webpBytes(w = 640, h = 480, pad = 100) {
   return b;
 }
 
+/* what the kick already leased and queued after the last call (index.js): the queue here only collects */
+export function kicked(env) {
+  const { sent } = env.JOBS;
+  const ids = sent.filter(j => j.type === 'member.email').flatMap(j => j.payload.ids);
+  sent.splice(0, sent.length, ...sent.filter(j => j.type !== 'member.email'));
+  return ids;
+}
+
 export function harness({ env: extra = {} } = {}) {
   resetAuthCaches();
   const db = migratedDb();
   const sent = [];
   const env = {
     ENVIRONMENT: 'test', ALLOWED_ORIGINS: ORIGIN, GOOGLE_CLIENT_ID: CLIENT_ID, LOG_SALT: 'salt', ADMIN_EMAILS: 'admin@example.com',
-    DB: db, JOBS: { send: async m => { sent.push(m); } }, PROOFS: fakeR2(), SYNC_SECRET: 'sync-test-secret', ...extra
+    DB: db, JOBS: { sent, send: async m => { sent.push(m); } }, KICK_VIA_QUEUE: '1', PROOFS: fakeR2(), SYNC_SECRET: 'sync-test-secret', ...extra
   };
   const waits = [];
   return {

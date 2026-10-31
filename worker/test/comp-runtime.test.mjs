@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { harness, fakeGoogle } from './helpers.mjs';
+import { harness, fakeGoogle, kicked } from './helpers.mjs';
 import { signSync } from '../src/lib/sync.js';
 import { msStamp } from '../src/book/model.js';
 import { compReleaseTick } from '../src/comp/runtime.js';
@@ -416,7 +416,7 @@ test('comp-live: needs its signature; a version is immutable; withdrawing ends n
 /* ---------- email (§4.3, §4.4) ---------- */
 
 async function deliver(w, now = Date.now()) {
-  const ids = await memberLease(w.env, now);
+  const ids = [...kicked(w.env), ...await memberLease(w.env, now)];
   return memberSend(w.env, ids, now);
 }
 

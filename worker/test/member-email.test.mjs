@@ -2,12 +2,12 @@
 // account's own sections (P5-3): the pipeline on real SQLite, with a fake Gmail.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { harness } from './helpers.mjs';
+import { harness, kicked } from './helpers.mjs';
 import { setGmailFetch } from '../src/notify/gmail.js';
 import { memberEmailStmt, memberLease, memberSend, memberStatus, KINDS } from '../src/notify/member.js';
 import { securityEmail } from '../src/notify/templates.js';
 import { hourKey, quotaOf } from '../src/notify/email.js';
-import { notifyTick } from '../src/notify/tick.js';
+import { memberKick, notifyTick } from '../src/notify/tick.js';
 
 const KEYS = { PW_PEPPER: 'pepper-test', PW_KEY: Buffer.alloc(32, 7).toString('base64'), OTP_PEPPER: 'otp-test', ACCOUNT_PAD_MS: '0' };
 const GMAIL = { GMAIL_CLIENT_ID: 'c', GMAIL_CLIENT_SECRET: 's', GMAIL_REFRESH_TOKEN: 'r' };
@@ -41,7 +41,7 @@ async function account(h, over = {}) {
 const enqueue = (h, kind, participantId, over = {}) => memberEmailStmt(h.db, { kind, participantId, dedupeKey: over.dedupeKey || `t:${kind}:${participantId}:${++serial}`, entityVersion: over.entityVersion ?? null, now: over.now }).run();
 const rows = h => h.db.prepare('SELECT * FROM member_outbox ORDER BY created_ms, id').all().then(r => r.results);
 async function deliver(h, now = Date.now()) {
-  const ids = await memberLease(h.env, now);
+  const ids = [...kicked(h.env), ...await memberLease(h.env, now)];
   return memberSend(h.env, ids, now);
 }
 
@@ -378,4 +378,155 @@ test('half of the daily form budget: one important alert for the admins, no pers
   const fifth = await h.call('/v1/account/signin', { method: 'POST', body: { email: 'y@staging.invalid' }, headers: { 'cf-connecting-ip': '192.0.2.9' } });
   assert.equal(fifth.status, 200);
   assert.equal((await h.call('/v1/account/signin', { method: 'POST', body: { email: 'z@staging.invalid' }, headers: { 'cf-connecting-ip': '192.0.2.10' } })).status, 429, 'over the cap');
+});
+
+/* ---------- fast sending (accounts improvements, Step 3) ---------- */
+
+test('results are transactional: they pass where bulk waits, and still leave the codes and the critical alerts their room', async t => {
+  const mails = gmail(t);
+  const h = await world();
+  KINDS['test.bulk'] = { tier: 2, cls: 'member_bulk', ttl: 72 * 3600000, notice: 'new_signin' };
+  t.after(() => { delete KINDS['test.bulk']; });
+  for (const kind of ['res.result', 'res.done', 'res.points', 'res.correction']) assert.equal(KINDS[kind].cls, 'member_tx', kind);
+  assert.equal(KINDS['acct.age'].cls, 'member_bulk', 'the age-out notice stays gradual');
+  const p = await account(h);
+  const hour = hourKey(Date.now());
+  // 200 used, 31 of them bulk: the old class of the results stops here, the new one doesn't
+  await h.db.prepare('INSERT INTO notify_quota (day, total, member_bulk) VALUES (?, 200, 31)').bind(hour).run();
+  await enqueue(h, 'test.bulk', p);
+  assert.equal((await deliver(h)).deferred, 1);
+  await enqueue(h, 'acct.new', p);
+  assert.equal((await deliver(h)).sent, 1);
+  assert.equal(mails.length, 1);
+  // 250: what's left is the 150 held for codes and critical alerts
+  await h.db.prepare('UPDATE notify_quota SET total = 250 WHERE day = ?').bind(hour).run();
+  await enqueue(h, 'acct.new', p);
+  assert.equal((await deliver(h)).deferred, 1);
+  assert.equal(mails.length, 1);
+});
+
+test('a row goes once: one job delivered three times at the same moment, again later, and the other path', async t => {
+  const mails = gmail(t);
+  const h = await world();
+  const p = await account(h);
+  await enqueue(h, 'acct.new', p);
+  const ids = await memberLease(h.env);
+  assert.equal(ids.length, 1);
+  assert.deepEqual(await memberLease(h.env), [], 'leased: the other path finds nothing');
+  await Promise.all([memberSend(h.env, ids), memberSend(h.env, ids), memberSend(h.env, ids)]);
+  await memberSend(h.env, ids);
+  assert.equal(mails.length, 1);
+  const [row] = await rows(h);
+  assert.equal(row.status, 'sent');
+  assert.equal(row.attempts, 1);
+});
+
+test('a send that never finished goes back in line, only after its lease, and an expired one stops', async t => {
+  const mails = gmail(t);
+  const h = await world();
+  const p = await account(h);
+  await enqueue(h, 'acct.new', p);
+  const now = Date.now();
+  await h.db.prepare("UPDATE member_outbox SET status = 'sending', next_ms = ?").bind(now + 60000).run();
+  assert.deepEqual(await memberLease(h.env, now), [], 'still in its lease');
+  assert.equal((await memberSend(h.env, [(await rows(h))[0].id], now)).sent, 0, 'someone else holds it');
+  const later = await memberLease(h.env, now + 61000);
+  assert.equal(later.length, 1);
+  await memberSend(h.env, later, now + 61000);
+  assert.equal(mails.length, 1);
+  await enqueue(h, 'acct.dev', p);
+  await h.db.prepare("UPDATE member_outbox SET status = 'sending', next_ms = 0, expires_ms = 1 WHERE kind = 'acct.dev'").run();
+  assert.deepEqual(await memberLease(h.env, now + 62000), []);
+  assert.equal((await rows(h)).find(r => r.kind === 'acct.dev').status, 'expired');
+});
+
+test('Gmail failing: the claim doesn\'t lose the row, it retries on its own time', async t => {
+  gmail(t, { status: 500 });
+  const h = await world();
+  const p = await account(h);
+  await enqueue(h, 'acct.new', p);
+  const now = Date.now();
+  await deliver(h, now);
+  const [row] = await rows(h);
+  assert.equal(row.status, 'failed');
+  assert.ok(row.next_ms > now);
+  assert.equal(await memberKick(h.env, row.next_ms + 1), 0, 'the kick leaves retries to the cron');
+  assert.equal((await memberLease(h.env, row.next_ms + 1)).length, 1);
+});
+
+test('the kick: a row or two go at once; more go by the queue; nothing to do costs one read; a failed kick leaves them for the cron', async t => {
+  const mails = gmail(t);
+  const h = await world({ KICK_VIA_QUEUE: '0' });
+  const p = await account(h);
+  assert.equal(await memberKick(h.env), 0);
+  assert.equal(h.sent.length, 0);
+  await enqueue(h, 'acct.new', p);
+  assert.equal(await memberKick(h.env), 1);
+  assert.equal(mails.length, 1, 'here and now');
+  assert.equal(h.sent.length, 0);
+  assert.equal((await rows(h))[0].status, 'sent');
+  assert.equal(await memberKick(h.env), 0, 'nothing left');
+
+  for (let i = 0; i < 3; i++) await enqueue(h, 'acct.new', p);
+  assert.equal(await memberKick(h.env), 3);
+  assert.equal(h.sent.at(-1).type, 'member.email');
+  assert.equal(mails.length, 1, 'three go by the queue');
+
+  for (let i = 0; i < 3; i++) await enqueue(h, 'acct.new', p);
+  const send = h.env.JOBS.send;
+  h.env.JOBS.send = async () => { throw new Error('queue down'); };
+  await assert.rejects(memberKick(h.env));
+  h.env.JOBS.send = send;
+  assert.equal((await memberLease(h.env)).length, 3, 'there for the minute at once');
+});
+
+test('a kick that dies after its claim: the row comes back after the lease, nothing is lost', async t => {
+  const mails = gmail(t);
+  const h = await world({ KICK_VIA_QUEUE: '0' });
+  const p = await account(h);
+  await enqueue(h, 'acct.new', p);
+  const now = Date.now();
+  await h.db.prepare("UPDATE member_outbox SET status = 'sending', next_ms = ?").bind(now + 600000).run();
+  assert.equal(await memberKick(h.env, now), 0, 'not fresh: not for the kick');
+  const ids = await memberLease(h.env, now + 600001);
+  await memberSend(h.env, ids, now + 600001);
+  assert.equal(mails.length, 1);
+});
+
+test('the kick respects the switch', async t => {
+  gmail(t);
+  const h = await world();
+  const p = await account(h);
+  await enqueue(h, 'acct.new', p);
+  await h.db.prepare("UPDATE settings SET value = '0' WHERE key = 'MEMBER_EMAIL'").run();
+  assert.equal(await memberKick(h.env), 0);
+  assert.equal(h.sent.length, 0);
+});
+
+test('the minute: up to three batches, thirty rows, in priority order', async t => {
+  gmail(t);
+  const h = await world();
+  const p = await account(h);
+  const now = Date.now();
+  for (let i = 0; i < 35; i++) await enqueue(h, 'acct.new', p, { now: now - 1000 });
+  await notifyTick(h.env, now);
+  const jobs = h.sent.filter(j => j.type === 'member.email');
+  assert.deepEqual(jobs.map(j => j.payload.ids.length), [10, 10, 10]);
+  assert.equal(new Set(jobs.flatMap(j => j.payload.ids)).size, 30);
+});
+
+test('results don\'t use up the day\'s ten receipts', async t => {
+  const mails = gmail(t);
+  const h = await world();
+  KINDS['test.receipt'] = { tier: 2, cls: 'member_tx', ttl: 3600000, notice: 'new_signin' };
+  t.after(() => { delete KINDS['test.receipt']; });
+  const p = await account(h);
+  const now = Date.now();
+  for (let i = 0; i < 12; i++) {
+    await enqueue(h, 'res.result', p, { now: now - 1000 });
+  }
+  await h.db.prepare("UPDATE member_outbox SET status = 'sent', sent_ms = ?").bind(now - 1000).run();
+  await enqueue(h, 'test.receipt', p, { now: now - 500 });
+  assert.equal((await deliver(h, now)).sent, 1);
+  assert.equal(mails.length, 1);
 });

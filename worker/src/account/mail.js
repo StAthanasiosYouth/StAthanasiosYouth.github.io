@@ -51,7 +51,7 @@ export function sendCode(ctx, { to, code, purpose, outboxId, support = null, now
     try {
       await sendMail(ctx.env, { to, ...otpEmail({ code, minutes: CODE_MINUTES, purpose, support }), now });
       await retry(() => db.batch([
-        db.prepare("UPDATE member_outbox SET status = 'sent', sent_ms = ?, attempts = 1 WHERE id = ?").bind(now, outboxId),
+        db.prepare("UPDATE member_outbox SET status = 'sent', sent_ms = ?, attempts = 1 WHERE id = ?").bind(Date.now(), outboxId),
         countStmt(db, hourKey(now), 'otp')
       ]));
     } catch (err) {

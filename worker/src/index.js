@@ -15,6 +15,10 @@ import { logLine, persistIfNotable } from './lib/log.js';
 import { match } from './routes.js';
 import { consume, consumeDead } from './jobs.js';
 import { scheduled } from './scheduled.js';
+import { memberKick } from './notify/tick.js';
+
+/* the routes that can write a member's email: it goes right after the reply instead of waiting for the minute */
+const MAIL_ROUTES = /^\/v1\/(?:book\/|comp\/submit|shop\/|account\/(?:signin|forgot\/verify)|admin\/(?:book\/|participants|store\/|comp\/))/;
 
 export async function handle(request, env, ectx, deps = {}) {
   const t0 = Date.now();
@@ -62,6 +66,8 @@ export async function handle(request, env, ectx, deps = {}) {
     code = err instanceof ApiError ? err.code : 'error';
     response = errorResponse(ctx, err);
   }
+
+  if (request.method === 'POST' && response.status < 400 && MAIL_ROUTES.test(url.pathname)) ctx.defer(memberKick(env));
 
   const entry = {
     rid: ctx.rid, method: request.method, route: route ? route.path : url.pathname.slice(0, 80),
