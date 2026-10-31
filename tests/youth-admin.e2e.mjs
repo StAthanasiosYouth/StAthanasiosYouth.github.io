@@ -3,7 +3,7 @@
 // the switch, the list, a new account, the sheet, viewing vs resetting a password, points, seasons.
 // Run: cd tools && node --test ../tests/youth-admin.e2e.mjs
 
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -69,6 +69,13 @@ async function handle(request) {
   const path = url.pathname;
   fake.calls.push({ method, path, body });
   if (path === '/v1/account/config') return json(200, { ok: true, mode: fake.mode, turnstile: null, support: {} });
+  if (path.endsWith('/avatar') && method === 'GET') return { status: 200, headers: { ...cors, 'content-type': 'image/webp' }, body: readFileSync(`${ROOT}assets/img/logo-128.webp`) };
+  if (path.endsWith('/avatar/delete')) {
+    if (!body.reason) return json(400, { ok: false, code: 'invalid', field: 'reason', message: 'اكتب السبب.' });
+    fake.people[0].avatar = null;
+    fake.removedFor = body.reason;
+    return json(200, fake.sheet(fake.people[0].id));
+  }
   if (path === '/v1/admin/book/module') return json(200, { ok: true, on: false, env: 'production' });
   if (path === '/v1/admin/participants/settings') return json(200, { ok: true, ageMin: 18, ageMax: 30, warnDays: 60, support: null, supportDefault: { name: 'مينا زكريا', phone: '01276162016' } });
   if (path === '/v1/admin/participants/review') return json(200, { ok: true, people: [{ ...fake.people[0], flags: ['same_name_dob'] }] });
@@ -214,6 +221,26 @@ test('a new account: typed twice, the password once on screen, nothing left behi
   await page.evaluate(() => [...document.querySelectorAll('#sheet .btn')].find(b => b.textContent.trim() === 'قفل').click());
   await page.waitForFunction(() => !document.querySelector('[data-youth-password]') || !document.querySelector('#sheet').open, { timeout: 5000 });
   assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('the photo: seen in the sheet over the session; removed with a reason; no button without participants.edit', async () => {
+  fake.reset();
+  fake.people.unshift(person({ balance: 0, avatar: 3 }));
+  const { context, page, problems } = await open({ width: 390, height: 844 });
+  await goYouth(page);
+  await click(page, '[data-youth="p-aaaaaaaa"]');
+  await page.waitForFunction(() => { const i = document.querySelector('[data-youth-photo]'); return i && i.complete && i.naturalWidth > 0; }, { timeout: 8000 });
+  assert.match(await page.$eval('[data-youth-photo]', i => i.src), /^blob:/);
+  await click(page, '[data-act="youth-photo-delete"]');
+  await page.waitForSelector('#sheet[open] [data-act="youth-save"]');
+  await saveSheet(page, { stays: true }).catch(() => {});
+  await page.waitForFunction(() => /السبب/.test(document.querySelector('#sheet').textContent));
+  await page.type('#sheet .form textarea', 'صورة مش مناسبة');
+  await saveSheet(page);
+  await page.waitForFunction(() => !document.querySelector('[data-youth-photo]'), { timeout: 8000 });
+  assert.equal(fake.removedFor, 'صورة مش مناسبة');
+  assert.deepEqual(problems.filter(p => !/400/.test(p)), []);
   await context.close();
 });
 

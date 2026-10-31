@@ -1,0 +1,59 @@
+# Accounts improvements batch
+
+The owner's batch before Phase 6. Each step ships on its own; Phase 6 and the admin redesign (Phase 8) stay closed.
+
+1. The account page and the optional photo (below).
+2. The account icon in the header, one sign-in across services, returning to the original page.
+3. OTP emails and copying the code, faster booking, result, points and store emails.
+4. Cleaning the old competitions (codes, unused options).
+5. Performance, final tests, closing the batch.
+
+## Step 1: the account page
+
+Direction «العتبة», approved from the preview on 2026-10-31.
+
+**The first page** answers «is anything needed from me?» (`attention` in `assets/js/account/model.js`: two items at most, the money first, nothing when nothing is needed), then a summary band, then rows that state each section's condition. A computer keeps the sections in a rail. A new member sees first steps instead of zeros.
+
+**Routes:** every route an email links to is unchanged. New: `#me/profile`, `#me/support`.
+
+**Sessions:** a valid session opens the account directly. «تكمّل بالحساب ده؟» appears only once the session has ended. With a session and no network the page offers a retry and never asks for a password.
+
+**Files:** `assets/js/account/app.js` (sign-in, registration, recovery), `home.js` (signed-in pages), `parts.js` (drawn parts), `motion.js`, `photo.js` (lazy), `assets/css/account.css`.
+
+### The photo
+
+- Optional. The member adds, changes or deletes it. `participants.view` sees it in «حسابات الشباب», `participants.edit` removes it with a required reason (`participant_audit` `avatar.remove`, an `important` activity row with no personal data).
+- The page redraws it at 256 × 256 on a canvas, so it leaves the phone small and without location or camera data.
+- `worker/src/account/avatar.js` checks it again: a session, 20 changes an hour, 64 KB, JPEG or WebP by its first bytes (no SVG, no HTML), square, 64 to 512 px.
+- Bytes live in the private `PROOFS` bucket under `avatars/` with a random name; `participants.avatar_key` and `avatar_version` hold the reference (migration 0023). The proofs' sweep only touches `proofs/`; `sweepAvatars` removes objects no account names after a day.
+- Served with a fixed type, `nosniff`, a sandbox CSP and `private` caching; a shared-device session gets `no-store`. The page shows it as `blob:`, which its CSP already allowed.
+
+### API
+
+- `GET /v1/account/summary`: the first page in one call, so opening it no longer needs `/v1/comp/me`. Answers are kept a minute in the page.
+- `GET`, `POST /v1/account/avatar`, `POST /v1/account/avatar/delete`.
+- `GET /v1/admin/participants/:id/avatar`, `POST /v1/admin/participants/:id/avatar/delete`.
+- `/v1/account/bookings` adds `slug` and `statusToken`, for «ادفع الباقي» on the booking's own page.
+- `/v1/account/points` adds each row's `title` and the store's state.
+
+### Fixed along the way
+
+- Competition points showed with no label: `KIND_WORDS` lacked `competition` and `correction`. Same words added to the admin's ledger.
+- A booking had no way to pay from the account.
+
+### Motion and sound
+
+Motion: `DESIGN.md`. Only transform, opacity and filter. Reduced motion: nothing moves. A weak phone: no blur or stagger.
+
+Sound: the site's own switch and synthesised sounds (`sound.js`), adding `enter`, `leave`, `page` and `nope`. Nothing before the first tap; the arrival on page load is silent.
+
+### Tests
+
+- `worker/test/account-avatar.test.mjs`
+- `tests/account-page.e2e.mjs` (real page and CSP, real Worker code on SQLite)
+- `tests/youth-admin.e2e.mjs` (the photo in the admin)
+- `worker/scripts/account-page-check.mjs` (live on staging, real R2 and D1)
+
+### Back
+
+Page and admin: revert the release commit on `main`. Worker: `npx wrangler rollback <version>`. Migration 0023 only adds two columns and can stay. Photos already uploaded stay in R2 under `avatars/`.

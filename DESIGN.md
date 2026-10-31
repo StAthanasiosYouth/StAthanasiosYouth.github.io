@@ -120,6 +120,22 @@ small mixer: compressor + limiter, at most 3 voices, each kind throttled.
 A speaker in every scene sheet toggles the same setting. Reduced motion:
 no ambient scene sounds; lite: no key taps, half the rate.
 
+## The account page (/account/)
+
+Direction «العتبة»: the iconostasis arch holds the member's photo, or their first letter in Ruqaa; under it what is needed now, then a plain list. Same tokens as the site. Mobile: one column, each section its own page with a back arrow. 640px: the arch beside the greeting, two columns of rows. 980px: the sections move into a rail beside the content, and the home's space shows what's coming and the latest activity.
+
+| Moment | Motion | Sound |
+| ------ | ------ | ----- |
+| First arrival in a visit | The arch opens upward out of a soft blur, the cross drops, the camera pops, the greeting comes into focus, then the blocks rise in reading order; the numbers climb to their value | None on page load |
+| Signing in | The form lifts away, the account opens (a View Transition on the page) | `enter`: a soft rising chord |
+| Between sections | The content turns in the reading direction, the rail and the bar stay still, the arch glides to its new place | `page`: a very quiet swish |
+| A saved switch | The dot springs across, «اتحفظ» | `pop` |
+| The photo saved | One breath of light on the arch, a toast with the real size | `success` |
+| Signing out | The page draws back | `leave` |
+| A failure | The state returns, the reason is said | `nope`: one soft low note |
+
+Reduced motion: nothing moves and no transition runs. A weak phone (`data-motion="lite"`): the same order with no blur, glide or stagger. Without View Transitions the screens simply change. Sound follows the site's one switch, and nothing plays before the first tap.
+
 ## Components
 
 | Component        | Notes                                                        |

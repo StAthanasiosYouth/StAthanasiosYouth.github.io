@@ -27,9 +27,10 @@
   var AUDIT = {
     register: 'اتعمل بنفسه', 'register.admin': 'اتعمل من الأدمن', 'email.change': 'تغيير الإيميل', 'phone.change': 'تغيير الموبايل', 'dob.correct': 'تصحيح تاريخ الميلاد', eligibility: 'تغيير الأهلية',
     block: 'إيقاف', unblock: 'رجوع', 'password.reset': 'باسورد جديد', 'password.reset.self': 'باسورد جديد بكود', 'password.reset.support': 'باسورد جديد من الدعم', 'password.view': 'عرض الباسورد',
-    'profile.edit': 'تعديل البيانات', 'session.revoke': 'خروج من كل الأجهزة', transfer: 'نقل نقاط'
+    'profile.edit': 'تعديل البيانات', 'session.revoke': 'خروج من كل الأجهزة', transfer: 'نقل نقاط',
+    'avatar.set': 'حط صورة', 'avatar.delete': 'مسح صورته', 'avatar.remove': 'الأدمن مسح صورته'
   };
-  var LEDGER = { earn: 'نقاط مسابقة', manual: 'تعديل يدوي', transfer: 'نقل', spend: 'طلب من المتجر', refund: 'رجوع نقاط' };
+  var LEDGER = { earn: 'نقاط مسابقة', competition: 'نقاط مسابقة', correction: 'تصحيح نتيجة', manual: 'تعديل يدوي', transfer: 'نقل', spend: 'طلب من المتجر', refund: 'رجوع نقاط' };
   var STATUS = { pending: 'قيد المراجعة', confirmed: 'مؤكد', rejected: 'مرفوض', cancelled: 'ملغي', withdrawn: 'اتسحب' };
   var MAIL = { queued: 'مستني', sent: 'اتبعت', failed: 'هيتعاد', dead: 'فشل', deferred: 'مؤجل', expired: 'انتهى', superseded: 'اتلغى', suppressed: 'اتمنع' };
 
@@ -333,6 +334,20 @@
       formSheet({ title: blocked ? 'رجوع الحساب' : 'إيقاف الحساب', kind: blocked ? 'primary' : 'danger', label: blocked ? 'رجّعه' : 'وقّفه', path: path + (blocked ? 'unblock' : 'block'), fields: [] });
     } }, blocked ? 'رجّع الحساب' : 'وقّف الحساب') : null;
 
+    // the member's optional photo: from the private bucket, over this admin's session; removing it asks why
+    var photo = null;
+    if (p.avatar) {
+      var image = el('img', { class: 'youth-photo', alt: 'صورة الحساب', width: '96', height: '96', 'data-youth-photo': '' });
+      window.AdminWorker.blob('/v1/admin/participants/' + encodeURIComponent(p.id) + '/avatar').then(function (blob) {
+        var url = URL.createObjectURL(blob);
+        image.addEventListener('load', function () { URL.revokeObjectURL(url); }, { once: true });
+        image.src = url;
+      }).catch(function () { image.alt = 'مقدرناش نعرض الصورة'; });
+      photo = el('div', { class: 'youth-photo-row' }, image, can.edit ? el('button', { class: 'btn btn--small btn--danger', type: 'button', 'data-act': 'youth-photo-delete', onclick: function () {
+        formSheet({ title: 'مسح صورة الحساب', kind: 'danger', label: 'امسح الصورة', path: path + 'avatar/delete', intro: 'الصورة بتتمسح نهائي، والسبب بيتسجل في تاريخ الحساب. صاحب الحساب يقدر يحط صورة تانية.', fields: [] });
+      } }, 'امسح الصورة') : null);
+    }
+
     var points = d.points;
     var adjust = can.points ? el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-points', onclick: function () {
       var amount = A.textInput('', { ltr: true, max: 8, placeholder: '+50 أو -20' });
@@ -356,6 +371,7 @@
     return [
       el('h2', { class: 'card__title', dir: 'auto', text: p.name }),
       el('p', {}, eligibilityChip(p), ' ', p.emailChangedRecently ? A.chip('الإيميل اتغير من قريب', 'gold') : null),
+      photo,
       el('dl', { class: 'comp-facts', 'data-youth-facts': '' },
         fact('رقم الحساب', p.id), fact('الإيميل', el('span', { class: 'ltr', text: p.email })),
         fact('تأكيد الإيميل', !p.emailVerified ? 'مش متأكد' : p.emailVia === 'admin' ? 'متأكد من الأدمن' : 'متأكد بالكود'),

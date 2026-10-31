@@ -130,6 +130,17 @@ const SOUNDS = {
     tone(1180, 0, 0.12, { gain: 0.14, glideTo: 780 });
   },
   pop: () => tone(740, 0, 0.09, { gain: 0.3, glideTo: 1180, attack: 0.004 }),
+  // the account: going in, going out, a quiet turn of the page, a soft «no»
+  enter: () => {
+    noise(0, 0.32, { from: 700, to: 2600, gain: 0.16 });
+    [523.3, 784, 1046.5].forEach((f, i) => tone(f, 0.04 + i * 0.09, 0.46, { gain: 0.24 }));
+  },
+  leave: () => {
+    noise(0, 0.28, { from: 2400, to: 700, gain: 0.14 });
+    tone(784, 0, 0.3, { gain: 0.2, glideTo: 523.3 });
+  },
+  page: () => noise(0, 0.14, { from: 1400, to: 2800, gain: 0.07 }),
+  nope: () => tone(330, 0, 0.16, { gain: 0.22, glideTo: 262 }),
   success: () => {
     tone(1046.5, 0, 0.28, { gain: 0.4 });
     tone(1318.5, 0.08, 0.34, { gain: 0.35 });

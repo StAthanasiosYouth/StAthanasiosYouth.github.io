@@ -37,11 +37,14 @@
 
   <link rel="modulepreload" href="../assets/js/account/app.js">
   <link rel="modulepreload" href="../assets/js/account/model.js">
+  <link rel="modulepreload" href="../assets/js/account/home.js">
+  <link rel="modulepreload" href="../assets/js/account/parts.js">
+  <link rel="modulepreload" href="../assets/js/account/motion.js">
   <script type="module" src="../assets/js/account/page.js"></script>
 
 </head>
 
-<body>
+<body class="ac-page">
 
   <a class="skip-link" href="#acct-main">انتقل للمحتوى</a>
 
@@ -51,9 +54,10 @@
       <span class="cbar__name">أسرة البابا أثناسيوس</span>
       <span class="visually-hidden">— الصفحة الرئيسية</span>
     </a>
+    <a class="cbar__home" href="../">ارجع للموقع</a>
   </header>
 
-  <main id="acct-main" class="comp" data-state="loading" tabindex="-1">
+  <main id="acct-main" class="ac-main" data-state="loading" tabindex="-1">
     <noscript>
       <p class="card noscript">الصفحة دي محتاجة جافاسكريبت يكون شغال في المتصفح. شغّله وافتح الصفحة تاني.</p>
     </noscript>

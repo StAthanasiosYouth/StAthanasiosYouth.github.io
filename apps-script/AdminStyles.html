@@ -6385,6 +6385,23 @@ dialog .toasts[popover] {
 }
 
 /* «تحديد»: a ticked list (export / distribute / bulk changes) */
+/* a member's optional photo in the person sheet */
+.youth-photo-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-block: 10px;
+}
+
+.youth-photo {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 50% 50% 14% 14% / 50% 50% 14% 14%;
+  box-shadow: 0 0 0 1px var(--gold-line-strong, rgba(242, 210, 139, .36));
+}
+
 .comp-person--pick {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;

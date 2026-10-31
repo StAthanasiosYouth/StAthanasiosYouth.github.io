@@ -7,16 +7,21 @@
  * email + password → signs in directly. The password never reaches storage.
  * The server decides everything; this page only draws its answers.
  *
- * mountAccount(main, { onSignedIn }) is what competition/ and points/ will use.
+ * While a session is valid the account opens at once; the «continue» question is for when it has ended.
+ * The signed-in pages are in home.js.
  */
 
 import { h } from '../dom.js';
+import { cue, soundToggle, uiSounds } from '../ui-sound.js';
 import { bookApiUrl } from '../page/book-config.js';
 import { mountTurnstile } from '../page/turnstile.js';
 import {
   validEmail, emailTypo, maskEmail, submitLabel, arDigits, monthNames, dateText, birthDateOf, birthYears,
-  readHints, addHint, removeHint, writeHints, readSession, writeSession, clearSession, cleanRoute, keepDest, takeDest, RETURN_KEY, cleanReturn
+  readHints, addHint, removeHint, writeHints, readSession, writeSession, clearSession, cleanRoute, keepDest, takeDest, RETURN_KEY, cleanReturn, SESSION_KEY, DEST_KEY
 } from './model.js';
+import { createMine, brokenHome } from './home.js';
+import { arch } from './parts.js';
+import { transition, setTier, resetArrival } from './motion.js';
 
 const safeStore = name => {
   try {
@@ -47,7 +52,8 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
     fieldErrors: {},
     otp: { kind: '', minutes: 10, wait: 0 },
     issued: null,          // { email, password, firstName, eligible, first }
-    account: null
+    account: null,
+    photo: { url: '', version: 0 }
   };
 
   let captcha = null;
@@ -103,9 +109,16 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
     }
   };
 
+  let leaving = false;
+
   /* ---------- small parts ---------- */
 
-  const card = (...kids) => h('div', { class: 'card step acct' }, ...kids);
+  const card = (...kids) => h('div', { class: 'ac-gate' },
+    h('header', { class: 'ac-gate__head' },
+      h('img', { class: 'ac-gate__logo', src: '../assets/img/logo-256.webp', width: 128, height: 128, alt: '' }),
+      h('p', { class: 'ac-gate__name' }, 'أسرة البابا أثناسيوس'),
+      h('p', { class: 'ac-lead' }, 'مسابقاتك ونقطك وحجوزاتك في مكان واحد.')),
+    h('div', { class: 'step acct ac-panel' }, ...kids));
   const title = text => h('h1', { class: 'acct__title', tabindex: '-1' }, text);
   const errorLine = () => h('p', { class: 'field__error', 'data-error': '', role: 'alert', hidden: !S.error || null }, S.error);
   const noticeLine = () => (S.notice ? h('p', { class: 'acct__notice', role: 'status' }, S.notice) : null);
@@ -133,12 +146,19 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
       captcha = null;
     }
     clearInterval(timer);
-    main.dataset.state = 'ready';
-    main.replaceChildren(view);
-    const box = view.querySelector('[data-check]');
-    if (box) mountCheck(box);
-    const target = focus ? view.querySelector(focus) : view.querySelector('.acct__title');
-    if (target) target.focus({ preventScroll: false });
+    const change = () => {
+      main.dataset.state = 'ready';
+      main.replaceChildren(view);
+      scrollTo({ top: 0 });
+      const box = view.querySelector('[data-check]');
+      if (box) mountCheck(box);
+      const target = focus ? view.querySelector(focus) : view.querySelector('.acct__title');
+      if (target) target.focus({ preventScroll: false });
+    };
+    const kind = leaving ? 'leave' : '';
+    leaving = false;
+    if (kind) transition(kind, change);
+    else change();
   }
 
   /* ---------- the two-field form (§8.1, §8.2) ---------- */
@@ -300,11 +320,11 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
       }
       catch { /* the browser's own prompt still has its chance */ }
     }
-    enter(reply.account);
+    enter(reply.account, { fresh: true });
   }
 
   /* signed in: the page a link was going to, once; else the account's first page */
-  function enter(account) {
+  function enter(account, { fresh = false } = {}) {
     S.account = account;
     // came from a page that asked for a sign-in: straight back to it
     let back = '';
@@ -319,19 +339,9 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
     }
     const dest = takeDest(tab) || (cleanRoute(location.hash) === '#me' ? '' : cleanRoute(location.hash));
     history.replaceState(null, '', location.pathname + location.search + dest);
-    openRoute();
+    if (fresh) cue('enter');
+    mine.openRoute({ kind: fresh ? 'enter' : '' });
     if (onSignedIn) onSignedIn(account);
-  }
-
-  function openRoute() {
-    const route = cleanRoute(location.hash);
-    if (route === '#me/security') viewSecurity();
-    else if (route === '#me/notifications') viewPrefs();
-    else if (route === '#me/points') viewPoints();
-    else if (route.startsWith('#me/bookings')) viewBookings(route.split('/')[2] || '');
-    else if (route.startsWith('#me/results')) viewResults(route.split('/')[2] || '');
-    else if (route.startsWith('#me/orders')) viewOrders(route.split('/')[2] || '');
-    else viewHome();
   }
 
   /* the session ended while the page was open: sign in, then back here */
@@ -339,6 +349,7 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
     keepDest(tab, location.hash);
     clearSession(local, tab);
     S.email = S.account ? S.account.email : S.email;
+    mine.reset();
     S.account = null;
     S.notice = 'لازم تسجّل دخولك تاني.';
     viewSignin();
@@ -637,7 +648,9 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
       title('نسيت الباسورد؟'),
       h('p', { class: 'acct__lead' }, 'اكتب إيميلك وهنبعتلك كود تعمل بيه باسورد جديد. الباسورد القديم هيفضل شغال لحد ما تأكد الكود.'),
       form,
-      textBtn('ارجع لتسجيل الدخول', () => viewSignin({ prefill: email.value })),
+      S.account
+        ? h('a', { class: 'acct__link', href: '#me/security', onclick: () => mine.openRoute({ kind: 'back' }) }, 'ارجع لحسابك')
+        : textBtn('ارجع لتسجيل الدخول', () => viewSignin({ prefill: email.value })),
       support()
     ), '#acct-forgot');
   }
@@ -646,14 +659,17 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
 
   function viewHints(hints) {
     const rows = hints.map(hint => h('li', { class: 'acct__hint', 'data-hint': '' },
-      h('p', { class: 'acct__hintname' }, h('strong', {}, hint.firstName), ' · ', h('span', { dir: 'ltr' }, maskEmail(hint.email))),
-      h('div', { class: 'actions' },
+      h('div', { class: 'ac-who' }, arch({ firstName: hint.firstName, photo: '' }, { size: 's' }), h('div', {},
+        h('p', { class: 'ac-who__t' }, hint.firstName),
+        h('p', { class: 'ac-who__s', dir: 'ltr' }, maskEmail(hint.email)))),
+      h('div', { class: 'ac-btns' },
         h('button', { type: 'button', class: 'btn btn--primary', 'data-continue': '', onclick: () => continueAs(hint) }, 'متابعة'),
-        h('button', { type: 'button', class: 'btn', 'aria-label': 'انسَ الحساب ده على الجهاز ده', 'data-forget': '', onclick: () => forget(hint) }, '✕ انسَ الحساب ده على الجهاز ده'))));
+        h('button', { type: 'button', class: 'acct__link ac-center', 'data-forget': '', onclick: () => forget(hint) }, 'انسَ الحساب ده على الجهاز ده'))));
     show(card(
-      title('هل تريد المتابعة بالحساب الذي استخدمته سابقًا؟'),
+      title('تكمّل بالحساب ده؟'),
+      noticeLine(),
       h('ul', { class: 'acct__hints' }, ...rows),
-      h('button', { type: 'button', class: 'btn', 'data-other': '', onclick: () => viewSignin() }, 'استخدام حساب آخر')
+      h('button', { type: 'button', class: 'btn', 'data-other': '', onclick: () => viewSignin() }, 'حساب تاني')
     ));
   }
 
@@ -662,7 +678,7 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
     if (saved && saved.email && saved.email.toLowerCase() === hint.email.toLowerCase()) {
       const reply = await call('GET', '/v1/account/me', null, saved.token);
       if (reply.ok) {
-        enter(reply.account);
+        enter(reply.account, { fresh: true });
         return;
       }
       if (reply.code === 'session') clearSession(local, tab);
@@ -685,239 +701,64 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
     else viewSignin();
   }
 
-  /* ---------- signed in ---------- */
+  /* ---------- signed in (home.js) ---------- */
 
-  function viewHome() {
-    const A = S.account;
-    const guest = A.eligibility && A.eligibility.state === 'guest';
-    const logout = async forgetDevice => {
-      const saved = readSession(local, tab);
-      if (saved) await call('POST', '/v1/account/logout', {}, saved.token);
-      clearSession(local, tab);
-      if (forgetDevice) writeHints(local, removeHint(readHints(local), A.email));
-      S.account = null;
-      S.email = forgetDevice ? '' : A.email;
-      S.notice = forgetDevice ? 'خرجت، والجهاز ده نسي الحساب. الباسورد المحفوظ في المتصفح بيتمسح من إعدادات المتصفح.' : 'خرجت من حسابك.';
-      S.asked = null;
-      S.exists = null;
-      viewSignin();
-    };
-    const fact = (label, value, ltr) => h('div', { class: 'acct__fact' },
-      h('dt', {}, label), h('dd', { dir: ltr ? 'ltr' : null }, value));
-    show(card(
-      title('أهلاً بيك يا ' + A.firstName),
-      guest ? h('p', { class: 'acct__notice', 'data-guest': '' }, 'حسابك خارج النطاق العمري للخدمة، فتقدر تشارك كضيف بدون نقاط.') : null,
-      A.eligibility && A.eligibility.soon ? h('p', { class: 'acct__notice' }, 'سنك قرب يخرج من النطاق العمري للخدمة.') : null,
-      h('dl', { class: 'acct__facts', 'data-home': '' },
-        fact('الاسم', A.name),
-        fact('الإيميل', A.email, true),
-        fact('الموبايل', A.phone, true),
-        fact('تاريخ الميلاد', dateText(A.birthDate))),
-      support('بياناتك محتاجة تتصلح؟'),
-      h('nav', { class: 'acct__nav', 'aria-label': 'حسابي' },
-        h('a', { class: 'btn', href: '#me/bookings', 'data-nav': 'bookings' }, 'حجوزاتي'),
-        h('a', { class: 'btn', href: '#me/points', 'data-nav': 'points' }, 'نقاطي'),
-        h('a', { class: 'btn', href: '#me/results', 'data-nav': 'results' }, 'نتايجي'),
-        h('a', { class: 'btn', href: '#me/orders', 'data-nav': 'orders' }, 'طلباتي'),
-        h('a', { class: 'btn', href: '#me/notifications', 'data-nav': 'notifications' }, 'إشعاراتي'),
-        h('a', { class: 'btn', href: '#me/security', 'data-nav': 'security' }, 'أمان الحساب')),
-      h('div', { class: 'actions' },
-        h('button', { type: 'button', class: 'btn', 'data-logout': '', onclick: () => logout(false) }, 'خروج'),
-        h('button', { type: 'button', class: 'btn', 'data-logout-forget': '', onclick: () => logout(true) }, 'خروج وانسَ الجهاز ده'))
-    ));
+  async function signOut(forgetDevice, { done = false, notice = '' } = {}) {
+    const saved = readSession(local, tab);
+    const email = S.account ? S.account.email : S.email;
+    if (saved && !done) authedQuiet(saved.token);
+    clearSession(local, tab);
+    if (forgetDevice) writeHints(local, removeHint(readHints(local), email));
+    mine.reset();
+    resetArrival();
+    S.account = null;
+    S.summary = null;
+    S.email = forgetDevice ? '' : email;
+    S.notice = notice || (forgetDevice ? 'خرجت، والجهاز ده نسي الحساب. الباسورد المحفوظ في المتصفح بيتمسح من إعدادات المتصفح.' : 'خرجت من حسابك.');
+    S.asked = null;
+    S.exists = null;
+    history.replaceState(null, '', location.pathname + location.search);
+    cue('leave');
+    leaving = true;
+    viewSignin();
   }
 
-  const HISTORY_WORDS = { submitted: 'اتبعتت', pending_review: 'مستني مراجعة', graded: 'اتصححت' };
-  const ORDER_WORDS = { pending: 'مستني', approved: 'جاهزة للاستلام', fulfilled: 'اتسلمت', cancelled: 'اتلغت' };
+  const authedQuiet = token => call('POST', '/v1/account/logout', {}, token);
 
-  async function viewMine(titleText, draw) {
-    main.dataset.state = 'loading';
-    const reply = await authed('POST', '/v1/comp/me', {});
-    if (reply.code === 'session') {
-      sessionOver();
-      return;
+  /* the photo's bytes: as a blob, over the session. Shared device: nothing stays in the browser's cache */
+  async function avatarBytes(version) {
+    const saved = readSession(local, tab);
+    if (!saved) return null;
+    try {
+      const res = await fetch(api + '/v1/account/avatar?v=' + encodeURIComponent(version), { headers: { authorization: 'Bearer ' + saved.token }, credentials: 'omit', cache: tab && tab.getItem(SESSION_KEY) ? 'no-store' : 'default' });
+      return res.ok ? await res.blob() : null;
     }
-    if (!reply.ok) {
-      show(card(title(titleText), h('p', { class: 'field__error', role: 'alert' }, reply.message || 'حصلت مشكلة. جرّب تاني.'), backToAccount()));
-      return;
+    catch {
+      return null;
     }
-    show(card(title(titleText), ...draw(reply), backToAccount()));
   }
 
-  /* #me/results[/slug]: what the policy lets the member see now; a number only when it may show */
-  function viewResults(slug) {
-    return viewMine('نتايجي', me => {
-      const list = slug ? me.history.filter(x => x.slug === slug) : me.history;
-      return [
-        slug && !list.length ? h('p', { class: 'acct__notice' }, 'مش لاقيين ده.') : null,
-        !slug && !list.length ? h('p', { class: 'acct__lead' }, 'لسه ما شاركتش في مسابقات.') : null,
-        h('ul', { class: 'acct__sessions', 'data-results': '' }, ...list.map(x => h('li', {},
-          h('strong', {}, x.title),
-          h('p', { class: 'field__hint' }, HISTORY_WORDS[x.status] || ''),
-          x.score !== null ? h('p', {}, 'الدرجة ' + arDigits(x.score) + ' من ' + arDigits(x.maxScore)) : h('p', { class: 'field__hint' }, 'النتيجة هتظهر قريب.'),
-          x.pointsAwarded ? h('p', {}, arDigits(x.pointsAwarded) + ' نقطة') : null))),
-        h('a', { class: 'btn', href: new URL('../points/', location.href).href }, 'نقاطي والمتجر')
-      ];
-    });
+  async function avatarSave(blob) {
+    const saved = readSession(local, tab);
+    try {
+      const res = await fetch(api + '/v1/account/avatar', { method: 'POST', headers: { authorization: 'Bearer ' + (saved ? saved.token : ''), 'content-type': blob.type }, body: blob, credentials: 'omit' });
+      return { status: res.status, ...(await res.json()) };
+    }
+    catch {
+      return { ok: false, code: 'network', message: 'النت قطع. اتأكد من الاتصال وجرّب تاني.' };
+    }
   }
 
-  /* #me/orders[/id] */
-  function viewOrders(id) {
-    return viewMine('طلباتي', me => {
-      const list = id ? me.redemptions.filter(x => x.id === id) : me.redemptions;
-      return [
-        id && !list.length ? h('p', { class: 'acct__notice' }, 'مش لاقيين ده.') : null,
-        !id && !list.length ? h('p', { class: 'acct__lead' }, 'لسه ما طلبتش حاجة من المتجر.') : null,
-        h('ul', { class: 'acct__sessions', 'data-orders': '' }, ...list.map(x => h('li', {},
-          h('strong', {}, x.itemName), ' · ' + arDigits(x.cost) + ' نقطة',
-          h('p', { class: 'field__hint' }, ORDER_WORDS[x.status] || '')))),
-        h('a', { class: 'btn', href: new URL('../points/', location.href).href }, 'نقاطي والمتجر')
-      ];
-    });
-  }
-
-  const money = n => arDigits(Number(n) || 0) + ' جنيه';
-  const BOOKING_STATUS = { pending: 'قيد المراجعة', confirmed: 'مؤكد', rejected: 'مرفوض', cancelled: 'ملغي', withdrawn: 'اتسحب' };
-
-  /* #me/bookings[/REF]: an unknown ref and someone else's look the same: not in the list */
-  async function viewBookings(ref) {
-    main.dataset.state = 'loading';
-    const reply = await authed('GET', '/v1/account/bookings');
-    if (reply.code === 'session') {
-      sessionOver();
-      return;
+  const mine = createMine({
+    main, S, authed, api: { avatar: avatarBytes, avatarSave }, sessionOver,
+    signOut,
+    openForgot: () => {
+      S.fromAccount = true;
+      viewForgot(S.account ? S.account.email : '');
     }
-    if (!reply.ok) {
-      show(card(title('حجوزاتي'), h('p', { class: 'field__error', role: 'alert' }, reply.message || 'حصلت مشكلة. جرّب تاني.'), backToAccount()));
-      return;
-    }
-    const shown = ref ? reply.bookings.filter(b => b.ref === ref) : reply.bookings;
-    show(card(
-      title('حجوزاتي'),
-      ref && !shown.length ? h('p', { class: 'acct__notice' }, 'مش لاقيين ده.') : null,
-      !ref && !shown.length ? h('p', { class: 'acct__lead' }, 'مفيش حجوزات مربوطة بحسابك لسه. لو حجزت قبل كده من غير حساب، افتح رابط حالة الحجز ودوس «اربطه بحسابي».') : null,
-      h('ul', { class: 'acct__sessions', 'data-bookings': '' }, ...shown.map(b => h('li', { class: 'acct__booking' },
-        h('strong', {}, b.event), ' · ', h('span', { dir: 'ltr' }, b.ref),
-        h('p', { class: 'field__hint' }, BOOKING_STATUS[b.status] || b.status),
-        ['confirmed', 'pending'].includes(b.status) ? h('p', {}, 'المطلوب ' + money(b.total) + ' · المدفوع ' + money(b.paid) + (b.left > 0 ? ' · الباقي ' + money(b.left) : '')) : null,
-        b.reason ? h('p', { class: 'field__hint' }, b.reason) : null))),
-      ref ? h('a', { class: 'acct__link', href: '#me/bookings' }, 'كل حجوزاتي') : null,
-      backToAccount()
-    ));
-  }
+  });
 
-  const KIND_WORDS = { earn: 'نقاط مسابقة', manual: 'تعديل من الخدمة', transfer: 'نقل', spend: 'طلب من المتجر', refund: 'رجوع نقاط' };
-
-  /* #me/points: the active season's balance and movements; closed seasons below */
-  async function viewPoints() {
-    main.dataset.state = 'loading';
-    const reply = await authed('GET', '/v1/account/points');
-    if (reply.code === 'session') {
-      sessionOver();
-      return;
-    }
-    if (!reply.ok) {
-      show(card(title('نقاطي'), h('p', { class: 'field__error', role: 'alert' }, reply.message || 'حصلت مشكلة. جرّب تاني.'), backToAccount()));
-      return;
-    }
-    show(card(
-      title('نقاطي'),
-      h('p', { class: 'acct__password', 'data-balance': '' }, arDigits(reply.balance) + ' نقطة'),
-      reply.season ? h('p', { class: 'field__hint' }, reply.season.name) : null,
-      reply.frozen ? h('p', { class: 'acct__notice', 'data-frozen': '' }, 'رصيدك متجمد: النقط اللي جمعتها محفوظة، بس مش هتقدر تستخدمها طول ما سنك خارج النطاق العمري للخدمة. لو بياناتك غلط، كلّم الخدمة.') : null,
-      reply.ledger.length
-        ? h('ul', { class: 'acct__sessions', 'data-ledger': '' }, ...reply.ledger.map(l => h('li', {},
-          h('strong', { dir: 'ltr' }, (l.amount > 0 ? '+' : '') + arDigits(l.amount)), ' ' + (KIND_WORDS[l.kind] || ''), l.note ? ' — ' + l.note : '')))
-        : h('p', { class: 'acct__lead' }, 'لسه مفيش نقط في الموسم ده.'),
-      reply.seasons.length ? h('p', { class: 'field__hint' }, 'مواسم فاتت: ' + reply.seasons.map(s => s.name + ' (' + arDigits(s.final) + ')').join('، ')) : null,
-      backToAccount()
-    ));
-  }
-
-  const backToAccount = () => h('a', { class: 'acct__link', href: '#me', 'data-back': '' }, 'ارجع لحسابي');
-
-  /* #me/security: where this account is signed in; a security notice's button opens this */
-  async function viewSecurity() {
-    main.dataset.state = 'loading';
-    const reply = await authed('GET', '/v1/account/security');
-    if (reply.code === 'session') {
-      sessionOver();
-      return;
-    }
-    if (!reply.ok) {
-      show(card(title('أمان الحساب'), h('p', { class: 'field__error', role: 'alert' }, reply.message || 'حصلت مشكلة. جرّب تاني.'), backToAccount()));
-      return;
-    }
-    const everywhere = h('button', { type: 'button', class: 'btn', 'data-logout-all': '' }, 'اخرج من كل الأجهزة');
-    everywhere.addEventListener('click', async () => {
-      everywhere.disabled = true;
-      await authed('POST', '/v1/account/logout', { all: true });
-      clearSession(local, tab);
-      S.email = S.account.email;
-      S.account = null;
-      S.notice = 'خرجت من كل الأجهزة.';
-      history.replaceState(null, '', location.pathname + location.search);
-      viewSignin();
-    });
-    show(card(
-      title('أمان الحساب'),
-      h('p', { class: 'acct__lead' }, 'الأجهزة اللي حسابك مفتوح عليها دلوقتي:'),
-      h('ul', { class: 'acct__sessions', 'data-sessions': '' }, ...reply.sessions.map(s => h('li', {},
-        h('strong', { dir: 'ltr' }, s.device),
-        s.current ? ' (الجهاز ده)' : '',
-        s.kind === 'shared' ? ' · جهاز مشترك' : ''))),
-      h('p', { class: 'field__hint' }, 'لو في جهاز مش بتاعك، اخرج من كل الأجهزة وكلّم الدعم الفني.'),
-      h('div', { class: 'actions' }, everywhere),
-      support('محتاج مساعدة؟'),
-      backToAccount()
-    ));
-  }
-
-  /* #me/notifications: «إشعاراتي». Each tap saves; the server's answer is what stays drawn */
-  async function viewPrefs() {
-    main.dataset.state = 'loading';
-    const reply = await authed('GET', '/v1/account/prefs');
-    if (reply.code === 'session') {
-      sessionOver();
-      return;
-    }
-    if (!reply.ok) {
-      show(card(title('إشعاراتي'), h('p', { class: 'field__error', role: 'alert' }, reply.message || 'حصلت مشكلة. جرّب تاني.'), backToAccount()));
-      return;
-    }
-    const row = group => {
-      const box = h('input', { type: 'checkbox', id: 'pref-' + group.key, 'data-pref': group.key, checked: group.on || null });
-      box.addEventListener('change', async () => {
-        const wanted = box.checked;
-        box.disabled = true;
-        showError('');
-        const saved = await authed('POST', '/v1/account/prefs', { prefs: { [group.key]: wanted } });
-        box.disabled = false;
-        if (saved.code === 'session') {
-          sessionOver();
-          return;
-        }
-        if (!saved.ok) {
-          box.checked = !wanted;
-          showError(saved.message || 'مقدرناش نحفظ. جرّب تاني.');
-          return;
-        }
-        box.checked = saved.groups.find(g => g.key === group.key).on;
-      });
-      return h('li', { class: 'acct__row' }, box, h('label', { for: 'pref-' + group.key }, group.label));
-    };
-    show(card(
-      title('إشعاراتي'),
-      h('p', { class: 'acct__lead' }, 'الإيميلات اللي تحب توصلك عن حسابك. عمرنا ما هنبعتلك إعلانات.'),
-      h('ul', { class: 'acct__prefs', 'data-prefs': '' }, ...reply.groups.map(row)),
-      errorLine(),
-      h('p', { class: 'field__hint' }, 'دول بيوصلوك على طول:'),
-      h('ul', { class: 'acct__always', 'data-always': '' }, ...reply.always.map(text => h('li', {}, text))),
-      backToAccount()
-    ));
-  }
-
-  function viewOff() {
+    function viewOff() {
     show(card(title('تسجيل الدخول متوقف مؤقتًا'), h('p', { class: 'acct__lead' }, 'جرّب تاني بعد شوية.'), support('محتاج مساعدة؟')));
   }
 
@@ -944,26 +785,52 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
       return;
     }
     const saved = readSession(local, tab);
+    if (saved) {
+      // a valid session opens the account at once; the home's summary carries the account, so that's one request
+      const home = !takeDestPeek() && (cleanRoute(location.hash) || '#me') === '#me';
+      const path = home ? '/v1/account/summary' : '/v1/account/me';
+      const reply = await call('GET', path, null, saved.token);
+      if (reply.ok) {
+        if (home) mine.keep(path, reply);
+        enter(reply.account);
+        return;
+      }
+      if (reply.code === 'session') clearSession(local, tab);
+      else {
+        // the session may be fine and the network not: never ask them to sign in for that
+        show(brokenHome(start));
+        return;
+      }
+    }
     const hints = readHints(local);
     if (hints.length) {
       viewHints(hints);
       return;
     }
-    if (saved) {
-      // a shared-device session in this tab: no card, it simply goes on
-      const reply = await call('GET', '/v1/account/me', null, saved.token);
-      if (reply.ok) {
-        enter(reply.account);
-        return;
-      }
-      if (reply.code === 'session') clearSession(local, tab);
-    }
     viewSignin();
   }
 
+  const takeDestPeek = () => {
+    try {
+      return !!(tab && tab.getItem(DEST_KEY));
+    }
+    catch {
+      return false;
+    }
+  };
+
   window.addEventListener('hashchange', () => {
-    if (S.account) openRoute();
+    if (S.account) mine.openRoute();
     else keepDest(tab, location.hash);
+  });
+
+  // the bar's sound button, a light tap for what's pressed (ui-sound.js: nothing before the first tap)
+  setTier();
+  soundToggle(document.querySelector('.cbar'));
+  uiSounds(document);
+  document.addEventListener('click', event => {
+    const link = event.target instanceof Element ? event.target.closest('.ac-row:not(.ac-row--static):not([data-quiet]), .ac-rail__a, .ac-band__seg, .ac-now__item, .ac-sub__back') : null;
+    if (link && link.tagName === 'A') cue('tap');
   });
 
   keepDest(tab, location.hash);
