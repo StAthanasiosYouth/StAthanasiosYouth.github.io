@@ -169,3 +169,13 @@ Every competition has belonged to an account since accounts went on (YOUTH-ACCOU
 **Staging:** Worker `1f2e2cd4`. `scripts/comp-check.mjs` passes on it. Signed out, `points/` reaches `/account/`, and a missing competition says unavailable with no code screen.
 
 **Not checked:** a competition played by hand on Staging from the site, the builder opened on real Staging (no admin sign-in here), and real phones.
+
+### Release (2026-10-31)
+
+Commit `82e96ca` through CI, Worker version `65001395`; the rollback version is `73437f90`. No migration and no Apps Script deployment.
+
+After the release: CI tests and smoke pass, `/v1/health` answers 200, `tools/account-prod-check.mjs` passes. On the real site, signed out, `points/` reaches `/account/`, and a missing competition says unavailable with no code screen. The admin file has no «المشاركين» screen and no «بكود لكل مشترك».
+
+**Not checked on production:** a competition played from start to finish, a signed-in `points/`, the builder with an admin signed in, and real phones. Production's switch values were not read, so a wallet on with the codes switch off would now show as on.
+
+**Back:** revert `82e96ca` on `main` first, then `npx wrangler rollback 73437f90` from `worker/`. No data needs undoing.
