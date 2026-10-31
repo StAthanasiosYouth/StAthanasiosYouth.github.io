@@ -316,6 +316,23 @@ export async function compReleaseTick(env, now = Date.now()) {
  * { comps: [{ slug, compId, version, def, closedAt, finalizedAt }], withdrawn: [{ slug }] }
  * A version is immutable once here. Finalizing releases the competition's held results (the cron does the rest).
  */
+/* c.def null: the version is here already (a close or a finalize) */
+export function compLiveStmts(db, comps, withdrawn, now) {
+  const wall = wallOf(now);
+  const stmts = [];
+  for (const c of comps) {
+    if (c.def) stmts.push(db.prepare('INSERT OR IGNORE INTO comp_versions (comp_id, version, slug, def, meta, synced_ms) VALUES (?, ?, ?, ?, ?, ?)').bind(String(c.compId), String(c.version), c.slug, JSON.stringify(c.def), JSON.stringify(metaOf(c.def)), now));
+    // a competition renamed: its old slug goes
+    stmts.push(db.prepare('DELETE FROM comp_live WHERE comp_id = ? AND slug <> ?').bind(String(c.compId), c.slug));
+    stmts.push(db.prepare(`INSERT INTO comp_live (slug, comp_id, version, closed_at, finalized_at, updated_ms) VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(slug) DO UPDATE SET comp_id = excluded.comp_id, version = excluded.version, closed_at = excluded.closed_at, finalized_at = excluded.finalized_at, updated_ms = excluded.updated_ms`)
+      .bind(c.slug, String(c.compId), String(c.version), c.closedAt || null, c.finalizedAt || null, now));
+    if (c.finalizedAt) stmts.push(db.prepare(`UPDATE submissions SET release_at = ? WHERE comp_id = ? AND released_ms IS NULL AND status IN ${SENT_SQL}`).bind(wall, String(c.compId)));
+  }
+  for (const w of withdrawn) if (w && SLUG.test(String(w.slug))) stmts.push(db.prepare('DELETE FROM comp_live WHERE slug = ?').bind(w.slug));
+  return stmts;
+}
+
 export async function syncCompLive(ctx) {
   await limit(ctx, 'sync.comp', clientIp(ctx.request), 120, 60);
   const raw = new TextDecoder().decode(ctx.raw);
@@ -325,19 +342,10 @@ export async function syncCompLive(ctx) {
   if (comps.length > 50 || withdrawn.length > 50) throw new ApiError('bad', 'too many');
   const db = ctx.env.DB;
   const now = Date.now();
-  const wall = wallOf(now);
-  const stmts = [];
   for (const c of comps) {
     if (!c || !SLUG.test(String(c.slug)) || !c.compId || !c.version || !c.def || !Array.isArray(c.def.questions)) throw new ApiError('bad', 'comp');
-    stmts.push(db.prepare('INSERT OR IGNORE INTO comp_versions (comp_id, version, slug, def, meta, synced_ms) VALUES (?, ?, ?, ?, ?, ?)').bind(String(c.compId), String(c.version), c.slug, JSON.stringify(c.def), JSON.stringify(metaOf(c.def)), now));
-    // a competition renamed: its old slug goes
-    stmts.push(db.prepare('DELETE FROM comp_live WHERE comp_id = ? AND slug <> ?').bind(String(c.compId), c.slug));
-    stmts.push(db.prepare(`INSERT INTO comp_live (slug, comp_id, version, closed_at, finalized_at, updated_ms) VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(slug) DO UPDATE SET comp_id = excluded.comp_id, version = excluded.version, closed_at = excluded.closed_at, finalized_at = excluded.finalized_at, updated_ms = excluded.updated_ms`)
-      .bind(c.slug, String(c.compId), String(c.version), c.closedAt || null, c.finalizedAt || null, now));
-    if (c.finalizedAt) stmts.push(db.prepare(`UPDATE submissions SET release_at = ? WHERE comp_id = ? AND released_ms IS NULL AND status IN ${SENT_SQL}`).bind(wall, String(c.compId)));
   }
-  for (const w of withdrawn) if (w && SLUG.test(String(w.slug))) stmts.push(db.prepare('DELETE FROM comp_live WHERE slug = ?').bind(w.slug));
+  const stmts = compLiveStmts(db, comps, withdrawn, now);
   stmts.push(syncStampStmt(db, 'comp-live', ts));
   await retry(() => db.batch(stmts));
   return { stored: comps.length, withdrawn: withdrawn.length };

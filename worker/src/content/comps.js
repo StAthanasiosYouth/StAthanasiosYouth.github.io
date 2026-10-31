@@ -25,7 +25,7 @@ import { limit, clientIp } from '../lib/ratelimit.js';
 import { verifySync, syncStampStmt, signSync } from '../lib/sync.js';
 
 const SIG_RE = /^(?:[0-9a-f]{64}|none)$/;
-const NONE = { none: true, built: null, errors: [], warnings: [], points: null, modules: {}, files: {}, reviewInfo: {}, stableUntil: '' };
+export const NONE_PART = { none: true, built: null, errors: [], warnings: [], points: null, modules: {}, files: {}, reviewInfo: {}, stableUntil: '' };
 
 /* POST /v1/sync/comp-sig { sig } (signed, Apps Script): the competitions' draft changed */
 export async function syncCompSig(ctx) {
@@ -51,7 +51,7 @@ function cleanView(view) {
   return {
     comps: list(view.comps, ['id', 'slug', 'title', 'banner', 'icon']),
     questions: list(view.questions, ['compId', 'media', 'explanationMedia']),
-    items: list(view.items, ['id', 'name', 'image'])
+    items: list(view.items, ['id', 'name', 'image', 'active'])
   };
 }
 
@@ -105,14 +105,14 @@ export async function askAppsScript(ctx, payload) {
  * → { …the part, sig, prepared, fresh }
  */
 export async function compPackage(ctx, { mode, now, media, by }) {
-  if (staticNone(ctx.env)) return { ...NONE, sig: 'none', prepared: true, fresh: false };
+  if (staticNone(ctx.env)) return { ...NONE_PART, sig: 'none', prepared: true, fresh: false };
   const db = ctx.env.DB;
   // the panel's state (P4-7: after a save, on open): the part kept, never a wait for Apps Script —
   // a save never depends on it; the review and the publish ask when it is not current
   if (mode === 'state') {
     const kept = await retry(() => db.prepare("SELECT sig, data, prepared FROM comp_package WHERE id = 'current'").first());
     if (kept) return { ...JSON.parse(kept.data), sig: kept.sig, prepared: kept.prepared === 1, fresh: false };
-    return { ...NONE, none: false, sig: '', prepared: false, fresh: false, unknown: true };
+    return { ...NONE_PART, none: false, sig: '', prepared: false, fresh: false, unknown: true };
   }
   const mediaSig = await sha256(JSON.stringify(media || {}));
   const [row, sigRow] = await Promise.all([

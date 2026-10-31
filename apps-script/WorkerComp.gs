@@ -43,6 +43,18 @@ function contentWriterGuard_() {
 
 }
 
+/*
+ * One writer: after the move (compExportForWorker_) the competitions' drafts are the Worker's, so a
+ * change from here (an old open panel) is refused. Back: delete the Script Property.
+ */
+function compWriterGuard_() {
+
+  if (PropertiesService.getScriptProperties().getProperty('COMP_DRAFTS') === 'worker') {
+    throw apiError_('moved', 'المسابقات بقت بتتحفظ على السيرفر الجديد.', 'اعمل Refresh للصفحة وكمّل من هناك.');
+  }
+
+}
+
 /* the competitions' draft as the build reads it, without what a publish writes → hex */
 function compPackageSig_() {
 
@@ -81,7 +93,7 @@ function compView_() {
   return {
     comps: (draft.comps || []).map(function (c) { return { id: c.id, slug: c.slug, title: c.title, banner: c.banner, icon: c.icon }; }),
     questions: (draft.questions || []).map(function (q) { return { compId: q.compId, media: q.media, explanationMedia: q.explanationMedia }; }),
-    items: (draft.items || []).map(function (i) { return { id: i.id, name: i.name, image: i.image }; })
+    items: (draft.items || []).map(function (i) { return { id: i.id, name: i.name, image: i.image, active: i.active }; })
   };
 
 }
@@ -102,24 +114,6 @@ function compSigPush_() {
     console.warn('comp sig: not sent: ' + ((error && error.message) || error));
     return false;
   }
-
-}
-
-/* the earliest competition time still ahead (a wall stamp): the part must be built again after it */
-function compStableUntil_(draft, now) {
-
-  var next = '';
-
-  (draft && draft.comps || []).forEach(function (row) {
-    var comp = compParseComp_(row);
-    if (!comp.id || !comp.enabled || comp.archived) return;
-    [comp.startAt, comp.endAt, comp.answersAt, comp.resultsAt].forEach(function (t) {
-      var at = String(t || '').replace(' ', 'T');
-      if (at && at > now && (!next || at < next)) next = at;
-    });
-  });
-
-  return next;
 
 }
 
@@ -189,6 +183,53 @@ function compCommitFromWorker_(live, withdrawn, stamp) {
 
 }
 
+/*
+ * The move of the competitions' drafts (worker/src/content/compdrafts.js): freeze = this copy takes no
+ * more changes (under the lock, so no save slips in after the read). The rows as the export reads them,
+ * the cards they link, the switches, and the key their version hashes use (so what is live stays «not changed»).
+ */
+function compExportForWorker_(freeze) {
+
+  return withScriptLock_(30000, function () {
+
+    var props = PropertiesService.getScriptProperties();
+
+    if (freeze) props.setProperty('COMP_DRAFTS', 'worker');
+
+    compDropDraft_();
+
+    var kinds = {};
+
+    COMP_EXPORT_KINDS.forEach(function (spec) { kinds[spec[0]] = contentExportKind_(spec); });
+
+    return {
+      kinds: kinds,
+      cards: contentExportKind_(['activities', 'content', 'Activities', 'id']).rows,
+      types: contentExportKind_(['types', 'content', 'Types', 'key']).rows,
+      modules: { COMP_REGISTRY: props.getProperty('COMP_REGISTRY') || '', COMP_WALLET: props.getProperty('COMP_WALLET') || '', COMP_SHOP: props.getProperty('COMP_SHOP') || '' },
+      view: compView_(),
+      hashKey: compSecret_('COMP_SECRET')
+    };
+
+  });
+
+}
+
+/* the switches changed on the Worker: the screens still here (wallet, store, seasons) read them from the properties */
+function compModulesFromWorker_(modules) {
+
+  modules = modules || {};
+
+  PropertiesService.getScriptProperties().setProperties({
+    COMP_REGISTRY: modules.COMP_REGISTRY === '1' ? '1' : '',
+    COMP_WALLET: modules.COMP_WALLET === '1' ? '1' : '',
+    COMP_SHOP: modules.COMP_SHOP === '1' ? '1' : ''
+  });
+
+  return { ok: true };
+
+}
+
 /* doPost { fn: 'workerSync', args: [{ ts, sig, payload }] }: the Worker's signed question → its answer */
 function workerSyncCall_(arg) {
 
@@ -214,6 +255,14 @@ function workerSyncCall_(arg) {
 
   if (body.call === 'compPackage' && (body.mode === 'review' || body.mode === 'prepare')) {
     return { ok: true, result: compPackage_(body.mode, String(body.now || cairoNow_()), body.media || {}, String(body.by || '')) };
+  }
+
+  if (body.call === 'compExport') {
+    return { ok: true, result: compExportForWorker_(body.freeze === true) };
+  }
+
+  if (body.call === 'compModules') {
+    return { ok: true, result: compModulesFromWorker_(body.modules) };
   }
 
   if (body.call === 'compCommit') {

@@ -22,7 +22,8 @@ import { randomId } from '../lib/hash.js';
 import { githubConfig, readText } from '../lib/github.js';
 import { preparePublish, pathKind } from '../publish.js';
 import { makeJob } from '../jobs.js';
-import { compPackage, compCommitOf, commitComps } from './comps.js';
+import { compPackage, compCommitOf, commitComps, NONE_PART } from './comps.js';
+import { COMP_CALLS } from './compdrafts.js';
 import { sha256Sync } from './services.js';
 import { runtimePoints } from '../store/shop.js';
 
@@ -38,7 +39,8 @@ export const STATE_FREE = new Set([
   'apiPages', 'apiPage', 'apiPageSave', 'apiPageSetEnabled', 'apiPageArchive', 'apiPageDelete',
   'apiPageMediaSave', 'apiPageMediaOrder', 'apiPageMediaDelete', 'apiPagePreview',
   'apiEvents', 'apiEvent', 'apiEventSave', 'apiEventSetEnabled', 'apiEventArchive', 'apiEventDelete',
-  'apiMediaPreview', 'apiMediaLibrary', 'apiImportPreview'
+  'apiMediaPreview', 'apiMediaLibrary', 'apiImportPreview',
+  ...COMP_CALLS
 ]);
 const CLAIM_MS = 2 * 60 * 1000;
 const EMPTY_COMPS = { index: [], live: {}, withdrawn: [], byId: {}, slugs: {}, media: [] };
@@ -52,23 +54,45 @@ const enc = new TextEncoder();
  */
 const SHELL_FRESH_MS = 6 * 3600 * 1000;
 
-async function fetchShell(ctx) {
+async function fetchShell(ctx, path = 'pages/index.html', key = 'PAGES_SHELL') {
   const cfg = githubConfig(ctx.env);
   if (cfg.error) return '';
-  const text = await readText(cfg, 'pages/index.html', ctx.fetch);
+  const text = await readText(cfg, path, ctx.fetch);
   // kept even when empty (no shell in the repository: Pages.gs uses its built-in copy, as Apps Script did)
-  await retry(() => ctx.env.DB.prepare("INSERT INTO settings (key, value, updated_at, updated_by) VALUES ('PAGES_SHELL', ?, ?, 'worker') ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at")
-    .bind(text || '', Date.now()).run()).catch(() => {});
+  await retry(() => ctx.env.DB.prepare("INSERT INTO settings (key, value, updated_at, updated_by) VALUES (?, ?, ?, 'worker') ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at")
+    .bind(key, text || '', Date.now()).run()).catch(() => {});
   return text;
 }
 
-async function pageShell(ctx) {
-  const row = await retry(() => ctx.env.DB.prepare("SELECT value, updated_at FROM settings WHERE key = 'PAGES_SHELL'").first()).catch(() => null);
+async function pageShell(ctx, path, key = 'PAGES_SHELL') {
+  const row = await retry(() => ctx.env.DB.prepare('SELECT value, updated_at FROM settings WHERE key = ?').bind(key).first()).catch(() => null);
   if (row) {
-    if (Date.now() - row.updated_at > SHELL_FRESH_MS) ctx.defer(fetchShell(ctx));
+    if (Date.now() - row.updated_at > SHELL_FRESH_MS) ctx.defer(fetchShell(ctx, path, key));
     return row.value;
   }
-  return fetchShell(ctx);
+  return fetchShell(ctx, path, key);
+}
+
+/*
+ * The competitions' part built here, from the drafts in memory (docs/PHASE5-PLAN.md §3o): the same
+ * compBuildPublic_ / compPublishFiles_ Apps Script runs, the same shape as its answer.
+ */
+async function localCompPart(ctx, { g, media, now, publishing }) {
+  const draft = g.compDraft_();
+  const errors = [];
+  const warnings = [];
+  const built = g.compBuildPublic_(draft, {
+    media, now, hash: g.compKeyedHash_,
+    error: (where, message) => errors.push({ where, message }),
+    warn: (where, message) => warnings.push({ where, message })
+  });
+  let files = {};
+  if (publishing && !errors.length) {
+    const needShell = Object.keys(built.live).some(id => !built.live[id].comp || built.live[id].comp.liveVersion !== built.live[id].version);
+    const shell = needShell ? await pageShell(ctx, 'competition/index.html', 'COMP_SHELL') : '';
+    files = g.compPublishFiles_(built, (ctx.env.SITE_URL || '').replace(/\/?$/, '/'), now, shell && g.compShellOk_(shell) ? shell : '');
+  }
+  return { ...NONE_PART, none: false, built, errors, warnings, modules: draft.modules, files, reviewInfo: g.compReviewInfo_(built), stableUntil: g.compStableUntil_(draft, now), sig: 'worker', prepared: true, fresh: false };
 }
 
 async function release(db, id) {
@@ -79,7 +103,7 @@ async function release(db, id) {
  * Before the call: everything the build reads, then the hooks. Returns
  * { statements(), finish(), release() } for runtime.js (null for other calls).
  */
-export async function setupBuild(ctx, { fn, g, hooks, services, email }) {
+export async function setupBuild(ctx, { fn, g, hooks, services, email, compLocal }) {
   if (!BUILD_CALLS.has(fn) && STATE_FREE.has(fn)) return null;
   const db = ctx.env.DB;
   const publishing = fn === 'apiPublish';
@@ -104,7 +128,8 @@ export async function setupBuild(ctx, { fn, g, hooks, services, email }) {
         db.prepare('SELECT kind, key, hash FROM published_revisions WHERE live = 1'),
         db.prepare("SELECT body FROM published_revisions WHERE live = 1 AND kind = 'content' AND key = 'site'")
       ])),
-      compPackage(ctx, { mode: publishing ? 'publish' : BUILD_CALLS.has(fn) ? 'review' : 'state', now: wall, media, by: email }),
+      compLocal ? localCompPart(ctx, { g, media, now: wall, publishing })
+        : compPackage(ctx, { mode: publishing ? 'publish' : BUILD_CALLS.has(fn) ? 'review' : 'state', now: wall, media, by: email }),
       publishing ? pageShell(ctx) : null
     ]);
     if (claimId) {
@@ -130,11 +155,12 @@ export async function setupBuild(ctx, { fn, g, hooks, services, email }) {
     });
     hooks.use('compReviewInfo_', () => ({ ...(pkg.reviewInfo || {}) }));
     hooks.use('compPublishFiles_', () => ({ ...(pkg.files || {}) }));
-    hooks.use('compWriteSnapshots_', () => 0);   // Apps Script wrote them when it prepared the part
+    hooks.use('compWriteSnapshots_', () => 0);   // Apps Script wrote them when it prepared the part; here comp_versions, in the batch (runtime.js)
 
     let commit = null;
     let sent = null;
-    hooks.use('compAfterCommit_', () => { commit = compCommitOf(pkg); });
+    // Apps Script's competitions: it is told what went live. The Worker's own: liveVersion is a draft change like pages' liveV (the real code)
+    if (!compLocal) hooks.use('compAfterCommit_', () => { commit = compCommitOf(pkg); });
     hooks.use('publishClaim_', () => claimId || 'review');
     hooks.use('publishDropClaim_', () => {});
     hooks.use('publishShadow_', () => {});

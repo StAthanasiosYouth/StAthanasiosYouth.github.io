@@ -16,7 +16,7 @@ import { ROOT } from './lib/gs.mjs';
 
 // the files the fake Apps Script world loads (tests/fakes/gas.mjs): every cross-file call resolves
 export const FILES = ['Platforms.gs', 'Content.gs', 'Hub.gs', 'Review.gs', 'Seed.gs', 'Auth.gs', 'Store.gs', 'Publish.gs', 'Code.gs', 'Media.gs',
-  'Items.gs', 'Import.gs', 'Migrate.gs', 'Presence.gs', 'Activity.gs', 'AdminDevice.gs', 'CompStore.gs', 'CompModel.gs',
+  'Items.gs', 'Import.gs', 'Migrate.gs', 'Presence.gs', 'Activity.gs', 'AdminDevice.gs', 'CompStore.gs', 'CompModel.gs', 'CompCrypto.gs', 'CompScore.gs', 'CompPublish.gs', 'CompAdmin.gs',
   'BookModel.gs', 'Pages.gs', 'WorkerSync.gs', 'PayDest.gs', 'Grants.gs', 'NotifyClaim.gs', 'AdminPlatform.gs', 'AdminNotify.gs', 'Api.gs', 'Push.gs', 'ContentExport.gs'];
 
 const SERVICES = ['SpreadsheetApp', 'CacheService', 'LockService', 'PropertiesService', 'Utilities', 'Session', 'UrlFetchApp',
@@ -25,14 +25,14 @@ const SERVICES = ['SpreadsheetApp', 'CacheService', 'LockService', 'PropertiesSe
 export const SETTABLE = ['API_REQUEST_'];
 
 // module constants the Worker reads (get)
-export const READABLE = ['CONTENT_EXPORT_KINDS', 'DATA_SCHEMA_VERSION', 'COMP_SCHEMA_VERSION', 'API_PERMS', 'ACTIVITY_COLUMNS', 'ACTIVITY_MERGE_MS', 'ACTIVITY_MERGE_LOOKBACK'];
+export const READABLE = ['CONTENT_EXPORT_KINDS', 'DATA_SCHEMA_VERSION', 'COMP_SCHEMA_VERSION', 'API_PERMS', 'ACTIVITY_COLUMNS', 'ACTIVITY_MERGE_MS', 'ACTIVITY_MERGE_LOOKBACK', 'COMP_TABLES', 'COMP_EXPORT_KINDS'];
 
 // left the spreadsheet in Apps Script; the Worker answers them itself (runtime.js)
 export const REPLACEABLE = ['assertAdmin_', 'currentEmail_', 'log_', 'rememberActivity_', 'activityForward_', 'activityPendingFlag_',
   'activityDispatch_', 'apiStateFor_', 'payDestSync_', 'workerSyncSoon_', 'grantsFresh_', 'adminDirectory_', 'displayName_',
   // the review and the publish (P4-4, P4-6): what is live, the competitions' part, where the files go
   'workerLiveContent_', 'publishMode_', 'compDraft_', 'compBuildPublic_', 'compPublishFiles_', 'compReviewInfo_', 'compWriteSnapshots_',
-  'compAfterCommit_', 'publishClaim_', 'publishDropClaim_', 'mediaForPublish_', 'githubCommitFiles_', 'publishToWorker_', 'publishShadow_',
+  'compAfterCommit_', 'compShellText_', 'compRuntimePush_', 'compSubmissionCounts_', 'compDefinitionFor_', 'publishClaim_', 'publishDropClaim_', 'mediaForPublish_', 'githubCommitFiles_', 'publishToWorker_', 'publishShadow_',
   'fetchPublishedContent_', 'lastPublished_',
   // the panel state (P4-7): its activity from D1
   'activityState_',
@@ -41,11 +41,11 @@ export const REPLACEABLE = ['assertAdmin_', 'currentEmail_', 'log_', 'rememberAc
 
 // called by bundled code, defined in files that stay on Apps Script: a no-op here unless the Worker replaces it
 //   compEnsureSecrets_ (CompCrypto.gs) — Pages.gs pagesWrite_ makes the competitions' secrets; they stay Apps Script's (Phase 5–6)
-//   compPublishFiles_, compReviewInfo_, compWriteSnapshots_, compAfterCommit_ (CompPublish.gs) — the competitions' part
-//     of a publish is built by Apps Script (apps-script/WorkerComp.gs); the Worker hands over what it answered
-//   compShellText_ (CompPublish.gs) — publishNow_ reads the competitions' shell for their files; Apps Script did that already
+//   compRegistryReady_, compWalletReady_, compShopReady_ — compModules_: those modules' code is the Worker's own (the switches decide)
+//   compRuntimePush_ (WorkerComp.gs) — what goes live, closes or is finalized: the Worker writes it itself (content/runtime.js)
+//   compWriterGuard_ (WorkerComp.gs) — Apps Script refuses competitions' writes after the move; the Worker IS the writer
 //   contentWriterGuard_ (WorkerComp.gs) — Apps Script refuses content writes after the cutover; the Worker IS the writer
-export const STUBS = ['compEnsureSecrets_', 'compPublishFiles_', 'compReviewInfo_', 'compWriteSnapshots_', 'compAfterCommit_', 'compShellText_', 'contentWriterGuard_'];
+export const STUBS = ['compEnsureSecrets_', 'compRegistryReady_', 'compWalletReady_', 'compShopReady_', 'compRuntimePush_', 'compWriterGuard_', 'contentWriterGuard_'];
 
 export function build() {
   const parts = [];

@@ -80,6 +80,31 @@ export const KINDS = Object.freeze({
 
 export const KIND_NAMES = Object.freeze(Object.keys(KINDS));
 
+/*
+ * The competitions' drafts (docs/PHASE5-PLAN.md §3o): answers included, so never in the panel's
+ * drafts read, the content import or the export; only the admin's competition calls read them.
+ */
+export const COMP_KINDS = Object.freeze({
+  competitions: {
+    tab: 'Competitions', sheet: 'comp', key: 'id',
+    columns: ['id', 'slug', 'title', 'shortTitle', 'description', 'instructions', 'ctaLabel', 'banner', 'icon', 'theme',
+      'startAt', 'endAt', 'participation', 'scoring', 'resultShow', 'resultsAt', 'answersShow', 'answersAt', 'showPoints', 'wallet',
+      'attempts', 'layout', 'shuffleQ', 'shuffleC', 'timeLimit', 'maxSubmissions', 'uniquePhone', 'fields', 'successText', 'enabled',
+      'cardId', 'liveVersion', 'publishedAt', 'closedAt', 'finalizedAt', 'archived', 'createdBy', 'createdAt', 'updatedAt', 'seasonId', 'allowGuests']
+  },
+  questions: {
+    tab: 'Questions', sheet: 'comp', key: 'id',
+    columns: ['id', 'compId', 'order', 'type', 'text', 'help', 'media', 'choices', 'correct', 'points', 'required', 'explanation',
+      'explanationMedia', 'review', 'enabled', 'updatedAt']
+  }
+});
+
+export const COMP_KIND_NAMES = Object.freeze(Object.keys(COMP_KINDS));
+
+/* every kind a call of the admin runs over */
+export const RUN_KINDS = Object.freeze({ ...KINDS, ...COMP_KINDS });
+export const RUN_KIND_NAMES = Object.freeze(Object.keys(RUN_KINDS));
+
 /* a row key: printable, short (ids, keys, dates as the Sheets hold them) */
 const KEY_RE = /^[^\u0000-\u001f\u007f]{1,120}$/;
 
@@ -98,7 +123,7 @@ export function validCell(value) {
  * must be exact, so nothing is guessed or filled in.
  */
 export function canonicalRow(kind, row) {
-  const spec = KINDS[kind];
+  const spec = RUN_KINDS[kind];
   if (!spec) throw new Error('unknown kind ' + kind);
   if (!row || typeof row !== 'object' || Array.isArray(row)) throw new Error(kind + ': row is not an object');
   const out = {};
@@ -115,5 +140,5 @@ export function canonicalRow(kind, row) {
 }
 
 export function rowKey(kind, row) {
-  return String(row[KINDS[kind].key]);
+  return String(row[RUN_KINDS[kind].key]);
 }

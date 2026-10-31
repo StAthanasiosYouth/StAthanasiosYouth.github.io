@@ -33,14 +33,18 @@ export async function adminReviewInput(ctx) {
   for (const r of kinds.media.rows) for (const c of KINDS.media.private) r.data[c] = r.data[c] === '' ? '' : true;
   const now = Date.now();
   const wall = cairoText(now).replace(' ', 'T');
-  const [live, pkg, sig, online] = await retry(() => db.batch([
+  const [live, pkg, sig, online, writer] = await retry(() => db.batch([
     db.prepare("SELECT body FROM published_revisions WHERE kind = 'content' AND key = 'site' AND live = 1"),
     db.prepare("SELECT sig, data FROM comp_package WHERE id = 'current'"),
     db.prepare("SELECT value FROM settings WHERE key = 'COMP_SIG'"),
-    db.prepare("SELECT value FROM settings WHERE key = 'BOOKING_ONLINE'")
+    db.prepare("SELECT value FROM settings WHERE key = 'BOOKING_ONLINE'"),
+    db.prepare("SELECT value FROM settings WHERE key = 'COMP_DRAFTS'")
   ]));
   let comps = null;
-  if (ctx.env.COMPS_SOURCE === 'none' && ctx.env.ENVIRONMENT !== 'production') {
+  // the competitions' drafts on the Worker (their answers stay here): the panel asks the Worker's review
+  if (writer.results[0] && writer.results[0].value === 'worker') {
+    comps = null;
+  } else if (ctx.env.COMPS_SOURCE === 'none' && ctx.env.ENVIRONMENT !== 'production') {
     comps = { none: true, built: null, errors: [], warnings: [], points: null, modules: {}, files: {}, reviewInfo: {}, stableUntil: '' };
   } else if (pkg.results[0] && sig.results[0] && pkg.results[0].sig === sig.results[0].value) {
     const data = JSON.parse(pkg.results[0].data);

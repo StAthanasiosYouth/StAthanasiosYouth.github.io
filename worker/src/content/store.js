@@ -40,7 +40,7 @@ export async function kindHash(rows) {
  * the row hashes and the kind hash equal to what Apps Script sent.
  * → { rows: [{ id, pos, text, hash }], hash, problems: [] }
  */
-async function checkKind(kind, sent) {
+export async function checkKind(kind, sent) {
   const problems = [];
   const rows = [];
   if (!sent || !Array.isArray(sent.rows)) return { rows, hash: '', problems: ['rows missing'] };

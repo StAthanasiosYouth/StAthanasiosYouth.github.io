@@ -37,6 +37,8 @@ function compValidId_(value, pattern, label) {
 /* a draft change under the script lock; Activity notes written after it succeeded */
 function compWrite_(label, change) {
 
+  compWriterGuard_();
+
   var email = currentEmail_();
   var lock = LockService.getScriptLock();
   var result;

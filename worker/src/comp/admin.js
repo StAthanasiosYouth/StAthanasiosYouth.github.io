@@ -1,6 +1,6 @@
 /*
- * Results in the admin (docs/PHASE5-PLAN.md P5-8): submissions, manual grading, void, regrade, export, on the
- * Worker's own rows. Authoring, close and finalize stay on Apps Script until Phase 6 and arrive by POST /v1/sync/comp-live.
+ * Results in the admin (docs/PHASE5-PLAN.md P5-8, §3o): submissions, manual grading, void, regrade, export, on the
+ * Worker's own rows. The admin's calls reach the marks through content/runtime.js (the routes here answer the same).
  * Ranking (YOUTH-ACCOUNTS-PLAN §28 #4): guests carry a badge and no rank number.
  */
 
@@ -9,7 +9,7 @@ import { retry } from '../lib/db.js';
 import { activityStmt } from '../lib/activity.js';
 import { limit } from '../lib/ratelimit.js';
 import { memberEmailStmt } from '../notify/member.js';
-import { compApplyManual_, compRegrade_ } from './score.gen.js';
+import { compApplyManual_, compRegrade_, compAnswerKey_ } from './score.gen.js';
 import { SENT, SUBMISSION_ID, wallOf } from './model.js';
 import { liveById, versionDef, walletStmts } from './runtime.js';
 
@@ -81,10 +81,14 @@ function followUps(db, row, deltas, wasPending, nowPending, now, kind) {
 
 /* POST /v1/admin/comp/submissions/:id/grade { grades: { qid: true | false | number | null } } */
 export async function adminCompGrade(ctx) {
-  const db = ctx.env.DB;
   const id = String(ctx.params.id);
+  await gradeSubmission(ctx, id, (ctx.body || {}).grades);
+  return adminCompSubmission(ctx);
+}
+
+export async function gradeSubmission(ctx, id, grades) {
+  const db = ctx.env.DB;
   if (!SUBMISSION_ID.test(id)) throw new ApiError('not_found', 'submission');
-  const grades = (ctx.body || {}).grades;
   if (!grades || typeof grades !== 'object' || Array.isArray(grades)) throw new ApiError('bad', 'grades');
   const row = await retry(() => db.prepare('SELECT * FROM submissions WHERE id = ?').bind(id).first());
   if (!row) throw new ApiError('not_found', 'submission');
@@ -101,7 +105,7 @@ export async function adminCompGrade(ctx) {
     if (!totals) throw new ApiError('invalid', 'qid', { field: 'grades', message: 'السؤال ده مينفعش يتصحح.' });
     grading = totals.grading;
   }
-  if (!totals) return adminCompSubmission(ctx);
+  if (!totals) return;
   const change = { id, status: totals.status, score: totals.score, submitted_ms: row.submitted_ms, no_points: row.no_points };
   const wallet = await walletStmts(db, { participantId: row.participant_id, compId: row.comp_id, def, change, actor: ctx.actor.email, now });
   await retry(() => db.batch([
@@ -111,20 +115,39 @@ export async function adminCompGrade(ctx) {
     ...followUps(db, row, wallet.deltas, row.pending_count, totals.pendingCount, now, 'res.points'),
     activityStmt(db, { at: now, actor: ctx.actor.email, actorName: ctx.actor.name, action: 'review', entityType: 'competition', entityId: row.comp_id, summary: 'صحّح إجابة', changes: { questions: Object.keys(grades).length } })
   ]));
-  return adminCompSubmission(ctx);
+}
+
+/* one mark for every sent submission with the same (normalized) answer → how many */
+export async function gradeGroup(ctx, compId, qid, key, pts) {
+  const db = ctx.env.DB;
+  if (!COMP_ID.test(compId)) throw new ApiError('not_found', 'comp');
+  const rows = (await retry(() => db.prepare(`SELECT id, version, qids, answers FROM submissions WHERE comp_id = ? AND status IN ${SENT_SQL} LIMIT 500`).bind(compId).all())).results;
+  let updated = 0;
+  for (const row of rows) {
+    if (!JSON.parse(row.qids || '[]').includes(qid)) continue;
+    const def = await versionDef(db, compId, row.version);
+    const q = def && def.questions.find(x => x.id === qid);
+    if (!q || compAnswerKey_(q, JSON.parse(row.answers || '{}')[qid]) !== key) continue;
+    await gradeSubmission(ctx, row.id, { [qid]: pts });
+    updated++;
+  }
+  return updated;
 }
 
 /* POST /v1/admin/comp/submissions/:id/void { voided }: never earns; restoring puts it back */
 export async function adminCompVoid(ctx) {
+  await voidSubmission(ctx, String(ctx.params.id), (ctx.body || {}).voided !== false);
+  return adminCompSubmission(ctx);
+}
+
+export async function voidSubmission(ctx, id, voided) {
   const db = ctx.env.DB;
-  const id = String(ctx.params.id);
   if (!SUBMISSION_ID.test(id)) throw new ApiError('not_found', 'submission');
-  const voided = (ctx.body || {}).voided !== false;
   const row = await retry(() => db.prepare('SELECT * FROM submissions WHERE id = ?').bind(id).first());
   if (!row || row.status === 'in_progress') throw new ApiError('not_found', 'submission');
   const def = await versionDef(db, row.comp_id, row.version);
   const next = voided ? 'void' : (def && def.scoring ? (row.pending_count ? 'pending_review' : 'graded') : 'submitted');
-  if (next === row.status) return adminCompSubmission(ctx);
+  if (next === row.status) return;
   const now = Date.now();
   const wallet = await walletStmts(db, { participantId: row.participant_id, compId: row.comp_id, def, change: { id, status: next, score: row.score, submitted_ms: row.submitted_ms, no_points: row.no_points }, actor: ctx.actor.email, now });
   await retry(() => db.batch([
@@ -133,13 +156,15 @@ export async function adminCompVoid(ctx) {
     ...followUps(db, row, wallet.deltas, 0, 0, now, 'res.correction'),
     activityStmt(db, { at: now, actor: ctx.actor.email, actorName: ctx.actor.name, action: 'review', entityType: 'competition', entityId: row.comp_id, summary: voided ? 'لغى مشاركة' : 'رجّع مشاركة' })
   ]));
-  return adminCompSubmission(ctx);
 }
 
 /* POST /v1/admin/comp/:id/regrade: the live key on every submission of the live version; reviewers' marks stay */
-export async function adminCompRegrade(ctx) {
+export function adminCompRegrade(ctx) {
+  return regradeComp(ctx, String(ctx.params.id));
+}
+
+export async function regradeComp(ctx, id) {
   const db = ctx.env.DB;
-  const id = String(ctx.params.id);
   await limit(ctx, 'comp.regrade', ctx.actor.email, 6, 60);
   const live = await liveById(db, id);
   if (!live) throw new ApiError('not_found', 'comp');

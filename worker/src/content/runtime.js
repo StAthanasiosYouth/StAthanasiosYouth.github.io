@@ -24,12 +24,17 @@ import { requirePerm } from '../lib/perms.js';
 import { cleanDests, payDestStmts } from '../book/pay.js';
 import { createGs, GS_SOURCE } from './gs.gen.js';
 import { MemSpreadsheet, Utilities, memCache, memProperties, LockService, offline } from './services.js';
-import { KINDS, KIND_NAMES } from './kinds.js';
+import { RUN_KINDS as KINDS, RUN_KIND_NAMES as KIND_NAMES } from './kinds.js';
 import { setupBuild } from './publishing.js';
 import { staticView } from './comps.js';
+import { askAppsScript } from './comps.js';
 import { setupMedia, mirrorMedia, MEDIA_CALLS, MEDIA_UPLOAD_MAX_BYTES } from './media.js';
+import { COMP_CALLS, COMP_RESULT_READS, MODULE_KEYS, compSettingsQuery, compSettingsOf, loadCounts, loadResults, settingStmt } from './compdrafts.js';
+import { compLiveStmts } from '../comp/runtime.js';
 
 export { MEDIA_UPLOAD_MAX_BYTES };
+
+import { gradeSubmission, voidSubmission, gradeGroup, regradeComp } from '../comp/admin.js';
 
 const CONTENT_ID = 'd1-content';
 const COMP_ID = 'd1-comp';
@@ -58,7 +63,7 @@ const NEEDS_ROOTS = new Set(['apiPageSave', 'apiEventSave']);
 const PASS_CODES = new Set(['locked', 'busy', 'session_expired', 'session_replaced']);
 
 async function loadAll(db, sid, now, { activityRows = 15, activityMs = 10 * 60_000 } = {}) {
-  const [rows, kinds, admins, locks, router, recent, writer, view, waiting, online] = await retry(() => db.batch([
+  const [rows, kinds, admins, locks, router, recent, writer, view, waiting, online, comps] = await retry(() => db.batch([
     db.prepare('SELECT kind, id, pos, version, data, hash FROM draft_rows WHERE deleted_ms IS NULL ORDER BY kind, pos, id'),
     db.prepare('SELECT kind, version FROM draft_kinds'),
     db.prepare('SELECT email, name, role FROM admins WHERE active = 1 ORDER BY email'),
@@ -76,7 +81,9 @@ async function loadAll(db, sid, now, { activityRows = 15, activityMs = 10 * 60_0
     db.prepare("SELECT data FROM comp_package WHERE id = 'view'"),
     db.prepare('SELECT COUNT(*) AS n FROM media_files WHERE mirrored_ms IS NULL AND deleted_ms IS NULL AND site_path IS NOT NULL'),
     // Pages.gs bookOnline_: the online-booking go-live switch (was the Script Property BOOKING_ONLINE)
-    db.prepare("SELECT value FROM settings WHERE key = 'BOOKING_ONLINE'")
+    db.prepare("SELECT value FROM settings WHERE key = 'BOOKING_ONLINE'"),
+    // who writes the competitions' drafts, their module switches, their version key
+    compSettingsQuery(db)
   ]));
   const byKind = Object.fromEntries(KIND_NAMES.map(k => [k, []]));
   for (const r of rows.results) if (byKind[r.kind]) byKind[r.kind].push({ id: r.id, pos: r.pos, version: r.version, hash: r.hash, data: JSON.parse(r.data) });
@@ -95,7 +102,8 @@ async function loadAll(db, sid, now, { activityRows = 15, activityMs = 10 * 60_0
     writer: writer.results[0] && writer.results[0].value === '1' ? 'worker' : 'sheets',
     view: view.results[0] ? JSON.parse(view.results[0].data) : null,
     waiting: waiting.results[0] ? waiting.results[0].n : 0,
-    bookingOnline: online.results[0] ? online.results[0].value : null
+    bookingOnline: online.results[0] ? online.results[0].value : null,
+    comps: compSettingsOf(comps.results)
   };
 }
 
@@ -137,7 +145,7 @@ function sheetsFrom(loaded) {
  */
 export async function runContentCall(ctx, fn, args, { expect = {}, now = Date.now() } = {}) {
   const db = ctx.env.DB;
-  if (!CONTENT_CALLS.has(fn)) throw new ApiError('bad', 'fn');
+  if (!CONTENT_CALLS.has(fn) && !COMP_CALLS.has(fn)) throw new ApiError('bad', 'fn');
   if (!Array.isArray(args) || args.length > 6) throw new ApiError('bad', 'args');
   const t0 = Date.now();
   const timing = {};
@@ -148,6 +156,14 @@ export async function runContentCall(ctx, fn, args, { expect = {}, now = Date.no
   const history = fn === 'apiPublish' ? { activityRows: 300, activityMs: 30 * 86400_000 } : {};
   let [loaded, roots] = await Promise.all([loadAll(db, sid, now, history), NEEDS_ROOTS.has(fn) ? repoRoots(ctx) : null]);
   if (loaded.writer !== 'worker') throw new ApiError('writer', 'CONTENT_DRAFTS is not 1: the Sheets are the writer');
+  const compLocal = loaded.comps.local;
+  if (COMP_CALLS.has(fn) && !compLocal) throw new ApiError('writer', 'COMP_DRAFTS is not worker: Apps Script writes the competitions');
+  if (compLocal && !loaded.comps.key) throw new ApiError('error', 'settings.COMP_HASH_KEY is not set');
+  // what a competition call reads beyond the drafts: the counts, or one competition's submissions
+  const [counts, results] = await Promise.all([
+    fn === 'apiComps' || fn === 'apiComp' || fn === 'apiCompSave' || fn === 'apiCompCreate' || fn === 'apiCompDuplicate' || fn === 'apiCompArchive' || fn === 'apiCompClose' || fn === 'apiCompFinalize' || fn === 'apiCompDelete' ? loadCounts(db) : {},
+    COMP_RESULT_READS.includes(fn) ? loadResults(db, fn, args, SUBMISSION_COLUMNS) : null
+  ]);
   // never guessed in production: a missing switch would publish every event without online booking
   if (loaded.bookingOnline === null && ctx.env.ENVIRONMENT === 'production') throw new ApiError('error', 'settings.BOOKING_ONLINE is not set (copy it from the Script Property at the cutover)');
   // a publish never moves bytes: library files still waiting for the site go first (like Publish.gs, a failure stops it)
@@ -200,7 +216,8 @@ export async function runContentCall(ctx, fn, args, { expect = {}, now = Date.no
     ADMIN_PLATFORM: 'worker', NOTIFY_ROUTER_ON: loaded.notifyRouter ? '1' : '0',
     GITHUB_REPO: ctx.env.GITHUB_REPO || '', GITHUB_BRANCH: ctx.env.GITHUB_BRANCH || 'main',
     SITE_URL: (ctx.env.SITE_URL || '').replace(/\/?$/, '/'),
-    BOOKING_ONLINE: loaded.bookingOnline === '1' ? '1' : '0'
+    BOOKING_ONLINE: loaded.bookingOnline === '1' ? '1' : '0',
+    ...(compLocal ? { ...loaded.comps.modules, COMP_SECRET: loaded.comps.key } : {})
   });
   const g = createGs(services, h => { hooks = h; });
   // the Activity tab as Activity.gs reads it for a merge: the recent D1 rows, oldest first
@@ -226,14 +243,30 @@ export async function runContentCall(ctx, fn, args, { expect = {}, now = Date.no
   hooks.use('adminDirectory_', () => ({ ...names }));
   hooks.use('displayName_', who => names[who] || String(who || '').split('@')[0]);
 
-  // the competitions stay on Apps Script: what this code reads of them is their view (comps.js)
+  // Apps Script's competitions: what this code reads of them is their view (comps.js). The Worker's own: the rows themselves.
   const view = staticView(ctx.env) || loaded.view;
-  hooks.use('compDraft_', () => (view ? JSON.parse(JSON.stringify({ ...view, points: null, modules: {} })) : null));
+  const pushes = [];
+  if (compLocal) {
+    // read by the delete check and the result calls; never written (a write would be refused as outside the drafts)
+    sheets.comp.addSheet('Submissions', [SUBMISSION_COLUMNS.slice()].concat(results ? results.lines : Object.keys(counts).map(id => SUBMISSION_COLUMNS.map(c => (c === 'compId' ? id : c === 'id' ? 's-' + id : '')))));
+    hooks.use('compDraft_', () => ({
+      comps: g.compRows_(g.compSheet_('Competitions')).map(g.compStrip_),
+      questions: g.compRows_(g.compSheet_('Questions')).map(g.compStrip_),
+      items: (view && view.items) || [],
+      modules: g.compModules_(),
+      points: null
+    }));
+    hooks.use('compSubmissionCounts_', () => ({ ...counts }));
+    hooks.use('compRuntimePush_', (ids, withdrawn) => { pushes.push({ ids, withdrawn: withdrawn || [] }); });
+    if (results) hooks.use('compDefinitionFor_', (compId, version) => (compId === results.compId && results.defs[version] ? JSON.parse(results.defs[version]) : null));
+  } else {
+    hooks.use('compDraft_', () => (view ? JSON.parse(JSON.stringify({ ...view, points: null, modules: {} })) : null));
+  }
   // a picture a competition uses is never purged: without the view the Worker can't tell
   if (fn === 'apiPurgeMedia' && !view) throw new ApiError('comps', 'the competitions view is not known yet');
 
   const media = await setupMedia(ctx, { fn, args, hooks, loaded });
-  const build = await setupBuild(ctx, { fn, g, hooks, services, email });
+  const build = await setupBuild(ctx, { fn, g, hooks, services, email, compLocal });
   mark('setup');
   // P4-7: these calls answer with the whole panel state, built here as Apps Script built it
   if (build) {
@@ -243,13 +276,13 @@ export async function runContentCall(ctx, fn, args, { expect = {}, now = Date.no
     hooks.use('activityState_', () => (activity ? { recent: activity.items, latest: activity.items.length ? activity.items[0].at : 0, now } : null));
   }
   try {
-    return await runAndSave(ctx, { fn, args, expect, now, g, hooks, sheets, loaded, noted, email, build, media, payDest: () => payDest, mark, timing });
+    return await runAndSave(ctx, { fn, args, expect, now, g, hooks, sheets, loaded, noted, email, build, media, payDest: () => payDest, mark, timing, pushes, props: services.PropertiesService });
   } finally {
     if (build) await build.release();
   }
 }
 
-async function runAndSave(ctx, { fn, args, expect, now, g, hooks, sheets, loaded, noted, email, build, media, payDest: payDestOf, mark, timing }) {
+async function runAndSave(ctx, { fn, args, expect, now, g, hooks, sheets, loaded, noted, email, build, media, payDest: payDestOf, mark, timing, pushes, props }) {
   const db = ctx.env.DB;
   let result;
   try {
@@ -266,7 +299,7 @@ async function runAndSave(ctx, { fn, args, expect, now, g, hooks, sheets, loaded
     .filter(s => s.dirty && !Object.values(sheets.tabs).includes(s) && s.name !== 'Log' && s.name !== 'Activity');
   if (stray.length) throw new ApiError('error', 'wrote outside the drafts: ' + stray.map(s => s.name).join(','));
 
-  const specs = hooks.get('CONTENT_EXPORT_KINDS');
+  const specs = hooks.get('CONTENT_EXPORT_KINDS').concat(hooks.get('COMP_EXPORT_KINDS'));
   const plan = [];
   for (const spec of specs) {
     const kind = spec[0];
@@ -354,6 +387,31 @@ async function runAndSave(ctx, { fn, args, expect, now, g, hooks, sheets, loaded
 
   // a publish: its revisions in the same batch as the drafts it changed (pages' liveV, Activity)
   if (build) stmts.push(...await build.statements());
+  // what goes live, closes or is finalized: the competitions' runtime, in the same batch as the drafts
+  if (pushes.length) {
+    const rows = g.compRows_(g.compSheet_('Competitions'));
+    const built = (build && build.pkg && build.pkg.built && build.pkg.built.live) || {};
+    const live = [];
+    const withdrawn = [];
+    for (const push of pushes) {
+      withdrawn.push(...push.withdrawn);
+      for (const id of push.ids) {
+        const row = rows.find(r => r.id === id);
+        if (!row || !row.liveVersion) continue;
+        const entry = built[id];
+        live.push({ slug: row.slug, compId: row.id, version: row.liveVersion, def: entry && entry.version === row.liveVersion ? entry.def : null,
+          closedAt: row.closedAt ? g.compWall_(row.closedAt) : '', finalizedAt: row.finalizedAt ? g.compWall_(row.finalizedAt) : '' });
+      }
+    }
+    stmts.push(...compLiveStmts(db, live, withdrawn, now));
+  }
+  // the module switches: D1's copy; the screens still on Apps Script hear it after the save
+  let modules = null;
+  if (fn === 'apiCompSettings') {
+    const sp = props.getScriptProperties();
+    modules = Object.fromEntries(MODULE_KEYS.map(k => [k, sp.getProperty(k) === '1' ? '1' : '']));
+    for (const k of MODULE_KEYS) stmts.push(settingStmt(db, k, modules[k], now, email));
+  }
   mark('prepare');
   // new library files: in R2 before the rows that point at them
   const mediaPlan = plan.find(p => p.kind === 'media');
@@ -370,6 +428,7 @@ async function runAndSave(ctx, { fn, args, expect, now, g, hooks, sheets, loaded
   mark('write');
   if (build) await build.finish();
   if (media) await media.afterBatch(db, now);
+  if (modules) ctx.defer(askAppsScript(ctx, { call: 'compModules', modules }).catch(err => console.warn('comp modules not sent: ' + (err && err.message))));
 
   const versions = { ...loaded.versions };
   for (const p of plan) versions[p.kind] = (versions[p.kind] || 0) + 1;
@@ -389,12 +448,35 @@ async function runAndSave(ctx, { fn, args, expect, now, g, hooks, sheets, loaded
 export async function adminContentCall(ctx) {
   const body = ctx.body || {};
   const fn = String(body.fn || '');
-  if (!CONTENT_CALLS.has(fn)) throw new ApiError('bad', 'fn');
+  if (!CONTENT_CALLS.has(fn) && !COMP_CALLS.has(fn)) throw new ApiError('bad', 'fn');
   const perm = API_PERM[fn];
   if (!perm) throw new ApiError('denied', 'perm unmapped');
   await requirePerm(ctx, perm === '*' ? '*' : perm, { scope: 'all' });
-  return runContentCall(ctx, fn, Array.isArray(body.args) ? body.args : [], { expect: body.expect && typeof body.expect === 'object' ? body.expect : {} });
+  const args = Array.isArray(body.args) ? body.args : [];
+  // the marks: the Worker's own code (the ledger and the member's emails), the answer read back as Apps Script gave it
+  if (COMP_MARKS[fn]) return COMP_MARKS[fn](ctx, args);
+  return runContentCall(ctx, fn, args, { expect: body.expect && typeof body.expect === 'object' ? body.expect : {} });
 }
+
+const COMP_MARKS = {
+  async apiCompGrade(ctx, [id, grades]) {
+    await gradeSubmission(ctx, String(id), grades);
+    return runContentCall(ctx, 'apiCompSubmission', [String(id)]);
+  },
+  async apiCompVoid(ctx, [id, voided]) {
+    await voidSubmission(ctx, String(id), voided !== false);
+    return runContentCall(ctx, 'apiCompSubmission', [String(id)]);
+  },
+  async apiCompGradeGroup(ctx, [compId, qid, key, pts]) {
+    const updated = await gradeGroup(ctx, String(compId), String(qid), String(key), pts);
+    const queue = await runContentCall(ctx, 'apiCompReviewQueue', [String(compId), String(qid)]);
+    return { ...queue, result: { updated, queue: queue.result } };
+  },
+  async apiCompRegrade(ctx, [compId]) {
+    const r = await regradeComp(ctx, String(compId));
+    return { result: { regraded: r.checked, changed: r.changed }, changed: [], versions: {}, source: GS_SOURCE, timing: {} };
+  }
+};
 
 /* POST /v1/admin/media/upload { …apiUploadMedia's input } — the same call, a body big enough for a video */
 export async function adminMediaUpload(ctx) {
@@ -403,8 +485,9 @@ export async function adminMediaUpload(ctx) {
 }
 
 /* read once from the bundle: the same table doPost checks */
-const API_PERM = (() => {
+const { API_PERM, SUBMISSION_COLUMNS } = (() => {
   let map = {};
-  createGs({ console: { log() {}, warn() {}, error() {} } }, h => { map = h.get('API_PERMS') || {}; });
-  return map;
+  let columns = [];
+  createGs({ console: { log() {}, warn() {}, error() {} } }, h => { map = h.get('API_PERMS') || {}; columns = h.get('COMP_TABLES').Submissions; });
+  return { API_PERM: map, SUBMISSION_COLUMNS: columns };
 })();

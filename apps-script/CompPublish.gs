@@ -165,6 +165,24 @@ function compAfterCommit_(comps, stamp) {
 }
 
 
+/* the earliest competition time still ahead (a wall stamp): the part must be built again after it */
+function compStableUntil_(draft, now) {
+
+  var next = '';
+
+  (draft && draft.comps || []).forEach(function (row) {
+    var comp = compParseComp_(row);
+    if (!comp.id || !comp.enabled || comp.archived) return;
+    [comp.startAt, comp.endAt, comp.answersAt, comp.resultsAt].forEach(function (t) {
+      var at = String(t || '').replace(' ', 'T');
+      if (at && at > now && (!next || at < next)) next = at;
+    });
+  });
+
+  return next;
+
+}
+
 /* the review's extra words: { compId: question count } */
 function compReviewInfo_(comps) {
 

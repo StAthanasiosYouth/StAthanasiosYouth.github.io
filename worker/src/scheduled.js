@@ -13,6 +13,7 @@ import { sessionSweepStmts } from './admin/session.js';
 import { accountSweepStmts, pendingSweepStmt } from './account/session.js';
 import { bookingReminders } from './book/account.js';
 import { compReleaseTick } from './comp/runtime.js';
+import { compImportTick } from './content/compdrafts.js';
 import { ageOutNotices } from './account/age-out.js';
 
 const DAY = 24 * 3600 * 1000;
@@ -85,6 +86,7 @@ export async function scheduled(controller, env) {
   if (controller.cron === '* * * * *') {
     await notifyTick(env, now);
     // Phase 5B: results whose release moment has come (COMPETITIONS §20.2)
+    await compImportTick(env).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'comp.import', err: String(err && err.message).slice(0, 200) }));
     await compReleaseTick(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'comp.release', err: String(err && err.message).slice(0, 200) }));
     // Phase 2: the shadow comparison every 15 minutes (nothing until a publish was posted)
     if (new Date(now).getUTCMinutes() % SHADOW_EVERY_MIN === 0) {

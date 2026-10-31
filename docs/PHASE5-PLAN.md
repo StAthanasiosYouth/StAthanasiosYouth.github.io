@@ -347,6 +347,20 @@ Owner approved and set the Script Property `COMP_RUNTIME = worker` in the editor
 
 **Phase 5 stays open.** Step 6 closes it: a competition watched with `wrangler tail`. No submission has reached the Worker on production yet, and no member email other than codes has gone out. The owner's accounts improvements batch comes after the close, before Phase 6.
 
+## 3o. Competitions' admin on the Worker (2026-10-31)
+
+**Why:** during step 6 the owner saved «مسابقة نقاط», but it never showed among the changes ready to publish. Activity reached D1, while the competitions' signature and view stayed old, so the Worker's review kept reusing its last part. Each save also waited for Apps Script and its Sheets. The owner ordered the whole admin moved.
+
+**Moved to the Worker + D1:** create, edit, questions, bulk import, duplicate, archive, delete, close, finalize, module switches, trial grade, preview, review, publish, and the results screens (list, submission, review queue, ranking, export, marks, void, regrade).
+
+**How:** `Competitions` and `Questions` are `draft_rows` kinds (`COMP_KINDS`), outside the panel's drafts read, the content import and the export, because they hold the answers. The admin's calls run the same `CompAdmin.gs`, `CompModel.gs`, `CompPublish.gs`, `CompScore.gs` and `CompCrypto.gs`, bundled in `gs.gen.js`. A publish writes the revisions, `liveVersion`, `comp_versions` and `comp_live` in one D1 batch, so there is no partial publish. Results read D1's `submissions` through a tab in memory; marks go through `comp/admin.js`. The browser's review kit gets no competitions, so the panel uses the Worker's review.
+
+**The move:** `COMP_IMPORT = 'dry'` reports Apps Script's rows and changes nothing. `COMP_IMPORT = 'apply'` freezes Apps Script (Script Property `COMP_DRAFTS = worker`) and copies the rows, linked cards, module switches and the version key in one batch with `settings.COMP_DRAFTS = worker`. The outcome is in `COMP_IMPORT_REPORT`. The version key travels so that what is live stays «not changed».
+
+**Back:** delete the Script Property, then set `settings.COMP_DRAFTS` to empty. The Sheets hold the state at the move: anything saved on the Worker after it stays only in `draft_rows`, so it has to be copied back by hand. `comp_live` and submissions are untouched either way.
+
+**Still on Apps Script:** the old participants, wallet, store and seasons screens, and push schedules. They read a frozen copy of the competitions' titles. The module switches are sent there after a change. Moving them is separate work.
+
 ## 4. Rollback (batches 1–5)
 
 - Batch 4 extra: `accounts_mode = off` returns `competition/` and `points/` to Apps Script at once and refuses every `/v1/comp/*`, `/v1/shop/*` route. Worker rows stay. After launch that fallback serves only the old code login, so it is a stop, not a way back.

@@ -16,19 +16,23 @@ import { retry } from '../lib/db.js';
 import { bookingOn } from '../book/public.js';
 import { adminMe } from './me.js';
 import { draftsWriter } from '../content/store.js';
+import { compWriter } from '../content/compdrafts.js';
 
 export async function bootPayload(ctx, now = Date.now()) {
-  const [me, activity, book, writer] = await Promise.all([
+  const [me, activity, book, writer, comps] = await Promise.all([
     adminMe(ctx),
     retry(() => queryActivity(ctx.env.DB, { limit: 6, view: 'log' })).catch(() => null),
     bookingOn(ctx.env).catch(() => null),
-    draftsWriter(ctx.env.DB).catch(() => 'sheets')
+    draftsWriter(ctx.env.DB).catch(() => 'sheets'),
+    compWriter(ctx.env.DB).catch(() => 'apps-script')
   ]);
   return {
     me,
     activity: activity ? { recent: activity.items, latest: activity.items.length ? activity.items[0].at : 0, now } : null,
     modules: { book: book === null ? null : !!book },
     // Phase 4: who writes the content drafts (settings.CONTENT_DRAFTS) — the page sends its content calls there
-    content: writer
+    content: writer,
+    // who writes the competitions' drafts (settings.COMP_DRAFTS): the page sends their calls there
+    comps
   };
 }

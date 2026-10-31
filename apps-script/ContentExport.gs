@@ -39,6 +39,12 @@ var CONTENT_EXPORT_KINDS = [
   ['pay_methods', 'comp', 'PayMethods', 'key']
 ];
 
+/* the competitions' drafts: moved on their own (WorkerComp.gs compExportForWorker_), never with the content's copy */
+var COMP_EXPORT_KINDS = [
+  ['competitions', 'comp', 'Competitions', 'id'],
+  ['questions', 'comp', 'Questions', 'id']
+];
+
 function contentExportColumns_(sheet, tab) {
 
   return sheet === 'content' ? TABLES[tab].columns : COMP_TABLES[tab];

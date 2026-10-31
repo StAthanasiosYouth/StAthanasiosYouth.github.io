@@ -41,6 +41,7 @@ var COMP_ID = /^cmp-[0-9a-f]{8}$/;
 var COMP_QID = /^q-[0-9a-f]{8}$/;
 var COMP_CHOICE_ID = /^c-[0-9a-z]{6}$/;
 var COMP_SUBMISSION_ID = /^s-[0-9a-f]{12}$/;
+var COMP_SUBMITTED = ['submitted', 'pending_review', 'graded'];
 var COMP_SITE_URL = 'https://stathanasiosyouth.github.io/';
 var COMP_SITE_NAME = 'أسرة البابا أثناسيوس – سفاجا';
 
@@ -1283,5 +1284,12 @@ function compPublishProblems_(comp, questions, modules, media) {
   });
 
   return problems;
+
+}
+
+
+function compChoiceOrder_(def, q, seed) {
+
+  return def.shuffleC && q.choices && q.choices.length ? compShuffle_(q.choices.map(function (c) { return c.id; }), seed + ':' + q.id) : null;
 
 }

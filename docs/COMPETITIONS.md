@@ -1,5 +1,7 @@
 # Competitions platform
 
+> Since 2026-10-31 the drafts and the admin's calls run on the Worker + D1 (docs/PHASE5-PLAN.md §3o, the same code). Where this file says «the Sheet» for `Competitions`, `Questions`, `Snapshots` and `Submissions`, read `draft_rows`, `comp_versions` and `submissions`.
+
 One reusable competition engine, an optional participant registry with codes,
 an optional points wallet with a «نقاطي» portal and a rewards store. Everything
 is operated from the admin (`/admin/`); Google Sheets is the storage; the

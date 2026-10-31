@@ -202,3 +202,38 @@ test('content on the Worker: the panel, a save, the review in the page (3 steps)
   assert.ok(!workerCalls.includes('apiState'));
   await r.close();
 });
+
+test('competitions on the Worker: the list, a new one with a question, in the review, published: Apps Script is never asked', async () => {
+  await freshWorld();
+  env.COMPS_SOURCE = '';
+  env.DB.raw.exec("INSERT INTO settings (key, value, updated_at) VALUES ('COMP_DRAFTS', 'worker', 0), ('COMP_HASH_KEY', 'a2V5LWtleS1rZXkta2V5LWtleS1rZXk=', 0), ('COMP_REGISTRY', '1', 0), ('COMP_WALLET', '1', 0), ('BOOKING_ONLINE', '1', 0) ON CONFLICT(key) DO UPDATE SET value = excluded.value; DELETE FROM admin_sessions;");
+  workerCalls.length = 0;
+  const s = await open();
+  await signedIn(s.page);
+  await s.page.evaluate(() => A.go('comps', 'comps'));
+  await s.page.waitForFunction(() => document.getElementById('view') && !document.querySelector('#view .skeleton-list'), { timeout: 10000 });
+  assert.ok(workerCalls.includes('apiComps'), 'the list came from the Worker');
+
+  // the site is already live: the review then lists what changed
+  await s.page.evaluate(() => A.call('apiReview').then(r => A.call('apiPublish', r.revision)));
+
+  const start = await s.page.evaluate(() => A.call('apiCompCreate', { preset: 'scored', title: 'مسابقة نقاط', slug: 'msabqa-nqat', enabled: true, participation: 'registered', wallet: true, showPoints: true, startAt: '2026-01-01 10:00', endAt: '2036-01-01 10:00' }));
+  await s.page.evaluate(id => A.call('apiCompQuestionSave', id, { type: 'truefalse', text: 'صح؟', correct: 'صح', points: 5 }), start.comp.id);
+  assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM draft_rows WHERE kind = 'questions'").get().n, 1, 'in D1');
+
+  await s.page.evaluate(() => A.refresh ? A.refresh() : null);
+  await s.page.click('#publish-open');
+  await s.page.waitForSelector('dialog.sheet[open] .stepper[data-publish]');
+  await s.page.waitForFunction(() => document.querySelector('dialog.sheet[open] .review-groups'), { timeout: 15000 });
+  assert.ok(workerCalls.includes('apiReview'), 'the Worker\'s review: the answers stay on the server');
+  assert.deepEqual(await s.page.$eval('dialog.sheet[open]', el => el.textContent.includes('مسابقة نقاط')), true, 'it is among the changes');
+  await s.page.click('dialog.sheet[open] .sheet__foot .btn--primary');
+  await s.page.waitForFunction(() => document.querySelectorAll('dialog.sheet[open] .stepper__step.is-done').length === 2, { timeout: 15000 });
+  const live = env.DB.raw.prepare('SELECT slug, version FROM comp_live').get();
+  assert.equal(live.slug, 'msabqa-nqat');
+  const row = JSON.parse(env.DB.raw.prepare("SELECT data FROM draft_rows WHERE kind = 'competitions'").get().data);
+  assert.equal(row.liveVersion, live.version);
+  assert.deepEqual(s.appsScript.filter(fn => /^apiComp|apiReview|apiPublish/.test(fn)), [], 'none of it went to Apps Script');
+  assert.deepEqual(s.problems, []);
+  await s.close();
+});

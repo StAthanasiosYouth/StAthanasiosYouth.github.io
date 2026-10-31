@@ -609,7 +609,7 @@
     // the session, presence and device calls go to the Worker (same reply shape)
     if (PLATFORM && Object.prototype.hasOwnProperty.call(PLATFORM_FNS, name)) return platformPost(name, args, tokenValue, sidValue, options);
     // Phase 4: the content calls too, once the Worker writes the drafts (its session answer says so)
-    if (PLATFORM && contentWorker && (Object.prototype.hasOwnProperty.call(CONTENT_FNS, name) || Object.prototype.hasOwnProperty.call(CONTENT_ALIASES, name))) {
+    if (PLATFORM && contentWorker && (Object.prototype.hasOwnProperty.call(CONTENT_FNS, name) || Object.prototype.hasOwnProperty.call(CONTENT_ALIASES, name) || (compWorker && Object.prototype.hasOwnProperty.call(COMP_FNS, name)))) {
       return contentPost(name, args, tokenValue, options);
     }
 
@@ -1557,6 +1557,14 @@
   // Apps Script names whose Worker answer is another call's
   var CONTENT_ALIASES = { apiPublishRefresh: 'apiState' };
   var contentWorker = false;
+  /* the competitions' admin, once the Worker writes their drafts (boot.comps, settings.COMP_DRAFTS). The list = worker/src/content/compdrafts.js COMP_CALLS */
+  var COMP_FNS = {
+    apiComps: 1, apiComp: 1, apiCompCreate: 1, apiCompSave: 1, apiCompDuplicate: 1, apiCompArchive: 1, apiCompDelete: 1, apiCompClose: 1, apiCompFinalize: 1, apiCompSettings: 1,
+    apiCompQuestionSave: 1, apiCompQuestionDuplicate: 1, apiCompQuestionDelete: 1, apiCompQuestionsReorder: 1, apiCompImportPreview: 1, apiCompImportApply: 1, apiCompPreviewGrade: 1, apiCompPreviewDefinition: 1,
+    apiCompSubmissions: 1, apiCompSubmission: 1, apiCompReviewQueue: 1, apiCompResults: 1, apiCompExport: 1,
+    apiCompGrade: 1, apiCompGradeGroup: 1, apiCompRegrade: 1, apiCompVoid: 1
+  };
+  var compWorker = false;
 
   function contentPost(name, args, tokenValue, options) {
 
@@ -1658,6 +1666,7 @@
         keepPanel(r, r.sid);
         // Phase 4: the server says who writes the content (it can change at the cutover or a rollback)
         if (r.boot && (r.boot.content === 'worker' || r.boot.content === 'sheets')) contentWorker = r.boot.content === 'worker';
+        if (r.boot && r.boot.comps) compWorker = r.boot.comps === 'worker';
         var answer = { sid: r.sid, device: r.device, resumed: r.resumed === true, state: null };
         if (!withState) return { ok: true, result: answer };
         var late = function () { return post('apiState', [], r.token, r.sid, options); };

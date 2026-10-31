@@ -43,7 +43,6 @@ var COMP_DEADLINE_SLACK_MS = 60000;
 var COMP_TIMEUP_EARLY_MS = 15000;
 var COMP_FAST_SECONDS = 2;
 var COMP_CLIENT_KEY = /^[A-Za-z0-9_-]{16,64}$/;
-var COMP_SUBMITTED = ['submitted', 'pending_review', 'graded'];
 
 var COMP_MESSAGES = {
   bad: 'الطلب مش مفهوم. حدّث الصفحة وجرّب تاني.',
@@ -286,11 +285,6 @@ function compServedOrder_(def, seed) {
 
 }
 
-function compChoiceOrder_(def, q, seed) {
-
-  return def.shuffleC && q.choices && q.choices.length ? compShuffle_(q.choices.map(function (c) { return c.id; }), seed + ':' + q.id) : null;
-
-}
 
 
 /* =========================================================
