@@ -349,7 +349,7 @@ Owner approved and set the Script Property `COMP_RUNTIME = worker` in the editor
 
 ## 3o. Competitions' admin on the Worker (2026-10-31)
 
-**Why:** during step 6 the owner saved «مسابقة نقاط», but it never showed among the changes ready to publish. Activity reached D1, while the competitions' signature and view stayed old, so the Worker's review kept reusing its last part. Each save also waited for Apps Script and its Sheets. The owner ordered the whole admin moved.
+**Why:** during step 6 the owner saved «مسابقة نقاط», but it never showed among the changes ready to publish. Activity reached D1, while the competitions' signature and view stayed old, so the Worker's review kept reusing its last part. The monitoring later showed why: `POST /v1/sync/comp-sig` allows 1024 bytes, and the view outgrew that, so every push got a 413. Each save also waited for Apps Script and its Sheets. The owner ordered the whole admin moved.
 
 **Moved to the Worker + D1:** create, edit, questions, bulk import, duplicate, archive, delete, close, finalize, module switches, trial grade, preview, review, publish, and the results screens (list, submission, review queue, ranking, export, marks, void, regrade).
 
@@ -360,6 +360,35 @@ Owner approved and set the Script Property `COMP_RUNTIME = worker` in the editor
 **Back:** delete the Script Property, then set `settings.COMP_DRAFTS` to empty. The Sheets hold the state at the move: anything saved on the Worker after it stays only in `draft_rows`, so it has to be copied back by hand. `comp_live` and submissions are untouched either way.
 
 **Still on Apps Script:** the old participants, wallet, store and seasons screens, and push schedules. They read a frozen copy of the competitions' titles. The module switches are sent there after a change. Moving them is separate work.
+
+## 3p. Phase 5 closed (2026-10-31)
+
+**Closed by the owner's order after the final check below.** The next work is the owner's accounts improvements batch (5 steps, a desktop and mobile preview before any publish). It and Phase 6 each wait for the owner's approval.
+
+**Production:** `main` `9724cd5` plus mirror commits, Worker `be8cc66f`, Apps Script @60. `accounts_mode = on`, `OTP_EMAIL = 1`, `MEMBER_EMAIL = 1`, `SHOP_MODE = closed`, `CONTENT_DRAFTS = 1`, `COMP_DRAFTS = worker`, `COMP_RUNTIME = worker`.
+
+**Owner's live tests, as reported, each matched by the logs:**
+- A competition with a result email: `s-47b8d9bc6544`.
+- A competition with points: `s-503569b948a0`, 100/100, one ledger row of 100, shown in «نقاطي» and in the admin's «المشاركات».
+- The support name changed and restored.
+- A booking with an account: `bkg-177e022fb41b`, in the account and the admin, confirmation email received.
+
+**Test items withdrawn 2026-10-31:** «تجربة تشغيل», «مسابقة نقاط», «مسابقة نقاط (نسخة)» and «تجربة حجز» are archived and published (`0d2cc47b7c93`, mirrored). `comp_live` is empty, content.json names none of them, their public files say `withdrawn`, and booking state answers `not_found`. Links people have still open and say so. Kept: 2 submissions, the 100 points, all bookings. Their removal stays with the cleanup in Phase 7c, on a fresh inventory.
+
+**Final check:**
+- Site, account, points and admin pages, and the Worker's health and config routes, answer 200.
+- 620 monitored requests from the move through the booking test: no failed outcome, no exception, no 5xx. All 4xx: 18 `comp-sig` 413s (below), 3 404s, 2 401s, 1 400.
+- Member outbox: every due email sent, none waiting. Gmail health is ok.
+- The two 5xx rows in the last 24 hours are `accounts_off` from before step 4, by design.
+
+**Follow-ups:**
+1. **iPhone:** not tested.
+2. **Android:** the owner's close order names only iPhone; no Android result was reported in the runbook record.
+3. **Performance at the first real competition:** watch `wrangler tail`. Peak CPU so far: 55 ms on an admin call (21 of 92 above 10 ms), 14 ms on `book/submit`, 13 ms on `comp/submit`, with no rejected request. Test traffic only, so the load is unproven. If requests start failing on CPU, the fix is the paid plan, which is the owner's decision.
+4. **`comp-sig` 413:** harmless to competitions since the move, because they no longer read it. It does keep the store items' picture list (`view.items`) stale and adds a wasted call after admin calls on Apps Script. Fix: raise the route's `maxBytes`.
+5. **Screens still on Apps Script:** old participants, wallet, store and seasons screens, and push schedules (§3o).
+6. **Cleanup in Phase 7c** also covers today's test records and their still-enabled cards. Each publish warns about those cards until then.
+7. **Uninvestigated:** one old 500 on `/v1/sync/content-notify`, 2026-10-29.
 
 ## 4. Rollback (batches 1–5)
 
