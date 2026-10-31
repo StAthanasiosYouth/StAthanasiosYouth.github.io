@@ -21,7 +21,8 @@ import { money } from './model.js';
 import { arabicDigits } from '../words.js';
 import { prepareImage, UNSUPPORTED } from './image.js';
 import { mountTurnstile } from './turnstile.js';
-import { rememberBooking, accountSession } from './book-store.js';
+import { rememberBooking, accountSession, accountsKnownOff } from './book-store.js';
+import { goSignIn } from '../account/link.js';
 import { createBookApi } from './book-api.js';
 import { bookApiUrl } from './book-config.js';
 
@@ -255,7 +256,13 @@ export function showStatus({ event, announce = () => {}, reduced = false, onChan
   /* signed in on this device: this booking can join the account (possession of this link; YOUTH-ACCOUNTS-PLAN §18.1) */
   function linkButton() {
     const session = accountSession();
-    if (!session) return null;
+    if (!session) {
+      // signed out: sign in, and back to this same booking to link it
+      if (accountsKnownOff()) return null;
+      const signIn = h('button', { class: 'btn', type: 'button', 'data-link-signin': '' }, 'سجّل دخولك عشان تربطه بحسابك');
+      signIn.addEventListener('click', () => goSignIn(new URL('../../../', import.meta.url)));
+      return signIn;
+    }
     const button = h('button', { class: 'btn', type: 'button', 'data-link-account': '' }, 'اربطه بحسابي');
     button.addEventListener('click', async () => {
       button.disabled = true;

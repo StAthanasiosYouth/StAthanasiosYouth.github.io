@@ -23,7 +23,7 @@ const ICONS = {
   off: ['M4 9.5v5h3.5L12 18.5v-13L7.5 9.5Z', 'm16 9.5 5 5M21 9.5l-5 5']
 };
 
-const TAPS = 'button, a.btn, a[class*="__home"], a[class*="__cta"], .mcard__open, [role="button"]';
+const TAPS = 'button, a.btn, a.acct-badge, a[class*="__home"], a[class*="__cta"], .mcard__open, [role="button"]';
 // these make their own sound (a sheet opening, the speaker) or none
 const QUIET = '.usound, .xp-sound, [data-quiet], [aria-haspopup="dialog"], .sheet__close, .xp-clip__toggle, .cintro__skip';
 

@@ -5,8 +5,9 @@
  */
 
 export const HINTS_KEY = 'athanasios.account.hints.v1';
-export const SESSION_KEY = 'athanasios.account.v1';
 export const MAX_HINTS = 3;
+
+export { SESSION_KEY, RETURN_KEY, FROM_KEY, MODE_KEY, cleanReturn, readSession, writeSession, clearSession, readFace, writeFace } from './link.js';
 
 const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
 
@@ -127,9 +128,6 @@ export function attention(summary, { money = n => arDigits(n) + ' جنيه' } = 
 /* ---------- where a link was going (docs/EMAIL-DEEP-LINKS.md §3) ---------- */
 
 export const DEST_KEY = 'athanasios.account.dest.v1';
-/* the booking page a sign-in came from (assets/js/page/booking.js): this tab, this site's own paths only */
-export const RETURN_KEY = 'athanasios.account.return.v1';
-export const cleanReturn = path => (/^\/(?:events\/[a-z0-9-]{1,60}\/|competition\/[a-z0-9-]{2,40}\/|points\/)(?:\?[\w=&-]{0,120})?$/.test(String(path || '')) ? String(path) : '');
 const DEST_MS = 30 * 60000;
 
 /* the page's own hash routes only: anything else (an address, script) is dropped */
@@ -193,30 +191,4 @@ export function writeHints(storage, list) {
     storage.setItem(HINTS_KEY, JSON.stringify(list));
   }
   catch { /* private window: nothing remembered, everything still works */ }
-}
-
-/* { token, email } from this tab (shared device) first, then this device */
-export function readSession(local, session) {
-  for (const store of [session, local]) {
-    const value = store ? read(store, SESSION_KEY) : null;
-    if (value && typeof value.token === 'string' && /^as1\./.test(value.token)) return value;
-  }
-  return null;
-}
-
-export function writeSession(local, session, value, kind) {
-  clearSession(local, session);
-  try {
-    (kind === 'shared' ? session : local).setItem(SESSION_KEY, JSON.stringify(value));
-  }
-  catch { /* the session lives for this page only */ }
-}
-
-export function clearSession(local, session) {
-  for (const store of [session, local]) {
-    try {
-      if (store) store.removeItem(SESSION_KEY);
-    }
-    catch { /* nothing to clear */ }
-  }
 }

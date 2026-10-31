@@ -24,7 +24,7 @@ const depth = route => (route === '#me' ? 0 : route.split('/').length - 1);
 const safeSlug = slug => /^[a-z0-9-]{1,60}$/.test(String(slug || ''));
 const greet = () => (Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hourCycle: 'h23', timeZone: 'Africa/Cairo' }).format(new Date())) < 12 ? 'صباح الخير' : 'مساء الخير');
 
-export function createMine({ main, S, authed, api, sessionOver, signOut, openForgot }) {
+export function createMine({ main, S, authed, api, sessionOver, signOut, openForgot, onPhoto }) {
 
   const memo = new Map();
   let route = '#me';
@@ -54,11 +54,15 @@ export function createMine({ main, S, authed, api, sessionOver, signOut, openFor
     const version = S.account.avatar;
     if (!version) {
       setPhoto('', 0);
+      onPhoto(null, 0);
       return;
     }
     if (S.photo.version === version) return;
     const blob = await api.avatar(version);
-    if (S.account && S.account.avatar === version && blob) setPhoto(URL.createObjectURL(blob), version);
+    if (S.account && S.account.avatar === version && blob) {
+      setPhoto(URL.createObjectURL(blob), version);
+      onPhoto(blob, version);
+    }
   }
   function setPhoto(url, version) {
     if (S.photo.url && S.photo.url !== url) URL.revokeObjectURL(S.photo.url);
@@ -80,6 +84,7 @@ export function createMine({ main, S, authed, api, sessionOver, signOut, openFor
         const url = URL.createObjectURL(blob);
         S.account.avatar = reply.avatar;
         setPhoto(url, reply.avatar);
+        onPhoto(blob, reply.avatar);
         forget('/v1/account/summary');
         return { ok: true, photo: url };
       },
@@ -92,6 +97,7 @@ export function createMine({ main, S, authed, api, sessionOver, signOut, openFor
         if (!reply.ok) return { ok: false, message: reply.code === 'network' ? 'النت قطع. جرّب تاني.' : reply.message };
         S.account.avatar = null;
         setPhoto('', 0);
+        onPhoto(null, 0);
         forget('/v1/account/summary');
         return { ok: true };
       },

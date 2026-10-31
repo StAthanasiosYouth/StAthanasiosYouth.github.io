@@ -21,6 +21,7 @@ import * as F from './flow.js';
 import { createView } from './view.js';
 import { zonedNow, stamp, setServerTime, setClockOffset, clockOffset, cairoInstant, realMinutesBetween } from '../schedule.js';
 import { soundToggle, uiSounds, cue } from '../ui-sound.js';
+import { accountBadge } from '../account/link.js';
 import { fetchPublished } from '../content-source.js';
 
 /* the mount points (a stub made from an older shell may only have its own <main>) */
@@ -824,6 +825,7 @@ else {
   else {
     // the site's sound: the same toggle and taps as the home page
     soundToggle(document.querySelector('.cbar'));
+    accountBadge(document.querySelector('.cbar'), new URL('../../../', import.meta.url));
     uiSounds();
     boot();
   }

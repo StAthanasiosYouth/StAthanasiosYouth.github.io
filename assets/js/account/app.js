@@ -17,7 +17,7 @@ import { bookApiUrl } from '../page/book-config.js';
 import { mountTurnstile } from '../page/turnstile.js';
 import {
   validEmail, emailTypo, maskEmail, submitLabel, arDigits, monthNames, dateText, birthDateOf, birthYears,
-  readHints, addHint, removeHint, writeHints, readSession, writeSession, clearSession, cleanRoute, keepDest, takeDest, RETURN_KEY, cleanReturn, SESSION_KEY, DEST_KEY
+  readHints, addHint, removeHint, writeHints, readSession, writeSession, clearSession, cleanRoute, keepDest, takeDest, RETURN_KEY, cleanReturn, SESSION_KEY, DEST_KEY, FROM_KEY, MODE_KEY, readFace, writeFace
 } from './model.js';
 import { createMine, brokenHome } from './home.js';
 import { arch } from './parts.js';
@@ -326,6 +326,7 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
   /* signed in: the page a link was going to, once; else the account's first page */
   function enter(account, { fresh = false } = {}) {
     S.account = account;
+    rememberFace(account);
     // came from a page that asked for a sign-in: straight back to it
     let back = '';
     try {
@@ -334,7 +335,9 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
     }
     catch { back = ''; }
     if (back) {
-      location.replace(back);
+      // the page they return to shows their photo in its header; a slow network never holds them here
+      const leave = () => location.replace(back);
+      Promise.race([facePhoto(account), new Promise(r => setTimeout(r, 1500))]).then(leave, leave);
       return;
     }
     const dest = takeDest(tab) || (cleanRoute(location.hash) === '#me' ? '' : cleanRoute(location.hash));
@@ -725,6 +728,37 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
 
   const authedQuiet = token => call('POST', '/v1/account/logout', {}, token);
 
+  /* what the header's icon draws on every page (link.js), without asking the server */
+  function rememberFace(account) {
+    const had = readFace(local, tab);
+    const same = had && account.avatar && had.version === account.avatar;
+    writeFace(local, tab, { firstName: account.firstName, photo: same ? had.photo : '', version: same ? had.version : 0 });
+  }
+
+  function savePhotoFace(blob, version) {
+    if (!S.account) return Promise.resolve();
+    if (!blob) {
+      writeFace(local, tab, { firstName: S.account.firstName, photo: '', version: 0 });
+      return Promise.resolve();
+    }
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (S.account) writeFace(local, tab, { firstName: S.account.firstName, photo: String(reader.result), version });
+        resolve();
+      };
+      reader.onerror = () => resolve();
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function facePhoto(account) {
+    const had = readFace(local, tab);
+    if (!account.avatar || (had && had.version === account.avatar)) return;
+    const blob = await avatarBytes(account.avatar);
+    if (blob) await savePhotoFace(blob, account.avatar);
+  }
+
   /* the photo's bytes: as a blob, over the session. Shared device: nothing stays in the browser's cache */
   async function avatarBytes(version) {
     const saved = readSession(local, tab);
@@ -750,7 +784,7 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
   }
 
   const mine = createMine({
-    main, S, authed, api: { avatar: avatarBytes, avatarSave }, sessionOver,
+    main, S, authed, api: { avatar: avatarBytes, avatarSave }, sessionOver, onPhoto: savePhotoFace,
     signOut,
     openForgot: () => {
       S.fromAccount = true;
@@ -780,6 +814,10 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
       return;
     }
     S.config = config;
+    try {
+      if (local) local.setItem(MODE_KEY, config.mode === 'on' ? 'on' : 'off');
+    }
+    catch { /* asked again next time */ }
     if (config.mode !== 'on') {
       viewOff();
       return;
@@ -823,6 +861,14 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
     if (S.account) mine.openRoute();
     else keepDest(tab, location.hash);
   });
+
+  // «ارجع للموقع» goes back to the page they came from
+  try {
+    const from = cleanReturn(tab ? tab.getItem(FROM_KEY) : '');
+    const home = document.querySelector('.cbar__home');
+    if (from && home) home.href = from;
+  }
+  catch { /* the site's first page */ }
 
   // the bar's sound button, a light tap for what's pressed (ui-sound.js: nothing before the first tap)
   setTier();

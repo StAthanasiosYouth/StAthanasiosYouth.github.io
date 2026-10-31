@@ -467,6 +467,7 @@ test('happy path at 360×740: state → who → servant + WhatsApp → a real JP
   assert.doesNotMatch(await textOf(page, '#bstat'), /null|undefined/);
 
   // «إلغاء الطلب»: asked first, then withdrawn
+  assert.ok(await page.$('[data-link-signin]'), 'signed out: sign in, then back here to link it');
   await page.click('.bstat__cancel');
   assert.match(await textOf(page, '.bstat__ask'), /متأكد/);
   await page.click('.bstat__confirm .btn--primary');     // «لا، سيبه»

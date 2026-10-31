@@ -33,7 +33,8 @@ import {
   methodOnline, onlineMethodsOf, offlineServants, payCopyText, payGrouped, cashMessage,
   partAllowed, minPart, partAmount, partProblem
 } from './book-model.js';
-import { accountSession, keepSignInReturn, loadDraft, saveDraft, clearDraft, loadMine, rememberBooking, forgetBooking } from './book-store.js';
+import { goSignIn as signInAndReturn } from '../account/link.js';
+import { accountSession, loadDraft, saveDraft, clearDraft, loadMine, rememberBooking, forgetBooking } from './book-store.js';
 import { prepareImage, UNSUPPORTED } from './image.js';
 import { createBookApi } from './book-api.js';
 import { bookApiUrl } from './book-config.js';
@@ -108,10 +109,7 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
     }
     catch { /* the form stays as it is; the server decides at the send */ }
   }
-  function goSignIn() {
-    keepSignInReturn(location.pathname + location.search);
-    location.href = rootUrl + 'account/';
-  }
+  const goSignIn = () => signInAndReturn(new URL(rootUrl, location.href));
   const steps = stepsFor(booking);
   const free = isFree(booking);
 

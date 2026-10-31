@@ -19,6 +19,7 @@ import { iconNode } from './icons.js';
 import { particles } from './motion.js';
 import { startFeel } from './feel.js';
 import { play, soundEnabled, setSoundEnabled } from './sound.js';
+import { accountBadge } from './account/link.js';
 import { watchInstall } from './install.js';
 import { isEntryPath } from './page/model.js';
 
@@ -257,6 +258,8 @@ function setupTopbar() {
   });
 
   paintSound();
+
+  accountBadge(bar.querySelector('.topbar__actions'), new URL('../../', import.meta.url), { cls: 'topbar__btn', before: sound });
 
   scrollBar(bar, hero.querySelector('.hero__name'));
 

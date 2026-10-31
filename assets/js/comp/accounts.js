@@ -6,10 +6,9 @@
  */
 
 import { bookApiUrl } from '../page/book-config.js';
-import { readSession, clearSession, RETURN_KEY, cleanReturn } from '../account/model.js';
+import { readSession, clearSession, MODE_KEY } from '../account/link.js';
 import { retryDelay, RETRYABLE } from './flow.js';
 
-const MODE_KEY = 'athanasios.account.mode.v1';
 const CONFIG_TIMEOUT_MS = 4000;
 
 const store = name => {
@@ -60,15 +59,7 @@ export const accountSession = () => readSession(store('localStorage'), store('se
 
 export const dropAccountSession = () => clearSession(store('localStorage'), store('sessionStorage'));
 
-/* off to /account/; it brings them back to this page after signing in */
-export function goSignIn(rootUrl) {
-  const path = location.pathname + location.search;
-  try {
-    if (cleanReturn(path) && store('sessionStorage')) store('sessionStorage').setItem(RETURN_KEY, path);
-  }
-  catch { /* the account page still opens */ }
-  location.href = new URL('account/', rootUrl).href;
-}
+export { goSignIn } from '../account/link.js';
 
 const ROUTES = {
   compStart: '/v1/comp/start', compSubmit: '/v1/comp/submit', compResult: '/v1/comp/result', portalMe: '/v1/comp/me', portalReview: '/v1/comp/result',

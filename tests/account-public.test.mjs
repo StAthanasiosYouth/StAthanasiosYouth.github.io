@@ -77,7 +77,11 @@ test('a link\'s destination: own routes only, this tab, 30 minutes, once', () =>
   assert.equal(M.cleanReturn('/competition/bible-quiz/'), '/competition/bible-quiz/');
   assert.equal(M.cleanReturn('/points/'), '/points/');
   assert.equal(M.cleanReturn('/events/alex-trip/'), '/events/alex-trip/');
-  for (const bad of ['//evil.example/', 'https://evil.example', '/admin/', 'javascript:alert(1)']) assert.equal(M.cleanReturn(bad), '', bad);
+  assert.equal(M.cleanReturn('/'), '/');
+  assert.equal(M.cleanReturn('/black-theatre/'), '/black-theatre/');
+  assert.equal(M.cleanReturn('/pages/about/'), '/pages/about/');
+  assert.equal(M.cleanReturn('/events/alex-trip/#b/bk1.abc-_.def'), '/events/alex-trip/#b/bk1.abc-_.def');
+  for (const bad of ['//evil.example/', 'https://evil.example', '/admin/', 'javascript:alert(1)', '/account/', '/\\evil.example', '/#"><script>']) assert.equal(M.cleanReturn(bad), '', bad);
   for (const bad of ['#//evil.example', 'javascript:alert(1)', 'https://evil.example', '#me/<x>', '#mee', '']) assert.equal(M.cleanRoute(bad), '', bad);
   const tab = store();
   M.keepDest(tab, 'https://evil.example', 1000);

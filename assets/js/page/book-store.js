@@ -9,7 +9,7 @@
  * the admin preview (main.js never loads the booking there).
  */
 
-import { readSession, RETURN_KEY } from '../account/model.js';
+import { readSession, MODE_KEY } from '../account/link.js';
 import { draftKey, readDraft, storeDraft, readMine, addMine, dropMine, MINE_KEY } from './book-model.js';
 
 function store() {
@@ -18,6 +18,16 @@ function store() {
   }
   catch {
     return null;
+  }
+}
+
+/* this device heard the accounts are switched off (comp/accounts.js, account/app.js) */
+export function accountsKnownOff() {
+  try {
+    return store().getItem(MODE_KEY) === 'off';
+  }
+  catch {
+    return false;
   }
 }
 
@@ -31,13 +41,6 @@ export function accountSession() {
   }
 }
 
-/* where to come back after signing in: this tab only */
-export function keepSignInReturn(path) {
-  try {
-    sessionStorage.setItem(RETURN_KEY, path);
-  }
-  catch { /* the account page still opens */ }
-}
 
 function readJson(key) {
   try {

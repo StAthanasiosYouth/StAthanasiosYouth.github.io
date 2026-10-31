@@ -3383,3 +3383,61 @@ img, svg, video {
   justify-items: start;
   margin-top: 6px;
 }
+
+.acct-badge {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: 999px;
+  color: var(--gold-hi);
+  background: rgba(6, 26, 49, .7);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.acct-badge:hover {
+  background: var(--navy-800);
+}
+
+/* three controls leave no room for the name on a phone; the logo stays */
+@media (max-width: 420px) {
+  .pbar:has(.acct-badge) .pbar__name {
+    display: none;
+  }
+}
+
+/* the account's icon (assets/js/account/link.js): a small arch, the member's photo or first letter */
+.acct-badge__face {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  overflow: hidden;
+  border-radius: 50% 50% 14% 14% / 50% 50% 14% 14%;
+  font: 700 1.05rem / 1 var(--font-display);
+  color: var(--gold-hi);
+}
+
+.acct-badge__face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.acct-badge__face svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.acct-badge.is-in .acct-badge__face {
+  background: var(--navy-700);
+  box-shadow: 0 0 0 1px var(--gold-line-strong);
+}

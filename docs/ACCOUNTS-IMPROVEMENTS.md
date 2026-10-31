@@ -62,6 +62,18 @@ After the release: smoke passes; `tools/account-prod-check.mjs` passes (the new 
 
 **Not checked by these tests:** the signed-in pages on production (no test account was made there), a real iPhone and Android, real uploads from a phone's camera or HEIC files, how the sounds actually sound, and the admin's photo screen on production. In the unit run, `a competition and a trip…` and `admin/config.js` fail on `60d0200` as well, so they predate this step.
 
-### Back
+### Back (Step 1)
 
 Page and admin: revert `32e3fb8` on `main`. Worker: `npx wrangler rollback ade89df5` (the version before this step); revert the page first, because it needs the new routes. Migration 0023 only adds two columns and can stay. Photos already uploaded stay in R2 under `avatars/`.
+
+## Step 2: the account icon and one way back
+
+**The icon** is in the top bar of the home page, the service pages, the events, the competitions and «نقاطي» (`assets/js/account/link.js`). Not on `/account/` itself, not in the admin's preview frame, and not during a competition's running timer. Signed out it shows a person and says «سجّل دخولك». Signed in it shows the member's photo or first letter in a small arch.
+
+**No request on public pages:** it draws from what the device remembers (`FACE_KEY`, beside the session and cleared with it; in the tab on a shared device). If the session ended elsewhere the icon still looks signed in until it is pressed, then `/account/` asks.
+
+**One way back:** every sign-in goes through `goSignIn` in `link.js`. After signing in the member returns to the same page, with its query and hash. `cleanReturn` allows this site's own public pages only, never `/admin/`, another host or a script. Signed in, the icon opens the account, and «ارجع للموقع» returns to the page they came from.
+
+**A booking's page**, signed out, offers «سجّل دخولك عشان تربطه بحسابك», then returns to that booking to link it.
+
+**Tests:** `tests/account-badge.e2e.mjs`, `tools/account-badge-staging.mjs`. No Worker change.
