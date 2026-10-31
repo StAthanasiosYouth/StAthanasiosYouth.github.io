@@ -134,6 +134,8 @@ Direction «العتبة»: the iconostasis arch holds the member's photo, or th
 | Signing out | The page draws back | `leave` |
 | A failure | The state returns, the reason is said | `nope`: one soft low note |
 
+The header's account icon is the same door at 40 × 44, one gold line, the photo filling it. The first-time walkthrough is six cards, each a small drawing of the page's own parts that moves once and rests: a bottom sheet on a phone, the drawing beside the words on a computer.
+
 Reduced motion: nothing moves and no transition runs. A weak phone (`data-motion="lite"`): the same order with no blur, glide or stagger. Without View Transitions the screens simply change. Sound follows the site's one switch, and nothing plays before the first tap.
 
 ## Components

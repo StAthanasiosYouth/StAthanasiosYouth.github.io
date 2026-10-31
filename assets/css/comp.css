@@ -1802,45 +1802,61 @@ dialog.order[open] {
   color: var(--text);
 }
 
+/* the account's icon (assets/js/account/link.js): the control is the door, and the photo fills it */
 .acct-badge {
-  display: inline-grid;
+  display: grid;
   place-items: center;
   flex: none;
   width: 44px;
   height: 44px;
-  border: 1px solid var(--gold-line-strong);
-  border-radius: 999px;
-  color: var(--gold-hi);
-  background: rgba(6, 26, 49, .7);
+  padding: 0;
   text-decoration: none;
   -webkit-tap-highlight-color: transparent;
 }
 
-.acct-badge:hover {
-  background: var(--navy-800);
-}
-
-/* a competition's running timer needs the room */
-.cbar__timer:not([hidden]) ~ .acct-badge {
-  display: none;
-}
-
-/* the account's icon (assets/js/account/link.js): a small arch, the member's photo or first letter */
 .acct-badge__face {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 40px;
+  height: 44px;
   overflow: hidden;
-  border-radius: 50% 50% 14% 14% / 50% 50% 14% 14%;
-  font: 700 1.05rem / 1 var(--font-display);
+  border-radius: 20px 20px 7px 7px;
+  font: 700 1.3rem / 1 var(--font-display);
   color: var(--gold-hi);
+  background: rgba(6, 26, 49, .8);
+  transition: filter .16s;
+}
+
+.acct-badge__face::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--gold-line-strong);
+  pointer-events: none;
+}
+
+.acct-badge:hover .acct-badge__face {
+  filter: brightness(1.14);
+}
+
+.acct-badge.is-in .acct-badge__face {
+  background: linear-gradient(180deg, var(--navy-700), var(--navy-900));
+}
+
+.acct-badge.is-in .acct-badge__face::after {
+  box-shadow: inset 0 0 0 1.5px var(--gold);
 }
 
 .acct-badge__face img {
+  position: absolute;
+  inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
 }
 
 .acct-badge__face svg {
@@ -1853,7 +1869,7 @@ dialog.order[open] {
   stroke-linejoin: round;
 }
 
-.acct-badge.is-in .acct-badge__face {
-  background: var(--navy-700);
-  box-shadow: 0 0 0 1px var(--gold-line-strong);
+/* a competition's running timer needs the room */
+.cbar__timer:not([hidden]) ~ .acct-badge {
+  display: none;
 }

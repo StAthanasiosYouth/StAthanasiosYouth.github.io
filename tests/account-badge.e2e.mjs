@@ -76,6 +76,7 @@ async function member() {
   const start = await h.call('/v1/account/register/start', { method: 'POST', body: { email, phone: '012' + String(40000000 + tick), name: 'مارك سامي فوزي', birthDate: '2000-03-12' } });
   assert.equal(start.status, 200, JSON.stringify(start.body));
   const done = await h.call('/v1/account/register/verify', { method: 'POST', body: { pendingId: start.body.pendingId, code: start.body.testCode } });
+  await h.db.prepare('UPDATE participants SET onboarded_at = 1 WHERE email = ?').bind(email).run();
   return { email, password: done.body.password };
 }
 
@@ -111,7 +112,7 @@ const pressBadge = async page => {
   await page.click('.acct-badge');
 };
 
-test('signed out on a page: the icon says sign in, and after signing in you are back on that page with your letter', async () => {
+test('signed out on a page: the icon says sign in, signing in lands on the account at once, and its link goes back there with the letter', async () => {
   const m = await member();
   const { page, ctx, problems } = await open('/black-theatre/?x=1');
   await badge(page);
@@ -119,7 +120,11 @@ test('signed out on a page: the icon says sign in, and after signing in you are 
   await page.screenshot({ path: SHOTS + 'signed-out-page-mobile.png' });
   await pressBadge(page);
   await signIn(page, m);
-  await page.waitForFunction(() => location.pathname === '/black-theatre/' && location.search === '?x=1', { timeout: 10000 });
+  await page.waitForSelector('[data-home]', { timeout: 10000 });
+  assert.equal(await page.evaluate(() => location.pathname), '/account/', 'no trip back to press it again');
+  assert.equal(await page.$eval('.cbar__home', a => { const u = new URL(a.href); return u.pathname + u.search; }), '/black-theatre/?x=1');
+  await page.click('.cbar__home');
+  await page.waitForFunction(() => location.pathname === '/black-theatre/', { timeout: 10000 });
   await badge(page);
   assert.equal(await label(page), 'حسابي: مارك');
   assert.equal(await page.$eval('.acct-badge__face', n => n.textContent), 'م');
@@ -128,7 +133,7 @@ test('signed out on a page: the icon says sign in, and after signing in you are 
   await ctx.close();
 });
 
-test('the home page: the icon in the top bar, no call to the Worker for it; back home after signing in', async () => {
+test('the home page: the icon in the top bar, no call to the Worker for it; signing in goes straight to the account', async () => {
   const m = await member();
   const { page, ctx, problems, calls } = await open('/');
   await badge(page);
@@ -140,12 +145,9 @@ test('the home page: the icon in the top bar, no call to the Worker for it; back
   await page.screenshot({ path: SHOTS + 'home-mobile.png' });
   await pressBadge(page);
   await signIn(page, m);
-  await page.waitForFunction(() => location.pathname === '/' || location.pathname === '/index.html', { timeout: 10000 });
-  await badge(page);
-  assert.equal(await label(page), 'حسابي: مارك');
-  const before = calls.length;
-  await sleep(500);
-  assert.equal(calls.filter(c => c.startsWith('/v1/account/')).length, calls.slice(0, before).filter(c => c.startsWith('/v1/account/')).length);
+  await page.waitForSelector('[data-home]', { timeout: 10000 });
+  assert.equal(await page.evaluate(() => location.pathname), '/account/');
+  assert.ok(['/', '/index.html'].includes(await page.$eval('.cbar__home', a => new URL(a.href).pathname)));
   assert.deepEqual(problems, []);
   await ctx.close();
 });
@@ -238,6 +240,54 @@ test('a session that ended: the icon opens the account, which asks; then back to
   await set(page, '#acct-password', m.password);
   await page.$eval('form', f => f.requestSubmit());
   await page.waitForFunction(() => location.pathname === '/points/', { timeout: 10000 });
+  await ctx.close();
+});
+
+test('a stale return is dropped by the icon; a service that asks still gets its page back', async () => {
+  const m = await member();
+  const { page, ctx } = await open('/black-theatre/');
+  await badge(page);
+  await page.evaluate(() => sessionStorage.setItem('athanasios.account.return.v1', '/points/'));
+  await pressBadge(page);
+  await signIn(page, m);
+  await page.waitForSelector('[data-home]', { timeout: 10000 });
+  assert.equal(await page.evaluate(() => location.pathname), '/account/');
+  await ctx.close();
+  const other = await member();
+  const s = await open('/points/');
+  await s.page.waitForFunction(() => location.pathname === '/account/', { timeout: 15000 });
+  await signIn(s.page, other);
+  await s.page.waitForFunction(() => location.pathname === '/points/', { timeout: 10000 });
+  await s.ctx.close();
+});
+
+test('the door: the control is the frame, the photo fills it', async () => {
+  const m = await member();
+  const { page, ctx } = await open('/account/');
+  await signIn(page, m);
+  await page.waitForSelector('[data-home]', { timeout: 10000 });
+  await page.click('.ac-hero .ac-arch');
+  await page.waitForSelector('[data-photo-sheet][open]');
+  await (await page.$('#ac-photo-file')).uploadFile(SAMPLE);
+  await page.waitForSelector('[data-photo-crop] canvas');
+  await page.click('[data-photo-save]');
+  await page.waitForSelector('.ac-toast__b--ok', { timeout: 10000 });
+  await sleep(200);
+  await page.goto(LOCAL + '/', { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => { const i = document.querySelector('.acct-badge img'); return i && i.naturalWidth === 256; }, { timeout: 8000 });
+  const r = await page.evaluate(() => {
+    const a = document.querySelector('.acct-badge').getBoundingClientRect();
+    const f = document.querySelector('.acct-badge__face').getBoundingClientRect();
+    const i = document.querySelector('.acct-badge img').getBoundingClientRect();
+    return { a: [a.width, a.height], f: [f.width, f.height], i: [i.width, i.height], fit: getComputedStyle(document.querySelector('.acct-badge img')).objectFit, circle: getComputedStyle(document.querySelector('.acct-badge'), '::before').display };
+  });
+  assert.deepEqual(r.a, [44, 44], 'still 44 to press');
+  assert.deepEqual(r.f, [40, 44]);
+  assert.deepEqual(r.i, [40, 44], 'the photo fills the door');
+  assert.equal(r.fit, 'cover');
+  assert.equal(r.circle, 'none', 'no round button behind it');
+  await sleep(3200);
+  await page.screenshot({ path: SHOTS + 'door-home-mobile.png' });
   await ctx.close();
 });
 

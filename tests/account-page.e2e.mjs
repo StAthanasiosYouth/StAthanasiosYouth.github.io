@@ -83,10 +83,11 @@ test.after(async () => {
 async function member(over = {}) {
   tick++;
   const email = `page${tick}${Date.now()}@staging.invalid`;
-  const start = await h.call('/v1/account/register/start', { method: 'POST', body: { email, phone: '012' + String(30000000 + tick), name: 'مارك سامي فوزي', birthDate: '2000-03-12', ...over } });
+  const start = await h.call('/v1/account/register/start', { method: 'POST', body: { email, phone: '012' + String(30000000 + tick), name: 'مارك سامي فوزي', birthDate: over.birthDate || '2000-03-12' } });
   assert.equal(start.status, 200, JSON.stringify(start.body));
   const done = await h.call('/v1/account/register/verify', { method: 'POST', body: { pendingId: start.body.pendingId, code: start.body.testCode } });
   const row = await h.db.prepare('SELECT id FROM participants WHERE email = ?').bind(email).first();
+  if (!over.fresh) await h.db.prepare('UPDATE participants SET onboarded_at = 1 WHERE id = ?').bind(row.id).run();
   return { email, password: done.body.password, id: row.id };
 }
 
@@ -494,6 +495,115 @@ test('every width: no sideways scroll, the rail on a computer, RTL throughout', 
   await ctx.close();
 });
 
+test('the walkthrough: once for a new account, not again on this or another device; six steady cards; reopens from support', async () => {
+  const m = await member({ fresh: true });
+  const { page, ctx, problems } = await open();
+  await signIn(page, m);
+  await home(page);
+  await page.waitForSelector('[data-tour]', { timeout: 5000 });
+  await page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));
+  await axe(page, 'walkthrough');
+  const heights = [];
+  const titles = [];
+  const shot = n => page.screenshot({ path: SHOTS + 'tour-' + n + '.png' });
+  for (let i = 0; i < 6; i++) {
+    await sleep(120);
+    heights.push(await page.$eval('[data-tour]', n => Math.round(n.getBoundingClientRect().height)));
+    titles.push(await page.$eval('.ac-ob__t', n => n.textContent));
+    if (i === 0 || i === 3) {
+      await sleep(900);
+      await shot(i + 1);
+    }
+    if (i < 5) await page.click('[data-tour-next]');
+  }
+  assert.deepEqual(titles, ['ده حسابك', 'نقطك ونتايجك', 'حجوزاتك', 'صورتك', 'الإشعارات والدعم', 'لما تخلص']);
+  assert.equal(new Set(heights).size, 1, 'the sheet stays still: ' + heights);
+  assert.equal(await page.$eval('[data-tour-skip]', n => n.hidden), true, 'no skip on the last');
+  await page.click('[data-tour-back]');
+  assert.equal(await page.$eval('.ac-ob__t', n => n.textContent), 'الإشعارات والدعم');
+  await page.click('[data-tour-next]');
+  assert.equal((await h.db.prepare('SELECT onboarded_at FROM participants WHERE id = ?').bind(m.id).first()).onboarded_at, null, 'not marked until it closes');
+  await page.click('[data-tour-next]');
+  await page.waitForFunction(() => !document.querySelector('[data-tour]'));
+  await page.waitForFunction(() => true);
+  await sleep(300);
+  assert.ok((await h.db.prepare('SELECT onboarded_at FROM participants WHERE id = ?').bind(m.id).first()).onboarded_at > 0);
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await home(page);
+  await sleep(1300);
+  assert.equal(await page.$('[data-tour]'), null, 'not on the same device');
+  const other = await open();
+  await signIn(other.page, m);
+  await home(other.page);
+  await sleep(1300);
+  assert.equal(await other.page.$('[data-tour]'), null, 'not on another device');
+  await other.ctx.close();
+
+  await route(page, '#me/support', '[data-tour-open]');
+  await page.click('[data-tour-open]');
+  await page.waitForSelector('[data-tour]', { timeout: 5000 });
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('[data-tour]'));
+  assert.deepEqual(problems, []);
+  await ctx.close();
+});
+
+test('the walkthrough: skipping counts as seen; swipe follows RTL; a guest reads the right words; a computer sees it beside its drawing', async () => {
+  const m = await member({ fresh: true });
+  const { page, ctx } = await open();
+  await signIn(page, m);
+  await home(page);
+  await page.waitForSelector('[data-tour]', { timeout: 5000 });
+  const box = await (await page.$('[data-tour]')).boundingBox();
+  const y = box.y + box.height / 2;
+  await page.mouse.move(box.x + 60, y);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 200, y);
+  await page.mouse.up();
+  assert.equal(await page.$eval('.ac-ob__t', n => n.textContent), 'نقطك ونتايجك', 'a swipe to the right goes forward');
+  await page.click('[data-tour-skip]');
+  await page.waitForFunction(() => !document.querySelector('[data-tour]'));
+  await sleep(300);
+  assert.ok((await h.db.prepare('SELECT onboarded_at FROM participants WHERE id = ?').bind(m.id).first()).onboarded_at > 0);
+  await ctx.close();
+
+  const g = await member({ fresh: true, birthDate: '1990-01-01' });
+  const guest = await open('/account/', { width: 1280, height: 860 });
+  await signIn(guest.page, g);
+  await home(guest.page);
+  await guest.page.waitForSelector('[data-tour]', { timeout: 5000 });
+  await guest.page.click('[data-tour-next]');
+  assert.match(await text(guest.page, '.ac-ob__text'), /كضيف بدون نقاط/);
+  await sleep(900);
+  await guest.page.screenshot({ path: SHOTS + 'tour-desktop.png' });
+  await guest.ctx.close();
+});
+
+test('the walkthrough waits: someone who signed in for a service goes there first; reduced motion holds still', async () => {
+  const m = await member({ fresh: true });
+  const { page, ctx } = await open('/account/');
+  await page.waitForSelector('#acct-email');
+  await page.evaluate(() => sessionStorage.setItem('athanasios.account.return.v1', '/black-theatre/'));
+  await set(page, '#acct-email', m.email);
+  await set(page, '#acct-password', m.password);
+  await page.$eval('form', f => f.requestSubmit());
+  await page.waitForFunction(() => location.pathname === '/black-theatre/', { timeout: 10000 });
+  assert.equal(await page.$('[data-tour]'), null);
+  assert.equal((await h.db.prepare('SELECT onboarded_at FROM participants WHERE id = ?').bind(m.id).first()).onboarded_at, null, 'still ahead of them');
+  await page.goto(LOCAL + '/account/', { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('[data-tour]', { timeout: 8000 });
+  await ctx.close();
+
+  const r = await member({ fresh: true });
+  const still = await open('/account/', { reduced: true });
+  await signIn(still.page, r);
+  await home(still.page);
+  await still.page.waitForSelector('[data-tour]', { timeout: 5000 });
+  assert.equal(await still.page.evaluate(() => document.getAnimations().filter(a => a.playState === 'running').length), 0);
+  await still.ctx.close();
+});
+
 test('what the first page costs: one API call, no competition query, and a light page', async () => {
   const m = await member();
   await seed(m);
@@ -513,6 +623,6 @@ test('what the first page costs: one API call, no competition query, and a light
   assert.equal(calls.filter(c => c === '/v1/account/summary').length, 1, 'kept for a minute');
   assert.ok(!calls.includes('/v1/comp/me'));
   const sizes = ['assets/js/account/app.js', 'assets/js/account/home.js', 'assets/js/account/parts.js', 'assets/js/account/motion.js', 'assets/js/account/model.js', 'assets/css/account.css'].map(f => readFileSync(join(ROOT, f)).length);
-  assert.ok(sizes.reduce((a, b) => a + b) < 130 * 1024, 'sizes ' + sizes);
+  assert.ok(sizes.reduce((a, b) => a + b) < 140 * 1024, 'sizes ' + sizes);
   await ctx.close();
 });

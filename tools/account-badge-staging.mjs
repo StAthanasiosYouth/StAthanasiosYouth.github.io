@@ -55,15 +55,19 @@ try {
   await page.$eval('#acct-password', (n, v) => { n.value = v; n.dispatchEvent(new Event('input', { bubbles: true })); }, password);
   await sleep(1500); // the Turnstile test widget
   await page.$eval('form', f => f.requestSubmit());
-  await page.waitForFunction(() => location.pathname === '/black-theatre/', { timeout: 20000 });
-  check('back on the same page after signing in', true);
+  await page.waitForSelector('[data-tour]', { timeout: 20000 });
+  check('the icon lands on the account at once, the walkthrough shows', (await page.evaluate(() => location.pathname)) === '/account/');
+  await page.click('[data-tour-skip]');
+  await page.waitForFunction(() => !document.querySelector('[data-tour]'));
+  await sleep(800);
+  await page.goto(SITE + '/black-theatre/', { waitUntil: 'domcontentloaded' });
   await clear();
   check('the icon has the first letter', (await page.$eval('.acct-badge__face', n => n.textContent)) === 'م');
   await page.screenshot({ path: SHOTS + 'signed-in-mobile.png' });
 
   await page.click('.acct-badge');
   await page.waitForSelector('[data-home]', { timeout: 15000 });
-  check('signed in: straight to the account', true);
+  check('signed in: straight to the account, no walkthrough again', !(await page.$('[data-tour]')));
   check('«ارجع للموقع» goes back to that page', (await page.$eval('.cbar__home', a => new URL(a.href).pathname)) === '/black-theatre/');
   await sleep(1500);
   await page.click('.ac-hero .ac-arch');

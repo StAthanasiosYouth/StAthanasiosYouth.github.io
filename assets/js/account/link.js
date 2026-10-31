@@ -8,7 +8,7 @@ export const SESSION_KEY = 'athanasios.account.v1';
 /* where a sign-in came from, and the page a signed-in member came to the account from: this tab only */
 export const RETURN_KEY = 'athanasios.account.return.v1';
 export const FROM_KEY = 'athanasios.account.from.v1';
-/* the icon's first letter and small photo: beside the session, and gone with it */
+/* the icon's first letter and photo: beside the session, and gone with it */
 export const FACE_KEY = 'athanasios.account.face.v1';
 export const MODE_KEY = 'athanasios.account.mode.v1';
 
@@ -114,8 +114,8 @@ function paintFace(button) {
     const img = document.createElement('img');
     img.src = face.photo;
     img.alt = '';
-    img.width = 32;
-    img.height = 32;
+    img.width = 40;
+    img.height = 44;
     inner.append(img);
   }
   else if (face && face.firstName) {
@@ -139,8 +139,9 @@ function paintFace(button) {
 
 /*
  * The header's icon, added to `bar` once (before `before` when given). Not in a frame (the admin's preview), and not
- * while the account is known to be switched off. Signed out it brings them back here after signing in; signed in,
- * the account's «ارجع للموقع» does.
+ * while the account is known to be switched off. Pressing it means they want their account, signed in or not: after
+ * signing in they land there, and its «ارجع للموقع» brings them back. Only a service that asked for the sign-in
+ * (goSignIn) returns to the page.
  */
 export function accountBadge(bar, rootUrl, { cls = '', before = null } = {}) {
   if (!bar || bar.querySelector('.acct-badge')) return null;
@@ -159,8 +160,7 @@ export function accountBadge(bar, rootUrl, { cls = '', before = null } = {}) {
   link.className = 'acct-badge' + (cls ? ' ' + cls : '');
   link.href = new URL('account/', rootUrl).href;
   link.addEventListener('click', () => {
-    const signedIn = !!readSession(local, storage('sessionStorage'));
-    keep(RETURN_KEY, signedIn ? '' : here());
+    keep(RETURN_KEY, '');
     keep(FROM_KEY, here());
   });
   paintFace(link);

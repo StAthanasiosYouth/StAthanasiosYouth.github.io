@@ -30,6 +30,8 @@ export function createMine({ main, S, authed, api, sessionOver, signOut, openFor
   let route = '#me';
   let shown = false;
   let latest = 0;
+  let toured = false;
+  let tourTimer = 0;
 
   /* ---------- data ---------- */
 
@@ -103,6 +105,32 @@ export function createMine({ main, S, authed, api, sessionOver, signOut, openFor
       },
       after: () => { const a = main.querySelector('[data-arch]'); if (a) a.focus({ preventScroll: true }); }
     });
+  }
+
+  /* ---------- the first-time walkthrough ---------- */
+
+  async function openTourNow(mark) {
+    const { openTour } = await import('./onboard.js');
+    openTour(person(), {
+      guest: !!(S.account.eligibility && S.account.eligibility.state === 'guest'),
+      onDone: () => {
+        if (!mark) return;
+        if (S.account) S.account.onboarded = true;
+        forget('/v1/account/summary');
+        authed('POST', '/v1/account/onboarded', {});
+      }
+    });
+  }
+
+  /* once, on the account's first page: someone who signed in to finish a competition or a booking isn't held up */
+  function tourIfNew() {
+    if (toured || !S.account || S.account.onboarded) return;
+    clearTimeout(tourTimer);
+    tourTimer = setTimeout(() => {
+      if (toured || !S.account || S.account.onboarded || route !== '#me' || document.querySelector('dialog[open]')) return;
+      toured = true;
+      openTourNow(true).catch(() => { toured = false; });
+    }, 900);
   }
 
   /* ---------- the frame ---------- */
@@ -293,9 +321,10 @@ export function createMine({ main, S, authed, api, sessionOver, signOut, openFor
     const path = '/v1/account/summary';
     if (isKept(path)) {
       const reply = memo.get(path).reply;
-      S.account = reply.account;
+      S.account = { ...reply.account, onboarded: reply.account.onboarded || S.account.onboarded };
       put(homeOf(reply), kind);
       loadPhoto();
+      tourIfNew();
       return;
     }
     // the greeting is there at once; what needs the server fills in under it
@@ -312,9 +341,10 @@ export function createMine({ main, S, authed, api, sessionOver, signOut, openFor
         put(failed('حسابي', reply, '#me'), '');
         return;
       }
-      S.account = reply.account;
+      S.account = { ...reply.account, onboarded: reply.account.onboarded || S.account.onboarded };
       put(homeOf(reply), '');
       loadPhoto();
+      tourIfNew();
     });
   }
 
@@ -573,6 +603,7 @@ export function createMine({ main, S, authed, api, sessionOver, signOut, openFor
     const s = (S.config && S.config.support) || {};
     put(h('div', { class: 'ac-view' }, head('الدعم الفني'),
       h('p', { class: 'ac-lead' }, 'في مشكلة في حسابك أو بياناتك محتاجة تتصلح؟ كلّم ' + (s.name || 'الدعم الفني') + '.'),
+      rows(row({ icon: 'home', title: 'إزاي تستخدم حسابك', sub: 'شرح سريع لكل أقسام حسابك', onclick: () => openTourNow(false), attrs: { 'data-tour-open': '', 'data-quiet': '' } })),
       rows(
         s.whatsapp ? row({ icon: 'whatsapp', title: 'واتساب', sub: 'أسرع طريقة', href: s.whatsapp, attrs: { target: '_blank', rel: 'noopener', 'data-support': '' } }) : null,
         s.phone ? row({ icon: 'phone', title: 'مكالمة', sub: h('span', { dir: 'ltr' }, s.phone), href: 'tel:' + s.phone }) : null,
@@ -612,6 +643,8 @@ export function createMine({ main, S, authed, api, sessionOver, signOut, openFor
     reset() {
       memo.clear();
       shown = false;
+      toured = false;
+      clearTimeout(tourTimer);
       route = '#me';
       if (S.photo.url) URL.revokeObjectURL(S.photo.url);
       S.photo = { url: '', version: 0 };

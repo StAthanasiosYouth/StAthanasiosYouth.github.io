@@ -68,11 +68,11 @@ Page and admin: revert `32e3fb8` on `main`. Worker: `npx wrangler rollback ade89
 
 ## Step 2: the account icon and one way back
 
-**The icon** is in the top bar of the home page, the service pages, the events, the competitions and «نقاطي» (`assets/js/account/link.js`). Not on `/account/` itself, not in the admin's preview frame, and not during a competition's running timer. Signed out it shows a person and says «سجّل دخولك». Signed in it shows the member's photo or first letter in a small arch.
+**The icon** (changed since this section's release, see «The Step 2 fix» below) is in the top bar of the home page, the service pages, the events, the competitions and «نقاطي» (`assets/js/account/link.js`). Not on `/account/` itself, not in the admin's preview frame, and not during a competition's running timer. Signed out it shows a person and says «سجّل دخولك». Signed in it shows the member's photo or first letter in a small arch.
 
 **No request on public pages:** it draws from what the device remembers (`FACE_KEY`, beside the session and cleared with it; in the tab on a shared device). If the session ended elsewhere the icon still looks signed in until it is pressed, then `/account/` asks.
 
-**One way back:** every sign-in goes through `goSignIn` in `link.js`. After signing in the member returns to the same page, with its query and hash. `cleanReturn` allows this site's own public pages only, never `/admin/`, another host or a script. Signed in, the icon opens the account, and «ارجع للموقع» returns to the page they came from.
+**One way back:** a service's sign-in goes through `goSignIn` in `link.js`. After signing in the member returns to the same page, with its query and hash. `cleanReturn` allows this site's own public pages only, never `/admin/`, another host or a script. Signed in, the icon opens the account, and «ارجع للموقع» returns to the page they came from.
 
 **A booking's page**, signed out, offers «سجّل دخولك عشان تربطه بحسابك», then returns to that booking to link it.
 
@@ -87,3 +87,18 @@ After the release: `tools/account-badge-prod-check.mjs` and `tools/account-prod-
 **Not checked by these tests:** signing in and returning on production (no test account was made there), a real iPhone and Android, the tap sound by ear, and the icon on published event and competition pages on production, since none is published now.
 
 **Back:** revert `9c8bb63` on `main`.
+
+## The Step 2 fix
+
+Approved from a prototype on 2026-10-31 (`spike/account-preview/step2b/`, not in the site).
+
+**The icon is the door.** The round button is gone. The control is a 40 × 44 door with one gold line, and the photo or first letter fills it, centred. It still presses as 44 × 44.
+
+**Pressing the icon opens the account, signed in or not.** Before, signing in from the icon returned to the page, so the member pressed it again. `RETURN_KEY` is now set only by `goSignIn`, when a service asked for the sign-in; the icon clears any old value and sets `FROM_KEY` for «ارجع للموقع».
+
+**First-time walkthrough** (`assets/js/account/onboard.js`, loaded only when it shows): six cards drawn from the page's own parts. Chosen over stills and video for speed, data use and easy editing; its words are plain text in that file.
+
+- Once per account, on any device: `participants.onboarded_at` (migration 0024), set by `POST /v1/account/onboarded` when it closes, by finishing, skipping or Esc. Members who already had an account see it once too.
+- On the account's first page only, so signing in to finish a competition or a booking isn't interrupted.
+- Reopens from «إزاي تستخدم حسابك» in the support page, which marks nothing.
+- A guest reads that they take part without points. The sample cards say «مثال», since a new member has no such data.
