@@ -390,6 +390,33 @@ Owner approved and set the Script Property `COMP_RUNTIME = worker` in the editor
 6. **Cleanup in Phase 7c** also covers today's test records and their still-enabled cards. Each publish warns about those cards until then.
 7. **Uninvestigated:** one old 500 on `/v1/sync/content-notify`, 2026-10-29.
 
+## 3q. `comp-sig` proven, Phase 5 complete (2026-10-31)
+
+**What triggers it:** `doPost` in `Api.gs` calls `compSigPush_` after an admin call that reaches Apps Script, not on a timer. It sends only when the signature differs from the one last accepted (kept 6 hours in the script cache). It signs with `WORKER_SYNC_SECRET` (`v1=` HMAC over `ts.body`). The Worker checks the signature, refuses an old timestamp, then writes `COMP_SIG`, the view and `SYNC_TS_comp-sig` in one batch.
+
+**Evidence on production (read from D1, no test data, nothing changed):**
+- Apps Script signed at 07:55:42.742 UTC, after Worker `ade89df5` went live. The Worker stored it 559 ms later. That timestamp can only be written after the signature check, and only Apps Script and the Worker hold the secret.
+- `COMP_SIG`, `SYNC_TS_comp-sig` and the view carry the same stored time, so they landed in one batch. The signature moved from `9ec9a0cc…` to `2394f266…`.
+- Content: the view went from 2 competitions and 11 questions to 4 and 13. Ids, slugs, titles, pictures and question media equal D1's drafts row by row. It holds no answers.
+- Store items: `i-9cc596e4` «محفظة», active, no picture, the same as `store_items`.
+
+**Limit of this proof:** the one prize has no picture, so no picture value has crossed on production. Adding one would change real data. `comp-drafts.test.mjs` covers a view with pictures. The monitoring did not capture this push's HTTP line; the proof is the D1 rows above.
+
+**Requirements (P5-1 to P5-10), against the records in §3 to §3p:** accounts, sign-in, recovery, profile, member email, participants in the admin, booking with an account, points, competitions runtime and the runbook steps are done and tested live, except as listed below.
+
+**Tests on the final code:**
+- Worker: 394/394.
+- Site units: 771 pass, the same 3 failures known from before Phase 5.
+- Browser, all pass: comp-admin 1–4, comp-accounts, comp-live, comp-portal 1–2, comp-public, content-worker, content-source, youth-admin, book-public.
+- Browser, `book-admin`: 10 pass, 2 fail (#1 and #7). Both fail the same way on `e9d212b`, the commit before the move, so the move did not cause them. Not investigated beyond that.
+
+**Runbook points that ended differently, none blocking:**
+- Step 6 says the first real competition closes the phase. The owner closed on test competitions instead, and watching the first real one is a follow-up.
+- A prize request stays untested until the store opens.
+- Test data stays until Phase 7c, by the owner's decision.
+
+**Status: Phase 5 complete. No critical issue open.** The follow-ups in §3p stand, except `comp-sig`, now proven. One added: the old store, wallet and seasons screens still write to the Sheets while the accounts screens write to D1, so edits belong in the accounts screens. Test a prize request before opening the store.
+
 ## 4. Rollback (batches 1–5)
 
 - Batch 4 extra: `accounts_mode = off` returns `competition/` and `points/` to Apps Script at once and refuses every `/v1/comp/*`, `/v1/shop/*` route. Worker rows stay. After launch that fallback serves only the old code login, so it is a stop, not a way back.
