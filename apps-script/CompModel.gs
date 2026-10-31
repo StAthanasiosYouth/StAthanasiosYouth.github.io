@@ -52,7 +52,6 @@ var COMP_SITE_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; im
 var COMP_PRESETS = {
   survey: { label: 'استبيان بسيط', participation: 'open', scoring: '', resultShow: 'none', answersShow: 'never', wallet: '', needs: '' },
   scored: { label: 'مسابقة عامة بدرجات', participation: 'open', scoring: '1', resultShow: 'score', answersShow: 'never', wallet: '', needs: '' },
-  coded: { label: 'مسابقة بأكواد', participation: 'registered', scoring: '1', resultShow: 'both', answersShow: 'never', wallet: '', needs: 'registry' },
   points: { label: 'مسابقة نقاط', participation: 'registered', scoring: '1', resultShow: 'points', answersShow: 'never', wallet: '1', needs: 'wallet' }
 };
 
@@ -444,12 +443,8 @@ function compValidateComp_(input, ctx) {
     record.wallet = '';
   }
 
-  if (record.participation === 'registered' && !modules.registry) {
-    problems.push('«مسابقة بأكواد» محتاجة تفعيل المشاركين بالأكواد الأول');
-  }
-
-  if (record.wallet && (!modules.wallet || record.participation !== 'registered' || !record.scoring)) {
-    problems.push('النقاط في المحفظة محتاجة: مسابقة بأكواد + درجات + تفعيل المحفظة');
+  if (record.wallet && (!modules.wallet || !record.scoring)) {
+    problems.push('النقاط في المحفظة محتاجة: درجات + تفعيل المحفظة');
   }
 
   if (record.uniquePhone && record.participation === 'open') {
@@ -1221,7 +1216,6 @@ function compBuildPublic_(draft, ctx) {
 
 var COMP_WARN_QUESTION_MEDIA = 'صور الأسئلة بتبقى على الموقع من وقت النشر — متحطش صورة فيها الإجابة';
 var COMP_WARN_EXPLANATION_MEDIA = 'صور شرح الإجابات مش هتتنشر غير لما الإجابات تظهر: انشر تاني بعدها علشان تظهر';
-var COMP_WARN_RETRY = 'أي حد يقدر يحاول كذا مرة ويعرف الإجابات من الدرجة';
 
 /*
  * What the builder should know before publishing (never blocks):
@@ -1243,11 +1237,6 @@ function compPublishWarnings_(comp, questions, now) {
     warnings.push(COMP_WARN_EXPLANATION_MEDIA);
   }
 
-  if (comp.participation === 'open' && comp.scoring && comp.resultShow !== 'none' && !comp.resultsAt &&
-      !(comp.uniquePhone && comp.attempts === 1)) {
-    warnings.push(COMP_WARN_RETRY);
-  }
-
   return warnings;
 
 }
@@ -1264,8 +1253,7 @@ function compPublishProblems_(comp, questions, modules, media) {
   var slugProblem = compSlugProblem_(comp.slug);
   if (slugProblem) problems.push(slugProblem);
 
-  if (comp.participation === 'registered' && !modules.registry) problems.push('«مسابقة بأكواد» محتاجة تفعيل المشاركين بالأكواد');
-  if (comp.wallet && (!modules.wallet || comp.participation !== 'registered' || !comp.scoring)) problems.push('النقاط في المحفظة محتاجة مسابقة بأكواد + درجات + تفعيل المحفظة');
+  if (comp.wallet && (!modules.wallet || !comp.scoring)) problems.push('النقاط في المحفظة محتاجة درجات + تفعيل المحفظة');
   if (comp.startAt && comp.endAt && comp.startAt >= comp.endAt) problems.push('ميعاد البداية لازم يكون قبل النهاية');
   if (comp.answersShow === 'atDate' && !comp.answersAt) problems.push('حدد ميعاد ظهور الإجابات');
 

@@ -129,33 +129,6 @@ export function cleanImage(raw) {
 }
 
 
-export function cleanFields(raw) {
-
-  if (!Array.isArray(raw)) return DEFAULT_FIELDS.map(f => ({ ...f }));
-
-  const seen = new Set();
-  const fields = [];
-
-  for (const f of raw) {
-    if (!f || typeof f !== 'object' || !FIELD_KEYS.includes(f.key) || seen.has(f.key)) continue;
-    seen.add(f.key);
-    const options = Array.isArray(f.options) ? f.options.map(o => text(o, 40)).filter(Boolean).slice(0, 12) : [];
-    let type = f.key === 'name' ? 'text' : f.key === 'phone' ? 'phone' : f.key === 'age' ? 'number' : (f.type === 'select' ? 'select' : 'text');
-    if (type === 'select' && options.length < 1) type = 'text';
-    fields.push({
-      key: f.key,
-      label: text(f.label, 40) || FIELD_LABELS[f.key],
-      type,
-      mode: ['required', 'optional', 'hidden'].includes(f.mode) ? f.mode : 'hidden',
-      options: type === 'select' ? options : []
-    });
-  }
-
-  return fields;
-
-}
-
-
 /**
  * One public question (compStart PublicQuestion, or the admin preview's
  * draft question). Private parts (correct, explanation, review) are never
@@ -243,9 +216,6 @@ export function sanitizeDefinition(raw, { withQuestions = false } = {}) {
     endAt: cleanStamp(raw.endAt),
     resultsAt: cleanStamp(raw.resultsAt),
     answersAt: cleanStamp(raw.answersAt),
-    participation: raw.participation === 'registered' ? 'registered' : 'open',
-    // §19.2: a coded competition that also takes guests (the identity form, no points)
-    allowGuests: raw.participation === 'registered' && raw.allowGuests === true,
     scoring: flag(raw.scoring),
     resultShow: ['none', 'score', 'points', 'both'].includes(raw.resultShow) ? raw.resultShow : 'none',
     answersShow: ['never', 'immediately', 'afterClose', 'atDate'].includes(raw.answersShow) ? raw.answersShow : 'never',
@@ -254,7 +224,6 @@ export function sanitizeDefinition(raw, { withQuestions = false } = {}) {
     attempts: int(raw.attempts, 1, 20, 1),
     layout: raw.layout === 'single' ? 'single' : 'paged',
     timeLimit: int(raw.timeLimit, 0, 600, 0),
-    fields: cleanFields(raw.fields),
     successText: text(raw.successText, 300),
     questionCount: int(raw.questionCount, 0, 300, 0),
     totalPoints: int(raw.totalPoints, 0, 3000000, 0),
@@ -392,66 +361,6 @@ export function compPhase(def, nowStamp) {
    PARTICIPANT FORM (open mode, §3.3) AND CODE (registered, §7)
 ========================================================= */
 
-export function visibleFields(def, { guest = false } = {}) {
-  return def && (def.participation === 'open' || (guest && def.allowGuests)) ? (def.fields || []).filter(f => f.mode !== 'hidden') : [];
-}
-
-/** Egyptian mobile (01xxxxxxxxx, +20 / 0020 prefixes) or an international +number. */
-export function normalizePhone(value) {
-  const digits = normalizeDigits(value).replace(/[\s\-().]/g, '');
-  if (/^(?:\+20|0020|20)?0?1[0125]\d{8}$/.test(digits)) return `0${digits.replace(/^(?:\+20|0020|20)?0?/, '')}`;
-  if (/^\+\d{8,15}$/.test(digits)) return digits;
-  return '';
-}
-
-/**
- * values: { key: string } as typed → { ok, errors: { key: message }, clean: { key: value } }
- * (only the visible fields; empty optional fields are left out)
- */
-export function validateFields(fields, values = {}) {
-
-  const errors = {};
-  const clean = {};
-
-  for (const field of fields) {
-    const raw = typeof values[field.key] === 'string' ? values[field.key].trim() : '';
-    if (!raw) {
-      if (field.mode === 'required') errors[field.key] = field.type === 'select' ? `اختار ${field.label}` : `اكتب ${field.label}`;
-      continue;
-    }
-    if (field.type === 'phone') {
-      const phone = normalizePhone(raw);
-      if (!phone) errors[field.key] = 'اكتب رقم موبايل صحيح (١١ رقم، زي 01012345678)';
-      else clean[field.key] = phone;
-    }
-    else if (field.type === 'number') {
-      const n = Number(normalizeDigits(raw));
-      if (!/^\d{1,3}$/.test(normalizeDigits(raw)) || n < 1 || n > 120) errors[field.key] = `اكتب ${field.label} بالأرقام`;
-      else clean[field.key] = String(n);
-    }
-    else if (field.type === 'select') {
-      if (!field.options.includes(raw)) errors[field.key] = `اختار ${field.label} من القايمة`;
-      else clean[field.key] = raw;
-    }
-    else if (field.key === 'name' && raw.replace(/\s+/g, '').length < 2) {
-      errors[field.key] = 'اكتب اسمك كامل';
-    }
-    else {
-      clean[field.key] = raw.replace(/\s+/g, ' ').slice(0, field.key === 'name' ? 60 : LIMITS.field);
-    }
-  }
-
-  return { ok: Object.keys(errors).length === 0, errors, clean };
-
-}
-
-/** ATH-XXXX-XXXX as typed → the 8 symbols ('' when it can't be a code). */
-export function normalizeCode(value) {
-  const s = normalizeDigits(value).toUpperCase().replace(/[\s\-_]/g, '').replace(/^ATH/, '');
-  return /^[23456789ABCDEFGHJKMNPQRSTVWXYZ]{8}$/.test(s) ? s : '';
-}
-
-export const formatCode = code => (code.length === 8 ? `ATH-${code.slice(0, 4)}-${code.slice(4)}` : code);
 
 
 /* =========================================================
@@ -566,8 +475,8 @@ export const invalidAnswers = (questions, answers = {}) => questions
 /* =========================================================
    STEP MACHINE
    state = { name, index?, error?, field?, participant?, from? }
-   names: loading | unavailable | scheduled | closed | intro | identity |
-          code | confirm | starting | question | single | review |
+   names: loading | unavailable | scheduled | closed | intro | entering |
+          starting | question | single | review |
           submitting | queued | result | error
 ========================================================= */
 
@@ -576,12 +485,6 @@ export function firstStep(def, phase) {
   if (phase === 'scheduled') return { name: 'scheduled' };
   if (phase === 'closed' || phase === 'results') return { name: 'closed' };
   return { name: 'intro' };
-}
-
-/** Where «ابدأ» leads. */
-export function beginStep(def) {
-  if (def.participation === 'registered') return { name: 'code' };
-  return visibleFields(def).length ? { name: 'identity' } : { name: 'starting' };
 }
 
 /** The first answering step once questions are there (or a restored one). */
@@ -619,26 +522,10 @@ export function transition(state, event, ctx = {}) {
       return firstStep(ctx.def, event.phase);
 
     case 'begin':
-      return state.name === 'intro' ? beginStep(ctx.def) : state;
+      return state.name === 'intro' ? { name: 'entering' } : state;
 
-    case 'back':
-      // a guest's form goes back to the code screen it came from
-      if (state.name === 'identity' && state.guest) return { name: 'code' };
-      if (state.name === 'identity' || state.name === 'code') return { name: 'intro' };
-      if (state.name === 'confirm') return { name: 'code' };
-      return state;
-
-    case 'guest':
-      return state.name === 'code' && ctx.def && ctx.def.allowGuests ? { name: 'identity', guest: true } : state;
-
-    case 'fields-ok':
-      return state.name === 'identity' ? { name: 'starting', from: 'identity', ...(state.guest && { guest: true }) } : state;
-
-    case 'code-ok':
-      return state.name === 'code' ? { name: 'confirm', participant: event.participant } : state;
-
-    case 'confirm':
-      return state.name === 'confirm' ? { name: 'starting', from: 'confirm', participant: state.participant } : state;
+    case 'entered':
+      return state.name === 'entering' ? { name: 'starting', participant: event.participant } : state;
 
     case 'started':
       return answeringStep(layout, { length: count }, event.step);
@@ -647,12 +534,9 @@ export function transition(state, event, ctx = {}) {
       const code = event.code;
       if (code === 'closed') return { name: 'closed', error: event.message };
       if (code === 'not_open') return { name: 'scheduled', error: event.message };
-      if (code === 'session') return { name: 'code', error: event.message };
+      if (code === 'session') return { name: 'entering', error: event.message };
       if (code === 'not_found' || code === 'disabled') return { name: 'unavailable', error: event.message };
-      const guest = state.guest ? { guest: true } : {};
-      if (code === 'invalid' && state.from === 'identity') return { name: 'identity', error: event.message, field: event.field, ...guest };
-      const back = state.from === 'identity' ? 'identity' : state.from === 'confirm' ? 'code' : 'intro';
-      return { name: back, error: event.message, ...(back === 'identity' ? guest : {}) };
+      return { name: 'intro', error: event.message };
     }
 
     case 'next':
@@ -781,7 +665,7 @@ export const scoreText = (score, maxScore) => `جبت ${ar(score)} من ${ar(max
 /** «جمعت ٧٠٠ نقطة» */
 export const pointsText = n => `جمعت ${countPoints(n)}`;
 
-export const GUEST_RESULT = 'دي نتيجتك — المشاركة بدون كود مفيهاش نقاط';
+export const GUEST_RESULT = 'دي نتيجتك — المشاركة دي مفيهاش نقاط';
 
 /**
  * What the result screen says, decided from what the server returned
@@ -815,7 +699,7 @@ export function resultSummary(result, def = {}, { noPoints = false } = {}) {
     lines.push({ kind: 'pending', text: 'فيه إجابات بتتراجع، والنتيجة النهائية هتظهر بعد المراجعة.' });
   }
 
-  if (!r.guest && (r.noPoints || noPoints)) lines.push({ kind: 'hint', text: 'المشاركة دي متسجلة بالكود بتاعك من غير نقاط.' });
+  if (!r.guest && (r.noPoints || noPoints)) lines.push({ kind: 'hint', text: 'المشاركة دي متسجلة بحسابك من غير نقاط.' });
 
   if (r.resultsAt && num(r.score) === null && num(r.pointsAwarded) === null) {
     lines.push({ kind: 'hint', text: `النتيجة هتظهر ${formatStamp(r.resultsAt)}` });

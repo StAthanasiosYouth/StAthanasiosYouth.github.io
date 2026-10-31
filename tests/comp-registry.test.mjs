@@ -532,11 +532,10 @@ test('registered competition: code → ptoken → start (identity from the regis
 
 /* ---------------- module switches ---------------- */
 
-test('module switches: each needs the one before (chain enforced), logged; disabled modules answer disabled; admin writes need the switch', () => {
+test('module switches: the store needs the wallet, logged; disabled modules answer disabled; admin writes need the switch', () => {
   const world = compWorld();
   const call = adminApi(world);
-  assert.deepEqual(plain(call('apiCompSettings', { wallet: true, shop: true }).modules), { registry: false, wallet: false, shop: false }, 'no registry: nothing else');
-  assert.deepEqual(plain(call('apiCompSettings', { registry: true, shop: true }).modules), { registry: true, wallet: false, shop: false }, 'no wallet: no store');
+  assert.deepEqual(plain(call('apiCompSettings', { registry: true, shop: true }).modules), { registry: true, wallet: false, shop: false }, 'no store without the wallet');
   assert.deepEqual(plain(call('apiCompSettings', { wallet: true, shop: true }).modules), { registry: true, wallet: true, shop: true });
   assert.deepEqual(plain(call('apiCompSettings', { wallet: false }).modules), { registry: true, wallet: false, shop: false }, 'the store goes with the wallet');
   assert.equal(world.properties.get('COMP_SHOP'), '');

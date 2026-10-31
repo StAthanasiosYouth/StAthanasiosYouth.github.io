@@ -148,3 +148,24 @@ After the release: CI tests and smoke pass, `/v1/health` answers 200, and `tools
 **Not checked on production:** no real email was sent there, so the first real one is the first test of this path.
 
 **Back:** `npx wrangler rollback 2401d969` from `worker/`, then revert `662e11f` on `main` so the next push doesn't bring it back. Rows in `sending` at that moment stay there: the old code doesn't pick them up, so set them back to `queued`.
+
+## Step 4: the old competitions
+
+Every competition has belonged to an account since accounts went on (YOUTH-ACCOUNTS-PLAN §4, rev. 3), but the code path and its options stayed in the pages and the builder. This step removes them. No data was touched: no row, column, setting or Script Property.
+
+**Removed from the public pages:** the code screen and «الكود مسجل باسم …», the form, guests, the participant token, the Apps Script client (`comp/api.js`, `comp/config.js`) and the check that fell back to all of it. `points/` keeps its address, for links and printed cards, and sends anyone signed out to `/account/`.
+
+**Removed from the admin:** the builder's «المشاركة» tab, the «مسابقة بأكواد» preset, the codes switch, the «المشاركين» screen with code display, reset, distribution, cards and name import (`AdminCompPeople.html`), the «+ مشارك» quick action and the old age-rules card. «حسابات الشباب» already does these jobs, including the age range. The wallet no longer depends on the codes switch.
+
+**Fixed along the way:** a refused start (attempts used up, for example) went back to the entry step and asked again in a loop. It now stays on the intro with the server's message. A session the server refuses is dropped before sign-in.
+
+**Stays, on purpose:**
+- `participation`, `allowGuests`, `fields` and `uniquePhone` columns and old values. Nothing reads them on the public side. Non-points presets still store `open`, because the Apps Script runtime below reads it.
+- `CompPublic.gs`, `CompRegistry.gs` and `CompCrypto.gs` on Apps Script, closed by `COMP_RUNTIME = worker`, with their unit tests. They leave with Apps Script, and any data with the Phase 7c cleanup.
+- The old «النقاط» and «المتجر» screens, hidden while accounts are on (§3o).
+
+**Tests:** site 757 pass, with the same 2 failing as before this step. Worker 414 pass. Browser: `comp-public` 12, `comp-portal` 8, `comp-portal2` 10, `comp-admin` 16, `comp-admin3` 8, `comp-admin4` 2, `comp-accounts` 3 pass. They run against a signed-in Worker mock (`tests/fakes/comp-worker.mjs`). `points-widget` (3 of 6) and one `admin-filters` test fail the same way on `main`. Removed with the code they tested: `comp-live.e2e.mjs` (Apps Script runtime), `comp-admin2.e2e.mjs` and `people-roundtrip.e2e.mjs` (codes and old participants), plus those scenarios elsewhere. Server behaviour stays covered by `worker/test/comp-runtime.test.mjs`.
+
+**Staging:** Worker `1f2e2cd4`. `scripts/comp-check.mjs` passes on it. Signed out, `points/` reaches `/account/`, and a missing competition says unavailable with no code screen.
+
+**Not checked:** a competition played by hand on Staging from the site, the builder opened on real Staging (no admin sign-in here), and real phones.

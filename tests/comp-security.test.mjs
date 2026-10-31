@@ -193,18 +193,6 @@ test('M4: unsent attempts per competition are capped (live ones only: older than
 
 /* ---------------- M5: warnings, one phone identity ---------------- */
 
-test('M5a: an open competition that shows the score at once warns unless it is one submission per number and one attempt', () => {
-  const world = compWorld();
-  const call = adminApi(world);
-  const { id } = scoredComp(call, { resultShow: 'score' });
-  const retry = 'أي حد يقدر يحاول كذا مرة ويعرف الإجابات من الدرجة';
-  assert.ok(call('apiComp', id).warnings.includes(retry));
-  call('apiCompSave', id, { uniquePhone: true, attempts: 1 });
-  assert.ok(!call('apiComp', id).warnings.includes(retry));
-  call('apiCompSave', id, { uniquePhone: false, resultsAt: '2099-01-01 10:00' });
-  assert.ok(!call('apiComp', id).warnings.includes(retry), 'the score waits: no warning');
-});
-
 test('M5b: every way of writing an Egyptian number is one identity (uniquePhone, attempts); other numbers are their digits', () => {
   const gs = loadGs(['Platforms.gs', 'Content.gs', 'Hub.gs', 'CompModel.gs', 'CompScore.gs']);
   for (const form of ['01012345678', '+20 010 1234 5678', '+201012345678', '00201012345678', '0020 10 1234 5678', '1012345678', '٠١٠١٢٣٤٥٦٧٨', '(010) 1234-5678', '2001012345678']) {

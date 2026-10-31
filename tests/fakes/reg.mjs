@@ -26,9 +26,11 @@ export function login(world, code) {
 }
 
 /* a published registered competition: single (10) + truefalse (5), optionally a long (manual, 20) */
-export function codedComp(world, call, { slug = 'coded-quiz', preset = 'coded', long = false, overrides = {} } = {}) {
-  const created = call('apiCompCreate', { preset, title: 'مسابقة بأكواد ' + slug, slug, enabled: true, ...overrides });
+export function codedComp(world, call, { slug = 'coded-quiz', preset = 'scored', long = false, overrides = {} } = {}) {
+  // the Apps Script runtime (off since COMP_RUNTIME = worker) still knows this mode; the builder no longer offers it
+  const created = call('apiCompCreate', { preset, title: 'مسابقة بأكواد ' + slug, slug, enabled: true });
   const id = created.comp.id;
+  call('apiCompSave', id, { participation: 'registered', resultShow: 'both', ...overrides });
   const q = input => call('apiCompQuestionSave', id, input).question;
   const questions = {
     single: q({ type: 'single', text: 'مين بنى الفلك؟', choices: [{ text: 'نوح', correct: true }, { text: 'موسى' }], points: 10 }),

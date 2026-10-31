@@ -624,8 +624,8 @@
       C.youthOn = true;
       var area = A.AREAS.filter(function (a) { return a.key === 'comps'; })[0];
       if (!area || area.subs.some(function (s) { return s.key === 'youth'; })) return;
-      // the old people / points / store screens read Apps Script: with accounts on, this tab holds them
-      for (var i = area.subs.length - 1; i >= 0; i--) if (['people', 'points', 'shop'].indexOf(area.subs[i].key) !== -1) area.subs.splice(i, 1);
+      // the old points / store screens read Apps Script: with accounts on, this tab holds them
+      for (var i = area.subs.length - 1; i >= 0; i--) if (['points', 'shop'].indexOf(area.subs[i].key) !== -1) area.subs.splice(i, 1);
       area.subs.splice(Math.max(0, area.subs.length - 1), 0, { key: 'youth', label: 'حسابات الشباب' });
       A.renderNav();
     }).catch(function () { setTimeout(lookForAccounts, 3000); });

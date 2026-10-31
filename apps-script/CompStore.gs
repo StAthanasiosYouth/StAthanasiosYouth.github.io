@@ -128,7 +128,7 @@ function compModules_() {
   var props = PropertiesService.getScriptProperties();
   var on = function (key) { return String(props.getProperty(key) || '') === '1'; };
   var registry = on('COMP_REGISTRY') && typeof compRegistryReady_ === 'function';
-  var wallet = registry && on('COMP_WALLET') && typeof compWalletReady_ === 'function';
+  var wallet = on('COMP_WALLET') && typeof compWalletReady_ === 'function';
   var shop = wallet && on('COMP_SHOP') && typeof compShopReady_ === 'function';
 
   return { registry: registry, wallet: wallet, shop: shop };

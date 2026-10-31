@@ -51,7 +51,6 @@ test('competition: slug rules, reserved and taken slugs, the slug is fixed after
 });
 
 test('competition: modules, dates, the answers date, unique phone, limits, unknown choices', () => {
-  assert.ok(comp({ slug: 'aa', title: 'x', participation: 'registered' }).problems.some(p => /بأكواد/.test(p)));
   assert.deepEqual(comp({ slug: 'aa', title: 'x', participation: 'registered' }, { modules: { registry: true } }).problems, []);
   assert.ok(comp({ slug: 'aa', title: 'x', scoring: true, wallet: true, participation: 'registered' }, { modules: { registry: true, wallet: false } }).problems.some(p => /المحفظة/.test(p)));
   assert.ok(comp({ slug: 'aa', title: 'x', startAt: '2026-10-21 10:00', endAt: '2026-10-21 09:00' }).problems.some(p => /قبل النهاية/.test(p)));
@@ -321,7 +320,6 @@ test('publish build: index with v, withdrawn ones, media, errors (keys, modules,
   }, { ...ctx, error: (where, message) => broken.push(message) });
   assert.ok(broken.some(m => /س١: مفيش إجابة صحيحة/.test(m)), broken.join(' / '));
   assert.ok(broken.some(m => /بنفس الرابط/.test(m)));
-  assert.ok(broken.some(m => /بأكواد/.test(m)));
   assert.ok(broken.some(m => /مفيش أسئلة ظاهرة/.test(m)), 'a competition with no questions');
   // a sheet that can't be read is a publish error, never a silent withdrawal
   const unread = [];

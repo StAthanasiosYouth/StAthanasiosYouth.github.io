@@ -12,7 +12,7 @@
 import { h } from '../dom.js';
 import {
   ar, countQuestions, countPoints, countMinutesShort, stampText, startsInText, answerText,
-  isAnswered, progress, unanswered, resultSummary, visibleFields, LIMITS
+  isAnswered, progress, unanswered, resultSummary, LIMITS
 } from './flow.js';
 
 /* ---------- small inline icons (static, trusted markup built as nodes) ---------- */
@@ -57,7 +57,6 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
 
   const resolve = src => mediaUrl(src);
   const homeHref = new URL('index.html', rootUrl).href;
-  const privacyHref = new URL('privacy/#competitions', rootUrl).href;
 
   function picture(image, { className = '', sizes = '(min-width: 760px) 680px, 92vw', eager = false } = {}) {
     if (!image) return null;
@@ -141,76 +140,7 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
     scheduled: m => introScreen(m, 'scheduled'),
     closed: m => introScreen(m, 'closed'),
 
-    identity: m => {
-      const guest = !!m.state.guest;
-      const fields = visibleFields(m.def, { guest });
-      const errors = m.fieldErrors || {};
-      const form = h('form', { class: 'step card form', novalidate: '', onsubmit: event => {
-        event.preventDefault();
-        const values = {};
-        for (const f of fields) values[f.key] = form.elements[`f-${f.key}`].value;
-        m.actions.fieldsSubmit(values, form.elements.website ? form.elements.website.value : '');
-      } },
-      heading(guest ? 'شارك من غير كود' : 'بياناتك'),
-      h('p', { class: 'muted' }, 'علشان نعرف مين اللي جاوب. الحاجات اللي عليها «مطلوب» لازم تتكتب.'),
-      guest ? h('p', { class: 'note', 'data-guest-note': '' }, 'المشاركة بدون كود مفيهاش نقاط.') : null,
-      errorBox(m.state.error && !m.state.field ? m.state.error : ''),
-      fields.map(f => fieldControl(f, (m.fieldValues || {})[f.key] || '', errors[f.key] || (m.state.field === f.key ? m.state.error : ''))),
-      // honeypot (people never see it; bots fill it)
-      h('div', { class: 'hp', 'aria-hidden': 'true' },
-        h('label', { for: 'f-website' }, 'سيب الخانة دي فاضية'),
-        h('input', { id: 'f-website', name: 'website', type: 'text', tabindex: '-1', autocomplete: 'off' })
-      ),
-      h('p', { class: 'consent' }, 'بإرسالك البيانات دي إنت موافق على استخدامها في المسابقة — ',
-        h('a', { href: privacyHref }, 'شوف سياسة الخصوصية')),
-      h('div', { class: 'actions' },
-        btn('يلا نبدأ', null, { kind: 'primary', type: 'submit', iconName: 'next', iconAfter: true }),
-        btn('رجوع', m.actions.back)
-      ));
-      return form;
-    },
-
-    code: m => {
-      const form = h('form', { class: 'step card form', novalidate: '', onsubmit: event => {
-        event.preventDefault();
-        m.actions.codeSubmit(form.elements.code.value);
-      } },
-      heading('ادخل الكود بتاعك'),
-      h('p', { class: 'muted' }, 'الكود اللي الخدام إداهولك (زي ATH-XXXX-XXXX). الحروف الكبيرة والصغيرة زي بعض.'),
-      h('div', { class: `field${m.state.error ? ' has-error' : ''}` },
-        h('label', { class: 'field__label', for: 'f-code' }, 'الكود'),
-        h('input', {
-          class: 'field__input field__input--code', id: 'f-code', name: 'code', type: 'text', dir: 'ltr',
-          autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', inputmode: 'text', maxlength: '20',
-          value: m.codeValue || '', 'aria-describedby': m.state.error ? 'f-code-err' : null, 'aria-invalid': m.state.error ? 'true' : null, required: ''
-        }),
-        m.state.error ? h('p', { class: 'field__error', id: 'f-code-err' }, m.state.error) : null
-      ),
-      h('div', { class: 'actions' },
-        btn(m.busy ? 'بنتأكد…' : 'تأكيد', null, { kind: 'primary', type: 'submit', disabled: m.busy || null }),
-        m.hideCodeBack ? null : btn('رجوع', m.actions.back)
-      ),
-      // §19.2: a coded competition that takes guests too
-      m.def && m.def.allowGuests && m.actions.guest
-        ? h('div', { class: 'guest-offer' },
-          h('p', { class: 'muted' }, 'معندكش كود؟ تقدر تشارك عادي، بس من غير نقاط.'),
-          btn('شارك من غير كود', m.actions.guest, { 'data-guest': '', disabled: m.busy || null }))
-        : null);
-      return form;
-    },
-
-    confirm: m => h('section', { class: 'step card' },
-      heading('الكود مسجل باسم'),
-      h('p', { class: 'who' }, h('strong', { class: 'who__name' }, m.state.participant ? m.state.participant.name : ''),
-        m.state.participant && m.state.participant.group ? h('span', { class: 'who__group' }, m.state.participant.group) : null),
-      // §19.3: outside the age range — said kindly, then they continue with their code
-      m.state.participant && m.state.participant.notice ? h('p', { class: 'note note--age', role: 'status', 'data-age-notice': '' }, m.state.participant.notice) : null,
-      h('p', { class: 'muted' }, 'ده إنت؟ لو مش إنت، ارجع وراجع الكود.'),
-      h('div', { class: 'actions' },
-        btn('أيوه، ده أنا', m.actions.confirm, { kind: 'primary' }),
-        btn('لا، مش أنا', m.actions.back)
-      )
-    ),
+    entering: () => screens.starting(),
 
     starting: () => h('div', { class: 'step step--center', 'aria-busy': 'true' }, heading('بنجهز الأسئلة…', 'h1', 'step__title step__title--quiet')),
 
@@ -257,7 +187,7 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
         chips(def),
         def.description ? h('p', { class: 'intro__desc' }, def.description) : null,
         def.instructions ? h('div', { class: 'note' }, h('h2', { class: 'note__title' }, 'قبل ما تبدأ'), h('p', { class: 'note__text' }, def.instructions)) : null,
-        def.participation === 'registered' && kind === 'open' ? h('p', { class: 'muted' }, 'المسابقة دي بالكود: هتحتاج الكود اللي الخدام إداهولك.') : null,
+        kind === 'open' ? h('p', { class: 'muted' }, 'هتدخل المسابقة بحسابك.') : null,
         status,
         errorBox(m.state.error),
         kind === 'open'
@@ -265,37 +195,6 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
           : null,
         kind !== 'open' ? h('div', { class: 'actions' }, h('a', { class: 'btn', href: homeHref }, icon('home'), 'ارجع للموقع')) : null
       )
-    );
-  }
-
-  /* ---------- the participant form ---------- */
-
-  function fieldControl(f, value, error) {
-    const id = `f-${f.key}`;
-    const described = [f.type === 'phone' ? `${id}-hint` : '', error ? `${id}-err` : ''].filter(Boolean).join(' ') || null;
-    const common = { id, name: id, class: 'field__input', 'aria-describedby': described, 'aria-invalid': error ? 'true' : null, required: f.mode === 'required' ? '' : null };
-    let control;
-    if (f.type === 'select') {
-      control = h('select', common,
-        h('option', { value: '' }, 'اختار…'),
-        f.options.map(o => h('option', { value: o, selected: o === value ? '' : null }, o)));
-    }
-    else {
-      control = h('input', {
-        ...common,
-        type: f.type === 'phone' ? 'tel' : 'text',
-        inputmode: f.type === 'phone' ? 'tel' : f.type === 'number' ? 'numeric' : null,
-        autocomplete: f.key === 'name' ? 'name' : f.type === 'phone' ? 'tel' : 'off',
-        dir: f.type === 'phone' ? 'ltr' : null,
-        maxlength: f.type === 'phone' ? '20' : f.type === 'number' ? '3' : String(f.key === 'name' ? 60 : LIMITS.field),
-        value
-      });
-    }
-    return h('div', { class: `field${error ? ' has-error' : ''}` },
-      h('label', { class: 'field__label', for: id }, f.label, f.mode === 'required' ? h('span', { class: 'req' }, ' (مطلوب)') : h('span', { class: 'opt' }, ' (اختياري)')),
-      control,
-      f.type === 'phone' ? h('p', { class: 'field__hint', id: `${id}-hint` }, 'زي 01012345678') : null,
-      error ? h('p', { class: 'field__error', id: `${id}-err` }, error) : null
     );
   }
 
@@ -591,8 +490,6 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
   /* building blocks for other pages of the engine (portal.js «نقاطي») */
   const parts = {
     icon, picture, btn, heading, errorBox, reviewList,
-    codeForm: m => screens.code(m),
-    confirmBox: m => screens.confirm(m),
     homeHref
   };
 

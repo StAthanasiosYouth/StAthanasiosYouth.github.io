@@ -51,7 +51,7 @@ test('the competitions spreadsheet: made by the first admin write only (private,
   assert.equal(list.ready, false);
   assert.equal(world.properties.get('COMP_SHEET_ID'), undefined, 'reading creates nothing');
   assert.deepEqual(list.presets.map(p => p.key), ['survey', 'scored'], 'presets that need a switched-off module are hidden');
-  assert.throws(() => call('apiCompCreate', { preset: 'coded', title: 'x' }), /محتاج جزء لسه مش متفعّل/);
+  assert.throws(() => call('apiCompCreate', { preset: 'points', title: 'x' }), /محتاج جزء لسه مش متفعّل/);
 
   call('apiCompCreate', { preset: 'survey', title: 'أول مسابقة' });
   const ss = world.compSpreadsheet;
@@ -486,10 +486,9 @@ test('module switches: refused until the module is installed; each needs the one
   world.gs.compRegistryReady_ = () => true;
   assert.deepEqual(plain(call('apiCompSettings', { registry: true }).modules), { registry: true, wallet: false, shop: false });
   assert.equal(world.properties.get('COMP_REGISTRY'), '1');
-  assert.ok(call('apiComps').presets.some(p => p.key === 'coded'), 'the coded preset shows now');
   world.gs.compWalletReady_ = () => true;
   call('apiCompSettings', { wallet: true });
-  assert.deepEqual(plain(call('apiCompSettings', { registry: false }).modules), { registry: false, wallet: false, shop: false }, 'the wallet goes with the registry');
+  assert.deepEqual(plain(call('apiCompSettings', { registry: false }).modules), { registry: false, wallet: true, shop: false }, 'accounts carry the wallet, not the old registry');
   assert.ok(activityRows(world).some(r => r[5] === 'settings' && r[6] === 'competition'));
 });
 

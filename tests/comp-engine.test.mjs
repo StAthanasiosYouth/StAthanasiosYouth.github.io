@@ -12,9 +12,6 @@ globalThis.document = { createElement: () => ({ content: {} }) };
 
 const F = await import('../assets/js/comp/flow.js');
 const { createSave, memoryStorage, cleanRecord, storageKey } = await import('../assets/js/comp/save.js');
-const { createApi, request } = await import('../assets/js/comp/api.js');
-const { COMP_CONFIG } = await import('../assets/js/comp/config.js');
-const { PUSH_CONFIG } = await import('../assets/js/push-config.js');
 const { sanitizeContent } = await import('../assets/js/content.js');
 const { pageForHash, parseHash } = await import('../assets/js/router.js');
 const { competitionHref } = await import('../assets/js/items.js');
@@ -43,12 +40,6 @@ test('slug: <html data-slug> first, else ?s=, only [a-z0-9-]{2,40}', () => {
   assert.equal(F.compPagePath('quiz'), 'competition/quiz/');
 });
 
-test('config: the API URL comes from push-config.js (one source)', () => {
-  assert.equal(COMP_CONFIG.apiUrl, PUSH_CONFIG.apiUrl);
-  assert.doesNotMatch(read('assets/js/comp/config.js'), /script\.google\.com/);
-});
-
-
 /* =========================================================
    PUBLISHED FILES
 ========================================================= */
@@ -62,7 +53,6 @@ test('comp.json: sanitized like content.json; withdrawn; nothing private kept', 
   assert.equal(def.layout, 'paged');
   assert.equal(def.theme, 'azure');
   assert.equal(def.banner.src, 'media/2026/img-592fd134.webp');
-  assert.deepEqual(def.fields.map(f => [f.key, f.type, f.mode]), [['name', 'text', 'required'], ['phone', 'phone', 'required'], ['church', 'select', 'optional'], ['age', 'number', 'hidden']]);
   assert.equal(def.questions, undefined, 'comp.json has no questions');
 
   assert.deepEqual(F.sanitizeDefinition({ schema: 1, slug: 'old', withdrawn: true }), { withdrawn: true, slug: 'old' });
@@ -78,7 +68,6 @@ test('comp.json: sanitized like content.json; withdrawn; nothing private kept', 
   assert.equal(odd.banner, null);
   assert.equal(odd.startAt, '2026-10-11T20:00', 'the Sheet form is accepted');
   assert.equal(odd.endAt, '');
-  assert.deepEqual(odd.fields.map(f => f.key), ['name', 'phone'], 'defaults: name + phone required');
   assert.equal(F.sanitizeDefinition({ ...DEF, scoring: true, showPoints: 1 }).showPoints, true, 'booleans or "1"');
 });
 
@@ -132,20 +121,16 @@ test('phase by Cairo wall time', () => {
   assert.equal(F.compPhase(F.sanitizeDefinition(DEF), '2030-01-01T00:00'), 'open', 'no dates = open');
 });
 
-test('step machine: intro → identity / code → start → questions → review → submit → result', () => {
+test('step machine: intro → the account → start → questions → review → submit → result', () => {
   const def = F.sanitizeDefinition(DEF);
   const ctx = { def, layout: 'paged', count: 3 };
   const t = (state, event, c = ctx) => F.transition(state, event, c);
 
   assert.deepEqual(F.firstStep(def, 'open'), { name: 'intro' });
   assert.deepEqual(F.firstStep(def, 'results'), { name: 'closed' });
-  assert.deepEqual(t({ name: 'intro' }, { type: 'begin' }), { name: 'identity' });
-  assert.deepEqual(t({ name: 'intro' }, { type: 'begin' }, { ...ctx, def: { ...def, fields: [] } }), { name: 'starting' }, 'no visible fields: straight to start');
-  assert.deepEqual(t({ name: 'intro' }, { type: 'begin' }, { ...ctx, def: { ...def, participation: 'registered' } }), { name: 'code' });
-  assert.deepEqual(t({ name: 'identity' }, { type: 'fields-ok' }), { name: 'starting', from: 'identity' });
-  assert.deepEqual(t({ name: 'code' }, { type: 'code-ok', participant: { name: 'م' } }), { name: 'confirm', participant: { name: 'م' } });
-  assert.deepEqual(t({ name: 'confirm', participant: { name: 'م' } }, { type: 'back' }), { name: 'code' });
-  assert.equal(t({ name: 'confirm', participant: { name: 'م' } }, { type: 'confirm' }).name, 'starting');
+  assert.deepEqual(t({ name: 'intro' }, { type: 'begin' }), { name: 'entering' });
+  assert.deepEqual(t({ name: 'entering' }, { type: 'entered', participant: { name: 'م' } }), { name: 'starting', participant: { name: 'م' } });
+  assert.deepEqual(t({ name: 'intro' }, { type: 'entered' }), { name: 'intro' }, 'only while entering');
 
   assert.deepEqual(t({ name: 'starting' }, { type: 'started' }), { name: 'question', index: 0 });
   assert.deepEqual(t({ name: 'starting' }, { type: 'started' }, { ...ctx, layout: 'single' }), { name: 'single' });
@@ -169,11 +154,10 @@ test('step machine: intro → identity / code → start → questions → review
   assert.deepEqual(t({ name: 'result' }, { type: 'again' }), { name: 'intro' });
 
   // failures go somewhere sensible
-  assert.equal(t({ name: 'starting', from: 'identity' }, { type: 'start-failed', code: 'closed' }).name, 'closed');
-  assert.equal(t({ name: 'starting', from: 'identity' }, { type: 'start-failed', code: 'not_open' }).name, 'scheduled');
-  assert.equal(t({ name: 'starting', from: 'confirm' }, { type: 'start-failed', code: 'session' }).name, 'code');
-  assert.deepEqual(t({ name: 'starting', from: 'identity' }, { type: 'start-failed', code: 'invalid', message: 'م', field: 'phone' }), { name: 'identity', error: 'م', field: 'phone' });
-  assert.equal(t({ name: 'starting', from: 'identity' }, { type: 'start-failed', code: 'limit', message: 'م' }).name, 'identity');
+  assert.equal(t({ name: 'starting' }, { type: 'start-failed', code: 'closed' }).name, 'closed');
+  assert.equal(t({ name: 'starting' }, { type: 'start-failed', code: 'not_open' }).name, 'scheduled');
+  assert.deepEqual(t({ name: 'starting' }, { type: 'start-failed', code: 'session', message: 'م' }), { name: 'entering', error: 'م' });
+  assert.deepEqual(t({ name: 'starting' }, { type: 'start-failed', code: 'limit', message: 'م' }), { name: 'intro', error: 'م' }, 'a refusal stays on the intro: asking again would only go round');
   assert.deepEqual(t({ name: 'submitting' }, { type: 'submit-failed', code: 'invalid', index: 1, message: 'م' }), { name: 'question', index: 1, error: 'م' });
   assert.equal(t({ name: 'submitting' }, { type: 'submit-failed', code: 'expired' }).name, 'error');
   assert.equal(t({ name: 'submitting' }, { type: 'submit-failed', code: 'limit', message: 'م' }).name, 'review');
@@ -185,37 +169,6 @@ test('step machine: intro → identity / code → start → questions → review
 /* =========================================================
    FORM AND ANSWERS
 ========================================================= */
-
-test('participant form: required / optional / hidden, phone and age normalized', () => {
-  const def = F.sanitizeDefinition(DEF);
-  const fields = F.visibleFields(def);
-  assert.deepEqual(fields.map(f => f.key), ['name', 'phone', 'church']);
-  assert.deepEqual(F.visibleFields({ ...def, participation: 'registered' }), [], 'registered: identity from the code');
-
-  let r = F.validateFields(fields, {});
-  assert.equal(r.ok, false);
-  assert.deepEqual(Object.keys(r.errors), ['name', 'phone']);
-  r = F.validateFields(fields, { name: '  مارك   ميلاد ', phone: '٠١٠ ١٢٣٤ ٥٦٧٨', church: 'أبي سيفين' });
-  assert.equal(r.ok, true);
-  assert.deepEqual(r.clean, { name: 'مارك ميلاد', phone: '01012345678', church: 'أبي سيفين' });
-  assert.equal(F.validateFields(fields, { name: 'م', phone: '01012345678' }).errors.name, 'اكتب اسمك كامل');
-  assert.ok(F.validateFields(fields, { name: 'مارك', phone: '01012345678', church: 'غيرها' }).errors.church);
-  for (const [raw, out] of [['01012345678', '01012345678'], ['+201012345678', '01012345678'], ['00201112345678', '01112345678'], ['1012345678', '01012345678'], ['+447700900123', '+447700900123'], ['0101234', ''], ['01312345678', ''], ['abc', '']]) {
-    assert.equal(F.normalizePhone(raw), out, raw);
-  }
-  const age = [{ key: 'age', label: 'السن', type: 'number', mode: 'required', options: [] }];
-  assert.deepEqual(F.validateFields(age, { age: '١٦' }).clean, { age: '16' });
-  assert.ok(F.validateFields(age, { age: '200' }).errors.age);
-});
-
-test('participant code: normalized like the server (§7.1)', () => {
-  assert.equal(F.normalizeCode('ATH-K7P2-9QXM'), 'K7P29QXM');
-  assert.equal(F.normalizeCode(' ath k7p2 9qxm '), 'K7P29QXM');
-  assert.equal(F.normalizeCode('٢٣٤٥٦٧٨٩'), '23456789');
-  assert.equal(F.normalizeCode('ATH-K7P2-9QX0'), '', '0 is not in the alphabet');
-  assert.equal(F.normalizeCode('K7P2'), '');
-  assert.equal(F.formatCode('K7P29QXM'), 'ATH-K7P2-9QXM');
-});
 
 test('answers: answered / errors / payload in the contract shapes (§5.2)', () => {
   const qs = F.cleanQuestions(QS);
@@ -313,7 +266,6 @@ test('autosave: written on every change, restored, cleared except the receipt; s
   assert.equal(back.step, 'q:1');
   assert.equal(back.at, 2000);
   assert.deepEqual(back.answers, { 'q-single01': 'c-aaaa02', 'q-tf000003': 't' });
-  assert.deepEqual(back.fields, { name: 'م', phone: '01012345678' });
   assert.equal(back.questions.length, 7);
   assert.ok(storage.getItem(storageKey('quiz')).includes('"clientKey"'));
 
@@ -356,48 +308,6 @@ function fakeFetch(replies) {
   fn.calls = calls;
   return fn;
 }
-
-test('api: text/plain {fn,args:[arg]}, no credentials, no cache; retries network + busy only', async () => {
-  const sleeps = [];
-  const sleep = async ms => { sleeps.push(ms); };
-  let fetchImpl = fakeFetch([new Error('offline'), { status: 503, body: {} }, { body: { ok: false, code: 'busy', message: 'ضغط' } }, { body: { ok: true, receipt: 'rc1' } }]);
-  let api = createApi({ url: 'https://script.google.com/x/exec', fetchImpl, sleep, random: () => 0.5 });
-  const reply = await api.call('compSubmit', { token: 't', clientKey: 'k', answers: {} });
-  assert.deepEqual(reply, { ok: true, receipt: 'rc1' });
-  assert.equal(fetchImpl.calls.length, 4);
-  assert.deepEqual(sleeps, [800, 1600, 3200]);
-  const init = fetchImpl.calls[0].init;
-  assert.equal(init.method, 'POST');
-  assert.equal(init.headers['Content-Type'], 'text/plain;charset=utf-8');
-  assert.equal(init.credentials, 'omit');
-  assert.equal(init.cache, 'no-store');
-  assert.equal(init.body, JSON.stringify({ fn: 'compSubmit', args: [{ token: 't', clientKey: 'k', answers: {} }] }));
-  assert.equal(request('compStart', { slug: 'q' }), '{"fn":"compStart","args":[{"slug":"q"}]}');
-  assert.equal(new Set(fetchImpl.calls.map(c => c.init.body)).size, 1, 'every retry sends the same idempotency keys');
-
-  for (const code of ['invalid', 'closed', 'limit', 'expired', 'code', 'session', 'not_open']) {
-    fetchImpl = fakeFetch([{ body: { ok: false, code, message: 'رسالة' } }]);
-    api = createApi({ url: 'u', fetchImpl, sleep });
-    const r = await api.call('compStart', {});
-    assert.deepEqual([r.ok, r.code, r.message, fetchImpl.calls.length], [false, code, 'رسالة', 1], code);
-  }
-
-  fetchImpl = fakeFetch(Array.from({ length: 10 }, () => new Error('down')));
-  api = createApi({ url: 'u', fetchImpl, sleep, retries: 2 });
-  const down = await api.call('compResult', {});
-  assert.equal(down.code, 'network');
-  assert.equal(fetchImpl.calls.length, 3);
-
-  fetchImpl = fakeFetch([new Error('down'), { body: { ok: true } }]);
-  api = createApi({ url: 'u', fetchImpl, sleep });
-  assert.equal((await api.call('compSubmit', {}, { shouldStop: () => true })).code, 'network', 'offline: stop and queue');
-  assert.equal(fetchImpl.calls.length, 1);
-
-  fetchImpl = fakeFetch([{ body: [1, 2] }, { body: 'x' }]);
-  api = createApi({ url: 'u', fetchImpl, sleep, retries: 1 });
-  assert.equal((await api.call('compStart', {})).code, 'network', 'a non-object reply is not trusted');
-});
-
 
 /* =========================================================
    MAIN SITE HOOKS
@@ -532,7 +442,7 @@ test('competition/index.html: the site CSP, no inline code, relative URLs one le
 });
 
 test('engine code: text only (no innerHTML / eval), no storage outside save.js', () => {
-  for (const file of ['api.js', 'flow.js', 'view.js', 'save.js', 'main.js', 'config.js']) {
+  for (const file of ['flow.js', 'view.js', 'save.js', 'main.js']) {
     const code = read(`assets/js/comp/${file}`);
     assert.doesNotMatch(code, /innerHTML|outerHTML|insertAdjacentHTML|document\.write|\beval\(|new Function/, file);
     if (file !== 'save.js') assert.doesNotMatch(code, /localStorage|sessionStorage/, file);
@@ -542,40 +452,20 @@ test('engine code: text only (no innerHTML / eval), no storage outside save.js',
 
 /* ---------- §19.2 guests, §19.3 age eligibility ---------- */
 
-test('allowGuests: only on a registered competition; the guest steps', () => {
-  const reg = F.sanitizeDefinition({ title: 'x', participation: 'registered', allowGuests: true });
-  assert.equal(reg.allowGuests, true);
-  assert.equal(F.sanitizeDefinition({ title: 'x', participation: 'open', allowGuests: true }).allowGuests, false);
-  assert.equal(F.sanitizeDefinition({ title: 'x', participation: 'registered', allowGuests: 'yes' }).allowGuests, false);
-  assert.equal(F.sanitizeDefinition({ title: 'x', participation: 'registered' }).allowGuests, false);
-  // the guest form uses the competition's fields (name + phone by default)
-  assert.deepEqual(F.visibleFields(reg, { guest: true }).map(f => f.key), ['name', 'phone']);
-  assert.deepEqual(F.visibleFields(reg), [], 'a code login has no form');
-
-  const ctx = { def: reg, layout: 'paged', count: 3 };
-  const t = (state, event, c = ctx) => F.transition(state, event, c);
-  assert.deepEqual(t({ name: 'code' }, { type: 'guest' }), { name: 'identity', guest: true });
-  assert.deepEqual(t({ name: 'code' }, { type: 'guest' }, { ...ctx, def: { ...reg, allowGuests: false } }), { name: 'code' }, 'not offered');
-  assert.deepEqual(t({ name: 'identity', guest: true }, { type: 'back' }), { name: 'code' });
-  assert.deepEqual(t({ name: 'identity', guest: true }, { type: 'fields-ok' }), { name: 'starting', from: 'identity', guest: true });
-  assert.deepEqual(t({ name: 'starting', from: 'identity', guest: true }, { type: 'start-failed', code: 'invalid', message: 'م', field: 'phone' }), { name: 'identity', error: 'م', field: 'phone', guest: true });
-  assert.deepEqual(t({ name: 'starting', from: 'identity', guest: true }, { type: 'start-failed', code: 'limit', message: 'م' }), { name: 'identity', error: 'م', guest: true });
-});
-
 test('guest result: «دي نتيجتك…», never a points line; noPoints (age): no points line', () => {
   const guest = F.sanitizeResult({ status: 'graded', score: 8, maxScore: 10, pointsAwarded: 800, guest: true });
   assert.equal(guest.guest, true);
   let s = F.resultSummary(guest, {});
-  assert.deepEqual(s.lines.map(l => l.text), ['دي نتيجتك — المشاركة بدون كود مفيهاش نقاط', 'جبت ٨ من ١٠']);
+  assert.deepEqual(s.lines.map(l => l.text), ['دي نتيجتك — المشاركة دي مفيهاش نقاط', 'جبت ٨ من ١٠']);
   assert.equal(F.sanitizeResult({ status: 'graded', guest: 'yes' }).guest, undefined);
 
   s = F.resultSummary({ status: 'graded', score: 8, maxScore: 10, pointsAwarded: 800 }, {}, { noPoints: true });
   assert.deepEqual(s.lines.map(l => l.kind), ['score', 'hint']);
-  assert.equal(s.lines[1].text, 'المشاركة دي متسجلة بالكود بتاعك من غير نقاط.');
+  assert.equal(s.lines[1].text, 'المشاركة دي متسجلة بحسابك من غير نقاط.');
   assert.ok(!F.resultSummary(F.sanitizeResult({ status: 'graded', pointsAwarded: 5, noPoints: true }), {}).lines.some(l => l.kind === 'points'));
 });
 
-test('eligibility from compCode / portalMe', () => {
+test('eligibility from portalMe', () => {
   assert.deepEqual(F.eligibility({ ok: true }), { eligible: true, notice: '' });
   assert.deepEqual(F.eligibility({ eligible: true, notice: 'x' }), { eligible: true, notice: '' });
   assert.deepEqual(F.eligibility({ eligible: false, notice: ' رسالة ' }), { eligible: false, notice: 'رسالة' });

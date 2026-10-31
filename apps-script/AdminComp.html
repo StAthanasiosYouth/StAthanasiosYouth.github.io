@@ -61,7 +61,6 @@
   var TABS = [
     { key: 'overview', label: 'نظرة عامة' },
     { key: 'basics', label: 'الأساسيات', edit: true },
-    { key: 'people', label: 'المشاركة', edit: true },
     { key: 'rules', label: 'القواعد', edit: true },
     { key: 'result', label: 'النتيجة', edit: true },
     { key: 'questions', label: 'الأسئلة', edit: true },
@@ -81,7 +80,6 @@
   /* the help topic for the screen on now (AdminHelp) */
   A.compHelpKey = function () {
     if (A.sub.comps === 'compsettings') return 'compsettings';
-    if (A.sub.comps === 'people') return 'comp-people';
     if (A.sub.comps === 'points') return 'comp-points';
     if (A.sub.comps === 'shop') return 'comp-shop';
     if (!C.open) return 'comps';
@@ -556,9 +554,8 @@
 
   var PRESET_TEXT = {
     survey: 'أسئلة من غير درجات: رأي، تسجيل، استبيان. اللي بيبعت بيشوف رسالة شكر.',
-    scored: 'أي حد يدخل باسمه وموبايله، والإجابات بتتصحح لوحدها، وبيشوف نتيجته النهائية بس.',
-    coded: 'كل مشترك بكود خاص بيه (ATH-…)، من غير ما يكتب اسمه.',
-    points: 'زي اللي بالأكواد، والدرجة بتتحول نقاط في محفظة المشترك.'
+    scored: 'الإجابات بتتصحح لوحدها، وكل واحد بيشوف نتيجته النهائية بس.',
+    points: 'الإجابات بتتصحح لوحدها، والدرجة بتتحول نقاط في محفظة المشترك.'
   };
 
   var RESERVED = ['index', 'assets', 'admin', 'points', 'media', 'preview', 'new', 'comp', 'competition', 'competitions'];
@@ -641,8 +638,8 @@
             return el('label', { class: 'comp-preset' }, input,
               el('span', { class: 'comp-preset__body' }, el('strong', { text: p.label }), el('small', { text: PRESET_TEXT[p.key] || '' })));
           }));
-          var hidden = (list.presets || []).length < 4
-            ? el('p', { class: 'field__hint', text: 'أنواع «بأكواد» و«نقاط» بتظهر لما تفعّل المشاركين بالأكواد / المحفظة من «المسابقات ← الإعدادات».' })
+          var hidden = (list.presets || []).length < 3
+            ? el('p', { class: 'field__hint', text: 'نوع «نقاط» بيظهر لما تفعّل المحفظة من «المسابقات ← الإعدادات».' })
             : null;
           collect = function () { wiz.title = title.input.value.trim(); };
           body = [title.node, A.field('نوع المسابقة', kind, 'النوع بيملا الإعدادات الأول بس — تقدر تغيّر أي حاجة بعدين.'), hidden];
@@ -1163,108 +1160,6 @@
 
   /* ---------------- المشاركة ---------------- */
 
-  var FIELD_HINTS = { name: 'الاسم', phone: 'الموبايل', age: 'السن', church: 'الكنيسة', group: 'الفصل', custom1: 'سؤال ١', custom2: 'سؤال ٢', custom3: 'سؤال ٣' };
-
-  tabBuilders.people = function () {
-
-    var comp = C.data.comp;
-    var modules = C.data.modules || {};
-    var box = A.errorBox();
-    var mode = A.choices(A.uid('mode'), [
-      { value: 'open', label: 'أي حد يدخل باسمه (فورم بسيط)' },
-      { value: 'registered', label: 'بكود لكل مشترك' + (modules.registry ? '' : ' — محتاج تفعيل') }
-    ], comp.participation, function (value) { syncMode(value); });
-    var registeredInput = mode.node.querySelector('input[value="registered"]');
-    if (!modules.registry && comp.participation !== 'registered') registeredInput.disabled = true;
-
-    var rows = [];
-    var table = el('div', { class: 'comp-fields', role: 'list' }, (comp.fields || []).map(function (field) {
-      var fixedType = field.key === 'name' || field.key === 'phone' || field.key === 'age';
-      var label = el('input', { class: 'input', value: field.label, maxlength: '40', 'aria-label': 'اسم الخانة: ' + FIELD_HINTS[field.key], oninput: A.markDirty });
-      var modeSelect = el('select', { class: 'input', 'aria-label': 'الخانة «' + field.label + '»: إجباري ولا اختياري', onchange: function () { A.markDirty(); sync(); } },
-        [{ v: 'required', t: 'إجباري' }, { v: 'optional', t: 'اختياري' }, { v: 'hidden', t: 'مش ظاهر' }].map(function (o) {
-          return el('option', { value: o.v, selected: o.v === field.mode ? 'selected' : null, text: o.t });
-        }));
-      var typeSelect = fixedType ? null : el('select', { class: 'input', 'aria-label': 'نوع الخانة «' + field.label + '»', onchange: function () { A.markDirty(); sync(); } },
-        el('option', { value: 'text', selected: field.type !== 'select' ? 'selected' : null, text: 'كتابة' }),
-        el('option', { value: 'select', selected: field.type === 'select' ? 'selected' : null, text: 'اختيارات' }));
-      var options = fixedType ? null : el('textarea', { class: 'input comp-fields__options', rows: '3', placeholder: 'كل اختيار في سطر (من ٢ لـ ١٢)', 'aria-label': 'اختيارات «' + field.label + '»', value: (field.options || []).join('\n'), oninput: A.markDirty });
-      var node = el('div', { class: 'comp-fields__row', role: 'listitem', 'data-key': field.key },
-        el('span', { class: 'comp-fields__key', text: FIELD_HINTS[field.key] }),
-        label, modeSelect, typeSelect, options);
-      function sync() {
-        node.classList.toggle('is-hidden', modeSelect.value === 'hidden');
-        if (options) options.hidden = modeSelect.value === 'hidden' || typeSelect.value !== 'select';
-      }
-      sync();
-      rows.push({ key: field.key, label: label, mode: modeSelect, type: typeSelect, options: options });
-      return node;
-    }));
-
-    var unique = A.checkbox('مشاركة واحدة لكل رقم موبايل', comp.uniquePhone, 'الرقم ده لو شارك قبل كده مش هيقدر تاني (محتاج الموبايل يكون إجباري)');
-    var openPart = el('div', { class: 'form-group' },
-      el('p', { class: 'section-label', text: 'البيانات اللي بيكتبها قبل ما يبدأ' }),
-      el('p', { class: 'field__hint', text: 'الاسم والموبايل افتراضيًا. الخانات اللي «مش ظاهر» مبتظهرش للمشترك.' }),
-      table,
-      unique.node
-    );
-    var registeredPart = el('div', { class: 'note' },
-      el('p', { class: 'note__title', text: 'الشخص بيتعرف من الكود بتاعه' }),
-      el('p', { text: 'في المسابقة بالأكواد المشترك بيكتب الكود بتاعه بس (ATH-…)، والصفحة بتقوله «الكود مسجل باسم …» ويأكد. الاسم والموبايل والمجموعة بيتجابوا من «المشاركين» — الفورم ده مبيظهرش، ومحدش يقدر يشارك باسم حد تاني.' }),
-      el('p', { class: 'field__hint', text: 'المحاولات بتتحسب لكل مشترك. الأكواد بتتعمل وتتبعت من «المسابقات ← المشاركين».' }));
-
-    // §19.2: a coded competition may also take people without a code (they use the form above; no points)
-    var guests = A.checkbox('السماح بالمشاركة بدون كود', !!comp.allowGuests, 'اللي معاهوش كود يقدر يشارك بالفورم (الاسم والموبايل وأي خانة تانية تختارها). بيشوف نتيجته، بس مبياخدش نقاط ومش بيتسجل في «المشاركين».');
-    guests.input.addEventListener('change', function () { syncMode(mode.value() || comp.participation); });
-    var guestPart = el('div', { class: 'form-group comp-guests' }, guests.node,
-      el('p', { class: 'field__hint comp-guests__said', text: 'مشاركة الضيف بتظهر في «المشاركات» بعلامة «ضيف».' }));
-    registeredPart.appendChild(guestPart);
-
-    function syncMode(value) {
-      var registered = value === 'registered';
-      openPart.hidden = registered && !guests.input.checked;
-      registeredPart.hidden = !registered;
-      openPart.querySelector('.section-label').textContent = registered ? 'البيانات اللي بيكتبها الضيف (اللي من غير كود)' : 'البيانات اللي بيكتبها قبل ما يبدأ';
-    }
-
-    syncMode(comp.participation);
-
-    var save = el('button', { class: 'btn btn--primary', type: 'button', text: 'حفظ' });
-
-    save.addEventListener('click', function () {
-      C.save({
-        participation: mode.value() || 'open',
-        allowGuests: guests.input.checked,
-        uniquePhone: unique.input.checked,
-        fields: rows.map(function (r) {
-          var field = { key: r.key, label: r.label.value.trim(), mode: r.mode.value };
-          if (r.type && r.type.value === 'select') {
-            field.type = 'select';
-            field.options = r.options.value.split('\n').map(function (o) { return o.trim(); }).filter(Boolean);
-          }
-          return field;
-        })
-      }, save, box);
-    });
-
-    return [
-      el('section', { class: 'card' },
-        el('div', { class: 'card__head' }, el('div', {}, el('h2', { class: 'card__title', text: 'المشاركة' }), el('p', { class: 'card__hint', text: 'مين يقدر يشارك، وبيكتب إيه قبل ما يبدأ.' }))),
-        box,
-        el('div', { class: 'form' },
-          A.field('طريقة الاشتراك', mode.node, modules.registry ? '' : 'المسابقة بالأكواد بتتفتح لما تفعّل «المشاركين بالأكواد» من «المسابقات ← الإعدادات».'),
-          registeredPart,
-          openPart
-        ),
-        el('div', { class: 'actions comp-save' }, save)
-      )
-    ];
-
-  };
-
-
-  /* ---------------- القواعد ---------------- */
-
   function numberInput(value, min, max) {
     return el('input', { class: 'input comp-number', type: 'number', inputmode: 'numeric', min: String(min), max: String(max), step: '1', value: String(value === undefined || value === null ? '' : value), oninput: A.markDirty });
   }
@@ -1389,12 +1284,10 @@
       var show = resultShow.value() || 'none';
       var answers = answersShow.value() || 'never';
       scorePart.hidden = !on;
-      // the wallet needs: the switch on, a coded competition, scoring (CompModel.gs)
-      var registered = comp.participation === 'registered';
-      var walletOk = !!modules.wallet && registered && on;
+      // the wallet needs: the switch on, scoring (CompModel.gs)
+      var walletOk = !!modules.wallet && on;
       wallet.input.disabled = !walletOk && !wallet.input.checked;
       walletWhy.textContent = !modules.wallet ? 'المحفظة مقفولة من «المسابقات ← الإعدادات».'
-        : !registered ? 'النقاط بتشتغل في المسابقات بالأكواد بس (من «المشاركة» اختار «بكود لكل مشترك»).'
           : !on ? 'شغّل الدرجات الأول.' : '';
       walletWhy.hidden = wallet.node.hidden || !walletWhy.textContent;
       answersAtField.hidden = answers !== 'atDate';
@@ -1463,7 +1356,7 @@
 
   /* ---------------- المعاينة (§13.3: the parent side) ---------------- */
 
-  var STEP_WORDS = { intro: 'صفحة البداية', form: 'فورم البيانات', code: 'إدخال الكود', question: 'السؤال', single: 'الأسئلة', review: 'مراجعة قبل الإرسال', result: 'النتيجة', closed: 'مقفولة', scheduled: 'قبل البداية', loading: 'بتحمّل' };
+  var STEP_WORDS = { intro: 'صفحة البداية', question: 'السؤال', single: 'الأسئلة', review: 'مراجعة قبل الإرسال', result: 'النتيجة', closed: 'مقفولة', scheduled: 'قبل البداية', loading: 'بتحمّل' };
   var DEVICE_SIZES = { phone: { width: 390, height: 780 }, desktop: { width: 1100, height: 760 } };
   var preview = { device: '', state: 'auto', full: true };
 
@@ -1778,11 +1671,10 @@
   ======================================================= */
 
   var MODULES = [
-    { key: 'registry', label: 'تفعيل المشاركين بالأكواد', screen: 'المشاركين', hint: 'سجل للمشاركين، وكود خاص لكل واحد (ATH-…) بيدخل بيه المسابقات من غير ما يكتب اسمه، وصفحة «نقاطي» بتاعته. بيظهر «المشاركين» هنا.' },
-    { key: 'wallet', label: 'المحفظة والنقاط', screen: 'النقاط', hint: 'الدرجات بتتحول نقاط في «نقاطي» لكل مشترك، وتقدر تزوّد أو تخصم بإيدك. بيظهر «النقاط» هنا.', needs: 'registry', needsLabel: 'المشاركين بالأكواد' },
+    { key: 'wallet', label: 'المحفظة والنقاط', screen: 'النقاط', hint: 'الدرجات بتتحول نقاط في «نقاطي» لكل مشترك، وتقدر تزوّد أو تخصم بإيدك. بيظهر «النقاط» هنا.' },
     { key: 'shop', label: 'متجر الجوائز', screen: 'المتجر', hint: 'المشتركين يبدّلوا نقاطهم بجوايز من «نقاطي»، وإنت بتجهّز الطلبات وتسلّمها. بيظهر «المتجر» هنا.', needs: 'wallet', needsLabel: 'المحفظة والنقاط' }
   ];
-  var DEPENDS = { registry: ['wallet', 'shop'], wallet: ['shop'], shop: [] };
+  var DEPENDS = { wallet: ['shop'], shop: [] };
 
   A.views.compsettings = function () {
 
@@ -1794,7 +1686,6 @@
       var modules = reply.modules || {};
       var installed = reply.installed || { registry: true, wallet: true, shop: true };
       A.fill(body, MODULES.map(function (m) {
-        var needsOff = m.needs && !modules[m.needs];
         var toggle = A.switchInput(m.label, !!modules[m.key], function (checked) {
           A.dirty = false;
           var input = {};
@@ -1802,7 +1693,7 @@
           // turning one off takes the ones that need it along: said first
           var along = checked ? [] : DEPENDS[m.key].filter(function (k) { return modules[k]; });
           var ask = along.length
-            ? A.confirm({ tone: 'warn', title: 'تقفل «' + m.label + '»؟', message: 'هيتقفل معاه: ' + along.map(function (k) { return '«' + MODULES.filter(function (x) { return x.key === k; })[0].label + '»'; }).join(' و') + '. مفيش أي بيانات هتتمسح: المشاركين والأكواد والنقاط والطلبات بيفضلوا محفوظين، وترجع تشغّلهم وقت ما تحب.', confirmLabel: 'اقفل', cancelLabel: 'لأ' })
+            ? A.confirm({ tone: 'warn', title: 'تقفل «' + m.label + '»؟', message: 'هيتقفل معاه: ' + along.map(function (k) { return '«' + MODULES.filter(function (x) { return x.key === k; })[0].label + '»'; }).join(' و') + '. مفيش أي بيانات هتتمسح: النقاط والطلبات بيفضلوا محفوظين، وترجع تشغّلهم وقت ما تحب.', confirmLabel: 'اقفل', cancelLabel: 'لأ' })
             : Promise.resolve(true);
           ask.then(function (ok) {
             if (!ok) { toggle.input.checked = !checked; return; }
@@ -1820,7 +1711,7 @@
             });
           });
         });
-        toggle.input.disabled = !installed[m.key] || (needsOff && !modules[m.key]);
+        toggle.input.disabled = !installed[m.key];
         toggle.node.dataset.module = m.key;
         return el('div', { class: 'comp-module' + (modules[m.key] ? ' is-on' : ''), 'data-module-card': m.key },
           toggle.node,
@@ -1828,7 +1719,7 @@
           el('div', { class: 'item__meta' },
             !installed[m.key] ? A.chip('لسه مش متركب في النسخة دي', 'gold')
               : modules[m.key] ? A.chip('شغال', 'ok')
-                : needsOff ? A.chip('محتاج «' + m.needsLabel + '» الأول', 'off') : A.chip('مقفول', 'off')
+                : A.chip('مقفول', 'off')
           )
         );
       }));
@@ -1844,10 +1735,8 @@
     });
 
     return [
-      // §19.3: the age rules belong to the registry (birth dates live there)
-      C.modules && C.modules.registry && A.compAgeRulesCard ? A.compAgeRulesCard() : null,
-      A.card('أجزاء المسابقات', 'المسابقات نفسها شغالة دايمًا. الأجزاء دي اختيارية، وكل واحد محتاج اللي قبله: المتجر محتاج النقاط، والنقاط محتاجة المشاركين بالأكواد.', body),
-      el('p', { class: 'note', text: 'لما تقفل جزء، شاشاته بتختفي من هنا وصفحاته في الموقع بتقول إنها مش متاحة — بس مفيش أي حاجة بتتمسح: المشاركين والأكواد والنقاط والجوايز والطلبات بيفضلوا زي ما هما لحد ما تشغّله تاني.' })
+      A.card('أجزاء المسابقات', 'المسابقات نفسها شغالة دايمًا. الأجزاء دي اختيارية، والمتجر محتاج النقاط.', body),
+      el('p', { class: 'note', text: 'لما تقفل جزء، شاشاته بتختفي من هنا وصفحاته في الموقع بتقول إنها مش متاحة — بس مفيش أي حاجة بتتمسح: النقاط والجوايز والطلبات بيفضلوا زي ما هما لحد ما تشغّله تاني.' })
     ].filter(Boolean);
 
   };
@@ -1858,7 +1747,6 @@
   ======================================================= */
 
   var MODULE_SUBS = [
-    { key: 'people', label: 'المشاركين', module: 'registry' },
     { key: 'points', label: 'النقاط', module: 'wallet' },
     { key: 'shop', label: 'المتجر', module: 'shop' }
   ];

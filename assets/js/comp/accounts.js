@@ -1,15 +1,11 @@
 /**
- * COMPETITIONS AND «نقاطي» ON ACCOUNTS (docs/PHASE5-PLAN.md P5-8): once the Worker says accounts are on,
- * the same pages talk to it, signed in, with the same reply shapes. Before that nothing changes: the
- * code login on Apps Script stays. The last answer is remembered, so a moment without the Worker can't
- * send anyone back to the old login. Sign-in itself happens on /account/, which brings them back here.
+ * COMPETITIONS AND «نقاطي» ON ACCOUNTS (docs/PHASE5-PLAN.md P5-8): these pages talk to the Worker, signed in.
+ * Sign-in itself happens on /account/, which brings them back here.
  */
 
 import { bookApiUrl } from '../page/book-config.js';
-import { readSession, clearSession, MODE_KEY } from '../account/link.js';
+import { readSession, clearSession } from '../account/link.js';
 import { retryDelay, RETRYABLE } from './flow.js';
-
-const CONFIG_TIMEOUT_MS = 4000;
 
 const store = name => {
   try {
@@ -19,41 +15,6 @@ const store = name => {
     return null;
   }
 };
-
-const read = key => {
-  try {
-    return store('localStorage') ? store('localStorage').getItem(key) : null;
-  }
-  catch {
-    return null;
-  }
-};
-
-const remember = value => {
-  try {
-    if (store('localStorage')) store('localStorage').setItem(MODE_KEY, value);
-  }
-  catch { /* asked again next time */ }
-};
-
-/* are accounts on? The Worker's word, else the last one heard, else no */
-export async function accountsOn(fetchImpl = (...a) => fetch(...a)) {
-  const controller = typeof AbortController === 'function' ? new AbortController() : null;
-  const timer = controller ? setTimeout(() => controller.abort(), CONFIG_TIMEOUT_MS) : null;
-  try {
-    const response = await fetchImpl(bookApiUrl() + '/v1/account/config', { credentials: 'omit', cache: 'no-store', signal: controller ? controller.signal : undefined });
-    const data = await response.json();
-    const on = !!data && data.ok === true && data.mode === 'on';
-    remember(on ? 'on' : 'off');
-    return on;
-  }
-  catch {
-    return read(MODE_KEY) === 'on';
-  }
-  finally {
-    if (timer) clearTimeout(timer);
-  }
-}
 
 export const accountSession = () => readSession(store('localStorage'), store('sessionStorage'));
 
@@ -67,7 +28,7 @@ const ROUTES = {
 };
 const NETWORK_MESSAGE = 'مش قادرين نوصل للسيرفر دلوقتي.';
 
-/* the same call() as api.js: { ok: true, … } or { ok: false, code, message }; never throws */
+/* { ok: true, … } or { ok: false, code, message }; never throws */
 export function createWorkerApi({ fetchImpl = (...a) => fetch(...a), sleep = ms => new Promise(r => setTimeout(r, ms)), random = Math.random, timeoutMs = 25000, retries = 4 } = {}) {
 
   async function once(fn, arg) {

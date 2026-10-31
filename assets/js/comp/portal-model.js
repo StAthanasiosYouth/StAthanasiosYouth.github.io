@@ -3,7 +3,7 @@
  *
  * What the portal page may show from portalMe / shopRedeem replies
  * (re-validated, never trusted), the Arabic labels, the store's
- * availability rules and the participant token's (sessionStorage) memo.
+ * availability rules.
  * Contract: docs/COMPETITIONS.md §5.1 (portalMe, portalReview, shopRedeem),
  * §7.4, §8, §9.
  */
@@ -12,7 +12,6 @@ import { cleanImage, cleanStamp, countPoints, ar, eligibility, scoreText, points
 import { formatStamp, leftText } from '../words.js';
 import { realMinutesBetween } from '../schedule.js';
 
-export const TOKEN_KEY = 'athanasios.portal.v1';
 
 const text = (value, max) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 const num = value => (typeof value === 'number' && Number.isFinite(value) ? value : null);
@@ -347,35 +346,3 @@ export const withoutCancel = (me, redemptionId) => ({ ...me, redemptions: me.red
 
 /** the store closed under us (shop_closed): closed, nothing can be cancelled */
 export const storeClosed = me => (me.store ? { ...withoutCancel(me, '*'), store: { ...me.store, state: 'closed' } } : me);
-
-
-/* ---------- the participant token: this tab only (sessionStorage) ---------- */
-
-export function readToken(storage) {
-  try {
-    const value = storage && storage.getItem(TOKEN_KEY);
-    return typeof value === 'string' && /^pt1\.[\w.-]{1,3000}$/.test(value) ? value : '';
-  }
-  catch {
-    return '';
-  }
-}
-
-export function writeToken(storage, token) {
-  try {
-    if (storage && typeof token === 'string' && token) storage.setItem(TOKEN_KEY, token);
-    return true;
-  }
-  catch {
-    return false;
-  }
-}
-
-export function clearToken(storage) {
-  try {
-    if (storage) storage.removeItem(TOKEN_KEY);
-  }
-  catch {
-    // nothing to do
-  }
-}

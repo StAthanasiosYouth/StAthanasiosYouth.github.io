@@ -3,7 +3,7 @@
  *
  * localStorage['athanasios.comp.v1:<slug>'] =
  *   { clientKey, token, receipt, answers, at, step,          ← the contract's keys
- *     v, fields, ptoken, participant, attempt, comp, questions, pending, submittedAt }
+ *     v, participant, attempt, comp, questions, pending, submittedAt }
  *
  * Written on every change; read back on reload / reopen, so a participant
  * continues on the same question with the same answers (the questions the
@@ -55,8 +55,6 @@ export function cleanRecord(raw) {
     at: Number.isFinite(raw.at) ? raw.at : 0,
     step: /^(q:\d{1,3}|single|review)$/.test(raw.step || '') ? raw.step : '',
     v: str(raw.v, 40),
-    fields: {},
-    ptoken: str(raw.ptoken, 4000),
     participant: raw.participant && typeof raw.participant === 'object' && typeof raw.participant.name === 'string'
       ? { name: raw.participant.name.slice(0, 80), group: typeof raw.participant.group === 'string' ? raw.participant.group.slice(0, 60) : '', noPoints: raw.participant.noPoints === true }
       : null,
@@ -68,12 +66,6 @@ export function cleanRecord(raw) {
     // the published comp.json the attempt started with (a reload works offline)
     def: raw.def && typeof raw.def === 'object' && !Array.isArray(raw.def) && sanitizeDefinition(raw.def) && JSON.stringify(raw.def).length < 20000 ? raw.def : null
   };
-
-  if (raw.fields && typeof raw.fields === 'object') {
-    for (const [key, value] of Object.entries(raw.fields)) {
-      if (/^(name|phone|age|church|group|custom[123])$/.test(key) && typeof value === 'string') record.fields[key] = value.slice(0, 80);
-    }
-  }
 
   if (raw.attempt && typeof raw.attempt === 'object') {
     const deadline = Number(raw.attempt.deadlineMs);

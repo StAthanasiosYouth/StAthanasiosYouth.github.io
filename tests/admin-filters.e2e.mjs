@@ -82,39 +82,6 @@ test.after(async () => {
 const count = fn => calls.filter(c => c === fn).length;
 const rows = () => page.$$eval('.comp-subs .comp-person', n => n.length);
 
-test('participants: one load; every chip, search, group and page is local and instant', async () => {
-  delay = 400;
-  await page.evaluate(() => A.go('comps', 'people'));
-  await page.waitForSelector('.comp-subs .comp-person', { timeout: 15000 });
-  await page.waitForNetworkIdle({ idleTime: 300 }).catch(() => {});
-  const before = count('apiParticipants');
-  assert.ok(before >= 1);
-
-  // 12 quick clicks across the chips: no request at all, the last choice shows at once
-  const started = Date.now();
-  for (const chip of ['active', 'inactive', 'all', 'active', 'inactive', 'all', 'inactive', 'active', 'all', 'inactive', 'all', 'inactive']) {
-    await page.$eval(`.filter-chip[data-status="${chip}"]`, n => n.click());
-  }
-  const pressed = await page.$eval('.filter-chip[data-status="inactive"]', n => n.getAttribute('aria-pressed'));
-  assert.equal(pressed, 'true');
-  assert.equal(await rows(), 10, 'every 4th of 40 is inactive');
-  assert.ok(Date.now() - started < 2000, 'instant (no round trips)');
-
-  await page.$eval('.filter-chip[data-eligibility="out"]', n => n.click());
-  assert.ok(await rows() > 0);
-  await page.$eval('.filter-chip[data-eligibility="all"]', n => n.click());
-  await page.$eval('.filter-chip[data-status="all"]', n => n.click());
-
-  // search: Arabic digits / name, locally
-  await page.$eval('.comp-subs__tools input[type=search]', n => { n.value = 'رقم ١٢'; n.dispatchEvent(new Event('input')); });
-  await page.waitForFunction(() => document.querySelectorAll('.comp-subs .comp-person').length === 1, { timeout: 3000 });
-  await page.$eval('.comp-subs__tools input[type=search]', n => { n.value = ''; n.dispatchEvent(new Event('input')); });
-  await page.waitForFunction(() => document.querySelectorAll('.comp-subs .comp-person').length === 40, { timeout: 3000 });
-
-  assert.equal(count('apiParticipants'), before, 'no server call for any filter, search or page');
-  delay = 0;
-});
-
 test('store requests and other server-paged lists: rapid chip clicks → at most two requests, the newest choice wins', async () => {
   delay = 500;
   await page.evaluate(() => A.go('comps', 'shop'));

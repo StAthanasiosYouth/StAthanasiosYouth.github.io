@@ -1,67 +1,42 @@
 /**
  * «نقاطي» — the participant portal and rewards store (points/index.html)
  *
- * One stable page, no per-participant URLs. The participant logs in with
- * their code (compCode → «الكود مسجل باسم …» → confirm); the participant
- * token (ptoken, 3 h) lives in this tab's sessionStorage only and «خروج»
- * forgets it. portalMe draws the dashboard: name, balance and ledger
- * (wallet on), competition history (+ «شوف إجاباتك» → portalReview), the
- * store and the requests (shop on). shopRedeem carries a requestKey made
- * once per confirmed request and reused on every retry of it.
+ * One stable page, no per-participant URLs, for the signed-in account (§18). The
+ * dashboard: name, balance and ledger (wallet on), competition history (+ «شوف
+ * إجاباتك»), the store and the requests (shop on). shopRedeem carries a requestKey
+ * made once per confirmed request and reused on every retry of it.
  * v2 (§18.3, §18.4): the store's schedule (open / scheduled / closed),
  * «إلغاء الطلب» (shopCancel), the season bar and the past seasons.
  * Contract: docs/COMPETITIONS.md §5.1, §7.4, §8, §9, §18.
  */
 
 import { h } from '../dom.js';
-import { COMP_CONFIG } from './config.js';
-import { createApi } from './api.js';
 import { createView } from './view.js';
-import { normalizeCode, formatCode, sanitizeResult, resultSummary, countPoints, eligibility } from './flow.js';
+import { sanitizeResult, resultSummary, countPoints, eligibility } from './flow.js';
 import {
   sanitizeMe, formatAmount, dateText, historyLines, groupShop, itemAvailability, redeemPreview,
   sanitizeRedeem, redeemError, KEEP_KEY, KIND_LABELS, REDEMPTION_LABELS, HISTORY_LABELS,
-  readToken, writeToken, clearToken,
   storeWords, seasonDates, seasonProgress, pastSeasonLine, cancelPreview, cancelError, applyCancel, withoutCancel, storeClosed
 } from './portal-model.js';
 import { zonedNow, stamp } from '../schedule.js';
 import { arabicDigits } from '../words.js';
 import { soundToggle, uiSounds, cue } from '../ui-sound.js';
 import { accountBadge } from '../account/link.js';
-import { accountsOn, createWorkerApi, goSignIn, accountSession, dropAccountSession } from './accounts.js';
+import { createWorkerApi, goSignIn, accountSession, dropAccountSession } from './accounts.js';
 
 const ROOT = new URL('../../../', import.meta.url);
 const main = document.getElementById('comp-main');
 const live = document.getElementById('comp-live');
 
 const view = createView({ main, live, timer: null, net: null, rootUrl: ROOT, mediaUrl: src => new URL(src, ROOT).href });
-const { icon, picture, btn, heading, errorBox, reviewList, codeForm, confirmBox, homeHref } = view.parts;
+const { icon, picture, btn, heading, errorBox, reviewList, homeHref } = view.parts;
 
-let api = createApi({ url: COMP_CONFIG.apiUrl });
-let accountsMode = false;
-
-const session = () => {
-  try {
-    return globalThis.sessionStorage || null;
-  }
-  catch {
-    return null;
-  }
-};
-
-function uuid() {
-  if (globalThis.crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-  const b = crypto.getRandomValues(new Uint8Array(16));
-  return [...b].map(x => x.toString(16).padStart(2, '0')).join('').replace(/^(.{8})(.{4})(.{4})(.{4})/, '$1-$2-$3-$4-');
-}
+const api = createWorkerApi();
 
 const S = {
   screen: 'loading',
   error: '',
   busy: false,
-  codeValue: '',
-  participant: null,
-  ptoken: '',
   me: null,
   review: null,
   reviewTitle: '',
@@ -109,80 +84,24 @@ function render({ focus = true } = {}) {
 }
 
 
-/* =========================================================
-   LOGIN
-========================================================= */
-
-const loginModel = () => ({
-  state: { name: S.screen, error: S.error, participant: S.participant },
-  codeValue: S.codeValue,
-  busy: S.busy,
-  hideCodeBack: true,
-  actions: {
-    codeSubmit,
-    back: () => { S.participant = null; S.ptoken = ''; S.error = ''; S.screen = 'code'; render(); },
-    confirm: () => {
-      writeToken(session(), S.ptoken);
-      S.participant = null;
-      loadMe();
-    }
-  }
-});
-
-async function codeSubmit(raw) {
-  S.codeValue = String(raw || '').slice(0, 20);
-  const code = normalizeCode(raw);
-  if (!code) {
-    S.error = 'الكود ٨ حروف وأرقام، زي ATH-K7P2-9QXM.';
-    render();
-    return;
-  }
-  S.busy = true;
-  S.error = '';
-  render();
-  const reply = await api.call('compCode', { code: formatCode(code) });
-  S.busy = false;
-  if (reply.ok && reply.participant && typeof reply.ptoken === 'string') {
-    S.ptoken = reply.ptoken;
-    S.codeValue = '';
-    // §19.3: the age notice shows on the «الكود مسجل باسم …» step; they continue normally
-    S.participant = { name: String(reply.participant.name || '').slice(0, 80), group: String(reply.participant.group || '').slice(0, 60), ...eligibility(reply) };
-    S.screen = 'confirm';
-    cue('pop');
-    render();
-    return;
-  }
-  if (reply.code === 'disabled' || reply.code === 'not_found') {
-    S.screen = 'unavailable';
-    render();
-    return;
-  }
-  S.error = reply.code === 'busy' ? 'محاولات كتير، استنى شوية وجرّب تاني.'
-    : reply.code === 'network' ? 'النت فاصل أو ضعيف، جرّب تاني.'
-      : reply.code === 'code' ? (reply.message || 'الكود ده مش صح، راجع الحروف والأرقام.') : (reply.message || 'حصلت مشكلة، جرّب تاني.');
-  render();
+function uuid() {
+  if (globalThis.crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  return [...b].map(x => x.toString(16).padStart(2, '0')).join('').replace(/^(.{8})(.{4})(.{4})(.{4})/, '$1-$2-$3-$4-');
 }
 
-function logout(message = '') {
-  if (accountsMode) {
-    dropAccountSession();
-    goSignIn(ROOT);
-    return;
-  }
-  clearToken(session());
-  Object.assign(S, { ptoken: '', me: null, review: null, participant: null, error: message, screen: 'code', ordering: null, cancelling: null, alert: '' });
-  S.pendingKeys.clear();
-  render();
+function logout() {
+  dropAccountSession();
+  goSignIn(ROOT);
 }
 
 /** a reply that says the login is over (or the page is off) */
 function handled(reply) {
   if (reply.code === 'session') {
-    logout('الدخول خلص، ادخل الكود بتاعك تاني.');
+    logout();
     return true;
   }
   if (reply.code === 'disabled') {
-    clearToken(session());
     S.screen = 'unavailable';
     render();
     return true;
@@ -196,22 +115,15 @@ function handled(reply) {
 ========================================================= */
 
 async function loadMe({ quiet = false } = {}) {
-  const ptoken = accountsMode ? (accountSession() ? 'account' : '') : readToken(session()) || S.ptoken;
-  if (!ptoken && accountsMode) {
+  if (!accountSession()) {
     goSignIn(ROOT);
     return;
   }
-  if (!ptoken) {
-    S.screen = 'code';
-    render();
-    return;
-  }
-  S.ptoken = ptoken;
   if (!quiet) {
     S.screen = 'loading';
     render({ focus: false });
   }
-  const reply = await api.call('portalMe', { ptoken });
+  const reply = await api.call('portalMe', {});
   if (!reply.ok) {
     if (handled(reply)) return;
     if (quiet) return;
@@ -237,7 +149,7 @@ async function loadMe({ quiet = false } = {}) {
 async function openReview(item) {
   S.screen = 'loading';
   render({ focus: false });
-  const reply = await api.call('portalReview', { ptoken: S.ptoken, submissionId: item.submissionId });
+  const reply = await api.call('portalReview', { submissionId: item.submissionId });
   if (!reply.ok) {
     if (handled(reply)) return;
     S.screen = 'dashboard';
@@ -281,7 +193,7 @@ async function confirmOrder() {
   S.busy = true;
   S.orderError = '';
   render({ focus: false });
-  const reply = await api.call('shopRedeem', { ptoken: S.ptoken, itemId: item.id, requestKey });
+  const reply = await api.call('shopRedeem', { itemId: item.id, requestKey });
   S.busy = false;
   if (!reply.ok && KEEP_KEY.has(reply.code)) {
     S.orderError = redeemError(reply);
@@ -366,7 +278,7 @@ async function confirmCancel() {
   S.busy = true;
   S.cancelError = '';
   render({ focus: false });
-  const reply = await api.call('shopCancel', { ptoken: S.ptoken, redemptionId: r.id });
+  const reply = await api.call('shopCancel', { redemptionId: r.id });
   S.busy = false;
   if (!reply.ok) {
     if (handled(reply)) return;
@@ -431,16 +343,12 @@ document.addEventListener('visibilitychange', tickStore);
    SCREENS
 ========================================================= */
 
-const intro = () => h('header', { class: 'portal__intro' },
-  h('p', { class: 'hero__kicker' }, 'نقاطي'),
-  h('p', { class: 'muted' }, 'ادخل بالكود بتاعك وشوف مسابقاتك ونتايجك ونقاطك والجوايز.')
-);
 
 const section = (id, title, ...children) => h('section', { class: 'card portal__section', 'aria-labelledby': id },
   h('h2', { class: 'portal__h2', id }, title), ...children);
 
 function historySection(me) {
-  if (!me.history.length) return section('p-history', 'مسابقاتي', h('p', { class: 'muted' }, 'لسه مشاركتش في مسابقات بالكود ده.'));
+  if (!me.history.length) return section('p-history', 'مسابقاتي', h('p', { class: 'muted' }, 'لسه مشاركتش في مسابقات.'));
   return section('p-history', 'مسابقاتي', h('ul', { class: 'plist' }, me.history.map(item => h('li', { class: 'prow', 'data-history': item.submissionId || item.compId },
     h('div', { class: 'prow__main' },
       h('p', { class: 'prow__title' }, item.title),
@@ -604,10 +512,6 @@ const screens = {
     btn('خروج', () => logout())
   ),
 
-  code: () => h('div', { class: 'step' }, intro(), codeForm({ ...loginModel(), state: { name: 'code', error: S.error } })),
-
-  confirm: () => h('div', { class: 'step' }, intro(), confirmBox(loginModel())),
-
   dashboard: () => {
     const me = S.me;
     return h('div', { class: 'step portal' },
@@ -671,17 +575,5 @@ soundToggle(document.querySelector('.cbar'));
 accountBadge(document.querySelector('.cbar'), new URL('../../../', import.meta.url));
 uiSounds();
 
-accountsOn().then(on => {
-  accountsMode = on;
-  if (on) {
-    api = createWorkerApi();
-    loadMe();
-    return;
-  }
-  if (readToken(session())) loadMe();
-  else {
-    S.screen = 'code';
-    render({ focus: false });
-  }
-});
+loadMe();
 

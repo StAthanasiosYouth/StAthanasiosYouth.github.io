@@ -12,7 +12,7 @@ import { createRequire } from 'node:module';
 import { existsSync, readFileSync, statSync, mkdirSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { ROOT } from '../tools/lib/gs.mjs';
-import { PUSH_CONFIG } from '../assets/js/push-config.js';
+import { seedSession, workerRoute } from './fakes/comp-worker.mjs';
 
 const require = createRequire(`${ROOT}tools/package.json`);
 const puppeteer = require('puppeteer-core');
@@ -20,7 +20,6 @@ const AXE = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 
 const PORT = 4962;
 const BASE = `http://localhost:${PORT}`;
-const API = PUSH_CONFIG.apiUrl;
 const SHOTS = `${ROOT}tools/.cache/comp/`;
 const CHROME = [
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -34,7 +33,6 @@ const NARROW = { width: 280, height: 653, isMobile: true, hasTouch: true, device
 const DESKTOP = { width: 1280, height: 800, deviceScaleFactor: 1 };
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'];
 const IMG = { src: 'media/2026/img-af6b0c28.webp', thumb: 'media/2026/img-af6b0c28-480.webp', w: 1122, h: 1402, alt: 'كوباية الأسرة' };
-const TOKEN_KEY = 'athanasios.portal.v1';
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.webp': 'image/webp', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
 const PRIVATE = /^\/(apps-script|tools|tests|docs|node_modules)(\/|$)|\/\.|\.md$/i;
@@ -166,21 +164,14 @@ async function open({ viewport = PHONE, mock = createMock(), bypassCSP = false, 
   page.on('console', msg => { if (msg.type() === 'error' && /CSP|Content Security|Refused/i.test(msg.text())) problems.push(msg.text()); });
   page.on('pageerror', error => problems.push(`pageerror: ${error.message}`));
   await page.evaluateOnNewDocument(() => document.addEventListener('securitypolicyviolation', e => console.error(`CSP violation: ${e.violatedDirective} ${e.blockedURI}`)));
-  if (token) await page.evaluateOnNewDocument((k, v) => { try { if (location.protocol === 'http:' && !sessionStorage.getItem(k + ':seeded')) { sessionStorage.setItem(k, v); sessionStorage.setItem(k + ':seeded', '1'); } } catch { /* about:blank */ } }, TOKEN_KEY, token);
+  if (token) await seedSession(page);
   if (bypassCSP) await page.setBypassCSP(true);
   await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
   await page.setViewport(viewport);
   await page.setRequestInterception(true);
   page.on('request', request => {
     const url = request.url();
-    if (url === API && request.method() === 'POST') {
-      const key = `k${++echo}`;
-      echoes.set(key, JSON.stringify(mock.post(request.postData() || '{}')));
-      return request.respond({ status: 302, headers: { Location: `https://script.googleusercontent.com/macros/echo?user_content_key=${key}`, 'Access-Control-Allow-Origin': '*' }, body: '' });
-    }
-    if (url.startsWith('https://script.googleusercontent.com/macros/echo?')) {
-      return request.respond({ status: 200, contentType: 'application/json; charset=utf-8', headers: { 'Access-Control-Allow-Origin': '*' }, body: echoes.get(new URL(url).searchParams.get('user_content_key')) || '{}' });
-    }
+    if (workerRoute(request, mock)) return undefined;
     if (/^(https?:\/\/(localhost|127\.0\.0\.1)[:/]|data:|blob:|about:)/.test(url)) return request.continue();
     if (!url.endsWith('/v1/account/config')) mock.outside.push(url);
     return request.respond({ status: 204, body: '' });
@@ -207,15 +198,6 @@ async function axe(page, label) {
   assert.deepEqual(results.violations.map(v => `${label} ${v.id}: ${v.nodes.slice(0, 3).map(n => n.target.join(' ')).join(' | ')}`), []);
 }
 
-async function login(page) {
-  await waitScreen(page, 'code');
-  await page.type('#f-code', 'ath-2345-678a');
-  await page.click('button[type="submit"]');
-  await waitScreen(page, 'confirm');
-  await clickText(page, 'button', 'أيوه، ده أنا');
-  await waitScreen(page, 'dashboard');
-}
-
 async function order(page, itemId) {
   await page.click(`[data-item="${itemId}"] [data-order]`);
   await page.waitForSelector('dialog.order[open]');
@@ -227,23 +209,9 @@ async function order(page, itemId) {
    TESTS
 ========================================================= */
 
-test('login → dashboard with wallet and store; the token lives in this tab only', async () => {
+test('signed in → dashboard with wallet and store; nothing about them in the URL', async () => {
 
-  const { context, page, problems, mock } = await open();
-  await waitScreen(page, 'code');
-  assert.equal(await page.$('.actions .btn:not([type="submit"])'), null, 'no «رجوع» on the portal code screen');
-  await page.screenshot({ path: `${SHOTS}portal-mobile-code.png` });
-
-  await page.type('#f-code', 'ATH-2345-6789');
-  await page.click('button[type="submit"]');
-  await page.waitForFunction(() => document.getElementById('f-code-err')?.textContent.includes('مش صح'));
-  await page.$eval('#f-code', el => { el.value = ''; });
-  await page.type('#f-code', 'ath-2345-678a');
-  await page.click('button[type="submit"]');
-  await waitScreen(page, 'confirm');
-  assert.equal(mock.fns('compCode').at(-1).arg.code, 'ATH-2345-678A');
-  assert.equal(await textOf(page, '.who__name'), 'مينا عادل');
-  await clickText(page, 'button', 'أيوه، ده أنا');
+  const { context, page, problems, mock } = await open({ token: 'pt1.good.sig' });
   await waitScreen(page, 'dashboard');
 
   assert.deepEqual(mock.fns('portalMe')[0].arg, { ptoken: 'pt1.good.sig' });
@@ -270,20 +238,11 @@ test('login → dashboard with wallet and store; the token lives in this tab onl
   assert.match(await textOf(page, '[data-item="i-mug"]'), /فاضل ٥ · تقدر تطلب ٢ كمان/);
   assert.ok(await page.$('[data-item="i-mug"] img[src$="/media/2026/img-af6b0c28-480.webp"]'));
 
-  // only sessionStorage; a reload goes straight to the dashboard
-  assert.equal(await page.evaluate(k => sessionStorage.getItem(k), TOKEN_KEY), 'pt1.good.sig');
-  assert.deepEqual(await page.evaluate(() => Object.keys(localStorage)), []);
   assert.equal(new URL(page.url()).search + new URL(page.url()).hash, '', 'nothing about the participant in the URL');
   await page.reload({ waitUntil: 'networkidle0' });
   await waitScreen(page, 'dashboard');
-  assert.equal(mock.fns('compCode').length, 2, 'no new code check after a reload');
   await page.screenshot({ path: `${SHOTS}portal-mobile-dashboard.png`, fullPage: true });
   assert.ok(await overflow(page) <= 0);
-
-  // «خروج»
-  await page.click('[data-logout]');
-  await waitScreen(page, 'code');
-  assert.equal(await page.evaluate(k => sessionStorage.getItem(k), TOKEN_KEY), null);
 
   assert.deepEqual(mock.outside, []);
   assert.deepEqual(problems, []);
@@ -391,26 +350,22 @@ test('busy: the redeem is retried with the SAME requestKey and lands once', asyn
 });
 
 
-test('session over: back to the code screen with a message; registry off: unavailable', async () => {
+test('session over: on to sign-in, the session gone; signed out: the same; registry off: unavailable', async () => {
 
   const mock = createMock();
-  let { context, page, problems } = await open({ token: 'pt1.good.sig', mock });
+  let { context, page } = await open({ token: 'pt1.good.sig', mock });
   await waitScreen(page, 'dashboard');
-  mock.valid = 'pt1.other.sig';   // e.g. the code was reset
+  mock.valid = 'pt1.other.sig';   // the server no longer takes this session
   await page.click('[data-history="s-1"] [data-review-btn]');
-  await waitScreen(page, 'code');
-  assert.match(await textOf(page, '#f-code-err'), /ادخل الكود بتاعك تاني/);
-  assert.equal(await page.evaluate(k => sessionStorage.getItem(k), TOKEN_KEY), null);
+  await page.waitForFunction(() => location.pathname.startsWith('/account/'));
+  assert.equal(await page.evaluate(() => localStorage.getItem('athanasios.account.v1')), null);
   await context.close();
 
-  ({ context, page, problems } = await open({ token: 'pt1.expired.sig' }));
-  await waitScreen(page, 'code');
-  assert.deepEqual(problems, []);
+  ({ context, page } = await open());
+  await page.waitForFunction(() => location.pathname.startsWith('/account/'));
   await context.close();
 
-  ({ context, page } = await open({ mock: createMock({ registry: false }) }));
-  await page.type('#f-code', 'ATH-2345-678A');
-  await page.click('button[type="submit"]');
+  ({ context, page } = await open({ token: 'pt1.good.sig', mock: createMock({ registry: false }) }));
   await waitScreen(page, 'unavailable');
   assert.equal(await textOf(page, '#comp-main h1'), 'الصفحة دي مش متاحة دلوقتي');
   await context.close();
@@ -436,10 +391,9 @@ test('wallet off: no balance, no ledger, no store; history still there', async (
 test('accessibility (axe) phone + desktop, and no horizontal scroll at 280 / 360 / 1280', async () => {
 
   for (const [name, viewport] of Object.entries({ narrow: NARROW, phone: PHONE, desktop: DESKTOP })) {
-    const { context, page, problems } = await open({ viewport, bypassCSP: name !== 'narrow' });
-    await waitScreen(page, 'code');
+    const { context, page, problems } = await open({ viewport, bypassCSP: name !== 'narrow', token: 'pt1.good.sig' });
+    await waitScreen(page, 'dashboard');
     if (name !== 'narrow') await axe(page, `${name} code`);
-    await login(page);
     assert.ok(await overflow(page) <= 0, `${name} dashboard overflow`);
     if (name !== 'narrow') await axe(page, `${name} dashboard`);
     if (name === 'desktop') await page.screenshot({ path: `${SHOTS}portal-desktop-dashboard.png`, fullPage: true });

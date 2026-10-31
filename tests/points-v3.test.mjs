@@ -150,7 +150,7 @@ test('age: «قرب يخرج من السن» within the warning days, with the d
 
 test('privacy: every preset keeps the answers hidden; the result is only the score', () => {
   const { world, call } = v3World();
-  for (const preset of ['survey', 'scored', 'coded', 'points']) {
+  for (const preset of ['survey', 'scored', 'points']) {
     assert.equal(world.gs.COMP_PRESETS[preset].answersShow, 'never', preset);
   }
   const created = call('apiCompCreate', { preset: 'scored', title: 'مسابقة سرية', slug: 'secret-quiz', enabled: true });

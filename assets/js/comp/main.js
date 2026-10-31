@@ -13,9 +13,7 @@
  *            (protocol: docs/COMPETITIONS.md §13)
  */
 
-import { COMP_CONFIG } from './config.js';
-import { createApi } from './api.js';
-import { accountsOn, createWorkerApi, accountSummary, goSignIn, accountSession } from './accounts.js';
+import { createWorkerApi, accountSummary, goSignIn, accountSession, dropAccountSession } from './accounts.js';
 import { createSave, memoryStorage, browserStorage } from './save.js';
 import * as F from './flow.js';
 import { createView } from './view.js';
@@ -89,7 +87,6 @@ const MESSAGES = {
   session: 'سجّل دخولك تاني.',
   disabled: 'المسابقة دي مش متاحة دلوقتي.',
   not_found: 'المسابقة دي مش متاحة دلوقتي.',
-  code: 'الكود ده مش صح، راجع الحروف والأرقام.',
   expired: 'الوقت خلص قبل ما الإجابات توصل.',
   bad: 'حصلت مشكلة، جرّب تاني.'
 };
@@ -113,19 +110,14 @@ const S = {
   attempt: null,
   token: '',
   clientKey: '',
-  ptoken: '',
   fields: {},
-  fieldValues: {},
-  fieldErrors: {},
-  codeValue: '',
-  hp: '',
   result: null,
   receipt: '',
   resultLoading: false,
   resultNote: '',
   confirming: false,
   busy: false,
-  noPoints: false,      // §19.3: a code outside the age range (the attempt counts, no points)
+  noPoints: false,      // §19.3: outside the age range (the attempt counts, no points)
   queueReason: '',
   online: navigator.onLine !== false,
   warnedMinute: false, timeUpSent: false
@@ -157,9 +149,6 @@ function model() {
     questions: S.questions,
     answers: S.answers,
     comp: S.comp,
-    fieldValues: S.fieldValues,
-    fieldErrors: S.fieldErrors,
-    codeValue: S.codeValue,
     busy: S.busy,
     confirming: S.confirming,
     result: S.result,
@@ -180,20 +169,24 @@ function model() {
 }
 
 function render(options = {}) {
-  // accounts on: there is no code screen: the signed-in account goes straight on (§18)
-  if (accountsMode && S.state.name === 'code') {
-    enterWithAccount();
-    return;
-  }
   view.render({ ...model(), ...options });
+  if (S.state.name === 'entering') enterWithAccount();
 }
 
-let accountsMode = false;
 let entering = false;
 
+/* every competition belongs to an account (§18): the signed-in one goes straight on, the rest sign in first */
 async function enterWithAccount() {
   if (entering) return;
   entering = true;
+  if (PREVIEW) {
+    await null;
+    entering = false;
+    go({ type: 'entered', participant: { name: 'مشارك تجريبي', group: '' } });
+    return;
+  }
+  // the server refused this session after it looked fine: asking it again would only go round
+  if (S.state.error) dropAccountSession();
   const account = accountSession() ? await accountSummary() : null;
   entering = false;
   if (!account) {
@@ -201,10 +194,8 @@ async function enterWithAccount() {
     return;
   }
   const eligible = account.eligible !== false;
-  S.ptoken = '';
   S.noPoints = !eligible;
-  go({ type: 'code-ok', participant: { name: String(account.firstName || '').slice(0, 80), group: '', eligible, noPoints: !eligible } });
-  go({ type: 'confirm' });
+  go({ type: 'entered', participant: { name: String(account.firstName || '').slice(0, 80), group: '', eligible, noPoints: !eligible } });
 }
 
 /** a step change through the machine (+ its side effects) */
@@ -228,71 +219,6 @@ function go(event) {
 const actions = {
 
   begin: () => go({ type: 'begin' }),
-
-  back: () => {
-    S.fieldErrors = {};
-    go({ type: 'back' });
-  },
-
-  fieldsSubmit(values, hp) {
-    const guest = !!S.state.guest;
-    const fields = F.visibleFields(S.def, { guest });
-    const check = F.validateFields(fields, values);
-    S.fieldValues = values;
-    S.hp = typeof hp === 'string' ? hp : '';
-    if (!check.ok) {
-      S.fieldErrors = check.errors;
-      S.state = { name: 'identity', error: 'راجع الخانات اللي عليها علامة.', ...(guest && { guest: true }) };
-      render();
-      const first = document.querySelector('[aria-invalid="true"]');
-      if (first) first.focus();
-      return;
-    }
-    S.fieldErrors = {};
-    S.fields = check.clean;
-    save.write({ fields: check.clean, clientKey: ensureClientKey() });
-    go({ type: 'fields-ok' });
-  },
-
-  async codeSubmit(raw) {
-    S.codeValue = String(raw || '').slice(0, 20);
-    const code = F.normalizeCode(raw);
-    if (!code) {
-      S.state = { name: 'code', error: 'الكود ٨ حروف وأرقام، زي ATH-K7P2-9QXM.' };
-      render();
-      return;
-    }
-    S.busy = true;
-    S.state = { name: 'code' };
-    render();
-    const reply = await api.call('compCode', { code: F.formatCode(code) });
-    S.busy = false;
-    if (reply.ok && reply.participant && typeof reply.ptoken === 'string') {
-      S.ptoken = reply.ptoken;
-      S.codeValue = '';
-      const participant = { name: String(reply.participant.name || '').slice(0, 80), group: String(reply.participant.group || '').slice(0, 60), ...F.eligibility(reply) };
-      S.noPoints = participant.eligible === false;
-      go({ type: 'code-ok', participant });
-      return;
-    }
-    if (reply.code === 'disabled' || reply.code === 'not_found') {
-      S.state = { name: 'unavailable', error: message(reply) };
-      render();
-      return;
-    }
-    S.state = { name: 'code', error: reply.code === 'busy' ? 'محاولات كتير، استنى شوية وجرّب تاني.' : message(reply) };
-    render();
-  },
-
-  confirm: () => go({ type: 'confirm' }),
-
-  // §19.2: «شارك من غير كود» (only when the competition allows guests)
-  guest: () => {
-    S.ptoken = '';
-    S.noPoints = false;
-    S.fieldErrors = {};
-    go({ type: 'guest' });
-  },
 
   answer(qid, value) {
     S.answers = { ...S.answers, [qid]: value };
@@ -389,12 +315,6 @@ async function start() {
 
   const arg = { slug: S.def.slug || S.slug, clientKey: ensureClientKey() };
 
-  if (S.def.participation === 'registered' && !S.state.guest) arg.ptoken = S.ptoken;
-  else {
-    arg.fields = S.fields;
-    arg.hp = S.hp || '';
-  }
-
   save.write({ clientKey: S.clientKey });
 
   const reply = await api.call('compStart', arg);
@@ -442,7 +362,7 @@ async function start() {
 
   save.write({
     clientKey: S.clientKey, token: S.token, receipt: '', answers: S.answers, step: '',
-    v: S.def.v, fields: S.fields, ptoken: S.ptoken, participant: S.state.participant ? { ...S.state.participant, noPoints: S.noPoints } : null,
+    v: S.def.v, participant: S.state.participant ? { ...S.state.participant, noPoints: S.noPoints } : null,
     attempt: { id: attempt.id, startedAt: attempt.startedAt, deadlineMs: attempt.deadlineMs },
     comp: S.comp, questions, pending: false, def: S.defRaw
   });
@@ -615,8 +535,7 @@ async function fetchDefinition(slug) {
 function applyDefinition(raw) {
   const def = F.sanitizeDefinition(raw);
   if (!def || (def.slug && def.slug !== S.slug)) return false;
-  // §18: with accounts on, every competition needs one: no form, no guests, whatever an older definition says
-  S.def = accountsMode ? { ...def, participation: 'registered', allowGuests: false } : def;
+  S.def = def;
   S.defRaw = def.withdrawn ? null : raw;
   if (def.theme) html.dataset.theme = def.theme;
   if (!def.withdrawn) document.title = `${def.title} – مسابقات أسرة البابا أثناسيوس`;
@@ -626,8 +545,7 @@ function applyDefinition(raw) {
 async function boot() {
 
   S.slug = F.slugFrom({ dataSlug: html.dataset.slug || '', search: location.search });
-  accountsMode = await accountsOn();
-  api = accountsMode ? createWorkerApi() : createApi({ url: COMP_CONFIG.apiUrl });
+  api = createWorkerApi();
   save = createSave(S.slug, browserStorage);
 
   if (!S.slug) {
@@ -664,9 +582,6 @@ async function boot() {
   }
 
   S.clientKey = record && record.clientKey ? record.clientKey : '';
-  S.fields = record ? record.fields : {};
-  S.fieldValues = { ...S.fields };
-  S.ptoken = record ? record.ptoken : '';
   S.noPoints = !!(record && record.participant && record.participant.noPoints);
 
   // an attempt in progress on this phone: continue where it was left
@@ -722,7 +637,6 @@ function previewApi() {
 
   return {
     async call(fn, arg) {
-      if (fn === 'compCode') return { ok: true, participant: { name: 'مشارك تجريبي', group: '' }, ptoken: 'preview' };
       if (fn === 'compStart') {
         const questions = S.def.questions || [];
         return {
@@ -775,8 +689,8 @@ function startPreview() {
     clearTimeout(retryTimer);
     Object.assign(S, {
       slug: def.slug, def, defRaw: null, forcePhase: ['scheduled', 'open', 'closed'].includes(data.state) ? data.state : 'auto',
-      questions: [], answers: {}, comp: null, attempt: null, token: '', clientKey: '', ptoken: '', fields: {}, fieldValues: {}, fieldErrors: {},
-      codeValue: '', hp: '', result: null, receipt: '', resultLoading: false, resultNote: '', confirming: false, busy: false, warnedMinute: false, timeUpSent: false
+      questions: [], answers: {}, comp: null, attempt: null, token: '', clientKey: '',
+      result: null, receipt: '', resultLoading: false, resultNote: '', confirming: false, busy: false, warnedMinute: false, timeUpSent: false
     });
     if (def.theme) html.dataset.theme = def.theme;
     else delete html.dataset.theme;

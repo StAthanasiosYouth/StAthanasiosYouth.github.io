@@ -718,8 +718,7 @@ function apiCompSettings(input) {
     }
   });
 
-  // each one needs the one before it
-  if (!next.registry) next.wallet = false;
+  // the store needs the wallet
   if (!next.wallet) next.shop = false;
 
   compWrite_('settings', function () {

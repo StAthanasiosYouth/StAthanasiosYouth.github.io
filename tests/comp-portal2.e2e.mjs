@@ -15,7 +15,7 @@ import { createRequire } from 'node:module';
 import { existsSync, readFileSync, statSync, mkdirSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { ROOT } from '../tools/lib/gs.mjs';
-import { PUSH_CONFIG } from '../assets/js/push-config.js';
+import { seedSession, workerRoute } from './fakes/comp-worker.mjs';
 
 const require = createRequire(`${ROOT}tools/package.json`);
 const puppeteer = require('puppeteer-core');
@@ -23,7 +23,6 @@ const AXE = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 
 const PORT = 4964;
 const BASE = `http://localhost:${PORT}`;
-const API = PUSH_CONFIG.apiUrl;
 const SHOTS = `${ROOT}tools/.cache/comp/`;
 const CHROME = [
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -37,7 +36,6 @@ const NARROW = { width: 280, height: 653, isMobile: true, hasTouch: true, device
 const DESKTOP = { width: 1280, height: 800, deviceScaleFactor: 1 };
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'];
 const TOKEN = 'pt1.good.sig';
-const TOKEN_KEY = 'athanasios.portal.v1';
 const AGE_NOTICE = 'نأسف، سنك حاليًا خارج الفئة العمرية المخصصة لنظام نقاط الاجتماع. تقدر تشارك في المسابقة بدون نقاط.';
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.webp': 'image/webp', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
@@ -183,21 +181,14 @@ async function open({ viewport = PHONE, mock = createMock(), bypassCSP = false, 
   page.on('console', msg => { if (msg.type() === 'error' && /CSP|Content Security|Refused/i.test(msg.text())) problems.push(msg.text()); });
   page.on('pageerror', error => problems.push(`pageerror: ${error.message}`));
   await page.evaluateOnNewDocument(() => document.addEventListener('securitypolicyviolation', e => console.error(`CSP violation: ${e.violatedDirective} ${e.blockedURI}`)));
-  if (token) await page.evaluateOnNewDocument((k, v) => { try { if (location.protocol === 'http:' && !sessionStorage.getItem(k + ':seeded')) { sessionStorage.setItem(k, v); sessionStorage.setItem(k + ':seeded', '1'); } } catch { /* about:blank */ } }, TOKEN_KEY, token);
+  if (token) await seedSession(page);
   if (bypassCSP) await page.setBypassCSP(true);
   await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
   await page.setViewport(viewport);
   await page.setRequestInterception(true);
   page.on('request', request => {
     const url = request.url();
-    if (url === API && request.method() === 'POST') {
-      const key = `k${++echo}`;
-      echoes.set(key, JSON.stringify(mock.post(request.postData() || '{}')));
-      return request.respond({ status: 302, headers: { Location: `https://script.googleusercontent.com/macros/echo?user_content_key=${key}`, 'Access-Control-Allow-Origin': '*' }, body: '' });
-    }
-    if (url.startsWith('https://script.googleusercontent.com/macros/echo?')) {
-      return request.respond({ status: 200, contentType: 'application/json; charset=utf-8', headers: { 'Access-Control-Allow-Origin': '*' }, body: echoes.get(new URL(url).searchParams.get('user_content_key')) || '{}' });
-    }
+    if (workerRoute(request, mock)) return undefined;
     if (/^(https?:\/\/(localhost|127\.0\.0\.1)[:/]|data:|blob:|about:)/.test(url)) return request.continue();
     if (!url.endsWith('/v1/account/config')) mock.outside.push(url);
     return request.respond({ status: 204, body: '' });
@@ -462,15 +453,9 @@ test('preview: the prizes on show, the order buttons off with their reason; with
 });
 
 
-test('age: the code login shows the notice, then the dashboard says it and the store takes no orders', async () => {
+test('age: the dashboard says it and the store takes no orders', async () => {
 
-  const { context, page, problems, mock } = await open({ mock: createMock({ eligible: false }), token: '', bypassCSP: true });
-  await page.type('#f-code', 'ATH-2345-678A');
-  await page.click('button[type="submit"]');
-  await page.waitForFunction(() => document.getElementById('comp-main')?.dataset.state === 'confirm');
-  assert.equal(await textOf(page, '[data-age-notice]'), AGE_NOTICE);
-  await axe(page, 'portal confirm + age notice');
-  await clickText(page, 'button', 'أيوه، ده أنا');
+  const { context, page, problems, mock } = await open({ mock: createMock({ eligible: false }), bypassCSP: true });
   await page.waitForFunction(() => document.getElementById('comp-main')?.dataset.state === 'dashboard');
 
   assert.equal(await textOf(page, '.portal__me ~ [data-age-notice]'), AGE_NOTICE);

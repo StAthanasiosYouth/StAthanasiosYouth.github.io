@@ -2,6 +2,8 @@
 
 > Since 2026-10-31 the drafts and the admin's calls run on the Worker + D1 (docs/PHASE5-PLAN.md §3o, the same code). Where this file says «the Sheet» for `Competitions`, `Questions`, `Snapshots` and `Submissions`, read `draft_rows`, `comp_versions` and `submissions`.
 
+> Since the accounts improvements, Step 4 (docs/ACCOUNTS-IMPROVEMENTS.md), every competition belongs to an account. The code login (§7.4), `participation: open`, `allowGuests`, the form and `uniquePhone` are gone from the public pages and the builder. Stored rows keep those columns, and the Apps Script server keeps that code behind `COMP_RUNTIME = worker` until it is retired.
+
 One reusable competition engine, an optional participant registry with codes,
 an optional points wallet with a «نقاطي» portal and a rewards store. Everything
 is operated from the admin (`/admin/`); Google Sheets is the storage; the

@@ -1,7 +1,6 @@
 // The competition engine (competition/index.html + assets/js/comp/*) in
-// headless Chrome, against a MOCK of the public API (§5: compStart,
-// compSubmit, compResult, compCode) answered in the browser the way Apps
-// Script does it (POST → 302 → googleusercontent echo). comp.json fixtures
+// headless Chrome, signed in, against a MOCK of the API (§5: compStart,
+// compSubmit, compResult) answered in the browser (fakes/comp-worker.mjs). comp.json fixtures
 // come from tests/fixtures/comp/ through this test's own server (never
 // committed into competition/); stubs are made from the shell exactly like
 // the publisher does (="../ → ="../../, <html data-slug>).
@@ -15,7 +14,7 @@ import { createRequire } from 'node:module';
 import { existsSync, readFileSync, statSync, mkdirSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { ROOT } from '../tools/lib/gs.mjs';
-import { PUSH_CONFIG } from '../assets/js/push-config.js';
+import { seedSession, workerRoute } from './fakes/comp-worker.mjs';
 import { zonedNow, stamp, addMinutes } from '../assets/js/schedule.js';
 
 const require = createRequire(`${ROOT}tools/package.json`);
@@ -24,7 +23,6 @@ const AXE = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 
 const PORT = 4961;
 const BASE = `http://localhost:${PORT}`;
-const API = PUSH_CONFIG.apiUrl;
 const SHOTS = `${ROOT}tools/.cache/comp/`;
 const CHROME = [
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -285,21 +283,12 @@ async function open(path, { viewport = PHONE, mock = createMock(), bypassCSP = f
   if (reducedMotion) await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
   await page.setViewport(viewport);
 
+  await seedSession(page);
   await page.setRequestInterception(true);
   page.on('request', async request => {
     const url = request.url();
     try {
-      if (url === API && request.method() === 'POST') {
-        if (mock.offline) return request.abort('internetdisconnected');
-        const reply = mock.post(request.postData() || '{}');
-        const key = `k${++echo}`;
-        echoes.set(key, JSON.stringify(reply));
-        return request.respond({ status: 302, headers: { Location: `https://script.googleusercontent.com/macros/echo?user_content_key=${key}`, 'Access-Control-Allow-Origin': '*' }, body: '' });
-      }
-      if (url.startsWith('https://script.googleusercontent.com/macros/echo?')) {
-        if (mock.offline) return request.abort('internetdisconnected');
-        return request.respond({ status: 200, contentType: 'application/json; charset=utf-8', headers: { 'Access-Control-Allow-Origin': '*' }, body: echoes.get(new URL(url).searchParams.get('user_content_key')) || '{}' });
-      }
+      if (workerRoute(request, mock)) return undefined;
       if (/^(https?:\/\/(localhost|127\.0\.0\.1)[:/]|data:|blob:|about:)/.test(url)) return request.continue();
       if (!url.endsWith('/v1/account/config')) mock.outside.push(url);
       return request.respond({ status: 204, body: '' });
@@ -335,13 +324,6 @@ async function axe(page, label) {
   assert.deepEqual(results.violations.map(v => `${label} ${v.id}: ${v.nodes.slice(0, 3).map(n => n.target.join(' ')).join(' | ')}`), []);
 }
 
-async function fillIdentity(page) {
-  await page.type('#f-name', 'مارك ميلاد');
-  await page.type('#f-phone', '01012345678');
-  await page.select('#f-church', 'أبي سيفين');
-  await page.click('button[type="submit"]');
-}
-
 /** paged flow: answers q1..q3 (single, multi, tf) */
 async function answerFirstThree(page) {
   await waitState(page, 'question');
@@ -374,30 +356,13 @@ test('open competition, phone: intro → form → all 7 types → reload restore
   assert.ok(await overflow(page) <= 0, 'no horizontal scroll at 360px');
   await page.screenshot({ path: `${SHOTS}mobile-intro.png` });
 
-  // identity: required fields checked here first
   await page.click('[data-cta]');
-  await waitState(page, 'identity');
-  assert.equal(await page.$('#f-age'), null, 'hidden fields are not asked');
-  assert.ok(await page.$('.consent a[href$="/privacy/#competitions"]'), 'consent line links to the privacy policy');
-  await page.click('button[type="submit"]');
-  await page.waitForSelector('#f-name[aria-invalid="true"]');
-  assert.equal(await page.evaluate(() => document.activeElement.id), 'f-name', 'focus on the first invalid field');
-  await page.type('#f-phone', '123');
-  await page.type('#f-name', 'مارك ميلاد');
-  await page.click('button[type="submit"]');
-  await page.waitForSelector('#f-phone[aria-invalid="true"]');
-  await page.$eval('#f-phone', el => { el.value = ''; });
-  await page.type('#f-phone', '٠١٠١٢٣٤٥٦٧٨');
-  await page.select('#f-church', 'أبي سيفين');
-  await page.click('button[type="submit"]');
 
   // start
   await answerFirstThree(page);
   const start = mock.fns('compStart')[0].arg;
   assert.equal(start.slug, 'quiz');
   assert.match(start.clientKey, /^[0-9a-f-]{36}$/);
-  assert.deepEqual(start.fields, { name: 'مارك ميلاد', phone: '01012345678', church: 'أبي سيفين' });
-  assert.equal(start.hp, '');
   assert.match(await textOf(page, '[data-progress-step]'), /سؤال ٣ من ٧/);
   assert.match(await textOf(page, '[data-progress-answered]'), /جاوبت ٢ من ٦/);
   assert.equal(await page.evaluate(() => document.activeElement.classList.contains('q__text')), true, 'focus moved to the question');
@@ -497,9 +462,7 @@ test('accessibility (axe) and layout on every screen, phone and desktop', async 
     await axe(page, `${name} intro`);
     if (name === 'desktop') await page.screenshot({ path: `${SHOTS}desktop-intro.png` });
     await page.click('[data-cta]');
-    await waitState(page, 'identity');
     await axe(page, `${name} identity`);
-    await fillIdentity(page);
     await waitState(page, 'question');
     await clickText(page, 'label.choice', 'نينوى');
     await axe(page, `${name} question`);
@@ -526,9 +489,7 @@ test('accessibility (axe) and layout on every screen, phone and desktop', async 
   // the result screen (with its review list), desktop
   const mock = createMock();
   const { context, page } = await open('/competition/quiz/', { viewport: DESKTOP, bypassCSP: true, mock });
-  await page.evaluate(() => { localStorage.clear(); });
   await page.click('[data-cta]');
-  await fillIdentity(page);
   await waitState(page, 'question');
   await clickText(page, 'label.choice', 'نينوى');
   await next(page);
@@ -562,7 +523,6 @@ test('single-page layout; the result without a review list when the server sends
   const { context, page, problems, mock } = await open('/competition/quiz-single/');
   await waitState(page, 'intro');
   await page.click('[data-cta]');
-  await fillIdentity(page);
   await waitState(page, 'single');
   assert.equal(await page.$$eval('.q', els => els.length), 7, 'every question on one page');
   assert.equal(await page.$('.q__pts'), null, 'points hidden (showPoints off)');
@@ -598,7 +558,6 @@ test('offline at submit: queued with the Arabic message, sent when the connectio
 
   const { context, page, problems, mock } = await open('/competition/quiz/');
   await page.click('[data-cta]');
-  await fillIdentity(page);
   await answerFirstThree(page);
   for (let i = 0; i < 5; i += 1) await next(page);
   await waitState(page, 'review');
@@ -644,7 +603,6 @@ test('busy once: the submit is retried with the same keys and lands once', async
   const mock = createMock({ busyOnce: true });
   const { context, page, problems } = await open('/competition/quiz-single/', { mock });
   await page.click('[data-cta]');
-  await fillIdentity(page);
   await waitState(page, 'single');
   for (const [q, w] of [['q-single01', 'ترشيش'], ['q-multi002', 'النوتية'], ['q-tf000003', 'غلط']]) await clickText(page, `[data-q="${q}"] label.choice`, w);
   await page.type('#a-q-short005', 'يقطينة');
@@ -714,70 +672,12 @@ test('device clock 5 hours off: the countdown follows the server Date header', a
 });
 
 
-test('registered competition: code → «الكود مسجل باسم …» → start with the participant token', async () => {
-
-  const { context, page, problems, mock } = await open('/competition/quiz-reg/');
-  await waitState(page, 'intro');
-  assert.match(await textOf(page, '.intro__body'), /بالكود/);
-  await page.click('[data-cta]');
-  await waitState(page, 'code');
-  await page.type('#f-code', 'abc');
-  await page.click('button[type="submit"]');
-  await page.waitForSelector('#f-code-err');
-  assert.equal(mock.fns('compCode').length, 0, 'a malformed code never reaches the server');
-  await page.$eval('#f-code', el => { el.value = ''; });
-  await page.type('#f-code', 'ATH-2345-6789');
-  await page.click('button[type="submit"]');
-  await page.waitForFunction(() => document.getElementById('f-code-err')?.textContent.includes('مش صح'));
-  await page.$eval('#f-code', el => { el.value = ''; });
-  await page.type('#f-code', 'ath 2345 678a');
-  await page.click('button[type="submit"]');
-  await waitState(page, 'confirm');
-  assert.equal(mock.fns('compCode').at(-1).arg.code, 'ATH-2345-678A');
-  assert.equal(await textOf(page, '#comp-main h1'), 'الكود مسجل باسم');
-  assert.equal(await textOf(page, '.who__name'), 'مينا عادل');
-  await clickText(page, 'button', 'لا، مش أنا');
-  await waitState(page, 'code');
-  await page.type('#f-code', 'ATH2345678A');
-  await page.click('button[type="submit"]');
-  await waitState(page, 'confirm');
-  await clickText(page, 'button', 'أيوه، ده أنا');
-  await waitState(page, 'question');
-  const start = mock.fns('compStart')[0].arg;
-  assert.equal(start.ptoken, 'pt1.good.sig');
-  assert.equal(start.fields, undefined, 'registered: no typed identity');
-  // answer everything required and submit: points result
-  await clickText(page, 'label.choice', 'ترشيش');
-  await next(page);
-  await clickText(page, 'label.choice', 'النوتية');
-  await clickText(page, 'label.choice', 'رئيس النوتية');
-  await next(page);
-  await clickText(page, 'label.choice', 'صح');
-  await next(page);
-  await next(page);
-  await page.type('#a-q-short005', 'اليقطينة');
-  await next(page);
-  await page.type('#a-q-number06', '40');
-  await next(page);
-  await next(page);
-  await page.click('[data-submit]');
-  await page.click('[data-confirm]');
-  await page.waitForSelector('.result__line--points');
-  assert.equal(await textOf(page, '.result__line--points'), 'جمعت ٥٠٠ نقطة');
-  assert.equal(await page.$('.result__line--score'), null, 'points only (resultShow points)');
-  assert.deepEqual(problems, []);
-  await context.close();
-
-});
-
-
 test('time limit: the clock runs from the server deadline and submits by itself at zero', async () => {
 
   const mock = createMock({ timedMs: 4000 });
   const { context, page, problems } = await open('/competition/quiz-timed/', { mock });
   assert.match(await textOf(page, '.chips'), /الوقت دقيقة/);
   await page.click('[data-cta]');
-  await fillIdentity(page);
   await waitState(page, 'question');
   await page.waitForSelector('#comp-timer:not([hidden])');
   assert.match(await textOf(page, '#comp-timer'), /٠٠:٠[٠-٥]/);
@@ -856,9 +756,6 @@ test('admin preview: definition by postMessage, no network, no storage, result f
   await page.evaluate(def => document.getElementById('frame').contentWindow.postMessage({ type: 'athanasios:comp-preview', definition: def, at: null, state: 'open' }, location.origin), definition);
   await frame.waitForFunction(() => document.getElementById('comp-main').dataset.state === 'intro');
   await frame.click('[data-cta]');
-  await frame.waitForSelector('#f-name');
-  await frame.type('#f-name', 'خادم بيجرب');
-  await frame.click('button[type="submit"]');
   await frame.waitForFunction(() => document.getElementById('comp-main').dataset.state === 'question');
   await frame.evaluate(() => [...document.querySelectorAll('label.choice')].find(l => l.textContent.includes('ترشيش')).click());
   await frame.click('[data-next]');
@@ -894,9 +791,6 @@ test('the narrowest phones (280px): nothing wider than the screen', async () => 
   await waitState(page, 'intro');
   assert.ok(await overflow(page) <= 0, 'intro');
   await page.click('[data-cta]');
-  await waitState(page, 'identity');
-  assert.ok(await overflow(page) <= 0, 'identity');
-  await fillIdentity(page);
   await waitState(page, 'question');
   await page.click('.jump__toggle');
   assert.ok(await overflow(page) <= 0, 'question + jump grid');
@@ -936,75 +830,14 @@ async function answerAllAndSend(page) {
   await waitState(page, 'result');
 }
 
-test('guests (allowGuests): «شارك من غير كود» → the form → compStart without a code → «دي نتيجتك…», no points', async () => {
+test('an account outside the age range: they go on, no points line', async () => {
 
-  const { context, page, problems, mock } = await open('/competition/quiz-guests/', { bypassCSP: true });
-  await waitState(page, 'intro');
+  const mock = createMock();
+  mock.account = { firstName: 'بيشوي', eligible: false };
+  const { context, page, problems } = await open('/competition/quiz/', { bypassCSP: true, mock });
   await page.click('[data-cta]');
-  await waitState(page, 'code');
-  assert.match(await textOf(page, '.guest-offer'), /معندكش كود؟/);
-  await axe(page, 'code + guest offer');
-
-  // the form, and back to the code screen
-  await page.click('[data-guest]');
-  await waitState(page, 'identity');
-  assert.equal(await textOf(page, '#comp-main h1'), 'شارك من غير كود');
-  assert.equal(await textOf(page, '[data-guest-note]'), 'المشاركة بدون كود مفيهاش نقاط.');
-  assert.deepEqual(await page.$$eval('#comp-main input:not([name="website"]), #comp-main select', els => els.map(e => e.id)), ['f-name', 'f-phone', 'f-church']);
-  await axe(page, 'guest form');
-  await clickText(page, 'button', 'رجوع');
-  await waitState(page, 'code');
-  await page.click('[data-guest]');
-  await waitState(page, 'identity');
-
-  // a required field missing: stays on the form, nothing sent
-  await page.click('button[type="submit"]');
-  await page.waitForSelector('[aria-invalid="true"]');
-  assert.equal(mock.fns('compStart').length, 0);
-  await fillIdentity(page);
   await answerAllAndSend(page);
-
-  const start = mock.fns('compStart')[0].arg;
-  assert.equal(start.ptoken, undefined, 'no code');
-  assert.deepEqual(start.fields, { name: 'مارك ميلاد', phone: '01012345678', church: 'أبي سيفين' });
-  assert.deepEqual(await page.$$eval('.result__line', els => els.map(e => [e.dataset.kind, e.textContent])), [
-    ['guest', 'دي نتيجتك — المشاركة بدون كود مفيهاش نقاط'],
-    ['score', 'جبت ٥٠ من ٥٠']
-  ]);
   assert.equal(await page.$('.result__line--points'), null);
-  assert.equal(await page.$('.answers, .answer'), null, 'no answers / marks without result.review');
-  assert.equal(await overflow(page), 0);
-  await axe(page, 'guest result');
-  assert.deepEqual(problems.filter(p => !/Refused to apply inline style/.test(p)), []);
-  await context.close();
-
-  // without allowGuests: no offer
-  const plain = await open('/competition/quiz-reg/');
-  await plain.page.click('[data-cta]');
-  await waitState(plain.page, 'code');
-  assert.equal(await plain.page.$('[data-guest]'), null);
-  await plain.context.close();
-
-});
-
-test('a code outside the age range: the notice on «الكود مسجل باسم …», they continue, no points line', async () => {
-
-  const { context, page, problems, mock } = await open('/competition/quiz-guests/', { bypassCSP: true });
-  await page.click('[data-cta]');
-  await waitState(page, 'code');
-  await page.type('#f-code', 'ATH-3456-789B');
-  await page.click('button[type="submit"]');
-  await waitState(page, 'confirm');
-  assert.equal(await textOf(page, '.who__name'), 'بيشوي سمير');
-  assert.equal(await textOf(page, '[data-age-notice]'), AGE_NOTICE);
-  assert.equal(await page.$eval('[data-age-notice]', el => el.classList.contains('alert')), false, 'a notice, not an error');
-  await axe(page, 'confirm + age notice');
-  await clickText(page, 'button', 'أيوه، ده أنا');
-  await answerAllAndSend(page);
-  assert.equal(mock.fns('compStart')[0].arg.ptoken, 'pt1.old.sig', 'recorded under their code');
-  assert.equal(await textOf(page, '.result__line--score'), 'جبت ٥٠ من ٥٠');
-  assert.equal(await page.$('.result__line--points'), null);
-  assert.match(await page.$eval('.result__lines', el => el.textContent), /متسجلة بالكود بتاعك من غير نقاط/);
   assert.deepEqual(problems.filter(p => !/Refused to apply inline style/.test(p)), []);
   await context.close();
 

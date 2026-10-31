@@ -775,28 +775,29 @@ test('edit lock: another admin in the builder → read-only with who; free again
 });
 
 
-test('module switches: the registry on, and the coded preset appears in the wizard (Phase 2 / 3 are installed now: tests/comp-admin2.e2e.mjs)', async () => {
+test('module switches: no codes switch; the wallet on, and the points preset appears in the wizard', async () => {
 
   await d.page.evaluate(() => A.go('comps', 'compsettings'));
   await $('.comp-module');
-  assert.equal(await d.page.$eval('[data-module="wallet"] input', n => n.disabled), true, 'the wallet waits for the registry');
-  await d.page.waitForFunction(() => !document.querySelector('[data-module="registry"] input').disabled, { timeout: 10000 });
-  await d.page.$eval('[data-module="registry"] input', n => n.click());
-  for (let i = 0; i < 40 && world.properties.get('COMP_REGISTRY') !== '1'; i++) await sleep(250);
-  assert.equal(world.properties.get('COMP_REGISTRY'), '1');
-  await d.page.waitForFunction(() => document.querySelector('.comp-module.is-on [data-module="registry"]'), { timeout: 10000 });
+  assert.equal(await d.page.$('[data-module="registry"]'), null, 'accounts replaced the codes');
+  await d.page.waitForFunction(() => !document.querySelector('[data-module="wallet"] input').disabled, { timeout: 10000 });
+  await d.page.$eval('[data-module="wallet"] input', n => n.click());
+  for (let i = 0; i < 40 && world.properties.get('COMP_WALLET') !== '1'; i++) await sleep(250);
+  assert.equal(world.properties.get('COMP_WALLET'), '1');
   await shot('20-modules');
 
   await d.page.evaluate(() => A.compNew());
   await $('dialog.sheet[open] .comp-presets');
-  assert.ok((await d.page.$$eval('dialog.sheet[open] .comp-preset strong', n => n.map(x => x.textContent))).includes('مسابقة بأكواد'));
+  const presets = await d.page.$$eval('dialog.sheet[open] .comp-preset strong', n => n.map(x => x.textContent));
+  assert.ok(presets.includes('مسابقة نقاط'));
+  assert.ok(!presets.includes('مسابقة بأكواد'));
   await d.page.evaluate(() => { A.dirty = false; document.getElementById('sheet').close(); });
 
   await d.page.evaluate(() => A.go('comps', 'compsettings'));
-  await $('[data-module="registry"] input');
-  await d.page.$eval('[data-module="registry"] input', n => n.click());
-  for (let i = 0; i < 40 && world.properties.get('COMP_REGISTRY') !== ''; i++) await sleep(250);
-  assert.equal(world.properties.get('COMP_REGISTRY'), '');
+  await $('[data-module="wallet"] input');
+  await d.page.$eval('[data-module="wallet"] input', n => n.click());
+  for (let i = 0; i < 40 && world.properties.get('COMP_WALLET') !== ''; i++) await sleep(250);
+  assert.equal(world.properties.get('COMP_WALLET'), '');
 
 });
 
@@ -835,7 +836,7 @@ test('360px: the dock fits eight areas; the list, the builder tabs and screens n
   assert.ok(await overflow(d.page) <= 0, 'list');
   await shot('21-phone-list');
 
-  for (const key of ['overview', 'basics', 'people', 'rules', 'result', 'questions', 'notify', 'subs', 'review', 'results', 'preview']) {
+  for (const key of ['overview', 'basics', 'rules', 'result', 'questions', 'notify', 'subs', 'review', 'results', 'preview']) {
     await d.page.evaluate(id => { A.dirty = false; return A.compOpen(id, 'overview'); }, compId);
     await d.page.evaluate(k => { A.comp.tab = k; A.render(); }, key);
     await d.page.waitForFunction(k => document.querySelector(`.comp-tab[data-tab="${k}"]`), {}, key);

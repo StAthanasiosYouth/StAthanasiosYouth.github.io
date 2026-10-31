@@ -87,27 +87,6 @@ test('redeem replies and errors; which failures keep the requestKey', () => {
   assert.ok(M.KEEP_KEY.has('network') && M.KEEP_KEY.has('busy') && !M.KEEP_KEY.has('stock') && !M.KEEP_KEY.has('insufficient'));
 });
 
-test('participant token: sessionStorage only, validated, failures harmless', () => {
-  const data = new Map();
-  const store = { getItem: k => data.get(k) ?? null, setItem: (k, v) => data.set(k, v), removeItem: k => data.delete(k) };
-  assert.equal(M.readToken(store), '');
-  M.writeToken(store, 'pt1.eyJwIjoxfQ.sig');
-  assert.equal(M.readToken(store), 'pt1.eyJwIjoxfQ.sig');
-  assert.deepEqual([...data.keys()], ['athanasios.portal.v1']);
-  M.clearToken(store);
-  assert.equal(M.readToken(store), '');
-  data.set('athanasios.portal.v1', '<script>');
-  assert.equal(M.readToken(store), '', 'not a token');
-  const hostile = { getItem() { throw new Error('x'); }, setItem() { throw new Error('x'); }, removeItem() { throw new Error('x'); } };
-  assert.equal(M.readToken(hostile), '');
-  assert.equal(M.writeToken(hostile, 'pt1.a.b'), false);
-  M.clearToken(hostile);
-  assert.equal(M.readToken(null), '');
-  const code = read('assets/js/comp/portal.js') + read('assets/js/comp/portal-model.js');
-  assert.doesNotMatch(code, /localStorage/, 'never localStorage');
-  assert.doesNotMatch(code, /innerHTML|insertAdjacentHTML|\beval\(/);
-});
-
 test('points/index.html: the site CSP, no inline code, relative URLs; sw.js allows /points/', () => {
   const page = read('points/index.html');
   const csp = html => /<meta http-equiv="Content-Security-Policy" content="([^"]+)">/.exec(html)[1];
