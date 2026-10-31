@@ -54,6 +54,14 @@ Sound: the site's own switch and synthesised sounds (`sound.js`), adding `enter`
 - `tests/youth-admin.e2e.mjs` (the photo in the admin)
 - `worker/scripts/account-page-check.mjs` (live on staging, real R2 and D1)
 
+### Release (2026-10-31)
+
+On staging first: Worker `4028c699`, `account-page-check` and `account-check` passed against real R2 and D1. Then production, the Worker before the page, so the page never called a route that wasn't there: Worker `8cec81b7` from `96a979b` (CI: staging, smoke, migration 0023, production, smoke), page and admin `32e3fb8`.
+
+After the release: smoke passes; `tools/account-prod-check.mjs` passes (the new page on the real site at phone and computer widths, no script or CSP errors, silent until a tap, the new routes closed without a session).
+
+**Not checked by these tests:** the signed-in pages on production (no test account was made there), a real iPhone and Android, real uploads from a phone's camera or HEIC files, how the sounds actually sound, and the admin's photo screen on production. In the unit run, `a competition and a trip…` and `admin/config.js` fail on `60d0200` as well, so they predate this step.
+
 ### Back
 
-Page and admin: revert the release commit on `main`. Worker: `npx wrangler rollback <version>`. Migration 0023 only adds two columns and can stay. Photos already uploaded stay in R2 under `avatars/`.
+Page and admin: revert `32e3fb8` on `main`. Worker: `npx wrangler rollback ade89df5` (the version before this step); revert the page first, because it needs the new routes. Migration 0023 only adds two columns and can stay. Photos already uploaded stay in R2 under `avatars/`.
