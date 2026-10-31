@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "4017b3ad3b6d",
-  "publishedAt": "2026-10-30T21:54:46.112Z",
+  "revision": "7f8a4765459a",
+  "publishedAt": "2026-10-31T06:49:13.723Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -308,6 +308,44 @@
       "ctaLabel": "ادخل صفحة فريق المسرح ال",
       "watch": true,
       "partner": "bug"
+    },
+    {
+      "id": "act-6836e989",
+      "type": "competition",
+      "section": "competitions",
+      "title": "تجربة تشغيل",
+      "subtitle": "",
+      "description": "",
+      "image": null,
+      "cta": null,
+      "location": "",
+      "startAt": "2026-10-30T23:51",
+      "endAt": "2026-11-01T22:00",
+      "visibleFrom": "",
+      "visibleUntil": "2026-11-01T22:00",
+      "display": "",
+      "displayMobile": "",
+      "competition": "tgrba-tshghyl",
+      "ctaLabel": "ابدأ المسابقة"
+    },
+    {
+      "id": "act-786a1b0d",
+      "type": "competition",
+      "section": "competitions",
+      "title": "مسابقة نقاط",
+      "subtitle": "",
+      "description": "",
+      "image": null,
+      "cta": null,
+      "location": "",
+      "startAt": "",
+      "endAt": "",
+      "visibleFrom": "",
+      "visibleUntil": "",
+      "display": "",
+      "displayMobile": "",
+      "competition": "msabqa-nqat",
+      "ctaLabel": "ابدأ المسابقة"
     }
   ],
   "types": [
@@ -316,6 +354,13 @@
       "label": "مسرح أسود",
       "icon": "theatre",
       "theme": "night",
+      "banner": null
+    },
+    {
+      "key": "competition",
+      "label": "مسابقة",
+      "icon": "trophy",
+      "theme": "ember",
       "banner": null
     }
   ],
@@ -470,7 +515,16 @@
       "shortTitle": "",
       "startAt": "2026-10-30T23:51",
       "endAt": "2026-11-01T22:00",
-      "v": "dcea1facb6f062df"
+      "v": "b3f7f8b33827830f"
+    },
+    {
+      "id": "cmp-8a21f34d",
+      "slug": "msabqa-nqat",
+      "title": "مسابقة نقاط",
+      "shortTitle": "",
+      "startAt": "",
+      "endAt": "",
+      "v": "6c8cf8b4a850c206"
     }
   ],
   "pages": [
