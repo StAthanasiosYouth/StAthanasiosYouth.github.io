@@ -362,7 +362,7 @@ export const ROUTES = [
   { method: 'GET', path: '/v1/admin/content/export', auth: 'admin', handler: adminDraftsExport },
   { method: 'GET', path: '/v1/admin/content/status', auth: 'admin', handler: adminDraftsStatus },
   { method: 'POST', path: '/v1/admin/content/call', auth: 'admin', needSession: true, maxBytes: 256 * 1024, handler: adminContentCall },
-  { method: 'POST', path: '/v1/sync/comp-sig', auth: 'sync', raw: true, maxBytes: 1024, handler: syncCompSig },
+  { method: 'POST', path: '/v1/sync/comp-sig', auth: 'sync', raw: true, maxBytes: 512 * 1024, handler: syncCompSig },
   { method: 'POST', path: '/v1/admin/media/upload', auth: 'admin', needSession: true, maxBytes: MEDIA_UPLOAD_MAX_BYTES, handler: adminMediaUpload },
   { method: 'POST', path: '/v1/sync/media-copy', auth: 'sync', raw: true, maxBytes: MEDIA_UPLOAD_MAX_BYTES, handler: syncMediaCopy },
   { method: 'GET', path: '/v1/admin/content/media-status', auth: 'admin', handler: adminMediaStatus },

@@ -114,6 +114,20 @@ test('the move: a dry run changes nothing; apply copies every row, freezes Apps 
   assert.match(again.problems[0], /already worker/);
 });
 
+test('the signature with a big view is accepted: the store items keep arriving after the move', async () => {
+  const { world } = sheets();
+  const w = await worker(world);
+  await w.move('apply');
+  const items = Array.from({ length: 200 }, (_, i) => ({ id: 'itm-' + i, name: 'جائزة ' + i, image: 'img-' + i, active: '1' }));
+  const comps = Array.from({ length: 50 }, (_, i) => ({ id: 'cmp-' + i, slug: 's-' + i, title: 'مسابقة ' + i, banner: '', icon: '' }));
+  const sent = await w.sync('/v1/sync/comp-sig', { sig: 'a'.repeat(64), view: { comps, questions: [], items } });
+  assert.equal(sent.status, 200, JSON.stringify(sent.body));
+  const view = JSON.parse((await w.h.db.prepare("SELECT data FROM comp_package WHERE id = 'view'").first()).data);
+  assert.equal(view.items.length, 200);
+  assert.equal(view.items[0].active, '1');
+  assert.equal((await rowsOf(w.h, 'competitions')).length, 1, 'the drafts stay D1\'s: the view never replaces them');
+});
+
 test('before the move the calls are refused and the panel keeps using Apps Script', async () => {
   const { world } = sheets();
   const w = await worker(world);

@@ -385,7 +385,7 @@ Owner approved and set the Script Property `COMP_RUNTIME = worker` in the editor
 1. **iPhone:** not tested.
 2. **Android:** the owner's close order names only iPhone; no Android result was reported in the runbook record.
 3. **Performance at the first real competition:** watch `wrangler tail`. Peak CPU so far: 55 ms on an admin call (21 of 92 above 10 ms), 14 ms on `book/submit`, 13 ms on `comp/submit`, with no rejected request. Test traffic only, so the load is unproven. If requests start failing on CPU, the fix is the paid plan, which is the owner's decision.
-4. **`comp-sig` 413:** harmless to competitions since the move, because they no longer read it. It does keep the store items' picture list (`view.items`) stale and adds a wasted call after admin calls on Apps Script. Fix: raise the route's `maxBytes`.
+4. **`comp-sig` 413:** fixed 2026-10-31, the limit is now 512 KB.
 5. **Screens still on Apps Script:** old participants, wallet, store and seasons screens, and push schedules (§3o).
 6. **Cleanup in Phase 7c** also covers today's test records and their still-enabled cards. Each publish warns about those cards until then.
 7. **Uninvestigated:** one old 500 on `/v1/sync/content-notify`, 2026-10-29.
