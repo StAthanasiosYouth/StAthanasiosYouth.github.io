@@ -54,7 +54,7 @@ import { adminComps, adminCompSubmissions, adminCompSubmission, adminCompGrade, 
 import { shopRedeem, shopCancel, adminStoreItems, adminStoreItemSave, adminStoreItemDelete, adminRedemptions, adminRedemptionStatus, adminStoreSchedule, adminStoreScheduleSave, syncStoreImport } from './store/shop.js';
 import { accountSummary } from './account/summary.js';
 import { AVATAR_MAX_BYTES, accountAvatarSave, accountAvatarRead, accountAvatarDelete, adminAvatarRead } from './account/avatar.js';
-import { accountConfig, accountSignin, accountRegisterStart, accountRegisterVerify, accountMe, accountBookingsList, accountBookingsLink, accountPoints, accountSecurity, accountPrefs, accountPrefsSave, accountLogout, accountForgot, accountForgotVerify } from './account/routes.js';
+import { accountOnboarded, accountConfig, accountSignin, accountRegisterStart, accountRegisterVerify, accountMe, accountBookingsList, accountBookingsLink, accountPoints, accountSecurity, accountPrefs, accountPrefsSave, accountLogout, accountForgot, accountForgotVerify } from './account/routes.js';
 
 /* GET /v1/admin/publish/status — the last publishes + the shadow gate (docs/PUBLISH-SEPARATION-PLAN.md P2-2) */
 async function publishStatus(ctx) {
@@ -377,6 +377,7 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/account/register/verify', auth: 'public', maxBytes: 1024, handler: accountRegisterVerify },
   { method: 'GET', path: '/v1/account/me', auth: 'public', handler: accountMe },
   { method: 'GET', path: '/v1/account/summary', auth: 'public', handler: accountSummary },
+  { method: 'POST', path: '/v1/account/onboarded', auth: 'public', maxBytes: 1024, handler: accountOnboarded },
   { method: 'GET', path: '/v1/account/avatar', auth: 'public', handler: accountAvatarRead },
   { method: 'POST', path: '/v1/account/avatar', auth: 'public', raw: true, maxBytes: AVATAR_MAX_BYTES, handler: accountAvatarSave },
   { method: 'POST', path: '/v1/account/avatar/delete', auth: 'public', maxBytes: 1024, handler: accountAvatarDelete },

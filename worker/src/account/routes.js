@@ -101,6 +101,7 @@ export function accountViewOf(account, settings, now = Date.now()) {
     phone: account.phone,
     birthDate: account.birth_date,
     avatar: account.avatar_key ? account.avatar_version : null,
+    onboarded: !!account.onboarded_at,
     eligible: e.state === 'eligible',
     eligibility: { state: e.state, soon: e.soon, leavesAt: e.soon ? e.leavesAt : null }
   };
@@ -327,6 +328,15 @@ export async function accountMe(ctx) {
   const settings = await gate(ctx);
   const { account } = await requireAccount(ctx, settings);
   return { account: accountViewOf(account, settings) };
+}
+
+/* POST /v1/account/onboarded: the first-time walkthrough was seen; it shows once per account, on any device */
+export async function accountOnboarded(ctx) {
+  const settings = await gate(ctx);
+  const { account } = await requireAccount(ctx, settings);
+  await limit(ctx, 'acct.onboarded', account.id, 30, 60);
+  if (!account.onboarded_at) await retry(() => ctx.env.DB.prepare('UPDATE participants SET onboarded_at = ? WHERE id = ? AND onboarded_at IS NULL').bind(Date.now(), account.id).run());
+  return { onboarded: true };
 }
 
 /* GET /v1/account/bookings: this account's bookings */

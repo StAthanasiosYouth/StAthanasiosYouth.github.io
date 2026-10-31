@@ -193,6 +193,21 @@ test('summary: a new account reads empty, in one call', async () => {
   assert.equal((await h.call('/v1/account/summary', {})).status, 401);
 });
 
+test('the walkthrough: not seen for a new account; once marked it stays, on any device; needs a session', async () => {
+  const h = await world();
+  const m = await member(h);
+  assert.equal((await h.call('/v1/account/me', { headers: m.auth })).body.account.onboarded, false);
+  assert.equal((await h.call('/v1/account/summary', { headers: m.auth })).body.account.onboarded, false);
+  assert.equal((await h.call('/v1/account/onboarded', { method: 'POST', body: {} })).status, 401);
+  const first = await h.call('/v1/account/onboarded', { method: 'POST', body: {}, headers: m.auth });
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  const at = (await h.db.prepare('SELECT onboarded_at FROM participants WHERE id = ?').bind(m.id).first()).onboarded_at;
+  assert.ok(at > 0);
+  assert.equal((await h.call('/v1/account/onboarded', { method: 'POST', body: {}, headers: m.auth })).status, 200, 'again: quiet');
+  assert.equal((await h.db.prepare('SELECT onboarded_at FROM participants WHERE id = ?').bind(m.id).first()).onboarded_at, at, 'the first time stays');
+  assert.equal((await h.call('/v1/account/summary', { headers: m.auth })).body.account.onboarded, true);
+});
+
 test('points: the rows say what they were; the store state comes with them', async () => {
   const h = await world();
   const m = await member(h);

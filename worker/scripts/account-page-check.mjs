@@ -112,6 +112,14 @@ try {
   await sleep(1400);
   await settle(page);
   check('registered through the page, the first page opens', /أهلاً بيك يا مينا/.test(await page.$eval('.ac-hero__hi', n => n.textContent)));
+  await page.waitForSelector('[data-tour]', { timeout: 8000 });
+  check('the walkthrough shows the first time', true);
+  await settle(page);
+  await page.screenshot({ path: SHOTS + 'tour-mobile.png' });
+  await page.click('[data-tour-skip]');
+  await page.waitForFunction(() => !document.querySelector('[data-tour]'));
+  await sleep(1200);
+  check('skipping marks it seen on the server', sql(`SELECT onboarded_at FROM participants WHERE email = '${email}'`)[0].onboarded_at > 0);
   await page.screenshot({ path: SHOTS + 'new-mobile.png', fullPage: false });
   check('no errors so far (real CSP)', page.problems.length === 0, page.problems);
 
