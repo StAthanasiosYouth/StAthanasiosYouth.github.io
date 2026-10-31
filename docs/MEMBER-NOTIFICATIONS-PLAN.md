@@ -138,7 +138,7 @@ One rolling-24h window (`notify_quota` hour buckets, shared with admin mail). Ta
 | 2 | admin critical | 50 (`MAIL_RESERVE_CRITICAL`) | over the room: `deferred_quota` + push (existing, never expires) |
 | 3 | `member_tx` | 100 (`MAIL_RESERVE_MEMBER`, new) | Tier 0–2 transactional |
 | 4 | admin important | 120 (`MAIL_ADMIN_BUDGET`) | over: into the daily summary (existing) |
-| 5 | `member_bulk` | remainder | results, completion, age-out; drip `MAIL_BULK_PER_HOUR` (default 30) |
+| 5 | `member_bulk` | remainder | age-out notices; drip `MAIL_BULK_PER_HOUR` (default 30). Results moved to `member_tx` in the accounts improvements, Step 3: as bulk they got only the 30 a day the reservations left |
 | 6 | admin routine / summaries | remainder | |
 
 Rule (replaces today's hard caps in `allowed()`): a send of class *c* is allowed when `total < target − Σ unused reservations of the classes ranked above c` (unused = reservation − sent in the window, ≥ 0); OTP checks only `total < target`. Reservations protect room; they never cap a class while room is free. The counters gain columns per class (`member_tx`, `member_bulk`, `admin`) and the `otp` counter is actually incremented (5A-1 migration; current production values 150/50 stay until then).

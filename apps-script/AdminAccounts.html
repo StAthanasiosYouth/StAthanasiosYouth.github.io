@@ -32,7 +32,7 @@
   };
   var LEDGER = { earn: 'نقاط مسابقة', competition: 'نقاط مسابقة', correction: 'تصحيح نتيجة', manual: 'تعديل يدوي', transfer: 'نقل', spend: 'طلب من المتجر', refund: 'رجوع نقاط' };
   var STATUS = { pending: 'قيد المراجعة', confirmed: 'مؤكد', rejected: 'مرفوض', cancelled: 'ملغي', withdrawn: 'اتسحب' };
-  var MAIL = { queued: 'مستني', sent: 'اتبعت', failed: 'هيتعاد', dead: 'فشل', deferred: 'مؤجل', expired: 'انتهى', superseded: 'اتلغى', suppressed: 'اتمنع' };
+  var MAIL = { queued: 'مستني', sending: 'بيتبعت', sent: 'اتبعت', failed: 'هيتعاد', dead: 'فشل', deferred: 'مؤجل', expired: 'انتهى', superseded: 'اتلغى', suppressed: 'اتمنع' };
 
   function api(method, path, body) { return window.AdminWorker.call(method, '/v1/admin/' + path, body, { quiet: true }); }
   function when(ms) { return ms ? new Date(ms).toLocaleString('ar-EG', { timeZone: 'Africa/Cairo', dateStyle: 'medium', timeStyle: 'short' }) : '—'; }

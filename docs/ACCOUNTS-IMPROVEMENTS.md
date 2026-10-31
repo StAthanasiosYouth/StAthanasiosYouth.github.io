@@ -112,3 +112,39 @@ After the release: smoke passes; `tools/account-badge-prod-check.mjs` and `tools
 **Not checked by these tests:** signing in, the walkthrough and the door with a photo on production (no test account was made there), a real iPhone and Android, and how it feels by hand.
 
 **Back:** revert `486a4ca` on `main` first, then `npx wrangler rollback 8cec81b7`. Migration 0024 only adds a column and can stay.
+
+## Step 3: emails
+
+The owner kept the old blue design with five edits only, and the sending fix after the measurements.
+
+**Design** (`worker/src/notify/templates.js`): the logo on the right beside the names; the code as one run of six digits with no cells; the white card the full width of the mail, so its corners meet the header and it reaches the footer; a dark version for apps that honour `prefers-color-scheme` (the header, code and footer keep their blue, the white parts go dark); the words `Verification code` beside the code, also in the plain text. No copy button: mail apps drop scripts, and a link would carry the code. Whether Gmail recognises the code is Google's unpublished rule, so that part is best effort.
+
+**Sending:**
+- `res.result`, `res.done` and `res.points` are `member_tx`. As `member_bulk` they got only the 30 a day the reservations left. The 400 budget and the OTP and critical reservations did not change, and results don't count toward the ten daily receipts. `acct.age` stays gradual.
+- `memberKick` (`notify/tick.js`) runs after the reply on routes that can write a member's email. One or two rows are sent directly; more go through the queue. The queue alone once held a leased row for 57 s, which is why the common case skips it. The cron stays as the safety net, now up to three batches a minute.
+- The lease is one `UPDATE … RETURNING`, and `memberSend` claims each row with one `UPDATE` to `sending`, so two paths or a repeated job can't send a row twice. A row stuck in `sending` goes back in line when its 10 minute lease ends. A crash after Gmail accepts and before the row is saved can still send twice, rarely.
+
+### Measured on Staging (2026-10-31)
+
+| Test | Before | After |
+|---|---|---|
+| One real email, saved to accepted by Gmail (5 runs) | waited 42–56 s before sending | 0.9–1.2 s |
+| One row, test inbox (15 runs) | median 51 s | 0.3–0.4 s |
+| One real OTP (1 run) | path unchanged | 0.9 s |
+| 5 real emails at the same moment | not measured | 6.6–13.2 s, none twice |
+| 120 rows, cron alone, test inbox | 10 a minute | 29 a minute, none twice |
+| 100 rows, 15 parallel requests and the cron, test inbox | not measured | 85 a minute, none twice, none stuck |
+
+CPU: a request that also sent through Gmail used a median of 11 ms and a maximum of 25 ms.
+
+**Not checked:** arrival in the inbox (the Gmail scope only sends), 30 real emails a minute (calculated from about 1.6 s per email in a batch), real Gmail and Apple Mail in dark mode, Gmail recognising the code on a phone, and production quotas (the session was refused production reads).
+
+### Release (2026-10-31)
+
+Worker `662e11f`, version `73437f90` through CI; the rollback version is `2401d969`. No migration. The admin label for a row being sent went out after it.
+
+After the release: CI tests and smoke pass, `/v1/health` answers 200, and `tools/account-prod-check.mjs` passes.
+
+**Not checked on production:** no real email was sent there, so the first real one is the first test of this path.
+
+**Back:** `npx wrangler rollback 2401d969` from `worker/`, then revert `662e11f` on `main` so the next push doesn't bring it back. Rows in `sending` at that moment stay there: the old code doesn't pick them up, so set them back to `queued`.
