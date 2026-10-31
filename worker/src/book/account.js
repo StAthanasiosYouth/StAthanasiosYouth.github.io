@@ -12,11 +12,12 @@ import { limit, clientIp } from '../lib/ratelimit.js';
 import { begin, finishStmt, abandon } from '../lib/idempotency.js';
 import { memberEmailStmt } from '../notify/member.js';
 import { requireAccount } from '../account/session.js';
-import { readStatusToken } from './token.js';
+import { readStatusToken, statusToken } from './token.js';
 import { paidOf, amountDueOf, stampMs } from './model.js';
 
 const HOUR = 3600 * 1000;
 const DAY = 24 * HOUR;
+const STATUS_TOKEN_MS = 60 * DAY;   // book/public.js: event end + 60 days
 const KEYS_SQL = "('accounts_mode', 'session_days_device', 'session_hours_shared')";
 const CHANGE_FIELDS = { date: 'التاريخ', time: 'الميعاد', place: 'المكان' };
 
@@ -56,21 +57,23 @@ export function bookMailStmts(db, b, kind, { guard, guardBinds, dedupe, now = Da
 /* GET /v1/account/bookings: «حجوزاتي» of the signed-in account */
 export async function accountBookings(ctx, account) {
   const db = ctx.env.DB;
-  const rows = (await retry(() => db.prepare(`SELECT b.*, e.title, e.start_at, e.booking AS cfg FROM bookings b LEFT JOIN event_cfg e ON e.id = b.event_id
+  const rows = (await retry(() => db.prepare(`SELECT b.*, e.title, e.slug, e.start_at, e.end_ms, e.booking AS cfg FROM bookings b LEFT JOIN event_cfg e ON e.id = b.event_id
     WHERE b.participant_id = ? ORDER BY b.created_ms DESC LIMIT 50`).bind(account.id).all())).results;
   if (!rows.length) return { bookings: [] };
   const pays = (await retry(() => db.prepare(`SELECT * FROM payments WHERE booking_id IN (${rows.map(() => '?').join(',')})`).bind(...rows.map(r => r.id)).all())).results;
   return {
-    bookings: rows.map(b => {
+    bookings: await Promise.all(rows.map(async b => {
       const paid = paidOf(pays.filter(p => p.booking_id === b.id));
       const total = amountDueOf(b);
       let due = '';
       try { const cfg = b.cfg ? JSON.parse(b.cfg) : null; due = cfg && cfg.payment && cfg.payment.mode === 'installments' ? cfg.payment.finalDueAt || '' : ''; } catch { due = ''; }
       return {
         ref: b.ref, status: b.status, event: b.title || '', startAt: b.start_at || '', total, paid, left: Math.max(0, total - paid), dueAt: due,
-        reason: b.status === 'rejected' ? b.reject_reason || '' : b.status === 'cancelled' ? b.cancel_reason || '' : ''
+        reason: b.status === 'rejected' ? b.reject_reason || '' : b.status === 'cancelled' ? b.cancel_reason || '' : '',
+        // the booking's own status page, where the member pays what is left: their booking, their token
+        slug: b.slug || '', statusToken: b.slug ? await statusToken(ctx.env, b.id, (b.end_ms || b.created_ms) + STATUS_TOKEN_MS).catch(() => '') : ''
       };
-    })
+    }))
   };
 }
 

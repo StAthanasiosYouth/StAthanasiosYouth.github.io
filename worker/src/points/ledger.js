@@ -65,13 +65,25 @@ export async function pointsOf(db, participantId, frozenFrom) {
 }
 
 /* GET /v1/account/points: «نقاطي» for the signed-in account; the notes it may read, and no one else's */
+const compTitle = meta => {
+  try {
+    const m = meta ? JSON.parse(meta) : null;
+    return m ? m.shortTitle || m.title || '' : '';
+  } catch {
+    return '';
+  }
+};
+
 export async function memberPoints(ctx, account, settings) {
   const db = ctx.env.DB;
   const state = eligibility(account, rulesFrom(settings)).state;
   const p = await pointsOf(db, account.id, state);
-  const rows = (await retry(() => db.prepare(`SELECT * FROM points_ledger l WHERE l.participant_id = ? AND l.season_id = ? AND ${HELD_SQL} ORDER BY l.created_ms DESC, l.id DESC LIMIT 100`).bind(account.id, p.season ? p.season.id : '').all())).results;
+  const rows = (await retry(() => db.prepare(`SELECT l.*,
+      (SELECT v.meta FROM comp_versions v WHERE v.comp_id = l.comp_id ORDER BY v.version DESC LIMIT 1) AS comp_meta,
+      (SELECT r.item_name FROM redemptions r WHERE r.id = substr(l.ref, 5) AND substr(l.ref, 1, 4) IN ('red:', 'ref:')) AS item_name
+    FROM points_ledger l WHERE l.participant_id = ? AND l.season_id = ? AND ${HELD_SQL} ORDER BY l.created_ms DESC, l.id DESC LIMIT 100`).bind(account.id, p.season ? p.season.id : '').all())).results;
   const balance = p.season ? await retry(() => db.prepare(`SELECT COALESCE(SUM(l.amount), 0) AS n FROM points_ledger l WHERE l.participant_id = ? AND l.season_id = ? AND ${HELD_SQL}`).bind(account.id, p.season.id).first('n')) : 0;
-  return { season: p.season, balance, frozen: state === 'guest' && balance > 0, eligible: state === 'eligible', ledger: rows.map(l => entryView(l, false)), seasons: p.seasons.map(s => ({ name: s.name, earned: s.earned, spent: s.spent, final: s.final })) };
+  return { season: p.season, balance, frozen: state === 'guest' && balance > 0, eligible: state === 'eligible', ledger: rows.map(l => ({ ...entryView(l, false), title: l.item_name || compTitle(l.comp_meta) })), seasons: p.seasons.map(s => ({ name: s.name, earned: s.earned, spent: s.spent, final: s.final })) };
 }
 
 function adjustInput(body) {

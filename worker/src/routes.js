@@ -44,7 +44,7 @@ import { syncCompSig } from './content/comps.js';
 import { syncMediaCopy, adminMediaStatus } from './content/media.js';
 import {
   adminParticipants, adminParticipantsReview, adminParticipantsExport, adminParticipantCreate, adminParticipant, adminParticipantProfile, adminParticipantEmail, adminParticipantPhone,
-  adminParticipantDob, adminParticipantEligibility, adminParticipantViewPassword, adminParticipantResetPassword, adminParticipantBlock, adminParticipantUnblock, adminParticipantRevoke,
+  adminParticipantDob, adminParticipantEligibility, adminParticipantViewPassword, adminParticipantResetPassword, adminParticipantBlock, adminParticipantUnblock, adminParticipantRevoke, adminParticipantAvatarDelete,
   adminParticipantResend, adminParticipantSettings, adminParticipantSettingsSave
 } from './account/admin.js';
 import { adminPointsAdjust, adminPointsTransfer, adminSeasons, adminSeasonSave, adminSeasonPreview, adminSeasonClose } from './points/ledger.js';
@@ -52,6 +52,8 @@ import { adminBookingLink } from './book/account.js';
 import { compStart, compSubmit, compResult, compMe, syncCompLive } from './comp/runtime.js';
 import { adminComps, adminCompSubmissions, adminCompSubmission, adminCompGrade, adminCompVoid, adminCompRegrade } from './comp/admin.js';
 import { shopRedeem, shopCancel, adminStoreItems, adminStoreItemSave, adminStoreItemDelete, adminRedemptions, adminRedemptionStatus, adminStoreSchedule, adminStoreScheduleSave, syncStoreImport } from './store/shop.js';
+import { accountSummary } from './account/summary.js';
+import { AVATAR_MAX_BYTES, accountAvatarSave, accountAvatarRead, accountAvatarDelete, adminAvatarRead } from './account/avatar.js';
 import { accountConfig, accountSignin, accountRegisterStart, accountRegisterVerify, accountMe, accountBookingsList, accountBookingsLink, accountPoints, accountSecurity, accountPrefs, accountPrefsSave, accountLogout, accountForgot, accountForgotVerify } from './account/routes.js';
 
 /* GET /v1/admin/publish/status — the last publishes + the shadow gate (docs/PUBLISH-SEPARATION-PLAN.md P2-2) */
@@ -374,6 +376,10 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/account/register/start', auth: 'public', maxBytes: 8 * 1024, handler: accountRegisterStart },
   { method: 'POST', path: '/v1/account/register/verify', auth: 'public', maxBytes: 1024, handler: accountRegisterVerify },
   { method: 'GET', path: '/v1/account/me', auth: 'public', handler: accountMe },
+  { method: 'GET', path: '/v1/account/summary', auth: 'public', handler: accountSummary },
+  { method: 'GET', path: '/v1/account/avatar', auth: 'public', handler: accountAvatarRead },
+  { method: 'POST', path: '/v1/account/avatar', auth: 'public', raw: true, maxBytes: AVATAR_MAX_BYTES, handler: accountAvatarSave },
+  { method: 'POST', path: '/v1/account/avatar/delete', auth: 'public', maxBytes: 1024, handler: accountAvatarDelete },
   { method: 'GET', path: '/v1/account/bookings', auth: 'public', handler: accountBookingsList },
   { method: 'POST', path: '/v1/account/bookings/link', auth: 'public', maxBytes: 4 * 1024, handler: accountBookingsLink },
   { method: 'GET', path: '/v1/account/points', auth: 'public', handler: accountPoints },
@@ -399,6 +405,8 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/admin/participants/:id/eligibility', auth: 'admin', maxBytes: 4 * 1024, handler: adminParticipantEligibility },
   { method: 'POST', path: '/v1/admin/participants/:id/view-password', auth: 'admin', maxBytes: 1024, handler: adminParticipantViewPassword },
   { method: 'POST', path: '/v1/admin/participants/:id/reset-password', auth: 'admin', maxBytes: 4 * 1024, handler: adminParticipantResetPassword },
+  { method: 'GET', path: '/v1/admin/participants/:id/avatar', auth: 'admin', handler: adminAvatarRead },
+  { method: 'POST', path: '/v1/admin/participants/:id/avatar/delete', auth: 'admin', maxBytes: 4 * 1024, handler: adminParticipantAvatarDelete },
   { method: 'POST', path: '/v1/admin/participants/:id/block', auth: 'admin', maxBytes: 4 * 1024, handler: adminParticipantBlock },
   { method: 'POST', path: '/v1/admin/participants/:id/unblock', auth: 'admin', maxBytes: 4 * 1024, handler: adminParticipantUnblock },
   { method: 'POST', path: '/v1/admin/participants/:id/sessions/revoke', auth: 'admin', maxBytes: 1024, handler: adminParticipantRevoke },

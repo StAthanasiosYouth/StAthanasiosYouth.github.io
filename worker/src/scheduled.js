@@ -5,6 +5,7 @@
 
 import { logLine } from './lib/log.js';
 import { sweepProofs } from './lib/proofs.js';
+import { sweepAvatars } from './account/avatar.js';
 import { activityStmt } from './lib/activity.js';
 import { notifyTick } from './notify/tick.js';
 import { shadowCheck, SHADOW_EVERY_MIN } from './publish-shadow.js';
@@ -114,4 +115,6 @@ export async function scheduled(controller, env) {
   // proofs past their retention date, and R2 objects no row names (> 24 h)
   const proofs = await sweepProofs(env, { now });
   logLine({ kind: 'cron', job: 'proofs', ...proofs });
+  const avatars = await sweepAvatars(env, { now });
+  logLine({ kind: 'cron', job: 'avatars', ...avatars });
 }

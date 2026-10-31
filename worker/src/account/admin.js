@@ -19,6 +19,7 @@ import {
 } from './model.js';
 import { generatePassword, passwordHash, passwordEncrypt, passwordDecrypt } from './secret.js';
 import { revokeAllStmt } from './session.js';
+import { removeAvatarByAdmin } from './avatar.js';
 
 const PID = /^p-[a-z2-7]{8}$/;
 const REASON_MAX = 300;
@@ -72,7 +73,8 @@ const rowView = (p, rules, now) => {
   return {
     id: p.id, name: p.name, email: p.email, emailVerified: !!p.email_verified_at, emailVia: p.email_verified_via || null, phone: p.phone, birthDate: p.birth_date, age: e.age,
     eligibility: { state: e.state, source: e.source, soon: e.soon, leavesAt: e.soon ? e.leavesAt : null, override: p.eligibility_override || null },
-    group: p.grp || '', church: p.church || '', servant: p.servant || '', status: p.status, createdVia: p.created_via, createdAt: p.created_at
+    group: p.grp || '', church: p.church || '', servant: p.servant || '', status: p.status, createdVia: p.created_via, createdAt: p.created_at,
+    avatar: p.avatar_key ? p.avatar_version : null
   };
 };
 
@@ -409,6 +411,13 @@ export async function adminParticipantUnblock(ctx) {
     auditStmt(db, { id: p.id, at: now, actor: ctx.actor.email, action: 'unblock', reason }),
     act(ctx, now, 'participant.unblock', p.id, 'رجّع حساب مشترك')
   ]));
+  return adminParticipant(ctx);
+}
+
+/* POST /:id/avatar/delete { reason } (participants.edit): a photo that shouldn't be there; the member can add another */
+export async function adminParticipantAvatarDelete(ctx) {
+  const p = await personOr404(ctx.env.DB, ctx.params.id);
+  await removeAvatarByAdmin(ctx, p, reasonOf(ctx.body || {}));
   return adminParticipant(ctx);
 }
 

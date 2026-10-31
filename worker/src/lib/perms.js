@@ -118,6 +118,8 @@ export const ROUTE_PERMS = Object.freeze({
   // Primary Admin only, checked inside (§12.3)
   'POST /v1/admin/participants/:id/view-password': 'participants.view',
   'POST /v1/admin/participants/:id/reset-password': 'participants.manage',
+  'GET /v1/admin/participants/:id/avatar': 'participants.view',
+  'POST /v1/admin/participants/:id/avatar/delete': 'participants.edit',
   'POST /v1/admin/participants/:id/block': 'participants.edit',
   'POST /v1/admin/participants/:id/unblock': 'participants.manage',
   'POST /v1/admin/participants/:id/sessions/revoke': 'participants.manage',

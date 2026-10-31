@@ -26,6 +26,8 @@ import { CODE_MINUTES, isTestInbox, codesReady, codeRow, sendCode } from './mail
 import { memberEmailStmt, GROUPS, ALWAYS_ON } from '../notify/member.js';
 import { memberPoints } from '../points/ledger.js';
 import { accountBookings, accountBookingLink } from '../book/account.js';
+import { storeOf } from '../store/shop.js';
+import { wallOf } from '../comp/model.js';
 
 const SETTINGS = ['accounts_mode', 'OTP_EMAIL', 'age_min', 'age_max', 'age_warn_days', 'session_days_device', 'session_hours_shared', 'discovery_daily_cap',
   'GMAIL_HEALTH', 'MAIL_DAILY_TARGET', 'MAIL_ADMIN_BUDGET', 'MAIL_RESERVE_CRITICAL', 'MAIL_RESERVE_OTP', 'MAIL_RESERVE_MEMBER', 'support_contact'];
@@ -89,7 +91,7 @@ const failHit = async (ctx, bucket, who, max, windowS) => hit(ctx.env.DB, bucket
 
 const findByCanon = (db, canon) => retry(() => db.prepare("SELECT * FROM participants WHERE email_canon = ? AND status <> 'deleted'").bind(canon).first());
 
-function accountView(account, settings, now = Date.now()) {
+export function accountViewOf(account, settings, now = Date.now()) {
   const e = eligibility(account, rulesFrom(settings), now);
   return {
     id: account.id,
@@ -98,6 +100,7 @@ function accountView(account, settings, now = Date.now()) {
     email: account.email,
     phone: account.phone,
     birthDate: account.birth_date,
+    avatar: account.avatar_key ? account.avatar_version : null,
     eligible: e.state === 'eligible',
     eligibility: { state: e.state, soon: e.soon, leavesAt: e.soon ? e.leavesAt : null }
   };
@@ -174,7 +177,7 @@ export async function accountSignin(ctx) {
       signinStmts.push(memberEmailStmt(db, { kind: 'acct.dev', participantId: account.id, entityType: 'session', entityId: session.id, dedupeKey: 'acct:dev:' + session.id, now }));
     }
     await retry(() => db.batch(signinStmts));
-    return { exists: true, session: { token: session.token, kind: session.kind, expiresAt: session.expiresAt }, account: accountView(account, settings, now) };
+    return { exists: true, session: { token: session.token, kind: session.kind, expiresAt: session.expiresAt }, account: accountViewOf(account, settings, now) };
   });
 }
 
@@ -315,7 +318,7 @@ export async function accountRegisterVerify(ctx) {
     await retry(() => db.prepare('DELETE FROM pending_registrations WHERE id = ?').bind(pendingId).run());
     throw new ApiError(field === 'email' ? 'dup_email' : 'dup_phone');
   }
-  const view = accountView(account, settings, now);
+  const view = accountViewOf(account, settings, now);
   return { email: form.email, password, firstName: view.firstName, eligible: view.eligible };
 }
 
@@ -323,7 +326,7 @@ export async function accountRegisterVerify(ctx) {
 export async function accountMe(ctx) {
   const settings = await gate(ctx);
   const { account } = await requireAccount(ctx, settings);
-  return { account: accountView(account, settings) };
+  return { account: accountViewOf(account, settings) };
 }
 
 /* GET /v1/account/bookings: this account's bookings */
@@ -344,7 +347,8 @@ export async function accountBookingsLink(ctx) {
 export async function accountPoints(ctx) {
   const settings = await gate(ctx);
   const { account } = await requireAccount(ctx, settings);
-  return memberPoints(ctx, account, settings);
+  const [points, store] = await Promise.all([memberPoints(ctx, account, settings), storeOf(ctx.env.DB, wallOf(Date.now()))]);
+  return { ...points, store: { state: store.state } };
 }
 
 /* GET /v1/account/security: where this account is signed in. Device families only. */

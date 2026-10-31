@@ -237,26 +237,15 @@ export async function compResult(ctx) {
   return { result: await resultFor(db, def, row, await liveById(db, row.comp_id), Date.now()) };
 }
 
-/* POST /v1/comp/me → «نقاطي» (the shape of portalMe, §18.4): only what the member may see now */
-export async function compMe(ctx) {
-  const settings = await gate(ctx);
-  const { account } = await requireAccount(ctx, settings);
-  const db = ctx.env.DB;
-  const now = Date.now();
-  const wall = wallOf(now);
-  const state = eligibility(account, rulesFrom(settings), now).state;
-  const season = await activeSeason(db);
-  const seasonId = season ? season.id : '';
-  const [ledger, totals, subs, sums] = await retry(() => db.batch([
-    db.prepare(`SELECT l.* FROM points_ledger l WHERE l.participant_id = ? AND l.season_id = ?
-      AND NOT EXISTS (SELECT 1 FROM submissions s WHERE 'sub:' || s.id = l.ref AND s.released_ms IS NULL) ORDER BY l.created_ms DESC, l.id DESC LIMIT 500`).bind(account.id, seasonId),
-    db.prepare('SELECT t.season_id, s.name, s.start_at, s.end_at, t.earned, t.spent, t.final FROM season_totals t JOIN seasons s ON s.id = t.season_id WHERE t.participant_id = ? ORDER BY t.closed_ms DESC').bind(account.id),
+/* the member's submissions as the policy lets them show now, newest first (also the account's first page) */
+export async function historyOf(db, participantId, wall, max = 200) {
+  const [subs, sums] = await retry(() => db.batch([
     // one query for the whole history: the metas of each version served and of the live one, never the questions
     db.prepare(`SELECT s.id, s.comp_id, s.status, s.submitted_ms, s.score, s.max_score, s.pending_count, s.released_ms, v.meta, l.closed_at, l.finalized_at, lv.meta AS live_meta
       FROM submissions s JOIN comp_versions v ON v.comp_id = s.comp_id AND v.version = s.version
       LEFT JOIN comp_live l ON l.comp_id = s.comp_id LEFT JOIN comp_versions lv ON lv.comp_id = l.comp_id AND lv.version = l.version
-      WHERE s.participant_id = ? AND s.status IN ${SENT_SQL} ORDER BY s.submitted_ms DESC LIMIT 200`).bind(account.id),
-    db.prepare("SELECT ref, SUM(amount) AS n FROM points_ledger WHERE participant_id = ? AND ref LIKE 'sub:%' GROUP BY ref").bind(account.id)
+      WHERE s.participant_id = ? AND s.status IN ${SENT_SQL} ORDER BY s.submitted_ms DESC LIMIT ?`).bind(participantId, max),
+    db.prepare("SELECT ref, SUM(amount) AS n FROM points_ledger WHERE participant_id = ? AND ref LIKE 'sub:%' GROUP BY ref").bind(participantId)
   ]));
   const pointsBy = new Map(sums.results.map(s => [s.ref, s.n]));
   const metas = new Map();
@@ -270,8 +259,28 @@ export async function compMe(ctx) {
     const meta = parsed(r.meta);
     if (!meta) continue;
     const live = r.closed_at !== undefined && r.live_meta ? { closedAt: r.closed_at || '', finalizedAt: r.finalized_at || '' } : null;
-    history.push(historyLine(meta, parsed(r.live_meta) || meta, r, live, wall, pointsBy.get('sub:' + r.id)));
+    const line = historyLine(meta, parsed(r.live_meta) || meta, r, live, wall, pointsBy.get('sub:' + r.id));
+    history.push(line.score !== null || line.pointsAwarded !== null ? { ...line, releasedMs: r.released_ms || null } : line);
   }
+  return history;
+}
+
+/* POST /v1/comp/me → «نقاطي» (the shape of portalMe, §18.4): only what the member may see now */
+export async function compMe(ctx) {
+  const settings = await gate(ctx);
+  const { account } = await requireAccount(ctx, settings);
+  const db = ctx.env.DB;
+  const now = Date.now();
+  const wall = wallOf(now);
+  const state = eligibility(account, rulesFrom(settings), now).state;
+  const season = await activeSeason(db);
+  const seasonId = season ? season.id : '';
+  const [ledger, totals] = await retry(() => db.batch([
+    db.prepare(`SELECT l.* FROM points_ledger l WHERE l.participant_id = ? AND l.season_id = ?
+      AND NOT EXISTS (SELECT 1 FROM submissions s WHERE 'sub:' || s.id = l.ref AND s.released_ms IS NULL) ORDER BY l.created_ms DESC, l.id DESC LIMIT 500`).bind(account.id, seasonId),
+    db.prepare('SELECT t.season_id, s.name, s.start_at, s.end_at, t.earned, t.spent, t.final FROM season_totals t JOIN seasons s ON s.id = t.season_id WHERE t.participant_id = ? ORDER BY t.closed_ms DESC').bind(account.id)
+  ]));
+  const history = await historyOf(db, account.id, wall);
   const titles = new Map(history.map(h => [h.compId, h.title]));
   const balance = visibleBalance(ledger.results);
   const redemptions = await redemptionsOf(db, account.id, season, settings, wall);
