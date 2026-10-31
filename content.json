@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "7f8a4765459a",
-  "publishedAt": "2026-10-31T06:49:13.723Z",
+  "revision": "abc4f2cbd6f8",
+  "publishedAt": "2026-10-31T07:09:57.663Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -346,6 +346,36 @@
       "displayMobile": "",
       "competition": "msabqa-nqat",
       "ctaLabel": "ابدأ المسابقة"
+    },
+    {
+      "id": "act-67384eb0",
+      "type": "trip",
+      "section": "activities",
+      "title": "تجربة حجز",
+      "subtitle": "",
+      "description": "",
+      "image": {
+        "src": "media/2026/img-c1308156.webp",
+        "thumb": "media/2026/img-c1308156-480.webp",
+        "w": 1600,
+        "h": 900,
+        "alt": "",
+        "color": "#7f3a23"
+      },
+      "cta": null,
+      "location": "",
+      "startAt": "2026-11-06T10:00",
+      "endAt": "",
+      "visibleFrom": "",
+      "visibleUntil": "2026-11-06T22:00",
+      "display": "",
+      "displayMobile": "",
+      "event": "tgrba",
+      "ctaLabel": "",
+      "booking": {
+        "opensAt": "",
+        "closesAt": ""
+      }
     }
   ],
   "types": [
@@ -361,6 +391,13 @@
       "label": "مسابقة",
       "icon": "trophy",
       "theme": "ember",
+      "banner": null
+    },
+    {
+      "key": "trip",
+      "label": "رحلة",
+      "icon": "bus",
+      "theme": "azure",
       "banner": null
     }
   ],
@@ -543,6 +580,33 @@
       },
       "partner": "bug",
       "v": "9a8b1a5b3aa7"
+    }
+  ],
+  "events": [
+    {
+      "id": "evt-1295c819",
+      "slug": "tgrba",
+      "kind": "trip",
+      "kindLabel": "رحلة",
+      "title": "تجربة حجز",
+      "shortTitle": "",
+      "summary": "",
+      "cover": {
+        "src": "media/2026/img-c1308156.webp",
+        "thumb": "media/2026/img-c1308156-480.webp",
+        "w": 1600,
+        "h": 900,
+        "alt": "",
+        "color": "#7f3a23"
+      },
+      "startAt": "2026-11-06T10:00",
+      "endAt": "",
+      "booking": {
+        "opensAt": "",
+        "closesAt": ""
+      },
+      "partner": null,
+      "v": "d073803fe419"
     }
   ],
   "partners": {
