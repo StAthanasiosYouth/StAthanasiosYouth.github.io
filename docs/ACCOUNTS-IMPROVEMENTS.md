@@ -77,3 +77,13 @@ Page and admin: revert `32e3fb8` on `main`. Worker: `npx wrangler rollback ade89
 **A booking's page**, signed out, offers «سجّل دخولك عشان تربطه بحسابك», then returns to that booking to link it.
 
 **Tests:** `tests/account-badge.e2e.mjs`, `tools/account-badge-staging.mjs`. No Worker change.
+
+### Release (2026-10-31)
+
+On staging first: `tools/account-badge-staging.mjs` passed. Production: `main` `9c8bb63`, the site only; Worker stays `8cec81b7`.
+
+After the release: `tools/account-badge-prod-check.mjs` and `tools/account-prod-check.mjs` pass on the real site signed out (the home page and the Black Theatre at 320, 390 and 1280: the icon fits, no account request, no script errors, the sign-in opens and keeps the page to return to).
+
+**Not checked by these tests:** signing in and returning on production (no test account was made there), a real iPhone and Android, the tap sound by ear, and the icon on published event and competition pages on production, since none is published now.
+
+**Back:** revert `9c8bb63` on `main`.
