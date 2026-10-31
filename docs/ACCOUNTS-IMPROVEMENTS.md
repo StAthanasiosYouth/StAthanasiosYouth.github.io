@@ -102,3 +102,13 @@ Approved from a prototype on 2026-10-31 (`spike/account-preview/step2b/`, not in
 - On the account's first page only, so signing in to finish a competition or a booking isn't interrupted.
 - Reopens from «إزاي تستخدم حسابك» in the support page, which marks nothing.
 - A guest reads that they take part without points. The sample cards say «مثال», since a new member has no such data.
+
+### Release (2026-10-31)
+
+On staging first: Worker `69aa55fa`, `account-page-check` and `account-badge-staging` passed. Then production, the Worker before the page: Worker `2401d969` from `2d8c719` (CI, migration 0024), page `486a4ca`.
+
+After the release: smoke passes; `tools/account-badge-prod-check.mjs` and `tools/account-prod-check.mjs` pass on the real site signed out; `POST /v1/account/onboarded` answers 401 without a session.
+
+**Not checked by these tests:** signing in, the walkthrough and the door with a photo on production (no test account was made there), a real iPhone and Android, and how it feels by hand.
+
+**Back:** revert `486a4ca` on `main` first, then `npx wrangler rollback 8cec81b7`. Migration 0024 only adds a column and can stay.
