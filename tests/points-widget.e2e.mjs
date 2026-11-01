@@ -13,6 +13,7 @@ import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ROOT } from '../tools/lib/gs.mjs';
+import { seedSession } from './fakes/comp-worker.mjs';
 
 const require = createRequire(`${ROOT}tools/package.json`);
 const puppeteer = require('puppeteer-core');
@@ -73,6 +74,8 @@ async function open(viewport, state, { bypassCSP = false } = {}) {
   page.on('console', msg => { if (msg.type() === 'error') problems.push(`console: ${msg.text()}`); });
   page.on('pageerror', error => problems.push(`pageerror: ${error.message}`));
   await page.evaluateOnNewDocument(() => document.addEventListener('securitypolicyviolation', e => console.error(`CSP violation: ${e.violatedDirective} ${e.blockedURI}`)));
+  // signed in: points/ stays put; signed out it goes on to /account/ (comp-accounts.e2e.mjs)
+  await seedSession(page);
   // no opening intro (first visit of the session): straight to the page
   await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
   if (bypassCSP) await page.setBypassCSP(true);
@@ -84,7 +87,7 @@ async function open(viewport, state, { bypassCSP = false } = {}) {
     if (url.pathname === '/content.json' && state) {
       return request.respond({ status: 200, contentType: 'application/json', headers: { Date: state.date }, body: JSON.stringify(state.content) });
     }
-    if (url.hostname !== 'localhost') return request.respond({ status: 204, body: '' });
+    if (url.hostname !== 'localhost') return request.respond({ status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type' }, body: '' });
     return request.continue();
   });
   await page.goto(BASE, { waitUntil: 'networkidle0' });

@@ -179,3 +179,35 @@ After the release: CI tests and smoke pass, `/v1/health` answers 200, `tools/acc
 **Not checked on production:** a competition played from start to finish, a signed-in `points/`, the builder with an admin signed in, and real phones. Production's switch values were not read, so a wallet on with the codes switch off would now show as on.
 
 **Back:** revert `82e96ca` on `main` first, then `npx wrangler rollback 73437f90` from `worker/`. No data needs undoing.
+
+## Step 5: performance and final tests
+
+Measured first, on the live site as a signed-out phone on slow 4G with a 4x slower CPU, and on Staging under load.
+
+**Changed, because the numbers showed it:**
+- `requireAccount` reads the session and the account in one trip to the database. Every signed-in call starts there.
+- `/v1/comp/me` runs its independent reads together.
+- `/account/` preloads the display font. It was found only after the JavaScript and `/v1/account/config`, at about 1.7 s.
+
+**Staging, 40 people at once (`scripts/comp-load.mjs`):**
+
+| Call | Before (p50) | After (p50) |
+|---|---|---|
+| «نقاطي», 30 competitions | 438 ms | 262 ms |
+| Start, burst | 1319 ms | 1031 ms |
+| Submit, burst | 1207 ms | 1104 ms |
+| Store race | 1196 ms | 998 ms |
+
+No request failed and the stock stayed exact. CPU p50 is 9 ms on «نقاطي» and 13 ms on submit, with peaks of 23 ms. 45 of 116 calls went over the Free plan's 10 ms, none rejected.
+
+**Not changed:**
+- Bursts stay around 1 s, above the 0.1–0.5 s target for one person. D1 takes writes one at a time.
+- The database is in Vienna and requests reach Milan, about 15 ms apart in round trips, so Smart Placement has little to gain. Not tried.
+- The home page's two pictures (236 and 127 KB) load in full on phones, because only 480 px and full size exist. A middle size needs the media pipeline.
+- The admin stays 278 KB compressed. The hidden «النقاط» and «المتجر» screens still sit inside it.
+
+**Fixed from the final tests:** the top bar on the home page is now a `<header>` landmark. The account icon from Step 2 sat outside any landmark, which axe reports.
+
+**Browser tests:** 45 files. `points-widget` passes now, 6 of 6: it signs in first, because signed out `points/` goes on to `/account/`. 12 files still fail, 36 tests, and every one fails by the same name on `60d0200`, the commit before this batch, which was checked by running them there. Most of them expect content that the real `content.json` no longer has. `xp-fit` does not finish in 500 s on either commit, so its later tests were not seen.
+
+`final-m` is unsteady on the map page: on this step two of four runs passed all 31, one failed test 25, and one failed tests 7 and 25. On `60d0200` one of three runs failed test 25, so that one predates the batch. Test 7 was not seen failing there; this step does not touch the map. Test 25 fails on a button measured 43.9999 px against a 44 px rule.

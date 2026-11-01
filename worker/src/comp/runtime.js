@@ -275,29 +275,28 @@ export async function compMe(ctx) {
   const state = eligibility(account, rulesFrom(settings), now).state;
   const season = await activeSeason(db);
   const seasonId = season ? season.id : '';
-  const [ledger, totals] = await retry(() => db.batch([
+  // independent reads, together: this page is the one a member opens most
+  const [[ledger, totals], history, redemptions, store, shop] = await Promise.all([retry(() => db.batch([
     db.prepare(`SELECT l.* FROM points_ledger l WHERE l.participant_id = ? AND l.season_id = ?
       AND NOT EXISTS (SELECT 1 FROM submissions s WHERE 'sub:' || s.id = l.ref AND s.released_ms IS NULL) ORDER BY l.created_ms DESC, l.id DESC LIMIT 500`).bind(account.id, seasonId),
     db.prepare('SELECT t.season_id, s.name, s.start_at, s.end_at, t.earned, t.spent, t.final FROM season_totals t JOIN seasons s ON s.id = t.season_id WHERE t.participant_id = ? ORDER BY t.closed_ms DESC').bind(account.id)
-  ]));
-  const history = await historyOf(db, account.id, wall);
+  ])), historyOf(db, account.id, wall), redemptionsOf(db, account.id, season, settings, wall), storeOf(db, wall), shopForMember(db, account.id)]);
   const titles = new Map(history.map(h => [h.compId, h.title]));
   const balance = visibleBalance(ledger.results);
-  const redemptions = await redemptionsOf(db, account.id, season, settings, wall);
   return {
     participant: { name: account.name, group: account.grp || '' },
     features: { wallet: true, shop: true },
     eligible: state === 'eligible',
     ...(state === 'eligible' ? {} : { notice: AGE_NOTICE }),
     frozen: state !== 'eligible' && balance > 0,
-    store: await storeOf(db, wall),
+    store,
     season: season ? { id: season.id, name: season.name, startAt: season.start_at || '', endAt: season.end_at || '', earned: ledger.results.filter(l => l.kind === 'competition' || l.kind === 'correction').reduce((n, l) => n + l.amount, 0), maxTheoretical: null } : null,
     seasons: totals.results.map(t => ({ id: t.season_id, name: t.name, startAt: t.start_at || '', endAt: t.end_at || '', final: t.final, earned: t.earned, spent: t.spent })),
     balance,
     ledger: ledger.results.map(l => ({ amount: l.amount, kind: l.kind, note: l.note_public ? l.note || '' : '', compTitle: l.comp_id ? titles.get(l.comp_id) || '' : '', createdAt: wallOf(l.created_ms) })),
     history,
     redemptions,
-    shop: await shopForMember(db, account.id)
+    shop
   };
 }
 

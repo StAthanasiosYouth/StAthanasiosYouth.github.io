@@ -41,9 +41,14 @@ export async function requireAccount(ctx, settings, now = Date.now()) {
   if (!token) throw new ApiError('session');
   const db = ctx.env.DB;
   const hash = await tokenHash(token);
-  const row = await retry(() => db.prepare('SELECT * FROM account_sessions WHERE token_hash = ?').bind(hash).first());
+  // one trip to the database: every signed-in call starts here
+  const [sessions, accounts] = await retry(() => db.batch([
+    db.prepare('SELECT * FROM account_sessions WHERE token_hash = ?').bind(hash),
+    db.prepare('SELECT p.* FROM participants p JOIN account_sessions s ON s.participant_id = p.id WHERE s.token_hash = ?').bind(hash)
+  ]));
+  const row = sessions.results[0];
   if (!row || row.revoked_at || row.expires_at <= now) throw new ApiError('session');
-  const account = await retry(() => db.prepare('SELECT * FROM participants WHERE id = ?').bind(row.participant_id).first());
+  const account = accounts.results[0];
   if (!account || account.status !== 'active' || account.pw_version !== row.pw_version) throw new ApiError('session');
   if (row.kind === 'device' && now - row.last_seen > SLIDE_EVERY_MS) {
     ctx.defer(retry(() => db.prepare('UPDATE account_sessions SET last_seen = ?, expires_at = ? WHERE id = ?').bind(now, now + sessionMs(settings, 'device'), row.id).run()));
