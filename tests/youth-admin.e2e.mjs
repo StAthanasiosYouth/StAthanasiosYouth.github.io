@@ -43,6 +43,9 @@ const fake = {
     this.orders = [{ id: 'r-0000000001', itemName: 'كتاب هدية', cost: 30, status: 'pending', person: 'مينا زكريا', requestedAt: Date.now(), emailChangedRecently: true, next: ['approved', 'fulfilled', 'cancelled'] }];
     this.gradedWith = null;
     this.savedItem = null;
+    this.planned = null;
+    this.seasonMax = 0;
+    this.savedSeason = null;
     this.schedule = null;
   },
   sheet(id) {
@@ -102,7 +105,7 @@ async function handle(request) {
   }
   if (path === '/v1/admin/store/items') {
     if (method === 'POST') fake.savedItem = body;
-    return json(200, { ok: true, items: [{ id: 'i-00000001', name: 'كتاب هدية', cost: 30, stock: 5, perPerson: 1, available: 4, redeemed: 1, active: true, category: '', order: 0, description: '' }] });
+    return json(200, { ok: true, seasonMax: fake.seasonMax || 0, items: [{ id: 'i-00000001', name: 'كتاب هدية', cost: 30, stock: 5, perPerson: 1, available: 4, redeemed: 1, active: true, category: '', order: 0, description: '', image: '', pctOfMax: fake.seasonMax ? 8 : null }] });
   }
   if (path === '/v1/admin/store/schedule') {
     if (method === 'POST') fake.schedule = body;
@@ -113,7 +116,11 @@ async function handle(request) {
     fake.orders = fake.orders.map(o => ({ ...o, status: body.status, next: [] }));
     return json(200, { ok: true, redemptions: fake.orders });
   }
-  if (path === '/v1/admin/points/seasons') return json(200, { ok: true, seasons: [{ id: 'sea-first', name: 'الموسم الأول', status: 'active' }] });
+  if (path === '/v1/admin/points/seasons' && method === 'POST') {
+    fake.savedSeason = body;
+    return json(200, { ok: true, seasons: [] });
+  }
+  if (path === '/v1/admin/points/seasons') return json(200, { ok: true, seasons: [{ id: 'sea-first', name: 'الموسم الأول', status: 'active', maxTheoretical: 400, expected: 60, competitions: 4, topBalance: 180, participants: 32 }, ...(fake.planned || [])] });
   if (path === '/v1/admin/points/seasons/sea-first/preview') return json(200, { ok: true, participants: 2, total: 110, frozen: { participants: 1, total: 40 }, key: 'k1', season: {} });
   if (path === '/v1/admin/points/seasons/sea-first/close') return json(200, { ok: true, closed: 'sea-first', active: 'sea-next', seasons: [] });
   const m = /^\/v1\/admin\/participants\/([^/]+)(?:\/(.+))?$/.exec(path);
@@ -340,6 +347,54 @@ test('seasons: the preview shows frozen points apart; review list; settings; exp
   await click(page, '[data-act="youth-export"]');
   await page.waitForFunction(() => window.A.comp.lastDownload, { timeout: 8000 });
   assert.equal(await page.evaluate(() => A.comp.lastDownload.filename), 'حسابات-الشباب.xlsx');
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('seasons: the numbers, a new one, editing, closing into a planned one; a prize shows its share', async () => {
+  fake.reset();
+  fake.planned = [{ id: 'sea-spring27', name: 'موسم الربيع', status: 'planned', startAt: '2027-01-01 00:00', endAt: '', maxTheoretical: 0, expected: 50 }];
+  fake.seasonMax = 400;
+  const { context, page, problems } = await open();
+  await goYouth(page);
+  await click(page, '[data-act="youth-seasons"]');
+  await page.waitForSelector('.comp-season--active .comp-tile', { timeout: 8000 });
+  const shown = await page.evaluate(() => document.querySelector('#view').innerText);
+  assert.match(shown, /٤٠٠/);
+  assert.match(shown, /\+٦٠/);
+  assert.match(shown, /موسم الربيع/);
+
+  await click(page, '[data-act="season-new"]');
+  await page.waitForSelector('#sheet[open] [data-act="youth-save"]');
+  await page.type('#sheet .form input', 'موسم الصيف');
+  await saveSheet(page);
+  await page.waitForFunction(() => !document.querySelector('#sheet').open, { timeout: 5000 });
+  assert.equal(fake.savedSeason.name, 'موسم الصيف');
+  assert.equal(fake.savedSeason.id, undefined, 'a new one');
+
+  await page.waitForSelector('.comp-season--active [data-act="season-edit"]', { timeout: 8000 });
+  await click(page, '.comp-season--active [data-act="season-edit"]');
+  await page.waitForSelector('#sheet[open] [data-act="youth-save"]');
+  await saveSheet(page);
+  await page.waitForFunction(() => !document.querySelector('#sheet').open, { timeout: 5000 });
+  assert.equal(fake.savedSeason.id, 'sea-first');
+
+  await page.waitForSelector('[data-act="season-close"]', { timeout: 8000 });
+  await click(page, '[data-act="season-close"]');
+  await page.waitForSelector('#sheet[open] input[name="next-season"]');
+  assert.equal(await page.$eval('#sheet input[name="next-season"]:checked', n => n.value), 'sea-spring27', 'the planned one first');
+  await saveSheet(page);
+  await page.waitForFunction(() => !document.querySelector('#sheet').open, { timeout: 5000 });
+  assert.deepEqual(fake.calls.filter(c => c.path.endsWith('/close')).pop().body, { key: 'k1', next: 'sea-spring27' });
+
+  await click(page, '[data-act="youth-back"]');
+  await page.waitForSelector('[data-act="youth-store"]', { timeout: 8000 });
+  await click(page, '[data-act="youth-store"]');
+  await page.waitForSelector('[data-season-max]', { timeout: 8000 });
+  assert.match(await page.$eval('[data-item="i-00000001"]', n => n.innerText), /٨٪ من أقصى الموسم/);
+  await click(page, '[data-item-edit="i-00000001"]');
+  await page.waitForSelector('#sheet[open] [data-item-share]');
+  assert.match(await page.$eval('[data-item-share]', n => n.textContent), /٨٪/);
   assert.deepEqual(problems, []);
   await context.close();
 });

@@ -4617,6 +4617,16 @@ dialog .toasts[popover] {
   background: rgba(255, 255, 255, .025);
 }
 
+/* a prize request's buttons wrap under it on a phone, instead of pushing the page sideways */
+.admin[data-order] {
+  flex-wrap: wrap;
+}
+
+.admin[data-order] .admin__body {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
 .admin--primary {
   border-color: rgba(242, 210, 139, .26);
   background:

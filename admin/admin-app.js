@@ -14264,28 +14264,94 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   function seasonsView() {
     var box = A.errorBox();
-    var rows = el('div', { 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
+    var rows = el('div', { class: 'comp-seasons', 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
 
-    function closeForm(s, button) {
+    // the competition screen's picker keeps its own copy of the list
+    function changed(text) {
+      A.toast(text);
+      if (C.seasons) C.seasons(true).catch(function () {});
+    }
+
+    /* add / edit: name and dates. A new one stays planned until the current season closes and picks it */
+    function seasonForm(s) {
+      var name = A.textInput(s ? s.name : '', { max: 80, placeholder: 'مثلاً: موسم الصيف ٢٠٢٧' });
+      var start = A.dateTimeInput(s ? s.startAt : '', { emptyText: 'من غير بداية' });
+      var end = A.dateTimeInput(s ? s.endAt : '', { emptyText: 'من غير نهاية' });
+      formSheet({
+        title: s ? 'تعديل: ' + s.name : 'موسم جديد', label: s ? 'حفظ' : 'إضافة', reason: false, path: 'points/seasons',
+        intro: s ? '' : 'الموسم الجديد بيفضل «جاي» لحد ما تقفل الموسم الحالي وتختاره. وتقدر تربط بيه مسابقة من دلوقتي.',
+        extra: function () { return s ? { id: s.id } : {}; },
+        done: function () { changed(s ? 'اتحفظ ✓' : 'الموسم اتضاف ✓'); },
+        fields: [
+          { key: 'name', label: 'اسم الموسم', input: name },
+          { key: 'startAt', node: A.field('بيبدأ', start.node), get: function () { return start.value(); } },
+          { key: 'endAt', node: A.field('بيخلص', end.node, 'المواعيد للعرض بس: الموسم بيتقفل لما تقفله إنت.'), get: function () { return end.value(); } }
+        ]
+      });
+    }
+
+    function closeForm(s, planned, button) {
       A.withBusy(button, api('GET', 'points/seasons/' + encodeURIComponent(s.id) + '/preview')).then(function (pre) {
         var name = A.textInput('', { max: 80, placeholder: 'اسم الموسم الجاي' });
+        var chosen = planned.length ? planned[0].id : 'new';
+        var nameField = A.field('اسم الموسم الجديد', name);
+        nameField.hidden = chosen !== 'new';
+        var choices = planned.length ? el('div', { class: 'comp-presets', role: 'radiogroup', 'aria-label': 'الموسم الجاي' },
+          planned.map(function (p) { return { value: p.id, label: p.name, sub: dates(p) }; }).concat([{ value: 'new', label: 'موسم جديد', sub: 'اكتب اسمه تحت' }]).map(function (o) {
+            return el('label', { class: 'comp-preset' },
+              el('input', { type: 'radio', name: 'next-season', value: o.value, checked: o.value === chosen, onchange: function () { chosen = o.value; nameField.hidden = chosen !== 'new'; } }),
+              el('span', { class: 'comp-preset__body' }, el('strong', { text: o.label }), el('small', { text: o.sub })));
+          })) : null;
         formSheet({
           title: 'قفل الموسم: ' + s.name, kind: 'danger', label: 'اقفل الموسم', reason: false, path: 'points/seasons/' + encodeURIComponent(s.id) + '/close',
           intro: ar(pre.participants) + ' مشترك، إجمالي ' + ar(pre.total) + ' نقطة' + (pre.frozen.participants ? '، منهم ' + ar(pre.frozen.participants) + ' متجمدين بـ' + ar(pre.frozen.total) + ' نقطة' : '') + '. الأرصدة بتتحفظ والموسم الجاي بيبدأ من صفر.',
           extra: function () { return { key: pre.key }; },
-          fields: [{ key: 'next', label: 'الموسم الجاي', input: name, get: function () { return { name: name.value.trim() }; } }]
+          done: function () { changed('الموسم اتقفل ✓'); },
+          fields: [{ key: 'next', node: el('div', { class: 'form' }, choices ? A.field('الموسم الجاي', choices) : null, nameField), get: function () { return chosen === 'new' ? { name: name.value.trim() } : chosen; } }]
         });
       }).catch(function (error) { A.fail(error, box); });
     }
 
+    function dates(s) {
+      var wall = function (v) { return C.when(String(v).replace('T', ' ').slice(0, 16)); };
+      return (s.startAt ? 'من ' + wall(s.startAt) : 'من غير بداية') + (s.endAt ? ' لحد ' + wall(s.endAt) : '');
+    }
+
+    function tile(label, value, tone) {
+      return el('div', { class: 'comp-tile' + (tone ? ' comp-tile--' + tone : '') }, el('span', { class: 'comp-tile__n', dir: 'ltr', text: value }), el('span', { class: 'comp-tile__label', text: label }));
+    }
+
+    function seasonRow(s, chips, control) {
+      return el('li', { class: 'admin', 'data-season': s.id },
+        el('div', { class: 'admin__main' }, el('p', { class: 'admin__name', text: s.name }), el('p', { class: 'admin__email', text: dates(s) }), el('div', { class: 'admin__chips' }, chips)),
+        control);
+    }
+
     api('GET', 'points/seasons').then(function (d) {
       rows.setAttribute('aria-busy', 'false');
+      var active = d.seasons.filter(function (s) { return s.status === 'active'; })[0];
+      var planned = d.seasons.filter(function (s) { return s.status === 'planned'; });
+      var closed = d.seasons.filter(function (s) { return s.status === 'closed'; });
       A.fill(rows,
-        el('ul', { class: 'admins' }, d.seasons.map(function (s) {
-          return el('li', { class: 'admin', 'data-season': s.id },
-            el('div', { class: 'admin__body' }, el('p', { class: 'admin__name', text: s.name }), s.status === 'active' ? A.chip('الحالي', 'ok') : s.status === 'planned' ? A.chip('جاي', 'info') : A.chip('اتقفل', 'off')),
-            s.status === 'active' ? el('button', { class: 'btn btn--small btn--danger', type: 'button', 'data-act': 'season-close', onclick: function (event) { closeForm(s, event.currentTarget); } }, 'اقفل الموسم') : null);
-        })));
+        el('div', { class: 'actions' }, el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'season-new', onclick: function () { seasonForm(null); } }, icon('plus'), 'موسم جديد')),
+        active ? el('section', { class: 'comp-season comp-season--active', 'data-season': active.id },
+          el('div', { class: 'comp-season__head' }, el('h3', { class: 'comp-season__name', text: active.name }), A.chip('الحالي', 'ok'), el('span', { class: 'field__hint', text: dates(active) })),
+          el('div', { class: 'comp-tiles' },
+            tile('أقصى نقاط ممكنة', ar(active.maxTheoretical || 0), 'gold'),
+            tile('متوقع (لسه ما اتنشرتش)', active.expected ? '+' + ar(active.expected) : ar(0)),
+            tile('أعلى رصيد', ar(active.topBalance || 0)),
+            tile('مشتركين ليهم رصيد', ar(active.participants || 0))),
+          el('p', { class: 'field__hint', text: 'أقصى نقاط ممكنة من ' + ar(active.competitions || 0) + ' مسابقة. مفيش حد أقصى للنقاط: الرقم ده بس علشان تسعّر الجوايز.' }),
+          el('div', { class: 'actions' },
+            el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'season-edit', onclick: function () { seasonForm(active); } }, 'تعديل'),
+            el('button', { class: 'btn btn--small btn--danger', type: 'button', 'data-act': 'season-close', onclick: function (event) { closeForm(active, planned, event.currentTarget); } }, 'اقفل الموسم'))) : null,
+        planned.length ? el('p', { class: 'section-label', text: 'مواسم جاية' }) : null,
+        planned.length ? el('ul', { class: 'admins' }, planned.map(function (s) {
+          return seasonRow(s, [A.chip('جاي', 'info'), s.maxTheoretical ? A.chip('أقصى ' + ar(s.maxTheoretical) + ' نقطة', 'gold') : null, s.expected ? A.chip('متوقع ' + ar(s.expected)) : null],
+            el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'season-edit', onclick: function () { seasonForm(s); } }, 'تعديل'));
+        })) : null,
+        closed.length ? el('p', { class: 'section-label', text: 'مواسم خلصت' }) : null,
+        closed.length ? el('ul', { class: 'admins' }, closed.map(function (s) { return seasonRow(s, [A.chip('اتقفل', 'off')], null); })) : null);
     }).catch(function (error) { rows.setAttribute('aria-busy', 'false'); A.fill(rows); A.fail(error, box); });
     return [A.card('المواسم', 'الرصيد بتاع الموسم الحالي بس. القفل بيحفظ الأرصدة ومبيمسحش حاجة.', box, backButton(), rows)];
   }
@@ -14384,7 +14450,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   var ORDER_STATUS = { pending: 'مستني', approved: 'جاهزة للاستلام', fulfilled: 'اتسلمت', cancelled: 'اتلغت' };
   var ORDER_ACT = { approved: 'جاهزة', fulfilled: 'اتسلمت', cancelled: 'الغي ورجّع النقط' };
 
-  function itemForm(item) {
+  function itemForm(item, seasonMax) {
     var i = item || {};
     var name = A.textInput(i.name || '', { max: 60 });
     var description = A.textInput(i.description || '', { multiline: true, rows: 2, max: 500 });
@@ -14395,11 +14461,18 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var order = A.textInput(String(i.order || 0), { ltr: true, max: 4 });
     var active = A.checkbox('معروضة في المتجر', i.active !== false);
     var picture = A.imagePicker ? A.imagePicker(i.image || null, { label: 'الصورة' }) : null;
+    var share = el('span', { class: 'field__hint', 'data-item-share': '' });
+    function shareNow() {
+      var c = Number(cost.value);
+      share.textContent = seasonMax && c > 0 ? '= ' + ar(Math.round(c * 100 / seasonMax)) + '٪ من أقصى نقاط الموسم (' + ar(seasonMax) + ')' : '';
+    }
+    cost.addEventListener('input', shareNow);
+    shareNow();
     formSheet({
       title: item ? 'تعديل جايزة' : 'جايزة جديدة', reason: false, path: 'store/items',
       extra: function () { return { id: i.id || undefined, active: active.input.checked, image: picture && picture.value ? picture.value() : i.image || null }; },
       fields: [
-        { key: 'name', label: 'الاسم', input: name }, { key: 'description', label: 'الوصف', input: description }, { key: 'cost', label: 'النقاط', input: cost },
+        { key: 'name', label: 'الاسم', input: name }, { key: 'description', label: 'الوصف', input: description }, { key: 'cost', input: cost, node: el('div', { class: 'form' }, A.field('النقاط', cost), share) },
         { key: 'stock', label: 'المتاح', input: stock }, { key: 'perPerson', label: 'الحد لكل شخص', input: per }, { key: 'category', label: 'التصنيف', input: category }, { key: 'order', label: 'الترتيب', input: order },
         { key: 'x', node: active.node, get: function () { return undefined; } }
       ].concat(picture ? [{ key: 'y', node: picture.node, get: function () { return undefined; } }] : [])
@@ -14431,12 +14504,16 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     api('GET', 'store/items').then(function (d) {
       items.setAttribute('aria-busy', 'false');
       A.fill(items,
-        el('div', { class: 'actions' }, el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'item-add', onclick: function () { itemForm(null); } }, icon('plus'), 'جايزة جديدة')),
+        el('div', { class: 'actions' }, el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'item-add', onclick: function () { itemForm(null, d.seasonMax); } }, icon('plus'), 'جايزة جديدة')),
+        d.seasonMax ? el('p', { class: 'field__hint', 'data-season-max': '', text: 'أقصى نقاط في الموسم الحالي: ' + ar(d.seasonMax) + '. النسبة بتوضح الجايزة بتساوي كام منها.' }) : null,
         el('ul', { class: 'admins' }, d.items.map(function (i) {
-          return el('li', { class: 'admin', 'data-item': i.id },
+          var thumb = el('span', { class: 'item__thumb', 'aria-hidden': 'true' });
+          if (i.image) A.mediaPreview(i.image).then(function (src) { if (src) thumb.appendChild(el('img', { src: src, alt: '' })); }).catch(function () {});
+          return el('li', { class: 'admin', 'data-item': i.id }, thumb,
             el('div', { class: 'admin__body' }, el('p', { class: 'admin__name', dir: 'auto', text: i.name + ' · ' + ar(i.cost) + ' نقطة' }),
-              el('p', { class: 'admin__email', text: (i.available === null ? 'من غير حد' : 'متاح ' + ar(i.available)) + ' · اتطلب ' + ar(i.redeemed || 0) }), i.active ? null : A.chip('مقفولة', 'off')),
-            el('button', { class: 'btn btn--small', type: 'button', 'data-item-edit': i.id, onclick: function () { itemForm(i); } }, 'تعديل'));
+              el('p', { class: 'admin__email', text: (i.available === null ? 'من غير حد' : 'متاح ' + ar(i.available)) + ' · اتطلب ' + ar(i.redeemed || 0) }), i.active ? null : A.chip('مقفولة', 'off'),
+              i.pctOfMax !== null && i.pctOfMax !== undefined ? A.chip(ar(i.pctOfMax) + '٪ من أقصى الموسم', 'gold') : null),
+            el('button', { class: 'btn btn--small', type: 'button', 'data-item-edit': i.id, onclick: function () { itemForm(i, d.seasonMax); } }, 'تعديل'));
         })));
     }).catch(function (error) { items.setAttribute('aria-busy', 'false'); A.fail(error, box); });
     api('GET', 'store/schedule').then(function (s) {
