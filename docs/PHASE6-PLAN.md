@@ -2,7 +2,7 @@
 
 Started 2026-11-02 on the owner's order. Six steps, one at a time. Each step needs the owner's choice to start, and each production release needs its own approval.
 
-**Progress: Step 3 of 6 passed on Staging, with the screens the owner approved. It waits for the owner's approval for production.**
+**Progress: Step 3 of 6 is live on production (2026-11-02). Step 4 waits for the owner's order.**
 
 ## 1. Official scope
 
@@ -129,6 +129,12 @@ No rebuild. The competition screens stop depending on Apps Script.
 - Live on Staging: `season-check` 20 of 20, `comp-check` 39 of 39, `comp-reads-check` passes.
 
 **Not checked:** the new screens signed in against Staging itself (no Google sign-in from this session; the browser tests use a fake Worker for this screen), a real phone, and `comp-sig` sent by Apps Script itself (a signed call stood in for it).
+
+**Release (2026-11-02, on the owner's approval):** `6a2b935` through CI (test and deploy jobs both passed), Worker `aa069df6`, rollback `e3f3a476`. Then `24194da`, the panel, built by Pages at 21:43 UTC. No migration and no switch changed.
+
+**After the release:** `/v1/health` answers 200, the season, badge and store routes answer 401 without a credential, and `/v1/comp/me` answers 401 without a session. The live `admin-app.js` and `admin.css` carry the new code. `tools/account-prod-check.mjs` and `tools/account-badge-prod-check.mjs` pass. `wrangler tail` for 90 s: 5 events, all `ok`, no exceptions. That was little traffic.
+
+**Not checked on production:** a signed-in call or the new screens signed in, which need the owner's sign-in. D1 counts weren't read in this step: only a competition's new submission or a prize save writes differently, and no such write has happened. The owner can run the usual count query if wanted.
 
 **Back:** `npx wrangler rollback e3f3a476` from `worker/` and revert the admin commit, the page first. Points landed in a chosen season stay there. No migration.
 
