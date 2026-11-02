@@ -237,3 +237,24 @@ test('competitions on the Worker: the list, a new one with a question, in the re
   assert.deepEqual(s.problems, []);
   await s.close();
 });
+
+test('the competition screens read seasons and the menu numbers from the Worker, never from Apps Script', async () => {
+  await freshWorld();
+  env.COMPS_SOURCE = '';
+  env.DB.raw.exec("INSERT INTO settings (key, value, updated_at) VALUES ('COMP_DRAFTS', 'worker', 0), ('COMP_HASH_KEY', 'a2V5LWtleS1rZXkta2V5LWtleS1rZXk=', 0), ('COMP_WALLET', '1', 0)");
+  env.DB.raw.exec("INSERT INTO seasons (id, name, status, created_ms, updated_ms) VALUES ('sea-summer27', 'موسم الصيف', 'planned', 0, 0)");
+  env.DB.raw.exec("INSERT INTO redemptions (id, item_id, item_name, participant_id, season_id, cost, status, request_key, created_ms, updated_ms) VALUES ('r-1', 'i-1', 'جايزة', 'p-1', 'sea-first', 5, 'pending', 'k-1', 0, 0)");
+  const s = await open();
+  await signedIn(s.page);
+  const { names, badges } = await s.page.evaluate(async () => {
+    const seasons = await A.comp.seasons(true);
+    return { names: seasons.seasons.map(x => x.name), badges: await A.call('apiBadges') };
+  });
+  assert.ok(names.includes('موسم الصيف'), 'a season made on the Worker reaches the picker');
+  assert.equal(badges.shop, 1);
+  // a few heartbeats ask for the numbers again
+  await new Promise(resolve => setTimeout(resolve, 2 * TIMING.beat));
+  assert.deepEqual(s.appsScript.filter(fn => fn === 'apiSeasons' || fn === 'apiBadges'), [], 'none of it went to Apps Script');
+  assert.deepEqual(s.problems, []);
+  await s.close();
+});

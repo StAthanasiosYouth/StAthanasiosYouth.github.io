@@ -608,6 +608,7 @@
 
     // the session, presence and device calls go to the Worker (same reply shape)
     if (PLATFORM && Object.prototype.hasOwnProperty.call(PLATFORM_FNS, name)) return platformPost(name, args, tokenValue, sidValue, options);
+    if (PLATFORM && compWorker && Object.prototype.hasOwnProperty.call(COMP_READS, name)) return compRead(name, options);
     // Phase 4: the content calls too, once the Worker writes the drafts (its session answer says so)
     if (PLATFORM && contentWorker && (Object.prototype.hasOwnProperty.call(CONTENT_FNS, name) || Object.prototype.hasOwnProperty.call(CONTENT_ALIASES, name) || (compWorker && Object.prototype.hasOwnProperty.call(COMP_FNS, name)))) {
       return contentPost(name, args, tokenValue, options);
@@ -1565,6 +1566,16 @@
     apiCompGrade: 1, apiCompGradeGroup: 1, apiCompRegrade: 1, apiCompVoid: 1
   };
   var compWorker = false;
+  /* Phase 6 (docs/PHASE6-PLAN.md Step 2): what the competition screens read beside their drafts, from the rows the Worker holds */
+  var COMP_READS = { apiSeasons: '/v1/admin/comp/seasons', apiBadges: '/v1/admin/comp/badges' };
+
+  function compRead(name, options) {
+
+    return panelToken().then(function (value) {
+      return workerFetch('GET', COMP_READS[name], null, value, options || {});
+    }).then(envelope, asReply);
+
+  }
 
   function contentPost(name, args, tokenValue, options) {
 
@@ -1692,7 +1703,7 @@
         var out = envelope(result);
         if (out.ok) {
           keepPanel(out.result, sid);
-          // the menu's numbers for competitions and the store are still Apps Script's: every ~4th beat, quietly
+          // the menu's numbers for competitions and the store: every ~4th beat, quietly
           if (!a.hidden && badgeBeats++ % 4 === 0 && A.setBadges && window.AdminTransport) {
             window.AdminTransport.call('apiBadges').then(function (badges) { if (badges) A.setBadges(badges); }, function () {});
           }
