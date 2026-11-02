@@ -150,7 +150,9 @@ and publish in the Worker): the «راجع وانشر» dialog goes from 4 steps
 ظهر على الموقع) to 3 (Review → Publish → Live on the site). No GitHub or GitHub Pages wait in the UI; the GitHub mirror
 keeps running in the background. Not started.
 
-**Accounts improvements batch closed 2026-11-02** (`docs/ACCOUNTS-IMPROVEMENTS.md`): five steps live, Worker `b8f6ca82`, rollback `65001395`. Three follow-ups stand on their own: the old failing tests, picture sizes on phones, the first real competition. Phase 6 needs the owner's approval.
+**Accounts improvements batch closed 2026-11-02** (`docs/ACCOUNTS-IMPROVEMENTS.md`): five steps live, Worker `b8f6ca82`, rollback `65001395`. Three follow-ups stand on their own: the old failing tests, picture sizes on phones, the first real competition.
+
+**Phase 6 started 2026-11-02 on the owner's order** (`docs/PHASE6-PLAN.md`: scope, inventory, gaps, six steps, decisions). One step at a time; each step needs the owner's choice to start and each production release its own approval.
 
 ## 6. Working rules (owner's standing instructions)
 
