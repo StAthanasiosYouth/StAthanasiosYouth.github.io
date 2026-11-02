@@ -7,8 +7,8 @@
  *    «فعّل الإشعارات» (never on load).
  *  - Firebase Messaging (assets/vendor/firebase-messaging.js) is loaded only
  *    to turn notifications on or off, or to refresh the token.
- *  - The token goes to the Apps Script API (pushSubscribe / pushUnsubscribe,
- *    apps-script/Push.gs); nothing else about the visitor is sent.
+ *  - The token goes to the server (push-config.js: the Worker, or the Apps Script
+ *    API, apps-script/Push.gs); nothing else about the visitor is sent.
  *  - sw.js shows what arrives and opens the item's deep link when tapped.
  */
 
@@ -19,6 +19,7 @@ import { PUSH_CONFIG } from './push-config.js';
 import { pushSupport, platformOf, loadMemo, saveMemo, shouldNudge, pushRequest, pushReplyOk, bellHint } from './push-env.js';
 import { installState, promptInstall, onInstallChange } from './install.js';
 
+const WORKER_ROUTES = { pushSubscribe: '/v1/push/subscribe', pushUnsubscribe: '/v1/push/unsubscribe' };
 const SW_URL = '/sw.js';
 const ICON = '/assets/img/icon-192.png';
 const BADGE = '/assets/img/push-badge.png';
@@ -92,7 +93,13 @@ async function tokenFor(reg) {
 async function server(fn, arg) {
 
   try {
-    const response = await fetch(PUSH_CONFIG.apiUrl, {
+    const response = await fetch(PUSH_CONFIG.workerUrl ? PUSH_CONFIG.workerUrl + WORKER_ROUTES[fn] : PUSH_CONFIG.apiUrl, PUSH_CONFIG.workerUrl ? {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(arg),
+      credentials: 'omit',
+      cache: 'no-store'
+    } : {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // no CORS preflight
       body: pushRequest(fn, arg),

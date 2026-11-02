@@ -258,3 +258,31 @@ test('the competition screens read seasons and the menu numbers from the Worker,
   assert.deepEqual(s.problems, []);
   await s.close();
 });
+
+test('an admin\'s push devices go to the Worker once the switch says so, and stay on Apps Script before it', async () => {
+  await freshWorld();
+  const token = 'admin_device_'.padEnd(150, 'z');
+  const before = await open();
+  await signedIn(before.page);
+  // only where it goes: this world's Apps Script has no session of the Worker's to accept it
+  await before.page.evaluate(() => A.call('apiAdminPushDevices', {}).catch(() => null));
+  assert.ok(before.appsScript.includes('apiAdminPushDevices'), 'off: Apps Script');
+  await before.close();
+
+  // a new world: the closed tab's session would still hold the account
+  await freshWorld();
+  env.DB.raw.exec("INSERT INTO settings (key, value, updated_at) VALUES ('PUSH_DEVICES', 'worker', 0)");
+  const s = await open();
+  await signedIn(s.page);
+  const on = await s.page.evaluate(t => A.call('apiAdminPushSubscribe', { token: t, platform: 'desktop', device: 'لابتوب' }), token);
+  assert.equal(on.on, true);
+  assert.equal(on.devices[0].device, 'لابتوب');
+  assert.equal(env.DB.raw.prepare('SELECT email FROM push_devices').get().email, ADMIN);
+  const listed = await s.page.evaluate(t => A.call('apiAdminPushDevices', { token: t }), token);
+  assert.equal(listed.on, true);
+  await s.page.evaluate(id => A.call('apiAdminPushRemoveDevice', id), listed.devices[0].id);
+  assert.equal(env.DB.raw.prepare('SELECT COUNT(*) AS n FROM push_devices').get().n, 0);
+  assert.deepEqual(s.appsScript.filter(fn => /^apiAdminPush/.test(fn)), [], 'none of it went to Apps Script');
+  assert.deepEqual(s.problems, []);
+  await s.close();
+});

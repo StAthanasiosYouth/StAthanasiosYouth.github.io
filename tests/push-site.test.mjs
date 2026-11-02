@@ -350,3 +350,9 @@ test('push config: public values only, and the same API deployment as the admin 
     assert.doesNotMatch(readFileSync(`${ROOT}${file}`, 'utf8'), /-----BEGIN PRIVATE KEY-----|"private_key"\s*:/, file);
   }
 });
+
+test('the site stays on Apps Script until the sending moves (push-config.js workerUrl)', async () => {
+  const { PUSH_CONFIG } = await import('../assets/js/push-config.js');
+  assert.equal(PUSH_CONFIG.workerUrl, '');
+  assert.match(PUSH_CONFIG.apiUrl, /script\.google\.com/);
+});

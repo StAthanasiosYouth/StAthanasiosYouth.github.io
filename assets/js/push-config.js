@@ -9,10 +9,15 @@
  * apiUrl: the Apps Script API deployment (the same /exec as admin/config.js
  * apiUrl and map-config.js routeUrl); the page only calls its two narrow
  * public actions, pushSubscribe and pushUnsubscribe (apps-script/Push.gs).
+ *
+ * workerUrl: when set, those two go to the Worker (POST /v1/push/subscribe and
+ * /unsubscribe, worker/src/push/devices.js). '' = Apps Script, which still does
+ * the sending; it is set when the sending moves (docs/PHASE6-PLAN.md Step 4).
  */
 
 export const PUSH_CONFIG = {
   apiUrl: 'https://script.google.com/macros/s/AKfycbxJjDyktRi6VlwRGSrF-H_KzN-vkw9QaFCiLD1TlqgrppKs4CHfmOBE4cKEd6AZ9Km1/exec',
+  workerUrl: '',
   vapidKey: 'BG1xbtyFFTedzotjPEgX4HEpiuMQ05R1KRCezOGMtjcXsgtdWEemVgamRZnegbztyomypmVL-D74niZLoKduS5Q',
   firebase: {
     apiKey: 'AIzaSyDFT6GqY1RHMn9V9xBStPTQ3fwfHSTdE4Q',

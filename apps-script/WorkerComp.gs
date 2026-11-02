@@ -261,6 +261,10 @@ function workerSyncCall_(arg) {
     return { ok: true, result: compExportForWorker_(body.freeze === true) };
   }
 
+  if (body.call === 'pushExport') {
+    return { ok: true, result: pushExportForWorker_() };
+  }
+
   if (body.call === 'compModules') {
     return { ok: true, result: compModulesFromWorker_(body.modules) };
   }

@@ -194,6 +194,27 @@ function pushHash_(token) {
 }
 
 
+/* the devices, for the Worker's one-time copy (WorkerComp.gs, a signed question): nothing is changed here */
+function pushExportForWorker_() {
+
+  var ss = spreadsheet_();
+  var rows = function (name, columns) {
+    var sheet = ss.getSheetByName(name);
+    return sheet ? pushRows_(sheet, columns) : [];
+  };
+
+  return {
+    public: rows(PUSH_SUBS_SHEET, PUSH_SUBS_COLUMNS).map(function (r) {
+      return { token: String(r.token), platform: String(r.platform), createdAt: Number(r.createdAt) || 0, lastSeen: Number(r.lastSeen) || 0, fails: Number(r.fails) || 0 };
+    }),
+    admin: rows(ADMIN_PUSH_SHEET, ADMIN_PUSH_COLUMNS).map(function (r) {
+      return { token: String(r.token), email: String(r.email), device: String(r.device), platform: String(r.platform), createdAt: Number(r.createdAt) || 0, lastSeen: Number(r.lastSeen) || 0, fails: Number(r.fails) || 0 };
+    })
+  };
+
+}
+
+
 /* the shared public budget (a minute in CacheService, the UTC day via takeDayCount_: PUSH_DAY_COUNT) */
 function pushTakeQuota_(cache) {
 

@@ -609,6 +609,7 @@
     // the session, presence and device calls go to the Worker (same reply shape)
     if (PLATFORM && Object.prototype.hasOwnProperty.call(PLATFORM_FNS, name)) return platformPost(name, args, tokenValue, sidValue, options);
     if (PLATFORM && compWorker && Object.prototype.hasOwnProperty.call(COMP_READS, name)) return compRead(name, options);
+    if (PLATFORM && pushWorker && Object.prototype.hasOwnProperty.call(PUSH_CALLS, name)) return pushCall(name, args, options);
     // Phase 4: the content calls too, once the Worker writes the drafts (its session answer says so)
     if (PLATFORM && contentWorker && (Object.prototype.hasOwnProperty.call(CONTENT_FNS, name) || Object.prototype.hasOwnProperty.call(CONTENT_ALIASES, name) || (compWorker && Object.prototype.hasOwnProperty.call(COMP_FNS, name)))) {
       return contentPost(name, args, tokenValue, options);
@@ -1569,6 +1570,21 @@
   /* Phase 6 (docs/PHASE6-PLAN.md Step 2): what the competition screens read beside their drafts, from the rows the Worker holds */
   var COMP_READS = { apiSeasons: '/v1/admin/comp/seasons', apiBadges: '/v1/admin/comp/badges' };
 
+  /* Phase 6 (docs/PHASE6-PLAN.md Step 4a): an admin's own push devices, once the Worker keeps them (boot.push, settings.PUSH_DEVICES) */
+  var PUSH_CALLS = { apiAdminPushSubscribe: 'subscribe', apiAdminPushUnsubscribe: 'unsubscribe', apiAdminPushDevices: 'devices', apiAdminPushRemoveDevice: 'remove' };
+  var pushWorker = false;
+
+  function pushCall(name, args, options) {
+
+    var arg = args && args[0];
+    var body = name === 'apiAdminPushRemoveDevice' ? { id: arg } : (arg || {});
+
+    return panelToken().then(function (value) {
+      return workerFetch('POST', '/v1/admin/push/' + PUSH_CALLS[name], body, value, options || {});
+    }).then(envelope, asReply);
+
+  }
+
   function compRead(name, options) {
 
     return panelToken().then(function (value) {
@@ -1678,6 +1694,7 @@
         // Phase 4: the server says who writes the content (it can change at the cutover or a rollback)
         if (r.boot && (r.boot.content === 'worker' || r.boot.content === 'sheets')) contentWorker = r.boot.content === 'worker';
         if (r.boot && r.boot.comps) compWorker = r.boot.comps === 'worker';
+        if (r.boot && r.boot.push) pushWorker = r.boot.push === 'worker';
         var answer = { sid: r.sid, device: r.device, resumed: r.resumed === true, state: null };
         if (!withState) return { ok: true, result: answer };
         var late = function () { return post('apiState', [], r.token, r.sid, options); };

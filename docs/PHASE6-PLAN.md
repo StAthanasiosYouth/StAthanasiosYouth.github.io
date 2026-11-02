@@ -2,7 +2,7 @@
 
 Started 2026-11-02 on the owner's order. Six steps, one at a time. Each step needs the owner's choice to start, and each production release needs its own approval.
 
-**Progress: Step 3 of 6 is live on production (2026-11-02). Step 4 waits for the owner's order.**
+**Progress: Step 4 of 6 in progress. Slice 4a passed on Staging (2026-11-03) and stays off production until the sending moves. Slice 4b waits for the owner's order.**
 
 ## 1. Official scope
 
@@ -145,6 +145,22 @@ No rebuild. The competition screens stop depending on Apps Script.
 - **4d, groundwork.** The rest of §22.2.4: config-driven origins and the new FCM web client API. A Staging check with one web token and one simulated native token, then a real closed-app push re-run with a tap that opens the exact record.
 
 **Done when:** every slice passes Worker tests and its Staging check, one owner device receives with the app closed, and the switch back has been tried.
+
+**Release order, decided in 4a:** Apps Script keeps sending from its Sheets until the Worker's sender is live. So a device that registered only on the Worker before then would get nothing, and the slices reach production together at one cutover after 4d, with its own approval:
+1. Migration and Worker, with `FCM_SERVICE_ACCOUNT` set by the owner.
+2. Copy the devices (`PUSH_IMPORT = dry`, then `apply`).
+3. Point the site (`push-config.js workerUrl`) and the panel (`PUSH_DEVICES = worker`) at the Worker.
+4. Copy again for what registered in between. A row already on the Worker stays.
+5. The Worker sends, and Apps Script stops.
+
+**4a as built (Staging Worker `908fe1d6`, migration `0025`):**
+- `push_devices`: one table for visitors' and admins' rows, with `platform` (web, android, ios), `os`, `app_version`, `topics`, an account link column, and `fails`.
+- Visitors: `POST /v1/push/subscribe` and `/unsubscribe`, one token in or out, nothing read back. Admins: `/v1/admin/push/{subscribe,unsubscribe,devices,remove}`, the same answers as Apps Script. Five devices per admin, and the two audiences never mix.
+- The copy: `settings.PUSH_IMPORT`, a signed question to Apps Script (`pushExport`), which changes nothing there. A row already on the Worker stays, no token in a report. It needs Apps Script's new call, so that deploy joins the cutover.
+- `panel`: `admin/boot.js` follows `boot.push`. `site`: `workerUrl` stays empty, and a test holds it there until the cutover.
+- Linking a device to an account is only a column so far. It's built with decision 3 in 4c.
+
+**4a tests:** Worker 431 of 431, site units 758 of 760 (the same two failures), `content-worker` 4 of 4, `push-hint` and `admin-rel` 15 of 15, `push-devices-check` live on Staging 15 of 15. The copy ran through the fake Apps Script only, because Staging has none. No real token and no notification were involved.
 
 ### Step 5: Integration
 - `route` moves to the Worker: the key as a secret, a D1 cache, a daily budget.
