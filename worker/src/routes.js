@@ -50,7 +50,7 @@ import {
 import { adminPointsAdjust, adminPointsTransfer, adminSeasons, adminSeasonSave, adminSeasonPreview, adminSeasonClose } from './points/ledger.js';
 import { adminBookingLink } from './book/account.js';
 import { compStart, compSubmit, compResult, compMe, syncCompLive } from './comp/runtime.js';
-import { adminComps, adminCompSubmissions, adminCompSubmission, adminCompGrade, adminCompVoid, adminCompRegrade } from './comp/admin.js';
+import { adminComps, adminCompBadges, adminCompSubmissions, adminCompSubmission, adminCompGrade, adminCompVoid, adminCompRegrade } from './comp/admin.js';
 import { shopRedeem, shopCancel, adminStoreItems, adminStoreItemSave, adminStoreItemDelete, adminRedemptions, adminRedemptionStatus, adminStoreSchedule, adminStoreScheduleSave, syncStoreImport } from './store/shop.js';
 import { accountSummary } from './account/summary.js';
 import { AVATAR_MAX_BYTES, accountAvatarSave, accountAvatarRead, accountAvatarDelete, adminAvatarRead } from './account/avatar.js';
@@ -431,6 +431,9 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/sync/comp-live', auth: 'sync', raw: true, maxBytes: 2 * 1024 * 1024, handler: syncCompLive },
   { method: 'POST', path: '/v1/sync/store-import', auth: 'sync', raw: true, maxBytes: 512 * 1024, handler: syncStoreImport },
   { method: 'GET', path: '/v1/admin/comp', auth: 'admin', handler: adminComps },
+  { method: 'GET', path: '/v1/admin/comp/badges', auth: 'admin', handler: adminCompBadges },
+  // the competition screen's season picker: the same list, for whoever may see competitions
+  { method: 'GET', path: '/v1/admin/comp/seasons', auth: 'admin', handler: adminSeasons },
   { method: 'GET', path: '/v1/admin/comp/submissions/:id', auth: 'admin', handler: adminCompSubmission },
   { method: 'POST', path: '/v1/admin/comp/submissions/:id/grade', auth: 'admin', maxBytes: 16 * 1024, handler: adminCompGrade },
   { method: 'POST', path: '/v1/admin/comp/submissions/:id/void', auth: 'admin', maxBytes: 1024, handler: adminCompVoid },

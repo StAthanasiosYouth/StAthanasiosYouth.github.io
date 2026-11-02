@@ -132,6 +132,8 @@ export const ROUTE_PERMS = Object.freeze({
   'GET /v1/admin/points/seasons/:id/preview': 'points.view',
   'POST /v1/admin/points/seasons/:id/close': 'points.approve',
   'GET /v1/admin/comp': 'competitions.view',
+  'GET /v1/admin/comp/badges': ANY_ADMIN,
+  'GET /v1/admin/comp/seasons': 'competitions.view',
   'GET /v1/admin/comp/:id/submissions': 'competitions.view',
   'GET /v1/admin/comp/submissions/:id': 'competitions.view',
   'POST /v1/admin/comp/submissions/:id/grade': 'competitions.edit',

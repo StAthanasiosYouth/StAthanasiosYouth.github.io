@@ -481,3 +481,29 @@ test('templates: score only when given; no answers, ages or admin links', () => 
     assert.doesNotMatch(e.html + e.text, /\/admin|سنك|\d{4}-\d{2}-\d{2}/);
   }
 });
+
+test('the menu numbers and the season picker come from D1: only what waits, and the seasons the accounts screen made', async () => {
+  const w = await world();
+  const insertSubmission = (id, status) => w.h.db.prepare(`INSERT INTO submissions (id, comp_id, version, client_key, participant_id, attempt_no, status, started_ms, seed, qids, updated_ms)
+    VALUES (?, 'c-aaaaaaaa', 'v1', ?, 'p-1', 1, ?, 0, 's', '[]', 0)`).bind(id, 'key-' + id, status).run();
+  const insertRequest = (id, status) => w.h.db.prepare(`INSERT INTO redemptions (id, item_id, item_name, participant_id, season_id, cost, status, request_key, created_ms, updated_ms)
+    VALUES (?, 'i-1', 'جايزة', 'p-1', 'sea-first', 5, ?, ?, 0, 0)`).bind(id, status, 'key-' + id).run();
+
+  assert.deepEqual((await w.admin('GET', 'comp/badges')).body.comps, 0);
+  await insertSubmission('s-1', 'pending_review');
+  await insertSubmission('s-2', 'pending_review');
+  await insertSubmission('s-3', 'graded');
+  await insertRequest('r-1', 'pending');
+  await insertRequest('r-2', 'fulfilled');
+  const badges = await w.admin('GET', 'comp/badges');
+  assert.equal(badges.body.comps, 2);
+  assert.equal(badges.body.shop, 1);
+
+  assert.equal((await w.admin('POST', 'points/seasons', { name: 'موسم الصيف' })).status, 200);
+  const seasons = (await w.admin('GET', 'comp/seasons')).body.seasons;
+  const made = seasons.find(s => s.name === 'موسم الصيف');
+  assert.equal(made.status, 'planned');
+  // the competition's own field accepts this id (CompModel.gs seasonId)
+  assert.match(made.id, /^sea-[0-9a-z]{4,12}$/);
+  assert.ok(seasons.some(s => s.id === 'sea-first' && s.status === 'active'));
+});

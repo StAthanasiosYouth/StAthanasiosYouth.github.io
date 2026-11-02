@@ -271,3 +271,8 @@ test('cash create (§4.2): create_cash alone = pending only; confirm needs appro
   assert.equal(both.status, 200, JSON.stringify(both.body));
   assert.equal(both.body.booking.status, 'confirmed');
 });
+
+test('the competition screen reads its seasons with the competitions permission; the menu numbers need only an admin', () => {
+  assert.equal(ROUTE_PERMS['GET /v1/admin/comp/seasons'], 'competitions.view');
+  assert.equal(ROUTE_PERMS['GET /v1/admin/comp/badges'], ANY_ADMIN);
+});

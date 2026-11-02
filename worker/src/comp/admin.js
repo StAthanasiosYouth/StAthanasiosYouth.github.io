@@ -32,6 +32,16 @@ export async function adminComps(ctx) {
   };
 }
 
+/* GET /v1/admin/comp/badges: the menu's numbers (Presence.gs adminBadges_), from the rows that hold them */
+export async function adminCompBadges(ctx) {
+  const db = ctx.env.DB;
+  const [comps, shop] = await retry(() => db.batch([
+    db.prepare("SELECT COUNT(*) AS n FROM submissions WHERE status = 'pending_review'"),
+    db.prepare("SELECT COUNT(*) AS n FROM redemptions WHERE status = 'pending'")
+  ]));
+  return { comps: comps.results[0].n, shop: shop.results[0].n };
+}
+
 const rowView = r => ({
   id: r.id, participantId: r.participant_id, name: r.person || '', phone: r.phone || '', status: r.status, attempt: r.attempt_no, submittedAt: r.submitted_ms, duration: r.duration_sec,
   score: r.score, maxScore: r.max_score, correct: r.correct_count, pending: r.pending_count, guest: r.elig === 'guest', flags: r.flags ? r.flags.split(',') : []
