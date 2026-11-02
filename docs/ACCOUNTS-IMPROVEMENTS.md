@@ -187,7 +187,6 @@ Measured first, on the live site as a signed-out phone on slow 4G with a 4x slow
 **Changed, because the numbers showed it:**
 - `requireAccount` reads the session and the account in one trip to the database. Every signed-in call starts there.
 - `/v1/comp/me` runs its independent reads together.
-- `/account/` preloads the display font. It was found only after the JavaScript and `/v1/account/config`, at about 1.7 s.
 
 **Staging, 40 people at once (`scripts/comp-load.mjs`):**
 
@@ -200,6 +199,8 @@ Measured first, on the live site as a signed-out phone on slow 4G with a 4x slow
 
 No request failed and the stock stayed exact. CPU p50 is 9 ms on «نقاطي» and 13 ms on submit, with peaks of 23 ms. 45 of 116 calls went over the Free plan's 10 ms, none rejected.
 
+**Tried and taken back:** preloading the display font on `/account/`. On production, both versions served the same way and taken in turn (7 runs each), the largest paint was 2368 ms with it and 1972 ms without it. It went out in `46d6edd` and came back out after the release.
+
 **Not changed:**
 - Bursts stay around 1 s, above the 0.1–0.5 s target for one person. D1 takes writes one at a time.
 - The database is in Vienna and requests reach Milan, about 15 ms apart in round trips, so Smart Placement has little to gain. Not tried.
@@ -211,3 +212,35 @@ No request failed and the stock stayed exact. CPU p50 is 9 ms on «نقاطي» 
 **Browser tests:** 45 files. `points-widget` passes now, 6 of 6: it signs in first, because signed out `points/` goes on to `/account/`. 12 files still fail, 36 tests, and every one fails by the same name on `60d0200`, the commit before this batch, which was checked by running them there. Most of them expect content that the real `content.json` no longer has. `xp-fit` does not finish in 500 s on either commit, so its later tests were not seen.
 
 `final-m` is unsteady on the map page: on this step two of four runs passed all 31, one failed test 25, and one failed tests 7 and 25. On `60d0200` one of three runs failed test 25, so that one predates the batch. Test 7 was not seen failing there; this step does not touch the map. Test 25 fails on a button measured 43.9999 px against a 44 px rule.
+
+### Release (2026-11-02)
+
+Commit `46d6edd` through CI, Worker version `b8f6ca82`; the rollback version is `65001395`. No migration. The preload was taken back afterwards, in a commit that touches only the page.
+
+Production data before the release, read by the owner: accounts 1, ledger rows 1 summing 100, bookings 10, payments 4, store items 1, redemptions 0, submissions 2. Only reads changed in this step.
+
+After the release: CI tests and smoke pass, `/v1/health` answers 200, `/v1/comp/me` answers `session` without a session and with a false one, and both `tools/account-prod-check.mjs` and `tools/account-badge-prod-check.mjs` pass. `wrangler tail` for 90 s: 5 events, all `ok`, no exceptions, no warnings, peak CPU 25 ms.
+
+The site measured slower than on 2026-10-31 on every page, including ones this step didn't touch, and `/v1/health` went from 80 to 236 ms. That points to the connection on the day, so the two sets of page numbers can't be compared. The Staging load numbers above are the evidence for this step.
+
+**Not checked on production:** a signed-in call, because no account was made there.
+
+**Back:** `npx wrangler rollback 65001395` from `worker/`, then revert `46d6edd` on `main`.
+
+## The batch is closed
+
+All five steps are live as of 2026-11-02. Phase 6 needs the owner's approval, and the admin redesign stays in Phase 8.
+
+| Step | What | Live at |
+|---|---|---|
+| 1 | The account page and the optional photo | Worker `8cec81b7` |
+| 2 | The account icon, one sign-in, returning to the page | `9c8bb63`, then the fix in Worker `2401d969` |
+| 3 | The blue emails with the code as one run, fast sending | Worker `73437f90` |
+| 4 | Code login and retired competition options removed | Worker `65001395` |
+| 5 | Fewer database trips, final tests | Worker `b8f6ca82` |
+
+**Follow-ups, each on its own and none of them part of this batch:**
+
+1. **The old failing tests.** 36 browser tests in 12 files and 2 unit tests, failing since before the batch, plus the unsteady `final-m` map tests.
+2. **Picture sizes on phones.** The home page's two pictures take 363 of its 657 KB, because only 480 px and full size exist. Study a middle size, preview first.
+3. **The first real competition.** Watch it with `wrangler tail`: errors, CPU against the Free plan's 10 ms (the paid plan is the owner's decision), bursts around 1 s, and the speed of result emails. Check real phones and the arrival time of real mail at the same time. None of this has been seen with real use.
