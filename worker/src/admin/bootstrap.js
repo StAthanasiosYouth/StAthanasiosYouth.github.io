@@ -17,14 +17,16 @@ import { bookingOn } from '../book/public.js';
 import { adminMe } from './me.js';
 import { draftsWriter } from '../content/store.js';
 import { compWriter } from '../content/compdrafts.js';
+import { pushWriter } from '../push/devices.js';
 
 export async function bootPayload(ctx, now = Date.now()) {
-  const [me, activity, book, writer, comps] = await Promise.all([
+  const [me, activity, book, writer, comps, push] = await Promise.all([
     adminMe(ctx),
     retry(() => queryActivity(ctx.env.DB, { limit: 6, view: 'log' })).catch(() => null),
     bookingOn(ctx.env).catch(() => null),
     draftsWriter(ctx.env.DB).catch(() => 'sheets'),
-    compWriter(ctx.env.DB).catch(() => 'apps-script')
+    compWriter(ctx.env.DB).catch(() => 'apps-script'),
+    pushWriter(ctx.env.DB).catch(() => 'apps-script')
   ]);
   return {
     me,
@@ -33,6 +35,8 @@ export async function bootPayload(ctx, now = Date.now()) {
     // Phase 4: who writes the content drafts (settings.CONTENT_DRAFTS) — the page sends its content calls there
     content: writer,
     // who writes the competitions' drafts (settings.COMP_DRAFTS): the page sends their calls there
-    comps
+    comps,
+    // Phase 6: who keeps the devices that get push (settings.PUSH_DEVICES)
+    push
   };
 }

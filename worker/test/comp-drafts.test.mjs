@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { harness, fakeGoogle } from './helpers.mjs';
 import { signSync } from '../src/lib/sync.js';
+import { pushImportTick } from '../src/push/devices.js';
 import { compImportTick } from '../src/content/compdrafts.js';
 import { compWorld, adminApi, webp, wallAt, plain, scoredComp, errorText, ADMIN, SECOND } from '../../tests/fakes/comp.mjs';
 
@@ -142,6 +143,19 @@ test("a picture only a prize on the Worker uses can't be purged", async () => {
   assert.match(JSON.stringify(refused.body), /رجعت اتستخدمت/);
   await w.h.db.prepare("DELETE FROM store_items WHERE id = 'i-aaaaaaaa'").run();
   assert.doesNotMatch(JSON.stringify((await w.call('apiPurgeMedia', spare)).body), /رجعت اتستخدمت/, 'free once nothing uses it');
+});
+
+test("the push devices come over through a signed question, and Apps Script's rows stay", async () => {
+  const { world } = sheets();
+  const w = await worker(world);
+  const token = ('site_device_').padEnd(150, 'y');
+  assert.equal(world.post({ fn: 'pushSubscribe', args: [{ token, platform: 'android' }] }).ok, true);
+  await w.h.db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('PUSH_IMPORT', 'apply', 0)").run();
+  const report = await pushImportTick(w.h.env, w.fetch);
+  assert.deepEqual([report.state, report.public, report.added], ['applied', 1, 1]);
+  const row = await w.h.db.prepare('SELECT audience, os, token FROM push_devices').first();
+  assert.deepEqual([row.audience, row.os, row.token], ['public', 'android', token]);
+  assert.equal(plain(world.gs.pushExportForWorker_()).public.length, 1, 'nothing removed there');
 });
 
 test('before the move the calls are refused and the panel keeps using Apps Script', async () => {
