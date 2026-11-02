@@ -2,7 +2,7 @@
 
 Started 2026-11-02 on the owner's order. Six steps, one at a time. Each step needs the owner's choice to start, and each production release needs its own approval.
 
-**Progress: Step 2 of 6 is live on production (2026-11-02). Step 3 waits for the owner's order.**
+**Progress: Step 3 of 6 passed on Staging, with the screens the owner approved. It waits for the owner's approval for production.**
 
 ## 1. Official scope
 
@@ -59,6 +59,8 @@ Started 2026-11-02 on the owner's order. Six steps, one at a time. Each step nee
 8. **Push to a booker** is marked "Phase 6, not built" in `PAYMENT-REMINDERS.md`, but it isn't in the roadmap row (decision 3 below).
 9. **A prize's picture is lost on save (found in Step 2, read from the code, not yet run).** The accounts screen's picker sends a library id as text, and `itemFields` in `worker/src/store/shop.js` stores only an object, so the picture becomes empty with no error. The store is closed and its one prize has no picture. Fixed in Step 3.
 10. **`comp-sig` still carries the prizes (found in Step 2).** With the drafts on the Worker, only `view.items` from that push is still read, and it comes from the frozen Sheets. So a picture used only by a prize made on the Worker isn't protected from a purge. Reading the prizes from D1 ends the need for this push, and it belongs with gap 9.
+11. **Removing a picture never saw the competitions (found in Step 3, in production since `795b55c`, 2026-10-27).** `apiDeleteMedia` and `apiPurgeMedia` answer with the panel's state, so the build's setup replaced `compDraft_` before `mediaUsage_` read it. The check then saw no competition, question or prize, and a purge could delete a picture in use. Fixed in Step 3. Whether any picture was purged this way hasn't been checked.
+12. **The seasons screen can't add a season (found in Step 3).** It only closes the active one and names the next, so the competition picker's list can't get a planned season from the panel. The route exists. Added with the screens, after the preview.
 
 ## 4. Steps
 
@@ -103,11 +105,32 @@ No rebuild. The competition screens stop depending on Apps Script.
 ### Step 3: Seasons and points
 - Points land in the competition's season, and write nothing when that season is closed (gap 1). Reports and «نقاطي» stay correct.
 - A prize keeps its picture, and the purge guard and the build read prizes from D1, so `comp-sig` stops being needed (gaps 9 and 10).
-- Additive migration `0025`: `notify_days`, plus whatever the store schedule's notify choices need.
+- The season's reminder days and the store schedule's notify choices move to Step 4c, with the sending that makes them work. A control that does nothing until then would mislead, so Step 3 needs no migration.
+- The seasons screen gains adding and editing a season, and closing picks the next season from the planned ones (gap 12).
 - The admin's season view gains `maxTheoretical`, `expected` and the competition count, and prizes gain their percent of the season's maximum.
 - Close a season on Staging with a prize request open and with none. Close twice, and refund in the right season.
 
 **Done when:** those cases pass in Worker tests and live on Staging, and the ledger's totals are unchanged by the release.
+
+**As built (Staging Worker `8a4b806c`):**
+- `walletStmts` reads the competition's `seasonId` from its draft in the query that already read the active season, so a submit makes no extra trip. A choice D1 doesn't know counts in the active season, so no points are lost. Corrections stay in the row's season, and a closed one is never written.
+- The seasons list carries `maxTheoretical`, `expected`, `competitions`, and for the active one `topBalance` and `participants`. Prizes carry `pctOfMax`, and the list `seasonMax`.
+- A prize stores its library id. The admin reads the id back, and a member gets the file only when it's published and not removed. The Worker stamps `publishedAt` once the file is on the site.
+- The usage check and the build read the prizes from D1, and `comp-sig` changes nothing once the drafts are the Worker's (gaps 9, 10, 11).
+- The picker's `seasonId` isn't in the published definition, as on Apps Script: changing it needs no publish.
+
+- The seasons screen and the prize list follow the preview the owner approved (https://claude.ai/artifact/2ZGRiet8jQfiYvqQTLHViB), on existing components.
+- A fix beside it: a prize request's buttons pushed the store screen 75 px sideways on a phone. They wrap now.
+
+**Tests:**
+- Worker: 422 of 422.
+- Site units: 757 of 759, the same two failures.
+- Browser: `youth-admin`, `comp-admin` 1, 3, 4 and `admin-layout` 36 of 36, `content-worker` 3 of 3. Phone width 375: no sideways scroll on the seasons, closing, store and prize screens.
+- Live on Staging: `season-check` 20 of 20, `comp-check` 39 of 39, `comp-reads-check` passes.
+
+**Not checked:** the new screens signed in against Staging itself (no Google sign-in from this session; the browser tests use a fake Worker for this screen), a real phone, and `comp-sig` sent by Apps Script itself (a signed call stood in for it).
+
+**Back:** `npx wrangler rollback e3f3a476` from `worker/` and revert the admin commit, the page first. Points landed in a chosen season stay there. No migration.
 
 ### Step 4: Push (four slices, each tested on Staging and reported on its own)
 - **4a, the device table.** One table for admin, member and anonymous devices, with `platform`, `app_version`, topic preferences and an optional account link. One register endpoint. The site and admin move behind a switch. `PushSubs` and the admin devices are copied once: dry run, then apply, on the owner's approval.
