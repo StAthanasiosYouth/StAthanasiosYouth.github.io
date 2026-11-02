@@ -31,6 +31,7 @@ import { askAppsScript } from './comps.js';
 import { setupMedia, mirrorMedia, MEDIA_CALLS, MEDIA_UPLOAD_MAX_BYTES } from './media.js';
 import { COMP_CALLS, COMP_RESULT_READS, MODULE_KEYS, compSettingsQuery, compSettingsOf, loadCounts, loadResults, settingStmt } from './compdrafts.js';
 import { compLiveStmts } from '../comp/runtime.js';
+import { imageId } from '../store/shop.js';
 
 export { MEDIA_UPLOAD_MAX_BYTES };
 
@@ -63,7 +64,7 @@ const NEEDS_ROOTS = new Set(['apiPageSave', 'apiEventSave']);
 const PASS_CODES = new Set(['locked', 'busy', 'session_expired', 'session_replaced']);
 
 async function loadAll(db, sid, now, { activityRows = 15, activityMs = 10 * 60_000 } = {}) {
-  const [rows, kinds, admins, locks, router, recent, writer, view, waiting, online, comps] = await retry(() => db.batch([
+  const [rows, kinds, admins, locks, router, recent, writer, view, waiting, online, comps, items] = await retry(() => db.batch([
     db.prepare('SELECT kind, id, pos, version, data, hash FROM draft_rows WHERE deleted_ms IS NULL ORDER BY kind, pos, id'),
     db.prepare('SELECT kind, version FROM draft_kinds'),
     db.prepare('SELECT email, name, role FROM admins WHERE active = 1 ORDER BY email'),
@@ -83,7 +84,9 @@ async function loadAll(db, sid, now, { activityRows = 15, activityMs = 10 * 60_0
     // Pages.gs bookOnline_: the online-booking go-live switch (was the Script Property BOOKING_ONLINE)
     db.prepare("SELECT value FROM settings WHERE key = 'BOOKING_ONLINE'"),
     // who writes the competitions' drafts, their module switches, their version key
-    compSettingsQuery(db)
+    compSettingsQuery(db),
+    // the prizes: what a publish sends to the site, and which pictures can't be purged
+    db.prepare('SELECT id, name, image, active FROM store_items')
   ]));
   const byKind = Object.fromEntries(KIND_NAMES.map(k => [k, []]));
   for (const r of rows.results) if (byKind[r.kind]) byKind[r.kind].push({ id: r.id, pos: r.pos, version: r.version, hash: r.hash, data: JSON.parse(r.data) });
@@ -103,7 +106,8 @@ async function loadAll(db, sid, now, { activityRows = 15, activityMs = 10 * 60_0
     view: view.results[0] ? JSON.parse(view.results[0].data) : null,
     waiting: waiting.results[0] ? waiting.results[0].n : 0,
     bookingOnline: online.results[0] ? online.results[0].value : null,
-    comps: compSettingsOf(comps.results)
+    comps: compSettingsOf(comps.results),
+    items: items.results.map(i => ({ id: i.id, name: i.name, image: imageId(i.image), active: i.active ? '1' : '' }))
   };
 }
 
@@ -246,27 +250,29 @@ export async function runContentCall(ctx, fn, args, { expect = {}, now = Date.no
   // Apps Script's competitions: what this code reads of them is their view (comps.js). The Worker's own: the rows themselves.
   const view = staticView(ctx.env) || loaded.view;
   const pushes = [];
+  let draftNow;
   if (compLocal) {
     // read by the delete check and the result calls; never written (a write would be refused as outside the drafts)
     sheets.comp.addSheet('Submissions', [SUBMISSION_COLUMNS.slice()].concat(results ? results.lines : Object.keys(counts).map(id => SUBMISSION_COLUMNS.map(c => (c === 'compId' ? id : c === 'id' ? 's-' + id : '')))));
-    hooks.use('compDraft_', () => ({
+    draftNow = () => ({
       comps: g.compRows_(g.compSheet_('Competitions')).map(g.compStrip_),
       questions: g.compRows_(g.compSheet_('Questions')).map(g.compStrip_),
-      items: (view && view.items) || [],
+      items: loaded.items,
       modules: g.compModules_(),
       points: null
-    }));
+    });
     hooks.use('compSubmissionCounts_', () => ({ ...counts }));
     hooks.use('compRuntimePush_', (ids, withdrawn) => { pushes.push({ ids, withdrawn: withdrawn || [] }); });
     if (results) hooks.use('compDefinitionFor_', (compId, version) => (compId === results.compId && results.defs[version] ? JSON.parse(results.defs[version]) : null));
   } else {
-    hooks.use('compDraft_', () => (view ? JSON.parse(JSON.stringify({ ...view, points: null, modules: {} })) : null));
+    draftNow = () => (view ? JSON.parse(JSON.stringify({ ...view, points: null, modules: {} })) : null);
   }
+  hooks.use('compDraft_', draftNow);
   // a picture a competition uses is never purged: without the view the Worker can't tell
-  if (fn === 'apiPurgeMedia' && !view) throw new ApiError('comps', 'the competitions view is not known yet');
+  if (fn === 'apiPurgeMedia' && !view && !compLocal) throw new ApiError('comps', 'the competitions view is not known yet');
 
   const media = await setupMedia(ctx, { fn, args, hooks, loaded });
-  const build = await setupBuild(ctx, { fn, g, hooks, services, email, compLocal });
+  const build = await setupBuild(ctx, { fn, g, hooks, services, email, compLocal, items: loaded.items, draftNow });
   mark('setup');
   // P4-7: these calls answer with the whole panel state, built here as Apps Script built it
   if (build) {

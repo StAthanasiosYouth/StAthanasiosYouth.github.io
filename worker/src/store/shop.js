@@ -15,7 +15,7 @@ import { requireAccount } from '../account/session.js';
 import { gate } from '../account/routes.js';
 import { eligibility, rulesFrom } from '../account/model.js';
 import { memberEmailStmt } from '../notify/member.js';
-import { activeSeason, ledgerStmt, HELD_SQL } from '../points/ledger.js';
+import { activeSeason, ledgerStmt, HELD_SQL, seasonMaxima } from '../points/ledger.js';
 import { wallOf } from '../comp/model.js';
 
 const NEXT = { pending: ['approved', 'fulfilled', 'cancelled'], approved: ['fulfilled', 'cancelled'], fulfilled: [], cancelled: [] };
@@ -75,6 +75,31 @@ const parseImage = text => {
   }
 };
 
+const MEDIA_ID = /^img-[a-z0-9]{8}$/;
+export const imageId = text => {
+  const image = parseImage(text);
+  return image && MEDIA_ID.test(String(image.id)) ? image.id : '';
+};
+
+/*
+ * A prize keeps its library id; what a member gets is that file on the site (CompStoreItems.gs shopPublishedImages_):
+ * published and not removed, so the public only ever points at files that are there.
+ */
+async function publishedImages(db, items) {
+  const ids = [...new Set(items.map(i => imageId(i.image)).filter(Boolean))];
+  if (!ids.length) return new Map();
+  const { results } = await retry(() => db.prepare(`SELECT id, data FROM draft_rows WHERE kind = 'media' AND deleted_ms IS NULL AND id IN (${ids.map(() => '?').join(',')})`).bind(...ids).all());
+  const out = new Map();
+  for (const row of results) {
+    const m = JSON.parse(row.data);
+    const w = Number(m.width);
+    const h = Number(m.height);
+    if (!m.publishedAt || m.deletedAt || !m.path || !(w > 0) || !(h > 0)) continue;
+    out.set(row.id, { src: m.path, thumb: m.thumb || m.path, w: Math.round(w), h: Math.round(h), alt: String(m.alt || '').slice(0, 140), ...(/^#[0-9a-f]{6}$/i.test(String(m.color || '')) ? { color: String(m.color).toLowerCase() } : {}) });
+  }
+  return out;
+}
+
 /* the prizes as a member sees them */
 export async function shopForMember(db, participantId) {
   const [items, taken, mine] = await retry(() => db.batch([
@@ -83,8 +108,9 @@ export async function shopForMember(db, participantId) {
     db.prepare("SELECT item_id, COUNT(*) AS n FROM redemptions WHERE status <> 'cancelled' AND participant_id = ? GROUP BY item_id").bind(participantId)
   ]));
   const count = (rows, id) => (rows.results.find(r => r.item_id === id) || { n: 0 }).n;
+  const images = await publishedImages(db, items.results);
   return items.results.map(i => ({
-    id: i.id, name: i.name, description: i.description, image: parseImage(i.image), cost: i.cost, category: i.category,
+    id: i.id, name: i.name, description: i.description, image: images.get(imageId(i.image)) || null, cost: i.cost, category: i.category,
     available: i.stock === null ? null : Math.max(0, i.stock - count(taken, i.id)),
     perPersonLeft: i.per_person === null ? null : Math.max(0, i.per_person - count(mine, i.id))
   }));
@@ -180,8 +206,8 @@ export async function shopCancel(ctx) {
 
 /* ---------- admin ---------- */
 
-const adminItem = (i, counts) => ({
-  id: i.id, name: i.name, description: i.description, image: parseImage(i.image), cost: i.cost, stock: i.stock, perPerson: i.per_person, category: i.category, order: i.ord, active: !!i.active,
+const adminItem = (i, counts, seasonMax) => ({
+  id: i.id, name: i.name, description: i.description, image: imageId(i.image), pctOfMax: seasonMax ? Math.round(i.cost * 100 / seasonMax) : null, cost: i.cost, stock: i.stock, perPerson: i.per_person, category: i.category, order: i.ord, active: !!i.active,
   redeemed: (counts.find(c => c.item_id === i.id) || { n: 0 }).n, pending: (counts.find(c => c.item_id === i.id) || { p: 0 }).p,
   available: i.stock === null ? null : Math.max(0, i.stock - (counts.find(c => c.item_id === i.id) || { n: 0 }).n)
 });
@@ -193,7 +219,11 @@ export async function adminStoreItems(ctx) {
     db.prepare('SELECT * FROM store_items ORDER BY ord, created_ms'),
     db.prepare("SELECT item_id, SUM(status <> 'cancelled') AS n, SUM(status = 'pending') AS p FROM redemptions GROUP BY item_id")
   ]));
-  return { items: items.results.map(i => adminItem(i, counts.results)) };
+  // §18.6: what a prize costs against what the active season can give
+  const season = await activeSeason(db);
+  const known = season ? (await retry(() => db.prepare('SELECT id FROM seasons').all())).results.map(s => s.id) : [];
+  const seasonMax = season ? ((await seasonMaxima(db, season.id, new Set(known)))[season.id] || { max: 0 }).max : 0;
+  return { seasonMax, items: items.results.map(i => adminItem(i, counts.results, seasonMax)) };
 }
 
 function itemFields(body) {
@@ -210,7 +240,9 @@ function itemFields(body) {
     if (!Number.isInteger(n) || n < 0 || n > max) throw invalid(field, 'الرقم مش صح.');
     return n;
   };
-  const image = body.image && typeof body.image === 'object' ? JSON.stringify(body.image).slice(0, 4000) : null;
+  const picked = String(body.image == null ? '' : body.image);
+  if (picked && !MEDIA_ID.test(picked)) throw invalid('image', 'الصورة دي مش من المكتبة.');
+  const image = picked ? JSON.stringify({ id: picked }) : null;
   return { name, description, cost, stock: whole(body.stock, 'stock', LIMITS.stock), perPerson: whole(body.perPerson, 'perPerson', LIMITS.perPerson), category: String(body.category == null ? '' : body.category).trim().slice(0, LIMITS.category), order: Number(body.order) || 0, active: body.active !== false, image };
 }
 
@@ -222,6 +254,10 @@ export async function adminStoreItemSave(ctx) {
   const now = Date.now();
   const id = body.id ? String(body.id) : randomId('i-', 4);
   if (body.id && !ITEM_ID.test(id)) throw new ApiError('not_found', 'item');
+  if (f.image) {
+    const known = await retry(() => db.prepare("SELECT 1 AS ok FROM draft_rows WHERE kind = 'media' AND id = ? AND deleted_ms IS NULL").bind(body.image).first());
+    if (!known) throw invalid('image', 'الصورة دي مش من المكتبة.');
+  }
   await retry(() => db.batch([
     db.prepare(`INSERT INTO store_items (id, name, description, image, cost, stock, per_person, category, ord, active, created_ms, updated_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET name = excluded.name, description = excluded.description, image = excluded.image, cost = excluded.cost, stock = excluded.stock, per_person = excluded.per_person,

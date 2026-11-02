@@ -77,8 +77,9 @@ async function pageShell(ctx, path, key = 'PAGES_SHELL') {
  * The competitions' part built here, from the drafts in memory (docs/PHASE5-PLAN.md §3o): the same
  * compBuildPublic_ / compPublishFiles_ Apps Script runs, the same shape as its answer.
  */
-async function localCompPart(ctx, { g, media, now, publishing }) {
-  const draft = g.compDraft_();
+async function localCompPart(ctx, { g, media, now, publishing, items }) {
+  // the prizes are D1's: the picture of an active one goes to the site with the rest
+  const draft = { ...g.compDraft_(), items };
   const errors = [];
   const warnings = [];
   const built = g.compBuildPublic_(draft, {
@@ -103,7 +104,7 @@ async function release(db, id) {
  * Before the call: everything the build reads, then the hooks. Returns
  * { statements(), finish(), release() } for runtime.js (null for other calls).
  */
-export async function setupBuild(ctx, { fn, g, hooks, services, email, compLocal }) {
+export async function setupBuild(ctx, { fn, g, hooks, services, email, compLocal, items, draftNow }) {
   if (!BUILD_CALLS.has(fn) && STATE_FREE.has(fn)) return null;
   const db = ctx.env.DB;
   const publishing = fn === 'apiPublish';
@@ -128,7 +129,7 @@ export async function setupBuild(ctx, { fn, g, hooks, services, email, compLocal
         db.prepare('SELECT kind, key, hash FROM published_revisions WHERE live = 1'),
         db.prepare("SELECT body FROM published_revisions WHERE live = 1 AND kind = 'content' AND key = 'site'")
       ])),
-      compLocal ? localCompPart(ctx, { g, media, now: wall, publishing })
+      compLocal ? localCompPart(ctx, { g, media, now: wall, publishing, items })
         : compPackage(ctx, { mode: publishing ? 'publish' : BUILD_CALLS.has(fn) ? 'review' : 'state', now: wall, media, by: email }),
       publishing ? pageShell(ctx) : null
     ]);
@@ -147,7 +148,9 @@ export async function setupBuild(ctx, { fn, g, hooks, services, email, compLocal
     hooks.use('fetchPublishedContent_', () => null);
 
     const points = await runtimePoints(ctx.env.DB, pkg.none ? null : pkg.points);
-    hooks.use('compDraft_', () => (pkg.none && !points ? null : { points, modules: pkg.modules }));
+    // removing a picture asks what uses it (Media.gs mediaUsage_): it keeps seeing the competitions and the prizes
+    const usage = fn === 'apiDeleteMedia' || fn === 'apiPurgeMedia' ? draftNow() : null;
+    hooks.use('compDraft_', () => (pkg.none && !points ? usage : { ...(usage || {}), points, modules: pkg.modules }));
     hooks.use('compBuildPublic_', (draft, c) => {
       (pkg.errors || []).forEach(e => c.error(e.where, e.message));
       (pkg.warnings || []).forEach(w => c.warn(w.where, w.message));

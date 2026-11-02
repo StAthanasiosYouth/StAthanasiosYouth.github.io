@@ -507,3 +507,111 @@ test('the menu numbers and the season picker come from D1: only what waits, and 
   assert.match(made.id, /^sea-[0-9a-z]{4,12}$/);
   assert.ok(seasons.some(s => s.id === 'sea-first' && s.status === 'active'));
 });
+
+/* the competition's draft row, with the season its admin chose */
+const chooseSeason = (w, seasonId, compId = 'c-aaaaaaaa') => w.db.prepare("INSERT INTO draft_rows (kind, id, pos, kver, data, hash, updated_ms) VALUES ('competitions', ?, 0, 1, ?, 'h', 0) ON CONFLICT(kind, id) DO UPDATE SET data = excluded.data").bind(compId, JSON.stringify({ id: compId, seasonId })).run();
+const addSeason = (w, id, status) => w.db.prepare('INSERT INTO seasons (id, name, status, created_ms, updated_ms) VALUES (?, ?, ?, 0, 0)').bind(id, 'موسم ' + id, status).run();
+
+test('§18.6: points land in the competition\'s own season; the active balance stays apart', async () => {
+  const w = await world();
+  assert.equal((await w.publish(def())).status, 200);
+  await addSeason(w, 'sea-summer27', 'planned');
+  await chooseSeason(w, 'sea-summer27');
+  const m = await member(w);
+  const s = await begin(w, m);
+  assert.equal((await send(w, m, s)).status, 200);
+  const rows = await ledger(w, m.id);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].season_id, 'sea-summer27');
+  assert.equal(rows[0].amount, 10);
+  assert.equal((await me(w, m)).body.balance, 0, 'a balance is the active season\'s');
+});
+
+test('§18.6: a closed season gets nothing, and an unknown choice counts in the active season', async () => {
+  const w = await world();
+  assert.equal((await w.publish(def())).status, 200);
+  await addSeason(w, 'sea-old2026', 'closed');
+  await chooseSeason(w, 'sea-old2026');
+  const a = await member(w);
+  const first = await begin(w, a);
+  assert.equal((await send(w, a, first)).status, 200, 'the answer is kept');
+  assert.equal((await ledger(w, a.id)).length, 0, 'no points anywhere');
+
+  await chooseSeason(w, 'sea-gone1234');
+  const b = await member(w);
+  const second = await begin(w, b);
+  assert.equal((await send(w, b, second)).status, 200);
+  assert.equal((await ledger(w, b.id))[0].season_id, 'sea-first');
+});
+
+test('§18.6: a correction stays in the row\'s season, and never changes one that closed', async () => {
+  const w = await world();
+  assert.equal((await w.publish(def())).status, 200);
+  await addSeason(w, 'sea-summer27', 'planned');
+  await chooseSeason(w, 'sea-summer27');
+  const m = await member(w);
+  const s = await begin(w, m);
+  const sent = await send(w, m, s, { q1: 'a', q2: 'مقال' });
+  assert.equal(sent.status, 200);
+  const id = s.body.attempt.id;
+  // the choice moves later: the row's season holds
+  await chooseSeason(w, '');
+  assert.equal((await w.admin('POST', `comp/submissions/${id}/grade`, { grades: { q2: true } })).status, 200);
+  let rows = await ledger(w, m.id);
+  assert.deepEqual(rows.map(r => [r.season_id, r.amount]), [['sea-summer27', 10], ['sea-summer27', 5]]);
+  await w.db.prepare("UPDATE seasons SET status = 'closed' WHERE id = 'sea-summer27'").run();
+  assert.equal((await w.admin('POST', `comp/submissions/${id}/grade`, { grades: { q2: false } })).status, 200);
+  rows = await ledger(w, m.id);
+  assert.equal(rows.length, 2, 'a closed season never changes again');
+});
+
+test('the admin\'s seasons say what they can give, and a prize says its share', async () => {
+  const w = await world();
+  const row = (kind, id, data) => w.db.prepare("INSERT INTO draft_rows (kind, id, pos, kver, data, hash, updated_ms) VALUES (?, ?, 0, 1, ?, 'h', 0)").bind(kind, id, JSON.stringify(data)).run();
+  await addSeason(w, 'sea-summer27', 'planned');
+  const comp = { wallet: '1', scoring: '1', archived: '' };
+  await row('competitions', 'c-live', { ...comp, id: 'c-live', liveVersion: 'v1', seasonId: '' });
+  await row('competitions', 'c-draft', { ...comp, id: 'c-draft', liveVersion: '', seasonId: '' });
+  await row('competitions', 'c-next', { ...comp, id: 'c-next', liveVersion: 'v1', seasonId: 'sea-summer27' });
+  await row('competitions', 'c-off', { ...comp, id: 'c-off', liveVersion: 'v1', wallet: '', seasonId: '' });
+  await row('competitions', 'c-arch', { ...comp, id: 'c-arch', liveVersion: 'v1', archived: '1', seasonId: '' });
+  await row('questions', 'q1', { compId: 'c-live', type: 'single', points: '40', enabled: '1' });
+  await row('questions', 'q2', { compId: 'c-live', type: 'info', points: '99', enabled: '1' });
+  await row('questions', 'q3', { compId: 'c-live', type: 'single', points: '99', enabled: '' });
+  await row('questions', 'q4', { compId: 'c-draft', type: 'single', points: '7', enabled: '1' });
+  await row('questions', 'q5', { compId: 'c-next', type: 'single', points: '20', enabled: '1' });
+  await row('questions', 'q6', { compId: 'c-off', type: 'single', points: '500', enabled: '1' });
+  const a = await member(w);
+  const b = await member(w);
+  await w.admin('POST', `participants/${a.id}/points`, { amount: 30, note: 'رصيد', key: 'seed-aaaaaaaa' });
+  await w.admin('POST', `participants/${b.id}/points`, { amount: 12, note: 'رصيد', key: 'seed-bbbbbbbb' });
+  const r = (await w.admin('GET', 'points/seasons')).body;
+  assert.equal(r.active, 'sea-first');
+  const active = r.seasons.find(s => s.id === 'sea-first');
+  assert.deepEqual([active.maxTheoretical, active.expected, active.competitions, active.topBalance, active.participants], [40, 7, 2, 30, 2]);
+  const next = r.seasons.find(s => s.id === 'sea-summer27');
+  assert.deepEqual([next.maxTheoretical, next.expected, next.competitions, next.topBalance], [20, 0, 1, undefined]);
+  const items = (await w.admin('POST', 'store/items', { name: 'كتاب', cost: 10 })).body;
+  assert.equal(items.seasonMax, 40);
+  assert.equal(items.items[0].pctOfMax, 25);
+});
+
+test('a prize keeps its picture: the library id for the admin, the published file for a member', async () => {
+  const { w, itemId, rich } = await shopWorld();
+  const media = data => w.db.prepare("INSERT INTO draft_rows (kind, id, pos, kver, data, hash, updated_ms) VALUES ('media', 'img-aaaa1111', 0, 1, ?, 'h', 0) ON CONFLICT(kind, id) DO UPDATE SET data = excluded.data").bind(JSON.stringify(data)).run();
+  const save = image => w.admin('POST', 'store/items', { id: itemId, name: 'كتاب', cost: 30, image });
+  assert.equal((await save('img-aaaa1111')).body.code, 'invalid', 'not in the library');
+  assert.equal((await save({ src: 'https://example.com/x.png' })).body.code, 'invalid', 'nothing but a library id');
+  const file = { id: 'img-aaaa1111', path: 'media/a.webp', thumb: 'media/a-t.webp', width: 800, height: 600, alt: 'كتاب', color: '#ABCDEF', publishedAt: '' };
+  await media(file);
+  const saved = await save('img-aaaa1111');
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.equal(saved.body.items[0].image, 'img-aaaa1111', 'the picker reads it back');
+  const m = await rich();
+  assert.equal((await me(w, m)).body.shop[0].image, null, 'not on the site yet');
+  await media({ ...file, publishedAt: '2026-11-02 10:00' });
+  assert.deepEqual((await me(w, m)).body.shop[0].image, { src: 'media/a.webp', thumb: 'media/a-t.webp', w: 800, h: 600, alt: 'كتاب', color: '#abcdef' });
+  await media({ ...file, publishedAt: '2026-11-02 10:00', deletedAt: '2026-11-02 11:00' });
+  assert.equal((await me(w, m)).body.shop[0].image, null, 'removed from the library');
+  assert.equal((await save('')).body.items[0].image, '', 'cleared');
+});

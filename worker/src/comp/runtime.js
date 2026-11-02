@@ -59,7 +59,13 @@ export async function walletStmts(db, { participantId, compId, def, change, acto
   const best = earning.slice().sort((a, b) => b.score - a.score || (a.submitted_ms || 0) - (b.submitted_ms || 0))[0];
   const refs = rows.map(r => 'sub:' + r.id);
   const ledger = refs.length ? (await retry(() => db.prepare(`SELECT ref, amount, season_id FROM points_ledger WHERE ref IN (${refs.map(() => '?').join(',')}) ORDER BY created_ms`).bind(...refs).all())).results : [];
-  const season = await activeSeason(db);
+  // §18.6: the competition's own season (its draft's choice), else the active one. A choice this database doesn't know = the active one, so no points are lost
+  const held = [...new Set(ledger.map(l => l.season_id))];
+  const seasons = (await retry(() => db.prepare(`SELECT id, status, (SELECT json_extract(data, '$.seasonId') FROM draft_rows WHERE kind = 'competitions' AND id = ? AND deleted_ms IS NULL) AS wanted
+    FROM seasons WHERE status = 'active' OR id = (SELECT json_extract(data, '$.seasonId') FROM draft_rows WHERE kind = 'competitions' AND id = ? AND deleted_ms IS NULL)
+      OR id IN (${held.map(() => '?').join(',')})`).bind(compId, compId, ...held).all())).results;
+  const active = seasons.find(s => s.status === 'active') || null;
+  const own = seasons.find(s => s.id === s.wanted) || active;
   const stmts = [];
   const deltas = [];
   for (const r of rows) {
@@ -67,10 +73,11 @@ export async function walletStmts(db, { participantId, compId, def, change, acto
     const sum = mine.reduce((n, l) => n + l.amount, 0);
     const target = best && best.id === r.id ? Number(best.score) || 0 : 0;
     if (target === sum) continue;
-    const seasonId = mine.length ? mine[0].season_id : season && season.id;
+    const seasonId = mine.length ? mine[0].season_id : own && own.id;
     if (!seasonId) continue;
-    // a closed season never changes again (§18.6)
-    if (mine.length && (!season || seasonId !== season.id)) continue;
+    // a closed season never changes again (§18.6): a known season still open is the only place a row may land
+    const landing = seasons.find(s => s.id === seasonId);
+    if (!landing || landing.status === 'closed') continue;
     stmts.push(ledgerStmt(db, {
       participantId, seasonId, amount: target - sum, kind: mine.length ? 'correction' : 'competition', ref: 'sub:' + r.id, compId, idemKey: `sub:${r.id}:${mine.length}`, actor, now, force: true, guard, guardBinds
     }));

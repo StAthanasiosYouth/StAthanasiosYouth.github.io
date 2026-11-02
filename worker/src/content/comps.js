@@ -35,6 +35,12 @@ export async function syncCompSig(ctx) {
   const sig = String(body.sig || '');
   if (!SIG_RE.test(sig)) throw new ApiError('bad', 'sig');
   const db = ctx.env.DB;
+  // the drafts are the Worker's: what Apps Script holds stopped changing at the move, and nothing here reads it
+  const writer = await retry(() => db.prepare("SELECT value FROM settings WHERE key = 'COMP_DRAFTS'").first('value'));
+  if (writer === 'worker') {
+    await retry(() => syncStampStmt(db, 'comp-sig', ts).run());
+    return { sig, ignored: true };
+  }
   await retry(() => db.batch([
     db.prepare("INSERT INTO settings (key, value, updated_at, updated_by) VALUES ('COMP_SIG', ?, ?, 'apps-script') ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").bind(sig, Date.now()),
     viewStmt(db, sig, body.view),

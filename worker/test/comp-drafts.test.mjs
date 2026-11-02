@@ -114,18 +114,34 @@ test('the move: a dry run changes nothing; apply copies every row, freezes Apps 
   assert.match(again.problems[0], /already worker/);
 });
 
-test('the signature with a big view is accepted: the store items keep arriving after the move', async () => {
+test("after the move a signature changes nothing: the drafts and the prizes are D1's", async () => {
   const { world } = sheets();
   const w = await worker(world);
   await w.move('apply');
+  const before = (await w.h.db.prepare("SELECT data FROM comp_package WHERE id = 'view'").first() || {}).data;
+  const sigBefore = await setting(w.h, 'COMP_SIG');
   const items = Array.from({ length: 200 }, (_, i) => ({ id: 'itm-' + i, name: 'جائزة ' + i, image: 'img-' + i, active: '1' }));
   const comps = Array.from({ length: 50 }, (_, i) => ({ id: 'cmp-' + i, slug: 's-' + i, title: 'مسابقة ' + i, banner: '', icon: '' }));
   const sent = await w.sync('/v1/sync/comp-sig', { sig: 'a'.repeat(64), view: { comps, questions: [], items } });
   assert.equal(sent.status, 200, JSON.stringify(sent.body));
-  const view = JSON.parse((await w.h.db.prepare("SELECT data FROM comp_package WHERE id = 'view'").first()).data);
-  assert.equal(view.items.length, 200);
-  assert.equal(view.items[0].active, '1');
-  assert.equal((await rowsOf(w.h, 'competitions')).length, 1, 'the drafts stay D1\'s: the view never replaces them');
+  assert.equal(sent.body.ignored, true);
+  assert.equal((await w.h.db.prepare("SELECT data FROM comp_package WHERE id = 'view'").first() || {}).data, before);
+  assert.equal(await setting(w.h, 'COMP_SIG'), sigBefore);
+  assert.equal((await rowsOf(w.h, 'competitions')).length, 1, "the drafts stay D1's: the view never replaces them");
+});
+
+test("a picture only a prize on the Worker uses can't be purged", async () => {
+  const { world } = sheets();
+  const w = await worker(world);
+  await w.move('apply');
+  const spare = 'img-spare123';
+  await w.h.db.prepare("INSERT INTO draft_rows (kind, id, pos, kver, data, hash, updated_ms) VALUES ('media', ?, 99, 1, ?, 'h', 0)").bind(spare, JSON.stringify({ id: spare, path: 'media/spare.webp', width: 640, height: 480, deletedAt: '2026-11-02 10:00' })).run();
+  await w.h.db.prepare("INSERT INTO store_items (id, name, image, cost, created_ms, updated_ms) VALUES ('i-aaaaaaaa', 'جايزة', ?, 5, 0, 0)").bind(JSON.stringify({ id: spare })).run();
+
+  const refused = await w.call('apiPurgeMedia', spare);
+  assert.match(JSON.stringify(refused.body), /رجعت اتستخدمت/);
+  await w.h.db.prepare("DELETE FROM store_items WHERE id = 'i-aaaaaaaa'").run();
+  assert.doesNotMatch(JSON.stringify((await w.call('apiPurgeMedia', spare)).body), /رجعت اتستخدمت/, 'free once nothing uses it');
 });
 
 test('before the move the calls are refused and the panel keeps using Apps Script', async () => {

@@ -172,11 +172,47 @@ export async function adminPointsTransfer(ctx) {
 
 const seasonView = s => ({ id: s.id, name: s.name, startAt: s.start_at || '', endAt: s.end_at || '', status: s.status, closedAt: s.closed_ms || null, closedBy: s.closed_by || '' });
 
+/*
+ * §18.6 (CompSeasons.gs seasonMaxima_): { seasonId: { max, expected, competitions } } from the drafts: what the
+ * season's competitions with points can give. Published ones count as max, the rest as expected.
+ * A choice this database doesn't know counts in the active season, where its points would land.
+ */
+export async function seasonMaxima(db, activeId, known) {
+  const [comps, questions] = await retry(() => db.batch([
+    db.prepare(`SELECT id, json_extract(data, '$.seasonId') AS season, json_extract(data, '$.liveVersion') AS live FROM draft_rows
+      WHERE kind = 'competitions' AND deleted_ms IS NULL AND json_extract(data, '$.wallet') = '1' AND json_extract(data, '$.scoring') = '1' AND COALESCE(json_extract(data, '$.archived'), '') <> '1'`),
+    db.prepare(`SELECT json_extract(data, '$.compId') AS comp, SUM(CAST(json_extract(data, '$.points') AS REAL)) AS n FROM draft_rows
+      WHERE kind = 'questions' AND deleted_ms IS NULL AND json_extract(data, '$.type') <> 'info' AND COALESCE(json_extract(data, '$.enabled'), '1') <> '' GROUP BY comp`)
+  ]));
+  const points = new Map(questions.results.map(q => [q.comp, q.n || 0]));
+  const out = {};
+  for (const c of comps.results) {
+    const sid = c.season && known.has(c.season) ? c.season : activeId;
+    if (!sid) continue;
+    const entry = out[sid] = out[sid] || { max: 0, expected: 0, competitions: 0 };
+    entry.competitions++;
+    if (c.live) entry.max += points.get(c.id) || 0;
+    else entry.expected += points.get(c.id) || 0;
+  }
+  return out;
+}
+
 /* GET /v1/admin/points/seasons */
 export async function adminSeasons(ctx) {
   const db = ctx.env.DB;
   const rows = (await retry(() => db.prepare("SELECT * FROM seasons ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'planned' THEN 1 ELSE 2 END, updated_ms DESC").all())).results;
-  return { seasons: rows.map(seasonView) };
+  const active = rows.find(s => s.status === 'active');
+  const [maxima, top] = await Promise.all([
+    seasonMaxima(db, active ? active.id : '', new Set(rows.map(s => s.id))),
+    active ? retry(() => db.prepare('SELECT COALESCE(MAX(n), 0) AS top, COALESCE(SUM(n <> 0), 0) AS people FROM (SELECT SUM(amount) AS n FROM points_ledger WHERE season_id = ? GROUP BY participant_id)').bind(active.id).first()) : null
+  ]);
+  return {
+    active: active ? active.id : '',
+    seasons: rows.map(s => {
+      const m = maxima[s.id] || { max: 0, expected: 0, competitions: 0 };
+      return { ...seasonView(s), maxTheoretical: m.max, expected: m.expected, competitions: m.competitions, ...(s.status === 'active' ? { topBalance: top.top, participants: top.people } : {}) };
+    })
+  };
 }
 
 const seasonFields = body => {
