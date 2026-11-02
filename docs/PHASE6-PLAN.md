@@ -2,7 +2,7 @@
 
 Started 2026-11-02 on the owner's order. Six steps, one at a time. Each step needs the owner's choice to start, and each production release needs its own approval.
 
-**Progress: Step 2 of 6 passed on Staging. It waits for the owner's approval for production. Step 3 waits for the owner's order.**
+**Progress: Step 2 of 6 is live on production (2026-11-02). Step 3 waits for the owner's order.**
 
 ## 1. Official scope
 
@@ -91,6 +91,12 @@ No rebuild. The competition screens stop depending on Apps Script.
 - `scripts/comp-reads-check.mjs` live on Staging: no credential and a non-admin are refused, the numbers equal D1, and a season made on the accounts side reaches the picker. It removes its own season.
 
 **Not checked:** the panel in a browser against Staging itself, because Google sign-in isn't possible there from this session. The browser test runs the same Worker code in the page's place. The rest of the competition screens' calls were checked in Step 1's inventory.
+
+**Release (2026-11-02, on the owner's approval):** `1c89aa0` through CI, Worker `e3f3a476`, rollback `b8f6ca82`. Then `6d003b4`, the panel, live on Pages. No migration and no switch changed.
+
+**After the release:** `/v1/health` answers 200, both new routes answer 401 without a credential, and `/admin/` answers 200 with the new `boot.js`. `tools/account-prod-check.mjs` and `tools/account-badge-prod-check.mjs` pass. `wrangler tail` for 90 s: 2 events, both `ok`, no exceptions. That was little traffic, so it says little.
+
+**Not checked on production:** a signed-in call to the two routes, since that needs the owner's sign-in. The owner can confirm it by opening a competition in the panel, where «الموسم» should list the seasons from «حسابات الشباب». D1 counts weren't read, because this release only adds reads.
 
 **Back:** `npx wrangler rollback b8f6ca82` from `worker/` and revert the `admin/boot.js` commit, the page first. Nothing in the data changes.
 
