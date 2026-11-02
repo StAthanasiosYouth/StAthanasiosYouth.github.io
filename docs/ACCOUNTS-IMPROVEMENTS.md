@@ -217,7 +217,7 @@ No request failed and the stock stayed exact. CPU p50 is 9 ms on «نقاطي» 
 
 Commit `46d6edd` through CI, Worker version `b8f6ca82`; the rollback version is `65001395`. No migration. The preload was taken back afterwards, in a commit that touches only the page.
 
-Production data before the release, read by the owner: accounts 1, ledger rows 1 summing 100, bookings 10, payments 4, store items 1, redemptions 0, submissions 2. Only reads changed in this step.
+Production data before the release, read by the owner: accounts 1, ledger rows 1 summing 100, bookings 10, payments 4, store items 1, redemptions 0, submissions 2. Only reads changed in this step. After the release the owner ran the same query, and every number matched: accounts 1, ledger rows 1 summing 100, bookings 10, payments 4, store items 1, redemptions 0, submissions 2.
 
 After the release: CI tests and smoke pass, `/v1/health` answers 200, `/v1/comp/me` answers `session` without a session and with a false one, and both `tools/account-prod-check.mjs` and `tools/account-badge-prod-check.mjs` pass. `wrangler tail` for 90 s: 5 events, all `ok`, no exceptions, no warnings, peak CPU 25 ms.
 
