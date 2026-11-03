@@ -2,7 +2,7 @@
 
 Started 2026-11-02 on the owner's order. Six steps, one at a time. Each step needs the owner's choice to start, and each production release needs its own approval.
 
-**Progress: Step 4 of 6 closed (2026-11-03). Step 5 started.** Earlier: Step 4 of 6 in progress. Slices 4a and 4b passed on Staging (2026-11-03). Slice 4c passed on Staging the same day, its screens on the approved preview. The push cutover ran on production on 2026-11-03, steps 1 to 7, under the owner's end-to-end approval. Step 8, the real phone test, waits for the owner's hands. Step 5 starts alongside. Nothing reaches production before 4d and a review of the whole cutover plan (owner, 2026-11-03).**
+**Progress: Step 4 of 6 closed (2026-11-03). Step 5 in progress: the panel no longer calls Apps Script; the route waits for migration 0028 on production and the ORS key.** Earlier: Step 4 of 6 in progress. Slices 4a and 4b passed on Staging (2026-11-03). Slice 4c passed on Staging the same day, its screens on the approved preview. The push cutover ran on production on 2026-11-03, steps 1 to 7, under the owner's end-to-end approval. Step 8, the real phone test, waits for the owner's hands. Step 5 starts alongside. Nothing reaches production before 4d and a review of the whole cutover plan (owner, 2026-11-03).**
 
 ## 1. Official scope
 
@@ -264,6 +264,15 @@ No rebuild. The competition screens stop depending on Apps Script.
 - The sync routes the Worker no longer needs are listed for 7b, not removed.
 
 **Done when:** a pass through every admin screen on Staging, with the network logged, shows no Apps Script call.
+
+**Step 5 as built (2026-11-03):**
+- **Settings and tools (live):** `worker/src/admin/tools.js` answers `apiCheckGithub`, `apiCheckMedia` (now the library's own path: R2 write, read and delete, D1, the site's copy), `apiResolveMapsUrl`, `apiFetchMediaUrl`, `apiSetLiveStage` (`live.json` committed alone, and the panel's copy in `settings.LIVE_STATE`), `apiPlanMigration` (finished) and `apiMigrate` (refused, decision 4: retired). The answers keep Apps Script's shapes and permissions, so no screen changed. `apiAgeRules`/`apiAgeRulesSave` map to D1's account settings. The old card has no caller.
+- **Admins (live):** `apiAdmins` comes from D1 in `adminList_`'s shape. `apiSetAdminName` is the Worker's rename followed by that list. `apiActivity` is called only when no Worker exists, so no live caller.
+- **The old «النقاط» / «المتجر» screens:** they hide once accounts are on. Until then, or from a remembered tab, they asked Apps Script for the frozen Sheets. While the Worker writes the content, their calls are now answered in the page, pointing to «حسابات الشباب». Tests: `comp-*`, `youth-admin`, `points-widget` 41 of 42. The failing `points-widget` 31 (axe on the public page) fails on the code before this change too.
+- **Panel calls left on Apps Script:** none reachable with the content on the Worker (a check of every `A.call` name in `admin-app.js` against `boot.js`'s routes).
+- **Route:** `worker/src/route.js` keeps Route.gs's contract, takes the page's own body and `text/plain`, caches 6 h in D1 (migration `0028`), and has a minute and day budget plus a per-visitor limit. Staging (`fd4188ed`) answers `config` without its key, and CORS works from the site. Worker 474 of 474. **Not on production:** the auto-mode guard refused the production migration from this session. The commit (`88094bf`) waits, local, for migration `0028` on production, because the daily housekeeping deletes from `route_cache`. Then `ORS_API_KEY` (Staging and production, owner) and the page's `routeUrl`.
+- **Background jobs, each with its reason:** `bookNewsTick` (5 min) runs the claim, then stops while the router is on: it is the claim's heartbeat, which keeps Apps Script's `PUSH_SENDER` in step. `pushScheduleTick`/`Daily` send nothing under `pushOnWorker_`, and the daily one also sends the admins list. `activityForward_`, `compSigPush_`, `workerSyncAdmins_` and `notifyClaimRun_` rode on admin calls, which no longer reach Apps Script. None needs a Worker home. The triggers go in 7b.
+- **Sync routes, for 7b:** still called by Apps Script's triggers: `notify-claim` (`bookNewsTick`), `admins` (the daily trigger). With no live caller once the triggers go: `session`, `activity`, `grants`, `pay-dest`, `publish`, `content-import`, `content-export`, `content-notify`, `comp-sig`, `media-copy`, `comp-live`, `store-import`, `book-news`. To list and remove in 7b, not before.
 
 ### Step 6: Tests and close
 Full Worker, unit and browser suites against the start of this phase. A security review of the new public endpoints. Push fan-out and route under load on Staging. D1 counts before and after the last release. The gate measured on production: Apps Script's executions show no live caller. The closing record goes here, and the handoff is updated.
