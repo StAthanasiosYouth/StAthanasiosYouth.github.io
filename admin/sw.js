@@ -91,11 +91,42 @@ self.addEventListener('install', () => self.skipWaiting());
 
 self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
 
+/*
+ * What happened on this device, told to the Worker (POST /v1/push/receipt): Google's 200 only says it took the push.
+ * Only the push's own id (the outbox row) and the outcome: no token, nothing about the admin. Never in the way of the
+ * notification, and a failure here changes nothing.
+ */
+const RECEIPT = 'https://athanasios-api.menazak-lab.workers.dev/v1/push/receipt';
+
+async function receipt(data, shown, error) {
+
+  try {
+    const id = data && typeof data.id === 'string' ? data.id : '';
+    if (!/^ntf-[0-9a-f]{6,}$|^test:/.test(id)) return;
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const open = windows.some(client => new URL(client.url).pathname.startsWith(HOME));
+    await fetch(RECEIPT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ id, shown, error: error ? String(error.name || '') + ': ' + String(error.message || '').slice(0, 120) : '', open }),
+      credentials: 'omit',
+      mode: 'cors'
+    });
+  }
+  catch {
+    // only a diagnostic
+  }
+
+}
+
+
 self.addEventListener('push', event => {
 
-  const { title, options } = notificationFrom(readPush(event));
+  const data = readPush(event);
+  const { title, options } = notificationFrom(data);
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(self.registration.showNotification(title, options)
+    .then(() => receipt(data, true, null), error => receipt(data, false, error)));
 
 });
 

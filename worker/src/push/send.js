@@ -354,7 +354,7 @@ export async function adminPushTest(ctx) {
   if (recent) throw refuse('استنى دقيقة بين كل تجربة والتانية.', '', 'rate');
   const devices = (await retry(() => db.prepare("SELECT id FROM push_devices WHERE audience = 'admin' AND email = ?").bind(me).all())).results.map(d => d.id);
   if (!devices.length) throw refuse('مفيش أجهزة مفعّل عليها الإشعارات.', 'فعّل الإشعارات من «أجهزتي» الأول.');
-  const message = model({ kind: 'admin', id: 'test', title: 'تجربة إشعارات لوحة التحكم', body: 'لو الرسالة دي وصلت، الإشعارات شغالة على الجهاز ده.', url: '/admin/', tag: 'adm-test', group: 'admin' });
+  const message = model({ kind: 'admin', id: ('test:' + me).slice(0, 80), title: 'تجربة إشعارات لوحة التحكم', body: 'لو الرسالة دي وصلت، الإشعارات شغالة على الجهاز ده.', url: '/admin/', tag: 'adm-test', group: 'admin' });
   const r = await startSend(ctx.env, { audience: 'admin', ref: 'test:' + me, by: me, message, ttl: 600, devices, now, doFetch: ctx.fetch });
   return { targets: r.targets, send: r.id };
 }

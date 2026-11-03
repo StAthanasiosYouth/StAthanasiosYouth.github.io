@@ -57,7 +57,7 @@ export const SECTIONS = {
   bookings: ['booking', 'bookings', 'proof', 'handover'],
   delivery: ['notify']
 };
-const TECHNICAL = ['diag.echo', 'diag.queue', 'booknews.claim', 'booknews.ack', 'admins.sync', 'paydest.sync', 'job.failed', 'booking.retention'];
+const TECHNICAL = ['diag.echo', 'diag.queue', 'booknews.claim', 'booknews.ack', 'admins.sync', 'paydest.sync', 'job.failed', 'booking.retention', 'push.receipt'];
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const marks = list => list.map(() => '?').join(',');
 

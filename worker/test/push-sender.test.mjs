@@ -404,3 +404,19 @@ test('a send with no device left to reach finishes at once, so its item is never
   assert.deepEqual([row.status, row.targets, row.error, !!row.finished_ms], ['failed', 0, 'no devices', true]);
   assert.equal(w.jobs().length, 0);
 });
+
+test('a delivery receipt from the admin app\'s service worker: only for a push the Worker sent, once, hidden from the log', async () => {
+  const w = await world();
+  const id = await w.device(tok(1), { audience: 'admin', email: P });
+  await startSend(w.h.env, { audience: 'admin', ref: 'ntf-abc123', message: model({ kind: 'admin', id: 'ntf-abc123', title: 'x' }), ttl: 60, devices: [id] });
+  const send = body => w.h.call('/v1/push/receipt', { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'text/plain;charset=utf-8' } });
+  assert.deepEqual((await send({ id: 'ntf-abc123', shown: true, open: false })).body.taken, true);
+  assert.deepEqual((await send({ id: 'ntf-abc123', shown: true })).body.taken, false, 'once');
+  assert.deepEqual((await send({ id: 'ntf-ffffff', shown: true })).body.taken, false, 'never sent: not taken');
+  assert.deepEqual((await send({ id: '<script>' })).body.taken, false);
+  const row = await w.h.db.prepare("SELECT action, entity_id, summary FROM activity WHERE action = 'push.receipt'").first();
+  assert.deepEqual([row.entity_id, row.summary], ['ntf-abc123', 'shown (app closed)']);
+  const g = await fakeGoogle();
+  const log = await w.h.call('/v1/admin/activity?view=log', { headers: { authorization: 'Bearer ' + await g.sign(g.claims({ email: P, sub: 's-p' })) }, fetch: g.fetch });
+  assert.ok(!JSON.stringify(log.body).includes('push.receipt'), 'not in «سجل النشاط»');
+});

@@ -53,6 +53,7 @@ import { compStart, compSubmit, compResult, compMe, syncCompLive } from './comp/
 import { pushSubscribe, pushUnsubscribe, adminPushSubscribe, adminPushUnsubscribe, adminPushDevices, adminPushRemove } from './push/devices.js';
 import { adminPushCheck, adminPushTest } from './push/send.js';
 import { publicRoute } from './route.js';
+import { pushReceipt } from './push/receipt.js';
 import { adminPushState, adminPushSend } from './push/screen.js';
 import { adminToolGithub, adminToolMedia, adminToolMaps, adminToolFetchMedia, adminToolLiveStage, adminToolMigration, adminToolMigrate, adminToolAdmins } from './admin/tools.js';
 import { adminPushAuto, adminPushSchedule, adminPushScheduleCancel } from './push/schedule.js';
@@ -441,6 +442,8 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/push/unsubscribe', auth: 'public', maxBytes: 1024, handler: pushUnsubscribe },
   // Phase 6 Step 5 — the map card's routes (route.js; the key is ORS_API_KEY)
   { method: 'POST', path: '/v1/public/route', auth: 'public', maxBytes: 1024, handler: publicRoute },
+  // the admin app's service worker: what happened to a push on the device (push/receipt.js)
+  { method: 'POST', path: '/v1/push/receipt', auth: 'public', maxBytes: 512, handler: pushReceipt },
   { method: 'POST', path: '/v1/admin/push/subscribe', auth: 'admin', maxBytes: 2048, handler: adminPushSubscribe },
   { method: 'POST', path: '/v1/admin/push/unsubscribe', auth: 'admin', maxBytes: 1024, handler: adminPushUnsubscribe },
   { method: 'POST', path: '/v1/admin/push/devices', auth: 'admin', maxBytes: 1024, handler: adminPushDevices },
