@@ -889,6 +889,13 @@
 
   /* ---------- 4. the gate ---------- */
 
+  /* the hint after a problem: the recovery admin only while config.js still names one */
+  function tryAgain(still) {
+
+    return 'جرّب تاني. ' + (FALLBACK ? 'لو ' + still + '، استخدم لوحة الطوارئ.' : 'لو ' + still + '، اقفل التطبيق وافتحه تاني.');
+
+  }
+
   function fallbackLink(label, className) {
 
     return FALLBACK ? h('a', { class: className || 'gate__link', href: FALLBACK, rel: 'noreferrer', text: label }) : null;
@@ -1950,7 +1957,7 @@
     var stop = watchdog(TIMING.render, function () {
       if (settled || my !== attempt) return;
       settled = true;
-      showProblem('اللوحة بتاخد وقت طويل تتفتح.', 'جرّب تاني. لو فضلت كده، استخدم لوحة الطوارئ.', 'render: no answer after ' + Math.round(TIMING.render / 1000) + ' s', function () { enter(); });
+      showProblem('اللوحة بتاخد وقت طويل تتفتح.', tryAgain('فضلت كده'), 'render: no answer after ' + Math.round(TIMING.render / 1000) + ' s', function () { enter(); });
     });
 
     var drawn;
@@ -1970,12 +1977,12 @@
       if (settled || my !== attempt) return;
       settled = true;
       if (ok === false) {
-        showProblem('لوحة التحكم مفتحتش.', 'جرّب تاني. لو المشكلة فضلت، استخدم لوحة الطوارئ.', '', function () { enter(); });
+        showProblem('لوحة التحكم مفتحتش.', tryAgain('المشكلة فضلت'), '', function () { enter(); });
         return;
       }
       var blank = reveal();
       if (blank) {
-        showProblem('لوحة التحكم مظهرتش على الشاشة.', 'جرّب تاني. لو المشكلة فضلت، استخدم لوحة الطوارئ.', 'render: ' + blank, function () { enter(); });
+        showProblem('لوحة التحكم مظهرتش على الشاشة.', tryAgain('المشكلة فضلت'), 'render: ' + blank, function () { enter(); });
         return;
       }
       phase = 'app';

@@ -343,3 +343,22 @@ test('Phase 6: closing the panel and opening it again comes back to the area and
   assert.ok(!(await again.evaluate(() => JSON.stringify(localStorage.getItem('athanasios-admin.place')))).includes('news-aaaa1111'), 'the place only, never an item');
   await context.close();
 });
+
+test('a kept place whose tab has no screen yet (or none at all) still opens the panel, never a blank one', async () => {
+  // owner, 2026-11-03: «لوحة التحكم مظهرتش على الشاشة» after closing the app on «الصفحات والفعاليات»
+  for (const place of [{ area: 'pages', sub: {} }, { area: 'pages', sub: { pages: 'bookings' } }, { area: 'pages', sub: { pages: 'nothing' } }]) {
+    await freshWorld();
+    const context = await browser.createBrowserContext();
+    const page = await context.newPage();
+    await page.evaluateOnNewDocument(value => { localStorage.setItem('athanasios-admin.place', value); }, JSON.stringify(place));
+    await interceptGoogle(page, { post: body => world.post(body) }, { site: { origin: SITE, local: LOCAL }, handle: worker, calls: [] });
+    await page.setViewport(DESKTOP);
+    await page.goto(ADMIN_URL, { waitUntil: 'networkidle0' });
+    await signedIn(page);
+    const shown = await page.evaluate(() => ({ area: A.area, sub: A.sub.pages, children: document.getElementById('view').childElementCount }));
+    assert.equal(shown.area, 'pages', JSON.stringify(place));
+    assert.ok(shown.children > 0, 'the view has something: ' + JSON.stringify(place));
+    assert.ok(['svcpages', 'bookings'].includes(shown.sub), JSON.stringify(shown));
+    await context.close();
+  }
+});

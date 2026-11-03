@@ -11,8 +11,9 @@
  *             Sign-In uses on this page: …apps.googleusercontent.com.
  *             The same value goes in the Script Property ADMIN_CLIENT_ID.
  *             (docs/ADMIN-SETUP.md, step 1)
- * fallbackUrl The recovery admin (the Apps Script admin, unchanged). Shown as
- *             a small link; never opened by itself.
+ * fallbackUrl (optional) The recovery admin (the Apps Script admin). Removed
+ *             2026-11-03: Apps Script is being retired, so the page offers no
+ *             link to it. Adding it back shows the small link again.
  *
  * workerUrl   The new backend (Cloudflare Worker, worker/README.md). Today the
  *             page checks the same Google sign-in against it, quietly
@@ -37,7 +38,6 @@
 window.ADMIN_CONFIG = Object.freeze({
   apiUrl: 'https://script.google.com/macros/s/AKfycbxJjDyktRi6VlwRGSrF-H_KzN-vkw9QaFCiLD1TlqgrppKs4CHfmOBE4cKEd6AZ9Km1/exec',
   clientId: '246924773718-38p45gji0ouvi7an4jdjsip3obmk6ve4.apps.googleusercontent.com',
-  fallbackUrl: 'https://script.google.com/macros/s/AKfycbwhHMp54vLJLK5UuwH_7zByzkPRkQErcUQdvZ1ad2_AxpasNWzShoh1CT3AIOrB8Rtbvw/exec',
   workerUrl: 'https://athanasios-api.menazak-lab.workers.dev',
   platform: 'worker',
   content: 'worker'

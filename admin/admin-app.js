@@ -2971,7 +2971,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       ['content', 'page', 'comps', 'pages'].forEach(function (key) {
         var owner = areaOf(key);
         var sub = ui.sub && ui.sub[key];
-        if (owner && owner.subs && owner.subs.some(function (s) { return s.key === sub; })) A.sub[key] = sub;
+        // a tab added after the first drawing («الحجوزات», «حسابات الشباب») has its screen already
+        if (owner && owner.subs && (owner.subs.some(function (s) { return s.key === sub; }) || (sub && A.views[sub]))) A.sub[key] = sub;
       });
       pendingScroll = Math.max(0, Math.min(200000, Number(ui.y) || 0));
 
@@ -3172,7 +3173,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   };
 
   A.area = 'home';
-  A.sub = { content: 'meetings', page: 'layout', comps: 'comps' };
+  A.sub = { content: 'meetings', page: 'layout', comps: 'comps', pages: 'svcpages' };
 
   function areaOf(key) {
 
@@ -3325,6 +3326,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var view = document.getElementById('view');
     var area = areaOf(A.area);
+    // a sub-tab with no screen (kept from before, or not there for this admin): the area's first one
+    if (area.subs && !A.views[A.sub[A.area]] && area.subs.length) {
+      A.sub[A.area] = area.subs[0].key;
+      renderNav();
+    }
     var key = area.subs ? A.sub[A.area] : (area.view || area.key);
     var builder = A.views[key];
 

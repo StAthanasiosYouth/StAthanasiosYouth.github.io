@@ -458,13 +458,13 @@ test('admin/config.js: the one public config place — no secrets, the right sha
   new Function('window', text)(sandbox);
   const config = sandbox.ADMIN_CONFIG;
   // platform (Phase 3) and content (Phase 6 Step 5) are switches with a fixed set of values, nothing secret
-  assert.deepEqual(Object.keys(config).sort(), ['apiUrl', 'clientId', 'content', 'fallbackUrl', 'platform', 'workerUrl']);
+  // no fallbackUrl since 2026-11-03: the page links to no Apps Script recovery admin
+  assert.deepEqual(Object.keys(config).sort(), ['apiUrl', 'clientId', 'content', 'platform', 'workerUrl']);
   assert.ok(['worker'].includes(config.platform), 'platform: worker (remove it to roll back)');
   assert.ok(['worker', 'sheets'].includes(config.content), 'content: the first guess of who keeps the content');
   assert.match(config.workerUrl, /^https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev$/);
   assert.ok(config.apiUrl === '' || /^https:\/\/script\.google\.com\/macros\/s\/[\w-]{20,}\/exec$/.test(config.apiUrl), 'apiUrl: empty or an /exec URL');
   assert.match(config.clientId, /^[\w-]+\.apps\.googleusercontent\.com$/, 'the OAuth client ID (public)');
-  assert.match(config.fallbackUrl, /^https:\/\/script\.google\.com\/macros\/s\/AKfycbwhHMp54vLJLK5UuwH_7zByzkPRkQErcUQdvZ1ad2_AxpasNWzShoh1CT3AIOrB8Rtbvw\/exec$/);
   assert.doesNotMatch(text, /GOCSPX|client_secret|ghp_|github_pat_|AIza/, 'no secrets');
 
   // the deployment ids appear nowhere else in admin/
