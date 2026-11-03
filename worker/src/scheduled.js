@@ -18,6 +18,7 @@ import { compImportTick } from './content/compdrafts.js';
 import { pushImportTick } from './push/devices.js';
 import { ageOutNotices } from './account/age-out.js';
 import { staleDevicesStmt } from './push/send.js';
+import { routeSweepStmt } from './route.js';
 import { scheduleTick } from './push/schedule.js';
 import { autoBellTick } from './push/autobell.js';
 
@@ -51,7 +52,9 @@ export async function housekeeping(env, now = Date.now()) {
     // Phase 5: account sessions, codes, the member outbox, registration IP hashes
     ...accountSweepStmts(env.DB, now),
     // Phase 6: a visitor's device not seen for 270 days
-    staleDevicesStmt(env.DB, now)
+    staleDevicesStmt(env.DB, now),
+    // Phase 6 Step 5: routes past their 6 hours
+    routeSweepStmt(env.DB, now)
   ]);
   const removed = r.map(x => x.meta.changes);
   logLine({ kind: 'cron', job: 'housekeeping', removed });
