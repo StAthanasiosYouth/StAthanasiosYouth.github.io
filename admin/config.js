@@ -24,6 +24,11 @@
  *             presence, edit locks and trusted device are the Worker's; Apps
  *             Script takes the Worker's panel token. Absent = the Apps Script
  *             sessions (the rollback: remove this line).
+ * content     'worker' (Phase 6 Step 5): the first guess of who keeps the content
+ *             until the Worker's own answer says (it is remembered after that).
+ *             With 'worker' the page asks Apps Script nothing at all: no
+ *             warm-up, no early state. A rollback needs no edit here: the
+ *             first answer that says 'sheets' brings both back.
  *
  * While apiUrl or clientId is empty, the page says it isn't set up yet and
  * offers the recovery admin. It never redirects.
@@ -34,5 +39,6 @@ window.ADMIN_CONFIG = Object.freeze({
   clientId: '246924773718-38p45gji0ouvi7an4jdjsip3obmk6ve4.apps.googleusercontent.com',
   fallbackUrl: 'https://script.google.com/macros/s/AKfycbwhHMp54vLJLK5UuwH_7zByzkPRkQErcUQdvZ1ad2_AxpasNWzShoh1CT3AIOrB8Rtbvw/exec',
   workerUrl: 'https://athanasios-api.menazak-lab.workers.dev',
-  platform: 'worker'
+  platform: 'worker',
+  content: 'worker'
 });

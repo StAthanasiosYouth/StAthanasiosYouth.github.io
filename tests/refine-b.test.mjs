@@ -457,7 +457,10 @@ test('admin/config.js: the one public config place — no secrets, the right sha
   const sandbox = {};
   new Function('window', text)(sandbox);
   const config = sandbox.ADMIN_CONFIG;
-  assert.deepEqual(Object.keys(config).sort(), ['apiUrl', 'clientId', 'fallbackUrl', 'workerUrl']);
+  // platform (Phase 3) and content (Phase 6 Step 5) are switches with a fixed set of values, nothing secret
+  assert.deepEqual(Object.keys(config).sort(), ['apiUrl', 'clientId', 'content', 'fallbackUrl', 'platform', 'workerUrl']);
+  assert.ok(['worker'].includes(config.platform), 'platform: worker (remove it to roll back)');
+  assert.ok(['worker', 'sheets'].includes(config.content), 'content: the first guess of who keeps the content');
   assert.match(config.workerUrl, /^https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev$/);
   assert.ok(config.apiUrl === '' || /^https:\/\/script\.google\.com\/macros\/s\/[\w-]{20,}\/exec$/.test(config.apiUrl), 'apiUrl: empty or an /exec URL');
   assert.match(config.clientId, /^[\w-]+\.apps\.googleusercontent\.com$/, 'the OAuth client ID (public)');

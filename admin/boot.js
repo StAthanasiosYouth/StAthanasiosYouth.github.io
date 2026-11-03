@@ -689,9 +689,23 @@
   var WARM_IDLE = 5 * 60000;
   var lastCall = 0;
 
+  /*
+   * Phase 6 Step 5: with the content on the Worker, Apps Script has nothing to answer the panel. config.content
+   * is the guess (the page keeps nothing of its own: no persistent storage here): with 'worker' no warm-up and no
+   * early state go there. When the Worker's answer says the Sheets write the content (a rollback), the state is
+   * asked as before (the Google token), and the warm-up follows that answer.
+   */
+  function contentGuess() {
+
+    return config.content === 'worker';
+
+  }
+
   function warm() {
 
     if (!API || typeof fetch !== 'function') return;
+    // the Worker's own answer once heard, else the config's guess
+    if (PLATFORM && (contentHeard ? contentWorker : contentGuess())) return;
 
     lastCall = Date.now();
 
@@ -1562,6 +1576,7 @@
   // Apps Script names whose Worker answer is another call's
   var CONTENT_ALIASES = { apiPublishRefresh: 'apiState' };
   var contentWorker = false;
+  var contentHeard = false;
   /* the competitions' admin, once the Worker writes their drafts (boot.comps, settings.COMP_DRAFTS). The list = worker/src/content/compdrafts.js COMP_CALLS */
   var COMP_FNS = {
     apiComps: 1, apiComp: 1, apiCompCreate: 1, apiCompSave: 1, apiCompDuplicate: 1, apiCompArchive: 1, apiCompDelete: 1, apiCompClose: 1, apiCompFinalize: 1, apiCompSettings: 1,
@@ -1764,7 +1779,9 @@
         : { sid: sidValue, device: a.device, tab: a.tab, prev: a.prev, left: a.left === true, boot: withState };
       // … and the content state (still Apps Script's) is asked AT THE SAME TIME with the Google token
       // (read-only; a device's token can't: then it is asked right after, with the panel token)
-      var early = withState && session && session.via === 'google' && tokenValue === session.token ? post('apiState', [], tokenValue, '', options) : null;
+      var googleState = withState && session && session.via === 'google' && tokenValue === session.token;
+      var guessedWorker = contentGuess();
+      var early = googleState && !guessedWorker ? post('apiState', [], tokenValue, '', options) : null;
       if (early) early.catch(function () {});
       return workerFetch('POST', start ? '/v1/admin/session/start' : '/v1/admin/session/resume', body, tokenValue, options).then(function (result) {
         var out = envelope(result);
@@ -1772,7 +1789,10 @@
         var r = out.result;
         keepPanel(r, r.sid);
         // Phase 4: the server says who writes the content (it can change at the cutover or a rollback)
-        if (r.boot && (r.boot.content === 'worker' || r.boot.content === 'sheets')) contentWorker = r.boot.content === 'worker';
+        if (r.boot && (r.boot.content === 'worker' || r.boot.content === 'sheets')) {
+          contentWorker = r.boot.content === 'worker';
+          contentHeard = true;
+        }
         if (r.boot && r.boot.comps) compWorker = r.boot.comps === 'worker';
         if (r.boot && r.boot.push) pushWorker = r.boot.push === 'worker';
         if (r.boot && r.boot.pushSend) pushSendWorker = r.boot.pushSend === 'worker';
@@ -1781,6 +1801,8 @@
         var late = function () { return post('apiState', [], r.token, r.sid, options); };
         // the early Apps Script state is only good while Apps Script writes the content
         if (early && contentWorker) early = null;
+        // guessed the Worker, but the Sheets write the content (a rollback): asked now, as it was asked before (the Google token)
+        if (!early && googleState && guessedWorker && !contentWorker) early = post('apiState', [], tokenValue, '', options);
         return (early ? early.then(function (st) { return st.ok ? st : late(); }, late) : late()).then(function (st) {
           if (!st.ok) return st;
           var state = st.result;

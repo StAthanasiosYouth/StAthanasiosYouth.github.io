@@ -110,7 +110,8 @@ test.before(async () => {
   await freshWorld();
   server = createSiteServer({
     world: { issueToken: c => issueToken(c), get github() { return world.github; } },
-    config: () => ({ apiUrl: TEST_API, clientId: TEST_CLIENT, fallbackUrl: TEST_FALLBACK, timing: TIMING, workerUrl: WORKER_URL, platform: 'worker' }),
+    // as production's admin/config.js since Phase 6 Step 5 (content: the first guess of who keeps the content)
+    config: () => ({ apiUrl: TEST_API, clientId: TEST_CLIENT, fallbackUrl: TEST_FALLBACK, timing: TIMING, workerUrl: WORKER_URL, platform: 'worker', content: 'worker' }),
     claims: () => ({ email: ADMIN })
   });
   await new Promise(resolve => server.listen(PORT, '127.0.0.1', resolve));
@@ -284,5 +285,38 @@ test('an admin\'s push devices go to the Worker once the switch says so, and sta
   assert.equal(env.DB.raw.prepare('SELECT COUNT(*) AS n FROM push_devices').get().n, 0);
   assert.deepEqual(s.appsScript.filter(fn => /^apiAdminPush/.test(fn)), [], 'none of it went to Apps Script');
   assert.deepEqual(s.problems, []);
+  await s.close();
+});
+
+test('Phase 6 Step 5: with production\'s switches, a walk through every area and tab asks Apps Script nothing', async () => {
+  await freshWorld();
+  Object.assign(env, { PW_PEPPER: 'p', PW_KEY: Buffer.alloc(32, 7).toString('base64'), OTP_PEPPER: 'o' });
+  env.COMPS_SOURCE = '';
+  env.DB.raw.exec(`INSERT INTO settings (key, value, updated_at) VALUES ('COMP_DRAFTS', 'worker', 0), ('COMP_HASH_KEY', 'a2V5LWtleS1rZXkta2V5LWtleS1rZXk=', 0), ('COMP_REGISTRY', '1', 0), ('COMP_WALLET', '1', 0), ('COMP_SHOP', '1', 0), ('BOOKING_ONLINE', '1', 0), ('PUSH_DEVICES', 'worker', 0), ('PUSH_SENDER', 'worker', 0)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+    UPDATE settings SET value = 'on' WHERE key = 'accounts_mode'; DELETE FROM admin_sessions;`);
+  const s = await open();
+  await signedIn(s.page);
+  // the accounts tab replaces the old points / store ones once the Worker says accounts are on
+  await s.page.waitForFunction(() => window.A && A.AREAS.some(a => a.subs && a.subs.some(x => x.key === 'youth')), { timeout: 15000 }).catch(() => {});
+  const visited = await s.page.evaluate(async () => {
+    const seen = [];
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    for (const area of A.AREAS) {
+      const subs = area.subs && area.subs.length ? area.subs.map(x => x.key) : [null];
+      for (const sub of subs) {
+        try { await (sub ? A.go(area.key, sub) : A.go(area.key)); } catch (e) { /* a screen that refuses still counts as visited */ }
+        await wait(700);
+        seen.push(area.key + (sub ? '/' + sub : ''));
+      }
+    }
+    // the settings' own checks, and the push screen
+    if (A.push && A.push.open) { try { A.push.open(); await wait(900); A.closeSheet && A.closeSheet(); } catch (e) { /* */ } }
+    return seen;
+  });
+  await new Promise(r => setTimeout(r, 1500));
+  console.log('visited', visited.length, visited.join(' '));
+  assert.ok(visited.length >= 8, 'every area and tab');
+  assert.deepEqual(s.appsScript, [], 'not one call reached Apps Script');
   await s.close();
 });
