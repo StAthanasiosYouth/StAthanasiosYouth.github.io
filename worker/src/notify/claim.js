@@ -13,7 +13,8 @@
  *   notify.failed / gmail.token row: no loop);
  * - the bodies are made now from the activity rows (the outbox stores none);
  * - PUSH_SENDER = 'worker' (Phase 6 Step 4b): the Worker sends them itself (push/send.js), and the reply hands out
- *   nothing. `router` still says whether the router is on, so Apps Script's own admin pushes stay off.
+ *   nothing. `router` still says whether the router is on, so Apps Script's own admin pushes stay off, and `sender`
+ *   tells Apps Script to send nothing at all (NotifyClaim.gs keeps it as the Script Property PUSH_SENDER).
  */
 
 import { ApiError } from '../lib/http.js';
@@ -101,7 +102,7 @@ export async function notifyClaim(ctx) {
   const router = set.NOTIFY_ROUTER === '1';
   if (!router || set.PUSH_SENDER === 'worker') {
     await retry(() => db.batch(stmts));
-    return { router, items: [] };
+    return { router, sender: set.PUSH_SENDER === 'worker', items: [] };
   }
 
   // 2. rows out of attempts with no answer: dead
@@ -116,7 +117,7 @@ export async function notifyClaim(ctx) {
   await retry(() => db.batch(stmts));
 
   const rows = (await retry(() => db.prepare("SELECT id, recipient, kind, level, activity_ids FROM notify_outbox WHERE claim_id = ? ORDER BY CASE level WHEN 'critical' THEN 0 WHEN 'important' THEN 1 ELSE 2 END, created_ms").bind(claim).all())).results;
-  if (!rows.length) return { router: true, items: [] };
+  if (!rows.length) return { router: true, sender: false, items: [] };
   const src = await sources(db, rows.flatMap(r => { try { return JSON.parse(r.activity_ids) || []; } catch { return []; } }));
   const items = [];
   const gone = [];
@@ -128,5 +129,5 @@ export async function notifyClaim(ctx) {
   if (gone.length) {
     await retry(() => db.prepare(`UPDATE notify_outbox SET status = 'dismissed', claim_id = NULL, error = 'activity gone' WHERE id IN (${gone.map(() => '?').join(',')})`).bind(...gone).run());
   }
-  return { router: true, items };
+  return { router: true, sender: false, items };
 }

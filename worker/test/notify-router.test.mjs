@@ -191,7 +191,7 @@ test('claim: an unanswered claim comes back after its lease; activity gone → d
   assert.ok((await outbox(h)).every(x => x.status === 'dismissed'));
 
   await set(h, 'NOTIFY_ROUTER', '0');
-  assert.deepEqual((await claim(h, [], t++)).body, { ok: true, router: false, items: [] });
+  assert.deepEqual((await claim(h, [], t++)).body, { ok: true, router: false, sender: false, items: [] });
 });
 
 test('cron: the minute routes; the daily keeps the outbox 30 days (never a waiting critical row)', async () => {

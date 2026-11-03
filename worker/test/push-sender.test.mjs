@@ -221,7 +221,7 @@ test('admin pushes: from the outbox once PUSH_SENDER = worker; the claim feed th
   assert.equal(await adminPushTick(w.h.env), null, 'switch off: Apps Script claims them');
   await w.set('PUSH_SENDER', 'worker');
   const c = await claim(w.h);
-  assert.deepEqual([c.body.router, c.body.items.length], [true, 0], 'router on (Apps Script keeps its own pushes off), nothing handed out');
+  assert.deepEqual([c.body.router, c.body.sender, c.body.items.length], [true, true, 0], 'router on (Apps Script keeps its own pushes off), Apps Script told to send nothing, nothing handed out');
 
   const looking = await w.device(tok(1), { audience: 'admin', email: P, label: 'لابتوب' });
   const phone = await w.device(tok(2), { audience: 'admin', email: P, label: 'موبايل' });

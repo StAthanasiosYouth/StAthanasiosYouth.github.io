@@ -460,3 +460,12 @@ test('Phase 6 cutover: with PUSH_SENDER = worker nothing here sends — no butto
   world.properties.set('PUSH_SENDER', '');
   assert.equal(world.gs.pushOnWorker_(), false, 'back: the property removed');
 });
+
+test('Phase 6 cutover: the claim reply\'s `sender` sets and clears PUSH_SENDER by itself (no hand on Script Properties)', () => {
+  const world = pushWorld();
+  world.gs.notifySenderRemember_(true);
+  assert.equal(world.properties.get('PUSH_SENDER'), 'worker');
+  assert.equal(world.gs.pushOnWorker_(), true);
+  world.gs.notifySenderRemember_(false);
+  assert.equal(world.gs.pushOnWorker_(), false, 'the Worker went back: Apps Script sends again');
+});

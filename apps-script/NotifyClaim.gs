@@ -59,6 +59,24 @@ function notifyRouterRemember_(on) {
 
 }
 
+/*
+ * Phase 6: the Worker sends every push now (its reply's `sender`) → the Script Property PUSH_SENDER = 'worker',
+ * which Push.gs pushOnWorker_ reads: nothing here sends. The Worker going back removes it the same way.
+ */
+function notifySenderRemember_(onWorker) {
+
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var now = props.getProperty('PUSH_SENDER') === 'worker';
+    if (onWorker && !now) props.setProperty('PUSH_SENDER', 'worker');
+    if (!onWorker && now) props.deleteProperty('PUSH_SENDER');
+  }
+  catch (ignored) {
+    // the next claim tells again
+  }
+
+}
+
 /* POST /v1/sync/notify-claim → the reply, or null on any doubt */
 function notifyClaimPost_(acks) {
 
@@ -167,6 +185,7 @@ function notifyClaimRun_(force) {
       // the Worker has these answers now
       acks = [];
       notifyRouterRemember_(reply.router === true);
+      notifySenderRemember_(reply.sender === true);
       var items = Array.isArray(reply.items) ? reply.items : [];
       if (!items.length) break;
       acks = items.map(notifyDeliver_);
