@@ -17,7 +17,7 @@ import { retry, cairoText } from '../lib/db.js';
 import { randomId } from '../lib/hash.js';
 import { logLine } from '../lib/log.js';
 import { cleanLabel } from '../admin/session.js';
-import { serviceAccount, accessToken, forgetAccessToken, model, fcmMessage, sendOne, checkKey } from './fcm.js';
+import { serviceAccount, accountProblem, PROBLEM_TEXT, accessToken, forgetAccessToken, model, fcmMessage, sendOne, checkKey } from './fcm.js';
 import { sources, messageFor, deadStmts, backoffMs, MAX_ATTEMPTS } from '../notify/claim.js';
 import { makeJob } from '../jobs.js';
 
@@ -30,6 +30,15 @@ export const ADMIN_TTL = 86400;
 export const PRESENT_MS = 70 * 1000;          // Presence.gs PRESENCE_ONLINE_SECONDS
 export const ADMIN_LEASE_MS = 10 * 60000;     // an outbox row's send may take a retry round
 export const ADMIN_CLAIM_MAX = 40;
+
+/* once per isolate while the Worker sends: a key that can't work is said in the log by its problem's name, never a value */
+let keySaid = false;
+export function keyWatch(env) {
+  if (keySaid) return;
+  keySaid = true;
+  const problem = accountProblem(env);
+  if (problem) logLine({ lvl: 'warn', kind: 'push', msg: 'FCM_SERVICE_ACCOUNT unusable', problem });
+}
 export const SEND_COOLDOWN_MS = 60000;
 export const SENDS_PER_DAY = 10;
 const SENDING_STALE_MS = 10 * 60000;
@@ -197,6 +206,7 @@ export async function adminPushTick(env, now = Date.now(), doFetch) {
   const db = env.DB;
   const set = Object.fromEntries((await retry(() => db.prepare("SELECT key, value FROM settings WHERE key IN ('PUSH_SENDER', 'NOTIFY_ROUTER')").all())).results.map(r => [r.key, r.value]));
   if (set.PUSH_SENDER !== 'worker' || set.NOTIFY_ROUTER !== '1') return null;
+  keyWatch(env);
 
   const stmts = [];
   // rows out of attempts with no answer: dead (claim.js step 2)
@@ -323,7 +333,7 @@ export const staleDevicesStmt = (db, now) => db.prepare("DELETE FROM push_device
 export async function adminPushCheck(ctx) {
   const r = await checkKey(ctx.env, ctx.fetch);
   const text = {
-    missing: 'FCM_SERVICE_ACCOUNT ناقص أو مش صحيح على الـWorker.',
+    ...PROBLEM_TEXT,
     auth: 'جوجل رفض مفتاح الإشعارات.',
     permission: 'حساب الخدمة مالوش صلاحية Firebase Cloud Messaging API Admin، أو الـ API مقفول.',
     http: 'FCM رد بـ HTTP ' + r.status + '. جرّب تاني بعد شوية.',

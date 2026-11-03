@@ -23,16 +23,37 @@ const IMAGE = /^\/media\/[\w./-]{1,200}\.(?:webp|jpe?g|png)$/;
 
 const cache = new Map();
 
+/*
+ * What is wrong with the key, by name only — never a value: '' (fine) | 'missing' | 'not-json' (often only its first
+ * line was kept, when it was pasted into a terminal) | 'project_id' | 'client_email' | 'private_key'.
+ */
+export function accountProblem(env) {
+  const raw = String(env.FCM_SERVICE_ACCOUNT || '').replace(/^\uFEFF/, '').trim();
+  if (!raw) return 'missing';
+  let a = null;
+  try { a = JSON.parse(raw); } catch { return 'not-json'; }
+  if (!a || typeof a !== 'object') return 'not-json';
+  if (!/^[a-z][a-z0-9-]{4,40}$/.test(String(a.project_id || ''))) return 'project_id';
+  if (!/^[^@\s]+@[\w.-]+\.iam\.gserviceaccount\.com$/.test(String(a.client_email || ''))) return 'client_email';
+  if (!String(a.private_key || '').includes('PRIVATE KEY')) return 'private_key';
+  return '';
+}
+
 /* the parsed account, or null (the same checks as Push.gs pushServiceAccount_) */
 export function serviceAccount(env) {
-  let a = null;
-  try { a = env.FCM_SERVICE_ACCOUNT ? JSON.parse(env.FCM_SERVICE_ACCOUNT) : null; } catch { a = null; }
-  if (!a || typeof a !== 'object'
-    || !/^[a-z][a-z0-9-]{4,40}$/.test(String(a.project_id || ''))
-    || !/^[^@\s]+@[\w.-]+\.iam\.gserviceaccount\.com$/.test(String(a.client_email || ''))
-    || !String(a.private_key || '').includes('PRIVATE KEY')) return null;
+  if (accountProblem(env)) return null;
+  const a = JSON.parse(String(env.FCM_SERVICE_ACCOUNT).replace(/^\uFEFF/, '').trim());
   return { projectId: a.project_id, email: a.client_email, key: a.private_key };
 }
+
+/* the admin's words for a problem (the screen and «اختبر الإعداد») */
+export const PROBLEM_TEXT = {
+  missing: 'FCM_SERVICE_ACCOUNT مش موجود على الـWorker.',
+  'not-json': 'FCM_SERVICE_ACCOUNT على الـWorker مش JSON كامل. غالبًا اتحفظ أول سطر بس لما اتلصق في الـterminal: ارفعه تاني من الملف نفسه.',
+  project_id: 'FCM_SERVICE_ACCOUNT على الـWorker ناقصه project_id صحيح.',
+  client_email: 'FCM_SERVICE_ACCOUNT على الـWorker ناقصه client_email بتاع حساب خدمة.',
+  private_key: 'FCM_SERVICE_ACCOUNT على الـWorker ناقصه private_key.'
+};
 
 export const forgetAccessToken = account => (account ? cache.delete(account.email) : cache.clear());
 
@@ -138,8 +159,9 @@ export async function sendOne(account, token, message, doFetch) {
 
 /* is the key good? validate_only to a token that can't exist: no device gets anything (Push.gs apiPushCheck) */
 export async function checkKey(env, doFetch) {
+  const problem = accountProblem(env);
+  if (problem) return { ok: false, code: problem };
   const account = serviceAccount(env);
-  if (!account) return { ok: false, code: 'missing' };
   try {
     const token = await accessToken(account, doFetch, { fresh: true });
     const res = await doFetch(FCM_URL + account.projectId + '/messages:send', {

@@ -377,3 +377,22 @@ test('Phase 6 Step 4d: the allowed origins are configuration; a native shell\'s 
   const res = await handle(new Request('https://api.test/v1/push/subscribe', { method: 'OPTIONS', headers: { origin: 'capacitor://localhost', 'access-control-request-method': 'POST' } }), plain.env, { waitUntil() {} });
   assert.equal(res.status, 403, 'not configured: refused');
 });
+
+test('a key that can\'t work is named by its problem, never by a value; a BOM or spaces around it are fine', async () => {
+  const { accountProblem } = await import('../src/push/fcm.js');
+  assert.equal(accountProblem({}), 'missing');
+  assert.equal(accountProblem({ FCM_SERVICE_ACCOUNT: '{' }), 'not-json', 'the first line of a pasted file');
+  assert.equal(accountProblem({ FCM_SERVICE_ACCOUNT: '{"project_id":"x"}' }), 'project_id');
+  assert.equal(accountProblem({ FCM_SERVICE_ACCOUNT: JSON.stringify({ project_id: 'athanasios-test', client_email: 'x@y.com' }) }), 'client_email');
+  assert.equal(accountProblem({ FCM_SERVICE_ACCOUNT: JSON.stringify({ project_id: 'athanasios-test', client_email: 'a@b.iam.gserviceaccount.com' }) }), 'private_key');
+  assert.equal(accountProblem({ FCM_SERVICE_ACCOUNT: '\uFEFF ' + ACCOUNT + '\n' }), '');
+  assert.ok(serviceAccount({ FCM_SERVICE_ACCOUNT: '\uFEFF' + ACCOUNT }));
+  const w = await world({ key: false });
+  w.h.env.FCM_SERVICE_ACCOUNT = ACCOUNT.slice(0, -1);   // a real key, cut short
+  const g = await fakeGoogle();
+  const state = await w.h.call('/v1/admin/push/state', { method: 'POST', body: {}, headers: { authorization: 'Bearer ' + await g.sign(g.claims({ email: P, sub: 's-p' })) }, fetch: g.fetch });
+  assert.equal(state.status, 200, JSON.stringify(state.body));
+  assert.equal(state.body.configured, false);
+  assert.match(state.body.configHint, /أول سطر/);
+  assert.ok(!/PRIVATE KEY|gserviceaccount|athanasios-test/.test(JSON.stringify(state.body)), 'nothing of the key comes back');
+});

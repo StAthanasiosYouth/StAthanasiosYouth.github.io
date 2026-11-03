@@ -16956,7 +16956,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     if (!state.configured) {
       body.push(el('div', { class: 'note note--warn' },
         el('p', { class: 'note__title', text: 'إشعارات الموبايل لسه مش متظبطة' }),
-        el('p', { text: 'FCM_SERVICE_ACCOUNT ناقص أو مش صحيح في Script Properties (docs/ADMIN-SETUP.md).' })));
+        // the Worker names what is wrong (push/fcm.js); Apps Script's own answer has no hint
+        el('p', { text: state.configHint || 'FCM_SERVICE_ACCOUNT ناقص أو مش صحيح في Script Properties (docs/ADMIN-SETUP.md).' })));
     }
 
     if (state.contentError) {

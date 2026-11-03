@@ -9,7 +9,7 @@
 
 import { ApiError } from '../lib/http.js';
 import { retry } from '../lib/db.js';
-import { serviceAccount, model } from './fcm.js';
+import { accountProblem, PROBLEM_TEXT, model } from './fcm.js';
 import { publicSend, SEND_COOLDOWN_MS, SENDS_PER_DAY } from './send.js';
 import { wallNow, wallMs } from './schedule.js';
 
@@ -116,8 +116,9 @@ export async function adminPushState(ctx) {
   const latest = {};
   for (const s of [...sends].reverse()) latest[s.notifId] = s;
   const lastAt = last.results[0].at || 0;
+  const problem = accountProblem(ctx.env);
   const state = {
-    configured: !!serviceAccount(ctx.env), subscribers, platforms, candidates: [], contentError: '', log: sends.slice(0, 15),
+    configured: !problem, configHint: problem ? PROBLEM_TEXT[problem] : '', subscribers, platforms, candidates: [], contentError: '', log: sends.slice(0, 15),
     limits: { perDay: SENDS_PER_DAY, sentToday: today.results[0].n, cooldownSeconds: SEND_COOLDOWN_MS / 1000, waitSeconds: Math.max(0, Math.ceil((lastAt + SEND_COOLDOWN_MS - now) / 1000)), titleMax: TITLE_MAX, bodyMax: BODY_MAX }
   };
   const content = await liveContent(db);
