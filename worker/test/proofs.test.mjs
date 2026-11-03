@@ -181,3 +181,18 @@ test('admin sync refusals: bad signature, wrong secret, old/future ts, replay, e
   const noSecret = harness({ env: { SYNC_SECRET: undefined } });
   assert.equal((await sync(noSecret, list)).status, 403, 'disabled without a secret');
 });
+
+test('Phase 7: settings.APPS_SCRIPT = retired closes every sync route (410), deleting it opens them again', async () => {
+  const h = harness();
+  const list = { admins: [{ email: 'a@example.com', primary: true }] };
+  const t = Date.now();
+  await h.db.prepare("INSERT INTO settings (key, value, updated_at, updated_by) VALUES ('APPS_SCRIPT', 'retired', 0, 'test')").run();
+  const r = await sync(h, list, { ts: t });
+  assert.equal(r.status, 410, JSON.stringify(r.body));
+  assert.equal(r.body.code, 'gone');
+  const forged = await h.call('/v1/sync/notify-claim', { method: 'POST', body: '{}', headers: { 'x-sync-ts': String(t), 'x-sync-signature': 'v1=' + '0'.repeat(64) } });
+  assert.equal(forged.status, 410, 'closed before the signature is read');
+  assert.equal(await h.db.prepare("SELECT COUNT(*) AS n FROM settings WHERE key = 'SYNC_TS_admins'").first('n'), 0, 'nothing written');
+  await h.db.prepare("DELETE FROM settings WHERE key = 'APPS_SCRIPT'").run();
+  assert.equal((await sync(h, list, { ts: t + 1 })).status, 200, 'the way back');
+});

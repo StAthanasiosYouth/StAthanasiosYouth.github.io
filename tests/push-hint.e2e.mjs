@@ -84,10 +84,6 @@ async function visit({ permission = 'prompt', memo = null, reducedMotion = false
     if (url.endsWith('/assets/vendor/firebase-messaging.js')) {
       return req.respond({ status: 200, contentType: 'text/javascript', body: FIREBASE_STUB });
     }
-    if (url.startsWith('https://script.google.com/')) {
-      api.push(JSON.parse(req.postData() || '{}').fn);
-      return req.respond({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: '{"ok":true}' });
-    }
     // the Worker (push-config.js workerUrl since the cutover): never the real one from a test
     if (/^https:\/\/athanasios-api[\w.-]*\.workers\.dev\/v1\/push\//.test(url)) {
       const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type, authorization', 'Access-Control-Allow-Methods': 'POST' };

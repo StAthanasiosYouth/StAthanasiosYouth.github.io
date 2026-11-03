@@ -438,7 +438,8 @@ async function runAndSave(ctx, { fn, args, expect, now, g, hooks, sheets, loaded
   mark('write');
   if (build) await build.finish();
   if (media) await media.afterBatch(db, now);
-  if (modules) ctx.defer(askAppsScript(ctx, { call: 'compModules', modules }).catch(err => console.warn('comp modules not sent: ' + (err && err.message))));
+  // Phase 7: with Apps Script retired (APPS_SCRIPT_URL empty) nothing there reads the switches
+  if (modules && ctx.env.APPS_SCRIPT_URL) ctx.defer(askAppsScript(ctx, { call: 'compModules', modules }).catch(err => console.warn('comp modules not sent: ' + (err && err.message))));
 
   const versions = { ...loaded.versions };
   for (const p of plan) versions[p.kind] = (versions[p.kind] || 0) + 1;

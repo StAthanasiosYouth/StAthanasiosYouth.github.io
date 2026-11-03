@@ -9,6 +9,7 @@
 
 import { ApiError, errorResponse, json, preflight, readJson, readRaw } from './lib/http.js';
 import { requireAdmin } from './lib/auth.js';
+import { syncRetired } from './lib/sync.js';
 import { requireRoutePerm } from './lib/perms.js';
 import { pseudonym } from './lib/hash.js';
 import { logLine, persistIfNotable } from './lib/log.js';
@@ -49,6 +50,7 @@ export async function handle(request, env, ectx, deps = {}) {
       await requireAdmin(ctx);
       ctx.perm = await requireRoutePerm(ctx, route);   // lib/perms.js ROUTE_PERMS
     }
+    if (route.auth === 'sync' && await syncRetired(env)) throw new ApiError('gone', 'apps script retired');
     if (route.raw) ctx.raw = await readRaw(request, route.maxBytes);
     else ctx.body = request.method === 'POST' ? await readJson(request, route.maxBytes) : null;
     const data = await route.handler(ctx);

@@ -8,7 +8,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import { ROOT, loadGs } from '../tools/lib/gs.mjs';
-import { pushSupport, platformOf, loadMemo, saveMemo, shouldNudge, pushRequest, pushReplyOk, bellHint, MEMO_KEY } from '../assets/js/push-env.js';
+import { pushSupport, platformOf, loadMemo, saveMemo, shouldNudge, pushReplyOk, bellHint, MEMO_KEY } from '../assets/js/push-env.js';
 import { buildPushVendor } from '../tools/build-push-vendor.mjs';
 
 const require = createRequire(new URL('../tools/package.json', import.meta.url));
@@ -261,7 +261,6 @@ test('push-env: the memo survives broken storage; requests and replies', () => {
   assert.deepEqual(loadMemo(storage), {});
   assert.deepEqual(loadMemo({ getItem() { throw new Error('blocked'); } }), {});
   saveMemo({ a: 1 }, { setItem() { throw new Error('full'); } });
-  assert.deepEqual(JSON.parse(pushRequest('pushSubscribe', { token: 't' })), { fn: 'pushSubscribe', args: [{ token: 't' }] });
   assert.equal(pushReplyOk({ ok: true }), true);
   for (const reply of [null, {}, { ok: 'true' }, { ok: false, code: 'busy' }, 'ok']) assert.equal(pushReplyOk(reply), false);
   // main.js reads the same memo key without importing push-env.js
@@ -339,11 +338,12 @@ test('push config: the VAPID key is a real P-256 public key (a mistyped one make
   await crypto.subtle.importKey('raw', raw, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
 });
 
-test('push config: public values only, the same API deployment as the admin, the same Worker as the map', () => {
+test('push config: public values only, no Apps Script, the same Worker as the admin and the map', () => {
   const config = readFileSync(`${ROOT}assets/js/push-config.js`, 'utf8');
-  const exec = text => /https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec/.exec(text)[0];
   const worker = text => /https:\/\/athanasios-api\.menazak-lab\.workers\.dev/.exec(text)[0];
-  assert.equal(exec(config), exec(readFileSync(`${ROOT}admin/config.js`, 'utf8')));
+  // Phase 7: Apps Script retired
+  assert.doesNotMatch(config, /script\.google/);
+  assert.equal(worker(config), worker(readFileSync(`${ROOT}admin/config.js`, 'utf8')));
   // the map's routes moved to the Worker in Phase 6 Step 5, as push did in Step 4
   assert.equal(worker(config), worker(readFileSync(`${ROOT}assets/js/map-config.js`, 'utf8')));
   assert.doesNotMatch(config, /PRIVATE KEY|private_key|client_email|AAAA[\w-]{100,}/);
@@ -356,6 +356,6 @@ test('push config: public values only, the same API deployment as the admin, the
 test('the site registers on the production Worker since the push cutover (push-config.js workerUrl)', async () => {
   const { PUSH_CONFIG } = await import('../assets/js/push-config.js');
   assert.equal(PUSH_CONFIG.workerUrl, 'https://athanasios-api.menazak-lab.workers.dev', 'never Staging, never a trailing slash');
-  // the way back (workerUrl '') still has its Apps Script address
-  assert.match(PUSH_CONFIG.apiUrl, /script\.google\.com/);
+  // Phase 7: Apps Script retired, no address of it left
+  assert.equal(PUSH_CONFIG.apiUrl, undefined);
 });

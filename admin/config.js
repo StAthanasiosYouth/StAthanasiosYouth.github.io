@@ -4,9 +4,9 @@
  * ever goes here: who may edit is decided by the server (Google sign-in +
  * the allowlist), and the GitHub token stays in Script Properties.
  *
- * apiUrl      The Apps Script API deployment's Web app URL (…/exec):
- *             Execute as "Me", Who has access "Anyone".
- *             (docs/ADMIN-SETUP.md, "The official admin page", step 3)
+ * apiUrl      (removed in Phase 7, docs/PHASE7-PLAN.md) The Apps Script API
+ *             deployment's /exec URL. Apps Script is retired: the Worker is the
+ *             panel's only server. Adding it back is part of a rollback only.
  * clientId    The OAuth 2.0 Client ID (type "Web application") that Google
  *             Sign-In uses on this page: …apps.googleusercontent.com.
  *             The same value goes in the Script Property ADMIN_CLIENT_ID.
@@ -31,12 +31,11 @@
  *             warm-up, no early state. A rollback needs no edit here: the
  *             first answer that says 'sheets' brings both back.
  *
- * While apiUrl or clientId is empty, the page says it isn't set up yet and
- * offers the recovery admin. It never redirects.
+ * While clientId is empty, or neither apiUrl nor workerUrl + platform is set,
+ * the page says it isn't set up yet. It never redirects.
  */
 
 window.ADMIN_CONFIG = Object.freeze({
-  apiUrl: 'https://script.google.com/macros/s/AKfycbxJjDyktRi6VlwRGSrF-H_KzN-vkw9QaFCiLD1TlqgrppKs4CHfmOBE4cKEd6AZ9Km1/exec',
   clientId: '246924773718-38p45gji0ouvi7an4jdjsip3obmk6ve4.apps.googleusercontent.com',
   workerUrl: 'https://athanasios-api.menazak-lab.workers.dev',
   platform: 'worker',

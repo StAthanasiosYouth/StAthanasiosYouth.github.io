@@ -90,7 +90,7 @@ const MESSAGES = {
 };
 
 const STATUS = {
-  auth: 401, denied: 403, origin: 403, bad: 400, toolarge: 413, rate: 429, conflict: 409, busy: 409, disabled: 403, notfound: 404, method: 405, error: 500,
+  auth: 401, denied: 403, origin: 403, bad: 400, toolarge: 413, rate: 429, conflict: 409, busy: 409, disabled: 403, gone: 410, notfound: 404, method: 405, error: 500,
   not_found: 404, invalid: 400, proof: 400, not_open: 409, closed: 409, full: 409, limit: 429, final: 409, expired: 401, warn: 409, needs_override: 409, over: 409, recent: 409,
   locked: 409, turnstile: 403, google: 403, protected: 403, age: 400, mode: 409,
   session_replaced: 401, session_expired: 401, off: 409, device: 401, writer: 409, stale: 409, comps: 503,

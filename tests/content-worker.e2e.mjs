@@ -110,8 +110,8 @@ test.before(async () => {
   await freshWorld();
   server = createSiteServer({
     world: { issueToken: c => issueToken(c), get github() { return world.github; } },
-    // as production's admin/config.js since Phase 6 Step 5 (content: the first guess of who keeps the content)
-    config: () => ({ apiUrl: TEST_API, clientId: TEST_CLIENT, fallbackUrl: TEST_FALLBACK, timing: TIMING, workerUrl: WORKER_URL, platform: 'worker', content: 'worker' }),
+    // as production's admin/config.js since Phase 7: no apiUrl (Apps Script retired), the Worker alone
+    config: () => ({ clientId: TEST_CLIENT, timing: TIMING, workerUrl: WORKER_URL, platform: 'worker', content: 'worker' }),
     claims: () => ({ email: ADMIN })
   });
   await new Promise(resolve => server.listen(PORT, '127.0.0.1', resolve));

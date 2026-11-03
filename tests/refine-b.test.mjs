@@ -410,7 +410,8 @@ test('admin/: strict CSP, noindex, no-referrer, no inline code, no redirect, no 
   assert.deepEqual(rules['default-src'], ["'none'"]);
   assert.deepEqual(rules['script-src'], ["'self'", 'https://accounts.google.com/gsi/client']);
   assert.deepEqual(rules['style-src'], ["'self'", 'https://accounts.google.com/gsi/style']);
-  assert.deepEqual(rules['connect-src'], ["'self'", 'https://script.google.com', 'https://script.googleusercontent.com', 'https://accounts.google.com/gsi/',
+  // Phase 7: no Apps Script hosts (retired)
+  assert.deepEqual(rules['connect-src'], ["'self'", 'https://accounts.google.com/gsi/',
     'https://firebaseinstallations.googleapis.com', 'https://fcmregistrations.googleapis.com',
     // the new backend: today only a quiet sign-in check (boot.js checkWorker)
     'https://athanasios-api.menazak-lab.workers.dev']);
@@ -458,12 +459,13 @@ test('admin/config.js: the one public config place — no secrets, the right sha
   new Function('window', text)(sandbox);
   const config = sandbox.ADMIN_CONFIG;
   // platform (Phase 3) and content (Phase 6 Step 5) are switches with a fixed set of values, nothing secret
-  // no fallbackUrl since 2026-11-03: the page links to no Apps Script recovery admin
-  assert.deepEqual(Object.keys(config).sort(), ['apiUrl', 'clientId', 'content', 'platform', 'workerUrl']);
+  // no fallbackUrl since 2026-11-03: the page links to no Apps Script recovery admin;
+  // no apiUrl since Phase 7: Apps Script is retired, the Worker is the panel's only server
+  assert.deepEqual(Object.keys(config).sort(), ['clientId', 'content', 'platform', 'workerUrl']);
   assert.ok(['worker'].includes(config.platform), 'platform: worker (remove it to roll back)');
   assert.ok(['worker', 'sheets'].includes(config.content), 'content: the first guess of who keeps the content');
   assert.match(config.workerUrl, /^https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev$/);
-  assert.ok(config.apiUrl === '' || /^https:\/\/script\.google\.com\/macros\/s\/[\w-]{20,}\/exec$/.test(config.apiUrl), 'apiUrl: empty or an /exec URL');
+  assert.doesNotMatch(text, /script\.google/, 'no Apps Script address');
   assert.match(config.clientId, /^[\w-]+\.apps\.googleusercontent\.com$/, 'the OAuth client ID (public)');
   assert.doesNotMatch(text, /GOCSPX|client_secret|ghp_|github_pat_|AIza/, 'no secrets');
 

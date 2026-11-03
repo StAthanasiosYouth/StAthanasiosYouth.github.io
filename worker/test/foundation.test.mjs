@@ -259,6 +259,22 @@ test('errors are kept in api_log without personal data', async () => {
   assert.ok(row.actor && !row.actor.includes('@'), 'actor is a pseudonym');
 });
 
+test('Phase 7: API_LOG_SAMPLE keeps about one in N routine requests in api_log (the p95 gate); unset keeps none', async () => {
+  const { persistIfNotable } = await import('../src/lib/log.js');
+  const db = migratedDb();
+  const waits = [];
+  const ctx = { waitUntil: p => waits.push(p) };
+  const entry = { rid: 'r', method: 'GET', route: '/v1/health', status: 200, ms: 40 };
+  persistIfNotable({ DB: db }, ctx, entry, () => 0);
+  persistIfNotable({ DB: db, API_LOG_SAMPLE: '10' }, ctx, entry, () => 0.5);
+  await Promise.all(waits.splice(0));
+  assert.equal(await db.prepare('SELECT COUNT(*) AS n FROM api_log').first('n'), 0, 'no sample, or not picked');
+  persistIfNotable({ DB: db, API_LOG_SAMPLE: '10' }, ctx, entry, () => 0.05);
+  await Promise.all(waits.splice(0));
+  const row = await db.prepare('SELECT route, status, ms FROM api_log').first();
+  assert.deepEqual({ ...row }, { route: '/v1/health', status: 200, ms: 40 });
+});
+
 test('queue consumer: known job runs once (idempotent), unknown acked, failures retried, DLQ audited', async () => {
   const db = migratedDb();
   const env = { DB: db };

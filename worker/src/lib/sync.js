@@ -49,3 +49,13 @@ export function syncStampStmt(db, kind, ts) {
   return db.prepare("INSERT INTO settings (key, value, updated_at, updated_by) VALUES (?, ?, ?, 'apps-script') ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at WHERE CAST(settings.value AS INTEGER) < CAST(excluded.value AS INTEGER)")
     .bind('SYNC_TS_' + kind, String(ts), Date.now());
 }
+
+/*
+ * Phase 7 (docs/PHASE7-PLAN.md): settings.APPS_SCRIPT = 'retired' closes every /v1/sync/* route (410)
+ * before the signature is read. Apps Script has no triggers left to call them; deleting the row is the
+ * way back while the rollback window is open (a redeployed Apps Script is heard again).
+ */
+export async function syncRetired(env) {
+  const row = await env.DB.prepare("SELECT value FROM settings WHERE key = 'APPS_SCRIPT'").first();
+  return !!row && row.value === 'retired';
+}

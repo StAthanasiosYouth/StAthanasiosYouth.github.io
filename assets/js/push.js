@@ -16,7 +16,7 @@ import { h } from './dom.js';
 import { iconNode } from './icons.js';
 import { toast } from './share.js';
 import { PUSH_CONFIG } from './push-config.js';
-import { pushSupport, platformOf, loadMemo, saveMemo, shouldNudge, pushRequest, pushReplyOk, bellHint } from './push-env.js';
+import { pushSupport, platformOf, loadMemo, saveMemo, shouldNudge, pushReplyOk, bellHint } from './push-env.js';
 import { installState, promptInstall, onInstallChange } from './install.js';
 import { readSession } from './account/link.js';
 import { deviceId, forget, FID } from './push-fid.js';
@@ -119,20 +119,16 @@ function accountToken() {
 
 async function server(fn, arg) {
 
+  // Phase 7: the Worker is the only server (Apps Script retired); no workerUrl = no registration
+  if (!PUSH_CONFIG.workerUrl) return false;
+
   try {
-    const token = PUSH_CONFIG.workerUrl && fn === 'pushSubscribe' ? accountToken() : '';
-    const response = await fetch(PUSH_CONFIG.workerUrl ? PUSH_CONFIG.workerUrl + WORKER_ROUTES[fn] : PUSH_CONFIG.apiUrl, PUSH_CONFIG.workerUrl ? {
+    const token = fn === 'pushSubscribe' ? accountToken() : '';
+    const response = await fetch(PUSH_CONFIG.workerUrl + WORKER_ROUTES[fn], {
       method: 'POST',
       headers: token ? { 'Content-Type': 'application/json', authorization: 'Bearer ' + token } : { 'Content-Type': 'application/json' },
       body: JSON.stringify(arg),
       credentials: 'omit',
-      cache: 'no-store'
-    } : {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // no CORS preflight
-      body: pushRequest(fn, arg),
-      credentials: 'omit',
-      redirect: 'follow',
       cache: 'no-store'
     });
     return pushReplyOk(await response.json());

@@ -152,12 +152,6 @@ export function bellHint(env, memo, now) {
 }
 
 
-/* the POST body for PUSH_CONFIG.apiUrl (apps-script/Push.gs) */
-export function pushRequest(fn, arg) {
-
-  return JSON.stringify({ fn, args: [arg] });
-
-}
 
 
 /* the server's answer: true only for a clear { ok: true } */

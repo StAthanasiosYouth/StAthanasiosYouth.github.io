@@ -9,7 +9,9 @@
  *    shared with other project sites), never used past its expiry, and
  *    renewed by signing in again — silently when Google can, otherwise with
  *    the button, over the open panel, so nothing being edited is lost.
- * 3. window.AdminTransport: every A.call() goes to the Apps Script API
+ * 3. window.AdminTransport: every A.call() goes to the Worker (Phase 7: Apps
+ *    Script retired; config.js has no apiUrl, and a call with no Worker route
+ *    fails with a clear message). Before that it went to the Apps Script API
  *    (doPost) as text/plain JSON { fn, args, token, sid }, no cookies. The
  *    server verifies the token with Google, checks the allowlist, and that
  *    sid is this account's one live session (apps-script/Presence.gs); this
@@ -638,6 +640,11 @@
 
     function finish() {
       if (timer) clearTimeout(timer);
+    }
+
+    // Phase 7: Apps Script retired (config.js has no apiUrl): a call nothing above routes fails clearly, never a fetch of ''
+    if (!API) {
+      return Promise.reject(appError('الجزء ده لسه مربوط بالخادم القديم اللي اتقفل.', 'بلّغ الدعم الفني باسم الشاشة اللي كنت فيها.', name + ': Apps Script retired'));
     }
 
     return fetch(API, {
@@ -1272,7 +1279,7 @@
   /* not set up yet: config.js has no client ID (or no API URL yet) */
   function showUnconfigured() {
 
-    var preparing = !!CLIENT && !API;
+    var preparing = !!CLIENT && !API && !PLATFORM;
 
     showGate(preparing ? 'preparing' : 'unconfigured', [
       h('div', { class: 'gate__message gate__message--info' },
@@ -2295,7 +2302,7 @@
           if (wkCache && wkCache.sid === sid && wkCache.exp > Date.now()) navigator.sendBeacon(WORKER + '/v1/admin/session/park', new Blob([JSON.stringify({ token: wkCache.token, tab: TAB })], { type: 'text/plain;charset=utf-8' }));
           return;
         }
-        if (!fresh(session)) return;
+        if (!API || !fresh(session)) return;
         navigator.sendBeacon(API, new Blob([JSON.stringify({ fn: 'apiSessionEnd', args: [{ park: true, tab: TAB }], token: session.token, sid: sid })], { type: 'text/plain;charset=utf-8' }));
       }
       catch (ignored) {
@@ -2791,7 +2798,8 @@
     return;
   }
 
-  if (!CLIENT || !API) {
+  // Phase 7: the Worker's platform alone is enough (Apps Script retired, no apiUrl)
+  if (!CLIENT || !(API || PLATFORM)) {
     showUnconfigured();
     return;
   }

@@ -21,8 +21,12 @@
     "GITHUB_BRANCH": "main",
     // The «Athanasios booking» Turnstile widget (stathanasiosyouth.github.io); its secret is TURNSTILE_SECRET.
     "TURNSTILE_SITEKEY": "0x4AAAAAAFXKmirGDFqXzeNL",
-    // Phase 4 (content/comps.js): the Apps Script API deployment the publish asks for the competitions' part
-    "APPS_SCRIPT_URL": "https://script.google.com/macros/s/AKfycbxJjDyktRi6VlwRGSrF-H_KzN-vkw9QaFCiLD1TlqgrppKs4CHfmOBE4cKEd6AZ9Km1/exec"
+    // Phase 7 (src/lib/log.js): about one in 10 routine requests kept in api_log, for the p95 gate (BACKEND-MIGRATION §25)
+    "API_LOG_SAMPLE": "10",
+    // Phase 4 (content/comps.js): the Apps Script API deployment the publish asked for the competitions' part.
+    // Empty since Phase 7 (docs/PHASE7-PLAN.md): the competitions' drafts are the Worker's (COMP_DRAFTS = worker)
+    // and Apps Script is retired. A rollback to Apps Script's competitions puts its /exec URL back here.
+    "APPS_SCRIPT_URL": ""
   },
 
   "d1_databases": [
@@ -62,6 +66,8 @@
         // Cloudflare's published Turnstile TEST site key (always passes; the secret is the matching test secret).
         // Production gets its own widget's key at go-live (worker/README.md); without TURNSTILE_SECRET production refuses every submit.
         "TURNSTILE_SITEKEY": "1x00000000000000000000AA",
+        // Phase 7: every request kept in api_log on staging (src/lib/log.js)
+        "API_LOG_SAMPLE": "1",
         // staging has no Apps Script of its own: its builds have no competitions (never honoured in production)
         "COMPS_SOURCE": "none",
         "APPS_SCRIPT_URL": ""

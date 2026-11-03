@@ -200,6 +200,11 @@ export async function interceptGoogle(page, world, { outside = [], calls = [], s
   const echoes = new Map();
   let echo = 0;
 
+  // Phase 7: production's admin CSP no longer allows Apps Script (retired). A test that still drives the
+  // panel through the fake Apps Script world (world.post: the legacy transport, until Phase 8 rewrites these
+  // tests for the Worker) has its fake TEST_API let through; a Worker-only world keeps the real CSP.
+  if (world && typeof world.post === 'function') await page.setBypassCSP(true);
+
   await page.setRequestInterception(true);
 
   page.on('request', async request => {
