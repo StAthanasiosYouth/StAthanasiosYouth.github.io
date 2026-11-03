@@ -2,7 +2,7 @@
 
 Started 2026-11-02 on the owner's order. Six steps, one at a time. Each step needs the owner's choice to start, and each production release needs its own approval.
 
-**Progress: Step 4 of 6 in progress. Slices 4a and 4b passed on Staging (2026-11-03). Slice 4c passed on Staging the same day, its screens on the approved preview. Slice 4d waits for the owner's order. Nothing reaches production before 4d and a review of the whole cutover plan (owner, 2026-11-03).**
+**Progress: Step 4 of 6 in progress. Slices 4a and 4b passed on Staging (2026-11-03). Slice 4c passed on Staging the same day, its screens on the approved preview. Slice 4d's groundwork passed on Staging the same day; the real closed-app push waits for the owner's choice of where to run it. Nothing reaches production before 4d and a review of the whole cutover plan (owner, 2026-11-03).**
 
 ## 1. Official scope
 
@@ -200,6 +200,19 @@ No rebuild. The competition screens stop depending on Apps Script.
 **4c screen tests:** `youth-admin` 10 of 10, one new at phone width 375: no sideways scroll on the store screen, and the push result while sending. `admin-layout`, `comp-admin3` 9 of 9, `content-worker` 4 of 4, site units 758 of 760 (the same two). Desktop and phone screenshots match the preview.
 
 **4c not checked:** the screens signed in against Staging itself, which needs the owner's sign-in. The browser tests use a fake Worker.
+
+**4d as built (Staging Worker `dab09782`), against §22.2.4:**
+1. Device registry: done in 4a (`platform`, `app_version`, one register call for web and native, admins and visitors).
+2. Payload per platform: done in 4b. Now `urgent` (an admin's critical or important row) is `HIGH` on Android and `apns-priority 10` on iOS. Anything else is `NORMAL` and 5, and the web keeps `Urgency: high` as before.
+3. Path links: done in 4b and 4c.
+4. Anonymous rows linked after sign-in, and topics on the server: done in 4a and 4c.
+5. Origins: CORS reads `ALLOWED_ORIGINS` only, and a test shows `https://localhost` and `capacitor://localhost` pass once listed and are refused otherwise. The pages' CSP lists where they connect, not who calls, so a shell that loads the live site needs no change there.
+6. The new FCM web API: the vendor bundles gain `register`, `unregister`, `onRegistered` (Firebase 12.19.0). `assets/js/push-fid.js` is shared by the site and the panel. On the Worker the device is its Firebase Installation ID (22 characters), and a failure falls back to the old token. On Apps Script nothing changes, because its sender knows tokens only. The Worker takes both shapes and sends `fid` or `token` to match. FCM's reference marks `token` deprecated in favour of `fid`, and `token` still takes an FID during the transition.
+7. Badge and group: done in 4b.
+
+**4d tests:** Worker 457 of 457, site units 762 of 764 (the same two failures, `push-fid` 4 new), browser `push-hint` and `admin-app` 21 of 21. Live on Staging, `push-native-check` 5 of 5: one web device by its FID and one simulated native Android token through the same register call, then one send. The real FCM took both targets, `fid` and `token`, refused the made-up ids, and both rows were removed with no auth error.
+
+**4d not done yet:** a real closed-app push on the owner's phone with a tap that opens the exact record. The live site still registers on Apps Script and can't be pointed at the Worker without a production change, which waits for the cutover review.
 
 ### Step 5: Integration
 - `route` moves to the Worker: the key as a secret, a D1 cache, a daily budget.
