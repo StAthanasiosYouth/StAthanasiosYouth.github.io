@@ -339,11 +339,13 @@ test('push config: the VAPID key is a real P-256 public key (a mistyped one make
   await crypto.subtle.importKey('raw', raw, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
 });
 
-test('push config: public values only, and the same API deployment as the admin and the map', () => {
+test('push config: public values only, the same API deployment as the admin, the same Worker as the map', () => {
   const config = readFileSync(`${ROOT}assets/js/push-config.js`, 'utf8');
   const exec = text => /https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec/.exec(text)[0];
+  const worker = text => /https:\/\/athanasios-api\.menazak-lab\.workers\.dev/.exec(text)[0];
   assert.equal(exec(config), exec(readFileSync(`${ROOT}admin/config.js`, 'utf8')));
-  assert.equal(exec(config), exec(readFileSync(`${ROOT}assets/js/map-config.js`, 'utf8')));
+  // the map's routes moved to the Worker in Phase 6 Step 5, as push did in Step 4
+  assert.equal(worker(config), worker(readFileSync(`${ROOT}assets/js/map-config.js`, 'utf8')));
   assert.doesNotMatch(config, /PRIVATE KEY|private_key|client_email|AAAA[\w-]{100,}/);
   // nothing secret anywhere on the public site or in the repo's apps-script code
   for (const file of ['assets/js/push.js', 'assets/js/push-env.js', 'sw.js', 'apps-script/Push.gs']) {
