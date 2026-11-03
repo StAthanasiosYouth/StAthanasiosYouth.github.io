@@ -2,7 +2,7 @@
 
 Started 2026-11-02 on the owner's order. Six steps, one at a time. Each step needs the owner's choice to start, and each production release needs its own approval.
 
-**Progress: Step 4 of 6 in progress. Slices 4a and 4b passed on Staging (2026-11-03). Slice 4c passed on Staging the same day, its screens on the approved preview. Slice 4d's groundwork passed on Staging the same day. The real closed-app push runs in the cutover (owner, 2026-11-03), whose plan below waits for the owner's review. Nothing reaches production before 4d and a review of the whole cutover plan (owner, 2026-11-03).**
+**Progress: Step 4 of 6 in progress. Slices 4a and 4b passed on Staging (2026-11-03). Slice 4c passed on Staging the same day, its screens on the approved preview. The push cutover ran on production on 2026-11-03, steps 1 to 7, under the owner's end-to-end approval. Step 8, the real phone test, waits for the owner's hands. Step 5 starts alongside. Nothing reaches production before 4d and a review of the whole cutover plan (owner, 2026-11-03).**
 
 ## 1. Official scope
 
@@ -195,6 +195,16 @@ No rebuild. The competition screens stop depending on Apps Script.
 **4b tests:** Worker 443 of 443, 12 of them new, against a fake FCM. Live on Staging, `push-sender-check` 9 of 9 against the real FCM with made-up tokens: Google accepted the key, the queue ran the part, and FCM refused the tokens, which were deleted. No device got anything. `push-devices-check` 15 of 15 again.
 
 **4b not checked:** a delivery to a real device (4d, the owner's phone). The admin outbox path ran only in the unit tests, because Staging's `NOTIFY_ROUTER` is 0 and stays as it is. No setting was changed on Staging.
+
+**The cutover as it ran (2026-11-03, owner's approval for the whole plan, no step-by-step stops):**
+- B1–B3 by the owner. `FCM_SERVICE_ACCOUNT` was set on `athanasios-api`. Counts before: participants 1, ledger 1, redemptions 0, bookings 10, activity 324, outbox 8. `PUSH_AUTO = 1`. No real notifications to keep, because the site isn't launched (owner), so no pending `PushSchedule` row was carried over.
+- 1. Migrations `0025`–`0027`. The list showed exactly those three. The counts afterwards matched, with `push_devices` at 0.
+- 2–3. `main` `5cf8d11` → `21130f9`, CI run 41626502454 (test and deploy passed), Worker `c7c26096` (back: `8207618c`, the version the owner's secret made). `/v1/health` 200, the new admin push routes 401, and the live `admin-app.js` carries `data-season-days`.
+- 4. Apps Script `@61` = `@60` (its head, checked equal) plus Step 4's five files only. The folder in git was **not** pushed as it is: its `appsscript.json` web-app access (`USER_ACCESSING`/`ANYONE` against the live `USER_DEPLOYING`/`ANYONE_ANONYMOUS`) and older competition changes differ from what is live, and pushing it would have changed who the public API runs as. Back: `clasp deploy -i AKfycbxJ…Km1 -V 60`. The public API answered as before.
+- 5. `PUSH_IMPORT` dry: 4 visitor and 2 admin devices, no problems. Apply: 6 added.
+- 6. `PUSH_DEVICES = worker`, and `main` `90d4623` sets `workerUrl`, live after 40 s. The second copy added 0. The browser test now fakes the Worker too. Before that change, its run had reached the real Worker from a test origin, CORS refused it, and production holds no such row.
+- 7. **Found:** `NOTIFY_SINCE` was still set from 2026-10-21, with 51 activity rows waiting since then, so turning the router on would have pushed all 51 to the admins at once. In one batch: `NOTIFY_SINCE` removed, `PUSH_SENDER = worker`, `NOTIFY_ROUTER = 1`. The first tick marked the 51 as backlog (3) and sent nothing. Apps Script's next claim (11:33 UTC) carried `sender`, and it sends nothing since. `wrangler tail`: the minute cron's push tick ran with no exceptions.
+- Owner said no store or season reminders need moving now. They are set in the new screens when wanted.
 
 **4c decisions:**
 - **The automatic pushes (owner, 2026-11-03): a push goes at its moment, always.** It doesn't wait for a publish. Its bell item joins the site with the next publish, so the bell may not show one that no publish carried.
