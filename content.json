@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "0d2cc47b7c93",
-  "publishedAt": "2026-10-31T07:19:22.707Z",
+  "revision": "5cd89d12b5f9",
+  "publishedAt": "2026-11-03T11:45:15.825Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -279,7 +279,18 @@
   "sessions": [],
   "news": [],
   "games": [],
-  "notifications": [],
+  "notifications": [
+    {
+      "id": "notif-16822dae",
+      "type": "general",
+      "title": "🔔 تجربة إشعارات موقع الأسرة نسخ",
+      "message": "ده إشعار تجريبي للتأكد إن إشعارات موقع الأسرة بتوصلك حتى لو الموقع مقفول.",
+      "target": null,
+      "image": null,
+      "publishAt": "2026-11-03T13:44",
+      "expireAt": "2026-11-17T13:44"
+    }
+  ],
   "activities": [
     {
       "id": "act-2f7f8204",
