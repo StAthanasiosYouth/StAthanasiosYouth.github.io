@@ -611,6 +611,7 @@
     if (PLATFORM && compWorker && Object.prototype.hasOwnProperty.call(COMP_READS, name)) return compRead(name, options);
     if (PLATFORM && pushWorker && Object.prototype.hasOwnProperty.call(PUSH_CALLS, name)) return pushCall(name, args, options);
     if (PLATFORM && pushSendWorker && Object.prototype.hasOwnProperty.call(PUSH_SEND_CALLS, name)) return pushSendCall(name, args, options);
+    if (PLATFORM && contentWorker && Object.prototype.hasOwnProperty.call(TOOL_CALLS, name)) return toolCall(name, args, options);
     // Phase 4: the content calls too, once the Worker writes the drafts (its session answer says so)
     if (PLATFORM && contentWorker && (Object.prototype.hasOwnProperty.call(CONTENT_FNS, name) || Object.prototype.hasOwnProperty.call(CONTENT_ALIASES, name) || (compWorker && Object.prototype.hasOwnProperty.call(COMP_FNS, name)))) {
       return contentPost(name, args, tokenValue, options);
@@ -1603,6 +1604,46 @@
       if (out.ok && name === 'apiPushCheck') out.result = { ok: out.result.check === true, message: out.result.message };
       return out;
     }, asReply);
+
+  }
+
+  /*
+   * Phase 6 Step 5: the settings and tools calls, the admins list and the age rules, on the Worker
+   * (worker/src/admin/tools.js), with the answers the screens already read. While the Worker writes the content.
+   */
+  var TOOL_CALLS = {
+    apiCheckGithub: 1, apiCheckMedia: 1, apiResolveMapsUrl: 1, apiFetchMediaUrl: 1, apiSetLiveStage: 1, apiPlanMigration: 1, apiMigrate: 1,
+    apiAdmins: 1, apiSetAdminName: 1, apiAgeRules: 1, apiAgeRulesSave: 1
+  };
+
+  function toolCall(name, args, options) {
+
+    var a = args || [];
+    var o = options || {};
+
+    return panelToken().then(function (value) {
+      var post = function (path, body) { return workerFetch('POST', path, body || {}, value, o).then(envelope, asReply); };
+      var get = function (path) { return workerFetch('GET', path, null, value, o).then(envelope, asReply); };
+      var map = function (reply, fn) { return reply.ok ? { ok: true, result: fn(reply.result) } : reply; };
+      var ages = function (r) { return { min: r.ageMin, max: r.ageMax, warnDays: r.warnDays }; };
+      switch (name) {
+        case 'apiCheckGithub': return post('/v1/admin/tools/github');
+        case 'apiCheckMedia': return post('/v1/admin/tools/media');
+        case 'apiResolveMapsUrl': return post('/v1/admin/tools/maps', { url: a[0] });
+        case 'apiFetchMediaUrl': return post('/v1/admin/tools/fetch-media', { url: a[0] });
+        case 'apiSetLiveStage': return post('/v1/admin/tools/live-stage', { date: a[0], stage: a[1] === undefined ? null : a[1] });
+        case 'apiPlanMigration': return post('/v1/admin/tools/migration');
+        case 'apiMigrate': return post('/v1/admin/tools/migrate');
+        case 'apiAdmins': return post('/v1/admin/tools/admins');
+        // the rename, then the list as apiSetAdminName answered it
+        case 'apiSetAdminName': return post('/v1/admin/accounts/' + encodeURIComponent(String(a[0] || '')) + '/name', { name: a[1] }).then(function (r) {
+          return r.ok ? post('/v1/admin/tools/admins') : r;
+        });
+        case 'apiAgeRules': return get('/v1/admin/participants/settings').then(function (r) { return map(r, ages); });
+        case 'apiAgeRulesSave': return post('/v1/admin/participants/settings', { ageMin: (a[0] || {}).min, ageMax: (a[0] || {}).max, warnDays: (a[0] || {}).warnDays }).then(function (r) { return map(r, ages); });
+      }
+      return { ok: false, code: 'error', error: appError('الطلب ده مش معروف.', '', name).message };
+    });
 
   }
 

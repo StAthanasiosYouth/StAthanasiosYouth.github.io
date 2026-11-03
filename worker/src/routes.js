@@ -53,6 +53,7 @@ import { compStart, compSubmit, compResult, compMe, syncCompLive } from './comp/
 import { pushSubscribe, pushUnsubscribe, adminPushSubscribe, adminPushUnsubscribe, adminPushDevices, adminPushRemove } from './push/devices.js';
 import { adminPushCheck, adminPushTest } from './push/send.js';
 import { adminPushState, adminPushSend } from './push/screen.js';
+import { adminToolGithub, adminToolMedia, adminToolMaps, adminToolFetchMedia, adminToolLiveStage, adminToolMigration, adminToolMigrate, adminToolAdmins } from './admin/tools.js';
 import { adminPushAuto, adminPushSchedule, adminPushScheduleCancel } from './push/schedule.js';
 import { adminComps, adminCompBadges, adminCompSubmissions, adminCompSubmission, adminCompGrade, adminCompVoid, adminCompRegrade } from './comp/admin.js';
 import { shopRedeem, shopCancel, adminStoreItems, adminStoreItemSave, adminStoreItemDelete, adminRedemptions, adminRedemptionStatus, adminStoreSchedule, adminStoreScheduleSave, syncStoreImport } from './store/shop.js';
@@ -450,6 +451,15 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/admin/push/auto', auth: 'admin', maxBytes: 256, handler: adminPushAuto },
   { method: 'POST', path: '/v1/admin/push/schedule', auth: 'admin', maxBytes: 256, handler: adminPushSchedule },
   { method: 'POST', path: '/v1/admin/push/schedule/cancel', auth: 'admin', maxBytes: 256, handler: adminPushScheduleCancel },
+  // Phase 6 Step 5 — the settings and tools calls off Apps Script (admin/tools.js)
+  { method: 'POST', path: '/v1/admin/tools/github', auth: 'admin', maxBytes: 256, handler: adminToolGithub },
+  { method: 'POST', path: '/v1/admin/tools/media', auth: 'admin', maxBytes: 256, handler: adminToolMedia },
+  { method: 'POST', path: '/v1/admin/tools/maps', auth: 'admin', maxBytes: 4096, handler: adminToolMaps },
+  { method: 'POST', path: '/v1/admin/tools/fetch-media', auth: 'admin', maxBytes: 4096, handler: adminToolFetchMedia },
+  { method: 'POST', path: '/v1/admin/tools/live-stage', auth: 'admin', maxBytes: 512, handler: adminToolLiveStage },
+  { method: 'POST', path: '/v1/admin/tools/migration', auth: 'admin', maxBytes: 256, handler: adminToolMigration },
+  { method: 'POST', path: '/v1/admin/tools/migrate', auth: 'admin', maxBytes: 256, handler: adminToolMigrate },
+  { method: 'POST', path: '/v1/admin/tools/admins', auth: 'admin', maxBytes: 256, handler: adminToolAdmins },
   { method: 'GET', path: '/v1/admin/comp', auth: 'admin', handler: adminComps },
   { method: 'GET', path: '/v1/admin/comp/badges', auth: 'admin', handler: adminCompBadges },
   // the competition screen's season picker: the same list, for whoever may see competitions

@@ -70,7 +70,8 @@ async function loadAll(db, sid, now, { activityRows = 15, activityMs = 10 * 60_0
     db.prepare('SELECT email, name, role FROM admins WHERE active = 1 ORDER BY email'),
     db.prepare("SELECT l.kind, l.id, l.sid, l.email, l.since_ms, l.expires_ms, s.device, s.parked_ms, a.name FROM edit_locks l " +
       "JOIN admin_sessions s ON s.sid = l.sid LEFT JOIN admins a ON a.email = l.email WHERE l.kind <> 'booking' AND l.expires_ms > ?").bind(now),
-    db.prepare("SELECT value FROM settings WHERE key = 'NOTIFY_ROUTER'"),
+    // the router's switch, and the meeting's live stage the panel shows (admin/tools.js writes it)
+    db.prepare("SELECT key, value FROM settings WHERE key IN ('NOTIFY_ROUTER', 'LIVE_STATE')"),
     // the rows Activity.gs may merge a repeat edit into (its window: 10 minutes, the last 15 rows)
     // a publish reads further back: «what changed since the last publish» (Activity.gs activitySincePublish_ stops at
     // the last «publish» row, at most 300): from that row on — or, for a save, the merge window
@@ -100,7 +101,8 @@ async function loadAll(db, sid, now, { activityRows = 15, activityMs = 10 * 60_0
     versions: Object.fromEntries(kinds.results.map(k => [k.kind, k.version])),
     admins: admins.results,
     holders,
-    notifyRouter: !!(router.results[0] && router.results[0].value === '1'),
+    notifyRouter: router.results.some(r => r.key === 'NOTIFY_ROUTER' && r.value === '1'),
+    liveState: (router.results.find(r => r.key === 'LIVE_STATE') || {}).value || '',
     recent: recent.results.reverse(),
     writer: writer.results[0] && writer.results[0].value === '1' ? 'worker' : 'sheets',
     view: view.results[0] ? JSON.parse(view.results[0].data) : null,
@@ -218,6 +220,8 @@ export async function runContentCall(ctx, fn, args, { expect = {}, now = Date.no
     ADMIN_EMAILS: loaded.admins.map(a => a.email).join(','), ADMIN_PRIMARY: primary,
     // NotifyClaim.gs notifyRouterOn_: the router's switch as Apps Script last heard it (D1 is the truth here)
     ADMIN_PLATFORM: 'worker', NOTIFY_ROUTER_ON: loaded.notifyRouter ? '1' : '0',
+    // Publish.gs liveState_: the stage set from the panel (admin/tools.js), shown in its meeting screen
+    ...(loaded.liveState ? { LIVE_STATE: loaded.liveState } : {}),
     GITHUB_REPO: ctx.env.GITHUB_REPO || '', GITHUB_BRANCH: ctx.env.GITHUB_BRANCH || 'main',
     SITE_URL: (ctx.env.SITE_URL || '').replace(/\/?$/, '/'),
     BOOKING_ONLINE: loaded.bookingOnline === '1' ? '1' : '0',
