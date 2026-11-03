@@ -133,7 +133,7 @@ in the Apps Script editor; the project kept 90 days, then deleted. None of it is
 Nothing below has been deleted. Backups: `D:/private_projects/athanasios-backups/2026-11-03-phase7-pre-cleanup/` (D1 export, 9 proof
 files, bookmark `00000197-00000392-00005118-c819c1d6e406f21aa53b0ce6c7079ccc`). Names and phones are left out on purpose.
 All three booking events are tests by their titles: `evt-4011914c` «اختبار نظام الحجز - مؤقت», `evt-59f41592` «test-2»,
-`evt-1295c819` «تجربة حجز» (still open for booking until 2026-11-06).
+`evt-1295c819` «تجربة حجز» (its page already says it is not available).
 
 ### List A — test data, delete (one atomic D1 batch by exact id, then R2)
 
@@ -176,3 +176,17 @@ and the booking and payment system itself. The competitions spreadsheet (Sheets)
 3. Done when: the counts are as expected; media, links, pages, admins, grants, settings unchanged; `/`, «المسرح الأسود» and the admin's
    bookings page open without errors.
 4. Way back: the encrypted export, or `wrangler d1 time-travel restore athanasios-prod --bookmark=<new bookmark taken in step 1>` (7 days).
+
+### 7c result (owner approved List A + List B defaults, 2026-11-03)
+
+- Recount matched the list exactly; bookmark before the batch: `00000199-000000a8-00005118-d04f10b379425de556b60b25d60ac225`.
+- One D1 batch, 13 statements, **62 rows** removed: List A (bookings 10, payments 4, proofs 11, handovers 3, reminders 1,
+  book_news 3, `booking.new` outbox 2, «محفظة», the `test` competition's version, activity 22) and the data parts of List B: the
+  2 test submissions, the 100-point row `led-8041a8cc6e134bb0` and its closed-season snapshot (`sea-first`, `p-ahtj7xz3`). The account stays.
+- R2: the 9 backed-up proof files deleted (one checked gone). The 2 without a file were already gone.
+- After: all those tables 0; `comp_versions` 3 (the two test competitions, kept until they are withdrawn); activity 342 → 320;
+  media 65, admins 3, settings 64, drafts 126, participants 1, events 3 — unchanged. `/`, «المسرح الأسود» load; «تجربة حجز» says not available.
+- **Left for the owner, in the panel:** withdraw «تجربة تشغيل» and «مسابقة نقاط», delete the draft «مسابقة نقاط (نسخة)», then publish.
+  After that their 3 `comp_versions` rows and 21 competition activity rows go in one more batch. The admin's bookings page should open
+  empty without errors (needs a signed-in admin).
+- Way back: the encrypted export of 2026-11-03, or time travel to the bookmark above (7 days, replaces the whole database).
