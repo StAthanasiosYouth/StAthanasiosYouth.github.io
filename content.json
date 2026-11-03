@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "a00160dfd1ce",
-  "publishedAt": "2026-11-03T16:34:10.458Z",
+  "revision": "fd674f5f5e2e",
+  "publishedAt": "2026-11-03T16:49:25.044Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -276,35 +276,10 @@
       }
     }
   ],
-  "sessions": [
-    {
-      "date": "2026-11-08",
-      "time": "20:00",
-      "topic": "تجربة الإشعارات التلقائية-4",
-      "speaker": "تجربة",
-      "description": "اختبار نظام الإشعارات الجديد",
-      "image": null,
-      "status": "normal",
-      "note": "",
-      "visibleFrom": "2026-11-03T14:32",
-      "durationMinutes": 120
-    }
-  ],
+  "sessions": [],
   "news": [],
   "games": [],
   "notifications": [
-    {
-      "id": "notif-session-2026-11-08",
-      "type": "meeting",
-      "title": "موضوع الاجتماع الجاي",
-      "message": "تجربة الإشعارات التلقائية — تجربة",
-      "target": {
-        "kind": "meeting"
-      },
-      "image": null,
-      "publishAt": "2026-11-03T14:32",
-      "expireAt": "2026-11-08T20:00"
-    },
     {
       "id": "notif-16822dae",
       "type": "general",
