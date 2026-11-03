@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "5cd89d12b5f9",
-  "publishedAt": "2026-11-03T11:45:15.825Z",
+  "revision": "40a46a8a6f49",
+  "publishedAt": "2026-11-03T12:34:15.707Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -276,10 +276,35 @@
       }
     }
   ],
-  "sessions": [],
+  "sessions": [
+    {
+      "date": "2026-11-08",
+      "time": "20:00",
+      "topic": "تجربة الإشعارات التلقائية",
+      "speaker": "تجربة",
+      "description": "اختبار نظام الإشعارات الجديد",
+      "image": null,
+      "status": "normal",
+      "note": "",
+      "visibleFrom": "2026-11-03T14:32",
+      "durationMinutes": 120
+    }
+  ],
   "news": [],
   "games": [],
   "notifications": [
+    {
+      "id": "notif-session-2026-11-08",
+      "type": "meeting",
+      "title": "موضوع الاجتماع الجاي",
+      "message": "تجربة الإشعارات التلقائية — تجربة",
+      "target": {
+        "kind": "meeting"
+      },
+      "image": null,
+      "publishAt": "2026-11-03T14:32",
+      "expireAt": "2026-11-08T20:00"
+    },
     {
       "id": "notif-16822dae",
       "type": "general",
@@ -522,7 +547,7 @@
       "closesAt": ""
     },
     "season": {
-      "name": "الموسم الأول",
+      "name": "مافيش",
       "startAt": "",
       "endAt": ""
     }
