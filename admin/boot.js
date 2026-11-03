@@ -612,6 +612,7 @@
     if (PLATFORM && pushWorker && Object.prototype.hasOwnProperty.call(PUSH_CALLS, name)) return pushCall(name, args, options);
     if (PLATFORM && pushSendWorker && Object.prototype.hasOwnProperty.call(PUSH_SEND_CALLS, name)) return pushSendCall(name, args, options);
     if (PLATFORM && contentWorker && Object.prototype.hasOwnProperty.call(TOOL_CALLS, name)) return toolCall(name, args, options);
+    if (PLATFORM && contentWorker && Object.prototype.hasOwnProperty.call(MOVED_CALLS, name)) return Promise.resolve(movedReply());
     // Phase 4: the content calls too, once the Worker writes the drafts (its session answer says so)
     if (PLATFORM && contentWorker && (Object.prototype.hasOwnProperty.call(CONTENT_FNS, name) || Object.prototype.hasOwnProperty.call(CONTENT_ALIASES, name) || (compWorker && Object.prototype.hasOwnProperty.call(COMP_FNS, name)))) {
       return contentPost(name, args, tokenValue, options);
@@ -1615,6 +1616,23 @@
     apiCheckGithub: 1, apiCheckMedia: 1, apiResolveMapsUrl: 1, apiFetchMediaUrl: 1, apiSetLiveStage: 1, apiPlanMigration: 1, apiMigrate: 1,
     apiAdmins: 1, apiSetAdminName: 1, apiAgeRules: 1, apiAgeRulesSave: 1
   };
+
+  /*
+   * The old «النقاط» / «المتجر» screens and their seasons card read the Sheets, frozen since the accounts moved to D1
+   * (Phase 5). They hide once the panel hears accounts are on; a moment before that (or a remembered tab) must not
+   * call Apps Script: the answer is here, pointing to «حسابات الشباب», which has all of it.
+   */
+  var MOVED_CALLS = {
+    apiWallet: 1, apiWalletParticipant: 1, apiWalletAdjust: 1, apiWalletSync: 1,
+    apiShopItems: 1, apiShopItemSave: 1, apiShopItemDelete: 1, apiShopRedemptions: 1, apiShopRedemptionStatus: 1, apiShopSchedule: 1, apiShopScheduleSave: 1,
+    apiSeasonSave: 1, apiSeasonClosePreview: 1, apiSeasonClose: 1
+  };
+
+  function movedReply() {
+
+    return { ok: false, code: 'moved', error: appError('الشاشة دي اتنقلت لـ«حسابات الشباب».', 'افتح «المسابقات» ← «حسابات الشباب»: النقاط والمتجر والمواسم كلها هناك.', 'moved').message };
+
+  }
 
   function toolCall(name, args, options) {
 
