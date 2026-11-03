@@ -2,7 +2,7 @@
 
 Started 2026-11-02 on the owner's order. Six steps, one at a time. Each step needs the owner's choice to start, and each production release needs its own approval.
 
-**Progress: Step 4 of 6 in progress. Slices 4a and 4b passed on Staging (2026-11-03). Slice 4c passed on Staging the same day, its screens on the approved preview. Slice 4d's groundwork passed on Staging the same day; the real closed-app push waits for the owner's choice of where to run it. Nothing reaches production before 4d and a review of the whole cutover plan (owner, 2026-11-03).**
+**Progress: Step 4 of 6 in progress. Slices 4a and 4b passed on Staging (2026-11-03). Slice 4c passed on Staging the same day, its screens on the approved preview. Slice 4d's groundwork passed on Staging the same day. The real closed-app push runs in the cutover (owner, 2026-11-03), whose plan below waits for the owner's review. Nothing reaches production before 4d and a review of the whole cutover plan (owner, 2026-11-03).**
 
 ## 1. Official scope
 
@@ -146,12 +146,33 @@ No rebuild. The competition screens stop depending on Apps Script.
 
 **Done when:** every slice passes Worker tests and its Staging check, one owner device receives with the app closed, and the switch back has been tried.
 
-**Release order, decided in 4a:** Apps Script keeps sending from its Sheets until the Worker's sender is live. So a device that registered only on the Worker before then would get nothing, and the slices reach production together at one cutover after 4d, with its own approval:
-1. Migrations `0025`, `0026`, `0027` and the Worker, with `FCM_SERVICE_ACCOUNT` set by the owner.
-2. Copy the devices (`PUSH_IMPORT = dry`, then `apply`).
-3. Point the site (`push-config.js workerUrl`) and the panel (`PUSH_DEVICES = worker`) at the Worker.
-4. Copy again for what registered in between. A row already on the Worker stays.
-5. The Worker sends: `PUSH_SENDER = worker` and `NOTIFY_ROUTER = 1` (decision 2), and Apps Script stops. Back: `PUSH_SENDER` unset, and the claim feed hands Apps Script the rows again.
+**The push cutover (for the owner's review, 2026-11-03).** Slices 4a to 4d reach production together, here, each step only on the owner's approval. Apps Script keeps sending from its Sheets until step 7. Every step says how to check it and how to go back.
+
+*Before (nothing changes):*
+- B1. The owner sets `FCM_SERVICE_ACCOUNT` on the production Worker. The key is never shown here: `cd worker && npx wrangler secret put FCM_SERVICE_ACCOUNT`.
+- B2. The owner reads the production D1 counts as usual, plus the Script Property `PUSH_AUTO` (is Apps Script's automatic push on?) and anything in the «الإرسال المتجدول» list due during the cutover window.
+- B3. Pick a quiet hour with nothing scheduled to send.
+
+*1. Migrations `0025`, `0026`, `0027` on production* (owner: `npx wrangler d1 migrations apply athanasios-prod --remote`). Additive: three new tables and one nullable column. They go first, because the new Worker writes there: saving a season, the store's schedule, the daily housekeeping. **Check:** the migration list shows them applied. **Back:** nothing to undo, the old Worker doesn't read them.
+
+*2. The Worker.* The branch's Worker commits reach `main` and CI deploys them. With every switch unset it behaves as today. **Check:** CI's own run passes (read by its id), `/v1/health` answers 200, the new push routes answer 401 without a credential, and `wrangler tail` shows no exceptions. **Back:** `npx wrangler rollback <the version before>`.
+
+*3. The pages (panel and site), after the Worker.* `push-config.js workerUrl` is still empty, so the site registers on Apps Script as today. The panel gets the store's and seasons' new fields and follows `boot.push` and `boot.pushSend`, both still Apps Script. **Check:** the live `admin-app.js` carries `data-season-days`. **Back:** revert the page commit, before any Worker rollback.
+
+*4. Apps Script deploy* (owner, as before). Adds `pushExport` for the copy and `pushOnWorker_`, which stops every send there once its `PUSH_SENDER` property is set. **Check:** `PUSH_IMPORT = dry` gives a report with the counts. **Back:** `clasp deploy -i <API id> -V <the version before>`.
+
+*5. Copy the devices.* `PUSH_IMPORT = dry`, read `PUSH_IMPORT_REPORT`, then `apply`. A row already on the Worker stays, and nothing is deleted from the Sheets. **Check:** `added` matches the dry run's counts. **Back:** the rows are unused until step 6.
+
+*6. Point the devices at the Worker,* then copy again. `settings.PUSH_DEVICES = worker`, and a site commit sets `workerUrl`. Devices registering from now on use their Firebase Installation ID. A second `apply` brings what registered on Apps Script in between. Keep this step and step 7 close together: a device that registered only on the Worker gets nothing until the Worker sends. **Check:** a new subscribe lands in `push_devices`. **Back:** `workerUrl` empty and `PUSH_DEVICES` removed. A device that took an FID re-registers on Apps Script with its token at its next weekly refresh, because the site leaves the FID out there.
+
+*7. The Worker sends.* Set `settings.PUSH_SENDER = worker`, `settings.NOTIFY_ROUTER = 1` (decision 2; the first tick marks the old backlog, so nothing floods), and the Apps Script property `PUSH_SENDER = worker`. Apps Script then sends nothing: no button, no schedule, no admin push. **Check:** «إشعارات الموبايل» shows the Worker's subscribers and log, and the «الإرسال المتجدول» list is the Worker's. **Back:** remove the Apps Script property, `PUSH_SENDER`, and set `NOTIFY_ROUTER = 0`. Apps Script sends from its Sheets again, and the claim feed hands it the admin rows.
+
+*8. The real phone test (owner's choice, 2026-11-03: here, in the cutover).*
+- Visitor: on the owner's phone, open the site, turn notifications off and on from the bell (a fresh registration on the Worker), and close the browser or app. Send one real live bell item from «إشعارات الموبايل». **Done when:** it arrives with the app closed, and a tap opens that exact item.
+- Admin: in the panel on the phone, «أجهزتي» turns this device on again. Another admin edits an item. **Done when:** the push arrives closed, and a tap opens that item in the panel (`/admin/#open/…`).
+- If either fails: back with step 7's way back, then find out why on Staging.
+
+*9. After.* Watch for a day with `wrangler tail`, `push_sends` (sent, failed, removed) and the activity log for «إرسال تلقائي ما اتبعتش». Apps Script's push tabs stay as they are until 7c's clean-up.
 
 **4a as built (Staging Worker `908fe1d6`, migration `0025`):**
 - `push_devices`: one table for visitors' and admins' rows, with `platform` (web, android, ios), `os`, `app_version`, `topics`, an account link column, and `fails`.
@@ -212,7 +233,11 @@ No rebuild. The competition screens stop depending on Apps Script.
 
 **4d tests:** Worker 457 of 457, site units 762 of 764 (the same two failures, `push-fid` 4 new), browser `push-hint` and `admin-app` 21 of 21. Live on Staging, `push-native-check` 5 of 5: one web device by its FID and one simulated native Android token through the same register call, then one send. The real FCM took both targets, `fid` and `token`, refused the made-up ids, and both rows were removed with no auth error.
 
-**4d not done yet:** a real closed-app push on the owner's phone with a tap that opens the exact record. The live site still registers on Apps Script and can't be pointed at the Worker without a production change, which waits for the cutover review.
+**4d not done yet:** a real closed-app push on the owner's phone with a tap that opens the exact record. It is step 8 of the cutover, by the owner's choice.
+
+**Found while writing the cutover:**
+- Apps Script would have kept sending its own scheduled store pushes after the switch: a device on both sides would get them twice. `pushOnWorker_` (the Script Property `PUSH_SENDER`) now stops the button, the schedule and the admin pushes there. Tested in `push.test`.
+- Going back after FIDs: the site would send an FID as `previous` to Apps Script, which refuses the whole call. It now leaves it out there.
 
 ### Step 5: Integration
 - `route` moves to the Worker: the key as a secret, a D1 cache, a daily budget.
