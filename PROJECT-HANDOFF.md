@@ -1,4 +1,4 @@
-# Project handoff — start of Phase 7
+# Project handoff — Phase 7 (Apps Script retired)
 
 Written 2026-10-21 at the close of Phase 1.5; updated 2026-10-22 at the close of Phase 2, then by the plan review of Phases 0–9 (§4.1), then at the close of Phase 3 (§4.2), and at the close of Phase 6 (§5.1, 2026-11-03). Read this first in a fresh session, then the docs it names.
 Progress rule (owner, 2026-10-22): nothing is gated or scheduled by a number of days. A step is done when its checks pass; functional time rules (retention, expiry, reminders, provider deadlines) stay.
@@ -157,7 +157,16 @@ keeps running in the background. Not started.
 
 Competition authoring and seasons on the Worker, all push on the Worker (FCM with Firebase Installation IDs, the schedule, automatic bell pushes, the booker's reminder, admin pushes from the router's outbox, a delivery receipt from the admin app), and the panel's tools and the map's routes off Apps Script. **The panel and the site call Apps Script for nothing.** It still runs its own triggers until 7b. Closed-app push on a real phone passed for a visitor and for an admin. Production: migrations to `0028` (next free: `0029`), Apps Script **@61** (back `-V 60`), Worker secrets `FCM_SERVICE_ACCOUNT` and `ORS_API_KEY`. The record, the releases with their way back, and what is carried to 7a, 7b, 8 and 9: `docs/PHASE6-PLAN.md` (closing record at the end of Step 6). **Never `clasp push` the `apps-script/` folder as it is:** it differs from the deployed version. Deploy the live version plus the changed files.
 
-**Next: Phase 7**, on the owner's order.
+**Phase 7 started 2026-11-03 on the owner's order** (`docs/PHASE7-PLAN.md`).
+
+### 5.2 Phase 7 — Apps Script retired (2026-11-03)
+
+Apps Script is out of the running system. Its API and old recovery deployments answer `retired` (`@62`; back `-V 61` / `-V 14`), its
+triggers removed themselves, no shipped config or CSP names it (`main` `129734f`), the Worker (`0c0b4fc5`, back `bb36f6b5`) has
+`APPS_SCRIPT_URL` empty and closes every `/v1/sync/*` with D1 `APPS_SCRIPT = retired` (delete the row to reopen). `api_log` now samples
+1 in 10 requests for §25's p95 gate. **Waiting for the owner:** the 7c deletion (backups and a fresh inventory are ready), Sheets/Drive
+read-only and the deployments archived, the iOS / desktop / new-booking device checks (`docs/NOTIFICATIONS-AUDIT-REPORT.md`).
+`apps-script/` stays: it is the Worker's builder source and the admin's screens' source. Closing record and §25 table: `docs/PHASE7-PLAN.md` §3.
 
 ## 6. Working rules (owner's standing instructions)
 

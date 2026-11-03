@@ -73,7 +73,57 @@ Backups first: the live code of `@61` and `HEAD` (identical) pulled to `D:/priva
 (`enableBookingAlerts`, `enableAutoPush`); delete the D1 row `APPS_SCRIPT`; restore `apiUrl` / `APPS_SCRIPT_URL` from git.
 Meaningful only with a reverse export (§23 row 7): `/v1/sync/content-export` stays in the code for it.
 
-## 3. Progress
+## 3. Closing record (2026-11-03)
 
-- Step 1: built; Worker 478/478, site units 765/766 (the one is the known #12), Staging Worker `22d290d4` (sync switch 401 → 410 → 401;
-  sampled rows land). Browser suite: see the closing record.
+**Step 1 — code off Apps Script: LIVE.** Staging Worker `22d290d4` (sync switch 401 → 410 → 401, sampled rows land). Production:
+`main` `129734f` (commits `a2688a0`, `1477042`, `129734f`), pages live 19:48 UTC, Worker `0c0b4fc5` by CI at 19:49 UTC (back: `bb36f6b5`).
+Checked on production: `/v1/health` ok; `admin/config.js` and `index.html` carry no `script.google`; the home page loads with no
+console error and no request to Apps Script; the admin gate reaches «ادخل بحساب جوجل» (not "not set up"); the only console errors
+on `/admin/` are Google Sign-In's own inline styles, as before. Sampled `api_log` rows arrive (heartbeat 109–144 ms, a content call 307 ms).
+
+**Step 2 — Apps Script retired: DONE.** `@62` on the API deployment and on the old `@14` recovery deployment, ~17:12 UTC: GET and POST
+answer `{"ok":false,"code":"retired"}`. The claim stamp `SYNC_TS_notifyclaim` (every 5 min until then) has stayed at 17:08:34 UTC
+for over 2.5 hours: no trigger runs. Production D1 `APPS_SCRIPT = retired` set at 19:42 UTC; since the Worker release every
+`/v1/sync/*` answers 410. Backups of the live code: `D:/private_projects/athanasios-backups/2026-11-03-phase7-apps-script/`.
+
+**Tests.** Worker 478/478. Site units 765/766 (#12, known). Browser 461: the production-shaped `content-worker.e2e` 7/7 (21-screen walk,
+no Apps Script call; with no `apiUrl` a call with no Worker route fails clearly, no request). Three route tests in `final-m.e2e` failed
+on the Phase 7 code only (their fake answered through Apps Script's redirect, now outside the CSP): fixed (`129734f`), the file is now
+as on `origin/main` (30/31, #7 fails there too). The other failures fail on the starting code too: the 33 of Phase 6's list (7a), plus
+`final-r.e2e` 1, 2, 4, 6 (they refuse Phase 6's `athanasios-admin.place` key), `account-badge.e2e` 8 (the photo sheet) — checked
+on a temporary worktree at `origin/main` `fc98200`. **No regression from Phase 7.** Updating those old tests stays a 7a item.
+
+**Step 3 — 7a.** `docs/NOTIFICATIONS-AUDIT-REPORT.md`: server side complete, no failure found; Android passed (Phase 6). Left for the
+owner's devices: iOS home-screen app, desktop, one real new booking's admin push with the app closed. Note: §4.8 set the audit as
+the gate *before* retirement; Apps Script already sent nothing (Phase 6), so retiring it first removes nothing the audit needs.
+
+**Step 4 — 7c: backups and inventory done, deletion NOT run (waits for the owner).** Encrypted D1 export (counts checked against
+live before encrypting), the 9 proof files that still exist (2 were already gone, as on 2026-10-30), D1 bookmark
+`00000197-00000392-00005118-c819c1d6e406f21aa53b0ce6c7079ccc`: `D:/private_projects/athanasios-backups/2026-11-03-phase7-pre-cleanup/`.
+Since 2026-10-30 the data changed: bookings 10 (new: `bkg-177e022fb41b`, confirmed, event `evt-1295c819`, 2026-10-31), competitions
+`tgrba-tshghyl` and `msabqa-nqat` with 2 graded submissions, 1 participant, 1 points row. Which of them are tests is the owner's call.
+
+**Step 5 — archive: waits for the owner.** Sheets and Drive made read-only (after File → Make a copy); the two deployments archived
+in the Apps Script editor; the project kept 90 days, then deleted. None of it is needed for the site to work.
+
+### §25 checklist after Phase 7
+
+| # | Item | State |
+|---|---|---|
+| 1 | No file references `script.google.com`; CSP doesn't allow it | Shipped config and every hand-written CSP: done. Left: the pages the publish writes (new CSP at the next publish), `apps-script/` (the Worker's builder source), the tests' fake Apps Script, `tools/deploy-api.mjs`, docs — removed with item 8 |
+| 2 | No active deployment, no triggers | Triggers: none. Deployments answer `retired`; archiving them waits for the owner |
+| 3 | Sheets and Drive read-only, no code reads them | No live code reads them. Read-only: owner |
+| 4 | p95 < 600 ms per routine action from `api_log` | Measurement on since 19:49 UTC (`API_LOG_SAMPLE = 10`). Sample size: 200 sampled rows per routine route (or all routes after 30 days); read then |
+| 5 | Publishing never waits for Pages | Done (Phase 4) |
+| 6 | Nightly backup + a restore drill after the last phase | Nightly backup runs; a restore drill after Phase 7 is still to do |
+| 7 | Two Cloudflare owners, 2FA, runbook | Owner (open since Phase 1) |
+| 8 | Rollback windows closed, old Apps Script code deleted | After the 90 days (2027-02-01); `apps-script/` must first stop being the Worker's builder source |
+
+### Way back
+
+| What | How | Time |
+|---|---|---|
+| Worker | `wrangler rollback bb36f6b5` | seconds |
+| Sync routes | `DELETE FROM settings WHERE key = 'APPS_SCRIPT'` | seconds |
+| Pages | revert `a2688a0` on `main` | ~1 min |
+| Apps Script | `clasp deploy -i <API id> -V 61`, `-i <@14 id> -V 14`; re-arm `enableBookingAlerts`, `enableAutoPush` from the editor | minutes |
