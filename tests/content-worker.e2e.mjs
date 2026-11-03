@@ -320,3 +320,26 @@ test('Phase 6 Step 5: with production\'s switches, a walk through every area and
   assert.deepEqual(s.appsScript, [], 'not one call reached Apps Script');
   await s.close();
 });
+
+test('Phase 6: closing the panel and opening it again comes back to the area and tab it was on', async () => {
+  await freshWorld();
+  const s = await open();
+  await signedIn(s.page);
+  await s.page.evaluate(() => A.go('pages', 'events'));
+  await s.page.waitForFunction(() => A.area === 'pages' && A.sub.pages === 'events', { timeout: 8000 });
+  // the app is put away (pagehide), then opened again: a new page, so no tab session of its own
+  await s.page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  const context = s.page.browserContext();
+  // the app closed: its page is gone and its session with it (a live one would rightly ask before a takeover)
+  await s.page.close();
+  env.DB.raw.exec('DELETE FROM admin_sessions;');
+  const again = await context.newPage();
+  const calls = [];
+  await interceptGoogle(again, { post: body => world.post(body) }, { site: { origin: SITE, local: LOCAL }, handle: worker, calls });
+  await again.setViewport(DESKTOP);
+  await again.goto(ADMIN_URL, { waitUntil: 'networkidle0' });
+  await signedIn(again);
+  await again.waitForFunction(() => A.area === 'pages' && A.sub.pages === 'events', { timeout: 8000 });
+  assert.ok(!(await again.evaluate(() => JSON.stringify(localStorage.getItem('athanasios-admin.place')))).includes('news-aaaa1111'), 'the place only, never an item');
+  await context.close();
+});

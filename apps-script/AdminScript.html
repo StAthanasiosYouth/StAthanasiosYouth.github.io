@@ -2767,10 +2767,41 @@
     draftOpen = null;
   });
 
+  /*
+   * Where the admin was, past the tab's own life too (Phase 6: closing the app and opening it again): only the area
+   * and its sub-tabs, never an item, a value or anything of the session. This tab's own copy (A.keep) wins.
+   */
+  var PLACE = 'athanasios-admin.place';
+
+  function savePlace(place) {
+
+    try {
+      window.localStorage.setItem(PLACE, JSON.stringify(place));
+    }
+    catch (ignored) {
+      // private mode: the tab's own copy still works
+    }
+
+  }
+
+  function lastPlace() {
+
+    try {
+      var value = JSON.parse(window.localStorage.getItem(PLACE) || 'null');
+      return value && typeof value === 'object' && typeof value.area === 'string' ? { area: value.area, sub: value.sub && typeof value.sub === 'object' ? value.sub : {} } : null;
+    }
+    catch (ignored) {
+      return null;
+    }
+
+  }
+
   function saveUi() {
 
     if (!A.keep) return;
-    A.keep.set('ui', { area: A.area, sub: { content: A.sub.content, page: A.sub.page, comps: A.sub.comps }, y: Math.max(0, Math.round(window.scrollY || 0)), publish: publishMemo() });
+    var sub = { content: A.sub.content, page: A.sub.page, comps: A.sub.comps, pages: A.sub.pages };
+    A.keep.set('ui', { area: A.area, sub: sub, y: Math.max(0, Math.round(window.scrollY || 0)), publish: publishMemo() });
+    savePlace({ area: A.area, sub: sub });
 
   }
 
@@ -2802,13 +2833,13 @@
     /* before the panel is drawn: the area and sub-tab the admin was in */
     view: function () {
 
-      var ui = A.keep && A.keep.get('ui');
+      var ui = (A.keep && A.keep.get('ui')) || lastPlace();
       var area = ui && areaOf(ui.area);
 
       if (!area) return;
 
       A.area = area.key;
-      ['content', 'page', 'comps'].forEach(function (key) {
+      ['content', 'page', 'comps', 'pages'].forEach(function (key) {
         var owner = areaOf(key);
         var sub = ui.sub && ui.sub[key];
         if (owner && owner.subs && owner.subs.some(function (s) { return s.key === sub; })) A.sub[key] = sub;
