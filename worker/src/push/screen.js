@@ -22,7 +22,7 @@ const OS = ['android', 'ios', 'desktop', 'other'];
 
 const refuse = (message, hint) => new ApiError('invalid', 'push', { message, hint });
 
-async function liveContent(db) {
+export async function liveContent(db) {
   const row = await retry(() => db.prepare("SELECT body FROM published_revisions WHERE kind = 'content' AND key = 'site' AND live = 1").first());
   let content = null;
   try { content = row ? JSON.parse(row.body) : null; } catch { content = null; }

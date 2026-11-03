@@ -396,3 +396,11 @@ test('a key that can\'t work is named by its problem, never by a value; a BOM or
   assert.match(state.body.configHint, /أول سطر/);
   assert.ok(!/PRIVATE KEY|gserviceaccount|athanasios-test/.test(JSON.stringify(state.body)), 'nothing of the key comes back');
 });
+
+test('a send with no device left to reach finishes at once, so its item is never blocked', async () => {
+  const w = await world();
+  const r = await startSend(w.h.env, { audience: 'public', ref: 'n-empty', message: model({ title: 'x' }), ttl: 60, devices: ['not-an-id'] });
+  const row = await w.sendRow(r.id);
+  assert.deepEqual([row.status, row.targets, row.error, !!row.finished_ms], ['failed', 0, 'no devices', true]);
+  assert.equal(w.jobs().length, 0);
+});

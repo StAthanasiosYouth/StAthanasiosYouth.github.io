@@ -298,3 +298,11 @@ test('Phase 6 Step 4c: the automatic pushes\' bell items join content.json at pu
   const item = (await live()).notifications.find(n => n.id === 'notif-shop-open-x');
   assert.deepEqual([item.target.kind, item.publishAt, item.expireAt], ['points', day + 'T19:00', day + 'T23:00']);
 });
+
+test('Phase 6: a publish asks for the bell items\' pushes right away (push/autobell.js), only while it is on', async () => {
+  const { world } = sheets();
+  const w = await worker(world, { ENVIRONMENT: 'staging', COMPS_SOURCE: 'none' });
+  await w.h.db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('PUSH_SENDER', 'worker', 0), ('PUSH_AUTO_BELL', '1', 0)").run();
+  assert.equal((await w.call('apiPublish', (await w.call('apiReview')).body.result.revision)).status, 200);
+  assert.ok(await w.h.db.prepare("SELECT value FROM settings WHERE key = 'PUSH_AUTO_BELL_SINCE'").first('value'), 'the run after the publish happened');
+});

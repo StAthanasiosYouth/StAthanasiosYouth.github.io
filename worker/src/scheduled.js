@@ -19,6 +19,7 @@ import { pushImportTick } from './push/devices.js';
 import { ageOutNotices } from './account/age-out.js';
 import { staleDevicesStmt } from './push/send.js';
 import { scheduleTick } from './push/schedule.js';
+import { autoBellTick } from './push/autobell.js';
 
 const DAY = 24 * 3600 * 1000;
 export const RETENTION = {
@@ -96,6 +97,8 @@ export async function scheduled(controller, env) {
     await pushImportTick(env).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'push.import', err: String(err && err.message).slice(0, 200) }));
     // Phase 6 Step 4c: the automatic pushes whose moment has come (push/schedule.js)
     await scheduleTick(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'push.schedule', err: String(err && err.message).slice(0, 200) }));
+    // a bell item live now goes as a push by itself (push/autobell.js)
+    await autoBellTick(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'push.bell', err: String(err && err.message).slice(0, 200) }));
     await compReleaseTick(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'comp.release', err: String(err && err.message).slice(0, 200) }));
     // Phase 2: the shadow comparison every 15 minutes (nothing until a publish was posted)
     if (new Date(now).getUTCMinutes() % SHADOW_EVERY_MIN === 0) {

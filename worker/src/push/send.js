@@ -69,9 +69,11 @@ export async function startSend(env, { audience, ref, sendKey = null, by = '', m
   const parts = [];
   for (let i = 0; i < ids.length; i += PART_SIZE) parts.push(ids.slice(i, i + PART_SIZE));
   const id = randomId('ps-');
-  const r = await retry(() => db.prepare(`INSERT INTO push_sends (id, send_key, audience, ref, status, by, started_ms, targets, parts, message, ttl)
-    VALUES (?, ?, ?, ?, 'sending', ?, ?, ?, ?, ?, ?) ON CONFLICT(send_key) DO NOTHING`)
-    .bind(id, sendKey, audience, ref, by, now, ids.length, parts.length, JSON.stringify(message), ttl).run());
+  // no device left to reach: finished at once (a send that waits for parts it never had would block its item for good)
+  const empty = !parts.length;
+  const r = await retry(() => db.prepare(`INSERT INTO push_sends (id, send_key, audience, ref, status, by, started_ms, finished_ms, targets, parts, message, ttl, error)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(send_key) DO NOTHING`)
+    .bind(id, sendKey, audience, ref, empty ? 'failed' : 'sending', by, now, empty ? now : null, ids.length, parts.length, JSON.stringify(message), ttl, empty ? 'no devices' : null).run());
   if (!r.meta.changes) return { replay: await retry(() => db.prepare('SELECT * FROM push_sends WHERE send_key = ?').bind(sendKey).first()) };
   logLine({ kind: 'push', send: id, audience, targets: ids.length, parts: parts.length });
   try {

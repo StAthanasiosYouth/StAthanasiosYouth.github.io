@@ -251,3 +251,54 @@ test('wanted: nothing in the past, nothing for a closed season', async () => {
   assert.deepEqual(await wanted(w.h.db), []);
   assert.deepEqual(await syncSchedule(w.h.db, 'season-'), { wanted: 0, changed: 0 });
 });
+
+test('a bell item goes as a push by itself once it is live: once, after the switch only, one a minute, a scheduled one at its time', async () => {
+  const { autoBellTick } = await import('../src/push/autobell.js');
+  const w = await world();
+  await w.device(tok(1));
+  const site = notifications => JSON.stringify({ layout: [{ key: 'news' }], news: [{ id: 'n1' }], notifications });
+  const live = async notifications => {
+    await w.h.db.prepare("UPDATE published_revisions SET live = 0 WHERE kind = 'content'").run();
+    await w.h.db.prepare("INSERT INTO published_revisions (id, kind, key, rev, hash, body, live, publish_id, published_at) VALUES (?, 'content', 'site', ?, 'h', ?, 1, 'p', 0)")
+      .bind('rev-' + Math.random().toString(16).slice(2, 8), Math.floor(Math.random() * 1e9), site(notifications)).run();
+  };
+  const at = (min) => new Date(Date.now() + 2 * 3600000 + min * 60000).toISOString().slice(0, 16);   // Cairo is UTC+2 in November
+  const { f, sends } = fcm();
+
+  assert.equal(await autoBellTick(w.h.env, Date.now(), f), null, 'switch off');
+  await w.set('PUSH_AUTO_BELL', '1');
+  await live([{ id: 'notif-old', type: 'general', title: 'قديم', publishAt: at(-60) }]);
+  assert.ok((await autoBellTick(w.h.env, Date.now(), f)).since, 'the first run only stamps when it started');
+  assert.equal(await autoBellTick(w.h.env, Date.now(), f), null, 'an item from before is never sent this way');
+
+  await live([
+    { id: 'notif-old', type: 'general', title: 'قديم', publishAt: at(-60) },
+    { id: 'notif-n1', type: 'news', title: 'خبر جديد', message: 'اقرا', target: { kind: 'news', id: 'n1' }, publishAt: at(1) },
+    { id: 'notif-n2', type: 'general', title: 'كمان واحد', publishAt: at(1) },
+    { id: 'notif-later', type: 'general', title: 'بعدين', publishAt: at(120) }
+  ]);
+  const now = Date.now() + 2 * 60000;
+  assert.deepEqual(await autoBellTick(w.h.env, now, f), { sent: 'notif-n1' });
+  await w.drain(f);
+  assert.equal(sends[0].data.url, '/#news/n1', 'linked to its content');
+  assert.deepEqual(await autoBellTick(w.h.env, now + 1000, f), { waiting: 'notif-n2' }, 'a minute between sends');
+  assert.deepEqual(await autoBellTick(w.h.env, now + 61000, f), { sent: 'notif-n2' });
+  assert.equal(await autoBellTick(w.h.env, now + 122000, f), null, 'each once; the later one not yet');
+  assert.deepEqual(await autoBellTick(w.h.env, Date.now() + 121 * 60000, f), { sent: 'notif-later' }, 'a scheduled one at its time');
+  const rows = (await w.h.db.prepare("SELECT ref, COUNT(*) AS n FROM push_sends GROUP BY ref").all()).results;
+  assert.deepEqual(rows.map(r => [r.ref, r.n]).sort(), [['notif-later', 1], ['notif-n1', 1], ['notif-n2', 1]]);
+});
+
+test('a bell item already sent from the push screen is not sent again; no subscribers is logged once and handled', async () => {
+  const { autoBellTick } = await import('../src/push/autobell.js');
+  const w = await world();
+  await w.set('PUSH_AUTO_BELL', '1');
+  await w.set('PUSH_AUTO_BELL_SINCE', '2026-01-01T00:00');
+  const at = new Date(Date.now() + 2 * 3600000 - 60000).toISOString().slice(0, 16);
+  await w.h.db.prepare("INSERT INTO published_revisions (id, kind, key, rev, hash, body, live, publish_id, published_at) VALUES ('rev-1', 'content', 'site', 1, 'h', ?, 1, 'p', 0)")
+    .bind(JSON.stringify({ notifications: [{ id: 'notif-a', type: 'general', title: 'أ', publishAt: at }] })).run();
+  const first = await autoBellTick(w.h.env, Date.now(), fcm().f);
+  assert.deepEqual([first.capped, first.reason], ['notif-a', 'invalid'], 'nobody subscribed yet');
+  assert.ok(await w.h.db.prepare("SELECT 1 FROM activity WHERE action = 'push' AND entity_id = 'notif-a'").first());
+  assert.equal(await autoBellTick(w.h.env, Date.now(), fcm().f), null, 'handled: not every minute');
+});

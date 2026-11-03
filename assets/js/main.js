@@ -10,7 +10,7 @@ import { zonedNow, stamp, meetingStatus } from './schedule.js';
 import { shareLink, openQr, shareRow } from './share.js';
 import { startRouter, resolveRoute, go, leave, parseHash, followPageHash } from './router.js';
 import { openSheet, closeSheet, sheetStyles } from './sheet.js';
-import { openBell } from './bell.js';
+import { openBell, refreshOpenBell } from './bell.js';
 import { gameStates, visibleNews } from './hub.js';
 import { itemSheetContent, typeOf, visibleItems } from './items.js';
 import { isSectionLive, liveSections } from './layout.js';
@@ -50,6 +50,8 @@ function show(content, animate) {
 
   renderPage(content, time, actions, { animate });
   shownKey = visibilityKey(content, time.stamp);
+  // the bell opened from an older copy (a tapped push): it shows what just arrived
+  refreshOpenBell(content, time.stamp);
 
 }
 

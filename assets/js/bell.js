@@ -101,12 +101,12 @@ export function updateBell(content, nowStamp) {
 }
 
 
-export function openBell(content, nowStamp) {
+/* the open sheet's list: a newer content.json (a publish, the Worker's file after the cached one) redraws it */
+let openList = null;
+
+function inboxList(content, nowStamp) {
 
   const items = visibleNotifications(content, nowStamp);
-
-  inbox = inbox || loadInbox(nowStamp);
-
   const groups = [];
 
   for (const item of items) {
@@ -127,6 +127,18 @@ export function openBell(content, nowStamp) {
       h('p', { class: 'inbox__hint' }, 'أي جديد في الأسرة هيظهر هنا.')
     );
 
+  return list;
+
+}
+
+
+export function openBell(content, nowStamp) {
+
+  inbox = inbox || loadInbox(nowStamp);
+
+  const list = inboxList(content, nowStamp);
+  openList = list;
+
   // notifications on this phone (push.js, loaded only now; never in the admin's preview)
   const pushSlot = h('div', { class: 'push-slot' });
 
@@ -142,6 +154,25 @@ export function openBell(content, nowStamp) {
   });
 
   inbox = markOpened(inbox, nowStamp);
+  saveInbox(inbox);
+  updateBell(content, nowStamp);
+
+}
+
+
+/**
+ * The bell is open and newer content arrived (main.js show()): a tap on a push opens the bell at once, from the
+ * page's cached copy or a tab opened before the publish, and the fresh content.json comes a moment later.
+ * Without this the open list stayed as it was, empty of what the push was about.
+ */
+export function refreshOpenBell(content, nowStamp) {
+
+  if (!openList || !openList.isConnected) return;
+
+  const list = inboxList(content, nowStamp);
+  openList.replaceWith(list);
+  openList = list;
+  inbox = markOpened(inbox || loadInbox(nowStamp), nowStamp);
   saveInbox(inbox);
   updateBell(content, nowStamp);
 

@@ -267,3 +267,21 @@ test('reduced motion: no particles, no rim, no intro animation', async () => {
   await page.close();
 
 });
+
+test('a tapped push opens the bell from an older copy; the bell shows what the fresh content brought (Phase 6)', async () => {
+
+  // the page's cached content.json is from before the publish: no notifications in it
+  const content = JSON.parse(readFileSync(`${ROOT}tools/.cache/demo/content.json`, 'utf8'));
+  assert.ok(content.notifications.length, 'the demo has notifications');
+  const older = JSON.stringify({ ...content, notifications: [] });
+  const { page, problems } = await open(PHONE, {
+    hash: '#notifications',
+    before: `try { if (location.protocol === 'http:') localStorage.setItem('athanasios.content.v1', ${JSON.stringify(older)}); } catch (e) {}`
+  });
+  await page.waitForSelector('dialog.sheet[open]');
+  await page.waitForFunction(() => document.querySelectorAll('dialog.sheet[open] .inbox__list li').length > 0, { timeout: 8000 });
+  assert.equal(await page.$('dialog.sheet[open] .inbox__empty'), null, 'not left empty');
+  assert.deepEqual(problems, []);
+  await page.close();
+
+});

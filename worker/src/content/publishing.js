@@ -28,6 +28,7 @@ import { sha256Sync } from './services.js';
 import { runtimePoints } from '../store/shop.js';
 import { senderOn } from '../push/send.js';
 import { bellItems } from '../push/schedule.js';
+import { autoBellTick } from '../push/autobell.js';
 
 export const BUILD_CALLS = new Set(['apiReview', 'apiPreview', 'apiPublish']);
 
@@ -209,6 +210,8 @@ export async function setupBuild(ctx, { fn, g, hooks, services, email, compLocal
       async finish() {
         released = true;
         if (mirrorId && ctx.env.JOBS) ctx.defer(ctx.env.JOBS.send(makeJob('publish.mirror', { id: mirrorId })));
+        // a new bell item goes as a push right after the publish, not a minute later (push/autobell.js)
+        if (sent) ctx.defer(autoBellTick(ctx.env, Date.now(), ctx.fetch));
         if (commit) {
           const stamp = g.nowStamp_();
           ctx.defer(commitComps(ctx, commit, stamp).catch(err => {
