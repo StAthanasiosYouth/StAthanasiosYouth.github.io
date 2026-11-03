@@ -146,7 +146,7 @@ No rebuild. The competition screens stop depending on Apps Script.
 
 **Done when:** every slice passes Worker tests and its Staging check, one owner device receives with the app closed, and the switch back has been tried.
 
-**The push cutover (for the owner's review, 2026-11-03).** Slices 4a to 4d reach production together, here, each step only on the owner's approval. Apps Script keeps sending from its Sheets until step 7. Every step says how to check it and how to go back.
+**The push cutover (approved by the owner as a plan, 2026-11-03; each step still waits for its own approval).** Slices 4a to 4d reach production together, here, each step only on the owner's approval. Apps Script keeps sending from its Sheets until step 7. Every step says how to check it and how to go back.
 
 *Before (nothing changes):*
 - B1. The owner sets `FCM_SERVICE_ACCOUNT` on the production Worker. The key is never shown here: `cd worker && npx wrangler secret put FCM_SERVICE_ACCOUNT`.
