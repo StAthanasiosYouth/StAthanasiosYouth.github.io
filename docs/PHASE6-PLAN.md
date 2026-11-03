@@ -2,7 +2,7 @@
 
 Started 2026-11-02 on the owner's order. Six steps, one at a time. Each step needs the owner's choice to start, and each production release needs its own approval.
 
-**Progress: Step 4 of 6 in progress. Slice 4a passed on Staging (2026-11-03) and stays off production until the sending moves. Slice 4b waits for the owner's order.**
+**Progress: Step 4 of 6 in progress. Slices 4a and 4b passed on Staging (2026-11-03) and stay off production until the cutover. Slice 4c waits for the owner's order.**
 
 ## 1. Official scope
 
@@ -147,11 +147,11 @@ No rebuild. The competition screens stop depending on Apps Script.
 **Done when:** every slice passes Worker tests and its Staging check, one owner device receives with the app closed, and the switch back has been tried.
 
 **Release order, decided in 4a:** Apps Script keeps sending from its Sheets until the Worker's sender is live. So a device that registered only on the Worker before then would get nothing, and the slices reach production together at one cutover after 4d, with its own approval:
-1. Migration and Worker, with `FCM_SERVICE_ACCOUNT` set by the owner.
+1. Migrations (`0025`, `0026`, and 4c's) and Worker, with `FCM_SERVICE_ACCOUNT` set by the owner.
 2. Copy the devices (`PUSH_IMPORT = dry`, then `apply`).
 3. Point the site (`push-config.js workerUrl`) and the panel (`PUSH_DEVICES = worker`) at the Worker.
 4. Copy again for what registered in between. A row already on the Worker stays.
-5. The Worker sends, and Apps Script stops.
+5. The Worker sends: `PUSH_SENDER = worker` and `NOTIFY_ROUTER = 1` (decision 2), and Apps Script stops. Back: `PUSH_SENDER` unset, and the claim feed hands Apps Script the rows again.
 
 **4a as built (Staging Worker `908fe1d6`, migration `0025`):**
 - `push_devices`: one table for visitors' and admins' rows, with `platform` (web, android, ios), `os`, `app_version`, `topics`, an account link column, and `fails`.
@@ -161,6 +161,19 @@ No rebuild. The competition screens stop depending on Apps Script.
 - Linking a device to an account is only a column so far. It's built with decision 3 in 4c.
 
 **4a tests:** Worker 431 of 431, site units 758 of 760 (the same two failures), `content-worker` 4 of 4, `push-hint` and `admin-rel` 15 of 15, `push-devices-check` live on Staging 15 of 15. The copy ran through the fake Apps Script only, because Staging has none. No real token and no notification were involved.
+
+**4b as built (Staging Worker `31e03447`, migration `0026`):**
+- `push/fcm.js`: the key, the access token (a WebCrypto RS256 JWT, kept in the isolate's memory, never in D1), `classify` as Push.gs, and one message model. The web gets data only, as `sw.js` expects. Android gets `android.notification` and iOS gets `apns` for Phase 9, with `tag`, `group` and `badge`. Links are paths, and an outside link or picture is dropped.
+- `push/send.js`: a send is a `push_sends` row plus queue messages (`push.fanout`) of 45 device ids each, never tokens. `push_parts` takes each part once, so a message delivered twice sends nothing twice. Transient failures get one more round 30 s later.
+- Clean-up: a dead token is deleted. One that failed 5 sends in a row goes too, and a visitor's device unseen for 270 days goes in housekeeping. A missing or refused key never counts against a device.
+- `jobs.js`: a fan-out runs first in its consumer batch. Anything after it is sent again as the same job, which spends no retry, so a run stays under 50 outside requests.
+- Admin pushes: with `PUSH_SENDER = worker` and the router on, the minute cron leases the outbox's push rows and sends each to the named admin's devices. The device whose panel is in sight in D1 `admin_sessions` is spared, unless the row is critical. The send's result answers the row: sent, a backoff, or dead after 5 tries. The claim feed then hands Apps Script nothing, and still says the router is on, so Apps Script's own admin pushes stay off.
+- `publicSend`: Push.gs's rules for a send to visitors. A repeated key gets its first result, an item goes once, 60 s between sends, 10 a Cairo day, and an optional topic. The screen and the schedule that call it come in 4c.
+- Routes: `POST /v1/admin/push/check` (`push.view`, validate_only, no device notified) and `POST /v1/admin/push/test` (any admin, their own devices only, once a minute).
+
+**4b tests:** Worker 443 of 443, 12 of them new, against a fake FCM. Live on Staging, `push-sender-check` 9 of 9 against the real FCM with made-up tokens: Google accepted the key, the queue ran the part, and FCM refused the tokens, which were deleted. No device got anything. `push-devices-check` 15 of 15 again.
+
+**4b not checked:** a delivery to a real device (4d, the owner's phone). The admin outbox path ran only in the unit tests, because Staging's `NOTIFY_ROUTER` is 0 and stays as it is. No setting was changed on Staging.
 
 ### Step 5: Integration
 - `route` moves to the Worker: the key as a secret, a D1 cache, a daily budget.
