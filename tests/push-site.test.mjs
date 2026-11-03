@@ -351,8 +351,9 @@ test('push config: public values only, and the same API deployment as the admin 
   }
 });
 
-test('the site stays on Apps Script until the sending moves (push-config.js workerUrl)', async () => {
+test('the site registers on the production Worker since the push cutover (push-config.js workerUrl)', async () => {
   const { PUSH_CONFIG } = await import('../assets/js/push-config.js');
-  assert.equal(PUSH_CONFIG.workerUrl, '');
+  assert.equal(PUSH_CONFIG.workerUrl, 'https://athanasios-api.menazak-lab.workers.dev', 'never Staging, never a trailing slash');
+  // the way back (workerUrl '') still has its Apps Script address
   assert.match(PUSH_CONFIG.apiUrl, /script\.google\.com/);
 });

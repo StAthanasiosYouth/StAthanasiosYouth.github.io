@@ -11,13 +11,13 @@
  * public actions, pushSubscribe and pushUnsubscribe (apps-script/Push.gs).
  *
  * workerUrl: when set, those two go to the Worker (POST /v1/push/subscribe and
- * /unsubscribe, worker/src/push/devices.js). '' = Apps Script, which still does
- * the sending; it is set when the sending moves (docs/PHASE6-PLAN.md Step 4).
+ * /unsubscribe, worker/src/push/devices.js). Set at the push cutover
+ * (docs/PHASE6-PLAN.md Step 4, 2026-11-03). '' = back to Apps Script.
  */
 
 export const PUSH_CONFIG = {
   apiUrl: 'https://script.google.com/macros/s/AKfycbxJjDyktRi6VlwRGSrF-H_KzN-vkw9QaFCiLD1TlqgrppKs4CHfmOBE4cKEd6AZ9Km1/exec',
-  workerUrl: '',
+  workerUrl: 'https://athanasios-api.menazak-lab.workers.dev',
   vapidKey: 'BG1xbtyFFTedzotjPEgX4HEpiuMQ05R1KRCezOGMtjcXsgtdWEemVgamRZnegbztyomypmVL-D74niZLoKduS5Q',
   firebase: {
     apiKey: 'AIzaSyDFT6GqY1RHMn9V9xBStPTQ3fwfHSTdE4Q',

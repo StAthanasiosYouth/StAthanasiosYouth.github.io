@@ -33,6 +33,11 @@ export const initializeApp = () => ({});
 export const getMessaging = () => ({});
 export const getToken = async () => 'e2eHint:APA91b${'Q'.repeat(140)}';
 export const deleteToken = async () => true;
+// the new FCM web API (assets/js/push-fid.js): the FID comes through onRegistered
+let registered = null;
+export const onRegistered = (m, fn) => { registered = fn; return () => { registered = null; }; };
+export const register = async () => { if (registered) registered('e2eHintFid0123456789ab'); };
+export const unregister = async () => true;
 `;
 
 let server;
@@ -62,6 +67,7 @@ async function visit({ permission = 'prompt', memo = null, reducedMotion = false
   const requests = [];
   const errors = [];
   const api = [];
+  const apiBodies = [];
 
   // (one browser session for the whole run: an override ends with the session that set it)
   await browserSession.send('Browser.setPermission', { origin: SITE, browserContextId: ctx.id, permission: { name: 'notifications' }, setting: permission });
@@ -82,13 +88,21 @@ async function visit({ permission = 'prompt', memo = null, reducedMotion = false
       api.push(JSON.parse(req.postData() || '{}').fn);
       return req.respond({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: '{"ok":true}' });
     }
+    // the Worker (push-config.js workerUrl since the cutover): never the real one from a test
+    if (/^https:\/\/athanasios-api[\w.-]*\.workers\.dev\/v1\/push\//.test(url)) {
+      const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type, authorization', 'Access-Control-Allow-Methods': 'POST' };
+      if (req.method() === 'OPTIONS') return req.respond({ status: 204, headers: cors, body: '' });
+      api.push(url.endsWith('/subscribe') ? 'pushSubscribe' : 'pushUnsubscribe');
+      apiBodies.push(JSON.parse(req.postData() || '{}'));
+      return req.respond({ status: 200, contentType: 'application/json', headers: cors, body: '{"ok":true}' });
+    }
     return req.continue();
   });
   page.on('pageerror', error => errors.push(error.message));
 
   await page.goto(`${SITE}/`, { waitUntil: 'networkidle0' });
 
-  return { ctx, page, requests, errors, api };
+  return { ctx, page, requests, errors, api, apiBodies };
 
 }
 
@@ -157,7 +171,7 @@ test('blocked in the browser: no hint (nothing to nag about)', async () => {
 });
 
 test('turning notifications on removes the dot, the ripples and the pill at once', async () => {
-  const { ctx, page, api, errors } = await visit({ permission: 'granted' });
+  const { ctx, page, api, apiBodies, errors } = await visit({ permission: 'granted' });
   await waitForHint(page);
   await page.waitForSelector('.bell-hint', { timeout: 5000 });
   // the pill opens the bell
@@ -168,6 +182,7 @@ test('turning notifications on removes the dot, the ripples and the pill at once
   await page.waitForFunction(() => /شغالة/.test(document.querySelector('.push-card')?.textContent || ''), { timeout: 15000 });
   assert.deepEqual(await hint(page), { dot: false, halo: false, pill: false, described: null });
   assert.deepEqual(api, ['pushSubscribe']);
+  assert.equal(apiBodies[0].token, 'e2eHintFid0123456789ab', 'on the Worker: the Firebase Installation ID, not the old token');
   assert.equal(await page.$('#bell-hint-note'), null);
   assert.deepEqual(errors, []);
   await ctx.close();
