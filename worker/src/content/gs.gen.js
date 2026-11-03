@@ -25031,6 +25031,7 @@ function contentNotifyPull_() {
           case 'publishShadow_': publishShadow_ = fn; return;
           case 'fetchPublishedContent_': fetchPublishedContent_ = fn; return;
           case 'lastPublished_': lastPublished_ = fn; return;
+          case 'buildHub_': buildHub_ = fn; return;
           case 'activityState_': activityState_ = fn; return;
           case 'driveUpload_': driveUpload_ = fn; return;
           case 'driveDownloadBase64_': driveDownloadBase64_ = fn; return;

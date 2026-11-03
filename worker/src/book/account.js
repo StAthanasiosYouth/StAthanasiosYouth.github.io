@@ -14,6 +14,7 @@ import { memberEmailStmt } from '../notify/member.js';
 import { requireAccount } from '../account/session.js';
 import { readStatusToken, statusToken } from './token.js';
 import { paidOf, amountDueOf, stampMs } from './model.js';
+import { bookerPush } from '../push/send.js';
 
 const HOUR = 3600 * 1000;
 const DAY = 24 * HOUR;
@@ -157,10 +158,13 @@ export async function adminEventNotify(ctx, event) {
  */
 export async function bookingReminders(env, now = Date.now()) {
   const db = env.DB;
-  const s = await retry(() => db.prepare("SELECT key, value FROM settings WHERE key IN ('MEMBER_EMAIL', 'accounts_mode')").all());
+  const s = await retry(() => db.prepare("SELECT key, value FROM settings WHERE key IN ('MEMBER_EMAIL', 'accounts_mode', 'PUSH_SENDER')").all());
   const set = Object.fromEntries(s.results.map(r => [r.key, r.value]));
-  if (set.MEMBER_EMAIL !== '1' || set.accounts_mode !== 'on') return 0;
-  const events = (await retry(() => db.prepare('SELECT id, booking FROM event_cfg WHERE withdrawn = 0 AND end_ms > ?').bind(now).all())).results;
+  const mail = set.MEMBER_EMAIL === '1';
+  // Phase 6 decision 3: a short nudge to the devices linked to the booker's account, beside the email
+  const push = set.PUSH_SENDER === 'worker';
+  if ((!mail && !push) || set.accounts_mode !== 'on') return 0;
+  const events = (await retry(() => db.prepare('SELECT id, title, booking FROM event_cfg WHERE withdrawn = 0 AND end_ms > ?').bind(now).all())).results;
   const today = cairoText(now).slice(0, 10);
   let made = 0;
   for (const e of events) {
@@ -176,15 +180,18 @@ export async function bookingReminders(env, now = Date.now()) {
       AND NOT EXISTS (SELECT 1 FROM payment_claims c WHERE c.booking_id = b.id AND c.status = 'pending')
       AND NOT EXISTS (SELECT 1 FROM reminders r WHERE r.booking_id = b.id AND r.sent_ms > ?)`).bind(e.id, now - 20 * HOUR).all())).results;
     const stmts = [];
+    const nudges = [];
     for (const row of rows) {
       const pays = (await retry(() => db.prepare('SELECT * FROM payments WHERE booking_id = ?').bind(row.id).all())).results;
       if (amountDueOf(row) - paidOf(pays) <= 0) continue;
-      stmts.push(memberEmailStmt(db, { kind: 'book.reminder', participantId: row.participant_id, entityType: 'booking', entityId: row.id, dedupeKey: `rem:${row.id}:${stage}`, now, expires: dueMs + DAY }));
+      nudges.push({ bookingId: row.id, participantId: row.participant_id });
+      if (mail) stmts.push(memberEmailStmt(db, { kind: 'book.reminder', participantId: row.participant_id, entityType: 'booking', entityId: row.id, dedupeKey: `rem:${row.id}:${stage}`, now, expires: dueMs + DAY }));
     }
     if (stmts.length) {
       await retry(() => db.batch(stmts));
       made += stmts.length;
     }
+    if (push && nudges.length) await bookerPush(env, nudges, { stage, event: e.title || '', day: today, now }).catch(() => 0);
   }
   return made;
 }

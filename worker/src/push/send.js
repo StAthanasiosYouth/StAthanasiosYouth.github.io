@@ -265,28 +265,53 @@ const refuse = (message, hint, code = 'invalid') => new ApiError(code, 'push', {
 export async function publicSend(env, { notifId, sendKey, by = '', message, ttl, topic = null, now = Date.now(), doFetch }) {
   const db = env.DB;
   if (!/^[\w-]{1,80}$/.test(String(notifId || '')) || !/^[\w-]{8,64}$/.test(String(sendKey || ''))) throw refuse('الطلب مش مفهوم.', 'اعمل Refresh للصفحة.');
-  if (!serviceAccount(env)) throw refuse('إشعارات الموبايل لسه مش متظبطة.', 'FCM_SERVICE_ACCOUNT ناقص على الـWorker.', 'unavailable');
+  if (!serviceAccount(env)) throw refuse('إشعارات الموبايل لسه مش متظبطة.', 'FCM_SERVICE_ACCOUNT ناقص على الـWorker.', 'disabled');
   const m = model({ ...message, kind: 'public', id: notifId });
   if (!m) throw refuse('العنوان فاضي.', '');
   const dayStart = Date.parse(cairoText(now).slice(0, 10) + 'T00:00:00Z') - (Date.parse(cairoText(now).replace(' ', 'T') + ':00Z') - Math.floor(now / 60000) * 60000);
   const [same, item, last, today] = await retry(() => db.batch([
     db.prepare('SELECT * FROM push_sends WHERE send_key = ?').bind(sendKey),
-    db.prepare("SELECT status, started_ms FROM push_sends WHERE audience = 'public' AND ref = ? ORDER BY started_ms DESC").bind(notifId),
+    db.prepare("SELECT * FROM push_sends WHERE audience = 'public' AND ref = ? ORDER BY started_ms DESC").bind(notifId),
     db.prepare("SELECT MAX(started_ms) AS at FROM push_sends WHERE audience = 'public'"),
     db.prepare("SELECT COUNT(*) AS n FROM push_sends WHERE audience = 'public' AND started_ms >= ?").bind(dayStart)
   ]));
   if (same.results[0]) return { replay: true, send: same.results[0] };
   const done = item.results.find(x => x.status === 'sent');
   if (done) return { already: true, send: done };
-  if (item.results.some(x => x.status === 'sending' && now - x.started_ms < SENDING_STALE_MS)) throw refuse('الإشعار ده بيتبعت دلوقتي.', 'استنى دقيقة وبص على السجل.', 'conflict');
+  if (item.results.some(x => x.status === 'sending' && now - x.started_ms < SENDING_STALE_MS)) throw refuse('الإشعار ده بيتبعت دلوقتي.', 'استنى دقيقة وبص على السجل.', 'busy');
   const lastAt = last.results[0].at || 0;
-  if (now - lastAt < SEND_COOLDOWN_MS) throw refuse('استنى دقيقة بين كل إشعار والتاني.', 'باقي ' + Math.ceil((lastAt + SEND_COOLDOWN_MS - now) / 1000) + ' ثانية.', 'rate_limited');
-  if (today.results[0].n >= SENDS_PER_DAY) throw refuse('وصلنا للحد: ' + SENDS_PER_DAY + ' إشعارات في اليوم.', 'الإشعارات الكتير بتخلي الناس تقفلها. كمّل بكرة.', 'rate_limited');
+  if (now - lastAt < SEND_COOLDOWN_MS) throw refuse('استنى دقيقة بين كل إشعار والتاني.', 'باقي ' + Math.ceil((lastAt + SEND_COOLDOWN_MS - now) / 1000) + ' ثانية.', 'rate');
+  if (today.results[0].n >= SENDS_PER_DAY) throw refuse('وصلنا للحد: ' + SENDS_PER_DAY + ' إشعارات في اليوم.', 'الإشعارات الكتير بتخلي الناس تقفلها. كمّل بكرة.', 'rate');
   const devices = (await retry(() => (topic
     ? db.prepare("SELECT id FROM push_devices WHERE audience = 'public' AND EXISTS (SELECT 1 FROM json_each(push_devices.topics) WHERE value = ?)").bind(topic)
     : db.prepare("SELECT id FROM push_devices WHERE audience = 'public'")).all())).results.map(d => d.id);
   if (!devices.length) throw refuse('مفيش مشتركين لسه.', 'أول ما حد يفعّل الإشعارات من الموقع هيظهر هنا.');
   return startSend(env, { audience: 'public', ref: notifId, sendKey, by, message: m, ttl, devices, now, doFetch });
+}
+
+/*
+ * A booker's payment reminder (decision 3): a short nudge to the devices linked to their account that kept
+ * «reminders». No amounts. The key is the booking, the stage and the day, so a second cron run sends nothing.
+ */
+export async function bookerPush(env, list, { stage, event, day, now = Date.now(), doFetch }) {
+  if (!serviceAccount(env)) return 0;
+  const db = env.DB;
+  const people = [...new Set(list.map(x => x.participantId))];
+  const rows = people.length ? (await retry(() => db.prepare(`SELECT id, account_id FROM push_devices WHERE audience = 'public' AND account_id IN (${inList(people)})
+    AND EXISTS (SELECT 1 FROM json_each(push_devices.topics) WHERE value = 'reminders')`).bind(...people).all())).results : [];
+  let sent = 0;
+  for (const x of list) {
+    const devices = rows.filter(r => r.account_id === x.participantId).map(r => r.id);
+    if (!devices.length) continue;
+    const message = model({
+      kind: 'public', id: x.bookingId, title: '⏰ ميعاد الدفع قرّب' + (event ? ' – ' + event : ''),
+      body: stage === 'd0' ? 'النهارده آخر ميعاد للدفع. افتح حسابك وشوف التفاصيل.' : 'فاضل ٣ أيام على آخر ميعاد للدفع. افتح حسابك وشوف التفاصيل.',
+      url: '/account/#me/bookings', tag: ('book-' + x.bookingId).replace(/[^\w-]/g, '').slice(0, 80), group: 'reminders'
+    });
+    const r = await startSend(env, { audience: 'public', ref: 'book:' + x.bookingId, sendKey: ('rem-' + x.bookingId + '-' + stage + '-' + day).slice(0, 64), message, ttl: 86400, devices, now, doFetch });
+    if (!r.replay) sent++;
+  }
+  return sent;
 }
 
 /* housekeeping: a visitor's device not seen for STALE_MS goes (Push.gs pushCleanup_) */
@@ -311,10 +336,10 @@ export async function adminPushCheck(ctx) {
 export async function adminPushTest(ctx) {
   const db = ctx.env.DB;
   const me = ctx.actor.email;
-  if (!serviceAccount(ctx.env)) throw refuse('إشعارات الموبايل لسه مش متظبطة.', 'FCM_SERVICE_ACCOUNT ناقص على الـWorker.', 'unavailable');
+  if (!serviceAccount(ctx.env)) throw refuse('إشعارات الموبايل لسه مش متظبطة.', 'FCM_SERVICE_ACCOUNT ناقص على الـWorker.', 'disabled');
   const now = Date.now();
   const recent = await retry(() => db.prepare("SELECT 1 AS y FROM push_sends WHERE audience = 'admin' AND ref = ? AND started_ms > ?").bind('test:' + me, now - SEND_COOLDOWN_MS).first());
-  if (recent) throw refuse('استنى دقيقة بين كل تجربة والتانية.', '', 'rate_limited');
+  if (recent) throw refuse('استنى دقيقة بين كل تجربة والتانية.', '', 'rate');
   const devices = (await retry(() => db.prepare("SELECT id FROM push_devices WHERE audience = 'admin' AND email = ?").bind(me).all())).results.map(d => d.id);
   if (!devices.length) throw refuse('مفيش أجهزة مفعّل عليها الإشعارات.', 'فعّل الإشعارات من «أجهزتي» الأول.');
   const message = model({ kind: 'admin', id: 'test', title: 'تجربة إشعارات لوحة التحكم', body: 'لو الرسالة دي وصلت، الإشعارات شغالة على الجهاز ده.', url: '/admin/', tag: 'adm-test', group: 'admin' });

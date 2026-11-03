@@ -17,6 +17,7 @@ import { eligibility, rulesFrom } from '../account/model.js';
 import { memberEmailStmt } from '../notify/member.js';
 import { activeSeason, ledgerStmt, HELD_SQL, seasonMaxima } from '../points/ledger.js';
 import { wallOf } from '../comp/model.js';
+import { syncSchedule, shopNotify, NOTIFY_KEYS } from '../push/schedule.js';
 
 const NEXT = { pending: ['approved', 'fulfilled', 'cancelled'], approved: ['fulfilled', 'cancelled'], fulfilled: [], cancelled: [] };
 const MODES = ['auto', 'open', 'preview', 'closed'];
@@ -24,7 +25,7 @@ const KEY = /^[A-Za-z0-9_-]{8,64}$/;
 const ITEM_ID = /^i-[0-9a-f]{8}$/;
 const REDEMPTION_ID = /^r-[0-9a-f]{10}$/;
 const LIMITS = { name: 60, description: 500, category: 30, cost: 1000000, stock: 100000, perPerson: 1000 };
-const SETTINGS = ['SHOP_MODE', 'SHOP_OPENS_AT', 'SHOP_CLOSES_AT', 'SHOP_ALLOW_CANCEL'];
+const SETTINGS = ['SHOP_MODE', 'SHOP_OPENS_AT', 'SHOP_CLOSES_AT', 'SHOP_ALLOW_CANCEL', 'SHOP_NOTIFY'];
 
 const invalid = (field, message) => new ApiError('invalid', field, { field, message });
 const refuse = (code, message, extra) => new ApiError(code, code, { message, ...(extra || {}) });
@@ -331,7 +332,10 @@ export async function adminRedemptionStatus(ctx) {
 
 /* GET + POST /v1/admin/store/schedule */
 export async function adminStoreSchedule(ctx) {
-  return storeOf(ctx.env.DB, wallOf(Date.now())).then(async store => ({ ...store, mode: (await storeSettings(ctx.env.DB)).SHOP_MODE || 'auto' }));
+  return storeOf(ctx.env.DB, wallOf(Date.now())).then(async store => {
+    const s = await storeSettings(ctx.env.DB);
+    return { ...store, mode: s.SHOP_MODE || 'auto', notify: shopNotify(s.SHOP_NOTIFY) };
+  });
 }
 
 export async function adminStoreScheduleSave(ctx) {
@@ -350,8 +354,11 @@ export async function adminStoreScheduleSave(ctx) {
   const set = (key, value) => db.prepare('INSERT INTO settings (key, value, updated_at, updated_by) VALUES (?, ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at, updated_by = excluded.updated_by').bind(key, value, now, ctx.actor.email);
   await retry(() => db.batch([
     set('SHOP_MODE', body.mode), set('SHOP_OPENS_AT', opens), set('SHOP_CLOSES_AT', closes), set('SHOP_ALLOW_CANCEL', body.allowCancel === true ? '1' : ''),
+    // §18.5: which automatic pushes go with these dates
+    set('SHOP_NOTIFY', JSON.stringify(Object.fromEntries(NOTIFY_KEYS.map(k => [k, !!(body.notify && body.notify[k] === true)])))),
     activityStmt(db, { at: now, actor: ctx.actor.email, actorName: ctx.actor.name, action: 'settings', entityType: 'shopitem', entityId: 'schedule', summary: 'مواعيد المتجر' })
   ]));
+  await syncSchedule(db, 'shop-', now);
   return adminStoreSchedule(ctx);
 }
 

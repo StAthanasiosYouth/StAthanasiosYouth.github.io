@@ -279,3 +279,22 @@ test('the Worker\'s own fetch (none injected): asking Apps Script works with a W
     globalThis.fetch = real;
   }
 });
+
+test('Phase 6 Step 4c: the automatic pushes\' bell items join content.json at publish, only while the Worker sends', async () => {
+  const { world } = sheets();
+  const w = await worker(world, { ENVIRONMENT: 'staging', COMPS_SOURCE: 'none' });
+  const day = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10);
+  await w.h.db.prepare(`INSERT INTO push_schedule (id, notif_id, kind, send_wall, send_ms, expire_wall, title, body, send_key, updated_ms)
+    VALUES ('psh-00000000aa', 'notif-shop-open-x', 'shop-open', ?, 0, ?, 'المتجر فتح', 'ادخل', 'auto-1', 0)`).bind(day + 'T19:00', day + 'T23:00').run();
+  const live = async () => JSON.parse((await w.h.db.prepare("SELECT body FROM published_revisions WHERE kind = 'content' AND live = 1").first()).body);
+  assert.equal((await w.call('apiPublish', (await w.call('apiReview')).body.result.revision)).status, 200);
+  assert.ok(!(await live()).notifications.some(n => n.id === 'notif-shop-open-x'), 'Apps Script still sends: nothing added');
+  assert.ok((await w.h.call('/v1/admin/content/review-input', { headers: { authorization: 'Bearer ' + await w.g.sign(w.g.claims({ email: ADMIN, sub: 's1' })) }, fetch: w.g.fetch })).body.comps, 'the browser may review');
+  await w.h.db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('PUSH_SENDER', 'worker', 0)").run();
+  assert.equal((await w.h.call('/v1/admin/content/review-input', { headers: { authorization: 'Bearer ' + await w.g.sign(w.g.claims({ email: ADMIN, sub: 's1' })) }, fetch: w.g.fetch })).body.comps, null, 'bell items only the Worker adds: its review answers');
+  const p = await w.call('apiPublish', (await w.call('apiReview')).body.result.revision);
+  assert.equal(p.status, 200, JSON.stringify(p.body));
+
+  const item = (await live()).notifications.find(n => n.id === 'notif-shop-open-x');
+  assert.deepEqual([item.target.kind, item.publishAt, item.expireAt], ['points', day + 'T19:00', day + 'T23:00']);
+});

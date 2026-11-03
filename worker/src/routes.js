@@ -52,6 +52,8 @@ import { adminBookingLink } from './book/account.js';
 import { compStart, compSubmit, compResult, compMe, syncCompLive } from './comp/runtime.js';
 import { pushSubscribe, pushUnsubscribe, adminPushSubscribe, adminPushUnsubscribe, adminPushDevices, adminPushRemove } from './push/devices.js';
 import { adminPushCheck, adminPushTest } from './push/send.js';
+import { adminPushState, adminPushSend } from './push/screen.js';
+import { adminPushAuto, adminPushSchedule, adminPushScheduleCancel } from './push/schedule.js';
 import { adminComps, adminCompBadges, adminCompSubmissions, adminCompSubmission, adminCompGrade, adminCompVoid, adminCompRegrade } from './comp/admin.js';
 import { shopRedeem, shopCancel, adminStoreItems, adminStoreItemSave, adminStoreItemDelete, adminRedemptions, adminRedemptionStatus, adminStoreSchedule, adminStoreScheduleSave, syncStoreImport } from './store/shop.js';
 import { accountSummary } from './account/summary.js';
@@ -442,6 +444,12 @@ export const ROUTES = [
   // Phase 6 Step 4b — the sender (push/send.js)
   { method: 'POST', path: '/v1/admin/push/check', auth: 'admin', maxBytes: 256, handler: adminPushCheck },
   { method: 'POST', path: '/v1/admin/push/test', auth: 'admin', maxBytes: 256, handler: adminPushTest },
+  // Phase 6 Step 4c — «إشعارات الموبايل» and the automatic pushes (push/screen.js, push/schedule.js)
+  { method: 'POST', path: '/v1/admin/push/state', auth: 'admin', maxBytes: 256, handler: adminPushState },
+  { method: 'POST', path: '/v1/admin/push/send', auth: 'admin', maxBytes: 2048, handler: adminPushSend },
+  { method: 'POST', path: '/v1/admin/push/auto', auth: 'admin', maxBytes: 256, handler: adminPushAuto },
+  { method: 'POST', path: '/v1/admin/push/schedule', auth: 'admin', maxBytes: 256, handler: adminPushSchedule },
+  { method: 'POST', path: '/v1/admin/push/schedule/cancel', auth: 'admin', maxBytes: 256, handler: adminPushScheduleCancel },
   { method: 'GET', path: '/v1/admin/comp', auth: 'admin', handler: adminComps },
   { method: 'GET', path: '/v1/admin/comp/badges', auth: 'admin', handler: adminCompBadges },
   // the competition screen's season picker: the same list, for whoever may see competitions

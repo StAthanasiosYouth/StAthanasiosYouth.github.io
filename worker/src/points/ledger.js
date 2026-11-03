@@ -12,6 +12,7 @@ import { activityStmt } from '../lib/activity.js';
 import { limit } from '../lib/ratelimit.js';
 import { memberEmailStmt } from '../notify/member.js';
 import { eligibility, rulesFrom } from '../account/model.js';
+import { syncSchedule } from '../push/schedule.js';
 
 export const MAX_ADJUST = 1000000;
 const NOTE_MAX = 200;
@@ -170,7 +171,7 @@ export async function adminPointsTransfer(ctx) {
 
 /* ---------- seasons ---------- */
 
-const seasonView = s => ({ id: s.id, name: s.name, startAt: s.start_at || '', endAt: s.end_at || '', status: s.status, closedAt: s.closed_ms || null, closedBy: s.closed_by || '' });
+const seasonView = s => ({ id: s.id, name: s.name, startAt: s.start_at || '', endAt: s.end_at || '', status: s.status, notifyDays: s.notify_days || null, closedAt: s.closed_ms || null, closedBy: s.closed_by || '' });
 
 /*
  * §18.6 (CompSeasons.gs seasonMaxima_): { seasonId: { max, expected, competitions } } from the drafts: what the
@@ -223,7 +224,11 @@ const seasonFields = body => {
     if (text && !/^\d{4}-\d{2}-\d{2}/.test(text)) throw invalid('date', 'التاريخ مش صح.');
     return text.slice(0, 16) || null;
   };
-  return { name, startAt: stamp(body.startAt), endAt: stamp(body.endAt) };
+  // §18.5: «الموسم بيخلص بعد … يوم», 1 to 30 days, or none
+  const days = body.notifyDays;
+  const notifyDays = days === '' || days == null ? null : Number(days);
+  if (notifyDays !== null && !(Number.isInteger(notifyDays) && notifyDays >= 1 && notifyDays <= 30)) throw invalid('notifyDays', 'التنبيه قبل نهاية الموسم بين يوم و٣٠ يوم.');
+  return { name, startAt: stamp(body.startAt), endAt: stamp(body.endAt), notifyDays };
 };
 
 /* POST /v1/admin/points/seasons { id?, name, startAt, endAt }: a new planned season, or edit one not closed */
@@ -234,11 +239,12 @@ export async function adminSeasonSave(ctx) {
   const now = Date.now();
   if (body.id) {
     if (!SEASON_ID.test(String(body.id))) throw new ApiError('not_found', 'id');
-    const r = await retry(() => db.prepare("UPDATE seasons SET name = ?, start_at = ?, end_at = ?, updated_ms = ? WHERE id = ? AND status <> 'closed'").bind(f.name, f.startAt, f.endAt, now, body.id).run());
+    const r = await retry(() => db.prepare("UPDATE seasons SET name = ?, start_at = ?, end_at = ?, notify_days = ?, updated_ms = ? WHERE id = ? AND status <> 'closed'").bind(f.name, f.startAt, f.endAt, f.notifyDays, now, body.id).run());
     if (r.meta.changes !== 1) throw new ApiError('final', 'season');
   } else {
-    await retry(() => db.prepare("INSERT INTO seasons (id, name, start_at, end_at, status, created_ms, updated_ms) VALUES (?, ?, ?, ?, 'planned', ?, ?)").bind(randomId('sea-', 4), f.name, f.startAt, f.endAt, now, now).run());
+    await retry(() => db.prepare("INSERT INTO seasons (id, name, start_at, end_at, notify_days, status, created_ms, updated_ms) VALUES (?, ?, ?, ?, ?, 'planned', ?, ?)").bind(randomId('sea-', 4), f.name, f.startAt, f.endAt, f.notifyDays, now, now).run());
   }
+  await syncSchedule(db, 'season-', now);
   return adminSeasons(ctx);
 }
 
@@ -298,9 +304,11 @@ export async function adminSeasonClose(ctx) {
   } else {
     const f = seasonFields(body.next || {});
     nextId = randomId('sea-', 4);
-    stmts.push(db.prepare("INSERT INTO seasons (id, name, start_at, end_at, status, created_ms, updated_ms) VALUES (?, ?, ?, ?, 'active', ?, ?)").bind(nextId, f.name, f.startAt, f.endAt, now, now));
+    stmts.push(db.prepare("INSERT INTO seasons (id, name, start_at, end_at, notify_days, status, created_ms, updated_ms) VALUES (?, ?, ?, ?, ?, 'active', ?, ?)").bind(nextId, f.name, f.startAt, f.endAt, f.notifyDays, now, now));
   }
   stmts.push(activityStmt(db, { at: now, actor: ctx.actor.email, actorName: ctx.actor.name, action: 'finalize', entityType: 'points', entityId: id, entityTitle: 'قفل الموسم', summary: 'قفل الموسم', changes: { season: true, participants: rows.length, next: nextId } }));
   await retry(() => db.batch(stmts));
+  // a closed season's reminder no longer goes
+  await syncSchedule(db, 'season-', now);
   return { closed: id, active: nextId, participants: rows.length, ...(await adminSeasons(ctx)) };
 }

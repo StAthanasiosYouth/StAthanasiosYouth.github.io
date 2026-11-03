@@ -26,6 +26,8 @@ import { compPackage, compCommitOf, commitComps, NONE_PART } from './comps.js';
 import { COMP_CALLS } from './compdrafts.js';
 import { sha256Sync } from './services.js';
 import { runtimePoints } from '../store/shop.js';
+import { senderOn } from '../push/send.js';
+import { bellItems } from '../push/schedule.js';
 
 export const BUILD_CALLS = new Set(['apiReview', 'apiPreview', 'apiPublish']);
 
@@ -148,6 +150,18 @@ export async function setupBuild(ctx, { fn, g, hooks, services, email, compLocal
     hooks.use('fetchPublishedContent_', () => null);
 
     const points = await runtimePoints(ctx.env.DB, pkg.none ? null : pkg.points);
+    // Phase 6 Step 4c: the automatic pushes' bell items join the site with this publish (push/schedule.js)
+    const bells = (await senderOn(db).catch(() => false)) ? await bellItems(db).catch(() => []) : [];
+    // inside the build, so the review and the publish see the same notifications (g.buildHub_ is the original)
+    if (bells.length) {
+      hooks.use('buildHub_', (draft, c) => {
+        const hub = g.buildHub_(draft, c);
+        const have = new Set(hub.notifications.map(n => n.id));
+        hub.notifications = hub.notifications.concat(bells.filter(b => !have.has(b.id)).map(b => ({ ...b })))
+          .sort((a, b) => (a.publishAt > b.publishAt ? -1 : a.publishAt < b.publishAt ? 1 : 0));
+        return hub;
+      });
+    }
     // removing a picture asks what uses it (Media.gs mediaUsage_): it keeps seeing the competitions and the prizes
     const usage = fn === 'apiDeleteMedia' || fn === 'apiPurgeMedia' ? draftNow() : null;
     hooks.use('compDraft_', () => (pkg.none && !points ? usage : { ...(usage || {}), points, modules: pkg.modules }));

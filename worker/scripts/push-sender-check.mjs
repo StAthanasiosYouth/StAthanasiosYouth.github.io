@@ -49,7 +49,7 @@ try {
   for (const n of [1, 2]) await call('/v1/admin/push/subscribe', { token: tok(n), platform: 'desktop', device: 'فحص ' + n }, P);
   const t = await call('/v1/admin/push/test', {}, P);
   check('a test to my own devices', t.status === 200 && t.body.targets === 2, t);
-  check('… once a minute', (await call('/v1/admin/push/test', {}, P)).body.code === 'rate_limited');
+  check('… once a minute', (await call('/v1/admin/push/test', {}, P)).body.code === 'rate');
 
   let row = null;
   for (let i = 0; i < 20 && !(row && row.finished_ms); i++) {

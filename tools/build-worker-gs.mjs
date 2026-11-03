@@ -34,6 +34,8 @@ export const REPLACEABLE = ['assertAdmin_', 'currentEmail_', 'log_', 'rememberAc
   'workerLiveContent_', 'publishMode_', 'compDraft_', 'compBuildPublic_', 'compPublishFiles_', 'compReviewInfo_', 'compWriteSnapshots_',
   'compAfterCommit_', 'compShellText_', 'compRuntimePush_', 'compSubmissionCounts_', 'compDefinitionFor_', 'publishClaim_', 'publishDropClaim_', 'mediaForPublish_', 'githubCommitFiles_', 'publishToWorker_', 'publishShadow_',
   'fetchPublishedContent_', 'lastPublished_',
+  // Phase 6 Step 4c: the automatic pushes' bell items join the hub's notifications (push/schedule.js)
+  'buildHub_',
   // the panel state (P4-7): its activity from D1
   'activityState_',
   // the media library's bytes (P4-5): R2 instead of Drive

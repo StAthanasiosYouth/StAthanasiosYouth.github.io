@@ -284,17 +284,17 @@ test('a send to the visitors: once per item, a repeated key gets its result, coo
   assert.equal((await go()).replay, true);
   await w.drain(fakeFcm().f);
   assert.equal((await go({ sendKey: 'key-00000002' })).already, true, 'an item goes once');
-  await assert.rejects(go({ notifId: 'n2', sendKey: 'key-00000003' }), err => err.code === 'rate_limited', 'a minute between sends');
+  await assert.rejects(go({ notifId: 'n2', sendKey: 'key-00000003' }), err => err.code === 'rate', 'a minute between sends');
   const later = Date.now() + 61000;
   const topic = await go({ notifId: 'n2', sendKey: 'key-00000004', topic: 'announcements', now: later });
   assert.equal(topic.targets, 1, 'only devices that kept the topic');
   await w.h.db.prepare('UPDATE push_sends SET started_ms = started_ms - 120000').run();
   for (let i = 0; i < SENDS_PER_DAY; i++) await w.h.db.prepare("INSERT INTO push_sends (id, audience, ref, status, started_ms, message, ttl) VALUES (?, 'public', ?, 'sent', ?, '{}', 1)").bind('ps-00000' + i, 'x' + i, later - 100000).run();
-  await assert.rejects(go({ notifId: 'n3', sendKey: 'key-00000005', now: later }), err => err.code === 'rate_limited');
+  await assert.rejects(go({ notifId: 'n3', sendKey: 'key-00000005', now: later }), err => err.code === 'rate');
   const none = await world();
   await assert.rejects(publicSend(none.h.env, { notifId: 'n1', sendKey: 'key-00000001', message: { title: 'x' }, ttl: 60 }), err => err.code === 'invalid');
   const off = await world({ key: false });
-  await assert.rejects(publicSend(off.h.env, { notifId: 'n1', sendKey: 'key-00000001', message: { title: 'x' }, ttl: 60 }), err => err.code === 'unavailable');
+  await assert.rejects(publicSend(off.h.env, { notifId: 'n1', sendKey: 'key-00000001', message: { title: 'x' }, ttl: 60 }), err => err.code === 'disabled');
 });
 
 test('the queue: a fan-out runs first in its batch; one after it waits for its own run, spending no retry', async () => {
@@ -331,7 +331,7 @@ test('the routes: the key check and a test to my own devices only', async () => 
   await w.device(tok(3));
   const t = await call(P, 'test');
   assert.equal(t.body.targets, 1);
-  assert.equal((await call(P, 'test')).body.code, 'rate_limited');
+  assert.equal((await call(P, 'test')).body.code, 'rate');
   const k = await world({ key: false });
   w.h = k.h;
   assert.equal((await call(P, 'check')).body.check, false);

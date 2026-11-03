@@ -19,6 +19,8 @@ import { logLine } from '../lib/log.js';
 import { limit, clientIp } from '../lib/ratelimit.js';
 import { askAppsScript } from '../content/comps.js';
 import { settingStmt } from '../content/compdrafts.js';
+import { requireAccount } from '../account/session.js';
+import { gate } from '../account/routes.js';
 
 const TOKEN = /^[\w:-]{100,400}$/;
 const OS = ['android', 'ios', 'desktop', 'other'];
@@ -76,7 +78,25 @@ export async function pushSubscribe(ctx) {
   const row = r[r.length - 1].results[0];
   if (!row) return { ok: false, code: 'full' };
   if (row.audience !== 'public') return { ok: false, code: 'invalid' };
+  await linkAccount(ctx, id);
   return { ok: true };
+}
+
+/*
+ * Phase 6 Step 4c: with the account's own token beside it, the device is that account's (a booker's reminder goes
+ * there, decision 3). Without one, or a token that no longer opens a session, the device keeps what it had: signing
+ * out never unlinks a phone by itself, and a visitor's row never needs an account.
+ */
+async function linkAccount(ctx, id) {
+  if (!/^Bearer\s/i.test(ctx.request.headers.get('authorization') || '')) return;
+  let account = null;
+  try {
+    // the account's own settings: a session is never stretched past what they allow
+    ({ account } = await requireAccount(ctx, await gate(ctx)));
+  } catch {
+    return;
+  }
+  await retry(() => ctx.env.DB.prepare("UPDATE push_devices SET account_id = ? WHERE id = ? AND audience = 'public' AND account_id IS NOT ?").bind(account.id, id, account.id).run());
 }
 
 export async function pushUnsubscribe(ctx) {
