@@ -204,6 +204,7 @@ No rebuild. The competition screens stop depending on Apps Script.
 - 5. `PUSH_IMPORT` dry: 4 visitor and 2 admin devices, no problems. Apply: 6 added.
 - 6. `PUSH_DEVICES = worker`, and `main` `90d4623` sets `workerUrl`, live after 40 s. The second copy added 0. The browser test now fakes the Worker too. Before that change, its run had reached the real Worker from a test origin, CORS refused it, and production holds no such row.
 - 7. **Found:** `NOTIFY_SINCE` was still set from 2026-10-21, with 51 activity rows waiting since then, so turning the router on would have pushed all 51 to the admins at once. In one batch: `NOTIFY_SINCE` removed, `PUSH_SENDER = worker`, `NOTIFY_ROUTER = 1`. The first tick marked the 51 as backlog (3) and sent nothing. Apps Script's next claim (11:33 UTC) carried `sender`, and it sends nothing since. `wrangler tail`: the minute cron's push tick ran with no exceptions.
+- **Found at the first real send (owner):** «إشعارات الموبايل» said the key was missing and kept «إرسال» off. The Worker answered, not Apps Script (Apps Script has its key). The Worker now names the problem without a value, and production logs `not-json`: the secret holds only part of the file, typically its first line from a paste into a terminal. Fix: the owner uploads it again from the file itself, piped. The screen and «اختبر الإعداد» now show the Worker's own words (`616e818`, Worker by CI run 41630815979).
 - Owner said no store or season reminders need moving now. They are set in the new screens when wanted.
 
 **4c decisions:**
