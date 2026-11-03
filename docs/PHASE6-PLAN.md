@@ -2,7 +2,7 @@
 
 Started 2026-11-02 on the owner's order. Six steps, one at a time. Each step needs the owner's choice to start, and each production release needs its own approval.
 
-**Progress: Step 4 of 6 in progress. Slices 4a and 4b passed on Staging (2026-11-03) and stay off production until the cutover. Slice 4c waits for the owner's order.**
+**Progress: Step 4 of 6 in progress. Slices 4a and 4b passed on Staging (2026-11-03). Slice 4c's server side passed on Staging the same day; its screens wait for the owner's approval of the preview. Nothing reaches production before 4d and a review of the whole cutover plan (owner, 2026-11-03).**
 
 ## 1. Official scope
 
@@ -147,7 +147,7 @@ No rebuild. The competition screens stop depending on Apps Script.
 **Done when:** every slice passes Worker tests and its Staging check, one owner device receives with the app closed, and the switch back has been tried.
 
 **Release order, decided in 4a:** Apps Script keeps sending from its Sheets until the Worker's sender is live. So a device that registered only on the Worker before then would get nothing, and the slices reach production together at one cutover after 4d, with its own approval:
-1. Migrations (`0025`, `0026`, and 4c's) and Worker, with `FCM_SERVICE_ACCOUNT` set by the owner.
+1. Migrations `0025`, `0026`, `0027` and the Worker, with `FCM_SERVICE_ACCOUNT` set by the owner.
 2. Copy the devices (`PUSH_IMPORT = dry`, then `apply`).
 3. Point the site (`push-config.js workerUrl`) and the panel (`PUSH_DEVICES = worker`) at the Worker.
 4. Copy again for what registered in between. A row already on the Worker stays.
@@ -174,6 +174,24 @@ No rebuild. The competition screens stop depending on Apps Script.
 **4b tests:** Worker 443 of 443, 12 of them new, against a fake FCM. Live on Staging, `push-sender-check` 9 of 9 against the real FCM with made-up tokens: Google accepted the key, the queue ran the part, and FCM refused the tokens, which were deleted. No device got anything. `push-devices-check` 15 of 15 again.
 
 **4b not checked:** a delivery to a real device (4d, the owner's phone). The admin outbox path ran only in the unit tests, because Staging's `NOTIFY_ROUTER` is 0 and stays as it is. No setting was changed on Staging.
+
+**4c decisions:**
+- **The automatic pushes (owner, 2026-11-03): a push goes at its moment, always.** It doesn't wait for a publish. Its bell item joins the site with the next publish, so the bell may not show one that no publish carried.
+- **Decision 2:** production reads `NOTIFY_ROUTER = 0`, `NOTIFY_EMAIL = 0`, `PERMS_ENFORCE = 0` (owner, 2026-11-03, unchanged since). So the cutover turns the router on, as the default said, with the owner's approval at that step.
+- **Decision 3, as built:** the booker's payment reminder goes to the devices linked to their account that kept «reminders», beside the email. It carries no amounts and needs no table: the send key is the booking, the stage and the day. `reminders` keeps its WhatsApp-only check, so no table rebuild.
+- **D5:** announcements, new events and new competitions have no email path. They go through «إشعارات الموبايل» and the bell only. Nothing to build.
+
+**4c as built (Staging Worker `09ae3510`, migration `0027`):**
+- `push_schedule` (the §18.5 kinds) and `seasons.notify_days`. The store's `SHOP_NOTIFY` sits beside its dates in `settings`. Saving the store or a season syncs the schedule, and closing a season cancels its reminder. One schedule, from the Worker's own dates (gap 4).
+- The minute cron (`scheduleTick`) sends what is due while `PUSH_SENDER = worker`, through `publicSend`: once per item, the cooldown and the day's cap. A cooldown waits for the next minute. Six hours overdue is skipped, and the admins get an activity row.
+- The bell items: added inside the build's hub (`buildHub_` is now replaceable in `gs.gen.js`), so the review and the publish agree. While any exist, the browser's own review defers to the Worker's, as it does for the competitions.
+- «إشعارات الموبايل» on the Worker: `/v1/admin/push/{state,send,auto,schedule,schedule/cancel}`, with Apps Script's answers. Candidates come from the Worker's live `content.json`, not a fetch of the site. The panel follows `boot.pushSend`.
+- Account link: a visitor's subscribe with the account's own token (this device's, never a shared session's) links the row. A bad token never stops the subscribe, and the session is never stretched past the account's settings.
+- Found and fixed beside it: 4b refused with codes the HTTP table didn't know (`rate_limited`, `unavailable`), which would have answered 400. Now `rate`, `busy`, `disabled`.
+
+**4c tests:** Worker 455 of 455 (12 new in `push-schedule`, one in `content-publish` through a real publish). Site units 758 of 760, the same two failures. Browser: `content-worker`, `push-hint` and `admin-rel` 19 of 19. Live on Staging, `push-schedule-check` 10 of 10: the screen's state, the store's choices, the list and a cancel, and the minute cron sending a due moment through the queue to the real FCM, which refused the made-up token. `PUSH_SENDER` was on for that part only and is back as it was, and the store's schedule was restored. `push-devices-check` and `push-sender-check` pass again.
+
+**4c waiting:** the screens. The store's notify choices and its scheduled list, the season's reminder field, and the push result while sending follow the preview (https://claude.ai/artifact/6tyKoB6NnwvaKtKk6V3Jan) once the owner approves it. The server already accepts and returns those fields.
 
 ### Step 5: Integration
 - `route` moves to the Worker: the key as a secret, a D1 cache, a daily budget.
