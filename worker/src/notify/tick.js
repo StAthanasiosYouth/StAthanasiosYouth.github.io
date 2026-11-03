@@ -3,7 +3,7 @@
  * activity rows into the outbox (router.js); lease the due email rows and
  * hand them to the queue ('notify.email', or send them here without one:
  * email.js); the same for member email, up to three batches (member.js; memberKick already sent the fresh ones); once an hour, the Gmail token's health. Pushes leave through
- * Apps Script's claim (claim.js). Never throws: a bad minute is logged and the
+ * Apps Script's claim (claim.js), or from here once PUSH_SENDER = 'worker' (push/send.js adminPushTick). Never throws: a bad minute is logged and the
  * next one picks up where it stopped (rows stay notified = 0).
  */
 
@@ -13,6 +13,7 @@ import { leaseDue, sendRows, tokenHealth } from './email.js';
 import { memberLease, memberSend } from './member.js';
 import { makeJob } from '../jobs.js';
 import { retry } from '../lib/db.js';
+import { adminPushTick } from '../push/send.js';
 
 const MEMBER_BATCHES = 3;
 const KICK_DIRECT = 2;
@@ -44,6 +45,12 @@ export async function notifyTick(env, now = Date.now()) {
     out.route = await route(env, now);
   } catch (err) {
     out.error = String(err && err.message).slice(0, 200);
+  }
+  try {
+    const push = await adminPushTick(env, now);
+    if (push) out.push = push;
+  } catch (err) {
+    out.pushError = String(err && err.message).slice(0, 200);
   }
   try {
     const ids = await leaseDue(env, now);

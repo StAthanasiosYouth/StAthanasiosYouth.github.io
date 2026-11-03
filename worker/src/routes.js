@@ -51,6 +51,7 @@ import { adminPointsAdjust, adminPointsTransfer, adminSeasons, adminSeasonSave, 
 import { adminBookingLink } from './book/account.js';
 import { compStart, compSubmit, compResult, compMe, syncCompLive } from './comp/runtime.js';
 import { pushSubscribe, pushUnsubscribe, adminPushSubscribe, adminPushUnsubscribe, adminPushDevices, adminPushRemove } from './push/devices.js';
+import { adminPushCheck, adminPushTest } from './push/send.js';
 import { adminComps, adminCompBadges, adminCompSubmissions, adminCompSubmission, adminCompGrade, adminCompVoid, adminCompRegrade } from './comp/admin.js';
 import { shopRedeem, shopCancel, adminStoreItems, adminStoreItemSave, adminStoreItemDelete, adminRedemptions, adminRedemptionStatus, adminStoreSchedule, adminStoreScheduleSave, syncStoreImport } from './store/shop.js';
 import { accountSummary } from './account/summary.js';
@@ -438,6 +439,9 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/admin/push/unsubscribe', auth: 'admin', maxBytes: 1024, handler: adminPushUnsubscribe },
   { method: 'POST', path: '/v1/admin/push/devices', auth: 'admin', maxBytes: 1024, handler: adminPushDevices },
   { method: 'POST', path: '/v1/admin/push/remove', auth: 'admin', maxBytes: 256, handler: adminPushRemove },
+  // Phase 6 Step 4b — the sender (push/send.js)
+  { method: 'POST', path: '/v1/admin/push/check', auth: 'admin', maxBytes: 256, handler: adminPushCheck },
+  { method: 'POST', path: '/v1/admin/push/test', auth: 'admin', maxBytes: 256, handler: adminPushTest },
   { method: 'GET', path: '/v1/admin/comp', auth: 'admin', handler: adminComps },
   { method: 'GET', path: '/v1/admin/comp/badges', auth: 'admin', handler: adminCompBadges },
   // the competition screen's season picker: the same list, for whoever may see competitions

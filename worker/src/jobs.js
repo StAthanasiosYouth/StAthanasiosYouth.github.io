@@ -16,6 +16,7 @@ import { memberSend } from './notify/member.js';
 import { mirrorPending } from './publish-mirror.js';
 import { commitComps } from './content/comps.js';
 import { mirrorMedia } from './content/media.js';
+import { runPart } from './push/send.js';
 
 export const JOB_TYPES = {
   // diagnostics: proves enqueue → consume → D1 write end to end
@@ -44,8 +45,15 @@ export const JOB_TYPES = {
   // Phase 4 P4-5: the library's new files → the site's repository (content/media.js; idempotent)
   async 'media.mirror'(env) {
     await mirrorMedia(env);
+  },
+  // Phase 6 Step 4b: one part (<= 45 devices) of one push send (push/send.js; a part is taken once)
+  async 'push.fanout'(env, payload) {
+    await runPart(env, payload);
   }
 };
+
+// a fan-out uses most of a run's 50 outside requests: it runs first in its batch or waits for the next
+const HEAVY = ['push.fanout'];
 
 export function makeJob(type, payload) {
   if (!JOB_TYPES[type]) throw new Error('unknown job type ' + type);
@@ -58,10 +66,24 @@ export async function enqueue(env, type, payload) {
 }
 
 export async function consume(batch, env) {
+  let heavy = false;
+  let ran = 0;
   for (const msg of batch.messages) {
     const job = msg.body || {};
     const handler = JOB_TYPES[job.type];
     const t0 = Date.now();
+    if (handler && env.JOBS && (heavy || (ran && HEAVY.includes(job.type)))) {
+      // its own run: sent again as it is (the same id), which spends none of its retries
+      try {
+        await env.JOBS.send(job, { delaySeconds: 1 });
+        msg.ack();
+      } catch {
+        msg.retry({ delaySeconds: 5 });
+      }
+      continue;
+    }
+    ran++;
+    if (HEAVY.includes(job.type)) heavy = true;
     if (!handler) {
       logLine({ lvl: 'warn', kind: 'job', type: job.type, id: job.id, msg: 'unknown type, dropped' });
       msg.ack();

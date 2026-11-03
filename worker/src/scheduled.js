@@ -17,6 +17,7 @@ import { compReleaseTick } from './comp/runtime.js';
 import { compImportTick } from './content/compdrafts.js';
 import { pushImportTick } from './push/devices.js';
 import { ageOutNotices } from './account/age-out.js';
+import { staleDevicesStmt } from './push/send.js';
 
 const DAY = 24 * 3600 * 1000;
 export const RETENTION = {
@@ -46,7 +47,9 @@ export async function housekeeping(env, now = Date.now()) {
     // Phase 3: forgotten admin sessions, old replaced sids, used device nonces
     ...sessionSweepStmts(env.DB, now),
     // Phase 5: account sessions, codes, the member outbox, registration IP hashes
-    ...accountSweepStmts(env.DB, now)
+    ...accountSweepStmts(env.DB, now),
+    // Phase 6: a visitor's device not seen for 270 days
+    staleDevicesStmt(env.DB, now)
   ]);
   const removed = r.map(x => x.meta.changes);
   logLine({ kind: 'cron', job: 'housekeeping', removed });

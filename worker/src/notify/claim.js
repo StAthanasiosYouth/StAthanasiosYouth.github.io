@@ -11,7 +11,9 @@
  * - ok → sent; a refusal → retried with backoff; after MAX_ATTEMPTS → dead and a
  *   critical «notify.failed» row for the Primary Admin (never for a failed
  *   notify.failed / gmail.token row: no loop);
- * - the bodies are made now from the activity rows (the outbox stores none).
+ * - the bodies are made now from the activity rows (the outbox stores none);
+ * - PUSH_SENDER = 'worker' (Phase 6 Step 4b): the Worker sends them itself (push/send.js), and the reply hands out
+ *   nothing. `router` still says whether the router is on, so Apps Script's own admin pushes stay off.
  */
 
 import { ApiError } from '../lib/http.js';
@@ -95,10 +97,11 @@ export async function notifyClaim(ctx) {
     }
   }
 
-  const router = (await retry(() => db.prepare("SELECT value FROM settings WHERE key = 'NOTIFY_ROUTER'").first('value'))) === '1';
-  if (!router) {
+  const set = Object.fromEntries((await retry(() => db.prepare("SELECT key, value FROM settings WHERE key IN ('NOTIFY_ROUTER', 'PUSH_SENDER')").all())).results.map(r => [r.key, r.value]));
+  const router = set.NOTIFY_ROUTER === '1';
+  if (!router || set.PUSH_SENDER === 'worker') {
     await retry(() => db.batch(stmts));
-    return { router: false, items: [] };
+    return { router, items: [] };
   }
 
   // 2. rows out of attempts with no answer: dead
