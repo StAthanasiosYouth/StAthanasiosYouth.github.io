@@ -89,4 +89,5 @@ Way back: revert the slice's commit (static admin files, minutes); a Worker chan
 
 ## 4. Progress
 
-- 2026-11-04: plan written. Track P runs in its own session; Track A starts with A0 here.
+- 2026-11-04: plan written. Track P proposed as its own session (card «Phase 8 track P: public site navigation»); Track A runs here.
+- 2026-11-04: **A0 done.** `tools/phase8-baseline.mjs` (run: `cd tools && node --experimental-sqlite phase8-baseline.mjs`) signs in to the official panel against the real Worker code on SQLite and captures 20 screens × 375 / 768 / 1440 (60 screenshots in `tools/.cache/phase8-baseline/`, not committed), and writes `docs/PHASE8-INVENTORY.md` (510 controls, plus the switch-gated screens listed from the source). Next: A1.
