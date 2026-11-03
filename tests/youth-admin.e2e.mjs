@@ -109,7 +109,7 @@ async function handle(request) {
   }
   if (path === '/v1/admin/store/schedule') {
     if (method === 'POST') fake.schedule = body;
-    return json(200, { ok: true, mode: 'auto', state: 'open', opensAt: '', closesAt: '', allowCancel: false });
+    return json(200, { ok: true, mode: 'auto', state: 'open', opensAt: '', closesAt: '', allowCancel: false, notify: { open1d: true, open1h: false, openAt: false, close24h: false, close1h: false } });
   }
   if (path === '/v1/admin/store/redemptions') return json(200, { ok: true, redemptions: fake.orders });
   if (path.startsWith('/v1/admin/store/redemptions/')) {
@@ -120,7 +120,7 @@ async function handle(request) {
     fake.savedSeason = body;
     return json(200, { ok: true, seasons: [] });
   }
-  if (path === '/v1/admin/points/seasons') return json(200, { ok: true, seasons: [{ id: 'sea-first', name: 'الموسم الأول', status: 'active', maxTheoretical: 400, expected: 60, competitions: 4, topBalance: 180, participants: 32 }, ...(fake.planned || [])] });
+  if (path === '/v1/admin/points/seasons') return json(200, { ok: true, seasons: [{ id: 'sea-first', name: 'الموسم الأول', status: 'active', notifyDays: 3, maxTheoretical: 400, expected: 60, competitions: 4, topBalance: 180, participants: 32 }, ...(fake.planned || [])] });
   if (path === '/v1/admin/points/seasons/sea-first/preview') return json(200, { ok: true, participants: 2, total: 110, frozen: { participants: 1, total: 40 }, key: 'k1', season: {} });
   if (path === '/v1/admin/points/seasons/sea-first/close') return json(200, { ok: true, closed: 'sea-first', active: 'sea-next', seasons: [] });
   const m = /^\/v1\/admin\/participants\/([^/]+)(?:\/(.+))?$/.exec(path);
@@ -363,6 +363,7 @@ test('seasons: the numbers, a new one, editing, closing into a planned one; a pr
   assert.match(shown, /٤٠٠/);
   assert.match(shown, /\+٦٠/);
   assert.match(shown, /موسم الربيع/);
+  assert.match(await textOf(page, '[data-season-reminder]'), /تنبيه قبل النهاية بـ٣ يوم/);
 
   await click(page, '[data-act="season-new"]');
   await page.waitForSelector('#sheet[open] [data-act="youth-save"]');
@@ -372,12 +373,16 @@ test('seasons: the numbers, a new one, editing, closing into a planned one; a pr
   assert.equal(fake.savedSeason.name, 'موسم الصيف');
   assert.equal(fake.savedSeason.id, undefined, 'a new one');
 
+  assert.equal(fake.savedSeason.notifyDays, '', 'no reminder on a new one unless typed');
   await page.waitForSelector('.comp-season--active [data-act="season-edit"]', { timeout: 8000 });
   await click(page, '.comp-season--active [data-act="season-edit"]');
-  await page.waitForSelector('#sheet[open] [data-act="youth-save"]');
+  await page.waitForSelector('#sheet[open] [data-season-days]');
+  assert.equal(await page.$eval('#sheet [data-season-days]', n => n.value), '3');
+  await page.evaluate(() => { const n = document.querySelector('#sheet [data-season-days]'); n.value = '5'; n.dispatchEvent(new Event('input', { bubbles: true })); });
   await saveSheet(page);
   await page.waitForFunction(() => !document.querySelector('#sheet').open, { timeout: 5000 });
   assert.equal(fake.savedSeason.id, 'sea-first');
+  assert.equal(fake.savedSeason.notifyDays, 5);
 
   await page.waitForSelector('[data-act="season-close"]', { timeout: 8000 });
   await click(page, '[data-act="season-close"]');
@@ -435,10 +440,14 @@ test('results: a guest has no place number; a servant grades; the store: a prize
   assert.equal(fake.savedItem.name, 'جايزة جديدة');
   assert.equal(fake.savedItem.active, true);
   await page.waitForSelector('[data-act="store-schedule"]', { timeout: 8000 });
+  assert.equal(await page.$eval('[data-notify="open1d"] input', n => n.checked), true);
+  await click(page, '[data-notify="close1h"] input');
   await click(page, '[data-act="store-schedule"]');
   await page.waitForFunction(() => true);
   await new Promise(r => setTimeout(r, 300));
   assert.equal(fake.schedule.mode, 'auto');
+  assert.deepEqual(fake.schedule.notify, { open1d: true, open1h: false, openAt: false, close24h: false, close1h: true });
+  await page.waitForFunction(() => /الإرسال المتجدول/.test((document.querySelector('.comp-sends') || {}).innerText || ''), { timeout: 8000 });
   assert.deepEqual(problems, []);
   await context.close();
 });
@@ -470,5 +479,39 @@ test('not the Primary Admin: no password row, no call for it, and the separate r
   assert.ok(await page.$('[data-act="youth-reset"]'));
   assert.deepEqual(problems, []);
   fake.primary = true;
+  await context.close();
+});
+
+test('Phase 6 Step 4c on a phone: the store\'s notify choices and scheduled list fit; a push result while sending', async () => {
+  fake.reset();
+  const { context, page, problems } = await open({ width: 375, height: 800, isMobile: true, hasTouch: true });
+  await goYouth(page);
+  await page.evaluate(() => { A.compYouth.view = 'store'; A.render(); });
+  await page.waitForSelector('[data-notify="open1d"]', { timeout: 8000 });
+  await page.waitForFunction(() => /الإرسال المتجدول/.test((document.querySelector('.comp-sends') || {}).innerText || ''), { timeout: 8000 });
+  const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  assert.ok(wide <= 0, 'no sideways scroll: ' + wide + ' px');
+
+  // the push screen's answer from the Worker: still sending
+  await page.evaluate(() => {
+    const real = A.call;
+    A.call = function (name) {
+      if (name === 'apiPushState') return Promise.resolve({ configured: true, subscribers: 2, platforms: { android: 2 }, contentError: '', log: [],
+        limits: { perDay: 10, sentToday: 0, cooldownSeconds: 60, waitSeconds: 0, titleMax: 60, bodyMax: 200 },
+        candidates: [{ id: 'n1', type: 'news', state: 'live', publishAt: '', expireAt: '', image: '', message: { title: 'خبر', body: 'جديد', url: '/#news/n1' }, last: null }] });
+      if (name === 'apiSendPush') return Promise.resolve({ status: 'sending', audience: 2, sent: 0, failed: 0, removed: 0, replay: false, already: false, at: Date.now() });
+      return real.apply(A, arguments);
+    };
+    A.push.open();
+  });
+  await page.waitForSelector('#sheet[open] .list .btn--primary', { timeout: 8000 });
+  await click(page, '#sheet .list .btn--primary');
+  await page.waitForFunction(() => [...document.querySelectorAll('#sheet .btn--primary')].some(b => /إرسال الآن/.test(b.textContent)), { timeout: 5000 });
+  await page.evaluate(() => [...document.querySelectorAll('#sheet .btn--primary')].find(b => /إرسال الآن/.test(b.textContent)).click());
+  await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => /ابعت دلوقتي/.test(b.textContent)), { timeout: 5000 });
+  await page.evaluate(() => [...document.querySelectorAll('button')].find(b => /ابعت دلوقتي/.test(b.textContent)).click());
+  await page.waitForSelector('[data-push-sending]', { timeout: 5000 });
+  assert.match(await textOf(page, '[data-push-sending]'), /بيوصل لـ جهازين على دفعات/);
+  assert.deepEqual(problems, []);
   await context.close();
 });

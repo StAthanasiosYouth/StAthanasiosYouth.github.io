@@ -268,6 +268,12 @@
     if (result.already) {
       lines.push(el('div', { class: 'note note--warn', text: 'الإشعار ده اتبعت قبل كده (' + when(result.at) + ')، فمتبعتش تاني.' }));
     }
+    else if (result.status === 'sending') {
+      // Phase 6: the Worker sends in parts through its queue
+      lines.push(el('div', { class: 'note', 'data-push-sending': '' },
+        el('p', { class: 'note__title', text: 'بيتبعت دلوقتي…' }),
+        el('p', { text: 'بيوصل لـ ' + count(result.audience) + ' على دفعات. النتيجة النهائية بتظهر في «آخر الإرسالات» خلال دقيقة.' })));
+    }
     else {
       lines.push(el('div', { class: 'note ' + (result.status === 'sent' ? 'note--ok' : 'note--warn') },
         el('p', { class: 'note__title', text: result.status === 'sent' ? 'اتبعت ✓' : 'ما وصلش لحد' }),
@@ -282,6 +288,7 @@
     ]);
 
     if (!result.already && result.status === 'sent') A.toast('الإشعار اتبعت ✓');
+    if (!result.already && result.status === 'sending') A.toast('الإشعار بيتبعت ✓');
 
   }
 
