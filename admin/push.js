@@ -17,6 +17,7 @@
  */
 
 import { PUSH_CONFIG } from '../assets/js/push-config.js';
+import { deviceId, forget } from '../assets/js/push-fid.js';
 
 const MEMO = 'athanasios-admin.push';
 const APP_NAME = 'athanasios-admin-push';
@@ -64,11 +65,13 @@ function messaging() {
 
 }
 
+/* the FID while the Worker keeps the admins' devices (boot.push), else the old token (assets/js/push-fid.js) */
 async function tokenFor(reg) {
 
   const { sdk, messaging: m } = await messaging();
+  const worker = window.AdminWorker;
 
-  return sdk.getToken(m, { vapidKey: PUSH_CONFIG.vapidKey, serviceWorkerRegistration: reg });
+  return deviceId(sdk, m, reg, PUSH_CONFIG.vapidKey, !!(worker && worker.pushDevices && worker.pushDevices()));
 
 }
 
@@ -180,10 +183,8 @@ export async function disable(call, reg) {
     saveMemo(null);
     try {
       if (window.Notification && Notification.permission === 'granted' && reg) {
-        // deleteToken needs the messaging instance tied to our worker (getToken does that)
         const { sdk, messaging: m } = await messaging();
-        await sdk.getToken(m, { vapidKey: PUSH_CONFIG.vapidKey, serviceWorkerRegistration: reg });
-        await sdk.deleteToken(m);
+        await forget(sdk, m, reg, PUSH_CONFIG.vapidKey, token);
       }
     }
     catch (error) {

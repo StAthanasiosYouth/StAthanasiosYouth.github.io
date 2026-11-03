@@ -1836,6 +1836,8 @@
     available: function () { return !!WORKER; },
     /* Phase 4: does the Worker write the content (the last session answer said so)? */
     content: function () { return contentWorker; },
+    /* Phase 6: does the Worker keep the admins' push devices (boot.push)? admin/push.js then registers an FID */
+    pushDevices: function () { return pushWorker; },
     /* 'google' | 'device' | '' */
     via: function () { return session ? session.via || '' : ''; },
     /* this page's edit session (the booking locks) */

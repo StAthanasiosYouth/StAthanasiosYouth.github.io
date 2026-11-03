@@ -19,6 +19,7 @@ import { PUSH_CONFIG } from './push-config.js';
 import { pushSupport, platformOf, loadMemo, saveMemo, shouldNudge, pushRequest, pushReplyOk, bellHint } from './push-env.js';
 import { installState, promptInstall, onInstallChange } from './install.js';
 import { readSession } from './account/link.js';
+import { deviceId, forget } from './push-fid.js';
 
 const WORKER_ROUTES = { pushSubscribe: '/v1/push/subscribe', pushUnsubscribe: '/v1/push/unsubscribe' };
 const SW_URL = '/sw.js';
@@ -82,11 +83,12 @@ async function registration() {
 }
 
 
+/* the FID on the Worker (the new FCM web API), the old token on Apps Script (push-fid.js) */
 async function tokenFor(reg) {
 
   const { sdk, messaging: m } = await messaging();
 
-  return sdk.getToken(m, { vapidKey: PUSH_CONFIG.vapidKey, serviceWorkerRegistration: reg });
+  return deviceId(sdk, m, reg, PUSH_CONFIG.vapidKey, !!PUSH_CONFIG.workerUrl);
 
 }
 
@@ -202,11 +204,9 @@ async function disable() {
   try {
     if (memo.token) await server('pushUnsubscribe', { token: memo.token });
     if (permission() === 'granted') {
-      // deleteToken needs the messaging instance tied to our worker (getToken does that)
       const reg = await registration();
       const { sdk, messaging: m } = await messaging();
-      await sdk.getToken(m, { vapidKey: PUSH_CONFIG.vapidKey, serviceWorkerRegistration: reg });
-      await sdk.deleteToken(m);
+      await forget(sdk, m, reg, PUSH_CONFIG.vapidKey, memo.token);
     }
   }
   catch (error) {

@@ -31,7 +31,8 @@ const esbuild = require('esbuild');
 /* what assets/js/push.js and admin/push.js use (keep in sync) */
 export const PUSH_VENDOR_EXPORTS = {
   'firebase/app': ['initializeApp'],
-  'firebase/messaging': ['getMessaging', 'getToken', 'deleteToken', 'isSupported']
+  // register / unregister / onRegistered: the new FCM web API (assets/js/push-fid.js, Phase 6 Step 4d)
+  'firebase/messaging': ['getMessaging', 'getToken', 'deleteToken', 'isSupported', 'register', 'unregister', 'onRegistered']
 };
 
 export const ADMIN_MESSAGING_DB = 'athanasios-admin-messaging-database';
