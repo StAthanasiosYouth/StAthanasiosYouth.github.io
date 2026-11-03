@@ -127,3 +127,52 @@ in the Apps Script editor; the project kept 90 days, then deleted. None of it is
 | Sync routes | `DELETE FROM settings WHERE key = 'APPS_SCRIPT'` | seconds |
 | Pages | revert `a2688a0` on `main` | ~1 min |
 | Apps Script | `clasp deploy -i <API id> -V 61`, `-i <@14 id> -V 14`; re-arm `enableBookingAlerts`, `enableAutoPush` from the editor | minutes |
+
+## 4. 7c — the cleanup list for the owner's approval (read 2026-11-03, production, read-only)
+
+Nothing below has been deleted. Backups: `D:/private_projects/athanasios-backups/2026-11-03-phase7-pre-cleanup/` (D1 export, 9 proof
+files, bookmark `00000197-00000392-00005118-c819c1d6e406f21aa53b0ce6c7079ccc`). Names and phones are left out on purpose.
+All three booking events are tests by their titles: `evt-4011914c` «اختبار نظام الحجز - مؤقت», `evt-59f41592` «test-2»,
+`evt-1295c819` «تجربة حجز» (still open for booking until 2026-11-06).
+
+### List A — test data, delete (one atomic D1 batch by exact id, then R2)
+
+| Table | Rows | Ids |
+|---|---|---|
+| `bookings` | 10 | `bkg-ef4a39eebab4`, `bkg-db173f55b264`, `bkg-84354476ae40`, `bkg-33109c56d428`, `bkg-321ee0e7609c`, `bkg-474bc7b56d4f`, `bkg-328726b48e15`, `bkg-fcaa44d738df`, `bkg-0e0c76d0a486`, `bkg-177e022fb41b` (new since 10-30, confirmed, on «تجربة حجز») |
+| `payments` | 4 | `pay-420b161b13bb`, `pay-bfda1d37b3ce`, `pay-206715ea77b4`, `pay-52bc2be16bcb` (460 in total) |
+| `proofs` | 11 | 9 linked to the bookings above, 2 unlinked (`prf-ylitlzf5`, `prf-ozzauqaz`, files already gone) |
+| R2 `athanasios-proofs-prod` | 9 files | the keys in `proofs/keys.txt` of the backup |
+| `handovers` | 3 | `hnd-03548f4c76f5`, `hnd-25bf79734cc3`, `hnd-3aaca5b84f70` |
+| `reminders` | 1 | `rmd-fa317f461ad9` |
+| `book_news` | 3 | the three test events |
+| `notify_outbox` | 2 | `booking.new` (sent) |
+| `store_items` | 1 | `i-9cc596e4` «محفظة» |
+| `comp_versions` | 1 | `cmp-9227de8c` «test» (withdrawn) |
+| `activity` | 22 | `booking` 20, `shopitem` 2 |
+
+### List B — the owner decides (default in brackets)
+
+| Item | What it is | Default |
+|---|---|---|
+| Competition «تجربة تشغيل» `cmp-9308ac4d` | 2 versions, 1 graded submission `s-47b8d9bc6544` | test → withdraw it in the panel, then delete the submission and versions |
+| Competition «مسابقة نقاط» `cmp-8a21f34d` | 1 version, 1 graded submission `s-503569b948a0`, which gave 100 points | test → as above, plus the points row `led-8041a8cc6e134bb0` and the season total rebuilt |
+| Draft «مسابقة نقاط (نسخة)» `cmp-3d4405b4` | unpublished copy | delete it from the panel |
+| Participant `p-ahtj7xz3` | one real account (holds the 100 points) | **keep** the account; only its test points go with the row above |
+| Event «تجربة حجز» `evt-1295c819` | published, bookable until 2026-11-06 | withdraw it in the panel now (the drafts stay, as with the other two) |
+| `activity` on competitions (21) and the participant (16) | history of those tests | delete with their competitions; keep the participant's |
+
+### Keep (unchanged rule)
+
+All media and R2 media, links, contacts, sections, pages, «المسرح الأسود», settings, admins, grants, `pay_dest`, the 3 events' drafts and
+`event_cfg` rows, the withdrawn stubs, `published_revisions`, season `sea-first`, every other `activity` and `notify_outbox` row,
+and the booking and payment system itself. The competitions spreadsheet (Sheets) is not touched here: it goes read-only with the archive.
+
+### Run (after approval) and check
+
+1. Fresh count of every table above; stop if any count differs from this list.
+2. One D1 batch by exact id (order: activity, notify_outbox, reminders, handovers, proofs, payments, bookings, book_news,
+   comp_versions, store_items; List B rows only as approved), then the 9 R2 files.
+3. Done when: the counts are as expected; media, links, pages, admins, grants, settings unchanged; `/`, «المسرح الأسود» and the admin's
+   bookings page open without errors.
+4. Way back: the encrypted export, or `wrangler d1 time-travel restore athanasios-prod --bookmark=<new bookmark taken in step 1>` (7 days).
