@@ -409,8 +409,8 @@ for (const [name, viewport] of Object.entries({ phone: PHONE, desktop: DESKTOP }
   test(`${name}: location allowed → the route, distance and time, the credit; the other mode asks again`, async () => {
 
     const { page, problems, posts, state, close } = await open({ viewport });
-    // the real web app answers through a redirect to googleusercontent.com
-    state.route = body => { state.echo = okRoute(body); return { redirect: 'https://script.googleusercontent.com/macros/echo?user_content_key=abc&lib=x' }; };
+    // the Worker answers directly (Phase 6 Step 5); the Apps Script redirect is gone with its CSP hosts (Phase 7)
+    state.route = body => ({ status: 200, body: okRoute(body) });
     await openDirections(page);
     assert.equal(await page.$eval('.location__toggle', el => el.getAttribute('aria-expanded')), 'true', 'the map opened with it');
     assert.equal(await page.evaluate(() => document.activeElement.className), 'btn btn--primary route__locate', 'focus on «من موقعي»');
