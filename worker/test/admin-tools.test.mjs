@@ -132,3 +132,12 @@ test('the Sheets\' upgrade is finished; the admins list comes from D1 in Apps Sc
   assert.deepEqual(list.body.emails, [P, S]);
   assert.deepEqual([list.body.names[P], list.body.names[S], list.body.stored[S], list.body.primary, list.body.me, list.body.max], ['مينا', 's', undefined, P, S, 20]);
 });
+
+test('a file with no length that runs past the limit is cut off, not read to the end', async () => {
+  const { readCapped } = await import('../src/admin/tools.js');
+  let pulled = 0;
+  const stream = new ReadableStream({ pull(c) { pulled++; c.enqueue(new Uint8Array(1024 * 1024)); if (pulled > 100) c.close(); } });
+  assert.equal(await readCapped(new Response(stream), 5 * 1024 * 1024), null);
+  assert.ok(pulled < 12, 'stopped soon after the limit: ' + pulled + ' MB pulled');
+  assert.equal((await readCapped(new Response(new Uint8Array(10)), 100)).length, 10);
+});

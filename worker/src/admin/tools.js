@@ -143,6 +143,28 @@ function base64(bytes) {
   return btoa(s);
 }
 
+/* the body, or null once it passes `max` bytes (the rest is not read) */
+export async function readCapped(res, max) {
+  if (!res.body) return new Uint8Array(0);
+  const reader = res.body.getReader();
+  const parts = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.length;
+    if (size > max) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    parts.push(value);
+  }
+  const out = new Uint8Array(size);
+  let at = 0;
+  for (const p of parts) { out.set(p, at); at += p.length; }
+  return out;
+}
+
 export async function adminToolFetchMedia(ctx) {
   await limit(ctx, 'tools.fetch', ctx.actor.email, 20, 60);
   const href = String((ctx.body || {}).url == null ? '' : ctx.body.url).trim();
@@ -168,7 +190,9 @@ export async function adminToolFetchMedia(ctx) {
   }
   const declared = Number(res.headers.get('content-length')) || 0;
   if (declared > URL_IMAGE_BYTES) throw refuse('الملف أكبر من 15 MB.', 'نزّله على جهازك وارفعه من هناك.');
-  const bytes = new Uint8Array(await res.arrayBuffer());
+  // read up to the largest allowed size, never more: a host that sends no length can't fill the Worker's memory
+  const bytes = await readCapped(res, URL_IMAGE_BYTES);
+  if (!bytes) throw refuse('الملف أكبر من 15 MB.', 'نزّله على جهازك وارفعه من هناك.');
   const mime = sniffMedia(bytes);
   if (mime.startsWith('video/')) {
     if (bytes.length > URL_VIDEO_BYTES) throw refuse('الفيديو أكبر من 8 MB.', 'قصّ الجزء اللي عايزه بس وارفعه من جهازك.');
