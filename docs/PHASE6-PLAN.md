@@ -2,7 +2,7 @@
 
 Started 2026-11-02 on the owner's order. Six steps, one at a time. Each step needs the owner's choice to start, and each production release needs its own approval.
 
-**Progress: Step 4 of 6 in progress. Slices 4a and 4b passed on Staging (2026-11-03). Slice 4c's server side passed on Staging the same day; its screens wait for the owner's approval of the preview. Nothing reaches production before 4d and a review of the whole cutover plan (owner, 2026-11-03).**
+**Progress: Step 4 of 6 in progress. Slices 4a and 4b passed on Staging (2026-11-03). Slice 4c passed on Staging the same day, its screens on the approved preview. Slice 4d waits for the owner's order. Nothing reaches production before 4d and a review of the whole cutover plan (owner, 2026-11-03).**
 
 ## 1. Official scope
 
@@ -191,7 +191,15 @@ No rebuild. The competition screens stop depending on Apps Script.
 
 **4c tests:** Worker 455 of 455 (12 new in `push-schedule`, one in `content-publish` through a real publish). Site units 758 of 760, the same two failures. Browser: `content-worker`, `push-hint` and `admin-rel` 19 of 19. Live on Staging, `push-schedule-check` 10 of 10: the screen's state, the store's choices, the list and a cancel, and the minute cron sending a due moment through the queue to the real FCM, which refused the made-up token. `PUSH_SENDER` was on for that part only and is back as it was, and the store's schedule was restored. `push-devices-check` and `push-sender-check` pass again.
 
-**4c waiting:** the screens. The store's notify choices and its scheduled list, the season's reminder field, and the push result while sending follow the preview (https://claude.ai/artifact/6tyKoB6NnwvaKtKk6V3Jan) once the owner approves it. The server already accepts and returns those fields.
+**4c screens (owner approved the preview, https://claude.ai/artifact/6tyKoB6NnwvaKtKk6V3Jan), on existing components and no new CSS:**
+- «المتجر»: the five «إشعارات المتجر» choices under the dates, saved with them, and «الإرسال المتجدول» with a cancel on each pending one.
+- «المواسم»: «تنبيه قبل النهاية (يوم)» in the season's form, and the active season shows its reminder.
+- «إشعارات الموبايل»: «بيتبعت دلوقتي…» while the Worker's parts are still going.
+- Until the cutover the scheduled list is Apps Script's (`apiPushSchedule` follows `boot.pushSend`), and the store's choices are saved on the Worker for when it sends.
+
+**4c screen tests:** `youth-admin` 10 of 10, one new at phone width 375: no sideways scroll on the store screen, and the push result while sending. `admin-layout`, `comp-admin3` 9 of 9, `content-worker` 4 of 4, site units 758 of 760 (the same two). Desktop and phone screenshots match the preview.
+
+**4c not checked:** the screens signed in against Staging itself, which needs the owner's sign-in. The browser tests use a fake Worker.
 
 ### Step 5: Integration
 - `route` moves to the Worker: the key as a secret, a D1 cache, a daily budget.
