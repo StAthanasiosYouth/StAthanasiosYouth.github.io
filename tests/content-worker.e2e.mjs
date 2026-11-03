@@ -45,6 +45,8 @@ const jwksFetch = async url => {
 };
 
 let world, env, server, browser;
+// Phase 7: production's config has no apiUrl; only a rollback section (back to Apps Script) gets the old one
+let legacy = false;
 const workerCalls = [];
 
 function issueToken(c) {
@@ -111,7 +113,7 @@ test.before(async () => {
   server = createSiteServer({
     world: { issueToken: c => issueToken(c), get github() { return world.github; } },
     // as production's admin/config.js since Phase 7: no apiUrl (Apps Script retired), the Worker alone
-    config: () => ({ clientId: TEST_CLIENT, timing: TIMING, workerUrl: WORKER_URL, platform: 'worker', content: 'worker' }),
+    config: () => ({ ...(legacy ? { apiUrl: TEST_API } : {}), clientId: TEST_CLIENT, timing: TIMING, workerUrl: WORKER_URL, platform: 'worker', content: 'worker' }),
     claims: () => ({ email: ADMIN })
   });
   await new Promise(resolve => server.listen(PORT, '127.0.0.1', resolve));
@@ -196,12 +198,14 @@ test('content on the Worker: the panel, a save, the review in the page (3 steps)
   // rollback: the switch back to the Sheets → after a reload the content calls go to Apps Script
   env.DB.raw.exec("UPDATE settings SET value = '0' WHERE key = 'CONTENT_DRAFTS'; DELETE FROM admin_sessions;");
   workerCalls.length = 0;
+  legacy = true;
   const r = await open();
   await signedIn(r.page);
   assert.equal(await r.page.evaluate(() => A.state.platform.content), 'sheets');
   assert.ok(r.appsScript.includes('apiState'), 'the state from Apps Script again');
   assert.ok(!workerCalls.includes('apiState'));
   await r.close();
+  legacy = false;
 });
 
 test('competitions on the Worker: the list, a new one with a question, in the review, published: Apps Script is never asked', async () => {
@@ -263,12 +267,23 @@ test('the competition screens read seasons and the menu numbers from the Worker,
 test('an admin\'s push devices go to the Worker once the switch says so, and stay on Apps Script before it', async () => {
   await freshWorld();
   const token = 'admin_device_'.padEnd(150, 'z');
+  legacy = true;
   const before = await open();
   await signedIn(before.page);
   // only where it goes: this world's Apps Script has no session of the Worker's to accept it
   await before.page.evaluate(() => A.call('apiAdminPushDevices', {}).catch(() => null));
-  assert.ok(before.appsScript.includes('apiAdminPushDevices'), 'off: Apps Script');
+  assert.ok(before.appsScript.includes('apiAdminPushDevices'), 'off: Apps Script (the rollback config)');
   await before.close();
+  legacy = false;
+
+  // Phase 7: production's config (no apiUrl) with the switch off: nothing goes to Apps Script, the call fails clearly
+  await freshWorld();
+  const retired = await open();
+  await signedIn(retired.page);
+  const failed = await retired.page.evaluate(() => A.call('apiAdminPushDevices', {}).then(() => '', e => e.message));
+  assert.match(failed, /Apps Script retired/);
+  assert.deepEqual(retired.appsScript, [], 'no request to Apps Script');
+  await retired.close();
 
   // a new world: the closed tab's session would still hold the account
   await freshWorld();

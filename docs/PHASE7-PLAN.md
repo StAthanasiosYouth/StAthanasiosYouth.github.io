@@ -51,8 +51,10 @@ The Google client ID (`…apps.googleusercontent.com`) is Google Sign-In, not Ap
   is the way back). `API_LOG_SAMPLE = 10` keeps about one in ten routine requests in `api_log`, so §25's p95 gate can be read
   (until now `api_log` kept only errors and requests over 1.5 s).
 - **Tests:** the admin's browser tests that still drive the panel through the fake Apps Script world (`tests/fakes/gas.mjs`)
-  run with the page's CSP bypassed (`tools/lib/admin-server.mjs interceptGoogle`, only when the world has `post`); the
-  production-shaped test (`content-worker.e2e`) runs with production's config (no `apiUrl`) and the real CSP. Rewriting the
+  run with the page's CSP bypassed (`tools/lib/admin-server.mjs interceptGoogle`, only when the world has `post`; the
+  CSP itself is checked by `tests/refine-b.test.mjs` and `final-m.test.mjs`). The production-shaped test (`content-worker.e2e`)
+  runs with production's config (no `apiUrl`): the 21-screen walk asks Apps Script nothing, and a call with no Worker route
+  fails with the clear message and no request; only its two rollback sections get the old `apiUrl`. Rewriting the
   legacy-transport tests for the Worker belongs with Phase 8's single transport (BACKEND-MIGRATION §22.1).
 
 ### Step 2 — Apps Script retired
