@@ -22,7 +22,8 @@ import { settingStmt } from '../content/compdrafts.js';
 import { requireAccount } from '../account/session.js';
 import { gate } from '../account/routes.js';
 
-const TOKEN = /^[\w:-]{100,400}$/;
+// an FCM registration token, or (Phase 6 Step 4d, the new web API register()) a Firebase Installation ID: 22 characters
+const TOKEN = /^(?:[\w:-]{100,400}|[\w-]{22})$/;
 const OS = ['android', 'ios', 'desktop', 'other'];
 const PLATFORMS = ['web', 'android', 'ios'];
 export const TOPICS = ['announcements', 'events', 'competitions', 'reminders'];

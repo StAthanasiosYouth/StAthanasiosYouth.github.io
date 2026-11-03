@@ -34,7 +34,7 @@ function fakeFcm({ oauth = 200, fcmStatus = null } = {}) {
     }
     const body = JSON.parse(init.body);
     log.sends.push({ url, auth: init.headers.authorization, message: body.message });
-    const t = body.message.token;
+    const t = body.message.token || body.message.fid;
     if (fcmStatus) return Response.json({ error: { message: 'x' } }, { status: fcmStatus });
     if (t.startsWith('tok_dead')) return Response.json({ error: { message: 'gone', details: [{ errorCode: 'UNREGISTERED' }] } }, { status: 404 });
     if (t.startsWith('tok_bad')) return Response.json({ error: { message: 'busy' } }, { status: 503 });
@@ -335,4 +335,45 @@ test('the routes: the key check and a test to my own devices only', async () => 
   const k = await world({ key: false });
   w.h = k.h;
   assert.equal((await call(P, 'check')).body.check, false);
+});
+
+test('Phase 6 Step 4d: a Firebase Installation ID registers like a token and is sent as `fid`; urgent is the high priority on native', async () => {
+  const w = await world();
+  const fid = 'cR_m2xYz0123456789abcd';
+  const r = await w.h.call('/v1/push/subscribe', { method: 'POST', body: { token: fid, previous: tok(9) } });
+  assert.equal(r.body.ok, true);
+  const id = await pushHash(fid);
+  assert.ok(await w.h.db.prepare('SELECT 1 FROM push_devices WHERE id = ?').bind(id).first());
+  assert.equal((await w.h.call('/v1/push/subscribe', { method: 'POST', body: { token: 'x'.repeat(23) } })).body.code, 'invalid', '22 exactly, or a full token');
+
+  const m = model({ title: 'x' });
+  assert.deepEqual(Object.keys(fcmMessage({ token: fid, platform: 'web' }, m, 60)).sort(), ['data', 'fid', 'webpush']);
+  assert.equal(fcmMessage({ token: tok(1), platform: 'web' }, m, 60).token, tok(1));
+  const urgent = model({ title: 'x', urgent: true });
+  assert.equal(fcmMessage({ token: tok(1), platform: 'android' }, urgent, 60).android.priority, 'HIGH');
+  assert.equal(fcmMessage({ token: tok(1), platform: 'android' }, m, 60).android.priority, 'NORMAL');
+  assert.equal(fcmMessage({ token: tok(1), platform: 'ios' }, urgent, 60).apns.headers['apns-priority'], '10');
+  assert.equal(fcmMessage({ token: tok(1), platform: 'web' }, urgent, 60).data.urgent, undefined, 'not a data field');
+  assert.equal(classify(400, { error: { message: 'The provided Firebase Installation ID is not valid' } }), 'dead');
+
+  // a native token and a send: the `fid` / `token` targets go out as built
+  const native = await w.device(tok(2), { platform: 'android' });
+  await startSend(w.h.env, { audience: 'public', ref: 'n1', message: urgent, ttl: 60, devices: [id, native] });
+  const { f, log } = fakeFcm();
+  await w.drain(f);
+  const targets = log.sends.map(s => Object.keys(s.message).filter(k => k === 'fid' || k === 'token')[0]).sort();
+  assert.deepEqual(targets, ['fid', 'token']);
+});
+
+test('Phase 6 Step 4d: the allowed origins are configuration; a native shell\'s origin is one more entry, nothing in code', async () => {
+  const h = harness({ env: { ALLOWED_ORIGINS: 'https://stathanasiosyouth.github.io,https://localhost,capacitor://localhost' } });
+  const { handle } = await import('../src/index.js');
+  for (const origin of ['https://localhost', 'capacitor://localhost']) {
+    const res = await handle(new Request('https://api.test/v1/push/subscribe', { method: 'OPTIONS', headers: { origin, 'access-control-request-method': 'POST' } }), h.env, { waitUntil() {} });
+    assert.equal(res.status, 204, origin);
+    assert.equal(res.headers.get('access-control-allow-origin'), origin);
+  }
+  const plain = harness();
+  const res = await handle(new Request('https://api.test/v1/push/subscribe', { method: 'OPTIONS', headers: { origin: 'capacitor://localhost', 'access-control-request-method': 'POST' } }), plain.env, { waitUntil() {} });
+  assert.equal(res.status, 403, 'not configured: refused');
 });

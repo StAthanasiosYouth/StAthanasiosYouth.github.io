@@ -245,7 +245,7 @@ export async function adminPushTick(env, now = Date.now(), doFetch) {
       out.done++;
       continue;
     }
-    const message = model({ kind: 'admin', id: row.id, title: m.title, body: m.body, url: m.url, tag: m.tag, group: 'admin' });
+    const message = model({ kind: 'admin', id: row.id, title: m.title, body: m.body, url: m.url, tag: m.tag, group: 'admin', urgent: row.level === 'critical' || row.level === 'important' });
     await startSend(env, { audience: 'admin', ref: row.id, by: '', message, ttl: ADMIN_TTL, devices: targets, now, doFetch });
     out.sent++;
   }

@@ -7,11 +7,14 @@
  * - The access token lives in this isolate's memory (≈ 50 min), never in D1.
  * - One message model for every device: data for the web (sw.js and admin/sw.js show it), plus the `android` and
  *   `apns` blocks a native app needs (Phase 9). Links are paths ('/events/x/'): each app adds its own origin.
+ * - A device is an FCM token or a Firebase Installation ID (FID, the new web API): v1 sends `fid` for the one and
+ *   `token` for the other. `urgent` (an admin's critical or important row) is the high priority on Android and iOS.
  */
 
 export const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 export const OAUTH_URL = 'https://oauth2.googleapis.com/token';
 export const FCM_URL = 'https://fcm.googleapis.com/v1/projects/';
+export const FID = /^[\w-]{22}$/;
 const CHECK_TOKEN = 'push-config-check';
 const TITLE_MAX = 80;
 const BODY_MAX = 200;
@@ -79,22 +82,23 @@ export function model(m) {
   if (IMAGE.test(String(m.image || ''))) out.image = m.image;
   if (Number.isInteger(m.badge) && m.badge >= 0 && m.badge <= 999) out.badge = m.badge;
   if (/^[\w-]{1,40}$/.test(String(m.group || ''))) out.group = m.group;
+  if (m.urgent === true) out.urgent = true;
   return out;
 }
 
 /* one device ({ token, platform }) + the model → FCM's `message` */
 export function fcmMessage(device, m, ttl, now = Date.now()) {
   const data = {};
-  for (const [k, v] of Object.entries(m)) data[k] = String(v);
-  const message = { token: device.token, data };
+  for (const [k, v] of Object.entries(m)) if (k !== 'urgent') data[k] = String(v);
+  const message = FID.test(device.token) ? { fid: device.token, data } : { token: device.token, data };
   if (device.platform === 'android') {
     message.android = {
-      priority: 'HIGH', ttl: ttl + 's', collapse_key: m.tag,
+      priority: m.urgent ? 'HIGH' : 'NORMAL', ttl: ttl + 's', collapse_key: m.tag,
       notification: { title: m.title, body: m.body, tag: m.tag, ...(m.group ? { channel_id: m.group } : {}), ...(m.badge != null ? { notification_count: m.badge } : {}), ...(m.image ? { image: m.image } : {}) }
     };
   } else if (device.platform === 'ios') {
     message.apns = {
-      headers: { 'apns-priority': '10', 'apns-expiration': String(Math.floor(now / 1000) + ttl), 'apns-collapse-id': m.tag.slice(0, 64) },
+      headers: { 'apns-priority': m.urgent ? '10' : '5', 'apns-expiration': String(Math.floor(now / 1000) + ttl), 'apns-collapse-id': m.tag.slice(0, 64) },
       payload: { aps: { alert: { title: m.title, body: m.body }, sound: 'default', 'mutable-content': 1, ...(m.group ? { 'thread-id': m.group } : {}), ...(m.badge != null ? { badge: m.badge } : {}) } }
     };
   } else {
@@ -113,7 +117,7 @@ export function classify(status, body) {
   for (const d of (error && error.details) || []) if (d && d.errorCode) code = d.errorCode;
   if (status === 404 || code === 'UNREGISTERED' || code === 'SENDER_ID_MISMATCH') return 'dead';
   // only the token's own fault: a bad message would fail every device the same way
-  if (status === 400 && /registration token/i.test(String(error && error.message))) return 'dead';
+  if (status === 400 && /registration token|installation id|\bfid\b/i.test(String(error && error.message))) return 'dead';
   if (status === 403) return 'auth';
   return 'retry';
 }
