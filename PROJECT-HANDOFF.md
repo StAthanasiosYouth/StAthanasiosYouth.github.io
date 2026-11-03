@@ -1,6 +1,6 @@
-# Project handoff — start of Phase 4
+# Project handoff — start of Phase 7
 
-Written 2026-10-21 at the close of Phase 1.5; updated 2026-10-22 at the close of Phase 2, then by the plan review of Phases 0–9 (§4.1), then at the close of Phase 3 (§4.2). Read this first in a fresh session, then the docs it names.
+Written 2026-10-21 at the close of Phase 1.5; updated 2026-10-22 at the close of Phase 2, then by the plan review of Phases 0–9 (§4.1), then at the close of Phase 3 (§4.2), and at the close of Phase 6 (§5.1, 2026-11-03). Read this first in a fresh session, then the docs it names.
 Progress rule (owner, 2026-10-22): nothing is gated or scheduled by a number of days. A step is done when its checks pass; functional time rules (retention, expiry, reminders, provider deadlines) stay.
 Owner: Mena Zakaria. The owner approves every production release; nothing reaches production without an explicit "approved".
 
@@ -44,8 +44,7 @@ APIs: production `https://athanasios-api.menazak-lab.workers.dev`, staging `http
   (owner), `admin/config.js` `platform: 'worker'` (`a6a7a18`). The panel's sessions, presence, edit locks and trusted devices
   are the Worker's (D1). Rollback (reverse): Script Property `both` → revert `a6a7a18` → delete the property → D1 `'0'` →
   Worker `6094eb69` / Apps Script @56.
-- D1 `settings` switches — **all OFF, keep them OFF unless the owner says otherwise:**
-  `NOTIFY_ROUTER=0`, `NOTIFY_EMAIL=0`, `PERMS_ENFORCE=0`, `PAY_REQUESTS` (missing/0 = off).
+- D1 `settings` switches — **keep as they are unless the owner says otherwise.** Since Phase 6 (2026-11-03): `NOTIFY_ROUTER=1`, `PUSH_DEVICES=worker`, `PUSH_SENDER=worker`, `PUSH_AUTO_BELL=1`. Still off: `NOTIFY_EMAIL=0`, `PERMS_ENFORCE=0`, `PAY_REQUESTS` (missing/0 = off).
   On: `BOOKING_MODULE=1`, `PAY_DEST=1` (approved payment numbers shown).
 - Not launched officially: the launch gate (`docs/BOOKING-PHASE1-COMPLETION-PLAN.md` §6) is still open — go-live test #2,
   **test-data cleanup with the owner's explicit go**, real events published.
@@ -153,6 +152,12 @@ keeps running in the background. Not started.
 **Accounts improvements batch closed 2026-11-02** (`docs/ACCOUNTS-IMPROVEMENTS.md`): five steps live, Worker `b8f6ca82`, rollback `65001395`. Three follow-ups stand on their own: the old failing tests, picture sizes on phones, the first real competition.
 
 **Phase 6 started 2026-11-02 on the owner's order** (`docs/PHASE6-PLAN.md`: scope, inventory, gaps, six steps, decisions). One step at a time; each step needs the owner's choice to start and each production release its own approval.
+
+### 5.1 Phase 6 closure — done 2026-11-03
+
+Competition authoring and seasons on the Worker, all push on the Worker (FCM with Firebase Installation IDs, the schedule, automatic bell pushes, the booker's reminder, admin pushes from the router's outbox, a delivery receipt from the admin app), and the panel's tools and the map's routes off Apps Script. **The panel and the site call Apps Script for nothing.** It still runs its own triggers until 7b. Closed-app push on a real phone passed for a visitor and for an admin. Production: migrations to `0028` (next free: `0029`), Apps Script **@61** (back `-V 60`), Worker secrets `FCM_SERVICE_ACCOUNT` and `ORS_API_KEY`. The record, the releases with their way back, and what is carried to 7a, 7b, 8 and 9: `docs/PHASE6-PLAN.md` (closing record at the end of Step 6). **Never `clasp push` the `apps-script/` folder as it is:** it differs from the deployed version. Deploy the live version plus the changed files.
+
+**Next: Phase 7**, on the owner's order.
 
 ## 6. Working rules (owner's standing instructions)
 
