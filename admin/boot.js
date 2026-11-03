@@ -610,6 +610,7 @@
     if (PLATFORM && Object.prototype.hasOwnProperty.call(PLATFORM_FNS, name)) return platformPost(name, args, tokenValue, sidValue, options);
     if (PLATFORM && compWorker && Object.prototype.hasOwnProperty.call(COMP_READS, name)) return compRead(name, options);
     if (PLATFORM && pushWorker && Object.prototype.hasOwnProperty.call(PUSH_CALLS, name)) return pushCall(name, args, options);
+    if (PLATFORM && pushSendWorker && Object.prototype.hasOwnProperty.call(PUSH_SEND_CALLS, name)) return pushSendCall(name, args, options);
     // Phase 4: the content calls too, once the Worker writes the drafts (its session answer says so)
     if (PLATFORM && contentWorker && (Object.prototype.hasOwnProperty.call(CONTENT_FNS, name) || Object.prototype.hasOwnProperty.call(CONTENT_ALIASES, name) || (compWorker && Object.prototype.hasOwnProperty.call(COMP_FNS, name)))) {
       return contentPost(name, args, tokenValue, options);
@@ -1585,6 +1586,26 @@
 
   }
 
+  /* Phase 6 Step 4c: «إشعارات الموبايل» and the automatic pushes, once the Worker sends (boot.pushSend, settings.PUSH_SENDER) */
+  var PUSH_SEND_CALLS = { apiPushState: 'state', apiPushCheck: 'check', apiSendPush: 'send', apiPushAuto: 'auto', apiPushSchedule: 'schedule', apiPushScheduleCancel: 'schedule/cancel' };
+  var pushSendWorker = false;
+
+  function pushSendCall(name, args, options) {
+
+    var a = args || [];
+    var body = name === 'apiSendPush' ? { id: a[0], sendKey: a[1], edits: a[2] || {} } : name === 'apiPushScheduleCancel' ? { id: a[0] } : {};
+
+    return panelToken().then(function (value) {
+      return workerFetch('POST', '/v1/admin/push/' + PUSH_SEND_CALLS[name], body, value, options || {});
+    }).then(function (result) {
+      var out = envelope(result);
+      // apiPushCheck answered { ok, message }: the reply's own ok is the envelope's
+      if (out.ok && name === 'apiPushCheck') out.result = { ok: out.result.check === true, message: out.result.message };
+      return out;
+    }, asReply);
+
+  }
+
   function compRead(name, options) {
 
     return panelToken().then(function (value) {
@@ -1695,6 +1716,7 @@
         if (r.boot && (r.boot.content === 'worker' || r.boot.content === 'sheets')) contentWorker = r.boot.content === 'worker';
         if (r.boot && r.boot.comps) compWorker = r.boot.comps === 'worker';
         if (r.boot && r.boot.push) pushWorker = r.boot.push === 'worker';
+        if (r.boot && r.boot.pushSend) pushSendWorker = r.boot.pushSend === 'worker';
         var answer = { sid: r.sid, device: r.device, resumed: r.resumed === true, state: null };
         if (!withState) return { ok: true, result: answer };
         var late = function () { return post('apiState', [], r.token, r.sid, options); };

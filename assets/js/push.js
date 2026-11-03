@@ -18,6 +18,7 @@ import { toast } from './share.js';
 import { PUSH_CONFIG } from './push-config.js';
 import { pushSupport, platformOf, loadMemo, saveMemo, shouldNudge, pushRequest, pushReplyOk, bellHint } from './push-env.js';
 import { installState, promptInstall, onInstallChange } from './install.js';
+import { readSession } from './account/link.js';
 
 const WORKER_ROUTES = { pushSubscribe: '/v1/push/subscribe', pushUnsubscribe: '/v1/push/unsubscribe' };
 const SW_URL = '/sw.js';
@@ -90,12 +91,27 @@ async function tokenFor(reg) {
 }
 
 
+/* this device's own account session (never a shared one: that phone is someone else's), for the Worker to link the device */
+function accountToken() {
+
+  try {
+    const saved = readSession(window.localStorage, null);
+    return saved ? saved.token : '';
+  }
+  catch {
+    return '';
+  }
+
+}
+
+
 async function server(fn, arg) {
 
   try {
+    const token = PUSH_CONFIG.workerUrl && fn === 'pushSubscribe' ? accountToken() : '';
     const response = await fetch(PUSH_CONFIG.workerUrl ? PUSH_CONFIG.workerUrl + WORKER_ROUTES[fn] : PUSH_CONFIG.apiUrl, PUSH_CONFIG.workerUrl ? {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: token ? { 'Content-Type': 'application/json', authorization: 'Bearer ' + token } : { 'Content-Type': 'application/json' },
       body: JSON.stringify(arg),
       credentials: 'omit',
       cache: 'no-store'
