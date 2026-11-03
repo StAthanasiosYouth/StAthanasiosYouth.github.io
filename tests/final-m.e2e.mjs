@@ -48,7 +48,7 @@ const DESKTOP = { width: 1366, height: 900, deviceScaleFactor: 1 };
 const PUBLISHED = JSON.parse(readFileSync(`${ROOT}content.json`, 'utf8'));
 const CHURCH = { lat: PUBLISHED.location.lat, lng: PUBLISHED.location.lng };
 const HERE = { latitude: 26.74051234, longitude: 33.93029876 };
-const ROUTE_URL = /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/;
+const ROUTE_URL = /^https:\/\/athanasios-api\.menazak-lab\.workers\.dev\/v1\/public\/route$/;   // the Worker since Phase 6 Step 5
 
 const MAP_FILES = /vendor\/leaflet|\/assets\/js\/map(-config|-route)?\.js|\/assets\/css\/map\.css|tile\.openstreetmap\.org|script\.google/;
 
@@ -138,7 +138,9 @@ async function open({ viewport = PHONE, reduced = false, route = body => ({ stat
       tiles.push({ url: request.url(), referer: request.headers().referer || '' });
       request.respond({ status: 200, contentType: 'image/png', body: TILE });
     }
-    else if (url.hostname === 'script.google.com') {
+    // the routes: the Worker since Phase 6 Step 5 (map-config.js), Apps Script before; never the real ones from a test
+    else if (url.hostname === 'script.google.com' || (/\.workers\.dev$/.test(url.hostname) && url.pathname === '/v1/public/route')) {
+      if (request.method() === 'OPTIONS') return request.respond({ status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type', 'Access-Control-Allow-Methods': 'POST' }, body: '' });
       const body = JSON.parse(request.postData() || 'null');
       posts.push({ url: request.url(), method: request.method(), headers: request.headers(), body });
       const answer = await state.route(body, request);
