@@ -19,7 +19,7 @@ import { PUSH_CONFIG } from './push-config.js';
 import { pushSupport, platformOf, loadMemo, saveMemo, shouldNudge, pushRequest, pushReplyOk, bellHint } from './push-env.js';
 import { installState, promptInstall, onInstallChange } from './install.js';
 import { readSession } from './account/link.js';
-import { deviceId, forget } from './push-fid.js';
+import { deviceId, forget, FID } from './push-fid.js';
 
 const WORKER_ROUTES = { pushSubscribe: '/v1/push/subscribe', pushUnsubscribe: '/v1/push/unsubscribe' };
 const SW_URL = '/sw.js';
@@ -89,6 +89,16 @@ async function tokenFor(reg) {
   const { sdk, messaging: m } = await messaging();
 
   return deviceId(sdk, m, reg, PUSH_CONFIG.vapidKey, !!PUSH_CONFIG.workerUrl);
+
+}
+
+
+/* the id this device had before: Apps Script refuses an FID there (back from the Worker), so it is left out */
+function previousOf(before, now) {
+
+  if (!before || before === now) return undefined;
+
+  return !PUSH_CONFIG.workerUrl && FID.test(before) ? undefined : before;
 
 }
 
@@ -164,7 +174,7 @@ async function enable() {
     const token = await tokenFor(reg);
     const memo = loadMemo();
 
-    if (!token || !(await server('pushSubscribe', { token, platform: platformOf(), previous: memo.token && memo.token !== token ? memo.token : undefined }))) {
+    if (!token || !(await server('pushSubscribe', { token, platform: platformOf(), previous: previousOf(memo.token, token) }))) {
       throw new Error('subscribe failed');
     }
 
@@ -246,7 +256,7 @@ export async function refresh() {
   try {
     const token = await tokenFor(await registration());
     if (!token) return;
-    const ok = await server('pushSubscribe', { token, platform: platformOf(), previous: token !== memo.token ? memo.token : undefined });
+    const ok = await server('pushSubscribe', { token, platform: platformOf(), previous: previousOf(memo.token, token) });
     if (ok) saveMemo({ ...loadMemo(), token, at: Date.now() });
   }
   catch (error) {
