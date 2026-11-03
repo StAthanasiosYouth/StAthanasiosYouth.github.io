@@ -90,7 +90,7 @@ function notifyClaimPost_(acks) {
 function adminPushTo_(email, message, level) {
 
   var account = null;
-  try { account = pushServiceAccount_(); } catch (ignored) { account = null; }
+  try { account = pushOnWorker_() ? null : pushServiceAccount_(); } catch (ignored) { account = null; }
   if (!account) return { sent: 0, reason: 'off' };
 
   forgetAdminEmails_();

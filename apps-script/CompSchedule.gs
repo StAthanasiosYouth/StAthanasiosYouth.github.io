@@ -327,7 +327,8 @@ function pushScheduleDaily(e) {
 /* due entries → pushSendItem_ (no lock around the send); results written under a short lock */
 function pushScheduleRun_() {
 
-  if (!compSpreadsheetIdOrEmpty_()) return;
+  // the Worker sends the schedule now (Push.gs pushOnWorker_): nothing is sent or re-armed here
+  if (!compSpreadsheetIdOrEmpty_() || pushOnWorker_()) return;
 
   var nowMs = Date.now();
   var due = pushScheduleRows_().filter(function (row) {

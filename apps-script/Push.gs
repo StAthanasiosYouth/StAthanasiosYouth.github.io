@@ -194,6 +194,23 @@ function pushHash_(token) {
 }
 
 
+/*
+ * Phase 6 cutover (docs/PHASE6-PLAN.md Step 4): once the Worker sends, the owner sets the Script Property
+ * PUSH_SENDER = 'worker' and nothing here sends any more: no button, no schedule, no admin push. So a device
+ * that is on both sides never gets a push twice. Back: delete the property.
+ */
+function pushOnWorker_() {
+
+  try {
+    return PropertiesService.getScriptProperties().getProperty('PUSH_SENDER') === 'worker';
+  }
+  catch (ignored) {
+    return false;
+  }
+
+}
+
+
 /* the devices, for the Worker's one-time copy (WorkerComp.gs, a signed question): nothing is changed here */
 function pushExportForWorker_() {
 
@@ -753,6 +770,10 @@ function pushSendItem_(id, sendKey, actor, edits) {
 
   if (!/^[\w-]{1,80}$/.test(id) || !/^[\w-]{8,64}$/.test(sendKey)) {
     throw appError_('الطلب مش مفهوم.', 'اعمل Refresh للصفحة.');
+  }
+
+  if (pushOnWorker_()) {
+    throw appError_('الإشعارات بقت بتتبعت من النظام الجديد.', 'اعمل Refresh للصفحة وابعت من «إشعارات الموبايل» تاني.');
   }
 
   var account = pushServiceAccount_();

@@ -359,7 +359,7 @@ function adminPushNotify_(row, actor) {
   var account = null;
 
   try {
-    account = pushServiceAccount_();
+    account = pushOnWorker_() ? null : pushServiceAccount_();
   }
   catch (ignored) {
     account = null;

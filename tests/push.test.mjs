@@ -450,3 +450,13 @@ test('publishing does not involve push at all', () => {
   assert.equal(world.fcm.sent.length, 0);
   assert.equal(world.fcm.tokenRequests, 0);
 });
+
+test('Phase 6 cutover: with PUSH_SENDER = worker nothing here sends — no button, no schedule, no admin push', () => {
+  const world = pushWorld();
+  world.properties.set('PUSH_SENDER', 'worker');
+  assert.equal(world.gs.pushOnWorker_(), true);
+  assert.throws(() => world.as(ADMIN).gs.apiSendPush('notif-news-aaaa1111', sendKey(), {}), /النظام الجديد/);
+  assert.deepEqual(plain(world.gs.adminPushNotify_({ id: 'act-1', action: 'publish', type: 'site', summary: 'نشر' }, '')), { sent: 0, reason: 'off' });
+  world.properties.set('PUSH_SENDER', '');
+  assert.equal(world.gs.pushOnWorker_(), false, 'back: the property removed');
+});
