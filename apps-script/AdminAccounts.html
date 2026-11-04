@@ -73,7 +73,7 @@
         return A.closeSheet().then(function () {
           if (options.done) options.done(reply);
           else A.toast('اتحفظ ✓');
-          if (A.area === 'comps' && A.sub.comps === 'youth') A.render();
+          if (A.onTab('comps', 'youth')) A.render();
         });
       }).catch(function (error) { A.fail(error, box, { fields: false }); });
     });

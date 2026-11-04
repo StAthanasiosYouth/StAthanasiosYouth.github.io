@@ -410,7 +410,7 @@
     again.addEventListener('click', function () {
       box.hidden = true;
       A.withBusy(again, B.retry()).then(function (on) {
-        if (A.area === 'pages' && A.sub.pages === 'bookings') {
+        if (A.onTab('pages', 'bookings')) {
           if (on || B.needGoogle) A.render();
           else if (B.failed) A.fail(B.failed, box);
           else A.render();
@@ -471,7 +471,7 @@
     go.addEventListener('click', function () {
       box.hidden = true;
       A.withBusy(go, W().google().then(function () { return B.check(); })).then(function () {
-        if (A.area === 'pages' && A.sub.pages === 'bookings') A.render();
+        if (A.onTab('pages', 'bookings')) A.render();
       }).catch(function (error) { A.fail(error, box); });
     });
     return A.card('الحجوزات محتاجة دخول بحساب جوجل', 'التطبيق داخل بالجهاز المتذكَّر. الحجوزات والفلوس محتاجة حساب جوجل نفسه: ادخل مرة وكمّل من مكانك.',
@@ -2020,7 +2020,7 @@
         A.closeSheet();
         A.toast('اتلغى ' + ar(reply.cancelled || 0) + ' حجز — راجع «مرتجعات مطلوبة»');
         B.filter = 'refunds';
-        if (A.area === 'pages' && A.sub.pages === 'bookings') A.render();
+        if (A.onTab('pages', 'bookings')) A.render();
       }
     });
 

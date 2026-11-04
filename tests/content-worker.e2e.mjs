@@ -501,7 +501,7 @@ test('Phase 8 A2: the shell — the welcome, the rail in groups with its light a
   await p.page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
   await signedIn(p.page);
   await p.page.waitForFunction(() => !document.querySelector('.welcome'), { timeout: 6000 });
-  assert.deepEqual(await p.page.$$eval('#dock .dockbtn', ns => ns.map(n => n.dataset.area)), ['home', 'content', 'comps', 'pages', 'more']);
+  assert.deepEqual(await p.page.$$eval('#dock .dockbtn', ns => ns.map(n => n.dataset.area)), ['home', 'comps', 'pages', 'content', 'more']);
   await p.page.click('#dock [data-area="more"]');
   await p.page.waitForSelector('#sheet[open] .more');
   assert.deepEqual(await p.page.$$eval('.more__item', ns => ns.map(n => n.dataset.area)), ['page', 'media', 'activity', 'settings']);
@@ -692,6 +692,8 @@ test('Phase 8 A7 + A8: the locked games corner (GAMES_MODULE), and axe (serious 
     for (const [area, sub] of [['home'], ['content', 'news'], ['comps', 'comps'], ['pages', 'events'], ['media'], ['activity'], ['settings'], ['gamescorner']]) {
       await s.page.evaluate((a, b) => A.go(a, b), area, sub);
       await sleep(700);
+      // (the screen's entrance has to end first: a half-faded row reads as low contrast)
+      await s.page.evaluate(() => Promise.all(document.getAnimations().filter(x => x.effect && x.effect.getComputedTiming().iterations !== Infinity).map(x => x.finished.catch(() => {}))));
       await s.page.evaluate(AXE);
       const v = await s.page.evaluate(() => axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] }, resultTypes: ['violations'] })
         .then(r => r.violations.filter(x => x.impact === 'serious' || x.impact === 'critical').map(x => x.id + ': ' + x.nodes.slice(0, 2).map(n => n.target.join(' ')).join(' | '))));

@@ -275,8 +275,9 @@ test('module on: the tab, «الحجوزات (٢ جديد)», chips with counts,
   await signIn(d.page);
   await d.page.evaluate(() => A.go('pages', 'events'));
   await d.page.waitForFunction(() => { const b = document.querySelector('[data-act="book-open"]'); return b && /الحجوزات \(٢ جديد\)/.test(b.textContent); }, { timeout: 8000 });
-  // the menu tab carries the new requests of all the events
-  assert.deepEqual(await subtabs(d.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام', 'الحجوزات٢', 'حسابات الخدام']);
+  // Phase 8: «الحجوزات والفلوس» is an area of its own in the rail, carrying the new requests of all the events
+  assert.deepEqual(await subtabs(d.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام']);
+  assert.equal(await d.page.$eval('#rail-nav [data-area="bookings"] .nav-badge', n => n.textContent), '٢');
   // the home card «الحجوزات»: what waits, per event
   await d.page.evaluate(() => A.go('home'));
   await d.page.waitForFunction(() => { const c = document.getElementById('dash-book'); return c && !c.hidden && /مستنيين المراجعة: ٢/.test(c.innerText); }, { timeout: 8000 });
@@ -285,7 +286,8 @@ test('module on: the tab, «الحجوزات (٢ جديد)», chips with counts,
   await d.page.waitForSelector('[data-act="book-open"]', { visible: true });
   await d.page.click('[data-act="book-open"]');
   await waitRows(d.page, ['B-AAAA1', 'B-BBBB2']);
-  assert.equal(await d.page.evaluate(() => A.sub.pages), 'bookings');
+  assert.deepEqual(await d.page.evaluate(() => [A.area, A.sub.bookings]), ['bookings', 'bookings']);
+  assert.deepEqual(await subtabs(d.page), ['الحجوزات٢', 'حسابات الخدام']);
   const chips = await d.page.$$eval('.book-chips .filter-chip', n => n.map(x => x.textContent));
   assert.deepEqual(chips, ['مستنية المراجعة (٢)', 'المؤكدة (٢)', 'متأخر (١)', 'مرتجعات مطلوبة (١)', 'طلبات دفع', 'المرفوضة والملغية (١)', 'الكل (٥)']);
   const first = await d.page.$eval('.book-row[data-ref="B-AAAA1"]', n => n.innerText);
@@ -805,7 +807,7 @@ test('device session (the app\'s remembered phone): «الحجوزات» opens w
   assert.deepEqual((await rows(again.page)).sort(), ['B-AAAA1', 'B-BBBB2']);
   assert.ok(fake.state.calls.length > 0 && fake.state.calls.every(c => /^Bearer wk1\.[A-Za-z0-9_-]+\.[0-9a-f]{64}$/.test(c.auth)), 'the panel session credential');
   assert.ok(fake.state.calls.every(c => !/adm1\./.test(c.auth)), 'the device token never reaches the Worker');
-  assert.deepEqual(await subtabs(again.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام', 'الحجوزات٢', 'حسابات الخدام']);
+  assert.deepEqual(await subtabs(again.page), ['الحجوزات٢', 'حسابات الخدام']);
   assert.deepEqual(again.problems, []);
   await context.close();
 });

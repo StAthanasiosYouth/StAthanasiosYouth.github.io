@@ -414,7 +414,8 @@ test('the editor panel: as tall as its content, floating on wide screens, a bott
     assert.ok(small.height < small.vh - 28 - 150, `follows its content (${small.height}px)`);
     assert.equal(small.scrolls, false);
     assert.ok(small.headIn && small.footIn);
-    assert.match(small.blur, /blur/);
+    // Phase 8 (the approved preview): a solid surface, no glass behind the editor
+    assert.equal(small.blur, 'none');
     await page.evaluate(() => A.closeSheet());
     await page.waitForFunction(() => !document.querySelector('dialog.sheet').open);
 

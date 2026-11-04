@@ -828,7 +828,7 @@ test('360px: the dock (four areas + «المزيد», Phase 8 A2) fits; the list
     const label = b.querySelector('.dockbtn__label');
     return { text: label.textContent, overflow: label.scrollWidth > label.clientWidth + 1 };
   }));
-  assert.deepEqual(dock.map(b => b.text), ['الرئيسية', 'المحتوى', 'مسابقات', 'صفحات', 'المزيد']);
+  assert.deepEqual(dock.map(b => b.text), ['الرئيسية', 'مسابقات', 'الفعاليات', 'المحتوى', 'المزيد']);
   assert.ok(dock.every(b => !b.overflow), 'dock labels fit: ' + JSON.stringify(dock));
 
   await d.page.evaluate(() => { A.comp.open = ''; return A.go('comps', 'comps'); });

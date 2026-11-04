@@ -178,7 +178,12 @@
     var session = next.session;
     var topic = session && session.topic;
 
-    body.push(el('div', { class: 'dash-meeting' },
+    var day = new Date(A.wallFromMinutes(next.at).slice(0, 10) + 'T12:00:00Z');
+    body.push(el('div', { class: 'dash-meeting meet' },
+      el('span', { class: 'meet__day', 'aria-hidden': 'true' },
+        el('b', { text: String(day.getUTCDate()).replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; }) }),
+        el('span', { text: ['الأحد', 'الاتنين', 'التلات', 'الأربع', 'الخميس', 'الجمعة', 'السبت'][day.getUTCDay()] })),
+      el('div', { class: 'meet__text' },
       el('p', { class: 'dash-meeting__when' },
         el('strong', { text: A.formatWall(A.wallFromMinutes(next.at)) }),
         el('span', { class: 'dash-meeting__rel', text: next.live ? 'شغال دلوقتي' : relative(next.at) })
@@ -188,7 +193,7 @@
       topic && session.visibleFrom && A.wallMinutes(session.visibleFrom) > now()
         ? A.chip('الموضوع يظهر ' + A.formatWall(session.visibleFrom), 'gold')
         : null
-    ));
+    )));
 
     // the meeting is on now and has a program: which stage is happening (live.json)
     if (next.live && session && A.liveControl && A.programStages(session.program).length) {
@@ -371,21 +376,129 @@
   }
 
 
+  /* =======================================================
+     THE HOME (Phase 8, the approved preview): a greeting, what waits (tiles), the site's state,
+     the next meeting beside the quick actions, then the bell and what's coming; on the side
+     who is here now and the latest activity. Every card of before is still here.
+  ======================================================= */
+
+  var WEEKDAY_SHORT = ['الأحد', 'الاتنين', 'التلات', 'الأربع', 'الخميس', 'الجمعة', 'السبت'];
+  var MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+
+  function ar(n) { return String(n).replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; }); }
+
+  function todayLine() {
+    var wall = A.cairoNow();
+    var d = new Date(wall.slice(0, 10) + 'T12:00:00Z');
+    return WEEKDAY_SHORT[d.getUTCDay()] + ' ' + ar(d.getUTCDate()) + ' ' + MONTHS_AR[d.getUTCMonth()] + ' ' + ar(d.getUTCFullYear());
+  }
+
+  function greeting() {
+    var h = Number(A.cairoNow().slice(11, 13));
+    return h < 12 ? 'صباح الخير' : 'مساء الخير';
+  }
+
+  function helloCard(waiting) {
+    var name = String((A.state.me || (A.state.user || '').split('@')[0]) || '').split(' ')[0];
+    var count = waiting.reduce(function (n, w) { return n + (w.n || 1); }, 0);
+    return el('section', { class: 'hello', 'aria-labelledby': 'hello-title' },
+      el('div', {},
+        el('p', { class: 'hello__date', text: todayLine() }),
+        el('h2', { class: 'hello__name', id: 'hello-title' }, greeting() + ' يا ', el('em', { text: name })),
+        el('p', { class: 'hello__sub', text: count ? 'فيه ' + ar(count) + (count === 1 ? ' حاجة مستنياك' : ' حاجات مستنياك') + ' النهارده.' : 'مفيش حاجة مستنياك دلوقتي. كله تمام.' })
+      ),
+      el('div', { class: 'hello__actions' },
+        el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.news(null); } }, icon('plus'), 'خبر'),
+        upgraded() ? el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.activities(null, 'activities'); } }, icon('plus'), 'فعالية') : null,
+        el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.notifications(null); } }, icon('bell'), 'إشعار')
+      )
+    );
+  }
+
+  /* what waits, as tiles: the menu's own numbers and the unpublished changes */
+  function queueTiles(waiting) {
+    if (!waiting.length) return null;
+    var TONE = { send: 'gold', trophy: 'info', ticket: 'warn' };
+    return el('div', { class: 'queue', 'data-home-queue': '' }, waiting.slice(0, 4).map(function (w) {
+      return el('button', { class: 'qcard', type: 'button', 'data-tone': TONE[w.icon] || 'ok', onclick: w.go },
+        el('span', { class: 'qcard__ico', 'aria-hidden': 'true' }, icon(w.icon)),
+        el('span', { class: 'qcard__n' + (w.n ? '' : ' qcard__n--word'), text: w.n ? ar(w.n) : 'انشر' }),
+        el('span', { class: 'qcard__t', text: w.label + (w.where && w.n ? ' · ' + w.where : '') }),
+        el('span', { class: 'qcard__go', 'aria-hidden': 'true' }, icon('chevron')));
+    }));
+  }
+
+  /* the numbers of the site right now, from the draft (no guesses, no history the panel does not keep) */
+  function kpis() {
+    var draft = A.state.draft || {};
+    var live = function (list) { return (list || []).filter(function (x) { return bool(x.enabled) && !bool(x.archived); }).length; };
+    var soon = upcoming().length;
+    var bell = (draft.notifications || []).filter(function (n) { return bool(n.enabled) && !bool(n.archived); }).length;
+    var tile = function (label, value, hint, go) {
+      return el('button', { class: 'kpi', type: 'button', onclick: go },
+        el('span', { class: 'kpi__label', text: label }),
+        el('span', { class: 'kpi__value', text: ar(value) }),
+        hint ? el('span', { class: 'kpi__hint', text: hint }) : null);
+    };
+    return el('section', { class: 'card kpis', 'aria-label': 'الأرقام دلوقتي' },
+      tile('أخبار ظاهرة', live(draft.news), '', function () { A.go('content', 'news'); }),
+      tile('جاي في أسبوعين', soon, 'أخبار وألعاب وفعاليات', function () { A.go('content', 'activities'); }),
+      tile('إشعارات في الجرس', bell, '', function () { A.go('content', 'notifications'); }),
+      tile('ألعاب', live(draft.games), '', function () { A.go('content', 'games'); }));
+  }
+
+  /* who is in the panel now (the presence the heartbeat brings) */
+  A.homePresence = function () {
+    var box = el('section', { class: 'card who-card', 'aria-labelledby': 'who-title', 'data-home-presence': '' });
+    function draw(list) {
+      var others = list || [];
+      var live = others.filter(function (o) { return o.seen < 40; }).length;
+      var editing = others.filter(function (o) { return o.item && o.item.label; }).length;
+      A.fill(box,
+        el('div', { class: 'card__head' },
+          el('h2', { class: 'card__title', id: 'who-title', text: 'المتصلين دلوقتي' }),
+          others.length ? A.chip('مباشر', 'ok') : null),
+        others.length ? el('p', { class: 'who__sum' },
+          el('span', {}, el('i', { class: 'is-ok' }), ar(live) + ' متصل'),
+          editing ? el('span', {}, el('i', { class: 'is-acc' }), ar(editing) + ' بيعدّل') : null) : null,
+        others.length ? el('div', { class: 'who' }, others.map(function (o) {
+          var state = o.item && o.item.label ? 'editing' : o.seen < 40 ? 'online' : 'idle';
+          return el('div', { class: 'who__item' },
+            el('span', { class: 'pav pav--' + state, 'aria-hidden': 'true', text: String(o.name || o.email || '؟').trim().charAt(0) }),
+            el('span', { class: 'who__text' },
+              el('b', { dir: 'auto', text: o.name || o.email }),
+              el('small', { class: state === 'editing' ? 'editing' : '', text: state === 'editing' ? 'بيعدّل في: ' + o.item.label : state === 'online' ? 'متصل دلوقتي' : 'آخر نشاط ' + A.ago(o.seen) })));
+        })) : el('p', { class: 'empty', text: 'مفيش أدمن تاني فاتح دلوقتي.' }));
+    }
+    draw(A.presentNow ? A.presentNow() : []);
+    box._draw = draw;
+    return box;
+  };
+
   /* the home view: the dashboard, then the timeline (AdminContent) */
   A.dashboard = function () {
 
-    return el('div', { class: 'dash' },
-      siteCard(),
-      // critical notifications waiting (AdminPage: «حالة النظام»), for the Primary Admin
-      A.criticalBanner ? A.criticalBanner() : null,
-      A.setupNudge ? A.setupNudge() : null,
-      // «الحجوزات»: new requests waiting (AdminBook; hidden while the module is off)
-      A.bookCard ? A.bookCard() : null,
-      meetingCard(),
-      bellCard(),
-      quickCard(),
-      A.activityCard ? A.activityCard() : null,
-      upcomingCard()
+    var waiting = A.waitingNow ? A.waitingNow() : [];
+
+    return el('div', { class: 'home' },
+      el('div', { class: 'home__main' },
+        helloCard(waiting),
+        queueTiles(waiting),
+        kpis(),
+        siteCard(),
+        // critical notifications waiting (AdminPage: «حالة النظام»), for the Primary Admin
+        A.criticalBanner ? A.criticalBanner() : null,
+        A.setupNudge ? A.setupNudge() : null,
+        // «الحجوزات»: new requests waiting (AdminBook; hidden while the module is off)
+        A.bookCard ? A.bookCard() : null,
+        el('div', { class: 'duo' }, meetingCard(), quickCard()),
+        bellCard(),
+        upcomingCard()
+      ),
+      el('aside', { class: 'home__side', 'aria-label': 'الفريق والنشاط' },
+        window.AdminTransport ? A.homePresence() : null,
+        A.activityCard ? A.activityCard() : null
+      )
     );
 
   };

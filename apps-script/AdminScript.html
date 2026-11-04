@@ -3152,7 +3152,7 @@
   function saveUi() {
 
     if (!A.keep) return;
-    var sub = { content: A.sub.content, page: A.sub.page, comps: A.sub.comps, pages: A.sub.pages };
+    var sub = { content: A.sub.content, page: A.sub.page, comps: A.sub.comps, pages: A.sub.pages, bookings: A.sub.bookings, youth: A.sub.youth };
     A.keep.set('ui', { area: A.area, sub: sub, y: Math.max(0, Math.round(window.scrollY || 0)), publish: publishMemo() });
     savePlace({ area: A.area, sub: sub });
 
@@ -3374,7 +3374,7 @@
       { key: 'compsettings', label: 'الإعدادات' }
     ] },
     // «الصفحات والفعاليات» (AdminPages.html, docs/EVENTS.md): service pages, events, servants
-    { key: 'pages', label: 'الصفحات والفعاليات', short: 'صفحات', icon: 'theatre', group: 'main', subs: [
+    { key: 'pages', label: 'الفعاليات والصفحات', short: 'الفعاليات', icon: 'theatre', group: 'main', subs: [
       { key: 'svcpages', label: 'صفحات الخدمة' },
       { key: 'events', label: 'الفعاليات' },
       { key: 'servants', label: 'الخدام' }
@@ -3385,9 +3385,9 @@
       { key: 'location', label: 'المكان' },
       { key: 'contacts', label: 'التواصل' }
     ] },
-    { key: 'media', label: 'الصور', icon: 'photos', group: 'site' },
+    { key: 'media', label: 'الصور والملفات', short: 'الصور', icon: 'photos', group: 'site' },
     // «سجل النشاط» (AdminActivity.html)
-    { key: 'activity', label: 'النشاط', icon: 'clock', title: 'سجل النشاط', group: 'team' },
+    { key: 'activity', label: 'سجل النشاط', short: 'النشاط', icon: 'clock', title: 'سجل النشاط', group: 'team' },
     { key: 'settings', label: 'الإعدادات', icon: 'gear' }
   ];
 
@@ -3419,6 +3419,60 @@
 
   }
 
+  /*
+   * The preview's map of the panel (Phase 8): «الشباب» and «الحجوزات والفلوس» are areas of their own in
+   * the rail and the dock. Their screens stay where the modules put them (comps › youth, pages › bookings
+   * and finance), so every old link and every module keeps working: opening one of those tabs lands on
+   * the area that now shows it.
+   */
+  var PROMOTED = {
+    youth: { from: 'comps', subs: ['youth'], label: 'الشباب', short: 'الشباب', icon: 'users', title: 'حسابات الشباب' },
+    bookings: { from: 'pages', subs: ['bookings', 'finance'], label: 'الحجوزات والفلوس', short: 'الحجوزات', icon: 'ticket' }
+  };
+
+  function promotedFor(host, sub) {
+    var found = '';
+    // only once that area exists (the module has put its tab there)
+    Object.keys(PROMOTED).forEach(function (k) { if (PROMOTED[k].from === host && PROMOTED[k].subs.indexOf(sub) !== -1 && areaOf(k)) found = k; });
+    return found;
+  }
+
+  function syncPromoted() {
+    Object.keys(PROMOTED).forEach(function (key) {
+      var p = PROMOTED[key];
+      var host = areaOf(p.from);
+      var subs = host && host.subs ? host.subs.filter(function (s) { return p.subs.indexOf(s.key) !== -1; }) : [];
+      var area = areaOf(key);
+      if (!subs.length) {
+        if (area) A.AREAS = A.AREAS.filter(function (a) { return a.key !== key; });
+        if (host) host._hidden = 0;
+        return;
+      }
+      if (!area) {
+        area = { key: key, label: p.label, short: p.short, icon: p.icon, title: p.title, group: 'main', promoted: p.from, subs: [] };
+        var at = A.AREAS.indexOf(host);
+        A.AREAS.splice(at + 1, 0, area);
+      }
+      area.subs = subs;
+      area.badge = subs.reduce(function (n, s) { return n + (Number(s.badge) || 0); }, 0);
+      host._hidden = area.badge;
+      if (!A.sub[key] || p.subs.indexOf(A.sub[key]) === -1 || !subs.some(function (s) { return s.key === A.sub[key]; })) A.sub[key] = subs[0].key;
+    });
+  }
+
+  /* is this tab on screen now? (also when its own area shows it: «الحجوزات والفلوس», «الشباب») */
+  A.onTab = function (host, sub) {
+    if (A.area === host && A.sub[host] === sub) return true;
+    var promoted = promotedFor(host, sub);
+    return !!promoted && A.area === promoted && A.sub[promoted] === sub;
+  };
+
+  /* the tabs an area shows (a host without its promoted ones) */
+  function shownSubs(area) {
+    if (!area || !area.subs) return null;
+    return area.subs.filter(function (s) { return !promotedFor(area.key, s.key); });
+  }
+
   /* jump from anywhere, e.g. the timeline: A.go('content', 'games') */
   A.go = function (area, sub) {
 
@@ -3426,6 +3480,9 @@
       sub = AREA_ALIASES[area][1] || sub;
       area = AREA_ALIASES[area][0];
     }
+    syncPromoted();
+    var promoted = sub ? promotedFor(area, sub) : '';
+    if (promoted) area = promoted;
 
     return A.confirmLeave().then(function (ok) {
       if (!ok) return false;
@@ -3466,7 +3523,7 @@
         if (area.key !== A.area) A.go(area.key);
       }
     },
-    el('span', { class: className + '__icon' }, icon(area.icon), navBadge(area.badge, className + '__badge')),
+    el('span', { class: className + '__icon' }, icon(area.icon), navBadge((Number(area.badge) || 0) - (Number(area._hidden) || 0), className + '__badge')),
     // the dock is narrow: its own short word where there is one (the rail and the title say it in full)
     el('span', { class: className + '__label', text: className === 'dockbtn' && area.short ? area.short : area.label }),
     area.soon && className === 'navlink' ? el('span', { class: 'nav-soon', text: 'قريبًا' }) : null
@@ -3515,6 +3572,7 @@
   function renderNav() {
 
     applyBadges();
+    syncPromoted();
 
     var rail = document.getElementById('rail-nav');
     var dock = document.getElementById('dock');
@@ -3534,8 +3592,9 @@
     dock.classList.remove('dock--dense', 'dock--crowded');
     dock.style.setProperty('--active', String(inMain < 0 ? docked.main.length : inMain));
 
-    subs.hidden = !current.subs;
-    subs.replaceChildren.apply(subs, (current.subs || []).map(function (s) {
+    var tabsShown = shownSubs(current);
+    subs.hidden = !tabsShown || !tabsShown.length;
+    subs.replaceChildren.apply(subs, (tabsShown || []).map(function (s) {
       return el('button', {
         class: 'tab', type: 'button',
         'aria-current': s.key === A.sub[A.area] ? 'page' : null,
@@ -3590,7 +3649,9 @@
     pages: ['content.view', 'events.view'],
     page: ['content.view'],
     media: ['media.view'],
-    activity: ['activity.view']
+    activity: ['activity.view'],
+    youth: ['participants.view'],
+    bookings: ['bookings.view', 'finance.view']
   };
 
   A.access = null;
@@ -3738,7 +3799,9 @@
   function dockAreas() {
     // the admin's own home first (A4), then the rest in their order
     var home = A.homeArea();
-    var all = A.visibleAreas().filter(function (a) { return a.key !== 'settings'; });
+    var order = Object.keys(GROUPS);
+    var all = A.visibleAreas().filter(function (a) { return a.key !== 'settings'; }).map(function (a, i) { return { a: a, i: i }; })
+      .sort(function (x, y) { return (order.indexOf(x.a.group || 'site') - order.indexOf(y.a.group || 'site')) || (x.i - y.i); }).map(function (x) { return x.a; });
     all = all.filter(function (a) { return a.key === home; }).concat(all.filter(function (a) { return a.key !== home; }));
     return { main: all.slice(0, DOCK_MAIN), rest: all.slice(DOCK_MAIN) };
   }
@@ -4066,6 +4129,8 @@
   function paintPresence(others, place) {
     present = others || [];
     if (place) presentPlace = place;
+    var home = document.querySelector('[data-home-presence]');
+    if (home && home._draw) home._draw(present);
     var button = document.getElementById('presence-open');
     if (!button) return;
     button.hidden = !present.length;
@@ -4086,6 +4151,9 @@
           el('small', { text: [STATE_WORDS[state], state === 'idle' ? 'آخر نشاط ' + A.ago(o.seen) : '', what].filter(Boolean).join(' · ') })));
     }), [el('p', { class: 'menu__note', text: 'اللي بيعدّل حاجة، بتتقفل للباقيين لحد ما يخلص.' })]));
   }
+
+  A.waitingNow = waiting;
+  A.presentNow = function () { return present; };
 
   A.shell = { presence: paintPresence, tools: shellTools, account: paintAccount, bell: paintBell, welcome: welcome, closeLayer: closeLayer, railLight: moveRailLight, setRail: setRail };
 
