@@ -22,6 +22,7 @@ import { zonedNow, stamp } from '../schedule.js';
 import { arabicDigits } from '../words.js';
 import { soundToggle, uiSounds, cue } from '../ui-sound.js';
 import { accountBadge } from '../account/link.js';
+import { mountNav } from '../nav.js';
 import { createWorkerApi, goSignIn, accountSession, dropAccountSession } from './accounts.js';
 
 const ROOT = new URL('../../../', import.meta.url);
@@ -573,6 +574,7 @@ if (window.top !== window.self) {
 // the site's sound: the same toggle and taps as the home page
 soundToggle(document.querySelector('.cbar'));
 accountBadge(document.querySelector('.cbar'), new URL('../../../', import.meta.url));
+mountNav();
 uiSounds();
 
 loadMe();

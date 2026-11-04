@@ -237,7 +237,8 @@ test('top bar: dialogs sit above it; the bell and the sound button still work', 
   assert.match(await page.$eval('#sound-toggle', b => b.getAttribute('aria-label')), /مقفولة/);
 
   // touch targets
-  const sizes = await page.$$eval('.topbar__btn', els => els.map(e => Math.min(e.offsetWidth, e.offsetHeight)));
+  // the visible ones (on phones the account icon is in the bottom bar: Phase 8 track P)
+  const sizes = await page.evaluate(() => [...document.querySelectorAll('.topbar__btn')].filter(e => e.offsetParent).map(e => Math.min(e.offsetWidth, e.offsetHeight)));
   assert.ok(sizes.every(s => s >= 44), sizes.join(','));
 
   assert.deepEqual(problems, []);

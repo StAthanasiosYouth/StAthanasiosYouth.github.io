@@ -7,6 +7,8 @@ import { extname, join, normalize } from 'node:path';
 import { ROOT } from './lib/gs.mjs';
 
 const PORT = Number(process.argv.slice(2).find(a => /^\d+$/.test(a)) || process.env.PORT || 4321);
+// --404: a missing page gets /404.html, as GitHub Pages does (tools/nav-check.mjs uses it); off by default
+const PAGES_404 = process.argv.includes('--404');
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -62,7 +64,16 @@ createServer(async (req, res) => {
     res.end(body);
   }
   catch {
-    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('404');
+    // with --404, like GitHub Pages: a missing page gets /404.html (the shell that finds new pages, BACKEND-MIGRATION §19)
+    try {
+      if (!PAGES_404) throw new Error('plain');
+      if (/\.[a-z0-9]{2,5}$/i.test(new URL(req.url, 'http://x').pathname) && !/\.html$/i.test(req.url)) throw new Error('a file');
+      res.writeHead(404, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'max-age=0, must-revalidate' });
+      res.end(await readFile(join(ROOT, '404.html')));
+    }
+    catch {
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('404');
+    }
   }
 }).listen(PORT, '127.0.0.1', () => console.log(`http://localhost:${PORT}/`));

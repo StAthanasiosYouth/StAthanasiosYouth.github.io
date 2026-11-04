@@ -23,6 +23,7 @@ import { zonedNow, stamp, setServerTime } from '../schedule.js';
 import { fetchPublished } from '../content-source.js';
 import { soundToggle, uiSounds } from '../ui-sound.js';
 import { accountBadge } from '../account/link.js';
+import { mountNav } from '../nav.js';
 
 const ROOT = new URL('../../../', import.meta.url);
 const html = document.documentElement;
@@ -326,6 +327,7 @@ else {
   // the site's sound: the same toggle and taps as the home page
   soundToggle(document.querySelector('.pbar'));
   accountBadge(document.querySelector('.pbar'), new URL('../../../', import.meta.url), { before: document.querySelector('.pbar__home') });
+  mountNav();
   uiSounds();
   boot();
   setInterval(tick, 60000);

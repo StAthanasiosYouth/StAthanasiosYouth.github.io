@@ -103,7 +103,7 @@ export function goSignIn(rootUrl) {
   location.href = new URL('account/', rootUrl).href;
 }
 
-function paintFace(button) {
+function paintFace(button, caption) {
   const local = storage('localStorage');
   const tab = storage('sessionStorage');
   const signedIn = !!readSession(local, tab);
@@ -135,6 +135,13 @@ function paintFace(button) {
   button.setAttribute('aria-label', label);
   button.title = label;
   button.replaceChildren(inner);
+  // the phones' bottom bar (nav.js) shows a word under the face
+  if (caption) {
+    const word = document.createElement('span');
+    word.className = 'tabbar__word';
+    word.textContent = caption;
+    button.append(word);
+  }
 }
 
 /*
@@ -143,7 +150,7 @@ function paintFace(button) {
  * signing in they land there, and its «ارجع للموقع» brings them back. Only a service that asked for the sign-in
  * (goSignIn) returns to the page.
  */
-export function accountBadge(bar, rootUrl, { cls = '', before = null } = {}) {
+export function accountBadge(bar, rootUrl, { cls = '', before = null, caption = '' } = {}) {
   if (!bar || bar.querySelector('.acct-badge')) return null;
   try {
     if (window.top !== window.self) return null;
@@ -163,10 +170,10 @@ export function accountBadge(bar, rootUrl, { cls = '', before = null } = {}) {
     keep(RETURN_KEY, '');
     keep(FROM_KEY, here());
   });
-  paintFace(link);
+  paintFace(link, caption);
   // back from another tab or page: what it shows may have changed
-  addEventListener('storage', () => paintFace(link));
-  addEventListener('pageshow', event => { if (event.persisted) paintFace(link); });
+  addEventListener('storage', () => paintFace(link, caption));
+  addEventListener('pageshow', event => { if (event.persisted) paintFace(link, caption); });
   if (before) before.before(link);
   else bar.append(link);
   return link;

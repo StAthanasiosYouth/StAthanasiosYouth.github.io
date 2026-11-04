@@ -41,7 +41,7 @@ export function shellFor(text, route) {
 
 async function boot() {
   const route = routeOf(location.pathname);
-  if (!route) return;
+  if (!route) return false;
   // relative files (event.json next to the page) need the folder form
   if (!location.pathname.endsWith('/') && !location.pathname.endsWith('/index.html')) {
     history.replaceState(null, '', location.pathname + '/' + location.search + location.hash);
@@ -49,16 +49,20 @@ async function boot() {
   let text;
   try {
     const response = await fetch(route.shell, { cache: 'no-cache', credentials: 'same-origin' });
-    if (!response.ok) return;
+    if (!response.ok) return false;
     text = await response.text();
   }
   catch {
-    return;                         // offline: the plain 404 page stays
+    return false;                   // offline: the plain 404 page stays
   }
-  if (!/<html lang="ar" dir="rtl">/.test(text)) return;
+  if (!/<html lang="ar" dir="rtl">/.test(text)) return false;
   document.open();
   document.write(shellFor(text, route));
   document.close();
+  return true;
 }
 
-if (typeof document !== 'undefined' && typeof location !== 'undefined' && document.documentElement.dataset.shell === '404') boot();
+if (typeof document !== 'undefined' && typeof location !== 'undefined' && document.documentElement.dataset.shell === '404') {
+  // the plain «مش موجودة» page gets the site's navigation; a written shell mounts its own
+  boot().then(written => { if (!written) import('./nav.js').then(m => m.mountNav(), () => {}); });
+}

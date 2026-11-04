@@ -103,13 +103,15 @@ async function signIn(page, m, { shared = false } = {}) {
   await page.$eval('form', f => f.requestSubmit());
 }
 
-const badge = (page, timeout = 10000) => page.waitForSelector('.acct-badge', { timeout });
-const label = page => page.$eval('.acct-badge', n => n.getAttribute('aria-label'));
+// phones (Phase 8 track P, assets/js/nav.js): the icon is «حسابي» in the bottom bar; wider screens keep it in the top bar
+const iconOf = page => (page.viewport().width < 768 ? '.tabbar .acct-badge' : '.acct-badge');
+const badge = (page, timeout = 10000) => page.waitForSelector(iconOf(page), { timeout });
+const label = page => page.$eval(iconOf(page), n => n.getAttribute('aria-label'));
 const pressBadge = async page => {
   await badge(page);
   // the intro on a first visit covers the bar for a moment, and a tap only skips it
-  await page.waitForFunction(() => { const b = document.querySelector('.acct-badge'); const r = b.getBoundingClientRect(); const e = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return e && b.contains(e); }, { timeout: 12000 });
-  await page.click('.acct-badge');
+  await page.waitForFunction(sel => { const b = document.querySelector(sel); const r = b.getBoundingClientRect(); const e = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return e && b.contains(e); }, { timeout: 12000 }, iconOf(page));
+  await page.click(iconOf(page));
 };
 
 test('signed out on a page: the icon says sign in, signing in lands on the account at once, and its link goes back there with the letter', async () => {
@@ -127,7 +129,7 @@ test('signed out on a page: the icon says sign in, signing in lands on the accou
   await page.waitForFunction(() => location.pathname === '/black-theatre/', { timeout: 10000 });
   await badge(page);
   assert.equal(await label(page), 'حسابي: مارك');
-  assert.equal(await page.$eval('.acct-badge__face', n => n.textContent), 'م');
+  assert.equal(await page.$eval(iconOf(page) + ' .acct-badge__face', n => n.firstChild.textContent), 'م');
   await page.screenshot({ path: SHOTS + 'signed-in-page-mobile.png' });
   assert.deepEqual(problems, []);
   await ctx.close();
@@ -162,7 +164,8 @@ test('signed in: the icon opens the account directly, and «ارجع للموق�
   await page.waitForSelector('[data-home]', { timeout: 10000 });
   assert.equal(await page.evaluate(() => location.pathname), '/account/', 'no bounce back');
   assert.equal(await page.$eval('.cbar__home', a => new URL(a.href).pathname), '/black-theatre/');
-  assert.equal(await page.$('.acct-badge'), null, 'no icon on the account page');
+  assert.equal(await page.$('.cbar .acct-badge'), null, 'no icon in the account page\'s own bar');
+  assert.equal(await page.$eval('.tabbar [data-tab="account"]', n => n.getAttribute('aria-current')), 'page', '«حسابي» says you are there');
   await ctx.close();
 });
 
@@ -331,14 +334,18 @@ test('every header at every width: fits, one row, 44px, RTL', async () => {
       }
       await badge(page);
       await sleep(3200);
-      const r = await page.evaluate(() => {
-        const a = document.querySelector('.acct-badge');
+      const r = await page.evaluate(sel => {
+        const a = document.querySelector(sel);
         const box = a.getBoundingClientRect();
-        const bar = a.closest('.topbar, .pbar, .cbar');
-        const items = [...bar.querySelectorAll('a, button')].filter(n => n.offsetParent).map(n => n.getBoundingClientRect());
+        // the bar the icon is in, and the page's top bar (on phones the icon is in the bottom bar)
+        const overlaps = bar => {
+          if (!bar) return false;
+          const items = [...bar.querySelectorAll('a, button')].filter(n => n.offsetParent && getComputedStyle(n).display !== 'none' && !n.inert).map(n => n.getBoundingClientRect());
+          return items.some((x, i) => items.some((y, j) => i < j && x.left < y.right - 1 && y.left < x.right - 1 && x.top < y.bottom - 1 && y.top < x.bottom - 1));
+        };
         return { w: box.width, h: box.height, left: box.left, right: box.right, inner: innerWidth, over: document.documentElement.scrollWidth - document.documentElement.clientWidth, dir: document.documentElement.dir,
-          overlap: items.some((x, i) => items.some((y, j) => i < j && x.left < y.right - 1 && y.left < x.right - 1 && x.top < y.bottom - 1 && y.top < x.bottom - 1)) };
-      });
+          overlap: overlaps(a.closest('.topbar, .pbar, .cbar, .tabbar')) || overlaps(document.querySelector('.topbar, .pbar, .cbar')) };
+      }, iconOf(page));
       const name = path + ' at ' + width + ': ' + JSON.stringify(r);
       assert.ok(r.w >= 44 && r.h >= 44, name);
       assert.ok(r.left >= 0 && r.right <= r.inner, name);
