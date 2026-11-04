@@ -1,6 +1,6 @@
 {
   "schema": 3,
-  "revision": "a55029924e36",
+  "revision": "efeb586b9dab",
   "publishedAt": "2026-10-08T09:00:00.000Z",
   "timezone": "Africa/Cairo",
   "site": {
@@ -131,6 +131,7 @@
         "h": 1500,
         "alt": "بوستر موضوع حياة التسليم"
       },
+      "icon": "",
       "status": "normal",
       "note": "",
       "visibleFrom": "2026-10-08T20:00",
@@ -143,6 +144,7 @@
       "speaker": "",
       "description": "",
       "image": null,
+      "icon": "",
       "status": "cancelled",
       "note": "علشان مؤتمر الشباب",
       "visibleFrom": "",
@@ -156,6 +158,7 @@
       "summary": "علشان مؤتمر الشباب — نتقابل الأحد اللي بعده",
       "body": "",
       "image": null,
+      "icon": "",
       "link": null,
       "badge": "",
       "featured": false,
@@ -178,6 +181,7 @@
         "h": 1500,
         "alt": "بوستر رحلة الغردقة"
       },
+      "icon": "",
       "link": {
         "url": "https://forms.gle/your-form-id",
         "label": "سجّل هنا"
@@ -204,6 +208,7 @@
         "h": 900,
         "alt": "بوستر رحلة الاستكشاف في الكنيسة"
       },
+      "icon": "",
       "url": "https://example.com/church-explorer",
       "buttonLabel": "ابدأ اللعب",
       "visibleFrom": "2026-10-11T21:00",
