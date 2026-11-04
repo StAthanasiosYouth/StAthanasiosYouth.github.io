@@ -279,3 +279,25 @@ Way back: revert the slice's commit (static admin files, minutes); a Worker chan
   `8632bed` A3+A5, `a4413b8` A4+A6, and A7+A8). Production is one deploy after the owner's approval: push the branch to
   `main` (CI runs the Worker's migrations — `0029_admin_prefs` — and deploys Staging then production; the static admin
   files go with GitHub Pages). Way back: revert on `main` and `wrangler rollback`; the migration only adds a table.
+- 2026-11-04: **Owner's review: "not the approved preview yet"** — the panel must take the preview's look, not only new colours
+  and buttons. Built on the same branch (`0f63e53`, `083fca0`), not on production:
+  - The preview's visual system on the real panel (the last layer of `AdminStyles.html`): flat solid surfaces with fine
+    lines (no gradient cards, no gold edge), the preview's buttons, chips, fields, underline sub-tabs, rail (46px rows, the
+    light, groups, Ruqaa brand), top bar, dock, sheets, menus and toasts; the content area uses the width (up to 1320px).
+  - The home in the preview's layout, with real data only: the greeting (Cairo date, صباح/مساء الخير يا …, what waits, quick
+    adds), the tiles of what waits, the numbers (news shown, the next two weeks, the bell, games — from the draft; no made-up
+    figures), the site's publish state, the next meeting (day tile, topic in Ruqaa) beside the quick actions, the bell,
+    «جاي قريب»; on the side who is here now and the latest activity.
+  - The preview's map: «الشباب» and «الحجوزات والفلوس» are areas of their own (rail, dock, palette); their screens stay
+    where the modules put them and every old link lands on the new area (`A.go('pages', 'bookings')`, `A.onTab`); the
+    preview's area names (الفعاليات والصفحات · الصور والملفات · سجل النشاط).
+  - Media library: the preview's tiles, the image at full size (lightbox), «اختيار» to move several to «المحذوفة» at once
+    (used ones are skipped; restorable; «تراجع» right after).
+  - Payment numbers as cards with a mark per method (a generic wallet; InstaPay as an instant-transfer mark in the panel's
+    colours — the brand's own logo is not drawn without its official asset); money in tabular digits.
+  - Fixed on the way: toasts readable on the new surfaces; past timeline rows readable (axe AA: no faded blocks).
+  - Tests: the suites follow the new map (bookings and youth as areas, the dock's order, a solid editor sheet); every admin
+    suite: the same failures as `main`, none new; axe clean in both themes.
+  - **Next, needs the owner's word (it changes the public site and the content data):** §22.1 item 11, «صورة أو أيقونة» in
+    every content image field (about 20 editors) with the icon tile on the public pages. Also waiting: `PERMS_ENFORCE`,
+    `GAMES_MODULE`, the test-data rule (item 21).
