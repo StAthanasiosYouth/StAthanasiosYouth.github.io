@@ -32,8 +32,9 @@ for (const path of ['/', '/black-theatre/']) {
     page.on('request', r => { if (r.url().startsWith(API)) calls.push(new URL(r.url()).pathname); });
     await page.setViewport({ width, height: 800, deviceScaleFactor: width < 640 ? 2 : 1 });
     await page.goto(SITE + path + '?check=' + Date.now(), { waitUntil: 'domcontentloaded' });
-    // phones (Phase 8 track P): the icon is «حسابي» in the bottom bar; wider screens keep it in the top bar
-    const ICON = width < 768 ? '.tabbar .acct-badge' : '.acct-badge';
+    // phones (Phase 8 track P): on the home page the icon is «حسابي» in the bottom bar; other pages and wider
+    // screens keep it in the top bar
+    const ICON = width < 768 ? '.tabbar .acct-badge, .pbar .acct-badge, .cbar .acct-badge' : '.acct-badge';
     await page.waitForSelector(ICON, { timeout: 20000 });
     await page.waitForFunction(sel => { const b = document.querySelector(sel); const r = b.getBoundingClientRect(); const e = document.elementFromPoint(r.x + 22, r.y + 22); return e && b.contains(e); }, { timeout: 15000 }, ICON);
     await sleep(1200);
@@ -50,7 +51,8 @@ for (const path of ['/', '/black-theatre/']) {
       };
     }, ICON);
     check(name + ': says sign in', r.label === 'سجّل دخولك', r);
-    check(name + ': the door' + (width < 768 ? ', 22 by 25 in the bar' : ', 40 by 44'), width < 768 ? r.door[0] === 22 && r.door[1] === 25 : r.door[0] === 40 && r.door[1] === 44, r);
+    const inBar = width < 768 && path === '/';
+    check(name + ': the door' + (inBar ? ', 22 by 25 in the bar' : ', 40 by 44'), inBar ? r.door[0] === 22 && r.door[1] === 25 : r.door[0] === 40 && r.door[1] === 44, r);
     check(name + ': fits, 44px, no overlap, RTL', r.w >= 44 && r.h >= 44 && r.left >= 0 && r.right <= r.inner && r.over <= 0 && !r.overlap && r.dir === 'rtl', r);
     check(name + ': no account request', !calls.some(c => c.startsWith('/v1/account/')), calls);
     check(name + ': no script errors', problems.length === 0, problems);

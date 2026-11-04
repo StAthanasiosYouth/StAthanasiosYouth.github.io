@@ -12,7 +12,7 @@
   --gold-wash: rgba(215, 170, 80, .1);
   --carmine-wash: rgba(200, 67, 58, .14);
   --ok-wash: rgba(79, 202, 140, .12);
-  --lattice: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 56 56'%3E%3Cpath d='M28 12v32M12 28h32M24 12h8M24 44h8M12 24v8M44 24v8' fill='none' stroke='%23f2d28b' stroke-width='1.1' stroke-linecap='round'/%3E%3C/svg%3E");
+  --lattice: url("data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' width='56' height='56' viewBox='0 0 56 56'%3E%3Cpath d='M28 12v32M12 28h32M24 12h8M24 44h8M12 24v8M44 24v8' fill='none' stroke='%23f2d28b' stroke-width='1.1' stroke-linecap='round'/%3E%3C/svg%3E");
   background:
     radial-gradient(90% 420px at 85% -60px, rgba(215, 170, 80, .16), transparent 62%),
     radial-gradient(70% 380px at 0% 0%, rgba(18, 56, 95, .6), transparent 70%),
@@ -716,4 +716,39 @@ html:active-view-transition-type(site-page)::view-transition-new(root) {
   @view-transition {
     navigation: none;
   }
+}
+
+/* «ارجع للموقع» as the Home icon from the very first frame (Phase 8 track P; the link and its words stay for no-JS
+   and the page builders' markup; nav.js names it). Here, in the page's own stylesheet, so it never shows as text. */
+.cbar__home {
+  position: relative;
+  justify-content: center;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 !important;
+  border: 1px solid var(--gold-line-strong, rgba(242, 210, 139, .36));
+  border-radius: 50%;
+  overflow: hidden;
+  color: transparent !important;
+  font-size: 0 !important;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.cbar__home::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 22px;
+  height: 22px;
+  background: var(--gold-hi, #f2d28b);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 10.6 12 4l8 6.6V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.5h-6v5.5H5.5A1.5 1.5 0 0 1 4 19z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 10.6 12 4l8 6.6V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.5h-6v5.5H5.5A1.5 1.5 0 0 1 4 19z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.cbar__home:hover {
+  background: var(--navy-800, #0b2a4c);
 }

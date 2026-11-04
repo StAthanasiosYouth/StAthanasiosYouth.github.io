@@ -738,14 +738,17 @@ test('B.U.G. co-brand line: a partnered service page and event page at 360 and 1
   await plain.context.close();
 });
 
-test('B.U.G. intro: full screen, plays to its end onto the lockup; again every time the visitor comes into a B.U.G. page', async () => {
+// Phase 8 track P (owner, 2026-11-04): the ident is part of the page — under the page's own bars, no letterbox,
+// no «تخطي»; it opens onto the page once the page is ready; again every time the visitor comes into a page
+test('B.U.G. intro: in the page under its bars, plays to its end onto the lockup; again every time the visitor comes in', async () => {
   clock = WINDOW_OPEN;
   const { context, page, problems } = await open('/bug-theatre/', PHONE, { reduced: false, init: recordIntro, waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__collab.added !== null, { timeout: 3000 });
   assert.equal(await page.$eval('.cintro', el => el.getAttribute('aria-hidden')), 'true');
-  // the whole screen (100vw × 100dvh), «تخطي» in its corner
+  // the page's area, under the page's own top bar (it stays on top), no letterbox, no «تخطي»
   assert.deepEqual(await page.$eval('.cintro', el => { const r = el.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height), innerWidth, innerHeight]; }).then(([l, t, w, h, vw, vh]) => [l, t, w === vw, h === vh]), [0, 0, true, true]);
-  assert.equal(await page.$eval('.cintro__skip', b => [b.tagName, b.textContent, b.tabIndex].join()), 'BUTTON,تخطي,-1');
+  assert.equal(await page.$('.cintro__skip'), null, 'no «تخطي» button');
+  assert.ok(await page.$eval('.cintro', el => Number(getComputedStyle(el).zIndex)) < await page.$eval('.pbar', el => Number(getComputedStyle(el).zIndex)), 'the page\'s top bar stays above it');
   await page.waitForFunction(() => performance.now() - window.__collab.added > 1700);
   await page.screenshot({ path: `${SHOTS}intro-360.png` });
   // the page renders underneath from the start (the overlay never holds it back)
@@ -754,7 +757,7 @@ test('B.U.G. intro: full screen, plays to its end onto the lockup; again every t
   await page.waitForFunction(() => window.__collab.removed !== null, { timeout: 3000 });
   let log = await introLog(page);
   assert.deepEqual(log.modes, ['full']);
-  assert.ok(log.removed - log.added <= 3300, `removed after ${Math.round(log.removed - log.added)} ms`);
+  assert.ok(log.removed - log.added <= 4300, `removed after ${Math.round(log.removed - log.added)} ms`);
   assert.ok(log.removed - log.added >= 2200, 'the ident plays to its end (≈ 2.35 s)');
   assert.equal(log.overlay, false);
   assert.equal(log.state, 'done');
@@ -770,10 +773,10 @@ test('B.U.G. intro: full screen, plays to its end onto the lockup; again every t
   // another B.U.G. page, then back to this one: the visitor comes in again, the ident plays again
   await page.goto(`${BASE}/events/bug-camp/`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__collab.added !== null, { timeout: 3000 });
-  await page.waitForFunction(() => window.__collab.removed !== null, { timeout: 4000 });
+  await page.waitForFunction(() => window.__collab.removed !== null, { timeout: 5000 });
   await page.goto(`${BASE}/bug-theatre/`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__collab.added !== null, { timeout: 3000 });
-  await page.waitForFunction(() => window.__collab.removed !== null, { timeout: 4000 });
+  await page.waitForFunction(() => window.__collab.removed !== null, { timeout: 5000 });
   await ready(page);
   assert.equal((await lockup(page)).inside, true);
   assert.deepEqual(problems, []);
@@ -786,13 +789,13 @@ test('B.U.G. intro at 1366: the same composition, centred', async () => {
   await page.waitForFunction(() => performance.now() - window.__collab.added > 1700);
   await page.screenshot({ path: `${SHOTS}intro-1366.png` });
   assert.deepEqual(await page.$eval('.cintro', el => { const r = el.getBoundingClientRect(); return [r.width === innerWidth, r.height === innerHeight]; }), [true, true], 'the whole screen');
-  await page.waitForFunction(() => window.__collab.removed !== null, { timeout: 3000 });
+  await page.waitForFunction(() => window.__collab.removed !== null, { timeout: 4500 });
   assert.ok(await overflow(page) <= 0);
   assert.deepEqual(problems, []);
   await context.close();
 });
 
-test('B.U.G. intro: «تخطي» or any tap skips it at once and is spent on it (nothing underneath opens)', async () => {
+test('B.U.G. intro: any tap ends it at once and is spent on it (nothing underneath opens); no «تخطي» button', async () => {
   const { context, page, problems } = await open('/bug-theatre/', PHONE, { reduced: false, init: recordIntro, waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__collab.added !== null && document.querySelector('main[data-state="ready"]'), { timeout: 3000 });
   const at = await page.evaluate(() => performance.now());
@@ -806,12 +809,10 @@ test('B.U.G. intro: «تخطي» or any tap skips it at once and is spent on it 
   assert.deepEqual(problems, []);
   await context.close();
 
-  // the «تخطي» button itself
+  // no «تخطي» button: the page itself is there, a tap is enough
   const again = await open('/bug-theatre/', PHONE, { reduced: false, init: recordIntro, waitUntil: 'domcontentloaded' });
-  await again.page.waitForSelector('.cintro__skip');
-  await again.page.waitForFunction(() => getComputedStyle(document.querySelector('.cintro__skip')).opacity > 0.5, { timeout: 3000 });
-  await again.page.click('.cintro__skip');
-  assert.equal(await again.page.$('.cintro'), null);
+  await again.page.waitForSelector('.cintro');
+  assert.equal(await again.page.$('.cintro__skip'), null);
   await again.context.close();
 });
 

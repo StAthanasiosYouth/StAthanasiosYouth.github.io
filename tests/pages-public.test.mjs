@@ -660,8 +660,9 @@ test('collab.js: the ident every time the page is entered; a light version on we
   assert.deepEqual(r.images, ['https://site.test/assets/img/partners/athanasios-family-240.webp', 'https://site.test/assets/img/partners/bug-symbol-320.webp']);
   assert.deepEqual([r.session, r.local], [{}, {}], 'nothing stored: it plays on every entry');
   assert.ok(r.timers.includes(700), 'starts by 0.7 s even if the logos are slow');
-  assert.ok(r.timers.includes(3300), 'the hard limit');
-  assert.ok(Math.max(...r.timers) <= 3300);
+  // (Phase 8 track P: it waits for the page to be ready before it opens onto it, never long)
+  assert.ok(r.timers.includes(4300), 'the hard limit');
+  assert.ok(Math.max(...r.timers) <= 4300);
   // any input skips it; leaving ends it; back from the back/forward cache plays it again
   assert.deepEqual([...new Set(r.listeners)].sort(), ['keydown', 'pagehide', 'pageshow', 'pointerdown', 'wheel']);
   assert.doesNotMatch(r.overlay.className, /cintro--lite/);

@@ -4975,3 +4975,15 @@ html:active-view-transition-type(site-page)::view-transition-new(root) {
     navigation: none;
   }
 }
+
+/* phones: the account icon lives in the bottom bar (nav.js), and the page keeps the bar's room, from the first frame
+   (Phase 8 track P; the bar's own look is nav.css, loaded by nav.js) */
+@media (max-width: 767px) {
+  .topbar .acct-badge {
+    display: none;
+  }
+
+  body:has(> main.hub) {
+    padding-bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+}

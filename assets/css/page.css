@@ -2354,6 +2354,58 @@ img, svg, video {
   display: none;
 }
 
+/* Phase 8 track P (owner, 2026-11-04): part of the page, not a scene. Under the page's own top bar and the
+   phones' bottom bar (z-index), on the page's navy with a soft gold room, no letterbox, no «تخطي». At the end the
+   stage opens from the centre (a widening window) onto the page, which settles in under it. */
+@property --cintro-hole {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
+.cintro {
+  z-index: 9;
+  background:
+    radial-gradient(60% 46% at 50% 46%, rgba(215, 170, 80, .12), transparent 70%),
+    radial-gradient(80% 60% at 50% 46%, rgba(18, 56, 95, .6), transparent 75%),
+    linear-gradient(180deg, var(--navy-900, #061a31), var(--ink, #020914) 70%);
+}
+
+.cintro__bar,
+.cintro__skip {
+  display: none;
+}
+
+.cintro.is-go,
+.cintro.is-go .cintro__scene {
+  animation: none;
+}
+
+.cintro.is-open {
+  -webkit-mask: radial-gradient(circle at 50% 46%, transparent var(--cintro-hole), #000 calc(var(--cintro-hole) + 18%));
+  mask: radial-gradient(circle at 50% 46%, transparent var(--cintro-hole), #000 calc(var(--cintro-hole) + 18%));
+  animation: cintro-open .75s cubic-bezier(.65, 0, .35, 1) both;
+}
+
+.cintro.is-open .cintro__scene {
+  animation: cintro-scene-out .5s cubic-bezier(.4, 0, .2, 1) both;
+}
+
+@keyframes cintro-open {
+  0% { --cintro-hole: 0%; opacity: 1; }
+  80% { opacity: 1; }
+  100% { --cintro-hole: 140%; opacity: 0; }
+}
+
+/* the page settles in as the stage opens */
+html[data-collab-reveal] .pg {
+  animation: cintro-page .8s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+@keyframes cintro-page {
+  from { opacity: .4; transform: scale(.985); filter: blur(4px); }
+}
+
 /* reduced motion never gets here (collab.js), but just in case */
 @media (prefers-reduced-motion: reduce) {
   .cintro {
@@ -3483,4 +3535,39 @@ html:active-view-transition-type(site-page)::view-transition-new(root) {
   @view-transition {
     navigation: none;
   }
+}
+
+/* «ارجع للموقع» as the Home icon from the very first frame (Phase 8 track P; the link and its words stay for no-JS
+   and the page builders' markup; nav.js names it). Here, in the page's own stylesheet, so it never shows as text. */
+.pbar__home {
+  position: relative;
+  justify-content: center;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 !important;
+  border: 1px solid var(--gold-line-strong, rgba(242, 210, 139, .36));
+  border-radius: 50%;
+  overflow: hidden;
+  color: transparent !important;
+  font-size: 0 !important;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.pbar__home::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 22px;
+  height: 22px;
+  background: var(--gold-hi, #f2d28b);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 10.6 12 4l8 6.6V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.5h-6v5.5H5.5A1.5 1.5 0 0 1 4 19z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 10.6 12 4l8 6.6V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.5h-6v5.5H5.5A1.5 1.5 0 0 1 4 19z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.pbar__home:hover {
+  background: var(--navy-800, #0b2a4c);
 }

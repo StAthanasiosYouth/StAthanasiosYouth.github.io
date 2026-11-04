@@ -15,8 +15,16 @@
  *   1.55–1.95  one light sweep, a few motes                 · an airy sweep, sparkles
  *   1.95–2.35  the bars open, the stage lifts into the page · the tail fades
  *
- * It plays every time the visitor comes into the page (a new load, or the
- * page coming back from the back/forward cache) — never again for a resize,
+ * Phase 8 track P (owner, 2026-11-04): the ident is part of the page, not a
+ * separate scene. It plays on the page's own navy under the page's top bar
+ * (and the phones' bottom bar), with no letterbox and no «تخطي» button; at
+ * the end the stage opens from the centre onto the page, once the page is
+ * ready (it waits for it, never long). It plays every time the visitor comes
+ * into the page (a new load, or the page coming back from the back/forward
+ * cache; owner, 2026-11-04). A tap still ends it; a tap on the page's own bars
+ * goes to them.
+ *
+ * Never again for a resize,
  * a turn of the phone or a re-render, which never run this script. Skipped
  * with reduced motion, a #hash (deep link), a hidden tab, framed, data
  * saver, the admin preview, and without getAnimations. A weak device gets
@@ -57,7 +65,9 @@
 
   var FULL = 2350;      // ms; page.css INTRO uses the same times
   var WAIT = 700;       // the longest it waits for the logos
-  var HARD = 3300;      // gone after this, whatever happens
+  var HARD = 4300;      // gone after this, whatever happens (the page may need a moment)
+  var READY_WAIT = 1200; // the longest the stage waits for the page before it opens
+  var OPEN = 750;        // page.css cintro-open
   var DUST = 7;
   var SOUND_KEY = 'athanasios.sound';      // sound.js: the site's one sound setting
 
@@ -327,8 +337,6 @@
     overlay.setAttribute('aria-hidden', 'true');
     overlay.setAttribute('data-partner', key);
 
-    overlay.appendChild(el('span', 'cintro__bar cintro__bar--top'));
-    overlay.appendChild(el('span', 'cintro__bar cintro__bar--bottom'));
     overlay.appendChild(el('span', 'cintro__ambient'));
 
     var scene = el('div', 'cintro__scene');
@@ -350,12 +358,6 @@
     scene.appendChild(el('span', 'cintro__sweep'));
     overlay.appendChild(scene);
 
-    // «تخطي»: a real target (any tap anywhere skips too); never in the tab order
-    var skip = el('button', 'cintro__skip', 'تخطي');
-    skip.type = 'button';
-    skip.tabIndex = -1;
-    overlay.appendChild(skip);
-
     // before <body> exists the overlay goes on <html>, over everything, from the first paint
     (document.body || html).appendChild(overlay);
 
@@ -365,7 +367,25 @@
       started = true;
       overlay.className += ' is-go';
       sound = score(performance.now());
-      timers.push(setTimeout(finish, FULL + 50));
+      timers.push(setTimeout(open, FULL - 400));
+    }
+
+    /* the stage opens onto the page once the page has drawn itself (never a half-made page) */
+    function ready() {
+      var main = document.querySelector('main.pg');
+      return !!main && main.getAttribute('data-state') !== 'loading';
+    }
+
+    function open() {
+      if (!overlay) return;
+      var waited = 0;
+      (function look() {
+        if (!overlay) return;
+        if (!ready() && waited < READY_WAIT) { waited += 100; timers.push(setTimeout(look, 100)); return; }
+        overlay.className += ' is-open';
+        html.setAttribute('data-collab-reveal', '');
+        timers.push(setTimeout(finish, OPEN + 60));
+      })();
     }
 
     function decoded(img) {
@@ -387,11 +407,15 @@
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       overlay = null;
       html.removeAttribute('data-collab');
+      setTimeout(function () { html.removeAttribute('data-collab-reveal'); }, 900);
     }
 
     /* the first input ends it, and is spent on that: the tap never reaches the page underneath */
     function onInput(event) {
       if (!overlay) return;
+      // the page's own bars (its top bar, the phones' bottom bar) take the tap: it ends the ident and goes through
+      var target = event.target && event.target.closest ? event.target.closest('.pbar, .tabbar') : null;
+      if (target) { finish(true); return; }
       if (event.type !== 'wheel') {
         if (event.cancelable) event.preventDefault();
         event.stopPropagation();
@@ -423,7 +447,7 @@
     addEventListener('pagehide', onLeave);
 
     overlay.addEventListener('animationend', function (event) {
-      if (event.target === overlay && event.animationName === 'cintro-out') finish();
+      if (event.target === overlay && event.animationName === 'cintro-open') finish();
     });
 
     timers.push(setTimeout(finish, HARD));
