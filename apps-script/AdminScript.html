@@ -879,6 +879,22 @@
     setTimeout(function () { button.classList.remove(cls); }, ok ? 1200 : 600);
   };
 
+  A.digits = function (n) { return String(n).replace(/\d/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[d]; }); };
+
+  /* an image at full size over everything (the media library's preview) */
+  A.lightbox = function (src, title) {
+    var img = el('img', { class: 'lightbox__img', src: src, alt: title || '' });
+    var box = el('dialog', { class: 'lightbox', 'aria-label': title || 'الصورة' },
+      el('button', { class: 'icon-btn lightbox__close', type: 'button', 'aria-label': 'قفل' }, icon('close')),
+      img,
+      title ? el('p', { class: 'lightbox__title', text: title }) : null);
+    box.addEventListener('click', function () { box.close(); });
+    box.addEventListener('close', function () { box.remove(); });
+    document.body.appendChild(box);
+    box.showModal();
+    A.sound('open');
+  };
+
   A.undoToast = function (message, undo) {
     A.toast(message, 'success', { label: 'تراجع', onclick: undo });
   };

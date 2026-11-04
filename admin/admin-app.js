@@ -1008,6 +1008,22 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     setTimeout(function () { button.classList.remove(cls); }, ok ? 1200 : 600);
   };
 
+  A.digits = function (n) { return String(n).replace(/\d/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[d]; }); };
+
+  /* an image at full size over everything (the media library's preview) */
+  A.lightbox = function (src, title) {
+    var img = el('img', { class: 'lightbox__img', src: src, alt: title || '' });
+    var box = el('dialog', { class: 'lightbox', 'aria-label': title || 'الصورة' },
+      el('button', { class: 'icon-btn lightbox__close', type: 'button', 'aria-label': 'قفل' }, icon('close')),
+      img,
+      title ? el('p', { class: 'lightbox__title', text: title }) : null);
+    box.addEventListener('click', function () { box.close(); });
+    box.addEventListener('close', function () { box.remove(); });
+    document.body.appendChild(box);
+    box.showModal();
+    A.sound('open');
+  };
+
   A.undoToast = function (message, undo) {
     A.toast(message, 'success', { label: 'تراجع', onclick: undo });
   };
@@ -8786,7 +8802,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   }
 
-  function grid(items, onPick, selectedId) {
+  function grid(items, onPick, selectedId, pickedSet) {
 
     if (!items.length) {
       return el('div', { class: 'empty-state' },
@@ -8797,7 +8813,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
 
     return el('div', { class: 'media-grid' }, items.map(function (item) {
-      return tile(item, function () { onPick(item); }, item.id === selectedId);
+      var node = tile(item, function () { onPick(item); }, item.id === selectedId || (pickedSet ? pickedSet.has(item.id) : false));
+      if (pickedSet) { node.classList.add('is-picking'); node.setAttribute('aria-pressed', String(pickedSet.has(item.id))); }
+      return node;
     }));
 
   }
@@ -8845,10 +8863,57 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       }));
     }
 
+    // Phase 8 (§22.1 item 7): select several, then move them to «المحذوفة» together (restorable, «تراجع» right after)
+    var picked = new Set();
+    var picking = false;
+    var pickBtn = el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'media-pick', 'aria-pressed': 'false', onclick: function () {
+      picking = !picking;
+      picked.clear();
+      pickBtn.setAttribute('aria-pressed', String(picking));
+      pickBtn.lastChild.textContent = picking ? 'خلّص الاختيار' : 'اختيار';
+      draw();
+    } }, icon('check'), el('span', { text: 'اختيار' }));
+    var pickBar = el('div', { class: 'pick-bar', hidden: true, role: 'status' });
+
+    function drawBar() {
+      pickBar.hidden = !picking;
+      if (!picking) return;
+      var items = library.items.filter(function (i) { return picked.has(i.id); });
+      var free = items.filter(function (i) { return !i.usage.length && !i.deletedAt; });
+      var used = items.length - free.length;
+      A.fill(pickBar,
+        el('span', { class: 'pick-bar__n', text: items.length ? A.digits(items.length) + ' مختارة' : 'اختار صور من تحت' }),
+        used ? el('span', { class: 'pick-bar__note', text: A.digits(used) + ' مستخدمة أو محذوفة: مش هتتشال' }) : null,
+        el('button', { class: 'btn btn--small btn--danger', type: 'button', 'data-act': 'media-pick-remove', disabled: !free.length || null, onclick: function (event) {
+          var button = event.currentTarget;
+          A.confirm({ tone: 'danger', title: 'تشيل ' + A.digits(free.length) + ' من المكتبة؟', message: 'هيروحوا «المحذوفة» وتقدر ترجعهم بعدين.', confirmLabel: 'شيلهم', cancelLabel: 'لأ' }).then(function (ok) {
+            if (!ok) return;
+            var ids = free.map(function (i) { return i.id; });
+            var chain = ids.reduce(function (p, id) { return p.then(function () { return A.call('apiDeleteMedia', id); }); }, Promise.resolve());
+            A.withBusy(button, chain).then(function (next) {
+              A.invalidateLibrary();
+              if (next) A.applyState(next);
+              picked.clear();
+              load(true).then(draw).catch(function () {});
+              A.undoToast('اتشالوا ' + A.digits(ids.length) + ' — تلاقيهم في «المحذوفة»', function () {
+                ids.reduce(function (p, id) { return p.then(function () { return A.call('apiRestoreMedia', id); }); }, Promise.resolve())
+                  .then(function (state) { A.invalidateLibrary(); if (state) A.applyState(state); load(true).then(draw).catch(function () {}); A.toast('رجعوا للمكتبة ✓'); })
+                  .catch(function (error) { A.fail(error); });
+              });
+            }).catch(function (error) { A.fail(error); });
+          });
+        } }, icon('trash'), 'شيل المختارة'));
+    }
+
     function draw() {
       if (!library) return;
       var items = library.items.filter(function (item) { return matches(item, viewFilter, viewQuery); });
-      body.replaceChildren(grid(items, openDetails));
+      body.replaceChildren(grid(items, function (item) {
+        if (!picking) { openDetails(item); return; }
+        if (picked.has(item.id)) picked.delete(item.id); else picked.add(item.id);
+        draw();
+      }, null, picking ? picked : null));
+      drawBar();
     }
 
     search.addEventListener('input', function () { viewQuery = search.value.trim(); draw(); });
@@ -8868,7 +8933,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return [
       A.card('مكتبة الصور', 'كل البوسترات والبانرات ومقاطع المشاهد في مكان واحد. اختار من هنا بدل ما ترفع نفس الصورة كذا مرة.',
         el('div', { class: 'media-upload' }, upload.node, uploads, videoNote),
-        el('div', { class: 'media-tools' }, search, chips)
+        el('div', { class: 'media-tools' }, search, chips, pickBtn),
+        pickBar
       ),
       el('section', { class: 'card' }, body)
     ];
@@ -8904,6 +8970,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var alt = A.counted(video ? 'وصف الفيديو' : 'وصف الصورة', item.alt, 140, video ? 'للي بيستخدم قارئ شاشة (مثلاً: الشباب في رحلة الغردقة)' : 'للي بيستخدم قارئ شاشة (مثلاً: بوستر رحلة الغردقة)');
     // a video: its poster frame (the clip itself plays on the site)
     var preview = el('img', { class: 'media-detail__img', alt: '' });
+    // Phase 8: a tap shows it full size (a lightbox; Esc or a tap closes it)
+    preview.addEventListener('click', function () { if (preview.src) A.lightbox(preview.src, item.name || item.alt || ''); });
+    preview.setAttribute('role', 'button');
+    preview.tabIndex = 0;
+    preview.setAttribute('aria-label', 'شوفها بالحجم الكامل');
+    preview.addEventListener('keydown', function (event) { if ((event.key === 'Enter' || event.key === ' ') && preview.src) { event.preventDefault(); A.lightbox(preview.src, item.name || item.alt || ''); } });
     var length = el('dd', { class: 'ltr', text: '—' });
 
     if (!audio) A.mediaPreview(item.id).then(function (src) { if (src) preview.src = src; }).catch(function () {
@@ -17546,7 +17618,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var waiting = A.waitingNow ? A.waitingNow() : [];
 
-    return el('div', { class: 'home' },
+    return el('div', { class: 'home dash' },
       el('div', { class: 'home__main' },
         helloCard(waiting),
         queueTiles(waiting),
