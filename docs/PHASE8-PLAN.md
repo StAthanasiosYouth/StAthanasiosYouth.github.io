@@ -1,6 +1,6 @@
 # Phase 8 — execution plan
 
-Started 2026-11-04 on the owner's order. Spec: `docs/BACKEND-MIGRATION.md` §22.1 (items 1–25). This file fixes the order,
+Started and CLOSED 2026-11-04 (live in production, see the end of this file). Spec: `docs/BACKEND-MIGRATION.md` §22.1 (items 1–25). This file fixes the order,
 the gates and the way back. Where it and §22.1 differ, §22.1 wins unless this file says why.
 
 ## 0. What the owner approved (2026-11-03 → 2026-11-04)
@@ -310,5 +310,18 @@ Way back: revert the slice's commit (static admin files, minutes); a Worker chan
       (points-widget). Full regression: the same failures as `main`, none new.
     - Not covered yet (owner's call): banners, service pages, events, contacts; search, categories and recent picks in the
       icon list.
-  - **Waiting on the owner:** `PERMS_ENFORCE`, `GAMES_MODULE`, the test-data rule (item 21), and the final review before
-    the one production deploy.
+  - **Closing (owner 2026-11-04: «لوحة التحكم» in plain Cairo, then publish and close Phase 8):** the rail brand and the
+    sign-in screen's title in Cairo (Ruqaa kept for the greeting). Item 11's reference example regenerated (the `icon`
+    field).
+
+## Phase 8 — CLOSED 2026-11-04 (live in production)
+
+- Live: main `670172f` (the whole admin branch: A1–A8, the preview's look, media, payment cards, item 11, Cairo brand;
+  Worker CI success on Staging and production, migration `0029_admin_prefs` applied), then `71b5560` (the sign-in title
+  in Cairo; static only). Track P was already live (`9d17056`).
+- Switches left as they were (off), each on the owner's word only: `PERMS_ENFORCE` (nothing hidden today), `GAMES_MODULE`
+  (the games corner stays locked). The test-data rule (item 21) is not built.
+- Way back: the last main before the deploy is `a31a74e`: restore `admin/`, `apps-script/`, `assets/` and `worker/` from it in a new commit on main (the content mirror files keep their latest); migration 0029 is additive (the
+  prefs table stays, unused, on a revert). The Worker redeploys from main on the revert.
+- Carried for the owner: «صورة أو أيقونة» for banners, service pages, events and contacts; search and recent picks in the
+  icon list; the three switches above.
