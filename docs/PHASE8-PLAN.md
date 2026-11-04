@@ -48,6 +48,23 @@ How (study result):
 Slices: **P1** nav module + bottom bar + top icons → **P2** Home icon on every bar → **P3** transitions, prefetch, back rules →
 **P4** tests and checks.
 
+**Owner's changes while building (2026-11-04), all built:**
+- The bar is **three slots + «حسابي» + «المزيد»**. On the home page the three slots are the places **nearest to where you are**
+  (the section you are in, lit, and its neighbours; «الرئيسية» is the top) and follow the scroll: going down, the far one
+  leaves to the right and the next comes in from the left, out of the line beside «حسابي»; going up, the other way round.
+  On any other page the slots are «الرئيسية · الفعاليات · المسابقات». «حسابي» and «المزيد» never move.
+- **«المزيد»**: a sheet with every place: the home page's sections (in the page's order), the social pages, the site's pages
+  («نقاطي والمسابقات», service pages). From another page a home section opens `/index.html#to-<key>` at that section.
+- **Look:** a floating glass capsule (iOS 18 in spirit) in the site's navy and gold: blur, a light edge, crisp hairlines.
+  One glass **lens** glides to the lit place with a soft spring (never a jump). Going down the page the bar draws in to icons
+  only; going up it opens again.
+- **Tasks keep the screen:** while a booking is filled in, or while typing, the bar slides away (as an app hides its tab
+  bar). The competition's sticky actions stop above the bar; `scroll-padding-bottom` keeps anything brought into view clear.
+- The cross-page transition is typed (`site-page`), so a page's own transitions (the account's sign-in) stay as they were;
+  moves into and out of the account page are plain; an aborted transition is never a page error.
+- The account page's link keeps returning to the page you came from (ACCOUNTS-IMPROVEMENTS); its icon is the Home icon and
+  its name says where it goes.
+
 Done when:
 - Unit and browser tests pass (existing ones updated only where the change is the point: the Home link's look).
 - On the local site against the Staging Worker: every page type shows the bar on a phone width and not on desktop; every tab
@@ -90,3 +107,11 @@ Way back: revert the slice's commit (static admin files, minutes); a Worker chan
 ## 4. Progress
 
 - 2026-11-04: plan written. Track P runs in its own session; Track A starts with A0 here.
+- 2026-11-04: **Track P built and checked** (branch `phase8-public-nav`, done in the main session on the owner's choice).
+  `assets/js/nav.js` + `assets/css/nav.css`, imported by every entry module; the cross-page opt-in in each page's CSS.
+  Checks: `tools/nav-check.mjs` all ok (every page type at 390 and 1280, tabs, «المزيد», the slots following the scroll,
+  Back to the same scroll by the Home icon / the tab / the browser, cold links, the 404 page). Unit tests 765 of 766 (the one
+  failure is the old one from Phase 6). Public browser tests: no new failures against `main` (the 11 that fail fail on
+  `main` too); tests changed only where the icon's place is the point (`account-badge.e2e`, `polish-a.e2e`).
+  `tools/serve.mjs --404` answers missing pages like GitHub Pages (off by default, so other tests are unchanged).
+  Way back: revert the track's commit on `main`.

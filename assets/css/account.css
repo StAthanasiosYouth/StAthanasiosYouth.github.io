@@ -690,3 +690,30 @@ html[data-motion="lite"] .ac-arch.is-bloom .ac-arch__face { animation: none; }
 @media (min-width: 1500px) {
   .ac-shell { max-width: 1380px; grid-template-columns: 330px minmax(0, 1fr); gap: 56px; }
 }
+
+/* moving between the site's pages feels like one app: the browser keeps the bar still and fades the page
+   (Phase 8 track P, assets/js/nav.js). Where unsupported, the page simply loads. */
+@view-transition {
+  navigation: auto;
+  types: site-page;
+}
+
+/* only for a move between pages (the type), so a page's own transitions (the account's sign-in) stay as they were */
+html:active-view-transition-type(site-page) :is(.topbar, .pbar, .cbar) {
+  view-transition-name: site-topbar;
+}
+
+html:active-view-transition-type(site-page) .tabbar {
+  view-transition-name: site-tabbar;
+}
+
+html:active-view-transition-type(site-page)::view-transition-old(root),
+html:active-view-transition-type(site-page)::view-transition-new(root) {
+  animation-duration: .22s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @view-transition {
+    navigation: none;
+  }
+}

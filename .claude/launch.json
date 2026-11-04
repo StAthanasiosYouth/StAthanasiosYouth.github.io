@@ -4,19 +4,29 @@
     {
       "name": "portal",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["tools/serve.mjs", "4321"],
+      "runtimeArgs": [
+        "tools/serve.mjs",
+        "4321"
+      ],
       "port": 4321
     },
     {
       "name": "portal-8080",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["tools/serve.mjs", "8080"],
+      "runtimeArgs": [
+        "tools/serve.mjs",
+        "8080",
+        "--404"
+      ],
       "port": 8080
     },
     {
       "name": "admin-preview",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["tools/admin-preview.mjs", "4322"],
+      "runtimeArgs": [
+        "tools/admin-preview.mjs",
+        "4322"
+      ],
       "port": 4322
     }
   ]
