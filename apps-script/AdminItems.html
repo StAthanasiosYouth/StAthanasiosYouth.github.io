@@ -533,7 +533,7 @@
     var title = A.counted('العنوان', item.title, 80, 'مثلاً: مسابقة الكتاب المقدس', { required: true });
     var subtitle = A.counted('سطر قصير', item.subtitle, 140, 'بيظهر على الكارت');
     var description = A.counted('التفاصيل', item.description, 1500, 'اختياري — بتظهر لما حد يفتحها', { multiline: true });
-    var image = A.imagePicker(item.image, { label: 'البوستر', hint: 'من غير بوستر؟ هياخد بانر النوع أو القسم تلقائي', onchange: function () { if (display) display.refresh(); } });
+    var image = A.imageOrIcon(item.image, item.icon, { label: 'البوستر', hint: 'من غير بوستر؟ هياخد بانر النوع أو القسم تلقائي', onchange: function () { if (display) display.refresh(); } });
     var display = null;
     var url = A.textInput(item.url, { ltr: true, placeholder: 'https://', type: 'url' });
     var cta = A.textInput(item.ctaLabel, { max: 24 });
@@ -569,6 +569,7 @@
         subtitle: subtitle.input.value,
         description: description.input.value,
         image: image.value(),
+        icon: image.icon(),
         url: url.value.trim(),
         ctaLabel: cta.value,
         location: location.input.value,

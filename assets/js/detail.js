@@ -9,7 +9,7 @@ import { iconNode } from './icons.js';
 import { upcomingSessions } from './schedule.js';
 import { formatStamp, formatDate, formatTime, DAY_NAMES } from './words.js';
 import { openViewer } from './sheet.js';
-import { gameCard } from './hub.js';
+import { gameCard, art } from './hub.js';
 import { motionTier } from './feel.js';
 import { programList } from './program.js';
 
@@ -35,6 +35,13 @@ export function shapeOf(image) {
   if (ratio > 0.85) return 'square';
   if (ratio >= 0.5) return 'portrait';
   return 'tall';
+
+}
+
+/* an item with an icon instead of a poster (Phase 8, §22.1 item 11): its branded tile in the hero's place */
+export function iconHero(icon) {
+
+  return icon ? h('div', { class: 'media-hero media-hero--icon' }, art({}, icon, true)) : null;
 
 }
 
@@ -127,7 +134,7 @@ function expandIcon() {
 export function newsSheetContent(item, nowStamp, shareItem) {
 
   return h('article', { class: 'detail' },
-    mediaHero(item.image),
+    item.image ? mediaHero(item.image) : iconHero(item.icon),
     h('div', { class: 'detail__meta' },
       item.badge ? h('span', { class: 'badge' }, item.badge) : null,
       item.publishAt ? h('span', {}, formatStamp(item.publishAt)) : null
@@ -148,7 +155,7 @@ export function gameSheetContent(entry, shareItem) {
 
   return {
     node: h('article', { class: 'detail' },
-      mediaHero(game.image),
+      game.image ? mediaHero(game.image) : iconHero(game.icon),
       game.description ? h('p', { class: 'detail__body' }, game.description) : null,
       h('div', { class: 'detail__game' }, card.el),
       shareItem(`#game/${game.id}`, game.title)
@@ -171,7 +178,7 @@ export function meetingSheetContent(content, status, nowStamp) {
     : '';
 
   return h('article', { class: 'detail' },
-    session ? mediaHero(session.image) : null,
+    session ? (session.image ? mediaHero(session.image) : iconHero(session.icon)) : null,
     session && session.topic ? h('p', { class: 'detail__kicker' }, 'موضوع الاجتماع') : null,
     session && session.topic ? h('p', { class: 'detail__topic' }, session.topic) : null,
     session && session.speaker ? h('p', { class: 'detail__lead' }, `مع ${session.speaker}`) : null,

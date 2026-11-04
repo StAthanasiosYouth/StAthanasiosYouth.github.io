@@ -47,6 +47,8 @@ export function picture(image, { sizes = '(min-width: 1024px) 360px, 92vw', clas
 export function posterOrFallback(image, section = {}, options = {}) {
 
   if (image) return picture(image, options);
+  // the admin chose an icon for this item: it stands where its poster would (before the section's banner)
+  if (options.chosen) return art({ theme: section.theme }, options.chosen, true);
   if (section.banner) return picture(section.banner, options);
 
   return art(section, options.icon);
@@ -55,11 +57,11 @@ export function posterOrFallback(image, section = {}, options = {}) {
 
 
 /* built-in art: the section's colour, a quiet cross lattice, its icon */
-export function art(section = {}, iconName = '') {
+export function art(section = {}, iconName = '', chosen = false) {
 
-  return h('span', { class: 'art', 'data-theme': section.theme || null, 'aria-hidden': 'true' },
+  return h('span', { class: 'art' + (chosen ? ' art--chosen' : ''), 'data-theme': section.theme || null, 'aria-hidden': 'true' },
     h('span', { class: 'art__glow' }),
-    iconNode(section.icon || iconName || 'cross', 'art__icon')
+    iconNode(chosen ? iconName : section.icon || iconName || 'cross', 'art__icon')
   );
 
 }
@@ -263,7 +265,7 @@ export function newsSection(items, nowStamp, section = {}) {
 
 export function newsLead(item, nowStamp, section = {}) {
 
-  const media = h('div', { class: 'news-lead__media' }, posterOrFallback(item.image, section, { sizes: '(min-width: 1024px) 520px, 92vw', icon: 'megaphone' }));
+  const media = h('div', { class: 'news-lead__media' }, posterOrFallback(item.image, section, { sizes: '(min-width: 1024px) 520px, 92vw', icon: 'megaphone', chosen: item.icon }));
   const body = h('div', { class: 'news-lead__body' },
       h('div', { class: 'news__meta' },
         item.badge ? h('span', { class: 'badge' }, item.badge) : null,
@@ -284,7 +286,7 @@ export function newsLead(item, nowStamp, section = {}) {
 function newsCard(item, nowStamp, section = {}) {
 
   return h('article', { class: 'news-card' },
-    h('div', { class: 'news-card__media' }, posterOrFallback(item.image, section, { sizes: '220px', icon: 'megaphone' })),
+    h('div', { class: 'news-card__media' }, posterOrFallback(item.image, section, { sizes: '220px', icon: 'megaphone', chosen: item.icon })),
     h('div', { class: 'news-card__body' },
       h('div', { class: 'news__meta' },
         item.badge ? h('span', { class: 'badge' }, item.badge) : null,
@@ -345,7 +347,7 @@ export function gameCard(entry, { live = false, inSheet = false, section = {} } 
 
   const canvas = live ? h('canvas', { class: 'game__embers', 'aria-hidden': 'true' }) : null;
 
-  const media = h('div', { class: 'game__media' }, posterOrFallback(game.image, section, { sizes: live ? '(min-width: 1024px) 420px, 92vw' : '160px', icon: 'star' }));
+  const media = h('div', { class: 'game__media' }, posterOrFallback(game.image, section, { sizes: live ? '(min-width: 1024px) 420px, 92vw' : '160px', icon: 'star', chosen: game.icon }));
   const body = h('div', { class: 'game__body' },
       stateLabel,
       h('h3', { class: 'game__title' }, game.title),
@@ -456,7 +458,8 @@ export function meetingTopic(session) {
   const poster = session.image || null;
 
   return h('button', { class: 'topic', type: 'button', onclick: () => go('meeting') },
-    poster ? h('span', { class: 'topic__poster' }, picture(poster, { sizes: '72px' })) : null,
+    poster ? h('span', { class: 'topic__poster' }, picture(poster, { sizes: '72px' }))
+      : session.icon ? h('span', { class: 'topic__poster' }, art({}, session.icon, true)) : null,
     h('span', { class: 'topic__text' },
       h('span', { class: 'topic__label' }, iconNode('book'), 'موضوع الاجتماع'),
       h('span', { class: 'topic__title' }, session.topic),

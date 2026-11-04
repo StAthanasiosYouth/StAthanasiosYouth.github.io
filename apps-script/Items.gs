@@ -90,6 +90,20 @@ function storedOf_(stamp) {
 }
 
 
+/* Phase 8 (§22.1 item 11): an icon instead of a poster — one of the site's own icons, or nothing */
+function iconKey_(value, problems) {
+
+  var key = contentLine_(value);
+  if (!key) return '';
+  if (ICON_NAMES.indexOf(key) === -1) {
+    problems.push('الأيقونة مش معروفة');
+    return '';
+  }
+  return key;
+
+}
+
+
 function imageRef_(value, problems) {
 
   var id = contentLine_(value);
@@ -327,6 +341,7 @@ var ITEM_VALIDATORS = {
       speaker: input_(input.speaker, HUB_LIMITS.speaker, 'الخادم / المتكلم', problems, false),
       description: textBlock_(input.description, HUB_LIMITS.sessionDescription, 'الوصف', problems),
       image: imageRef_(input.image, problems),
+      icon: iconKey_(input.icon, problems),
       status: input.status === 'cancelled' ? 'cancelled' : 'normal',
       note: input_(input.note, LIMITS.note, 'الملاحظة', problems, false),
       visibleFrom: dateInput_(input.visibleFrom, false, 'ميعاد ظهور الموضوع', problems)
@@ -362,6 +377,7 @@ var ITEM_VALIDATORS = {
       summary: input_(input.summary, HUB_LIMITS.summary, 'الملخص', problems, false),
       body: textBlock_(input.body, HUB_LIMITS.body, 'التفاصيل', problems),
       image: imageRef_(input.image, problems),
+      icon: iconKey_(input.icon, problems),
       linkUrl: link,
       linkLabel: input_(input.linkLabel, LIMITS.linkLabel, 'نص الزرار', problems, false),
       badge: input_(input.badge, LIMITS.badge, 'الشارة', problems, false),
@@ -391,6 +407,7 @@ var ITEM_VALIDATORS = {
       title: input_(input.title, HUB_LIMITS.gameTitle, 'اسم اللعبة', problems, true),
       description: textBlock_(input.description, HUB_LIMITS.gameDescription, 'الوصف', problems),
       image: imageRef_(input.image, problems),
+      icon: iconKey_(input.icon, problems),
       url: url,
       buttonLabel: input_(input.buttonLabel, HUB_LIMITS.buttonLabel, 'نص الزرار', problems, false),
       visibleFrom: dateInput_(input.visibleFrom, false, 'ميعاد الظهور', problems),
@@ -444,6 +461,7 @@ var ITEM_VALIDATORS = {
       subtitle: input_(input.subtitle, ACTIVITY_LIMITS.subtitle, 'سطر قصير', problems, false),
       description: textBlock_(input.description, ACTIVITY_LIMITS.description, 'التفاصيل', problems),
       image: imageRef_(input.image, problems),
+      icon: iconKey_(input.icon, problems),
       ctaLabel: input_(input.ctaLabel, ACTIVITY_LIMITS.cta, 'نص الزرار', problems, false),
       url: url || '',
       location: input_(input.location, ACTIVITY_LIMITS.location, 'المكان', problems, false),

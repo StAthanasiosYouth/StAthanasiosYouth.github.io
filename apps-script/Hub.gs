@@ -433,6 +433,13 @@ function buildHub_(draft, ctx) {
   var usedMedia = Object.create(null);
   var today = ctx.now ? ctx.now.slice(0, 10) : '';
 
+  // Phase 8 (§22.1 item 11): the icon is published only for an item with no image (the image wins)
+  function iconFor(row, img) {
+    if (img) return '';
+    var key = contentLine_(row.icon);
+    return ICON_NAMES.indexOf(key) !== -1 ? key : '';
+  }
+
   function image(where, value) {
     var id = contentLine_(value);
     if (!id) {
@@ -533,6 +540,7 @@ function buildHub_(draft, ctx) {
       speaker: ctx.limited(where, contentLine_(row.speaker), HUB_LIMITS.speaker, 'الخادم / المتكلم'),
       description: ctx.limited(where, contentText_(row.description), HUB_LIMITS.sessionDescription, 'الوصف'),
       image: image(where, row.image),
+      icon: iconFor(row, contentLine_(row.image)),
       status: status,
       note: ctx.limited(where, contentLine_(row.note), LIMITS.note, 'الملاحظة'),
       visibleFrom: dateTime(where, row.visibleFrom, false, 'ميعاد الظهور'),
@@ -625,6 +633,7 @@ function buildHub_(draft, ctx) {
       summary: ctx.limited(where, contentLine_(row.summary), HUB_LIMITS.summary, 'الملخص'),
       body: ctx.limited(where, contentText_(row.body).replace(/\n{3,}/g, '\n\n'), HUB_LIMITS.body, 'التفاصيل'),
       image: image(where, row.image),
+      icon: iconFor(row, contentLine_(row.image)),
       link: safeLink
         ? { url: safeLink, label: ctx.limited(where, contentLine_(row.linkLabel), LIMITS.linkLabel, 'نص الزرار') || 'التفاصيل' }
         : null,
@@ -717,6 +726,7 @@ function buildHub_(draft, ctx) {
       title: ctx.limited(where, title, HUB_LIMITS.gameTitle, 'العنوان'),
       description: ctx.limited(where, contentText_(row.description), HUB_LIMITS.gameDescription, 'الوصف'),
       image: image(where, row.image),
+      icon: iconFor(row, contentLine_(row.image)),
       url: url,
       buttonLabel: ctx.limited(where, contentLine_(row.buttonLabel), HUB_LIMITS.buttonLabel, 'نص الزرار'),
       visibleFrom: visibleFrom,
@@ -865,6 +875,7 @@ function buildHub_(draft, ctx) {
       subtitle: ctx.limited(where, linked ? linked.subtitle : contentLine_(row.subtitle), 140, 'السطر القصير'),
       description: owner ? '' : ctx.limited(where, contentText_(row.description).replace(/\n{3,}/g, '\n\n'), 1500, 'التفاصيل'),
       image: image(where, linked && linked.bannerId ? linked.bannerId : row.image),
+      icon: iconFor(row, contentLine_(linked && linked.bannerId ? linked.bannerId : row.image)),
       cta: url ? { label: ctx.limited(where, contentLine_(row.ctaLabel) || type.ctaDefault || 'التفاصيل', 24, 'نص الزرار'), url: url } : null,
       location: ctx.limited(where, owner ? owner.location : contentLine_(row.location), 120, 'المكان'),
       startAt: startAt,

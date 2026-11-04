@@ -28,15 +28,15 @@ export const KINDS = Object.freeze({
   },
   sessions: {
     tab: 'Sessions', sheet: 'content', key: 'date',
-    columns: ['date', 'enabled', 'time', 'topic', 'speaker', 'description', 'image', 'status', 'note', 'visibleFrom', 'updatedAt', 'durationMinutes', 'program']
+    columns: ['date', 'enabled', 'time', 'topic', 'speaker', 'description', 'image', 'status', 'note', 'visibleFrom', 'updatedAt', 'durationMinutes', 'program', 'icon']
   },
   news: {
     tab: 'News', sheet: 'content', key: 'id',
-    columns: ['id', 'enabled', 'featured', 'pinned', 'tone', 'title', 'summary', 'body', 'image', 'linkUrl', 'linkLabel', 'badge', 'publishAt', 'expireAt', 'updatedAt', 'archived', 'display', 'displayMobile']
+    columns: ['id', 'enabled', 'featured', 'pinned', 'tone', 'title', 'summary', 'body', 'image', 'linkUrl', 'linkLabel', 'badge', 'publishAt', 'expireAt', 'updatedAt', 'archived', 'display', 'displayMobile', 'icon']
   },
   games: {
     tab: 'Games', sheet: 'content', key: 'id',
-    columns: ['id', 'enabled', 'title', 'description', 'image', 'url', 'buttonLabel', 'visibleFrom', 'startAt', 'endAt', 'afterEnd', 'updatedAt', 'archived', 'display', 'displayMobile']
+    columns: ['id', 'enabled', 'title', 'description', 'image', 'url', 'buttonLabel', 'visibleFrom', 'startAt', 'endAt', 'afterEnd', 'updatedAt', 'archived', 'display', 'displayMobile', 'icon']
   },
   notifications: {
     tab: 'Notifications', sheet: 'content', key: 'id',
@@ -48,7 +48,7 @@ export const KINDS = Object.freeze({
   },
   activities: {
     tab: 'Activities', sheet: 'content', key: 'id',
-    columns: ['id', 'enabled', 'type', 'title', 'subtitle', 'description', 'image', 'ctaLabel', 'url', 'location', 'startAt', 'endAt', 'visibleFrom', 'visibleUntil', 'order', 'archived', 'updatedAt', 'display', 'displayMobile', 'competition', 'page', 'event']
+    columns: ['id', 'enabled', 'type', 'title', 'subtitle', 'description', 'image', 'ctaLabel', 'url', 'location', 'startAt', 'endAt', 'visibleFrom', 'visibleUntil', 'order', 'archived', 'updatedAt', 'display', 'displayMobile', 'competition', 'page', 'event', 'icon']
   },
   types: {
     tab: 'Types', sheet: 'content', key: 'key',

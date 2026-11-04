@@ -19,7 +19,7 @@ import { h, external } from './dom.js';
 import { iconNode } from './icons.js';
 import { visibilityState } from './schedule.js';
 import { formatStamp, untilText } from './words.js';
-import { posterOrFallback, layCard } from './hub.js';
+import { posterOrFallback, layCard, art } from './hub.js';
 import { go } from './router.js';
 import { entryCta, pageHref, eventHref } from './page/model.js';
 
@@ -179,7 +179,7 @@ export function itemCard(item, type, section, nowStamp, partners = {}) {
   const theme = type.theme || section.theme || null;
   const fallback = { theme, icon: type.icon || SECTION_ICONS[section.key] || 'calendar', banner: type.banner || section.banner };
 
-  const media = h('div', { class: 'item-card__media' }, posterOrFallback(item.image, fallback, { sizes: '(min-width: 1024px) 480px, 46vw', icon: fallback.icon }));
+  const media = h('div', { class: 'item-card__media' }, posterOrFallback(item.image, fallback, { sizes: '(min-width: 1024px) 480px, 46vw', icon: fallback.icon, chosen: item.icon }));
   const body = h('div', { class: 'item-card__body' },
       h('p', { class: 'item-card__meta' },
         type.label ? h('span', { class: 'item-card__type' }, iconNode(type.icon || fallback.icon), type.label) : null,
@@ -232,7 +232,7 @@ export function itemSheetContent(item, type, section, nowStamp, shareRow, hero) 
   const media = item.image || type.banner || section.banner;
 
   return h('article', { class: 'detail', 'data-theme': type.theme || section.theme || null },
-    hero(media),
+    !item.image && item.icon ? h('div', { class: 'media-hero media-hero--icon' }, art({ theme: type.theme || section.theme }, item.icon, true)) : hero(media),
     h('p', { class: 'detail__kicker' }, type.label || SECTION_TITLES[section.key] || ''),
     label ? h('p', { class: `detail__state item-card__state is-${state.state}` }, label) : null,
     item.subtitle ? h('p', { class: 'detail__lead' }, item.subtitle) : null,

@@ -719,3 +719,41 @@ test('Phase 8 A7 + A8: the locked games corner (GAMES_MODULE), and axe (serious 
   assert.equal(await off.page.evaluate(() => A.AREAS.some(a => a.key === 'gamescorner')), false);
   await off.close();
 });
+
+
+test('Phase 8 (§22.1 item 11): «صورة أو أيقونة» in the news editor — the icon is saved, the image is not, and it comes back on reopening', async () => {
+  await freshWorld();
+  const s = await open();
+  await signedIn(s.page);
+  await s.page.waitForFunction(() => !document.querySelector('.welcome'), { timeout: 6000 });
+  await s.page.evaluate(() => A.go('content', 'news'));
+  await s.page.waitForSelector('#view .btn--primary');
+  await s.page.evaluate(() => [...document.querySelectorAll('#view .btn--primary')].find(b => /خبر/.test(b.textContent)).click());
+  await s.page.waitForSelector('dialog.sheet[open] .pick-either');
+  // the image first; the icon a tap away; the image picker hides with its alt text
+  assert.equal(await s.page.$eval('dialog.sheet[open] [data-pick-mode="image"]', i => i.checked), true);
+  await s.page.$eval('dialog.sheet[open] [data-pick-mode="icon"]', i => i.closest('label').click());
+  assert.equal(await s.page.$eval('dialog.sheet[open] .pick-either > .field', n => n.hidden), true);
+  await s.page.$eval('dialog.sheet[open] .pick-icon input[value="bus"]', i => i.closest('label').click());
+  await s.page.screenshot({ path: `${ROOT}tools/.cache/phase8-a3/icon-picker.png` });
+  const field = labels => s.page.$$eval('dialog.sheet[open] .field[data-label]', (fs, ls) => fs.filter(f => ls.includes(f.dataset.label)).map(f => f.querySelector('input, textarea')), labels);
+  await s.page.evaluate(() => {
+    const byLabel = l => [...document.querySelectorAll('dialog.sheet[open] .field[data-label]')].find(f => f.dataset.label === l);
+    const set = (l, v) => { const c = byLabel(l).querySelector('input, textarea'); c.value = v; c.dispatchEvent(new Event('input', { bubbles: true })); };
+    set('العنوان', 'رحلة بأيقونة');
+    set('سطر قصير', 'سجّل اسمك قبل الخميس');
+  });
+  void field;
+  await s.page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .sheet__foot .btn--primary')].find(b => !b.disabled).click());
+  await s.page.waitForFunction(() => !document.getElementById('sheet').open, { timeout: 8000 });
+  const saved = await s.page.evaluate(() => A.state.draft.news.find(n => n.title === 'رحلة بأيقونة'));
+  assert.equal(saved.icon, 'bus');
+  assert.ok(!saved.image, 'no image with an icon');
+  // reopened: the icon is chosen
+  await s.page.evaluate(id => A.editors.news(A.state.draft.news.find(n => n.id === id)), saved.id);
+  await s.page.waitForSelector('dialog.sheet[open] .pick-either');
+  assert.equal(await s.page.$eval('dialog.sheet[open] [data-pick-mode="icon"]', i => i.checked), true);
+  assert.equal(await s.page.$eval('dialog.sheet[open] .pick-icon input[value="bus"]', i => i.checked), true);
+  assert.deepEqual(s.problems, []);
+  await s.close();
+});

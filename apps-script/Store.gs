@@ -92,9 +92,11 @@ var TABLES = {
   },
 
   Sessions: {
-    columns: ['date', 'enabled', 'time', 'topic', 'speaker', 'description', 'image', 'status', 'note', 'visibleFrom', 'updatedAt', 'durationMinutes', 'program'],
+    columns: ['date', 'enabled', 'time', 'topic', 'speaker', 'description', 'image', 'status', 'note', 'visibleFrom', 'updatedAt', 'durationMinutes', 'program', 'icon'],
     bool: ['enabled'],
     text: ['date', 'time', 'topic', 'speaker', 'description', 'image', 'status', 'note', 'visibleFrom', 'updatedAt', 'program'],
+    // Phase 8 (§22.1 item 11): «صورة أو أيقونة»; the image wins when both are set
+    lazy: ['icon'],
     notes: {
       date: 'تاريخ الاجتماع: 2026-10-11',
       enabled: 'ظاهر',
@@ -108,13 +110,14 @@ var TABLES = {
       visibleFrom: 'الموضوع يظهر من (اختياري): 2026-10-09 20:00',
       updatedAt: 'آخر تعديل (تلقائي)',
       durationMinutes: 'مدة الاجتماع ده بالدقايق لو مختلفة (اختياري)',
-      program: 'برنامج الاجتماع (لوحة التحكم بتكتبه): [{"title":"تسبحة","time":"20:00","minutes":30}, ...]'
+      program: 'برنامج الاجتماع (لوحة التحكم بتكتبه): [{"title":"تسبحة","time":"20:00","minutes":30}, ...]',
+      icon: 'أيقونة بدل البوستر (اختياري، من أيقونات الموقع)'
     }
   },
 
   News: {
-    columns: ['id', 'enabled', 'featured', 'pinned', 'tone', 'title', 'summary', 'body', 'image', 'linkUrl', 'linkLabel', 'badge', 'publishAt', 'expireAt', 'updatedAt', 'archived', 'display', 'displayMobile'],
-    lazy: ['display', 'displayMobile'],
+    columns: ['id', 'enabled', 'featured', 'pinned', 'tone', 'title', 'summary', 'body', 'image', 'linkUrl', 'linkLabel', 'badge', 'publishAt', 'expireAt', 'updatedAt', 'archived', 'display', 'displayMobile', 'icon'],
+    lazy: ['display', 'displayMobile', 'icon'],
     bool: ['enabled', 'featured', 'pinned', 'archived'],
     text: ['id', 'tone', 'title', 'summary', 'body', 'image', 'linkUrl', 'linkLabel', 'badge', 'publishAt', 'expireAt', 'updatedAt'],
     notes: {
@@ -140,8 +143,8 @@ var TABLES = {
   },
 
   Games: {
-    columns: ['id', 'enabled', 'title', 'description', 'image', 'url', 'buttonLabel', 'visibleFrom', 'startAt', 'endAt', 'afterEnd', 'updatedAt', 'archived', 'display', 'displayMobile'],
-    lazy: ['display', 'displayMobile'],
+    columns: ['id', 'enabled', 'title', 'description', 'image', 'url', 'buttonLabel', 'visibleFrom', 'startAt', 'endAt', 'afterEnd', 'updatedAt', 'archived', 'display', 'displayMobile', 'icon'],
+    lazy: ['display', 'displayMobile', 'icon'],
     bool: ['enabled', 'archived'],
     text: ['id', 'title', 'description', 'image', 'url', 'buttonLabel', 'visibleFrom', 'startAt', 'endAt', 'afterEnd', 'updatedAt'],
     notes: {
@@ -207,13 +210,13 @@ var TABLES = {
   },
 
   Activities: {
-    columns: ['id', 'enabled', 'type', 'title', 'subtitle', 'description', 'image', 'ctaLabel', 'url', 'location', 'startAt', 'endAt', 'visibleFrom', 'visibleUntil', 'order', 'archived', 'updatedAt', 'display', 'displayMobile', 'competition', 'page', 'event'],
+    columns: ['id', 'enabled', 'type', 'title', 'subtitle', 'description', 'image', 'ctaLabel', 'url', 'location', 'startAt', 'endAt', 'visibleFrom', 'visibleUntil', 'order', 'archived', 'updatedAt', 'display', 'displayMobile', 'competition', 'page', 'event', 'icon'],
     bool: ['enabled', 'archived'],
     text: ['id', 'type', 'title', 'subtitle', 'description', 'image', 'ctaLabel', 'url', 'location', 'startAt', 'endAt', 'visibleFrom', 'visibleUntil', 'updatedAt', 'display', 'displayMobile', 'competition', 'page', 'event'],
     // added by the first save that sets them (Items.gs lazyColumns_), never an upgrade step;
     // competition: the linked competition's id (CompAdmin.gs compSyncCard_);
     // page / event: the service page's / event's id (Pages.gs homeSync_, docs/EVENTS.md §1.2)
-    lazy: ['display', 'displayMobile', 'competition', 'page', 'event'],
+    lazy: ['display', 'displayMobile', 'competition', 'page', 'event', 'icon'],
     notes: {
       id: 'معرّف ثابت (تلقائي)',
       enabled: 'ظاهر',

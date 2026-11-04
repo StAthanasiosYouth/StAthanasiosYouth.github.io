@@ -10495,3 +10495,68 @@ textarea.input {
   display: none;
 }
 
+
+/* ---------- «صورة أو أيقونة» (§22.1 item 11) ---------- */
+
+.pick-either {
+  gap: 10px;
+}
+
+.pick-either > .field > .field__label:first-child {
+  display: none;
+}
+
+.pick-either .pick-either__mode {
+  margin-bottom: 2px;
+}
+
+.pick-icon[hidden],
+.pick-either > .field[hidden] {
+  display: none;
+}
+
+.pick-icon {
+  display: grid;
+  gap: 8px;
+}
+
+
+.pick-icon label[hidden] {
+  display: none;
+}
+
+.pick-icon__row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* the site's branded tile, small: navy, the gold glyph, the arch's hairline */
+.pick-icon__tile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 84px;
+  height: 104px;
+  overflow: hidden;
+  border-radius: 16px;
+  color: #f2d28b;
+  background:
+    radial-gradient(90% 70% at 70% 20%, rgb(215 170 80 / .28), transparent 70%),
+    linear-gradient(160deg, #3b3020, #041127 85%);
+}
+
+.pick-icon__tile::after {
+  content: "";
+  position: absolute;
+  inset: 10%;
+  border-radius: 999px 999px 10px 10px;
+  box-shadow: inset 0 0 0 1px rgb(242 210 139 / .3);
+}
+
+.pick-icon__tile .icon {
+  width: 34px;
+  height: 34px;
+}
+

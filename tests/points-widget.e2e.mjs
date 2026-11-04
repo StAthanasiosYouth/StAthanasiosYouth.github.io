@@ -171,3 +171,24 @@ test('axe phone + desktop; no horizontal scroll at 280 / 360 / 1280; the star is
   }
 
 });
+
+
+test('Phase 8 (§22.1 item 11): a news item with an icon and no poster shows the branded tile, on its card and in its sheet', async () => {
+  const base = (SEED.news && SEED.news[0]) || {};
+  const item = { ...base, id: 'news-icon0001', title: 'رحلة الغردقة', summary: 'سجّل اسمك قبل الخميس', body: 'التفاصيل هنا', image: null, icon: 'bus', publishAt: '2026-10-01T10:00', expireAt: '', featured: false, pinned: false };
+  const { context, page, problems } = await open(PHONE, { content: world({ news: [item] }), date: TUESDAY_NOON });
+  await page.waitForSelector('[data-area="news"]', { timeout: 8000 });
+  const tile = await page.evaluate(() => {
+    const t = document.querySelector('[data-area="news"] .art--chosen');
+    if (!t) return null;
+    const use = t.querySelector('.art__icon');
+    return { tile: true, icon: use ? (use.getAttribute('data-icon') || use.outerHTML.length) : null, img: !!t.closest('[data-area="news"]').querySelector('img.news-card__img, .news-card__media img') };
+  });
+  assert.ok(tile && tile.tile, 'the chosen icon stands where the poster would');
+  assert.equal(tile.img, false, 'no picture in its place');
+  const section = await page.$('[data-area="news"]');
+  await section.scrollIntoView();
+  await section.screenshot({ path: `${ROOT}tools/.cache/comp/news-icon-tile.png` });
+  assert.deepEqual(problems, []);
+  await context.close();
+});

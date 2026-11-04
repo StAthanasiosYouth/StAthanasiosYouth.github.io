@@ -1209,6 +1209,68 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   };
 
+  /*
+   * «صورة أو أيقونة» (Phase 8, §22.1 item 11): the image picker and the site's icons, one choice at a time.
+   * An icon stands as the branded tile wherever the image would appear (the home cards, the sheets); the
+   * image wins if both were ever set. The alt text belongs to the image, so it goes with it.
+   *   var pick = A.imageOrIcon(item.image, item.icon, { label: 'البوستر' });
+   *   save: { image: pick.value(), icon: pick.icon() }
+   */
+  A.imageOrIcon = function (imageId, iconKey, options) {
+
+    options = options || {};
+    var image = A.imagePicker(imageId, Object.assign({}, options, { label: ' ' }));
+    var icons = A.iconPicker(iconKey || 'star');
+    var mode = !imageId && iconKey ? 'icon' : 'image';
+    var name = A.uid('pick-mode');
+    // a poster's icon is a subject, not a platform: the social networks' marks are not offered here
+    var BRAND_MARKS = ["facebook","instagram","tiktok","youtube","whatsapp","telegram","spotify","messenger","discord","x","threads","snapchat"];
+    Array.prototype.forEach.call(icons.node.querySelectorAll('input'), function (input) {
+      if (BRAND_MARKS.indexOf(input.value) !== -1) input.closest('label').hidden = true;
+    });
+    // how it will look on the site: the branded tile, at a card's size
+    var sample = el('span', { class: 'pick-icon__tile', 'aria-hidden': 'true' });
+    function paintSample() {
+      var chosen = icons.value() || 'star';
+      sample.replaceChildren(icon(chosen));
+    }
+    icons.node.addEventListener('change', paintSample);
+    paintSample();
+    var iconBox = el('div', { class: 'pick-icon' },
+      el('div', { class: 'pick-icon__row' }, sample, el('p', { class: 'field__hint', text: 'كده هتظهر على الكارت في الموقع.' })),
+      icons.node,
+      el('p', { class: 'field__hint', text: 'الأيقونة بتظهر في مكان الصورة على الموقع بنفس شكل الأسرة. صورة المشاركة هتبقى صورة الموقع الافتراضية.' }));
+
+    function seg(value, text) {
+      var input = el('input', { type: 'radio', name: name, value: value, checked: mode === value, 'data-pick-mode': value, onchange: function () {
+        mode = value;
+        draw();
+        A.markDirty();
+      } });
+      return el('label', { class: 'choice' }, input, el('span', { text: text }));
+    }
+
+    function draw() {
+      image.node.hidden = mode !== 'image';
+      iconBox.hidden = mode !== 'icon';
+    }
+
+    var node = el('div', { class: 'field pick-either', 'data-label': options.label || 'الصورة / البوستر' },
+      el('span', { class: 'field__label', text: options.label || 'الصورة / البوستر' }),
+      el('div', { class: 'choices pick-either__mode', role: 'radiogroup', 'aria-label': 'صورة ولا أيقونة' }, seg('image', 'صورة'), seg('icon', 'أيقونة')),
+      image.node,
+      iconBox);
+    draw();
+
+    return {
+      node: node,
+      value: function () { return mode === 'image' ? image.value() : ''; },
+      icon: function () { return mode === 'icon' ? icons.value() : ''; },
+      busy: function () { return mode === 'image' && image.busy(); }
+    };
+
+  };
+
   A.iconPicker = function (selected) {
 
     var inputs = [];
@@ -7615,7 +7677,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var topic = A.counted('الموضوع', session.topic, limits.topic, 'مثلاً: حياة التسليم');
     var speaker = A.counted('الخادم / المتكلم', session.speaker, limits.speaker, 'مثلاً: أبونا أنطوني عياد');
     var description = A.counted('وصف', session.description, limits.sessionDescription, 'اختياري', { multiline: true });
-    var image = A.imagePicker(session.image, { label: 'بوستر الاجتماع' });
+    var image = A.imageOrIcon(session.image, session.icon, { label: 'بوستر الاجتماع' });
     var note = A.counted('ملاحظة', session.note, A.state.meta.limits.note, 'مثلاً سبب الإلغاء، أو "الاجتماع في القاعة الكبيرة"');
 
     var status = A.choices('status', [
@@ -7669,6 +7731,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         speaker: speaker.input.value,
         description: description.input.value,
         image: image.value(),
+        icon: image.icon(),
         status: status.value(),
         note: note.input.value,
         visibleFrom: visibleFrom.value(),
@@ -8264,7 +8327,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var summary = A.counted('سطر قصير', item.summary, limits.summary, 'بيظهر على الكارت');
     var body = A.counted('التفاصيل', item.body, limits.body, 'اختياري — بتظهر لما حد يفتح الخبر', { multiline: true, rows: 6 });
     var display = null;
-    var image = A.imagePicker(item.image, { label: 'البوستر', onchange: function () { if (display) display.refresh(); } });
+    var image = A.imageOrIcon(item.image, item.icon, { label: 'البوستر', onchange: function () { if (display) display.refresh(); } });
     var linkUrl = A.textInput(item.linkUrl, { ltr: true, type: 'url', placeholder: 'https://', inputmode: 'url' });
     var linkLabel = A.counted('نص الزرار', item.linkLabel, base.linkLabel, 'مثلاً: سجّل هنا');
 
@@ -8315,6 +8378,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         summary: summary.input.value,
         body: body.input.value,
         image: image.value(),
+        icon: image.icon(),
         linkUrl: linkUrl.value.trim(),
         linkLabel: linkLabel.input.value,
         badge: badge.value,
@@ -8424,7 +8488,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var title = A.counted('اسم اللعبة', game.title, limits.gameTitle, 'مثلاً: رحلة الاستكشاف في الكنيسة', { required: true });
     var description = A.counted('وصف قصير', game.description, limits.gameDescription, 'اختياري', { multiline: true, rows: 3 });
     var display = null;
-    var image = A.imagePicker(game.image, { label: 'بوستر اللعبة', onchange: function () { if (display) display.refresh(); } });
+    var image = A.imageOrIcon(game.image, game.icon, { label: 'بوستر اللعبة', onchange: function () { if (display) display.refresh(); } });
     var url = A.textInput(game.url, { ltr: true, type: 'url', placeholder: 'https://', inputmode: 'url', required: true });
     var buttonLabel = A.counted('نص الزرار', game.buttonLabel, limits.buttonLabel, 'افتراضي: ابدأ اللعب');
 
@@ -8478,6 +8542,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         title: title.input.value,
         description: description.input.value,
         image: image.value(),
+        icon: image.icon(),
         url: url.value.trim(),
         buttonLabel: buttonLabel.input.value,
         visibleFrom: visibleFrom.value(),
@@ -10485,7 +10550,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var title = A.counted('العنوان', item.title, 80, 'مثلاً: مسابقة الكتاب المقدس', { required: true });
     var subtitle = A.counted('سطر قصير', item.subtitle, 140, 'بيظهر على الكارت');
     var description = A.counted('التفاصيل', item.description, 1500, 'اختياري — بتظهر لما حد يفتحها', { multiline: true });
-    var image = A.imagePicker(item.image, { label: 'البوستر', hint: 'من غير بوستر؟ هياخد بانر النوع أو القسم تلقائي', onchange: function () { if (display) display.refresh(); } });
+    var image = A.imageOrIcon(item.image, item.icon, { label: 'البوستر', hint: 'من غير بوستر؟ هياخد بانر النوع أو القسم تلقائي', onchange: function () { if (display) display.refresh(); } });
     var display = null;
     var url = A.textInput(item.url, { ltr: true, placeholder: 'https://', type: 'url' });
     var cta = A.textInput(item.ctaLabel, { max: 24 });
@@ -10521,6 +10586,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         subtitle: subtitle.input.value,
         description: description.input.value,
         image: image.value(),
+        icon: image.icon(),
         url: url.value.trim(),
         ctaLabel: cta.value,
         location: location.input.value,
