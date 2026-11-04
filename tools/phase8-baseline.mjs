@@ -4,6 +4,8 @@
 // answers the session and the content; the fake Apps Script world holds the Sheets the copy came from
 // (the harness of tests/content-worker.e2e.mjs). Nothing here touches Google, GitHub or Cloudflare.
 //   cd tools && node phase8-baseline.mjs [shots dir]
+// A1 and later (the look): PHASE8_PREFS='{"theme":"light"}' seeds the panel's look on the device; PHASE8_WIDTHS=phone,desktop
+// limits the sizes; PHASE8_ONLY=settings limits the areas. With any of them the inventory is not rewritten.
 // Run it again at the end of Phase 8 and compare: every inventory row must still exist, or be listed as moved.
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -99,12 +101,17 @@ const inventory = new Map();
 const errors = [];
 let shots = 0;
 try {
+  const PREFS = process.env.PHASE8_PREFS || '';
+  const ONLY = (process.env.PHASE8_ONLY || '').split(',').filter(Boolean);
+  const SIZES = (process.env.PHASE8_WIDTHS || '').split(',').filter(Boolean);
   for (const [wname, viewport] of Object.entries(WIDTHS)) {
+    if (SIZES.length && !SIZES.includes(wname)) continue;
     env.DB.raw.exec('DELETE FROM admin_sessions');
     const context = await browser.createBrowserContext();
     const page = await context.newPage();
     page.on('pageerror', e => errors.push(`[${wname}] ${e.message.slice(0, 160)}`));
     page.on('dialog', d => d.dismiss());
+    if (PREFS) await page.evaluateOnNewDocument(p => { try { localStorage.setItem('athanasios-admin.prefs.v1', JSON.stringify({ prefs: JSON.parse(p), dirty: true })); } catch { /* no storage */ } }, PREFS);
     await interceptGoogle(page, { post: body => world.post(body) }, { site: { origin: SITE, local: LOCAL }, handle: worker, calls: [] });
     await page.setViewport(viewport);
     await page.goto(`${SITE}/admin/`, { waitUntil: 'networkidle0' });
@@ -119,7 +126,7 @@ try {
     await sleep(1500);
     const screens = await page.evaluate(() => A.AREAS.flatMap(a => (a.subs && a.subs.length ? a.subs : [{ key: '', label: '' }]).map(s => ({ area: a.key, areaLabel: a.label, sub: s.key, subLabel: s.label }))));
     mkdirSync(`${SHOTS}${wname}`, { recursive: true });
-    for (const s of screens) {
+    for (const s of screens.filter(x => !ONLY.length || ONLY.includes(x.area))) {
       await page.evaluate((area, sub) => A.go(area, sub || undefined), s.area, s.sub);
       await sleep(1100);
       const name = `${s.area}${s.sub ? '-' + s.sub : ''}`;
@@ -163,6 +170,6 @@ for (const [screen, set] of inventory) {
   for (const c of [...set].sort()) lines.push(`- [ ] ${c}`);
   lines.push('');
 }
-writeFileSync(new URL('../docs/PHASE8-INVENTORY.md', import.meta.url), lines.join('\n'));
+if (!process.env.PHASE8_PREFS && !process.env.PHASE8_ONLY && !process.env.PHASE8_WIDTHS) writeFileSync(new URL('../docs/PHASE8-INVENTORY.md', import.meta.url), lines.join('\n'));
 console.log(`screens ${inventory.size}, shots ${shots}, errors ${errors.length}`);
 errors.slice(0, 10).forEach(e => console.log(e));

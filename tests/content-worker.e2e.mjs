@@ -377,3 +377,57 @@ test('a kept place whose tab has no screen yet (or none at all) still opens the 
     await context.close();
   }
 });
+
+
+test('Phase 8 A1: «المظهر» — the look shows at once, follows the admin to another device, and is there at the first paint', async () => {
+  await freshWorld();
+  const s = await open();
+  await signedIn(s.page);
+  const look = () => s.page.evaluate(() => ['mode', 'theme', 'accent', 'density', 'motion'].map(k => document.documentElement.getAttribute('data-' + k)));
+  assert.deepEqual(await look(), ['dark', 'dark', 'gold', 'comfortable', 'full'], 'the family\'s look by default');
+  await s.page.evaluate(() => A.go('settings'));
+  await s.page.waitForSelector('[data-look-card]');
+  const pick = (key, value) => s.page.$eval(`input[data-look="${key}"][value="${value}"]`, i => i.closest('label').click());
+  await pick('theme', 'light');
+  assert.equal((await look())[0], 'light', 'at once');
+  assert.equal(await s.page.$eval('meta[name="theme-color"]', m => m.content), '#edf1f6');
+  assert.equal(await s.page.evaluate(() => getComputedStyle(document.body).color), 'rgb(10, 26, 48)', 'the light text');
+  await pick('accent', 'azure');
+  await pick('density', 'compact');
+  await pick('motion', 'lite');
+  await s.page.$eval('input[data-look="sound"]', i => i.closest('label').click());
+  assert.deepEqual(await look(), ['light', 'light', 'azure', 'compact', 'lite']);
+  // nothing marked as unsaved: leaving asks nothing
+  assert.equal(await s.page.evaluate(() => !!A.dirty), false);
+  // on the server a moment later (the admin's own row), and the device copy is clean
+  await s.page.waitForFunction(() => { try { return JSON.parse(localStorage.getItem('athanasios-admin.prefs.v1')).dirty === false; } catch { return false; } }, { timeout: 5000 });
+  const row = env.DB.raw.prepare('SELECT prefs FROM admin_prefs WHERE email = ?').get(ADMIN);
+  assert.deepEqual(JSON.parse(row.prefs), { theme: 'light', accent: 'azure', density: 'compact', motion: 'lite', sound: true });
+  // the first paint of the next visit: look.js has put it on <html> before the panel's code runs
+  // (the document is parsed, the deferred panel code has not run yet)
+  await s.page.evaluateOnNewDocument(() => document.addEventListener('readystatechange', () => { if (document.readyState === 'interactive') window.__early = [document.documentElement.getAttribute('data-mode'), !!window.A]; }));
+  await s.page.reload({ waitUntil: 'networkidle0' });
+  const early = await s.page.evaluate(() => window.__early);
+  assert.deepEqual(early, ['light', false], 'in the right colours before the panel starts');
+  assert.deepEqual(s.problems, []);
+  await s.close();
+
+  // another device (nothing kept there): the server's copy after the sign-in
+  env.DB.raw.exec('DELETE FROM admin_sessions;');
+  const other = await open();
+  assert.equal(await other.page.evaluate(() => document.documentElement.getAttribute('data-mode')), 'dark', 'a new device starts with the default');
+  await signedIn(other.page);
+  await other.page.waitForFunction(() => document.documentElement.getAttribute('data-accent') === 'azure', { timeout: 5000 });
+  assert.equal(await other.page.evaluate(() => document.documentElement.getAttribute('data-mode')), 'light');
+  await other.close();
+
+  // the device's «reduce motion» always wins
+  env.DB.raw.exec('DELETE FROM admin_sessions;');
+  const calm = await open();
+  await calm.page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+  await signedIn(calm.page);
+  await calm.page.waitForFunction(() => document.documentElement.getAttribute('data-accent') === 'azure', { timeout: 5000 });
+  assert.equal(await calm.page.evaluate(() => document.documentElement.getAttribute('data-motion')), 'off');
+  assert.equal(await calm.page.evaluate(() => A.reducedMotion()), true);
+  await calm.close();
+});

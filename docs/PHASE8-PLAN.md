@@ -181,3 +181,24 @@ Way back: revert the slice's commit (static admin files, minutes); a Worker chan
   #12); public browser tests: the same failures as `main` (hub, layout, browser, not-found, final-r, prog-a, refine-b,
   account-badge #8), none new. Way back: revert `0073a73` on `main`. Next: Track A slice A1, only on the owner's word.
 - 2026-11-04: **Track P round 2 live** (main 9d17056), after the owner's live review and the audit table in section 1: the Home icon on «نقاطي» and every competition page, «نقاطي» reorganized (summary card, tabs with their own addresses, compact prizes, red logout at the end), the account's arch on every entry with a gentle way out to the site, the account's red «خروج», no «نقاطي والمتجر» card on home (the star stays). Live: tools/nav-check.mjs all ok, tools/account-badge-prod-check.mjs all passed; unit 765/766 (old #12); browser tests: the same failures as main, none new (final-m #4 is intermittent on both). Way back: revert 9d17056 on main. Track A (A1) waits for the owner's word that track P is done.
+- 2026-11-04: **The owner confirmed track P is done** («Yes, start A1»). Track A resumes.
+- 2026-11-04: **A1 built** (branch `claude/phase-8-admin-dashboard-redesign-54b4da`, not on production yet):
+  - Tokens: every colour of `apps-script/AdminStyles.html` goes through a token (white light → `--tint`, gold →
+    `--acc-rgb` / `--acc-hi-rgb`, the status colours, the navy family `--nv-*`, shadows `--shade` × `--shade-k`). The dark theme's
+    values are exactly the old ones: the A0 screenshots and the new ones match on every screen (pixel diff 0–0.05 %; only
+    «الإعدادات» differs, by the new card).
+  - Themes: dark (the family's identity), light (designed for daylight: its own surfaces, text and status colours, softer
+    shadows), «زي الجهاز». Six accents (ذهبي · بحري · عنابي · سماوي · زمردي · بنفسجي), each with its dark and light values; the
+    primary button keeps its exact gold on dark.
+  - Density (مريح / مضغوط), motion tiers (كاملة / مخففة / مقفولة; the device's «reduce motion» always wins:
+    `A.reducedMotion()` reads it), and the sound module (`A.sound`, synthesized, very quiet, off until turned on; toasts and
+    the editor sheet use it).
+  - Per admin on the Worker: migration `0029_admin_prefs.sql` (additive: a new table), `GET /v1/admin/me` returns `prefs`,
+    `POST /v1/admin/me/prefs` keeps known values only (`worker/src/admin/prefs.js`; any admin, own row, no audit row).
+  - Before the first paint: `admin/look.js` (not deferred, after `restore.js`) puts the device's copy on `<html>`;
+    after sign-in the server's copy wins unless this device has a change it could not send yet.
+  - «المظهر» card at the top of «الإعدادات»: every choice shows at once and is kept; nothing to save.
+  - Tests: Worker (`admin-platform.test.mjs`: defaults, saved per admin, known values only), unit (look.js reads only its
+    entry and sets only the look's attributes), browser (`content-worker.e2e.mjs`: shows at once, on the server, first paint,
+    another device, reduced motion). `tools/phase8-baseline.mjs` takes `PHASE8_PREFS`, `PHASE8_WIDTHS`, `PHASE8_ONLY`.
+  - Next: the owner's look on Staging, then production (Worker by CI on `main` with the migration; static admin files).

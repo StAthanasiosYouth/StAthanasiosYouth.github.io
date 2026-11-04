@@ -1643,7 +1643,9 @@
    */
   var TOOL_CALLS = {
     apiCheckGithub: 1, apiCheckMedia: 1, apiResolveMapsUrl: 1, apiFetchMediaUrl: 1, apiSetLiveStage: 1, apiPlanMigration: 1, apiMigrate: 1,
-    apiAdmins: 1, apiSetAdminName: 1, apiAgeRules: 1, apiAgeRulesSave: 1
+    apiAdmins: 1, apiSetAdminName: 1, apiAgeRules: 1, apiAgeRulesSave: 1,
+    // Phase 8 A1: the admin's own look of the panel (worker/src/admin/prefs.js)
+    apiAdminPrefs: 1, apiAdminPrefsSave: 1
   };
 
   /*
@@ -1687,6 +1689,8 @@
           return r.ok ? post('/v1/admin/tools/admins') : r;
         });
         case 'apiAgeRules': return get('/v1/admin/participants/settings').then(function (r) { return map(r, ages); });
+        case 'apiAdminPrefs': return get('/v1/admin/me').then(function (r) { return map(r, function (me) { return me.prefs || null; }); });
+        case 'apiAdminPrefsSave': return post('/v1/admin/me/prefs', a[0] || {}).then(function (r) { return map(r, function (x) { return x.prefs; }); });
         case 'apiAgeRulesSave': return post('/v1/admin/participants/settings', { ageMin: (a[0] || {}).min, ageMax: (a[0] || {}).max, warnDays: (a[0] || {}).warnDays }).then(function (r) { return map(r, ages); });
       }
       return { ok: false, code: 'error', error: appError('الطلب ده مش معروف.', '', name).message };

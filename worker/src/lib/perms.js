@@ -61,6 +61,8 @@ export const ANY_ADMIN = '*';
 export const ROUTE_PERMS = Object.freeze({
   'GET /v1/admin/whoami': ANY_ADMIN,
   'GET /v1/admin/me': ANY_ADMIN,
+  // Phase 8 A1: the admin's own look of the panel (admin/prefs.js)
+  'POST /v1/admin/me/prefs': ANY_ADMIN,
   'POST /v1/admin/accounts/:email/name': ANY_ADMIN,
   'POST /v1/admin/session/start': ANY_ADMIN,
   'POST /v1/admin/session/resume': ANY_ADMIN,

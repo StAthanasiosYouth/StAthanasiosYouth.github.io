@@ -511,9 +511,10 @@ test('scrollbars: slim navy/gold on desktop (idle + hover), native on touch', as
     }
     return found.join('\n');
   });
-  assert.match(rules, /::-webkit-scrollbar-thumb \{[^}]*rgba\(215, 170, 80, 0\.42\)/);
-  assert.match(rules, /::-webkit-scrollbar-thumb:hover[^{]*\{[^}]*rgba\(242, 210, 139, 0\.75\)/);
-  assert.match(rules, /scrollbar-color: rgba\(215, 170, 80, 0\.45\) transparent/);
+  // (Phase 8 A1: the gold is the accent token; on the default look it is the same 215 170 80)
+  assert.match(rules, /::-webkit-scrollbar-thumb \{[^}]*rgb\(var\(--acc-rgb\) \/ \.42\)/);
+  assert.match(rules, /::-webkit-scrollbar-thumb:hover[^{]*\{[^}]*rgb\(var\(--acc-hi-rgb\) \/ \.75\)/);
+  assert.match(rules, /scrollbar-color: rgb\(var\(--acc-rgb\) \/ \.45\) transparent/);
   assert.deepEqual(problems, []);
   await close();
 

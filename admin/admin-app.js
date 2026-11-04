@@ -342,6 +342,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   A.toast = function (message, kind, action) {
 
     kind = kind === true ? 'error' : (kind || 'success');
+    A.sound(kind === 'error' ? 'nope' : kind === 'success' ? 'success' : 'pop');
 
     var stack = document.getElementById('toasts');
     var item = el('div', { class: 'toast toast--' + kind + (action ? ' toast--action' : ''), role: kind === 'error' ? 'alert' : 'status' },
@@ -720,9 +721,246 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   };
 
+  /* =======================================================
+     LOOK (Phase 8 A1, docs/PHASE8-PLAN.md §2): theme, accent, density, motion and sound, each
+     admin's own. A copy on this device (localStorage; admin/restore.js applies it before the
+     first paint, so nothing flashes) and the copy on the server (/v1/admin/me/prefs) that
+     follows the admin to any other device. Nothing here changes what an admin may do.
+  ======================================================= */
+
+  var PREFS_KEY = 'athanasios-admin.prefs.v1';
+  var PREF_DEFAULTS = { theme: 'dark', accent: 'gold', density: 'comfortable', motion: 'full', sound: false };
+  var PREF_CHOICES = {
+    theme: ['dark', 'light', 'system'],
+    accent: ['gold', 'sea', 'carmine', 'azure', 'emerald', 'violet'],
+    density: ['comfortable', 'compact'],
+    motion: ['full', 'lite', 'off']
+  };
+  // the swatches: [key, word, dark colour] (the CSS holds each one's dark and light values)
+  A.ACCENTS = [['gold', 'ذهبي', '#d7aa50'], ['sea', 'بحري', '#4cc3cb'], ['carmine', 'عنابي', '#e0736b'], ['azure', 'سماوي', '#7fb4ff'], ['emerald', 'زمردي', '#5ad7a0'], ['violet', 'بنفسجي', '#b39cff']];
+
+  function cleanPrefs(input, base) {
+    var src = input && typeof input === 'object' ? input : {};
+    var out = {};
+    Object.keys(PREF_DEFAULTS).forEach(function (k) { out[k] = (base || PREF_DEFAULTS)[k]; });
+    Object.keys(PREF_CHOICES).forEach(function (k) { if (PREF_CHOICES[k].indexOf(src[k]) !== -1) out[k] = src[k]; });
+    if (typeof src.sound === 'boolean') out.sound = src.sound;
+    return out;
+  }
+
+  function readLocal() {
+    try {
+      var saved = JSON.parse(window.localStorage.getItem(PREFS_KEY) || 'null');
+      return saved ? { prefs: cleanPrefs(saved.prefs || saved), dirty: !!saved.dirty } : null;
+    }
+    catch (ignored) {
+      return null;
+    }
+  }
+
+  function writeLocal(dirty) {
+    try { window.localStorage.setItem(PREFS_KEY, JSON.stringify({ prefs: A.prefs, dirty: !!dirty })); }
+    catch (ignored) { /* this device just forgets */ }
+  }
+
+  var local = readLocal();
+  A.prefs = local ? local.prefs : cleanPrefs(null);
+
+  var lightQuery = window.matchMedia ? matchMedia('(prefers-color-scheme: light)') : null;
+  var reduceQuery = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+
+  /* the theme the screen shows now («زي الجهاز» follows the device) */
+  A.mode = function () {
+    if (A.prefs.theme !== 'system') return A.prefs.theme;
+    return lightQuery && lightQuery.matches ? 'light' : 'dark';
+  };
+
+  A.applyPrefs = function () {
+    var root = document.documentElement;
+    root.setAttribute('data-mode', A.mode());
+    root.setAttribute('data-theme', A.prefs.theme);
+    root.setAttribute('data-accent', A.prefs.accent);
+    root.setAttribute('data-density', A.prefs.density);
+    // the device's «reduce motion» always wins
+    root.setAttribute('data-motion', reduceQuery && reduceQuery.matches ? 'off' : A.prefs.motion);
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', A.mode() === 'light' ? '#edf1f6' : '#020914');
+    var scheme = document.querySelector('meta[name="color-scheme"]');
+    if (scheme) scheme.setAttribute('content', A.mode());
+    document.dispatchEvent(new CustomEvent('admin:prefs', { detail: A.prefs }));
+  };
+
+  var saveTimer = 0;
+
+  /* a change from «المظهر»: shown at once, kept on this device, sent to the server a moment later */
+  A.setPrefs = function (patch) {
+    A.prefs = cleanPrefs(patch, A.prefs);
+    A.applyPrefs();
+    writeLocal(true);
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(pushPrefs, 600);
+  };
+
+  function pushPrefs() {
+    var sent = JSON.stringify(A.prefs);
+    A.call('apiAdminPrefsSave', A.prefs).then(function (saved) {
+      // a newer change waits its turn; this one landed
+      if (JSON.stringify(A.prefs) === sent) {
+        if (saved) A.prefs = cleanPrefs(saved);
+        writeLocal(false);
+      }
+    }).catch(function () { /* kept on this device (dirty): sent again on the next start */ });
+  }
+
+  /* after sign-in: the server's copy wins, unless this device changed something it could not send yet */
+  A.loadPrefs = function () {
+    var mine = readLocal();
+    if (mine && mine.dirty) { pushPrefs(); return; }
+    A.call('apiAdminPrefs').then(function (server) {
+      if (!server) return;
+      var next = cleanPrefs(server);
+      if (JSON.stringify(next) === JSON.stringify(A.prefs)) { writeLocal(false); return; }
+      A.prefs = next;
+      writeLocal(false);
+      A.applyPrefs();
+    }).catch(function () { /* the device's copy stays */ });
+  };
+
+  if (lightQuery && lightQuery.addEventListener) lightQuery.addEventListener('change', function () { if (A.prefs.theme === 'system') A.applyPrefs(); });
+  if (reduceQuery && reduceQuery.addEventListener) reduceQuery.addEventListener('change', function () { A.applyPrefs(); });
+  // another tab of the panel changed it
+  window.addEventListener('storage', function (event) {
+    if (event.key !== PREFS_KEY) return;
+    var next = readLocal();
+    if (next) { A.prefs = next.prefs; A.applyPrefs(); }
+  });
+
+  A.applyPrefs();
+
+  /* =======================================================
+     SOUND (Phase 8 A1): synthesized, very quiet, off until the admin turns it on («المظهر»).
+     Never before a tap (browsers block it anyway), never in a hidden tab.
+       A.sound('tap' | 'open' | 'close' | 'pop' | 'success' | 'nope' | 'swish')
+  ======================================================= */
+
+  var audio = null;
+  var lastSound = {};
+
+  A.sound = function (kind, force) {
+    if ((!A.prefs.sound && !force) || document.hidden) return;
+    var now = Date.now();
+    if (lastSound[kind] && now - lastSound[kind] < 60) return;
+    lastSound[kind] = now;
+    try {
+      if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === 'suspended') audio.resume();
+    }
+    catch (ignored) {
+      return;
+    }
+    var c = audio;
+    var t = c.currentTime;
+    function tone(type, f1, f2, start, dur, vol) {
+      var o = c.createOscillator();
+      var g = c.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(f1, t + start);
+      if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + start + dur);
+      g.gain.setValueAtTime(0.0001, t + start);
+      g.gain.exponentialRampToValueAtTime(vol, t + start + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + start + dur);
+      o.connect(g);
+      g.connect(c.destination);
+      o.start(t + start);
+      o.stop(t + start + dur + 0.02);
+    }
+    if (kind === 'tap') tone('sine', 1500, 900, 0, 0.035, 0.025);
+    if (kind === 'open') tone('triangle', 320, 720, 0, 0.16, 0.035);
+    if (kind === 'close') tone('triangle', 640, 300, 0, 0.14, 0.03);
+    if (kind === 'pop') tone('sine', 880, 1320, 0, 0.06, 0.04);
+    if (kind === 'success') { tone('sine', 659, 0, 0, 0.12, 0.05); tone('sine', 831, 0, 0.09, 0.2, 0.05); }
+    if (kind === 'nope') tone('sine', 230, 180, 0, 0.2, 0.06);
+    if (kind === 'swish') tone('triangle', 500, 900, 0, 0.09, 0.02);
+  };
+
   A.reducedMotion = function () {
 
-    return window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var tier = document.documentElement.getAttribute('data-motion');
+    return tier === 'off' || !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  };
+
+  /*
+   * «المظهر» (Phase 8 A1): the admin's own look, at the top of «الإعدادات». Every choice shows at
+   * once and is kept (this device now, the server a moment later); nothing to save, nothing to
+   * lose on leaving, so it never marks the screen as changed.
+   */
+  A.lookCard = function () {
+
+    var p = A.prefs;
+
+    function group(key, label, options) {
+      var name = A.uid('look-' + key);
+      return el('div', { class: 'look__row' },
+        el('p', { class: 'look__label', id: name + '-l', text: label }),
+        el('div', { class: 'choices look__choices', role: 'radiogroup', 'aria-labelledby': name + '-l' }, options.map(function (o) {
+          var input = el('input', { type: 'radio', name: name, value: o[0], checked: p[key] === o[0], 'data-look': key, onchange: function () {
+            var patch = {};
+            patch[key] = o[0];
+            A.setPrefs(patch);
+            A.sound('tap');
+          } });
+          return el('label', { class: 'choice' }, input, el('span', { text: o[1] }));
+        }))
+      );
+    }
+
+    var accentName = A.uid('look-accent');
+    var accents = el('div', { class: 'look__row' },
+      el('p', { class: 'look__label', id: accentName + '-l', text: 'لون التمييز' }),
+      el('div', { class: 'swatches', role: 'radiogroup', 'aria-labelledby': accentName + '-l' }, A.ACCENTS.map(function (a) {
+        var input = el('input', { type: 'radio', name: accentName, value: a[0], checked: p.accent === a[0], 'data-look': 'accent', onchange: function () {
+          A.setPrefs({ accent: a[0] });
+          A.sound('tap');
+        } });
+        return el('label', { class: 'swatch swatch--acc-' + a[0] }, input, el('span', { class: 'swatch__dot', 'aria-hidden': 'true' }), el('span', { class: 'swatch__label', text: a[1] }));
+      }))
+    );
+
+    var test = el('button', { class: 'btn btn--small', type: 'button', disabled: !p.sound, 'data-look-test': '', onclick: function () {
+      ['tap', 'open', 'pop', 'success', 'close', 'nope'].forEach(function (k, i) { setTimeout(function () { A.sound(k); }, i * 320); });
+    } }, 'جرّب الأصوات');
+
+    var sound = el('input', { type: 'checkbox', role: 'switch', checked: !!p.sound, 'data-look': 'sound', onchange: function () {
+      A.setPrefs({ sound: sound.checked });
+      test.disabled = !sound.checked;
+      if (sound.checked) A.sound('success');
+    } });
+
+    return el('section', { class: 'card look', 'data-look-card': '' },
+      el('div', { class: 'card__head' },
+        el('div', {},
+          el('h2', { class: 'card__title', text: 'المظهر' }),
+          el('p', { class: 'card__hint', text: 'اختياراتك ليك إنت بس، وبتتحفظ لحسابك فبتمشي معاك على أي جهاز تفتح منه.' })
+        )
+      ),
+      group('theme', 'الوضع', [['dark', 'داكن'], ['light', 'فاتح'], ['system', 'زي الجهاز']]),
+      accents,
+      group('density', 'الكثافة', [['comfortable', 'مريح'], ['compact', 'مضغوط']]),
+      group('motion', 'الحركة', [['full', 'كاملة'], ['lite', 'مخففة'], ['off', 'مقفولة']]),
+      el('p', { class: 'look__note', text: 'لو جهازك على «تقليل الحركة» بنحترمه دايمًا، أيًا كان اختيارك هنا.' }),
+      el('div', { class: 'look__row look__row--sound' },
+        el('label', { class: 'switch' }, sound, el('span', { class: 'switch__track', 'aria-hidden': 'true' }), el('span', { text: 'أصوات الواجهة (خفيفة جدًا، مقفولة من الأول)' })),
+        test
+      )
+    );
+
+  };
+
+  /* lite: the same order, shorter (weak phones) — for code that times its own steps */
+  A.liteMotion = function () {
+
+    return document.documentElement.getAttribute('data-motion') === 'lite';
 
   };
 
@@ -2206,6 +2444,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   A.openSheet = function (title, body, footer, options) {
 
     options = options || {};
+    if (!sheet.open) A.sound('open');
 
     // the message stack may live inside the editor: keep it when refilling
     var toasts = document.getElementById('toasts');
@@ -2520,7 +2759,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return A.confirmLeave().then(function (ok) {
       if (!ok) return false;
       A.dirty = false;
-      if (sheet.open) sheet.close();
+      if (sheet.open) { sheet.close(); A.sound('close'); }
       if (A.lastFocus && A.lastFocus.isConnected) A.lastFocus.focus({ preventScroll: true });
       return true;
     });
@@ -4385,6 +4624,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         renderNav();
         A.render({ animate: true });
         resumePublish();
+        // Phase 8 A1: this admin's look from the server (a no-op where it has no copy)
+        A.loadPrefs();
         return true;
       })
       .catch(function (error) {
@@ -5369,7 +5610,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       )
       : null;
 
-    return [A.appCard ? A.appCard() : null, siteCard, A.state.hubReady ? hubCard : null, guideCard, upgradeCard, publishCard, publishHistoryCard(), adminsCard()].concat(notifyCards(), [mediaCard, accountCard]).filter(Boolean);
+    // Phase 8 A1: the admin's own look first (AdminScript «LOOK»)
+    return [A.lookCard ? A.lookCard() : null, A.appCard ? A.appCard() : null, siteCard, A.state.hubReady ? hubCard : null, guideCard, upgradeCard, publishCard, publishHistoryCard(), adminsCard()].concat(notifyCards(), [mediaCard, accountCard]).filter(Boolean);
 
   };
 

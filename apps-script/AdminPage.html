@@ -970,7 +970,8 @@
       )
       : null;
 
-    return [A.appCard ? A.appCard() : null, siteCard, A.state.hubReady ? hubCard : null, guideCard, upgradeCard, publishCard, publishHistoryCard(), adminsCard()].concat(notifyCards(), [mediaCard, accountCard]).filter(Boolean);
+    // Phase 8 A1: the admin's own look first (AdminScript «LOOK»)
+    return [A.lookCard ? A.lookCard() : null, A.appCard ? A.appCard() : null, siteCard, A.state.hubReady ? hubCard : null, guideCard, upgradeCard, publishCard, publishHistoryCard(), adminsCard()].concat(notifyCards(), [mediaCard, accountCard]).filter(Boolean);
 
   };
 

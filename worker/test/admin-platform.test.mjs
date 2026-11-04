@@ -237,6 +237,26 @@ test('P3-3 /me: the admin, their effective permissions (switch off = all but the
   assert.equal(primary.body.perms['accounts.manage'], 'all');
 });
 
+test('Phase 8 A1 prefs: the defaults on /me, saved per admin, known values only, a missing key keeps its value', async () => {
+  const w = await world();
+  const auth = await w.google(M);
+  const first = await w.call(auth, 'GET', '/v1/admin/me');
+  assert.deepEqual(first.body.prefs, { theme: 'dark', accent: 'gold', density: 'comfortable', motion: 'full', sound: false });
+  const saved = await w.call(auth, 'POST', '/v1/admin/me/prefs', { theme: 'light', accent: 'sea', density: 'compact', motion: 'lite', sound: true, extra: 'x' });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.deepEqual(saved.body.prefs, { theme: 'light', accent: 'sea', density: 'compact', motion: 'lite', sound: true });
+  // an unknown value is dropped, a missing key keeps what was saved
+  const again = await w.call(auth, 'POST', '/v1/admin/me/prefs', { accent: 'neon', motion: 'off' });
+  assert.deepEqual(again.body.prefs, { theme: 'light', accent: 'sea', density: 'compact', motion: 'off', sound: true });
+  assert.deepEqual((await w.call(auth, 'GET', '/v1/admin/me')).body.prefs, again.body.prefs);
+  // theirs only: another admin still has the defaults
+  assert.equal((await w.call(await w.google(P), 'GET', '/v1/admin/me')).body.prefs.theme, 'dark');
+  // not a list, not a string
+  assert.equal((await w.call(auth, 'POST', '/v1/admin/me/prefs', [1])).body.code, 'bad');
+  // no audit row: a personal preference
+  assert.equal(await w.h.db.prepare("SELECT 1 FROM activity WHERE action LIKE 'admin.prefs%'").first(), null);
+});
+
 test('P3-3 rename: rules of Activity.gs (length, characters, unique by reading), audit row, clear', async () => {
   const w = await world();
   const auth = await w.google(M);

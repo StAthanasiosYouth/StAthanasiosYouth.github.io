@@ -13,6 +13,7 @@ import { activityStmt } from '../lib/activity.js';
 import { limit } from '../lib/ratelimit.js';
 import { PERMS, heldScope } from '../lib/perms.js';
 import { platformOn } from './session.js';
+import { readPrefs } from './prefs.js';
 
 export const NAME_MIN = 2;
 export const NAME_MAX = 40;
@@ -31,7 +32,7 @@ export function nameKey(v) {
 }
 
 /*
- * GET /v1/admin/me → { email, name, primary, servantId, enforce, platform, perms: { perm: 'all' | 'own' } }
+ * GET /v1/admin/me → { email, name, primary, servantId, enforce, platform, perms: { perm: 'all' | 'own' }, prefs }
  * `perms` holds only what the admin may do (the same rule every route checks: lib/perms.js heldScope).
  */
 export async function adminMe(ctx) {
@@ -50,7 +51,9 @@ export async function adminMe(ctx) {
     servantId: (row && row.servant_id) || null,
     enforce: !!row && row.enforce === '1',
     platform: await platformOn(ctx.env),
-    perms
+    perms,
+    // Phase 8 A1: the admin's own look of the panel (prefs.js)
+    prefs: await readPrefs(ctx.env, ctx.actor.email)
   };
 }
 

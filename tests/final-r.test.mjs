@@ -291,6 +291,14 @@ test('boot.js keeps only the sid (+ page load id), "ui" and "draft" in sessionSt
   assert.doesNotMatch(early, /setItem|removeItem|fetch|XMLHttpRequest|sendBeacon|localStorage|cookie|innerHTML/);
   assert.match(early, /sessionStorage\.getItem\('athanasios-admin\.session'\)/);
   assert.ok(early.length < 1200, 'tiny: it runs before the page draws');
+
+  // Phase 8 A1: look.js only reads the look's own entry and only sets the look's attributes
+  const look = readFileSync(`${ROOT}admin/look.js`, 'utf8');
+  assert.doesNotMatch(look, /setItem|removeItem|sessionStorage|fetch|XMLHttpRequest|sendBeacon|cookie|innerHTML|token|session/);
+  assert.deepEqual([...look.matchAll(/localStorage\.getItem\('([^']+)'\)/g)].map(m => m[1]), ['athanasios-admin.prefs.v1']);
+  assert.deepEqual([...new Set([...look.matchAll(/setAttribute\('([\w-]+)'/g)].map(m => m[1]))], ['data-mode', 'data-theme', 'data-accent', 'data-density', 'data-motion']);
+  assert.ok(look.length < 2000, 'tiny: it runs before the page draws');
+  assert.match(readFileSync(`${ROOT}admin/index.html`, 'utf8'), /<script src="restore\.js"><\/script>[\s\S]*<script src="look\.js"><\/script>[\s\S]*<script src="config\.js" defer>/);
 });
 
 test('the drafts: plain form values only (no files), capped, cleared on save / cancel / sign-out; recovery admin unchanged', () => {

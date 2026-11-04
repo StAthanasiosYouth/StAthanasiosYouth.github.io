@@ -19,6 +19,7 @@ import { accountsList, accountAdd, accountUpdate, accountRemove } from './lib/ac
 import { sessionStart, sessionResume, sessionRenew, sessionEnd, sessionPark, sessionHeartbeat, syncSession } from './admin/session.js';
 import { deviceTrust, deviceForget, deviceSignIn } from './admin/devices.js';
 import { adminMe, adminRename } from './admin/me.js';
+import { adminPrefsSave } from './admin/prefs.js';
 import { notifyClaim } from './notify/claim.js';
 import { tokenHealth } from './notify/email.js';
 import { diagMailSample } from './notify/samples.js';
@@ -321,6 +322,8 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/admin/accounts/:email/remove', auth: 'admin', handler: accountRemove },
   { method: 'POST', path: '/v1/admin/accounts/:email/name', auth: 'admin', maxBytes: 1024, handler: adminRename },
   { method: 'GET', path: '/v1/admin/me', auth: 'admin', handler: adminMe },
+  // Phase 8 A1: the admin's own look of the panel (admin/prefs.js)
+  { method: 'POST', path: '/v1/admin/me/prefs', auth: 'admin', maxBytes: 1024, handler: adminPrefsSave },
 
   // Phase 3 admin platform (admin/session.js, docs/ADMIN-PLATFORM-PLAN.md): off until ADMIN_PLATFORM = '1'
   { method: 'POST', path: '/v1/admin/session/start', auth: 'admin', anySession: true, maxBytes: 2048, handler: sessionStart },
