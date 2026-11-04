@@ -263,3 +263,19 @@ Way back: revert the slice's commit (static admin files, minutes); a Worker chan
     data has to be agreed per table with the owner ("never a guess"); the per-item «إدارة» menu and the remaining module
     restyles (media library grid and lightbox, payment-method cards, finance tables, the image-or-icon picker that also
     changes the public site, items 7–9 and 11).
+- 2026-11-04: **Batch A7 + A8 built** (same branch, not on production):
+  - A7, the games corner: a locked «الألعاب · قريبًا» area, only while the new switch `GAMES_MODULE = '1'` (D1 settings;
+    absent = off, so nothing shows today); `GET /v1/admin/me` reports it (`modules.games`). It lists the six approved games
+    and what the corner will hold; nothing runs a game, keeps a session or reads a table (Phase 10, §22.3). The external
+    game links in «المحتوى» ← «الألعاب» stay as they are.
+  - A8: axe (WCAG 2.0–2.2 A/AA, serious and critical) on «الرئيسية», «الأخبار», «المسابقات», «الفعاليات», «الصور»,
+    «سجل النشاط», «الإعدادات» and the games corner, in the dark and the light theme, at 1440 and 390: clean (one finding
+    fixed: the log's day headings were list items with `role="presentation"`). Keyboard: the palette (Ctrl K, arrows, Enter,
+    Esc), the menus (Esc, focus to the first item), Ctrl+S in editors, the typed confirmation (Enter only when the word is
+    right). Real devices (the Android app, the iPhone home-screen app, desktop Chrome/Edge) are the owner's pass after
+    deploy.
+  - Tests: `content-worker.e2e.mjs` (A7 on and off, the axe matrix).
+- **Phase 8 track A on the branch, ready for the owner's final review** (A1–A8 in four batches: `2ac8887` A1+A2,
+  `8632bed` A3+A5, `a4413b8` A4+A6, and A7+A8). Production is one deploy after the owner's approval: push the branch to
+  `main` (CI runs the Worker's migrations — `0029_admin_prefs` — and deploys Staging then production; the static admin
+  files go with GitHub Pages). Way back: revert on `main` and `wrangler rollback`; the migration only adds a table.

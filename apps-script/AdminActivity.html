@@ -489,7 +489,7 @@
       var day = String(entry.cairo).slice(0, 10);
       if (day !== current) {
         current = day;
-        list.appendChild(el('li', { class: 'act-day', role: 'presentation' }, el('span', { text: dayLabel(day) })));
+        list.appendChild(el('li', { class: 'act-day' }, el('span', { text: dayLabel(day) })));
       }
       list.appendChild(entryNode(entry, { focus: !!focus && entry.id === focus }));
     });

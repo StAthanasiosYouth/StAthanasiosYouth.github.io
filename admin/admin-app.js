@@ -3597,7 +3597,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     },
     el('span', { class: className + '__icon' }, icon(area.icon), navBadge(area.badge, className + '__badge')),
     // the dock is narrow: its own short word where there is one (the rail and the title say it in full)
-    el('span', { class: className + '__label', text: className === 'dockbtn' && area.short ? area.short : area.label })
+    el('span', { class: className + '__label', text: className === 'dockbtn' && area.short ? area.short : area.label }),
+    area.soon && className === 'navlink' ? el('span', { class: 'nav-soon', text: 'قريبًا' }) : null
     );
 
   }
@@ -3747,6 +3748,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return A.call('apiAdminMe').then(function (me) {
       if (!me || !me.perms) return;
       A.access = { enforce: !!me.enforce, primary: !!me.primary, perms: me.perms };
+      A.gamesCorner(!!(me.modules && me.modules.games));
       if (!A.allowed(A.area)) A.go(A.homeArea());
       else {
         renderNav();
@@ -3754,6 +3756,44 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         if (A.area === 'activity') A.render();
       }
     }).catch(function () { /* the Apps Script panel, or the Worker away: today's access (the Worker still refuses) */ });
+  };
+
+  /* =======================================================
+     THE GAMES CORNER (Phase 8 A7, §22.1 item 23): a locked «قريبًا» area, shown only while the Worker's
+     GAMES_MODULE switch is on. Phase 10 builds the games (§22.3); nothing here runs a game, keeps a
+     session or reads a table — it only says what is coming. The external game links stay in
+     «المحتوى» ← «الألعاب» as they are.
+  ======================================================= */
+
+  var COMING_GAMES = [
+    ['الكويز', 'أسئلة على البروجكتور، والموبايل فيه أزرار. نقط بالسرعة وترتيب بعد كل سؤال.', 'في الاجتماع'],
+    ['الجرس السريع', 'الـHost يفتح الجرس ويشوف مين داس الأول فعلًا، ويحكم صح ولا غلط.', 'في الاجتماع'],
+    ['مين الشخصية؟', 'تلميحات بتتكشف واحدة واحدة، والإجابة بالكتابة أو بالجرس.', 'في الاجتماع'],
+    ['المافيوسو والمتخفي', 'أدوار سرية على الموبايلات، تلميحات، وتصويت سري.', 'بعد الاجتماع'],
+    ['مين المختلف؟', 'لاعب واحد بياخد سؤال مختلف، وبعدين نقاش وتصويت.', 'بعد الاجتماع'],
+    ['رحلة الاستكشاف في الكنيسة', 'كروكي لكل مكان، والفريق يصوّر ويرفع، والـHost يختار الفايزين.', 'بعد الاجتماع']
+  ];
+
+  A.views.gamescorner = function () {
+    return [A.card('ركن الألعاب', 'جاي قريب: المكتبة، الجلسات، المشاركين والفرق، حسابات الـHost، والمكافآت. لسه مفيش حاجة هنا تشتغل.',
+      el('p', { class: 'soon-chip' }, icon('lock'), 'قريبًا'),
+      el('ul', { class: 'coming' }, COMING_GAMES.map(function (g) {
+        return el('li', { class: 'coming__game' },
+          el('span', { class: 'coming__icon', 'aria-hidden': 'true' }, icon('sparkle')),
+          el('span', { class: 'coming__text' }, el('b', { text: g[0] }), el('small', { text: g[1] })),
+          el('span', { class: 'chip', text: g[2] }));
+      })),
+      el('p', { class: 'note', text: 'لينكات الألعاب الحالية في «المحتوى» ← «الألعاب» زي ما هي.' }))];
+  };
+
+  /* the switch from the Worker (A.loadAccess): the area comes only when it is on */
+  A.gamesCorner = function (on) {
+    var has = A.AREAS.some(function (a) { return a.key === 'gamescorner'; });
+    if (on && !has) {
+      var at = A.AREAS.length - 1; // before «الإعدادات»
+      A.AREAS.splice(at, 0, { key: 'gamescorner', label: 'الألعاب', title: 'ركن الألعاب', icon: 'sparkle', group: 'site', soon: true, view: 'gamescorner' });
+    }
+    if (!on && has) A.AREAS = A.AREAS.filter(function (a) { return a.key !== 'gamescorner'; });
   };
 
   A.views.denied = function () {
@@ -18564,7 +18604,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       var day = String(entry.cairo).slice(0, 10);
       if (day !== current) {
         current = day;
-        list.appendChild(el('li', { class: 'act-day', role: 'presentation' }, el('span', { text: dayLabel(day) })));
+        list.appendChild(el('li', { class: 'act-day' }, el('span', { text: dayLabel(day) })));
       }
       list.appendChild(entryNode(entry, { focus: !!focus && entry.id === focus }));
     });

@@ -10,7 +10,7 @@
 //
 // Run: cd tools && node --test --test-concurrency=1 ../tests/content-worker.e2e.mjs
 
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { generateKeyPairSync, createSign, createHmac } from 'node:crypto';
 import assert from 'node:assert/strict';
@@ -671,4 +671,49 @@ test('Phase 8 A6: «إدارة السجل» — the size, an archive to a privat
   await s.page.screenshot({ path: `${ROOT}tools/.cache/phase8-a3/log-manage.png` });
   assert.deepEqual(s.problems, []);
   await s.close();
+});
+
+
+test('Phase 8 A7 + A8: the locked games corner (GAMES_MODULE), and axe (serious / critical) in both themes on the main screens, desktop and phone', async () => {
+  await freshWorld();
+  env.DB.raw.exec("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('GAMES_MODULE', '1', 0)");
+  const AXE = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
+  const found = [];
+  for (const [mode, viewport] of [['dark', DESKTOP], ['light', DESKTOP], ['dark', { width: 390, height: 844, isMobile: true, hasTouch: true }], ['light', { width: 390, height: 844, isMobile: true, hasTouch: true }]]) {
+    env.DB.raw.exec('DELETE FROM admin_sessions;');
+    const s = await open();
+    await s.page.evaluateOnNewDocument(m => { try { localStorage.setItem('athanasios-admin.prefs.v1', JSON.stringify({ prefs: { theme: m }, dirty: true })); } catch { /* none */ } }, mode);
+    await s.page.setViewport(viewport);
+    await s.page.reload({ waitUntil: 'networkidle0' });
+    await signedIn(s.page);
+    await s.page.waitForFunction(() => !document.querySelector('.welcome') && A.access, { timeout: 8000 });
+    // A7: the games corner, locked
+    await s.page.waitForFunction(() => A.AREAS.some(a => a.key === 'gamescorner'), { timeout: 5000 });
+    for (const [area, sub] of [['home'], ['content', 'news'], ['comps', 'comps'], ['pages', 'events'], ['media'], ['activity'], ['settings'], ['gamescorner']]) {
+      await s.page.evaluate((a, b) => A.go(a, b), area, sub);
+      await sleep(700);
+      await s.page.evaluate(AXE);
+      const v = await s.page.evaluate(() => axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] }, resultTypes: ['violations'] })
+        .then(r => r.violations.filter(x => x.impact === 'serious' || x.impact === 'critical').map(x => x.id + ': ' + x.nodes.slice(0, 2).map(n => n.target.join(' ')).join(' | '))));
+      v.forEach(x => found.push(`[${mode} ${viewport.width}] ${area}${sub ? '/' + sub : ''} ${x}`));
+    }
+    if (mode === 'light' && viewport.width > 1000) {
+      await s.page.evaluate(() => A.go('gamescorner'));
+      await sleep(400);
+      assert.match(await s.page.$eval('#view', n => n.textContent), /قريبًا/);
+      assert.equal(await s.page.$$eval('#view .coming__game', ns => ns.length), 6, 'the six approved games, as a list only');
+      await s.page.screenshot({ path: `${ROOT}tools/.cache/phase8-a3/games-corner-light.png` });
+    }
+    assert.deepEqual(s.problems, []);
+    await s.close();
+  }
+  assert.deepEqual(found, [], 'axe serious/critical:\n' + found.join('\n'));
+
+  // the switch off: no area, nothing else changes
+  env.DB.raw.exec("UPDATE settings SET value = '0' WHERE key = 'GAMES_MODULE'; DELETE FROM admin_sessions;");
+  const off = await open();
+  await signedIn(off.page);
+  await off.page.waitForFunction(() => !!A.access, { timeout: 8000 });
+  assert.equal(await off.page.evaluate(() => A.AREAS.some(a => a.key === 'gamescorner')), false);
+  await off.close();
 });

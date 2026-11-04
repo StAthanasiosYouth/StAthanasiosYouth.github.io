@@ -9217,3 +9217,83 @@ input[type="datetime-local"].input::-webkit-calendar-picker-indicator {
   font-size: .86rem;
 }
 
+
+/* ---------- Phase 8 A7: the games corner, locked «قريبًا» ---------- */
+
+.nav-soon,
+.soon-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 8px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 999px;
+  font-size: .7rem;
+  font-weight: 800;
+  color: var(--text-3);
+}
+
+.soon-chip {
+  justify-self: start;
+  padding: 4px 12px;
+  font-size: .84rem;
+  color: var(--gold-hi);
+}
+
+.soon-chip .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.coming {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 760px) {
+  .coming {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.coming__game {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 16px;
+  background: rgb(var(--tint) / .03);
+  opacity: .88;
+}
+
+.coming__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: var(--gold-hi);
+  background: rgb(var(--acc-rgb) / .12);
+}
+
+.coming__text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.coming__text small {
+  color: var(--text-3);
+  font-size: .82rem;
+  line-height: 1.6;
+}
+
+html[data-rail="closed"] .nav-soon {
+  display: none;
+}
+

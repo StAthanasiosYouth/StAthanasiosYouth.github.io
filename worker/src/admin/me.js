@@ -37,7 +37,7 @@ export function nameKey(v) {
  */
 export async function adminMe(ctx) {
   const row = await retry(() => ctx.env.DB.prepare(
-    "SELECT a.name, a.servant_id, (SELECT value FROM settings WHERE key = 'PERMS_ENFORCE') AS enforce FROM admins a WHERE a.email = ?"
+    "SELECT a.name, a.servant_id, (SELECT value FROM settings WHERE key = 'PERMS_ENFORCE') AS enforce, (SELECT value FROM settings WHERE key = 'GAMES_MODULE') AS games FROM admins a WHERE a.email = ?"
   ).bind(ctx.actor.email).first());
   const perms = {};
   for (const p of PERMS) {
@@ -53,7 +53,9 @@ export async function adminMe(ctx) {
     platform: await platformOn(ctx.env),
     perms,
     // Phase 8 A1: the admin's own look of the panel (prefs.js)
-    prefs: await readPrefs(ctx.env, ctx.actor.email)
+    prefs: await readPrefs(ctx.env, ctx.actor.email),
+    // Phase 8 A7: the games corner's locked «قريبًا» entry (off unless GAMES_MODULE = '1'; no Phase 10 code)
+    modules: { games: !!row && row.games === '1' }
   };
 }
 
