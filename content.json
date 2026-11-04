@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "42bdc23fb958",
-  "publishedAt": "2026-11-04T12:07:46.413Z",
+  "revision": "249ea7943c00",
+  "publishedAt": "2026-11-04T12:10:12.041Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -324,7 +324,7 @@
       "id": "act-0484d9cb",
       "type": "mime",
       "section": "activities",
-      "title": "مسرح صامت",
+      "title": "المسرح صامت",
       "subtitle": "فن بلا كلمات… ورسالة تلمس القلوب 🎭",
       "description": "",
       "image": {
@@ -528,7 +528,7 @@
     {
       "id": "pg-1212ad29",
       "slug": "silenttheatre",
-      "title": "مسرح صامت",
+      "title": "المسرح صامت",
       "tagline": "فن بلا كلمات… ورسالة تلمس القلوب 🎭",
       "cover": {
         "src": "media/2026/img-685492a2.webp",
@@ -539,7 +539,7 @@
         "color": "#4c2d18"
       },
       "partner": "bug",
-      "v": "9fc7d2d89200"
+      "v": "756764ceda61"
     }
   ],
   "partners": {
