@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "4c11fbef81e8",
-  "publishedAt": "2026-11-03T20:09:07.477Z",
+  "revision": "7ea0a4b169b8",
+  "publishedAt": "2026-11-04T12:13:57.128Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -294,8 +294,8 @@
   "activities": [
     {
       "id": "act-2f7f8204",
-      "type": "black-theatre",
-      "section": "activities",
+      "type": "service",
+      "section": "services",
       "title": "المسرح الأسود",
       "subtitle": "حكايات بالنور والظل… ورسالة بتوصل من غير كلام",
       "description": "",
@@ -319,12 +319,40 @@
       "ctaLabel": "ادخل صفحة فريق المسرح ال",
       "watch": true,
       "partner": "bug"
+    },
+    {
+      "id": "act-0484d9cb",
+      "type": "service",
+      "section": "services",
+      "title": "المسرح صامت",
+      "subtitle": "فن بلا كلمات… ورسالة تلمس القلوب 🎭",
+      "description": "",
+      "image": {
+        "src": "media/2026/img-685492a2.webp",
+        "thumb": "media/2026/img-685492a2-480.webp",
+        "w": 1600,
+        "h": 900,
+        "alt": "",
+        "color": "#4c2d18"
+      },
+      "cta": null,
+      "location": "",
+      "startAt": "",
+      "endAt": "",
+      "visibleFrom": "",
+      "visibleUntil": "",
+      "display": "banner",
+      "displayMobile": "",
+      "page": "silenttheatre",
+      "ctaLabel": "",
+      "watch": true,
+      "partner": "bug"
     }
   ],
   "types": [
     {
-      "key": "black-theatre",
-      "label": "مسرح أسود",
+      "key": "service",
+      "label": "خدمة",
       "icon": "theatre",
       "theme": "night",
       "banner": null
@@ -489,6 +517,22 @@
       },
       "partner": "bug",
       "v": "5bf0b59d54ba"
+    },
+    {
+      "id": "pg-1212ad29",
+      "slug": "silenttheatre",
+      "title": "المسرح صامت",
+      "tagline": "فن بلا كلمات… ورسالة تلمس القلوب 🎭",
+      "cover": {
+        "src": "media/2026/img-685492a2.webp",
+        "thumb": "media/2026/img-685492a2-480.webp",
+        "w": 1600,
+        "h": 900,
+        "alt": "",
+        "color": "#4c2d18"
+      },
+      "partner": "bug",
+      "v": "756764ceda61"
     }
   ],
   "partners": {
