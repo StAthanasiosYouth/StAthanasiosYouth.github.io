@@ -103,8 +103,9 @@ async function signIn(page, m, { shared = false } = {}) {
   await page.$eval('form', f => f.requestSubmit());
 }
 
-// phones (Phase 8 track P, assets/js/nav.js): the icon is «حسابي» in the bottom bar; wider screens keep it in the top bar
-const iconOf = page => (page.viewport().width < 768 ? '.tabbar .acct-badge' : '.acct-badge');
+// phones (Phase 8 track P, assets/js/nav.js): on the home page the icon is «حسابي» in the bottom bar; every other page,
+// and wider screens, keep it in the top bar
+const iconOf = page => (page.viewport().width < 768 ? '.tabbar .acct-badge, .pbar .acct-badge, .cbar .acct-badge' : '.acct-badge');
 const badge = (page, timeout = 10000) => page.waitForSelector(iconOf(page), { timeout });
 const label = page => page.$eval(iconOf(page), n => n.getAttribute('aria-label'));
 const pressBadge = async page => {
@@ -164,8 +165,7 @@ test('signed in: the icon opens the account directly, and «ارجع للموق�
   await page.waitForSelector('[data-home]', { timeout: 10000 });
   assert.equal(await page.evaluate(() => location.pathname), '/account/', 'no bounce back');
   assert.equal(await page.$eval('.cbar__home', a => new URL(a.href).pathname), '/black-theatre/');
-  assert.equal(await page.$('.cbar .acct-badge'), null, 'no icon in the account page\'s own bar');
-  assert.equal(await page.$eval('.tabbar [data-tab="account"]', n => n.getAttribute('aria-current')), 'page', '«حسابي» says you are there');
+  assert.equal(await page.$('.acct-badge'), null, 'no icon on the account page');
   await ctx.close();
 });
 

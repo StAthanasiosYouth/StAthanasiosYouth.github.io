@@ -65,6 +65,27 @@ Slices: **P1** nav module + bottom bar + top icons → **P2** Home icon on every
 - The account page's link keeps returning to the page you came from (ACCOUNTS-IMPROVEMENTS); its icon is the Home icon and
   its name says where it goes.
 
+**Closing round (owner, 2026-11-04), built:**
+- **The bottom bar is the home page's only.** Every other page (account, «نقاطي», service pages, events, competitions, 404)
+  keeps its own top bar with the Home icon and the account icon, as before Phase 8 (this also ends a broken-icon look in
+  «المزيد» on those pages, which do not carry the home page's icon styles).
+- **The Home icon from the first frame:** what the first paint needs is in each page's own stylesheet (the Home icon
+  in `page.css` and `account.css`; on home phones the account icon's place and the bar's room in `main.css`; `page.css`
+  stays self-contained, no `@import`), so there is no «ارجع للموقع» text for a moment and no jump. `nav.css` (the bar,
+  «المزيد», the games intro) is loaded by `nav.js` on home and by `game-intro.js` before it plays on a competition page.
+  The bar itself rises in once, softly.
+- **The B.U.G. ident (and any partner ident, `collab.js`) is part of the page:** under the page's own top bar (and the
+  phones' bottom bar on home), on the page's navy with a gold room, no letterbox, no «تخطي» button; the same logos, motion
+  and sound; at the end the stage opens from the centre onto the page once the page is ready (it waits, never long), and
+  the page settles in. It plays every time the visitor comes into the page (owner: every entry, not once per visit).
+  A tap ends it; a tap on the page's own bars goes to them. The service page's design is unchanged.
+- **A games intro** (`assets/js/game-intro.js`): when a game's sheet opens on the home page, and when a competition page
+  opens (under its bar): the family's seal, the «تحديات وألعاب» mark, light bursts, sparks, «يلا نلعب!» / «جاهز للتحدي؟»,
+  then the content rises. With a partner (`content.partners`), both marks with a gold ×. Every time a game is opened.
+  Phase 10's live games are designed in as the kind 'live' and not enabled (no Phase 10 code).
+- **«نقاطي»:** a light arrival each time (the account page keeps its own arrival, DESIGN.md «العتبة»).
+- Reduced motion: none of them; data saver / hidden tab / frame: none; weak phones: the light versions.
+
 Done when:
 - Unit and browser tests pass (existing ones updated only where the change is the point: the Home link's look).
 - On the local site against the Staging Worker: every page type shows the bar on a phone width and not on desktop; every tab
@@ -116,3 +137,9 @@ Way back: revert the slice's commit (static admin files, minutes); a Worker chan
   `main` too); tests changed only where the icon's place is the point (`account-badge.e2e`, `polish-a.e2e`).
   `tools/serve.mjs --404` answers missing pages like GitHub Pages (off by default, so other tests are unchanged).
   Way back: revert the track's commit on `main`.
+- 2026-11-04: **Track P live** (main `4c83055` + `00dc43f`); production checks passed.
+- 2026-11-04: **Track P closing round live, track P closed** (main `0073a73`): the bar on home only, the Home icon from the
+  first frame, the in-page B.U.G. ident on every entry, the games intro (game sheets, competition pages), the «نقاطي»
+  arrival. Local and live: `tools/nav-check.mjs` all ok, `tools/account-badge-prod-check.mjs` all passed; unit 765/766 (old
+  #12); public browser tests: the same failures as `main` (hub, layout, browser, not-found, final-r, prog-a, refine-b,
+  account-badge #8), none new. Way back: revert `0073a73` on `main`. Next: Track A slice A1, only on the owner's word.

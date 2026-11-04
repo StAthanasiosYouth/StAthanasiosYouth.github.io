@@ -16,7 +16,8 @@ const DESKTOP = { width: 1280, height: 860 };
 const PAGES = ['/', '/black-theatre/', '/events/tgrba/', '/competition/test/', '/points/', '/account/', '/no-such-page-x/'];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // the pages' own first-visit intros (home intro.js, the service pages' .cintro) are tapped away, as a person would
-const settle = async page => { await sleep(1200); await page.evaluate(() => document.querySelector('.cintro__skip')?.click()).catch(() => {}); await page.waitForFunction(() => !document.querySelector('.cintro') && document.documentElement.getAttribute('data-intro-state') !== 'playing', { timeout: 9000 }).catch(() => {}); await sleep(600); };
+// (the service pages' ident and the games intro end by themselves; the check lets them, as a visitor would)
+const settle = async page => { await sleep(1200); await page.waitForFunction(() => !document.querySelector('.cintro, .gintro') && document.documentElement.getAttribute('data-intro-state') !== 'playing', { timeout: 9000 }).catch(() => {}); await sleep(600); };
 let failed = 0;
 const check = (name, ok, detail) => {
   console.log((ok ? 'ok   ' : 'FAIL ') + name + (ok ? '' : '  ' + JSON.stringify(detail ?? '').slice(0, 300)));
@@ -64,7 +65,13 @@ try {
       await settle(s.page);
       const st = await state(s.page);
       const where = `[${vname}] ${path}${st.path !== path ? ' → ' + st.path : ''}`;
-      if (vname === 'phone') {
+      const homePage = ['/', '/index.html'].includes(st.path);
+      if (vname === 'phone' && !homePage) {
+        // every page but home keeps its own top bar: no bottom bar, the account icon on top (owner, 2026-11-04)
+        check(`${where}: no bottom bar (the page's own top bar)`, !st.tabbar, st);
+        check(`${where}: the account icon in the top bar`, !st.hasTopAccount || st.topAccount, st);
+      }
+      else if (vname === 'phone') {
         check(`${where}: the bottom bar is there`, st.tabbar, st);
         const home = ['/', '/index.html'].includes(st.path);
         if (home) check(`${where}: three places near you, the top first («الرئيسية» lit)`, st.tabs.length === 5 && st.tabs[0][0] === 'top' && st.tabs[0][2] === 'location', st.tabs);
@@ -84,8 +91,51 @@ try {
     }
   }
 
+  // the Home icon from the very first frame (its CSS comes with the page's own stylesheet): never the old words
+  for (const path of ['/black-theatre/', '/account/', '/no-such-page-x/']) {
+    const s = await open(PHONE);
+    let first = null;
+    s.page.on('domcontentloaded', async () => { try { first = await s.page.evaluate(() => { const a = document.querySelector('.pbar__home, .cbar__home'); return a ? [getComputedStyle(a).fontSize, getComputedStyle(a).width] : null; }); } catch { /* navigated */ } });
+    await s.page.goto(BASE + path, { waitUntil: 'domcontentloaded' });
+    await sleep(150);
+    check(`${path}: the Home icon at the first paint (no «ارجع للموقع» text)`, !!first && first[0] === '0px' && first[1] === '44px', first);
+    await s.close();
+  }
+
+  // the service page's ident: part of the page (under its bar), no «تخطي», once per visit, the page ready after it
+  {
+    const s = await open(PHONE);
+    await s.page.goto(BASE + '/black-theatre/', { waitUntil: 'domcontentloaded' });
+    await sleep(700);
+    const during = await s.page.evaluate(() => { const c = document.querySelector('.cintro'); const bar = document.querySelector('.pbar'); return c ? { skip: !!document.querySelector('.cintro__skip'), under: Number(getComputedStyle(c).zIndex) < Number(getComputedStyle(bar).zIndex), bars: [...document.querySelectorAll('.cintro__bar')].some(n => getComputedStyle(n).display !== 'none') } : null; });
+    check('B.U.G. page: the ident plays inside the page, under its bar, no letterbox, no «تخطي»', !!during && !during.skip && during.under && !during.bars, during);
+    await s.page.waitForFunction(() => !document.querySelector('.cintro'), { timeout: 6000 }).catch(() => {});
+    const after = await s.page.evaluate(() => ({ gone: !document.querySelector('.cintro'), state: document.querySelector('main.pg')?.dataset.state }));
+    check('B.U.G. page: it opens onto the ready page', after.gone && after.state === 'ready', after);
+    await s.page.goto(BASE + '/', { waitUntil: 'networkidle2' });
+    await s.page.goto(BASE + '/black-theatre/', { waitUntil: 'domcontentloaded' });
+    await sleep(500);
+    check('B.U.G. page: again each time you come into it', !!(await s.page.$('.cintro')));
+    check('B.U.G. page: no page errors', s.errors.length === 0, s.errors);
+    await s.close();
+  }
+
+  // a competition: the games intro under its bar, then the competition
+  {
+    const s = await open(PHONE);
+    await s.page.goto(BASE + '/competition/test/', { waitUntil: 'domcontentloaded' });
+    await sleep(600);
+    const g = await s.page.evaluate(() => { const n = document.querySelector('.gintro'); return n ? { top: Math.round(n.getBoundingClientRect().top), bar: Math.round(document.querySelector('.cbar').getBoundingClientRect().bottom), word: n.querySelector('.gintro__word')?.textContent } : null; });
+    check('competition: the games intro under the page\'s bar', !!g && Math.abs(g.top - g.bar) <= 1 && g.word === 'جاهز للتحدي؟', g);
+    await s.page.waitForFunction(() => !document.querySelector('.gintro'), { timeout: 5000 }).catch(() => {});
+    const r = await s.page.evaluate(() => ({ gone: !document.querySelector('.gintro'), state: document.getElementById('comp-main').dataset.state, hidden: document.getElementById('comp-main').classList.contains('gintro-covered') }));
+    check('competition: then the competition, nothing left hidden', r.gone && r.state !== 'loading' && !r.hidden, r);
+    check('competition: no page errors', s.errors.length === 0, s.errors);
+    await s.close();
+  }
+
   // Back from an inner page returns to the home page where it was
-  for (const how of ['home-icon', 'browser-back', 'home-tab']) {
+  for (const how of ['home-icon', 'browser-back']) {
     const s = await open(PHONE);
     await s.page.goto(BASE + '/', { waitUntil: 'networkidle2' });
     await settle(s.page);
@@ -95,7 +145,7 @@ try {
     await Promise.all([s.page.waitForNavigation({ waitUntil: 'networkidle2' }), s.page.evaluate(base => { location.href = base + '/black-theatre/'; }, BASE)]);
     await settle(s.page);
     if (how === 'browser-back') await Promise.all([s.page.waitForNavigation({ waitUntil: 'load' }).catch(() => {}), s.page.goBack()]);
-    else await Promise.all([s.page.waitForNavigation({ waitUntil: 'load' }).catch(() => {}), s.page.click(how === 'home-icon' ? '.pbar__home' : '.tabbar [data-tab="home"]')]);
+    else await Promise.all([s.page.waitForNavigation({ waitUntil: 'load' }).catch(() => {}), s.page.click('.pbar__home')]);
     await sleep(2500);
     const back = await s.page.evaluate(() => ({ path: location.pathname, y: Math.round(scrollY), len: history.length }));
     check(`back via ${how}: the home page`, ['/', '/index.html'].includes(back.path), back);
@@ -140,19 +190,6 @@ try {
     await sleep(1500);
     const c = await s.page.evaluate(() => ({ open: !!document.querySelector('dialog.nav-more[open]'), top: Math.round(document.querySelector('[data-area="contacts"]')?.getBoundingClientRect().top ?? 9999), path: location.pathname }));
     check('«المزيد» → تواصل: the sheet closes, the page is at the section', !c.open && Math.abs(c.top) < 160 && ['/', '/index.html'].includes(c.path), c);
-    await s.close();
-  }
-  // from another page, «المزيد» → a home section opens the home page there
-  {
-    const s = await open(PHONE);
-    await s.page.goto(BASE + '/black-theatre/', { waitUntil: 'networkidle2' });
-    await settle(s.page);
-    await s.page.click('.tabbar [data-tab="more"]');
-    await s.page.waitForSelector('dialog.nav-more[open] .nav-more__tile');
-    await Promise.all([s.page.waitForNavigation({ waitUntil: 'networkidle2' }), s.page.evaluate(() => [...document.querySelectorAll('dialog.nav-more .nav-more__tile')].find(a => /#to-location$/.test(a.href)).click())]);
-    await sleep(3500);
-    const r = await s.page.evaluate(() => ({ path: location.pathname, top: Math.round(document.querySelector('[data-area="location"]')?.getBoundingClientRect().top ?? 9999) }));
-    check('another page → «المزيد» → المكان: the home page, at the section', ['/', '/index.html'].includes(r.path) && Math.abs(r.top) < 160, r);
     await s.close();
   }
 } finally {

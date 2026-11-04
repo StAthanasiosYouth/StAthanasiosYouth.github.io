@@ -21,6 +21,7 @@ import { startFeel } from './feel.js';
 import { play, soundEnabled, setSoundEnabled } from './sound.js';
 import { accountBadge } from './account/link.js';
 import { mountNav } from './nav.js';
+import { playGameIntro } from './game-intro.js';
 import { watchInstall } from './install.js';
 import { isEntryPath } from './page/model.js';
 
@@ -175,6 +176,10 @@ function openRoute(route) {
       const { node, card } = d.gameSheetContent(entry, share);
       sheetCards = [card];
       openSheet({ title: entry.game.title, content: node, onClose });
+      // into a game: its own short welcome, once per visit (game-intro.js); with a partner, both marks
+      const partners = current.partners || {};
+      const partner = entry.game.partner && Object.prototype.hasOwnProperty.call(partners, entry.game.partner) ? partners[entry.game.partner] : null;
+      playGameIntro(node, { key: 'game:' + entry.game.id, kind: 'game', partner });
     });
     return;
   }

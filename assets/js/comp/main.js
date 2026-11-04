@@ -21,6 +21,7 @@ import { zonedNow, stamp, setServerTime, setClockOffset, clockOffset, cairoInsta
 import { soundToggle, uiSounds, cue } from '../ui-sound.js';
 import { accountBadge } from '../account/link.js';
 import { mountNav } from '../nav.js';
+import { playGameIntro } from '../game-intro.js';
 import { fetchPublished } from '../content-source.js';
 
 /* the mount points (a stub made from an older shell may only have its own <main>) */
@@ -557,6 +558,13 @@ async function boot() {
 
   S.state = { name: 'loading' };
   render({ focus: false });
+  // into a challenge: its short welcome under the page's own bar, once per visit; it opens when the
+  // competition has drawn itself (game-intro.js)
+  const stage = document.getElementById('comp-main');
+  const intro = () => playGameIntro(stage, { key: 'comp:' + S.slug, kind: 'challenge', fixedTop: document.querySelector('.cbar'), ready: () => stage.dataset.state !== 'loading' });
+  intro();
+  // back to it (the back/forward cache): coming in again
+  addEventListener('pageshow', event => { if (event.persisted) intro(); });
 
   const record = save.read();
   const loaded = await fetchDefinition(S.slug);

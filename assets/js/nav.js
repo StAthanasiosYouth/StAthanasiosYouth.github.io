@@ -1,10 +1,11 @@
 /**
  * NAV: one navigation for every public page (docs/PHASE8-PLAN.md §1, BACKEND-MIGRATION §22.1 item 24).
  *
- *  - Phones: a bottom bar of three slots + «حسابي» + «المزيد». On the home page the three slots are the places
+ *  - Phones, the home page: a bottom bar of three slots + «حسابي» + «المزيد». The three slots are the places
  *    nearest to where you are (the section you are in, lit, and its neighbours; «الرئيسية» is the top), and they
- *    follow the scroll; on any other page they are «الرئيسية · الفعاليات · المسابقات». «حسابي» never moves: the
- *    account icon leaves the top bar for it (nav.css). «المزيد» opens every other place in one sheet.
+ *    follow the scroll. «حسابي» never moves: the account icon leaves the top bar for it (nav.css). «المزيد» opens
+ *    every place in one sheet. Every other page (account, «نقاطي», a service page, an event, a competition) keeps
+ *    its own top bar with the Home icon and the account icon, and no bottom bar (owner, 2026-11-04).
  *    Wide screens keep today's navigation.
  *  - The top bar's «ارجع للموقع» shows as a Home icon (nav.css; the link and its text stay for no-JS and the
  *    builders' markup). It and «الرئيسية» go back in history when the page before was the home page, so the
@@ -507,7 +508,8 @@ function prefetch(link) {
 }
 
 function withSheet(done) {
-  if (document.querySelector('link[data-nav-css]')) { done(); return; }
+  // the page's own stylesheet imports nav.css (before the first paint); a link only where it does not
+  if (getComputedStyle(document.documentElement).getPropertyValue('--nav-css').trim() || document.querySelector('link[data-nav-css]')) { done(); return; }
   const sheet = document.createElement('link');
   sheet.rel = 'stylesheet';
   sheet.href = new URL('assets/css/nav.css', ROOT).href;
@@ -527,6 +529,19 @@ export function mountNav() {
     return;
   }
 
+  // «نقاطي»: a light arrival each time you come in (the account page has its own, DESIGN.md «العتبة»); the page's
+  // state and the session are untouched, it only lets what is drawn in the first moment rise into place
+  if (location.pathname.slice(ROOT.pathname.length) === 'points/') {
+    const arrive = () => {
+      if (reduced()) return;
+      document.documentElement.setAttribute('data-arrive', '');
+      setTimeout(() => document.documentElement.removeAttribute('data-arrive'), 1400);
+    };
+    arrive();
+    // back to it (the back/forward cache): coming in again
+    addEventListener('pageshow', event => { if (event.persisted) arrive(); });
+  }
+
   // «ارجع للموقع» → the Home icon (the look is CSS; the name and the way home are here)
   for (const link of document.querySelectorAll('.pbar__home, .cbar__home')) {
     // the account page's link returns to the page you came from (account/app.js): its name says so
@@ -543,6 +558,9 @@ export function mountNav() {
     const link = event.target.closest?.('a[href]');
     if (link) setTimeout(() => { if (link.matches(':hover')) prefetch(link); }, 80);
   }, { passive: true });
+
+  // the bottom bar is the home page's; every other page keeps its own top bar (Home icon, account icon)
+  if (!onHome()) return;
 
   withSheet(() => import('./icons.js').then(m => { iconsModule = m; }, () => {}).then(() => {
     const bar = buildBar();
