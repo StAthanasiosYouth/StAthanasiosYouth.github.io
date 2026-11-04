@@ -403,8 +403,8 @@ test('layout: the log, its filters and the app card fit a phone (no sideways scr
       })
     }));
     assert.ok(fit.scroll <= fit.width, `${name}: no sideways scroll (${fit.scroll} > ${fit.width})`);
-    // eight areas since «الصفحات والفعاليات» (AdminPages)
-    assert.equal(fit.dock.length, 8);
+    // Phase 8 A2: four areas and «المزيد» (the rest, the settings, sign-out)
+    assert.equal(fit.dock.length, 5);
     assert.ok(fit.dock.every(b => !b.overflow), `${name}: dock labels fit`);
     await shot(d.page, `06-log-${name}`);
 

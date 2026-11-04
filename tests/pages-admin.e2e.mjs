@@ -517,12 +517,12 @@ test('publish → /black-theatre/, /events/alex-trip/ and the home page\'s cards
 test('360px: the new screens and editors never scroll sideways', async () => {
   await d.page.setViewport(SMALL);
   await sleep(300);
-  // eight areas in the dock: every word still fits
+  // the dock: four areas and «المزيد» (Phase 8 A2): every word fits
   const dock = await d.page.$$eval('#dock .dockbtn', list => list.map(b => {
     const label = b.querySelector('.dockbtn__label');
     return { text: label.textContent, overflow: label.scrollWidth > label.clientWidth + 1, size: parseFloat(getComputedStyle(label).fontSize) };
   }));
-  assert.equal(dock.length, 8);
+  assert.equal(dock.length, 5);
   assert.ok(dock.every(b => !b.overflow), 'dock labels fit: ' + JSON.stringify(dock));
   assert.ok(dock.every(b => b.size >= 9), 'readable: ' + JSON.stringify(dock));
   await shot('00-dock-360');

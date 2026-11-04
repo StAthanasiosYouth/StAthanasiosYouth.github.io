@@ -295,8 +295,8 @@ test('boot.js keeps only the sid (+ page load id), "ui" and "draft" in sessionSt
   // Phase 8 A1: look.js only reads the look's own entry and only sets the look's attributes
   const look = readFileSync(`${ROOT}admin/look.js`, 'utf8');
   assert.doesNotMatch(look, /setItem|removeItem|sessionStorage|fetch|XMLHttpRequest|sendBeacon|cookie|innerHTML|token|session/);
-  assert.deepEqual([...look.matchAll(/localStorage\.getItem\('([^']+)'\)/g)].map(m => m[1]), ['athanasios-admin.prefs.v1']);
-  assert.deepEqual([...new Set([...look.matchAll(/setAttribute\('([\w-]+)'/g)].map(m => m[1]))], ['data-mode', 'data-theme', 'data-accent', 'data-density', 'data-motion']);
+  assert.deepEqual([...look.matchAll(/localStorage\.getItem\('([^']+)'\)/g)].map(m => m[1]), ['athanasios-admin.rail', 'athanasios-admin.prefs.v1']);
+  assert.deepEqual([...new Set([...look.matchAll(/setAttribute\('([\w-]+)'/g)].map(m => m[1]))], ['data-rail', 'data-mode', 'data-theme', 'data-accent', 'data-density', 'data-motion']);
   assert.ok(look.length < 2000, 'tiny: it runs before the page draws');
   assert.match(readFileSync(`${ROOT}admin/index.html`, 'utf8'), /<script src="restore\.js"><\/script>[\s\S]*<script src="look\.js"><\/script>[\s\S]*<script src="config\.js" defer>/);
 });

@@ -10,7 +10,7 @@
 //
 // Run: cd tools && node --test --test-concurrency=1 ../tests/content-worker.e2e.mjs
 
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { generateKeyPairSync, createSign, createHmac } from 'node:crypto';
 import assert from 'node:assert/strict';
@@ -22,6 +22,7 @@ import { handle as workerHandle } from '../worker/src/index.js';
 import { resetAuthCaches, GOOGLE_JWKS_URL } from '../worker/src/lib/auth.js';
 import { migratedDb } from '../worker/test/d1-sqlite.mjs';
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 const require = createRequire(`${ROOT}tools/package.json`);
 const puppeteer = require('puppeteer-core');
 
@@ -430,4 +431,81 @@ test('Phase 8 A1: «المظهر» — the look shows at once, follows the admin
   assert.equal(await calm.page.evaluate(() => document.documentElement.getAttribute('data-motion')), 'off');
   assert.equal(await calm.page.evaluate(() => A.reducedMotion()), true);
   await calm.close();
+});
+
+
+test('Phase 8 A2: the shell — the welcome, the rail in groups with its light and collapse, the palette, the menus, sign-out', async () => {
+  await freshWorld();
+  const shots = `${ROOT}tools/.cache/phase8-a2/`;
+  mkdirSync(shots, { recursive: true });
+  const s = await open();
+  await s.page.waitForSelector('.gate[data-state="signin"] .gis-stub');
+  await s.page.click('.gis-stub');
+  // the welcome inside the shell, right after signing in; then it steps aside by itself
+  await s.page.waitForSelector('.welcome', { timeout: 15000 });
+  await s.page.waitForFunction(() => /أهلاً يا/.test(document.querySelector('.welcome__hello')?.textContent || ''), { timeout: 8000 });
+  await s.page.screenshot({ path: `${shots}welcome.png` });
+  await s.page.waitForFunction(() => !document.querySelector('.welcome'), { timeout: 6000 });
+  await s.page.waitForFunction(() => window.A && A.state && !document.getElementById('shell').hidden, { timeout: 15000 });
+
+  // the rail: its groups in order, one light under the current area
+  const rail = await s.page.evaluate(() => [...document.querySelectorAll('#rail-nav > *')].map(n => n.classList.contains('rail__group') ? '#' + n.textContent : n.dataset.area || 'light'));
+  assert.deepEqual(rail, ['light', '#الشغل', 'home', 'comps', 'pages', '#الموقع', 'content', 'page', 'media', '#الفريق', 'activity']);
+  await s.page.evaluate(() => A.go('media'));
+  await s.page.waitForFunction(() => { const l = document.querySelector('.rail__light'); const c = document.querySelector('#rail-nav .navlink[aria-current="page"]'); return l && c && Math.abs(new DOMMatrix(getComputedStyle(l).transform).m42 - c.offsetTop) < 1; }, { timeout: 4000 });
+  // «الإعدادات», collapse and sign-out at the rail's foot; sign-out is red
+  assert.deepEqual(await s.page.$$eval('#rail-foot > *', ns => ns.map(n => n.dataset.area || n.className.split(' ').pop())), ['settings', 'navlink--quiet', 'rail__collapse', 'rail__user', 'navlink--out']);
+  assert.equal(await s.page.$eval('.navlink--out', b => getComputedStyle(b).color), 'rgb(255, 138, 125)');
+  await s.page.click('.rail__collapse');
+  assert.equal(await s.page.evaluate(() => document.documentElement.getAttribute('data-rail')), 'closed');
+  await sleep(450);
+  assert.ok(await s.page.$eval('.rail', r => r.getBoundingClientRect().width) < 100, 'icons only');
+  await s.page.screenshot({ path: `${shots}rail-closed.png` });
+  await s.page.click('.rail__collapse');
+  assert.equal(await s.page.evaluate(() => localStorage.getItem('athanasios-admin.rail')), 'open');
+
+  // the palette: Ctrl K, a few letters, Enter
+  await s.page.keyboard.down('Control');
+  await s.page.keyboard.press('KeyK');
+  await s.page.keyboard.up('Control');
+  await s.page.waitForSelector('dialog.palette[open]');
+  await s.page.keyboard.type('الاخبار');
+  assert.equal(await s.page.$eval('.palette__item[aria-selected="true"] span', n => n.textContent), 'الأخبار', 'the folding finds «الأخبار» from «الاخبار»');
+  await s.page.screenshot({ path: `${shots}palette.png` });
+  await s.page.keyboard.press('Enter');
+  await s.page.waitForFunction(() => A.area === 'content' && A.sub.content === 'news' && !document.querySelector('dialog.palette[open]'), { timeout: 4000 });
+
+  // the account menu: name, «المظهر», the mode, sign-out (red)
+  await s.page.click('#acct-open');
+  await s.page.waitForSelector('.menu--account:popover-open');
+  const items = await s.page.$$eval('.menu--account .menu__item', ns => ns.map(n => n.textContent.trim()));
+  assert.deepEqual(items.filter(t => !/افتح الموقع/.test(t)), ['المظهر', 'الوضع الفاتح', 'تسجيل الخروج']);
+  await s.page.screenshot({ path: `${shots}account-menu.png` });
+  await s.page.click('.menu--account .menu__item:nth-of-type(2)');
+  assert.equal(await s.page.evaluate(() => document.documentElement.getAttribute('data-mode')), 'light', 'the mode from the menu');
+  // «اللي مستنيك»
+  await s.page.click('#bell-open');
+  await s.page.waitForSelector('.menu--bell:popover-open');
+  await s.page.screenshot({ path: `${shots}bell-light.png` });
+  await s.page.keyboard.press('Escape');
+  assert.deepEqual(s.problems, []);
+  await s.close();
+
+  // phones: four areas and «المزيد», with the rest, the settings and sign-out
+  env.DB.raw.exec('DELETE FROM admin_sessions;');
+  const p = await open();
+  await p.page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+  await signedIn(p.page);
+  await p.page.waitForFunction(() => !document.querySelector('.welcome'), { timeout: 6000 });
+  assert.deepEqual(await p.page.$$eval('#dock .dockbtn', ns => ns.map(n => n.dataset.area)), ['home', 'content', 'comps', 'pages', 'more']);
+  await p.page.click('#dock [data-area="more"]');
+  await p.page.waitForSelector('#sheet[open] .more');
+  assert.deepEqual(await p.page.$$eval('.more__item', ns => ns.map(n => n.dataset.area)), ['page', 'media', 'activity', 'settings']);
+  assert.ok(await p.page.$('#sheet [data-signout]'), 'sign-out in «المزيد»');
+  await p.page.screenshot({ path: `${shots}more-phone.png` });
+  await p.page.click('.more__item[data-area="media"]');
+  await p.page.waitForFunction(() => A.area === 'media' && !document.getElementById('sheet').open, { timeout: 4000 });
+  assert.equal(await p.page.$eval('#dock [data-area="more"]', b => b.getAttribute('aria-current')), 'page', '«المزيد» lit for an area inside it');
+  assert.deepEqual(p.problems, []);
+  await p.close();
 });

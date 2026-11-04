@@ -145,6 +145,15 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   var A = window.A = {};
 
   A.ICONS = window.ADMIN_ICONS || {};
+  // Phase 8 A2: the shell's own few icons, in the site set's line style (only where the set has none)
+  (function (extra) {
+    Object.keys(extra).forEach(function (k) {
+      if (!Object.prototype.hasOwnProperty.call(A.ICONS, k)) A.ICONS[k] = '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + extra[k] + '</svg>';
+    });
+  })({
+    search: '<circle class="duo" cx="11" cy="11" r="6.5"/><path d="m20 20-4.4-4.4"/>',
+    sidebar: '<rect class="duo" x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/>'
+  });
   A.views = {};
   // the item editors, by kind (AdminContent, AdminItems, AdminPage): reopened after a reload
   A.editors = {};
@@ -3357,8 +3366,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   ======================================================= */
 
   A.AREAS = [
-    { key: 'home', label: 'الرئيسية', icon: 'home', view: 'schedule' },
-    { key: 'content', label: 'المحتوى', icon: 'megaphone', subs: [
+    // group: the rail's heading (Phase 8 A2): الشغل · الموقع · الفريق; «الإعدادات» lives at the rail's foot
+    { key: 'home', label: 'الرئيسية', icon: 'home', view: 'schedule', group: 'main' },
+    { key: 'content', label: 'المحتوى', icon: 'megaphone', group: 'site', subs: [
       { key: 'meetings', label: 'الاجتماعات' },
       { key: 'news', label: 'الأخبار' },
       { key: 'games', label: 'الألعاب' },
@@ -3370,25 +3380,25 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       { key: 'notifications', label: 'الإشعارات' }
     ] },
     // «المسابقات» (AdminComp*.html, docs/COMPETITIONS.md): the competitions themselves; short: the phone dock's word
-    { key: 'comps', label: 'المسابقات', short: 'مسابقات', icon: 'trophy', subs: [
+    { key: 'comps', label: 'المسابقات', short: 'مسابقات', icon: 'trophy', group: 'main', subs: [
       { key: 'comps', label: 'المسابقات' },
       { key: 'compsettings', label: 'الإعدادات' }
     ] },
     // «الصفحات والفعاليات» (AdminPages.html, docs/EVENTS.md): service pages, events, servants
-    { key: 'pages', label: 'الصفحات والفعاليات', short: 'صفحات', icon: 'theatre', subs: [
+    { key: 'pages', label: 'الصفحات والفعاليات', short: 'صفحات', icon: 'theatre', group: 'main', subs: [
       { key: 'svcpages', label: 'صفحات الخدمة' },
       { key: 'events', label: 'الفعاليات' },
       { key: 'servants', label: 'الخدام' }
     ] },
-    { key: 'page', label: 'الصفحة', icon: 'layers', subs: [
+    { key: 'page', label: 'الصفحة', icon: 'layers', group: 'site', subs: [
       { key: 'layout', label: 'ترتيب الصفحة' },
       { key: 'links', label: 'الروابط' },
       { key: 'location', label: 'المكان' },
       { key: 'contacts', label: 'التواصل' }
     ] },
-    { key: 'media', label: 'الصور', icon: 'photos' },
+    { key: 'media', label: 'الصور', icon: 'photos', group: 'site' },
     // «سجل النشاط» (AdminActivity.html)
-    { key: 'activity', label: 'النشاط', icon: 'clock', title: 'سجل النشاط' },
+    { key: 'activity', label: 'النشاط', icon: 'clock', title: 'سجل النشاط', group: 'team' },
     { key: 'settings', label: 'الإعدادات', icon: 'gear' }
   ];
 
@@ -3522,13 +3532,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var current = areaOf(A.area);
     var sub = current.subs ? current.subs.filter(function (s) { return s.key === A.sub[A.area]; })[0] : null;
 
-    rail.replaceChildren.apply(rail, A.AREAS.map(function (area) { return navButton(area, 'navlink'); }));
-    dock.replaceChildren.apply(dock, A.AREAS.map(function (area) { return navButton(area, 'dockbtn'); }));
-    dock.style.setProperty('--count', String(A.AREAS.length));
-    dock.classList.toggle('dock--dense', A.AREAS.length > 6);
-    dock.style.setProperty('--active', String(A.AREAS.indexOf(current)));
-    // eight areas («الصفحات والفعاليات»): the dock goes a little wider and its words a little smaller
-    dock.classList.toggle('dock--crowded', A.AREAS.length > 7);
+    // Phase 8 A2: the rail in its groups, with one light that glides to the current area
+    if (!railLight) railLight = el('span', { class: 'rail__light', 'aria-hidden': 'true' });
+    rail.replaceChildren.apply(rail, [railLight].concat(railNav(A.AREAS.filter(function (a) { return a.key !== 'settings'; }))));
+    requestAnimationFrame(function () { moveRailLight(false); });
+    // the phones' dock: the first four areas and «المزيد» (the rest, the settings, the account, sign-out)
+    var docked = dockAreas();
+    var inMain = docked.main.indexOf(current);
+    dock.replaceChildren.apply(dock, docked.main.map(function (area) { return navButton(area, 'dockbtn'); }).concat([moreButton(inMain < 0)]));
+    dock.style.setProperty('--count', String(docked.main.length + 1));
+    dock.classList.remove('dock--dense', 'dock--crowded');
+    dock.style.setProperty('--active', String(inMain < 0 ? docked.main.length : inMain));
 
     subs.hidden = !current.subs;
     subs.replaceChildren.apply(subs, (current.subs || []).map(function (s) {
@@ -3545,21 +3559,391 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var foot = document.getElementById('rail-foot');
     if (A.state) {
+      var settings = areaOf('settings');
+      var collapse = el('button', { class: 'navlink navlink--quiet rail__collapse', type: 'button', 'aria-pressed': String(railClosed()), title: railClosed() ? 'كبّر القائمة' : 'صغّر القائمة', onclick: function () { setRail(!railClosed()); } },
+        el('span', { class: 'navlink__icon' }, icon('sidebar')), el('span', { class: 'navlink__label', text: railClosed() ? 'كبّر القائمة' : 'صغّر القائمة' }));
       A.fill(foot,
-        A.state.config.siteUrl ? el('a', { class: 'navlink navlink--quiet', href: A.state.config.siteUrl, target: '_blank', rel: 'noopener' },
+        settings ? navButton(settings, 'navlink') : null,
+        A.state.config.siteUrl ? el('a', { class: 'navlink navlink--quiet', href: A.state.config.siteUrl, target: '_blank', rel: 'noopener', title: 'افتح الموقع' },
           el('span', { class: 'navlink__icon' }, icon('globe')), el('span', { class: 'navlink__label', text: 'افتح الموقع' })) : null,
-        el('p', { class: 'rail__user', title: A.state.user }, icon('user'), A.state.me && A.state.me !== A.state.user.split('@')[0]
+        collapse,
+        el('p', { class: 'rail__user', title: A.state.user }, el('span', { class: 'acct__av', 'aria-hidden': 'true', text: initial(myName()) }), A.state.me && A.state.me !== A.state.user.split('@')[0]
           ? el('span', { class: 'rail__name', dir: 'auto', text: A.state.me })
           : el('span', { class: 'ltr', text: A.state.user })),
         // the official admin page only (Google sign-in lives there)
-        A.signOut ? el('button', { class: 'navlink navlink--quiet', type: 'button', onclick: function () { A.signOut(); } },
+        A.signOut ? el('button', { class: 'navlink navlink--quiet navlink--out', type: 'button', 'data-signout': '', title: 'تسجيل الخروج', onclick: function () { A.signOut(); } },
           el('span', { class: 'navlink__icon' }, icon('logout')), el('span', { class: 'navlink__label', text: 'خروج' })) : null
       );
+      paintAccount();
     }
+    paintBell();
 
   }
 
   A.renderNav = renderNav;
+
+  /* =======================================================
+     SHELL (Phase 8 A2, docs/PHASE8-PLAN.md §2): the rail's groups, its sliding light and its
+     collapse; the top bar's search palette, «اللي مستنيك» and the account menu; the phones'
+     dock of four + «المزيد»; sign-out in the rail, the account menu and «المزيد»; and the
+     welcome inside the shell right after sign-in.
+  ======================================================= */
+
+  var RAIL_KEY = 'athanasios-admin.rail';
+  var GROUPS = { main: 'الشغل', site: 'الموقع', team: 'الفريق' };
+  var DOCK_MAIN = 4;
+  var railLight = null;
+
+  function railClosed() {
+    return document.documentElement.getAttribute('data-rail') === 'closed';
+  }
+
+  function setRail(closed) {
+    document.documentElement.setAttribute('data-rail', closed ? 'closed' : 'open');
+    try { window.localStorage.setItem(RAIL_KEY, closed ? 'closed' : 'open'); } catch (ignored) { /* this device forgets */ }
+    renderNav();
+  }
+
+  (function () {
+    var kept = '';
+    try { kept = window.localStorage.getItem(RAIL_KEY) || ''; } catch (ignored) { /* default */ }
+    if (!document.documentElement.getAttribute('data-rail')) document.documentElement.setAttribute('data-rail', kept === 'closed' ? 'closed' : 'open');
+  })();
+
+  /* the light under the rail's current area glides to the new one */
+  function moveRailLight(instant) {
+    var nav = document.getElementById('rail-nav');
+    if (!nav || !railLight) return;
+    var current = nav.querySelector('.navlink[aria-current="page"]');
+    if (!current) { railLight.classList.remove('is-on'); return; }
+    if (instant) railLight.classList.add('is-instant');
+    railLight.style.transform = 'translateY(' + current.offsetTop + 'px)';
+    railLight.style.height = current.offsetHeight + 'px';
+    railLight.classList.add('is-on');
+    if (instant) { void railLight.offsetHeight; railLight.classList.remove('is-instant'); }
+  }
+
+  window.addEventListener('resize', function () { moveRailLight(true); });
+
+  function railNav(items) {
+    // each group together, in the order its areas have
+    var order = Object.keys(GROUPS);
+    items = items.map(function (a, i) { return { a: a, i: i }; }).sort(function (x, y) {
+      return (order.indexOf(x.a.group || 'site') - order.indexOf(y.a.group || 'site')) || (x.i - y.i);
+    }).map(function (x) { return x.a; });
+    var nav = [];
+    var last = '';
+    items.forEach(function (area) {
+      var g = area.group || 'site';
+      if (g !== last) { nav.push(el('p', { class: 'rail__group', 'aria-hidden': 'true', text: GROUPS[g] || '' })); last = g; }
+      var link = navButton(area, 'navlink');
+      link.title = area.label;
+      nav.push(link);
+    });
+    return nav;
+  }
+
+  function dockAreas() {
+    var all = A.AREAS.filter(function (a) { return a.key !== 'settings'; });
+    return { main: all.slice(0, DOCK_MAIN), rest: all.slice(DOCK_MAIN) };
+  }
+
+  function moreButton(restSelected) {
+    return el('button', {
+      class: 'dockbtn dockbtn--more', type: 'button', 'data-area': 'more', 'aria-haspopup': 'dialog',
+      'aria-current': restSelected ? 'page' : null,
+      onclick: function (event) { pop(event.currentTarget); openMore(); }
+    }, el('span', { class: 'dockbtn__icon' }, icon('grip'), navBadge(dockAreas().rest.reduce(function (n, a) { return n + (Number(a.badge) || 0); }, 0), 'dockbtn__badge')),
+    el('span', { class: 'dockbtn__label', text: 'المزيد' }));
+  }
+
+  /* ---------- the layers: one menu at a time, one palette ---------- */
+
+  var openLayer = null;
+
+  function closeLayer() {
+    if (!openLayer) return;
+    var layer = openLayer;
+    openLayer = null;
+    if (layer.tagName === 'DIALOG') { if (layer.open) layer.close(); }
+    else if (layer.matches(':popover-open')) layer.hidePopover();
+    if (layer._anchor) layer._anchor.setAttribute('aria-expanded', 'false');
+    A.sound('close');
+  }
+
+  /* a menu under its button (popover: Esc and a tap outside close it) */
+  function menu(anchor, className, children) {
+    closeLayer();
+    var box = el('div', { class: 'menu ' + className, popover: 'auto', role: 'menu' }, children);
+    document.body.appendChild(box);
+    box.addEventListener('toggle', function (event) {
+      if (event.newState === 'closed') {
+        anchor.setAttribute('aria-expanded', 'false');
+        if (openLayer === box) openLayer = null;
+        setTimeout(function () { box.remove(); }, 400);
+      }
+    });
+    box.showPopover();
+    var r = anchor.getBoundingClientRect();
+    var w = box.offsetWidth;
+    var left = Math.min(Math.max(8, r.left + r.width - w), window.innerWidth - w - 8);
+    box.style.top = Math.round(r.bottom + 8) + 'px';
+    box.style.left = Math.round(Math.max(8, left)) + 'px';
+    box._anchor = anchor;
+    anchor.setAttribute('aria-expanded', 'true');
+    openLayer = box;
+    A.sound('open');
+    var first = box.querySelector('button, a[href]');
+    if (first) first.focus({ preventScroll: true });
+    return box;
+  }
+
+  function menuItem(iconName, label, onclick, extra) {
+    return el(onclick && onclick.href ? 'a' : 'button', Object.assign({
+      class: 'menu__item' + (extra && extra.danger ? ' menu__item--danger' : ''),
+      role: 'menuitem'
+    }, onclick && onclick.href ? { href: onclick.href, target: '_blank', rel: 'noopener' } : { type: 'button', onclick: function () { closeLayer(); onclick(); } }),
+    icon(iconName), el('span', { text: label }), extra && extra.hint ? el('small', { class: 'menu__hint', text: extra.hint }) : null);
+  }
+
+  function myName() {
+    return (A.state && A.state.me) || (A.state && A.state.user ? A.state.user.split('@')[0] : '');
+  }
+
+  function initial(name) {
+    var n = String(name || '').trim();
+    return n ? n.charAt(0) : '؟';
+  }
+
+  /* ---------- the account menu ---------- */
+
+  function openAccount(anchor) {
+    var email = A.state ? A.state.user : '';
+    var light = A.mode() === 'light';
+    menu(anchor, 'menu--account', [
+      el('div', { class: 'menu__me' },
+        el('span', { class: 'acct__av acct__av--lg', 'aria-hidden': 'true', text: initial(myName()) }),
+        el('span', { class: 'menu__who' }, el('b', { dir: 'auto', text: myName() }), el('small', { class: 'ltr', text: email }))),
+      menuItem('sparkle', 'المظهر', function () { A.go('settings'); setTimeout(function () { var card = document.querySelector('[data-look-card]'); if (card) card.scrollIntoView({ block: 'start', behavior: A.reducedMotion() ? 'auto' : 'smooth' }); }, 60); }),
+      menuItem(light ? 'star' : 'sparkle', light ? 'الوضع الداكن' : 'الوضع الفاتح', function () { A.setPrefs({ theme: light ? 'dark' : 'light' }); }),
+      A.state && A.state.config && A.state.config.siteUrl ? menuItem('globe', 'افتح الموقع', { href: A.state.config.siteUrl }) : null,
+      A.signOut ? el('span', { class: 'menu__sep', 'aria-hidden': 'true' }) : null,
+      A.signOut ? menuItem('logout', 'تسجيل الخروج', function () { A.signOut(); }, { danger: true }) : null
+    ].filter(Boolean));
+  }
+
+  /* ---------- «اللي مستنيك»: what waits for this admin, from the menu's own numbers ---------- */
+
+  function waiting() {
+    var list = [];
+    A.AREAS.forEach(function (area) {
+      (area.subs || []).forEach(function (s) {
+        if (Number(s.badge) > 0) list.push({ n: Number(s.badge), label: s.label, where: area.label, icon: area.icon, go: function () { A.go(area.key, s.key); } });
+      });
+      if (!(area.subs || []).some(function (s) { return Number(s.badge) > 0; }) && Number(area.badge) > 0) {
+        list.push({ n: Number(area.badge), label: area.label, where: '', icon: area.icon, go: function () { A.go(area.key); } });
+      }
+    });
+    var status = document.getElementById('status');
+    if (status && status.classList.contains('status--dirty')) {
+      list.unshift({ n: 0, label: 'تغييرات مستنية النشر', where: 'راجع وانشر', icon: 'send', go: function () { var b = document.getElementById('publish-open'); if (b) b.click(); } });
+    }
+    return list;
+  }
+
+  function digits(n) {
+    return String(n).replace(/\d/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[d]; });
+  }
+
+  function paintBell() {
+    var bell = document.getElementById('bell-open');
+    if (!bell) return;
+    var total = waiting().reduce(function (sum, w) { return sum + (w.n || 1); }, 0);
+    var dot = bell.querySelector('.topbar__dot');
+    dot.hidden = !total;
+    dot.textContent = total > 99 ? '٩٩+' : digits(total);
+    bell.setAttribute('aria-label', total ? 'اللي مستنيك: ' + digits(total) : 'اللي مستنيك: مفيش حاجة');
+  }
+
+  function openBell(anchor) {
+    var list = waiting();
+    menu(anchor, 'menu--bell', [el('p', { class: 'menu__title', text: 'اللي مستنيك' })].concat(list.length ? list.map(function (w) {
+      return el('button', { class: 'menu__item menu__item--wait', type: 'button', role: 'menuitem', onclick: function () { closeLayer(); w.go(); } },
+        icon(w.icon), el('span', {}, el('b', { text: w.label }), w.where ? el('small', { text: w.where }) : null),
+        w.n ? el('span', { class: 'nav-badge', text: w.n > 99 ? '٩٩+' : digits(w.n) }) : null);
+    }) : [el('p', { class: 'menu__empty', text: 'مفيش حاجة مستنياك دلوقتي.' })]));
+  }
+
+  /* ---------- the palette: any area, tab or command in a few letters (Ctrl K) ---------- */
+
+  function fold(text) {
+    return String(text || '').toLowerCase().replace(/[ً-ٰٟـ]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').trim();
+  }
+
+  function commands() {
+    var out = [];
+    A.AREAS.forEach(function (area) {
+      out.push({ group: 'روح لـ', label: area.title || area.label, icon: area.icon, run: function () { A.go(area.key); } });
+      (area.subs || []).forEach(function (s) {
+        out.push({ group: 'روح لـ', label: s.label, hint: area.label, icon: area.icon, run: function () { A.go(area.key, s.key); } });
+      });
+    });
+    var publish = document.getElementById('publish-open');
+    if (publish && !publish.hidden) out.push({ group: 'اعمل', label: 'راجع وانشر', icon: 'send', run: function () { publish.click(); } });
+    if (A.state && A.state.config && A.state.config.siteUrl) out.push({ group: 'اعمل', label: 'افتح الموقع', icon: 'globe', run: function () { window.open(A.state.config.siteUrl, '_blank', 'noopener'); } });
+    out.push({ group: 'اعمل', label: A.mode() === 'light' ? 'الوضع الداكن' : 'الوضع الفاتح', icon: 'sparkle', run: function () { A.setPrefs({ theme: A.mode() === 'light' ? 'dark' : 'light' }); } });
+    out.push({ group: 'اعمل', label: 'المظهر', icon: 'sparkle', run: function () { A.go('settings'); } });
+    if (window.matchMedia && matchMedia('(min-width: 1024px)').matches) out.push({ group: 'اعمل', label: railClosed() ? 'كبّر القائمة' : 'صغّر القائمة', icon: 'layers', run: function () { setRail(!railClosed()); } });
+    if (A.signOut) out.push({ group: 'اعمل', label: 'تسجيل الخروج', icon: 'logout', danger: true, run: function () { A.signOut(); } });
+    return out;
+  }
+
+  A.openPalette = function () {
+    closeLayer();
+    var all = commands();
+    var shown = [];
+    var at = 0;
+    var input = el('input', { class: 'palette__q', type: 'search', placeholder: 'اكتب اسم قسم أو أمر…', autocomplete: 'off', 'aria-label': 'بحث', 'aria-controls': 'palette-list', role: 'combobox', 'aria-expanded': 'true' });
+    var list = el('div', { class: 'palette__list', id: 'palette-list', role: 'listbox', 'aria-label': 'النتايج' });
+    var box = el('dialog', { class: 'palette', 'aria-label': 'البحث السريع' },
+      el('div', { class: 'palette__in' }, icon('search'), input, el('kbd', { class: 'kbd', text: 'Esc' })), list);
+    document.body.appendChild(box);
+
+    function run(c) {
+      closeLayer();
+      c.run();
+    }
+
+    function draw() {
+      var q = fold(input.value);
+      shown = all.filter(function (c) { return !q || fold(c.label + ' ' + (c.hint || '')).indexOf(q) !== -1; }).slice(0, 40);
+      at = Math.min(at, Math.max(0, shown.length - 1));
+      var nodes = [];
+      var group = '';
+      shown.forEach(function (c, i) {
+        if (c.group !== group) { nodes.push(el('p', { class: 'palette__group', text: c.group })); group = c.group; }
+        nodes.push(el('button', { class: 'palette__item' + (c.danger ? ' palette__item--danger' : ''), type: 'button', role: 'option', id: 'pal-' + i, 'aria-selected': String(i === at), onclick: function () { run(c); } },
+          icon(c.icon), el('span', { text: c.label }), c.hint ? el('small', { text: c.hint }) : null));
+      });
+      list.replaceChildren.apply(list, nodes.length ? nodes : [el('p', { class: 'menu__empty', text: 'مفيش نتايج.' })]);
+      input.setAttribute('aria-activedescendant', shown.length ? 'pal-' + at : '');
+      var current = list.querySelector('[aria-selected="true"]');
+      if (current) current.scrollIntoView({ block: 'nearest' });
+    }
+
+    input.addEventListener('input', function () { at = 0; draw(); });
+    input.addEventListener('keydown', function (event) {
+      if (event.key === 'ArrowDown') { at = Math.min(shown.length - 1, at + 1); draw(); event.preventDefault(); }
+      else if (event.key === 'ArrowUp') { at = Math.max(0, at - 1); draw(); event.preventDefault(); }
+      else if (event.key === 'Enter' && shown[at]) { event.preventDefault(); run(shown[at]); }
+    });
+    box.addEventListener('close', function () { if (openLayer === box) openLayer = null; setTimeout(function () { box.remove(); }, 300); });
+    box.addEventListener('click', function (event) { if (event.target === box) closeLayer(); });
+    draw();
+    box.showModal();
+    openLayer = box;
+    A.sound('open');
+    input.focus();
+  };
+
+  document.addEventListener('keydown', function (event) {
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && String(event.key).toLowerCase() === 'k') {
+      if (!A.state || document.body.classList.contains('is-gated')) return;
+      event.preventDefault();
+      if (openLayer && openLayer.classList.contains('palette')) closeLayer();
+      else A.openPalette();
+    }
+  });
+
+  /* ---------- «المزيد» (phones): the other areas, the settings, the account, sign-out ---------- */
+
+  function openMore() {
+    var rest = dockAreas().rest.concat(A.AREAS.filter(function (a) { return a.key === 'settings'; }));
+    A.openSheet('المزيد', el('div', { class: 'more' },
+      el('div', { class: 'more__grid' }, rest.map(function (area) {
+        return el('button', { class: 'more__item', type: 'button', 'data-area': area.key, 'aria-current': area.key === A.area ? 'page' : null, onclick: function () {
+          A.closeSheet().then(function (ok) { if (ok && area.key !== A.area) A.go(area.key); });
+        } }, el('span', { class: 'more__icon' }, icon(area.icon), navBadge(area.badge, 'more__badge')), el('span', { text: area.label }));
+      })),
+      el('div', { class: 'more__me' },
+        el('span', { class: 'acct__av acct__av--lg', 'aria-hidden': 'true', text: initial(myName()) }),
+        el('span', { class: 'menu__who' }, el('b', { dir: 'auto', text: myName() }), el('small', { class: 'ltr', text: A.state ? A.state.user : '' }))),
+      A.signOut ? el('button', { class: 'btn btn--danger more__out', type: 'button', 'data-signout': '', onclick: function () { A.closeSheet().then(function (ok) { if (ok) A.signOut(); }); } }, icon('logout'), 'تسجيل الخروج') : null
+    ), null, { className: 'sheet--more' });
+  }
+
+  A.openMore = openMore;
+
+  /* ---------- the top bar's own buttons (made once) ---------- */
+
+  function shellTools() {
+    var bar = document.querySelector('.topbar');
+    if (!bar || document.getElementById('palette-open')) return;
+    var tools = el('div', { class: 'topbar__tools' },
+      el('button', { class: 'icon-btn topbar__search', id: 'palette-open', type: 'button', 'aria-label': 'بحث سريع (Ctrl K)', 'aria-haspopup': 'dialog', onclick: function () { A.openPalette(); } },
+        icon('search'), el('span', { class: 'topbar__search-text', text: 'دوّر أو روح لأي قسم…' }), el('kbd', { class: 'kbd', text: 'Ctrl K' })),
+      el('button', { class: 'icon-btn topbar__bell', id: 'bell-open', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: function (event) { openBell(event.currentTarget); } },
+        icon('bell'), el('span', { class: 'topbar__dot', hidden: true }))
+    );
+    var acct = el('button', { class: 'acct', id: 'acct-open', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: function (event) { openAccount(event.currentTarget); } },
+      el('span', { class: 'acct__av', 'aria-hidden': 'true' }), el('span', { class: 'acct__name', dir: 'auto' }));
+    var publish = document.getElementById('publish-open');
+    bar.insertBefore(tools, publish);
+    bar.appendChild(acct);
+  }
+
+  function paintAccount() {
+    var acct = document.getElementById('acct-open');
+    if (!acct || !A.state) return;
+    var name = myName();
+    acct.querySelector('.acct__av').textContent = initial(name);
+    acct.querySelector('.acct__name').textContent = String(name).split(' ')[0];
+    acct.setAttribute('aria-label', 'حسابك: ' + name);
+  }
+
+  /* ---------- the welcome inside the shell, right after signing in ---------- */
+
+  var welcomed = false;
+
+  function welcome() {
+    if (welcomed) return null;
+    welcomed = true;
+    var root = document.documentElement;
+    if (root.classList.contains('is-restoring') || A.reducedMotion() || document.visibilityState === 'hidden' || !window.AdminTransport) return null;
+    var main = document.querySelector('.app__main');
+    if (!main) return null;
+    var hello = el('p', { class: 'welcome__hello', text: 'أهلاً بيك' });
+    var box = el('div', { class: 'welcome', 'aria-hidden': 'true' },
+      el('span', { class: 'welcome__glow' }),
+      el('img', { class: 'welcome__logo', src: '../assets/img/logo-256.webp', width: 112, height: 112, alt: '' }),
+      el('p', { class: 'welcome__title', text: 'لوحة التحكم' }),
+      hello,
+      el('span', { class: 'welcome__line' }, el('i')));
+    main.appendChild(box);
+    var shown = Date.now();
+    var gone = false;
+    function leave() {
+      if (gone) return;
+      gone = true;
+      box.classList.add('is-leaving');
+      setTimeout(function () { box.remove(); }, 520);
+    }
+    // it never stands in the way: the first tap or key goes to the panel and the welcome steps aside
+    document.addEventListener('pointerdown', leave, { capture: true, once: true });
+    document.addEventListener('keydown', leave, { capture: true, once: true });
+    setTimeout(leave, 3200);
+    return {
+      ready: function (name) {
+        if (gone) return;
+        if (name) hello.textContent = 'أهلاً يا ' + String(name).split(' ')[0];
+        box.classList.add('is-ready');
+        setTimeout(leave, Math.max(450, 1100 - (Date.now() - shown)));
+      },
+      leave: leave
+    };
+  }
+
+  A.shell = { tools: shellTools, account: paintAccount, bell: paintBell, welcome: welcome, closeLayer: closeLayer, railLight: moveRailLight, setRail: setRail };
 
   A.render = function (options) {
 
@@ -4607,6 +4991,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     if (!started) {
       started = true;
       document.getElementById('publish-open').prepend(icon('send'));
+      shellTools();
       var uploads = document.getElementById('uploads');
       if (uploads) {
         uploads.prepend(icon('upload'));
@@ -4615,10 +5000,13 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
 
     renderNav();
+    // right after signing in (not after a reload): the panel greets the admin inside the shell, then steps aside
+    var hello = welcome();
 
     return (preloaded ? Promise.resolve(preloaded) : A.call('apiState'))
       .then(function (state) {
         A.state = state;
+        if (hello) hello.ready(state && (state.me || (state.user || '').split('@')[0]));
         myAcct = acctTag(state.user);
         A.renderStatus();
         renderNav();
@@ -4629,6 +5017,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         return true;
       })
       .catch(function (error) {
+        if (hello) hello.leave();
         if (window.console) console.error('[admin] start', error);
         startFailed(error);
         return false;

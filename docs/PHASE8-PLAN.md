@@ -202,3 +202,24 @@ Way back: revert the slice's commit (static admin files, minutes); a Worker chan
     entry and sets only the look's attributes), browser (`content-worker.e2e.mjs`: shows at once, on the server, first paint,
     another device, reduced motion). `tools/phase8-baseline.mjs` takes `PHASE8_PREFS`, `PHASE8_WIDTHS`, `PHASE8_ONLY`.
   - Next: the owner's look on Staging, then production (Worker by CI on `main` with the migration; static admin files).
+- 2026-11-04: **Owner's order for the rest of track A:** A1 is not published on its own. The slices go in four batches,
+  built and tested one after the other without stopping between them: **A1 + A2**, **A3 + A5**, **A4 + A6**, **A7 + A8**
+  (a better technical order may be used). **Production once**, after all of Phase 8 is done and the owner's final approval.
+  Until then everything stays on the branch `claude/phase-8-admin-dashboard-redesign-54b4da` (pushing it to `main` would
+  deploy the Worker and run its migrations through CI). A4's `PERMS_ENFORCE` switch on Staging or production is a step
+  that waits for that final approval too.
+- 2026-11-04: **A2 built** (same branch; batch A1 + A2 done, not on production):
+  - The rail in groups (الشغل · الموقع · الفريق), one light that glides to the current area (spring), «الإعدادات», «افتح
+    الموقع», «صغّر القائمة» (icons only, kept per device and set before the first paint by `admin/look.js`), the admin and
+    a red «خروج» at its foot.
+  - The top bar: the search palette (button and Ctrl K; areas, tabs and commands; Arabic letters folded, so «الاخبار» finds
+    «الأخبار»), «اللي مستنيك» (the menu's own numbers and unpublished changes, each a way there), the account menu (name,
+    email, «المظهر», the mode, «افتح الموقع», «تسجيل الخروج» in red). Menus are popovers (Esc and a tap outside close them).
+  - Phones: the dock is four areas + «المزيد» (a sheet with the other areas, the settings, the admin and sign-out); «المزيد»
+    is lit when the area is inside it.
+  - The welcome inside the shell right after signing in (not after a reload, not with reduced motion): the family's logo,
+    «لوحة التحكم», «أهلاً يا …», then it steps aside by itself (≈1 s); it never stands in the way of a tap.
+  - The presence strip stays as it was (its own place under the top bar); the publish flow is unchanged.
+  - Tests: `content-worker.e2e.mjs` (the welcome, the rail's order and light, collapse, the palette, the menus, «المزيد» on a
+    phone, sign-out in each place); the dock tests now expect four areas + «المزيد» (admin-app, comp-admin, pages-admin).
+    Browser suites: the same failures as `main`, none new.
