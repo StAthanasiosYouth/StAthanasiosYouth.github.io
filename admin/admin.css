@@ -9369,10 +9369,11 @@ body {
   min-height: 62px;
 }
 
+/* owner 2026-11-04: «لوحة التحكم» in plain Cairo, the panel's own type (Ruqaa stays for the greeting) */
 .brand__title {
-  font-family: var(--f-display);
-  font-size: 21px;
-  font-weight: 700;
+  font-family: "Cairo", system-ui, sans-serif;
+  font-size: 19px;
+  font-weight: 800;
   line-height: 1.2;
   color: var(--gold-hi);
 }
