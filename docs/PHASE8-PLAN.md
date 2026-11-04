@@ -223,3 +223,16 @@ Way back: revert the slice's commit (static admin files, minutes); a Worker chan
   - Tests: `content-worker.e2e.mjs` (the welcome, the rail's order and light, collapse, the palette, the menus, «المزيد» on a
     phone, sign-out in each place); the dock tests now expect four areas + «المزيد» (admin-app, comp-admin, pages-admin).
     Browser suites: the same failures as `main`, none new.
+- 2026-11-04: **Batch A3 + A5 built** (same branch, not on production):
+  - Already there from Phases 1–7 and kept: no native `confirm()` left (the in-app `A.confirm` / `A.modal`), toasts with an
+    action, field errors under their field with the first one scrolled into view and focused.
+  - New: a ripple on every press (not under reduced or lite motion); a busy button ends on itself (a check when saved, a
+    short shake when it failed; `A.withBusy`); `A.confirm({ typed: 'امسح' })` for what cannot come back (the button turns
+    on only with the word; used by A6's deletes); `A.undoToast(message, undo)`; Ctrl+S presses the open editor's save.
+  - The form layer: a field to fix inside a folded part opens it; with two or more, the save bar says «٢ حقول محتاجة تتصلح»
+    (a live region) with «اللي قبله» / «اللي بعده»; fields keep clear of the top bar, the dock and the keyboard
+    (`scroll-margin`).
+  - Controls: checkboxes read as toggle rows (words, then the switch); dropdowns in the panel's own look where the browser
+    has `appearance: base-select` (Chrome), the styled native one elsewhere; date and time fields follow the theme.
+  - Tests: `content-worker.e2e.mjs` (typed confirmation, saved / failed, the save bar's count and way between fields,
+    toggle rows, Ctrl+S). Browser suites: the same failures as `main`, none new.

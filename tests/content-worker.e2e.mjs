@@ -509,3 +509,69 @@ test('Phase 8 A2: the shell — the welcome, the rail in groups with its light a
   assert.deepEqual(p.problems, []);
   await p.close();
 });
+
+
+test('Phase 8 A3 + A5: typed confirmation, saved/failed on the button, Ctrl+S, the save bar\'s count and way between fields', async () => {
+  await freshWorld();
+  const shots = `${ROOT}tools/.cache/phase8-a3/`;
+  mkdirSync(shots, { recursive: true });
+  const s = await open();
+  await signedIn(s.page);
+  await s.page.waitForFunction(() => !document.querySelector('.welcome'), { timeout: 6000 });
+
+  // what cannot come back asks for the word first
+  const asked = s.page.evaluate(() => A.confirm({ title: 'تمسح ٣ حاجات؟', message: 'المسح مش بيرجع.', typed: 'امسح', confirmLabel: 'امسح' }));
+  await s.page.waitForSelector('dialog.modal[open] .modal__typed');
+  const ok = 'dialog.modal[open] .modal__actions .btn:first-child';
+  assert.equal(await s.page.$eval(ok, b => b.disabled), true, 'off until the word');
+  await s.page.type('dialog.modal[open] .modal__typed', 'امس');
+  assert.equal(await s.page.$eval(ok, b => b.disabled), true);
+  await s.page.type('dialog.modal[open] .modal__typed', 'ح');
+  assert.equal(await s.page.$eval(ok, b => b.disabled), false);
+  assert.match(await s.page.$eval('dialog.modal[open]', d => d.className), /modal--danger/);
+  await s.page.screenshot({ path: `${shots}typed-confirm.png` });
+  await s.page.click(ok);
+  assert.equal(await asked, true);
+
+  // a busy button ends on itself: saved, or failed
+  const states = await s.page.evaluate(async () => {
+    const b = A.el('button', { class: 'btn', type: 'button', text: 'حفظ' });
+    document.getElementById('view').prepend(b);
+    await A.withBusy(b, Promise.resolve({ ok: true }));
+    const done = b.classList.contains('is-done');
+    await A.withBusy(b, Promise.reject(new Error('x'))).catch(() => {});
+    const failed = b.classList.contains('is-failed');
+    b.remove();
+    return [done, failed];
+  });
+  assert.deepEqual(states, [true, true]);
+
+  // an editor: two fields to fix → the save bar counts them and moves between them; Ctrl+S saves
+  await s.page.evaluate(() => A.go('content', 'news'));
+  await s.page.waitForSelector('.btn--primary');
+  await s.page.evaluate(() => [...document.querySelectorAll('#view .btn--primary')].find(b => /خبر/.test(b.textContent)).click());
+  await s.page.waitForSelector('dialog.sheet[open] .field[data-label]');
+  const labels = await s.page.$$eval('dialog.sheet[open] .field[data-label]', fs => fs.filter(f => f.offsetParent).map(f => f.dataset.label).slice(0, 2));
+  assert.equal(labels.length, 2, JSON.stringify(labels));
+  await s.page.evaluate(ls => A.fail(new Error(ls.map(l => l + ' مطلوب').join('\n')), document.querySelector('dialog.sheet[open] .errors')), labels);
+  await s.page.waitForSelector('.fix-nav');
+  assert.match(await s.page.$eval('.fix-nav__count', n => n.textContent), /^٢ حقول محتاجة تتصلح$/);
+  assert.equal(await s.page.evaluate(() => document.activeElement.closest('.field')?.dataset.label), labels[0], 'the first one, focused');
+  await s.page.click('.fix-nav .btn:last-child');
+  assert.equal(await s.page.evaluate(() => document.activeElement.closest('.field')?.dataset.label), labels[1], 'the next one');
+  await s.page.screenshot({ path: `${shots}fix-nav.png` });
+  // toggle rows: the words, then the switch
+  const toggles = await s.page.$$eval('dialog.sheet[open] .check--toggle', ns => ns.map(n => [n.firstElementChild.tagName, !!n.querySelector('.switch__track')]));
+  assert.ok(toggles.every(t => t[0] === 'SPAN' && t[1]), JSON.stringify(toggles));
+  // Ctrl+S presses the editor's save
+  const pressed = s.page.evaluate(() => new Promise(resolve => {
+    const save = [...document.querySelectorAll('dialog.sheet[open] .sheet__foot .btn--primary')].find(b => !b.disabled);
+    save.addEventListener('click', e => { e.stopImmediatePropagation(); e.preventDefault(); resolve(true); }, { capture: true, once: true });
+  }));
+  await s.page.keyboard.down('Control');
+  await s.page.keyboard.press('KeyS');
+  await s.page.keyboard.up('Control');
+  assert.equal(await pressed, true);
+  assert.deepEqual(s.problems, []);
+  await s.close();
+});

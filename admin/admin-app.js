@@ -455,12 +455,15 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     button.classList.add('is-busy');
     button.replaceChildren(el('span', { class: 'spinner', 'aria-hidden': 'true' }), button.classList.contains('icon-btn') ? '' : 'استنى…');
 
-    return promise.finally(function () {
+    var ended = null;
+    return promise.then(function (value) { ended = value && value.ok === false ? false : true; return value; }, function (error) { ended = false; throw error; }).finally(function () {
       button.disabled = false;
       button.removeAttribute('aria-busy');
       button.style.minWidth = '';
       button.classList.remove('is-busy');
       button.replaceChildren.apply(button, original);
+      // Phase 8 A3: saved (a check) or failed (a short shake), on the button itself
+      if (ended !== null && A.flash) A.flash(button, ended);
     });
 
   };
@@ -535,6 +538,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     box.hidden = false;
 
     var firstInvalid = scope.querySelector('.field--invalid');
+    if (A.invalidNav) A.invalidNav(scope);
     (firstInvalid || box).scrollIntoView({ block: 'center', behavior: A.reducedMotion() ? 'auto' : 'smooth' });
     if (firstInvalid) {
       var control = firstInvalid.querySelector('input, textarea, select');
@@ -697,6 +701,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         return text === label || text.indexOf(label + ' ') === 0 || text.indexOf(label + ':') === 0;
       })[0];
 
+      if (field && A.revealField) A.revealField(field);
       if (!field || field.offsetParent === null) return true;
 
       field.classList.add('field--invalid');
@@ -966,6 +971,104 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   };
 
+  /* =======================================================
+     ACTIONS AND FEEDBACK (Phase 8 A3) + THE SHARED FORM LAYER (A5)
+       - a press leaves a ripple (not under reduced motion)
+       - a busy button ends in «saved» (a check) or «failed» (a short shake)
+       - A.undoToast(message, undo): a reversible action says so, with «تراجع»
+       - typed confirmation for what cannot come back: A.confirm({ typed: 'امسح' })
+       - Ctrl+S saves the open editor; the save bar counts what needs fixing and
+         moves between those fields; a collapsed part with one opens by itself
+  ======================================================= */
+
+  var RIPPLE = '.btn, .navlink, .dockbtn, .menu__item, .palette__item, .icon-btn, .tab, .more__item, .acct, .choice, .swatch';
+
+  document.addEventListener('pointerdown', function (event) {
+    var host = event.target instanceof Element ? event.target.closest(RIPPLE) : null;
+    if (!host || host.disabled || A.reducedMotion() || A.liteMotion()) return;
+    var r = host.getBoundingClientRect();
+    var size = Math.max(r.width, r.height) * 2.2;
+    var dot = document.createElement('span');
+    dot.className = 'ripple';
+    dot.setAttribute('aria-hidden', 'true');
+    dot.style.width = dot.style.height = size + 'px';
+    dot.style.left = (event.clientX - r.left - size / 2) + 'px';
+    dot.style.top = (event.clientY - r.top - size / 2) + 'px';
+    host.appendChild(dot);
+    setTimeout(function () { dot.remove(); }, 650);
+  }, { passive: true });
+
+  /* the end of a busy action, on its button */
+  A.flash = function (button, ok) {
+    if (!button || !button.isConnected) return;
+    var cls = ok ? 'is-done' : 'is-failed';
+    button.classList.remove('is-done', 'is-failed');
+    void button.offsetWidth;
+    button.classList.add(cls);
+    setTimeout(function () { button.classList.remove(cls); }, ok ? 1200 : 600);
+  };
+
+  A.undoToast = function (message, undo) {
+    A.toast(message, 'success', { label: 'تراجع', onclick: undo });
+  };
+
+  /* the open editor's main button (Ctrl+S); none when it is off or busy */
+  function sheetSave() {
+    var open = document.querySelector('dialog.sheet[open]');
+    if (!open) return null;
+    var buttons = Array.prototype.slice.call(open.querySelectorAll('.sheet__foot .btn--primary'));
+    return buttons.filter(function (b) { return !b.disabled && b.offsetParent !== null; })[0] || null;
+  }
+
+  document.addEventListener('keydown', function (event) {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey || String(event.key).toLowerCase() !== 's') return;
+    var save = sheetSave();
+    if (!save) return;
+    event.preventDefault();
+    save.click();
+  });
+
+  /* the save bar's «٢ حقول محتاجة تتصلح» with the way between them */
+  A.invalidNav = function (scope) {
+    var host = scope && (scope.closest('dialog.sheet') ? scope.closest('dialog.sheet').querySelector('.sheet__foot') : null);
+    var old = document.querySelector('.fix-nav');
+    if (old) old.remove();
+    var fields = scope ? Array.prototype.slice.call(scope.querySelectorAll('.field--invalid')) : [];
+    if (fields.length < 2 || !host) return;
+    var at = 0;
+    var count = el('span', { class: 'fix-nav__count', role: 'status', text: digitsAr(fields.length) + ' حقول محتاجة تتصلح' });
+    function show(i) {
+      at = (i + fields.length) % fields.length;
+      var f = fields[at];
+      if (!f.isConnected || !f.classList.contains('field--invalid')) { refresh(); return; }
+      f.scrollIntoView({ block: 'center', behavior: A.reducedMotion() ? 'auto' : 'smooth' });
+      var control = f.querySelector('input, textarea, select');
+      if (control) control.focus({ preventScroll: true });
+    }
+    function refresh() {
+      fields = fields.filter(function (f) { return f.isConnected && f.classList.contains('field--invalid'); });
+      if (fields.length < 2) { nav.remove(); return; }
+      count.textContent = digitsAr(fields.length) + ' حقول محتاجة تتصلح';
+    }
+    var nav = el('div', { class: 'fix-nav' },
+      icon('alert'), count,
+      el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () { show(at - 1); } }, 'اللي قبله'),
+      el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () { show(at + 1); } }, 'اللي بعده'));
+    host.prepend(nav);
+    scope.addEventListener('input', refresh);
+  };
+
+  function digitsAr(n) {
+    return String(n).replace(/\d/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[d]; });
+  }
+
+  /* a field that needs fixing inside a folded part: the part opens (details, a hidden step) */
+  A.revealField = function (field) {
+    for (var d = field.closest('details'); d; d = d.parentElement && d.parentElement.closest('details')) d.open = true;
+    var panel = field.closest('[hidden]');
+    if (panel && panel.dataset && panel.dataset.revealable !== undefined) panel.hidden = false;
+  };
+
   /* lite: the same order, shorter (weak phones) — for code that times its own steps */
   A.liteMotion = function () {
 
@@ -1030,7 +1133,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var input = el('input', { type: 'checkbox', checked: checked, onchange: markDirty });
 
     return {
-      node: el('label', { class: 'check' }, input, el('span', {}, el('strong', { text: label }), hint ? el('small', { text: hint }) : null)),
+      node: el('label', { class: 'check check--toggle' }, el('span', {}, el('strong', { text: label }), hint ? el('small', { text: hint }) : null), input, el('span', { class: 'switch__track', 'aria-hidden': 'true' })),
       input: input
     };
 
@@ -3335,6 +3438,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       document.body.appendChild(dialog);
       dialog.showModal();
       (focusTarget || buttons[buttons.length - 1]).focus();
+      if (options.setup) options.setup(dialog, buttons);
 
     });
 
@@ -3343,14 +3447,26 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   /** Resolves true only when the admin chose the confirming action. */
   A.confirm = function (options) {
 
-    var danger = options.tone === 'danger';
+    var danger = options.tone === 'danger' || !!options.typed;
+    // Phase 8 A3: what cannot come back asks for a word («اكتب امسح») before its button turns on
+    var typed = options.typed ? String(options.typed) : '';
+    var word = typed ? el('input', { class: 'input modal__typed', type: 'text', autocomplete: 'off', 'aria-label': 'اكتب «' + typed + '» علشان تأكد', placeholder: typed }) : null;
+    var body = typed ? el('label', { class: 'field modal__typed-field' }, el('span', { class: 'field__label', text: 'اكتب «' + typed + '» علشان تأكد' }), word) : null;
 
     return A.modal({
-      tone: options.tone || 'warn',
+      tone: danger ? 'danger' : (options.tone || 'warn'),
       icon: options.icon,
       title: options.title,
       message: options.message,
       details: options.details,
+      body: options.body ? el('div', {}, options.body, body) : body,
+      setup: typed ? function (dialog, buttons) {
+        var ok = buttons[0];
+        ok.disabled = true;
+        word.addEventListener('input', function () { ok.disabled = word.value.trim() !== typed; });
+        word.addEventListener('keydown', function (event) { if (event.key === 'Enter' && !ok.disabled) ok.click(); });
+        word.focus();
+      } : null,
       actions: [
         { label: options.confirmLabel || 'تمام', value: true, kind: danger ? 'danger-solid' : 'primary', autofocus: !danger },
         { label: options.cancelLabel || 'رجوع', value: false, kind: 'ghost', autofocus: danger }
