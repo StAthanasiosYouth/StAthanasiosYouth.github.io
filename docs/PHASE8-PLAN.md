@@ -298,6 +298,17 @@ Way back: revert the slice's commit (static admin files, minutes); a Worker chan
   - Fixed on the way: toasts readable on the new surfaces; past timeline rows readable (axe AA: no faded blocks).
   - Tests: the suites follow the new map (bookings and youth as areas, the dock's order, a solid editor sheet); every admin
     suite: the same failures as `main`, none new; axe clean in both themes.
-  - **Next, needs the owner's word (it changes the public site and the content data):** §22.1 item 11, «صورة أو أيقونة» in
-    every content image field (about 20 editors) with the icon tile on the public pages. Also waiting: `PERMS_ENFORCE`,
-    `GAMES_MODULE`, the test-data rule (item 21).
+  - **§22.1 item 11, «صورة أو أيقونة» (owner: "Yes, build it"; branch commit 1122e8d, not in production):**
+    - Covered: the meeting (sessions), news, games, activities. The editor offers «صورة / أيقونة»: the image picker as
+      before, or the site's own icons (the social networks' marks hidden), with a live sample of the tile.
+    - Data, additive: an optional `icon` column (lazy, added by the first save that sets it) on Sessions, News, Games and
+      Activities; the Worker's kinds list it. Only a known icon is saved (else «الأيقونة مش معروفة»). Published only when
+      the item has no image (the image wins). Old content reads and publishes exactly as before.
+    - Public: the branded tile (navy, gold glyph, the arch's hairline) where the poster would be, on the cards, the
+      meeting and the sheets; the public sanitizer keeps known icons only.
+    - Tests: `tests/icon-choice.test.mjs` (3), the news editor end to end (content-worker), the public tile
+      (points-widget). Full regression: the same failures as `main`, none new.
+    - Not covered yet (owner's call): banners, service pages, events, contacts; search, categories and recent picks in the
+      icon list.
+  - **Waiting on the owner:** `PERMS_ENFORCE`, `GAMES_MODULE`, the test-data rule (item 21), and the final review before
+    the one production deploy.
