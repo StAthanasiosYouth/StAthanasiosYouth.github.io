@@ -1,9 +1,9 @@
-// «نقاطي / المتجر» on the main page (content.json `points`, docs/COMPETITIONS.md
-// §18.4) in headless Chrome: no widget without `points`; the widget's states
-// from Cairo time (the server's Date header corrects the device's clock);
-// a clock change and a world change while the page is open; its place in the
-// layout; tap → points/ in the same tab; the top-bar entry; a bell item with
-// target `points`; axe, overflow and touch targets on phone and desktop.
+// «نقاطي» on the main page (content.json `points`, docs/COMPETITIONS.md §18.4)
+// in headless Chrome. Since Phase 8 track P (owner, 2026-11-04) the home page
+// has no «نقاطي والمتجر» card: only the top bar's star, which opens points/ in
+// the same tab; a bell item with target `points`; nothing without `points`;
+// axe, overflow and the star's touch target on phone and desktop. (The store's
+// words from Cairo time stay tested in points.test.mjs.)
 //
 // Run: cd tools && node --test ../tests/points-widget.e2e.mjs
 
@@ -98,16 +98,6 @@ async function open(viewport, state, { bypassCSP = false } = {}) {
 }
 
 const textOf = (page, selector) => page.$eval(selector, el => el.textContent.trim());
-const words = page => page.$eval('.points', el => ({
-  shop: el.dataset.shop,
-  title: el.querySelector('.points__title').textContent.trim(),
-  headline: el.querySelector('.points__headline').textContent.trim(),
-  detail: el.querySelector('.points__detail').hidden ? '' : el.querySelector('.points__detail').textContent.trim(),
-  season: el.querySelector('.points__season').hidden ? '' : el.querySelector('.points__season').textContent.trim()
-}));
-const waitHeadline = (page, pattern) => page.waitForFunction(p => new RegExp(p).test(document.querySelector('.points__headline')?.textContent || ''), { timeout: 8000 }, pattern.source);
-// the page's own refresh (a tab coming back): content.json again, then its tick
-const refresh = page => page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
 
 
 test('no `points` in content.json: no widget, no top-bar entry, no points.js request', async () => {
@@ -123,79 +113,16 @@ test('no `points` in content.json: no widget, no top-bar entry, no points.js req
 });
 
 
-test('states from Cairo time across a clock change and a world change; season line; same-tab link', async () => {
+test('the home page has no «نقاطي والمتجر» card (owner, Phase 8 track P): the top star stays and opens points/', async () => {
 
-  const state = { content: world(), date: TUESDAY_NOON };
-  const { context, page, problems, requests } = await open(PHONE, state);
-  await waitHeadline(page, /المتجر بيفتح/);
-
-  // the device clock is today's; the server says Tuesday noon: the widget follows the server
-  assert.deepEqual(await words(page), {
-    shop: 'scheduled',
-    title: 'نقاطي والمتجر',
-    headline: 'المتجر بيفتح السبت الساعة ٧ بالليل',
-    detail: 'فاضل ٤ أيام',
-    season: 'الموسم بيخلص بعد ٧ أيام'
-  });
-  assert.ok(requests.some(path => path.endsWith('/assets/js/points.js')));
-  assert.equal(requests.filter(path => /script\.google/.test(path)).length, 0, 'no server call');
-
-  // the clock moves to Saturday 19:00: the store opens on the page's own refresh
-  state.date = SATURDAY_OPEN;
-  await refresh(page);
-  await waitHeadline(page, /مفتوح/);
-  assert.deepEqual(await words(page), {
-    shop: 'open',
-    title: 'نقاطي والمتجر',
-    headline: 'المتجر مفتوح لحد الخميس الساعة ٨ بالليل',
-    detail: 'اطلب جايزتك بنقاطك',
-    season: 'الموسم بيخلص بعد يومين'
-  });
-
-  // the world changes (a publish: the admin closed the store)
-  state.content = world({ points: { url: 'points/', shop: { ...SHOP, mode: 'closed' }, season: SEASON } });
-  await refresh(page);
-  await waitHeadline(page, /مقفول/);
-  assert.equal((await words(page)).headline, 'المتجر مقفول — نقاطك محفوظة');
-  assert.equal(await page.$eval('.points', el => el.dataset.shop), 'closed');
-
-  // no store, no season: just «نقاطي»
-  state.content = world({ points: { url: 'points/', shop: null, season: null } });
-  await refresh(page);
-  await page.waitForFunction(() => document.querySelector('.points')?.dataset.shop === 'none');
-  assert.deepEqual(await words(page), { shop: 'none', title: 'نقاطي', headline: 'نقاطك ومسابقاتك في مكان واحد', detail: '', season: '' });
-
-  // the whole card opens points/ in this tab
-  const link = await page.$eval('.points .stretched', a => ({ href: a.getAttribute('href'), target: a.getAttribute('target') }));
-  assert.deepEqual(link, { href: 'points/', target: null });
-  await Promise.all([page.waitForNavigation(), page.click('.points .points__art')]);
+  const { context, page, problems, requests } = await open(PHONE, { content: world(), date: TUESDAY_NOON });
+  assert.equal(await page.$('[data-area="points"]'), null, 'no card in the page');
+  assert.equal(await page.$('.points'), null);
+  assert.ok(!requests.some(path => path.endsWith('/assets/js/points.js')), 'the card\'s module is not loaded');
+  assert.deepEqual(await page.$eval('#points-link', a => [a.getAttribute('href'), a.hidden]), ['points/', false]);
+  await Promise.all([page.waitForNavigation(), page.click('#points-link')]);
   assert.equal(new URL(page.url()).pathname, '/points/');
   assert.deepEqual(problems, []);
-  await context.close();
-
-});
-
-
-test('placement: under the meeting; right after the competitions when they show', async () => {
-
-  let { context, page } = await open(PHONE, { content: world(), date: TUESDAY_NOON });
-  let order = await page.$$eval('#main > [data-area]', els => els.map(e => e.dataset.area));
-  const at = order.indexOf('points');
-  assert.ok(at > 0 && ['meeting', 'live-game', 'announcement', 'banner'].includes(order[at - 1]), order.join(' '));
-  assert.ok(order.indexOf('meeting') < at);
-  assert.equal(await page.$eval('.points', el => el.hasAttribute('data-wide')), true);
-  await context.close();
-
-  const content = world({
-    types: [{ key: 'quiz', label: 'مسابقة', icon: 'trophy' }],
-    activities: [{ id: 'a-1', type: 'quiz', section: 'competitions', title: 'مسابقة يونان', startAt: '2026-10-10T00:00', endAt: '2026-10-30T00:00' }]
-  });
-  ({ context, page } = await open(PHONE, { content, date: TUESDAY_NOON }));
-  order = await page.$$eval('#main > [data-area]', els => els.map(e => e.dataset.area));
-  const items = await page.$$eval('#main > [data-area]', els => els.map(e => e.dataset.area === 'items' && !!e.querySelector('[data-item], .item-card, li')));
-  const points = order.indexOf('points');
-  assert.equal(order[points - 1], 'items', order.join(' '));
-  assert.ok(items[points - 1]);
   await context.close();
 
 });
@@ -221,16 +148,16 @@ test('top bar «نقاطي» and a bell item with target points: same tab, point
 });
 
 
-test('axe phone + desktop; no horizontal scroll at 280 / 360 / 1280; touch targets', async () => {
+test('axe phone + desktop; no horizontal scroll at 280 / 360 / 1280; the star is a full touch target', async () => {
 
   for (const [name, viewport] of Object.entries({ narrow: NARROW, phone: PHONE, desktop: DESKTOP })) {
     for (const shop of [SHOP, null]) {
       const { context, page, problems } = await open(viewport, { content: world({ points: { url: 'points/', shop, season: SEASON } }), date: TUESDAY_NOON }, { bypassCSP: name !== 'narrow' });
-      await page.waitForFunction(() => document.querySelector('.points__headline')?.textContent);
+      await page.waitForSelector('#points-link:not([hidden])');
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
       assert.ok(overflow <= 0, `${name}: horizontal overflow ${overflow}px`);
-      const boxes = await page.$$eval('.points, #points-link', els => els.map(el => { const r = el.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }));
-      assert.ok(boxes.every(([w, h]) => w >= 44 && h >= 44), `${name}: ${JSON.stringify(boxes)}`);
+      const box = await page.$eval('#points-link', el => { const r = el.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; });
+      assert.ok(box[0] >= 40 && box[1] >= 40, `${name}: ${JSON.stringify(box)}`);
       if (name !== 'narrow') {
         await page.evaluate(AXE);
         const results = await page.evaluate(tags => axe.run(document, { runOnly: { type: 'tag', values: tags } }), AXE_TAGS);
@@ -239,44 +166,8 @@ test('axe phone + desktop; no horizontal scroll at 280 / 360 / 1280; touch targe
       else {
         assert.deepEqual(problems, [], 'no console errors / CSP violations');
       }
-      if (shop) await page.screenshot({ path: `${ROOT}tools/.cache/comp/points-widget-${name}.png` });
       await context.close();
     }
   }
-
-});
-
-
-test('§19.1 preview: auto with preview before opensAt, then open on the clock; manual preview «قريب»', async () => {
-
-  const state = { content: world({ points: { url: 'points/', shop: { ...SHOP, preview: true }, season: null } }), date: TUESDAY_NOON };
-  const { context, page, problems } = await open(PHONE, state);
-  await waitHeadline(page, /للعرض/);
-  assert.deepEqual(await words(page), {
-    shop: 'preview',
-    title: 'نقاطي والمتجر',
-    headline: 'المتجر مفتوح للعرض — الطلب هيفتح السبت الساعة ٧ بالليل',
-    detail: 'فاضل ٤ أيام',
-    season: ''
-  });
-
-  state.date = SATURDAY_OPEN;
-  await refresh(page);
-  await waitHeadline(page, /مفتوح لحد/);
-  assert.equal(await page.$eval('.points', el => el.dataset.shop), 'open');
-
-  // the admin switches to a manual preview (a publish), no date
-  state.content = world({ points: { url: 'points/', shop: { on: true, mode: 'preview', preview: false, opensAt: '', closesAt: '' }, season: null } });
-  await refresh(page);
-  await waitHeadline(page, /قريب/);
-  assert.deepEqual(await words(page), {
-    shop: 'preview',
-    title: 'نقاطي والمتجر',
-    headline: 'المتجر مفتوح للعرض — الطلب هيفتح قريب',
-    detail: 'اتفرج على الجوايز وجهّز نقاطك',
-    season: ''
-  });
-  assert.deepEqual(problems, []);
-  await context.close();
 
 });

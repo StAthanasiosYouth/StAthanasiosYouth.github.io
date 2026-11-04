@@ -47,7 +47,9 @@ const state = page => page.evaluate(() => {
     tabs: bar ? [...bar.querySelectorAll('[data-tab]')].map(a => [a.dataset.tab, a.href ? new URL(a.href).pathname + new URL(a.href).hash : '', a.getAttribute('aria-current') || '']) : [],
     topAccount: visible(document.querySelector('.topbar .acct-badge, .pbar .acct-badge, .cbar .acct-badge')),
     hasTopAccount: !!document.querySelector('.topbar .acct-badge, .pbar .acct-badge, .cbar .acct-badge'),
-    home: home ? { label: home.getAttribute('aria-label'), w: Math.round(home.getBoundingClientRect().width), text: getComputedStyle(home).fontSize } : null,
+    home: home ? { label: home.getAttribute('aria-label'), w: Math.round(home.getBoundingClientRect().width), text: getComputedStyle(home).fontSize, last: home === home.parentElement.lastElementChild } : null,
+    pointsCard: !!document.querySelector('[data-area="points"]'),
+    star: document.querySelector('#points-link') ? !document.querySelector('#points-link').hidden : null,
     covered: (() => { // nothing of the page's last content sits under the bar once scrolled to the end
       if (!visible(bar)) return false;
       scrollTo(0, document.documentElement.scrollHeight);
@@ -85,6 +87,9 @@ try {
         check(`${where}: no bottom bar`, !st.tabbar, st);
         check(`${where}: the account icon stays in the top bar`, !st.hasTopAccount || st.topAccount, st);
       }
+      // every inner page has the Home icon at its bar's end (owner, 2026-11-04: «نقاطي» and the competitions too)
+      if (!homePage) check(`${where}: the Home icon is there, at the bar's end`, !!st.home && st.home.last, st.home);
+      if (homePage) check(`${where}: no «نقاطي والمتجر» card; the top star stays`, !st.pointsCard && st.star !== false, { card: st.pointsCard, star: st.star });
       if (st.home) check(`${where}: «ارجع للموقع» is the Home icon`, ['الرئيسية', 'ارجع للصفحة اللي كنت فيها'].includes(st.home.label) && st.home.w === 44 && st.home.text === '0px', st.home);
       check(`${where}: no page errors`, s.errors.length === 0, s.errors);
       await s.close();
@@ -92,7 +97,7 @@ try {
   }
 
   // the Home icon from the very first frame (its CSS comes with the page's own stylesheet): never the old words
-  for (const path of ['/black-theatre/', '/account/', '/no-such-page-x/']) {
+  for (const path of ['/black-theatre/', '/account/', '/points/', '/no-such-page-x/']) {
     const s = await open(PHONE);
     let first = null;
     s.page.on('domcontentloaded', async () => { try { first = await s.page.evaluate(() => { const a = document.querySelector('.pbar__home, .cbar__home'); return a ? [getComputedStyle(a).fontSize, getComputedStyle(a).width] : null; }); } catch { /* navigated */ } });

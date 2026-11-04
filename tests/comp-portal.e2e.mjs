@@ -153,10 +153,21 @@ function createMock({ wallet = true, shop = true, registry = true } = {}) {
    PAGES
 ========================================================= */
 
-async function open({ viewport = PHONE, mock = createMock(), bypassCSP = false, token = '' } = {}) {
+async function open({ viewport = PHONE, mock = createMock(), bypassCSP = false, token = '', path = '/points/' } = {}) {
 
   const context = await browser.createBrowserContext();
   const page = await context.newPage();
+  // the dashboard is in tabs (Phase 8 track P): a press opens the tab its button is in and brings it to the middle
+  // of the screen, clear of the sticky bars, as a person would
+  const press = page.click.bind(page);
+  page.click = async (selector, options) => {
+    await page.$eval(selector, el => {
+      const panel = el.closest('[data-panel][hidden]');
+      if (panel) document.querySelector(`[data-tab="${panel.dataset.panel}"]`)?.click();
+      el.scrollIntoView({ block: 'center' });
+    }).catch(() => {});
+    return press(selector, options);
+  };
   const problems = [];
   const echoes = new Map();
   let echo = 0;
@@ -176,7 +187,7 @@ async function open({ viewport = PHONE, mock = createMock(), bypassCSP = false, 
     if (!url.endsWith('/v1/account/config')) mock.outside.push(url);
     return request.respond({ status: 204, body: '' });
   });
-  await page.goto(`${BASE}/points/`, { waitUntil: 'networkidle0' });
+  await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle0' });
 
   return { context, page, problems, mock };
 
@@ -369,6 +380,44 @@ test('session over: on to sign-in, the session gone; signed out: the same; regis
   await waitScreen(page, 'unavailable');
   assert.equal(await textOf(page, '#comp-main h1'), 'الصفحة دي مش متاحة دلوقتي');
   await context.close();
+
+});
+
+
+test('Phase 8: the summary card, tabs with their own address, the Home icon, «خروج» red at the end', async () => {
+
+  const { context, page, problems } = await open({ token: 'pt1.good.sig' });
+  await waitScreen(page, 'dashboard');
+  // the top bar: the Home icon at its end, named for where it goes
+  assert.deepEqual(await page.$eval('.cbar', bar => [bar.lastElementChild.className, bar.lastElementChild.getAttribute('href'), bar.lastElementChild.getAttribute('aria-label')]), ['cbar__home', '../', 'الرئيسية']);
+  // the summary: the balance and three numbers that open their tabs
+  assert.deepEqual(await page.$$eval('.portal__me .pstat', els => els.map(e => e.dataset.stat)), ['comps', 'orders', 'prizes']);
+  // the tabs: the prizes first; one panel showing
+  assert.deepEqual(await page.$$eval('[role="tab"]', els => els.map(e => [e.dataset.tab, e.getAttribute('aria-selected')])), [['prizes', 'true'], ['orders', 'false'], ['comps', 'false'], ['points', 'false']]);
+  assert.deepEqual(await page.$$eval('[data-panel]', els => els.filter(e => !e.hidden).map(e => e.dataset.panel)), ['prizes']);
+  const before = await page.evaluate(() => history.length);
+  await page.click('[data-tab="comps"]');
+  assert.deepEqual(await page.$$eval('[data-panel]', els => els.filter(e => !e.hidden).map(e => e.dataset.panel)), ['comps']);
+  assert.equal(await page.evaluate(() => location.hash), '#comps');
+  assert.equal(await page.evaluate(() => history.length), before, 'a tab is not a new step for Back');
+  // the arrows move between tabs (RTL: left goes on)
+  await page.focus('[data-tab="comps"]');
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await page.evaluate(() => document.activeElement.dataset.tab), 'points');
+  // a stat opens its tab
+  await page.click('[data-stat="orders"]');
+  assert.equal(await page.$eval('[data-tab="orders"]', e => e.getAttribute('aria-selected')), 'true');
+  // «خروج» is at the end, red, never in the first card
+  assert.equal(await page.$('.portal__me [data-logout]'), null);
+  assert.equal(await page.$eval('[data-logout]', b => b.closest('.portal__end') !== null && b.classList.contains('btn--out')), true);
+  assert.deepEqual(problems, []);
+  await context.close();
+
+  // a tab's address opens it directly
+  const deep = await open({ token: 'pt1.good.sig', path: '/points/#orders' });
+  await waitScreen(deep.page, 'dashboard');
+  assert.deepEqual(await deep.page.$$eval('[data-panel]', els => els.filter(e => !e.hidden).map(e => e.dataset.panel)), ['orders']);
+  await deep.context.close();
 
 });
 

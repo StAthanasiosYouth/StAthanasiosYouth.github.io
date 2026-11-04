@@ -174,6 +174,17 @@ async function open({ viewport = PHONE, mock = createMock(), bypassCSP = false, 
 
   const context = await browser.createBrowserContext();
   const page = await context.newPage();
+  // the dashboard is in tabs (Phase 8 track P): a press opens the tab its button is in and brings it to the middle
+  // of the screen, clear of the sticky bars, as a person would
+  const press = page.click.bind(page);
+  page.click = async (selector, options) => {
+    await page.$eval(selector, el => {
+      const panel = el.closest('[data-panel][hidden]');
+      if (panel) document.querySelector(`[data-tab="${panel.dataset.panel}"]`)?.click();
+      el.scrollIntoView({ block: 'center' });
+    }).catch(() => {});
+    return press(selector, options);
+  };
   const problems = [];
   const echoes = new Map();
   let echo = 0;

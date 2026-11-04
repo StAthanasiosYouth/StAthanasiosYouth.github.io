@@ -585,7 +585,8 @@ for (const [name, [route, message]] of Object.entries(FAILURES)) {
     const outside = await page.$eval('.route__outside', el => ({ href: el.getAttribute('href'), bg: getComputedStyle(el).backgroundColor, h: el.getBoundingClientRect().height, visible: el.offsetParent !== null }));
     assert.equal(outside.href, PUBLISHED.location.directionsUrl);
     assert.equal(outside.bg, 'rgb(215, 170, 80)', 'the Google Maps button stands out');
-    assert.ok(outside.visible && outside.h >= 44);
+    // (rounded: the card may still be finishing its rise-in, a fraction of a pixel short)
+    assert.ok(outside.visible && Math.round(outside.h) >= 44, JSON.stringify(outside));
     assert.equal(await page.$('.location__live path.route-line'), null);
     assert.equal(await page.$eval('.route__credit', el => el.hidden), true);
     assert.deepEqual(problems.filter(p => !/Failed to load resource|ERR_INTERNET_DISCONNECTED/.test(p)), []);

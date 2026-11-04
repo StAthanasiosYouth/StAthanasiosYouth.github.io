@@ -431,7 +431,48 @@ test('sound: nothing before the first gesture, a toggle in the bar that remember
   await ctx.close();
 });
 
-test('motion: staged once a visit; reduced motion stops everything and skips the transitions', async () => {
+test('Phase 8: «خروج» red and clear; the arch on every entry; back to the site the page draws back and the next rises', async () => {
+  const m = await member();
+  await seed(m);
+  const { page, ctx, problems } = await open();
+  await signIn(page, m);
+  await home(page);
+  // red, a pill, a full touch target, on a phone (in the page) and on a desktop (in the rail)
+  const out = await page.$eval('.ac-signout--m', b => { const c = getComputedStyle(b); const r = b.getBoundingClientRect(); return [c.color, c.borderStyle, Math.round(r.height) >= 44, b.textContent.trim()]; });
+  assert.deepEqual(out, ['rgb(255, 138, 125)', 'solid', true, 'خروج']);
+  await page.evaluate(async () => {
+    await Promise.all(document.getAnimations().map(a => a.finished.catch(() => {})));
+    document.querySelector('.ac-signout--m').scrollIntoView({ block: 'center' });
+  });
+  await page.screenshot({ path: `${SHOTS}account-phase8-phone.png` });
+  // a new entry (a reload: the session stays): the arch arrives again
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await home(page);
+  assert.ok(await page.$('.ac-hero.is-staged'), 'the arch arrives on every entry');
+  assert.ok(await page.evaluate(() => localStorage.getItem('athanasios.account.v1')), 'still signed in');
+  // the Home icon: the page draws back, then the site, which rises in; still signed in there
+  const leaving = page.evaluate(() => new Promise(resolve => {
+    new MutationObserver(() => { if (document.documentElement.hasAttribute('data-leaving')) resolve(true); }).observe(document.documentElement, { attributes: true });
+  }));
+  await Promise.all([page.waitForNavigation({ waitUntil: 'domcontentloaded' }), page.click('.cbar__home')]);
+  assert.equal(await leaving.catch(() => 'not seen'), true, 'the account drew back before the site opened');
+  assert.match(new URL(page.url()).pathname, /^\/(index\.html)?$/, 'the site');
+  assert.equal(await page.evaluate(() => sessionStorage.getItem('athanasios.nav.arrive.v1')), null, 'the arrival was taken');
+  assert.ok(await page.evaluate(() => localStorage.getItem('athanasios.account.v1')), 'the Home icon never signs out');
+  assert.deepEqual(problems.filter(p => !/content\.json|Failed to fetch|NetworkError/i.test(p)), []);
+  await ctx.close();
+
+  const wide = await open('/account/', { width: 1280, height: 860 });
+  await signIn(wide.page, m);
+  await home(wide.page);
+  assert.equal(await wide.page.$eval('.ac-rail .ac-signout', b => getComputedStyle(b).color), 'rgb(255, 138, 125)');
+  await wide.page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));
+  await wide.page.screenshot({ path: `${SHOTS}account-phase8-desktop.png` });
+  await wide.ctx.close();
+});
+
+
+test('motion: staged once an entry; reduced motion stops everything and skips the transitions', async () => {
   const m = await member();
   await seed(m);
   const { page, ctx } = await open();
@@ -441,7 +482,7 @@ test('motion: staged once a visit; reduced motion stops everything and skips the
   await route(page, '#me/profile', '[data-facts]');
   await page.evaluate(() => { location.hash = '#me'; });
   await home(page);
-  assert.equal(await page.$('.ac-hero.is-staged'), null, 'once');
+  assert.equal(await page.$('.ac-hero.is-staged'), null, 'once an entry: the account\'s own screens just appear');
   const names = await page.evaluate(() => ['.ac-wrap', '.cbar'].map(s => getComputedStyle(document.querySelector(s)).viewTransitionName));
   assert.deepEqual(names, ['ac-view', 'ac-bar']);
   const rest = await page.evaluate(async () => {

@@ -20,7 +20,7 @@ import { createView } from './view.js';
 import { zonedNow, stamp, setServerTime, setClockOffset, clockOffset, cairoInstant, realMinutesBetween } from '../schedule.js';
 import { soundToggle, uiSounds, cue } from '../ui-sound.js';
 import { accountBadge } from '../account/link.js';
-import { mountNav } from '../nav.js';
+import { mountNav, homeLink } from '../nav.js';
 import { playGameIntro } from '../game-intro.js';
 import { fetchPublished } from '../content-source.js';
 
@@ -747,8 +747,10 @@ else {
   }
   else {
     // the site's sound: the same toggle and taps as the home page
+    // the Home icon at the bar's end, as on every other page (the shells are drawn without it)
+    const home = homeLink(document.querySelector('.cbar'));
     soundToggle(document.querySelector('.cbar'));
-    accountBadge(document.querySelector('.cbar'), new URL('../../../', import.meta.url));
+    accountBadge(document.querySelector('.cbar'), new URL('../../../', import.meta.url), { before: home });
     mountNav();
     uiSounds();
     boot();

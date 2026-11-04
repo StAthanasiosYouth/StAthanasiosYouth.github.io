@@ -740,66 +740,10 @@ function liveChat(stage) {
 
 
 /* =========================================================
-   «نقاطي / المتجر» (content.points, docs/COMPETITIONS.md §18.4)
-   No server call: the store's state comes from Cairo time (points.js,
-   loaded only when content.json has `points`). The whole card opens
-   points/ in this tab.
+   «نقاطي» (content.points, docs/COMPETITIONS.md §18.4): the top bar's
+   star opens points/ in this tab. Since Phase 8 track P (owner,
+   2026-11-04) the home page has no «نقاطي والمتجر» card.
 ========================================================= */
-
-let pointsModule = null;
-
-const pointsLogic = () => (pointsModule ||= import('./points.js'));
-
-function pointsWidget(points, nowStamp) {
-
-  const title = h('a', { class: 'stretched', href: points.url, id: 'points-title', 'aria-describedby': 'points-state' }, 'نقاطي');
-  const headline = h('p', { class: 'points__headline', id: 'points-state' });
-  const detail = h('p', { class: 'points__detail', hidden: true });
-  const season = h('p', { class: 'points__season', hidden: true });
-
-  const el = h('article', { class: 'widget points', 'data-area': 'points', 'data-shop': 'none', 'aria-labelledby': 'points-title' },
-    h('span', { class: 'points__art', 'aria-hidden': 'true' }, iconNode(points.shop && points.shop.on ? 'gift' : 'star')),
-    h('div', { class: 'points__body' },
-      h('h2', { class: 'points__title' }, title),
-      headline,
-      detail,
-      season
-    ),
-    h('span', { class: 'points__go', 'aria-hidden': 'true' }, iconNode('arrow'))
-  );
-
-  let stamp = nowStamp;
-  let lastKey = null;
-  let lastState = null;
-
-  const paint = logic => {
-    const s = logic.pointsWidgetState(points, stamp);
-    if (!s || s.key === lastKey) return;
-    title.textContent = s.title;
-    headline.textContent = s.headline;
-    detail.textContent = s.detail;
-    detail.hidden = !s.detail;
-    season.textContent = s.season;
-    season.hidden = !s.season;
-    el.dataset.shop = s.state || 'none';
-    // the store opened while someone was looking
-    if (lastState !== null && lastState !== s.state && s.state === 'open') wake(el);
-    lastKey = s.key;
-    lastState = s.state;
-  };
-
-  pointsLogic().then(paint).catch(error => console.warn(error));
-
-  return {
-    el,
-    update(nextStamp) {
-      stamp = nextStamp;
-      pointsLogic().then(paint).catch(() => {});
-    }
-  };
-
-}
-
 
 /* a small «نقاطي» button in the top bar, only when the page has `points` */
 function topbarPoints(points) {
@@ -867,7 +811,6 @@ function footer(content) {
 ========================================================= */
 
 let meetingHandle = null;
-let pointsHandle = null;
 let currentStatus = null;
 let gameCards = [];
 let previousGameStates = new Map();
@@ -1045,30 +988,6 @@ function paintSurface(el, section) {
 PHONE.addEventListener('change', () => surfaced.forEach(([el, section]) => paintSurface(el, section)));
 
 
-/*
- * Where the «نقاطي» card goes: right after the competitions (and the list
- * paired with them); else under the meeting (with its banner and live
- * game); else first, under the hero.
- */
-function pointsPlace(flow) {
-
-  const after = index => (flow[index].partner && flow[index + 1] === flow[index].partner ? index + 2 : index + 1);
-
-  let last = -1;
-  flow.forEach((item, i) => { if (item.section && item.section.key === 'competitions') last = i; });
-  if (last >= 0) return after(last);
-
-  const meeting = flow.findIndex(item => item.kind === 'meeting');
-  if (meeting < 0) return 0;
-
-  let end = meeting;
-  while (flow[end + 1] && ['live-game', 'banner'].includes(flow[end + 1].kind)) end++;
-
-  return end + 1;
-
-}
-
-
 export function renderPage(content, clock, actions, { animate = false } = {}) {
 
   const main = document.getElementById('main');
@@ -1193,13 +1112,8 @@ export function renderPage(content, clock, actions, { animate = false } = {}) {
 
   pairUp([{ el: hero, kind: 'hero' }, ...flow]);
 
-  // «نقاطي / المتجر»: a full row of its own, never between two partners
-  pointsHandle = null;
-  if (content.points) {
-    pointsHandle = pointsWidget(content.points, clock.stamp);
-    pointsHandle.el.setAttribute('data-wide', '');
-    flow.splice(pointsPlace(flow), 0, { el: pointsHandle.el, kind: 'points', section: null });
-  }
+  // «نقاطي / المتجر» is no longer a section of the home page (owner, Phase 8 track P, 2026-11-04): the top
+  // bar's star keeps the way in, and «المزيد» lists the page
 
   topbarPoints(content.points);
 
@@ -1237,7 +1151,6 @@ export function renderPage(content, clock, actions, { animate = false } = {}) {
 export function tickPage(content, clock) {
 
   meetingHandle?.update(clock.now);
-  pointsHandle?.update(clock.stamp);
 
   const states = new Map(gameStates(content, clock.stamp).map(g => [g.game.id, g]));
 
