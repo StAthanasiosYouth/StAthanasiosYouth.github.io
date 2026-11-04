@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "v": "9fc7d2d89200",
+  "id": "pg-1212ad29",
+  "slug": "silenttheatre",
+  "title": "مسرح صامت",
+  "tagline": "فن بلا كلمات… ورسالة تلمس القلوب 🎭",
+  "description": "في المسرح الصامت، مش بنحتاج كلمات عشان نوصل رسالتنا… لأن أحيانًا الحركة والتعبير بيكونوا أقوى من ألف كلمة. 🎭\nمن خلال مشاهد تمثيلية هادفة، بنقدم رسائل روحية وإنسانية بتلمس القلوب، وبتعبر عن مواقف من حياتنا اليومية بطريقة فنية مختلفة ومؤثرة.\nخدمة المسرح الصامت – فريق B.U.G | Brave Under Grace\nفن بلا كلمات… ورسالة تلمس القلوب ❤️",
+  "theme": "",
+  "cover": {
+    "src": "media/2026/img-685492a2.webp",
+    "thumb": "media/2026/img-685492a2-480.webp",
+    "w": 1600,
+    "h": 900,
+    "alt": "",
+    "color": "#4c2d18"
+  },
+  "hero": {
+    "src": "media/2026/img-685492a2.webp",
+    "thumb": "media/2026/img-685492a2-480.webp",
+    "w": 1600,
+    "h": 900,
+    "alt": "",
+    "color": "#4c2d18"
+  },
+  "partner": {
+    "key": "bug",
+    "name": "Brave Under Grace – B.U.G.",
+    "short": "B.U.G.",
+    "logo": {
+      "src": "assets/img/partners/bug-logo-720.webp",
+      "thumb": "assets/img/partners/bug-logo-360.webp",
+      "w": 720,
+      "h": 305,
+      "alt": "شعار Brave Under Grace – B.U.G."
+    },
+    "mark": {
+      "src": "assets/img/partners/bug-symbol-320.webp",
+      "w": 320,
+      "h": 107,
+      "alt": "B.U.G."
+    },
+    "url": null
+  },
+  "media": [
+    {
+      "id": "pm-d0e4e0a9",
+      "title": "🎭 ثمن الحرية",
+      "text": "الحرية ليها ثمن… لكن يا ترى إحنا مستعدين ندفعه؟ 🎭\nعرض مسرحي صامت من فريق B.U.G، بيقدم رسالة مؤثرة عن الحرية والقيود اللي ممكن تحاصر الإنسان، وإزاي يقدر يواجهها.\nمش كل رسالة محتاجة كلام… أحيانًا المشهد بيحكي أكتر من ألف كلمة. ❤️",
+      "duration": "",
+      "cover": {
+        "src": "media/2026/img-3bd86461.webp",
+        "thumb": "media/2026/img-3bd86461-480.webp",
+        "w": 1600,
+        "h": 900,
+        "alt": "",
+        "color": "#6a524d"
+      },
+      "source": "clip",
+      "clip": {
+        "type": "video",
+        "src": "media/2026/vid-10504f7d.mp4",
+        "poster": "media/2026/vid-10504f7d-480.webp",
+        "w": 854,
+        "h": 480,
+        "alt": "",
+        "start": 0,
+        "end": 16
+      },
+      "audio": {
+        "mode": "original",
+        "src": null
+      },
+      "fullUrl": "https://www.facebook.com/share/v/19c7BGeeXL/",
+      "ctaLabel": "شاهد المسرحية كاملة"
+    }
+  ],
+  "team": null,
+  "publishedAt": "2026-11-04T14:06"
+}
