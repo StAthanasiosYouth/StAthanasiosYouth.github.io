@@ -94,6 +94,27 @@ function reduced() {
   return !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
 }
 
+/* the pages with their own way in and out (the account, «نقاطي»): they draw back for a moment when left for
+   the site, and the page they lead to rises in (ARRIVE_KEY). Never longer than LEAVE_MS; nothing to wait for
+   under reduced motion. */
+const ARRIVE_KEY = 'athanasios.nav.arrive.v1';
+const LEAVE_MS = 190;
+const sectionOf = (path = location.pathname) => {
+  const rest = path.startsWith(ROOT.pathname) ? path.slice(ROOT.pathname.length) : path.replace(/^\//, '');
+  return /^account\//.test(rest) ? 'account' : /^points\//.test(rest) ? 'points' : '';
+};
+
+function leaveThen(go) {
+  const from = sectionOf();
+  if (!from) { go(); return; }
+  try { sessionStorage.setItem(ARRIVE_KEY, from); } catch { /* the next page just appears */ }
+  if (reduced() || document.hidden) { go(); return; }
+  document.documentElement.setAttribute('data-leaving', '');
+  setTimeout(go, LEAVE_MS);
+  // back here from the next page (the back/forward cache): the page is whole again
+  addEventListener('pageshow', () => document.documentElement.removeAttribute('data-leaving'), { once: true });
+}
+
 /* the home link and the «الرئيسية» tab */
 function goHome(event) {
   if (event.defaultPrevented || event.button > 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -102,10 +123,60 @@ function goHome(event) {
     scrollTo({ top: 0, behavior: reduced() ? 'auto' : 'smooth' });
     return;
   }
+  const link = event.currentTarget;
   if (cameFromHome()) {
     event.preventDefault();
-    history.back();
+    leaveThen(() => history.back());
+    return;
   }
+  if (sectionOf() && link && link.href) {
+    event.preventDefault();
+    leaveThen(() => location.assign(link.href));
+  }
+}
+
+/*
+ * The Home icon in a top bar that the page builders drew without it (the competition pages; «نقاطي» has it in its
+ * markup). It goes at the bar's end, where every other page has it; the sound toggle and the account icon are put
+ * before it. Returns the link.
+ */
+export function homeLink(bar) {
+  if (!bar) return null;
+  let link = bar.querySelector('a[class$="__home"]');
+  if (link) return link;
+  link = document.createElement('a');
+  link.className = bar.classList.contains('pbar') ? 'pbar__home' : 'cbar__home';
+  link.href = ROOT.href;
+  link.textContent = 'ارجع للموقع';
+  bar.append(link);
+  return link;
+}
+
+/* a light arrival: what the page draws first rises into place, once it is drawn (main leaves «loading»), never
+   later than 2.5 s; the page's state and the session are untouched */
+function arrive() {
+  if (reduced()) return;
+  const main = document.querySelector('main');
+  const html = document.documentElement;
+  const go = () => {
+    html.setAttribute('data-arrive', '');
+    setTimeout(() => html.removeAttribute('data-arrive'), 1200);
+  };
+  if (!main || main.dataset.state !== 'loading') { go(); return; }
+  const started = Date.now();
+  (function wait() {
+    if (main.dataset.state !== 'loading' || Date.now() - started > 2500) go();
+    else setTimeout(wait, 60);
+  })();
+}
+
+function arrivedFromOwn() {
+  try {
+    const from = sessionStorage.getItem(ARRIVE_KEY);
+    if (from) sessionStorage.removeItem(ARRIVE_KEY);
+    return !!from && from !== sectionOf();
+  }
+  catch { return false; }
 }
 
 /* «الفعاليات» on the home page: the section, once it has been drawn (the content arrives after the page) */
@@ -529,21 +600,19 @@ export function mountNav() {
     return;
   }
 
-  // «نقاطي»: a light arrival each time you come in (the account page has its own, DESIGN.md «العتبة»); the page's
-  // state and the session are untouched, it only lets what is drawn in the first moment rise into place
-  if (location.pathname.slice(ROOT.pathname.length) === 'points/') {
-    const arrive = () => {
-      if (reduced()) return;
-      document.documentElement.setAttribute('data-arrive', '');
-      setTimeout(() => document.documentElement.removeAttribute('data-arrive'), 1400);
-    };
-    arrive();
-    // back to it (the back/forward cache): coming in again
-    addEventListener('pageshow', event => { if (event.persisted) arrive(); });
-  }
+  // «نقاطي» and the account: a light arrival each time you come in (the account's arch plays too, DESIGN.md
+  // «العتبة»); and the page you reach when you leave them rises in, so going back to the site is one movement
+  const own = !!sectionOf();
+  if (own || arrivedFromOwn()) arrive();
+  addEventListener('pageshow', event => { if (event.persisted && (own || arrivedFromOwn())) arrive(); });
 
   // «ارجع للموقع» → the Home icon (the look is CSS; the name and the way home are here)
-  for (const link of document.querySelectorAll('.pbar__home, .cbar__home')) {
+  for (const link of document.querySelectorAll('.pbar__home, .cbar__home, .cbar__brand, .pbar__brand[href]')) {
+    if (!link.matches('[class$="__home"]')) {
+      // the logo goes home too: the same gentle way out of the account and «نقاطي»
+      link.addEventListener('click', goHome);
+      continue;
+    }
     // the account page's link returns to the page you came from (account/app.js): its name says so
     let toHome = true;
     try { toHome = isHomeUrl(new URL(link.href)); } catch { /* the home page */ }

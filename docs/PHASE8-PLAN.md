@@ -86,6 +86,43 @@ Slices: **P1** nav module + bottom bar + top icons → **P2** Home icon on every
 - **«نقاطي»:** a light arrival each time (the account page keeps its own arrival, DESIGN.md «العتبة»).
 - Reduced motion: none of them; data saver / hidden tab / frame: none; weak phones: the light versions.
 
+**Audit after the owner's live review (2026-11-04): every track P requirement against the code, not the closing report.**
+
+| # | Requirement | In the code before this round | Status |
+|---|---|---|---|
+| 1 | Bottom bar on phones (home only, owner) | `nav.js` builds it only on home | done |
+| 2 | Fewer top icons (account icon into the bar on home) | `main.css` phone rule | done |
+| 3 | Home icon in every inner page's top bar | service pages, `/events/`, `/pages/`, 404, account: yes. **«نقاطي» (`points/`) and every competition page (`competition/<slug>/`): no Home link at all** (`.cbar` has only the logo) | **missing** |
+| 4 | The Home icon never signs anyone out | «نقاطي» has no Home icon and its only button in the first card is «خروج», where a way back is expected | **missing** |
+| 5 | Smooth moves between home, account, points, services, games | cross-page transitions everywhere **except into and out of the account page** (skipped to protect its sign-in transition) | **missing (account)** |
+| 6 | A light intro for account and points | «نقاطي»'s arrival rules live in `nav.css`, which inner pages no longer load since the bar became home-only: **it never shows**. The account page's «العتبة» plays only on sign-in | **missing** |
+| 7 | «نقاطي» reorganized professionally (owner, live review) | one long column of cards (balance, season, prizes full width, requests, competitions, ledger) | **missing** |
+| 8 | Logout red and clear on the account page (owner, live review) | `.ac-signout` is grey text | **missing** |
+| 9 | «نقاطي والمتجر» off the home page, the top star icon kept (owner, live review) | `render.js` still places the widget in the home flow | **missing** |
+| 10 | In-page B.U.G. ident, every entry | `collab.js` | done |
+| 11 | Games intro (games, competitions; Phase 10 off) | `game-intro.js` | done |
+| 12 | Home icon from the first frame | `page.css`, `account.css` | done for those pages; comp pages need it (row 3) |
+| 13 | Deep links, Back, history kept | tests and `nav-check.mjs` | done |
+
+**Closing round 2 (owner, 2026-11-04), built:** rows 3–9.
+- **Home icon everywhere:** «نقاطي» has it in its markup; the competition pages get it from `nav.js` `homeLink()` (their
+  shells come from the page builder, unchanged), at the bar's end like every other page, styled in `comp.css`. The logo goes
+  home the same way. Going home never touches the session.
+- **«نقاطي» reorganized** (`comp/portal.js`, `comp.css`; same look and tokens): one summary card (name, balance, the season
+  with its bar, three numbers that open their tab: competitions, requests waiting, prizes you can order now), then tabs that
+  stay under the top bar: الجوايز · طلباتي · مسابقاتي · الحركة (only those with something to say). Each tab has its own
+  address (`#prizes`, `#orders`, `#comps`, `#points`) that opens it; switching uses `replaceState`, so Back still leaves the
+  page. Prizes are compact cards, two to a row on a phone, three on a desktop. The past seasons fold under «الحركة».
+  «خروج من الحساب» is red, at the end of the page (no longer next to the name).
+- **Account way in and out:** the arch's arrival plays on every entry (was once a visit), not again between the account's own
+  screens; the page rises in once drawn. Leaving for the site (Home icon or logo), the account and «نقاطي» draw back for
+  190 ms and the page they lead to rises in (`nav.js`, `sessionStorage` key `athanasios.nav.arrive.v1`). Reduced motion: none.
+- **«خروج» on the account page** is a red pill (`account.css` `.ac-signout`), in the rail on a desktop and at the end on a phone.
+- **The home page has no «نقاطي والمتجر» card** (`render.js`); the top star (`#points-link`) and «المزيد» keep the way in.
+  `points.js` stays (its words are unit-tested; nothing on home loads it now).
+- **«نقاطي»'s arrival works again:** its rules moved into `comp.css` (they were in `nav.css`, which inner pages stopped
+  loading when the bar became home-only); the arrival now waits for the page to be drawn.
+
 Done when:
 - Unit and browser tests pass (existing ones updated only where the change is the point: the Home link's look).
 - On the local site against the Staging Worker: every page type shows the bar on a phone width and not on desktop; every tab

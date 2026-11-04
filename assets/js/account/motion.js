@@ -62,24 +62,23 @@ export function countUp(el, to, format) {
   requestAnimationFrame(step);
 }
 
-const STAGED = 'athanasios.account.staged.v1';
+/*
+ * The arch's arrival plays each time the visitor comes into the page (owner, 2026-11-04: a clear way in, every
+ * entry), once per entry: moving between the account's own screens and back to its home just appears.
+ * Coming back from the back/forward cache is a new entry.
+ */
+let staged = false;
+if (typeof addEventListener === 'function') addEventListener('pageshow', event => { if (event.persisted) staged = false; });
 
-/* the arch's arrival plays once a visit; deep links and returning to the home just appear */
 export function firstArrival() {
-  if (reduced()) return false;
-  try {
-    if (sessionStorage.getItem(STAGED)) return false;
-    sessionStorage.setItem(STAGED, '1');
-  }
-  catch { /* played again next time */ }
+  if (reduced() || staged) return false;
+  staged = true;
   return true;
 }
 
+/* after signing out, the next sign-in arrives as a new entry */
 export function resetArrival() {
-  try {
-    sessionStorage.removeItem(STAGED);
-  }
-  catch { /* nothing kept */ }
+  staged = false;
 }
 
 /* a moment of light on the arch when the photo changed */

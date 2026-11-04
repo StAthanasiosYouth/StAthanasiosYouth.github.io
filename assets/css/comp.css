@@ -1847,3 +1847,366 @@ html:active-view-transition-type(site-page)::view-transition-new(root) {
     navigation: none;
   }
 }
+
+
+/* =========================================================
+   Phase 8 track P, closing round 2 (owner, 2026-11-04)
+========================================================= */
+
+/* «ارجع للموقع» as the Home icon, at the bar's end, from the first frame («نقاطي» has it in its markup; nav.js adds
+   it to the competition pages, whose shells are drawn without it). The link and its words stay for no-JS. */
+.cbar__home {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: 50%;
+  overflow: hidden;
+  color: transparent;
+  font-size: 0;
+  white-space: nowrap;
+  text-decoration: none;
+  background: rgba(6, 26, 49, .7);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cbar__home::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 22px;
+  height: 22px;
+  background: var(--gold-hi);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 10.6 12 4l8 6.6V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.5h-6v5.5H5.5A1.5 1.5 0 0 1 4 19z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 10.6 12 4l8 6.6V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.5h-6v5.5H5.5A1.5 1.5 0 0 1 4 19z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.cbar__home:hover {
+  background: var(--navy-800);
+}
+
+.cbar__home:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: 2px;
+}
+
+/* ---------- «نقاطي»: the summary card, the tabs, the prizes ---------- */
+
+.portal__head {
+  display: grid;
+  gap: 12px;
+}
+
+.portal__me .season {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--gold-line);
+}
+
+.season__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 12px;
+}
+
+.season__name {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.pstats {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.pstat {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0;
+  min-height: 64px;
+  padding: 8px 6px;
+  border: 1px solid var(--gold-line);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  color: var(--text);
+  text-align: center;
+  background: rgba(255, 255, 255, .035);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color .16s, border-color .16s, transform .16s;
+}
+
+.pstat:hover {
+  border-color: var(--gold-line-strong);
+  background: rgba(255, 255, 255, .07);
+}
+
+.pstat:active {
+  transform: scale(.97);
+}
+
+.pstat:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: 2px;
+}
+
+.pstat__n {
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-hi);
+}
+
+.pstat__w {
+  font-size: .8rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text-2);
+}
+
+/* the tabs: one place at a time; they stay under the top bar while the page scrolls */
+.ptabs {
+  position: sticky;
+  top: calc(60px + env(safe-area-inset-top));
+  z-index: 5;
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: 999px;
+  background: rgba(6, 26, 49, .88);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: 0 14px 30px -18px rgba(0, 0, 0, .9);
+}
+
+.ptabs::-webkit-scrollbar {
+  display: none;
+}
+
+.ptabs__tab {
+  position: relative;
+  display: inline-flex;
+  flex: 1 1 0;
+  min-width: max-content;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: .86rem;
+  font-weight: 800;
+  white-space: nowrap;
+  color: var(--text-2);
+  background: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: color .18s, background-color .22s cubic-bezier(.22, 1, .36, 1);
+}
+
+.ptabs__tab:hover {
+  color: var(--text);
+}
+
+.ptabs__tab[aria-selected="true"] {
+  color: var(--accent-ink);
+  background: var(--accent);
+  box-shadow: 0 8px 18px -10px var(--accent-glow);
+}
+
+.ptabs__tab:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: 1px;
+}
+
+.ptabs__icon {
+  width: 18px;
+  height: 18px;
+}
+
+.ptabs__count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: .75rem;
+  color: #fff;
+  background: var(--carmine);
+}
+
+.portal__panel:not([hidden]) {
+  animation: ptab-in .32s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+/* the tab names the panel: its own heading stays for screen readers only */
+.ptabs ~ .portal__panel > .portal__h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@keyframes ptab-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+/* the prizes: two to a row on a phone, a compact card each */
+.portal .shop {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.portal .shop__media,
+.portal .shop__media--art {
+  aspect-ratio: 4 / 3;
+  height: auto;
+}
+
+.portal .shop__icon {
+  width: 38px;
+  height: 38px;
+}
+
+.portal .shop__body {
+  gap: 6px;
+  padding: 10px 10px 12px;
+}
+
+.portal .shop__name {
+  font-size: .95rem;
+  line-height: 1.45;
+}
+
+.portal .shop__desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: .84rem;
+}
+
+.portal .shop__cost {
+  font-size: 1rem;
+}
+
+.portal .shop__note {
+  font-size: .78rem;
+}
+
+.portal .shop__body .btn,
+.portal .shop__off {
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  font-size: .9rem;
+}
+
+@media (max-width: 330px) {
+  .portal .shop {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* a phone: the words alone, so the four tabs fit */
+@media (max-width: 480px) {
+  .ptabs__icon {
+    display: none;
+  }
+}
+
+@media (min-width: 640px) {
+  .portal__head {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .portal__head .portal__balance {
+    min-width: 220px;
+    text-align: center;
+  }
+
+  .portal .shop {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+}
+
+/* leaving the account: red, plain, at the end of the page */
+.portal__end {
+  display: flex;
+  justify-content: center;
+  padding-top: 6px;
+}
+
+.btn--out {
+  min-height: 48px;
+  border-color: rgba(255, 138, 125, .55);
+  color: var(--carmine-hi);
+  background: rgba(200, 67, 58, .12);
+}
+
+.btn--out:hover {
+  border-color: var(--carmine-hi);
+  color: #fff;
+  background: rgba(200, 67, 58, .3);
+}
+
+/* ---------- coming in and going out (nav.js) ---------- */
+
+/* a light arrival: what the page draws first rises into place, in reading order */
+html[data-arrive] .comp > .step > * {
+  animation: nav-arrive .55s cubic-bezier(.22, 1, .36, 1) backwards;
+}
+
+html[data-arrive] .comp > .step > *:nth-child(2) { animation-delay: .07s; }
+html[data-arrive] .comp > .step > *:nth-child(3) { animation-delay: .13s; }
+html[data-arrive] .comp > .step > *:nth-child(n+4) { animation-delay: .19s; }
+
+/* going back to the site: the page draws back for a moment, the bar stays */
+html[data-leaving] main {
+  animation: nav-leave .19s ease-in forwards;
+}
+
+@keyframes nav-arrive {
+  from { opacity: 0; transform: translateY(16px); }
+}
+
+@keyframes nav-leave {
+  to { opacity: 0; transform: translateY(10px) scale(.985); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal__panel:not([hidden]),
+  html[data-arrive] .comp > .step > *,
+  html[data-leaving] main {
+    animation: none;
+  }
+
+  .pstat,
+  .ptabs__tab {
+    transition: none;
+  }
+}

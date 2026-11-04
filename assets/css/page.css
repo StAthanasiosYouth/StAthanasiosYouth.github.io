@@ -3571,3 +3571,19 @@ html:active-view-transition-type(site-page)::view-transition-new(root) {
 .pbar__home:hover {
   background: var(--navy-800, #0b2a4c);
 }
+
+/* coming back from the account or «نقاطي» (Phase 8 track P, nav.js): what the page draws first rises into place */
+html[data-arrive] main > * {
+  animation: nav-arrive .55s cubic-bezier(.22, 1, .36, 1) backwards;
+}
+
+html[data-arrive] main > *:nth-child(2) { animation-delay: .06s; }
+html[data-arrive] main > *:nth-child(n+3) { animation-delay: .12s; }
+
+@keyframes nav-arrive {
+  from { opacity: 0; transform: translateY(16px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-arrive] main > * { animation: none; }
+}

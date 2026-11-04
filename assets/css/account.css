@@ -290,21 +290,28 @@ a.ac-row:hover .ac-row__go, button.ac-row:hover .ac-row__go, .ac-now__item:hover
 .ac-step { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 50%; font-weight: 800; color: var(--gold-hi); border: 1px solid var(--gold-line-strong); }
 .ac-step--done { color: var(--ok-hi); border-color: rgba(166, 239, 200, .4); background: var(--ok-wash); }
 
+/* leaving the account: red and clear (owner, 2026-11-04), never mistaken for the way home */
 .ac-signout {
   justify-self: center;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   min-height: 48px;
-  padding-inline: 18px;
-  border: 0;
-  background: none;
-  font-weight: 700;
-  color: var(--text-2);
+  padding-inline: 22px;
+  border: 1px solid rgba(255, 138, 125, .55);
+  border-radius: 999px;
+  background: rgba(200, 67, 58, .12);
+  font-weight: 800;
+  color: var(--carmine-hi);
   cursor: pointer;
+  transition: background-color .16s, border-color .16s, color .16s, transform .16s;
 }
 
-.ac-signout:hover { color: var(--text); }
+.ac-signout:hover { border-color: var(--carmine-hi); color: #fff; background: rgba(200, 67, 58, .3); }
+.ac-signout:active { transform: scale(.97); }
+.ac-signout:focus-visible { outline: 2px solid var(--carmine-hi); outline-offset: 2px; }
+.ac-rail .ac-signout { justify-self: stretch; margin: 8px 12px 0; }
 
 /* a section's head */
 .ac-sub { display: flex; align-items: center; gap: 8px; min-height: 48px; }
@@ -751,4 +758,18 @@ html:active-view-transition-type(site-page)::view-transition-new(root) {
 
 .cbar__home:hover {
   background: var(--navy-800, #0b2a4c);
+}
+
+/* coming in and going out (Phase 8 track P, nav.js): what the page draws first rises into place, once it is drawn;
+   going back to the site, the page draws back for a moment and the bar stays */
+html[data-arrive] .ac-main > * { animation: ac-arrive .6s cubic-bezier(.22, 1, .36, 1) backwards; }
+html[data-leaving] .ac-main { animation: ac-leave .19s ease-in forwards; }
+
+@keyframes ac-arrive { from { opacity: 0; transform: translateY(18px) scale(.99); } }
+@keyframes ac-leave { to { opacity: 0; transform: translateY(10px) scale(.985); } }
+
+html[data-motion="lite"][data-arrive] .ac-main > * { animation-duration: .3s; }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-arrive] .ac-main > *, html[data-leaving] .ac-main { animation: none; }
 }

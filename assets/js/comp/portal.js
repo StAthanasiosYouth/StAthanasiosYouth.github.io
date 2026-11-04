@@ -22,7 +22,7 @@ import { zonedNow, stamp } from '../schedule.js';
 import { arabicDigits } from '../words.js';
 import { soundToggle, uiSounds, cue } from '../ui-sound.js';
 import { accountBadge } from '../account/link.js';
-import { mountNav } from '../nav.js';
+import { mountNav, homeLink } from '../nav.js';
 import { createWorkerApi, goSignIn, accountSession, dropAccountSession } from './accounts.js';
 
 const ROOT = new URL('../../../', import.meta.url);
@@ -47,7 +47,8 @@ const S = {
   cancelling: null,     // the request in the cancel sheet
   cancelError: '',
   alert: '',            // a warning on the dashboard (the store just closed…)
-  pendingKeys: new Map() // itemId → requestKey of a request that may have landed
+  pendingKeys: new Map(), // itemId → requestKey of a request that may have landed
+  tab: ''               // the dashboard's open tab (#prizes, #orders, #comps, #points); '' = the first one
 };
 
 let lastScreen = '';
@@ -469,31 +470,109 @@ function cancelDialog(me) {
   );
 }
 
-/* the active season (balance and ledger are its own) + the past ones, folded */
-function seasonSection(me) {
-  if (!me.season && !me.seasons.length) return null;
+/* the active season, in the summary card: its name, dates and how far you got */
+function seasonBlock(me) {
   const s = me.season;
+  if (!s) return null;
   const progress = seasonProgress(s);
-  const past = me.seasons.length
-    ? h('details', { class: 'seasons' },
-      h('summary', { class: 'seasons__summary' }, `المواسم اللي فاتت (${arabicDigits(me.seasons.length)})`),
-      h('ul', { class: 'plist' }, me.seasons.map(p => h('li', { class: 'prow', 'data-season': p.id },
-        h('div', { class: 'prow__main' },
-          h('p', { class: 'prow__title' }, p.name),
-          seasonDates(p) ? h('p', { class: 'prow__meta' }, seasonDates(p)) : null,
-          h('p', { class: 'prow__line' }, pastSeasonLine(p))
-        )
-      ))))
-    : null;
-  return h('section', { class: 'card portal__section season', 'aria-labelledby': 'p-season' },
-    h('h2', { class: 'portal__h2', id: 'p-season' }, s ? `الموسم: ${s.name}` : 'المواسم'),
-    s && seasonDates(s) ? h('p', { class: 'muted season__dates' }, seasonDates(s)) : null,
-    progress ? h('p', { class: 'season__earned', 'data-earned': String(s.earned) }, progress.text) : null,
+  return h('div', { class: 'season', 'aria-labelledby': 'p-season', role: 'group' },
+    h('div', { class: 'season__head' },
+      h('h2', { class: 'season__name', id: 'p-season' }, `الموسم: ${s.name}`),
+      seasonDates(s) ? h('p', { class: 'muted season__dates' }, seasonDates(s)) : null),
     progress && progress.ratio !== null
       ? h('meter', { class: 'season__meter', min: '0', max: String(s.maxTheoretical), value: String(Math.max(0, Math.min(s.earned, s.maxTheoretical))), 'aria-label': progress.text })
       : null,
-    past
+    progress ? h('p', { class: 'season__earned', 'data-earned': String(s.earned) }, progress.text) : null
   );
+}
+
+/* the past seasons, folded (under «حركة النقاط») */
+function pastSeasons(me) {
+  if (!me.seasons.length) return null;
+  return h('details', { class: 'seasons' },
+    h('summary', { class: 'seasons__summary' }, `المواسم اللي فاتت (${arabicDigits(me.seasons.length)})`),
+    h('ul', { class: 'plist' }, me.seasons.map(p => h('li', { class: 'prow', 'data-season': p.id },
+      h('div', { class: 'prow__main' },
+        h('p', { class: 'prow__title' }, p.name),
+        seasonDates(p) ? h('p', { class: 'prow__meta' }, seasonDates(p)) : null,
+        h('p', { class: 'prow__line' }, pastSeasonLine(p))
+      )
+    ))));
+}
+
+/*
+ * The dashboard's parts as tabs (Phase 8 track P, owner 2026-11-04): one place at a time instead of one long
+ * column. Each tab has a real address (#prizes …) that opens it directly; switching keeps the history as it
+ * was (replaceState), so Back still leaves the page. A tab shows only when it has something to say.
+ */
+const TABS = [
+  { key: 'prizes', word: 'الجوايز', icon: 'gift' },
+  { key: 'orders', word: 'طلباتي', icon: 'bag' },
+  { key: 'comps', word: 'مسابقاتي', icon: 'trophy' },
+  { key: 'points', word: 'الحركة', icon: 'list' }
+];
+
+function panels(me) {
+  const ledger = me.features.wallet ? ledgerSection(me) : null;
+  if (ledger) {
+    const past = pastSeasons(me);
+    if (past) ledger.append(past);
+  }
+  return { prizes: shopSection(me), orders: redemptionsSection(me), comps: historySection(me), points: ledger };
+}
+
+function openTab(key, { focus = false } = {}) {
+  S.tab = key;
+  try { history.replaceState(history.state, '', `#${key}`); } catch { /* the address stays */ }
+  for (const tab of main.querySelectorAll('[data-tab]')) {
+    const on = tab.dataset.tab === key;
+    tab.setAttribute('aria-selected', String(on));
+    tab.tabIndex = on ? 0 : -1;
+    if (on && focus) tab.focus();
+  }
+  for (const panel of main.querySelectorAll('[data-panel]')) panel.hidden = panel.dataset.panel !== key;
+}
+
+function tabList(shown, active, me) {
+  const pending = me.redemptions.filter(r => r.status === 'pending').length;
+  const counts = { orders: pending };
+  const list = h('div', { class: 'ptabs', role: 'tablist', 'aria-label': 'أقسام نقاطي' }, shown.map(t => h('button', {
+    type: 'button', class: 'ptabs__tab', role: 'tab', id: `tab-${t.key}`, 'aria-controls': `panel-${t.key}`,
+    'aria-selected': String(t.key === active), tabindex: t.key === active ? '0' : '-1', 'data-tab': t.key,
+    onclick: () => openTab(t.key)
+  }, icon(t.icon, 'ptabs__icon'), h('span', { class: 'ptabs__word' }, t.word),
+  counts[t.key] ? h('span', { class: 'ptabs__count', 'aria-hidden': 'true' }, arabicDigits(counts[t.key])) : null)));
+  // the arrows move between tabs (RTL: the left arrow goes on)
+  list.addEventListener('keydown', event => {
+    const keys = shown.map(t => t.key);
+    const at = keys.indexOf(S.tab);
+    const step = { ArrowLeft: 1, ArrowRight: -1, Home: -at, End: keys.length - 1 - at }[event.key];
+    if (step === undefined) return;
+    event.preventDefault();
+    openTab(keys[(at + step + keys.length) % keys.length], { focus: true });
+  });
+  return list;
+}
+
+/* three numbers under the balance, each opens its tab */
+function stats(me, shown) {
+  const has = key => shown.some(t => t.key === key);
+  const affordable = me.features.shop && me.eligible !== false && me.balance !== null && me.store && me.store.state === 'open'
+    ? me.shop.filter(item => itemAvailability(item, me.balance).canOrder).length : null;
+  const pending = me.redemptions.filter(r => r.status === 'pending').length;
+  const stat = (key, value, word) => (has(key) && value !== null
+    ? h('button', { type: 'button', class: 'pstat', 'data-stat': key, onclick: () => {
+      openTab(key);
+      const list = main.querySelector('.ptabs');
+      if (list) list.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    } }, h('strong', { class: 'pstat__n' }, arabicDigits(value)), h('span', { class: 'pstat__w' }, word))
+    : null);
+  const items = [
+    stat('comps', me.history.length, me.history.length === 1 ? 'مسابقة' : 'مسابقات'),
+    stat('orders', pending, pending === 1 ? 'طلب مستني' : 'طلبات مستنية'),
+    stat('prizes', affordable, 'تقدر تطلبها')
+  ].filter(Boolean);
+  return items.length ? h('div', { class: 'pstats' }, items) : null;
 }
 
 const screens = {
@@ -515,27 +594,43 @@ const screens = {
 
   dashboard: () => {
     const me = S.me;
+    const all = panels(me);
+    const shown = TABS.filter(t => all[t.key]);
+    const wanted = S.tab || (location.hash || '').slice(1);
+    const active = shown.some(t => t.key === wanted) ? wanted : (shown[0] ? shown[0].key : '');
+    S.tab = active;
     return h('div', { class: 'step portal' },
       h('section', { class: 'card portal__me', 'aria-labelledby': 'p-me' },
-        h('div', { class: 'portal__who' },
-          h('p', { class: 'hero__kicker' }, 'نقاطي'),
-          h('h1', { class: 'portal__name', id: 'p-me', tabindex: '-1', 'data-focus': '' }, `أهلًا يا ${me.participant.name}`),
-          me.participant.group ? h('p', { class: 'muted' }, me.participant.group) : null
+        h('div', { class: 'portal__head' },
+          h('div', { class: 'portal__who' },
+            h('p', { class: 'hero__kicker' }, 'نقاطي'),
+            h('h1', { class: 'portal__name', id: 'p-me', tabindex: '-1', 'data-focus': '' }, `أهلًا يا ${me.participant.name}`),
+            me.participant.group ? h('p', { class: 'muted' }, me.participant.group) : null
+          ),
+          me.features.wallet && me.balance !== null
+            ? h('p', { class: 'portal__balance', 'data-balance': String(me.balance) }, h('span', { class: 'portal__balance-label' }, me.season ? 'رصيدك في الموسم ده' : 'رصيدك'), h('strong', {}, countPoints(me.balance)))
+            : null
         ),
-        me.features.wallet && me.balance !== null
-          ? h('p', { class: 'portal__balance', 'data-balance': String(me.balance) }, h('span', { class: 'portal__balance-label' }, me.season ? 'رصيدك في الموسم ده' : 'رصيدك'), h('strong', {}, countPoints(me.balance)))
-          : null,
-        btn('خروج', () => logout(), { kind: 'small', 'data-logout': '' })
+        me.features.wallet ? seasonBlock(me) : null,
+        stats(me, shown)
       ),
       S.notice ? h('p', { class: 'portal__notice', role: 'status', tabindex: '-1' }, S.notice) : null,
       S.alert ? h('p', { class: 'portal__alert', role: 'alert', tabindex: '-1' }, S.alert) : null,
       // §19.3: kindly, not as an error
       me.eligible === false && me.notice && me.notice !== S.alert ? h('p', { class: 'note note--age', 'data-age-notice': '' }, me.notice) : null,
-      me.features.wallet ? seasonSection(me) : null,
-      shopSection(me),
-      redemptionsSection(me),
-      historySection(me),
-      me.features.wallet ? ledgerSection(me) : null,
+      shown.length > 1 ? tabList(shown, active, me) : null,
+      shown.map(t => {
+        const panel = all[t.key];
+        panel.classList.add('portal__panel');
+        panel.dataset.panel = t.key;
+        panel.id = `panel-${t.key}`;
+        if (shown.length > 1) panel.setAttribute('role', 'tabpanel');
+        panel.hidden = t.key !== active;
+        return panel;
+      }),
+      // leaving the account is at the end, red and plain (never where the way home is expected)
+      h('div', { class: 'portal__end' },
+        btn('خروج من الحساب', () => logout(), { kind: 'out', iconName: 'logout', 'data-logout': '' })),
       orderDialog(me),
       cancelDialog(me)
     );
@@ -572,8 +667,9 @@ if (window.top !== window.self) {
 }
 
 // the site's sound: the same toggle and taps as the home page
+const homeIcon = homeLink(document.querySelector('.cbar'));
 soundToggle(document.querySelector('.cbar'));
-accountBadge(document.querySelector('.cbar'), new URL('../../../', import.meta.url));
+accountBadge(document.querySelector('.cbar'), new URL('../../../', import.meta.url), { before: homeIcon });
 mountNav();
 uiSounds();
 

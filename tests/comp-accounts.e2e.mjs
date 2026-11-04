@@ -201,7 +201,8 @@ test('signed out at a competition → /account/ → back to it → answers → r
   await page.waitForSelector('[data-balance="10"]', { timeout: 10000 });
   const portal = await page.evaluate(() => document.body.innerText);
   assert.match(portal, /كتاب هدية/);
-  assert.match(portal, /الكتاب/);
+  // the competitions are «نقاطي»'s own tab since Phase 8 track P (the prizes show first)
+  assert.match(await page.$eval('[aria-labelledby="p-history"]', el => el.textContent), /الكتاب/);
   await page.evaluate(() => document.querySelector('[data-order]').click());
   await page.waitForSelector('[data-confirm-order]', { timeout: 5000 });
   await page.evaluate(() => document.querySelector('[data-confirm-order]').click());
