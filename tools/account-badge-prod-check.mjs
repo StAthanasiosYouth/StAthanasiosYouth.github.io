@@ -32,29 +32,31 @@ for (const path of ['/', '/black-theatre/']) {
     page.on('request', r => { if (r.url().startsWith(API)) calls.push(new URL(r.url()).pathname); });
     await page.setViewport({ width, height: 800, deviceScaleFactor: width < 640 ? 2 : 1 });
     await page.goto(SITE + path + '?check=' + Date.now(), { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.acct-badge', { timeout: 20000 });
-    await page.waitForFunction(() => { const b = document.querySelector('.acct-badge'); const r = b.getBoundingClientRect(); const e = document.elementFromPoint(r.x + 22, r.y + 22); return e && b.contains(e); }, { timeout: 15000 });
+    // phones (Phase 8 track P): the icon is «حسابي» in the bottom bar; wider screens keep it in the top bar
+    const ICON = width < 768 ? '.tabbar .acct-badge' : '.acct-badge';
+    await page.waitForSelector(ICON, { timeout: 20000 });
+    await page.waitForFunction(sel => { const b = document.querySelector(sel); const r = b.getBoundingClientRect(); const e = document.elementFromPoint(r.x + 22, r.y + 22); return e && b.contains(e); }, { timeout: 15000 }, ICON);
     await sleep(1200);
-    const r = await page.evaluate(() => {
-      const a = document.querySelector('.acct-badge');
+    const r = await page.evaluate(sel => {
+      const a = document.querySelector(sel);
       const box = a.getBoundingClientRect();
       const face = a.querySelector('.acct-badge__face').getBoundingClientRect();
-      const bar = a.closest('.topbar, .pbar, .cbar');
-      const items = [...bar.querySelectorAll('a, button')].filter(n => n.offsetParent).map(n => n.getBoundingClientRect());
+      const bar = a.closest('.topbar, .pbar, .cbar, .tabbar');
+      const items = [...bar.querySelectorAll('a, button')].filter(n => n.offsetParent && !n.inert).map(n => n.getBoundingClientRect());
       return {
         label: a.getAttribute('aria-label'), door: [face.width, face.height], w: box.width, h: box.height, left: box.left, right: box.right, inner: innerWidth,
         over: document.documentElement.scrollWidth - document.documentElement.clientWidth, dir: document.documentElement.dir,
         overlap: items.some((x, i) => items.some((y, j) => i < j && x.left < y.right - 1 && y.left < x.right - 1 && x.top < y.bottom - 1 && y.top < x.bottom - 1))
       };
-    });
+    }, ICON);
     check(name + ': says sign in', r.label === 'سجّل دخولك', r);
-    check(name + ': the door, 40 by 44', r.door[0] === 40 && r.door[1] === 44, r);
+    check(name + ': the door' + (width < 768 ? ', 22 by 25 in the bar' : ', 40 by 44'), width < 768 ? r.door[0] === 22 && r.door[1] === 25 : r.door[0] === 40 && r.door[1] === 44, r);
     check(name + ': fits, 44px, no overlap, RTL', r.w >= 44 && r.h >= 44 && r.left >= 0 && r.right <= r.inner && r.over <= 0 && !r.overlap && r.dir === 'rtl', r);
     check(name + ': no account request', !calls.some(c => c.startsWith('/v1/account/')), calls);
     check(name + ': no script errors', problems.length === 0, problems);
     await page.screenshot({ path: SHOTS + (path.replace(/\W/g, '') || 'home') + '-' + width + '.png' });
     if (width === 390) {
-      await page.click('.acct-badge');
+      await page.click(ICON);
       await page.waitForFunction(() => location.pathname === '/account/', { timeout: 15000 });
       await page.waitForSelector('#acct-email', { timeout: 20000 });
       const kept = await page.evaluate(() => sessionStorage.getItem('athanasios.account.return.v1'));

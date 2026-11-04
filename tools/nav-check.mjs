@@ -23,7 +23,8 @@ const check = (name, ok, detail) => {
   if (!ok) failed++;
 };
 // errors that are about the network from this origin, not the page (a local origin the production Worker refuses)
-const NOISE = /CORS|Failed to load resource|net::ERR_|ERR_FAILED|Turnstile|challenges\.cloudflare/;
+// (and Cloudflare Turnstile's own hidden console lines on the live account page: "%c%d font-size:0;color:transparent …")
+const NOISE = /CORS|Failed to load resource|net::ERR_|ERR_FAILED|Turnstile|challenges\.cloudflare|^%c%[do] font-size:0;color:transparent/;
 
 const browser = await puppeteer.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
 async function open(viewport) {
