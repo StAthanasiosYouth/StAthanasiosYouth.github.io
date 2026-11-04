@@ -136,3 +136,9 @@ Way back: revert the slice's commit (static admin files, minutes); a Worker chan
   `main` too); tests changed only where the icon's place is the point (`account-badge.e2e`, `polish-a.e2e`).
   `tools/serve.mjs --404` answers missing pages like GitHub Pages (off by default, so other tests are unchanged).
   Way back: revert the track's commit on `main`.
+- 2026-11-04: **Track P live** (main `4c83055` + `00dc43f`); production checks passed.
+- 2026-11-04: **Track P closing round live, track P closed** (main `0073a73`): the bar on home only, the Home icon from the
+  first frame, the in-page B.U.G. ident on every entry, the games intro (game sheets, competition pages), the «نقاطي»
+  arrival. Local and live: `tools/nav-check.mjs` all ok, `tools/account-badge-prod-check.mjs` all passed; unit 765/766 (old
+  #12); public browser tests: the same failures as `main` (hub, layout, browser, not-found, final-r, prog-a, refine-b,
+  account-badge #8), none new. Way back: revert `0073a73` on `main`. Next: Track A slice A1, only on the owner's word.
