@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "4a3f0a8c9f85",
-  "publishedAt": "2026-11-04T12:06:13.317Z",
+  "revision": "42bdc23fb958",
+  "publishedAt": "2026-11-04T12:07:46.413Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -341,7 +341,7 @@
       "endAt": "",
       "visibleFrom": "",
       "visibleUntil": "",
-      "display": "",
+      "display": "banner",
       "displayMobile": "",
       "page": "silenttheatre",
       "ctaLabel": "",
