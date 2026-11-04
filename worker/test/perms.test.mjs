@@ -52,9 +52,11 @@ test('0009 seeds existing admins: primary = every permission; others = all but t
   apply(db, '0009_admin_grants_notify.sql');
   const of = e => db.raw.prepare('SELECT perm, scope FROM admin_grants WHERE email = ? ORDER BY perm').all(e);
   const p = of('p@example.com');
-  assert.deepEqual(p.map(r => r.perm), [...PERMS].sort(), 'the SQL seed list equals the code catalog');
+  // permissions added to the catalog after 0009 (never seeded: the Primary Admin holds them in code, others by a grant)
+  const LATER = ['activity.manage'];   // Phase 8 A6
+  assert.deepEqual(p.map(r => r.perm), PERMS.filter(x => !LATER.includes(x)).sort(), 'the SQL seed list equals the code catalog of the time');
   assert.ok(p.every(r => r.scope === 'all'));
-  assert.deepEqual(of('a@example.com').map(r => r.perm), PERMS.filter(x => !PRIMARY_DEFAULT.includes(x)).sort());
+  assert.deepEqual(of('a@example.com').map(r => r.perm), PERMS.filter(x => !PRIMARY_DEFAULT.includes(x) && !LATER.includes(x)).sort());
   assert.equal(of('i@example.com').length, 0);
   const old = db.raw.prepare("SELECT notified, severity, source FROM activity WHERE id = 'act-old'").get();
   assert.deepEqual({ ...old }, { notified: 1, severity: 'routine', source: 'worker' });

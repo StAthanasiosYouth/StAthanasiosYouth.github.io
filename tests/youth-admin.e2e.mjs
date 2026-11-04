@@ -515,3 +515,41 @@ test('Phase 6 Step 4c on a phone: the store\'s notify choices and scheduled list
   assert.deepEqual(problems, []);
   await context.close();
 });
+
+
+test('Phase 8 A6: accounts as cards at 375 — the photo or the letter, the full name, phone and email (never cut), a tap copies, a tap opens', async () => {
+  fake.reset('on');
+  const { context, page, problems } = await open({ width: 375, height: 812, isMobile: true, hasTouch: true });
+  await goYouth(page);
+  const cards = await page.$$eval('.ycard', ns => ns.map(n => {
+    const cut = el => !!el && el.scrollWidth > el.clientWidth + 1;
+    return {
+      name: n.querySelector('.ycard__name').textContent,
+      letter: n.querySelector('.ycard__letter').textContent,
+      phone: n.querySelector('.ycard__phone bdi')?.textContent || '',
+      email: n.querySelector('.ycard__email bdi')?.textContent || '',
+      cut: [n.querySelector('.ycard__name'), n.querySelector('.ycard__phone bdi'), n.querySelector('.ycard__email bdi')].some(cut),
+      inside: n.getBoundingClientRect().right <= innerWidth + 1
+    };
+  }));
+  assert.ok(cards.length >= 1);
+  for (const c of cards) {
+    assert.equal(c.letter, c.name.trim().charAt(0));
+    assert.ok(c.phone && c.email, JSON.stringify(c));
+    assert.equal(c.cut, false, 'nothing cut: ' + JSON.stringify(c));
+    assert.ok(c.inside);
+  }
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no sideways scroll');
+  await page.waitForFunction(() => !document.querySelector('.welcome'), { timeout: 6000 });
+  await page.screenshot({ path: `${ROOT}tools/.cache/youth-admin/phase8-cards-375.png`, fullPage: true });
+  // a tap on the email copies it and does not open the account
+  await page.click('.ycard .ycard__email');
+  // (headless Chrome keeps no clipboard to read back: what the admin sees is the confirmation)
+  await page.waitForFunction(() => /اتنسخ الإيميل|مقدرناش ننسخ/.test(document.getElementById('toasts').textContent), { timeout: 4000 });
+  assert.ok(await page.$('.ycard'), 'still the list');
+  // a tap on the card opens it
+  await page.click('.ycard .ycard__name');
+  await page.waitForSelector('[data-youth-facts]', { timeout: 8000 });
+  assert.deepEqual(problems, []);
+  await context.close();
+});

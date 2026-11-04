@@ -273,6 +273,13 @@ test('presence and edit locks: who is where, a read-only editor for a locked ite
   assert.ok(!strip.text.includes('second.admin'), 'yourself is not "someone else"');
   assert.match(strip.title, new RegExp(ADMIN.replace(/\./g, '\\.')));
   await shot(b.page, '04-presence-strip');
+  // Phase 8 A6: the same admin as an avatar in the top bar, marked as editing; a tap lists who and what
+  assert.equal(await b.page.$$eval('#presence-open .pav', ns => ns.length), 1);
+  assert.ok(await b.page.$('#presence-open .pav--editing'));
+  await b.page.click('#presence-open');
+  await b.page.waitForSelector('.menu--presence:popover-open');
+  assert.match(await b.page.$eval('.menu--presence', n => n.innerText), /بيعدّل في خبر «رحلة الغردقة»/);
+  await b.page.keyboard.press('Escape');
 
   // A sees B, and where B is
   await b.page.evaluate(() => A.go('page', 'links'));

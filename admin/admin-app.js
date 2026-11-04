@@ -2849,6 +2849,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     others = Array.isArray(others) ? others : [];
     strip.hidden = !others.length;
+    // Phase 8 A6 (§22.1 item 18): the same list as avatars in the top bar (online / idle / editing)
+    if (A.shell && A.shell.presence) A.shell.presence(others, placeLabel);
 
     A.fill(strip, others.length ? [
       el('span', { class: 'presence__icon', 'aria-hidden': 'true' }, icon('users')),
@@ -3650,7 +3652,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     // Phase 8 A2: the rail in its groups, with one light that glides to the current area
     if (!railLight) railLight = el('span', { class: 'rail__light', 'aria-hidden': 'true' });
-    rail.replaceChildren.apply(rail, [railLight].concat(railNav(A.AREAS.filter(function (a) { return a.key !== 'settings'; }))));
+    rail.replaceChildren.apply(rail, [railLight].concat(railNav(A.visibleAreas().filter(function (a) { return a.key !== 'settings'; }))));
     requestAnimationFrame(function () { moveRailLight(false); });
     // the phones' dock: the first four areas and «المزيد» (the rest, the settings, the account, sign-out)
     var docked = dockAreas();
@@ -3697,6 +3699,69 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   }
 
   A.renderNav = renderNav;
+
+  /* =======================================================
+     ACCESS (Phase 8 A4, BACKEND-MIGRATION §22.1 item 17): the areas follow the admin's grants.
+     The Worker decides (GET /v1/admin/me → perms, the same rule every route checks) and refuses
+     anything else while PERMS_ENFORCE is on. With the switch off every admin keeps today's access,
+     so nothing here hides anything until the owner turns it on.
+       - an area without a grant is not drawn (rail, dock, «المزيد», the palette, «اللي مستنيك»)
+       - opened anyway (a kept place, a link): «مش متاح لحسابك» with who to ask
+       - home is the first area the admin may open (competitions only → «المسابقات»)
+  ======================================================= */
+
+  // area → the grants that open it (any one of them)
+  var AREA_NEEDS = {
+    home: ['content.view'],
+    content: ['content.view'],
+    comps: ['competitions.view'],
+    pages: ['content.view', 'events.view'],
+    page: ['content.view'],
+    media: ['media.view'],
+    activity: ['activity.view']
+  };
+
+  A.access = null;
+
+  /* may this admin open the area? (true until the Worker says otherwise) */
+  A.allowed = function (key) {
+    var a = A.access;
+    if (!a || !a.enforce || a.primary) return true;
+    var needs = AREA_NEEDS[key];
+    if (!needs) return true;
+    return needs.some(function (p) { return !!a.perms[p]; });
+  };
+
+  A.visibleAreas = function () {
+    return A.AREAS.filter(function (area) { return A.allowed(area.key); });
+  };
+
+  /* the admin's own home: «الرئيسية» when it is theirs, else the first area they may open */
+  A.homeArea = function () {
+    if (A.allowed('home')) return 'home';
+    var first = A.visibleAreas().filter(function (a) { return a.key !== 'settings'; })[0];
+    return first ? first.key : 'settings';
+  };
+
+  A.loadAccess = function () {
+    return A.call('apiAdminMe').then(function (me) {
+      if (!me || !me.perms) return;
+      A.access = { enforce: !!me.enforce, primary: !!me.primary, perms: me.perms };
+      if (!A.allowed(A.area)) A.go(A.homeArea());
+      else {
+        renderNav();
+        // a screen with grant-dependent parts (A6: «إدارة السجل») draws them now
+        if (A.area === 'activity') A.render();
+      }
+    }).catch(function () { /* the Apps Script panel, or the Worker away: today's access (the Worker still refuses) */ });
+  };
+
+  A.views.denied = function () {
+    return [A.card('مش متاح لحسابك', null,
+      el('p', { class: 'denied__text', text: 'القسم ده مش من صلاحياتك. لو محتاجه في خدمتك، اطلبه من الأدمن الأساسي، وهو يديك الصلاحية من «الإعدادات» ← «الأدمنز».' }),
+      el('div', { class: 'actions' },
+        el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.go(A.homeArea()); } }, icon('home'), 'روح لرئيسيتك')))];
+  };
 
   /* =======================================================
      SHELL (Phase 8 A2, docs/PHASE8-PLAN.md §2): the rail's groups, its sliding light and its
@@ -3760,7 +3825,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   }
 
   function dockAreas() {
-    var all = A.AREAS.filter(function (a) { return a.key !== 'settings'; });
+    // the admin's own home first (A4), then the rest in their order
+    var home = A.homeArea();
+    var all = A.visibleAreas().filter(function (a) { return a.key !== 'settings'; });
+    all = all.filter(function (a) { return a.key === home; }).concat(all.filter(function (a) { return a.key !== home; }));
     return { main: all.slice(0, DOCK_MAIN), rest: all.slice(DOCK_MAIN) };
   }
 
@@ -3852,7 +3920,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   function waiting() {
     var list = [];
-    A.AREAS.forEach(function (area) {
+    A.visibleAreas().forEach(function (area) {
       (area.subs || []).forEach(function (s) {
         if (Number(s.badge) > 0) list.push({ n: Number(s.badge), label: s.label, where: area.label, icon: area.icon, go: function () { A.go(area.key, s.key); } });
       });
@@ -3898,7 +3966,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   function commands() {
     var out = [];
-    A.AREAS.forEach(function (area) {
+    A.visibleAreas().forEach(function (area) {
       out.push({ group: 'روح لـ', label: area.title || area.label, icon: area.icon, run: function () { A.go(area.key); } });
       (area.subs || []).forEach(function (s) {
         out.push({ group: 'روح لـ', label: s.label, hint: area.label, icon: area.icon, run: function () { A.go(area.key, s.key); } });
@@ -3995,9 +4063,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   function shellTools() {
     var bar = document.querySelector('.topbar');
     if (!bar || document.getElementById('palette-open')) return;
+    // §22.1 item 4: the family's logo in place of the decorative cross (the official page serves the site's images)
+    if (window.AdminTransport) {
+      document.querySelectorAll('.brand__mark, .topbar__mark').forEach(function (mark) {
+        mark.classList.add('brand__mark--logo');
+        mark.replaceChildren(el('img', { src: '../assets/img/logo-128.webp', width: 42, height: 42, alt: '', decoding: 'async' }));
+      });
+    }
     var tools = el('div', { class: 'topbar__tools' },
       el('button', { class: 'icon-btn topbar__search', id: 'palette-open', type: 'button', 'aria-label': 'بحث سريع (Ctrl K)', 'aria-haspopup': 'dialog', onclick: function () { A.openPalette(); } },
         icon('search'), el('span', { class: 'topbar__search-text', text: 'دوّر أو روح لأي قسم…' }), el('kbd', { class: 'kbd', text: 'Ctrl K' })),
+      el('button', { class: 'pstack', id: 'presence-open', type: 'button', hidden: true, 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: function (event) { openPresence(event.currentTarget); } }),
       el('button', { class: 'icon-btn topbar__bell', id: 'bell-open', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: function (event) { openBell(event.currentTarget); } },
         icon('bell'), el('span', { class: 'topbar__dot', hidden: true }))
     );
@@ -4059,7 +4135,48 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     };
   }
 
-  A.shell = { tools: shellTools, account: paintAccount, bell: paintBell, welcome: welcome, closeLayer: closeLayer, railLight: moveRailLight, setRail: setRail };
+  /* ---------- presence: the other admins as avatars (online · idle · editing), the list a tap away ---------- */
+
+  var present = [];
+  var presentPlace = null;
+
+  function presenceState(other) {
+    if (other.item && other.item.label) return 'editing';
+    return other.seen < 40 ? 'online' : 'idle';
+  }
+
+  var STATE_WORDS = { online: 'متصل دلوقتي', idle: 'مش نشط', editing: 'بيعدّل' };
+
+  function avatar(other, extra) {
+    var name = other.name || other.email || '';
+    return el('span', { class: 'pav pav--' + presenceState(other) + (extra ? ' ' + extra : ''), 'aria-hidden': 'true', text: initial(name) });
+  }
+
+  function paintPresence(others, place) {
+    present = others || [];
+    if (place) presentPlace = place;
+    var button = document.getElementById('presence-open');
+    if (!button) return;
+    button.hidden = !present.length;
+    var shown = present.slice(0, 3).map(function (o) { return avatar(o); });
+    if (present.length > 3) shown.push(el('span', { class: 'pav pav--more', 'aria-hidden': 'true', text: '+' + digits(present.length - 3) }));
+    button.replaceChildren.apply(button, shown);
+    button.setAttribute('aria-label', 'الأدمنز الفاتحين دلوقتي: ' + digits(present.length));
+  }
+
+  function openPresence(anchor) {
+    menu(anchor, 'menu--presence', [el('p', { class: 'menu__title', text: 'الفريق دلوقتي' })].concat(present.map(function (o) {
+      var state = presenceState(o);
+      var what = o.item && o.item.label ? 'بيعدّل في ' + o.item.label : (presentPlace ? 'في ' + presentPlace(o.area, o.view) : '');
+      return el('div', { class: 'menu__person', role: 'menuitem', tabindex: '-1' },
+        avatar(o),
+        el('span', { class: 'menu__who' },
+          el('b', { dir: 'auto', text: o.name || o.email }),
+          el('small', { text: [STATE_WORDS[state], state === 'idle' ? 'آخر نشاط ' + A.ago(o.seen) : '', what].filter(Boolean).join(' · ') })));
+    }), [el('p', { class: 'menu__note', text: 'اللي بيعدّل حاجة، بتتقفل للباقيين لحد ما يخلص.' })]));
+  }
+
+  A.shell = { presence: paintPresence, tools: shellTools, account: paintAccount, bell: paintBell, welcome: welcome, closeLayer: closeLayer, railLight: moveRailLight, setRail: setRail };
 
   A.render = function (options) {
 
@@ -4071,7 +4188,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       renderNav();
     }
     var key = area.subs ? A.sub[A.area] : (area.view || area.key);
-    var builder = A.views[key];
+    var builder = A.allowed(A.area) ? A.views[key] : A.views.denied;
 
     releaseCardLocks();
     if (A.collab) A.collab.where(A.area, area.subs ? key : '');
@@ -5130,6 +5247,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         resumePublish();
         // Phase 8 A1: this admin's look from the server (a no-op where it has no copy)
         A.loadPrefs();
+        A.loadAccess();
         return true;
       })
       .catch(function (error) {
@@ -14769,20 +14887,56 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
      THE LIST
   ======================================================= */
 
+  /*
+   * Phase 8 A6 (§22.1 item 20): a member as a card — the photo (or the first letter in Ruqaa), the full
+   * name, the full phone and email (never cut; LTR, a tap copies), the chips. The whole card opens the
+   * account. Photos come over this admin's session, only when the card is on screen.
+   */
+  var cardPhotos = typeof IntersectionObserver === 'function' ? new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (!entry.isIntersecting) return;
+      var img = entry.target;
+      cardPhotos.unobserve(img);
+      window.AdminWorker.blob('/v1/admin/participants/' + encodeURIComponent(img.dataset.pid) + '/avatar').then(function (blob) {
+        if (!img.isConnected) return;
+        img.src = URL.createObjectURL(blob);
+        img.addEventListener('load', function () { img.closest('.ycard__face').classList.add('has-photo'); URL.revokeObjectURL(img.src); }, { once: true });
+      }).catch(function () { /* the letter stays */ });
+    });
+  }, { rootMargin: '120px' }) : null;
+
+  function copyLine(text, label, cls) {
+    return el('button', { class: 'ycard__copy ' + cls, type: 'button', 'aria-label': 'انسخ ' + label + ': ' + text, title: 'اضغط تنسخ', onclick: function (event) {
+      event.stopPropagation();
+      navigator.clipboard.writeText(text).then(function () { A.toast('اتنسخ ' + label + ' ✓'); }).catch(function () { A.toast('مقدرناش ننسخ', 'error'); });
+    } }, el('bdi', { class: 'ltr', text: text }), icon('copy'));
+  }
+
   function personRow(p) {
-    return el('button', { class: 'comp-sub comp-person', type: 'button', 'data-youth': p.id, onclick: function () { Y.view = 'person'; Y.id = p.id; A.render(); } },
-      el('span', { class: 'comp-sub__who' }, el('bdi', { class: 'comp-sub__name', text: p.name }), el('span', { class: 'comp-sub__phone ltr', text: p.phone })),
-      el('span', { class: 'comp-sub__meta' },
-        eligibilityChip(p),
-        p.emailVerified ? null : A.chip('الإيميل مش متأكد', 'danger'),
-        p.balance ? A.chip(ar(p.balance) + ' نقطة' + (p.eligibility.state === 'guest' ? ' · متجمد' : ''), p.eligibility.state === 'guest' ? 'off' : 'info') : null,
-        (p.flags || []).map(function (f) { return A.chip(FLAGS[f] || f, 'gold'); })),
-      el('span', { class: 'comp-sub__when ltr', text: p.email }));
+    var face = el('span', { class: 'ycard__face', 'aria-hidden': 'true' }, el('span', { class: 'ycard__letter', text: String(p.name || '؟').trim().charAt(0) }));
+    if (p.avatar && window.AdminWorker && cardPhotos) {
+      var img = el('img', { class: 'ycard__photo', alt: '', width: '64', height: '64', 'data-youth-card-photo': '', 'data-pid': p.id });
+      face.appendChild(img);
+      cardPhotos.observe(img);
+    }
+    return el('article', { class: 'ycard' + (p.status === 'blocked' ? ' is-blocked' : '') },
+      el('button', { class: 'ycard__open', type: 'button', 'data-youth': p.id, 'aria-label': 'افتح حساب ' + p.name, onclick: function () { Y.view = 'person'; Y.id = p.id; A.render(); } }),
+      face,
+      el('div', { class: 'ycard__main' },
+        el('bdi', { class: 'ycard__name', text: p.name }),
+        p.phone ? copyLine(p.phone, 'الموبايل', 'ycard__phone') : null,
+        p.email ? copyLine(p.email, 'الإيميل', 'ycard__email') : null,
+        el('span', { class: 'ycard__chips' },
+          eligibilityChip(p),
+          p.emailVerified ? null : A.chip('الإيميل مش متأكد', 'danger'),
+          p.balance ? A.chip(ar(p.balance) + ' نقطة' + (p.eligibility.state === 'guest' ? ' · متجمد' : ''), p.eligibility.state === 'guest' ? 'off' : 'info') : null,
+          (p.flags || []).map(function (f) { return A.chip(FLAGS[f] || f, 'gold'); }))),
+      el('span', { class: 'ycard__go', 'aria-hidden': 'true' }, icon('chevron')));
   }
 
   function listView() {
     var box = A.errorBox();
-    var rows = el('div', { class: 'comp-list', 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
+    var rows = el('div', { class: 'comp-list ycards', 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
     var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر بالاسم أو الإيميل أو الموبايل…', 'aria-label': 'بحث', value: Y.q });
     var state = select([['', 'الكل'], ['eligible', 'مؤهل'], ['guest', 'ضيف'], ['blocked', 'موقوف']], Y.state, 'الأهلية');
     var tools = el('div', { class: 'actions' });
@@ -18591,6 +18745,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return [
       A.card('سجل النشاط', 'كل اللي اتعمل في لوحة التحكم: مين عمل إيه وإمتى. اضغط «افتح» علشان تروح للحاجة نفسها.',
         box,
+        // Phase 8 A6: «إدارة السجل», only with activity.manage
+        canManageLog() ? el('div', { class: 'actions' }, el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'log-manage', onclick: openLogManage }, icon('gear'), 'إدارة السجل')) : null,
         intro,
         filters,
         list,
@@ -18599,6 +18755,119 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     ];
 
   };
+
+
+
+  /* =======================================================
+     «إدارة السجل» (Phase 8 A6, §22.1 item 22): the log's size, an archive to a private file, and a safe
+     delete — only for admins holding activity.manage (the Worker checks it on every call).
+  ======================================================= */
+
+  function canManageLog() {
+    var a = A.access;
+    return !!(a && window.AdminWorker && (a.primary || (a.perms && a.perms['activity.manage'])));
+  }
+
+  var SECTION_WORDS = {
+    sessions: 'الاجتماعات', news: 'الأخبار', games: 'الألعاب', activities: 'الفعاليات', notifications: 'الإشعارات', page: 'الصفحة',
+    media: 'الصور', site: 'الموقع', admins: 'الأدمنز', competitions: 'المسابقات', pages: 'الصفحات', bookings: 'الحجوزات', delivery: 'التوصيل'
+  };
+
+  function digits(n) { return String(n).replace(/\d/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[d]; }); }
+
+  function openLogManage() {
+    var api = function (method, path, body) { return window.AdminWorker.call(method, '/v1/admin/activity/manage' + path, body, { quiet: true }); };
+    var box = A.errorBox();
+    var stats = el('div', { class: 'logm__stats', 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
+    var days = el('select', { class: 'input', 'aria-label': 'الفترة' }, [['90', 'أقدم من ٣ شهور'], ['180', 'أقدم من ٦ شهور'], ['365', 'أقدم من سنة']].map(function (o) { return el('option', { value: o[0], text: o[1] }); }));
+    var section = el('select', { class: 'input', 'aria-label': 'القسم' });
+    var technical = A.checkbox('الصفوف التقنية بس', false, 'زي الإيصالات وفحص الطوابير: أكبر جزء من السجل ومحدش بيحتاجه.');
+    var count = el('p', { class: 'logm__count', role: 'status' });
+    var archives = el('ul', { class: 'logm__archives' });
+    var archiveBtn = el('button', { class: 'btn', type: 'button', 'data-act': 'log-archive' }, icon('download'), 'أرشف');
+    var deleteBtn = el('button', { class: 'btn btn--danger', type: 'button', 'data-act': 'log-delete' }, icon('trash'), 'مسح آمن');
+    var current = { count: 0, kept: 0 };
+
+    function filter() {
+      return { days: Number(days.value), section: section.value || undefined, technical: technical.input.checked || undefined };
+    }
+
+    function preview() {
+      api('POST', '/preview', filter()).then(function (r) {
+        current = r;
+        count.textContent = 'هيتأثر ' + digits(r.count) + ' صف' + (r.kept ? ' · ' + digits(r.kept) + ' صف أمان وصلاحيات من آخر سنة محميين ومش هيتمسحوا' : '');
+        deleteBtn.disabled = !r.count;
+      }).catch(function (error) { A.fail(error, box); });
+    }
+
+    function drawArchives(list) {
+      A.fill(archives, list.length ? list.map(function (a) {
+        return el('li', { class: 'logm__archive' }, icon('download'), el('span', { class: 'ltr', text: 'activity-' + a.id + '.csv' }),
+          el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function (event) {
+            A.withBusy(event.currentTarget, window.AdminWorker.blob('/v1/admin/activity/manage/archive/' + encodeURIComponent(a.id)).then(function (blob) {
+              var link = el('a', { href: URL.createObjectURL(blob), download: 'activity-' + a.id + '.csv' });
+              document.body.appendChild(link);
+              link.click();
+              setTimeout(function () { URL.revokeObjectURL(link.href); link.remove(); }, 1000);
+            })).catch(function (error) { A.fail(error, box); });
+          } }, 'نزّل'));
+      }) : [el('li', { class: 'note', text: 'لسه مفيش أرشيف.' })]);
+    }
+
+    function load() {
+      api('GET', '').then(function (s) {
+        stats.setAttribute('aria-busy', 'false');
+        A.fill(stats,
+          el('div', {}, el('small', { text: 'الصفوف' }), el('b', { text: digits(s.rows) })),
+          el('div', {}, el('small', { text: 'أقدم صف' }), el('b', { text: s.oldest ? A.dateText ? A.dateText(s.oldest.slice(0, 10)) : s.oldest.slice(0, 10) : '—' })),
+          el('div', {}, el('small', { text: 'تقنية' }), el('b', { text: digits(s.technical) })));
+        A.fill(section, [el('option', { value: '', text: 'كل الأقسام' })].concat(s.sections.map(function (k) { return el('option', { value: k, text: SECTION_WORDS[k] || k }); })));
+        drawArchives(s.archives || []);
+        preview();
+      }).catch(function (error) { stats.setAttribute('aria-busy', 'false'); A.fill(stats); A.fail(error, box); });
+    }
+
+    [days, section, technical.input].forEach(function (n) { n.addEventListener('change', preview); });
+
+    archiveBtn.addEventListener('click', function () {
+      A.withBusy(archiveBtn, api('POST', '/archive', filter())).then(function (r) {
+        A.toast('اتأرشف ' + digits(r.archive.rows) + ' صف في ملف خاص');
+        load();
+      }).catch(function (error) { A.fail(error, box); });
+    });
+
+    deleteBtn.addEventListener('click', function () {
+      A.confirm({
+        title: 'تمسح ' + digits(current.count) + ' صف من السجل؟',
+        message: 'المسح مش بيرجع. الأحسن تأرشفهم الأول. صفوف الأمان والصلاحيات من آخر سنة محمية، والمسح نفسه هيتسجل كصف واحد.',
+        typed: 'امسح',
+        confirmLabel: 'امسح الصفوف'
+      }).then(function (ok) {
+        if (!ok) return;
+        var body = filter();
+        body.confirm = 'امسح';
+        A.withBusy(deleteBtn, api('POST', '/delete', body)).then(function (r) {
+          A.toast('اتمسح ' + digits(r.deleted) + ' صف · اتسجل في السجل');
+          load();
+        }).catch(function (error) { A.fail(error, box); });
+      });
+    });
+
+    A.openSheet('إدارة السجل', el('div', { class: 'form logm' },
+      box,
+      stats,
+      el('p', { class: 'note', text: 'السجل بيتنضف لوحده كل ليلة: بيفضل آخر سنة وبحد أقصى ٥٢٥٠ صف. هنا تقدر تأرشف أو تمسح قبل كده.' }),
+      A.field('الفترة', days, 'أقل حاجة ٣ شهور: الأحدث من كده بيفضل.'),
+      A.field('القسم', section, ''),
+      technical.node,
+      count,
+      el('h3', { class: 'logm__h', text: 'الأرشيف' }),
+      archives
+    ), [archiveBtn, deleteBtn], { className: 'sheet--logm' });
+    load();
+  }
+
+  A.openLogManage = openLogManage;
 
 
   /* =======================================================

@@ -21,7 +21,10 @@ import { createWorld } from './fakes/gas.mjs';
 import { handle as workerHandle } from '../worker/src/index.js';
 import { resetAuthCaches, GOOGLE_JWKS_URL } from '../worker/src/lib/auth.js';
 import { migratedDb } from '../worker/test/d1-sqlite.mjs';
+import { fakeR2 } from '../worker/test/helpers.mjs';
 
+// the signed-in Google account (Phase 8 A4 signs in another admin)
+let who = null;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const require = createRequire(`${ROOT}tools/package.json`);
 const puppeteer = require('puppeteer-core');
@@ -68,10 +71,11 @@ async function call(path, init) {
 }
 
 async function freshWorld() {
+  who = ADMIN;
   resetAuthCaches();
   env = {
     ENVIRONMENT: 'test', ALLOWED_ORIGINS: SITE, GOOGLE_CLIENT_ID: TEST_CLIENT, LOG_SALT: 'salt', ADMIN_EMAILS: '', SYNC_SECRET: SECRET,
-    DEVICE_KEY: 'k'.repeat(48), DB: migratedDb(), JOBS: { send: async () => {} }, COMPS_SOURCE: 'none', SITE_URL: SITE
+    DEVICE_KEY: 'k'.repeat(48), DB: migratedDb(), JOBS: { send: async () => {} }, COMPS_SOURCE: 'none', SITE_URL: SITE, PROOFS: fakeR2()
   };
   env.DB.raw.exec(`INSERT INTO admins (email, name, role, active, created_at) VALUES ('${ADMIN}', 'مينا', 'primary', 1, 0);
     UPDATE settings SET value = '1' WHERE key = 'ADMIN_PLATFORM';`);
@@ -115,7 +119,7 @@ test.before(async () => {
     world: { issueToken: c => issueToken(c), get github() { return world.github; } },
     // as production's admin/config.js since Phase 7: no apiUrl (Apps Script retired), the Worker alone
     config: () => ({ ...(legacy ? { apiUrl: TEST_API } : {}), clientId: TEST_CLIENT, timing: TIMING, workerUrl: WORKER_URL, platform: 'worker', content: 'worker' }),
-    claims: () => ({ email: ADMIN })
+    claims: () => ({ email: who })
   });
   await new Promise(resolve => server.listen(PORT, '127.0.0.1', resolve));
   browser = await puppeteer.launch({ executablePath: CHROME, headless: true });
@@ -572,6 +576,99 @@ test('Phase 8 A3 + A5: typed confirmation, saved/failed on the button, Ctrl+S, t
   await s.page.keyboard.press('KeyS');
   await s.page.keyboard.up('Control');
   assert.equal(await pressed, true);
+  assert.deepEqual(s.problems, []);
+  await s.close();
+});
+
+
+test('Phase 8 A4: with PERMS_ENFORCE on, an admin with competitions only lands on «المسابقات», sees only what they may open, and a kept place says «مش متاح لحسابك»', async () => {
+  await freshWorld();
+  const COMPS = 'comps.servant@example.com';
+  env.DB.raw.exec(`INSERT INTO admins (email, name, role, active, created_at) VALUES ('${COMPS}', 'بيشوي', 'admin', 1, 0);
+    INSERT INTO admin_grants (email, perm, scope, granted_by, granted_at) VALUES ('${COMPS}', 'competitions.view', 'all', 't', 0), ('${COMPS}', 'competitions.edit', 'all', 't', 0);
+    UPDATE settings SET value = '1' WHERE key = 'PERMS_ENFORCE';`);
+  world.properties.set('ADMIN_EMAILS', ADMIN + ',' + COMPS);
+  who = COMPS;
+  try {
+    const s = await open();
+    await signedIn(s.page);
+    await s.page.waitForFunction(() => A.access && A.area === 'comps', { timeout: 8000 });
+    // only what they may open, everywhere
+    const rail = await s.page.$$eval('#rail-nav .navlink', ns => ns.map(n => n.dataset.area));
+    assert.deepEqual(rail, ['comps']);
+    assert.ok(await s.page.$('#rail-foot [data-area="settings"]'), '«الإعدادات» stays (their own look, their devices)');
+    await s.page.keyboard.down('Control');
+    await s.page.keyboard.press('KeyK');
+    await s.page.keyboard.up('Control');
+    await s.page.waitForSelector('dialog.palette[open]');
+    const found = await s.page.$$eval('.palette__item span', ns => ns.map(n => n.textContent));
+    assert.ok(!found.includes('الأخبار') && !found.includes('الصور') && found.includes('المسابقات'), JSON.stringify(found));
+    await s.page.keyboard.press('Escape');
+    // a place they may not open (a kept one, a link): told, with the way home
+    await s.page.evaluate(() => A.go('media'));
+    await s.page.waitForFunction(() => /مش متاح لحسابك/.test(document.getElementById('view').textContent), { timeout: 4000 });
+    await s.page.click('#view .btn--primary');
+    await s.page.waitForFunction(() => A.area === 'comps', { timeout: 4000 });
+    // and the Worker refuses the call anyway
+    const refused = await s.page.evaluate(() => A.call('apiMediaList').then(() => 'ok', e => String(e && e.message || e)));
+    assert.notEqual(refused, 'ok');
+    await s.close();
+    // phones: the dock starts with their home
+    env.DB.raw.exec('DELETE FROM admin_sessions;');
+    const p = await open();
+    await p.page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+    await signedIn(p.page);
+    await p.page.waitForFunction(() => A.access && A.area === 'comps', { timeout: 8000 });
+    assert.deepEqual(await p.page.$$eval('#dock .dockbtn', ns => ns.map(n => n.dataset.area)), ['comps', 'more']);
+    await p.close();
+  }
+  finally {
+    who = ADMIN;
+    env.DB.raw.exec("UPDATE settings SET value = '0' WHERE key = 'PERMS_ENFORCE';");
+  }
+
+  // the switch off (today on production): the same admin sees every area, as before
+  env.DB.raw.exec('DELETE FROM admin_sessions;');
+  who = COMPS;
+  try {
+    const o = await open();
+    await signedIn(o.page);
+    await o.page.waitForFunction(() => !!A.access, { timeout: 8000 });
+    assert.ok((await o.page.$$eval('#rail-nav .navlink', ns => ns.length)) >= 7, 'nothing hidden while the switch is off');
+    await o.close();
+  }
+  finally {
+    who = ADMIN;
+  }
+});
+
+
+test('Phase 8 A6: «إدارة السجل» — the size, an archive to a private file, a safe delete with the word; only with activity.manage', async () => {
+  await freshWorld();
+  const now = Date.now();
+  for (let i = 0; i < 4; i++) env.DB.raw.prepare("INSERT INTO activity (id, at, cairo, actor, action, entity_type, summary) VALUES (?, ?, '2025-01-01 00:00', 'x@example.com', 'diag.echo', 'diag', 's')").run('act-oldtech0' + i, now - 200 * 24 * 3600 * 1000);
+  const s = await open();
+  await signedIn(s.page);
+  await s.page.waitForFunction(() => !!A.access, { timeout: 8000 });
+  await s.page.evaluate(() => A.go('activity'));
+  await s.page.waitForSelector('[data-act="log-manage"]', { timeout: 8000 });
+  await s.page.click('[data-act="log-manage"]');
+  await s.page.waitForSelector('dialog.sheet[open] .logm__stats[aria-busy="false"]', { timeout: 8000 });
+  await s.page.$eval('dialog.sheet[open] .check--toggle input', i => i.click());
+  await s.page.waitForFunction(() => /هيتأثر ٤ صف/.test(document.querySelector('.logm__count')?.textContent || ''), { timeout: 5000 });
+  // an archive first (nothing deleted)
+  await s.page.click('[data-act="log-archive"]');
+  await s.page.waitForSelector('.logm__archive', { timeout: 8000 });
+  assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM activity WHERE action = 'diag.echo'").get().n, 4);
+  // the safe delete asks for the word
+  await s.page.click('[data-act="log-delete"]');
+  await s.page.waitForSelector('dialog.modal[open] .modal__typed');
+  await s.page.type('dialog.modal[open] .modal__typed', 'امسح');
+  await s.page.click('dialog.modal[open] .modal__actions .btn:first-child');
+  await s.page.waitForFunction(() => /هيتأثر ٠ صف/.test(document.querySelector('.logm__count')?.textContent || ''), { timeout: 8000 });
+  assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM activity WHERE action = 'diag.echo'").get().n, 0);
+  assert.ok(env.DB.raw.prepare("SELECT 1 FROM activity WHERE action = 'activity.trim'").get(), 'the delete is in the log');
+  await s.page.screenshot({ path: `${ROOT}tools/.cache/phase8-a3/log-manage.png` });
   assert.deepEqual(s.problems, []);
   await s.close();
 });

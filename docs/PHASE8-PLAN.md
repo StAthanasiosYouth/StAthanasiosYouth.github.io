@@ -236,3 +236,30 @@ Way back: revert the slice's commit (static admin files, minutes); a Worker chan
     has `appearance: base-select` (Chrome), the styled native one elsewhere; date and time fields follow the theme.
   - Tests: `content-worker.e2e.mjs` (typed confirmation, saved / failed, the save bar's count and way between fields,
     toggle rows, Ctrl+S). Browser suites: the same failures as `main`, none new.
+- 2026-11-04: **Batch A4 + A6 built** (same branch, not on production):
+  - A4, the panel side of permissions: the panel reads `GET /v1/admin/me` (`perms`, the same rule every route checks). An
+    area without a grant is not drawn (rail, dock, «المزيد», the palette, «اللي مستنيك»); opened anyway (a kept place, a
+    link) it shows «مش متاح لحسابك» with who to ask and the way to the admin's own home; home is the first area the admin
+    may open (competitions only → «المسابقات», first in the dock too). The Worker refuses the calls anyway. **With
+    `PERMS_ENFORCE` off (today) nothing is hidden**: every admin keeps today's access. Turning it on (Staging, a grants review
+    with the owner, then production) waits for the owner's final approval with the rest of Phase 8.
+  - A6, presence (§22.1 item 18): the other admins as avatars in the top bar (online · idle · editing, gold ring when
+    editing, «+N»), a tap lists who and what; on phones they stand for the strip.
+  - A6, youth accounts (item 20): cards — the photo (fetched over the session only when on screen) or the first letter in
+    Ruqaa, the full name, phone and email never cut (LTR, a tap copies), the chips; the whole card opens the account;
+    one column on a phone, a grid on wider screens.
+  - A6, «إدارة السجل» (item 22): new grant `activity.manage` (a Primary default: never held by others until granted);
+    Worker routes `GET /v1/admin/activity/manage`, `POST …/preview`, `POST …/archive` (a private R2 CSV with a BOM, listed and
+    downloadable), `GET …/archive/:id`, `POST …/delete` (only rows older than 90 days, never the security and permission
+    rows of the last year, the word «امسح» required, logged as one `activity.trim` row). The nightly trim that already
+    existed (365 days, 5250 rows) stays. The sheet in «سجل النشاط» shows only with the grant.
+  - A2 leftover done here: the family's logo replaces the decorative cross mark (§22.1 item 4).
+  - `apps-script/Grants.gs` (retired, kept in step for its tests) lists `activity.manage` among the Primary defaults;
+    `worker/src/content/gs.gen.js` regenerated. No `clasp push`.
+  - Tests: Worker `activity-manage.test.mjs` (grant, preview, safe delete, protected rows, archive); `perms.test.mjs` seed
+    test knows the permission added after 0009; browser: A4 (enforce on and off), presence avatars (admin-rel), youth
+    cards at 375 (youth-admin), «إدارة السجل» end to end (content-worker). Suites: the same failures as `main`, none new.
+  - **Open, needs the owner (not built):** the «بيانات تجريبية» bulk delete (item 21) — its rule for what counts as test
+    data has to be agreed per table with the owner ("never a guess"); the per-item «إدارة» menu and the remaining module
+    restyles (media library grid and lightbox, payment-method cards, finance tables, the image-or-icon picker that also
+    changes the public site, items 7–9 and 11).

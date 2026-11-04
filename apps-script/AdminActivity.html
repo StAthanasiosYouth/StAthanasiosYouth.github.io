@@ -670,6 +670,8 @@
     return [
       A.card('سجل النشاط', 'كل اللي اتعمل في لوحة التحكم: مين عمل إيه وإمتى. اضغط «افتح» علشان تروح للحاجة نفسها.',
         box,
+        // Phase 8 A6: «إدارة السجل», only with activity.manage
+        canManageLog() ? el('div', { class: 'actions' }, el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'log-manage', onclick: openLogManage }, icon('gear'), 'إدارة السجل')) : null,
         intro,
         filters,
         list,
@@ -678,6 +680,119 @@
     ];
 
   };
+
+
+
+  /* =======================================================
+     «إدارة السجل» (Phase 8 A6, §22.1 item 22): the log's size, an archive to a private file, and a safe
+     delete — only for admins holding activity.manage (the Worker checks it on every call).
+  ======================================================= */
+
+  function canManageLog() {
+    var a = A.access;
+    return !!(a && window.AdminWorker && (a.primary || (a.perms && a.perms['activity.manage'])));
+  }
+
+  var SECTION_WORDS = {
+    sessions: 'الاجتماعات', news: 'الأخبار', games: 'الألعاب', activities: 'الفعاليات', notifications: 'الإشعارات', page: 'الصفحة',
+    media: 'الصور', site: 'الموقع', admins: 'الأدمنز', competitions: 'المسابقات', pages: 'الصفحات', bookings: 'الحجوزات', delivery: 'التوصيل'
+  };
+
+  function digits(n) { return String(n).replace(/\d/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[d]; }); }
+
+  function openLogManage() {
+    var api = function (method, path, body) { return window.AdminWorker.call(method, '/v1/admin/activity/manage' + path, body, { quiet: true }); };
+    var box = A.errorBox();
+    var stats = el('div', { class: 'logm__stats', 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
+    var days = el('select', { class: 'input', 'aria-label': 'الفترة' }, [['90', 'أقدم من ٣ شهور'], ['180', 'أقدم من ٦ شهور'], ['365', 'أقدم من سنة']].map(function (o) { return el('option', { value: o[0], text: o[1] }); }));
+    var section = el('select', { class: 'input', 'aria-label': 'القسم' });
+    var technical = A.checkbox('الصفوف التقنية بس', false, 'زي الإيصالات وفحص الطوابير: أكبر جزء من السجل ومحدش بيحتاجه.');
+    var count = el('p', { class: 'logm__count', role: 'status' });
+    var archives = el('ul', { class: 'logm__archives' });
+    var archiveBtn = el('button', { class: 'btn', type: 'button', 'data-act': 'log-archive' }, icon('download'), 'أرشف');
+    var deleteBtn = el('button', { class: 'btn btn--danger', type: 'button', 'data-act': 'log-delete' }, icon('trash'), 'مسح آمن');
+    var current = { count: 0, kept: 0 };
+
+    function filter() {
+      return { days: Number(days.value), section: section.value || undefined, technical: technical.input.checked || undefined };
+    }
+
+    function preview() {
+      api('POST', '/preview', filter()).then(function (r) {
+        current = r;
+        count.textContent = 'هيتأثر ' + digits(r.count) + ' صف' + (r.kept ? ' · ' + digits(r.kept) + ' صف أمان وصلاحيات من آخر سنة محميين ومش هيتمسحوا' : '');
+        deleteBtn.disabled = !r.count;
+      }).catch(function (error) { A.fail(error, box); });
+    }
+
+    function drawArchives(list) {
+      A.fill(archives, list.length ? list.map(function (a) {
+        return el('li', { class: 'logm__archive' }, icon('download'), el('span', { class: 'ltr', text: 'activity-' + a.id + '.csv' }),
+          el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function (event) {
+            A.withBusy(event.currentTarget, window.AdminWorker.blob('/v1/admin/activity/manage/archive/' + encodeURIComponent(a.id)).then(function (blob) {
+              var link = el('a', { href: URL.createObjectURL(blob), download: 'activity-' + a.id + '.csv' });
+              document.body.appendChild(link);
+              link.click();
+              setTimeout(function () { URL.revokeObjectURL(link.href); link.remove(); }, 1000);
+            })).catch(function (error) { A.fail(error, box); });
+          } }, 'نزّل'));
+      }) : [el('li', { class: 'note', text: 'لسه مفيش أرشيف.' })]);
+    }
+
+    function load() {
+      api('GET', '').then(function (s) {
+        stats.setAttribute('aria-busy', 'false');
+        A.fill(stats,
+          el('div', {}, el('small', { text: 'الصفوف' }), el('b', { text: digits(s.rows) })),
+          el('div', {}, el('small', { text: 'أقدم صف' }), el('b', { text: s.oldest ? A.dateText ? A.dateText(s.oldest.slice(0, 10)) : s.oldest.slice(0, 10) : '—' })),
+          el('div', {}, el('small', { text: 'تقنية' }), el('b', { text: digits(s.technical) })));
+        A.fill(section, [el('option', { value: '', text: 'كل الأقسام' })].concat(s.sections.map(function (k) { return el('option', { value: k, text: SECTION_WORDS[k] || k }); })));
+        drawArchives(s.archives || []);
+        preview();
+      }).catch(function (error) { stats.setAttribute('aria-busy', 'false'); A.fill(stats); A.fail(error, box); });
+    }
+
+    [days, section, technical.input].forEach(function (n) { n.addEventListener('change', preview); });
+
+    archiveBtn.addEventListener('click', function () {
+      A.withBusy(archiveBtn, api('POST', '/archive', filter())).then(function (r) {
+        A.toast('اتأرشف ' + digits(r.archive.rows) + ' صف في ملف خاص');
+        load();
+      }).catch(function (error) { A.fail(error, box); });
+    });
+
+    deleteBtn.addEventListener('click', function () {
+      A.confirm({
+        title: 'تمسح ' + digits(current.count) + ' صف من السجل؟',
+        message: 'المسح مش بيرجع. الأحسن تأرشفهم الأول. صفوف الأمان والصلاحيات من آخر سنة محمية، والمسح نفسه هيتسجل كصف واحد.',
+        typed: 'امسح',
+        confirmLabel: 'امسح الصفوف'
+      }).then(function (ok) {
+        if (!ok) return;
+        var body = filter();
+        body.confirm = 'امسح';
+        A.withBusy(deleteBtn, api('POST', '/delete', body)).then(function (r) {
+          A.toast('اتمسح ' + digits(r.deleted) + ' صف · اتسجل في السجل');
+          load();
+        }).catch(function (error) { A.fail(error, box); });
+      });
+    });
+
+    A.openSheet('إدارة السجل', el('div', { class: 'form logm' },
+      box,
+      stats,
+      el('p', { class: 'note', text: 'السجل بيتنضف لوحده كل ليلة: بيفضل آخر سنة وبحد أقصى ٥٢٥٠ صف. هنا تقدر تأرشف أو تمسح قبل كده.' }),
+      A.field('الفترة', days, 'أقل حاجة ٣ شهور: الأحدث من كده بيفضل.'),
+      A.field('القسم', section, ''),
+      technical.node,
+      count,
+      el('h3', { class: 'logm__h', text: 'الأرشيف' }),
+      archives
+    ), [archiveBtn, deleteBtn], { className: 'sheet--logm' });
+    load();
+  }
+
+  A.openLogManage = openLogManage;
 
 
   /* =======================================================

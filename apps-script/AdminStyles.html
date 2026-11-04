@@ -8844,4 +8844,340 @@ input[type="datetime-local"].input::-webkit-calendar-picker-indicator {
   .btn.is-done::after { animation: none; opacity: 0; }
 }
 
+
+/* ---------- Phase 8 A6: presence as avatars in the top bar ---------- */
+
+.pstack {
+  display: inline-flex;
+  align-items: center;
+  height: 42px;
+  padding: 0 4px 0 10px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  cursor: pointer;
+}
+
+.pstack[hidden] {
+  display: none;
+}
+
+.pstack .pav {
+  margin-inline-start: -8px;
+}
+
+.pstack .pav:first-child {
+  margin-inline-start: 0;
+}
+
+.pav {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: .82rem;
+  font-weight: 800;
+  color: var(--text);
+  background: var(--navy-700);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+.pav::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  inset-inline-end: -1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-3);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+.pav--online::after { background: var(--ok); }
+.pav--idle::after { background: var(--warn); }
+.pav--editing::after { background: var(--gold); }
+
+.pav--editing {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px rgb(var(--acc-rgb) / .55);
+}
+
+.pav--more {
+  font-size: .7rem;
+  color: var(--text-2);
+}
+
+.pav--more::after {
+  display: none;
+}
+
+.menu__person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 6px 10px;
+  border-radius: 10px;
+}
+
+.menu__note {
+  padding: 8px 10px 4px;
+  font-size: .76rem;
+  color: var(--text-3);
+}
+
+/* phones: the avatars stand for the strip (a tap opens the list) */
+@media (max-width: 1023px) {
+  .presence {
+    display: none !important;
+  }
+}
+
+
+/* ---------- Phase 8 A6: youth accounts as cards ---------- */
+
+.ycards {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+@media (min-width: 760px) {
+  .ycards {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  }
+}
+
+.ycards > .note,
+.ycards > .btn {
+  grid-column: 1 / -1;
+}
+
+.ycard {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgb(var(--nv-16-44-80) / .45), rgb(var(--nv-7-24-46) / .5));
+  transition: border-color .2s, transform .35s var(--spring), box-shadow .2s;
+}
+
+.ycard:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-2px);
+}
+
+.ycard.is-blocked {
+  opacity: .78;
+}
+
+/* the whole card opens the account; the copy buttons sit above it */
+.ycard__open {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  cursor: pointer;
+}
+
+.ycard__open:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: 2px;
+}
+
+.ycard__face {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 56px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: 999px 999px 12px 12px;
+  background: linear-gradient(180deg, var(--navy-700), var(--navy-900));
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+.ycard__letter {
+  font-family: "Aref Ruqaa", "Cairo", serif;
+  font-size: 1.7rem;
+  line-height: 1;
+  color: var(--gold-hi);
+}
+
+.ycard__photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity .3s;
+}
+
+.ycard__face.has-photo .ycard__photo {
+  opacity: 1;
+}
+
+.ycard__main {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ycard__name {
+  font-weight: 800;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.ycard__copy {
+  position: relative;
+  z-index: 2;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 2px 8px;
+  margin-inline-start: -8px;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  font-size: .88rem;
+  color: var(--text-2);
+  background: none;
+  cursor: copy;
+}
+
+.ycard__copy bdi {
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.ycard__copy .icon {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  opacity: .55;
+}
+
+.ycard__copy:hover {
+  color: var(--text);
+  background: rgb(var(--tint) / .06);
+}
+
+.ycard__phone {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .02em;
+}
+
+.ycard__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.ycard__go {
+  align-self: center;
+  color: var(--text-3);
+}
+
+.ycard__go .icon {
+  width: 18px;
+  height: 18px;
+  transform: rotate(90deg);
+}
+
+
+/* ---------- Phase 8 A2 (§22.1 item 4): the family's logo as the mark ---------- */
+
+.brand__mark--logo {
+  overflow: hidden;
+  border-radius: 50%;
+  background: none;
+  box-shadow: 0 0 0 1px var(--line-strong), 0 0 22px -6px rgb(var(--acc-rgb) / .6);
+}
+
+.brand__mark--logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+
+/* ---------- Phase 8 A6: «إدارة السجل» ---------- */
+
+.logm__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.logm__stats > div {
+  display: grid;
+  padding: 10px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  background: rgb(var(--tint) / .03);
+}
+
+.logm__stats small {
+  font-size: .76rem;
+  color: var(--text-3);
+}
+
+.logm__stats b {
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.logm__count {
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 700;
+  background: rgb(var(--acc-rgb) / .08);
+}
+
+.logm__h {
+  margin-top: 6px;
+  font-size: 1rem;
+}
+
+.logm__archives {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.logm__archive {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+}
+
+.logm__archive > span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: .86rem;
+}
+
 </style>

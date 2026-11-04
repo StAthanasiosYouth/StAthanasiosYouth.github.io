@@ -2720,6 +2720,8 @@
 
     others = Array.isArray(others) ? others : [];
     strip.hidden = !others.length;
+    // Phase 8 A6 (§22.1 item 18): the same list as avatars in the top bar (online / idle / editing)
+    if (A.shell && A.shell.presence) A.shell.presence(others, placeLabel);
 
     A.fill(strip, others.length ? [
       el('span', { class: 'presence__icon', 'aria-hidden': 'true' }, icon('users')),
@@ -3521,7 +3523,7 @@
 
     // Phase 8 A2: the rail in its groups, with one light that glides to the current area
     if (!railLight) railLight = el('span', { class: 'rail__light', 'aria-hidden': 'true' });
-    rail.replaceChildren.apply(rail, [railLight].concat(railNav(A.AREAS.filter(function (a) { return a.key !== 'settings'; }))));
+    rail.replaceChildren.apply(rail, [railLight].concat(railNav(A.visibleAreas().filter(function (a) { return a.key !== 'settings'; }))));
     requestAnimationFrame(function () { moveRailLight(false); });
     // the phones' dock: the first four areas and «المزيد» (the rest, the settings, the account, sign-out)
     var docked = dockAreas();
@@ -3568,6 +3570,69 @@
   }
 
   A.renderNav = renderNav;
+
+  /* =======================================================
+     ACCESS (Phase 8 A4, BACKEND-MIGRATION §22.1 item 17): the areas follow the admin's grants.
+     The Worker decides (GET /v1/admin/me → perms, the same rule every route checks) and refuses
+     anything else while PERMS_ENFORCE is on. With the switch off every admin keeps today's access,
+     so nothing here hides anything until the owner turns it on.
+       - an area without a grant is not drawn (rail, dock, «المزيد», the palette, «اللي مستنيك»)
+       - opened anyway (a kept place, a link): «مش متاح لحسابك» with who to ask
+       - home is the first area the admin may open (competitions only → «المسابقات»)
+  ======================================================= */
+
+  // area → the grants that open it (any one of them)
+  var AREA_NEEDS = {
+    home: ['content.view'],
+    content: ['content.view'],
+    comps: ['competitions.view'],
+    pages: ['content.view', 'events.view'],
+    page: ['content.view'],
+    media: ['media.view'],
+    activity: ['activity.view']
+  };
+
+  A.access = null;
+
+  /* may this admin open the area? (true until the Worker says otherwise) */
+  A.allowed = function (key) {
+    var a = A.access;
+    if (!a || !a.enforce || a.primary) return true;
+    var needs = AREA_NEEDS[key];
+    if (!needs) return true;
+    return needs.some(function (p) { return !!a.perms[p]; });
+  };
+
+  A.visibleAreas = function () {
+    return A.AREAS.filter(function (area) { return A.allowed(area.key); });
+  };
+
+  /* the admin's own home: «الرئيسية» when it is theirs, else the first area they may open */
+  A.homeArea = function () {
+    if (A.allowed('home')) return 'home';
+    var first = A.visibleAreas().filter(function (a) { return a.key !== 'settings'; })[0];
+    return first ? first.key : 'settings';
+  };
+
+  A.loadAccess = function () {
+    return A.call('apiAdminMe').then(function (me) {
+      if (!me || !me.perms) return;
+      A.access = { enforce: !!me.enforce, primary: !!me.primary, perms: me.perms };
+      if (!A.allowed(A.area)) A.go(A.homeArea());
+      else {
+        renderNav();
+        // a screen with grant-dependent parts (A6: «إدارة السجل») draws them now
+        if (A.area === 'activity') A.render();
+      }
+    }).catch(function () { /* the Apps Script panel, or the Worker away: today's access (the Worker still refuses) */ });
+  };
+
+  A.views.denied = function () {
+    return [A.card('مش متاح لحسابك', null,
+      el('p', { class: 'denied__text', text: 'القسم ده مش من صلاحياتك. لو محتاجه في خدمتك، اطلبه من الأدمن الأساسي، وهو يديك الصلاحية من «الإعدادات» ← «الأدمنز».' }),
+      el('div', { class: 'actions' },
+        el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.go(A.homeArea()); } }, icon('home'), 'روح لرئيسيتك')))];
+  };
 
   /* =======================================================
      SHELL (Phase 8 A2, docs/PHASE8-PLAN.md §2): the rail's groups, its sliding light and its
@@ -3631,7 +3696,10 @@
   }
 
   function dockAreas() {
-    var all = A.AREAS.filter(function (a) { return a.key !== 'settings'; });
+    // the admin's own home first (A4), then the rest in their order
+    var home = A.homeArea();
+    var all = A.visibleAreas().filter(function (a) { return a.key !== 'settings'; });
+    all = all.filter(function (a) { return a.key === home; }).concat(all.filter(function (a) { return a.key !== home; }));
     return { main: all.slice(0, DOCK_MAIN), rest: all.slice(DOCK_MAIN) };
   }
 
@@ -3723,7 +3791,7 @@
 
   function waiting() {
     var list = [];
-    A.AREAS.forEach(function (area) {
+    A.visibleAreas().forEach(function (area) {
       (area.subs || []).forEach(function (s) {
         if (Number(s.badge) > 0) list.push({ n: Number(s.badge), label: s.label, where: area.label, icon: area.icon, go: function () { A.go(area.key, s.key); } });
       });
@@ -3769,7 +3837,7 @@
 
   function commands() {
     var out = [];
-    A.AREAS.forEach(function (area) {
+    A.visibleAreas().forEach(function (area) {
       out.push({ group: 'روح لـ', label: area.title || area.label, icon: area.icon, run: function () { A.go(area.key); } });
       (area.subs || []).forEach(function (s) {
         out.push({ group: 'روح لـ', label: s.label, hint: area.label, icon: area.icon, run: function () { A.go(area.key, s.key); } });
@@ -3866,9 +3934,17 @@
   function shellTools() {
     var bar = document.querySelector('.topbar');
     if (!bar || document.getElementById('palette-open')) return;
+    // §22.1 item 4: the family's logo in place of the decorative cross (the official page serves the site's images)
+    if (window.AdminTransport) {
+      document.querySelectorAll('.brand__mark, .topbar__mark').forEach(function (mark) {
+        mark.classList.add('brand__mark--logo');
+        mark.replaceChildren(el('img', { src: '../assets/img/logo-128.webp', width: 42, height: 42, alt: '', decoding: 'async' }));
+      });
+    }
     var tools = el('div', { class: 'topbar__tools' },
       el('button', { class: 'icon-btn topbar__search', id: 'palette-open', type: 'button', 'aria-label': 'بحث سريع (Ctrl K)', 'aria-haspopup': 'dialog', onclick: function () { A.openPalette(); } },
         icon('search'), el('span', { class: 'topbar__search-text', text: 'دوّر أو روح لأي قسم…' }), el('kbd', { class: 'kbd', text: 'Ctrl K' })),
+      el('button', { class: 'pstack', id: 'presence-open', type: 'button', hidden: true, 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: function (event) { openPresence(event.currentTarget); } }),
       el('button', { class: 'icon-btn topbar__bell', id: 'bell-open', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: function (event) { openBell(event.currentTarget); } },
         icon('bell'), el('span', { class: 'topbar__dot', hidden: true }))
     );
@@ -3930,7 +4006,48 @@
     };
   }
 
-  A.shell = { tools: shellTools, account: paintAccount, bell: paintBell, welcome: welcome, closeLayer: closeLayer, railLight: moveRailLight, setRail: setRail };
+  /* ---------- presence: the other admins as avatars (online · idle · editing), the list a tap away ---------- */
+
+  var present = [];
+  var presentPlace = null;
+
+  function presenceState(other) {
+    if (other.item && other.item.label) return 'editing';
+    return other.seen < 40 ? 'online' : 'idle';
+  }
+
+  var STATE_WORDS = { online: 'متصل دلوقتي', idle: 'مش نشط', editing: 'بيعدّل' };
+
+  function avatar(other, extra) {
+    var name = other.name || other.email || '';
+    return el('span', { class: 'pav pav--' + presenceState(other) + (extra ? ' ' + extra : ''), 'aria-hidden': 'true', text: initial(name) });
+  }
+
+  function paintPresence(others, place) {
+    present = others || [];
+    if (place) presentPlace = place;
+    var button = document.getElementById('presence-open');
+    if (!button) return;
+    button.hidden = !present.length;
+    var shown = present.slice(0, 3).map(function (o) { return avatar(o); });
+    if (present.length > 3) shown.push(el('span', { class: 'pav pav--more', 'aria-hidden': 'true', text: '+' + digits(present.length - 3) }));
+    button.replaceChildren.apply(button, shown);
+    button.setAttribute('aria-label', 'الأدمنز الفاتحين دلوقتي: ' + digits(present.length));
+  }
+
+  function openPresence(anchor) {
+    menu(anchor, 'menu--presence', [el('p', { class: 'menu__title', text: 'الفريق دلوقتي' })].concat(present.map(function (o) {
+      var state = presenceState(o);
+      var what = o.item && o.item.label ? 'بيعدّل في ' + o.item.label : (presentPlace ? 'في ' + presentPlace(o.area, o.view) : '');
+      return el('div', { class: 'menu__person', role: 'menuitem', tabindex: '-1' },
+        avatar(o),
+        el('span', { class: 'menu__who' },
+          el('b', { dir: 'auto', text: o.name || o.email }),
+          el('small', { text: [STATE_WORDS[state], state === 'idle' ? 'آخر نشاط ' + A.ago(o.seen) : '', what].filter(Boolean).join(' · ') })));
+    }), [el('p', { class: 'menu__note', text: 'اللي بيعدّل حاجة، بتتقفل للباقيين لحد ما يخلص.' })]));
+  }
+
+  A.shell = { presence: paintPresence, tools: shellTools, account: paintAccount, bell: paintBell, welcome: welcome, closeLayer: closeLayer, railLight: moveRailLight, setRail: setRail };
 
   A.render = function (options) {
 
@@ -3942,7 +4059,7 @@
       renderNav();
     }
     var key = area.subs ? A.sub[A.area] : (area.view || area.key);
-    var builder = A.views[key];
+    var builder = A.allowed(A.area) ? A.views[key] : A.views.denied;
 
     releaseCardLocks();
     if (A.collab) A.collab.where(A.area, area.subs ? key : '');
@@ -5001,6 +5118,7 @@
         resumePublish();
         // Phase 8 A1: this admin's look from the server (a no-op where it has no copy)
         A.loadPrefs();
+        A.loadAccess();
         return true;
       })
       .catch(function (error) {

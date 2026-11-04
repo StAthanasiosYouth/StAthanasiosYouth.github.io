@@ -29,7 +29,7 @@ const CATALOG = {
   media: ['view', 'add', 'delete'],
   push: ['view', 'manage'],
   accounts: ['view', 'manage'],
-  activity: ['view'],
+  activity: ['view', 'manage'],
   notifications: ['view', 'manage'],
   system: ['view', 'manage']
 };
@@ -38,7 +38,7 @@ export const PERMS = Object.freeze(Object.entries(CATALOG).flatMap(([m, actions]
 const KNOWN = new Set(PERMS);
 
 /* Never granted by default: the Primary Admin's, until they grant them (§4.3; YOUTH-ACCOUNTS-PLAN §12.2). */
-export const PRIMARY_DEFAULT = Object.freeze(['accounts.manage', 'notifications.manage', 'participants.manage']);
+export const PRIMARY_DEFAULT = Object.freeze(['accounts.manage', 'notifications.manage', 'participants.manage', 'activity.manage']);
 
 /* «الصلاحيات» presets: they only pre-fill the checkboxes (§4.3). perm → scope. */
 const views = PERMS.filter(p => p.endsWith('.view') && p !== 'accounts.view' && p !== 'notifications.view');
@@ -72,6 +72,12 @@ export const ROUTE_PERMS = Object.freeze({
   'POST /v1/admin/devices/trust': ANY_ADMIN,
   'POST /v1/admin/devices/forget': ANY_ADMIN,
   'GET /v1/admin/activity': 'activity.view',
+  // Phase 8 A6: «إدارة السجل» (admin/activity-manage.js)
+  'GET /v1/admin/activity/manage': 'activity.manage',
+  'POST /v1/admin/activity/manage/preview': 'activity.manage',
+  'POST /v1/admin/activity/manage/archive': 'activity.manage',
+  'GET /v1/admin/activity/manage/archive/:id': 'activity.manage',
+  'POST /v1/admin/activity/manage/delete': 'activity.manage',
   'GET /v1/admin/accounts': 'accounts.view',
   'POST /v1/admin/accounts': 'accounts.manage',
   'POST /v1/admin/accounts/:email': 'accounts.manage',

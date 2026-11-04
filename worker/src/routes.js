@@ -20,6 +20,7 @@ import { sessionStart, sessionResume, sessionRenew, sessionEnd, sessionPark, ses
 import { deviceTrust, deviceForget, deviceSignIn } from './admin/devices.js';
 import { adminMe, adminRename } from './admin/me.js';
 import { adminPrefsSave } from './admin/prefs.js';
+import { activityManage, activityManagePreview, activityManageArchive, activityManageArchiveRead, activityManageDelete } from './admin/activity-manage.js';
 import { notifyClaim } from './notify/claim.js';
 import { tokenHealth } from './notify/email.js';
 import { diagMailSample } from './notify/samples.js';
@@ -311,6 +312,12 @@ export const ROUTES = [
   { method: 'GET', path: '/v1/health/deep', auth: 'public', handler: healthDeep },
   { method: 'GET', path: '/v1/admin/whoami', auth: 'admin', handler: whoami },
   { method: 'GET', path: '/v1/admin/activity', auth: 'admin', handler: activity },
+  // Phase 8 A6: «إدارة السجل» (activity.manage)
+  { method: 'GET', path: '/v1/admin/activity/manage', auth: 'admin', handler: activityManage },
+  { method: 'POST', path: '/v1/admin/activity/manage/preview', auth: 'admin', maxBytes: 1024, handler: activityManagePreview },
+  { method: 'POST', path: '/v1/admin/activity/manage/archive', auth: 'admin', maxBytes: 1024, handler: activityManageArchive },
+  { method: 'GET', path: '/v1/admin/activity/manage/archive/:id', auth: 'admin', handler: activityManageArchiveRead },
+  { method: 'POST', path: '/v1/admin/activity/manage/delete', auth: 'admin', maxBytes: 1024, handler: activityManageDelete },
   { method: 'POST', path: '/v1/admin/diag/echo', auth: 'admin', handler: diagEcho },
   { method: 'POST', path: '/v1/admin/diag/housekeeping', auth: 'admin', handler: diagHousekeeping },
   { method: 'POST', path: '/v1/admin/proofs', auth: 'admin', raw: true, maxBytes: PROOF_MAX_BYTES, handler: proofUpload },

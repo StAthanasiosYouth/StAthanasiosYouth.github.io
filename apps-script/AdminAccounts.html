@@ -135,20 +135,56 @@
      THE LIST
   ======================================================= */
 
+  /*
+   * Phase 8 A6 (§22.1 item 20): a member as a card — the photo (or the first letter in Ruqaa), the full
+   * name, the full phone and email (never cut; LTR, a tap copies), the chips. The whole card opens the
+   * account. Photos come over this admin's session, only when the card is on screen.
+   */
+  var cardPhotos = typeof IntersectionObserver === 'function' ? new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (!entry.isIntersecting) return;
+      var img = entry.target;
+      cardPhotos.unobserve(img);
+      window.AdminWorker.blob('/v1/admin/participants/' + encodeURIComponent(img.dataset.pid) + '/avatar').then(function (blob) {
+        if (!img.isConnected) return;
+        img.src = URL.createObjectURL(blob);
+        img.addEventListener('load', function () { img.closest('.ycard__face').classList.add('has-photo'); URL.revokeObjectURL(img.src); }, { once: true });
+      }).catch(function () { /* the letter stays */ });
+    });
+  }, { rootMargin: '120px' }) : null;
+
+  function copyLine(text, label, cls) {
+    return el('button', { class: 'ycard__copy ' + cls, type: 'button', 'aria-label': 'انسخ ' + label + ': ' + text, title: 'اضغط تنسخ', onclick: function (event) {
+      event.stopPropagation();
+      navigator.clipboard.writeText(text).then(function () { A.toast('اتنسخ ' + label + ' ✓'); }).catch(function () { A.toast('مقدرناش ننسخ', 'error'); });
+    } }, el('bdi', { class: 'ltr', text: text }), icon('copy'));
+  }
+
   function personRow(p) {
-    return el('button', { class: 'comp-sub comp-person', type: 'button', 'data-youth': p.id, onclick: function () { Y.view = 'person'; Y.id = p.id; A.render(); } },
-      el('span', { class: 'comp-sub__who' }, el('bdi', { class: 'comp-sub__name', text: p.name }), el('span', { class: 'comp-sub__phone ltr', text: p.phone })),
-      el('span', { class: 'comp-sub__meta' },
-        eligibilityChip(p),
-        p.emailVerified ? null : A.chip('الإيميل مش متأكد', 'danger'),
-        p.balance ? A.chip(ar(p.balance) + ' نقطة' + (p.eligibility.state === 'guest' ? ' · متجمد' : ''), p.eligibility.state === 'guest' ? 'off' : 'info') : null,
-        (p.flags || []).map(function (f) { return A.chip(FLAGS[f] || f, 'gold'); })),
-      el('span', { class: 'comp-sub__when ltr', text: p.email }));
+    var face = el('span', { class: 'ycard__face', 'aria-hidden': 'true' }, el('span', { class: 'ycard__letter', text: String(p.name || '؟').trim().charAt(0) }));
+    if (p.avatar && window.AdminWorker && cardPhotos) {
+      var img = el('img', { class: 'ycard__photo', alt: '', width: '64', height: '64', 'data-youth-card-photo': '', 'data-pid': p.id });
+      face.appendChild(img);
+      cardPhotos.observe(img);
+    }
+    return el('article', { class: 'ycard' + (p.status === 'blocked' ? ' is-blocked' : '') },
+      el('button', { class: 'ycard__open', type: 'button', 'data-youth': p.id, 'aria-label': 'افتح حساب ' + p.name, onclick: function () { Y.view = 'person'; Y.id = p.id; A.render(); } }),
+      face,
+      el('div', { class: 'ycard__main' },
+        el('bdi', { class: 'ycard__name', text: p.name }),
+        p.phone ? copyLine(p.phone, 'الموبايل', 'ycard__phone') : null,
+        p.email ? copyLine(p.email, 'الإيميل', 'ycard__email') : null,
+        el('span', { class: 'ycard__chips' },
+          eligibilityChip(p),
+          p.emailVerified ? null : A.chip('الإيميل مش متأكد', 'danger'),
+          p.balance ? A.chip(ar(p.balance) + ' نقطة' + (p.eligibility.state === 'guest' ? ' · متجمد' : ''), p.eligibility.state === 'guest' ? 'off' : 'info') : null,
+          (p.flags || []).map(function (f) { return A.chip(FLAGS[f] || f, 'gold'); }))),
+      el('span', { class: 'ycard__go', 'aria-hidden': 'true' }, icon('chevron')));
   }
 
   function listView() {
     var box = A.errorBox();
-    var rows = el('div', { class: 'comp-list', 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
+    var rows = el('div', { class: 'comp-list ycards', 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
     var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر بالاسم أو الإيميل أو الموبايل…', 'aria-label': 'بحث', value: Y.q });
     var state = select([['', 'الكل'], ['eligible', 'مؤهل'], ['guest', 'ضيف'], ['blocked', 'موقوف']], Y.state, 'الأهلية');
     var tools = el('div', { class: 'actions' });
