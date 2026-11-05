@@ -69,30 +69,27 @@
   .cta__row { display: flex; gap: 10px; }
   .cta button { flex: 1; height: 48px; border-radius: 14px; font: 800 15px Cairo, sans-serif; cursor: pointer; border: 1px solid rgb(240 216 160 / .7); background: rgb(240 216 160 / .08); color: #f2dcaa; }
   .cta button.is-main { border: 0; background: linear-gradient(180deg, #f6dfa4, #dcb45f); color: #1b1203; box-shadow: 0 0 0 1px rgb(255 240 200 / .5) inset, 0 14px 30px -12px rgb(230 190 100 / .85); }
-  /* the world on the other side of the card: the church backdrop (desktop / phone art), St Athanasius (left) and St Abu Sefein (right) */
-  .world { position: absolute; inset: 0; opacity: 0; }
-  .world__church { position: absolute; inset: 0; background: url(assets/bg-desktop.png) center / cover no-repeat; }
-  .world__shade { position: absolute; inset: 0; background: radial-gradient(34% 40% at 50% 54%, rgb(3 12 28 / .62) 0%, rgb(3 12 28 / .2) 70%, transparent 100%); }
-  .saint { position: absolute; top: 50%; width: clamp(170px, 17vw, 270px); transform-origin: 50% 100%; opacity: 0; }
-  .saint img { width: 100%; display: block; filter: drop-shadow(0 30px 40px rgb(0 0 0 / .7)) drop-shadow(0 0 18px rgb(227 207 159 / .18)); }
-  .saint--athanasius { left: 8vw; margin-top: calc(clamp(170px, 17vw, 270px) * -.95); }
-  .saint--sefein { right: 8vw; margin-top: calc(clamp(170px, 17vw, 270px) * -.95); }
-  .plaque { display: block; margin: 12px auto 0; width: max-content; max-width: 120%; padding: 7px 16px 8px; border-radius: 12px; text-align: center; background: rgb(4 16 34 / .82); border: 1px solid rgb(227 207 159 / .45); box-shadow: 0 10px 24px -12px #000; }
-  .plaque b { display: block; font-size: clamp(14px, 1.25vw, 17px); font-weight: 800; color: #f2dcaa; line-height: 1.5; }
-  .plaque i { display: block; font-style: normal; font-size: clamp(11.5px, 1vw, 13px); font-weight: 600; color: var(--ink-2); letter-spacing: .01em; }
+  /* the world on the other side of the card — v3 layout (owner's pick), the owner's church art behind, dark and zoomed;
+     only the background is dim: the saints, the logo and the buttons are lit. Athanasius left, Abu Sefein right. */
+  .world { position: absolute; inset: 0; opacity: 0; background: #020a18; }
+  .world__church { position: absolute; inset: 0; background: url(assets/bg-phone.png) no-repeat; filter: brightness(.34) saturate(.8) blur(2px); }
+  .saint { position: absolute; top: 50%; width: clamp(210px, 21vw, 340px); opacity: 0; }
+  .saint img { width: 100%; display: block; filter: brightness(1.06) drop-shadow(0 34px 44px rgb(0 0 0 / .75)) drop-shadow(0 0 26px rgb(240 210 150 / .22)); }
+  .saint--athanasius { left: 6vw; margin-top: calc(clamp(210px, 21vw, 340px) * -1.02); }
+  .saint--sefein { right: 6vw; margin-top: calc(clamp(210px, 21vw, 340px) * -1.02); }
+  .plaque { display: block; margin: 12px auto 0; width: max-content; max-width: 130%; padding: 7px 16px 8px; border-radius: 12px; text-align: center; background: rgb(4 16 34 / .85); border: 1px solid rgb(240 216 160 / .55); box-shadow: 0 10px 24px -12px #000; }
+  .plaque b { display: block; font-size: clamp(14px, 1.25vw, 18px); font-weight: 800; color: #f4dfae; line-height: 1.5; }
+  .plaque i { display: block; font-style: normal; font-size: clamp(11.5px, 1vw, 13.5px); font-weight: 600; color: var(--ink-2); }
   @media (max-width: 700px) {
-    .world { background: #040f22; }
-    .world__church { background-image: url(assets/bg-phone.png); background-size: auto 50%; background-position: center top; -webkit-mask: linear-gradient(180deg, #000 70%, transparent); mask: linear-gradient(180deg, #000 70%, transparent); }
-    .world__shade { background: radial-gradient(80% 30% at 50% 70%, rgb(3 12 28 / .75), transparent 85%); }
-    .saint { top: 6.5%; width: 19vw; margin-top: 0 !important; }
-    .saint--athanasius { left: 4vw; } .saint--sefein { right: 4vw; }
-    .plaque { margin-top: 8px; padding: 4px 6px 5px; border-radius: 8px; max-width: 27vw; width: auto; }
-    .plaque b { font-size: 10.5px; line-height: 1.45; } .plaque i { display: none; }
-    .brand { top: 66%; transform: translate(-50%, -50%); }
-    .brand .logo { display: none; }
-    .glowlogo { display: block; }
+    .world__church { filter: brightness(.24) saturate(.7) blur(4px) !important; }
+    .saint { top: 5.5%; width: 33vw; margin-top: 0 !important; }
+    .saint--athanasius { left: 5vw; } .saint--sefein { right: 5vw; }
+    .plaque { margin-top: 8px; padding: 5px 8px 6px; border-radius: 9px; max-width: 38vw; width: auto; }
+    .plaque b { font-size: 12px; line-height: 1.4; } .plaque i { font-size: 10.5px; }
+    .brand { top: 69%; transform: translate(-50%, -50%); }
+    .logo { width: 96px; }
+    .name { margin-top: 14px; } .slogan { margin-top: 14px; } .cta { margin-top: 18px; }
   }
-  .glowlogo { display: none; position: absolute; left: 50%; top: 9%; width: 52vw; height: 52vw; margin-left: -26vw; border-radius: 50%; background: radial-gradient(circle, rgb(255 236 190 / .32), transparent 62%); opacity: 0; mix-blend-mode: screen; }
   /* the tap gate (unlocks sound) */
   .gate { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; background: radial-gradient(50% 46% at 50% 48%, #0b2343, #01050d 80%); cursor: pointer; transition: opacity .5s cubic-bezier(.16,1,.3,1); }
   .gate__in { display: flex; flex-direction: column; align-items: center; gap: 22px; }
@@ -114,7 +111,7 @@
 <div class="stage" id="stage">
   <div class="room"></div>
   <div class="site"></div>
-  <div class="world" id="world"><div class="world__church"></div><div class="world__shade"></div><span class="glowlogo"></span><div class="saint saint--athanasius"><img src="assets/saint-athanasius.png" alt=""><span class="plaque"><b>القديس أثناسيوس الرسولي</b><i>حامي الإيمان</i></span></div><div class="saint saint--sefein"><img src="assets/saint-sefein.png" alt=""><span class="plaque"><b>الشهيد العظيم أبي سيفين</b><i>فيلوباتير مرقوريوس</i></span></div></div>
+  <div class="world" id="world"><div class="world__church" id="church"></div><div class="saint saint--athanasius"><img src="assets/saint-athanasius.png" alt=""><span class="plaque"><b>القديس أثناسيوس الرسولي</b><i>حامي الإيمان</i></span></div><div class="saint saint--sefein"><img src="assets/saint-sefein.png" alt=""><span class="plaque"><b>الشهيد العظيم أبي سيفين</b><i>فيلوباتير مرقوريوس</i></span></div></div>
   <canvas class="fx" id="fx"></canvas>
   <div class="rig" id="rig">
     <div class="card" id="card">
@@ -199,8 +196,17 @@
     burst(hitAt, W / 2, H * .5 - Math.min(W, H) * .12, 80, Math.max(W, H) * .45, 1300);
   }
 
+  function placeChurch() {
+    var el = $('.logo'), ch = $('#church'); if (!el) return;
+    var r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    var k = Math.max(innerWidth / 1134, innerHeight / 543) * 1.18, ls = r.width / (k * 160);   // art logo ≈ 160 px wide at (567, 160)
+    k = Math.max(k, k * ls > k ? k : k);
+    ch.style.backgroundSize = (1134 * k) + 'px auto';
+    ch.style.backgroundPosition = (cx - 567 * k) + 'px ' + (cy - 160 * k) + 'px';
+  }
   function build() {
     anims.forEach(function (a) { a.cancel(); }); anims = []; STAGES = [];
+    placeChurch();
     var w = $('#card').offsetWidth, QX = -0.236 * w; QXr = QX;
     var PX = QX, PY = 0.02 * w;
     // 1 — the card slams in from deep space, a flare crosses at impact, the room shakes once
@@ -237,9 +243,8 @@
     A('.site', [{ opacity: 0 }, { opacity: 1 }], { duration: 300, delay: 3620 });
     stage(3600, '٧ دخلت عالم الكارت');
     A('#world', [{ opacity: 0 }, { opacity: 1 }], { duration: 500, delay: 3580 });
-    A('.world__church', [{ transform: 'scale(1.3)', filter: 'brightness(1.6)' }, { transform: 'scale(1)', filter: 'brightness(1)' }], { duration: 2400, delay: 3580, easing: EXPO });
+    A('.world__church', [{ transform: 'scale(1.3)', filter: 'brightness(.9) saturate(.8) blur(2px)' }, { transform: 'scale(1)', filter: matchMedia('(max-width: 700px)').matches ? 'brightness(.24) saturate(.7) blur(4px)' : 'brightness(.34) saturate(.8) blur(2px)' }], { duration: 2400, delay: 3580, easing: EXPO });
     A('.saint--athanasius', [{ opacity: 0, transform: 'translateX(-70px) scale(.9)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 850, delay: 3900 });
-    A('.glowlogo', [{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'none' }], { duration: 900, delay: 3720 });
     A('.saint--sefein', [{ opacity: 0, transform: 'translateX(70px) scale(.9)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 850, delay: 4000 });
     // 6 — the logo hits with a shockwave; then name, line, slogan, welcome, account card
     stage(3800, '٨ اللوجو');
