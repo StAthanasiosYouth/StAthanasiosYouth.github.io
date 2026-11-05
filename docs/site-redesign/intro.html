@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>الموقع العام — الانترو المقترح (S1)</title>
+<!--
+  S1 proposal: the public site's intro, separate from the admin's.
+  ?v=first  (default) — first visit until the member makes an account: card 3D turn → phone scans the QR →
+                         the card becomes the site → backdrop → logo + name → slogan → welcome.
+  ?v=member — after the account exists: lighter, no card, no scan.
+  ?freeze=<ms> pauses everything at that moment (stage screenshots); ?replay shows the replay button.
+-->
+<style>
+  @font-face { font-family: "Cairo"; src: url("../../assets/fonts/cairo-arabic.woff2") format("woff2"); unicode-range: U+0600-06FF, U+FB50-FDFF, U+FE70-FEFF; font-weight: 200 1000; }
+  @font-face { font-family: "Cairo"; src: url("../../assets/fonts/cairo-latin.woff2") format("woff2"); unicode-range: U+0000-00FF; font-weight: 200 1000; }
+  @font-face { font-family: "Aref Ruqaa"; src: url("../../assets/fonts/aref-ruqaa-arabic.woff2") format("woff2"); font-weight: 400 700; }
+  :root { --gold: #d7aa50; --gold-hi: #f2d28b; --navy: #04122a; --navy-2: #0a2448; --ease: cubic-bezier(.16, 1, .3, 1); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #01060f; font-family: "Cairo", system-ui, sans-serif; color: #eef3f9; }
+  .stage { position: fixed; inset: 0; overflow: hidden; perspective: 1400px; display: grid; place-items: center; cursor: pointer; }
+  /* the dark room before the card */
+  .room { position: absolute; inset: 0; background: radial-gradient(50% 45% at 50% 48%, #0d2a50 0%, #04102a 55%, #01060f 100%); }
+  .dust { position: absolute; inset: 0; width: 100%; height: 100%; }
+  /* the card: real art, two faces, 3D turn */
+  .card { position: absolute; width: min(78vw, 620px); aspect-ratio: 1134 / 543; transform-style: preserve-3d; will-change: transform; }
+  .card__face { position: absolute; inset: 0;  border-radius: 4.2%/8.8%; overflow: hidden; box-shadow: 0 40px 90px -30px rgb(0 0 0 / .9), 0 0 0 1px rgb(242 210 139 / .35); }
+  .card__face img { width: 100%; height: 100%; display: block; }
+  .card__face--qr { transform: rotateY(180deg) translateZ(1px); }
+  .card__sheen { position: absolute; inset: 0; background: linear-gradient(115deg, transparent 30%, rgb(255 244 214 / .32) 48%, transparent 62%); transform: translateX(-120%); }
+  .card__glow { position: absolute; inset: -18%; border-radius: 30%; background: radial-gradient(closest-side, rgb(215 170 80 / .35), transparent 70%); filter: blur(10px); transform: translateZ(-40px); opacity: 0; }
+  /* the QR area on the QR face (x 15.6%–37.3%, y 25.7%–71%) */
+  .qrmark { position: absolute; right: 15.2%; top: 25%; width: 22.6%; height: 46.6%; border-radius: 10px; box-shadow: 0 0 0 3px var(--gold-hi), 0 0 30px 6px rgb(242 210 139 / .7); opacity: 0; transform: rotateY(180deg) translateZ(2px); }
+  /* the phone that scans */
+  .phone { position: absolute; width: min(30vw, 230px); aspect-ratio: 9 / 19; border-radius: 34px; background: #0b0f17; padding: 9px; box-shadow: 0 0 0 2px #2a3446, 0 40px 80px -24px #000, inset 0 0 0 1px #000; opacity: 0; will-change: transform; }
+  .phone__screen { position: relative; width: 100%; height: 100%; border-radius: 26px; overflow: hidden; background: #000; }
+  .phone__cam { position: absolute; inset: 0; background-image: url(assets/card-front.png); background-size: 470% auto; background-position: 20% 50%; filter: saturate(1.05) brightness(.95); }
+  .phone__notch { position: absolute; top: 8px; left: 50%; width: 34%; height: 18px; margin-left: -17%; border-radius: 12px; background: #000; z-index: 3; }
+  .phone__ui { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; }
+  .finder { position: relative; width: 68%; aspect-ratio: 1; }
+  .finder i { position: absolute; width: 26%; height: 26%; border: 4px solid #fff; }
+  .finder i:nth-child(1) { top: 0; right: 0; border-left: 0; border-bottom: 0; border-radius: 0 14px 0 0; }
+  .finder i:nth-child(2) { top: 0; left: 0; border-right: 0; border-bottom: 0; border-radius: 14px 0 0 0; }
+  .finder i:nth-child(3) { bottom: 0; right: 0; border-left: 0; border-top: 0; border-radius: 0 0 14px 0; }
+  .finder i:nth-child(4) { bottom: 0; left: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 14px; }
+  .scanline { position: absolute; left: 6%; right: 6%; top: 8%; height: 3px; border-radius: 3px; background: linear-gradient(90deg, transparent, var(--gold-hi), transparent); box-shadow: 0 0 14px 2px var(--gold); }
+  .phone__ok { position: absolute; bottom: 9%; left: 8%; right: 8%; z-index: 4; display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 16px; background: rgb(10 30 60 / .88); border: 1px solid rgb(242 210 139 / .4); font-size: 12px; font-weight: 800; opacity: 0; transform: translateY(12px); }
+  .phone__ok b { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, var(--gold-hi), var(--gold)); color: #1d1203; font-size: 13px; flex: none; }
+  /* the morph: the card's art fills the screen and settles into the site's own backdrop */
+  .wash { position: absolute; inset: 0; background: radial-gradient(70% 55% at 50% 38%, #10305a 0%, #061936 45%, #020a16 100%); opacity: 0; }
+  .rays { position: absolute; left: 50%; top: 38%; width: 220vmax; height: 220vmax; margin: -110vmax 0 0 -110vmax; background: repeating-conic-gradient(from 0deg, rgb(242 210 139 / .07) 0deg 2deg, transparent 2deg 15deg); -webkit-mask: radial-gradient(circle, #000 0, transparent 34%); mask: radial-gradient(circle, #000 0, transparent 34%); opacity: 0; }
+  .crosses { position: absolute; inset: 0; background-image: radial-gradient(circle at 1px 1px, rgb(242 210 139 / .16) 1px, transparent 1.6px); background-size: 34px 34px; -webkit-mask: radial-gradient(60% 50% at 50% 40%, transparent 20%, #000 80%); mask: radial-gradient(60% 50% at 50% 40%, transparent 20%, #000 80%); opacity: 0; }
+  .frame { position: absolute; inset: 4vmin; border: 1px solid rgb(242 210 139 / .35); border-radius: 22px; opacity: 0; }
+  .frame::before, .frame::after { content: "✥"; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); color: var(--gold); font-size: 18px; background: #04122a; padding: 0 8px; }
+  .frame::after { top: auto; bottom: -12px; }
+  /* logo, name, slogan, welcome */
+  .brand { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -58%); display: flex; flex-direction: column; align-items: center; text-align: center; width: min(92vw, 760px); }
+  .logo { position: relative; width: clamp(120px, 20vmin, 190px); aspect-ratio: 1; opacity: 0; }
+  .logo img { width: 100%; height: 100%; border-radius: 50%; display: block; box-shadow: 0 0 0 2px rgb(242 210 139 / .6), 0 0 70px -10px var(--gold), 0 30px 60px -30px #000; }
+  .logo__halo { position: absolute; inset: -70%; border-radius: 50%; background: radial-gradient(circle, rgb(215 170 80 / .32) 0%, rgb(215 170 80 / .08) 40%, transparent 68%); }
+  .logo__ring { position: absolute; inset: -12px; border-radius: 50%; border: 1px solid rgb(242 210 139 / .45); }
+  .name { margin: 22px 0 0; font-family: "Aref Ruqaa", serif; font-weight: 700; font-size: clamp(36px, 7.4vmin, 66px); line-height: 1.25; background: linear-gradient(180deg, #fff4d6, var(--gold-hi) 45%, var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 6px 18px rgb(215 170 80 / .25)); clip-path: inset(0 0 0 100%); }
+  .sub { margin: 2px 0 0; font-family: "Aref Ruqaa", serif; font-size: clamp(17px, 3vmin, 25px); color: var(--gold-hi); opacity: 0; }
+  .slogan { margin: 22px 0 0; font-size: clamp(17px, 3vmin, 24px); font-weight: 700; color: #fff; opacity: 0; }
+  .slogan em { font-style: normal; color: var(--gold-hi); }
+  .welcome { margin: 16px 0 0; max-width: 560px; font-size: clamp(14px, 2.3vmin, 18px); line-height: 1.9; color: #c9d5e4; opacity: 0; }
+  .welcome b { color: var(--gold-hi); }
+  .hint { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); font-size: 12px; color: rgb(255 255 255 / .45); opacity: 0; }
+  .bar { position: absolute; bottom: 0; left: 0; height: 3px; width: 100%; background: linear-gradient(90deg, var(--gold), var(--gold-hi)); transform-origin: right; transform: scaleX(0); opacity: .8; }
+  .replay { position: fixed; top: 14px; left: 14px; z-index: 9; height: 36px; padding: 0 14px; border-radius: 10px; border: 1px solid rgb(242 210 139 / .4); background: rgb(4 18 42 / .8); color: var(--gold-hi); font: 700 13px Cairo, sans-serif; cursor: pointer; display: none; }
+  .stagename { position: fixed; top: 14px; right: 14px; z-index: 9; padding: 6px 12px; border-radius: 999px; background: rgb(0 0 0 / .5); font-size: 12px; color: rgb(255 255 255 / .7); display: none; }
+  html.show-ui .replay, html.show-ui .stagename { display: block; }
+  @media (max-width: 700px) {
+    .card { width: 88vw; }
+    .phone { width: 46vw; }
+  }
+</style>
+<body>
+<button class="replay" type="button" onclick="location.reload()">↻ اعرض تاني</button>
+<span class="stagename" id="stagename"></span>
+<div class="stage" id="stage">
+  <div class="room"></div>
+  <canvas class="dust"></canvas>
+  <div class="wash"></div><div class="rays"></div><div class="crosses"></div><div class="frame"></div>
+  <div class="card" id="card">
+    <span class="card__glow"></span>
+    <div class="card__face card__face--logo"><img src="assets/card-back.png" alt=""><span class="card__sheen"></span></div>
+    <div class="card__face card__face--qr"><img src="assets/card-front.png" alt=""><span class="card__sheen"></span></div>
+    <span class="qrmark"></span>
+  </div>
+  <div class="phone" id="phone"><div class="phone__screen"><span class="phone__notch"></span><div class="phone__cam"></div><div class="phone__ui"><div class="finder"><i></i><i></i><i></i><i></i><span class="scanline"></span></div></div><div class="phone__ok"><b>✓</b>اتعمل Scan · بنفتح موقع الأسرة</div></div></div>
+  <div class="brand">
+    <div class="logo"><span class="logo__halo"></span><span class="logo__ring"></span><img src="../../assets/img/logo-512.png" alt=""></div>
+    <p class="name">أسرة البابا أثناسيوس</p>
+    <p class="sub">لخدمة شعب كنيستها الحبيبة في سفاجا</p>
+    <p class="slogan">كل اللي يخص اجتماعنا<em>...</em> في مكان واحد</p>
+    <p class="welcome" id="welcome">مرحبًا بك في تطبيق <b>أسرة البابا أثناسيوس</b> لخدمة شعب سفاجا</p>
+  </div>
+  <span class="hint">المس الشاشة علشان تكمّل</span>
+  <span class="bar"></span>
+</div>
+<script>
+(function () {
+  var Q = new URLSearchParams(location.search);
+  var V = Q.get('v') === 'member' ? 'member' : 'first';
+  var FREEZE = Q.get('freeze') != null ? Number(Q.get('freeze')) : null;
+  if (Q.get('replay') != null || FREEZE == null) document.documentElement.classList.add('show-ui');
+  var $ = function (s) { return document.querySelector(s); };
+  var E = 'cubic-bezier(.16,1,.3,1)', IO = 'cubic-bezier(.65,0,.35,1)';
+  var anims = [];
+  function A(sel, kf, o) { var n = typeof sel === 'string' ? $(sel) : sel; var a = n.animate(kf, Object.assign({ fill: 'both', easing: E }, o)); anims.push(a); return a; }
+  var STAGES = [];
+  function stage(at, name) { STAGES.push([at, name]); }
+
+  /* gold dust, drawn from the timeline clock so a frozen frame shows it too */
+  var cv = $('.dust'), ctx = cv.getContext('2d'), dpr = Math.min(2, devicePixelRatio || 1), ps = [];
+  function size() { cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  size();
+  for (var i = 0; i < 70; i++) ps.push({ x: Math.random(), y: Math.random(), r: .6 + Math.random() * 1.8, v: .02 + Math.random() * .05, a: Math.random() * 6.28 });
+  function drawDust(t) {
+    ctx.clearRect(0, 0, innerWidth, innerHeight);
+    ps.forEach(function (p) {
+      var y = (p.y - p.v * t / 1000 + 2) % 1, x = p.x + Math.sin(p.a + t / 900) * .01, tw = .5 + .5 * Math.sin(p.a * 3 + t / 300);
+      ctx.beginPath(); ctx.fillStyle = 'rgba(242,210,139,' + (.06 + .3 * tw).toFixed(3) + ')'; ctx.arc(x * innerWidth, y * innerHeight, p.r, 0, 6.283); ctx.fill();
+    });
+  }
+
+  var T;
+  if (V === 'first') {
+    T = 9800;
+    // 1 — the card arrives and turns: logo face → QR face (full 3D turn, then settles on the QR)
+    stage(0, '١ الكارت بيظهر');
+    A('#card', [
+      { transform: 'translateY(30px) rotateX(18deg) rotateY(-30deg) scale(.55)', opacity: 0 },
+      { transform: 'translateY(0) rotateX(10deg) rotateY(0deg) scale(.9)', opacity: 1, offset: .22 },
+      { transform: 'rotateX(6deg) rotateY(180deg) scale(.95)', offset: .55 },
+      { transform: 'rotateX(4deg) rotateY(360deg) scale(.95)', offset: .78 },
+      { transform: 'rotateX(0deg) rotateY(540deg) scale(1)' }
+    ], { duration: 3000, easing: IO });
+    stage(900, '٢ لفة 3D: الوش والضهر');
+    A('.card__face--logo', [{ opacity: 1, easing: 'step-end' }, { opacity: 0, offset: .3, easing: 'step-end' }, { opacity: 1, offset: .66, easing: 'step-end' }, { opacity: 0, offset: .89 }, { opacity: 0 }], { duration: 3000, easing: 'cubic-bezier(.65,0,.35,1)' });
+    A('.card__face--qr', [{ opacity: 0, easing: 'step-end' }, { opacity: 1, offset: .3, easing: 'step-end' }, { opacity: 0, offset: .66, easing: 'step-end' }, { opacity: 1, offset: .89 }, { opacity: 1 }], { duration: 3000, easing: 'cubic-bezier(.65,0,.35,1)' });
+    var QX = -0.26 * document.getElementById('card').offsetWidth, PY = 0.06 * document.getElementById('card').offsetWidth;
+    A('.card__glow', [{ opacity: 0 }, { opacity: 1, offset: .3 }, { opacity: .6 }], { duration: 3000 });
+    document.querySelectorAll('.card__sheen').forEach(function (s, k) { A(s, [{ transform: 'translateX(-120%)' }, { transform: 'translateX(140%)' }], { duration: 900, delay: 700 + k * 900, easing: 'ease-in-out' }); });
+    // 2 — the phone comes in and scans the QR
+    stage(3000, '٣ الموبايل بيعمل Scan');
+    A('#phone', [{ opacity: 0, transform: 'translate(' + (QX - 160) + 'px, 260px) rotate(-14deg) scale(.9)' }, { opacity: 1, transform: 'translate(' + QX + 'px, ' + PY + 'px) rotate(-5deg) scale(1)' }], { duration: 900, delay: 2900 });
+    A('.scanline', [{ top: '8%' }, { top: '88%' }, { top: '8%' }, { top: '88%' }], { duration: 1300, delay: 3500, easing: 'ease-in-out' });
+    A('.qrmark', [{ opacity: 0 }, { opacity: 1, offset: .4 }, { opacity: .2, offset: .7 }, { opacity: 1 }], { duration: 900, delay: 4300 });
+    A('.phone__ok', [{ opacity: 0, transform: 'translateY(12px)' }, { opacity: 1, transform: 'none' }], { duration: 400, delay: 4750 });
+    stage(4800, '٤ اتعمل Scan ✓');
+    // 3 — the card becomes the site: it grows past the screen, the art melts into the site backdrop
+    stage(5500, '٥ الكارت بيتحول للموقع');
+    A('#phone', [{ opacity: 1, transform: 'translate(' + QX + 'px, ' + PY + 'px) rotate(-5deg) scale(1)' }, { opacity: 0, transform: 'translate(' + (QX - 120) + 'px, 220px) rotate(-10deg) scale(.9)' }], { duration: 500, delay: 5300, easing: 'ease-in', fill: 'forwards' });
+    A('#card', [{ transform: 'rotateY(540deg) scale(1)', filter: 'blur(0) brightness(1)', opacity: 1 }, { transform: 'rotateY(540deg) scale(3.4)', filter: 'blur(14px) brightness(.55)', opacity: 0 }], { duration: 1300, delay: 5400, easing: 'cubic-bezier(.7,0,.25,1)', fill: 'forwards' });
+    A('.room', [{ opacity: 1 }, { opacity: 0 }], { duration: 900, delay: 5700, fill: 'forwards' });
+    A('.wash', [{ opacity: 0 }, { opacity: 1 }], { duration: 1000, delay: 5600 });
+    A('.frame', [{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'none' }], { duration: 1100, delay: 5800 });
+    // 4 — the backdrop behind the logo, then the logo and the name
+    stage(6500, '٦ الخلفية واللوجو والاسم');
+    A('.rays', [{ opacity: 0, transform: 'rotate(0deg)' }, { opacity: 1, transform: 'rotate(10deg)' }], { duration: 3300, delay: 6100, easing: 'linear' });
+    A('.crosses', [{ opacity: 0 }, { opacity: 1 }], { duration: 900, delay: 6200 });
+    A('.logo', [{ opacity: 0, transform: 'scale(.7)', filter: 'blur(8px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 800, delay: 6400 });
+    A('.logo__halo', [{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'none' }], { duration: 1000, delay: 6400 });
+    A('.logo__ring', [{ opacity: 0, transform: 'scale(.8)' }, { opacity: 1, transform: 'none' }], { duration: 700, delay: 6700 });
+    A('.name', [{ clipPath: 'inset(0 0 0 100%)' }, { clipPath: 'inset(0 0 0 0)' }], { duration: 900, delay: 6900, easing: 'cubic-bezier(.4,0,.2,1)' });
+    A('.sub', [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 600, delay: 7500 });
+    // 5 — the slogan, 6 — the welcome
+    stage(8000, '٧ السلوجان');
+    A('.slogan', [{ opacity: 0, transform: 'translateY(10px)', letterSpacing: '.08em' }, { opacity: 1, transform: 'none', letterSpacing: '0' }], { duration: 700, delay: 7900 });
+    stage(8900, '٨ الترحيب');
+    A('.welcome', [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 700, delay: 8700 });
+    A('.hint', [{ opacity: 0 }, { opacity: 1 }], { duration: 400, delay: 1200 });
+  } else {
+    // after the account: no card, no scan — the backdrop, the logo, «أهلًا يا مينا», the slogan
+    T = 3600;
+    $('#card').style.display = 'none'; $('#phone').style.display = 'none'; $('.room').style.display = 'none';
+    $('#welcome').innerHTML = 'أهلًا يا <b>مينا</b> 👋 · فاضل ٣ أيام على اجتماع الشباب';
+    stage(0, '١ الخلفية');
+    A('.wash', [{ opacity: 0 }, { opacity: 1 }], { duration: 500 });
+    A('.rays', [{ opacity: 0 }, { opacity: 1, transform: 'rotate(6deg)' }], { duration: 2600, delay: 100, easing: 'linear' });
+    A('.crosses', [{ opacity: 0 }, { opacity: 1 }], { duration: 600, delay: 100 });
+    stage(500, '٢ اللوجو والاسم');
+    A('.logo', [{ opacity: 0, transform: 'scale(.8)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 650, delay: 250 });
+    A('.logo__halo', [{ opacity: 0 }, { opacity: 1 }], { duration: 700, delay: 250 });
+    A('.logo__ring', [{ opacity: 0 }, { opacity: 1 }], { duration: 500, delay: 500 });
+    A('.name', [{ clipPath: 'inset(0 0 0 100%)' }, { clipPath: 'inset(0 0 0 0)' }], { duration: 700, delay: 600, easing: 'cubic-bezier(.4,0,.2,1)' });
+    A('.sub', [{ opacity: 0 }, { opacity: 1 }], { duration: 400, delay: 1100 });
+    stage(1500, '٣ أهلًا بالاسم');
+    A('.welcome', [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 500, delay: 1300 });
+    A('.slogan', [{ opacity: 0 }, { opacity: 1 }], { duration: 500, delay: 1700 });
+  }
+  A('.bar', [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: T, easing: 'linear' });
+
+  function label(t) { var n = ''; STAGES.forEach(function (s) { if (t >= s[0]) n = s[1]; }); $('#stagename').textContent = (V === 'first' ? 'أول مرة · ' : 'بعد الحساب · ') + n; }
+  if (FREEZE != null) {
+    anims.forEach(function (a) { a.pause(); a.currentTime = FREEZE; });
+    drawDust(FREEZE); label(FREEZE); document.documentElement.classList.add('show-ui');
+    return;
+  }
+  var start = performance.now();
+  (function tick(now) { var t = now - start; drawDust(t); label(t); if (t < T + 2000) requestAnimationFrame(tick); })(start);
+  // never in the way: a tap jumps to the end
+  $('#stage').addEventListener('click', function () { anims.forEach(function (a) { try { a.finish(); } catch (e) {} }); });
+})();
+</script>
+</body>
+</html>
