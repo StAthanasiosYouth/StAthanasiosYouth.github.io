@@ -55,7 +55,7 @@
   /* brand — solid text on plain navy, nothing behind it */
   .brand { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -56%); display: flex; flex-direction: column; align-items: center; text-align: center; width: min(92vw, 720px); }
   .logo { position: relative; width: clamp(116px, 19vmin, 172px); aspect-ratio: 1; opacity: 0; }
-  .logo img { width: 100%; height: 100%; border-radius: 50%; display: block; filter: saturate(.72) brightness(.9); box-shadow: 0 0 0 1px rgb(227 207 159 / .35), 0 24px 50px -26px #000; }
+  .logo img { width: 100%; height: 100%; border-radius: 50%; display: block; filter: saturate(.95) brightness(1.06); box-shadow: 0 0 0 2px rgb(240 216 160 / .7), 0 0 0 7px rgb(240 216 160 / .12), 0 0 60px 4px rgb(240 210 140 / .32), 0 24px 50px -26px #000; }
   .wave { position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; border: 2px solid rgb(227 207 159 / .8); opacity: 0; }
   .wave--2 { border-width: 1px; }
   .name { margin: 24px 0 0; font-family: "Aref Ruqaa", serif; font-weight: 700; font-size: clamp(36px, 7vmin, 62px); line-height: 1.35; color: var(--champagne); opacity: 0; text-wrap: balance; }
@@ -63,27 +63,36 @@
   .slogan { margin: 22px 0 0; font-size: clamp(18px, 3vmin, 24px); font-weight: 800; color: var(--ink); opacity: 0; }
   .welcome { margin: 8px 0 0; max-width: 34em; font-size: clamp(14px, 2.2vmin, 17px); line-height: 1.9; color: var(--ink-2); opacity: 0; }
   .welcome b { color: var(--champagne); }
-  .cta { margin: 26px 0 0; width: min(100%, 440px); padding: 16px; border-radius: 20px; background: rgb(8 24 48 / .9); border: 1px solid rgb(227 207 159 / .28); box-shadow: 0 30px 60px -30px #000; opacity: 0; text-align: start; }
+  .cta { margin: 26px 0 0; width: min(100%, 440px); padding: 16px; border-radius: 20px; background: rgb(8 26 54 / .92); border: 1px solid rgb(240 216 160 / .5); box-shadow: 0 30px 60px -30px #000; opacity: 0; text-align: start; }
   .cta p { margin: 0 0 12px; font-size: 14px; line-height: 1.8; color: var(--ink-2); }
   .cta p b { display: block; color: var(--ink); font-size: 15.5px; }
   .cta__row { display: flex; gap: 10px; }
-  .cta button { flex: 1; height: 46px; border-radius: 14px; font: 800 14.5px Cairo, sans-serif; cursor: pointer; border: 1px solid rgb(227 207 159 / .35); background: transparent; color: var(--champagne); }
-  .cta button.is-main { border: 0; background: var(--champagne); color: #1b1407; box-shadow: 0 12px 26px -14px var(--champagne); }
-  /* the world on the other side of the card: its church, St Athanasius (right) and St Abu Sefein (left) in their arches */
+  .cta button { flex: 1; height: 48px; border-radius: 14px; font: 800 15px Cairo, sans-serif; cursor: pointer; border: 1px solid rgb(240 216 160 / .7); background: rgb(240 216 160 / .08); color: #f2dcaa; }
+  .cta button.is-main { border: 0; background: linear-gradient(180deg, #f6dfa4, #dcb45f); color: #1b1203; box-shadow: 0 0 0 1px rgb(255 240 200 / .5) inset, 0 14px 30px -12px rgb(230 190 100 / .85); }
+  /* the world on the other side of the card: the church backdrop (desktop / phone art), St Athanasius (left) and St Abu Sefein (right) */
   .world { position: absolute; inset: 0; opacity: 0; }
-  .world__church { position: absolute; inset: -6%; background: url(assets/card-back.png) center 40% / cover no-repeat; filter: brightness(.26) saturate(.7) blur(5px); }
-  .world__shade { position: absolute; inset: 0; background: radial-gradient(38% 46% at 50% 50%, rgb(3 12 28 / .88) 0%, rgb(3 12 28 / .55) 55%, rgb(2 8 20 / .25) 100%), linear-gradient(180deg, rgb(2 8 20 / .55), transparent 25%, transparent 75%, rgb(2 8 20 / .7)); }
-  .saint { position: absolute; top: 50%; width: clamp(170px, 19vw, 300px); aspect-ratio: 230 / 330; margin-top: calc(clamp(170px, 19vw, 300px) * -.72); background-image: url(assets/card-back.png); background-size: 493% auto; border-radius: 999px 999px 18px 18px; box-shadow: 0 0 0 1px rgb(227 207 159 / .45), 0 0 0 7px rgb(4 16 34 / .7), 0 0 0 8px rgb(227 207 159 / .25), 0 40px 80px -30px #000; filter: saturate(.85) brightness(.95); opacity: 0; }
-  .saint--athanasius { right: 7vw; background-position: 11% 42%; }
-  .saint--sefein { left: 7vw; background-position: 89.2% 42%; }
-  .saint small { position: absolute; bottom: -34px; left: 0; right: 0; text-align: center; font-family: "Aref Ruqaa", serif; font-size: clamp(14px, 1.4vw, 18px); color: var(--champagne); white-space: nowrap; }
+  .world__church { position: absolute; inset: 0; background: url(assets/bg-desktop.png) center / cover no-repeat; }
+  .world__shade { position: absolute; inset: 0; background: radial-gradient(34% 40% at 50% 54%, rgb(3 12 28 / .62) 0%, rgb(3 12 28 / .2) 70%, transparent 100%); }
+  .saint { position: absolute; top: 50%; width: clamp(170px, 17vw, 270px); transform-origin: 50% 100%; opacity: 0; }
+  .saint img { width: 100%; display: block; filter: drop-shadow(0 30px 40px rgb(0 0 0 / .7)) drop-shadow(0 0 18px rgb(227 207 159 / .18)); }
+  .saint--athanasius { left: 8vw; margin-top: calc(clamp(170px, 17vw, 270px) * -.95); }
+  .saint--sefein { right: 8vw; margin-top: calc(clamp(170px, 17vw, 270px) * -.95); }
+  .plaque { display: block; margin: 12px auto 0; width: max-content; max-width: 120%; padding: 7px 16px 8px; border-radius: 12px; text-align: center; background: rgb(4 16 34 / .82); border: 1px solid rgb(227 207 159 / .45); box-shadow: 0 10px 24px -12px #000; }
+  .plaque b { display: block; font-size: clamp(14px, 1.25vw, 17px); font-weight: 800; color: #f2dcaa; line-height: 1.5; }
+  .plaque i { display: block; font-style: normal; font-size: clamp(11.5px, 1vw, 13px); font-weight: 600; color: var(--ink-2); letter-spacing: .01em; }
   @media (max-width: 700px) {
-    .saint { top: 13%; width: 26vw; margin-top: 0; }
-    .saint--athanasius { right: 8vw; } .saint--sefein { left: 8vw; }
-    .saint small { bottom: -26px; font-size: 13px; }
-    .brand { transform: translate(-50%, -36%); }
-    .logo { width: 104px; }
+    .world { background: #040f22; }
+    .world__church { background-image: url(assets/bg-phone.png); background-size: auto 50%; background-position: center top; -webkit-mask: linear-gradient(180deg, #000 70%, transparent); mask: linear-gradient(180deg, #000 70%, transparent); }
+    .world__shade { background: radial-gradient(80% 30% at 50% 70%, rgb(3 12 28 / .75), transparent 85%); }
+    .saint { top: 6.5%; width: 19vw; margin-top: 0 !important; }
+    .saint--athanasius { left: 4vw; } .saint--sefein { right: 4vw; }
+    .plaque { margin-top: 8px; padding: 4px 6px 5px; border-radius: 8px; max-width: 27vw; width: auto; }
+    .plaque b { font-size: 10.5px; line-height: 1.45; } .plaque i { display: none; }
+    .brand { top: 66%; transform: translate(-50%, -50%); }
+    .brand .logo { display: none; }
+    .glowlogo { display: block; }
   }
+  .glowlogo { display: none; position: absolute; left: 50%; top: 9%; width: 52vw; height: 52vw; margin-left: -26vw; border-radius: 50%; background: radial-gradient(circle, rgb(255 236 190 / .32), transparent 62%); opacity: 0; mix-blend-mode: screen; }
   /* the tap gate (unlocks sound) */
   .gate { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; background: radial-gradient(50% 46% at 50% 48%, #0b2343, #01050d 80%); cursor: pointer; transition: opacity .5s cubic-bezier(.16,1,.3,1); }
   .gate__in { display: flex; flex-direction: column; align-items: center; gap: 22px; }
@@ -105,7 +114,7 @@
 <div class="stage" id="stage">
   <div class="room"></div>
   <div class="site"></div>
-  <div class="world" id="world"><div class="world__church"></div><div class="world__shade"></div><div class="saint saint--sefein"><small>الشهيد أبو سيفين</small></div><div class="saint saint--athanasius"><small>البابا أثناسيوس الرسولي</small></div></div>
+  <div class="world" id="world"><div class="world__church"></div><div class="world__shade"></div><span class="glowlogo"></span><div class="saint saint--athanasius"><img src="assets/saint-athanasius.png" alt=""><span class="plaque"><b>القديس أثناسيوس الرسولي</b><i>حامي الإيمان</i></span></div><div class="saint saint--sefein"><img src="assets/saint-sefein.png" alt=""><span class="plaque"><b>الشهيد العظيم أبي سيفين</b><i>فيلوباتير مرقوريوس</i></span></div></div>
   <canvas class="fx" id="fx"></canvas>
   <div class="rig" id="rig">
     <div class="card" id="card">
@@ -228,9 +237,10 @@
     A('.site', [{ opacity: 0 }, { opacity: 1 }], { duration: 300, delay: 3620 });
     stage(3600, '٧ دخلت عالم الكارت');
     A('#world', [{ opacity: 0 }, { opacity: 1 }], { duration: 500, delay: 3580 });
-    A('.world__church', [{ transform: 'scale(1.35)' }, { transform: 'scale(1)' }], { duration: 2600, delay: 3580, easing: EXPO });
-    A('.saint--athanasius', [{ opacity: 0, transform: 'translateX(-60px) scale(.92)', filter: 'blur(6px) saturate(.85)' }, { opacity: 1, transform: 'none', filter: 'blur(0) saturate(.85)' }], { duration: 800, delay: 3900 });
-    A('.saint--sefein', [{ opacity: 0, transform: 'translateX(60px) scale(.92)', filter: 'blur(6px) saturate(.85)' }, { opacity: 1, transform: 'none', filter: 'blur(0) saturate(.85)' }], { duration: 800, delay: 4000 });
+    A('.world__church', [{ transform: 'scale(1.3)', filter: 'brightness(1.6)' }, { transform: 'scale(1)', filter: 'brightness(1)' }], { duration: 2400, delay: 3580, easing: EXPO });
+    A('.saint--athanasius', [{ opacity: 0, transform: 'translateX(-70px) scale(.9)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 850, delay: 3900 });
+    A('.glowlogo', [{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'none' }], { duration: 900, delay: 3720 });
+    A('.saint--sefein', [{ opacity: 0, transform: 'translateX(70px) scale(.9)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 850, delay: 4000 });
     // 6 — the logo hits with a shockwave; then name, line, slogan, welcome, account card
     stage(3800, '٨ اللوجو');
     A('.logo', [{ opacity: 0, transform: 'scale(1.6)', filter: 'blur(10px)' }, { opacity: 1, transform: 'scale(1)', filter: 'blur(0)' }], { duration: 620, delay: 3700 });
