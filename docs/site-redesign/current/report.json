@@ -1,0 +1,280 @@
+[
+ {
+  "w": "desktop",
+  "path": "/",
+  "name": "home",
+  "status": 200,
+  "title": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
+  "h": 3360,
+  "buttons": 26
+ },
+ {
+  "w": "desktop",
+  "path": "/events/",
+  "name": "events",
+  "status": 200,
+  "title": "الفعاليات – أسرة البابا أثناسيوس",
+  "h": 900,
+  "buttons": 5
+ },
+ {
+  "w": "desktop",
+  "path": "/events/tgrba/",
+  "name": "events-tgrba",
+  "status": 200,
+  "title": "تجربة حجز | أسرة البابا أثناسيوس – سفاجا",
+  "h": 900,
+  "buttons": 5
+ },
+ {
+  "w": "desktop",
+  "path": "/competition/",
+  "name": "competition",
+  "status": 200,
+  "title": "مسابقات أسرة البابا أثناسيوس",
+  "h": 900,
+  "buttons": 6
+ },
+ {
+  "w": "desktop",
+  "path": "/competition/msabqa-nqat/",
+  "name": "competition-msabqa-nqat",
+  "status": 200,
+  "title": "مسابقة نقاط | أسرة البابا أثناسيوس – سفاجا",
+  "h": 900,
+  "buttons": 6
+ },
+ {
+  "w": "desktop",
+  "path": "/competition/test/",
+  "name": "competition-test",
+  "status": 200,
+  "title": "test | أسرة البابا أثناسيوس – سفاجا",
+  "h": 900,
+  "buttons": 6
+ },
+ {
+  "w": "desktop",
+  "path": "/black-theatre/",
+  "name": "black-theatre",
+  "status": 200,
+  "title": "المسرح الأسود – أسرة البابا أثناسيوس",
+  "h": 1322,
+  "buttons": 6
+ },
+ {
+  "w": "desktop",
+  "path": "/silenttheatre/",
+  "name": "silenttheatre",
+  "status": 200,
+  "title": "المسرح صامت – أسرة البابا أثناسيوس",
+  "h": 1375,
+  "buttons": 5
+ },
+ {
+  "w": "desktop",
+  "path": "/pages/",
+  "name": "pages",
+  "status": 200,
+  "title": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
+  "h": 3360,
+  "buttons": 24
+ },
+ {
+  "w": "desktop",
+  "path": "/account/",
+  "name": "account",
+  "status": 200,
+  "title": "حسابي – أسرة البابا أثناسيوس",
+  "h": 900,
+  "buttons": 9
+ },
+ {
+  "w": "desktop",
+  "path": "/points/",
+  "name": "points",
+  "status": 200,
+  "title": "حسابي – أسرة البابا أثناسيوس",
+  "h": 900,
+  "buttons": 9
+ },
+ {
+  "w": "desktop",
+  "path": "/privacy/",
+  "name": "privacy",
+  "status": 200,
+  "title": "سياسة الخصوصية – أسرة البابا أثناسيوس",
+  "h": 3191,
+  "buttons": 5
+ },
+ {
+  "w": "desktop",
+  "path": "/terms/",
+  "name": "terms",
+  "status": 200,
+  "title": "شروط الاستخدام – أسرة البابا أثناسيوس",
+  "h": 1436,
+  "buttons": 4
+ },
+ {
+  "w": "desktop",
+  "path": "/your-voice-matters/",
+  "name": "your-voice-matters",
+  "status": 200,
+  "title": "صوتك يهمنا",
+  "h": 900,
+  "buttons": 0
+ },
+ {
+  "w": "desktop",
+  "path": "/no-such-page/",
+  "name": "no-such-page",
+  "status": 404,
+  "title": "أسرة البابا أثناسيوس",
+  "h": 900,
+  "buttons": 5
+ },
+ {
+  "w": "desktop",
+  "errors": []
+ },
+ {
+  "w": "phone",
+  "path": "/",
+  "name": "home",
+  "status": 200,
+  "title": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
+  "h": 3872,
+  "buttons": 30
+ },
+ {
+  "w": "phone",
+  "path": "/events/",
+  "name": "events",
+  "status": 200,
+  "title": "الفعاليات – أسرة البابا أثناسيوس",
+  "h": 844,
+  "buttons": 5
+ },
+ {
+  "w": "phone",
+  "path": "/events/tgrba/",
+  "name": "events-tgrba",
+  "status": 200,
+  "title": "تجربة حجز | أسرة البابا أثناسيوس – سفاجا",
+  "h": 844,
+  "buttons": 5
+ },
+ {
+  "w": "phone",
+  "path": "/competition/",
+  "name": "competition",
+  "status": 200,
+  "title": "مسابقات أسرة البابا أثناسيوس",
+  "h": 844,
+  "buttons": 6
+ },
+ {
+  "w": "phone",
+  "path": "/competition/msabqa-nqat/",
+  "name": "competition-msabqa-nqat",
+  "status": 200,
+  "title": "مسابقة نقاط | أسرة البابا أثناسيوس – سفاجا",
+  "h": 844,
+  "buttons": 6
+ },
+ {
+  "w": "phone",
+  "path": "/competition/test/",
+  "name": "competition-test",
+  "status": 200,
+  "title": "test | أسرة البابا أثناسيوس – سفاجا",
+  "h": 844,
+  "buttons": 6
+ },
+ {
+  "w": "phone",
+  "path": "/black-theatre/",
+  "name": "black-theatre",
+  "status": 200,
+  "title": "المسرح الأسود – أسرة البابا أثناسيوس",
+  "h": 1339,
+  "buttons": 6
+ },
+ {
+  "w": "phone",
+  "path": "/silenttheatre/",
+  "name": "silenttheatre",
+  "status": 200,
+  "title": "المسرح صامت – أسرة البابا أثناسيوس",
+  "h": 1133,
+  "buttons": 5
+ },
+ {
+  "w": "phone",
+  "path": "/pages/",
+  "name": "pages",
+  "status": 200,
+  "title": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
+  "h": 3872,
+  "buttons": 30
+ },
+ {
+  "w": "phone",
+  "path": "/account/",
+  "name": "account",
+  "status": 200,
+  "title": "حسابي – أسرة البابا أثناسيوس",
+  "h": 1048,
+  "buttons": 9
+ },
+ {
+  "w": "phone",
+  "path": "/points/",
+  "name": "points",
+  "status": 200,
+  "title": "حسابي – أسرة البابا أثناسيوس",
+  "h": 1048,
+  "buttons": 9
+ },
+ {
+  "w": "phone",
+  "path": "/privacy/",
+  "name": "privacy",
+  "status": 200,
+  "title": "سياسة الخصوصية – أسرة البابا أثناسيوس",
+  "h": 5084,
+  "buttons": 5
+ },
+ {
+  "w": "phone",
+  "path": "/terms/",
+  "name": "terms",
+  "status": 200,
+  "title": "شروط الاستخدام – أسرة البابا أثناسيوس",
+  "h": 2078,
+  "buttons": 4
+ },
+ {
+  "w": "phone",
+  "path": "/your-voice-matters/",
+  "name": "your-voice-matters",
+  "status": 200,
+  "title": "صوتك يهمنا",
+  "h": 844,
+  "buttons": 0
+ },
+ {
+  "w": "phone",
+  "path": "/no-such-page/",
+  "name": "no-such-page",
+  "status": 404,
+  "title": "أسرة البابا أثناسيوس",
+  "h": 844,
+  "buttons": 5
+ },
+ {
+  "w": "phone",
+  "errors": []
+ }
+]

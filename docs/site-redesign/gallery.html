@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>الموقع العام — معرض التصميم (منفصل عن الأدمن)</title>
+<style>
+  /* the gallery page itself (not part of the site design): the public site's own gold-on-navy identity */
+  @font-face { font-family: "Cairo"; src: url("../../assets/fonts/cairo-arabic.woff2") format("woff2"); unicode-range: U+0600-06FF, U+FB50-FDFF, U+FE70-FEFF; font-weight: 200 1000; }
+  @font-face { font-family: "Cairo"; src: url("../../assets/fonts/cairo-latin.woff2") format("woff2"); unicode-range: U+0000-00FF; font-weight: 200 1000; }
+  :root { --gold: #d7aa50; --gold-hi: #f2d28b; --bg: #020a16; --card: #071a33; --line: rgb(242 210 139 / .16); --t2: #b9c6d6; --t3: #7d8ea3; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Cairo", system-ui, sans-serif; background: radial-gradient(60% 40% at 50% -10%, #0d2b4f, transparent 70%), var(--bg); color: #eef3f9; }
+  .gal { max-width: 1500px; margin: 0 auto; padding: 28px 22px 80px; }
+  h1 { margin: 0; font-size: 26px; color: var(--gold-hi); } .lead { color: var(--t2); margin: 6px 0 22px; line-height: 1.8; }
+  .toc { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 26px; }
+  .toc a { color: var(--t2); text-decoration: none; font-weight: 700; font-size: 13px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); }
+  .round { margin: 40px 0 16px; font-size: 22px; color: var(--gold-hi); }
+  .shot { margin-bottom: 34px; padding: 20px; border-radius: 24px; border: 1px solid var(--line); background: linear-gradient(180deg, rgb(13 40 73 / .5), rgb(7 26 51 / .8)); }
+  .shot h2 { margin: 0 0 6px; font-size: 19px; } .shot p { margin: 0 0 12px; color: var(--t2); font-size: 13.5px; line-height: 1.8; }
+  .inv { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .inv div { padding: 12px 14px; border-radius: 14px; background: rgb(2 12 24 / .5); border: 1px solid rgb(255 255 255 / .07); font-size: 13px; line-height: 1.8; color: var(--t2); }
+  .inv b { display: block; color: var(--gold-hi); font-size: 12.5px; margin-bottom: 4px; }
+  .pair { display: grid; grid-template-columns: 1fr 300px; gap: 16px; align-items: start; }
+  .pair .col { max-height: 820px; overflow: auto; border-radius: 14px; border: 1px solid rgb(255 255 255 / .12); }
+  .pair img { width: 100%; display: block; }
+  .tag { display: inline-block; font-size: 11.5px; font-weight: 800; padding: 2px 10px; border-radius: 999px; background: rgb(215 170 80 / .15); color: var(--gold-hi); margin-inline-start: 8px; vertical-align: middle; }
+  .tag--live { background: rgb(79 214 156 / .14); color: #4fd69c; }
+  .live { display: inline-block; margin-top: 8px; font-size: 12.5px; color: var(--gold-hi); }
+  .frames { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .frames img { width: 100%; border-radius: 10px; border: 1px solid rgb(255 255 255 / .12); display: block; }
+  .frames small { display: block; text-align: center; color: var(--t3); margin-top: 4px; font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; } td, th { padding: 8px 10px; border-bottom: 1px solid rgb(255 255 255 / .07); text-align: start; vertical-align: top; } th { color: var(--gold-hi); font-size: 12px; }
+  @media (max-width: 900px) { .pair, .inv { grid-template-columns: 1fr; } .frames { grid-template-columns: 1fr 1fr; } }
+</style>
+<body>
+<div class="gal">
+  <h1>الموقع العام — معرض التصميم</h1>
+  <p class="lead">معرض مستقل عن الأدمن (<code>docs/phase8b/</code>). الهوية بتاعة الموقع نفسه (الدهبي على الكحلي، وخطوط الموقع). كل شاشة: كمبيوتر (1440) وجنبها موبايل (390). <b>تصميم ومراجعة بس، مفيش تنفيذ ولا نشر.</b></p>
+  <nav class="toc" id="toc"></nav>
+  <div id="list"></div>
+</div>
+<script>
+/* [key, title, now (what is there today), change (what the redesign does), rounds tag, folder] */
+var CUR = [
+  ['home', 'الرئيسية', 'اللوجو والاسم والسلوجان فوق، وبعدهم «صوتك يهمنا» (مميز)، وكارت «اجتماع الشباب» بشريط الأسبوع و«أضف للتقويم»، و«خدماتنا» (كارتين بالطول)، و«مكان الاجتماع» بخريطة، و«تابعنا» (فيسبوك، إنستجرام، تيك توك، جروب الواتساب)، والتواصل (فادي يوسف أمين الخدمة، ومينا زكريا الدعم الفني)، و«شارك الصفحة» (لينك وQR)، والفوتر. وفيه جرس إشعارات، وصوت، وحسابي، ونجمة (نقاطي). <b>الأقسام اللي بتستخبى لما مفيش محتوى (فاضية دلوقتي):</b> جديد الأسرة، تحديات وألعاب، المسابقات، الفعاليات. وعلى الموبايل: الشريط العائم (الرئيسية · مميز · الاجتماع · حسابي · المزيد) وطلب تفعيل الإشعارات.', 'S2: Suggestions متحرك فوق، وكارت الاجتماع، وكل قسم بيتقلب أفقي ومعاه «الكل ‹»، وصفحات «عرض الكل».'],
+  ['pages', 'الرئيسية (رابط /pages/)', 'نفس الرئيسية.', 'S2 زي الرئيسية.'],
+  ['events', 'الفعاليات (/events/)', 'دلوقتي «الفعالية دي مش متاحة» لأن الفعاليات التلاتة في الأرشيف. لما يبقى فيه فعالية: صفحة فيها الغلاف والتفاصيل والحجز.', 'S2: صفحة «عرض الكل» بالفلاتر (الكل · جاية · رحلات · خدمات). وS6: صفحة الفعالية والحجز.'],
+  ['events-tgrba', 'صفحة فعالية (تجربة حجز)', 'دلوقتي «مش متاحة» (في الأرشيف). لما تكون منشورة: الغلاف، والمواعيد، والمكان، والأسعار، والشروط، و«احجز»، وخطوات الحجز (العدد، والخادم، وطريقة الدفع، ورفع الإثبات)، ومتابعة الحجز.', 'S6: خطوات الحجز ومتابعته وتفاصيله. الحالات هتترسم من الكود، لأن مفيش فعالية حية دلوقتي.'],
+  ['competition', 'المسابقات (/competition/)', '«المسابقة دي مش متاحة دلوقتي»، لأن مفيش مسابقة منشورة.', 'S4: قايمة المسابقات، وصفحة البداية، والأسئلة، والاختيارات، والمراجعة، والنتيجة، وحالات «قبل البداية / مقفولة».'],
+  ['competition-msabqa-nqat', 'مسابقة (msabqa-nqat)', 'مش متاحة (مش منشورة).', 'S4.'],
+  ['competition-test', 'مسابقة (test)', 'مش متاحة.', 'S4.'],
+  ['black-theatre', 'المسرح الأسود (صفحة خدمة)', 'البانر، والاسم بخط مميز، والسطر القصير، وشارة «أسرة البابا أثناسيوس × B.U.G»، والوصف، و«اتفرّج» (فيديوهين: 🎭 ميدلي العذراء، وجاء المخلص) بمقطع بيشتغل جوه الصفحة.', 'S5: عرض المسرحيات والفيديوهات والتفاصيل وفريق الخدمة.'],
+  ['silenttheatre', 'المسرح صامت (صفحة خدمة)', 'نفس شكل صفحة الخدمة.', 'S5.'],
+  ['account', 'حسابي (من غير دخول)', 'اللوجو، و«مسابقاتك ونقطك وحجوزاتك في مكان واحد»، و«سجّل دخولك» (الإيميل، والباسورد، و«إظهار»، وتحقق Cloudflare، و«متابعة»، و«إنشاء حساب جديد»، و«ده جهاز مشترك»، و«نسيت الباسورد؟»، و«كلّم مينا زكريا على واتساب»). <b>بعد الدخول (مش ظاهر هنا):</b> الحساب، والنقاط، والحجوزات، والمسابقات، والصورة، والأجهزة، والخروج.', 'S7: الدخول، وإنشاء الحساب، والحساب، والنقاط، والمتجر. وS3: اختيار اللون.'],
+  ['points', 'نقاطي (من غير دخول)', 'نفس صفحة الدخول. <b>بعد الدخول:</b> الرصيد، والموسم، والحركات، والمتجر.', 'S7.'],
+  ['privacy', 'سياسة الخصوصية', 'صفحة نص طويلة.', 'S8: قراءة مريحة بعناوين وفهرس.'],
+  ['terms', 'شروط الاستخدام', 'صفحة نص.', 'S8.'],
+  ['your-voice-matters', 'صوتك يهمنا (/your-voice-matters/)', 'الرابط ده بيفتح صفحة فاضية على الموقع (0 أزرار). التجربة نفسها بتشتغل من كارت «صوتك يهمنا» جوه الرئيسية (مشهد).', 'S8: مراجعة التجربة والرابط ده.'],
+  ['no-such-page', 'صفحة مش موجودة (404)', 'صفحة 404 الحالية.', 'S8.']
+];
+var MISSING = [
+  ['الانترو الحالي', 'بيشتغل أول ما تفتح الرئيسية (data-intro)، ونسخة B.U.G في صفحات الخدمة، وانترو الألعاب (game-intro.js).', 'S1: انترو «أول مرة» بالكارت، وانترو «بعد الحساب» أخف.'],
+  ['جرس الإشعارات و«خليك عارف الجديد»', 'قايمة الإشعارات، وطلب تفعيل الموبايل.', 'S8.'],
+  ['التجارب (المشاهد)', 'المشاهد اللي بتفتح من الكروت (فيسبوك، صوتك يهمنا…) في assets/js/xp.', 'S8: مراجعة وتنسيق مع الشكل الجديد.'],
+  ['«المزيد» على الموبايل', 'شيت فيه كل الأماكن.', 'S2.'],
+  ['تثبيت التطبيق (PWA)', 'install.js.', 'S8.'],
+  ['الحساب بعد الدخول والحجز والمسابقة وهي شغالة', 'مش ظاهرين للزوار دلوقتي، ومحتاجين دخول أو محتوى منشور.', 'هيترسموا من الكود بحالاتهم في S4 وS6 وS7.']
+];
+var ROUNDS = (window.SITE_ROUNDS || []);
+var toc = ['<a href="#s0">S0 الجرد والشكل الحالي</a>'].concat(ROUNDS.map(function (r) { return '<a href="#' + r.id + '">' + r.title + '</a>'; }));
+document.getElementById('toc').innerHTML = toc.join('');
+var h = '';
+ROUNDS.forEach(function (r) { h += '<h2 class="round" id="' + r.id + '">' + r.title + '</h2>' + r.html; });
+h += '<h2 class="round" id="s0">S0 — الجرد والشكل الحالي (الموقع الحي، النهارده)</h2>' +
+  '<p class="lead">الصور دي من الموقع الحقيقي (stathanasiosyouth.github.io) بالبيانات اللي عليه النهارده، من غير دخول. كل شاشة معاها <b>الموجود دلوقتي</b> و<b>إيه اللي هيتغير</b>.</p>';
+CUR.forEach(function (c) {
+  h += '<section class="shot" id="cur-' + c[0] + '"><h2>' + c[1] + ' <span class="tag tag--live">الحالي</span></h2><div class="inv"><div><b>الموجود دلوقتي</b>' + c[2] + '</div><div><b>هيتغير إيه</b>' + c[3] + '</div></div>' +
+    '<div class="pair"><div class="col"><img loading="lazy" src="current/desktop/' + c[0] + '.png" alt=""></div><div class="col"><img loading="lazy" src="current/phone/' + c[0] + '.png" alt=""></div></div></section>';
+});
+h += '<section class="shot"><h2>حاجات موجودة ومش باينة في الصور</h2><table><tr><th>الجزء</th><th>الموجود</th><th>هيتعمل فين</th></tr>' + MISSING.map(function (m) { return '<tr><td><b>' + m[0] + '</b></td><td>' + m[1] + '</td><td>' + m[2] + '</td></tr>'; }).join('') + '</table></section>';
+h += '<section class="shot"><h2>صور التصميم المقترح السابق (اللي عجبك)</h2><p>محفوظة في <code>reference/</code>، ومكتوب في BRIEF.md هناخد إيه من كل صورة.</p><div class="frames">' + ['02-old-preview-events-services-news-mobile.png', '03-old-preview-home-desktop.webp', '05-old-preview-events-services-page.png', '06-old-preview-home-hero-mobile.png'].map(function (f) { return '<div><img loading="lazy" src="reference/' + f + '" alt=""><small>' + f.replace(/^\d+-|\.(png|webp)$/g, '') + '</small></div>'; }).join('') + '</div></section>';
+document.getElementById('list').innerHTML = h;
+</script>
+</body>
+</html>
