@@ -5,7 +5,7 @@ import { mkdirSync } from 'node:fs';
 const require = createRequire('D:/private_projects/athanasios-links/.claude/worktrees/admin-panel-redesign-1907bc/tools/package.json');
 const puppeteer = require('puppeteer-core');
 const OUT = 'D:/private_projects/athanasios-links/.claude/worktrees/admin-panel-redesign-1907bc/docs/site-redesign/shots';
-const F = { first: [700, 1900, 2700, 3500, 4300, 5200, 5900, 6600, 7300, 8300, 9300, 10000, 11000], member: [300, 1000, 1700, 4200] };
+const F = { first: [300, 650, 1150, 1700, 2400, 2850, 3300, 3700, 4300, 4800, 5600, 6600], member: [] };
 const V = { desktop: { width: 1440, height: 900 }, phone: { width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } };
 const b = await puppeteer.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
 for (const [w, vp] of Object.entries(V)) {
