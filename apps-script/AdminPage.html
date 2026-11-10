@@ -889,11 +889,39 @@
 
     var upgradeCard = A.upgradeCard();
 
-    var accountCard = A.card('الحساب', null,
-      el('p', {}, 'انت داخل بـ ', A.chip(A.state.user, 'ltr'), A.state.me ? el('span', {}, ' — اسمك في اللوحة: ', el('strong', { dir: 'auto', text: A.state.me })) : null),
-      A.signOut ? el('div', { class: 'actions' },
-        el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { A.signOut(); } }, icon('logout'), 'خروج')
-      ) : null
+    // Phase 8B «حسابي»: the approved rows — name (rename), role, devices, sign-out
+    var me = A.state.me || '';
+    var meEmail = A.state.user || '';
+    var access = A.access || {};
+    function setrow(lead, label, hint, control, extra) {
+      return el('div', { class: 'setrow' + (extra ? ' ' + extra : '') },
+        lead || null,
+        el('div', { class: 'setrow__text' },
+          el('b', { class: 'setrow__label', dir: 'auto', text: label }),
+          hint ? el('small', { class: 'setrow__hint', text: hint }) : null),
+        el('div', { class: 'setrow__ctl' }, control));
+    }
+    var accountCard = el('section', { class: 'card setcard setcard--account' },
+      el('div', { class: 'setcard__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('user')),
+        el('div', { class: 'setcard__titles' },
+          el('h2', { class: 'card__title', text: 'حسابي' }),
+          el('p', { class: 'card__hint' }, 'إنت داخل بـ ', el('span', { class: 'ltr', text: meEmail })))),
+      setrow(el('span', { class: 'avatar', 'aria-hidden': 'true', text: (me || meEmail).trim().charAt(0).toUpperCase() }),
+        me || meEmail.split('@')[0], 'اسمك في اللوحة والسجل',
+        el('button', { class: 'btn btn--small', type: 'button', onclick: function (event) {
+          if (A.renameAdmin) A.renameAdmin(meEmail, me, event.currentTarget);
+          else { var t = document.getElementById('set-team'); if (t) t.scrollIntoView({ behavior: 'smooth' }); }
+        } }, icon('edit'), 'غيّر الاسم'), 'setrow--lead'),
+      setrow(null, 'الدور', access.primary ? 'الأدمن الأساسي: صلاحياته كاملة ومينفعش يتشال' : 'صلاحياتك حسب «الفريق والصلاحيات»',
+        A.chip(access.primary ? 'الأدمن الأساسي' : 'أدمن', access.primary ? 'gold' : 'info')),
+      A.appCard ? setrow(null, 'الأجهزة اللي داخل منها', 'التطبيق والإشعارات على كل جهاز',
+        el('button', { class: 'btn btn--small', type: 'button', onclick: function () {
+          var t = document.querySelector('.setsec [data-app-card], #set-notify');
+          if (t) t.scrollIntoView({ behavior: A.reducedMotion() ? 'auto' : 'smooth', block: 'start' });
+        } }, 'إدارة الأجهزة')) : null,
+      A.signOut ? setrow(null, 'خروج', 'من الجهاز ده بس',
+        el('button', { class: 'btn btn--small btn--danger', type: 'button', onclick: function () { A.signOut(); } }, icon('logout'), 'خروج'), 'setrow--out') : null
     );
 
     var config = A.state.config || {};
@@ -903,22 +931,17 @@
         config.repo ? el('a', { class: 'btn btn--ghost', href: 'https://github.com/' + config.repo + '/blob/main/docs/ADMIN-GUIDE.md', target: '_blank', rel: 'noopener' }, icon('book'), 'افتح الدليل كامل') : null)
     );
 
-    // «شوف شاشة البداية» (the intro, again)
     var look = A.lookCard ? A.lookCard() : null;
-    if (look && A.playIntro) {
-      var head = look.querySelector('.card__head, .card__title');
-      var replay = el('button', { class: 'btn btn--small settings__intro', type: 'button', onclick: function () { A.playIntro(); } }, icon('eye'), 'شوف شاشة البداية');
-      if (head && head.parentNode === look) head.appendChild(replay);
-      else look.appendChild(el('div', { class: 'actions' }, replay));
-    }
+    var appCard = A.appCard ? A.appCard() : null;
+    if (appCard) appCard.setAttribute('data-app-card', '');
 
     var notify = notifyCards();   // [mine, the settings, the system status] (only with the Worker)
 
     // Phase 8B: sections with a side list (chips on phones); every card stays on the one page, the list
     // jumps to its section and follows the scroll
     var groups = [
-      { key: 'me', title: 'حسابي والشكل', icon: 'user', head: 'الحساب', cards: [accountCard, look, A.appCard ? A.appCard() : null] },
-      { key: 'notify', title: 'إشعاراتي', icon: 'bell', cards: [notify[0]] },
+      { key: 'me', title: 'حسابي والشكل', icon: 'user', head: 'الحساب', cards: [accountCard, look] },
+      { key: 'notify', title: 'إشعاراتي', icon: 'bell', cards: [notify[0], appCard] },
       { key: 'site', title: 'بيانات الموقع', icon: 'globe', head: 'الموقع', cards: [siteCard] },
       { key: 'content', title: 'المحتوى والظهور', icon: 'megaphone', cards: [A.state.hubReady ? hubCard : null, upgradeCard] },
       { key: 'publish', title: 'النشر والنسخ', icon: 'retry', cards: [publishHistoryCard()] },
@@ -933,6 +956,7 @@
 
     var links = groups.map(function (g, i) {
       return [
+        g.head && i > 0 ? el('hr', { class: 'setnav__sep', 'aria-hidden': 'true' }) : null,
         g.head ? el('p', { class: 'setnav__head', text: g.head }) : null,
         el('button', { class: 'setnav__link' + (i === 0 ? ' is-on' : ''), type: 'button', 'data-set': g.key, onclick: function () {
           var target = document.getElementById('set-' + g.key);
@@ -1316,6 +1340,9 @@
     }
 
     /* the display name: our own small dialog; the server checks it (length, no copies) */
+    // Phase 8B: «غيّر الاسم» in «حسابي» uses the same rename
+    A.renameAdmin = rename;
+
     function rename(email, current, button) {
 
       box.hidden = true;

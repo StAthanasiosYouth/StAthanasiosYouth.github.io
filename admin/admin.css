@@ -11505,6 +11505,239 @@ html[data-mode="light"] .setnav__link.is-on {
   }
 }
 
+/* ---------- W2: the settings cards (approved «settings» screen) ---------- */
+
+.setnav__sep {
+  width: 100%;
+  height: 1px;
+  margin: 8px 0 4px;
+  border: 0;
+  background: var(--p-line-2);
+}
+
+@media (max-width: 1023px) {
+  .setnav__sep {
+    display: none;
+  }
+
+  .setnav__head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    margin: 0 8px;
+    color: var(--text-3);
+    font-size: 12px;
+    font-weight: 700;
+  }
+}
+
+.setcard {
+  display: grid;
+  gap: 0;
+  padding: 22px 22px 8px;
+  border-radius: 24px;
+}
+
+.setcard__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.setcard__titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.setcard__titles .card__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.setcard__titles .card__hint {
+  margin: 2px 0 0;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.setcard .chipico {
+  width: 40px;
+  height: 40px;
+}
+
+.setrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 74px;
+  padding: 14px 0;
+  border-top: 1px solid var(--p-line-2);
+}
+
+.setcard__head + .setrow {
+  border-top: 0;
+}
+
+.setrow__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.setrow__label {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.setrow__hint {
+  display: block;
+  color: var(--text-3);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.setrow--out .setrow__label {
+  color: var(--danger);
+}
+
+.setrow__ctl {
+  display: flex;
+  flex: none;
+  align-items: center;
+  max-width: 100%;
+}
+
+.setrow__pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.setrow .avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: var(--acc-ink);
+  background: var(--grad);
+  font-weight: 800;
+}
+
+.setcard .btn--small {
+  min-height: 36px;
+  border-radius: 11px;
+}
+
+.setcard .btn--danger {
+  border-color: rgb(var(--danger-rgb) / .35);
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+/* the compact segmented control (its radios stay, hidden, for the keyboard and the tests) */
+.seg {
+  display: inline-flex;
+  gap: 4px;
+  max-width: 100%;
+  padding: 4px;
+  overflow-x: auto;
+  border: 1px solid var(--p-line-3);
+  border-radius: 12px;
+  background: rgb(var(--nv-2-9-20) / .5);
+}
+
+html[data-mode="light"] .seg {
+  background: var(--p-surface-2);
+}
+
+.seg__opt {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 9px;
+  color: var(--text-2);
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.seg__opt input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.seg__opt:has(input:checked) {
+  color: var(--acc-hi);
+  background: var(--p-raised);
+  box-shadow: inset 0 0 0 1px var(--p-acc-line);
+}
+
+html[data-mode="light"] .seg__opt:has(input:checked) {
+  color: var(--acc-deep);
+}
+
+.seg__opt:has(input:focus-visible) {
+  outline: 2px solid var(--acc);
+  outline-offset: 1px;
+}
+
+/* the colours: dots only */
+.swatches--dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.swatches--dots .swatch {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.swatches--dots .swatch__dot {
+  width: 28px;
+  height: 28px;
+}
+
+.swatches--dots .swatch:has(input:checked) .swatch__dot {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px currentColor;
+}
+
+.switch--bare {
+  gap: 0;
+}
+
+@media (max-width: 759px) {
+  .setcard {
+    padding: 18px 16px 6px;
+  }
+
+  .setcard__head {
+    flex-wrap: wrap;
+  }
+
+  .setcard__act {
+    flex: 1 0 100%;
+    justify-content: center;
+  }
+
+  .setrow {
+    flex-wrap: wrap;
+  }
+
+  .setrow:not(.setrow--lead) .setrow__text {
+    flex: 1 1 55%;
+  }
+}
+
 /* the primary button and the chosen tab carry the gradient */
 .btn--primary {
   background: var(--grad);

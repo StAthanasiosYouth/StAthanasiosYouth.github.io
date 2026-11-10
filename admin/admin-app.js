@@ -231,6 +231,15 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   var icon = A.icon;
 
+  /* Phase 8B: the design's own extra icons (docs/phase8b/proposal.js EXTRA, proposal-2.js play) */
+  if (A.ICONS) {
+    var EXTRA_ICONS = {
+      palette: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-1.3-1-1.6-1-2.6 0-.8.6-1.4 1.4-1.4H16a5 5 0 0 0 5-5C21 6.2 17 3 12 3Z"/><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-1.3-1-1.6-1-2.6 0-.8.6-1.4 1.4-1.4H16a5 5 0 0 0 5-5C21 6.2 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="14.5" cy="7.5" r="1"/></svg>',
+      play: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M8 5.5v13l10.5-6.5Z"/><path d="M8 5.5v13l10.5-6.5Z"/></svg>'
+    };
+    Object.keys(EXTRA_ICONS).forEach(function (k) { if (!Object.prototype.hasOwnProperty.call(A.ICONS, k)) A.ICONS[k] = EXTRA_ICONS[k]; });
+  }
+
   /*
    * One server call -> a promise. Here (Apps Script) through
    * google.script.run; on the official admin page (GitHub Pages /admin/)
@@ -909,64 +918,69 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
    * once and is kept (this device now, the server a moment later); nothing to save, nothing to
    * lose on leaving, so it never marks the screen as changed.
    */
+  /* «الشكل» (Phase 8 A1; Phase 8B: the approved settings card — a row per choice, its words on one side and
+     the control on the other, a compact segmented control, colour dots, «شوف شاشة البداية» in the head) */
   A.lookCard = function () {
 
     var p = A.prefs;
 
-    function group(key, label, options) {
+    function row(label, hint, control, extra) {
+      return el('div', { class: 'setrow' + (extra ? ' ' + extra : '') },
+        el('div', { class: 'setrow__text' },
+          el('b', { class: 'setrow__label', text: label }),
+          hint ? el('small', { class: 'setrow__hint', text: hint }) : null),
+        el('div', { class: 'setrow__ctl' }, control));
+    }
+
+    function group(key, label, hint, options) {
       var name = A.uid('look-' + key);
-      return el('div', { class: 'look__row' },
-        el('p', { class: 'look__label', id: name + '-l', text: label }),
-        el('div', { class: 'choices look__choices', role: 'radiogroup', 'aria-labelledby': name + '-l' }, options.map(function (o) {
+      return row(label, hint,
+        el('div', { class: 'seg look__choices', role: 'radiogroup', 'aria-label': label }, options.map(function (o) {
           var input = el('input', { type: 'radio', name: name, value: o[0], checked: p[key] === o[0], 'data-look': key, onchange: function () {
             var patch = {};
             patch[key] = o[0];
             A.setPrefs(patch);
             A.sound('tap');
           } });
-          return el('label', { class: 'choice' }, input, el('span', { text: o[1] }));
-        }))
-      );
+          return el('label', { class: 'seg__opt' }, input, el('span', { text: o[1] }));
+        })));
     }
 
     var accentName = A.uid('look-accent');
-    var accents = el('div', { class: 'look__row' },
-      el('p', { class: 'look__label', id: accentName + '-l', text: 'لون التمييز' }),
-      el('div', { class: 'swatches', role: 'radiogroup', 'aria-labelledby': accentName + '-l' }, A.ACCENTS.map(function (a) {
-        var input = el('input', { type: 'radio', name: accentName, value: a[0], checked: p.accent === a[0], 'data-look': 'accent', onchange: function () {
+    var accents = row('اللون', 'لون الأزرار والتحديد',
+      el('div', { class: 'swatches swatches--dots', role: 'radiogroup', 'aria-label': 'اللون' }, A.ACCENTS.map(function (a) {
+        var input = el('input', { type: 'radio', name: accentName, value: a[0], checked: p.accent === a[0], 'data-look': 'accent', 'aria-label': a[1], onchange: function () {
           A.setPrefs({ accent: a[0] });
           A.sound('tap');
         } });
-        return el('label', { class: 'swatch swatch--acc-' + a[0] }, input, el('span', { class: 'swatch__dot', 'aria-hidden': 'true' }), el('span', { class: 'swatch__label', text: a[1] }));
-      }))
-    );
+        return el('label', { class: 'swatch swatch--acc-' + a[0], title: a[1] }, input, el('span', { class: 'swatch__dot', 'aria-hidden': 'true' }), el('span', { class: 'swatch__label visually-hidden', text: a[1] }));
+      })));
 
-    var test = el('button', { class: 'btn btn--small', type: 'button', disabled: !p.sound, 'data-look-test': '', onclick: function () {
+    var test = el('button', { class: 'btn btn--small btn--ghost', type: 'button', disabled: !p.sound, 'data-look-test': '', onclick: function () {
       ['tap', 'open', 'pop', 'success', 'close', 'nope'].forEach(function (k, i) { setTimeout(function () { A.sound(k); }, i * 320); });
-    } }, 'جرّب الأصوات');
+    } }, 'جرّب');
 
-    var sound = el('input', { type: 'checkbox', role: 'switch', checked: !!p.sound, 'data-look': 'sound', onchange: function () {
+    var sound = el('input', { type: 'checkbox', role: 'switch', checked: !!p.sound, 'data-look': 'sound', 'aria-label': 'الأصوات', onchange: function () {
       A.setPrefs({ sound: sound.checked });
       test.disabled = !sound.checked;
       if (sound.checked) A.sound('success');
     } });
 
-    return el('section', { class: 'card look', 'data-look-card': '' },
-      el('div', { class: 'card__head' },
-        el('div', {},
-          el('h2', { class: 'card__title', text: 'المظهر' }),
-          el('p', { class: 'card__hint', text: 'اختياراتك ليك إنت بس، وبتتحفظ لحسابك فبتمشي معاك على أي جهاز تفتح منه.' })
-        )
+    return el('section', { class: 'card look setcard', 'data-look-card': '' },
+      el('div', { class: 'setcard__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('palette')),
+        el('div', { class: 'setcard__titles' },
+          el('h2', { class: 'card__title', text: 'الشكل' }),
+          el('p', { class: 'card__hint', text: 'بيتحفظ على حسابك وبيمشي معاك على كل جهاز' })),
+        A.playIntro ? el('button', { class: 'btn btn--small setcard__act settings__intro', type: 'button', onclick: function () { A.playIntro(); } }, icon('play'), 'شوف شاشة البداية') : null
       ),
-      group('theme', 'الوضع', [['dark', 'داكن'], ['light', 'فاتح'], ['system', 'زي الجهاز']]),
+      group('theme', 'الوضع', '', [['dark', 'داكن'], ['light', 'فاتح'], ['system', 'زي الجهاز']]),
       accents,
-      group('density', 'الكثافة', [['comfortable', 'مريح'], ['compact', 'مضغوط']]),
-      group('motion', 'الحركة', [['full', 'كاملة'], ['lite', 'مخففة'], ['off', 'مقفولة']]),
-      el('p', { class: 'look__note', text: 'لو جهازك على «تقليل الحركة» بنحترمه دايمًا، أيًا كان اختيارك هنا.' }),
-      el('div', { class: 'look__row look__row--sound' },
-        el('label', { class: 'switch' }, sound, el('span', { class: 'switch__track', 'aria-hidden': 'true' }), el('span', { text: 'أصوات الواجهة (خفيفة جدًا، مقفولة من الأول)' })),
-        test
-      )
+      group('density', 'الكثافة', 'المسافات بين العناصر', [['comfortable', 'مريحة'], ['compact', 'مضغوطة']]),
+      group('motion', 'الحركة', '«خفيفة» بتشيل الجزيئات والانتقالات الكبيرة', [['full', 'كاملة'], ['lite', 'خفيفة'], ['off', 'من غير']]),
+      row('الأصوات', 'صوت خفيف مع النشر والحفظ',
+        el('span', { class: 'setrow__pair' }, test,
+          el('label', { class: 'switch switch--bare' }, sound, el('span', { class: 'switch__track', 'aria-hidden': 'true' }))), 'look__row--sound')
     );
 
   };
@@ -6652,11 +6666,39 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var upgradeCard = A.upgradeCard();
 
-    var accountCard = A.card('الحساب', null,
-      el('p', {}, 'انت داخل بـ ', A.chip(A.state.user, 'ltr'), A.state.me ? el('span', {}, ' — اسمك في اللوحة: ', el('strong', { dir: 'auto', text: A.state.me })) : null),
-      A.signOut ? el('div', { class: 'actions' },
-        el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { A.signOut(); } }, icon('logout'), 'خروج')
-      ) : null
+    // Phase 8B «حسابي»: the approved rows — name (rename), role, devices, sign-out
+    var me = A.state.me || '';
+    var meEmail = A.state.user || '';
+    var access = A.access || {};
+    function setrow(lead, label, hint, control, extra) {
+      return el('div', { class: 'setrow' + (extra ? ' ' + extra : '') },
+        lead || null,
+        el('div', { class: 'setrow__text' },
+          el('b', { class: 'setrow__label', dir: 'auto', text: label }),
+          hint ? el('small', { class: 'setrow__hint', text: hint }) : null),
+        el('div', { class: 'setrow__ctl' }, control));
+    }
+    var accountCard = el('section', { class: 'card setcard setcard--account' },
+      el('div', { class: 'setcard__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('user')),
+        el('div', { class: 'setcard__titles' },
+          el('h2', { class: 'card__title', text: 'حسابي' }),
+          el('p', { class: 'card__hint' }, 'إنت داخل بـ ', el('span', { class: 'ltr', text: meEmail })))),
+      setrow(el('span', { class: 'avatar', 'aria-hidden': 'true', text: (me || meEmail).trim().charAt(0).toUpperCase() }),
+        me || meEmail.split('@')[0], 'اسمك في اللوحة والسجل',
+        el('button', { class: 'btn btn--small', type: 'button', onclick: function (event) {
+          if (A.renameAdmin) A.renameAdmin(meEmail, me, event.currentTarget);
+          else { var t = document.getElementById('set-team'); if (t) t.scrollIntoView({ behavior: 'smooth' }); }
+        } }, icon('edit'), 'غيّر الاسم'), 'setrow--lead'),
+      setrow(null, 'الدور', access.primary ? 'الأدمن الأساسي: صلاحياته كاملة ومينفعش يتشال' : 'صلاحياتك حسب «الفريق والصلاحيات»',
+        A.chip(access.primary ? 'الأدمن الأساسي' : 'أدمن', access.primary ? 'gold' : 'info')),
+      A.appCard ? setrow(null, 'الأجهزة اللي داخل منها', 'التطبيق والإشعارات على كل جهاز',
+        el('button', { class: 'btn btn--small', type: 'button', onclick: function () {
+          var t = document.querySelector('.setsec [data-app-card], #set-notify');
+          if (t) t.scrollIntoView({ behavior: A.reducedMotion() ? 'auto' : 'smooth', block: 'start' });
+        } }, 'إدارة الأجهزة')) : null,
+      A.signOut ? setrow(null, 'خروج', 'من الجهاز ده بس',
+        el('button', { class: 'btn btn--small btn--danger', type: 'button', onclick: function () { A.signOut(); } }, icon('logout'), 'خروج'), 'setrow--out') : null
     );
 
     var config = A.state.config || {};
@@ -6666,22 +6708,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         config.repo ? el('a', { class: 'btn btn--ghost', href: 'https://github.com/' + config.repo + '/blob/main/docs/ADMIN-GUIDE.md', target: '_blank', rel: 'noopener' }, icon('book'), 'افتح الدليل كامل') : null)
     );
 
-    // «شوف شاشة البداية» (the intro, again)
     var look = A.lookCard ? A.lookCard() : null;
-    if (look && A.playIntro) {
-      var head = look.querySelector('.card__head, .card__title');
-      var replay = el('button', { class: 'btn btn--small settings__intro', type: 'button', onclick: function () { A.playIntro(); } }, icon('eye'), 'شوف شاشة البداية');
-      if (head && head.parentNode === look) head.appendChild(replay);
-      else look.appendChild(el('div', { class: 'actions' }, replay));
-    }
+    var appCard = A.appCard ? A.appCard() : null;
+    if (appCard) appCard.setAttribute('data-app-card', '');
 
     var notify = notifyCards();   // [mine, the settings, the system status] (only with the Worker)
 
     // Phase 8B: sections with a side list (chips on phones); every card stays on the one page, the list
     // jumps to its section and follows the scroll
     var groups = [
-      { key: 'me', title: 'حسابي والشكل', icon: 'user', head: 'الحساب', cards: [accountCard, look, A.appCard ? A.appCard() : null] },
-      { key: 'notify', title: 'إشعاراتي', icon: 'bell', cards: [notify[0]] },
+      { key: 'me', title: 'حسابي والشكل', icon: 'user', head: 'الحساب', cards: [accountCard, look] },
+      { key: 'notify', title: 'إشعاراتي', icon: 'bell', cards: [notify[0], appCard] },
       { key: 'site', title: 'بيانات الموقع', icon: 'globe', head: 'الموقع', cards: [siteCard] },
       { key: 'content', title: 'المحتوى والظهور', icon: 'megaphone', cards: [A.state.hubReady ? hubCard : null, upgradeCard] },
       { key: 'publish', title: 'النشر والنسخ', icon: 'retry', cards: [publishHistoryCard()] },
@@ -6696,6 +6733,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var links = groups.map(function (g, i) {
       return [
+        g.head && i > 0 ? el('hr', { class: 'setnav__sep', 'aria-hidden': 'true' }) : null,
         g.head ? el('p', { class: 'setnav__head', text: g.head }) : null,
         el('button', { class: 'setnav__link' + (i === 0 ? ' is-on' : ''), type: 'button', 'data-set': g.key, onclick: function () {
           var target = document.getElementById('set-' + g.key);
@@ -7079,6 +7117,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
 
     /* the display name: our own small dialog; the server checks it (length, no copies) */
+    // Phase 8B: «غيّر الاسم» in «حسابي» uses the same rename
+    A.renameAdmin = rename;
+
     function rename(email, current, button) {
 
       box.hidden = true;
