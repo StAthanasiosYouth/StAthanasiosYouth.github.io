@@ -2836,6 +2836,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       el('div', { class: 'sheet__grab', 'aria-hidden': 'true' }),
       el('div', { class: 'sheet__head' },
         el('h2', { class: 'sheet__title', id: 'sheet-title', tabindex: '-1', text: title }),
+        options.headActions ? el('span', { class: 'sheet__headacts' }, options.headActions) : null,
         A.helpButton ? A.helpButton() : null,
         el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: function () { A.closeSheet(); } }, icon('close'))
       ),
@@ -4477,7 +4478,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   /* ---------- the welcome inside the shell, right after signing in ----------
      Phase 8B: the approved preview's intro (docs/phase8/admin-preview.src.html playIntro + dust) as it is,
-     with no «تخطي» button: a tap or a key ends it. Its colours follow the chosen accent; once after signing
+     with no «تخطي» button, and it always plays to its end (a tap does not cut it). Its colours follow the chosen accent; once after signing
      in, never with reduced motion; A.playIntro() («شوف شاشة البداية») plays it again. Same API as before:
      { ready(name), leave() }. */
 
@@ -4557,7 +4558,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     play('.intro__load', [{ opacity: 0 }, { opacity: 1 }], { duration: 400, delay: 300 });
     play('.intro__progress i', [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: D, easing: 'linear' });
 
-    // it ends by itself once the panel is ready and the bar is full; a tap or a key ends it now
+    // it ends by itself once the panel is ready and the bar is full
     var timer = setTimeout(function () { if (ready) leave(false); }, D);
     var hardStop = setTimeout(function () { leave(false); }, 6000);
 
@@ -4570,7 +4571,6 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       if (gone) return;
       gone = true;
       clearTimeout(timer); clearTimeout(hardStop);
-      document.removeEventListener('keydown', onKey, true);
       anims.forEach(function (a) { try { a.finish(); } catch (e) { /* gone */ } });
       box.classList.add('is-leaving');
       ['.intro__text', '.intro__load', '.intro__halo', '.intro__ring', '.intro__sweep'].forEach(function (s) {
@@ -4591,9 +4591,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       else setTimeout(cleanup, 520);
     }
 
-    function onKey(event) { if (event.key === 'Tab') return; leave(true); }
-    box.addEventListener('pointerdown', function () { leave(true); });
-    document.addEventListener('keydown', onKey, true);
+    // owner (2026-11-11): it plays to its end; a tap or a key no longer ends it
 
     return {
       ready: function (name) {
@@ -5224,17 +5222,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   A.openReview = function () { openReview(); };
 
   var PUBLISH_STEPS = [
-    { key: 'review', label: 'مراجعة' },
-    { key: 'github', label: 'نشر على GitHub' },
-    { key: 'pages', label: 'انتظار GitHub Pages' },
+    { key: 'review', label: 'راجع التغييرات' },
+    { key: 'github', label: 'انشر' },
+    { key: 'pages', label: 'بنجهز الموقع' },
     { key: 'live', label: 'ظهر على الموقع' }
   ];
 
   /* the Worker publishes (PUBLISH_MODE 'worker', Phase 2/4): live the moment it answers — the
      GitHub copy follows in the background, nobody waits for it (owner 2026-10-22: 3 steps) */
   var PUBLISH_STEPS_LIVE = [
-    { key: 'review', label: 'مراجعة' },
-    { key: 'publish', label: 'نشر' },
+    { key: 'review', label: 'راجع التغييرات' },
+    { key: 'publish', label: 'انشر' },
     { key: 'live', label: 'ظهر على الموقع' }
   ];
 
@@ -5272,6 +5270,18 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   }
 
+  /* «النسخ السابقة» from the review (the same list as in «الإعدادات» ← «النشر والنسخ») */
+  function historyButton() {
+
+    if (!A.publishHistoryCard || !window.AdminWorker) return null;
+    return el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () {
+      A.openSheet('النسخ السابقة', [A.publishHistoryCard()], [
+        el('button', { class: 'btn', type: 'button', onclick: openReview }, icon('send'), 'رجوع لراجع وانشر')
+      ], { size: 'md' });
+    } }, icon('clock'), 'النسخ السابقة');
+
+  }
+
   function reviewSkeleton() {
 
     return [
@@ -5297,13 +5307,13 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
 
     publishJob = null;
-    A.openSheet('مراجعة قبل النشر', reviewSkeleton());
+    A.openSheet('راجع وانشر', reviewSkeleton());
 
     reviewNow()
       .then(renderReview)
       .catch(function (error) {
         var box = A.errorBox();
-        A.openSheet('مراجعة قبل النشر', [stepper(0, true), box], [
+        A.openSheet('راجع وانشر', [stepper(0, true), box], [
           el('button', { class: 'btn btn--primary', type: 'button', onclick: openReview }, icon('retry'), 'جرّب تاني'),
           el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })
         ]);
@@ -5367,12 +5377,16 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       return el('section', { class: 'review-group' },
         el('h3', { class: 'review-group__title' }, icon(group.icon), group.title),
         el('ul', { class: 'changes' }, group.items.map(function (item) {
+          // Phase 8B: each change a card, its kind as a chip, and «شوف الفرق» (the site with the drafts)
           return el('li', { class: 'is-' + item.tone },
-            el('span', { class: 'visually-hidden', text: tones[item.tone] + ': ' }),
             el('span', { class: 'change__text' },
+              el('span', { class: 'chip change__tone change__tone--' + item.tone, text: tones[item.tone] }),
               el('span', { text: item.text }),
               item.when ? el('span', { class: 'chip chip--gold change__when', text: item.when }) : null
-            )
+            ),
+            A.state && A.state.config && A.state.config.siteUrl && item.tone !== 'remove'
+              ? el('button', { class: 'btn btn--small btn--ghost change__diff', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'شوف الفرق')
+              : null
           );
         }))
       );
@@ -5449,7 +5463,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       ? el('button', { class: 'btn', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'معاينة')
       : null;
 
-    A.openSheet('مراجعة قبل النشر', body, [publish, preview].concat(A.sheetFooter(publish).slice(1)).filter(Boolean));
+    A.openSheet('راجع وانشر', body, [publish, preview].concat(A.sheetFooter(publish).slice(1)).filter(Boolean), { headActions: historyButton() });
 
   }
 
@@ -6633,76 +6647,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       }, hubBox)
     );
 
-    var config = A.state.config;
-    var status = A.state.status;
-    var checkResult = el('p', { class: 'note', hidden: true });
-    var check = el('button', { class: 'btn', type: 'button', text: 'اختبر الاتصال بـ GitHub' });
-
-    check.addEventListener('click', function () {
-      checkResult.hidden = true;
-      A.withBusy(check, A.call('apiCheckGithub'))
-        .then(function (result) {
-          checkResult.className = 'note note--ok';
-          checkResult.textContent = 'تمام ✓ — ' + result.repo + ' (' + result.branch + ' @ ' + result.head + ')' + (result.pages ? ' — GitHub Pages شغال' : ' — GitHub Pages مش متفعل');
-          checkResult.hidden = false;
-        })
-        .catch(function (error) {
-          checkResult.className = 'errors';
-          A.fail(error, checkResult);
-        });
-    });
-
-    /* every step of a poster upload against the real Google Drive */
-    var mediaResult = el('div', { class: 'checklist', hidden: true, 'aria-live': 'polite' });
-    var mediaCheck = el('button', { class: 'btn', type: 'button', text: 'اختبر رفع الصور' });
-
-    mediaCheck.addEventListener('click', function () {
-      mediaResult.hidden = true;
-      A.withBusy(mediaCheck, A.call('apiCheckMedia'))
-        .then(function (report) {
-          mediaResult.replaceChildren(
-            el('p', { class: report.ok ? 'note note--ok' : 'errors', text: report.ok ? 'رفع الصور شغال ✓' : 'فيه مشكلة في رفع الصور — الخطوة اللي عليها ✗ هي السبب' }),
-            el('ol', { class: 'checklist__steps' }, report.steps.map(function (step) {
-              return el('li', { class: step.ok ? 'is-ok' : 'is-fail' },
-                el('span', { class: 'checklist__mark', 'aria-hidden': 'true', text: step.ok ? '✓' : '✗' }),
-                el('span', { text: step.label + (step.ok && step.detail ? ' — ' + step.detail : '') }),
-                step.ok ? null : A.technicalDetails(step.detail)
-              );
-            }))
-          );
-          mediaResult.hidden = false;
-        })
-        .catch(function (error) {
-          mediaResult.replaceChildren(el('div', { class: 'errors' }));
-          A.fail(error, mediaResult.firstChild);
-          mediaResult.hidden = false;
-        });
-    });
-
-    var commitLink = status.publishedCommit && config.repo
-      ? el('a', { href: 'https://github.com/' + config.repo + '/commit/' + status.publishedCommit, target: '_blank', rel: 'noopener', text: status.publishedCommit.slice(0, 7) })
-      : '—';
-
-    var publishCard = A.card('النشر', 'القيم دي بتتظبط من Script Properties في محرر Apps Script (مش من هنا، علشان الأمان).',
-      el('dl', { class: 'kv' },
-        el('dt', { text: 'الريبو' }), el('dd', { class: 'chip--ltr', text: config.repo || 'ناقص — GITHUB_REPO' }),
-        el('dt', { text: 'الفرع' }), el('dd', { text: config.branch }),
-        el('dt', { text: 'التوكن' }), el('dd', { text: config.tokenSet ? 'متسجل ✓' : 'ناقص — GITHUB_TOKEN' }),
-        el('dt', { text: 'الموقع' }), el('dd', {}, config.siteUrl ? el('a', { href: config.siteUrl, target: '_blank', rel: 'noopener', text: config.siteUrl }) : 'ناقص — SITE_URL'),
-        el('dt', { text: 'آخر نشر' }), el('dd', { text: A.formatIso(status.publishedAt) }),
-        el('dt', { text: 'الكوميت' }), el('dd', {}, commitLink)
-      ),
-      checkResult,
-      el('div', { class: 'actions' },
-        check,
-        el('a', { class: 'btn', href: config.sheetUrl, target: '_blank', rel: 'noopener', text: 'افتح الشيت' })
-      )
-    );
-
-    var mediaCard = A.card('الصور', 'لو رفع البوسترات مش شغال، الاختبار ده بيجرّب كل خطوة على Google Drive الحقيقي ويقولك السبب بالظبط. مبيسيبش أي ملفات وراه.',
-      mediaResult,
-      el('div', { class: 'actions' }, mediaCheck)
-    );
+    // Phase 8B: no GitHub, Script Properties, Drive test or «افتح الشيت» here any more (the Worker publishes;
+    // the mirror keeps running in the background)
 
     var upgradeCard = A.upgradeCard();
 
@@ -6713,14 +6659,67 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       ) : null
     );
 
-    var guideCard = config.repo
-      ? A.card('دليل الأدمن', 'كل خانة معناها إيه، وإزاي تضيف اجتماع أو خبر أو لعبة خطوة بخطوة.',
-        el('a', { class: 'btn', href: 'https://github.com/' + config.repo + '/blob/main/docs/ADMIN-GUIDE.md', target: '_blank', rel: 'noopener', text: 'افتح الدليل' })
-      )
-      : null;
+    var config = A.state.config || {};
+    var guideCard = A.card('دليل الأدمن', 'كل خانة معناها إيه، وإزاي تضيف اجتماع أو خبر أو لعبة خطوة بخطوة.',
+      el('div', { class: 'actions' },
+        el('button', { class: 'btn', type: 'button', onclick: function () { A.help(); } }, icon('video'), 'شرح الجزء ده'),
+        config.repo ? el('a', { class: 'btn btn--ghost', href: 'https://github.com/' + config.repo + '/blob/main/docs/ADMIN-GUIDE.md', target: '_blank', rel: 'noopener' }, icon('book'), 'افتح الدليل كامل') : null)
+    );
 
-    // Phase 8 A1: the admin's own look first (AdminScript «LOOK»)
-    return [A.lookCard ? A.lookCard() : null, A.appCard ? A.appCard() : null, siteCard, A.state.hubReady ? hubCard : null, guideCard, upgradeCard, publishCard, publishHistoryCard(), adminsCard()].concat(notifyCards(), [mediaCard, accountCard]).filter(Boolean);
+    // «شوف شاشة البداية» (the intro, again)
+    var look = A.lookCard ? A.lookCard() : null;
+    if (look && A.playIntro) {
+      var head = look.querySelector('.card__head, .card__title');
+      var replay = el('button', { class: 'btn btn--small settings__intro', type: 'button', onclick: function () { A.playIntro(); } }, icon('eye'), 'شوف شاشة البداية');
+      if (head && head.parentNode === look) head.appendChild(replay);
+      else look.appendChild(el('div', { class: 'actions' }, replay));
+    }
+
+    var notify = notifyCards();   // [mine, the settings, the system status] (only with the Worker)
+
+    // Phase 8B: sections with a side list (chips on phones); every card stays on the one page, the list
+    // jumps to its section and follows the scroll
+    var groups = [
+      { key: 'me', title: 'حسابي والشكل', icon: 'user', head: 'الحساب', cards: [accountCard, look, A.appCard ? A.appCard() : null] },
+      { key: 'notify', title: 'إشعاراتي', icon: 'bell', cards: [notify[0]] },
+      { key: 'site', title: 'بيانات الموقع', icon: 'globe', head: 'الموقع', cards: [siteCard] },
+      { key: 'content', title: 'المحتوى والظهور', icon: 'megaphone', cards: [A.state.hubReady ? hubCard : null, upgradeCard] },
+      { key: 'publish', title: 'النشر والنسخ', icon: 'retry', cards: [publishHistoryCard()] },
+      { key: 'team', title: 'الفريق والصلاحيات', icon: 'shield', head: 'الفريق', cards: [adminsCard()] },
+      { key: 'system', title: 'حالة النظام', icon: 'gear', head: 'النظام', cards: [notify[2], notify[1]] },
+      { key: 'guide', title: 'دليل الأدمن', icon: 'book', cards: [guideCard] }
+    ].map(function (g) { g.cards = g.cards.filter(Boolean); return g; }).filter(function (g) { return g.cards.length; });
+
+    var sections = groups.map(function (g) {
+      return el('section', { class: 'setsec', id: 'set-' + g.key, 'data-set': g.key, 'aria-label': g.title }, g.cards);
+    });
+
+    var links = groups.map(function (g, i) {
+      return [
+        g.head ? el('p', { class: 'setnav__head', text: g.head }) : null,
+        el('button', { class: 'setnav__link' + (i === 0 ? ' is-on' : ''), type: 'button', 'data-set': g.key, onclick: function () {
+          var target = document.getElementById('set-' + g.key);
+          if (target) target.scrollIntoView({ behavior: A.reducedMotion() ? 'auto' : 'smooth', block: 'start' });
+        } }, icon(g.icon), el('span', { text: g.title }))
+      ];
+    });
+
+    var nav = el('nav', { class: 'setnav', 'aria-label': 'أقسام الإعدادات' }, links);
+    var page = el('div', { class: 'setpage' }, nav, el('div', { class: 'setpage__main' }, sections));
+
+    // the list follows the scroll
+    if ('IntersectionObserver' in window) {
+      var seen = {};
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) { seen[e.target.getAttribute('data-set')] = e.isIntersecting ? e.boundingClientRect.top : null; });
+        var on = groups.map(function (g) { return g.key; }).filter(function (k) { return seen[k] !== null && seen[k] !== undefined; })[0];
+        if (!on) return;
+        nav.querySelectorAll('.setnav__link').forEach(function (b) { b.classList.toggle('is-on', b.getAttribute('data-set') === on); });
+      }, { rootMargin: '-90px 0px -55% 0px' });
+      requestAnimationFrame(function () { sections.forEach(function (s) { io.observe(s); }); });
+    }
+
+    return [page];
 
   };
 
@@ -7558,6 +7557,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
    */
   var PUBLISH_KINDS = { worker: 'نشر', restore: 'رجوع لنسخة', shadow: 'نشر (GitHub)', seed: 'البداية' };
 
+  A.publishHistoryCard = function () { return publishHistoryCard(); };
+
   function publishHistoryCard() {
 
     var W = window.AdminWorker;
@@ -7565,7 +7566,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var box = A.errorBox();
     var body = el('div', { 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
-    var card = A.card('نسخ النشر', 'آخر مرات النشر. لما النشر يبقى من السيرفر الجديد تقدر ترجّع الموقع لأي نسخة منهم.', box, body);
+    var card = A.card('النسخ المنشورة', 'كل نشر نسخة كاملة من الموقع. ترجع لأي واحدة بضغطة، والرجوع نفسه بيتسجل كنشر جديد.', box, body);
     card.classList.add('card--publish-history');
 
     function restore(job, live, button) {
@@ -7592,23 +7593,60 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       });
     }
 
+    /* Phase 8B: grouped by day (Cairo), no commit codes: the time, who, and «ارجع للنسخة دي» */
+    var SHOW = 12;
+    var showAll = false;
+
+    function cairo(ms) {
+      var p = {};
+      new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+        .formatToParts(new Date(ms)).forEach(function (x) { p[x.type] = x.value; });
+      return { day: p.year + '-' + p.month + '-' + p.day, hour: +(p.hour === '24' ? 0 : p.hour), minute: p.minute };
+    }
+
+    function clock(c) {
+      var h = c.hour % 12 || 12;
+      return A.digits(h + ':' + c.minute) + (c.hour < 12 ? ' ص' : ' م');
+    }
+
+    var lastData = null;
+
     function draw(data) {
+      lastData = data;
       body.setAttribute('aria-busy', 'false');
       var names = (A.state && A.state.names) || {};
+      var today = A.cairoNow().slice(0, 10);
+      var jobs = showAll ? data.jobs : data.jobs.slice(0, SHOW);
+      var days = [];
+      jobs.forEach(function (job) {
+        var c = cairo(job.at);
+        var last = days[days.length - 1];
+        if (!last || last.day !== c.day) days.push(last = { day: c.day, jobs: [] });
+        last.jobs.push({ job: job, c: c });
+      });
+      var count = function (day) { return data.jobs.filter(function (j) { return cairo(j.at).day === day; }).length; };
       A.fill(body, [
         data.enabled ? null : el('p', { class: 'note' }, 'الرجوع لنسخة قديمة بيشتغل لما النشر يبقى من السيرفر الجديد. دلوقتي الموقع بيتنشر من GitHub.'),
-        data.jobs.length ? el('ul', { class: 'admins' }, data.jobs.map(function (job) {
-          return el('li', { class: 'admin', 'data-publish': job.id },
-            el('div', { class: 'admin__body' },
-              el('p', { class: 'admin__name', text: (PUBLISH_KINDS[job.mode] || job.mode) + ' · ' + ntWhen(job.at) }),
-              el('p', { class: 'admin__email', dir: 'auto', text: (names[job.by] || job.by || '') + (job.revision ? ' · ' + job.revision : '') }),
-              job.live ? A.chip('الحالية', 'ok') : null
-            ),
-            data.enabled && !job.live
-              ? el('button', { class: 'btn btn--small', type: 'button', onclick: function (event) { restore(job, data.live, event.currentTarget); } }, 'ارجع للنسخة دي')
-              : null
-          );
-        })) : el('p', { class: 'note' }, 'لسه مفيش نشر من السيرفر الجديد.')
+        data.jobs.length ? el('div', { class: 'pubdays' }, days.map(function (d) {
+          return el('section', { class: 'pubday' },
+            el('p', { class: 'pubday__title', text: (d.day === today ? 'النهارده · ' : '') + A.formatWall(d.day, false) + ' · ' + A.digits(count(d.day)) + ' نشر' }),
+            el('ul', { class: 'pubday__list' }, d.jobs.map(function (x) {
+              var job = x.job;
+              var who = names[job.by] || job.by || '';
+              return el('li', { class: 'pubrow' + (job.live ? ' is-live' : ''), 'data-publish': job.id },
+                el('span', { class: 'chipico' + (job.live ? ' chipico--ok' : ''), 'aria-hidden': 'true' }, icon(job.live ? 'check' : job.mode === 'restore' ? 'retry' : 'send')),
+                el('div', { class: 'pubrow__body' },
+                  el('p', { class: 'pubrow__time' }, el('b', { text: clock(x.c) }), job.live ? A.chip('الحالية · اللي على الموقع دلوقتي', 'ok') : null),
+                  el('p', { class: 'pubrow__who', dir: 'auto', text: (job.mode === 'restore' ? PUBLISH_KINDS.restore + ' · ' : '') + (who ? 'نشرها ' + who : PUBLISH_KINDS[job.mode] || job.mode) })
+                ),
+                data.enabled && !job.live
+                  ? el('button', { class: 'btn btn--small', type: 'button', onclick: function (event) { restore(job, data.live, event.currentTarget); } }, icon('retry'), 'ارجع للنسخة دي')
+                  : null
+              );
+            })));
+        }), !showAll && data.jobs.length > SHOW
+          ? el('button', { class: 'btn btn--ghost btn--block pubdays__more', type: 'button', onclick: function () { showAll = true; draw(lastData); } }, 'اعرض الأقدم')
+          : null) : el('p', { class: 'note' }, 'لسه مفيش نشر من السيرفر الجديد.')
       ]);
     }
 
@@ -17580,14 +17618,26 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       config.siteUrl ? el('a', { class: 'btn btn--ghost', href: config.siteUrl, target: '_blank', rel: 'noopener' }, icon('external'), 'افتح الموقع') : null
     );
 
+    // Phase 8B: no Git here. The last publish comes from the Worker (its publish list), which is the truth:
+    // the Sheet's copy could say «لسه متنشرش» after a publish.
+    var lastAt = el('dd', { text: s.publishedAt ? A.formatIso(s.publishedAt) : '…' });
+    var lastBy = el('dd', { text: '—' });
+    var W = window.AdminWorker;
+    if (W && W.call) {
+      W.call('GET', '/v1/admin/publish/revisions', undefined, { quiet: true }).then(function (data) {
+        var jobs = (data && data.jobs) || [];
+        var job = jobs.filter(function (j) { return j.id === data.live; })[0] || jobs[0];
+        if (!job) { lastAt.textContent = s.publishedAt ? A.formatIso(s.publishedAt) : 'لسه متنشرش'; return; }
+        var names = (A.state && A.state.names) || {};
+        lastAt.textContent = A.formatIso(new Date(job.at).toISOString());
+        lastBy.textContent = names[job.by] || job.by || '—';
+      }).catch(function () { if (!s.publishedAt) lastAt.textContent = 'لسه متنشرش'; });
+    } else if (!s.publishedAt) lastAt.textContent = 'لسه متنشرش';
+
     var facts = el('dl', { class: 'dash-facts' },
-      el('div', {}, el('dt', { text: 'آخر نشر' }), el('dd', { text: s.publishedAt ? A.formatIso(s.publishedAt) : 'لسه متنشرش' })),
-      el('div', {}, el('dt', { text: 'GitHub' }), el('dd', {},
-        A.chip(github ? 'متوصل' : 'مش متظبط', github ? 'ok' : 'danger'),
-        s.publishedCommit && config.repo
-          ? el('a', { class: 'dash-facts__link', href: 'https://github.com/' + config.repo + '/commit/' + s.publishedCommit, target: '_blank', rel: 'noopener', text: s.publishedCommit.slice(0, 7) })
-          : null
-      )),
+      el('div', {}, el('dt', { text: 'آخر نشر' }), lastAt),
+      el('div', {}, el('dt', { text: 'نشره' }), lastBy),
+      el('div', {}, el('dt', { text: 'تغييرات مستنية' }), el('dd', { text: s.hasChanges ? 'فيه' : 'مفيش' })),
       s.warnings && s.warnings.length ? el('div', {}, el('dt', { text: 'تنبيهات' }), el('dd', { text: String(s.warnings.length).replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; }) + ' (مش بتمنع النشر)' })) : null
     );
 
@@ -19552,8 +19602,21 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   A.activityCard = function () {
 
     var recent = (A.state.activity && A.state.activity.recent) || [];
-    var list = el('ul', { class: 'acts acts--compact', 'aria-label': 'آخر نشاط' }, recent.slice(0, 5).map(function (entry) {
-      return entryNode(entry, { compact: true });
+    // Phase 8B: the same thing done again and again (same person, same action, same item) is one row, «٤ مرات»
+    var groups = [];
+    recent.forEach(function (entry) {
+      var key = JSON.stringify(entry, function (k, v) { return /^(id|at|ts|time|when|seq|rid|ago)$/i.test(k) ? undefined : v; });
+      var last = groups[groups.length - 1];
+      if (last && last.key === key) last.count++;
+      else groups.push({ key: key, entry: entry, count: 1 });
+    });
+    var list = el('ul', { class: 'acts acts--compact', 'aria-label': 'آخر نشاط' }, groups.slice(0, 5).map(function (g) {
+      var node = entryNode(g.entry, { compact: true });
+      if (g.count > 1) {
+        var where = node.querySelector('.act__text, .act__title, p, span') || node;
+        where.appendChild(el('span', { class: 'chip chip--gold act__times', text: String(g.count).replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; }) + ' مرات' }));
+      }
+      return node;
     }));
 
     return el('section', { class: 'card dash-card dash-activity', id: 'dash-activity', 'aria-labelledby': 'dash-activity-title' },

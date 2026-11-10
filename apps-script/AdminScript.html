@@ -2707,6 +2707,7 @@
       el('div', { class: 'sheet__grab', 'aria-hidden': 'true' }),
       el('div', { class: 'sheet__head' },
         el('h2', { class: 'sheet__title', id: 'sheet-title', tabindex: '-1', text: title }),
+        options.headActions ? el('span', { class: 'sheet__headacts' }, options.headActions) : null,
         A.helpButton ? A.helpButton() : null,
         el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: function () { A.closeSheet(); } }, icon('close'))
       ),
@@ -4348,7 +4349,7 @@
 
   /* ---------- the welcome inside the shell, right after signing in ----------
      Phase 8B: the approved preview's intro (docs/phase8/admin-preview.src.html playIntro + dust) as it is,
-     with no «تخطي» button: a tap or a key ends it. Its colours follow the chosen accent; once after signing
+     with no «تخطي» button, and it always plays to its end (a tap does not cut it). Its colours follow the chosen accent; once after signing
      in, never with reduced motion; A.playIntro() («شوف شاشة البداية») plays it again. Same API as before:
      { ready(name), leave() }. */
 
@@ -4428,7 +4429,7 @@
     play('.intro__load', [{ opacity: 0 }, { opacity: 1 }], { duration: 400, delay: 300 });
     play('.intro__progress i', [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: D, easing: 'linear' });
 
-    // it ends by itself once the panel is ready and the bar is full; a tap or a key ends it now
+    // it ends by itself once the panel is ready and the bar is full
     var timer = setTimeout(function () { if (ready) leave(false); }, D);
     var hardStop = setTimeout(function () { leave(false); }, 6000);
 
@@ -4441,7 +4442,6 @@
       if (gone) return;
       gone = true;
       clearTimeout(timer); clearTimeout(hardStop);
-      document.removeEventListener('keydown', onKey, true);
       anims.forEach(function (a) { try { a.finish(); } catch (e) { /* gone */ } });
       box.classList.add('is-leaving');
       ['.intro__text', '.intro__load', '.intro__halo', '.intro__ring', '.intro__sweep'].forEach(function (s) {
@@ -4462,9 +4462,7 @@
       else setTimeout(cleanup, 520);
     }
 
-    function onKey(event) { if (event.key === 'Tab') return; leave(true); }
-    box.addEventListener('pointerdown', function () { leave(true); });
-    document.addEventListener('keydown', onKey, true);
+    // owner (2026-11-11): it plays to its end; a tap or a key no longer ends it
 
     return {
       ready: function (name) {
@@ -5095,17 +5093,17 @@
   A.openReview = function () { openReview(); };
 
   var PUBLISH_STEPS = [
-    { key: 'review', label: 'مراجعة' },
-    { key: 'github', label: 'نشر على GitHub' },
-    { key: 'pages', label: 'انتظار GitHub Pages' },
+    { key: 'review', label: 'راجع التغييرات' },
+    { key: 'github', label: 'انشر' },
+    { key: 'pages', label: 'بنجهز الموقع' },
     { key: 'live', label: 'ظهر على الموقع' }
   ];
 
   /* the Worker publishes (PUBLISH_MODE 'worker', Phase 2/4): live the moment it answers — the
      GitHub copy follows in the background, nobody waits for it (owner 2026-10-22: 3 steps) */
   var PUBLISH_STEPS_LIVE = [
-    { key: 'review', label: 'مراجعة' },
-    { key: 'publish', label: 'نشر' },
+    { key: 'review', label: 'راجع التغييرات' },
+    { key: 'publish', label: 'انشر' },
     { key: 'live', label: 'ظهر على الموقع' }
   ];
 
@@ -5143,6 +5141,18 @@
 
   }
 
+  /* «النسخ السابقة» from the review (the same list as in «الإعدادات» ← «النشر والنسخ») */
+  function historyButton() {
+
+    if (!A.publishHistoryCard || !window.AdminWorker) return null;
+    return el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () {
+      A.openSheet('النسخ السابقة', [A.publishHistoryCard()], [
+        el('button', { class: 'btn', type: 'button', onclick: openReview }, icon('send'), 'رجوع لراجع وانشر')
+      ], { size: 'md' });
+    } }, icon('clock'), 'النسخ السابقة');
+
+  }
+
   function reviewSkeleton() {
 
     return [
@@ -5168,13 +5178,13 @@
     }
 
     publishJob = null;
-    A.openSheet('مراجعة قبل النشر', reviewSkeleton());
+    A.openSheet('راجع وانشر', reviewSkeleton());
 
     reviewNow()
       .then(renderReview)
       .catch(function (error) {
         var box = A.errorBox();
-        A.openSheet('مراجعة قبل النشر', [stepper(0, true), box], [
+        A.openSheet('راجع وانشر', [stepper(0, true), box], [
           el('button', { class: 'btn btn--primary', type: 'button', onclick: openReview }, icon('retry'), 'جرّب تاني'),
           el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })
         ]);
@@ -5238,12 +5248,16 @@
       return el('section', { class: 'review-group' },
         el('h3', { class: 'review-group__title' }, icon(group.icon), group.title),
         el('ul', { class: 'changes' }, group.items.map(function (item) {
+          // Phase 8B: each change a card, its kind as a chip, and «شوف الفرق» (the site with the drafts)
           return el('li', { class: 'is-' + item.tone },
-            el('span', { class: 'visually-hidden', text: tones[item.tone] + ': ' }),
             el('span', { class: 'change__text' },
+              el('span', { class: 'chip change__tone change__tone--' + item.tone, text: tones[item.tone] }),
               el('span', { text: item.text }),
               item.when ? el('span', { class: 'chip chip--gold change__when', text: item.when }) : null
-            )
+            ),
+            A.state && A.state.config && A.state.config.siteUrl && item.tone !== 'remove'
+              ? el('button', { class: 'btn btn--small btn--ghost change__diff', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'شوف الفرق')
+              : null
           );
         }))
       );
@@ -5320,7 +5334,7 @@
       ? el('button', { class: 'btn', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'معاينة')
       : null;
 
-    A.openSheet('مراجعة قبل النشر', body, [publish, preview].concat(A.sheetFooter(publish).slice(1)).filter(Boolean));
+    A.openSheet('راجع وانشر', body, [publish, preview].concat(A.sheetFooter(publish).slice(1)).filter(Boolean), { headActions: historyButton() });
 
   }
 

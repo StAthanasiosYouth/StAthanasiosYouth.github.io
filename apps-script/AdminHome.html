@@ -76,14 +76,26 @@
       config.siteUrl ? el('a', { class: 'btn btn--ghost', href: config.siteUrl, target: '_blank', rel: 'noopener' }, icon('external'), 'افتح الموقع') : null
     );
 
+    // Phase 8B: no Git here. The last publish comes from the Worker (its publish list), which is the truth:
+    // the Sheet's copy could say «لسه متنشرش» after a publish.
+    var lastAt = el('dd', { text: s.publishedAt ? A.formatIso(s.publishedAt) : '…' });
+    var lastBy = el('dd', { text: '—' });
+    var W = window.AdminWorker;
+    if (W && W.call) {
+      W.call('GET', '/v1/admin/publish/revisions', undefined, { quiet: true }).then(function (data) {
+        var jobs = (data && data.jobs) || [];
+        var job = jobs.filter(function (j) { return j.id === data.live; })[0] || jobs[0];
+        if (!job) { lastAt.textContent = s.publishedAt ? A.formatIso(s.publishedAt) : 'لسه متنشرش'; return; }
+        var names = (A.state && A.state.names) || {};
+        lastAt.textContent = A.formatIso(new Date(job.at).toISOString());
+        lastBy.textContent = names[job.by] || job.by || '—';
+      }).catch(function () { if (!s.publishedAt) lastAt.textContent = 'لسه متنشرش'; });
+    } else if (!s.publishedAt) lastAt.textContent = 'لسه متنشرش';
+
     var facts = el('dl', { class: 'dash-facts' },
-      el('div', {}, el('dt', { text: 'آخر نشر' }), el('dd', { text: s.publishedAt ? A.formatIso(s.publishedAt) : 'لسه متنشرش' })),
-      el('div', {}, el('dt', { text: 'GitHub' }), el('dd', {},
-        A.chip(github ? 'متوصل' : 'مش متظبط', github ? 'ok' : 'danger'),
-        s.publishedCommit && config.repo
-          ? el('a', { class: 'dash-facts__link', href: 'https://github.com/' + config.repo + '/commit/' + s.publishedCommit, target: '_blank', rel: 'noopener', text: s.publishedCommit.slice(0, 7) })
-          : null
-      )),
+      el('div', {}, el('dt', { text: 'آخر نشر' }), lastAt),
+      el('div', {}, el('dt', { text: 'نشره' }), lastBy),
+      el('div', {}, el('dt', { text: 'تغييرات مستنية' }), el('dd', { text: s.hasChanges ? 'فيه' : 'مفيش' })),
       s.warnings && s.warnings.length ? el('div', {}, el('dt', { text: 'تنبيهات' }), el('dd', { text: String(s.warnings.length).replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; }) + ' (مش بتمنع النشر)' })) : null
     );
 
