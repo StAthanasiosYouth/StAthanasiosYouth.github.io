@@ -139,3 +139,8 @@ html.s2-still .s2-sugg__dots button.on i::after { animation: none; transform: sc
   .s2-rail.s2-rail--sv { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; grid-auto-flow: row; overflow: visible; }
 }
 @media (max-width: 1023px) { .s2-rail.s2-rail--sv { grid-template-columns: none !important; } }
+/* S9 audit: the slide dots are real tap targets (32 px tall), the bar stays thin */
+.s2-sugg__dots { gap: 2px; margin-top: 4px; }
+.s2-sugg__dots button { height: 32px; min-width: 32px; }
+.s2-sugg__dots button i { inset: 14px 5px; }
+.s2-sugg__dots button.on { width: 54px; }
