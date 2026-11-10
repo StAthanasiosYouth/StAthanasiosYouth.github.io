@@ -1,0 +1,25 @@
+/* S7 — account + store, over the live account.css / comp.css. Live tokens only. */
+
+/* the bar like the home */
+.s7 .cbar__name { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; color: var(--gold-hi); }
+.s7 .cbar__brand img { width: 36px; height: 36px; box-shadow: 0 0 0 1px var(--gold-line-strong); }
+
+/* «لون الموقع» row */
+.s7 button.ac-row { width: 100%; font: inherit; color: inherit; background: none; border: 0; text-align: start; cursor: pointer; }
+.s7-row-ic { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: rgba(255, 255, 255, .05); }
+.s7-row-ic i { width: 22px; height: 22px; border-radius: 50%; background: conic-gradient(#d8ab51, #4cc3cb, #4fca8c, #e8789f, #ef8a4c, #9a95ee, #d8ab51); box-shadow: 0 0 0 2px rgba(2, 9, 20, .6); }
+
+/* store: filters + one grid */
+.s7-cats { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 12px; }
+.s7-cats button { flex: none; height: 38px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--gold-line-strong); background: rgba(8, 33, 61, .7); color: var(--text-2); font: 700 .88rem var(--font-ui); cursor: pointer; }
+.s7-cats button.on { background: linear-gradient(180deg, var(--gold-hi), var(--gold)); color: var(--gold-ink); border-color: transparent; }
+.s7 .s7-shop { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 640px) { .s7 .s7-shop { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.s7 .s7-shop .shop__item[hidden] { display: none; }
+.s7-art { display: grid; place-items: center; width: 100%; height: 100%; color: var(--gold-hi); background: radial-gradient(70% 80% at 50% 110%, rgba(215, 170, 80, .3), transparent 70%), var(--navy-800); }
+.s7-art svg { width: 46%; max-width: 74px; height: auto; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .5)); }
+.s7-cat { display: inline-flex; align-self: start; justify-self: start; height: 22px; padding: 0 9px; border-radius: 999px; align-items: center; background: rgba(215, 170, 80, .14); color: var(--gold-hi); font-size: .7rem; font-weight: 800; margin-bottom: 4px; }
+.s7-need { display: grid; gap: 6px; margin-top: 6px; }
+.s7-need__bar { height: 6px; border-radius: 6px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.s7-need__bar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--gold), var(--gold-hi)); }
+.s7-need__t { font-size: .8rem; font-weight: 800; color: var(--text-2); }

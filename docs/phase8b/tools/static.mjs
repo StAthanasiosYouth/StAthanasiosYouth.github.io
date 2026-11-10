@@ -12,6 +12,10 @@ createServer(async (q, r) => {
   // S6: a sample event with online booking (the live page engine + booking.js; API: tools/book-mock.mjs). ?s6=1 adds the redesign layer
   if (u.pathname === '/events/s6-sample/' || u.pathname === '/events/s6-sample/index.html') p = u.searchParams.has('s6') ? 'docs/site-redesign/s6/new.html' : 'docs/site-redesign/s6/now.html';
   if (u.pathname === '/events/s6-sample/event.json') p = 'docs/site-redesign/s6/event.json';
+  // S7: the account and «نقاطي» pages with the redesign layer (?s7=1)
+  const s7 = /^\/(account|points)\/(index\.html)?$/.exec(u.pathname);
+  if (s7 && u.searchParams.has('s7')) p = `docs/site-redesign/s7/${s7[1]}.html`;
+  else if (s7 && u.searchParams.has('api')) p = `docs/site-redesign/s7/${s7[1]}-now.html`;
   // S5: a service page with the redesign layer, at its own address (the page engine reads ./page.json next to it)
   const svc = /^\/(black-theatre|silenttheatre)\/(index\.html|page\.json)$/.exec(u.pathname);
   if (svc && svc[2] === 'index.html' && u.searchParams.has('s5')) p = `docs/site-redesign/svc/${svc[1]}.html`;
