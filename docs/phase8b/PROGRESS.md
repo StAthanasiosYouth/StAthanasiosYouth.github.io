@@ -38,10 +38,12 @@
 - [x] «الألعاب · قريبًا» في مجموعة «الشغل» بعد المسابقات (لسه بيظهر بس لما `GAMES_MODULE=1`، زي اختبار Phase 8 A7).
 - [x] شريط الموبايل: الرئيسية · المسابقات · الشباب · الحجوزات · المزيد.
 - [x] أداة المواعيد الواحدة `A.whenPicker` (اختيارات سريعة + تقويم + ساعة + امسح + الميعاد بالكلام) من زرار التقويم في كل `A.dateTimeInput`.
+- [x] اختبارات W1: unit 768/769 (الفاشل قديم)، و e2e (refine-b, fix-admin, admin-layout, content-worker) كلها عدّت ما عدا القديم.
 - [ ] باقي W1: لوحة «قبل النشر»/المعاينة على شمال النافذة الكبيرة (`maside`) — هتتعمل لكل محرر في W3 مع محرره؛ قائمة ⋯ لكل عنصر — مع كل قسم في W3–W5؛ صورة الأدمن في الشريط — W6 (محتاجة الـWorker).
 
 ## اختبارات معروفة إنها فاشلة قبل أي تغيير (مش من 8B)
 - `tests/activities.test.mjs` «a competition and a trip are published…» (ميعاد في البيانات عدّى).
+- `tests/admin.e2e.mjs` «review: changes grouped in plain words…» (فاشل على c5fab18).
 - `tests/admin.e2e.mjs`: «12 MP phone photo»، «small image»، «Drive failure»، «library: tiles»، «من المكتبة»، «a section gets a colour»؛ و«allowlist card» — فاشلين على c5fab18 كمان.
 
 ## السجل

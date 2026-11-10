@@ -1210,14 +1210,14 @@
 
     describe();
 
-    // Phase 8B: the one schedule picker (A.whenPicker), from a calendar button next to the fields
-    var pick = el('button', { class: 'icon-btn datetime__pick', type: 'button', 'aria-label': 'اختار الميعاد من التقويم', onclick: function () {
+    // Phase 8B: the one schedule picker (A.whenPicker), from a «التقويم» chip after the quick choices
+    presets.push(el('button', { class: 'preset datetime__pick', type: 'button', 'aria-label': 'اختار الميعاد من التقويم', onclick: function () {
       A.whenPicker({ title: options.title || 'الميعاد', sub: options.sub || '', value: current(), presets: options.presets || [], dateOnly: options.dateOnly, onDone: set });
-    } }, icon('calendar'));
+    } }, icon('calendar'), 'التقويم'));
 
     return {
       node: el('div', { class: 'datetime' },
-        el('div', { class: 'row' }, date, time, pick),
+        el('div', { class: 'row' }, date, time),
         presets.length ? el('div', { class: 'presets' }, presets) : null,
         said
       ),

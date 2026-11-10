@@ -386,7 +386,7 @@ async function measureSheet(page) {
     const foot = sheet.querySelector('.sheet__foot')?.getBoundingClientRect();
     return {
       top: Math.round(r.top), left: Math.round(r.left), bottom: Math.round(r.bottom), width: Math.round(r.width), height: Math.round(r.height),
-      vw: innerWidth, vh: innerHeight,
+      vw: document.documentElement.clientWidth, vh: innerHeight,
       scrolls: body.scrollHeight > body.clientHeight + 1,
       headIn: head.top >= r.top && head.bottom <= r.bottom,
       footIn: !foot || (foot.top >= r.top && foot.bottom <= r.bottom + 1),
