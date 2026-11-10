@@ -360,8 +360,7 @@
   build(); seek(0, true); $('#stagename').textContent = 'البوابة: لمسة بتشغّل الصوت';
   $('#gate').addEventListener('click', function () { try { audio(); } catch (e) {} $('#gate').classList.add('is-off'); setTimeout(function () { go(true); }, 120); });
   $('#replay').addEventListener('click', function () { if (!AC) { try { audio(); } catch (e) {} } $('#gate').classList.add('is-off'); go(true); });
-  // a tap during the intro jumps to the account card (the sound stops)
-  $('#stage').addEventListener('click', function (e) { if (e.target.closest('.gate, .cta')) return; if (started == null || done) return; sfxTimers.forEach(clearTimeout); seek(1e5, false); done = true; });
+  // owner 2026-11-11: a tap never cuts the intro short (it plays to its end)
 })();
 </script>
 </body>

@@ -4,7 +4,7 @@
    0.60–1.15  «مساء الخير» · the name in Ruqaa revealed right-to-left · gold rule · chip with the next meeting
    1.30–2.08  text lifts away, the ring opens out, the logo flies on a curve into the top bar; the page rises in behind
    2.08       the bar logo lands with a small gold pulse
-   ?freeze=<ms> holds one moment for review frames. Tap skips. Reduced motion: no intro. */
+   ?freeze=<ms> holds one moment for review frames. A tap does not skip it (owner, 2026-11-11). Reduced motion: no intro. */
 (function () { function run() {
   var Q = new URLSearchParams(location.search);
   if (!Q.get('intro') || Q.get('v') !== 'member' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -81,5 +81,5 @@
   function done() { target.classList.remove('is-waiting'); target.classList.add('is-landed'); el.remove(); }
   if (FREEZE != null) { anims.forEach(function (x) { x.pause(); x.currentTime = FREEZE; }); if (FREEZE >= END) { el.remove(); target.classList.remove('is-waiting'); } return; }
   setTimeout(done, END);
-  el.addEventListener('click', function () { anims.forEach(function (x) { try { x.finish(); } catch (e) {} }); done(); });
+  // owner 2026-11-11: a tap never cuts the intro short (it plays to its end)
 } if (window.S2_DEFER_INTRO) window.S2_RUN_INTRO = run; else run(); })();
