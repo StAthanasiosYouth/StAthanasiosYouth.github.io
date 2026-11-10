@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>الموقع العام — ملف التغييرات (دلوقتي ← الجديد)</title>
+<!-- One file for the whole public-site redesign: every part of the site, the live site today next to the design, with
+     what stays, what changes and why. Data in changes.js; each new batch appends its phase there. Images: tools/changes-shots.mjs -->
+<style>
+  @font-face { font-family: "Cairo"; src: url("../../assets/fonts/cairo-arabic.woff2") format("woff2"); unicode-range: U+0600-06FF, U+FB50-FDFF, U+FE70-FEFF; font-weight: 200 1000; }
+  @font-face { font-family: "Cairo"; src: url("../../assets/fonts/cairo-latin.woff2") format("woff2"); unicode-range: U+0000-00FF; font-weight: 200 1000; }
+  :root { --gold: #d7aa50; --gold-hi: #f2d28b; --bg: #020a16; --line: rgb(242 210 139 / .16); --t2: #b9c6d6; --t3: #7d8ea3; --keep: #4fd69c; --chg: #f2c46b; --new: #7cc4ff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Cairo", system-ui, sans-serif; background: radial-gradient(60% 40% at 50% -10%, #0d2b4f, transparent 70%), var(--bg); color: #eef3f9; }
+  .wrap { max-width: 1320px; margin: 0 auto; padding: 28px 22px 90px; }
+  h1 { margin: 0; font-size: 28px; color: var(--gold-hi); }
+  .lead { color: var(--t2); margin: 8px 0 18px; line-height: 1.9; font-size: 14.5px; max-width: 980px; }
+  .how { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0 0 18px; }
+  .how div { padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: rgb(7 26 51 / .6); font-size: 13px; line-height: 1.7; color: var(--t2); }
+  .how b { display: block; font-size: 13.5px; margin-bottom: 2px; }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 0; margin-bottom: 10px; }
+  .seg { position: fixed; left: 18px; bottom: 18px; z-index: 5; box-shadow: 0 10px 30px -10px #000; }
+  .item, .phase { scroll-margin-top: 16px; }
+  .cmp.wide { grid-template-columns: 1fr !important; }
+  .cmp.wide .side--now .imgs.frames, .cmp.wide .side--now .empty { max-width: 640px; }
+  .seg { display: inline-flex; padding: 4px; border-radius: 999px; border: 1px solid var(--line); background: rgb(7 26 51 / .8); }
+  .seg button { font: 800 13px Cairo, sans-serif; color: var(--t2); background: none; border: 0; padding: 7px 16px; border-radius: 999px; cursor: pointer; }
+  .seg button.on { background: linear-gradient(180deg, #f2d28b, #c99a43); color: #1c1405; }
+  .toc { display: flex; flex-wrap: wrap; gap: 6px; }
+  .toc a { color: var(--t2); text-decoration: none; font-weight: 700; font-size: 12.5px; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line); }
+  .toc a.ph { color: var(--gold-hi); border-color: rgb(242 210 139 / .4); }
+  .phase { margin: 34px 0 14px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .phase h2 { margin: 0; font-size: 23px; color: var(--gold-hi); }
+  .phase small { color: var(--t3); }
+  .plead { color: var(--t2); font-size: 14px; line-height: 1.9; margin: 0 0 16px; }
+  .item { margin-bottom: 26px; padding: 18px; border-radius: 22px; border: 1px solid var(--line); background: linear-gradient(180deg, rgb(13 40 73 / .5), rgb(7 26 51 / .85)); }
+  .item h3 { margin: 0 0 12px; font-size: 18px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .st { font-size: 11.5px; font-weight: 800; padding: 2px 10px; border-radius: 999px; }
+  .st--ok { background: rgb(79 214 156 / .15); color: var(--keep); }
+  .st--wait { background: rgb(242 196 107 / .15); color: var(--chg); }
+  .st--keep { background: rgb(124 196 255 / .14); color: var(--new); }
+  .st--todo { background: rgb(255 255 255 / .08); color: var(--t3); }
+  .cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+  .side > b { display: block; font-size: 13px; margin-bottom: 8px; }
+  .side--now > b { color: var(--t2); } .side--new > b { color: var(--gold-hi); }
+  .imgs { display: flex; flex-direction: column; gap: 8px; }
+  .imgs img { width: 100%; display: block; border-radius: 14px; border: 1px solid rgb(255 255 255 / .12); background: #000; }
+  .imgs.frames { flex-direction: row; } .imgs.frames img { width: calc((100% - 8px * (var(--n) - 1)) / var(--n)); min-width: 0; }
+  .empty { display: grid; place-items: center; min-height: 140px; padding: 18px; border-radius: 14px; border: 1px dashed rgb(255 255 255 / .18); color: var(--t3); font-size: 13.5px; text-align: center; }
+  .notes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+  .notes div { padding: 12px 14px; border-radius: 14px; background: rgb(2 12 24 / .55); border: 1px solid rgb(255 255 255 / .07); font-size: 13.5px; line-height: 1.85; color: #dfe7f1; }
+  .notes ul { margin: 0; padding: 0 18px 0 0; } .notes li { margin: 2px 0; }
+  .notes .k b { color: var(--keep); } .notes .c b { color: var(--chg); }
+  .notes b.h { display: block; font-size: 12.5px; margin-bottom: 4px; }
+  .why { margin: 10px 0 0; font-size: 13.5px; color: var(--t2); line-height: 1.8; } .why b { color: var(--gold-hi); }
+  .warn { margin: 8px 0 0; font-size: 12.5px; color: var(--t3); }
+  .live { display: inline-block; margin-top: 10px; font-size: 13px; font-weight: 700; color: var(--gold-hi); }
+  /* phone mode: narrow phone crops side by side; desktop mode: wide crops stacked */
+  body.desk .cmp { grid-template-columns: 1fr; }
+  body.phone .cmp:not(.wide) .imgs:not(.frames) { max-width: 420px; }
+  body.phone .cmp:not(.wide) { grid-template-columns: minmax(0, 420px) minmax(0, 420px); justify-content: start; gap: 28px; }
+  @media (max-width: 900px) { .how, .notes { grid-template-columns: 1fr; } .cmp, body.phone .cmp:not(.wide) { grid-template-columns: 1fr 1fr; gap: 10px; } }
+</style>
+<body class="phone">
+<div class="wrap">
+  <h1>ملف التغييرات — الموقع العام</h1>
+  <p class="lead">كل جزء في الموقع: <b>دلوقتي</b> (صورة من الموقع الحقيقي النهارده) جنب <b>الجديد</b> (صورة من التصميم)، وتحتهم إيه اللي هيفضل، وإيه اللي هيتغير، وليه. كل مرحلة جديدة في إعادة التصميم بتتضاف في آخر نفس الملف ده، فتلاقي كل حاجة في مكان واحد. ده تصميم بس: مفيش أي حاجة اتغيرت في الموقع الحقيقي.</p>
+  <div class="how">
+    <div><b style="color:var(--keep)">معتمد</b>إنت وافقت عليه.</div>
+    <div><b style="color:var(--chg)">مستني رأيك</b>اتعمل ومحتاج تشوفه وتقولي رأيك.</div>
+    <div><b style="color:var(--new)">هيفضل زي ما هو</b>نفس اللي في الموقع بالظبط، وممكن مكانه بس يتغير.</div>
+    <div><b style="color:var(--t3)">لسه</b>مرحلة جاية، لسه متعملتش.</div>
+  </div>
+  <div class="bar"><span class="seg" id="seg"><button data-m="phone" class="on">موبايل</button><button data-m="desk">كمبيوتر</button></span><nav class="toc" id="toc"></nav></div>
+  <div id="list"></div>
+</div>
+<script src="changes.js"></script>
+<script>
+(function () {
+  var ST = { ok: 'معتمد', wait: 'مستني رأيك', keep: 'هيفضل زي ما هو', todo: 'لسه' };
+  var mode = /desk/.test(location.hash) ? 'desk' : 'phone';
+  function src(name) {
+    if (name.indexOf('shots/') === 0) return mode === 'desk' ? name.replace('/phone/', '/desktop/') : name;
+    return 'shots/changes/' + (mode === 'desk' ? 'desktop' : 'phone') + '/' + name;
+  }
+  function imgs(list, frames) {
+    return '<div class="imgs' + (frames ? ' frames' : '') + '" style="--n:' + list.length + '">' + list.map(function (n) { return '<img loading="lazy" src="' + src(n) + '" alt="" onerror="this.replaceWith(Object.assign(document.createElement(\'div\'),{className:\'empty\',textContent:\'مفيش صورة للمقاس ده\'}))">'; }).join('') + '</div>';
+  }
+  function ul(a) { return '<ul>' + a.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>'; }
+  function render() {
+    document.body.className = mode;
+    var toc = '', out = '';
+    window.SITE_CHANGES.forEach(function (ph) {
+      toc += '<a class="ph" href="#' + ph.id + '">' + ph.id + '</a>';
+      out += '<div class="phase" id="' + ph.id + '"><h2>' + ph.title + '</h2><span class="st st--' + ph.status + '">' + ST[ph.status] + '</span><small>' + (ph.date || '') + '</small></div>' + (ph.lead ? '<p class="plead">' + ph.lead + '</p>' : '');
+      ph.items.forEach(function (it) {
+        toc += '<a href="#' + ph.id + '-' + it.k + '">' + it.title.split(':')[0].split('(')[0].trim() + '</a>';
+        var now = it.now === undefined ? ['now-' + it.k + '.png'] : it.now;
+        var next = (mode === 'desk' && it.nextDesk) ? it.nextDesk : (it.next || ['new-' + it.k + '.png'].concat(it.extra || []));
+        var frames = next.length > 2;
+        var nowHtml = now ? imgs(now, now.length > 2) : '<div class="empty">' + (it.nowNote || 'مش موجود دلوقتي.') + '</div>';
+        if (mode === 'desk' && it.k === 'bar') nowHtml = '<div class="empty">' + it.nowNote + '</div>';
+        out += '<section class="item" id="' + ph.id + '-' + it.k + '"><h3>' + it.title + '<span class="st st--' + it.status + '">' + ST[it.status] + '</span></h3>' +
+          '<div class="cmp' + (frames ? ' wide' : '') + '"><div class="side side--now"><b>دلوقتي</b>' + nowHtml + (now && it.nowNote && it.k !== 'bar' ? '<p class="warn">' + it.nowNote + '</p>' : '') + '</div>' +
+          '<div class="side side--new"><b>الجديد</b>' + imgs(next, frames) + '</div></div>' +
+          '<div class="notes">' + (it.keep ? '<div class="k"><b class="h">هيفضل</b>' + ul(it.keep) + '</div>' : '<div class="k"><b class="h">هيفضل</b>— (حاجة جديدة)</div>') +
+          '<div class="c"><b class="h">هيتغير</b>' + ul(it.change || []) + '</div></div>' +
+          (it.why ? '<p class="why"><b>ليه:</b> ' + it.why + '</p>' : '') + (it.note ? '<p class="warn">' + it.note + '</p>' : '') +
+          (it.live ? '<a class="live" href="' + it.live + '">افتحها حيّة ‹</a>' : '') + '</section>';
+      });
+    });
+    document.getElementById('toc').innerHTML = toc;
+    document.getElementById('list').innerHTML = out;
+    [].forEach.call(document.querySelectorAll('#seg button'), function (b) { b.classList.toggle('on', b.dataset.m === mode); });
+  }
+  document.getElementById('seg').onclick = function (e) { var m = e.target.dataset && e.target.dataset.m; if (!m || m === mode) return; mode = m; history.replaceState(null, '', m === 'desk' ? '#desk' : '#'); var y = scrollY; render(); scrollTo(0, y); };
+  render();
+})();
+</script>
+</body>
+</html>

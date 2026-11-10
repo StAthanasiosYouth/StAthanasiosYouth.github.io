@@ -1,0 +1,28 @@
+/* S2 — member intro v2 (the person already has an account). Logo only, ~2.1 s, then the logo flies into the top bar. */
+.mi { position: fixed; inset: 0; z-index: 60; overflow: hidden; }
+.mi__bg { position: absolute; inset: 0; background: #020914; }
+.mi__art { position: absolute; left: 50%; top: 44%; width: 220vmax; height: 220vmax; margin: -110vmax 0 0 -110vmax; background: repeating-conic-gradient(from 0deg, rgb(242 210 139 / .07) 0deg 1.2deg, transparent 1.2deg 9deg); -webkit-mask: radial-gradient(closest-side, #000 4%, transparent 30%); mask: radial-gradient(closest-side, #000 4%, transparent 30%); opacity: 0; }
+.mi__veil { position: absolute; inset: 0; background: radial-gradient(42% 34% at 50% 44%, rgb(16 52 94 / .75), rgb(2 9 20 / .2) 60%, transparent 75%), radial-gradient(120% 90% at 50% 50%, transparent 40%, #01060e 100%); }
+.mi__stage { position: absolute; inset: 0; display: grid; place-items: center; }
+.mi__core { display: flex; flex-direction: column; align-items: center; transform: translateY(-3vh); }
+.mi__seal { --d: clamp(132px, 24vmin, 230px); position: relative; width: var(--d); height: var(--d); }
+.mi__bloom { position: absolute; inset: -60%; border-radius: 50%; background: radial-gradient(closest-side, rgb(242 210 139 / .34), rgb(242 210 139 / .08) 55%, transparent); opacity: 0; pointer-events: none; }
+.mi__svg { position: absolute; inset: -16%; width: 132%; height: 132%; overflow: visible; }
+.mi__svg circle { fill: none; }
+.mi__track { stroke: rgb(242 210 139 / .14); stroke-width: .6; }
+.mi__draw { stroke: url(#miGold); stroke-width: 1.3; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; }
+.mi__head { position: absolute; inset: -16%; }
+.mi__head i { position: absolute; left: 50%; top: 0; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: #fff6dc; box-shadow: 0 0 10px 3px rgb(242 210 139 / .9), 0 0 26px 8px rgb(242 210 139 / .35); }
+.mi__disc { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 1.5px rgb(242 210 139 / .75), 0 30px 60px -30px #000; }
+.mi__disc img { width: 100%; height: 100%; display: block; }
+.mi__shine { position: absolute; inset: -20%; background: linear-gradient(105deg, transparent 38%, rgb(255 246 220 / .55) 50%, transparent 62%); mix-blend-mode: screen; }
+.mi__text { margin-top: calc(var(--d) * .16 + clamp(16px, 3vh, 30px)); text-align: center; }
+.mi__hi { display: block; font: 700 clamp(13px, 2vmin, 18px)/1 Cairo, system-ui, sans-serif; letter-spacing: .02em; color: rgb(242 210 139 / .72); }
+.mi__name { display: block; margin-top: 6px; font: 700 clamp(38px, 7.4vmin, 76px)/1.25 "Aref Ruqaa", serif; color: #f6dda0; text-shadow: 0 0 30px rgb(242 210 139 / .25); }
+.mi__rule { display: block; width: clamp(90px, 16vh, 150px); height: 1px; margin: 10px auto 0; background: linear-gradient(90deg, transparent, #f2d28b, transparent); }
+.mi__chip { display: inline-flex; align-items: center; gap: 8px; margin-top: 14px; padding: 6px 14px; border-radius: 999px; border: 1px solid rgb(242 210 139 / .28); background: rgb(7 26 51 / .6); font: 700 clamp(12.5px, 1.8vmin, 16px)/1.4 Cairo, system-ui, sans-serif; color: #dfe7f1; }
+.mi__chip b { color: #f2d28b; }
+.mi__chip svg { width: 16px; height: 16px; color: #f2d28b; }
+.top__brand img.is-waiting { opacity: 0; }
+.top__brand img.is-landed { border-radius: 50%; animation: miLand .7s cubic-bezier(.16,1,.3,1); }
+@keyframes miLand { 0% { box-shadow: 0 0 0 0 rgb(242 210 139 / .9); } 100% { box-shadow: 0 0 0 14px rgb(242 210 139 / 0); } }

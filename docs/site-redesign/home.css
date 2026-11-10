@@ -190,15 +190,3 @@ html.still .sugg__bar i.on::after { transform: scaleX(.45); }
   .top__brand b { font-size: 18px; white-space: nowrap; }
   .tbtn--me { padding: 0 12px; }
 }
-
-/* ---------- member intro (after the account exists): logo only, fast, the logo flies to its place in the top bar ---------- */
-.mi { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; pointer-events: auto; }
-.mi__bg { position: absolute; inset: 0; background: radial-gradient(46% 40% at 50% 46%, #12355f 0%, #061a31 55%, #020914 100%); }
-.mi__core { position: relative; display: flex; flex-direction: column; align-items: center; gap: clamp(14px, 2.4vh, 26px); }
-.mi__logo { position: relative; width: clamp(120px, 22vmin, 220px); aspect-ratio: 1; }
-.mi__logo img { width: 100%; height: 100%; border-radius: 50%; display: block; box-shadow: 0 0 0 2px rgb(242 210 139 / .7), 0 0 60px 4px rgb(242 210 139 / .3), 0 24px 50px -26px #000; }
-.mi__ring { position: absolute; inset: -14px; border-radius: 50%; border: 1px solid rgb(242 210 139 / .55); }
-.mi__wave { position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid rgb(242 210 139 / .7); opacity: 0; }
-.mi__hello { margin: 0; font-family: "Aref Ruqaa", serif; font-size: clamp(26px, 4.6vh, 44px); color: var(--gold-hi); }
-.mi__hello b { font-weight: 700; }
-.top__brand img.is-waiting { opacity: 0; }
