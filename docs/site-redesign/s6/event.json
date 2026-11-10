@@ -1,0 +1,115 @@
+{
+ "schema": 1,
+ "v": "s6sample01",
+ "id": "evt-s6sample",
+ "slug": "s6-sample",
+ "kind": "trip",
+ "kindLabel": "رحلة",
+ "title": "يوم ترفيهي على البحر",
+ "shortTitle": "يوم على البحر",
+ "summary": "مثال: يوم كامل على البحر في سفاجا: ألعاب، ومسابقات، وغدا، وصلاة في الآخر.",
+ "body": "مثال (مش فعالية حقيقية): هنتجمع الساعة ٩ الصبح قدام الكنيسة، ونرجع ٦ المغرب.\nالسعر شامل المواصلات والغدا والمشروبات.\nهات معاك مايوه وفوطة وكريم شمس.",
+ "theme": "azure",
+ "cover": null,
+ "gallery": [],
+ "startAt": "2026-11-14T09:00",
+ "endAt": "2026-11-14T18:00",
+ "location": {
+  "name": "شاطئ سفاجا العام",
+  "url": null
+ },
+ "terms": "الحجز بيتأكد بعد ما الخادم يراجع صورة التحويل.\nلو اعتذرت قبل الرحلة بيومين بنرجّع المبلغ كامل.",
+ "partner": null,
+ "booking": {
+  "online": true,
+  "opensAt": "",
+  "closesAt": "2026-11-13T22:00",
+  "capacity": 40,
+  "showLeft": true,
+  "showLeftBelow": 20,
+  "perBookingMax": 4,
+  "collectNames": true,
+  "participants": true,
+  "contactOnPage": true,
+  "contactAfter": true,
+  "pricing": {
+   "mode": "group",
+   "categories": [
+    {
+     "key": "adult",
+     "label": "شباب",
+     "group": "adult",
+     "price": 150,
+     "seat": true,
+     "min": 0,
+     "max": 4,
+     "note": ""
+    },
+    {
+     "key": "child",
+     "label": "أطفال (تحت ١٢)",
+     "group": "child",
+     "price": 75,
+     "seat": true,
+     "min": 0,
+     "max": 3,
+     "note": "لازم يبقى معاه حد كبير"
+    }
+   ]
+  },
+  "payment": {
+   "mode": "installments",
+   "minFirst": 75,
+   "finalDueAt": "2026-11-13T22:00"
+  },
+  "methods": [
+   {
+    "key": "cash",
+    "label": "كاش",
+    "icon": "",
+    "needsProof": false,
+    "online": false
+   },
+   {
+    "key": "instapay",
+    "label": "إنستاباي",
+    "icon": "",
+    "needsProof": true,
+    "online": true
+   },
+   {
+    "key": "wallet",
+    "label": "محفظة",
+    "icon": "",
+    "needsProof": true,
+    "online": true
+   }
+  ],
+  "servants": [
+   {
+    "id": "srv-s6aaaaaa",
+    "name": "اسم الخادم (مثال)",
+    "role": "مسؤول الرحلة",
+    "image": null,
+    "wa": "https://wa.me/201000000001",
+    "methods": [
+     "cash",
+     "instapay",
+     "wallet"
+    ]
+   },
+   {
+    "id": "srv-s6bbbbbb",
+    "name": "اسم الخادمة (مثال)",
+    "role": "خادمة الرحلة",
+    "image": null,
+    "wa": "https://wa.me/201000000002",
+    "methods": [
+     "cash",
+     "instapay"
+    ]
+   }
+  ]
+ },
+ "publishedAt": "2026-11-09T12:00"
+}

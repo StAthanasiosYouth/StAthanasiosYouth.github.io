@@ -9,6 +9,9 @@ createServer(async (q, r) => {
   let p = normalize(decodeURIComponent(u.pathname)).replace(/^([\/])+/, '');
   // the public-site S2 final mockup runs the live home code, which mounts its home-only parts (the bottom bar) on the home address
   if (u.pathname === '/index.html' && u.searchParams.has('s2')) p = 'docs/site-redesign/final.html';
+  // S6: a sample event with online booking (the live page engine + booking.js; API: tools/book-mock.mjs). ?s6=1 adds the redesign layer
+  if (u.pathname === '/events/s6-sample/' || u.pathname === '/events/s6-sample/index.html') p = u.searchParams.has('s6') ? 'docs/site-redesign/s6/new.html' : 'docs/site-redesign/s6/now.html';
+  if (u.pathname === '/events/s6-sample/event.json') p = 'docs/site-redesign/s6/event.json';
   // S5: a service page with the redesign layer, at its own address (the page engine reads ./page.json next to it)
   const svc = /^\/(black-theatre|silenttheatre)\/(index\.html|page\.json)$/.exec(u.pathname);
   if (svc && svc[2] === 'index.html' && u.searchParams.has('s5')) p = `docs/site-redesign/svc/${svc[1]}.html`;
