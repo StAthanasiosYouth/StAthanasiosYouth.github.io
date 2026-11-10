@@ -3892,6 +3892,7 @@
   var RAIL_KEY = 'athanasios-admin.rail';
   var GROUPS = { main: 'الشغل', site: 'الموقع', team: 'الفريق' };
   var DOCK_MAIN = 4;
+  var DOCK_PLACES = ['comps', 'youth', 'bookings'];
   var railLight = null;
 
   function railClosed() {
@@ -3950,7 +3951,13 @@
     var all = A.visibleAreas().filter(function (a) { return a.key !== 'settings'; }).map(function (a, i) { return { a: a, i: i }; })
       .sort(function (x, y) { return (order.indexOf(x.a.group || 'site') - order.indexOf(y.a.group || 'site')) || (x.i - y.i); }).map(function (x) { return x.a; });
     all = all.filter(function (a) { return a.key === home; }).concat(all.filter(function (a) { return a.key !== home; }));
-    return { main: all.slice(0, DOCK_MAIN), rest: all.slice(DOCK_MAIN) };
+    // Phase 8B: the dock's own places (الرئيسية · المسابقات · الشباب · الحجوزات), those this admin has, in that
+    // order after their home; the rest fill up (never a locked «قريبًا» area); the others go under «المزيد»
+    var main = all.slice(0, 1);
+    DOCK_PLACES.forEach(function (key) { var a = all.filter(function (x) { return x.key === key; })[0]; if (a && main.indexOf(a) === -1) main.push(a); });
+    all.forEach(function (a) { if (main.length < DOCK_MAIN && main.indexOf(a) === -1 && !a.soon) main.push(a); });
+    main = main.slice(0, DOCK_MAIN);
+    return { main: main, rest: all.filter(function (a) { return main.indexOf(a) === -1; }) };
   }
 
   function moreButton(restSelected) {
