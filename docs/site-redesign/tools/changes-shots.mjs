@@ -8,25 +8,25 @@ const require = createRequire('D:/private_projects/athanasios-links/.claude/work
 const puppeteer = require('puppeteer-core');
 const OUT = 'D:/private_projects/athanasios-links/.claude/worktrees/admin-panel-redesign-1907bc/docs/site-redesign/shots/changes';
 const LIVE = 'https://stathanasiosyouth.github.io/';
-const MOCK = 'http://127.0.0.1:4330/docs/site-redesign/home.html?still=1&v=';
+const MOCK = 'http://127.0.0.1:4330/index.html?s2=1&still=1&v=';  // final.html: the live code + the S2 layer
 const V = { phone: { width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, desktop: { width: 1440, height: 900, deviceScaleFactor: 1 } };
 // key: [live selectors (union), mock selectors (union)]. "sel@text" = the first match whose text contains text.
 const PARTS = {
-  top: [['#topbar', 'header.hero'], ['header.top']],
-  featured: [['article.featured'], ['.sugg']],
-  join: [[], ['.join']],
-  meeting: [['section.meeting'], ['.meet']],
-  events: [[], ['section.sec@الفعاليات الجاية']],
-  services: [['section.items--services'], ['section.sec@خدماتنا']],
-  news: [[], ['section.sec@جديد الأسرة']],
-  location: [['section.location'], ['section.sec@مكان الاجتماع']],
-  social: [['section.links-section'], ['section.sec@تابعنا']],
-  contact: [['section.contact', 'section.support'], ['section.sec@تواصل معانا']],
+  top: [['#topbar', 'header.hero'], ['#topbar']],
+  featured: [['article.featured'], ['.s2-sugg']],
+  join: [[], ['.s2-join']],
+  meeting: [['section.meeting'], ['section.meeting']],
+  events: [[], ['[data-area="s2-events"]']],
+  services: [['section.items--services'], ['section.items--services']],
+  news: [[], ['[data-area="s2-news"]']],
+  location: [['section.location'], ['section.location']],
+  social: [['section.links-section'], ['section.links-section']],
+  contact: [['section.contact', 'section.support'], ['.s2-people']],
   share: [['section.share'], ['section.share']],
-  footer: [['footer.footer'], ['footer.foot']],
-  bar: [['nav.tabbar'], ['nav.dock']]
+  footer: [['footer.footer'], ['footer.footer']],
+  bar: [['nav.tabbar'], ['nav.tabbar']]
 };
-const BARS = { live: ['#topbar', 'nav.tabbar', '.bell-hint'], mock: ['header.top', 'nav.dock'] };
+const BARS = { live: ['#topbar', 'nav.tabbar', '.bell-hint'], mock: ['#topbar', 'nav.tabbar', '.bell-hint'] };
 
 async function rectOf(p, sels) {
   return p.evaluate((sels) => {
@@ -83,7 +83,7 @@ for (const [w, vp] of Object.entries(V)) {
   // the mockup, guest and member
   for (const v of ['guest', 'member']) {
     const m = await b.newPage(); await m.setViewport(vp);
-    await m.goto(MOCK + v, { waitUntil: 'networkidle0' }); await m.evaluate(() => document.fonts.ready); await walk(m);
+    await m.goto(MOCK + v, { waitUntil: 'networkidle0' }); await m.waitForFunction(() => document.documentElement.classList.contains('s2-ready'), { timeout: 20000 }); await m.evaluate(() => document.fonts.ready); await walk(m); await new Promise(r => setTimeout(r, 1500));
     for (const [k, [, mock]] of Object.entries(PARTS)) {
       if (v === 'member' && !['join', 'top'].includes(k)) continue;
       log.push(w + ' new ' + v + ' ' + k + ' ' + await shoot(m, mock, `${OUT}/${w}/new-${k}${v === 'member' ? '-member' : ''}.png`, BARS.mock, k));

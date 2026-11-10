@@ -51,6 +51,8 @@
   .notes ul { margin: 0; padding: 0 18px 0 0; } .notes li { margin: 2px 0; }
   .notes .k b { color: var(--keep); } .notes .c b { color: var(--chg); }
   .notes b.h { display: block; font-size: 12.5px; margin-bottom: 4px; }
+  .cmp.tall .imgs { max-height: 1400px; overflow: auto; border-radius: 14px; }
+  body.desk .cmp.tall { grid-template-columns: 1fr 1fr; }
   .why { margin: 10px 0 0; font-size: 13.5px; color: var(--t2); line-height: 1.8; } .why b { color: var(--gold-hi); }
   .warn { margin: 8px 0 0; font-size: 12.5px; color: var(--t3); }
   .live { display: inline-block; margin-top: 10px; font-size: 13px; font-weight: 700; color: var(--gold-hi); }
@@ -79,11 +81,11 @@
   var ST = { ok: 'معتمد', wait: 'مستني رأيك', keep: 'هيفضل زي ما هو', todo: 'لسه' };
   var mode = /desk/.test(location.hash) ? 'desk' : 'phone';
   function src(name) {
-    if (name.indexOf('shots/') === 0) return mode === 'desk' ? name.replace('/phone/', '/desktop/') : name;
+    if (name.indexOf('/') > 0) return mode === 'desk' ? name.replace('/phone/', '/desktop/') : name;
     return 'shots/changes/' + (mode === 'desk' ? 'desktop' : 'phone') + '/' + name;
   }
   function imgs(list, frames) {
-    return '<div class="imgs' + (frames ? ' frames' : '') + '" style="--n:' + list.length + '">' + list.map(function (n) { return '<img loading="lazy" src="' + src(n) + '" alt="" onerror="this.replaceWith(Object.assign(document.createElement(\'div\'),{className:\'empty\',textContent:\'مفيش صورة للمقاس ده\'}))">'; }).join('') + '</div>';
+    return '<div class="imgs' + (frames ? ' frames' : '') + '" style="--n:' + list.length + '">' + list.map(function (n) { return '<img loading="lazy" src="' + src(n) + '" alt="" onerror="this.replaceWith(Object.assign(document.createElement(\'div\'),{className:\'empty\',textContent:\'مش موجود على المقاس ده\'}))">'; }).join('') + '</div>';
   }
   function ul(a) { return '<ul>' + a.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>'; }
   function render() {
@@ -96,11 +98,11 @@
         toc += '<a href="#' + ph.id + '-' + it.k + '">' + it.title.split(':')[0].split('(')[0].trim() + '</a>';
         var now = it.now === undefined ? ['now-' + it.k + '.png'] : it.now;
         var next = (mode === 'desk' && it.nextDesk) ? it.nextDesk : (it.next || ['new-' + it.k + '.png'].concat(it.extra || []));
-        var frames = next.length > 2;
+        var frames = next.length > 2; var tall = it.k === 'page';
         var nowHtml = now ? imgs(now, now.length > 2) : '<div class="empty">' + (it.nowNote || 'مش موجود دلوقتي.') + '</div>';
         if (mode === 'desk' && it.k === 'bar') nowHtml = '<div class="empty">' + it.nowNote + '</div>';
         out += '<section class="item" id="' + ph.id + '-' + it.k + '"><h3>' + it.title + '<span class="st st--' + it.status + '">' + ST[it.status] + '</span></h3>' +
-          '<div class="cmp' + (frames ? ' wide' : '') + '"><div class="side side--now"><b>دلوقتي</b>' + nowHtml + (now && it.nowNote && it.k !== 'bar' ? '<p class="warn">' + it.nowNote + '</p>' : '') + '</div>' +
+          '<div class="cmp' + (frames ? ' wide' : '') + (tall ? ' tall' : '') + '"><div class="side side--now"><b>دلوقتي</b>' + nowHtml + (now && it.nowNote && it.k !== 'bar' ? '<p class="warn">' + it.nowNote + '</p>' : '') + '</div>' +
           '<div class="side side--new"><b>الجديد</b>' + imgs(next, frames) + '</div></div>' +
           '<div class="notes">' + (it.keep ? '<div class="k"><b class="h">هيفضل</b>' + ul(it.keep) + '</div>' : '<div class="k"><b class="h">هيفضل</b>— (حاجة جديدة)</div>') +
           '<div class="c"><b class="h">هيتغير</b>' + ul(it.change || []) + '</div></div>' +

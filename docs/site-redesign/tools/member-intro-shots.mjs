@@ -11,7 +11,7 @@ for (const [w, vp] of Object.entries(V)) {
   mkdirSync(`${OUT}/${w}`, { recursive: true });
   const p = await b.newPage(); await p.setViewport(vp);
   for (const t of T) {
-    await p.goto(`http://127.0.0.1:4330/docs/site-redesign/home.html?still=1&v=member&intro=1&freeze=${t}`, { waitUntil: 'networkidle0' });
+    await p.goto(`http://127.0.0.1:4330/index.html?s2=1&still=1&v=member&intro=1&freeze=${t}`, { waitUntil: 'networkidle0' }); await p.waitForFunction(() => document.documentElement.classList.contains('s2-ready'), { timeout: 20000 }); await new Promise(r => setTimeout(r, 400));
     await p.evaluate(() => document.fonts.ready); await new Promise(r => setTimeout(r, 200));
     await p.screenshot({ path: `${OUT}/${w}/member-intro-${t}.png` });
   }

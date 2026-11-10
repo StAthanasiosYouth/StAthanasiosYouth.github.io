@@ -4,7 +4,10 @@ import { join, extname, normalize } from 'node:path';
 const root = process.argv[2], port = Number(process.argv[3]);
 const T = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp', '.png': 'image/png', '.woff2': 'font/woff2', '.svg': 'image/svg+xml' };
 createServer(async (q, r) => {
-  let p = normalize(decodeURIComponent(new URL(q.url, 'http://x').pathname)).replace(/^([\/])+/, '');
+  const u = new URL(q.url, 'http://x');
+  let p = normalize(decodeURIComponent(u.pathname)).replace(/^([\/])+/, '');
+  // the public-site S2 final mockup runs the live home code, which mounts its home-only parts (the bottom bar) on the home address
+  if (u.pathname === '/index.html' && u.searchParams.has('s2')) p = 'docs/site-redesign/final.html';
   if (p.includes('..')) { r.writeHead(403).end(); return; }
   if (!extname(p)) p = join(p, 'index.html');
   try { const b = await readFile(join(root, p)); r.writeHead(200, { 'content-type': T[extname(p)] || 'application/octet-stream', 'cache-control': 'no-store' }).end(b); }

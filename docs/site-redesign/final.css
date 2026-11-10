@@ -1,0 +1,141 @@
+/* S2 FINAL — the redesign layer on top of the live main.css (final.html). Live tokens only (--gold-hi, --gold-line…). */
+
+/* the member intro holds the first paint (final.html sets .mi-pending before anything shows) */
+html.mi-pending::after { content: ""; position: fixed; inset: 0; z-index: 59; background: #020914; }
+
+/* ---------- top bar: always the compact bar with the logo; the big hero leaves the home ---------- */
+html[data-s2] .hub > .hero { display: none; }
+html[data-s2] .topbar { --p: 1; --pb: 1; }
+html[data-s2] .topbar::before, html[data-s2] .topbar::after, html[data-s2] .topbar__brand { animation: none !important; opacity: 1 !important; transform: none !important; }
+html[data-s2] .topbar__brand img { width: 36px; height: 36px; }
+@media (min-width: 1024px) { html[data-s2] .topbar__brand img { width: 42px; height: 42px; } html[data-s2] .topbar__name { font-size: 1.32rem; } }
+html[data-s2] .hub { padding-top: max(10px, env(safe-area-inset-top)); }
+
+/* every block full width on the phone; the desktop places them below */
+html.s2-ready .hub > * { grid-column: 1 / -1 !important; grid-row: auto !important; }
+html.s2-ready .hub::before { display: none; }
+
+/* ---------- Suggestions ---------- */
+.s2-sugg { position: relative; min-width: 0; }
+.s2-sugg__track { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; border-radius: var(--radius-lg, 24px); }
+.s2-sugg__track::-webkit-scrollbar { display: none; }
+.s2-slide { position: relative; flex: 0 0 100%; scroll-snap-align: center; margin: 0 !important; min-width: 0; }
+.s2-slide__tag { position: absolute; z-index: 3; top: 12px; inset-inline-start: 12px; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: 999px; background: rgb(2 9 20 / .72); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border: 1px solid var(--gold-line-strong); color: var(--gold-hi); font-size: 12.5px; font-weight: 800; pointer-events: none; }
+.s2-slide__tag .icon { width: 15px; height: 15px; }
+.s2-sugg__dots { display: flex; justify-content: center; gap: 6px; margin-top: 12px; }
+.s2-sugg__dots button { position: relative; width: 22px; height: 18px; padding: 0; border: 0; background: none; cursor: pointer; transition: width .3s; }
+.s2-sugg__dots button i { position: absolute; inset: 7px 0; border-radius: 4px; background: rgb(242 210 139 / .22); overflow: hidden; }
+.s2-sugg__dots button.on { width: 44px; }
+.s2-sugg__dots button.on i::after { content: ""; position: absolute; inset: 0; background: var(--gold-hi); transform-origin: right; animation: s2-fill 5s linear forwards; }
+@keyframes s2-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+html.s2-still .s2-sugg__dots button.on i::after { animation: none; transform: scaleX(.45); }
+.s2-chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 12px calc(-1 * max(16px, env(safe-area-inset-left))) 0; padding: 2px max(16px, env(safe-area-inset-left)); }
+.s2-chips::-webkit-scrollbar { display: none; }
+.s2-chip { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--gold-line-strong); background: rgb(8 33 61 / .72); color: var(--text); font-weight: 700; font-size: .9rem; text-decoration: none; transition: border-color .2s, background .2s; }
+.s2-chip:hover { border-color: var(--gold-hi); background: rgb(215 170 80 / .1); }
+.s2-chip .icon { width: 18px; height: 18px; color: var(--gold-hi); }
+
+/* ---------- side column: account nudge / greeting + the live meeting ---------- */
+.s2-side { display: grid; gap: var(--gap); align-content: start; min-width: 0; }
+.s2-join { display: flex; align-items: center; gap: 14px; padding: 14px 16px !important; background: linear-gradient(90deg, rgb(215 170 80 / .14), rgb(8 33 61 / .5) 65%) !important; border-color: var(--gold-line-strong) !important; }
+.s2-join > div { flex: 1; min-width: 0; }
+.s2-join b { display: block; font-size: 1rem; } .s2-join small { display: block; color: var(--text-2); font-size: .8rem; line-height: 1.6; }
+.s2-join__ic, .s2-join__av { flex: none; width: 46px; height: 46px; border-radius: 15px; display: grid; place-items: center; background: linear-gradient(135deg, var(--gold-hi), var(--gold)); color: var(--gold-ink); font-weight: 900; font-size: 20px; }
+.s2-join__ic .icon { width: 22px; height: 22px; }
+.s2-join .btn { flex: none; }
+.s2-join__x { flex: none; width: 30px; height: 30px; margin-inline-start: -6px; border: 0; border-radius: 50%; background: none; color: var(--text-3); font-size: 20px; cursor: pointer; }
+
+/* ---------- section heads: the live title + «الكل ‹» (+ arrows on the desktop) ---------- */
+.s2-head { display: flex; align-items: center; gap: 10px; }
+.s2-head .widget__title { margin: 0; display: flex; align-items: center; gap: 8px; }
+.s2-head .widget__title .icon { color: var(--gold-hi); }
+.s2-all { margin-inline-start: auto; display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--gold-line-strong); color: var(--gold-hi); font-weight: 800; font-size: .86rem; text-decoration: none; white-space: nowrap; }
+.s2-all:hover { background: rgb(215 170 80 / .1); }
+.s2-arrows { display: none; gap: 6px; }
+.s2-arrows button { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--gold-line-strong); background: rgb(8 33 61 / .7); color: var(--gold-soft); display: grid; place-items: center; cursor: pointer; }
+.s2-arrows button .icon { width: 18px; height: 18px; }
+.s2-arrows [data-dir="1"] .icon { transform: rotate(-90deg); } .s2-arrows [data-dir="-1"] .icon { transform: rotate(90deg); }
+.items--services .s2-head .widget__title { margin: 0; }
+
+/* ---------- rails ---------- */
+.s2-rail { display: flex !important; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; margin: 14px -4px 0 !important; padding: 2px 4px 6px !important; }
+.s2-rail::-webkit-scrollbar { display: none; }
+.s2-rail > * { flex: none; scroll-snap-align: start; }
+.s2-rail--sv > li { width: 86%; }
+
+.s2-ex { position: absolute; z-index: 2; top: 10px; inset-inline-end: 10px; height: 22px; padding: 0 9px; border-radius: 999px; display: inline-flex; align-items: center; background: rgb(2 9 20 / .75); border: 1px dashed rgb(255 255 255 / .35); color: var(--text-2); font-size: 11px; font-weight: 800; }
+.s2-ex--b { top: auto; bottom: 10px; }
+
+.s2-ev { position: relative; width: min(72vw, 270px); aspect-ratio: 4 / 5; border-radius: 20px; overflow: hidden; border: 1px solid var(--gold-line-strong); display: flex; align-items: flex-end; background: var(--navy-850); color: var(--text); text-decoration: none; transition: transform .35s var(--ease-out, ease), border-color .2s; }
+.s2-ev:hover { transform: translateY(-3px); border-color: var(--gold-hi); }
+.s2-ev img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.s2-ev::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, rgb(2 9 20 / .96), rgb(2 9 20 / .25) 58%, transparent); }
+.s2-ev__body { position: relative; z-index: 1; padding: 14px; }
+.s2-ev__date { display: inline-flex; flex-direction: column; align-items: center; padding: 5px 10px; margin-bottom: 8px; border-radius: 13px; background: rgb(215 170 80 / .18); border: 1px solid var(--gold-line-strong); color: var(--gold-hi); font-weight: 800; line-height: 1.15; }
+.s2-ev__date b { font-size: 1.2rem; } .s2-ev__date small { font-size: .7rem; }
+.s2-ev h3 { margin: 0; font-size: 1.05rem; line-height: 1.4; }
+.s2-ev p { margin: 2px 0 0; font-size: .8rem; color: var(--text-2); }
+.s2-ev__tag { display: inline-flex; align-items: center; margin-top: 8px; height: 24px; padding: 0 10px; border-radius: 999px; background: var(--gold-hi); color: var(--gold-ink); font-size: .72rem; font-weight: 800; }
+
+.s2-nw { position: relative; width: min(78vw, 320px); display: flex; gap: 12px; padding: 14px 14px 38px; border-radius: 18px; border: 1px solid var(--gold-line); background: rgb(8 33 61 / .55); color: var(--text); text-decoration: none; }
+.s2-nw:hover { border-color: var(--gold-line-strong); }
+.s2-nw__ic { flex: none; width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: rgb(215 170 80 / .14); color: var(--gold-hi); }
+.s2-nw b { display: block; font-size: .95rem; line-height: 1.5; } .s2-nw small { display: block; margin-top: 2px; color: var(--text-3); font-size: .76rem; }
+.s2-nw__new { position: absolute; top: 10px; inset-inline-end: 12px; height: 20px; padding: 0 8px; border-radius: 999px; background: #ff5c5c; color: #fff; font-size: .66rem; font-weight: 800; display: inline-flex; align-items: center; }
+
+/* ---------- the two people cards: stacked on the phone, a pair on wider screens ---------- */
+.s2-people { display: grid; gap: var(--gap); min-width: 0; }
+
+/* ---------- tablet ---------- */
+@media (min-width: 640px) {
+  .s2-people { grid-template-columns: 1fr 1fr; align-items: start; }
+  .s2-rail--sv > li { width: calc((100% - 12px) / 2); }
+  .s2-chips { margin-inline: 0; padding-inline: 0; flex-wrap: wrap; overflow: visible; }
+}
+
+/* ---------- desktop: Suggestions + the meeting on top, rails fill the width ---------- */
+@media (min-width: 1024px) {
+  html.s2-ready .hub > .s2-sugg { grid-column: 1 / span 7 !important; grid-row: 1 !important; }
+  html.s2-ready .hub > .s2-side { grid-column: 8 / -1 !important; grid-row: 1 !important; }
+  html.s2-ready .hub > .location { grid-column: 1 / span 5 !important; }
+  html.s2-ready .hub > .links-section { grid-column: 6 / -1 !important; }
+  .s2-arrows { display: flex; }
+  .s2-rail { display: grid !important; grid-auto-flow: column; }
+  .s2-rail--ev { grid-auto-columns: calc((100% - 3 * 12px) / 4); }
+  .s2-rail--nw { grid-auto-columns: calc((100% - 2 * 12px) / 3); }
+  .s2-rail--sv { grid-auto-columns: calc((100% - 12px) / 2); }
+  .s2-rail > *, .s2-rail--sv > li { width: auto; }
+  .s2-ev { width: auto; aspect-ratio: 4 / 4.6; }
+  .s2-nw { width: auto; }
+  .s2-chips { flex-wrap: nowrap; }
+  .s2-chip { flex: 1; justify-content: center; padding: 0 10px; }
+}
+
+/* fixes after the first look */
+@media (max-width: 639px) {
+  .s2-join { flex-wrap: wrap; row-gap: 12px; }
+  .s2-join > div { flex: 1 1 calc(100% - 100px); }
+  .s2-join .btn { flex: 1 1 auto; order: 3; }
+  .s2-join__x { position: absolute; top: 8px; inset-inline-end: 8px; margin: 0; }
+  .s2-join { position: relative; padding-inline-end: 40px !important; }
+}
+.s2-chip { white-space: nowrap; }
+@media (min-width: 1024px) {
+  .s2-chip { flex: 1 1 auto; font-size: .84rem; padding: 0 12px; gap: 6px; }
+  .s2-chip .icon { width: 16px; height: 16px; }
+  .s2-rail--ev { grid-auto-columns: calc((100% - 2 * 12px) / 3); }
+  .s2-ev { aspect-ratio: 16 / 12; }
+}
+/* desktop review: the pair side by side, the map gets the room it needs, posters shown whole, services fill the row */
+.s2-people > * { grid-column: auto !important; margin: 0 !important; }
+.s2-rail--sv > li { max-width: none; } .s2-rail--sv > li > .item-card { height: 100%; }
+@media (min-width: 1024px) {
+  html.s2-ready .hub > .location { grid-column: 1 / span 7 !important; }
+  html.s2-ready .hub > .links-section { grid-column: 8 / -1 !important; }
+  .s2-ev { aspect-ratio: 4 / 5; }
+}
+@media (min-width: 1024px) {
+  html.s2-ready .hub > .location, html.s2-ready .hub > .links-section { grid-column: 1 / -1 !important; }
+  .s2-rail.s2-rail--sv { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; grid-auto-flow: row; overflow: visible; }
+}
+@media (max-width: 1023px) { .s2-rail.s2-rail--sv { grid-template-columns: none !important; } }

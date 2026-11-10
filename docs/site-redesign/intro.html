@@ -139,10 +139,12 @@
   /* review controls (not part of the design) */
   .ui { position: fixed; top: 12px; left: 12px; z-index: 9; display: flex; gap: 8px; }
   .ui button { height: 32px; padding: 0 12px; border-radius: 10px; border: 1px solid rgb(227 207 159 / .35); background: rgb(4 14 30 / .85); color: var(--champagne); font: 700 12px Cairo, sans-serif; cursor: pointer; }
+  html:not(.review) .ui, html:not(.review) .stagename { display: none; }
   .stagename { position: fixed; top: 12px; right: 12px; z-index: 9; max-width: 56vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 6px 12px; border-radius: 999px; background: rgb(0 0 0 / .45); font-size: 11.5px; color: rgb(255 255 255 / .7); }
   @media (prefers-reduced-motion: reduce) { .gate__logo::before, .gate__logo::after { animation: none; } }
 </style>
 <body>
+<script>if (/[?&]review=1/.test(location.search)) document.documentElement.classList.add('review');</script>
 <div class="ui"><button type="button" id="replay">↻ اعرض تاني</button></div>
 <span class="stagename" id="stagename"></span>
 <div class="stage" id="stage">
@@ -176,7 +178,7 @@
     <p class="sub">لخدمة شعب كنيستها الحبيبة في سفاجا</p>
     <p class="slogan">كل اللي يخص اجتماعنا… في مكان واحد</p>
     <p class="welcome">مرحبًا بك في تطبيق <b>أسرة البابا أثناسيوس</b> لخدمة شعب سفاجا</p>
-    <div class="cta"><p><b>اعمل حسابك في دقيقة</b>علشان تتابع حجوزاتك ونقطك والمسابقات، ويوصلك كل جديد.</p><div class="cta__row"><button class="is-main" type="button">اعمل حساب</button><button type="button">ادخل الموقع</button></div></div>
+    <div class="cta"><p><b>اعمل حسابك في دقيقة</b>علشان تتابع حجوزاتك ونقطك والمسابقات، ويوصلك كل جديد.</p><div class="cta__row"><button class="is-main" type="button" onclick="location.href='../../account/'">اعمل حساب</button><button type="button" onclick="location.href='final.html?v=guest'">ادخل الموقع</button></div></div>
   </div>
   <div class="gate" id="gate"><div class="gate__in"><div class="gate__logo"><img src="../../assets/img/logo-256.webp" alt=""></div><div><b>المس الشاشة علشان تدخل</b><small>بصوت 🔊</small></div></div></div>
 </div>

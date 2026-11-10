@@ -5,12 +5,13 @@
    1.30–2.08  text lifts away, the ring opens out, the logo flies on a curve into the top bar; the page rises in behind
    2.08       the bar logo lands with a small gold pulse
    ?freeze=<ms> holds one moment for review frames. Tap skips. Reduced motion: no intro. */
-(function () {
+(function () { function run() {
   var Q = new URLSearchParams(location.search);
   if (!Q.get('intro') || Q.get('v') !== 'member' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   var FREEZE = Q.get('freeze') != null ? Number(Q.get('freeze')) : null;
   var EXPO = 'cubic-bezier(.16,1,.3,1)', QUART = 'cubic-bezier(.76,0,.24,1)', OUT = 'cubic-bezier(.22,1,.36,1)';
-  var target = document.querySelector('.top__brand img');
+  var target = document.querySelector('.topbar__brand img') || document.querySelector('.top__brand img');
+  document.documentElement.classList.remove('mi-pending');
   var hr = new Date().getHours(), hi = hr < 12 ? 'صباح الخير' : 'مساء الخير';
   var CAL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg>';
   var el = document.createElement('div');
@@ -21,7 +22,7 @@
     '<svg class="mi__svg" viewBox="0 0 100 100"><defs><linearGradient id="miGold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff1c9"/><stop offset=".5" stop-color="#e3b862"/><stop offset="1" stop-color="#a97b2c"/></linearGradient></defs>' +
     '<circle class="mi__track" cx="50" cy="50" r="48"/><circle class="mi__draw" cx="50" cy="50" r="48" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/></svg>' +
     '<span class="mi__head"><i></i></span>' +
-    '<div class="mi__disc"><img src="../../assets/img/logo-512.png" alt=""><span class="mi__shine"></span></div>' +
+    '<div class="mi__disc"><img src="' + (document.querySelector('base') ? '' : '../../') + 'assets/img/logo-512.png" alt=""><span class="mi__shine"></span></div>' +
     '</div><div class="mi__text"><span class="mi__hi">' + hi + '</span><span class="mi__name">مينا</span><span class="mi__rule"></span>' +
     '<span class="mi__chip">' + CAL + 'الاجتماع الأحد ٨ بالليل · <b>فاضل ٥ أيام</b></span></div></div></div>';
   document.body.appendChild(el);
@@ -62,7 +63,7 @@
   ], { duration: FLY, delay: T0 + 60, easing: 'cubic-bezier(.55,.05,.25,1)', fill: 'forwards' });
   A('.mi__bg', [{ opacity: 1 }, { opacity: 0 }], { duration: 560, delay: T0 + 180, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards' });
   // the page rises in behind: bar slides down, sections lift one after another
-  var top = document.querySelector('.top'), parts = [].slice.call(document.querySelectorAll('main > *')).slice(0, 6);
+  var top = document.querySelector('#topbar') || document.querySelector('.top'), parts = [].slice.call(document.querySelectorAll('main > *')).filter(function (n) { return n.offsetParent && n.getBoundingClientRect().top < innerHeight; }).slice(0, 6);
   anims.push(top.animate([{ transform: 'translateY(-100%)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 520, delay: T0 + 200, easing: EXPO, fill: 'backwards' }));
   parts.forEach(function (p, i) { anims.push(p.animate([{ transform: 'translateY(26px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 640, delay: T0 + 300 + i * 70, easing: EXPO, fill: 'backwards' })); });
   var LAND = T0 + 60 + FLY, END = LAND + 20;
@@ -81,4 +82,4 @@
   if (FREEZE != null) { anims.forEach(function (x) { x.pause(); x.currentTime = FREEZE; }); if (FREEZE >= END) { el.remove(); target.classList.remove('is-waiting'); } return; }
   setTimeout(done, END);
   el.addEventListener('click', function () { anims.forEach(function (x) { try { x.finish(); } catch (e) {} }); done(); });
-})();
+} if (window.S2_DEFER_INTRO) window.S2_RUN_INTRO = run; else run(); })();
