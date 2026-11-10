@@ -1339,9 +1339,14 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     describe();
 
+    // Phase 8B: the one schedule picker (A.whenPicker), from a calendar button next to the fields
+    var pick = el('button', { class: 'icon-btn datetime__pick', type: 'button', 'aria-label': 'اختار الميعاد من التقويم', onclick: function () {
+      A.whenPicker({ title: options.title || 'الميعاد', sub: options.sub || '', value: current(), presets: options.presets || [], dateOnly: options.dateOnly, onDone: set });
+    } }, icon('calendar'));
+
     return {
       node: el('div', { class: 'datetime' },
-        el('div', { class: 'row' }, date, time),
+        el('div', { class: 'row' }, date, time, pick),
         presets.length ? el('div', { class: 'presets' }, presets) : null,
         said
       ),
@@ -1350,6 +1355,126 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     };
 
   };
+
+  /*
+   * Phase 8B: the one schedule picker (docs/phase8b sched-picker): quick choices, a month calendar, the hour,
+   * «امسح الميعاد», and the time said in words in Cairo time with how far it is. Every A.dateTimeInput opens it
+   * from its calendar button; the typed date and time fields stay, so nothing that fills them changes.
+   * opts: { title, sub, value, presets, dateOnly, onDone(value) }
+   */
+  var whenDialog = null;
+  var WEEK_HEADS = ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س'];
+  var HOURS = [['20:00', '٨:٠٠ م'], ['21:00', '٩:٠٠ م'], ['22:00', '١٠:٠٠ م']];
+
+  function arabicDigits(text) { return String(text).replace(/\d/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[d]; }); }
+
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+  A.whenPicker = function (opts) {
+
+    opts = opts || {};
+    if (!whenDialog) {
+      whenDialog = el('dialog', { class: 'whenpick', 'aria-labelledby': 'whenpick-title' });
+      whenDialog.addEventListener('click', function (event) { if (event.target === whenDialog) whenDialog.close(); });
+      document.body.appendChild(whenDialog);
+    }
+
+    var today = A.cairoNow().slice(0, 10);
+    var start = String(opts.value || '').split(/[ T]/);
+    var date = start[0] || '';
+    var time = opts.dateOnly ? '' : (start[1] || '');
+    var month = (date || today).slice(0, 7);
+    var dialog = whenDialog;
+
+    function value() { return date ? (time && !opts.dateOnly ? date + ' ' + time : date) : ''; }
+
+    function said() {
+      var v = value();
+      if (!v) return 'من غير ميعاد';
+      var text = A.formatWall(v) + ' بتوقيت مصر';
+      var days = Math.round((A.wallMinutes(v.slice(0, 10)) - A.wallMinutes(today)) / 1440);
+      var away = days === 0 ? 'النهارده' : days === 1 ? 'بكرة' : days === -1 ? 'امبارح'
+        : days > 0 ? 'بعد ' + arabicDigits(days) + (days <= 10 ? ' أيام' : ' يوم') : 'من ' + arabicDigits(-days) + (-days <= 10 ? ' أيام' : ' يوم');
+      return text + ' — ' + away;
+    }
+
+    function calendar() {
+      var y = +month.slice(0, 4), m = +month.slice(5, 7);
+      var first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+      var count = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      var cells = [];
+      for (var i = 0; i < first; i++) cells.push(el('span', { class: 'whenpick__day is-blank', 'aria-hidden': 'true' }));
+      for (var d = 1; d <= count; d++) {
+        (function (day) {
+          var key = y + '-' + pad2(m) + '-' + pad2(day);
+          cells.push(el('button', {
+            class: 'whenpick__day' + (key === date ? ' is-on' : '') + (key === today ? ' is-today' : ''), type: 'button',
+            'aria-pressed': key === date ? 'true' : 'false', 'aria-label': A.formatWall(key, false),
+            onclick: function () { date = key; draw(); }
+          }, arabicDigits(day)));
+        })(d);
+      }
+      function shift(by) {
+        var t = new Date(Date.UTC(y, m - 1 + by, 1));
+        month = t.getUTCFullYear() + '-' + pad2(t.getUTCMonth() + 1);
+        draw();
+      }
+      return el('div', { class: 'whenpick__cal' },
+        el('div', { class: 'whenpick__month' },
+          el('b', { text: MONTHS[m - 1] + ' ' + arabicDigits(y) }),
+          el('span', { class: 'whenpick__sp' }),
+          el('button', { class: 'icon-btn icon-btn--small', type: 'button', 'aria-label': 'الشهر اللي فات', onclick: function () { shift(-1); } }, el('span', { class: 'whenpick__prev' }, icon('chevron'))),
+          el('button', { class: 'icon-btn icon-btn--small', type: 'button', 'aria-label': 'الشهر الجاي', onclick: function () { shift(1); } }, icon('chevron'))),
+        el('div', { class: 'whenpick__grid' },
+          WEEK_HEADS.map(function (h) { return el('span', { class: 'whenpick__head', 'aria-hidden': 'true', text: h }); }),
+          cells));
+    }
+
+    function hours() {
+      var other = el('input', { class: 'input whenpick__other', type: 'time', value: time, 'aria-label': 'ساعة تانية', oninput: function () { time = other.value; if (!date) date = today; drawSaid(); markChips(); } });
+      var chips = HOURS.map(function (h) {
+        return el('button', { class: 'preset' + (time === h[0] ? ' is-on' : ''), type: 'button', 'data-time': h[0], onclick: function () { time = h[0]; if (!date) date = today; other.value = time; drawSaid(); markChips(); } }, h[1]);
+      });
+      function markChips() { chips.forEach(function (c) { c.classList.toggle('is-on', c.getAttribute('data-time') === time); }); }
+      return el('div', { class: 'whenpick__hours' }, el('p', { class: 'whenpick__label', text: 'الساعة' }), el('div', { class: 'presets' }, chips, other));
+    }
+
+    var saidNode = el('p', { class: 'whenpick__said' }, icon('info'), el('span'));
+    function drawSaid() { saidNode.lastChild.textContent = said(); }
+
+    function draw() {
+      var presets = (opts.presets || []).map(function (preset) {
+        var v = typeof preset.value === 'function' ? preset.value() : preset.value;
+        return el('button', { class: 'preset' + (v && v === value() ? ' is-on' : ''), type: 'button', onclick: function () {
+          var p = String(v || '').split(/[ T]/);
+          date = p[0] || ''; time = opts.dateOnly ? '' : (p[1] || '');
+          if (date) month = date.slice(0, 7);
+          draw();
+        } }, preset.label);
+      });
+      drawSaid();
+      A.fill(dialog,
+        el('div', { class: 'whenpick__headrow' },
+          el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('clock')),
+          el('div', { class: 'whenpick__titles' },
+            el('h2', { id: 'whenpick-title', text: opts.title || 'الميعاد' }),
+            opts.sub ? el('p', { text: opts.sub }) : null),
+          el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: function () { dialog.close(); } }, icon('close'))),
+        el('div', { class: 'whenpick__body' },
+          presets.length ? el('div', { class: 'presets' }, presets) : null,
+          calendar(),
+          opts.dateOnly ? null : hours(),
+          saidNode),
+        el('div', { class: 'whenpick__foot' },
+          el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { dialog.close(); if (opts.onDone) opts.onDone(value()); } }, icon('check'), 'تمام'),
+          el('button', { class: 'btn', type: 'button', onclick: function () { dialog.close(); if (opts.onDone) opts.onDone(''); } }, 'امسح الميعاد')));
+    }
+
+    draw();
+    if (!dialog.open) dialog.showModal();
+
+  };
+
 
   /* common presets */
   A.PRESETS = {
@@ -4021,6 +4146,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   var RAIL_KEY = 'athanasios-admin.rail';
   var GROUPS = { main: 'الشغل', site: 'الموقع', team: 'الفريق' };
   var DOCK_MAIN = 4;
+  var DOCK_PLACES = ['comps', 'youth', 'bookings'];
   var railLight = null;
 
   function railClosed() {
@@ -4079,7 +4205,13 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var all = A.visibleAreas().filter(function (a) { return a.key !== 'settings'; }).map(function (a, i) { return { a: a, i: i }; })
       .sort(function (x, y) { return (order.indexOf(x.a.group || 'site') - order.indexOf(y.a.group || 'site')) || (x.i - y.i); }).map(function (x) { return x.a; });
     all = all.filter(function (a) { return a.key === home; }).concat(all.filter(function (a) { return a.key !== home; }));
-    return { main: all.slice(0, DOCK_MAIN), rest: all.slice(DOCK_MAIN) };
+    // Phase 8B: the dock's own places (الرئيسية · المسابقات · الشباب · الحجوزات), those this admin has, in that
+    // order after their home; the rest fill up (never a locked «قريبًا» area); the others go under «المزيد»
+    var main = all.slice(0, 1);
+    DOCK_PLACES.forEach(function (key) { var a = all.filter(function (x) { return x.key === key; })[0]; if (a && main.indexOf(a) === -1) main.push(a); });
+    all.forEach(function (a) { if (main.length < DOCK_MAIN && main.indexOf(a) === -1 && !a.soon) main.push(a); });
+    main = main.slice(0, DOCK_MAIN);
+    return { main: main, rest: all.filter(function (a) { return main.indexOf(a) === -1; }) };
   }
 
   function moreButton(restSelected) {

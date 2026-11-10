@@ -11024,6 +11024,214 @@ html[data-mode="light"] .intro__title {
   color: var(--text-3);
 }
 
+/* ---------- the one schedule picker (A.whenPicker) ---------- */
+
+.datetime__pick {
+  flex: none;
+}
+
+.whenpick {
+  width: min(520px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--p-line-3);
+  border-radius: 26px;
+  color: var(--text);
+  background: var(--p-modal);
+  box-shadow: var(--p-shadow-lg);
+}
+
+.whenpick[open] {
+  animation: p8b-pop .45s var(--ease) both;
+}
+
+.whenpick::backdrop {
+  background: rgb(var(--nv-1-6-14) / .55);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.whenpick__headrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--p-line-2);
+}
+
+.whenpick__titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.whenpick__titles h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.whenpick__titles p {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.chipico {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--p-line);
+  border-radius: 12px;
+  color: var(--acc-hi);
+  background: var(--grad-soft);
+}
+
+html[data-mode="light"] .chipico {
+  color: var(--acc-deep);
+}
+
+.whenpick__body {
+  display: grid;
+  gap: 16px;
+  padding: 18px 22px;
+}
+
+.whenpick__cal {
+  padding: 12px;
+  border: 1px solid var(--p-line-3);
+  border-radius: 18px;
+}
+
+.whenpick__month {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.whenpick__sp {
+  flex: 1;
+}
+
+.whenpick__prev {
+  display: inline-flex;
+  transform: scaleX(-1);
+}
+
+.whenpick__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  text-align: center;
+}
+
+.whenpick__head {
+  padding: 4px 0;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.whenpick__day {
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--text);
+  background: none;
+  font-weight: 700;
+  font-size: 13.5px;
+}
+
+.whenpick__day:hover {
+  background: var(--p-hover);
+}
+
+.whenpick__day.is-today {
+  border-color: var(--p-acc-line);
+}
+
+.whenpick__day.is-on {
+  border-color: transparent;
+  color: var(--acc-ink);
+  background: var(--grad);
+}
+
+.whenpick__label {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+
+.whenpick__hours .presets {
+  align-items: center;
+}
+
+.whenpick__other {
+  width: auto;
+  min-width: 120px;
+  height: 36px;
+}
+
+.whenpick .preset.is-on {
+  border-color: transparent;
+  color: var(--acc-ink);
+  background: var(--grad);
+}
+
+.whenpick__said {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  color: var(--info);
+  background: var(--info-bg);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.whenpick__said .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.whenpick__foot {
+  display: flex;
+  gap: 10px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--p-line-2);
+  background: var(--p-modal-foot);
+}
+
+@media (max-width: 759px) {
+  .whenpick {
+    width: 100%;
+    max-width: 100%;
+    margin: auto 0 0;
+    border-radius: 24px 24px 0 0;
+  }
+
+  .whenpick[open] {
+    animation: p8b-up .5s var(--ease) both;
+  }
+
+  .whenpick__foot {
+    padding-bottom: max(14px, env(safe-area-inset-bottom));
+  }
+
+  .whenpick__foot .btn {
+    flex: 1;
+  }
+}
+
+@keyframes p8b-pop { from { opacity: 0; transform: translateY(14px) scale(.975); } }
+@keyframes p8b-up { from { opacity: 0; transform: translateY(40px); } }
+
 /* the primary button and the chosen tab carry the gradient */
 .btn--primary {
   background: var(--grad);

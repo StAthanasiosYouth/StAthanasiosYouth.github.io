@@ -397,7 +397,7 @@ async function measureSheet(page) {
 
 }
 
-test('the editor panel: as tall as its content, floating on wide screens, a bottom sheet on phones', async () => {
+test('the editor panel: as tall as its content, centred on wide screens (Phase 8B), a bottom sheet on phones', async () => {
 
   // desktop
   {
@@ -409,9 +409,11 @@ test('the editor panel: as tall as its content, floating on wide screens, a bott
     await sleep(700);
     const small = await measureSheet(page);
     await page.screenshot({ captureBeyondViewport: false, path: `${SHOTS}20-drawer-desktop-little.png` });
-    assert.equal(small.top, 14);
-    assert.equal(small.left, 14, 'floating, with a margin');
-    assert.ok(small.height < small.vh - 28 - 150, `follows its content (${small.height}px)`);
+    // Phase 8B: centred, the medium size
+    assert.ok(Math.abs(small.left - (small.vw - small.width) / 2) <= 1, 'centred across');
+    assert.ok(Math.abs(small.top - (small.vh - small.height) / 2) <= 1, 'centred down');
+    assert.ok(small.width <= 760);
+    assert.ok(small.height < small.vh - 56 - 150, `follows its content (${small.height}px)`);
     assert.equal(small.scrolls, false);
     assert.ok(small.headIn && small.footIn);
     // Phase 8 (the approved preview): a solid surface, no glass behind the editor
@@ -424,11 +426,11 @@ test('the editor panel: as tall as its content, floating on wide screens, a bott
     await sleep(700);
     const big = await measureSheet(page);
     await page.screenshot({ captureBeyondViewport: false, path: `${SHOTS}21-drawer-desktop-lot.png` });
-    assert.equal(big.top, 14);
-    assert.equal(big.height, big.vh - 28, 'up to the screen, with the same margin');
+    assert.ok(Math.abs(big.top - (big.vh - big.height) / 2) <= 1, 'centred');
+    assert.ok(big.height <= big.vh - 56 && big.height >= Math.min(big.vh - 56, 400), 'up to the screen, with a margin');
     assert.equal(big.scrolls, true, 'only the body scrolls');
     assert.ok(big.headIn && big.footIn, 'title and buttons stay in view');
-    assert.ok(big.width <= 560);
+    assert.ok(big.width <= 1120);
 
     // unsaved changes still ask, with our modal
     await page.type('dialog.sheet[open] input', 'خبر');
