@@ -90,3 +90,37 @@
     b[1].onclick = function () { r.scrollBy({ left: -320, behavior: 'smooth' }); };
   });
 })();
+
+/* ---------- member intro: plays when a member opens the site (?intro=1&v=member). ~1.7 s: the logo lands with a ring and
+   a soft wave, «أهلًا يا مينا», then the logo flies into the top bar and the page is already there under it.
+   ?freeze=<ms> holds a moment for review frames. Reduced motion: no intro. ---------- */
+(function () {
+  var Q = new URLSearchParams(location.search);
+  if (!Q.get('intro') || Q.get('v') !== 'member' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var FREEZE = Q.get('freeze') != null ? Number(Q.get('freeze')) : null;
+  var EXPO = 'cubic-bezier(.16,1,.3,1)', INOUT = 'cubic-bezier(.65,0,.35,1)';
+  var target = document.querySelector('.top__brand img');
+  var el = document.createElement('div');
+  el.className = 'mi';
+  el.innerHTML = '<div class="mi__bg"></div><div class="mi__core"><div class="mi__logo"><span class="mi__wave"></span><span class="mi__ring"></span><img src="../../assets/img/logo-512.png" alt=""></div><p class="mi__hello">أهلًا يا <b>مينا</b></p></div>';
+  document.body.appendChild(el);
+  target.classList.add('is-waiting');
+  var logo = el.querySelector('.mi__logo'), anims = [];
+  function A(n, kf, o) { var a = (typeof n === 'string' ? el.querySelector(n) : n).animate(kf, Object.assign({ fill: 'both', easing: EXPO }, o)); anims.push(a); return a; }
+  // land
+  A('.mi__logo', [{ opacity: 0, transform: 'scale(.6)', filter: 'blur(8px)' }, { opacity: 1, transform: 'scale(1)', filter: 'blur(0)' }], { duration: 480 });
+  A('.mi__ring', [{ opacity: 0, transform: 'scale(.85)' }, { opacity: 1, transform: 'none' }], { duration: 420, delay: 180 });
+  A('.mi__wave', [{ opacity: .9, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(2.8)' }], { duration: 900, delay: 260, easing: 'cubic-bezier(.2,.7,.3,1)' });
+  A('.mi__hello', [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: 420, delay: 320 });
+  // fly to the top bar: measured from the real target
+  var a = logo.getBoundingClientRect(), b = target.getBoundingClientRect();
+  var dx = (b.left + b.width / 2) - (a.left + a.width / 2), dy = (b.top + b.height / 2) - (a.top + a.height / 2), sc = b.width / a.width;
+  A('.mi__hello', [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-8px)' }], { duration: 260, delay: 1050, easing: 'ease-in', fill: 'forwards' });
+  A('.mi__ring', [{ opacity: 1 }, { opacity: 0 }], { duration: 240, delay: 1050, fill: 'forwards' });
+  A(logo, [{ transform: 'translate(0, 0) scale(1)' }, { transform: 'translate(' + dx + 'px, ' + dy + 'px) scale(' + sc + ')' }], { duration: 620, delay: 1080, easing: INOUT, fill: 'forwards', composite: 'add' });
+  A('.mi__bg', [{ opacity: 1 }, { opacity: 0 }], { duration: 520, delay: 1150, easing: 'ease-in-out', fill: 'forwards' });
+  var END = 1700;
+  if (FREEZE != null) { anims.forEach(function (x) { x.pause(); x.currentTime = FREEZE; }); if (FREEZE >= END) { el.remove(); target.classList.remove('is-waiting'); } return; }
+  setTimeout(function () { target.classList.remove('is-waiting'); el.remove(); }, END);
+  el.addEventListener('click', function () { anims.forEach(function (x) { try { x.finish(); } catch (e) {} }); target.classList.remove('is-waiting'); el.remove(); });
+})();
