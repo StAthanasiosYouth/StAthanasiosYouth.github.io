@@ -22,6 +22,7 @@
   .item, .phase { scroll-margin-top: 16px; }
   .cmp.wide { grid-template-columns: 1fr !important; }
   .cmp.wide .side--now .imgs.frames, .cmp.wide .side--now .empty { max-width: 640px; }
+  .cmp.wide .side--now .imgs:not(.frames) { max-width: 220px; }
   .seg { display: inline-flex; padding: 4px; border-radius: 999px; border: 1px solid var(--line); background: rgb(7 26 51 / .8); }
   .seg button { font: 800 13px Cairo, sans-serif; color: var(--t2); background: none; border: 0; padding: 7px 16px; border-radius: 999px; cursor: pointer; }
   .seg button.on { background: linear-gradient(180deg, #f2d28b, #c99a43); color: #1c1405; }
@@ -98,7 +99,7 @@
         toc += '<a href="#' + ph.id + '-' + it.k + '">' + it.title.split(':')[0].split('(')[0].trim() + '</a>';
         var now = it.now === undefined ? ['now-' + it.k + '.png'] : it.now;
         var next = (mode === 'desk' && it.nextDesk) ? it.nextDesk : (it.next || ['new-' + it.k + '.png'].concat(it.extra || []));
-        var frames = next.length > 2; var tall = it.k === 'page';
+        var frames = next.length > 2; var tall = it.k === 'page' || it.k === 'full';
         var nowHtml = now ? imgs(now, now.length > 2) : '<div class="empty">' + (it.nowNote || 'مش موجود دلوقتي.') + '</div>';
         if (mode === 'desk' && it.k === 'bar') nowHtml = '<div class="empty">' + it.nowNote + '</div>';
         out += '<section class="item" id="' + ph.id + '-' + it.k + '"><h3>' + it.title + '<span class="st st--' + it.status + '">' + ST[it.status] + '</span></h3>' +

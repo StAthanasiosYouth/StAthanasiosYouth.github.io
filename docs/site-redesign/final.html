@@ -7,6 +7,7 @@
   <!-- S2 FINAL MOCKUP: the live home page code itself (same CSS/JS/content), with the redesign layer on top (final.css / final.js). Served from the repo root via <base>. Design review only. -->
   <script>/* the live code mounts its home-only parts (the bottom bar) on the home address, so the review server also serves this file at /index.html?s2=1 */ if (!/\/index\.html$/.test(location.pathname)) location.replace('/index.html?s2=1' + (location.search ? '&' + location.search.slice(1) : ''));</script>
   <base href="../../">
+  <script src="docs/site-redesign/tint.js"></script>
   <script>window.S2_DEFER_INTRO = 1; if (/[?&]intro=1/.test(location.search) && /[?&]v=member/.test(location.search) && !matchMedia("(prefers-reduced-motion: reduce)").matches) document.documentElement.classList.add("mi-pending");</script>
 
   <!-- pinch-zoom stays enabled on purpose (accessibility) -->
@@ -55,6 +56,7 @@
   <link rel="stylesheet" href="assets/css/main.css">
   <link rel="stylesheet" href="docs/site-redesign/final.css">
   <link rel="stylesheet" href="docs/site-redesign/member-intro.css">
+  <link rel="stylesheet" href="docs/site-redesign/tint.css">
 
   <!-- the opening intro decides before the first paint (first visit of the session only; see intro.js) -->
   

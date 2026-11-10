@@ -75,7 +75,7 @@
     var side = el('<div class="s2-side" data-area="s2-side"></div>');
     side.appendChild(V === 'guest'
       ? el('<div class="widget s2-join"><span class="s2-join__ic">' + ic('user') + '</span><div><b>اعمل حسابك في دقيقة</b><small>علشان تحجز في الفعاليات، وتتابع نقطك والمسابقات</small></div><a class="btn btn--primary btn--small" href="account/">اعمل حساب</a><button class="s2-join__x" type="button" aria-label="مش دلوقتي">×</button></div>')
-      : el('<div class="widget s2-join s2-join--member"><span class="s2-join__av">م</span><div><b>أهلًا يا مينا 👋</b><small>نقطك ٠ · مفيش حجوزات مستنية</small></div><a class="btn btn--small" href="account/">حسابي</a></div>'));
+      : el('<div class="widget s2-join s2-join--member"><span class="s2-join__av">م</span><div><b>أهلًا يا مينا 👋</b><small>نقطك ٠ · مفيش حجوزات مستنية</small></div><button class="s2-join__tint" type="button"><i></i>لون الموقع</button></div>'));
     meeting.id = meeting.id || 's2-meet';
     side.appendChild(meeting);
 
@@ -102,6 +102,8 @@
     [].forEach.call(document.querySelectorAll('.s2-head .s2-arrows button'), function (b) {
       b.addEventListener('click', function () { var r = b.closest('.widget').querySelector('.s2-rail'); r.scrollBy({ left: Number(b.dataset.dir) * r.clientWidth * .8, behavior: 'smooth' }); });
     });
+    var tb = document.querySelector('.s2-join__tint'); if (tb) tb.addEventListener('click', function () { window.S2Tint && window.S2Tint.open(); });
+    window.S2_TOAST = function (t) { var el = document.getElementById('toast'); if (!el) return; el.textContent = t; el.classList.add('is-visible'); clearTimeout(window.S2_TOAST.t); window.S2_TOAST.t = setTimeout(function () { el.classList.remove('is-visible'); }, 2400); };
     var x = document.querySelector('.s2-join__x'); if (x) x.addEventListener('click', function () { x.closest('.s2-join').remove(); });
     if (window.S2_RUN_INTRO) requestAnimationFrame(function () { requestAnimationFrame(window.S2_RUN_INTRO); });
   }
