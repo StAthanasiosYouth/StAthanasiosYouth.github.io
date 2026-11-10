@@ -68,7 +68,7 @@
     [].forEach.call(track.children, function (s, i) { s.classList.add('s2-slide'); s.insertAdjacentHTML('afterbegin', '<span class="s2-slide__tag">' + (i ? ic('theatre') + 'خدماتنا' : ic('star') + 'مميز') + '</span>'); });
     var dots = sugg.querySelector('.s2-sugg__dots');
     dots.innerHTML = [].map.call(track.children, function (s, i) { return '<button type="button" aria-label="شريحة ' + (i + 1) + '"' + (i ? '' : ' class="on"') + '><i></i></button>'; }).join('');
-    var chips = [['calendar', 'الاجتماع الجاي', '#s2-meet'], ['map', 'مكان الاجتماع', '#location-map'], ['trophy', 'المسابقات', 'competition/'], ['star', V === 'member' ? 'نقاطي: ٠' : 'نقاطي', 'points/'], ['phone', 'كلّم الخدمة', '#s2-contact']];
+    var chips = [['calendar', 'الاجتماع الجاي', '#s2-meet'], ['map', 'مكان الاجتماع', '#location-map'], ['trophy', 'المسابقات', D + 'comp-list.html'], ['star', V === 'member' ? 'نقاطي: ٠' : 'نقاطي', 'points/'], ['phone', 'كلّم الخدمة', '#s2-contact']];
     sugg.querySelector('.s2-chips').innerHTML = chips.map(function (c) { return '<a class="s2-chip" href="' + c[2] + '">' + ic(c[0]) + c[1] + '</a>'; }).join('');
 
     /* side column: the account nudge / greeting + the live meeting card */

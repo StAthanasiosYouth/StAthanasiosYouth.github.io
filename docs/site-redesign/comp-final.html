@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>الموقع العام — المسابقات (S4)</title>
+<!--
+  S4: the LIVE competition engine (competition/index.html + assets/js/comp/*) in its own preview mode (docs/COMPETITIONS.md §13.3),
+  fed a sample competition by this page, so the real engine draws every state. ?layer=0 shows it as it is today;
+  the default adds the S4 redesign layer (comp-s4.css) inside it.
+  ?state=auto|scheduled|open|closed · ?layer=0 · ?tint=<S3 colour>
+-->
+<style>
+  html, body { margin: 0; height: 100%; background: #020914; }
+  iframe { display: block; width: 100%; height: 100%; border: 0; }
+</style>
+<body>
+<iframe id="engine" src="/competition/?preview" title="المسابقة"></iframe>
+<script src="comp-sample.js"></script>
+<script>
+(function () {
+  var Q = new URLSearchParams(location.search);
+  var LAYER = Q.get('layer') !== '0';
+  var f = document.getElementById('engine');
+  function inject(doc) {
+    if (!LAYER || doc.querySelector('link[data-s4]')) return;
+    var l = doc.createElement('link'); l.rel = 'stylesheet'; l.href = '/docs/site-redesign/comp-s4.css'; l.dataset.s4 = '1'; doc.head.appendChild(l);
+    var s = doc.createElement('script'); s.src = '/docs/site-redesign/comp-s4.js'; s.dataset.s4 = '1'; doc.head.appendChild(s);
+    doc.documentElement.classList.add('s4');
+  }
+  window.addEventListener('message', function (e) {
+    if (e.origin !== location.origin || e.source !== f.contentWindow) return;
+    var d = e.data || {};
+    if (d.type === 'athanasios:comp-preview-ready') {
+      inject(f.contentDocument);
+      f.contentWindow.postMessage({ type: 'athanasios:comp-preview', definition: window.S4_SAMPLE.definition, at: ({ scheduled: '2026-11-05T19:30', closed: '2026-11-21T10:00' })[Q.get('state')] || null, state: Q.get('state') || 'open' }, location.origin);
+    }
+    if (d.type === 'athanasios:comp-preview-submit') {
+      setTimeout(function () { f.contentWindow.postMessage({ type: 'athanasios:comp-preview-result', id: d.id, result: window.S4_SAMPLE.result(d.answers) }, location.origin); }, 900);
+    }
+    if (d.type === 'athanasios:comp-preview-shown') document.documentElement.dataset.step = d.state;
+  });
+})();
+</script>
+</body>
+</html>

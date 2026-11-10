@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="s4">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>المسابقات — أسرة البابا أثناسيوس (S4)</title>
+<!-- S4: the competitions list (new: today a competition is only reached from its own link or the home).
+     Built on the live comp.css (same bar, cards, chips, buttons) + the S4 layer. Examples marked «مثال». -->
+<link rel="stylesheet" href="../../assets/css/comp.css">
+<link rel="stylesheet" href="comp-s4.css">
+<style>
+  .cl { width: min(100%, 980px); margin: 0 auto; padding: 18px var(--gutter) 60px; display: grid; gap: 18px; }
+  .cl__head { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+  .cl__head h1 { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: clamp(2rem, 8vw, 2.8rem); line-height: 1.3; color: var(--gold-hi); }
+  .cl__head p { margin: 2px 0 0; color: var(--text-2); }
+  .cl__bal { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--gold-line-strong); background: linear-gradient(90deg, rgba(215, 170, 80, .18), rgba(215, 170, 80, .04)); color: var(--text); text-decoration: none; font-weight: 700; }
+  .cl__bal b { color: var(--gold-hi); font-size: 1.1rem; }
+  .cl__tabs { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+  .cl__tabs button { flex: none; height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--gold-line-strong); background: rgba(8, 33, 61, .7); color: var(--text-2); font: 700 .9rem var(--font-ui); cursor: pointer; }
+  .cl__tabs button.on { background: linear-gradient(180deg, var(--gold-hi), var(--gold)); color: var(--gold-ink); border-color: transparent; }
+  .cl__tabs small { opacity: .75; margin-inline-start: 4px; }
+  .cl__grid { display: grid; gap: 14px; }
+  @media (min-width: 760px) { .cl__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .cc { position: relative; display: grid; grid-template-columns: auto 1fr; gap: 14px; padding: 16px; border-radius: var(--radius-lg); border: 1px solid var(--gold-line); background: linear-gradient(180deg, var(--navy-800), var(--navy-900)); color: var(--text); text-decoration: none; transition: transform .25s var(--ease-out), border-color .2s; }
+  .cc:hover { transform: translateY(-3px); border-color: var(--gold-line-strong); }
+  .cc__ic { width: 64px; height: 64px; border-radius: 20px; display: grid; place-items: center; color: var(--gold-hi); background: radial-gradient(circle at 35% 30%, rgba(242, 210, 139, .25), rgba(8, 33, 61, .9) 70%); box-shadow: 0 0 0 1px var(--gold-line-strong); }
+  .cc__ic svg { width: 32px; height: 32px; }
+  .cc h2 { margin: 0; font-size: 1.12rem; line-height: 1.5; }
+  .cc p { margin: 2px 0 0; color: var(--text-2); font-size: .88rem; line-height: 1.7; }
+  .cc__meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .cc__chip { height: 28px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 800; border: 1px solid var(--gold-line-strong); color: var(--gold-hi); background: rgba(215, 170, 80, .1); }
+  .cc__chip--open { color: #04210f; background: var(--ok); border-color: transparent; }
+  .cc__chip--soon { color: var(--text); background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .16); }
+  .cc__chip--done { color: var(--text-3); background: none; border-color: rgba(255, 255, 255, .14); }
+  .cc__go { margin-inline-start: auto; height: 40px; padding: 0 16px; border-radius: 999px; display: inline-flex; align-items: center; font-weight: 800; font-size: .88rem; background: linear-gradient(180deg, var(--gold-hi), var(--gold)); color: var(--gold-ink); }
+  .cc__go--ghost { background: none; border: 1px solid var(--gold-line-strong); color: var(--gold-hi); }
+  .cc__score { margin-inline-start: auto; font-weight: 800; color: var(--text-2); font-size: .85rem; }
+  .cc__score b { color: var(--gold-hi); font-size: 1.05rem; }
+  .cc--done { opacity: .86; }
+  .cc .ex { position: absolute; top: 12px; inset-inline-end: 12px; height: 22px; padding: 0 9px; border-radius: 999px; display: inline-flex; align-items: center; border: 1px dashed rgba(255, 255, 255, .35); color: var(--text-2); font-size: 11px; font-weight: 800; }
+  .cl__empty { padding: 26px; border-radius: var(--radius-lg); border: 1px dashed var(--gold-line-strong); text-align: center; color: var(--text-2); }
+</style>
+<body>
+<header class="cbar"><a class="cbar__brand" href="final.html"><img src="../../assets/img/logo-128.webp" width="36" height="36" alt=""><span class="cbar__name">أسرة البابا أثناسيوس</span></a></header>
+<main class="cl">
+  <div class="cl__head"><div><h1>المسابقات</h1><p>جاوب، واكسب نقط تبدّلها من متجر «نقاطي».</p></div><a class="cl__bal" href="../../points/">رصيدك <b>١٢٠</b> نقطة ‹</a></div>
+  <div class="cl__tabs" role="tablist"><button class="on" type="button">الكل<small>٣</small></button><button type="button">متاحة دلوقتي<small>١</small></button><button type="button">جاية<small>١</small></button><button type="button">خلصت<small>١</small></button></div>
+  <div class="cl__grid">
+    <a class="cc" href="comp-final.html?state=open"><span class="ex">مثال</span><span class="cc__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8v5a4 4 0 0 1-8 0Z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7M9.5 17h5"/></svg></span>
+      <div><h2>مسابقة سفر أعمال الرسل</h2><p>٦ أسئلة · ٤٠ نقطة · ١٠ دقايق</p></div>
+      <div class="cc__meta"><span class="cc__chip cc__chip--open">متاحة دلوقتي</span><span class="cc__chip">فاضل ١٠ أيام</span><span class="cc__go">ابدأ ‹</span></div></a>
+    <a class="cc" href="comp-final.html?state=scheduled"><span class="ex">مثال</span><span class="cc__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 4.5h11a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3Z"/><path d="M5 16.5a3 3 0 0 1 3-3h11M9 8h6"/></svg></span>
+      <div><h2>مسابقة الكتاب المقدس — المستوى التاني</h2><p>١٠ أسئلة · ٦٠ نقطة</p></div>
+      <div class="cc__meta"><span class="cc__chip cc__chip--soon">بتبدأ بعد ٣ أيام</span><span class="cc__chip">السبت ١٤ نوفمبر · ٦ المغرب</span><span class="cc__go cc__go--ghost">فكّرني</span></div></a>
+    <a class="cc cc--done" href="comp-final.html?state=closed"><span class="ex">مثال</span><span class="cc__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="9.5" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg></span>
+      <div><h2>مسابقة قصة القديس أبي سيفين</h2><p>خلصت يوم ١ نوفمبر</p></div>
+      <div class="cc__meta"><span class="cc__chip cc__chip--done">خلصت</span><span class="cc__score">درجتك <b>٢٨</b> من ٣٠ · +٢٨ نقطة</span></div></a>
+  </div>
+  <p class="cl__empty" hidden>مفيش مسابقات دلوقتي. أول ما تنزل مسابقة هيوصلك إشعار.</p>
+</main>
+</body>
+</html>
