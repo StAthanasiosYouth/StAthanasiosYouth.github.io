@@ -37,13 +37,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .sugg { margin-top: 16px; position: relative; }
 .sugg__track { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; padding-bottom: 4px; }
 .sugg__track::-webkit-scrollbar { display: none; }
-.slide { position: relative; flex: 0 0 100%; scroll-snap-align: center; min-height: clamp(200px, 30vw, 360px); border-radius: 26px; overflow: hidden; border: 1px solid var(--gold-line-strong); display: flex; align-items: flex-end; background: var(--navy-850); }
-.slide img.bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.slide::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, rgb(2 9 20 / .92) 0%, rgb(2 9 20 / .5) 45%, transparent 75%); }
-.slide__body { position: relative; z-index: 1; padding: clamp(16px, 2.4vw, 30px); width: 100%; display: flex; align-items: flex-end; gap: 14px; }
+.slide { position: relative; flex: 0 0 100%; scroll-snap-align: center; border-radius: 26px; overflow: hidden; border: 1px solid var(--gold-line-strong); display: flex; flex-direction: column; background: linear-gradient(180deg, var(--navy-850), var(--navy-900)); }
+.slide img.bg { display: block; width: 100%; aspect-ratio: 16 / 6.2; object-fit: cover; }
+
+.slide__body { position: relative; z-index: 1; padding: clamp(12px, 1.8vw, 22px) clamp(14px, 2vw, 24px); width: 100%; display: flex; align-items: center; gap: 14px; }
 .slide__txt { flex: 1; min-width: 0; }
 .slide__tag { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 11px; border-radius: 999px; background: rgb(215 170 80 / .18); border: 1px solid var(--gold-line-strong); color: var(--gold-hi); font-size: 12px; font-weight: 800; }
-.slide h2 { margin: 8px 0 2px; font-family: "Aref Ruqaa", serif; font-size: clamp(30px, 4.2vw, 52px); line-height: 1.25; color: var(--gold-hi); }
+.slide h2 { margin: 6px 0 2px; font-family: "Aref Ruqaa", serif; font-size: clamp(26px, 3vw, 40px); line-height: 1.25; color: var(--gold-hi); }
 .slide p { margin: 0; color: var(--text-2); font-size: clamp(13.5px, 1.4vw, 17px); }
 .cta { display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 20px; border-radius: 999px; border: 0; background: linear-gradient(180deg, var(--gold-hi), var(--gold)); color: var(--gold-ink); font-weight: 800; font-size: 14.5px; white-space: nowrap; box-shadow: 0 12px 28px -14px var(--gold); }
 .cta--ghost { background: rgb(8 33 61 / .7); color: var(--gold-soft); border: 1px solid var(--gold-line-strong); box-shadow: none; }
