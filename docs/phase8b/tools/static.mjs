@@ -20,8 +20,17 @@ createServer(async (q, r) => {
   const svc = /^\/(black-theatre|silenttheatre)\/(index\.html|page\.json)$/.exec(u.pathname);
   if (svc && svc[2] === 'index.html' && u.searchParams.has('s5')) p = `docs/site-redesign/svc/${svc[1]}.html`;
   if (svc && svc[2] === 'page.json' && /[?&]s5=1/.test(q.headers.referer || '') && /[?&]team=1/.test(q.headers.referer || '') && existsSync(join(root, `docs/site-redesign/svc/${svc[1]}.page.json`))) p = `docs/site-redesign/svc/${svc[1]}.page.json`;
+  // S8: privacy and terms with the redesign layer (?s8=1)
+  const s8 = /^\/(privacy|terms)\/(index\.html)?$/.exec(u.pathname);
+  if (s8 && u.searchParams.has('s8')) p = `docs/site-redesign/s8/${s8[1]}.html`;
   if (p.includes('..')) { r.writeHead(403).end(); return; }
   if (!extname(p)) p = join(p, 'index.html');
   try { const b = await readFile(join(root, p)); r.writeHead(200, { 'content-type': T[extname(p)] || 'application/octet-stream', 'cache-control': 'no-store' }).end(b); }
-  catch { r.writeHead(404).end('404'); }
+  catch {
+    // like GitHub Pages: a missing page gets the site's 404.html (with ?s8=1, the redesigned one)
+    if (/\.html$/.test(p)) {
+      try { const b = await readFile(join(root, u.searchParams.has('s8') ? 'docs/site-redesign/s8/404.html' : '404.html')); r.writeHead(404, { 'content-type': T['.html'], 'cache-control': 'no-store' }).end(b); return; } catch {}
+    }
+    r.writeHead(404).end('404');
+  }
 }).listen(port, '127.0.0.1', () => console.log('proposal on ' + port));

@@ -99,7 +99,7 @@
         toc += '<a href="#' + ph.id + '-' + it.k + '">' + it.title.split(':')[0].split('(')[0].trim() + '</a>';
         var now = it.now === undefined ? ['now-' + it.k + '.png'] : it.now;
         var next = (mode === 'desk' && it.nextDesk) ? it.nextDesk : (it.next || ['new-' + it.k + '.png'].concat(it.extra || []));
-        var frames = next.length > 2; var tall = it.k === 'acct-home' || it.k === 'acct-store' || it.k === 'acct-signin' || it.k === 'book-page' || it.k === 'page' || it.k === 'full' || it.k.indexOf('svc-') === 0 && it.k !== 'svc-player';
+        var frames = next.length > 2; var tall = it.k === 'rest-privacy' || it.k === 'rest-terms' || it.k === 'rest-404' || it.k === 'rest-unavail' || it.k === 'acct-home' || it.k === 'acct-store' || it.k === 'acct-signin' || it.k === 'book-page' || it.k === 'page' || it.k === 'full' || it.k.indexOf('svc-') === 0 && it.k !== 'svc-player';
         var nowHtml = now ? imgs(now, now.length > 2) : '<div class="empty">' + (it.nowNote || 'مش موجود دلوقتي.') + '</div>';
         if (mode === 'desk' && it.k === 'bar') nowHtml = '<div class="empty">' + it.nowNote + '</div>';
         out += '<section class="item" id="' + ph.id + '-' + it.k + '"><h3>' + it.title + '<span class="st st--' + it.status + '">' + ST[it.status] + '</span></h3>' +
