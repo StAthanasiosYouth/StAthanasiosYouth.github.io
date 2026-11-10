@@ -598,6 +598,8 @@ test('InstaPay payment card: the approved number + amount + «نسخ الرقم�
   assert.equal(await textOf(page, '.bk-paycard__number'), '011 9876 5432');
   assert.equal(await page.$eval('.bk-paycard__number', el => el.dir), 'ltr');
   assert.match(await textOf(page, '.bk-paycard__name'), /Mina Adel/);
+  // «دفع كامل» (the first choice) has no box under it: nothing printed there (it once showed the word «null»)
+  assert.doesNotMatch(await textOf(page, '#book'), /\bnull\b|undefined/);
   // «دفع قسط»: the amount, the minimum, what's left; the pay card follows; back to «دفع كامل»
   await page.click('label[for="bk-plan-part"]');
   await page.waitForSelector('#bk-pay-amount');

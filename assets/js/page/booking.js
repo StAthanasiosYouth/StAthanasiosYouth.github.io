@@ -958,7 +958,8 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
         h('div', { class: 'bk-plans' },
           choice('full', 'دفع كامل', money(total)),
           choice('part', 'دفع قسط', `من ${money(min)}`))),
-        details);
+        // «دفع كامل» has no box: replaceChildren would print a null as the text «null»
+        ...(details ? [details] : []));
     }
 
     function payCard(servant, method, reply) {
