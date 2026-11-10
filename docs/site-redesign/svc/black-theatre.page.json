@@ -1,0 +1,134 @@
+{
+ "schema": 1,
+ "v": "5bf0b59d54ba",
+ "id": "pg-0d2eeb07",
+ "slug": "black-theatre",
+ "title": "المسرح الأسود",
+ "tagline": "حكايات بالنور والظل… ورسالة بتوصل من غير كلام",
+ "description": "فريق المسرح الأسود بيقدم عروض قصيرة بتعتمد على الإضاءة والحركة والمؤثرات البصرية، وكل عرض بيحكي فكرة ورسالة بطريقة مختلفة ومميزة.  \nهنا هتقدر تشوف مقتطفات من عروضنا السابقة، وتتعرف أكتر على الخدمة، وتشاهد بعض الأعمال اللي قدمناها في المناسبات والاجتماعات المختلفة.  \nبعض العروض بتتقدم بالتعاون مع فريق Brave Under Grace – B.U.G.",
+ "theme": "",
+ "cover": {
+  "src": "media/2026/img-09d4476b.webp",
+  "thumb": "media/2026/img-09d4476b-480.webp",
+  "w": 1600,
+  "h": 900,
+  "alt": "",
+  "color": "#412618"
+ },
+ "hero": {
+  "src": "media/2026/img-09d4476b.webp",
+  "thumb": "media/2026/img-09d4476b-480.webp",
+  "w": 1600,
+  "h": 900,
+  "alt": "",
+  "color": "#412618"
+ },
+ "partner": {
+  "key": "bug",
+  "name": "Brave Under Grace – B.U.G.",
+  "short": "B.U.G.",
+  "logo": {
+   "src": "assets/img/partners/bug-logo-720.webp",
+   "thumb": "assets/img/partners/bug-logo-360.webp",
+   "w": 720,
+   "h": 305,
+   "alt": "شعار Brave Under Grace – B.U.G."
+  },
+  "mark": {
+   "src": "assets/img/partners/bug-symbol-320.webp",
+   "w": 320,
+   "h": 107,
+   "alt": "B.U.G."
+  },
+  "url": null
+ },
+ "media": [
+  {
+   "id": "pm-81b596b6",
+   "title": "🎭 ميدلي العذراء",
+   "text": "BUG – Brave Under Grace\nBlack Theater Team",
+   "duration": "",
+   "cover": {
+    "src": "media/2026/img-8ffd40eb.webp",
+    "thumb": "media/2026/img-8ffd40eb-480.webp",
+    "w": 1600,
+    "h": 900,
+    "alt": "",
+    "color": "#47372c"
+   },
+   "source": "clip",
+   "clip": {
+    "type": "video",
+    "src": "media/2026/vid-1dab96f8.mp4",
+    "poster": "media/2026/vid-1dab96f8-480.webp",
+    "w": 854,
+    "h": 480,
+    "alt": "",
+    "start": 0,
+    "end": 6
+   },
+   "audio": {
+    "mode": "custom",
+    "src": "media/2026/aud-fde40f81.mp3"
+   },
+   "fullUrl": "https://www.facebook.com/share/v/18JfZXsrjn/",
+   "ctaLabel": "شاهد المسرحية كاملة"
+  },
+  {
+   "id": "pm-f641b60e",
+   "title": "جاء المخلص",
+   "text": "",
+   "duration": "",
+   "cover": {
+    "src": "media/2026/img-53ca69a3.webp",
+    "thumb": "media/2026/img-53ca69a3-480.webp",
+    "w": 1280,
+    "h": 720,
+    "alt": "",
+    "color": "#463a2f"
+   },
+   "source": "clip",
+   "clip": {
+    "type": "video",
+    "src": "media/2026/vid-91def8c7.mp4",
+    "poster": "media/2026/vid-91def8c7-480.webp",
+    "w": 854,
+    "h": 480,
+    "alt": "",
+    "start": 0,
+    "end": 22.5
+   },
+   "audio": {
+    "mode": "original",
+    "src": null
+   },
+   "fullUrl": "https://www.facebook.com/share/v/1F4ESNjpdd/",
+   "ctaLabel": "شاهد المسرحية كاملة"
+  }
+ ],
+ "team": {
+  "title": "فريق الخدمة",
+  "text": "مثال: لو عاوز تنضم للفريق أو عندك سؤال عن العروض، كلّم حد منهم.",
+  "people": [
+   {
+    "id": "tm1",
+    "name": "اسم الخادم (مثال)",
+    "role": "مسؤول الفريق",
+    "wa": "201000000001"
+   },
+   {
+    "id": "tm2",
+    "name": "اسم الخادمة (مثال)",
+    "role": "الإخراج",
+    "wa": "201000000002"
+   },
+   {
+    "id": "tm3",
+    "name": "اسم الخادم (مثال) ",
+    "role": "الإضاءة والمؤثرات",
+    "wa": "201000000003"
+   }
+  ]
+ },
+ "publishedAt": "2026-11-03T22:09"
+}
