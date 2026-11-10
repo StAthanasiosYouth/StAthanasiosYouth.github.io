@@ -2502,6 +2502,69 @@
 
   var sheet = document.getElementById('sheet');
 
+  var DIGITS = '٠١٢٣٤٥٦٧٨٩';
+  function arabicNumber(n) { return String(n).replace(/\d/g, function (d) { return DIGITS[d]; }); }
+
+  /* Phase 8B: a big editor's sections, listed on its side (wide screens) or as chips over it (phones).
+     Taken from the editor's own «section-label» headings, so every editor gets it without changes; one with
+     fewer than two sections stays a single column at the medium width. A tap scrolls to the section, and the
+     list follows the scroll. */
+  function sheetSections(dialog) {
+
+    var body = dialog.querySelector('.sheet__body');
+    var labels = Array.prototype.slice.call(body.querySelectorAll('.section-label')).filter(function (label) {
+      return !label.closest('.sheet__body .sheet__body, dialog:not(.sheet)');
+    });
+    if (labels.length < 2) { dialog.classList.remove('sheet--lg'); dialog.classList.add('sheet--md'); return; }
+
+    var sections = labels.map(function (label) {
+      var target = label.closest('.form-group, fieldset, .card') || label;
+      if (!body.contains(target) || target === body) target = label;
+      target.classList.add('sheet__sec');
+      return { title: label.textContent.trim(), target: target };
+    });
+
+    // fields before the first section: «الأساسيات»
+    var firstTop = sections[0].target;
+    var lead = body.querySelector('.field, .form > *');
+    if (lead && lead !== firstTop && !firstTop.contains(lead) && (lead.compareDocumentPosition(firstTop) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+      sections.unshift({ title: 'الأساسيات', target: null });
+    }
+
+    var links = sections.map(function (section, i) {
+      return el('button', {
+        class: 'sheet__navlink' + (i === 0 ? ' is-on' : ''), type: 'button',
+        onclick: function () {
+          var smooth = document.documentElement.getAttribute('data-motion') !== 'off' &&!matchMedia('(prefers-reduced-motion: reduce)').matches;
+          if (!section.target) body.scrollTo({ top: 0, behavior: smooth ? 'smooth' : 'auto' });
+          else body.scrollTo({ top: secTop(section.target) - 12, behavior: smooth ? 'smooth' : 'auto' });
+        }
+      }, el('span', { class: 'sheet__navnum', 'aria-hidden': 'true', text: arabicNumber(i + 1) }), el('span', { text: section.title }));
+    });
+
+    var nav = el('nav', { class: 'sheet__nav', 'aria-label': 'أقسام النافذة' }, links);
+    dialog.insertBefore(nav, body);
+
+    function secTop(node) { return node.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop; }
+
+    var ticking = false;
+    body.addEventListener('scroll', function () {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(function () {
+        ticking = false;
+        var at = 0;
+        var top = body.scrollTop + 40;
+        sections.forEach(function (section, i) { if (section.target && secTop(section.target) <= top) at = i; });
+        if (body.scrollTop + body.clientHeight >= body.scrollHeight - 4) at = sections.length - 1;
+        links.forEach(function (link, i) { link.classList.toggle('is-on', i === at); });
+        var on = links[at];
+        if (on && nav.scrollWidth > nav.clientWidth) nav.scrollTo({ left: on.offsetLeft - nav.clientWidth / 2 + on.offsetWidth / 2 });
+      });
+    }, { passive: true });
+
+  }
+
   A.openSheet = function (title, body, footer, options) {
 
     options = options || {};
@@ -2511,7 +2574,10 @@
     var toasts = document.getElementById('toasts');
     if (toasts && sheet.contains(toasts)) document.body.appendChild(toasts);
 
-    sheet.className = 'sheet' + (options.wide ? ' sheet--wide' : '') + (options.className ? ' ' + options.className : '');
+    // Phase 8B: centred on wide screens, in three sizes. An item editor (a draft or a lock) or a wide sheet is big
+    // (sections on the side), the rest medium; options.size wins.
+    var size = options.size || (options.wide || options.draft || options.lock ? 'lg' : 'md');
+    sheet.className = 'sheet sheet--' + size + (options.wide ? ' sheet--wide' : '') + (options.className ? ' ' + options.className : '');
     A.fill(sheet,
       el('div', { class: 'sheet__grab', 'aria-hidden': 'true' }),
       el('div', { class: 'sheet__head' },
@@ -2522,6 +2588,8 @@
       el('div', { class: 'sheet__body' }, body),
       footer ? el('div', { class: 'sheet__foot' }, footer) : null
     );
+
+    if (size === 'lg') sheetSections(sheet);
 
     sheet.style.transform = '';
 
@@ -3785,7 +3853,7 @@
   ];
 
   A.views.gamescorner = function () {
-    return [A.card('ركن الألعاب', 'جاي قريب: المكتبة، الجلسات، المشاركين والفرق، حسابات الـHost، والمكافآت. لسه مفيش حاجة هنا تشتغل.',
+    return [A.card('الألعاب', 'جاي قريب: المكتبة، الجلسات، المشاركين والفرق، حسابات الـHost، والمكافآت. لسه مفيش حاجة هنا تشتغل.',
       el('p', { class: 'soon-chip' }, icon('lock'), 'قريبًا'),
       el('ul', { class: 'coming' }, COMING_GAMES.map(function (g) {
         return el('li', { class: 'coming__game' },
@@ -3800,8 +3868,9 @@
   A.gamesCorner = function (on) {
     var has = A.AREAS.some(function (a) { return a.key === 'gamescorner'; });
     if (on && !has) {
-      var at = A.AREAS.length - 1; // before «الإعدادات»
-      A.AREAS.splice(at, 0, { key: 'gamescorner', label: 'الألعاب', title: 'ركن الألعاب', icon: 'sparkle', group: 'site', soon: true, view: 'gamescorner' });
+      // Phase 8B: in «الشغل», right after «المسابقات» («ركن الألعاب» of the content is another thing)
+      var at = A.AREAS.map(function (a) { return a.key; }).indexOf('comps') + 1 || A.AREAS.length - 1;
+      A.AREAS.splice(at, 0, { key: 'gamescorner', label: 'الألعاب', title: 'الألعاب', icon: 'star', group: 'main', soon: true, view: 'gamescorner' });
     }
     if (!on && has) A.AREAS = A.AREAS.filter(function (a) { return a.key !== 'gamescorner'; });
   };
@@ -4145,47 +4214,146 @@
     acct.setAttribute('aria-label', 'حسابك: ' + name);
   }
 
-  /* ---------- the welcome inside the shell, right after signing in ---------- */
+  /* ---------- the welcome inside the shell, right after signing in ----------
+     Phase 8B: the approved preview's intro (docs/phase8/admin-preview.src.html playIntro + dust) as it is,
+     with no «تخطي» button: a tap or a key ends it. Its colours follow the chosen accent; once after signing
+     in, never with reduced motion; A.playIntro() («شوف شاشة البداية») plays it again. Same API as before:
+     { ready(name), leave() }. */
 
   var welcomed = false;
 
-  function welcome() {
-    if (welcomed) return null;
+  function introDust(cv, dur) {
+    if (document.documentElement.getAttribute('data-motion') === 'lite') return;
+    var rgb = (getComputedStyle(document.documentElement).getPropertyValue('--acc-hi-rgb') || '242 210 139').trim().split(/\s+/).join(',');
+    var ctx = cv.getContext('2d'), dpr = Math.min(2, window.devicePixelRatio || 1), w = cv.clientWidth, h = cv.clientHeight, ps = [], start = performance.now();
+    if (!ctx || !w || !h) return;
+    cv.width = w * dpr; cv.height = h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (var i = 0; i < 48; i++) ps.push({ x: Math.random() * w, y: h * (0.3 + Math.random() * 0.8), r: 0.6 + Math.random() * 1.9, v: 0.15 + Math.random() * 0.55, a: Math.random() * 6.28, s: 0.5 + Math.random() });
+    (function frame(t) {
+      if (!cv.isConnected) return;
+      var k = (t - start) / dur, fade = k < 0.15 ? k / 0.15 : k > 0.85 ? Math.max(0, (1 - k) / 0.15) : 1;
+      ctx.clearRect(0, 0, w, h);
+      ps.forEach(function (p) {
+        p.y -= p.v; p.x += Math.sin(p.a += 0.02) * 0.25;
+        var tw = 0.5 + 0.5 * Math.sin(p.a * 3 * p.s);
+        ctx.beginPath(); ctx.fillStyle = 'rgba(' + rgb + ',' + ((0.08 + 0.32 * tw) * fade).toFixed(3) + ')'; ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill();
+      });
+      if (k < 1) requestAnimationFrame(frame);
+    })(start);
+  }
+
+  function welcome(force) {
+    if (welcomed && !force) return null;
     welcomed = true;
     var root = document.documentElement;
-    if (root.classList.contains('is-restoring') || A.reducedMotion() || document.visibilityState === 'hidden' || !window.AdminTransport) return null;
+    if (!force && (root.classList.contains('is-restoring') || document.visibilityState === 'hidden' || !window.AdminTransport)) return null;
+    if (A.reducedMotion()) {
+      if (force) A.toast('شاشة البداية مقفولة مع «تقليل الحركة»');
+      return null;
+    }
     var main = document.querySelector('.app__main');
     if (!main) return null;
-    var hello = el('p', { class: 'welcome__hello', text: 'أهلاً بيك' });
-    var box = el('div', { class: 'welcome', 'aria-hidden': 'true' },
-      el('span', { class: 'welcome__glow' }),
-      el('img', { class: 'welcome__logo', src: '../assets/img/logo-256.webp', width: 112, height: 112, alt: '' }),
-      el('p', { class: 'welcome__title', text: 'لوحة التحكم' }),
-      hello,
-      el('span', { class: 'welcome__line' }, el('i')));
-    main.appendChild(box);
-    var shown = Date.now();
-    var gone = false;
-    function leave() {
+    var old = document.querySelector('.welcome');
+    if (old) old.remove();
+
+    var sub = el('p', { class: 'intro__sub welcome__hello', text: 'أسرة البابا أثناسيوس الرسولي · سفاجا' });
+    var status = el('span', { class: 'intro__status', text: 'بنجهز لوحتك…' });
+    var box = el('div', { class: 'welcome intro', 'aria-hidden': 'true' },
+      el('div', { class: 'intro__bg' }, el('div', { class: 'intro__rays' }), el('canvas', { class: 'intro__dust' })),
+      el('div', { class: 'intro__core' },
+        el('div', { class: 'intro__mark' },
+          el('span', { class: 'intro__halo' }), el('span', { class: 'intro__ring' }),
+          el('img', { class: 'intro__logo', src: '../assets/img/logo-256.webp', width: 128, height: 128, alt: '' }),
+          el('span', { class: 'intro__sweep' }, el('i'))),
+        el('div', { class: 'intro__text' }, el('p', { class: 'intro__title', text: 'لوحة التحكم' }), sub),
+        el('div', { class: 'intro__load' }, el('span', { class: 'intro__progress' }, el('i')), status)));
+
+    // over the panel's column, under its top bar
+    var bar = document.querySelector('.topbar');
+    var r = main.getBoundingClientRect();
+    var top = bar && bar.offsetParent ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
+    box.style.cssText = 'top:' + top + 'px;left:' + Math.max(0, r.left) + 'px;width:' + Math.min(innerWidth, r.width) + 'px';
+    document.body.appendChild(box);
+    root.classList.add('is-intro');
+    introDust(box.querySelector('canvas'), 2600);
+    if (A.sound) A.sound('open');
+
+    var anims = [], D = 1900, E = 'cubic-bezier(.16,1,.3,1)', gone = false, ready = false, shown = Date.now();
+    function play(sel, kf, o) {
+      var node = box.querySelector(sel);
+      if (!node || !node.animate) return null;
+      var a = node.animate(kf, Object.assign({ fill: 'both', easing: 'cubic-bezier(.22,1,.36,1)' }, o));
+      anims.push(a);
+      return a;
+    }
+    play('.intro__rays', [{ opacity: 0, transform: 'rotate(0deg)' }, { opacity: 1, transform: 'rotate(8deg)' }], { duration: 2600, easing: 'linear' });
+    play('.intro__halo', [{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 1000, delay: 100 });
+    play('.intro__logo', [{ opacity: 0, transform: 'scale(.9)', filter: 'blur(10px)' }, { opacity: 1, transform: 'none', filter: 'blur(0px)' }], { duration: 850, delay: 150, easing: E });
+    play('.intro__ring', [{ opacity: 0, transform: 'scale(.85)' }, { opacity: 1, transform: 'none' }], { duration: 700, delay: 450, easing: E });
+    play('.intro__sweep i', [{ left: '-60%' }, { left: '140%' }], { duration: 750, delay: 850, easing: 'ease-in-out' });
+    play('.intro__title', [{ opacity: 0, transform: 'translateY(12px)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0px)' }], { duration: 750, delay: 600, easing: E });
+    play('.intro__sub', [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 600, delay: 900, easing: E });
+    play('.intro__load', [{ opacity: 0 }, { opacity: 1 }], { duration: 400, delay: 300 });
+    play('.intro__progress i', [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: D, easing: 'linear' });
+
+    // it ends by itself once the panel is ready and the bar is full; a tap or a key ends it now
+    var timer = setTimeout(function () { if (ready) leave(false); }, D);
+    var hardStop = setTimeout(function () { leave(false); }, 6000);
+
+    function target() {
+      return ['.rail .brand__mark', '.topbar__mark'].map(function (s) { return document.querySelector(s); })
+        .filter(function (n) { return n && n.offsetParent && n.getBoundingClientRect().width; })[0];
+    }
+
+    function leave(fast) {
       if (gone) return;
       gone = true;
+      clearTimeout(timer); clearTimeout(hardStop);
+      document.removeEventListener('keydown', onKey, true);
+      anims.forEach(function (a) { try { a.finish(); } catch (e) { /* gone */ } });
       box.classList.add('is-leaving');
-      setTimeout(function () { box.remove(); }, 520);
+      ['.intro__text', '.intro__load', '.intro__halo', '.intro__ring', '.intro__sweep'].forEach(function (s) {
+        var n = box.querySelector(s);
+        if (n && n.animate) n.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-8px)' }], { duration: fast ? 160 : 320, fill: 'both', easing: 'ease-in' });
+      });
+      var bg = box.querySelector('.intro__bg');
+      if (bg.animate) bg.animate([{ opacity: 1 }, { opacity: 0 }], { duration: fast ? 260 : 520, delay: fast ? 60 : 300, fill: 'both', easing: 'ease-in-out' });
+      // the logo travels to its home in the rail (or the phone's top bar)
+      var logo = box.querySelector('.intro__logo'), t = target(), fly = null;
+      if (t && logo.animate) {
+        var a = logo.getBoundingClientRect(), b = t.getBoundingClientRect();
+        var dx = (b.left + b.width / 2) - (a.left + a.width / 2), dy = (b.top + b.height / 2) - (a.top + a.height / 2), sc = b.width / (a.width || 1);
+        fly = logo.animate([{ transform: 'none' }, { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(' + sc + ')' }], { duration: fast ? 420 : 820, easing: 'cubic-bezier(.65,0,.35,1)', fill: 'forwards' });
+      } else if (logo.animate) fly = logo.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
+      function cleanup() { root.classList.remove('is-intro'); box.remove(); }
+      if (fly && fly.finished) fly.finished.then(cleanup, cleanup);
+      else setTimeout(cleanup, 520);
     }
-    // it never stands in the way: the first tap or key goes to the panel and the welcome steps aside
-    document.addEventListener('pointerdown', leave, { capture: true, once: true });
-    document.addEventListener('keydown', leave, { capture: true, once: true });
-    setTimeout(leave, 3200);
+
+    function onKey(event) { if (event.key === 'Tab') return; leave(true); }
+    box.addEventListener('pointerdown', function () { leave(true); });
+    document.addEventListener('keydown', onKey, true);
+
     return {
       ready: function (name) {
         if (gone) return;
-        if (name) hello.textContent = 'أهلاً يا ' + String(name).split(' ')[0];
+        ready = true;
+        if (name) sub.textContent = 'أهلاً يا ' + String(name).split(' ')[0];
+        status.textContent = 'اللوحة جاهزة ✓';
         box.classList.add('is-ready');
-        setTimeout(leave, Math.max(450, 1100 - (Date.now() - shown)));
+        var left = D - (Date.now() - shown);
+        clearTimeout(timer);
+        timer = setTimeout(function () { leave(false); }, Math.max(450, left));
       },
-      leave: leave
+      leave: function () { leave(true); }
     };
   }
+
+  /* «شوف شاشة البداية» */
+  A.playIntro = function () {
+    var intro = welcome(true);
+    if (intro) intro.ready(A.state && (A.state.me || (A.state.user || '').split('@')[0]));
+  };
 
   /* ---------- presence: the other admins as avatars (online · idle · editing), the list a tap away ---------- */
 

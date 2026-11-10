@@ -66,8 +66,16 @@
     var body = el('div', { class: 'help__body' }, el('p', { class: 'loading-text', role: 'status' }, el('span', { class: 'spinner spinner--inline', 'aria-hidden': 'true' }), 'جاري التحميل…'));
     A.fill(dialog,
       el('div', { class: 'help__head' },
-        el('h2', { id: 'help-heading', class: 'help__heading' }, icon('info'), 'مساعدة'),
+        el('h2', { id: 'help-heading', class: 'help__heading' }, icon('video'), 'شرح الجزء ده'),
         el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل المساعدة', onclick: function () { dialog.close(); } }, icon('close'))
+      ),
+      // Phase 8B: this part's guide video (coming); the written help stays under it
+      el('div', { class: 'vhelp-card' },
+        el('span', { class: 'vhelp-card__play', 'aria-hidden': 'true' }, icon('video')),
+        el('div', {},
+          el('b', { text: 'فيديو شرح · قريبًا' }),
+          el('small', { text: 'هنا هيبقى فيديو قصير بيشرح الجزء ده. لحد ما يجهز، الشرح المكتوب تحت.' })
+        )
       ),
       body
     );
@@ -97,12 +105,17 @@
 
   /* the «؟» in an editor's header (AdminScript openSheet) */
   A.helpButton = function () {
-    return el('button', { class: 'icon-btn help-btn', type: 'button', 'aria-label': 'مساعدة: إزاي أستخدم ده', onclick: function () { A.help(); } }, '؟');
+    return el('button', { class: 'vhelp help-btn', type: 'button', title: 'فيديو شرح · قريبًا', 'aria-label': 'فيديو شرح: إزاي أستخدم ده', onclick: function () { A.help(); } }, icon('video'));
   };
 
   var open = document.getElementById('help-open');
   if (open) {
     open.hidden = false;
+    // Phase 8B: the video-guide icon instead of «؟»
+    open.className = 'vhelp help-btn';
+    open.title = 'فيديو شرح · قريبًا';
+    open.setAttribute('aria-label', 'فيديو شرح: إزاي أستخدم الجزء ده');
+    A.fill(open, icon('video'));
     open.addEventListener('click', function () { A.help(); });
   }
 
