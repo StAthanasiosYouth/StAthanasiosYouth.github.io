@@ -4,107 +4,143 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>الموقع العام — الانترو المقترح (S1 · نسخة ٣)</title>
 <!--
-  S1 v3 (owner 2026-11-05): faster (~6.5 s) and bolder, with sound always on.
-  Browsers never play sound before the first touch, so the intro opens on a one-tap gate («المس علشان تدخل»)
-  that unlocks audio; then: card slams in from depth → one confident flip → phone rises, scans, locks →
-  the camera dives through the QR → flash → logo hit with a shockwave → name, slogan, welcome → «اعمل حسابك».
-  Plays on every visit until the member makes an account; after the account it never plays again.
+  S1 v3.4 (owner 2026-11-10): the approved look, now fitted to every screen.
+  · Layout is chosen by the screen's shape, not its width: portrait (phones, tablets standing up) / landscape (desktop,
+    tablets lying down). Every size is in viewport units with floors and ceilings, and a resize re-lays-out in place
+    (the timeline keeps its moment).
+  · Desktop uses the screen: the card, the phone and the end scene grow with it.
+  · A real iPhone (titanium frame, side buttons, Dynamic Island, status bar, lock screen → Camera app with the iOS QR
+    pill). On portrait screens the card turns to stand along the screen at a slight angle while the phone scans, so it is
+    big and sharp; nothing is blurred until the dive into the code.
+  Sound always on (one-tap gate unlocks audio). Plays every visit until the member makes an account, then never again.
   ?freeze=<ms> pauses at that moment (no gate, no sound) for stage frames.
-  Motion: transform/opacity (+ brief blur), ease-out-expo, no bounce; prefers-reduced-motion → straight to the end card.
 -->
 <style>
   @font-face { font-family: "Cairo"; src: url("../../assets/fonts/cairo-arabic.woff2") format("woff2"); unicode-range: U+0600-06FF, U+FB50-FDFF, U+FE70-FEFF; font-weight: 200 1000; }
   @font-face { font-family: "Cairo"; src: url("../../assets/fonts/cairo-latin.woff2") format("woff2"); unicode-range: U+0000-00FF; font-weight: 200 1000; }
   @font-face { font-family: "Aref Ruqaa"; src: url("../../assets/fonts/aref-ruqaa-arabic.woff2") format("woff2"); font-weight: 400 700; }
-  :root { --champagne: #e3cf9f; --champagne-2: #c9ad74; --ink: #f1f4f8; --ink-2: #bcc7d6; --navy: #071b38; }
+  :root { --champagne: #e3cf9f; --champagne-2: #c9ad74; --ink: #f1f4f8; --ink-2: #bcc7d6; --cw: 600px; --pw: 200px; --sw: clamp(130px, min(21vw, 34vh), 520px); }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #01050d; font-family: "Cairo", system-ui, sans-serif; color: var(--ink); }
   .stage { position: fixed; inset: 0; overflow: hidden; perspective: 1400px; }
-  .layer { position: absolute; inset: 0; display: grid; place-items: center; }
   .room { position: absolute; inset: 0; background: radial-gradient(50% 46% at 50% 48%, #0d2a50 0%, #05132a 55%, #01050d 100%); }
   .fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   .site { position: absolute; inset: 0; background: radial-gradient(62% 56% at 50% 40%, #10305a 0%, #071b38 46%, #020a18 100%); opacity: 0; }
-  .flare { position: absolute; left: 50%; top: 50%; width: 140vmax; height: 4px; margin: -2px 0 0 -70vmax; background: linear-gradient(90deg, transparent, rgb(255 244 220 / .0) 20%, rgb(255 244 220 / .85) 50%, rgb(255 244 220 / 0) 80%, transparent); filter: blur(2px); opacity: 0; }
+  .flare { position: absolute; left: 50%; top: 50%; width: 140vmax; height: 4px; margin: -2px 0 0 -70vmax; background: linear-gradient(90deg, transparent, rgb(255 244 220 / 0) 20%, rgb(255 244 220 / .85) 50%, rgb(255 244 220 / 0) 80%, transparent); filter: blur(2px); opacity: 0; }
   .flash { position: absolute; inset: 0; background: radial-gradient(circle at 50% 46%, #fff8e8, #e9d3a1 40%, #0b2448 85%); opacity: 0; }
   /* rig = card + phone, so the camera can dive through the QR together */
   .rig { position: absolute; inset: 0; display: grid; place-items: center; transform-style: preserve-3d; }
-  .card { position: absolute; width: min(74vw, 600px); aspect-ratio: 1134 / 543; transform-style: preserve-3d; opacity: 0; }
+  .card { position: absolute; width: var(--cw); aspect-ratio: 1134 / 543; transform-style: preserve-3d; opacity: 0; }
   .card__face { position: absolute; inset: 0; border-radius: 4.2%/8.8%; overflow: hidden; box-shadow: 0 40px 90px -34px #000, 0 0 0 1px rgb(227 207 159 / .3); }
   .card__face img { width: 100%; height: 100%; display: block; }
   .card__face--qr { transform: rotateY(180deg); opacity: 0; }
   .card__sheen { position: absolute; inset: 0; background: linear-gradient(105deg, transparent 38%, rgb(255 248 230 / .28) 50%, transparent 62%); transform: translateX(-140%); }
-  .qrmark { position: absolute; right: 15.2%; top: 25%; width: 22.6%; height: 46.6%; border-radius: 10px; box-shadow: 0 0 0 2px var(--champagne), 0 0 34px 6px rgb(227 207 159 / .55); opacity: 0; transform: rotateY(180deg) translateZ(2px); }
-  .phone { position: absolute; width: min(26vw, 210px); aspect-ratio: 9 / 19; border-radius: 34px; background: linear-gradient(160deg, #1d2636, #0a0e15); padding: 8px; box-shadow: 0 0 0 1.5px #313c4f, 0 50px 90px -30px #000; opacity: 0; }
-  .phone__screen { position: relative; width: 100%; height: 100%; border-radius: 27px; overflow: hidden; background: linear-gradient(170deg, #10233f, #050b16 70%); }
-  .phone__island { position: absolute; top: 9px; left: 50%; width: 30%; height: 16px; margin-left: -15%; border-radius: 12px; background: #000; z-index: 5; }
-  .phone__idle { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--ink-2); font-size: 12px; font-weight: 700; }
-  .phone__idle i { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: rgb(255 255 255 / .07); border: 1px solid rgb(255 255 255 / .12); }
-  .phone__idle svg { width: 22px; height: 22px; fill: none; stroke: var(--champagne); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-  .phone__cam { position: absolute; inset: 0; background-image: url(assets/card-front.png); background-size: 470% auto; background-position: 20% 50%; opacity: 0; }
-  .phone__ui { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; }
-  .finder { position: relative; width: 66%; aspect-ratio: 1; }
-  .finder i { position: absolute; width: 24%; height: 24%; border: 3px solid #fff; }
-  .finder i:nth-child(1) { top: 0; right: 0; border-left: 0; border-bottom: 0; border-radius: 0 12px 0 0; }
-  .finder i:nth-child(2) { top: 0; left: 0; border-right: 0; border-bottom: 0; border-radius: 12px 0 0 0; }
-  .finder i:nth-child(3) { bottom: 0; right: 0; border-left: 0; border-top: 0; border-radius: 0 0 12px 0; }
-  .finder i:nth-child(4) { bottom: 0; left: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 12px; }
-  .finder.is-lock i { border-color: var(--champagne); }
-  .laser { position: absolute; left: 4%; right: 4%; top: 6%; height: 2px; background: linear-gradient(90deg, transparent, #fff, transparent); box-shadow: 0 0 14px 3px rgb(227 207 159 / .8); opacity: 0; }
-  .phone__ok { position: absolute; bottom: 9%; left: 8%; right: 8%; display: flex; align-items: center; gap: 8px; padding: 9px 11px; border-radius: 15px; background: rgb(8 22 44 / .94); border: 1px solid rgb(227 207 159 / .35); font-size: 11.5px; font-weight: 800; opacity: 0; }
-  .phone__ok b { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: var(--champagne); color: #1b1407; font-size: 12px; flex: none; }
-  /* brand — solid text on plain navy, nothing behind it */
-  .brand { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -56%); display: flex; flex-direction: column; align-items: center; text-align: center; width: min(92vw, 720px); }
-  .logo { position: relative; width: clamp(116px, 19vmin, 172px); aspect-ratio: 1; opacity: 0; }
+  .qrmark { position: absolute; right: 15.2%; top: 25%; width: 22.6%; height: 46.6%; border-radius: 6%; box-shadow: 0 0 0 2px var(--champagne), 0 0 34px 6px rgb(227 207 159 / .55); opacity: 0; transform: rotateY(180deg) translateZ(2px); }
+
+  /* ---------- a real iPhone (15 Pro proportions 71.6 × 147.6 mm) ---------- */
+  .phone { position: absolute; width: var(--pw); aspect-ratio: 71.6 / 147.6; border-radius: calc(var(--pw) * .2); padding: calc(var(--pw) * .022); opacity: 0;
+    background: linear-gradient(118deg, #b7bcc4 0%, #6d727a 9%, #3a3e45 22%, #2a2d32 50%, #4b5058 78%, #a9aeb6 92%, #e2e5ea 100%);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / .35), inset 0 0 0 2px rgb(0 0 0 / .5), 0 60px 100px -36px #000, 0 20px 40px -24px rgb(0 0 0 / .8); }
+  .phone::before { content: ""; position: absolute; left: calc(var(--pw) * -.014); top: 17%; width: calc(var(--pw) * .02); height: 5%; border-radius: 3px 0 0 3px; background: linear-gradient(90deg, #8b9098, #3f434a);
+    box-shadow: 0 calc(var(--pw) * .2) 0 0 #5d626a, 0 calc(var(--pw) * .34) 0 0 #5d626a; }
+  .phone::after { content: ""; position: absolute; right: calc(var(--pw) * -.014); top: 25%; width: calc(var(--pw) * .02); height: 13%; border-radius: 0 3px 3px 0; background: linear-gradient(270deg, #8b9098, #3f434a); }
+  .phone__screen { position: relative; width: 100%; height: 100%; border-radius: calc(var(--pw) * .18); overflow: hidden; background: #000; box-shadow: inset 0 0 0 calc(var(--pw) * .022) #050505; }
+  .phone__glass { position: absolute; inset: 0; z-index: 7; border-radius: inherit; pointer-events: none; background: linear-gradient(125deg, rgb(255 255 255 / .14) 0%, rgb(255 255 255 / 0) 28%, rgb(255 255 255 / 0) 70%, rgb(255 255 255 / .05) 100%); }
+  .phone__island { position: absolute; z-index: 6; top: calc(var(--pw) * .045); left: 50%; width: 32%; height: calc(var(--pw) * .088); transform: translateX(-50%); border-radius: 999px; background: #000; }
+  .phone__island::after { content: ""; position: absolute; right: 18%; top: 50%; width: calc(var(--pw) * .04); height: calc(var(--pw) * .04); margin-top: calc(var(--pw) * -.02); border-radius: 50%; background: radial-gradient(circle at 35% 35%, #2a3550, #05070c 60%); }
+  .phone__status { position: absolute; z-index: 6; top: calc(var(--pw) * .05); left: 0; right: 0; display: flex; justify-content: space-between; padding: 0 calc(var(--pw) * .085); direction: ltr; font: 700 calc(var(--pw) * .052) / 1 -apple-system, "SF Pro Text", Cairo, sans-serif; color: #fff; }
+  .phone__status svg { height: calc(var(--pw) * .048); fill: #fff; }
+  .phone__status span:last-child { display: flex; gap: calc(var(--pw) * .02); align-items: center; }
+  /* lock screen first */
+  .phone__lock { position: absolute; inset: calc(var(--pw) * .022); border-radius: calc(var(--pw) * .16); overflow: hidden; background: radial-gradient(90% 60% at 30% 20%, #23477a, #0b1d38 55%, #040a16); display: flex; flex-direction: column; align-items: center; }
+  .phone__lock b { margin-top: 22%; font: 300 calc(var(--pw) * .26) / 1 -apple-system, "SF Pro Display", Cairo, sans-serif; letter-spacing: -.02em; color: #fff; direction: ltr; }
+  .phone__lock small { margin-top: 4%; font-size: calc(var(--pw) * .058); font-weight: 600; color: rgb(255 255 255 / .85); }
+  .phone__lock i { position: absolute; bottom: 4%; width: 36%; height: calc(var(--pw) * .02); border-radius: 9px; background: rgb(255 255 255 / .7); }
+  /* then the Camera app — the QR shows only in here, sharp */
+  .phone__cam { position: absolute; inset: calc(var(--pw) * .022); border-radius: calc(var(--pw) * .16); overflow: hidden; background: #000; opacity: 0; }
+  .phone__feed { position: absolute; left: 0; right: 0; top: 14%; bottom: 24%; background-image: url(assets/card-front.png); background-size: 470% auto; background-position: 20% 50%; }
+  .phone__modes { position: absolute; left: 0; right: 0; bottom: 15.5%; display: flex; justify-content: center; gap: 9%; direction: rtl; font-size: calc(var(--pw) * .05); font-weight: 700; color: rgb(255 255 255 / .75); }
+  .phone__modes em { font-style: normal; color: #ffd60a; }
+  .phone__shutter { position: absolute; left: 50%; bottom: 4.5%; width: calc(var(--pw) * .2); height: calc(var(--pw) * .2); margin-left: calc(var(--pw) * -.1); border-radius: 50%; border: calc(var(--pw) * .012) solid #fff; box-shadow: inset 0 0 0 calc(var(--pw) * .012) #000; background: #fff; background-clip: content-box; }
+  .finder { position: absolute; left: 50%; top: 45%; width: 62%; aspect-ratio: 1; transform: translate(-50%, -50%); }
+  .finder i { position: absolute; width: 22%; height: 22%; border: calc(var(--pw) * .012) solid #ffd60a; }
+  .finder i:nth-child(1) { top: 0; right: 0; border-left: 0; border-bottom: 0; border-radius: 0 14% 0 0; }
+  .finder i:nth-child(2) { top: 0; left: 0; border-right: 0; border-bottom: 0; border-radius: 14% 0 0 0; }
+  .finder i:nth-child(3) { bottom: 0; right: 0; border-left: 0; border-top: 0; border-radius: 0 0 14% 0; }
+  .finder i:nth-child(4) { bottom: 0; left: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 14%; }
+  .laser { position: absolute; left: 4%; right: 4%; top: 6%; height: 2px; background: linear-gradient(90deg, transparent, #fff, transparent); box-shadow: 0 0 14px 3px rgb(255 214 10 / .7); opacity: 0; }
+  .phone__pill { position: absolute; left: 9%; right: 9%; top: 71%; display: flex; align-items: center; gap: 6%; padding: 3.5% 5%; border-radius: calc(var(--pw) * .06); background: #ffd60a; color: #1a1400; direction: rtl; opacity: 0; }
+  .phone__pill svg { flex: none; width: calc(var(--pw) * .085); height: calc(var(--pw) * .085); }
+  .phone__pill b { display: block; font-size: calc(var(--pw) * .048); line-height: 1.3; }
+  .phone__pill small { display: block; font-size: calc(var(--pw) * .038); direction: ltr; text-align: right; opacity: .75; }
+
+  /* ---------- brand — solid text on plain navy, nothing behind it ---------- */
+  .brand { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -52%); display: flex; flex-direction: column; align-items: center; text-align: center;
+    width: max(300px, min(92vw, calc(100vw - 2 * (5vw + var(--sw)) - 3vw), 900px)); }
+  .logo { position: relative; width: clamp(96px, 22vh, 260px); aspect-ratio: 1; opacity: 0; flex: none; }
   .logo img { width: 100%; height: 100%; border-radius: 50%; display: block; filter: saturate(.95) brightness(1.06); box-shadow: 0 0 0 2px rgb(240 216 160 / .7), 0 0 0 7px rgb(240 216 160 / .12), 0 0 60px 4px rgb(240 210 140 / .32), 0 24px 50px -26px #000; }
   .wave { position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; border: 2px solid rgb(227 207 159 / .8); opacity: 0; }
   .wave--2 { border-width: 1px; }
-  .name { margin: 24px 0 0; font-family: "Aref Ruqaa", serif; font-weight: 700; font-size: clamp(36px, 7vmin, 62px); line-height: 1.35; color: var(--champagne); opacity: 0; text-wrap: balance; }
-  .sub { margin: 2px 0 0; font-family: "Aref Ruqaa", serif; font-size: clamp(16px, 2.8vmin, 22px); color: var(--champagne-2); opacity: 0; }
-  .slogan { margin: 22px 0 0; font-size: clamp(18px, 3vmin, 24px); font-weight: 800; color: var(--ink); opacity: 0; }
-  .welcome { margin: 8px 0 0; max-width: 34em; font-size: clamp(14px, 2.2vmin, 17px); line-height: 1.9; color: var(--ink-2); opacity: 0; }
+  .name { margin: clamp(12px, 2.6vh, 34px) 0 0; font-family: "Aref Ruqaa", serif; font-weight: 700; font-size: clamp(32px, 7.2vh, 96px); line-height: 1.3; color: var(--champagne); opacity: 0; text-wrap: balance; }
+  .sub { margin: 2px 0 0; font-family: "Aref Ruqaa", serif; font-size: clamp(15px, 2.6vh, 30px); color: var(--champagne-2); opacity: 0; }
+  .slogan { margin: clamp(12px, 2.6vh, 34px) 0 0; font-size: clamp(17px, 3.2vh, 36px); font-weight: 800; color: var(--ink); opacity: 0; text-wrap: balance; }
+  .welcome { margin: clamp(4px, 1vh, 14px) 0 0; max-width: 34em; font-size: clamp(13.5px, 2.2vh, 23px); line-height: 1.8; color: var(--ink-2); opacity: 0; text-wrap: balance; }
   .welcome b { color: var(--champagne); }
-  .cta { margin: 26px 0 0; width: min(100%, 440px); padding: 16px; border-radius: 20px; background: rgb(8 26 54 / .92); border: 1px solid rgb(240 216 160 / .5); box-shadow: 0 30px 60px -30px #000; opacity: 0; text-align: start; }
-  .cta p { margin: 0 0 12px; font-size: 14px; line-height: 1.8; color: var(--ink-2); }
-  .cta p b { display: block; color: var(--ink); font-size: 15.5px; }
+  .cta { margin: clamp(14px, 3vh, 40px) 0 0; width: min(100%, clamp(340px, 32vw, 620px)); padding: clamp(12px, 2vh, 24px); border-radius: clamp(16px, 2.4vh, 26px); background: rgb(8 26 54 / .92); border: 1px solid rgb(240 216 160 / .5); box-shadow: 0 30px 60px -30px #000; opacity: 0; text-align: start; }
+  .cta p { margin: 0 0 clamp(8px, 1.4vh, 16px); font-size: clamp(13px, 1.75vh, 19px); line-height: 1.75; color: var(--ink-2); }
+  .cta p b { display: block; color: var(--ink); font-size: clamp(14.5px, 2vh, 22px); }
   .cta__row { display: flex; gap: 10px; }
-  .cta button { flex: 1; height: 48px; border-radius: 14px; font: 800 15px Cairo, sans-serif; cursor: pointer; border: 1px solid rgb(240 216 160 / .7); background: rgb(240 216 160 / .08); color: #f2dcaa; }
+  .cta button { flex: 1; height: clamp(42px, 6vh, 60px); border-radius: 14px; font: 800 clamp(14px, 1.9vh, 20px) Cairo, sans-serif; cursor: pointer; border: 1px solid rgb(240 216 160 / .7); background: rgb(240 216 160 / .08); color: #f2dcaa; }
   .cta button.is-main { border: 0; background: linear-gradient(180deg, #f6dfa4, #dcb45f); color: #1b1203; box-shadow: 0 0 0 1px rgb(255 240 200 / .5) inset, 0 14px 30px -12px rgb(230 190 100 / .85); }
-  /* the world on the other side of the card — v3 layout (owner's pick), the owner's church art behind, dark and zoomed;
-     only the background is dim: the saints, the logo and the buttons are lit. Athanasius left, Abu Sefein right. */
+
+  /* ---------- the world on the other side of the card (landscape = desktop layout, approved) ---------- */
   .world { position: absolute; inset: 0; opacity: 0; background: #020a18; }
   .world__church { position: absolute; inset: 0; background: url(assets/bg-phone.png) no-repeat; filter: brightness(.34) saturate(.8) blur(2px); }
-  .saint { position: absolute; top: 50%; width: clamp(210px, 21vw, 340px); opacity: 0; }
+  .saint { position: absolute; top: 50%; width: var(--sw); margin-top: calc(var(--sw) * -1.02); opacity: 0; }
   .saint img { width: 100%; display: block; filter: brightness(1.06) drop-shadow(0 34px 44px rgb(0 0 0 / .75)) drop-shadow(0 0 26px rgb(240 210 150 / .22)); }
-  .saint--athanasius { left: 6vw; margin-top: calc(clamp(210px, 21vw, 340px) * -1.02); }
-  .saint--sefein { right: 6vw; margin-top: calc(clamp(210px, 21vw, 340px) * -1.02); }
-  .plaque { display: block; margin: 12px auto 0; width: max-content; max-width: 130%; padding: 7px 16px 8px; border-radius: 12px; text-align: center; background: rgb(4 16 34 / .85); border: 1px solid rgb(240 216 160 / .55); box-shadow: 0 10px 24px -12px #000; }
-  .plaque b { display: block; font-size: clamp(14px, 1.25vw, 18px); font-weight: 800; color: #f4dfae; line-height: 1.5; }
-  .plaque i { display: block; font-style: normal; font-size: clamp(11.5px, 1vw, 13.5px); font-weight: 600; color: var(--ink-2); }
-  /* phone = the first v3 phone layout (owner's pick): saints small at the top, logo under them, the church art as a dark cover;
-     saints, logo and buttons lit, only the backdrop dim. Athanasius left, Abu Sefein right. */
-  @media (max-width: 700px) {
+  .saint--athanasius { left: 5vw; }
+  .saint--sefein { right: 5vw; }
+  .plaque { display: block; margin: clamp(8px, 1.4vh, 18px) auto 0; width: max-content; max-width: 130%; padding: .5em 1.1em .55em; border-radius: 12px; text-align: center; background: rgb(4 16 34 / .85); border: 1px solid rgb(240 216 160 / .55); box-shadow: 0 10px 24px -12px #000; font-size: clamp(13px, 1.9vh, 22px); }
+  .plaque b { display: block; font-size: 1em; font-weight: 800; color: #f4dfae; line-height: 1.5; }
+  .plaque i { display: block; font-style: normal; font-size: .76em; font-weight: 600; color: var(--ink-2); }
+  /* short landscape screens (phones lying down): keep the essentials */
+  @media (min-aspect-ratio: 4/5) and (max-height: 560px) { .sub, .welcome { display: none; } .plaque i { display: none; } }
+
+  /* ---------- portrait (phones, tablets standing up) = the approved phone layout, sized by height so it always fits ---------- */
+  @media (max-aspect-ratio: 4/5) {
+    :root { --sw: min(23vw, 13.5vh); }
     .world__church { inset: -6%; background-size: cover !important; background-position: center 40% !important; filter: brightness(.36) saturate(.75) blur(4px) !important; }
-    .saint { top: 11%; width: 23vw; margin-top: 0 !important; }
+    .saint { top: calc(env(safe-area-inset-top) + 9vh); margin-top: 0; }
     .saint--athanasius { left: 8vw; } .saint--sefein { right: 8vw; }
-    .plaque { margin-top: 6px; padding: 0; border: 0; background: none; box-shadow: none; max-width: 34vw; width: auto; }
-    .plaque b { font-size: 11.5px; line-height: 1.45; color: #f4dfae; } .plaque i { display: none; }
-    .brand { top: 50%; transform: translate(-50%, -30%); }
-    .logo { width: 104px; }
+    .plaque { margin-top: .7vh; padding: 0; border: 0; background: none; box-shadow: none; max-width: 34vw; width: auto; font-size: clamp(10.5px, 1.7vh, 16px); }
+    .plaque b { line-height: 1.4; } .plaque i { display: none; }
+    .brand { top: 0; bottom: 0; left: 5vw; right: 5vw; width: auto; transform: none; padding: calc(env(safe-area-inset-top) + 9vh + var(--sw) * 1.22) 0 calc(env(safe-area-inset-bottom) + 2.6vh); }
+    .logo { width: min(28vw, 15vh); }
+    .name { margin-top: 1.8vh; font-size: clamp(26px, 4.6vh, 56px); }
+    .sub { font-size: clamp(13px, 2vh, 24px); }
+    .slogan { margin-top: 2.2vh; font-size: clamp(15px, 2.6vh, 30px); }
+    .welcome { margin-top: .6vh; font-size: clamp(12.5px, 1.95vh, 20px); }
+    .cta { margin-top: clamp(16px, 4vh, 48px); width: min(100%, 560px); padding: clamp(11px, 1.8vh, 20px); }
+    .cta p { font-size: clamp(12.5px, 1.8vh, 18px); } .cta p b { font-size: clamp(14px, 2.1vh, 21px); }
+    .cta button { height: clamp(40px, 6.2vh, 58px); font-size: clamp(14px, 2vh, 19px); }
   }
-  /* the tap gate (unlocks sound) */
+  @media (max-aspect-ratio: 4/5) and (max-height: 600px) { .welcome { display: none; } }
+
+  /* ---------- the tap gate (unlocks sound) ---------- */
   .gate { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; background: radial-gradient(50% 46% at 50% 48%, #0b2343, #01050d 80%); cursor: pointer; transition: opacity .5s cubic-bezier(.16,1,.3,1); }
   .gate__in { display: flex; flex-direction: column; align-items: center; gap: 22px; }
-  .gate__logo { position: relative; width: 92px; height: 92px; }
+  .gate__logo { position: relative; width: clamp(80px, 12vh, 140px); aspect-ratio: 1; }
   .gate__logo img { width: 100%; height: 100%; border-radius: 50%; filter: saturate(.6) brightness(.75); }
   .gate__logo::before, .gate__logo::after { content: ""; position: absolute; inset: -12px; border-radius: 50%; border: 1px solid rgb(227 207 159 / .45); animation: ping 2.2s cubic-bezier(.16,1,.3,1) infinite; }
   .gate__logo::after { animation-delay: 1.1s; }
   @keyframes ping { from { transform: scale(.85); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
-  .gate b { font-size: 16px; color: var(--ink); } .gate small { display: block; margin-top: 4px; font-size: 12.5px; color: var(--ink-2); text-align: center; }
+  .gate b { font-size: clamp(15px, 2.2vh, 22px); color: var(--ink); } .gate small { display: block; margin-top: 4px; font-size: clamp(12px, 1.7vh, 17px); color: var(--ink-2); text-align: center; }
   .gate.is-off { opacity: 0; pointer-events: none; }
-  .ui { position: fixed; top: 14px; left: 14px; z-index: 9; display: flex; gap: 8px; }
-  .ui button { height: 34px; padding: 0 13px; border-radius: 10px; border: 1px solid rgb(227 207 159 / .35); background: rgb(4 14 30 / .85); color: var(--champagne); font: 700 12.5px Cairo, sans-serif; cursor: pointer; }
-  .stagename { position: fixed; top: 14px; right: 14px; z-index: 9; padding: 6px 12px; border-radius: 999px; background: rgb(0 0 0 / .45); font-size: 12px; color: rgb(255 255 255 / .7); }
-  @media (max-width: 700px) { .card { width: 88vw; } .phone { width: 33vw; } .stagename { top: auto; bottom: 12px; right: 50%; transform: translateX(50%); white-space: nowrap; } }
+  /* review controls (not part of the design) */
+  .ui { position: fixed; top: 12px; left: 12px; z-index: 9; display: flex; gap: 8px; }
+  .ui button { height: 32px; padding: 0 12px; border-radius: 10px; border: 1px solid rgb(227 207 159 / .35); background: rgb(4 14 30 / .85); color: var(--champagne); font: 700 12px Cairo, sans-serif; cursor: pointer; }
+  .stagename { position: fixed; top: 12px; right: 12px; z-index: 9; max-width: 56vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 6px 12px; border-radius: 999px; background: rgb(0 0 0 / .45); font-size: 11.5px; color: rgb(255 255 255 / .7); }
+  @media (prefers-reduced-motion: reduce) { .gate__logo::before, .gate__logo::after { animation: none; } }
 </style>
 <body>
 <div class="ui"><button type="button" id="replay">↻ اعرض تاني</button></div>
@@ -120,11 +156,17 @@
       <div class="card__face card__face--qr"><img src="assets/card-front.png" alt=""><span class="card__sheen"></span></div>
       <span class="qrmark"></span>
     </div>
-    <div class="phone" id="phone"><div class="phone__screen"><span class="phone__island"></span>
-      <div class="phone__idle"><i><svg viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M8 12h8"/></svg></i>وجّه الكاميرا للكود</div>
-      <div class="phone__cam"></div>
-      <div class="phone__ui"><div class="finder" id="finder"><i></i><i></i><i></i><i></i><span class="laser"></span></div></div>
-      <div class="phone__ok"><b>✓</b>بنفتح موقع الأسرة…</div></div></div>
+    <div class="phone" id="phone"><div class="phone__screen">
+      <span class="phone__island"></span>
+      <div class="phone__status"><span>8:00</span><span><svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12"><path d="M8 11.5 10.6 8.6a3.7 3.7 0 0 0-5.2 0Zm-4.6-5a6.6 6.6 0 0 1 9.2 0l1.5-1.6a8.8 8.8 0 0 0-12.2 0ZM.4 3.4a10.8 10.8 0 0 1 15.2 0L17 1.8a13 13 0 0 0-18 0Z"/></svg><svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="22" height="11" rx="3" fill="none" stroke="#fff" stroke-opacity=".5"/><rect x="2" y="2" width="16" height="8" rx="1.6"/><rect x="24" y="4" width="2" height="4" rx="1" fill-opacity=".5"/></svg></span></div>
+      <div class="phone__lock"><b>8:00</b><small>الأحد ٨ نوفمبر</small><i></i></div>
+      <div class="phone__cam"><div class="phone__feed"></div>
+        <div class="finder" id="finder"><i></i><i></i><i></i><i></i><span class="laser"></span></div>
+        <div class="phone__pill"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#1a1400"/><path d="M12 4.5 14 12l-2 7.5L10 12Z" fill="#ffd60a"/><path d="M4.5 12 12 10l7.5 2L12 14Z" fill="#ffd60a" opacity=".55"/></svg><div><b>افتح «أسرة البابا أثناسيوس»</b><small>stathanasiosyouth.github.io</small></div></div>
+        <div class="phone__modes"><span>فيديو</span><em>صورة</em><span>بورتريه</span></div><span class="phone__shutter"></span>
+      </div>
+      <span class="phone__glass"></span>
+    </div></div>
   </div>
   <span class="flare"></span>
   <div class="flash"></div>
@@ -144,48 +186,46 @@
   var FREEZE = Q.get('freeze') != null ? Number(Q.get('freeze')) : null;
   var REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
   var $ = function (s) { return document.querySelector(s); };
-  var EXPO = 'cubic-bezier(.16,1,.3,1)', QUART = 'cubic-bezier(.25,1,.5,1)', INOUT = 'cubic-bezier(.76,0,.24,1)', IN = 'cubic-bezier(.7,0,.84,0)';
-  var anims = [], STAGES = [], T = 6600;
+  var EXPO = 'cubic-bezier(.16,1,.3,1)', INOUT = 'cubic-bezier(.76,0,.24,1)', IN = 'cubic-bezier(.7,0,.84,0)';
+  var anims = [], STAGES = [], T = 6900;
   function A(sel, kf, o) { var n = typeof sel === 'string' ? $(sel) : sel; var a = n.animate(kf, Object.assign({ fill: 'both', easing: EXPO }, o)); anims.push(a); return a; }
   function stage(at, n) { STAGES.push([at, n]); }
 
-  /* ================= sound design (WebAudio): a small mix bus with a room reverb and a glue compressor ================= */
+  /* ================= sound design (WebAudio): mix bus + synthetic hall reverb + glue compressor ================= */
   var AC, bus, verb;
   function audio() {
     AC = new (window.AudioContext || window.webkitAudioContext)();
     var comp = AC.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 3; comp.attack.value = .004; comp.release.value = .25;
     var out = AC.createGain(); out.gain.value = .9; comp.connect(out); out.connect(AC.destination);
     bus = AC.createGain(); bus.connect(comp);
-    // a synthetic hall: decaying stereo noise impulse
     var len = AC.sampleRate * 2.4, imp = AC.createBuffer(2, len, AC.sampleRate);
     for (var c = 0; c < 2; c++) { var d = imp.getChannelData(c); for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2); }
     var conv = AC.createConvolver(); conv.buffer = imp; verb = AC.createGain(); verb.gain.value = .32; verb.connect(conv); conv.connect(comp);
   }
-  function node(at, dest, pan, wet) { var g = AC.createGain(), p = AC.createStereoPanner ? AC.createStereoPanner() : null; if (p) { p.pan.setValueAtTime(pan || 0, at); g.connect(p); p.connect(bus); if (wet) p.connect(verb); } else { g.connect(bus); if (wet) g.connect(verb); } return { g: g, p: p }; }
-  function osc(type, f1, f2, at, dur, vol, o) { o = o || {}; var t = AC.currentTime + at, x = AC.createOscillator(), n = node(t, null, o.pan, o.wet); x.type = type; x.frequency.setValueAtTime(f1, t); if (f2) x.frequency.exponentialRampToValueAtTime(f2, t + (o.glide || dur)); n.g.gain.setValueAtTime(0, t); n.g.gain.linearRampToValueAtTime(vol, t + (o.atk || .005)); n.g.gain.exponentialRampToValueAtTime(.0001, t + dur); x.connect(n.g); x.start(t); x.stop(t + dur + .1); return n; }
-  function noise(at, dur, type, f1, f2, vol, o) { o = o || {}; var t = AC.currentTime + at, b = AC.createBuffer(1, Math.ceil(AC.sampleRate * dur), AC.sampleRate), d = b.getChannelData(0); for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; var s = AC.createBufferSource(), f = AC.createBiquadFilter(), n = node(t, null, o.pan, o.wet); s.buffer = b; f.type = type; f.Q.value = o.q || .9; f.frequency.setValueAtTime(f1, t); f.frequency.exponentialRampToValueAtTime(f2, t + dur); n.g.gain.setValueAtTime(0, t); n.g.gain.linearRampToValueAtTime(vol, t + dur * (o.peak || .1)); n.g.gain.exponentialRampToValueAtTime(.0001, t + dur); if (n.p && o.pan2 != null) n.p.pan.linearRampToValueAtTime(o.pan2, t + dur); s.connect(f); f.connect(n.g); s.start(t); }
+  function node(at, pan, wet) { var g = AC.createGain(), p = AC.createStereoPanner ? AC.createStereoPanner() : null; if (p) { p.pan.setValueAtTime(pan || 0, at); g.connect(p); p.connect(bus); if (wet) p.connect(verb); } else { g.connect(bus); if (wet) g.connect(verb); } return { g: g, p: p }; }
+  function osc(type, f1, f2, at, dur, vol, o) { o = o || {}; var t = AC.currentTime + at, x = AC.createOscillator(), n = node(t, o.pan, o.wet); x.type = type; x.frequency.setValueAtTime(f1, t); if (f2) x.frequency.exponentialRampToValueAtTime(f2, t + (o.glide || dur)); n.g.gain.setValueAtTime(0, t); n.g.gain.linearRampToValueAtTime(vol, t + (o.atk || .005)); n.g.gain.exponentialRampToValueAtTime(.0001, t + dur); x.connect(n.g); x.start(t); x.stop(t + dur + .1); }
+  function noise(at, dur, type, f1, f2, vol, o) { o = o || {}; var t = AC.currentTime + at, b = AC.createBuffer(1, Math.ceil(AC.sampleRate * dur), AC.sampleRate), d = b.getChannelData(0); for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; var s = AC.createBufferSource(), f = AC.createBiquadFilter(), n = node(t, o.pan, o.wet); s.buffer = b; f.type = type; f.Q.value = o.q || .9; f.frequency.setValueAtTime(f1, t); f.frequency.exponentialRampToValueAtTime(f2, t + dur); n.g.gain.setValueAtTime(0, t); n.g.gain.linearRampToValueAtTime(vol, t + dur * (o.peak || .1)); n.g.gain.exponentialRampToValueAtTime(.0001, t + dur); if (n.p && o.pan2 != null) n.p.pan.linearRampToValueAtTime(o.pan2, t + dur); s.connect(f); f.connect(n.g); s.start(t); }
   function bell(f, at, dur, vol) { [1, 2.756, 5.404, 8.933].forEach(function (k, i) { osc('sine', f * k, 0, at, dur / (1 + i * .8), vol / (1 + i * 1.6), { wet: true, pan: (i % 2 ? .25 : -.25) }); }); }
   var SFX = [
     [0, function () { osc('sine', 150, 38, 0, .9, .55, { glide: .5 }); noise(0, .5, 'lowpass', 900, 120, .35, { wet: true }); osc('sawtooth', 55, 0, 0, 1.6, .05, { wet: true }); }],        // impact: the card lands
-    [40, function () { noise(0, .9, 'highpass', 6000, 9000, .05, { wet: true }); bell(1568, .05, 1.4, .05); }],                                                                  // glint on the card
+    [40, function () { noise(0, .9, 'highpass', 6000, 9000, .05, { wet: true }); bell(1568, .05, 1.4, .05); }],                                                                  // glint
     [780, function () { noise(0, .75, 'bandpass', 300, 3800, .3, { pan: -.8, pan2: .8, q: .7, peak: .55 }); osc('sine', 90, 180, 0, .7, .08); }],                              // whoosh: the flip
-    [1500, function () { noise(0, .35, 'bandpass', 1400, 500, .12, { pan: .3 }); osc('sine', 1900, 0, .3, .07, .12); osc('sine', 2600, 0, .34, .06, .06); }],                 // phone rises + lands (tick)
-    [2050, function () { osc('square', 1200, 0, 0, .04, .04); osc('square', 1600, 0, .05, .04, .03); }],                                                                       // camera on
-    [2200, function () { osc('sine', 700, 2400, 0, .5, .06, { glide: .5, wet: true }); for (var i = 0; i < 6; i++) osc('square', 2200 + i * 140, 0, i * .07, .025, .025); }],  // scan: laser + data ticks
-    [2750, function () { [880, 1318.5, 1760].forEach(function (f, i) { osc('triangle', f, 0, i * .055, .6, .09, { wet: true }); }); noise(0, .4, 'highpass', 5000, 8000, .05); }], // lock ✓
-    [3000, function () { noise(0, .75, 'highpass', 300, 7000, .22, { peak: .95, wet: true }); osc('sawtooth', 110, 880, 0, .78, .05, { glide: .75 }); osc('sine', 220, 1760, 0, .78, .05, { glide: .75 }); }], // riser into the QR
-    [3720, function () { osc('sine', 120, 34, 0, 1.4, .7, { glide: .6 }); noise(0, .8, 'lowpass', 1500, 100, .3, { wet: true }); [196, 293.7, 392, 493.9].forEach(function (f, i) { bell(f * 2, .02 + i * .015, 3.2, .055); }); }], // reveal hit + bell chord
-    [4200, function () { noise(0, 1.2, 'bandpass', 2500, 6000, .03, { wet: true, pan: -.4, pan2: .4 }); }],                                                                    // air under the name
-    [6150, function () { osc('sine', 1046.5, 0, 0, .5, .05, { wet: true }); osc('sine', 1568, 0, .08, .6, .04, { wet: true }); }]                                              // the account card
+    [1650, function () { noise(0, .45, 'bandpass', 1400, 500, .12, { pan: .3 }); osc('sine', 1900, 0, .4, .07, .12); osc('sine', 2600, 0, .44, .06, .06); }],                 // phone rises + lands (tick)
+    [2200, function () { osc('square', 1200, 0, 0, .04, .04); osc('square', 1600, 0, .05, .04, .03); }],                                                                       // camera on
+    [2400, function () { osc('sine', 700, 2400, 0, .5, .06, { glide: .5, wet: true }); for (var i = 0; i < 6; i++) osc('square', 2200 + i * 140, 0, i * .07, .025, .025); }],  // scan
+    [2950, function () { [880, 1318.5, 1760].forEach(function (f, i) { osc('triangle', f, 0, i * .055, .6, .09, { wet: true }); }); noise(0, .4, 'highpass', 5000, 8000, .05); }], // lock ✓
+    [3200, function () { noise(0, .75, 'highpass', 300, 7000, .22, { peak: .95, wet: true }); osc('sawtooth', 110, 880, 0, .78, .05, { glide: .75 }); osc('sine', 220, 1760, 0, .78, .05, { glide: .75 }); }], // riser into the QR
+    [3920, function () { osc('sine', 120, 34, 0, 1.4, .7, { glide: .6 }); noise(0, .8, 'lowpass', 1500, 100, .3, { wet: true }); [196, 293.7, 392, 493.9].forEach(function (f, i) { bell(f * 2, .02 + i * .015, 3.2, .055); }); }], // reveal hit + bell chord
+    [4400, function () { noise(0, 1.2, 'bandpass', 2500, 6000, .03, { wet: true, pan: -.4, pan2: .4 }); }],
+    [6350, function () { osc('sine', 1046.5, 0, 0, .5, .05, { wet: true }); osc('sine', 1568, 0, .08, .6, .04, { wet: true }); }]
   ];
   var sfxTimers = [];
-  function playSfx() { if (!AC) return; sfxTimers = SFX.map(function (s) { return setTimeout(s[1], s[0]); }); }
+  function playSfx(from) { if (!AC) return; sfxTimers = SFX.filter(function (s) { return s[0] >= (from || 0); }).map(function (s) { return setTimeout(s[1], s[0] - (from || 0)); }); }
 
-  /* ================= particles (deterministic by time, so frozen frames show them) ================= */
-  var cv = $('#fx'), ctx = cv.getContext('2d'), dpr = Math.min(2, devicePixelRatio || 1), W = innerWidth, H = innerHeight;
-  cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  /* ================= particles (deterministic by time) ================= */
+  var cv = $('#fx'), ctx = cv.getContext('2d'), W = 0, H = 0, QXr = 0, QYr = 0, burstAt = 2950, hitAt = 3920;
+  function sizeCanvas() { var dpr = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
   function rnd(i) { var x = Math.sin(i * 127.1) * 43758.5453; return x - Math.floor(x); }
-  var QXr = 0, burstAt = 2750, hitAt = 3720;
   function drawFx(t) {
     ctx.clearRect(0, 0, W, H);
     for (var i = 0; i < 40; i++) { var y = (rnd(i) - (.01 + rnd(i + 50) * .02) * t / 1000 + 3) % 1, a = (.05 + .2 * (.5 + .5 * Math.sin(i + t / 420))) * (t > hitAt ? .6 : 1); ctx.fillStyle = 'rgba(227,207,159,' + a.toFixed(3) + ')'; ctx.beginPath(); ctx.arc(rnd(i + 9) * W, y * H, .5 + rnd(i + 3) * 1.4, 0, 6.283); ctx.fill(); }
@@ -193,91 +233,133 @@
       var k = (t - t0) / life; if (k <= 0 || k >= 1) return;
       for (var j = 0; j < n; j++) { var ang = rnd(j + t0) * 6.283, sp = (.35 + rnd(j * 3 + t0) * .65) * speed, d = sp * (1 - Math.pow(1 - k, 3)); ctx.fillStyle = 'rgba(240,222,176,' + (1 - k).toFixed(3) + ')'; ctx.beginPath(); ctx.arc(cx + Math.cos(ang) * d, cy + Math.sin(ang) * d, (1 - k) * (1 + rnd(j) * 2.2), 0, 6.283); ctx.fill(); }
     }
-    burst(burstAt, W / 2 + QXr, H / 2, 46, Math.min(W, H) * .22, 700);
-    burst(hitAt, W / 2, H * .5 - Math.min(W, H) * .12, 80, Math.max(W, H) * .45, 1300);
+    burst(burstAt, W / 2 + QXr, H / 2 + QYr, 46, Math.min(W, H) * .22, 700);
+    var lr = $('.logo').getBoundingClientRect();
+    burst(hitAt, lr.left + lr.width / 2, lr.top + lr.height / 2, 80, Math.max(W, H) * .45, 1300);
   }
 
+  /* ================= layout: sizes from the screen's shape ================= */
+  var L = {};
+  function layout() {
+    sizeCanvas();
+    var portrait = W / H < .8;
+    var cw, s, rz, pw;
+    if (portrait) {
+      cw = Math.min(.9 * W, 760);                                   // arrives lying across the screen
+      var len = Math.min(.8 * H, .9 * W * 1134 / 543);              // then stands up along it while scanning
+      s = len / cw; rz = 84;                                       // …at a slight angle
+      pw = Math.min(.44 * W, .24 * H, 330);
+    } else {
+      cw = Math.min(.62 * W, .6 * H * 1134 / 543, 1500);            // desktop: use the screen
+      s = 1.06; rz = -3;
+      pw = Math.min(cw * .34, .5 * H * 71.6 / 147.6);
+    }
+    var ch = cw * 543 / 1134;
+    var qx = -0.2376 * cw, qy = -0.017 * ch, r = rz * Math.PI / 180;  // QR centre on the QR face, then scaled + turned
+    L = { portrait: portrait, cw: cw, s: s, rz: rz, pw: pw, QX: s * (qx * Math.cos(r) - qy * Math.sin(r)), QY: s * (qx * Math.sin(r) + qy * Math.cos(r)) };
+    QXr = L.QX; QYr = L.QY;
+    document.documentElement.style.setProperty('--cw', cw + 'px');
+    document.documentElement.style.setProperty('--pw', pw + 'px');
+    placeChurch();
+  }
   function placeChurch() {
-    var el = $('.logo'), ch = $('#church'); if (!el) return;
-    if (matchMedia('(max-width: 700px)').matches) { ch.style.backgroundSize = ''; ch.style.backgroundPosition = ''; return; }
-    var r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-    var k = Math.max(innerWidth / 1134, innerHeight / 543) * 1.18, ls = r.width / (k * 160);   // art logo ≈ 160 px wide at (567, 160)
-    k = Math.max(k, k * ls > k ? k : k);
+    var ch = $('#church');
+    if (L.portrait) { ch.style.backgroundSize = ''; ch.style.backgroundPosition = ''; return; }
+    var r = $('.logo').getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    var k = Math.max(W / 1134, H / 543) * 1.18;                     // the art's own logo (≈ x 567, y 160) sits behind ours
     ch.style.backgroundSize = (1134 * k) + 'px auto';
     ch.style.backgroundPosition = (cx - 567 * k) + 'px ' + (cy - 160 * k) + 'px';
   }
+  function tf(z, rz, sc, rx, ry) { return 'translateZ(' + z + 'px) rotateZ(' + rz + 'deg) scale(' + sc + ') rotateX(' + rx + 'deg) rotateY(' + ry + 'deg)'; }
+
   function build() {
     anims.forEach(function (a) { a.cancel(); }); anims = []; STAGES = [];
-    placeChurch();
-    var w = $('#card').offsetWidth, QX = -0.236 * w; QXr = QX;
-    var PX = QX, PY = 0.02 * w;
-    // 1 — the card slams in from deep space, a flare crosses at impact, the room shakes once
+    layout();
+    var s = L.s, rz = L.rz, PX = L.QX, PY = L.QY + (L.portrait ? .06 * H : .02 * L.cw), prz = L.portrait ? -6 : -4;
+    // 1 — the card slams in from deep space; 2 — one confident flip; 3 — it comes closer (portrait: stands up, tilted)
     stage(0, '١ الكارت بيدخل بقوة');
-    A('#card', [{ opacity: 0, transform: 'translateZ(-1400px) rotateX(28deg) rotateY(-50deg) rotateZ(-8deg)' }, { opacity: 1, offset: .25 }, { opacity: 1, transform: 'translateZ(0) rotateX(6deg) rotateY(0deg) rotateZ(0deg)' }], { duration: 700 });
+    stage(780, '٢ قلبة واحدة للوش');
+    stage(1500, '٣ الكارت بيقرّب والموبايل بيطلع');
+    A('#card', [
+      { offset: 0, opacity: 0, transform: tf(-1400, -8, 1, 28, -50), easing: EXPO },
+      { offset: .087, opacity: 1 },
+      { offset: .35, opacity: 1, transform: tf(0, 0, 1, 6, 0), easing: 'linear' },
+      { offset: .39, transform: tf(0, 0, 1, 6, 0), easing: INOUT },
+      { offset: .8, opacity: 1, transform: tf(0, 0, 1, 0, 180), easing: EXPO },
+      { offset: 1, opacity: 1, transform: tf(0, rz, s, 0, 180) }
+    ], { duration: 2000, easing: 'linear', fill: 'forwards' });
     A('.flare', [{ opacity: 0, transform: 'scaleX(.2)' }, { opacity: 1, transform: 'scaleX(1)', offset: .3 }, { opacity: 0, transform: 'scaleX(1.2)' }], { duration: 600, delay: 560, easing: 'ease-out' });
     A('#stage', [{ transform: 'none' }, { transform: 'translate(0,6px)', offset: .2 }, { transform: 'translate(-4px,-3px)', offset: .45 }, { transform: 'translate(2px,2px)', offset: .7 }, { transform: 'none' }], { duration: 320, delay: 620, easing: 'linear', fill: 'none' });
     A('.card__face--logo .card__sheen', [{ transform: 'translateX(-140%)' }, { transform: 'translateX(140%)' }], { duration: 600, delay: 450, easing: 'ease-in-out' });
-    // 2 — one confident flip to the QR face (faces swap at 90°)
-    stage(780, '٢ قلبة واحدة للوش');
-    A('#card', [{ transform: 'rotateX(6deg) rotateY(0deg)' }, { transform: 'rotateX(8deg) rotateY(90deg) scale(.96)', offset: .5 }, { transform: 'rotateX(0deg) rotateY(180deg) scale(1)' }], { duration: 820, delay: 780, easing: INOUT, fill: 'forwards' });
     A('.card__face--logo', [{ opacity: 1 }, { opacity: 1, offset: .5 }, { opacity: 0, offset: .5 }, { opacity: 0 }], { duration: 820, delay: 780, easing: INOUT });
     A('.card__face--qr', [{ opacity: 0 }, { opacity: 0, offset: .5 }, { opacity: 1, offset: .5 }, { opacity: 1 }], { duration: 820, delay: 780, easing: INOUT });
-    A('.card__face--qr .card__sheen', [{ transform: 'translateX(-140%)' }, { transform: 'translateX(140%)' }], { duration: 550, delay: 1450, easing: 'ease-in-out' });
-    // 3 — the phone rises with a clean screen and lands on the QR
-    stage(1500, '٣ الموبايل بيطلع');
-    A('#phone', [{ opacity: 0, transform: 'translate(' + PX + 'px, 70vh) rotate(-14deg)' }, { opacity: 1, transform: 'translate(' + PX + 'px, ' + PY + 'px) rotate(-4deg)' }], { duration: 560, delay: 1450 });
-    // 4 — camera on, laser scan, lock
-    stage(2050, '٤ الكاميرا والـScan');
-    A('.phone__idle', [{ opacity: 1 }, { opacity: 0 }], { duration: 150, delay: 2000 });
-    A('.phone__cam', [{ opacity: 0, transform: 'scale(1.25)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 380, delay: 2030 });
-    A('.phone__ui', [{ opacity: 0, transform: 'scale(1.15)' }, { opacity: 1, transform: 'none' }], { duration: 300, delay: 2100 });
-    A('.laser', [{ opacity: 0, top: '6%' }, { opacity: 1, top: '8%', offset: .08 }, { opacity: 1, top: '90%', offset: .5 }, { opacity: 1, top: '10%', offset: .92 }, { opacity: 0, top: '8%' }], { duration: 560, delay: 2200, easing: 'linear' });
-    A('#finder', [{ transform: 'scale(1)' }, { transform: 'scale(.9)' }], { duration: 220, delay: 2740 });
-    stage(2750, '٥ اتقفل ✓');
-    A('.qrmark', [{ opacity: 0 }, { opacity: 1, offset: .3 }, { opacity: .85 }], { duration: 400, delay: 2750 });
-    A('.phone__ok', [{ opacity: 0, transform: 'translateY(10px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 300, delay: 2780 });
-    // 5 — the camera dives through the QR into the site
-    stage(3000, '٦ الدخول جوه الكود');
-    $('#rig').style.transformOrigin = 'calc(50% + ' + QX + 'px) 50%';
-    A('#rig', [{ transform: 'scale(1)', filter: 'blur(0)', opacity: 1 }, { transform: 'scale(1.15)', offset: .35 }, { transform: 'scale(9)', filter: 'blur(14px)', opacity: 0 }], { duration: 760, delay: 3000, easing: IN, fill: 'forwards' });
-    A('.room', [{ opacity: 1 }, { opacity: 0 }], { duration: 400, delay: 3400, fill: 'forwards' });
-    A('.flash', [{ opacity: 0 }, { opacity: .9, offset: .35 }, { opacity: 0 }], { duration: 650, delay: 3540, easing: 'ease-out' });
-    A('.site', [{ opacity: 0 }, { opacity: 1 }], { duration: 300, delay: 3620 });
-    stage(3600, '٧ دخلت عالم الكارت');
-    A('#world', [{ opacity: 0 }, { opacity: 1 }], { duration: 500, delay: 3580 });
-    A('.world__church', [{ transform: 'scale(1.3)', filter: 'brightness(.9) saturate(.8) blur(2px)' }, { transform: 'scale(1)', filter: matchMedia('(max-width: 700px)').matches ? 'brightness(.36) saturate(.75) blur(4px)' : 'brightness(.34) saturate(.8) blur(2px)' }], { duration: 2400, delay: 3580, easing: EXPO });
-    A('.saint--athanasius', [{ opacity: 0, transform: 'translateX(-70px) scale(.9)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 850, delay: 3900 });
-    A('.saint--sefein', [{ opacity: 0, transform: 'translateX(70px) scale(.9)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 850, delay: 4000 });
-    // 6 — the logo hits with a shockwave; then name, line, slogan, welcome, account card
-    stage(3800, '٨ اللوجو');
-    A('.logo', [{ opacity: 0, transform: 'scale(1.6)', filter: 'blur(10px)' }, { opacity: 1, transform: 'scale(1)', filter: 'blur(0)' }], { duration: 620, delay: 3700 });
-    A('.wave', [{ opacity: .9, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(60)' }], { duration: 1100, delay: 3740, easing: 'cubic-bezier(.2,.7,.3,1)' });
-    A('.wave--2', [{ opacity: .6, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(90)' }], { duration: 1500, delay: 3820, easing: 'cubic-bezier(.2,.7,.3,1)' });
-    stage(4200, '٩ الاسم');
-    A('.name', [{ opacity: 0, transform: 'translateY(18px) scale(.97)', filter: 'blur(8px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 650, delay: 4150 });
-    A('.sub', [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: 500, delay: 4450 });
-    stage(4900, '١٠ السلوجان والترحيب');
-    A('.slogan', [{ opacity: 0, transform: 'translateY(12px)' }, { opacity: 1, transform: 'none' }], { duration: 520, delay: 4850 });
-    A('.welcome', [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: 520, delay: 5250 });
-    stage(6100, '١١ اعمل حسابك');
-    A('.cta', [{ opacity: 0, transform: 'translateY(22px) scale(.98)' }, { opacity: 1, transform: 'none' }], { duration: 600, delay: 6050 });
+    A('.card__face--qr .card__sheen', [{ transform: 'translateX(-140%)' }, { transform: 'translateX(140%)' }], { duration: 600, delay: 1500, easing: 'ease-in-out' });
+    // the phone (lock screen) rises and settles over the QR
+    A('#phone', [{ opacity: 0, transform: 'translate(' + PX + 'px, ' + (PY + .7 * H) + 'px) rotate(' + (prz - 10) + 'deg)' }, { opacity: 1, transform: 'translate(' + PX + 'px, ' + PY + 'px) rotate(' + prz + 'deg)' }], { duration: 620, delay: 1650 });
+    // 4 — the Camera app opens: only now the QR shows, inside the phone, sharp
+    stage(2200, '٤ الكاميرا والـScan');
+    A('.phone__lock', [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(1.06)' }], { duration: 260, delay: 2150, easing: 'ease-in' });
+    A('.phone__cam', [{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'none' }], { duration: 320, delay: 2180 });
+    A('.laser', [{ opacity: 0, top: '6%' }, { opacity: 1, top: '8%', offset: .08 }, { opacity: 1, top: '90%', offset: .5 }, { opacity: 1, top: '10%', offset: .92 }, { opacity: 0, top: '8%' }], { duration: 560, delay: 2400, easing: 'linear' });
+    A('#finder', [{ transform: 'translate(-50%, -50%) scale(1)' }, { transform: 'translate(-50%, -50%) scale(.86)' }], { duration: 240, delay: 2940 });
+    stage(2950, '٥ اتقفل ✓');
+    A('.qrmark', [{ opacity: 0 }, { opacity: 1, offset: .3 }, { opacity: .85 }], { duration: 400, delay: 2950 });
+    A('.phone__pill', [{ opacity: 0, transform: 'translateY(14%) scale(.92)' }, { opacity: 1, transform: 'none' }], { duration: 320, delay: 2980 });
+    // 5 — the camera dives through the QR (the only blur in the intro)
+    stage(3200, '٦ الدخول جوه الكود');
+    $('#rig').style.transformOrigin = 'calc(50% + ' + L.QX + 'px) calc(50% + ' + L.QY + 'px)';
+    A('#rig', [{ transform: 'scale(1)', filter: 'blur(0)', opacity: 1 }, { transform: 'scale(1.15)', filter: 'blur(0)', offset: .35 }, { transform: 'scale(9)', filter: 'blur(14px)', opacity: 0 }], { duration: 760, delay: 3200, easing: IN, fill: 'forwards' });
+    A('.room', [{ opacity: 1 }, { opacity: 0 }], { duration: 400, delay: 3600, fill: 'forwards' });
+    A('.flash', [{ opacity: 0 }, { opacity: .9, offset: .35 }, { opacity: 0 }], { duration: 650, delay: 3740, easing: 'ease-out' });
+    A('.site', [{ opacity: 0 }, { opacity: 1 }], { duration: 300, delay: 3820 });
+    stage(3800, '٧ دخلت عالم الكارت');
+    A('#world', [{ opacity: 0 }, { opacity: 1 }], { duration: 500, delay: 3780 });
+    var dim = L.portrait ? 'brightness(.36) saturate(.75) blur(4px)' : 'brightness(.34) saturate(.8) blur(2px)';
+    A('.world__church', [{ transform: 'scale(1.3)', filter: 'brightness(.9) saturate(.8) blur(2px)' }, { transform: 'scale(1)', filter: dim }], { duration: 2400, delay: 3780 });
+    A('.saint--athanasius', [{ opacity: 0, transform: 'translateX(-70px) scale(.9)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 850, delay: 4100 });
+    A('.saint--sefein', [{ opacity: 0, transform: 'translateX(70px) scale(.9)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 850, delay: 4200 });
+    // 6 — logo hit with a shockwave; name, slogan, welcome, the account card
+    stage(4000, '٨ اللوجو');
+    A('.logo', [{ opacity: 0, transform: 'scale(1.6)', filter: 'blur(10px)' }, { opacity: 1, transform: 'scale(1)', filter: 'blur(0)' }], { duration: 620, delay: 3900 });
+    A('.wave', [{ opacity: .9, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(60)' }], { duration: 1100, delay: 3940, easing: 'cubic-bezier(.2,.7,.3,1)' });
+    A('.wave--2', [{ opacity: .6, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(90)' }], { duration: 1500, delay: 4020, easing: 'cubic-bezier(.2,.7,.3,1)' });
+    stage(4400, '٩ الاسم');
+    A('.name', [{ opacity: 0, transform: 'translateY(18px) scale(.97)', filter: 'blur(8px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 650, delay: 4350 });
+    A('.sub', [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: 500, delay: 4650 });
+    stage(5100, '١٠ السلوجان والترحيب');
+    A('.slogan', [{ opacity: 0, transform: 'translateY(12px)' }, { opacity: 1, transform: 'none' }], { duration: 520, delay: 5050 });
+    A('.welcome', [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: 520, delay: 5450 });
+    stage(6300, '١١ اعمل حسابك');
+    A('.cta', [{ opacity: 0, transform: 'translateY(22px) scale(.98)' }, { opacity: 1, transform: 'none' }], { duration: 600, delay: 6250 });
   }
   function label(t) { var n = ''; STAGES.forEach(function (s) { if (t >= s[0]) n = s[1]; }); $('#stagename').textContent = 'أول زيارة (من غير حساب) · ' + n; }
-  var raf;
+
+  var raf, started = null, done = false;
+  function seek(t, paused) { anims.forEach(function (a) { a.currentTime = Math.min(t, 1e5); if (paused) a.pause(); }); drawFx(t); label(t); }
   function go(withSound) {
-    sfxTimers.forEach(clearTimeout); cancelAnimationFrame(raf);
+    sfxTimers.forEach(clearTimeout); cancelAnimationFrame(raf); done = false;
     build();
-    if (REDUCED) { anims.forEach(function (a) { try { a.finish(); } catch (e) {} }); drawFx(9999); label(9999); return; }
-    if (withSound) playSfx();
-    var start = performance.now();
-    (function tick(now) { var t = now - start; drawFx(t); label(t); if (t < T + 1500) raf = requestAnimationFrame(tick); })(start);
+    if (REDUCED) { seek(1e5, true); done = true; return; }
+    if (withSound) playSfx(0);
+    started = performance.now();
+    (function tick(now) { var t = now - started; drawFx(t); label(t); if (t < T + 1500) raf = requestAnimationFrame(tick); else done = true; })(started);
   }
-  if (FREEZE != null) { $('#gate').remove(); build(); anims.forEach(function (a) { a.pause(); a.currentTime = FREEZE; }); drawFx(FREEZE); label(FREEZE); return; }
-  build(); anims.forEach(function (a) { a.pause(); a.currentTime = 0; }); label(0); $('#stagename').textContent = 'البوابة: لمسة بتشغّل الصوت';
+  // a resize (rotate, tablet ↔ phone, window drag) re-lays-out in place, at the same moment
+  var rz0;
+  addEventListener('resize', function () {
+    clearTimeout(rz0);
+    rz0 = setTimeout(function () {
+      var t = FREEZE != null ? FREEZE : started == null ? 0 : done ? 1e5 : performance.now() - started;
+      var paused = FREEZE != null || started == null;
+      build(); seek(t, paused);
+    }, 120);
+  });
+  if (FREEZE != null) { $('#gate').remove(); build(); seek(FREEZE, true); return; }
+  build(); seek(0, true); $('#stagename').textContent = 'البوابة: لمسة بتشغّل الصوت';
   $('#gate').addEventListener('click', function () { try { audio(); } catch (e) {} $('#gate').classList.add('is-off'); setTimeout(function () { go(true); }, 120); });
   $('#replay').addEventListener('click', function () { if (!AC) { try { audio(); } catch (e) {} } $('#gate').classList.add('is-off'); go(true); });
   // a tap during the intro jumps to the account card (the sound stops)
-  $('#stage').addEventListener('click', function (e) { if (e.target.closest('.gate, .cta')) return; if (!anims.length) return; sfxTimers.forEach(clearTimeout); anims.forEach(function (a) { try { a.finish(); } catch (err) {} }); });
+  $('#stage').addEventListener('click', function (e) { if (e.target.closest('.gate, .cta')) return; if (started == null || done) return; sfxTimers.forEach(clearTimeout); seek(1e5, false); done = true; });
 })();
 </script>
 </body>
