@@ -343,7 +343,7 @@ test('import: paste rows → preview (add / update / skip / error) → tick the 
   const pc = await panel({ width: 412, height: 915, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
   const { page } = pc;
   await page.evaluate(() => A.go('content', 'meetings'));
-  await clickText(page, '.view', 'استيراد جدول الاجتماعات');
+  await clickText(page, '.view', 'برنامج الاجتماع');
   await page.waitForSelector('dialog.sheet[open] .import__paste');
   await page.evaluate(text => {
     const area = document.querySelector('.import__paste');
@@ -460,7 +460,7 @@ test('live stage: during the meeting, «دي الحالية دلوقتي» write
   const pc = await panel({ width: 412, height: 915, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
   const { page } = pc;
   await page.evaluate(() => A.go('home'));
-  await page.waitForSelector('.dash-card .live-control');
+  await page.waitForSelector('.home8-meeting .live-control');
   const mode = () => page.$eval('.live-control__mode', n => n.textContent);
   assert.match(await mode(), /تلقائي: كلمة/);
   await page.evaluate(() => document.querySelector('.live-control').scrollIntoView({ block: 'center' }));

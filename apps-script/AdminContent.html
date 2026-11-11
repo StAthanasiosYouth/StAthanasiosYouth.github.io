@@ -164,62 +164,196 @@
      MEETINGS (weekly rule + dated sessions)
   ======================================================= */
 
-  A.views.meetings = guard(function () {
+  /*
+   * «الاجتماعات» (Phase 8B, meetings.png): «الميعاد الأسبوعي» as a summary (the day square, the name, the day · time ·
+   * length, the note, the cancelled weeks with «+», the calendar file) with «تعديل» for its form; «الاجتماعات الجاية»: the
+   * next weeks one under the other — a week without a topic says so with «ضيف الموضوع», a recorded one shows its
+   * topic with «تعديل» and ⋯ (show / hide, delete). «برنامج الاجتماع» = the schedule import. «إظهار ركن الاجتماع» lives
+   * in «الصفحة ← ترتيب الصفحة» (the section's switch); a draft not upgraded yet still shows its old card here.
+   */
+  var WEEKS_AHEAD = 5;
+
+  function weeklyEditor() {
 
     var setting = A.setting;
     var limits = A.state.meta.limits;
     var box = A.errorBox();
-
     var title = A.counted('اسم الاجتماع', setting('meeting.title'), limits.title);
-
     var currentDay = String(setting('meeting.day'));
     var daySelect = el('select', { class: 'input', onchange: A.markDirty }, A.state.meta.days.map(function (day, index) {
       var selected = currentDay === day || currentDay === String(index) || (currentDay && day.indexOf(currentDay.replace(/^ال/, '')) !== -1);
       return el('option', { value: day, selected: selected ? 'selected' : null, text: day });
     }));
-
     var time = el('input', { class: 'input', type: 'time', value: setting('meeting.time'), oninput: A.markDirty });
     var duration = A.textInput(setting('meeting.durationMinutes'), { type: 'number', inputmode: 'numeric', placeholder: 'مثلاً 120' });
     var note = A.counted('ملاحظة', setting('meeting.note'), limits.note, A.settingHelp('meeting.note'));
-
-    var weekly = A.card('الميعاد الأسبوعي', 'الأساس اللي الموقع بيعد عليه. أي أسبوع مختلف (موضوع، ساعة تانية، إلغاء) ضيفه تحت.',
+    var saver = A.settingsSaver(function () {
+      return {
+        'meeting.title': title.input.value,
+        'meeting.day': daySelect.value,
+        'meeting.time': time.value,
+        'meeting.durationMinutes': duration.value,
+        'meeting.note': note.input.value
+      };
+    }, box);
+    A.dirty = false;
+    A.openSheet('الميعاد الأسبوعي', [
       box,
       el('div', { class: 'form' },
         title.node,
         el('div', { class: 'row' }, A.field('اليوم', daySelect), A.field('الساعة', time)),
         A.field('مدة الاجتماع بالدقايق', duration, 'سيبها فاضية لو مش متأكد — ساعتها الموقع مش هيقول "شغال دلوقتي"'),
-        note.node
-      ),
-      A.settingsSaver(function () {
-        return {
-          'meeting.title': title.input.value,
-          'meeting.day': daySelect.value,
-          'meeting.time': time.value,
-          'meeting.durationMinutes': duration.value,
-          'meeting.note': note.input.value
-        };
-      }, box)
-    );
+        note.node)
+    ], [saver, el('button', { class: 'btn btn--ghost', type: 'button', text: 'إلغاء', onclick: function () { A.closeSheet(); } })], { size: 'md', icon: 'church', sub: 'بيظهر في «ركن الاجتماع» وفي ملف التقويم' });
+
+  }
+
+  function hoursWords(minutes) {
+    var m = Number(minutes) || 0;
+    if (!m) return '';
+    if (m === 60) return 'ساعة';
+    if (m === 120) return 'ساعتين';
+    if (m % 60 === 0) return A.digits(m / 60) + ' ساعات';
+    return A.digits(m) + ' دقيقة';
+  }
+
+  function clock12(hhmm) {
+    var p = String(hhmm || '').split(':');
+    if (p.length < 2) return '';
+    var h = +p[0];
+    return A.digits(((h % 12) || 12) + ':' + p[1]) + (h < 12 ? ' ص' : ' م');
+  }
+
+  function weeklyCard(sessions, today) {
+
+    var setting = A.setting;
+    var day = A.state.meta.days[dayIndex()] || String(setting('meeting.day') || '');
+    var facts = [day, clock12(setting('meeting.time')), hoursWords(setting('meeting.durationMinutes'))].filter(Boolean).join(' · ');
+    var cancelled = sessions.filter(function (s) { return s.date >= today && s.status === 'cancelled'; });
+    var site = String((A.state.config && A.state.config.siteUrl) || '').replace(/\/?$/, '/');
+
+    function row(label, value, action) {
+      return el('div', { class: 'p8-factrow' },
+        el('span', { class: 'p8-factrow__label', text: label }),
+        el('span', { class: 'p8-factrow__value' }, value),
+        action || el('span', { class: 'p8-factrow__sp' }));
+    }
+
+    return el('section', { class: 'card p8-card p8-weekly' },
+      el('div', { class: 'p8-card__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('church')),
+        el('div', { class: 'p8-card__titles' },
+          el('h2', { class: 'card__title', text: 'الميعاد الأسبوعي' }),
+          el('p', { class: 'card__hint', text: 'بيظهر في «ركن الاجتماع» وفي ملف التقويم' })),
+        el('div', { class: 'p8-card__acts' },
+          el('button', { class: 'btn', type: 'button', onclick: weeklyEditor }, icon('edit'), 'تعديل'))),
+      el('div', { class: 'p8-weekly__main' },
+        el('span', { class: 'p8-weekly__day' }, icon('calendar'), el('span', { text: 'كل ' + day.replace(/^ال/, '') })),
+        el('div', {},
+          el('b', { class: 'p8-weekly__title', text: setting('meeting.title') || 'الاجتماع' }),
+          el('small', { class: 'p8-weekly__facts', text: facts }))),
+      row('ملاحظة', el('span', { text: setting('meeting.note') || 'مفيش' })),
+      row('أيام مفيش فيها اجتماع', el('span', { text: cancelled.length ? cancelled.map(function (s) { return A.formatWall(s.date, false); }).join('، ') : 'مفيش' }),
+        el('button', { class: 'p8-iconbtn p8-iconbtn--lg', type: 'button', 'aria-label': 'ضيف يوم مفيش فيه اجتماع', onclick: function () { A.editors.sessions(null, { status: 'cancelled' }); } }, icon('plus'))),
+      row('التقويم', el('span', { class: 'mono', dir: 'ltr', text: 'meeting.ics' }),
+        el('button', { class: 'p8-iconbtn p8-iconbtn--lg', type: 'button', 'aria-label': 'انسخ رابط ملف التقويم', onclick: function () {
+          var url = site + 'meeting.ics';
+          if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(function () { A.toast('رابط التقويم اتنسخ ✓'); }, function () { A.toast(url, 'info'); });
+          else A.toast(url, 'info');
+        } }, icon('copy'))));
+
+  }
+
+  function upcomingRow(date, session, first, today) {
+
+    var d = new Date(A.wallMinutes(date) * 60000);
+    var MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+    var cancelled = session && session.status === 'cancelled';
+    var enabled = !session || bool(session.enabled);
+    var time = (session && session.time) || A.setting('meeting.time');
+    var days = Math.round((A.wallMinutes(date) - A.wallMinutes(today)) / 1440);
+    var away = days === 0 ? 'النهارده' : days === 1 ? 'بكرة' : 'بعد ' + A.digits(days) + (days <= 10 ? ' أيام' : ' يوم');
+    var sub = cancelled ? 'ملغي الأسبوع ده' : session && session.topic ? session.topic + (session.speaker ? ' · ' + session.speaker : '') : 'لسه مفيش موضوع';
+
+    var tags = [];
+    if (session && !enabled) tags.push(el('span', { class: 'p8-tag', text: 'مخفي' }));
+    if (cancelled) tags.push(el('span', { class: 'p8-tag p8-tag--danger', text: 'ملغي' }));
+    if (session && session.time) tags.push(el('span', { class: 'p8-tag', text: 'الساعة ' + clock12(session.time) }));
+    if (session && hasNotification('notif-session-' + session.date)) tags.push(el('span', { class: 'p8-tag p8-tag--info', text: 'في الجرس' }));
+
+    var acts = !session
+      ? [el('button', { class: 'btn btn--sm', type: 'button', onclick: function () { A.editors.sessions(null, { date: date }); } }, icon('plus'), 'ضيف الموضوع')]
+      : [
+        el('button', { class: 'btn btn--sm', type: 'button', 'aria-label': 'تعديل الاجتماع', onclick: function () { A.editors.sessions(session); } }, icon('edit'), 'تعديل'),
+        el('button', { class: 'p8-iconbtn', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-label': 'اختيارات تانية: اجتماع ' + A.formatWall(date, false), onclick: function (e) {
+          if (!A.menu) return;
+          A.menu(e.currentTarget, 'menu--p8', [
+            A.menuItem(enabled ? 'eye-off' : 'eye', enabled ? 'اخفيه من الموقع' : 'اظهره في الموقع', function () {
+              A.draftChange({
+                apply: function (state) { var r = A.findRow(state.draft.sessions, 'date', session.date); if (r) r.enabled = !enabled; },
+                run: function () { return A.call('apiSetItemEnabled', 'sessions', session.date, !enabled); }
+              });
+            }),
+            el('hr', { class: 'menu__sep' }),
+            A.menuItem('trash', 'امسح الاجتماع', function () { A.deleteItem('sessions', session.date, 'اجتماع ' + session.date, e.currentTarget); }, { danger: true })
+          ], { align: 'start' });
+        } }, icon('dots'))
+      ];
+
+    return el('li', { class: 'p8-item p8-meet' + (enabled ? '' : ' is-off'), 'data-date': date },
+      el('span', { class: 'p8-meet__date', 'aria-hidden': 'true' }, el('b', { text: A.digits(d.getUTCDate()) }), el('small', { text: MONTHS_AR[d.getUTCMonth()] })),
+      el('div', { class: 'p8-item__main' },
+        el('b', {},
+          el('span', { text: A.formatWall(date, false) + (first && time ? ' · ' + clock12(time) : '') }),
+          first ? el('span', { class: 'p8-tag p8-tag--info', text: away }) : null),
+        el('small', { text: sub }),
+        tags.length ? el('div', { class: 'p8-item__tags' }, tags) : null),
+      el('div', { class: 'p8-item__acts' }, acts));
+
+  }
+
+  A.views.meetings = guard(function () {
 
     var today = A.cairoNow().slice(0, 10);
     var sessions = (A.state.draft.sessions || []).slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
-    var upcoming = sessions.filter(function (s) { return s.date >= today; });
+    var byDate = {};
+    sessions.forEach(function (s) { byDate[s.date] = s; });
+
+    // the next weeks from the weekly day, and every recorded meeting from today on
+    var dates = {};
+    var next = A.nextWeekday(dayIndex(), String(A.setting('meeting.time') || '20:00')).slice(0, 10);
+    for (var i = 0; i < WEEKS_AHEAD; i++) {
+      dates[next] = true;
+      next = A.wallFromMinutes(A.wallMinutes(next) + 7 * 1440).slice(0, 10);
+    }
+    sessions.forEach(function (s) { if (s.date >= today) dates[s.date] = true; });
+    var upcoming = Object.keys(dates).sort();
     var past = sessions.filter(function (s) { return s.date < today; }).reverse();
+    var showPast = false;
+    var pastList = el('ul', { class: 'p8-list p8-past', hidden: true }, past.map(function (s) { return upcomingRow(s.date, s, false, today); }));
 
-    var list = function (items) {
-      return el('ul', { class: 'list' }, items.map(sessionItem));
-    };
+    var list = el('section', { class: 'card p8-card p8-meetings' },
+      el('div', { class: 'p8-card__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('calendar')),
+        el('div', { class: 'p8-card__titles' },
+          el('h2', { class: 'card__title', text: 'الاجتماعات الجاية' }),
+          el('p', { class: 'card__hint', text: 'كل أحد ليه كارت: حط الموضوع والمتكلم، وهيظهر للشباب في ميعاده' })),
+        el('div', { class: 'p8-card__acts' },
+          el('button', { class: 'btn', type: 'button', 'aria-label': 'برنامج الاجتماع: استيراد جدول الاجتماعات', onclick: function () { A.openImport(); } }, icon('upload'), 'برنامج الاجتماع'),
+          el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.editors.sessions(null); } }, icon('plus'), 'اجتماع'))),
+      el('ul', { class: 'p8-list' }, upcoming.map(function (date, index) { return upcomingRow(date, byDate[date] || null, index === 0, today); })),
+      past.length ? el('button', { class: 'btn btn--sm btn--ghost p8-pastbtn', type: 'button', onclick: function (e) {
+        showPast = !showPast;
+        pastList.hidden = !showPast;
+        e.currentTarget.textContent = (showPast ? 'اخفي ' : '') + 'اجتماعات فاتت (' + A.digits(past.length) + ')';
+      } }, 'اجتماعات فاتت (' + A.digits(past.length) + ')') : null,
+      pastList);
 
-    var dated = A.card('الاجتماعات الجاية', 'موضوع كل أسبوع، المتكلم، البوستر، أو إلغاء أسبوع.',
-      el('div', { class: 'actions' },
-        addButton('+ اجتماع', function () { A.editors.sessions(null); }),
-        el('button', { class: 'btn', type: 'button', onclick: function () { A.openImport(); } }, icon('calendar'), 'استيراد جدول الاجتماعات')
-      ),
-      upcoming.length ? list(upcoming) : el('p', { class: 'empty', text: 'مفيش اجتماعات متسجلة لسه — الموقع هيعرض الميعاد الأسبوعي بس.' }),
-      past.length ? el('details', { class: 'past' }, el('summary', { text: 'اجتماعات فاتت (' + past.length + ')' }), list(past)) : null
-    );
-
-    return [meetingSectionCard(), weekly, dated];
+    var upgraded = A.state.schema.data >= A.state.schema.target;
+    return [
+      upgraded ? null : meetingSectionCard(),
+      el('div', { class: 'p8-cols p8-cols--meet' }, weeklyCard(sessions, today), list)
+    ].filter(Boolean);
 
   });
 
