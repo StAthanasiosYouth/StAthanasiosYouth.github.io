@@ -4399,7 +4399,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   function menu(anchor, className, children, opts) {
     closeLayer();
     var box = el('div', { class: 'menu ' + className, popover: 'auto', role: 'menu' }, children);
-    document.body.appendChild(box);
+    // inside an open modal (an editor's video help) the menu lives in it: outside, the modal makes it inert
+    (anchor.closest('dialog[open]') || document.body).appendChild(box);
     box.addEventListener('toggle', function (event) {
       if (event.newState === 'closed') {
         anchor.setAttribute('aria-expanded', 'false');
@@ -19245,9 +19246,34 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   A.help = function (key) { show(key || here()); };
 
+  /* Phase 8B (help-pop.png): the video icon opens a bubble — this part's guide video («قريبًا»), its title and a line;
+     under it (owner 2026-11-11, option ب) «اقرا الشرح المكتوب» opens this screen's written help */
+  function areaTitle() {
+    var t = document.getElementById('page-title');
+    var sheetTitle = document.querySelector('dialog.sheet[open] .sheet__title');
+    return (sheetTitle && sheetTitle.textContent) || (t && t.textContent) || 'الجزء ده';
+  }
+
+  A.helpPop = function (anchor) {
+    var key = here();
+    var title = areaTitle();
+    if (!A.menu) { show(key); return; }
+    var box = A.menu(anchor, 'vpop', [
+      el('div', { class: 'vpop__thumb', 'aria-hidden': 'true' },
+        el('img', { src: '../assets/img/logo-128.webp', alt: '', width: 64, height: 64 }),
+        el('span', { class: 'vpop__play' }),
+        el('span', { class: 'vpop__soon', text: 'قريبًا' })),
+      el('b', { class: 'vpop__title', text: 'فيديو شرح: ' + title }),
+      el('small', { class: 'vpop__text', text: 'فيديو قصير بيشرح القسم ده خطوة بخطوة. هيتضاف بعدين.' }),
+      el('button', { class: 'vpop__more', type: 'button', role: 'menuitem', onclick: function () { box.hidePopover(); show(key); } }, 'اقرا الشرح المكتوب')
+    ]);
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-label', 'فيديو شرح: ' + title);
+  };
+
   /* the «؟» in an editor's header (AdminScript openSheet) */
   A.helpButton = function () {
-    return el('button', { class: 'vhelp help-btn', type: 'button', title: 'فيديو شرح · قريبًا', 'aria-label': 'فيديو شرح: إزاي أستخدم ده', onclick: function () { A.help(); } }, icon('video'));
+    return el('button', { class: 'vhelp help-btn', type: 'button', title: 'فيديو شرح · قريبًا', 'aria-label': 'فيديو شرح: إزاي أستخدم ده', onclick: function (e) { A.helpPop(e.currentTarget); } }, icon('video'));
   };
 
   var open = document.getElementById('help-open');
@@ -19258,7 +19284,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     open.title = 'فيديو شرح · قريبًا';
     open.setAttribute('aria-label', 'فيديو شرح: إزاي أستخدم الجزء ده');
     A.fill(open, icon('video'));
-    open.addEventListener('click', function () { A.help(); });
+    open.addEventListener('click', function () { A.helpPop(open); });
   }
 
 })();

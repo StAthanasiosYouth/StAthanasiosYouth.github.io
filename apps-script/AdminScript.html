@@ -4270,7 +4270,8 @@
   function menu(anchor, className, children, opts) {
     closeLayer();
     var box = el('div', { class: 'menu ' + className, popover: 'auto', role: 'menu' }, children);
-    document.body.appendChild(box);
+    // inside an open modal (an editor's video help) the menu lives in it: outside, the modal makes it inert
+    (anchor.closest('dialog[open]') || document.body).appendChild(box);
     box.addEventListener('toggle', function (event) {
       if (event.newState === 'closed') {
         anchor.setAttribute('aria-expanded', 'false');
