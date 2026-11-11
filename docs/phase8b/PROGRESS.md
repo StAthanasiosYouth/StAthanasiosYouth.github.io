@@ -87,3 +87,4 @@
 - النشر: 2026-11-11 اتنشر على main (commit ba47dca فوق ce5df11)، والـPages بيقدّم admin.css الجديد (فيه games-soon). مفيش تغيير في worker/. الرجوع: git revert ba47dca ثم push لـmain.
 - الاختبارات: unit 768/769 (الفاشل قديم)؛ pages-admin 9/9، fix-admin 7/7، admin-layout، content-worker 14/14، refine-b (allowlist قديم). book-admin: ٤ فاشلين (module off، booking sheet، reject، edit locks) — فاشلين بنفس الشكل على c5fc27f قبل التغيير (اتأكدت). admin.e2e: القديم بس، و«unsaved changes» بيعدّي لوحده (بيتأثر بالفاشلين اللي قبله).
 - الجاي: W3 (B4 + B5) بنفس الطريقة — المحتوى (meetings, news, cards, bell, games-corner) والصفحات (svcpages, svc-clip, servants, layout-sched). المحرر الكبير والقائمة ⋯ والـpill tabs جاهزين للاستخدام.
+- النشر: help-pop اتنشر على main (commit b1b15f3 فوق ba47dca)، والـPages بيقدّمه. الرجوع: git revert b1b15f3.
