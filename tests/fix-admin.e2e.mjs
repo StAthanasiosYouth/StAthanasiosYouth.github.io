@@ -255,7 +255,9 @@ test('help «؟»: the screen\'s own topic from admin/help.json, on top of an op
       await page.evaluate((a, s) => A.go(a, s || undefined), area, sub);
       await new Promise(resolve => setTimeout(resolve, 300));
       const button = await page.$('#help-open');
-      assert.ok(await shown(button), `«؟» visible on ${area}/${sub || ''} (${viewport.width})`);
+      // Phase 8B: the approved phone top bar has no help icon (help stays in every window, below)
+      if (viewport.width < 760) { assert.equal(await shown(button), false, 'no top help on a phone'); continue; }
+      assert.ok(await shown(button), `help visible on ${area}/${sub || ''} (${viewport.width})`);
       await press(button);
       await page.waitForSelector('dialog.help[open] .help__title');
       assert.equal(await page.$eval('dialog.help[open] .help__title', n => n.textContent), title);

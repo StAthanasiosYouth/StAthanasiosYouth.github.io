@@ -5099,7 +5099,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         el('h2', { class: 'card__title', text: 'في ترقية للبيانات مستنياك' }),
         el('p', { class: 'card__hint', text: 'بتضيف أقسام الصفحة (علشان تقدر تخفي وتظهر وترتب أي قسم)، وأعمدة المسابقات والفعاليات والأرشيف، ورابط جروب الواتساب. بتعمل نسخة احتياطية الأول ومبتمسحش حاجة.' })
       ),
-      el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.go('settings'); } }, 'روح للترقية')
+      el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.go('settings', 'content'); } }, 'روح للترقية')
     );
 
   };
