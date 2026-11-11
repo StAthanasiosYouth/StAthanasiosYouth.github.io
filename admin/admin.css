@@ -10905,7 +10905,8 @@ html[data-mode="light"] .sheet__navlink.is-on {
   cursor: default;
   opacity: 1;
   animation: none;
-  pointer-events: auto;
+  /* it plays to its end, and never stands in the way: taps go through to the panel */
+  pointer-events: none;
 }
 
 .intro__bg {
