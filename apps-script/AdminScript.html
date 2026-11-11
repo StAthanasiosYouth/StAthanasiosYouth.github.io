@@ -4416,13 +4416,24 @@
         el('div', { class: 'intro__load' }, el('span', { class: 'intro__progress' }, el('i')), status)));
 
     // over the panel's column, under its top bar
+    // (right after signing in the panel is not shown yet and measures 0: wait for it, then place; again on
+    // a resize; the dust starts once there is room for it)
     var bar = document.querySelector('.topbar');
-    var r = main.getBoundingClientRect();
-    var top = bar && bar.offsetParent ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
-    box.style.cssText = 'top:' + top + 'px;left:' + Math.max(0, r.left) + 'px;width:' + Math.min(innerWidth, r.width) + 'px';
+    var dusted = false;
+    function place() {
+      if (!box.isConnected) return;
+      var r = main.getBoundingClientRect();
+      if (!r.width) return;
+      var top = bar && bar.offsetParent ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
+      box.style.cssText = 'top:' + top + 'px;left:' + Math.max(0, r.left) + 'px;width:' + Math.min(innerWidth, r.width) + 'px';
+      if (!dusted) { dusted = true; introDust(box.querySelector('canvas'), 2600); }
+    }
+    box.style.cssText = 'visibility:hidden';
     document.body.appendChild(box);
+    // the rail's (or the phone bar's) logo waits for the flying one
     root.classList.add('is-intro');
-    introDust(box.querySelector('canvas'), 2600);
+    // it follows the panel while it settles (the shell arrives, the rail opens) and on a resize
+    (function follow() { place(); if (!gone && box.isConnected) requestAnimationFrame(follow); })();
     if (A.sound) A.sound('open');
 
     var anims = [], D = 1900, E = 'cubic-bezier(.16,1,.3,1)', gone = false, ready = false, shown = Date.now();

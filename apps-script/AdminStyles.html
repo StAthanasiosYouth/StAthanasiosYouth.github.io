@@ -10872,6 +10872,12 @@ html[data-mode="light"] .sheet__navlink.is-on {
   pointer-events: none;
 }
 
+/* the logo's home waits for the flying logo (it takes its place when the intro ends) */
+html.is-intro .rail .brand__mark,
+html.is-intro .topbar__mark {
+  visibility: hidden;
+}
+
 .intro__bg {
   position: absolute;
   inset: 0;
