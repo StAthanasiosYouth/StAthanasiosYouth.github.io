@@ -274,7 +274,7 @@ test('help «؟»: the screen\'s own topic from admin/help.json, on top of an op
     // the editor's «؟»: over the news editor, which keeps what was typed
     await page.evaluate(() => A.go('content', 'news'));
     await new Promise(resolve => setTimeout(resolve, 300));
-    await press(await page.evaluateHandle(() => [...document.querySelectorAll('button')].find(b => b.offsetParent && b.textContent.trim() === '+ خبر')));
+    await press(await page.evaluateHandle(() => [...document.querySelectorAll('button')].find(b => b.offsetParent && b.textContent.trim() === 'خبر')));
     await page.waitForSelector('dialog.sheet[open] .help-btn');
     await new Promise(resolve => setTimeout(resolve, 500));
     const field = await page.evaluateHandle(() => [...document.querySelectorAll('dialog.sheet[open] input, dialog.sheet[open] textarea')].find(n => n.offsetParent));
@@ -304,7 +304,7 @@ test('news editor: the «مميز» / «مثبت» switches, alone and together,
     const { page, problems, close } = await open(viewport);
     await page.evaluate(() => A.go('content', 'news'));
     await new Promise(resolve => setTimeout(resolve, 300));
-    const add = await page.evaluateHandle(() => [...document.querySelectorAll('button')].find(b => b.offsetParent && b.textContent.trim() === '+ خبر'));
+    const add = await page.evaluateHandle(() => [...document.querySelectorAll('button')].find(b => b.offsetParent && b.textContent.trim() === 'خبر'));
     await add.evaluate(n => n.scrollIntoView({ block: 'center' }));
     await add.click();
     await page.waitForSelector('dialog.sheet[open] .switch');
@@ -399,7 +399,7 @@ test('«شكل العرض» is one shared control: news (its «مميز» card) 
   const choose = label => page.evaluateHandle(l => [...document.querySelectorAll('dialog.sheet[open] .item-display label.choice')].find(c => c.textContent.includes(l)), label);
 
   for (const [sub, add, label, card, field, table] of [
-    ['news', '+ خبر', 'شكل عرض الخبر', '.news-lead.lay', 'خبر الشكل', 'News'],
+    ['news', 'خبر', 'شكل عرض الخبر', '.news-lead.lay', 'خبر الشكل', 'News'],
     ['games', '+ لعبة', 'شكل عرض اللعبة', '.game.lay', 'لعبة الشكل', 'Games']
   ]) {
     await page.evaluate(s => A.go('content', s), sub);

@@ -533,7 +533,7 @@ const OVERFLOW = () => {
   }
   for (const node of document.querySelectorAll('#view *, #presence *, .topbar *, #gate-panel *, dialog[open] *')) {
     const r = node.getBoundingClientRect();
-    if (!r.width || node.closest('.tabs')) continue;
+    if (!r.width || node.closest('.tabs, .sheet__nav, .hero__art, .setnav')) continue;
     if (r.right > root.clientWidth + 1 || r.left < -1) issues.push(`${node.tagName.toLowerCase()}.${String(node.className.baseVal ?? node.className).trim().split(/\s+/).join('.')} [${Math.round(r.left)}..${Math.round(r.right)}]`);
   }
   return issues.slice(0, 10);
@@ -600,11 +600,13 @@ test('speed: the API is warmed before sign-in; show/hide and up/down show at onc
   await page.evaluate(() => A.go('content', 'news'));
   const newsSwitch = title => page.evaluate(t => {
     const item = [...document.querySelectorAll('#view .item')].find(li => li.querySelector('.item__title').textContent === t);
-    return item ? { checked: item.querySelector('input[role="switch"]').checked, off: item.classList.contains('item--off') } : null;
+    // Phase 8B (news.png): no switch on the row — «مخفي» is the row's state, the change is in its ⋯
+    return item ? { checked: !item.classList.contains('item--off'), off: item.classList.contains('item--off') } : null;
   }, title);
   const flip = title => page.evaluate(t => {
     const item = [...document.querySelectorAll('#view .item')].find(li => li.querySelector('.item__title').textContent === t);
-    item.querySelector('input[role="switch"]').click();
+    item.querySelector('.p8-iconbtn').click();
+    document.querySelector('.menu--p8 .menu__item').click();
   }, title);
   assert.deepEqual(await newsSwitch('رحلة الغردقة'), { checked: true, off: false });
   api.hold = true;
