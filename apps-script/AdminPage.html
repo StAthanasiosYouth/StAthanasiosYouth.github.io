@@ -543,6 +543,9 @@
 
   }
 
+  /* Phase 8B (layout-sched.png): «ترتيب الصفحة» — one card, the sections in order: the grip (drag, or ↑ ↓ on
+     it from the keyboard), the number, the name and when it shows («ظاهر على طول» / its schedule in words),
+     ظاهر · بميعاد · مخفي, «الميعاد» (the section's editor) and its switch. What visitors see now: data-live. */
   A.views.layout = function () {
 
     var layout = A.state.layout || [];
@@ -553,37 +556,75 @@
       out.push(A.upgradeNotice());
     }
 
-    var showing = layout.filter(sectionLiveNow);
+    var list = el('ol', { class: 'p8-list layout-list p8-layout' }, layout.map(function (s, index) { return layoutItem(s, index, layout.length, upgraded); }));
+    layoutDrag(list, layout);
 
-    out.push(A.card('الزوار شايفين دلوقتي', 'بعد آخر نشر + المواعيد بتوقيت مصر. اللي مش هنا مخفي أو فاضي أو لسه مجاش ميعاده.',
-      showing.length
-        ? el('div', { class: 'now-showing' }, showing.map(function (s) {
-          return el('span', { class: 'now-showing__item' }, icon((KIND_INFO[s.kind] || KIND_INFO.links).icon), s.title);
-        }))
-        : el('p', { class: 'empty', text: 'مفيش أقسام ظاهرة — الصفحة هتبان فيها الهيدر بس.' })
-    ));
-
-    out.push(A.card('أقسام الصفحة', 'بنفس الترتيب ده في الموقع. اقفل أي قسم يختفي بكل اللي جواه (ومش بيتنشر أصلاً)، أو حدّد له ميعاد يظهر ويختفي فيه.',
-      el('div', { class: 'actions' },
-        el('button', { class: 'btn', type: 'button', onclick: function () { editSection(null); } }, icon('plus'), 'قسم روابط جديد')
-      ),
-      el('ol', { class: 'list layout-list' }, layout.map(function (s, index) { return layoutItem(s, index, layout.length, upgraded); }))
-    ));
+    out.push(el('section', { class: 'card p8-card' },
+      el('div', { class: 'p8-card__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('layers')),
+        el('div', { class: 'p8-card__titles' },
+          el('h2', { class: 'card__title', text: 'ترتيب الصفحة' }),
+          el('p', { class: 'card__hint', text: 'أقسام الصفحة الرئيسية بالترتيب. كل قسم ممكن يتخبّى، أو يظهر ويختفي في ميعاد.' })),
+        el('div', { class: 'p8-card__acts' },
+          el('button', { class: 'btn btn--sm btn--ghost', type: 'button', onclick: function () { editSection(null); } }, icon('plus'), 'قسم روابط جديد'))),
+      list,
+      el('p', { class: 'p8-foot', text: 'الأقسام والترتيب بيبانوا في الموقع بعد «راجع وانشر»؛ المواعيد بتوقيت مصر.' })));
 
     return out;
 
   };
+
+  /* a drop moves the section step by step (apiMoveSection), so the server keeps one rule for the order */
+  function layoutDrag(list, layout) {
+
+    var from = null;
+    list.addEventListener('pointerdown', function (e) {
+      var grip = e.target.closest('.grip');
+      if (grip && !grip.closest('.item').classList.contains('is-locked')) grip.closest('.item').draggable = true;
+    });
+    list.addEventListener('dragstart', function (e) { from = e.target.closest('.item'); if (from) { from.classList.add('is-drag'); e.dataTransfer.effectAllowed = 'move'; } });
+    list.addEventListener('dragover', function (e) {
+      var over = e.target.closest('.item');
+      if (!from || !over || over === from) return;
+      e.preventDefault();
+      var after = Array.prototype.indexOf.call(list.children, over) > Array.prototype.indexOf.call(list.children, from);
+      list.insertBefore(from, after ? over.nextSibling : over);
+    });
+    list.addEventListener('dragend', function () {
+      if (!from) return;
+      var moved = from;
+      moved.classList.remove('is-drag');
+      moved.draggable = false;
+      from = null;
+      var key = moved.dataset.key;
+      var before = layout.map(function (x) { return x.key; }).indexOf(key);
+      var now = Array.prototype.indexOf.call(list.children, moved);
+      var steps = now - before;
+      if (!steps) return;
+      var dir = steps > 0 ? 1 : -1;
+      var chain = Promise.resolve();
+      for (var i = 0; i < Math.abs(steps); i++) chain = chain.then(function () { return A.call('apiMoveSection', key, dir); });
+      chain.then(function () { return A.call('apiState'); }).then(function (state) { A.applyState(state); A.toast('الترتيب اتحفظ — بيبان بعد «راجع وانشر»'); })
+        .catch(function (error) { A.fail(error); A.render(); });
+    });
+
+  }
 
   function layoutItem(s, index, total, upgraded) {
 
     var info = KIND_INFO[s.kind] || KIND_INFO.links;
     var count = sectionCount(s);
     var enabled = bool(s.enabled);
-    var chips = [A.visibilityChip(enabled, s.visibleFrom, s.visibleUntil)];
     var locked = s.virtual;
-
-    if (enabled && count === 0) chips.push(A.chip('فاضي — مش هيظهر', 'off'));
-    if (s.kind === 'links') chips.push(A.chip(s.key, 'ltr'));
+    var v = A.visibility(enabled, s.visibleFrom, s.visibleUntil);
+    var timed = !!(s.visibleFrom || s.visibleUntil);
+    var empty = enabled && count === 0;
+    var when = timed
+      ? [s.visibleFrom ? 'يظهر من ' + A.formatWall(s.visibleFrom) : '', s.visibleUntil ? 'يختفي ' + A.formatWall(s.visibleUntil) : ''].filter(Boolean).join(' · ')
+      : enabled ? 'ظاهر على طول' : 'مخفي';
+    var state = el('span', { class: 'p8-tag chip--state' + (empty ? '' : !enabled ? '' : v.state === 'live' && !timed ? ' p8-tag--ok' : timed ? ' p8-tag--info' : ' p8-tag--ok'), 'data-state': v.state },
+      timed && enabled && !empty ? icon('clock') : null,
+      empty ? 'فاضي — مش هيظهر' : !enabled ? 'مخفي' : timed ? 'بميعاد' : 'ظاهر');
 
     var toggle = A.switchInput('ظاهر', enabled, function (checked) {
       A.dirty = false;
@@ -594,24 +635,32 @@
         done: function () { A.toast(checked ? 'القسم هيظهر بعد النشر' : 'القسم هيختفي بعد النشر'); }
       });
     });
-
     toggle.input.disabled = locked;
+    toggle.node.classList.add('p8-switch');
 
-    return A.listItem({
-      icon: s.icon || info.icon,
-      title: s.title || info.label,
-      sub: info.label,
-      off: !enabled,
-      chips: chips,
-      controls: [
-        toggle.node,
-        el('span', { class: 'spacer' }),
-        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'طلّع «' + s.title + '» لفوق', disabled: locked || index === 0, onclick: function (e) { A.move('apiMoveSection', s.key, -1, e.currentTarget); } }, icon('chevron-up')),
-        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'نزّل «' + s.title + '» لتحت', disabled: locked || index === total - 1, onclick: function (e) { A.move('apiMoveSection', s.key, 1, e.currentTarget); } }, icon('chevron')),
-        locked ? null : A.editButton(s.title, function () { editSection(s); }),
-        s.kind === 'links' && !locked ? A.deleteButton(s.title, function (e) { removeSection(s, e.currentTarget); }) : null
-      ]
-    });
+    var grip = el('button', { class: 'grip', type: 'button', 'aria-label': 'رتّب «' + s.title + '» (الأسهم لفوق ولتحت)', disabled: locked || null, onkeydown: function (e) {
+      if (e.key === 'ArrowUp' && index > 0) { e.preventDefault(); A.move('apiMoveSection', s.key, -1, e.currentTarget); }
+      if (e.key === 'ArrowDown' && index < total - 1) { e.preventDefault(); A.move('apiMoveSection', s.key, 1, e.currentTarget); }
+    } }, icon('grip'));
+
+    var more = s.kind === 'links' && !locked ? el('button', { class: 'p8-iconbtn', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-label': 'اختيارات تانية: ' + s.title, onclick: function (e) {
+      var button = e.currentTarget;
+      var del = A.menuItem('trash', 'امسح القسم', function () { removeSection(s, button); }, { danger: true });
+      del.setAttribute('aria-label', 'مسح ' + s.title);
+      A.menu(button, 'menu--p8', [del], { align: 'start' });
+    } }, icon('dots')) : null;
+
+    return el('li', { class: 'p8-item item' + (enabled ? '' : ' item--off') + (locked ? ' is-locked' : ''), 'data-key': s.key, 'data-live': sectionLiveNow(s) ? '1' : null },
+      grip,
+      el('span', { class: 'stage__n', 'aria-hidden': 'true', text: A.digits(index + 1) }),
+      el('div', { class: 'p8-item__main' },
+        el('b', { class: 'p8-item__line' }, el('span', { class: 'item__title', text: s.title || info.label })),
+        el('small', { text: when + (s.kind === 'links' ? ' · ' + s.key : '') })),
+      el('div', { class: 'p8-item__acts' },
+        state,
+        locked ? null : el('button', { class: 'btn btn--sm', type: 'button', 'aria-label': 'تعديل ' + s.title, onclick: function () { editSection(s); } }, icon('clock'), 'الميعاد'),
+        more,
+        toggle.node));
 
   }
 

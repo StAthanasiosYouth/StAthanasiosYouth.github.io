@@ -217,7 +217,7 @@ test('«الخدام»: a servant with his WhatsApp shown (by consent), and the 
 test('«أرقام الدفع»: an own InstaPay number, the wallet from the phone; the primary admin approves the number shown («اعتمد رقم الدفع ده»)', async () => {
   await d.page.evaluate(() => A.go('pages', 'servants'));
   await d.page.waitForFunction(() => /مينا عادل/.test(document.querySelector('.view').textContent), { timeout: 10000 });
-  await d.page.evaluate(() => [...document.querySelectorAll('.view .item')].find(i => i.textContent.includes('مينا عادل')).querySelector('.icon-btn[aria-label^="تعديل"]').click());
+  await d.page.evaluate(() => [...document.querySelectorAll('.view .item')].find(i => i.textContent.includes('مينا عادل')).querySelector('[aria-label^="تعديل"]').click());
   await $('dialog.sheet[open] [data-pay]');
   // before: the wallet would come from his phone, not approved
   assert.match(await d.page.$eval('dialog.sheet[open] .pay-dest[data-method="wallet"]', n => n.textContent), /010 1234 5678.*من رقم الموبايل/);
@@ -229,7 +229,7 @@ test('«أرقام الدفع»: an own InstaPay number, the wallet from the pho
   await sheetGone();
   await d.page.waitForFunction(() => /إنستاباي محتاج اعتماد/.test(document.querySelector('.view').textContent), { timeout: 10000 });
 
-  await d.page.evaluate(() => [...document.querySelectorAll('.view .item')].find(i => i.textContent.includes('مينا عادل')).querySelector('.icon-btn[aria-label^="تعديل"]').click());
+  await d.page.evaluate(() => [...document.querySelectorAll('.view .item')].find(i => i.textContent.includes('مينا عادل')).querySelector('[aria-label^="تعديل"]').click());
   await $('dialog.sheet[open] [data-act="pay-approve"][data-method="instapay"]');
   assert.match(await d.page.$eval('dialog.sheet[open] .pay-dest[data-method="instapay"]', n => n.textContent), /011 2223 3344/);
   await d.page.click('dialog.sheet[open] [data-act="pay-approve"][data-method="instapay"]');

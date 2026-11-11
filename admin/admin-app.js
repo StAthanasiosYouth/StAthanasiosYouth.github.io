@@ -6498,6 +6498,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   }
 
+  /* Phase 8B (layout-sched.png): «ترتيب الصفحة» — one card, the sections in order: the grip (drag, or ↑ ↓ on
+     it from the keyboard), the number, the name and when it shows («ظاهر على طول» / its schedule in words),
+     ظاهر · بميعاد · مخفي, «الميعاد» (the section's editor) and its switch. What visitors see now: data-live. */
   A.views.layout = function () {
 
     var layout = A.state.layout || [];
@@ -6508,37 +6511,75 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       out.push(A.upgradeNotice());
     }
 
-    var showing = layout.filter(sectionLiveNow);
+    var list = el('ol', { class: 'p8-list layout-list p8-layout' }, layout.map(function (s, index) { return layoutItem(s, index, layout.length, upgraded); }));
+    layoutDrag(list, layout);
 
-    out.push(A.card('الزوار شايفين دلوقتي', 'بعد آخر نشر + المواعيد بتوقيت مصر. اللي مش هنا مخفي أو فاضي أو لسه مجاش ميعاده.',
-      showing.length
-        ? el('div', { class: 'now-showing' }, showing.map(function (s) {
-          return el('span', { class: 'now-showing__item' }, icon((KIND_INFO[s.kind] || KIND_INFO.links).icon), s.title);
-        }))
-        : el('p', { class: 'empty', text: 'مفيش أقسام ظاهرة — الصفحة هتبان فيها الهيدر بس.' })
-    ));
-
-    out.push(A.card('أقسام الصفحة', 'بنفس الترتيب ده في الموقع. اقفل أي قسم يختفي بكل اللي جواه (ومش بيتنشر أصلاً)، أو حدّد له ميعاد يظهر ويختفي فيه.',
-      el('div', { class: 'actions' },
-        el('button', { class: 'btn', type: 'button', onclick: function () { editSection(null); } }, icon('plus'), 'قسم روابط جديد')
-      ),
-      el('ol', { class: 'list layout-list' }, layout.map(function (s, index) { return layoutItem(s, index, layout.length, upgraded); }))
-    ));
+    out.push(el('section', { class: 'card p8-card' },
+      el('div', { class: 'p8-card__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('layers')),
+        el('div', { class: 'p8-card__titles' },
+          el('h2', { class: 'card__title', text: 'ترتيب الصفحة' }),
+          el('p', { class: 'card__hint', text: 'أقسام الصفحة الرئيسية بالترتيب. كل قسم ممكن يتخبّى، أو يظهر ويختفي في ميعاد.' })),
+        el('div', { class: 'p8-card__acts' },
+          el('button', { class: 'btn btn--sm btn--ghost', type: 'button', onclick: function () { editSection(null); } }, icon('plus'), 'قسم روابط جديد'))),
+      list,
+      el('p', { class: 'p8-foot', text: 'الأقسام والترتيب بيبانوا في الموقع بعد «راجع وانشر»؛ المواعيد بتوقيت مصر.' })));
 
     return out;
 
   };
+
+  /* a drop moves the section step by step (apiMoveSection), so the server keeps one rule for the order */
+  function layoutDrag(list, layout) {
+
+    var from = null;
+    list.addEventListener('pointerdown', function (e) {
+      var grip = e.target.closest('.grip');
+      if (grip && !grip.closest('.item').classList.contains('is-locked')) grip.closest('.item').draggable = true;
+    });
+    list.addEventListener('dragstart', function (e) { from = e.target.closest('.item'); if (from) { from.classList.add('is-drag'); e.dataTransfer.effectAllowed = 'move'; } });
+    list.addEventListener('dragover', function (e) {
+      var over = e.target.closest('.item');
+      if (!from || !over || over === from) return;
+      e.preventDefault();
+      var after = Array.prototype.indexOf.call(list.children, over) > Array.prototype.indexOf.call(list.children, from);
+      list.insertBefore(from, after ? over.nextSibling : over);
+    });
+    list.addEventListener('dragend', function () {
+      if (!from) return;
+      var moved = from;
+      moved.classList.remove('is-drag');
+      moved.draggable = false;
+      from = null;
+      var key = moved.dataset.key;
+      var before = layout.map(function (x) { return x.key; }).indexOf(key);
+      var now = Array.prototype.indexOf.call(list.children, moved);
+      var steps = now - before;
+      if (!steps) return;
+      var dir = steps > 0 ? 1 : -1;
+      var chain = Promise.resolve();
+      for (var i = 0; i < Math.abs(steps); i++) chain = chain.then(function () { return A.call('apiMoveSection', key, dir); });
+      chain.then(function () { return A.call('apiState'); }).then(function (state) { A.applyState(state); A.toast('الترتيب اتحفظ — بيبان بعد «راجع وانشر»'); })
+        .catch(function (error) { A.fail(error); A.render(); });
+    });
+
+  }
 
   function layoutItem(s, index, total, upgraded) {
 
     var info = KIND_INFO[s.kind] || KIND_INFO.links;
     var count = sectionCount(s);
     var enabled = bool(s.enabled);
-    var chips = [A.visibilityChip(enabled, s.visibleFrom, s.visibleUntil)];
     var locked = s.virtual;
-
-    if (enabled && count === 0) chips.push(A.chip('فاضي — مش هيظهر', 'off'));
-    if (s.kind === 'links') chips.push(A.chip(s.key, 'ltr'));
+    var v = A.visibility(enabled, s.visibleFrom, s.visibleUntil);
+    var timed = !!(s.visibleFrom || s.visibleUntil);
+    var empty = enabled && count === 0;
+    var when = timed
+      ? [s.visibleFrom ? 'يظهر من ' + A.formatWall(s.visibleFrom) : '', s.visibleUntil ? 'يختفي ' + A.formatWall(s.visibleUntil) : ''].filter(Boolean).join(' · ')
+      : enabled ? 'ظاهر على طول' : 'مخفي';
+    var state = el('span', { class: 'p8-tag chip--state' + (empty ? '' : !enabled ? '' : v.state === 'live' && !timed ? ' p8-tag--ok' : timed ? ' p8-tag--info' : ' p8-tag--ok'), 'data-state': v.state },
+      timed && enabled && !empty ? icon('clock') : null,
+      empty ? 'فاضي — مش هيظهر' : !enabled ? 'مخفي' : timed ? 'بميعاد' : 'ظاهر');
 
     var toggle = A.switchInput('ظاهر', enabled, function (checked) {
       A.dirty = false;
@@ -6549,24 +6590,32 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         done: function () { A.toast(checked ? 'القسم هيظهر بعد النشر' : 'القسم هيختفي بعد النشر'); }
       });
     });
-
     toggle.input.disabled = locked;
+    toggle.node.classList.add('p8-switch');
 
-    return A.listItem({
-      icon: s.icon || info.icon,
-      title: s.title || info.label,
-      sub: info.label,
-      off: !enabled,
-      chips: chips,
-      controls: [
-        toggle.node,
-        el('span', { class: 'spacer' }),
-        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'طلّع «' + s.title + '» لفوق', disabled: locked || index === 0, onclick: function (e) { A.move('apiMoveSection', s.key, -1, e.currentTarget); } }, icon('chevron-up')),
-        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'نزّل «' + s.title + '» لتحت', disabled: locked || index === total - 1, onclick: function (e) { A.move('apiMoveSection', s.key, 1, e.currentTarget); } }, icon('chevron')),
-        locked ? null : A.editButton(s.title, function () { editSection(s); }),
-        s.kind === 'links' && !locked ? A.deleteButton(s.title, function (e) { removeSection(s, e.currentTarget); }) : null
-      ]
-    });
+    var grip = el('button', { class: 'grip', type: 'button', 'aria-label': 'رتّب «' + s.title + '» (الأسهم لفوق ولتحت)', disabled: locked || null, onkeydown: function (e) {
+      if (e.key === 'ArrowUp' && index > 0) { e.preventDefault(); A.move('apiMoveSection', s.key, -1, e.currentTarget); }
+      if (e.key === 'ArrowDown' && index < total - 1) { e.preventDefault(); A.move('apiMoveSection', s.key, 1, e.currentTarget); }
+    } }, icon('grip'));
+
+    var more = s.kind === 'links' && !locked ? el('button', { class: 'p8-iconbtn', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-label': 'اختيارات تانية: ' + s.title, onclick: function (e) {
+      var button = e.currentTarget;
+      var del = A.menuItem('trash', 'امسح القسم', function () { removeSection(s, button); }, { danger: true });
+      del.setAttribute('aria-label', 'مسح ' + s.title);
+      A.menu(button, 'menu--p8', [del], { align: 'start' });
+    } }, icon('dots')) : null;
+
+    return el('li', { class: 'p8-item item' + (enabled ? '' : ' item--off') + (locked ? ' is-locked' : ''), 'data-key': s.key, 'data-live': sectionLiveNow(s) ? '1' : null },
+      grip,
+      el('span', { class: 'stage__n', 'aria-hidden': 'true', text: A.digits(index + 1) }),
+      el('div', { class: 'p8-item__main' },
+        el('b', { class: 'p8-item__line' }, el('span', { class: 'item__title', text: s.title || info.label })),
+        el('small', { text: when + (s.kind === 'links' ? ' · ' + s.key : '') })),
+      el('div', { class: 'p8-item__acts' },
+        state,
+        locked ? null : el('button', { class: 'btn btn--sm', type: 'button', 'aria-label': 'تعديل ' + s.title, onclick: function () { editSection(s); } }, icon('clock'), 'الميعاد'),
+        more,
+        toggle.node));
 
   }
 
@@ -19037,30 +19086,35 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
 
     function draw(r) {
-      A.fill(body, r.servants.length ? el('ul', { class: 'list' }, r.servants.map(function (s) {
-        return A.listItem({
-          icon: 'user',
-          image: s.image || null,
-          title: s.name,
-          sub: [s.role, s.phone].filter(Boolean).join(' · '),
-          off: !s.active,
-          chips: [s.publicWa ? A.chip('رقمه ظاهر للزوار', 'ok') : A.chip('رقمه مش ظاهر', 'off'), s.active ? null : A.chip('موقوف', 'off')]
-            .concat((s.pay || []).filter(function (p) { return p.number; }).map(function (p) {
-              return p.approved ? A.chip(PAY_LABELS[p.method] + ' معتمد', 'ok') : A.chip(PAY_LABELS[p.method] + ' محتاج اعتماد', 'gold');
-            })).filter(Boolean),
-          controls: [
-            el('span', { class: 'spacer' }),
-            el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function (e) {
-              A.withBusy(e.currentTarget, A.call('apiServantSetActive', s.id, !s.active)).then(function (next) { reply = next; draw(next); })
-                .catch(function (error) { A.fail(error, box); });
-            } }, s.active ? 'إيقاف' : 'تفعيل'),
-            A.editButton(s.name, function () { servantEditor(s); })
-          ]
-        });
-      })) : el('div', { class: 'empty-state' },
-        el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('users')),
-        el('p', { class: 'empty-state__title', text: 'مفيش خدام لسه' }),
-        el('p', { class: 'empty-state__text', text: 'زوّد الخدام المسؤولين عن الفعاليات وفرق الخدمة.' })));
+      A.fill(body, r.servants.length ? el('ul', { class: 'p8-list p8-events' }, r.servants.map(function (s) {
+        var avatar = el('span', { class: 'p8-avatar', 'aria-hidden': 'true' }, icon('user'));
+        if (s.image && A.mediaPreview) A.mediaPreview(s.image).then(function (src) { if (src) A.fill(avatar, el('img', { src: src, alt: '' })); }).catch(function () {});
+        var tags = [s.role ? el('span', { class: 'p8-tag', text: s.role }) : null,
+          s.publicWa ? el('span', { class: 'p8-tag p8-tag--ok', text: 'رقمه ظاهر للزوار' }) : el('span', { class: 'p8-tag', text: 'رقمه مش ظاهر' }),
+          s.active ? null : el('span', { class: 'p8-tag', text: 'موقوف' })]
+          .concat((s.pay || []).filter(function (p) { return p.number; }).map(function (p) {
+            return el('span', { class: 'p8-tag ' + (p.approved ? 'p8-tag--ok' : 'p8-tag--warn'), text: PAY_LABELS[p.method] + (p.approved ? ' معتمد' : ' محتاج اعتماد') });
+          }));
+        var more = el('button', { class: 'p8-iconbtn', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-label': 'اختيارات تانية: ' + s.name, onclick: function (e) {
+          var button = e.currentTarget;
+          A.menu(button, 'menu--p8', [A.menuItem(s.active ? 'eye-off' : 'eye', s.active ? 'إيقاف' : 'تفعيل', function () {
+            A.withBusy(button, A.call('apiServantSetActive', s.id, !s.active)).then(function (next) { reply = next; draw(next); })
+              .catch(function (error) { A.fail(error, box); });
+          })], { align: 'start' });
+        } }, icon('dots'));
+        return el('li', { class: 'p8-item item' + (s.active ? '' : ' item--off'), 'data-id': s.id },
+          avatar,
+          el('div', { class: 'p8-item__main' },
+            el('b', { class: 'p8-item__line' }, el('span', { class: 'item__title', text: s.name })),
+            s.phone ? el('small', { class: 'ltr p8-phone', text: s.phone }) : null,
+            el('div', { class: 'p8-item__tags' }, tags.filter(Boolean))),
+          el('div', { class: 'p8-item__acts' },
+            el('button', { class: 'btn btn--sm', type: 'button', 'aria-label': 'تعديل ' + s.name, onclick: function () { servantEditor(s); } }, icon('edit'), 'تعديل'),
+            more));
+      })) : el('div', { class: 'p8-empty empty-state' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('users')),
+        el('b', { text: 'مفيش خدام لسه' }),
+        el('small', { text: 'زوّد الخدام المسؤولين عن الفعاليات وفرق الخدمة.' })));
       drawMethods(r.methods);
     }
 
@@ -19084,13 +19138,13 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       var isNew = !s;
       s = s || { active: true };
       var ebox = A.errorBox();
-      var name = A.counted('الاسم', s.name, 60, 'مثلاً: مينا عادل', { required: true });
+      var name = A.counted('الاسم', s.name, 60, '', { required: true, placeholder: 'مثلاً: مينا عادل' });
       var phone = A.textInput(s.phone, { ltr: true, inputmode: 'tel', placeholder: '01012345678' });
-      var role = A.counted('الدور', s.role, 40, 'اختياري، مثلاً: مسؤول الرحلة');
+      var role = A.counted('الدور', s.role, 40, '', { placeholder: 'اختياري، مثلاً: مسؤول الرحلة' });
       var image = A.imagePicker(s.image || '', { label: 'الصورة', hint: 'اختياري' });
       var publicWa = A.checkbox('رقمه يظهر للزوار على واتساب', !!s.publicWa, 'بموافقته بس: بيظهر زرار واتساب في صفحات الفعاليات والفرق');
       var active = A.checkbox('متاح', s.active !== false);
-      var note = A.counted('ملاحظة (للأدمن بس)', s.note, 200, 'مبتظهرش في الموقع');
+      var note = A.counted('ملاحظة (للأدمن بس)', s.note, 200, '', { placeholder: 'مبتظهرش في الموقع' });
 
       // «أرقام الدفع» (PayDest.gs): own numbers or the phone; shown to visitors only once the primary admin approves
       var payAdmin = !!(reply && reply.payAdmin);
@@ -19101,27 +19155,47 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         input.disabled = !payAdmin;
         input.addEventListener('input', function () { payBox.dataset.changed = '1'; drawPay(s.pay); });
       });
-      var payBox = el('div', { class: 'pay-dests', 'data-pay': '1' });
+      var payBox = el('div', { class: 'pay-dests p8-paycards', 'data-pay': '1' });
+      var payNote = el('p', { class: 'note' });
+      var PAY_ICON = { instapay: 'swap', wallet: 'wallet' };
+      var PAY_INPUT = { instapay: A.field('رقم إنستاباي', instapay), wallet: A.field('رقم المحفظة', wallet) };
+      var shells = {};
 
       function drawPay(list) {
         var changed = payBox.dataset.changed === '1' || phone.value !== (s.phone || '');
-        A.fill(payBox, (list || []).map(function (p) {
-          var label = PAY_LABELS[p.method] || p.method;
-          var line = p.number
-            ? el('span', {}, el('bdi', { class: 'ltr', dir: 'ltr', text: groupedNumber(p.number) }), p.source === 'phone' ? ' (من رقم الموبايل)' : '')
-            : el('span', { text: 'مفيش رقم' });
-          var approve = !isNew && payAdmin && p.number && !p.approved
-            ? el('button', { class: 'btn btn--small btn--primary', type: 'button', 'data-act': 'pay-approve', 'data-method': p.method, disabled: changed ? 'disabled' : null, onclick: function (e) { decide(p, true, e.currentTarget); } }, icon('check'), 'اعتمد رقم الدفع ده')
-            : null;
-          var revoke = !isNew && payAdmin && p.approved
-            ? el('button', { class: 'btn btn--small btn--ghost', type: 'button', 'data-act': 'pay-revoke', 'data-method': p.method, onclick: function (e) { decide(p, false, e.currentTarget); } }, 'شيل الاعتماد')
-            : null;
-          return el('div', { class: 'pay-dest', 'data-method': p.method },
-            el('p', { class: 'pay-dest__head' }, el('strong', { text: label + ': ' }), line, ' ',
-              p.approved ? A.chip('معتمد للزوار', 'ok') : p.number ? A.chip('مش ظاهر للزوار', 'gold') : A.chip('مقفول', 'off')),
-            p.problem ? el('p', { class: 'field__hint', text: p.problem }) : null,
-            el('div', { class: 'actions' }, approve, revoke));
-        }), changed && payAdmin && !isNew ? el('p', { class: 'note', text: 'احفظ الأول، وبعدين اعتمد الرقم الجديد.' }) : null);
+        var seen = {};
+        (list || []).concat(['instapay', 'wallet'].filter(function (k) { return !(list || []).some(function (p) { return p.method === k; }); }).map(function (k) { return { method: k, number: '' }; }))
+          .forEach(function (p) {
+            seen[p.method] = true;
+            var label = PAY_LABELS[p.method] || p.method;
+            var shell = shells[p.method];
+            if (!shell) {
+              shell = shells[p.method] = { head: el('div', { class: 'pay-dest__top' }), problem: el('p', { class: 'field__hint' }), acts: el('div', { class: 'actions' }) };
+              shell.node = el('div', { class: 'pay-dest p8-paycard', 'data-method': p.method }, shell.head, shell.problem, PAY_INPUT[p.method] || null, shell.acts);
+              payBox.appendChild(shell.node);
+            }
+            var line = p.number
+              ? el('small', { class: 'mono' }, el('bdi', { class: 'ltr', dir: 'ltr', text: groupedNumber(p.number) }), p.source === 'phone' ? ' (من رقم الموبايل)' : '')
+              : el('small', { text: 'مفيش رقم' });
+            A.fill(shell.head,
+              el('span', { class: 'chipico' + (p.number && !p.approved ? ' chipico--warn' : ''), 'aria-hidden': 'true' }, icon(PAY_ICON[p.method] || 'wallet')),
+              el('div', { class: 'pay-dest__head' }, el('strong', { text: label }), line),
+              p.approved ? el('span', { class: 'p8-tag p8-tag--ok', text: 'معتمد للزوار' }) : p.number ? el('span', { class: 'p8-tag p8-tag--warn', text: 'مش ظاهر للزوار' }) : el('span', { class: 'p8-tag', text: 'مقفول' }));
+            shell.node.classList.toggle('is-wait', !!(p.number && !p.approved));
+            shell.problem.textContent = p.problem || '';
+            shell.problem.hidden = !p.problem;
+            A.fill(shell.acts,
+              !isNew && payAdmin && p.number && !p.approved
+                ? el('button', { class: 'btn btn--sm btn--primary', type: 'button', 'data-act': 'pay-approve', 'data-method': p.method, disabled: changed ? 'disabled' : null, onclick: function (e) { decide(p, true, e.currentTarget); } }, icon('check'), 'اعتمد الرقم ده')
+                : null,
+              !isNew && payAdmin && p.approved
+                ? el('button', { class: 'btn btn--sm btn--ghost', type: 'button', 'data-act': 'pay-revoke', 'data-method': p.method, onclick: function (e) { decide(p, false, e.currentTarget); } }, 'شيل الاعتماد')
+                : null);
+          });
+        payNote.textContent = changed && payAdmin && !isNew ? 'احفظ الأول، وبعدين اعتمد الرقم الجديد.' : '';
+        payNote.hidden = !payNote.textContent;
+        if (!payNote.parentNode) payBox.appendChild(payNote);
+        else payBox.appendChild(payNote);
       }
 
       function decide(p, on, button) {
@@ -19159,24 +19233,42 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           .catch(function (error) { A.fail(error, ebox); });
       });
       A.dirty = false;
+      A.fill(save, icon('check'), el('span', { text: isNew ? 'إضافة' : 'احفظ' }));
       A.openSheet(isNew ? 'خادم جديد' : 'تعديل: ' + s.name, [
         ebox,
-        el('div', { class: 'form' }, name.node, A.field('رقم الموبايل', phone, 'بيتكتب بأي شكل (010… أو +20…)'), role.node, image.node, publicWa.node, active.node, note.node,
-          el('p', { class: 'section-label', text: 'أرقام الدفع (إنستاباي والمحفظة)' }),
-          el('p', { class: 'field__hint', text: payAdmin
-            ? 'لو سبت الرقم فاضي بيتاخد رقم الموبايل. الرقم مبيظهرش للزوار في خطوة الدفع غير بعد ما تعتمده بنفسك، وأي تغيير فيه محتاج اعتماد تاني. مستقل عن ظهور الواتساب.'
-            : 'أرقام الدفع بيغيّرها ويعتمدها الأدمن الرئيسي بس.' }),
-          A.field('رقم إنستاباي', instapay, 'اختياري'), A.field('رقم المحفظة', wallet, 'اختياري'), A.field('اسم المستفيد', payName, 'اختياري: بيظهر للزوار جنب الرقم'),
-          payBox)
-      ], A.sheetFooter(save), { lock: isNew ? null : A.editLock('servant', s.id, 'الخادم «' + s.name + '»', function () { A.closeSheet(); load(); }) });
+        el('div', { class: 'fgrid p8-servant' },
+          A.col(name.node, 6), A.col(role.node, 6),
+          A.col(A.field('رقم الموبايل', phone), 6), A.col(note.node, 6),
+          A.col(el('div', { class: 'hr' }), 12),
+          A.col(el('div', { class: 'p8-subhead' }, el('h4', { text: 'أرقام الدفع' }), el('p', { text: payAdmin
+            ? 'الرقم مبيظهرش للزوار في خطوة الدفع غير بعد ما يعتمده الأدمن الأساسي. أي تغيير محتاج اعتماد تاني.'
+            : 'أرقام الدفع بيغيّرها ويعتمدها الأدمن الرئيسي بس.' })), 12),
+          A.col(payBox, 12),
+          A.col(A.field('اسم المستفيد', payName, 'بيظهر للزوار جنب الرقم'), 12),
+          A.col(el('div', { class: 'hr' }), 12),
+          A.col(publicWa.node, 6), A.col(active.node, 6),
+          A.col(image.node, 12))
+      ], A.sheetFooter(save), {
+        size: 'md',
+        icon: 'user',
+        sub: isNew ? 'للحجز في الفعاليات وفرق الخدمة' : [s.role, s.phone].filter(Boolean).join(' · '),
+        className: 'sheet--servant',
+        lock: isNew ? null : A.editLock('servant', s.id, 'الخادم «' + s.name + '»', function () { A.closeSheet(); load(); })
+      });
       phone.addEventListener('input', function () { drawPay(s.pay || []); });
     }
 
     load();
 
     return [
-      A.card('الخدام', 'قائمة واحدة للخدام: المسؤولين عن الحجز في الفعاليات، وفرق الخدمة في آخر صفحات الخدمة. رقم الخادم مبيظهرش للزوار إلا بموافقته.',
-        el('div', { class: 'actions' }, el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { servantEditor(null); } }, icon('plus'), 'خادم جديد')),
+      el('section', { class: 'card p8-card' },
+        el('div', { class: 'p8-card__head' },
+          el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('users')),
+          el('div', { class: 'p8-card__titles' },
+            el('h2', { class: 'card__title', text: 'الخدام' }),
+            el('p', { class: 'card__hint', text: 'قايمة واحدة للخدام المسؤولين عن الحجز في الفعاليات' })),
+          el('div', { class: 'p8-card__acts' },
+            el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { servantEditor(null); } }, icon('plus'), 'خادم جديد'))),
         box,
         body),
       A.card('طرق الدفع', 'اللي الخدام بيقبلوها (كاش، إنستاباي، محفظة…). الكاش للمعلومة بس في الموقع: الخادم يسجّل الحجز بعد ما يستلم. أرقام إنستاباي والمحفظة بتظهر في خطوة الدفع بس بعد اعتماد الأدمن الرئيسي، ومبتتنشرش في الموقع.', methodsBody)
