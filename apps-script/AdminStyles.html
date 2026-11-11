@@ -14018,4 +14018,188 @@ html[data-mode="light"] .vpop__more {
   display: none;
 }
 
+/* ---------- Phase 8B: «الاجتماعات» (meetings.png): the weekly summary beside the next weeks ---------- */
+.p8-cols {
+  display: grid;
+  gap: 20px;
+  align-items: start;
+}
+
+.p8-cols--meet {
+  grid-template-columns: minmax(0, 424px) minmax(0, 1fr);
+}
+
+.p8-weekly__main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 0 20px;
+  border-bottom: 1px solid var(--p-line-2);
+}
+
+.p8-weekly__day {
+  display: grid;
+  flex: none;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  width: 76px;
+  height: 76px;
+  border: 1px solid var(--p-acc-line);
+  border-radius: 18px;
+  color: var(--text);
+  background: var(--grad-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.p8-weekly__day .icon {
+  width: 18px;
+  height: 18px;
+  color: var(--acc-hi);
+}
+
+.p8-weekly__title {
+  display: block;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.p8-weekly__facts {
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.p8-factrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--p-line-2);
+}
+
+.p8-factrow__label {
+  flex: 1;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.p8-factrow__value {
+  flex: 1;
+  color: var(--text-2);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.p8-factrow__sp {
+  width: 46px;
+}
+
+.p8-iconbtn--lg {
+  width: 46px;
+  height: 34px;
+}
+
+.p8-meet {
+  min-height: 90px;
+}
+
+.p8-meet.is-off .p8-item__main {
+  opacity: .6;
+}
+
+.p8-meet__date {
+  display: grid;
+  flex: none;
+  place-items: center;
+  align-content: center;
+  width: 62px;
+  height: 62px;
+  border: 1px solid var(--p-line-3);
+  border-radius: 16px;
+  background: var(--p-raised);
+}
+
+.p8-meet__date b {
+  color: var(--acc-hi);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.p8-meet__date small {
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.p8-meet .p8-item__main > b {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.p8-meetings .p8-list,
+.p8-past {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.p8-past[hidden] {
+  display: none;
+}
+
+.p8-pastbtn {
+  margin-top: 12px;
+}
+
+.p8-past {
+  margin-top: 10px;
+}
+
+@media (max-width: 1100px) {
+  .p8-cols--meet {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 759px) {
+  .p8-weekly .p8-card__acts {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .p8-meet .p8-item__acts > .btn {
+    flex: 1;
+  }
+}
+
+.p8-weekly .p8-card__titles {
+  min-width: 0;
+}
+
+.p8-factrow .mono,
+.p8-card .mono {
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+  unicode-bidi: isolate;
+}
+
+@media (max-width: 759px) {
+  /* meetings.png (phone): the weekly card keeps its icon beside the title, «تعديل» full width under */
+  .p8-weekly .p8-card__head {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .p8-weekly .p8-card__titles {
+    flex: 1 1 60%;
+  }
+
+  .p8-weekly .p8-card__acts {
+    flex: 1 0 100%;
+  }
+}
+
 </style>

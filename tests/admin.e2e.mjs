@@ -266,7 +266,7 @@ test('navigation: dock on phones, rail on wide screens, tabs for sub-sections', 
     assert.equal(await page.$eval(`${container} [aria-current="page"]`, b => b.dataset.area), 'content');
 
     const tabs = await page.$$eval('#subtabs .tab', t => t.map(b => b.textContent));
-    assert.deepEqual(tabs, ['الاجتماعات', 'الأخبار', 'الألعاب', 'كروت المسابقات', 'الفعاليات', 'كروت خدماتنا', 'الإشعارات']);
+    assert.deepEqual(tabs, ['الاجتماعات', 'الأخبار', 'ركن الألعاب', 'كروت المسابقات', 'الفعاليات', 'كروت خدماتنا', 'الإشعارات']);
     await page.click('#subtabs .tab:nth-child(7)');
     await page.waitForFunction(() => document.getElementById('page-title').textContent === 'الإشعارات');
 
@@ -483,18 +483,20 @@ test('ترتيب الصفحة: every section, what visitors see now, hide and sh
 test('ركن الاجتماع: one switch hides the whole meeting block, topics included', async () => {
 
   const { page, problems, close } = await open();
-  await page.evaluate(() => { A.go('content', 'meetings'); });
-  await page.waitForSelector('.card--switch .switch input');
-  assert.equal(await page.$eval('.card--switch .switch input', i => i.checked), true);
+  // Phase 8B: «إظهار ركن الاجتماع» is the section's own switch in «الصفحة ← ترتيب الصفحة» (layout-sched.png)
+  await page.evaluate(() => { A.go('page', 'layout'); });
+  await page.waitForSelector('.view .layout-list .item');
+  const meetSwitch = () => page.evaluateHandle(() => [...document.querySelectorAll('.view .layout-list .item')].find(i => /ركن الاجتماع|الاجتماع/.test(i.textContent)).querySelector('.switch'));
+  assert.equal(await page.evaluate(() => [...document.querySelectorAll('.view .layout-list .item')].find(i => /ركن الاجتماع|الاجتماع/.test(i.textContent)).querySelector('.switch input').checked), true);
 
-  await page.click('.card--switch .switch');
-  await page.waitForSelector('.card--switch.is-off');
+  await (await meetSwitch()).click();
+  await page.waitForFunction(() => ![...document.querySelectorAll('.view .layout-list .item')].find(i => /ركن الاجتماع|الاجتماع/.test(i.textContent)).querySelector('.switch input').checked);
   const built = JSON.parse(JSON.stringify(world.gs.buildPublicContent(world.gs.readDraft_(), { now: '2026-10-08T12:00' })));
   assert.equal(built.content.meeting, null);
   assert.deepEqual(built.content.sessions, [], 'the topic of 2026-10-11 is not published either');
 
-  await page.click('.card--switch .switch');
-  await page.waitForSelector('.card--switch:not(.is-off)');
+  await (await meetSwitch()).click();
+  await page.waitForFunction(() => [...document.querySelectorAll('.view .layout-list .item')].find(i => /ركن الاجتماع|الاجتماع/.test(i.textContent)).querySelector('.switch input').checked);
 
   assert.deepEqual(problems, []);
   await close();
