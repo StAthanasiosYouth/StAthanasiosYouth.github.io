@@ -11941,8 +11941,11 @@ html[data-mode="light"] .setnav__link.is-on {
   gap: 12px;
 }
 
-.ntt {
+.ntt,
+.ntt.grants {
   display: grid;
+  gap: 0;
+  max-height: none;
   overflow: hidden;
   border: 1px solid var(--p-line-2);
   border-radius: 16px;
@@ -12021,7 +12024,13 @@ button.ntt__name:hover {
   font-size: 12px;
   font-weight: 800;
   cursor: pointer;
-  opacity: .35;
+  opacity: 0;
+  transition: opacity .2s;
+}
+
+.ntt__row:hover .ntt__lock,
+.ntt__lock:focus-within {
+  opacity: .5;
 }
 
 .ntt__lock.is-on {

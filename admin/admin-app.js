@@ -7581,7 +7581,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           A.field('محجوز لأكواد التأكيد', top.otp, ''),
           A.field('محجوز لإيميلات الأعضاء', top.member, '')));
 
-      var arN = function (v) { return String(v).replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; }); };
+      var arN = function (v) { return v === undefined || v === null || v === '' ? '—' : String(v).replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; }); };
       var tile = function (label, value, hint) { return el('div', { class: 'kpi ntq' }, el('small', { text: label }), el('b', { text: arN(value) }), hint ? el('small', { class: 'ntq__hint', text: hint }) : null); };
       var t12 = (function (v) { var p = String(v || '21:00').split(':'); var h = +p[0]; return arN((h % 12 || 12) + ':' + (p[1] || '00')) + (h < 12 ? ' ص' : ' م'); })(data.summaryTime);
 
