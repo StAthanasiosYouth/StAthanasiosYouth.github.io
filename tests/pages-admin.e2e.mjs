@@ -317,17 +317,18 @@ test('«صفحات الخدمة»: a new page with its cover, its video card; on
   assert.equal(cards[0].type, 'service');
 
   // the list says it: published? no; on the home page: yes
-  await d.page.waitForFunction(() => /ظاهر في الرئيسية/.test(document.querySelector('.view').textContent), { timeout: 10000 });
+  await d.page.waitForFunction(() => /كارت في الرئيسية/.test(document.querySelector('.view').textContent), { timeout: 10000 });
 
   // «كروت خدماتنا»: the card is there, linked (no delete, no editor of its own)
   await d.page.evaluate(() => A.go('content', 'services'));
   await d.page.waitForFunction(() => document.querySelector('.view .item--linked'), { timeout: 10000 });
-  assert.match(await d.page.$eval('.view .item--linked', n => n.textContent), /بيتعدل من صفحة الخدمة/);
+  assert.match(await d.page.$eval('.view .item--linked', n => n.textContent), /بيفتح صفحة الخدمة/);
   assert.equal(await d.page.$$eval('.view .item--linked .icon-btn--danger', l => l.length), 0, 'no delete');
   await shot('04-services-cards');
 
-  // switching the card off there: the page's own «إظهار» follows
-  await d.page.evaluate(() => document.querySelector('.view .item--linked .switch input, .view .item--linked input[type=checkbox]').click());
+  // switching the card off there (Phase 8B: «اخفيه من الموقع» in its ⋯ menu): the page's own «إظهار» follows
+  await d.page.evaluate(() => document.querySelector('.view .item--linked .p8-iconbtn').click());
+  await (await d.page.waitForSelector('.menu [aria-label^="اخفي:"]')).evaluate(b => b.click());
   await idle();
   await d.page.waitForFunction(id => {
     const card = (A.state.draft.activities || []).find(a => a.page === id);
@@ -335,7 +336,8 @@ test('«صفحات الخدمة»: a new page with its cover, its video card; on
   }, { timeout: 10000 }, pages[0].id);
   assert.equal(plain(world.as(ADMIN).gs.apiPage(pages[0].id)).page.home.show, false);
   // and back on
-  await d.page.evaluate(() => document.querySelector('.view .item--linked .switch input, .view .item--linked input[type=checkbox]').click());
+  await d.page.evaluate(() => document.querySelector('.view .item--linked .p8-iconbtn').click());
+  await (await d.page.waitForSelector('.menu [aria-label^="اظهر:"]')).evaluate(b => b.click());
   await idle();
   await d.page.waitForFunction(() => { const c = (A.state.draft.activities || []).find(a => a.page); return c && A.bool(c.enabled); }, { timeout: 10000 });
   assert.equal(plain(world.as(ADMIN).gs.apiPage(pages[0].id)).page.home.show, true);
@@ -372,9 +374,8 @@ test('«تعديل» opens the page editor at once from the list (the full copy 
   assert.ok(opened.ms < 400, `the sheet was open and filled after ${Math.round(opened.ms)} ms`);
   assert.equal(opened.title, 'المسرح الأسود');
   assert.equal(await d.page.evaluate(() => window.__apiPageCalls), 1, 'one background request, not one per field');
-  // «كروت الفيديو» waits for that same request (no second one), then shows the cards
-  await clickText('dialog.sheet[open] button', 'كروت الفيديو');
-  await d.page.waitForFunction(() => /كروت الفيديو/.test(document.querySelector('dialog.sheet[open] .sheet__title')?.textContent || '') && document.querySelectorAll('dialog.sheet[open] .list .item').length === 1, { timeout: 8000 });
+  // Phase 8B (svcpage-edit.png): the clips sit in the editor itself; they wait for that same request (no second one)
+  await d.page.waitForFunction(() => document.querySelectorAll('dialog.sheet[open] .p8-clip').length === 1, { timeout: 8000 });
   assert.equal(await d.page.evaluate(() => window.__apiPageCalls), 1, 'the video cards reused the request already on its way');
   await d.page.evaluate(() => { window.__restoreCall(); A.dirty = false; return A.closeSheet(); });
   await sheetGone();
@@ -453,8 +454,10 @@ test('«رتّب الكروت»: the order sheet moves a card up and saves the h
 
 test('the preview frame shows the draft page (not published yet)', async () => {
   await d.page.evaluate(() => A.go('pages', 'svcpages'));
-  await d.page.waitForFunction(() => document.querySelector('.view .item [aria-label^="معاينة"]'), { timeout: 10000 });
-  await d.page.evaluate(() => document.querySelector('.view .item [aria-label^="معاينة"]').click());
+  // Phase 8B (svcpages.png): «معاينة» is in the card's ⋯ menu
+  await d.page.waitForFunction(() => document.querySelector('.view .item [aria-label^="اختيارات تانية"]'), { timeout: 10000 });
+  await d.page.evaluate(() => document.querySelector('.view .item [aria-label^="اختيارات تانية"]').click());
+  await (await d.page.waitForSelector('.menu [aria-label^="معاينة"]')).evaluate(b => b.click());
   await $('dialog.sheet[open] iframe.comp-preview__frame');
   await d.page.waitForFunction(() => /دي شكل الصفحة من المسودة/.test(document.querySelector('dialog.sheet[open] .preview-status')?.textContent || ''), { timeout: 15000 });
   const frame = d.page.frames().find(f => /pages\/index\.html\?preview/.test(f.url()));

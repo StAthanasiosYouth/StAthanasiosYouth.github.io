@@ -635,7 +635,7 @@ test('a competition from the admin: type preset, dates in Cairo time, a notifica
   await page.evaluate(() => { A.go('content', 'competitions'); });
   await page.waitForSelector('#subtabs .tab[aria-current="page"]');
   assert.equal(await page.$eval('#page-title', n => n.textContent), 'كروت المسابقات');
-  await page.evaluate(() => [...document.querySelectorAll('.view button')].find(b => b.textContent.includes('مسابقة جديدة')).click());
+  await page.evaluate(() => document.querySelector('.view [aria-label="مسابقة جديدة"]').click());
   await page.waitForSelector('dialog.sheet[open] input');
 
   await page.evaluate(() => {
@@ -655,7 +655,7 @@ test('a competition from the admin: type preset, dates in Cairo time, a notifica
   assert.deepEqual([row.startAt, row.endAt], ['2099-10-09 18:00', '2099-10-16 23:00']);
   assert.ok(world.gs.readTable_('Notifications').some(n => n.id === 'notif-' + row.id), 'publish notification');
   assert.ok(world.gs.readTable_('Notifications').some(n => n.id === 'notif-' + row.id + '-start'), 'start notification');
-  assert.match(await page.$eval('.list .item__title', n => n.textContent), /مسابقة الكتاب المقدس/);
+  assert.match(await page.$eval('.p8-cgrid .item__title', n => n.textContent), /مسابقة الكتاب المقدس/);
 
   assert.deepEqual(problems, []);
   await close();
@@ -667,16 +667,20 @@ test('archive and «استخدم تاني»: old items leave the list, come back
   world.gs.apiSaveItem('activities', { type: 'trip', title: 'رحلة السنة اللي فاتت', url: 'https://forms.gle/old' });
   const { page, problems, close } = await open(DESKTOP);
   await page.evaluate(() => { A.go('content', 'activities'); });
+  // Phase 8B (cards.png): archive / «استخدم تاني» are in the card's ⋯ menu, with the same names
+  await page.waitForSelector('[aria-label="اختيارات تانية: رحلة السنة اللي فاتت"]');
+  await page.evaluate(() => document.querySelector('[aria-label="اختيارات تانية: رحلة السنة اللي فاتت"]').click());
   await page.waitForSelector('[aria-label="أرشفة: رحلة السنة اللي فاتت"]');
-
-  await page.click('[aria-label="أرشفة: رحلة السنة اللي فاتت"]');
+  await page.evaluate(() => document.querySelector('[aria-label="أرشفة: رحلة السنة اللي فاتت"]').click());
   await page.waitForFunction(() => !document.querySelector('[aria-label="أرشفة: رحلة السنة اللي فاتت"]'));
   assert.equal(world.gs.readTable_('Activities').find(a => a.title === 'رحلة السنة اللي فاتت').archived, true);
 
   // the archive view
   await page.evaluate(() => [...document.querySelectorAll('.view button')].find(b => b.textContent.startsWith('الأرشيف')).click());
+  await page.waitForSelector('[aria-label="اختيارات تانية: رحلة السنة اللي فاتت"]');
+  await page.evaluate(() => document.querySelector('[aria-label="اختيارات تانية: رحلة السنة اللي فاتت"]').click());
   await page.waitForSelector('[aria-label="استخدم تاني: رحلة السنة اللي فاتت"]');
-  await page.click('[aria-label="استخدم تاني: رحلة السنة اللي فاتت"]');
+  await page.evaluate(() => document.querySelector('[aria-label="استخدم تاني: رحلة السنة اللي فاتت"]').click());
   // the copy opens straight in its editor
   await page.waitForSelector('dialog.sheet[open]');
   assert.match(await page.$eval('#sheet-title', n => n.textContent), /\(نسخة\)/);
@@ -692,7 +696,7 @@ test('a new activity type, from the admin, without code', async () => {
 
   const { page, problems, close } = await open(DESKTOP);
   await page.evaluate(() => { A.go('content', 'activities'); });
-  await page.evaluate(() => [...document.querySelectorAll('.view button')].find(b => b.textContent.includes('نوع جديد')).click());
+  await page.evaluate(() => [...document.querySelectorAll('.view button')].find(b => b.textContent.includes('أنواع الكروت')).click());
   await page.waitForSelector('dialog.sheet[open] .icon-grid');
   await page.evaluate(() => {
     const sheet = document.querySelector('dialog.sheet[open]');

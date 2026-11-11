@@ -342,9 +342,9 @@ test('competition «شكل العرض»: auto says what it chose, the site\'s ow
 
   await page.evaluate(() => A.go('content', 'competitions'));
   await new Promise(resolve => setTimeout(resolve, 300));
-  await press(await page.evaluateHandle(() => [...document.querySelectorAll('.app__main button')].find(b => b.offsetParent && b.textContent.trim() === 'مسابقة جديدة')));
+  await press(await page.evaluateHandle(() => [...document.querySelectorAll('.app__main button')].find(b => b.offsetParent && b.getAttribute('aria-label') === 'مسابقة جديدة')));
   await page.waitForSelector('dialog.sheet[open] .item-display');
-  const title = await page.evaluateHandle(() => [...document.querySelectorAll('dialog.sheet[open] input')].find(n => n.offsetParent));
+  const title = await page.$('dialog.sheet[open] .field[data-label="العنوان"] input');
   await press(title);
   await page.keyboard.type('مسابقة الكتاب');
 
@@ -359,20 +359,22 @@ test('competition «شكل العرض»: auto says what it chose, the site\'s ow
   await page.waitForFunction(() => document.querySelector('dialog.sheet[open] .item-preview__frame')?.contentDocument?.querySelector('.item-card__title')?.textContent === 'مسابقة الكتاب', { timeout: 15000 });
   let now = await card();
   assert.equal(now.cls, 'is-compact');
-  assert.equal(now.width, 1100, 'desktop width');
+  // Phase 8B (card-edit.png): the preview sits in the left column, the phone first
+  assert.equal(now.width, 400, 'phone width first');
   assert.ok(now.stage > 60, 'the preview shows');
   assert.ok(await shown(await page.$('dialog.sheet[open] .item-preview__stage')));
 
-  // «بانر عريض» by a real click: the preview follows
-  await press(await page.evaluateHandle(() => [...document.querySelectorAll('dialog.sheet[open] .item-display label.choice')].find(l => l.textContent.includes('بانر عريض'))));
+  // «بانر» from the approved «الشكل» row, by a real click: the preview follows
+  await press(await page.evaluateHandle(() => [...document.querySelectorAll('dialog.sheet[open] .seg--field[aria-label="الشكل"] .seg__opt')].find(l => l.textContent.trim() === 'بانر')));
   await page.waitForFunction(() => document.querySelector('dialog.sheet[open] .item-preview__frame').contentDocument.querySelector('.item-card.is-banner'), { timeout: 10000 });
   assert.match(await page.$eval('dialog.sheet[open] .item-preview__auto', n => n.textContent), /سطح المكتب: بانر عريض — الموبايل: بانر عريض/);
 
-  // the phone: «كارت مدمج» there only
+  // the phone: «كارت مدمج» there only («…» opens the full choice)
+  await press(await page.evaluateHandle(() => [...document.querySelectorAll('dialog.sheet[open] .seg--field[aria-label="الشكل"] .seg__opt')].find(l => l.textContent.trim() === '…')));
   const mobile = await page.evaluateHandle(() => [...document.querySelectorAll('dialog.sheet[open] .item-display select')][0]);
   assert.ok(await shown(mobile));
   await mobile.select('compact');
-  await press(await page.evaluateHandle(() => [...document.querySelectorAll('dialog.sheet[open] .item-preview__tabs button')].find(b => b.textContent === 'الموبايل')));
+  await press(await page.$('dialog.sheet[open] .item-preview__tabs button[aria-label="الموبايل"]'));
   await page.waitForFunction(() => document.querySelector('dialog.sheet[open] .item-preview__frame').offsetWidth === 400, { timeout: 10000 });
   await page.waitForFunction(() => document.querySelector('dialog.sheet[open] .item-preview__frame').contentDocument.querySelector('.item-card.is-compact'), { timeout: 10000 });
   await page.screenshot({ path: `${ROOT}tools/.cache/display-preview.png` });
@@ -405,7 +407,7 @@ test('«شكل العرض» is one shared control: news (its «مميز» card) 
   ]) {
     await page.evaluate(s => A.go('content', s), sub);
     await new Promise(resolve => setTimeout(resolve, 300));
-    await press(await page.evaluateHandle(t => [...document.querySelectorAll('.app__main button')].find(b => b.offsetParent && b.textContent.trim() === t), add));
+    await press(await page.evaluateHandle(t => [...document.querySelectorAll('.app__main button')].find(b => b.offsetParent && (b.textContent.trim() === t || b.getAttribute('aria-label') === t)), add));
     await page.waitForSelector('dialog.sheet[open] .item-display');
     assert.equal(await page.$eval('dialog.sheet[open] .item-display .section-label', n => n.textContent), label);
     const input = await page.evaluateHandle(() => [...document.querySelectorAll('dialog.sheet[open] input')].find(n => n.offsetParent));
@@ -415,15 +417,13 @@ test('«شكل العرض» is one shared control: news (its «مميز» card) 
       const link = await page.evaluateHandle(() => [...document.querySelectorAll('dialog.sheet[open] input[type=url]')].find(n => n.offsetParent));
       await link.evaluate(n => { n.scrollIntoView({ block: 'center' }); n.focus(); });
       await page.keyboard.type('https://example.org/game');
-      // its times: the editor's own preset buttons
-      for (const name of ['تبدأ', 'تخلص']) {
-        // Phase 8B: the date box opens the schedule picker; its first quick choice, then «تمام»
-        await press(await page.evaluateHandle(n => [...document.querySelectorAll('dialog.sheet[open] .field')].find(f => f.dataset.label === n).querySelector('.datetime__box, button.chip, .presets button, button'), name));
-        if (await page.$('dialog.whenpick[open]')) {
-          await press(await page.waitForSelector('dialog.whenpick[open] .presets .preset'));
-          await press(await page.$('dialog.whenpick[open] .whenpick__foot .btn--primary'));
-        }
-      }
+      // its times (Phase 8B game-edit.png: the schedule blocks keep the date fields inside)
+      await page.evaluate(() => {
+        const set = (input, value) => { input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); };
+        const [, start, end] = document.querySelectorAll('dialog.sheet[open] .sched .datetime');
+        set(start.querySelector('input[type=date]'), '2099-10-09'); set(start.querySelector('input[type=time]'), '22:00');
+        set(end.querySelector('input[type=date]'), '2099-10-09'); set(end.querySelector('input[type=time]'), '23:00');
+      });
     }
     await frameCard(card);
     assert.match(await page.$eval('dialog.sheet[open] .item-preview__auto', n => n.textContent), /التلقائي اختار: /);
