@@ -1015,7 +1015,7 @@
       { key: 'content', title: 'المحتوى والظهور', icon: 'megaphone', make: function () { var s = A.state.schema; return [A.state.hubReady ? hubCard : null, s && s.data < s.target ? upgradeCard : null]; } },
       { key: 'publish', title: 'النشر والنسخ', icon: 'history', has: worker, make: function () { return [headify(publishHistoryCard(), 'history')]; } },
       { key: 'team', title: 'الفريق والصلاحيات', icon: 'shield', head: 'الفريق', make: function () { return [headify(adminsCard(), 'users')]; } },
-      { key: 'system', title: 'حالة النظام', icon: 'gear', head: 'النظام', has: worker, make: function () { return [headify(notifyCards()[2], 'gear')]; } },
+      { key: 'system', title: 'حالة النظام', icon: 'gear', head: 'النظام', has: worker, make: function () { return [systemCard(window.AdminWorker)]; } },
       { key: 'guide', title: 'دليل الأدمن', icon: 'book', make: function () { return [guideCard]; } }
     ].filter(function (g) { return g.has !== false; });
 
@@ -1852,7 +1852,130 @@
 
   }
 
-  /* «حالة النظام»: what went out, what failed, Gmail, the quota, critical waiting */
+  /*
+   * «حالة النظام» (Phase 8B, set-system.png): one row per part — the site, the server, uploads, the emails,
+   * the phone notifications, the permissions, the repo copy — each «تمام» or «محتاج قرار», no technical
+   * details. «افحص تاني» checks again. The emails row opens the old detail (sent, waiting, failed, the
+   * critical list with «شيله», the youth accounts' mail), so nothing that was here is lost.
+   */
+  function systemCard(W) {
+
+    var list = el('div', { class: 'p8-list' });
+    var again = el('button', { class: 'btn setcard__act', type: 'button' }, icon('retry'), 'افحص تاني');
+    var card = el('section', { class: 'card setcard setcard--plain p8-sys' },
+      el('div', { class: 'card__head setcard__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('gear')),
+        el('div', { class: 'setcard__titles' },
+          el('h2', { class: 'card__title', text: 'حالة النظام' }),
+          el('p', { class: 'card__hint', text: 'كل جزء شغال ولا لأ، من غير تفاصيل تقنية' })),
+        again),
+      list);
+
+    function when(ms) { return ntWhen(ms).replace('، ', ' '); }
+
+    function row(key, ic, title) {
+      var tag = el('span', { class: 'p8-tag', text: '…' });
+      var small = el('small', { text: '…' });
+      var tools = el('span', { class: 'p8-item__tools' });
+      var item = el('div', { class: 'p8-item', 'data-sys': key },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(ic)),
+        el('div', { class: 'p8-item__main' }, el('b', { text: title }), small),
+        tag, tools);
+      list.appendChild(item);
+      return function (ok, text, action) {
+        var chip = item.firstChild;
+        chip.className = 'chipico chipico--' + (ok === null ? 'info' : ok ? 'ok' : 'warn');
+        tag.className = 'p8-tag p8-tag--' + (ok === null ? 'info' : ok ? 'ok' : 'warn');
+        tag.textContent = ok === null ? '…' : ok ? 'تمام' : 'محتاج قرار';
+        small.textContent = text;
+        A.fill(tools, action || null);
+      };
+    }
+
+    function openBtn(label, onclick, ghost) {
+      return el('button', { class: 'btn btn--sm' + (ghost ? ' btn--ghost' : ''), type: 'button', onclick: onclick }, label);
+    }
+
+    function details() {
+      var c = systemStatusCard(W);
+      var body = c.querySelector(':scope > .card__head') ? Array.prototype.slice.call(c.children, 1) : [c];
+      A.openSheet('الإيميلات والإشعارات', body, null, { size: 'md' });
+    }
+
+    function check() {
+
+      list.textContent = '';
+      var site = row('site', 'globe', 'الموقع');
+      var server = row('server', 'layers', 'السيرفر');
+      var media = row('media', 'photos', 'رفع الصور والفيديو');
+      var mail = row('mail', 'mail', 'الإيميلات');
+      var push = row('push', 'bell', 'إشعارات الموبايل');
+      var perms = row('perms', 'shield', 'الصلاحيات');
+      var mirror = row('mirror', 'retry', 'نسخة الريبو (في الخلفية)');
+      var quiet = { quiet: true };
+      var failed = function (set) { return function () { set(false, 'مش بيرد دلوقتي · جرّب «افحص تاني»'); }; };
+
+      W.call('GET', '/v1/admin/publish/revisions', undefined, quiet).then(function (data) {
+        var jobs = (data && data.jobs) || [];
+        var job = jobs.filter(function (j) { return j.id === data.live; })[0] || jobs[0];
+        var same = !(A.state && A.state.status && A.state.status.hasChanges);
+        site(true, (job ? 'آخر نشر ' + when(job.at) : 'لسه متنشرش') + ' · ' + (same ? 'النسخة على الموقع زي المسودة' : 'فيه تغييرات لسه متنشرتش'));
+      }).catch(failed(site));
+
+      function serverCheck() {
+        var at = Date.now();
+        return W.call('GET', '/v1/health/deep', undefined, quiet).then(function (h) {
+          server(!!(h && h.db && h.db.ok), (h && h.db && h.db.ok ? 'شغال' : 'قاعدة البيانات مش بترد') + ' · آخر فحص ' + when(at).replace(/^\S+ \S+ \S+ /, ''));
+        }).catch(failed(server));
+      }
+      serverCheck();
+
+      function mediaCheck(button) {
+        var p = W.call('GET', '/v1/admin/content/media-status', undefined, quiet).then(function (m) {
+          var n = ((m && m.files) || []).reduce(function (s, f) { return s + (f.n || 0); }, 0);
+          media(true, 'شغال · ' + A.digits(n) + ' ملف', openBtn('اختبر الرفع', function (e) { mediaCheck(e.currentTarget); }, true));
+          if (button) A.toast('الرفع شغال ✓');
+        }).catch(failed(media));
+        if (button) A.withBusy(button, p);
+      }
+      mediaCheck();
+
+      W.call('GET', '/v1/admin/notify/status', undefined, quiet).then(function (s) {
+        var stopped = s.email && s.gmail.configured && !s.gmail.ok;
+        var ok = !stopped && !s.critical.length;
+        var text = !s.email ? 'مقفولة' : stopped ? 'جيميل واقف: محتاج موافقة تاني' : s.critical.length ? A.digits(s.critical.length) + ' تنبيه مهم مستني' : 'اتبعت النهارده ' + A.digits(s.quota.total) + ' من ' + A.digits(s.quota.target);
+        mail(ok, text, ok ? null : openBtn('افتح', details));
+      }).catch(failed(mail));
+
+      A.call('apiPushState').then(function (p) {
+        push(!!p.configured, p.configured ? 'متظبطة · ' + A.digits(p.subscribers || 0) + ' مشتركين' : (p.configHint || 'مش متظبطة'), p.configured || !A.push ? null : openBtn('افتح', function () { A.push.open(); }));
+      }).catch(failed(push));
+
+      var a = A.access;
+      perms(!!(a && a.enforce), a && a.enforce ? 'شغالة: كل أدمن شايف اللي مسموح له بس' : 'لسه مقفولة: كل الأدمنز شايفين كل حاجة', a && a.enforce ? null : openBtn('افتح', function () { A.go('settings', 'team'); }));
+
+      W.call('GET', '/v1/admin/publish/status', undefined, quiet).then(function (s) {
+        var m = s.mirror || {};
+        var last = m.last;
+        var ok = m.configured && !m.late && !(last && last.ok === false);
+        var text = !m.configured ? 'مش متوصلة' : m.late ? 'متأخرة · فيه ' + A.digits(m.pending) + ' نشر مستني' : last && last.ok === false ? 'آخر مزامنة فشلت · هتتعاد لوحدها' : last ? 'آخر مزامنة ' + when(last.at) : 'لسه متزامنتش';
+        mirror(ok, text);
+      }).catch(failed(mirror));
+
+    }
+
+    again.addEventListener('click', check);
+    list.addEventListener('click', function (e) {
+      // the emails row opens the details (sent, waiting, failed, the critical list)
+      if (e.target.closest('button')) return;
+      if (e.target.closest('[data-sys="mail"]')) details();
+    });
+    check();
+    return card;
+
+  }
+
+  /* «حالة النظام» (before 8B, now «الإيميلات» → details): what went out, what failed, Gmail, the quota, critical waiting */
   function systemStatusCard(W) {
 
     var box = A.errorBox();

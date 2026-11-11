@@ -1011,11 +1011,11 @@
   A.counted = function (label, value, max, hint, options) {
 
     var input = A.textInput(value, Object.assign({ max: max }, options || {}));
-    // ltr so "25 / 60" doesn't read as "60 / 25"
-    var counter = el('span', { class: 'field__count', dir: 'ltr' });
+    // Phase 8B: Arabic digits, read right to left (٩ / ٦٠) as the approved editor
+    var counter = el('span', { class: 'field__count' });
 
     function update() {
-      counter.textContent = input.value.length + ' / ' + max;
+      counter.textContent = A.digits(input.value.length + ' / ' + max);
       counter.classList.toggle('field__count--over', input.value.length > max);
     }
 
@@ -1048,6 +1048,47 @@
       node: el('label', { class: 'check check--toggle' }, el('span', {}, el('strong', { text: label }), hint ? el('small', { text: hint }) : null), input, el('span', { class: 'switch__track', 'aria-hidden': 'true' })),
       input: input
     };
+
+  };
+
+  /* Phase 8B: the approved segmented choice (editor.png «النوع»): radios in a pill row. The node itself carries
+     .value (get/set), so it stands in for a <select>. options: [{ value, label }] */
+  A.segmented = function (options, selected, label, onchange) {
+
+    var name = A.uid('seg');
+    var inputs = [];
+    var node = el('div', { class: 'seg seg--field', role: 'radiogroup', 'aria-label': label || null }, options.map(function (o) {
+      var input = el('input', { type: 'radio', name: name, value: o.value, checked: o.value === (selected || options[0].value), onchange: function () {
+        markDirty();
+        if (onchange) onchange(o.value);
+      } });
+      inputs.push(input);
+      return el('label', { class: 'seg__opt' }, input, el('span', { text: o.label }));
+    }));
+    Object.defineProperty(node, 'value', {
+      get: function () { var on = inputs.filter(function (i) { return i.checked; })[0]; return on ? on.value : ''; },
+      set: function (v) { inputs.forEach(function (i) { i.checked = i.value === v; }); }
+    });
+    return node;
+
+  };
+
+  /* Phase 8B: a big editor's section (editor.png): an icon and a title, a line under it, the fields in a 12-column
+     grid (A.col(node, 6) = half). The side list of A.openSheet is made from these; data-state 'done' | 'warn'
+     marks its number (✓) or a dot. */
+  A.msec = function (title, iconName, sub, children) {
+
+    return el('section', { class: 'msec', 'data-title': title },
+      el('h4', { class: 'msec__title' }, iconName ? icon(iconName) : null, el('span', { text: title })),
+      sub ? el('p', { class: 'msec__sub', text: sub }) : null,
+      el('div', { class: 'fgrid' }, children));
+
+  };
+
+  A.col = function (node, n) {
+
+    if (node && node.classList) node.classList.add('c' + n);
+    return node;
 
   };
 
@@ -1196,10 +1237,14 @@
 
     options = options || {};
 
+    // the typed values live in the native date/time fields (kept, out of sight: drafts and every save read them);
+    // Phase 8B (editor.png, sched-picker.png): what shows is one box with the time in words, and a tap opens
+    // the one schedule picker (A.whenPicker) with the quick choices and «امسح الميعاد»
     var parts = String(value || '').split(/[ T]/);
-    var date = el('input', { class: 'input', type: 'date', value: parts[0] || '', oninput: onInput });
-    var time = el('input', { class: 'input', type: 'time', value: parts[1] || '', oninput: onInput, hidden: options.dateOnly || null });
-    var said = el('span', { class: 'field__hint field__hint--when' });
+    var date = el('input', { class: 'input', type: 'date', value: parts[0] || '', oninput: onInput, tabindex: '-1' });
+    var time = el('input', { class: 'input', type: 'time', value: parts[1] || '', oninput: onInput, tabindex: '-1', hidden: options.dateOnly || null });
+    var words = el('span', { class: 'datetime__words' });
+    var box = el('button', { class: 'input datetime__box', type: 'button', 'aria-haspopup': 'dialog', onclick: open }, icon('calendar'), words);
 
     function current() {
       if (!date.value) return '';
@@ -1207,7 +1252,10 @@
     }
 
     function describe() {
-      said.textContent = current() ? A.formatWall(current()) + ' — بتوقيت مصر' : (options.emptyText || 'فاضي');
+      var v = current();
+      words.textContent = v ? A.formatWallLong(v) : (options.emptyText || 'فاضي');
+      box.classList.toggle('is-empty', !v);
+      box.setAttribute('aria-label', (v ? A.formatWallLong(v) + ' بتوقيت مصر' : (options.emptyText || 'فاضي')) + ' — اختار الميعاد');
     }
 
     function onInput() {
@@ -1223,32 +1271,43 @@
       onInput();
     }
 
-    var presets = (options.presets || []).map(function (preset) {
-      return el('button', { class: 'preset', type: 'button', onclick: function () {
-        set(typeof preset.value === 'function' ? preset.value() : preset.value);
-      } }, preset.label);
-    });
-
-    if (options.clearable !== false) {
-      presets.push(el('button', { class: 'preset preset--ghost', type: 'button', onclick: function () { set(''); } }, 'مسح'));
+    function open() {
+      // the picker's title: the field's own label; its line: the open editor's title
+      var field = box.closest('.field');
+      var sheetTitle = box.closest('dialog') ? box.closest('dialog').querySelector('.sheet__title') : null;
+      A.whenPicker({
+        title: options.title || (field && field.dataset.label) || 'الميعاد',
+        sub: options.sub || (sheetTitle ? '«' + sheetTitle.textContent.replace(/^تعديل: /, '') + '»' : ''),
+        value: current(), presets: options.presets || [], dateOnly: options.dateOnly, onDone: set
+      });
     }
 
     describe();
 
-    // Phase 8B: the one schedule picker (A.whenPicker), from a «التقويم» chip after the quick choices
-    presets.push(el('button', { class: 'preset datetime__pick', type: 'button', 'aria-label': 'اختار الميعاد من التقويم', onclick: function () {
-      A.whenPicker({ title: options.title || 'الميعاد', sub: options.sub || '', value: current(), presets: options.presets || [], dateOnly: options.dateOnly, onDone: set });
-    } }, icon('calendar'), 'التقويم'));
-
     return {
       node: el('div', { class: 'datetime' },
-        el('div', { class: 'row' }, date, time),
-        presets.length ? el('div', { class: 'presets' }, presets) : null,
-        said
+        box,
+        el('div', { class: 'datetime__native', 'aria-hidden': 'true' }, date, time)
       ),
       value: current,
-      set: set
+      set: set,
+      open: open
     };
+
+  };
+
+  /* "الجمعة ٦ نوفمبر ٢٠٢٦ · ١٠:٠٠ ص" (the approved date box) */
+  A.formatWallLong = function (value) {
+
+    var minutes = A.wallMinutes(value);
+    if (minutes === null) return String(value || '—');
+    var d = new Date(minutes * 60000);
+    var text = DAY_NAMES[d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear();
+    if (/[ T]\d{2}:\d{2}$/.test(String(value))) {
+      var h = d.getUTCHours(), m = d.getUTCMinutes();
+      text += ' · ' + ((h % 12) || 12) + ':' + pad(m) + (h < 12 ? ' ص' : ' م');
+    }
+    return text.replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; });
 
   };
 
@@ -1287,7 +1346,7 @@
     function said() {
       var v = value();
       if (!v) return 'من غير ميعاد';
-      var text = A.formatWall(v) + ' بتوقيت مصر';
+      var text = A.formatWall(v).replace('، ', ' · ') + ' بتوقيت مصر';
       var days = Math.round((A.wallMinutes(v.slice(0, 10)) - A.wallMinutes(today)) / 1440);
       var away = days === 0 ? 'النهارده' : days === 1 ? 'بكرة' : days === -1 ? 'امبارح'
         : days > 0 ? 'بعد ' + arabicDigits(days) + (days <= 10 ? ' أيام' : ' يوم') : 'من ' + arabicDigits(-days) + (-days <= 10 ? ' أيام' : ' يوم');
@@ -1319,20 +1378,39 @@
         el('div', { class: 'whenpick__month' },
           el('b', { text: MONTHS[m - 1] + ' ' + arabicDigits(y) }),
           el('span', { class: 'whenpick__sp' }),
-          el('button', { class: 'icon-btn icon-btn--small', type: 'button', 'aria-label': 'الشهر اللي فات', onclick: function () { shift(-1); } }, el('span', { class: 'whenpick__prev' }, icon('chevron'))),
-          el('button', { class: 'icon-btn icon-btn--small', type: 'button', 'aria-label': 'الشهر الجاي', onclick: function () { shift(1); } }, icon('chevron'))),
+          el('button', { class: 'whenpick__nav whenpick__nav--prev', type: 'button', 'aria-label': 'الشهر اللي فات', onclick: function () { shift(-1); } }, icon('chevron')),
+          el('button', { class: 'whenpick__nav whenpick__nav--next', type: 'button', 'aria-label': 'الشهر الجاي', onclick: function () { shift(1); } }, icon('chevron'))),
         el('div', { class: 'whenpick__grid' },
           WEEK_HEADS.map(function (h) { return el('span', { class: 'whenpick__head', 'aria-hidden': 'true', text: h }); }),
           cells));
     }
 
+    /* the hour (approved): ٨:٠٠ م · ٩:٠٠ م · ١٠:٠٠ م · «…» in one row; «…» opens the clock for any other time
+       and then shows it */
     function hours() {
-      var other = el('input', { class: 'input whenpick__other', type: 'time', value: time, 'aria-label': 'ساعة تانية', oninput: function () { time = other.value; if (!date) date = today; drawSaid(); markChips(); } });
+      var other = el('input', { class: 'input whenpick__other', type: 'time', value: time, 'aria-label': 'ساعة تانية', hidden: true, oninput: function () { time = other.value; if (!date) date = today; drawSaid(); markChips(); } });
       var chips = HOURS.map(function (h) {
-        return el('button', { class: 'preset' + (time === h[0] ? ' is-on' : ''), type: 'button', 'data-time': h[0], onclick: function () { time = h[0]; if (!date) date = today; other.value = time; drawSaid(); markChips(); } }, h[1]);
+        return el('button', { class: 'whenpick__hour', type: 'button', 'data-time': h[0], onclick: function () { time = h[0]; if (!date) date = today; other.value = time; other.hidden = true; drawSaid(); markChips(); } }, h[1]);
       });
-      function markChips() { chips.forEach(function (c) { c.classList.toggle('is-on', c.getAttribute('data-time') === time); }); }
-      return el('div', { class: 'whenpick__hours' }, el('p', { class: 'whenpick__label', text: 'الساعة' }), el('div', { class: 'presets' }, chips, other));
+      var more = el('button', { class: 'whenpick__hour whenpick__more', type: 'button', 'aria-label': 'ساعة تانية', onclick: function () {
+        other.hidden = false;
+        other.focus();
+        try { if (other.showPicker) other.showPicker(); } catch (e) { /* typed instead */ }
+      } });
+      function clock(t) {
+        var p = String(t).split(':');
+        var h = +p[0];
+        return arabicDigits(((h % 12) || 12) + ':' + p[1]) + (h < 12 ? ' ص' : ' م');
+      }
+      function markChips() {
+        var listed = false;
+        chips.forEach(function (c) { var on = c.getAttribute('data-time') === time; c.classList.toggle('is-on', on); if (on) listed = true; });
+        var custom = !!time && !listed;
+        more.classList.toggle('is-on', custom);
+        more.textContent = custom ? clock(time) : '…';
+      }
+      markChips();
+      return el('div', { class: 'whenpick__hours' }, el('p', { class: 'whenpick__label', text: 'الساعة' }), el('div', { class: 'whenpick__hourrow' }, chips, more), other);
     }
 
     var saidNode = el('p', { class: 'whenpick__said' }, icon('info'), el('span'));
@@ -2659,41 +2737,96 @@
      Taken from the editor's own «section-label» headings, so every editor gets it without changes; one with
      fewer than two sections stays a single column at the medium width. A tap scrolls to the section, and the
      list follows the scroll. */
-  function sheetSections(dialog) {
+  function sheetSections(dialog, options) {
 
+    options = options || {};
     var body = dialog.querySelector('.sheet__body');
-    var labels = Array.prototype.slice.call(body.querySelectorAll('.section-label')).filter(function (label) {
-      return !label.closest('.sheet__body .sheet__body, dialog:not(.sheet)');
-    });
-    if (labels.length < 2) { dialog.classList.remove('sheet--lg'); dialog.classList.add('sheet--md'); return; }
+    var foot = dialog.querySelector('.sheet__foot');
+    // Phase 8B: an editor built from A.msec sections lists those (with their ✓ / dot); older ones their «section-label»s
+    var msecs = Array.prototype.slice.call(body.querySelectorAll('.msec')).filter(function (m) { return !m.parentNode.closest('.msec'); });
+    var sections;
+    if (msecs.length >= 2) {
+      sections = msecs.map(function (m) { m.classList.add('sheet__sec'); return { title: m.dataset.title, target: m }; });
+    }
+    else {
+      var labels = Array.prototype.slice.call(body.querySelectorAll('.section-label')).filter(function (label) {
+        return !label.closest('.sheet__body .sheet__body, dialog:not(.sheet)');
+      });
+      if (labels.length < 2) { dialog.classList.remove('sheet--lg', 'sheet--aside'); dialog.classList.add('sheet--md'); return; }
 
-    var sections = labels.map(function (label) {
-      var target = label.closest('.form-group, fieldset, .card') || label;
-      if (!body.contains(target) || target === body) target = label;
-      target.classList.add('sheet__sec');
-      return { title: label.textContent.trim(), target: target };
-    });
+      sections = labels.map(function (label) {
+        var target = label.closest('.form-group, fieldset, .card') || label;
+        if (!body.contains(target) || target === body) target = label;
+        target.classList.add('sheet__sec');
+        return { title: label.textContent.trim(), target: target };
+      });
 
-    // fields before the first section: «الأساسيات»
-    var firstTop = sections[0].target;
-    var lead = body.querySelector('.field, .form > *');
-    if (lead && lead !== firstTop && !firstTop.contains(lead) && (lead.compareDocumentPosition(firstTop) & Node.DOCUMENT_POSITION_FOLLOWING)) {
-      sections.unshift({ title: 'الأساسيات', target: null });
+      // fields before the first section: «الأساسيات»
+      var firstTop = sections[0].target;
+      var lead = body.querySelector('.field, .form > *');
+      if (lead && lead !== firstTop && !firstTop.contains(lead) && (lead.compareDocumentPosition(firstTop) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+        sections.unshift({ title: 'الأساسيات', target: null });
+      }
+    }
+
+    function smooth() { return document.documentElement.getAttribute('data-motion') !== 'off' && !matchMedia('(prefers-reduced-motion: reduce)').matches; }
+
+    function goTo(i) {
+      var section = sections[i];
+      if (!section) return;
+      if (!section.target) body.scrollTo({ top: 0, behavior: smooth() ? 'smooth' : 'auto' });
+      else body.scrollTo({ top: secTop(section.target) - 12, behavior: smooth() ? 'smooth' : 'auto' });
     }
 
     var links = sections.map(function (section, i) {
-      return el('button', {
-        class: 'sheet__navlink' + (i === 0 ? ' is-on' : ''), type: 'button',
-        onclick: function () {
-          var smooth = document.documentElement.getAttribute('data-motion') !== 'off' &&!matchMedia('(prefers-reduced-motion: reduce)').matches;
-          if (!section.target) body.scrollTo({ top: 0, behavior: smooth ? 'smooth' : 'auto' });
-          else body.scrollTo({ top: secTop(section.target) - 12, behavior: smooth ? 'smooth' : 'auto' });
-        }
-      }, el('span', { class: 'sheet__navnum', 'aria-hidden': 'true', text: arabicNumber(i + 1) }), el('span', { text: section.title }));
+      return el('button', { class: 'sheet__navlink' + (i === 0 ? ' is-on' : ''), type: 'button', onclick: function () { goTo(i); } },
+        el('span', { class: 'sheet__navnum', 'aria-hidden': 'true', text: arabicNumber(i + 1) }),
+        el('span', { class: 'sheet__navtext', text: section.title }),
+        el('span', { class: 'sheet__navwarn', 'aria-hidden': 'true' }));
     });
 
     var nav = el('nav', { class: 'sheet__nav', 'aria-label': 'أقسام النافذة' }, links);
     dialog.insertBefore(nav, body);
+
+    // the sections' marks: ✓ for a finished one, a dot for one that needs a look (the editor sets data-state)
+    function paintMarks() {
+      var n = 0;
+      sections.forEach(function (section, i) {
+        var state = section.target ? section.target.dataset.state || '' : '';
+        var link = links[i];
+        // a hidden section (the booking's, with no booking) leaves the list
+        link.hidden = !!(section.target && section.target.hidden);
+        if (!link.hidden) n++;
+        link.classList.toggle('is-done', state === 'done');
+        link.classList.toggle('is-warn', state === 'warn');
+        link.querySelector('.sheet__navnum').textContent = state === 'done' ? '✓' : arabicNumber(n);
+      });
+    }
+    var current = 0;
+    paintMarks();
+    A.sheetMarks = function () { paintMarks(); paintNext(current); };
+
+    // the foot (approved): «… · Ctrl+S» and «التالي: <next section>»
+    var next = null;
+    if (foot) {
+      var words = options.draft ? 'المسودة اتحفظت تلقائي من ثواني · Ctrl+S' : 'التعديلات بتتحفظ لما تدوس «احفظ» · Ctrl+S';
+      next = el('button', { class: 'btn btn--sm sheet__next', type: 'button' });
+      foot.append(el('span', { class: 'sheet__sp', 'aria-hidden': 'true' }), el('span', { class: 'sheet__saved' }, icon('clock'), el('span', { text: words })), next);
+    }
+
+    function paintNext(at) {
+      if (!next) return;
+      // the next section still to fill (approved: «التالي: الصور» past a finished «المواعيد»)
+      var to = at + 1;
+      while (sections[to] && sections[to].target && (sections[to].target.hidden || sections[to].target.dataset.state === 'done')) to++;
+      var after = sections[to];
+      next.hidden = !after;
+      if (after) {
+        next.textContent = 'التالي: ' + after.title + ' ‹';
+        next.onclick = function () { goTo(to); };
+      }
+    }
+    paintNext(0);
 
     function secTop(node) { return node.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop; }
 
@@ -2708,6 +2841,8 @@
         sections.forEach(function (section, i) { if (section.target && secTop(section.target) <= top) at = i; });
         if (body.scrollTop + body.clientHeight >= body.scrollHeight - 4) at = sections.length - 1;
         links.forEach(function (link, i) { link.classList.toggle('is-on', i === at); });
+        current = at;
+        paintNext(at);
         var on = links[at];
         if (on && nav.scrollWidth > nav.clientWidth) nav.scrollTo({ left: on.offsetLeft - nav.clientWidth / 2 + on.offsetWidth / 2 });
       });
@@ -2727,7 +2862,7 @@
     // Phase 8B: centred on wide screens, in three sizes. An item editor (a draft or a lock) or a wide sheet is big
     // (sections on the side), the rest medium; options.size wins.
     var size = options.size || (options.wide || options.draft || options.lock ? 'lg' : 'md');
-    sheet.className = 'sheet sheet--' + size + (options.icon ? ' sheet--chip' : '') + (options.wide ? ' sheet--wide' : '') + (options.className ? ' ' + options.className : '');
+    sheet.className = 'sheet sheet--' + size + (options.icon ? ' sheet--chip' : '') + (options.wide ? ' sheet--wide' : '') + (options.aside && size === 'lg' ? ' sheet--aside' : '') + (options.className ? ' ' + options.className : '');
     A.fill(sheet,
       el('div', { class: 'sheet__grab', 'aria-hidden': 'true' }),
       el('div', { class: 'sheet__head' },
@@ -2741,10 +2876,13 @@
         el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: function () { A.closeSheet(); } }, icon('close'))
       ),
       el('div', { class: 'sheet__body' }, body),
+      // Phase 8B: the big editor's left column (editor.png): how it shows on the site, «قبل النشر», «إدارة»
+      options.aside && size === 'lg' ? el('aside', { class: 'sheet__aside' }, options.aside) : null,
       footer ? el('div', { class: 'sheet__foot' }, footer) : null
     );
 
-    if (size === 'lg') sheetSections(sheet);
+    A.sheetMarks = function () {};
+    if (size === 'lg') sheetSections(sheet, options);
 
     sheet.style.transform = '';
 
@@ -3998,25 +4136,15 @@
      «المحتوى» ← «الألعاب» as they are.
   ======================================================= */
 
-  var COMING_GAMES = [
-    ['الكويز', 'أسئلة على البروجكتور، والموبايل فيه أزرار. نقط بالسرعة وترتيب بعد كل سؤال.', 'في الاجتماع'],
-    ['الجرس السريع', 'الـHost يفتح الجرس ويشوف مين داس الأول فعلًا، ويحكم صح ولا غلط.', 'في الاجتماع'],
-    ['مين الشخصية؟', 'تلميحات بتتكشف واحدة واحدة، والإجابة بالكتابة أو بالجرس.', 'في الاجتماع'],
-    ['المافيوسو والمتخفي', 'أدوار سرية على الموبايلات، تلميحات، وتصويت سري.', 'بعد الاجتماع'],
-    ['مين المختلف؟', 'لاعب واحد بياخد سؤال مختلف، وبعدين نقاش وتصويت.', 'بعد الاجتماع'],
-    ['رحلة الاستكشاف في الكنيسة', 'كروكي لكل مكان، والفريق يصوّر ويرفع، والـHost يختار الفايزين.', 'بعد الاجتماع']
-  ];
-
+  /* Phase 8B (games-soon.png): one card in the middle — the star, «الألعاب · قريبًا», what it is, and the way to
+     today's games («المحتوى» ← «الألعاب») */
   A.views.gamescorner = function () {
-    return [A.card('الألعاب', 'جاي قريب: المكتبة، الجلسات، المشاركين والفرق، حسابات الـHost، والمكافآت. لسه مفيش حاجة هنا تشتغل.',
-      el('p', { class: 'soon-chip' }, icon('lock'), 'قريبًا'),
-      el('ul', { class: 'coming' }, COMING_GAMES.map(function (g) {
-        return el('li', { class: 'coming__game' },
-          el('span', { class: 'coming__icon', 'aria-hidden': 'true' }, icon('sparkle')),
-          el('span', { class: 'coming__text' }, el('b', { text: g[0] }), el('small', { text: g[1] })),
-          el('span', { class: 'chip', text: g[2] }));
-      })),
-      el('p', { class: 'note', text: 'لينكات الألعاب الحالية في «المحتوى» ← «الألعاب» زي ما هي.' }))];
+    return [el('section', { class: 'card games-soon' },
+      el('span', { class: 'chipico games-soon__icon', 'aria-hidden': 'true' }, icon('star')),
+      el('h2', { class: 'games-soon__title', text: 'الألعاب · قريبًا' }),
+      el('p', { class: 'games-soon__text', text: 'قسم مستقل لنظام الألعاب الجديد (Phase 10). مقفول لحد ما نبدأ.' }),
+      el('p', { class: 'games-soon__note', text: 'ألعاب وتحديات الاجتماع موجودة دلوقتي في «المحتوى ← ركن الألعاب».' }),
+      el('button', { class: 'btn', type: 'button', onclick: function () { A.go('content', 'games'); } }, icon('star'), 'روح لركن الألعاب'))];
   };
 
   /* the switch from the Worker (A.loadAccess): the area comes only when it is on */
@@ -4139,7 +4267,7 @@
   }
 
   /* a menu under its button (popover: Esc and a tap outside close it) */
-  function menu(anchor, className, children) {
+  function menu(anchor, className, children, opts) {
     closeLayer();
     var box = el('div', { class: 'menu ' + className, popover: 'auto', role: 'menu' }, children);
     document.body.appendChild(box);
@@ -4153,7 +4281,8 @@
     box.showPopover();
     var r = anchor.getBoundingClientRect();
     var w = box.offsetWidth;
-    var left = Math.min(Math.max(8, r.left + r.width - w), window.innerWidth - w - 8);
+    // opts.align 'start': the menu's left edge on the button's (approved ⋯ menus); else their right edges meet
+    var left = Math.min(Math.max(8, opts && opts.align === 'start' ? r.left : r.left + r.width - w), window.innerWidth - w - 8);
     box.style.top = Math.round(r.bottom + 8) + 'px';
     box.style.left = Math.round(Math.max(8, left)) + 'px';
     box._anchor = anchor;
@@ -4172,6 +4301,10 @@
     }, onclick && onclick.href ? { href: onclick.href, target: '_blank', rel: 'noopener' } : { type: 'button', onclick: function () { closeLayer(); onclick(); } }),
     icon(iconName), el('span', { text: label }), extra && extra.hint ? el('small', { class: 'menu__hint', text: extra.hint }) : null);
   }
+
+  // Phase 8B: the ⋯ menus of the lists (event-menu.png)
+  A.menu = menu;
+  A.menuItem = menuItem;
 
   function myName() {
     return (A.state && A.state.me) || (A.state && A.state.user ? A.state.user.split('@')[0] : '');

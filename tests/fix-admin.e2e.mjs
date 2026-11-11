@@ -413,7 +413,12 @@ test('«شكل العرض» is one shared control: news (its «مميز» card) 
       await page.keyboard.type('https://example.org/game');
       // its times: the editor's own preset buttons
       for (const name of ['تبدأ', 'تخلص']) {
-        await press(await page.evaluateHandle(n => [...document.querySelectorAll('dialog.sheet[open] .field')].find(f => f.dataset.label === n).querySelector('button.chip, .presets button, button'), name));
+        // Phase 8B: the date box opens the schedule picker; its first quick choice, then «تمام»
+        await press(await page.evaluateHandle(n => [...document.querySelectorAll('dialog.sheet[open] .field')].find(f => f.dataset.label === n).querySelector('.datetime__box, button.chip, .presets button, button'), name));
+        if (await page.$('dialog.whenpick[open]')) {
+          await press(await page.waitForSelector('dialog.whenpick[open] .presets .preset'));
+          await press(await page.$('dialog.whenpick[open] .whenpick__foot .btn--primary'));
+        }
       }
     }
     await frameCard(card);

@@ -187,7 +187,8 @@ const OVERFLOW = () => {
   }
   for (const node of document.querySelectorAll('#view *, .topbar *, dialog[open] *')) {
     const r = node.getBoundingClientRect();
-    if (!r.width || node.closest('.tabs')) continue;
+    // the sub-tabs and a big editor's section chips (Phase 8B, phones) scroll inside their own strip
+    if (!r.width || node.closest('.tabs, .sheet__nav')) continue;
     if (r.right > root.clientWidth + 1 || r.left < -1) issues.push(`${node.tagName.toLowerCase()}.${String(node.className.baseVal ?? node.className).trim().split(/\s+/).join('.')}`);
   }
   return issues.slice(0, 6);
@@ -406,9 +407,10 @@ test('«الفعاليات»: a trip with prices and a servant; its card in «ا
   await d.page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .pages-prices__row .check')].find(c => c.textContent.includes('متاحة في الفعالية دي')).querySelector('input').click());
   await d.page.$eval('dialog.sheet[open] .field[data-label="سن الحاجز من"] input', n => { n.value = '18'; n.dispatchEvent(new Event('input', { bubbles: true })); });
   await d.page.$eval('dialog.sheet[open] .field[data-label="لحد"] input', n => { n.value = '30'; n.dispatchEvent(new Event('input', { bubbles: true })); });
-  await d.page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] legend')].find(l => l.textContent === 'الأسعار').scrollIntoView({ block: 'start' }));
+  // Phase 8B: the editor's sections (A.msec) instead of the old fieldsets
+  await d.page.evaluate(() => document.querySelector('dialog.sheet[open] .msec[data-title="الأسعار والسن"]').scrollIntoView({ block: 'start' }));
   await shot('05b-event-editor-ages');
-  await d.page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] legend')].find(l => l.textContent === 'شروط السن').scrollIntoView({ block: 'start' }));
+  await d.page.evaluate(() => document.querySelector('dialog.sheet[open] .field[data-label="سن الحاجز من"]').scrollIntoView({ block: 'start' }));
   await shot('05c-event-editor-age-rule');
   await saveSheet();
   await sheetGone();
@@ -435,7 +437,7 @@ test('«رتّب الكروت»: the order sheet moves a card up and saves the h
   world.as('');
   await d.page.evaluate(() => A.call('apiState').then(s => A.applyState(s)));
   await d.page.evaluate(() => A.go('pages', 'events'));
-  await clickText('.view button', 'ترتيب كروت «الفعاليات»');
+  await clickText('.view button', 'ترتيب الكروت');
   await $('dialog.sheet[open] .pages-order');
   const before = await d.page.$$eval('dialog.sheet[open] .pages-order .item__title', l => l.map(n => n.textContent));
   assert.equal(before.length, 2);
