@@ -105,6 +105,17 @@
   /* Phase 8B: the design's own extra icons (docs/phase8b/proposal.js EXTRA, proposal-2.js play) */
   if (A.ICONS) {
     var EXTRA_ICONS = {
+      wallet: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18a2 2 0 0 1 2 2v1H6.5A2.5 2.5 0 0 0 4 10.5Z"/><path d="M4 7.5v9A2.5 2.5 0 0 0 6.5 19H19a1 1 0 0 0 1-1v-8a2 2 0 0 0-2-2H6.5A2.5 2.5 0 0 1 4 5.5"/><path d="M16 13.5h.01"/></svg>',
+      cash: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="duo" x="3" y="6" width="18" height="12" rx="2.5"/><rect x="3" y="6" width="18" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6.5 9.5v.01M17.5 14.5v.01"/></svg>',
+      swap: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 7h12l-3-3M17 17H5l3 3"/></svg>',
+      grid: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="duo" x="4" y="4" width="7" height="7" rx="2"/><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg>',
+      history: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>',
+      userx: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle class="duo" cx="10" cy="8" r="4"/><circle cx="10" cy="8" r="4"/><path d="M3 20a7 7 0 0 1 11.5-5.4M17 15l4 4m0-4-4 4"/></svg>',
+      filter: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M4 5h16l-6 7.5V19l-4-2v-4.5Z"/><path d="M4 5h16l-6 7.5V19l-4-2v-4.5Z"/></svg>',
+      archive: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="duo" x="3" y="4" width="18" height="5" rx="1.5"/><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4"/></svg>',
+      key: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle class="duo" cx="8" cy="15" r="4"/><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8m-3 3 2 2m-4 0 1.5 1.5"/></svg>',
+      device: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="duo" x="7" y="3" width="10" height="18" rx="2.5"/><rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/></svg>',
+      cake: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M4 13h16v7H4z"/><path d="M4 20h16M4 13h16v7M6 13v-3h12v3M12 10V7m0-3v.01"/></svg>',
       palette: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-1.3-1-1.6-1-2.6 0-.8.6-1.4 1.4-1.4H16a5 5 0 0 0 5-5C21 6.2 17 3 12 3Z"/><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-1.3-1-1.6-1-2.6 0-.8.6-1.4 1.4-1.4H16a5 5 0 0 0 5-5C21 6.2 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="14.5" cy="7.5" r="1"/></svg>',
       play: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M8 5.5v13l10.5-6.5Z"/><path d="M8 5.5v13l10.5-6.5Z"/></svg>'
     };
@@ -2716,11 +2727,15 @@
     // Phase 8B: centred on wide screens, in three sizes. An item editor (a draft or a lock) or a wide sheet is big
     // (sections on the side), the rest medium; options.size wins.
     var size = options.size || (options.wide || options.draft || options.lock ? 'lg' : 'md');
-    sheet.className = 'sheet sheet--' + size + (options.wide ? ' sheet--wide' : '') + (options.className ? ' ' + options.className : '');
+    sheet.className = 'sheet sheet--' + size + (options.icon ? ' sheet--chip' : '') + (options.wide ? ' sheet--wide' : '') + (options.className ? ' ' + options.className : '');
     A.fill(sheet,
       el('div', { class: 'sheet__grab', 'aria-hidden': 'true' }),
       el('div', { class: 'sheet__head' },
-        el('h2', { class: 'sheet__title', id: 'sheet-title', tabindex: '-1', text: title }),
+        // Phase 8B: the approved head — an icon square, the title and a line under it
+        options.icon ? el('span', { class: 'chipico sheet__chip', 'aria-hidden': 'true' }, icon(options.icon)) : null,
+        options.sub !== undefined
+          ? el('div', { class: 'sheet__titles' }, el('h2', { class: 'sheet__title', id: 'sheet-title', tabindex: '-1', text: title }), el('p', { class: 'sheet__sub', text: options.sub }))
+          : el('h2', { class: 'sheet__title', id: 'sheet-title', tabindex: '-1', text: title }),
         options.headActions ? el('span', { class: 'sheet__headacts' }, options.headActions) : null,
         A.helpButton ? A.helpButton() : null,
         el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: function () { A.closeSheet(); } }, icon('close'))
@@ -3642,7 +3657,7 @@
 
   A.AREAS = [
     // group: the rail's heading (Phase 8 A2): الشغل · الموقع · الفريق; «الإعدادات» lives at the rail's foot
-    { key: 'home', label: 'الرئيسية', icon: 'home', view: 'schedule', group: 'main' },
+    { key: 'home', label: 'الرئيسية', icon: 'grid', view: 'schedule', group: 'main' },
     { key: 'content', label: 'المحتوى', icon: 'megaphone', group: 'site', subs: [
       { key: 'meetings', label: 'الاجتماعات' },
       { key: 'news', label: 'الأخبار' },
@@ -3903,8 +3918,8 @@
           el('span', { class: 'navlink__icon' }, icon('globe')), el('span', { class: 'navlink__label', text: 'افتح الموقع' })) : null,
         collapse,
         el('p', { class: 'rail__user', title: A.state.user }, el('span', { class: 'acct__av', 'aria-hidden': 'true', text: initial(myName()) }), A.state.me && A.state.me !== A.state.user.split('@')[0]
-          ? el('span', { class: 'rail__name', dir: 'auto', text: A.state.me })
-          : el('span', { class: 'ltr', text: A.state.user })),
+          ? el('span', { class: 'rail__who' }, el('span', { class: 'rail__name', dir: 'auto', text: A.state.me }), el('small', { class: 'rail__role', text: A.access && A.access.primary ? 'الأدمن الأساسي' : 'أدمن' }))
+          : el('span', { class: 'rail__who' }, el('span', { class: 'ltr', text: A.state.user }), el('small', { class: 'rail__role', text: A.access && A.access.primary ? 'الأدمن الأساسي' : 'أدمن' }))),
         // the official admin page only (Google sign-in lives there)
         A.signOut ? el('button', { class: 'navlink navlink--quiet navlink--out', type: 'button', 'data-signout': '', title: 'تسجيل الخروج', onclick: function () { A.signOut(); } },
           el('span', { class: 'navlink__icon' }, icon('logout')), el('span', { class: 'navlink__label', text: 'خروج' })) : null
@@ -4667,7 +4682,7 @@
   /* Save button for settings-based forms */
   A.settingsSaver = function (collect, box) {
 
-    var button = el('button', { class: 'btn btn--primary', type: 'button', text: 'حفظ', 'data-lockable': 'settings' });
+    var button = el('button', { class: 'btn btn--primary', type: 'button', 'data-lockable': 'settings' }, icon('check'), 'احفظ');
 
     // the official admin locks the card's settings groups on the first change
     button._collect = collect;
@@ -5156,12 +5171,16 @@
   /* step: index of the current step; failed: that step failed */
   function stepper(step, failed) {
 
-    return el('ol', { class: 'stepper', 'aria-label': 'خطوات النشر', 'data-publish': '' }, publishSteps().map(function (s, i) {
+    // Phase 8B: the approved stepper — each step a chip (its number in a circle), a line between them
+    var steps = publishSteps();
+    return el('ol', { class: 'stepper', 'aria-label': 'خطوات النشر', 'data-publish': '' }, steps.map(function (s, i) {
       var state = i < step ? 'done' : i === step ? (failed ? 'failed' : 'current') : 'todo';
-      return el('li', { class: 'stepper__step is-' + state, 'aria-current': i === step ? 'step' : null },
-        el('span', { class: 'stepper__dot', 'aria-hidden': 'true' }, state === 'done' ? icon('check') : state === 'failed' ? icon('alert') : String(i + 1)),
-        el('span', { class: 'stepper__label', text: s.label })
-      );
+      return [
+        el('li', { class: 'stepper__step is-' + state, 'aria-current': i === step ? 'step' : null },
+          el('span', { class: 'stepper__dot', 'aria-hidden': 'true' }, state === 'done' ? icon('check') : state === 'failed' ? icon('alert') : A.digits(i + 1)),
+          el('span', { class: 'stepper__label', text: s.label })),
+        i < steps.length - 1 ? el('li', { class: 'stepper__bar' + (i < step ? ' is-done' : ''), 'aria-hidden': 'true' }) : null
+      ];
     }));
 
   }
@@ -5174,7 +5193,7 @@
       A.openSheet('النسخ السابقة', [A.publishHistoryCard()], [
         el('button', { class: 'btn', type: 'button', onclick: openReview }, icon('send'), 'رجوع لراجع وانشر')
       ], { size: 'md' });
-    } }, icon('clock'), 'النسخ السابقة');
+    } }, icon('history'), 'النسخ السابقة');
 
   }
 
@@ -5203,7 +5222,7 @@
     }
 
     publishJob = null;
-    A.openSheet('راجع وانشر', reviewSkeleton());
+    A.openSheet('راجع وانشر', reviewSkeleton(), null, { icon: 'send', sub: 'بنقارن المسودة بالموقع…', headActions: historyButton() });
 
     reviewNow()
       .then(renderReview)
@@ -5212,7 +5231,7 @@
         A.openSheet('راجع وانشر', [stepper(0, true), box], [
           el('button', { class: 'btn btn--primary', type: 'button', onclick: openReview }, icon('retry'), 'جرّب تاني'),
           el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })
-        ]);
+        ], { icon: 'send', sub: 'مقدرناش نجيب التغييرات' });
         A.fail(error, box);
       });
 
@@ -5259,36 +5278,34 @@
 
   }
 
-  /* the changes grouped the way the admin thinks: الاجتماع، الأخبار… each line
-     marked new / edited / leaving, with when a scheduled thing appears */
+  /* Phase 8B: the changes exactly as the approved «راجع وانشر» — one card each: the part's icon, what it is
+     with its kind as a chip, where and when under it, and «شوف الفرق» (the site with the drafts) */
   function changeList(review) {
 
     if (!review.groups || !review.groups.length) {
-      return el('ul', { class: 'changes' }, review.changes.map(function (line) { return el('li', { text: line }); }));
+      return el('ul', { class: 'changes review-groups' }, review.changes.map(function (line) {
+        return el('li', { class: 'change-card' }, el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('send')), el('div', { class: 'change-card__main' }, el('b', { text: line })));
+      }));
     }
 
     var tones = { add: 'جديد', change: 'تعديل', remove: 'هيختفي' };
+    var preview = A.state && A.state.config && A.state.config.siteUrl;
 
-    return el('div', { class: 'review-groups' }, review.groups.map(function (group) {
-      return el('section', { class: 'review-group' },
-        el('h3', { class: 'review-group__title' }, icon(group.icon), group.title),
-        el('ul', { class: 'changes' }, group.items.map(function (item) {
-          // Phase 8B: each change a card, its kind as a chip, and «شوف الفرق» (the site with the drafts)
-          return el('li', { class: 'is-' + item.tone },
-            el('span', { class: 'change__text' },
-              el('span', { class: 'chip change__tone change__tone--' + item.tone, text: tones[item.tone] }),
-              el('span', { text: item.text }),
-              item.when ? el('span', { class: 'chip chip--gold change__when', text: item.when }) : null
-            ),
-            A.state && A.state.config && A.state.config.siteUrl && item.tone !== 'remove'
-              ? el('button', { class: 'btn btn--small btn--ghost change__diff', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'شوف الفرق')
-              : null
-          );
-        }))
-      );
+    return el('ul', { class: 'changes review-groups' }, review.groups.map(function (group) {
+      return group.items.map(function (item) {
+        return el('li', { class: 'change-card is-' + item.tone },
+          el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(group.icon)),
+          el('div', { class: 'change-card__main' },
+            el('b', {}, el('span', { text: item.text }), el('span', { class: 'change__tone change__tone--' + item.tone, text: tones[item.tone] })),
+            el('small', { text: group.title + (item.when ? ' · ' + item.when : '') })),
+          preview && item.tone !== 'remove'
+            ? el('button', { class: 'btn btn--small change__diff', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'شوف الفرق')
+            : null);
+      });
     }));
 
   }
+
 
   function renderReview(review) {
 
@@ -5326,17 +5343,17 @@
 
     if (!review.githubError) {
       body.push(nothing
-        ? el('div', { class: 'empty-state empty-state--ok' },
-          el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('check')),
+        ? el('div', { class: 'empty-state empty-state--ok pubempty' },
+          el('span', { class: 'chipico chipico--ok', 'aria-hidden': 'true' }, icon('check')),
           el('p', { class: 'empty-state__title', text: 'الموقع متحدث' }),
-          el('p', { class: 'empty-state__text', text: 'مفيش تغييرات في المسودة عن اللي على الموقع.' }))
-        : el('div', { class: 'form' },
-          el('p', { class: 'section-label', text: 'اللي الزوار هيشوفوه بعد النشر (' + review.changes.length + ')' }),
-          changeList(review)
-        ));
+          el('p', { class: 'empty-state__text', text: 'مفيش تغييرات في المسودة عن اللي على الموقع.' }),
+          A.state.status && A.state.status.publishedAt ? el('p', { class: 'pubempty__last', text: 'آخر نشر: ' + A.formatIso(A.state.status.publishedAt) }) : null)
+        : changeList(review));
     }
 
-    var publish = el('button', { class: 'btn btn--primary', type: 'button', disabled: blocked || nothing }, icon('send'), el('span', { text: 'نشر التغييرات' }));
+    var count = review.changes.length;
+    var publish = el('button', { class: 'btn btn--primary', type: 'button', disabled: blocked || nothing }, icon('send'),
+      el('span', { text: nothing ? 'نشر التغييرات' : 'انشر ' + A.digits(count) + (count === 1 ? ' تغيير' : count <= 10 ? ' تغييرات' : ' تغيير') }));
 
     publish.addEventListener('click', function () {
       if (publishActive()) {
@@ -5359,7 +5376,7 @@
       ? el('button', { class: 'btn', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'معاينة')
       : null;
 
-    A.openSheet('راجع وانشر', body, [publish, preview].concat(A.sheetFooter(publish).slice(1)).filter(Boolean), { headActions: historyButton() });
+    A.openSheet('راجع وانشر', body, [publish, preview].concat(A.sheetFooter(publish).slice(1)).filter(Boolean), { icon: 'send', sub: nothing ? 'كل حاجة منشورة' : A.digits(count) + (count === 1 ? ' تغيير مستني' : ' تغييرات مستنية') + ' النشر', headActions: historyButton() });
 
   }
 
@@ -5414,7 +5431,7 @@
         el('p', { class: 'loading-text', role: 'status', 'data-publish-job': '' },
           el('span', { class: 'spinner spinner--inline', 'aria-hidden': 'true' }),
           liveAtOnce() ? 'بننشر التغييرات… النشر شغال حتى لو قفلت الشاشة دي.' : 'بنبعت التغييرات لـ GitHub… النشر شغال حتى لو قفلت الشاشة دي.')
-      ], [el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })]);
+      ], [el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })], { icon: 'send', sub: 'النشر شغال' });
       return;
     }
 
@@ -5453,10 +5470,9 @@
       el('p', { class: 'note note--ok', 'data-publish-job': '', text: liveAtOnce()
         ? (result.unchanged ? 'الموقع كان متحدث بالفعل.' : 'التغييرات على الموقع دلوقتي ✓ — مش محتاج تستنى حاجة.')
         : result.unchanged ? 'الملفات على GitHub زي ما هي.' : mirror ? 'اتنشر على السيرفر الجديد ✓ ونسخة GitHub بتتحدث في الخلفية.' : 'التغييرات اتبعتت لـ GitHub.' }),
-      result.commitUrl ? el('a', { class: 'link-row', href: result.commitUrl, target: '_blank', rel: 'noopener' }, icon('external'), 'شوف الكوميت على GitHub') : null,
       live,
       push
-    ], [el('button', { class: 'btn btn--primary', type: 'button', text: 'تمام', onclick: function () { A.closeSheet(); } })]);
+    ], [el('button', { class: 'btn btn--primary', type: 'button', text: 'تمام', onclick: function () { A.closeSheet(); } })], { icon: 'send', sub: 'ظهر على الموقع' });
 
   }
 
@@ -5468,7 +5484,7 @@
     A.openSheet('النشر ما كملش', [stepper(1, true), box], [
       el('button', { class: 'btn btn--primary', type: 'button', onclick: openReview }, icon('retry'), 'راجع تاني'),
       el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })
-    ]);
+    ], { icon: 'send', sub: 'جرّب تاني بعد ما تراجع' });
     A.fail(error, box);
 
   }

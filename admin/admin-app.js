@@ -234,6 +234,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   /* Phase 8B: the design's own extra icons (docs/phase8b/proposal.js EXTRA, proposal-2.js play) */
   if (A.ICONS) {
     var EXTRA_ICONS = {
+      wallet: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18a2 2 0 0 1 2 2v1H6.5A2.5 2.5 0 0 0 4 10.5Z"/><path d="M4 7.5v9A2.5 2.5 0 0 0 6.5 19H19a1 1 0 0 0 1-1v-8a2 2 0 0 0-2-2H6.5A2.5 2.5 0 0 1 4 5.5"/><path d="M16 13.5h.01"/></svg>',
+      cash: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="duo" x="3" y="6" width="18" height="12" rx="2.5"/><rect x="3" y="6" width="18" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6.5 9.5v.01M17.5 14.5v.01"/></svg>',
+      swap: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 7h12l-3-3M17 17H5l3 3"/></svg>',
+      grid: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="duo" x="4" y="4" width="7" height="7" rx="2"/><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg>',
+      history: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>',
+      userx: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle class="duo" cx="10" cy="8" r="4"/><circle cx="10" cy="8" r="4"/><path d="M3 20a7 7 0 0 1 11.5-5.4M17 15l4 4m0-4-4 4"/></svg>',
+      filter: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M4 5h16l-6 7.5V19l-4-2v-4.5Z"/><path d="M4 5h16l-6 7.5V19l-4-2v-4.5Z"/></svg>',
+      archive: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="duo" x="3" y="4" width="18" height="5" rx="1.5"/><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4"/></svg>',
+      key: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle class="duo" cx="8" cy="15" r="4"/><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8m-3 3 2 2m-4 0 1.5 1.5"/></svg>',
+      device: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="duo" x="7" y="3" width="10" height="18" rx="2.5"/><rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/></svg>',
+      cake: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M4 13h16v7H4z"/><path d="M4 20h16M4 13h16v7M6 13v-3h12v3M12 10V7m0-3v.01"/></svg>',
       palette: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-1.3-1-1.6-1-2.6 0-.8.6-1.4 1.4-1.4H16a5 5 0 0 0 5-5C21 6.2 17 3 12 3Z"/><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-1.3-1-1.6-1-2.6 0-.8.6-1.4 1.4-1.4H16a5 5 0 0 0 5-5C21 6.2 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="14.5" cy="7.5" r="1"/></svg>',
       play: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M8 5.5v13l10.5-6.5Z"/><path d="M8 5.5v13l10.5-6.5Z"/></svg>'
     };
@@ -2845,11 +2856,15 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     // Phase 8B: centred on wide screens, in three sizes. An item editor (a draft or a lock) or a wide sheet is big
     // (sections on the side), the rest medium; options.size wins.
     var size = options.size || (options.wide || options.draft || options.lock ? 'lg' : 'md');
-    sheet.className = 'sheet sheet--' + size + (options.wide ? ' sheet--wide' : '') + (options.className ? ' ' + options.className : '');
+    sheet.className = 'sheet sheet--' + size + (options.icon ? ' sheet--chip' : '') + (options.wide ? ' sheet--wide' : '') + (options.className ? ' ' + options.className : '');
     A.fill(sheet,
       el('div', { class: 'sheet__grab', 'aria-hidden': 'true' }),
       el('div', { class: 'sheet__head' },
-        el('h2', { class: 'sheet__title', id: 'sheet-title', tabindex: '-1', text: title }),
+        // Phase 8B: the approved head — an icon square, the title and a line under it
+        options.icon ? el('span', { class: 'chipico sheet__chip', 'aria-hidden': 'true' }, icon(options.icon)) : null,
+        options.sub !== undefined
+          ? el('div', { class: 'sheet__titles' }, el('h2', { class: 'sheet__title', id: 'sheet-title', tabindex: '-1', text: title }), el('p', { class: 'sheet__sub', text: options.sub }))
+          : el('h2', { class: 'sheet__title', id: 'sheet-title', tabindex: '-1', text: title }),
         options.headActions ? el('span', { class: 'sheet__headacts' }, options.headActions) : null,
         A.helpButton ? A.helpButton() : null,
         el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: function () { A.closeSheet(); } }, icon('close'))
@@ -3771,7 +3786,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   A.AREAS = [
     // group: the rail's heading (Phase 8 A2): الشغل · الموقع · الفريق; «الإعدادات» lives at the rail's foot
-    { key: 'home', label: 'الرئيسية', icon: 'home', view: 'schedule', group: 'main' },
+    { key: 'home', label: 'الرئيسية', icon: 'grid', view: 'schedule', group: 'main' },
     { key: 'content', label: 'المحتوى', icon: 'megaphone', group: 'site', subs: [
       { key: 'meetings', label: 'الاجتماعات' },
       { key: 'news', label: 'الأخبار' },
@@ -4032,8 +4047,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           el('span', { class: 'navlink__icon' }, icon('globe')), el('span', { class: 'navlink__label', text: 'افتح الموقع' })) : null,
         collapse,
         el('p', { class: 'rail__user', title: A.state.user }, el('span', { class: 'acct__av', 'aria-hidden': 'true', text: initial(myName()) }), A.state.me && A.state.me !== A.state.user.split('@')[0]
-          ? el('span', { class: 'rail__name', dir: 'auto', text: A.state.me })
-          : el('span', { class: 'ltr', text: A.state.user })),
+          ? el('span', { class: 'rail__who' }, el('span', { class: 'rail__name', dir: 'auto', text: A.state.me }), el('small', { class: 'rail__role', text: A.access && A.access.primary ? 'الأدمن الأساسي' : 'أدمن' }))
+          : el('span', { class: 'rail__who' }, el('span', { class: 'ltr', text: A.state.user }), el('small', { class: 'rail__role', text: A.access && A.access.primary ? 'الأدمن الأساسي' : 'أدمن' }))),
         // the official admin page only (Google sign-in lives there)
         A.signOut ? el('button', { class: 'navlink navlink--quiet navlink--out', type: 'button', 'data-signout': '', title: 'تسجيل الخروج', onclick: function () { A.signOut(); } },
           el('span', { class: 'navlink__icon' }, icon('logout')), el('span', { class: 'navlink__label', text: 'خروج' })) : null
@@ -4796,7 +4811,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   /* Save button for settings-based forms */
   A.settingsSaver = function (collect, box) {
 
-    var button = el('button', { class: 'btn btn--primary', type: 'button', text: 'حفظ', 'data-lockable': 'settings' });
+    var button = el('button', { class: 'btn btn--primary', type: 'button', 'data-lockable': 'settings' }, icon('check'), 'احفظ');
 
     // the official admin locks the card's settings groups on the first change
     button._collect = collect;
@@ -5285,12 +5300,16 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   /* step: index of the current step; failed: that step failed */
   function stepper(step, failed) {
 
-    return el('ol', { class: 'stepper', 'aria-label': 'خطوات النشر', 'data-publish': '' }, publishSteps().map(function (s, i) {
+    // Phase 8B: the approved stepper — each step a chip (its number in a circle), a line between them
+    var steps = publishSteps();
+    return el('ol', { class: 'stepper', 'aria-label': 'خطوات النشر', 'data-publish': '' }, steps.map(function (s, i) {
       var state = i < step ? 'done' : i === step ? (failed ? 'failed' : 'current') : 'todo';
-      return el('li', { class: 'stepper__step is-' + state, 'aria-current': i === step ? 'step' : null },
-        el('span', { class: 'stepper__dot', 'aria-hidden': 'true' }, state === 'done' ? icon('check') : state === 'failed' ? icon('alert') : String(i + 1)),
-        el('span', { class: 'stepper__label', text: s.label })
-      );
+      return [
+        el('li', { class: 'stepper__step is-' + state, 'aria-current': i === step ? 'step' : null },
+          el('span', { class: 'stepper__dot', 'aria-hidden': 'true' }, state === 'done' ? icon('check') : state === 'failed' ? icon('alert') : A.digits(i + 1)),
+          el('span', { class: 'stepper__label', text: s.label })),
+        i < steps.length - 1 ? el('li', { class: 'stepper__bar' + (i < step ? ' is-done' : ''), 'aria-hidden': 'true' }) : null
+      ];
     }));
 
   }
@@ -5303,7 +5322,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       A.openSheet('النسخ السابقة', [A.publishHistoryCard()], [
         el('button', { class: 'btn', type: 'button', onclick: openReview }, icon('send'), 'رجوع لراجع وانشر')
       ], { size: 'md' });
-    } }, icon('clock'), 'النسخ السابقة');
+    } }, icon('history'), 'النسخ السابقة');
 
   }
 
@@ -5332,7 +5351,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
 
     publishJob = null;
-    A.openSheet('راجع وانشر', reviewSkeleton());
+    A.openSheet('راجع وانشر', reviewSkeleton(), null, { icon: 'send', sub: 'بنقارن المسودة بالموقع…', headActions: historyButton() });
 
     reviewNow()
       .then(renderReview)
@@ -5341,7 +5360,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.openSheet('راجع وانشر', [stepper(0, true), box], [
           el('button', { class: 'btn btn--primary', type: 'button', onclick: openReview }, icon('retry'), 'جرّب تاني'),
           el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })
-        ]);
+        ], { icon: 'send', sub: 'مقدرناش نجيب التغييرات' });
         A.fail(error, box);
       });
 
@@ -5388,36 +5407,34 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   }
 
-  /* the changes grouped the way the admin thinks: الاجتماع، الأخبار… each line
-     marked new / edited / leaving, with when a scheduled thing appears */
+  /* Phase 8B: the changes exactly as the approved «راجع وانشر» — one card each: the part's icon, what it is
+     with its kind as a chip, where and when under it, and «شوف الفرق» (the site with the drafts) */
   function changeList(review) {
 
     if (!review.groups || !review.groups.length) {
-      return el('ul', { class: 'changes' }, review.changes.map(function (line) { return el('li', { text: line }); }));
+      return el('ul', { class: 'changes review-groups' }, review.changes.map(function (line) {
+        return el('li', { class: 'change-card' }, el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('send')), el('div', { class: 'change-card__main' }, el('b', { text: line })));
+      }));
     }
 
     var tones = { add: 'جديد', change: 'تعديل', remove: 'هيختفي' };
+    var preview = A.state && A.state.config && A.state.config.siteUrl;
 
-    return el('div', { class: 'review-groups' }, review.groups.map(function (group) {
-      return el('section', { class: 'review-group' },
-        el('h3', { class: 'review-group__title' }, icon(group.icon), group.title),
-        el('ul', { class: 'changes' }, group.items.map(function (item) {
-          // Phase 8B: each change a card, its kind as a chip, and «شوف الفرق» (the site with the drafts)
-          return el('li', { class: 'is-' + item.tone },
-            el('span', { class: 'change__text' },
-              el('span', { class: 'chip change__tone change__tone--' + item.tone, text: tones[item.tone] }),
-              el('span', { text: item.text }),
-              item.when ? el('span', { class: 'chip chip--gold change__when', text: item.when }) : null
-            ),
-            A.state && A.state.config && A.state.config.siteUrl && item.tone !== 'remove'
-              ? el('button', { class: 'btn btn--small btn--ghost change__diff', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'شوف الفرق')
-              : null
-          );
-        }))
-      );
+    return el('ul', { class: 'changes review-groups' }, review.groups.map(function (group) {
+      return group.items.map(function (item) {
+        return el('li', { class: 'change-card is-' + item.tone },
+          el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(group.icon)),
+          el('div', { class: 'change-card__main' },
+            el('b', {}, el('span', { text: item.text }), el('span', { class: 'change__tone change__tone--' + item.tone, text: tones[item.tone] })),
+            el('small', { text: group.title + (item.when ? ' · ' + item.when : '') })),
+          preview && item.tone !== 'remove'
+            ? el('button', { class: 'btn btn--small change__diff', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'شوف الفرق')
+            : null);
+      });
     }));
 
   }
+
 
   function renderReview(review) {
 
@@ -5455,17 +5472,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     if (!review.githubError) {
       body.push(nothing
-        ? el('div', { class: 'empty-state empty-state--ok' },
-          el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('check')),
+        ? el('div', { class: 'empty-state empty-state--ok pubempty' },
+          el('span', { class: 'chipico chipico--ok', 'aria-hidden': 'true' }, icon('check')),
           el('p', { class: 'empty-state__title', text: 'الموقع متحدث' }),
-          el('p', { class: 'empty-state__text', text: 'مفيش تغييرات في المسودة عن اللي على الموقع.' }))
-        : el('div', { class: 'form' },
-          el('p', { class: 'section-label', text: 'اللي الزوار هيشوفوه بعد النشر (' + review.changes.length + ')' }),
-          changeList(review)
-        ));
+          el('p', { class: 'empty-state__text', text: 'مفيش تغييرات في المسودة عن اللي على الموقع.' }),
+          A.state.status && A.state.status.publishedAt ? el('p', { class: 'pubempty__last', text: 'آخر نشر: ' + A.formatIso(A.state.status.publishedAt) }) : null)
+        : changeList(review));
     }
 
-    var publish = el('button', { class: 'btn btn--primary', type: 'button', disabled: blocked || nothing }, icon('send'), el('span', { text: 'نشر التغييرات' }));
+    var count = review.changes.length;
+    var publish = el('button', { class: 'btn btn--primary', type: 'button', disabled: blocked || nothing }, icon('send'),
+      el('span', { text: nothing ? 'نشر التغييرات' : 'انشر ' + A.digits(count) + (count === 1 ? ' تغيير' : count <= 10 ? ' تغييرات' : ' تغيير') }));
 
     publish.addEventListener('click', function () {
       if (publishActive()) {
@@ -5488,7 +5505,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       ? el('button', { class: 'btn', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'معاينة')
       : null;
 
-    A.openSheet('راجع وانشر', body, [publish, preview].concat(A.sheetFooter(publish).slice(1)).filter(Boolean), { headActions: historyButton() });
+    A.openSheet('راجع وانشر', body, [publish, preview].concat(A.sheetFooter(publish).slice(1)).filter(Boolean), { icon: 'send', sub: nothing ? 'كل حاجة منشورة' : A.digits(count) + (count === 1 ? ' تغيير مستني' : ' تغييرات مستنية') + ' النشر', headActions: historyButton() });
 
   }
 
@@ -5543,7 +5560,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         el('p', { class: 'loading-text', role: 'status', 'data-publish-job': '' },
           el('span', { class: 'spinner spinner--inline', 'aria-hidden': 'true' }),
           liveAtOnce() ? 'بننشر التغييرات… النشر شغال حتى لو قفلت الشاشة دي.' : 'بنبعت التغييرات لـ GitHub… النشر شغال حتى لو قفلت الشاشة دي.')
-      ], [el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })]);
+      ], [el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })], { icon: 'send', sub: 'النشر شغال' });
       return;
     }
 
@@ -5582,10 +5599,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       el('p', { class: 'note note--ok', 'data-publish-job': '', text: liveAtOnce()
         ? (result.unchanged ? 'الموقع كان متحدث بالفعل.' : 'التغييرات على الموقع دلوقتي ✓ — مش محتاج تستنى حاجة.')
         : result.unchanged ? 'الملفات على GitHub زي ما هي.' : mirror ? 'اتنشر على السيرفر الجديد ✓ ونسخة GitHub بتتحدث في الخلفية.' : 'التغييرات اتبعتت لـ GitHub.' }),
-      result.commitUrl ? el('a', { class: 'link-row', href: result.commitUrl, target: '_blank', rel: 'noopener' }, icon('external'), 'شوف الكوميت على GitHub') : null,
       live,
       push
-    ], [el('button', { class: 'btn btn--primary', type: 'button', text: 'تمام', onclick: function () { A.closeSheet(); } })]);
+    ], [el('button', { class: 'btn btn--primary', type: 'button', text: 'تمام', onclick: function () { A.closeSheet(); } })], { icon: 'send', sub: 'ظهر على الموقع' });
 
   }
 
@@ -5597,7 +5613,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     A.openSheet('النشر ما كملش', [stepper(1, true), box], [
       el('button', { class: 'btn btn--primary', type: 'button', onclick: openReview }, icon('retry'), 'راجع تاني'),
       el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })
-    ]);
+    ], { icon: 'send', sub: 'جرّب تاني بعد ما تراجع' });
     A.fail(error, box);
 
   }
@@ -6656,34 +6672,47 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var siteCard = A.card('بيانات الموقع', 'بتظهر في عنوان الموقع، وفي المشاركة على واتساب وفيسبوك',
       box,
       el('div', { class: 'setsplit' },
-        el('div', { class: 'form', oninput: drawShare }, name.node, tagline.node, shareText.node),
-        el('aside', { class: 'setsplit__aside' }, el('p', { class: 'setsplit__label', text: 'لما حد يشارك اللينك' }), share)),
-      A.settingsSaver(function () {
-        return {
-          'site.name': name.input.value,
-          'site.tagline': tagline.input.value,
-          'site.shareText': shareText.input.value
-        };
-      }, box)
+        el('div', { class: 'form', oninput: drawShare }, name.node, tagline.node, shareText.node,
+          el('div', { class: 'setcard__foot' },
+            A.settingsSaver(function () {
+              return {
+                'site.name': name.input.value,
+                'site.tagline': tagline.input.value,
+                'site.shareText': shareText.input.value
+              };
+            }, box),
+            el('small', { class: 'setcard__note', text: 'بيتحفظ مسودة لحد «راجع وانشر»' }))),
+        el('aside', { class: 'setsplit__aside' }, el('p', { class: 'setsplit__label', text: 'لما حد يشارك اللينك' }), share))
     );
 
     var hubBox = A.errorBox();
     var historyDays = A.textInput(setting('notifications.historyDays'), { type: 'number', inputmode: 'numeric' });
     var endedHours = A.textInput(setting('games.endedHours'), { type: 'number', inputmode: 'numeric' });
 
-    var hubCard = A.card('المحتوى', null,
+    // Phase 8B «المحتوى والظهور»: the approved rows — the words on one side, the number with its unit on the other
+    function unitRow(label, hint, input, unit) {
+      input.classList.add('setnum__input');
+      return el('div', { class: 'setrow' },
+        el('div', { class: 'setrow__text' }, el('b', { class: 'setrow__label', text: label }), hint ? el('small', { class: 'setrow__hint', text: hint }) : null),
+        el('div', { class: 'setrow__ctl' }, el('label', { class: 'setnum' }, input, el('span', { class: 'setnum__unit', text: unit }))));
+    }
+    var hubCard = el('section', { class: 'card setcard setcard--rows' },
+      el('div', { class: 'setcard__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('megaphone')),
+        el('div', { class: 'setcard__titles' },
+          el('h2', { class: 'card__title', text: 'المحتوى والظهور' }),
+          el('p', { class: 'card__hint', text: 'إمتى الحاجات بتختفي لوحدها من الموقع' }))),
       hubBox,
-      el('div', { class: 'form' },
-        A.field('الإشعارات بتفضل في الجرس كام يوم', historyDays, A.settingHelp('notifications.historyDays')),
-        A.field('اللعبة بتفضل ظاهرة كام ساعة بعد ما تخلص', endedHours, A.settingHelp('games.endedHours'))
-      ),
-      A.settingsSaver(function () {
+      unitRow('الإشعارات بتفضل في الجرس كام يوم', 'لو الإشعار مالوش ميعاد اختفاء', historyDays, 'يوم'),
+      unitRow('اللعبة بتفضل ظاهرة كام ساعة بعد ما تخلص', 'كروت «ركن الألعاب» في الاجتماع (مش قسم الألعاب الجاي في Phase 10)', endedHours, 'ساعة'),
+      el('div', { class: 'setcard__foot' }, A.settingsSaver(function () {
         return {
           'notifications.historyDays': historyDays.value,
           'games.endedHours': endedHours.value
         };
-      }, hubBox)
+      }, hubBox))
     );
+
 
     // Phase 8B: no GitHub, Script Properties, Drive test or «افتح الشيت» here any more (the Worker publishes;
     // the mirror keeps running in the background)
@@ -6725,11 +6754,36 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     );
 
     var config = A.state.config || {};
-    var guideCard = A.card('دليل الأدمن', 'كل خانة معناها إيه، وإزاي تضيف اجتماع أو خبر أو لعبة خطوة بخطوة.',
-      el('div', { class: 'actions' },
-        el('button', { class: 'btn', type: 'button', onclick: function () { A.help(); } }, icon('video'), 'شرح الجزء ده'),
-        config.repo ? el('a', { class: 'btn btn--ghost', href: 'https://github.com/' + config.repo + '/blob/main/docs/ADMIN-GUIDE.md', target: '_blank', rel: 'noopener' }, icon('book'), 'افتح الدليل كامل') : null)
-    );
+    // Phase 8B «دليل الأدمن»: the approved grid — a search, then a card per guide that opens its help
+    var GUIDES = [
+      ['church', 'إزاي أضيف موضوع اجتماع', 'المحتوى ← الاجتماعات', 'meetings'],
+      ['megaphone', 'إزاي أكتب خبر ويظهر في الرئيسية', 'المحتوى ← الأخبار', 'news'],
+      ['theatre', 'فعالية جديدة بحجز', 'الفعاليات والصفحات', 'events'],
+      ['ticket', 'مراجعة طلب حجز وتسجيل دفعة', 'الحجوزات والفلوس', 'bookings'],
+      ['trophy', 'مسابقة من الأول للنتيجة', 'المسابقات', 'comps'],
+      ['send', 'النشر والرجوع لنسخة قديمة', 'راجع وانشر', 'publish'],
+      ['shield', 'إضافة خادم للإدارة وصلاحياته', 'الإعدادات ← الفريق', 'settings'],
+      ['photos', 'رفع صورة أو مقطع فيديو', 'الصور والملفات', 'media']
+    ];
+    var guideGrid = el('div', { class: 'guides' }, GUIDES.map(function (g) {
+      return el('button', { class: 'guide', type: 'button', 'data-q': g[1] + ' ' + g[2], onclick: function () { A.help(g[3]); } },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(g[0])),
+        el('span', { class: 'guide__text' }, el('b', { text: g[1] }), el('small', { text: g[2] })),
+        el('span', { class: 'guide__go', 'aria-hidden': 'true' }, icon('chevron')));
+    }));
+    var guideSearch = el('input', { class: 'guide-search__input', type: 'search', placeholder: 'دوّر في الدليل…', 'aria-label': 'دوّر في الدليل', oninput: function () {
+      var q = guideSearch.value.trim();
+      guideGrid.querySelectorAll('.guide').forEach(function (b) { b.hidden = !!q && b.getAttribute('data-q').indexOf(q) === -1; });
+    } });
+    var guideCard = el('section', { class: 'card setcard setcard--plain' },
+      el('div', { class: 'setcard__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('book')),
+        el('div', { class: 'setcard__titles' },
+          el('h2', { class: 'card__title', text: 'دليل الأدمن' }),
+          el('p', { class: 'card__hint', text: 'كل خانة معناها إيه، وإزاي تعمل كل حاجة خطوة بخطوة. زرار الفيديو في أي شاشة بيفتح الجزء بتاعها على طول.' }))),
+      el('label', { class: 'guide-search' }, icon('filter'), guideSearch),
+      guideGrid);
+
 
     // Phase 8B: every settings card gets the approved head (an icon square, the title, its hint)
     function headify(card, name) {
@@ -6757,13 +6811,15 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       { key: 'notify', title: 'إشعاراتي', icon: 'bell', has: worker || !!A.appCard, make: function () {
         var app = A.appCard ? A.appCard() : null;
         if (app) app.setAttribute('data-app-card', '');
-        return [worker ? headify(notifyCards()[0], 'bell') : null, headify(app, 'phone')];
+        // the approved «إشعاراتي»: «إعدادات الإشعارات» (what goes to whom), then the admin's own choices, then the app
+        var n = worker ? notifyCards() : [];
+        return [headify(n[1], 'bell'), headify(n[0], 'user'), headify(app, 'device')];
       } },
       { key: 'site', title: 'بيانات الموقع', icon: 'globe', head: 'الموقع', make: function () { return [siteCard]; } },
-      { key: 'content', title: 'المحتوى والظهور', icon: 'megaphone', make: function () { return [A.state.hubReady ? hubCard : null, upgradeCard]; } },
-      { key: 'publish', title: 'النشر والنسخ', icon: 'retry', has: worker, make: function () { return [headify(publishHistoryCard(), 'clock')]; } },
+      { key: 'content', title: 'المحتوى والظهور', icon: 'megaphone', make: function () { var s = A.state.schema; return [A.state.hubReady ? hubCard : null, s && s.data < s.target ? upgradeCard : null]; } },
+      { key: 'publish', title: 'النشر والنسخ', icon: 'history', has: worker, make: function () { return [headify(publishHistoryCard(), 'history')]; } },
       { key: 'team', title: 'الفريق والصلاحيات', icon: 'shield', head: 'الفريق', make: function () { return [headify(adminsCard(), 'users')]; } },
-      { key: 'system', title: 'حالة النظام', icon: 'gear', head: 'النظام', has: worker, make: function () { var n = notifyCards(); return [headify(n[2], 'gear'), headify(n[1], 'bell')]; } },
+      { key: 'system', title: 'حالة النظام', icon: 'gear', head: 'النظام', has: worker, make: function () { return [headify(notifyCards()[2], 'gear')]; } },
       { key: 'guide', title: 'دليل الأدمن', icon: 'book', make: function () { return [guideCard]; } }
     ].filter(function (g) { return g.has !== false; });
 
@@ -7428,7 +7484,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var box = A.errorBox();
     var body = el('div', { 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
-    var save = el('button', { class: 'btn btn--primary', type: 'button', disabled: true }, 'احفظ الإعدادات');
+    var save = el('button', { class: 'btn btn--primary', type: 'button', disabled: true }, icon('check'), 'احفظ الإعدادات');
     var data = null;
     var rows = {};
     var top = {};
@@ -7480,34 +7536,75 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       top.member = A.textInput(String(data.budget.member), { ltr: true, max: 3 });
       ['target', 'admin', 'critical', 'otp'].forEach(function (k) { top[k].type = 'number'; top[k].min = '0'; });
 
+      // Phase 8B: exactly the approved «إعدادات الإشعارات» — the email line with «الميعاد والحصص», a table of
+      // switches (إشعار · إيميل · ملخص اليوم) with «إجباري», then the quota numbers
+      function sw(on, label, key) {
+        var input = el('input', { type: 'checkbox', role: 'switch', checked: !!on, 'aria-label': label, 'data-nt': key });
+        input.disabled = !manage;
+        return { input: input, node: el('label', { class: 'switch switch--bare ntt__sw' }, input, el('span', { class: 'switch__track', 'aria-hidden': 'true' })) };
+      }
+
       var groups = ntGroups(data.types).map(function (g) {
-        return el('fieldset', { class: 'grants__group' },
-          el('legend', { text: NT_MODULES[g.module] || g.module }),
+        return [
+          el('div', { class: 'ntt__grp', role: 'row' }, el('span', { role: 'rowheader', text: NT_MODULES[g.module] || g.module })),
           g.types.map(function (t) {
             var state = { mode: t.mode, include: t.include.slice(), exclude: t.exclude.slice(), dirty: false };
-            var push = A.checkbox('إشعار', t.push);
-            var mail = ntSelect(NT_EMAIL, t.email, 'إيميل ' + ntLabel(t.key));
-            var lock = A.checkbox('إجباري', t.locked);
-            rows[t.key] = { t: t, push: push.input, email: mail, locked: lock.input, state: state };
-            [push.input, mail, lock.input].forEach(function (c) { c.disabled = !manage; });
-            return el('div', { class: 'nt-row' },
-              el('span', { class: 'nt-row__name' }, ntLabel(t.key), ' ', A.chip(NT_LEVELS[t.level][0], NT_LEVELS[t.level][1])),
-              push.node, mail, lock.node, manage ? recipientsButton(t, state) : null);
-          }));
+            var push = sw(t.push, 'إشعار: ' + ntLabel(t.key), 'push');
+            var now_ = sw(t.email === 'immediate', 'إيميل: ' + ntLabel(t.key), 'immediate');
+            var sum = sw(t.email === 'summary', 'ملخص اليوم: ' + ntLabel(t.key), 'summary');
+            // one email choice: on the spot, in the day's summary, or none
+            now_.input.addEventListener('change', function () { if (now_.input.checked) sum.input.checked = false; });
+            sum.input.addEventListener('change', function () { if (sum.input.checked) now_.input.checked = false; });
+            var mail = { get value() { return now_.input.checked ? 'immediate' : sum.input.checked ? 'summary' : 'off'; } };
+            var lock = el('input', { type: 'checkbox', checked: !!t.locked, 'aria-label': 'إجباري: ' + ntLabel(t.key), 'data-nt': 'locked' });
+            lock.disabled = !manage;
+            var lockChip = el('label', { class: 'ntt__lock' + (t.locked ? ' is-on' : ''), title: 'إجباري: مبيتقفلش' }, lock, icon('lock'), 'إجباري');
+            lock.addEventListener('change', function () { lockChip.classList.toggle('is-on', lock.checked); });
+            rows[t.key] = { t: t, push: push.input, email: mail, locked: lock, state: state };
+            return el('div', { class: 'nt-row ntt__row', role: 'row' },
+              manage
+                ? el('button', { class: 'ntt__name', type: 'button', title: 'مين يوصله؟', onclick: function () { recipientsButton(t, state).click(); } }, ntLabel(t.key))
+                : el('span', { class: 'ntt__name', text: ntLabel(t.key) }),
+              push.node, now_.node, sum.node,
+              el('span', { class: 'ntt__lockcell' }, lockChip));
+          })
+        ];
       });
 
-      A.fill(body, [
+      var more = el('div', { class: 'ntb__more', hidden: true },
         top.router.node, top.email.node,
         A.field('ميعاد ملخص اليوم', top.time, 'بتوقيت القاهرة.'),
-        el('details', { class: 'nt-budget' },
-          el('summary', { text: 'حصة الإيميلات اليومية' }),
+        el('div', { class: 'ntb__budget' },
           A.field('الهدف اليومي (كل الإيميلات)', top.target, 'في حدود جيميل الحقيقي (~٥٠٠ في اليوم).'),
           A.field('إيميلات الأدمنز', top.admin, ''),
           A.field('محجوز للمهم جدًا', top.critical, ''),
           A.field('محجوز لأكواد التأكيد', top.otp, ''),
-          A.field('محجوز لإيميلات الأعضاء', top.member, '')
-        ),
-        el('div', { class: 'grants' }, groups)
+          A.field('محجوز لإيميلات الأعضاء', top.member, '')));
+
+      var arN = function (v) { return v === undefined || v === null || v === '' ? '—' : String(v).replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; }); };
+      var tile = function (label, value, hint) { return el('div', { class: 'kpi ntq' }, el('small', { text: label }), el('b', { text: arN(value) }), hint ? el('small', { class: 'ntq__hint', text: hint }) : null); };
+      var t12 = (function (v) { var p = String(v || '21:00').split(':'); var h = +p[0]; return arN((h % 12 || 12) + ':' + (p[1] || '00')) + (h < 12 ? ' ص' : ' م'); })(data.summaryTime);
+
+      A.fill(body, [
+        el('div', { class: 'ntb' + (data.email ? ' is-on' : '') },
+          el('span', { class: 'chipico' + (data.email ? ' chipico--ok' : ''), 'aria-hidden': 'true' }, icon('mail')),
+          el('div', { class: 'ntb__text' },
+            el('b', { text: data.email ? 'الإيميلات شغالة' : 'الإيميلات مقفولة' }),
+            el('small', { text: (data.gmail ? 'من athanasius.youth.safaga@gmail.com' : 'جيميل محتاج موافقة الأول') + ' · ملخص اليوم الساعة ' + t12 + ' بتوقيت القاهرة' })),
+          manage ? el('button', { class: 'btn btn--small', type: 'button', 'aria-expanded': 'false', onclick: function (event) {
+            more.hidden = !more.hidden;
+            event.currentTarget.setAttribute('aria-expanded', String(!more.hidden));
+          } }, icon('edit'), 'الميعاد والحصص') : null),
+        more,
+        el('div', { class: 'ntt grants', role: 'table', 'aria-label': 'إيه اللي يتبعت لمين' },
+          el('div', { class: 'ntt__head', role: 'row' },
+            el('span', { role: 'columnheader', text: 'الحدث' }), el('span', { role: 'columnheader', text: 'إشعار' }),
+            el('span', { role: 'columnheader', text: 'إيميل' }), el('span', { role: 'columnheader', text: 'ملخص اليوم' }), el('span', { 'aria-hidden': 'true' })),
+          groups),
+        el('div', { class: 'grid g3 ntq__row' },
+          tile('الهدف اليومي (كل الإيميلات)', data.budget.target, 'في حدود جيميل (~٥٠٠)'),
+          tile('محجوز لأكواد التأكيد', data.budget.otp),
+          tile('محجوز لإيميلات الأعضاء', data.budget.member))
       ]);
       [top.router.input, top.email.input, top.time, top.target, top.admin, top.critical, top.otp, top.member].forEach(function (c) { c.disabled = !manage; });
       save.hidden = !manage;
@@ -7551,7 +7648,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     });
 
-    var card = A.card('إعدادات الإشعارات', 'إيه اللي يتبعت لمين، إشعار ولا إيميل ولا في ملخص اليوم. للأدمن الأساسي.', box, body, el('div', { class: 'actions' }, save));
+    var card = A.card('إعدادات الإشعارات', 'إيه اللي يتبعت لمين: إشعار ولا إيميل ولا في ملخص اليوم. بيوصل كل أدمن حسب صلاحياته. للأدمن الأساسي.', box, body,
+      el('div', { class: 'actions setcard__foot' }, save, el('small', { class: 'setcard__note', text: 'الإجباري (الأمان والنظام) مبيتقفلش' })));
     card.classList.add('card--notify-settings');
     load();
     return card;
@@ -7927,7 +8025,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var pending = A.state.schema && A.state.schema.data < A.state.schema.target ? A.upgradeNotice() : null;
 
-    return [pending, A.dashboard(), timeline].filter(Boolean);
+    // Phase 8B: the home is exactly the approved screen; «الجدول» is not on it (A.homeTimeline keeps it reachable)
+    A.homeTimeline = timeline;
+    return [pending, A.dashboard()].filter(Boolean);
 
   };
 
@@ -18074,60 +18174,187 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       tile('ألعاب', live(draft.games), '', function () { A.go('content', 'games'); }));
   }
 
-  /* who is in the panel now (the presence the heartbeat brings) */
+
+  /* =======================================================
+     PHASE 8B HOME — exactly the approved screen (docs/phase8b/shots/{desktop,phone}/home.png,
+     proposal.js V.home): the greeting, four number cards, then the site, the bookings and
+     «الاجتماع الجاي» beside «اعمل حاجة جديدة»; on the side who is here and the latest activity.
+     The bell, «جاي قريب» and the timeline live in «المحتوى» (owner 2026-11-11: the screen as approved).
+  ======================================================= */
+
+  function head8(iconName, title, hint, tone, extra) {
+    return el('div', { class: 'card__head' },
+      el('span', { class: 'chipico' + (tone ? ' chipico--' + tone : ''), 'aria-hidden': 'true' }, icon(iconName)),
+      el('div', { class: 'card__head-text' },
+        el('h3', { text: title }),
+        hint ? el('p', { text: hint }) : null),
+      extra ? el('span', { class: 'sp' }) : null,
+      extra || null);
+  }
+
+  function hero8(waiting) {
+    var name = String((A.state.me || (A.state.user || '').split('@')[0]) || '').split(' ')[0];
+    var count = waiting.reduce(function (n, w) { return n + (w.n || 1); }, 0);
+    return el('section', { class: 'card card--glow hero', 'aria-labelledby': 'hello-title' },
+      el('span', { class: 'hero__art', 'aria-hidden': 'true' }),
+      el('div', { class: 'hero__text' },
+        el('small', { class: 'muted', text: todayLine() }),
+        el('h1', { id: 'hello-title' }, greeting() + ' يا ', el('em', { text: name })),
+        el('p', { text: count ? 'فيه ' + ar(count) + (count === 1 ? ' حاجة مستنياك' : ' حاجات مستنياك') + ' النهارده.' : 'مفيش حاجة مستنياك دلوقتي. كله تمام.' })),
+      el('div', { class: 'row hero__acts' },
+        el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.news(null); } }, icon('plus'), 'خبر'),
+        upgraded() ? el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.activities(null, 'activities'); } }, icon('plus'), 'فعالية') : null,
+        el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.notifications(null); } }, icon('bell'), 'إشعار')));
+  }
+
+  function kpis8() {
+    var draft = A.state.draft || {};
+    var live = function (list) { return (list || []).filter(function (x) { return bool(x.enabled) && !bool(x.archived); }).length; };
+    var bell = (draft.notifications || []).filter(function (n) { return bool(n.enabled) && !bool(n.archived); }).length;
+    var tile = function (iconName, label, value, hint, go) {
+      return el('button', { class: 'kpi', type: 'button', onclick: go },
+        el('small', {}, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon(iconName)), label),
+        el('b', { text: ar(value) }),
+        hint ? el('small', { class: 'kpi__hint', text: hint }) : null);
+    };
+    return el('div', { class: 'grid g4 kpis', 'aria-label': 'الأرقام دلوقتي' },
+      tile('megaphone', 'أخبار ظاهرة', live(draft.news), '', function () { A.go('content', 'news'); }),
+      tile('calendar', 'جاي في أسبوعين', upcoming().length, 'أخبار وألعاب وفعاليات', function () { A.go('content', 'activities'); }),
+      tile('bell', 'إشعارات في الجرس', bell, '', function () { A.go('content', 'notifications'); }),
+      tile('star', 'ألعاب', live(draft.games), '', function () { A.go('content', 'games'); }));
+  }
+
+  function site8() {
+    var s = A.state.status;
+    var config = A.state.config || {};
+    var state = s.errors.length ? 'error' : s.hasChanges ? 'dirty' : 'clean';
+    var words = {
+      error: ['يوجد خطأ يمنع النشر', 'صلّح ' + (s.errors.length === 1 ? 'الخطأ' : 'الأخطاء') + ' الأول، وبعدين انشر', 'danger', 'alert'],
+      dirty: ['في تغييرات مستنية النشر', 'الزوار لسه شايفين النسخة القديمة لحد ما تنشر', 'warn', 'send'],
+      clean: ['الموقع متحدث', 'كل اللي في المسودة ظاهر على الموقع', 'ok', 'check']
+    }[state];
+    var lastAt = el('b', { text: s.publishedAt ? A.formatIso(s.publishedAt) : '…' });
+    var lastBy = el('b', { text: '—' });
+    var W = window.AdminWorker;
+    if (W && W.call) {
+      W.call('GET', '/v1/admin/publish/revisions', undefined, { quiet: true }).then(function (data) {
+        var jobs = (data && data.jobs) || [];
+        var job = jobs.filter(function (j) { return j.id === data.live; })[0] || jobs[0];
+        if (!job) { lastAt.textContent = s.publishedAt ? A.formatIso(s.publishedAt) : 'لسه متنشرش'; return; }
+        var names = (A.state && A.state.names) || {};
+        lastAt.textContent = A.formatWall(cairoWall(job.at));
+        lastBy.textContent = names[job.by] || job.by || '—';
+      }).catch(function () { if (!s.publishedAt) lastAt.textContent = 'لسه متنشرش'; });
+    } else if (!s.publishedAt) lastAt.textContent = 'لسه متنشرش';
+    var acts = el('span', { class: 'row' },
+      state !== 'clean' ? el('button', { class: 'btn btn--sm btn--primary', type: 'button', onclick: function () { A.openReview(); } }, icon(state === 'error' ? 'alert' : 'send'), state === 'error' ? 'شوف الأخطاء' : 'راجع وانشر') : null,
+      state !== 'clean' && config.siteUrl ? el('button', { class: 'btn btn--sm', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'معاينة') : null,
+      config.siteUrl ? el('a', { class: 'btn btn--sm', href: config.siteUrl, target: '_blank', rel: 'noopener' }, icon('external'), 'افتح الموقع') : null);
+    return el('section', { class: 'card home8-site is-' + state, 'aria-labelledby': 'dash-site-title' },
+      head8(words[3], words[0], words[1], words[2], acts),
+      el('div', { class: 'grid g3 facts' },
+        el('div', {}, el('small', { class: 'muted', text: 'آخر نشر' }), lastAt),
+        el('div', {}, el('small', { class: 'muted', text: 'نشره' }), lastBy),
+        el('div', {}, el('small', { class: 'muted', text: 'تغييرات مستنية' }), el('b', { text: s.hasChanges ? 'فيه' : 'مفيش' }))),
+      s.warnings && s.warnings.length ? el('p', { class: 'muted facts__warn', text: 'تنبيهات: ' + ar(s.warnings.length) + ' (مش بتمنع النشر)' }) : null);
+  }
+
+  function cairoWall(ms) {
+    var p = {};
+    new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(new Date(ms)).forEach(function (x) { p[x.type] = x.value; });
+    return p.year + '-' + p.month + '-' + p.day + ' ' + (p.hour === '24' ? '00' : p.hour) + ':' + p.minute;
+  }
+
+  function meeting8() {
+    var row = (A.state.layout || []).filter(function (s) { return s.key === 'meeting'; })[0] || { enabled: true };
+    var shown = A.visibility(bool(row.enabled), row.visibleFrom, row.visibleUntil);
+    var off = shown.state === 'off' || shown.state === 'ended';
+    var next = A.nextMeeting();
+    var body = [];
+    if (off) body.push(el('p', { class: 'note note--warn', text: 'ركن الاجتماع مخفي من الموقع: الزوار مش شايفين ميعاد ولا موضوع.' }));
+    next.cancelled.forEach(function (date) { body.push(el('p', { class: 'muted' }, icon('alert'), 'مفيش اجتماع ' + A.formatWall(date, false) + ' (ملغي)')); });
+    if (!next.date) {
+      body.push(el('p', { class: 'muted', text: 'مفيش ميعاد اجتماع متظبط.' }));
+      body.push(el('button', { class: 'btn btn--sm', type: 'button', onclick: function () { A.go('content', 'meetings'); } }, icon('plus'), 'ظبط الميعاد'));
+    } else {
+      var session = next.session;
+      var topic = session && session.topic;
+      var day = new Date(A.wallFromMinutes(next.at).slice(0, 10) + 'T12:00:00Z');
+      body.push(el('div', { class: 'meet' },
+        el('div', { class: 'meet__day', 'aria-hidden': 'true' }, el('b', { text: ar(day.getUTCDate()) }), el('small', { text: WEEKDAY_SHORT[day.getUTCDay()] })),
+        el('div', { class: 'meet__text' },
+          el('b', { class: 'meet__when', text: A.formatWall(A.wallFromMinutes(next.at)) }), ' ',
+          el('span', { class: 'tag tag--acc', text: next.live ? 'شغال دلوقتي' : relative(next.at) }),
+          el('p', { class: 'muted meet__topic', text: topic ? '«' + topic + '»' : 'لسه مفيش موضوع للاجتماع ده' }),
+          session && session.speaker ? el('p', { class: 'muted', text: session.speaker }) : null,
+          topic && session.visibleFrom && A.wallMinutes(session.visibleFrom) > now() ? el('span', { class: 'tag tag--warn', text: 'الموضوع يظهر ' + A.formatWall(session.visibleFrom) }) : null,
+          el('button', { class: 'btn btn--sm', type: 'button', onclick: function () { A.editors.sessions(session, session ? null : { date: next.date }); } }, icon(topic ? 'edit' : 'plus'), topic ? 'تعديل الموضوع' : 'ضيف الموضوع'))));
+      if (next.live && session && A.liveControl && A.programStages(session.program).length) body.push(A.liveControl(session));
+    }
+    return el('section', { class: 'card home8-meeting' + (off ? ' is-off' : ''), 'aria-labelledby': 'dash-meeting-title' },
+      head8('church', 'الاجتماع الجاي', '', '', off ? el('span', { class: 'tag', text: 'مخفي' }) : null),
+      body);
+  }
+
+  function quick8() {
+    var items = upgraded();
+    function q(label, iconName, onclick) {
+      return el('button', { type: 'button', onclick: onclick }, el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(iconName)), label);
+    }
+    return el('section', { class: 'card home8-quick', 'aria-labelledby': 'dash-quick-title' },
+      head8('sparkle', 'اعمل حاجة جديدة'),
+      el('div', { class: 'q8' },
+        q('موضوع اجتماع', 'church', function () { var n = A.nextMeeting(); A.editors.sessions(n.session, n.session ? null : (n.date ? { date: n.date } : null)); }),
+        q('خبر', 'megaphone', function () { A.editors.news(null); }),
+        window.AdminTransport && A.compNew ? q('مسابقة', 'trophy', function () { A.compNew(); })
+          : items ? q('مسابقة', 'trophy', function () { A.editors.activities(null, 'competitions'); }) : null,
+        items ? q('فعالية', 'calendar', function () { A.editors.activities(null, 'activities'); }) : null,
+        q('لعبة', 'star', function () { A.editors.games(null); }),
+        q('إشعار', 'bell', function () { A.editors.notifications(null); })));
+  }
+
+  /* «المتصلين دلوقتي» (the heartbeat redraws it through _draw) */
   A.homePresence = function () {
-    var box = el('section', { class: 'card who-card', 'aria-labelledby': 'who-title', 'data-home-presence': '' });
+    var box = el('section', { class: 'card home8-who', 'aria-labelledby': 'who-title', 'data-home-presence': '' });
     function draw(list) {
       var others = list || [];
-      var live = others.filter(function (o) { return o.seen < 40; }).length;
-      var editing = others.filter(function (o) { return o.item && o.item.label; }).length;
       A.fill(box,
         el('div', { class: 'card__head' },
-          el('h2', { class: 'card__title', id: 'who-title', text: 'المتصلين دلوقتي' }),
-          others.length ? A.chip('مباشر', 'ok') : null),
-        others.length ? el('p', { class: 'who__sum' },
-          el('span', {}, el('i', { class: 'is-ok' }), ar(live) + ' متصل'),
-          editing ? el('span', {}, el('i', { class: 'is-acc' }), ar(editing) + ' بيعدّل') : null) : null,
-        others.length ? el('div', { class: 'who' }, others.map(function (o) {
+          el('span', { class: 'chipico chipico--info', 'aria-hidden': 'true' }, icon('users')),
+          el('h3', { id: 'who-title', text: 'المتصلين دلوقتي' }),
+          others.length ? el('span', { class: 'sp' }) : null,
+          others.length ? el('span', { class: 'tag tag--ok', text: 'مباشر' }) : null),
+        others.length ? el('div', { class: 'list' }, others.map(function (o) {
           var state = o.item && o.item.label ? 'editing' : o.seen < 40 ? 'online' : 'idle';
-          return el('div', { class: 'who__item' },
-            el('span', { class: 'pav pav--' + state, 'aria-hidden': 'true', text: String(o.name || o.email || '؟').trim().charAt(0) }),
-            el('span', { class: 'who__text' },
+          return el('div', { class: 'item item--who is-' + state },
+            el('span', { class: 'avatar', 'aria-hidden': 'true', text: String(o.name || o.email || '؟').trim().charAt(0) }),
+            el('div', { class: 'item__main' },
               el('b', { dir: 'auto', text: o.name || o.email }),
-              el('small', { class: state === 'editing' ? 'editing' : '', text: state === 'editing' ? 'بيعدّل في: ' + o.item.label : state === 'online' ? 'متصل دلوقتي' : 'آخر نشاط ' + A.ago(o.seen) })));
-        })) : el('p', { class: 'empty', text: 'مفيش أدمن تاني فاتح دلوقتي.' }));
+              el('small', { text: state === 'editing' ? 'بيعدّل في: ' + o.item.label : state === 'online' ? 'متصل دلوقتي' : 'آخر نشاط ' + A.ago(o.seen) })));
+        })) : el('p', { class: 'muted who__empty', text: 'مفيش أدمن تاني فاتح دلوقتي.' }));
     }
     draw(A.presentNow ? A.presentNow() : []);
     box._draw = draw;
     return box;
   };
 
-  /* the home view: the dashboard, then the timeline (AdminContent) */
   A.dashboard = function () {
-
     var waiting = A.waitingNow ? A.waitingNow() : [];
-
-    return el('div', { class: 'home dash' },
-      el('div', { class: 'home__main' },
-        helloCard(waiting),
-        queueTiles(waiting),
-        kpis(),
-        siteCard(),
-        // critical notifications waiting (AdminPage: «حالة النظام»), for the Primary Admin
-        A.criticalBanner ? A.criticalBanner() : null,
-        A.setupNudge ? A.setupNudge() : null,
-        // «الحجوزات»: new requests waiting (AdminBook; hidden while the module is off)
-        A.bookCard ? A.bookCard() : null,
-        el('div', { class: 'duo' }, meetingCard(), quickCard()),
-        bellCard(),
-        upcomingCard()
-      ),
-      el('aside', { class: 'home__side', 'aria-label': 'الفريق والنشاط' },
-        window.AdminTransport ? A.homePresence() : null,
-        A.activityCard ? A.activityCard() : null
-      )
-    );
-
+    return el('div', { class: 'home8' },
+      hero8(waiting),
+      kpis8(),
+      el('div', { class: 'grid home8__cols' },
+        el('div', { class: 'grid home8__main' },
+          // critical notifications (AdminPage «حالة النظام»), the app setup nudge: only when they have something
+          A.criticalBanner ? A.criticalBanner() : null,
+          A.setupNudge ? A.setupNudge() : null,
+          site8(),
+          A.bookCard ? A.bookCard() : null,
+          el('div', { class: 'grid g2 home8__duo' }, meeting8(), quick8())),
+        el('aside', { class: 'grid home8__side', 'aria-label': 'الفريق والنشاط' },
+          window.AdminTransport ? A.homePresence() : null,
+          A.activityCard ? A.activityCard() : null)));
   };
 
 })();
@@ -19672,38 +19899,45 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
      THE HOME CARD
   ======================================================= */
 
+  /* Phase 8B: «آخر نشاط» exactly as the approved home — an icon square, «كل النشاط» in the head, each row
+     the person's initial, what they did, when; the same thing done again and again is one row «N مرات».
+     A row opens what it is about, as before (or the log). */
   A.activityCard = function () {
 
     var recent = (A.state.activity && A.state.activity.recent) || [];
-    // Phase 8B: the same thing done again and again (same person, same action, same item) is one row, «٤ مرات»
     var groups = [];
     recent.forEach(function (entry) {
-      var key = JSON.stringify(entry, function (k, v) { return /^(id|at|ts|time|when|seq|rid|ago)$/i.test(k) ? undefined : v; });
+      var key = JSON.stringify(entry, function (k, v) { return /^(id|at|ts|time|when|seq|rid|ago|cairo|count)$/i.test(k) ? undefined : v; });
       var last = groups[groups.length - 1];
-      if (last && last.key === key) last.count++;
-      else groups.push({ key: key, entry: entry, count: 1 });
+      if (last && last.key === key) last.count += Math.max(1, Number(entry.count) || 1);
+      else groups.push({ key: key, entry: entry, count: Math.max(1, Number(entry.count) || 1), first: entry });
     });
-    var list = el('ul', { class: 'acts acts--compact', 'aria-label': 'آخر نشاط' }, groups.slice(0, 5).map(function (g) {
-      var node = entryNode(g.entry, { compact: true });
-      if (g.count > 1) {
-        var where = node.querySelector('.act__text, .act__title, p, span') || node;
-        where.appendChild(el('span', { class: 'chip chip--gold act__times', text: String(g.count).replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; }) + ' مرات' }));
-      }
-      return node;
+
+    var list = el('div', { class: 'list', 'aria-label': 'آخر نشاط' }, groups.slice(0, 5).map(function (g) {
+      var entry = g.entry;
+      var target = targetOf(entry);
+      return el('button', { class: 'item item--act', type: 'button', onclick: function () {
+        if (target && target.open) target.open();
+        else A.go('activity');
+      } },
+        el('span', { class: 'avatar', 'aria-hidden': 'true', text: String(entry.actorName || '؟').trim().charAt(0) }),
+        el('span', { class: 'item__main' },
+          el('b', { dir: 'auto' }, (entry.actorName || '') + ' ' + (entry.summary || ''),
+            g.count > 1 ? el('span', { class: 'x', text: digits(g.count) + ' مرات' }) : null),
+          el('small', { text: (g.count > 1 ? 'آخرها ' : '') + when(entry) })));
     }));
 
-    return el('section', { class: 'card dash-card dash-activity', id: 'dash-activity', 'aria-labelledby': 'dash-activity-title' },
-      el('div', { class: 'dash-card__head' },
-        el('span', { class: 'dash-card__icon', 'aria-hidden': 'true' }, icon('clock')),
-        el('h2', { class: 'card__title', id: 'dash-activity-title', text: 'آخر نشاط' })
-      ),
-      recent.length ? list : el('p', { class: 'card__hint', text: 'لسه مفيش نشاط متسجل. أول ما حد يضيف أو يعدّل أو ينشر هيظهر هنا.' }),
-      el('div', { class: 'actions' },
-        el('button', { class: 'btn btn--ghost btn--small', type: 'button', onclick: function () { A.go('activity'); } }, icon('clock'), 'كل النشاط')
-      )
+    return el('section', { class: 'card home8-act', id: 'dash-activity', 'aria-labelledby': 'dash-activity-title' },
+      el('div', { class: 'card__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('clock')),
+        el('h3', { id: 'dash-activity-title', text: 'آخر نشاط' }),
+        el('span', { class: 'sp' }),
+        el('button', { class: 'btn btn--sm btn--ghost', type: 'button', onclick: function () { A.go('activity'); } }, 'كل النشاط')),
+      recent.length ? list : el('p', { class: 'muted', text: 'لسه مفيش نشاط متسجل. أول ما حد يضيف أو يعدّل أو ينشر هيظهر هنا.' })
     );
 
   };
+
 
   function refreshHomeCard() {
 
@@ -20549,7 +20783,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   var cardNode = null;
 
   A.bookCard = function () {
-    cardNode = el('section', { class: 'card dash-card dash-book', id: 'dash-book', 'aria-labelledby': 'dash-book-title', hidden: true });
+    cardNode = el('section', { class: 'card home8-book', id: 'dash-book', 'aria-labelledby': 'dash-book-title', hidden: true });
     paintCard();
     if (!B.checked && W()) B.check();
     return cardNode;
@@ -20562,24 +20796,35 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       return;
     }
     cardNode.hidden = false;
-    var head = el('div', { class: 'dash-card__head' },
-      el('span', { class: 'dash-card__icon', 'aria-hidden': 'true' }, icon('ticket')),
-      el('h2', { class: 'card__title', id: 'dash-book-title', text: 'الحجوزات' }));
+    // Phase 8B: exactly the approved home card — an icon square, the title and what waits, «كل الحجوزات» in the
+    // head, then three numbers (the list of events with new requests stays under them)
+    function head(hint, button) {
+      return el('div', { class: 'card__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('ticket')),
+        el('div', { class: 'card__head-text' }, el('h3', { id: 'dash-book-title', text: 'الحجوزات' }), el('p', { text: hint })),
+        el('span', { class: 'sp' }), button);
+    }
     if (!B.on) {
-      A.fill(cardNode, head,
-        el('p', { class: 'card__hint', text: B.needGoogle ? 'الحجوزات والفلوس محتاجة دخول بحساب جوجل.' : 'سيرفر الحجوزات مش بيرد دلوقتي.' }),
-        el('div', { class: 'actions' }, el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'book-home', onclick: function () { B.open(''); } }, icon(B.needGoogle ? 'lock' : 'retry'), 'افتح الحجوزات')));
+      A.fill(cardNode, head(B.needGoogle ? 'الحجوزات والفلوس محتاجة دخول بحساب جوجل.' : 'سيرفر الحجوزات مش بيرد دلوقتي.',
+        el('button', { class: 'btn btn--sm', type: 'button', 'data-act': 'book-home', onclick: function () { B.open(''); } }, icon(B.needGoogle ? 'lock' : 'retry'), 'افتح الحجوزات')));
       return;
     }
     var waiting = (B.events || []).filter(function (e) { return e.counts && e.counts.pending; });
     var total = pendingTotal();
-    A.fill(cardNode, head,
-      el('p', { class: 'card__hint', text: !B.events ? 'بنجيب الحجوزات…' : total ? 'مستنيين المراجعة: ' + ar(total) + (total === 1 ? ' طلب' : ' طلبات') : 'مفيش طلبات حجز مستنية مراجعة ✓' }),
+    // (the event list may not carry these yet: then a dash, never a made-up zero)
+    var sum = function (key) { var has = (B.events || []).some(function (e) { return e.counts && key in e.counts; }); return has ? ar((B.events || []).reduce(function (n, e) { return n + (Number(e.counts && e.counts[key]) || 0); }, 0)) : '—'; };
+    var kpi = function (label, value) { return el('div', { class: 'kpi' }, el('small', { text: label }), el('b', { text: value })); };
+    A.fill(cardNode,
+      head(!B.events ? 'بنجيب الحجوزات…' : total ? 'مستنيين المراجعة: ' + ar(total) + (total === 1 ? ' طلب' : ' طلبات') : 'مفيش طلبات حجز مستنية مراجعة ✓',
+        el('button', { class: 'btn btn--sm', type: 'button', 'data-act': 'book-home', onclick: function () { B.open(''); } }, icon('ticket'), 'كل الحجوزات')),
+      el('div', { class: 'grid g3' },
+        kpi('طلبات جديدة', B.events ? ar(total) : '…'),
+        kpi('إثباتات دفع مستنية', B.events ? sum('proofs') : '…'),
+        kpi('مرتجعات مطلوبة', B.events ? sum('refunds') : '…')),
       waiting.length ? el('ul', { class: 'dash-book__list' }, waiting.slice(0, 5).map(function (e) {
-        return el('li', {}, el('button', { class: 'btn btn--ghost btn--small', type: 'button', 'data-act': 'book-home-event', 'data-event': e.id, onclick: function () { B.open(e.id); } },
+        return el('li', {}, el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'book-home-event', 'data-event': e.id, onclick: function () { B.open(e.id); } },
           el('bdi', { text: e.title }), ' (' + ar(e.counts.pending) + ' جديد)'));
-      })) : null,
-      el('div', { class: 'actions' }, el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'book-home', onclick: function () { B.open(''); } }, icon('ticket'), 'كل الحجوزات')));
+      })) : null);
   }
 
   /* a device session (the installed app's remembered phone): Google itself, once */

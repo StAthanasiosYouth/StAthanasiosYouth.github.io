@@ -702,14 +702,14 @@ test('home: the site state, the next meeting, quick actions, the bell; fits a ph
 
   const { page, problems, close } = await open();
   await page.evaluate(() => A.go('home'));
-  await page.waitForSelector('.dash .dash-site');
+  await page.waitForSelector('.home8 .home8-site');
 
   // a saved change waits for publishing: said plainly, one tap to review
   world.gs.apiPublish(JSON.parse(JSON.stringify(world.gs.apiReview())).revision);
   world.gs.apiSaveItem('news', { title: 'خبر للوحة الرئيسية', publishAt: '2099-01-01 10:00' });
   await page.reload({ waitUntil: 'networkidle0' });
-  await page.waitForSelector('.dash .dash-site');
-  assert.equal(await page.$eval('.dash-site h2', n => n.textContent), 'في تغييرات مستنية النشر');
+  await page.waitForSelector('.home8 .home8-site');
+  assert.equal(await page.$eval('.home8-site h3', n => n.textContent), 'في تغييرات مستنية النشر');
 
   // the next meeting: its date, and its topic or a button to add one
   const meeting = await page.evaluate(() => {
@@ -717,15 +717,15 @@ test('home: the site state, the next meeting, quick actions, the bell; fits a ph
     return {
       date: next.date,
       topic: next.session ? next.session.topic : '',
-      shown: document.querySelector('.dash-meeting__topic').textContent,
-      when: document.querySelector('.dash-meeting__when strong').textContent
+      shown: document.querySelector('.home8-meeting .meet__topic').textContent,
+      when: document.querySelector('.home8-meeting .meet__when').textContent
     };
   });
   assert.match(meeting.date, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(meeting.shown, meeting.topic ? `«${meeting.topic}»` : 'لسه مفيش موضوع للاجتماع ده');
   assert.match(meeting.when, /[٠-٩]/, 'Arabic digits, Cairo time');
 
-  await page.evaluate(() => document.querySelector('.dash-card .actions .btn').click());
+  await page.evaluate(() => document.querySelector('.home8-meeting .meet .btn').click());
   await page.waitForSelector('dialog.sheet[open]');
   const editing = await page.evaluate(() => document.querySelector('dialog.sheet[open] input[type=date]').value);
   assert.equal(editing, meeting.date, 'the editor opens on that meeting');
@@ -733,14 +733,14 @@ test('home: the site state, the next meeting, quick actions, the bell; fits a ph
   await page.waitForFunction(() => !document.querySelector('dialog.sheet').open);
 
   // quick actions open the right editors
-  await page.evaluate(() => [...document.querySelectorAll('.quick')].find(b => b.textContent.includes('مسابقة')).click());
+  await page.evaluate(() => [...document.querySelectorAll('.q8 button')].find(b => b.textContent.includes('مسابقة')).click());
   await page.waitForSelector('dialog.sheet[open] input');
   assert.match(await page.$eval('dialog.sheet[open] .sheet__title', n => n.textContent), /مسابقة/);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('dialog.sheet').open);
 
-  // the bell card counts what visitors see in the bell now
-  assert.match(await page.$eval('#dash-bell-title', n => n.closest('.dash-card').querySelector('.chip').textContent), /[٠-٩]+ إشعار/);
+  // Phase 8B: the approved home has no bell card; its number card counts what visitors see in the bell now
+  assert.match(await page.evaluate(() => [...document.querySelectorAll('.home8 .kpi')].find(k => k.textContent.includes('إشعارات في الجرس')).querySelector('b').textContent), /^[٠-٩]+$/);
 
   // nothing wider than the phone
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no sideways scroll');
@@ -754,18 +754,14 @@ test('review: changes grouped in plain words, scheduled ones say when', async ()
 
   const { page, problems, close } = await open(DESKTOP);
   await page.evaluate(() => A.go('home'));
-  await page.waitForSelector('.dash-site .btn--primary');
-  await page.click('.dash-site .btn--primary');
+  await page.waitForSelector('.home8-site .btn--primary');
+  await page.click('.home8-site .btn--primary');
   await page.waitForSelector('dialog.sheet[open] .review-groups');
 
-  const groups = await page.evaluate(() => [...document.querySelectorAll('.review-group')].map(g => ({
-    title: g.querySelector('.review-group__title').textContent,
-    items: [...g.querySelectorAll('li')].map(li => ({ tone: li.className, text: li.querySelector('.change__text > span').textContent, when: li.querySelector('.change__when')?.textContent || '' }))
-  })));
-  const news = groups.find(g => g.title === 'الأخبار');
-  assert.ok(news, groups.map(g => g.title).join(' | '));
-  const line = news.items.find(i => i.text === 'خبر جديد: خبر للوحة الرئيسية');
-  assert.deepEqual(line, { tone: 'is-add', text: 'خبر جديد: خبر للوحة الرئيسية', when: 'يظهر الخميس ١ يناير، ١٠:٠٠ ص' });
+  // Phase 8B: one card per change — its part and when under it
+  const items = await page.evaluate(() => [...document.querySelectorAll('.change-card')].map(li => ({ add: li.classList.contains('is-add'), text: li.querySelector('.change-card__main b > span').textContent, under: li.querySelector('.change-card__main small').textContent })));
+  const line = items.find(i => i.text === 'خبر جديد: خبر للوحة الرئيسية');
+  assert.deepEqual(line, { add: true, text: 'خبر جديد: خبر للوحة الرئيسية', under: 'الأخبار · يظهر الخميس ١ يناير، ١٠:٠٠ ص' }, JSON.stringify(items));
 
   // publish from here: the stepper moves on
   await page.click('dialog.sheet[open] .sheet__foot .btn--primary');
@@ -817,8 +813,8 @@ test('preview: the draft on the real page, phone/computer, time travel; nothing 
   const { page, problems, close } = await open(DESKTOP);
   const sent = await serveSiteLocally(page);
   await page.evaluate(() => A.go('home'));
-  await page.waitForSelector('.dash-site');
-  await page.evaluate(() => [...document.querySelectorAll('.dash-site .btn')].find(b => b.textContent.includes('معاينة')).click());
+  await page.waitForSelector('.home8-site');
+  await page.evaluate(() => [...document.querySelectorAll('.home8-site .btn')].find(b => b.textContent.includes('معاينة')).click());
   await page.waitForSelector('.preview-status--ok', { timeout: 20000 });
 
   const frame = page.frames().find(f => f.url() === 'about:srcdoc');

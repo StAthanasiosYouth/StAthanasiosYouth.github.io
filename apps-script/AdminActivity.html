@@ -799,38 +799,45 @@
      THE HOME CARD
   ======================================================= */
 
+  /* Phase 8B: «آخر نشاط» exactly as the approved home — an icon square, «كل النشاط» in the head, each row
+     the person's initial, what they did, when; the same thing done again and again is one row «N مرات».
+     A row opens what it is about, as before (or the log). */
   A.activityCard = function () {
 
     var recent = (A.state.activity && A.state.activity.recent) || [];
-    // Phase 8B: the same thing done again and again (same person, same action, same item) is one row, «٤ مرات»
     var groups = [];
     recent.forEach(function (entry) {
-      var key = JSON.stringify(entry, function (k, v) { return /^(id|at|ts|time|when|seq|rid|ago)$/i.test(k) ? undefined : v; });
+      var key = JSON.stringify(entry, function (k, v) { return /^(id|at|ts|time|when|seq|rid|ago|cairo|count)$/i.test(k) ? undefined : v; });
       var last = groups[groups.length - 1];
-      if (last && last.key === key) last.count++;
-      else groups.push({ key: key, entry: entry, count: 1 });
+      if (last && last.key === key) last.count += Math.max(1, Number(entry.count) || 1);
+      else groups.push({ key: key, entry: entry, count: Math.max(1, Number(entry.count) || 1), first: entry });
     });
-    var list = el('ul', { class: 'acts acts--compact', 'aria-label': 'آخر نشاط' }, groups.slice(0, 5).map(function (g) {
-      var node = entryNode(g.entry, { compact: true });
-      if (g.count > 1) {
-        var where = node.querySelector('.act__text, .act__title, p, span') || node;
-        where.appendChild(el('span', { class: 'chip chip--gold act__times', text: String(g.count).replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; }) + ' مرات' }));
-      }
-      return node;
+
+    var list = el('div', { class: 'list', 'aria-label': 'آخر نشاط' }, groups.slice(0, 5).map(function (g) {
+      var entry = g.entry;
+      var target = targetOf(entry);
+      return el('button', { class: 'item item--act', type: 'button', onclick: function () {
+        if (target && target.open) target.open();
+        else A.go('activity');
+      } },
+        el('span', { class: 'avatar', 'aria-hidden': 'true', text: String(entry.actorName || '؟').trim().charAt(0) }),
+        el('span', { class: 'item__main' },
+          el('b', { dir: 'auto' }, (entry.actorName || '') + ' ' + (entry.summary || ''),
+            g.count > 1 ? el('span', { class: 'x', text: digits(g.count) + ' مرات' }) : null),
+          el('small', { text: (g.count > 1 ? 'آخرها ' : '') + when(entry) })));
     }));
 
-    return el('section', { class: 'card dash-card dash-activity', id: 'dash-activity', 'aria-labelledby': 'dash-activity-title' },
-      el('div', { class: 'dash-card__head' },
-        el('span', { class: 'dash-card__icon', 'aria-hidden': 'true' }, icon('clock')),
-        el('h2', { class: 'card__title', id: 'dash-activity-title', text: 'آخر نشاط' })
-      ),
-      recent.length ? list : el('p', { class: 'card__hint', text: 'لسه مفيش نشاط متسجل. أول ما حد يضيف أو يعدّل أو ينشر هيظهر هنا.' }),
-      el('div', { class: 'actions' },
-        el('button', { class: 'btn btn--ghost btn--small', type: 'button', onclick: function () { A.go('activity'); } }, icon('clock'), 'كل النشاط')
-      )
+    return el('section', { class: 'card home8-act', id: 'dash-activity', 'aria-labelledby': 'dash-activity-title' },
+      el('div', { class: 'card__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('clock')),
+        el('h3', { id: 'dash-activity-title', text: 'آخر نشاط' }),
+        el('span', { class: 'sp' }),
+        el('button', { class: 'btn btn--sm btn--ghost', type: 'button', onclick: function () { A.go('activity'); } }, 'كل النشاط')),
+      recent.length ? list : el('p', { class: 'muted', text: 'لسه مفيش نشاط متسجل. أول ما حد يضيف أو يعدّل أو ينشر هيظهر هنا.' })
     );
 
   };
+
 
   function refreshHomeCard() {
 
