@@ -394,7 +394,8 @@ test('competition «شكل العرض»: auto says what it chose, the site\'s ow
 test('«شكل العرض» is one shared control: news (its «مميز» card) and games preview the site\'s own card, and save their choice', async () => {
 
   const { page, problems, close } = await open();
-  const press = async handle => { await handle.evaluate(n => n.scrollIntoView({ block: 'center' })); await handle.click(); };
+  // (the editor may still be settling after the previous one: scroll at once, then a breath before the click)
+  const press = async handle => { await handle.evaluate(n => n.scrollIntoView({ block: 'center', behavior: 'instant' })); await new Promise(resolve => setTimeout(resolve, 150)); await handle.click(); };
   const frameCard = selector => page.waitForFunction(s => document.querySelector('dialog.sheet[open] .item-preview__frame')?.contentDocument?.querySelector(s), { timeout: 15000 }, selector);
   const choose = label => page.evaluateHandle(l => [...document.querySelectorAll('dialog.sheet[open] .item-display label.choice')].find(c => c.textContent.includes(l)), label);
 
@@ -412,7 +413,7 @@ test('«شكل العرض» is one shared control: news (its «مميز» card) 
     await page.keyboard.type(field);
     if (sub === 'games') {
       const link = await page.evaluateHandle(() => [...document.querySelectorAll('dialog.sheet[open] input[type=url]')].find(n => n.offsetParent));
-      await press(link);
+      await link.evaluate(n => { n.scrollIntoView({ block: 'center' }); n.focus(); });
       await page.keyboard.type('https://example.org/game');
       // its times: the editor's own preset buttons
       for (const name of ['تبدأ', 'تخلص']) {

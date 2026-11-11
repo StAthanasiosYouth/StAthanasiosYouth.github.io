@@ -2938,13 +2938,13 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     // the foot (approved): «… · Ctrl+S» and «التالي: <next section>»
     var next = null;
     if (foot) {
-      var words = options.draft ? 'المسودة اتحفظت تلقائي من ثواني · Ctrl+S' : 'التعديلات بتتحفظ لما تدوس «احفظ» · Ctrl+S';
-      next = el('button', { class: 'btn btn--sm sheet__next', type: 'button' });
+      var words = options.footWords || (options.draft ? 'المسودة اتحفظت تلقائي من ثواني · Ctrl+S' : 'التعديلات بتتحفظ لما تدوس «احفظ» · Ctrl+S');
+      next = el('button', { class: 'btn btn--sm sheet__next', type: 'button', hidden: options.next === false || null });
       foot.append(el('span', { class: 'sheet__sp', 'aria-hidden': 'true' }), el('span', { class: 'sheet__saved' }, icon('clock'), el('span', { text: words })), next);
     }
 
     function paintNext(at) {
-      if (!next) return;
+      if (!next || options.next === false) return;
       // the next section still to fill (approved: «التالي: الصور» past a finished «المواعيد»)
       var to = at + 1;
       while (sections[to] && sections[to].target && (sections[to].target.hidden || sections[to].target.dataset.state === 'done')) to++;
@@ -9288,20 +9288,25 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var base = A.state.meta.limits;
 
     var title = A.counted('العنوان', item.title, limits.newsTitle, null, { required: true });
-    var summary = A.counted('سطر قصير', item.summary, limits.summary, 'بيظهر على الكارت');
-    var body = A.counted('التفاصيل', item.body, limits.body, 'اختياري — بتظهر لما حد يفتح الخبر', { multiline: true, rows: 6 });
+    var summary = A.counted('سطر قصير', item.summary, limits.summary, '', { placeholder: 'بيظهر على الكارت' });
+    var body = A.counted('التفاصيل', item.body, limits.body, '', { multiline: true, rows: 4, placeholder: 'اختياري — بتظهر لما حد يفتح الخبر' });
     var display = null;
     var image = A.imageOrIcon(item.image, item.icon, { label: 'البوستر', onchange: function () { if (display) display.refresh(); } });
     var linkUrl = A.textInput(item.linkUrl, { ltr: true, type: 'url', placeholder: 'https://', inputmode: 'url' });
-    var linkLabel = A.counted('نص الزرار', item.linkLabel, base.linkLabel, 'مثلاً: سجّل هنا');
+    var linkLabel = A.counted('نص الزرار', item.linkLabel, base.linkLabel, '', { placeholder: 'مثلاً: سجّل هنا' });
 
     var badge = A.textInput(item.badge, { max: base.badge, placeholder: 'مثلاً: جديد' });
-    var badgeField = A.field('شارة', el('div', { class: 'actions' },
-      badge,
-      el('button', { class: 'btn', type: 'button', onclick: function () { badge.value = 'جديد'; A.markDirty(); } }, 'جديد'),
-      el('button', { class: 'btn', type: 'button', onclick: function () { badge.value = 'مهم'; A.markDirty(); } }, 'مهم'),
-      el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { badge.value = ''; A.markDirty(); } }, 'من غير')
-    ));
+    // Phase 8B (news-edit.png): «من غير · جديد · مهم · آخر فرصة» — «…» for another word (the box under it)
+    var BADGES = ['', 'جديد', 'مهم', 'آخر فرصة'];
+    var custom = !!item.badge && BADGES.indexOf(item.badge) === -1;
+    var badgeSeg = A.segmented(BADGES.map(function (b) { return { value: b, label: b || 'من غير' }; }).concat([{ value: '*', label: '…' }]), custom ? '*' : (item.badge || ''), 'شارة', function (v) {
+      badge.hidden = v !== '*';
+      if (v !== '*') badge.value = v;
+      else badge.focus();
+      A.markDirty();
+    });
+    badge.hidden = !custom;
+    var badgeField = A.field('شارة', el('div', { class: 'p8-stack' }, badgeSeg, badge));
 
     var publishAt = A.dateTimeInput(item.publishAt, {
       emptyText: 'هيتنشر أول ما تدوس نشر',
@@ -9360,30 +9365,75 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     A.dirty = false;
 
-    A.openSheet(isNew ? 'خبر جديد' : 'تعديل: ' + item.title, [
-      box,
-      el('div', { class: 'form', oninput: function () { display.refresh(); }, onchange: function () { display.refresh(); } },
-        title.node,
-        summary.node,
-        image.node,
-        body.node,
-        A.field('لينك', linkUrl, 'اختياري — تسجيل، صور، تفاصيل…'),
-        linkLabel.node,
-        badgeField,
-        A.field('يتنشر', publishAt.node),
-        A.field('يختفي', expireAt.node),
-        featured.node,
-        display.node,
-        pinned.node,
-        toneField,
-        notify.node,
-        enabled.node
-      )
-    ], A.sheetFooter(save), {
+    // Phase 8B (news-edit.png): sections on the side, the card as the home page shows it on the left, «قبل النشر»
+    A.fill(save, icon('check'), el('span', { text: isNew ? 'إضافة' : 'احفظ' }));
+    var prevImg = el('img', { alt: '', hidden: true });
+    var prevTitle = el('b');
+    var prevBadge = el('span', { class: 'p8-tag p8-tag--warn' });
+    var prevSummary = el('small');
+    var prevCta = el('span', { class: 'p8-tag p8-tag--acc' });
+    var checks = el('ul', { class: 'checklist' });
+    var lastImage = null;
+
+    function paintAside() {
+      prevTitle.textContent = title.input.value.trim() || 'العنوان';
+      prevBadge.textContent = badge.value;
+      prevBadge.hidden = !badge.value;
+      prevSummary.textContent = summary.input.value;
+      prevCta.textContent = linkLabel.input.value.trim() || 'اعرف أكتر';
+      prevCta.hidden = !linkUrl.value.trim();
+      var img = image.value();
+      if (img !== lastImage) {
+        lastImage = img;
+        prevImg.hidden = true;
+        if (img && A.mediaPreview) A.mediaPreview(img).then(function (src) { if (src && lastImage === img) { prevImg.src = src; prevImg.hidden = false; } }).catch(function () {});
+      }
+      var url = linkUrl.value.trim();
+      var items = [
+        [!!(title.input.value.trim() && summary.input.value.trim()), 'العنوان والسطر القصير', 'العنوان والسطر القصير: ناقص'],
+        [!url || /^https?:\/\/\S+\.\S+/.test(url), url ? 'اللينك شغال' : 'من غير لينك', 'اللينك: لازم يبدأ بـ https://'],
+        [!!expireAt.value(), 'ميعاد الاختفاء', 'مفيش ميعاد اختفاء (هيفضل ظاهر)']
+      ];
+      A.fill(checks, items.map(function (it) { return el('li', { class: it[0] ? 'ok' : 'no' }, icon(it[0] ? 'check' : 'alert'), el('span', { text: it[0] ? it[1] : it[2] })); }));
+    }
+
+    var form = el('div', { class: 'msecs', oninput: function () { display.refresh(); paintAside(); }, onchange: function () { display.refresh(); paintAside(); } },
+      A.msec('الخبر', 'edit', 'العنوان والسطر القصير بيظهروا على الكارت؛ التفاصيل لما حد يفتحه', [
+        A.col(title.node, 6), A.col(summary.node, 6), A.col(body.node, 12)
+      ]),
+      A.msec('الزرار واللينك', 'link', 'اختياري: لو فيه استمارة أو صفحة', [
+        A.col(A.field('لينك', linkUrl), 6), A.col(linkLabel.node, 6)
+      ]),
+      A.msec('الشكل', 'sparkle', 'الشارة والصورة وشكل الكارت', [
+        A.col(badgeField, 12), A.col(image.node, 12), A.col(featured.node, 12), A.col(display.node, 12), A.col(pinned.node, 12), A.col(toneField, 12)
+      ]),
+      A.msec('المواعيد', 'calendar', 'إمتى يظهر وإمتى يختفي، بتوقيت مصر', [
+        A.col(A.field('يتنشر', publishAt.node), 6), A.col(A.field('يختفي', expireAt.node), 6)
+      ]),
+      A.msec('الإشعار', 'bell', 'الجرس في الموقع، وظاهر ولا لأ', [
+        A.col(notify.node, 12), A.col(enabled.node, 12)
+      ]));
+
+    A.openSheet(isNew ? 'خبر جديد' : 'تعديل: ' + item.title, [box, form], A.sheetFooter(save), {
+      size: 'lg',
+      icon: 'megaphone',
+      sub: 'جديد الأسرة · بيتحفظ مسودة لحد النشر',
+      next: false,
+      footWords: 'بيتحفظ كمسودة لحد «راجع وانشر»',
+      headActions: [el('button', { class: 'btn btn--sm btn--ghost', type: 'button', onclick: function () { if (A.openPreview) A.openPreview(); } }, icon('eye'), 'معاينة')],
+      aside: [
+        el('h5', { text: 'هيظهر كده في الرئيسية' }),
+        el('div', { class: 'prevcard' }, prevImg, el('div', {}, el('div', { class: 'prevcard__line' }, prevTitle, prevBadge), prevSummary, el('div', { class: 'prevcard__tags' }, prevCta))),
+        el('div', { class: 'hr' }),
+        el('h5', { text: 'قبل النشر' }),
+        checks
+      ],
       // one editor per item: the official admin locks it while this is open
       draft: A.draftKey('news', isNew ? '' : item.id),
       lock: isNew ? null : A.editLock('news', item.id, 'خبر «' + (item.title || '') + '»', function () { var fresh = A.findRow(A.state.draft.news, 'id', item.id); if (fresh) A.editors.news(fresh); else A.closeSheet(); })
     });
+    paintAside();
+    var asideTimer = setInterval(function () { if (!form.isConnected) { clearInterval(asideTimer); return; } paintAside(); }, 1500);
 
   };
 
