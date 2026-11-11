@@ -31,7 +31,7 @@ import { makeJob } from './jobs.js';
 import { bookState, bookProof, bookSubmit, bookStatus, bookWithdraw } from './book/public.js';
 import {
   adminModule, adminModuleSet, adminEvents, adminEventRefresh, adminBookings, adminBooking, adminCreate, adminConfirm,
-  adminReject, adminCancel, adminReopen, adminUpdate, adminPaymentAdd, adminPaymentVoid, adminCancelAll, adminSummary, adminExport, adminReport, adminLock, adminUnlock, proofTarget, adminHandovers, adminHandoverAdd, adminHandoverVoid, adminFinance, adminReminders, adminReminderAdd, adminNotifyBookers
+  adminReject, adminCancel, adminReopen, adminUpdate, adminPaymentAdd, adminPaymentVoid, adminCancelAll, adminSummary, adminExport, adminReport, adminLock, adminUnlock, proofTarget, adminHandovers, adminHandoverAdd, adminHandoverVoid, adminFinance, adminReminders, adminReminderAdd, adminNotifyBookers, adminEventPurge
 } from './book/admin.js';
 import { rowFromJson, saveRow } from './book/event.js';
 import { syncBookNews, diagNews } from './book/news.js';
@@ -509,6 +509,7 @@ export const ROUTES = [
   { method: 'GET', path: '/v1/admin/book/events', auth: 'admin', handler: adminEvents },
   { method: 'POST', path: '/v1/admin/book/events/:slug/refresh', auth: 'admin', handler: adminEventRefresh },
   { method: 'POST', path: '/v1/admin/book/events/:id/cancel-all', auth: 'admin', handler: adminCancelAll },
+  { method: 'POST', path: '/v1/admin/book/events/:id/purge', auth: 'admin', maxBytes: 1024, handler: adminEventPurge },
   { method: 'GET', path: '/v1/admin/book/bookings', auth: 'admin', handler: adminBookings },
   { method: 'POST', path: '/v1/admin/book/bookings', auth: 'admin', handler: adminCreate },
   { method: 'GET', path: '/v1/admin/book/bookings/:id', auth: 'admin', handler: adminBooking },

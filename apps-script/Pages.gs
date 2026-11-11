@@ -1600,10 +1600,16 @@ function apiEventArchive(id, on) {
 
 }
 
-function apiEventDelete(id) {
+/*
+ * opts (Phase 8B, owner 2026-11-11, event-delete.png): { force: true, confirm: '<the event title>' } deletes an event that
+ * was published before — the primary admin only, the title typed again. Its bookings and money are removed by the
+ * Worker (POST /v1/admin/book/event-purge) right before, after the panel saved them as Excel.
+ */
+function apiEventDelete(id, opts) {
 
-  assertAdmin_();
+  var email = assertAdmin_();
   pagesValidId_(id, EVENT_ID, 'معرّف الفعالية');
+  opts = opts || {};
 
   pagesWrite_('event.delete', function () {
 
@@ -1612,13 +1618,23 @@ function apiEventDelete(id) {
     if (!found) throw new Error('الفعالية مش موجودة');
     assertUnlocked_('event:' + id);
 
-    if (found.row.liveV || found.row.publishedAt) {
+    var published = !!(found.row.liveV || found.row.publishedAt);
+
+    if (published && opts.force !== true) {
       throw appError_('الفعالية دي اتنشرت قبل كده، فمينفعش تتمسح.', 'اقفلها أو حطها في الأرشيف وانشر: الرابط هيقول إنها مش متاحة.');
+    }
+
+    if (published && email !== primaryAdmin_()) {
+      throw appError_('المسح النهائي لفعالية اتنشرت للأدمن الرئيسي بس.', 'اطلب منه يمسحها، أو سيبها في الأرشيف.');
+    }
+
+    if (published && String(opts.confirm || '').trim() !== String(found.row.title || '').trim()) {
+      throw appError_('اكتب اسم الفعالية زي ما هو بالظبط علشان تأكد المسح.', '');
     }
 
     pagesDeleteCard_(found.row.cardId);
     compDeleteRows_(found.t, [found.row.__row]);
-    activityNote_({ action: 'delete', type: 'event', id: id, title: found.row.title });
+    activityNote_({ action: 'delete', type: 'event', id: id, title: found.row.title + (published ? ' (كانت منشورة: اتمسحت نهائي)' : '') });
 
   });
 

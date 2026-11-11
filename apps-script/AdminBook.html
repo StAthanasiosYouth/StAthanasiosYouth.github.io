@@ -2182,6 +2182,34 @@
     });
   }
 
+  /* Phase 8B (event-delete.png): before «امسحها نهائي» — how many bookings, and the Excel of all of them saved on this
+     device (no question: the delete itself was confirmed with the event's name). Resolves { bookings, filename }. */
+  B.bookingsOf = function (eventId) {
+    if (!W() || B.off) return Promise.resolve(0);
+    return W().call('GET', '/v1/admin/book/events', undefined, { quiet: true }).then(function (r) {
+      var row = (r.events || []).filter(function (e) { return e.id === eventId; })[0];
+      if (!row) return 0;
+      return Object.keys(row.counts || {}).reduce(function (n, k) { return n + (row.counts[k] || 0); }, 0);
+    }).catch(function () { return 0; });
+  };
+
+  B.saveExcel = function (eventId) {
+    return Promise.all([
+      W().call('GET', '/v1/admin/book/export?eventId=' + enc(eventId) + '&download=1'),
+      import(new URL('xlsx.js', location.href).href)
+    ]).then(function (got) {
+      var made = K.bookingBook(got[0], { from: '', to: '', today: A.cairoNow().slice(0, 10) });
+      var bytes = got[1].writeXlsx(made.book);
+      B.lastDownload = { filename: made.filename, bytes: bytes };
+      got[1].download(bytes, made.filename);
+      return made.filename;
+    });
+  };
+
+  B.purgeEvent = function (eventId, confirm) {
+    return W().call('POST', '/v1/admin/book/events/' + enc(eventId) + '/purge', { confirm: confirm });
+  };
+
   /* one servant (or all of them) → the numbers the tiles show; methods by key */
   function finTotals(list) {
     var t = { net: 0, held: 0, handedOver: 0, toHandOver: 0, pendingQuoted: 0, pendingCount: 0, owed: 0, unreconciled: 0, byMethod: {} };

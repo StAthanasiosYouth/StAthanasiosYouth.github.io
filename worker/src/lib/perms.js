@@ -183,6 +183,7 @@ export const ROUTE_PERMS = Object.freeze({
   'GET /v1/admin/book/events': 'bookings.view',
   'POST /v1/admin/book/events/:slug/refresh': 'bookings.edit',
   'POST /v1/admin/book/events/:id/cancel-all': 'bookings.manage',
+  'POST /v1/admin/book/events/:id/purge': 'bookings.manage',
   'GET /v1/admin/book/bookings': 'bookings.view',
   'POST /v1/admin/book/bookings': 'bookings.create_cash',
   'GET /v1/admin/book/bookings/:id': 'bookings.view',

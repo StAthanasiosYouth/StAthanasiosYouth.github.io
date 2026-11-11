@@ -13954,3 +13954,104 @@ html[data-mode="light"] .vpop__more {
   border-left: 11px solid #fff;
 }
 
+/* ---------- Phase 8B: «تمسح «…»؟» (event-delete.png): two choices, the safe one first ---------- */
+.sheet--danger .sheet__chip {
+  border-color: rgb(var(--danger-rgb) / .3);
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.p8-choices {
+  display: grid;
+  gap: 12px;
+}
+
+.p8-choice {
+  position: relative;
+  display: block;
+  padding: 16px 18px;
+  border: 1px solid var(--p-line-3);
+  border-radius: 18px;
+  background: rgb(var(--nv-2-9-20) / .35);
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+}
+
+.p8-choice > input {
+  position: absolute;
+  opacity: 0;
+}
+
+.p8-choice:has(input:checked) {
+  border-color: var(--acc);
+  background: rgb(var(--acc-rgb) / .1);
+}
+
+.p8-choice:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: .6;
+}
+
+.p8-choice:has(input:focus-visible) {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.p8-choice__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.p8-choice__head b {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.p8-choice--danger .p8-choice__head b {
+  color: var(--danger);
+}
+
+.p8-choice__radio {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--text-3);
+  border-radius: 50%;
+}
+
+.p8-choice:has(input:checked) .p8-choice__radio {
+  border-color: var(--acc);
+}
+
+.p8-choice:has(input:checked) .p8-choice__radio::after {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--acc);
+}
+
+.p8-choice__lines {
+  margin: 8px 0 0;
+  padding-inline-start: 46px;
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.sheet--danger .sheet__body > .field {
+  margin-top: 14px;
+}
+
+.sheet--danger .sheet__body > .field[hidden] {
+  display: none;
+}
+
+.sheet--danger .sheet__head > .vhelp,
+.sheet--danger .sheet__head > .icon-btn {
+  display: none;
+}
+

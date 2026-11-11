@@ -1215,3 +1215,49 @@ export async function adminReminderAdd(ctx) {
   }
   return adminReminders(ctx);
 }
+
+/*
+ * POST /v1/admin/book/events/:id/purge { confirm: '<the event title>' } (Phase 8B, owner 2026-11-11, event-delete.png):
+ * «امسحها نهائي من اللوحة» — every booking of the event and what hangs on it (payments, proofs and their files,
+ * claims, handovers, reminders, notices, news, locks) and the event's booking copy. The primary admin only; the
+ * panel saves the Excel first (GET /v1/admin/book/export?download=1) and deletes the event's draft right after
+ * (apiEventDelete with force). An event the Worker never read has nothing here: { bookings: 0 }.
+ */
+export async function adminEventPurge(ctx) {
+  const env = ctx.env;
+  const db = env.DB;
+  if (!ctx.actor || ctx.actor.role !== 'primary') throw new ApiError('denied', 'primary only', { perm: 'primary' });
+  await limit(ctx, 'book.purge', ctx.actor.email, 5, 600);
+  const id = String(ctx.params.id || '');
+  if (!/^evt-[a-z0-9]{4,16}$/.test(id)) throw invalid('id');
+  const cfg = await retry(() => db.prepare('SELECT id, title FROM event_cfg WHERE id = ?').bind(id).first());
+  const confirm = String((ctx.body && ctx.body.confirm) || '').trim();
+  if (!confirm || (cfg && confirm !== String(cfg.title || '').trim())) throw invalid('confirm');
+  const [bookings, files] = await retry(() => db.batch([
+    db.prepare('SELECT COUNT(*) AS n FROM bookings WHERE event_id = ?').bind(id),
+    db.prepare('SELECT r2_key FROM proofs WHERE deleted_at IS NULL AND booking_id IN (SELECT id FROM bookings WHERE event_id = ?)').bind(id)
+  ]));
+  // the private files first (a failed delete leaves a file the daily retention removes anyway)
+  if (env.PROOFS) {
+    for (const f of files.results) { try { await env.PROOFS.delete(f.r2_key); } catch { /* retention cleans it */ } }
+  }
+  const of = 'SELECT id FROM bookings WHERE event_id = ?';
+  await retry(() => db.batch([
+    db.prepare(`DELETE FROM proofs WHERE booking_id IN (${of})`).bind(id),
+    db.prepare('DELETE FROM payments WHERE event_id = ?').bind(id),
+    db.prepare('DELETE FROM payment_claims WHERE event_id = ?').bind(id),
+    db.prepare('DELETE FROM reminders WHERE event_id = ?').bind(id),
+    db.prepare('DELETE FROM handovers WHERE event_id = ?').bind(id),
+    db.prepare('DELETE FROM event_notices WHERE event_id = ?').bind(id),
+    db.prepare('DELETE FROM book_news WHERE event_id = ?').bind(id),
+    db.prepare(`DELETE FROM edit_locks WHERE kind = 'booking' AND id IN (${of})`).bind(id),
+    db.prepare('DELETE FROM bookings WHERE event_id = ?').bind(id),
+    db.prepare('DELETE FROM event_cfg WHERE id = ?').bind(id),
+    activityStmt(db, {
+      actor: ctx.actor.email, actorName: ctx.actor.name, action: 'book.purge', entityType: 'event', entityId: id,
+      summary: 'مسح نهائي لحجوزات «' + ((cfg && cfg.title) || confirm) + '» (' + bookings.results[0].n + ' حجز)',
+      changes: { bookings: bookings.results[0].n, files: files.results.length }, severity: 'important'
+    })
+  ]));
+  return { bookings: bookings.results[0].n, files: files.results.length };
+}
