@@ -236,7 +236,8 @@ test('module off (and 401 / 403 / unreachable): no «الحجوزات» anywhere
   assert.deepEqual(await subtabs(d.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام']);
   assert.equal(await d.page.$('.book-link'), null, 'not even a hidden slot on the event');
   // (besides boot.js's quiet sign-in check, unchanged)
-  const asked = fake.state.calls.filter(c => c.path !== '/v1/admin/whoami');
+  // (the home's «آخر نشر» asks the publish list: Phase 8B)
+  const asked = fake.state.calls.filter(c => c.path !== '/v1/admin/whoami' && c.path !== '/v1/admin/publish/revisions');
   assert.deepEqual(asked.map(c => `${c.method} ${c.path}`), ['GET /v1/admin/book/module'], 'one quiet question, nothing else');
   assert.match(asked[0].auth, /^Bearer \S+/, 'the Google ID token');
   // a push link to the bookings goes nowhere; the events editor has no booking button either
@@ -259,7 +260,7 @@ test('module off (and 401 / 403 / unreachable): no «الحجوزات» anywhere
     assert.deepEqual(await subtabs(v.page), ['صفحات الخدمة', 'الفعاليات', 'الخدام'], variant);
     assert.equal(await v.page.$('dialog.reauth'), null, `${variant}: no sign-in dialog`);
     assert.equal(await v.page.$('.toast--error'), null, `${variant}: no error toast`);
-    assert.ok(fake.state.calls.every(c => c.path === '/v1/admin/book/module' || c.path === '/v1/admin/whoami'), variant);
+    assert.ok(fake.state.calls.every(c => c.path === '/v1/admin/book/module' || c.path === '/v1/admin/whoami' || c.path === '/v1/admin/publish/revisions'), variant);
     assert.deepEqual(v.problems, [], variant);
     await v.context.close();
   }

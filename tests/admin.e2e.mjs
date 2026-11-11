@@ -717,15 +717,15 @@ test('home: the site state, the next meeting, quick actions, the bell; fits a ph
     return {
       date: next.date,
       topic: next.session ? next.session.topic : '',
-      shown: document.querySelector('.dash-meeting__topic').textContent,
-      when: document.querySelector('.dash-meeting__when strong').textContent
+      shown: document.querySelector('.home8-meeting .meet__topic').textContent,
+      when: document.querySelector('.home8-meeting .meet__when').textContent
     };
   });
   assert.match(meeting.date, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(meeting.shown, meeting.topic ? `«${meeting.topic}»` : 'لسه مفيش موضوع للاجتماع ده');
   assert.match(meeting.when, /[٠-٩]/, 'Arabic digits, Cairo time');
 
-  await page.evaluate(() => document.querySelector('.dash-card .actions .btn').click());
+  await page.evaluate(() => document.querySelector('.home8-meeting .meet .btn').click());
   await page.waitForSelector('dialog.sheet[open]');
   const editing = await page.evaluate(() => document.querySelector('dialog.sheet[open] input[type=date]').value);
   assert.equal(editing, meeting.date, 'the editor opens on that meeting');
@@ -739,8 +739,8 @@ test('home: the site state, the next meeting, quick actions, the bell; fits a ph
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('dialog.sheet').open);
 
-  // the bell card counts what visitors see in the bell now
-  assert.match(await page.$eval('#dash-bell-title', n => n.closest('.dash-card').querySelector('.chip').textContent), /[٠-٩]+ إشعار/);
+  // Phase 8B: the approved home has no bell card; its number card counts what visitors see in the bell now
+  assert.match(await page.evaluate(() => [...document.querySelectorAll('.home8 .kpi')].find(k => k.textContent.includes('إشعارات في الجرس')).querySelector('b').textContent), /^[٠-٩]+$/);
 
   // nothing wider than the phone
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no sideways scroll');
@@ -758,14 +758,10 @@ test('review: changes grouped in plain words, scheduled ones say when', async ()
   await page.click('.home8-site .btn--primary');
   await page.waitForSelector('dialog.sheet[open] .review-groups');
 
-  const groups = await page.evaluate(() => [...document.querySelectorAll('.review-group')].map(g => ({
-    title: g.querySelector('.review-group__title').textContent,
-    items: [...g.querySelectorAll('li')].map(li => ({ tone: li.className, text: li.querySelector('.change__text > span').textContent, when: li.querySelector('.change__when')?.textContent || '' }))
-  })));
-  const news = groups.find(g => g.title === 'الأخبار');
-  assert.ok(news, groups.map(g => g.title).join(' | '));
-  const line = news.items.find(i => i.text === 'خبر جديد: خبر للوحة الرئيسية');
-  assert.deepEqual(line, { tone: 'is-add', text: 'خبر جديد: خبر للوحة الرئيسية', when: 'يظهر الخميس ١ يناير، ١٠:٠٠ ص' });
+  // Phase 8B: one card per change — its part and when under it
+  const items = await page.evaluate(() => [...document.querySelectorAll('.change-card')].map(li => ({ add: li.classList.contains('is-add'), text: li.querySelector('.change-card__main b > span').textContent, under: li.querySelector('.change-card__main small').textContent })));
+  const line = items.find(i => i.text === 'خبر جديد: خبر للوحة الرئيسية');
+  assert.deepEqual(line, { add: true, text: 'خبر جديد: خبر للوحة الرئيسية', under: 'الأخبار · يظهر الخميس ١ يناير، ١٠:٠٠ ص' }, JSON.stringify(items));
 
   // publish from here: the stepper moves on
   await page.click('dialog.sheet[open] .sheet__foot .btn--primary');

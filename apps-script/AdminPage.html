@@ -1680,7 +1680,7 @@
 
     var box = A.errorBox();
     var body = el('div', { 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
-    var save = el('button', { class: 'btn btn--primary', type: 'button', disabled: true }, 'احفظ الإعدادات');
+    var save = el('button', { class: 'btn btn--primary', type: 'button', disabled: true }, icon('check'), 'احفظ الإعدادات');
     var data = null;
     var rows = {};
     var top = {};
@@ -1732,34 +1732,75 @@
       top.member = A.textInput(String(data.budget.member), { ltr: true, max: 3 });
       ['target', 'admin', 'critical', 'otp'].forEach(function (k) { top[k].type = 'number'; top[k].min = '0'; });
 
+      // Phase 8B: exactly the approved «إعدادات الإشعارات» — the email line with «الميعاد والحصص», a table of
+      // switches (إشعار · إيميل · ملخص اليوم) with «إجباري», then the quota numbers
+      function sw(on, label, key) {
+        var input = el('input', { type: 'checkbox', role: 'switch', checked: !!on, 'aria-label': label, 'data-nt': key });
+        input.disabled = !manage;
+        return { input: input, node: el('label', { class: 'switch switch--bare ntt__sw' }, input, el('span', { class: 'switch__track', 'aria-hidden': 'true' })) };
+      }
+
       var groups = ntGroups(data.types).map(function (g) {
-        return el('fieldset', { class: 'grants__group' },
-          el('legend', { text: NT_MODULES[g.module] || g.module }),
+        return [
+          el('div', { class: 'ntt__grp', role: 'row' }, el('span', { role: 'rowheader', text: NT_MODULES[g.module] || g.module })),
           g.types.map(function (t) {
             var state = { mode: t.mode, include: t.include.slice(), exclude: t.exclude.slice(), dirty: false };
-            var push = A.checkbox('إشعار', t.push);
-            var mail = ntSelect(NT_EMAIL, t.email, 'إيميل ' + ntLabel(t.key));
-            var lock = A.checkbox('إجباري', t.locked);
-            rows[t.key] = { t: t, push: push.input, email: mail, locked: lock.input, state: state };
-            [push.input, mail, lock.input].forEach(function (c) { c.disabled = !manage; });
-            return el('div', { class: 'nt-row' },
-              el('span', { class: 'nt-row__name' }, ntLabel(t.key), ' ', A.chip(NT_LEVELS[t.level][0], NT_LEVELS[t.level][1])),
-              push.node, mail, lock.node, manage ? recipientsButton(t, state) : null);
-          }));
+            var push = sw(t.push, 'إشعار: ' + ntLabel(t.key), 'push');
+            var now_ = sw(t.email === 'immediate', 'إيميل: ' + ntLabel(t.key), 'immediate');
+            var sum = sw(t.email === 'summary', 'ملخص اليوم: ' + ntLabel(t.key), 'summary');
+            // one email choice: on the spot, in the day's summary, or none
+            now_.input.addEventListener('change', function () { if (now_.input.checked) sum.input.checked = false; });
+            sum.input.addEventListener('change', function () { if (sum.input.checked) now_.input.checked = false; });
+            var mail = { get value() { return now_.input.checked ? 'immediate' : sum.input.checked ? 'summary' : 'off'; } };
+            var lock = el('input', { type: 'checkbox', checked: !!t.locked, 'aria-label': 'إجباري: ' + ntLabel(t.key), 'data-nt': 'locked' });
+            lock.disabled = !manage;
+            var lockChip = el('label', { class: 'ntt__lock' + (t.locked ? ' is-on' : ''), title: 'إجباري: مبيتقفلش' }, lock, icon('lock'), 'إجباري');
+            lock.addEventListener('change', function () { lockChip.classList.toggle('is-on', lock.checked); });
+            rows[t.key] = { t: t, push: push.input, email: mail, locked: lock, state: state };
+            return el('div', { class: 'nt-row ntt__row', role: 'row' },
+              manage
+                ? el('button', { class: 'ntt__name', type: 'button', title: 'مين يوصله؟', onclick: function () { recipientsButton(t, state).click(); } }, ntLabel(t.key))
+                : el('span', { class: 'ntt__name', text: ntLabel(t.key) }),
+              push.node, now_.node, sum.node,
+              el('span', { class: 'ntt__lockcell' }, lockChip));
+          })
+        ];
       });
 
-      A.fill(body, [
+      var more = el('div', { class: 'ntb__more', hidden: true },
         top.router.node, top.email.node,
         A.field('ميعاد ملخص اليوم', top.time, 'بتوقيت القاهرة.'),
-        el('details', { class: 'nt-budget' },
-          el('summary', { text: 'حصة الإيميلات اليومية' }),
+        el('div', { class: 'ntb__budget' },
           A.field('الهدف اليومي (كل الإيميلات)', top.target, 'في حدود جيميل الحقيقي (~٥٠٠ في اليوم).'),
           A.field('إيميلات الأدمنز', top.admin, ''),
           A.field('محجوز للمهم جدًا', top.critical, ''),
           A.field('محجوز لأكواد التأكيد', top.otp, ''),
-          A.field('محجوز لإيميلات الأعضاء', top.member, '')
-        ),
-        el('div', { class: 'grants' }, groups)
+          A.field('محجوز لإيميلات الأعضاء', top.member, '')));
+
+      var arN = function (v) { return String(v).replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; }); };
+      var tile = function (label, value, hint) { return el('div', { class: 'kpi ntq' }, el('small', { text: label }), el('b', { text: arN(value) }), hint ? el('small', { class: 'ntq__hint', text: hint }) : null); };
+      var t12 = (function (v) { var p = String(v || '21:00').split(':'); var h = +p[0]; return arN((h % 12 || 12) + ':' + (p[1] || '00')) + (h < 12 ? ' ص' : ' م'); })(data.summaryTime);
+
+      A.fill(body, [
+        el('div', { class: 'ntb' + (data.email ? ' is-on' : '') },
+          el('span', { class: 'chipico' + (data.email ? ' chipico--ok' : ''), 'aria-hidden': 'true' }, icon('mail')),
+          el('div', { class: 'ntb__text' },
+            el('b', { text: data.email ? 'الإيميلات شغالة' : 'الإيميلات مقفولة' }),
+            el('small', { text: (data.gmail ? 'من athanasius.youth.safaga@gmail.com' : 'جيميل محتاج موافقة الأول') + ' · ملخص اليوم الساعة ' + t12 + ' بتوقيت القاهرة' })),
+          manage ? el('button', { class: 'btn btn--small', type: 'button', 'aria-expanded': 'false', onclick: function (event) {
+            more.hidden = !more.hidden;
+            event.currentTarget.setAttribute('aria-expanded', String(!more.hidden));
+          } }, icon('edit'), 'الميعاد والحصص') : null),
+        more,
+        el('div', { class: 'ntt grants', role: 'table', 'aria-label': 'إيه اللي يتبعت لمين' },
+          el('div', { class: 'ntt__head', role: 'row' },
+            el('span', { role: 'columnheader', text: 'الحدث' }), el('span', { role: 'columnheader', text: 'إشعار' }),
+            el('span', { role: 'columnheader', text: 'إيميل' }), el('span', { role: 'columnheader', text: 'ملخص اليوم' }), el('span', { 'aria-hidden': 'true' })),
+          groups),
+        el('div', { class: 'grid g3 ntq__row' },
+          tile('الهدف اليومي (كل الإيميلات)', data.budget.target, 'في حدود جيميل (~٥٠٠)'),
+          tile('محجوز لأكواد التأكيد', data.budget.otp),
+          tile('محجوز لإيميلات الأعضاء', data.budget.member))
       ]);
       [top.router.input, top.email.input, top.time, top.target, top.admin, top.critical, top.otp, top.member].forEach(function (c) { c.disabled = !manage; });
       save.hidden = !manage;
@@ -1803,7 +1844,8 @@
 
     });
 
-    var card = A.card('إعدادات الإشعارات', 'إيه اللي يتبعت لمين، إشعار ولا إيميل ولا في ملخص اليوم. للأدمن الأساسي.', box, body, el('div', { class: 'actions' }, save));
+    var card = A.card('إعدادات الإشعارات', 'إيه اللي يتبعت لمين: إشعار ولا إيميل ولا في ملخص اليوم. بيوصل كل أدمن حسب صلاحياته. للأدمن الأساسي.', box, body,
+      el('div', { class: 'actions setcard__foot' }, save, el('small', { class: 'setcard__note', text: 'الإجباري (الأمان والنظام) مبيتقفلش' })));
     card.classList.add('card--notify-settings');
     load();
     return card;

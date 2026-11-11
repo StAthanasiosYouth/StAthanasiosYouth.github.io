@@ -278,8 +278,8 @@ test('notifications: «تنبيهاتي», «إعدادات الإشعارات»
   // «إعدادات الإشعارات»: publish → no push, summary email; then the switch on (asks first)
   await page.evaluate(() => {
     const row = [...document.querySelectorAll('.card--notify-settings .nt-row')].find(r => r.textContent.includes('نشر الموقع'));
-    row.querySelector('.check input').click();
-    const sel = row.querySelector('select'); sel.value = 'summary'; sel.dispatchEvent(new Event('change'));
+    row.querySelector('[data-nt="push"]').click();
+    row.querySelector('[data-nt="summary"]').click();
     const on = [...document.querySelectorAll('.card--notify-settings .check')].find(c => c.textContent.includes('شغّل الإشعارات الجديدة'));
     on.querySelector('input').click();
   });

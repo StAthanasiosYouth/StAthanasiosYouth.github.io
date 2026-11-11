@@ -11891,6 +11891,208 @@ html[data-mode="light"] .setnav__link.is-on {
   font-size: 12.5px;
 }
 
+/* «إعدادات الإشعارات» (approved): the email line, the table of switches, the quota numbers */
+.ntb {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border: 1px solid var(--p-line-3);
+  border-radius: 18px;
+  background: var(--p-surface-2);
+}
+
+.ntb.is-on {
+  border-color: rgb(var(--ok-rgb) / .3);
+  background: linear-gradient(90deg, transparent, rgb(var(--ok-rgb) / .06));
+}
+
+.ntb__text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.ntb__text b {
+  font-size: 14.5px;
+  font-weight: 800;
+}
+
+.ntb__text small {
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.ntb__more {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--p-line-2);
+  border-radius: 16px;
+}
+
+.ntb__more[hidden] {
+  display: none;
+}
+
+.ntb__budget {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.ntt {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--p-line-2);
+  border-radius: 16px;
+}
+
+.ntt__head,
+.ntt__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px 76px 110px 120px;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 16px;
+}
+
+.ntt__head {
+  color: var(--text-3);
+  background: var(--p-surface-2);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.ntt__row {
+  min-height: 44px;
+  border-top: 1px solid var(--p-line-2);
+}
+
+.ntt__grp {
+  padding: 8px 16px;
+  border-top: 1px solid var(--p-line-2);
+  color: var(--acc-hi);
+  background: rgb(var(--acc-rgb) / .06);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+html[data-mode="light"] .ntt__grp {
+  color: var(--acc-deep);
+}
+
+.ntt__name {
+  padding: 0;
+  border: 0;
+  color: var(--text);
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: start;
+}
+
+button.ntt__name {
+  cursor: pointer;
+}
+
+button.ntt__name:hover {
+  color: var(--acc-hi);
+}
+
+.ntt__sw {
+  justify-self: start;
+}
+
+.ntt__lockcell {
+  justify-self: end;
+}
+
+.ntt__lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  opacity: .35;
+}
+
+.ntt__lock.is-on {
+  color: var(--warn);
+  background: var(--warn-bg);
+  opacity: 1;
+}
+
+.ntt__lock input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ntt__lock .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.ntq__row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+
+.ntq {
+  padding: 18px 20px;
+  border: 1px solid var(--p-line-2);
+  border-radius: 18px;
+  background: var(--p-surface-2);
+}
+
+.ntq small {
+  display: block;
+  color: var(--text-3);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.ntq b {
+  display: block;
+  margin: 4px 0;
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.ntq .ntq__hint {
+  font-weight: 500;
+}
+
+@media (max-width: 759px) {
+  .ntt {
+    overflow-x: auto;
+  }
+
+  .ntt__head,
+  .ntt__row {
+    grid-template-columns: minmax(130px, 1fr) 56px 56px 72px 84px;
+    min-width: 440px;
+    padding: 0 12px;
+  }
+
+  .ntq__row {
+    grid-template-columns: 1fr;
+  }
+
+  .ntb {
+    flex-wrap: wrap;
+  }
+}
+
 /* «دليل الأدمن» (approved): a search, then the guides two by two */
 .guide-search {
   display: flex;
