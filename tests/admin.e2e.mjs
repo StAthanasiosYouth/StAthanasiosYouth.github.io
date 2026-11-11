@@ -281,9 +281,12 @@ test('delete asks with our own modal: cancel keeps it, confirm deletes it', asyn
   world.gs.apiSaveItem('news', { title: 'خبر للمسح', summary: 'x' });
   const { page, problems, close } = await open();
   await page.evaluate(() => A.go('content', 'news'));
+  // Phase 8B (news.png): delete lives in the row's ⋯
+  await page.waitForSelector('[aria-label="اختيارات تانية: خبر للمسح"]');
+  await page.evaluate(() => document.querySelector('[aria-label="اختيارات تانية: خبر للمسح"]').click());
   await page.waitForSelector('[aria-label="مسح خبر للمسح"]');
 
-  await page.click('[aria-label="مسح خبر للمسح"]');
+  await page.evaluate(() => document.querySelector('[aria-label="مسح خبر للمسح"]').click());
   await page.waitForSelector('dialog.modal[open]');
   const modal = await page.$eval('dialog.modal[open]', d => ({
     title: d.querySelector('.modal__title').textContent,
@@ -298,10 +301,12 @@ test('delete asks with our own modal: cancel keeps it, confirm deletes it', asyn
   await page.waitForFunction(() => !document.querySelector('dialog.modal'));
   assert.ok(world.gs.readTable_('News').some(n => n.title === 'خبر للمسح'), 'Esc keeps it');
 
-  await page.click('[aria-label="مسح خبر للمسح"]');
+  await page.evaluate(() => document.querySelector('[aria-label="اختيارات تانية: خبر للمسح"]').click());
+  await page.waitForSelector('[aria-label="مسح خبر للمسح"]');
+  await page.evaluate(() => document.querySelector('[aria-label="مسح خبر للمسح"]').click());
   await page.waitForSelector('dialog.modal[open]');
   await page.evaluate(() => [...document.querySelectorAll('dialog.modal[open] button')].find(b => b.textContent === 'امسح').click());
-  await page.waitForFunction(() => !document.querySelector('[aria-label="مسح خبر للمسح"]'));
+  await page.waitForFunction(() => !document.querySelector('[aria-label="اختيارات تانية: خبر للمسح"]'));
   assert.ok(!world.gs.readTable_('News').some(n => n.title === 'خبر للمسح'), 'confirm deletes it');
 
   assert.deepEqual(problems, [], 'no native dialogs');
@@ -368,8 +373,15 @@ test('every list shows the same visibility words', async () => {
   world.gs.apiSaveItem('news', { title: 'خلص', summary: 'x', publishAt: '2020-01-01 10:00', expireAt: '2020-01-02' });
   const { page, problems, close } = await open();
   await page.evaluate(() => A.go('content', 'news'));
-  await page.waitForSelector('.chip--state');
-  const states = await page.$$eval('.chip--state', chips => chips.map(c => c.dataset.state + ':' + c.textContent.split(' · ')[0]));
+  await page.waitForSelector('.p8-filter');
+  // Phase 8B (news.png): «ظاهرة · جاية · خلصت» — the words of every group
+  const states = [];
+  for (const v of ['live', 'soon', 'done']) {
+    await page.click('.p8-filter input[value="' + v + '"]');
+    await page.waitForSelector('.p8-filter input[value="' + v + '"]:checked');
+    await new Promise(resolve => setTimeout(resolve, 200));
+    states.push(...await page.$$eval('.chip--state', chips => chips.map(c => c.dataset.state + ':' + c.textContent.split(' · ')[0])));
+  }
   assert.ok(states.includes('scheduled:يظهر لاحقًا'), states.join(' | '));
   assert.ok(states.includes('ended:انتهى'), states.join(' | '));
   assert.deepEqual(problems, []);

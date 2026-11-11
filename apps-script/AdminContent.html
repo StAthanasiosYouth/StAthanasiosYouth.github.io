@@ -1051,39 +1051,101 @@
      NEWS
   ======================================================= */
 
+  /*
+   * «جديد الأسرة» (Phase 8B, news.png): «ظاهرة · جاية · خلصت», one row per news with its picture, its marks
+   * («جديد»/«مهم», «مميز», «مثبت»), its window, «ظاهر»/«عليه إشعار», «تعديل» and ⋯ (show / hide, archive,
+   * «استخدم تاني», delete). Archived news count as «خلصت». An empty choice says so with «اكتب أول خبر».
+   */
+  A.newsFilter = A.newsFilter || 'live';
+
+  function newsState(item) {
+    if (bool(item.archived)) return 'done';
+    // its window only: a news hidden by hand stays in its group, marked «مخفي»
+    var v = A.visibility(true, item.publishAt, item.expireAt);
+    return v.state === 'scheduled' ? 'soon' : v.state === 'ended' ? 'done' : 'live';
+  }
+
+  function itemMenu(kind, item, label, button) {
+    var enabled = bool(item.enabled);
+    var archived = bool(item.archived);
+    var entries = [
+      A.menuItem(enabled ? 'eye-off' : 'eye', enabled ? 'اخفيه من الموقع' : 'اظهره في الموقع', function () {
+        A.draftChange({
+          apply: function (state) { ((state.draft && state.draft[kind]) || []).forEach(function (row) { if (row.id === item.id) row.enabled = !enabled; }); },
+          run: function () { return A.call('apiSetItemEnabled', kind, item.id, !enabled); }
+        });
+      })
+    ];
+    // archive / «استخدم تاني» (A.archiveControls: the same actions, as menu rows)
+    A.archiveControls(kind, item, label).forEach(function (b) {
+      var row = A.menuItem(b.textContent ? 'link' : (b.getAttribute('title') === 'رجّع' ? 'retry' : b.getAttribute('title') === 'أرشيف' ? 'archive' : 'copy'), b.getAttribute('title') === 'رجّع' ? 'رجّع من الأرشيف' : b.getAttribute('title') === 'أرشيف' ? 'حطه في الأرشيف' : 'استخدم تاني (نسخة)', function () { b.click(); });
+      row.setAttribute('aria-label', b.getAttribute('aria-label'));
+      entries.push(row);
+    });
+    var del = A.menuItem('trash', 'امسح', function () { A.deleteItem(kind, item.id, label, button); }, { danger: true });
+    del.setAttribute('aria-label', 'مسح ' + label);
+    entries.push(el('hr', { class: 'menu__sep' }), del);
+    void archived;
+    A.menu(button, 'menu--p8', entries, { align: 'start' });
+  }
+
   A.views.news = guard(function () {
 
-    var split = A.archiveSplit('news', (A.state.draft.news || []).slice().sort(function (a, b) { return (b.publishAt || '') < (a.publishAt || '') ? -1 : 1; }), function () { A.render(); });
-    var news = split.items;
+    var all = (A.state.draft.news || []).slice().sort(function (a, b) { return (b.publishAt || '') < (a.publishAt || '') ? -1 : 1; });
+    var groups = { live: [], soon: [], done: [] };
+    all.forEach(function (item) { groups[newsState(item)].push(item); });
+    var filter = A.newsFilter;
+    var name = A.uid('newsf');
+    var seg = el('div', { class: 'seg p8-filter', role: 'radiogroup', 'aria-label': 'الأخبار اللي تظهر' }, [['live', 'ظاهرة'], ['soon', 'جاية'], ['done', 'خلصت']].map(function (o) {
+      return el('label', { class: 'seg__opt' },
+        el('input', { type: 'radio', name: name, value: o[0], checked: filter === o[0], onchange: function () { A.newsFilter = o[0]; A.render(); } }),
+        el('span', { text: o[1] + ' (' + A.digits(groups[o[0]].length) + ')' }));
+    }));
 
-    return [A.card('جديد الأسرة', 'الأخبار والبوسترات والإعلانات. "مثبت" بيظهر كشريط فوق في الصفحة بدل الإعلان القديم.',
-      el('div', { class: 'actions' }, addButton('+ خبر', function () { A.editors.news(null); }), split.toggle),
-      news.length
-        ? el('ul', { class: 'list' }, news.map(function (item) {
-          var enabled = bool(item.enabled);
-          var chips = windowChips(enabled, item.publishAt, item.expireAt);
-          if (bool(item.pinned)) chips.unshift(A.chip('مثبت · ' + TONE_LABELS[item.tone || 'info'], 'gold'));
-          if (bool(item.featured)) chips.unshift(A.chip('مميز', 'gold'));
-          if (item.badge) chips.push(A.chip(item.badge));
-          if (hasNotification('notif-' + item.id)) chips.push(A.chip('🔔 في الجرس'));
-          return A.listItem({
-            icon: 'megaphone',
-            image: item.image,
-            title: item.title,
-            sub: item.summary,
-            off: !enabled,
-            chips: chips,
-            controls: [
-              A.toggleItem('news', item.id, enabled).node,
-              el('span', { class: 'spacer' }),
-              A.editButton(item.title, function () { A.editors.news(item); })
-            ].concat(A.archiveControls('news', item, item.title), [
-              A.deleteButton(item.title, function (e) { A.deleteItem('news', item.id, item.title, e.currentTarget); })
-            ])
-          });
-        }))
-        : el('p', { class: 'empty', text: split.showing ? 'الأرشيف فاضي' : 'مفيش أخبار لسه' })
-    )];
+    function row(item) {
+      var enabled = bool(item.enabled);
+      var v0 = A.visibility(enabled, item.publishAt, item.expireAt);
+      var state = el('span', { class: 'p8-tag chip--state' + (v0.kind === 'ok' ? ' p8-tag--ok' : v0.kind === 'gold' ? ' p8-tag--warn' : ''), 'data-state': v0.state, text: v0.label });
+      var thumb = el('span', { class: 'p8-item__thumb', 'aria-hidden': 'true' }, icon('megaphone'));
+      if (item.image && A.mediaPreview) A.mediaPreview(item.image).then(function (src) { if (src) A.fill(thumb, el('img', { src: src, alt: '' })); }).catch(function () {});
+      var v = v0;
+      var when = v.state === 'live' && item.expireAt ? 'ظاهر لحد ' + A.formatWall(item.expireAt, false) : v.state === 'scheduled' ? 'يظهر ' + A.formatWall(item.publishAt) : v.state === 'ended' ? 'خلص ' + A.formatWall(item.expireAt, false) : '';
+      var more = el('button', { class: 'p8-iconbtn', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-label': 'اختيارات تانية: ' + item.title, onclick: function (e) { itemMenu('news', item, item.title, e.currentTarget); } }, icon('dots'));
+      return el('li', { class: 'p8-item item' + (enabled ? '' : ' item--off'), 'data-id': item.id },
+        thumb,
+        el('div', { class: 'p8-item__main' },
+          el('b', { class: 'p8-item__line' },
+            el('span', { class: 'item__title', text: item.title }),
+            item.badge ? el('span', { class: 'p8-tag p8-tag--warn', text: item.badge }) : null,
+            bool(item.featured) ? el('span', { class: 'p8-tag p8-tag--acc' }, icon('star'), 'مميز') : null,
+            bool(item.pinned) ? el('span', { class: 'p8-tag p8-tag--acc', text: 'مثبت · ' + TONE_LABELS[item.tone || 'info'] }) : null),
+          el('small', { text: [item.summary, when].filter(Boolean).join(' · ') }),
+          el('div', { class: 'p8-item__tags' },
+            state,
+            bool(item.archived) ? el('span', { class: 'p8-tag', text: 'في الأرشيف' }) : null,
+            hasNotification('notif-' + item.id) ? el('span', { class: 'p8-tag' }, icon('bell'), 'عليه إشعار') : null)),
+        el('div', { class: 'p8-item__acts' },
+          el('button', { class: 'btn btn--sm', type: 'button', 'aria-label': 'تعديل ' + item.title, onclick: function () { A.editors.news(item); } }, icon('edit'), 'تعديل'),
+          more));
+    }
+
+    var shown = groups[filter];
+    var empty = el('div', { class: 'p8-empty' },
+      el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('megaphone')),
+      el('b', { text: filter === 'live' ? 'مفيش أخبار دلوقتي' : filter === 'soon' ? 'مفيش أخبار جاية' : 'مفيش أخبار خلصت' }),
+      el('small', { text: filter === 'live' ? 'الصفحة الرئيسية بتخبي قسم «جديد الأسرة» لوحدها لحد ما تضيف خبر.' : '' }),
+      filter === 'live' ? el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.editors.news(null); } }, icon('plus'), 'اكتب أول خبر') : null);
+
+    return [el('section', { class: 'card p8-card' },
+      el('div', { class: 'p8-card__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('megaphone')),
+        el('div', { class: 'p8-card__titles' },
+          el('h2', { class: 'card__title', text: 'جديد الأسرة' }),
+          el('p', { class: 'card__hint', text: 'الأخبار اللي بتظهر في الصفحة الرئيسية: إعلان، رحلة، تسجيل… كل خبر ليه ميعاد يظهر ويختفي.' })),
+        el('div', { class: 'p8-card__acts' },
+          el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.editors.news(null); } }, icon('plus'), 'خبر'))),
+      el('div', { class: 'p8-card__filters' }, seg),
+      shown.length ? el('ul', { class: 'p8-list p8-events' }, shown.map(row)) : empty)];
 
   });
 
