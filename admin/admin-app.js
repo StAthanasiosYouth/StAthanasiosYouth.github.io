@@ -6631,9 +6631,22 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var tagline = A.counted('الجملة التعريفية', setting('site.tagline'), limits.tagline, A.settingHelp('site.tagline'));
     var shareText = A.counted('نص المشاركة', setting('site.shareText'), limits.shareText, A.settingHelp('site.shareText'));
 
-    var siteCard = A.card('الموقع', null,
+    // Phase 8B «بيانات الموقع»: the fields, and next to them how a shared link looks (live)
+    var share = el('div', { class: 'sharecard' },
+      el('img', { class: 'sharecard__logo', src: '../assets/img/logo-256.webp', alt: '', width: 56, height: 56 }),
+      el('div', { class: 'sharecard__text' },
+        el('small', { class: 'sharecard__host ltr', text: String((A.state.config || {}).siteUrl || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '') }),
+        el('b', { class: 'sharecard__name' }), el('span', { class: 'sharecard__line' })));
+    function drawShare() {
+      share.querySelector('.sharecard__name').textContent = name.input.value;
+      share.querySelector('.sharecard__line').textContent = tagline.input.value || shareText.input.value;
+    }
+    drawShare();
+    var siteCard = A.card('بيانات الموقع', 'بتظهر في عنوان الموقع، وفي المشاركة على واتساب وفيسبوك',
       box,
-      el('div', { class: 'form' }, name.node, tagline.node, shareText.node),
+      el('div', { class: 'setsplit' },
+        el('div', { class: 'form', oninput: drawShare }, name.node, tagline.node, shareText.node),
+        el('aside', { class: 'setsplit__aside' }, el('p', { class: 'setsplit__label', text: 'لما حد يشارك اللينك' }), share)),
       A.settingsSaver(function () {
         return {
           'site.name': name.input.value,
@@ -6714,6 +6727,20 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var notify = notifyCards();   // [mine, the settings, the system status] (only with the Worker)
 
+    // Phase 8B: every settings card gets the approved head (an icon square, the title, its hint)
+    function headify(card, name) {
+      if (!card || card.classList.contains('setcard')) return card;
+      var head = card.querySelector(':scope > .card__head');
+      if (!head) return card;
+      card.classList.add('setcard', 'setcard--plain');
+      head.classList.add('setcard__head');
+      if (head.firstElementChild) head.firstElementChild.classList.add('setcard__titles');
+      head.insertBefore(el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(name)), head.firstChild);
+      return card;
+    }
+    headify(siteCard, 'globe'); headify(hubCard, 'megaphone'); headify(upgradeCard, 'layers'); headify(guideCard, 'book'); headify(appCard, 'phone');
+    notify.forEach(function (c, i) { headify(c, ['bell', 'gear', 'shield'][i]); });
+
     // Phase 8B: sections with a side list (chips on phones); every card stays on the one page, the list
     // jumps to its section and follows the scroll
     var groups = [
@@ -6721,8 +6748,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       { key: 'notify', title: 'إشعاراتي', icon: 'bell', cards: [notify[0], appCard] },
       { key: 'site', title: 'بيانات الموقع', icon: 'globe', head: 'الموقع', cards: [siteCard] },
       { key: 'content', title: 'المحتوى والظهور', icon: 'megaphone', cards: [A.state.hubReady ? hubCard : null, upgradeCard] },
-      { key: 'publish', title: 'النشر والنسخ', icon: 'retry', cards: [publishHistoryCard()] },
-      { key: 'team', title: 'الفريق والصلاحيات', icon: 'shield', head: 'الفريق', cards: [adminsCard()] },
+      { key: 'publish', title: 'النشر والنسخ', icon: 'retry', cards: [headify(publishHistoryCard(), 'clock')] },
+      { key: 'team', title: 'الفريق والصلاحيات', icon: 'shield', head: 'الفريق', cards: [headify(adminsCard(), 'users')] },
       { key: 'system', title: 'حالة النظام', icon: 'gear', head: 'النظام', cards: [notify[2], notify[1]] },
       { key: 'guide', title: 'دليل الأدمن', icon: 'book', cards: [guideCard] }
     ].map(function (g) { g.cards = g.cards.filter(Boolean); return g; }).filter(function (g) { return g.cards.length; });

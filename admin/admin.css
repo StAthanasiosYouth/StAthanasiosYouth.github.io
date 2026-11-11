@@ -11583,6 +11583,11 @@ html[data-mode="light"] .setnav__link.is-on {
 .setrow__text {
   flex: 1;
   min-width: 0;
+  text-align: right;
+}
+
+.setrow__label[dir="auto"] {
+  unicode-bidi: plaintext;
 }
 
 .setrow__label {
@@ -11636,6 +11641,79 @@ html[data-mode="light"] .setnav__link.is-on {
   border-color: rgb(var(--danger-rgb) / .35);
   color: var(--danger);
   background: var(--danger-bg);
+}
+
+.setcard--plain {
+  gap: 14px;
+  padding: 22px;
+}
+
+.setcard--plain > .setcard__head {
+  margin-bottom: 4px;
+}
+
+.setcard--plain > .btn--primary {
+  justify-self: start;
+  min-width: 140px;
+}
+
+.setsplit {
+  display: grid;
+  gap: 22px;
+}
+
+.setsplit__label {
+  margin: 0 0 8px;
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.sharecard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--p-line-3);
+  border-radius: 16px;
+  background: var(--p-surface-2);
+}
+
+.sharecard__logo {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+}
+
+.sharecard__text {
+  display: grid;
+  min-width: 0;
+}
+
+.sharecard__host {
+  color: var(--text-3);
+  font: 600 11px ui-monospace, monospace;
+}
+
+.sharecard__name {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.sharecard__line {
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 12.5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@media (min-width: 1024px) {
+  .setsplit {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    align-items: start;
+  }
 }
 
 /* the compact segmented control (its radios stay, hidden, for the keyboard and the tests) */
@@ -11735,6 +11813,79 @@ html[data-mode="light"] .seg__opt:has(input:checked) {
 
   .setrow:not(.setrow--lead) .setrow__text {
     flex: 1 1 55%;
+  }
+}
+
+/* ---------- phones: the approved top bar (logo + title · bell · a square «راجع وانشر») ---------- */
+
+@media (max-width: 759px) {
+  .topbar {
+    grid-template-areas: "mark title tools publish";
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 10px;
+  }
+
+  .topbar #status,
+  .topbar .topbar__tools .topbar__search,
+  .topbar #acct-open,
+  .topbar .topbar__title .vhelp {
+    display: none;
+  }
+
+  .topbar__title {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .topbar #publish-open {
+    position: relative;
+    flex: none;
+    width: 52px;
+    min-width: 0;
+    height: 52px;
+    padding: 0;
+    border-radius: 16px;
+  }
+
+  .topbar #publish-open .btn__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .topbar #publish-open .icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  /* changes waiting: a dot on the button (the status words are hidden here) */
+  .topbar:has(#status.status--dirty) #publish-open::after,
+  .topbar:has(#status.status--error) #publish-open::after {
+    content: "";
+    position: absolute;
+    top: -3px;
+    inset-inline-end: -3px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--warn);
+    box-shadow: 0 0 0 2px var(--bg);
+  }
+
+  .topbar:has(#status.status--error) #publish-open::after {
+    background: var(--danger);
+  }
+
+  .topbar .topbar__tools .topbar__bell {
+    width: 52px;
+    height: 52px;
+    border: 1px solid var(--p-line-3);
+    border-radius: 16px;
+    background: var(--p-surface);
   }
 }
 
