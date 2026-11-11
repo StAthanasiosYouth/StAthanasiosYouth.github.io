@@ -129,8 +129,13 @@ try {
   const amount = await page.waitForSelector('#sheet .field[data-label="المبلغ"] input', { visible: true });
   await amount.click({ clickCount: 3 });
   await amount.type('3000');
-  const preset = await page.$('#sheet .field[data-label="وقت الاستلام"] .preset');
-  if (preset) await preset.click();
+  const box = await page.$('#sheet .field[data-label="وقت الاستلام"] .datetime__box');
+  if (box) {
+    await box.click();
+    await page.waitForSelector('dialog.whenpick[open] .presets .preset');
+    await page.click('dialog.whenpick[open] .presets .preset');
+    await page.click('dialog.whenpick[open] .whenpick__foot .btn--primary');
+  }
   await page.click('#sheet [data-act="submit"]');
   await page.waitForFunction(r => { const t = document.querySelector('#sheet[open] .sheet__title'); return t && t.textContent === 'حجز ' + r && /مؤكد/.test(document.querySelector('#sheet .book-chips').innerText); }, { timeout: 20000 }, ref);
   ok('confirmed from the admin UI with a 3000 payment (full mode)', true);

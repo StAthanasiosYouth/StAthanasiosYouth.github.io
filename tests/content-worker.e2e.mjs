@@ -703,7 +703,8 @@ test('Phase 8 A7 + A8: the locked games corner (GAMES_MODULE), and axe (serious 
       await s.page.evaluate(() => A.go('gamescorner'));
       await sleep(400);
       assert.match(await s.page.$eval('#view', n => n.textContent), /قريبًا/);
-      assert.equal(await s.page.$$eval('#view .coming__game', ns => ns.length), 6, 'the six approved games, as a list only');
+      // Phase 8B (games-soon.png): one card, and the way to today's games
+      assert.match(await s.page.$eval('#view .games-soon', n => n.textContent), /روح لركن الألعاب/);
       await s.page.screenshot({ path: `${ROOT}tools/.cache/phase8-a3/games-corner-light.png` });
     }
     assert.deepEqual(s.problems, []);

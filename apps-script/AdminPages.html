@@ -896,45 +896,130 @@
       });
     }
 
+    // Phase 8B (events.png, event-menu.png): «الكل · شغالة · في الأرشيف», a search, one row per event with its
+    // picture, its tags, «معاينة», «تعديل» and «⋯» (a copy, archive, the link, delete)
+    var filter = P.eventsFilter || 'all';
+    var query = '';
+    var counts = el('span', { class: 'badge', hidden: true });
+    var seg = el('div', { class: 'seg p8-filter', role: 'radiogroup', 'aria-label': 'الفعاليات اللي تظهر' });
+    var search = el('input', { class: 'p8-search__input', type: 'search', placeholder: 'دوّر باسم الفعالية…', 'aria-label': 'دوّر باسم الفعالية', oninput: function () { query = search.value.trim(); if (reply) draw(reply); } });
+
+    function tag(text, kind) { return el('span', { class: 'p8-tag' + (kind ? ' p8-tag--' + kind : ''), text: text }); }
+
+    function liveTag(ev) {
+      if (ev.archived) return tag('في الأرشيف');
+      if (!ev.enabled) return tag('مقفولة');
+      return ev.live ? tag('منشورة', 'ok') : tag('لسه متنشرتش', 'warn');
+    }
+
+    function cardTag(card, home) {
+      if (!home || !home.show) return tag('الكارت مخفي');
+      if (!card) return tag('الكارت هيتعمل مع الحفظ', 'info');
+      return card.show === false ? tag('الكارت مخفي') : tag('الكارت ظاهر', 'ok');
+    }
+
+    function paintSeg(r) {
+      var all = r.events.length;
+      var archived = r.events.filter(function (e) { return e.archived; }).length;
+      var name = A.uid('evf');
+      A.fill(seg, [['all', 'الكل', all], ['on', 'شغالة', all - archived], ['archived', 'في الأرشيف', archived]].map(function (o) {
+        var input = el('input', { type: 'radio', name: name, value: o[0], checked: filter === o[0], onchange: function () { filter = P.eventsFilter = o[0]; draw(r); } });
+        return el('label', { class: 'seg__opt' }, input, el('span', { text: o[1] + ' (' + ar(o[2]) + ')' }));
+      }));
+      counts.textContent = ar(archived);
+      counts.hidden = !archived;
+    }
+
+    function copyLink(ev, site) {
+      var url = site + 'events/' + ev.slug + '/';
+      var done = function () { A.toast('الرابط اتنسخ ✓'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, function () { A.toast(url, 'info'); });
+      else A.toast(url, 'info');
+    }
+
+    function archive(ev) {
+      A.call('apiEventArchive', ev.id, !ev.archived).then(function () {
+        refreshState();
+        A.toast(ev.archived ? 'رجعت من الأرشيف' : 'اتأرشفت — بعد النشر الرابط هيقول إنها مش متاحة');
+        eventsList.reload();
+        load();
+      }).catch(function (error) { A.fail(error, box); });
+    }
+
+    function remove(ev) {
+      A.confirm({ tone: 'danger', title: 'تمسح «' + ev.title + '»؟', message: 'الفعالية لسه متنشرتش، فالمسح آمن: هتتمسح هي وكارت الصفحة الرئيسية.', confirmLabel: 'امسح', cancelLabel: 'لأ' }).then(function (ok) {
+        if (!ok) return;
+        A.call('apiEventDelete', ev.id).then(function () {
+          refreshState();
+          A.toast('اتمسحت');
+          eventsList.reload();
+          load();
+        }).catch(function (error) { A.fail(error, box); });
+      });
+    }
+
+    /* «اعمل نسخة منها»: a new event's editor with this one's fields (a new link, not published, out of the archive) */
+    function duplicate(ev) {
+      var copy = JSON.parse(JSON.stringify(ev));
+      ['id', 'slug', 'live', 'publishedAt', 'updatedAt', 'card', 'archived'].forEach(function (k) { delete copy[k]; });
+      copy.title = ev.title + ' (نسخة)';
+      eventEditor(null, reply, copy);
+    }
+
+    function openMenu(button, ev, site) {
+      if (!A.menu) return;
+      var items = [
+        A.menuItem('copy', 'اعمل نسخة منها', function () { duplicate(ev); }),
+        A.menuItem(ev.archived ? 'retry' : 'archive', ev.archived ? 'رجّع من الأرشيف' : 'حطها في الأرشيف', function () { archive(ev); }),
+        A.menuItem('link', 'انسخ الرابط', function () { copyLink(ev, site); })
+      ];
+      if (!ev.live && !ev.publishedAt) {
+        items.push(el('hr', { class: 'menu__sep' }), A.menuItem('trash', 'امسح الفعالية…', function () { remove(ev); }, { danger: true }));
+      }
+      A.menu(button, 'menu--p8', items, { align: 'start' });
+    }
+
     function draw(r) {
-      var events = r.events.filter(function (e) { return !e.archived || P.showArchivedEvents; });
+      paintSeg(r);
+      var q = query.toLowerCase();
+      var events = r.events.filter(function (e) {
+        if (filter === 'on' && e.archived) return false;
+        if (filter === 'archived' && !e.archived) return false;
+        return !q || String(e.title || '').toLowerCase().indexOf(q) !== -1 || String(e.slug || '').indexOf(q) !== -1;
+      });
       if (!events.length) {
         A.fill(body, el('div', { class: 'empty-state' },
           el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('bus')),
-          el('p', { class: 'empty-state__title', text: 'مفيش فعاليات لسه' }),
-          el('p', { class: 'empty-state__text', text: 'رحلة، مؤتمر، أو يوم ترفيهي: صفحة بتفاصيلها وأسعارها والخدام اللي بيتحجز معاهم.' })));
+          el('p', { class: 'empty-state__title', text: r.events.length ? 'مفيش فعاليات هنا' : 'مفيش فعاليات لسه' }),
+          el('p', { class: 'empty-state__text', text: r.events.length ? 'غيّر الاختيار أو الكلام اللي بتدوّر بيه.' : 'رحلة، مؤتمر، أو يوم ترفيهي: صفحة بتفاصيلها وأسعارها والخدام اللي بيتحجز معاهم.' })));
         return;
       }
       var site = siteUrl(r);
       var now = A.wallMinutes(A.cairoNow());
-      A.fill(body, el('ul', { class: 'list' }, events.map(function (ev) {
+      A.fill(body, el('ul', { class: 'p8-list p8-events' }, events.map(function (ev) {
         var ended = ev.endAt ? A.wallMinutes(ev.endAt, true) < now : ev.startAt && A.wallMinutes(ev.startAt) < now;
-        var row = A.listItem({
-          icon: ev.kind === 'trip' ? 'bus' : ev.kind === 'conference' ? 'users' : 'star',
-          image: ev.cover || null,
-          title: ev.title,
-          sub: ev.kindLabel + ' · ' + (ev.startAt ? A.formatWall(ev.startAt) : '') + ' · /events/' + ev.slug + '/',
-          off: !ev.enabled || ev.archived,
-          chips: [
-            liveChip(ev),
-            cardChip(ev.card, ev.home),
-            ev.booking ? A.chip('فيه حجز' + (ev.booking.capacity ? ' · ' + ar(ev.booking.capacity) + ' مكان' : ''), 'gold') : A.chip('من غير حجز'),
-            // the booking window ends at «الحجز يقفل», or when the event STARTS (EVENTS.md §3): say so,
-            // so a started event isn't mistaken for a broken booking
-            ev.booking && bookingClosedNow(ev) ? A.chip('الحجز قفل: ' + (ev.booking.closesAt ? 'عدّى ميعاد القفل' : 'الفعالية بدأت'), 'danger') : null,
-            ended ? A.chip('خلصت', 'off') : null,
-            ev.partner ? A.chip('بإشراف B.U.G.', 'info') : null
-          ].filter(Boolean),
-          controls: [
-            el('span', { class: 'spacer' }),
+        var thumb = el('span', { class: 'p8-item__thumb', 'aria-hidden': 'true' }, icon(ev.kind === 'trip' ? 'bus' : ev.kind === 'conference' ? 'users' : 'star'));
+        if (ev.cover && A.mediaPreview) A.mediaPreview(ev.cover).then(function (src) { if (src) A.fill(thumb, el('img', { src: src, alt: '' })); }).catch(function () {});
+        var more = el('button', { class: 'p8-iconbtn', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-label': 'اختيارات تانية: ' + ev.title, onclick: function (e) { openMenu(e.currentTarget, ev, site); } }, icon('dots'));
+        var row = el('li', { class: 'p8-item', 'data-id': ev.id },
+          thumb,
+          el('div', { class: 'p8-item__main' },
+            el('b', { text: ev.title }),
+            el('small', {}, ev.kindLabel + ' · ' + (ev.startAt ? A.formatWall(ev.startAt) : '') + ' · ', el('span', { class: 'mono', dir: 'ltr', text: '/events/' + ev.slug + '/' })),
+            el('div', { class: 'p8-item__tags' },
+              liveTag(ev),
+              cardTag(ev.card, ev.home),
+              ev.booking ? tag('فيه حجز' + (ev.booking.capacity ? ' · ' + ar(ev.booking.capacity) + ' مكان' : ''), 'acc') : tag('من غير حجز'),
+              // the booking window ends at «الحجز يقفل», or when the event STARTS (EVENTS.md §3)
+              ev.booking && bookingClosedNow(ev) ? tag('الحجز قفل: ' + (ev.booking.closesAt ? 'عدّى ميعاد القفل' : 'الفعالية بدأت'), 'danger') : null,
+              ended ? tag('خلصت') : null,
+              ev.partner ? tag('بإشراف B.U.G', 'info') : null)),
+          el('div', { class: 'p8-item__acts' },
             // «الحجوزات (N جديد)»: only while the booking module is on (AdminBook)
             ev.booking && A.book ? A.book.eventLink(ev) : null,
-            ev.live ? el('a', { class: 'icon-btn', href: site + 'events/' + ev.slug + '/', target: '_blank', rel: 'noopener', 'aria-label': 'افتح الفعالية في الموقع: ' + ev.title, title: 'افتح في الموقع' }, icon('external')) : null,
-            el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'معاينة: ' + ev.title, title: 'معاينة', onclick: function () { previewSheet('event', ev.id, ev.title); } }, icon('eye')),
-            A.editButton(ev.title, function () { openEvent(ev.id); })
-          ]
-        });
-        row.dataset.id = ev.id;
+            el('button', { class: 'btn btn--sm btn--ghost', type: 'button', 'aria-label': 'معاينة: ' + ev.title, onclick: function () { previewSheet('event', ev.id, ev.title); } }, icon('eye'), 'معاينة'),
+            el('button', { class: 'btn btn--sm', type: 'button', 'aria-label': 'تعديل ' + ev.title, onclick: function () { openEvent(ev.id); } }, icon('edit'), 'تعديل'),
+            more));
         return row;
       })));
     }
@@ -963,15 +1048,23 @@
     else body.appendChild(el('div', { class: 'skeleton skeleton--line' }));
     load();
 
-    return [
-      A.card('الفعاليات', 'رحلات ومؤتمرات وأيام ترفيهية، كل واحدة ليها صفحة (الموقع/events/…) بالتفاصيل والأسعار والخدام اللي الناس بتكلمهم على واتساب علشان تحجز. الحجز من الموقع نفسه (مع إثبات الدفع) جاي في المرحلة الجاية.',
-        el('div', { class: 'actions' },
-          el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { eventEditor(null, reply); } }, icon('plus'), 'فعالية جديدة'),
-          el('button', { class: 'btn btn--ghost btn--small', type: 'button', onclick: function () { P.showArchivedEvents = !P.showArchivedEvents; if (reply) draw(reply); } }, icon('layers'), 'الأرشيف'),
-          el('button', { class: 'btn btn--ghost btn--small', type: 'button', onclick: function () { orderSheet('activities', ''); } }, icon('layers'), 'ترتيب كروت «الفعاليات»')),
-        box,
-        body)
-    ];
+    var card = el('section', { class: 'card p8-card' },
+      el('div', { class: 'p8-card__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('theatre')),
+        el('div', { class: 'p8-card__titles' },
+          el('h2', { class: 'card__title', text: 'الفعاليات' }),
+          el('p', { class: 'card__hint', text: 'رحلات ومؤتمرات وأيام ترفيهية — كل واحدة ليها صفحة (الموقع/events/…) وحجز من الموقع نفسه' })),
+        el('div', { class: 'p8-card__acts' },
+          el('button', { class: 'btn', type: 'button', onclick: function () { orderSheet('activities', ''); } }, icon('layers'), 'ترتيب الكروت'),
+          el('button', { class: 'btn', type: 'button', onclick: function () { filter = P.eventsFilter = 'archived'; if (reply) draw(reply); } }, icon('archive'), 'الأرشيف', counts),
+          el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { eventEditor(null, reply); } }, icon('plus'), 'فعالية جديدة'))),
+      el('div', { class: 'p8-card__filters' },
+        seg,
+        el('label', { class: 'p8-search' }, icon('filter'), search)),
+      box,
+      body);
+
+    return [card];
 
   };
 
@@ -1031,10 +1124,11 @@
 
   }
 
-  function eventEditor(r, list) {
+  function eventEditor(r, list, prefill) {
 
     var isNew = !r;
-    var ev = r ? r.event : { enabled: true, kind: 'trip', home: { show: true }, servants: [], booking: null };
+    // prefill: «اعمل نسخة منها» (a copy of another event's fields)
+    var ev = r ? r.event : Object.assign({ enabled: true, kind: 'trip', home: { show: true }, servants: [], booking: null }, prefill || {});
     P.editing = isNew ? '' : ev.id;
     var kinds = (r && r.kinds) || (list && list.kinds) || [{ key: 'trip', label: 'رحلة' }, { key: 'conference', label: 'مؤتمر' }, { key: 'funday', label: 'يوم ترفيهي' }];
     var servants = (r && r.servants) || (list && list.servants) || [];
@@ -1043,12 +1137,13 @@
     var booking = ev.booking || null;
     var box = A.errorBox();
 
-    var kind = select(kinds.map(function (k) { return { value: k.key, label: k.label }; }), ev.kind, 'النوع');
+    // Phase 8B (editor.png): the kinds as a segmented choice
+    var kind = A.segmented(kinds.map(function (k) { return { value: k.key, label: k.label }; }), ev.kind, 'النوع');
     var slug = A.textInput(ev.slug, { ltr: true, max: 40, placeholder: 'alex-trip-2026', required: true });
-    var title = A.counted('العنوان', ev.title, limits.title || 80, 'مثلاً: رحلة إسكندرية', { required: true });
-    var shortTitle = A.counted('العنوان المختصر', ev.shortTitle, limits.shortTitle || 30, 'اختياري، للأماكن الضيقة');
-    var summary = A.counted('الملخص', ev.summary, limits.summary || 200, 'سطر أو اتنين: بيظهر على الكارت وفوق الصفحة');
-    var body = A.counted('التفاصيل', ev.body, limits.body || 3000, 'البرنامج، المعاد، المطلوب…', { multiline: true, rows: 6 });
+    var title = A.counted('العنوان', ev.title, limits.title || 80, '', { required: true, placeholder: 'مثلاً: رحلة إسكندرية' });
+    var shortTitle = A.counted('العنوان المختصر', ev.shortTitle, limits.shortTitle || 30, '', { placeholder: 'اختياري: للكارت' });
+    var summary = A.counted('الملخص', ev.summary, limits.summary || 200, '', { placeholder: 'سطر أو اتنين: بيظهر على الكارت وفوق الصفحة' });
+    var body = A.counted('التفاصيل', ev.body, limits.body || 3000, '', { multiline: true, rows: 4, placeholder: 'البرنامج، المعاد، المطلوب…' });
     var cover = A.imagePicker(ev.cover || '', { label: 'صورة الغلاف', hint: 'مطلوبة لكارت الصفحة الرئيسية' });
     var gallery = A.galleryPicker(ev.gallery || [], { max: limits.gallery || 8, label: 'صور وفيديوهات الفعالية', hint: 'اختياري' });
     var startAt = A.dateTimeInput(ev.startAt, { emptyText: 'مطلوب', presets: [A.PRESETS.friday] });
@@ -1151,10 +1246,11 @@
       }).catch(function (error) { A.fail(error, box); });
     });
 
-    var controls = isNew ? [] : [
-      ev.booking && A.book ? A.book.eventLink(ev) : null,
-      el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () { previewSheet('event', ev.id, ev.title); } }, icon('eye'), 'معاينة'),
-      el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function (e) {
+    // Phase 8B (editor.png): «احفظ» with a check
+    A.fill(save, icon('check'), el('span', { text: isNew ? 'إضافة' : 'احفظ' }));
+
+    function archiveButton() {
+      return el('button', { class: 'btn btn--sm btn--block', type: 'button', onclick: function (e) {
         A.withBusy(e.currentTarget, A.call('apiEventArchive', ev.id, !ev.archived)).then(function () {
           A.dirty = false;
           A.closeSheet();
@@ -1162,8 +1258,11 @@
           A.toast(ev.archived ? 'رجعت من الأرشيف' : 'اتأرشفت — بعد النشر الرابط هيقول إنها مش متاحة');
           if (P.reloadEvents) P.reloadEvents();
         }).catch(function (error) { A.fail(error, box); });
-      } }, icon(ev.archived ? 'retry' : 'download'), ev.archived ? 'رجّع من الأرشيف' : 'أرشيف'),
-      ev.live || ev.publishedAt ? null : el('button', { class: 'btn btn--small btn--danger', type: 'button', onclick: function (e) {
+      } }, icon(ev.archived ? 'retry' : 'archive'), ev.archived ? 'رجّع من الأرشيف' : 'أرشيف');
+    }
+
+    function deleteButton() {
+      return el('button', { class: 'btn btn--sm btn--block btn--danger', type: 'button', onclick: function (e) {
         var button = e.currentTarget;
         A.confirm({ tone: 'danger', title: 'تمسح «' + ev.title + '»؟', message: 'الفعالية لسه متنشرتش، فالمسح آمن: هتتمسح هي وكارت الصفحة الرئيسية.', confirmLabel: 'امسح', cancelLabel: 'لأ' }).then(function (ok) {
           if (!ok) return;
@@ -1175,34 +1274,143 @@
             if (P.reloadEvents) P.reloadEvents();
           }).catch(function (error) { A.fail(error, box); });
         });
-      } }, icon('trash'), 'مسح')
+      } }, icon('trash'), 'امسح الفعالية…');
+    }
+
+    // the head (approved): «معاينة» and «صفحة الحجز» (the event's page on the site, where people book)
+    var site = siteUrl(list);
+    var headActions = isNew ? null : [
+      el('button', { class: 'btn btn--sm btn--ghost', type: 'button', onclick: function () { previewSheet('event', ev.id, ev.title); } }, icon('eye'), 'معاينة'),
+      ev.live && site !== '/' ? el('a', { class: 'btn btn--sm btn--ghost', href: site + 'events/' + ev.slug + '/', target: '_blank', rel: 'noopener' }, icon('ticket'), 'صفحة الحجز') : null
     ].filter(Boolean);
 
+    var kindLabel = function () { var k = kinds.filter(function (x) { return x.key === kind.value; })[0]; return k ? k.label : ''; };
+    var sub = isNew ? 'رحلة أو مؤتمر أو يوم ترفيهي' : [ev.kindLabel || kindLabel(), '/events/' + ev.slug + '/', ev.archived ? 'في الأرشيف' : !ev.enabled ? 'مقفولة' : ev.live ? 'منشورة' : 'لسه متنشرتش'].join(' · ');
+
+    // the left column: how it shows on the site, «قبل النشر», «إدارة»
+    var prevImg = el('img', { alt: '', hidden: true });
+    var prevTitle = el('b');
+    var prevSub = el('small', { class: 'muted' });
+    var prevTag = el('span', { class: 'p8-tag p8-tag--acc', text: 'احجز مكانك' });
+    var checks = el('ul', { class: 'checklist' });
+    var aside = [
+      el('h5', { text: 'هتظهر كده في الموقع' }),
+      el('div', { class: 'prevcard' }, prevImg, el('div', {}, prevTitle, prevSub, el('div', { class: 'prevcard__tags' }, prevTag))),
+      el('div', { class: 'hr' }),
+      el('h5', { text: 'قبل النشر' }),
+      checks,
+      isNew ? null : el('div', { class: 'hr' }),
+      isNew ? null : el('h5', { text: 'إدارة' }),
+      isNew ? null : el('div', { class: 'stack' },
+        ev.booking && A.book ? A.book.eventLink(ev) : null,
+        archiveButton(),
+        ev.live || ev.publishedAt ? null : deleteButton())
+    ];
+
+    var lastCover = null;
+    function paintAside() {
+      prevTitle.textContent = title.input.value.trim() || 'من غير عنوان';
+      var start = startAt.value();
+      prevSub.textContent = [kindLabel(), start ? A.formatWall(start, false) : ''].filter(Boolean).join(' · ');
+      prevTag.hidden = !hasBooking.input.checked;
+      var c = cover.value();
+      if (c !== lastCover) {
+        lastCover = c;
+        prevImg.hidden = true;
+        if (c && A.mediaPreview) A.mediaPreview(c).then(function (src) { if (src && lastCover === c) { prevImg.src = src; prevImg.hidden = false; } }).catch(function () {});
+      }
+      var payNeedsDue = hasBooking.input.checked && payMode.value && payMode.value() === 'installments' && !finalDueAt.value();
+      var items = [
+        [!!(title.input.value.trim() && slug.value.trim()), 'العنوان والرابط', 'العنوان والرابط'],
+        [!!start, 'المواعيد', 'المواعيد: مفيش ميعاد بداية'],
+        [!!c, 'صورة الكارت', 'صورة الكارت: مفيش غلاف']
+      ];
+      if (hasBooking.input.checked) items.push([!payNeedsDue, 'الدفع', 'الدفع: مفيش آخر ميعاد']);
+      A.fill(checks, items.map(function (it) {
+        return el('li', { class: it[0] ? 'ok' : 'no' }, icon(it[0] ? 'check' : 'alert'), el('span', { text: it[0] ? it[1] : it[2] }));
+      }));
+      // the side list's marks: ✓ for the dates once set, a dot on «الدفع» while it misses its due date
+      secWhen.dataset.state = start ? 'done' : '';
+      secPay.dataset.state = payNeedsDue ? 'warn' : '';
+      if (A.sheetMarks) A.sheetMarks();
+    }
+
+    var sections = el('div', { class: 'msecs' },
+      A.msec('الأساسيات', 'edit', 'النوع والاسم والرابط — اللي الناس بتشوفه الأول', [
+        A.col(A.field('النوع', kind, 'اليوم الترفيهي نوع لوحده (مش رحلة)'), 12),
+        A.col(title.node, 6),
+        A.col(shortTitle.node, 6),
+        A.col(A.field('الرابط', el('div', { class: 'pre' }, slug, el('span', { text: '/events/' })), ev.live || ev.publishedAt ? 'الرابط مبيتغيرش بعد النشر' : 'حروف إنجليزي صغيرة وأرقام وشرطة'), 6),
+        A.col(summary.node, 6),
+        A.col(body.node, 12)
+      ]),
+      A.msec('المواعيد والمكان', 'calendar', 'الموقع بيحسب «خلصت» و«بدأت» من المواعيد دي', [
+        A.col(A.field('بتبدأ', startAt.node), 6),
+        A.col(A.field('بتخلص', endAt.node), 6),
+        A.col(locationName.node, 6),
+        A.col(A.field('لينك المكان', locationUrl, 'اختياري: جوجل ماب'), 6),
+        A.col(terms.node, 12)
+      ]),
+      A.msec('الصور', 'photos', 'صورة الكارت والمعرض', [A.col(cover.node, 6), A.col(gallery.node, 6)]),
+      A.msec('الحجز', 'ticket', 'فيه حجز ولا لأ، وإمتى يفتح ويقفل، والعدد', [
+        A.col(hasBooking.node, 12),
+        A.col(el('div', { class: 'fgrid', hidden: !booking, 'data-booking': '' },
+          A.col(A.field('الحجز يفتح', opensAt.node), 6),
+          A.col(A.field('الحجز يقفل', closesAt.node, 'آخره ميعاد بداية الفعالية: بعد ما تبدأ الحجز من الموقع بيقفل'), 6),
+          A.col(A.field('العدد المتاح', capacity, 'المؤكدين بس هما اللي بياخدوا أماكن'), 6),
+          A.col(A.field('أقصى عدد في الحجز الواحد', perBooking), 6),
+          A.col(A.field('الحجز محتاج حساب؟', requireAccount), 6),
+          A.col(collectNames.node, 12),
+          A.col(participants.node, 12)), 12)
+      ]),
+      A.msec('الأسعار والسن', 'wallet', 'الفئات وأسعارها، وسن الحاجز والمرافقين', [
+        A.col(pricing.node, 12),
+        A.col(A.field('سن الحاجز من', bookerMin), 6),
+        A.col(A.field('لحد', bookerMax), 6),
+        A.col(el('p', { class: 'note', text: 'لو حطيت سن للحاجز (سنه يوم الفعالية)، الحاجز بيكتب تاريخ ميلاده والحجز اللي برّه السن بيترفض. الفئة اللي تقفل «متاحة في الفعالية دي» بترفض المرافقين اللي فيها. الأدمن بصلاحية «يدير · الحجوزات» يقدر يتجاوز مع كتابة السبب.' }), 12),
+        A.col(ageStrict.node, 12)
+      ]),
+      A.msec('الدفع', 'send', 'كامل ولا مقدم وأقساط، وآخر ميعاد', [
+        A.col(payMode.node || payMode, 12), A.col(installments, 12), A.col(mailReminders.node, 12)
+      ]),
+      A.msec('الخدام', 'users', 'اللي الناس بتحجز معاهم وبتدفع لهم', [
+        A.col(servantRows.length ? el('div', {}, servantRows.map(function (s) { return s.node; })) : el('p', { class: 'note', text: 'مفيش خدام لسه — زوّدهم من «الخدام».' }), 12),
+        A.col(el('p', { class: 'note', text: 'رقم التواصل بيظهر بس للخادم اللي رقمه متاح للزوار (من «الخدام»). أرقام الدفع والأرقام الخاصة عمرها ما بتظهر هنا.' }), 12),
+        A.col(contactOnPage.node, 12), A.col(contactAfter.node, 12)
+      ]),
+      A.msec('الظهور', 'eye', 'الشكل، والصفحة الرئيسية، والفعالية شغالة ولا لأ', [
+        A.col(A.field('الشكل', theme), 6),
+        A.col(partner.node, 12),
+        A.col(home.node, 12),
+        A.col(enabled.node, 12)
+      ]));
+    var secWhen = sections.children[1];
+    var secPay = sections.children[5];
+    var bookingGrid = sections.querySelector('[data-booking]');
+    // the booking's own sections follow «فيه حجز»
+    function paintBooking() {
+      var on = hasBooking.input.checked;
+      bookingGrid.hidden = !on;
+      sections.children[4].hidden = !on;
+      sections.children[5].hidden = !on;
+    }
+    hasBooking.input.addEventListener('change', paintBooking);
+
     A.dirty = false;
-    A.openSheet(isNew ? 'فعالية جديدة' : 'تعديل: ' + ev.title, [
-      box,
-      controls.length ? el('div', { class: 'actions' }, controls) : null,
-      el('div', { class: 'form' },
-        A.field('النوع', kind, 'اليوم الترفيهي نوع لوحده (مش رحلة)'),
-        title.node,
-        A.field('الرابط', slug, ev.live || ev.publishedAt ? 'الرابط مبيتغيرش بعد النشر' : 'حروف إنجليزي صغيرة وأرقام وشرطة ← الموقع/events/الرابط/'),
-        shortTitle.node,
-        summary.node,
-        body.node,
-        cover.node,
-        gallery.node,
-        el('div', { class: 'row' }, A.field('بتبدأ', startAt.node), A.field('بتخلص', endAt.node)),
-        locationName.node,
-        A.field('لينك المكان', locationUrl, 'اختياري: جوجل ماب'),
-        A.field('الشكل', theme),
-        terms.node,
-        el('fieldset', { class: 'fieldset' }, el('legend', { text: 'الحجز' }), hasBooking.node, bookingBox),
-        partner.node,
-        home.node,
-        enabled.node)
-    ], A.sheetFooter(save), {
+    A.openSheet(isNew ? 'فعالية جديدة' : 'تعديل: ' + ev.title, [box, sections], A.sheetFooter(save), {
+      size: 'lg',
+      icon: 'theatre',
+      sub: sub,
+      headActions: headActions,
+      aside: aside,
       lock: isNew ? null : A.editLock('event', ev.id, 'الفعالية «' + ev.title + '»', function () { A.closeSheet(); if (P.openEvent) P.openEvent(ev.id); })
     });
+    paintBooking();
+    paintAside();
+    sections.addEventListener('input', paintAside);
+    sections.addEventListener('change', paintAside);
+    // a picked cover / date comes without an input event: look again now and then while open
+    var asideTimer = setInterval(function () { if (!sections.isConnected) { clearInterval(asideTimer); return; } paintAside(); }, 1500);
 
   }
 

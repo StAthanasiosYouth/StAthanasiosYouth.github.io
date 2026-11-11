@@ -124,13 +124,17 @@ try {
       throw err;
     }
     await sleep(1500);
-    const screens = await page.evaluate(() => A.AREAS.flatMap(a => (a.subs && a.subs.length ? a.subs : [{ key: '', label: '' }]).map(s => ({ area: a.key, areaLabel: a.label, sub: s.key, subLabel: s.label }))));
+    // PHASE8_GO=settings:system,content:news shoots exactly those screens (A.go(area, sub))
+    const GO = (process.env.PHASE8_GO || '').split(',').filter(Boolean).map(x => { const [area, sub] = x.split(':'); return { area, areaLabel: area, sub: sub || '', subLabel: sub || '' }; });
+    const screens = GO.length ? GO : await page.evaluate(() => A.AREAS.flatMap(a => (a.subs && a.subs.length ? a.subs : [{ key: '', label: '' }]).map(s => ({ area: a.key, areaLabel: a.label, sub: s.key, subLabel: s.label }))));
     mkdirSync(`${SHOTS}${wname}`, { recursive: true });
-    for (const s of screens.filter(x => !ONLY.length || ONLY.includes(x.area))) {
+    for (const s of screens.filter(x => GO.length || !ONLY.length || ONLY.includes(x.area))) {
       await page.evaluate((area, sub) => A.go(area, sub || undefined), s.area, s.sub);
       await sleep(1100);
+      // PHASE8_EVAL: a script run on the screen before the shot (open an editor, a menu…); may return a promise
+      if (process.env.PHASE8_EVAL) { await page.evaluate(process.env.PHASE8_EVAL).catch(e => errors.push('eval ' + e.message)); await sleep(1500); }
       const name = `${s.area}${s.sub ? '-' + s.sub : ''}`;
-      await page.screenshot({ path: `${SHOTS}${wname}/${name}.png`, fullPage: true });
+      await page.screenshot({ path: `${SHOTS}${wname}/${name}.png`, fullPage: !process.env.PHASE8_VIEWPORT });
       shots++;
       const controls = await page.evaluate(() => {
         const out = [];
@@ -170,6 +174,6 @@ for (const [screen, set] of inventory) {
   for (const c of [...set].sort()) lines.push(`- [ ] ${c}`);
   lines.push('');
 }
-if (!process.env.PHASE8_PREFS && !process.env.PHASE8_ONLY && !process.env.PHASE8_WIDTHS) writeFileSync(new URL('../docs/PHASE8-INVENTORY.md', import.meta.url), lines.join('\n'));
+if (!process.env.PHASE8_PREFS && !process.env.PHASE8_ONLY && !process.env.PHASE8_GO && !process.env.PHASE8_WIDTHS) writeFileSync(new URL('../docs/PHASE8-INVENTORY.md', import.meta.url), lines.join('\n'));
 console.log(`screens ${inventory.size}, shots ${shots}, errors ${errors.length}`);
 errors.slice(0, 10).forEach(e => console.log(e));

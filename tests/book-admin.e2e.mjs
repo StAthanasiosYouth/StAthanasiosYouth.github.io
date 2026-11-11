@@ -242,7 +242,7 @@ test('module off (and 401 / 403 / unreachable): no «الحجوزات» anywhere
   assert.match(asked[0].auth, /^Bearer \S+/, 'the Google ID token');
   // a push link to the bookings goes nowhere; the events editor has no booking button either
   assert.equal(await d.page.evaluate(id => A.openLink('#open/bookings/' + id), eventId), false);
-  await d.page.click('.item .icon-btn[aria-label^="تعديل"]');
+  await d.page.click('.p8-item [aria-label^="تعديل"]');
   await d.page.waitForSelector('#sheet[open]');
   assert.doesNotMatch(await sheetText(d.page), /الحجوزات|حدّث بيانات الفعالية/);
   await closeSheet(d.page);
@@ -360,7 +360,11 @@ test('the booking sheet + confirm with the first payment: needs_override → «�
   await clickAct(d.page, 'submit');
   await d.page.waitForSelector('#sheet .field--invalid[data-label="وقت الاستلام"]');
   assert.equal(fake.writes().length, before, 'nothing sent');
-  await d.page.click('#sheet .field[data-label="وقت الاستلام"] .preset');
+  // Phase 8B: the date box opens the one schedule picker; its quick choice, then «تمام»
+  await d.page.click('#sheet .field[data-label="وقت الاستلام"] .datetime__box');
+  await d.page.waitForSelector('dialog.whenpick[open] .presets .preset');
+  await d.page.click('dialog.whenpick[open] .presets .preset');
+  await d.page.click('dialog.whenpick[open] .whenpick__foot .btn--primary');
   await clickAct(d.page, 'submit');
   // full payment mode: 1000 of 2300 → the reason, then «أكّد برضه» with a reason
   await d.page.waitForSelector('#sheet .book-warn:not([hidden])');

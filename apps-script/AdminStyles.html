@@ -12759,4 +12759,1018 @@ html[data-mode="light"] .home8 .item { background: var(--p-surface-2); }
   background: var(--grad);
 }
 
+/* ---------- Phase 8B: the design's lists (.list / .item / .tag in proposal.css), namespaced ---------- */
+.p8-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.p8-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--p-line-2);
+  border-radius: 18px;
+  background: rgb(10 33 64 / .55);
+  transition: border-color .25s, transform .25s var(--ease);
+}
+
+html[data-mode="light"] .p8-item {
+  background: var(--p-surface-2);
+}
+
+.p8-item:hover {
+  border-color: var(--p-acc-line);
+}
+
+.p8-item[data-sys="mail"] {
+  cursor: pointer;
+}
+
+.p8-item__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.p8-item__main b {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.p8-item__main small {
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.p8-item__tools {
+  display: contents;
+}
+
+.p8-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--p-line-3);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.p8-tag--ok { border-color: transparent; color: var(--ok); background: var(--ok-bg); }
+.p8-tag--warn { border-color: transparent; color: var(--warn); background: var(--warn-bg); }
+.p8-tag--danger { border-color: transparent; color: var(--danger); background: var(--danger-bg); }
+.p8-tag--info { border-color: transparent; color: var(--info); background: var(--info-bg); }
+.p8-tag--acc { border-color: transparent; color: var(--acc-hi); background: var(--p-acc-soft); }
+
+.btn.btn--sm {
+  min-height: 34px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.btn.btn--ghost {
+  background: transparent;
+}
+
+.p8-sys > .setcard__head {
+  margin-bottom: 4px;
+}
+
+/* ---------- Phase 8B: the big editor as approved (editor.png): numbered sections, a left column, «التالي» ---------- */
+
+.sheet__navwarn {
+  display: none;
+  width: 8px;
+  height: 8px;
+  margin-inline-start: auto;
+  border-radius: 50%;
+  background: var(--warn);
+}
+
+.sheet__navlink.is-warn .sheet__navwarn {
+  display: block;
+}
+
+.sheet__navlink.is-done:not(.is-on) .sheet__navnum {
+  border-color: transparent;
+  color: var(--ok);
+  background: var(--ok-bg);
+}
+
+.sheet__navlink[hidden] {
+  display: none;
+}
+
+.sheet__aside {
+  display: none;
+}
+
+.msec {
+  margin-bottom: 26px;
+  scroll-margin-top: 12px;
+}
+
+.msec[hidden] {
+  display: none;
+}
+
+.msec__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  color: var(--text);
+  font-size: 15.5px;
+  font-weight: 800;
+}
+
+.msec__title .icon {
+  width: 16px;
+  height: 16px;
+  color: var(--text-2);
+}
+
+.msec__sub {
+  margin: 0 0 14px;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.fgrid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px 18px;
+}
+
+.fgrid[hidden] {
+  display: none;
+}
+
+.fgrid > * {
+  grid-column: span 12;
+  min-width: 0;
+}
+
+.fgrid > .c6 { grid-column: span 6; }
+.fgrid > .c4 { grid-column: span 4; }
+.fgrid > .c8 { grid-column: span 8; }
+.fgrid > .c3 { grid-column: span 3; }
+
+/* a field in a section: the label, the box, then its hint at the start and its count at the end */
+.msec .field {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 8px;
+  align-content: start;
+}
+
+.msec .field > * {
+  grid-column: 1 / -1;
+}
+
+.msec .field > .field__label {
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.msec .field > .field__hint {
+  grid-row: 3;
+  grid-column: 1;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.msec .field > .field__count {
+  grid-row: 3;
+  grid-column: 2;
+  align-self: start;
+  font-size: 12px;
+  text-align: end;
+}
+
+.msec .fieldset {
+  margin: 0;
+}
+
+/* «الرابط»: the box and its fixed start, as one */
+.pre {
+  display: flex;
+  align-items: stretch;
+  direction: ltr;
+}
+
+.pre .input {
+  flex: 1;
+  min-width: 0;
+  border-radius: 0 12px 12px 0;
+}
+
+.pre > span {
+  display: grid;
+  flex: none;
+  place-items: center;
+  padding: 0 12px;
+  border: 1px solid var(--p-line-3);
+  border-inline-end: 0;
+  border-radius: 12px 0 0 12px;
+  color: var(--text-3);
+  background: var(--p-surface-2);
+  font-size: 12.5px;
+}
+
+.seg--field {
+  display: flex;
+  width: 100%;
+}
+
+/* the left column: «هتظهر كده في الموقع», «قبل النشر», «إدارة» */
+.sheet__aside h5 {
+  margin: 0 0 10px;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.prevcard {
+  overflow: hidden;
+  border: 1px solid var(--p-line-3);
+  border-radius: 18px;
+  background: var(--p-surface-2);
+}
+
+.prevcard img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+}
+
+.prevcard img[hidden] {
+  display: none;
+}
+
+.prevcard > div {
+  padding: 12px 14px;
+}
+
+.prevcard b {
+  display: block;
+  font-size: 15px;
+}
+
+.prevcard small {
+  display: block;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.prevcard__tags {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.prevcard__tags [hidden] {
+  display: none;
+}
+
+.checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+  list-style: none;
+}
+
+.checklist li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checklist .icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.checklist .ok {
+  color: var(--ok);
+}
+
+.checklist .no {
+  color: var(--warn);
+}
+
+.sheet__aside .hr {
+  height: 1px;
+  margin: 16px 0;
+  background: var(--p-line-2);
+}
+
+.sheet__aside .stack {
+  display: grid;
+  gap: 10px;
+}
+
+.sheet__aside .stack > [hidden] {
+  display: none;
+}
+
+.btn.btn--block,
+.book-link .btn {
+  width: 100%;
+}
+
+.sheet__saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.sheet__saved .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.sheet__sp {
+  flex: 1;
+}
+
+.sheet__next[hidden] {
+  display: none;
+}
+
+@media (min-width: 760px) {
+
+  .sheet--aside[open] {
+    grid-template-columns: 230px minmax(0, 1fr) 300px;
+  }
+
+  .sheet--aside .sheet__aside {
+    display: block;
+    padding: 18px;
+    overflow: auto;
+    border-inline-start: 1px solid var(--p-line-2);
+    background: var(--p-modal-side);
+  }
+
+  .sheet--lg .sheet__foot .btn--primary {
+    min-width: 150px;
+  }
+
+}
+
+@media (max-width: 759px) {
+
+  .fgrid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .fgrid > * {
+    grid-column: auto !important;
+  }
+
+  .sheet--lg .sheet__foot {
+    flex-wrap: wrap;
+  }
+
+  .sheet--lg .sheet__foot > .btn {
+    flex: 1;
+  }
+
+  .sheet--lg .sheet__foot > .sheet__next {
+    flex: 1 0 100%;
+    order: 3;
+  }
+
+  .sheet__saved,
+  .sheet__sp {
+    display: none;
+  }
+
+  .sheet--lg .sheet__headacts {
+    display: none;
+  }
+
+}
+
+/* phones (editor.png): the head wraps as approved — icon, titles, the video icon; «قفل» on the next line */
+@media (max-width: 759px) {
+  .sheet--lg.sheet--chip .sheet__head {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .sheet--lg.sheet--chip .sheet__titles {
+    flex: 1 1 60%;
+  }
+
+  .sheet--lg.sheet--chip .sheet__title {
+    font-size: 17px;
+  }
+
+  .sheet--lg .sheet__grab {
+    display: none;
+  }
+}
+
+/* ---------- Phase 8B: the date box (editor.png «بتبدأ») and the schedule picker (sched-picker.png) ---------- */
+.datetime__box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+}
+
+.datetime__box .icon {
+  display: none;
+}
+
+.datetime__box.is-empty {
+  color: var(--text-3);
+  font-weight: 500;
+}
+
+.datetime__words {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.datetime {
+  position: relative;
+}
+
+.datetime__native {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  pointer-events: none;
+}
+
+.whenpick .presets {
+  gap: 8px;
+}
+
+.whenpick .presets .preset {
+  min-height: 30px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--p-line-3);
+  border-radius: 999px;
+  color: var(--text);
+  background: var(--p-surface);
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.whenpick .presets .preset.is-on {
+  border-color: transparent;
+  color: var(--acc-ink);
+  background: var(--grad);
+}
+
+.whenpick__nav {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--p-line-3);
+  border-radius: 10px;
+  color: var(--text-2);
+  background: transparent;
+  cursor: pointer;
+}
+
+.whenpick__nav:hover {
+  border-color: var(--p-acc-line);
+  color: var(--text);
+}
+
+.whenpick__nav .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.whenpick__nav--prev .icon {
+  transform: rotate(-90deg);
+}
+
+.whenpick__nav--next .icon {
+  transform: rotate(90deg);
+}
+
+.whenpick__month b {
+  font-size: 14.5px;
+  font-weight: 800;
+}
+
+.whenpick__hourrow {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--p-line-3);
+  border-radius: 12px;
+  background: rgb(var(--nv-2-9-20) / .5);
+}
+
+html[data-mode="light"] .whenpick__hourrow {
+  background: var(--p-surface-2);
+}
+
+.whenpick__hour {
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--text-2);
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.whenpick__hour.is-on {
+  color: var(--acc-hi);
+  background: var(--p-raised);
+  box-shadow: inset 0 0 0 1px var(--p-acc-line);
+}
+
+html[data-mode="light"] .whenpick__hour.is-on {
+  color: var(--acc-deep);
+}
+
+.whenpick__other {
+  margin-top: 8px;
+}
+
+.whenpick__other[hidden] {
+  display: none;
+}
+
+.whenpick__said {
+  color: var(--acc-hi);
+}
+
+/* ---------- Phase 8B: «الألعاب · قريبًا» (games-soon.png) ---------- */
+.games-soon {
+  display: grid;
+  justify-items: center;
+  max-width: 720px;
+  margin: 30px auto;
+  padding: 70px 24px;
+  text-align: center;
+}
+
+.games-soon__icon {
+  width: 72px;
+  height: 72px;
+  margin-bottom: 16px;
+  border-radius: 16px;
+}
+
+.games-soon__icon .icon {
+  width: 22px;
+  height: 22px;
+}
+
+.games-soon__title {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.games-soon__text {
+  margin: 0 0 6px;
+  color: var(--text-3);
+  font-size: 14px;
+}
+
+.games-soon__note {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.games-soon .btn {
+  margin-top: 16px;
+}
+
+@media (max-width: 759px) {
+  .games-soon {
+    margin: 30px 0 0;
+  }
+}
+
+.games-soon {
+  position: relative;
+  gap: 0;
+  width: 100%;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, rgb(13 40 73 / .55), rgb(7 26 51 / .75));
+}
+
+.games-soon::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(70% 90% at 100% 0%, rgb(var(--acc-rgb) / .10), transparent 60%);
+}
+
+html[data-mode="light"] .games-soon {
+  background: var(--p-surface);
+}
+
+.games-soon > p.games-soon__text,
+.games-soon > p.games-soon__note {
+  line-height: 1.6;
+}
+
+/* the rail's «قريبًا» (approved): a small warm tag at the row's end; the row a little quieter */
+.nav-soon {
+  height: 20px;
+  margin-inline-start: auto;
+  padding: 0 8px;
+  border: 0;
+  color: var(--warn);
+  background: var(--warn-bg);
+  font-size: 10.5px;
+}
+
+.navlink:has(.nav-soon):not([aria-current="page"]):not(.is-active) {
+  opacity: .7;
+}
+
+/* ---------- Phase 8B: the sub-tabs as approved (events.png): pills in a box, the chosen one filled ---------- */
+#subtabs.tabs {
+  display: flex;
+  gap: 6px;
+  width: max-content;
+  max-width: calc(100% - 2 * var(--p-pad));
+  margin: 22px var(--p-pad) 0;
+  padding: 5px;
+  overflow-x: auto;
+  border: 1px solid var(--p-line-2);
+  border-radius: 14px;
+  background: var(--p-surface);
+}
+
+#subtabs.tabs[hidden] {
+  display: none;
+}
+
+#subtabs .tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 0;
+  height: 38px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--text-2);
+  background: none;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+#subtabs .tab:hover {
+  color: var(--text);
+}
+
+#subtabs .tab[aria-current="page"] {
+  color: var(--acc-ink);
+  background: var(--grad);
+  box-shadow: 0 8px 20px -10px var(--acc);
+}
+
+#subtabs .tab[aria-current="page"]::after {
+  display: none;
+}
+
+@media (max-width: 759px) {
+  #subtabs.tabs {
+    width: auto;
+    margin: 14px 16px 0;
+  }
+
+  #subtabs .tab {
+    flex: 1 0 auto;
+    justify-content: center;
+  }
+}
+
+/* ---------- Phase 8B: a list card (events.png): head with its buttons, filters, rows ---------- */
+.p8-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.p8-card__titles {
+  flex: 1;
+  min-width: 220px;
+}
+
+.p8-card__titles .card__title {
+  margin: 0;
+  font-size: 16.5px;
+  font-weight: 800;
+}
+
+.p8-card__titles .card__hint {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.p8-card__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.p8-card .badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  color: var(--acc-ink);
+  background: var(--grad);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.p8-card .badge[hidden] {
+  display: none;
+}
+
+.p8-card__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.p8-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 260px;
+  max-width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--p-line-3);
+  border-radius: 12px;
+  color: var(--text-3);
+  background: var(--p-surface);
+}
+
+.p8-search .icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.p8-search__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  color: var(--text);
+  background: none;
+  font: inherit;
+  font-size: 13px;
+}
+
+.p8-list.p8-events {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.p8-item__thumb {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border-radius: 14px;
+  color: var(--acc-hi);
+  background: var(--p-raised);
+}
+
+.p8-item__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.p8-item__main .mono {
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+  unicode-bidi: isolate;
+}
+
+.p8-item__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.p8-item__acts {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.p8-item__acts .book-link[hidden] {
+  display: none;
+}
+
+.p8-iconbtn {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--p-line-3);
+  border-radius: 10px;
+  color: var(--text-2);
+  background: var(--p-surface);
+  cursor: pointer;
+}
+
+.p8-iconbtn:hover,
+.p8-iconbtn[aria-expanded="true"] {
+  border-color: var(--acc);
+  color: var(--text);
+}
+
+/* the ⋯ menu (event-menu.png) */
+.menu.menu--p8 {
+  width: auto;
+  min-width: 220px;
+  padding: 6px;
+  border: 1px solid var(--p-line-3);
+  border-radius: 16px;
+  background: var(--p-modal, #0b2342);
+  box-shadow: var(--p-shadow-lg);
+}
+
+.menu--p8 .menu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--text-2);
+  background: none;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  text-align: start;
+}
+
+.menu--p8 .menu__item:hover,
+.menu--p8 .menu__item:focus-visible {
+  color: var(--text);
+  background: var(--p-hover);
+}
+
+.menu--p8 .menu__item .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.menu--p8 .menu__item--danger {
+  color: var(--danger);
+}
+
+.menu--p8 .menu__sep {
+  height: 1px;
+  margin: 4px;
+  border: 0;
+  background: var(--p-line-2);
+}
+
+@media (max-width: 759px) {
+  .p8-card__head {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .p8-card__head > .chipico {
+    justify-self: start;
+  }
+
+  .p8-card__acts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .p8-card__acts .btn--primary {
+    grid-column: 1 / -1;
+  }
+
+  .p8-search {
+    width: 100%;
+  }
+
+  .p8-events .p8-item {
+    flex-wrap: wrap;
+  }
+
+  .p8-events .p8-item__main {
+    flex: 1 1 60%;
+  }
+
+  .p8-events .p8-item__acts {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
+
+.p8-card {
+  gap: 0;
+  padding: 22px;
+}
+
+.p8-card .p8-card__head {
+  margin-bottom: 20px;
+}
+
+.p8-card .p8-card__filters {
+  margin-bottom: 16px;
+}
+
+.menu--p8 .menu__item {
+  min-height: 0;
+}
+
+.menu.menu--p8:popover-open {
+  gap: 0;
+}
+
+@media (max-width: 759px) {
+  /* approved phones: no search box; rows a bit tighter, their buttons share the width */
+  .p8-card .p8-search {
+    display: none;
+  }
+
+  .p8-events .p8-item {
+    padding: 12px;
+  }
+
+  .p8-events .p8-item__thumb {
+    width: 48px;
+    height: 48px;
+  }
+
+  .p8-events .p8-item__acts > .btn {
+    flex: 1;
+  }
+}
+
 </style>
