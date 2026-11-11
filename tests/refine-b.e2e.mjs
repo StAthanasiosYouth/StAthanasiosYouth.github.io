@@ -230,7 +230,7 @@ test('sign in with Google → the dashboard, and the browser stays on /admin/', 
 
     // the token lives in memory only: not in any storage, after sign-in and after more API calls
     await noTokenStored(page, 'after sign-in');
-    await page.evaluate(() => A.go('settings'));
+    await page.evaluate(() => A.go('settings', 'team'));
     await page.waitForSelector('.card--admins .admin');
     assert.ok(calls.some(c => c.fn === 'apiAdmins'));
     await noTokenStored(page, 'after an API call');
@@ -294,7 +294,7 @@ test('editing and publishing work through the API', async () => {
   const { page, problems, calls, close } = await open();
   await signIn(page);
 
-  await page.evaluate(() => A.go('settings'));
+  await page.evaluate(() => A.go('settings', 'site'));
   await page.waitForSelector('.card .input');
   await page.evaluate(() => {
     const field = [...document.querySelectorAll('.field')].find(f => f.dataset.label === 'الجملة التعريفية');
@@ -363,7 +363,7 @@ test('the token runs out (server or clock) → sign in again over the open edito
   await sleep(3500);
   const sent = second.calls.length;
   claims = { email: ADMIN };
-  await second.page.evaluate(() => A.go('settings'));
+  await second.page.evaluate(() => A.go('settings', 'team'));
   await second.page.waitForSelector('dialog.reauth[open] .gis-stub');
   assert.equal(second.calls.length, sent, 'nothing sent with a token about to expire');
   await second.page.click('dialog.reauth[open] .gis-stub');
@@ -538,7 +538,7 @@ test('allowlist card: the list, add and remove with our modal, the primary accou
 
   const { page, problems, close } = await open();
   await signIn(page);
-  await page.evaluate(() => A.go('settings'));
+  await page.evaluate(() => A.go('settings', 'team'));
   await page.waitForSelector('.card--admins .admin');
   await page.evaluate(() => document.querySelector('.card--admins').scrollIntoView({ block: 'center' }));
   await sleep(400);

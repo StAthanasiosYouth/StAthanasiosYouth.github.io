@@ -229,7 +229,8 @@ test('a Drive failure is visible inside the editor, with the real reason, and re
 
 });
 
-test('Settings: «اختبر رفع الصور» shows each step', async () => {
+// Phase 8B (docs/phase8b/PLAN.md §2): the Drive upload test left «الإعدادات» with GitHub and the Sheet link
+test.skip('Settings: «اختبر رفع الصور» shows each step', async () => {
 
   const { page, problems, close } = await open();
   await page.evaluate(() => A.go('settings'));

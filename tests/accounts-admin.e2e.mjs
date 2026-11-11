@@ -163,7 +163,7 @@ async function openSettings(viewport = { width: 1366, height: 900 }, rows = 2) {
   await page.waitForSelector('.gis-stub');
   await page.click('.gis-stub');
   await page.waitForFunction(() => window.A && A.state && !document.getElementById('shell').hidden, { timeout: 15000 });
-  await page.evaluate(() => A.go('settings'));
+  await page.evaluate(() => A.go('settings', 'team'));
   await page.waitForFunction(n => document.querySelectorAll('.card--admins .admin').length === n && /صلاحية واحدة/.test(document.querySelector('.card--admins').innerText), { timeout: 8000 }, rows);
   return { context, page, problems };
 }
@@ -389,6 +389,7 @@ test('«نسخ النشر»: the last publishes; while the Worker is the truth o
     { id: 'pub-1', mode: 'shadow', revision: 'r1', by: ADMIN, at: t, files: 2, changed: 2, state: 'live' }
   ] };
   let { context, page, problems } = await openSettings();
+  await page.evaluate(() => A.go('settings', 'publish'));
   await page.waitForFunction(() => document.querySelector('.card--publish-history [data-publish]'), { timeout: 8000 });
   let text = await page.$eval('.card--publish-history', n => n.innerText);
   assert.match(text, /بيشتغل لما النشر يبقى من السيرفر الجديد/);
@@ -398,6 +399,7 @@ test('«نسخ النشر»: the last publishes; while the Worker is the truth o
 
   fake.publish = { ...fake.publish, enabled: true, jobs: fake.publish.jobs.map(j => ({ ...j, mode: 'worker' })) };
   ({ context, page, problems } = await openSettings());
+  await page.evaluate(() => A.go('settings', 'publish'));
   await page.waitForSelector('.card--publish-history [data-publish="pub-1"] button');
   assert.equal(await page.$$eval('.card--publish-history [data-publish="pub-2"] button', n => n.length), 0, 'the live one has none');
   await page.click('.card--publish-history [data-publish="pub-1"] button');

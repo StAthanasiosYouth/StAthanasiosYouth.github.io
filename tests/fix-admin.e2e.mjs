@@ -94,7 +94,7 @@ test('a publish under way: closing the editor and opening it again shows the sam
 
   const { page, problems, close } = await open();
 
-  await page.evaluate(() => A.go('settings'));
+  await page.evaluate(() => A.go('settings', 'site'));
   await page.waitForSelector('.card .input');
   await page.evaluate(() => {
     const field = [...document.querySelectorAll('.field')].find(f => f.dataset.label === 'الجملة التعريفية');
@@ -149,7 +149,7 @@ test('an upload stays listed (name, progress, result) after leaving «الصور
   await page.waitForFunction(() => window.__release.apiUploadMedia, { timeout: 20000 });
 
   // away and back while it is still sending
-  await page.evaluate(() => A.go('settings'));
+  await page.evaluate(() => A.go('settings', 'site'));
   await page.waitForSelector('.card .input');
   assert.equal(await page.evaluate(() => A.uploads.length), 1);
   await page.evaluate(() => A.go('media'));

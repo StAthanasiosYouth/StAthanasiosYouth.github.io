@@ -6707,8 +6707,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.chip(access.primary ? 'الأدمن الأساسي' : 'أدمن', access.primary ? 'gold' : 'info')),
       A.appCard ? setrow(null, 'الأجهزة اللي داخل منها', 'التطبيق والإشعارات على كل جهاز',
         el('button', { class: 'btn btn--small', type: 'button', onclick: function () {
-          var t = document.querySelector('.setsec [data-app-card], #set-notify');
-          if (t) t.scrollIntoView({ behavior: A.reducedMotion() ? 'auto' : 'smooth', block: 'start' });
+          A.go('settings', 'notify');
         } }, 'إدارة الأجهزة')) : null,
       A.signOut ? setrow(null, 'خروج', 'من الجهاز ده بس',
         el('button', { class: 'btn btn--small btn--danger', type: 'button', onclick: function () { A.signOut(); } }, icon('logout'), 'خروج'), 'setrow--out') : null
@@ -6721,12 +6720,6 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         config.repo ? el('a', { class: 'btn btn--ghost', href: 'https://github.com/' + config.repo + '/blob/main/docs/ADMIN-GUIDE.md', target: '_blank', rel: 'noopener' }, icon('book'), 'افتح الدليل كامل') : null)
     );
 
-    var look = A.lookCard ? A.lookCard() : null;
-    var appCard = A.appCard ? A.appCard() : null;
-    if (appCard) appCard.setAttribute('data-app-card', '');
-
-    var notify = notifyCards();   // [mine, the settings, the system status] (only with the Worker)
-
     // Phase 8B: every settings card gets the approved head (an icon square, the title, its hint)
     function headify(card, name) {
       if (!card || card.classList.contains('setcard')) return card;
@@ -6738,51 +6731,52 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       head.insertBefore(el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(name)), head.firstChild);
       return card;
     }
-    headify(siteCard, 'globe'); headify(hubCard, 'megaphone'); headify(upgradeCard, 'layers'); headify(guideCard, 'book'); headify(appCard, 'phone');
-    notify.forEach(function (c, i) { headify(c, ['bell', 'gear', 'shield'][i]); });
+    headify(siteCard, 'globe'); headify(hubCard, 'megaphone'); headify(upgradeCard, 'layers'); headify(guideCard, 'book');
 
-    // Phase 8B: sections with a side list (chips on phones); every card stays on the one page, the list
-    // jumps to its section and follows the scroll
+    var worker = !!window.AdminWorker;
+
+    // Phase 8B (owner 2026-11-11): one section at a time, exactly as the approved screens — the side list picks
+    // it (A.go('settings', key), so it is remembered and can be linked); only its cards are built
     var groups = [
-      { key: 'me', title: 'حسابي والشكل', icon: 'user', head: 'الحساب', cards: [accountCard, look] },
-      { key: 'notify', title: 'إشعاراتي', icon: 'bell', cards: [notify[0], appCard] },
-      { key: 'site', title: 'بيانات الموقع', icon: 'globe', head: 'الموقع', cards: [siteCard] },
-      { key: 'content', title: 'المحتوى والظهور', icon: 'megaphone', cards: [A.state.hubReady ? hubCard : null, upgradeCard] },
-      { key: 'publish', title: 'النشر والنسخ', icon: 'retry', cards: [headify(publishHistoryCard(), 'clock')] },
-      { key: 'team', title: 'الفريق والصلاحيات', icon: 'shield', head: 'الفريق', cards: [headify(adminsCard(), 'users')] },
-      { key: 'system', title: 'حالة النظام', icon: 'gear', head: 'النظام', cards: [notify[2], notify[1]] },
-      { key: 'guide', title: 'دليل الأدمن', icon: 'book', cards: [guideCard] }
-    ].map(function (g) { g.cards = g.cards.filter(Boolean); return g; }).filter(function (g) { return g.cards.length; });
+      { key: 'me', title: 'حسابي والشكل', icon: 'user', head: 'الحساب', make: function () {
+        // «غيّر الاسم» uses the team card's rename (built aside, not shown)
+        if (!A.renameAdmin) adminsCard();
+        return [accountCard, A.lookCard ? A.lookCard() : null];
+      } },
+      { key: 'notify', title: 'إشعاراتي', icon: 'bell', has: worker || !!A.appCard, make: function () {
+        var app = A.appCard ? A.appCard() : null;
+        if (app) app.setAttribute('data-app-card', '');
+        return [worker ? headify(notifyCards()[0], 'bell') : null, headify(app, 'phone')];
+      } },
+      { key: 'site', title: 'بيانات الموقع', icon: 'globe', head: 'الموقع', make: function () { return [siteCard]; } },
+      { key: 'content', title: 'المحتوى والظهور', icon: 'megaphone', make: function () { return [A.state.hubReady ? hubCard : null, upgradeCard]; } },
+      { key: 'publish', title: 'النشر والنسخ', icon: 'retry', has: worker, make: function () { return [headify(publishHistoryCard(), 'clock')]; } },
+      { key: 'team', title: 'الفريق والصلاحيات', icon: 'shield', head: 'الفريق', make: function () { return [headify(adminsCard(), 'users')]; } },
+      { key: 'system', title: 'حالة النظام', icon: 'gear', head: 'النظام', has: worker, make: function () { var n = notifyCards(); return [headify(n[2], 'gear'), headify(n[1], 'bell')]; } },
+      { key: 'guide', title: 'دليل الأدمن', icon: 'book', make: function () { return [guideCard]; } }
+    ].filter(function (g) { return g.has !== false; });
 
-    var sections = groups.map(function (g) {
-      return el('section', { class: 'setsec', id: 'set-' + g.key, 'data-set': g.key, 'aria-label': g.title }, g.cards);
-    });
+    var current = groups.filter(function (g) { return g.key === A.sub.settings; })[0] || groups[0];
 
     var links = groups.map(function (g, i) {
       return [
         g.head && i > 0 ? el('hr', { class: 'setnav__sep', 'aria-hidden': 'true' }) : null,
         g.head ? el('p', { class: 'setnav__head', text: g.head }) : null,
-        el('button', { class: 'setnav__link' + (i === 0 ? ' is-on' : ''), type: 'button', 'data-set': g.key, onclick: function () {
-          var target = document.getElementById('set-' + g.key);
-          if (target) target.scrollIntoView({ behavior: A.reducedMotion() ? 'auto' : 'smooth', block: 'start' });
+        el('button', { class: 'setnav__link' + (g === current ? ' is-on' : ''), type: 'button', 'data-set': g.key, 'aria-current': g === current ? 'page' : null, onclick: function () {
+          if (g !== current) A.go('settings', g.key);
         } }, icon(g.icon), el('span', { text: g.title }))
       ];
     });
 
     var nav = el('nav', { class: 'setnav', 'aria-label': 'أقسام الإعدادات' }, links);
-    var page = el('div', { class: 'setpage' }, nav, el('div', { class: 'setpage__main' }, sections));
+    var section = el('section', { class: 'setsec', id: 'set-' + current.key, 'data-set': current.key, 'aria-label': current.title }, current.make().filter(Boolean));
+    var page = el('div', { class: 'setpage' }, nav, el('div', { class: 'setpage__main' }, section));
 
-    // the list follows the scroll
-    if ('IntersectionObserver' in window) {
-      var seen = {};
-      var io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (e) { seen[e.target.getAttribute('data-set')] = e.isIntersecting ? e.boundingClientRect.top : null; });
-        var on = groups.map(function (g) { return g.key; }).filter(function (k) { return seen[k] !== null && seen[k] !== undefined; })[0];
-        if (!on) return;
-        nav.querySelectorAll('.setnav__link').forEach(function (b) { b.classList.toggle('is-on', b.getAttribute('data-set') === on); });
-      }, { rootMargin: '-90px 0px -55% 0px' });
-      requestAnimationFrame(function () { sections.forEach(function (s) { io.observe(s); }); });
-    }
+    // phones: the chosen chip in view
+    requestAnimationFrame(function () {
+      var on = nav.querySelector('.is-on');
+      if (on && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = on.offsetLeft - nav.clientWidth / 2 + on.offsetWidth / 2;
+    });
 
     return [page];
 
@@ -7757,7 +7751,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       A.fill(slot, [
         icon('alert'),
         el('span', { text: stopped ? 'الإيميلات واقفة: صلاحية جيميل محتاجة تتجدد.' : 'فيه ' + s.critical.length + ' تنبيه مهم جدًا لسه متبعتش.' }),
-        el('button', { class: 'btn btn--small', type: 'button', onclick: function () { A.go('settings'); } }, 'شوف «حالة النظام»')
+        el('button', { class: 'btn btn--small', type: 'button', onclick: function () { A.go('settings', 'system'); } }, 'شوف «حالة النظام»')
       ]);
       slot.hidden = false;
     }, function () { /* quiet */ });
