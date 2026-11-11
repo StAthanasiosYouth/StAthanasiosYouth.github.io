@@ -11302,6 +11302,214 @@ html[data-mode="light"] .chipico {
   flex: none;
 }
 
+/* the approved window head: icon square, title, a line under it */
+.sheet--chip .sheet__title::before {
+  display: none;
+}
+
+.sheet__titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.sheet__titles .sheet__title {
+  margin: 0;
+}
+
+.sheet__sub {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.sheet__chip {
+  flex: none;
+}
+
+/* the approved publish stepper: chips with their number in a circle, a line between */
+.stepper[data-publish] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+}
+
+.stepper[data-publish] .stepper__step {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px 5px 6px;
+  border: 1px solid var(--p-line-3);
+  border-radius: 12px;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: start;
+}
+
+.stepper[data-publish] .stepper__step::after {
+  display: none;
+}
+
+.stepper[data-publish] .stepper__dot {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--p-line-3);
+  color: var(--text-2);
+  background: none;
+  box-shadow: none;
+  animation: none;
+}
+
+.stepper[data-publish] .is-current {
+  border-color: var(--p-acc-line);
+  color: var(--acc-hi);
+}
+
+.stepper[data-publish] .is-current .stepper__dot {
+  border: 0;
+  color: var(--acc-ink);
+  background: var(--grad);
+  box-shadow: 0 0 0 4px rgb(var(--acc-rgb) / .15);
+}
+
+.stepper[data-publish] .is-done {
+  color: var(--ok);
+}
+
+.stepper[data-publish] .is-done .stepper__dot {
+  border: 0;
+  color: var(--ok);
+  background: var(--ok-bg);
+}
+
+.stepper[data-publish] .is-failed .stepper__dot {
+  border: 0;
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.stepper__bar {
+  flex: 1;
+  min-width: 24px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--p-line-3);
+}
+
+.stepper__bar.is-done {
+  background: var(--ok);
+}
+
+/* the changes, one card each */
+.changes.review-groups {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.change-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--p-line-2);
+  border-radius: 18px;
+  background: var(--p-surface-2);
+}
+
+.change-card::before {
+  display: none;
+}
+
+.change-card__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.change-card__main b {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.change-card__main small {
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.change__tone {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+/* nothing to publish */
+.pubempty {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 34px 20px;
+  border: 1.5px dashed var(--p-line-3);
+  border-radius: 18px;
+  text-align: center;
+  background: rgb(2 12 24 / .3);
+}
+
+html[data-mode="light"] .pubempty {
+  background: var(--p-surface-2);
+}
+
+.pubempty .chipico {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 6px;
+  border-radius: 14px;
+}
+
+.pubempty .empty-state__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.pubempty .empty-state__text,
+.pubempty__last {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+@media (max-width: 759px) {
+  .stepper[data-publish] .stepper__label {
+    display: none;
+  }
+
+  .stepper[data-publish] .is-current .stepper__label {
+    display: inline;
+  }
+
+  .change-card {
+    flex-wrap: wrap;
+  }
+
+  .change-card .change__diff {
+    flex: 1 0 100%;
+    justify-content: center;
+  }
+}
+
 /* ---------- W2: published versions, by day ---------- */
 
 .pubdays {

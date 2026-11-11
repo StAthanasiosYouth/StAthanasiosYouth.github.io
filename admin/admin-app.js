@@ -2845,11 +2845,15 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     // Phase 8B: centred on wide screens, in three sizes. An item editor (a draft or a lock) or a wide sheet is big
     // (sections on the side), the rest medium; options.size wins.
     var size = options.size || (options.wide || options.draft || options.lock ? 'lg' : 'md');
-    sheet.className = 'sheet sheet--' + size + (options.wide ? ' sheet--wide' : '') + (options.className ? ' ' + options.className : '');
+    sheet.className = 'sheet sheet--' + size + (options.icon ? ' sheet--chip' : '') + (options.wide ? ' sheet--wide' : '') + (options.className ? ' ' + options.className : '');
     A.fill(sheet,
       el('div', { class: 'sheet__grab', 'aria-hidden': 'true' }),
       el('div', { class: 'sheet__head' },
-        el('h2', { class: 'sheet__title', id: 'sheet-title', tabindex: '-1', text: title }),
+        // Phase 8B: the approved head — an icon square, the title and a line under it
+        options.icon ? el('span', { class: 'chipico sheet__chip', 'aria-hidden': 'true' }, icon(options.icon)) : null,
+        options.sub !== undefined
+          ? el('div', { class: 'sheet__titles' }, el('h2', { class: 'sheet__title', id: 'sheet-title', tabindex: '-1', text: title }), el('p', { class: 'sheet__sub', text: options.sub }))
+          : el('h2', { class: 'sheet__title', id: 'sheet-title', tabindex: '-1', text: title }),
         options.headActions ? el('span', { class: 'sheet__headacts' }, options.headActions) : null,
         A.helpButton ? A.helpButton() : null,
         el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: function () { A.closeSheet(); } }, icon('close'))
@@ -5285,12 +5289,16 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   /* step: index of the current step; failed: that step failed */
   function stepper(step, failed) {
 
-    return el('ol', { class: 'stepper', 'aria-label': 'خطوات النشر', 'data-publish': '' }, publishSteps().map(function (s, i) {
+    // Phase 8B: the approved stepper — each step a chip (its number in a circle), a line between them
+    var steps = publishSteps();
+    return el('ol', { class: 'stepper', 'aria-label': 'خطوات النشر', 'data-publish': '' }, steps.map(function (s, i) {
       var state = i < step ? 'done' : i === step ? (failed ? 'failed' : 'current') : 'todo';
-      return el('li', { class: 'stepper__step is-' + state, 'aria-current': i === step ? 'step' : null },
-        el('span', { class: 'stepper__dot', 'aria-hidden': 'true' }, state === 'done' ? icon('check') : state === 'failed' ? icon('alert') : String(i + 1)),
-        el('span', { class: 'stepper__label', text: s.label })
-      );
+      return [
+        el('li', { class: 'stepper__step is-' + state, 'aria-current': i === step ? 'step' : null },
+          el('span', { class: 'stepper__dot', 'aria-hidden': 'true' }, state === 'done' ? icon('check') : state === 'failed' ? icon('alert') : A.digits(i + 1)),
+          el('span', { class: 'stepper__label', text: s.label })),
+        i < steps.length - 1 ? el('li', { class: 'stepper__bar' + (i < step ? ' is-done' : ''), 'aria-hidden': 'true' }) : null
+      ];
     }));
 
   }
@@ -5332,7 +5340,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
 
     publishJob = null;
-    A.openSheet('راجع وانشر', reviewSkeleton());
+    A.openSheet('راجع وانشر', reviewSkeleton(), null, { icon: 'send', sub: 'بنقارن المسودة بالموقع…', headActions: historyButton() });
 
     reviewNow()
       .then(renderReview)
@@ -5341,7 +5349,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.openSheet('راجع وانشر', [stepper(0, true), box], [
           el('button', { class: 'btn btn--primary', type: 'button', onclick: openReview }, icon('retry'), 'جرّب تاني'),
           el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })
-        ]);
+        ], { icon: 'send', sub: 'مقدرناش نجيب التغييرات' });
         A.fail(error, box);
       });
 
@@ -5388,36 +5396,34 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   }
 
-  /* the changes grouped the way the admin thinks: الاجتماع، الأخبار… each line
-     marked new / edited / leaving, with when a scheduled thing appears */
+  /* Phase 8B: the changes exactly as the approved «راجع وانشر» — one card each: the part's icon, what it is
+     with its kind as a chip, where and when under it, and «شوف الفرق» (the site with the drafts) */
   function changeList(review) {
 
     if (!review.groups || !review.groups.length) {
-      return el('ul', { class: 'changes' }, review.changes.map(function (line) { return el('li', { text: line }); }));
+      return el('ul', { class: 'changes review-groups' }, review.changes.map(function (line) {
+        return el('li', { class: 'change-card' }, el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('send')), el('div', { class: 'change-card__main' }, el('b', { text: line })));
+      }));
     }
 
     var tones = { add: 'جديد', change: 'تعديل', remove: 'هيختفي' };
+    var preview = A.state && A.state.config && A.state.config.siteUrl;
 
-    return el('div', { class: 'review-groups' }, review.groups.map(function (group) {
-      return el('section', { class: 'review-group' },
-        el('h3', { class: 'review-group__title' }, icon(group.icon), group.title),
-        el('ul', { class: 'changes' }, group.items.map(function (item) {
-          // Phase 8B: each change a card, its kind as a chip, and «شوف الفرق» (the site with the drafts)
-          return el('li', { class: 'is-' + item.tone },
-            el('span', { class: 'change__text' },
-              el('span', { class: 'chip change__tone change__tone--' + item.tone, text: tones[item.tone] }),
-              el('span', { text: item.text }),
-              item.when ? el('span', { class: 'chip chip--gold change__when', text: item.when }) : null
-            ),
-            A.state && A.state.config && A.state.config.siteUrl && item.tone !== 'remove'
-              ? el('button', { class: 'btn btn--small btn--ghost change__diff', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'شوف الفرق')
-              : null
-          );
-        }))
-      );
+    return el('ul', { class: 'changes review-groups' }, review.groups.map(function (group) {
+      return group.items.map(function (item) {
+        return el('li', { class: 'change-card is-' + item.tone },
+          el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(group.icon)),
+          el('div', { class: 'change-card__main' },
+            el('b', {}, el('span', { text: item.text }), el('span', { class: 'change__tone change__tone--' + item.tone, text: tones[item.tone] })),
+            el('small', { text: group.title + (item.when ? ' · ' + item.when : '') })),
+          preview && item.tone !== 'remove'
+            ? el('button', { class: 'btn btn--small change__diff', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'شوف الفرق')
+            : null);
+      });
     }));
 
   }
+
 
   function renderReview(review) {
 
@@ -5455,17 +5461,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     if (!review.githubError) {
       body.push(nothing
-        ? el('div', { class: 'empty-state empty-state--ok' },
-          el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('check')),
+        ? el('div', { class: 'empty-state empty-state--ok pubempty' },
+          el('span', { class: 'chipico chipico--ok', 'aria-hidden': 'true' }, icon('check')),
           el('p', { class: 'empty-state__title', text: 'الموقع متحدث' }),
-          el('p', { class: 'empty-state__text', text: 'مفيش تغييرات في المسودة عن اللي على الموقع.' }))
-        : el('div', { class: 'form' },
-          el('p', { class: 'section-label', text: 'اللي الزوار هيشوفوه بعد النشر (' + review.changes.length + ')' }),
-          changeList(review)
-        ));
+          el('p', { class: 'empty-state__text', text: 'مفيش تغييرات في المسودة عن اللي على الموقع.' }),
+          A.state.status && A.state.status.publishedAt ? el('p', { class: 'pubempty__last', text: 'آخر نشر: ' + A.formatIso(A.state.status.publishedAt) }) : null)
+        : changeList(review));
     }
 
-    var publish = el('button', { class: 'btn btn--primary', type: 'button', disabled: blocked || nothing }, icon('send'), el('span', { text: 'نشر التغييرات' }));
+    var count = review.changes.length;
+    var publish = el('button', { class: 'btn btn--primary', type: 'button', disabled: blocked || nothing }, icon('send'),
+      el('span', { text: nothing ? 'نشر التغييرات' : 'انشر ' + A.digits(count) + (count === 1 ? ' تغيير' : count <= 10 ? ' تغييرات' : ' تغيير') }));
 
     publish.addEventListener('click', function () {
       if (publishActive()) {
@@ -5488,7 +5494,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       ? el('button', { class: 'btn', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'معاينة')
       : null;
 
-    A.openSheet('راجع وانشر', body, [publish, preview].concat(A.sheetFooter(publish).slice(1)).filter(Boolean), { headActions: historyButton() });
+    A.openSheet('راجع وانشر', body, [publish, preview].concat(A.sheetFooter(publish).slice(1)).filter(Boolean), { icon: 'send', sub: nothing ? 'كل حاجة منشورة' : A.digits(count) + (count === 1 ? ' تغيير مستني' : ' تغييرات مستنية') + ' النشر', headActions: historyButton() });
 
   }
 
@@ -5543,7 +5549,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         el('p', { class: 'loading-text', role: 'status', 'data-publish-job': '' },
           el('span', { class: 'spinner spinner--inline', 'aria-hidden': 'true' }),
           liveAtOnce() ? 'بننشر التغييرات… النشر شغال حتى لو قفلت الشاشة دي.' : 'بنبعت التغييرات لـ GitHub… النشر شغال حتى لو قفلت الشاشة دي.')
-      ], [el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })]);
+      ], [el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })], { icon: 'send', sub: 'النشر شغال' });
       return;
     }
 
@@ -5582,10 +5588,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       el('p', { class: 'note note--ok', 'data-publish-job': '', text: liveAtOnce()
         ? (result.unchanged ? 'الموقع كان متحدث بالفعل.' : 'التغييرات على الموقع دلوقتي ✓ — مش محتاج تستنى حاجة.')
         : result.unchanged ? 'الملفات على GitHub زي ما هي.' : mirror ? 'اتنشر على السيرفر الجديد ✓ ونسخة GitHub بتتحدث في الخلفية.' : 'التغييرات اتبعتت لـ GitHub.' }),
-      result.commitUrl ? el('a', { class: 'link-row', href: result.commitUrl, target: '_blank', rel: 'noopener' }, icon('external'), 'شوف الكوميت على GitHub') : null,
       live,
       push
-    ], [el('button', { class: 'btn btn--primary', type: 'button', text: 'تمام', onclick: function () { A.closeSheet(); } })]);
+    ], [el('button', { class: 'btn btn--primary', type: 'button', text: 'تمام', onclick: function () { A.closeSheet(); } })], { icon: 'send', sub: 'ظهر على الموقع' });
 
   }
 
@@ -5597,7 +5602,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     A.openSheet('النشر ما كملش', [stepper(1, true), box], [
       el('button', { class: 'btn btn--primary', type: 'button', onclick: openReview }, icon('retry'), 'راجع تاني'),
       el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })
-    ]);
+    ], { icon: 'send', sub: 'جرّب تاني بعد ما تراجع' });
     A.fail(error, box);
 
   }
