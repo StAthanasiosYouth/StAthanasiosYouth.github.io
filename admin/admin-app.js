@@ -234,6 +234,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   /* Phase 8B: the design's own extra icons (docs/phase8b/proposal.js EXTRA, proposal-2.js play) */
   if (A.ICONS) {
     var EXTRA_ICONS = {
+      wallet: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18a2 2 0 0 1 2 2v1H6.5A2.5 2.5 0 0 0 4 10.5Z"/><path d="M4 7.5v9A2.5 2.5 0 0 0 6.5 19H19a1 1 0 0 0 1-1v-8a2 2 0 0 0-2-2H6.5A2.5 2.5 0 0 1 4 5.5"/><path d="M16 13.5h.01"/></svg>',
+      cash: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="duo" x="3" y="6" width="18" height="12" rx="2.5"/><rect x="3" y="6" width="18" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6.5 9.5v.01M17.5 14.5v.01"/></svg>',
+      swap: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 7h12l-3-3M17 17H5l3 3"/></svg>',
+      grid: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="duo" x="4" y="4" width="7" height="7" rx="2"/><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg>',
+      history: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>',
+      userx: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle class="duo" cx="10" cy="8" r="4"/><circle cx="10" cy="8" r="4"/><path d="M3 20a7 7 0 0 1 11.5-5.4M17 15l4 4m0-4-4 4"/></svg>',
+      filter: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M4 5h16l-6 7.5V19l-4-2v-4.5Z"/><path d="M4 5h16l-6 7.5V19l-4-2v-4.5Z"/></svg>',
+      archive: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="duo" x="3" y="4" width="18" height="5" rx="1.5"/><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4"/></svg>',
+      key: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle class="duo" cx="8" cy="15" r="4"/><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8m-3 3 2 2m-4 0 1.5 1.5"/></svg>',
+      device: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="duo" x="7" y="3" width="10" height="18" rx="2.5"/><rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/></svg>',
+      cake: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M4 13h16v7H4z"/><path d="M4 20h16M4 13h16v7M6 13v-3h12v3M12 10V7m0-3v.01"/></svg>',
       palette: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-1.3-1-1.6-1-2.6 0-.8.6-1.4 1.4-1.4H16a5 5 0 0 0 5-5C21 6.2 17 3 12 3Z"/><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-1.3-1-1.6-1-2.6 0-.8.6-1.4 1.4-1.4H16a5 5 0 0 0 5-5C21 6.2 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="14.5" cy="7.5" r="1"/></svg>',
       play: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M8 5.5v13l10.5-6.5Z"/><path d="M8 5.5v13l10.5-6.5Z"/></svg>'
     };
@@ -3775,7 +3786,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   A.AREAS = [
     // group: the rail's heading (Phase 8 A2): الشغل · الموقع · الفريق; «الإعدادات» lives at the rail's foot
-    { key: 'home', label: 'الرئيسية', icon: 'home', view: 'schedule', group: 'main' },
+    { key: 'home', label: 'الرئيسية', icon: 'grid', view: 'schedule', group: 'main' },
     { key: 'content', label: 'المحتوى', icon: 'megaphone', group: 'site', subs: [
       { key: 'meetings', label: 'الاجتماعات' },
       { key: 'news', label: 'الأخبار' },
@@ -4800,7 +4811,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   /* Save button for settings-based forms */
   A.settingsSaver = function (collect, box) {
 
-    var button = el('button', { class: 'btn btn--primary', type: 'button', text: 'حفظ', 'data-lockable': 'settings' });
+    var button = el('button', { class: 'btn btn--primary', type: 'button', 'data-lockable': 'settings' }, icon('check'), 'احفظ');
 
     // the official admin locks the card's settings groups on the first change
     button._collect = collect;
@@ -5311,7 +5322,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       A.openSheet('النسخ السابقة', [A.publishHistoryCard()], [
         el('button', { class: 'btn', type: 'button', onclick: openReview }, icon('send'), 'رجوع لراجع وانشر')
       ], { size: 'md' });
-    } }, icon('clock'), 'النسخ السابقة');
+    } }, icon('history'), 'النسخ السابقة');
 
   }
 
@@ -6661,34 +6672,47 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var siteCard = A.card('بيانات الموقع', 'بتظهر في عنوان الموقع، وفي المشاركة على واتساب وفيسبوك',
       box,
       el('div', { class: 'setsplit' },
-        el('div', { class: 'form', oninput: drawShare }, name.node, tagline.node, shareText.node),
-        el('aside', { class: 'setsplit__aside' }, el('p', { class: 'setsplit__label', text: 'لما حد يشارك اللينك' }), share)),
-      A.settingsSaver(function () {
-        return {
-          'site.name': name.input.value,
-          'site.tagline': tagline.input.value,
-          'site.shareText': shareText.input.value
-        };
-      }, box)
+        el('div', { class: 'form', oninput: drawShare }, name.node, tagline.node, shareText.node,
+          el('div', { class: 'setcard__foot' },
+            A.settingsSaver(function () {
+              return {
+                'site.name': name.input.value,
+                'site.tagline': tagline.input.value,
+                'site.shareText': shareText.input.value
+              };
+            }, box),
+            el('small', { class: 'setcard__note', text: 'بيتحفظ مسودة لحد «راجع وانشر»' }))),
+        el('aside', { class: 'setsplit__aside' }, el('p', { class: 'setsplit__label', text: 'لما حد يشارك اللينك' }), share))
     );
 
     var hubBox = A.errorBox();
     var historyDays = A.textInput(setting('notifications.historyDays'), { type: 'number', inputmode: 'numeric' });
     var endedHours = A.textInput(setting('games.endedHours'), { type: 'number', inputmode: 'numeric' });
 
-    var hubCard = A.card('المحتوى', null,
+    // Phase 8B «المحتوى والظهور»: the approved rows — the words on one side, the number with its unit on the other
+    function unitRow(label, hint, input, unit) {
+      input.classList.add('setnum__input');
+      return el('div', { class: 'setrow' },
+        el('div', { class: 'setrow__text' }, el('b', { class: 'setrow__label', text: label }), hint ? el('small', { class: 'setrow__hint', text: hint }) : null),
+        el('div', { class: 'setrow__ctl' }, el('label', { class: 'setnum' }, input, el('span', { class: 'setnum__unit', text: unit }))));
+    }
+    var hubCard = el('section', { class: 'card setcard setcard--rows' },
+      el('div', { class: 'setcard__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('megaphone')),
+        el('div', { class: 'setcard__titles' },
+          el('h2', { class: 'card__title', text: 'المحتوى والظهور' }),
+          el('p', { class: 'card__hint', text: 'إمتى الحاجات بتختفي لوحدها من الموقع' }))),
       hubBox,
-      el('div', { class: 'form' },
-        A.field('الإشعارات بتفضل في الجرس كام يوم', historyDays, A.settingHelp('notifications.historyDays')),
-        A.field('اللعبة بتفضل ظاهرة كام ساعة بعد ما تخلص', endedHours, A.settingHelp('games.endedHours'))
-      ),
-      A.settingsSaver(function () {
+      unitRow('الإشعارات بتفضل في الجرس كام يوم', 'لو الإشعار مالوش ميعاد اختفاء', historyDays, 'يوم'),
+      unitRow('اللعبة بتفضل ظاهرة كام ساعة بعد ما تخلص', 'كروت «ركن الألعاب» في الاجتماع (مش قسم الألعاب الجاي في Phase 10)', endedHours, 'ساعة'),
+      el('div', { class: 'setcard__foot' }, A.settingsSaver(function () {
         return {
           'notifications.historyDays': historyDays.value,
           'games.endedHours': endedHours.value
         };
-      }, hubBox)
+      }, hubBox))
     );
+
 
     // Phase 8B: no GitHub, Script Properties, Drive test or «افتح الشيت» here any more (the Worker publishes;
     // the mirror keeps running in the background)
@@ -6730,11 +6754,36 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     );
 
     var config = A.state.config || {};
-    var guideCard = A.card('دليل الأدمن', 'كل خانة معناها إيه، وإزاي تضيف اجتماع أو خبر أو لعبة خطوة بخطوة.',
-      el('div', { class: 'actions' },
-        el('button', { class: 'btn', type: 'button', onclick: function () { A.help(); } }, icon('video'), 'شرح الجزء ده'),
-        config.repo ? el('a', { class: 'btn btn--ghost', href: 'https://github.com/' + config.repo + '/blob/main/docs/ADMIN-GUIDE.md', target: '_blank', rel: 'noopener' }, icon('book'), 'افتح الدليل كامل') : null)
-    );
+    // Phase 8B «دليل الأدمن»: the approved grid — a search, then a card per guide that opens its help
+    var GUIDES = [
+      ['church', 'إزاي أضيف موضوع اجتماع', 'المحتوى ← الاجتماعات', 'meetings'],
+      ['megaphone', 'إزاي أكتب خبر ويظهر في الرئيسية', 'المحتوى ← الأخبار', 'news'],
+      ['theatre', 'فعالية جديدة بحجز', 'الفعاليات والصفحات', 'events'],
+      ['ticket', 'مراجعة طلب حجز وتسجيل دفعة', 'الحجوزات والفلوس', 'bookings'],
+      ['trophy', 'مسابقة من الأول للنتيجة', 'المسابقات', 'comps'],
+      ['send', 'النشر والرجوع لنسخة قديمة', 'راجع وانشر', 'publish'],
+      ['shield', 'إضافة خادم للإدارة وصلاحياته', 'الإعدادات ← الفريق', 'settings'],
+      ['photos', 'رفع صورة أو مقطع فيديو', 'الصور والملفات', 'media']
+    ];
+    var guideGrid = el('div', { class: 'guides' }, GUIDES.map(function (g) {
+      return el('button', { class: 'guide', type: 'button', 'data-q': g[1] + ' ' + g[2], onclick: function () { A.help(g[3]); } },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(g[0])),
+        el('span', { class: 'guide__text' }, el('b', { text: g[1] }), el('small', { text: g[2] })),
+        el('span', { class: 'guide__go', 'aria-hidden': 'true' }, icon('chevron')));
+    }));
+    var guideSearch = el('input', { class: 'guide-search__input', type: 'search', placeholder: 'دوّر في الدليل…', 'aria-label': 'دوّر في الدليل', oninput: function () {
+      var q = guideSearch.value.trim();
+      guideGrid.querySelectorAll('.guide').forEach(function (b) { b.hidden = !!q && b.getAttribute('data-q').indexOf(q) === -1; });
+    } });
+    var guideCard = el('section', { class: 'card setcard setcard--plain' },
+      el('div', { class: 'setcard__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('book')),
+        el('div', { class: 'setcard__titles' },
+          el('h2', { class: 'card__title', text: 'دليل الأدمن' }),
+          el('p', { class: 'card__hint', text: 'كل خانة معناها إيه، وإزاي تعمل كل حاجة خطوة بخطوة. زرار الفيديو في أي شاشة بيفتح الجزء بتاعها على طول.' }))),
+      el('label', { class: 'guide-search' }, icon('filter'), guideSearch),
+      guideGrid);
+
 
     // Phase 8B: every settings card gets the approved head (an icon square, the title, its hint)
     function headify(card, name) {
@@ -6762,13 +6811,15 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       { key: 'notify', title: 'إشعاراتي', icon: 'bell', has: worker || !!A.appCard, make: function () {
         var app = A.appCard ? A.appCard() : null;
         if (app) app.setAttribute('data-app-card', '');
-        return [worker ? headify(notifyCards()[0], 'bell') : null, headify(app, 'phone')];
+        // the approved «إشعاراتي»: «إعدادات الإشعارات» (what goes to whom), then the admin's own choices, then the app
+        var n = worker ? notifyCards() : [];
+        return [headify(n[1], 'bell'), headify(n[0], 'user'), headify(app, 'device')];
       } },
       { key: 'site', title: 'بيانات الموقع', icon: 'globe', head: 'الموقع', make: function () { return [siteCard]; } },
-      { key: 'content', title: 'المحتوى والظهور', icon: 'megaphone', make: function () { return [A.state.hubReady ? hubCard : null, upgradeCard]; } },
-      { key: 'publish', title: 'النشر والنسخ', icon: 'retry', has: worker, make: function () { return [headify(publishHistoryCard(), 'clock')]; } },
+      { key: 'content', title: 'المحتوى والظهور', icon: 'megaphone', make: function () { var s = A.state.schema; return [A.state.hubReady ? hubCard : null, s && s.data < s.target ? upgradeCard : null]; } },
+      { key: 'publish', title: 'النشر والنسخ', icon: 'history', has: worker, make: function () { return [headify(publishHistoryCard(), 'history')]; } },
       { key: 'team', title: 'الفريق والصلاحيات', icon: 'shield', head: 'الفريق', make: function () { return [headify(adminsCard(), 'users')]; } },
-      { key: 'system', title: 'حالة النظام', icon: 'gear', head: 'النظام', has: worker, make: function () { var n = notifyCards(); return [headify(n[2], 'gear'), headify(n[1], 'bell')]; } },
+      { key: 'system', title: 'حالة النظام', icon: 'gear', head: 'النظام', has: worker, make: function () { return [headify(notifyCards()[2], 'gear')]; } },
       { key: 'guide', title: 'دليل الأدمن', icon: 'book', make: function () { return [guideCard]; } }
     ].filter(function (g) { return g.has !== false; });
 

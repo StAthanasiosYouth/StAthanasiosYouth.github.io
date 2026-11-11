@@ -264,13 +264,15 @@ test('notifications: «تنبيهاتي», «إعدادات الإشعارات»
   const { context, page, problems } = await openSettings();
   // Phase 8B: one section at a time — «حالة النظام» holds the notification settings and the system status
   await page.evaluate(() => A.go('settings', 'system'));
-  await page.waitForSelector('.card--notify-settings .nt-row');
   await page.waitForSelector('.card--system-status .nt-critical');
   const memberPart = await page.evaluate(() => document.querySelector('.card--system-status .nt-member').innerText);
   assert.match(memberPart, /الحسابات شغالة/);
   assert.match(memberPart, /إيميلات الأعضاء مقفولة/);
   assert.match(memberPart, /12 \/ 400/);
   assert.match(memberPart, /مصدر بيجرّب إيميلات كتير/);
+  // «إعدادات الإشعارات» lives in «إشعاراتي» (the approved screen)
+  await page.evaluate(() => A.go('settings', 'notify'));
+  await page.waitForSelector('.card--notify-settings .nt-row');
   await page.screenshot({ path: `${SHOTS}notify-settings.png`, fullPage: true });
 
   // «إعدادات الإشعارات»: publish → no push, summary email; then the switch on (asks first)
@@ -316,7 +318,7 @@ test('notifications: «تنبيهاتي», «إعدادات الإشعارات»
 test('notifications on a phone: no page overflow in the settings page', async () => {
   fake.reset();
   const { context, page, problems } = await openSettings({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
-  await page.evaluate(() => A.go('settings', 'system'));
+  await page.evaluate(() => A.go('settings', 'notify'));
   await page.waitForSelector('.card--notify-settings .nt-row');
   await page.evaluate(() => document.querySelector('.card--notify-settings .grants').scrollIntoView({ block: 'start' }));
   await sleep(300);

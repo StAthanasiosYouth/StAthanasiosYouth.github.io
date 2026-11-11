@@ -868,34 +868,47 @@
     var siteCard = A.card('بيانات الموقع', 'بتظهر في عنوان الموقع، وفي المشاركة على واتساب وفيسبوك',
       box,
       el('div', { class: 'setsplit' },
-        el('div', { class: 'form', oninput: drawShare }, name.node, tagline.node, shareText.node),
-        el('aside', { class: 'setsplit__aside' }, el('p', { class: 'setsplit__label', text: 'لما حد يشارك اللينك' }), share)),
-      A.settingsSaver(function () {
-        return {
-          'site.name': name.input.value,
-          'site.tagline': tagline.input.value,
-          'site.shareText': shareText.input.value
-        };
-      }, box)
+        el('div', { class: 'form', oninput: drawShare }, name.node, tagline.node, shareText.node,
+          el('div', { class: 'setcard__foot' },
+            A.settingsSaver(function () {
+              return {
+                'site.name': name.input.value,
+                'site.tagline': tagline.input.value,
+                'site.shareText': shareText.input.value
+              };
+            }, box),
+            el('small', { class: 'setcard__note', text: 'بيتحفظ مسودة لحد «راجع وانشر»' }))),
+        el('aside', { class: 'setsplit__aside' }, el('p', { class: 'setsplit__label', text: 'لما حد يشارك اللينك' }), share))
     );
 
     var hubBox = A.errorBox();
     var historyDays = A.textInput(setting('notifications.historyDays'), { type: 'number', inputmode: 'numeric' });
     var endedHours = A.textInput(setting('games.endedHours'), { type: 'number', inputmode: 'numeric' });
 
-    var hubCard = A.card('المحتوى', null,
+    // Phase 8B «المحتوى والظهور»: the approved rows — the words on one side, the number with its unit on the other
+    function unitRow(label, hint, input, unit) {
+      input.classList.add('setnum__input');
+      return el('div', { class: 'setrow' },
+        el('div', { class: 'setrow__text' }, el('b', { class: 'setrow__label', text: label }), hint ? el('small', { class: 'setrow__hint', text: hint }) : null),
+        el('div', { class: 'setrow__ctl' }, el('label', { class: 'setnum' }, input, el('span', { class: 'setnum__unit', text: unit }))));
+    }
+    var hubCard = el('section', { class: 'card setcard setcard--rows' },
+      el('div', { class: 'setcard__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('megaphone')),
+        el('div', { class: 'setcard__titles' },
+          el('h2', { class: 'card__title', text: 'المحتوى والظهور' }),
+          el('p', { class: 'card__hint', text: 'إمتى الحاجات بتختفي لوحدها من الموقع' }))),
       hubBox,
-      el('div', { class: 'form' },
-        A.field('الإشعارات بتفضل في الجرس كام يوم', historyDays, A.settingHelp('notifications.historyDays')),
-        A.field('اللعبة بتفضل ظاهرة كام ساعة بعد ما تخلص', endedHours, A.settingHelp('games.endedHours'))
-      ),
-      A.settingsSaver(function () {
+      unitRow('الإشعارات بتفضل في الجرس كام يوم', 'لو الإشعار مالوش ميعاد اختفاء', historyDays, 'يوم'),
+      unitRow('اللعبة بتفضل ظاهرة كام ساعة بعد ما تخلص', 'كروت «ركن الألعاب» في الاجتماع (مش قسم الألعاب الجاي في Phase 10)', endedHours, 'ساعة'),
+      el('div', { class: 'setcard__foot' }, A.settingsSaver(function () {
         return {
           'notifications.historyDays': historyDays.value,
           'games.endedHours': endedHours.value
         };
-      }, hubBox)
+      }, hubBox))
     );
+
 
     // Phase 8B: no GitHub, Script Properties, Drive test or «افتح الشيت» here any more (the Worker publishes;
     // the mirror keeps running in the background)
@@ -937,11 +950,36 @@
     );
 
     var config = A.state.config || {};
-    var guideCard = A.card('دليل الأدمن', 'كل خانة معناها إيه، وإزاي تضيف اجتماع أو خبر أو لعبة خطوة بخطوة.',
-      el('div', { class: 'actions' },
-        el('button', { class: 'btn', type: 'button', onclick: function () { A.help(); } }, icon('video'), 'شرح الجزء ده'),
-        config.repo ? el('a', { class: 'btn btn--ghost', href: 'https://github.com/' + config.repo + '/blob/main/docs/ADMIN-GUIDE.md', target: '_blank', rel: 'noopener' }, icon('book'), 'افتح الدليل كامل') : null)
-    );
+    // Phase 8B «دليل الأدمن»: the approved grid — a search, then a card per guide that opens its help
+    var GUIDES = [
+      ['church', 'إزاي أضيف موضوع اجتماع', 'المحتوى ← الاجتماعات', 'meetings'],
+      ['megaphone', 'إزاي أكتب خبر ويظهر في الرئيسية', 'المحتوى ← الأخبار', 'news'],
+      ['theatre', 'فعالية جديدة بحجز', 'الفعاليات والصفحات', 'events'],
+      ['ticket', 'مراجعة طلب حجز وتسجيل دفعة', 'الحجوزات والفلوس', 'bookings'],
+      ['trophy', 'مسابقة من الأول للنتيجة', 'المسابقات', 'comps'],
+      ['send', 'النشر والرجوع لنسخة قديمة', 'راجع وانشر', 'publish'],
+      ['shield', 'إضافة خادم للإدارة وصلاحياته', 'الإعدادات ← الفريق', 'settings'],
+      ['photos', 'رفع صورة أو مقطع فيديو', 'الصور والملفات', 'media']
+    ];
+    var guideGrid = el('div', { class: 'guides' }, GUIDES.map(function (g) {
+      return el('button', { class: 'guide', type: 'button', 'data-q': g[1] + ' ' + g[2], onclick: function () { A.help(g[3]); } },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(g[0])),
+        el('span', { class: 'guide__text' }, el('b', { text: g[1] }), el('small', { text: g[2] })),
+        el('span', { class: 'guide__go', 'aria-hidden': 'true' }, icon('chevron')));
+    }));
+    var guideSearch = el('input', { class: 'guide-search__input', type: 'search', placeholder: 'دوّر في الدليل…', 'aria-label': 'دوّر في الدليل', oninput: function () {
+      var q = guideSearch.value.trim();
+      guideGrid.querySelectorAll('.guide').forEach(function (b) { b.hidden = !!q && b.getAttribute('data-q').indexOf(q) === -1; });
+    } });
+    var guideCard = el('section', { class: 'card setcard setcard--plain' },
+      el('div', { class: 'setcard__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('book')),
+        el('div', { class: 'setcard__titles' },
+          el('h2', { class: 'card__title', text: 'دليل الأدمن' }),
+          el('p', { class: 'card__hint', text: 'كل خانة معناها إيه، وإزاي تعمل كل حاجة خطوة بخطوة. زرار الفيديو في أي شاشة بيفتح الجزء بتاعها على طول.' }))),
+      el('label', { class: 'guide-search' }, icon('filter'), guideSearch),
+      guideGrid);
+
 
     // Phase 8B: every settings card gets the approved head (an icon square, the title, its hint)
     function headify(card, name) {
@@ -969,13 +1007,15 @@
       { key: 'notify', title: 'إشعاراتي', icon: 'bell', has: worker || !!A.appCard, make: function () {
         var app = A.appCard ? A.appCard() : null;
         if (app) app.setAttribute('data-app-card', '');
-        return [worker ? headify(notifyCards()[0], 'bell') : null, headify(app, 'phone')];
+        // the approved «إشعاراتي»: «إعدادات الإشعارات» (what goes to whom), then the admin's own choices, then the app
+        var n = worker ? notifyCards() : [];
+        return [headify(n[1], 'bell'), headify(n[0], 'user'), headify(app, 'device')];
       } },
       { key: 'site', title: 'بيانات الموقع', icon: 'globe', head: 'الموقع', make: function () { return [siteCard]; } },
-      { key: 'content', title: 'المحتوى والظهور', icon: 'megaphone', make: function () { return [A.state.hubReady ? hubCard : null, upgradeCard]; } },
-      { key: 'publish', title: 'النشر والنسخ', icon: 'retry', has: worker, make: function () { return [headify(publishHistoryCard(), 'clock')]; } },
+      { key: 'content', title: 'المحتوى والظهور', icon: 'megaphone', make: function () { var s = A.state.schema; return [A.state.hubReady ? hubCard : null, s && s.data < s.target ? upgradeCard : null]; } },
+      { key: 'publish', title: 'النشر والنسخ', icon: 'history', has: worker, make: function () { return [headify(publishHistoryCard(), 'history')]; } },
       { key: 'team', title: 'الفريق والصلاحيات', icon: 'shield', head: 'الفريق', make: function () { return [headify(adminsCard(), 'users')]; } },
-      { key: 'system', title: 'حالة النظام', icon: 'gear', head: 'النظام', has: worker, make: function () { var n = notifyCards(); return [headify(n[2], 'gear'), headify(n[1], 'bell')]; } },
+      { key: 'system', title: 'حالة النظام', icon: 'gear', head: 'النظام', has: worker, make: function () { return [headify(notifyCards()[2], 'gear')]; } },
       { key: 'guide', title: 'دليل الأدمن', icon: 'book', make: function () { return [guideCard]; } }
     ].filter(function (g) { return g.has !== false; });
 

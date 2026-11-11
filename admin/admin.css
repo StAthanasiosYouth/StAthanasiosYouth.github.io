@@ -11867,6 +11867,148 @@ html[data-mode="light"] .setnav__link.is-on {
   margin-bottom: 4px;
 }
 
+.setcard__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding-top: 16px;
+}
+
+.setcard--rows .setcard__foot {
+  border-top: 1px solid var(--p-line-2);
+  padding-bottom: 14px;
+}
+
+.setcard__foot .btn--primary {
+  min-width: 98px;
+  min-height: 42px;
+  border-radius: 12px;
+}
+
+.setcard__note {
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+/* «دليل الأدمن» (approved): a search, then the guides two by two */
+.guide-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--p-line-3);
+  border-radius: 12px;
+  color: var(--text-3);
+  background: var(--p-surface);
+}
+
+.guide-search .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.guide-search__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  color: var(--text);
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.guides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.guide {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--p-line-2);
+  border-radius: 18px;
+  color: var(--text);
+  background: rgb(10 33 64 / .55);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color .25s;
+}
+
+html[data-mode="light"] .guide {
+  background: var(--p-surface-2);
+}
+
+.guide:hover {
+  border-color: var(--p-acc-line);
+}
+
+.guide[hidden] {
+  display: none;
+}
+
+.guide__text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.guide__text b {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.guide__text small {
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.guide__go {
+  color: var(--text-3);
+}
+
+.guide__go .icon {
+  width: 18px;
+  height: 18px;
+}
+
+@media (max-width: 759px) {
+  .guides {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* a number with its unit (the approved «المحتوى والظهور») */
+.setnum {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.setnum .setnum__input {
+  width: 106px;
+  height: 44px;
+  border-radius: 0 12px 12px 0;
+  text-align: right;
+}
+
+.setnum__unit {
+  display: grid;
+  place-items: center;
+  padding: 0 12px;
+  border: 1px solid var(--p-line-3);
+  border-right: 0;
+  border-radius: 12px 0 0 12px;
+  color: var(--text-3);
+  background: var(--p-surface-2);
+  font-size: 12.5px;
+}
+
 .setcard--plain > .btn--primary {
   justify-self: start;
   min-width: 140px;
