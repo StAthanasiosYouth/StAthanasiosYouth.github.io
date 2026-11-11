@@ -259,6 +259,8 @@ test('help «؟»: the screen\'s own topic from admin/help.json, on top of an op
       if (viewport.width < 760) { assert.equal(await shown(button), false, 'no top help on a phone'); continue; }
       assert.ok(await shown(button), `help visible on ${area}/${sub || ''} (${viewport.width})`);
       await press(button);
+      // Phase 8B: the video bubble first, then «اقرا الشرح المكتوب»
+      await press(await page.waitForSelector('.vpop:popover-open .vpop__more'));
       await page.waitForSelector('dialog.help[open] .help__title');
       assert.equal(await page.$eval('dialog.help[open] .help__title', n => n.textContent), title);
       assert.ok(await page.$$eval('dialog.help[open] .help__item', n => n.length) >= 2);
@@ -281,6 +283,7 @@ test('help «؟»: the screen\'s own topic from admin/help.json, on top of an op
     const help = await page.$('dialog.sheet[open] .help-btn');
     assert.ok(await shown(help), 'the editor\'s «؟» visible');
     await press(help);
+    await press(await page.waitForSelector('.vpop:popover-open .vpop__more'));
     await page.waitForSelector('dialog.help[open] .help__title');
     assert.equal(await page.$eval('dialog.help[open] .help__title', n => n.textContent), 'الأخبار');
     await page.screenshot({ path: `${ROOT}tools/.cache/help-${viewport.width}.png` });

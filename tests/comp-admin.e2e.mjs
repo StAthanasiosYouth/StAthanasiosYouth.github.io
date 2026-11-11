@@ -813,6 +813,7 @@ test('«كروت المسابقات»: the linked card is read-only with «اف�
   await $('.comp-head .comp-head__title');
 
   await d.page.click('#help-open');
+  await d.page.click(await d.page.waitForSelector('.vpop:popover-open .vpop__more').then(() => '.vpop:popover-open .vpop__more'));
   await d.page.waitForSelector('dialog.help[open] .help__title');
   assert.equal(await d.page.$eval('dialog.help[open] .help__title', n => n.textContent), 'المسابقات');
   await d.page.keyboard.press('Escape');

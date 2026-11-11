@@ -13815,3 +13815,142 @@ html[data-mode="light"] .seg--field .seg__opt:has(input:checked) {
   color: var(--text);
 }
 
+/* ---------- Phase 8B: the video-help bubble (help-pop.png) ---------- */
+.menu.vpop {
+  width: 280px;
+  padding: 12px;
+  overflow: visible;
+  border: 1px solid var(--p-line-3);
+  border-radius: 18px;
+  background: var(--p-modal, #0b2342);
+  box-shadow: var(--p-shadow-lg);
+}
+
+.menu.vpop:popover-open {
+  display: block;
+}
+
+.menu.vpop::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  right: 26px;
+  width: 12px;
+  height: 12px;
+  transform: rotate(45deg);
+  border-top: 1px solid var(--p-line-3);
+  border-left: 1px solid var(--p-line-3);
+  background: inherit;
+}
+
+.vpop__thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin-bottom: 10px;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  background: radial-gradient(circle, #1b4b74, #061629);
+}
+
+.vpop__thumb img {
+  grid-area: 1 / 1;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  opacity: .5;
+}
+
+.vpop__play {
+  display: grid;
+  grid-area: 1 / 1;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border: 1px solid rgb(255 255 255 / .25);
+  border-radius: 50%;
+  color: #fff;
+  background: rgb(4 17 31 / .45);
+}
+
+.vpop__play .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.vpop__soon {
+  position: absolute;
+  top: 8px;
+  inset-inline-start: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--warn);
+  background: var(--warn-bg);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.vpop__title {
+  display: block;
+  font-size: 14px;
+}
+
+.vpop__text {
+  display: block;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.vpop__more {
+  display: block;
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  color: var(--acc-hi);
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+html[data-mode="light"] .vpop__more {
+  color: var(--acc-deep);
+}
+
+@media (max-width: 759px) {
+  .menu.vpop {
+    left: 12px !important;
+    right: 12px;
+    width: auto;
+  }
+}
+
+.vpop .vpop__thumb img {
+  width: 64px;
+  height: 64px;
+  opacity: .5;
+}
+
+.vpop .vpop__play {
+  position: relative;
+  width: 58px;
+  height: 58px;
+}
+
+.vpop .vpop__play::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  transform: translate(-35%, -50%);
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-left: 11px solid #fff;
+}
+
