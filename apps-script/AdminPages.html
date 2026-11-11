@@ -355,35 +355,42 @@
     function draw(r) {
       var pages = r.pages.filter(function (p) { return !p.archived || P.showArchived; });
       if (!pages.length) {
-        A.fill(body, el('div', { class: 'empty-state' },
-          el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('theatre')),
-          el('p', { class: 'empty-state__title', text: 'مفيش صفحات خدمة لسه' }),
-          el('p', { class: 'empty-state__text', text: 'زوّد صفحة زي «المسرح الأسود»: غلاف، وصف، فيديوهات، وفريق الخدمة.' })));
+        A.fill(body, el('div', { class: 'p8-empty empty-state' },
+          el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('theatre')),
+          el('b', { text: 'مفيش صفحات خدمة لسه' }),
+          el('small', { text: 'زوّد صفحة زي «المسرح الأسود»: غلاف، وصف، فيديوهات، وفريق الخدمة.' })));
         return;
       }
       var site = siteUrl(r);
-      A.fill(body, el('ul', { class: 'list' }, pages.map(function (page) {
-        var row = A.listItem({
-          icon: 'theatre',
-          image: page.cover || null,
-          title: page.title,
-          sub: '/' + page.slug + '/' + (page.tagline ? ' — ' + page.tagline : ''),
-          off: !page.enabled || page.archived,
-          chips: [
-            liveChip(page),
-            cardChip(page.card, page.home),
-            A.chip(ar(page.mediaCount) + ' كارت فيديو', page.mediaCount ? '' : 'gold'),
-            page.partner ? A.chip('بإشراف B.U.G.', 'info') : null
-          ].filter(Boolean),
-          controls: [
-            el('span', { class: 'spacer' }),
-            page.live ? el('a', { class: 'icon-btn', href: site + page.slug + '/', target: '_blank', rel: 'noopener', 'aria-label': 'افتح الصفحة في الموقع: ' + page.title, title: 'افتح في الموقع' }, icon('external')) : null,
-            el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'معاينة: ' + page.title, title: 'معاينة', onclick: function () { previewSheet('page', page.id, page.title); } }, icon('eye')),
-            A.editButton(page.title, function () { openPage(page.id); })
-          ]
-        });
-        row.dataset.id = page.id;
-        return row;
+      // Phase 8B (svcpages.png): a card per page — its cover, title and line, /slug/, its clips and partner,
+      // «منشورة» / «كارت في الرئيسية», «إدارة الصفحة», «افتحها» and ⋯ («معاينة», «ترتيب الكروت»)
+      A.fill(body, el('div', { class: 'p8-cgrid' }, pages.map(function (page) {
+        var cover = el('div', { class: 'p8-cc__img' + (page.cover ? '' : ' is-icon'), 'aria-hidden': 'true' }, page.cover ? null : icon('theatre'));
+        if (page.cover && A.mediaPreview) A.mediaPreview(page.cover).then(function (src) { if (src) cover.appendChild(el('img', { src: src, alt: '' })); }).catch(function () {});
+        var live = page.live && page.enabled && !page.archived;
+        var home = page.home && page.home.show && (!page.card || page.card.show);
+        var more = el('button', { class: 'p8-iconbtn', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-label': 'اختيارات تانية: ' + page.title, onclick: function (e) {
+          var look = A.menuItem('eye', 'معاينة', function () { previewSheet('page', page.id, page.title); });
+          look.setAttribute('aria-label', 'معاينة: ' + page.title);
+          A.menu(e.currentTarget, 'menu--p8', [look, A.menuItem('layers', 'ترتيب كروت «' + sectionTitle('services') + '»', function () { orderSheet('services', page.card ? page.card.id : ''); })], { align: 'start' });
+        } }, icon('dots'));
+        var card = el('article', { class: 'p8-cc item' + (page.enabled && !page.archived ? '' : ' is-off'), 'data-id': page.id },
+          cover,
+          el('div', { class: 'p8-cc__body' },
+            el('div', { class: 'p8-cc__words' }, el('b', { class: 'item__title', text: page.title }), page.tagline ? el('small', { text: page.tagline }) : null),
+            el('div', { class: 'p8-cc__facts' },
+              el('span', { class: 'ltr' }, icon('link'), '/' + page.slug + '/'),
+              el('span', {}, icon('video'), ar(page.mediaCount) + ' مقطع'),
+              page.partner ? el('span', {}, icon('users'), 'بإشراف B.U.G') : null),
+            el('div', { class: 'p8-item__tags' },
+              el('span', { class: 'p8-tag ' + (live ? 'p8-tag--ok' : page.archived || !page.enabled ? '' : 'p8-tag--warn'), text: page.archived ? 'في الأرشيف' : !page.enabled ? 'مقفولة' : page.live ? 'منشورة' : 'لسه متنشرتش' }),
+              home ? el('span', { class: 'p8-tag p8-tag--info', text: 'كارت في الرئيسية' }) : el('span', { class: 'p8-tag', text: page.home && page.home.show ? 'الكارت مخفي' : 'مش في الرئيسية' })),
+            el('div', { class: 'p8-cc__acts' },
+              el('button', { class: 'btn btn--sm btn--primary', type: 'button', 'aria-label': 'تعديل ' + page.title, onclick: function () { openPage(page.id); } }, icon('edit'), 'إدارة الصفحة'),
+              page.live ? el('a', { class: 'btn btn--sm btn--ghost', href: site + page.slug + '/', target: '_blank', rel: 'noopener', 'aria-label': 'افتح الصفحة في الموقع: ' + page.title }, icon('external'), 'افتحها') : null,
+              el('span', { class: 'sp' }),
+              more)));
+        return card;
       })));
     }
 
@@ -398,11 +405,16 @@
     var archivedCount = function () { return reply ? reply.pages.filter(function (p) { return p.archived; }).length : 0; };
 
     return [
-      A.card('صفحات الخدمة', 'صفحات ثابتة ليها رابطها الخاص (زي /black-theatre/): غلاف، وصف، كروت فيديو، وأرقام فريق الخدمة. كل صفحة ممكن يبقى ليها كارت في الصفحة الرئيسية.',
-        el('div', { class: 'actions' },
-          el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { pageEditor(null, reply); } }, icon('plus'), 'صفحة جديدة'),
-          el('button', { class: 'btn btn--ghost btn--small', type: 'button', onclick: function () { P.showArchived = !P.showArchived; if (reply) draw(reply); } }, icon('layers'), 'الأرشيف'),
-          el('button', { class: 'btn btn--ghost btn--small', type: 'button', onclick: function () { orderSheet('services', ''); } }, icon('layers'), 'ترتيب كروت «خدماتنا»')),
+      el('section', { class: 'card p8-card p8-cards p8-svcpages' },
+        el('div', { class: 'p8-card__head' },
+          el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('theatre')),
+          el('div', { class: 'p8-card__titles' },
+            el('h2', { class: 'card__title', text: 'صفحات الخدمة' }),
+            el('p', { class: 'card__hint', text: 'صفحة كاملة لكل خدمة (الموقع/black-theatre/): غلاف، وصف، مقاطع فيديو، فريق الخدمة، وكارت في الرئيسية.' })),
+          el('div', { class: 'p8-card__acts' },
+            el('button', { class: 'btn', type: 'button', 'aria-pressed': P.showArchived ? 'true' : 'false', onclick: function (e) { P.showArchived = !P.showArchived; e.currentTarget.setAttribute('aria-pressed', P.showArchived ? 'true' : 'false'); if (reply) draw(reply); } }, icon('archive'), 'الأرشيف'),
+            el('button', { class: 'btn', type: 'button', onclick: function () { orderSheet('services', ''); } }, icon('layers'), 'ترتيب كروت «' + sectionTitle('services') + '»'),
+            el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { pageEditor(null, reply); } }, icon('plus'), 'صفحة جديدة'))),
         box,
         body)
     ];
@@ -516,15 +528,99 @@
       });
     });
 
-    var controls = isNew ? [] : [
-      el('button', { class: 'btn btn--small', type: 'button', onclick: function (e) {
+    /* Phase 8B (svcpage-edit.png): the big editor — «الأساسيات», «الغلاف والبانر», «المقاطع (N)» (the page's clips
+       right here: drag or ↑ ↓, «تعديل», ⋯), «فريق الخدمة», «الظهور»; on the left the page on a phone, «الشريك»
+       and «إدارة» (أرشيف, and «مسح» before it was ever published). */
+    var clips = el('div', { class: 'p8-clips' });
+    var clipCount = el('span');
+    var prevClips = el('div', { class: 'p8-pageprev__clips' });
+
+    function clipRow(full, m, i, all) {
+      var thumb = el('span', { class: 'p8-clip__thumb', 'aria-hidden': 'true' }, icon(m.source === 'link' ? 'link' : 'video'));
+      var pic = m.cover || m.thumb || '';
+      if (pic && A.mediaPreview) A.mediaPreview(pic).then(function (src) { if (src) A.fill(thumb, el('img', { src: src, alt: '' }), el('span', { class: 'p8-clip__play' }, icon('play'))); }).catch(function () {});
+      var lib = m.clip && A.libraryItem ? A.libraryItem(m.clip) : null;
+      var secs = lib && lib.duration ? Math.round(Number(lib.duration)) : 0;
+      var len = secs ? '0:00 → ' + Math.floor(secs / 60) + ':' + ('0' + secs % 60).slice(-2) : '';
+      var sound = m.audioMode === 'none' ? 'من غير صوت' : m.audioMode === 'custom' ? 'موسيقى' : 'بصوته';
+      function order(step, button) {
+        var list = all.slice();
+        var j = i + step;
+        if (j < 0 || j >= list.length) return;
+        var t = list[i]; list[i] = list[j]; list[j] = t;
+        A.withBusy(button, A.call('apiPageMediaOrder', page.id, list.map(function (x) { return x.id; }))).then(function (next) { r = next; drawClips(next); })
+          .catch(function (error) { A.fail(error, box); });
+      }
+      var more = el('button', { class: 'p8-iconbtn', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-label': 'اختيارات تانية: ' + m.title, onclick: function (e) {
         var button = e.currentTarget;
-        A.withBusy(button, withMedia(r)).then(function (full) {
-          return A.closeSheet().then(function (closed) { if (closed) mediaSheet(full); });
-        }).catch(function (error) { A.fail(error, box); });
-      } }, icon('video'), 'كروت الفيديو (' + ar(r.media ? r.media.length : r.mediaCount || 0) + ')'),
-      el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () { previewSheet('page', page.id, page.title); } }, icon('eye'), 'معاينة'),
-      el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function (e) {
+        var del = A.menuItem('trash', 'امسح المقطع', function () {
+          A.confirm({ tone: 'danger', title: 'تمسح كارت «' + m.title + '»؟', message: 'الفيديو نفسه بيفضل في المكتبة.', confirmLabel: 'امسح', cancelLabel: 'لأ' }).then(function (ok) {
+            if (!ok) return;
+            A.withBusy(button, A.call('apiPageMediaDelete', m.id)).then(function (next) { r = next; drawClips(next); A.toast('اتمسح'); })
+              .catch(function (error) { A.fail(error, box); });
+          });
+        }, { danger: true });
+        del.setAttribute('aria-label', 'مسح ' + m.title);
+        A.menu(button, 'menu--p8', [
+          i > 0 ? A.menuItem('chevron-up', 'لفوق', function () { order(-1, button); }) : null,
+          i < all.length - 1 ? A.menuItem('chevron', 'لتحت', function () { order(1, button); }) : null,
+          del
+        ].filter(Boolean), { align: 'start' });
+      } }, icon('dots'));
+      return el('div', { class: 'p8-clip' + (m.enabled ? '' : ' is-off'), 'data-id': m.id },
+        el('span', { class: 'grip', 'aria-hidden': 'true' }, icon('grip')),
+        thumb,
+        el('div', { class: 'p8-clip__main' },
+          el('b', { text: m.title }),
+          el('small', { text: m.text || 'من غير وصف' }),
+          el('div', { class: 'p8-item__tags' },
+            m.source === 'link' ? el('span', { class: 'p8-tag' }, icon('link'), 'لينك بس') : el('span', { class: 'p8-tag' }, icon('video'), 'المقطع', len ? el('span', { class: 'ltr mono', text: ' ' + len }) : null),
+            m.source === 'link' ? null : el('span', { class: 'p8-tag' }, icon('music'), sound),
+            m.enabled ? null : el('span', { class: 'p8-tag', text: 'مخفي' }))),
+        el('button', { class: 'btn btn--sm', type: 'button', 'aria-label': 'تعديل ' + m.title, onclick: function () { mediaEditor(full, m); } }, icon('edit'), 'تعديل'),
+        more);
+    }
+
+    function drawClips(full) {
+      var media = full.media || [];
+      clipCount.textContent = ar(media.length);
+      A.fill(clips, media.length
+        ? media.map(function (m, i) { return clipRow(full, m, i, media); })
+        : el('p', { class: 'note', text: 'مفيش مقاطع لسه. كل مقطع: جزء قصير بيشتغل في الصفحة، وصورة كارت، ولينك للفيديو الكامل.' }));
+      clips.appendChild(el('button', { class: 'btn btn--ghost btn--block p8-clips__add', type: 'button', onclick: function () { mediaEditor(full, null); } }, icon('plus'), 'مقطع'));
+      A.fill(prevClips, media.slice(0, 2).map(function (m) {
+        var t = el('span', { class: 'p8-pageprev__clip' });
+        var pic = m.cover || m.thumb || '';
+        if (pic && A.mediaPreview) A.mediaPreview(pic).then(function (src) { if (src) t.appendChild(el('img', { src: src, alt: '' })); }).catch(function () {});
+        return t;
+      }));
+      if (A.sheetMarks) A.sheetMarks();
+    }
+
+    if (!isNew) {
+      clipCount.textContent = ar(r.media ? r.media.length : r.mediaCount || 0);
+      clips.appendChild(el('div', { class: 'skeleton skeleton--line' }));
+      // after openPage() started its background copy (freshPage): the same request, not a second one
+      setTimeout(function () { withMedia(r).then(function (full) { if (P.editing === page.id && clips.isConnected) drawClips(full); }).catch(function (error) { A.fail(error, box); }); }, 0);
+    }
+
+    var prevImg = el('img', { alt: '', hidden: true });
+    var prevTitle = el('b');
+    var prevLine = el('small');
+    var lastCover = null;
+    function paintAside() {
+      prevTitle.textContent = title.input.value.trim() || 'العنوان';
+      prevLine.textContent = tagline.input.value.trim();
+      var c = cover.value();
+      if (c !== lastCover) {
+        lastCover = c;
+        prevImg.hidden = true;
+        if (c && A.mediaPreview) A.mediaPreview(c).then(function (src) { if (src && lastCover === c) { prevImg.src = src; prevImg.hidden = false; } }).catch(function () {});
+      }
+    }
+
+    var manage = isNew ? [] : [
+      el('button', { class: 'btn btn--sm btn--block', type: 'button', onclick: function (e) {
         A.withBusy(e.currentTarget, A.call('apiPageArchive', page.id, !page.archived)).then(function () {
           A.dirty = false;
           A.closeSheet();
@@ -532,8 +628,8 @@
           A.toast(page.archived ? 'رجعت من الأرشيف' : 'اتأرشفت — بعد النشر الرابط هيقول إنها مش متاحة');
           if (P.reload) P.reload();
         }).catch(function (error) { A.fail(error, box); });
-      } }, icon(page.archived ? 'retry' : 'download'), page.archived ? 'رجّع من الأرشيف' : 'أرشيف'),
-      page.live || page.publishedAt ? null : el('button', { class: 'btn btn--small btn--danger', type: 'button', onclick: function (e) {
+      } }, icon(page.archived ? 'retry' : 'archive'), page.archived ? 'رجّع من الأرشيف' : 'أرشيف'),
+      page.live || page.publishedAt ? null : el('button', { class: 'btn btn--sm btn--block btn--danger', type: 'button', onclick: function (e) {
         var button = e.currentTarget;
         A.confirm({ tone: 'danger', title: 'تمسح «' + page.title + '»؟', message: 'الصفحة لسه متنشرتش، فالمسح آمن: هتتمسح هي وكروتها وكارت الصفحة الرئيسية.', confirmLabel: 'امسح', cancelLabel: 'لأ' }).then(function (ok) {
           if (!ok) return;
@@ -548,31 +644,49 @@
       } }, icon('trash'), 'مسح')
     ].filter(Boolean);
 
+    var slugBox = el('div', { class: 'pre' }, el('span', { text: '/' }), slug);
+    var form = el('div', { class: 'msecs', oninput: paintAside, onchange: paintAside },
+      A.msec('الأساسيات', 'edit', '', [
+        A.col(A.field('الرابط', slugBox, page.live || page.publishedAt ? 'الرابط مبيتغيرش بعد النشر' : 'حروف إنجليزي صغيرة وأرقام وشرطة، مثلاً black-theatre ← الموقع/black-theatre/'), 4),
+        A.col(title.node, 4), A.col(tagline.node, 4), A.col(description.node, 12)
+      ]),
+      A.msec('الغلاف والبانر', 'photos', 'صورة الغلاف للكروت والمشاركة، والبانر اللي فوق خالص في الصفحة', [
+        A.col(cover.node, 6), A.col(hero.node, 6),
+        A.col(A.field('نوع الكارت', cardType, 'بيحدد قسم الكارت في الصفحة الرئيسية وأيقونته'), 6), A.col(A.field('الشكل', theme), 6)
+      ]),
+      isNew ? null : A.msec('المقاطع', 'video', 'اسحب علشان تغيّر الترتيب. كل مقطع: جزء قصير بيشتغل في الصفحة، وصورة كارت، ولينك للفيديو الكامل.', [A.col(clips, 12)], 'المقاطع'),
+      A.msec('فريق الخدمة', 'users', 'آخر الصفحة: مين تكلمه علشان تنضم', [
+        A.col(teamTitle.node, 6), A.col(teamMessage.node, 6), A.col(teamText.node, 12),
+        A.col(team.length ? el('div', { class: 'pages-team' }, team.map(function (t) { return t.node; })) : el('p', { class: 'note', text: 'مفيش خدام لسه — زوّدهم من «الخدام».' }), 12)
+      ]),
+      A.msec('الظهور', 'eye', '', [A.col(home.node, 12), A.col(enabled.node, 12)]));
+
     A.dirty = false;
-    A.openSheet(isNew ? 'صفحة خدمة جديدة' : 'تعديل: ' + page.title, [
-      box,
-      controls.length ? el('div', { class: 'actions' }, controls) : null,
-      el('div', { class: 'form' },
-        A.field('الرابط', slug, page.live || page.publishedAt ? 'الرابط مبيتغيرش بعد النشر' : 'حروف إنجليزي صغيرة وأرقام وشرطة، مثلاً black-theatre ← الموقع/black-theatre/'),
-        title.node,
-        tagline.node,
-        description.node,
-        hero.node,
-        cover.node,
-        A.field('نوع الكارت', cardType, 'بيحدد قسم الكارت في الصفحة الرئيسية وأيقونته'),
-        A.field('الشكل', theme),
-        el('fieldset', { class: 'fieldset' },
-          el('legend', { text: 'فريق الخدمة (آخر الصفحة)' }),
-          teamTitle.node,
-          teamText.node,
-          teamMessage.node,
-          team.length ? el('div', { class: 'pages-team' }, team.map(function (t) { return t.node; })) : el('p', { class: 'note', text: 'مفيش خدام لسه — زوّدهم من «الخدام».' })),
-        partner.node,
-        home.node,
-        enabled.node)
-    ], A.sheetFooter(save), {
+    A.openSheet(isNew ? 'صفحة خدمة جديدة' : 'إدارة الصفحة: ' + page.title, [box, form], A.sheetFooter(save), {
+      size: 'lg',
+      icon: 'theatre',
+      sub: isNew ? 'صفحة خدمة · بتتحفظ مسودة لحد النشر' : ['/' + page.slug + '/', page.archived ? 'في الأرشيف' : page.live ? 'منشورة' : 'لسه متنشرتش', page.partner ? 'بإشراف B.U.G' : ''].filter(Boolean).join(' · '),
+      next: false,
+      footWords: 'بيتحفظ كمسودة لحد «راجع وانشر»',
+      className: 'sheet--page',
+      headActions: isNew ? [] : [el('button', { class: 'btn btn--sm btn--ghost', type: 'button', onclick: function () { previewSheet('page', page.id, page.title); } }, icon('eye'), 'معاينة')],
+      aside: [
+        el('h5', { text: 'الصفحة على الموبايل' }),
+        el('div', { class: 'prevcard p8-pageprev' }, prevImg, el('div', {}, prevTitle, prevLine, prevClips)),
+        el('div', { class: 'hr' }),
+        el('h5', { text: 'الشريك' }),
+        el('div', { class: 'p8-partner' }, partner.node),
+        manage.length ? el('div', { class: 'hr' }) : null,
+        manage.length ? el('h5', { text: 'إدارة' }) : null,
+        manage.length ? el('div', { class: 'p8-stack' }, manage) : null
+      ],
       lock: isNew ? null : A.editLock('page', page.id, 'الصفحة «' + page.title + '»', function () { A.closeSheet(); if (P.openPage) P.openPage(page.id); })
     });
+    // the clips' count in the side list: «المقاطع (٢)»
+    var navText = Array.prototype.filter.call(document.querySelectorAll('dialog.sheet .sheet__navtext'), function (n) { return n.textContent === 'المقاطع'; })[0];
+    if (navText) A.fill(navText, 'المقاطع (', clipCount, ')');
+    paintAside();
+    if (r && r.media) drawClips(r);
 
   }
 

@@ -131,6 +131,12 @@
 
   }
 
+  /* Phase 8B (cards.png): one card per item in a grid — the picture, the grip (drag to reorder), the title and its
+     line, tags (ظاهر / مخفي, the type, the shape, where it is edited), «تعديل» «معاينة» and ⋯. The types live
+     behind «أنواع الكروت» (card-types.png). */
+  var SECTION_ICON = { services: 'layers', activities: 'calendar', competitions: 'trophy' };
+  var SHAPE_NAME = { banner: 'بانر', stack: 'كارت', side: 'صف', compact: 'كارت مدمج' };
+
   function itemsView(sectionKey) {
 
     if (!upgraded()) return [A.upgradeNotice()];
@@ -141,13 +147,13 @@
     var all = (A.state.draft.activities || []).filter(function (a) { return typeKeys.indexOf(a.type) !== -1; });
     var split = A.archiveSplit('activities', A.byOrder(all), function () { A.render(); });
 
-    var list = split.items.length
-      ? el('ul', { class: 'list' }, split.items.map(function (item) { return activityItem(item, sectionKey); }))
-      : el('div', { class: 'empty-state' },
-        el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon(meta.icon)),
-        el('p', { class: 'empty-state__title', text: split.showing ? 'الأرشيف فاضي' : 'مفيش ' + meta.title + ' لسه' }),
-        split.showing ? null : el('p', { class: 'empty-state__text', text: 'دوس «' + meta.add + '» وابدأ.' })
-      );
+    var grid = el('div', { class: 'p8-cgrid' }, split.items.map(function (item) { return activityItem(item, sectionKey); }));
+    if (!split.showing) dragOrder(grid, sectionKey, split.items);
+
+    var empty = el('div', { class: 'p8-empty' },
+      el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(meta.icon)),
+      el('b', { text: split.showing ? 'الأرشيف فاضي' : 'مفيش كروت هنا لسه' }),
+      split.showing ? null : el('small', { text: types.length ? 'دوس «' + meta.one + '» وابدأ.' : 'مفيش أنواع للقسم ده — ضيف نوع من «أنواع الكروت» الأول.' }));
 
     // the competitions themselves (questions, results) live in their own area (AdminComp)
     var compNote = sectionKey === 'competitions' && window.AdminTransport && A.compOpen
@@ -162,16 +168,19 @@
 
     return [
       compNote,
-      A.card(meta.title, meta.hint,
-        el('div', { class: 'actions' },
-          types.length
-            ? el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.editors.activities(null, sectionKey); } }, icon('plus'), meta.add)
-            : el('p', { class: 'note note--warn', text: 'مفيش أنواع للقسم ده — ضيف نوع من تحت الأول.' }),
-          split.toggle
-        ),
-        list
-      ),
-      typesCard(sectionKey, types)
+      el('section', { class: 'card p8-card p8-cards' },
+        el('div', { class: 'p8-card__head' },
+          el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(SECTION_ICON[sectionKey] || meta.icon)),
+          el('div', { class: 'p8-card__titles' },
+            el('h2', { class: 'card__title', text: 'كروت ' + meta.title }),
+            el('p', { class: 'card__hint', text: 'الكروت اللي بتظهر في قسم «' + meta.title + '» في الرئيسية. اسحب علشان تغيّر الترتيب.' })),
+          el('div', { class: 'p8-card__acts' },
+            split.toggle,
+            el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.types(null, sectionKey); } }, icon('gear'), 'أنواع الكروت'),
+            types.length
+              ? el('button', { class: 'btn btn--primary', type: 'button', 'aria-label': meta.add, onclick: function () { A.editors.activities(null, sectionKey); } }, icon('plus'), meta.one)
+              : null)),
+        split.items.length ? grid : empty)
     ].filter(Boolean);
 
   }
@@ -180,36 +189,122 @@
   A.views.activities = function () { return itemsView('activities'); };
   A.views.services = function () { return itemsView('services'); };
 
+  /* drag a card by its grip: the new order is saved at once (apiHomeOrder, the same as «رتّب الكروت») */
+  function dragOrder(grid, sectionKey, items) {
+
+    var from = null;
+    grid.addEventListener('pointerdown', function (e) {
+      var grip = e.target.closest('.grip');
+      if (grip) grip.closest('.p8-cc').draggable = true;
+    });
+    grid.addEventListener('dragstart', function (e) {
+      from = e.target.closest('.p8-cc');
+      if (from) { from.classList.add('is-drag'); e.dataTransfer.effectAllowed = 'move'; }
+    });
+    grid.addEventListener('dragover', function (e) {
+      var over = e.target.closest('.p8-cc');
+      if (!from || !over || over === from) return;
+      e.preventDefault();
+      var after = Array.prototype.indexOf.call(grid.children, over) > Array.prototype.indexOf.call(grid.children, from);
+      grid.insertBefore(from, after ? over.nextSibling : over);
+    });
+    grid.addEventListener('dragend', function () {
+      if (!from) return;
+      from.classList.remove('is-drag');
+      from.draggable = false;
+      from = null;
+      var ids = Array.prototype.map.call(grid.children, function (c) { return c.dataset.id; });
+      var before = items.map(function (i) { return i.id; });
+      if (ids.join() === before.join()) return;
+      A.call('apiHomeOrder', sectionKey, ids).then(function (state) {
+        A.applyState(state);
+        A.toast('الترتيب اتحفظ — بيبان في الموقع بعد «راجع وانشر»');
+      }).catch(function (error) { A.fail(error); A.render(); });
+    });
+
+  }
+
+  function cardThumb(item, type, sectionKey) {
+    var box = el('div', { class: 'p8-cc__img' + (item.image ? '' : ' is-icon'), 'aria-hidden': 'true' }, item.image ? null : icon(item.icon || type.icon || info(sectionKey).icon));
+    if (item.image) A.mediaPreview(item.image).then(function (src) { if (src) box.appendChild(el('img', { src: src, alt: '' })); }).catch(function () {});
+    return box;
+  }
+
+  /* the card in the grid. opts: { tags: [...], primary: button, menu: [menu items], cls } */
+  function gridCard(item, sectionKey, opts) {
+
+    var enabled = bool(item.enabled);
+    var type = typeByKey(item.type) || {};
+    var tags = [el('span', { class: 'p8-tag ' + (enabled ? 'p8-tag--ok' : ''), text: enabled ? 'ظاهر' : 'مخفي' }),
+      el('span', { class: 'p8-tag' }, icon(type.icon || info(sectionKey).icon), type.label || item.type)];
+    if (SHAPE_NAME[item.display]) tags.push(el('span', { class: 'p8-tag', text: SHAPE_NAME[item.display] }));
+    tags = tags.concat(opts.tags || []);
+    var more = el('button', { class: 'p8-iconbtn', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-label': 'اختيارات تانية: ' + (item.title || ''), onclick: function (e) {
+      A.menu(e.currentTarget, 'menu--p8', opts.menu, { align: 'start' });
+    } }, icon('dots'));
+
+    return el('article', { class: 'p8-cc' + (enabled ? '' : ' is-off') + (opts.cls ? ' ' + opts.cls : ''), 'data-id': item.id },
+      cardThumb(item, type, sectionKey),
+      el('div', { class: 'p8-cc__body' },
+        el('div', { class: 'p8-cc__top' },
+          el('span', { class: 'grip', title: 'اسحب علشان تغيّر الترتيب', 'aria-hidden': 'true' }, icon('grip')),
+          el('div', { class: 'p8-cc__words' }, el('b', { class: 'item__title', text: item.title || '(من غير عنوان)' }), item.subtitle ? el('small', { text: item.subtitle }) : null)),
+        el('div', { class: 'p8-item__tags' }, tags),
+        el('div', { class: 'p8-cc__acts' },
+          opts.primary,
+          el('button', { class: 'btn btn--sm btn--ghost', type: 'button', onclick: function () { if (A.openPreview) A.openPreview(); } }, icon('eye'), 'معاينة'),
+          el('span', { class: 'sp' }),
+          opts.menu && opts.menu.length ? more : null)));
+
+  }
+
+  /* «اخفيه / اظهره» in the ⋯ menu (the page's own «إظهار» follows for a page's card) */
+  function showItem(item) {
+    var enabled = bool(item.enabled);
+    var entry = A.menuItem(enabled ? 'eye-off' : 'eye', enabled ? 'اخفيه من الموقع' : 'اظهره في الموقع', function () {
+      A.draftChange({
+        apply: function (state) { ((state.draft && state.draft.activities) || []).forEach(function (r) { if (r.id === item.id) r.enabled = !enabled; }); },
+        run: function () { return A.call('apiSetItemEnabled', 'activities', item.id, !enabled); }
+      });
+    });
+    entry.setAttribute('aria-label', (enabled ? 'اخفي: ' : 'اظهر: ') + (item.title || ''));
+    entry.classList.add('item__show');
+    return entry;
+  }
+
+  /* the old row's archive / copy / delete, as ⋯ menu entries with the same names */
+  function archiveEntries(item) {
+    return A.archiveControls('activities', item, item.title).map(function (button) {
+      var label = button.getAttribute('aria-label');
+      var entry = A.menuItem(/^استخدم/.test(label) ? 'copy' : bool(item.archived) ? 'retry' : 'archive', /^استخدم/.test(label) ? 'استخدم تاني (نسخة)' : bool(item.archived) ? 'رجّعه من الأرشيف' : 'الأرشيف', function () { button.click(); });
+      entry.setAttribute('aria-label', label);
+      return entry;
+    });
+  }
+
   function activityItem(item, sectionKey) {
 
     if (item.competition) return linkedItem(item, sectionKey);
     if (item.page || item.event) return ownedItem(item, sectionKey);
 
-    var enabled = bool(item.enabled);
-    var type = typeByKey(item.type) || {};
-    var chips = [A.visibilityChip(enabled, item.visibleFrom, item.visibleUntil || item.endAt)];
     var state = itemState(item);
+    var tags = [];
+    if (state) tags.push(el('span', { class: 'p8-tag p8-tag--warn', text: state.textContent }));
+    if (item.location) tags.push(el('span', { class: 'p8-tag', text: item.location }));
+    if ((A.state.draft.notifications || []).some(function (n) { return n.id === 'notif-' + item.id; })) tags.push(el('span', { class: 'p8-tag p8-tag--info' }, icon('bell'), 'في الجرس'));
+    if (item.url) tags.push(el('span', { class: 'p8-tag p8-tag--info', text: 'بيفتح لينك' }));
 
-    if (state) chips.push(state);
-    chips.push(A.chip(type.label || item.type, 'gold'));
-    if (item.location) chips.push(A.chip(item.location));
-    if ((A.state.draft.notifications || []).some(function (n) { return n.id === 'notif-' + item.id; })) chips.push(A.chip('🔔 في الجرس'));
+    var del = A.menuItem('trash', 'امسح', function () { A.deleteItem('activities', item.id, item.title, more); }, { danger: true });
+    del.setAttribute('aria-label', 'مسح ' + item.title);
+    var more = null;
 
-    return A.listItem({
-      icon: type.icon || info(sectionKey).icon,
-      image: item.image,
-      title: item.title,
-      sub: item.subtitle,
-      off: !enabled,
-      chips: chips,
-      controls: [
-        A.toggleItem('activities', item.id, enabled).node,
-        el('span', { class: 'spacer' }),
-        A.editButton(item.title, function () { A.editors.activities(item, sectionKey); })
-      ].concat(A.archiveControls('activities', item, item.title), [
-        A.deleteButton(item.title, function (e) { A.deleteItem('activities', item.id, item.title, e.currentTarget); })
-      ])
+    var card = gridCard(item, sectionKey, {
+      tags: tags,
+      primary: el('button', { class: 'btn btn--sm btn--primary', type: 'button', 'aria-label': 'تعديل ' + item.title, onclick: function () { A.editors.activities(item, sectionKey); } }, icon('edit'), 'تعديل'),
+      menu: [showItem(item)].concat(archiveEntries(item), [del])
     });
+    more = card.querySelector('.p8-iconbtn');
+    return card;
 
   }
 
@@ -223,24 +318,18 @@
   function linkedItem(item, sectionKey) {
 
     var enabled = bool(item.enabled);
-    var type = typeByKey(item.type) || {};
     var open = window.AdminTransport && A.compOpen
-      ? el('button', { class: 'btn btn--small', type: 'button', 'aria-label': 'افتح المسابقة: ' + (item.title || ''), onclick: function () { A.compOpen(item.competition); } }, icon('trophy'), 'افتح المسابقة')
+      ? el('button', { class: 'btn btn--sm btn--primary', type: 'button', 'aria-label': 'افتح المسابقة: ' + (item.title || ''), onclick: function () { A.compOpen(item.competition); } }, icon('trophy'), 'افتح المسابقة')
       : null;
 
-    var row = A.listItem({
-      icon: type.icon || info(sectionKey).icon,
-      image: item.image,
-      title: item.title,
-      sub: item.subtitle,
-      off: !enabled,
-      chips: [enabled ? A.chip('ظاهر مع المسابقة', 'ok') : A.chip('مخفي', 'off'), A.chip('بيتعدل من المسابقة', 'info')],
-      controls: [el('span', { class: 'spacer' }), open]
+    var card = gridCard(item, sectionKey, {
+      cls: 'item--linked',
+      tags: [el('span', { class: 'p8-tag p8-tag--info', text: enabled ? 'ظاهر مع المسابقة · بيتعدل من المسابقة' : 'بيتعدل من المسابقة' })],
+      primary: open,
+      menu: []
     });
-
-    row.classList.add('item--linked');
-    row.dataset.competition = item.competition;
-    return row;
+    card.dataset.competition = item.competition;
+    return card;
 
   }
 
@@ -267,24 +356,14 @@
 
   function ownedItem(item, sectionKey) {
 
-    var enabled = bool(item.enabled);
-    var type = typeByKey(item.type) || {};
-    var row = A.listItem({
-      icon: type.icon || info(sectionKey).icon,
-      image: item.image,
-      title: item.title,
-      sub: item.subtitle,
-      off: !enabled,
-      chips: [A.visibilityChip(enabled, item.visibleFrom, item.visibleUntil), A.chip(item.page ? 'بيتعدل من صفحة الخدمة' : 'بيتعدل من الفعالية', 'info')],
-      controls: [
-        A.toggleItem('activities', item.id, enabled).node,
-        el('span', { class: 'spacer' }),
-        ownerOpen(item, false)
-      ]
+    var open = ownerOpen(item, false);
+    var go = A.menuItem(item.page ? 'theatre' : 'calendar', item.page ? 'افتح الصفحة' : 'افتح الفعالية', function () { open.click(); });
+    return gridCard(item, sectionKey, {
+      cls: 'item--linked',
+      tags: [el('span', { class: 'p8-tag p8-tag--info', text: item.page ? 'بيفتح صفحة الخدمة' : 'بيفتح صفحة الفعالية' })],
+      primary: el('button', { class: 'btn btn--sm btn--primary', type: 'button', 'aria-label': 'تعديل ' + (item.title || ''), onclick: function () { ownedEditor(item); } }, icon('edit'), 'تعديل'),
+      menu: [showItem(item), go]
     });
-
-    row.classList.add('item--linked');
-    return row;
 
   }
 
@@ -383,14 +462,16 @@
     );
     var chose = el('p', { class: 'item-preview__auto', role: 'status', 'aria-live': 'polite' });
     var note = el('p', { class: 'field__hint item-preview__note', hidden: true });
-    var wide = true;
-    var tabs = el('div', { class: 'item-preview__tabs', role: 'group', 'aria-label': 'المعاينة' },
-      ['سطح المكتب', 'الموبايل'].map(function (label, i) {
-        return el('button', { class: 'btn btn--small' + (i === 0 ? ' is-on' : ''), type: 'button', 'aria-pressed': i === 0 ? 'true' : 'false', onclick: function () {
-          wide = i === 0;
+    // options.split (card-edit.png): the preview goes to the editor's left column — phone first, icons for tabs
+    var split = !!options.split;
+    var wide = !split;
+    var tabs = el('div', { class: 'item-preview__tabs' + (split ? ' seg seg--icons' : ''), role: 'group', 'aria-label': 'المعاينة' },
+      (split ? ['الموبايل', 'سطح المكتب'] : ['سطح المكتب', 'الموبايل']).map(function (label, i) {
+        return el('button', { class: (split ? 'seg__btn' : 'btn btn--small') + (i === 0 ? ' is-on' : ''), type: 'button', 'aria-pressed': i === 0 ? 'true' : 'false', 'aria-label': split ? label : null, title: split ? label : null, onclick: function () {
+          wide = split ? i === 1 : i === 0;
           Array.prototype.forEach.call(tabs.children, function (b, k) { b.classList.toggle('is-on', k === i); b.setAttribute('aria-pressed', k === i ? 'true' : 'false'); });
           refresh();
-        } }, label);
+        } }, split ? icon(i === 0 ? 'device' : 'grid') : label);
       })
     );
     var frame = el('iframe', { class: 'item-preview__frame', title: 'معاينة الكارت', tabindex: '-1', 'aria-hidden': 'true' });
@@ -456,6 +537,23 @@
 
     refresh();
 
+    if (split) {
+      return {
+        node: el('div', { class: 'form-group item-display item-display--split' },
+          A.field('على سطح المكتب', mode.node),
+          A.field('شكل الموبايل', mobile, 'عادةً سيبها «نفس إعداد سطح المكتب»'),
+          chose),
+        preview: el('div', { class: 'item-preview item-preview--aside' },
+          el('div', { class: 'item-preview__head' }, el('h5', { text: 'المعاينة' }), tabs),
+          note,
+          stage),
+        value: function () { return mode.value(); },
+        mobile: function () { return mobile.value; },
+        set: function (v) { var input = mode.node.querySelector('input[value="' + v + '"]'); if (input) { input.checked = true; A.markDirty(); refresh(); } },
+        refresh: refresh
+      };
+    }
+
     return {
       node: el('div', { class: 'form-group item-display' },
         el('p', { class: 'section-label', text: options.label || 'شكل العرض' }),
@@ -474,9 +572,10 @@
   };
 
   /* competitions / activities: the site's items section with this one card */
-  A.itemDisplay = function (item, sectionKey, draft) {
+  A.itemDisplay = function (item, sectionKey, draft, extra) {
 
     return A.cardDisplay(item, {
+      split: !!(extra && extra.split),
       label: sectionKey === 'competitions' ? 'شكل عرض المسابقة' : 'شكل عرض الفعالية',
       draft: draft,
       build: function (site, d, picture, now) {
@@ -504,6 +603,12 @@
      ACTIVITY EDITOR
   ======================================================= */
 
+  /* Phase 8B (card-edit.png): «الكارت» (النوع segmented + «+ نوع جديد», العنوان, سطر قصير, التفاصيل, المكان),
+     «الصورة والشكل» (the picture, «الشكل» بانر · كارت · صف · …, «القسم»), «الزرار», «المواعيد»; on the left
+     the site's own card («المعاينة», phone / desktop) and «إدارة» (خبّي / امسح). */
+  var SHAPES = [{ value: 'banner', label: 'بانر' }, { value: 'stack', label: 'كارت' }, { value: 'side', label: 'صف' }, { value: '*', label: '…' }];
+  var MOVE_SECTIONS = ['services', 'activities'];
+
   A.editors.activities = function (item, sectionKey) {
 
     // a competition's own card is edited from the competition
@@ -521,55 +626,79 @@
     var isNew = !item;
     var current = item ? typeByKey(item.type) : null;
     sectionKey = sectionKey || (current && current.section) || 'activities';
-    var types = typesOf(sectionKey).filter(function (t) { return bool(t.enabled) || (item && t.key === item.type); });
+    var usable = function (section) { return typesOf(section).filter(function (t) { return bool(t.enabled) || (item && t.key === item.type); }); };
+    var types = usable(sectionKey);
     item = item || { enabled: true, type: types.length ? types[0].key : '' };
 
     var meta = info(sectionKey);
     var box = A.errorBox();
-
-    var typeSelect = el('select', { class: 'input', onchange: function () { A.markDirty(); syncType(); } }, types.map(function (t) {
-      return el('option', { value: t.key, selected: t.key === item.type ? 'selected' : null, text: t.label });
-    }));
-    var title = A.counted('العنوان', item.title, 80, 'مثلاً: مسابقة الكتاب المقدس', { required: true });
-    var subtitle = A.counted('سطر قصير', item.subtitle, 140, 'بيظهر على الكارت');
-    var description = A.counted('التفاصيل', item.description, 1500, 'اختياري — بتظهر لما حد يفتحها', { multiline: true });
-    var image = A.imageOrIcon(item.image, item.icon, { label: 'البوستر', hint: 'من غير بوستر؟ هياخد بانر النوع أو القسم تلقائي', onchange: function () { if (display) display.refresh(); } });
     var display = null;
+    var refresh = function () { if (display) display.refresh(); };
+
+    // «النوع»: the section's types as one row; «+ نوع جديد» opens «أنواع الكروت»
+    var typeValue = item.type;
+    var typeHolder = el('div', { class: 'p8-typeseg' });
+    function drawTypes(section) {
+      var list = usable(section);
+      if (!list.some(function (t) { return t.key === typeValue; })) typeValue = list.length ? list[0].key : '';
+      var seg = A.segmented(list.map(function (t) { return { value: t.key, label: t.label, icon: t.icon || 'calendar' }; }), typeValue, 'النوع', function (v) { typeValue = v; syncType(); refresh(); });
+      seg.classList.add('seg--types');
+      seg.appendChild(el('button', { class: 'seg__opt seg__add', type: 'button', onclick: function () {
+        A.closeSheet().then(function (closed) { if (closed) A.editors.types(null, section); });
+      } }, '+ نوع جديد'));
+      A.fill(typeHolder, seg);
+    }
+
+    var title = A.counted('العنوان', item.title, 80, '', { required: true, placeholder: 'مثلاً: مسابقة الكتاب المقدس' });
+    var subtitle = A.counted('سطر قصير', item.subtitle, 140, '', { placeholder: 'بيظهر على الكارت' });
+    var description = A.counted('التفاصيل', item.description, 1500, '', { multiline: true, rows: 3, placeholder: 'اختياري' });
+    var location = A.counted('المكان', item.location, 120, '', { placeholder: 'اختياري' });
+    var image = A.imagePicker(item.image, { label: 'صورة الكارت', className: 'picker--drop', noLabel: true, noHint: true, noAlt: true, libraryLabel: 'غيّر من المكتبة', onchange: refresh });
     var url = A.textInput(item.url, { ltr: true, placeholder: 'https://', type: 'url' });
     var cta = A.textInput(item.ctaLabel, { max: 24 });
-    var location = A.counted('المكان', item.location, 120, 'اختياري، مثلاً: الغردقة');
-    var startAt = A.dateTimeInput(item.startAt, { emptyText: 'من غير ميعاد', presets: [A.PRESETS.now, A.PRESETS.friday, A.PRESETS.sunday8] });
-    var endAt = A.dateTimeInput(item.endAt, { emptyText: 'من غير ميعاد', presets: [A.PRESETS.sunday10] });
-    var visibleFrom = A.dateTimeInput(item.visibleFrom, { emptyText: 'يظهر أول ما تنشر', presets: [A.PRESETS.now, A.PRESETS.thursday8] });
-    var visibleUntil = A.dateTimeInput(item.visibleUntil, { emptyText: 'يختفي بعد ميعاد النهاية (لو موجود)', presets: [] });
-    var enabled = A.switchInput('ظاهر', item.enabled === undefined ? true : bool(item.enabled));
+    var startAt = A.dateTimeInput(item.startAt, { emptyText: '—', presets: [A.PRESETS.now, A.PRESETS.friday, A.PRESETS.sunday8], onchange: refresh });
+    var endAt = A.dateTimeInput(item.endAt, { emptyText: '—', presets: [A.PRESETS.sunday10], onchange: refresh });
+    var visibleFrom = A.dateTimeInput(item.visibleFrom, { emptyText: 'من النشر', presets: [A.PRESETS.now, A.PRESETS.thursday8] });
+    var visibleUntil = A.dateTimeInput(item.visibleUntil, { emptyText: 'مبيختفيش', presets: [] });
+    var enabledOn = item.enabled === undefined ? true : bool(item.enabled);
     var hasNotif = function (id) { return (A.state.draft.notifications || []).some(function (n) { return n.id === id; }); };
-    var notifyPublish = A.checkbox('اعمل إشعار في الجرس لما تظهر', isNew ? true : hasNotif('notif-' + item.id), 'بنص النوع (مثلاً: المسابقة الجديدة بدأت)');
+    var notifyPublish = A.checkbox('اعمل إشعار في الجرس لما يظهر', isNew ? true : hasNotif('notif-' + item.id), 'بنص النوع (مثلاً: المسابقة الجديدة بدأت)');
     var notifyStart = A.checkbox('إشعار وقت البداية', isNew ? sectionKey === 'competitions' : hasNotif('notif-' + item.id + '-start'), 'بيظهر في الجرس في ميعاد البداية');
 
     function syncType() {
-      var t = typeByKey(typeSelect.value) || {};
-      cta.placeholder = t.ctaDefault ? 'افتراضي: ' + t.ctaDefault : 'مثلاً: سجّل دلوقتي';
+      var t = typeByKey(typeValue) || {};
+      cta.placeholder = t.ctaDefault ? 'افتراضي النوع: ' + t.ctaDefault : 'مثلاً: سجّل دلوقتي';
+      typeLine.textContent = t.label ? 'نوعه ' + t.label : '';
     }
 
-    syncType();
-
-    // «شكل العرض» and the card, live from the fields above
+    // «شكل العرض»: the approved three shapes; «…» opens the full choice (تلقائي، كارت مدمج، الموبايل)
     display = A.itemDisplay(item, sectionKey, function () {
-      return { type: typeSelect.value, title: title.input.value, subtitle: subtitle.input.value, image: image.value(), url: url.value.trim(), ctaLabel: cta.value, location: location.input.value, startAt: startAt.value(), endAt: endAt.value() };
+      return { type: typeValue, title: title.input.value, subtitle: subtitle.input.value, image: image.value(), url: url.value.trim(), ctaLabel: cta.value, location: location.input.value, startAt: startAt.value(), endAt: endAt.value() };
+    }, { split: true });
+    var simple = ['banner', 'stack', 'side'].indexOf(item.display || '') !== -1;
+    var shape = A.segmented(SHAPES, simple ? item.display : '*', 'الشكل', function (v) {
+      display.node.hidden = v !== '*';
+      if (v !== '*') display.set(v);
     });
+    display.node.hidden = simple;
 
-    var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
+    // «القسم»: a card can move between «خدماتنا» and «الفعاليات» (its type follows)
+    var sectionSeg = MOVE_SECTIONS.indexOf(sectionKey) !== -1 && MOVE_SECTIONS.every(function (s) { return usable(s).length; })
+      ? A.segmented(MOVE_SECTIONS.map(function (s) { return { value: s, label: info(s).title }; }), sectionKey, 'القسم', function (v) { drawTypes(v); syncType(); refresh(); })
+      : null;
+
+    var save = el('button', { class: 'btn btn--primary', type: 'button' }, icon('check'), el('span', { text: isNew ? 'إضافة' : 'احفظ' }));
 
     save.addEventListener('click', function () {
       A.saveItem('activities', {
         id: isNew ? '' : item.id,
-        type: typeSelect.value,
+        type: typeValue,
         title: title.input.value,
         subtitle: subtitle.input.value,
         description: description.input.value,
         image: image.value(),
-        icon: image.icon(),
+        // the picture is the card's now; an older icon stays until a picture replaces it
+        icon: image.value() ? '' : item.icon || '',
         url: url.value.trim(),
         ctaLabel: cta.value,
         location: location.input.value,
@@ -580,101 +709,117 @@
         display: display.value(),
         displayMobile: display.mobile(),
         order: item.order,
-        enabled: enabled.input.checked,
+        enabled: enabledOn,
         notify: { publish: notifyPublish.input.checked, start: notifyStart.input.checked }
       }, box, save);
     });
 
     A.dirty = false;
 
-    var form = el('div', { class: 'form', oninput: function () { display.refresh(); }, onchange: function () { display.refresh(); } },
-        types.length > 1 ? A.field('النوع', typeSelect) : null,
-        title.node,
-        subtitle.node,
-        image.node,
-        display.node,
-        el('div', { class: 'form-group' },
-          el('p', { class: 'section-label', text: 'الزرار' }),
-          A.field('اللينك', url, sectionKey === 'competitions' ? 'لينك المسابقة (https)' : 'لينك التسجيل أو التفاصيل (اختياري)'),
-          A.field('نص الزرار', cta)
-        ),
-        el('div', { class: 'form-group' },
-          el('p', { class: 'section-label', text: sectionKey === 'competitions' ? 'مواعيد المسابقة (بتوقيت مصر)' : 'ميعاد الفعالية (بتوقيت مصر)' }),
-          A.field('بيبدأ', startAt.node),
-          A.field('بيخلص', endAt.node)
-        ),
-        location.node,
-        description.node,
-        el('div', { class: 'form-group' },
-          el('p', { class: 'section-label', text: 'الظهور في الموقع' }),
-          enabled.node,
-          A.field('يظهر من', visibleFrom.node),
-          A.field('يختفي بعد', visibleUntil.node)
-        ),
-        notifyPublish.node,
-        notifyStart.node
-    );
+    var typeLine = el('span');
+    var form = el('div', { class: 'msecs', oninput: refresh, onchange: refresh },
+      A.msec('الكارت', 'edit', '', [
+        A.col(A.field('النوع', typeHolder), 12),
+        A.col(title.node, 6), A.col(subtitle.node, 6),
+        A.col(description.node, 8), A.col(location.node, 4)
+      ]),
+      A.msec('الصورة والشكل', 'photos', '', [
+        A.col(image.node, 6),
+        A.col(el('div', { class: 'p8-stack' }, A.field('الشكل', el('div', { class: 'p8-stack' }, shape, display.node)), sectionSeg ? A.field('القسم', sectionSeg) : null), 6)
+      ]),
+      A.msec('الزرار', 'link', '', [
+        A.col(A.field('اللينك', url, sectionKey === 'competitions' ? 'لينك المسابقة (https)' : 'لينك التسجيل أو التفاصيل (اختياري)'), 8),
+        A.col(A.field('نص الزرار', cta), 4)
+      ]),
+      A.msec('المواعيد', 'calendar', 'اختياري: للكروت اللي ليها ميعاد', [
+        A.col(A.field('بيبدأ', startAt.node), 3), A.col(A.field('بيخلص', endAt.node), 3),
+        A.col(A.field('يظهر من', visibleFrom.node), 3), A.col(A.field('يختفي بعد', visibleUntil.node), 3),
+        A.col(notifyPublish.node, 6), A.col(notifyStart.node, 6)
+      ]));
 
-    A.openSheet(isNew ? meta.add : 'تعديل: ' + item.title, [
-      box,
-      form
-    ], A.sheetFooter(save), {
+    drawTypes(sectionKey);
+    syncType();
+
+    // «إدارة»: hide / show (saved with «احفظ»), delete
+    var hideBtn = el('button', { class: 'btn btn--sm btn--block', type: 'button', onclick: function () {
+      enabledOn = !enabledOn;
+      A.markDirty();
+      paintHide();
+    } });
+    function paintHide() { A.fill(hideBtn, icon(enabledOn ? 'eye-off' : 'eye'), enabledOn ? 'خبّي الكارت' : 'اظهر الكارت'); hideBtn.setAttribute('aria-pressed', enabledOn ? 'false' : 'true'); }
+    paintHide();
+
+    A.openSheet(isNew ? meta.add : 'تعديل: ' + item.title, [box, form], A.sheetFooter(save), {
+      size: 'lg',
+      icon: SECTION_ICON[sectionKey] || meta.icon,
+      sub: '',
+      next: false,
+      footWords: 'بيتحفظ كمسودة لحد «راجع وانشر»',
+      headActions: [el('button', { class: 'btn btn--sm btn--ghost', type: 'button', onclick: function () { if (A.openPreview) A.openPreview(); } }, icon('eye'), 'معاينة')],
+      aside: [
+        display.preview,
+        el('div', { class: 'hr' }),
+        el('h5', { text: 'إدارة' }),
+        el('div', { class: 'p8-stack' },
+          hideBtn,
+          isNew ? null : el('button', { class: 'btn btn--sm btn--block btn--danger', type: 'button', 'aria-label': 'مسح ' + item.title, onclick: function (e) { A.deleteItem('activities', item.id, item.title, e.currentTarget); } }, icon('trash'), 'امسح الكارت…'))
+      ],
       // one editor per item: the official admin locks it while this is open
       draft: A.draftKey('activities', isNew ? '' : item.id, sectionKey),
       lock: isNew ? null : A.editLock('activities', item.id, (meta.one || 'فعالية') + ' «' + (item.title || '') + '»', function () { var fresh = A.findRow(A.state.draft.activities, 'id', item.id); if (fresh) A.editors.activities(fresh, sectionKey); else A.closeSheet(); })
     });
+    var sub = document.querySelector('dialog.sheet .sheet__sub');
+    if (sub) A.fill(sub, 'كارت في «', el('span', {}, meta.title), '» · ', typeLine);
 
   };
 
 
   /* =======================================================
-     TYPES
+     TYPES — Phase 8B (card-types.png): «أنواع الكروت», one window: the section's types (icon, name and key,
+     colour and how many cards use it, «تعديل»), then «نوع جديد» (or the one being edited) in a box under them.
+     A.editors.types(type, sectionKey): type = the one to edit, null = a new one.
   ======================================================= */
 
-  function typesCard(sectionKey, types) {
+  var THEME_NAME = { '': 'تلقائي', gold: 'دهبي', ember: 'جمر', azure: 'بحري', rose: 'وردي', emerald: 'زمردي', night: 'ليلي' };
+  var COMMON_ICONS = ['theatre', 'bus', 'church', 'music', 'trophy', 'heart', 'star', 'calendar'];
 
-    return A.card('الأنواع', 'كل نوع ليه اسم وأيقونة ولون وبانر افتراضي. نوع جديد = من غير أي تعديل في الكود.',
-      el('div', { class: 'actions' },
-        el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.types(null, sectionKey); } }, icon('plus'), 'نوع جديد')
-      ),
-      types.length
-        ? el('ul', { class: 'list' }, types.map(function (t) {
-          var count = (A.state.draft.activities || []).filter(function (a) { return a.type === t.key; }).length;
-          return A.listItem({
-            icon: t.icon || 'calendar',
-            image: t.banner,
-            title: t.label,
-            sub: t.ctaDefault ? 'الزرار: ' + t.ctaDefault : '',
-            off: !bool(t.enabled),
-            chips: [A.visibilityChip(bool(t.enabled)), A.chip(t.key, 'ltr'), A.chip(count + ' ' + (count === 1 ? 'عنصر' : 'عناصر'))],
-            controls: [
-              el('span', { class: 'spacer' }),
-              A.editButton(t.label, function () { A.editors.types(t, sectionKey); }),
-              count ? null : A.deleteButton(t.label, function (e) { A.deleteItem('types', t.key, t.label, e.currentTarget); })
-            ]
-          });
-        }))
-        : el('p', { class: 'empty', text: 'مفيش أنواع هنا لسه.' })
-    );
-
-  }
+  function usedBy(key) { return (A.state.draft.activities || []).filter(function (a) { return a.type === key; }).length; }
 
   A.editors.types = function (type, sectionKey) {
 
     var isNew = !type;
+    sectionKey = sectionKey || (type && type.section) || 'activities';
     type = type || { enabled: true, section: sectionKey };
+    var types = typesOf(sectionKey);
 
     var box = A.errorBox();
     var key = A.textInput(type.key, { ltr: true, placeholder: 'trip', max: 31 });
     if (!isNew) key.readOnly = true;
-    var label = A.counted('اسم النوع', type.label, 30, 'مثلاً: رحلة', { required: true });
+    var label = A.counted('اسم النوع', type.label, 30, '', { required: true, placeholder: 'مثلًا: رحلة' });
     var iconChoice = A.iconPicker(type.icon || 'calendar');
     var theme = A.themePicker(type.theme || '');
-    var banner = A.imagePicker(type.banner || '', { label: 'البانر الافتراضي', hint: 'لأي عنصر من النوع ده من غير بوستر' });
-    var cta = A.textInput(type.ctaDefault, { max: 24, placeholder: 'مثلاً: سجّل دلوقتي' });
-    var template = A.textInput(type.notifyTemplate, { max: 120, placeholder: 'مثلاً: التسجيل للرحلة فتح: {title}' });
+    var banner = A.imagePicker(type.banner || '', { label: 'البانر الافتراضي', hint: 'لأي كارت من النوع ده من غير بوستر' });
+    var cta = A.textInput(type.ctaDefault, { max: 24, placeholder: 'احجز مكانك' });
+    var template = A.textInput(type.notifyTemplate, { max: 120, placeholder: 'رحلة جديدة: {العنوان}' });
     var enabled = A.switchInput('متاح', bool(type.enabled));
-    var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
+
+    // the icons: the common ones in a row, «…» for the rest (the chosen one always shows)
+    var grid = iconChoice.node;
+    grid.classList.add('icon-grid--row');
+    Array.prototype.forEach.call(grid.querySelectorAll('input'), function (input) {
+      if (COMMON_ICONS.indexOf(input.value) === -1 && !input.checked) input.closest('label').classList.add('is-more');
+    });
+    var moreIcons = el('button', { class: 'choice icon-grid__more', type: 'button', 'aria-label': 'أيقونات تانية', onclick: function () { grid.classList.add('is-all'); moreIcons.hidden = true; } }, el('span', { text: '…' }));
+    grid.appendChild(moreIcons);
+    // the colours: round swatches (the names stay for screen readers and the tooltip)
+    theme.node.classList.add('swatches--dots');
+    Array.prototype.forEach.call(theme.node.querySelectorAll('.swatch'), function (s) { s.title = s.textContent.trim(); });
+
+    // «{العنوان}» in the box = the server's {title}
+    function templateValue() { return template.value.replace(/\{العنوان\}/g, '{title}'); }
+    if (template.value) template.value = template.value.replace(/\{title\}/g, '{العنوان}');
+
+    var save = el('button', { class: 'btn btn--primary', type: 'button' }, icon(isNew ? 'plus' : 'check'), isNew ? 'ضيف النوع' : 'احفظ النوع');
 
     save.addEventListener('click', function () {
       A.saveItem('types', {
@@ -686,7 +831,7 @@
         theme: theme.value(),
         banner: banner.value(),
         ctaDefault: cta.value,
-        notifyTemplate: template.value,
+        notifyTemplate: templateValue(),
         order: type.order,
         enabled: enabled.input.checked
       }, box, save, 'النوع اتحفظ ✓');
@@ -694,19 +839,41 @@
 
     A.dirty = false;
 
-    A.openSheet(isNew ? 'نوع جديد' : 'تعديل النوع: ' + type.label, [
-      box,
-      el('div', { class: 'form' },
-        A.field('مفتاح النوع', key, isNew ? 'بالإنجليزي الصغير، مثلاً trip. مش بيظهر للناس' : 'المفتاح مبيتغيرش'),
-        label.node,
-        A.field('الأيقونة', iconChoice.node),
-        A.field('اللون', theme.node),
-        banner.node,
-        A.field('نص الزرار الافتراضي', cta),
-        A.field('نص الإشعار', template, '{title} بيتبدل بعنوان العنصر'),
-        enabled.node
-      )
-    ], A.sheetFooter(save), {
+    var list = el('div', { class: 'p8-list p8-types' }, types.map(function (t) {
+      var count = (A.state.draft.activities || []).filter(function (a) { return a.type === t.key; }).length;
+      var editing = !isNew && t.key === type.key;
+      return el('div', { class: 'p8-item' + (editing ? ' is-on' : '') + (bool(t.enabled) ? '' : ' is-off') },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(t.icon || 'calendar')),
+        el('div', { class: 'p8-item__main' },
+          el('b', {}, t.label, ' ', el('span', { class: 'mono p8-types__key', text: t.key })),
+          el('small', { text: 'اللون: ' + (THEME_NAME[t.theme || ''] || t.theme) + ' · ' + (count ? 'مستخدم في ' + A.digits(count) + (count === 1 ? ' كارت' : ' كروت') : 'مش مستخدم') + (bool(t.enabled) ? '' : ' · مقفول') })),
+        el('div', { class: 'p8-item__acts' },
+          el('button', { class: 'btn btn--sm', type: 'button', 'aria-label': 'تعديل ' + t.label, disabled: editing || null, onclick: function () { A.editors.types(t, sectionKey); } }, icon('edit'), 'تعديل')));
+    }));
+
+    var form = el('div', { class: 'p8-typeform' },
+      el('div', { class: 'p8-typeform__head' },
+        el('b', { text: isNew ? 'نوع جديد' : 'تعديل النوع: ' + type.label }),
+        isNew || usedBy(type.key) ? null : A.deleteButton(type.label, function (e) { A.deleteItem('types', type.key, type.label, e.currentTarget); }),
+        isNew ? null : el('button', { class: 'btn btn--sm btn--ghost', type: 'button', onclick: function () { A.editors.types(null, sectionKey); } }, icon('plus'), 'نوع جديد')),
+      el('div', { class: 'fgrid' },
+        A.col(label.node, 6),
+        A.col(A.field('مفتاح النوع', key, isNew ? 'إنجليزي، مبيتغيرش بعدين' : 'المفتاح مبيتغيرش'), 6),
+        A.col(A.field('الأيقونة', grid), 12),
+        A.col(A.field('اللون', theme.node), 6),
+        A.col(A.field('نص الزرار الافتراضي', cta), 6),
+        A.col(A.field('نص الإشعار', template, isNew ? '' : '{العنوان} بيتبدل بعنوان الكارت'), 12),
+        isNew ? null : A.col(banner.node, 12),
+        isNew ? null : A.col(enabled.node, 12)));
+
+    A.openSheet('أنواع الكروت', [box, types.length ? list : null, form], [
+      save,
+      el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })
+    ], {
+      size: 'md',
+      icon: 'gear',
+      sub: 'النوع بيحدد الأيقونة واللون ونص الزرار الافتراضي',
+      className: 'sheet--types',
       // one editor per item: the official admin locks it while this is open
       draft: A.draftKey('types', isNew ? '' : type.key, sectionKey),
       lock: isNew ? null : A.editLock('types', type.key, 'نوع «' + (type.label || type.key) + '»', function () { var fresh = A.findRow(A.state.draft.types, 'key', type.key); if (fresh) A.editors.types(fresh, sectionKey); else A.closeSheet(); })

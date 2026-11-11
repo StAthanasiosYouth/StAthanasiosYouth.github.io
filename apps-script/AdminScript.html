@@ -1063,7 +1063,7 @@
         if (onchange) onchange(o.value);
       } });
       inputs.push(input);
-      return el('label', { class: 'seg__opt' }, input, el('span', { text: o.label }));
+      return el('label', { class: 'seg__opt' }, input, o.icon ? icon(o.icon) : null, el('span', { text: o.label }));
     }));
     Object.defineProperty(node, 'value', {
       get: function () { var on = inputs.filter(function (i) { return i.checked; })[0]; return on ? on.value : ''; },
@@ -1948,7 +1948,7 @@
       urlRow.hidden = !urlRow.hidden;
       if (!urlRow.hidden) urlInput.focus();
     } }, icon('link'), 'من رابط');
-    var fromLibrary = el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () {
+    var fromLibrary = el('button', { class: 'btn btn--ghost picker__lib', type: 'button', onclick: function () {
       if (busy) return;
       A.pickFromLibrary(value).then(function (id) {
         if (!id || id === value) return;
@@ -2062,6 +2062,7 @@
       choose.lastChild.textContent = options.allowVideo || options.fixedLabel ? chooseLabel : value ? 'ارفع صورة تانية' : 'ارفع صورة';
       var known = media();
       metaName.textContent = value ? value + (known && known.width ? ' · ' + known.width + '×' + known.height : '') : '';
+      if (options.posterTitle) { metaName.textContent = options.posterTitle; metaFrom.hidden = true; }
       metaFrom.textContent = value ? 'من المكتبة · ' + (known && known.usage && known.usage.length > 1 ? 'مستخدم في ' + A.digits(known.usage.length) + ' أماكن' : 'مستخدم هنا بس') : 'مفيش بوستر لسه';
 
       if (!value) {
@@ -2336,7 +2337,7 @@
     var inner = options.poster
       ? el('div', { class: 'picker picker--poster' + (options.className ? ' ' + options.className : '') },
         el('div', { class: 'picker__img-wrap' }, preview, el('span', { class: 'p8-tag p8-tag--ok picker__badge' }, icon('check'), options.badge || 'البوستر')),
-        el('div', { class: 'picker__side' }, metaName, metaFrom, actions, hint, urlRow, progress, errorBox, altField))
+        el('div', { class: 'picker__side' }, metaName, metaFrom, actions, options.noHint ? null : hint, urlRow, progress, errorBox, altField))
       : el('div', { class: 'picker' + (options.className ? ' ' + options.className : '') },
         preview,
         actions,
