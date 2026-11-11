@@ -346,7 +346,7 @@ test('names: renamed from «صلاحيات لوحة التحكم»; a copy is re
   freshWorld();
   const d = await device();
   await signIn(d.page);
-  await d.page.evaluate(() => A.go('settings'));
+  await d.page.evaluate(() => A.go('settings', 'team'));
   await d.page.waitForSelector(`.admin[data-email="${SECOND}"] .admin__name`);
   assert.equal(await d.page.$eval(`.admin[data-email="${SECOND}"] .admin__name`, n => n.textContent), 'فادي يوسف');
 
@@ -408,7 +408,7 @@ test('layout: the log, its filters and the app card fit a phone (no sideways scr
     assert.ok(fit.dock.every(b => !b.overflow), `${name}: dock labels fit`);
     await shot(d.page, `06-log-${name}`);
 
-    await d.page.evaluate(() => A.go('settings'));
+    await d.page.evaluate(() => A.go('settings', 'notify'));
     await d.page.waitForSelector('.card--app');
     const app = await d.page.$eval('.card--app', n => n.innerText);
     assert.match(app, /إعداد تطبيق الإدارة/);
@@ -449,7 +449,7 @@ function stage({ standalone = false, related = null, prompt = false } = {}) {
 async function staged(options, path = '') {
   const d = await device({ viewport: PHONE, ua: ANDROID, path, before: stage(options) });
   await signIn(d.page);
-  await d.page.evaluate(() => A.go('settings'));
+  await d.page.evaluate(() => A.go('settings', 'notify'));
   await d.page.waitForSelector('#app-setup .setup__step');
   await sleep(600);
   const read = () => d.page.$eval('#app-setup', n => ({

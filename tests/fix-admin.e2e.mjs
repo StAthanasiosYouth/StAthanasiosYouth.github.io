@@ -94,7 +94,7 @@ test('a publish under way: closing the editor and opening it again shows the sam
 
   const { page, problems, close } = await open();
 
-  await page.evaluate(() => A.go('settings'));
+  await page.evaluate(() => A.go('settings', 'site'));
   await page.waitForSelector('.card .input');
   await page.evaluate(() => {
     const field = [...document.querySelectorAll('.field')].find(f => f.dataset.label === 'الجملة التعريفية');
@@ -149,7 +149,7 @@ test('an upload stays listed (name, progress, result) after leaving «الصور
   await page.waitForFunction(() => window.__release.apiUploadMedia, { timeout: 20000 });
 
   // away and back while it is still sending
-  await page.evaluate(() => A.go('settings'));
+  await page.evaluate(() => A.go('settings', 'site'));
   await page.waitForSelector('.card .input');
   assert.equal(await page.evaluate(() => A.uploads.length), 1);
   await page.evaluate(() => A.go('media'));
@@ -255,7 +255,9 @@ test('help «؟»: the screen\'s own topic from admin/help.json, on top of an op
       await page.evaluate((a, s) => A.go(a, s || undefined), area, sub);
       await new Promise(resolve => setTimeout(resolve, 300));
       const button = await page.$('#help-open');
-      assert.ok(await shown(button), `«؟» visible on ${area}/${sub || ''} (${viewport.width})`);
+      // Phase 8B: the approved phone top bar has no help icon (help stays in every window, below)
+      if (viewport.width < 760) { assert.equal(await shown(button), false, 'no top help on a phone'); continue; }
+      assert.ok(await shown(button), `help visible on ${area}/${sub || ''} (${viewport.width})`);
       await press(button);
       await page.waitForSelector('dialog.help[open] .help__title');
       assert.equal(await page.$eval('dialog.help[open] .help__title', n => n.textContent), title);

@@ -231,6 +231,15 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   var icon = A.icon;
 
+  /* Phase 8B: the design's own extra icons (docs/phase8b/proposal.js EXTRA, proposal-2.js play) */
+  if (A.ICONS) {
+    var EXTRA_ICONS = {
+      palette: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-1.3-1-1.6-1-2.6 0-.8.6-1.4 1.4-1.4H16a5 5 0 0 0 5-5C21 6.2 17 3 12 3Z"/><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-1.3-1-1.6-1-2.6 0-.8.6-1.4 1.4-1.4H16a5 5 0 0 0 5-5C21 6.2 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="14.5" cy="7.5" r="1"/></svg>',
+      play: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M8 5.5v13l10.5-6.5Z"/><path d="M8 5.5v13l10.5-6.5Z"/></svg>'
+    };
+    Object.keys(EXTRA_ICONS).forEach(function (k) { if (!Object.prototype.hasOwnProperty.call(A.ICONS, k)) A.ICONS[k] = EXTRA_ICONS[k]; });
+  }
+
   /*
    * One server call -> a promise. Here (Apps Script) through
    * google.script.run; on the official admin page (GitHub Pages /admin/)
@@ -909,64 +918,69 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
    * once and is kept (this device now, the server a moment later); nothing to save, nothing to
    * lose on leaving, so it never marks the screen as changed.
    */
+  /* «الشكل» (Phase 8 A1; Phase 8B: the approved settings card — a row per choice, its words on one side and
+     the control on the other, a compact segmented control, colour dots, «شوف شاشة البداية» in the head) */
   A.lookCard = function () {
 
     var p = A.prefs;
 
-    function group(key, label, options) {
+    function row(label, hint, control, extra) {
+      return el('div', { class: 'setrow' + (extra ? ' ' + extra : '') },
+        el('div', { class: 'setrow__text' },
+          el('b', { class: 'setrow__label', text: label }),
+          hint ? el('small', { class: 'setrow__hint', text: hint }) : null),
+        el('div', { class: 'setrow__ctl' }, control));
+    }
+
+    function group(key, label, hint, options) {
       var name = A.uid('look-' + key);
-      return el('div', { class: 'look__row' },
-        el('p', { class: 'look__label', id: name + '-l', text: label }),
-        el('div', { class: 'choices look__choices', role: 'radiogroup', 'aria-labelledby': name + '-l' }, options.map(function (o) {
+      return row(label, hint,
+        el('div', { class: 'seg look__choices', role: 'radiogroup', 'aria-label': label }, options.map(function (o) {
           var input = el('input', { type: 'radio', name: name, value: o[0], checked: p[key] === o[0], 'data-look': key, onchange: function () {
             var patch = {};
             patch[key] = o[0];
             A.setPrefs(patch);
             A.sound('tap');
           } });
-          return el('label', { class: 'choice' }, input, el('span', { text: o[1] }));
-        }))
-      );
+          return el('label', { class: 'seg__opt' }, input, el('span', { text: o[1] }));
+        })));
     }
 
     var accentName = A.uid('look-accent');
-    var accents = el('div', { class: 'look__row' },
-      el('p', { class: 'look__label', id: accentName + '-l', text: 'لون التمييز' }),
-      el('div', { class: 'swatches', role: 'radiogroup', 'aria-labelledby': accentName + '-l' }, A.ACCENTS.map(function (a) {
-        var input = el('input', { type: 'radio', name: accentName, value: a[0], checked: p.accent === a[0], 'data-look': 'accent', onchange: function () {
+    var accents = row('اللون', 'لون الأزرار والتحديد',
+      el('div', { class: 'swatches swatches--dots', role: 'radiogroup', 'aria-label': 'اللون' }, A.ACCENTS.map(function (a) {
+        var input = el('input', { type: 'radio', name: accentName, value: a[0], checked: p.accent === a[0], 'data-look': 'accent', 'aria-label': a[1], onchange: function () {
           A.setPrefs({ accent: a[0] });
           A.sound('tap');
         } });
-        return el('label', { class: 'swatch swatch--acc-' + a[0] }, input, el('span', { class: 'swatch__dot', 'aria-hidden': 'true' }), el('span', { class: 'swatch__label', text: a[1] }));
-      }))
-    );
+        return el('label', { class: 'swatch swatch--acc-' + a[0], title: a[1] }, input, el('span', { class: 'swatch__dot', 'aria-hidden': 'true' }), el('span', { class: 'swatch__label visually-hidden', text: a[1] }));
+      })));
 
-    var test = el('button', { class: 'btn btn--small', type: 'button', disabled: !p.sound, 'data-look-test': '', onclick: function () {
+    var test = el('button', { class: 'btn btn--small btn--ghost', type: 'button', disabled: !p.sound, 'data-look-test': '', onclick: function () {
       ['tap', 'open', 'pop', 'success', 'close', 'nope'].forEach(function (k, i) { setTimeout(function () { A.sound(k); }, i * 320); });
-    } }, 'جرّب الأصوات');
+    } }, 'جرّب');
 
-    var sound = el('input', { type: 'checkbox', role: 'switch', checked: !!p.sound, 'data-look': 'sound', onchange: function () {
+    var sound = el('input', { type: 'checkbox', role: 'switch', checked: !!p.sound, 'data-look': 'sound', 'aria-label': 'الأصوات', onchange: function () {
       A.setPrefs({ sound: sound.checked });
       test.disabled = !sound.checked;
       if (sound.checked) A.sound('success');
     } });
 
-    return el('section', { class: 'card look', 'data-look-card': '' },
-      el('div', { class: 'card__head' },
-        el('div', {},
-          el('h2', { class: 'card__title', text: 'المظهر' }),
-          el('p', { class: 'card__hint', text: 'اختياراتك ليك إنت بس، وبتتحفظ لحسابك فبتمشي معاك على أي جهاز تفتح منه.' })
-        )
+    return el('section', { class: 'card look setcard', 'data-look-card': '' },
+      el('div', { class: 'setcard__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('palette')),
+        el('div', { class: 'setcard__titles' },
+          el('h2', { class: 'card__title', text: 'الشكل' }),
+          el('p', { class: 'card__hint', text: 'بيتحفظ على حسابك وبيمشي معاك على كل جهاز' })),
+        A.playIntro ? el('button', { class: 'btn btn--small setcard__act settings__intro', type: 'button', onclick: function () { A.playIntro(); } }, icon('play'), 'شوف شاشة البداية') : null
       ),
-      group('theme', 'الوضع', [['dark', 'داكن'], ['light', 'فاتح'], ['system', 'زي الجهاز']]),
+      group('theme', 'الوضع', '', [['dark', 'داكن'], ['light', 'فاتح'], ['system', 'زي الجهاز']]),
       accents,
-      group('density', 'الكثافة', [['comfortable', 'مريح'], ['compact', 'مضغوط']]),
-      group('motion', 'الحركة', [['full', 'كاملة'], ['lite', 'مخففة'], ['off', 'مقفولة']]),
-      el('p', { class: 'look__note', text: 'لو جهازك على «تقليل الحركة» بنحترمه دايمًا، أيًا كان اختيارك هنا.' }),
-      el('div', { class: 'look__row look__row--sound' },
-        el('label', { class: 'switch' }, sound, el('span', { class: 'switch__track', 'aria-hidden': 'true' }), el('span', { text: 'أصوات الواجهة (خفيفة جدًا، مقفولة من الأول)' })),
-        test
-      )
+      group('density', 'الكثافة', 'المسافات بين العناصر', [['comfortable', 'مريحة'], ['compact', 'مضغوطة']]),
+      group('motion', 'الحركة', '«خفيفة» بتشيل الجزيئات والانتقالات الكبيرة', [['full', 'كاملة'], ['lite', 'خفيفة'], ['off', 'من غير']]),
+      row('الأصوات', 'صوت خفيف مع النشر والحفظ',
+        el('span', { class: 'setrow__pair' }, test,
+          el('label', { class: 'switch switch--bare' }, sound, el('span', { class: 'switch__track', 'aria-hidden': 'true' }))), 'look__row--sound')
     );
 
   };
@@ -1339,6 +1353,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     describe();
 
+    // Phase 8B: the one schedule picker (A.whenPicker), from a «التقويم» chip after the quick choices
+    presets.push(el('button', { class: 'preset datetime__pick', type: 'button', 'aria-label': 'اختار الميعاد من التقويم', onclick: function () {
+      A.whenPicker({ title: options.title || 'الميعاد', sub: options.sub || '', value: current(), presets: options.presets || [], dateOnly: options.dateOnly, onDone: set });
+    } }, icon('calendar'), 'التقويم'));
+
     return {
       node: el('div', { class: 'datetime' },
         el('div', { class: 'row' }, date, time),
@@ -1350,6 +1369,126 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     };
 
   };
+
+  /*
+   * Phase 8B: the one schedule picker (docs/phase8b sched-picker): quick choices, a month calendar, the hour,
+   * «امسح الميعاد», and the time said in words in Cairo time with how far it is. Every A.dateTimeInput opens it
+   * from its calendar button; the typed date and time fields stay, so nothing that fills them changes.
+   * opts: { title, sub, value, presets, dateOnly, onDone(value) }
+   */
+  var whenDialog = null;
+  var WEEK_HEADS = ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س'];
+  var HOURS = [['20:00', '٨:٠٠ م'], ['21:00', '٩:٠٠ م'], ['22:00', '١٠:٠٠ م']];
+
+  function arabicDigits(text) { return String(text).replace(/\d/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[d]; }); }
+
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+  A.whenPicker = function (opts) {
+
+    opts = opts || {};
+    if (!whenDialog) {
+      whenDialog = el('dialog', { class: 'whenpick', 'aria-labelledby': 'whenpick-title' });
+      whenDialog.addEventListener('click', function (event) { if (event.target === whenDialog) whenDialog.close(); });
+      document.body.appendChild(whenDialog);
+    }
+
+    var today = A.cairoNow().slice(0, 10);
+    var start = String(opts.value || '').split(/[ T]/);
+    var date = start[0] || '';
+    var time = opts.dateOnly ? '' : (start[1] || '');
+    var month = (date || today).slice(0, 7);
+    var dialog = whenDialog;
+
+    function value() { return date ? (time && !opts.dateOnly ? date + ' ' + time : date) : ''; }
+
+    function said() {
+      var v = value();
+      if (!v) return 'من غير ميعاد';
+      var text = A.formatWall(v) + ' بتوقيت مصر';
+      var days = Math.round((A.wallMinutes(v.slice(0, 10)) - A.wallMinutes(today)) / 1440);
+      var away = days === 0 ? 'النهارده' : days === 1 ? 'بكرة' : days === -1 ? 'امبارح'
+        : days > 0 ? 'بعد ' + arabicDigits(days) + (days <= 10 ? ' أيام' : ' يوم') : 'من ' + arabicDigits(-days) + (-days <= 10 ? ' أيام' : ' يوم');
+      return text + ' — ' + away;
+    }
+
+    function calendar() {
+      var y = +month.slice(0, 4), m = +month.slice(5, 7);
+      var first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+      var count = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      var cells = [];
+      for (var i = 0; i < first; i++) cells.push(el('span', { class: 'whenpick__day is-blank', 'aria-hidden': 'true' }));
+      for (var d = 1; d <= count; d++) {
+        (function (day) {
+          var key = y + '-' + pad2(m) + '-' + pad2(day);
+          cells.push(el('button', {
+            class: 'whenpick__day' + (key === date ? ' is-on' : '') + (key === today ? ' is-today' : ''), type: 'button',
+            'aria-pressed': key === date ? 'true' : 'false', 'aria-label': A.formatWall(key, false),
+            onclick: function () { date = key; draw(); }
+          }, arabicDigits(day)));
+        })(d);
+      }
+      function shift(by) {
+        var t = new Date(Date.UTC(y, m - 1 + by, 1));
+        month = t.getUTCFullYear() + '-' + pad2(t.getUTCMonth() + 1);
+        draw();
+      }
+      return el('div', { class: 'whenpick__cal' },
+        el('div', { class: 'whenpick__month' },
+          el('b', { text: MONTHS[m - 1] + ' ' + arabicDigits(y) }),
+          el('span', { class: 'whenpick__sp' }),
+          el('button', { class: 'icon-btn icon-btn--small', type: 'button', 'aria-label': 'الشهر اللي فات', onclick: function () { shift(-1); } }, el('span', { class: 'whenpick__prev' }, icon('chevron'))),
+          el('button', { class: 'icon-btn icon-btn--small', type: 'button', 'aria-label': 'الشهر الجاي', onclick: function () { shift(1); } }, icon('chevron'))),
+        el('div', { class: 'whenpick__grid' },
+          WEEK_HEADS.map(function (h) { return el('span', { class: 'whenpick__head', 'aria-hidden': 'true', text: h }); }),
+          cells));
+    }
+
+    function hours() {
+      var other = el('input', { class: 'input whenpick__other', type: 'time', value: time, 'aria-label': 'ساعة تانية', oninput: function () { time = other.value; if (!date) date = today; drawSaid(); markChips(); } });
+      var chips = HOURS.map(function (h) {
+        return el('button', { class: 'preset' + (time === h[0] ? ' is-on' : ''), type: 'button', 'data-time': h[0], onclick: function () { time = h[0]; if (!date) date = today; other.value = time; drawSaid(); markChips(); } }, h[1]);
+      });
+      function markChips() { chips.forEach(function (c) { c.classList.toggle('is-on', c.getAttribute('data-time') === time); }); }
+      return el('div', { class: 'whenpick__hours' }, el('p', { class: 'whenpick__label', text: 'الساعة' }), el('div', { class: 'presets' }, chips, other));
+    }
+
+    var saidNode = el('p', { class: 'whenpick__said' }, icon('info'), el('span'));
+    function drawSaid() { saidNode.lastChild.textContent = said(); }
+
+    function draw() {
+      var presets = (opts.presets || []).map(function (preset) {
+        var v = typeof preset.value === 'function' ? preset.value() : preset.value;
+        return el('button', { class: 'preset' + (v && v === value() ? ' is-on' : ''), type: 'button', onclick: function () {
+          var p = String(v || '').split(/[ T]/);
+          date = p[0] || ''; time = opts.dateOnly ? '' : (p[1] || '');
+          if (date) month = date.slice(0, 7);
+          draw();
+        } }, preset.label);
+      });
+      drawSaid();
+      A.fill(dialog,
+        el('div', { class: 'whenpick__headrow' },
+          el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('clock')),
+          el('div', { class: 'whenpick__titles' },
+            el('h2', { id: 'whenpick-title', text: opts.title || 'الميعاد' }),
+            opts.sub ? el('p', { text: opts.sub }) : null),
+          el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: function () { dialog.close(); } }, icon('close'))),
+        el('div', { class: 'whenpick__body' },
+          presets.length ? el('div', { class: 'presets' }, presets) : null,
+          calendar(),
+          opts.dateOnly ? null : hours(),
+          saidNode),
+        el('div', { class: 'whenpick__foot' },
+          el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { dialog.close(); if (opts.onDone) opts.onDone(value()); } }, icon('check'), 'تمام'),
+          el('button', { class: 'btn', type: 'button', onclick: function () { dialog.close(); if (opts.onDone) opts.onDone(''); } }, 'امسح الميعاد')));
+    }
+
+    draw();
+    if (!dialog.open) dialog.showModal();
+
+  };
+
 
   /* common presets */
   A.PRESETS = {
@@ -2631,6 +2770,69 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   var sheet = document.getElementById('sheet');
 
+  var DIGITS = '٠١٢٣٤٥٦٧٨٩';
+  function arabicNumber(n) { return String(n).replace(/\d/g, function (d) { return DIGITS[d]; }); }
+
+  /* Phase 8B: a big editor's sections, listed on its side (wide screens) or as chips over it (phones).
+     Taken from the editor's own «section-label» headings, so every editor gets it without changes; one with
+     fewer than two sections stays a single column at the medium width. A tap scrolls to the section, and the
+     list follows the scroll. */
+  function sheetSections(dialog) {
+
+    var body = dialog.querySelector('.sheet__body');
+    var labels = Array.prototype.slice.call(body.querySelectorAll('.section-label')).filter(function (label) {
+      return !label.closest('.sheet__body .sheet__body, dialog:not(.sheet)');
+    });
+    if (labels.length < 2) { dialog.classList.remove('sheet--lg'); dialog.classList.add('sheet--md'); return; }
+
+    var sections = labels.map(function (label) {
+      var target = label.closest('.form-group, fieldset, .card') || label;
+      if (!body.contains(target) || target === body) target = label;
+      target.classList.add('sheet__sec');
+      return { title: label.textContent.trim(), target: target };
+    });
+
+    // fields before the first section: «الأساسيات»
+    var firstTop = sections[0].target;
+    var lead = body.querySelector('.field, .form > *');
+    if (lead && lead !== firstTop && !firstTop.contains(lead) && (lead.compareDocumentPosition(firstTop) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+      sections.unshift({ title: 'الأساسيات', target: null });
+    }
+
+    var links = sections.map(function (section, i) {
+      return el('button', {
+        class: 'sheet__navlink' + (i === 0 ? ' is-on' : ''), type: 'button',
+        onclick: function () {
+          var smooth = document.documentElement.getAttribute('data-motion') !== 'off' &&!matchMedia('(prefers-reduced-motion: reduce)').matches;
+          if (!section.target) body.scrollTo({ top: 0, behavior: smooth ? 'smooth' : 'auto' });
+          else body.scrollTo({ top: secTop(section.target) - 12, behavior: smooth ? 'smooth' : 'auto' });
+        }
+      }, el('span', { class: 'sheet__navnum', 'aria-hidden': 'true', text: arabicNumber(i + 1) }), el('span', { text: section.title }));
+    });
+
+    var nav = el('nav', { class: 'sheet__nav', 'aria-label': 'أقسام النافذة' }, links);
+    dialog.insertBefore(nav, body);
+
+    function secTop(node) { return node.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop; }
+
+    var ticking = false;
+    body.addEventListener('scroll', function () {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(function () {
+        ticking = false;
+        var at = 0;
+        var top = body.scrollTop + 40;
+        sections.forEach(function (section, i) { if (section.target && secTop(section.target) <= top) at = i; });
+        if (body.scrollTop + body.clientHeight >= body.scrollHeight - 4) at = sections.length - 1;
+        links.forEach(function (link, i) { link.classList.toggle('is-on', i === at); });
+        var on = links[at];
+        if (on && nav.scrollWidth > nav.clientWidth) nav.scrollTo({ left: on.offsetLeft - nav.clientWidth / 2 + on.offsetWidth / 2 });
+      });
+    }, { passive: true });
+
+  }
+
   A.openSheet = function (title, body, footer, options) {
 
     options = options || {};
@@ -2640,17 +2842,23 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var toasts = document.getElementById('toasts');
     if (toasts && sheet.contains(toasts)) document.body.appendChild(toasts);
 
-    sheet.className = 'sheet' + (options.wide ? ' sheet--wide' : '') + (options.className ? ' ' + options.className : '');
+    // Phase 8B: centred on wide screens, in three sizes. An item editor (a draft or a lock) or a wide sheet is big
+    // (sections on the side), the rest medium; options.size wins.
+    var size = options.size || (options.wide || options.draft || options.lock ? 'lg' : 'md');
+    sheet.className = 'sheet sheet--' + size + (options.wide ? ' sheet--wide' : '') + (options.className ? ' ' + options.className : '');
     A.fill(sheet,
       el('div', { class: 'sheet__grab', 'aria-hidden': 'true' }),
       el('div', { class: 'sheet__head' },
         el('h2', { class: 'sheet__title', id: 'sheet-title', tabindex: '-1', text: title }),
+        options.headActions ? el('span', { class: 'sheet__headacts' }, options.headActions) : null,
         A.helpButton ? A.helpButton() : null,
         el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: function () { A.closeSheet(); } }, icon('close'))
       ),
       el('div', { class: 'sheet__body' }, body),
       footer ? el('div', { class: 'sheet__foot' }, footer) : null
     );
+
+    if (size === 'lg') sheetSections(sheet);
 
     sheet.style.transform = '';
 
@@ -3914,7 +4122,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   ];
 
   A.views.gamescorner = function () {
-    return [A.card('ركن الألعاب', 'جاي قريب: المكتبة، الجلسات، المشاركين والفرق، حسابات الـHost، والمكافآت. لسه مفيش حاجة هنا تشتغل.',
+    return [A.card('الألعاب', 'جاي قريب: المكتبة، الجلسات، المشاركين والفرق، حسابات الـHost، والمكافآت. لسه مفيش حاجة هنا تشتغل.',
       el('p', { class: 'soon-chip' }, icon('lock'), 'قريبًا'),
       el('ul', { class: 'coming' }, COMING_GAMES.map(function (g) {
         return el('li', { class: 'coming__game' },
@@ -3929,8 +4137,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   A.gamesCorner = function (on) {
     var has = A.AREAS.some(function (a) { return a.key === 'gamescorner'; });
     if (on && !has) {
-      var at = A.AREAS.length - 1; // before «الإعدادات»
-      A.AREAS.splice(at, 0, { key: 'gamescorner', label: 'الألعاب', title: 'ركن الألعاب', icon: 'sparkle', group: 'site', soon: true, view: 'gamescorner' });
+      // Phase 8B: in «الشغل», right after «المسابقات» («ركن الألعاب» of the content is another thing)
+      var at = A.AREAS.map(function (a) { return a.key; }).indexOf('comps') + 1 || A.AREAS.length - 1;
+      A.AREAS.splice(at, 0, { key: 'gamescorner', label: 'الألعاب', title: 'الألعاب', icon: 'star', group: 'main', soon: true, view: 'gamescorner' });
     }
     if (!on && has) A.AREAS = A.AREAS.filter(function (a) { return a.key !== 'gamescorner'; });
   };
@@ -3952,6 +4161,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   var RAIL_KEY = 'athanasios-admin.rail';
   var GROUPS = { main: 'الشغل', site: 'الموقع', team: 'الفريق' };
   var DOCK_MAIN = 4;
+  var DOCK_PLACES = ['comps', 'youth', 'bookings'];
   var railLight = null;
 
   function railClosed() {
@@ -4010,7 +4220,13 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var all = A.visibleAreas().filter(function (a) { return a.key !== 'settings'; }).map(function (a, i) { return { a: a, i: i }; })
       .sort(function (x, y) { return (order.indexOf(x.a.group || 'site') - order.indexOf(y.a.group || 'site')) || (x.i - y.i); }).map(function (x) { return x.a; });
     all = all.filter(function (a) { return a.key === home; }).concat(all.filter(function (a) { return a.key !== home; }));
-    return { main: all.slice(0, DOCK_MAIN), rest: all.slice(DOCK_MAIN) };
+    // Phase 8B: the dock's own places (الرئيسية · المسابقات · الشباب · الحجوزات), those this admin has, in that
+    // order after their home; the rest fill up (never a locked «قريبًا» area); the others go under «المزيد»
+    var main = all.slice(0, 1);
+    DOCK_PLACES.forEach(function (key) { var a = all.filter(function (x) { return x.key === key; })[0]; if (a && main.indexOf(a) === -1) main.push(a); });
+    all.forEach(function (a) { if (main.length < DOCK_MAIN && main.indexOf(a) === -1 && !a.soon) main.push(a); });
+    main = main.slice(0, DOCK_MAIN);
+    return { main: main, rest: all.filter(function (a) { return main.indexOf(a) === -1; }) };
   }
 
   function moreButton(restSelected) {
@@ -4274,47 +4490,143 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     acct.setAttribute('aria-label', 'حسابك: ' + name);
   }
 
-  /* ---------- the welcome inside the shell, right after signing in ---------- */
+  /* ---------- the welcome inside the shell, right after signing in ----------
+     Phase 8B: the approved preview's intro (docs/phase8/admin-preview.src.html playIntro + dust) as it is,
+     with no «تخطي» button, and it always plays to its end (a tap does not cut it). Its colours follow the chosen accent; once after signing
+     in, never with reduced motion; A.playIntro() («شوف شاشة البداية») plays it again. Same API as before:
+     { ready(name), leave() }. */
 
   var welcomed = false;
 
-  function welcome() {
-    if (welcomed) return null;
+  function introDust(cv, dur) {
+    if (document.documentElement.getAttribute('data-motion') === 'lite') return;
+    var rgb = (getComputedStyle(document.documentElement).getPropertyValue('--acc-hi-rgb') || '242 210 139').trim().split(/\s+/).join(',');
+    var ctx = cv.getContext('2d'), dpr = Math.min(2, window.devicePixelRatio || 1), w = cv.clientWidth, h = cv.clientHeight, ps = [], start = performance.now();
+    if (!ctx || !w || !h) return;
+    cv.width = w * dpr; cv.height = h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (var i = 0; i < 48; i++) ps.push({ x: Math.random() * w, y: h * (0.3 + Math.random() * 0.8), r: 0.6 + Math.random() * 1.9, v: 0.15 + Math.random() * 0.55, a: Math.random() * 6.28, s: 0.5 + Math.random() });
+    (function frame(t) {
+      if (!cv.isConnected) return;
+      var k = (t - start) / dur, fade = k < 0.15 ? k / 0.15 : k > 0.85 ? Math.max(0, (1 - k) / 0.15) : 1;
+      ctx.clearRect(0, 0, w, h);
+      ps.forEach(function (p) {
+        p.y -= p.v; p.x += Math.sin(p.a += 0.02) * 0.25;
+        var tw = 0.5 + 0.5 * Math.sin(p.a * 3 * p.s);
+        ctx.beginPath(); ctx.fillStyle = 'rgba(' + rgb + ',' + ((0.08 + 0.32 * tw) * fade).toFixed(3) + ')'; ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill();
+      });
+      if (k < 1) requestAnimationFrame(frame);
+    })(start);
+  }
+
+  function welcome(force) {
+    if (welcomed && !force) return null;
     welcomed = true;
     var root = document.documentElement;
-    if (root.classList.contains('is-restoring') || A.reducedMotion() || document.visibilityState === 'hidden' || !window.AdminTransport) return null;
+    if (!force && (root.classList.contains('is-restoring') || document.visibilityState === 'hidden' || !window.AdminTransport)) return null;
+    if (A.reducedMotion()) {
+      if (force) A.toast('شاشة البداية مقفولة مع «تقليل الحركة»');
+      return null;
+    }
     var main = document.querySelector('.app__main');
     if (!main) return null;
-    var hello = el('p', { class: 'welcome__hello', text: 'أهلاً بيك' });
-    var box = el('div', { class: 'welcome', 'aria-hidden': 'true' },
-      el('span', { class: 'welcome__glow' }),
-      el('img', { class: 'welcome__logo', src: '../assets/img/logo-256.webp', width: 112, height: 112, alt: '' }),
-      el('p', { class: 'welcome__title', text: 'لوحة التحكم' }),
-      hello,
-      el('span', { class: 'welcome__line' }, el('i')));
-    main.appendChild(box);
-    var shown = Date.now();
-    var gone = false;
-    function leave() {
+    var old = document.querySelector('.welcome');
+    if (old) old.remove();
+
+    var sub = el('p', { class: 'intro__sub welcome__hello', text: 'أسرة البابا أثناسيوس الرسولي · سفاجا' });
+    var status = el('span', { class: 'intro__status', text: 'بنجهز لوحتك…' });
+    var box = el('div', { class: 'welcome intro', 'aria-hidden': 'true' },
+      el('div', { class: 'intro__bg' }, el('div', { class: 'intro__rays' }), el('canvas', { class: 'intro__dust' })),
+      el('div', { class: 'intro__core' },
+        el('div', { class: 'intro__mark' },
+          el('span', { class: 'intro__halo' }), el('span', { class: 'intro__ring' }),
+          el('img', { class: 'intro__logo', src: '../assets/img/logo-256.webp', width: 128, height: 128, alt: '' }),
+          el('span', { class: 'intro__sweep' }, el('i'))),
+        el('div', { class: 'intro__text' }, el('p', { class: 'intro__title', text: 'لوحة التحكم' }), sub),
+        el('div', { class: 'intro__load' }, el('span', { class: 'intro__progress' }, el('i')), status)));
+
+    // over the panel's column, under its top bar
+    var bar = document.querySelector('.topbar');
+    var r = main.getBoundingClientRect();
+    var top = bar && bar.offsetParent ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
+    box.style.cssText = 'top:' + top + 'px;left:' + Math.max(0, r.left) + 'px;width:' + Math.min(innerWidth, r.width) + 'px';
+    document.body.appendChild(box);
+    root.classList.add('is-intro');
+    introDust(box.querySelector('canvas'), 2600);
+    if (A.sound) A.sound('open');
+
+    var anims = [], D = 1900, E = 'cubic-bezier(.16,1,.3,1)', gone = false, ready = false, shown = Date.now();
+    function play(sel, kf, o) {
+      var node = box.querySelector(sel);
+      if (!node || !node.animate) return null;
+      var a = node.animate(kf, Object.assign({ fill: 'both', easing: 'cubic-bezier(.22,1,.36,1)' }, o));
+      anims.push(a);
+      return a;
+    }
+    play('.intro__rays', [{ opacity: 0, transform: 'rotate(0deg)' }, { opacity: 1, transform: 'rotate(8deg)' }], { duration: 2600, easing: 'linear' });
+    play('.intro__halo', [{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 1000, delay: 100 });
+    play('.intro__logo', [{ opacity: 0, transform: 'scale(.9)', filter: 'blur(10px)' }, { opacity: 1, transform: 'none', filter: 'blur(0px)' }], { duration: 850, delay: 150, easing: E });
+    play('.intro__ring', [{ opacity: 0, transform: 'scale(.85)' }, { opacity: 1, transform: 'none' }], { duration: 700, delay: 450, easing: E });
+    play('.intro__sweep i', [{ left: '-60%' }, { left: '140%' }], { duration: 750, delay: 850, easing: 'ease-in-out' });
+    play('.intro__title', [{ opacity: 0, transform: 'translateY(12px)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0px)' }], { duration: 750, delay: 600, easing: E });
+    play('.intro__sub', [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 600, delay: 900, easing: E });
+    play('.intro__load', [{ opacity: 0 }, { opacity: 1 }], { duration: 400, delay: 300 });
+    play('.intro__progress i', [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: D, easing: 'linear' });
+
+    // it ends by itself once the panel is ready and the bar is full
+    var timer = setTimeout(function () { if (ready) leave(false); }, D);
+    var hardStop = setTimeout(function () { leave(false); }, 6000);
+
+    function target() {
+      return ['.rail .brand__mark', '.topbar__mark'].map(function (s) { return document.querySelector(s); })
+        .filter(function (n) { return n && n.offsetParent && n.getBoundingClientRect().width; })[0];
+    }
+
+    function leave(fast) {
       if (gone) return;
       gone = true;
+      clearTimeout(timer); clearTimeout(hardStop);
+      anims.forEach(function (a) { try { a.finish(); } catch (e) { /* gone */ } });
       box.classList.add('is-leaving');
-      setTimeout(function () { box.remove(); }, 520);
+      ['.intro__text', '.intro__load', '.intro__halo', '.intro__ring', '.intro__sweep'].forEach(function (s) {
+        var n = box.querySelector(s);
+        if (n && n.animate) n.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-8px)' }], { duration: fast ? 160 : 320, fill: 'both', easing: 'ease-in' });
+      });
+      var bg = box.querySelector('.intro__bg');
+      if (bg.animate) bg.animate([{ opacity: 1 }, { opacity: 0 }], { duration: fast ? 260 : 520, delay: fast ? 60 : 300, fill: 'both', easing: 'ease-in-out' });
+      // the logo travels to its home in the rail (or the phone's top bar)
+      var logo = box.querySelector('.intro__logo'), t = target(), fly = null;
+      if (t && logo.animate) {
+        var a = logo.getBoundingClientRect(), b = t.getBoundingClientRect();
+        var dx = (b.left + b.width / 2) - (a.left + a.width / 2), dy = (b.top + b.height / 2) - (a.top + a.height / 2), sc = b.width / (a.width || 1);
+        fly = logo.animate([{ transform: 'none' }, { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(' + sc + ')' }], { duration: fast ? 420 : 820, easing: 'cubic-bezier(.65,0,.35,1)', fill: 'forwards' });
+      } else if (logo.animate) fly = logo.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
+      function cleanup() { root.classList.remove('is-intro'); box.remove(); }
+      if (fly && fly.finished) fly.finished.then(cleanup, cleanup);
+      else setTimeout(cleanup, 520);
     }
-    // it never stands in the way: the first tap or key goes to the panel and the welcome steps aside
-    document.addEventListener('pointerdown', leave, { capture: true, once: true });
-    document.addEventListener('keydown', leave, { capture: true, once: true });
-    setTimeout(leave, 3200);
+
+    // owner (2026-11-11): it plays to its end; a tap or a key no longer ends it
+
     return {
       ready: function (name) {
         if (gone) return;
-        if (name) hello.textContent = 'أهلاً يا ' + String(name).split(' ')[0];
+        ready = true;
+        if (name) sub.textContent = 'أهلاً يا ' + String(name).split(' ')[0];
+        status.textContent = 'اللوحة جاهزة ✓';
         box.classList.add('is-ready');
-        setTimeout(leave, Math.max(450, 1100 - (Date.now() - shown)));
+        var left = D - (Date.now() - shown);
+        clearTimeout(timer);
+        timer = setTimeout(function () { leave(false); }, Math.max(450, left));
       },
-      leave: leave
+      leave: function () { leave(true); }
     };
   }
+
+  /* «شوف شاشة البداية» */
+  A.playIntro = function () {
+    var intro = welcome(true);
+    if (intro) intro.ready(A.state && (A.state.me || (A.state.user || '').split('@')[0]));
+  };
 
   /* ---------- presence: the other admins as avatars (online · idle · editing), the list a tap away ---------- */
 
@@ -4787,7 +5099,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         el('h2', { class: 'card__title', text: 'في ترقية للبيانات مستنياك' }),
         el('p', { class: 'card__hint', text: 'بتضيف أقسام الصفحة (علشان تقدر تخفي وتظهر وترتب أي قسم)، وأعمدة المسابقات والفعاليات والأرشيف، ورابط جروب الواتساب. بتعمل نسخة احتياطية الأول ومبتمسحش حاجة.' })
       ),
-      el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.go('settings'); } }, 'روح للترقية')
+      el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.go('settings', 'content'); } }, 'روح للترقية')
     );
 
   };
@@ -4924,17 +5236,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   A.openReview = function () { openReview(); };
 
   var PUBLISH_STEPS = [
-    { key: 'review', label: 'مراجعة' },
-    { key: 'github', label: 'نشر على GitHub' },
-    { key: 'pages', label: 'انتظار GitHub Pages' },
+    { key: 'review', label: 'راجع التغييرات' },
+    { key: 'github', label: 'انشر' },
+    { key: 'pages', label: 'بنجهز الموقع' },
     { key: 'live', label: 'ظهر على الموقع' }
   ];
 
   /* the Worker publishes (PUBLISH_MODE 'worker', Phase 2/4): live the moment it answers — the
      GitHub copy follows in the background, nobody waits for it (owner 2026-10-22: 3 steps) */
   var PUBLISH_STEPS_LIVE = [
-    { key: 'review', label: 'مراجعة' },
-    { key: 'publish', label: 'نشر' },
+    { key: 'review', label: 'راجع التغييرات' },
+    { key: 'publish', label: 'انشر' },
     { key: 'live', label: 'ظهر على الموقع' }
   ];
 
@@ -4972,6 +5284,18 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   }
 
+  /* «النسخ السابقة» from the review (the same list as in «الإعدادات» ← «النشر والنسخ») */
+  function historyButton() {
+
+    if (!A.publishHistoryCard || !window.AdminWorker) return null;
+    return el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () {
+      A.openSheet('النسخ السابقة', [A.publishHistoryCard()], [
+        el('button', { class: 'btn', type: 'button', onclick: openReview }, icon('send'), 'رجوع لراجع وانشر')
+      ], { size: 'md' });
+    } }, icon('clock'), 'النسخ السابقة');
+
+  }
+
   function reviewSkeleton() {
 
     return [
@@ -4997,13 +5321,13 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
 
     publishJob = null;
-    A.openSheet('مراجعة قبل النشر', reviewSkeleton());
+    A.openSheet('راجع وانشر', reviewSkeleton());
 
     reviewNow()
       .then(renderReview)
       .catch(function (error) {
         var box = A.errorBox();
-        A.openSheet('مراجعة قبل النشر', [stepper(0, true), box], [
+        A.openSheet('راجع وانشر', [stepper(0, true), box], [
           el('button', { class: 'btn btn--primary', type: 'button', onclick: openReview }, icon('retry'), 'جرّب تاني'),
           el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })
         ]);
@@ -5067,12 +5391,16 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       return el('section', { class: 'review-group' },
         el('h3', { class: 'review-group__title' }, icon(group.icon), group.title),
         el('ul', { class: 'changes' }, group.items.map(function (item) {
+          // Phase 8B: each change a card, its kind as a chip, and «شوف الفرق» (the site with the drafts)
           return el('li', { class: 'is-' + item.tone },
-            el('span', { class: 'visually-hidden', text: tones[item.tone] + ': ' }),
             el('span', { class: 'change__text' },
+              el('span', { class: 'chip change__tone change__tone--' + item.tone, text: tones[item.tone] }),
               el('span', { text: item.text }),
               item.when ? el('span', { class: 'chip chip--gold change__when', text: item.when }) : null
-            )
+            ),
+            A.state && A.state.config && A.state.config.siteUrl && item.tone !== 'remove'
+              ? el('button', { class: 'btn btn--small btn--ghost change__diff', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'شوف الفرق')
+              : null
           );
         }))
       );
@@ -5149,7 +5477,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       ? el('button', { class: 'btn', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'معاينة')
       : null;
 
-    A.openSheet('مراجعة قبل النشر', body, [publish, preview].concat(A.sheetFooter(publish).slice(1)).filter(Boolean));
+    A.openSheet('راجع وانشر', body, [publish, preview].concat(A.sheetFooter(publish).slice(1)).filter(Boolean), { headActions: historyButton() });
 
   }
 
@@ -6303,9 +6631,22 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var tagline = A.counted('الجملة التعريفية', setting('site.tagline'), limits.tagline, A.settingHelp('site.tagline'));
     var shareText = A.counted('نص المشاركة', setting('site.shareText'), limits.shareText, A.settingHelp('site.shareText'));
 
-    var siteCard = A.card('الموقع', null,
+    // Phase 8B «بيانات الموقع»: the fields, and next to them how a shared link looks (live)
+    var share = el('div', { class: 'sharecard' },
+      el('img', { class: 'sharecard__logo', src: '../assets/img/logo-256.webp', alt: '', width: 56, height: 56 }),
+      el('div', { class: 'sharecard__text' },
+        el('small', { class: 'sharecard__host ltr', text: String((A.state.config || {}).siteUrl || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '') }),
+        el('b', { class: 'sharecard__name' }), el('span', { class: 'sharecard__line' })));
+    function drawShare() {
+      share.querySelector('.sharecard__name').textContent = name.input.value;
+      share.querySelector('.sharecard__line').textContent = tagline.input.value || shareText.input.value;
+    }
+    drawShare();
+    var siteCard = A.card('بيانات الموقع', 'بتظهر في عنوان الموقع، وفي المشاركة على واتساب وفيسبوك',
       box,
-      el('div', { class: 'form' }, name.node, tagline.node, shareText.node),
+      el('div', { class: 'setsplit' },
+        el('div', { class: 'form', oninput: drawShare }, name.node, tagline.node, shareText.node),
+        el('aside', { class: 'setsplit__aside' }, el('p', { class: 'setsplit__label', text: 'لما حد يشارك اللينك' }), share)),
       A.settingsSaver(function () {
         return {
           'site.name': name.input.value,
@@ -6333,94 +6674,111 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       }, hubBox)
     );
 
-    var config = A.state.config;
-    var status = A.state.status;
-    var checkResult = el('p', { class: 'note', hidden: true });
-    var check = el('button', { class: 'btn', type: 'button', text: 'اختبر الاتصال بـ GitHub' });
-
-    check.addEventListener('click', function () {
-      checkResult.hidden = true;
-      A.withBusy(check, A.call('apiCheckGithub'))
-        .then(function (result) {
-          checkResult.className = 'note note--ok';
-          checkResult.textContent = 'تمام ✓ — ' + result.repo + ' (' + result.branch + ' @ ' + result.head + ')' + (result.pages ? ' — GitHub Pages شغال' : ' — GitHub Pages مش متفعل');
-          checkResult.hidden = false;
-        })
-        .catch(function (error) {
-          checkResult.className = 'errors';
-          A.fail(error, checkResult);
-        });
-    });
-
-    /* every step of a poster upload against the real Google Drive */
-    var mediaResult = el('div', { class: 'checklist', hidden: true, 'aria-live': 'polite' });
-    var mediaCheck = el('button', { class: 'btn', type: 'button', text: 'اختبر رفع الصور' });
-
-    mediaCheck.addEventListener('click', function () {
-      mediaResult.hidden = true;
-      A.withBusy(mediaCheck, A.call('apiCheckMedia'))
-        .then(function (report) {
-          mediaResult.replaceChildren(
-            el('p', { class: report.ok ? 'note note--ok' : 'errors', text: report.ok ? 'رفع الصور شغال ✓' : 'فيه مشكلة في رفع الصور — الخطوة اللي عليها ✗ هي السبب' }),
-            el('ol', { class: 'checklist__steps' }, report.steps.map(function (step) {
-              return el('li', { class: step.ok ? 'is-ok' : 'is-fail' },
-                el('span', { class: 'checklist__mark', 'aria-hidden': 'true', text: step.ok ? '✓' : '✗' }),
-                el('span', { text: step.label + (step.ok && step.detail ? ' — ' + step.detail : '') }),
-                step.ok ? null : A.technicalDetails(step.detail)
-              );
-            }))
-          );
-          mediaResult.hidden = false;
-        })
-        .catch(function (error) {
-          mediaResult.replaceChildren(el('div', { class: 'errors' }));
-          A.fail(error, mediaResult.firstChild);
-          mediaResult.hidden = false;
-        });
-    });
-
-    var commitLink = status.publishedCommit && config.repo
-      ? el('a', { href: 'https://github.com/' + config.repo + '/commit/' + status.publishedCommit, target: '_blank', rel: 'noopener', text: status.publishedCommit.slice(0, 7) })
-      : '—';
-
-    var publishCard = A.card('النشر', 'القيم دي بتتظبط من Script Properties في محرر Apps Script (مش من هنا، علشان الأمان).',
-      el('dl', { class: 'kv' },
-        el('dt', { text: 'الريبو' }), el('dd', { class: 'chip--ltr', text: config.repo || 'ناقص — GITHUB_REPO' }),
-        el('dt', { text: 'الفرع' }), el('dd', { text: config.branch }),
-        el('dt', { text: 'التوكن' }), el('dd', { text: config.tokenSet ? 'متسجل ✓' : 'ناقص — GITHUB_TOKEN' }),
-        el('dt', { text: 'الموقع' }), el('dd', {}, config.siteUrl ? el('a', { href: config.siteUrl, target: '_blank', rel: 'noopener', text: config.siteUrl }) : 'ناقص — SITE_URL'),
-        el('dt', { text: 'آخر نشر' }), el('dd', { text: A.formatIso(status.publishedAt) }),
-        el('dt', { text: 'الكوميت' }), el('dd', {}, commitLink)
-      ),
-      checkResult,
-      el('div', { class: 'actions' },
-        check,
-        el('a', { class: 'btn', href: config.sheetUrl, target: '_blank', rel: 'noopener', text: 'افتح الشيت' })
-      )
-    );
-
-    var mediaCard = A.card('الصور', 'لو رفع البوسترات مش شغال، الاختبار ده بيجرّب كل خطوة على Google Drive الحقيقي ويقولك السبب بالظبط. مبيسيبش أي ملفات وراه.',
-      mediaResult,
-      el('div', { class: 'actions' }, mediaCheck)
-    );
+    // Phase 8B: no GitHub, Script Properties, Drive test or «افتح الشيت» here any more (the Worker publishes;
+    // the mirror keeps running in the background)
 
     var upgradeCard = A.upgradeCard();
 
-    var accountCard = A.card('الحساب', null,
-      el('p', {}, 'انت داخل بـ ', A.chip(A.state.user, 'ltr'), A.state.me ? el('span', {}, ' — اسمك في اللوحة: ', el('strong', { dir: 'auto', text: A.state.me })) : null),
-      A.signOut ? el('div', { class: 'actions' },
-        el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { A.signOut(); } }, icon('logout'), 'خروج')
-      ) : null
+    // Phase 8B «حسابي»: the approved rows — name (rename), role, devices, sign-out
+    var me = A.state.me || '';
+    var meEmail = A.state.user || '';
+    var access = A.access || {};
+    function setrow(lead, label, hint, control, extra) {
+      return el('div', { class: 'setrow' + (extra ? ' ' + extra : '') },
+        lead || null,
+        el('div', { class: 'setrow__text' },
+          el('b', { class: 'setrow__label', dir: 'auto', text: label }),
+          hint ? el('small', { class: 'setrow__hint', text: hint }) : null),
+        el('div', { class: 'setrow__ctl' }, control));
+    }
+    var accountCard = el('section', { class: 'card setcard setcard--account' },
+      el('div', { class: 'setcard__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('user')),
+        el('div', { class: 'setcard__titles' },
+          el('h2', { class: 'card__title', text: 'حسابي' }),
+          el('p', { class: 'card__hint' }, 'إنت داخل بـ ', el('span', { class: 'ltr', text: meEmail })))),
+      setrow(el('span', { class: 'avatar', 'aria-hidden': 'true', text: (me || meEmail).trim().charAt(0).toUpperCase() }),
+        me || meEmail.split('@')[0], 'اسمك في اللوحة والسجل',
+        el('button', { class: 'btn btn--small', type: 'button', onclick: function (event) {
+          if (A.renameAdmin) A.renameAdmin(meEmail, me, event.currentTarget);
+          else { var t = document.getElementById('set-team'); if (t) t.scrollIntoView({ behavior: 'smooth' }); }
+        } }, icon('edit'), 'غيّر الاسم'), 'setrow--lead'),
+      setrow(null, 'الدور', access.primary ? 'الأدمن الأساسي: صلاحياته كاملة ومينفعش يتشال' : 'صلاحياتك حسب «الفريق والصلاحيات»',
+        A.chip(access.primary ? 'الأدمن الأساسي' : 'أدمن', access.primary ? 'gold' : 'info')),
+      A.appCard ? setrow(null, 'الأجهزة اللي داخل منها', 'التطبيق والإشعارات على كل جهاز',
+        el('button', { class: 'btn btn--small', type: 'button', onclick: function () {
+          A.go('settings', 'notify');
+        } }, 'إدارة الأجهزة')) : null,
+      A.signOut ? setrow(null, 'خروج', 'من الجهاز ده بس',
+        el('button', { class: 'btn btn--small btn--danger', type: 'button', onclick: function () { A.signOut(); } }, icon('logout'), 'خروج'), 'setrow--out') : null
     );
 
-    var guideCard = config.repo
-      ? A.card('دليل الأدمن', 'كل خانة معناها إيه، وإزاي تضيف اجتماع أو خبر أو لعبة خطوة بخطوة.',
-        el('a', { class: 'btn', href: 'https://github.com/' + config.repo + '/blob/main/docs/ADMIN-GUIDE.md', target: '_blank', rel: 'noopener', text: 'افتح الدليل' })
-      )
-      : null;
+    var config = A.state.config || {};
+    var guideCard = A.card('دليل الأدمن', 'كل خانة معناها إيه، وإزاي تضيف اجتماع أو خبر أو لعبة خطوة بخطوة.',
+      el('div', { class: 'actions' },
+        el('button', { class: 'btn', type: 'button', onclick: function () { A.help(); } }, icon('video'), 'شرح الجزء ده'),
+        config.repo ? el('a', { class: 'btn btn--ghost', href: 'https://github.com/' + config.repo + '/blob/main/docs/ADMIN-GUIDE.md', target: '_blank', rel: 'noopener' }, icon('book'), 'افتح الدليل كامل') : null)
+    );
 
-    // Phase 8 A1: the admin's own look first (AdminScript «LOOK»)
-    return [A.lookCard ? A.lookCard() : null, A.appCard ? A.appCard() : null, siteCard, A.state.hubReady ? hubCard : null, guideCard, upgradeCard, publishCard, publishHistoryCard(), adminsCard()].concat(notifyCards(), [mediaCard, accountCard]).filter(Boolean);
+    // Phase 8B: every settings card gets the approved head (an icon square, the title, its hint)
+    function headify(card, name) {
+      if (!card || card.classList.contains('setcard')) return card;
+      var head = card.querySelector(':scope > .card__head');
+      if (!head) return card;
+      card.classList.add('setcard', 'setcard--plain');
+      head.classList.add('setcard__head');
+      if (head.firstElementChild) head.firstElementChild.classList.add('setcard__titles');
+      head.insertBefore(el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(name)), head.firstChild);
+      return card;
+    }
+    headify(siteCard, 'globe'); headify(hubCard, 'megaphone'); headify(upgradeCard, 'layers'); headify(guideCard, 'book');
+
+    var worker = !!window.AdminWorker;
+
+    // Phase 8B (owner 2026-11-11): one section at a time, exactly as the approved screens — the side list picks
+    // it (A.go('settings', key), so it is remembered and can be linked); only its cards are built
+    var groups = [
+      { key: 'me', title: 'حسابي والشكل', icon: 'user', head: 'الحساب', make: function () {
+        // «غيّر الاسم» uses the team card's rename (built aside, not shown)
+        if (!A.renameAdmin) adminsCard();
+        return [accountCard, A.lookCard ? A.lookCard() : null];
+      } },
+      { key: 'notify', title: 'إشعاراتي', icon: 'bell', has: worker || !!A.appCard, make: function () {
+        var app = A.appCard ? A.appCard() : null;
+        if (app) app.setAttribute('data-app-card', '');
+        return [worker ? headify(notifyCards()[0], 'bell') : null, headify(app, 'phone')];
+      } },
+      { key: 'site', title: 'بيانات الموقع', icon: 'globe', head: 'الموقع', make: function () { return [siteCard]; } },
+      { key: 'content', title: 'المحتوى والظهور', icon: 'megaphone', make: function () { return [A.state.hubReady ? hubCard : null, upgradeCard]; } },
+      { key: 'publish', title: 'النشر والنسخ', icon: 'retry', has: worker, make: function () { return [headify(publishHistoryCard(), 'clock')]; } },
+      { key: 'team', title: 'الفريق والصلاحيات', icon: 'shield', head: 'الفريق', make: function () { return [headify(adminsCard(), 'users')]; } },
+      { key: 'system', title: 'حالة النظام', icon: 'gear', head: 'النظام', has: worker, make: function () { var n = notifyCards(); return [headify(n[2], 'gear'), headify(n[1], 'bell')]; } },
+      { key: 'guide', title: 'دليل الأدمن', icon: 'book', make: function () { return [guideCard]; } }
+    ].filter(function (g) { return g.has !== false; });
+
+    var current = groups.filter(function (g) { return g.key === A.sub.settings; })[0] || groups[0];
+
+    var links = groups.map(function (g, i) {
+      return [
+        g.head && i > 0 ? el('hr', { class: 'setnav__sep', 'aria-hidden': 'true' }) : null,
+        g.head ? el('p', { class: 'setnav__head', text: g.head }) : null,
+        el('button', { class: 'setnav__link' + (g === current ? ' is-on' : ''), type: 'button', 'data-set': g.key, 'aria-current': g === current ? 'page' : null, onclick: function () {
+          if (g !== current) A.go('settings', g.key);
+        } }, icon(g.icon), el('span', { text: g.title }))
+      ];
+    });
+
+    var nav = el('nav', { class: 'setnav', 'aria-label': 'أقسام الإعدادات' }, links);
+    var section = el('section', { class: 'setsec', id: 'set-' + current.key, 'data-set': current.key, 'aria-label': current.title }, current.make().filter(Boolean));
+    var page = el('div', { class: 'setpage' }, nav, el('div', { class: 'setpage__main' }, section));
+
+    // phones: the chosen chip in view
+    requestAnimationFrame(function () {
+      var on = nav.querySelector('.is-on');
+      if (on && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = on.offsetLeft - nav.clientWidth / 2 + on.offsetWidth / 2;
+    });
+
+    return [page];
 
   };
 
@@ -6780,6 +7138,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
 
     /* the display name: our own small dialog; the server checks it (length, no copies) */
+    // Phase 8B: «غيّر الاسم» in «حسابي» uses the same rename
+    A.renameAdmin = rename;
+
     function rename(email, current, button) {
 
       box.hidden = true;
@@ -7258,6 +7619,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
    */
   var PUBLISH_KINDS = { worker: 'نشر', restore: 'رجوع لنسخة', shadow: 'نشر (GitHub)', seed: 'البداية' };
 
+  A.publishHistoryCard = function () { return publishHistoryCard(); };
+
   function publishHistoryCard() {
 
     var W = window.AdminWorker;
@@ -7265,7 +7628,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var box = A.errorBox();
     var body = el('div', { 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
-    var card = A.card('نسخ النشر', 'آخر مرات النشر. لما النشر يبقى من السيرفر الجديد تقدر ترجّع الموقع لأي نسخة منهم.', box, body);
+    var card = A.card('النسخ المنشورة', 'كل نشر نسخة كاملة من الموقع. ترجع لأي واحدة بضغطة، والرجوع نفسه بيتسجل كنشر جديد.', box, body);
     card.classList.add('card--publish-history');
 
     function restore(job, live, button) {
@@ -7292,23 +7655,60 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       });
     }
 
+    /* Phase 8B: grouped by day (Cairo), no commit codes: the time, who, and «ارجع للنسخة دي» */
+    var SHOW = 12;
+    var showAll = false;
+
+    function cairo(ms) {
+      var p = {};
+      new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+        .formatToParts(new Date(ms)).forEach(function (x) { p[x.type] = x.value; });
+      return { day: p.year + '-' + p.month + '-' + p.day, hour: +(p.hour === '24' ? 0 : p.hour), minute: p.minute };
+    }
+
+    function clock(c) {
+      var h = c.hour % 12 || 12;
+      return A.digits(h + ':' + c.minute) + (c.hour < 12 ? ' ص' : ' م');
+    }
+
+    var lastData = null;
+
     function draw(data) {
+      lastData = data;
       body.setAttribute('aria-busy', 'false');
       var names = (A.state && A.state.names) || {};
+      var today = A.cairoNow().slice(0, 10);
+      var jobs = showAll ? data.jobs : data.jobs.slice(0, SHOW);
+      var days = [];
+      jobs.forEach(function (job) {
+        var c = cairo(job.at);
+        var last = days[days.length - 1];
+        if (!last || last.day !== c.day) days.push(last = { day: c.day, jobs: [] });
+        last.jobs.push({ job: job, c: c });
+      });
+      var count = function (day) { return data.jobs.filter(function (j) { return cairo(j.at).day === day; }).length; };
       A.fill(body, [
         data.enabled ? null : el('p', { class: 'note' }, 'الرجوع لنسخة قديمة بيشتغل لما النشر يبقى من السيرفر الجديد. دلوقتي الموقع بيتنشر من GitHub.'),
-        data.jobs.length ? el('ul', { class: 'admins' }, data.jobs.map(function (job) {
-          return el('li', { class: 'admin', 'data-publish': job.id },
-            el('div', { class: 'admin__body' },
-              el('p', { class: 'admin__name', text: (PUBLISH_KINDS[job.mode] || job.mode) + ' · ' + ntWhen(job.at) }),
-              el('p', { class: 'admin__email', dir: 'auto', text: (names[job.by] || job.by || '') + (job.revision ? ' · ' + job.revision : '') }),
-              job.live ? A.chip('الحالية', 'ok') : null
-            ),
-            data.enabled && !job.live
-              ? el('button', { class: 'btn btn--small', type: 'button', onclick: function (event) { restore(job, data.live, event.currentTarget); } }, 'ارجع للنسخة دي')
-              : null
-          );
-        })) : el('p', { class: 'note' }, 'لسه مفيش نشر من السيرفر الجديد.')
+        data.jobs.length ? el('div', { class: 'pubdays' }, days.map(function (d) {
+          return el('section', { class: 'pubday' },
+            el('p', { class: 'pubday__title', text: (d.day === today ? 'النهارده · ' : '') + A.formatWall(d.day, false) + ' · ' + A.digits(count(d.day)) + ' نشر' }),
+            el('ul', { class: 'pubday__list' }, d.jobs.map(function (x) {
+              var job = x.job;
+              var who = names[job.by] || job.by || '';
+              return el('li', { class: 'pubrow' + (job.live ? ' is-live' : ''), 'data-publish': job.id },
+                el('span', { class: 'chipico' + (job.live ? ' chipico--ok' : ''), 'aria-hidden': 'true' }, icon(job.live ? 'check' : job.mode === 'restore' ? 'retry' : 'send')),
+                el('div', { class: 'pubrow__body' },
+                  el('p', { class: 'pubrow__time' }, el('b', { text: clock(x.c) }), job.live ? A.chip('الحالية · اللي على الموقع دلوقتي', 'ok') : null),
+                  el('p', { class: 'pubrow__who', dir: 'auto', text: (job.mode === 'restore' ? PUBLISH_KINDS.restore + ' · ' : '') + (who ? 'نشرها ' + who : PUBLISH_KINDS[job.mode] || job.mode) })
+                ),
+                data.enabled && !job.live
+                  ? el('button', { class: 'btn btn--small', type: 'button', onclick: function (event) { restore(job, data.live, event.currentTarget); } }, icon('retry'), 'ارجع للنسخة دي')
+                  : null
+              );
+            })));
+        }), !showAll && data.jobs.length > SHOW
+          ? el('button', { class: 'btn btn--ghost btn--block pubdays__more', type: 'button', onclick: function () { showAll = true; draw(lastData); } }, 'اعرض الأقدم')
+          : null) : el('p', { class: 'note' }, 'لسه مفيش نشر من السيرفر الجديد.')
       ]);
     }
 
@@ -7351,7 +7751,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       A.fill(slot, [
         icon('alert'),
         el('span', { text: stopped ? 'الإيميلات واقفة: صلاحية جيميل محتاجة تتجدد.' : 'فيه ' + s.critical.length + ' تنبيه مهم جدًا لسه متبعتش.' }),
-        el('button', { class: 'btn btn--small', type: 'button', onclick: function () { A.go('settings'); } }, 'شوف «حالة النظام»')
+        el('button', { class: 'btn btn--small', type: 'button', onclick: function () { A.go('settings', 'system'); } }, 'شوف «حالة النظام»')
       ]);
       slot.hidden = false;
     }, function () { /* quiet */ });
@@ -17280,14 +17680,26 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       config.siteUrl ? el('a', { class: 'btn btn--ghost', href: config.siteUrl, target: '_blank', rel: 'noopener' }, icon('external'), 'افتح الموقع') : null
     );
 
+    // Phase 8B: no Git here. The last publish comes from the Worker (its publish list), which is the truth:
+    // the Sheet's copy could say «لسه متنشرش» after a publish.
+    var lastAt = el('dd', { text: s.publishedAt ? A.formatIso(s.publishedAt) : '…' });
+    var lastBy = el('dd', { text: '—' });
+    var W = window.AdminWorker;
+    if (W && W.call) {
+      W.call('GET', '/v1/admin/publish/revisions', undefined, { quiet: true }).then(function (data) {
+        var jobs = (data && data.jobs) || [];
+        var job = jobs.filter(function (j) { return j.id === data.live; })[0] || jobs[0];
+        if (!job) { lastAt.textContent = s.publishedAt ? A.formatIso(s.publishedAt) : 'لسه متنشرش'; return; }
+        var names = (A.state && A.state.names) || {};
+        lastAt.textContent = A.formatIso(new Date(job.at).toISOString());
+        lastBy.textContent = names[job.by] || job.by || '—';
+      }).catch(function () { if (!s.publishedAt) lastAt.textContent = 'لسه متنشرش'; });
+    } else if (!s.publishedAt) lastAt.textContent = 'لسه متنشرش';
+
     var facts = el('dl', { class: 'dash-facts' },
-      el('div', {}, el('dt', { text: 'آخر نشر' }), el('dd', { text: s.publishedAt ? A.formatIso(s.publishedAt) : 'لسه متنشرش' })),
-      el('div', {}, el('dt', { text: 'GitHub' }), el('dd', {},
-        A.chip(github ? 'متوصل' : 'مش متظبط', github ? 'ok' : 'danger'),
-        s.publishedCommit && config.repo
-          ? el('a', { class: 'dash-facts__link', href: 'https://github.com/' + config.repo + '/commit/' + s.publishedCommit, target: '_blank', rel: 'noopener', text: s.publishedCommit.slice(0, 7) })
-          : null
-      )),
+      el('div', {}, el('dt', { text: 'آخر نشر' }), lastAt),
+      el('div', {}, el('dt', { text: 'نشره' }), lastBy),
+      el('div', {}, el('dt', { text: 'تغييرات مستنية' }), el('dd', { text: s.hasChanges ? 'فيه' : 'مفيش' })),
       s.warnings && s.warnings.length ? el('div', {}, el('dt', { text: 'تنبيهات' }), el('dd', { text: String(s.warnings.length).replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; }) + ' (مش بتمنع النشر)' })) : null
     );
 
@@ -18094,8 +18506,16 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var body = el('div', { class: 'help__body' }, el('p', { class: 'loading-text', role: 'status' }, el('span', { class: 'spinner spinner--inline', 'aria-hidden': 'true' }), 'جاري التحميل…'));
     A.fill(dialog,
       el('div', { class: 'help__head' },
-        el('h2', { id: 'help-heading', class: 'help__heading' }, icon('info'), 'مساعدة'),
+        el('h2', { id: 'help-heading', class: 'help__heading' }, icon('video'), 'شرح الجزء ده'),
         el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل المساعدة', onclick: function () { dialog.close(); } }, icon('close'))
+      ),
+      // Phase 8B: this part's guide video (coming); the written help stays under it
+      el('div', { class: 'vhelp-card' },
+        el('span', { class: 'vhelp-card__play', 'aria-hidden': 'true' }, icon('video')),
+        el('div', {},
+          el('b', { text: 'فيديو شرح · قريبًا' }),
+          el('small', { text: 'هنا هيبقى فيديو قصير بيشرح الجزء ده. لحد ما يجهز، الشرح المكتوب تحت.' })
+        )
       ),
       body
     );
@@ -18125,12 +18545,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   /* the «؟» in an editor's header (AdminScript openSheet) */
   A.helpButton = function () {
-    return el('button', { class: 'icon-btn help-btn', type: 'button', 'aria-label': 'مساعدة: إزاي أستخدم ده', onclick: function () { A.help(); } }, '؟');
+    return el('button', { class: 'vhelp help-btn', type: 'button', title: 'فيديو شرح · قريبًا', 'aria-label': 'فيديو شرح: إزاي أستخدم ده', onclick: function () { A.help(); } }, icon('video'));
   };
 
   var open = document.getElementById('help-open');
   if (open) {
     open.hidden = false;
+    // Phase 8B: the video-guide icon instead of «؟»
+    open.className = 'vhelp help-btn';
+    open.title = 'فيديو شرح · قريبًا';
+    open.setAttribute('aria-label', 'فيديو شرح: إزاي أستخدم الجزء ده');
+    A.fill(open, icon('video'));
     open.addEventListener('click', function () { A.help(); });
   }
 
@@ -19239,8 +19664,21 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   A.activityCard = function () {
 
     var recent = (A.state.activity && A.state.activity.recent) || [];
-    var list = el('ul', { class: 'acts acts--compact', 'aria-label': 'آخر نشاط' }, recent.slice(0, 5).map(function (entry) {
-      return entryNode(entry, { compact: true });
+    // Phase 8B: the same thing done again and again (same person, same action, same item) is one row, «٤ مرات»
+    var groups = [];
+    recent.forEach(function (entry) {
+      var key = JSON.stringify(entry, function (k, v) { return /^(id|at|ts|time|when|seq|rid|ago)$/i.test(k) ? undefined : v; });
+      var last = groups[groups.length - 1];
+      if (last && last.key === key) last.count++;
+      else groups.push({ key: key, entry: entry, count: 1 });
+    });
+    var list = el('ul', { class: 'acts acts--compact', 'aria-label': 'آخر نشاط' }, groups.slice(0, 5).map(function (g) {
+      var node = entryNode(g.entry, { compact: true });
+      if (g.count > 1) {
+        var where = node.querySelector('.act__text, .act__title, p, span') || node;
+        where.appendChild(el('span', { class: 'chip chip--gold act__times', text: String(g.count).replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; }) + ' مرات' }));
+      }
+      return node;
     }));
 
     return el('section', { class: 'card dash-card dash-activity', id: 'dash-activity', 'aria-labelledby': 'dash-activity-title' },

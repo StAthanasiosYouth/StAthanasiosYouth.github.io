@@ -184,7 +184,7 @@ test('content on the Worker: the panel, a save, the review in the page (3 steps)
   await s.page.waitForSelector('dialog.sheet[open] .stepper[data-publish]');
   await s.page.waitForFunction(() => document.querySelector('dialog.sheet[open] .review-groups, dialog.sheet[open] .empty-state'), { timeout: 10000 });
   const steps = await s.page.$$eval('dialog.sheet[open] .stepper__label', els => els.map(e => e.textContent));
-  assert.deepEqual(steps, ['مراجعة', 'نشر', 'ظهر على الموقع']);
+  assert.deepEqual(steps, ['راجع التغييرات', 'انشر', 'ظهر على الموقع']);
   assert.ok(workerCalls.includes('review-input'), 'the review was computed in the page');
   assert.ok(!workerCalls.includes('apiReview'), 'no server review needed');
   const t0 = Date.now();

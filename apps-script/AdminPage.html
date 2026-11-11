@@ -854,9 +854,22 @@
     var tagline = A.counted('الجملة التعريفية', setting('site.tagline'), limits.tagline, A.settingHelp('site.tagline'));
     var shareText = A.counted('نص المشاركة', setting('site.shareText'), limits.shareText, A.settingHelp('site.shareText'));
 
-    var siteCard = A.card('الموقع', null,
+    // Phase 8B «بيانات الموقع»: the fields, and next to them how a shared link looks (live)
+    var share = el('div', { class: 'sharecard' },
+      el('img', { class: 'sharecard__logo', src: '../assets/img/logo-256.webp', alt: '', width: 56, height: 56 }),
+      el('div', { class: 'sharecard__text' },
+        el('small', { class: 'sharecard__host ltr', text: String((A.state.config || {}).siteUrl || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '') }),
+        el('b', { class: 'sharecard__name' }), el('span', { class: 'sharecard__line' })));
+    function drawShare() {
+      share.querySelector('.sharecard__name').textContent = name.input.value;
+      share.querySelector('.sharecard__line').textContent = tagline.input.value || shareText.input.value;
+    }
+    drawShare();
+    var siteCard = A.card('بيانات الموقع', 'بتظهر في عنوان الموقع، وفي المشاركة على واتساب وفيسبوك',
       box,
-      el('div', { class: 'form' }, name.node, tagline.node, shareText.node),
+      el('div', { class: 'setsplit' },
+        el('div', { class: 'form', oninput: drawShare }, name.node, tagline.node, shareText.node),
+        el('aside', { class: 'setsplit__aside' }, el('p', { class: 'setsplit__label', text: 'لما حد يشارك اللينك' }), share)),
       A.settingsSaver(function () {
         return {
           'site.name': name.input.value,
@@ -884,94 +897,111 @@
       }, hubBox)
     );
 
-    var config = A.state.config;
-    var status = A.state.status;
-    var checkResult = el('p', { class: 'note', hidden: true });
-    var check = el('button', { class: 'btn', type: 'button', text: 'اختبر الاتصال بـ GitHub' });
-
-    check.addEventListener('click', function () {
-      checkResult.hidden = true;
-      A.withBusy(check, A.call('apiCheckGithub'))
-        .then(function (result) {
-          checkResult.className = 'note note--ok';
-          checkResult.textContent = 'تمام ✓ — ' + result.repo + ' (' + result.branch + ' @ ' + result.head + ')' + (result.pages ? ' — GitHub Pages شغال' : ' — GitHub Pages مش متفعل');
-          checkResult.hidden = false;
-        })
-        .catch(function (error) {
-          checkResult.className = 'errors';
-          A.fail(error, checkResult);
-        });
-    });
-
-    /* every step of a poster upload against the real Google Drive */
-    var mediaResult = el('div', { class: 'checklist', hidden: true, 'aria-live': 'polite' });
-    var mediaCheck = el('button', { class: 'btn', type: 'button', text: 'اختبر رفع الصور' });
-
-    mediaCheck.addEventListener('click', function () {
-      mediaResult.hidden = true;
-      A.withBusy(mediaCheck, A.call('apiCheckMedia'))
-        .then(function (report) {
-          mediaResult.replaceChildren(
-            el('p', { class: report.ok ? 'note note--ok' : 'errors', text: report.ok ? 'رفع الصور شغال ✓' : 'فيه مشكلة في رفع الصور — الخطوة اللي عليها ✗ هي السبب' }),
-            el('ol', { class: 'checklist__steps' }, report.steps.map(function (step) {
-              return el('li', { class: step.ok ? 'is-ok' : 'is-fail' },
-                el('span', { class: 'checklist__mark', 'aria-hidden': 'true', text: step.ok ? '✓' : '✗' }),
-                el('span', { text: step.label + (step.ok && step.detail ? ' — ' + step.detail : '') }),
-                step.ok ? null : A.technicalDetails(step.detail)
-              );
-            }))
-          );
-          mediaResult.hidden = false;
-        })
-        .catch(function (error) {
-          mediaResult.replaceChildren(el('div', { class: 'errors' }));
-          A.fail(error, mediaResult.firstChild);
-          mediaResult.hidden = false;
-        });
-    });
-
-    var commitLink = status.publishedCommit && config.repo
-      ? el('a', { href: 'https://github.com/' + config.repo + '/commit/' + status.publishedCommit, target: '_blank', rel: 'noopener', text: status.publishedCommit.slice(0, 7) })
-      : '—';
-
-    var publishCard = A.card('النشر', 'القيم دي بتتظبط من Script Properties في محرر Apps Script (مش من هنا، علشان الأمان).',
-      el('dl', { class: 'kv' },
-        el('dt', { text: 'الريبو' }), el('dd', { class: 'chip--ltr', text: config.repo || 'ناقص — GITHUB_REPO' }),
-        el('dt', { text: 'الفرع' }), el('dd', { text: config.branch }),
-        el('dt', { text: 'التوكن' }), el('dd', { text: config.tokenSet ? 'متسجل ✓' : 'ناقص — GITHUB_TOKEN' }),
-        el('dt', { text: 'الموقع' }), el('dd', {}, config.siteUrl ? el('a', { href: config.siteUrl, target: '_blank', rel: 'noopener', text: config.siteUrl }) : 'ناقص — SITE_URL'),
-        el('dt', { text: 'آخر نشر' }), el('dd', { text: A.formatIso(status.publishedAt) }),
-        el('dt', { text: 'الكوميت' }), el('dd', {}, commitLink)
-      ),
-      checkResult,
-      el('div', { class: 'actions' },
-        check,
-        el('a', { class: 'btn', href: config.sheetUrl, target: '_blank', rel: 'noopener', text: 'افتح الشيت' })
-      )
-    );
-
-    var mediaCard = A.card('الصور', 'لو رفع البوسترات مش شغال، الاختبار ده بيجرّب كل خطوة على Google Drive الحقيقي ويقولك السبب بالظبط. مبيسيبش أي ملفات وراه.',
-      mediaResult,
-      el('div', { class: 'actions' }, mediaCheck)
-    );
+    // Phase 8B: no GitHub, Script Properties, Drive test or «افتح الشيت» here any more (the Worker publishes;
+    // the mirror keeps running in the background)
 
     var upgradeCard = A.upgradeCard();
 
-    var accountCard = A.card('الحساب', null,
-      el('p', {}, 'انت داخل بـ ', A.chip(A.state.user, 'ltr'), A.state.me ? el('span', {}, ' — اسمك في اللوحة: ', el('strong', { dir: 'auto', text: A.state.me })) : null),
-      A.signOut ? el('div', { class: 'actions' },
-        el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { A.signOut(); } }, icon('logout'), 'خروج')
-      ) : null
+    // Phase 8B «حسابي»: the approved rows — name (rename), role, devices, sign-out
+    var me = A.state.me || '';
+    var meEmail = A.state.user || '';
+    var access = A.access || {};
+    function setrow(lead, label, hint, control, extra) {
+      return el('div', { class: 'setrow' + (extra ? ' ' + extra : '') },
+        lead || null,
+        el('div', { class: 'setrow__text' },
+          el('b', { class: 'setrow__label', dir: 'auto', text: label }),
+          hint ? el('small', { class: 'setrow__hint', text: hint }) : null),
+        el('div', { class: 'setrow__ctl' }, control));
+    }
+    var accountCard = el('section', { class: 'card setcard setcard--account' },
+      el('div', { class: 'setcard__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('user')),
+        el('div', { class: 'setcard__titles' },
+          el('h2', { class: 'card__title', text: 'حسابي' }),
+          el('p', { class: 'card__hint' }, 'إنت داخل بـ ', el('span', { class: 'ltr', text: meEmail })))),
+      setrow(el('span', { class: 'avatar', 'aria-hidden': 'true', text: (me || meEmail).trim().charAt(0).toUpperCase() }),
+        me || meEmail.split('@')[0], 'اسمك في اللوحة والسجل',
+        el('button', { class: 'btn btn--small', type: 'button', onclick: function (event) {
+          if (A.renameAdmin) A.renameAdmin(meEmail, me, event.currentTarget);
+          else { var t = document.getElementById('set-team'); if (t) t.scrollIntoView({ behavior: 'smooth' }); }
+        } }, icon('edit'), 'غيّر الاسم'), 'setrow--lead'),
+      setrow(null, 'الدور', access.primary ? 'الأدمن الأساسي: صلاحياته كاملة ومينفعش يتشال' : 'صلاحياتك حسب «الفريق والصلاحيات»',
+        A.chip(access.primary ? 'الأدمن الأساسي' : 'أدمن', access.primary ? 'gold' : 'info')),
+      A.appCard ? setrow(null, 'الأجهزة اللي داخل منها', 'التطبيق والإشعارات على كل جهاز',
+        el('button', { class: 'btn btn--small', type: 'button', onclick: function () {
+          A.go('settings', 'notify');
+        } }, 'إدارة الأجهزة')) : null,
+      A.signOut ? setrow(null, 'خروج', 'من الجهاز ده بس',
+        el('button', { class: 'btn btn--small btn--danger', type: 'button', onclick: function () { A.signOut(); } }, icon('logout'), 'خروج'), 'setrow--out') : null
     );
 
-    var guideCard = config.repo
-      ? A.card('دليل الأدمن', 'كل خانة معناها إيه، وإزاي تضيف اجتماع أو خبر أو لعبة خطوة بخطوة.',
-        el('a', { class: 'btn', href: 'https://github.com/' + config.repo + '/blob/main/docs/ADMIN-GUIDE.md', target: '_blank', rel: 'noopener', text: 'افتح الدليل' })
-      )
-      : null;
+    var config = A.state.config || {};
+    var guideCard = A.card('دليل الأدمن', 'كل خانة معناها إيه، وإزاي تضيف اجتماع أو خبر أو لعبة خطوة بخطوة.',
+      el('div', { class: 'actions' },
+        el('button', { class: 'btn', type: 'button', onclick: function () { A.help(); } }, icon('video'), 'شرح الجزء ده'),
+        config.repo ? el('a', { class: 'btn btn--ghost', href: 'https://github.com/' + config.repo + '/blob/main/docs/ADMIN-GUIDE.md', target: '_blank', rel: 'noopener' }, icon('book'), 'افتح الدليل كامل') : null)
+    );
 
-    // Phase 8 A1: the admin's own look first (AdminScript «LOOK»)
-    return [A.lookCard ? A.lookCard() : null, A.appCard ? A.appCard() : null, siteCard, A.state.hubReady ? hubCard : null, guideCard, upgradeCard, publishCard, publishHistoryCard(), adminsCard()].concat(notifyCards(), [mediaCard, accountCard]).filter(Boolean);
+    // Phase 8B: every settings card gets the approved head (an icon square, the title, its hint)
+    function headify(card, name) {
+      if (!card || card.classList.contains('setcard')) return card;
+      var head = card.querySelector(':scope > .card__head');
+      if (!head) return card;
+      card.classList.add('setcard', 'setcard--plain');
+      head.classList.add('setcard__head');
+      if (head.firstElementChild) head.firstElementChild.classList.add('setcard__titles');
+      head.insertBefore(el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(name)), head.firstChild);
+      return card;
+    }
+    headify(siteCard, 'globe'); headify(hubCard, 'megaphone'); headify(upgradeCard, 'layers'); headify(guideCard, 'book');
+
+    var worker = !!window.AdminWorker;
+
+    // Phase 8B (owner 2026-11-11): one section at a time, exactly as the approved screens — the side list picks
+    // it (A.go('settings', key), so it is remembered and can be linked); only its cards are built
+    var groups = [
+      { key: 'me', title: 'حسابي والشكل', icon: 'user', head: 'الحساب', make: function () {
+        // «غيّر الاسم» uses the team card's rename (built aside, not shown)
+        if (!A.renameAdmin) adminsCard();
+        return [accountCard, A.lookCard ? A.lookCard() : null];
+      } },
+      { key: 'notify', title: 'إشعاراتي', icon: 'bell', has: worker || !!A.appCard, make: function () {
+        var app = A.appCard ? A.appCard() : null;
+        if (app) app.setAttribute('data-app-card', '');
+        return [worker ? headify(notifyCards()[0], 'bell') : null, headify(app, 'phone')];
+      } },
+      { key: 'site', title: 'بيانات الموقع', icon: 'globe', head: 'الموقع', make: function () { return [siteCard]; } },
+      { key: 'content', title: 'المحتوى والظهور', icon: 'megaphone', make: function () { return [A.state.hubReady ? hubCard : null, upgradeCard]; } },
+      { key: 'publish', title: 'النشر والنسخ', icon: 'retry', has: worker, make: function () { return [headify(publishHistoryCard(), 'clock')]; } },
+      { key: 'team', title: 'الفريق والصلاحيات', icon: 'shield', head: 'الفريق', make: function () { return [headify(adminsCard(), 'users')]; } },
+      { key: 'system', title: 'حالة النظام', icon: 'gear', head: 'النظام', has: worker, make: function () { var n = notifyCards(); return [headify(n[2], 'gear'), headify(n[1], 'bell')]; } },
+      { key: 'guide', title: 'دليل الأدمن', icon: 'book', make: function () { return [guideCard]; } }
+    ].filter(function (g) { return g.has !== false; });
+
+    var current = groups.filter(function (g) { return g.key === A.sub.settings; })[0] || groups[0];
+
+    var links = groups.map(function (g, i) {
+      return [
+        g.head && i > 0 ? el('hr', { class: 'setnav__sep', 'aria-hidden': 'true' }) : null,
+        g.head ? el('p', { class: 'setnav__head', text: g.head }) : null,
+        el('button', { class: 'setnav__link' + (g === current ? ' is-on' : ''), type: 'button', 'data-set': g.key, 'aria-current': g === current ? 'page' : null, onclick: function () {
+          if (g !== current) A.go('settings', g.key);
+        } }, icon(g.icon), el('span', { text: g.title }))
+      ];
+    });
+
+    var nav = el('nav', { class: 'setnav', 'aria-label': 'أقسام الإعدادات' }, links);
+    var section = el('section', { class: 'setsec', id: 'set-' + current.key, 'data-set': current.key, 'aria-label': current.title }, current.make().filter(Boolean));
+    var page = el('div', { class: 'setpage' }, nav, el('div', { class: 'setpage__main' }, section));
+
+    // phones: the chosen chip in view
+    requestAnimationFrame(function () {
+      var on = nav.querySelector('.is-on');
+      if (on && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = on.offsetLeft - nav.clientWidth / 2 + on.offsetWidth / 2;
+    });
+
+    return [page];
 
   };
 
@@ -1331,6 +1361,9 @@
     }
 
     /* the display name: our own small dialog; the server checks it (length, no copies) */
+    // Phase 8B: «غيّر الاسم» in «حسابي» uses the same rename
+    A.renameAdmin = rename;
+
     function rename(email, current, button) {
 
       box.hidden = true;
@@ -1809,6 +1842,8 @@
    */
   var PUBLISH_KINDS = { worker: 'نشر', restore: 'رجوع لنسخة', shadow: 'نشر (GitHub)', seed: 'البداية' };
 
+  A.publishHistoryCard = function () { return publishHistoryCard(); };
+
   function publishHistoryCard() {
 
     var W = window.AdminWorker;
@@ -1816,7 +1851,7 @@
 
     var box = A.errorBox();
     var body = el('div', { 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
-    var card = A.card('نسخ النشر', 'آخر مرات النشر. لما النشر يبقى من السيرفر الجديد تقدر ترجّع الموقع لأي نسخة منهم.', box, body);
+    var card = A.card('النسخ المنشورة', 'كل نشر نسخة كاملة من الموقع. ترجع لأي واحدة بضغطة، والرجوع نفسه بيتسجل كنشر جديد.', box, body);
     card.classList.add('card--publish-history');
 
     function restore(job, live, button) {
@@ -1843,23 +1878,60 @@
       });
     }
 
+    /* Phase 8B: grouped by day (Cairo), no commit codes: the time, who, and «ارجع للنسخة دي» */
+    var SHOW = 12;
+    var showAll = false;
+
+    function cairo(ms) {
+      var p = {};
+      new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+        .formatToParts(new Date(ms)).forEach(function (x) { p[x.type] = x.value; });
+      return { day: p.year + '-' + p.month + '-' + p.day, hour: +(p.hour === '24' ? 0 : p.hour), minute: p.minute };
+    }
+
+    function clock(c) {
+      var h = c.hour % 12 || 12;
+      return A.digits(h + ':' + c.minute) + (c.hour < 12 ? ' ص' : ' م');
+    }
+
+    var lastData = null;
+
     function draw(data) {
+      lastData = data;
       body.setAttribute('aria-busy', 'false');
       var names = (A.state && A.state.names) || {};
+      var today = A.cairoNow().slice(0, 10);
+      var jobs = showAll ? data.jobs : data.jobs.slice(0, SHOW);
+      var days = [];
+      jobs.forEach(function (job) {
+        var c = cairo(job.at);
+        var last = days[days.length - 1];
+        if (!last || last.day !== c.day) days.push(last = { day: c.day, jobs: [] });
+        last.jobs.push({ job: job, c: c });
+      });
+      var count = function (day) { return data.jobs.filter(function (j) { return cairo(j.at).day === day; }).length; };
       A.fill(body, [
         data.enabled ? null : el('p', { class: 'note' }, 'الرجوع لنسخة قديمة بيشتغل لما النشر يبقى من السيرفر الجديد. دلوقتي الموقع بيتنشر من GitHub.'),
-        data.jobs.length ? el('ul', { class: 'admins' }, data.jobs.map(function (job) {
-          return el('li', { class: 'admin', 'data-publish': job.id },
-            el('div', { class: 'admin__body' },
-              el('p', { class: 'admin__name', text: (PUBLISH_KINDS[job.mode] || job.mode) + ' · ' + ntWhen(job.at) }),
-              el('p', { class: 'admin__email', dir: 'auto', text: (names[job.by] || job.by || '') + (job.revision ? ' · ' + job.revision : '') }),
-              job.live ? A.chip('الحالية', 'ok') : null
-            ),
-            data.enabled && !job.live
-              ? el('button', { class: 'btn btn--small', type: 'button', onclick: function (event) { restore(job, data.live, event.currentTarget); } }, 'ارجع للنسخة دي')
-              : null
-          );
-        })) : el('p', { class: 'note' }, 'لسه مفيش نشر من السيرفر الجديد.')
+        data.jobs.length ? el('div', { class: 'pubdays' }, days.map(function (d) {
+          return el('section', { class: 'pubday' },
+            el('p', { class: 'pubday__title', text: (d.day === today ? 'النهارده · ' : '') + A.formatWall(d.day, false) + ' · ' + A.digits(count(d.day)) + ' نشر' }),
+            el('ul', { class: 'pubday__list' }, d.jobs.map(function (x) {
+              var job = x.job;
+              var who = names[job.by] || job.by || '';
+              return el('li', { class: 'pubrow' + (job.live ? ' is-live' : ''), 'data-publish': job.id },
+                el('span', { class: 'chipico' + (job.live ? ' chipico--ok' : ''), 'aria-hidden': 'true' }, icon(job.live ? 'check' : job.mode === 'restore' ? 'retry' : 'send')),
+                el('div', { class: 'pubrow__body' },
+                  el('p', { class: 'pubrow__time' }, el('b', { text: clock(x.c) }), job.live ? A.chip('الحالية · اللي على الموقع دلوقتي', 'ok') : null),
+                  el('p', { class: 'pubrow__who', dir: 'auto', text: (job.mode === 'restore' ? PUBLISH_KINDS.restore + ' · ' : '') + (who ? 'نشرها ' + who : PUBLISH_KINDS[job.mode] || job.mode) })
+                ),
+                data.enabled && !job.live
+                  ? el('button', { class: 'btn btn--small', type: 'button', onclick: function (event) { restore(job, data.live, event.currentTarget); } }, icon('retry'), 'ارجع للنسخة دي')
+                  : null
+              );
+            })));
+        }), !showAll && data.jobs.length > SHOW
+          ? el('button', { class: 'btn btn--ghost btn--block pubdays__more', type: 'button', onclick: function () { showAll = true; draw(lastData); } }, 'اعرض الأقدم')
+          : null) : el('p', { class: 'note' }, 'لسه مفيش نشر من السيرفر الجديد.')
       ]);
     }
 
@@ -1902,7 +1974,7 @@
       A.fill(slot, [
         icon('alert'),
         el('span', { text: stopped ? 'الإيميلات واقفة: صلاحية جيميل محتاجة تتجدد.' : 'فيه ' + s.critical.length + ' تنبيه مهم جدًا لسه متبعتش.' }),
-        el('button', { class: 'btn btn--small', type: 'button', onclick: function () { A.go('settings'); } }, 'شوف «حالة النظام»')
+        el('button', { class: 'btn btn--small', type: 'button', onclick: function () { A.go('settings', 'system'); } }, 'شوف «حالة النظام»')
       ]);
       slot.hidden = false;
     }, function () { /* quiet */ });

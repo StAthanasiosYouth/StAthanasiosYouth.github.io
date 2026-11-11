@@ -230,7 +230,7 @@ test('sign in with Google → the dashboard, and the browser stays on /admin/', 
 
     // the token lives in memory only: not in any storage, after sign-in and after more API calls
     await noTokenStored(page, 'after sign-in');
-    await page.evaluate(() => A.go('settings'));
+    await page.evaluate(() => A.go('settings', 'team'));
     await page.waitForSelector('.card--admins .admin');
     assert.ok(calls.some(c => c.fn === 'apiAdmins'));
     await noTokenStored(page, 'after an API call');
@@ -294,7 +294,7 @@ test('editing and publishing work through the API', async () => {
   const { page, problems, calls, close } = await open();
   await signIn(page);
 
-  await page.evaluate(() => A.go('settings'));
+  await page.evaluate(() => A.go('settings', 'site'));
   await page.waitForSelector('.card .input');
   await page.evaluate(() => {
     const field = [...document.querySelectorAll('.field')].find(f => f.dataset.label === 'الجملة التعريفية');
@@ -363,7 +363,7 @@ test('the token runs out (server or clock) → sign in again over the open edito
   await sleep(3500);
   const sent = second.calls.length;
   claims = { email: ADMIN };
-  await second.page.evaluate(() => A.go('settings'));
+  await second.page.evaluate(() => A.go('settings', 'team'));
   await second.page.waitForSelector('dialog.reauth[open] .gis-stub');
   assert.equal(second.calls.length, sent, 'nothing sent with a token about to expire');
   await second.page.click('dialog.reauth[open] .gis-stub');
@@ -386,7 +386,7 @@ async function measureSheet(page) {
     const foot = sheet.querySelector('.sheet__foot')?.getBoundingClientRect();
     return {
       top: Math.round(r.top), left: Math.round(r.left), bottom: Math.round(r.bottom), width: Math.round(r.width), height: Math.round(r.height),
-      vw: innerWidth, vh: innerHeight,
+      vw: document.documentElement.clientWidth, vh: innerHeight,
       scrolls: body.scrollHeight > body.clientHeight + 1,
       headIn: head.top >= r.top && head.bottom <= r.bottom,
       footIn: !foot || (foot.top >= r.top && foot.bottom <= r.bottom + 1),
@@ -397,7 +397,7 @@ async function measureSheet(page) {
 
 }
 
-test('the editor panel: as tall as its content, floating on wide screens, a bottom sheet on phones', async () => {
+test('the editor panel: as tall as its content, centred on wide screens (Phase 8B), a bottom sheet on phones', async () => {
 
   // desktop
   {
@@ -409,9 +409,11 @@ test('the editor panel: as tall as its content, floating on wide screens, a bott
     await sleep(700);
     const small = await measureSheet(page);
     await page.screenshot({ captureBeyondViewport: false, path: `${SHOTS}20-drawer-desktop-little.png` });
-    assert.equal(small.top, 14);
-    assert.equal(small.left, 14, 'floating, with a margin');
-    assert.ok(small.height < small.vh - 28 - 150, `follows its content (${small.height}px)`);
+    // Phase 8B: centred, the medium size
+    assert.ok(Math.abs(small.left - (small.vw - small.width) / 2) <= 1, 'centred across');
+    assert.ok(Math.abs(small.top - (small.vh - small.height) / 2) <= 1, 'centred down');
+    assert.ok(small.width <= 760);
+    assert.ok(small.height < small.vh - 56 - 150, `follows its content (${small.height}px)`);
     assert.equal(small.scrolls, false);
     assert.ok(small.headIn && small.footIn);
     // Phase 8 (the approved preview): a solid surface, no glass behind the editor
@@ -424,11 +426,11 @@ test('the editor panel: as tall as its content, floating on wide screens, a bott
     await sleep(700);
     const big = await measureSheet(page);
     await page.screenshot({ captureBeyondViewport: false, path: `${SHOTS}21-drawer-desktop-lot.png` });
-    assert.equal(big.top, 14);
-    assert.equal(big.height, big.vh - 28, 'up to the screen, with the same margin');
+    assert.ok(Math.abs(big.top - (big.vh - big.height) / 2) <= 1, 'centred');
+    assert.ok(big.height <= big.vh - 56 && big.height >= Math.min(big.vh - 56, 400), 'up to the screen, with a margin');
     assert.equal(big.scrolls, true, 'only the body scrolls');
     assert.ok(big.headIn && big.footIn, 'title and buttons stay in view');
-    assert.ok(big.width <= 560);
+    assert.ok(big.width <= 1120);
 
     // unsaved changes still ask, with our modal
     await page.type('dialog.sheet[open] input', 'خبر');
@@ -536,7 +538,7 @@ test('allowlist card: the list, add and remove with our modal, the primary accou
 
   const { page, problems, close } = await open();
   await signIn(page);
-  await page.evaluate(() => A.go('settings'));
+  await page.evaluate(() => A.go('settings', 'team'));
   await page.waitForSelector('.card--admins .admin');
   await page.evaluate(() => document.querySelector('.card--admins').scrollIntoView({ block: 'center' }));
   await sleep(400);

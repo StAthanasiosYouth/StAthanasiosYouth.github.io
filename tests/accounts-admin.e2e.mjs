@@ -163,7 +163,7 @@ async function openSettings(viewport = { width: 1366, height: 900 }, rows = 2) {
   await page.waitForSelector('.gis-stub');
   await page.click('.gis-stub');
   await page.waitForFunction(() => window.A && A.state && !document.getElementById('shell').hidden, { timeout: 15000 });
-  await page.evaluate(() => A.go('settings'));
+  await page.evaluate(() => A.go('settings', 'team'));
   await page.waitForFunction(n => document.querySelectorAll('.card--admins .admin').length === n && /صلاحية واحدة/.test(document.querySelector('.card--admins').innerText), { timeout: 8000 }, rows);
   return { context, page, problems };
 }
@@ -262,6 +262,8 @@ test('«سجل النشاط» reads the unified log from D1 (Worker + Apps Scrip
 test('notifications: «تنبيهاتي», «إعدادات الإشعارات» (switch on with a confirm), «حالة النظام» (dismiss), the home banner', async () => {
   fake.reset();
   const { context, page, problems } = await openSettings();
+  // Phase 8B: one section at a time — «حالة النظام» holds the notification settings and the system status
+  await page.evaluate(() => A.go('settings', 'system'));
   await page.waitForSelector('.card--notify-settings .nt-row');
   await page.waitForSelector('.card--system-status .nt-critical');
   const memberPart = await page.evaluate(() => document.querySelector('.card--system-status .nt-member').innerText);
@@ -269,7 +271,6 @@ test('notifications: «تنبيهاتي», «إعدادات الإشعارات»
   assert.match(memberPart, /إيميلات الأعضاء مقفولة/);
   assert.match(memberPart, /12 \/ 400/);
   assert.match(memberPart, /مصدر بيجرّب إيميلات كتير/);
-  await page.waitForSelector('.card--notify-me .nt-row');
   await page.screenshot({ path: `${SHOTS}notify-settings.png`, fullPage: true });
 
   // «إعدادات الإشعارات»: publish → no push, summary email; then the switch on (asks first)
@@ -288,13 +289,17 @@ test('notifications: «تنبيهاتي», «إعدادات الإشعارات»
   assert.deepEqual([sent.types.publish.push, sent.types.publish.email], [false, 'summary']);
   assert.equal(Object.keys(sent.types).length, 1, 'only what changed');
 
-  // «تنبيهاتي»: a choice saved; critical ones locked
+  // «تنبيهاتي» («إشعاراتي»): a choice saved; critical ones locked
+  await page.evaluate(() => A.go('settings', 'notify'));
+  await page.waitForSelector('.card--notify-me .nt-row');
   assert.equal(await page.$$eval('.card--notify-me .nt-row', rows => rows.filter(r => r.textContent.includes('إجباري')).every(r => [...r.querySelectorAll('select')].every(s => s.disabled))), true);
   await page.click('.card--notify-me .actions .btn--primary');
   await page.waitForFunction(() => /اتحفظت اختياراتك/.test(document.body.innerText), { timeout: 8000 });
   assert.ok(fake.notify.prefs && typeof fake.notify.prefs === 'object');
 
   // «حالة النظام»: the waiting critical row, dismissed on purpose
+  await page.evaluate(() => A.go('settings', 'system'));
+  await page.waitForSelector('.card--system-status .nt-critical button');
   await page.evaluate(() => [...document.querySelectorAll('.card--system-status .nt-critical button')][0].click());
   await clickDialogButton(page, 'شيله');
   await page.waitForFunction(() => /مفيش تنبيهات مهمة مستنية/.test(document.querySelector('.card--system-status').innerText), { timeout: 8000 });
@@ -311,6 +316,7 @@ test('notifications: «تنبيهاتي», «إعدادات الإشعارات»
 test('notifications on a phone: no page overflow in the settings page', async () => {
   fake.reset();
   const { context, page, problems } = await openSettings({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+  await page.evaluate(() => A.go('settings', 'system'));
   await page.waitForSelector('.card--notify-settings .nt-row');
   await page.evaluate(() => document.querySelector('.card--notify-settings .grants').scrollIntoView({ block: 'start' }));
   await sleep(300);
@@ -389,6 +395,7 @@ test('«نسخ النشر»: the last publishes; while the Worker is the truth o
     { id: 'pub-1', mode: 'shadow', revision: 'r1', by: ADMIN, at: t, files: 2, changed: 2, state: 'live' }
   ] };
   let { context, page, problems } = await openSettings();
+  await page.evaluate(() => A.go('settings', 'publish'));
   await page.waitForFunction(() => document.querySelector('.card--publish-history [data-publish]'), { timeout: 8000 });
   let text = await page.$eval('.card--publish-history', n => n.innerText);
   assert.match(text, /بيشتغل لما النشر يبقى من السيرفر الجديد/);
@@ -398,6 +405,7 @@ test('«نسخ النشر»: the last publishes; while the Worker is the truth o
 
   fake.publish = { ...fake.publish, enabled: true, jobs: fake.publish.jobs.map(j => ({ ...j, mode: 'worker' })) };
   ({ context, page, problems } = await openSettings());
+  await page.evaluate(() => A.go('settings', 'publish'));
   await page.waitForSelector('.card--publish-history [data-publish="pub-1"] button');
   assert.equal(await page.$$eval('.card--publish-history [data-publish="pub-2"] button', n => n.length), 0, 'the live one has none');
   await page.click('.card--publish-history [data-publish="pub-1"] button');

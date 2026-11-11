@@ -102,6 +102,15 @@
 
   var icon = A.icon;
 
+  /* Phase 8B: the design's own extra icons (docs/phase8b/proposal.js EXTRA, proposal-2.js play) */
+  if (A.ICONS) {
+    var EXTRA_ICONS = {
+      palette: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-1.3-1-1.6-1-2.6 0-.8.6-1.4 1.4-1.4H16a5 5 0 0 0 5-5C21 6.2 17 3 12 3Z"/><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-1.3-1-1.6-1-2.6 0-.8.6-1.4 1.4-1.4H16a5 5 0 0 0 5-5C21 6.2 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="14.5" cy="7.5" r="1"/></svg>',
+      play: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M8 5.5v13l10.5-6.5Z"/><path d="M8 5.5v13l10.5-6.5Z"/></svg>'
+    };
+    Object.keys(EXTRA_ICONS).forEach(function (k) { if (!Object.prototype.hasOwnProperty.call(A.ICONS, k)) A.ICONS[k] = EXTRA_ICONS[k]; });
+  }
+
   /*
    * One server call -> a promise. Here (Apps Script) through
    * google.script.run; on the official admin page (GitHub Pages /admin/)
@@ -780,64 +789,69 @@
    * once and is kept (this device now, the server a moment later); nothing to save, nothing to
    * lose on leaving, so it never marks the screen as changed.
    */
+  /* «الشكل» (Phase 8 A1; Phase 8B: the approved settings card — a row per choice, its words on one side and
+     the control on the other, a compact segmented control, colour dots, «شوف شاشة البداية» in the head) */
   A.lookCard = function () {
 
     var p = A.prefs;
 
-    function group(key, label, options) {
+    function row(label, hint, control, extra) {
+      return el('div', { class: 'setrow' + (extra ? ' ' + extra : '') },
+        el('div', { class: 'setrow__text' },
+          el('b', { class: 'setrow__label', text: label }),
+          hint ? el('small', { class: 'setrow__hint', text: hint }) : null),
+        el('div', { class: 'setrow__ctl' }, control));
+    }
+
+    function group(key, label, hint, options) {
       var name = A.uid('look-' + key);
-      return el('div', { class: 'look__row' },
-        el('p', { class: 'look__label', id: name + '-l', text: label }),
-        el('div', { class: 'choices look__choices', role: 'radiogroup', 'aria-labelledby': name + '-l' }, options.map(function (o) {
+      return row(label, hint,
+        el('div', { class: 'seg look__choices', role: 'radiogroup', 'aria-label': label }, options.map(function (o) {
           var input = el('input', { type: 'radio', name: name, value: o[0], checked: p[key] === o[0], 'data-look': key, onchange: function () {
             var patch = {};
             patch[key] = o[0];
             A.setPrefs(patch);
             A.sound('tap');
           } });
-          return el('label', { class: 'choice' }, input, el('span', { text: o[1] }));
-        }))
-      );
+          return el('label', { class: 'seg__opt' }, input, el('span', { text: o[1] }));
+        })));
     }
 
     var accentName = A.uid('look-accent');
-    var accents = el('div', { class: 'look__row' },
-      el('p', { class: 'look__label', id: accentName + '-l', text: 'لون التمييز' }),
-      el('div', { class: 'swatches', role: 'radiogroup', 'aria-labelledby': accentName + '-l' }, A.ACCENTS.map(function (a) {
-        var input = el('input', { type: 'radio', name: accentName, value: a[0], checked: p.accent === a[0], 'data-look': 'accent', onchange: function () {
+    var accents = row('اللون', 'لون الأزرار والتحديد',
+      el('div', { class: 'swatches swatches--dots', role: 'radiogroup', 'aria-label': 'اللون' }, A.ACCENTS.map(function (a) {
+        var input = el('input', { type: 'radio', name: accentName, value: a[0], checked: p.accent === a[0], 'data-look': 'accent', 'aria-label': a[1], onchange: function () {
           A.setPrefs({ accent: a[0] });
           A.sound('tap');
         } });
-        return el('label', { class: 'swatch swatch--acc-' + a[0] }, input, el('span', { class: 'swatch__dot', 'aria-hidden': 'true' }), el('span', { class: 'swatch__label', text: a[1] }));
-      }))
-    );
+        return el('label', { class: 'swatch swatch--acc-' + a[0], title: a[1] }, input, el('span', { class: 'swatch__dot', 'aria-hidden': 'true' }), el('span', { class: 'swatch__label visually-hidden', text: a[1] }));
+      })));
 
-    var test = el('button', { class: 'btn btn--small', type: 'button', disabled: !p.sound, 'data-look-test': '', onclick: function () {
+    var test = el('button', { class: 'btn btn--small btn--ghost', type: 'button', disabled: !p.sound, 'data-look-test': '', onclick: function () {
       ['tap', 'open', 'pop', 'success', 'close', 'nope'].forEach(function (k, i) { setTimeout(function () { A.sound(k); }, i * 320); });
-    } }, 'جرّب الأصوات');
+    } }, 'جرّب');
 
-    var sound = el('input', { type: 'checkbox', role: 'switch', checked: !!p.sound, 'data-look': 'sound', onchange: function () {
+    var sound = el('input', { type: 'checkbox', role: 'switch', checked: !!p.sound, 'data-look': 'sound', 'aria-label': 'الأصوات', onchange: function () {
       A.setPrefs({ sound: sound.checked });
       test.disabled = !sound.checked;
       if (sound.checked) A.sound('success');
     } });
 
-    return el('section', { class: 'card look', 'data-look-card': '' },
-      el('div', { class: 'card__head' },
-        el('div', {},
-          el('h2', { class: 'card__title', text: 'المظهر' }),
-          el('p', { class: 'card__hint', text: 'اختياراتك ليك إنت بس، وبتتحفظ لحسابك فبتمشي معاك على أي جهاز تفتح منه.' })
-        )
+    return el('section', { class: 'card look setcard', 'data-look-card': '' },
+      el('div', { class: 'setcard__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('palette')),
+        el('div', { class: 'setcard__titles' },
+          el('h2', { class: 'card__title', text: 'الشكل' }),
+          el('p', { class: 'card__hint', text: 'بيتحفظ على حسابك وبيمشي معاك على كل جهاز' })),
+        A.playIntro ? el('button', { class: 'btn btn--small setcard__act settings__intro', type: 'button', onclick: function () { A.playIntro(); } }, icon('play'), 'شوف شاشة البداية') : null
       ),
-      group('theme', 'الوضع', [['dark', 'داكن'], ['light', 'فاتح'], ['system', 'زي الجهاز']]),
+      group('theme', 'الوضع', '', [['dark', 'داكن'], ['light', 'فاتح'], ['system', 'زي الجهاز']]),
       accents,
-      group('density', 'الكثافة', [['comfortable', 'مريح'], ['compact', 'مضغوط']]),
-      group('motion', 'الحركة', [['full', 'كاملة'], ['lite', 'مخففة'], ['off', 'مقفولة']]),
-      el('p', { class: 'look__note', text: 'لو جهازك على «تقليل الحركة» بنحترمه دايمًا، أيًا كان اختيارك هنا.' }),
-      el('div', { class: 'look__row look__row--sound' },
-        el('label', { class: 'switch' }, sound, el('span', { class: 'switch__track', 'aria-hidden': 'true' }), el('span', { text: 'أصوات الواجهة (خفيفة جدًا، مقفولة من الأول)' })),
-        test
-      )
+      group('density', 'الكثافة', 'المسافات بين العناصر', [['comfortable', 'مريحة'], ['compact', 'مضغوطة']]),
+      group('motion', 'الحركة', '«خفيفة» بتشيل الجزيئات والانتقالات الكبيرة', [['full', 'كاملة'], ['lite', 'خفيفة'], ['off', 'من غير']]),
+      row('الأصوات', 'صوت خفيف مع النشر والحفظ',
+        el('span', { class: 'setrow__pair' }, test,
+          el('label', { class: 'switch switch--bare' }, sound, el('span', { class: 'switch__track', 'aria-hidden': 'true' }))), 'look__row--sound')
     );
 
   };
@@ -1210,6 +1224,11 @@
 
     describe();
 
+    // Phase 8B: the one schedule picker (A.whenPicker), from a «التقويم» chip after the quick choices
+    presets.push(el('button', { class: 'preset datetime__pick', type: 'button', 'aria-label': 'اختار الميعاد من التقويم', onclick: function () {
+      A.whenPicker({ title: options.title || 'الميعاد', sub: options.sub || '', value: current(), presets: options.presets || [], dateOnly: options.dateOnly, onDone: set });
+    } }, icon('calendar'), 'التقويم'));
+
     return {
       node: el('div', { class: 'datetime' },
         el('div', { class: 'row' }, date, time),
@@ -1221,6 +1240,126 @@
     };
 
   };
+
+  /*
+   * Phase 8B: the one schedule picker (docs/phase8b sched-picker): quick choices, a month calendar, the hour,
+   * «امسح الميعاد», and the time said in words in Cairo time with how far it is. Every A.dateTimeInput opens it
+   * from its calendar button; the typed date and time fields stay, so nothing that fills them changes.
+   * opts: { title, sub, value, presets, dateOnly, onDone(value) }
+   */
+  var whenDialog = null;
+  var WEEK_HEADS = ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س'];
+  var HOURS = [['20:00', '٨:٠٠ م'], ['21:00', '٩:٠٠ م'], ['22:00', '١٠:٠٠ م']];
+
+  function arabicDigits(text) { return String(text).replace(/\d/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[d]; }); }
+
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+  A.whenPicker = function (opts) {
+
+    opts = opts || {};
+    if (!whenDialog) {
+      whenDialog = el('dialog', { class: 'whenpick', 'aria-labelledby': 'whenpick-title' });
+      whenDialog.addEventListener('click', function (event) { if (event.target === whenDialog) whenDialog.close(); });
+      document.body.appendChild(whenDialog);
+    }
+
+    var today = A.cairoNow().slice(0, 10);
+    var start = String(opts.value || '').split(/[ T]/);
+    var date = start[0] || '';
+    var time = opts.dateOnly ? '' : (start[1] || '');
+    var month = (date || today).slice(0, 7);
+    var dialog = whenDialog;
+
+    function value() { return date ? (time && !opts.dateOnly ? date + ' ' + time : date) : ''; }
+
+    function said() {
+      var v = value();
+      if (!v) return 'من غير ميعاد';
+      var text = A.formatWall(v) + ' بتوقيت مصر';
+      var days = Math.round((A.wallMinutes(v.slice(0, 10)) - A.wallMinutes(today)) / 1440);
+      var away = days === 0 ? 'النهارده' : days === 1 ? 'بكرة' : days === -1 ? 'امبارح'
+        : days > 0 ? 'بعد ' + arabicDigits(days) + (days <= 10 ? ' أيام' : ' يوم') : 'من ' + arabicDigits(-days) + (-days <= 10 ? ' أيام' : ' يوم');
+      return text + ' — ' + away;
+    }
+
+    function calendar() {
+      var y = +month.slice(0, 4), m = +month.slice(5, 7);
+      var first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+      var count = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      var cells = [];
+      for (var i = 0; i < first; i++) cells.push(el('span', { class: 'whenpick__day is-blank', 'aria-hidden': 'true' }));
+      for (var d = 1; d <= count; d++) {
+        (function (day) {
+          var key = y + '-' + pad2(m) + '-' + pad2(day);
+          cells.push(el('button', {
+            class: 'whenpick__day' + (key === date ? ' is-on' : '') + (key === today ? ' is-today' : ''), type: 'button',
+            'aria-pressed': key === date ? 'true' : 'false', 'aria-label': A.formatWall(key, false),
+            onclick: function () { date = key; draw(); }
+          }, arabicDigits(day)));
+        })(d);
+      }
+      function shift(by) {
+        var t = new Date(Date.UTC(y, m - 1 + by, 1));
+        month = t.getUTCFullYear() + '-' + pad2(t.getUTCMonth() + 1);
+        draw();
+      }
+      return el('div', { class: 'whenpick__cal' },
+        el('div', { class: 'whenpick__month' },
+          el('b', { text: MONTHS[m - 1] + ' ' + arabicDigits(y) }),
+          el('span', { class: 'whenpick__sp' }),
+          el('button', { class: 'icon-btn icon-btn--small', type: 'button', 'aria-label': 'الشهر اللي فات', onclick: function () { shift(-1); } }, el('span', { class: 'whenpick__prev' }, icon('chevron'))),
+          el('button', { class: 'icon-btn icon-btn--small', type: 'button', 'aria-label': 'الشهر الجاي', onclick: function () { shift(1); } }, icon('chevron'))),
+        el('div', { class: 'whenpick__grid' },
+          WEEK_HEADS.map(function (h) { return el('span', { class: 'whenpick__head', 'aria-hidden': 'true', text: h }); }),
+          cells));
+    }
+
+    function hours() {
+      var other = el('input', { class: 'input whenpick__other', type: 'time', value: time, 'aria-label': 'ساعة تانية', oninput: function () { time = other.value; if (!date) date = today; drawSaid(); markChips(); } });
+      var chips = HOURS.map(function (h) {
+        return el('button', { class: 'preset' + (time === h[0] ? ' is-on' : ''), type: 'button', 'data-time': h[0], onclick: function () { time = h[0]; if (!date) date = today; other.value = time; drawSaid(); markChips(); } }, h[1]);
+      });
+      function markChips() { chips.forEach(function (c) { c.classList.toggle('is-on', c.getAttribute('data-time') === time); }); }
+      return el('div', { class: 'whenpick__hours' }, el('p', { class: 'whenpick__label', text: 'الساعة' }), el('div', { class: 'presets' }, chips, other));
+    }
+
+    var saidNode = el('p', { class: 'whenpick__said' }, icon('info'), el('span'));
+    function drawSaid() { saidNode.lastChild.textContent = said(); }
+
+    function draw() {
+      var presets = (opts.presets || []).map(function (preset) {
+        var v = typeof preset.value === 'function' ? preset.value() : preset.value;
+        return el('button', { class: 'preset' + (v && v === value() ? ' is-on' : ''), type: 'button', onclick: function () {
+          var p = String(v || '').split(/[ T]/);
+          date = p[0] || ''; time = opts.dateOnly ? '' : (p[1] || '');
+          if (date) month = date.slice(0, 7);
+          draw();
+        } }, preset.label);
+      });
+      drawSaid();
+      A.fill(dialog,
+        el('div', { class: 'whenpick__headrow' },
+          el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('clock')),
+          el('div', { class: 'whenpick__titles' },
+            el('h2', { id: 'whenpick-title', text: opts.title || 'الميعاد' }),
+            opts.sub ? el('p', { text: opts.sub }) : null),
+          el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: function () { dialog.close(); } }, icon('close'))),
+        el('div', { class: 'whenpick__body' },
+          presets.length ? el('div', { class: 'presets' }, presets) : null,
+          calendar(),
+          opts.dateOnly ? null : hours(),
+          saidNode),
+        el('div', { class: 'whenpick__foot' },
+          el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { dialog.close(); if (opts.onDone) opts.onDone(value()); } }, icon('check'), 'تمام'),
+          el('button', { class: 'btn', type: 'button', onclick: function () { dialog.close(); if (opts.onDone) opts.onDone(''); } }, 'امسح الميعاد')));
+    }
+
+    draw();
+    if (!dialog.open) dialog.showModal();
+
+  };
+
 
   /* common presets */
   A.PRESETS = {
@@ -2502,6 +2641,69 @@
 
   var sheet = document.getElementById('sheet');
 
+  var DIGITS = '٠١٢٣٤٥٦٧٨٩';
+  function arabicNumber(n) { return String(n).replace(/\d/g, function (d) { return DIGITS[d]; }); }
+
+  /* Phase 8B: a big editor's sections, listed on its side (wide screens) or as chips over it (phones).
+     Taken from the editor's own «section-label» headings, so every editor gets it without changes; one with
+     fewer than two sections stays a single column at the medium width. A tap scrolls to the section, and the
+     list follows the scroll. */
+  function sheetSections(dialog) {
+
+    var body = dialog.querySelector('.sheet__body');
+    var labels = Array.prototype.slice.call(body.querySelectorAll('.section-label')).filter(function (label) {
+      return !label.closest('.sheet__body .sheet__body, dialog:not(.sheet)');
+    });
+    if (labels.length < 2) { dialog.classList.remove('sheet--lg'); dialog.classList.add('sheet--md'); return; }
+
+    var sections = labels.map(function (label) {
+      var target = label.closest('.form-group, fieldset, .card') || label;
+      if (!body.contains(target) || target === body) target = label;
+      target.classList.add('sheet__sec');
+      return { title: label.textContent.trim(), target: target };
+    });
+
+    // fields before the first section: «الأساسيات»
+    var firstTop = sections[0].target;
+    var lead = body.querySelector('.field, .form > *');
+    if (lead && lead !== firstTop && !firstTop.contains(lead) && (lead.compareDocumentPosition(firstTop) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+      sections.unshift({ title: 'الأساسيات', target: null });
+    }
+
+    var links = sections.map(function (section, i) {
+      return el('button', {
+        class: 'sheet__navlink' + (i === 0 ? ' is-on' : ''), type: 'button',
+        onclick: function () {
+          var smooth = document.documentElement.getAttribute('data-motion') !== 'off' &&!matchMedia('(prefers-reduced-motion: reduce)').matches;
+          if (!section.target) body.scrollTo({ top: 0, behavior: smooth ? 'smooth' : 'auto' });
+          else body.scrollTo({ top: secTop(section.target) - 12, behavior: smooth ? 'smooth' : 'auto' });
+        }
+      }, el('span', { class: 'sheet__navnum', 'aria-hidden': 'true', text: arabicNumber(i + 1) }), el('span', { text: section.title }));
+    });
+
+    var nav = el('nav', { class: 'sheet__nav', 'aria-label': 'أقسام النافذة' }, links);
+    dialog.insertBefore(nav, body);
+
+    function secTop(node) { return node.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop; }
+
+    var ticking = false;
+    body.addEventListener('scroll', function () {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(function () {
+        ticking = false;
+        var at = 0;
+        var top = body.scrollTop + 40;
+        sections.forEach(function (section, i) { if (section.target && secTop(section.target) <= top) at = i; });
+        if (body.scrollTop + body.clientHeight >= body.scrollHeight - 4) at = sections.length - 1;
+        links.forEach(function (link, i) { link.classList.toggle('is-on', i === at); });
+        var on = links[at];
+        if (on && nav.scrollWidth > nav.clientWidth) nav.scrollTo({ left: on.offsetLeft - nav.clientWidth / 2 + on.offsetWidth / 2 });
+      });
+    }, { passive: true });
+
+  }
+
   A.openSheet = function (title, body, footer, options) {
 
     options = options || {};
@@ -2511,17 +2713,23 @@
     var toasts = document.getElementById('toasts');
     if (toasts && sheet.contains(toasts)) document.body.appendChild(toasts);
 
-    sheet.className = 'sheet' + (options.wide ? ' sheet--wide' : '') + (options.className ? ' ' + options.className : '');
+    // Phase 8B: centred on wide screens, in three sizes. An item editor (a draft or a lock) or a wide sheet is big
+    // (sections on the side), the rest medium; options.size wins.
+    var size = options.size || (options.wide || options.draft || options.lock ? 'lg' : 'md');
+    sheet.className = 'sheet sheet--' + size + (options.wide ? ' sheet--wide' : '') + (options.className ? ' ' + options.className : '');
     A.fill(sheet,
       el('div', { class: 'sheet__grab', 'aria-hidden': 'true' }),
       el('div', { class: 'sheet__head' },
         el('h2', { class: 'sheet__title', id: 'sheet-title', tabindex: '-1', text: title }),
+        options.headActions ? el('span', { class: 'sheet__headacts' }, options.headActions) : null,
         A.helpButton ? A.helpButton() : null,
         el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: function () { A.closeSheet(); } }, icon('close'))
       ),
       el('div', { class: 'sheet__body' }, body),
       footer ? el('div', { class: 'sheet__foot' }, footer) : null
     );
+
+    if (size === 'lg') sheetSections(sheet);
 
     sheet.style.transform = '';
 
@@ -3785,7 +3993,7 @@
   ];
 
   A.views.gamescorner = function () {
-    return [A.card('ركن الألعاب', 'جاي قريب: المكتبة، الجلسات، المشاركين والفرق، حسابات الـHost، والمكافآت. لسه مفيش حاجة هنا تشتغل.',
+    return [A.card('الألعاب', 'جاي قريب: المكتبة، الجلسات، المشاركين والفرق، حسابات الـHost، والمكافآت. لسه مفيش حاجة هنا تشتغل.',
       el('p', { class: 'soon-chip' }, icon('lock'), 'قريبًا'),
       el('ul', { class: 'coming' }, COMING_GAMES.map(function (g) {
         return el('li', { class: 'coming__game' },
@@ -3800,8 +4008,9 @@
   A.gamesCorner = function (on) {
     var has = A.AREAS.some(function (a) { return a.key === 'gamescorner'; });
     if (on && !has) {
-      var at = A.AREAS.length - 1; // before «الإعدادات»
-      A.AREAS.splice(at, 0, { key: 'gamescorner', label: 'الألعاب', title: 'ركن الألعاب', icon: 'sparkle', group: 'site', soon: true, view: 'gamescorner' });
+      // Phase 8B: in «الشغل», right after «المسابقات» («ركن الألعاب» of the content is another thing)
+      var at = A.AREAS.map(function (a) { return a.key; }).indexOf('comps') + 1 || A.AREAS.length - 1;
+      A.AREAS.splice(at, 0, { key: 'gamescorner', label: 'الألعاب', title: 'الألعاب', icon: 'star', group: 'main', soon: true, view: 'gamescorner' });
     }
     if (!on && has) A.AREAS = A.AREAS.filter(function (a) { return a.key !== 'gamescorner'; });
   };
@@ -3823,6 +4032,7 @@
   var RAIL_KEY = 'athanasios-admin.rail';
   var GROUPS = { main: 'الشغل', site: 'الموقع', team: 'الفريق' };
   var DOCK_MAIN = 4;
+  var DOCK_PLACES = ['comps', 'youth', 'bookings'];
   var railLight = null;
 
   function railClosed() {
@@ -3881,7 +4091,13 @@
     var all = A.visibleAreas().filter(function (a) { return a.key !== 'settings'; }).map(function (a, i) { return { a: a, i: i }; })
       .sort(function (x, y) { return (order.indexOf(x.a.group || 'site') - order.indexOf(y.a.group || 'site')) || (x.i - y.i); }).map(function (x) { return x.a; });
     all = all.filter(function (a) { return a.key === home; }).concat(all.filter(function (a) { return a.key !== home; }));
-    return { main: all.slice(0, DOCK_MAIN), rest: all.slice(DOCK_MAIN) };
+    // Phase 8B: the dock's own places (الرئيسية · المسابقات · الشباب · الحجوزات), those this admin has, in that
+    // order after their home; the rest fill up (never a locked «قريبًا» area); the others go under «المزيد»
+    var main = all.slice(0, 1);
+    DOCK_PLACES.forEach(function (key) { var a = all.filter(function (x) { return x.key === key; })[0]; if (a && main.indexOf(a) === -1) main.push(a); });
+    all.forEach(function (a) { if (main.length < DOCK_MAIN && main.indexOf(a) === -1 && !a.soon) main.push(a); });
+    main = main.slice(0, DOCK_MAIN);
+    return { main: main, rest: all.filter(function (a) { return main.indexOf(a) === -1; }) };
   }
 
   function moreButton(restSelected) {
@@ -4145,47 +4361,143 @@
     acct.setAttribute('aria-label', 'حسابك: ' + name);
   }
 
-  /* ---------- the welcome inside the shell, right after signing in ---------- */
+  /* ---------- the welcome inside the shell, right after signing in ----------
+     Phase 8B: the approved preview's intro (docs/phase8/admin-preview.src.html playIntro + dust) as it is,
+     with no «تخطي» button, and it always plays to its end (a tap does not cut it). Its colours follow the chosen accent; once after signing
+     in, never with reduced motion; A.playIntro() («شوف شاشة البداية») plays it again. Same API as before:
+     { ready(name), leave() }. */
 
   var welcomed = false;
 
-  function welcome() {
-    if (welcomed) return null;
+  function introDust(cv, dur) {
+    if (document.documentElement.getAttribute('data-motion') === 'lite') return;
+    var rgb = (getComputedStyle(document.documentElement).getPropertyValue('--acc-hi-rgb') || '242 210 139').trim().split(/\s+/).join(',');
+    var ctx = cv.getContext('2d'), dpr = Math.min(2, window.devicePixelRatio || 1), w = cv.clientWidth, h = cv.clientHeight, ps = [], start = performance.now();
+    if (!ctx || !w || !h) return;
+    cv.width = w * dpr; cv.height = h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (var i = 0; i < 48; i++) ps.push({ x: Math.random() * w, y: h * (0.3 + Math.random() * 0.8), r: 0.6 + Math.random() * 1.9, v: 0.15 + Math.random() * 0.55, a: Math.random() * 6.28, s: 0.5 + Math.random() });
+    (function frame(t) {
+      if (!cv.isConnected) return;
+      var k = (t - start) / dur, fade = k < 0.15 ? k / 0.15 : k > 0.85 ? Math.max(0, (1 - k) / 0.15) : 1;
+      ctx.clearRect(0, 0, w, h);
+      ps.forEach(function (p) {
+        p.y -= p.v; p.x += Math.sin(p.a += 0.02) * 0.25;
+        var tw = 0.5 + 0.5 * Math.sin(p.a * 3 * p.s);
+        ctx.beginPath(); ctx.fillStyle = 'rgba(' + rgb + ',' + ((0.08 + 0.32 * tw) * fade).toFixed(3) + ')'; ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill();
+      });
+      if (k < 1) requestAnimationFrame(frame);
+    })(start);
+  }
+
+  function welcome(force) {
+    if (welcomed && !force) return null;
     welcomed = true;
     var root = document.documentElement;
-    if (root.classList.contains('is-restoring') || A.reducedMotion() || document.visibilityState === 'hidden' || !window.AdminTransport) return null;
+    if (!force && (root.classList.contains('is-restoring') || document.visibilityState === 'hidden' || !window.AdminTransport)) return null;
+    if (A.reducedMotion()) {
+      if (force) A.toast('شاشة البداية مقفولة مع «تقليل الحركة»');
+      return null;
+    }
     var main = document.querySelector('.app__main');
     if (!main) return null;
-    var hello = el('p', { class: 'welcome__hello', text: 'أهلاً بيك' });
-    var box = el('div', { class: 'welcome', 'aria-hidden': 'true' },
-      el('span', { class: 'welcome__glow' }),
-      el('img', { class: 'welcome__logo', src: '../assets/img/logo-256.webp', width: 112, height: 112, alt: '' }),
-      el('p', { class: 'welcome__title', text: 'لوحة التحكم' }),
-      hello,
-      el('span', { class: 'welcome__line' }, el('i')));
-    main.appendChild(box);
-    var shown = Date.now();
-    var gone = false;
-    function leave() {
+    var old = document.querySelector('.welcome');
+    if (old) old.remove();
+
+    var sub = el('p', { class: 'intro__sub welcome__hello', text: 'أسرة البابا أثناسيوس الرسولي · سفاجا' });
+    var status = el('span', { class: 'intro__status', text: 'بنجهز لوحتك…' });
+    var box = el('div', { class: 'welcome intro', 'aria-hidden': 'true' },
+      el('div', { class: 'intro__bg' }, el('div', { class: 'intro__rays' }), el('canvas', { class: 'intro__dust' })),
+      el('div', { class: 'intro__core' },
+        el('div', { class: 'intro__mark' },
+          el('span', { class: 'intro__halo' }), el('span', { class: 'intro__ring' }),
+          el('img', { class: 'intro__logo', src: '../assets/img/logo-256.webp', width: 128, height: 128, alt: '' }),
+          el('span', { class: 'intro__sweep' }, el('i'))),
+        el('div', { class: 'intro__text' }, el('p', { class: 'intro__title', text: 'لوحة التحكم' }), sub),
+        el('div', { class: 'intro__load' }, el('span', { class: 'intro__progress' }, el('i')), status)));
+
+    // over the panel's column, under its top bar
+    var bar = document.querySelector('.topbar');
+    var r = main.getBoundingClientRect();
+    var top = bar && bar.offsetParent ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
+    box.style.cssText = 'top:' + top + 'px;left:' + Math.max(0, r.left) + 'px;width:' + Math.min(innerWidth, r.width) + 'px';
+    document.body.appendChild(box);
+    root.classList.add('is-intro');
+    introDust(box.querySelector('canvas'), 2600);
+    if (A.sound) A.sound('open');
+
+    var anims = [], D = 1900, E = 'cubic-bezier(.16,1,.3,1)', gone = false, ready = false, shown = Date.now();
+    function play(sel, kf, o) {
+      var node = box.querySelector(sel);
+      if (!node || !node.animate) return null;
+      var a = node.animate(kf, Object.assign({ fill: 'both', easing: 'cubic-bezier(.22,1,.36,1)' }, o));
+      anims.push(a);
+      return a;
+    }
+    play('.intro__rays', [{ opacity: 0, transform: 'rotate(0deg)' }, { opacity: 1, transform: 'rotate(8deg)' }], { duration: 2600, easing: 'linear' });
+    play('.intro__halo', [{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 1000, delay: 100 });
+    play('.intro__logo', [{ opacity: 0, transform: 'scale(.9)', filter: 'blur(10px)' }, { opacity: 1, transform: 'none', filter: 'blur(0px)' }], { duration: 850, delay: 150, easing: E });
+    play('.intro__ring', [{ opacity: 0, transform: 'scale(.85)' }, { opacity: 1, transform: 'none' }], { duration: 700, delay: 450, easing: E });
+    play('.intro__sweep i', [{ left: '-60%' }, { left: '140%' }], { duration: 750, delay: 850, easing: 'ease-in-out' });
+    play('.intro__title', [{ opacity: 0, transform: 'translateY(12px)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0px)' }], { duration: 750, delay: 600, easing: E });
+    play('.intro__sub', [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 600, delay: 900, easing: E });
+    play('.intro__load', [{ opacity: 0 }, { opacity: 1 }], { duration: 400, delay: 300 });
+    play('.intro__progress i', [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: D, easing: 'linear' });
+
+    // it ends by itself once the panel is ready and the bar is full
+    var timer = setTimeout(function () { if (ready) leave(false); }, D);
+    var hardStop = setTimeout(function () { leave(false); }, 6000);
+
+    function target() {
+      return ['.rail .brand__mark', '.topbar__mark'].map(function (s) { return document.querySelector(s); })
+        .filter(function (n) { return n && n.offsetParent && n.getBoundingClientRect().width; })[0];
+    }
+
+    function leave(fast) {
       if (gone) return;
       gone = true;
+      clearTimeout(timer); clearTimeout(hardStop);
+      anims.forEach(function (a) { try { a.finish(); } catch (e) { /* gone */ } });
       box.classList.add('is-leaving');
-      setTimeout(function () { box.remove(); }, 520);
+      ['.intro__text', '.intro__load', '.intro__halo', '.intro__ring', '.intro__sweep'].forEach(function (s) {
+        var n = box.querySelector(s);
+        if (n && n.animate) n.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-8px)' }], { duration: fast ? 160 : 320, fill: 'both', easing: 'ease-in' });
+      });
+      var bg = box.querySelector('.intro__bg');
+      if (bg.animate) bg.animate([{ opacity: 1 }, { opacity: 0 }], { duration: fast ? 260 : 520, delay: fast ? 60 : 300, fill: 'both', easing: 'ease-in-out' });
+      // the logo travels to its home in the rail (or the phone's top bar)
+      var logo = box.querySelector('.intro__logo'), t = target(), fly = null;
+      if (t && logo.animate) {
+        var a = logo.getBoundingClientRect(), b = t.getBoundingClientRect();
+        var dx = (b.left + b.width / 2) - (a.left + a.width / 2), dy = (b.top + b.height / 2) - (a.top + a.height / 2), sc = b.width / (a.width || 1);
+        fly = logo.animate([{ transform: 'none' }, { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(' + sc + ')' }], { duration: fast ? 420 : 820, easing: 'cubic-bezier(.65,0,.35,1)', fill: 'forwards' });
+      } else if (logo.animate) fly = logo.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
+      function cleanup() { root.classList.remove('is-intro'); box.remove(); }
+      if (fly && fly.finished) fly.finished.then(cleanup, cleanup);
+      else setTimeout(cleanup, 520);
     }
-    // it never stands in the way: the first tap or key goes to the panel and the welcome steps aside
-    document.addEventListener('pointerdown', leave, { capture: true, once: true });
-    document.addEventListener('keydown', leave, { capture: true, once: true });
-    setTimeout(leave, 3200);
+
+    // owner (2026-11-11): it plays to its end; a tap or a key no longer ends it
+
     return {
       ready: function (name) {
         if (gone) return;
-        if (name) hello.textContent = 'أهلاً يا ' + String(name).split(' ')[0];
+        ready = true;
+        if (name) sub.textContent = 'أهلاً يا ' + String(name).split(' ')[0];
+        status.textContent = 'اللوحة جاهزة ✓';
         box.classList.add('is-ready');
-        setTimeout(leave, Math.max(450, 1100 - (Date.now() - shown)));
+        var left = D - (Date.now() - shown);
+        clearTimeout(timer);
+        timer = setTimeout(function () { leave(false); }, Math.max(450, left));
       },
-      leave: leave
+      leave: function () { leave(true); }
     };
   }
+
+  /* «شوف شاشة البداية» */
+  A.playIntro = function () {
+    var intro = welcome(true);
+    if (intro) intro.ready(A.state && (A.state.me || (A.state.user || '').split('@')[0]));
+  };
 
   /* ---------- presence: the other admins as avatars (online · idle · editing), the list a tap away ---------- */
 
@@ -4658,7 +4970,7 @@
         el('h2', { class: 'card__title', text: 'في ترقية للبيانات مستنياك' }),
         el('p', { class: 'card__hint', text: 'بتضيف أقسام الصفحة (علشان تقدر تخفي وتظهر وترتب أي قسم)، وأعمدة المسابقات والفعاليات والأرشيف، ورابط جروب الواتساب. بتعمل نسخة احتياطية الأول ومبتمسحش حاجة.' })
       ),
-      el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.go('settings'); } }, 'روح للترقية')
+      el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.go('settings', 'content'); } }, 'روح للترقية')
     );
 
   };
@@ -4795,17 +5107,17 @@
   A.openReview = function () { openReview(); };
 
   var PUBLISH_STEPS = [
-    { key: 'review', label: 'مراجعة' },
-    { key: 'github', label: 'نشر على GitHub' },
-    { key: 'pages', label: 'انتظار GitHub Pages' },
+    { key: 'review', label: 'راجع التغييرات' },
+    { key: 'github', label: 'انشر' },
+    { key: 'pages', label: 'بنجهز الموقع' },
     { key: 'live', label: 'ظهر على الموقع' }
   ];
 
   /* the Worker publishes (PUBLISH_MODE 'worker', Phase 2/4): live the moment it answers — the
      GitHub copy follows in the background, nobody waits for it (owner 2026-10-22: 3 steps) */
   var PUBLISH_STEPS_LIVE = [
-    { key: 'review', label: 'مراجعة' },
-    { key: 'publish', label: 'نشر' },
+    { key: 'review', label: 'راجع التغييرات' },
+    { key: 'publish', label: 'انشر' },
     { key: 'live', label: 'ظهر على الموقع' }
   ];
 
@@ -4843,6 +5155,18 @@
 
   }
 
+  /* «النسخ السابقة» from the review (the same list as in «الإعدادات» ← «النشر والنسخ») */
+  function historyButton() {
+
+    if (!A.publishHistoryCard || !window.AdminWorker) return null;
+    return el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () {
+      A.openSheet('النسخ السابقة', [A.publishHistoryCard()], [
+        el('button', { class: 'btn', type: 'button', onclick: openReview }, icon('send'), 'رجوع لراجع وانشر')
+      ], { size: 'md' });
+    } }, icon('clock'), 'النسخ السابقة');
+
+  }
+
   function reviewSkeleton() {
 
     return [
@@ -4868,13 +5192,13 @@
     }
 
     publishJob = null;
-    A.openSheet('مراجعة قبل النشر', reviewSkeleton());
+    A.openSheet('راجع وانشر', reviewSkeleton());
 
     reviewNow()
       .then(renderReview)
       .catch(function (error) {
         var box = A.errorBox();
-        A.openSheet('مراجعة قبل النشر', [stepper(0, true), box], [
+        A.openSheet('راجع وانشر', [stepper(0, true), box], [
           el('button', { class: 'btn btn--primary', type: 'button', onclick: openReview }, icon('retry'), 'جرّب تاني'),
           el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })
         ]);
@@ -4938,12 +5262,16 @@
       return el('section', { class: 'review-group' },
         el('h3', { class: 'review-group__title' }, icon(group.icon), group.title),
         el('ul', { class: 'changes' }, group.items.map(function (item) {
+          // Phase 8B: each change a card, its kind as a chip, and «شوف الفرق» (the site with the drafts)
           return el('li', { class: 'is-' + item.tone },
-            el('span', { class: 'visually-hidden', text: tones[item.tone] + ': ' }),
             el('span', { class: 'change__text' },
+              el('span', { class: 'chip change__tone change__tone--' + item.tone, text: tones[item.tone] }),
               el('span', { text: item.text }),
               item.when ? el('span', { class: 'chip chip--gold change__when', text: item.when }) : null
-            )
+            ),
+            A.state && A.state.config && A.state.config.siteUrl && item.tone !== 'remove'
+              ? el('button', { class: 'btn btn--small btn--ghost change__diff', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'شوف الفرق')
+              : null
           );
         }))
       );
@@ -5020,7 +5348,7 @@
       ? el('button', { class: 'btn', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'معاينة')
       : null;
 
-    A.openSheet('مراجعة قبل النشر', body, [publish, preview].concat(A.sheetFooter(publish).slice(1)).filter(Boolean));
+    A.openSheet('راجع وانشر', body, [publish, preview].concat(A.sheetFooter(publish).slice(1)).filter(Boolean), { headActions: historyButton() });
 
   }
 
