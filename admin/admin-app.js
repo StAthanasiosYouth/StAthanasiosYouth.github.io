@@ -18201,9 +18201,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       file,
       status);
     var choice = A.choices(A.uid('aud'), [
-      { value: 'original', label: 'صوت الفيديو الأصلي' },
-      { value: 'custom', label: 'موسيقى/صوت مخصص' },
-      { value: 'none', label: 'بدون صوت' }
+      { value: 'original', label: 'صوته الأصلي' },
+      { value: 'none', label: 'من غير صوت' },
+      { value: 'custom', label: 'ملف صوت' }
     ], mode, function (v) { mode = v; custom.hidden = v !== 'custom'; });
 
     player.hidden = true;
@@ -18295,7 +18295,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     return {
       node: el('div', { class: 'form sound-field' },
-        A.field('صوت المقطع', choice.node, 'اللي بيتسمع لما الزائر يفتح الكارت. «صوت الفيديو الأصلي»: صوت المقطع نفسه (المقاطع اللي اتقصّت بالصوت). «موسيقى/صوت مخصص»: ملف بتختاره، والمقطع بيشتغل من غير صوته. الصوت بيظهر ويختفي بهدوء، وبيحترم زرار الصوت في الموقع.'),
+        A.field('صوت المقطع', choice.node),
         custom),
       value: function () { return { audioMode: mode, audio: mode === 'custom' ? current : '' }; },
       busy: function () { return uploading; }
@@ -18320,10 +18320,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var title = A.counted('عنوان الفيديو', m.title, limits.mediaTitle || 80, 'مثلاً: عرض الكريسماس ٢٠٢٥', { required: true });
     var text = A.counted('وصف قصير', m.text, limits.mediaText || 300, 'اختياري: سطر بيظهر تحت العنوان على الكارت وتحت الفيديو', { multiline: true, rows: 2 });
     var duration = A.textInput(m.duration, { max: limits.duration || 10, placeholder: 'مثلاً ٣:٢٠' });
-    var cover = A.imagePicker(m.cover || '', { label: 'صورة الكارت', hint: 'الصورة اللي بتظهر على الكارت (زي صورة فيديو يوتيوب، عرضي ١٦:٩ أحسن). اختياري لو فيه مقطع: هنستخدم صورة من المقطع نفسه.' });
+    var cover = A.imagePicker(m.cover || '', { label: 'صورة الكارت', className: 'picker--row', libraryLabel: 'غيّر', noAlt: true, hint: 'اختياري لو فيه مقطع: هنستخدم صورة من المقطع نفسه. عرضي ١٦:٩ أحسن.' });
     var source = A.choices(A.uid('src'), [{ value: 'clip', label: 'مقطع بيشتغل جوه الصفحة' }, { value: 'link', label: 'لينك بس (من غير مقطع)' }], m.source || 'clip', function (v) { clipField.hidden = v !== 'clip'; });
     var clip = A.galleryPicker(m.clip ? [m.clip] : [], CLIP_OPTIONS);
-    var clipHolder = el('div', {}, clip.node);
+    var clipHolder = el('div', { class: 'p8-cliphold' }, clip.node);
+    var trim = clipTrimView(clipHolder);
     // a new video: the panel's own uploader and trimmer (the same as «الصور»), straight into this card
     var upload = A.imagePicker('', {
       uploadOnly: true,
@@ -18342,7 +18343,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       }
     });
     var sound = soundField(m);
-    var clipField = el('div', { class: 'form' }, clipHolder, upload.node, sound.node);
+    var clipField = el('div', { class: 'form' }, clipHolder, trim.node, upload.node, sound.node);
     var fullUrl = A.textInput(m.fullUrl, { ltr: true, type: 'url', placeholder: 'https://youtube.com/…' });
     var ctaLabel = A.textInput(m.ctaLabel, { max: limits.ctaLabel || 30, placeholder: 'شاهد المسرحية كاملة' });
     var enabled = A.checkbox('ظاهر في الصفحة', m.enabled !== false);
@@ -18368,31 +18369,243 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       }).catch(function (error) { A.fail(error, box); });
     });
 
+    // Phase 8B (svc-clip.png): one window, the four parts in order; «شيل المقطع» in the foot
+    var all = r.media || [];
+    var at = isNew ? all.length + 1 : all.map(function (x) { return x.id; }).indexOf(m.id) + 1;
+    function part(iconName, legend, children) {
+      return el('fieldset', { class: 'fieldset p8-part' }, el('legend', { class: 'msec__title' }, icon(iconName), el('span', { text: legend })), children);
+    }
+    A.fill(save, icon('check'), el('span', { text: isNew ? 'إضافة' : 'احفظ' }));
     A.dirty = false;
-    A.openSheet(isNew ? 'كارت فيديو جديد' : 'تعديل: ' + m.title, [
+    A.openSheet(isNew ? 'مقطع جديد' : 'تعديل المقطع: ' + m.title, [
       box,
-      el('p', { class: 'note', text: 'في الصفحة: الزائر بيشوف صورة الكارت ← يدوس ← المقطع يشتغل لوحده في شيت زي «صوتك يهمنا» (تفاعلات وكلام حوالين المقطع)، بالصوت اللي تختاره، وتحته العنوان والوصف وزرار بيفتح الفيديو الكامل.' }),
-      el('div', { class: 'form' },
-        el('fieldset', { class: 'fieldset' },
-          el('legend', { text: '١. المقطع اللي بيشتغل جوه الصفحة وصوته' }),
-          A.field('نوع الكارت', source.node || source),
-          clipField),
-        el('fieldset', { class: 'fieldset' },
-          el('legend', { text: '٢. صورة الكارت' }),
-          cover.node),
-        el('fieldset', { class: 'fieldset' },
-          el('legend', { text: '٣. العنوان والوصف' }),
-          title.node,
-          text.node,
-          A.field('المدة (اختياري)', duration, 'بتظهر صغيرة على صورة الكارت، زي يوتيوب')),
-        el('fieldset', { class: 'fieldset' },
-          el('legend', { text: '٤. الفيديو الكامل' }),
-          A.field('لينك الفيديو الكامل', fullUrl, 'العرض كله على يوتيوب أو فيسبوك أو درايف. بيظهر زرار تحت المقطع بيفتحه. مطلوب لكارت «لينك بس».'),
-          A.field('نص زرار الفيديو الكامل', ctaLabel, 'فاضي = «شاهد المسرحية كاملة»')),
-        enabled.node)
-    ], [save, el('button', { class: 'btn btn--ghost', type: 'button', text: 'رجوع', onclick: function () { mediaSheet(r); } })], {
+      el('div', { class: 'form p8-clipedit' },
+        part('video', '١. المقطع اللي بيشتغل جوه الصفحة وصوته', [A.field('نوع الكارت', source.node || source), clipField]),
+        part('photos', '٢. صورة الكارت', [cover.node]),
+        part('edit', '٣. العنوان والوصف', [el('div', { class: 'p8-two' }, title.node, A.field('المدة (اختياري)', duration, 'بتظهر صغيرة على صورة الكارت')), text.node]),
+        part('external', '٤. الفيديو الكامل', [
+          A.field('لينك الفيديو الكامل', fullUrl, 'اختياري: زرار «شاهد العرض كامل». مطلوب لكارت «لينك بس».'),
+          A.field('نص زرار الفيديو الكامل', ctaLabel, 'فاضي = «شاهد المسرحية كاملة»'),
+          enabled.node]))
+    ], [
+      save,
+      el('button', { class: 'btn btn--ghost', type: 'button', text: 'إلغاء', onclick: function () { mediaSheet(r); } }),
+      el('span', { class: 'sheet__sp', 'aria-hidden': 'true' }),
+      isNew ? null : el('button', { class: 'btn btn--sm btn--danger', type: 'button', onclick: function (e) {
+        var button = e.currentTarget;
+        A.confirm({ tone: 'danger', title: 'تشيل المقطع «' + m.title + '»؟', message: 'الفيديو نفسه بيفضل في المكتبة.', confirmLabel: 'شيله', cancelLabel: 'لأ' }).then(function (ok) {
+          if (!ok) return;
+          A.withBusy(button, A.call('apiPageMediaDelete', m.id)).then(function (next) { A.dirty = false; A.toast('اتشال'); mediaSheet(next); })
+            .catch(function (error) { A.fail(error, box); });
+        });
+      } }, icon('trash'), 'شيل المقطع')
+    ], {
+      size: 'md',
+      icon: 'video',
+      sub: page.title + ' · المقطع ' + A.digits(at) + ' من ' + A.digits(Math.max(all.length, at)),
+      className: 'sheet--clip',
       lock: A.editLock('page', page.id, 'الصفحة «' + page.title + '»', function () { A.closeSheet(); })
     });
+    trim.sync();
+
+  }
+
+
+  /*
+   * Phase 8B (svc-clip.png): the approved trimmer over a library clip — the video (or its picture before it is
+   * published), a filmstrip with the part framed (drag its ends or the frame), the ruler, «من» / «لحد» with
+   * −١ −٠٫١ +٠٫١ +١ and «خد الوقت الحالي» (I / O), the length with 5/10/15/30 ث, «اتفرج على الجزء» and «كرر».
+   * It drives the gallery picker's own «من» / «لحد» fields (they keep the value and its checks).
+   * holder: the node with the A.galleryPicker inside. → { node, sync() }
+   */
+  function clipTrimView(holder) {
+
+    var clipApi = A.clip;
+    var node = el('div', { class: 'p8-trim', hidden: true });
+    var state = { id: '', duration: 0, from: null, to: null, video: null, loop: true, playingPart: false };
+
+    function fmt(sec) { return clipApi && clipApi.formatTime ? clipApi.formatTime(sec) : String(sec); }
+    function fmt1(sec) { var m = Math.floor(sec / 60); var s = sec - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); }
+    function inputs() { return holder.querySelectorAll('.gallery-picker__item.is-video .gallery-picker__time'); }
+    function parse(v) { var t = clipApi && clipApi.parseTime ? clipApi.parseTime(v) : Number(v); return t === null || isNaN(t) ? null : t; }
+    function bounds() {
+      var ins = inputs();
+      var a = parse(ins[0] ? ins[0].value : '');
+      var b = parse(ins[1] ? ins[1].value : '');
+      if (a === null) a = 0;
+      if (b === null) b = clipApi && clipApi.defaultEnd ? clipApi.defaultEnd(a, state.duration || 0) : a + 6;
+      return { a: a, b: b };
+    }
+    function write(a, b) {
+      var len = state.duration || Math.max(b, 30);
+      a = Math.max(0, Math.min(a, len - 0.5));
+      b = Math.max(a + 0.5, Math.min(b, len));
+      var ins = inputs();
+      if (!ins[0] || !ins[1]) return;
+      ins[0].value = fmt1(Math.round(a * 10) / 10).replace(/\.0$/, '');
+      ins[1].value = fmt1(Math.round(b * 10) / 10).replace(/\.0$/, '');
+      ins[0].dispatchEvent(new Event('input', { bubbles: true }));
+      ins[1].dispatchEvent(new Event('input', { bubbles: true }));
+      paint();
+    }
+
+    var video = el('video', { class: 'p8-trim__video', playsinline: '', preload: 'metadata', muted: true });
+    var poster = el('img', { class: 'p8-trim__poster', alt: '' });
+    var playBtn = el('button', { class: 'p8-trim__play', type: 'button', 'aria-label': 'اتفرج على الجزء', onclick: function () { playPart(); } }, icon('play'));
+    var clock = el('span', { class: 'p8-trim__t mono' });
+    var film = el('div', { class: 'p8-trim__film', 'aria-hidden': 'true' });
+    var dimA = el('span', { class: 'p8-trim__dim' });
+    var dimB = el('span', { class: 'p8-trim__dim' });
+    var badge = el('em');
+    var hA = el('i', { class: 'p8-trim__h p8-trim__h--a', 'data-h': 'a' });
+    var hB = el('i', { class: 'p8-trim__h p8-trim__h--b', 'data-h': 'b' });
+    var sel = el('span', { class: 'p8-trim__sel', 'data-h': 'sel' }, hA, hB, badge);
+    var head = el('span', { class: 'p8-trim__head' });
+    var line = el('div', { class: 'p8-trim__line', dir: 'ltr' }, film, dimA, dimB, sel, head);
+    var ruler = el('div', { class: 'p8-trim__ruler mono', dir: 'ltr' });
+    var len = el('b');
+    var loop = A.switchInput('كرر', true, function (on) { state.loop = on; });
+
+    function pick(which) {
+      var box = el('input', { class: 'input mono p8-trim__v', dir: 'ltr', 'aria-label': which === 'a' ? 'من' : 'لحد', onchange: function () {
+        var v = parse(box.value); if (v === null) { paint(); return; }
+        var t = bounds(); if (which === 'a') write(v, t.b); else write(t.a, v);
+      } });
+      function stepBtn(label, by) { return el('button', { class: 'p8-step', type: 'button', onclick: function () { var t = bounds(); if (which === 'a') write(t.a + by, t.b); else write(t.a, t.b + by); } }, label); }
+      var take = el('button', { class: 'btn btn--sm btn--ghost', type: 'button', onclick: function () { takeNow(which); } }, icon('clock'), 'خد الوقت الحالي (' + (which === 'a' ? 'I' : 'O') + ')');
+      return { box: box, node: el('div', { class: 'p8-tpick' }, el('small', { text: which === 'a' ? 'من' : 'لحد' }),
+        el('div', { class: 'p8-tpick__row' }, stepBtn('−١', -1), stepBtn('−٠٫١', -0.1), box, stepBtn('+٠٫١', 0.1), stepBtn('+١', 1)), take) };
+    }
+    var pa = pick('a');
+    var pb = pick('b');
+    var quick = el('div', { class: 'seg p8-trim__quick' }, [5, 10, 15, 30].map(function (n) {
+      return el('button', { class: 'seg__btn seg__btn--text', type: 'button', onclick: function () { var t = bounds(); write(t.a, t.a + n); } }, A.digits(n) + ' ث');
+    }));
+    var watch = el('button', { class: 'btn btn--sm btn--primary', type: 'button', onclick: function () { playPart(); } }, icon('play'), 'اتفرج على الجزء');
+    var note = el('p', { class: 'field__hint p8-trim__note', hidden: true });
+
+    // «غيّر المقطع»: out of the picker (its own ✕), then its «اختار مقطع من المكتبة»
+    var change = el('button', { class: 'btn btn--sm btn--ghost p8-trim__change', type: 'button', onclick: function () {
+      var x = holder.querySelector('.gallery-picker__item.is-video .gallery-picker__remove');
+      if (x) x.click();
+      setTimeout(function () { var add = [].slice.call(holder.querySelectorAll('button')).filter(function (b) { return !b.disabled && /المكتبة/.test(b.textContent); })[0]; if (add) add.click(); }, 0);
+    } }, icon('video'), 'غيّر المقطع');
+    node.append(
+      el('div', { class: 'p8-trim__top' }, change),
+      el('div', { class: 'p8-trim__stage' }, video, poster, playBtn, clock),
+      line, ruler,
+      el('div', { class: 'p8-trim__picks' }, pa.node, pb.node),
+      el('div', { class: 'p8-trim__sum' },
+        el('div', {}, el('small', { text: 'المدة' }), len),
+        quick, el('span', { class: 'sp' }), watch, el('div', { class: 'p8-trim__loop' }, loop.node)),
+      note);
+
+    function takeNow(which) {
+      if (!state.video) return;
+      var t = bounds();
+      if (which === 'a') write(video.currentTime, Math.max(t.b, video.currentTime + 0.5)); else write(t.a, video.currentTime);
+    }
+    function playPart() {
+      if (!state.video) { A.toast('الفيديو بيشتغل هنا بعد ما يتنشر — «من» و«لحد» محفوظين', 'info'); return; }
+      var t = bounds();
+      video.muted = false;
+      video.currentTime = t.a;
+      state.playingPart = true;
+      video.play().catch(function () {});
+    }
+    video.addEventListener('timeupdate', function () {
+      var t = bounds();
+      if (state.playingPart && video.currentTime >= t.b) {
+        if (state.loop) video.currentTime = t.a; else { video.pause(); state.playingPart = false; }
+      }
+      paintHead();
+    });
+    video.addEventListener('loadedmetadata', function () { if (isFinite(video.duration) && video.duration > 0) { state.duration = video.duration; paint(); } });
+
+    node.addEventListener('keydown', function (e) {
+      if (e.target.tagName === 'INPUT') return;
+      if (e.key === 'i' || e.key === 'I') { e.preventDefault(); takeNow('a'); }
+      if (e.key === 'o' || e.key === 'O') { e.preventDefault(); takeNow('b'); }
+      if (state.video && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); video.currentTime = Math.max(0, video.currentTime + (e.key === 'ArrowRight' ? 0.1 : -0.1)); }
+    });
+
+    // dragging an end or the whole frame (the line runs left to right: 0:00 on the left)
+    var drag = null;
+    line.addEventListener('pointerdown', function (e) {
+      var h = e.target.closest('[data-h]');
+      if (!h) return;
+      e.preventDefault();
+      var t = bounds();
+      drag = { h: h.dataset.h, x: e.clientX, a: t.a, b: t.b, w: line.getBoundingClientRect().width };
+      line.setPointerCapture(e.pointerId);
+    });
+    line.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var total = state.duration || Math.max(drag.b + 5, 30);
+      var d = (e.clientX - drag.x) / drag.w * total;
+      if (drag.h === 'a') write(drag.a + d, drag.b);
+      else if (drag.h === 'b') write(drag.a, drag.b + d);
+      else write(drag.a + d, drag.b + d);
+    });
+    line.addEventListener('pointerup', function () { drag = null; });
+
+    function paintHead() {
+      var total = state.duration || Math.max(bounds().b + 5, 30);
+      head.style.left = (Math.min(1, video.currentTime / total) * 100) + '%';
+      clock.textContent = fmt1(video.currentTime || 0) + ' / ' + (state.duration ? fmt1(state.duration) : '—');
+    }
+
+    function paint() {
+      var t = bounds();
+      var total = state.duration || Math.max(t.b + 5, 30);
+      var pa0 = Math.max(0, Math.min(1, t.a / total)) * 100;
+      var pb0 = Math.max(0, Math.min(1, t.b / total)) * 100;
+      dimA.style.left = '0'; dimA.style.width = pa0 + '%';
+      dimB.style.left = pb0 + '%'; dimB.style.right = '0';
+      sel.style.left = pa0 + '%'; sel.style.width = (pb0 - pa0) + '%';
+      var secs = Math.round((t.b - t.a) * 10) / 10;
+      badge.textContent = A.digits(String(secs).replace('.', '٫')) + ' ث';
+      len.textContent = A.digits(String(secs).replace('.', '٫')) + ' ثانية';
+      if (document.activeElement !== pa.box) pa.box.value = fmt1(t.a);
+      if (document.activeElement !== pb.box) pb.box.value = fmt1(t.b);
+      var marks = [];
+      for (var i = 0; i <= 4; i++) marks.push(el('span', { text: fmt(Math.round(total * i / 4)) }));
+      A.fill(ruler, marks);
+      paintHead();
+    }
+
+    function sync() {
+      var item = holder.querySelector('.gallery-picker__item.is-video');
+      var id = item ? item.dataset.id : '';
+      node.hidden = !id;
+      holder.classList.toggle('has-trim', !!id);
+      if (!id) { state.id = ''; return; }
+      if (id !== state.id) {
+        state.id = id;
+        state.duration = A.videoDurations[id] || 0;
+        var media = (A.state.draft.media || []).filter(function (m) { return m.id === id; })[0];
+        var site = A.state.config && A.state.config.siteUrl ? A.state.config.siteUrl.replace(/\/?$/, '/') : '';
+        state.video = media && media.publishedAt && site && media.path ? site + media.path : null;
+        video.hidden = !state.video;
+        poster.hidden = !!state.video;
+        if (state.video) video.src = state.video; else video.removeAttribute('src');
+        A.mediaPreview(id).then(function (src) {
+          if (!src) return;
+          poster.src = src;
+          video.poster = src;
+          A.fill(film, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(function () { return el('img', { src: src, alt: '' }); }));
+        }).catch(function () {});
+        A.videoDuration(id).then(function (d) { if (d && state.id === id) { state.duration = d; paint(); } });
+        note.textContent = state.video ? '' : 'المقطع لسه متنشرش: الفيديو بيشتغل هنا بعد النشر، و«من» و«لحد» بيتحفظوا عادي.';
+        note.hidden = !!state.video;
+      }
+      paint();
+    }
+
+    new MutationObserver(function () { sync(); }).observe(holder, { childList: true, subtree: true });
+    holder.addEventListener('input', function (e) { if (e.target.classList.contains('gallery-picker__time')) paint(); });
+
+    return { node: node, sync: sync };
 
   }
 

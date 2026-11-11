@@ -168,7 +168,7 @@ async function pickImage(scopeSelector, label = '') {
     const labelOf = p => ((p.parentElement && p.parentElement.querySelector(':scope > .field__label')) || {}).textContent;
     const pickers = [...document.querySelectorAll(s)].filter(p => !l || labelOf(p) === l);
     if (!pickers.length) throw new Error('no picker labelled ' + l);
-    [...pickers[0].querySelectorAll('button')].find(b => b.textContent.includes('من المكتبة')).click();
+    [...pickers[0].querySelectorAll('button')].find(b => b.textContent.includes('من المكتبة') || b.classList.contains('picker__lib')).click();
   }, scopeSelector, label);
   await $('dialog.picker-dialog[open] .media-tile');
   await d.page.evaluate(() => [...document.querySelectorAll('dialog.picker-dialog[open] .media-tile')].find(t => !t.classList.contains('is-video')).click());
@@ -285,11 +285,15 @@ test('«صفحات الخدمة»: a new page with its cover, its video card; on
   await d.page.evaluate(() => document.querySelector('dialog.picker-dialog[open] .media-tile.is-video').click());
   await d.page.waitForFunction(() => !document.querySelector('dialog.picker-dialog'));
 
+  // Phase 8B (svc-clip.png): the trimmer over the chosen clip
+  await $('dialog.sheet[open] .p8-trim:not([hidden])');
+  await shot('03a2-card-trim');
+
   // «صوت المقطع»: the clip's own sound by default; a music file of its own, uploaded right here
   const soundChoices = await d.page.$$eval('dialog.sheet[open] .sound-field .choice', l => l.map(c => [c.textContent.trim(), c.querySelector('input').checked]));
-  assert.deepEqual(soundChoices, [['صوت الفيديو الأصلي', true], ['موسيقى/صوت مخصص', false], ['بدون صوت', false]]);
+  assert.deepEqual(soundChoices, [['صوته الأصلي', true], ['من غير صوت', false], ['ملف صوت', false]]);
   assert.equal(await d.page.$eval('dialog.sheet[open] .sound-pick', n => n.hidden), true, 'no file to choose until «مخصص»');
-  await d.page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .sound-field .choice')].find(c => c.textContent.includes('مخصص')).querySelector('input').click());
+  await d.page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .sound-field .choice')].find(c => c.textContent.includes('ملف صوت')).querySelector('input').click());
   assert.equal(await d.page.$eval('dialog.sheet[open] .sound-pick', n => n.hidden), false);
   const mp3 = join(TMP, 'موسيقى العرض.mp3');
   writeFileSync(mp3, silentMp3(120));
