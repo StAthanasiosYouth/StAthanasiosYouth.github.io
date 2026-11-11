@@ -84,3 +84,6 @@
 - [ ] help-pop: الشرح المكتوب لكل شاشة مالوش مكان في الصورة — مستني رد صاحب المشروع (أ: الفقاعة بس والشرح من «دليل الأدمن»، ب: سطر «اقرا الشرح المكتوب»).
 - [ ] event-delete.png (مسح فعالية اتنشرت وفيها حجوزات + Excel قبل المسح): محتاج تغيير في السيرفر ومسح بيانات حقيقية = موافقة صاحب المشروع. لحد دلوقتي المسح بس للي لسه متنشرتش.
 - أداة الصور: `PHASE8_GO=pages:events`، `PHASE8_EVAL=<js>` (يفتح محرر/قائمة)، `PHASE8_VIEWPORT=1` (للنوافذ: الصورة الكاملة بتزحزحها).
+- النشر: 2026-11-11 اتنشر على main (commit ba47dca فوق ce5df11)، والـPages بيقدّم admin.css الجديد (فيه games-soon). مفيش تغيير في worker/. الرجوع: git revert ba47dca ثم push لـmain.
+- الاختبارات: unit 768/769 (الفاشل قديم)؛ pages-admin 9/9، fix-admin 7/7، admin-layout، content-worker 14/14، refine-b (allowlist قديم). book-admin: ٤ فاشلين (module off، booking sheet، reject، edit locks) — فاشلين بنفس الشكل على c5fc27f قبل التغيير (اتأكدت). admin.e2e: القديم بس، و«unsaved changes» بيعدّي لوحده (بيتأثر بالفاشلين اللي قبله).
+- الجاي: W3 (B4 + B5) بنفس الطريقة — المحتوى (meetings, news, cards, bell, games-corner) والصفحات (svcpages, svc-clip, servants, layout-sched). المحرر الكبير والقائمة ⋯ والـpill tabs جاهزين للاستخدام.
