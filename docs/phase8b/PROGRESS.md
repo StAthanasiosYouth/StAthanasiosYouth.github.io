@@ -104,3 +104,5 @@
 - النشر: «الاجتماعات» على main (commit d14aaf4 فوق d25af71). الرجوع: git revert d14aaf4.
 - [x] «الأخبار» زي news.png: راس بأيقونة و«+ خبر»، فلتر «ظاهرة · جاية · خلصت» (بالميعاد بس؛ المخفي بإيده بيفضل في مجموعته بعلامة «مخفي»، والأرشيف في «خلصت»)، صف بصورة وعلامات (جديد/مهم، مميز، مثبت)، سطر الميعاد، «ظاهر»/«عليه إشعار»، «تعديل» و⋯ (اخفيه/اظهره، الأرشيف، استخدم تاني، امسح بنفس الـaria-labels). القايمة الفاضية: «مفيش أخبار دلوقتي» و«اكتب أول خبر».
 - اختبارات اتعدلت للصف الجديد: admin.e2e (المسح من ⋯، الكلمات في كل فلتر)، admin-rel (الإخفاء من ⋯؛ شريط الإعدادات والـhero ممكن يسكرولوا جوه نفسهم)، fix-admin («خبر»). معروفين فاشلين مش من 8B: final-r ١،٢،٤،٦ (مفتاح athanasios-admin.place من 2026-11-03)، hub ١،٢ وlayout ٩–١١ (الموقع العام: touch targets).
+- النشر: «الأخبار» على main (commit a1ffed3 فوق d14aaf4). الرجوع: git revert a1ffed3.
+- الجاي في W3: news-edit، session-edit/session-program، cards/card-edit/card-types، bell/bell-edit، games-corner/game-edit، وبعدين B5: svcpages/svcpage-edit/svc-clip، servants/servant-remove، layout-sched.
