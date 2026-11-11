@@ -132,7 +132,7 @@ function sessionDuration_(value) {
 /* =========================================================
    MEETING PROGRAM «برنامج الاجتماع»
    Stored (Sessions.program) as JSON text, in order:
-     [{ title (≤ 40), time 'HH:MM' | '', minutes 1..600 | '' }]
+     [{ title (≤ 40), time 'HH:MM' | '', minutes 1..600 | '', image? (a Media id) }]
    Published (content.json sessions[].program) as contiguous Cairo wall
    times: [{ title, start, end }] — a stage ends where the next one
    starts, the last one at the meeting's end.
@@ -191,7 +191,14 @@ function programStages_(value) {
       problems.push(label + ': المدة لازم تكون عدد دقايق من 1 لـ ' + PROGRAM_LIMITS.minutes);
     }
 
-    stages.push({ title: title, time: time || '', minutes: minutes === '' || isNaN(minutes) ? '' : minutes });
+    var stage = { title: title, time: time || '', minutes: minutes === '' || isNaN(minutes) ? '' : minutes };
+    // Phase 8B (session-program.png): an optional picture per stage (a Media id)
+    var picture = contentLine_(item.image);
+    if (picture) {
+      if (/^[\w.-]{1,80}$/.test(picture)) stage.image = picture;
+      else problems.push(label + ': الصورة مش مفهومة');
+    }
+    stages.push(stage);
 
   });
 
@@ -561,7 +568,13 @@ function buildHub_(draft, ctx) {
       );
       resolved.errors.forEach(function (problem) { ctx.error(where, 'برنامج الاجتماع: ' + problem); });
       resolved.warnings.forEach(function (problem) { ctx.warn(where, 'برنامج الاجتماع: ' + problem); });
-      if (!resolved.errors.length && resolved.stages.length) entry.program = resolved.stages;
+      if (!resolved.errors.length && resolved.stages.length) {
+        entry.program = resolved.stages.map(function (stage, k) {
+          var picture = program.stages[k] && program.stages[k].image ? image(where, program.stages[k].image) : null;
+          if (picture) stage.image = picture;
+          return stage;
+        });
+      }
     }
 
     sessions.push(entry);

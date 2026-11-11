@@ -14250,4 +14250,114 @@ html[data-mode="light"] .vpop__more {
 .prevcard__line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .prevcard__line [hidden], .prevcard__tags [hidden] { display: none; }
 
+/* ---------- the meeting editor (session-edit.png, session-program.png) ---------- */
+.p8-endcol { display: flex; align-items: flex-end; height: 100%; }
+.sheet__foot .sheet__del { order: 9; }
+
+/* «بوستر الاجتماع»: the picture, then its name, three buttons one under the other and the line */
+.picker--poster { display: grid; grid-template-columns: 240px 1fr; gap: 16px; align-items: start; }
+.picker--poster .picker__img-wrap { position: relative; }
+.picker--poster .picker__preview { min-height: 0; aspect-ratio: 1; border: 1px solid var(--p-line-3); border-radius: 16px; background: #020b16; }
+.picker--poster .picker__img { width: 100%; height: 100%; max-height: none; object-fit: cover; }
+.picker__badge { position: absolute; top: 8px; inset-inline-start: 8px; }
+.picker__img-wrap:has(.picker__empty) .picker__badge { display: none; }
+.picker--poster .picker__side { display: grid; align-content: start; gap: 0; min-width: 0; }
+.picker--poster .picker__name { display: block; font-size: 13.5px; font-weight: 800; text-align: start; direction: ltr; unicode-bidi: plaintext; }
+.picker--poster .picker__from { display: block; margin-top: 2px; color: var(--text-3); font-size: 12.5px; }
+.picker--poster .actions { display: grid; gap: 8px; margin-top: 12px; }
+.picker--poster .actions .btn { justify-content: center; width: 100%; min-height: 36px; font-size: 13px; }
+.picker--poster .actions .btn--ghost { border: 1px solid var(--p-line-3); background: transparent; }
+.picker--poster .actions .btn[hidden] { display: none; }
+.picker--poster .field__hint { display: block; margin-top: 10px; color: var(--text-3); font-size: 12px; }
+.picker--poster .upload, .picker--poster .upload-error, .picker--poster .field { margin-top: 10px; }
+
+/* «برنامج الاجتماع» */
+.program__head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+.program__head .sp { flex: 1; }
+.seg--sum > span { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: 9px; color: var(--text-2); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.seg--sum > span.is-on { color: var(--acc-hi); background: var(--p-raised); box-shadow: inset 0 0 0 1px var(--p-acc-line); }
+.seg--sum .icon { width: 15px; height: 15px; }
+.stages { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.stage { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--p-line-2); border-radius: 16px; background: rgb(10 33 64 / .5); cursor: pointer; transition: border-color .2s var(--ease), background .2s var(--ease); }
+html[data-mode="light"] .stage { background: var(--p-surface-2); }
+.stage.program__row { display: flex; box-shadow: none; }
+.stage__span .program__span { color: inherit; font-size: inherit; font-weight: inherit; }
+.stage__pre .input { width: auto; flex: 1; direction: rtl; -moz-appearance: textfield; appearance: textfield; }
+.stage__pre .input::-webkit-inner-spin-button, .stage__pre .input::-webkit-outer-spin-button { margin: 0; -webkit-appearance: none; }
+.stage.is-open { border-color: var(--p-acc-line); background: rgb(var(--acc-rgb) / .05); cursor: default; }
+.stage.is-live { box-shadow: inset 3px 0 0 var(--ok); }
+.stage.is-drop { border-color: var(--acc); border-style: dashed; }
+.stage .grip { display: inline-flex; flex: none; margin-top: 10px; color: var(--text-3); cursor: grab; touch-action: none; }
+.stage .grip .icon { width: 16px; height: 16px; }
+.stage__n { display: grid; flex: none; place-items: center; width: 26px; height: 26px; margin-top: 7px; border: 1px solid var(--p-line-3); border-radius: 50%; font-size: 12px; font-weight: 800; }
+.stage__img { display: grid; flex: none; place-items: center; width: 52px; height: 40px; overflow: hidden; border: 1px solid var(--p-line-3); border-radius: 10px; color: var(--text-3); }
+.stage__img.is-empty { border-style: dashed; }
+.stage__img img { width: 100%; height: 100%; object-fit: cover; }
+.stage__img .icon { width: 15px; height: 15px; }
+.stage__main { flex: 1; min-width: 0; }
+.stage__title.input { width: 100%; height: 40px; }
+.stage__tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.stage__span .icon { width: 13px; height: 13px; }
+.stage__when { display: grid; grid-template-columns: auto auto auto 1fr; align-items: end; gap: 10px; margin-top: 10px; }
+.stage__when[hidden] { display: none; }
+.stage__when label { display: flex; flex-direction: column; gap: 4px; color: var(--text-3); font-size: 12px; font-weight: 700; }
+.stage__when label > .input { width: 130px; }
+.stage__when .program__or { padding-bottom: 12px; color: var(--text-3); font-size: 13px; }
+.stage__pre { width: 140px; }
+.stage__pre .input { min-width: 0; }
+.stage__pic { grid-column: 1 / -1; margin-top: 4px; }
+.picker--stage { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.picker--stage .picker__preview { width: 64px; min-height: 0; height: 40px; border-radius: 8px; border-style: solid; }
+.picker--stage .picker__preview[hidden], .picker--stage .actions [hidden] { display: none; }
+.picker--stage .picker__img { width: 100%; height: 100%; max-height: none; object-fit: cover; }
+.picker--stage .picker__empty { font-size: 0; }
+.picker--stage .picker__empty .icon { width: 15px; height: 15px; }
+.picker--stage .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.picker--stage .actions .btn { min-height: 34px; padding: 0 12px; font-size: 13px; }
+.picker--stage .actions .btn--ghost { border: 1px solid var(--p-line-3); }
+.picker--stage .actions > :nth-child(1) { order: 2; }
+.picker--stage .actions > :nth-child(3) { order: 3; }
+.picker--stage .actions > :nth-child(4) { order: 1; }
+.picker--stage .upload, .picker--stage .upload-error, .picker--stage .url-import { flex-basis: 100%; }
+.stage__tools { display: flex; flex: none; gap: 4px; }
+.stage__tools .p8-iconbtn { width: 32px; height: 32px; border-radius: 50%; }
+.stage__tools .p8-iconbtn .icon { width: 15px; height: 15px; }
+.stage__tools .p8-iconbtn:disabled { opacity: .45; cursor: default; }
+.program__add { margin-top: 10px; border: 1px dashed var(--p-line-3); }
+.program-editor + .field__hint, .field[data-label="برنامج الاجتماع"] > .field__hint { margin-top: 10px; color: var(--text-3); font-size: 12px; }
+
+/* the left column: the card in «ركن الاجتماع» and «البرنامج كده» */
+.prevcard--square img { aspect-ratio: 1; }
+.prevcard--square > div b { margin: 2px 0; font-size: 16px; }
+.tl-mini { margin: 0; padding: 0; list-style: none; }
+.tl-mini li { position: relative; padding: 0 18px 12px 0; font-size: 12.5px; }
+.tl-mini li::before { content: ""; position: absolute; top: 6px; right: 3px; width: 8px; height: 8px; border-radius: 50%; background: var(--p-line-3); }
+.tl-mini li.is-done::before { background: var(--text-3); }
+.tl-mini li.is-live::before { background: var(--ok); box-shadow: 0 0 0 4px rgb(var(--ok-rgb) / .18); }
+.tl-mini li.tl-mini__empty::before { display: none; }
+.tl-mini b { display: block; font-size: 13px; }
+.tl-mini small { color: var(--text-3); }
+
+@media (max-width: 760px) {
+  .picker--poster { grid-template-columns: 1fr; }
+  .picker--poster .picker__img-wrap { max-width: 280px; }
+  .stage { flex-wrap: wrap; }
+  .stage__main { flex-basis: calc(100% - 60px); order: 5; }
+  .stage__tools { margin-inline-start: auto; }
+  .stage__when { grid-template-columns: 1fr auto 1fr; }
+  .stage__when label > .input, .stage__when .stage__pre { width: 100%; }
+}
+
+.stage__clock { position: relative; display: block; }
+.stage__clock .input { width: 130px; }
+.stage__clock-words { position: absolute; inset: 0 14px; display: flex; align-items: center; font-weight: 700; font-size: 14px; pointer-events: none; }
+.stage__clock .input:not(:focus) { color: transparent; }
+.stage__clock .input:not(:focus)::-webkit-datetime-edit { color: transparent; }
+.stage__clock .input:focus + .stage__clock-words, .stage__clock-words:empty { display: none; }
+.stage__clock:has(.stage__clock-words:empty) .input { color: inherit; }
+.stage__clock:has(.stage__clock-words:empty) .input::-webkit-datetime-edit { color: var(--text-3); }
+@media (max-width: 760px) {
+  .sheet--session .sheet__foot .sheet__del { flex-basis: 100%; order: 10; justify-content: center; }
+  .stage__clock .input { width: 100%; }
+}
 </style>

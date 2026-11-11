@@ -1205,9 +1205,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   /* Phase 8B: a big editor's section (editor.png): an icon and a title, a line under it, the fields in a 12-column
      grid (A.col(node, 6) = half). The side list of A.openSheet is made from these; data-state 'done' | 'warn'
      marks its number (✓) or a dot. */
-  A.msec = function (title, iconName, sub, children) {
+  A.msec = function (title, iconName, sub, children, navTitle) {
 
-    return el('section', { class: 'msec', 'data-title': title },
+    return el('section', { class: 'msec', 'data-title': title, 'data-nav': navTitle || null },
       el('h4', { class: 'msec__title' }, iconName ? icon(iconName) : null, el('span', { text: title })),
       sub ? el('p', { class: 'msec__sub', text: sub }) : null,
       el('div', { class: 'fgrid' }, children));
@@ -2089,8 +2089,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         alt.value = chosen ? chosen.alt || '' : '';
         show();
       });
-    } }, icon('photos'), 'من المكتبة');
-    var remove = el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { value = ''; markDirty(); setStage(null); show(); } }, 'شيل الصورة');
+    } }, icon('photos'), options.libraryLabel || 'من المكتبة');
+    var remove = el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { value = ''; markDirty(); setStage(null); show(); } }, options.removeLabel ? icon('trash') : null, options.removeLabel || 'شيل الصورة');
+    // Phase 8B (session-edit.png): the poster's name and size, and where it comes from
+    var metaName = el('b', { class: 'picker__name ltr' });
+    var metaFrom = el('small', { class: 'picker__from' });
 
     var uploadStarted = 0;
     var elapsedTimer = 0;
@@ -2183,9 +2186,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       // upload-only (the library): no empty box, no «من المكتبة»
       preview.hidden = options.uploadOnly && !value;
       fromLibrary.hidden = !!options.uploadOnly;
-      altField.hidden = !value;
+      altField.hidden = !value || !!options.noAlt;
       remove.hidden = !value || busy || !!options.uploadOnly;
-      choose.lastChild.textContent = options.allowVideo ? chooseLabel : value ? 'ارفع صورة تانية' : 'ارفع صورة';
+      choose.lastChild.textContent = options.allowVideo || options.fixedLabel ? chooseLabel : value ? 'ارفع صورة تانية' : 'ارفع صورة';
+      var known = media();
+      metaName.textContent = value ? value + (known && known.width ? ' · ' + known.width + '×' + known.height : '') : '';
+      metaFrom.textContent = value ? 'من المكتبة · ' + (known && known.usage && known.usage.length > 1 ? 'مستخدم في ' + A.digits(known.usage.length) + ' أماكن' : 'مستخدم هنا بس') : 'مفيش بوستر لسه';
 
       if (!value) {
         preview.appendChild(el('span', { class: 'picker__empty' }, icon('photos'), 'من غير صورة'));
@@ -2452,20 +2458,30 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     show();
 
+    var hint = el('span', { class: 'field__hint', text: options.hint || 'من الموبايل أو الكمبيوتر — بتتصغر وتتضغط لوحدها قبل الرفع' });
+    var actions = el('div', { class: 'actions' }, choose, fromUrl, fromLibrary, remove, file);
+    // Phase 8B: options.poster (session-edit.png) — the picture on one side; its name, the buttons one under the other
+    // and the line on the other. options.className 'picker--stage': a program stage's small row
+    var inner = options.poster
+      ? el('div', { class: 'picker picker--poster' + (options.className ? ' ' + options.className : '') },
+        el('div', { class: 'picker__img-wrap' }, preview, el('span', { class: 'p8-tag p8-tag--ok picker__badge' }, icon('check'), options.badge || 'البوستر')),
+        el('div', { class: 'picker__side' }, metaName, metaFrom, actions, hint, urlRow, progress, errorBox, altField))
+      : el('div', { class: 'picker' + (options.className ? ' ' + options.className : '') },
+        preview,
+        actions,
+        urlRow,
+        progress,
+        errorBox,
+        altField
+      );
+
     // a <div>, not a <label>: a label around several buttons forwards stray clicks
     return {
       // after a reload (A.restore): the chosen image's id comes back — never a file being uploaded
       node: A.draftWidget(root = el('div', { class: 'field' },
-        el('span', { class: 'field__label', text: options.label || 'الصورة / البوستر' }),
-        el('div', { class: 'picker' + (options.className ? ' ' + options.className : '') },
-          preview,
-          el('div', { class: 'actions' }, choose, fromUrl, fromLibrary, remove, file),
-          urlRow,
-          progress,
-          errorBox,
-          altField
-        ),
-        el('span', { class: 'field__hint', text: options.hint || 'من الموبايل أو الكمبيوتر — بتتصغر وتتضغط لوحدها قبل الرفع' })
+        el('span', { class: 'field__label' + (options.poster || options.noLabel ? ' visually-hidden' : ''), text: options.label || 'الصورة / البوستر' }),
+        inner,
+        options.poster || options.noHint ? null : hint
       ), {
         get: function () { return value; },
         set: function (id) {
@@ -2875,7 +2891,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var msecs = Array.prototype.slice.call(body.querySelectorAll('.msec')).filter(function (m) { return !m.parentNode.closest('.msec'); });
     var sections;
     if (msecs.length >= 2) {
-      sections = msecs.map(function (m) { m.classList.add('sheet__sec'); return { title: m.dataset.title, target: m }; });
+      sections = msecs.map(function (m) { m.classList.add('sheet__sec'); return { title: m.dataset.nav || m.dataset.title, target: m }; });
     }
     else {
       var labels = Array.prototype.slice.call(body.querySelectorAll('.section-label')).filter(function (label) {
@@ -8558,7 +8574,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   }
 
-  /* prefill (new only): e.g. { date } from the home page's next meeting */
+  /* prefill (new only): e.g. { date } from the home page's next meeting.
+     Phase 8B (session-edit.png, session-program.png): the big editor — «الاجتماع», «الموضوع», «البوستر»,
+     «برنامج الاجتماع» (stage cards, each with its own picture), «الظهور والإشعار»; on the left how it shows in
+     «ركن الاجتماع» and the program as it runs; «امسح الاجتماع» in the foot. */
   A.editors.sessions = function (session, prefill) {
 
     var isNew = !session;
@@ -8569,23 +8588,29 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var box = A.errorBox();
     var limits = hubLimits();
+    var usualTime = A.setting('meeting.time') || '';
+    var usualLength = A.setting('meeting.durationMinutes');
+    var program = null;
 
     var date = A.dateTimeInput(session.date, { dateOnly: true, clearable: false, presets: [
       { label: 'الأحد الجاي', value: function () { return A.nextWeekday(dayIndex(), '20:00').slice(0, 10); } }
-    ] });
+    ], onchange: function () { if (program) program.refresh(); paintAside(); } });
 
     var time = el('input', { class: 'input', type: 'time', value: session.time || '', oninput: A.markDirty });
-    var duration = A.textInput(session.durationMinutes, { type: 'number', inputmode: 'numeric', placeholder: A.setting('meeting.durationMinutes') ? 'المعتاد ' + A.setting('meeting.durationMinutes') : 'مثلاً 120' });
-    var topic = A.counted('الموضوع', session.topic, limits.topic, 'مثلاً: حياة التسليم');
-    var speaker = A.counted('الخادم / المتكلم', session.speaker, limits.speaker, 'مثلاً: أبونا أنطوني عياد');
-    var description = A.counted('وصف', session.description, limits.sessionDescription, 'اختياري', { multiline: true });
-    var image = A.imageOrIcon(session.image, session.icon, { label: 'بوستر الاجتماع' });
-    var note = A.counted('ملاحظة', session.note, A.state.meta.limits.note, 'مثلاً سبب الإلغاء، أو "الاجتماع في القاعة الكبيرة"');
+    var duration = A.textInput(session.durationMinutes, { type: 'number', inputmode: 'numeric', placeholder: usualLength ? 'فاضية = المعتاد (' + A.digits(usualLength) + ')' : 'مثلاً 120' });
+    var topic = A.counted('الموضوع', session.topic, limits.topic, '', { placeholder: 'مثلاً: حياة التسليم' });
+    var speaker = A.counted('الخادم / المتكلم', session.speaker, limits.speaker, '', { placeholder: 'مثلاً: أبونا أنطوني عياد' });
+    var description = A.counted('وصف', session.description, limits.sessionDescription, '', { multiline: true, rows: 2, placeholder: 'اختياري' });
+    var image = A.imagePicker(session.image, {
+      label: 'بوستر الاجتماع', poster: true, fixedLabel: true, chooseLabel: 'ارفع بوستر', libraryLabel: 'اختار من المكتبة', removeLabel: 'من غير بوستر',
+      hint: 'من الموبايل أو الكمبيوتر — بيتصغر ويتضغط لوحده قبل الرفع', onchange: function () { paintAside(); }
+    });
+    var note = A.counted('ملاحظة', session.note, A.state.meta.limits.note, '', { placeholder: 'مثلاً سبب الإلغاء، أو «الاجتماع في القاعة الكبيرة»' });
 
-    var status = A.choices('status', [
+    var status = A.segmented([
       { value: 'normal', label: 'عادي' },
       { value: 'cancelled', label: 'ملغي الأسبوع ده' }
-    ], session.status === 'cancelled' ? 'cancelled' : 'normal', sync);
+    ], session.status === 'cancelled' ? 'cancelled' : 'normal', 'الحالة', function (v) { sync(v); });
 
     var visibleFrom = A.dateTimeInput(session.visibleFrom, {
       emptyText: 'الموضوع يظهر على طول',
@@ -8595,35 +8620,37 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var notify = A.checkbox('اعمل إشعار بالموضوع في الجرس', isNew ? true : hasNotification('notif-session-' + session.date), 'بيظهر للناس لما الموضوع يظهر');
     var enabled = A.switchInput('ظاهر', session.enabled === undefined ? true : bool(session.enabled));
 
+    function meetingTime() { return time.value || usualTime; }
+    function meetingLength() { return Number(duration.value || usualLength) || null; }
+
     // «برنامج الاجتماع»: its times follow this meeting's own time and length
-    var program = programEditor(A.programStages(session.program), {
+    program = programEditor(A.programStages(session.program), {
       date: function () { return date.value(); },
-      time: function () { return time.value || A.setting('meeting.time') || ''; },
-      duration: function () { return Number(duration.value || A.setting('meeting.durationMinutes')) || null; },
-      exclude: isNew ? '' : session.date
+      time: meetingTime,
+      duration: meetingLength,
+      exclude: isNew ? '' : session.date,
+      onchange: function () { paintAside(); }
     });
     time.addEventListener('input', program.refresh);
     duration.addEventListener('input', program.refresh);
 
-    var details = el('div', { class: 'form' },
-      topic.node,
-      speaker.node,
-      description.node,
-      image.node,
-      program.node,
-      A.field('الموضوع يظهر في الموقع من', visibleFrom.node, 'سيبه فاضي لو عايز يظهر أول ما تنشر'),
-      notify.node
-    );
+    var secTopic = A.msec('الموضوع', 'edit', '', [A.col(topic.node, 6), A.col(speaker.node, 6), A.col(description.node, 12)]);
+    var secPoster = A.msec('بوستر الاجتماع', 'photos', 'بيظهر في «ركن الاجتماع» على الموقع، وفي الإشعار', [A.col(image.node, 12)], 'البوستر');
+    var secProgram = A.msec('برنامج الاجتماع', 'layers', 'رتّب الفقرات بالسحب أو بالأسهم. افتح أي فقرة تغيّر ميعادها أو صورتها.', [A.col(program.node, 12)]);
+    var visibleField = A.field('الموضوع يظهر في الموقع من', visibleFrom.node, 'سيبه فاضي لو عايز يظهر أول ما تنشر');
 
     function sync(value) {
-      details.hidden = (value || status.value()) === 'cancelled';
+      // a cancelled week: no topic, poster or program (the note says why)
+      var off = (value || status.value) === 'cancelled';
+      [secTopic, secPoster, secProgram, visibleField, notify.node].forEach(function (node) { node.hidden = off; });
+      if (A.sheetMarks) A.sheetMarks();
     }
 
-    sync();
-
     var save = saveButton(isNew);
+    A.fill(save, icon('check'), el('span', { text: isNew ? 'إضافة' : 'احفظ' }));
 
     save.addEventListener('click', function () {
+      var picture = image.value();
       A.saveItem('sessions', {
         originalDate: isNew ? '' : session.date,
         date: date.value(),
@@ -8632,9 +8659,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         topic: topic.input.value,
         speaker: speaker.input.value,
         description: description.input.value,
-        image: image.value(),
-        icon: image.icon(),
-        status: status.value(),
+        image: picture,
+        // the poster is the picture now; an older icon stays until a poster replaces it
+        icon: picture ? '' : session.icon || '',
+        status: status.value,
         note: note.input.value,
         visibleFrom: visibleFrom.value(),
         program: program.value(),
@@ -8650,25 +8678,91 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       ? A.liveControl(session)
       : null;
 
-    A.openSheet(isNew ? 'اجتماع جديد' : 'تعديل الاجتماع', [
-      box,
+    // the left column: the card in «ركن الاجتماع», then «البرنامج كده»
+    var prevImg = el('img', { alt: '', hidden: true });
+    var prevWhen = el('small');
+    var prevTopic = el('b');
+    var prevSpeaker = el('small');
+    var timeline = el('ul', { class: 'tl-mini' });
+    var lastImage = null;
+
+    function paintAside() {
+      if (!program) return;
+      var d = date.value();
+      prevWhen.textContent = (d ? A.formatWallLong(d).replace(/ [٠-٩]{4}$/, '') : '') + (meetingTime() ? ' · ' + clock12(meetingTime()) : '');
+      prevTopic.textContent = topic.input.value.trim() || 'الموضوع';
+      prevSpeaker.textContent = speaker.input.value.trim();
+      var img = image.value();
+      if (img !== lastImage) {
+        lastImage = img;
+        prevImg.hidden = true;
+        if (img && A.mediaPreview) A.mediaPreview(img).then(function (src) { if (src && lastImage === img) { prevImg.src = src; prevImg.hidden = false; } }).catch(function () {});
+      }
+      var stages = program.value();
+      var times = A.resolveProgram(stages, d, meetingTime(), meetingLength());
+      var now = nowMinutes();
+      A.fill(timeline, stages.length ? stages.map(function (stage, i) {
+        var span = times[i] || {};
+        var known = span.start !== null && span.start !== undefined;
+        var state = !known || span.end === null ? '' : now >= span.end ? 'is-done' : now >= span.start ? 'is-live' : '';
+        return el('li', { class: state },
+          el('b', { text: stage.title || 'الفقرة ' + A.digits(i + 1) }),
+          el('small', { text: known ? clock(span.start).replace(/ [صم]$/, '') + ' ← ' + clock(span.end) : '—' }));
+      }) : el('li', { class: 'tl-mini__empty' }, el('small', { text: 'مفيش برنامج لسه' })));
+    }
+
+    var form = el('div', { class: 'msecs p8-session', oninput: paintAside, onchange: paintAside },
       live,
-      el('div', { class: 'form' },
-        A.field('التاريخ', date.node),
-        el('div', { class: 'row' },
-          A.field('الساعة', time, 'فاضية = المعتاد (' + (A.setting('meeting.time') || '—') + ')'),
-          A.field('المدة بالدقايق', duration, 'فاضية = المعتاد')
-        ),
-        A.field('الحالة', status.node),
-        details,
-        note.node,
-        enabled.node
-      )
-    ], A.sheetFooter(save), {
+      A.msec('الاجتماع', 'calendar', '', [
+        A.col(A.field('التاريخ', date.node), 4),
+        A.col(A.field('الساعة', time, 'فاضية = المعتاد (' + (usualTime ? clock12(usualTime) : '—') + ')'), 4),
+        A.col(A.field('المدة بالدقايق', duration), 4),
+        A.col(A.field('الحالة', status), 12)
+      ]),
+      secTopic,
+      secPoster,
+      secProgram,
+      A.msec('الظهور والإشعار', 'clock', '', [
+        A.col(visibleField, 12),
+        A.col(notify.node, 12),
+        A.col(note.node, 8),
+        A.col(el('div', { class: 'p8-endcol' }, enabled.node), 4)
+      ]));
+
+    var title = isNew ? 'اجتماع جديد' : 'اجتماع ' + A.formatWallLong(session.date).replace(/ [٠-٩]{4}$/, '');
+    var meetingName = A.setting('meeting.title') || 'الاجتماع';
+
+    A.openSheet(title, [box, form], A.sheetFooter(save), {
+      size: 'lg',
+      icon: 'church',
+      sub: meetingName + ' · ' + (session.time || usualTime ? clock12(session.time || usualTime) + ' · ' : '') + 'بيتحفظ مسودة لحد النشر',
+      next: false,
+      footWords: 'بيتحفظ مسودة لحد «راجع وانشر»',
+      className: 'sheet--session',
+      headActions: [el('button', { class: 'btn btn--sm btn--ghost', type: 'button', onclick: function () { if (A.openPreview) A.openPreview(); } }, icon('eye'), 'معاينة')],
+      aside: [
+        el('h5', { text: 'في «ركن الاجتماع» على الموقع' }),
+        el('div', { class: 'prevcard prevcard--square' }, prevImg, el('div', {}, prevWhen, prevTopic, prevSpeaker)),
+        el('div', { class: 'hr' }),
+        el('h5', { text: 'البرنامج كده' }),
+        timeline
+      ],
       // one editor per item: the official admin locks it while this is open
       draft: A.draftKey('sessions', isNew ? '' : session.date),
       lock: isNew ? null : A.editLock('sessions', session.date, 'اجتماع ' + A.formatWall(session.date, false), function () { var fresh = A.findRow(A.state.draft.sessions, 'date', session.date); if (fresh) A.editors.sessions(fresh); else A.closeSheet(); })
     });
+
+    // «امسح الاجتماع» at the foot's far end (approved)
+    var foot = document.querySelector('dialog.sheet .sheet__foot');
+    if (foot && !isNew) {
+      foot.appendChild(el('button', { class: 'btn btn--sm btn--danger sheet__del', type: 'button', 'aria-label': 'مسح اجتماع ' + session.date, onclick: function (e) {
+        A.deleteItem('sessions', session.date, 'اجتماع ' + session.date, e.currentTarget);
+      } }, icon('trash'), 'امسح الاجتماع'));
+    }
+
+    sync();
+    paintAside();
+    var asideTimer = setInterval(function () { if (!form.isConnected) { clearInterval(asideTimer); return; } paintAside(); }, 30000);
 
   };
 
@@ -8703,7 +8797,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return (Array.isArray(list) ? list : []).map(function (stage) {
       stage = stage && typeof stage === 'object' ? stage : {};
       var minutes = stage.minutes === '' || stage.minutes === null || stage.minutes === undefined ? '' : Number(stage.minutes);
-      return { title: String(stage.title || ''), time: String(stage.time || ''), minutes: isFinite(minutes) ? minutes : '' };
+      var out = { title: String(stage.title || ''), time: String(stage.time || ''), minutes: isFinite(minutes) ? minutes : '' };
+      if (stage.image && typeof stage.image === 'string') out.image = stage.image;
+      return out;
     });
 
   };
@@ -8744,142 +8840,231 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   }
 
   /*
-   * context: { date(), time(), duration(), exclude: a date not to copy from }
+   * context: { date(), time(), duration(), exclude: a date not to copy from, onchange() }
    * → { node (a field named «برنامج الاجتماع»), value(), refresh() }
+   * Phase 8B (session-program.png): a summary («N فقرات | from ← to») and «انسخ برنامج اجتماع تاني», then a card
+   * per stage — the grip (drag), its number, its picture, the name and its span (and «دلوقتي على الموقع»), ↑ ↓ ⋯.
+   * Opening a stage shows «تظهر الساعة» أو «المدة» and its picture (upload, library, none).
    */
   function programEditor(initial, context) {
 
-    var stages = initial.map(function (s) { return { title: s.title, time: s.time, minutes: s.minutes }; });
-    var list = el('ol', { class: 'program' });
+    var stages = initial.map(function (s) { var c = { title: s.title, time: s.time, minutes: s.minutes }; if (s.image) c.image = s.image; return c; });
+    var openAt = -1;
+    var dragFrom = -1;
+    var list = el('ol', { class: 'program stages' });
     var empty = el('p', { class: 'program__empty', text: 'مفيش برنامج — الموقع هيعرض الاجتماع من غير فقرات.' });
-    var addButtonNode = el('button', { class: 'btn', type: 'button', onclick: function () {
+    var sumCount = el('span', { class: 'is-on' }, icon('layers'), el('span'));
+    var sumSpan = el('span');
+    var changed = function () { A.markDirty(); if (context.onchange) context.onchange(); };
+    var addButtonNode = el('button', { class: 'btn btn--ghost btn--block program__add', type: 'button', onclick: function () {
       stages.push({ title: '', time: '', minutes: '' });
-      A.markDirty();
+      openAt = stages.length - 1;
+      changed();
       draw();
       var inputs = list.querySelectorAll('.program__title');
       if (inputs.length) inputs[inputs.length - 1].focus();
     } }, icon('plus'), 'فقرة');
 
-    // «انسخ من اجتماع تاني»
+    // «انسخ برنامج اجتماع تاني»
     var others = (A.state.draft.sessions || []).filter(function (s) {
       return s.date !== context.exclude && A.programStages(s.program).length;
     }).sort(function (a, b) { return a.date < b.date ? 1 : -1; });
 
-    var copySelect = others.length ? el('select', { class: 'input program__copy-select', 'aria-label': 'اجتماع تنسخ منه' },
-      el('option', { value: '', text: 'انسخ من اجتماع تاني…' }),
-      others.slice(0, 30).map(function (s) {
-        return el('option', { value: s.date, text: A.formatWall(s.date, false) + (s.topic ? ' — ' + s.topic : '') + ' (' + A.programStages(s.program).length + ' فقرات)' });
-      })
-    ) : null;
-
-    if (copySelect) {
-      copySelect.addEventListener('change', function () {
-        var source = A.findRow(A.state.draft.sessions, 'date', copySelect.value);
-        copySelect.value = '';
-        if (!source) return;
-        var copy = function () {
-          stages = A.programStages(source.program);
-          A.markDirty();
-          draw();
-          A.toast('اتنسخ برنامج ' + A.formatWall(source.date, false));
-        };
-        if (!stages.length) { copy(); return; }
-        A.confirm({ tone: 'warn', title: 'تبدّل البرنامج ده؟', message: 'الفقرات اللي هنا هتتشال، ويتحط مكانها برنامج ' + A.formatWall(source.date, false) + '.', confirmLabel: 'انسخ', cancelLabel: 'لأ' })
-          .then(function (ok) { if (ok) copy(); });
-      });
+    function copyFrom(source) {
+      var copy = function () {
+        stages = A.programStages(source.program);
+        openAt = -1;
+        changed();
+        draw();
+        A.toast('اتنسخ برنامج ' + A.formatWall(source.date, false));
+      };
+      if (!stages.length) { copy(); return; }
+      A.confirm({ tone: 'warn', title: 'تبدّل البرنامج ده؟', message: 'الفقرات اللي هنا هتتشال، ويتحط مكانها برنامج ' + A.formatWall(source.date, false) + '.', confirmLabel: 'انسخ', cancelLabel: 'لأ' })
+        .then(function (ok) { if (ok) copy(); });
     }
+
+    var copyButton = el('button', { class: 'btn btn--sm program__copy', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: function (e) {
+      if (!others.length) { A.toast('مفيش اجتماع تاني متسجل فيه برنامج لسه', 'info'); return; }
+      A.menu(e.currentTarget, 'menu--p8', others.slice(0, 30).map(function (s) {
+        return A.menuItem('calendar', A.formatWall(s.date, false) + (s.topic ? ' — ' + s.topic : ''), function () { copyFrom(s); }, { hint: A.digits(A.programStages(s.program).length) + ' فقرات' });
+      }), { align: 'start' });
+    } }, icon('copy'), 'انسخ برنامج اجتماع تاني');
 
     function move(i, by) {
       var j = i + by;
       if (j < 0 || j >= stages.length) return;
       stages.splice(j, 0, stages.splice(i, 1)[0]);
-      A.markDirty();
+      if (openAt === i) openAt = j;
+      else if (openAt === j) openAt = i;
+      changed();
       draw();
       var row = list.children[j];
       var again = row && row.querySelector(by < 0 ? '.program__up' : '.program__down');
       if (again && !again.disabled) again.focus();
     }
 
+    function spanText(span) {
+      return span.start === null || span.start === undefined ? 'محتاجة وقت بداية أو مدة للي قبلها' : clock(span.start).replace(/ [صم]$/, '') + ' ← ' + clock(span.end);
+    }
+
+    function thumb(id, cls) {
+      var box = el('span', { class: cls });
+      if (!id) { box.appendChild(icon('photos')); box.classList.add('is-empty'); return box; }
+      var img = el('img', { alt: '' });
+      box.appendChild(img);
+      A.mediaPreview(id).then(function (src) { if (src) img.src = src; }).catch(function () {});
+      return box;
+    }
+
     function draw() {
 
       var times = A.resolveProgram(stages, context.date(), context.time(), context.duration());
+      var now = nowMinutes();
 
       list.replaceChildren.apply(list, stages.map(function (stage, i) {
 
-        var n = String(i + 1).replace(/\d/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[d]; });
-        var title = el('input', { class: 'input program__title', type: 'text', value: stage.title, maxlength: 40, placeholder: 'مثلاً: تسبحة', 'aria-label': 'اسم الفقرة ' + n,
-          oninput: function () { stage.title = title.value; A.markDirty(); } });
-        var time = el('input', { class: 'input program__time', type: 'time', value: stage.time, 'aria-label': 'تبدأ الساعة (الفقرة ' + n + ')',
-          oninput: function () { stage.time = time.value; A.markDirty(); refresh(); } });
-        var minutes = el('input', { class: 'input program__minutes', type: 'number', inputmode: 'numeric', min: 1, max: 600, value: stage.minutes === '' ? '' : String(stage.minutes), placeholder: 'دقايق', 'aria-label': 'المدة بالدقايق (الفقرة ' + n + ')',
-          oninput: function () { stage.minutes = minutes.value === '' ? '' : Number(minutes.value); A.markDirty(); refresh(); } });
+        var n = A.digits(i + 1);
+        var open = i === openAt;
         var span = times[i] || {};
+        var live = span.start !== null && span.start !== undefined && span.end !== null && now >= span.start && now < span.end;
+        var title = el('input', { class: 'input program__title stage__title', type: 'text', value: stage.title, maxlength: 40, placeholder: 'مثلاً: تسبحة', 'aria-label': 'اسم الفقرة ' + n,
+          oninput: function () { stage.title = title.value; changed(); } });
+        var time = el('input', { class: 'input program__time', type: 'time', value: stage.time, 'aria-label': 'تبدأ الساعة (الفقرة ' + n + ')',
+          oninput: function () { stage.time = time.value; clockWords.textContent = time.value ? clock12(time.value) : ''; changed(); refresh(); } });
+        // the approved box says the time in words («٨:٣٥ م»); the native field stays under it for typing
+        var clockWords = el('span', { class: 'stage__clock-words', 'aria-hidden': 'true', text: stage.time ? clock12(stage.time) : '' });
+        var minutes = el('input', { class: 'input program__minutes', type: 'number', inputmode: 'numeric', min: 1, max: 600, value: stage.minutes === '' ? '' : String(stage.minutes), placeholder: 'دقايق', 'aria-label': 'المدة بالدقايق (الفقرة ' + n + ')',
+          oninput: function () { stage.minutes = minutes.value === '' ? '' : Number(minutes.value); changed(); refresh(); } });
 
-        return el('li', { class: 'program__row' },
-          el('span', { class: 'program__n', 'aria-hidden': 'true', text: n }),
-          el('div', { class: 'program__main' },
+        // the stage's own picture (optional): the picker only for the open one
+        var pic = null;
+        if (open) {
+          pic = A.imagePicker(stage.image || '', {
+            label: 'صورة الفقرة ' + n, className: 'picker--stage', noLabel: true, noHint: true, noAlt: true, fixedLabel: true,
+            chooseLabel: 'ارفع', removeLabel: 'من غير صورة',
+            onchange: function (id) {
+              if ((stage.image || '') === (id || '')) return;
+              if (id) stage.image = id; else delete stage.image;
+              changed();
+              var small = row.querySelector('.stage__img');
+              if (small) small.replaceWith(thumb(stage.image, 'stage__img'));
+            }
+          });
+        }
+
+        var toggle = function (e) {
+          if (e.target.closest('input, button, .picker')) return;
+          openAt = open ? -1 : i;
+          draw();
+        };
+
+        var row = el('li', { class: 'program__row stage' + (open ? ' is-open' : '') + (live ? ' is-live' : ''), 'data-i': String(i), onclick: toggle,
+          ondragover: function (e) { if (dragFrom !== -1) { e.preventDefault(); row.classList.add('is-drop'); } },
+          ondragleave: function () { row.classList.remove('is-drop'); },
+          ondrop: function (e) {
+            e.preventDefault();
+            row.classList.remove('is-drop');
+            if (dragFrom === -1 || dragFrom === i) return;
+            move(dragFrom, i - dragFrom);
+          },
+          ondragend: function () { dragFrom = -1; row.draggable = false; } },
+          el('span', { class: 'grip', 'aria-hidden': 'true', onpointerdown: function () { row.draggable = true; }, onpointerup: function () { row.draggable = false; } }, icon('grip')),
+          el('span', { class: 'stage__n', 'aria-hidden': 'true', text: n }),
+          thumb(stage.image, 'stage__img'),
+          el('div', { class: 'stage__main' },
             title,
-            el('div', { class: 'program__when' },
-              el('label', { class: 'program__part' }, el('span', { text: 'تبدأ' }), time),
+            el('div', { class: 'stage__tags' },
+              el('span', { class: 'p8-tag stage__span' }, icon('clock'), el('span', { class: 'program__span', 'data-i': String(i), text: spanText(span) })),
+              live ? el('span', { class: 'p8-tag p8-tag--ok', text: 'دلوقتي على الموقع' }) : null),
+            el('div', { class: 'stage__when', hidden: !open || null },
+              el('label', { class: 'program__part' }, el('span', { text: 'تظهر الساعة' }), el('span', { class: 'stage__clock' }, time, clockWords)),
               el('span', { class: 'program__or', text: 'أو' }),
-              el('label', { class: 'program__part' }, el('span', { text: 'المدة' }), minutes)
-            ),
-            el('span', { class: 'program__span', 'data-i': String(i), text: span.start === null || span.start === undefined ? 'محتاجة وقت بداية أو مدة للي قبلها' : clock(span.start) + ' ← ' + clock(span.end) })
+              el('label', { class: 'program__part' }, el('span', { text: 'المدة' }), el('span', { class: 'pre stage__pre' }, el('span', { text: 'دقيقة' }), minutes)),
+              pic ? el('div', { class: 'stage__pic' }, pic.node) : null)
           ),
-          el('div', { class: 'program__tools' },
-            el('button', { class: 'icon-btn program__up', type: 'button', 'aria-label': 'لفوق', disabled: i === 0, onclick: function () { move(i, -1); } }, icon('chevron-up')),
-            el('button', { class: 'icon-btn program__down', type: 'button', 'aria-label': 'لتحت', disabled: i === stages.length - 1, onclick: function () { move(i, 1); } }, icon('chevron')),
-            el('button', { class: 'icon-btn icon-btn--danger program__delete', type: 'button', 'aria-label': 'امسح الفقرة ' + n, onclick: function () {
-              stages.splice(i, 1);
-              A.markDirty();
-              draw();
-            } }, icon('trash'))
+          el('div', { class: 'stage__tools' },
+            el('button', { class: 'p8-iconbtn program__up', type: 'button', 'aria-label': 'لفوق', disabled: i === 0, onclick: function () { move(i, -1); } }, icon('chevron-up')),
+            el('button', { class: 'p8-iconbtn program__down', type: 'button', 'aria-label': 'لتحت', disabled: i === stages.length - 1, onclick: function () { move(i, 1); } }, icon('chevron')),
+            el('button', { class: 'p8-iconbtn program__more', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-label': 'اختيارات تانية: الفقرة ' + n, onclick: function (e) {
+              var del = A.menuItem('trash', 'امسح الفقرة', function () {
+                stages.splice(i, 1);
+                if (openAt === i) openAt = -1; else if (openAt > i) openAt--;
+                changed();
+                draw();
+              }, { danger: true });
+              del.classList.add('program__delete');
+              del.setAttribute('aria-label', 'امسح الفقرة ' + n);
+              A.menu(e.currentTarget, 'menu--p8', [
+                A.menuItem(open ? 'chevron-up' : 'edit', open ? 'اقفل الفقرة' : 'الميعاد والصورة', function () { openAt = open ? -1 : i; draw(); }),
+                del
+              ], { align: 'start' });
+            } }, icon('dots'))
           )
         );
+        return row;
 
       }));
 
       empty.hidden = stages.length > 0;
       addButtonNode.disabled = stages.length >= PROGRAM_MAX;
+      summary();
 
+    }
+
+    /* «٥ فقرات | ٨:٠٠ ← ١٠:٠٠ م» */
+    function summary() {
+      var times = A.resolveProgram(stages, context.date(), context.time(), context.duration());
+      sumCount.lastChild.textContent = A.digits(stages.length) + (stages.length === 1 ? ' فقرة' : ' فقرات');
+      var first = times[0], last = times[times.length - 1];
+      sumSpan.textContent = first && first.start !== null && last && last.end !== null ? clock(first.start).replace(/ [صم]$/, '') + ' ← ' + clock(last.end) : '—';
     }
 
     /* only the times (typing keeps focus) */
     function refresh() {
       var times = A.resolveProgram(stages, context.date(), context.time(), context.duration());
       list.querySelectorAll('.program__span').forEach(function (node) {
-        var span = times[Number(node.dataset.i)] || {};
-        node.textContent = span.start === null || span.start === undefined ? 'محتاجة وقت بداية أو مدة للي قبلها' : clock(span.start) + ' ← ' + clock(span.end);
+        node.textContent = spanText(times[Number(node.dataset.i)] || {});
       });
+      summary();
     }
 
     draw();
 
     function value() {
-      return stages.map(function (s) { return { title: String(s.title || '').trim(), time: s.time || '', minutes: s.minutes === '' || s.minutes === null || isNaN(s.minutes) ? '' : Number(s.minutes) }; });
+      return stages.map(function (s) {
+        var out = { title: String(s.title || '').trim(), time: s.time || '', minutes: s.minutes === '' || s.minutes === null || isNaN(s.minutes) ? '' : Number(s.minutes) };
+        if (s.image) out.image = s.image;
+        return out;
+      });
     }
 
+    var field = A.field('برنامج الاجتماع', A.draftWidget(el('div', { class: 'program-editor' },
+      el('div', { class: 'program__head' }, el('div', { class: 'seg seg--sum' }, sumCount, sumSpan), el('span', { class: 'sp' }), copyButton),
+      empty,
+      list,
+      addButtonNode
+    ), {
+      // after a reload (A.restore): the stages as they were being edited
+      get: function () { return stages.map(function (s) { var c = { title: String(s.title || ''), time: s.time || '', minutes: s.minutes }; if (s.image) c.image = s.image; return c; }); },
+      set: function (saved) {
+        if (!Array.isArray(saved)) return false;
+        var next = saved.slice(0, PROGRAM_MAX).map(function (s) {
+          s = s && typeof s === 'object' ? s : {};
+          var minutes = s.minutes === '' || s.minutes === null || s.minutes === undefined || !isFinite(Number(s.minutes)) ? '' : Number(s.minutes);
+          var c = { title: String(s.title || '').slice(0, 40), time: /^\d{2}:\d{2}$/.test(s.time) ? s.time : '', minutes: minutes };
+          if (typeof s.image === 'string' && /^[\w.-]{1,80}$/.test(s.image)) c.image = s.image;
+          return c;
+        });
+        if (JSON.stringify(next) === JSON.stringify(stages)) return false;
+        stages = next;
+        draw();
+        return true;
+      }
+    }), 'كل فقرة: وقت ظهورها أو مدتها. الفقرة بتختفي لما اللي بعدها تظهر، وآخر فقرة بتخلص مع نهاية الاجتماع. الفقرة اللي شغالة بتنور على الموقع في ميعادها. الصورة اختيارية لكل فقرة.');
+    field.querySelector('.field__label').classList.add('visually-hidden');
+
     return {
-      node: A.field('برنامج الاجتماع', A.draftWidget(el('div', { class: 'program-editor' },
-        empty,
-        list,
-        el('div', { class: 'actions' }, addButtonNode, copySelect)
-      ), {
-        // after a reload (A.restore): the stages as they were being edited
-        get: function () { return stages.map(function (s) { return { title: String(s.title || ''), time: s.time || '', minutes: s.minutes }; }); },
-        set: function (saved) {
-          if (!Array.isArray(saved)) return false;
-          var next = saved.slice(0, PROGRAM_MAX).map(function (s) {
-            s = s && typeof s === 'object' ? s : {};
-            var minutes = s.minutes === '' || s.minutes === null || s.minutes === undefined || !isFinite(Number(s.minutes)) ? '' : Number(s.minutes);
-            return { title: String(s.title || '').slice(0, 40), time: /^\d{2}:\d{2}$/.test(s.time) ? s.time : '', minutes: minutes };
-          });
-          if (JSON.stringify(next) === JSON.stringify(stages)) return false;
-          stages = next;
-          draw();
-          return true;
-        }
-      }), 'كل فقرة: وقت بدايتها أو مدتها (أو الاتنين). الفقرة بتخلص لما اللي بعدها تبدأ، وآخر فقرة مع نهاية الاجتماع.'),
+      node: field,
       value: value,
       refresh: refresh
     };

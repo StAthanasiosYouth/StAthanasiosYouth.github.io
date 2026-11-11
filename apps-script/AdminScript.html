@@ -1076,9 +1076,9 @@
   /* Phase 8B: a big editor's section (editor.png): an icon and a title, a line under it, the fields in a 12-column
      grid (A.col(node, 6) = half). The side list of A.openSheet is made from these; data-state 'done' | 'warn'
      marks its number (✓) or a dot. */
-  A.msec = function (title, iconName, sub, children) {
+  A.msec = function (title, iconName, sub, children, navTitle) {
 
-    return el('section', { class: 'msec', 'data-title': title },
+    return el('section', { class: 'msec', 'data-title': title, 'data-nav': navTitle || null },
       el('h4', { class: 'msec__title' }, iconName ? icon(iconName) : null, el('span', { text: title })),
       sub ? el('p', { class: 'msec__sub', text: sub }) : null,
       el('div', { class: 'fgrid' }, children));
@@ -1960,8 +1960,11 @@
         alt.value = chosen ? chosen.alt || '' : '';
         show();
       });
-    } }, icon('photos'), 'من المكتبة');
-    var remove = el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { value = ''; markDirty(); setStage(null); show(); } }, 'شيل الصورة');
+    } }, icon('photos'), options.libraryLabel || 'من المكتبة');
+    var remove = el('button', { class: 'btn btn--ghost', type: 'button', onclick: function () { value = ''; markDirty(); setStage(null); show(); } }, options.removeLabel ? icon('trash') : null, options.removeLabel || 'شيل الصورة');
+    // Phase 8B (session-edit.png): the poster's name and size, and where it comes from
+    var metaName = el('b', { class: 'picker__name ltr' });
+    var metaFrom = el('small', { class: 'picker__from' });
 
     var uploadStarted = 0;
     var elapsedTimer = 0;
@@ -2054,9 +2057,12 @@
       // upload-only (the library): no empty box, no «من المكتبة»
       preview.hidden = options.uploadOnly && !value;
       fromLibrary.hidden = !!options.uploadOnly;
-      altField.hidden = !value;
+      altField.hidden = !value || !!options.noAlt;
       remove.hidden = !value || busy || !!options.uploadOnly;
-      choose.lastChild.textContent = options.allowVideo ? chooseLabel : value ? 'ارفع صورة تانية' : 'ارفع صورة';
+      choose.lastChild.textContent = options.allowVideo || options.fixedLabel ? chooseLabel : value ? 'ارفع صورة تانية' : 'ارفع صورة';
+      var known = media();
+      metaName.textContent = value ? value + (known && known.width ? ' · ' + known.width + '×' + known.height : '') : '';
+      metaFrom.textContent = value ? 'من المكتبة · ' + (known && known.usage && known.usage.length > 1 ? 'مستخدم في ' + A.digits(known.usage.length) + ' أماكن' : 'مستخدم هنا بس') : 'مفيش بوستر لسه';
 
       if (!value) {
         preview.appendChild(el('span', { class: 'picker__empty' }, icon('photos'), 'من غير صورة'));
@@ -2323,20 +2329,30 @@
 
     show();
 
+    var hint = el('span', { class: 'field__hint', text: options.hint || 'من الموبايل أو الكمبيوتر — بتتصغر وتتضغط لوحدها قبل الرفع' });
+    var actions = el('div', { class: 'actions' }, choose, fromUrl, fromLibrary, remove, file);
+    // Phase 8B: options.poster (session-edit.png) — the picture on one side; its name, the buttons one under the other
+    // and the line on the other. options.className 'picker--stage': a program stage's small row
+    var inner = options.poster
+      ? el('div', { class: 'picker picker--poster' + (options.className ? ' ' + options.className : '') },
+        el('div', { class: 'picker__img-wrap' }, preview, el('span', { class: 'p8-tag p8-tag--ok picker__badge' }, icon('check'), options.badge || 'البوستر')),
+        el('div', { class: 'picker__side' }, metaName, metaFrom, actions, hint, urlRow, progress, errorBox, altField))
+      : el('div', { class: 'picker' + (options.className ? ' ' + options.className : '') },
+        preview,
+        actions,
+        urlRow,
+        progress,
+        errorBox,
+        altField
+      );
+
     // a <div>, not a <label>: a label around several buttons forwards stray clicks
     return {
       // after a reload (A.restore): the chosen image's id comes back — never a file being uploaded
       node: A.draftWidget(root = el('div', { class: 'field' },
-        el('span', { class: 'field__label', text: options.label || 'الصورة / البوستر' }),
-        el('div', { class: 'picker' + (options.className ? ' ' + options.className : '') },
-          preview,
-          el('div', { class: 'actions' }, choose, fromUrl, fromLibrary, remove, file),
-          urlRow,
-          progress,
-          errorBox,
-          altField
-        ),
-        el('span', { class: 'field__hint', text: options.hint || 'من الموبايل أو الكمبيوتر — بتتصغر وتتضغط لوحدها قبل الرفع' })
+        el('span', { class: 'field__label' + (options.poster || options.noLabel ? ' visually-hidden' : ''), text: options.label || 'الصورة / البوستر' }),
+        inner,
+        options.poster || options.noHint ? null : hint
       ), {
         get: function () { return value; },
         set: function (id) {
@@ -2746,7 +2762,7 @@
     var msecs = Array.prototype.slice.call(body.querySelectorAll('.msec')).filter(function (m) { return !m.parentNode.closest('.msec'); });
     var sections;
     if (msecs.length >= 2) {
-      sections = msecs.map(function (m) { m.classList.add('sheet__sec'); return { title: m.dataset.title, target: m }; });
+      sections = msecs.map(function (m) { m.classList.add('sheet__sec'); return { title: m.dataset.nav || m.dataset.title, target: m }; });
     }
     else {
       var labels = Array.prototype.slice.call(body.querySelectorAll('.section-label')).filter(function (label) {

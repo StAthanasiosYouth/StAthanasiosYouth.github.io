@@ -403,7 +403,10 @@ test('program: add, reorder and delete stages; an error shows under the field; s
   await addStage('ختام', '21:40', '');
   // reorder: «تسبحة» first; delete the wrong one
   await page.evaluate(() => document.querySelectorAll('.program__row')[1].querySelector('.program__up').click());
-  await page.evaluate(() => document.querySelectorAll('.program__row')[2].querySelector('.program__delete').click());
+  // Phase 8B: «امسح الفقرة» lives in the stage's ⋯ menu
+  await page.evaluate(() => document.querySelectorAll('.program__row')[2].querySelector('.program__more').click());
+  await page.waitForSelector('[aria-label="امسح الفقرة ٣"]');
+  await page.evaluate(() => document.querySelector('[aria-label="امسح الفقرة ٣"]').click());
   const titles = await page.$$eval('.program__title', inputs => inputs.map(i => i.value));
   assert.deepEqual(titles, ['تسبحة', 'كلمة', 'ختام']);
   const spans = await page.$$eval('.program__span', nodes => nodes.map(n => n.textContent));
