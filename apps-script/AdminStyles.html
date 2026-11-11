@@ -14526,4 +14526,47 @@ html[data-mode="light"] .p8-clip { background: var(--p-surface-2); }
   .p8-clip { flex-wrap: wrap; }
   .p8-clip__main { flex-basis: calc(100% - 130px); }
 }
+/* ---------- «الخدام» (servants.png) ---------- */
+.p8-avatar { display: grid; flex: none; place-items: center; width: 44px; height: 44px; overflow: hidden; border-radius: 50%; color: var(--text-2); background: var(--p-raised); }
+.p8-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.p8-phone { direction: ltr; text-align: end; unicode-bidi: plaintext; }
+.sheet--servant.sheet--md { width: min(760px, calc(100vw - 32px)); }
+.p8-servant { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px 16px; }
+.p8-servant .c12 { grid-column: span 12; } .p8-servant .c6 { grid-column: span 6; }
+.p8-servant .hr { height: 1px; margin: 4px 0; background: var(--p-line-2); }
+.p8-subhead h4 { margin: 0 0 4px; font-size: 14.5px; }
+.p8-subhead p { margin: 0; color: var(--text-3); font-size: 12.5px; }
+.p8-paycards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.p8-paycards > .note { grid-column: 1 / -1; margin: 0; }
+.p8-paycards > .note[hidden] { display: none; }
+.p8-paycard { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--p-line-3); border-radius: 18px; background: rgb(var(--nv-2-9-20) / .4); }
+.p8-paycard.is-wait { border-color: rgb(242 195 91 / .35); }
+.pay-dest__top { display: flex; align-items: center; gap: 12px; }
+.pay-dest__top .chipico { flex: none; }
+.pay-dest__head { flex: 1; min-width: 0; }
+.pay-dest__head strong { display: block; font-size: 14px; }
+.pay-dest__head small { display: block; color: var(--text-3); font-size: 12px; }
+.p8-paycard .field__hint[hidden] { display: none; }
+.p8-paycard .actions { display: flex; gap: 8px; }
+.p8-paycard .actions:empty { display: none; }
+.chipico--warn { color: rgb(242 195 91); background: rgb(242 195 91 / .12); border-color: rgb(242 195 91 / .35); }
+@media (max-width: 760px) {
+  .p8-paycards { grid-template-columns: 1fr; }
+  .p8-servant .c6 { grid-column: span 12; }
+}
+
+/* ---------- «ترتيب الصفحة» (layout-sched.png) ---------- */
+.p8-layout { gap: 10px; margin: 0; padding: 0; list-style: none; }
+.p8-layout .p8-item { align-items: center; }
+.p8-layout .grip { display: inline-flex; flex: none; padding: 4px; border: 0; color: var(--text-3); background: none; cursor: grab; }
+.p8-layout .grip:disabled { opacity: .35; cursor: default; }
+.p8-layout .grip .icon { width: 16px; height: 16px; }
+.p8-layout .stage__n { margin-top: 0; }
+.p8-layout .p8-item__acts { align-items: center; }
+.p8-layout .p8-tag .icon { width: 13px; height: 13px; }
+.p8-layout .item.is-drag { opacity: .5; border-style: dashed; }
+.p8-layout .p8-switch > span:last-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.p8-foot { margin: 14px 0 0; color: var(--text-3); font-size: 12px; }
+.p8-paycard::before, .p8-paycard::after { display: none; content: none; }
+.p8-paycard { position: relative; }
 </style>

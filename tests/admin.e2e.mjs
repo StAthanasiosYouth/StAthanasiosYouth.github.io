@@ -474,7 +474,8 @@ test('ترتيب الصفحة: every section, what visitors see now, hide and sh
   const titles = await page.$$eval('.layout-list .item__title', t => t.map(x => x.textContent));
   assert.equal(titles.length, 12);
   assert.equal(titles[0], 'ركن الاجتماع');
-  const showing = await page.$$eval('.now-showing__item', t => t.map(x => x.textContent));
+  // Phase 8B (layout-sched.png): what visitors see now is marked on the rows (data-live)
+  const showing = await page.$$eval('.layout-list .item[data-live] .item__title', t => t.map(x => x.textContent));
   assert.ok(showing.includes('تابعنا'), showing.join(' | '));
   assert.ok(!showing.includes('المسابقات'), 'an empty section is not "showing"');
 
@@ -483,7 +484,7 @@ test('ترتيب الصفحة: every section, what visitors see now, hide and sh
     const item = [...document.querySelectorAll('.layout-list .item')].find(i => i.querySelector('.item__title').textContent === 'تابعنا');
     item.querySelector('.switch input').click();
   });
-  await page.waitForFunction(() => ![...document.querySelectorAll('.now-showing__item')].some(x => x.textContent === 'تابعنا'));
+  await page.waitForFunction(() => ![...document.querySelectorAll('.layout-list .item[data-live] .item__title')].some(x => x.textContent === 'تابعنا'));
   assert.equal(world.gs.readTable_('Sections').find(s => s.key === 'social').enabled, false);
   world.gs.apiSetSectionEnabled('social', true);
 
