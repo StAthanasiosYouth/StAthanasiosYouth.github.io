@@ -2809,13 +2809,13 @@
     // the foot (approved): «… · Ctrl+S» and «التالي: <next section>»
     var next = null;
     if (foot) {
-      var words = options.draft ? 'المسودة اتحفظت تلقائي من ثواني · Ctrl+S' : 'التعديلات بتتحفظ لما تدوس «احفظ» · Ctrl+S';
-      next = el('button', { class: 'btn btn--sm sheet__next', type: 'button' });
+      var words = options.footWords || (options.draft ? 'المسودة اتحفظت تلقائي من ثواني · Ctrl+S' : 'التعديلات بتتحفظ لما تدوس «احفظ» · Ctrl+S');
+      next = el('button', { class: 'btn btn--sm sheet__next', type: 'button', hidden: options.next === false || null });
       foot.append(el('span', { class: 'sheet__sp', 'aria-hidden': 'true' }), el('span', { class: 'sheet__saved' }, icon('clock'), el('span', { text: words })), next);
     }
 
     function paintNext(at) {
-      if (!next) return;
+      if (!next || options.next === false) return;
       // the next section still to fill (approved: «التالي: الصور» past a finished «المواعيد»)
       var to = at + 1;
       while (sections[to] && sections[to].target && (sections[to].target.hidden || sections[to].target.dataset.state === 'done')) to++;

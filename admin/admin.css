@@ -14282,3 +14282,8 @@ html[data-mode="light"] .vpop__more {
   margin-top: 8px;
 }
 
+.p8-stack { display: grid; gap: 8px; }
+.p8-stack > [hidden] { display: none; }
+.prevcard__line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.prevcard__line [hidden], .prevcard__tags [hidden] { display: none; }
+
