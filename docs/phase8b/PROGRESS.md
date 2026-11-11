@@ -87,3 +87,11 @@
 - النشر: 2026-11-11 اتنشر على main (commit ba47dca فوق ce5df11)، والـPages بيقدّم admin.css الجديد (فيه games-soon). مفيش تغيير في worker/. الرجوع: git revert ba47dca ثم push لـmain.
 - الاختبارات: unit 768/769 (الفاشل قديم)؛ pages-admin 9/9، fix-admin 7/7، admin-layout، content-worker 14/14، refine-b (allowlist قديم). book-admin: ٤ فاشلين (module off، booking sheet، reject، edit locks) — فاشلين بنفس الشكل على c5fc27f قبل التغيير (اتأكدت). admin.e2e: القديم بس، و«unsaved changes» بيعدّي لوحده (بيتأثر بالفاشلين اللي قبله).
 - الجاي: W3 (B4 + B5) بنفس الطريقة — المحتوى (meetings, news, cards, bell, games-corner) والصفحات (svcpages, svc-clip, servants, layout-sched). المحرر الكبير والقائمة ⋯ والـpill tabs جاهزين للاستخدام.
+- النشر: help-pop اتنشر على main (commit b1b15f3 فوق ba47dca)، والـPages بيقدّمه. الرجوع: git revert b1b15f3.
+
+## موافقة صاحب المشروع (2026-11-11) — event-delete
+- موافق على مسح الفعاليات المنشورة (event-delete.png) بما فيها الحجوزات والبيانات المرتبطة. الموقع لسه تجريبي ومفيش حجوزات حقيقية.
+- الشرط: صلاحيات + تأكيد واضح قبل المسح (اختيار «سيبها في الأرشيف» آمن افتراضي، «امسحها نهائي» بكتابة اسم الفعالية، Excel للحجوزات قبل المسح)، اختبارات، وتوثيق هنا.
+- بعدها: يبدأ W3 لوحده بعد ما حد الـ٥ ساعات يتصفّر، من غير ما نرجع له في كل خطوة عادية.
+- [x] event-delete زي event-delete.png (بموافقة صاحب المشروع): «امسح الفعالية…» في قائمة ⋯ وفي «إدارة» بالمحرر. لفعالية اتنشرت: نافذة باختيارين — «سيبها في الأرشيف» (آمن، الافتراضي، ورسالة فيها «تراجع») و«امسحها نهائي من اللوحة» (للأدمن الرئيسي بس، لازم تكتب اسم الفعالية). المسح النهائي: Excel بكل الحجوزات والفلوس بيتحفظ على الجهاز الأول، وبعدين الـWorker يمسح حجوزاتها (POST /v1/admin/book/events/:id/purge: bookings, payments, proofs + ملفاتها, payment_claims, reminders, handovers, event_notices, book_news, الأقفال, event_cfg، ويتسجل في «سجل النشاط»)، وبعدين المسودة (apiEventDelete مع force + الاسم). فعالية لسه متنشرتش: السؤال القصير زي الأول.
+- اختبارات event-delete: worker/test/book-purge.test.mjs (الأدمن الرئيسي بس، الاسم لازم يطابق، الفعالية التانية سليمة)، tests/pages-server.test.mjs (force + الاسم)، worker npm test كله، pages-admin 9/9.

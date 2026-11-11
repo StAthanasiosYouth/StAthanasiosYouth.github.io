@@ -17519,15 +17519,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
 
     function remove(ev) {
-      A.confirm({ tone: 'danger', title: 'تمسح «' + ev.title + '»؟', message: 'الفعالية لسه متنشرتش، فالمسح آمن: هتتمسح هي وكارت الصفحة الرئيسية.', confirmLabel: 'امسح', cancelLabel: 'لأ' }).then(function (ok) {
-        if (!ok) return;
-        A.call('apiEventDelete', ev.id).then(function () {
-          refreshState();
-          A.toast('اتمسحت');
-          eventsList.reload();
-          load();
-        }).catch(function (error) { A.fail(error, box); });
-      });
+      deleteEvent(ev, function () { eventsList.reload(); load(); });
     }
 
     /* «اعمل نسخة منها»: a new event's editor with this one's fields (a new link, not published, out of the archive) */
@@ -17545,9 +17537,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.menuItem(ev.archived ? 'retry' : 'archive', ev.archived ? 'رجّع من الأرشيف' : 'حطها في الأرشيف', function () { archive(ev); }),
         A.menuItem('link', 'انسخ الرابط', function () { copyLink(ev, site); })
       ];
-      if (!ev.live && !ev.publishedAt) {
-        items.push(el('hr', { class: 'menu__sep' }), A.menuItem('trash', 'امسح الفعالية…', function () { remove(ev); }, { danger: true }));
-      }
+      items.push(el('hr', { class: 'menu__sep' }), A.menuItem('trash', 'امسح الفعالية…', function () { remove(ev); }, { danger: true }));
       A.menu(button, 'menu--p8', items, { align: 'start' });
     }
 
@@ -17696,6 +17686,122 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   }
 
+  /*
+   * «تمسح «…»؟» (Phase 8B, owner 2026-11-11, event-delete.png) for an event that was published:
+   *   «سيبها في الأرشيف» (safe, the default): archived, «تراجع» in the message
+   *   «امسحها نهائي من اللوحة»: the primary admin, the name typed again; its bookings saved as Excel on this device
+   *   first, then removed on the Worker (book/events/:id/purge), then the event's draft (apiEventDelete force).
+   * An event never published keeps the short question (nothing of it is on the site).
+   * done(): after either way (the list reloads).
+   */
+  function deleteEvent(ev, done) {
+
+    if (!ev.live && !ev.publishedAt) {
+      A.confirm({ tone: 'danger', title: 'تمسح «' + ev.title + '»؟', message: 'الفعالية لسه متنشرتش، فالمسح آمن: هتتمسح هي وكارت الصفحة الرئيسية.', confirmLabel: 'امسح', cancelLabel: 'لأ' }).then(function (ok) {
+        if (!ok) return;
+        A.call('apiEventDelete', ev.id).then(function () {
+          A.dirty = false;
+          refreshState();
+          A.toast('اتمسحت');
+          if (done) done();
+        }).catch(function (error) { A.fail(error); });
+      });
+      return;
+    }
+
+    var primary = !!(A.access && A.access.primary) || !(A.access && A.access.enforce !== undefined);
+    var box = A.errorBox();
+    var name = A.uid('evdel');
+    var count = 0;
+    var keep = el('input', { type: 'radio', name: name, value: 'keep', checked: true });
+    var purge = el('input', { type: 'radio', name: name, value: 'purge', disabled: !primary });
+    var typed = A.textInput('', { placeholder: ev.title, max: 120 });
+    var typedField = A.field('اكتب اسم الفعالية للتأكيد', typed, '«' + ev.title + '»');
+    typedField.hidden = true;
+    var booksLine = el('li', { text: 'بنشوف الحجوزات اللي عليها…' });
+    var sub = el('span', { text: 'الفعالية اتنشرت قبل كده' });
+
+    function choice(input, title, tagText, tagKind, lines, danger) {
+      return el('label', { class: 'p8-choice' + (danger ? ' p8-choice--danger' : '') },
+        input,
+        el('span', { class: 'p8-choice__body' },
+          el('span', { class: 'p8-choice__head' },
+            el('span', { class: 'p8-choice__radio', 'aria-hidden': 'true' }),
+            el('b', { text: title }),
+            el('span', { class: 'p8-tag p8-tag--' + tagKind, text: tagText })),
+          el('ul', { class: 'p8-choice__lines' }, lines)));
+    }
+
+    var go = el('button', { class: 'btn btn--primary', type: 'button' });
+    function paint() {
+      var p = purge.checked;
+      typedField.hidden = !p;
+      go.className = 'btn ' + (p ? 'btn--danger-solid' : 'btn--primary');
+      A.fill(go, icon(p ? 'trash' : 'archive'), el('span', { text: p ? 'امسحها نهائي' : (ev.archived ? 'خليها في الأرشيف' : 'خليها في الأرشيف') }));
+      go.disabled = p && typed.value.trim() !== String(ev.title).trim();
+    }
+    keep.addEventListener('change', paint);
+    purge.addEventListener('change', function () { paint(); typed.focus(); });
+    typed.addEventListener('input', paint);
+
+    go.addEventListener('click', function () {
+      box.hidden = true;
+      if (!purge.checked) {
+        if (ev.archived) { A.dirty = false; A.closeSheet(); return; }
+        A.withBusy(go, A.call('apiEventArchive', ev.id, true)).then(function () {
+          A.dirty = false;
+          A.closeSheet();
+          refreshState();
+          if (done) done();
+          A.toast('اتنقلت للأرشيف', 'success', { label: 'تراجع', onclick: function () {
+            A.call('apiEventArchive', ev.id, false).then(function () { refreshState(); if (done) done(); A.toast('رجعت من الأرشيف'); }).catch(function (error) { A.fail(error); });
+          } });
+        }).catch(function (error) { A.fail(error, box); });
+        return;
+      }
+      var confirm = typed.value.trim();
+      var B = A.book;
+      var steps = Promise.resolve()
+        // the bookings and their money, saved here before anything goes
+        .then(function () { return count && B && B.saveExcel ? B.saveExcel(ev.id) : null; })
+        .then(function () { return B && B.purgeEvent && !B.off && window.AdminWorker ? B.purgeEvent(ev.id, confirm) : null; })
+        .then(function () { return A.call('apiEventDelete', ev.id, { force: true, confirm: confirm }); });
+      A.withBusy(go, steps).then(function () {
+        A.dirty = false;
+        A.closeSheet();
+        refreshState();
+        if (done) done();
+        A.toast(count ? 'اتمسحت نهائي — ملف Excel بالحجوزات اتحفظ عندك' : 'اتمسحت نهائي');
+      }).catch(function (error) { A.fail(error, box); });
+    });
+
+    A.dirty = false;
+    A.openSheet('تمسح «' + ev.title + '»؟', [
+      box,
+      el('div', { class: 'p8-choices', role: 'radiogroup', 'aria-label': 'تعمل إيه في الفعالية' },
+        choice(keep, 'سيبها في الأرشيف', 'آمن', 'ok', [
+          el('li', { text: 'الرابط بيقول «الفعالية دي مش متاحة»' }),
+          el('li', { text: 'الحجوزات والفلوس محفوظة للتقارير' })]),
+        choice(purge, 'امسحها نهائي من اللوحة', 'مبترجعش', 'danger', [
+          el('li', { text: 'بتتمسح هي وكارتها وصورها من المسودة' }),
+          booksLine,
+          el('li', { text: primary ? 'محتاج تكتب اسم الفعالية للتأكيد' : 'للأدمن الرئيسي بس' })], true)),
+      typedField
+    ], [go, el('button', { class: 'btn btn--ghost', type: 'button', text: 'إلغاء', onclick: function () { A.closeSheet(); } })], {
+      size: 'sm', icon: 'trash', sub: '', className: 'sheet--danger'
+    });
+    var subNode = document.querySelector('dialog.sheet[open] .sheet__sub');
+    if (subNode) subNode.replaceChildren(sub);
+    paint();
+
+    (A.book && A.book.bookingsOf ? A.book.bookingsOf(ev.id) : Promise.resolve(0)).then(function (n) {
+      count = n || 0;
+      sub.textContent = count ? 'الفعالية اتنشرت قبل كده وفيها حجوزات' : 'الفعالية اتنشرت قبل كده';
+      booksLine.textContent = count ? A.digits(count) + ' حجوزات وسجل فلوسها بيتصدروا Excel تلقائي قبل المسح' : 'مفيش حجوزات عليها';
+    });
+
+  }
+
   function eventEditor(r, list, prefill) {
 
     var isNew = !r;
@@ -17834,18 +17940,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
 
     function deleteButton() {
-      return el('button', { class: 'btn btn--sm btn--block btn--danger', type: 'button', onclick: function (e) {
-        var button = e.currentTarget;
-        A.confirm({ tone: 'danger', title: 'تمسح «' + ev.title + '»؟', message: 'الفعالية لسه متنشرتش، فالمسح آمن: هتتمسح هي وكارت الصفحة الرئيسية.', confirmLabel: 'امسح', cancelLabel: 'لأ' }).then(function (ok) {
-          if (!ok) return;
-          A.withBusy(button, A.call('apiEventDelete', ev.id)).then(function () {
-            A.dirty = false;
-            A.closeSheet();
-            refreshState();
-            A.toast('اتمسحت');
-            if (P.reloadEvents) P.reloadEvents();
-          }).catch(function (error) { A.fail(error, box); });
-        });
+      return el('button', { class: 'btn btn--sm btn--block btn--danger', type: 'button', onclick: function () {
+        deleteEvent(ev, function () { if (P.reloadEvents) P.reloadEvents(); });
       } }, icon('trash'), 'امسح الفعالية…');
     }
 
@@ -17876,7 +17972,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       isNew ? null : el('div', { class: 'stack' },
         ev.booking && A.book ? A.book.eventLink(ev) : null,
         archiveButton(),
-        ev.live || ev.publishedAt ? null : deleteButton())
+        deleteButton())
     ];
 
     var lastCover = null;
@@ -23023,6 +23119,34 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       })).then(function (made) { A.toast('اتنزّل ' + made.filename); }).catch(function (error) { A.fail(error, box); });
     });
   }
+
+  /* Phase 8B (event-delete.png): before «امسحها نهائي» — how many bookings, and the Excel of all of them saved on this
+     device (no question: the delete itself was confirmed with the event's name). Resolves { bookings, filename }. */
+  B.bookingsOf = function (eventId) {
+    if (!W() || B.off) return Promise.resolve(0);
+    return W().call('GET', '/v1/admin/book/events', undefined, { quiet: true }).then(function (r) {
+      var row = (r.events || []).filter(function (e) { return e.id === eventId; })[0];
+      if (!row) return 0;
+      return Object.keys(row.counts || {}).reduce(function (n, k) { return n + (row.counts[k] || 0); }, 0);
+    }).catch(function () { return 0; });
+  };
+
+  B.saveExcel = function (eventId) {
+    return Promise.all([
+      W().call('GET', '/v1/admin/book/export?eventId=' + enc(eventId) + '&download=1'),
+      import(new URL('xlsx.js', location.href).href)
+    ]).then(function (got) {
+      var made = K.bookingBook(got[0], { from: '', to: '', today: A.cairoNow().slice(0, 10) });
+      var bytes = got[1].writeXlsx(made.book);
+      B.lastDownload = { filename: made.filename, bytes: bytes };
+      got[1].download(bytes, made.filename);
+      return made.filename;
+    });
+  };
+
+  B.purgeEvent = function (eventId, confirm) {
+    return W().call('POST', '/v1/admin/book/events/' + enc(eventId) + '/purge', { confirm: confirm });
+  };
 
   /* one servant (or all of them) → the numbers the tiles show; methods by key */
   function finTotals(list) {

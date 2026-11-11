@@ -554,3 +554,16 @@ test('an event with no colour of its own takes its card type\'s (the home card\'
   publish(world, call);
   assert.equal(json(world.github.files(), 'events/alex-trip/event.json').theme, 'azure');
 });
+
+test('a published event: deleted only with force, by the primary admin, its title typed again (Phase 8B event-delete)', () => {
+  const ctx = setup();
+  const { world, call } = ctx;
+  const saved = trip(ctx);
+  publish(world, call);
+  const id = saved.event.id;
+  assert.throws(() => call('apiEventDelete', id), /اتنشرت قبل كده/);
+  assert.throws(() => call('apiEventDelete', id, { force: true, confirm: 'رحلة' }), /اكتب اسم الفعالية/);
+  call('apiEventDelete', id, { force: true, confirm: saved.event.title });
+  assert.equal(plain(call('apiEvents')).events.some(e => e.id === id), false, 'the event is gone from the draft');
+  assert.equal(activities(world).some(a => a.event === id), false, 'and its card');
+});
