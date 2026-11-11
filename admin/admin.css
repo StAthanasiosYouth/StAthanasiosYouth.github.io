@@ -13810,3 +13810,8 @@ html[data-mode="light"] .games-soon {
   }
 }
 
+html[data-mode="light"] .p8-filter .seg__opt:has(input:checked),
+html[data-mode="light"] .seg--field .seg__opt:has(input:checked) {
+  color: var(--text);
+}
+

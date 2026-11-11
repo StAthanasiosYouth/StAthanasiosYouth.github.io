@@ -187,7 +187,8 @@ const OVERFLOW = () => {
   }
   for (const node of document.querySelectorAll('#view *, .topbar *, dialog[open] *')) {
     const r = node.getBoundingClientRect();
-    if (!r.width || node.closest('.tabs')) continue;
+    // the sub-tabs and a big editor's section chips (Phase 8B, phones) scroll inside their own strip
+    if (!r.width || node.closest('.tabs, .sheet__nav')) continue;
     if (r.right > root.clientWidth + 1 || r.left < -1) issues.push(`${node.tagName.toLowerCase()}.${String(node.className.baseVal ?? node.className).trim().split(/\s+/).join('.')}`);
   }
   return issues.slice(0, 6);
@@ -436,7 +437,7 @@ test('«رتّب الكروت»: the order sheet moves a card up and saves the h
   world.as('');
   await d.page.evaluate(() => A.call('apiState').then(s => A.applyState(s)));
   await d.page.evaluate(() => A.go('pages', 'events'));
-  await clickText('.view button', 'ترتيب كروت «الفعاليات»');
+  await clickText('.view button', 'ترتيب الكروت');
   await $('dialog.sheet[open] .pages-order');
   const before = await d.page.$$eval('dialog.sheet[open] .pages-order .item__title', l => l.map(n => n.textContent));
   assert.equal(before.length, 2);
