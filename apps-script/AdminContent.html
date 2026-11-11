@@ -153,7 +153,9 @@
 
     var pending = A.state.schema && A.state.schema.data < A.state.schema.target ? A.upgradeNotice() : null;
 
-    return [pending, A.dashboard(), timeline].filter(Boolean);
+    // Phase 8B: the home is exactly the approved screen; «الجدول» is not on it (A.homeTimeline keeps it reachable)
+    A.homeTimeline = timeline;
+    return [pending, A.dashboard()].filter(Boolean);
 
   };
 

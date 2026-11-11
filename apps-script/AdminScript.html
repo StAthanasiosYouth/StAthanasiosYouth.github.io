@@ -3903,8 +3903,8 @@
           el('span', { class: 'navlink__icon' }, icon('globe')), el('span', { class: 'navlink__label', text: 'افتح الموقع' })) : null,
         collapse,
         el('p', { class: 'rail__user', title: A.state.user }, el('span', { class: 'acct__av', 'aria-hidden': 'true', text: initial(myName()) }), A.state.me && A.state.me !== A.state.user.split('@')[0]
-          ? el('span', { class: 'rail__name', dir: 'auto', text: A.state.me })
-          : el('span', { class: 'ltr', text: A.state.user })),
+          ? el('span', { class: 'rail__who' }, el('span', { class: 'rail__name', dir: 'auto', text: A.state.me }), el('small', { class: 'rail__role', text: A.access && A.access.primary ? 'الأدمن الأساسي' : 'أدمن' }))
+          : el('span', { class: 'rail__who' }, el('span', { class: 'ltr', text: A.state.user }), el('small', { class: 'rail__role', text: A.access && A.access.primary ? 'الأدمن الأساسي' : 'أدمن' }))),
         // the official admin page only (Google sign-in lives there)
         A.signOut ? el('button', { class: 'navlink navlink--quiet navlink--out', type: 'button', 'data-signout': '', title: 'تسجيل الخروج', onclick: function () { A.signOut(); } },
           el('span', { class: 'navlink__icon' }, icon('logout')), el('span', { class: 'navlink__label', text: 'خروج' })) : null

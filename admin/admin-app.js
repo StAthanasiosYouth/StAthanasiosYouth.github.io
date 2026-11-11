@@ -4032,8 +4032,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           el('span', { class: 'navlink__icon' }, icon('globe')), el('span', { class: 'navlink__label', text: 'افتح الموقع' })) : null,
         collapse,
         el('p', { class: 'rail__user', title: A.state.user }, el('span', { class: 'acct__av', 'aria-hidden': 'true', text: initial(myName()) }), A.state.me && A.state.me !== A.state.user.split('@')[0]
-          ? el('span', { class: 'rail__name', dir: 'auto', text: A.state.me })
-          : el('span', { class: 'ltr', text: A.state.user })),
+          ? el('span', { class: 'rail__who' }, el('span', { class: 'rail__name', dir: 'auto', text: A.state.me }), el('small', { class: 'rail__role', text: A.access && A.access.primary ? 'الأدمن الأساسي' : 'أدمن' }))
+          : el('span', { class: 'rail__who' }, el('span', { class: 'ltr', text: A.state.user }), el('small', { class: 'rail__role', text: A.access && A.access.primary ? 'الأدمن الأساسي' : 'أدمن' }))),
         // the official admin page only (Google sign-in lives there)
         A.signOut ? el('button', { class: 'navlink navlink--quiet navlink--out', type: 'button', 'data-signout': '', title: 'تسجيل الخروج', onclick: function () { A.signOut(); } },
           el('span', { class: 'navlink__icon' }, icon('logout')), el('span', { class: 'navlink__label', text: 'خروج' })) : null
@@ -7927,7 +7927,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var pending = A.state.schema && A.state.schema.data < A.state.schema.target ? A.upgradeNotice() : null;
 
-    return [pending, A.dashboard(), timeline].filter(Boolean);
+    // Phase 8B: the home is exactly the approved screen; «الجدول» is not on it (A.homeTimeline keeps it reachable)
+    A.homeTimeline = timeline;
+    return [pending, A.dashboard()].filter(Boolean);
 
   };
 
@@ -18074,60 +18076,187 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       tile('ألعاب', live(draft.games), '', function () { A.go('content', 'games'); }));
   }
 
-  /* who is in the panel now (the presence the heartbeat brings) */
+
+  /* =======================================================
+     PHASE 8B HOME — exactly the approved screen (docs/phase8b/shots/{desktop,phone}/home.png,
+     proposal.js V.home): the greeting, four number cards, then the site, the bookings and
+     «الاجتماع الجاي» beside «اعمل حاجة جديدة»; on the side who is here and the latest activity.
+     The bell, «جاي قريب» and the timeline live in «المحتوى» (owner 2026-11-11: the screen as approved).
+  ======================================================= */
+
+  function head8(iconName, title, hint, tone, extra) {
+    return el('div', { class: 'card__head' },
+      el('span', { class: 'chipico' + (tone ? ' chipico--' + tone : ''), 'aria-hidden': 'true' }, icon(iconName)),
+      el('div', { class: 'card__head-text' },
+        el('h3', { text: title }),
+        hint ? el('p', { text: hint }) : null),
+      extra ? el('span', { class: 'sp' }) : null,
+      extra || null);
+  }
+
+  function hero8(waiting) {
+    var name = String((A.state.me || (A.state.user || '').split('@')[0]) || '').split(' ')[0];
+    var count = waiting.reduce(function (n, w) { return n + (w.n || 1); }, 0);
+    return el('section', { class: 'card card--glow hero', 'aria-labelledby': 'hello-title' },
+      el('span', { class: 'hero__art', 'aria-hidden': 'true' }),
+      el('div', { class: 'hero__text' },
+        el('small', { class: 'muted', text: todayLine() }),
+        el('h1', { id: 'hello-title' }, greeting() + ' يا ', el('em', { text: name })),
+        el('p', { text: count ? 'فيه ' + ar(count) + (count === 1 ? ' حاجة مستنياك' : ' حاجات مستنياك') + ' النهارده.' : 'مفيش حاجة مستنياك دلوقتي. كله تمام.' })),
+      el('div', { class: 'row hero__acts' },
+        el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.news(null); } }, icon('plus'), 'خبر'),
+        upgraded() ? el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.activities(null, 'activities'); } }, icon('plus'), 'فعالية') : null,
+        el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.notifications(null); } }, icon('bell'), 'إشعار')));
+  }
+
+  function kpis8() {
+    var draft = A.state.draft || {};
+    var live = function (list) { return (list || []).filter(function (x) { return bool(x.enabled) && !bool(x.archived); }).length; };
+    var bell = (draft.notifications || []).filter(function (n) { return bool(n.enabled) && !bool(n.archived); }).length;
+    var tile = function (iconName, label, value, hint, go) {
+      return el('button', { class: 'kpi', type: 'button', onclick: go },
+        el('small', {}, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon(iconName)), label),
+        el('b', { text: ar(value) }),
+        hint ? el('small', { class: 'kpi__hint', text: hint }) : null);
+    };
+    return el('div', { class: 'grid g4 kpis', 'aria-label': 'الأرقام دلوقتي' },
+      tile('megaphone', 'أخبار ظاهرة', live(draft.news), '', function () { A.go('content', 'news'); }),
+      tile('calendar', 'جاي في أسبوعين', upcoming().length, 'أخبار وألعاب وفعاليات', function () { A.go('content', 'activities'); }),
+      tile('bell', 'إشعارات في الجرس', bell, '', function () { A.go('content', 'notifications'); }),
+      tile('star', 'ألعاب', live(draft.games), '', function () { A.go('content', 'games'); }));
+  }
+
+  function site8() {
+    var s = A.state.status;
+    var config = A.state.config || {};
+    var state = s.errors.length ? 'error' : s.hasChanges ? 'dirty' : 'clean';
+    var words = {
+      error: ['يوجد خطأ يمنع النشر', 'صلّح ' + (s.errors.length === 1 ? 'الخطأ' : 'الأخطاء') + ' الأول، وبعدين انشر', 'danger', 'alert'],
+      dirty: ['في تغييرات مستنية النشر', 'الزوار لسه شايفين النسخة القديمة لحد ما تنشر', 'warn', 'send'],
+      clean: ['الموقع متحدث', 'كل اللي في المسودة ظاهر على الموقع', 'ok', 'check']
+    }[state];
+    var lastAt = el('b', { text: s.publishedAt ? A.formatIso(s.publishedAt) : '…' });
+    var lastBy = el('b', { text: '—' });
+    var W = window.AdminWorker;
+    if (W && W.call) {
+      W.call('GET', '/v1/admin/publish/revisions', undefined, { quiet: true }).then(function (data) {
+        var jobs = (data && data.jobs) || [];
+        var job = jobs.filter(function (j) { return j.id === data.live; })[0] || jobs[0];
+        if (!job) { lastAt.textContent = s.publishedAt ? A.formatIso(s.publishedAt) : 'لسه متنشرش'; return; }
+        var names = (A.state && A.state.names) || {};
+        lastAt.textContent = A.formatWall(cairoWall(job.at));
+        lastBy.textContent = names[job.by] || job.by || '—';
+      }).catch(function () { if (!s.publishedAt) lastAt.textContent = 'لسه متنشرش'; });
+    } else if (!s.publishedAt) lastAt.textContent = 'لسه متنشرش';
+    var acts = el('span', { class: 'row' },
+      state !== 'clean' ? el('button', { class: 'btn btn--sm btn--primary', type: 'button', onclick: function () { A.openReview(); } }, icon(state === 'error' ? 'alert' : 'send'), state === 'error' ? 'شوف الأخطاء' : 'راجع وانشر') : null,
+      state !== 'clean' && config.siteUrl ? el('button', { class: 'btn btn--sm', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'معاينة') : null,
+      config.siteUrl ? el('a', { class: 'btn btn--sm', href: config.siteUrl, target: '_blank', rel: 'noopener' }, icon('external'), 'افتح الموقع') : null);
+    return el('section', { class: 'card home8-site is-' + state, 'aria-labelledby': 'dash-site-title' },
+      head8(words[3], words[0], words[1], words[2], acts),
+      el('div', { class: 'grid g3 facts' },
+        el('div', {}, el('small', { class: 'muted', text: 'آخر نشر' }), lastAt),
+        el('div', {}, el('small', { class: 'muted', text: 'نشره' }), lastBy),
+        el('div', {}, el('small', { class: 'muted', text: 'تغييرات مستنية' }), el('b', { text: s.hasChanges ? 'فيه' : 'مفيش' }))),
+      s.warnings && s.warnings.length ? el('p', { class: 'muted facts__warn', text: 'تنبيهات: ' + ar(s.warnings.length) + ' (مش بتمنع النشر)' }) : null);
+  }
+
+  function cairoWall(ms) {
+    var p = {};
+    new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(new Date(ms)).forEach(function (x) { p[x.type] = x.value; });
+    return p.year + '-' + p.month + '-' + p.day + ' ' + (p.hour === '24' ? '00' : p.hour) + ':' + p.minute;
+  }
+
+  function meeting8() {
+    var row = (A.state.layout || []).filter(function (s) { return s.key === 'meeting'; })[0] || { enabled: true };
+    var shown = A.visibility(bool(row.enabled), row.visibleFrom, row.visibleUntil);
+    var off = shown.state === 'off' || shown.state === 'ended';
+    var next = A.nextMeeting();
+    var body = [];
+    if (off) body.push(el('p', { class: 'note note--warn', text: 'ركن الاجتماع مخفي من الموقع: الزوار مش شايفين ميعاد ولا موضوع.' }));
+    next.cancelled.forEach(function (date) { body.push(el('p', { class: 'muted' }, icon('alert'), 'مفيش اجتماع ' + A.formatWall(date, false) + ' (ملغي)')); });
+    if (!next.date) {
+      body.push(el('p', { class: 'muted', text: 'مفيش ميعاد اجتماع متظبط.' }));
+      body.push(el('button', { class: 'btn btn--sm', type: 'button', onclick: function () { A.go('content', 'meetings'); } }, icon('plus'), 'ظبط الميعاد'));
+    } else {
+      var session = next.session;
+      var topic = session && session.topic;
+      var day = new Date(A.wallFromMinutes(next.at).slice(0, 10) + 'T12:00:00Z');
+      body.push(el('div', { class: 'meet' },
+        el('div', { class: 'meet__day', 'aria-hidden': 'true' }, el('b', { text: ar(day.getUTCDate()) }), el('small', { text: WEEKDAY_SHORT[day.getUTCDay()] })),
+        el('div', { class: 'meet__text' },
+          el('b', { class: 'meet__when', text: A.formatWall(A.wallFromMinutes(next.at)) }), ' ',
+          el('span', { class: 'tag tag--acc', text: next.live ? 'شغال دلوقتي' : relative(next.at) }),
+          el('p', { class: 'muted meet__topic', text: topic ? '«' + topic + '»' : 'لسه مفيش موضوع للاجتماع ده' }),
+          session && session.speaker ? el('p', { class: 'muted', text: session.speaker }) : null,
+          topic && session.visibleFrom && A.wallMinutes(session.visibleFrom) > now() ? el('span', { class: 'tag tag--warn', text: 'الموضوع يظهر ' + A.formatWall(session.visibleFrom) }) : null,
+          el('button', { class: 'btn btn--sm', type: 'button', onclick: function () { A.editors.sessions(session, session ? null : { date: next.date }); } }, icon(topic ? 'edit' : 'plus'), topic ? 'تعديل الموضوع' : 'ضيف الموضوع'))));
+      if (next.live && session && A.liveControl && A.programStages(session.program).length) body.push(A.liveControl(session));
+    }
+    return el('section', { class: 'card home8-meeting' + (off ? ' is-off' : ''), 'aria-labelledby': 'dash-meeting-title' },
+      head8('church', 'الاجتماع الجاي', '', '', off ? el('span', { class: 'tag', text: 'مخفي' }) : null),
+      body);
+  }
+
+  function quick8() {
+    var items = upgraded();
+    function q(label, iconName, onclick) {
+      return el('button', { type: 'button', onclick: onclick }, el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(iconName)), label);
+    }
+    return el('section', { class: 'card home8-quick', 'aria-labelledby': 'dash-quick-title' },
+      head8('sparkle', 'اعمل حاجة جديدة'),
+      el('div', { class: 'q8' },
+        q('موضوع اجتماع', 'church', function () { var n = A.nextMeeting(); A.editors.sessions(n.session, n.session ? null : (n.date ? { date: n.date } : null)); }),
+        q('خبر', 'megaphone', function () { A.editors.news(null); }),
+        window.AdminTransport && A.compNew ? q('مسابقة', 'trophy', function () { A.compNew(); })
+          : items ? q('مسابقة', 'trophy', function () { A.editors.activities(null, 'competitions'); }) : null,
+        items ? q('فعالية', 'calendar', function () { A.editors.activities(null, 'activities'); }) : null,
+        q('لعبة', 'star', function () { A.editors.games(null); }),
+        q('إشعار', 'bell', function () { A.editors.notifications(null); })));
+  }
+
+  /* «المتصلين دلوقتي» (the heartbeat redraws it through _draw) */
   A.homePresence = function () {
-    var box = el('section', { class: 'card who-card', 'aria-labelledby': 'who-title', 'data-home-presence': '' });
+    var box = el('section', { class: 'card home8-who', 'aria-labelledby': 'who-title', 'data-home-presence': '' });
     function draw(list) {
       var others = list || [];
-      var live = others.filter(function (o) { return o.seen < 40; }).length;
-      var editing = others.filter(function (o) { return o.item && o.item.label; }).length;
       A.fill(box,
         el('div', { class: 'card__head' },
-          el('h2', { class: 'card__title', id: 'who-title', text: 'المتصلين دلوقتي' }),
-          others.length ? A.chip('مباشر', 'ok') : null),
-        others.length ? el('p', { class: 'who__sum' },
-          el('span', {}, el('i', { class: 'is-ok' }), ar(live) + ' متصل'),
-          editing ? el('span', {}, el('i', { class: 'is-acc' }), ar(editing) + ' بيعدّل') : null) : null,
-        others.length ? el('div', { class: 'who' }, others.map(function (o) {
+          el('span', { class: 'chipico chipico--info', 'aria-hidden': 'true' }, icon('users')),
+          el('h3', { id: 'who-title', text: 'المتصلين دلوقتي' }),
+          others.length ? el('span', { class: 'sp' }) : null,
+          others.length ? el('span', { class: 'tag tag--ok', text: 'مباشر' }) : null),
+        others.length ? el('div', { class: 'list' }, others.map(function (o) {
           var state = o.item && o.item.label ? 'editing' : o.seen < 40 ? 'online' : 'idle';
-          return el('div', { class: 'who__item' },
-            el('span', { class: 'pav pav--' + state, 'aria-hidden': 'true', text: String(o.name || o.email || '؟').trim().charAt(0) }),
-            el('span', { class: 'who__text' },
+          return el('div', { class: 'item item--who is-' + state },
+            el('span', { class: 'avatar', 'aria-hidden': 'true', text: String(o.name || o.email || '؟').trim().charAt(0) }),
+            el('div', { class: 'item__main' },
               el('b', { dir: 'auto', text: o.name || o.email }),
-              el('small', { class: state === 'editing' ? 'editing' : '', text: state === 'editing' ? 'بيعدّل في: ' + o.item.label : state === 'online' ? 'متصل دلوقتي' : 'آخر نشاط ' + A.ago(o.seen) })));
-        })) : el('p', { class: 'empty', text: 'مفيش أدمن تاني فاتح دلوقتي.' }));
+              el('small', { text: state === 'editing' ? 'بيعدّل في: ' + o.item.label : state === 'online' ? 'متصل دلوقتي' : 'آخر نشاط ' + A.ago(o.seen) })));
+        })) : el('p', { class: 'muted who__empty', text: 'مفيش أدمن تاني فاتح دلوقتي.' }));
     }
     draw(A.presentNow ? A.presentNow() : []);
     box._draw = draw;
     return box;
   };
 
-  /* the home view: the dashboard, then the timeline (AdminContent) */
   A.dashboard = function () {
-
     var waiting = A.waitingNow ? A.waitingNow() : [];
-
-    return el('div', { class: 'home dash' },
-      el('div', { class: 'home__main' },
-        helloCard(waiting),
-        queueTiles(waiting),
-        kpis(),
-        siteCard(),
-        // critical notifications waiting (AdminPage: «حالة النظام»), for the Primary Admin
-        A.criticalBanner ? A.criticalBanner() : null,
-        A.setupNudge ? A.setupNudge() : null,
-        // «الحجوزات»: new requests waiting (AdminBook; hidden while the module is off)
-        A.bookCard ? A.bookCard() : null,
-        el('div', { class: 'duo' }, meetingCard(), quickCard()),
-        bellCard(),
-        upcomingCard()
-      ),
-      el('aside', { class: 'home__side', 'aria-label': 'الفريق والنشاط' },
-        window.AdminTransport ? A.homePresence() : null,
-        A.activityCard ? A.activityCard() : null
-      )
-    );
-
+    return el('div', { class: 'home8' },
+      hero8(waiting),
+      kpis8(),
+      el('div', { class: 'grid home8__cols' },
+        el('div', { class: 'grid home8__main' },
+          // critical notifications (AdminPage «حالة النظام»), the app setup nudge: only when they have something
+          A.criticalBanner ? A.criticalBanner() : null,
+          A.setupNudge ? A.setupNudge() : null,
+          site8(),
+          A.bookCard ? A.bookCard() : null,
+          el('div', { class: 'grid g2 home8__duo' }, meeting8(), quick8())),
+        el('aside', { class: 'grid home8__side', 'aria-label': 'الفريق والنشاط' },
+          window.AdminTransport ? A.homePresence() : null,
+          A.activityCard ? A.activityCard() : null)));
   };
 
 })();
@@ -19672,38 +19801,45 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
      THE HOME CARD
   ======================================================= */
 
+  /* Phase 8B: «آخر نشاط» exactly as the approved home — an icon square, «كل النشاط» in the head, each row
+     the person's initial, what they did, when; the same thing done again and again is one row «N مرات».
+     A row opens what it is about, as before (or the log). */
   A.activityCard = function () {
 
     var recent = (A.state.activity && A.state.activity.recent) || [];
-    // Phase 8B: the same thing done again and again (same person, same action, same item) is one row, «٤ مرات»
     var groups = [];
     recent.forEach(function (entry) {
-      var key = JSON.stringify(entry, function (k, v) { return /^(id|at|ts|time|when|seq|rid|ago)$/i.test(k) ? undefined : v; });
+      var key = JSON.stringify(entry, function (k, v) { return /^(id|at|ts|time|when|seq|rid|ago|cairo|count)$/i.test(k) ? undefined : v; });
       var last = groups[groups.length - 1];
-      if (last && last.key === key) last.count++;
-      else groups.push({ key: key, entry: entry, count: 1 });
+      if (last && last.key === key) last.count += Math.max(1, Number(entry.count) || 1);
+      else groups.push({ key: key, entry: entry, count: Math.max(1, Number(entry.count) || 1), first: entry });
     });
-    var list = el('ul', { class: 'acts acts--compact', 'aria-label': 'آخر نشاط' }, groups.slice(0, 5).map(function (g) {
-      var node = entryNode(g.entry, { compact: true });
-      if (g.count > 1) {
-        var where = node.querySelector('.act__text, .act__title, p, span') || node;
-        where.appendChild(el('span', { class: 'chip chip--gold act__times', text: String(g.count).replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; }) + ' مرات' }));
-      }
-      return node;
+
+    var list = el('div', { class: 'list', 'aria-label': 'آخر نشاط' }, groups.slice(0, 5).map(function (g) {
+      var entry = g.entry;
+      var target = targetOf(entry);
+      return el('button', { class: 'item item--act', type: 'button', onclick: function () {
+        if (target && target.open) target.open();
+        else A.go('activity');
+      } },
+        el('span', { class: 'avatar', 'aria-hidden': 'true', text: String(entry.actorName || '؟').trim().charAt(0) }),
+        el('span', { class: 'item__main' },
+          el('b', { dir: 'auto' }, (entry.actorName || '') + ' ' + (entry.summary || ''),
+            g.count > 1 ? el('span', { class: 'x', text: digits(g.count) + ' مرات' }) : null),
+          el('small', { text: (g.count > 1 ? 'آخرها ' : '') + when(entry) })));
     }));
 
-    return el('section', { class: 'card dash-card dash-activity', id: 'dash-activity', 'aria-labelledby': 'dash-activity-title' },
-      el('div', { class: 'dash-card__head' },
-        el('span', { class: 'dash-card__icon', 'aria-hidden': 'true' }, icon('clock')),
-        el('h2', { class: 'card__title', id: 'dash-activity-title', text: 'آخر نشاط' })
-      ),
-      recent.length ? list : el('p', { class: 'card__hint', text: 'لسه مفيش نشاط متسجل. أول ما حد يضيف أو يعدّل أو ينشر هيظهر هنا.' }),
-      el('div', { class: 'actions' },
-        el('button', { class: 'btn btn--ghost btn--small', type: 'button', onclick: function () { A.go('activity'); } }, icon('clock'), 'كل النشاط')
-      )
+    return el('section', { class: 'card home8-act', id: 'dash-activity', 'aria-labelledby': 'dash-activity-title' },
+      el('div', { class: 'card__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('clock')),
+        el('h3', { id: 'dash-activity-title', text: 'آخر نشاط' }),
+        el('span', { class: 'sp' }),
+        el('button', { class: 'btn btn--sm btn--ghost', type: 'button', onclick: function () { A.go('activity'); } }, 'كل النشاط')),
+      recent.length ? list : el('p', { class: 'muted', text: 'لسه مفيش نشاط متسجل. أول ما حد يضيف أو يعدّل أو ينشر هيظهر هنا.' })
     );
 
   };
+
 
   function refreshHomeCard() {
 
@@ -20549,7 +20685,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   var cardNode = null;
 
   A.bookCard = function () {
-    cardNode = el('section', { class: 'card dash-card dash-book', id: 'dash-book', 'aria-labelledby': 'dash-book-title', hidden: true });
+    cardNode = el('section', { class: 'card home8-book', id: 'dash-book', 'aria-labelledby': 'dash-book-title', hidden: true });
     paintCard();
     if (!B.checked && W()) B.check();
     return cardNode;
@@ -20562,24 +20698,35 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       return;
     }
     cardNode.hidden = false;
-    var head = el('div', { class: 'dash-card__head' },
-      el('span', { class: 'dash-card__icon', 'aria-hidden': 'true' }, icon('ticket')),
-      el('h2', { class: 'card__title', id: 'dash-book-title', text: 'الحجوزات' }));
+    // Phase 8B: exactly the approved home card — an icon square, the title and what waits, «كل الحجوزات» in the
+    // head, then three numbers (the list of events with new requests stays under them)
+    function head(hint, button) {
+      return el('div', { class: 'card__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('ticket')),
+        el('div', { class: 'card__head-text' }, el('h3', { id: 'dash-book-title', text: 'الحجوزات' }), el('p', { text: hint })),
+        el('span', { class: 'sp' }), button);
+    }
     if (!B.on) {
-      A.fill(cardNode, head,
-        el('p', { class: 'card__hint', text: B.needGoogle ? 'الحجوزات والفلوس محتاجة دخول بحساب جوجل.' : 'سيرفر الحجوزات مش بيرد دلوقتي.' }),
-        el('div', { class: 'actions' }, el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'book-home', onclick: function () { B.open(''); } }, icon(B.needGoogle ? 'lock' : 'retry'), 'افتح الحجوزات')));
+      A.fill(cardNode, head(B.needGoogle ? 'الحجوزات والفلوس محتاجة دخول بحساب جوجل.' : 'سيرفر الحجوزات مش بيرد دلوقتي.',
+        el('button', { class: 'btn btn--sm', type: 'button', 'data-act': 'book-home', onclick: function () { B.open(''); } }, icon(B.needGoogle ? 'lock' : 'retry'), 'افتح الحجوزات')));
       return;
     }
     var waiting = (B.events || []).filter(function (e) { return e.counts && e.counts.pending; });
     var total = pendingTotal();
-    A.fill(cardNode, head,
-      el('p', { class: 'card__hint', text: !B.events ? 'بنجيب الحجوزات…' : total ? 'مستنيين المراجعة: ' + ar(total) + (total === 1 ? ' طلب' : ' طلبات') : 'مفيش طلبات حجز مستنية مراجعة ✓' }),
+    // (the event list may not carry these yet: then a dash, never a made-up zero)
+    var sum = function (key) { var has = (B.events || []).some(function (e) { return e.counts && key in e.counts; }); return has ? ar((B.events || []).reduce(function (n, e) { return n + (Number(e.counts && e.counts[key]) || 0); }, 0)) : '—'; };
+    var kpi = function (label, value) { return el('div', { class: 'kpi' }, el('small', { text: label }), el('b', { text: value })); };
+    A.fill(cardNode,
+      head(!B.events ? 'بنجيب الحجوزات…' : total ? 'مستنيين المراجعة: ' + ar(total) + (total === 1 ? ' طلب' : ' طلبات') : 'مفيش طلبات حجز مستنية مراجعة ✓',
+        el('button', { class: 'btn btn--sm', type: 'button', 'data-act': 'book-home', onclick: function () { B.open(''); } }, icon('ticket'), 'كل الحجوزات')),
+      el('div', { class: 'grid g3' },
+        kpi('طلبات جديدة', B.events ? ar(total) : '…'),
+        kpi('إثباتات دفع مستنية', B.events ? sum('proofs') : '…'),
+        kpi('مرتجعات مطلوبة', B.events ? sum('refunds') : '…')),
       waiting.length ? el('ul', { class: 'dash-book__list' }, waiting.slice(0, 5).map(function (e) {
-        return el('li', {}, el('button', { class: 'btn btn--ghost btn--small', type: 'button', 'data-act': 'book-home-event', 'data-event': e.id, onclick: function () { B.open(e.id); } },
+        return el('li', {}, el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'book-home-event', 'data-event': e.id, onclick: function () { B.open(e.id); } },
           el('bdi', { text: e.title }), ' (' + ar(e.counts.pending) + ' جديد)'));
-      })) : null,
-      el('div', { class: 'actions' }, el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'book-home', onclick: function () { B.open(''); } }, icon('ticket'), 'كل الحجوزات')));
+      })) : null);
   }
 
   /* a device session (the installed app's remembered phone): Google itself, once */

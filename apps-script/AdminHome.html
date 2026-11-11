@@ -459,60 +459,187 @@
       tile('ألعاب', live(draft.games), '', function () { A.go('content', 'games'); }));
   }
 
-  /* who is in the panel now (the presence the heartbeat brings) */
+
+  /* =======================================================
+     PHASE 8B HOME — exactly the approved screen (docs/phase8b/shots/{desktop,phone}/home.png,
+     proposal.js V.home): the greeting, four number cards, then the site, the bookings and
+     «الاجتماع الجاي» beside «اعمل حاجة جديدة»; on the side who is here and the latest activity.
+     The bell, «جاي قريب» and the timeline live in «المحتوى» (owner 2026-11-11: the screen as approved).
+  ======================================================= */
+
+  function head8(iconName, title, hint, tone, extra) {
+    return el('div', { class: 'card__head' },
+      el('span', { class: 'chipico' + (tone ? ' chipico--' + tone : ''), 'aria-hidden': 'true' }, icon(iconName)),
+      el('div', { class: 'card__head-text' },
+        el('h3', { text: title }),
+        hint ? el('p', { text: hint }) : null),
+      extra ? el('span', { class: 'sp' }) : null,
+      extra || null);
+  }
+
+  function hero8(waiting) {
+    var name = String((A.state.me || (A.state.user || '').split('@')[0]) || '').split(' ')[0];
+    var count = waiting.reduce(function (n, w) { return n + (w.n || 1); }, 0);
+    return el('section', { class: 'card card--glow hero', 'aria-labelledby': 'hello-title' },
+      el('span', { class: 'hero__art', 'aria-hidden': 'true' }),
+      el('div', { class: 'hero__text' },
+        el('small', { class: 'muted', text: todayLine() }),
+        el('h1', { id: 'hello-title' }, greeting() + ' يا ', el('em', { text: name })),
+        el('p', { text: count ? 'فيه ' + ar(count) + (count === 1 ? ' حاجة مستنياك' : ' حاجات مستنياك') + ' النهارده.' : 'مفيش حاجة مستنياك دلوقتي. كله تمام.' })),
+      el('div', { class: 'row hero__acts' },
+        el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.news(null); } }, icon('plus'), 'خبر'),
+        upgraded() ? el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.activities(null, 'activities'); } }, icon('plus'), 'فعالية') : null,
+        el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.notifications(null); } }, icon('bell'), 'إشعار')));
+  }
+
+  function kpis8() {
+    var draft = A.state.draft || {};
+    var live = function (list) { return (list || []).filter(function (x) { return bool(x.enabled) && !bool(x.archived); }).length; };
+    var bell = (draft.notifications || []).filter(function (n) { return bool(n.enabled) && !bool(n.archived); }).length;
+    var tile = function (iconName, label, value, hint, go) {
+      return el('button', { class: 'kpi', type: 'button', onclick: go },
+        el('small', {}, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon(iconName)), label),
+        el('b', { text: ar(value) }),
+        hint ? el('small', { class: 'kpi__hint', text: hint }) : null);
+    };
+    return el('div', { class: 'grid g4 kpis', 'aria-label': 'الأرقام دلوقتي' },
+      tile('megaphone', 'أخبار ظاهرة', live(draft.news), '', function () { A.go('content', 'news'); }),
+      tile('calendar', 'جاي في أسبوعين', upcoming().length, 'أخبار وألعاب وفعاليات', function () { A.go('content', 'activities'); }),
+      tile('bell', 'إشعارات في الجرس', bell, '', function () { A.go('content', 'notifications'); }),
+      tile('star', 'ألعاب', live(draft.games), '', function () { A.go('content', 'games'); }));
+  }
+
+  function site8() {
+    var s = A.state.status;
+    var config = A.state.config || {};
+    var state = s.errors.length ? 'error' : s.hasChanges ? 'dirty' : 'clean';
+    var words = {
+      error: ['يوجد خطأ يمنع النشر', 'صلّح ' + (s.errors.length === 1 ? 'الخطأ' : 'الأخطاء') + ' الأول، وبعدين انشر', 'danger', 'alert'],
+      dirty: ['في تغييرات مستنية النشر', 'الزوار لسه شايفين النسخة القديمة لحد ما تنشر', 'warn', 'send'],
+      clean: ['الموقع متحدث', 'كل اللي في المسودة ظاهر على الموقع', 'ok', 'check']
+    }[state];
+    var lastAt = el('b', { text: s.publishedAt ? A.formatIso(s.publishedAt) : '…' });
+    var lastBy = el('b', { text: '—' });
+    var W = window.AdminWorker;
+    if (W && W.call) {
+      W.call('GET', '/v1/admin/publish/revisions', undefined, { quiet: true }).then(function (data) {
+        var jobs = (data && data.jobs) || [];
+        var job = jobs.filter(function (j) { return j.id === data.live; })[0] || jobs[0];
+        if (!job) { lastAt.textContent = s.publishedAt ? A.formatIso(s.publishedAt) : 'لسه متنشرش'; return; }
+        var names = (A.state && A.state.names) || {};
+        lastAt.textContent = A.formatWall(cairoWall(job.at));
+        lastBy.textContent = names[job.by] || job.by || '—';
+      }).catch(function () { if (!s.publishedAt) lastAt.textContent = 'لسه متنشرش'; });
+    } else if (!s.publishedAt) lastAt.textContent = 'لسه متنشرش';
+    var acts = el('span', { class: 'row' },
+      state !== 'clean' ? el('button', { class: 'btn btn--sm btn--primary', type: 'button', onclick: function () { A.openReview(); } }, icon(state === 'error' ? 'alert' : 'send'), state === 'error' ? 'شوف الأخطاء' : 'راجع وانشر') : null,
+      state !== 'clean' && config.siteUrl ? el('button', { class: 'btn btn--sm', type: 'button', onclick: function () { A.openPreview(); } }, icon('eye'), 'معاينة') : null,
+      config.siteUrl ? el('a', { class: 'btn btn--sm', href: config.siteUrl, target: '_blank', rel: 'noopener' }, icon('external'), 'افتح الموقع') : null);
+    return el('section', { class: 'card home8-site is-' + state, 'aria-labelledby': 'dash-site-title' },
+      head8(words[3], words[0], words[1], words[2], acts),
+      el('div', { class: 'grid g3 facts' },
+        el('div', {}, el('small', { class: 'muted', text: 'آخر نشر' }), lastAt),
+        el('div', {}, el('small', { class: 'muted', text: 'نشره' }), lastBy),
+        el('div', {}, el('small', { class: 'muted', text: 'تغييرات مستنية' }), el('b', { text: s.hasChanges ? 'فيه' : 'مفيش' }))),
+      s.warnings && s.warnings.length ? el('p', { class: 'muted facts__warn', text: 'تنبيهات: ' + ar(s.warnings.length) + ' (مش بتمنع النشر)' }) : null);
+  }
+
+  function cairoWall(ms) {
+    var p = {};
+    new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(new Date(ms)).forEach(function (x) { p[x.type] = x.value; });
+    return p.year + '-' + p.month + '-' + p.day + ' ' + (p.hour === '24' ? '00' : p.hour) + ':' + p.minute;
+  }
+
+  function meeting8() {
+    var row = (A.state.layout || []).filter(function (s) { return s.key === 'meeting'; })[0] || { enabled: true };
+    var shown = A.visibility(bool(row.enabled), row.visibleFrom, row.visibleUntil);
+    var off = shown.state === 'off' || shown.state === 'ended';
+    var next = A.nextMeeting();
+    var body = [];
+    if (off) body.push(el('p', { class: 'note note--warn', text: 'ركن الاجتماع مخفي من الموقع: الزوار مش شايفين ميعاد ولا موضوع.' }));
+    next.cancelled.forEach(function (date) { body.push(el('p', { class: 'muted' }, icon('alert'), 'مفيش اجتماع ' + A.formatWall(date, false) + ' (ملغي)')); });
+    if (!next.date) {
+      body.push(el('p', { class: 'muted', text: 'مفيش ميعاد اجتماع متظبط.' }));
+      body.push(el('button', { class: 'btn btn--sm', type: 'button', onclick: function () { A.go('content', 'meetings'); } }, icon('plus'), 'ظبط الميعاد'));
+    } else {
+      var session = next.session;
+      var topic = session && session.topic;
+      var day = new Date(A.wallFromMinutes(next.at).slice(0, 10) + 'T12:00:00Z');
+      body.push(el('div', { class: 'meet' },
+        el('div', { class: 'meet__day', 'aria-hidden': 'true' }, el('b', { text: ar(day.getUTCDate()) }), el('small', { text: WEEKDAY_SHORT[day.getUTCDay()] })),
+        el('div', { class: 'meet__text' },
+          el('b', { class: 'meet__when', text: A.formatWall(A.wallFromMinutes(next.at)) }), ' ',
+          el('span', { class: 'tag tag--acc', text: next.live ? 'شغال دلوقتي' : relative(next.at) }),
+          el('p', { class: 'muted meet__topic', text: topic ? '«' + topic + '»' : 'لسه مفيش موضوع للاجتماع ده' }),
+          session && session.speaker ? el('p', { class: 'muted', text: session.speaker }) : null,
+          topic && session.visibleFrom && A.wallMinutes(session.visibleFrom) > now() ? el('span', { class: 'tag tag--warn', text: 'الموضوع يظهر ' + A.formatWall(session.visibleFrom) }) : null,
+          el('button', { class: 'btn btn--sm', type: 'button', onclick: function () { A.editors.sessions(session, session ? null : { date: next.date }); } }, icon(topic ? 'edit' : 'plus'), topic ? 'تعديل الموضوع' : 'ضيف الموضوع'))));
+      if (next.live && session && A.liveControl && A.programStages(session.program).length) body.push(A.liveControl(session));
+    }
+    return el('section', { class: 'card home8-meeting' + (off ? ' is-off' : ''), 'aria-labelledby': 'dash-meeting-title' },
+      head8('church', 'الاجتماع الجاي', '', '', off ? el('span', { class: 'tag', text: 'مخفي' }) : null),
+      body);
+  }
+
+  function quick8() {
+    var items = upgraded();
+    function q(label, iconName, onclick) {
+      return el('button', { type: 'button', onclick: onclick }, el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(iconName)), label);
+    }
+    return el('section', { class: 'card home8-quick', 'aria-labelledby': 'dash-quick-title' },
+      head8('sparkle', 'اعمل حاجة جديدة'),
+      el('div', { class: 'q8' },
+        q('موضوع اجتماع', 'church', function () { var n = A.nextMeeting(); A.editors.sessions(n.session, n.session ? null : (n.date ? { date: n.date } : null)); }),
+        q('خبر', 'megaphone', function () { A.editors.news(null); }),
+        window.AdminTransport && A.compNew ? q('مسابقة', 'trophy', function () { A.compNew(); })
+          : items ? q('مسابقة', 'trophy', function () { A.editors.activities(null, 'competitions'); }) : null,
+        items ? q('فعالية', 'calendar', function () { A.editors.activities(null, 'activities'); }) : null,
+        q('لعبة', 'star', function () { A.editors.games(null); }),
+        q('إشعار', 'bell', function () { A.editors.notifications(null); })));
+  }
+
+  /* «المتصلين دلوقتي» (the heartbeat redraws it through _draw) */
   A.homePresence = function () {
-    var box = el('section', { class: 'card who-card', 'aria-labelledby': 'who-title', 'data-home-presence': '' });
+    var box = el('section', { class: 'card home8-who', 'aria-labelledby': 'who-title', 'data-home-presence': '' });
     function draw(list) {
       var others = list || [];
-      var live = others.filter(function (o) { return o.seen < 40; }).length;
-      var editing = others.filter(function (o) { return o.item && o.item.label; }).length;
       A.fill(box,
         el('div', { class: 'card__head' },
-          el('h2', { class: 'card__title', id: 'who-title', text: 'المتصلين دلوقتي' }),
-          others.length ? A.chip('مباشر', 'ok') : null),
-        others.length ? el('p', { class: 'who__sum' },
-          el('span', {}, el('i', { class: 'is-ok' }), ar(live) + ' متصل'),
-          editing ? el('span', {}, el('i', { class: 'is-acc' }), ar(editing) + ' بيعدّل') : null) : null,
-        others.length ? el('div', { class: 'who' }, others.map(function (o) {
+          el('span', { class: 'chipico chipico--info', 'aria-hidden': 'true' }, icon('users')),
+          el('h3', { id: 'who-title', text: 'المتصلين دلوقتي' }),
+          others.length ? el('span', { class: 'sp' }) : null,
+          others.length ? el('span', { class: 'tag tag--ok', text: 'مباشر' }) : null),
+        others.length ? el('div', { class: 'list' }, others.map(function (o) {
           var state = o.item && o.item.label ? 'editing' : o.seen < 40 ? 'online' : 'idle';
-          return el('div', { class: 'who__item' },
-            el('span', { class: 'pav pav--' + state, 'aria-hidden': 'true', text: String(o.name || o.email || '؟').trim().charAt(0) }),
-            el('span', { class: 'who__text' },
+          return el('div', { class: 'item item--who is-' + state },
+            el('span', { class: 'avatar', 'aria-hidden': 'true', text: String(o.name || o.email || '؟').trim().charAt(0) }),
+            el('div', { class: 'item__main' },
               el('b', { dir: 'auto', text: o.name || o.email }),
-              el('small', { class: state === 'editing' ? 'editing' : '', text: state === 'editing' ? 'بيعدّل في: ' + o.item.label : state === 'online' ? 'متصل دلوقتي' : 'آخر نشاط ' + A.ago(o.seen) })));
-        })) : el('p', { class: 'empty', text: 'مفيش أدمن تاني فاتح دلوقتي.' }));
+              el('small', { text: state === 'editing' ? 'بيعدّل في: ' + o.item.label : state === 'online' ? 'متصل دلوقتي' : 'آخر نشاط ' + A.ago(o.seen) })));
+        })) : el('p', { class: 'muted who__empty', text: 'مفيش أدمن تاني فاتح دلوقتي.' }));
     }
     draw(A.presentNow ? A.presentNow() : []);
     box._draw = draw;
     return box;
   };
 
-  /* the home view: the dashboard, then the timeline (AdminContent) */
   A.dashboard = function () {
-
     var waiting = A.waitingNow ? A.waitingNow() : [];
-
-    return el('div', { class: 'home dash' },
-      el('div', { class: 'home__main' },
-        helloCard(waiting),
-        queueTiles(waiting),
-        kpis(),
-        siteCard(),
-        // critical notifications waiting (AdminPage: «حالة النظام»), for the Primary Admin
-        A.criticalBanner ? A.criticalBanner() : null,
-        A.setupNudge ? A.setupNudge() : null,
-        // «الحجوزات»: new requests waiting (AdminBook; hidden while the module is off)
-        A.bookCard ? A.bookCard() : null,
-        el('div', { class: 'duo' }, meetingCard(), quickCard()),
-        bellCard(),
-        upcomingCard()
-      ),
-      el('aside', { class: 'home__side', 'aria-label': 'الفريق والنشاط' },
-        window.AdminTransport ? A.homePresence() : null,
-        A.activityCard ? A.activityCard() : null
-      )
-    );
-
+    return el('div', { class: 'home8' },
+      hero8(waiting),
+      kpis8(),
+      el('div', { class: 'grid home8__cols' },
+        el('div', { class: 'grid home8__main' },
+          // critical notifications (AdminPage «حالة النظام»), the app setup nudge: only when they have something
+          A.criticalBanner ? A.criticalBanner() : null,
+          A.setupNudge ? A.setupNudge() : null,
+          site8(),
+          A.bookCard ? A.bookCard() : null,
+          el('div', { class: 'grid g2 home8__duo' }, meeting8(), quick8())),
+        el('aside', { class: 'grid home8__side', 'aria-label': 'الفريق والنشاط' },
+          window.AdminTransport ? A.homePresence() : null,
+          A.activityCard ? A.activityCard() : null)));
   };
 
 })();

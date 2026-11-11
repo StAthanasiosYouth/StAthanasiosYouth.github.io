@@ -217,7 +217,7 @@ test('activity: the home card and the log show who did what with display names; 
   await signIn(d.page);
 
   // the home card
-  await d.page.waitForSelector('#dash-activity .act');
+  await d.page.waitForSelector('#dash-activity .item');
   const home = await d.page.$eval('#dash-activity', n => n.innerText);
   assert.match(home, /فادي يوسف أضاف خبر جديد «خبر من فادي»/);
   assert.match(home, /فادي يوسف أضاف جهة تواصل جديدة «أبونا داود»/);

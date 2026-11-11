@@ -702,14 +702,14 @@ test('home: the site state, the next meeting, quick actions, the bell; fits a ph
 
   const { page, problems, close } = await open();
   await page.evaluate(() => A.go('home'));
-  await page.waitForSelector('.dash .dash-site');
+  await page.waitForSelector('.home8 .home8-site');
 
   // a saved change waits for publishing: said plainly, one tap to review
   world.gs.apiPublish(JSON.parse(JSON.stringify(world.gs.apiReview())).revision);
   world.gs.apiSaveItem('news', { title: 'خبر للوحة الرئيسية', publishAt: '2099-01-01 10:00' });
   await page.reload({ waitUntil: 'networkidle0' });
-  await page.waitForSelector('.dash .dash-site');
-  assert.equal(await page.$eval('.dash-site h2', n => n.textContent), 'في تغييرات مستنية النشر');
+  await page.waitForSelector('.home8 .home8-site');
+  assert.equal(await page.$eval('.home8-site h3', n => n.textContent), 'في تغييرات مستنية النشر');
 
   // the next meeting: its date, and its topic or a button to add one
   const meeting = await page.evaluate(() => {
@@ -733,7 +733,7 @@ test('home: the site state, the next meeting, quick actions, the bell; fits a ph
   await page.waitForFunction(() => !document.querySelector('dialog.sheet').open);
 
   // quick actions open the right editors
-  await page.evaluate(() => [...document.querySelectorAll('.quick')].find(b => b.textContent.includes('مسابقة')).click());
+  await page.evaluate(() => [...document.querySelectorAll('.q8 button')].find(b => b.textContent.includes('مسابقة')).click());
   await page.waitForSelector('dialog.sheet[open] input');
   assert.match(await page.$eval('dialog.sheet[open] .sheet__title', n => n.textContent), /مسابقة/);
   await page.keyboard.press('Escape');
@@ -754,8 +754,8 @@ test('review: changes grouped in plain words, scheduled ones say when', async ()
 
   const { page, problems, close } = await open(DESKTOP);
   await page.evaluate(() => A.go('home'));
-  await page.waitForSelector('.dash-site .btn--primary');
-  await page.click('.dash-site .btn--primary');
+  await page.waitForSelector('.home8-site .btn--primary');
+  await page.click('.home8-site .btn--primary');
   await page.waitForSelector('dialog.sheet[open] .review-groups');
 
   const groups = await page.evaluate(() => [...document.querySelectorAll('.review-group')].map(g => ({
@@ -817,8 +817,8 @@ test('preview: the draft on the real page, phone/computer, time travel; nothing 
   const { page, problems, close } = await open(DESKTOP);
   const sent = await serveSiteLocally(page);
   await page.evaluate(() => A.go('home'));
-  await page.waitForSelector('.dash-site');
-  await page.evaluate(() => [...document.querySelectorAll('.dash-site .btn')].find(b => b.textContent.includes('معاينة')).click());
+  await page.waitForSelector('.home8-site');
+  await page.evaluate(() => [...document.querySelectorAll('.home8-site .btn')].find(b => b.textContent.includes('معاينة')).click());
   await page.waitForSelector('.preview-status--ok', { timeout: 20000 });
 
   const frame = page.frames().find(f => f.url() === 'about:srcdoc');

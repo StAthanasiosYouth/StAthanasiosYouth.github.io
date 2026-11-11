@@ -431,7 +431,7 @@
   var cardNode = null;
 
   A.bookCard = function () {
-    cardNode = el('section', { class: 'card dash-card dash-book', id: 'dash-book', 'aria-labelledby': 'dash-book-title', hidden: true });
+    cardNode = el('section', { class: 'card home8-book', id: 'dash-book', 'aria-labelledby': 'dash-book-title', hidden: true });
     paintCard();
     if (!B.checked && W()) B.check();
     return cardNode;
@@ -444,24 +444,35 @@
       return;
     }
     cardNode.hidden = false;
-    var head = el('div', { class: 'dash-card__head' },
-      el('span', { class: 'dash-card__icon', 'aria-hidden': 'true' }, icon('ticket')),
-      el('h2', { class: 'card__title', id: 'dash-book-title', text: 'الحجوزات' }));
+    // Phase 8B: exactly the approved home card — an icon square, the title and what waits, «كل الحجوزات» in the
+    // head, then three numbers (the list of events with new requests stays under them)
+    function head(hint, button) {
+      return el('div', { class: 'card__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('ticket')),
+        el('div', { class: 'card__head-text' }, el('h3', { id: 'dash-book-title', text: 'الحجوزات' }), el('p', { text: hint })),
+        el('span', { class: 'sp' }), button);
+    }
     if (!B.on) {
-      A.fill(cardNode, head,
-        el('p', { class: 'card__hint', text: B.needGoogle ? 'الحجوزات والفلوس محتاجة دخول بحساب جوجل.' : 'سيرفر الحجوزات مش بيرد دلوقتي.' }),
-        el('div', { class: 'actions' }, el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'book-home', onclick: function () { B.open(''); } }, icon(B.needGoogle ? 'lock' : 'retry'), 'افتح الحجوزات')));
+      A.fill(cardNode, head(B.needGoogle ? 'الحجوزات والفلوس محتاجة دخول بحساب جوجل.' : 'سيرفر الحجوزات مش بيرد دلوقتي.',
+        el('button', { class: 'btn btn--sm', type: 'button', 'data-act': 'book-home', onclick: function () { B.open(''); } }, icon(B.needGoogle ? 'lock' : 'retry'), 'افتح الحجوزات')));
       return;
     }
     var waiting = (B.events || []).filter(function (e) { return e.counts && e.counts.pending; });
     var total = pendingTotal();
-    A.fill(cardNode, head,
-      el('p', { class: 'card__hint', text: !B.events ? 'بنجيب الحجوزات…' : total ? 'مستنيين المراجعة: ' + ar(total) + (total === 1 ? ' طلب' : ' طلبات') : 'مفيش طلبات حجز مستنية مراجعة ✓' }),
+    // (the event list may not carry these yet: then a dash, never a made-up zero)
+    var sum = function (key) { var has = (B.events || []).some(function (e) { return e.counts && key in e.counts; }); return has ? ar((B.events || []).reduce(function (n, e) { return n + (Number(e.counts && e.counts[key]) || 0); }, 0)) : '—'; };
+    var kpi = function (label, value) { return el('div', { class: 'kpi' }, el('small', { text: label }), el('b', { text: value })); };
+    A.fill(cardNode,
+      head(!B.events ? 'بنجيب الحجوزات…' : total ? 'مستنيين المراجعة: ' + ar(total) + (total === 1 ? ' طلب' : ' طلبات') : 'مفيش طلبات حجز مستنية مراجعة ✓',
+        el('button', { class: 'btn btn--sm', type: 'button', 'data-act': 'book-home', onclick: function () { B.open(''); } }, icon('ticket'), 'كل الحجوزات')),
+      el('div', { class: 'grid g3' },
+        kpi('طلبات جديدة', B.events ? ar(total) : '…'),
+        kpi('إثباتات دفع مستنية', B.events ? sum('proofs') : '…'),
+        kpi('مرتجعات مطلوبة', B.events ? sum('refunds') : '…')),
       waiting.length ? el('ul', { class: 'dash-book__list' }, waiting.slice(0, 5).map(function (e) {
-        return el('li', {}, el('button', { class: 'btn btn--ghost btn--small', type: 'button', 'data-act': 'book-home-event', 'data-event': e.id, onclick: function () { B.open(e.id); } },
+        return el('li', {}, el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'data-act': 'book-home-event', 'data-event': e.id, onclick: function () { B.open(e.id); } },
           el('bdi', { text: e.title }), ' (' + ar(e.counts.pending) + ' جديد)'));
-      })) : null,
-      el('div', { class: 'actions' }, el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'book-home', onclick: function () { B.open(''); } }, icon('ticket'), 'كل الحجوزات')));
+      })) : null);
   }
 
   /* a device session (the installed app's remembered phone): Google itself, once */
