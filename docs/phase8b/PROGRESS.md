@@ -107,3 +107,4 @@
 - النشر: «الأخبار» على main (commit a1ffed3 فوق d14aaf4). الرجوع: git revert a1ffed3.
 - الجاي في W3: news-edit، session-edit/session-program، cards/card-edit/card-types، bell/bell-edit، games-corner/game-edit، وبعدين B5: svcpages/svcpage-edit/svc-clip، servants/servant-remove، layout-sched.
 - [x] محرر الخبر زي news-edit.png: ٥ أقسام (الخبر، الزرار واللينك، الشكل، المواعيد، الإشعار)، الشارة segmented «من غير · جديد · مهم · آخر فرصة» و«…» لكلمة تانية، عمود شمال بالكارت زي الرئيسية و«قبل النشر» (العنوان والسطر، اللينك، ميعاد الاختفاء)، «معاينة» بتفتح معاينة الموقع بالمسودة، وتحت «بيتحفظ كمسودة لحد «راجع وانشر»» من غير «التالي». A.openSheet: options.next=false وoptions.footWords.
+- النشر: محرر الخبر على main (commit 8315817 فوق a1ffed3). الرجوع: git revert 8315817.
