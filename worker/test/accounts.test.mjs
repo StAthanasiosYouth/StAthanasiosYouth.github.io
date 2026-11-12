@@ -139,3 +139,81 @@ test('validation and the 20-admin limit', async () => {
   for (let i = 0; i < MAX_ADMINS - 2; i++) await w.h.db.prepare("INSERT INTO admins (email, role, active, created_at) VALUES (?, 'admin', 1, 0)").bind(`x${i}@example.com`).run();
   assert.equal((await w.call(P, 'POST', '/v1/admin/accounts', { email: B, grants: {} })).body.reason, 'max');
 });
+
+test('Phase 8B W6: the list says who is online and who was removed; «اخرّجه من كل الأجهزة» ends their sessions and devices (accounts.manage, Google, audited)', async () => {
+  const w = await world();
+  const now = Date.now();
+  await w.h.db.prepare("INSERT INTO admin_sessions (email, sid, since_ms, seen_ms) VALUES (?, 'sid-m-1234567890abcdef', ?, ?)").bind(M, now - 60000, now - 5000).run();
+  await w.h.db.prepare("INSERT INTO admins (email, name, role, active, created_at) VALUES (?, 'Gone', 'admin', 0, 0)").bind(B).run();
+  const list = await w.call(P, 'GET', '/v1/admin/accounts');
+  assert.deepEqual(list.body.online, [M]);
+  assert.deepEqual(list.body.removed.map(r => [r.email, r.name]), [[B, 'Gone']]);
+  // not for an admin without accounts.manage
+  assert.equal((await w.call(M, 'POST', '/v1/admin/accounts/' + encodeURIComponent(P) + '/signout', {})).status, 403);
+  const out = await w.call(P, 'POST', '/v1/admin/accounts/' + encodeURIComponent(M) + '/signout', {});
+  assert.equal(out.status, 200, JSON.stringify(out.body));
+  assert.deepEqual(out.body.online, []);
+  assert.equal(await w.h.db.prepare('SELECT 1 FROM admin_sessions WHERE email = ?').bind(M).first(), null);
+  assert.equal((await w.h.db.prepare('SELECT active FROM admins WHERE email = ?').bind(M).first('active')), 1, 'the account stays');
+  const row = await w.h.db.prepare("SELECT severity, actor FROM activity WHERE action = 'accounts.signout' AND entity_id = ?").bind(M).first();
+  assert.deepEqual({ ...row }, { severity: 'critical', actor: P });
+  assert.equal((await w.call(P, 'POST', '/v1/admin/accounts/nobody%40example.com/signout', {})).body.code, 'not_found');
+});
+
+test('Phase 8B W6: «ابعتله إيميل بالدعوة» — only when asked, and never without Gmail', async () => {
+  const w = await world();
+  const plain = await w.call(P, 'POST', '/v1/admin/accounts', { email: B, grants: {} });
+  assert.equal(plain.status, 200, JSON.stringify(plain.body));
+  assert.equal(plain.body.invite, undefined);
+  await w.call(P, 'POST', '/v1/admin/accounts/' + encodeURIComponent(B) + '/remove', {});
+  const asked = await w.call(P, 'POST', '/v1/admin/accounts', { email: B, grants: {}, invite: true, role: 'viewer' });
+  assert.equal(asked.status, 200, JSON.stringify(asked.body));
+  assert.equal(asked.body.invite, 'off', 'no Gmail in the tests: nothing is sent');
+});
+
+test('Phase 8B W6: «اطلب الصلاحية» — any admin, a critical row for the account managers, nothing granted', async () => {
+  const w = await world({ enforce: '1' });
+  const r = await w.call(M, 'POST', '/v1/admin/me/ask-access', { area: 'bookings', sub: 'finance', label: 'الفلوس' });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const row = await w.h.db.prepare("SELECT actor, severity, summary FROM activity WHERE action = 'accounts.ask'").first();
+  assert.deepEqual({ ...row }, { actor: M, severity: 'critical', summary: 'طلب صلاحية «الفلوس»' });
+  assert.deepEqual(await w.grantsOf(M), {});
+  assert.equal((await w.call(M, 'POST', '/v1/admin/me/ask-access', { area: '' })).body.code, 'invalid');
+});
+
+test('Phase 8B W6 (team-enforce.png): «شغّل الصلاحيات» — the Primary Admin alone, Google itself, audited; off again the same way', async () => {
+  const w = await world();
+  await w.grant(M, 'accounts.manage');
+  assert.equal((await w.call(M, 'POST', '/v1/admin/accounts/enforce', { on: true })).status, 403, 'not for an account manager');
+  const on = await w.call(P, 'POST', '/v1/admin/accounts/enforce', { on: true });
+  assert.equal(on.status, 200, JSON.stringify(on.body));
+  assert.equal(on.body.enforce, true);
+  assert.equal(await w.h.db.prepare("SELECT value FROM settings WHERE key = 'PERMS_ENFORCE'").first('value'), '1');
+  const off = await w.call(P, 'POST', '/v1/admin/accounts/enforce', { on: false });
+  assert.equal(off.body.enforce, false);
+  assert.equal((await w.h.db.prepare("SELECT COUNT(*) AS n FROM activity WHERE action = 'accounts.enforce' AND severity = 'critical'").first('n')), 2);
+  // never with the panel's own session token
+  const token = await w.call(P, 'POST', '/v1/admin/accounts/enforce', { on: true }, { authorization: 'Bearer ' + wk(P) });
+  assert.equal(token.body.code, 'google');
+});
+
+test('Phase 8B W6 (B12 me-avatar.png): each admin sets and removes their own photo; real image bytes ≤ 200 KB only; removed admins drop out', async () => {
+  const w = await world();
+  const webp = n => { const b = Buffer.alloc(n); b.write('RIFF', 0, 'latin1'); b.write('WEBP', 8, 'latin1'); return 'data:image/webp;base64,' + b.toString('base64'); };
+  const save = await w.call(M, 'POST', '/v1/admin/me/avatar', { image: webp(3000) });
+  assert.equal(save.status, 200, JSON.stringify(save.body));
+  assert.deepEqual(Object.keys(save.body.avatars), [M]);
+  assert.match(save.body.avatars[M].src, /^data:image\/webp;base64,/);
+  // anyone signed in sees it
+  assert.deepEqual(Object.keys((await w.call(P, 'GET', '/v1/admin/avatars')).body.avatars), [M]);
+  // not an image, too big, a type we don't take
+  assert.equal((await w.call(M, 'POST', '/v1/admin/me/avatar', { image: 'data:image/webp;base64,' + Buffer.alloc(3000).toString('base64') })).body.code, 'invalid');
+  assert.equal((await w.call(M, 'POST', '/v1/admin/me/avatar', { image: webp(205 * 1024) })).body.code, 'invalid');
+  assert.equal((await w.call(M, 'POST', '/v1/admin/me/avatar', { image: 'data:image/svg+xml;base64,PHN2Zz4=' })).body.code, 'invalid');
+  // only their own: the route has no email in it; remove
+  const del = await w.call(M, 'POST', '/v1/admin/me/avatar/delete', {});
+  assert.deepEqual(del.body.avatars, {});
+  await w.call(M, 'POST', '/v1/admin/me/avatar', { image: webp(3000) });
+  await w.call(P, 'POST', '/v1/admin/accounts/' + encodeURIComponent(M) + '/remove', {});
+  assert.deepEqual((await w.call(P, 'GET', '/v1/admin/avatars')).body.avatars, {}, 'a removed admin is not shown');
+});

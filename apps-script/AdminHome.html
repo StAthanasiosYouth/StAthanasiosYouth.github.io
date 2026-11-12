@@ -613,7 +613,7 @@
         others.length ? el('div', { class: 'list' }, others.map(function (o) {
           var state = o.item && o.item.label ? 'editing' : o.seen < 40 ? 'online' : 'idle';
           return el('div', { class: 'item item--who is-' + state },
-            el('span', { class: 'avatar', 'aria-hidden': 'true', text: String(o.name || o.email || '؟').trim().charAt(0) }),
+            A.avatarNode('avatar', o.email, o.name || o.email),
             el('div', { class: 'item__main' },
               el('b', { dir: 'auto', text: o.name || o.email }),
               el('small', { text: state === 'editing' ? 'بيعدّل في: ' + o.item.label : state === 'online' ? 'متصل دلوقتي' : 'آخر نشاط ' + A.ago(o.seen) })));

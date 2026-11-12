@@ -3122,7 +3122,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     );
 
     A.sheetMarks = function () {};
-    if (size === 'lg') sheetSections(sheet, options);
+    // options.plain: a big sheet with its own layout (team-perms.png), no section list
+    if (size === 'lg' && !options.plain) sheetSections(sheet, options);
 
     sheet.style.transform = '';
 
@@ -4306,7 +4307,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.state.config.siteUrl ? el('a', { class: 'navlink navlink--quiet', href: A.state.config.siteUrl, target: '_blank', rel: 'noopener', title: 'افتح الموقع' },
           el('span', { class: 'navlink__icon' }, icon('globe')), el('span', { class: 'navlink__label', text: 'افتح الموقع' })) : null,
         collapse,
-        el('p', { class: 'rail__user', title: A.state.user }, el('span', { class: 'acct__av', 'aria-hidden': 'true', text: initial(myName()) }), A.state.me && A.state.me !== A.state.user.split('@')[0]
+        el('p', { class: 'rail__user', title: A.state.user }, A.avatarNode('acct__av', A.state.user, myName()), A.state.me && A.state.me !== A.state.user.split('@')[0]
           ? el('span', { class: 'rail__who' }, el('span', { class: 'rail__name', dir: 'auto', text: A.state.me }), el('small', { class: 'rail__role', text: A.access && A.access.primary ? 'الأدمن الأساسي' : 'أدمن' }))
           : el('span', { class: 'rail__who' }, el('span', { class: 'ltr', text: A.state.user }), el('small', { class: 'rail__role', text: A.access && A.access.primary ? 'الأدمن الأساسي' : 'أدمن' }))),
         // the official admin page only (Google sign-in lives there)
@@ -4343,8 +4344,23 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     youth: ['participants.view'],
     bookings: ['bookings.view', 'finance.view']
   };
+  A.AREA_NEEDS = AREA_NEEDS;
+  // Phase 8B W6 (denied.png): a tab inside an allowed area that needs more (key = the tab)
+  var SUB_NEEDS = {
+    finance: ['finance.view'],
+    paymethods: ['finance.view']
+  };
 
   A.access = null;
+
+  /* may this admin open this tab? (the area itself is A.allowed) */
+  A.allowedSub = function (key) {
+    var a = A.access;
+    if (!a || !a.enforce || a.primary) return true;
+    var needs = SUB_NEEDS[key];
+    if (!needs) return true;
+    return needs.some(function (p) { return !!a.perms[p]; });
+  };
 
   /* may this admin open the area? (true until the Worker says otherwise) */
   A.allowed = function (key) {
@@ -4369,6 +4385,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   A.loadAccess = function () {
     return A.call('apiAdminMe').then(function (me) {
       if (!me || !me.perms) return;
+      if (A.viewing) { A.viewing.real = { enforce: !!me.enforce, primary: !!me.primary, perms: me.perms }; return; }
       A.access = { enforce: !!me.enforce, primary: !!me.primary, perms: me.perms };
       A.gamesCorner(!!(me.modules && me.modules.games));
       if (!A.allowed(A.area)) A.go(A.homeArea());
@@ -4409,12 +4426,94 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     if (!on && has) A.AREAS = A.AREAS.filter(function (a) { return a.key !== 'gamescorner'; });
   };
 
-  A.views.denied = function () {
-    return [A.card('مش متاح لحسابك', null,
-      el('p', { class: 'denied__text', text: 'القسم ده مش من صلاحياتك. لو محتاجه في خدمتك، اطلبه من الأدمن الأساسي، وهو يديك الصلاحية من «الإعدادات» ← «الأدمنز».' }),
-      el('div', { class: 'actions' },
-        el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.go(A.homeArea()); } }, icon('home'), 'روح لرئيسيتك')))];
+  /* the admin's permissions in a line: «الحجوزات (عرض + حجز كاش بتاعك) والفعاليات (عرض)» */
+  var DENIED_VERBS = { view: 'عرض', add: 'إضافة', edit: 'تعديل', delete: 'مسح', approve: 'اعتماد', publish: 'نشر', export: 'تصدير', export_pii: 'تصدير بالأرقام', manage: 'إدارة', create_cash: 'حجز كاش', rename: 'تغيير الأسماء' };
+  var DENIED_MODULES = {
+    content: 'المحتوى', publish: 'النشر', events: 'الفعاليات', bookings: 'الحجوزات', finance: 'الفلوس', exports: 'التصدير',
+    competitions: 'المسابقات', store: 'المتجر', points: 'النقاط', participants: 'الشباب', media: 'الصور', push: 'الإشعارات',
+    accounts: 'الحسابات', activity: 'سجل النشاط', notifications: 'إعدادات الإشعارات', system: 'النظام'
   };
+  function permsLine(perms) {
+    var by = {};
+    var order = [];
+    Object.keys(perms || {}).forEach(function (p) {
+      var parts = p.split('.');
+      if (!by[parts[0]]) { by[parts[0]] = []; order.push(parts[0]); }
+      by[parts[0]].push((DENIED_VERBS[parts[1]] || parts[1]) + (perms[p] === 'own' ? ' بتاعك' : ''));
+    });
+    var items = order.map(function (m) { return (DENIED_MODULES[m] || m) + ' (' + by[m].join(' + ') + ')'; });
+    return items.length > 1 ? items.slice(0, -1).join('، ') + ' و' + items[items.length - 1] : items[0] || 'مفيش';
+  }
+
+  /* Phase 8B W6 (denied.png): the area or tab this admin may not open — its name, their permissions, the way back,
+     and «اطلب الصلاحية» (a critical activity row: the account managers get it as a notification) */
+  A.views.denied = function () {
+    var area = areaOf(A.area);
+    var sub = area.subs ? (area.subs.filter(function (x) { return x.key === A.sub[A.area]; })[0] || null) : null;
+    var what = sub && A.allowed(A.area) ? sub.label : area.label;
+    var back = A.allowed(A.area) && sub ? (area.subs.filter(function (x) { return A.allowedSub(x.key) && x !== sub; })[0] || null) : null;
+    var home = areaOf(A.homeArea());
+    var perms = A.access && A.access.perms || {};
+    var ask = el('button', { class: 'btn', type: 'button', onclick: function () {
+      if (A.viewing) { A.toast('ده معاينة: الطلب بيتبعت من حسابه هو بس', 'info'); return; }
+      A.withBusy(ask, A.call('apiAdminAskAccess', { area: A.area, sub: sub ? sub.key : '', label: what }))
+        .then(function () { A.toast('اتبعت الطلب للأدمن الأساسي ✓'); ask.disabled = true; })
+        .catch(function (error) { A.fail(error); });
+    } }, icon('mail'), 'اطلب الصلاحية');
+    return [el('section', { class: 'card denied8' },
+      el('span', { class: 'chipico chipico--warn denied8__icon', 'aria-hidden': 'true' }, icon('lock')),
+      el('h2', { class: 'denied8__title', text: '«' + what + '» مش متاحة لحسابك' }),
+      el('p', { class: 'denied8__text denied__text', text: 'صلاحياتك: ' + permsLine(perms) + '. لو محتاجها، اطلبها من الأدمن الأساسي.' }),
+      el('div', { class: 'denied8__acts' },
+        back
+          ? el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.go(A.area, back.key); } }, icon(area.icon || 'home'), 'روح لل' + back.label.replace(/^ال/, ''))
+          : el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.go(A.homeArea()); } }, icon(home.icon || 'home'), 'روح لل' + String(home.short || home.label).replace(/^ال/, '')),
+        ask))];
+  };
+
+  /* =======================================================
+     «شوف اللوحة بعينه» (Phase 8B W6, team.png / denied.png): the panel drawn with another admin's
+     permissions, as if PERMS_ENFORCE were on — the rail, the areas and «مش متاحة». Only the drawing
+     changes: the Worker still answers as the one looking, and nothing is saved as the other admin.
+  ======================================================= */
+  A.viewing = null;
+
+  A.viewAs = function (person) {
+    if (!person) return;
+    if (A.closeSheet) A.closeSheet();
+    A.viewing = { person: person, real: A.access, back: { area: A.area, sub: A.sub[A.area] } };
+    A.access = { enforce: true, primary: false, perms: person.grants || {} };
+    document.documentElement.setAttribute('data-viewing', '');
+    paintViewAs();
+    renderNav();
+    A.go(A.homeArea());
+  };
+
+  A.viewAsEnd = function () {
+    var v = A.viewing;
+    if (!v) return;
+    A.viewing = null;
+    A.access = v.real;
+    document.documentElement.removeAttribute('data-viewing');
+    paintViewAs();
+    renderNav();
+    A.go(v.back.area || 'settings', v.back.sub || undefined);
+  };
+
+  function paintViewAs() {
+    var bar = document.getElementById('viewas');
+    var v = A.viewing;
+    if (!v) { if (bar) bar.remove(); return; }
+    var name = v.person.name || String(v.person.email || '').split('@')[0];
+    var node = el('div', { class: 'viewas', id: 'viewas', role: 'status' },
+      A.avatarNode('viewas__av', v.person.email, name),
+      el('b', { class: 'viewas__text', text: 'بتشوف اللوحة بعين «' + name + '»' + (v.person.role ? ' · ' + v.person.role : '') }),
+      el('button', { class: 'btn btn--small viewas__back', type: 'button', onclick: function () { A.viewAsEnd(); } }, icon('close'), 'ارجع لعينك'));
+    // above the area's tabs (denied.png)
+    var view = document.getElementById('subtabs') || document.getElementById('view');
+    if (bar) bar.replaceWith(node);
+    else if (view) view.parentNode.insertBefore(node, view);
+  }
 
   /* =======================================================
      SHELL (Phase 8 A2, docs/PHASE8-PLAN.md §2): the rail's groups, its sliding light and its
@@ -4567,6 +4666,47 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return n ? n.charAt(0) : '؟';
   }
 
+  /* =======================================================
+     ADMIN PHOTOS (Phase 8B W6 / B12, me-avatar.png): each admin's own circle, else the first letter of the name.
+     Loaded once after sign-in (GET /v1/admin/avatars) and again after a change; the rail, the top bar,
+     «المتصلين دلوقتي», the log and the team draw them with A.avatarNode.
+  ======================================================= */
+  A.avatars = {};
+
+  A.avatarOf = function (email) {
+    var a = A.avatars[String(email || '').toLowerCase()];
+    return a && a.src ? a.src : '';
+  };
+
+  /* <span class=cls> with the photo, or the letter */
+  A.avatarNode = function (cls, email, name, attrs) {
+    var span = el('span', Object.assign({ class: cls, 'aria-hidden': 'true' }, attrs || {}));
+    A.avatarFill(span, email, name);
+    return span;
+  };
+
+  A.avatarFill = function (span, email, name) {
+    var src = A.avatarOf(email);
+    span.classList.toggle('has-img', !!src);
+    if (src) span.replaceChildren(el('img', { src: src, alt: '', decoding: 'async', draggable: 'false' }));
+    else span.textContent = initial(name || email);
+    return span;
+  };
+
+  A.loadAvatars = function () {
+    return A.call('apiAvatars').then(function (reply) {
+      A.setAvatars(reply && reply.avatars);
+    }).catch(function () { /* the letters stay */ });
+  };
+
+  A.setAvatars = function (avatars) {
+    A.avatars = avatars && typeof avatars === 'object' ? avatars : {};
+    renderNav();
+    paintAccount();
+    // the screens that draw people (no open editor is redrawn)
+    if (['home', 'settings', 'activity'].indexOf(A.area) !== -1 && !(document.getElementById('sheet') || {}).open) A.render();
+  };
+
   /* ---------- the account menu ---------- */
 
   function openAccount(anchor) {
@@ -4574,7 +4714,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var light = A.mode() === 'light';
     menu(anchor, 'menu--account', [
       el('div', { class: 'menu__me' },
-        el('span', { class: 'acct__av acct__av--lg', 'aria-hidden': 'true', text: initial(myName()) }),
+        A.avatarNode('acct__av acct__av--lg', email, myName()),
         el('span', { class: 'menu__who' }, el('b', { dir: 'auto', text: myName() }), el('small', { class: 'ltr', text: email }))),
       menuItem('sparkle', 'المظهر', function () { A.go('settings'); setTimeout(function () { var card = document.querySelector('[data-look-card]'); if (card) card.scrollIntoView({ block: 'start', behavior: A.reducedMotion() ? 'auto' : 'smooth' }); }, 60); }),
       menuItem(light ? 'star' : 'sparkle', light ? 'الوضع الداكن' : 'الوضع الفاتح', function () { A.setPrefs({ theme: light ? 'dark' : 'light' }); }),
@@ -4718,7 +4858,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         } }, el('span', { class: 'more__icon' }, icon(area.icon), navBadge(area.badge, 'more__badge')), el('span', { text: area.label }));
       })),
       el('div', { class: 'more__me' },
-        el('span', { class: 'acct__av acct__av--lg', 'aria-hidden': 'true', text: initial(myName()) }),
+        A.avatarNode('acct__av acct__av--lg', A.state ? A.state.user : '', myName()),
         el('span', { class: 'menu__who' }, el('b', { dir: 'auto', text: myName() }), el('small', { class: 'ltr', text: A.state ? A.state.user : '' }))),
       A.signOut ? el('button', { class: 'btn btn--danger more__out', type: 'button', 'data-signout': '', onclick: function () { A.closeSheet().then(function (ok) { if (ok) A.signOut(); }); } }, icon('logout'), 'تسجيل الخروج') : null
     ), null, { className: 'sheet--more' });
@@ -4756,7 +4896,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var acct = document.getElementById('acct-open');
     if (!acct || !A.state) return;
     var name = myName();
-    acct.querySelector('.acct__av').textContent = initial(name);
+    A.avatarFill(acct.querySelector('.acct__av'), A.state.user, name);
     acct.querySelector('.acct__name').textContent = String(name).split(' ')[0];
     acct.setAttribute('aria-label', 'حسابك: ' + name);
   }
@@ -4924,7 +5064,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   function avatar(other, extra) {
     var name = other.name || other.email || '';
-    return el('span', { class: 'pav pav--' + presenceState(other) + (extra ? ' ' + extra : ''), 'aria-hidden': 'true', text: initial(name) });
+    return A.avatarNode('pav pav--' + presenceState(other) + (extra ? ' ' + extra : ''), other.email, name);
   }
 
   function paintPresence(others, place) {
@@ -4968,13 +5108,16 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       renderNav();
     }
     var key = area.subs ? A.sub[A.area] : (area.view || area.key);
-    var builder = A.allowed(A.area) ? A.views[key] : A.views.denied;
+    var builder = A.allowed(A.area) && (!area.subs || A.allowedSub(key)) ? A.views[key] : A.views.denied;
 
     releaseCardLocks();
     if (A.collab) A.collab.where(A.area, area.subs ? key : '');
 
     view.replaceChildren.apply(view, [].concat(builder ? builder() : []));
     view.setAttribute('aria-busy', 'false');
+    // denied.png: an area this admin may not open shows no tabs over «مش متاحة»
+    var tabs = document.getElementById('subtabs');
+    if (tabs && !A.allowed(A.area)) tabs.hidden = true;
 
     // a new section enters with a short stagger; re-renders after a save don't
     // (never while the page is hidden: the entrance starts transparent)
@@ -6083,6 +6226,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         // Phase 8 A1: this admin's look from the server (a no-op where it has no copy)
         A.loadPrefs();
         A.loadAccess();
+        // Phase 8B W6 (B12): the admins' photos
+        A.loadAvatars();
         return true;
       })
       .catch(function (error) {
@@ -7080,7 +7225,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         el('div', { class: 'setcard__titles' },
           el('h2', { class: 'card__title', text: 'حسابي' }),
           el('p', { class: 'card__hint' }, 'إنت داخل بـ ', el('span', { class: 'ltr', text: meEmail })))),
-      setrow(el('span', { class: 'avatar', 'aria-hidden': 'true', text: (me || meEmail).trim().charAt(0).toUpperCase() }),
+      // Phase 8B W6 (B12, me-avatar.png): the photo row first
+      setrow(A.avatarNode('avatar avatar--photo', meEmail, me || meEmail), 'صورتك الشخصية',
+        'اختيارية. بتظهر في القائمة، والشريط اللي فوق، والمتصلين دلوقتي، والسجل، والنشر. من غيرها بيظهر أول حرف من اسمك.',
+        [el('button', { class: 'btn btn--small', type: 'button', onclick: function () { A.pickAvatar(); } }, icon('upload'), A.avatarOf(meEmail) ? 'غيّر الصورة' : 'ضيف صورة'),
+          A.avatarOf(meEmail) ? el('button', { class: 'btn btn--small btn--danger', type: 'button', onclick: function (event) { A.removeAvatar(event.currentTarget); } }, icon('trash'), 'شيلها') : null], 'setrow--lead setrow--photo'),
+      setrow(A.avatarNode('avatar', meEmail, me || meEmail),
         me || meEmail.split('@')[0], 'اسمك في اللوحة والسجل',
         el('button', { class: 'btn btn--small', type: 'button', onclick: function (event) {
           if (A.renameAdmin) A.renameAdmin(meEmail, me, event.currentTarget);
@@ -7161,7 +7311,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       { key: 'site', title: 'بيانات الموقع', icon: 'globe', head: 'الموقع', make: function () { return [siteCard]; } },
       { key: 'content', title: 'المحتوى والظهور', icon: 'megaphone', make: function () { var s = A.state.schema; return [A.state.hubReady ? hubCard : null, s && s.data < s.target ? upgradeCard : null]; } },
       { key: 'publish', title: 'النشر والنسخ', icon: 'history', has: worker, make: function () { return [headify(publishHistoryCard(), 'history')]; } },
-      { key: 'team', title: 'الفريق والصلاحيات', icon: 'shield', head: 'الفريق', make: function () { return [headify(adminsCard(), 'users')]; } },
+      { key: 'team', title: 'الفريق والصلاحيات', icon: 'shield', head: 'الفريق', make: function () { return adminsCard(); } },
       { key: 'system', title: 'حالة النظام', icon: 'gear', head: 'النظام', has: worker, make: function () { return [systemCard(window.AdminWorker)]; } },
       { key: 'guide', title: 'دليل الأدمن', icon: 'book', make: function () { return [guideCard]; } }
     ].filter(function (g) { return g.has !== false; });
@@ -7259,127 +7409,501 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   };
 
+  /* =======================================================
+     «صورتك الشخصية» (Phase 8B W6 / B12, me-avatar.png): choose a photo, move and zoom it until the face sits
+     in the ring, see it small as it will show, save. The circle is cut here (256 px, WebP ≤ 200 KB); the
+     Worker keeps it for this admin only (worker/src/admin/avatar.js).
+  ======================================================= */
+  var AVATAR_BOX = 240;      // the crop square (CSS px)
+  var AVATAR_RING = 20;      // the ring's inset in it
+  var AVATAR_OUT = 256;      // the saved square
+  var AVATAR_MAX = 200 * 1024;
+
+  A.pickAvatar = function () {
+    var input = el('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,image/heic,image/heif', hidden: true });
+    input.addEventListener('change', function () {
+      var file = input.files && input.files[0];
+      input.remove();
+      if (file) A.avatarEditor(file);
+    });
+    document.body.appendChild(input);
+    input.click();
+  };
+
+  A.removeAvatar = function (button) {
+    A.confirm({
+      tone: 'danger', icon: 'trash', title: 'تشيل صورتك؟',
+      message: 'هيرجع يظهر أول حرف من اسمك مكانها، في كل مكان.',
+      confirmLabel: 'شيلها', cancelLabel: 'لأ، سيبها'
+    }).then(function (ok) {
+      if (!ok) return;
+      var call = A.call('apiAvatarDelete');
+      (button ? A.withBusy(button, call) : call).then(function (reply) {
+        A.setAvatars(reply && reply.avatars);
+        A.toast('اتشالت صورتك');
+      }).catch(function (error) { A.fail(error); });
+    });
+  };
+
+  A.avatarEditor = function (file) {
+
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    var box = A.errorBox();
+    var stage = el('div', { class: 'crop8', role: 'img', 'aria-label': 'الصورة: اسحبها علشان تحركها' },
+      img, el('span', { class: 'crop8__ring', 'aria-hidden': 'true' }));
+    var zoom = el('input', { class: 'crop8__zoom', type: 'range', min: '0', max: '100', value: '0', 'aria-label': 'تكبير' });
+    var big = el('span', { class: 'avatar crop8__prev crop8__prev--big', 'aria-hidden': 'true' });
+    var small = el('span', { class: 'avatar crop8__prev', 'aria-hidden': 'true' });
+    var save = el('button', { class: 'btn btn--primary', type: 'button', disabled: true }, icon('check'), 'احفظ الصورة');
+    var state = { min: 1, scale: 1, x: 0, y: 0, w: 0, h: 0 };
+
+    function clamp() {
+      var w = state.w * state.scale;
+      var h = state.h * state.scale;
+      state.x = Math.min(AVATAR_RING, Math.max(AVATAR_BOX - AVATAR_RING - w, state.x));
+      state.y = Math.min(AVATAR_RING, Math.max(AVATAR_BOX - AVATAR_RING - h, state.y));
+    }
+
+    function render(size, quality, type) {
+      var canvas = document.createElement('canvas');
+      canvas.width = canvas.height = size;
+      var ctx = canvas.getContext('2d');
+      var side = (AVATAR_BOX - 2 * AVATAR_RING) / state.scale;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, (AVATAR_RING - state.x) / state.scale, (AVATAR_RING - state.y) / state.scale, side, side, 0, 0, size, size);
+      return canvas.toDataURL(type || 'image/webp', quality || 0.86);
+    }
+
+    var previewTimer = 0;
+    function paint() {
+      clamp();
+      img.style.width = state.w * state.scale + 'px';
+      img.style.height = state.h * state.scale + 'px';
+      img.style.transform = 'translate(' + state.x + 'px,' + state.y + 'px)';
+      clearTimeout(previewTimer);
+      previewTimer = setTimeout(function () {
+        var src = render(96, 0.8);
+        [big, small].forEach(function (n) { n.replaceChildren(el('img', { src: src, alt: '' })); n.classList.add('has-img'); });
+      }, 60);
+    }
+
+    function setScale(next, cx, cy) {
+      // zoom around a point of the box (the centre by default)
+      cx = cx == null ? AVATAR_BOX / 2 : cx;
+      cy = cy == null ? AVATAR_BOX / 2 : cy;
+      var k = next / state.scale;
+      state.x = cx - (cx - state.x) * k;
+      state.y = cy - (cy - state.y) * k;
+      state.scale = next;
+      paint();
+    }
+
+    zoom.addEventListener('input', function () {
+      setScale(state.min * (1 + Number(zoom.value) / 100 * 2));
+    });
+
+    var drag = null;
+    stage.addEventListener('pointerdown', function (event) {
+      drag = { id: event.pointerId, x: event.clientX, y: event.clientY, ox: state.x, oy: state.y };
+      stage.setPointerCapture(event.pointerId);
+      stage.classList.add('is-drag');
+    });
+    stage.addEventListener('pointermove', function (event) {
+      if (!drag || drag.id !== event.pointerId) return;
+      // RTL page, LTR picture: the photo moves with the finger
+      state.x = drag.ox + (event.clientX - drag.x);
+      state.y = drag.oy + (event.clientY - drag.y);
+      paint();
+    });
+    function endDrag() { drag = null; stage.classList.remove('is-drag'); }
+    stage.addEventListener('pointerup', endDrag);
+    stage.addEventListener('pointercancel', endDrag);
+    stage.addEventListener('wheel', function (event) {
+      event.preventDefault();
+      var r = stage.getBoundingClientRect();
+      var next = Math.min(state.min * 3, Math.max(state.min, state.scale * (event.deltaY < 0 ? 1.08 : 1 / 1.08)));
+      zoom.value = String(Math.round((next / state.min - 1) / 2 * 100));
+      setScale(next, event.clientX - r.left, event.clientY - r.top);
+    }, { passive: false });
+    stage.tabIndex = 0;
+    stage.addEventListener('keydown', function (event) {
+      var step = event.shiftKey ? 20 : 5;
+      var moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+      if (!moves[event.key]) return;
+      event.preventDefault();
+      state.x += moves[event.key][0];
+      state.y += moves[event.key][1];
+      paint();
+    });
+
+    img.alt = '';
+    img.draggable = false;
+    img.onload = function () {
+      state.w = img.naturalWidth;
+      state.h = img.naturalHeight;
+      state.min = (AVATAR_BOX - 2 * AVATAR_RING) / Math.min(state.w, state.h);
+      state.scale = state.min;
+      state.x = (AVATAR_BOX - state.w * state.scale) / 2;
+      state.y = (AVATAR_BOX - state.h * state.scale) / 2;
+      zoom.value = '0';
+      save.disabled = false;
+      paint();
+    };
+    img.onerror = function () {
+      A.fail(new Error('الملف ده مش صورة نقدر نفتحها. جرّب صورة JPG أو PNG.'), box);
+    };
+    img.src = url;
+
+    save.addEventListener('click', function () {
+      box.hidden = true;
+      var data = '';
+      // a browser without WebP output (it gives PNG) saves JPEG
+      var type = /^data:image\/webp/.test(render(8, 0.5)) ? 'image/webp' : 'image/jpeg';
+      [0.86, 0.75, 0.6, 0.45].some(function (q) { data = render(AVATAR_OUT, q, type); return data.length * 0.75 <= AVATAR_MAX; });
+      A.withBusy(save, A.call('apiAvatarSave', data)).then(function (reply) {
+        URL.revokeObjectURL(url);
+        A.dirty = false;
+        A.closeSheet();
+        A.setAvatars(reply && reply.avatars);
+        A.toast('اتحفظت صورتك ✓');
+      }).catch(function (error) { A.fail(error, box); });
+    });
+
+    A.openSheet('صورتك الشخصية', [
+      box,
+      stage,
+      el('div', { class: 'crop8__zoomrow' }, icon('photos'), zoom, el('span', { class: 'crop8__label', text: 'تكبير' })),
+      el('div', { class: 'crop8__prevs' }, big, small, el('small', { text: 'كده هتظهر في القائمة والسجل' })),
+      el('p', { class: 'crop8__note', text: 'بتتقص دايرة وتتضغط (أقصى ٢٠٠ KB)، ومبتظهرش في الموقع العام. أي أدمن يقدر يشيل صورته في أي وقت.' })
+    ], [
+      save,
+      el('button', { class: 'btn btn--ghost', type: 'button', text: 'إلغاء', onclick: function () { URL.revokeObjectURL(url); A.dirty = false; A.closeSheet(); } }),
+      el('button', { class: 'btn btn--small crop8__other', type: 'button', onclick: function () { URL.revokeObjectURL(url); A.closeSheet(); A.pickAvatar(); } }, icon('upload'), 'اختار صورة تانية')
+    ], { size: 'sm', icon: 'photos', sub: 'حرّك وكبّر لحد ما وشك يبقى في الدايرة', className: 'sheet--avatar' });
+
+  };
+
+  /* =======================================================
+     «الفريق والصلاحيات» (Phase 8B W6 / B13: team, team-add, team-perms, team-confirm, team-remove).
+     D1 owns the accounts (GET /v1/admin/accounts); every change goes through the Worker with Google
+     itself (change()), and the Worker checks it all again. Apps Script's apiAdmins only gives the names.
+  ======================================================= */
+
+  var ROLE_ICONS = { treasurer: 'wallet', servant_bookings: 'ticket', content_editor: 'megaphone', viewer: 'eye' };
+  var ROLE_HINTS = {
+    treasurer: 'الحجوزات والفلوس والتصدير', servant_bookings: 'يشوف الحجوزات ويسجّل كاش لنفسه',
+    content_editor: 'المحتوى والفعاليات والصور والنشر', viewer: 'يشوف كل حاجة من غير تعديل', custom: 'تختار الصلاحيات بنفسك'
+  };
+  var MODULE_ICONS = {
+    content: 'megaphone', publish: 'send', events: 'theatre', bookings: 'ticket', finance: 'wallet', exports: 'download',
+    competitions: 'trophy', store: 'gift', points: 'star', participants: 'users', media: 'photos', push: 'bell',
+    accounts: 'shield', activity: 'clock', notifications: 'mail', system: 'gear'
+  };
+  // a sensitive permission asks «أكّد» before it is given (team-confirm.png), with what it means
+  var SENSITIVE = {
+    'accounts.manage': 'هيقدر يضيف أدمنز ويغيّر صلاحياتهم',
+    'accounts.rename': 'هيقدر يغيّر أسماء الأدمنز التانيين',
+    'notifications.manage': 'هيقدر يغيّر مين يوصله إيه من الإشعارات',
+    'participants.manage': 'هيقدر يغيّر إيميلات وباسوردات حسابات الشباب',
+    'activity.manage': 'هيقدر يأرشف ويمسح من سجل النشاط',
+    'exports.export_pii': 'هيقدر ينزّل ملفات فيها موبايلات وإيميلات الشباب',
+    'finance.manage': 'هيقدر يسجّل ويلغي دفعات وتسليمات',
+    'system.manage': 'هيقدر يشغّل أدوات النظام',
+    'publish.publish': 'هيقدر ينشر التغييرات على الموقع'
+  };
+  var YOU_VERBS = {
+    view: 'تشوف', add: 'تضيف', edit: 'تعدّل', delete: 'تمسح', approve: 'تعتمد', publish: 'تنشر', export: 'تصدّر',
+    export_pii: 'تصدّر بأرقام التليفونات', manage: 'تدير', create_cash: 'تسجّل حجز كاش', rename: 'تغيّر أسماء الأدمنز'
+  };
+  var WEEKDAYS = ['الأحد', 'الاتنين', 'التلات', 'الأربع', 'الخميس', 'الجمعة', 'السبت'];
+  var MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+
+  function countWords(n) {
+    return n === 1 ? 'صلاحية واحدة' : n === 2 ? 'صلاحيتين' : A.digits(n) + (n <= 10 ? ' صلاحيات' : ' صلاحية');
+  }
+
+  /* «آخر دخول التلات ٣ نوفمبر» / «آخر دخول النهارده» (Cairo days) */
+  function seenWords(ms) {
+    if (!ms) return 'لسه مدخلش';
+    var cairo = function (t) { return new Date(new Date(t).toLocaleString('en-US', { timeZone: 'Africa/Cairo' })); };
+    var d = cairo(Number(ms));
+    var today = cairo(Date.now());
+    var days = Math.round((new Date(today.getFullYear(), today.getMonth(), today.getDate()) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+    if (days <= 0) return 'آخر دخول النهارده';
+    if (days === 1) return 'آخر دخول امبارح';
+    if (days === 2) return 'آخر دخول من يومين';
+    return 'آخر دخول ' + WEEKDAYS[d.getDay()] + ' ' + A.digits(d.getDate()) + ' ' + MONTHS[d.getMonth()];
+  }
+
+  function initialOf(text) {
+    return String(text || '').trim().charAt(0).toUpperCase() || '؟';
+  }
+
+  /* grants equal to a preset's → its key; else '' («مخصص») */
+  function presetKey(presets, grants) {
+    var keys = Object.keys(grants || {});
+    return Object.keys(presets || {}).filter(function (k) {
+      var p = presets[k].grants;
+      var pk = Object.keys(p);
+      return pk.length === keys.length && pk.every(function (perm) { return grants[perm] === p[perm]; });
+    })[0] || '';
+  }
+
   function adminsCard() {
 
     var box = A.errorBox();
-    var list = el('ul', { class: 'admins', 'aria-label': 'الحسابات المسموح لها', 'aria-busy': 'true' },
-      el('li', { class: 'skeleton skeleton--line' }),
-      el('li', { class: 'skeleton skeleton--line skeleton--short' })
-    );
-    var count = el('span', { class: 'admins__count', dir: 'ltr' });
-    var input = A.textInput('', { type: 'email', ltr: true, max: 254, placeholder: 'name@gmail.com', inputmode: 'email' });
-    var add = el('button', { class: 'btn btn--primary', type: 'button' }, icon('plus'), 'ضيف');
-    var addRow = el('div', { class: 'admins__add' },
-      A.field('الإيميل', input, 'حساب جوجل (Gmail أو حساب شغل على جوجل)'),
-      el('div', { class: 'actions' }, add)
-    );
-    var note = el('p', { class: 'note' });
     var data = null;       // apiAdmins: names, primary, me
-    var acc = null;        // GET /v1/admin/accounts: admins + grants, catalog, presets, canManage
-    var servants = null;   // apiServants (for «خادم مربوط»), loaded once
+    var acc = null;        // GET /v1/admin/accounts: admins + grants, catalog, presets, canManage, canRename, online, removed
+    var servants = null;   // apiServants (for «مربوط بالخادم»), loaded once
     var W = window.AdminWorker;
 
-    input.setAttribute('autocomplete', 'off');
-    input.setAttribute('spellcheck', 'false');
-    input.setAttribute('autocapitalize', 'off');
+    var grid = el('div', { class: 'tm8-grid', 'aria-busy': 'true' },
+      el('div', { class: 'skeleton skeleton--card' }), el('div', { class: 'skeleton skeleton--card' }));
+    var hint = el('p', { class: 'card__hint' });
+    var removedBtn = el('button', { class: 'btn', type: 'button', hidden: true, onclick: function () { showRemoved(); } });
+    var addBtn = el('button', { class: 'btn btn--primary', type: 'button', hidden: true, onclick: function () { addWizard(); } }, icon('plus'), 'ضيف خادم للإدارة');
+    var note = el('p', { class: 'note tm8-note', hidden: true });
+
+    var banner = el('div', { class: 'tm8-enforce', hidden: true },
+      el('span', { class: 'chipico chipico--ok', 'aria-hidden': 'true' }, icon('shield')),
+      el('div', { class: 'tm8-enforce__text' },
+        el('b', { text: 'الصلاحيات مطبقة على السيرفر' }),
+        el('small', { text: 'كل طلب بيتراجع في الـWorker: اللي مش مسموح له بحاجة مبيقدرش يعملها حتى لو فتح الرابط مباشرة. الأقسام اللي مش ليه مبتظهرش أصلًا.' })),
+      el('button', { class: 'btn btn--small', type: 'button', onclick: function () { howItWorks(); } }, 'إزاي بتشتغل؟'));
+
+    /* team-enforce.png: once, before the switch — what each admin will see and not see, «بعينه», then «شغّل الصلاحيات» */
+    var enforceRows = el('tbody');
+    var enforceSwitch = el('input', { type: 'checkbox', role: 'switch', 'aria-label': 'شغّل الصلاحيات', onchange: function () { setEnforce(enforceSwitch.checked, enforceSwitch); } });
+    var enforceCard = el('section', { class: 'card p8-card tm8-enf', hidden: true },
+      el('div', { class: 'p8-card__head' },
+        el('span', { class: 'chipico chipico--warn', 'aria-hidden': 'true' }, icon('shield')),
+        el('div', { class: 'p8-card__titles' },
+          el('h2', { class: 'card__title', text: 'تطبيق الصلاحيات' }),
+          el('p', { class: 'card__hint', text: 'مرة واحدة قبل التشغيل: راجع كل واحد هيشوف إيه' }))),
+      el('div', { class: 'tm8-enf__wrap' },
+        el('table', { class: 'tm8-enf__table' },
+          el('thead', null, el('tr', null, ['الأدمن', 'الدور', 'هيشوف', 'مش هيشوف', ''].map(function (t) { return el('th', { text: t }); }))),
+          enforceRows)),
+      el('div', { class: 'setrow tm8-enf__row' },
+        el('div', { class: 'setrow__text' },
+          el('b', { class: 'setrow__label', text: 'شغّل الصلاحيات' }),
+          el('small', { class: 'setrow__hint', text: 'بيتجرب على Staging الأول. ترجّعه بلمسة لو حد اتقفل عليه حاجة محتاجها.' })),
+        el('div', { class: 'setrow__ctl' }, el('label', { class: 'switch' }, enforceSwitch, el('span', { class: 'switch__track', 'aria-hidden': 'true' })))));
+
+    /* the areas these grants open / don't (the rail, «الإعدادات» aside) */
+    function areasOf(grants) {
+      var seen = [];
+      var unseen = [];
+      (A.AREAS || []).forEach(function (a) {
+        var needs = A.AREA_NEEDS && A.AREA_NEEDS[a.key];
+        if (!needs || a.soon) return;
+        (needs.some(function (p) { return !!grants[p]; }) ? seen : unseen).push(a.short || a.label);
+      });
+      return { seen: seen, unseen: unseen };
+    }
+
+    function drawEnforce() {
+      var show = !!(acc && !acc.enforce && iAmPrimary() && W);
+      enforceCard.hidden = !show;
+      if (!show) return;
+      enforceSwitch.checked = false;
+      A.fill(enforceRows, acc.admins.filter(function (a) { return !a.primary; }).map(function (a) {
+        var k = presetKey(acc.presets, a.grants || {});
+        var areas = areasOf(a.grants || {});
+        return el('tr', null,
+          el('td', null, el('b', { dir: 'auto', text: nameOf(a.email) })),
+          el('td', { 'data-l': 'الدور:', text: k ? acc.presets[k].label : 'مخصص' }),
+          el('td', { class: 'is-ok', 'data-l': 'هيشوف:', text: areas.seen.join('، ') || 'ولا قسم' }),
+          el('td', { class: 'is-muted', 'data-l': 'مش هيشوف:', text: !areas.unseen.length ? 'كله متاح' : areas.unseen.length > 5 && areas.seen.length <= 2 ? 'كل الباقي' : areas.unseen.join('، ') }),
+          el('td', { class: 'tm8-enf__go' }, el('button', { class: 'btn btn--small', type: 'button', onclick: function () { viewAs(a); } }, icon('eye'), 'بعينه')));
+      }));
+    }
+
+    function setEnforce(on, control) {
+      A.confirm({
+        tone: on ? 'info' : 'danger', icon: 'shield',
+        title: on ? 'تشغّل تطبيق الصلاحيات؟' : 'تقفل تطبيق الصلاحيات؟',
+        message: on
+          ? 'من دلوقتي كل أدمن هيشوف ويعمل اللي مسموح له بس، والسيرفر هيرفض أي حاجة تانية. الأدمن الأساسي صلاحياته كاملة زي ما هي.'
+          : 'كل الأدمنز هيرجعوا يشوفوا كل حاجة زي الأول (ما عدا صلاحيات الحساب الأساسي).',
+        confirmLabel: on ? 'شغّلها' : 'اقفلها', cancelLabel: 'لأ، رجوع'
+      }).then(function (ok) {
+        if (!ok) { if (control) control.checked = !on; return; }
+        change('/v1/admin/accounts/enforce', { on: on }).then(function () {
+          A.toast(on ? 'الصلاحيات اتطبقت ✓' : 'تطبيق الصلاحيات اتقفل');
+          if (A.loadAccess) A.loadAccess();
+        }).catch(function (error) { if (control) control.checked = !on; A.fail(error, box, { fields: false }); });
+      });
+    }
+
+    /* «إزاي بتشتغل؟»: the rule in words; the Primary Admin can turn it off from here */
+    function howItWorks() {
+      A.openSheet('الصلاحيات بتشتغل إزاي', el('div', { class: 'tm8-how' },
+        el('p', { text: 'كل أدمن ليه دور وصلاحيات. القائمة بتعرض له الأقسام اللي مسموح له بيها بس، وكل طلب للسيرفر بيتراجع: اللي مش مسموح له بحاجة مبيقدرش يعملها حتى لو فتح الرابط مباشرة.' }),
+        el('p', { text: 'الأدمن الأساسي صلاحياته كاملة دايمًا. والصلاحيات الحساسة محتاجة تكتب «أكّد» قبل ما تديها، وكل تغيير بيتسجل في «سجل النشاط» ويوصلك إشعار بيه.' }),
+        el('p', { text: '«شوف اللوحة بعينه» بيوريك اللوحة زي ما الأدمن ده هيشوفها، من غير ما يتغير حاجة.' })),
+      [iAmPrimary() && W ? el('button', { class: 'btn btn--danger', type: 'button', onclick: function () { A.closeSheet(); setEnforce(false); } }, icon('shield'), 'اقفل تطبيق الصلاحيات') : null,
+        el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })], { size: 'sm', icon: 'shield', sub: 'الصلاحيات مطبقة على السيرفر' });
+    }
+
+    var card = el('section', { class: 'card p8-card tm8-card', id: 'set-team' },
+      el('div', { class: 'p8-card__head tm8-head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('shield')),
+        el('div', { class: 'p8-card__titles' }, el('h2', { class: 'card__title', text: 'الفريق والصلاحيات' }), hint),
+        el('div', { class: 'p8-card__acts tm8-acts' }, removedBtn, addBtn)),
+      box, grid, note);
+
+    var rolesGrid = el('div', { class: 'tm8-roles' });
+    var rolesCard = el('section', { class: 'card p8-card tm8-rolescard', hidden: true },
+      el('div', { class: 'p8-card__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('layers')),
+        el('div', { class: 'p8-card__titles' },
+          el('h2', { class: 'card__title', text: 'الأدوار الجاهزة' }),
+          el('p', { class: 'card__hint', text: 'الدور بيملا الصلاحيات أول مرة بس، وبعدين تقدر تزوّد أو تشيل لكل خادم لوحده' }))),
+      rolesGrid);
+
+    // a menu action has no button to spin: the promise alone
+    function busy(button, promise) {
+      return button ? A.withBusy(button, promise) : promise;
+    }
+
+    var focused = '';   // the card an account link highlighted (kept through redraws)
 
     function accountOf(email) {
-
       return acc ? acc.admins.filter(function (a) { return a.email === email; })[0] || null : null;
-
     }
 
-    function grantsChip(account) {
-
-      if (!account) return null;
-      if (account.primary) return A.chip('كل الصلاحيات', 'gold');
-      var keys = Object.keys(account.grants || {});
-      if (!keys.length) return A.chip('من غير صلاحيات', 'off');
-      var preset = Object.keys(acc.presets).filter(function (k) {
-        var p = acc.presets[k].grants;
-        var pk = Object.keys(p);
-        return pk.length === keys.length && pk.every(function (perm) { return account.grants[perm] === p[perm]; });
-      })[0];
-      return A.chip(preset ? acc.presets[preset].label : keys.length === 1 ? 'صلاحية واحدة' : keys.length === 2 ? 'صلاحيتين' : keys.length + ' صلاحيات', 'info');
-
+    function nameOf(email) {
+      return (data && data.names && data.names[email]) || (accountOf(email) && accountOf(email).name) || email.split('@')[0];
     }
 
-    function row(email) {
+    function servantName(id) {
+      var s = (servants || []).filter(function (x) { return x.id === id; })[0];
+      return s ? s.name : '';
+    }
+
+    function isOnline(email) {
+      if (data && email === data.me) return true;
+      return !!(acc && (acc.online || []).indexOf(email) !== -1);
+    }
+
+    function iAmPrimary() {
+      return !!(data && data.me === data.primary) || !!(A.access && A.access.primary);
+    }
+
+    /* the role box of a card: the preset's name and icon, or «مخصص»; the count under it */
+    function roleOf(account, primary) {
+      if (primary) return { icon: 'shield', label: 'الأدمن الأساسي', sub: 'كل الصلاحيات' };
+      var grants = (account && account.grants) || {};
+      var n = Object.keys(grants).length;
+      var k = acc ? presetKey(acc.presets, grants) : '';
+      var own = grants['bookings.create_cash'] === 'own' ? ' · كاش بتاعه بس' : '';
+      if (!n) return { icon: 'gear', label: 'مخصص', sub: 'من غير صلاحيات' };
+      return { icon: k ? ROLE_ICONS[k] || 'gear' : 'gear', label: k ? acc.presets[k].label : 'مخصص', sub: countWords(n) + own };
+    }
+
+    function teamCard(email) {
 
       var account = accountOf(email);
-      var primary = email === data.primary || !!(account && account.primary);
-      var me = email === data.me;
+      var primary = email === (data && data.primary) || !!(account && account.primary);
+      var me = !!data && email === data.me;
       var manage = !!(acc && acc.canManage && !primary);
       // owner 2026-11-12: one's own name always; another admin's only for the Primary Admin or an
       // accounts.rename grant (the Worker checks it again)
-      var renamable = me || data.me === data.primary || !!(acc && acc.canRename);
+      var renamable = me || iAmPrimary() || !!(acc && acc.canRename);
+      var shown = nameOf(email);
+      var named = !!(data && data.stored && data.stored[email]);
+      var role = roleOf(account, primary);
+      var servantId = account && account.servantId;
 
-      var shown = (data.names && data.names[email]) || email.split('@')[0];
-      var named = !!(data.stored && data.stored[email]);
+      function openMenu(event) {
+        var anchor = event.currentTarget;
+        var items = [];
+        if (manage) {
+          items.push(A.menuItem('shield', 'غيّر الدور والصلاحيات', function () { editGrants(account); }));
+          items.push(A.menuItem('user', 'غيّر الخادم المربوط', function () { linkServant(account); }));
+          items.push(A.menuItem('logout', 'اخرّجه من كل الأجهزة', function () { signOutAll(email); }));
+        }
+        if (renamable) items.push(A.menuItem('edit', 'غيّر الاسم', function () { rename(email, named ? shown : ''); }));
+        if (manage && !me) {
+          items.push(el('hr', { class: 'menu__sep' }));
+          items.push(A.menuItem('userx', 'شيله من الإدارة…', function () { remove(email); }, { danger: true }));
+        }
+        A.menu(anchor, 'menu--p8', items, { align: 'start' });
+      }
 
-      return el('li', { class: 'admin' + (primary ? ' admin--primary' : ''), 'data-email': email },
-        el('span', { class: 'admin__icon', 'aria-hidden': 'true' }, icon(primary ? 'shield' : 'user')),
-        el('span', { class: 'admin__main' },
-          el('span', { class: 'admin__name' + (named ? '' : ' is-unnamed'), dir: 'auto', text: named ? shown : shown + ' (من غير اسم)' }),
-          el('span', { class: 'admin__email ltr', text: email }),
-          el('span', { class: 'admin__chips' },
-            primary ? A.chip('الحساب الأساسي', 'gold') : null,
-            me ? A.chip('انت', 'info') : null,
-            primary ? null : grantsChip(account)
-          )
-        ),
-        renamable ? el('button', {
-          class: 'icon-btn',
-          type: 'button',
-          'aria-label': 'غيّر اسم ' + email,
-          title: 'غيّر الاسم',
-          onclick: function (event) { rename(email, named ? shown : '', event.currentTarget); }
-        }, icon('edit')) : null,
-        manage && account ? el('button', {
-          class: 'icon-btn',
-          type: 'button',
-          'aria-label': 'صلاحيات ' + email,
-          title: 'الصلاحيات',
-          onclick: function (event) { editGrants(account, event.currentTarget); }
-        }, icon('shield')) : null,
+      var more = !primary && (manage || renamable)
+        ? el('button', { class: 'p8-iconbtn tm8__more', type: 'button', 'aria-label': 'اختيارات تانية: ' + shown, 'aria-haspopup': 'menu', onclick: openMenu }, icon('dots'))
+        : null;
+
+      return el('article', { class: 'tm8' + (primary ? ' is-primary' : '') + (focused === email ? ' is-focus' : ''), 'data-email': email },
+        el('div', { class: 'tm8__head' },
+          A.avatarNode('tm8__av', email, shown),
+          el('div', { class: 'tm8__who' },
+            el('b', { class: 'tm8__name' + (named ? '' : ' is-unnamed'), dir: 'auto', text: shown, title: named ? null : 'من غير اسم: أول الإيميل' }),
+            el('small', { class: 'tm8__email ltr', text: email })),
+          primary ? el('span', { class: 'p8-tag p8-tag--acc tm8__lock', role: 'img', 'aria-label': 'الأساسي: محمي، مينفعش يتشال' }, icon('lock'), 'الأساسي') : more),
+        el('div', { class: 'tm8__role' },
+          el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(role.icon)),
+          el('div', null, el('b', { text: role.label }), el('small', { text: role.sub }))),
+        el('div', { class: 'tm8__facts' },
+          el('span', null, icon('clock'), isOnline(email) ? 'متصل دلوقتي' : seenWords(account && account.lastSeen)),
+          servantId && servantName(servantId)
+            ? el('span', null, icon('user'), 'مربوط بالخادم «' + servantName(servantId) + '»')
+            : el('span', { class: 'is-muted' }, icon('user'), servantId ? 'مربوط بخادم' : 'مش مربوط بخادم')),
         primary
-          ? el('span', { class: 'admin__lock', role: 'img', 'aria-label': 'محمي: مينفعش يتشال', title: 'محمي: مينفعش يتشال' }, icon('lock'))
-          : manage && !me
-            ? el('button', {
-              class: 'icon-btn icon-btn--danger',
-              type: 'button',
-              'aria-label': 'شيل صلاحية ' + email,
-              onclick: function (event) { remove(email, event.currentTarget); }
-            }, icon('trash'))
-            : null
-      );
+          ? el('p', { class: 'tm8__note', text: 'صلاحياته كاملة ومينفعش يتغير أو يتشال.' })
+          : manage
+            ? el('div', { class: 'tm8__acts' },
+              el('button', { class: 'btn btn--small btn--primary', type: 'button', onclick: function () { editGrants(account); } }, icon('shield'), 'الدور والصلاحيات'),
+              el('button', { class: 'btn btn--small', type: 'button', onclick: function () { viewAs(account); } }, icon('eye'), 'شوف اللوحة بعينه'))
+            : null);
 
     }
 
     function draw() {
 
       if (!data) return;
-      list.setAttribute('aria-busy', 'false');
+      grid.setAttribute('aria-busy', 'false');
       // D1 decides who is in; until it answers (or in the emergency panel), the allowlist here
       var emails = acc ? acc.admins.map(function (a) { return a.email; }) : data.emails;
-      A.fill(list, emails.map(row));
+      A.fill(grid, emails.map(teamCard));
       focusAccount(emails);
-      count.textContent = emails.length + ' / ' + data.max;
-      addRow.hidden = !(acc && acc.canManage);
-      add.disabled = emails.length >= data.max;
+      hint.textContent = A.digits(emails.length) + ' من ' + A.digits(data.max) + ' · مين يدخل اللوحة، ودوره، والمسموح له بيه';
+      var manage = !!(acc && acc.canManage);
+      var gone = acc && acc.removed ? acc.removed.length : 0;
+      addBtn.hidden = !manage;
+      addBtn.disabled = emails.length >= data.max;
+      removedBtn.hidden = !manage;
+      A.fill(removedBtn, icon('userx'), 'اللي اتشالوا (' + A.digits(gone) + ')');
+      removedBtn.disabled = !gone;
+      banner.hidden = !(acc && acc.enforce);
+      drawEnforce();
+      note.hidden = !(!W || (acc && !manage));
       note.textContent = !W
         ? 'الإضافة والصلاحيات من لوحة التحكم الأساسية (stathanasiosyouth.github.io/admin).'
-        : acc && !acc.canManage
-          ? 'إضافة الأدمنز وتغيير صلاحياتهم للحساب الأساسي ومن معاه صلاحية «يدير · الحسابات والصلاحيات».'
-          : 'كل تغيير في الحسابات والصلاحيات بيتسجل في «سجل النشاط» ويوصل للحساب الأساسي.';
+        : 'إضافة الأدمنز وتغيير صلاحياتهم للحساب الأساسي ومن معاه صلاحية «يدير · الحسابات والصلاحيات».';
+      rolesCard.hidden = !acc;
+      if (acc) {
+        A.fill(rolesGrid, Object.keys(acc.presets).map(function (k) {
+          return el('div', { class: 'tm8-role' },
+            el('b', null, icon(ROLE_ICONS[k] || 'gear'), acc.presets[k].label),
+            el('p', { text: ROLE_HINTS[k] || '' }));
+        }));
+      }
+      if (A.teamScreenDrawn) A.teamScreenDrawn(acc);
 
     }
 
-    /* an email / push link to one account (#open/account/<key>, AdminActivity): that row, highlighted */
+    /* an email / push link to one account (#open/account/<key>, AdminActivity): that card, highlighted */
     function focusAccount(emails) {
 
       var key = A.accountFocus;
       if (!key) return;
+      // a new link: the last highlighted card lets go
+      focused = '';
+      grid.querySelectorAll('.tm8.is-focus').forEach(function (n) { n.classList.remove('is-focus'); });
       var email = emails.filter(function (e) { return A.accountKey(e) === key; })[0];
       if (!email) {
         // not in the list yet: the Worker's answer may still come; otherwise it was removed
@@ -7387,7 +7911,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         return;
       }
       A.accountFocus = '';
-      var li = list.querySelector('[data-email="' + email.replace(/["\\]/g, '') + '"]');
+      focused = email;
+      var li = grid.querySelector('[data-email="' + email.replace(/["\\]/g, '') + '"]');
       if (!li) return;
       li.classList.add('is-focus');
       setTimeout(function () { if (li.scrollIntoView) li.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 60);
@@ -7415,11 +7940,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         data = next;
         draw();
       }).catch(function (error) {
-        list.setAttribute('aria-busy', 'false');
-        list.replaceChildren();
+        grid.setAttribute('aria-busy', 'false');
+        grid.replaceChildren();
         A.fail(error, box);
       });
       loadAccounts();
+      loadServants().then(function () { draw(); });
 
     }
 
@@ -7433,7 +7959,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         return W.call('POST', path, body, { google: true });
       }
 
-      return A.withBusy(button, send().catch(function (error) {
+      return busy(button, send().catch(function (error) {
         if (!error || error.code !== 'google') throw error;
         return A.confirm({
           tone: 'info',
@@ -7447,9 +7973,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           return W.google().then(send);
         });
       })).then(function (reply) {
-        acc = reply;
+        var invite = reply && reply.invite;
+        if (reply && reply.admins) acc = reply;
         draw();
-        return reply;
+        return { reply: reply, invite: invite };
       }).catch(function (error) {
         throw accountsError(error);
       });
@@ -7462,96 +7989,391 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       return A.call('apiServants').then(function (reply) {
         servants = (reply && reply.servants || []).filter(function (s) { return s.active !== false; });
         return servants;
-      }, function () { return []; });
+      }, function () { servants = []; return []; });
 
     }
 
-    /* the grants form: a preset pre-fills, the boxes decide (the server checks again) */
-    function grantsForm(account) {
-
-      var current = account ? account.grants || {} : {};
-      var boxes = {};
-      var groups = [];
-      var byModule = {};
-
-      acc.perms.forEach(function (perm) {
-        var m = perm.split('.')[0];
-        (byModule[m] = byModule[m] || []).push(perm);
+    function servantSelect(selected) {
+      var select = el('select', { class: 'input', 'aria-label': 'الخادم المربوط' }, el('option', { value: '', text: 'من غير خادم مربوط' }));
+      (servants || []).forEach(function (s) {
+        select.appendChild(el('option', { value: s.id, text: s.name, selected: selected === s.id }));
       });
-
-      Object.keys(byModule).forEach(function (m) {
-        groups.push(el('fieldset', { class: 'grants__group' },
-          el('legend', { text: PERM_MODULES[m] || m }),
-          byModule[m].map(function (perm) {
-            var hint = perm === 'bookings.create_cash' ? 'لو اخترت «الخادم المربوط بس» تحت: يسجّل كاش باسم خادمه هو بس.' : '';
-            if (acc.primaryDefault.indexOf(perm) !== -1) hint = 'صلاحية حساسة: للحساب الأساسي أساسًا.';
-            var box = A.checkbox(PERM_ACTIONS[perm.split('.')[1]] || perm, !!current[perm], hint);
-            boxes[perm] = box.input;
-            return box.node;
-          })
-        ));
-      });
-
-      var own = A.checkbox('تسجيل الكاش للخادم المربوط بس', current['bookings.create_cash'] === 'own', 'من غير ده: يسجّل كاش باسم أي خادم.');
-      var servant = el('select', { class: 'input' }, el('option', { value: '', text: 'من غير خادم مربوط' }));
-      var preset = A.choices(A.uid('preset'), [{ value: '', label: 'مخصص' }].concat(Object.keys(acc.presets).map(function (k) {
-        return { value: k, label: acc.presets[k].label };
-      })), '', function (k) {
-        if (!k) return;
-        var g = acc.presets[k].grants;
-        Object.keys(boxes).forEach(function (perm) { boxes[perm].checked = !!g[perm]; });
-        own.input.checked = g['bookings.create_cash'] === 'own';
-      });
-
-      loadServants().then(function (all) {
-        all.forEach(function (s) {
-          servant.appendChild(el('option', { value: s.id, text: s.name, selected: account && account.servantId === s.id }));
-        });
-      });
-
-      return {
-        node: el('div', { class: 'grants' },
-          A.field('ابدأ من', preset.node, 'بيعلّم الخانات بس؛ تقدر تعدّل بعدها.'),
-          A.field('الخادم المربوط', servant, 'الخادم اللي الأدمن ده بيستلم الفلوس باسمه.'),
-          own.node,
-          groups
-        ),
-        value: function () {
-          var grants = {};
-          Object.keys(boxes).forEach(function (perm) {
-            if (boxes[perm].checked) grants[perm] = perm === 'bookings.create_cash' && own.input.checked ? 'own' : 'all';
-          });
-          return { grants: grants, servantId: servant.value || null };
-        }
-      };
-
+      return select;
     }
 
-    function editGrants(account, button) {
+    /* «شوف اللوحة بعينه»: the panel as this admin would see it (AdminScript A.viewAs) */
+    function viewAs(account) {
+      if (!A.viewAs || !account) return;
+      var k = acc ? presetKey(acc.presets, account.grants) : '';
+      A.viewAs({ email: account.email, name: nameOf(account.email), role: k ? acc.presets[k].label : 'مخصص', grants: account.grants || {} });
+    }
 
+    /* ---------- team-perms.png: the role and the permissions, one sheet ---------- */
+
+    /* what these grants open, in words: [ok lines], [warn lines], the areas they won't see */
+    function grantWords(grants) {
+      var byVerb = {};
+      var order = [];
+      Object.keys(grants).forEach(function (perm) {
+        var parts = perm.split('.');
+        if (SENSITIVE[perm]) return;
+        var key = parts[1] === 'create_cash' ? perm : parts[1];
+        if (!byVerb[key]) { byVerb[key] = []; order.push(key); }
+        byVerb[key].push(parts[0]);
+      });
+      var ok = order.map(function (key) {
+        if (key === 'bookings.create_cash') return YOU_VERBS.create_cash + (grants[key] === 'own' ? ' (بتاعه بس)' : '');
+        var mods = byVerb[key].map(function (m) { return PERM_MODULES[m] || m; });
+        return (YOU_VERBS[key] || key) + ' ' + (mods.length > 1 ? mods.slice(0, -1).join('، ') + ' و' + mods[mods.length - 1] : mods[0]);
+      });
+      var warn = Object.keys(grants).filter(function (p) { return SENSITIVE[p]; }).map(function (perm) {
+        var parts = perm.split('.');
+        return (YOU_VERBS[parts[1]] || parts[1]) + (parts[1] === 'export_pii' || parts[1] === 'rename' ? '' : ' ' + (PERM_MODULES[parts[0]] || parts[0]));
+      });
+      var hidden = (A.AREAS || []).filter(function (a) {
+        var needs = A.AREA_NEEDS && A.AREA_NEEDS[a.key];
+        return needs && !needs.some(function (p) { return !!grants[p]; });
+      }).map(function (a) { return a.label; });
+      return { ok: ok, warn: warn, hidden: hidden };
+    }
+
+    function editGrants(account, prefill, onDone) {
+
+      if (!account || !acc) return;
       box.hidden = true;
-      var form = grantsForm(account);
-      A.modal({
-        tone: 'info',
-        icon: 'shield',
-        title: 'صلاحيات «' + ((data.names && data.names[account.email]) || account.email) + '»',
-        message: 'علّم اللي يقدر يعمله. مش هتقدر تدي صلاحية مش عندك.',
-        body: form.node,
-        actions: [
-          { label: 'إلغاء', value: false, kind: 'ghost' },
-          { label: 'احفظ الصلاحيات', value: true, kind: 'primary' }
-        ]
+      var before = account.grants || {};
+      var grants = JSON.parse(JSON.stringify(prefill || before));
+      var onlyOn = false;
+      var linked = account.servantId ? servantName(account.servantId) : '';
+
+      var rolesNav = el('nav', { class: 'tm8p-roles', 'aria-label': 'الدور' });
+      var roleNote = el('p', { class: 'tm8p-roles__note' });
+      var matrix = el('div', { class: 'tm8p-matrix' });
+      var seg = A.segmented([{ value: 'all', label: 'كل الأقسام' }, { value: 'on', label: 'اللي متاح بس' }], 'all', 'اعرض', function (v) { onlyOn = v === 'on'; paint(); });
+      var aside = el('div', { class: 'tm8p-aside' });
+      var review = el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { confirmChange(account, grants, account.servantId || null, review, onDone); } });
+      var startKey = presetKey(acc.presets, before);
+
+      function setPreset(k) {
+        if (k === 'custom') return;
+        grants = JSON.parse(JSON.stringify(acc.presets[k].grants));
+        startKey = k;
+        paint();
+      }
+
+      function toggle(perm) {
+        var cur = grants[perm];
+        if (perm === 'bookings.create_cash') grants[perm] = !cur ? 'all' : cur === 'all' ? 'own' : undefined;
+        else grants[perm] = cur ? undefined : 'all';
+        if (!grants[perm]) delete grants[perm];
+        paint();
+      }
+
+      function changes() {
+        var n = 0;
+        Object.keys(grants).forEach(function (p) { if (before[p] !== grants[p]) n++; });
+        Object.keys(before).forEach(function (p) { if (!grants[p]) n++; });
+        return n;
+      }
+
+      function paint() {
+
+        var k = presetKey(acc.presets, grants);
+        A.fill(rolesNav, el('small', { class: 'tm8p-roles__label', text: 'الدور' }),
+          Object.keys(acc.presets).concat(['custom']).map(function (key) {
+            var on = key === 'custom' ? !k : key === k;
+            return el('button', { class: 'tm8p-role' + (on ? ' is-on' : ''), type: 'button', 'aria-pressed': on ? 'true' : 'false', onclick: function () { setPreset(key); } },
+              icon(key === 'custom' ? 'gear' : ROLE_ICONS[key] || 'gear'), el('span', { text: key === 'custom' ? 'مخصص' : acc.presets[key].label }));
+          }), roleNote);
+        roleNote.textContent = !k && startKey && acc.presets[startKey] ? 'اخترت «' + acc.presets[startKey].label + '» وزوّدت عليه، فبقى «مخصص».' : '';
+        roleNote.hidden = !roleNote.textContent;
+
+        var byModule = {};
+        var mods = [];
+        acc.perms.forEach(function (perm) {
+          var m = perm.split('.')[0];
+          if (!byModule[m]) { byModule[m] = []; mods.push(m); }
+          byModule[m].push(perm);
+        });
+        var onMods = mods.filter(function (m) { return byModule[m].some(function (p) { return grants[p]; }); });
+        seg.querySelectorAll('.seg__opt span')[1].textContent = 'اللي متاح بس (' + A.digits(onMods.length) + ')';
+        A.fill(matrix, (onlyOn ? onMods : mods).map(function (m) {
+          var on = byModule[m].filter(function (p) { return grants[p]; }).length;
+          return el('div', { class: 'tm8p-row' + (on ? ' has' : '') },
+            el('div', { class: 'tm8p-row__mod' },
+              el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(MODULE_ICONS[m] || 'shield')),
+              el('b', { text: PERM_MODULES[m] || m }),
+              on ? el('span', { class: 'badge', text: A.digits(on) }) : null),
+            el('div', { class: 'tm8p-row__acts', role: 'group', 'aria-label': PERM_MODULES[m] || m }, byModule[m].map(function (perm) {
+              var v = grants[perm];
+              var verb = PERM_ACTIONS[perm.split('.')[1]] || perm;
+              return el('button', {
+                class: 'tm8p-chip' + (v ? ' is-on' : '') + (before[perm] !== v ? ' is-new' : '') + (SENSITIVE[perm] ? ' is-sens' : ''),
+                type: 'button', 'aria-pressed': v ? 'true' : 'false', 'data-perm': perm,
+                'aria-label': verb + ' · ' + (PERM_MODULES[m] || m) + (v === 'own' ? ' (بتوعه بس)' : '') + (SENSITIVE[perm] ? ' · حساسة' : ''),
+                onclick: function () { toggle(perm); }
+              }, v ? icon('check') : null, el('span', { text: verb }), v === 'own' ? el('em', { text: 'بتوعه بس' }) : null, SENSITIVE[perm] ? icon('alert') : null);
+            })));
+        }));
+
+        var words = grantWords(grants);
+        A.fill(aside,
+          el('h5', { text: 'هتقدر تعمل إيه' }),
+          words.ok.length || words.warn.length
+            ? el('ul', { class: 'tm8p-check' },
+              words.ok.map(function (t) { return el('li', { class: 'ok' }, icon('check'), el('span', { text: t })); }),
+              words.warn.map(function (t) { return el('li', { class: 'no' }, icon('alert'), el('span', { text: t })); }))
+            : el('p', { class: 'tm8p-muted', text: 'مفيش صلاحيات: هيدخل اللوحة ومش هيقدر يعمل حاجة.' }),
+          el('div', { class: 'tm8p-hr' }),
+          el('h5', { text: 'مش هتشوف' }),
+          el('p', { class: 'tm8p-muted', text: words.hidden.length ? words.hidden.join('، ') + ' — مش هيظهروا في القائمة، والسيرفر هيرفض أي طلب ليهم.' : 'هيشوف كل الأقسام.' }),
+          el('div', { class: 'tm8p-hr' }),
+          el('h5', { text: 'نطاق «بتوعه بس»' }),
+          el('p', { class: 'tm8p-muted', text: 'الحجوزات اللي على اسم الخادم المربوط بس. لو مفيش خادم مربوط، الصلاحية دي مبتشتغلش.' }));
+
+        var n = changes();
+        A.fill(review, icon('check'), el('span', { text: 'راجع التغييرات (' + A.digits(n) + ')' }));
+        review.disabled = !n;
+        A.dirty = n > 0;
+
+      }
+
+      var name = nameOf(account.email);
+      var head = el('span', { class: 'tm8__av tm8p-av', 'aria-hidden': 'true', text: initialOf(name) });
+      A.openSheet('الدور والصلاحيات: ' + name, el('div', { class: 'tm8p' },
+        rolesNav,
+        el('div', { class: 'tm8p-main' },
+          el('div', { class: 'tm8p-tools' }, seg, el('small', { class: 'tm8p-legend' }, icon('alert'), ' = صلاحية حساسة محتاجة تأكيد')),
+          matrix)), [
+        review,
+        el('button', { class: 'btn btn--ghost', type: 'button', text: 'إلغاء', onclick: function () { A.dirty = false; A.closeSheet(); } }),
+        el('span', { class: 'tm8p-foot' }, icon('info'), 'مفيش حاجة بتتغير قبل التأكيد')
+      ], {
+        size: 'lg', plain: true, sub: account.email + (linked ? ' · مربوط بالخادم «' + linked + '»' : ''), aside: aside, className: 'sheet--team-perms',
+        headActions: el('button', { class: 'btn btn--small', type: 'button', onclick: function () { A.dirty = false; A.closeSheet(); viewAs(Object.assign({}, account, { grants: grants })); } }, icon('eye'), 'شوف اللوحة بعينه')
+      });
+      var titleRow = document.querySelector('dialog.sheet[open] .sheet__head');
+      if (titleRow) titleRow.insertBefore(head, titleRow.firstChild);
+      paint();
+
+    }
+
+    /* ---------- team-confirm.png: what changes, and «أكّد» when a sensitive one is given ---------- */
+    function confirmChange(account, grants, servantId, button, onDone, adding) {
+
+      var before = (account && account.grants) || {};
+      var added = Object.keys(grants).filter(function (p) { return before[p] !== grants[p]; });
+      var removed = Object.keys(before).filter(function (p) { return !grants[p]; });
+      var sensitive = added.filter(function (p) { return SENSITIVE[p]; });
+      var name = adding ? adding.name || adding.email : nameOf(account.email);
+      var cbox = A.errorBox();
+      var typed = el('input', { class: 'input', type: 'text', autocomplete: 'off', 'aria-label': 'اكتب أكّد' });
+      var go = el('button', { class: 'btn btn--primary', type: 'button' }, icon('check'), adding ? 'ضيفه' : 'أكّد التغيير');
+      function ready() { go.disabled = !!sensitive.length && typed.value.trim() !== 'أكّد'; }
+      typed.addEventListener('input', ready);
+
+      function line(perm, kind) {
+        var parts = perm.split('.');
+        var warn = !!SENSITIVE[perm] && kind === 'add';
+        var scope = grants[perm] === 'own' ? 'بتاعه بس' : 'كل ' + (PERM_MODULES[parts[0]] || parts[0]);
+        return el('div', { class: 'tm8c-item' + (warn ? ' is-warn' : kind === 'remove' ? ' is-off' : '') },
+          el('span', { class: 'chipico ' + (warn ? 'chipico--warn' : kind === 'remove' ? 'chipico--danger' : 'chipico--ok'), 'aria-hidden': 'true' }, icon(warn ? 'alert' : kind === 'remove' ? 'close' : 'plus')),
+          el('div', null,
+            el('b', { text: (PERM_MODULES[parts[0]] || parts[0]) + ': ' + (PERM_ACTIONS[parts[1]] || parts[1]) }),
+            el('small', { text: kind === 'remove' ? 'هتتشال' : warn ? SENSITIVE[perm] : scope })));
+      }
+
+      var list = el('div', { class: 'tm8c-list' },
+        added.map(function (p) { return line(p, 'add'); }),
+        removed.map(function (p) { return line(p, 'remove'); }),
+        adding && !added.length ? el('p', { class: 'tm8p-muted', text: 'من غير صلاحيات: هيدخل اللوحة ومش هيقدر يعمل حاجة لحد ما تديله.' }) : null);
+
+      go.addEventListener('click', function () {
+        cbox.hidden = true;
+        var path = adding ? '/v1/admin/accounts' : '/v1/admin/accounts/' + encodeURIComponent(account.email);
+        var body = { grants: grants, servantId: servantId || null };
+        if (adding) { body.email = adding.email; body.name = adding.name || null; body.invite = !!adding.invite; body.role = adding.role || ''; }
+        change(path, body, go).then(function (out) {
+          A.dirty = false;
+          A.closeSheet();
+          if (adding) {
+            A.toast('اتضاف ' + (adding.name || adding.email) + (out.invite === 'sent' ? ' — واتبعتله إيميل بالدعوة ✓' : out.invite === 'off' ? ' — الإيميلات مش متظبطة، فمتبعتش دعوة' : ' ✓'));
+            // the name directory learns the new admin within a minute
+            setTimeout(function () { A.call('apiAdmins').then(function (next) { data = next; draw(); }); }, 1500);
+          } else {
+            A.toast('اتحفظت الصلاحيات ✓');
+          }
+          if (onDone) onDone();
+        }).catch(function (error) { A.fail(error, cbox, { fields: false }); });
+      });
+
+      A.openSheet(adding ? 'تأكد إضافة ' + name : 'تأكد تغيير صلاحيات ' + name, [
+        cbox, list,
+        sensitive.length
+          ? el('div', { class: 'p8-typed tm8c-typed' }, el('b', null, 'علشان فيه صلاحية حساسة: اكتب ', el('span', { class: 'tm8c-word', text: 'أكّد' })), typed)
+          : null,
+        el('p', { class: 'tm8p-muted tm8c-note', text: adding
+          ? 'هيقدر يدخل بحساب جوجل ده بس، ويعمل اللي اتعلّم بس. وبيوصلك إشعار إدارة.'
+          : 'التغيير بيتطبق على طول: لو ' + name + ' فاتح اللوحة دلوقتي، القائمة بتتحدث عنده في الطلب الجاي. وبيوصلك إشعار إدارة.' })
+      ], [go, el('button', { class: 'btn btn--ghost', type: 'button', text: 'رجوع', onclick: function () {
+        if (adding && adding.back) adding.back();
+        else editGrants(account, grants, onDone);
+      } })], {
+        size: 'sm', icon: 'shield', sub: sensitive.length ? 'تغيير حساس: بيتسجل في «الصلاحيات والأمان»' : 'بيتسجل في «سجل النشاط»', className: 'sheet--team-confirm' + (sensitive.length ? ' is-sensitive' : '')
+      });
+      ready();
+      if (sensitive.length) setTimeout(function () { typed.focus(); }, 30);
+
+    }
+
+    /* ---------- team-add.png: three steps, nothing saved before the last ---------- */
+    function addWizard(prefill) {
+
+      if (!acc) return;
+      box.hidden = true;
+      var state = { step: 1, email: (prefill && prefill.email) || '', name: (prefill && prefill.name) || '', servantId: '', role: 'servant_bookings', invite: true };
+      var wbox = A.errorBox();
+
+      function steps() {
+        var words = ['مين', 'الدور', 'راجع وأكّد'];
+        var items = [];
+        words.forEach(function (w, i) {
+          var n = i + 1;
+          var cls = n < state.step ? ' is-done' : n === state.step ? ' is-current' : '';
+          if (i) items.push(el('li', { class: 'comp-steps__line' + (n <= state.step ? ' is-done' : ''), 'aria-hidden': 'true' }));
+          items.push(el('li', { class: 'comp-steps__step' + cls, 'aria-current': n === state.step ? 'step' : null },
+            el('span', { class: 'comp-steps__dot' }, n < state.step ? icon('check') : A.digits(n)), el('span', { text: w })));
+        });
+        return el('ol', { class: 'comp-steps c9-steps', 'aria-label': 'خطوات الإضافة' }, items);
+      }
+
+      function grantsOfRole() {
+        return state.role === 'custom' ? {} : JSON.parse(JSON.stringify(acc.presets[state.role].grants));
+      }
+
+      function who() {
+        var email = A.textInput(state.email, { type: 'email', ltr: true, max: 254, placeholder: 'name@gmail.com', inputmode: 'email' });
+        email.setAttribute('autocomplete', 'off');
+        email.setAttribute('spellcheck', 'false');
+        email.setAttribute('autocapitalize', 'off');
+        var nameIn = A.textInput(state.name, { max: 40, placeholder: 'مثلاً: بيشوي ماهر' });
+        nameIn.setAttribute('dir', 'auto');
+        var sel = servantSelect(state.servantId);
+        sel.addEventListener('change', function () {
+          state.servantId = sel.value;
+          if (!nameIn.value.trim() && sel.value) nameIn.value = servantName(sel.value);
+        });
+        var next = el('button', { class: 'btn btn--primary', type: 'button', onclick: function () {
+          wbox.hidden = true;
+          var e = email.value.trim().toLowerCase();
+          if (!EMAIL.test(e)) { A.fail(new Error('الإيميل ده مش مكتوب صح. اكتب إيميل جوجل كامل، مثلاً name@gmail.com'), wbox); return; }
+          if (accountOf(e)) { A.fail(new Error('الإيميل ده مسموح له قبل كده.'), wbox); return; }
+          state.email = e;
+          state.name = nameIn.value.trim();
+          state.servantId = sel.value;
+          state.step = 2;
+          paint();
+        } }, el('span', { text: 'التالي: الدور' }), el('span', { class: 'c9-next__ic', 'aria-hidden': 'true' }, icon('chevron')));
+        email.addEventListener('keydown', function (event) { if (event.key === 'Enter') { event.preventDefault(); next.click(); } });
+        return {
+          body: [wbox, steps(),
+            A.field('الإيميل', email, 'حساب جوجل (Gmail أو حساب شغل على جوجل)'),
+            A.field('الاسم في اللوحة', nameIn, 'اختياري. من ٢ لـ ٤٠ حرف'),
+            A.field('الخادم المربوط', sel, 'الخادم اللي الأدمن ده بيستلم الفلوس باسمه.')],
+          foot: [next, el('button', { class: 'btn btn--ghost', type: 'button', text: 'إلغاء', onclick: function () { A.dirty = false; A.closeSheet(); } })]
+        };
+      }
+
+      function role() {
+        var name = A.uid('role');
+        var keys = Object.keys(acc.presets).concat(['custom']);
+        var cards = el('div', { class: 'tm8a-roles', role: 'radiogroup', 'aria-label': 'الدور' }, keys.map(function (k) {
+          var input = el('input', { type: 'radio', name: name, value: k, checked: state.role === k, onchange: function () { state.role = k; } });
+          return el('label', { class: 'c9-kind tm8a-role' }, input,
+            el('span', { class: 'c9-kind__top' }, el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(k === 'custom' ? 'gear' : ROLE_ICONS[k] || 'gear')), el('span', { class: 'c9-kind__radio', 'aria-hidden': 'true' })),
+            el('span', { class: 'comp-preset__body' }, el('strong', { text: k === 'custom' ? 'مخصص' : acc.presets[k].label }), el('small', { text: ROLE_HINTS[k] || '' })));
+        }));
+        var sw = A.switchInput('ابعتله إيميل بالدعوة', state.invite, function (on) { state.invite = on; });
+        var display = state.name || state.email.split('@')[0];
+        return {
+          body: [wbox, steps(),
+            el('div', { class: 'tm8a-who' },
+              el('span', { class: 'tm8__av', 'aria-hidden': 'true', text: initialOf(display) }),
+              el('div', { class: 'tm8a-who__main' },
+                el('b', { dir: 'auto', text: display }),
+                el('small', { class: 'tm8a-who__line' }, el('span', { class: 'ltr', text: state.email }), state.servantId ? ' · مربوط بالخادم «' + servantName(state.servantId) + '»' : '')),
+              el('button', { class: 'btn btn--small', type: 'button', onclick: function () { state.step = 1; paint(); } }, icon('edit'), 'غيّر')),
+            el('div', { class: 'field' }, el('span', { class: 'field__label', text: 'الدور' }), cards,
+              el('small', { class: 'field__hint', text: 'الدور بيملا الصلاحيات بس. هتقدر تعدّلها في الخطوة الجاية أو بعدين.' })),
+            el('div', { class: 'tm8a-invite' }, sw.node || sw,
+              el('small', { text: 'فيه رابط اللوحة، ولازم يدخل بنفس حساب جوجل ده' }))],
+          foot: [el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { state.step = 3; paint(); } },
+            el('span', { text: 'التالي: راجع' }), el('span', { class: 'c9-next__ic', 'aria-hidden': 'true' }, icon('chevron'))),
+          el('button', { class: 'btn btn--ghost', type: 'button', text: 'رجوع', onclick: function () { state.step = 1; paint(); } })]
+        };
+      }
+
+      function paint() {
+        A.dirty = true;
+        if (state.step === 3) {
+          // the third step is the permissions with their confirm: the role's grants, editable, then «أكّد»
+          var adding = { email: state.email, name: state.name, invite: state.invite, role: state.role === 'custom' ? '' : state.role, back: function () { state.step = 2; paint(); } };
+          confirmChange({ email: state.email, grants: {} }, grantsOfRole(), state.servantId, null, null, adding);
+          var list = document.querySelector('dialog.sheet[open] .sheet__body');
+          if (list) list.insertBefore(steps(), list.firstChild);
+          return;
+        }
+        var view = state.step === 1 ? who() : role();
+        A.openSheet('ضيف خادم للإدارة', view.body, view.foot, { size: 'md', icon: 'plus', sub: '٣ خطوات — مفيش حاجة بتتحفظ قبل الآخر', className: 'sheet--team-add' });
+      }
+
+      paint();
+
+    }
+
+    /* ---------- «اللي اتشالوا»: removed admins, each can be brought back (the add steps, prefilled) ---------- */
+    function showRemoved() {
+      var gone = (acc && acc.removed) || [];
+      A.openSheet('اللي اتشالوا', el('div', { class: 'tm8-gone' }, gone.map(function (r) {
+        var shown = r.name || r.email.split('@')[0];
+        return el('div', { class: 'p8-item tm8-gone__item' },
+          el('span', { class: 'tm8__av', 'aria-hidden': 'true', text: initialOf(shown) }),
+          el('div', { class: 'p8-item__main' }, el('b', { dir: 'auto', text: shown }), el('small', { class: 'ltr', text: r.email }), el('small', { text: seenWords(r.lastSeen) })),
+          el('button', { class: 'btn btn--small', type: 'button', onclick: function () { A.closeSheet(); addWizard({ email: r.email, name: r.name }); } }, icon('retry'), 'رجّعه'));
+      })), [el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })], {
+        size: 'sm', icon: 'userx', sub: 'صلاحياتهم اتشالت. «رجّعه» بيضيفه تاني بدور تختاره.'
+      });
+    }
+
+    /* ⋯ «غيّر الخادم المربوط»: the same grants, another servant */
+    function linkServant(account) {
+      var sel = servantSelect(account.servantId);
+      var lbox = A.errorBox();
+      var save = el('button', { class: 'btn btn--primary', type: 'button', onclick: function () {
+        change('/v1/admin/accounts/' + encodeURIComponent(account.email), { grants: account.grants || {}, servantId: sel.value || null }, save)
+          .then(function () { A.closeSheet(); A.toast('اتغيّر الخادم المربوط ✓'); })
+          .catch(function (error) { A.fail(error, lbox, { fields: false }); });
+      } }, icon('check'), 'احفظ');
+      A.openSheet('الخادم المربوط: ' + nameOf(account.email), [lbox, A.field('الخادم المربوط', sel, 'الخادم اللي الأدمن ده بيستلم الفلوس باسمه، ونطاق «بتوعه بس».')],
+        [save, el('button', { class: 'btn btn--ghost', type: 'button', text: 'إلغاء', onclick: function () { A.closeSheet(); } })], { size: 'sm', icon: 'user', sub: '' });
+    }
+
+    /* ⋯ «اخرّجه من كل الأجهزة» */
+    function signOutAll(email) {
+      A.confirm({
+        tone: 'danger', icon: 'logout',
+        title: 'تخرّج «' + nameOf(email) + '» من كل الأجهزة؟',
+        message: 'اللوحة بتتقفل عنده دلوقتي، والأجهزة المحفوظة بتتنسي. حسابه وصلاحياته زي ما هم، ويقدر يدخل تاني بحساب جوجل.',
+        confirmLabel: 'اخرّجه', cancelLabel: 'لأ، سيبه'
       }).then(function (ok) {
-        A.dirty = false;
         if (!ok) return;
-        change('/v1/admin/accounts/' + encodeURIComponent(account.email), form.value(), button)
-          .then(function () { A.toast('اتحفظت الصلاحيات ✓'); })
+        change('/v1/admin/accounts/' + encodeURIComponent(email) + '/signout', {})
+          .then(function () { A.toast('اتخرّج ' + nameOf(email) + ' من كل الأجهزة'); })
           .catch(function (error) { A.fail(error, box, { fields: false }); });
       });
-
     }
 
-    /* the display name: our own small dialog; the server checks it (length, no copies) */
+    /* the display name: our own small dialog; the server checks it (length, no copies, who may) */
     // Phase 8B: «غيّر الاسم» in «حسابي» uses the same rename
     A.renameAdmin = rename;
 
@@ -7576,7 +8398,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       }).then(function (ok) {
         A.dirty = false;
         if (!ok) return;
-        A.withBusy(button, A.call('apiSetAdminName', email, field.value))
+        busy(button, A.call('apiSetAdminName', email, field.value))
           .then(function (next) {
             data = next;
             draw();
@@ -7588,98 +8410,80 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
             }
             A.toast(field.value.trim() ? 'اتحفظ الاسم ✓' : 'رجع لأول الإيميل');
           })
-          .catch(function (error) { A.fail(error, box, { fields: false }); });
+          .catch(function (error) { A.fail(accountsError(error), box, { fields: false }); });
       });
 
       setTimeout(function () { field.focus(); field.select(); }, 30);
 
     }
 
-    function remove(email, button) {
+    /* ---------- team-remove.png: only the panel (comes back), or the servant for good (servant-remove) ---------- */
+    function remove(email) {
 
       box.hidden = true;
-      A.confirm({
-        tone: 'danger',
-        icon: 'user',
-        title: 'تشيل صلاحية «' + email + '»؟',
-        message: 'مش هيقدر يدخل لوحة التحكم تاني بالحساب ده، وصلاحياته كلها بتتشال. تقدر تضيفه تاني في أي وقت.',
-        confirmLabel: 'شيل الصلاحية',
-        cancelLabel: 'لأ، سيبه'
-      }).then(function (ok) {
-        if (!ok) return;
-        change('/v1/admin/accounts/' + encodeURIComponent(email) + '/remove', {}, button)
-          .then(function () { A.toast('اتشالت صلاحية ' + email); })
-          .catch(function (error) { A.fail(error, box, { fields: false }); });
+      var account = accountOf(email);
+      var name = nameOf(email);
+      var servantId = account && account.servantId;
+      var rname = A.uid('rm');
+      var keep = el('input', { type: 'radio', name: rname, value: 'panel', checked: true });
+      var purge = el('input', { type: 'radio', name: rname, value: 'servant', disabled: !(servantId && iAmPrimary()) });
+      var rbox = A.errorBox();
+
+      function choice(input, title, tagText, tagKind, lines, danger) {
+        return el('label', { class: 'p8-choice' + (danger ? ' p8-choice--danger' : '') },
+          input,
+          el('span', { class: 'p8-choice__body' },
+            el('span', { class: 'p8-choice__head' },
+              el('span', { class: 'p8-choice__radio', 'aria-hidden': 'true' }),
+              el('b', { text: title }),
+              el('span', { class: 'p8-tag p8-tag--' + tagKind, text: tagText })),
+            el('ul', { class: 'p8-choice__lines' }, lines.map(function (t) { return el('li', { text: t }); }))));
+      }
+
+      var go = el('button', { class: 'btn btn--primary', type: 'button' });
+      function paintGo() {
+        var p = purge.checked;
+        go.className = 'btn ' + (p ? 'btn--danger-solid' : 'btn--primary');
+        A.fill(go, icon(p ? 'trash' : 'userx'), el('span', { text: p ? 'كمّل للحذف النهائي' : 'شيل الصلاحية' }));
+      }
+      keep.addEventListener('change', paintGo);
+      purge.addEventListener('change', paintGo);
+
+      go.addEventListener('click', function () {
+        rbox.hidden = true;
+        var toServant = purge.checked;
+        change('/v1/admin/accounts/' + encodeURIComponent(email) + '/remove', {}, go).then(function () {
+          A.closeSheet();
+          A.toast('اتشالت صلاحية ' + name + ' من الإدارة');
+          // the servant for good: the servant-remove window (servant-remove.png) with its own checks and «احذف»
+          if (toServant && A.removeServantById) A.removeServantById(servantId);
+        }).catch(function (error) { A.fail(error, rbox, { fields: false }); });
       });
+
+      A.openSheet('تشيل «' + name + '» إزاي؟', [
+        rbox,
+        el('div', { class: 'p8-choices', role: 'radiogroup', 'aria-label': 'تشيله إزاي' },
+          choice(keep, 'شيل صلاحيته من الإدارة بس', 'بترجع', 'ok', [
+            'مش هيقدر يدخل لوحة التحكم، وكل أجهزته هتخرج دلوقتي',
+            'يفضل في قايمة «الخدام» للحجوزات، وأرقام الدفع بتاعته زي ما هي',
+            'السجل والحجوزات اللي سجلها بتفضل باسمه',
+            'تقدر ترجّعه بعدين من «الفريق» ← «اللي اتشالوا»']),
+          choice(purge, 'احذف الخادم نهائي', 'مبترجعش', 'danger', servantId ? [
+            'بيتشال من الإدارة ومن قايمة الخدام في كل الفعاليات',
+            'أرقام إنستاباي والمحفظة بتتمسح ومبتظهرش للزوار',
+            'الحجوزات والفلوس اللي معاه: لازم تتنقل لخادم تاني الأول (مطلوب قبل الحذف)',
+            iAmPrimary() ? 'السجل بيفضل، والاسم يظهر فيه «خادم اتحذف»' : 'للأدمن الأساسي بس'
+          ] : ['مش مربوط بخادم: مفيش خادم يتحذف'], true))
+      ], [go, el('button', { class: 'btn btn--ghost', type: 'button', text: 'لأ، سيبه', onclick: function () { A.closeSheet(); } })], {
+        size: 'md', icon: 'userx', sub: 'اختار اللي إنت عاوزه بالظبط — مفيش حاجة بتحصل قبل التأكيد', className: 'sheet--danger sheet--team-remove'
+      });
+      paintGo();
 
     }
 
-    add.addEventListener('click', function () {
-
-      box.hidden = true;
-      A.clearFieldErrors(card);
-
-      var email = input.value.trim().toLowerCase();
-
-      if (!EMAIL.test(email)) {
-        A.fail(new Error('الإيميل ده مش مكتوب صح. اكتب إيميل جوجل كامل، مثلاً name@gmail.com'), box);
-        return;
-      }
-
-      if (accountOf(email)) {
-        A.fail(new Error('الإيميل ده مسموح له قبل كده.'), box);
-        return;
-      }
-
-      var form = grantsForm(null);
-      A.modal({
-        tone: 'info',
-        icon: 'shield',
-        title: 'تدّي «' + email + '» صلاحية لوحة التحكم؟',
-        message: 'هيقدر يدخل بحساب جوجل ده ويعمل اللي هتعلّمه بس.',
-        body: form.node,
-        actions: [
-          { label: 'لأ، رجوع', value: false, kind: 'ghost' },
-          { label: 'ضيف', value: true, kind: 'primary' }
-        ]
-      }).then(function (ok) {
-        A.dirty = false;
-        if (!ok) return;
-        var value = form.value();
-        value.email = email;
-        change('/v1/admin/accounts', value, add)
-          .then(function () {
-            input.value = '';
-            A.toast('اتضاف ' + email + ' ✓');
-            // the name directory (Apps Script) learns the new admin within a minute
-            setTimeout(function () { A.call('apiAdmins').then(function (next) { data = next; draw(); }); }, 1500);
-          })
-          .catch(function (error) { A.fail(error, box); });
-      });
-
-    });
-
-    input.addEventListener('keydown', function (event) {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        add.click();
-      }
-    });
-
-    var card = A.card('الصلاحيات', 'حسابات جوجل اللي تقدر تدخل لوحة التحكم، وكل واحد يقدر يعمل إيه. من غير باسوردات: كل واحد بيدخل بحساب جوجل بتاعه.',
-      box,
-      el('div', { class: 'admins__head' }, el('span', { class: 'section-label', text: 'مسموح لهم' }), count),
-      list,
-      addRow,
-      note,
-      el('p', { class: 'note' }, 'لو هيستخدم لوحة الطوارئ (رابط Apps Script)، شارك معاه الشيت كمان من «افتح الشيت».')
-    );
-
-    addRow.hidden = true;
-    card.classList.add('card--admins');
     load();
 
-    return card;
+    return [banner, enforceCard, card, rolesCard];
 
   }
 
@@ -20467,6 +21271,13 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   };
 
+  /* Phase 8B W6: «الفريق» ← «احذف الخادم نهائي» opens this screen and its servant-remove window */
+  A.removeServantById = function (id) {
+    if (!id) return;
+    P.removeServant = id;
+    A.go('pages', 'servants');
+  };
+
   A.views.servants = function () {
 
     if (!official()) return [recoveryNotice()];
@@ -20485,6 +21296,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           var who = (r.servants || []).filter(function (x) { return x.id === P.focusServant; })[0];
           P.focusServant = '';
           if (who) servantEditor(who);
+        }
+        // Phase 8B W6 (team-remove.png «احذف الخادم نهائي»): straight to the servant-remove window
+        if (P.removeServant) {
+          var gone = (r.servants || []).filter(function (x) { return x.id === P.removeServant; })[0];
+          P.removeServant = '';
+          if (gone && r.payAdmin) removeServant(gone);
         }
       }).catch(function (error) {
         if (!body.isConnected) return;
@@ -21370,7 +22187,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         others.length ? el('div', { class: 'list' }, others.map(function (o) {
           var state = o.item && o.item.label ? 'editing' : o.seen < 40 ? 'online' : 'idle';
           return el('div', { class: 'item item--who is-' + state },
-            el('span', { class: 'avatar', 'aria-hidden': 'true', text: String(o.name || o.email || '؟').trim().charAt(0) }),
+            A.avatarNode('avatar', o.email, o.name || o.email),
             el('div', { class: 'item__main' },
               el('b', { dir: 'auto', text: o.name || o.email }),
               el('small', { text: state === 'editing' ? 'بيعدّل في: ' + o.item.label : state === 'online' ? 'متصل دلوقتي' : 'آخر نشاط ' + A.ago(o.seen) })));
@@ -22549,6 +23366,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   function avatar(entry) {
 
+    // Phase 8B W6 (B12): the admin's photo when they have one
+    var src = A.avatarOf ? A.avatarOf(entry.actor) : '';
+    if (src) return el('span', { class: 'act__avatar has-img', 'aria-hidden': 'true' }, el('img', { src: src, alt: '', decoding: 'async' }));
     return el('span', { class: 'act__avatar', 'aria-hidden': 'true', style: '--hue:' + hue(entry.actor) }, initials(entry.actorName));
 
   }
@@ -23253,7 +24073,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         if (target && target.open) target.open();
         else A.go('activity', 'activity');
       } },
-        el('span', { class: 'avatar', 'aria-hidden': 'true', text: String(entry.actorName || '؟').trim().charAt(0) }),
+        A.avatarNode('avatar', entry.actor, entry.actorName),
         el('span', { class: 'item__main' },
           el('b', { dir: 'auto' }, (entry.actorName || '') + ' ' + (entry.summary || ''),
             g.count > 1 ? el('span', { class: 'x', text: digits(g.count) + ' مرات' }) : null),

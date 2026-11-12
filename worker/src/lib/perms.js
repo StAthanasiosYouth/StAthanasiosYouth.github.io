@@ -64,6 +64,12 @@ export const ROUTE_PERMS = Object.freeze({
   'GET /v1/admin/me': ANY_ADMIN,
   // Phase 8 A1: the admin's own look of the panel (admin/prefs.js)
   'POST /v1/admin/me/prefs': ANY_ADMIN,
+  // Phase 8B W6: «اطلب الصلاحية» (a notification to the account managers)
+  'POST /v1/admin/me/ask-access': ANY_ADMIN,
+  // Phase 8B W6 (B12): each admin's own photo (admin/avatar.js)
+  'GET /v1/admin/avatars': ANY_ADMIN,
+  'POST /v1/admin/me/avatar': ANY_ADMIN,
+  'POST /v1/admin/me/avatar/delete': ANY_ADMIN,
   'POST /v1/admin/accounts/:email/name': ANY_ADMIN,
   'POST /v1/admin/session/start': ANY_ADMIN,
   'POST /v1/admin/session/resume': ANY_ADMIN,
@@ -83,6 +89,9 @@ export const ROUTE_PERMS = Object.freeze({
   'POST /v1/admin/accounts': 'accounts.manage',
   'POST /v1/admin/accounts/:email': 'accounts.manage',
   'POST /v1/admin/accounts/:email/remove': 'accounts.manage',
+  'POST /v1/admin/accounts/:email/signout': 'accounts.manage',
+  // Primary Admin only, checked inside
+  'POST /v1/admin/accounts/enforce': 'accounts.manage',
   'GET /v1/admin/notify/settings': 'notifications.view',
   'POST /v1/admin/notify/settings': 'notifications.manage',
   'GET /v1/admin/notify/me': ANY_ADMIN,

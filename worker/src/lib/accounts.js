@@ -20,6 +20,8 @@ import { retry } from './db.js';
 import { activityStmt } from './activity.js';
 import { limit } from './ratelimit.js';
 import { PERMS, PRIMARY_DEFAULT, PRESETS, heldScope } from './perms.js';
+import { gmailConfigured, sendMail } from '../notify/gmail.js';
+import { adminInviteEmail } from '../notify/templates.js';
 
 export const MAX_ADMINS = 20;
 const EMAIL_RE = /^[^@\s]{1,64}@[^@\s]{1,190}\.[^@\s]{2,}$/;
@@ -94,9 +96,13 @@ async function loadAll(db) {
   }));
 }
 
+/* Phase 8B W6 (team.png): who has the panel open now (a live heartbeat, the page not left) */
+const ONLINE_MS = 90000;
+
 async function listing(ctx) {
   const all = await loadAll(ctx.env.DB);
   const enforce = await retry(() => ctx.env.DB.prepare("SELECT value FROM settings WHERE key = 'PERMS_ENFORCE'").first('value'));
+  const live = await retry(() => ctx.env.DB.prepare('SELECT email FROM admin_sessions WHERE seen_ms > ? AND parked_ms IS NULL').bind(Date.now() - ONLINE_MS).all());
   return {
     me: ctx.actor.email,
     canManage: (await heldScope(ctx, 'accounts.manage')) === 'all',
@@ -107,7 +113,10 @@ async function listing(ctx) {
     perms: PERMS,
     primaryDefault: PRIMARY_DEFAULT,
     presets: PRESETS,
-    admins: all.filter(a => a.active)
+    admins: all.filter(a => a.active),
+    online: live.results.map(r => r.email),
+    // «اللي اتشالوا»: removed admins (no grants left), to bring back through the add form
+    removed: all.filter(a => !a.active && !a.primary).map(a => ({ email: a.email, name: a.name, lastSeen: a.lastSeen }))
   };
 }
 
@@ -178,6 +187,59 @@ export async function accountAdd(ctx) {
     email, name, servantId, grants, add: true, action: 'accounts.add',
     summary: 'ضاف «' + email + '» للوحة التحكم (' + Object.keys(grants).length + ' صلاحية)', changes: { after: digest(grants), servant: servantId }
   })));
+  // Phase 8B W6: «ابعتله إيميل بالدعوة» — after the reply; a failed send changes nothing (the panel says it went or not)
+  const out = await listing(ctx);
+  if (ctx.body.invite === true) out.invite = invite(ctx, email, ctx.body.role);
+  return out;
+}
+
+/* the invitation email: 'sent' (queued after the reply) | 'off' (no Gmail here) */
+function invite(ctx, email, role) {
+  if (!gmailConfigured(ctx.env) || (ctx.env.ENVIRONMENT === 'staging' && /@staging.invalid$/i.test(email))) return 'off';
+  const label = PRESETS[role] ? PRESETS[role].label : '';
+  ctx.defer(sendMail(ctx.env, { to: email, ...adminInviteEmail({ by: ctx.actor.name || '', role: label }) })
+    .catch(err => console.log(JSON.stringify({ t: new Date().toISOString(), msg: 'admin invite failed', error: String(err && err.message || err).slice(0, 200) }))));
+  return 'sent';
+}
+
+/* POST /v1/admin/accounts/:email/signout (accounts.manage, Google) — team.png ⋯ «اخرّجه من كل الأجهزة»:
+   their panel session, its locks and their trusted devices end; the account stays as it is */
+export async function accountSignOut(ctx) {
+  requireGoogle(ctx);
+  await limit(ctx, 'accounts', ctx.actor.email, 30, 60);
+  const email = cleanEmail(ctx.params.email);
+  const all = await loadAll(ctx.env.DB);
+  const row = all.find(a => a.email === email && a.active);
+  if (!row) throw new ApiError('not_found', 'admin');
+  if (row.primary && ctx.actor.role !== 'primary') throw protect('primary');
+  const db = ctx.env.DB;
+  await retry(() => db.batch([
+    db.prepare('DELETE FROM admin_devices WHERE email = ?').bind(email),
+    db.prepare("DELETE FROM edit_locks WHERE kind <> 'booking' AND sid IN (SELECT sid FROM admin_sessions WHERE email = ?)").bind(email),
+    db.prepare('DELETE FROM admin_sessions WHERE email = ?').bind(email),
+    activityStmt(db, {
+      actor: ctx.actor.email, actorName: ctx.actor.name, action: 'accounts.signout', entityType: 'admin', entityId: email, entityTitle: email,
+      summary: 'خرّج «' + email + '» من كل الأجهزة', severity: 'critical'
+    })
+  ]));
+  return listing(ctx);
+}
+
+/* POST /v1/admin/accounts/enforce { on } — team-enforce.png «شغّل الصلاحيات»: the Primary Admin alone, with Google
+   itself, audited as critical. Off again the same way (the §8 rollback). */
+export async function accountsEnforce(ctx) {
+  requireGoogle(ctx);
+  if (ctx.actor.role !== 'primary') throw new ApiError('denied', 'primary only', { perm: 'accounts.manage' });
+  await limit(ctx, 'accounts', ctx.actor.email, 30, 60);
+  const on = ctx.body && ctx.body.on === true;
+  const db = ctx.env.DB;
+  await retry(() => db.batch([
+    db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('PERMS_ENFORCE', ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").bind(on ? '1' : '0', Date.now()),
+    activityStmt(db, {
+      actor: ctx.actor.email, actorName: ctx.actor.name, action: 'accounts.enforce', entityType: 'settings', entityId: 'PERMS_ENFORCE', entityTitle: 'تطبيق الصلاحيات',
+      summary: on ? 'شغّل تطبيق الصلاحيات' : 'قفل تطبيق الصلاحيات', changes: { to: on ? '1' : '0' }, severity: 'critical'
+    })
+  ]));
   return listing(ctx);
 }
 

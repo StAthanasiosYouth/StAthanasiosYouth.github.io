@@ -1647,7 +1647,11 @@
     // Phase 8 A1: the admin's own look of the panel (worker/src/admin/prefs.js)
     apiAdminPrefs: 1, apiAdminPrefsSave: 1,
     // Phase 8 A4: what this admin may open (the same rule every route checks)
-    apiAdminMe: 1
+    apiAdminMe: 1,
+    // Phase 8B W6 (denied.png): «اطلب الصلاحية»
+    apiAdminAskAccess: 1,
+    // Phase 8B W6 (B12): the admins' photos (worker/src/admin/avatar.js)
+    apiAvatars: 1, apiAvatarSave: 1, apiAvatarDelete: 1
   };
 
   /*
@@ -1692,6 +1696,10 @@
         });
         case 'apiAgeRules': return get('/v1/admin/participants/settings').then(function (r) { return map(r, ages); });
         case 'apiAdminMe': return get('/v1/admin/me');
+        case 'apiAdminAskAccess': return post('/v1/admin/me/ask-access', a[0] || {});
+        case 'apiAvatars': return get('/v1/admin/avatars');
+        case 'apiAvatarSave': return post('/v1/admin/me/avatar', { image: a[0] });
+        case 'apiAvatarDelete': return post('/v1/admin/me/avatar/delete', {});
         case 'apiAdminPrefs': return get('/v1/admin/me').then(function (r) { return map(r, function (me) { return me.prefs || null; }); });
         case 'apiAdminPrefsSave': return post('/v1/admin/me/prefs', a[0] || {}).then(function (r) { return map(r, function (x) { return x.prefs; }); });
         case 'apiAgeRulesSave': return post('/v1/admin/participants/settings', { ageMin: (a[0] || {}).min, ageMax: (a[0] || {}).max, warnDays: (a[0] || {}).warnDays }).then(function (r) { return map(r, ages); });

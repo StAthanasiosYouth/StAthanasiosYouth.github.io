@@ -231,7 +231,7 @@ test('sign in with Google → the dashboard, and the browser stays on /admin/', 
     // the token lives in memory only: not in any storage, after sign-in and after more API calls
     await noTokenStored(page, 'after sign-in');
     await page.evaluate(() => A.go('settings', 'team'));
-    await page.waitForSelector('.card--admins .admin');
+    await page.waitForSelector('.tm8-card .tm8');
     assert.ok(calls.some(c => c.fn === 'apiAdmins'));
     await noTokenStored(page, 'after an API call');
 
@@ -367,7 +367,7 @@ test('the token runs out (server or clock) → sign in again over the open edito
   await second.page.waitForSelector('dialog.reauth[open] .gis-stub');
   assert.equal(second.calls.length, sent, 'nothing sent with a token about to expire');
   await second.page.click('dialog.reauth[open] .gis-stub');
-  await second.page.waitForSelector('.admin');
+  await second.page.waitForSelector('.tm8');
   assert.deepEqual(second.problems, []);
   await second.close();
 

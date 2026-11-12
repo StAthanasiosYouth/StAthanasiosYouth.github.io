@@ -65,6 +65,24 @@ export async function adminMe(ctx) {
  * Who (owner 2026-11-12, whatever PERMS_ENFORCE says): the account itself, the Primary Admin, or an
  * admin the Primary Admin granted accounts.rename. Anyone else: denied.
  */
+/*
+ * POST /v1/admin/me/ask-access { area, sub?, label } — Phase 8B W6 (denied.png «اطلب الصلاحية»): a critical
+ * activity row, so the account managers get it as a notification. Nothing changes in the grants.
+ */
+export async function adminAskAccess(ctx) {
+  await limit(ctx, 'admin.ask', ctx.actor.email, 5, 600);
+  const b = ctx.body && typeof ctx.body === 'object' ? ctx.body : {};
+  const key = v => String(v || '').replace(/[^a-z0-9_-]/gi, '').slice(0, 40);
+  const label = String(b.label || '').replace(/[<>{}]/g, '').trim().slice(0, 60);
+  const area = key(b.area);
+  if (!area || !label) throw new ApiError('invalid', 'area', { field: 'area' });
+  await retry(() => activityStmt(ctx.env.DB, {
+    actor: ctx.actor.email, actorName: ctx.actor.name, action: 'accounts.ask', entityType: 'admin', entityId: ctx.actor.email, entityTitle: ctx.actor.email,
+    summary: 'طلب صلاحية «' + label + '»', changes: { area, sub: key(b.sub) || undefined }, severity: 'critical'
+  }).run());
+  return { ok: true };
+}
+
 export async function adminRename(ctx) {
   await limit(ctx, 'admin.rename', ctx.actor.email, 20, 60);
   const email = String(ctx.params.email || '').trim().toLowerCase();
