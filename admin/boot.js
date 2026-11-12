@@ -1000,6 +1000,31 @@
 
   }
 
+  /*
+   * Owner fix 2026-11-12: opening the app on a remembered device (no reload, nothing to restore) is just opening:
+   * the usual gate with «بنفتح لوحة التحكم...», never «جاري استعادة الجلسة...» (that one is for a reload only).
+   */
+  function showOpening(stage) {
+
+    var note = h('p', { class: 'gate__note gate__note--slow', role: 'status', hidden: true });
+
+    showGate('loading', [
+      h('p', { class: 'gate__status', role: 'status' },
+        h('span', { class: 'gate__line', 'aria-hidden': 'true' }, h('i')),
+        h('span', { class: 'gate__verify', text: 'بنفتح لوحة التحكم...' })),
+      note
+    ], stage);
+
+    return {
+      slow: function (message) {
+        note.textContent = message;
+        note.hidden = false;
+        gate.dataset.slow = '1';
+      }
+    };
+
+  }
+
   /* the panel is on its way: the restore look, or «جاري التحقق...» */
   function progress(step, stage) {
 
@@ -2797,7 +2822,8 @@
           return;
         }
         var my = nextAttempt();
-        var view = showRestoring('device');
+        // a reload of this tab restores; a fresh open of the app just opens
+        var view = saved ? showRestoring('device') : showOpening('device');
         var stopSlow = watchdog(TIMING.slow, function () {
           if (my === attempt) view.slow('بياخد وقت أطول من العادي… الخادم بيصحى لو بقاله فترة من غير استخدام.');
         });

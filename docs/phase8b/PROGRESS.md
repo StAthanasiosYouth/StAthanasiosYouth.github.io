@@ -264,6 +264,7 @@
 - النتايج: worker 492/492؛ content-worker 19/19، admin-app 14/14، fix-admin 7/7، prog-b 11/11، admin-filters 3/3، accounts-admin 7/8، refine-b 8/9، admin-rel 7/8، admin 14/21، unit 770/771 — كل الفاشل هو نفس القديم المكتوب فوق.
 - النشر: main eb70c3c (ملف واحد نضيف، 14 ملف)، الـCI نجح (Staging ← Production)، Worker Production e9f68ae4 (قبله dbc21e74)، Pages بيقدّم admin-app.js?v=dc2f90a522. الرجوع: git revert eb70c3c ثم push لـmain، أو فورًا للـWorker: cd worker && npx wrangler rollback dbc21e74-a917-40cc-84ab-14fae821df52.
 - شيل «خادم تصحيح درجات»: main 7637ac8، الـCI نجح، Worker Production c8342bc9 (قبله e9f68ae4). الرجوع: git revert 7637ac8 (أو wrangler rollback e9f68ae4-1a6c-4f3b-b8fc-ebb82ef8c7d5). الأدوار مبتغيّرش صلاحيات أي حساب موجود؛ بتملا الصناديق بس.
+- **«جاري استعادة الجلسة...» وهو بيفتح عادي** (التطبيق على جهاز متفتكر): الدخول بالجهاز كان بيعرض شاشة الاستعادة دايمًا. دلوقتي بتظهر بس في reload لنفس التاب؛ الفتح الجديد بيقول «بنفتح لوحة التحكم...» على البوابة العادية (admin/boot.js showOpening). اختبار admin-app «stay signed in» بيراقب كل كلام البوابة وفشل على الكود القديم (is-restoring + «جاري استعادة الجلسة...») وعدّى بعد الإصلاح؛ final-r (الـreload لسه بيقول «جاري استعادة الجلسة») 7/7. Pages بس، من غير Worker.
 
 ### الجاي: W7 (B14)
 - قائمة الأزرار كاملة (tools/phase8-baseline.mjs بيكتب docs/PHASE8-INVENTORY.md) وتقارن بالقديمة، axe في الثيمين، الكيبورد، تجربة على موبايل حقيقي (Android / iPhone PWA)، والمقارنة النهائية بكل الصور جنب بعض (1440 و390).

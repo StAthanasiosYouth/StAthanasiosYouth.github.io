@@ -572,6 +572,16 @@ async function launch(context) {
   await page.setViewport(PHONE);
   await interceptGoogle(page, { post: body => world.post(body) });
   await page.evaluateOnNewDocument(stage({ standalone: true }));
+  // every text the gate shows on the way in (owner fix 2026-11-12: a fresh open never says «جاري استعادة الجلسة...»)
+  await page.evaluateOnNewDocument(() => {
+    window.__gateSaid = [];
+    const note = () => {
+      const html = document.documentElement;
+      if (html.classList.contains('is-restoring')) window.__gateSaid.push('is-restoring');
+      document.querySelectorAll('#gate .gate__verify').forEach(n => { if (n.offsetParent && n.textContent) window.__gateSaid.push(n.textContent); });
+    };
+    new MutationObserver(note).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'hidden', 'data-state'] });
+  });
   await page.goto(`${LOCAL}/admin/?app=admin`, { waitUntil: 'networkidle0' });
   return { page, problems };
 }
@@ -605,6 +615,8 @@ test('stay signed in: Google once in the app → later launches open the panel w
   assert.equal(await again.page.$('.gis-stub'), null, 'no Google button');
   assert.equal(world.tokeninfo.calls, issued, 'no Google token checked');
   assert.equal(await again.page.evaluate(() => A.state.user), ADMIN);
+  const said = await again.page.evaluate(() => window.__gateSaid);
+  assert.ok(!said.some(t => /استعادة الجلسة|is-restoring/.test(t)), 'a fresh open is not a restore: ' + JSON.stringify([...new Set(said)]));
   await shot(again.page, '13-relaunch-no-google');
 
   // something that needs Google itself: asked once, then done
