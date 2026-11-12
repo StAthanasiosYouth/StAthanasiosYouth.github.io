@@ -2368,7 +2368,10 @@
         }
       }),
       value: function () { return value; },
-      busy: function () { return busy; }
+      busy: function () { return busy; },
+      // Phase 8B (media.png): the library's own «رفع صورة أو فيديو» button and its drop zone
+      choose: function () { if (!busy) file.click(); },
+      take: function (chosen) { handleFile(chosen); }
     };
 
   };

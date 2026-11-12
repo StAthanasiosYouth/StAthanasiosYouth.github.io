@@ -221,7 +221,7 @@ test('the trimmer cuts 4 s out of a local video and uploads only that clip (H.26
   }
 
   // the tile: the poster with a play mark
-  await page.waitForSelector(`.media-tile.is-video .media-tile__play`);
+  await page.waitForSelector('.media8 .tile.is-video');
   await shot(page, '02-library');
   assert.deepEqual(problems, []);
   await close();
