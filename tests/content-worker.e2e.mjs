@@ -670,7 +670,7 @@ test('Phase 8 A4: with PERMS_ENFORCE on, an admin with competitions only lands o
     await s.page.keyboard.press('Escape');
     // a place they may not open (a kept one, a link): told, with the way home
     await s.page.evaluate(() => A.go('media'));
-    await s.page.waitForFunction(() => /مش متاح لحسابك/.test(document.getElementById('view').textContent), { timeout: 4000 });
+    await s.page.waitForFunction(() => /مش متاحة? لحسابك/.test(document.getElementById('view').textContent), { timeout: 4000 });
     await s.page.click('#view .btn--primary');
     await s.page.waitForFunction(() => A.area === 'comps', { timeout: 4000 });
     // and the Worker refuses the call anyway

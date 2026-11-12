@@ -15,11 +15,12 @@ import { putProof, readProof, deleteProof, sweepProofs } from './lib/proofs.js';
 import { PROOF_MAX_BYTES } from './lib/image.js';
 import { verifySync, syncStampStmt } from './lib/sync.js';
 import { grantsSnapshot } from './lib/perms.js';
-import { accountsList, accountAdd, accountUpdate, accountRemove } from './lib/accounts.js';
+import { accountsList, accountAdd, accountUpdate, accountRemove, accountSignOut, accountsEnforce } from './lib/accounts.js';
 import { sessionStart, sessionResume, sessionRenew, sessionEnd, sessionPark, sessionHeartbeat, syncSession } from './admin/session.js';
 import { deviceTrust, deviceForget, deviceSignIn } from './admin/devices.js';
-import { adminMe, adminRename } from './admin/me.js';
+import { adminMe, adminRename, adminAskAccess } from './admin/me.js';
 import { adminPrefsSave } from './admin/prefs.js';
+import { adminAvatars, adminAvatarSave, adminAvatarDelete } from './admin/avatar.js';
 import { activityManage, activityManagePreview, activityManageArchive, activityManageArchiveRead, activityManageDelete } from './admin/activity-manage.js';
 import { notifyClaim } from './notify/claim.js';
 import { tokenHealth } from './notify/email.js';
@@ -325,9 +326,15 @@ export const ROUTES = [
   { method: 'DELETE', path: '/v1/admin/proofs/:id', auth: 'admin', handler: proofDelete },
   { method: 'GET', path: '/v1/admin/accounts', auth: 'admin', handler: accountsList },
   { method: 'POST', path: '/v1/admin/accounts', auth: 'admin', maxBytes: 8 * 1024, handler: accountAdd },
+  { method: 'POST', path: '/v1/admin/accounts/enforce', auth: 'admin', maxBytes: 256, handler: accountsEnforce },
   { method: 'POST', path: '/v1/admin/accounts/:email', auth: 'admin', maxBytes: 8 * 1024, handler: accountUpdate },
   { method: 'POST', path: '/v1/admin/accounts/:email/remove', auth: 'admin', handler: accountRemove },
   { method: 'POST', path: '/v1/admin/accounts/:email/name', auth: 'admin', maxBytes: 1024, handler: adminRename },
+  { method: 'POST', path: '/v1/admin/me/ask-access', auth: 'admin', maxBytes: 512, handler: adminAskAccess },
+  { method: 'GET', path: '/v1/admin/avatars', auth: 'admin', handler: adminAvatars },
+  { method: 'POST', path: '/v1/admin/me/avatar', auth: 'admin', maxBytes: 300 * 1024, handler: adminAvatarSave },
+  { method: 'POST', path: '/v1/admin/me/avatar/delete', auth: 'admin', maxBytes: 256, handler: adminAvatarDelete },
+  { method: 'POST', path: '/v1/admin/accounts/:email/signout', auth: 'admin', maxBytes: 256, handler: accountSignOut },
   { method: 'GET', path: '/v1/admin/me', auth: 'admin', handler: adminMe },
   // Phase 8 A1: the admin's own look of the panel (admin/prefs.js)
   { method: 'POST', path: '/v1/admin/me/prefs', auth: 'admin', maxBytes: 1024, handler: adminPrefsSave },

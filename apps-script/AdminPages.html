@@ -2018,6 +2018,13 @@
 
   };
 
+  /* Phase 8B W6: «الفريق» ← «احذف الخادم نهائي» opens this screen and its servant-remove window */
+  A.removeServantById = function (id) {
+    if (!id) return;
+    P.removeServant = id;
+    A.go('pages', 'servants');
+  };
+
   A.views.servants = function () {
 
     if (!official()) return [recoveryNotice()];
@@ -2036,6 +2043,12 @@
           var who = (r.servants || []).filter(function (x) { return x.id === P.focusServant; })[0];
           P.focusServant = '';
           if (who) servantEditor(who);
+        }
+        // Phase 8B W6 (team-remove.png «احذف الخادم نهائي»): straight to the servant-remove window
+        if (P.removeServant) {
+          var gone = (r.servants || []).filter(function (x) { return x.id === P.removeServant; })[0];
+          P.removeServant = '';
+          if (gone && r.payAdmin) removeServant(gone);
         }
       }).catch(function (error) {
         if (!body.isConnected) return;

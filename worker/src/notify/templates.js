@@ -330,6 +330,9 @@ const SUBJECTS = {
   'accounts.add': 'أدمن جديد في لوحة التحكم[: {target}]',
   'accounts.grants': 'تغيير صلاحيات[ {target}]',
   'accounts.remove': 'إزالة أدمن من لوحة التحكم[: {target}]',
+  'accounts.signout': 'أدمن اتخرّج من كل الأجهزة[: {target}]',
+  'accounts.ask': 'طلب صلاحية في لوحة التحكم[: {target}]',
+  'accounts.enforce': 'تغيير في تطبيق الصلاحيات',
   'notify.settings': 'تغيير إعدادات الإشعارات',
   'notify.failed': 'إشعار مقدرش يتبعت',
   'gmail.token': 'إرسال الإيميلات واقف',
@@ -405,6 +408,27 @@ export function alertEmail(m, { level = 'important', kind = '' } = {}) {
       facts,
       items: m.lines.length > 1 ? (grouped ? m.lines.slice(-10) : m.lines.slice(-5)).map(l => ({ text: l.text, meta: whenText(l.cairo) })) : [],
       link: panelLink(m.url)
+    })
+  };
+}
+
+/*
+ * Phase 8B W6 (team-add.png «ابعتله إيميل بالدعوة»): the new admin learns they were added and where
+ * the panel is. Admin audience; the only link is the panel itself. No code, no password: they sign
+ * in with that same Google account.
+ */
+export function adminInviteEmail({ by = '', role = '' } = {}) {
+  const heading = 'اتضفت للوحة تحكم الخدمة';
+  return {
+    subject: clip(heading + ' – ' + BRAND, 90),
+    ...layout({
+      audience: 'admin',
+      kicker: 'لوحة التحكم · دعوة',
+      heading,
+      intro: (by ? by + ' ضافك' : 'اتضفت') + ' للوحة تحكم الخدمة' + (role ? ' بدور «' + role + '»' : '') + '. ادخل بحساب جوجل ده نفسه، ومن غير أي باسورد.',
+      facts: [by ? ['ضافك', by] : null, role ? ['الدور', role] : null].filter(Boolean),
+      link: panelLink('/admin/'),
+      why: 'وصلك الإيميل ده لأن حد من خدام الخدمة ضاف حساب جوجل ده للوحة التحكم. لو مش متوقعه، كلّم الدعم الفني.'
     })
   };
 }

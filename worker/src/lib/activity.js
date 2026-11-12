@@ -40,7 +40,7 @@ export const FAMILIES = {
     'handover.void', 'event.cancelAll', 'proof.delete', 'accounts.remove'],
   publish: ['publish'],
   push: ['push'],
-  admins: ['admin.add', 'admin.remove', 'admin.rename', 'migrate', 'session.takeover', 'accounts.add', 'accounts.grants', 'accounts.remove']
+  admins: ['admin.add', 'admin.remove', 'admin.rename', 'migrate', 'session.takeover', 'accounts.add', 'accounts.grants', 'accounts.remove', 'accounts.signout', 'accounts.ask', 'accounts.enforce']
 };
 export const SECTIONS = {
   sessions: ['sessions'],

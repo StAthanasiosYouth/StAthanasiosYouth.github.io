@@ -89,6 +89,20 @@ world.gs.API_REQUEST_ = null;
   env.DB.raw.exec("UPDATE settings SET value = '1' WHERE key = 'CONTENT_DRAFTS'");
   // PHASE8_ACCOUNTS=1: youth accounts on (the «الشباب» area); PHASE8_EVAL can then add people over the admin's session
   if (process.env.PHASE8_ACCOUNTS) env.DB.raw.exec("UPDATE settings SET value = 'on' WHERE key = 'accounts_mode'");
+  // PHASE8_TEAM=1 (W6 team shots): two more admins with the presets, one removed, PERMS_ENFORCE on (the banner)
+  if (process.env.PHASE8_TEAM) {
+    const { PRESETS } = await import('../worker/src/lib/perms.js');
+    const day = 86400000;
+    env.DB.raw.exec(`INSERT INTO admins (email, name, role, active, created_at, last_seen) VALUES
+      ('family.account@example.com', 'حساب الأسرة', 'admin', 1, 0, ${Date.now() - 9 * day}),
+      ('christine.emad@example.com', 'كريستين عماد', 'admin', 1, 0, ${Date.now() - 2 * day}),
+      ('old.servant@example.com', 'مينا سمير', 'admin', 0, 0, ${Date.now() - 40 * day});
+      UPDATE settings SET value = '${process.env.PHASE8_TEAM === 'off' ? '0' : '1'}' WHERE key = 'PERMS_ENFORCE';`);
+    const ins = env.DB.raw.prepare("INSERT INTO admin_grants (email, perm, scope, granted_by, granted_at) VALUES (?, ?, ?, 't', 0)");
+    for (const [p, sc] of Object.entries(PRESETS.content_editor.grants)) ins.run('family.account@example.com', p, sc);
+    for (const [p, sc] of Object.entries(PRESETS.servant_bookings.grants)) ins.run('christine.emad@example.com', p, sc);
+    world.properties.set('ADMIN_EMAILS', [ADMIN, 'family.account@example.com', 'christine.emad@example.com'].join(','));
+  }
 }
 
 const server = createSiteServer({

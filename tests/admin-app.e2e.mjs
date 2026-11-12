@@ -347,26 +347,32 @@ test('names: renamed from «صلاحيات لوحة التحكم»; a copy is re
   const d = await device();
   await signIn(d.page);
   await d.page.evaluate(() => A.go('settings', 'team'));
-  await d.page.waitForSelector(`.admin[data-email="${SECOND}"] .admin__name`);
-  assert.equal(await d.page.$eval(`.admin[data-email="${SECOND}"] .admin__name`, n => n.textContent), 'فادي يوسف');
+  // Phase 8B W6 (team.png): a card per admin; «غيّر الاسم» in its ⋯
+  await d.page.waitForSelector(`.tm8[data-email="${SECOND}"] .tm8__name`);
+  assert.equal(await d.page.$eval(`.tm8[data-email="${SECOND}"] .tm8__name`, n => n.textContent), 'فادي يوسف');
+  const renameOpen = async () => {
+    await d.page.click(`.tm8[data-email="${SECOND}"] .tm8__more`);
+    await d.page.waitForFunction(() => [...document.querySelectorAll('.menu button, .menu [role=menuitem]')].some(b => b.textContent.includes('غيّر الاسم')));
+    await d.page.evaluate(() => [...document.querySelectorAll('.menu button, .menu [role=menuitem]')].find(b => b.textContent.includes('غيّر الاسم')).click());
+  };
 
   // rename
-  await d.page.click(`.admin[data-email="${SECOND}"] .icon-btn[title="غيّر الاسم"]`);
+  await renameOpen();
   await d.page.waitForSelector('dialog.modal[open] input');
   await d.page.$eval('dialog.modal[open] input', n => { n.value = ''; });
   await d.page.type('dialog.modal[open] input', 'فادي يوسف كامل');
   await shot(d.page, '05-rename');
   await d.page.click('dialog.modal[open] .btn--primary');
-  await d.page.waitForFunction(e => document.querySelector(`.admin[data-email="${e}"] .admin__name`)?.textContent === 'فادي يوسف كامل', {}, SECOND);
+  await d.page.waitForFunction(e => document.querySelector(`.tm8[data-email="${e}"] .tm8__name`)?.textContent === 'فادي يوسف كامل', {}, SECOND);
   assert.equal(JSON.parse(world.properties.get('ADMIN_NAMES'))[SECOND], 'فادي يوسف كامل');
 
   // a copy of someone else's name: refused, with the reason
-  await d.page.click(`.admin[data-email="${SECOND}"] .icon-btn[title="غيّر الاسم"]`);
+  await renameOpen();
   await d.page.waitForSelector('dialog.modal[open] input');
   await d.page.$eval('dialog.modal[open] input', n => { n.value = ''; });
   await d.page.type('dialog.modal[open] input', 'مينا  زكريا');
   await d.page.click('dialog.modal[open] .btn--primary');
-  await d.page.waitForFunction(() => /مستخدم لأدمن تاني/.test(document.querySelector('.card--admins')?.innerText || ''));
+  await d.page.waitForFunction(() => /مستخدم لأدمن تاني/.test(document.querySelector('.tm8-card')?.innerText || ''));
 
   // logged
   await d.page.evaluate(() => A.go('activity'));

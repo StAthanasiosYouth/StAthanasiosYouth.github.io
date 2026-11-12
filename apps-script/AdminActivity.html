@@ -379,6 +379,9 @@
 
   function avatar(entry) {
 
+    // Phase 8B W6 (B12): the admin's photo when they have one
+    var src = A.avatarOf ? A.avatarOf(entry.actor) : '';
+    if (src) return el('span', { class: 'act__avatar has-img', 'aria-hidden': 'true' }, el('img', { src: src, alt: '', decoding: 'async' }));
     return el('span', { class: 'act__avatar', 'aria-hidden': 'true', style: '--hue:' + hue(entry.actor) }, initials(entry.actorName));
 
   }
@@ -1083,7 +1086,7 @@
         if (target && target.open) target.open();
         else A.go('activity', 'activity');
       } },
-        el('span', { class: 'avatar', 'aria-hidden': 'true', text: String(entry.actorName || '؟').trim().charAt(0) }),
+        A.avatarNode('avatar', entry.actor, entry.actorName),
         el('span', { class: 'item__main' },
           el('b', { dir: 'auto' }, (entry.actorName || '') + ' ' + (entry.summary || ''),
             g.count > 1 ? el('span', { class: 'x', text: digits(g.count) + ' مرات' }) : null),

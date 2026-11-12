@@ -164,11 +164,22 @@ async function openSettings(viewport = { width: 1366, height: 900 }, rows = 2) {
   await page.click('.gis-stub');
   await page.waitForFunction(() => window.A && A.state && !document.getElementById('shell').hidden, { timeout: 15000 });
   await page.evaluate(() => A.go('settings', 'team'));
-  await page.waitForFunction(n => document.querySelectorAll('.card--admins .admin').length === n && /صلاحية واحدة/.test(document.querySelector('.card--admins').innerText), { timeout: 8000 }, rows);
+  // Phase 8B W6 (team.png): a card per admin
+  await page.waitForFunction(n => document.querySelectorAll('.tm8-card .tm8').length === n && /صلاحية واحدة/.test(document.querySelector('.tm8-card').innerText), { timeout: 8000 }, rows);
   return { context, page, problems };
 }
 
-const cardText = page => page.$eval('.card--admins', n => n.innerText);
+const cardText = page => page.$eval('.tm8-card', n => n.innerText);
+/* the sheet's primary button (the add steps, the permissions, their confirm) */
+async function sheetNext(page, label) {
+  await page.waitForFunction(text => { const b = document.querySelector('dialog.sheet[open] .sheet__foot .btn--primary'); return b && !b.disabled && b.textContent.includes(text); }, { timeout: 5000 }, label);
+  await page.click('dialog.sheet[open] .sheet__foot .btn--primary');
+}
+async function menuPick(page, email, label) {
+  await page.click(`.tm8[data-email="${email}"] .tm8__more`);
+  await page.waitForFunction(text => [...document.querySelectorAll('.menu button, .menu [role=menuitem]')].some(b => b.textContent.includes(text)), { timeout: 3000 }, label);
+  await page.evaluate(text => [...document.querySelectorAll('.menu button, .menu [role=menuitem]')].find(b => b.textContent.includes(text)).click(), label);
+}
 async function clickDialogButton(page, label) {
   await page.waitForFunction(text => [...document.querySelectorAll('dialog.modal .btn')].some(b => b.textContent.trim() === text), { timeout: 5000 }, label);
   await page.evaluate(text => [...document.querySelectorAll('dialog.modal .btn')].find(b => b.textContent.trim() === text).click(), label);
@@ -178,42 +189,43 @@ test('«الصلاحيات»: list from D1, add with a preset, change, remove �
   fake.reset();
   const { context, page, problems } = await openSettings();
   const text = await cardText(page);
-  assert.match(text, /الصلاحيات/);
-  assert.match(text, /الحساب الأساسي/, 'the Primary is marked');
+  assert.match(text, /الفريق والصلاحيات/);
+  assert.match(text, /الأساسي/, 'the Primary is marked');
   assert.match(text, /صلاحية واحدة/, 'the second admin: their grants count');
-  assert.equal(await page.$$eval('.card--admins .admin--primary .icon-btn--danger', n => n.length), 0, 'the Primary has no remove button');
+  assert.equal(await page.$$eval('.tm8.is-primary .tm8__more, .tm8.is-primary .tm8__acts', n => n.length), 0, 'the Primary has no menu and no buttons');
 
-  // add, starting from the «خادم – حجوزات» preset
-  await page.type('.card--admins .admins__add input', NEW);
-  await page.click('.card--admins .admins__add .btn--primary');
-  await page.waitForSelector('dialog.modal .grants');
-  await page.evaluate(label => [...document.querySelectorAll('dialog.modal .choice')].find(c => c.textContent.trim() === label).click(), PRESETS.servant_bookings.label);
+  // add (team-add.png): who → the «خادم – حجوزات» role → review and confirm
+  await page.click('.tm8-acts .btn--primary');
+  await page.waitForSelector('dialog.sheet[open] input[type=email]');
+  await page.type('dialog.sheet[open] input[type=email]', NEW);
+  await sheetNext(page, 'التالي');
+  await page.waitForSelector('dialog.sheet[open] .tm8a-role');
+  await page.evaluate(label => [...document.querySelectorAll('dialog.sheet[open] .tm8a-role')].find(c => c.textContent.includes(label)).click(), PRESETS.servant_bookings.label);
   await sleep(200);
   await page.screenshot({ path: `${SHOTS}add-preset.png` });
-  await clickDialogButton(page, 'ضيف');
-  await page.waitForFunction(email => document.querySelectorAll('.card--admins .admin').length === 3 && document.querySelector('.card--admins').innerText.includes(email), { timeout: 8000 }, NEW);
+  await sheetNext(page, 'راجع');
+  await sheetNext(page, 'ضيفه');
+  await page.waitForFunction(email => document.querySelectorAll('.tm8-card .tm8').length === 3 && document.querySelector('.tm8-card').innerText.includes(email), { timeout: 8000 }, NEW);
   const added = fake.calls.find(c => c.method === 'POST' && c.path === '/v1/admin/accounts');
   assert.deepEqual(added.body.grants, PRESETS.servant_bookings.grants, 'the preset pre-filled exactly its boxes (own scope kept)');
   assert.equal(added.body.email, NEW);
   assert.doesNotMatch(added.auth, /^Bearer wk1\./, 'a change goes with Google itself');
   assert.match(await cardText(page), new RegExp(PRESETS.servant_bookings.label));
 
-  // change the second admin: add «يشوف · الفلوس»
-  await page.click(`.card--admins .admin[data-email="${SECOND}"] [title="الصلاحيات"]`);
-  await page.waitForSelector('dialog.modal .grants');
-  await page.evaluate(() => {
-    const group = [...document.querySelectorAll('dialog.modal .grants__group')].find(g => g.querySelector('legend').textContent === 'الفلوس');
-    group.querySelector('input[type=checkbox]').click();
-  });
-  await clickDialogButton(page, 'احفظ الصلاحيات');
-  await page.waitForFunction(() => /صلاحيتين/.test(document.querySelector('.card--admins').innerText), { timeout: 8000 });
+  // change the second admin (team-perms.png → team-confirm.png): add «يشوف · الفلوس»
+  await page.click(`.tm8[data-email="${SECOND}"] .tm8__acts .btn--primary`);
+  await page.waitForSelector('dialog.sheet[open] [data-perm="finance.view"]');
+  await page.click('dialog.sheet[open] [data-perm="finance.view"]');
+  await sheetNext(page, 'راجع التغييرات');
+  await sheetNext(page, 'أكّد التغيير');
+  await page.waitForFunction(() => /صلاحيتين/.test(document.querySelector('.tm8-card').innerText), { timeout: 8000 });
   const changed = fake.calls.find(c => c.path === `/v1/admin/accounts/${encodeURIComponent(SECOND)}`);
   assert.deepEqual(changed.body.grants, { 'bookings.view': 'all', 'finance.view': 'all' });
 
-  // remove the new one
-  await page.click(`.card--admins .admin[data-email="${NEW}"] .icon-btn--danger`);
-  await clickDialogButton(page, 'شيل الصلاحية');
-  await page.waitForFunction(() => document.querySelectorAll('.card--admins .admin').length === 2, { timeout: 8000 });
+  // remove the new one (team-remove.png: «شيل صلاحيته من الإدارة بس» is the default)
+  await menuPick(page, NEW, 'شيله من الإدارة');
+  await sheetNext(page, 'شيل الصلاحية');
+  await page.waitForFunction(() => document.querySelectorAll('.tm8-card .tm8').length === 2, { timeout: 8000 });
   assert.ok(fake.calls.some(c => c.path === `/v1/admin/accounts/${encodeURIComponent(NEW)}/remove`));
 
   await page.screenshot({ path: `${SHOTS}after.png` });
@@ -221,16 +233,17 @@ test('«الصلاحيات»: list from D1, add with a preset, change, remove �
   await context.close();
 });
 
-test('«الصلاحيات» on a phone: the grants form scrolls inside the dialog, no page overflow', async () => {
+test('«الصلاحيات» on a phone: the permissions scroll inside the sheet, no page overflow', async () => {
   fake.reset();
   const { context, page, problems } = await openSettings({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
-  await page.click(`.card--admins .admin[data-email="${SECOND}"] [title="الصلاحيات"]`);
-  await page.waitForSelector('dialog.modal .grants');
-  await sleep(300);
+  // (the phone's dock may cover the card's button: the click itself)
+  await page.$eval(`.tm8[data-email="${SECOND}"] .tm8__acts .btn--primary`, b => b.click());
+  await page.waitForSelector('dialog.sheet[open] .tm8p-matrix');
+  await sleep(500);
   const fit = await page.evaluate(() => {
-    const d = document.querySelector('dialog.modal');
+    const d = document.querySelector('dialog.sheet[open]');
     const r = d.getBoundingClientRect();
-    return { inside: r.left >= 0 && r.right <= innerWidth + 1, overflowX: document.documentElement.scrollWidth > innerWidth + 1, scrolls: getComputedStyle(d.querySelector('.grants')).overflowY };
+    return { inside: r.left >= 0 && r.right <= innerWidth + 1, overflowX: document.documentElement.scrollWidth > innerWidth + 1, scrolls: getComputedStyle(d.querySelector('.sheet__body')).overflowY };
   });
   await page.screenshot({ path: `${SHOTS}phone-grants.png` });
   assert.deepEqual(fit, { inside: true, overflowX: false, scrolls: 'auto' });
@@ -336,17 +349,17 @@ test('an email / push link to one account (#open/account/<key>) opens «الصل
   await page.evaluate(() => A.go('home'));
   await page.evaluate(key => { window.location.hash = '#open/account/' + key; }, accountKey(SECOND));
   await page.waitForFunction(email => {
-    const row = document.querySelector('.card--admins .admin.is-focus');
+    const row = document.querySelector('.tm8-card .tm8.is-focus');
     return row && row.getAttribute('data-email') === email;
   }, { timeout: 8000 }, SECOND);
-  assert.equal(await page.$$eval('.card--admins .admin.is-focus', n => n.length), 1, 'only that row');
+  assert.equal(await page.$$eval('.tm8-card .tm8.is-focus', n => n.length), 1, 'only that row');
   assert.equal(await page.evaluate(() => window.location.hash), '', 'the link leaves the address bar at once');
   await page.screenshot({ path: `${SHOTS}account-link.png` });
   // a key that matches nobody (the account was removed since): a short note, nothing highlighted
   await page.evaluate(() => A.go('home'));
   await page.evaluate(() => { window.location.hash = '#open/account/acc-0000000000000000'; });
   await page.waitForFunction(() => /مبقاش في لوحة التحكم/.test(document.body.innerText), { timeout: 8000 });
-  assert.equal(await page.$$eval('.card--admins .admin.is-focus', n => n.length), 0);
+  assert.equal(await page.$$eval('.tm8-card .tm8.is-focus', n => n.length), 0);
   assert.deepEqual(problems, []);
   await context.close();
 });
@@ -355,10 +368,10 @@ test('rename an account Apps Script does not know yet: the error stays in the ca
   fake.reset();
   fake.admins.push({ email: NEW, name: '', primary: false, active: true, servantId: null, lastSeen: null, grants: { 'bookings.view': 'all' } });
   const { context, page, problems } = await openSettings(undefined, 3);
-  await page.waitForFunction(email => document.querySelector('.card--admins').innerText.includes(email), { timeout: 8000 }, NEW);
+  await page.waitForFunction(email => document.querySelector('.tm8-card').innerText.includes(email), { timeout: 8000 }, NEW);
 
   const rename = async name => {
-    await page.click(`.card--admins .admin[data-email="${NEW}"] [title="غيّر الاسم"]`);
+    await menuPick(page, NEW, 'غيّر الاسم');
     await page.waitForSelector('dialog.modal input');
     // the dialog focuses and selects its field itself (30 ms later): type after that, or the selection eats the text
     await page.waitForFunction(() => document.activeElement && document.activeElement.matches('dialog.modal input'), { timeout: 3000 });
@@ -369,8 +382,7 @@ test('rename an account Apps Script does not know yet: the error stays in the ca
 
   // the grants pull is not reachable: Apps Script cannot learn the account → refused, shown in the card's box
   await rename('خدمة الشباب');
-  await page.waitForFunction(() => /مش في القايمة/.test(document.querySelector('.card--admins').innerText), { timeout: 8000 });
-  assert.equal(await page.$$eval('.card--admins .admins__add .field--invalid, .card--admins .admins__add [aria-invalid="true"]', n => n.length), 0, 'the add form email is not marked');
+  await page.waitForFunction(() => /مش في القايمة/.test(document.querySelector('.tm8-card').innerText), { timeout: 8000 });
   await page.screenshot({ path: `${SHOTS}rename-unknown.png` });
 
   // D1 answers with the account: the rename asks it first and goes through
