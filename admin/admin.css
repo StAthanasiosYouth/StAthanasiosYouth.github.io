@@ -15291,3 +15291,114 @@ html[data-mode="light"] .p8-table th { background: var(--p-surface-2); }
   .p8-table--cards .b8-open .btn { width: 100%; }
 }
 
+
+/* ---------- Phase 8B B8: «الفلوس» (finance.png, fin-report.png, fin-ledger.png, fin-handover.png) ---------- */
+.fin8 { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; min-width: 0; }
+.fin8 > *, .fin8-bar > *, .fin8-two > * { min-width: 0; }
+.fin8-tabs { justify-self: start; }
+.fin8-tabs .seg__btn, .fin8-kinds .seg__btn { width: auto; height: 34px; padding: 0 16px; font: inherit; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.fin8-kinds { justify-self: start; gap: 6px; padding: 0; border: 0; background: none; }
+.fin8-kinds .seg__btn { height: 28px; padding: 0 12px; border: 1px solid var(--p-line-3); border-radius: 999px; font-size: 12px; }
+.fin8-kinds .seg__btn.is-on { border-color: transparent; }
+.fin8-kind--void.is-on { color: var(--danger); background: var(--danger-bg); box-shadow: none; }
+.fin8-kinds .fin8-kind--void:not(.is-on) { color: var(--danger); background: var(--danger-bg); border-color: transparent; }
+.fin8-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.fin8-filters { display: flex; flex-wrap: wrap; gap: 10px; }
+.fin8-exports { display: flex; flex-wrap: wrap; gap: 10px; }
+.fin8-search { width: 240px; }
+.fin8-bar .fin8-filters + .fin8-search { margin-inline-start: auto; }
+.fin8-pill .act-pill__t { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.fin8-pill .act-pill__select { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
+.fin8-kpis { margin-bottom: 0; }
+.fin8 .b8-kpis .kpi, .fin8-stats .kpi { cursor: default; }
+.fin8-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.fin8-stats .kpi { display: block; padding: 18px 20px; border: 1px solid var(--p-line-2); border-radius: 18px; background: rgb(10 33 64 / .55); }
+html[data-mode="light"] .fin8-stats .kpi { background: var(--p-surface-2); }
+.fin8-stats .kpi small { display: flex; align-items: center; gap: 6px; color: var(--text-3); font-size: 12.5px; font-weight: 700; }
+.fin8-stats .kpi .ico-sm .icon { width: 16px; height: 16px; }
+.fin8-stats .kpi b, .fin8-hand .kpi b { display: block; margin-top: 4px; font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.fin8-stats .kpi em { display: block; margin-top: 4px; color: var(--text-3); font-size: 12px; font-style: normal; }
+.kpi--gold { border-color: rgb(var(--acc-rgb) / .25) !important; }
+.kpi--gold b { color: var(--ok); }
+.kpi--warn { border-color: rgb(var(--warn-rgb) / .35) !important; }
+.kpi--warn b { color: var(--warn); }
+.kpi--danger { border-color: rgb(var(--danger-rgb) / .35) !important; }
+.kpi--danger b { color: var(--danger); }
+.fin8-gap { display: block; }
+.fin8-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.fin8-card { grid-template-columns: minmax(0, 1fr); min-width: 0; margin: 0; }
+.fin8-card--flat { padding: 0; overflow: hidden; }
+.fin8-card--flat .p8-tablewrap { border: 0; border-radius: 0; }
+.fin8-none { margin: 0; color: var(--text-3); font-size: 13px; list-style: none; }
+.fin8-recent li.skeleton::before, .fin8-recent li.skeleton::after { display: none; }
+.fin8-acts { display: flex; justify-content: flex-end; gap: 6px; white-space: nowrap; }
+.fin8 .fin-refs:not([hidden]) { margin-top: 8px; }
+.fin8 .b8-foot { margin: 0; }
+.fin8-ledger__table td { white-space: nowrap; }
+.fin8-ledger__table tr.is-void td { text-decoration: line-through; text-decoration-color: rgb(255 255 255 / .3); }
+.fin8-ledger__table tr.is-void td .chip { text-decoration: none; }
+
+/* «تسجيل تسليم فلوس للخدمة» */
+.fin8-hand { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 18px; }
+.fin8-hand .kpi { cursor: default; }
+.fin8-hand .kpi small { font-size: 12.5px; }
+.fin8-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+.fin8-field { margin: 0; }
+.fin8-money { display: flex; gap: 8px; }
+.fin8-money .input { flex: 1; text-align: left; }
+.fin8-unit { display: inline-grid; place-items: center; padding: 0 12px; border: 1px solid var(--p-line-3); border-radius: 12px; color: var(--text-3); font-size: 12.5px; }
+.fin8-hint { margin: 6px 0 0; color: var(--text-3); font-size: 12px; }
+.fin8-form .seg { display: flex; width: 100%; }
+.fin8-form .seg__opt { flex: 1; justify-content: center; }
+.fin8-form .seg__opt.is-off { opacity: .45; cursor: not-allowed; }
+
+@media (max-width: 759px) {
+  .fin8-stats { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .fin8-gap { display: none; }
+  .fin8-two { grid-template-columns: minmax(0, 1fr); }
+  .fin8-filters { max-width: 100%; }
+  .fin8-bar { flex-direction: column; align-items: stretch; }
+  .fin8-filters { flex-wrap: nowrap; overflow-x: auto; }
+  .fin8-pill { flex: none; }
+  .fin8-exports { display: grid; grid-template-columns: 1fr; }
+  .fin8-search { width: 100%; }
+  .fin8-tabs { max-width: 100%; overflow-x: auto; }
+  .fin8-hand { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .fin8-hand .kpi { padding: 12px; }
+  .fin8-hand .kpi b { font-size: 20px; }
+  .fin8-form { grid-template-columns: 1fr; }
+  /* finance.png (phone): the cards keep their icon, title and button in one row */
+  .fin8-card .p8-card__head { display: flex; flex-wrap: nowrap; align-items: center; }
+  .fin8-card .p8-card__titles { flex: 1; min-width: 0; }
+  .fin8-card .p8-card__head > .btn { flex: none; }
+}
+
+
+/* ---------- Phase 8B B8: «طرق الدفع» (paymethods.png) ---------- */
+.pm8 { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.pm8 + .pm8 { margin-top: 18px; }
+.pm8-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.pm8-card { display: flex; flex-direction: column; min-width: 0; padding: 18px; border: 1px solid var(--p-line-2); border-radius: 22px; background: var(--p-surface-2); }
+.pm8-head { display: flex; align-items: center; gap: 12px; }
+.pm8-title { min-width: 0; }
+.pm8-name { display: block; width: 100%; padding: 0; border: 0; outline: none; color: var(--text); background: none; font: inherit; font-size: 16px; font-weight: 800; }
+.pm8-name:focus-visible { border-bottom: 1px dashed var(--p-acc-line); }
+.pm8-title .mono { display: block; color: var(--text-3); font-family: ui-monospace, "Cascadia Mono", monospace; font-size: 12px; }
+.pm8-sp { flex: 1; }
+.pm8-head .switch { flex-direction: row-reverse; gap: 8px; color: var(--text-3); font-size: 12.5px; font-weight: 700; }
+.pm8-line { margin: 10px 0 14px; color: var(--text-3); font-size: 12.5px; }
+.pm8-toggles { display: grid; gap: 10px; }
+.pm8-toggles .check--toggle { display: flex; flex-direction: row-reverse; justify-content: flex-end; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--p-line-2); border-radius: 14px; background: rgb(2 12 24 / .35); }
+html[data-mode="light"] .pm8-toggles .check--toggle { background: var(--p-surface); }
+.pm8-toggles .check--toggle > span:first-child { flex: 1; }
+.pm8-toggles .check--toggle strong { display: block; font-weight: 800; }
+.pm8-toggles .check--toggle small { display: block; color: var(--text-3); font-size: 12px; }
+.pm8-foot { display: flex; align-items: center; gap: 10px; margin-top: auto; padding-top: 16px; border-top: 1px solid var(--p-line-2); }
+.pm8-toggles + .pm8-foot { margin-top: 16px; }
+.pm8-num { font-family: ui-monospace, "Cascadia Mono", monospace; font-weight: 700; letter-spacing: .04em; text-align: right; }
+
+@media (max-width: 759px) {
+  .pm8-grid { grid-template-columns: minmax(0, 1fr); }
+  .pm8-table .b8-open .btn { width: 100%; }
+}
+

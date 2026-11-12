@@ -1887,6 +1887,137 @@
     return /^01\d{9}$/.test(t) ? t.slice(0, 3) + ' ' + t.slice(3, 7) + ' ' + t.slice(7) : t;
   }
 
+  /*
+   * Phase 8B decision 4 (paymethods.png): «طرق الدفع» moved from «الخدام» to «الحجوزات والفلوس ← طرق الدفع» —
+   * one card per method (its name, «متاحة», «محتاج إثبات دفع», «الزوار يدفعوا بيها من الموقع», how many numbers,
+   * «احفظ» for that card alone), then «أرقام مستنية اعتمادك» (every servant number waiting for the primary admin).
+   * The servants' own numbers stay in each servant's window too.
+   */
+  var METHOD_ICON = { cash: 'cash', instapay: 'swap', wallet: 'wallet' };
+  var METHOD_LINE = { cash: 'بيتسجل من اللوحة بس بعد ما الخادم يستلم' };
+
+  A.views.paymethods = function () {
+
+    if (!official()) return [recoveryNotice()];
+
+    var box = A.errorBox();
+    var cards = el('div', { class: 'pm8-grid', 'aria-live': 'polite' }, el('div', { class: 'skeleton skeleton--line' }));
+    var waitBody = el('div', { 'aria-live': 'polite' });
+    var reply = null;
+
+    function load() {
+      return A.call('apiServants').then(function (r) {
+        reply = r;
+        if (cards.isConnected) draw(r);
+      }).catch(function (error) {
+        if (!cards.isConnected) return;
+        cards.replaceChildren();
+        A.fail(error, box);
+      });
+    }
+
+    function numbersOf(method) {
+      var approved = 0;
+      var waiting = 0;
+      (reply.servants || []).forEach(function (s) {
+        (s.pay || []).forEach(function (p) { if (p.method === method && p.number) { if (p.approved) approved++; else waiting++; } });
+      });
+      return { approved: approved, waiting: waiting };
+    }
+
+    function draw(r) {
+      var saved = (r.methods || []).map(function (m) { return Object.assign({}, m); });
+      A.fill(cards, saved.map(function (m, i) {
+        var name = el('input', { class: 'pm8-name', type: 'text', maxlength: '24', value: m.label, 'aria-label': 'اسم الطريقة: ' + m.key, onchange: function () { A.dirty = true; } });
+        var on = A.switchInput('متاحة', m.active !== false);
+        var proof = A.checkbox('محتاج إثبات دفع', !!m.needsProof, 'صورة التحويل إجبارية');
+        var online = A.checkbox('الزوار يدفعوا بيها من الموقع', m.online === true, m.online === true ? 'بتظهر في خطوة الدفع' : 'مقفولة: بتظهر للمعلومة بس');
+        online.input.addEventListener('change', function () {
+          var small = online.node.querySelector('small');
+          if (small) small.textContent = online.input.checked ? 'بتظهر في خطوة الدفع' : 'مقفولة: بتظهر للمعلومة بس';
+        });
+        var n = numbersOf(m.key);
+        var active = (r.servants || []).filter(function (s) { return s.active !== false; }).length;
+        var tag = m.key === 'cash'
+          ? el('span', { class: 'p8-tag p8-tag--acc', text: A.digits(active) + ' خدام' })
+          : el('span', { class: 'p8-tag ' + (n.waiting ? 'p8-tag--warn' : 'p8-tag--acc'), text: A.digits(n.approved) + ' أرقام معتمدة' + (n.waiting ? ' · ' + A.digits(n.waiting) + ' مستنيين' : '') });
+        var save = el('button', { class: 'btn btn--sm', type: 'button', 'data-act': 'paymethod-save', 'data-method': m.key, text: 'احفظ' });
+        save.addEventListener('click', function () {
+          // the server keeps the whole list: this card's new values, the others as they were saved
+          var list = saved.map(function (x, j) {
+            if (j !== i) return { key: x.key, label: x.label, needsProof: !!x.needsProof, online: x.online === true, active: x.active !== false };
+            return { key: x.key, label: name.value.trim() || x.label, needsProof: proof.input.checked, online: online.input.checked, active: on.input.checked };
+          });
+          A.withBusy(save, A.call('apiPayMethodsSave', list)).then(function (next) {
+            A.dirty = false;
+            reply = Object.assign({}, reply, { methods: next.methods || list });
+            draw(reply);
+            A.toast('اتحفظت ✓');
+          }).catch(function (error) { A.fail(error, box); });
+        });
+        return el('article', { class: 'pm8-card', 'data-method': m.key },
+          el('div', { class: 'pm8-head' },
+            el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(METHOD_ICON[m.key] || 'wallet')),
+            el('div', { class: 'pm8-title' }, name, el('small', { class: 'mono', text: m.key })),
+            el('span', { class: 'pm8-sp' }),
+            on.node),
+          el('p', { class: 'pm8-line', text: METHOD_LINE[m.key] || 'الزوار بيحولوا ويرفعوا صورة التحويل' }),
+          el('div', { class: 'pm8-toggles' }, proof.node, online.node),
+          el('div', { class: 'pm8-foot' }, tag, el('span', { class: 'pm8-sp' }), save));
+      }));
+      drawWaiting(r);
+    }
+
+    /* «أرقام مستنية اعتمادك»: the numbers visitors can't see yet; «اعتمد» = the same approval as in the servant's window */
+    function drawWaiting(r) {
+      var rows = [];
+      (r.servants || []).forEach(function (s) {
+        (s.pay || []).forEach(function (p) { if (p.number && !p.approved) rows.push({ s: s, p: p }); });
+      });
+      var can = !!r.payAdmin;
+      A.fill(waitBody, rows.length ? el('div', { class: 'p8-tablewrap' }, el('table', { class: 'p8-table p8-table--cards pm8-table' },
+        el('thead', {}, el('tr', {}, ['الخادم', 'الطريقة', 'الرقم', 'الحالة', ''].map(function (t) { return el('th', { scope: 'col', text: t }); }))),
+        el('tbody', {}, rows.map(function (x) {
+          var go = can ? el('button', { class: 'btn btn--sm btn--primary', type: 'button', 'data-act': 'pay-approve', 'data-method': x.p.method, 'data-servant': x.s.id }, icon('check'), 'اعتمد') : null;
+          if (go) go.addEventListener('click', function () {
+            A.withBusy(go, A.call('apiServantPayApprove', x.s.id, x.p.method, x.p.number, true)).then(function (next) {
+              reply = next;
+              A.toast('الرقم اتعتمد ✓ وبقى بيظهر للزوار في خطوة الدفع');
+              draw(next);
+            }).catch(function (error) { A.fail(error, box); });
+          });
+          return el('tr', { 'data-servant': x.s.id, 'data-method': x.p.method },
+            el('td', {}, el('b', { dir: 'auto', text: x.s.name })),
+            el('td', { 'data-l': 'الطريقة:' }, PAY_LABELS[x.p.method] || x.p.method),
+            el('td', { class: 'mono pm8-num', dir: 'ltr' }, groupedNumber(x.p.number)),
+            el('td', {}, el('span', { class: 'p8-tag p8-tag--warn', text: 'مستني اعتماد' })),
+            el('td', { class: 'b8-open' }, go));
+        }))))
+        : el('p', { class: 'b8-foot', text: 'مفيش أرقام مستنية اعتماد ✓' }));
+    }
+
+    load();
+
+    return [
+      el('section', { class: 'card p8-card pm8' },
+        el('div', { class: 'p8-card__head' },
+          el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('wallet')),
+          el('div', { class: 'p8-card__titles' },
+            el('h2', { class: 'card__title', text: 'طرق الدفع' }),
+            el('p', { class: 'card__hint', text: 'اللي الخدام بيقبلوه. كل طريقة وتحكماتها في كارت واحد، والحفظ لكل كارت لوحده.' }))),
+        box,
+        cards),
+      el('section', { class: 'card p8-card pm8' },
+        el('div', { class: 'p8-card__head' },
+          el('span', { class: 'chipico chipico--warn', 'aria-hidden': 'true' }, icon('shield')),
+          el('div', { class: 'p8-card__titles' },
+            el('h2', { class: 'card__title', text: 'أرقام مستنية اعتمادك' }),
+            el('p', { class: 'card__hint', text: 'مفيش رقم بيظهر للزوار قبل ما تعتمده' }))),
+        waitBody)
+    ];
+
+  };
+
   A.views.servants = function () {
 
     if (!official()) return [recoveryNotice()];
@@ -1943,7 +2074,7 @@
         el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('users')),
         el('b', { text: 'مفيش خدام لسه' }),
         el('small', { text: 'زوّد الخدام المسؤولين عن الفعاليات وفرق الخدمة.' })));
-      drawMethods(r.methods);
+      // (decision 4: «طرق الدفع» is its own tab in «الحجوزات والفلوس» now)
     }
 
     function drawMethods(methods) {
@@ -2167,8 +2298,7 @@
           el('div', { class: 'p8-card__acts' },
             el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { servantEditor(null); } }, icon('plus'), 'خادم جديد'))),
         box,
-        body),
-      A.card('طرق الدفع', 'اللي الخدام بيقبلوها (كاش، إنستاباي، محفظة…). الكاش للمعلومة بس في الموقع: الخادم يسجّل الحجز بعد ما يستلم. أرقام إنستاباي والمحفظة بتظهر في خطوة الدفع بس بعد اعتماد الأدمن الرئيسي، ومبتتنشرش في الموقع.', methodsBody)
+        body)
     ];
 
   };
