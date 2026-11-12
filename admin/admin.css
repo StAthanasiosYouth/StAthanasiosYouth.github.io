@@ -15736,3 +15736,76 @@ html[data-mode="light"] .tm8p-row { background: rgb(11 42 76 / .03); }
   .sheet--avatar .sheet__foot > .crop8__other { flex: 1 1 100%; order: 9; margin: 0; justify-content: center; }
 }
 
+/* ---------- Phase 8B W7 ---------- */
+/* the rail's current place = the approved shots (proposal.css .nav.is-on; owner 2026-11-12): a dark pill with a soft
+   accent wash toward its start, a thin line around it, and the glowing bar beside it; the words stay light */
+.rail__light { height: 46px; border-radius: 12px; background: linear-gradient(90deg, transparent, rgb(var(--acc-rgb) / .14)); box-shadow: inset 0 0 0 1px var(--p-line); }
+.rail__light::before { inset-inline-start: -14px; top: 11px; bottom: 11px; width: 3px; border-radius: 3px; background: var(--grad); box-shadow: 0 0 12px var(--acc); }
+.rail__nav .navlink[aria-current="page"], .rail__nav .navlink[aria-current="page"] .navlink__icon { color: var(--acc-hi); }
+html[data-mode="light"] .rail__light { background: linear-gradient(90deg, transparent, rgb(var(--acc-rgb) / .12)); }
+/* the «changes waiting» dot sits outside the publish button's corner (owner 2026-11-12), not cut by it */
+.topbar #publish-open { overflow: visible; }
+
+/* ---------- Phase 8B W7: motion and sound for every part (owner 2026-11-12) ----------
+   Each area enters its own way; inside it each kind of control has its own entrance and its own press.
+   The tiers still rule (lite = short, off / «reduce motion» = nothing moves), and the sounds are AdminScript
+   soundOfClick (off until «الأصوات» is on). */
+/* a section sliding in never makes the page wider for that moment (phones) */
+#view { overflow-x: clip; }
+#view[data-area="home"] > .is-entering { animation-name: enter-bloom; }
+#view[data-area="content"] > .is-entering { animation-name: enter-from-start; }
+#view[data-area="comps"] > .is-entering { animation-name: enter-flip; transform-origin: 50% 0; }
+#view[data-area="youth"] > .is-entering { animation-name: enter-pop; animation-timing-function: var(--spring); }
+#view[data-area="pages"] > .is-entering { animation-name: enter-lift-blur; }
+#view[data-area="page"] > .is-entering { animation-name: enter-from-end; }
+#view[data-area="media"] > .is-entering { animation-name: enter-zoom-out; }
+#view[data-area="activity"] > .is-entering { animation-name: enter-drop; }
+#view[data-area="bookings"] > .is-entering { animation-name: enter-tilt; transform-origin: 100% 100%; }
+#view[data-area="settings"] > .is-entering { animation-name: enter-focus; }
+
+@keyframes enter-bloom { from { opacity: 0; transform: scale(.965); filter: blur(6px); } }
+@keyframes enter-from-start { from { opacity: 0; transform: translateX(28px); } }
+@keyframes enter-from-end { from { opacity: 0; transform: translateX(-28px); } }
+@keyframes enter-flip { from { opacity: 0; transform: perspective(900px) rotateX(-14deg) translateY(14px); } }
+@keyframes enter-pop { from { opacity: 0; transform: scale(.9); } }
+@keyframes enter-lift-blur { from { opacity: 0; transform: translateY(22px); filter: blur(4px); } }
+@keyframes enter-zoom-out { from { opacity: 0; transform: scale(1.045); } }
+@keyframes enter-drop { from { opacity: 0; transform: translateY(-14px); } }
+@keyframes enter-tilt { from { opacity: 0; transform: translateY(16px) rotate(-.8deg); } }
+@keyframes enter-focus { from { opacity: 0; filter: blur(8px); } }
+
+/* the controls of an entering section: each kind its own way in, a beat after the card */
+.is-entering .btn--primary { animation: ctl-pop .45s var(--spring) both; animation-delay: calc(var(--i, 0) * 55ms + 120ms); }
+.is-entering .btn:not(.btn--primary) { animation: ctl-slide .38s var(--ease) both; animation-delay: calc(var(--i, 0) * 55ms + 140ms); }
+.is-entering .p8-iconbtn, .is-entering .icon-btn { animation: ctl-spin .4s var(--ease) both; animation-delay: calc(var(--i, 0) * 55ms + 160ms); }
+.is-entering .chipico { animation: ctl-spin .45s var(--spring) both; animation-delay: calc(var(--i, 0) * 55ms + 80ms); }
+.is-entering .p8-tag, .is-entering .chip { animation: ctl-pop .35s var(--spring) both; animation-delay: calc(var(--i, 0) * 55ms + 180ms); }
+.is-entering .switch__track { animation: ctl-switch .4s var(--ease) both; animation-delay: calc(var(--i, 0) * 55ms + 160ms); }
+.is-entering .kpi { animation: ctl-rise .42s var(--ease) both; animation-delay: calc(var(--i, 0) * 55ms + 60ms); }
+.is-entering .kpi:nth-child(2) { animation-delay: calc(var(--i, 0) * 55ms + 110ms); }
+.is-entering .kpi:nth-child(3) { animation-delay: calc(var(--i, 0) * 55ms + 160ms); }
+.is-entering .kpi:nth-child(4) { animation-delay: calc(var(--i, 0) * 55ms + 210ms); }
+@keyframes ctl-pop { from { opacity: 0; transform: scale(.82); } }
+@keyframes ctl-slide { from { opacity: 0; transform: translateX(-10px); } }
+@keyframes ctl-spin { from { opacity: 0; transform: rotate(-70deg) scale(.6); } }
+@keyframes ctl-switch { from { opacity: 0; transform: scaleX(.55); } }
+@keyframes ctl-rise { from { opacity: 0; transform: translateY(10px); } }
+
+/* every press answers: a short squeeze, back with a spring */
+.btn, .p8-iconbtn, .icon-btn, .navlink, .dockbtn, .kpi, .filter-chip, .seg__btn, .seg__opt { transition-property: transform, background, color, box-shadow, border-color, filter, opacity; }
+.btn:active:not(:disabled), .p8-iconbtn:active, .icon-btn:active, .dockbtn:active, .kpi:active, .filter-chip:active, .seg__btn:active { transform: scale(.95); transition: transform .08s; }
+.navlink:active { transform: scale(.98); transition: transform .08s; }
+/* the main button: a living gradient — it brightens and glows under the pointer */
+@media (hover: hover) {
+  .btn--primary:hover:not(:disabled) { filter: brightness(1.07) saturate(1.12); box-shadow: 0 10px 26px -12px rgb(var(--acc-rgb) / .75), inset 0 1px 0 rgb(255 255 255 / .25); transform: translateY(-1px); }
+  .p8-iconbtn:hover, .icon-btn:hover { transform: translateY(-1px); }
+}
+/* a switch's knob springs across */
+.switch__track, .switch__track::after, .switch__track::before { transition-timing-function: var(--spring); }
+
+/* modern gradients (owner 2026-11-12): a soft accent wash in each card's top corner, a gradient edge on hover */
+.p8-card, .card.p8-card { background-image: radial-gradient(120% 80% at 100% 0%, rgb(var(--acc-rgb) / .07), transparent 55%); }
+@media (hover: hover) {
+  .p8-card:hover { border-color: var(--p-acc-line); }
+}
+
