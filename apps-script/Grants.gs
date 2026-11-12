@@ -64,7 +64,7 @@ var API_PERMS = {
 
   // events, servants, payment numbers (§4.7: numbers = finance.manage; approval stays Primary-only in PayDest)
   apiEvents: 'events.view', apiEvent: 'events.view', apiServants: 'events.view',
-  apiEventSave: 'events.edit', apiEventSetEnabled: 'events.edit', apiEventArchive: 'events.edit', apiServantSetActive: 'events.edit',
+  apiEventSave: 'events.edit', apiEventSetEnabled: 'events.edit', apiEventArchive: 'events.edit', apiServantSetActive: 'events.edit', apiServantDelete: 'events.delete',
   apiEventDelete: 'events.delete',
   apiServantSave: 'finance.manage', apiPayMethodsSave: 'finance.manage', apiServantPayApprove: 'finance.manage',
 

@@ -194,6 +194,7 @@ function apiFunctions_() {
     apiServants: apiServants,
     apiServantSave: apiServantSave,
     apiServantSetActive: apiServantSetActive,
+    apiServantDelete: apiServantDelete,
     apiPayMethodsSave: apiPayMethodsSave,
     apiServantPayApprove: apiServantPayApprove,
     apiWorkerSession: apiWorkerSession,

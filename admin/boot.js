@@ -1580,7 +1580,7 @@
     apiSaveContact: 1, apiDeleteContact: 1, apiMoveContact: 1, apiSaveSettings: 1,
     apiSaveItem: 1, apiDeleteItem: 1, apiSetItemArchived: 1, apiDuplicateItem: 1, apiSetItemEnabled: 1,
     apiImportPreview: 1, apiImportApply: 1,
-    apiHomeOrder: 1, apiServants: 1, apiServantSave: 1, apiServantSetActive: 1, apiPayMethodsSave: 1, apiServantPayApprove: 1,
+    apiHomeOrder: 1, apiServants: 1, apiServantSave: 1, apiServantSetActive: 1, apiServantDelete: 1, apiPayMethodsSave: 1, apiServantPayApprove: 1,
     apiPages: 1, apiPage: 1, apiPageSave: 1, apiPageSetEnabled: 1, apiPageArchive: 1, apiPageDelete: 1,
     apiPageMediaSave: 1, apiPageMediaOrder: 1, apiPageMediaDelete: 1, apiPagePreview: 1,
     apiEvents: 1, apiEvent: 1, apiEventSave: 1, apiEventSetEnabled: 1, apiEventArchive: 1, apiEventDelete: 1,

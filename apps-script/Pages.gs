@@ -975,6 +975,79 @@ function apiServantSetActive(id, on) {
 
 }
 
+/*
+ * Phase 8B (servant-remove.png, owner 2026-11-12): a servant removed for good. The Worker moves the servant's
+ * bookings, payments, claims and handovers to `to` first (POST /v1/admin/book/servants/:id/purge) and drops the
+ * approved numbers; here the servant leaves every event (its place and methods go to `to`, or merge with it)
+ * and every page's team, and its row goes, payment numbers included. The activity log keeps the name.
+ * The primary admin only; confirm = «احذف».
+ */
+function apiServantDelete(id, to, confirm) {
+
+  var email = assertAdmin_();
+  pagesValidId_(id, SERVANT_ID, 'معرّف الخادم');
+  pagesValidId_(to, SERVANT_ID, 'الخادم اللي هتتنقل له الحجوزات');
+
+  if (email !== primaryAdmin_()) throw appError_('الحذف النهائي للخادم للأدمن الرئيسي بس.', 'تقدر توقفه بدل كده.');
+  if (String(confirm || '').trim() !== 'احذف') throw appError_('اكتب «احذف» علشان تأكد.', '');
+  if (id === to) throw appError_('اختار خادم تاني تنقل له الحجوزات.', '');
+
+  pagesWrite_('servant.delete', function () {
+
+    var found = pagesFind_('Servants', id);
+    var target = pagesFind_('Servants', to);
+
+    if (!found) throw new Error('الخادم مش موجود');
+    if (!target) throw new Error('الخادم اللي هتتنقل له الحجوزات مش موجود');
+    assertUnlocked_('servant:' + id);
+
+    var events = compSheet_('Events');
+    var events0 = 0;
+
+    compRows_(events).forEach(function (row) {
+      var list = pagesJson_(row.servants, []);
+      var gone = list.filter(function (s) { return s && s.id === id; })[0];
+      if (!gone) return;
+      var there = list.filter(function (s) { return s && s.id === to; })[0];
+      var next = [];
+      list.forEach(function (s) {
+        if (!s) return;
+        if (s.id === id) {
+          if (!there) next.push({ id: to, methods: (gone.methods || []).slice() });
+          return;
+        }
+        if (s.id === to) {
+          var keys = (s.methods || []).slice();
+          (gone.methods || []).forEach(function (k) { if (keys.indexOf(k) === -1) keys.push(k); });
+          next.push({ id: to, methods: keys });
+          return;
+        }
+        next.push(s);
+      });
+      compUpdate_(events, row.__row, { servants: JSON.stringify(next) }, row);
+      events0++;
+    });
+
+    var pages = compSheet_('Pages');
+
+    compRows_(pages).forEach(function (row) {
+      var team = pagesJson_(row.team, []);
+      if (team.indexOf(id) === -1) return;
+      compUpdate_(pages, row.__row, { team: JSON.stringify(team.filter(function (x) { return x !== id; })) }, row);
+    });
+
+    compDeleteRows_(found.t, [found.row.__row]);
+    activityNote_({ action: 'delete', type: 'servant', id: id, title: found.row.name + ' (اتحذف نهائي من ' + events0 + ' فعالية، وحجوزاته اتنقلت لـ' + target.row.name + ')' });
+
+  });
+
+  // its approved numbers leave the booking page
+  payDestSync_();
+
+  return apiServants();
+
+}
+
 /* the payment methods' names / order / on-off (keys stay; new keys allowed) */
 function apiPayMethodsSave(list) {
 

@@ -2206,6 +2206,11 @@
     });
   };
 
+  /* Phase 8B (servant-remove.png): { check: true } → { bookings, payments, holding }; { to, confirm } moves them */
+  B.servantPurge = function (servantId, body) {
+    return W().call('POST', '/v1/admin/book/servants/' + enc(servantId) + '/purge', body);
+  };
+
   B.purgeEvent = function (eventId, confirm) {
     return W().call('POST', '/v1/admin/book/events/' + enc(eventId) + '/purge', { confirm: confirm });
   };

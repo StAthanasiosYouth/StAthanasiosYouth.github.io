@@ -19347,6 +19347,72 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       A.fill(methodsBody, rows.map(function (r) { return r.node; }).concat([el('div', { class: 'actions' }, save)]));
     }
 
+    /*
+     * «احذف «…» نهائي؟» (Phase 8B, owner 2026-11-12, servant-remove.png): what goes with it (the events it is in,
+     * its bookings and the money it still holds — both move to the servant chosen here), «احذف» typed, then the
+     * Worker moves them (book/servants/:id/purge) and the draft drops the servant (apiServantDelete).
+     */
+    function removeServant(s) {
+      var others = (reply && reply.servants || []).filter(function (x) { return x.id !== s.id; });
+      if (!others.length) { A.toast('زوّد خادم تاني الأول علشان تنقل له الحجوزات', 'info'); return; }
+      var B = A.book;
+      var worker = !!(B && B.servantPurge && !B.off && window.AdminWorker);
+      var dbox = A.errorBox();
+      var target = el('select', { class: 'input', 'aria-label': 'انقل الحجوزات لـ' }, others.slice().sort(function (a, b) { return (b.active ? 1 : 0) - (a.active ? 1 : 0); }).map(function (x) {
+        return el('option', { value: x.id, text: x.name + (x.active ? '' : ' (موقوف)') });
+      }));
+      var typed = el('input', { class: 'input', type: 'text', autocomplete: 'off', 'aria-label': 'اكتب احذف عشان تأكد' });
+      var facts = el('ul', { class: 'checklist p8-dz__list' });
+      var info = { events: null, bookings: null, holding: null };
+      var go = el('button', { class: 'btn btn--danger-solid', type: 'button', disabled: true }, icon('trash'), 'احذف نهائي');
+
+      function line(ok, text) { return el('li', { class: ok ? 'ok' : 'no' }, icon(ok ? 'check' : 'alert'), el('span', { text: text })); }
+      function paint() {
+        var to = target.options[target.selectedIndex] ? target.options[target.selectedIndex].text.replace(/ \(موقوف\)$/, '') : '';
+        A.fill(facts,
+          info.events === null ? el('li', { text: 'بنشوف الفعاليات…' }) : info.events ? line(false, 'مربوط بـ' + A.digits(info.events) + ' فعاليات: هيتشال منها') : line(true, 'مش مربوط بأي فعالية'),
+          info.bookings === null ? (worker ? el('li', { text: 'بنشوف الحجوزات…' }) : null) : info.bookings ? line(false, 'معاه ' + A.digits(info.bookings) + ' حجز: هيتنقلوا لـ«' + to + '»') : line(true, 'مفيش حجوزات معاه'),
+          info.holding === null ? null : info.holding ? line(false, 'معاه ' + A.digits(info.holding) + ' ج لسه متسلمتش: هتتنقل لـ«' + to + '»') : line(true, 'مفيش فلوس معاه لسه متسلمتش'));
+        go.disabled = typed.value.trim() !== 'احذف';
+      }
+      target.addEventListener('change', paint);
+      typed.addEventListener('input', paint);
+
+      go.addEventListener('click', function () {
+        dbox.hidden = true;
+        var to = target.value;
+        var steps = Promise.resolve()
+          .then(function () { return worker ? B.servantPurge(s.id, { to: to, confirm: 'احذف' }) : null; })
+          .then(function () { return A.call('apiServantDelete', s.id, to, 'احذف'); });
+        A.withBusy(go, steps).then(function (next) {
+          A.dirty = false;
+          A.closeSheet();
+          reply = next;
+          draw(next);
+          refreshState();
+          A.toast('«' + s.name + '» اتحذف نهائي، وحجوزاته اتنقلت');
+        }).catch(function (error) { A.fail(error, dbox); });
+      });
+
+      A.dirty = false;
+      A.openSheet('احذف «' + s.name + '» نهائي؟', [
+        dbox,
+        el('div', { class: 'p8-dz' }, facts),
+        A.field('انقل الحجوزات لـ', target),
+        el('div', { class: 'p8-typed' }, el('b', {}, 'اكتب ', el('span', { class: 'p8-typed__word', text: 'احذف' }), ' عشان تأكد'), typed)
+      ], [go, el('button', { class: 'btn btn--ghost', type: 'button', text: 'لأ', onclick: function () { A.closeSheet(); } })], {
+        size: 'sm', icon: 'trash', sub: 'الخطوة دي مبترجعش', className: 'sheet--danger'
+      });
+      paint();
+      typed.focus();
+
+      A.call('apiEvents').then(function (r) {
+        info.events = (r.events || []).filter(function (e) { return (e.servants || []).some(function (x) { return x.id === s.id; }); }).length;
+        paint();
+      }).catch(function () { info.events = 0; paint(); });
+      if (worker) B.servantPurge(s.id, { check: true }).then(function (c) { info.bookings = c.bookings || 0; info.holding = c.holding || 0; paint(); }).catch(function (error) { A.fail(error, dbox); });
+    }
+
     function servantEditor(s) {
       var isNew = !s;
       s = s || { active: true };
@@ -19461,7 +19527,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           A.col(el('div', { class: 'hr' }), 12),
           A.col(publicWa.node, 6), A.col(active.node, 6),
           A.col(image.node, 12))
-      ], A.sheetFooter(save), {
+      ], A.sheetFooter(save).concat(isNew || !payAdmin ? [] : [
+        el('span', { class: 'sheet__sp', 'aria-hidden': 'true' }),
+        el('button', { class: 'btn btn--sm btn--danger', type: 'button', onclick: function () { removeServant(s); } }, icon('trash'), 'شيل الخادم…')
+      ]), {
         size: 'md',
         icon: 'user',
         sub: isNew ? 'للحجز في الفعاليات وفرق الخدمة' : [s.role, s.phone].filter(Boolean).join(' · '),
@@ -24359,6 +24428,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       got[1].download(bytes, made.filename);
       return made.filename;
     });
+  };
+
+  /* Phase 8B (servant-remove.png): { check: true } → { bookings, payments, holding }; { to, confirm } moves them */
+  B.servantPurge = function (servantId, body) {
+    return W().call('POST', '/v1/admin/book/servants/' + enc(servantId) + '/purge', body);
   };
 
   B.purgeEvent = function (eventId, confirm) {

@@ -556,3 +556,33 @@ test('360px: the new screens and editors never scroll sideways', async () => {
   await d.page.setViewport(DESKTOP);
   assert.deepEqual(d.problems, []);
 });
+
+test('«احذف نهائي» for a servant (Phase 8B servant-remove): the facts, «احذف» typed, its events go to the servant chosen', async () => {
+  world.as(ADMIN).gs.apiServantSave(null, { name: 'خادم مؤقت', phone: '01055555555' });
+  world.as('');
+  await d.page.evaluate(() => A.go('pages', 'servants'));
+  await d.page.waitForFunction(() => /خادم مؤقت/.test(document.querySelector('.view').textContent), { timeout: 10000 });
+  await d.page.evaluate(() => [...document.querySelectorAll('.view .item')].find(i => i.textContent.includes('مينا عادل')).querySelector('[aria-label^="تعديل"]').click());
+  await clickText('dialog.sheet[open] .sheet__foot button', 'شيل الخادم');
+  await d.page.waitForFunction(() => /احذف «مينا عادل» نهائي/.test(document.querySelector('dialog.sheet[open] .sheet__title')?.textContent || ''), { timeout: 10000 });
+  await d.page.waitForFunction(() => /مربوط بـ/.test(document.querySelector('dialog.sheet[open] .p8-dz')?.textContent || ''), { timeout: 10000 });
+  assert.equal(await d.page.$eval('dialog.sheet[open] .btn--danger-solid', b => b.disabled), true, 'nothing before «احذف»');
+  await d.page.evaluate(() => {
+    const select = document.querySelector('dialog.sheet[open] select');
+    select.value = [...select.options].find(o => o.text.includes('خادم مؤقت')).value;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    const input = document.querySelector('dialog.sheet[open] .p8-typed input');
+    input.value = 'احذف';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await shot('13-servant-remove');
+  await d.page.evaluate(() => document.querySelector('dialog.sheet[open] .btn--danger-solid').click());
+  await sheetGone();
+  const servants = plain(world.as(ADMIN).gs.apiServants()).servants;
+  world.as('');
+  assert.deepEqual(servants.map(s => s.name), ['خادم مؤقت']);
+  const events = plain(world.as(ADMIN).gs.apiEvents()).events;
+  world.as('');
+  assert.ok(events.every(e => e.servants.every(s => s.id === servants[0].id)), 'the events now name the servant chosen');
+  assert.deepEqual(d.problems, []);
+});

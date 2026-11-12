@@ -567,3 +567,18 @@ test('a published event: deleted only with force, by the primary admin, its titl
   assert.equal(plain(call('apiEvents')).events.some(e => e.id === id), false, 'the event is gone from the draft');
   assert.equal(activities(world).some(a => a.event === id), false, 'and its card');
 });
+
+test('a servant removed for good (Phase 8B servant-remove): «احذف» typed; out of every event (its place to the chosen servant) and every team', () => {
+  const ctx = setup();
+  const { call, servant, hidden } = ctx;
+  const page = theatre(ctx);
+  const event = trip(ctx);
+  assert.throws(() => call('apiServantDelete', servant.id, hidden.id, 'لأ'), /اكتب «احذف»/);
+  assert.throws(() => call('apiServantDelete', servant.id, servant.id, 'احذف'), /خادم تاني/);
+  const after = plain(call('apiServantDelete', servant.id, hidden.id, 'احذف'));
+  assert.deepEqual(after.servants.map(s => s.id), [hidden.id], 'the servant row is gone');
+  const ev = plain(call('apiEvent', event.event.id)).event;
+  assert.deepEqual(ev.servants, [{ id: hidden.id, methods: ['cash', 'instapay'] }], 'its place and methods went to the other servant');
+  const pg = plain(call('apiPage', page.page.id)).page;
+  assert.deepEqual(pg.team, [hidden.id], 'out of the page team');
+});

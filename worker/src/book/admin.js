@@ -1261,3 +1261,47 @@ export async function adminEventPurge(ctx) {
   ]));
   return { bookings: bookings.results[0].n, files: files.results.length };
 }
+
+/*
+ * POST /v1/admin/book/servants/:id/purge { to, confirm: 'احذف' } (Phase 8B, owner 2026-11-12, servant-remove.png):
+ * «احذف نهائي» for a servant — every booking, payment, claim and handover of theirs moves to the servant `to`
+ * (the money they hold goes with it; the payment rows keep the name they were recorded with), their approved
+ * numbers leave pay_dest, and an admin linked to them is unlinked. The primary admin only; the panel deletes the
+ * servant's draft row right after (apiServantDelete). { check: true } only counts: { bookings, payments, holding }.
+ */
+export async function adminServantPurge(ctx) {
+  const env = ctx.env;
+  const db = env.DB;
+  if (!ctx.actor || ctx.actor.role !== 'primary') throw new ApiError('denied', 'primary only', { perm: 'primary' });
+  const id = String(ctx.params.id || '');
+  if (!/^srv-[a-z0-9]{8}$/.test(id)) throw invalid('id');
+  const body = ctx.body || {};
+  const [bookings, payments, money, handed] = await retry(() => db.batch([
+    db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE servant_id = ?").bind(id),
+    db.prepare("SELECT COUNT(*) AS n FROM payments WHERE servant_id = ?").bind(id),
+    db.prepare(`SELECT COALESCE(SUM(CASE WHEN kind = 'payment' THEN amount WHEN kind = 'refund' THEN -amount ELSE 0 END), 0) AS n FROM payments p
+      WHERE servant_id = ? AND kind IN ('payment', 'refund') AND COALESCE(custody, 'servant') != 'service'
+      AND NOT EXISTS (SELECT 1 FROM payments v WHERE v.kind = 'void' AND v.voids_id = p.id)`).bind(id),
+    db.prepare("SELECT COALESCE(SUM(amount), 0) AS n FROM handovers WHERE servant_id = ? AND kind = 'handover' AND voided_by IS NULL").bind(id)
+  ]));
+  const counts = { bookings: bookings.results[0].n, payments: payments.results[0].n, holding: Math.max(0, money.results[0].n - handed.results[0].n) };
+  if (body.check === true) return counts;
+  await limit(ctx, 'book.purge', ctx.actor.email, 5, 600);
+  const to = String(body.to || '');
+  if (!/^srv-[a-z0-9]{8}$/.test(to) || to === id) throw invalid('to');
+  if (String(body.confirm || '').trim() !== 'احذف') throw invalid('confirm');
+  await retry(() => db.batch([
+    db.prepare('UPDATE bookings SET servant_id = ? WHERE servant_id = ?').bind(to, id),
+    db.prepare('UPDATE payments SET servant_id = ? WHERE servant_id = ?').bind(to, id),
+    db.prepare('UPDATE payment_claims SET servant_id = ? WHERE servant_id = ?').bind(to, id),
+    db.prepare('UPDATE handovers SET servant_id = ? WHERE servant_id = ?').bind(to, id),
+    db.prepare('DELETE FROM pay_dest WHERE servant_id = ?').bind(id),
+    db.prepare('UPDATE admins SET servant_id = NULL WHERE servant_id = ?').bind(id),
+    activityStmt(db, {
+      actor: ctx.actor.email, actorName: ctx.actor.name, action: 'book.purge', entityType: 'servant', entityId: id,
+      summary: 'حذف خادم نهائي: ' + counts.bookings + ' حجز و' + counts.payments + ' دفعة اتنقلوا لـ ' + to,
+      changes: Object.assign({ to }, counts), severity: 'important'
+    })
+  ]));
+  return Object.assign({ moved: true, to }, counts);
+}
