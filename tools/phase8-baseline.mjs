@@ -113,7 +113,7 @@ try {
     const page = await context.newPage();
     page.on('pageerror', e => errors.push(`[${wname}] ${e.message.slice(0, 160)}`));
     page.on('dialog', d => d.dismiss());
-    if (PREFS) await page.evaluateOnNewDocument(p => { try { localStorage.setItem('athanasios-admin.prefs.v1', JSON.stringify({ prefs: JSON.parse(p), dirty: true })); } catch { /* no storage */ } }, PREFS);
+    if (PREFS) await page.evaluateOnNewDocument((p, who) => { try { const prefs = JSON.parse(p); localStorage.setItem('athanasios-admin.prefs.v1', JSON.stringify({ prefs, dirty: true, email: who, by: { [who]: { prefs, dirty: true } } })); } catch { /* no storage */ } }, PREFS, ADMIN);
     await interceptGoogle(page, { post: body => world.post(body) }, { site: { origin: SITE, local: LOCAL }, handle: worker, calls: [] });
     await page.setViewport(viewport);
     await page.goto(`${SITE}/admin/`, { waitUntil: 'networkidle0' });

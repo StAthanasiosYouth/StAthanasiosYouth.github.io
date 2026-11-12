@@ -783,18 +783,44 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return out;
   }
 
-  function readLocal() {
+  /* The device copy is kept per account (owner fix 2026-11-12): two admins on one device (or
+     two windows of the panel signed in with different accounts) never get each other's look.
+     { prefs, dirty, email, by: { <email>: { prefs, dirty } } }: the top-level prefs is the last
+     account's (admin/look.js paints it before sign-in); `by` holds every account's own copy.
+     A copy with no owner (written before this fix) is never sent to the server. */
+  function myEmail() {
+    return String((A.state && A.state.user) || '').toLowerCase();
+  }
+
+  function readStore() {
     try {
       var saved = JSON.parse(window.localStorage.getItem(PREFS_KEY) || 'null');
-      return saved ? { prefs: cleanPrefs(saved.prefs || saved), dirty: !!saved.dirty } : null;
+      return saved && typeof saved === 'object' ? saved : null;
     }
     catch (ignored) {
       return null;
     }
   }
 
+  /* this account's copy on this device (before sign-in: the last account's, for the first paint) */
+  function readLocal() {
+    var saved = readStore();
+    if (!saved) return null;
+    var who = myEmail();
+    if (!who) return { prefs: cleanPrefs(saved.prefs || saved), dirty: false, email: saved.email || '' };
+    var own = saved.by && saved.by[who];
+    return own ? { prefs: cleanPrefs(own.prefs), dirty: !!own.dirty, email: who } : null;
+  }
+
   function writeLocal(dirty) {
-    try { window.localStorage.setItem(PREFS_KEY, JSON.stringify({ prefs: A.prefs, dirty: !!dirty })); }
+    var who = myEmail();
+    if (!who) return;
+    try {
+      var saved = readStore() || {};
+      var by = saved.by && typeof saved.by === 'object' ? saved.by : {};
+      by[who] = { prefs: A.prefs, dirty: !!dirty };
+      window.localStorage.setItem(PREFS_KEY, JSON.stringify({ prefs: A.prefs, dirty: !!dirty, email: who, by: by }));
+    }
     catch (ignored) { /* this device just forgets */ }
   }
 
@@ -829,6 +855,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   /* a change from «المظهر»: shown at once, kept on this device, sent to the server a moment later */
   A.setPrefs = function (patch) {
+    if (!myEmail()) return;
     A.prefs = cleanPrefs(patch, A.prefs);
     A.applyPrefs();
     writeLocal(true);
@@ -838,9 +865,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   function pushPrefs() {
     var sent = JSON.stringify(A.prefs);
+    var who = myEmail();
     A.call('apiAdminPrefsSave', A.prefs).then(function (saved) {
-      // a newer change waits its turn; this one landed
-      if (JSON.stringify(A.prefs) === sent) {
+      // a newer change waits its turn; this one landed (and the panel is still this account)
+      if (JSON.stringify(A.prefs) === sent && myEmail() === who) {
         if (saved) A.prefs = cleanPrefs(saved);
         writeLocal(false);
       }
@@ -865,9 +893,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   if (reduceQuery && reduceQuery.addEventListener) reduceQuery.addEventListener('change', function () { A.applyPrefs(); });
   // another tab of the panel changed it
   window.addEventListener('storage', function (event) {
-    if (event.key !== PREFS_KEY) return;
+    if (event.key !== PREFS_KEY || !myEmail()) return;
+    var saved = readStore();
+    // only a change of this account's own copy (another account's window changes nothing here)
+    if (!saved || saved.email !== myEmail()) return;
     var next = readLocal();
-    if (next) { A.prefs = next.prefs; A.applyPrefs(); }
+    if (next && JSON.stringify(next.prefs) !== JSON.stringify(A.prefs)) { A.prefs = next.prefs; A.applyPrefs(); }
   });
 
   A.applyPrefs();
@@ -7182,7 +7213,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   };
   var PERM_ACTIONS = {
     view: 'يشوف', add: 'يضيف', edit: 'يعدّل', delete: 'يمسح', approve: 'يعتمد', publish: 'ينشر',
-    export: 'يصدّر', export_pii: 'يصدّر بأرقام التليفونات', manage: 'يدير', create_cash: 'يسجّل حجز كاش'
+    export: 'يصدّر', export_pii: 'يصدّر بأرقام التليفونات', manage: 'يدير', create_cash: 'يسجّل حجز كاش',
+    rename: 'يغيّر أسماء الأدمنز'
   };
   var PROTECTED_REASONS = {
     primary: 'ده الحساب الأساسي: صلاحياته كاملة ومينفعش يتغير أو يتشال.',
@@ -7278,6 +7310,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       var primary = email === data.primary || !!(account && account.primary);
       var me = email === data.me;
       var manage = !!(acc && acc.canManage && !primary);
+      // owner 2026-11-12: one's own name always; another admin's only for the Primary Admin or an
+      // accounts.rename grant (the Worker checks it again)
+      var renamable = me || data.me === data.primary || !!(acc && acc.canRename);
 
       var shown = (data.names && data.names[email]) || email.split('@')[0];
       var named = !!(data.stored && data.stored[email]);
@@ -7293,13 +7328,13 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
             primary ? null : grantsChip(account)
           )
         ),
-        el('button', {
+        renamable ? el('button', {
           class: 'icon-btn',
           type: 'button',
           'aria-label': 'غيّر اسم ' + email,
           title: 'غيّر الاسم',
           onclick: function (event) { rename(email, named ? shown : '', event.currentTarget); }
-        }, icon('edit')),
+        }, icon('edit')) : null,
         manage && account ? el('button', {
           class: 'icon-btn',
           type: 'button',

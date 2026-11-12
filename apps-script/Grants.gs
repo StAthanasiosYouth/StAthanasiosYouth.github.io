@@ -26,7 +26,7 @@ var GRANTS_CACHE_KEY = 'grants:v1';
 var GRANTS_CACHE_S = 60;
 var GRANTS_MISS = 'miss';                         // the Worker didn't answer: last-good until the next minute
 var GRANTS_LAST_GOOD_KEY = 'GRANTS_LAST_GOOD';
-var GRANTS_PRIMARY_DEFAULT = ['accounts.manage', 'notifications.manage', 'participants.manage', 'activity.manage'];  // activity.manage: Phase 8 A6 (worker lib/perms.js)
+var GRANTS_PRIMARY_DEFAULT = ['accounts.manage', 'notifications.manage', 'participants.manage', 'activity.manage', 'accounts.rename'];  // activity.manage: Phase 8 A6; accounts.rename: owner 2026-11-12 (worker lib/perms.js)
 var ANY_ADMIN_PERM = '*';
 
 /* api* function → the permission it needs (ANY_ADMIN_PERM: any admin on the allowlist) */

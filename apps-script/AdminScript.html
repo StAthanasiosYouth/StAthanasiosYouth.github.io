@@ -654,18 +654,44 @@
     return out;
   }
 
-  function readLocal() {
+  /* The device copy is kept per account (owner fix 2026-11-12): two admins on one device (or
+     two windows of the panel signed in with different accounts) never get each other's look.
+     { prefs, dirty, email, by: { <email>: { prefs, dirty } } }: the top-level prefs is the last
+     account's (admin/look.js paints it before sign-in); `by` holds every account's own copy.
+     A copy with no owner (written before this fix) is never sent to the server. */
+  function myEmail() {
+    return String((A.state && A.state.user) || '').toLowerCase();
+  }
+
+  function readStore() {
     try {
       var saved = JSON.parse(window.localStorage.getItem(PREFS_KEY) || 'null');
-      return saved ? { prefs: cleanPrefs(saved.prefs || saved), dirty: !!saved.dirty } : null;
+      return saved && typeof saved === 'object' ? saved : null;
     }
     catch (ignored) {
       return null;
     }
   }
 
+  /* this account's copy on this device (before sign-in: the last account's, for the first paint) */
+  function readLocal() {
+    var saved = readStore();
+    if (!saved) return null;
+    var who = myEmail();
+    if (!who) return { prefs: cleanPrefs(saved.prefs || saved), dirty: false, email: saved.email || '' };
+    var own = saved.by && saved.by[who];
+    return own ? { prefs: cleanPrefs(own.prefs), dirty: !!own.dirty, email: who } : null;
+  }
+
   function writeLocal(dirty) {
-    try { window.localStorage.setItem(PREFS_KEY, JSON.stringify({ prefs: A.prefs, dirty: !!dirty })); }
+    var who = myEmail();
+    if (!who) return;
+    try {
+      var saved = readStore() || {};
+      var by = saved.by && typeof saved.by === 'object' ? saved.by : {};
+      by[who] = { prefs: A.prefs, dirty: !!dirty };
+      window.localStorage.setItem(PREFS_KEY, JSON.stringify({ prefs: A.prefs, dirty: !!dirty, email: who, by: by }));
+    }
     catch (ignored) { /* this device just forgets */ }
   }
 
@@ -700,6 +726,7 @@
 
   /* a change from «المظهر»: shown at once, kept on this device, sent to the server a moment later */
   A.setPrefs = function (patch) {
+    if (!myEmail()) return;
     A.prefs = cleanPrefs(patch, A.prefs);
     A.applyPrefs();
     writeLocal(true);
@@ -709,9 +736,10 @@
 
   function pushPrefs() {
     var sent = JSON.stringify(A.prefs);
+    var who = myEmail();
     A.call('apiAdminPrefsSave', A.prefs).then(function (saved) {
-      // a newer change waits its turn; this one landed
-      if (JSON.stringify(A.prefs) === sent) {
+      // a newer change waits its turn; this one landed (and the panel is still this account)
+      if (JSON.stringify(A.prefs) === sent && myEmail() === who) {
         if (saved) A.prefs = cleanPrefs(saved);
         writeLocal(false);
       }
@@ -736,9 +764,12 @@
   if (reduceQuery && reduceQuery.addEventListener) reduceQuery.addEventListener('change', function () { A.applyPrefs(); });
   // another tab of the panel changed it
   window.addEventListener('storage', function (event) {
-    if (event.key !== PREFS_KEY) return;
+    if (event.key !== PREFS_KEY || !myEmail()) return;
+    var saved = readStore();
+    // only a change of this account's own copy (another account's window changes nothing here)
+    if (!saved || saved.email !== myEmail()) return;
     var next = readLocal();
-    if (next) { A.prefs = next.prefs; A.applyPrefs(); }
+    if (next && JSON.stringify(next.prefs) !== JSON.stringify(A.prefs)) { A.prefs = next.prefs; A.applyPrefs(); }
   });
 
   A.applyPrefs();

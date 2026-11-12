@@ -28,7 +28,8 @@ const CATALOG = {
   participants: ['view', 'add', 'edit', 'manage'],
   media: ['view', 'add', 'delete'],
   push: ['view', 'manage'],
-  accounts: ['view', 'manage'],
+  // rename (owner 2026-11-12): rename another admin; the account itself and the Primary Admin always may
+  accounts: ['view', 'manage', 'rename'],
   activity: ['view', 'manage'],
   notifications: ['view', 'manage'],
   system: ['view', 'manage']
@@ -38,7 +39,7 @@ export const PERMS = Object.freeze(Object.entries(CATALOG).flatMap(([m, actions]
 const KNOWN = new Set(PERMS);
 
 /* Never granted by default: the Primary Admin's, until they grant them (§4.3; YOUTH-ACCOUNTS-PLAN §12.2). */
-export const PRIMARY_DEFAULT = Object.freeze(['accounts.manage', 'notifications.manage', 'participants.manage', 'activity.manage']);
+export const PRIMARY_DEFAULT = Object.freeze(['accounts.manage', 'notifications.manage', 'participants.manage', 'activity.manage', 'accounts.rename']);
 
 /* «الصلاحيات» presets: they only pre-fill the checkboxes (§4.3). perm → scope. */
 const views = PERMS.filter(p => p.endsWith('.view') && p !== 'accounts.view' && p !== 'notifications.view');

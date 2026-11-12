@@ -259,7 +259,8 @@ test('Phase 8 A1 prefs: the defaults on /me, saved per admin, known values only,
 
 test('P3-3 rename: rules of Activity.gs (length, characters, unique by reading), audit row, clear', async () => {
   const w = await world();
-  const auth = await w.google(M);
+  // the Primary Admin may rename anyone (owner 2026-11-12)
+  const auth = await w.google(P);
   const ok = await w.call(auth, 'POST', '/v1/admin/accounts/' + encodeURIComponent(P) + '/name', { name: '  مينا   زكريا ' });
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
   assert.equal(ok.body.name, 'مينا زكريا');
@@ -272,6 +273,37 @@ test('P3-3 rename: rules of Activity.gs (length, characters, unique by reading),
   const clear = await w.call(auth, 'POST', '/v1/admin/accounts/' + encodeURIComponent(P) + '/name', { name: '' });
   assert.equal(clear.body.name, 'p');
   assert.equal(nameKey('أحمد'), nameKey('احمد'));
+});
+
+test('owner 2026-11-12: who may rename an admin: the account itself, the Primary Admin, or an accounts.rename grant — whatever PERMS_ENFORCE says', async () => {
+  for (const enforce of ['0', '1']) {
+    const w = await world();
+    await w.h.db.prepare("UPDATE settings SET value = ? WHERE key = 'PERMS_ENFORCE'").bind(enforce).run();
+    const m = await w.google(M);
+    const rename = (auth, email, name) => w.call(auth, 'POST', '/v1/admin/accounts/' + encodeURIComponent(email) + '/name', { name });
+    // their own name: always
+    const own = await rename(m, M.toUpperCase(), 'مينا الخادم');
+    assert.equal(own.status, 200, enforce + ' ' + JSON.stringify(own.body));
+    assert.equal(own.body.canRename, false);
+    // another admin's: denied, nothing changes, no audit row for it
+    const other = await rename(m, P, 'Someone');
+    assert.equal(other.status, 403, enforce);
+    assert.equal(other.body.code, 'denied');
+    assert.equal(await w.h.db.prepare('SELECT name FROM admins WHERE email = ?').bind(P).first('name'), 'Primary');
+    assert.equal(await w.h.db.prepare("SELECT 1 FROM activity WHERE action = 'admin.rename' AND entity_id = ?").bind(P).first(), null);
+    if (enforce === '0') assert.equal((await w.call(m, 'GET', '/v1/admin/accounts')).body.canRename, false, 'the panel hides the pencil');
+    // the Primary Admin grants accounts.rename: now allowed
+    await w.h.db.prepare("INSERT INTO admin_grants (email, perm, scope, granted_by, granted_at) VALUES (?, 'accounts.rename', 'all', ?, 0)").bind(M, P).run();
+    if (enforce === '1') await w.h.db.prepare("INSERT INTO admin_grants (email, perm, scope, granted_by, granted_at) VALUES (?, 'accounts.view', 'all', ?, 0)").bind(M, P).run();
+    const granted = await rename(await w.google(M), P, 'Someone');
+    assert.equal(granted.status, 200, enforce + ' ' + JSON.stringify(granted.body));
+    assert.equal(granted.body.canRename, true);
+    assert.equal((await w.call(await w.google(M), 'GET', '/v1/admin/accounts')).body.canRename, true);
+    // the Primary Admin: always
+    const p = await w.google(P);
+    assert.equal((await rename(p, M, 'Mina')).status, 200);
+    assert.equal((await w.call(p, 'GET', '/v1/admin/accounts')).body.canRename, true);
+  }
 });
 
 test('Apps Script check with all: every live panel lock of the OTHER sessions (asked once before a write)', async () => {
