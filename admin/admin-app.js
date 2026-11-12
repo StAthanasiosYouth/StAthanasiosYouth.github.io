@@ -13513,6 +13513,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     points: 'الإجابات بتتصحح لوحدها، والدرجة بتتحول نقاط في محفظة المشترك.'
   };
 
+  var PRESET_ICON = { survey: 'form', scored: 'check', points: 'star' };
+
   var RESERVED = ['index', 'assets', 'admin', 'points', 'media', 'preview', 'new', 'comp', 'competition', 'competitions'];
   var LATIN = {
     'ا': 'a', 'أ': 'a', 'إ': 'e', 'آ': 'a', 'ٱ': 'a', 'ب': 'b', 'ت': 't', 'ث': 'th', 'ج': 'g', 'ح': 'h', 'خ': 'kh', 'د': 'd', 'ذ': 'z',
@@ -13563,18 +13565,22 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       var wiz = { step: 1, title: '', preset: presets.some(function (p) { return p.key === 'scored'; }) ? 'scored' : (presets[0] ? presets[0].key : ''), startAt: '', endAt: '', slug: '', slugTouched: false };
 
       function steps() {
-        return el('ol', { class: 'comp-steps', 'aria-label': 'خطوات المسابقة الجديدة' }, ['الاسم والنوع', 'المواعيد', 'الرابط'].map(function (label, i) {
+        // comp-new.png: three step chips joined by lines
+        var items = [];
+        ['الاسم والنوع', 'المواعيد', 'الرابط'].forEach(function (label, i) {
           var n = i + 1;
-          return el('li', { class: 'comp-steps__step' + (n < wiz.step ? ' is-done' : n === wiz.step ? ' is-current' : ''), 'aria-current': n === wiz.step ? 'step' : null },
-            el('span', { class: 'comp-steps__dot', 'aria-hidden': 'true' }, n < wiz.step ? icon('check') : ar(n)), el('span', { text: label }));
-        }));
+          if (i) items.push(el('li', { class: 'comp-steps__line' + (n <= wiz.step ? ' is-done' : ''), 'aria-hidden': 'true' }));
+          items.push(el('li', { class: 'comp-steps__step' + (n < wiz.step ? ' is-done' : n === wiz.step ? ' is-current' : ''), 'aria-current': n === wiz.step ? 'step' : null },
+            el('span', { class: 'comp-steps__dot', 'aria-hidden': 'true' }, n < wiz.step ? icon('check') : ar(n)), el('span', { text: label })));
+        });
+        return el('ol', { class: 'comp-steps c9-steps', 'aria-label': 'خطوات المسابقة الجديدة' }, items);
       }
 
       function show() {
 
         var box = A.errorBox();
         var body;
-        var next = el('button', { class: 'btn btn--primary', type: 'button' }, wiz.step < 3 ? 'التالي' : 'اعمل المسابقة');
+        var next = el('button', { class: 'btn btn--primary c9-next', type: 'button' }, wiz.step < 3 ? 'التالي' : 'اعمل المسابقة', wiz.step < 3 ? el('span', { class: 'c9-next__ic', 'aria-hidden': 'true' }, icon('chevron')) : null);
         var back = el('button', { class: 'btn btn--ghost', type: 'button', text: wiz.step > 1 ? 'رجوع' : 'إلغاء' });
 
         back.addEventListener('click', function () {
@@ -13587,10 +13593,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         var collect = function () {};
 
         if (wiz.step === 1) {
-          var title = A.counted('اسم المسابقة', wiz.title, 80, 'مثلاً: مسابقة الكتاب المقدس — الصوم الكبير', { required: true });
+          var title = A.counted('اسم المسابقة', wiz.title, 80, '', { required: true, placeholder: 'مثلًا: مسابقة الكتاب المقدس — الصوم الكبير' });
           var kind = el('div', { class: 'comp-presets', role: 'radiogroup', 'aria-label': 'نوع المسابقة' }, presets.map(function (p) {
             var input = el('input', { type: 'radio', name: 'comp-preset', value: p.key, checked: p.key === wiz.preset, onchange: function () { wiz.preset = p.key; A.markDirty(); } });
-            return el('label', { class: 'comp-preset' }, input,
+            // comp-new.png: a card per kind — its icon, the radio in the corner, the name and what it does
+            return el('label', { class: 'comp-preset c9-kind' }, input,
+              el('span', { class: 'c9-kind__top' }, el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(PRESET_ICON[p.key] || 'trophy')), el('span', { class: 'c9-kind__radio', 'aria-hidden': 'true' })),
               el('span', { class: 'comp-preset__body' }, el('strong', { text: p.label }), el('small', { text: PRESET_TEXT[p.key] || '' })));
           }));
           var hidden = (list.presets || []).length < 3
@@ -13665,7 +13673,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           });
         }
 
-        A.openSheet('مسابقة جديدة', [steps(), box, el('div', { class: 'form' }, body)], [next, back], { className: 'sheet--comp-wizard' });
+        A.openSheet('مسابقة جديدة', [steps(), box, el('div', { class: 'form' }, body)], [next, back], { className: 'sheet--comp-wizard', size: 'md', icon: 'trophy', sub: '٣ خطوات — تقدر تغيّر أي حاجة بعدين' });
         A.dirty = !!(wiz.title || wiz.startAt || wiz.endAt);
 
       }
