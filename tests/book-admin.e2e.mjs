@@ -288,7 +288,7 @@ test('module on: the tab, «الحجوزات (٢ جديد)», chips with counts,
   await d.page.click('[data-act="book-open"]');
   await waitRows(d.page, ['B-AAAA1', 'B-BBBB2']);
   assert.deepEqual(await d.page.evaluate(() => [A.area, A.sub.bookings]), ['bookings', 'bookings']);
-  assert.deepEqual(await subtabs(d.page), ['الحجوزات٢', 'الفلوس']);
+  assert.deepEqual(await subtabs(d.page), ['الحجوزات٢', 'الفلوس', 'طرق الدفع']);
   // Phase 8B (bookings.png): the design's four, then «متأخر» only while there are some; the counts are on the cards above
   const chips = await d.page.$$eval('.book-chips .filter-chip', n => n.map(x => x.textContent));
   assert.deepEqual(chips, ['الكل', 'جديد', 'مؤكد', 'ملغي', 'متأخر (١)']);
@@ -606,7 +606,8 @@ test('a manual booking confirmed in the same dialog; summary + XLSX (the phone w
   // «الحسابات المالية للخدام»: its own page (next to «الحجوزات»), opened on this event
   await clickAct(d.page, 'open-finance');
   await d.page.waitForSelector('.book-servants [data-servant="srv-mina"]');
-  assert.match(await d.page.$eval('.book-servants [data-servant="srv-mina"]', n => n.innerText), /٤٬٣٠٠ ج/);
+  // Phase 8B (fin-report.png): «التقرير التفصيلي», a row per servant (numbers without «ج» like the design)
+  assert.match(await d.page.$eval('.book-servants [data-servant="srv-mina"]', n => n.innerText), /٤٬٣٠٠|٤٣٠٠/);
   assert.ok(await d.page.$('.book-servants [data-servant="srv-mina"] [data-act="handover"]'), 'one event picked: a handover can be recorded');
   assert.ok(fake.state.calls.some(c => c.path === '/v1/admin/book/finance' && new URLSearchParams(c.query).get('eventId') === eventId));
   await shot(d.page, '08b-finance');
@@ -614,26 +615,26 @@ test('a manual booking confirmed in the same dialog; summary + XLSX (the phone w
   await d.page.screenshot({ path: `${SHOTS}08c-finance-full.png`, fullPage: true });
   // the servant filter: one card, the methods open, the summary is his
   await d.page.select('[data-act="finance-servant"]', 'srv-mina');
-  await d.page.waitForFunction(() => document.querySelectorAll('.fin-card').length === 1 && document.querySelector('.fin-methods[open]'));
-  assert.match(await d.page.$eval('#fin-sum-h', n => n.textContent), /مينا/);
+  await d.page.waitForFunction(() => document.querySelectorAll('.book-servants tr[data-servant]').length === 1);
+  assert.match(await d.page.$eval('[data-act="finance-servant"]', n => n.closest('.act-pill').textContent), /مينا/);
   // exports sit on the page (one event picked)
   assert.equal(await d.page.$eval('[data-act="fin-roster"]', n => n.disabled), false);
   assert.equal(await d.page.$eval('[data-act="fin-report"]', n => n.disabled), false);
   // the handover dialog: one method, the balance shown, more than it can't be sent
-  await d.page.click('.fin-card [data-act="handover"]');
-  await d.page.waitForSelector('dialog.modal[open] .fin-avail strong');
-  assert.match(await d.page.$eval('dialog.modal[open] .fin-avail', n => n.textContent), /٤٬٣٠٠/);
-  await d.page.$eval('dialog.modal[open] .fin-handover input[inputmode="numeric"]', n => { n.value = '999999'; n.dispatchEvent(new Event('input', { bubbles: true })); });
-  assert.equal(await d.page.$eval('dialog.modal[open] [data-fin-send]', n => n.disabled), true, 'more than he holds: the button is off');
-  await d.page.$eval('dialog.modal[open] .fin-handover input[inputmode="numeric"]', n => { n.value = '0'; n.dispatchEvent(new Event('input', { bubbles: true })); });
-  assert.equal(await d.page.$eval('dialog.modal[open] [data-fin-send]', n => n.disabled), true, 'zero: off');
-  await d.page.$eval('dialog.modal[open] .fin-handover input[inputmode="numeric"]', n => { n.value = '300'; n.dispatchEvent(new Event('input', { bubbles: true })); });
-  assert.equal(await d.page.$eval('dialog.modal[open] [data-fin-send]', n => n.disabled), false);
+  // the handover window (fin-handover.png): the balance shown, more than it can't be sent
+  await d.page.$eval('.book-servants [data-act="handover"]', n => n.click());
+  await d.page.waitForSelector('#sheet[open] .fin8-hint');
+  assert.match(await d.page.$eval('#sheet[open] .fin8-hint', n => n.textContent), /٤٬٣٠٠/);
+  await d.page.$eval('#sheet[open] .fin8-amount', n => { n.value = '999999'; n.dispatchEvent(new Event('input', { bubbles: true })); });
+  assert.equal(await d.page.$eval('#sheet[open] [data-fin-send]', n => n.disabled), true, 'more than he holds: the button is off');
+  await d.page.$eval('#sheet[open] .fin8-amount', n => { n.value = '0'; n.dispatchEvent(new Event('input', { bubbles: true })); });
+  assert.equal(await d.page.$eval('#sheet[open] [data-fin-send]', n => n.disabled), true, 'zero: off');
+  await d.page.$eval('#sheet[open] .fin8-amount', n => { n.value = '300'; n.dispatchEvent(new Event('input', { bubbles: true })); });
+  assert.equal(await d.page.$eval('#sheet[open] [data-fin-send]', n => n.disabled), false);
   await shot(d.page, '08d-handover');
-  await d.page.click('dialog.modal[open] .btn--ghost');
-  await d.page.waitForFunction(() => !document.querySelector('dialog.modal[open]'));
+  await closeSheet(d.page);
   // reminders: the section is there (with or without anyone owing)
-  await d.page.waitForSelector('[data-reminders] .fin-log, [data-reminders] .fin-hint');
+  await d.page.waitForSelector('[data-reminders] .fin-log, [data-reminders] .fin8-none');
   // phone width: no sideways scroll
   await d.page.setViewport({ width: 390, height: 844 });
   await sleep(400);
@@ -644,7 +645,7 @@ test('a manual booking confirmed in the same dialog; summary + XLSX (the phone w
   // coming back to the page reads the bookings again (reminders never use an older copy)
   const exportsBefore = fake.state.calls.filter(c => c.path === '/v1/admin/book/export').length;
   await d.page.evaluate(() => A.book.openFinance(A.book.eventId));
-  await d.page.waitForFunction(() => document.querySelector('[data-reminders] .fin-log, [data-reminders] .fin-hint'), { polling: 100, timeout: 8000 });
+  await d.page.waitForFunction(() => document.querySelector('[data-reminders] .fin-log, [data-reminders] .fin8-none'), { polling: 100, timeout: 8000 });
   await sleep(500);
   assert.ok(fake.state.calls.filter(c => c.path === '/v1/admin/book/export').length > exportsBefore, 'the export is read again');
   await d.page.select('[data-act="finance-event"]', 'all');
@@ -819,7 +820,7 @@ test('device session (the app\'s remembered phone): «الحجوزات» opens w
   assert.deepEqual((await rows(again.page)).sort(), ['B-AAAA1', 'B-BBBB2']);
   assert.ok(fake.state.calls.length > 0 && fake.state.calls.every(c => /^Bearer wk1\.[A-Za-z0-9_-]+\.[0-9a-f]{64}$/.test(c.auth)), 'the panel session credential');
   assert.ok(fake.state.calls.every(c => !/adm1\./.test(c.auth)), 'the device token never reaches the Worker');
-  assert.deepEqual(await subtabs(again.page), ['الحجوزات٢', 'الفلوس']);
+  assert.deepEqual(await subtabs(again.page), ['الحجوزات٢', 'الفلوس', 'طرق الدفع']);
   assert.deepEqual(again.problems, []);
   await context.close();
 });
