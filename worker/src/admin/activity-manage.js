@@ -10,8 +10,8 @@
  *   GET  /v1/admin/activity/manage/archive/:id → the CSV
  *   POST /v1/admin/activity/manage/delete     { days, section?, technical?, confirm: 'امسح' } → { deleted, kept }
  *
- * Delete: any age (owner 2026-11-12: MIN_DAYS 0, «days: 0» = every row up to now); never the security and permission rows of the last year
- * (PROTECTED); the word «امسح» is required; the delete itself is written as one row (`activity.trim`).
+ * Delete: any age (owner 2026-11-12: MIN_DAYS 0, «days: 0» = every row up to now); the security and permission rows too (owner, same day)
+ * the word «امسح» is required (no protected rows since 2026-11-12); the delete itself is written as one row (`activity.trim`).
  */
 
 import { ApiError, fileResponse } from '../lib/http.js';
@@ -25,7 +25,7 @@ export const MIN_DAYS = 0;
 const MAX_ROWS = 20000;
 const PREFIX = 'activity-archive/';
 const TECHNICAL = ['diag.echo', 'diag.queue', 'booknews.claim', 'booknews.ack', 'admins.sync', 'paydest.sync', 'job.failed', 'booking.retention', 'push.receipt'];
-// security and permissions: kept a year whatever the filter says
+// security and permissions (kept a year until 2026-11-12, when the owner removed that protection; the list stays for reference)
 export const PROTECTED = ['admin.add', 'admin.remove', 'admin.rename', 'accounts.add', 'accounts.grants', 'accounts.remove', 'session.takeover',
   'migrate', 'code.view', 'code.reset', 'code.export', 'activity.trim'];
 const marks = list => list.map(() => '?').join(',');
@@ -46,9 +46,10 @@ function scope(body, now) {
     where.push('action IN (' + marks(TECHNICAL) + ')');
     args.push(...TECHNICAL);
   }
-  const keepYear = now - 365 * DAY;
-  const kept = '(action IN (' + marks(PROTECTED) + ') AND at >= ?)';
-  return { days, section, technical: body && body.technical === true, where: where.join(' AND '), args, kept, keptArgs: [...PROTECTED, keepYear] };
+  // owner 2026-11-12: no protected rows any more — the security and permission rows go like the rest
+  // (the delete itself is still written as one important row, `activity.trim`)
+  const kept = '(0 = 1)';
+  return { days, section, technical: body && body.technical === true, where: where.join(' AND '), args, kept, keptArgs: [] };
 }
 
 async function counts(db, s) {

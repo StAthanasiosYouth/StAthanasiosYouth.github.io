@@ -35,26 +35,26 @@ test('needs activity.manage (never by default for a non-Primary admin)', async (
   assert.equal(s.body.minDays, 0);
 });
 
-test('preview and delete: any age, never the security rows of the last year, the word required, logged as one row', async () => {
+test('preview and delete: any age, the security rows too (owner 2026-11-12), the word required, logged as one row', async () => {
   const { h, call } = await world();
   await grant(h, 'activity.manage');
   assert.equal((await call('POST', '/v1/admin/activity/manage/preview', { days: -1 })).body.code, 'invalid', 'no negative age');
-  // owner 2026-11-12: any age — «days: 0» is every row up to now (the security rows of the last year stay)
+  // owner 2026-11-12: any age — «days: 0» is every row up to now (the security rows too)
   assert.equal((await call('POST', '/v1/admin/activity/manage/preview', { days: 0 })).status, 200);
   const p = await call('POST', '/v1/admin/activity/manage/preview', { days: 90 });
   const pick = b => ({ count: b.count, kept: b.kept });
-  assert.deepEqual(pick(p.body), { count: 3, kept: 1 });
+  assert.deepEqual(pick(p.body), { count: 4, kept: 0 });
   assert.deepEqual(pick((await call('POST', '/v1/admin/activity/manage/preview', { days: 90, technical: true })).body), { count: 1, kept: 0 });
   assert.equal((await call('POST', '/v1/admin/activity/manage/delete', { days: 90 })).body.code, 'invalid', 'the word first');
   const d = await call('POST', '/v1/admin/activity/manage/delete', { days: 90, confirm: 'امسح' });
   assert.equal(d.status, 200, JSON.stringify(d.body));
-  assert.deepEqual({ deleted: d.body.deleted, kept: d.body.kept }, { deleted: 3, kept: 1 });
+  assert.deepEqual({ deleted: d.body.deleted, kept: d.body.kept }, { deleted: 4, kept: 0 });
   const left = (await h.db.prepare("SELECT id FROM activity WHERE action <> 'activity.trim' ORDER BY id").all()).results.map(r => r.id);
-  assert.deepEqual(left, ['act-new000001', 'act-sec000001']);
+  assert.deepEqual(left, ['act-new000001']);
   const trim = await h.db.prepare("SELECT actor, severity, summary FROM activity WHERE action = 'activity.trim'").first();
   assert.equal(trim.actor, ME);
   assert.equal(trim.severity, 'important');
-  assert.match(trim.summary, /^مسح 3 صف/);
+  assert.match(trim.summary, /^مسح 4 صف/);
 });
 
 test('archive: the rows as a private CSV, listed and downloadable; the rows stay', async () => {
