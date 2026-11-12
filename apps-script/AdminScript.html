@@ -4178,8 +4178,8 @@
           el('span', { class: 'navlink__icon' }, icon('globe')), el('span', { class: 'navlink__label', text: 'افتح الموقع' })) : null,
         collapse,
         el('p', { class: 'rail__user', title: A.state.user }, A.avatarNode('acct__av', A.state.user, myName()), A.state.me && A.state.me !== A.state.user.split('@')[0]
-          ? el('span', { class: 'rail__who' }, el('span', { class: 'rail__name', dir: 'auto', text: A.state.me }), el('small', { class: 'rail__role', text: A.access && A.access.primary ? 'الأدمن الأساسي' : 'أدمن' }))
-          : el('span', { class: 'rail__who' }, el('span', { class: 'ltr', text: A.state.user }), el('small', { class: 'rail__role', text: A.access && A.access.primary ? 'الأدمن الأساسي' : 'أدمن' }))),
+          ? el('span', { class: 'rail__who' }, el('span', { class: 'rail__name', dir: 'auto', text: A.state.me }), el('small', { class: 'rail__role', text: realPrimary() ? 'الأدمن الأساسي' : 'أدمن' }))
+          : el('span', { class: 'rail__who' }, el('span', { class: 'ltr', text: A.state.user }), el('small', { class: 'rail__role', text: realPrimary() ? 'الأدمن الأساسي' : 'أدمن' }))),
         // the official admin page only (Google sign-in lives there)
         A.signOut ? el('button', { class: 'navlink navlink--quiet navlink--out', type: 'button', 'data-signout': '', title: 'تسجيل الخروج', onclick: function () { A.signOut(); } },
           el('span', { class: 'navlink__icon' }, icon('logout')), el('span', { class: 'navlink__label', text: 'خروج' })) : null
@@ -4204,7 +4204,7 @@
 
   // area → the grants that open it (any one of them)
   var AREA_NEEDS = {
-    home: ['content.view'],
+    // «الرئيسية» is every admin's (denied.png: a bookings servant has it); its cards follow their own areas
     content: ['content.view'],
     comps: ['competitions.view'],
     pages: ['content.view', 'events.view'],
@@ -4233,6 +4233,12 @@
   };
 
   /* may this admin open the area? (true until the Worker says otherwise) */
+  /* the signed-in admin's own rank, also while previewing another admin's view (denied.png) */
+  function realPrimary() {
+    var a = A.viewing ? A.viewing.real : A.access;
+    return !!(a && a.primary);
+  }
+
   A.allowed = function (key) {
     var a = A.access;
     if (!a || !a.enforce || a.primary) return true;
@@ -4247,9 +4253,10 @@
 
   /* the admin's own home: «الرئيسية» when it is theirs, else the first area they may open */
   A.homeArea = function () {
-    if (A.allowed('home')) return 'home';
-    var first = A.visibleAreas().filter(function (a) { return a.key !== 'settings'; })[0];
-    return first ? first.key : 'settings';
+    // «الرئيسية» is in everyone's menu (denied.png), but an admin without the content starts at their own work
+    if (A.allowed('home') && A.allowed('content')) return 'home';
+    var first = A.visibleAreas().filter(function (a) { return a.key !== 'settings' && a.key !== 'home'; })[0];
+    return first ? first.key : A.allowed('home') ? 'home' : 'settings';
   };
 
   A.loadAccess = function (changed) {
@@ -4258,7 +4265,8 @@
       if (A.viewing) { A.viewing.real = { enforce: !!me.enforce, primary: !!me.primary, perms: me.perms }; return; }
       A.access = { enforce: !!me.enforce, primary: !!me.primary, perms: me.perms };
       A.gamesCorner(!!(me.modules && me.modules.games));
-      if (!A.allowed(A.area)) A.go(A.homeArea());
+      // first load: an admin without the content starts at their own work, not on «الرئيسية»
+      if (!A.allowed(A.area) || (!changed && A.area === 'home' && A.homeArea() !== 'home')) A.go(A.homeArea());
       else {
         renderNav();
         // a screen with grant-dependent parts (A6: «إدارة السجل») draws them now; after a change, any screen
@@ -4516,7 +4524,7 @@
 
   function dockAreas() {
     // the admin's own home first (A4), then the rest in their order
-    var home = A.homeArea();
+    var home = A.allowed('home') ? 'home' : A.homeArea();
     var order = Object.keys(GROUPS);
     var all = A.visibleAreas().filter(function (a) { return a.key !== 'settings'; }).map(function (a, i) { return { a: a, i: i }; })
       .sort(function (x, y) { return (order.indexOf(x.a.group || 'site') - order.indexOf(y.a.group || 'site')) || (x.i - y.i); }).map(function (x) { return x.a; });
@@ -6178,6 +6186,8 @@
         if (hello) hello.ready(state && (state.me || (state.user || '').split('@')[0]));
         myAcct = acctTag(state.user);
         A.renderStatus();
+        // an admin without the content starts at their own work (A4), «الرئيسية» stays in their menu
+        if (A.area === 'home' && A.access && A.homeArea() !== 'home') A.area = A.homeArea();
         renderNav();
         A.render({ animate: true });
         resumePublish();

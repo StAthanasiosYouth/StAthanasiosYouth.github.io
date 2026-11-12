@@ -534,6 +534,12 @@ const OVERFLOW = () => {
   for (const node of document.querySelectorAll('#view *, #presence *, .topbar *, #gate-panel *, dialog[open] *')) {
     const r = node.getBoundingClientRect();
     if (!r.width || node.closest('.tabs, .sheet__nav, .hero__art, .setnav')) continue;
+    // a strip that scrolls sideways inside its own box (comps.png phone: the status filter) clips, it does not overflow
+    let clip = node.parentElement, inBox = false;
+    for (; clip && clip !== root; clip = clip.parentElement) {
+      if (/(auto|scroll)/.test(getComputedStyle(clip).overflowX)) { const b = clip.getBoundingClientRect(); inBox = b.left >= -1 && b.right <= root.clientWidth + 1; break; }
+    }
+    if (inBox) continue;
     if (r.right > root.clientWidth + 1 || r.left < -1) issues.push(`${node.tagName.toLowerCase()}.${String(node.className.baseVal ?? node.className).trim().split(/\s+/).join('.')} [${Math.round(r.left)}..${Math.round(r.right)}]`);
   }
   return issues.slice(0, 10);

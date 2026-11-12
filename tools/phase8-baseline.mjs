@@ -5,7 +5,7 @@
 // (the harness of tests/content-worker.e2e.mjs). Nothing here touches Google, GitHub or Cloudflare.
 //   cd tools && node phase8-baseline.mjs [shots dir]
 // A1 and later (the look): PHASE8_PREFS='{"theme":"light"}' seeds the panel's look on the device; PHASE8_WIDTHS=phone,desktop
-// limits the sizes; PHASE8_ONLY=settings limits the areas. With any of them the inventory is not rewritten.
+// limits the sizes; PHASE8_PHONE_W=360 sets the phone width; PHASE8_ONLY=settings limits the areas. With any of them the inventory is not rewritten.
 // Run it again at the end of Phase 8 and compare: every inventory row must still exist, or be listed as moved.
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -28,7 +28,7 @@ const WORKER_URL = 'https://athanasios-api.menazak-lab.workers.dev';
 const ADMIN = 'menazakmena@gmail.com';
 const SECRET = 's'.repeat(48);
 const TIMING = { gisSlow: 700, gisFail: 2500, button: 3000, silent: 1500, slow: 900, fail: 8000, render: 8000, beat: 900, beatFail: 2500 };
-const WIDTHS = { desktop: { width: 1440, height: 900 }, tablet: { width: 768, height: 1024 }, phone: { width: 375, height: 812, isMobile: true, hasTouch: true } };
+const WIDTHS = { desktop: { width: 1440, height: 900 }, tablet: { width: 768, height: 1024 }, phone: { width: +(process.env.PHASE8_PHONE_W || 375), height: 812, isMobile: true, hasTouch: true } };
 const CHROME = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(existsSync);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -150,6 +150,10 @@ try {
       // PHASE8_EVAL: a script run on the screen before the shot (open an editor, a menu…); may return a promise
       if (process.env.PHASE8_EVAL) { await page.evaluate(process.env.PHASE8_EVAL).catch(e => errors.push('eval ' + e.message)); await sleep(1500); }
       const name = `${s.area}${s.sub ? '-' + s.sub : ''}`;
+      // an eval may leave a report for the console (window.__report)
+      { const rep = await page.evaluate(() => window.__report || null).catch(() => null); if (rep) console.log("REPORT", wname, s.area + (s.sub ? "-" + s.sub : ""), JSON.stringify(rep)); }
+      // PHASE8_OVERFLOW=1: print each screen whose page is wider than the window (and the widest culprits)
+      if (process.env.PHASE8_OVERFLOW) console.log('OVERFLOW', wname, name, await page.evaluate(() => { const W = document.documentElement.clientWidth; if (document.documentElement.scrollWidth <= W) return 'ok'; const out = []; for (const n of document.querySelectorAll('#view *, dialog[open] *')) { const r = n.getBoundingClientRect(); const p = n.parentElement.getBoundingClientRect(); if (r.right > W + 1 && p.right <= W + 1) out.push(n.tagName.toLowerCase() + '.' + String(n.className.baseVal ?? n.className).trim().split(/s+/).join('.') + ' ' + Math.round(r.width)); } return document.documentElement.scrollWidth + ' ' + out.slice(0, 5).join(' | '); }));
       await page.screenshot({ path: `${SHOTS}${wname}/${name}.png`, fullPage: !process.env.PHASE8_VIEWPORT });
       shots++;
       const controls = await page.evaluate(() => {
