@@ -70,6 +70,13 @@ test('one session per account: another device gets the question; force takes ove
   assert.equal(b.body.active.area, 'content');
   assert.equal(b.body.active.view, 'news');
   assert.deepEqual(b.body.active.item, { kind: 'news', id: 'news-aaaa1111' });
+  // owner 2026-11-12: the heartbeat carries an access stamp; a grant change changes it (the panel follows, no refresh)
+  const s1 = (await w.call('Bearer ' + a.body.token, 'POST', '/v1/admin/session/heartbeat', { area: 'home' })).body.access;
+  const s2 = (await w.call('Bearer ' + a.body.token, 'POST', '/v1/admin/session/heartbeat', { area: 'home' })).body.access;
+  assert.ok(s1 && s1 === s2, 'the same access, the same stamp');
+  await w.h.db.prepare("INSERT INTO admin_grants (email, perm, scope, granted_by, granted_at) VALUES (?, 'finance.view', 'all', 'test', 0)").bind(M).run();
+  const s3 = (await w.call('Bearer ' + a.body.token, 'POST', '/v1/admin/session/heartbeat', { area: 'home' })).body.access;
+  assert.notEqual(s3, s1, 'a grant changes the stamp');
   assert.ok(!b.body.sid);
   const f = await w.start(M, { device: 'Android', tab: TAB2, force: true });
   assert.ok(f.body.sid && f.body.sid !== a.body.sid);
