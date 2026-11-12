@@ -21770,11 +21770,23 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   }
 
+  /* the row's Cairo wall time 'YYYY-MM-DD HH:MM': its cairo field, or (an older forwarded row with another format) from its time */
+  function wall(entry) {
+    var c = String(entry.cairo || '');
+    if (/^\d{4}-\d\d-\d\d[ T]\d\d:\d\d/.test(c)) return c.slice(0, 16).replace('T', ' ');
+    var at = Number(entry.at);
+    if (!at) return c;
+    var p = {};
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(new Date(at)).forEach(function (x) { p[x.type] = x.value; });
+    return p.year + '-' + p.month + '-' + p.day + ' ' + p.hour + ':' + p.minute;
+  }
+
   function when(entry) {
 
     var seconds = Math.max(0, (Date.now() - Number(entry.at)) / 1000);
     if (seconds < 3600) return A.ago(seconds);
-    return A.formatWall(String(entry.cairo).replace(' ', 'T'), true);
+    return A.formatWall(wall(entry).replace(' ', 'T'), true);
 
   }
 
@@ -21832,7 +21844,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var current = '';
 
     items.forEach(function (entry) {
-      var day = String(entry.cairo).slice(0, 10);
+      var day = wall(entry).slice(0, 10);
       if (day !== current) {
         current = day;
         list.appendChild(el('li', { class: 'act-day' }, el('span', { text: dayLabel(day) })));
@@ -21924,7 +21936,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var tone = TONES[entry.action] || '';
     var chipTone = { ok: 'ok', danger: 'danger', gold: 'warn', warn: 'warn', info: 'info' }[tone] || '';
     var changes = entry.changes || {};
-    var day = String(entry.cairo || '').slice(0, 10);
+    var day = wall(entry).slice(0, 10);
     var parts = [];
 
     function box(word, value, tags, on) {
@@ -21973,7 +21985,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       size: 'md',
       icon: TYPE_ICONS[entry.type] || 'info',
       className: 'sheet--actd' + (chipTone ? ' sheet--tone-' + chipTone : ''),
-      sub: [dayLabel(day) + (entry.cairo ? ' · ' + A.formatWall(String(entry.cairo).replace(' ', 'T'), true).split(' · ').pop() : ''), SECTION_SHORT[sectionOf(entry)] || ''].filter(Boolean).join(' · ')
+      sub: [dayLabel(day) + (wall(entry) ? ' · ' + A.formatWall(wall(entry).replace(' ', 'T'), true).split(' · ').pop() : ''), SECTION_SHORT[sectionOf(entry)] || ''].filter(Boolean).join(' · ')
     });
 
   }
@@ -22189,7 +22201,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     // «تصدير»: the rows on screen (with the filters and the search) as a CSV file
     var exportBtn = el('button', { class: 'btn', type: 'button', 'data-act': 'log-export', onclick: function () {
       var rows = [['اليوم والساعة', 'مين', 'الإيميل', 'عمل إيه', 'القسم', 'المرات']].concat(drawn.map(function (e) {
-        return [String(e.cairo || ''), e.actorName || '', e.actor || '', e.summary || '', SECTION_SHORT[sectionOf(e)] || '', String(e.count || 1)];
+        return [wall(e), e.actorName || '', e.actor || '', e.summary || '', SECTION_SHORT[sectionOf(e)] || '', String(e.count || 1)];
       }));
       var csv = '﻿' + rows.map(function (r) { return r.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(','); }).join('\r\n');
       var link = el('a', { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })), download: 'activity-' + String(A.cairoNow()).slice(0, 10) + '.csv' });
@@ -22325,6 +22337,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       }).catch(function (error) { A.fail(error, box); });
     }
 
+    // after an archive or a delete: the log behind the window shows the rows that are left
+    function refreshLog() {
+      ACT_LAST = { key: '', result: null };
+      if (A.area === 'activity') A.render();
+    }
+
     function load() {
       logApi('GET', '').then(function (s) {
         totals = { rows: s.rows, oldest: s.oldest || '', technical: s.technical || 0 };
@@ -22341,6 +22359,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.withBusy(go, logApi('POST', '/archive', filter())).then(function (r) {
           A.toast('اتأرشف ' + digits(r.archive.rows) + ' صف · تلاقيه في «الأرشيف»');
           load();
+          refreshLog();
         }).catch(function (error) { A.fail(error, box); });
         return;
       }
@@ -22356,6 +22375,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.withBusy(go, logApi('POST', '/delete', body)).then(function (r) {
           A.toast('اتمسح ' + digits(r.deleted) + ' صف · اتسجل في السجل');
           load();
+          refreshLog();
         }).catch(function (error) { A.fail(error, box); });
       });
     });
