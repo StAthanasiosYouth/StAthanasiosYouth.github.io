@@ -5010,8 +5010,40 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     node.className = 'status status--' + state;
     text.textContent = words[state] + (state === 'error' ? ' (' + s.errors.length + ')' : '');
     node.title = text.textContent;
+    if (state === 'dirty' && !override) recheckDirty();
 
   };
+
+  /*
+   * Owner 2026-11-12: «في تغييرات مش منشورة» and the bell's «تغييرات مستنية النشر» stayed after a publish while
+   * «راجع وانشر» said «الموقع متحدث». The flag is draft revision ≠ live revision, and the revision moves on its own
+   * (time windows, the Worker's copy catching up), while the review compares the real content. So when the flag
+   * says «dirty», ask the review once (per draft revision, quietly); no change and no error → clean, and the bell
+   * drops its line too.
+   */
+  var dirtyChecked = '';
+  var dirtyTimer = 0;
+  function recheckDirty() {
+    var s = A.state && A.state.status;
+    if (!s || !s.hasChanges) return;
+    var key = String(s.draftRevision || '') + '|' + String(s.publishedRevision || '');
+    if (dirtyChecked === key) return;
+    clearTimeout(dirtyTimer);
+    dirtyTimer = setTimeout(function () {
+      dirtyChecked = key;
+      reviewNow().then(function (review) {
+        var now = A.state && A.state.status;
+        if (!now || !now.hasChanges || publishActive()) return;
+        if (String(now.draftRevision || '') + '|' + String(now.publishedRevision || '') !== key) return;
+        if (review && !(review.changes || []).length && !(review.errors || []).length && !review.githubError) {
+          now.hasChanges = false;
+          A.renderStatus();
+          renderNav();
+        }
+      }).catch(function () { dirtyChecked = ''; });
+    }, 1200);
+  }
+  A.recheckDirty = function () { dirtyChecked = ''; recheckDirty(); };
 
   /* =======================================================
      SHARED PIECES FOR VIEWS
@@ -5665,6 +5697,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var blocked = review.errors.length > 0 || !!review.githubError;
     var nothing = !review.changes.length;
+    // the review is the truth: nothing to publish → the top pill and the bell say so too
+    if (nothing && !blocked && A.state.status && A.state.status.hasChanges && !publishActive()) {
+      A.state.status.hasChanges = false;
+      A.renderStatus();
+      renderNav();
+    }
     var body = [stepper(0, blocked)];
     var box = A.errorBox();
 
