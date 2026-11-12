@@ -60,12 +60,13 @@
 
   var TABS = [
     { key: 'overview', label: 'نظرة عامة' },
+    // comp-work.png: the ten tabs in the design's order and words
     { key: 'basics', label: 'الأساسيات', edit: true },
-    { key: 'rules', label: 'القواعد', edit: true },
-    { key: 'result', label: 'النتيجة', edit: true },
     { key: 'questions', label: 'الأسئلة', edit: true },
-    { key: 'preview', label: 'المعاينة' },
+    { key: 'rules', label: 'القواعد', edit: true },
+    { key: 'result', label: 'الدرجة والنقاط', edit: true },
     { key: 'notify', label: 'الإشعارات', edit: true },
+    { key: 'preview', label: 'المعاينة' },
     { key: 'subs', label: 'المشاركات' },
     { key: 'review', label: 'المراجعة' },
     { key: 'results', label: 'النتائج' }
@@ -418,6 +419,9 @@
 
   A.views.comps = function () {
     if (!official()) return [recoveryNotice()];
+    // comp-work.png: inside a competition the page starts with «كل المسابقات» (no area tabs above it)
+    var strip = document.getElementById('subtabs');
+    if (strip) strip.hidden = !!C.open || !strip.children.length;
     return C.open ? builderView() : listView();
   };
 
@@ -854,16 +858,28 @@
       if (seasonId) chips.push(A.chip('الموسم: ' + C.seasonName(seasonId), 'gold'));
     }
 
-    return el('section', { class: 'card comp-head' },
-      el('div', { class: 'comp-head__top' }, back),
-      el('div', { class: 'comp-head__main' },
-        el('span', { class: 'comp-head__icon', 'aria-hidden': 'true' }, icon('trophy')),
-        el('div', { class: 'comp-head__text' },
-          el('h2', { class: 'comp-head__title', text: comp.title || '(من غير اسم)' }),
-          el('div', { class: 'item__meta' }, chips)
-        )
-      )
-    );
+    // comp-work.png: «كل المسابقات» on its own row, then the hero — the kind's icon in the state's colour, the title
+    // and its state, «kind · /competition/slug/ · until», the other chips under it, «انسخ الرابط» and «جرّبها»
+    var tone = { open: 'ok', scheduled: 'info', closed: 'danger', results: 'info' }[summary.status] || '';
+    var kind = comp.wallet ? { icon: 'star', label: 'مسابقة نقاط' } : comp.scoring ? { icon: 'check', label: 'مسابقة عامة بدرجات' } : { icon: 'form', label: 'استبيان بسيط' };
+    var url = summary.url || (siteUrl().replace(/\/?$/, '/') + 'competition/' + (comp.slug || '') + '/');
+    var until = comp.endAt ? 'لحد ' + C.when(comp.endAt) : comp.startAt ? 'من ' + C.when(comp.startAt) : 'من غير مواعيد';
+    var stateChip = A.chip((STATUS[summary.status] || { label: summary.status || '' }).label, tone || 'off');
+    var others = chips.slice(1);
+    var copyBtn = el('button', { class: 'btn', type: 'button', 'data-act': 'comp-copy-link', onclick: function () {
+      if (!navigator.clipboard) return;
+      navigator.clipboard.writeText(url).then(function () { A.toast('اتنسخ الرابط ✓'); }).catch(function () { A.toast('مقدرناش ننسخ', 'error'); });
+    } }, icon('copy'), 'انسخ الرابط');
+    var tryBtn = el('button', { class: 'btn', type: 'button', 'data-act': 'comp-try', onclick: function () { goTab('preview'); } }, icon('eye'), 'جرّبها');
+    return el('div', { class: 'c9-headwrap' },
+      el('div', { class: 'c9-backrow' }, back),
+      el('section', { class: 'card card--glow comp-head c9-hero' },
+        el('span', { class: 'chipico c9-hero__ic' + (tone ? ' chipico--' + tone : ''), 'aria-hidden': 'true' }, icon(kind.icon)),
+        el('div', { class: 'comp-head__text c9-hero__text' },
+          el('div', { class: 'c9-hero__line' }, el('h2', { class: 'comp-head__title', dir: 'auto', text: comp.title || '(من غير اسم)' }), stateChip),
+          el('p', { class: 'c9-hero__sub' }, kind.label + ' · ', el('bdi', { class: 'mono', dir: 'ltr', text: '/competition/' + (comp.slug || '') + '/' }), ' · ' + until),
+          others.length ? el('div', { class: 'item__meta' }, others) : null),
+        el('div', { class: 'c9-hero__acts' }, copyBtn, tryBtn)));
 
   }
 
@@ -879,10 +895,9 @@
     var problems = (C.data.problems || []).length;
 
     return el('nav', { class: 'comp-tabs', role: 'tablist', 'aria-label': 'أجزاء المسابقة' }, TABS.map(function (t) {
+      // comp-work.png: the review count on «المراجعة»; «!» on «نظرة عامة» while something is missing before publishing
       var badge = t.key === 'review' && summary.pending ? ar(summary.pending)
-        : t.key === 'questions' && summary.questionCount ? ar(summary.questionCount)
-          : t.key === 'subs' && summary.submissions ? ar(summary.submissions)
-            : t.key === 'overview' && problems ? '!' : '';
+        : t.key === 'overview' && problems ? '!' : '';
       return el('button', {
         class: 'comp-tabs__tab' + (t.key === 'review' && summary.pending ? ' has-pending' : ''),
         type: 'button',

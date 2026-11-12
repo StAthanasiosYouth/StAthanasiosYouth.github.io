@@ -15434,4 +15434,32 @@ html[data-mode="light"] .cc { background: var(--p-surface); }
   .c9-list .p8-card__acts .btn--primary { grid-column: auto; }
 }
 
+
+/* ---------- Phase 8B B9: «شغل المسابقة» (comp-work.png) ---------- */
+.c9-headwrap { display: grid; gap: 14px; margin-bottom: 16px; }
+.c9-backrow { display: flex; justify-content: flex-start; }
+.c9-hero { position: relative; display: flex; align-items: center; gap: 18px; margin: 0; padding: 26px 24px; overflow: hidden; }
+.c9-hero__ic { flex: none; width: 56px; height: 56px; }
+.c9-hero__ic .icon { width: 24px; height: 24px; }
+.c9-hero__text { flex: 1; min-width: 0; }
+.c9-hero__line { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.c9-hero .comp-head__title { margin: 0; font-size: 22px; font-weight: 800; }
+.c9-hero__sub { margin: 4px 0 0; color: var(--text-3); font-size: 13px; }
+.c9-hero__sub .mono { font-family: ui-monospace, "Cascadia Mono", monospace; color: var(--text-2); }
+.c9-hero .item__meta { margin-top: 8px; }
+.c9-hero__acts { display: flex; flex-wrap: wrap; gap: 10px; }
+.comp-tabs { display: flex; gap: 6px; width: 100%; max-width: 100%; margin-bottom: 20px; padding: 5px; overflow-x: auto; border: 1px solid var(--p-line-2); border-radius: 14px; background: var(--p-surface); box-shadow: none; }
+.comp-tabs__tab { display: inline-flex; flex: 1 0 auto; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 18px; border: 0; border-radius: 10px; color: var(--text-2); background: none; box-shadow: none; font: inherit; font-size: 14px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.comp-tabs__tab:hover { color: var(--text); }
+.comp-tabs__tab[aria-selected="true"] { color: var(--acc-ink); background: var(--grad); box-shadow: 0 8px 20px -10px var(--acc); }
+.comp-tabs__badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; color: var(--text); background: rgb(0 0 0 / .25); font-size: 11px; font-weight: 800; }
+.comp-tabs__tab[aria-selected="true"] .comp-tabs__badge { color: inherit; background: rgb(0 0 0 / .2); }
+
+@media (max-width: 759px) {
+  .c9-hero { flex-wrap: wrap; padding: 20px; }
+  .c9-hero .comp-head__title { font-size: 19px; }
+  .c9-hero__acts { width: 100%; }
+  .c9-hero__acts .btn { flex: 1; }
+  .comp-tabs__tab { flex: none; }
+}
 </style>
