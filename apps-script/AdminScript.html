@@ -3953,7 +3953,7 @@
    */
   var PROMOTED = {
     youth: { from: 'comps', subs: ['youth', 'youth-review', 'youth-results', 'youth-store', 'youth-seasons'], label: 'الشباب', short: 'الشباب', icon: 'users', title: 'حسابات الشباب' },
-    bookings: { from: 'pages', subs: ['bookings', 'finance'], label: 'الحجوزات والفلوس', short: 'الحجوزات', icon: 'ticket' }
+    bookings: { from: 'pages', subs: ['bookings', 'finance', 'paymethods'], label: 'الحجوزات والفلوس', short: 'الحجوزات', icon: 'ticket', title: 'الحجوزات', crumb: 'الحجوزات والفلوس' }
   };
 
   function promotedFor(host, sub) {
@@ -3975,7 +3975,7 @@
         return;
       }
       if (!area) {
-        area = { key: key, label: p.label, short: p.short, icon: p.icon, title: p.title, group: 'main', promoted: p.from, subs: [] };
+        area = { key: key, label: p.label, short: p.short, icon: p.icon, title: p.title, crumb: p.crumb, group: 'main', promoted: p.from, subs: [] };
         var at = A.AREAS.indexOf(host);
         A.AREAS.splice(at + 1, 0, area);
       }
