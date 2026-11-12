@@ -901,7 +901,8 @@ test('Phase 8 A4: with PERMS_ENFORCE on, an admin with competitions only lands o
     await s.page.waitForFunction(() => A.access && A.area === 'comps', { timeout: 8000 });
     // only what they may open, everywhere
     const rail = await s.page.$$eval('#rail-nav .navlink', ns => ns.map(n => n.dataset.area));
-    assert.deepEqual(rail, ['comps']);
+    // «الرئيسية» is everyone's (denied.png); they still start at their own work
+    assert.deepEqual(rail, ['home', 'comps']);
     assert.ok(await s.page.$('#rail-foot [data-area="settings"]'), '«الإعدادات» stays (their own look, their devices)');
     await s.page.keyboard.down('Control');
     await s.page.keyboard.press('KeyK');
@@ -919,13 +920,13 @@ test('Phase 8 A4: with PERMS_ENFORCE on, an admin with competitions only lands o
     const refused = await s.page.evaluate(() => A.call('apiMediaList').then(() => 'ok', e => String(e && e.message || e)));
     assert.notEqual(refused, 'ok');
     await s.close();
-    // phones: the dock starts with their home
+    // phones: the dock starts with «الرئيسية» (as on every phone), then their work
     env.DB.raw.exec('DELETE FROM admin_sessions;');
     const p = await open();
     await p.page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
     await signedIn(p.page);
     await p.page.waitForFunction(() => A.access && A.area === 'comps', { timeout: 8000 });
-    assert.deepEqual(await p.page.$$eval('#dock .dockbtn', ns => ns.map(n => n.dataset.area)), ['comps', 'more']);
+    assert.deepEqual(await p.page.$$eval('#dock .dockbtn', ns => ns.map(n => n.dataset.area)), ['home', 'comps', 'more']);
     await p.close();
   }
   finally {

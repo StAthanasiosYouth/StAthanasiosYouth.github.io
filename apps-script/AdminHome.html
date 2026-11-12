@@ -477,7 +477,7 @@
       extra || null);
   }
 
-  function hero8(waiting) {
+  function hero8(waiting, content) {
     var name = String((A.state.me || (A.state.user || '').split('@')[0]) || '').split(' ')[0];
     var count = waiting.reduce(function (n, w) { return n + (w.n || 1); }, 0);
     return el('section', { class: 'card card--glow hero', 'aria-labelledby': 'hello-title' },
@@ -486,7 +486,7 @@
         el('small', { class: 'muted', text: todayLine() }),
         el('h1', { id: 'hello-title' }, greeting() + ' يا ', el('em', { text: name })),
         el('p', { text: count ? 'فيه ' + ar(count) + (count === 1 ? ' حاجة مستنياك' : ' حاجات مستنياك') + ' النهارده.' : 'مفيش حاجة مستنياك دلوقتي. كله تمام.' })),
-      el('div', { class: 'row hero__acts' },
+      content === false ? null : el('div', { class: 'row hero__acts' },
         el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.news(null); } }, icon('plus'), 'خبر'),
         upgraded() ? el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.activities(null, 'activities'); } }, icon('plus'), 'فعالية') : null,
         el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.notifications(null); } }, icon('bell'), 'إشعار')));
@@ -626,20 +626,22 @@
 
   A.dashboard = function () {
     var waiting = A.waitingNow ? A.waitingNow() : [];
+    // an admin without the content (denied.png: a bookings servant) gets the cards of their own areas only
+    var content = A.allowed('content');
     return el('div', { class: 'home8' },
-      hero8(waiting),
-      kpis8(),
+      hero8(content ? waiting : [], content),
+      content ? kpis8() : null,
       el('div', { class: 'grid home8__cols' },
         el('div', { class: 'grid home8__main' },
           // critical notifications (AdminPage «حالة النظام»), the app setup nudge: only when they have something
           A.criticalBanner ? A.criticalBanner() : null,
           A.setupNudge ? A.setupNudge() : null,
-          site8(),
-          A.bookCard ? A.bookCard() : null,
-          el('div', { class: 'grid g2 home8__duo' }, meeting8(), quick8())),
+          content ? site8() : null,
+          A.bookCard && A.allowed('bookings') ? A.bookCard() : null,
+          content ? el('div', { class: 'grid g2 home8__duo' }, meeting8(), quick8()) : null),
         el('aside', { class: 'grid home8__side', 'aria-label': 'الفريق والنشاط' },
           window.AdminTransport ? A.homePresence() : null,
-          A.activityCard ? A.activityCard() : null)));
+          A.activityCard && A.allowed('activity') ? A.activityCard() : null)));
   };
 
 })();

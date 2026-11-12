@@ -4307,8 +4307,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           el('span', { class: 'navlink__icon' }, icon('globe')), el('span', { class: 'navlink__label', text: 'افتح الموقع' })) : null,
         collapse,
         el('p', { class: 'rail__user', title: A.state.user }, A.avatarNode('acct__av', A.state.user, myName()), A.state.me && A.state.me !== A.state.user.split('@')[0]
-          ? el('span', { class: 'rail__who' }, el('span', { class: 'rail__name', dir: 'auto', text: A.state.me }), el('small', { class: 'rail__role', text: A.access && A.access.primary ? 'الأدمن الأساسي' : 'أدمن' }))
-          : el('span', { class: 'rail__who' }, el('span', { class: 'ltr', text: A.state.user }), el('small', { class: 'rail__role', text: A.access && A.access.primary ? 'الأدمن الأساسي' : 'أدمن' }))),
+          ? el('span', { class: 'rail__who' }, el('span', { class: 'rail__name', dir: 'auto', text: A.state.me }), el('small', { class: 'rail__role', text: realPrimary() ? 'الأدمن الأساسي' : 'أدمن' }))
+          : el('span', { class: 'rail__who' }, el('span', { class: 'ltr', text: A.state.user }), el('small', { class: 'rail__role', text: realPrimary() ? 'الأدمن الأساسي' : 'أدمن' }))),
         // the official admin page only (Google sign-in lives there)
         A.signOut ? el('button', { class: 'navlink navlink--quiet navlink--out', type: 'button', 'data-signout': '', title: 'تسجيل الخروج', onclick: function () { A.signOut(); } },
           el('span', { class: 'navlink__icon' }, icon('logout')), el('span', { class: 'navlink__label', text: 'خروج' })) : null
@@ -4333,7 +4333,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   // area → the grants that open it (any one of them)
   var AREA_NEEDS = {
-    home: ['content.view'],
+    // «الرئيسية» is every admin's (denied.png: a bookings servant has it); its cards follow their own areas
     content: ['content.view'],
     comps: ['competitions.view'],
     pages: ['content.view', 'events.view'],
@@ -4362,6 +4362,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   };
 
   /* may this admin open the area? (true until the Worker says otherwise) */
+  /* the signed-in admin's own rank, also while previewing another admin's view (denied.png) */
+  function realPrimary() {
+    var a = A.viewing ? A.viewing.real : A.access;
+    return !!(a && a.primary);
+  }
+
   A.allowed = function (key) {
     var a = A.access;
     if (!a || !a.enforce || a.primary) return true;
@@ -4376,9 +4382,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   /* the admin's own home: «الرئيسية» when it is theirs, else the first area they may open */
   A.homeArea = function () {
-    if (A.allowed('home')) return 'home';
-    var first = A.visibleAreas().filter(function (a) { return a.key !== 'settings'; })[0];
-    return first ? first.key : 'settings';
+    // «الرئيسية» is in everyone's menu (denied.png), but an admin without the content starts at their own work
+    if (A.allowed('home') && A.allowed('content')) return 'home';
+    var first = A.visibleAreas().filter(function (a) { return a.key !== 'settings' && a.key !== 'home'; })[0];
+    return first ? first.key : A.allowed('home') ? 'home' : 'settings';
   };
 
   A.loadAccess = function (changed) {
@@ -4387,7 +4394,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       if (A.viewing) { A.viewing.real = { enforce: !!me.enforce, primary: !!me.primary, perms: me.perms }; return; }
       A.access = { enforce: !!me.enforce, primary: !!me.primary, perms: me.perms };
       A.gamesCorner(!!(me.modules && me.modules.games));
-      if (!A.allowed(A.area)) A.go(A.homeArea());
+      // first load: an admin without the content starts at their own work, not on «الرئيسية»
+      if (!A.allowed(A.area) || (!changed && A.area === 'home' && A.homeArea() !== 'home')) A.go(A.homeArea());
       else {
         renderNav();
         // a screen with grant-dependent parts (A6: «إدارة السجل») draws them now; after a change, any screen
@@ -4645,7 +4653,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   function dockAreas() {
     // the admin's own home first (A4), then the rest in their order
-    var home = A.homeArea();
+    var home = A.allowed('home') ? 'home' : A.homeArea();
     var order = Object.keys(GROUPS);
     var all = A.visibleAreas().filter(function (a) { return a.key !== 'settings'; }).map(function (a, i) { return { a: a, i: i }; })
       .sort(function (x, y) { return (order.indexOf(x.a.group || 'site') - order.indexOf(y.a.group || 'site')) || (x.i - y.i); }).map(function (x) { return x.a; });
@@ -6307,6 +6315,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         if (hello) hello.ready(state && (state.me || (state.user || '').split('@')[0]));
         myAcct = acctTag(state.user);
         A.renderStatus();
+        // an admin without the content starts at their own work (A4), «الرئيسية» stays in their menu
+        if (A.area === 'home' && A.access && A.homeArea() !== 'home') A.area = A.homeArea();
         renderNav();
         A.render({ animate: true });
         resumePublish();
@@ -8595,7 +8605,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     notifications: 'إعدادات الإشعارات', system: 'النظام'
   };
   var NT_SPECIAL = {
-    'accounts.add': 'أدمن جديد اتضاف', 'accounts.grants': 'صلاحيات أدمن اتغيرت', 'accounts.remove': 'أدمن اتشال',
+    'accounts.add': 'أدمن جديد اتضاف', 'accounts.grants': 'صلاحيات أدمن اتغيرت', 'accounts.remove': 'أدمن اتشال', 'accounts.signout': 'أدمن اتخرّج من كل الأجهزة', 'accounts.ask': 'طلب صلاحية', 'accounts.enforce': 'تشغيل/قفل تطبيق الصلاحيات',
     'admin.add': 'أدمن اتضاف (النظام القديم)', 'admin.remove': 'أدمن اتشال (النظام القديم)', 'notify.settings': 'إعدادات الإشعارات اتغيرت',
     'pay.approve': 'اعتماد رقم دفع لخادم', 'payment.void': 'إلغاء دفعة', 'event.cancelAll': 'إلغاء كل حجوزات فعالية',
     'code.export': 'تصدير أكواد المشتركين', migrate: 'نقل البيانات', 'job.failed': 'مهمة في الخلفية فشلت',
@@ -8605,7 +8615,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     'booking.confirm': 'تأكيد حجز', 'booking.reject': 'رفض حجز', 'booking.cancel': 'إلغاء حجز', 'booking.reopen': 'رجوع حجز',
     'booking.update': 'تعديل حجز', 'booking.withdraw': 'زائر لغى طلبه', 'booking.remind': 'تذكير بالدفع', 'payment.add': 'دفعة اتسجلت',
     'payment.refund': 'استرداد', 'handover.add': 'تسليم فلوس للخدمة', 'handover.void': 'إلغاء تسليم فلوس', 'modules.book': 'تشغيل/قفل الحجز',
-    'admin.rename': 'اسم أدمن اتغير', 'session.takeover': 'دخول من جهاز تاني'
+    'admin.rename': 'اسم أدمن اتغير', 'session.takeover': 'دخول من جهاز تاني',
+    'export.pii': 'تصدير بيانات شخصية', 'export.bookings': 'تصدير الحجوزات', 'booking.ageOverride': 'تجاوز شرط السن في حجز',
+    'payment.request': 'طلب دفع الباقي', 'payment.requestReject': 'رفض طلب دفع', 'payment.requestWithdraw': 'زائر سحب طلب دفع',
+    'member.mail.dead': 'إيميل لعضو مقدرش يتبعت', 'participant.email': 'تغيير إيميل حساب', 'participant.phoneFix': 'تغيير موبايل حساب',
+    'participant.dob': 'تصحيح تاريخ ميلاد حساب', 'participant.reset': 'باسورد جديد لحساب', 'participant.block': 'حساب اتوقف',
+    'account.recovery.first': 'أول استرجاع بإيميل دخّله أدمن', 'participant.settings': 'إعدادات حسابات الشباب', 'account.discover.high': 'محاولات كتير على نموذج الدخول'
   };
   var NT_ENTITIES = {
     sessions: 'الاجتماعات', news: 'الأخبار', games: 'الألعاب', activities: 'الكروت والفعاليات', notifications: 'إشعارات الصفحة', types: 'أنواع الكروت',
@@ -22144,7 +22159,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       extra || null);
   }
 
-  function hero8(waiting) {
+  function hero8(waiting, content) {
     var name = String((A.state.me || (A.state.user || '').split('@')[0]) || '').split(' ')[0];
     var count = waiting.reduce(function (n, w) { return n + (w.n || 1); }, 0);
     return el('section', { class: 'card card--glow hero', 'aria-labelledby': 'hello-title' },
@@ -22153,7 +22168,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         el('small', { class: 'muted', text: todayLine() }),
         el('h1', { id: 'hello-title' }, greeting() + ' يا ', el('em', { text: name })),
         el('p', { text: count ? 'فيه ' + ar(count) + (count === 1 ? ' حاجة مستنياك' : ' حاجات مستنياك') + ' النهارده.' : 'مفيش حاجة مستنياك دلوقتي. كله تمام.' })),
-      el('div', { class: 'row hero__acts' },
+      content === false ? null : el('div', { class: 'row hero__acts' },
         el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.news(null); } }, icon('plus'), 'خبر'),
         upgraded() ? el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.activities(null, 'activities'); } }, icon('plus'), 'فعالية') : null,
         el('button', { class: 'btn', type: 'button', onclick: function () { A.editors.notifications(null); } }, icon('bell'), 'إشعار')));
@@ -22293,20 +22308,22 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   A.dashboard = function () {
     var waiting = A.waitingNow ? A.waitingNow() : [];
+    // an admin without the content (denied.png: a bookings servant) gets the cards of their own areas only
+    var content = A.allowed('content');
     return el('div', { class: 'home8' },
-      hero8(waiting),
-      kpis8(),
+      hero8(content ? waiting : [], content),
+      content ? kpis8() : null,
       el('div', { class: 'grid home8__cols' },
         el('div', { class: 'grid home8__main' },
           // critical notifications (AdminPage «حالة النظام»), the app setup nudge: only when they have something
           A.criticalBanner ? A.criticalBanner() : null,
           A.setupNudge ? A.setupNudge() : null,
-          site8(),
-          A.bookCard ? A.bookCard() : null,
-          el('div', { class: 'grid g2 home8__duo' }, meeting8(), quick8())),
+          content ? site8() : null,
+          A.bookCard && A.allowed('bookings') ? A.bookCard() : null,
+          content ? el('div', { class: 'grid g2 home8__duo' }, meeting8(), quick8()) : null),
         el('aside', { class: 'grid home8__side', 'aria-label': 'الفريق والنشاط' },
           window.AdminTransport ? A.homePresence() : null,
-          A.activityCard ? A.activityCard() : null)));
+          A.activityCard && A.allowed('activity') ? A.activityCard() : null)));
   };
 
 })();
