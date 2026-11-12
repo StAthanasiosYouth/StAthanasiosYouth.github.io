@@ -1811,7 +1811,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var media = (A.state.draft.media || []).filter(function (m) { return m.id === id; })[0];
 
-    if (!media || !media.publishedAt || !A.state.config.siteUrl || !/^media\/\d{4}\/vid-[a-z0-9]{8}\.(mp4|webm)$/.test(media.path || '')) {
+    if (!media || !/^media\/\d{4}\/vid-[a-z0-9]{8}\.(mp4|webm)$/.test(media.path || '')) {
       return Promise.resolve(null);
     }
 
@@ -1833,11 +1833,69 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         video.muted = true;
         video.addEventListener('loadedmetadata', function () { finish(isFinite(video.duration) ? video.duration : null); });
         video.addEventListener('error', function () { finish(null); });
-        video.src = A.state.config.siteUrl.replace(/\/?$/, '/') + media.path;
+        A.playMedia(video, id).then(function (url) { if (!url) finish(null); }, function () { finish(null); });
       });
     }
 
     return A.durationCache[id];
+
+  };
+
+  /*
+   * A library file the admin can PLAY (a video / a sound), published or not:
+   * the copy from this session's own upload (A.localMedia), else the live site
+   * (published), else the Worker's copy (R2: GET /v1/admin/content/media/:id/file).
+   * A.mediaFile(id, { worker: true }) skips the site (its copy not there yet).
+   */
+  A.localMedia = A.localMedia || {};
+  var workerFiles = {};
+
+  A.mediaFile = function (id, opts) {
+
+    if (A.localMedia[id]) return Promise.resolve(A.localMedia[id]);
+    var media = (A.state.draft.media || []).filter(function (m) { return m.id === id; })[0];
+    var site = A.state.config && A.state.config.siteUrl ? A.state.config.siteUrl.replace(/\/?$/, '/') : '';
+    if (!(opts && opts.worker) && media && media.publishedAt && site && media.path) return Promise.resolve(site + media.path);
+    if (!window.AdminWorker || !window.AdminWorker.blob) return Promise.resolve('');
+    if (!workerFiles[id]) {
+      workerFiles[id] = window.AdminWorker.blob('/v1/admin/content/media/' + encodeURIComponent(id) + '/file').then(function (blob) {
+        return blob && blob.size ? URL.createObjectURL(blob) : '';
+      });
+      workerFiles[id].catch(function () { delete workerFiles[id]; });
+    }
+    return workerFiles[id].catch(function () { return ''; });
+
+  };
+
+  /* point a <video>/<audio> at a library file; the site's copy failing (Pages not there yet) → the Worker's */
+  A.playMedia = function (player, id) {
+
+    player.dataset.media = id;
+    return A.mediaFile(id).then(function (url) {
+      if (player.dataset.media !== id) return '';
+      if (!url) return '';
+      if (/^https?:/.test(url)) {
+        player.addEventListener('error', function retry() {
+          player.removeEventListener('error', retry);
+          if (player.dataset.media !== id) return;
+          A.mediaFile(id, { worker: true }).then(function (u) { if (u && player.dataset.media === id) { player.src = u; player.load(); } });
+        });
+      }
+      player.src = url;
+      return url;
+    });
+
+  };
+
+  /* the bytes of a fresh upload (base64) as a playable local copy */
+  A.keepLocalMedia = function (id, b64, mime) {
+
+    try {
+      var bin = atob(b64);
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      A.localMedia[id] = URL.createObjectURL(new Blob([bytes], { type: mime || 'video/mp4' }));
+    } catch (e) {}
 
   };
 
@@ -2271,6 +2329,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
       return A.call('apiUploadMedia', payload).then(function (result) {
         if (video && result && result.media && result.media.id) A.videoDurations[result.media.id] = prepared.duration;
+        if (video && result && result.media && result.media.id && prepared.video) A.keepLocalMedia(result.media.id, prepared.video, prepared.mime);
         if (!result || !result.media || !result.media.id || !result.state) {
           throw imageError('الرفع خلص بس الرد رجع ناقص.', 'جرّب تاني.', JSON.stringify(result || null).slice(0, 200));
         }
@@ -10719,10 +10778,18 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     preview.addEventListener('click', full);
     var length = el('b', { class: 'mono ltr', text: '—' });
 
+    // a video plays right here, published or not (the site's copy, this session's upload, or the Worker's)
+    var player = video ? el('video', { class: 'media-detail__video', controls: '', playsinline: '', preload: 'metadata' }) : null;
     if (!audio) {
-      if (item.tiny) preview.src = item.tiny;
-      A.mediaPreview(item.id).then(function (src) { if (src) preview.src = src; }).catch(function () {});
+      if (item.tiny) { preview.src = item.tiny; if (player) player.poster = item.tiny; }
+      A.mediaPreview(item.id).then(function (src) { if (src) { preview.src = src; if (player) player.poster = src; } }).catch(function () {});
     }
+    if (player) A.playMedia(player, item.id).then(function (url) { if (!url && player.parentNode) player.replaceWith(preview); });
+    var fullOrig = full;
+    full = function () {
+      if (player && player.parentNode && player.requestFullscreen) { player.requestFullscreen().catch(function () {}); return; }
+      fullOrig();
+    };
     if (video) A.videoDuration(item.id).then(function (seconds) { if (seconds) length.textContent = A.clip.formatTime(seconds); });
 
     var draft = (A.state.draft.media || []).filter(function (m) { return m.id === item.id; })[0];
@@ -10810,8 +10877,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     A.openSheet(item.name || (video ? 'فيديو' : audio ? 'صوت' : 'صورة'), [
       el('div', { class: 'viewer' + (video ? ' is-video' : '') + (audio ? ' is-audio' : '') },
         el('div', { class: 'viewer__stage media-detail', style: item.color ? '--tile:' + item.color : null },
-          audio ? el('span', { class: 'viewer__note', 'aria-hidden': 'true' }, icon('music')) : preview,
-          audio ? null : el('button', { class: 'btn btn--sm viewer__full', type: 'button', onclick: full }, icon('external'), video ? 'شوفه بالحجم الكامل' : 'شوفها بالحجم الكامل')),
+          audio ? el('span', { class: 'viewer__note', 'aria-hidden': 'true' }, icon('music')) : player || preview,
+          audio ? null : el('button', { class: 'btn btn--sm viewer__full', type: 'button', onclick: function () { full(); } }, icon('external'), video ? 'شوفه بالحجم الكامل' : 'شوفها بالحجم الكامل')),
         el('div', { class: 'viewer__side' },
           box,
           el('div', { class: 'form' }, name.node, alt.node),
@@ -11481,7 +11548,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       var errorBox = el('div', { class: 'upload-error', role: 'alert', hidden: true });
 
       var video = el('video', { class: 'trim__video p8-trim__video', playsinline: '', preload: 'auto', 'aria-label': 'معاينة الفيديو' });
-      video.muted = true;
+      // the preview plays WITH its sound (the admin's own play tap is the gesture)
+      video.muted = false;
+      video.volume = 1;
       var noPreview = el('p', { class: 'note', hidden: true, text: 'المعاينة مش شغالة للفيديو ده في المتصفح، بس تقدر تكتب الأوقات بالأرقام.' });
       var play = el('button', { class: 'p8-trim__play trim__play', type: 'button', 'aria-label': 'شغّل' }, icon('play'));
       var clock = el('span', { class: 'p8-trim__t mono', text: '0:00.0 / —' });
@@ -11717,7 +11786,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         paintHead();
       });
       video.addEventListener('loadedmetadata', function () { paint(); });
-      video.addEventListener('loadeddata', function () { drawFilm(); }, { once: true });
+      video.addEventListener('loadeddata', function () { drawFilm(); if (!video.currentTime && video.paused) video.currentTime = 0.05; }, { once: true });
       video.addEventListener('error', function () {
         noPreview.hidden = false;
         video.hidden = true;
@@ -18918,7 +18987,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       if (which === 'a') write(video.currentTime, Math.max(t.b, video.currentTime + 0.5)); else write(t.a, video.currentTime);
     }
     function playPart() {
-      if (!state.video) { A.toast('الفيديو بيشتغل هنا بعد ما يتنشر — «من» و«لحد» محفوظين', 'info'); return; }
+      if (!state.video) { A.toast('الفيديو مش جاهز يتشغل هنا دلوقتي — «من» و«لحد» محفوظين', 'info'); return; }
       var t = bounds();
       video.muted = false;
       video.currentTime = t.a;
@@ -18996,11 +19065,15 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         state.id = id;
         state.duration = A.videoDurations[id] || 0;
         var media = (A.state.draft.media || []).filter(function (m) { return m.id === id; })[0];
-        var site = A.state.config && A.state.config.siteUrl ? A.state.config.siteUrl.replace(/\/?$/, '/') : '';
-        state.video = media && media.publishedAt && site && media.path ? site + media.path : null;
+        // published or not: the site's copy, this session's upload, or the Worker's (R2)
+        state.video = media && media.path ? id : null;
         video.hidden = !state.video;
         poster.hidden = !!state.video;
-        if (state.video) video.src = state.video; else video.removeAttribute('src');
+        video.removeAttribute('src');
+        if (state.video) A.playMedia(video, id).then(function (url) {
+          if (state.id !== id) return;
+          if (!url) { state.video = null; video.hidden = true; poster.hidden = false; note.textContent = 'الفيديو مش جاهز يتشغل هنا دلوقتي: «من» و«لحد» بيتحفظوا عادي.'; note.hidden = false; }
+        });
         A.mediaPreview(id).then(function (src) {
           if (!src) return;
           poster.src = src;

@@ -533,10 +533,18 @@
     preview.addEventListener('click', full);
     var length = el('b', { class: 'mono ltr', text: '—' });
 
+    // a video plays right here, published or not (the site's copy, this session's upload, or the Worker's)
+    var player = video ? el('video', { class: 'media-detail__video', controls: '', playsinline: '', preload: 'metadata' }) : null;
     if (!audio) {
-      if (item.tiny) preview.src = item.tiny;
-      A.mediaPreview(item.id).then(function (src) { if (src) preview.src = src; }).catch(function () {});
+      if (item.tiny) { preview.src = item.tiny; if (player) player.poster = item.tiny; }
+      A.mediaPreview(item.id).then(function (src) { if (src) { preview.src = src; if (player) player.poster = src; } }).catch(function () {});
     }
+    if (player) A.playMedia(player, item.id).then(function (url) { if (!url && player.parentNode) player.replaceWith(preview); });
+    var fullOrig = full;
+    full = function () {
+      if (player && player.parentNode && player.requestFullscreen) { player.requestFullscreen().catch(function () {}); return; }
+      fullOrig();
+    };
     if (video) A.videoDuration(item.id).then(function (seconds) { if (seconds) length.textContent = A.clip.formatTime(seconds); });
 
     var draft = (A.state.draft.media || []).filter(function (m) { return m.id === item.id; })[0];
@@ -624,8 +632,8 @@
     A.openSheet(item.name || (video ? 'فيديو' : audio ? 'صوت' : 'صورة'), [
       el('div', { class: 'viewer' + (video ? ' is-video' : '') + (audio ? ' is-audio' : '') },
         el('div', { class: 'viewer__stage media-detail', style: item.color ? '--tile:' + item.color : null },
-          audio ? el('span', { class: 'viewer__note', 'aria-hidden': 'true' }, icon('music')) : preview,
-          audio ? null : el('button', { class: 'btn btn--sm viewer__full', type: 'button', onclick: full }, icon('external'), video ? 'شوفه بالحجم الكامل' : 'شوفها بالحجم الكامل')),
+          audio ? el('span', { class: 'viewer__note', 'aria-hidden': 'true' }, icon('music')) : player || preview,
+          audio ? null : el('button', { class: 'btn btn--sm viewer__full', type: 'button', onclick: function () { full(); } }, icon('external'), video ? 'شوفه بالحجم الكامل' : 'شوفها بالحجم الكامل')),
         el('div', { class: 'viewer__side' },
           box,
           el('div', { class: 'form' }, name.node, alt.node),

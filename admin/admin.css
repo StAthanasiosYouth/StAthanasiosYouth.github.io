@@ -15030,3 +15030,13 @@ html[data-mode="light"] .act8 .act { background: var(--p-surface-2); }
   .act8 .act__open { display: none; }
   .actd__pair, .logm8__two { grid-template-columns: 1fr; }
 }
+
+/* media fixes 2026-11-12: a video plays in its viewer, published or not */
+.media-detail__video {
+  display: block;
+  width: 100%;
+  max-height: 62vh;
+  background: #000;
+  border-radius: inherit;
+  object-fit: contain;
+}

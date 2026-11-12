@@ -20,7 +20,7 @@
  * the row's own hash for a picture), stored, the row pointed at R2.
  */
 
-import { ApiError } from '../lib/http.js';
+import { ApiError, corsHeaders } from '../lib/http.js';
 import { retry, cairoText } from '../lib/db.js';
 import { sha256, sha256Bytes } from '../lib/hash.js';
 import { limit, clientIp } from '../lib/ratelimit.js';
@@ -216,6 +216,31 @@ export async function syncMediaCopy(ctx) {
   const column = part === 'full' ? 'driveId' : 'thumbDriveId';
   if (data[column] !== 'r2:' + key) await updateMediaRow(db, id, { [column]: 'r2:' + key }, 'media-copy');
   return { id, part, key, bytes: bytes.length, stored: !have };
+}
+
+/* GET /v1/admin/content/media/:id/file: a library file's own bytes from R2, so the admin can play a
+   video (or hear a sound) before the site has its copy (an upload not mirrored / not published yet) */
+export async function adminMediaFile(ctx) {
+  const id = String(ctx.params.id || '');
+  if (!/^[\w-]{1,64}$/.test(id)) throw new ApiError('bad', 'id');
+  await limit(ctx, 'media.file', ctx.actor.email, 120, 60);
+  const row = await retry(() => ctx.env.DB.prepare(
+    "SELECT key, mime FROM media_files WHERE media_id = ? AND part = 'full' AND deleted_ms IS NULL ORDER BY created_ms DESC LIMIT 1"
+  ).bind(id).first());
+  if (!row) throw new ApiError('not_found', 'media');
+  const obj = await bucket(ctx.env).get(row.key);
+  if (!obj) throw new ApiError('not_found', 'media object');
+  const mime = /^(video|audio|image)\/[\w.+-]+$/.test(String(row.mime)) ? row.mime : 'application/octet-stream';
+  return { __response: new Response(obj.body, { headers: {
+    ...corsHeaders(ctx.request, ctx.env),
+    'x-content-type-options': 'nosniff',
+    'content-security-policy': "default-src 'none'; sandbox",
+    'cross-origin-resource-policy': 'same-site',
+    'content-type': mime,
+    'cache-control': 'private, no-store',
+    vary: 'Authorization, Origin',
+    'x-request-id': ctx.rid
+  } }) };
 }
 
 /* GET /v1/admin/content/media-status: the copy's and the mirror's progress */
