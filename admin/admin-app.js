@@ -10363,6 +10363,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   var viewFilter = 'all';
   var viewQuery = '';
   var viewMode = 'grid';
+  // the older chips «مستخدمة» and «على الموقع»: real filters behind the search's filter icon (on top of the chip)
+  var viewUsed = false;
+  var viewSite = false;
   var drawView = null;    // the grid on screen now (an upload may end after its screen was left)
 
   /* an upload ended (from here or any editor, maybe after its screen was left): the grid on screen gets it */
@@ -10387,6 +10390,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   }
 
   function viewMatches(item, filter, query) {
+    if (viewUsed && !matches(item, 'used', '')) return false;
+    if (viewSite && !matches(item, 'site', '')) return false;
     if (filter === 'images') return !isVideo(item) && !isAudio(item) && matches(item, 'all', query);
     return matches(item, filter, query);
   }
@@ -10462,6 +10467,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var videoNote = A.trimmerAvailable && A.trimmerAvailable() ? null
       : el('p', { class: 'note', text: 'مقاطع الفيديو بتتعمل من لوحة التحكم الرسمية (/admin/) من Google Chrome على الكمبيوتر. من هنا تقدر تستخدم الفيديوهات اللي في المكتبة.' });
     var shown = PAGE;
+    var more = el('button', { class: 'media8-morebtn', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'data-act': 'media-more' }, icon('filter'));
 
     // Phase 8 (§22.1 item 7): select several, then move them to «المحذوفة» together (restorable, «تراجع» right after)
     var picked = new Set();
@@ -10602,6 +10608,28 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       drawBar();
     }
 
+    function markMore() {
+      var n = (viewUsed ? 1 : 0) + (viewSite ? 1 : 0);
+      more.classList.toggle('is-on', !!n);
+      more.setAttribute('aria-label', 'فلاتر تانية' + (n ? ' (' + A.digits(n) + ')' : ''));
+    }
+    more.addEventListener('click', function () {
+      function opt(on, label, flip) {
+        var b = A.menuItem(on ? 'check' : 'filter', label, function () { flip(); shown = PAGE; markMore(); draw(); });
+        b.setAttribute('role', 'menuitemcheckbox');
+        b.setAttribute('aria-checked', String(on));
+        if (on) b.classList.add('is-on');
+        return b;
+      }
+      A.menu(more, 'menu--p8 media8-more-menu', [
+        opt(viewUsed, 'مستخدمة بس', function () { viewUsed = !viewUsed; }),
+        opt(viewSite, 'على الموقع بس', function () { viewSite = !viewSite; }),
+        viewUsed || viewSite ? el('hr', { class: 'menu__sep' }) : null,
+        viewUsed || viewSite ? A.menuItem('close', 'شيل الفلاتر دي', function () { viewUsed = viewSite = false; shown = PAGE; markMore(); draw(); }) : null
+      ].filter(Boolean), { align: 'start' });
+    });
+    markMore();
+
     search.addEventListener('input', function () { viewQuery = search.value.trim(); shown = PAGE; draw(); });
     drawView = draw;
 
@@ -10628,7 +10656,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           chips,
           el('div', { class: 'media8-tools__end' },
             modes,
-            el('label', { class: 'p8-search' }, icon('filter'), search))),
+            el('div', { class: 'p8-search' }, more, search))),
         drop,
         uploader,
         body),
