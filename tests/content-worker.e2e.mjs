@@ -665,7 +665,7 @@ test('Phase 8 A6: «إدارة السجل» — the size, an archive to a privat
   await s.page.waitForSelector('dialog.modal[open] .modal__typed');
   await s.page.type('dialog.modal[open] .modal__typed', 'امسح');
   await s.page.click('dialog.modal[open] .modal__actions .btn:first-child');
-  await s.page.waitForFunction(() => document.querySelector('dialog.sheet[open] .logm8__n')?.textContent === '٠', { timeout: 8000 });
+  await s.page.waitForFunction(() => document.querySelector('dialog.sheet[open] .logm8__n.is-zero')?.textContent === 'مفيش صفوف', { timeout: 8000 });
   assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM activity WHERE action = 'diag.echo'").get().n, 0);
   assert.ok(env.DB.raw.prepare("SELECT 1 FROM activity WHERE action = 'activity.trim'").get(), 'the delete is in the log');
   await s.page.screenshot({ path: `${ROOT}tools/.cache/phase8-a3/log-manage.png` });

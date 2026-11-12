@@ -32,13 +32,15 @@ test('needs activity.manage (never by default for a non-Primary admin)', async (
   assert.equal(s.status, 200, JSON.stringify(s.body));
   assert.equal(s.body.rows, 5);
   assert.equal(s.body.technical, 1);
-  assert.equal(s.body.minDays, 90);
+  assert.equal(s.body.minDays, 0);
 });
 
-test('preview and safe delete: only older than 90 days, never the security rows of the last year, the word required, logged as one row', async () => {
+test('preview and delete: any age, never the security rows of the last year, the word required, logged as one row', async () => {
   const { h, call } = await world();
   await grant(h, 'activity.manage');
-  assert.equal((await call('POST', '/v1/admin/activity/manage/preview', { days: 30 })).body.code, 'invalid', 'never younger than 90 days');
+  assert.equal((await call('POST', '/v1/admin/activity/manage/preview', { days: -1 })).body.code, 'invalid', 'no negative age');
+  // owner 2026-11-12: any age — «days: 0» is every row up to now (the security rows of the last year stay)
+  assert.equal((await call('POST', '/v1/admin/activity/manage/preview', { days: 0 })).status, 200);
   const p = await call('POST', '/v1/admin/activity/manage/preview', { days: 90 });
   const pick = b => ({ count: b.count, kept: b.kept });
   assert.deepEqual(pick(p.body), { count: 3, kept: 1 });

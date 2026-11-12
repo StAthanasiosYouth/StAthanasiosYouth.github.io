@@ -22265,9 +22265,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var name = A.uid('logm');
     var tech = choice(name + 'r', 'tech', true, el('b', { text: 'الصفوف التقنية بس' }), el('small', { text: 'زي الإيصالات وفحص الطوابير: أكبر جزء من السجل ومحدش بيحتاجه' }));
     var all = choice(name + 'r', 'all', false, el('b', { text: 'كل الصفوف' }), el('small', { text: 'ما عدا الأمان والصلاحيات من آخر سنة (محمية)' }));
-    var dayOpts = [['90', 'أقدم من ٣ شهور'], ['180', 'أقدم من ٦ شهور'], ['365', 'أقدم من سنة'], ['date', 'لحد يوم…']];
+    // owner 2026-11-12: any age (the Worker's MIN_DAYS is 0); «كله» = every row up to now
+    var dayOpts = [['0', 'كله لحد دلوقتي'], ['30', 'أقدم من شهر'], ['90', 'أقدم من ٣ شهور'], ['180', 'أقدم من ٦ شهور'], ['365', 'أقدم من سنة'], ['date', 'لحد يوم…']];
     var picked = '180';
-    var untilDate = el('input', { class: 'input input--ltr', type: 'date', dir: 'ltr', hidden: true, 'aria-label': 'لحد يوم', max: dayBefore(90) });
+    var untilDate = el('input', { class: 'input input--ltr', type: 'date', dir: 'ltr', hidden: true, 'aria-label': 'لحد يوم', max: dayBefore(0) });
     var seg = el('div', { class: 'seg logm8__seg', role: 'radiogroup', 'aria-label': 'الفترة' }, dayOpts.map(function (o) {
       return el('label', { class: 'seg__opt' }, el('input', { type: 'radio', name: name + 'd', value: o[0], checked: o[0] === picked || null, onchange: function () {
         picked = o[0];
@@ -22288,9 +22289,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     function days() {
       if (picked !== 'date') return Number(picked);
-      if (!untilDate.value) return 90;
+      if (!untilDate.value) return 0;
       var today = String(A.cairoNow()).slice(0, 10);
-      return Math.max(90, Math.round((Date.parse(today) - Date.parse(untilDate.value)) / 86400000));
+      return Math.max(0, Math.round((Date.parse(today) - Date.parse(untilDate.value)) / 86400000));
     }
 
     function filter() {
@@ -22301,15 +22302,24 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       var del = deleteOpt.input.checked;
       go.className = 'btn ' + (del ? 'btn--danger' : 'btn--primary');
       go.setAttribute('data-act', del ? 'log-delete' : 'log-archive');
-      A.fill(go, icon(del ? 'trash' : 'archive'), el('span', { text: (del ? 'امسح ' : 'أرشف ') + digits(current.count) + ' صف' }));
+      A.fill(go, icon(del ? 'trash' : 'archive'), el('span', { text: current.count ? (del ? 'امسح ' : 'أرشف ') + digits(current.count.toLocaleString('en-US')) + ' صف' : (del ? 'مفيش حاجة تتمسح' : 'مفيش حاجة تتأرشف') }));
       go.disabled = !current.count;
     }
 
     function preview() {
       logApi('POST', '/preview', filter()).then(function (r) {
         current = r;
-        count.textContent = digits(r.count.toLocaleString('en-US'));
-        countLine.textContent = 'صف هيتأثر' + (totals.oldest ? ' · أقدم صف ' + (A.dateText ? A.dateText(totals.oldest.slice(0, 10)) : totals.oldest.slice(0, 10)) : '') + (r.kept ? ' · ' + digits(r.kept) + ' صف أمان وصلاحيات محميين' : '');
+        var oldest = totals.oldest ? (A.dateText ? A.dateText(totals.oldest.slice(0, 10)) : totals.oldest.slice(0, 10)) : '';
+        var age = totals.oldest ? Math.max(0, Math.round((Date.parse(String(A.cairoNow()).slice(0, 10)) - Date.parse(totals.oldest.slice(0, 10))) / 86400000)) : 0;
+        count.textContent = r.count ? digits(r.count.toLocaleString('en-US')) : 'مفيش صفوف';
+        count.classList.toggle('is-zero', !r.count);
+        // nothing to touch: say why (no row that old yet, or only protected rows)
+        countLine.textContent = r.count
+          ? 'صف هيتأثر' + (oldest ? ' · أقدم صف ' + oldest : '') + (r.kept ? ' · ' + digits(r.kept) + ' صف أمان وصلاحيات محميين' : '')
+          : r.kept ? 'الصفوف اللي في الفترة دي كلها أمان وصلاحيات من آخر سنة (محمية)' + (tech.input.checked ? '' : '')
+          : !totals.rows ? 'السجل فاضي'
+          : tech.input.checked && !totals.technical ? 'مفيش صفوف تقنية في السجل دلوقتي — اختار «كل الصفوف»'
+          : 'مفيش صفوف أقدم من الفترة دي — أقدم صف عمره ' + digits(age) + ' يوم (' + oldest + '). اختار فترة أقصر أو «كله لحد دلوقتي».';
         bar.style.width = (totals.rows ? Math.min(100, Math.round(r.count / totals.rows * 100)) : 0) + '%';
         paintGo();
       }).catch(function (error) { A.fail(error, box); });
@@ -22317,7 +22327,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     function load() {
       logApi('GET', '').then(function (s) {
-        totals = { rows: s.rows, oldest: s.oldest || '' };
+        totals = { rows: s.rows, oldest: s.oldest || '', technical: s.technical || 0 };
         A.fill(section, [el('option', { value: '', text: 'كل الأقسام' })].concat(s.sections.map(function (k) { return el('option', { value: k, text: SECTION_WORDS[k] || k }); })));
         preview();
       }).catch(function (error) { A.fail(error, box); });
@@ -22353,7 +22363,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     A.openSheet('إدارة السجل', el('div', { class: 'form logm logm8' },
       box,
       el('div', { class: 'field' }, el('span', { class: 'field__label', text: 'الصفوف' }), el('div', { class: 'logm8__two' }, tech.node, all.node)),
-      el('div', { class: 'field' }, el('span', { class: 'field__label', text: 'الفترة' }), el('div', { class: 'logm8__period' }, seg, untilDate), el('span', { class: 'field__hint', text: 'أقل حاجة ٣ شهور: الأحدث من كده بيفضل' })),
+      el('div', { class: 'field' }, el('span', { class: 'field__label', text: 'الفترة' }), el('div', { class: 'logm8__period' }, seg, untilDate), el('span', { class: 'field__hint', text: 'أي صف من الفترة دي. صفوف الأمان والصلاحيات من آخر سنة بتفضل محمية.' })),
       el('div', { class: 'field logm8__section' }, el('span', { class: 'field__label', text: 'القسم' }), section),
       el('div', { class: 'logm8__preview' }, el('div', {}, count, countLine), el('div', { class: 'logm8__bar' }, bar)),
       el('div', { class: 'logm8__two' }, archiveOpt.node, deleteOpt.node)
