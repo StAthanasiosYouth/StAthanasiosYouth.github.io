@@ -117,13 +117,13 @@ test('A.latest: one in flight, stale answers dropped, one follow-up with the lat
 test('media: the last copy draws at once on reopen (no skeletons, no second wait); upload + one compact toolbar row', async () => {
   delay = 400;
   await page.evaluate(() => A.go('media'));
-  await page.waitForSelector('.media-view .media-grid, .media-view .empty-state', { timeout: 15000 });
+  await page.waitForSelector('.media-view .media8-tiles, .media-view .media8-empty', { timeout: 15000 });
   await page.waitForNetworkIdle({ idleTime: 300 }).catch(() => {});
   await page.screenshot({ path: `${ROOT}tools/.cache/admin-media-desktop.png` });
   const row = await page.evaluate(() => {
-    const tools = document.querySelector('.media-tools');
+    const tools = document.querySelector('.media8-tools');
     const search = tools.querySelector('input[type=search]');
-    const chips = tools.querySelector('.filter-chips');
+    const chips = tools.querySelector('.media8-filter');
     return { same: Math.abs(search.getBoundingClientRect().top - chips.getBoundingClientRect().top) < 30, wide: document.documentElement.scrollWidth <= window.innerWidth };
   });
   assert.equal(row.same, true, 'search and filters share one row on a wide screen');
@@ -133,7 +133,7 @@ test('media: the last copy draws at once on reopen (no skeletons, no second wait
   await page.evaluate(() => A.go('activity'));
   await page.waitForSelector('.acts', { timeout: 15000 });
   await page.evaluate(() => A.go('media'));
-  const instant = await page.evaluate(() => !!document.querySelector('.media-view .media-grid, .media-view .empty-state') && !document.querySelector('.media-view .skeleton'));
+  const instant = await page.evaluate(() => !!document.querySelector('.media-view .media8-tiles, .media-view .media8-empty') && !document.querySelector('.media-view .skeleton'));
   assert.equal(instant, true, 'no skeleton on reopen');
 
   await page.setViewport({ width: 390, height: 844 });
