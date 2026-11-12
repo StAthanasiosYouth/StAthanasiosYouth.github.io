@@ -2056,10 +2056,11 @@
           }));
         var more = el('button', { class: 'p8-iconbtn', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-label': 'اختيارات تانية: ' + s.name, onclick: function (e) {
           var button = e.currentTarget;
+          // owner 2026-11-12: «شيل الخادم…» from the ⋯ too (the same window as in the editor; primary admin only)
           A.menu(button, 'menu--p8', [A.menuItem(s.active ? 'eye-off' : 'eye', s.active ? 'إيقاف' : 'تفعيل', function () {
             A.withBusy(button, A.call('apiServantSetActive', s.id, !s.active)).then(function (next) { reply = next; draw(next); })
               .catch(function (error) { A.fail(error, box); });
-          })], { align: 'start' });
+          })].concat(reply && reply.payAdmin ? [el('hr', { class: 'menu__sep' }), A.menuItem('trash', 'شيل الخادم…', function () { removeServant(s); }, { danger: true })] : []), { align: 'start' });
         } }, icon('dots'));
         return el('li', { class: 'p8-item item' + (s.active ? '' : ' item--off'), 'data-id': s.id },
           avatar,
