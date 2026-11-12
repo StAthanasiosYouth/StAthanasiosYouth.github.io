@@ -3978,7 +3978,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     ] },
     { key: 'media', label: 'الصور والملفات', short: 'الصور', icon: 'photos', group: 'site' },
     // «سجل النشاط» (AdminActivity.html)
-    { key: 'activity', label: 'سجل النشاط', short: 'النشاط', icon: 'clock', title: 'سجل النشاط', group: 'team' },
+    { key: 'activity', label: 'سجل النشاط', short: 'النشاط', icon: 'clock', title: 'سجل النشاط', crumb: 'الفريق', group: 'team', subs: [
+      // Phase 8B (activity.png): the log, its archive files, the admin app
+      { key: 'activity', label: 'السجل' },
+      { key: 'actarchive', label: 'الأرشيف' },
+      { key: 'actapp', label: 'تطبيق الإدارة' }
+    ] },
     { key: 'settings', label: 'الإعدادات', icon: 'gear' }
   ];
 
@@ -4193,8 +4198,10 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       }, s.label, navBadge(s.badge, 'tab__badge'));
     }));
 
-    document.getElementById('crumb').textContent = sub ? current.label : 'لوحة التحكم';
-    document.getElementById('page-title').textContent = sub ? sub.label : (current.title || current.label);
+    // Phase 8B (activity.png): an area whose tabs are parts of one screen keeps its own name on top
+    var keep = sub && current.crumb;
+    document.getElementById('crumb').textContent = keep ? current.crumb : sub ? current.label : 'لوحة التحكم';
+    document.getElementById('page-title').textContent = keep ? current.title : sub ? sub.label : (current.title || current.label);
     document.title = (sub ? sub.label : (current.title || current.label)) + ' — لوحة التحكم';
 
     var foot = document.getElementById('rail-foot');
@@ -21680,7 +21687,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     goneNote = gone || null;
 
     // A.go draws the page (also when it is already open), for this entry
-    return A.go('activity');
+    return A.go('activity', 'activity');
 
   }
 
@@ -21808,47 +21815,6 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   }
 
-  function entryNode(entry, options) {
-
-    options = options || {};
-
-    var target = targetOf(entry);
-    var gone = !target && KEYS[entry.type] && entry.entityId && GONE_ACTIONS.indexOf(entry.action) === -1 && entry.type !== 'settings';
-    var tone = TONES[entry.action] || '';
-    var meta = [when(entry)];
-
-    if (entry.count > 1) meta.push(digits(entry.count) + ' مرات');
-    if (options.full && entry.device) meta.push(entry.device);
-    // what happened to the admin push (AdminNotify.gs adminPushNotify_ → the row's `notified`)
-    if (options.full && pushText(entry.notified)) meta.push(pushText(entry.notified));
-
-    var text = el('p', { class: 'act__text' },
-      el('strong', { class: 'act__who', dir: 'auto', text: entry.actorName }),
-      ' ',
-      el('span', { dir: 'auto', text: entry.summary })
-    );
-
-    var body = el('div', { class: 'act__main' },
-      text,
-      el('p', { class: 'act__meta' },
-        el('span', { class: 'act__type', 'aria-hidden': 'true' }, icon(TYPE_ICONS[entry.type] || 'info')),
-        el('span', { text: meta.join(' · ') })
-      ),
-      options.compact ? null : changeChips(entry),
-      options.full && entry.ref ? el('p', { class: 'act__ref ltr', text: entry.ref }) : null
-    );
-
-    var action = target
-      ? el('button', { class: 'btn btn--small act__open', type: 'button', 'aria-label': target.label + ': ' + entry.text, onclick: function () { target.open(); } }, target.label)
-      : gone && !options.compact ? A.chip('مبقاش موجود', 'off') : null;
-
-    return el('li', {
-      class: 'act' + (tone ? ' act--' + tone : '') + (options.focus ? ' is-focus' : ''),
-      'data-id': entry.id
-    }, avatar(entry), body, action);
-
-  }
-
   function dayLabel(day) {
 
     var today = String(A.cairoNow()).slice(0, 10);
@@ -21883,16 +21849,162 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   ======================================================= */
 
   var query = { actor: '', family: '', section: '', from: '', to: '' };
+  var period = '';
+  var actSearch = '';
 
-  function select(options, value, onchange, label, extra) {
+  /* Phase 8B (activity.png): a row's section in words, for the line under it and the count chips */
+  var TYPE_SECTION = {
+    sessions: 'sessions', news: 'news', games: 'games', activities: 'activities', types: 'activities', notifications: 'notifications',
+    links: 'page', sections: 'page', contacts: 'page', settings: 'page', media: 'media', site: 'site', data: 'site',
+    admins: 'admins', admin: 'admins', session: 'admins',
+    competition: 'competitions', participant: 'competitions', points: 'competitions', shopitem: 'competitions', redemption: 'competitions',
+    season: 'competitions', seasons: 'competitions', shop: 'competitions', shopschedule: 'competitions', schedule: 'competitions', pushschedule: 'notifications', push: 'notifications',
+    booking: 'bookings', bookings: 'bookings', proof: 'bookings', handover: 'bookings'
+  };
+  var SECTION_SHORT = { sessions: 'الاجتماعات', news: 'الأخبار', games: 'الألعاب', activities: 'الفعاليات', competitions: 'المسابقات', notifications: 'الإشعارات', page: 'الصفحة والإعدادات', media: 'الصور', site: 'النشر', bookings: 'الحجوزات والفلوس', admins: 'الصلاحيات والأمان' };
 
-    return el('label', { class: 'act-filter' + (extra ? ' ' + extra : '') },
-      el('span', { class: 'act-filter__label', text: label }),
-      el('select', { class: 'input', onchange: function (event) { onchange(event.target.value); } }, options.map(function (o) {
-        return el('option', { value: o.key, selected: o.key === value ? 'selected' : null, text: o.label });
-      }))
+  function sectionOf(entry) {
+    return TYPE_SECTION[entry.type] || '';
+  }
+
+  function secure(entry) {
+    return sectionOf(entry) === 'admins' || /^(admin|accounts|session)\./.test(String(entry.action || ''));
+  }
+
+  /* one row (activity.png): who + what in one line, its section under it, the time, «افتح»; a tap opens the details */
+  function entryNode(entry, options) {
+
+    options = options || {};
+
+    var target = targetOf(entry);
+    var gone = !target && KEYS[entry.type] && entry.entityId && GONE_ACTIONS.indexOf(entry.action) === -1 && entry.type !== 'settings';
+    var tone = TONES[entry.action] || '';
+    var chipTone = { ok: 'ok', danger: 'danger', gold: 'warn', warn: 'warn', info: 'info' }[tone] || '';
+
+    var text = el('p', { class: 'act__text' },
+      el('strong', { class: 'act__who', dir: 'auto', text: entry.actorName }),
+      ' ',
+      el('span', { class: 'act__what', dir: 'auto', text: entry.summary }),
+      entry.count > 1 ? el('span', { class: 'p8-tag p8-tag--acc act__x', text: digits(entry.count) + ' مرات' }) : null
     );
 
+    var body = el('div', { class: 'act__main' },
+      text,
+      el('p', { class: 'act__meta' }, el('span', { text: SECTION_SHORT[sectionOf(entry)] || 'لوحة التحكم' })),
+      options.compact ? null : changeChips(entry)
+    );
+
+    var action = target
+      ? el('button', { class: 'btn btn--sm btn--ghost act__open', type: 'button', 'aria-label': target.label + ': ' + entry.text, onclick: function (event) { event.stopPropagation(); target.open(); } }, target.label)
+      : gone && !options.compact ? A.chip('مبقاش موجود', 'off') : null;
+
+    var node = el('li', {
+      class: 'act' + (tone ? ' act--' + tone : '') + (options.focus ? ' is-focus' : ''),
+      'data-id': entry.id
+    },
+    avatar(entry),
+    el('span', { class: 'chipico act__ic' + (chipTone ? ' chipico--' + chipTone : ''), 'aria-hidden': 'true' }, icon(TYPE_ICONS[entry.type] || 'info')),
+    body,
+    el('span', { class: 'act__t', text: when(entry) }),
+    action);
+
+    if (!options.compact) {
+      node.addEventListener('click', function (event) { if (!event.target.closest('button, a')) openEntryDetail(entry); });
+      node.classList.add('is-tappable');
+    }
+
+    return node;
+
+  }
+
+  /* activity-item.png: the row's details — before / after when the row knows them, who, from where, its number */
+  function openEntryDetail(entry) {
+
+    var target = targetOf(entry);
+    var tone = TONES[entry.action] || '';
+    var chipTone = { ok: 'ok', danger: 'danger', gold: 'warn', warn: 'warn', info: 'info' }[tone] || '';
+    var changes = entry.changes || {};
+    var day = String(entry.cairo || '').slice(0, 10);
+    var parts = [];
+
+    function box(word, value, tags, on) {
+      return el('div', { class: 'actd__box' + (on ? ' is-on' : '') }, el('small', { text: word }), el('b', { text: value || '—' }),
+        tags && tags.length ? el('div', { class: 'p8-item__tags' }, tags) : null);
+    }
+
+    var before = changes.before !== undefined ? changes.before : Array.isArray(changes.title) && changes.title.length === 2 ? changes.title[0] : null;
+    var after = changes.after !== undefined ? changes.after : Array.isArray(changes.title) && changes.title.length === 2 ? changes.title[1] : null;
+    function words(v) { return v && typeof v === 'object' ? (v.label || v.role || v.name || '') : String(v === null || v === undefined ? '' : v); }
+    function tagsOf(v, acc) {
+      var list = v && typeof v === 'object' && Array.isArray(v.perms) ? v.perms : [];
+      return list.slice(0, 6).map(function (t) { return el('span', { class: 'p8-tag' + (acc ? ' p8-tag--acc' : ''), text: String(t) }); });
+    }
+    if (before !== null || after !== null) parts.push(el('div', { class: 'actd__pair' }, box('كان', words(before), tagsOf(before)), box('بقى', words(after), tagsOf(after, true), true)));
+
+    var changed = [];
+    if (Array.isArray(changes.fields)) changes.fields.forEach(function (f) { changed.push(f); });
+    if (entry.action === 'publish' && Array.isArray(changes.items)) changes.items.forEach(function (t) { changed.push(t); });
+    if (changed.length) parts.push(el('div', { class: 'actd__changed' }, el('small', { text: entry.action === 'publish' ? 'اللي اتنشر' : 'اللي اتغير' }),
+      el('div', { class: 'p8-item__tags' }, changed.map(function (t) { return el('span', { class: 'p8-tag', text: String(t) }); }),
+        changes.other || changes.more ? el('span', { class: 'p8-tag', text: '+' + digits(changes.other || changes.more) }) : null)));
+
+    function kv(label, value) { return value ? el('div', {}, el('span', { text: label }), el('b', { dir: 'auto', text: value }), el('em')) : null; }
+    parts.push(el('div', { class: 'kv actd__kv' },
+      kv('عمله', [entry.actorName, entry.actor && entry.actor !== entry.actorName ? entry.actor : ''].filter(Boolean).join(' · ')),
+      kv('من', entry.device || ''),
+      kv('المرات', entry.count > 1 ? digits(entry.count) + ' مرات' : ''),
+      kv('الإشعار', pushText(entry.notified)),
+      kv('نوع الصف', secure(entry) ? 'أمان (محمي سنة كاملة)' : 'عادي')));
+
+    var refText = entry.ref || entry.id || '';
+    var copy = el('button', { class: 'btn btn--sm btn--ghost sheet__del', type: 'button', disabled: refText ? null : true, onclick: function () {
+      (navigator.clipboard ? navigator.clipboard.writeText(refText) : Promise.reject(new Error('copy')))
+        .then(function () { A.toast('رقم الحدث اتنسخ ✓'); })
+        .catch(function () { window.prompt('رقم الحدث', refText); });
+    } }, icon('copy'), 'انسخ رقم الحدث');
+
+    var foot = [
+      target ? el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.closeSheet().then(function (closed) { if (closed !== false) target.open(); }); } }, icon(TYPE_ICONS[entry.type] || 'external'), target.label) : null,
+      el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } }),
+      copy
+    ].filter(Boolean);
+
+    A.openSheet(entry.actorName + ' ' + entry.summary, [el('div', { class: 'actd' }, parts)], foot, {
+      size: 'md',
+      icon: TYPE_ICONS[entry.type] || 'info',
+      className: 'sheet--actd' + (chipTone ? ' sheet--tone-' + chipTone : ''),
+      sub: [dayLabel(day) + (entry.cairo ? ' · ' + A.formatWall(String(entry.cairo).replace(' ', 'T'), true).split(' · ').pop() : ''), SECTION_SHORT[sectionOf(entry)] || ''].filter(Boolean).join(' · ')
+    });
+
+  }
+
+  A.openEntryDetail = openEntryDetail;
+
+  function pill(iconName, options, value, onchange, label) {
+
+    var current = options.filter(function (o) { return o.key === value; })[0] || options[0];
+    return el('label', { class: 'act-pill' + (value ? ' is-on' : '') },
+      icon(iconName),
+      el('span', { class: 'act-pill__t', text: current.label }),
+      el('span', { class: 'act-pill__caret', 'aria-hidden': 'true', text: '▾' }),
+      el('select', { class: 'act-pill__select', 'aria-label': label, onchange: function (event) { onchange(event.target.value); } }, options.map(function (o) {
+        return el('option', { value: o.key, selected: o.key === value ? 'selected' : null, text: o.label });
+      })));
+
+  }
+
+  var PERIODS = [
+    { key: '', label: 'كل الوقت' },
+    { key: 'today', label: 'النهارده' },
+    { key: '7', label: 'آخر ٧ أيام' },
+    { key: '30', label: 'آخر ٣٠ يوم' },
+    { key: '90', label: 'آخر ٣ شهور' },
+    { key: 'range', label: 'فترة معينة…' }
+  ];
+
+  function dayBefore(n) {
+    var today = String(A.cairoNow()).slice(0, 10);
+    return A.wallFromMinutes ? String(A.wallFromMinutes(A.wallMinutes(today) - n * 1440)).slice(0, 10) : today;
   }
 
   function dateField(value, onchange, label) {
@@ -21908,7 +22020,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     var box = A.errorBox();
     var list = el('ul', { class: 'acts', 'aria-busy': 'true', 'aria-label': 'سجل النشاط' });
-    var more = el('button', { class: 'btn btn--ghost', type: 'button', hidden: true, text: 'اعرض أقدم' });
+    var more = el('button', { class: 'btn btn--ghost btn--block act-more', type: 'button', hidden: true, text: 'اعرض أقدم' });
+    var chipsRow = el('div', { class: 'act-chips' });
     var next = 0;
     var drawn = [];
     var refreshed = false;
@@ -21934,6 +22047,20 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     }
 
+    /* rows grouped by Cairo day, the search applied, and the section chips counted */
+    function paint() {
+      list.replaceChildren();
+      var q = actSearch.toLowerCase();
+      var shown = q ? drawn.filter(function (e) { return (String(e.actorName) + ' ' + e.summary + ' ' + (SECTION_SHORT[sectionOf(e)] || '')).toLowerCase().indexOf(q) !== -1; }) : drawn;
+      if (shown.length) grouped(shown, list, focus);
+      else if (drawn.length) list.appendChild(el('li', { class: 'empty-state' }, el('p', { class: 'empty-state__title', text: 'مفيش حاجة بالكلام ده في اللي ظاهر.' })));
+      var counts = {};
+      drawn.forEach(function (e) { var k = sectionOf(e); if (k) counts[k] = (counts[k] || 0) + 1; });
+      A.fill(chipsRow, Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; }).map(function (k) {
+        return el('button', { class: 'p8-tag act-chip' + (query.section === k ? ' p8-tag--acc' : ''), type: 'button', 'aria-pressed': String(query.section === k), onclick: function () { change('section', query.section === k ? '' : k); } }, SECTION_SHORT[k] + ' ' + digits(counts[k]));
+      }));
+    }
+
     // a filter change: one request at a time, the newest filters win (A.latest); «أكتر» pages directly
     var reloadLatest = A.latest(function () { return loadNow(false); }, function () {}, function () {});
 
@@ -21957,9 +22084,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       if (!append) {
         // the same question as last time (a reopened screen): its answer at once, the fresh one replaces it
         if (ACT_LAST.key === cacheKey && ACT_LAST.result && !list.querySelector('.act')) {
-          list.replaceChildren();
           drawn = ACT_LAST.result.items.slice();
-          if (drawn.length) grouped(drawn, list, focus);
+          paint();
         }
         else if (!list.querySelector('.act')) skeleton();
       }
@@ -21969,28 +22095,27 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         if (my !== loading) return;
         if (!append) ACT_LAST = { key: cacheKey, result: result };
         list.setAttribute('aria-busy', 'false');
-        if (!append) list.replaceChildren();
-        // the people filter knows everyone on the list now
         next = result.next || 0;
         more.hidden = !result.more;
         more.disabled = false;
         if (!result.items.length && !append) {
-          list.appendChild(el('li', { class: 'empty-state' },
+          drawn = [];
+          list.replaceChildren(el('li', { class: 'empty-state' },
             el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('clock')),
             el('p', { class: 'empty-state__title', text: focus ? 'الحدث ده مش موجود في السجل.' : 'مفيش نشاط بالشكل ده.' }),
             el('p', { class: 'empty-state__text', text: focus ? 'يمكن اتشال مع الوقت.' : 'غيّر الفلاتر أو امسحها.' })
           ));
+          A.fill(chipsRow);
           return;
         }
         drawn = append ? drawn.concat(result.items) : result.items.slice();
-        grouped(result.items, list, focus);
+        paint();
         // an item another admin added after this panel loaded: read the data again once, then «افتح» works
         if (!refreshed && result.items.some(stale)) {
           refreshed = true;
           freshState().then(function () {
             if (my !== loading || !list.isConnected) return;
-            list.replaceChildren();
-            grouped(drawn, list, focus);
+            paint();
           }, function () {});
         }
         if (focus && !append) {
@@ -22011,25 +22136,41 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
       query[key] = value || '';
       focus = '';
-      load(false);
-      filters.classList.toggle('is-filtered', Object.keys(query).some(function (k) { return !!query[k]; }));
+      A.render();
 
     }
 
     more.addEventListener('click', function () { load(true); });
 
+    function setPeriod(v) {
+      period = v || '';
+      if (period === 'range') { A.render(); return; }
+      query.to = '';
+      query.from = period === 'today' ? dayBefore(0) : period ? dayBefore(Number(period) - 1) : '';
+      focus = '';
+      A.render();
+    }
+
+    var search = el('input', { class: 'p8-search__input', type: 'search', placeholder: 'دوّر في السجل…', value: actSearch, 'aria-label': 'دوّر في السجل' });
+    search.addEventListener('input', function () { actSearch = search.value.trim(); paint(); });
+
     var filters = el('div', { class: 'act-filters' + (Object.keys(query).some(function (k) { return !!query[k]; }) ? ' is-filtered' : '') },
-      select(people, query.actor, function (v) { change('actor', v); }, 'مين'),
-      select(FAMILIES, query.family, function (v) { change('family', v); }, 'عمل إيه'),
-      select(SECTIONS, query.section, function (v) { change('section', v); }, 'في أنهي جزء', 'act-filter--wide'),
-      dateField(query.from, function (v) { change('from', v); }, 'من يوم'),
-      dateField(query.to, function (v) { change('to', v); }, 'لحد يوم'),
-      el('button', { class: 'btn btn--ghost btn--small act-filters__reset', type: 'button', text: 'امسح الفلاتر', onclick: function () {
+      pill('users', people, query.actor, function (v) { change('actor', v); }, 'مين'),
+      pill('layers', SECTIONS, query.section, function (v) { change('section', v); }, 'في أنهي جزء'),
+      pill('edit', FAMILIES, query.family, function (v) { change('family', v); }, 'عمل إيه'),
+      pill('calendar', PERIODS, period, setPeriod, 'الفترة'));
+
+    var range = period === 'range' ? el('div', { class: 'act-range' },
+      dateField(query.from, function (v) { query.from = v || ''; focus = ''; load(false); }, 'من يوم'),
+      dateField(query.to, function (v) { query.to = v || ''; focus = ''; load(false); }, 'لحد يوم')) : null;
+
+    var reset = Object.keys(query).some(function (k) { return !!query[k]; }) || period
+      ? el('button', { class: 'btn btn--ghost btn--sm act-filters__reset', type: 'button', text: 'امسح الفلاتر', onclick: function () {
         query = { actor: '', family: '', section: '', from: '', to: '' };
+        period = '';
         focus = '';
         A.render();
-      } })
-    );
+      } }) : null;
 
     var intro = null;
 
@@ -22045,27 +22186,50 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       }
     }
 
+    // «تصدير»: the rows on screen (with the filters and the search) as a CSV file
+    var exportBtn = el('button', { class: 'btn', type: 'button', 'data-act': 'log-export', onclick: function () {
+      var rows = [['اليوم والساعة', 'مين', 'الإيميل', 'عمل إيه', 'القسم', 'المرات']].concat(drawn.map(function (e) {
+        return [String(e.cairo || ''), e.actorName || '', e.actor || '', e.summary || '', SECTION_SHORT[sectionOf(e)] || '', String(e.count || 1)];
+      }));
+      var csv = '﻿' + rows.map(function (r) { return r.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(','); }).join('\r\n');
+      var link = el('a', { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })), download: 'activity-' + String(A.cairoNow()).slice(0, 10) + '.csv' });
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(function () { URL.revokeObjectURL(link.href); link.remove(); }, 1000);
+      A.toast('اتصدّر ' + digits(drawn.length) + ' صف');
+    } }, icon('download'), 'تصدير');
+
     load(false);
 
     return [
-      A.card('سجل النشاط', 'كل اللي اتعمل في لوحة التحكم: مين عمل إيه وإمتى. اضغط «افتح» علشان تروح للحاجة نفسها.',
+      el('section', { class: 'card p8-card act8' },
+        el('div', { class: 'p8-card__head' },
+          el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('clock')),
+          el('div', { class: 'p8-card__titles' },
+            el('h2', { class: 'card__title', text: 'سجل النشاط' }),
+            el('p', { class: 'card__hint', text: 'كل اللي اتعمل في لوحة التحكم: مين عمل إيه وإمتى. «افتح» بتوديك للحاجة نفسها.' })),
+          el('div', { class: 'p8-card__acts' },
+            exportBtn,
+            // Phase 8 A6: «إدارة السجل», only with activity.manage
+            canManageLog() ? el('button', { class: 'btn', type: 'button', 'data-act': 'log-manage', onclick: openLogManage }, icon('archive'), 'إدارة السجل') : null)),
         box,
-        // Phase 8 A6: «إدارة السجل», only with activity.manage
-        canManageLog() ? el('div', { class: 'actions' }, el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'log-manage', onclick: openLogManage }, icon('gear'), 'إدارة السجل')) : null,
         intro,
-        filters,
+        el('div', { class: 'p8-card__filters act8__filters' }, filters, el('label', { class: 'p8-search' }, icon('filter'), search)),
+        range,
+        reset ? el('div', { class: 'act8__reset' }, reset) : null,
+        chipsRow,
         list,
-        el('div', { class: 'actions acts__more' }, more)
+        more
       )
     ];
 
   };
 
 
-
   /* =======================================================
-     «إدارة السجل» (Phase 8 A6, §22.1 item 22): the log's size, an archive to a private file, and a safe
-     delete — only for admins holding activity.manage (the Worker checks it on every call).
+     «إدارة السجل» (Phase 8 A6, §22.1 item 22; Phase 8B activity-manage.png): which rows, how old, how many, then
+     «أرشفهم» (back any time from «الأرشيف») or «امسحهم» (never back) — only for admins holding activity.manage
+     (the Worker checks it on every call).
   ======================================================= */
 
   function canManageLog() {
@@ -22080,68 +22244,96 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   function digits(n) { return String(n).replace(/\d/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[d]; }); }
 
+  function logApi(method, path, body) { return window.AdminWorker.call(method, '/v1/admin/activity/manage' + path, body, { quiet: true }); }
+
+  function downloadArchive(a, box, button) {
+    return A.withBusy(button, window.AdminWorker.blob('/v1/admin/activity/manage/archive/' + encodeURIComponent(a.id)).then(function (blob) {
+      var link = el('a', { href: URL.createObjectURL(blob), download: 'activity-' + a.id + '.csv' });
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(function () { URL.revokeObjectURL(link.href); link.remove(); }, 1000);
+    })).catch(function (error) { A.fail(error, box); });
+  }
+
+  function choice(name, value, checked, title, text, extra) {
+    var input = el('input', { type: 'radio', name: name, value: value, checked: checked || null });
+    return { input: input, node: el('label', { class: 'p8-choice logm8__choice' + (extra ? ' ' + extra : '') }, input, el('span', { class: 'p8-choice__radio', 'aria-hidden': 'true' }), el('span', { class: 'p8-choice__body' }, title, text)) };
+  }
+
   function openLogManage() {
-    var api = function (method, path, body) { return window.AdminWorker.call(method, '/v1/admin/activity/manage' + path, body, { quiet: true }); };
     var box = A.errorBox();
-    var stats = el('div', { class: 'logm__stats', 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
-    var days = el('select', { class: 'input', 'aria-label': 'الفترة' }, [['90', 'أقدم من ٣ شهور'], ['180', 'أقدم من ٦ شهور'], ['365', 'أقدم من سنة']].map(function (o) { return el('option', { value: o[0], text: o[1] }); }));
+    var name = A.uid('logm');
+    var tech = choice(name + 'r', 'tech', true, el('b', { text: 'الصفوف التقنية بس' }), el('small', { text: 'زي الإيصالات وفحص الطوابير: أكبر جزء من السجل ومحدش بيحتاجه' }));
+    var all = choice(name + 'r', 'all', false, el('b', { text: 'كل الصفوف' }), el('small', { text: 'ما عدا الأمان والصلاحيات من آخر سنة (محمية)' }));
+    var dayOpts = [['90', 'أقدم من ٣ شهور'], ['180', 'أقدم من ٦ شهور'], ['365', 'أقدم من سنة'], ['date', 'لحد يوم…']];
+    var picked = '180';
+    var untilDate = el('input', { class: 'input input--ltr', type: 'date', dir: 'ltr', hidden: true, 'aria-label': 'لحد يوم', max: dayBefore(90) });
+    var seg = el('div', { class: 'seg logm8__seg', role: 'radiogroup', 'aria-label': 'الفترة' }, dayOpts.map(function (o) {
+      return el('label', { class: 'seg__opt' }, el('input', { type: 'radio', name: name + 'd', value: o[0], checked: o[0] === picked || null, onchange: function () {
+        picked = o[0];
+        untilDate.hidden = picked !== 'date';
+        if (picked !== 'date') preview();
+        else untilDate.focus();
+      } }), el('span', { text: o[1] }));
+    }));
     var section = el('select', { class: 'input', 'aria-label': 'القسم' });
-    var technical = A.checkbox('الصفوف التقنية بس', false, 'زي الإيصالات وفحص الطوابير: أكبر جزء من السجل ومحدش بيحتاجه.');
-    var count = el('p', { class: 'logm__count', role: 'status' });
-    var archives = el('ul', { class: 'logm__archives' });
-    var archiveBtn = el('button', { class: 'btn', type: 'button', 'data-act': 'log-archive' }, icon('download'), 'أرشف');
-    var deleteBtn = el('button', { class: 'btn btn--danger', type: 'button', 'data-act': 'log-delete' }, icon('trash'), 'مسح آمن');
+    var count = el('b', { class: 'logm8__n', text: '—' });
+    var countLine = el('small', { class: 'muted', role: 'status' });
+    var bar = el('i');
+    var archiveOpt = choice(name + 'a', 'archive', true, el('b', {}, 'أرشفهم ', el('span', { class: 'p8-tag p8-tag--ok', text: 'بترجع' })), el('ul', {}, el('li', { text: 'بيتشالوا من السجل ويتحفظوا في «الأرشيف»' }), el('li', { text: 'تفتح أي أرشيف وتصدّره' })));
+    var deleteOpt = choice(name + 'a', 'delete', false, el('b', { class: 'logm8__danger' }, 'امسحهم ', el('span', { class: 'p8-tag p8-tag--danger', text: 'مبترجعش' })), el('ul', {}, el('li', { text: 'الأحسن تأرشف الأول' }), el('li', { text: 'المسح نفسه بيتسجل كصف واحد' })), 'logm8__choice--danger');
+    var go = el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'log-archive' }, icon('archive'), el('span', { text: 'أرشف' }));
     var current = { count: 0, kept: 0 };
+    var totals = { rows: 0, oldest: '' };
+
+    function days() {
+      if (picked !== 'date') return Number(picked);
+      if (!untilDate.value) return 90;
+      var today = String(A.cairoNow()).slice(0, 10);
+      return Math.max(90, Math.round((Date.parse(today) - Date.parse(untilDate.value)) / 86400000));
+    }
 
     function filter() {
-      return { days: Number(days.value), section: section.value || undefined, technical: technical.input.checked || undefined };
+      return { days: days(), section: section.value || undefined, technical: tech.input.checked || undefined };
+    }
+
+    function paintGo() {
+      var del = deleteOpt.input.checked;
+      go.className = 'btn ' + (del ? 'btn--danger' : 'btn--primary');
+      go.setAttribute('data-act', del ? 'log-delete' : 'log-archive');
+      A.fill(go, icon(del ? 'trash' : 'archive'), el('span', { text: (del ? 'امسح ' : 'أرشف ') + digits(current.count) + ' صف' }));
+      go.disabled = !current.count;
     }
 
     function preview() {
-      api('POST', '/preview', filter()).then(function (r) {
+      logApi('POST', '/preview', filter()).then(function (r) {
         current = r;
-        count.textContent = 'هيتأثر ' + digits(r.count) + ' صف' + (r.kept ? ' · ' + digits(r.kept) + ' صف أمان وصلاحيات من آخر سنة محميين ومش هيتمسحوا' : '');
-        deleteBtn.disabled = !r.count;
+        count.textContent = digits(r.count.toLocaleString('en-US'));
+        countLine.textContent = 'صف هيتأثر' + (totals.oldest ? ' · أقدم صف ' + (A.dateText ? A.dateText(totals.oldest.slice(0, 10)) : totals.oldest.slice(0, 10)) : '') + (r.kept ? ' · ' + digits(r.kept) + ' صف أمان وصلاحيات محميين' : '');
+        bar.style.width = (totals.rows ? Math.min(100, Math.round(r.count / totals.rows * 100)) : 0) + '%';
+        paintGo();
       }).catch(function (error) { A.fail(error, box); });
-    }
-
-    function drawArchives(list) {
-      A.fill(archives, list.length ? list.map(function (a) {
-        return el('li', { class: 'logm__archive' }, icon('download'), el('span', { class: 'ltr', text: 'activity-' + a.id + '.csv' }),
-          el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function (event) {
-            A.withBusy(event.currentTarget, window.AdminWorker.blob('/v1/admin/activity/manage/archive/' + encodeURIComponent(a.id)).then(function (blob) {
-              var link = el('a', { href: URL.createObjectURL(blob), download: 'activity-' + a.id + '.csv' });
-              document.body.appendChild(link);
-              link.click();
-              setTimeout(function () { URL.revokeObjectURL(link.href); link.remove(); }, 1000);
-            })).catch(function (error) { A.fail(error, box); });
-          } }, 'نزّل'));
-      }) : [el('li', { class: 'note', text: 'لسه مفيش أرشيف.' })]);
     }
 
     function load() {
-      api('GET', '').then(function (s) {
-        stats.setAttribute('aria-busy', 'false');
-        A.fill(stats,
-          el('div', {}, el('small', { text: 'الصفوف' }), el('b', { text: digits(s.rows) })),
-          el('div', {}, el('small', { text: 'أقدم صف' }), el('b', { text: s.oldest ? A.dateText ? A.dateText(s.oldest.slice(0, 10)) : s.oldest.slice(0, 10) : '—' })),
-          el('div', {}, el('small', { text: 'تقنية' }), el('b', { text: digits(s.technical) })));
+      logApi('GET', '').then(function (s) {
+        totals = { rows: s.rows, oldest: s.oldest || '' };
         A.fill(section, [el('option', { value: '', text: 'كل الأقسام' })].concat(s.sections.map(function (k) { return el('option', { value: k, text: SECTION_WORDS[k] || k }); })));
-        drawArchives(s.archives || []);
         preview();
-      }).catch(function (error) { stats.setAttribute('aria-busy', 'false'); A.fill(stats); A.fail(error, box); });
+      }).catch(function (error) { A.fail(error, box); });
     }
 
-    [days, section, technical.input].forEach(function (n) { n.addEventListener('change', preview); });
+    [section, tech.input, all.input, untilDate].forEach(function (n) { n.addEventListener('change', preview); });
+    [archiveOpt.input, deleteOpt.input].forEach(function (n) { n.addEventListener('change', paintGo); });
 
-    archiveBtn.addEventListener('click', function () {
-      A.withBusy(archiveBtn, api('POST', '/archive', filter())).then(function (r) {
-        A.toast('اتأرشف ' + digits(r.archive.rows) + ' صف في ملف خاص');
-        load();
-      }).catch(function (error) { A.fail(error, box); });
-    });
-
-    deleteBtn.addEventListener('click', function () {
+    go.addEventListener('click', function () {
+      if (!deleteOpt.input.checked) {
+        A.withBusy(go, logApi('POST', '/archive', filter())).then(function (r) {
+          A.toast('اتأرشف ' + digits(r.archive.rows) + ' صف · تلاقيه في «الأرشيف»');
+          load();
+        }).catch(function (error) { A.fail(error, box); });
+        return;
+      }
       A.confirm({
         title: 'تمسح ' + digits(current.count) + ' صف من السجل؟',
         message: 'المسح مش بيرجع. الأحسن تأرشفهم الأول. صفوف الأمان والصلاحيات من آخر سنة محمية، والمسح نفسه هيتسجل كصف واحد.',
@@ -22151,28 +22343,76 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         if (!ok) return;
         var body = filter();
         body.confirm = 'امسح';
-        A.withBusy(deleteBtn, api('POST', '/delete', body)).then(function (r) {
+        A.withBusy(go, logApi('POST', '/delete', body)).then(function (r) {
           A.toast('اتمسح ' + digits(r.deleted) + ' صف · اتسجل في السجل');
           load();
         }).catch(function (error) { A.fail(error, box); });
       });
     });
 
-    A.openSheet('إدارة السجل', el('div', { class: 'form logm' },
+    A.openSheet('إدارة السجل', el('div', { class: 'form logm logm8' },
       box,
-      stats,
-      el('p', { class: 'note', text: 'السجل بيتنضف لوحده كل ليلة: بيفضل آخر سنة وبحد أقصى ٥٢٥٠ صف. هنا تقدر تأرشف أو تمسح قبل كده.' }),
-      A.field('الفترة', days, 'أقل حاجة ٣ شهور: الأحدث من كده بيفضل.'),
-      A.field('القسم', section, ''),
-      technical.node,
-      count,
-      el('h3', { class: 'logm__h', text: 'الأرشيف' }),
-      archives
-    ), [archiveBtn, deleteBtn], { className: 'sheet--logm' });
+      el('div', { class: 'field' }, el('span', { class: 'field__label', text: 'الصفوف' }), el('div', { class: 'logm8__two' }, tech.node, all.node)),
+      el('div', { class: 'field' }, el('span', { class: 'field__label', text: 'الفترة' }), el('div', { class: 'logm8__period' }, seg, untilDate), el('span', { class: 'field__hint', text: 'أقل حاجة ٣ شهور: الأحدث من كده بيفضل' })),
+      el('div', { class: 'field logm8__section' }, el('span', { class: 'field__label', text: 'القسم' }), section),
+      el('div', { class: 'logm8__preview' }, el('div', {}, count, countLine), el('div', { class: 'logm8__bar' }, bar)),
+      el('div', { class: 'logm8__two' }, archiveOpt.node, deleteOpt.node)
+    ), [go, el('button', { class: 'btn btn--ghost', type: 'button', text: 'إلغاء', onclick: function () { A.closeSheet(); } })], {
+      size: 'md',
+      icon: 'archive',
+      sub: 'السجل بيتنضف لوحده كل ليلة: بيفضل آخر سنة وبحد أقصى ٥٢٥٠ صف',
+      className: 'sheet--logm'
+    });
     load();
   }
 
   A.openLogManage = openLogManage;
+
+  /* «الأرشيف»: the log's size and its private archive files (Phase 8B tabs: السجل · الأرشيف · تطبيق الإدارة) */
+  A.views.actarchive = function () {
+
+    var box = A.errorBox();
+    var stats = el('div', { class: 'push8__kpis act8__kpis', 'aria-busy': 'true' });
+    var list = el('ul', { class: 'p8-list act8__archives' }, el('li', { class: 'skeleton skeleton--line' }));
+
+    if (canManageLog()) {
+      logApi('GET', '').then(function (s) {
+        stats.setAttribute('aria-busy', 'false');
+        A.fill(stats,
+          el('div', { class: 'kpi' }, el('small', {}, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon('clock')), 'الصفوف'), el('b', { text: digits(s.rows) })),
+          el('div', { class: 'kpi' }, el('small', {}, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon('calendar')), 'أقدم صف'), el('b', { text: s.oldest ? (A.dateText ? A.dateText(s.oldest.slice(0, 10)) : s.oldest.slice(0, 10)) : '—' })),
+          el('div', { class: 'kpi' }, el('small', {}, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon('gear')), 'تقنية'), el('b', { text: digits(s.technical) })),
+          el('div', { class: 'kpi' }, el('small', {}, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon('archive')), 'ملفات الأرشيف'), el('b', { text: digits((s.archives || []).length) })));
+        A.fill(list, (s.archives || []).length ? s.archives.map(function (a) {
+          return el('li', { class: 'p8-item item' },
+            el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('archive')),
+            el('div', { class: 'p8-item__main' }, el('b', { class: 'ltr', text: 'activity-' + a.id + '.csv' }), a.rows ? el('small', { text: digits(a.rows) + ' صف' }) : null),
+            el('div', { class: 'p8-item__acts' }, el('button', { class: 'btn btn--sm', type: 'button', onclick: function (event) { downloadArchive(a, box, event.currentTarget); } }, icon('download'), 'نزّل')));
+        }) : [el('li', { class: 'p8-empty' }, el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('archive')), el('b', { text: 'لسه مفيش أرشيف' }), el('small', { text: 'من «إدارة السجل» اختار «أرشفهم»: الصفوف بتتشال من السجل وتتحفظ هنا.' }))]);
+      }).catch(function (error) { A.fill(list); A.fail(error, box); });
+    }
+
+    return [el('section', { class: 'card p8-card act8' },
+      el('div', { class: 'p8-card__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('archive')),
+        el('div', { class: 'p8-card__titles' },
+          el('h2', { class: 'card__title', text: 'الأرشيف' }),
+          el('p', { class: 'card__hint', text: 'الصفوف اللي اتأرشفت من السجل، كل أرشيف ملف خاص تنزّله وتفتحه في Excel.' })),
+        canManageLog() ? el('div', { class: 'p8-card__acts' }, el('button', { class: 'btn', type: 'button', onclick: openLogManage }, icon('archive'), 'إدارة السجل')) : null),
+      box,
+      canManageLog() ? stats : null,
+      canManageLog() ? list : el('p', { class: 'note', text: 'الأرشيف للي معاه صلاحية «إدارة السجل».' }))];
+
+  };
+
+  /* «تطبيق الإدارة»: the same card as «الإعدادات ← إشعاراتي» (install + this device's admin notifications) */
+  A.views.actapp = function () {
+
+    var card = A.appCard ? A.appCard() : null;
+    return card ? [card] : [el('section', { class: 'card p8-card' }, el('p', { class: 'note', text: 'التطبيق والإشعارات من لوحة التحكم الرسمية (/admin/).' }))];
+
+  };
+
 
 
   /* =======================================================
@@ -22198,7 +22438,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       var target = targetOf(entry);
       return el('button', { class: 'item item--act', type: 'button', onclick: function () {
         if (target && target.open) target.open();
-        else A.go('activity');
+        else A.go('activity', 'activity');
       } },
         el('span', { class: 'avatar', 'aria-hidden': 'true', text: String(entry.actorName || '؟').trim().charAt(0) }),
         el('span', { class: 'item__main' },
@@ -22212,7 +22452,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('clock')),
         el('h3', { id: 'dash-activity-title', text: 'آخر نشاط' }),
         el('span', { class: 'sp' }),
-        el('button', { class: 'btn btn--sm btn--ghost', type: 'button', onclick: function () { A.go('activity'); } }, 'كل النشاط')),
+        el('button', { class: 'btn btn--sm btn--ghost', type: 'button', onclick: function () { A.go('activity', 'activity'); } }, 'كل النشاط')),
       recent.length ? list : el('p', { class: 'muted', text: 'لسه مفيش نشاط متسجل. أول ما حد يضيف أو يعدّل أو ينشر هيظهر هنا.' })
     );
 
@@ -22270,7 +22510,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     });
 
     if (list.length > 2) {
-      A.toast('و' + digits(list.length - 2) + ' تحديثات تانية من الأدمنز', 'info', { label: 'السجل', onclick: function () { A.go('activity'); } });
+      A.toast('و' + digits(list.length - 2) + ' تحديثات تانية من الأدمنز', 'info', { label: 'السجل', onclick: function () { A.go('activity', 'activity'); } });
     }
 
   };
