@@ -21,7 +21,23 @@
   var el = A.el;
   var icon = A.icon;
 
-  var P = A.pages = { focusPage: '', focusEvent: '' };
+  var P = A.pages = { focusPage: '', focusEvent: '', focusClip: '', focusServant: '' };
+
+  /*
+   * «افتح» on a library item's use (AdminMedia openUse): straight to its editor.
+   * pages: the page (or, for a video card's clip / cover / sound, that card's own editor);
+   * events: the event; servants: the servant. → Promise<boolean>
+   */
+  P.openUse = function (area, key, mediaId, label) {
+    if (area === 'pages') {
+      P.focusPage = key;
+      P.focusClip = /كارت فيديو/.test(String(label || '')) ? String(mediaId || '') : '';
+      return A.go('pages', 'svcpages');
+    }
+    if (area === 'events') { P.focusEvent = key; return A.go('pages', 'events'); }
+    if (area === 'servants') { P.focusServant = key; return A.go('pages', 'servants'); }
+    return Promise.resolve(false);
+  };
 
   var THEMES = [
     { value: '', label: 'تلقائي' }, { value: 'gold', label: 'ذهبي' }, { value: 'ember', label: 'جمري' }, { value: 'azure', label: 'أزرق' },
@@ -341,8 +357,17 @@
           draw(r);
           if (P.focusPage) {
             var page = r.pages.filter(function (p) { return p.id === P.focusPage; })[0];
+            var clipOf = P.focusClip;
             P.focusPage = '';
-            if (page) openPage(page.id);
+            P.focusClip = '';
+            if (page && clipOf) {
+              // a video card: its own editor (the page's full copy has the cards)
+              A.call('apiPage', page.id).then(function (full) {
+                var card = (full.media || []).filter(function (m) { return [m.cover, m.clip, m.audio].some(function (v) { return String(v || '').indexOf(clipOf) >= 0; }); })[0];
+                if (card) mediaEditor(full, card); else openPage(page.id);
+              }).catch(function (error) { A.fail(error, box); });
+            }
+            else if (page) openPage(page.id);
           }
         },
         failed: function (error) {
@@ -1876,6 +1901,11 @@
         reply = r;
         if (!body.isConnected) return;
         draw(r);
+        if (P.focusServant) {
+          var who = (r.servants || []).filter(function (x) { return x.id === P.focusServant; })[0];
+          P.focusServant = '';
+          if (who) servantEditor(who);
+        }
       }).catch(function (error) {
         if (!body.isConnected) return;
         body.replaceChildren();
