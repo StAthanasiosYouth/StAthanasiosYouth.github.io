@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "v": "3a46a27900cb",
+  "v": "49c0e55f8001",
   "id": "pg-0d2eeb07",
   "slug": "black-theatre",
   "title": "المسرح الأسود",
@@ -59,17 +59,17 @@
       "source": "clip",
       "clip": {
         "type": "video",
-        "src": "media/2026/vid-471d70c8.mp4",
-        "poster": "media/2026/vid-471d70c8-480.webp",
+        "src": "media/2026/vid-1f68bcf5.mp4",
+        "poster": "media/2026/vid-1f68bcf5-480.webp",
         "w": 854,
         "h": 480,
         "alt": "",
         "start": 0,
-        "end": 19.2
+        "end": 19.8
       },
       "audio": {
-        "mode": "custom",
-        "src": "media/2026/aud-fde40f81.mp3"
+        "mode": "original",
+        "src": null
       },
       "fullUrl": "https://www.facebook.com/share/v/18JfZXsrjn/",
       "ctaLabel": "شاهد المسرحية كاملة"
@@ -107,5 +107,5 @@
     }
   ],
   "team": null,
-  "publishedAt": "2026-11-12T09:46"
+  "publishedAt": "2026-11-12T09:58"
 }
