@@ -22,6 +22,7 @@ import { handle as workerHandle } from '../worker/src/index.js';
 import { resetAuthCaches, GOOGLE_JWKS_URL } from '../worker/src/lib/auth.js';
 import { migratedDb } from '../worker/test/d1-sqlite.mjs';
 import { fakeR2 } from '../worker/test/helpers.mjs';
+import { PRESETS } from '../worker/src/lib/perms.js';
 
 // the signed-in Google account (Phase 8 A4 signs in another admin)
 let who = null;
@@ -342,36 +343,50 @@ test('Phase 6 Step 5: with production\'s switches, a walk through every area and
   await s.close();
 });
 
-test('Phase 6: closing the panel and opening it again comes back to the area and tab it was on', async () => {
+test('owner 2026-11-12: closing the app and opening it again starts at «الرئيسية»; taking the panel over from another device opens its place and editor', async () => {
   await freshWorld();
   const s = await open();
   await signedIn(s.page);
   await s.page.evaluate(() => A.go('pages', 'events'));
   await s.page.waitForFunction(() => A.area === 'pages' && A.sub.pages === 'events', { timeout: 8000 });
-  // the app is put away (pagehide), then opened again: a new page, so no tab session of its own
   await s.page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
   const context = s.page.browserContext();
-  // the app closed: its page is gone and its session with it (a live one would rightly ask before a takeover)
+  // the app closed: its page is gone and its session with it
   await s.page.close();
   env.DB.raw.exec('DELETE FROM admin_sessions;');
   const again = await context.newPage();
-  const calls = [];
-  await interceptGoogle(again, { post: body => world.post(body) }, { site: { origin: SITE, local: LOCAL }, handle: worker, calls });
+  await interceptGoogle(again, { post: body => world.post(body) }, { site: { origin: SITE, local: LOCAL }, handle: worker, calls: [] });
   await again.setViewport(DESKTOP);
   await again.goto(ADMIN_URL, { waitUntil: 'networkidle0' });
   await signedIn(again);
-  await again.waitForFunction(() => A.area === 'pages' && A.sub.pages === 'events', { timeout: 8000 });
-  assert.ok(!(await again.evaluate(() => JSON.stringify(localStorage.getItem('athanasios-admin.place')))).includes('news-aaaa1111'), 'the place only, never an item');
+  assert.equal(await again.evaluate(() => A.area), 'home', 'a fresh open starts at home');
+  assert.equal(await again.evaluate(() => localStorage.getItem('athanasios-admin.place')), null, 'no place is kept past the app');
+
+  // still open here, on a news editor; the same account opens the panel on another device and takes it over
+  await again.evaluate(() => A.go('content', 'news').then(() => A.editors.news(A.state.draft.news.find(n => n.id === 'news-aaaa1111'))));
+  await again.waitForFunction(() => document.getElementById('sheet').open, { timeout: 8000 });
+  await sleep(2500);   // a heartbeat or two: the server knows the place and the editor
+  const other = await open();
+  await other.page.waitForSelector('.gate[data-state="signin"] .gis-stub');
+  await other.page.click('.gis-stub');
+  await other.page.waitForSelector('.gate[data-state="session-active"] .gate__btn', { timeout: 8000 });
+  await other.page.click('.gate[data-state="session-active"] .gate__btn');
+  await other.page.waitForFunction(() => window.A && A.state && A.state.draft && !document.getElementById('shell').hidden, { timeout: 15000 });
+  await other.page.waitForFunction(() => A.area === 'content' && A.sub.content === 'news' && document.getElementById('sheet').open, { timeout: 8000 });
+  assert.match(await other.page.$eval('#sheet', d => d.textContent), /رحلة الغردقة/, 'the same item\'s editor');
+  assert.deepEqual(other.problems, []);
+  await other.close();
   await context.close();
 });
 
-test('a kept place whose tab has no screen yet (or none at all) still opens the panel, never a blank one', async () => {
+test('a reload whose kept tab has no screen yet (or none at all) still opens the panel, never a blank one', async () => {
   // owner, 2026-11-03: «لوحة التحكم مظهرتش على الشاشة» after closing the app on «الصفحات والفعاليات»
+  // (2026-11-12: only a reload of the tab keeps a place — sessionStorage)
   for (const place of [{ area: 'pages', sub: {} }, { area: 'pages', sub: { pages: 'bookings' } }, { area: 'pages', sub: { pages: 'nothing' } }]) {
     await freshWorld();
     const context = await browser.createBrowserContext();
     const page = await context.newPage();
-    await page.evaluateOnNewDocument(value => { localStorage.setItem('athanasios-admin.place', value); }, JSON.stringify(place));
+    await page.evaluateOnNewDocument(value => { sessionStorage.setItem('athanasios-admin.ui', value); }, JSON.stringify(place));
     await interceptGoogle(page, { post: body => world.post(body) }, { site: { origin: SITE, local: LOCAL }, handle: worker, calls: [] });
     await page.setViewport(DESKTOP);
     await page.goto(ADMIN_URL, { waitUntil: 'networkidle0' });
@@ -501,6 +516,176 @@ test('owner fix 2026-11-12: each account keeps its own look, even with two accou
   }
 });
 
+
+/* owner report 2026-11-12, two real accounts: the family account (a «مشاهد») and the primary admin */
+async function teamWorld(enforce) {
+  await freshWorld();
+  const FAMILY = 'family.account@example.com';
+  const EDITOR = 'editor.account@example.com';
+  env.DB.raw.exec(`INSERT INTO admins (email, name, role, active, created_at) VALUES ('${FAMILY}', 'حساب الأسرة', 'admin', 1, 0), ('${EDITOR}', 'محرر', 'admin', 1, 0);
+    UPDATE settings SET value = '${enforce ? 1 : 0}' WHERE key = 'PERMS_ENFORCE';`);
+  const grant = (email, perms) => { for (const [p, s] of Object.entries(perms)) env.DB.raw.prepare("INSERT INTO admin_grants (email, perm, scope, granted_by, granted_at) VALUES (?, ?, ?, 'test', 0)").run(email, p, s); };
+  grant(FAMILY, PRESETS.viewer.grants);
+  grant(EDITOR, PRESETS.content_editor.grants);
+  world.properties.set('ADMIN_EMAILS', [ADMIN, FAMILY, EDITOR].join(','));
+  return { FAMILY, EDITOR };
+}
+
+test('owner fix 2026-11-12: «شوف اللوحة بعينه» saves nothing — it says what that admin may not do, and going back restores YOUR access', async () => {
+  const { FAMILY, EDITOR } = await teamWorld(true);
+  const s = await open();
+  await signedIn(s.page);
+  const sent = [];
+  s.page.on('request', r => { if (r.method() === 'POST' && /\/v1\/admin\/content\/call$/.test(r.url())) sent.push(JSON.parse(r.postData()).fn); });
+  const title = () => env.DB.raw.prepare("SELECT json_extract(data, '$.title') AS t FROM draft_rows WHERE kind = 'news' AND id = 'news-aaaa1111'").get().t;
+  const tryCall = (fn, ...args) => s.page.evaluate((fn, args) => A.call(fn, ...args).then(() => 'ok', e => A.parseError(e).message + ' | ' + (A.parseError(e).hint || '')), fn, args);
+
+  // from the team screen, the family account's card
+  await s.page.evaluate(() => A.go('settings', 'team'));
+  await s.page.waitForSelector('.tm8');
+  await s.page.evaluate(email => {
+    const card = [...document.querySelectorAll('.tm8')].find(c => c.textContent.includes(email.slice(0, 20)));
+    [...card.querySelectorAll('button')].find(b => /بعينه/.test(b.textContent)).click();
+  }, FAMILY);
+  await s.page.waitForSelector('#viewas');
+  assert.equal(await s.page.evaluate(() => A.access.primary), false);
+
+  // a change the viewer may not make: refused here, nothing sent, nothing saved
+  const before = title();
+  const refused = await tryCall('apiSaveItem', 'news', { id: 'news-aaaa1111', title: 'اتغيّر من المعاينة', summary: 'x' });
+  assert.match(refused, /مش مسموح له/);
+  assert.match(refused, /المحتوى \(تعديل\)/);
+  assert.deepEqual(sent.filter(f => f === 'apiSaveItem'), [], 'never sent to the Worker');
+  assert.equal(title(), before, 'nothing saved');
+  // a read the viewer may do goes through
+  assert.equal(await tryCall('apiAgeRules'), 'ok');
+  // the screens' own switches: a refusal in words, never a change
+  const delCount = env.DB.raw.prepare("SELECT COUNT(*) AS n FROM draft_rows WHERE kind = 'news'").get().n;
+  assert.match(await tryCall('apiDeleteItem', 'news', 'news-aaaa1111'), /مش مسموح له/);
+  assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM draft_rows WHERE kind = 'news'").get().n, delCount);
+
+  // the cause of the report: the team screen opened INSIDE the preview (the Worker answered as you), and its
+  // «شوف اللوحة بعينه» started a second preview that took the viewer's access as «yours». Now the viewer's team
+  // screen is what the viewer gets (no list), and a second preview still goes back to your own access.
+  await s.page.evaluate(() => A.go('settings', 'team'));
+  await s.page.waitForFunction(() => /مش مسموح له/.test(document.getElementById('view').textContent), { timeout: 8000 });
+  assert.equal(await s.page.$('.tm8'), null, 'no team list in the viewer\'s eyes');
+  await s.page.evaluate((email, grants) => A.viewAs({ email, name: 'محرر', role: 'محرر المحتوى', grants }), EDITOR, PRESETS.content_editor.grants);
+  await s.page.waitForFunction(() => /محرر/.test(document.getElementById('viewas')?.textContent || ''), { timeout: 4000 });
+  const preview = await tryCall('apiSaveItem', 'news', { id: 'news-aaaa1111', title: 'اتغيّر من المعاينة', summary: 'x' });
+  assert.match(preview, /يقدر يعمل ده، بس دي معاينة/);
+  assert.equal(title(), before, 'still nothing saved');
+  assert.deepEqual(sent.filter(f => f === 'apiSaveItem'), []);
+
+  // back to your own eyes: the primary admin again — the rail, «إدارة السجل», and saving works
+  await s.page.click('.viewas__back');
+  await s.page.waitForFunction(() => !document.getElementById('viewas'));
+  assert.deepEqual(await s.page.evaluate(() => [A.access.primary, A.viewing]), [true, null]);
+  assert.match(await s.page.$eval('.rail__role', n => n.textContent), /الأدمن الأساسي/);
+  await s.page.evaluate(() => A.go('activity'));
+  await s.page.waitForFunction(() => [...document.querySelectorAll('#view button')].some(b => /إدارة السجل/.test(b.textContent)), { timeout: 8000 });
+  assert.equal(await tryCall('apiSaveItem', 'news', { id: 'news-aaaa1111', title: 'اتغيّر بجد', summary: 'x' }), 'ok');
+  assert.equal(title(), 'اتغيّر بجد');
+  assert.deepEqual(s.problems, []);
+  await s.close();
+});
+
+test('owner fix 2026-11-12: a «مشاهد» renames themself with the permissions on — no «مش مسموح», and «حسابي» shows the name at once', async () => {
+  const { FAMILY } = await teamWorld(true);
+  try {
+    who = FAMILY;
+    const s = await open();
+    await signedIn(s.page);
+    await s.page.evaluate(() => A.go('settings', 'me'));
+    await s.page.waitForSelector('.setrow--lead .btn');
+    await s.page.evaluate(() => [...document.querySelectorAll('.setrow--lead .btn')].find(b => /غيّر الاسم/.test(b.textContent)).click());
+    await s.page.waitForSelector('dialog.modal[open] input');
+    await s.page.$eval('dialog.modal[open] input', i => { i.value = ''; });
+    await s.page.type('dialog.modal[open] input', 'أسرة البابا أثناسيوس');
+    await s.page.evaluate(() => [...document.querySelectorAll('dialog.modal[open] button')].find(b => /احفظ الاسم/.test(b.textContent)).click());
+    await s.page.waitForFunction(() => [...document.querySelectorAll('.toast')].some(t => /اتحفظ الاسم/.test(t.textContent)), { timeout: 8000 });
+    assert.equal(env.DB.raw.prepare('SELECT name FROM admins WHERE email = ?').get(FAMILY).name, 'أسرة البابا أثناسيوس');
+    await s.page.waitForFunction(() => [...document.querySelectorAll('#view .setrow')].some(r => /أسرة البابا أثناسيوس/.test(r.textContent)), { timeout: 4000 });
+    assert.ok(!(await s.page.evaluate(() => [...document.querySelectorAll('.toast, .errorbox:not([hidden])')].some(n => /مش مسموح|الصلاحية/.test(n.textContent)))), 'no refusal shown');
+    // another admin's name: refused by the Worker, and the pencil is not offered
+    const other = await s.page.evaluate(() => A.call('apiSetAdminName', 'menazakmena@gmail.com', 'تجربة').then(() => 'ok', e => A.parseError(e).message));
+    assert.notEqual(other, 'ok');
+    assert.equal(env.DB.raw.prepare('SELECT name FROM admins WHERE email = ?').get(ADMIN).name, 'مينا');
+    assert.deepEqual(s.problems, []);
+    await s.close();
+  }
+  finally {
+    who = ADMIN;
+  }
+});
+
+test('owner fix 2026-11-12: a new photo shows in «حسابي» at once; the online dot sits outside a photo', async () => {
+  await freshWorld();
+  const s = await open();
+  await signedIn(s.page);
+  await s.page.evaluate(() => A.go('settings', 'me'));
+  await s.page.waitForSelector('.setrow--photo');
+  assert.equal(await s.page.$('.setrow--photo .avatar.has-img img'), null);
+  await s.page.evaluate(() => new Promise(resolve => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 300;
+    const g = c.getContext('2d');
+    g.fillStyle = '#c33'; g.fillRect(0, 0, 300, 300); g.fillStyle = '#3c3'; g.fillRect(100, 100, 100, 100);
+    c.toBlob(blob => { A.avatarEditor(new File([blob], 'me.png', { type: 'image/png' })); resolve(); }, 'image/png');
+  }));
+  await s.page.waitForFunction(() => { const b = [...document.querySelectorAll('#sheet button')].find(x => /احفظ الصورة/.test(x.textContent)); return b && !b.disabled; }, { timeout: 8000 });
+  await s.page.evaluate(() => [...document.querySelectorAll('#sheet button')].find(x => /احفظ الصورة/.test(x.textContent)).click());
+  // no navigation: the row itself
+  await s.page.waitForSelector('.setrow--photo .avatar.has-img img', { timeout: 8000 });
+  assert.ok(env.DB.raw.prepare('SELECT 1 AS x FROM admin_avatars WHERE email = ?').get(ADMIN), 'saved on the Worker');
+  // a presence photo: the frame never clips, so the dot (::after) sits on the outside edge
+  const dot = await s.page.evaluate(email => {
+    const n = A.avatarNode('pav pav--online', email, 'م');
+    document.body.appendChild(n);
+    const out = { img: !!n.querySelector('img'), overflow: getComputedStyle(n).overflow, after: getComputedStyle(n, '::after').backgroundColor };
+    n.remove();
+    return out;
+  }, ADMIN);
+  assert.deepEqual([dot.img, dot.overflow], [true, 'visible']);
+  assert.notEqual(dot.after, 'rgba(0, 0, 0, 0)');
+  assert.deepEqual(s.problems, []);
+  await s.close();
+});
+
+test('owner fix 2026-11-12: signing in, the panel shows in THIS account\'s colour from the first frame — never the previous account\'s', async () => {
+  await freshWorld();
+  const FAMILY = 'family.account@example.com';
+  env.DB.raw.exec(`INSERT INTO admins (email, name, role, active, created_at) VALUES ('${FAMILY}', 'حساب الأسرة', 'admin', 1, 0);
+    INSERT INTO admin_prefs (email, prefs, updated_ms) VALUES ('${FAMILY}', '{"theme":"dark","accent":"carmine","density":"comfortable","motion":"full","sound":false}', 0),
+      ('${ADMIN}', '{"theme":"dark","accent":"sea","density":"comfortable","motion":"full","sound":false}', 0);`);
+  world.properties.set('ADMIN_EMAILS', ADMIN + ',' + FAMILY);
+  try {
+    who = ADMIN;
+    const a = await open();
+    await signedIn(a.page);
+    await a.page.waitForFunction(() => document.documentElement.getAttribute('data-accent') === 'sea', { timeout: 5000 });
+    // the family account signs in on the same device (the device's last colour is the primary's «sea»)
+    who = FAMILY;
+    const page = await a.context.newPage();
+    await page.evaluateOnNewDocument(() => {
+      window.__shown = [];
+      new MutationObserver(() => {
+        const shell = document.getElementById('shell');
+        if (shell && !shell.hidden && !window.__shown.length) window.__shown.push(document.documentElement.getAttribute('data-accent'));
+      }).observe(document, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
+    });
+    await interceptGoogle(page, { post: body => world.post(body) }, { site: { origin: SITE, local: LOCAL }, handle: worker, calls: [] });
+    await page.setViewport(DESKTOP);
+    await page.goto(ADMIN_URL, { waitUntil: 'networkidle0' });
+    assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-accent')), 'sea', 'the sign-in screen: the device\'s last look');
+    await signedIn(page);
+    assert.deepEqual(await page.evaluate(() => window.__shown), ['carmine'], 'the first frame of the panel is the family account\'s own colour');
+    await a.close();
+  }
+  finally {
+    who = ADMIN;
+  }
+});
 
 test('Phase 8 A2: the shell — the welcome, the rail in groups with its light and collapse, the palette, the menus, sign-out', async () => {
   await freshWorld();

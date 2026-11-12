@@ -15688,7 +15688,8 @@ html[data-mode="light"] .tm8p-row { background: rgb(11 42 76 / .03); }
 
 
 /* Phase 8B W6 (B12, me-avatar.png): the admins' photos and the crop */
-.has-img { overflow: hidden; padding: 0; background: none !important; }
+/* the photo is cut round by its own radius; the frame never clips, so the online dot stays outside (owner fix 2026-11-12) */
+.has-img { overflow: visible; padding: 0; background: none !important; }
 .has-img > img { display: block; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
 .setrow .avatar--photo { width: 64px; height: 64px; font-size: 24px; }
 .setrow--photo .setrow__ctl { display: flex; flex-wrap: wrap; gap: 8px; }

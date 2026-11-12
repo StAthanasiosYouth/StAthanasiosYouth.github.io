@@ -876,6 +876,20 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   }
 
   /* after sign-in: the server's copy wins, unless this device changed something it could not send yet */
+  /* owner fix 2026-11-12: at sign-in the panel takes THIS account's look at once — its unsent change on this device,
+     else the server's copy that came with the session, else its copy on this device, else the default — never the
+     previous account's (admin/look.js painted that one on the sign-in screen) */
+  A.lookFor = function (user, server) {
+    var who = String(user || '').toLowerCase();
+    if (!who) return;
+    var saved = readStore();
+    var own = saved && saved.by && saved.by[who];
+    var next = own && own.dirty ? cleanPrefs(own.prefs) : server ? cleanPrefs(server) : own ? cleanPrefs(own.prefs) : cleanPrefs(null);
+    if (JSON.stringify(next) === JSON.stringify(A.prefs)) return;
+    A.prefs = next;
+    A.applyPrefs();
+  };
+
   A.loadPrefs = function () {
     var mine = readLocal();
     if (mine && mine.dirty) { pushPrefs(); return; }
@@ -3800,41 +3814,15 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     draftOpen = null;
   });
 
-  /*
-   * Where the admin was, past the tab's own life too (Phase 6: closing the app and opening it again): only the area
-   * and its sub-tabs, never an item, a value or anything of the session. This tab's own copy (A.keep) wins.
-   */
-  var PLACE = 'athanasios-admin.place';
-
-  function savePlace(place) {
-
-    try {
-      window.localStorage.setItem(PLACE, JSON.stringify(place));
-    }
-    catch (ignored) {
-      // private mode: the tab's own copy still works
-    }
-
-  }
-
-  function lastPlace() {
-
-    try {
-      var value = JSON.parse(window.localStorage.getItem(PLACE) || 'null');
-      return value && typeof value === 'object' && typeof value.area === 'string' ? { area: value.area, sub: value.sub && typeof value.sub === 'object' ? value.sub : {} } : null;
-    }
-    catch (ignored) {
-      return null;
-    }
-
-  }
+  /* where the admin was, for a reload of this tab (A.keep). Owner 2026-11-12: opening the app again starts at home
+     (no copy past the tab's life); taking the panel over from another device opens its place (A.restore.view). */
+  try { window.localStorage.removeItem('athanasios-admin.place'); } catch (ignored) { /* nothing kept */ }
 
   function saveUi() {
 
     if (!A.keep) return;
     var sub = { content: A.sub.content, page: A.sub.page, comps: A.sub.comps, pages: A.sub.pages, bookings: A.sub.bookings, youth: A.sub.youth };
     A.keep.set('ui', { area: A.area, sub: sub, y: Math.max(0, Math.round(window.scrollY || 0)), publish: publishMemo() });
-    savePlace({ area: A.area, sub: sub });
 
   }
 
@@ -3863,10 +3851,14 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   A.restore = {
 
-    /* before the panel is drawn: the area and sub-tab the admin was in */
-    view: function () {
+    /* before the panel is drawn: the area and sub-tab the admin was in — this tab before a reload, or (owner
+       2026-11-12) the panel just taken over on another device (from: its last heartbeat). Opening the app
+       fresh starts at «الرئيسية». */
+    view: function (from) {
 
-      var ui = (A.keep && A.keep.get('ui')) || lastPlace();
+      var taken = from && from.area ? { area: from.area, sub: {} } : null;
+      if (taken && from.view) taken.sub[from.area] = from.view;
+      var ui = taken || (A.keep && A.keep.get('ui'));
       var area = ui && areaOf(ui.area);
 
       if (!area) return;
@@ -3883,9 +3875,16 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     },
 
     /* the panel is on screen: the scroll position, then the editor that was open, with its values */
-    rest: function () {
+    rest: function (from) {
 
       draftHold = false;
+
+      // taken over: the editor that was open there (its values stayed there, unsaved ones are lost — the takeover said so)
+      if (from && from.item && from.item.kind && !sheet.open) {
+        try { reopenEditor({ kind: from.item.kind, id: from.item.id || '', arg: '' }); }
+        catch (ignored) { /* the item is gone: the area is enough */ }
+        return;
+      }
 
       if (!A.keep) return;
 
@@ -4481,12 +4480,67 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   A.viewAs = function (person) {
     if (!person) return;
     if (A.closeSheet) A.closeSheet();
-    A.viewing = { person: person, real: A.access, back: { area: A.area, sub: A.sub[A.area] } };
+    // owner fix 2026-11-12: «شوف اللوحة بعينه» again from inside a preview keeps YOUR access and place to go back to
+    var was = A.viewing;
+    A.viewing = { person: person, real: was ? was.real : A.access, back: was ? was.back : { area: A.area, sub: A.sub[A.area] } };
     A.access = { enforce: true, primary: false, perms: person.grants || {} };
     document.documentElement.setAttribute('data-viewing', '');
     paintViewAs();
     renderNav();
     A.go(A.homeArea());
+    A.toast('معاينة: جرّب براحتك، ومفيش أي حاجة هتتحفظ', 'info');
+  };
+
+  /*
+   * While previewing (owner fix 2026-11-12) every request passes here first (admin/boot.js workerFetch). The
+   * Worker would answer as YOU, so nothing that changes data leaves the page: the panel answers what that admin
+   * would get — «مش مسموح له» when the grant is missing, «يقدر يعمل ده، بس دي معاينة» when it is there. Reads
+   * the admin may do go through. The tables are the Worker's own (tools/build-admin.mjs: A.ROUTE_PERMS, A.FN_PERMS).
+   */
+  var PREVIEW_OWN_WRITES = {
+    'POST /v1/admin/me/avatar': 1, 'POST /v1/admin/me/avatar/delete': 1, 'POST /v1/admin/accounts/:email/name': 1,
+    'POST /v1/admin/devices/trust': 1, 'POST /v1/admin/devices/forget': 1, 'POST /v1/admin/me/ask-access': 1,
+    'POST /v1/admin/push/subscribe': 1, 'POST /v1/admin/push/unsubscribe': 1, 'POST /v1/admin/push/remove': 1, 'POST /v1/admin/push/test': 1
+  };
+  var PREVIEW_OWN_FNS = { apiSetAdminName: 1, apiTrustDevice: 1, apiForgetDevice: 1, apiAdminPushSubscribe: 1, apiAdminPushUnsubscribe: 1, apiAdminPushRemoveDevice: 1 };
+  var routeList = null;
+
+  function routeOf(method, path) {
+    if (!routeList) {
+      routeList = Object.keys(A.ROUTE_PERMS || {}).map(function (key) {
+        var parts = key.split(' ');
+        return { key: key, method: parts[0], re: new RegExp('^' + parts[1].replace(/[.*+?^$()|[\]\\]/g, '\\$&').replace(/:[a-zA-Z]+/g, '[^/]+') + '$') };
+      });
+    }
+    var clean = String(path || '').split('?')[0];
+    for (var i = 0; i < routeList.length; i++) {
+      if (routeList[i].method === method && routeList[i].re.test(clean)) return routeList[i].key;
+    }
+    return '';
+  }
+
+  A.previewGuard = function (method, path, body) {
+    var v = A.viewing;
+    if (!v) return null;
+    var route = routeOf(method, path);
+    if (!route) return null;
+    var fn = route === 'POST /v1/admin/content/call' ? String(body && body.fn || '') : '';
+    var need = fn ? (A.FN_PERMS || {})[fn] : route === 'POST /v1/admin/media/upload' ? 'media.add' : A.ROUTE_PERMS[route];
+    var name = v.person.name || String(v.person.email || '').split('@')[0];
+    var saved = { ok: false, code: 'preview', message: 'حساب «' + name + '» يقدر يعمل ده، بس دي معاينة فمفيش حاجة اتحفظت.', hint: 'ارجع لعينك («ارجع لعينك» فوق) علشان تحفظ بجد.' };
+    if (need === undefined) return method === 'GET' ? null : saved;
+    if (need === '*') return PREVIEW_OWN_WRITES[route] || PREVIEW_OWN_FNS[fn] ? saved : null;
+    var list = Array.isArray(need) ? need : [need];
+    var perms = v.person.grants || {};
+    var own = (A.OWN_SCOPE_ROUTES || []).indexOf(route) !== -1;
+    var missing = list.filter(function (p) { return !(perms[p] === 'all' || (own && perms[p] === 'own')); });
+    if (missing.length) {
+      var want = {};
+      missing.forEach(function (p) { want[p] = 'all'; });
+      return { ok: false, code: 'preview_denied', message: 'حساب «' + name + '» مش مسموح له يعمل ده.', hint: 'محتاج صلاحية: ' + permsLine(want) + '.' };
+    }
+    var reads = list.every(function (p) { return /\.view$/.test(p); });
+    return method === 'GET' || reads ? null : saved;
   };
 
   A.viewAsEnd = function () {
@@ -6197,6 +6251,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
      again); resolves true once the panel is drawn, false when it failed. */
   var started = false;
 
+  function adoptMe(state) {
+    var me = state && state.platform && state.platform.me;
+    A.lookFor(state && state.user, me && me.prefs);
+    if (me && me.perms && !A.viewing) A.access = { enforce: !!me.enforce, primary: !!me.primary, perms: me.perms };
+  }
+
   A.start = function (preloaded) {
 
     if (!started) {
@@ -6210,6 +6270,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       }
     }
 
+    // this account's look and access before the first frame (the session's answer brought them)
+    if (preloaded) adoptMe(preloaded);
     renderNav();
     // right after signing in (not after a reload): the panel greets the admin inside the shell, then steps aside
     var hello = welcome();
@@ -6217,6 +6279,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return (preloaded ? Promise.resolve(preloaded) : A.call('apiState'))
       .then(function (state) {
         A.state = state;
+        if (!preloaded) adoptMe(state);
         if (hello) hello.ready(state && (state.me || (state.user || '').split('@')[0]));
         myAcct = acctTag(state.user);
         A.renderStatus();
@@ -7566,6 +7629,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.dirty = false;
         A.closeSheet();
         A.setAvatars(reply && reply.avatars);
+        // owner fix 2026-11-12: the sheet is still closing (setAvatars skips a screen under an open sheet): «حسابي» now
+        if (A.area === 'settings') A.render();
         A.toast('اتحفظت صورتك ✓');
       }).catch(function (error) { A.fail(error, box); });
     });
@@ -7590,10 +7655,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
      itself (change()), and the Worker checks it all again. Apps Script's apiAdmins only gives the names.
   ======================================================= */
 
-  var ROLE_ICONS = { treasurer: 'wallet', servant_bookings: 'ticket', content_editor: 'megaphone', viewer: 'eye' };
+  var ROLE_ICONS = { treasurer: 'wallet', servant_bookings: 'ticket', content_editor: 'megaphone', viewer: 'eye', comp_grader: 'check', comp_servant: 'trophy', comp_full: 'star' };
   var ROLE_HINTS = {
     treasurer: 'الحجوزات والفلوس والتصدير', servant_bookings: 'يشوف الحجوزات ويسجّل كاش لنفسه',
-    content_editor: 'المحتوى والفعاليات والصور والنشر', viewer: 'يشوف كل حاجة من غير تعديل', custom: 'تختار الصلاحيات بنفسك'
+    content_editor: 'المحتوى والفعاليات والصور والنشر', viewer: 'يشوف كل حاجة من غير تعديل',
+    comp_grader: 'يصحّح إجابات المسابقات بس', comp_servant: 'يعمل المسابقات ويصحّحها', comp_full: 'المسابقات والنقاط والمتجر وحسابات الشباب',
+    custom: 'تختار الصلاحيات بنفسك'
   };
   var MODULE_ICONS = {
     content: 'megaphone', publish: 'send', events: 'theatre', bookings: 'ticket', finance: 'wallet', exports: 'download',
@@ -8400,8 +8467,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         if (!ok) return;
         busy(button, A.call('apiSetAdminName', email, field.value))
           .then(function (next) {
-            data = next;
-            draw();
+            // an admin without «accounts.view» gets the names only (admin/boot.js): the team list stays as it is
+            if (!next.renamedOnly) { data = next; draw(); }
             // presence, the rail and the log use the names: the state learns them too
             if (A.state) {
               A.state.names = next.names;
@@ -8409,6 +8476,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
               if (A.renderNav) A.renderNav();
             }
             A.toast(field.value.trim() ? 'اتحفظ الاسم ✓' : 'رجع لأول الإيميل');
+            // owner fix 2026-11-12: «حسابي» shows the new name at once
+            if (A.state && email === A.state.user && A.area === 'settings' && A.sub.settings !== 'team') A.render();
           })
           .catch(function (error) { A.fail(accountsError(error), box, { fields: false }); });
       });
@@ -27483,3 +27552,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   }
 
 })();
+
+/* ---------- the permission tables (generated from worker/src/lib/perms.js and apps-script/Grants.gs) ---------- */
+A.ROUTE_PERMS = {"DELETE /v1/admin/book/bookings/:id/lock":"bookings.edit","DELETE /v1/admin/proofs/:id":"bookings.manage","GET /v1/admin/accounts":"accounts.view","GET /v1/admin/activity":"activity.view","GET /v1/admin/activity/manage":"activity.manage","GET /v1/admin/activity/manage/archive/:id":"activity.manage","GET /v1/admin/avatars":"*","GET /v1/admin/book/bookings":"bookings.view","GET /v1/admin/book/bookings/:id":"bookings.view","GET /v1/admin/book/events":"bookings.view","GET /v1/admin/book/events/:id/handovers":"finance.view","GET /v1/admin/book/events/:id/reminders":"bookings.view","GET /v1/admin/book/export":"exports.export","GET /v1/admin/book/finance":"finance.view","GET /v1/admin/book/module":"bookings.view","GET /v1/admin/book/report":"exports.export","GET /v1/admin/book/summary":"bookings.view","GET /v1/admin/comp":"competitions.view","GET /v1/admin/comp/:id/submissions":"competitions.view","GET /v1/admin/comp/badges":"*","GET /v1/admin/comp/seasons":"competitions.view","GET /v1/admin/comp/submissions/:id":"competitions.view","GET /v1/admin/content/drafts":"content.view","GET /v1/admin/content/export":"system.manage","GET /v1/admin/content/media-status":"system.view","GET /v1/admin/content/media/:id/file":"media.view","GET /v1/admin/content/review-input":"content.view","GET /v1/admin/content/status":"system.view","GET /v1/admin/diag/book-news":"system.view","GET /v1/admin/me":"*","GET /v1/admin/notify/me":"*","GET /v1/admin/notify/settings":"notifications.view","GET /v1/admin/notify/status":"notifications.view","GET /v1/admin/participants":"participants.view","GET /v1/admin/participants/:id":"participants.view","GET /v1/admin/participants/:id/avatar":"participants.view","GET /v1/admin/participants/export":["participants.view","exports.export_pii"],"GET /v1/admin/participants/review":"participants.view","GET /v1/admin/participants/settings":"participants.view","GET /v1/admin/points/seasons":"points.view","GET /v1/admin/points/seasons/:id/preview":"points.view","GET /v1/admin/proofs/:id":"bookings.view","GET /v1/admin/publish/revisions":"publish.publish","GET /v1/admin/publish/status":"system.view","GET /v1/admin/store/items":"store.view","GET /v1/admin/store/redemptions":"store.view","GET /v1/admin/store/schedule":"store.view","GET /v1/admin/whoami":"*","POST /v1/admin/accounts":"accounts.manage","POST /v1/admin/accounts/:email":"accounts.manage","POST /v1/admin/accounts/:email/name":"*","POST /v1/admin/accounts/:email/remove":"accounts.manage","POST /v1/admin/accounts/:email/signout":"accounts.manage","POST /v1/admin/accounts/enforce":"accounts.manage","POST /v1/admin/activity/manage/archive":"activity.manage","POST /v1/admin/activity/manage/delete":"activity.manage","POST /v1/admin/activity/manage/preview":"activity.manage","POST /v1/admin/book/bookings":"bookings.create_cash","POST /v1/admin/book/bookings/:id/cancel":"bookings.manage","POST /v1/admin/book/bookings/:id/confirm":"bookings.approve","POST /v1/admin/book/bookings/:id/link":"bookings.manage","POST /v1/admin/book/bookings/:id/lock":"bookings.edit","POST /v1/admin/book/bookings/:id/payments":["bookings.approve","finance.manage"],"POST /v1/admin/book/bookings/:id/reject":"bookings.approve","POST /v1/admin/book/bookings/:id/reopen":"bookings.manage","POST /v1/admin/book/bookings/:id/update":"bookings.edit","POST /v1/admin/book/claims/:id/reject":["bookings.approve","finance.manage"],"POST /v1/admin/book/events/:id/cancel-all":"bookings.manage","POST /v1/admin/book/events/:id/handovers":"finance.manage","POST /v1/admin/book/events/:id/notify":"bookings.manage","POST /v1/admin/book/events/:id/purge":"bookings.manage","POST /v1/admin/book/events/:id/reminders":"bookings.edit","POST /v1/admin/book/events/:slug/refresh":"bookings.edit","POST /v1/admin/book/handovers/:id/void":"finance.manage","POST /v1/admin/book/module":"bookings.manage","POST /v1/admin/book/payments/:id/void":"finance.manage","POST /v1/admin/book/servants/:id/purge":"bookings.manage","POST /v1/admin/comp/:id/regrade":"competitions.approve","POST /v1/admin/comp/submissions/:id/grade":"competitions.edit","POST /v1/admin/comp/submissions/:id/void":"competitions.approve","POST /v1/admin/content/call":"*","POST /v1/admin/devices/forget":"*","POST /v1/admin/devices/trust":"*","POST /v1/admin/diag/echo":"system.manage","POST /v1/admin/diag/event-fixture":"system.manage","POST /v1/admin/diag/gmail-health":"system.manage","POST /v1/admin/diag/housekeeping":"system.manage","POST /v1/admin/diag/mail-sample":"system.manage","POST /v1/admin/diag/retention":"system.manage","POST /v1/admin/me/ask-access":"*","POST /v1/admin/me/avatar":"*","POST /v1/admin/me/avatar/delete":"*","POST /v1/admin/me/prefs":"*","POST /v1/admin/media/upload":"*","POST /v1/admin/notify/me":"*","POST /v1/admin/notify/outbox/:id/dismiss":"notifications.manage","POST /v1/admin/notify/settings":"notifications.manage","POST /v1/admin/participants":"participants.add","POST /v1/admin/participants/:id/avatar/delete":"participants.edit","POST /v1/admin/participants/:id/block":"participants.edit","POST /v1/admin/participants/:id/dob":"participants.manage","POST /v1/admin/participants/:id/eligibility":"participants.manage","POST /v1/admin/participants/:id/email":"participants.manage","POST /v1/admin/participants/:id/phone":"participants.manage","POST /v1/admin/participants/:id/points":"points.edit","POST /v1/admin/participants/:id/profile":"participants.edit","POST /v1/admin/participants/:id/resend":"participants.view","POST /v1/admin/participants/:id/reset-password":"participants.manage","POST /v1/admin/participants/:id/sessions/revoke":"participants.manage","POST /v1/admin/participants/:id/transfer":"points.approve","POST /v1/admin/participants/:id/unblock":"participants.manage","POST /v1/admin/participants/:id/view-password":"participants.view","POST /v1/admin/participants/settings":"participants.manage","POST /v1/admin/points/seasons":"points.approve","POST /v1/admin/points/seasons/:id/close":"points.approve","POST /v1/admin/proofs":"bookings.edit","POST /v1/admin/publish/restore":"publish.publish","POST /v1/admin/publish/shadow-check":"system.manage","POST /v1/admin/push/auto":"push.view","POST /v1/admin/push/check":"push.view","POST /v1/admin/push/devices":"*","POST /v1/admin/push/remove":"*","POST /v1/admin/push/schedule":"push.view","POST /v1/admin/push/schedule/cancel":"push.manage","POST /v1/admin/push/send":"push.manage","POST /v1/admin/push/state":"push.view","POST /v1/admin/push/subscribe":"*","POST /v1/admin/push/test":"*","POST /v1/admin/push/unsubscribe":"*","POST /v1/admin/session/end":"*","POST /v1/admin/session/heartbeat":"*","POST /v1/admin/session/renew":"*","POST /v1/admin/session/resume":"*","POST /v1/admin/session/start":"*","POST /v1/admin/store/items":"store.edit","POST /v1/admin/store/items/:id/delete":"store.delete","POST /v1/admin/store/redemptions/:id/status":"store.approve","POST /v1/admin/store/schedule":"store.edit","POST /v1/admin/tools/admins":"accounts.view","POST /v1/admin/tools/fetch-media":"media.add","POST /v1/admin/tools/github":"system.view","POST /v1/admin/tools/live-stage":"content.edit","POST /v1/admin/tools/maps":"content.edit","POST /v1/admin/tools/media":"media.view","POST /v1/admin/tools/migrate":"system.manage","POST /v1/admin/tools/migration":"system.manage"};
+A.FN_PERMS = {"apiActivity":"activity.view","apiAddAdmin":"accounts.manage","apiAdminPushDevices":"*","apiAdminPushRemoveDevice":"*","apiAdminPushSubscribe":"*","apiAdminPushUnsubscribe":"*","apiAdmins":"accounts.view","apiAgeRules":"competitions.view","apiAgeRulesSave":"competitions.edit","apiBadges":"*","apiCheckGithub":"system.view","apiCheckMedia":"media.view","apiComp":"competitions.view","apiCompArchive":"competitions.edit","apiCompClose":"competitions.edit","apiCompCreate":"competitions.add","apiCompDelete":"competitions.delete","apiCompDuplicate":"competitions.add","apiCompExport":"exports.export","apiCompFinalize":"competitions.approve","apiCompGrade":"competitions.approve","apiCompGradeGroup":"competitions.approve","apiCompImportApply":"competitions.edit","apiCompImportPreview":"competitions.edit","apiCompPreviewDefinition":"competitions.view","apiCompPreviewGrade":"competitions.view","apiCompQuestionDelete":"competitions.delete","apiCompQuestionDuplicate":"competitions.edit","apiCompQuestionSave":"competitions.edit","apiCompQuestionsReorder":"competitions.edit","apiCompRegrade":"competitions.approve","apiCompResults":"competitions.view","apiCompReviewQueue":"competitions.view","apiCompSave":"competitions.edit","apiCompSettings":"competitions.edit","apiCompSubmission":"competitions.view","apiCompSubmissions":"competitions.view","apiCompVoid":"competitions.approve","apiComps":"competitions.view","apiDeleteContact":"content.delete","apiDeleteItem":"content.delete","apiDeleteLink":"content.delete","apiDeleteMedia":"media.delete","apiDeleteSection":"content.delete","apiDuplicateItem":"content.edit","apiEvent":"events.view","apiEventArchive":"events.edit","apiEventDelete":"events.delete","apiEventSave":"events.edit","apiEventSetEnabled":"events.edit","apiEvents":"events.view","apiFetchMediaUrl":"media.add","apiForgetDevice":"*","apiHeartbeat":"*","apiHomeOrder":"content.edit","apiImportApply":"content.edit","apiImportPreview":"content.edit","apiMediaLibrary":"media.view","apiMediaPreview":"media.view","apiMigrate":"system.manage","apiMoveContact":"content.edit","apiMoveLink":"content.edit","apiMoveSection":"content.edit","apiPage":"content.view","apiPageArchive":"content.edit","apiPageDelete":"content.delete","apiPageMediaDelete":"content.delete","apiPageMediaOrder":"content.edit","apiPageMediaSave":"content.edit","apiPagePreview":"content.view","apiPageSave":"content.edit","apiPageSetEnabled":"content.edit","apiPages":"content.view","apiParticipant":"participants.view","apiParticipantCode":"participants.edit","apiParticipantCodes":"participants.edit","apiParticipantResetCode":"participants.edit","apiParticipantSave":"participants.edit","apiParticipantSetActive":"participants.edit","apiParticipants":"participants.view","apiParticipantsAssign":"participants.edit","apiParticipantsImportApply":"participants.add","apiParticipantsImportPreview":"participants.add","apiParticipantsResetCodes":"participants.edit","apiParticipantsUndoImport":"participants.add","apiPayMethodsSave":"finance.manage","apiPlanMigration":"system.manage","apiPreview":"content.view","apiPublish":"publish.publish","apiPublishRefresh":"content.view","apiPurgeMedia":"media.delete","apiPushAuto":"push.manage","apiPushCheck":"push.view","apiPushSchedule":"push.view","apiPushScheduleCancel":"push.manage","apiPushState":"push.view","apiRemoveAdmin":"accounts.manage","apiResolveMapsUrl":"content.edit","apiRestoreMedia":"media.add","apiReview":"content.view","apiSaveContact":"content.edit","apiSaveItem":"content.edit","apiSaveLink":"content.edit","apiSaveSection":"content.edit","apiSaveSettings":"content.edit","apiSeasonClose":"competitions.approve","apiSeasonClosePreview":"competitions.view","apiSeasonSave":"competitions.edit","apiSeasons":"competitions.view","apiSendPush":"push.manage","apiServantDelete":"events.delete","apiServantPayApprove":"finance.manage","apiServantSave":"finance.manage","apiServantSetActive":"events.edit","apiServants":"events.view","apiSessionEnd":"*","apiSessionResume":"*","apiSessionStart":"*","apiSetAdminName":"*","apiSetItemArchived":"content.edit","apiSetItemEnabled":"content.edit","apiSetLinkEnabled":"content.edit","apiSetLiveStage":"content.edit","apiSetMediaAlt":"media.add","apiSetSectionEnabled":"content.edit","apiShopItemDelete":"store.delete","apiShopItemSave":"store.edit","apiShopItems":"store.view","apiShopRedemptionStatus":"store.approve","apiShopRedemptions":"store.view","apiShopSchedule":"store.view","apiShopScheduleSave":"store.edit","apiState":"*","apiTrustDevice":"*","apiUpdateMedia":"media.add","apiUploadMedia":"media.add","apiWallet":"points.view","apiWalletAdjust":"points.edit","apiWalletParticipant":"points.view","apiWalletSync":"points.edit","apiWorkerSession":"*"};
+A.OWN_SCOPE_ROUTES = ["POST /v1/admin/book/bookings"];
