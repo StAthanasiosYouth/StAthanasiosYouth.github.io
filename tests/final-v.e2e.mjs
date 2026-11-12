@@ -239,8 +239,8 @@ test('the scene gallery: a clip with «من» / «لحد» checked live, save bl
 
   const addFromLibrary = async kind => {
     await page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .gallery-picker button')].find(b => b.textContent.includes('زوّد')).click());
-    await page.waitForSelector('dialog.picker-dialog[open] .media-tile');
-    await page.evaluate(k => [...document.querySelectorAll('dialog.picker-dialog[open] .media-tile')].find(t => t.classList.contains('is-video') === (k === 'video')).click(), kind);
+    await page.waitForSelector('dialog.picker-dialog[open] .tile');
+    await page.evaluate(k => [...document.querySelectorAll('dialog.picker-dialog[open] .tile')].find(t => t.classList.contains('is-video') === (k === 'video')).click(), kind);
     await page.waitForFunction(() => !document.querySelector('dialog.picker-dialog'));
   };
   await addFromLibrary('image');
@@ -296,8 +296,8 @@ test('the scene gallery: a clip with «من» / «لحد» checked live, save bl
   await page.evaluate(() => A.editContact(A.state.draft.contacts.find(c => c.kind === 'support')));
   await page.waitForSelector('dialog.sheet[open] .picker--avatar');
   await page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .picker--avatar button')].find(b => b.textContent.includes('من المكتبة')).click());
-  await page.waitForSelector('dialog.picker-dialog[open] .media-tile');
-  assert.equal(await page.$$eval('dialog.picker-dialog[open] .media-tile.is-video', n => n.length), 0);
+  await page.waitForSelector('dialog.picker-dialog[open] .tile');
+  assert.equal(await page.$$eval('dialog.picker-dialog[open] .tile.is-video', n => n.length), 0);
   assert.deepEqual(problems, []);
   await close();
 });
