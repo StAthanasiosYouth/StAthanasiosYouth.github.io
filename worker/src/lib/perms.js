@@ -106,6 +106,7 @@ export const ROUTE_PERMS = Object.freeze({
   'POST /v1/admin/content/call': ANY_ADMIN,
   'POST /v1/admin/media/upload': ANY_ADMIN,
   'GET /v1/admin/content/media-status': 'system.view',
+  'GET /v1/admin/content/media/:id/file': 'media.view',
   'GET /v1/admin/content/review-input': 'content.view',
   'POST /v1/admin/proofs': 'bookings.edit',
   'GET /v1/admin/proofs/:id': 'bookings.view',

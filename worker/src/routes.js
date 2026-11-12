@@ -43,7 +43,7 @@ import { publishRevisions, publishRestore } from './publish-restore.js';
 import { syncContentImport, syncContentExport, syncContentNotify, adminDrafts, adminDraftsExport, adminDraftsStatus, adminReviewInput, IMPORT_MAX_BYTES } from './content/routes.js';
 import { adminContentCall, adminMediaUpload, MEDIA_UPLOAD_MAX_BYTES } from './content/runtime.js';
 import { syncCompSig } from './content/comps.js';
-import { syncMediaCopy, adminMediaStatus } from './content/media.js';
+import { syncMediaCopy, adminMediaStatus, adminMediaFile } from './content/media.js';
 import {
   adminParticipants, adminParticipantsReview, adminParticipantsExport, adminParticipantCreate, adminParticipant, adminParticipantProfile, adminParticipantEmail, adminParticipantPhone,
   adminParticipantDob, adminParticipantEligibility, adminParticipantViewPassword, adminParticipantResetPassword, adminParticipantBlock, adminParticipantUnblock, adminParticipantRevoke, adminParticipantAvatarDelete,
@@ -385,6 +385,7 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/admin/media/upload', auth: 'admin', needSession: true, maxBytes: MEDIA_UPLOAD_MAX_BYTES, handler: adminMediaUpload },
   { method: 'POST', path: '/v1/sync/media-copy', auth: 'sync', raw: true, maxBytes: MEDIA_UPLOAD_MAX_BYTES, handler: syncMediaCopy },
   { method: 'GET', path: '/v1/admin/content/media-status', auth: 'admin', handler: adminMediaStatus },
+  { method: 'GET', path: '/v1/admin/content/media/:id/file', auth: 'admin', handler: adminMediaFile },
   { method: 'GET', path: '/v1/admin/content/review-input', auth: 'admin', handler: adminReviewInput },
 
   // Phase 5 — youth accounts (account/routes.js, docs/YOUTH-ACCOUNTS-PLAN.md): off until accounts_mode = 'on'
