@@ -127,3 +127,8 @@
 - اختبارات: pages-admin 9/9، polish-b 14/14، admin.e2e (القديم بس)، fix-admin 7/7.
 - النشر: «الخدام» و«ترتيب الصفحة» على main (commit 7c600df)، محرر المقطع (commit 1b2b907). الرجوع: git revert 1b2b907 7c600df.
 - W3 خلص (B4 + B5) ما عدا servant-remove (مستني موافقة).
+
+## موافقة صاحب المشروع (2026-11-12) — servant-remove
+- موافق على «حذف خادم نهائي» زي servant-remove.png: الخادم يتشال من كل الفعاليات، أرقام الدفع تتمسح، الحجوزات والفلوس تتنقل لخادم تاني يتختار قبل الحذف، تأكيد بكتابة «احذف»، للأدمن الرئيسي بس، والسجل يفضل.
+- [x] servant-remove زي servant-remove.png (بموافقة صاحب المشروع 2026-11-12): «شيل الخادم…» في تحت محرر الخادم (للأدمن الرئيسي بس). النافذة: مربوط بكام فعالية، معاه كام حجز، ومعاه فلوس لسه متسلمتش ولا لأ (من الـWorker)، «انقل الحجوزات لـ» خادم تاني، واكتب «احذف». التنفيذ: الـWorker (POST /v1/admin/book/servants/:id/purge، الأدمن الرئيسي بس، { check } للأرقام) بينقل bookings وpayments وpayment_claims وhandovers للخادم التاني، بيمسح أرقامه من pay_dest، بيفك ربط أي أدمن بيه، وبيكتب في «سجل النشاط»؛ وبعدين apiServantDelete بيشيله من كل الفعاليات (مكانه وطرق دفعه للخادم التاني أو بتتدمج معاه) ومن فرق الصفحات، ويمسح صفه (وأرقام الدفع معاه)، وpayDestSync. ملحوظة: صفوف الدفع كانت append-only (بيتغير فيها voided_by بس)؛ هنا servant_id بيتغير بموافقة صاحب المشروع علشان الفلوس تتنقل، والاسم اللي اتسجلت بيه الدفعة بيفضل.
+- اختبارات servant-remove: worker/test/book-servant-purge.test.mjs، tests/pages-server.test.mjs («removed for good»)، pages-admin 10/10، worker 484/484، refine-b 18/18 (apiServantDelete في القايمة)، admin/boot.js CONTENT_FNS.

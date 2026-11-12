@@ -47,7 +47,7 @@ export const CONTENT_CALLS = new Set([
   'apiSaveContact', 'apiDeleteContact', 'apiMoveContact', 'apiSaveSettings',
   'apiSaveItem', 'apiDeleteItem', 'apiSetItemArchived', 'apiDuplicateItem', 'apiSetItemEnabled',
   'apiImportPreview', 'apiImportApply',
-  'apiHomeOrder', 'apiServants', 'apiServantSave', 'apiServantSetActive', 'apiPayMethodsSave', 'apiServantPayApprove',
+  'apiHomeOrder', 'apiServants', 'apiServantSave', 'apiServantSetActive', 'apiServantDelete', 'apiPayMethodsSave', 'apiServantPayApprove',
   'apiPages', 'apiPage', 'apiPageSave', 'apiPageSetEnabled', 'apiPageArchive', 'apiPageDelete',
   'apiPageMediaSave', 'apiPageMediaOrder', 'apiPageMediaDelete', 'apiPagePreview',
   'apiEvents', 'apiEvent', 'apiEventSave', 'apiEventSetEnabled', 'apiEventArchive', 'apiEventDelete',

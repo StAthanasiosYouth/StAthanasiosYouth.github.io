@@ -38,7 +38,7 @@ export const BUILD_CALLS = new Set(['apiReview', 'apiPreview', 'apiPublish']);
  * hence the same competitions' part as a review).
  */
 export const STATE_FREE = new Set([
-  'apiServants', 'apiServantSave', 'apiServantSetActive', 'apiPayMethodsSave', 'apiServantPayApprove',
+  'apiServants', 'apiServantSave', 'apiServantSetActive', 'apiServantDelete', 'apiPayMethodsSave', 'apiServantPayApprove',
   'apiPages', 'apiPage', 'apiPageSave', 'apiPageSetEnabled', 'apiPageArchive', 'apiPageDelete',
   'apiPageMediaSave', 'apiPageMediaOrder', 'apiPageMediaDelete', 'apiPagePreview',
   'apiEvents', 'apiEvent', 'apiEventSave', 'apiEventSetEnabled', 'apiEventArchive', 'apiEventDelete',
