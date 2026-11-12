@@ -21954,7 +21954,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       kv('من', entry.device || ''),
       kv('المرات', entry.count > 1 ? digits(entry.count) + ' مرات' : ''),
       kv('الإشعار', pushText(entry.notified)),
-      kv('نوع الصف', secure(entry) ? 'أمان (محمي سنة كاملة)' : 'عادي')));
+      kv('نوع الصف', secure(entry) ? 'أمان وصلاحيات' : 'عادي')));
 
     var refText = entry.ref || entry.id || '';
     var copy = el('button', { class: 'btn btn--sm btn--ghost sheet__del', type: 'button', disabled: refText ? null : true, onclick: function () {
@@ -22264,7 +22264,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var box = A.errorBox();
     var name = A.uid('logm');
     var tech = choice(name + 'r', 'tech', true, el('b', { text: 'الصفوف التقنية بس' }), el('small', { text: 'زي الإيصالات وفحص الطوابير: أكبر جزء من السجل ومحدش بيحتاجه' }));
-    var all = choice(name + 'r', 'all', false, el('b', { text: 'كل الصفوف' }), el('small', { text: 'ما عدا الأمان والصلاحيات من آخر سنة (محمية)' }));
+    var all = choice(name + 'r', 'all', false, el('b', { text: 'كل الصفوف' }), el('small', { text: 'كل حاجة في الفترة دي، حتى الأمان والصلاحيات' }));
     // owner 2026-11-12: any age (the Worker's MIN_DAYS is 0); «كله» = every row up to now
     var dayOpts = [['0', 'كله لحد دلوقتي'], ['30', 'أقدم من شهر'], ['90', 'أقدم من ٣ شهور'], ['180', 'أقدم من ٦ شهور'], ['365', 'أقدم من سنة'], ['date', 'لحد يوم…']];
     var picked = '180';
@@ -22346,7 +22346,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       }
       A.confirm({
         title: 'تمسح ' + digits(current.count) + ' صف من السجل؟',
-        message: 'المسح مش بيرجع. الأحسن تأرشفهم الأول. صفوف الأمان والصلاحيات من آخر سنة محمية، والمسح نفسه هيتسجل كصف واحد.',
+        message: 'المسح مش بيرجع، وبيشمل صفوف الأمان والصلاحيات كمان. الأحسن تأرشفهم الأول. المسح نفسه هيتسجل كصف واحد.',
         typed: 'امسح',
         confirmLabel: 'امسح الصفوف'
       }).then(function (ok) {
@@ -22363,7 +22363,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     A.openSheet('إدارة السجل', el('div', { class: 'form logm logm8' },
       box,
       el('div', { class: 'field' }, el('span', { class: 'field__label', text: 'الصفوف' }), el('div', { class: 'logm8__two' }, tech.node, all.node)),
-      el('div', { class: 'field' }, el('span', { class: 'field__label', text: 'الفترة' }), el('div', { class: 'logm8__period' }, seg, untilDate), el('span', { class: 'field__hint', text: 'أي صف من الفترة دي. صفوف الأمان والصلاحيات من آخر سنة بتفضل محمية.' })),
+      el('div', { class: 'field' }, el('span', { class: 'field__label', text: 'الفترة' }), el('div', { class: 'logm8__period' }, seg, untilDate), el('span', { class: 'field__hint', text: 'أي صف من الفترة دي، من غير أي صفوف محمية.' })),
       el('div', { class: 'field logm8__section' }, el('span', { class: 'field__label', text: 'القسم' }), section),
       el('div', { class: 'logm8__preview' }, el('div', {}, count, countLine), el('div', { class: 'logm8__bar' }, bar)),
       el('div', { class: 'logm8__two' }, archiveOpt.node, deleteOpt.node)
