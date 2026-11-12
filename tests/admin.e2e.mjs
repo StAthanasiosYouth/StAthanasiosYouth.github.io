@@ -582,9 +582,9 @@ test('any editor can choose an existing image «من المكتبة»', async ()
   await page.evaluate(() => A.editors.news(null));
   await page.waitForSelector('dialog.sheet[open] .picker');
   await page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .picker button')].find(b => b.textContent.includes('من المكتبة')).click());
-  await page.waitForSelector('dialog.picker-dialog[open] .media-tile');
+  await page.waitForSelector('dialog.picker-dialog[open] .tile');
   const chosen = await page.evaluate(() => {
-    const tile = document.querySelector('dialog.picker-dialog[open] .media-tile');
+    const tile = document.querySelector('dialog.picker-dialog[open] .tile');
     tile.click();
     return tile.getAttribute('aria-label');
   });
@@ -611,8 +611,8 @@ test('a section gets a colour and a banner from its editor', async () => {
   await page.waitForSelector('dialog.sheet[open] .swatches');
   await page.evaluate(() => document.querySelector('dialog.sheet[open] .swatch--emerald input').click());
   await page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .picker button')].find(b => b.textContent.includes('من المكتبة')).click());
-  await page.waitForSelector('dialog.picker-dialog[open] .media-tile');
-  await page.evaluate(() => document.querySelector('dialog.picker-dialog[open] .media-tile').click());
+  await page.waitForSelector('dialog.picker-dialog[open] .tile');
+  await page.evaluate(() => document.querySelector('dialog.picker-dialog[open] .tile').click());
   await page.waitForFunction(() => !document.querySelector('dialog.picker-dialog'));
   await page.evaluate(() => document.querySelector('dialog.sheet[open] .sheet__foot .btn--primary').click());
   await page.waitForFunction(() => !document.querySelector('dialog.sheet').open);

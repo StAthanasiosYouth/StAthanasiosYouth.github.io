@@ -170,8 +170,8 @@ async function pickImage(scopeSelector, label = '') {
     if (!pickers.length) throw new Error('no picker labelled ' + l);
     [...pickers[0].querySelectorAll('button')].find(b => b.textContent.includes('من المكتبة') || b.classList.contains('picker__lib')).click();
   }, scopeSelector, label);
-  await $('dialog.picker-dialog[open] .media-tile');
-  await d.page.evaluate(() => [...document.querySelectorAll('dialog.picker-dialog[open] .media-tile')].find(t => !t.classList.contains('is-video')).click());
+  await $('dialog.picker-dialog[open] .tile');
+  await d.page.evaluate(() => [...document.querySelectorAll('dialog.picker-dialog[open] .tile')].find(t => !t.classList.contains('is-video')).click());
   await d.page.waitForFunction(() => !document.querySelector('dialog.picker-dialog'));
 }
 
@@ -281,8 +281,8 @@ test('«صفحات الخدمة»: a new page with its cover, its video card; on
   await d.page.$eval('dialog.sheet[open] .sheet__body', n => { n.scrollTop = 0; });
   assert.match(await d.page.$eval('dialog.sheet[open] .gallery-picker', n => n.textContent), /لسه مفيش مقطع/, 'the card has its own empty words');
   await d.page.evaluate(() => [...document.querySelectorAll('dialog.sheet[open] .gallery-picker button')].find(b => b.textContent.includes('اختار مقطع من المكتبة')).click());
-  await $('dialog.picker-dialog[open] .media-tile.is-video');
-  await d.page.evaluate(() => document.querySelector('dialog.picker-dialog[open] .media-tile.is-video').click());
+  await $('dialog.picker-dialog[open] .tile.is-video');
+  await d.page.evaluate(() => document.querySelector('dialog.picker-dialog[open] .tile.is-video').click());
   await d.page.waitForFunction(() => !document.querySelector('dialog.picker-dialog'));
 
   // Phase 8B (svc-clip.png): the trimmer over the chosen clip

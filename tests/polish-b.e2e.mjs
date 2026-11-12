@@ -396,8 +396,8 @@ async function adminWorld() {
 }
 
 const pickFromLibrary = async (page, index) => {
-  await page.waitForSelector('dialog.picker-dialog[open] .media-tile');
-  await page.evaluate(i => document.querySelectorAll('dialog.picker-dialog[open] .media-tile')[i].click(), index);
+  await page.waitForSelector('dialog.picker-dialog[open] .tile');
+  await page.evaluate(i => document.querySelectorAll('dialog.picker-dialog[open] .tile')[i].click(), index);
   await page.waitForFunction(() => !document.querySelector('dialog.picker-dialog'));
 };
 

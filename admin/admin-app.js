@@ -10614,6 +10614,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       var items = library.items.filter(function (i) { return picked.has(i.id); });
       var free = items.filter(function (i) { return !i.usage.length && !i.deletedAt; });
       var used = items.length - free.length;
+      // «امسح نهائي»: anything not used anywhere (in the library or already in «المحذوفة»)
+      var purgeable = items.filter(function (i) { return !i.usage.length; });
       A.fill(bar,
         el('b', { class: 'pick-bar__n', text: items.length ? A.digits(items.length) + ' مختارة' : 'اختار من تحت' }),
         items.length ? el('small', { class: 'muted pick-bar__note', text: used ? A.digits(used) + ' مستخدمة أو محذوفة: مش هتتشال' : 'كلهم مش مستخدمين' }) : null,
@@ -10641,7 +10643,45 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
             }).catch(function (error) { A.fail(error); });
           });
         } }, icon('trash'), 'شيل المختارة'),
+        el('button', { class: 'btn btn--sm btn--danger', type: 'button', 'data-act': 'media-pick-purge', disabled: !purgeable.length || null, onclick: function (event) { purgeMany(event.currentTarget, purgeable, items.length - purgeable.length); } }, icon('trash'), 'امسح نهائي'),
         el('button', { class: 'btn btn--sm', type: 'button', 'data-act': 'media-pick-done', onclick: function () { setPicking(false); } }, 'خلّص الاختيار'));
+    }
+
+    /* the selected files gone for good, in one go: the used ones skipped (and said so), a typed «امسح» first */
+    function purgeMany(button, list, skipped) {
+      var names = el('ul', { class: 'purge-list' }, list.slice(0, 30).map(function (i) {
+        return el('li', {}, el('b', { text: i.name || i.alt || 'من غير اسم' }), el('small', { text: ' · ' + sizeLine(i) }));
+      }), list.length > 30 ? el('li', { class: 'muted', text: 'و' + A.digits(list.length - 30) + ' كمان' }) : null);
+      A.confirm({
+        tone: 'danger',
+        title: 'تمسح ' + A.digits(list.length) + ' نهائي؟',
+        message: 'دول هيتمسحوا ومش هيرجعوا تاني.' + (skipped ? ' ' + A.digits(skipped) + ' مستخدمين في أماكن: مش هيتمسحوا.' : '') + ' لو حاجة منهم اتنشرت قبل كده، الملف اللي على الموقع هيفضل علشان اللينكات القديمة.',
+        body: names,
+        typed: 'امسح',
+        confirmLabel: 'امسح نهائي',
+        cancelLabel: 'لأ'
+      }).then(function (ok) {
+        if (!ok) return;
+        var done = 0;
+        var failed = [];
+        var last = null;
+        var chain = list.reduce(function (p, item) {
+          return p.then(function () {
+            var step = item.deletedAt ? Promise.resolve() : A.call('apiDeleteMedia', item.id);
+            return step.then(function () { return A.call('apiPurgeMedia', item.id); })
+              .then(function (state) { done++; if (state) last = state; })
+              .catch(function (error) { failed.push((item.name || item.id) + ': ' + ((error && error.message) || 'ما اتمسحش')); });
+          });
+        }, Promise.resolve());
+        A.withBusy(button, chain).then(function () {
+          A.invalidateLibrary();
+          if (last) A.applyState(last);
+          picked.clear();
+          load(true).then(draw).catch(function () {});
+          if (failed.length) A.fail(new Error('اتمسح ' + A.digits(done) + '، و' + A.digits(failed.length) + ' ما اتمسحوش: ' + failed.slice(0, 3).join(' — ')));
+          else A.toast('اتمسحوا نهائي: ' + A.digits(done) + (skipped ? ' (' + A.digits(skipped) + ' مستخدمين فضلوا)' : ''));
+        });
+      });
     }
 
     function empty() {
@@ -10917,9 +10957,20 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     return new Promise(function (resolve) {
 
-      var dialog = el('dialog', { class: 'modal modal--wide picker-dialog', 'aria-label': sounds ? 'اختار ملف صوت من المكتبة' : videos ? 'اختار صورة أو فيديو من المكتبة' : 'اختار صورة من المكتبة' });
-      var body = el('div', { class: 'picker-dialog__body' }, skeletonGrid());
-      var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر…', 'aria-label': 'دوّر في الصور' });
+      // Phase 8B: the library's own look (media-select.png): tiles, a type filter, the search, the chosen one ticked
+      var dialog = el('dialog', { class: 'modal modal--wide picker-dialog picker8 media8', 'aria-label': sounds ? 'اختار ملف صوت من المكتبة' : videos ? 'اختار صورة أو فيديو من المكتبة' : 'اختار صورة من المكتبة' });
+      var body = el('div', { class: 'picker-dialog__body media8-body' }, skeletonGrid());
+      var search = el('input', { class: 'p8-search__input', type: 'search', placeholder: 'دوّر بالاسم أو الوصف…', 'aria-label': 'دوّر في المكتبة' });
+      var kind = 'all';
+      var shownN = 24;
+      var fname = A.uid('pickf');
+      var kinds = sounds ? [] : [['all', 'الكل'], ['images', 'صور']].concat(videos ? [['videos', 'فيديوهات']] : []).concat([['unused', 'مش مستخدمة']]);
+      var chips = kinds.length ? el('div', { class: 'seg p8-filter media8-filter', role: 'radiogroup', 'aria-label': 'النوع' }, kinds.map(function (k) {
+        return el('label', { class: 'seg__opt' },
+          el('input', { type: 'radio', name: fname, value: k[0], checked: k[0] === kind, onchange: function () { kind = k[0]; shownN = 24; draw(); } }),
+          el('span', { text: k[1] }));
+      })) : null;
+      var count = el('small', { class: 'picker8__count muted' });
       var done = false;
 
       function close(value) {
@@ -10932,22 +10983,50 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
       function draw() {
         var query = search.value.trim();
-        var items = library.items.filter(function (item) { return (sounds ? isAudio(item) : !isAudio(item) && (videos || !isVideo(item))) && matches(item, 'all', query); });
-        body.replaceChildren(grid(items, function (item) { close(item.id); }, currentId));
+        var items = library.items.filter(function (item) {
+          if (item.deletedAt) return false;
+          if (sounds ? !isAudio(item) : isAudio(item) || (!videos && isVideo(item))) return false;
+          if (kind === 'images' && (isVideo(item) || isAudio(item))) return false;
+          if (kind === 'videos' && !isVideo(item)) return false;
+          if (kind === 'unused' && item.usage.length) return false;
+          return matches(item, 'all', query);
+        });
+        // the chosen one first, so it is seen
+        items.sort(function (a, b) { return (b.id === currentId) - (a.id === currentId); });
+        count.textContent = A.digits(items.length) + (sounds ? ' ملف' : ' في المكتبة');
+        if (!items.length) {
+          body.replaceChildren(el('div', { class: 'media8-drop media8-empty' }, icon(sounds ? 'music' : 'photos'),
+            el('b', { text: 'مفيش حاجة هنا' }), el('small', { text: query ? 'جرّب كلمة تانية أو غيّر النوع.' : 'ارفع من زرار الرفع في المحرر، أو من «الصور والملفات».' })));
+          return;
+        }
+        var page = items.slice(0, shownN);
+        body.replaceChildren(
+          el('div', { class: 'tiles media8-tiles picker8__tiles' }, page.map(function (item) {
+            var node = tile8(item, function () { close(item.id); }, true, item.id === currentId);
+            node.setAttribute('aria-label', 'اختار: ' + node.getAttribute('aria-label') + (item.id === currentId ? ' (المختارة دلوقتي)' : ''));
+            node.removeAttribute('aria-pressed');
+            return node;
+          })),
+          items.length > shownN ? el('button', { class: 'btn btn--ghost btn--block media8-more', type: 'button', onclick: function () { shownN += 24; draw(); } }, 'اعرض كمان (' + A.digits(items.length - shownN) + ')') : '');
       }
 
       dialog.append(
-        el('div', { class: 'picker-dialog__head' },
-          el('h2', { class: 'modal__title', text: 'اختار من المكتبة' }),
+        el('div', { class: 'picker-dialog__head picker8__head' },
+          el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(sounds ? 'music' : 'photos')),
+          el('div', { class: 'picker8__titles' },
+            el('h2', { class: 'modal__title', text: 'اختار من المكتبة' }),
+            count),
           el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: function () { close(null); } }, icon('close'))
         ),
-        search,
+        el('div', { class: 'picker8__tools' },
+          chips,
+          el('label', { class: 'p8-search picker8__search' }, icon('search'), search)),
         body
       );
 
       dialog.addEventListener('cancel', function (event) { event.preventDefault(); close(null); });
       dialog.addEventListener('click', function (event) { if (event.target === dialog) close(null); });
-      search.addEventListener('input', function () { if (library) draw(); });
+      search.addEventListener('input', function () { shownN = 24; if (library) draw(); });
 
       document.body.appendChild(dialog);
       dialog.showModal();
