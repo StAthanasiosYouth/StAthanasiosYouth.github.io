@@ -1682,7 +1682,7 @@
 
     var media = (A.state.draft.media || []).filter(function (m) { return m.id === id; })[0];
 
-    if (!media || !media.publishedAt || !A.state.config.siteUrl || !/^media\/\d{4}\/vid-[a-z0-9]{8}\.(mp4|webm)$/.test(media.path || '')) {
+    if (!media || !/^media\/\d{4}\/vid-[a-z0-9]{8}\.(mp4|webm)$/.test(media.path || '')) {
       return Promise.resolve(null);
     }
 
@@ -1704,11 +1704,69 @@
         video.muted = true;
         video.addEventListener('loadedmetadata', function () { finish(isFinite(video.duration) ? video.duration : null); });
         video.addEventListener('error', function () { finish(null); });
-        video.src = A.state.config.siteUrl.replace(/\/?$/, '/') + media.path;
+        A.playMedia(video, id).then(function (url) { if (!url) finish(null); }, function () { finish(null); });
       });
     }
 
     return A.durationCache[id];
+
+  };
+
+  /*
+   * A library file the admin can PLAY (a video / a sound), published or not:
+   * the copy from this session's own upload (A.localMedia), else the live site
+   * (published), else the Worker's copy (R2: GET /v1/admin/content/media/:id/file).
+   * A.mediaFile(id, { worker: true }) skips the site (its copy not there yet).
+   */
+  A.localMedia = A.localMedia || {};
+  var workerFiles = {};
+
+  A.mediaFile = function (id, opts) {
+
+    if (A.localMedia[id]) return Promise.resolve(A.localMedia[id]);
+    var media = (A.state.draft.media || []).filter(function (m) { return m.id === id; })[0];
+    var site = A.state.config && A.state.config.siteUrl ? A.state.config.siteUrl.replace(/\/?$/, '/') : '';
+    if (!(opts && opts.worker) && media && media.publishedAt && site && media.path) return Promise.resolve(site + media.path);
+    if (!window.AdminWorker || !window.AdminWorker.blob) return Promise.resolve('');
+    if (!workerFiles[id]) {
+      workerFiles[id] = window.AdminWorker.blob('/v1/admin/content/media/' + encodeURIComponent(id) + '/file').then(function (blob) {
+        return blob && blob.size ? URL.createObjectURL(blob) : '';
+      });
+      workerFiles[id].catch(function () { delete workerFiles[id]; });
+    }
+    return workerFiles[id].catch(function () { return ''; });
+
+  };
+
+  /* point a <video>/<audio> at a library file; the site's copy failing (Pages not there yet) → the Worker's */
+  A.playMedia = function (player, id) {
+
+    player.dataset.media = id;
+    return A.mediaFile(id).then(function (url) {
+      if (player.dataset.media !== id) return '';
+      if (!url) return '';
+      if (/^https?:/.test(url)) {
+        player.addEventListener('error', function retry() {
+          player.removeEventListener('error', retry);
+          if (player.dataset.media !== id) return;
+          A.mediaFile(id, { worker: true }).then(function (u) { if (u && player.dataset.media === id) { player.src = u; player.load(); } });
+        });
+      }
+      player.src = url;
+      return url;
+    });
+
+  };
+
+  /* the bytes of a fresh upload (base64) as a playable local copy */
+  A.keepLocalMedia = function (id, b64, mime) {
+
+    try {
+      var bin = atob(b64);
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      A.localMedia[id] = URL.createObjectURL(new Blob([bytes], { type: mime || 'video/mp4' }));
+    } catch (e) {}
 
   };
 
@@ -2142,6 +2200,7 @@
 
       return A.call('apiUploadMedia', payload).then(function (result) {
         if (video && result && result.media && result.media.id) A.videoDurations[result.media.id] = prepared.duration;
+        if (video && result && result.media && result.media.id && prepared.video) A.keepLocalMedia(result.media.id, prepared.video, prepared.mime);
         if (!result || !result.media || !result.media.id || !result.state) {
           throw imageError('الرفع خلص بس الرد رجع ناقص.', 'جرّب تاني.', JSON.stringify(result || null).slice(0, 200));
         }

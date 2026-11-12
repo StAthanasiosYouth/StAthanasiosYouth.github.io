@@ -1087,7 +1087,7 @@
       if (which === 'a') write(video.currentTime, Math.max(t.b, video.currentTime + 0.5)); else write(t.a, video.currentTime);
     }
     function playPart() {
-      if (!state.video) { A.toast('الفيديو بيشتغل هنا بعد ما يتنشر — «من» و«لحد» محفوظين', 'info'); return; }
+      if (!state.video) { A.toast('الفيديو مش جاهز يتشغل هنا دلوقتي — «من» و«لحد» محفوظين', 'info'); return; }
       var t = bounds();
       video.muted = false;
       video.currentTime = t.a;
@@ -1165,11 +1165,15 @@
         state.id = id;
         state.duration = A.videoDurations[id] || 0;
         var media = (A.state.draft.media || []).filter(function (m) { return m.id === id; })[0];
-        var site = A.state.config && A.state.config.siteUrl ? A.state.config.siteUrl.replace(/\/?$/, '/') : '';
-        state.video = media && media.publishedAt && site && media.path ? site + media.path : null;
+        // published or not: the site's copy, this session's upload, or the Worker's (R2)
+        state.video = media && media.path ? id : null;
         video.hidden = !state.video;
         poster.hidden = !!state.video;
-        if (state.video) video.src = state.video; else video.removeAttribute('src');
+        video.removeAttribute('src');
+        if (state.video) A.playMedia(video, id).then(function (url) {
+          if (state.id !== id) return;
+          if (!url) { state.video = null; video.hidden = true; poster.hidden = false; note.textContent = 'الفيديو مش جاهز يتشغل هنا دلوقتي: «من» و«لحد» بيتحفظوا عادي.'; note.hidden = false; }
+        });
         A.mediaPreview(id).then(function (src) {
           if (!src) return;
           poster.src = src;

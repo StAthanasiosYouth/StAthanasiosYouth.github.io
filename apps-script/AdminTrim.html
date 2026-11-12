@@ -582,7 +582,9 @@
       var errorBox = el('div', { class: 'upload-error', role: 'alert', hidden: true });
 
       var video = el('video', { class: 'trim__video p8-trim__video', playsinline: '', preload: 'auto', 'aria-label': 'معاينة الفيديو' });
-      video.muted = true;
+      // the preview plays WITH its sound (the admin's own play tap is the gesture)
+      video.muted = false;
+      video.volume = 1;
       var noPreview = el('p', { class: 'note', hidden: true, text: 'المعاينة مش شغالة للفيديو ده في المتصفح، بس تقدر تكتب الأوقات بالأرقام.' });
       var play = el('button', { class: 'p8-trim__play trim__play', type: 'button', 'aria-label': 'شغّل' }, icon('play'));
       var clock = el('span', { class: 'p8-trim__t mono', text: '0:00.0 / —' });
@@ -818,7 +820,7 @@
         paintHead();
       });
       video.addEventListener('loadedmetadata', function () { paint(); });
-      video.addEventListener('loadeddata', function () { drawFilm(); }, { once: true });
+      video.addEventListener('loadeddata', function () { drawFilm(); if (!video.currentTime && video.paused) video.currentTime = 0.05; }, { once: true });
       video.addEventListener('error', function () {
         noPreview.hidden = false;
         video.hidden = true;
