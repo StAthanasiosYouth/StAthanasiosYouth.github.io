@@ -3955,7 +3955,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       { key: 'activities', label: 'الفعاليات' },
       // the cards of «خدماتنا» (a service page's own card follows it: AdminPages)
       { key: 'services', label: 'كروت خدماتنا' },
-      { key: 'notifications', label: 'الإشعارات' }
+      { key: 'notifications', label: 'الإشعارات' },
+      // Phase 8B (push.png): sending a bell item to the phones (AdminPush.html)
+      { key: 'push', label: 'إشعارات الموبايل' }
     ] },
     // «المسابقات» (AdminComp*.html, docs/COMPETITIONS.md): the competitions themselves; short: the phone dock's word
     { key: 'comps', label: 'المسابقات', short: 'مسابقات', icon: 'trophy', group: 'main', subs: [
@@ -10494,9 +10496,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }));
 
     // the drop zone: a picked or dropped file goes to the same uploader (pictures shrink, a video opens the trimmer)
-    var drop = el('div', { class: 'media8-drop', role: 'button', tabindex: '0', 'aria-label': 'اسحب صور أو فيديو هنا، أو دوس علشان تختار',
-      onclick: function () { upload.choose(); },
-      onkeydown: function (event) { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); upload.choose(); } } },
+    // (a mouse target only: keyboards have the head's «رفع صورة أو فيديو»; «أو من رابط» inside is its own button)
+    var drop = el('div', { class: 'media8-drop', onclick: function () { upload.choose(); } },
       icon('upload'),
       el('b', { text: 'اسحب صور أو فيديو هنا' }),
       el('small', {}, 'الفيديو (حتى لو كبير جدًا): بتختار منه جزء من ثانية لـ ٣٠ ثانية، والمقطع بس هو اللي بيترفع',
@@ -21142,92 +21143,57 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   }
 
-  function loading() {
+  /* =======================================================
+     THE PAGE (Phase 8B push.png): «المحتوى ← إشعارات الموبايل»
+  ======================================================= */
 
-    A.openSheet('إشعارات الموبايل', [
-      el('p', { class: 'loading-text', role: 'status' }, el('span', { class: 'spinner spinner--inline', 'aria-hidden': 'true' }), 'بنجيب الإشعارات الظاهرة على الموقع…')
-    ], [el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })]);
+  var lastState = null;
+
+  /* the old entry points (the bell editor, «تم النشر ✓», «حالة النظام») land on the page */
+  function open() {
+
+    if (A.area === 'content' && A.sub && A.sub.content === 'push') { A.render(); return Promise.resolve(true); }
+    return A.go('content', 'push');
 
   }
 
-  /* =======================================================
-     THE LIST
-  ======================================================= */
+  A.views.push = function () {
 
-  function open() {
+    var box = A.errorBox();
+    var root = el('div', { class: 'push8' }, lastState ? null : el('p', { class: 'skeleton skeleton--line' }));
 
-    loading();
+    function draw(state) {
+      lastState = state;
+      A.fill(root, page(state, box));
+    }
 
-    return A.call('apiPushState').then(renderList).catch(function (error) {
-      var box = A.errorBox();
-      A.openSheet('إشعارات الموبايل', [box], [
-        el('button', { class: 'btn btn--primary', type: 'button', onclick: open }, icon('retry'), 'جرّب تاني'),
-        el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })
-      ]);
+    if (lastState) draw(lastState);
+    A.call('apiPushState').then(function (state) { if (root.isConnected || !lastState) draw(state); }).catch(function (error) {
+      A.fill(root, box, el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { A.render(); } }, icon('retry'), 'جرّب تاني'));
       A.fail(error, box);
     });
 
+    return [root];
+
+  };
+
+  function kpi(iconName, label, value) {
+
+    return el('div', { class: 'kpi' }, el('small', {}, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon(iconName)), label), el('b', { text: value }));
+
   }
 
-  function renderList(state) {
+  function page(state, box) {
 
     var p = state.platforms || {};
-    var parts = [];
-    if (p.android) parts.push('أندرويد ' + p.android);
-    if (p.ios) parts.push('آيفون ' + p.ios);
-    if (p.desktop) parts.push('كمبيوتر ' + p.desktop);
-    if (p.other) parts.push('تاني ' + p.other);
-
     var live = state.candidates.filter(function (c) { return c.state === 'live'; });
     var later = state.candidates.filter(function (c) { return c.state === 'scheduled'; });
     var blocked = !state.configured || !state.subscribers;
-    var box = A.errorBox();
-    var body = [];
+    var others = [];
+    if (p.desktop) others.push('كمبيوتر ' + A.digits(p.desktop));
+    if (p.other) others.push('تاني ' + A.digits(p.other));
 
-    body.push(el('div', { class: 'push-summary' },
-      el('span', { class: 'push-summary__count', text: String(state.subscribers) }),
-      el('span', {},
-        el('strong', { text: 'مشترك في الإشعارات' }),
-        el('small', { text: parts.length ? parts.join(' · ') : 'لسه محدش فعّلها. الزرار في جرس الموقع 🔔' })
-      )
-    ));
-
-    if (!state.configured) {
-      body.push(el('div', { class: 'note note--warn' },
-        el('p', { class: 'note__title', text: 'إشعارات الموبايل لسه مش متظبطة' }),
-        // the Worker names what is wrong (push/fcm.js); Apps Script's own answer has no hint
-        el('p', { text: state.configHint || 'FCM_SERVICE_ACCOUNT ناقص أو مش صحيح في Script Properties (docs/ADMIN-SETUP.md).' })));
-    }
-
-    if (state.contentError) {
-      body.push(el('div', { class: 'note note--warn', text: state.contentError }));
-    }
-
-    body.push(el('p', { class: 'note', text: 'كل إشعار بيتبعت مرة واحدة بس. الحد ' + state.limits.perDay + ' في اليوم (اتبعت النهارده ' + state.limits.sentToday + ')، ودقيقة بين كل واحد والتاني. الإشعارات القليلة المهمة بتخلي الناس تسيبها شغالة.' }));
-
-    body.push(el('p', { class: 'section-label', text: 'ظاهرة على الموقع دلوقتي (' + live.length + ')' }));
-    body.push(live.length
-      ? el('ul', { class: 'list' }, live.map(function (c) { return row(c, blocked); }))
-      : el('p', { class: 'empty', text: 'مفيش إشعارات ظاهرة في الجرس دلوقتي. اعمل إشعار في «الإشعارات» وانشر.' }));
-
-    if (later.length) {
-      body.push(el('p', { class: 'section-label', text: 'هتظهر بعدين (' + later.length + ')' }));
-      body.push(el('ul', { class: 'list' }, later.map(function (c) { return row(c, true); })));
-    }
-
-    if (state.log.length) {
-      body.push(el('p', { class: 'section-label', text: 'آخر الإرسالات' }));
-      body.push(el('ul', { class: 'push-log' }, state.log.map(function (entry) {
-        return el('li', {},
-          el('span', { class: 'push-log__title', text: entry.title || entry.notifId }),
-          el('span', { class: 'push-log__meta', text: (STATUS[entry.status] || entry.status) + ' · ' + entry.sent + ' من ' + entry.audience + (entry.removed ? ' · اتشال ' + entry.removed + ' قديم' : '') + ' · ' + when(entry.at) })
-        );
-      })));
-    }
-
-    body.push(box);
-
-    var check = el('button', { class: 'btn', type: 'button' }, icon('check'), 'اختبر الإعداد');
+    var check = el('button', { class: 'btn btn--sm', type: 'button' }, icon('check'), 'اختبر الإعداد');
     check.addEventListener('click', function () {
       box.hidden = true;
       A.withBusy(check, A.call('apiPushCheck')).then(function (result) {
@@ -21235,31 +21201,69 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       }).catch(function (error) { A.fail(error, box); });
     });
 
-    A.openSheet('إشعارات الموبايل', body, [
-      check,
-      el('button', { class: 'btn btn--ghost', type: 'button', text: 'قفل', onclick: function () { A.closeSheet(); } })
-    ]);
-
     function row(c, disabled) {
-      var chips = [];
       var done = c.last && c.last.status === 'sent';
-      if (c.state === 'scheduled') chips.push(A.chip('متاح من ' + A.formatWall(c.publishAt, true)));
-      if (c.last) chips.push(A.chip((STATUS[c.last.status] || c.last.status) + (done ? ' لـ ' + c.last.sent : ''), done ? 'ok' : 'danger'));
-      if (c.message.image) chips.push(A.chip('فيها صورة'));
-      var send = el('button', { class: 'btn btn--primary btn--small', type: 'button', disabled: disabled || done, onclick: function () { preview(c, state); } }, icon('send'), done ? 'اتبعت' : 'إرسال');
-      return A.listItem({
-        icon: TYPE_ICONS[c.type] || 'bell',
-        title: c.message.title,
-        sub: (c.message.body ? c.message.body + ' — ' : '') + 'بيفتح: ' + destination(c.message.url),
-        chips: chips,
-        controls: [el('span', { class: 'spacer' }), send]
-      });
+      var line = [];
+      if (c.state === 'scheduled') line.push('متاح من ' + A.formatWall(c.publishAt, true));
+      else if (c.expireAt) line.push('متاح لحد ' + A.formatWall(c.expireAt, false));
+      line.push('بيفتح ' + destination(c.message.url));
+      var tag = c.last
+        ? el('span', { class: 'p8-tag ' + (done ? 'p8-tag--ok' : 'p8-tag--danger') }, done ? icon('check') : null, done ? 'اتبعت' : (STATUS[c.last.status] || c.last.status))
+        : null;
+      var send = done ? null : el('button', { class: 'btn btn--sm btn--primary', type: 'button', disabled: disabled || null, 'aria-label': 'ابعت: ' + c.message.title, onclick: function () { preview(c, state); } }, icon('send'), 'ابعت');
+      return el('li', { class: 'p8-item item push8__row' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(TYPE_ICONS[c.type] || 'bell')),
+        el('div', { class: 'p8-item__main' },
+          el('b', { class: 'p8-item__line' }, el('span', { class: 'item__title', text: c.message.title })),
+          el('small', { text: line.join(' · ') }),
+          c.message.image ? el('div', { class: 'p8-item__tags' }, el('span', { class: 'p8-tag', text: 'فيها صورة' })) : null),
+        el('div', { class: 'p8-item__acts' }, tag, send));
     }
+
+    var main = el('section', { class: 'card p8-card push8__live' },
+      el('div', { class: 'p8-card__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('bell')),
+        el('div', { class: 'p8-card__titles' },
+          el('h2', { class: 'card__title', text: 'ظاهرة على الموقع دلوقتي (' + A.digits(live.length) + ')' }),
+          el('p', { class: 'card__hint', text: 'اختار إشعار من الجرس وابعته للموبايلات. كل إشعار بيتبعت مرة واحدة بس.' }))),
+      !state.configured ? el('div', { class: 'note note--warn' },
+        el('p', { class: 'note__title', text: 'إشعارات الموبايل لسه مش متظبطة' }),
+        // the Worker names what is wrong (push/fcm.js); Apps Script's own answer has no hint
+        el('p', { text: state.configHint || 'FCM_SERVICE_ACCOUNT ناقص أو مش صحيح في Script Properties (docs/ADMIN-SETUP.md).' })) : null,
+      state.contentError ? el('div', { class: 'note note--warn', text: state.contentError }) : null,
+      live.length
+        ? el('ul', { class: 'p8-list list' }, live.map(function (c) { return row(c, blocked); }))
+        : el('div', { class: 'p8-empty' }, el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('bell')), el('b', { text: 'مفيش إشعارات ظاهرة في الجرس دلوقتي' }), el('small', { text: 'اعمل إشعار في «الإشعارات» وانشر.' })),
+      later.length ? el('p', { class: 'push8__h', text: 'هتظهر بعدين (' + A.digits(later.length) + ')' }) : null,
+      later.length ? el('ul', { class: 'p8-list list' }, later.map(function (c) { return row(c, true); })) : null,
+      el('div', { class: 'push8__limit' }, icon('info'), 'الحد ' + A.digits(state.limits.perDay) + ' في اليوم، ودقيقة بين كل واحد والتاني. الإشعارات القليلة المهمة بتخلي الناس تسيبها شغالة.'),
+      box);
+
+    var log = el('section', { class: 'card p8-card push8__log' },
+      el('div', { class: 'p8-card__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('clock')),
+        el('div', { class: 'p8-card__titles' }, el('h2', { class: 'card__title', text: 'آخر الإرسالات' }))),
+      state.log.length ? el('ul', { class: 'push8__sends push-log' }, state.log.map(function (entry) {
+        return el('li', { class: entry.status === 'sent' ? 'is-ok' : entry.status === 'sending' ? 'is-busy' : 'is-bad' },
+          el('b', { class: 'push-log__title', text: entry.title || entry.notifId }),
+          el('small', { class: 'push-log__meta', text: [when(entry.at), (STATUS[entry.status] || entry.status) === STATUS.sent ? 'وصل لـ ' + A.digits(entry.sent) + ' من ' + A.digits(entry.audience) + ' أجهزة' : (STATUS[entry.status] || entry.status) + ' · ' + A.digits(entry.sent) + ' من ' + A.digits(entry.audience), entry.removed ? A.digits(entry.removed) + ' جهاز اتشال قديم' : ''].filter(Boolean).join(' · ') }));
+      })) : el('p', { class: 'muted push8__none', text: 'لسه مفيش إرسالات.' }),
+      el('div', { class: 'push8__check' }, check));
+
+    return [
+      el('div', { class: 'push8__kpis' },
+        kpi('users', 'مشتركين', A.digits(state.subscribers)),
+        kpi('device', 'أندرويد', A.digits(p.android || 0)),
+        kpi('device', 'آيفون', A.digits(p.ios || 0)),
+        kpi('send', 'اتبعت النهارده', A.digits(state.limits.sentToday) + ' من ' + A.digits(state.limits.perDay))),
+      others.length ? el('p', { class: 'muted push8__others', text: 'كمان: ' + others.join(' · ') }) : null,
+      el('div', { class: 'push8__cols' }, main, log)
+    ];
 
   }
 
   /* =======================================================
-     PREVIEW + SEND
+     SEND (push-send.png): the fields, the phone, «ابعت دلوقتي»
   ======================================================= */
 
   function preview(c, state) {
@@ -21267,75 +21271,75 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var key = sendKey();
     var base = siteBase();
     var box = A.errorBox();
-    var title = el('input', { class: 'input', type: 'text', value: c.message.title, maxlength: state.limits.titleMax });
-    var text = el('textarea', { class: 'input', rows: 3, maxlength: state.limits.bodyMax });
-    text.value = c.message.body || '';
-    var withImage = c.message.image ? el('input', { type: 'checkbox', role: 'switch', checked: true }) : null;
+    var title = A.counted('العنوان', c.message.title, state.limits.titleMax, 'للإشعار ده بس — إشعار الجرس زي ما هو');
+    var text = A.counted('الكلام', c.message.body || '', state.limits.bodyMax, null, { multiline: true, rows: 4 });
+    var withImage = c.message.image ? el('input', { type: 'checkbox', role: 'switch', checked: true, 'aria-label': 'ابعت الصورة' }) : null;
 
     var phoneTitle = el('strong', { class: 'push-phone__title' });
     var phoneText = el('span', { class: 'push-phone__text' });
     var phoneImage = c.message.image && base ? el('img', { class: 'push-phone__image', src: base + c.message.image.replace(/^\//, ''), alt: '' }) : null;
+    var now = new Date();
+    var clock = el('div', { class: 'push8-phone__clock', text: A.digits(((now.getHours() % 12) || 12) + ':' + ('0' + now.getMinutes()).slice(-2)) });
 
     function sync() {
-      phoneTitle.textContent = title.value.trim() || c.message.title;
-      phoneText.textContent = text.value.trim();
-      phoneText.hidden = !text.value.trim();
+      phoneTitle.textContent = title.input.value.trim() || c.message.title;
+      phoneText.textContent = text.input.value.trim();
+      phoneText.hidden = !text.input.value.trim();
       if (phoneImage) phoneImage.hidden = !withImage.checked;
     }
 
-    title.addEventListener('input', sync);
-    text.addEventListener('input', sync);
+    title.input.addEventListener('input', sync);
+    text.input.addEventListener('input', sync);
     if (withImage) withImage.addEventListener('change', sync);
     sync();
 
-    var phone = el('div', { class: 'push-phone', 'aria-label': 'شكل الإشعار على الموبايل' },
-      el('div', { class: 'push-phone__head' },
-        base ? el('img', { class: 'push-phone__icon', src: base + 'assets/img/icon-192.png', alt: '' }) : null,
-        el('span', { text: 'أسرة البابا أثناسيوس - سفاجا · دلوقتي' })
-      ),
-      phoneTitle,
-      phoneText,
-      phoneImage
-    );
+    var phone = el('div', { class: 'push8-phone', 'aria-label': 'شكل الإشعار على الموبايل' },
+      clock,
+      el('div', { class: 'push-phone' },
+        el('div', { class: 'push-phone__head' },
+          base ? el('img', { class: 'push-phone__icon', src: base + 'assets/img/icon-192.png', alt: '' }) : null,
+          el('span', { text: 'أسرة البابا أثناسيوس - سفاجا · دلوقتي' })),
+        phoneTitle,
+        phoneText,
+        phoneImage));
 
-    var send = el('button', { class: 'btn btn--primary', type: 'button' }, icon('send'), 'إرسال الآن');
+    var picture = el('div', { class: 'field' },
+      el('span', { class: 'field__label', text: 'الصورة (بتظهر على أندرويد)' }),
+      withImage
+        ? el('label', { class: 'push8__pic' }, phoneImage ? el('img', { src: phoneImage.src, alt: '' }) : icon('photos'), el('span', { text: 'صورة الإشعار' }), el('span', { class: 'sp' }), el('span', { class: 'switch' }, withImage, el('span', { class: 'switch__track', 'aria-hidden': 'true' })))
+        : el('div', { class: 'push8__pic is-empty' }, icon('photos'), el('span', { text: 'الإشعار ده من غير صورة (الصورة بتيجي من إشعار الجرس)' })));
+
+    var opens = el('div', { class: 'field' },
+      el('span', { class: 'field__label', text: 'لما يدوسوا عليه' }),
+      el('div', { class: 'push8__opens' }, icon('grid'), el('span', { text: 'بيفتح ' + destination(c.message.url) + ' على الموقع' })));
+
+    var left = Math.max(0, (state.limits.perDay || 0) - (state.limits.sentToday || 0));
+    var send = el('button', { class: 'btn btn--primary', type: 'button' }, icon('send'), 'ابعت دلوقتي');
+    var cancel = el('button', { class: 'btn btn--ghost', type: 'button', text: 'لأ، استنى', onclick: function () { A.closeSheet(); } });
 
     send.addEventListener('click', function () {
-      if (!title.value.trim()) {
+      if (!title.input.value.trim()) {
         A.toast('العنوان فاضي', 'error');
-        title.focus();
+        title.input.focus();
         return;
       }
-      A.confirm({
-        tone: 'warn',
-        title: 'تبعت الإشعار لـ ' + count(state.subscribers) + '؟',
-        message: '«' + title.value.trim() + '»\nهيوصل لكل المشتركين دلوقتي، ومينفعش يترجع.',
-        confirmLabel: 'ابعت دلوقتي',
-        cancelLabel: 'لأ، استنى'
-      }).then(function (ok) {
-        if (!ok) return;
-        box.hidden = true;
-        var edits = { title: title.value, body: text.value, image: withImage ? withImage.checked : false };
-        return A.withBusy(send, A.call('apiSendPush', c.id, key, edits))
-          .then(function (result) { renderResult(result); })
-          .catch(function (error) { A.fail(error, box); });
-      });
+      box.hidden = true;
+      var edits = { title: title.input.value, body: text.input.value, image: withImage ? withImage.checked : false };
+      A.withBusy(send, A.call('apiSendPush', c.id, key, edits))
+        .then(function (result) { renderResult(result); })
+        .catch(function (error) { A.fail(error, box); });
     });
 
-    A.openSheet('معاينة الإشعار', [
-      phone,
-      el('div', { class: 'form' },
-        A.field('العنوان', title, 'للإشعار ده بس — إشعار الجرس زي ما هو.'),
-        A.field('الكلام', text),
-        withImage ? el('label', { class: 'switch' }, withImage, el('span', { class: 'switch__track', 'aria-hidden': 'true' }), el('span', { text: 'الصورة (بتظهر على أندرويد)' })) : null,
-        el('p', { class: 'note' }, el('strong', { text: 'لما يدوسوا عليه: ' }), 'بيفتح ' + destination(c.message.url) + ' على الموقع.'),
-        el('p', { class: 'note' }, el('strong', { text: 'هيوصل لـ: ' }), 'كل المشتركين · ' + count(state.subscribers))
-      ),
-      box
-    ], [
-      send,
-      el('button', { class: 'btn btn--ghost', type: 'button', text: 'رجوع', onclick: open })
-    ]);
+    A.openSheet('ابعت إشعار موبايل', [
+      el('div', { class: 'push8-send' },
+        el('div', { class: 'form push8-send__fields' }, box, title.node, text.node, picture, opens),
+        el('div', { class: 'push8-send__phone' }, el('span', { class: 'field__label', text: 'شكل الإشعار على الموبايل' }), phone))
+    ], [send, cancel, el('span', { class: 'sp' }), el('span', { class: 'push8__left' }, icon('alert'), 'باقي ' + A.digits(left) + ' إرسالات النهارده')], {
+      size: 'md',
+      icon: 'send',
+      sub: 'لكل المشتركين (' + A.digits(count(state.subscribers)) + ') · مينفعش يترجع',
+      className: 'sheet--push8'
+    });
 
   }
 
@@ -21362,8 +21366,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
 
     A.openSheet('إشعارات الموبايل', lines, [
-      el('button', { class: 'btn btn--primary', type: 'button', text: 'تمام', onclick: open })
-    ]);
+      el('button', { class: 'btn btn--primary', type: 'button', text: 'تمام', onclick: function () { A.closeSheet(); if (A.area === 'content') A.render(); } })
+    ], { size: 'sm', icon: 'send' });
 
     if (!result.already && result.status === 'sent') A.toast('الإشعار اتبعت ✓');
     if (!result.already && result.status === 'sending') A.toast('الإشعار بيتبعت ✓');
