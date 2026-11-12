@@ -14860,3 +14860,15 @@ html[data-mode="light"] .media-view > .bulk { background: var(--p-modal); }
   .trim8 .sheet__foot .sp { display: none; }
   .trim8__size { display: none; }
 }
+/* the filter icon in the search: «مستخدمة بس» / «على الموقع بس» (real filters, a dot when one is on) */
+.media8-morebtn { position: relative; display: grid; flex: none; place-items: center; width: 26px; height: 26px; margin-inline-start: -4px; padding: 0; border: 0; border-radius: 8px; color: var(--text-3); background: none; cursor: pointer; }
+.media8-morebtn:hover, .media8-morebtn[aria-expanded="true"] { color: var(--text); background: var(--p-hover); }
+.media8-morebtn.is-on { color: var(--acc-hi); }
+.media8-morebtn.is-on::after { content: ""; position: absolute; top: 2px; inset-inline-end: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--acc); box-shadow: 0 0 0 2px var(--p-surface); }
+.media8-more-menu .menu__item.is-on { color: var(--acc-hi); }
+@media (max-width: 759px) {
+  .media8 .p8-search { display: flex; width: 44px; height: 44px; padding: 0; justify-content: center; border-radius: 12px; }
+  .media8 .p8-search__input { display: none; }
+  .media8 .media8-morebtn { width: 100%; height: 100%; margin: 0; }
+  .media8-tools__end { width: 100%; }
+}
