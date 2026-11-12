@@ -134,3 +134,7 @@
 - اختبارات servant-remove: worker/test/book-servant-purge.test.mjs، tests/pages-server.test.mjs («removed for good»)، pages-admin 10/10، worker 484/484، refine-b 18/18 (apiServantDelete في القايمة)، admin/boot.js CONTENT_FNS.
 - النشر: servant-remove على main (commit 58c8120)، الـWorker CI نجح (Worker (API) success)، الـroute بيرد 401 من غير دخول، وPages بيقدّم admin.css الجديد. مفيش migration. الرجوع: git revert 58c8120 ثم push لـmain (الـCI بيرجّع الـWorker).
 - W3 (B4 + B5) خلص كله ومنشور.
+
+## W4 (B6 + B10) — لسه مبدأتش (2026-11-12)
+- الجلسة اتفتحت والاستخدام الأسبوعي كان 87% (الحد اللي بنقف عنده حوالي 90%، والتصفير الاثنين 2026-11-16). مفيش ولا سطر كود اتغير، علشان شاشة واحدة بالمقارنة بالصور كانت هتعدّي الحد وتسيب شغل نص نص.
+- الجاي (بالترتيب): B6 — media، media-item، media-select، media-trash، trim (AdminTrim.html في كل مكان)؛ وبعدين B10 — activity، activity-item، activity-manage، push، push-send. نفس الطريقة والقطع الجاهزة اللي في W3 (p8-card، p8-list، p8-item، p8-tag، p8-filter، A.menu، A.openSheet).
