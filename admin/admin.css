@@ -15402,3 +15402,44 @@ html[data-mode="light"] .pm8-toggles .check--toggle { background: var(--p-surfac
   .pm8-table .b8-open .btn { width: 100%; }
 }
 
+
+/* ---------- Phase 8B B9: «المسابقات» (comps.png) ---------- */
+.c9-list { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.c9-filters { justify-content: space-between; }
+.c9-search { width: 260px; }
+.comp-filters.seg { flex-wrap: nowrap; }
+.comp-filters .filter-chip { display: inline-flex; align-items: center; width: auto; height: 34px; min-height: 0; padding: 0 14px; border: 0; border-radius: 9px; color: var(--text-2); background: none; box-shadow: none; font: inherit; font-size: 13px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.comp-filters .filter-chip[aria-pressed="true"] { color: var(--acc-hi); background: var(--p-raised); box-shadow: inset 0 0 0 1px var(--p-acc-line); }
+.ccards { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
+.cc { position: relative; padding: 22px 18px 18px; overflow: hidden; border: 1px solid var(--p-line-2); border-radius: 20px; background: linear-gradient(180deg, rgb(13 40 73 / .55), rgb(7 26 51 / .7)); cursor: pointer; transition: transform .3s cubic-bezier(.2, .8, .2, 1), border-color .25s; }
+html[data-mode="light"] .cc { background: var(--p-surface); }
+.cc:hover { transform: translateY(-2px); border-color: var(--p-acc-line); }
+.cc.is-off { opacity: .72; }
+.cc__band { position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+.cc__band--ok { background: linear-gradient(270deg, var(--ok), transparent); }
+.cc__band--info { background: linear-gradient(270deg, var(--info), transparent); }
+.cc__band--danger { background: linear-gradient(270deg, var(--danger), transparent); }
+.cc__band--muted { background: linear-gradient(270deg, var(--text-3), transparent); }
+.cc__row { display: flex; align-items: center; gap: 12px; }
+.cc__t { flex: 1; min-width: 0; }
+.cc__t b { display: block; font-size: 15.5px; font-weight: 800; line-height: 1.5; }
+.cc__t small { display: block; color: var(--text-3); font-size: 12px; }
+.cc__facts { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 12px; color: var(--text-2); font-size: 12.5px; }
+.cc__facts span { display: inline-flex; align-items: center; gap: 6px; }
+.cc__facts .icon { width: 15px; height: 15px; color: var(--text-3); }
+.cc__tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.cc__kpi { display: block; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--p-line-2); border-radius: 14px; background: rgb(10 33 64 / .55); }
+.cc__kpi small { color: var(--text-3); font-size: 12px; font-weight: 700; }
+.cc__kpi .bar { display: block; height: 6px; margin-top: 8px; overflow: hidden; border-radius: 6px; background: rgb(255 255 255 / .08); }
+.cc__kpi .bar i { display: block; height: 100%; border-radius: inherit; background: var(--grad); }
+.cc__acts { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.cc__sp { flex: 1; }
+
+@media (max-width: 759px) {
+  .ccards { grid-template-columns: minmax(0, 1fr); }
+  .c9-filters { flex-direction: column; align-items: stretch; }
+  .comp-filters.seg { max-width: 100%; overflow-x: auto; }
+  /* comps.png (phone): «المؤرشفة» and «مسابقة جديدة» side by side */
+  .c9-list .p8-card__acts .btn--primary { grid-column: auto; }
+}
+

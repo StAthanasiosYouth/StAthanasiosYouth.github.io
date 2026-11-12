@@ -421,13 +421,26 @@
     return C.open ? builderView() : listView();
   };
 
+  /*
+   * Phase 8B (comps.png): one card — «المؤرشفة» and «مسابقة جديدة» in the head, the status filter (always all of
+   * them, with their counts) and the search, then a card per competition: a coloured band by its state, the kind's
+   * icon, its title and kind, the state tag, when and who, «اتصححت N٪» while there are entries, «افتح»,
+   * «معاينة» (the builder's preview tab) and ⋯ (the link). The old chips that matter stay as small tags.
+   */
+  var STATE_TONE = { open: 'ok', scheduled: 'info', draft: '', closed: 'danger', results: 'info' };
+  function kindOf(s) {
+    if (s.wallet) return { icon: 'star', label: 'مسابقة نقاط' };
+    if (s.scoring) return { icon: 'check', label: 'مسابقة عامة بدرجات' };
+    return { icon: 'form', label: 'استبيان بسيط' };
+  }
+
   function listView() {
 
     var body = el('div', { class: 'comp-list', 'aria-live': 'polite' });
-    var search = el('input', { class: 'input comp-search', type: 'search', placeholder: 'دوّر باسم المسابقة أو الرابط…', 'aria-label': 'دوّر في المسابقات', value: C.query.q });
-    var chips = el('div', { class: 'filter-chips comp-filters', role: 'group', 'aria-label': 'الحالة' });
-    var archive = el('button', { class: 'btn btn--ghost btn--small', type: 'button', 'aria-pressed': String(C.query.archived) });
-    var create = el('button', { class: 'btn btn--primary', type: 'button', onclick: function () { openWizard(); } }, icon('plus'), 'مسابقة جديدة');
+    var search = el('input', { class: 'p8-search__input comp-search', type: 'search', placeholder: 'دوّر باسم المسابقة أو الرابط…', 'aria-label': 'دوّر في المسابقات', value: C.query.q });
+    var chips = el('div', { class: 'seg p8-filter filter-chips comp-filters', role: 'group', 'aria-label': 'الحالة' });
+    var archive = el('button', { class: 'btn', type: 'button', 'aria-pressed': String(C.query.archived), 'data-act': 'comp-archived' });
+    var create = el('button', { class: 'btn btn--primary', type: 'button', 'aria-label': 'مسابقة جديدة', onclick: function () { openWizard(); } }, icon('plus'), 'مسابقة جديدة');
 
     search.addEventListener('input', function () { C.query.q = search.value; draw(); });
     archive.addEventListener('click', function () {
@@ -444,8 +457,7 @@
       if (!reply) {
         A.fill(body, el('div', { class: 'skeleton-list', 'aria-hidden': 'true' },
           el('div', { class: 'skeleton skeleton--line' }), el('div', { class: 'skeleton skeleton--line' }), el('div', { class: 'skeleton skeleton--line skeleton--short' })));
-        chips.hidden = true;
-        archive.hidden = true;
+        A.fill(archive, icon('archive'), 'المؤرشفة');
         return;
       }
 
@@ -456,14 +468,13 @@
 
       pool.forEach(function (c) { counts[c.status] = (counts[c.status] || 0) + 1; });
 
-      archive.hidden = !archivedCount && !C.query.archived;
-      A.fill(archive, icon(C.query.archived ? 'arrow' : 'layers'), C.query.archived ? 'رجوع للحالي' : 'الأرشيف (' + ar(archivedCount) + ')');
+      A.fill(archive, icon(C.query.archived ? 'arrow' : 'archive'), C.query.archived ? 'رجوع للحالي' : 'المؤرشفة' + (archivedCount ? ' (' + ar(archivedCount) + ')' : ''));
 
-      chips.hidden = C.query.archived || pool.length < 2;
-      A.fill(chips, [{ key: '', label: 'الكل', n: pool.length }].concat(['draft', 'scheduled', 'open', 'closed', 'results'].filter(function (k) { return counts[k]; }).map(function (k) {
-        return { key: k, label: STATUS[k].label, n: counts[k] };
+      // الكل · مفتوحة · مجدولة · مسودة · مقفولة (always, with counts); «النتائج» only when there are some
+      A.fill(chips, [{ key: '', label: 'الكل', n: pool.length }].concat(['open', 'scheduled', 'draft', 'closed', 'results'].filter(function (k) { return k !== 'results' || counts[k]; }).map(function (k) {
+        return { key: k, label: STATUS[k].label, n: counts[k] || 0 };
       })).map(function (f) {
-        return el('button', { class: 'filter-chip', type: 'button', 'aria-pressed': String(C.query.status === f.key), 'data-status': f.key || 'all', onclick: function () {
+        return el('button', { class: 'filter-chip seg__btn', type: 'button', 'aria-pressed': String(C.query.status === f.key), 'data-status': f.key || 'all', onclick: function () {
           C.query.status = f.key;
           draw();
         } }, f.label + ' (' + ar(f.n) + ')');
@@ -477,20 +488,19 @@
       }).sort(function (a, b) { return String(b.updatedAt).localeCompare(String(a.updatedAt)); });
 
       if (!reply.ready || !all.length) {
-        A.fill(body, el('div', { class: 'empty-state' },
-          el('span', { class: 'empty-state__icon', 'aria-hidden': 'true' }, icon('trophy')),
-          el('p', { class: 'empty-state__title', text: 'مفيش مسابقات لسه' }),
-          el('p', { class: 'empty-state__text', text: 'دوس «مسابقة جديدة»: اسم ونوع ومواعيد، وبعدين الأسئلة.' })
-        ));
+        A.fill(body, el('div', { class: 'p8-empty empty-state' },
+          el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('trophy')),
+          el('b', { text: 'مفيش مسابقات لسه' }),
+          el('small', { text: 'دوس «مسابقة جديدة»: اسم ونوع ومواعيد، وبعدين الأسئلة.' })));
         return;
       }
 
       if (!shown.length) {
-        A.fill(body, el('p', { class: 'empty', text: C.query.archived ? 'الأرشيف فاضي.' : 'مفيش مسابقات بالشكل ده.' }));
+        A.fill(body, el('div', { class: 'p8-empty' }, el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('trophy')), el('b', { text: C.query.archived ? 'الأرشيف فاضي.' : 'مفيش مسابقات بالشكل ده.' })));
         return;
       }
 
-      A.fill(body, el('ul', { class: 'list comp-items' }, shown.map(compItem)));
+      A.fill(body, el('div', { class: 'ccards comp-items' }, shown.map(compItem)));
 
     }
 
@@ -504,41 +514,69 @@
     });
 
     return [
-      A.card('المسابقات', 'كل مسابقة ليها صفحتها وأسئلتها ونتايجها. بتتنشر مع «راجع وانشر» زي باقي المحتوى.',
-        el('div', { class: 'actions comp-list__tools' }, create, archive),
-        search,
-        chips,
-        body
-      )
+      el('section', { class: 'card p8-card c9-list' },
+        el('div', { class: 'p8-card__head' },
+          el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('trophy')),
+          el('div', { class: 'p8-card__titles' },
+            el('h2', { class: 'card__title', text: 'المسابقات' }),
+            el('p', { class: 'card__hint', text: 'كل مسابقة ليها صفحتها وأسئلتها ونتيجتها. اعمل جديدة: اسم ونوع ومواعيد، وبعدين الأسئلة.' })),
+          el('div', { class: 'p8-card__acts comp-list__tools' }, archive, create)),
+        el('div', { class: 'p8-card__filters c9-filters' }, chips, el('label', { class: 'p8-search c9-search' }, icon('filter'), search)),
+        body)
     ];
 
   }
 
   function compItem(s) {
 
-    var chips = [C.statusChip(s.status)];
-    var started = (Number(s.submissions) || 0) + (Number(s.inProgress) || 0);
+    var kind = kindOf(s);
+    var tone = STATE_TONE[s.status] || '';
+    var done = Number(s.submissions) || 0;
+    var started = done + (Number(s.inProgress) || 0);
+    var tags = [];
+    if (s.liveVersion && !s.enabled && !s.archived) tags.push(A.chip('هتختفي في النشر الجاي', 'danger'));
+    else if (s.hasChanges && s.enabled && !s.archived) tags.push(A.chip('فيه تعديلات لسه متنشرتش', 'gold'));
+    if (s.problems) tags.push(A.chip(ar(s.problems) + ' حاجة ناقصة قبل النشر', 'danger'));
 
-    if (s.liveVersion && !s.enabled && !s.archived) chips.push(A.chip('هتختفي في النشر الجاي', 'danger'));
-    else if (s.hasChanges && s.enabled && !s.archived) chips.push(A.chip('فيه تعديلات لسه متنشرتش', 'gold'));
-    if (s.problems) chips.push(A.chip(ar(s.problems) + ' حاجة ناقصة قبل النشر', 'danger'));
-    chips.push(A.chip(ar(s.questionCount) + ' سؤال'));
-    if (started) chips.push(A.chip('بدأوا ' + ar(started) + ' · بعتوا ' + ar(s.submissions || 0), 'info'));
-    if (s.pending) {
-      var pending = A.chip('محتاجة مراجعة: ' + ar(s.pending), 'gold');
-      pending.classList.add('comp-badge');
-      chips.push(pending);
-    }
+    // comps.png: what matters now — when it opens, until when it's open, or when it ended
+    var when = s.status === 'scheduled' && s.startAt ? 'بتفتح ' + C.when(s.startAt)
+      : s.status === 'open' ? (s.endAt ? 'لحد ' + C.when(String(s.endAt).slice(0, 10)) : 'مفتوحة من غير نهاية')
+      : (s.status === 'closed' || s.status === 'results') && s.endAt ? 'اتقفلت ' + C.when(s.endAt)
+      : s.startAt || s.endAt ? (s.startAt ? 'من ' + C.when(s.startAt) : '') + (s.endAt ? (s.startAt ? ' ' : '') + 'لحد ' + C.when(s.endAt) : '')
+      : 'من غير مواعيد';
+    var who = started ? ar(started) + ' شارك' + (s.pending ? ' · ' + ar(s.pending) + ' محتاجين مراجعة' : '')
+      : s.status === 'draft' && !s.liveVersion ? 'مخفية لحد ما تتنشر'
+      : ar(s.questionCount) + ' سؤال';
+    var graded = done ? Math.round((done - (Number(s.pending) || 0)) * 100 / done) : 0;
+    var pending = null;
 
-    var when = s.startAt || s.endAt
-      ? (s.startAt ? 'من ' + C.when(s.startAt) : 'من أول ما تتنشر') + (s.endAt ? ' لحد ' + C.when(s.endAt) : '')
-      : 'مفتوحة أول ما تتنشر، ومبتقفلش لوحدها';
+    var open = el('button', { class: 'btn btn--sm btn--primary', type: 'button', 'aria-label': 'افتح المسابقة: ' + s.title, onclick: function (event) { event.stopPropagation(); A.compOpen(s.id); } }, 'افتح');
+    var preview = el('button', { class: 'btn btn--sm btn--ghost', type: 'button', 'aria-label': 'معاينة: ' + s.title, onclick: function (event) { event.stopPropagation(); A.compOpen(s.id, 'preview'); } }, icon('eye'), 'معاينة');
+    var more = el('button', { class: 'p8-iconbtn', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-label': 'اختيارات تانية: ' + s.title, onclick: function (event) {
+      event.stopPropagation();
+      var copy = function () {
+        if (!navigator.clipboard) return;
+        navigator.clipboard.writeText(s.url).then(function () { A.toast('اتنسخ الرابط ✓'); }).catch(function () { A.toast('مقدرناش ننسخ', 'error'); });
+      };
+      A.menu(event.currentTarget, 'menu--p8', [
+        A.menuItem('copy', 'انسخ الرابط', copy),
+        s.liveVersion ? A.menuItem('globe', 'افتح في الموقع', function () { window.open(s.url, '_blank', 'noopener'); }) : null,
+        A.menuItem('edit', 'افتح المسابقة', function () { A.compOpen(s.id); })
+      ].filter(Boolean), { align: 'start' });
+    } }, icon('dots'));
 
-    var open = el('button', { class: 'btn btn--small', type: 'button', 'aria-label': 'افتح المسابقة: ' + s.title, onclick: function (event) { event.stopPropagation(); A.compOpen(s.id); } }, 'افتح');
-    var item = A.listItem({ icon: 'trophy', title: s.title, sub: when, off: s.archived || (!s.enabled && !s.liveVersion), chips: chips, controls: [el('span', { class: 'spacer' }), open] });
-
-    item.classList.add('comp-item');
-    item.dataset.id = s.id;
+    var item = el('article', { class: 'cc comp-item' + (s.archived ? ' is-off' : ''), 'data-id': s.id },
+      el('span', { class: 'cc__band cc__band--' + (tone || 'muted'), 'aria-hidden': 'true' }),
+      el('div', { class: 'cc__row' },
+        el('span', { class: 'chipico' + (tone ? ' chipico--' + tone : ''), 'aria-hidden': 'true' }, icon(kind.icon)),
+        el('div', { class: 'cc__t' }, el('b', { dir: 'auto', text: s.title }), el('small', { text: kind.label })),
+        A.chip((STATUS[s.status] || { label: s.status }).label, tone || 'off')),
+      el('div', { class: 'cc__facts' },
+        el('span', {}, icon('calendar'), when),
+        el('span', {}, icon('users'), who)),
+      tags.length || pending ? el('div', { class: 'cc__tags' }, tags, pending) : null,
+      done ? el('div', { class: 'kpi cc__kpi' }, el('small', { text: 'اتصححت ' + ar(graded) + '٪' }), el('span', { class: 'bar', 'aria-hidden': 'true' }, el('i', { style: 'width:' + graded + '%' }))) : null,
+      el('div', { class: 'cc__acts' }, open, preview, el('span', { class: 'cc__sp' }), more));
     item.addEventListener('click', function (event) {
       if (!event.target.closest('button, a, input')) A.compOpen(s.id);
     });
