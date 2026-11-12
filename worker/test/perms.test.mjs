@@ -279,23 +279,28 @@ test('the competition screen reads its seasons with the competitions permission;
   assert.equal(ROUTE_PERMS['GET /v1/admin/comp/badges'], ANY_ADMIN);
 });
 
-test('owner 2026-11-12: the competition roles — known permissions, none of the Primary Admin\'s, each a step wider', async () => {
+test('owner 2026-11-12: the competition roles — known permissions, none of the Primary Admin\'s, the full one wider', async () => {
   const { PRESETS } = await import('../src/lib/perms.js');
   const g = k => Object.keys(PRESETS[k].grants).sort();
-  for (const k of ['comp_grader', 'comp_servant', 'comp_full']) {
+  // the grading-only role was dropped (owner, the same night)
+  assert.equal(PRESETS.comp_grader, undefined);
+  for (const k of ['comp_servant', 'comp_full']) {
     assert.ok(PRESETS[k] && PRESETS[k].label, k);
     for (const p of g(k)) {
       assert.ok(PERMS.includes(p), k + ': ' + p);
       assert.ok(!PRIMARY_DEFAULT.includes(p), k + ' never holds ' + p);
     }
   }
-  assert.deepEqual(PRESETS.comp_grader.label, 'خادم تصحيح درجات');
   assert.deepEqual(PRESETS.comp_servant.label, 'خادم مسابقات');
   assert.deepEqual(PRESETS.comp_full.label, 'خادم مسابقات شاملة');
-  // the grader grades and builds nothing; the servant builds and deletes nothing; the full one has it all
-  assert.ok(g('comp_grader').includes('competitions.approve') && !g('comp_grader').includes('competitions.edit'));
-  assert.ok(g('comp_servant').includes('competitions.edit') && !g('comp_servant').includes('competitions.delete'));
-  assert.ok(g('comp_full').includes('competitions.delete') && g('comp_full').includes('store.edit') && g('comp_full').includes('points.approve'));
-  for (const p of g('comp_grader')) assert.ok(g('comp_servant').includes(p), 'servant ⊇ grader: ' + p);
+  // the servant builds, sets up and grades, and deletes nothing, touches no points or store
+  assert.ok(['competitions.add', 'competitions.edit', 'competitions.approve'].every(p => g('comp_servant').includes(p)));
+  assert.ok(!g('comp_servant').some(p => p === 'competitions.delete' || p.startsWith('store.') || p === 'points.edit' || p === 'points.approve'));
+  // the full one: delete, points (adjust, transfer, seasons), the store (items, orders, opening hours), youth accounts
+  assert.ok(['competitions.delete', 'points.edit', 'points.approve', 'store.edit', 'store.approve', 'participants.add', 'participants.edit'].every(p => g('comp_full').includes(p)));
+  const { ROUTE_PERMS: RP } = await import('../src/lib/perms.js');
+  for (const route of ['POST /v1/admin/participants/:id/transfer', 'POST /v1/admin/participants/:id/points', 'POST /v1/admin/store/schedule', 'POST /v1/admin/points/seasons/:id/close']) {
+    assert.ok(g('comp_full').includes(RP[route]), 'full role reaches ' + route);
+  }
   for (const p of g('comp_servant')) assert.ok(g('comp_full').includes(p), 'full ⊇ servant: ' + p);
 });
