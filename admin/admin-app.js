@@ -17341,6 +17341,14 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   };
   var LEDGER = { earn: 'نقاط مسابقة', competition: 'نقاط مسابقة', correction: 'تصحيح نتيجة', manual: 'تعديل يدوي', transfer: 'نقل', spend: 'طلب من المتجر', refund: 'رجوع نقاط' };
   var STATUS = { pending: 'قيد المراجعة', confirmed: 'مؤكد', rejected: 'مرفوض', cancelled: 'ملغي', withdrawn: 'اتسحب' };
+  // the member emails in words (worker/src/notify/member.js KINDS)
+  var MAIL_KIND = {
+    'acct.new': 'الحساب اتعمل', 'acct.pw': 'باسورد جديد', 'acct.email': 'الإيميل اتغير', 'acct.dev': 'دخول من جهاز جديد', 'acct.age': 'قرب يخرج من السن', 'acct.rec1': 'استرجاع الحساب',
+    'book.received': 'الحجز وصل', 'book.confirmed': 'الحجز اتأكد', 'book.rejected': 'الحجز اترفض', 'book.cancelled': 'الحجز اتلغى', 'book.due': 'فاضل فلوس على الحجز', 'book.reminder': 'تذكير بالفعالية',
+    'pay.recorded': 'دفعة اتسجلت', 'pay.request': 'طلب دفع', 'pay.voided': 'دفعة اتلغت',
+    'res.result': 'نتيجة مسابقة', 'res.done': 'المشاركة وصلت', 'res.points': 'نقاط مسابقة', 'res.correction': 'تصحيح نتيجة', 'pts.deduct': 'خصم نقاط',
+    'store.requested': 'طلب من المتجر', 'store.approved': 'الطلب جاهز', 'store.cancelled': 'الطلب اتلغى'
+  };
   var MAIL = { queued: 'مستني', sending: 'بيتبعت', sent: 'اتبعت', failed: 'هيتعاد', dead: 'فشل', deferred: 'مؤجل', expired: 'انتهى', superseded: 'اتلغى', suppressed: 'اتمنع' };
 
   function api(method, path, body) { return window.AdminWorker.call(method, '/v1/admin/' + path, body, { quiet: true }); }
@@ -17885,21 +17893,78 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       })) : el('p', { class: 'y8-none', text: 'مش داخل من أي جهاز دلوقتي.' }));
 
     /* --- history tabs: تاريخ الحساب · الحجوزات · الإيميلات · المسابقات (points moves and past seasons) --- */
-    var panes = {
-      audit: el('ul', { class: 'y8-timeline', 'data-youth-audit': '' }, d.audit.map(function (a) {
+    /*
+     * Owner 2026-11-12: the history stays short — a period (آخر أسبوع · شهر · سنة · الكل, a month by default), the same
+     * thing by the same person on the same day folded into one row («عرض الباسورد ×٤», from … to …), the days as
+     * small headings, and «اعرض كمان» after ten rows.
+     */
+    var RANGES = [['7', 'آخر أسبوع'], ['30', 'آخر شهر'], ['365', 'آخر سنة'], ['', 'الكل']];
+    if (Y.histRange === undefined) Y.histRange = '30';
+    var shownRows = 10;
+    function inRange(ms) { return !Y.histRange || !ms || Date.now() - ms <= Number(Y.histRange) * 864e5; }
+    function cairoDay(ms) { return new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' }); }
+    function clock(ms) { return digits(new Date(ms).toLocaleTimeString('en-GB', { timeZone: 'Africa/Cairo', hour: 'numeric', minute: '2-digit', hour12: true }).replace(/\s*AM/i, ' ص').replace(/\s*PM/i, ' م')); }
+    function whoDid(actor) { return actor === 'self' ? 'صاحب الحساب' : actor === 'system' ? 'النظام' : actor || ''; }
+    function folded(list, keyOf) {
+      var out = [];
+      list.forEach(function (x) {
+        var day = cairoDay(x.at);
+        var last = out[out.length - 1];
+        if (last && last.day === day && last.key === keyOf(x)) { last.items.push(x); return; }
+        out.push({ day: day, key: keyOf(x), items: [x] });
+      });
+      return out;
+    }
+    function moreButton(left) {
+      return left > 0 ? el('button', { class: 'btn btn--ghost btn--small y8-more-btn', type: 'button', 'data-act': 'youth-hist-more', onclick: function () { shownRows += 20; paint(); } }, 'اعرض كمان (' + ar(left) + ')') : null;
+    }
+    function emptyFor(what) {
+      return el('div', { class: 'y8-none y8-empty' }, el('span', { text: 'مفيش ' + what + ' في ' + (RANGES.filter(function (r) { return r[0] === Y.histRange; })[0] || ['', ''])[1] + '.' }),
+        Y.histRange ? el('button', { class: 'btn btn--ghost btn--small', type: 'button', onclick: function () { Y.histRange = ''; paintRange(); paint(); } }, 'اعرض الكل') : null);
+    }
+    function timeline(groups, row, attrs) {
+      var lis = [];
+      var lastDay = '';
+      groups.slice(0, shownRows).forEach(function (g) {
+        if (g.day !== lastDay) { lastDay = g.day; lis.push(el('li', { class: 'y8-day', text: dayText(g.day) })); }
+        lis.push(row(g));
+      });
+      return [el('ul', Object.assign({ class: 'y8-timeline' }, attrs || {}), lis), moreButton(groups.length - shownRows)];
+    }
+    function auditPane() {
+      var list = d.audit.filter(function (a) { return inRange(a.at); });
+      if (!list.length) return emptyFor('حاجة في تاريخ الحساب');
+      var groups = folded(list, function (a) { return a.action + '|' + a.actor + '|' + (a.field && a.field !== 'pw' ? a.field + a.newValue : '') + '|' + (a.reason || ''); });
+      return timeline(groups, function (g) {
+        var a = g.items[0];
+        var n = g.items.length;
         var change = a.field && a.field !== 'pw' ? (a.field + ': ' + (a.oldValue || '—') + ' ← ' + (a.newValue || '—')) : '';
-        var extra = [change, a.reason, a.check].filter(Boolean).join(' · ');
-        return el('li', {}, el('b', { dir: 'auto', text: AUDIT[a.action] || a.action }), el('small', { dir: 'auto', text: [shortWhen(a.at), a.actor, extra].filter(Boolean).join(' · ') }));
-      })),
-      bookings: d.bookings.length ? el('ul', { class: 'y8-timeline' }, d.bookings.map(function (b) {
-        return el('li', {}, el('b', { dir: 'auto', text: b.ref + ' · ' + b.event }), el('small', { text: (STATUS[b.status] || b.status) + (b.mismatch ? ' · تاريخ الميلاد مختلف عن الحجز' : '') }));
-      })) : el('p', { class: 'y8-none', text: 'مفيش حجوزات مربوطة.' }),
-      mail: d.mail.length ? el('ul', { class: 'y8-timeline' }, d.mail.map(function (m) {
-        return el('li', {}, el('b', { dir: 'auto', text: m.kind + ' · ' + (MAIL[m.status] || m.status) }), el('small', { text: shortWhen(m.at) }),
+        var first = clock(g.items[n - 1].at);
+        var times = n > 1 && first !== clock(a.at) ? 'من ' + first + ' لـ ' + clock(a.at) : clock(a.at);
+        var how = (EMAIL_CHECKS.concat(SUPPORT_CHECKS).filter(function (c) { return c[0] === a.check; })[0] || [0, a.check])[1];
+        return el('li', {}, el('b', { dir: 'auto' }, AUDIT[a.action] || a.action, n > 1 ? el('span', { class: 'y8-times', text: '×' + ar(n) }) : null),
+          el('small', { dir: 'auto', text: [times, whoDid(a.actor), change, a.reason, how].filter(Boolean).join(' · ') }));
+      }, { 'data-youth-audit': '' });
+    }
+    function mailPane() {
+      var list = d.mail.filter(function (m) { return inRange(m.at); });
+      if (!list.length) return emptyFor('إيميلات');
+      return timeline(folded(list, function (m) { return m.kind + '|' + m.status; }), function (g) {
+        var m = g.items[0];
+        var n = g.items.length;
+        return el('li', {}, el('b', { dir: 'auto' }, (MAIL_KIND[m.kind] || m.kind), n > 1 ? el('span', { class: 'y8-times', text: '×' + ar(n) }) : null),
+          el('small', {}, el('span', { class: 'y8-mailst y8-mailst--' + m.status, text: MAIL[m.status] || m.status }), ' · ' + clock(m.at)),
           m.tier === 1 && can.manage ? el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function (event) {
             A.withBusy(event.currentTarget, api('POST', path + 'resend', { outboxId: m.id })).then(function () { A.toast('هيتبعت تاني ✓'); }).catch(function (error) { A.fail(error); });
           } }, 'ابعته تاني') : null);
-      })) : el('p', { class: 'y8-none', text: 'مفيش إيميلات.' }),
+      });
+    }
+    var panes = {
+      audit: auditPane,
+      bookings: d.bookings.length ? el('ul', { class: 'y8-timeline' }, d.bookings.map(function (b) {
+        return el('li', {}, el('b', { dir: 'auto', text: b.ref + ' · ' + b.event }), el('small', { text: (STATUS[b.status] || b.status) + (b.mismatch ? ' · تاريخ الميلاد مختلف عن الحجز' : '') }));
+      })) : el('p', { class: 'y8-none', text: 'مفيش حجوزات مربوطة.' }),
+      mail: mailPane,
       comps: el('div', {},
         points.ledger.length ? el('ul', { class: 'y8-timeline' }, points.ledger.map(function (l) {
           return el('li', {}, el('b', { dir: 'auto' }, el('bdi', { class: 'ltr', text: (l.amount > 0 ? '+' : '') + l.amount }), ' ' + (LEDGER[l.kind] || l.kind) + (l.note ? ' — ' + l.note : '')), el('small', { text: shortWhen(l.at) }));
@@ -17909,14 +17974,23 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var holder = el('div', { class: 'y8-hist__pane' });
     var tabName = A.uid('yhist');
     var on = Y.hist && panes[Y.hist] ? Y.hist : 'audit';
-    function paint() { A.fill(holder, panes[on]); }
+    function paint() { var p = panes[on]; A.fill(holder, typeof p === 'function' ? p() : p); }
+    var rangeName = A.uid('yrange');
+    var range = el('div', { class: 'seg p8-filter y8-hist__range', role: 'radiogroup', 'aria-label': 'الفترة' });
+    function paintRange() {
+      A.fill(range, RANGES.map(function (r) {
+        return el('label', { class: 'seg__opt' }, el('input', { type: 'radio', name: rangeName, value: r[0], checked: r[0] === Y.histRange, onchange: function () { Y.histRange = r[0]; shownRows = 10; paint(); } }), el('span', { text: r[1] }));
+      }));
+    }
+    paintRange();
     var tabs = el('div', { class: 'seg p8-filter y8-hist__tabs', role: 'radiogroup', 'aria-label': 'تاريخ الحساب' }, [['audit', 'clock', 'تاريخ الحساب'], ['bookings', 'ticket', 'الحجوزات'], ['mail', 'mail', 'الإيميلات'], ['comps', 'trophy', 'المسابقات']].map(function (t) {
       return el('label', { class: 'seg__opt' },
-        el('input', { type: 'radio', name: tabName, value: t[0], checked: t[0] === on, onchange: function () { on = Y.hist = t[0]; paint(); } }),
+        el('input', { type: 'radio', name: tabName, value: t[0], checked: t[0] === on, onchange: function () { on = Y.hist = t[0]; shownRows = 10; range.hidden = on === 'bookings'; paint(); } }),
         el('span', {}, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon(t[1])), t[2]));
     }));
     paint();
-    var history = el('section', { class: 'card p8-card y8-hist' }, el('div', { class: 'y8-hist__head' }, tabs), holder);
+    range.hidden = on === 'bookings';
+    var history = el('section', { class: 'card p8-card y8-hist' }, el('div', { class: 'y8-hist__head' }, tabs, range), holder);
 
     return [
       el('div', { class: 'y8-acct__side' }, profile),
@@ -20358,10 +20432,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           }));
         var more = el('button', { class: 'p8-iconbtn', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-label': 'اختيارات تانية: ' + s.name, onclick: function (e) {
           var button = e.currentTarget;
+          // owner 2026-11-12: «شيل الخادم…» from the ⋯ too (the same window as in the editor; primary admin only)
           A.menu(button, 'menu--p8', [A.menuItem(s.active ? 'eye-off' : 'eye', s.active ? 'إيقاف' : 'تفعيل', function () {
             A.withBusy(button, A.call('apiServantSetActive', s.id, !s.active)).then(function (next) { reply = next; draw(next); })
               .catch(function (error) { A.fail(error, box); });
-          })], { align: 'start' });
+          })].concat(reply && reply.payAdmin ? [el('hr', { class: 'menu__sep' }), A.menuItem('trash', 'شيل الخادم…', function () { removeServant(s); }, { danger: true })] : []), { align: 'start' });
         } }, icon('dots'));
         return el('li', { class: 'p8-item item' + (s.active ? '' : ' item--off'), 'data-id': s.id },
           avatar,

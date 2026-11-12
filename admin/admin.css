@@ -15198,6 +15198,17 @@ html[data-mode="light"] .y8-qa__b { background: var(--p-surface-2); }
 .y8-timeline b { font-weight: 700; }
 .y8-timeline small { display: block; color: var(--text-3); font-size: 12px; }
 .y8-timeline .btn { margin-top: 6px; }
+.y8-hist__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.y8-hist__range[hidden] { display: none; }
+.y8-timeline li.y8-day { padding: 6px 0 10px; color: var(--text-3); font-size: 12px; font-weight: 800; }
+.y8-timeline li.y8-day::before, .y8-timeline li.y8-day::after { display: none; }
+.y8-times { display: inline-grid; place-items: center; min-width: 22px; height: 20px; margin-inline-start: 8px; padding: 0 7px; border-radius: 999px; color: var(--acc-hi); background: var(--p-acc-soft); font-size: 11px; font-weight: 800; vertical-align: middle; }
+.y8-mailst { font-weight: 700; color: var(--ok); }
+.y8-mailst--failed, .y8-mailst--dead, .y8-mailst--suppressed { color: var(--danger); }
+.y8-mailst--queued, .y8-mailst--sending, .y8-mailst--deferred { color: var(--warn); }
+.y8-mailst--superseded, .y8-mailst--expired { color: var(--text-3); }
+.y8-more-btn { margin-top: 4px; }
+.y8-empty { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 
 @media (max-width: 759px) {
   .y8-kpis { grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -15215,10 +15226,9 @@ html[data-mode="light"] .y8-qa__b { background: var(--p-surface-2); }
   .y8-list .ycard__letter { font-size: 20px; }
   .y8-acct, .y8-acct__pair { grid-template-columns: 1fr; }
   .y8-qa { grid-template-columns: repeat(3, 1fr); }
-  .y8-hist__tabs { max-width: 100%; overflow-x: auto; }
+  .y8-hist__tabs, .y8-hist__range { max-width: 100%; overflow-x: auto; }
   .y8-points .p8-card__head > .chip, .y8-devices .p8-card__head > .chip { justify-self: start; }
 }
-
 
 /* ---------- Phase 8B B8: «الحجوزات والفلوس» (bookings.png, finance.png, fin-*.png, paymethods.png) ---------- */
 .b8-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 18px; }
