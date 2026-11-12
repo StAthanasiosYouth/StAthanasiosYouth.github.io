@@ -1323,6 +1323,8 @@
         A.dirty = false;
         A.closeSheet();
         A.setAvatars(reply && reply.avatars);
+        // owner fix 2026-11-12: the sheet is still closing (setAvatars skips a screen under an open sheet): «حسابي» now
+        if (A.area === 'settings') A.render();
         A.toast('اتحفظت صورتك ✓');
       }).catch(function (error) { A.fail(error, box); });
     });
@@ -1347,10 +1349,12 @@
      itself (change()), and the Worker checks it all again. Apps Script's apiAdmins only gives the names.
   ======================================================= */
 
-  var ROLE_ICONS = { treasurer: 'wallet', servant_bookings: 'ticket', content_editor: 'megaphone', viewer: 'eye' };
+  var ROLE_ICONS = { treasurer: 'wallet', servant_bookings: 'ticket', content_editor: 'megaphone', viewer: 'eye', comp_grader: 'check', comp_servant: 'trophy', comp_full: 'star' };
   var ROLE_HINTS = {
     treasurer: 'الحجوزات والفلوس والتصدير', servant_bookings: 'يشوف الحجوزات ويسجّل كاش لنفسه',
-    content_editor: 'المحتوى والفعاليات والصور والنشر', viewer: 'يشوف كل حاجة من غير تعديل', custom: 'تختار الصلاحيات بنفسك'
+    content_editor: 'المحتوى والفعاليات والصور والنشر', viewer: 'يشوف كل حاجة من غير تعديل',
+    comp_grader: 'يصحّح إجابات المسابقات بس', comp_servant: 'يعمل المسابقات ويصحّحها', comp_full: 'المسابقات والنقاط والمتجر وحسابات الشباب',
+    custom: 'تختار الصلاحيات بنفسك'
   };
   var MODULE_ICONS = {
     content: 'megaphone', publish: 'send', events: 'theatre', bookings: 'ticket', finance: 'wallet', exports: 'download',
@@ -2157,8 +2161,8 @@
         if (!ok) return;
         busy(button, A.call('apiSetAdminName', email, field.value))
           .then(function (next) {
-            data = next;
-            draw();
+            // an admin without «accounts.view» gets the names only (admin/boot.js): the team list stays as it is
+            if (!next.renamedOnly) { data = next; draw(); }
             // presence, the rail and the log use the names: the state learns them too
             if (A.state) {
               A.state.names = next.names;
@@ -2166,6 +2170,8 @@
               if (A.renderNav) A.renderNav();
             }
             A.toast(field.value.trim() ? 'اتحفظ الاسم ✓' : 'رجع لأول الإيميل');
+            // owner fix 2026-11-12: «حسابي» shows the new name at once
+            if (A.state && email === A.state.user && A.area === 'settings' && A.sub.settings !== 'team') A.render();
           })
           .catch(function (error) { A.fail(accountsError(error), box, { fields: false }); });
       });

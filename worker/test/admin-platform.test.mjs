@@ -62,10 +62,14 @@ test('one session per account: another device gets the question; force takes ove
   const w = await world();
   const a = await w.start(M);
   // the panel drew (a heartbeat), so a second device is asked
-  await w.call('Bearer ' + a.body.token, 'POST', '/v1/admin/session/heartbeat', { area: 'home' });
+  await w.call('Bearer ' + a.body.token, 'POST', '/v1/admin/session/heartbeat', { area: 'content', view: 'news', item: { kind: 'news', id: 'news-aaaa1111', label: 'خبر' } });
   const b = await w.start(M, { device: 'Android', tab: TAB2 });
   assert.equal(b.status, 200);
   assert.equal(b.body.active.device, 'Chrome');
+  // owner 2026-11-12: where that panel is, so the takeover opens the same place and editor
+  assert.equal(b.body.active.area, 'content');
+  assert.equal(b.body.active.view, 'news');
+  assert.deepEqual(b.body.active.item, { kind: 'news', id: 'news-aaaa1111' });
   assert.ok(!b.body.sid);
   const f = await w.start(M, { device: 'Android', tab: TAB2, force: true });
   assert.ok(f.body.sid && f.body.sid !== a.body.sid);

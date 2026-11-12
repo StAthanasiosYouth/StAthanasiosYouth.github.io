@@ -1237,8 +1237,13 @@
   }
 
   /* this account is live on another device or tab */
+  /* owner 2026-11-12: the place and editor of the panel taken over (its last heartbeat), opened here after the takeover */
+  var takenFrom = null;
+  var takeover = null;
+
   function showSessionActive(active) {
 
+    takenFrom = active && active.area ? { area: active.area, view: active.view || '', item: active.item || null } : null;
     nextAttempt();
     showGate('session-active', [
       h('div', { class: 'gate__message gate__message--info', role: 'alert' },
@@ -1341,6 +1346,8 @@
 
         sid = result.sid;
         storeSession();
+        takeover = options.force === true ? takenFrom : null;
+        takenFrom = null;
         openPanel(result.state, my);
       })
       .catch(function (error) {
@@ -1524,6 +1531,14 @@
     if (options.idempotencyKey) headers['idempotency-key'] = options.idempotencyKey;
     headers['x-edit-session'] = EDIT_SESSION;
 
+    // «شوف اللوحة بعينه» (owner 2026-11-12): while previewing another admin nothing is saved; the panel answers
+    // what that admin would get (AdminScript A.previewGuard)
+    var held = window.A && typeof window.A.previewGuard === 'function' ? window.A.previewGuard(method, path, body) : null;
+    if (held) {
+      if (timer) clearTimeout(timer);
+      return Promise.resolve({ status: 403, reply: held });
+    }
+
     return fetch(WORKER + path, {
       method: method,
       headers: headers,
@@ -1690,9 +1705,14 @@
         case 'apiPlanMigration': return post('/v1/admin/tools/migration');
         case 'apiMigrate': return post('/v1/admin/tools/migrate');
         case 'apiAdmins': return post('/v1/admin/tools/admins');
-        // the rename, then the list as apiSetAdminName answered it
+        // the rename, then the list as apiSetAdminName answered it. Owner fix 2026-11-12: an admin without
+        // «accounts.view» renames themself too — the list is then refused, but the name WAS saved: the
+        // rename's own answer (its names) is the reply, never «مش مسموح»
         case 'apiSetAdminName': return post('/v1/admin/accounts/' + encodeURIComponent(String(a[0] || '')) + '/name', { name: a[1] }).then(function (r) {
-          return r.ok ? post('/v1/admin/tools/admins') : r;
+          if (!r.ok) return r;
+          return post('/v1/admin/tools/admins').then(function (list) {
+            return list.ok ? list : { ok: true, result: { names: r.result.names || {}, renamedOnly: true } };
+          });
         });
         case 'apiAgeRules': return get('/v1/admin/participants/settings').then(function (r) { return map(r, ages); });
         case 'apiAdminMe': return get('/v1/admin/me');
@@ -1986,7 +2006,7 @@
 
     try {
       // where the admin was before a reload (area, sub-tab): drawn there straight away
-      if (A.restore) A.restore.view();
+      if (A.restore) A.restore.view(takeover);
       drawn = A.start(state);
     }
     catch (error) {
@@ -2011,9 +2031,10 @@
       // the scroll position, the editor that was open and its unsaved values —
       // before the first heartbeat, so the editor's lock is asked for, never let go
       if (A.restore) {
-        try { A.restore.rest(); }
+        try { A.restore.rest(takeover); }
         catch (error) { if (window.console) console.warn('[admin] restore', error); }
       }
+      takeover = null;
       collab.begin();
       // a link this page was opened with (an admin notification): there now
       links.ready();

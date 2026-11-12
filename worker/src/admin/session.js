@@ -85,7 +85,18 @@ function cleanItem(item) {
 const ageS = (stamp, now) => (Number.isFinite(Number(stamp)) ? Math.max(0, Math.round((now - Number(stamp)) / 1000)) : 0);
 const isLive = (row, now) => !!(row && row.sid && row.parked_ms == null && now - row.seen_ms < STALE_MS);
 const parkedOut = (row, now) => !!(row && row.parked_ms != null && now - row.parked_ms >= PARK_MS);
-const activeOf = (row, now) => ({ device: cleanLabel(row.device, 40), since: ageS(row.since_ms, now), seen: ageS(row.seen_ms, now) });
+// owner 2026-11-12: where that panel is (its last beat), so a takeover opens the same place and editor
+const activeOf = (row, now) => ({ device: cleanLabel(row.device, 40), since: ageS(row.since_ms, now), seen: ageS(row.seen_ms, now), area: cleanPlace(row.area), view: cleanPlace(row.view), item: itemOf(row.item) });
+
+function itemOf(text) {
+  try {
+    const it = text ? JSON.parse(text) : null;
+    return it && typeof it === 'object' ? { kind: cleanPlace(it.kind), id: String(it.id || '').slice(0, 120) } : null;
+  }
+  catch {
+    return null;
+  }
+}
 const nameOf = (name, email) => name || String(email).split('@')[0];
 
 function replaced() { return new ApiError('session_replaced', 'replaced'); }

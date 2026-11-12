@@ -278,3 +278,24 @@ test('the competition screen reads its seasons with the competitions permission;
   assert.equal(ROUTE_PERMS['GET /v1/admin/comp/seasons'], 'competitions.view');
   assert.equal(ROUTE_PERMS['GET /v1/admin/comp/badges'], ANY_ADMIN);
 });
+
+test('owner 2026-11-12: the competition roles — known permissions, none of the Primary Admin\'s, each a step wider', async () => {
+  const { PRESETS } = await import('../src/lib/perms.js');
+  const g = k => Object.keys(PRESETS[k].grants).sort();
+  for (const k of ['comp_grader', 'comp_servant', 'comp_full']) {
+    assert.ok(PRESETS[k] && PRESETS[k].label, k);
+    for (const p of g(k)) {
+      assert.ok(PERMS.includes(p), k + ': ' + p);
+      assert.ok(!PRIMARY_DEFAULT.includes(p), k + ' never holds ' + p);
+    }
+  }
+  assert.deepEqual(PRESETS.comp_grader.label, 'خادم تصحيح درجات');
+  assert.deepEqual(PRESETS.comp_servant.label, 'خادم مسابقات');
+  assert.deepEqual(PRESETS.comp_full.label, 'خادم مسابقات شاملة');
+  // the grader grades and builds nothing; the servant builds and deletes nothing; the full one has it all
+  assert.ok(g('comp_grader').includes('competitions.approve') && !g('comp_grader').includes('competitions.edit'));
+  assert.ok(g('comp_servant').includes('competitions.edit') && !g('comp_servant').includes('competitions.delete'));
+  assert.ok(g('comp_full').includes('competitions.delete') && g('comp_full').includes('store.edit') && g('comp_full').includes('points.approve'));
+  for (const p of g('comp_grader')) assert.ok(g('comp_servant').includes(p), 'servant ⊇ grader: ' + p);
+  for (const p of g('comp_servant')) assert.ok(g('comp_full').includes(p), 'full ⊇ servant: ' + p);
+});
