@@ -317,9 +317,8 @@
     }));
 
     // the drop zone: a picked or dropped file goes to the same uploader (pictures shrink, a video opens the trimmer)
-    var drop = el('div', { class: 'media8-drop', role: 'button', tabindex: '0', 'aria-label': 'اسحب صور أو فيديو هنا، أو دوس علشان تختار',
-      onclick: function () { upload.choose(); },
-      onkeydown: function (event) { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); upload.choose(); } } },
+    // (a mouse target only: keyboards have the head's «رفع صورة أو فيديو»; «أو من رابط» inside is its own button)
+    var drop = el('div', { class: 'media8-drop', onclick: function () { upload.choose(); } },
       icon('upload'),
       el('b', { text: 'اسحب صور أو فيديو هنا' }),
       el('small', {}, 'الفيديو (حتى لو كبير جدًا): بتختار منه جزء من ثانية لـ ٣٠ ثانية، والمقطع بس هو اللي بيترفع',

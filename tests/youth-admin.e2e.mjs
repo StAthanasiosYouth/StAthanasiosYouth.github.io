@@ -504,10 +504,9 @@ test('Phase 6 Step 4c on a phone: the store\'s notify choices and scheduled list
     };
     A.push.open();
   });
-  await page.waitForSelector('#sheet[open] .list .btn--primary', { timeout: 8000 });
-  await click(page, '#sheet .list .btn--primary');
-  await page.waitForFunction(() => [...document.querySelectorAll('#sheet .btn--primary')].some(b => /إرسال الآن/.test(b.textContent)), { timeout: 5000 });
-  await page.evaluate(() => [...document.querySelectorAll('#sheet .btn--primary')].find(b => /إرسال الآن/.test(b.textContent)).click());
+  // Phase 8B (push.png): a page under «المحتوى»; «ابعت» opens push-send.png, its «ابعت دلوقتي» sends
+  await page.waitForSelector('.push8 .push8__row .btn--primary', { timeout: 8000 });
+  await click(page, '.push8 .push8__row .btn--primary');
   await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => /ابعت دلوقتي/.test(b.textContent)), { timeout: 5000 });
   await page.evaluate(() => [...document.querySelectorAll('button')].find(b => /ابعت دلوقتي/.test(b.textContent)).click());
   await page.waitForSelector('[data-push-sending]', { timeout: 5000 });
