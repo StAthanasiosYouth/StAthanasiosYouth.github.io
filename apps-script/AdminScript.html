@@ -832,7 +832,35 @@
     if (kind === 'success') { tone('sine', 659, 0, 0, 0.12, 0.05); tone('sine', 831, 0, 0.09, 0.2, 0.05); }
     if (kind === 'nope') tone('sine', 230, 180, 0, 0.2, 0.06);
     if (kind === 'swish') tone('triangle', 500, 900, 0, 0.09, 0.02);
+    // Phase 8B W7 (owner 2026-11-12: every part its own sound): a page, a switch on / off, a tab
+    if (kind === 'page') { tone('sine', 420, 640, 0, 0.11, 0.022); tone('sine', 960, 0, 0.05, 0.08, 0.012); }
+    if (kind === 'on') tone('sine', 700, 1100, 0, 0.07, 0.03);
+    if (kind === 'off') tone('sine', 900, 520, 0, 0.07, 0.025);
+    if (kind === 'tab') tone('triangle', 760, 980, 0, 0.05, 0.018);
   };
+
+  /*
+   * Phase 8B W7: each kind of control has its own sound, without wiring every button: the area links and the
+   * dock say «page», tabs «tab», a switch «on»/«off», a main button «pop», the rest a soft «tap». A sheet's own
+   * «open»/«close» stays where it is (A.openSheet); still off until the admin turns sounds on («الشكل»).
+   */
+  function soundOfClick(event) {
+    var t = event.target;
+    if (!t || !t.closest || !A.prefs || !A.prefs.sound) return;
+    var sw = t.closest('label.switch, label.check--toggle, .switch input, [role="switch"]');
+    if (sw) {
+      var input = sw.matches('input') ? sw : sw.querySelector('input');
+      if (input && event.target === input) A.sound(input.checked ? 'on' : 'off');
+      return;
+    }
+    var b = t.closest('button, a[href], [role="tab"], [role="menuitem"]');
+    if (!b || b.disabled) return;
+    if (b.closest('#rail-nav, #rail-foot, #dock') || b.classList.contains('navlink') || b.classList.contains('dockbtn')) return A.sound('page');
+    if (b.getAttribute('role') === 'tab' || b.closest('.tabs, #subtabs, .seg, .setnav')) return A.sound('tab');
+    if (b.classList.contains('btn--primary')) return A.sound('pop');
+    A.sound('tap');
+  }
+  document.addEventListener('click', soundOfClick, true);
 
   A.reducedMotion = function () {
 
@@ -5071,6 +5099,8 @@
     if (A.collab) A.collab.where(A.area, area.subs ? key : '');
 
     view.replaceChildren.apply(view, [].concat(builder ? builder() : []));
+    // Phase 8B W7: each area enters its own way (AdminStyles «each area its own entrance»)
+    view.setAttribute('data-area', A.area);
     view.setAttribute('aria-busy', 'false');
     // denied.png: an area this admin may not open shows no tabs over «مش متاحة»
     var tabs = document.getElementById('subtabs');
@@ -5083,7 +5113,12 @@
       entering.forEach(function (child, i) {
         child.style.setProperty('--i', String(Math.min(i, 6)));
         child.classList.add('is-entering');
-        child.addEventListener('animationend', function () { child.classList.remove('is-entering'); }, { once: true });
+        // only the section's own entrance ends it (its buttons have entrances of their own, and those bubble)
+        child.addEventListener('animationend', function done(e) {
+          if (e.target !== child) return;
+          child.classList.remove('is-entering');
+          child.removeEventListener('animationend', done);
+        });
       });
       // a phone that doesn't run the animation (tab put away, throttled) still shows everything
       setTimeout(function () {
