@@ -19,7 +19,7 @@
 | W3 | B4 + B5 | المحتوى والصفحات والفعاليات: نفس المحرر الكبير وأداة المواعيد | — |
 | W4 | B6 + B10 | الصور/القص والسجل/الإشعارات: قوايم وتفاصيل بنفس النمط | — |
 | W5 | B7 + B8 + B9 | الشباب والحجوزات/الفلوس والمسابقات: صفحات تفصيلية بتبويبات | — |
-| W6 | B12 + B13 | الـWorker (Staging) والفريق والصلاحيات | — |
+| W6 | B12 + B13 | الـWorker (Staging) والفريق والصلاحيات | اتعملت (2026-11-12) |
 | W7 | B14 | الختام والنشر على Production | — |
 
 ## خطة النشر
@@ -242,3 +242,15 @@
 - worker 491/491 (rename ٤ حالات، signout/online/removed، invite، ask-access، enforce، avatar).
 - e2e: accounts-admin اتكتب تاني للشاشات الجديدة 7/8 (الـ8 «notifications … system-status» فاشل على main كمان)، content-worker (الشكل لكل حساب + A4 بنص «مش متاحة»)، admin-app «names» (الاسم من ⋯)، refine-b (القديم بس: allowlist).
 - أداة الصور: PHASE8_TEAM=1 (أدمنين بأدوار، واحد اتشال، الصلاحيات شغالة) أو PHASE8_TEAM=off (للـenforce).
+
+### نشر W6 (2026-11-12)
+- main 3b283d9 + ade963f: 3b283d9 اتنشر فيه الملفين الجداد بس (migration 0030 وworker/src/admin/avatar.js، من غير route) بسبب stash في worktree النشر؛ ade963f فيه الباقي كله (الأدمن، الـroutes، الاختبارات) وmain بقى = الفرع بالظبط. الـCI نجح للاتنين (Staging + migration + smoke ← Production + smoke). Production: dbc21e74 (قبل W6: 02cb6456، وقبل الإصلاحين: 070b3fb3). الـroutes الجديدة بترد 401 من غير دخول، وPages بيقدّم admin.css الجديد (tm8/crop8).
+- الرجوع: git revert ade963f 3b283d9 ثم push لـmain (الـCI بيرجّع الـWorker؛ جدول admin_avatars بيفضل فاضي ومش بيضر)، أو فورًا: cd worker && npx wrangler rollback 02cb6456-… (أول الرقم من `npx wrangler deployments list`).
+- Staging: PERMS_ENFORCE=1 (اتشغّل 2026-11-12 بعد النشر، smoke staging تمام). Production: PERMS_ENFORCE لسه 0 — **مستني موافقة صاحب المشروع**. التشغيل نفسه من «الإعدادات ← الفريق والصلاحيات ← شغّل الصلاحيات» (الأدمن الأساسي، بدخول جوجل)، والرجوع من «إزاي بتشتغل؟ ← اقفل تطبيق الصلاحيات» أو: wrangler d1 execute athanasios-prod --remote --command "UPDATE settings SET value='0' WHERE key='PERMS_ENFORCE'".
+- لسه لصاحب المشروع: (١) موافقة PERMS_ENFORCE على Production؛ (٢) تجربة بحسابين حقيقيين (اللون، وقلم الاسم، وصورة لكل حساب)؛ (٣) «ابعتله إيميل بالدعوة» بيتبعت فعلًا من Gmail الخدمة لو متظبط (اتجرب في الاختبارات من غير Gmail بس).
+- اختبارات قديمة فاشلة على main كمان (مش من W6): accounts-admin «notifications … system-status»، admin-rel «no horizontal overflow» (المسابقات على 360)، admin.e2e (12MP/small/Drive/navigation/library/من المكتبة/section colour)، refine-b allowlist، unit «a competition and a trip».
+
+### الجاي: W7 (B14)
+- قائمة الأزرار كاملة (tools/phase8-baseline.mjs بيكتب docs/PHASE8-INVENTORY.md) وتقارن بالقديمة، axe في الثيمين، الكيبورد، تجربة على موبايل حقيقي (Android / iPhone PWA)، والمقارنة النهائية بكل الصور جنب بعض (1440 و390).
+- يتصلح في W7: overflow المسابقات على 360 (admin-rel)، وشريط «تكبير» في قص الصورة (اتجاهه في RTL يتراجع على الصورة).
+- تشغيل PERMS_ENFORCE على Production بعد موافقة صاحب المشروع ومراجعة جدول «تطبيق الصلاحيات».
