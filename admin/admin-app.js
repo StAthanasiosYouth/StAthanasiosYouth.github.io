@@ -10794,11 +10794,16 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   ======================================================= */
 
   /* where a use lives: the item's own editor (A.openLink, AdminActivity) */
-  function openUse(u) {
+  function openUse(u, mediaId) {
     var kind = u.area === 'competitions' ? 'competition' : u.area;
-    A.closeSheet();
-    var go = A.openLink ? A.openLink('#open/' + kind + '/' + u.key) : Promise.resolve(false);
-    Promise.resolve(go).then(function (ok) { if (!ok) A.toast('افتحها من مكانها: ' + u.label, 'info'); });
+    Promise.resolve(A.closeSheet()).then(function (closed) {
+      if (closed === false) return;
+      // a service page / its video card, an event, a servant: AdminPages opens the editor itself
+      var go = /^(pages|events|servants)$/.test(u.area) && A.pages && A.pages.openUse
+        ? A.pages.openUse(u.area, u.key, mediaId, u.label)
+        : A.openLink ? A.openLink('#open/' + kind + '/' + u.key) : false;
+      Promise.resolve(go).then(function (ok) { if (ok === false) A.toast('افتحها من مكانها: ' + u.label, 'info'); });
+    });
   }
 
   function openDetails(item, list) {
@@ -10854,7 +10859,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         return el('div', { class: 'item media8-use' },
           el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(AREA_ICONS[u.area] || 'link')),
           el('div', { class: 'item__main' }, el('b', { text: parts.length > 1 ? parts.slice(1).join(': ') : u.label }), parts.length > 1 ? el('small', { text: parts[0] }) : null),
-          el('button', { class: 'btn btn--sm btn--ghost', type: 'button', 'aria-label': 'افتح: ' + u.label, onclick: function () { openUse(u); } }, 'افتح'));
+          el('button', { class: 'btn btn--sm btn--ghost', type: 'button', 'aria-label': 'افتح: ' + u.label, onclick: function () { openUse(u, item.id); } }, 'افتح'));
       }))
       : el('p', { class: 'note', text: 'مش مستخدمة في أي حاجة دلوقتي.' });
 
@@ -18000,7 +18005,23 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   var el = A.el;
   var icon = A.icon;
 
-  var P = A.pages = { focusPage: '', focusEvent: '' };
+  var P = A.pages = { focusPage: '', focusEvent: '', focusClip: '', focusServant: '' };
+
+  /*
+   * «افتح» on a library item's use (AdminMedia openUse): straight to its editor.
+   * pages: the page (or, for a video card's clip / cover / sound, that card's own editor);
+   * events: the event; servants: the servant. → Promise<boolean>
+   */
+  P.openUse = function (area, key, mediaId, label) {
+    if (area === 'pages') {
+      P.focusPage = key;
+      P.focusClip = /كارت فيديو/.test(String(label || '')) ? String(mediaId || '') : '';
+      return A.go('pages', 'svcpages');
+    }
+    if (area === 'events') { P.focusEvent = key; return A.go('pages', 'events'); }
+    if (area === 'servants') { P.focusServant = key; return A.go('pages', 'servants'); }
+    return Promise.resolve(false);
+  };
 
   var THEMES = [
     { value: '', label: 'تلقائي' }, { value: 'gold', label: 'ذهبي' }, { value: 'ember', label: 'جمري' }, { value: 'azure', label: 'أزرق' },
@@ -18320,8 +18341,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           draw(r);
           if (P.focusPage) {
             var page = r.pages.filter(function (p) { return p.id === P.focusPage; })[0];
+            var clipOf = P.focusClip;
             P.focusPage = '';
-            if (page) openPage(page.id);
+            P.focusClip = '';
+            if (page && clipOf) {
+              // a video card: its own editor (the page's full copy has the cards)
+              A.call('apiPage', page.id).then(function (full) {
+                var card = (full.media || []).filter(function (m) { return [m.cover, m.clip, m.audio].some(function (v) { return String(v || '').indexOf(clipOf) >= 0; }); })[0];
+                if (card) mediaEditor(full, card); else openPage(page.id);
+              }).catch(function (error) { A.fail(error, box); });
+            }
+            else if (page) openPage(page.id);
           }
         },
         failed: function (error) {
@@ -19855,6 +19885,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         reply = r;
         if (!body.isConnected) return;
         draw(r);
+        if (P.focusServant) {
+          var who = (r.servants || []).filter(function (x) { return x.id === P.focusServant; })[0];
+          P.focusServant = '';
+          if (who) servantEditor(who);
+        }
       }).catch(function (error) {
         if (!body.isConnected) return;
         body.replaceChildren();

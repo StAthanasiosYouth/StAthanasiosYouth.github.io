@@ -436,6 +436,24 @@ test('«الفعاليات»: a trip with prices and a servant; its card in «ا
   await shot('06-events');
 });
 
+test('a library item\'s «افتح» goes straight to its editor: the video card, the event, the servant (owner 2026-11-12)', async () => {
+  const pg = plain(world.as(ADMIN).gs.apiPages()).pages[0];
+  const card = plain(world.as(ADMIN).gs.apiPage(pg.id)).media[0];
+  const used = [card.cover, card.clip, card.audio].map(v => String(v || '').match(/(?:img|vid|aud)-[a-z0-9]{8}/)).filter(Boolean)[0][0];
+  await d.page.evaluate(() => A.closeSheet());
+  await d.page.evaluate(([key, id, title]) => A.pages.openUse('pages', key, id, 'كارت فيديو «' + title + '» في صفحة: x'), [pg.id, used, card.title]);
+  await d.page.waitForFunction(t => (document.querySelector('dialog.sheet[open] .sheet__title')?.textContent || '').includes('تعديل المقطع: ' + t), { timeout: 10000 }, card.title);
+  await d.page.evaluate(() => A.closeSheet());
+  const ev = plain(world.as(ADMIN).gs.apiEvents()).events[0];
+  await d.page.evaluate(key => A.pages.openUse('events', key, '', ''), ev.id);
+  await d.page.waitForFunction(t => (document.querySelector('dialog.sheet[open]')?.textContent || '').includes(t), { timeout: 10000 }, ev.title);
+  await d.page.evaluate(() => A.closeSheet());
+  const sv = plain(world.as(ADMIN).gs.apiServants()).servants[0];
+  await d.page.evaluate(key => A.pages.openUse('servants', key, '', ''), sv.id);
+  await d.page.waitForFunction(t => (document.querySelector('dialog.sheet[open]')?.textContent || '').includes(t), { timeout: 10000 }, sv.name);
+  await d.page.evaluate(() => A.closeSheet());
+});
+
 test('«رتّب الكروت»: the order sheet moves a card up and saves the home order', async () => {
   // a plain activity card next to the event's
   world.as(ADMIN).gs.apiSaveItem('activities', { type: 'trip', title: 'مسرحية العيد', enabled: true });
