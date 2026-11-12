@@ -431,7 +431,10 @@ test('admin/: strict CSP, noindex, no-referrer, no inline code, no redirect, no 
   assert.doesNotMatch(html, /\sstyle=|<style|<script>|\son[a-z]+="/, 'no inline style or script');
   assert.doesNotMatch(html, /<iframe|http-equiv="refresh"/i, 'never embedded, never redirected');
   // restore.js first and not deferred (final/r: the compact gate after a reload, before anything is drawn)
-  assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]), ['restore.js', 'look.js', 'config.js', 'admin-app.js', 'boot.js', 'layout-check.js']); // look.js: Phase 8 A1
+  // admin-app.js carries its content hash (?v=…) so a fresh page never runs an older copy
+  assert.match(html, /<script src="admin-app\.js\?v=[0-9a-f]{10}" defer>/);
+  assert.match(html, /<link rel="stylesheet" href="admin\.css\?v=[0-9a-f]{10}">/);
+  assert.deepEqual([...html.matchAll(/<script src="([^"?]+)(?:\?v=[0-9a-f]+)?"/g)].map(m => m[1]), ['restore.js', 'look.js', 'config.js', 'admin-app.js', 'boot.js', 'layout-check.js']); // look.js: Phase 8 A1
 
   const boot = readFileSync(`${ROOT}admin/boot.js`, 'utf8');
   assert.match(boot, /window\.top !== window\.self/, 'frame-busting');

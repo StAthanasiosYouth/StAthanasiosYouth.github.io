@@ -19,6 +19,7 @@
 // (npm run sync runs it too). tests/refine-b.test.mjs fails when admin/ is stale.
 
 import { readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { ROOT } from './lib/gs.mjs';
 
@@ -105,14 +106,21 @@ export function buildAdmin() {
 
   const scripts = includes.slice(1).map(name => `/* ---------- ${name}.html ---------- */\n${unwrap(name, 'script')}\n`);
 
+  const css = `/* ${NOTE} */\n\n${FONTS}\n${unwrap('AdminStyles', 'style')}\n`;
+  const app = `/* ${NOTE} */\n\n${scripts.join('\n')}`;
+  // owner 2026-11-12: a deploy showed late (GitHub Pages lets browsers keep a file 10 minutes). The page names its
+  // two big files with their content hash, so a fresh page never runs yesterday's panel.
+  const v = text => createHash('sha256').update(text).digest('hex').slice(0, 10);
   const index = read('tools/source/admin-index.html')
     .replace('{{GENERATED}}', NOTE)
-    .replace('{{SHELL}}', shell.split('\n').map(line => (line ? '  ' + line : line)).join('\n'));
+    .replace('{{SHELL}}', shell.split('\n').map(line => (line ? '  ' + line : line)).join('\n'))
+    .replace('href="admin.css"', `href="admin.css?v=${v(css)}"`)
+    .replace('src="admin-app.js"', `src="admin-app.js?v=${v(app)}"`);
 
   return {
     'admin/index.html': index,
-    'admin/admin.css': `/* ${NOTE} */\n\n${FONTS}\n${unwrap('AdminStyles', 'style')}\n`,
-    'admin/admin-app.js': `/* ${NOTE} */\n\n${scripts.join('\n')}`
+    'admin/admin.css': css,
+    'admin/admin-app.js': app
   };
 
 }
