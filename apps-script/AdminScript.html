@@ -3952,7 +3952,7 @@
    * the area that now shows it.
    */
   var PROMOTED = {
-    youth: { from: 'comps', subs: ['youth'], label: 'الشباب', short: 'الشباب', icon: 'users', title: 'حسابات الشباب' },
+    youth: { from: 'comps', subs: ['youth', 'youth-review', 'youth-results', 'youth-store', 'youth-seasons'], label: 'الشباب', short: 'الشباب', icon: 'users', title: 'حسابات الشباب' },
     bookings: { from: 'pages', subs: ['bookings', 'finance'], label: 'الحجوزات والفلوس', short: 'الحجوزات', icon: 'ticket' }
   };
 
@@ -4124,7 +4124,9 @@
       return el('button', {
         class: 'tab', type: 'button',
         'aria-current': s.key === A.sub[A.area] ? 'page' : null,
-        onclick: function () { if (s.key !== A.sub[A.area]) A.go(A.area, s.key); }
+        'data-act': s.act || null,
+        // a tab may reset its own screen when it's pressed again (the person → the list of «حسابات الشباب»)
+        onclick: function () { if (s.key !== A.sub[A.area]) A.go(A.area, s.key); else if (s.again) s.again(); }
       }, s.label, navBadge(s.badge, 'tab__badge'));
     }));
 

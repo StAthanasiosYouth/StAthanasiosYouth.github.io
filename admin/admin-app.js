@@ -4081,7 +4081,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
    * the area that now shows it.
    */
   var PROMOTED = {
-    youth: { from: 'comps', subs: ['youth'], label: 'الشباب', short: 'الشباب', icon: 'users', title: 'حسابات الشباب' },
+    youth: { from: 'comps', subs: ['youth', 'youth-review', 'youth-results', 'youth-store', 'youth-seasons'], label: 'الشباب', short: 'الشباب', icon: 'users', title: 'حسابات الشباب' },
     bookings: { from: 'pages', subs: ['bookings', 'finance'], label: 'الحجوزات والفلوس', short: 'الحجوزات', icon: 'ticket' }
   };
 
@@ -4253,7 +4253,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       return el('button', {
         class: 'tab', type: 'button',
         'aria-current': s.key === A.sub[A.area] ? 'page' : null,
-        onclick: function () { if (s.key !== A.sub[A.area]) A.go(A.area, s.key); }
+        'data-act': s.act || null,
+        // a tab may reset its own screen when it's pressed again (the person → the list of «حسابات الشباب»)
+        onclick: function () { if (s.key !== A.sub[A.area]) A.go(A.area, s.key); else if (s.again) s.again(); }
       }, s.label, navBadge(s.badge, 'tab__badge'));
     }));
 
@@ -17216,11 +17218,13 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   function when(ms) { return ms ? new Date(ms).toLocaleString('ar-EG', { timeZone: 'Africa/Cairo', dateStyle: 'medium', timeStyle: 'short' }) : '—'; }
   function newKey() { return (window.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2)).replace(/[^A-Za-z0-9_-]/g, ''); }
 
-  function eligibilityChip(p) {
+  function eligibilityChip(p, mark) {
     var e = p.eligibility || {};
     if (p.status === 'blocked' || e.state === 'blocked') return A.chip('موقوف', 'danger');
-    if (e.state === 'guest') return A.chip('ضيف' + (e.source === 'override' ? ' (يدوي)' : ''), 'off');
-    return A.chip('مؤهل' + (e.source === 'override' ? ' (يدوي)' : '') + (e.soon ? ' · قرب يخرج' : ''), e.soon ? 'gold' : 'ok');
+    if (e.state === 'guest') return A.chip('ضيف' + (e.source === 'override' ? ' (يدوي)' : ''), 'warn');
+    var chip = A.chip('مؤهل' + (e.source === 'override' ? ' (يدوي)' : '') + (e.soon ? ' · قرب يخرج' : ''), e.soon ? 'gold' : 'ok');
+    if (mark) chip.insertBefore(icon('check'), chip.firstChild);
+    return chip;
   }
 
   function fact(label, value) {
@@ -17279,36 +17283,6 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     A.openSheet(title, [el('p', { class: 'note', text: note }), text], [copy, close]);
   }
 
-  /*
-   * The current password in the person's facts, Primary Admin only (the server refuses anyone else). It isn't part
-   * of the sheet's reply: this separate call is what the server logs, once per view. It leaves the page by itself.
-   */
-  var YOUTH_PASSWORD_MS = 5 * 60000;
-
-  function currentPassword(path) {
-    var holder = el('span', { class: 'youth-current', 'data-youth-current': '' });
-    function again(message) {
-      A.fill(holder, [
-        message ? el('span', { text: message }) : null,
-        el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-password-again', onclick: load }, 'إظهار تاني')
-      ]);
-    }
-    function load() {
-      A.fill(holder, el('span', { class: 'note', text: 'بنجيبه…' }));
-      api('POST', path + 'view-password', {}).then(function (reply) {
-        var copy = el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-password-copy', text: 'نسخ' });
-        copy.addEventListener('click', function () {
-          if (!navigator.clipboard) return;
-          navigator.clipboard.writeText(reply.password).then(function () { A.toast('اتنسخ ✓'); }).catch(function () { A.toast('مقدرناش ننسخ', 'error'); });
-        });
-        A.fill(holder, [el('span', { class: 'ltr', 'data-youth-current-value': '', text: reply.password }), ' ', copy]);
-        setTimeout(function () { again(''); }, YOUTH_PASSWORD_MS);
-      }).catch(function () { again('مقدرناش نعرضه.'); });
-    }
-    load();
-    return holder;
-  }
-
   /* =======================================================
      THE LIST
   ======================================================= */
@@ -17331,56 +17305,99 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     });
   }, { rootMargin: '120px' }) : null;
 
-  function copyLine(text, label, cls) {
-    return el('button', { class: 'ycard__copy ' + cls, type: 'button', 'aria-label': 'انسخ ' + label + ': ' + text, title: 'اضغط تنسخ', onclick: function (event) {
+  // Phase 8B (youth-list.png): a card with the state's dot on the face, the chips under the name, then the phone and
+  // the email as copy pills (cut with «…» when long; the full text is in the title and is what gets copied)
+  function copyLine(text, label, cls, iconName) {
+    return el('button', { class: 'ycard__copy ' + cls, type: 'button', 'aria-label': 'انسخ ' + label + ': ' + text, title: text, onclick: function (event) {
       event.stopPropagation();
       navigator.clipboard.writeText(text).then(function () { A.toast('اتنسخ ' + label + ' ✓'); }).catch(function () { A.toast('مقدرناش ننسخ', 'error'); });
-    } }, el('bdi', { class: 'ltr', text: text }), icon('copy'));
+    } }, el('span', { class: 'ycard__ic', 'aria-hidden': 'true' }, icon(iconName)), el('bdi', { class: 'ltr', text: text }), el('span', { class: 'ycard__ic ycard__ic--copy', 'aria-hidden': 'true' }, icon('copy')));
+  }
+
+  function stateOf(p) {
+    var e = p.eligibility || {};
+    return p.status === 'blocked' || e.state === 'blocked' ? 'blocked' : e.state === 'guest' ? 'guest' : 'eligible';
+  }
+  var TONE = { eligible: 'ok', guest: 'warn', blocked: 'danger' };
+
+  /* the person: always on the «حسابات الشباب» tab (a card in «حسابات جديدة» opens there too) */
+  function openPerson(id) {
+    Y.view = 'person';
+    Y.id = id;
+    A.go('comps', 'youth');
   }
 
   function personRow(p) {
-    var face = el('span', { class: 'ycard__face', 'aria-hidden': 'true' }, el('span', { class: 'ycard__letter', text: String(p.name || '؟').trim().charAt(0) }));
+    var state = stateOf(p);
+    var face = el('span', { class: 'ycard__face', 'aria-hidden': 'true' },
+      el('span', { class: 'ycard__letter', text: String(p.name || '؟').trim().charAt(0) }),
+      el('i', { class: 'ycard__dot ycard__dot--' + TONE[state] }));
     if (p.avatar && window.AdminWorker && cardPhotos) {
       var img = el('img', { class: 'ycard__photo', alt: '', width: '64', height: '64', 'data-youth-card-photo': '', 'data-pid': p.id });
-      face.appendChild(img);
+      face.insertBefore(img, face.lastChild);
       cardPhotos.observe(img);
     }
-    return el('article', { class: 'ycard' + (p.status === 'blocked' ? ' is-blocked' : '') },
-      el('button', { class: 'ycard__open', type: 'button', 'data-youth': p.id, 'aria-label': 'افتح حساب ' + p.name, onclick: function () { Y.view = 'person'; Y.id = p.id; A.render(); } }),
+    return el('article', { class: 'ycard' + (state === 'blocked' ? ' is-blocked' : ''), 'data-state': state },
+      el('button', { class: 'ycard__open', type: 'button', 'data-youth': p.id, 'aria-label': 'افتح حساب ' + p.name, onclick: function () { openPerson(p.id); } }),
       face,
       el('div', { class: 'ycard__main' },
         el('bdi', { class: 'ycard__name', text: p.name }),
-        p.phone ? copyLine(p.phone, 'الموبايل', 'ycard__phone') : null,
-        p.email ? copyLine(p.email, 'الإيميل', 'ycard__email') : null,
         el('span', { class: 'ycard__chips' },
           eligibilityChip(p),
           p.emailVerified ? null : A.chip('الإيميل مش متأكد', 'danger'),
           p.balance ? A.chip(ar(p.balance) + ' نقطة' + (p.eligibility.state === 'guest' ? ' · متجمد' : ''), p.eligibility.state === 'guest' ? 'off' : 'info') : null,
-          (p.flags || []).map(function (f) { return A.chip(FLAGS[f] || f, 'gold'); }))),
+          (p.flags || []).map(function (f) { return A.chip(FLAGS[f] || f, 'gold'); })),
+        p.phone ? copyLine(p.phone, 'الموبايل', 'ycard__phone', 'phone') : null,
+        p.email ? copyLine(p.email, 'الإيميل', 'ycard__email', 'mail') : null),
       el('span', { class: 'ycard__go', 'aria-hidden': 'true' }, icon('chevron')));
   }
 
+  /* the card's head: icon, title and line, then its buttons (p8-card) */
+  function cardHead(iconName, title, hint, acts) {
+    return el('div', { class: 'p8-card__head' },
+      el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(iconName)),
+      el('div', { class: 'p8-card__titles' },
+        el('h2', { class: 'card__title', text: title }),
+        hint ? el('p', { class: 'card__hint', text: hint }) : null),
+      acts || null);
+  }
+
+  function kpi(iconName, label, value) {
+    return el('div', { class: 'kpi' }, el('small', {}, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon(iconName)), label), el('b', { text: value }));
+  }
+
+  var KPIS = [['users', 'كل الحسابات', 'all'], ['check', 'مؤهل', 'eligible'], ['user', 'ضيف', 'guest'], ['lock', 'موقوف', 'blocked']];
+
   function listView() {
     var box = A.errorBox();
+    var kpis = el('div', { class: 'y8-kpis', 'data-youth-kpis': '' });
+    function drawKpis(counts) {
+      // the Worker's own counts (every account); a dash until they come, never a made-up number
+      A.fill(kpis, KPIS.map(function (k) { return kpi(k[0], k[1], counts && counts[k[2]] != null ? ar(counts[k[2]]) : '—'); }));
+    }
+    drawKpis(null);
     var rows = el('div', { class: 'comp-list ycards', 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
-    var search = el('input', { class: 'input', type: 'search', placeholder: 'دوّر بالاسم أو الإيميل أو الموبايل…', 'aria-label': 'بحث', value: Y.q });
-    var state = select([['', 'الكل'], ['eligible', 'مؤهل'], ['guest', 'ضيف'], ['blocked', 'موقوف']], Y.state, 'الأهلية');
-    var tools = el('div', { class: 'actions' });
+    var more = el('div', { class: 'y8-more' });
+    var search = el('input', { class: 'p8-search__input', type: 'search', placeholder: 'دوّر بالاسم أو الإيميل أو الموبايل…', 'aria-label': 'بحث', value: Y.q });
+    var name = A.uid('ystate');
+    var state = el('div', { class: 'seg p8-filter y8-state', role: 'radiogroup', 'aria-label': 'الأهلية' }, [['', 'الكل'], ['eligible', 'مؤهل'], ['guest', 'ضيف'], ['blocked', 'موقوف']].map(function (o) {
+      return el('label', { class: 'seg__opt' },
+        el('input', { type: 'radio', name: name, value: o[0], checked: Y.state === o[0], onchange: function () { Y.state = o[0]; Y.offset = 0; load(); } }),
+        el('span', { text: o[1] }));
+    }));
+    var tools = el('div', { class: 'p8-card__acts y8-acts' });
 
     function load() {
       var q = 'q=' + encodeURIComponent(Y.q) + '&offset=' + Y.offset + (Y.state === 'blocked' ? '&status=blocked' : Y.state ? '&state=' + Y.state : '');
       api('GET', 'participants?' + q).then(function (d) {
         rows.setAttribute('aria-busy', 'false');
-        A.fill(rows, d.people.length ? d.people.map(personRow) : el('p', { class: 'note', text: Y.q ? 'مفيش نتايج.' : 'لسه مفيش حسابات.' }),
-          d.total > Y.offset + d.limit ? el('button', { class: 'btn btn--ghost', type: 'button', text: 'اللي بعدهم', onclick: function () { Y.offset += d.limit; load(); } }) : null);
+        drawKpis(d.counts);
+        A.fill(rows, d.people.length ? d.people.map(personRow) : el('div', { class: 'p8-empty' }, el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('users')), el('b', { text: Y.q ? 'مفيش نتايج.' : 'لسه مفيش حسابات.' })));
+        A.fill(more, d.total > Y.offset + d.limit ? el('button', { class: 'btn btn--ghost', type: 'button', text: 'اللي بعدهم', onclick: function () { Y.offset += d.limit; load(); } }) : null);
         A.fill(tools,
-          d.can.add ? el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'youth-add', onclick: addForm }, icon('plus'), 'حساب جديد') : null,
-          el('button', { class: 'btn', type: 'button', 'data-act': 'youth-review', onclick: function () { Y.view = 'review'; A.render(); } }, 'حسابات جديدة'),
-          el('button', { class: 'btn', type: 'button', 'data-act': 'youth-results', onclick: function () { Y.view = 'results'; Y.comp = ''; A.render(); } }, 'النتايج'),
-          el('button', { class: 'btn', type: 'button', 'data-act': 'youth-store', onclick: function () { Y.view = 'store'; A.render(); } }, 'المتجر'),
-          el('button', { class: 'btn', type: 'button', 'data-act': 'youth-seasons', onclick: function () { Y.view = 'seasons'; A.render(); } }, 'المواسم'),
           d.can.manage ? el('button', { class: 'btn', type: 'button', 'data-act': 'youth-settings', onclick: settingsForm }, icon('gear'), 'الإعدادات') : null,
-          d.can.export ? el('button', { class: 'btn btn--ghost', type: 'button', 'data-act': 'youth-export', onclick: exportBook }, 'تصدير Excel') : null);
+          d.can.export ? el('button', { class: 'btn btn--ghost', type: 'button', 'data-act': 'youth-export', onclick: exportBook }, icon('download'), 'تصدير Excel') : null,
+          d.can.add ? el('button', { class: 'btn btn--primary', type: 'button', 'data-act': 'youth-add', onclick: addForm }, icon('plus'), 'حساب جديد') : null);
       }).catch(function (error) {
         rows.setAttribute('aria-busy', 'false');
         A.fill(rows);
@@ -17393,23 +17410,26 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       clearTimeout(typing);
       typing = setTimeout(function () { Y.q = search.value.trim(); Y.offset = 0; load(); }, 300);
     });
-    state.addEventListener('change', function () { Y.state = state.value; Y.offset = 0; load(); });
     load();
-    return [A.card('حسابات الشباب', 'كل حساب: إيميل وباسورد مولّد. الأهلية بتتحسب لوحدها من السن والنطاق العمري.', box, tools, el('div', { class: 'row' }, search, state), rows)];
+    return [kpis, el('section', { class: 'card p8-card y8-list' },
+      cardHead('users', 'حسابات الشباب', 'اضغط على أي كارت تفتح الحساب. الموبايل والإيميل بيتنسخوا بلمسة.', tools),
+      box,
+      el('div', { class: 'p8-card__filters y8-filters' }, el('label', { class: 'p8-search y8-search' }, icon('filter'), search), state),
+      rows, more)];
   }
 
   function reviewView() {
     var box = A.errorBox();
-    var rows = el('div', { class: 'comp-list', 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
+    var rows = el('div', { class: 'comp-list ycards', 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
     api('GET', 'participants/review').then(function (d) {
       rows.setAttribute('aria-busy', 'false');
-      A.fill(rows, d.people.length ? d.people.map(personRow) : el('p', { class: 'note', text: 'مفيش حسابات جديدة.' }));
+      A.fill(rows, d.people.length ? d.people.map(personRow) : el('div', { class: 'p8-empty' }, el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('users')), el('b', { text: 'مفيش حسابات جديدة.' })));
     }).catch(function (error) { rows.setAttribute('aria-busy', 'false'); A.fill(rows); A.fail(error, box); });
-    return [A.card('حسابات جديدة', 'اللي سجلوا بنفسهم، الأحدث الأول. العلامات للمراجعة بس، مش بتمنع حد.', box, backButton(), rows)];
+    return [el('section', { class: 'card p8-card y8-list' }, cardHead('users', 'حسابات جديدة', 'اللي سجلوا بنفسهم، الأحدث الأول. العلامات للمراجعة بس، مش بتمنع حد.'), box, rows)];
   }
 
   function backButton() {
-    return el('button', { class: 'btn btn--ghost btn--small', type: 'button', 'data-act': 'youth-back', onclick: function () { Y.view = 'list'; A.render(); } }, icon('prev'), 'رجوع للحسابات');
+    return el('button', { class: 'btn btn--ghost btn--small y8-back', type: 'button', 'data-act': 'youth-back', onclick: function () { Y.view = 'list'; A.render(); } }, icon('arrow'), 'رجوع للحسابات');
   }
 
   function addForm() {
@@ -17474,17 +17494,18 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   }
 
   /* =======================================================
-     THE PERSON SHEET (§12.1)
+     THE PERSON SHEET (§12.1) — Phase 8B youth.png: the profile card on the side, then the password,
+     the actions, points + devices, and the history tabs
   ======================================================= */
 
   function personView() {
     var box = A.errorBox();
-    var main = el('div', { 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
+    var main = el('div', { class: 'y8-acct', 'aria-busy': 'true' }, el('p', { class: 'skeleton skeleton--line' }));
     api('GET', 'participants/' + encodeURIComponent(Y.id)).then(function (d) {
       main.setAttribute('aria-busy', 'false');
       A.fill(main, personBody(d));
     }).catch(function (error) { main.setAttribute('aria-busy', 'false'); A.fill(main); A.fail(error, box); });
-    return [A.card('حساب', '', box, backButton(), main)];
+    return [el('div', { class: 'y8-backrow' }, backButton()), box, main];
   }
 
   function emailForm(p, can) {
@@ -17502,11 +17523,94 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     });
   }
 
+  var MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  function dayText(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+    return m ? ar(Number(m[3])) + ' ' + MONTHS[Number(m[2]) - 1] + ' ' + ar(m[1]).replace(/٬/g, '') : (iso || '—');
+  }
+  function digits(text) { return String(text).replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[x]; }); }
+  function longWhen(ms) {
+    if (!ms) return '—';
+    var d = new Date(ms);
+    var day = d.toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
+    var time = d.toLocaleTimeString('en-GB', { timeZone: 'Africa/Cairo', hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
+    var m = /^(\d+):(\d+)\s*(am|pm)$/.exec(time);
+    var dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+    return digits(Number(dm[3]) + ' ' + MONTHS[Number(dm[2]) - 1] + ' ' + dm[1] + '، ' + (m ? m[1] + ':' + m[2] + ' ' + (m[3] === 'am' ? 'ص' : 'م') : time));
+  }
+  function shortWhen(ms) {
+    if (!ms) return '—';
+    var s = Math.round((Date.now() - ms) / 1000);
+    if (s >= 0 && s < 3600) return A.ago(s);
+    return longWhen(ms).replace(/ \d{4}|\s[٠-٩]{4}/, '');
+  }
+  function lastSeen(ms) {
+    if (!ms) return '';
+    var today = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
+    var day = new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
+    var yesterday = new Date(Date.now() - 864e5).toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
+    return 'آخر دخول ' + (day === today ? 'النهارده' : day === yesterday ? 'امبارح' : shortWhen(ms));
+  }
+
+  function copyText(text, label) {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(text).then(function () { A.toast('اتنسخ' + (label ? ' ' + label : '') + ' ✓'); }).catch(function () { A.toast('مقدرناش ننسخ', 'error'); });
+  }
+
+  /*
+   * Decision 2 (PLAN.md): the current password stays hidden until «اعرض»; every view is its own logged call
+   * (POST view-password), and it hides again by itself. «نسخ» fetches it the same way (one more logged view).
+   * Primary Admin only (the server refuses anyone else). Never in storage, lists, URLs or history.
+   */
+  var YOUTH_PASSWORD_MS = 5 * 60000;
+
+  function passwordCard(path, reset) {
+    var value = el('b', { class: 'mono y8-secret__v', 'data-youth-current': '', text: '••••-••••-••••' });
+    var shown = '';
+    var timer = null;
+    function hide() {
+      shown = '';
+      clearTimeout(timer);
+      value.removeAttribute('data-youth-current-value');
+      value.textContent = '••••-••••-••••';
+      show.hidden = false;
+      hideBtn.hidden = true;
+    }
+    function fetchIt(button) {
+      return A.withBusy(button, api('POST', path + 'view-password', {})).then(function (reply) {
+        shown = reply.password;
+        value.setAttribute('data-youth-current-value', '');
+        value.textContent = shown;
+        show.hidden = true;
+        hideBtn.hidden = false;
+        clearTimeout(timer);
+        timer = setTimeout(hide, YOUTH_PASSWORD_MS);
+        return shown;
+      });
+    }
+    var show = el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-password-show', onclick: function (event) {
+      fetchIt(event.currentTarget).catch(function (error) { A.fail(error); });
+    } }, icon('eye'), 'اعرض');
+    var hideBtn = el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-password-hide', hidden: true, onclick: hide }, icon('eye'), 'اخفي');
+    var copy = el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-password-copy', onclick: function (event) {
+      (shown ? Promise.resolve(shown) : fetchIt(event.currentTarget)).then(function (text) { copyText(text, 'الباسورد'); }).catch(function (error) { A.fail(error); });
+    } }, icon('copy'), 'نسخ');
+    var fresh = reset ? el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-password-new', onclick: reset }, icon('retry'), 'ولّد جديد') : null;
+    return el('section', { class: 'card p8-card y8-pw' },
+      el('div', { class: 'p8-card__head' },
+        el('span', { class: 'chipico chipico--warn', 'aria-hidden': 'true' }, icon('lock')),
+        el('div', { class: 'p8-card__titles' },
+          el('h2', { class: 'card__title', text: 'الباسورد الحالي' }),
+          el('p', { class: 'card__hint', text: 'ليك إنت بس — وكل عرض بيتسجل في السجل' }))),
+      el('div', { class: 'y8-secret' }, value, el('span', { class: 'y8-sp' }), show, hideBtn, copy, fresh));
+  }
+
   function personBody(d) {
     var p = d.person;
     var can = d.can;
     var path = 'participants/' + p.id + '/';
-    var edit = can.edit ? el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-edit', onclick: function () {
+
+    function editForm() {
       var name = A.textInput(p.name, { max: 80 });
       var group = A.textInput(p.group, { max: 120 });
       var church = A.textInput(p.church, { max: 120 });
@@ -17515,53 +17619,96 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       formSheet({ title: 'تعديل البيانات', path: path + 'profile', reasonHint: 'لازم سبب لو الاسم اتغير', fields: [
         { key: 'name', label: 'الاسم', input: name }, { key: 'group', label: 'المجموعة', input: group }, { key: 'church', label: 'الكنيسة', input: church }, { key: 'servant', label: 'الخادم المسؤول', input: servant }, { key: 'notes', label: 'ملاحظات (للأدمن بس)', input: notes }
       ] });
-    } }, 'تعديل البيانات') : null;
-
-    var manage = can.manage ? [
-      el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-email', onclick: function () { emailForm(p, can); } }, 'تصحيح الإيميل'),
-      el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-phone', onclick: function () {
-        formSheet({ title: 'تصحيح الموبايل', path: path + 'phone', fields: [{ key: 'phone', label: 'الرقم الجديد', input: A.textInput('', { ltr: true, max: 20 }) }] });
-      } }, 'تصحيح الموبايل'),
-      el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-dob', onclick: function () {
-        formSheet({ title: 'تصحيح تاريخ الميلاد', path: path + 'dob', intro: 'بيأثر على الجاي بس: النقط والحجوزات اللي فاتت بتفضل زي ما هي.', fields: [{ key: 'birthDate', label: 'التاريخ الصح', input: el('input', { class: 'input', type: 'date', value: p.birthDate, 'aria-label': 'تاريخ الميلاد' }) }] });
-      } }, 'تصحيح الميلاد'),
-      el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-eligibility', onclick: function () {
-        formSheet({ title: 'الأهلية', path: path + 'eligibility', fields: [{ key: 'override', label: 'الأهلية', input: select([['auto', 'تلقائي من السن'], ['eligible', 'مؤهل (يدوي)'], ['guest', 'ضيف (يدوي)']], p.eligibility.override || 'auto', 'الأهلية') }] });
-      } }, 'الأهلية'),
-      el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-reset', onclick: function () {
-        var check = select([['', 'مش من الدعم الفني']].concat(SUPPORT_CHECKS), '', 'التحقق');
-        formSheet({
-          title: 'باسورد جديد', kind: 'danger', label: 'اعمل باسورد جديد', path: path + 'reset-password',
-          intro: 'الباسورد القديم بيقف وكل الأجهزة بتخرج. مبيتبعتش بالإيميل أبدًا.',
-          extra: function () { return check.value ? { support: true } : {}; },
-          fields: [{ key: 'checkMethod', label: 'لو ده طلب من الدعم الفني: اتأكدت من الشخص إزاي؟', input: check }],
-          done: function (reply) { showPassword('الباسورد الجديد', reply.password, 'بيظهر للي عمله دلوقتي. سلّمه للشخص على واتساب خاص أو قدامك.'); }
-        });
-      } }, 'توليد باسورد جديد'),
-      el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-revoke', onclick: function (event) {
-        A.withBusy(event.currentTarget, api('POST', path + 'sessions/revoke', {})).then(function () { A.toast('خرج من كل الأجهزة ✓'); A.render(); }).catch(function (error) { A.fail(error); });
-      } }, 'اخرج من كل الأجهزة')
-    ] : [];
-
+    }
+    function phoneForm() { formSheet({ title: 'تصحيح الموبايل', path: path + 'phone', fields: [{ key: 'phone', label: 'الرقم الجديد', input: A.textInput('', { ltr: true, max: 20 }) }] }); }
+    function dobForm() {
+      formSheet({ title: 'تصحيح تاريخ الميلاد', path: path + 'dob', intro: 'بيأثر على الجاي بس: النقط والحجوزات اللي فاتت بتفضل زي ما هي.', fields: [{ key: 'birthDate', label: 'التاريخ الصح', input: el('input', { class: 'input', type: 'date', value: p.birthDate, 'aria-label': 'تاريخ الميلاد' }) }] });
+    }
+    function eligibilityForm() {
+      formSheet({ title: 'الأهلية', path: path + 'eligibility', fields: [{ key: 'override', label: 'الأهلية', input: select([['auto', 'تلقائي من السن'], ['eligible', 'مؤهل (يدوي)'], ['guest', 'ضيف (يدوي)']], p.eligibility.override || 'auto', 'الأهلية') }] });
+    }
+    function resetForm() {
+      var check = select([['', 'مش من الدعم الفني']].concat(SUPPORT_CHECKS), '', 'التحقق');
+      formSheet({
+        title: 'باسورد جديد', kind: 'danger', label: 'اعمل باسورد جديد', path: path + 'reset-password',
+        intro: 'الباسورد القديم بيقف وكل الأجهزة بتخرج. مبيتبعتش بالإيميل أبدًا.',
+        extra: function () { return check.value ? { support: true } : {}; },
+        fields: [{ key: 'checkMethod', label: 'لو ده طلب من الدعم الفني: اتأكدت من الشخص إزاي؟', input: check }],
+        done: function (reply) { showPassword('الباسورد الجديد', reply.password, 'بيظهر للي عمله دلوقتي. سلّمه للشخص على واتساب خاص أو قدامك.'); }
+      });
+    }
+    function revoke(event) {
+      A.withBusy(event.currentTarget, api('POST', path + 'sessions/revoke', {})).then(function () { A.toast('خرج من كل الأجهزة ✓'); A.render(); }).catch(function (error) { A.fail(error); });
+    }
     var blocked = p.status === 'blocked';
-    var blockBtn = (blocked ? can.manage : can.edit) ? el('button', { class: 'btn btn--small btn--danger', type: 'button', 'data-act': blocked ? 'youth-unblock' : 'youth-block', onclick: function () {
+    function blockForm() {
       formSheet({ title: blocked ? 'رجوع الحساب' : 'إيقاف الحساب', kind: blocked ? 'primary' : 'danger', label: blocked ? 'رجّعه' : 'وقّفه', path: path + (blocked ? 'unblock' : 'block'), fields: [] });
-    } }, blocked ? 'رجّع الحساب' : 'وقّف الحساب') : null;
-
-    // the member's optional photo: from the private bucket, over this admin's session; removing it asks why
-    var photo = null;
-    if (p.avatar) {
-      var image = el('img', { class: 'youth-photo', alt: 'صورة الحساب', width: '96', height: '96', 'data-youth-photo': '' });
-      window.AdminWorker.blob('/v1/admin/participants/' + encodeURIComponent(p.id) + '/avatar').then(function (blob) {
-        var url = URL.createObjectURL(blob);
-        image.addEventListener('load', function () { URL.revokeObjectURL(url); }, { once: true });
-        image.src = url;
-      }).catch(function () { image.alt = 'مقدرناش نعرض الصورة'; });
-      photo = el('div', { class: 'youth-photo-row' }, image, can.edit ? el('button', { class: 'btn btn--small btn--danger', type: 'button', 'data-act': 'youth-photo-delete', onclick: function () {
-        formSheet({ title: 'مسح صورة الحساب', kind: 'danger', label: 'امسح الصورة', path: path + 'avatar/delete', intro: 'الصورة بتتمسح نهائي، والسبب بيتسجل في تاريخ الحساب. صاحب الحساب يقدر يحط صورة تانية.', fields: [] });
-      } }, 'امسح الصورة') : null);
     }
 
+    /* --- the profile card --- */
+    var face = el('span', { class: 'y8-face', 'aria-hidden': 'true' }, el('span', { text: String(p.name || '؟').trim().charAt(0) }));
+    var photoUrl = '';
+    if (p.avatar) {
+      var image = el('img', { class: 'youth-photo', alt: 'صورة الحساب', width: '112', height: '112', 'data-youth-photo': '' });
+      face.appendChild(image);
+      window.AdminWorker.blob('/v1/admin/participants/' + encodeURIComponent(p.id) + '/avatar').then(function (blob) {
+        photoUrl = URL.createObjectURL(blob);
+        image.addEventListener('load', function () { face.classList.add('has-photo'); }, { once: true });
+        image.src = photoUrl;
+      }).catch(function () { image.alt = 'مقدرناش نعرض الصورة'; });
+    }
+    var photoActs = p.avatar ? el('div', { class: 'y8-profile__acts' },
+      el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-photo-view', onclick: function () { if (photoUrl && A.lightbox) A.lightbox(photoUrl, 'صورة ' + p.name); } }, icon('photos'), 'الصورة'),
+      can.edit ? el('button', { class: 'btn btn--small btn--danger', type: 'button', 'data-act': 'youth-photo-delete', onclick: function () {
+        formSheet({ title: 'مسح صورة الحساب', kind: 'danger', label: 'امسح الصورة', path: path + 'avatar/delete', intro: 'الصورة بتتمسح نهائي، والسبب بيتسجل في تاريخ الحساب. صاحب الحساب يقدر يحط صورة تانية.', fields: [] });
+      } }, icon('trash'), 'امسح الصورة') : null) : null;
+
+    function kv(iconName, label, value, control, opts) {
+      if (value === null || value === undefined || value === '') return null;
+      return el('div', { class: 'y8-kv__row' },
+        el('dt', {}, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon(iconName)), label),
+        el('dd', { class: opts && opts.mono ? 'mono' : '', dir: opts && opts.ltr ? 'ltr' : 'auto' }, value),
+        el('div', { class: 'y8-kv__ctl' }, control || null));
+    }
+    function pen(label, act, fn) { return el('button', { class: 'btn btn--small btn--ghost y8-pen', type: 'button', 'data-act': act, 'aria-label': label, title: label, onclick: fn }, icon('edit')); }
+
+    var emailState = !p.emailVerified ? A.chip('الإيميل مش متأكد', 'danger') : A.chip('إيميل متأكد', 'info');
+    // how it was confirmed (the design has no row for it): the chip's title, and the history says it too
+    if (p.emailVerified) emailState.title = p.emailVia === 'admin' ? 'متأكد من الأدمن' : 'متأكد بالكود';
+    var profile = el('section', { class: 'card p8-card card--glow y8-profile' },
+      face,
+      el('h2', { class: 'y8-profile__name', dir: 'auto', text: p.name }),
+      el('div', { class: 'y8-profile__tags' }, eligibilityChip(p, true), emailState, p.age != null ? A.chip(ar(p.age) + ' سنة') : null, p.emailChangedRecently ? A.chip('الإيميل اتغير من قريب', 'gold') : null),
+      photoActs,
+      el('dl', { class: 'y8-kv', 'data-youth-facts': '' },
+        kv('key', 'رقم الحساب', p.id, el('button', { class: 'btn btn--small btn--ghost y8-pen', type: 'button', 'aria-label': 'انسخ رقم الحساب', title: 'انسخ رقم الحساب', onclick: function () { copyText(p.id, 'رقم الحساب'); } }, icon('copy')), { mono: true, ltr: true }),
+        kv('mail', 'الإيميل', p.email, can.manage ? pen('تصحيح الإيميل', 'youth-email-edit', function () { emailForm(p, can); }) : null, { mono: true, ltr: true }),
+        kv('phone', 'الموبايل', p.phone, can.manage ? pen('تصحيح الموبايل', 'youth-phone-edit', phoneForm) : null, { mono: true, ltr: true }),
+        kv('cake', 'الميلاد', dayText(p.birthDate), can.manage ? pen('تصحيح الميلاد', 'youth-dob-edit', dobForm) : null),
+        kv('users', 'المجموعة', p.group), kv('home', 'الكنيسة', p.church), kv('user', 'الخادم المسؤول', p.servant), kv('info', 'ملاحظات', p.notes),
+        kv('lock', 'سبب الإيقاف', p.blockedReason),
+        kv('user', 'اتعمل', (p.createdVia === 'self' ? 'بنفسه' : 'من الأدمن') + ' · ' + longWhen(p.createdAt))));
+
+    /* --- the actions (the same eight as the design; each only when this admin may) --- */
+    function qa(iconName, label, act, fn, tone) {
+      return el('button', { class: 'y8-qa__b' + (tone === 'danger' ? ' is-danger' : ''), type: 'button', 'data-act': act, onclick: fn },
+        el('span', { class: 'chipico' + (tone ? ' chipico--' + tone : ''), 'aria-hidden': 'true' }, icon(iconName)), label);
+    }
+    var acts = [
+      can.edit ? qa('edit', 'تعديل البيانات', 'youth-edit', editForm) : null,
+      can.manage ? qa('mail', 'تصحيح الإيميل', 'youth-email', function () { emailForm(p, can); }) : null,
+      can.manage ? qa('phone', 'تصحيح الموبايل', 'youth-phone', phoneForm) : null,
+      can.manage ? qa('cake', 'تصحيح الميلاد', 'youth-dob', dobForm) : null,
+      can.manage ? qa('shield', 'الأهلية', 'youth-eligibility', eligibilityForm) : null,
+      can.manage ? qa('key', 'باسورد جديد', 'youth-reset', resetForm, 'warn') : null,
+      can.manage ? qa('logout', 'اخرج من كل الأجهزة', 'youth-revoke', revoke, 'warn') : null,
+      (blocked ? can.manage : can.edit) ? qa(blocked ? 'check' : 'lock', blocked ? 'رجّع الحساب' : 'وقّف الحساب', blocked ? 'youth-unblock' : 'youth-block', blockForm, blocked ? 'ok' : 'danger') : null
+    ].filter(Boolean);
+    var actions = acts.length ? el('section', { class: 'card p8-card y8-actions' },
+      el('div', { class: 'p8-card__head' }, el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('gear')), el('div', { class: 'p8-card__titles' }, el('h2', { class: 'card__title', text: 'إجراءات الحساب' }))),
+      el('div', { class: 'y8-qa' }, acts)) : null;
+
+    /* --- points --- */
     var points = d.points;
     var adjust = can.points ? el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-points', onclick: function () {
       var amount = A.textInput('', { ltr: true, max: 8, placeholder: '+50 أو -20' });
@@ -17571,7 +17718,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       formSheet({ title: 'تعديل نقاط', reason: false, path: path + 'points', extra: function () { return { key: key, notePublic: show.input.checked }; }, fields: [
         { key: 'amount', label: 'عدد النقاط', input: amount, get: function () { return Number(amount.value); } }, { key: 'note', label: 'السبب', input: note }, { key: 'x', node: show.node, get: function () { return undefined; } }
       ] });
-    } }, 'تعديل نقاط') : null;
+    } }, icon('edit'), 'تعديل نقاط') : null;
     var transfer = can.transfer ? el('button', { class: 'btn btn--small', type: 'button', 'data-act': 'youth-transfer', onclick: function () {
       var to = A.textInput('', { ltr: true, max: 12, placeholder: 'p-…' });
       var amount = A.textInput('', { ltr: true, max: 8 });
@@ -17580,45 +17727,75 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       formSheet({ title: 'نقل نقاط لحساب تاني', reason: false, path: path + 'transfer', intro: 'للحسابات المكررة: وقّف المكرر وانقل نقطه للحساب الصح.', extra: function () { return { key: key }; }, fields: [
         { key: 'to', label: 'رقم الحساب الصح', input: to }, { key: 'amount', label: 'عدد النقاط', input: amount, get: function () { return Number(amount.value); } }, { key: 'note', label: 'السبب', input: note }
       ] });
-    } }, 'نقل نقاط') : null;
+    } }, icon('swap'), 'نقل نقاط') : null;
+    var lastMove = points.ledger[0];
+    var pointsCard = el('section', { class: 'card p8-card y8-points' },
+      el('div', { class: 'p8-card__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('star')),
+        el('div', { class: 'p8-card__titles' }, el('h2', { class: 'card__title', text: 'النقاط' })),
+        el('span', { class: 'chip', text: points.season ? points.season.name : 'الموسم الحالي' })),
+      el('div', { class: 'y8-points__row', 'data-youth-balance': '' },
+        el('span', { class: 'y8-points__big', text: ar(points.balance) }),
+        el('div', {}, el('b', {}, 'نقطة', points.frozen ? ' ' : null, points.frozen ? A.chip('متجمد', 'off') : null),
+          el('small', { text: lastMove ? (LEDGER[lastMove.kind] || lastMove.kind) + ' ' + (lastMove.amount > 0 ? '+' : '') + ar(lastMove.amount) + ' · ' + shortWhen(lastMove.at) : 'مفيش حركات في الموسم ده' }))),
+      adjust || transfer ? el('div', { class: 'y8-points__acts' }, adjust, transfer) : null);
 
-    return [
-      el('h2', { class: 'card__title', dir: 'auto', text: p.name }),
-      el('p', {}, eligibilityChip(p), ' ', p.emailChangedRecently ? A.chip('الإيميل اتغير من قريب', 'gold') : null),
-      photo,
-      el('dl', { class: 'comp-facts', 'data-youth-facts': '' },
-        fact('رقم الحساب', p.id), fact('الإيميل', el('span', { class: 'ltr', text: p.email })),
-        fact('تأكيد الإيميل', !p.emailVerified ? 'مش متأكد' : p.emailVia === 'admin' ? 'متأكد من الأدمن' : 'متأكد بالكود'),
-        can.viewPassword ? fact('الباسورد الحالي (ليك إنت بس، وكل عرض بيتسجل)', currentPassword(path)) : null,
-        fact('الموبايل', el('span', { class: 'ltr', text: p.phone })), fact('تاريخ الميلاد', p.birthDate + (p.age != null ? ' (' + ar(p.age) + ' سنة)' : '')),
-        fact('المجموعة', p.group), fact('الكنيسة', p.church), fact('الخادم المسؤول', p.servant), fact('ملاحظات', p.notes),
-        fact('سبب الإيقاف', p.blockedReason), fact('اتعمل', (p.createdVia === 'self' ? 'بنفسه' : 'من الأدمن') + ' · ' + when(p.createdAt))),
-      el('div', { class: 'actions' }, edit, manage, blockBtn),
-      el('h3', { class: 'section-label', text: 'النقاط' + (points.season ? ' · ' + points.season.name : '') }),
-      el('p', { 'data-youth-balance': '' }, ar(points.balance) + ' نقطة', points.frozen ? ' ' : null, points.frozen ? A.chip('متجمد', 'off') : null),
-      el('div', { class: 'actions' }, adjust, transfer),
-      points.ledger.length ? el('ul', { class: 'comp-ledger' }, points.ledger.map(function (l) {
-        return el('li', {}, el('strong', { class: 'ltr', text: (l.amount > 0 ? '+' : '') + l.amount }), ' ' + (LEDGER[l.kind] || l.kind) + (l.note ? ' — ' + l.note : '') + ' · ' + when(l.at));
-      })) : el('p', { class: 'note', text: 'مفيش حركات في الموسم ده.' }),
-      points.seasons.length ? el('p', { class: 'note', text: 'مواسم فاتت: ' + points.seasons.map(function (s) { return s.name + ' (' + ar(s.final) + ')'; }).join('، ') }) : null,
-      el('h3', { class: 'section-label', text: 'الأجهزة' }),
-      d.sessions.length ? el('ul', {}, d.sessions.map(function (s) { return el('li', { dir: 'auto', text: s.device + ' · ' + when(s.lastSeen) }); })) : el('p', { class: 'note', text: 'مش داخل من أي جهاز دلوقتي.' }),
-      el('h3', { class: 'section-label', text: 'الحجوزات' }),
-      d.bookings.length ? el('ul', {}, d.bookings.map(function (b) {
-        return el('li', { dir: 'auto', text: b.ref + ' · ' + b.event + ' · ' + (STATUS[b.status] || b.status) + (b.mismatch ? ' · تاريخ الميلاد مختلف عن الحجز' : '') });
-      })) : el('p', { class: 'note', text: 'مفيش حجوزات مربوطة.' }),
-      el('h3', { class: 'section-label', text: 'الإيميلات' }),
-      d.mail.length ? el('ul', {}, d.mail.map(function (m) {
-        return el('li', {}, m.kind + ' · ' + (MAIL[m.status] || m.status) + ' · ' + when(m.at) + ' ',
+    /* --- devices --- */
+    var many = d.sessions.length > 1;
+    var devices = el('section', { class: 'card p8-card y8-devices' },
+      el('div', { class: 'p8-card__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('device')),
+        el('div', { class: 'p8-card__titles' }, el('h2', { class: 'card__title', text: 'الأجهزة' })),
+        el('span', { class: 'chip', text: ar(d.sessions.length) + ' جهاز' })),
+      d.sessions.length ? el('div', { class: 'y8-devlist' }, d.sessions.map(function (s, i) {
+        return el('div', { class: 'y8-dev' },
+          el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('device')),
+          el('div', { class: 'y8-dev__t' }, el('b', { dir: 'ltr', text: String(s.device).replace(/ /g, ' · ') }), el('small', { text: lastSeen(s.lastSeen) })),
+          // the Worker ends all of a person's sessions at once: one device → «اخرّجه», several → one «اخرّجهم كلهم» on the last
+          can.manage && (!many || i === d.sessions.length - 1) ? el('button', { class: 'btn btn--small btn--ghost', type: 'button', 'data-act': 'youth-revoke-device', onclick: revoke }, many ? 'اخرّجهم كلهم' : 'اخرّجه') : null);
+      })) : el('p', { class: 'y8-none', text: 'مش داخل من أي جهاز دلوقتي.' }));
+
+    /* --- history tabs: تاريخ الحساب · الحجوزات · الإيميلات · المسابقات (points moves and past seasons) --- */
+    var panes = {
+      audit: el('ul', { class: 'y8-timeline', 'data-youth-audit': '' }, d.audit.map(function (a) {
+        var change = a.field && a.field !== 'pw' ? (a.field + ': ' + (a.oldValue || '—') + ' ← ' + (a.newValue || '—')) : '';
+        var extra = [change, a.reason, a.check].filter(Boolean).join(' · ');
+        return el('li', {}, el('b', { dir: 'auto', text: AUDIT[a.action] || a.action }), el('small', { dir: 'auto', text: [shortWhen(a.at), a.actor, extra].filter(Boolean).join(' · ') }));
+      })),
+      bookings: d.bookings.length ? el('ul', { class: 'y8-timeline' }, d.bookings.map(function (b) {
+        return el('li', {}, el('b', { dir: 'auto', text: b.ref + ' · ' + b.event }), el('small', { text: (STATUS[b.status] || b.status) + (b.mismatch ? ' · تاريخ الميلاد مختلف عن الحجز' : '') }));
+      })) : el('p', { class: 'y8-none', text: 'مفيش حجوزات مربوطة.' }),
+      mail: d.mail.length ? el('ul', { class: 'y8-timeline' }, d.mail.map(function (m) {
+        return el('li', {}, el('b', { dir: 'auto', text: m.kind + ' · ' + (MAIL[m.status] || m.status) }), el('small', { text: shortWhen(m.at) }),
           m.tier === 1 && can.manage ? el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function (event) {
             A.withBusy(event.currentTarget, api('POST', path + 'resend', { outboxId: m.id })).then(function () { A.toast('هيتبعت تاني ✓'); }).catch(function (error) { A.fail(error); });
           } }, 'ابعته تاني') : null);
-      })) : el('p', { class: 'note', text: 'مفيش إيميلات.' }),
-      el('h3', { class: 'section-label', text: 'تاريخ الحساب' }),
-      el('ul', { class: 'comp-audit', 'data-youth-audit': '' }, d.audit.map(function (a) {
-        var change = a.field && a.field !== 'pw' ? (a.field + ': ' + (a.oldValue || '—') + ' ← ' + (a.newValue || '—')) : '';
-        return el('li', { dir: 'auto', text: (AUDIT[a.action] || a.action) + ' · ' + a.actor + ' · ' + when(a.at) + (change ? ' · ' + change : '') + (a.reason ? ' · ' + a.reason : '') + (a.check ? ' · ' + a.check : '') });
-      }))
+      })) : el('p', { class: 'y8-none', text: 'مفيش إيميلات.' }),
+      comps: el('div', {},
+        points.ledger.length ? el('ul', { class: 'y8-timeline' }, points.ledger.map(function (l) {
+          return el('li', {}, el('b', { dir: 'auto' }, el('bdi', { class: 'ltr', text: (l.amount > 0 ? '+' : '') + l.amount }), ' ' + (LEDGER[l.kind] || l.kind) + (l.note ? ' — ' + l.note : '')), el('small', { text: shortWhen(l.at) }));
+        })) : el('p', { class: 'y8-none', text: 'مفيش حركات في الموسم ده.' }),
+        points.seasons.length ? el('p', { class: 'y8-none', text: 'مواسم فاتت: ' + points.seasons.map(function (s) { return s.name + ' (' + ar(s.final) + ')'; }).join('، ') }) : null)
+    };
+    var holder = el('div', { class: 'y8-hist__pane' });
+    var tabName = A.uid('yhist');
+    var on = Y.hist && panes[Y.hist] ? Y.hist : 'audit';
+    function paint() { A.fill(holder, panes[on]); }
+    var tabs = el('div', { class: 'seg p8-filter y8-hist__tabs', role: 'radiogroup', 'aria-label': 'تاريخ الحساب' }, [['audit', 'clock', 'تاريخ الحساب'], ['bookings', 'ticket', 'الحجوزات'], ['mail', 'mail', 'الإيميلات'], ['comps', 'trophy', 'المسابقات']].map(function (t) {
+      return el('label', { class: 'seg__opt' },
+        el('input', { type: 'radio', name: tabName, value: t[0], checked: t[0] === on, onchange: function () { on = Y.hist = t[0]; paint(); } }),
+        el('span', {}, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon(t[1])), t[2]));
+    }));
+    paint();
+    var history = el('section', { class: 'card p8-card y8-hist' }, el('div', { class: 'y8-hist__head' }, tabs), holder);
+
+    return [
+      el('div', { class: 'y8-acct__side' }, profile),
+      el('div', { class: 'y8-acct__main' },
+        can.viewPassword ? passwordCard(path, can.manage ? resetForm : null) : null,
+        actions,
+        el('div', { class: 'y8-acct__pair' }, pointsCard, devices),
+        history)
     ];
   }
 
@@ -17720,7 +17897,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         closed.length ? el('p', { class: 'section-label', text: 'مواسم خلصت' }) : null,
         closed.length ? el('ul', { class: 'admins' }, closed.map(function (s) { return seasonRow(s, [A.chip('اتقفل', 'off')], null); })) : null);
     }).catch(function (error) { rows.setAttribute('aria-busy', 'false'); A.fill(rows); A.fail(error, box); });
-    return [A.card('المواسم', 'الرصيد بتاع الموسم الحالي بس. القفل بيحفظ الأرصدة ومبيمسحش حاجة.', box, backButton(), rows)];
+    return [A.card('المواسم', 'الرصيد بتاع الموسم الحالي بس. القفل بيحفظ الأرصدة ومبيمسحش حاجة.', box, rows)];
   }
 
   /* =======================================================
@@ -17807,7 +17984,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           el('span', { class: 'comp-sub__meta' }, A.chip(ar(c.sent) + ' مشاركة', 'info'), c.pending ? A.chip('مستني ' + ar(c.pending), 'gold') : null, c.finalizedAt ? A.chip('النتايج اتعتمدت', 'ok') : c.closedAt ? A.chip('اتقفلت', 'off') : null));
       })) : el('p', { class: 'note', text: 'مفيش مسابقات منشورة.' }));
     }).catch(function (error) { rows.setAttribute('aria-busy', 'false'); A.fill(rows); A.fail(error, box); });
-    return [A.card('النتايج', 'كتابة المسابقات وقفلها واعتماد النتايج لسه من «المسابقات».', box, backButton(), rows)];
+    return [A.card('النتايج', 'كتابة المسابقات وقفلها واعتماد النتايج لسه من «المسابقات».', box, rows)];
   }
 
   /* =======================================================
@@ -17948,18 +18125,28 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
     loadSends();
     loadOrders();
-    return [A.card('المتجر', 'الجوايز والطلبات والمواعيد.', box, backButton(), schedule, sends), A.card('الجوايز', '', items), A.card('الطلبات', 'كل طلب محتاج أدمن يوافق عليه. الإلغاء بيرجّع النقط مرة واحدة.', orders)];
+    return [A.card('المتجر', 'الجوايز والطلبات والمواعيد.', box, schedule, sends), A.card('الجوايز', '', items), A.card('الطلبات', 'كل طلب محتاج أدمن يوافق عليه. الإلغاء بيرجّع النقط مرة واحدة.', orders)];
   }
 
-  A.views.youth = function () {
-    if (!window.AdminWorker) return [A.card('من لوحة التحكم الرسمية بس', 'الحسابات بتتراجع من لوحة التحكم على الموقع.')];
-    if (Y.view === 'person' && Y.id) return personView();
-    if (Y.view === 'review') return reviewView();
-    if (Y.view === 'seasons') return seasonsView();
-    if (Y.view === 'results') return resultsView();
-    if (Y.view === 'store') return storeView();
-    return listView();
-  };
+  function only(build) {
+    return function () {
+      if (!window.AdminWorker) return [A.card('من لوحة التحكم الرسمية بس', 'الحسابات بتتراجع من لوحة التحكم على الموقع.')];
+      return build();
+    };
+  }
+  A.views.youth = only(function () { return Y.view === 'person' && Y.id ? personView() : listView(); });
+  A.views['youth-review'] = only(reviewView);
+  A.views['youth-results'] = only(resultsView);
+  A.views['youth-store'] = only(storeView);
+  A.views['youth-seasons'] = only(seasonsView);
+  // Phase 8B (youth-list.png): the area's own tabs; data-act keeps the old buttons' names
+  var YOUTH_TABS = [
+    { key: 'youth', label: 'حسابات الشباب' },
+    { key: 'youth-review', label: 'حسابات جديدة', act: 'youth-review' },
+    { key: 'youth-results', label: 'النتايج', act: 'youth-results' },
+    { key: 'youth-store', label: 'المتجر', act: 'youth-store' },
+    { key: 'youth-seasons', label: 'المواسم', act: 'youth-seasons' }
+  ];
 
   /* the tab appears when accounts are on (GET /v1/account/config); nothing changes for the panel before that */
   var tries = 0;
@@ -17972,9 +18159,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       C.youthOn = true;
       var area = A.AREAS.filter(function (a) { return a.key === 'comps'; })[0];
       if (!area || area.subs.some(function (s) { return s.key === 'youth'; })) return;
-      // the old points / store screens read Apps Script: with accounts on, this tab holds them
+      // the old points / store screens read Apps Script: with accounts on, these tabs hold them
       for (var i = area.subs.length - 1; i >= 0; i--) if (['points', 'shop'].indexOf(area.subs[i].key) !== -1) area.subs.splice(i, 1);
-      area.subs.splice(Math.max(0, area.subs.length - 1), 0, { key: 'youth', label: 'حسابات الشباب' });
+      Array.prototype.splice.apply(area.subs, [Math.max(0, area.subs.length - 1), 0].concat(YOUTH_TABS.map(function (t) {
+        return { key: t.key, label: t.label, act: t.act, again: t.key === 'youth' ? function () { if (Y.view !== 'list') { Y.view = 'list'; A.render(); } } : null };
+      })));
       A.renderNav();
     }).catch(function () { setTimeout(lookForAccounts, 3000); });
   }

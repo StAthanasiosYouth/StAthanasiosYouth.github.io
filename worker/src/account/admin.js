@@ -95,19 +95,23 @@ export async function adminParticipants(ctx) {
   }
   if (u.get('status') === 'blocked') where.push("status = 'blocked'");
   const clause = where.join(' AND ');
-  const [rows, count, season] = await retry(() => db.batch([
+  const [rows, count, season, all] = await retry(() => db.batch([
     db.prepare(`SELECT *, (SELECT COALESCE(SUM(l.amount), 0) FROM points_ledger l WHERE l.participant_id = participants.id AND l.season_id = (SELECT id FROM seasons WHERE status = 'active')) AS balance
       FROM participants WHERE ${clause} ORDER BY created_at DESC LIMIT ? OFFSET ?`).bind(...args, limitN, offset),
     db.prepare(`SELECT COUNT(*) AS n FROM participants WHERE ${clause}`).bind(...args),
-    db.prepare("SELECT id, name FROM seasons WHERE status = 'active'")
+    db.prepare("SELECT id, name FROM seasons WHERE status = 'active'"),
+    // Phase 8B (youth-list.png): the four counts on top, over every account (not the page or the search)
+    db.prepare("SELECT status, birth_date, eligibility_override FROM participants WHERE status <> 'deleted'")
   ]));
   const rules = rulesFrom(await settingsOf(db));
   const now = Date.now();
+  const counts = { all: 0, eligible: 0, guest: 0, blocked: 0 };
+  for (const p of all.results) { counts.all++; counts[eligibility(p, rules, now).state]++; }
   let people = rows.results.map(p => ({ ...rowView(p, rules, now), balance: p.balance }));
   const state = u.get('state');
   if (state === 'guest' || state === 'eligible') people = people.filter(p => p.eligibility.state === state);
   return {
-    people, total: count.results[0].n, offset, limit: limitN, season: season.results[0] || null,
+    people, total: count.results[0].n, offset, limit: limitN, season: season.results[0] || null, counts,
     can: { add: (await heldScope(ctx, 'participants.add')) !== '', manage: (await heldScope(ctx, 'participants.manage')) === 'all', viewPassword: ctx.actor.role === 'primary', export: (await heldScope(ctx, 'exports.export_pii')) === 'all' }
   };
 }

@@ -260,30 +260,38 @@ test('the sheet: viewing and resetting are separate; a reset needs its reason on
   await page.waitForSelector('[data-youth-facts]', { timeout: 8000 });
   const body = await textOf(page, '#view');
   assert.match(body, /mina@example\.com/);
-  assert.match(body, /متأكد من الأدمن/);
-  assert.match(body, /B-AAAA1/);
-  assert.match(body, /تاريخ الميلاد مختلف عن الحجز/);
-  assert.match(body, /اتعمل من الأدمن/);
+  assert.match(await page.$eval('.y8-profile__tags', n => [...n.children].map(c => c.title).join(' ')), /متأكد من الأدمن/, 'how the email was confirmed: the chip says it');
+  assert.match(body, /اتعمل من الأدمن/, 'the history (first tab)');
+  // the bookings are a tab of the history (youth.png)
+  await page.evaluate(() => [...document.querySelectorAll('.y8-hist__tabs .seg__opt')].find(l => /الحجوزات/.test(l.textContent)).click());
+  await page.waitForFunction(() => /B-AAAA1/.test(document.querySelector('.y8-hist__pane').innerText), { timeout: 5000 });
+  assert.match(await textOf(page, '.y8-hist__pane'), /تاريخ الميلاد مختلف عن الحجز/);
 
-  // the Primary Admin sees it among the facts, with no click; one logged call per view; no reset
+  // decision 2: hidden until «اعرض»; one logged call per view; viewing never resets
+  const views = () => fake.calls.filter(c => c.path.endsWith('/view-password')).length;
+  await page.waitForSelector('[data-act="youth-password-show"]', { timeout: 5000 });
+  assert.ok(!await page.$('[data-youth-current-value]'), 'hidden until «اعرض»');
+  assert.equal(views(), 0);
+  await click(page, '[data-act="youth-password-show"]');
   await page.waitForSelector('[data-youth-current-value]', { timeout: 5000 });
   assert.equal(await textOf(page, '[data-youth-current-value]'), 'CURR-ENTP-ASS2');
-  const views = () => fake.calls.filter(c => c.path.endsWith('/view-password')).length;
   assert.equal(views(), 1);
   assert.ok(!fake.calls.some(c => c.path.endsWith('/reset-password')), 'viewing never resets');
   assert.ok(!await page.$('[data-act="youth-view-password"]'), 'no extra button');
-  assert.match(await textOf(page, '[data-act="youth-reset"]'), /توليد باسورد جديد/);
+  assert.match(await textOf(page, '[data-act="youth-reset"]'), /باسورد جديد/);
   assert.equal(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }).includes('CURR-ENTP-ASS2')), false, 'never kept in the browser');
 
-  // it leaves the page by itself; showing it again is another logged view
+  // it hides by itself; showing it again is another logged view
   await page.evaluate(() => { const set = window.setTimeout; window.setTimeout = (f, ms, ...rest) => set(f, ms === 300000 ? 30 : ms, ...rest); });
   await page.evaluate(() => A.render());
-  await page.waitForSelector('[data-act="youth-password-again"]', { timeout: 5000 });
+  await page.waitForSelector('[data-act="youth-password-show"]', { timeout: 8000 });
   assert.ok(!(await textOf(page, '#view')).includes('CURR-ENTP-ASS2'));
   const before = views();
-  await click(page, '[data-act="youth-password-again"]');
-  await page.waitForSelector('[data-youth-current-value]', { timeout: 5000 });
+  await click(page, '[data-act="youth-password-show"]');
+  for (let i = 0; i < 50 && views() === before; i++) await new Promise(r => setTimeout(r, 100));
+  await page.waitForFunction(() => !document.querySelector('[data-youth-current-value]') && document.querySelector('[data-act="youth-password-show"]') && !document.querySelector('[data-act="youth-password-show"]').hidden, { timeout: 5000 });
   assert.equal(views(), before + 1);
+  assert.ok(!(await textOf(page, '#view')).includes('CURR-ENTP-ASS2'), 'gone again');
   await page.evaluate(() => A.render());
   await page.waitForSelector('[data-youth-facts]', { timeout: 8000 });
 
@@ -327,12 +335,11 @@ test('seasons: the preview shows frozen points apart; review list; settings; exp
   const closed = fake.calls.find(c => c.path.endsWith('/close'));
   assert.deepEqual(closed.body, { key: 'k1', next: { name: 'الموسم التاني' } });
 
-  await click(page, '[data-act="youth-back"]');
-  await page.waitForSelector('[data-act="youth-review"]', { timeout: 8000 });
+  // «حسابات جديدة» is a tab now (youth-list.png)
   await click(page, '[data-act="youth-review"]');
   await page.waitForFunction(() => /نفس الاسم وتاريخ الميلاد/.test(document.body.innerText), { timeout: 8000 });
 
-  await click(page, '[data-act="youth-back"]');
+  await page.evaluate(() => A.go('comps', 'youth'));
   await page.waitForSelector('[data-act="youth-settings"]', { timeout: 8000 });
   await click(page, '[data-act="youth-settings"]');
   await page.waitForSelector('#sheet[open] [data-act="youth-save"]');
@@ -392,8 +399,6 @@ test('seasons: the numbers, a new one, editing, closing into a planned one; a pr
   await page.waitForFunction(() => !document.querySelector('#sheet').open, { timeout: 5000 });
   assert.deepEqual(fake.calls.filter(c => c.path.endsWith('/close')).pop().body, { key: 'k1', next: 'sea-spring27' });
 
-  await click(page, '[data-act="youth-back"]');
-  await page.waitForSelector('[data-act="youth-store"]', { timeout: 8000 });
   await click(page, '[data-act="youth-store"]');
   await page.waitForSelector('[data-season-max]', { timeout: 8000 });
   assert.match(await page.$eval('[data-item="i-00000001"]', n => n.innerText), /٨٪ من أقصى الموسم/);
@@ -424,7 +429,7 @@ test('results: a guest has no place number; a servant grades; the store: a prize
   await page.evaluate(() => [...document.querySelectorAll('#sheet .btn')].find(b => b.textContent.trim() === 'قفل').click());
   await page.waitForFunction(() => !document.querySelector('#sheet').open, { timeout: 5000 });
 
-  await page.evaluate(() => { A.compYouth.view = 'store'; A.render(); });
+  await page.evaluate(() => A.go('comps', 'youth-store'));
   await page.waitForSelector('[data-order="r-0000000001"]', { timeout: 8000 });
   assert.match(await textOf(page, '#view'), /الإيميل اتغير من قريب/);
   await click(page, '[data-order-act="approved"]');
@@ -486,7 +491,7 @@ test('Phase 6 Step 4c on a phone: the store\'s notify choices and scheduled list
   fake.reset();
   const { context, page, problems } = await open({ width: 375, height: 800, isMobile: true, hasTouch: true });
   await goYouth(page);
-  await page.evaluate(() => { A.compYouth.view = 'store'; A.render(); });
+  await page.evaluate(() => A.go('comps', 'youth-store'));
   await page.waitForSelector('[data-notify="open1d"]', { timeout: 8000 });
   await page.waitForFunction(() => /الإرسال المتجدول/.test((document.querySelector('.comp-sends') || {}).innerText || ''), { timeout: 8000 });
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -516,7 +521,7 @@ test('Phase 6 Step 4c on a phone: the store\'s notify choices and scheduled list
 });
 
 
-test('Phase 8 A6: accounts as cards at 375 — the photo or the letter, the full name, phone and email (never cut), a tap copies, a tap opens', async () => {
+test('Phase 8 A6 / 8B youth-list.png: accounts as cards at 375 — the photo or the letter, the full name, phone and email (a long one ends in «…» like the design, the full text in its title), a tap copies, a tap opens', async () => {
   fake.reset('on');
   const { context, page, problems } = await open({ width: 375, height: 812, isMobile: true, hasTouch: true });
   await goYouth(page);
@@ -527,7 +532,8 @@ test('Phase 8 A6: accounts as cards at 375 — the photo or the letter, the full
       letter: n.querySelector('.ycard__letter').textContent,
       phone: n.querySelector('.ycard__phone bdi')?.textContent || '',
       email: n.querySelector('.ycard__email bdi')?.textContent || '',
-      cut: [n.querySelector('.ycard__name'), n.querySelector('.ycard__phone bdi'), n.querySelector('.ycard__email bdi')].some(cut),
+      emailTitle: n.querySelector('.ycard__email')?.title || '',
+      cut: [n.querySelector('.ycard__name'), n.querySelector('.ycard__phone bdi')].some(cut),
       inside: n.getBoundingClientRect().right <= innerWidth + 1
     };
   }));
@@ -535,7 +541,8 @@ test('Phase 8 A6: accounts as cards at 375 — the photo or the letter, the full
   for (const c of cards) {
     assert.equal(c.letter, c.name.trim().charAt(0));
     assert.ok(c.phone && c.email, JSON.stringify(c));
-    assert.equal(c.cut, false, 'nothing cut: ' + JSON.stringify(c));
+    assert.equal(c.cut, false, 'name and phone never cut: ' + JSON.stringify(c));
+    assert.equal(c.emailTitle, c.email, 'the full email in the title');
     assert.ok(c.inside);
   }
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no sideways scroll');
