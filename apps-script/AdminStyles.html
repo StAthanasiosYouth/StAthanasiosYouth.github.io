@@ -14977,6 +14977,8 @@ html[data-mode="light"] .act8 .act { background: var(--p-surface-2); }
 .logm8__preview { padding: 16px 18px; border: 1px solid var(--p-line-2); border-radius: 18px; background: rgb(2 12 24 / .45); }
 .logm8__n { display: block; font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .logm8__preview small { font-size: 12px; }
+.logm8__n.is-zero { color: var(--text-2); font-size: 18px; }
+.logm8__preview:has(.is-zero) small { color: var(--warn); font-weight: 700; }
 .logm8__bar { height: 6px; margin-top: 12px; overflow: hidden; border-radius: 6px; background: rgb(255 255 255 / .08); direction: ltr; }
 .logm8__bar i { display: block; height: 100%; border-radius: inherit; background: var(--grad); transition: width .4s var(--ease); }
 .act8__kpis { margin-bottom: 16px; }

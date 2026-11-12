@@ -10,7 +10,7 @@
  *   GET  /v1/admin/activity/manage/archive/:id → the CSV
  *   POST /v1/admin/activity/manage/delete     { days, section?, technical?, confirm: 'امسح' } → { deleted, kept }
  *
- * Safe delete: only rows older than MIN_DAYS (90); never the security and permission rows of the last year
+ * Delete: any age (owner 2026-11-12: MIN_DAYS 0, «days: 0» = every row up to now); never the security and permission rows of the last year
  * (PROTECTED); the word «امسح» is required; the delete itself is written as one row (`activity.trim`).
  */
 
@@ -21,7 +21,7 @@ import { limit } from '../lib/ratelimit.js';
 import { randomId } from '../lib/hash.js';
 
 const DAY = 24 * 3600 * 1000;
-export const MIN_DAYS = 90;
+export const MIN_DAYS = 0;
 const MAX_ROWS = 20000;
 const PREFIX = 'activity-archive/';
 const TECHNICAL = ['diag.echo', 'diag.queue', 'booknews.claim', 'booknews.ack', 'admins.sync', 'paydest.sync', 'job.failed', 'booking.retention', 'push.receipt'];
