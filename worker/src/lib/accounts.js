@@ -100,6 +100,8 @@ async function listing(ctx) {
   return {
     me: ctx.actor.email,
     canManage: (await heldScope(ctx, 'accounts.manage')) === 'all',
+    // owner 2026-11-12: renaming another admin (one's own name is always allowed)
+    canRename: ctx.actor.role === 'primary' || (await heldScope(ctx, 'accounts.rename')) === 'all',
     enforce: enforce === '1',
     max: MAX_ADMINS,
     perms: PERMS,

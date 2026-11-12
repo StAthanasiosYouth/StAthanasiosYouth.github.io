@@ -53,7 +53,7 @@ test('0009 seeds existing admins: primary = every permission; others = all but t
   const of = e => db.raw.prepare('SELECT perm, scope FROM admin_grants WHERE email = ? ORDER BY perm').all(e);
   const p = of('p@example.com');
   // permissions added to the catalog after 0009 (never seeded: the Primary Admin holds them in code, others by a grant)
-  const LATER = ['activity.manage'];   // Phase 8 A6
+  const LATER = ['activity.manage', 'accounts.rename'];   // Phase 8 A6; owner 2026-11-12
   assert.deepEqual(p.map(r => r.perm), PERMS.filter(x => !LATER.includes(x)).sort(), 'the SQL seed list equals the code catalog of the time');
   assert.ok(p.every(r => r.scope === 'all'));
   assert.deepEqual(of('a@example.com').map(r => r.perm), PERMS.filter(x => !PRIMARY_DEFAULT.includes(x) && !LATER.includes(x)).sort());

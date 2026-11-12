@@ -66,7 +66,7 @@ async function worker(request) {
 }
 
 resetAuthCaches();
-env = { ENVIRONMENT: 'test', ALLOWED_ORIGINS: SITE, GOOGLE_CLIENT_ID: TEST_CLIENT, LOG_SALT: 'salt', ADMIN_EMAILS: '', SYNC_SECRET: SECRET, DEVICE_KEY: 'k'.repeat(48), DB: migratedDb(), JOBS: { send: async () => {} }, COMPS_SOURCE: 'none', SITE_URL: SITE };
+env = { ENVIRONMENT: 'test', ALLOWED_ORIGINS: SITE, GOOGLE_CLIENT_ID: TEST_CLIENT, LOG_SALT: 'salt', ADMIN_EMAILS: '', SYNC_SECRET: SECRET, DEVICE_KEY: 'k'.repeat(48), DB: migratedDb(), JOBS: { send: async () => {} }, COMPS_SOURCE: 'none', SITE_URL: SITE, PW_PEPPER: 'pepper', PW_KEY: Buffer.alloc(32, 7).toString('base64'), OTP_PEPPER: 'otp', ACCOUNT_PAD_MS: '0' };
 env.DB.raw.exec(`INSERT INTO admins (email, name, role, active, created_at) VALUES ('${ADMIN}', 'مينا', 'primary', 1, 0);
   UPDATE settings SET value = '1' WHERE key = 'ADMIN_PLATFORM';`);
 world = createWorld({ executeAs: 'USER_DEPLOYING' });
@@ -87,6 +87,8 @@ world.gs.API_REQUEST_ = null;
   const imp = await call('/v1/sync/content-import', { method: 'POST', body: raw, headers: { 'x-sync-ts': ts, 'x-sync-signature': sig } });
   if ((await imp.json()).state !== 'ok') throw new Error('content import failed');
   env.DB.raw.exec("UPDATE settings SET value = '1' WHERE key = 'CONTENT_DRAFTS'");
+  // PHASE8_ACCOUNTS=1: youth accounts on (the «الشباب» area); PHASE8_EVAL can then add people over the admin's session
+  if (process.env.PHASE8_ACCOUNTS) env.DB.raw.exec("UPDATE settings SET value = 'on' WHERE key = 'accounts_mode'");
 }
 
 const server = createSiteServer({
@@ -111,7 +113,7 @@ try {
     const page = await context.newPage();
     page.on('pageerror', e => errors.push(`[${wname}] ${e.message.slice(0, 160)}`));
     page.on('dialog', d => d.dismiss());
-    if (PREFS) await page.evaluateOnNewDocument(p => { try { localStorage.setItem('athanasios-admin.prefs.v1', JSON.stringify({ prefs: JSON.parse(p), dirty: true })); } catch { /* no storage */ } }, PREFS);
+    if (PREFS) await page.evaluateOnNewDocument((p, who) => { try { const prefs = JSON.parse(p); localStorage.setItem('athanasios-admin.prefs.v1', JSON.stringify({ prefs, dirty: true, email: who, by: { [who]: { prefs, dirty: true } } })); } catch { /* no storage */ } }, PREFS, ADMIN);
     await interceptGoogle(page, { post: body => world.post(body) }, { site: { origin: SITE, local: LOCAL }, handle: worker, calls: [] });
     await page.setViewport(viewport);
     await page.goto(`${SITE}/admin/`, { waitUntil: 'networkidle0' });
@@ -124,13 +126,17 @@ try {
       throw err;
     }
     await sleep(1500);
-    const screens = await page.evaluate(() => A.AREAS.flatMap(a => (a.subs && a.subs.length ? a.subs : [{ key: '', label: '' }]).map(s => ({ area: a.key, areaLabel: a.label, sub: s.key, subLabel: s.label }))));
+    // PHASE8_GO=settings:system,content:news shoots exactly those screens (A.go(area, sub))
+    const GO = (process.env.PHASE8_GO || '').split(',').filter(Boolean).map(x => { const [area, sub] = x.split(':'); return { area, areaLabel: area, sub: sub || '', subLabel: sub || '' }; });
+    const screens = GO.length ? GO : await page.evaluate(() => A.AREAS.flatMap(a => (a.subs && a.subs.length ? a.subs : [{ key: '', label: '' }]).map(s => ({ area: a.key, areaLabel: a.label, sub: s.key, subLabel: s.label }))));
     mkdirSync(`${SHOTS}${wname}`, { recursive: true });
-    for (const s of screens.filter(x => !ONLY.length || ONLY.includes(x.area))) {
+    for (const s of screens.filter(x => GO.length || !ONLY.length || ONLY.includes(x.area))) {
       await page.evaluate((area, sub) => A.go(area, sub || undefined), s.area, s.sub);
       await sleep(1100);
+      // PHASE8_EVAL: a script run on the screen before the shot (open an editor, a menu…); may return a promise
+      if (process.env.PHASE8_EVAL) { await page.evaluate(process.env.PHASE8_EVAL).catch(e => errors.push('eval ' + e.message)); await sleep(1500); }
       const name = `${s.area}${s.sub ? '-' + s.sub : ''}`;
-      await page.screenshot({ path: `${SHOTS}${wname}/${name}.png`, fullPage: true });
+      await page.screenshot({ path: `${SHOTS}${wname}/${name}.png`, fullPage: !process.env.PHASE8_VIEWPORT });
       shots++;
       const controls = await page.evaluate(() => {
         const out = [];
@@ -170,6 +176,6 @@ for (const [screen, set] of inventory) {
   for (const c of [...set].sort()) lines.push(`- [ ] ${c}`);
   lines.push('');
 }
-if (!process.env.PHASE8_PREFS && !process.env.PHASE8_ONLY && !process.env.PHASE8_WIDTHS) writeFileSync(new URL('../docs/PHASE8-INVENTORY.md', import.meta.url), lines.join('\n'));
+if (!process.env.PHASE8_PREFS && !process.env.PHASE8_ONLY && !process.env.PHASE8_GO && !process.env.PHASE8_WIDTHS) writeFileSync(new URL('../docs/PHASE8-INVENTORY.md', import.meta.url), lines.join('\n'));
 console.log(`screens ${inventory.size}, shots ${shots}, errors ${errors.length}`);
 errors.slice(0, 10).forEach(e => console.log(e));

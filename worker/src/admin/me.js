@@ -60,12 +60,16 @@ export async function adminMe(ctx) {
 }
 
 /*
- * POST /v1/admin/accounts/:email/name { name } — any admin renames any admin (as today);
- * '' clears it (the email's local part is shown). Unique by nameKey. → { email, name, names }
+ * POST /v1/admin/accounts/:email/name { name } — '' clears it (the email's local part is shown).
+ * Unique by nameKey. → { email, name, names, canManage, canRename }
+ * Who (owner 2026-11-12, whatever PERMS_ENFORCE says): the account itself, the Primary Admin, or an
+ * admin the Primary Admin granted accounts.rename. Anyone else: denied.
  */
 export async function adminRename(ctx) {
   await limit(ctx, 'admin.rename', ctx.actor.email, 20, 60);
   const email = String(ctx.params.email || '').trim().toLowerCase();
+  const canRename = ctx.actor.role === 'primary' || (await heldScope(ctx, 'accounts.rename')) === 'all';
+  if (email !== String(ctx.actor.email || '').toLowerCase() && !canRename) throw new ApiError('denied', 'rename another admin', { perm: 'accounts.rename' });
   const clean = cleanName(ctx.body && ctx.body.name);
   if (clean && (clean.length < NAME_MIN || clean.length > NAME_MAX)) throw new ApiError('invalid', 'name length', { field: 'name' });
   if (clean && (/[@<>{}[\]\\/|`=]/.test(clean) || !/[A-Za-zء-ي]/.test(clean))) throw new ApiError('invalid', 'name chars', { field: 'name' });
@@ -90,5 +94,5 @@ export async function adminRename(ctx) {
     ]));
   }
   const names = Object.fromEntries(all.map(a => [a.email, a.email === email ? (clean || email.split('@')[0]) : (a.name || a.email.split('@')[0])]));
-  return { email, name: names[email], names, canManage: (await heldScope(ctx, 'accounts.manage')) === 'all' };
+  return { email, name: names[email], names, canManage: (await heldScope(ctx, 'accounts.manage')) === 'all', canRename };
 }

@@ -130,8 +130,9 @@ test.after(async () => {
   await new Promise(resolve => (server ? server.close(resolve) : resolve()));
 });
 
-async function open() {
-  const context = await browser.createBrowserContext();
+async function open(shared) {
+  // `shared`: a second window of the same browser (one localStorage), as two windows on one device
+  const context = shared || await browser.createBrowserContext();
   const page = await context.newPage();
   const problems = [];
   page.on('pageerror', error => problems.push(`pageerror: ${error.message}`));
@@ -140,7 +141,7 @@ async function open() {
   await interceptGoogle(page, { post: body => world.post(body) }, { site: { origin: SITE, local: LOCAL }, handle: worker, calls });
   await page.setViewport(DESKTOP);
   await page.goto(ADMIN_URL, { waitUntil: 'networkidle0' });
-  return { page, problems, get appsScript() { return calls.map(c => c.fn); }, close: () => context.close() };
+  return { page, context, problems, get appsScript() { return calls.map(c => c.fn); }, close: () => context.close() };
 }
 
 async function signedIn(page) {
@@ -438,6 +439,69 @@ test('Phase 8 A1: «المظهر» — the look shows at once, follows the admin
 });
 
 
+test('owner fix 2026-11-12: each account keeps its own look, even with two accounts in two windows of one device', async () => {
+  await freshWorld();
+  const FAMILY = 'family.account@example.com';
+  env.DB.raw.exec(`INSERT INTO admins (email, name, role, active, created_at) VALUES ('${FAMILY}', 'حساب الأسرة', 'admin', 1, 0);
+    INSERT INTO admin_prefs (email, prefs, updated_ms) VALUES ('${FAMILY}', '{"theme":"dark","accent":"carmine","density":"comfortable","motion":"full","sound":false}', 0);`);
+  world.properties.set('ADMIN_EMAILS', ADMIN + ',' + FAMILY);
+  const accent = page => page.evaluate(() => document.documentElement.getAttribute('data-accent'));
+  const row = email => JSON.parse(env.DB.raw.prepare('SELECT prefs FROM admin_prefs WHERE email = ?').get(email)?.prefs || '{}').accent;
+  const clean = page => page.waitForFunction(() => { try { return JSON.parse(localStorage.getItem('athanasios-admin.prefs.v1')).dirty === false; } catch { return false; } }, { timeout: 5000 });
+  try {
+    who = ADMIN;
+    const a = await open();
+    await signedIn(a.page);
+    who = FAMILY;
+    const b = await open(a.context);
+    await signedIn(b.page);
+    await b.page.waitForFunction(() => document.documentElement.getAttribute('data-accent') === 'carmine', { timeout: 5000 });
+    // the primary admin picks a colour in one window (each window in front while it is used: a hidden one has no frames)
+    await a.page.bringToFront();
+    await a.page.evaluate(() => A.go('settings'));
+    await a.page.waitForSelector('[data-look-card]');
+    await a.page.$eval('input[data-look="accent"][value="sea"]', i => i.closest('label').click());
+    await clean(a.page);
+    assert.equal(row(ADMIN), 'sea');
+    // the other account's window and its row stay as they were
+    await sleep(300);
+    assert.equal(await accent(b.page), 'carmine', 'the family window keeps its colour');
+    assert.equal(row(FAMILY), 'carmine');
+    // the family account changes its own motion: its row only
+    await b.page.bringToFront();
+    await b.page.evaluate(() => A.setPrefs({ motion: 'lite' }));
+    await clean(b.page);
+    assert.equal(row(FAMILY), 'carmine');
+    assert.equal(row(ADMIN), 'sea');
+    await sleep(300);
+    assert.equal(await accent(a.page), 'sea', 'the primary window keeps its colour');
+    // the primary changes again (left dirty on the device), then the family account signs in in a
+    // third window: its own colour, and nothing of the primary's is sent as the family's
+    await a.page.bringToFront();
+    await a.page.evaluate(() => A.setPrefs({ accent: 'violet' }));
+    await clean(a.page);
+    await a.page.evaluate(() => { const s = JSON.parse(localStorage.getItem('athanasios-admin.prefs.v1')); s.dirty = true; s.by[s.email].dirty = true; localStorage.setItem('athanasios-admin.prefs.v1', JSON.stringify(s)); });
+    who = FAMILY;
+    const c = await open(a.context);
+    // one session per account: this window takes over from the family window
+    await c.page.waitForSelector('.gate[data-state="signin"] .gis-stub');
+    await c.page.click('.gis-stub');
+    await c.page.waitForSelector('.gate[data-state="session-active"] .gate__btn', { timeout: 8000 });
+    await c.page.click('.gate[data-state="session-active"] .gate__btn');
+    await c.page.waitForFunction(() => window.A && A.state && A.state.draft, { timeout: 15000 });
+    await c.page.waitForFunction(() => document.documentElement.getAttribute('data-accent') === 'carmine', { timeout: 5000 });
+    await sleep(900);
+    assert.equal(row(FAMILY), 'carmine', 'the primary\'s unsent copy never lands on the family account');
+    assert.equal(row(ADMIN), 'violet', 'nothing of the family account was sent as the primary admin');
+    assert.deepEqual([...a.problems, ...c.problems], []);
+    await a.close();
+  }
+  finally {
+    who = ADMIN;
+  }
+});
+
+
 test('Phase 8 A2: the shell — the welcome, the rail in groups with its light and collapse, the palette, the menus, sign-out', async () => {
   await freshWorld();
   const shots = `${ROOT}tools/.cache/phase8-a2/`;
@@ -682,7 +746,7 @@ test('Phase 8 A7 + A8: the locked games corner (GAMES_MODULE), and axe (serious 
   for (const [mode, viewport] of [['dark', DESKTOP], ['light', DESKTOP], ['dark', { width: 390, height: 844, isMobile: true, hasTouch: true }], ['light', { width: 390, height: 844, isMobile: true, hasTouch: true }]]) {
     env.DB.raw.exec('DELETE FROM admin_sessions;');
     const s = await open();
-    await s.page.evaluateOnNewDocument(m => { try { localStorage.setItem('athanasios-admin.prefs.v1', JSON.stringify({ prefs: { theme: m }, dirty: true })); } catch { /* none */ } }, mode);
+    await s.page.evaluateOnNewDocument((m, who) => { try { localStorage.setItem('athanasios-admin.prefs.v1', JSON.stringify({ prefs: { theme: m }, dirty: true, email: who, by: { [who]: { prefs: { theme: m }, dirty: true } } })); } catch { /* none */ } }, mode, ADMIN);
     await s.page.setViewport(viewport);
     await s.page.reload({ waitUntil: 'networkidle0' });
     await signedIn(s.page);

@@ -1115,7 +1115,8 @@
   };
   var PERM_ACTIONS = {
     view: 'يشوف', add: 'يضيف', edit: 'يعدّل', delete: 'يمسح', approve: 'يعتمد', publish: 'ينشر',
-    export: 'يصدّر', export_pii: 'يصدّر بأرقام التليفونات', manage: 'يدير', create_cash: 'يسجّل حجز كاش'
+    export: 'يصدّر', export_pii: 'يصدّر بأرقام التليفونات', manage: 'يدير', create_cash: 'يسجّل حجز كاش',
+    rename: 'يغيّر أسماء الأدمنز'
   };
   var PROTECTED_REASONS = {
     primary: 'ده الحساب الأساسي: صلاحياته كاملة ومينفعش يتغير أو يتشال.',
@@ -1211,6 +1212,9 @@
       var primary = email === data.primary || !!(account && account.primary);
       var me = email === data.me;
       var manage = !!(acc && acc.canManage && !primary);
+      // owner 2026-11-12: one's own name always; another admin's only for the Primary Admin or an
+      // accounts.rename grant (the Worker checks it again)
+      var renamable = me || data.me === data.primary || !!(acc && acc.canRename);
 
       var shown = (data.names && data.names[email]) || email.split('@')[0];
       var named = !!(data.stored && data.stored[email]);
@@ -1226,13 +1230,13 @@
             primary ? null : grantsChip(account)
           )
         ),
-        el('button', {
+        renamable ? el('button', {
           class: 'icon-btn',
           type: 'button',
           'aria-label': 'غيّر اسم ' + email,
           title: 'غيّر الاسم',
           onclick: function (event) { rename(email, named ? shown : '', event.currentTarget); }
-        }, icon('edit')),
+        }, icon('edit')) : null,
         manage && account ? el('button', {
           class: 'icon-btn',
           type: 'button',
