@@ -749,7 +749,7 @@
     function paintHide() { A.fill(hideBtn, icon(enabledOn ? 'eye-off' : 'eye'), enabledOn ? 'خبّي الكارت' : 'اظهر الكارت'); hideBtn.setAttribute('aria-pressed', enabledOn ? 'false' : 'true'); }
     paintHide();
 
-    A.openSheet(isNew ? meta.add : 'تعديل: ' + item.title, [box, form], A.sheetFooter(save), {
+    A.openSheet(isNew ? meta.add : 'تعديل: ' + item.title, [box, form], A.sheetFooter(save), { help: 'card-edit',
       size: 'lg',
       icon: SECTION_ICON[sectionKey] || meta.icon,
       sub: '',

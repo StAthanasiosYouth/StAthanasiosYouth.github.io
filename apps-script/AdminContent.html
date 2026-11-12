@@ -587,7 +587,7 @@
     var title = isNew ? 'اجتماع جديد' : 'اجتماع ' + A.formatWallLong(session.date).replace(/ [٠-٩]{4}$/, '');
     var meetingName = A.setting('meeting.title') || 'الاجتماع';
 
-    A.openSheet(title, [box, form], A.sheetFooter(save), {
+    A.openSheet(title, [box, form], A.sheetFooter(save), { help: 'meeting-edit',
       size: 'lg',
       icon: 'church',
       sub: meetingName + ' · ' + (session.time || usualTime ? clock12(session.time || usualTime) + ' · ' : '') + 'بيتحفظ مسودة لحد النشر',
@@ -1454,7 +1454,7 @@
         A.col(notify.node, 12), A.col(enabled.node, 12)
       ]));
 
-    A.openSheet(isNew ? 'خبر جديد' : 'تعديل: ' + item.title, [box, form], A.sheetFooter(save), {
+    A.openSheet(isNew ? 'خبر جديد' : 'تعديل: ' + item.title, [box, form], A.sheetFooter(save), { help: 'news-edit',
       size: 'lg',
       icon: 'megaphone',
       sub: 'جديد الأسرة · بيتحفظ مسودة لحد النشر',
@@ -1731,7 +1731,7 @@
       A.msec('التنبيهات', 'bell', '', [A.col(soon.node, 12), A.col(atStart.node, 12)]),
       A.msec('الشكل', 'sparkle', '', [A.col(display.node, 12), A.col(enabled.node, 12)]));
 
-    A.openSheet(isNew ? 'لعبة جديدة' : 'تعديل: ' + game.title, [box, form], A.sheetFooter(save), {
+    A.openSheet(isNew ? 'لعبة جديدة' : 'تعديل: ' + game.title, [box, form], A.sheetFooter(save), { help: 'game-edit',
       size: 'lg',
       icon: 'star',
       sub: 'ركن الألعاب · تحديات وألعاب',
@@ -1961,7 +1961,7 @@
       isNew ? null : el('button', { class: 'btn btn--sm btn--danger', type: 'button', 'aria-label': 'مسح ' + item.title, onclick: function (e) { A.deleteItem('notifications', item.id, item.title, e.currentTarget); } }, icon('trash'), 'امسح')
     ]);
 
-    A.openSheet(isNew ? 'إشعار جديد' : 'تعديل: ' + item.title, [box, el('div', { class: 'p8-bellcols' }, form, side)], foot, {
+    A.openSheet(isNew ? 'إشعار جديد' : 'تعديل: ' + item.title, [box, el('div', { class: 'p8-bellcols' }, form, side)], foot, { help: 'bell-edit',
       size: 'md',
       icon: 'bell',
       sub: isNew ? 'بيظهر في 🔔 على الموقع في ميعاده' : (until ? 'ظاهر في الجرس لحد ' + A.formatWall(until, false) : 'في الجرس'),

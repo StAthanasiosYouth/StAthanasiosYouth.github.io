@@ -365,6 +365,7 @@
 
     A.dirty = false;
 
+    A.nextSheetHelp = 'link-edit';
     A.openSheet(isNew ? 'رابط جديد' : 'تعديل: ' + link.title, [
       box,
       el('div', { class: 'form' },
@@ -448,6 +449,7 @@
 
     A.dirty = false;
 
+    A.nextSheetHelp = 'linksection';
     A.openSheet(isNew ? 'قسم روابط جديد' : 'تعديل: ' + (row.title || info.label), [
       box,
       el('div', { class: 'form' },
@@ -856,6 +858,7 @@
 
     A.dirty = false;
 
+    A.nextSheetHelp = 'contact-edit';
     A.openSheet(isNew ? 'جهة تواصل جديدة' : 'تعديل: ' + contact.name, [
       box,
       el('div', { class: 'form' },
@@ -1006,17 +1009,17 @@
     var config = A.state.config || {};
     // Phase 8B «دليل الأدمن»: the approved grid — a search, then a card per guide that opens its help
     var GUIDES = [
-      ['church', 'إزاي أضيف موضوع اجتماع', 'المحتوى ← الاجتماعات', 'meetings'],
-      ['megaphone', 'إزاي أكتب خبر ويظهر في الرئيسية', 'المحتوى ← الأخبار', 'news'],
+      ['church', 'إزاي أضيف موضوع اجتماع', 'المحتوى ← الاجتماعات', 'meeting-edit'],
+      ['megaphone', 'إزاي أكتب خبر ويظهر في الرئيسية', 'المحتوى ← الأخبار', 'news-edit'],
       ['theatre', 'فعالية جديدة بحجز', 'الفعاليات والصفحات', 'events'],
-      ['ticket', 'مراجعة طلب حجز وتسجيل دفعة', 'الحجوزات والفلوس', 'bookings'],
-      ['trophy', 'مسابقة من الأول للنتيجة', 'المسابقات', 'comps'],
+      ['ticket', 'مراجعة طلب حجز وتسجيل دفعة', 'الحجوزات والفلوس', 'booking-review'],
+      ['trophy', 'مسابقة من الأول للنتيجة', 'المسابقات', 'comp-new'],
       ['send', 'النشر والرجوع لنسخة قديمة', 'راجع وانشر', 'publish'],
-      ['shield', 'إضافة خادم للإدارة وصلاحياته', 'الإعدادات ← الفريق', 'settings'],
+      ['shield', 'إضافة خادم للإدارة وصلاحياته', 'الإعدادات ← الفريق', 'team-add'],
       ['photos', 'رفع صورة أو مقطع فيديو', 'الصور والملفات', 'media']
     ];
     var guideGrid = el('div', { class: 'guides' }, GUIDES.map(function (g) {
-      return el('button', { class: 'guide', type: 'button', 'data-q': g[1] + ' ' + g[2], onclick: function () { A.help(g[3]); } },
+      return el('button', { class: 'guide', type: 'button', 'data-q': g[1] + ' ' + g[2], onclick: function () { A.guide({ article: g[3] }); } },
         el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(g[0])),
         el('span', { class: 'guide__text' }, el('b', { text: g[1] }), el('small', { text: g[2] })),
         el('span', { class: 'guide__go', 'aria-hidden': 'true' }, icon('chevron')));
@@ -1024,6 +1027,9 @@
     var guideSearch = el('input', { class: 'guide-search__input', type: 'search', placeholder: 'دوّر في الدليل…', 'aria-label': 'دوّر في الدليل', oninput: function () {
       var q = guideSearch.value.trim();
       guideGrid.querySelectorAll('.guide').forEach(function (b) { b.hidden = !!q && b.getAttribute('data-q').indexOf(q) === -1; });
+    }, onkeydown: function (e) {
+      // Enter: the whole guide's search (every article, not only these cards)
+      if (e.key === 'Enter' && guideSearch.value.trim()) A.guide({ query: guideSearch.value.trim() });
     } });
     var guideCard = el('section', { class: 'card setcard setcard--plain' },
       el('div', { class: 'setcard__head' },

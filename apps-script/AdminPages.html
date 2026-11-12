@@ -687,7 +687,7 @@
       A.msec('الظهور', 'eye', '', [A.col(home.node, 12), A.col(enabled.node, 12)]));
 
     A.dirty = false;
-    A.openSheet(isNew ? 'صفحة خدمة جديدة' : 'إدارة الصفحة: ' + page.title, [box, form], A.sheetFooter(save), {
+    A.openSheet(isNew ? 'صفحة خدمة جديدة' : 'إدارة الصفحة: ' + page.title, [box, form], A.sheetFooter(save), { help: 'svcpage-edit',
       size: 'lg',
       icon: 'theatre',
       sub: isNew ? 'صفحة خدمة · بتتحفظ مسودة لحد النشر' : ['/' + page.slug + '/', page.archived ? 'في الأرشيف' : page.live ? 'منشورة' : 'لسه متنشرتش', page.partner ? 'بإشراف B.U.G' : ''].filter(Boolean).join(' · '),
@@ -983,6 +983,7 @@
     }
     A.fill(save, icon('check'), el('span', { text: isNew ? 'إضافة' : 'احفظ' }));
     A.dirty = false;
+    A.nextSheetHelp = 'clip-edit';
     A.openSheet(isNew ? 'مقطع جديد' : 'تعديل المقطع: ' + m.title, [
       box,
       el('div', { class: 'form p8-clipedit' },
@@ -1849,7 +1850,7 @@
     hasBooking.input.addEventListener('change', paintBooking);
 
     A.dirty = false;
-    A.openSheet(isNew ? 'فعالية جديدة' : 'تعديل: ' + ev.title, [box, sections], A.sheetFooter(save), {
+    A.openSheet(isNew ? 'فعالية جديدة' : 'تعديل: ' + ev.title, [box, sections], A.sheetFooter(save), { help: 'event-edit',
       size: 'lg',
       icon: 'theatre',
       sub: sub,
@@ -2273,6 +2274,7 @@
       });
       A.dirty = false;
       A.fill(save, icon('check'), el('span', { text: isNew ? 'إضافة' : 'احفظ' }));
+      A.nextSheetHelp = 'servant-edit';
       A.openSheet(isNew ? 'خادم جديد' : 'تعديل: ' + s.name, [
         ebox,
         el('div', { class: 'fgrid p8-servant' },
