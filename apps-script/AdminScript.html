@@ -3849,7 +3849,12 @@
     ] },
     { key: 'media', label: 'الصور والملفات', short: 'الصور', icon: 'photos', group: 'site' },
     // «سجل النشاط» (AdminActivity.html)
-    { key: 'activity', label: 'سجل النشاط', short: 'النشاط', icon: 'clock', title: 'سجل النشاط', group: 'team' },
+    { key: 'activity', label: 'سجل النشاط', short: 'النشاط', icon: 'clock', title: 'سجل النشاط', crumb: 'الفريق', group: 'team', subs: [
+      // Phase 8B (activity.png): the log, its archive files, the admin app
+      { key: 'activity', label: 'السجل' },
+      { key: 'actarchive', label: 'الأرشيف' },
+      { key: 'actapp', label: 'تطبيق الإدارة' }
+    ] },
     { key: 'settings', label: 'الإعدادات', icon: 'gear' }
   ];
 
@@ -4064,8 +4069,10 @@
       }, s.label, navBadge(s.badge, 'tab__badge'));
     }));
 
-    document.getElementById('crumb').textContent = sub ? current.label : 'لوحة التحكم';
-    document.getElementById('page-title').textContent = sub ? sub.label : (current.title || current.label);
+    // Phase 8B (activity.png): an area whose tabs are parts of one screen keeps its own name on top
+    var keep = sub && current.crumb;
+    document.getElementById('crumb').textContent = keep ? current.crumb : sub ? current.label : 'لوحة التحكم';
+    document.getElementById('page-title').textContent = keep ? current.title : sub ? sub.label : (current.title || current.label);
     document.title = (sub ? sub.label : (current.title || current.label)) + ' — لوحة التحكم';
 
     var foot = document.getElementById('rail-foot');

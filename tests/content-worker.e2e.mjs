@@ -653,19 +653,19 @@ test('Phase 8 A6: «إدارة السجل» — the size, an archive to a privat
   await s.page.evaluate(() => A.go('activity'));
   await s.page.waitForSelector('[data-act="log-manage"]', { timeout: 8000 });
   await s.page.click('[data-act="log-manage"]');
-  await s.page.waitForSelector('dialog.sheet[open] .logm__stats[aria-busy="false"]', { timeout: 8000 });
-  await s.page.$eval('dialog.sheet[open] .check--toggle input', i => i.click());
-  await s.page.waitForFunction(() => /هيتأثر ٤ صف/.test(document.querySelector('.logm__count')?.textContent || ''), { timeout: 5000 });
+  // Phase 8B (activity-manage.png): «الصفوف التقنية بس» is the default; the count in big digits
+  await s.page.waitForFunction(() => document.querySelector('dialog.sheet[open] .logm8__n')?.textContent === '٤', { timeout: 8000 });
   // an archive first (nothing deleted)
   await s.page.click('[data-act="log-archive"]');
-  await s.page.waitForSelector('.logm__archive', { timeout: 8000 });
+  await s.page.waitForFunction(() => /اتأرشف/.test(document.body.textContent), { timeout: 8000 });
   assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM activity WHERE action = 'diag.echo'").get().n, 4);
   // the safe delete asks for the word
+  await s.page.$eval('dialog.sheet[open] input[value="delete"]', i => i.click());
   await s.page.click('[data-act="log-delete"]');
   await s.page.waitForSelector('dialog.modal[open] .modal__typed');
   await s.page.type('dialog.modal[open] .modal__typed', 'امسح');
   await s.page.click('dialog.modal[open] .modal__actions .btn:first-child');
-  await s.page.waitForFunction(() => /هيتأثر ٠ صف/.test(document.querySelector('.logm__count')?.textContent || ''), { timeout: 8000 });
+  await s.page.waitForFunction(() => document.querySelector('dialog.sheet[open] .logm8__n')?.textContent === '٠', { timeout: 8000 });
   assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM activity WHERE action = 'diag.echo'").get().n, 0);
   assert.ok(env.DB.raw.prepare("SELECT 1 FROM activity WHERE action = 'activity.trim'").get(), 'the delete is in the log');
   await s.page.screenshot({ path: `${ROOT}tools/.cache/phase8-a3/log-manage.png` });

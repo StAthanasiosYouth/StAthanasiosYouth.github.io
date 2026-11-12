@@ -234,7 +234,7 @@ test('activity: the home card and the log show who did what with display names; 
 
   // filter: a section
   await d.page.select('.act-filters select:nth-of-type(1)', '');
-  const sectionSelect = (await d.page.$$('.act-filters select'))[2];
+  const sectionSelect = (await d.page.$$('.act-filters select'))[1];
   await sectionSelect.select('news');
   await d.page.waitForFunction(() => document.querySelectorAll('.acts .act').length === 1 && document.querySelector('.acts[aria-busy="false"]'));
   assert.match(await d.page.$eval('.acts .act', n => n.innerText), /خبر من فادي/);
