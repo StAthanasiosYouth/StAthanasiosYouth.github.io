@@ -253,6 +253,13 @@ export async function sessionPark(ctx, now = Date.now()) {
   return { parked: r.meta.changes === 1 };
 }
 
+/* a short stamp of a text (FNV-1a, 32 bits): equal access → equal stamp */
+function stampOf(text) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return (h >>> 0).toString(36);
+}
+
 /*
  * POST /v1/admin/session/heartbeat { area, view, item, locks: ['<kind>:<key>'], hidden, since }
  * → { locks: { key: { granted } | { granted: false, holder } }, others, activity?, token?, exp? }
@@ -294,6 +301,15 @@ export async function sessionHeartbeat(ctx, now = Date.now()) {
     "LEFT JOIN admins a ON a.email = l.email WHERE l.kind <> 'booking' AND (l.kind || ':' || l.id) IN (SELECT value FROM json_each(?))").bind(JSON.stringify(wanted)));
   stmts.push(db.prepare('SELECT s.email, s.device, s.seen_ms, s.parked_ms, s.area, s.view, s.item, a.name FROM admin_sessions s JOIN admins a ON a.email = s.email ' +
     'WHERE s.email <> ? AND a.active = 1 AND s.seen_ms > ? ORDER BY s.email').bind(me.email, now - ONLINE_MS));
+  // owner 2026-11-12: this admin's access, as a stamp — a change of role or grants (or the switch) reaches the open
+  // panel with the next beat, no refresh
+  const accessAt = stmts.length;
+  stmts.push(db.prepare(
+    "SELECT (SELECT value FROM settings WHERE key = 'PERMS_ENFORCE') AS enforce, (SELECT role FROM admins WHERE email = ?) AS role, " +
+    "(SELECT group_concat(perm || '=' || scope, ',') FROM (SELECT perm, scope FROM admin_grants WHERE email = ? ORDER BY perm)) AS grants, " +
+    // and the admins' photos: one added, changed or removed anywhere reaches every open panel
+    "(SELECT COUNT(*) || ':' || IFNULL(MAX(updated_ms), 0) FROM admin_avatars) AS avatars"
+  ).bind(me.email, me.email));
   const since = Number(b.since);
   const withActivity = b.since !== undefined && Number.isFinite(since) && since > 0;
   if (withActivity) {
@@ -317,9 +333,10 @@ export async function sessionHeartbeat(ctx, now = Date.now()) {
     return { email: x.email, name: nameOf(x.name, x.email), device: cleanLabel(x.device, 40), seen: ageS(x.seen_ms, now), area: cleanPlace(x.area), view: cleanPlace(x.view), item: it };
   });
 
-  const out = { locks, others };
+  const a = r[accessAt].results[0] || {};
+  const out = { locks, others, access: stampOf(String(a.enforce || '') + '|' + String(a.role || '') + '|' + String(a.grants || '')), avatars: String(a.avatars || '') };
   if (withActivity) {
-    out.activity = r[nWrites + 2].results.reverse().map(x => {
+    out.activity = r[accessAt + 1].results.reverse().map(x => {
       const shown = x.admin_name || x.actor_name || String(x.actor).split('@')[0];
       return { id: x.id, at: x.at, actor: x.actor, actorName: shown, action: x.action, type: x.entity_type || '', entityId: x.entity_id || '',
         title: x.entity_title || '', summary: x.summary || '', text: shown + ' ' + (x.summary || ''), count: x.count || 1, severity: x.severity || 'routine' };

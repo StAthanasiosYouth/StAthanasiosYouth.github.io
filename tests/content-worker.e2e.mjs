@@ -619,6 +619,40 @@ test('owner fix 2026-11-12: a «مشاهد» renames themself with the permissio
   }
 });
 
+test('owner 2026-11-12: changing an admin\'s role reaches their open panel with no refresh (treasurer → viewer)', async () => {
+  const { FAMILY } = await teamWorld(true);
+  env.DB.raw.prepare('DELETE FROM admin_grants WHERE email = ?').run(FAMILY);
+  const grant = perms => {
+    env.DB.raw.prepare('DELETE FROM admin_grants WHERE email = ?').run(FAMILY);
+    for (const [p, s] of Object.entries(perms)) env.DB.raw.prepare("INSERT INTO admin_grants (email, perm, scope, granted_by, granted_at) VALUES (?, ?, ?, 'test', 0)").run(FAMILY, p, s);
+  };
+  grant(PRESETS.treasurer.grants);
+  try {
+    who = FAMILY;
+    const s = await open();
+    await signedIn(s.page);
+    const rail = () => s.page.$$eval('#rail-nav [data-area]', ns => ns.map(n => n.dataset.area));
+    await s.page.waitForFunction(() => document.querySelector('#rail-nav [data-area="activity"]'), { timeout: 8000 });
+    assert.ok(!(await rail()).includes('content'), 'a treasurer: no «المحتوى»');
+    await s.page.evaluate(() => A.go('activity'));
+    // the primary admin makes the account a viewer: the same page follows within a few beats
+    grant(PRESETS.viewer.grants);
+    await s.page.waitForFunction(() => document.querySelector('#rail-nav [data-area="content"]'), { timeout: 8000 });
+    assert.ok((await rail()).includes('content'), 'a viewer: «المحتوى» shows');
+    assert.equal(await s.page.evaluate(() => A.access.perms['finance.manage']), undefined, 'the treasurer\'s finance.manage is gone');
+    await s.page.waitForFunction(() => [...document.querySelectorAll('.toast')].some(t => /صلاحياتك اتغيّرت/.test(t.textContent)), { timeout: 4000 });
+    // and back: an area the account may no longer open sends it home
+    grant({ 'activity.view': 'all' });
+    await s.page.evaluate(() => A.go('content'));
+    await s.page.waitForFunction(() => !document.querySelector('#rail-nav [data-area="content"]') && A.area !== 'content', { timeout: 8000 });
+    assert.deepEqual(s.problems, []);
+    await s.close();
+  }
+  finally {
+    who = ADMIN;
+  }
+});
+
 test('owner fix 2026-11-12: a new photo shows in «حسابي» at once; the online dot sits outside a photo', async () => {
   await freshWorld();
   const s = await open();
@@ -648,6 +682,29 @@ test('owner fix 2026-11-12: a new photo shows in «حسابي» at once; the onl
   }, ADMIN);
   assert.deepEqual([dot.img, dot.overflow], [true, 'visible']);
   assert.notEqual(dot.after, 'rgba(0, 0, 0, 0)');
+
+  // owner 2026-11-12: another admin's panel shows the photo everywhere — the top bar's «الفريق دلوقتي» too —
+  // and a photo changed while it is open reaches it with the heartbeat, no refresh
+  const FAMILY = 'family.account@example.com';
+  env.DB.raw.exec(`INSERT INTO admins (email, name, role, active, created_at) VALUES ('${FAMILY}', 'حساب الأسرة', 'admin', 1, 0);`);
+  world.properties.set('ADMIN_EMAILS', ADMIN + ',' + FAMILY);
+  try {
+    who = FAMILY;
+    const f = await open();
+    await signedIn(f.page);
+    await f.page.waitForSelector('#presence-open:not([hidden]) .pav', { timeout: 8000 });
+    await f.page.waitForSelector('#presence-open .pav.has-img img', { timeout: 4000 });
+    // the primary removes the photo: the letter comes back in the other panel by itself
+    await s.page.bringToFront();
+    await s.page.evaluate(() => A.call('apiAvatarDelete').then(r => A.setAvatars(r && r.avatars)));
+    await f.page.bringToFront();
+    await f.page.waitForFunction(() => { const p = document.querySelector('#presence-open .pav'); return p && !p.querySelector('img') && /م/.test(p.textContent); }, { timeout: 8000 });
+    assert.deepEqual(f.problems, []);
+    await f.close();
+  }
+  finally {
+    who = ADMIN;
+  }
   assert.deepEqual(s.problems, []);
   await s.close();
 });

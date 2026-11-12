@@ -4381,7 +4381,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return first ? first.key : 'settings';
   };
 
-  A.loadAccess = function () {
+  A.loadAccess = function (changed) {
     return A.call('apiAdminMe').then(function (me) {
       if (!me || !me.perms) return;
       if (A.viewing) { A.viewing.real = { enforce: !!me.enforce, primary: !!me.primary, perms: me.perms }; return; }
@@ -4390,10 +4390,22 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       if (!A.allowed(A.area)) A.go(A.homeArea());
       else {
         renderNav();
-        // a screen with grant-dependent parts (A6: «إدارة السجل») draws them now
-        if (A.area === 'activity') A.render();
+        // a screen with grant-dependent parts (A6: «إدارة السجل») draws them now; after a change, any screen
+        // (an open editor stays as it is: the Worker still decides its save)
+        if (A.area === 'activity' || (changed && !(document.getElementById('sheet') || {}).open)) A.render();
       }
+      if (changed) A.toast('صلاحياتك اتغيّرت، واللوحة اتظبطت عليها', 'info');
     }).catch(function () { /* the Apps Script panel, or the Worker away: today's access (the Worker still refuses) */ });
+  };
+
+  /* the heartbeat's access stamp (admin/boot.js): the first one is remembered, a different one reloads the access */
+  var accessStamp = '';
+  A.accessStamp = function (stamp) {
+    if (!stamp) return;
+    if (!accessStamp) { accessStamp = stamp; return; }
+    if (stamp === accessStamp) return;
+    accessStamp = stamp;
+    A.loadAccess(true);
   };
 
   /* =======================================================
@@ -4753,10 +4765,22 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }).catch(function () { /* the letters stay */ });
   };
 
+  /* the heartbeat's photo stamp (admin/boot.js): the first one is remembered, a different one reloads the photos */
+  var avatarStamp = '';
+  A.avatarStamp = function (stamp) {
+    if (!stamp) return;
+    if (!avatarStamp) { avatarStamp = stamp; return; }
+    if (stamp === avatarStamp) return;
+    avatarStamp = stamp;
+    A.loadAvatars();
+  };
+
   A.setAvatars = function (avatars) {
     A.avatars = avatars && typeof avatars === 'object' ? avatars : {};
     renderNav();
     paintAccount();
+    // the top bar's «الفريق دلوقتي» and the home's «المتصلين دلوقتي» (owner 2026-11-12: never a stale letter)
+    paintPresence(present);
     // the screens that draw people (no open editor is redrawn)
     if (['home', 'settings', 'activity'].indexOf(A.area) !== -1 && !(document.getElementById('sheet') || {}).open) A.render();
   };

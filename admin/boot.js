@@ -2276,6 +2276,16 @@
       if (A.renderPresence) A.renderPresence(result.others || []);
       // the menu's numbers: competitions to review, store requests (Presence.gs adminBadges_)
       if (result.badges && A.setBadges) A.setBadges(result.badges);
+      // owner 2026-11-12: this admin's role or permissions changed elsewhere: the panel follows, no refresh
+      if (result.access && A.accessStamp) {
+        try { A.accessStamp(result.access); }
+        catch (error) { if (window.console) console.warn('[admin] access', error); }
+      }
+      // an admin's photo added, changed or removed anywhere: every open panel shows it
+      if (result.avatars && A.avatarStamp) {
+        try { A.avatarStamp(result.avatars); }
+        catch (error) { if (window.console) console.warn('[admin] avatars', error); }
+      }
       // what the other admins just did (instead of a push while this panel is open)
       if (result.activity && A.activityToasts) {
         try { A.activityToasts(result.activity); }
