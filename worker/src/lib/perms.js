@@ -49,12 +49,11 @@ export const PRESETS = Object.freeze({
   servant_bookings: { label: 'خادم – حجوزات', grants: { 'bookings.view': 'all', 'events.view': 'all', 'bookings.create_cash': 'own' } },
   content_editor: { label: 'محرر المحتوى', grants: allOf(['content.view', 'content.edit', 'content.delete', 'publish.publish', 'events.view', 'events.add', 'events.edit', 'media.view', 'media.add', 'media.delete', 'push.view']) },
   viewer: { label: 'مشاهد', grants: allOf(views) },
-  // owner 2026-11-12: three competition roles, narrowest first
-  // grades the answers (the review queue, grade, void, re-grade) and sees who answered; builds nothing
-  comp_grader: { label: 'خادم تصحيح درجات', grants: allOf(['competitions.view', 'competitions.approve', 'participants.view', 'points.view']) },
+  // owner 2026-11-12: two competition roles (a grading-only one was dropped: grading is part of running a competition)
   // builds and runs competitions (questions, images, settings) and grades them; deletes nothing
   comp_servant: { label: 'خادم مسابقات', grants: allOf(['competitions.view', 'competitions.add', 'competitions.edit', 'competitions.approve', 'participants.view', 'points.view', 'media.view', 'media.add']) },
-  // the whole competitions side: delete too, the points and the store, the youth accounts (not their reset), the export
+  // the whole competitions side: delete too, the points (adjust, transfer, seasons), the store (items, orders, opening
+  // and closing it), the youth accounts (not their reset: participants.manage stays the Primary Admin's), the export
   comp_full: { label: 'خادم مسابقات شاملة', grants: allOf(['competitions.view', 'competitions.add', 'competitions.edit', 'competitions.delete', 'competitions.approve', 'points.view', 'points.edit', 'points.approve', 'store.view', 'store.add', 'store.edit', 'store.delete', 'store.approve', 'participants.view', 'participants.add', 'participants.edit', 'media.view', 'media.add', 'exports.export', 'activity.view']) }
 });
 
