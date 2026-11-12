@@ -244,51 +244,81 @@ test('scene content: a chat link takes words-only messages with who says them; a
 
 });
 
-test('help «؟»: the screen\'s own topic from admin/help.json, on top of an open editor without touching it (desktop + phone)', async () => {
+test('«دليل الأدمن»: the video bubble, the article of the exact screen or editor, device steps, search, zoom — over an open editor without touching it (1440, 390, 360)', async () => {
 
   const shown = handle => handle.evaluate(n => !n.hidden && !!n.offsetParent && n.getBoundingClientRect().height > 0 && getComputedStyle(n).visibility === 'visible');
   const press = async handle => { await handle.evaluate(n => n.scrollIntoView({ block: 'center' })); await handle.click(); };
+  const guide = JSON.parse(readFileSync(`${ROOT}admin/guide.json`, 'utf8'));
+  const ids = new Set(guide.articles.map(a => a.id));
+  // every related link and every picture exists
+  for (const a of guide.articles) {
+    for (const r of a.related || []) assert.ok(ids.has(r), `${a.id} → ${r}`);
+    for (const s of a.steps || []) if (s.shot) for (const dev of s.only ? [s.only] : ['d', 'm']) assert.ok(existsSync(`${ROOT}admin/guide/${s.shot}-${dev}.webp`), `${a.id}: ${s.shot}-${dev}`);
+  }
 
-  for (const viewport of [{ width: 1366, height: 900 }, { width: 412, height: 915, isMobile: true, hasTouch: true }]) {
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844, isMobile: true, hasTouch: true }, { width: 360, height: 780, isMobile: true, hasTouch: true }]) {
+    const phone = viewport.width < 760;
     const { page, problems, close } = await open(viewport);
-    for (const [area, sub, title] of [['home', null, 'الرئيسية'], ['content', 'news', 'الأخبار'], ['content', 'meetings', 'الاجتماعات'], ['page', 'links', 'الروابط'], ['media', null, 'الصور'], ['settings', null, 'الإعدادات']]) {
+    for (const [area, sub, id] of [['home', null, 'navigate'], ['content', 'news', 'news'], ['content', 'meetings', 'meetings'], ['page', 'links', 'links'], ['media', null, 'media'], ['settings', 'team', 'team-add']]) {
       await page.evaluate((a, s) => A.go(a, s || undefined), area, sub);
       await new Promise(resolve => setTimeout(resolve, 300));
       const button = await page.$('#help-open');
-      // Phase 8B: the approved phone top bar has no help icon (help stays in every window, below)
-      if (viewport.width < 760) { assert.equal(await shown(button), false, 'no top help on a phone'); continue; }
-      assert.ok(await shown(button), `help visible on ${area}/${sub || ''} (${viewport.width})`);
+      assert.ok(await shown(button), `the video icon on ${area}/${sub || ''} (${viewport.width})`);
       await press(button);
-      // Phase 8B: the video bubble first, then «اقرا الشرح المكتوب»
-      await press(await page.waitForSelector('.vpop:popover-open .vpop__more'));
-      await page.waitForSelector('dialog.help[open] .help__title');
-      assert.equal(await page.$eval('dialog.help[open] .help__title', n => n.textContent), title);
-      assert.ok(await page.$$eval('dialog.help[open] .help__item', n => n.length) >= 2);
-      // another topic from the list, then closed with its own button
-      await press(await page.$('dialog.help[open] .help__chips button'));
-      await page.waitForFunction(t => document.querySelector('dialog.help[open] .help__title')?.textContent !== t, {}, title);
-      await press(await page.$('dialog.help[open] .help__head .icon-btn'));
-      await page.waitForFunction(() => !document.querySelector('dialog.help[open]'));
+      const bubble = await page.waitForSelector('.vpop:popover-open .vpop__more');
+      assert.match(await page.$eval('.vpop:popover-open', n => n.textContent), /فيديو الشرح قريبًا/);
+      assert.equal(await bubble.evaluate(n => n.textContent.trim()), 'لو حابب تقرأ الشرح');
+      await press(bubble);
+      await page.waitForSelector('dialog.gdoc[open] .gdoc__article');
+      assert.equal(await page.$eval('dialog.gdoc[open] .gdoc__article', n => n.dataset.id), id, `${area}/${sub || ''} opens its own article`);
+      // the device follows the real width
+      assert.equal(await page.$eval('dialog.gdoc[open] .gdoc__article', n => n.dataset.device), phone ? 'm' : 'd');
+      // nothing wider than the screen
+      assert.ok(await page.$eval('dialog.gdoc[open] .gdoc__main', n => n.scrollWidth <= n.clientWidth + 1), 'the article fits');
+      await press(await page.$('dialog.gdoc[open] .gdoc__close'));
+      await page.waitForFunction(() => !document.querySelector('dialog.gdoc[open]'));
     }
 
-    // the editor's «؟»: over the news editor, which keeps what was typed
+    // the editor's video icon: over the news editor, which keeps what was typed
     await page.evaluate(() => A.go('content', 'news'));
     await new Promise(resolve => setTimeout(resolve, 300));
-    await press(await page.evaluateHandle(() => [...document.querySelectorAll('button')].find(b => b.offsetParent && b.textContent.trim() === 'خبر')));
+    await press(await page.evaluateHandle(() => [...document.querySelectorAll('#view button')].find(b => b.offsetParent && b.textContent.trim() === 'خبر')));
     await page.waitForSelector('dialog.sheet[open] .help-btn');
     await new Promise(resolve => setTimeout(resolve, 500));
     const field = await page.evaluateHandle(() => [...document.querySelectorAll('dialog.sheet[open] input, dialog.sheet[open] textarea')].find(n => n.offsetParent));
     await press(field);
     await page.keyboard.type('خبر تجربة');
-    const help = await page.$('dialog.sheet[open] .help-btn');
-    assert.ok(await shown(help), 'the editor\'s «؟» visible');
-    await press(help);
+    await press(await page.$('dialog.sheet[open] .help-btn'));
     await press(await page.waitForSelector('.vpop:popover-open .vpop__more'));
-    await page.waitForSelector('dialog.help[open] .help__title');
-    assert.equal(await page.$eval('dialog.help[open] .help__title', n => n.textContent), 'الأخبار');
-    await page.screenshot({ path: `${ROOT}tools/.cache/help-${viewport.width}.png` });
+    await page.waitForSelector('dialog.gdoc[open] .gdoc__article');
+    assert.equal(await page.$eval('dialog.gdoc[open] .gdoc__article', n => n.dataset.id), 'news-edit', 'the editor opens its own article');
+    // the manual switch changes the words, not only the pictures
+    const words = () => page.$eval('dialog.gdoc[open] .gdoc__steps', n => n.textContent);
+    const before = await words();
+    await press(await page.$(`dialog.gdoc[open] .gdoc__devbtn[data-device="${phone ? 'd' : 'm'}"]`));
+    assert.equal(await page.$eval('dialog.gdoc[open] .gdoc__article', n => n.dataset.device), phone ? 'd' : 'm');
+    assert.notEqual(await words(), before, 'other steps for the other device');
+    assert.equal(await page.$eval('dialog.gdoc[open] .gdoc__fig img', (n, end) => n.getAttribute('src').endsWith(end), phone ? '-d.webp' : '-m.webp'), true);
+    await press(await page.$(`dialog.gdoc[open] .gdoc__devbtn[data-device="${phone ? 'm' : 'd'}"]`));
+    // zoom a picture, then close it with Escape (the guide stays)
+    await press(await page.$('dialog.gdoc[open] .gdoc__zoom'));
+    await page.waitForSelector('dialog.gdoc[open] .gdoc__lightbox img');
     await page.keyboard.press('Escape');
-    await page.waitForFunction(() => !document.querySelector('dialog.help[open]'));
+    await page.waitForFunction(() => !document.querySelector('.gdoc__lightbox'));
+    assert.equal(await page.evaluate(() => !!document.querySelector('dialog.gdoc[open]')), true);
+    // search: Arabic without marks finds the publishing article; a related link opens it
+    const search = await page.$('dialog.gdoc[open] .gdoc__search');
+    await press(search);
+    await page.keyboard.type('انشر');
+    await page.waitForSelector('dialog.gdoc[open] .gdoc__results .gdoc__link');
+    assert.ok(await page.$$eval('dialog.gdoc[open] .gdoc__results .gdoc__link', n => n.map(x => x.dataset.id).includes('publish')));
+    await press(await page.$('dialog.gdoc[open] .gdoc__results .gdoc__link[data-id="publish"]'));
+    await page.waitForFunction(() => document.querySelector('dialog.gdoc[open] .gdoc__article')?.dataset.id === 'publish');
+    // no «روح للشاشة دي» with an editor open (it would leave the editor)
+    assert.equal(await page.$('dialog.gdoc[open] .gdoc__goto'), null);
+    await page.screenshot({ path: `${ROOT}tools/.cache/guide-${viewport.width}.png` });
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.querySelector('dialog.gdoc[open]'));
     assert.equal(await page.evaluate(() => !!document.querySelector('dialog.sheet[open]')), true, 'the editor stays open');
     assert.equal(await field.evaluate(n => n.value), 'خبر تجربة', 'what was typed is still there');
     assert.deepEqual(problems, []);

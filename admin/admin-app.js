@@ -3168,6 +3168,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     if (size === 'lg' && !options.plain) sheetSections(sheet, options);
 
     sheet.style.transform = '';
+    // «دليل الأدمن»: which article the video icon of this window opens (AdminHelp A.guideContext)
+    // (options.help, or A.nextSheetHelp set just before the call by an editor whose options are built later)
+    var helpKey = options.help || A.nextSheetHelp;
+    A.nextSheetHelp = null;
+    if (helpKey) sheet.dataset.help = helpKey; else delete sheet.dataset.help;
 
     if (!sheet.open) {
       A.lastFocus = document.activeElement;
@@ -6740,6 +6745,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     A.dirty = false;
 
+    A.nextSheetHelp = 'link-edit';
     A.openSheet(isNew ? 'رابط جديد' : 'تعديل: ' + link.title, [
       box,
       el('div', { class: 'form' },
@@ -6823,6 +6829,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     A.dirty = false;
 
+    A.nextSheetHelp = 'linksection';
     A.openSheet(isNew ? 'قسم روابط جديد' : 'تعديل: ' + (row.title || info.label), [
       box,
       el('div', { class: 'form' },
@@ -7231,6 +7238,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     A.dirty = false;
 
+    A.nextSheetHelp = 'contact-edit';
     A.openSheet(isNew ? 'جهة تواصل جديدة' : 'تعديل: ' + contact.name, [
       box,
       el('div', { class: 'form' },
@@ -7381,17 +7389,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var config = A.state.config || {};
     // Phase 8B «دليل الأدمن»: the approved grid — a search, then a card per guide that opens its help
     var GUIDES = [
-      ['church', 'إزاي أضيف موضوع اجتماع', 'المحتوى ← الاجتماعات', 'meetings'],
-      ['megaphone', 'إزاي أكتب خبر ويظهر في الرئيسية', 'المحتوى ← الأخبار', 'news'],
+      ['church', 'إزاي أضيف موضوع اجتماع', 'المحتوى ← الاجتماعات', 'meeting-edit'],
+      ['megaphone', 'إزاي أكتب خبر ويظهر في الرئيسية', 'المحتوى ← الأخبار', 'news-edit'],
       ['theatre', 'فعالية جديدة بحجز', 'الفعاليات والصفحات', 'events'],
-      ['ticket', 'مراجعة طلب حجز وتسجيل دفعة', 'الحجوزات والفلوس', 'bookings'],
-      ['trophy', 'مسابقة من الأول للنتيجة', 'المسابقات', 'comps'],
+      ['ticket', 'مراجعة طلب حجز وتسجيل دفعة', 'الحجوزات والفلوس', 'booking-review'],
+      ['trophy', 'مسابقة من الأول للنتيجة', 'المسابقات', 'comp-new'],
       ['send', 'النشر والرجوع لنسخة قديمة', 'راجع وانشر', 'publish'],
-      ['shield', 'إضافة خادم للإدارة وصلاحياته', 'الإعدادات ← الفريق', 'settings'],
+      ['shield', 'إضافة خادم للإدارة وصلاحياته', 'الإعدادات ← الفريق', 'team-add'],
       ['photos', 'رفع صورة أو مقطع فيديو', 'الصور والملفات', 'media']
     ];
     var guideGrid = el('div', { class: 'guides' }, GUIDES.map(function (g) {
-      return el('button', { class: 'guide', type: 'button', 'data-q': g[1] + ' ' + g[2], onclick: function () { A.help(g[3]); } },
+      return el('button', { class: 'guide', type: 'button', 'data-q': g[1] + ' ' + g[2], onclick: function () { A.guide({ article: g[3] }); } },
         el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(g[0])),
         el('span', { class: 'guide__text' }, el('b', { text: g[1] }), el('small', { text: g[2] })),
         el('span', { class: 'guide__go', 'aria-hidden': 'true' }, icon('chevron')));
@@ -7399,6 +7407,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var guideSearch = el('input', { class: 'guide-search__input', type: 'search', placeholder: 'دوّر في الدليل…', 'aria-label': 'دوّر في الدليل', oninput: function () {
       var q = guideSearch.value.trim();
       guideGrid.querySelectorAll('.guide').forEach(function (b) { b.hidden = !!q && b.getAttribute('data-q').indexOf(q) === -1; });
+    }, onkeydown: function (e) {
+      // Enter: the whole guide's search (every article, not only these cards)
+      if (e.key === 'Enter' && guideSearch.value.trim()) A.guide({ query: guideSearch.value.trim() });
     } });
     var guideCard = el('section', { class: 'card setcard setcard--plain' },
       el('div', { class: 'setcard__head' },
@@ -9876,7 +9887,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var title = isNew ? 'اجتماع جديد' : 'اجتماع ' + A.formatWallLong(session.date).replace(/ [٠-٩]{4}$/, '');
     var meetingName = A.setting('meeting.title') || 'الاجتماع';
 
-    A.openSheet(title, [box, form], A.sheetFooter(save), {
+    A.openSheet(title, [box, form], A.sheetFooter(save), { help: 'meeting-edit',
       size: 'lg',
       icon: 'church',
       sub: meetingName + ' · ' + (session.time || usualTime ? clock12(session.time || usualTime) + ' · ' : '') + 'بيتحفظ مسودة لحد النشر',
@@ -10743,7 +10754,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         A.col(notify.node, 12), A.col(enabled.node, 12)
       ]));
 
-    A.openSheet(isNew ? 'خبر جديد' : 'تعديل: ' + item.title, [box, form], A.sheetFooter(save), {
+    A.openSheet(isNew ? 'خبر جديد' : 'تعديل: ' + item.title, [box, form], A.sheetFooter(save), { help: 'news-edit',
       size: 'lg',
       icon: 'megaphone',
       sub: 'جديد الأسرة · بيتحفظ مسودة لحد النشر',
@@ -11020,7 +11031,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       A.msec('التنبيهات', 'bell', '', [A.col(soon.node, 12), A.col(atStart.node, 12)]),
       A.msec('الشكل', 'sparkle', '', [A.col(display.node, 12), A.col(enabled.node, 12)]));
 
-    A.openSheet(isNew ? 'لعبة جديدة' : 'تعديل: ' + game.title, [box, form], A.sheetFooter(save), {
+    A.openSheet(isNew ? 'لعبة جديدة' : 'تعديل: ' + game.title, [box, form], A.sheetFooter(save), { help: 'game-edit',
       size: 'lg',
       icon: 'star',
       sub: 'ركن الألعاب · تحديات وألعاب',
@@ -11250,7 +11261,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       isNew ? null : el('button', { class: 'btn btn--sm btn--danger', type: 'button', 'aria-label': 'مسح ' + item.title, onclick: function (e) { A.deleteItem('notifications', item.id, item.title, e.currentTarget); } }, icon('trash'), 'امسح')
     ]);
 
-    A.openSheet(isNew ? 'إشعار جديد' : 'تعديل: ' + item.title, [box, el('div', { class: 'p8-bellcols' }, form, side)], foot, {
+    A.openSheet(isNew ? 'إشعار جديد' : 'تعديل: ' + item.title, [box, el('div', { class: 'p8-bellcols' }, form, side)], foot, { help: 'bell-edit',
       size: 'md',
       icon: 'bell',
       sub: isNew ? 'بيظهر في 🔔 على الموقع في ميعاده' : (until ? 'ظاهر في الجرس لحد ' + A.formatWall(until, false) : 'في الجرس'),
@@ -13801,7 +13812,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     function paintHide() { A.fill(hideBtn, icon(enabledOn ? 'eye-off' : 'eye'), enabledOn ? 'خبّي الكارت' : 'اظهر الكارت'); hideBtn.setAttribute('aria-pressed', enabledOn ? 'false' : 'true'); }
     paintHide();
 
-    A.openSheet(isNew ? meta.add : 'تعديل: ' + item.title, [box, form], A.sheetFooter(save), {
+    A.openSheet(isNew ? meta.add : 'تعديل: ' + item.title, [box, form], A.sheetFooter(save), { help: 'card-edit',
       size: 'lg',
       icon: SECTION_ICON[sectionKey] || meta.icon,
       sub: '',
@@ -16324,6 +16335,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
     A.dirty = false;
 
+    A.nextSheetHelp = 'comp-question';
     A.openSheet(isNew ? 'سؤال جديد' : 'تعديل السؤال ' + ar(n), [
       box,
       (q && (q.problems || []).length) ? el('div', { class: 'note note--warn' }, el('p', { class: 'note__title', text: 'ناقص قبل النشر:' }), el('ul', {}, q.problems.map(function (p) { return el('li', { text: p }); }))) : null,
@@ -20083,7 +20095,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       A.msec('الظهور', 'eye', '', [A.col(home.node, 12), A.col(enabled.node, 12)]));
 
     A.dirty = false;
-    A.openSheet(isNew ? 'صفحة خدمة جديدة' : 'إدارة الصفحة: ' + page.title, [box, form], A.sheetFooter(save), {
+    A.openSheet(isNew ? 'صفحة خدمة جديدة' : 'إدارة الصفحة: ' + page.title, [box, form], A.sheetFooter(save), { help: 'svcpage-edit',
       size: 'lg',
       icon: 'theatre',
       sub: isNew ? 'صفحة خدمة · بتتحفظ مسودة لحد النشر' : ['/' + page.slug + '/', page.archived ? 'في الأرشيف' : page.live ? 'منشورة' : 'لسه متنشرتش', page.partner ? 'بإشراف B.U.G' : ''].filter(Boolean).join(' · '),
@@ -20379,6 +20391,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
     A.fill(save, icon('check'), el('span', { text: isNew ? 'إضافة' : 'احفظ' }));
     A.dirty = false;
+    A.nextSheetHelp = 'clip-edit';
     A.openSheet(isNew ? 'مقطع جديد' : 'تعديل المقطع: ' + m.title, [
       box,
       el('div', { class: 'form p8-clipedit' },
@@ -21245,7 +21258,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     hasBooking.input.addEventListener('change', paintBooking);
 
     A.dirty = false;
-    A.openSheet(isNew ? 'فعالية جديدة' : 'تعديل: ' + ev.title, [box, sections], A.sheetFooter(save), {
+    A.openSheet(isNew ? 'فعالية جديدة' : 'تعديل: ' + ev.title, [box, sections], A.sheetFooter(save), { help: 'event-edit',
       size: 'lg',
       icon: 'theatre',
       sub: sub,
@@ -21669,6 +21682,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       });
       A.dirty = false;
       A.fill(save, icon('check'), el('span', { text: isNew ? 'إضافة' : 'احفظ' }));
+      A.nextSheetHelp = 'servant-edit';
       A.openSheet(isNew ? 'خادم جديد' : 'تعديل: ' + s.name, [
         ebox,
         el('div', { class: 'fgrid p8-servant' },
@@ -22682,13 +22696,19 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
 /* ---------- AdminHelp.html ---------- */
 /*
- * In-admin help («؟»): explains the screen you are on. The words live in
- * one file, admin/help.json (official admin, fetched the first time help
- * opens — nothing on the panel's first load); this only shows them.
- * Two ways in: the «؟» next to the screen title, and the «؟» in an
- * editor's header (the help of the screen that editor belongs to).
- * Its own <dialog>, over an open editor: closing it leaves the editor as
- * it was. The Apps Script admin (no help.json next to it) says so.
+ * «دليل الأدمن» — the in-admin help (owner 2026-11-13).
+ *
+ * 1. The video icon (top bar, every window, every screen on the phone) opens a small bubble:
+ *    «فيديو الشرح قريبًا» (or the video itself, once an article has one) and «لو حابب تقرأ الشرح».
+ * 2. That link opens the guide ON the article of the exact screen or editor you are in (A.guideContext).
+ * 3. The guide is a large reading space of its own (<dialog class="gdoc">), over whatever is open:
+ *    closing it leaves the screen and any editor exactly as they were — nothing reloads, nothing is lost.
+ * 4. Each article has its computer steps and its phone steps; the device follows the real window width
+ *    (under 760 px = phone), and «شرح الكمبيوتر» / «شرح الموبايل» switches it by hand.
+ * 5. The words and pictures live in admin/guide.json + admin/guide/*.webp (built by tools/build-admin.mjs
+ *    from tools/source/admin-guide.mjs; pictures by tools/guide-shots.mjs, demo data only), fetched the
+ *    first time help opens — nothing on the panel's first load.
+ * 6. An article the admin may not use (A.allowed / A.allowedSub / the primary admin) says so, without its steps.
  */
 (function () {
 
@@ -22698,130 +22718,415 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   var el = A.el;
   var icon = A.icon;
 
+  var PHONE_MAX = 759;
+  var DEVICE_KEY = 'athanasios-admin.guide-device';
+
   var loading = null;
+  var data = null;
   var dialog = null;
+  var view = { article: null, query: '', device: '' };
 
   function load() {
     if (!loading) {
-      loading = fetch('help.json', { cache: 'no-cache' })
+      loading = fetch('guide.json', { cache: 'no-cache' })
         .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function (json) { data = json; return json; })
         .catch(function (error) { loading = null; throw error; });
     }
     return loading;
   }
 
-  /* the screen on now -> its help topic */
+  /* ---------- where the admin is ---------- */
+
+  /* the screen on now -> its context key */
   function here() {
     if (A.area === 'content') return A.sub.content;
     if (A.area === 'page') return A.sub.page;
-    // «الصفحات والفعاليات» (AdminPages): صفحات الخدمة / الفعاليات / الخدام
     if (A.area === 'pages') return A.sub.pages || 'svcpages';
-    // the areas of their own since Phase 8: their tabs keep their topics
     if (A.area === 'bookings') return A.sub.bookings || 'bookings';
-    if (A.area === 'youth') return A.compHelpKey ? A.compHelpKey() : 'comps';
-    // «المسابقات»: the list, the builder's question / results tabs, the switches (AdminComp)
+    if (A.area === 'youth') return A.sub.youth || 'youth';
+    if (A.area === 'activity') return A.sub.activity || 'activity';
+    if (A.area === 'settings') return 'settings-' + (A.sub.settings || 'me');
     if (A.area === 'comps') return A.compHelpKey ? A.compHelpKey() : 'comps';
     return A.area || 'home';
   }
 
-  function topicNode(topic, open) {
-    return el('section', { class: 'help__topic', 'data-topic': topic.key },
-      el('h3', { class: 'help__title', text: topic.title }),
-      topic.intro ? el('p', { class: 'help__intro', text: topic.intro }) : null,
-      el('div', { class: 'help__items' }, (topic.items || []).map(function (item, i) {
-        return el('details', { class: 'help__item', open: open && i === 0 ? 'open' : null },
-          el('summary', { text: item.q }),
-          el('p', { text: item.a })
-        );
-      }))
-    );
-  }
-
-  function show(key) {
-
-    if (!dialog) {
-      dialog = el('dialog', { class: 'help', 'aria-labelledby': 'help-heading' });
-      dialog.addEventListener('click', function (event) { if (event.target === dialog) dialog.close(); });
-      document.body.appendChild(dialog);
+  /* the open window (an editor, «راجع وانشر», a confirmation…) wins over the screen under it */
+  A.guideContext = function (anchor) {
+    var sheet = anchor && anchor.closest ? anchor.closest('dialog.sheet[open]') : null;
+    if (!sheet && !anchor) sheet = document.querySelector('dialog.sheet[open]');
+    if (sheet && sheet.dataset.help) return 'sheet:' + sheet.dataset.help;
+    if (sheet) {
+      var t = sheet.querySelector('.sheet__title');
+      var title = t ? t.textContent.trim() : '';
+      var byTitle = data && data.titles ? matchTitle(title) : '';
+      if (byTitle) return 'sheet:' + byTitle;
+      return here();
     }
-
-    var body = el('div', { class: 'help__body' }, el('p', { class: 'loading-text', role: 'status' }, el('span', { class: 'spinner spinner--inline', 'aria-hidden': 'true' }), 'جاري التحميل…'));
-    A.fill(dialog,
-      el('div', { class: 'help__head' },
-        el('h2', { id: 'help-heading', class: 'help__heading' }, icon('video'), 'شرح الجزء ده'),
-        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل المساعدة', onclick: function () { dialog.close(); } }, icon('close'))
-      ),
-      // Phase 8B: this part's guide video (coming); the written help stays under it
-      el('div', { class: 'vhelp-card' },
-        el('span', { class: 'vhelp-card__play', 'aria-hidden': 'true' }, icon('video')),
-        el('div', {},
-          el('b', { text: 'فيديو شرح · قريبًا' }),
-          el('small', { text: 'هنا هيبقى فيديو قصير بيشرح الجزء ده. لحد ما يجهز، الشرح المكتوب تحت.' })
-        )
-      ),
-      body
-    );
-    if (!dialog.open) dialog.showModal();
-
-    load().then(function (help) {
-      var topics = help.topics || [];
-      var current = topics.filter(function (t) { return t.key === key; })[0] || topics[0];
-      var others = topics.filter(function (t) { return t !== current; });
-      A.fill(body,
-        topicNode(current, true),
-        el('nav', { class: 'help__more', 'aria-label': 'مواضيع تانية' },
-          el('p', { class: 'help__more-title', text: 'مواضيع تانية' }),
-          el('div', { class: 'help__chips' }, others.map(function (topic) {
-            return el('button', { class: 'btn btn--small btn--ghost', type: 'button', onclick: function () { show(topic.key); }, text: topic.title });
-          }))
-        )
-      );
-      body.scrollTop = 0;
-    }, function () {
-      A.fill(body, el('p', { class: 'help__intro', text: 'المساعدة موجودة في لوحة التحكم الرسمية (stathanasiosyouth.github.io/admin). لو إنت فيها، اتأكد من النت وجرّب تاني.' }));
-    });
-
-  }
-
-  A.help = function (key) { show(key || here()); };
-
-  /* Phase 8B (help-pop.png): the video icon opens a bubble — this part's guide video («قريبًا»), its title and a line;
-     under it (owner 2026-11-11, option ب) «اقرا الشرح المكتوب» opens this screen's written help */
-  function areaTitle() {
-    var t = document.getElementById('page-title');
-    var sheetTitle = document.querySelector('dialog.sheet[open] .sheet__title');
-    return (sheetTitle && sheetTitle.textContent) || (t && t.textContent) || 'الجزء ده';
-  }
-
-  A.helpPop = function (anchor) {
-    var key = here();
-    var title = areaTitle();
-    if (!A.menu) { show(key); return; }
-    var box = A.menu(anchor, 'vpop', [
-      el('div', { class: 'vpop__thumb', 'aria-hidden': 'true' },
-        el('img', { src: '../assets/img/logo-128.webp', alt: '', width: 64, height: 64 }),
-        el('span', { class: 'vpop__play' }),
-        el('span', { class: 'vpop__soon', text: 'قريبًا' })),
-      el('b', { class: 'vpop__title', text: 'فيديو شرح: ' + title }),
-      el('small', { class: 'vpop__text', text: 'فيديو قصير بيشرح القسم ده خطوة بخطوة. هيتضاف بعدين.' }),
-      el('button', { class: 'vpop__more', type: 'button', role: 'menuitem', onclick: function () { box.hidePopover(); show(key); } }, 'اقرا الشرح المكتوب')
-    ]);
-    box.setAttribute('role', 'dialog');
-    box.setAttribute('aria-label', 'فيديو شرح: ' + title);
+    return here();
   };
 
-  /* the «؟» in an editor's header (AdminScript openSheet) */
+  function matchTitle(title) {
+    var found = '';
+    (data.titles || []).some(function (pair) { if (title.indexOf(pair[0]) === 0) { found = pair[1]; return true; } return false; });
+    return found;
+  }
+
+  function articleFor(ctx) {
+    if (!data) return null;
+    var list = data.articles;
+    var hit = list.filter(function (a) { return (a.ctx || []).indexOf(ctx) !== -1; })[0];
+    // an editor without its own article: the article of the screen under it
+    if (!hit && ctx.indexOf('sheet:') === 0) hit = list.filter(function (a) { return (a.ctx || []).indexOf(here()) !== -1; })[0];
+    return hit || null;
+  }
+
+  function byId(id) {
+    return data ? data.articles.filter(function (a) { return a.id === id; })[0] || null : null;
+  }
+
+  /* ---------- the device: the real window width, or the admin's own choice ---------- */
+
+  function autoDevice() { return window.innerWidth <= PHONE_MAX ? 'm' : 'd'; }
+
+  function device() {
+    if (view.device) return view.device;
+    var saved = '';
+    try { saved = sessionStorage.getItem(DEVICE_KEY) || ''; } catch (e) { saved = ''; }
+    return saved === 'd' || saved === 'm' ? saved : autoDevice();
+  }
+
+  function setDevice(d) {
+    view.device = d;
+    try { sessionStorage.setItem(DEVICE_KEY, d); } catch (e) { /* no storage */ }
+    render();
+  }
+
+  /* ---------- may this admin use it? ---------- */
+
+  function locked(article) {
+    var a = A.access;
+    if (article.primary && a && !a.primary && !(A.viewing && A.viewing.real && A.viewing.real.primary)) return 'primary';
+    if (article.area && A.allowed && !A.allowed(article.area)) return 'perm';
+    if (article.sub && A.allowedSub && !A.allowedSub(article.sub)) return 'perm';
+    if (article.module && !A.AREAS.some(function (x) { return x.key === article.module || (x.subs || []).some(function (s) { return s.key === article.module; }); })) return 'off';
+    return '';
+  }
+
+  /* ---------- search: Arabic without its marks and letter forms ---------- */
+
+  function norm(s) {
+    return String(s || '').toLowerCase()
+      .replace(/[ً-ٰٟـ]/g, '')
+      .replace(/[أإآٱ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي')
+      .replace(/[«»"'.,،:؛!؟?()\-]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function haystack(a) {
+    if (!a._hay) {
+      var words = [a.title, a.summary, a.keywords, a.where].concat((a.steps || []).map(function (s) { return [s.d, s.m, s.t].join(' '); }))
+        .concat((a.fields || []).map(function (f) { return f.join(' '); })).concat(a.notes || []);
+      a._hay = norm(words.join(' '));
+      a._title = norm(a.title + ' ' + (a.keywords || ''));
+    }
+    return a._hay;
+  }
+
+  function search(q) {
+    var words = norm(q).split(' ').filter(Boolean);
+    if (!words.length) return [];
+    return data.articles.map(function (a) {
+      var hay = haystack(a);
+      if (!words.every(function (w) { return hay.indexOf(w) !== -1; })) return null;
+      var score = words.reduce(function (n, w) { return n + (a._title.indexOf(w) !== -1 ? 3 : 1); }, 0);
+      return { a: a, score: score };
+    }).filter(Boolean).sort(function (x, y) { return y.score - x.score; }).map(function (x) { return x.a; });
+  }
+
+  /* ---------- pieces ---------- */
+
+  function catOf(article) {
+    return data.categories.filter(function (c) { return c.key === article.cat; })[0] || { title: '', icon: 'book' };
+  }
+
+  function stepText(step, d) {
+    return d === 'm' ? (step.m || step.t || step.d) : (step.d || step.t || step.m);
+  }
+
+  function stepsFor(article, d) {
+    return (article.steps || []).filter(function (s) { return !s.only || s.only === d; });
+  }
+
+  function figure(shot, d, alt) {
+    var src = 'guide/' + shot + '-' + d + '.webp';
+    var img = el('img', { src: src, alt: alt, loading: 'lazy', decoding: 'async', class: 'gdoc__img gdoc__img--' + d });
+    img.addEventListener('error', function () { fig.hidden = true; });
+    var fig = el('figure', { class: 'gdoc__fig gdoc__fig--' + d },
+      el('button', { class: 'gdoc__zoom', type: 'button', 'aria-label': 'كبّر الصورة: ' + alt, onclick: function () { zoom(src, alt); } },
+        img, el('span', { class: 'gdoc__zoomhint', 'aria-hidden': 'true' }, icon('eye'), 'كبّر')));
+    return fig;
+  }
+
+  function zoom(src, alt) {
+    var box = el('div', { class: 'gdoc__lightbox', role: 'dialog', 'aria-label': alt, tabindex: '-1' });
+    var img = el('img', { src: src, alt: alt });
+    var close = function () { box.remove(); };
+    A.fill(box,
+      el('div', { class: 'gdoc__lbbar' },
+        el('span', { text: alt }),
+        el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل الصورة', onclick: close }, icon('close'))),
+      el('div', { class: 'gdoc__lbimg', onclick: function (e) { if (e.target === img) box.classList.toggle('is-big'); else close(); } }, img));
+    box.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); close(); } });
+    dialog.appendChild(box);
+    box.focus();
+  }
+
+  function videoBlock(article) {
+    if (article.video && article.video.src) {
+      return el('div', { class: 'gdoc__video' },
+        el('video', { src: article.video.src, poster: article.video.poster || null, controls: true, preload: 'metadata', playsinline: true }));
+    }
+    return el('div', { class: 'gdoc__vsoon' },
+      el('span', { class: 'gdoc__vsoon-ico', 'aria-hidden': 'true' }, icon('video')),
+      el('span', {}, el('b', { text: 'فيديو الشرح قريبًا' }), el('small', { text: 'لحد ما يجهز، الخطوات تحت بالصور.' })));
+  }
+
+  function link(article, small) {
+    var lock = locked(article);
+    return el('button', { class: 'gdoc__link' + (small ? ' gdoc__link--small' : ''), type: 'button', 'data-id': article.id, onclick: function () { openArticle(article.id); } },
+      el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(article.icon || catOf(article).icon || 'book')),
+      el('span', { class: 'gdoc__linktext' }, el('b', { text: article.title }), small ? null : el('small', { text: article.summary })),
+      lock ? el('span', { class: 'gdoc__lock', title: 'مش متاح لحسابك' }, icon('lock')) : el('span', { class: 'gdoc__go', 'aria-hidden': 'true' }, icon('chevron')));
+  }
+
+  /* ---------- the screens of the guide ---------- */
+
+  function homeView() {
+    var ctx = view.from ? articleFor(view.from) : null;
+    return el('div', { class: 'gdoc__home' },
+      el('div', { class: 'gdoc__hero' },
+        el('h2', { class: 'gdoc__h', text: 'إزاي نقدر نساعدك؟' }),
+        el('p', { class: 'gdoc__lead', text: 'اختار الجزء اللي عايز تتعلمه، أو دوّر فوق. كل شرح فيه خطوات بالصور للكمبيوتر وللموبايل.' })),
+      ctx ? el('div', { class: 'gdoc__here' }, el('p', { class: 'gdoc__label', text: 'للشاشة اللي كنت فيها' }), link(ctx)) : null,
+      data.categories.map(function (c) {
+        var list = data.articles.filter(function (a) { return a.cat === c.key; });
+        if (!list.length) return null;
+        return el('section', { class: 'gdoc__cat' },
+          el('div', { class: 'gdoc__cathead' },
+            el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(c.icon)),
+            el('div', {}, el('h3', { text: c.title }), el('p', { text: c.blurb }))),
+          el('div', { class: 'gdoc__links' }, list.map(function (a) { return link(a); })));
+      }));
+  }
+
+  function resultsView() {
+    var list = search(view.query);
+    return el('div', { class: 'gdoc__results', role: 'region', 'aria-live': 'polite', 'aria-label': 'نتايج البحث' },
+      el('p', { class: 'gdoc__label', text: list.length ? 'لقينا ' + A.digits(list.length) + (list.length === 1 ? ' شرح' : ' شروحات') : 'مفيش شرح بالكلام ده. جرّب كلمة تانية، زي «خبر» أو «نشر» أو «حجز».' }),
+      el('div', { class: 'gdoc__links' }, list.map(function (a) { return link(a); })));
+  }
+
+  function articleView(article) {
+    var d = device();
+    var lock = locked(article);
+    var cat = catOf(article);
+    var siblings = data.articles.filter(function (a) { return a.cat === article.cat; });
+    var at = siblings.indexOf(article);
+    var prev = siblings[at - 1];
+    var next = siblings[at + 1];
+    var steps = stepsFor(article, d);
+    var sheetOpen = !!document.querySelector('dialog.sheet[open]');
+
+    return el('article', { class: 'gdoc__article', 'data-id': article.id, 'data-device': d },
+      el('p', { class: 'gdoc__crumb' }, icon(cat.icon), cat.title),
+      el('h2', { class: 'gdoc__h', id: 'gdoc-article-title', tabindex: '-1', text: article.title }),
+      el('p', { class: 'gdoc__lead', text: article.summary }),
+      article.where ? el('p', { class: 'gdoc__where' }, icon('map'), el('span', { text: 'المكان: ' + article.where })) : null,
+      lock ? el('div', { class: 'gdoc__locked', role: 'note' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('lock')),
+        el('div', {},
+          el('b', { text: lock === 'off' ? 'الجزء ده مش شغال دلوقتي' : 'الجزء ده مش متاح لحسابك' }),
+          el('p', { text: lock === 'off'
+            ? 'الجزء ده مقفول في اللوحة كلها. لما يتفعل، الشرح هيظهر هنا.'
+            : lock === 'primary'
+              ? 'ده للأدمن الأساسي بس. لو محتاج حاجة فيه، كلّم الأدمن الأساسي.'
+              : 'لو محتاجه في خدمتك، اطلب من الأدمن الأساسي يديك الصلاحية من «الإعدادات ← الفريق والصلاحيات».' }))) : null,
+      lock ? null : videoBlock(article),
+      lock ? null : el('div', { class: 'gdoc__devnote' }, icon(d === 'm' ? 'phone' : 'globe'),
+        el('span', { text: d === 'm' ? 'الخطوات دي زي ما هتشوفها على الموبايل.' : 'الخطوات دي زي ما هتشوفها على الكمبيوتر.' })),
+      lock || !steps.length ? null : el('ol', { class: 'gdoc__steps' }, steps.map(function (s, i) {
+        var text = stepText(s, d);
+        return el('li', { class: 'gdoc__step' },
+          el('span', { class: 'gdoc__num', 'aria-hidden': 'true', text: A.digits(i + 1) }),
+          el('div', { class: 'gdoc__stepbody' },
+            el('p', { text: text }),
+            s.shot ? figure(s.shot, d, 'الخطوة ' + A.digits(i + 1) + ': ' + text) : null));
+      })),
+      lock || !(article.fields && article.fields.length) ? null : el('section', { class: 'gdoc__box' },
+        el('h3', { text: 'الأزرار والخانات' }),
+        el('dl', { class: 'gdoc__fields' }, article.fields.map(function (f) {
+          return [el('dt', { text: f[0] }), el('dd', { text: f[1] })];
+        }))),
+      lock || !(article.notes && article.notes.length) ? null : el('section', { class: 'gdoc__box gdoc__box--note' },
+        el('h3', {}, icon('info'), 'خد بالك'),
+        el('ul', {}, article.notes.map(function (n) { return el('li', { text: n }); }))),
+      article.related && article.related.length ? el('section', { class: 'gdoc__related' },
+        el('h3', { text: 'شروحات مرتبطة' }),
+        el('div', { class: 'gdoc__links gdoc__links--small' }, article.related.map(byId).filter(Boolean).map(function (a) { return link(a, true); }))) : null,
+      el('div', { class: 'gdoc__pager' },
+        prev ? el('button', { class: 'btn btn--ghost gdoc__prev', type: 'button', onclick: function () { openArticle(prev.id); } }, icon('chevron'), el('span', {}, el('small', { text: 'اللي قبله' }), el('b', { text: prev.title }))) : el('span'),
+        next ? el('button', { class: 'btn btn--ghost gdoc__next', type: 'button', onclick: function () { openArticle(next.id); } }, el('span', {}, el('small', { text: 'اللي بعده' }), el('b', { text: next.title })), icon('chevron')) : el('span')),
+      // only with no editor open: going to a screen would leave that editor
+      !lock && article.go && !sheetOpen ? el('button', { class: 'btn btn--primary gdoc__goto', type: 'button', onclick: function () {
+        var p = article.go.split(':');
+        closeGuide();
+        A.go(p[0], p[1] || undefined);
+      } }, icon('arrow'), 'روح للشاشة دي') : null
+    );
+  }
+
+  function navView() {
+    return el('nav', { class: 'gdoc__nav', 'aria-label': 'أقسام الدليل' },
+      el('button', { class: 'gdoc__navhome' + (!view.article && !view.query ? ' is-on' : ''), type: 'button', onclick: function () { view.article = null; view.query = ''; render(); } }, icon('grid'), 'كل الأقسام'),
+      data.categories.map(function (c) {
+        var list = data.articles.filter(function (a) { return a.cat === c.key; });
+        if (!list.length) return null;
+        var current = view.article && view.article.cat === c.key;
+        return el('details', { class: 'gdoc__navcat', open: current ? 'open' : null },
+          el('summary', {}, icon(c.icon), el('span', { text: c.title }), el('small', { text: A.digits(list.length) })),
+          list.map(function (a) {
+            return el('button', { class: 'gdoc__navitem' + (view.article === a ? ' is-on' : ''), type: 'button', 'aria-current': view.article === a ? 'page' : null, onclick: function () { openArticle(a.id); } },
+              el('span', { text: a.title }), locked(a) ? icon('lock') : null);
+          }));
+      }));
+  }
+
+  var body, main, input, back, seg;
+
+  function build() {
+    dialog = el('dialog', { class: 'gdoc', 'aria-labelledby': 'gdoc-heading' });
+    dialog.addEventListener('click', function (event) { if (event.target === dialog) closeGuide(); });
+    dialog.addEventListener('close', function () { A.sound('close'); });
+    input = el('input', { class: 'gdoc__search', type: 'search', placeholder: 'دوّر في الدليل… مثلًا: خبر، نشر، حجز', 'aria-label': 'دوّر في الدليل', oninput: function () { view.query = input.value; if (view.query.trim()) view.article = null; renderMain(); } });
+    back = el('button', { class: 'icon-btn gdoc__back', type: 'button', 'aria-label': 'رجوع لأقسام الدليل', onclick: function () { view.article = null; render(); } }, icon('chevron'));
+    seg = el('div', { class: 'gdoc__device', role: 'radiogroup', 'aria-label': 'الشرح لأنهي جهاز' });
+    main = el('div', { class: 'gdoc__main', tabindex: '-1' });
+    body = el('div', { class: 'gdoc__body' });
+    A.fill(dialog,
+      el('header', { class: 'gdoc__head' },
+        back,
+        el('span', { class: 'chipico gdoc__chip', 'aria-hidden': 'true' }, icon('book')),
+        el('div', { class: 'gdoc__titles' }, el('h2', { id: 'gdoc-heading', text: 'دليل الأدمن' }), el('p', { text: 'شرح كل جزء خطوة بخطوة' })),
+        el('label', { class: 'gdoc__find' }, icon('filter'), input),
+        seg,
+        el('button', { class: 'icon-btn gdoc__close', type: 'button', 'aria-label': 'قفل الدليل والرجوع لشغلك', onclick: closeGuide }, icon('close'))),
+      body);
+    document.body.appendChild(dialog);
+    window.addEventListener('resize', function () { if (dialog.open && !view.device) render(); });
+  }
+
+  function renderSeg() {
+    var d = device();
+    A.fill(seg, [['d', 'شرح الكمبيوتر', 'globe'], ['m', 'شرح الموبايل', 'phone']].map(function (o) {
+      return el('button', { class: 'gdoc__devbtn' + (d === o[0] ? ' is-on' : ''), type: 'button', role: 'radio', 'aria-checked': d === o[0] ? 'true' : 'false', 'data-device': o[0], onclick: function () { setDevice(o[0]); } }, icon(o[2]), el('span', { text: o[1] }));
+    }));
+  }
+
+  function renderMain() {
+    var node = view.query.trim() ? resultsView() : view.article ? articleView(view.article) : homeView();
+    A.fill(main, node);
+    dialog.classList.toggle('is-article', !!view.article && !view.query.trim());
+    var nav = body.querySelector('.gdoc__nav');
+    if (nav) nav.replaceWith(navView());
+  }
+
+  function render() {
+    if (!dialog || !data) return;
+    renderSeg();
+    if (!body.querySelector('.gdoc__nav')) A.fill(body, navView(), main);
+    renderMain();
+  }
+
+  function openArticle(id) {
+    var a = byId(id);
+    if (!a) return;
+    view.article = a;
+    view.query = '';
+    input.value = '';
+    render();
+    main.scrollTop = 0;
+    var h = main.querySelector('#gdoc-article-title');
+    if (h) h.focus({ preventScroll: true });
+    A.sound('tab');
+  }
+
+  function closeGuide() {
+    if (dialog && dialog.open) dialog.close();
+  }
+
+  /*
+   * A.guide({ ctx, article }) — opens the guide: on the article of that context (the screen or editor the admin is in),
+   * or a given article, or its home. Opens over whatever is open; the panel underneath is not touched.
+   */
+  A.guide = function (opts) {
+    opts = opts || {};
+    if (!dialog) build();
+    view.from = opts.ctx || '';
+    view.query = opts.query || '';
+    input.value = view.query;
+    A.fill(body, el('p', { class: 'loading-text gdoc__loading', role: 'status' }, el('span', { class: 'spinner spinner--inline', 'aria-hidden': 'true' }), 'جاري تحميل الدليل…'));
+    if (!dialog.open) { dialog.showModal(); A.sound('open'); }
+    load().then(function () {
+      view.article = opts.article ? byId(opts.article) : opts.ctx ? articleFor(opts.ctx) : null;
+      A.fill(body, navView(), main);
+      render();
+      main.scrollTop = 0;
+      var h = main.querySelector('#gdoc-article-title');
+      if (h) h.focus({ preventScroll: true });
+    }, function () {
+      A.fill(body, el('p', { class: 'gdoc__lead gdoc__loading', text: 'الدليل موجود في لوحة التحكم الرسمية. اتأكد من النت وجرّب تاني.' }));
+    });
+  };
+
+  /* old callers: A.help(key) = the guide on that screen's article */
+  A.help = function (key) { A.guide({ ctx: key || A.guideContext() }); };
+
+  /* ---------- the bubble ---------- */
+
+  A.helpPop = function (anchor) {
+    var ctx = A.guideContext(anchor);
+    if (!A.menu) { A.guide({ ctx: ctx }); return; }
+    // the article's own video, once there is one (guide.json already loaded or not: the bubble never waits)
+    var article = articleFor(ctx);
+    var video = article && article.video && article.video.src;
+    var box = A.menu(anchor, 'vpop', [
+      el(video ? 'button' : 'div', video
+        ? { class: 'vpop__thumb vpop__thumb--live', type: 'button', 'aria-label': 'شغّل فيديو الشرح', onclick: function () { box.hidePopover(); A.guide({ ctx: ctx }); } }
+        : { class: 'vpop__thumb', 'aria-hidden': 'true' },
+        el('img', { src: video && article.video.poster ? article.video.poster : '../assets/img/logo-128.webp', alt: '', width: 64, height: 64 }),
+        el('span', { class: 'vpop__play' }),
+        video ? null : el('span', { class: 'vpop__soon', text: 'قريبًا' })),
+      el('b', { class: 'vpop__title', text: video ? 'فيديو الشرح' : 'فيديو الشرح قريبًا' }),
+      article ? el('small', { class: 'vpop__text', text: article.title }) : null,
+      el('button', { class: 'vpop__more', type: 'button', role: 'menuitem', onclick: function () { box.hidePopover(); A.guide({ ctx: ctx }); } }, 'لو حابب تقرأ الشرح')
+    ]);
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-label', 'فيديو الشرح');
+    // the first time: fetch the guide in the background so the article's name shows next time
+    if (!data) load().catch(function () {});
+  };
+
+  /* the video icon in an editor's header (AdminScript openSheet) */
   A.helpButton = function () {
-    return el('button', { class: 'vhelp help-btn', type: 'button', title: 'فيديو شرح · قريبًا', 'aria-label': 'فيديو شرح: إزاي أستخدم ده', onclick: function (e) { A.helpPop(e.currentTarget); } }, icon('video'));
+    return el('button', { class: 'vhelp help-btn', type: 'button', title: 'فيديو الشرح', 'aria-label': 'فيديو الشرح والشرح المكتوب', onclick: function (e) { A.helpPop(e.currentTarget); } }, icon('video'));
   };
 
   var open = document.getElementById('help-open');
   if (open) {
     open.hidden = false;
-    // Phase 8B: the video-guide icon instead of «؟»
     open.className = 'vhelp help-btn';
-    open.title = 'فيديو شرح · قريبًا';
-    open.setAttribute('aria-label', 'فيديو شرح: إزاي أستخدم الجزء ده');
+    open.title = 'فيديو الشرح';
+    open.setAttribute('aria-label', 'فيديو الشرح والشرح المكتوب للجزء ده');
     A.fill(open, icon('video'));
     open.addEventListener('click', function () { A.helpPop(open); });
   }

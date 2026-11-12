@@ -3039,6 +3039,11 @@
     if (size === 'lg' && !options.plain) sheetSections(sheet, options);
 
     sheet.style.transform = '';
+    // «دليل الأدمن»: which article the video icon of this window opens (AdminHelp A.guideContext)
+    // (options.help, or A.nextSheetHelp set just before the call by an editor whose options are built later)
+    var helpKey = options.help || A.nextSheetHelp;
+    A.nextSheetHelp = null;
+    if (helpKey) sheet.dataset.help = helpKey; else delete sheet.dataset.help;
 
     if (!sheet.open) {
       A.lastFocus = document.activeElement;

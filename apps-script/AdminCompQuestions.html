@@ -450,6 +450,7 @@
 
     A.dirty = false;
 
+    A.nextSheetHelp = 'comp-question';
     A.openSheet(isNew ? 'سؤال جديد' : 'تعديل السؤال ' + ar(n), [
       box,
       (q && (q.problems || []).length) ? el('div', { class: 'note note--warn' }, el('p', { class: 'note__title', text: 'ناقص قبل النشر:' }), el('ul', {}, q.problems.map(function (p) { return el('li', { text: p }); }))) : null,
