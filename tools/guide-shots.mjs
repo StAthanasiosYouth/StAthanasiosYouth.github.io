@@ -96,6 +96,30 @@ world.gs.API_REQUEST_ = null;
   if ((await imp.json()).state !== 'ok') throw new Error('content import failed');
   env.DB.raw.exec("UPDATE settings SET value = '1' WHERE key = 'CONTENT_DRAFTS'");
   env.DB.raw.exec("UPDATE settings SET value = 'on' WHERE key = 'accounts_mode'");
+  // «الحجوزات والفلوس»: the module on, one demo trip and four demo bookings (made-up names, 0100… numbers)
+  {
+    const booking = { online: true, capacity: 40, perBookingMax: 10, collectNames: false,
+      pricing: { mode: 'group', categories: [{ key: 'applicant', label: 'الحاجز', group: 'adult', price: 1500, seat: true, min: 1, max: 1, note: '' }, { key: 'child', label: 'طفل', group: 'child', price: 800, seat: true, min: 0, max: 6, note: '' }] },
+      payment: { mode: 'full', minFirst: 0, finalDueAt: '' },
+      methods: [{ key: 'cash', label: 'كاش', icon: '' }, { key: 'instapay', label: 'إنستاباي', icon: '' }],
+      servants: [{ id: 'srv-demo', name: 'خادم الحجوزات', role: '', image: null, wa: null, methods: ['cash', 'instapay'] }] };
+    const start = new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10);
+    const endMs = Date.now() + 21 * 86400000;
+    env.DB.raw.exec("UPDATE settings SET value = '1' WHERE key = 'BOOKING_MODULE'; INSERT OR IGNORE INTO settings (key, value, updated_at, updated_by) VALUES ('BOOKING_MODULE', '1', 0, 't');");
+    env.DB.raw.prepare('INSERT INTO event_cfg (id, slug, title, start_at, end_at, end_ms, booking, online, capacity, price_rev, revision, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 40, ?, ?, ?)')
+      .run('evt-demo1', 'summer-trip', 'رحلة الصيف (تجريبية)', start + 'T07:00', start + 'T22:00', endMs, JSON.stringify(booking), 'p1', 'v1', Date.now());
+    const ins = env.DB.raw.prepare(`INSERT INTO bookings (id, ref, event_id, source, status, name, phone, servant_id, method, requested, actual, seats_requested, seats_actual, quoted_total, price_rev, amount_due, request_key, created_at, created_ms, updated_ms)
+      VALUES (?, ?, 'evt-demo1', 'site', ?, ?, ?, 'srv-demo', ?, ?, ?, ?, ?, ?, 'p1', ?, ?, ?, ?, ?)`);
+    const now = Date.now();
+    [['B-DEMO1', 'pending', 'حاجز تجريبي أول', 'instapay', { applicant: 1, child: 1 }, 2300],
+      ['B-DEMO2', 'pending', 'حاجز تجريبي تاني', 'cash', { applicant: 1 }, 1500],
+      ['B-DEMO3', 'confirmed', 'حاجز تجريبي تالت', 'cash', { applicant: 1 }, 1500],
+      ['B-DEMO4', 'confirmed', 'حاجز تجريبي رابع', 'instapay', { applicant: 1, child: 2 }, 3100]]
+      .forEach(([ref, status, name, method, counts, total], i) => {
+        const seats = Object.values(counts).reduce((a, b) => a + b, 0);
+        ins.run('bkg-demox' + i, ref, status, name, '+20100000000' + i, method, JSON.stringify(counts), status === 'confirmed' ? JSON.stringify(counts) : null, seats, status === 'confirmed' ? seats : 0, total, status === 'confirmed' ? total : null, 'rk-demo' + i, new Date(now - (i + 1) * 3600000).toISOString().slice(0, 16), now - (i + 1) * 3600000, now);
+      });
+  }
   const { PRESETS } = await import('../worker/src/lib/perms.js');
   const day = 86400000;
   env.DB.raw.exec(`INSERT INTO admins (email, name, role, active, created_at, last_seen) VALUES
@@ -198,7 +222,7 @@ try {
         await page.evaluate((a, s) => A.go(a, s || undefined), area, sub);
         await sleep(1300);
       }
-      if (how.run) { await page.evaluate(how.run).catch(e => errors.push(`${shot.id}/${dev} run: ${e.message}`)); await sleep(1400); }
+      if (how.run) { await page.evaluate(`(async () => { ${how.run} })()`).catch(e => errors.push(`${shot.id}/${dev} run: ${e.message}`)); await sleep(1400); }
       const marked = await page.evaluate(markSpot, how.mark || '');
       if (marked === 'missing') errors.push(`${shot.id}/${dev}: mark not found ${how.mark}`);
       await sleep(250);
