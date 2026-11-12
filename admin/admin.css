@@ -14815,3 +14815,48 @@ html[data-mode="light"] .media-view > .bulk { background: var(--p-modal); }
   .sheet--viewer .sheet__foot > .btn { flex: 1; }
   .sheet--viewer .sheet__foot .sheet__del { flex-basis: 100%; order: 10; justify-content: center; }
 }
+/* ---------- Phase 8B W4: the trimmer (trim.png) — a centred window on the p8-trim pieces ---------- */
+.modal.trim.trim8 { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 0; width: min(900px, calc(100vw - 56px)); max-height: calc(100dvh - 56px); padding: 0; overflow: hidden; border: 1px solid var(--p-line-3); border-radius: 26px; background: var(--p-modal); box-shadow: var(--p-shadow-lg), 0 0 0 1px rgb(var(--acc-rgb) / .08); animation: p8b-pop .35s var(--ease) both; }
+.modal.trim.trim8:not([open]) { display: none; }
+.modal.trim.trim8::backdrop { background: rgb(var(--nv-1-6-14) / .62); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.trim8__head { display: flex; align-items: center; gap: 14px; padding: 18px 24px; border-bottom: 1px solid var(--p-line-2); background: linear-gradient(90deg, transparent, rgb(var(--acc-rgb) / .05)); }
+.trim8__head .sheet__titles { flex: 1; min-width: 0; }
+.trim8__head .sheet__title { margin: 0; font-size: 19px; }
+.trim8 .trim__facts { margin: 2px 0 0; color: var(--text-3); font-size: 12px; }
+.trim8__head .vhelp { margin-inline-start: auto; }
+.trim8__body { display: grid; gap: 0; min-height: 0; padding: 22px 24px 24px; overflow: auto; }
+.trim8 .p8-trim__stage { display: block; min-height: 0; }
+.trim8 .p8-trim__video { max-height: none; aspect-ratio: 16 / 7; object-fit: contain; }
+.trim8 .p8-trim__play { z-index: 1; }
+.trim8 .p8-trim__play .icon { width: 22px; height: 22px; }
+.trim8 .p8-trim__picks { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.trim8 .p8-trim__ruler { margin-top: 4px; }
+.trim8 .trim__msg:not(.is-error) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.trim8 .trim__msg.is-error { margin: 10px 0 0; font-weight: 700; }
+.trim8 .trim__shapes { display: grid; gap: 8px; margin-top: 14px; }
+.trim8 .trim__shapes .seg { width: fit-content; max-width: 100%; }
+.p8-howto { margin-top: 14px; padding: 12px 14px; border: 1px dashed var(--p-line-3); border-radius: 14px; color: var(--text-2); font-size: 12.5px; }
+.p8-howto > b { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; color: var(--text); }
+.p8-howto > b .icon { width: 16px; height: 16px; }
+.p8-howto ul { margin: 0; padding-inline-start: 18px; }
+.p8-howto li { margin: 3px 0; }
+.trim8 .mono { font-family: ui-monospace, "Cascadia Mono", monospace; }
+.trim8__note { margin: 12px 0 0; color: var(--text-3); font-size: 12px; }
+.trim8 .upload { margin-top: 12px; }
+.trim8 .sheet__foot { display: flex; align-items: center; gap: 10px; margin: 0; padding: 14px 24px; border-top: 1px solid var(--p-line-2); background: var(--p-modal-foot); }
+.trim8 .sheet__foot .btn--primary { min-width: 170px; }
+.trim8 .sheet__foot .sp { flex: 1; }
+.trim8__size { display: inline-flex; align-items: center; gap: 6px; color: var(--text-3); font-size: 12.5px; }
+.trim8__size .icon { width: 15px; height: 15px; }
+
+@media (max-width: 759px) {
+  .modal.trim.trim8 { width: 100%; max-width: 100%; max-height: calc(100dvh - 14px); margin: auto auto 0; border-radius: 26px 26px 0 0; }
+  .trim8__head { padding: 16px; }
+  .trim8__body { padding: 22px 24px; }
+  .trim8 .p8-trim__picks { grid-template-columns: 1fr; }
+  .trim8 .p8-trim__video { aspect-ratio: 16 / 10; }
+  .trim8 .sheet__foot { flex-wrap: wrap; padding: 12px 16px; }
+  .trim8 .sheet__foot .btn { flex: 1; }
+  .trim8 .sheet__foot .sp { display: none; }
+  .trim8__size { display: none; }
+}

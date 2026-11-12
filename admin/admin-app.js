@@ -246,7 +246,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       device: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="duo" x="7" y="3" width="10" height="18" rx="2.5"/><rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/></svg>',
       cake: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M4 13h16v7H4z"/><path d="M4 20h16M4 13h16v7M6 13v-3h12v3M12 10V7m0-3v.01"/></svg>',
       palette: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-1.3-1-1.6-1-2.6 0-.8.6-1.4 1.4-1.4H16a5 5 0 0 0 5-5C21 6.2 17 3 12 3Z"/><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-1.3-1-1.6-1-2.6 0-.8.6-1.4 1.4-1.4H16a5 5 0 0 0 5-5C21 6.2 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="14.5" cy="7.5" r="1"/></svg>',
-      play: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M8 5.5v13l10.5-6.5Z"/><path d="M8 5.5v13l10.5-6.5Z"/></svg>'
+      play: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="duo" d="M8 5.5v13l10.5-6.5Z"/><path d="M8 5.5v13l10.5-6.5Z"/></svg>',
+      pause: '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="duo" x="6.5" y="5" width="4" height="14" rx="1.2"/><rect class="duo" x="13.5" y="5" width="4" height="14" rx="1.2"/><rect x="6.5" y="5" width="4" height="14" rx="1.2"/><rect x="13.5" y="5" width="4" height="14" rx="1.2"/></svg>'
     };
     Object.keys(EXTRA_ICONS).forEach(function (k) { if (!Object.prototype.hasOwnProperty.call(A.ICONS, k)) A.ICONS[k] = EXTRA_ICONS[k]; });
   }
@@ -11150,9 +11151,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   /* name · size · length · size · codec, each part isolated */
   function fillFacts(node, file, opened) {
 
-    var parts = [A.formatBytes(file.size)];
-    if (opened) parts.push(formatTime(opened.duration), opened.width + '×' + opened.height, codecLabel(opened.codec));
-    else parts.push('جاري الفتح…');
+    // trim.png: name · codec · size on screen · length · bytes
+    var parts = opened ? [codecLabel(opened.codec), opened.width + '×' + opened.height, formatTime(opened.duration)] : ['جاري الفتح…'];
+    parts.push(A.formatBytes(file.size));
     A.fill(node, el('bdi', { text: file.name || 'فيديو' }), parts.map(function (part) { return [' · ', el('bdi', { text: part })]; }));
 
   }
@@ -11413,6 +11414,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
    * hooks (optional, the panel's upload list): progress(fraction) while the
    * clip is being made; idle() when that stopped or failed (the trimmer stays open)
    */
+  /*
+   * Phase 8B (trim.png): the approved trimmer — the video with its play button and clock, a filmstrip with the
+   * part framed (drag its ends or the frame), the ruler, «من» / «لحد» with −١ −٠٫١ +٠٫١ +١ and «خد الوقت الحالي»
+   * (I / O), the length with 5/10/15/30 ث, «اتفرج على الجزء» and «كرر», the shape, «إزاي تحدد الجزء», and
+   * «اعمل المقطع» with the expected size. The same pieces as the library clip trimmer (AdminPages clipTrimView).
+   */
   A.openTrimmer = function (file, hooks) {
 
     hooks = hooks || {};
@@ -11425,69 +11432,119 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       var busy = false;
       var cancelled = false;
       var done = false;
-      var watchEnd = null;
+      var playingPart = false;
+      var loopOn = true;
       var previous = document.activeElement;
 
+      function fmt1(sec) { sec = Math.max(0, Number(sec) || 0); var m = Math.floor(sec / 60); var s = sec - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); }
+      function arDec(n) { return A.digits(String(Math.round(n * 10) / 10).replace('.', '٫')); }
+
       var titleId = A.uid('trim-title');
-      var dialog = el('dialog', { class: 'modal modal--wide trim', 'aria-labelledby': titleId });
-      var facts = el('p', { class: 'trim__facts' });
+      var dialog = el('dialog', { class: 'modal trim trim8', 'aria-labelledby': titleId });
+      var facts = el('p', { class: 'trim__facts sheet__sub' });
       var errorBox = el('div', { class: 'upload-error', role: 'alert', hidden: true });
 
-      var video = el('video', { class: 'trim__video', playsinline: '', preload: 'auto', 'aria-label': 'معاينة الفيديو' });
+      var video = el('video', { class: 'trim__video p8-trim__video', playsinline: '', preload: 'auto', 'aria-label': 'معاينة الفيديو' });
       video.muted = true;
       var noPreview = el('p', { class: 'note', hidden: true, text: 'المعاينة مش شغالة للفيديو ده في المتصفح، بس تقدر تكتب الأوقات بالأرقام.' });
+      var play = el('button', { class: 'p8-trim__play trim__play', type: 'button', 'aria-label': 'شغّل' }, icon('play'));
+      var clock = el('span', { class: 'p8-trim__t mono', text: '0:00.0 / —' });
 
-      var play = el('button', { class: 'btn btn--small trim__play', type: 'button', 'aria-label': 'شغّل', text: '▶' });
-      var scrub = el('input', { class: 'trim__scrub', type: 'range', min: '0', max: '0', step: '0.1', value: '0', dir: 'ltr', 'aria-label': 'مكان الفيديو' });
-      var now = el('span', { class: 'trim__now', dir: 'ltr', text: '0:00' });
+      // the filmstrip: frames of this video, drawn once it can be read
+      var film = el('div', { class: 'p8-trim__film', 'aria-hidden': 'true' });
+      var dimA = el('span', { class: 'p8-trim__dim' });
+      var dimB = el('span', { class: 'p8-trim__dim' });
+      var badge = el('em');
+      var sel = el('span', { class: 'p8-trim__sel', 'data-h': 'sel' }, el('i', { class: 'p8-trim__h p8-trim__h--a', 'data-h': 'a' }), el('i', { class: 'p8-trim__h p8-trim__h--b', 'data-h': 'b' }), badge);
+      var head = el('span', { class: 'p8-trim__head' });
+      var line = el('div', { class: 'p8-trim__line', dir: 'ltr' }, film, dimA, dimB, sel, head);
+      var ruler = el('div', { class: 'p8-trim__ruler mono', dir: 'ltr' });
 
-      var startInput = A.textInput('', { ltr: true, inputmode: 'decimal', placeholder: '0:00' });
-      var endInput = A.textInput('', { ltr: true, inputmode: 'decimal', placeholder: '0:06' });
-      var takeStart = el('button', { class: 'btn btn--small btn--ghost', type: 'button', text: 'خد الوقت الحالي', 'aria-label': 'خد الوقت الحالي في «من»' });
-      var takeEnd = el('button', { class: 'btn btn--small btn--ghost', type: 'button', text: 'خد الوقت الحالي', 'aria-label': 'خد الوقت الحالي في «لحد»' });
-      var watch = el('button', { class: 'btn btn--small', type: 'button' }, '▶ اتفرج على الجزء');
+      function pick(which) {
+        var input = A.textInput('', { ltr: true, inputmode: 'decimal', placeholder: which === 'a' ? '0:00' : '0:06' });
+        input.classList.add('mono', 'p8-trim__v');
+        input.setAttribute('aria-label', which === 'a' ? 'من' : 'لحد');
+        function step(label, by) {
+          return el('button', { class: 'p8-step', type: 'button', 'aria-label': (which === 'a' ? 'من ' : 'لحد ') + label, onclick: function () {
+            var t = times();
+            var v = (which === 'a' ? t.start : t.end);
+            input.value = fmt1(Math.max(0, Math.min(duration() || Infinity, (isNaN(v) || v === null ? 0 : v) + by)));
+            validate();
+          } }, label);
+        }
+        var take = el('button', { class: 'btn btn--sm btn--ghost', type: 'button', 'aria-label': 'خد الوقت الحالي في «' + (which === 'a' ? 'من' : 'لحد') + '»' }, icon('clock'), 'خد الوقت الحالي (' + (which === 'a' ? 'I' : 'O') + ')');
+        var node = el('div', { class: 'p8-tpick' }, el('small', { text: which === 'a' ? 'من' : 'لحد' }),
+          el('div', { class: 'p8-tpick__row' }, step('−١', -1), step('−٠٫١', -0.1), input, step('+٠٫١', 0.1), step('+١', 1)), take);
+        return { input: input, take: take, node: node, steps: [].slice.call(node.querySelectorAll('.p8-step')) };
+      }
+      var pa = pick('a');
+      var pb = pick('b');
+      var startInput = pa.input;
+      var endInput = pb.input;
+
+      var len = el('b', { text: '—' });
+      var quick = el('div', { class: 'seg p8-trim__quick' }, [5, 10, 15, 30].map(function (n) {
+        return el('button', { class: 'seg__btn seg__btn--text', type: 'button', onclick: function () {
+          var t = times();
+          var a = isNaN(t.start) || t.start === null ? 0 : t.start;
+          endInput.value = fmt1(Math.min(duration() || Infinity, a + n));
+          validate();
+        } }, A.digits(n) + ' ث');
+      }));
+      var watch = el('button', { class: 'btn btn--sm btn--primary', type: 'button' }, icon('play'), 'اتفرج على الجزء');
+      var loop = A.switchInput('كرر', true, function (on) { loopOn = on; });
       var message = el('p', { class: 'trim__msg', role: 'status', 'aria-live': 'polite' });
 
       var shapeName = A.uid('trim-shape');
       var tall = el('input', { type: 'radio', name: shapeName, value: 'tall', checked: true });
       var wide = el('input', { type: 'radio', name: shapeName, value: 'wide' });
-      var shapes = el('fieldset', { class: 'trim__shapes' },
-        el('legend', { class: 'field__label', text: 'الشكل' }),
-        el('label', { class: 'trim__shape' }, tall, el('span', { text: 'طولي ٩:١٦ (تيك توك/ريلز)' })),
-        el('label', { class: 'trim__shape' }, wide, el('span', { text: 'عرضي ١٦:٩ (يوتيوب)' }))
-      );
+      var shapes = el('div', { class: 'field trim__shapes' },
+        el('span', { class: 'field__label', text: 'الشكل' }),
+        el('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'الشكل' },
+          el('label', { class: 'seg__opt' }, tall, el('span', { text: 'طولي ٩:١٦ (تيك توك/ريلز)' })),
+          el('label', { class: 'seg__opt' }, wide, el('span', { text: 'عرضي ١٦:٩ (يوتيوب)' }))));
+
+      var howto = el('div', { class: 'p8-howto' },
+        el('b', {}, icon('info'), 'إزاي تحدد الجزء'),
+        el('ul', {},
+          el('li', {}, el('b', { text: 'اسحب' }), ' طرف الإطار (يمين أو شمال) علشان تقصّر أو تطوّل، أو اسحب الإطار كله علشان تنقله.'),
+          el('li', {}, el('b', { text: 'بالثانية:' }), ' اكتب الوقت في «من» و«لحد»، أو دوس ', el('b', { text: '±٠٫١' }), ' و', el('b', { text: '±١' }), '.'),
+          el('li', {}, el('b', { text: 'من الفيديو:' }), ' شغّل لحد اللحظة اللي عاوزها، ودوس «خد الوقت الحالي» (أو حرف I للبداية وO للنهاية). الأسهم ← → بتحرك ٠٫١ ثانية.'),
+          el('li', {}, el('b', { text: 'مدة جاهزة:' }), ' ٥ / ١٠ / ١٥ / ٣٠ ث بتمد «لحد» من «من».'),
+          el('li', { text: 'من ثانية لـ٣٠ ثانية. لو حاولت تزوّد عن ٣٠ الإطار بيقف ويقولك.' })));
 
       var stageLabel = el('span', { class: 'upload__label' });
       var bar = el('span', { class: 'upload__bar' });
       var track = el('span', { class: 'upload__track', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-label': 'عمل المقطع' }, bar);
       var progress = el('div', { class: 'upload', hidden: true, 'aria-live': 'polite' }, el('div', { class: 'upload__row' }, stageLabel), track);
 
-      var make = el('button', { class: 'btn btn--primary', type: 'button', text: 'اعمل المقطع', disabled: true });
+      var make = el('button', { class: 'btn btn--primary', type: 'button', disabled: true }, icon('check'), el('span', { text: 'اعمل المقطع' }));
       var cancel = el('button', { class: 'btn btn--ghost', type: 'button', text: 'إلغاء' });
+      var size = el('span', { class: 'trim8__size' }, icon('info'), el('span'));
 
       dialog.append(
-        el('div', { class: 'picker-dialog__head' },
-          el('h2', { class: 'modal__title', id: titleId, text: 'قصّ مقطع للمشهد' }),
+        el('div', { class: 'sheet__head trim8__head' },
+          el('span', { class: 'chipico sheet__chip', 'aria-hidden': 'true' }, icon('video')),
+          el('div', { class: 'sheet__titles' }, el('h2', { class: 'sheet__title modal__title', id: titleId, text: 'قصّ مقطع للمشهد' }), facts),
+          A.helpButton ? A.helpButton() : null,
           el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'قفل', onclick: function () { stop(); } }, icon('close'))
         ),
-        facts,
-        errorBox,
-        el('div', { class: 'trim__stage' }, video, noPreview),
-        el('div', { class: 'trim__bar' }, play, scrub, now),
-        el('div', { class: 'trim__times' },
-          A.field('من', el('div', { class: 'trim__time' }, startInput, takeStart)),
-          A.field('لحد', el('div', { class: 'trim__time' }, endInput, takeEnd))
-        ),
-        el('div', { class: 'actions' }, watch),
-        message,
-        shapes,
-        el('p', { class: 'field__hint', text: 'من ثانية لـ ٣٠ ثانية. الصوت بيتشال. المقطع بيتعمل على جهازك، والفيديو الأصلي مش بيترفع خالص.' }),
-        progress,
-        el('div', { class: 'modal__actions' }, make, cancel)
+        el('div', { class: 'trim8__body' },
+          errorBox,
+          el('div', { class: 'p8-trim' },
+            el('div', { class: 'p8-trim__stage trim__stage' }, video, noPreview, play, clock),
+            line, ruler,
+            el('div', { class: 'p8-trim__picks trim__times' }, pa.node, pb.node),
+            el('div', { class: 'p8-trim__sum' },
+              el('div', {}, el('small', { text: 'المدة' }), len),
+              quick, el('span', { class: 'sp' }), watch, el('div', { class: 'p8-trim__loop' }, loop.node))),
+          message,
+          shapes,
+          howto,
+          el('p', { class: 'field__hint trim8__note', text: 'الصوت بيتشال. المقطع بيتعمل على جهازك، والفيديو الأصلي مش بيترفع خالص. المقطع لازم يطلع أقل من 8 MB.' }),
+          progress),
+        el('div', { class: 'modal__actions sheet__foot' }, make, cancel, el('span', { class: 'sp' }), size)
       );
-
-      startInput.setAttribute('aria-label', 'من');
-      endInput.setAttribute('aria-label', 'لحد');
 
       function duration() {
         return source ? source.duration : (isFinite(video.duration) ? video.duration : 0);
@@ -11495,6 +11552,34 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
       function times() {
         return { start: parseTime(startInput.value), end: parseTime(endInput.value) };
+      }
+
+      /* the frame on the filmstrip, the clock, the length and the expected size */
+      function paint() {
+        var t = times();
+        var total = duration() || 30;
+        var a = isNaN(t.start) || t.start === null ? 0 : t.start;
+        var b = isNaN(t.end) || t.end === null ? a : t.end;
+        var pa0 = Math.max(0, Math.min(1, a / total)) * 100;
+        var pb0 = Math.max(0, Math.min(1, b / total)) * 100;
+        dimA.style.left = '0'; dimA.style.width = pa0 + '%';
+        dimB.style.left = pb0 + '%'; dimB.style.right = '0';
+        sel.style.left = pa0 + '%'; sel.style.width = Math.max(0, pb0 - pa0) + '%';
+        var secs = Math.max(0, b - a);
+        badge.textContent = arDec(secs) + ' ث';
+        len.textContent = arDec(secs) + ' ثانية';
+        // about the clip's bitrate plus its sound
+        size.lastChild.textContent = 'حجم متوقع ~' + arDec(Math.max(0.1, secs * (CLIP.bitrate + 128000) / 8 / 1048576)) + ' MB';
+        var marks = [];
+        for (var i = 0; i <= 4; i++) marks.push(el('span', { text: formatTime(Math.round(total * i / 4)) }));
+        A.fill(ruler, marks);
+        paintHead();
+      }
+
+      function paintHead() {
+        var total = duration() || 30;
+        head.style.left = (Math.min(1, (video.currentTime || 0) / total) * 100) + '%';
+        clock.textContent = fmt1(video.currentTime || 0) + ' / ' + (duration() ? fmt1(duration()) : '—');
       }
 
       /* the live check: '' = fine */
@@ -11509,6 +11594,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         if (!problem && source) message.textContent = 'المقطع ' + ltr(formatTime(t.end - t.start)) + ' — من ' + ltr(formatTime(t.start)) + ' لحد ' + ltr(formatTime(t.end));
         make.disabled = !source || !!problem || busy;
         watch.disabled = !!problem || !source;
+        paint();
         return problem;
       }
 
@@ -11532,7 +11618,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
       function setBusy(on) {
         busy = on;
-        [startInput, endInput, takeStart, takeEnd, tall, wide, watch].forEach(function (control) { control.disabled = on; });
+        [startInput, endInput, pa.take, pb.take, tall, wide, watch].concat(pa.steps, pb.steps).forEach(function (control) { control.disabled = on; });
         progress.hidden = !on;
         cancel.textContent = on ? 'وقّف' : 'إلغاء';
         validate();
@@ -11565,55 +11651,132 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       }
 
       function take(input) {
-        input.value = formatTime(video.currentTime || 0);
+        input.value = fmt1(video.currentTime || 0);
         if (input === startInput) {
           var t = times();
-          if (t.end === null || isNaN(t.end) || t.end <= t.start || t.end - t.start > CLIP.maxSeconds) endInput.value = formatTime(defaultEnd(t.start, duration()));
+          if (t.end === null || isNaN(t.end) || t.end <= t.start || t.end - t.start > CLIP.maxSeconds) endInput.value = fmt1(defaultEnd(t.start, duration()));
         }
         validate();
       }
 
+      function setPlayIcon() {
+        A.fill(play, icon(video.paused ? 'play' : 'pause'));
+        play.setAttribute('aria-label', video.paused ? 'شغّل' : 'وقّف');
+        play.classList.toggle('is-playing', !video.paused);
+      }
+
       play.addEventListener('click', function () {
-        watchEnd = null;
+        playingPart = false;
         if (video.paused) video.play().catch(function () {});
         else video.pause();
       });
-      video.addEventListener('play', function () { play.textContent = '⏸'; play.setAttribute('aria-label', 'وقّف'); });
-      video.addEventListener('pause', function () { play.textContent = '▶'; play.setAttribute('aria-label', 'شغّل'); });
+      video.addEventListener('play', setPlayIcon);
+      video.addEventListener('pause', setPlayIcon);
       video.addEventListener('timeupdate', function () {
-        scrub.value = String(video.currentTime);
-        now.textContent = formatTime(video.currentTime);
-        if (watchEnd !== null && video.currentTime >= watchEnd) {
-          watchEnd = null;
-          video.pause();
+        var t = times();
+        if (playingPart && t.end !== null && !isNaN(t.end) && video.currentTime >= t.end) {
+          if (loopOn) video.currentTime = t.start;
+          else { video.pause(); playingPart = false; }
         }
+        paintHead();
       });
-      video.addEventListener('loadedmetadata', function () {
-        if (!source && isFinite(video.duration)) scrub.max = String(video.duration);
-      });
+      video.addEventListener('loadedmetadata', function () { paint(); });
+      video.addEventListener('loadeddata', function () { drawFilm(); }, { once: true });
       video.addEventListener('error', function () {
         noPreview.hidden = false;
         video.hidden = true;
         play.disabled = true;
       });
-      scrub.addEventListener('input', function () {
-        watchEnd = null;
-        video.currentTime = Number(scrub.value) || 0;
-        now.textContent = formatTime(video.currentTime);
-      });
-      takeStart.addEventListener('click', function () { take(startInput); });
-      takeEnd.addEventListener('click', function () { take(endInput); });
+      pa.take.addEventListener('click', function () { take(startInput); });
+      pb.take.addEventListener('click', function () { take(endInput); });
       startInput.addEventListener('input', validate);
       endInput.addEventListener('input', validate);
       watch.addEventListener('click', function () {
         if (validate()) return;
         var t = times();
-        watchEnd = t.end;
+        playingPart = true;
         video.currentTime = t.start;
         video.play().catch(function () {});
       });
       cancel.addEventListener('click', stop);
       dialog.addEventListener('cancel', function (event) { event.preventDefault(); stop(); });
+
+      // I / O take the current time, ← → move it 0.1 s (not while typing)
+      dialog.addEventListener('keydown', function (e) {
+        if (busy || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+        if (e.key === 'i' || e.key === 'I') { e.preventDefault(); take(startInput); }
+        if (e.key === 'o' || e.key === 'O') { e.preventDefault(); take(endInput); }
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); video.currentTime = Math.max(0, (video.currentTime || 0) + (e.key === 'ArrowRight' ? 0.1 : -0.1)); }
+      });
+
+      // dragging an end or the whole frame (the line runs left to right: 0:00 on the left); 30 s at most
+      var drag = null;
+      line.addEventListener('pointerdown', function (e) {
+        if (busy || !duration()) return;
+        var h = e.target.closest('[data-h]');
+        var rect = line.getBoundingClientRect();
+        if (!h) {
+          // a tap on the strip: the video goes there
+          video.currentTime = Math.max(0, Math.min(duration(), (e.clientX - rect.left) / rect.width * duration()));
+          return;
+        }
+        e.preventDefault();
+        var t = times();
+        drag = { h: h.dataset.h, x: e.clientX, a: t.start || 0, b: t.end || 0, w: rect.width };
+        line.setPointerCapture(e.pointerId);
+      });
+      line.addEventListener('pointermove', function (e) {
+        if (!drag) return;
+        var total = duration();
+        var d = (e.clientX - drag.x) / drag.w * total;
+        var a = drag.a;
+        var b = drag.b;
+        if (drag.h === 'a') a = Math.max(0, Math.min(drag.a + d, drag.b - CLIP.minSeconds, total));
+        else if (drag.h === 'b') b = Math.min(total, Math.max(drag.b + d, drag.a + CLIP.minSeconds));
+        else { d = Math.max(-drag.a, Math.min(d, total - drag.b)); a = drag.a + d; b = drag.b + d; }
+        if (b - a > CLIP.maxSeconds) {
+          if (drag.h === 'a') a = b - CLIP.maxSeconds; else b = a + CLIP.maxSeconds;
+          if (!drag.warned) { drag.warned = true; A.toast('المقطع ٣٠ ثانية بالكتير', 'info'); }
+        }
+        startInput.value = fmt1(a);
+        endInput.value = fmt1(b);
+        validate();
+      });
+      line.addEventListener('pointerup', function () { drag = null; });
+      line.addEventListener('pointercancel', function () { drag = null; });
+
+      /* twelve frames along the video, from a second (silent, hidden) copy */
+      function drawFilm() {
+        var total = isFinite(video.duration) ? video.duration : 0;
+        if (!total || !video.videoWidth) return;
+        var copy = document.createElement('video');
+        copy.muted = true;
+        copy.preload = 'auto';
+        copy.src = url;
+        var canvas = document.createElement('canvas');
+        canvas.width = 160;
+        canvas.height = Math.max(1, Math.round(160 * video.videoHeight / video.videoWidth));
+        var ctx = canvas.getContext('2d');
+        var frames = [];
+        var i = 0;
+        function next() {
+          if (done || i >= 12) {
+            copy.removeAttribute('src');
+            copy.load();
+            if (!done && frames.length) A.fill(film, frames.map(function (src) { return el('img', { src: src, alt: '' }); }));
+            return;
+          }
+          copy.currentTime = Math.min(total - 0.05, (i + 0.5) * total / 12);
+        }
+        copy.addEventListener('seeked', function () {
+          try { ctx.drawImage(copy, 0, 0, canvas.width, canvas.height); frames.push(canvas.toDataURL('image/jpeg', 0.6)); }
+          catch (ignored) { /* a frame that can't be drawn */ }
+          i++;
+          next();
+        });
+        copy.addEventListener('error', function () { i = 12; next(); });
+        copy.addEventListener('loadedmetadata', next, { once: true });
+      }
 
       make.addEventListener('click', function () {
         if (busy || validate()) return;
@@ -11656,10 +11819,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           if (done) { opened.input.dispose(); return; }
           source = opened;
           fillFacts(facts, file, opened);
-          scrub.max = String(opened.duration);
           var from = Math.min(video.currentTime || 0, Math.max(0, opened.duration - CLIP.minSeconds));
-          startInput.value = formatTime(from);
-          endInput.value = formatTime(defaultEnd(from, opened.duration));
+          startInput.value = fmt1(from);
+          endInput.value = fmt1(defaultEnd(from, opened.duration));
           // a vertical source: portrait is the natural choice anyway; a wide one too (blurred fill)
           validate();
           startInput.focus();
