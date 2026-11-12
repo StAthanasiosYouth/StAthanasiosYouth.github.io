@@ -661,3 +661,19 @@ test('saveRow keeps the new event fields through event.json', async () => {
   const def = JSON.parse(rowFromJson(eventJson(), 'fixture').booking);
   assert.deepEqual([def.requireAccount, def.mailReminders], [null, false]);
 });
+
+/* ---------- Phase 8B: the list's four counts (youth-list.png) ---------- */
+
+test('the list sends counts over every account: all, eligible, guest, blocked (not just the page or the search)', async () => {
+  const w = await world();
+  const a = await created(w);
+  const b = await created(w);
+  const c = await created(w);
+  await created(w);
+  assert.equal((await post(w, b.id, 'eligibility', { override: 'guest', reason: 'تجربة' })).status, 200);
+  assert.equal((await post(w, c.id, 'block', { reason: 'تجربة' })).status, 200);
+  const r = await w.call(P, 'GET', '/v1/admin/participants?q=' + encodeURIComponent(a.email));
+  assert.equal(r.status, 200);
+  assert.equal(r.body.people.length, 1);
+  assert.deepEqual(r.body.counts, { all: 4, eligible: 2, guest: 1, blocked: 1 });
+});

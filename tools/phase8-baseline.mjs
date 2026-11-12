@@ -66,7 +66,7 @@ async function worker(request) {
 }
 
 resetAuthCaches();
-env = { ENVIRONMENT: 'test', ALLOWED_ORIGINS: SITE, GOOGLE_CLIENT_ID: TEST_CLIENT, LOG_SALT: 'salt', ADMIN_EMAILS: '', SYNC_SECRET: SECRET, DEVICE_KEY: 'k'.repeat(48), DB: migratedDb(), JOBS: { send: async () => {} }, COMPS_SOURCE: 'none', SITE_URL: SITE };
+env = { ENVIRONMENT: 'test', ALLOWED_ORIGINS: SITE, GOOGLE_CLIENT_ID: TEST_CLIENT, LOG_SALT: 'salt', ADMIN_EMAILS: '', SYNC_SECRET: SECRET, DEVICE_KEY: 'k'.repeat(48), DB: migratedDb(), JOBS: { send: async () => {} }, COMPS_SOURCE: 'none', SITE_URL: SITE, PW_PEPPER: 'pepper', PW_KEY: Buffer.alloc(32, 7).toString('base64'), OTP_PEPPER: 'otp', ACCOUNT_PAD_MS: '0' };
 env.DB.raw.exec(`INSERT INTO admins (email, name, role, active, created_at) VALUES ('${ADMIN}', 'مينا', 'primary', 1, 0);
   UPDATE settings SET value = '1' WHERE key = 'ADMIN_PLATFORM';`);
 world = createWorld({ executeAs: 'USER_DEPLOYING' });
@@ -87,6 +87,8 @@ world.gs.API_REQUEST_ = null;
   const imp = await call('/v1/sync/content-import', { method: 'POST', body: raw, headers: { 'x-sync-ts': ts, 'x-sync-signature': sig } });
   if ((await imp.json()).state !== 'ok') throw new Error('content import failed');
   env.DB.raw.exec("UPDATE settings SET value = '1' WHERE key = 'CONTENT_DRAFTS'");
+  // PHASE8_ACCOUNTS=1: youth accounts on (the «الشباب» area); PHASE8_EVAL can then add people over the admin's session
+  if (process.env.PHASE8_ACCOUNTS) env.DB.raw.exec("UPDATE settings SET value = 'on' WHERE key = 'accounts_mode'");
 }
 
 const server = createSiteServer({
