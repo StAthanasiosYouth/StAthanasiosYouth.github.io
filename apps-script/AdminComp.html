@@ -1049,15 +1049,66 @@
       );
     }));
 
-    /* counts */
-    var started = (Number(s.submissions) || 0) + (Number(s.inProgress) || 0);
-    var tiles = el('div', { class: 'comp-tiles' },
-      tile('بدأوا', started), tile('بعتوا', s.submissions || 0), tile('محتاجة مراجعة', s.pending || 0, s.pending ? 'gold' : ''), tile('الأسئلة', qCount)
-    );
-
-    function tile(label, value, tone) {
-      return el('div', { class: 'comp-tile' + (tone ? ' comp-tile--' + tone : '') }, el('span', { class: 'comp-tile__n', text: ar(value) }), el('span', { class: 'comp-tile__label', text: label }));
+    /* comp-work.png: four numbers (the average from the results, once they come; a dash meanwhile) */
+    var sent = Number(s.submissions) || 0;
+    var pendingN = Number(s.pending) || 0;
+    var avg = el('b', { text: '—' });
+    function kpi(iconName, label, value, hint) {
+      return el('div', { class: 'kpi' }, el('small', {}, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon(iconName)), label), value, hint ? el('em', { text: hint }) : null);
     }
+    var tiles = el('div', { class: 'b8-kpis c9-kpis', 'data-comp-kpis': '' },
+      kpi('users', 'شاركوا', el('b', { text: ar(sent) }), s.inProgress ? 'وبيحلّوا دلوقتي ' + ar(s.inProgress) : ''),
+      kpi('check', 'اتصححت', el('b', { text: ar(Math.max(0, sent - pendingN)) })),
+      kpi('alert', 'محتاجة مراجعة', el('b', { text: ar(pendingN) })),
+      kpi('star', 'متوسط الدرجة', avg));
+    if (comp.scoring && sent) {
+      A.call('apiCompResults', C.open).then(function (r) {
+        var st = r && r.stats || {};
+        if (st.maxScore) avg.textContent = ar(Math.round((Number(st.average) || 0) * 10) / 10).replace('.', '٫') + ' / ' + ar(st.maxScore);
+      }).catch(function () { /* the dash stays */ });
+    }
+
+    /* «محتاجة رأيك»: the first answers waiting (grouped like «المراجعة»), صح / غلط from here */
+    var opinion = el('div', { class: 'c9-opinion', 'aria-live': 'polite' });
+    function loadOpinion() {
+      if (!pendingN) { A.fill(opinion, el('p', { class: 'fin8-none', text: 'مفيش إجابات مستنية رأيك ✓' })); return; }
+      A.fill(opinion, el('div', { class: 'skeleton skeleton--line' }));
+      A.call('apiCompReviewQueue', C.open).then(function (queue) {
+        if (!opinion.isConnected) return;
+        var byQ = {};
+        (queue.questions || []).forEach(function (q) { byQ[q.qid] = q; });
+        var groups = (queue.groups || []).slice(0, 3);
+        A.fill(opinion, groups.length ? groups.map(function (g) {
+          var q = byQ[g.qid] || {};
+          var sample = g.sample === '' || g.sample == null ? '(فاضي)' : String(g.sample);
+          var send = function (ok, button) {
+            A.withBusy(button, A.call('apiCompGradeGroup', C.open, g.qid, g.key, ok)).then(function (reply) {
+              A.toast('اتصحح ' + ar(reply.updated) + ' إجابة ✓');
+              A.call('apiComp', C.open).then(function (fresh) { C.data = fresh; patchList(fresh.summary); if (inBuilder()) A.render(); }).catch(function () { loadOpinion(); });
+            }).catch(function (error) { A.fail(error); });
+          };
+          return el('div', { class: 'c9-op', 'data-key': g.key },
+            el('div', { class: 'c9-op__t' },
+              el('b', { text: (q.number || '') + ' · ' + (C.TYPE_LABELS[q.type] || '') }),
+              el('small', { dir: 'auto', text: '«' + sample.slice(0, 80) + '»' + (g.count > 1 ? ' — ' + ar(g.count) + ' إجابات زي بعض' : '') })),
+            el('button', { class: 'btn btn--sm btn--ghost', type: 'button', 'data-free': '', onclick: function (e) { send(true, e.currentTarget); } }, 'صح'),
+            el('button', { class: 'btn btn--sm btn--ghost', type: 'button', 'data-free': '', onclick: function (e) { send(false, e.currentTarget); } }, 'غلط'));
+        }) : el('p', { class: 'fin8-none', text: 'مفيش إجابات مستنية رأيك ✓' }));
+      }).catch(function () { A.fill(opinion, el('p', { class: 'fin8-none', text: ar(pendingN) + ' إجابة مستنية في «المراجعة».' })); });
+    }
+    loadOpinion();
+
+    /* «المواعيد»: what happened and what comes, in order */
+    var times = [];
+    if (comp.startAt) times.push([comp.startAt, s.status === 'scheduled' || s.status === 'draft' ? 'بتفتح' : 'فتحت']);
+    else if (comp.publishedAt) times.push([comp.publishedAt, 'اتنشرت وفتحت']);
+    if (comp.closedAt) times.push([comp.closedAt, 'اتقفلت بإيدك']);
+    else if (comp.endAt) times.push([comp.endAt, comp.resultsAt ? 'بتقفل' : 'بتقفل · والنتيجة تظهر']);
+    if (comp.resultsAt) times.push([comp.resultsAt, 'النتيجة تظهر']);
+    if (comp.finalizedAt) times.push([comp.finalizedAt, 'النتائج اتعتمدت']);
+    var timeline = times.length ? el('ul', { class: 'y8-timeline c9-times' }, times.map(function (t) {
+      return el('li', {}, el('b', { text: t[1] }), el('small', { text: C.when(String(t[0]).replace('T', ' ').slice(0, 16)) }));
+    })) : el('p', { class: 'fin8-none', text: 'من غير مواعيد: مفتوحة أول ما تتنشر، ومبتقفلش لوحدها.' });
 
     /* actions */
     var actions = [];
@@ -1138,16 +1189,33 @@
       Array.prototype.forEach.call(more.querySelectorAll('button'), function (b) { b.disabled = true; });
     }
 
+    function card8(iconName, tone, title, hint, acts, body, cls) {
+      return el('section', { class: 'card p8-card fin8-card' + (cls ? ' ' + cls : '') },
+        el('div', { class: 'p8-card__head' },
+          el('span', { class: 'chipico' + (tone ? ' chipico--' + tone : ''), 'aria-hidden': 'true' }, icon(iconName)),
+          el('div', { class: 'p8-card__titles' }, el('h2', { class: 'card__title', text: title }), hint ? el('p', { class: 'card__hint', text: hint }) : null),
+          acts || null),
+        body);
+    }
+
+    // comp-work.png on top; under it (owner 2026-11-12: «one card under them») everything about publishing
     return [
-      A.card('الحالة', statusText(d),
+      tiles,
+      el('div', { class: 'fin8-two c9-two' },
+        card8('alert', 'warn', 'محتاجة رأيك', '', el('button', { class: 'btn btn--sm', type: 'button', 'data-free': '', onclick: function () { goTab('review'); } }, 'روح للمراجعة'), opinion),
+        card8('clock', '', 'المواعيد', '', null, timeline)),
+      card8('send', '', 'النشر', statusText(d), null, el('div', { class: 'c9-publish' },
         el('div', { class: 'comp-switches' }, enabled.node, card.node),
         el('p', { class: 'field__hint', text: 'الكارت بياخد اسم المسابقة ووصفها والبانر والمواعيد لوحده، وزراره بيفتح صفحة المسابقة.' }),
-        el('div', { class: 'actions comp-actions' }, actions)
-      ),
-      A.card('اللينك', 'ده اللي بتبعته في الجروب أو تحطه على بوستر.', link),
-      A.card('قبل النشر', 'اللي ناقص علشان المسابقة تظهر للناس صح.', checklist),
-      A.card('الأرقام', 'من غير المشاركات الملغية.', tiles),
-      A.card('حاجات تانية', '', more)
+        el('div', { class: 'actions comp-actions' }, actions),
+        el('h3', { class: 'c9-sub', text: 'اللينك' }),
+        el('p', { class: 'field__hint', text: 'ده اللي بتبعته في الجروب أو تحطه على بوستر.' }),
+        link,
+        el('h3', { class: 'c9-sub', text: 'قبل النشر' }),
+        el('p', { class: 'field__hint', text: 'اللي ناقص علشان المسابقة تظهر للناس صح.' }),
+        checklist,
+        el('h3', { class: 'c9-sub', text: 'حاجات تانية' }),
+        more), 'c9-pubcard')
     ];
 
   };
