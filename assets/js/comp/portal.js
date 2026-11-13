@@ -414,31 +414,63 @@ function shopSection(me) {
   const preview = store.state === 'preview';
   const ineligible = me.eligible === false;
   const readOnly = preview || ineligible;
+  // site redesign S7: every prize in one grid (two on a phone, three wider), filter chips by kind, the kind on
+  // each card, a picture per kind, and «فاضلك N نقطة» with a bar where the balance can't cover it yet
   const groups = groupShop(me.shop);
-  return section('p-shop', 'الجوايز', banner, groups.map(group => h('div', { class: 'shop__group' },
-    group.category && groups.length > 1 ? h('h3', { class: 'shop__cat' }, group.category) : null,
-    h('ul', { class: 'shop' }, group.items.map(item => {
-      const state = preview ? { canOrder: false, reason: 'preview', label: 'الطلب لسه مفتحش', notes: itemAvailability(item, me.balance).notes }
-        : ineligible ? { canOrder: false, reason: 'not_eligible', label: 'الطلب مش متاح ليك', notes: [] }
-          : itemAvailability(item, me.balance);
-      return h('li', { class: `shop__item${state.canOrder ? '' : ' is-off'}${readOnly ? ' is-soon' : ''}`, 'data-item': item.id },
-        item.image ? h('figure', { class: 'shop__media' }, picture(item.image, { sizes: '(min-width: 760px) 320px, 92vw' })) : h('div', { class: 'shop__media shop__media--art', 'aria-hidden': 'true' }, icon('trophy', 'shop__icon')),
-        h('div', { class: 'shop__body' },
-          h('h3', { class: 'shop__name' }, item.name),
-          item.description ? h('p', { class: 'shop__desc' }, item.description) : null,
-          h('p', { class: 'shop__cost' }, countPoints(item.cost)),
-          state.notes.length ? h('p', { class: 'shop__note' }, state.notes.join(' · ')) : null,
-          state.canOrder
-            ? btn('اطلب', () => openOrder(item), { kind: 'primary', 'data-order': '', 'aria-label': `اطلب ${item.name}` })
-            : state.reason === 'preview'
-              // the order button is there, off, and says why
-              ? btn(state.label, null, { kind: 'primary', disabled: true, 'data-off': 'preview', 'aria-label': `${state.label}: ${item.name}` })
+  const kinds = groups.length > 1 ? groups.map(g => g.category).filter(Boolean) : [];
+  if (!kinds.includes(shopKind)) shopKind = 'الكل';
+  const items = groups.flatMap(group => group.items.map(item => {
+    const kind = groups.length > 1 ? group.category : '';
+    const state = preview ? { canOrder: false, reason: 'preview', label: 'الطلب لسه مفتحش', notes: itemAvailability(item, me.balance).notes }
+      : ineligible ? { canOrder: false, reason: 'not_eligible', label: 'الطلب مش متاح ليك', notes: [] }
+        : itemAvailability(item, me.balance);
+    const need = state.reason === 'insufficient' && me.balance !== null && item.cost > me.balance;
+    let bar = null;
+    if (need) {
+      bar = h('i');
+      bar.style.width = `${Math.round((Math.max(0, me.balance) / item.cost) * 100)}%`;   // CSSOM: the CSP blocks style=""
+    }
+    return h('li', { class: `shop__item${state.canOrder ? '' : ' is-off'}${readOnly ? ' is-soon' : ''}`, 'data-item': item.id, 'data-kind': kind, hidden: shopKind !== 'الكل' && kind !== shopKind ? '' : null },
+      item.image ? h('figure', { class: 'shop__media' }, picture(item.image, { sizes: '(min-width: 760px) 320px, 46vw' }))
+        : h('div', { class: 'shop__media shop__media--art', 'aria-hidden': 'true' },
+          PRIZE_ART[kind] ? h('span', { class: 'shop__art' }, icon(PRIZE_ART[kind])) : icon('trophy', 'shop__icon')),
+      h('div', { class: 'shop__body' },
+        kind ? h('span', { class: 'shop__kind' }, kind) : null,
+        h('h3', { class: 'shop__name' }, item.name),
+        item.description ? h('p', { class: 'shop__desc' }, item.description) : null,
+        h('p', { class: 'shop__cost' }, countPoints(item.cost)),
+        state.notes.length ? h('p', { class: 'shop__note' }, state.notes.join(' · ')) : null,
+        state.canOrder
+          ? btn('اطلب', () => openOrder(item), { kind: 'primary', 'data-order': '', 'aria-label': `اطلب ${item.name}` })
+          : state.reason === 'preview'
+            // the order button is there, off, and says why
+            ? btn(state.label, null, { kind: 'primary', disabled: true, 'data-off': 'preview', 'aria-label': `${state.label}: ${item.name}` })
+            : need
+              ? h('div', { class: 'shop__need', 'data-off': state.reason },
+                h('span', { class: 'shop__need-bar', 'aria-hidden': 'true' }, bar),
+                h('span', { class: 'shop__need-t' }, `فاضلك ${countPoints(item.cost - me.balance)}`))
               : h('p', { class: 'shop__off', 'data-off': state.reason }, state.label)
-        )
-      );
-    }))
-  )));
+      )
+    );
+  }));
+  const grid = h('ul', { class: 'shop shop--grid' }, items);
+  const chips = kinds.length ? h('div', { class: 'shop-kinds', role: 'group', 'aria-label': 'الأنواع' }, ['الكل', ...kinds].map(k => h('button', {
+    type: 'button', class: k === shopKind ? 'on' : '', 'aria-pressed': String(k === shopKind),
+    onclick: event => {
+      shopKind = k;
+      for (const b of event.currentTarget.parentNode.children) {
+        b.classList.toggle('on', b === event.currentTarget);
+        b.setAttribute('aria-pressed', String(b === event.currentTarget));
+      }
+      for (const li of grid.children) li.hidden = k !== 'الكل' && li.dataset.kind !== k;
+    }
+  }, k))) : null;
+  return section('p-shop', 'الجوايز', banner, chips, grid);
 }
+
+/* S7: a picture per kind of prize (the store's own category names) until the servants upload one */
+const PRIZE_ART = { 'هدايا': 'prize-gift', 'كتب': 'prize-book', 'لبس': 'prize-wear', 'خصومات': 'prize-off' };
+let shopKind = 'الكل';
 
 function orderDialog(me) {
   const item = S.ordering;

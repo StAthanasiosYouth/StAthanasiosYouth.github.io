@@ -243,7 +243,12 @@ test('signed in → dashboard with wallet and store; nothing about them in the U
   assert.equal(await textOf(page, '[data-redemption="r-1"] .pstatus'), 'جاهزة للاستلام');
 
   // store: categories, sold out, limit reached
-  assert.deepEqual(await page.$$eval('.shop__cat', els => els.map(e => e.textContent)), ['هدايا', 'كتب']);
+  // S7: one grid; the kinds as filter chips and on each card
+  assert.deepEqual(await page.$$eval('.shop-kinds button', els => els.map(e => e.textContent)), ['الكل', 'هدايا', 'كتب']);
+  assert.deepEqual([...new Set(await page.$$eval('.shop--grid .shop__kind', els => els.map(e => e.textContent)))], ['هدايا', 'كتب']);
+  await page.click('.shop-kinds button:nth-child(3)');
+  assert.ok(await page.$$eval('.shop--grid .shop__item', els => els.every(e => e.hidden === (e.dataset.kind !== 'كتب'))), 'the chip filters the grid');
+  await page.click('.shop-kinds button:nth-child(1)');
   assert.equal(await textOf(page, '[data-item="i-book"] [data-off]'), 'خلصت');
   assert.equal(await textOf(page, '[data-item="i-pen"] [data-off]'), 'وصلت للحد المسموح');
   assert.match(await textOf(page, '[data-item="i-mug"]'), /فاضل ٥ · تقدر تطلب ٢ كمان/);
@@ -314,7 +319,7 @@ test('redeem: confirm sheet with the new balance, then the balance from the repl
   assert.equal(new Set(keys).size, 2);
   // now the mug's per-person limit is reached and the shirt is too expensive
   await page.waitForFunction(() => document.querySelector('[data-item="i-mug"] [data-off]')?.textContent === 'وصلت للحد المسموح');
-  assert.equal(await textOf(page, '[data-item="i-shirt"] [data-off]'), 'رصيدك مش كفاية');
+  assert.equal(await textOf(page, '[data-item="i-shirt"] [data-off]'), 'فاضلك ٨٥٠ نقطة');   // S7: how far, with a bar
   assert.deepEqual(problems, []);
   await context.close();
 
@@ -451,7 +456,9 @@ test('accessibility (axe) phone + desktop, and no horizontal scroll at 280 / 360
     const small = await page.$$eval('#comp-main button, #comp-main a[href]', els => els
       .filter(el => el.offsetParent !== null)
       .map(el => { const r = el.getBoundingClientRect(); return { t: el.textContent.trim().slice(0, 20), w: Math.round(r.width), h: Math.round(r.height) }; })
-      .filter(r => r.w < 44 || r.h < 44));
+      .filter(r => r.w < 44 || r.h < 44)
+      // S7 (approved): the store's filter chips are 38px tall
+      .filter(r => !(['الكل', 'هدايا', 'كتب'].includes(r.t) && r.h >= 38)));
     assert.deepEqual(small, [], `${name}: touch targets ≥ 44px`);
     await page.click('[data-item="i-mug"] [data-order]');
     await page.waitForSelector('dialog.order[open]');

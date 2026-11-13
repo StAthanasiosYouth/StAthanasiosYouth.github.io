@@ -2458,3 +2458,19 @@ button.cc__go { position: relative; z-index: 1; border: 1px solid var(--gold-lin
 button.cc__go:disabled { cursor: default; opacity: .85; }
 .cl__wait { padding: 26px 0; text-align: center; }
 @media (prefers-reduced-motion: reduce) { .cc { transition: none; } .cc:hover { transform: none; } }
+
+/* ---------- «نقاطي» store — site redesign S7 (wave 5): every prize in one grid, filters by kind, a picture per kind, «فاضلك N نقطة» ---------- */
+.shop-kinds { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 12px; }
+.shop-kinds button { flex: none; height: 38px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--gold-line-strong); background: rgba(8, 33, 61, .7); color: var(--text-2); font: 700 .88rem var(--font-ui); cursor: pointer; }
+.shop-kinds button.on { background: linear-gradient(180deg, var(--gold-hi), var(--gold)); color: var(--gold-ink); border-color: transparent; }
+.shop-kinds button:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 2px; }
+.portal .shop.shop--grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 640px) { .portal .shop.shop--grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.shop--grid .shop__item[hidden] { display: none; }
+.shop__art { display: grid; place-items: center; width: 100%; height: 100%; color: var(--gold-hi); background: radial-gradient(70% 80% at 50% 110%, rgba(var(--gold-rgb), .3), transparent 70%), var(--navy-800); }
+.shop__art svg { width: 46%; max-width: 74px; height: auto; stroke-width: 1.6; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .5)); }
+.shop__kind { display: inline-flex; align-self: start; justify-self: start; height: 22px; padding: 0 9px; border-radius: 999px; align-items: center; background: rgba(var(--gold-rgb), .14); color: var(--gold-hi); font-size: .7rem; font-weight: 800; margin-bottom: 4px; }
+.shop__need { display: grid; gap: 6px; margin-top: 6px; }
+.shop__need-bar { height: 6px; border-radius: 6px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.shop__need-bar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--gold), var(--gold-hi)); }
+.shop__need-t { font-size: .8rem; font-weight: 800; color: var(--text-2); }

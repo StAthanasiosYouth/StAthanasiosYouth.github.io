@@ -40,6 +40,11 @@ const ICONS = {
   /* the list's cards (comp-list.html): open · coming · finished */
   cup: ['M8 4h8v5a4 4 0 0 1-8 0Z', 'M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7M9.5 17h5'],
   book: ['M5 4.5h11a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3Z', 'M5 16.5a3 3 0 0 1 3-3h11M9 8h6'],
+  /* «نقاطي»'s prizes by kind (site redesign S7) until the servants upload a picture */
+  'prize-gift': ['M4.5 8.5h15a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z', 'M5 12.5v7h14v-7M12 8.5v11M12 8.5S10.5 4 8 4.5 7 8.5 12 8.5ZM12 8.5S13.5 4 16 4.5s1 4-4 4Z'],
+  'prize-book': ['M5 4.5h11a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3Z', 'M5 16.5a3 3 0 0 1 3-3h11M12 7v4M10 9h4'],
+  'prize-wear': ['M9 4 4 6.5 5.5 11 8 10v10h8V10l2.5 1L20 6.5 15 4c-.6 1.3-1.7 2-3 2s-2.4-.7-3-2Z'],
+  'prize-off': ['M3.5 12V5.5a2 2 0 0 1 2-2H12l8.5 8.5-8.5 8.5Z', 'M9.4 8a1.4 1.4 0 1 1-2.8 0 1.4 1.4 0 0 1 2.8 0Z', 'm10 15 5-5'],
   padlock: ['M7.5 10.5h9a2.5 2.5 0 0 1 2.5 2.5v4.5a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 17.5V13a2.5 2.5 0 0 1 2.5-2.5Z', 'M8 10.5V8a4 4 0 0 1 8 0v2.5']
 };
 
