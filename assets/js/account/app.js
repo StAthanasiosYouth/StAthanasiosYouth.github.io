@@ -350,7 +350,7 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
   /* the session ended while the page was open: sign in, then back here */
   function sessionOver() {
     keepDest(tab, location.hash);
-    clearSession(local, tab);
+    dropSession();
     S.email = S.account ? S.account.email : S.email;
     mine.reset();
     S.account = null;
@@ -684,7 +684,7 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
         enter(reply.account, { fresh: true });
         return;
       }
-      if (reply.code === 'session') clearSession(local, tab);
+      if (reply.code === 'session') dropSession();
     }
     // the session has ended: the form, the email in place, the password manager's turn
     S.asked = hint.email;
@@ -696,7 +696,7 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
     const saved = readSession(local, tab);
     if (saved && saved.email && saved.email.toLowerCase() === hint.email.toLowerCase()) {
       call('POST', '/v1/account/logout', {}, saved.token);
-      clearSession(local, tab);
+      dropSession();
     }
     const left = removeHint(readHints(local), hint.email);
     writeHints(local, left);
@@ -710,7 +710,7 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
     const saved = readSession(local, tab);
     const email = S.account ? S.account.email : S.email;
     if (saved && !done) authedQuiet(saved.token);
-    clearSession(local, tab);
+    dropSession();
     if (forgetDevice) writeHints(local, removeHint(readHints(local), email));
     mine.reset();
     resetArrival();
@@ -728,8 +728,24 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
 
   const authedQuiet = token => call('POST', '/v1/account/logout', {}, token);
 
+  /* no session on this device any more: and no colour either (gold, as for a visitor) */
+  function dropSession() {
+    clearSession(local, tab);
+    if (window.SiteLook) window.SiteLook.apply('gold');
+  }
+
+  /* the account's site colour (site redesign W2): this page takes it now, and every page from the first paint (look.js) */
+  function rememberLook(account) {
+    const look = window.SiteLook;
+    if (!look || !account) return;
+    const tint = look.tints[account.tint] ? account.tint : 'gold';
+    look.remember(tint);
+    if (look.current() !== tint) look.apply(tint);
+  }
+
   /* what the header's icon draws on every page (link.js), without asking the server */
   function rememberFace(account) {
+    rememberLook(account);
     const had = readFace(local, tab);
     const same = had && account.avatar && had.version === account.avatar;
     writeFace(local, tab, { firstName: account.firstName, photo: same ? had.photo : '', version: same ? had.version : 0 });
@@ -833,7 +849,7 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
         enter(reply.account);
         return;
       }
-      if (reply.code === 'session') clearSession(local, tab);
+      if (reply.code === 'session') dropSession();
       else {
         // the session may be fine and the network not: never ask them to sign in for that
         show(brokenHome(start));

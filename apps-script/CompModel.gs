@@ -1018,6 +1018,7 @@ var COMP_SHELL_FALLBACK = [
   '  <link rel="icon" type="image/png" sizes="192x192" href="../assets/img/favicon-192.png">',
   '  <link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png">',
   '  <link rel="preload" href="../assets/fonts/cairo-arabic.woff2" as="font" type="font/woff2" crossorigin>',
+  '  <script src="../assets/js/look.js"></script>',
   '  <link rel="stylesheet" href="../assets/css/comp.css">',
   '  <script type="module" src="../assets/js/comp/main.js"></script>',
   '',

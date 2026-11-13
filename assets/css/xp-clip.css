@@ -7,7 +7,46 @@
 ========================================================= */
 
 :root {
-  --gold-soft: #e7cf9c;
+  /* gold tokens (site redesign W1): every gold in the site CSS is one of these
+     triplets, used as rgb(var(--gold-…-rgb)) / rgba(var(--gold-…-rgb), a).
+     assets/js/look.js swaps them for the member's colour before the first paint.
+     Same block in main.css, page.css, comp.css, legal.css, xp-clip.css (tests/gold-tokens.test.mjs). */
+  --gold-rgb: 215, 170, 80;
+  --gold-1a1205-rgb: 26, 18, 5;
+  --gold-3b2a0a-rgb: 59, 42, 10;
+  --gold-4e3e1e-rgb: 78, 62, 30;
+  --gold-6f4f1b-rgb: 111, 79, 27;
+  --gold-8a6a2c-rgb: 138, 106, 44;
+  --gold-8c6423-rgb: 140, 100, 35;
+  --gold-a8792b-rgb: 168, 121, 43;
+  --gold-b8862f-rgb: 184, 134, 47;
+  --gold-b8862f-shade-rgb: 184, 134, 47;
+  --gold-b98a35-rgb: 185, 138, 53;
+  --gold-c39340-rgb: 195, 147, 64;
+  --gold-c89235-rgb: 200, 146, 53;
+  --gold-c8973f-rgb: 200, 151, 63;
+  --gold-c99135-rgb: 201, 145, 53;
+  --gold-c99a45-rgb: 201, 154, 69;
+  --gold-d8ab51-rgb: 216, 171, 81;
+  --gold-deep-rgb: 107, 76, 23;
+  --gold-e0b55c-rgb: 224, 181, 92;
+  --gold-e7c27a-rgb: 231, 194, 122;
+  --gold-f2e4c4-rgb: 242, 228, 196;
+  --gold-f3d48e-rgb: 243, 212, 142;
+  --gold-f7d796-rgb: 247, 215, 150;
+  --gold-f7dc9b-rgb: 247, 220, 155;
+  --gold-f7dc9e-rgb: 247, 220, 158;
+  --gold-f7e2ad-rgb: 247, 226, 173;
+  --gold-fbf6ec-rgb: 251, 246, 236;
+  --gold-ffe9ba-rgb: 255, 233, 186;
+  --gold-fff4d6-rgb: 255, 244, 214;
+  --gold-hi-rgb: 242, 210, 139;
+  --gold-ink-rgb: 27, 19, 6;
+  --gold-light-rgb: 255, 236, 190;
+  --gold-soft-rgb: 231, 207, 156;
+  /* end gold tokens */
+
+  --gold-soft: rgb(var(--gold-soft-rgb));
   --ease-out-expo: cubic-bezier(.16, 1, .3, 1);
   --spring: cubic-bezier(.3, 1.3, .5, 1);
 }
@@ -86,9 +125,9 @@ dialog.sheet .icon--line .duo {
   border-radius: 18px;
   background: #000;
   box-shadow:
-    0 0 0 1px rgba(242, 210, 139, .22),
+    0 0 0 1px rgba(var(--gold-hi-rgb), .22),
     0 26px 60px -26px rgba(0, 0, 0, .95),
-    0 0 48px -14px rgba(215, 170, 80, .28);
+    0 0 48px -14px rgba(var(--gold-rgb), .28);
   isolation: isolate;
 }
 
@@ -130,7 +169,7 @@ dialog.sheet .icon--line .duo {
   height: 64px;
   border-radius: 50%;
   background: rgba(2, 9, 20, .55);
-  box-shadow: 0 0 0 1px rgba(242, 210, 139, .4), 0 12px 30px -10px rgba(0, 0, 0, .8);
+  box-shadow: 0 0 0 1px rgba(var(--gold-hi-rgb), .4), 0 12px 30px -10px rgba(0, 0, 0, .8);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
   opacity: 0;
@@ -167,8 +206,8 @@ dialog.sheet .icon--line .duo {
   display: block;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, #d7aa50, #f2d28b);
-  box-shadow: 0 0 10px rgba(242, 210, 139, .7);
+  background: linear-gradient(90deg, rgb(var(--gold-rgb)), rgb(var(--gold-hi-rgb)));
+  box-shadow: 0 0 10px rgba(var(--gold-hi-rgb), .7);
   transform-origin: left center;
   transform: scaleX(var(--p, 0));
   transition: transform .25s linear;
@@ -188,7 +227,7 @@ dialog.sheet .icon--line .duo {
   font-size: 15px;
   color: var(--gold-hi);
   background: rgba(2, 9, 20, .55);
-  box-shadow: 0 0 0 1px rgba(242, 210, 139, .35);
+  box-shadow: 0 0 0 1px rgba(var(--gold-hi-rgb), .35);
   pointer-events: none;
 }
 
@@ -214,7 +253,7 @@ dialog.sheet .icon--line .duo {
 /* people's words at the clip's edges: the site's navy glass */
 .xp-msg--clip {
   background: rgba(6, 26, 49, .94);
-  box-shadow: 0 0 0 1px rgba(242, 210, 139, .22), 0 10px 22px -10px rgba(0, 0, 0, .9);
+  box-shadow: 0 0 0 1px rgba(var(--gold-hi-rgb), .22), 0 10px 22px -10px rgba(0, 0, 0, .9);
 }
 
 .xp-side .xp-msg--clip {
@@ -226,9 +265,9 @@ dialog.sheet .icon--line .duo {
   position: relative;
   gap: 10px;
   overflow: hidden;
-  color: #1a1205;
-  background: linear-gradient(90deg, #f2d28b, #d7aa50 55%, #b98a35);
-  box-shadow: 0 14px 30px -14px rgba(215, 170, 80, .75);
+  color: rgb(var(--gold-1a1205-rgb));
+  background: linear-gradient(90deg, rgb(var(--gold-hi-rgb)), rgb(var(--gold-rgb)) 55%, rgb(var(--gold-b98a35-rgb)));
+  box-shadow: 0 14px 30px -14px rgba(var(--gold-rgb), .75);
 }
 
 .xp__cta--clip .ic {
@@ -237,7 +276,7 @@ dialog.sheet .icon--line .duo {
 }
 
 .xp__cta--clip:hover {
-  background: linear-gradient(90deg, #f7dc9e, #e0b55c 55%, #c39340);
+  background: linear-gradient(90deg, rgb(var(--gold-f7dc9e-rgb)), rgb(var(--gold-e0b55c-rgb)) 55%, rgb(var(--gold-c39340-rgb)));
 }
 
 @media (prefers-reduced-motion: no-preference) {

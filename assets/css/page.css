@@ -50,6 +50,45 @@
 /* ---------- tokens (main.css) ---------- */
 
 :root {
+  /* gold tokens (site redesign W1): every gold in the site CSS is one of these
+     triplets, used as rgb(var(--gold-…-rgb)) / rgba(var(--gold-…-rgb), a).
+     assets/js/look.js swaps them for the member's colour before the first paint.
+     Same block in main.css, page.css, comp.css, legal.css, xp-clip.css (tests/gold-tokens.test.mjs). */
+  --gold-rgb: 215, 170, 80;
+  --gold-1a1205-rgb: 26, 18, 5;
+  --gold-3b2a0a-rgb: 59, 42, 10;
+  --gold-4e3e1e-rgb: 78, 62, 30;
+  --gold-6f4f1b-rgb: 111, 79, 27;
+  --gold-8a6a2c-rgb: 138, 106, 44;
+  --gold-8c6423-rgb: 140, 100, 35;
+  --gold-a8792b-rgb: 168, 121, 43;
+  --gold-b8862f-rgb: 184, 134, 47;
+  --gold-b8862f-shade-rgb: 184, 134, 47;
+  --gold-b98a35-rgb: 185, 138, 53;
+  --gold-c39340-rgb: 195, 147, 64;
+  --gold-c89235-rgb: 200, 146, 53;
+  --gold-c8973f-rgb: 200, 151, 63;
+  --gold-c99135-rgb: 201, 145, 53;
+  --gold-c99a45-rgb: 201, 154, 69;
+  --gold-d8ab51-rgb: 216, 171, 81;
+  --gold-deep-rgb: 107, 76, 23;
+  --gold-e0b55c-rgb: 224, 181, 92;
+  --gold-e7c27a-rgb: 231, 194, 122;
+  --gold-f2e4c4-rgb: 242, 228, 196;
+  --gold-f3d48e-rgb: 243, 212, 142;
+  --gold-f7d796-rgb: 247, 215, 150;
+  --gold-f7dc9b-rgb: 247, 220, 155;
+  --gold-f7dc9e-rgb: 247, 220, 158;
+  --gold-f7e2ad-rgb: 247, 226, 173;
+  --gold-fbf6ec-rgb: 251, 246, 236;
+  --gold-ffe9ba-rgb: 255, 233, 186;
+  --gold-fff4d6-rgb: 255, 244, 214;
+  --gold-hi-rgb: 242, 210, 139;
+  --gold-ink-rgb: 27, 19, 6;
+  --gold-light-rgb: 255, 236, 190;
+  --gold-soft-rgb: 231, 207, 156;
+  /* end gold tokens */
+
   --ink: #020914;
   --navy-950: #041127;
   --navy-900: #061a31;
@@ -57,11 +96,11 @@
   --navy-800: #0b2a4c;
   --navy-700: #12385f;
 
-  --gold: #d7aa50;
-  --gold-hi: #f2d28b;
-  --gold-ink: #1b1306;
-  --gold-line: rgba(242, 210, 139, .14);
-  --gold-line-strong: rgba(242, 210, 139, .36);
+  --gold: rgb(var(--gold-rgb));
+  --gold-hi: rgb(var(--gold-hi-rgb));
+  --gold-ink: rgb(var(--gold-ink-rgb));
+  --gold-line: rgba(var(--gold-hi-rgb), .14);
+  --gold-line-strong: rgba(var(--gold-hi-rgb), .36);
 
   --text: #f5f7fb;
   --text-2: #b9c5d5;
@@ -75,8 +114,8 @@
 
   /* a partner's logo sits on this, never directly on navy (docs/EVENTS.md §12) */
   --partner-plate: #fffdf9;
-  --partner-ring: rgba(215, 170, 80, .42);
-  --partner-glow: rgba(251, 246, 236, .12);
+  --partner-ring: rgba(var(--gold-rgb), .42);
+  --partner-glow: rgba(var(--gold-fbf6ec-rgb), .12);
 
   --radius-xl: 28px;
   --radius-lg: 24px;
@@ -97,11 +136,11 @@
 /* the page's theme: only the accent changes (SECTION_THEMES) */
 :root,
 [data-theme="gold"] {
-  --accent: #d7aa50;
-  --accent-hi: #f2d28b;
-  --accent-deep: #6b4c17;
-  --accent-glow: rgba(215, 170, 80, .3);
-  --accent-ink: #1b1306;
+  --accent: rgb(var(--gold-rgb));
+  --accent-hi: rgb(var(--gold-hi-rgb));
+  --accent-deep: rgb(var(--gold-deep-rgb));
+  --accent-glow: rgba(var(--gold-rgb), .3);
+  --accent-ink: rgb(var(--gold-ink-rgb));
 }
 
 [data-theme="ember"] {
@@ -324,6 +363,9 @@ img, svg, video {
   gap: 10px;
   padding: max(8px, env(safe-area-inset-top)) max(var(--gutter), calc((100% - var(--page)) / 2 + var(--gutter))) 8px;
   background: linear-gradient(180deg, rgba(2, 9, 20, .92) 55%, rgba(2, 9, 20, 0));
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--gold-line);
 }
 
 .pbar__brand {
@@ -336,8 +378,12 @@ img, svg, video {
   color: var(--text);
 }
 
+/* the bar is one bar on every page (site redesign W1): the logo 36, the name in Ruqaa */
 .pbar__brand img {
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--gold-line-strong);
 }
 
 .pbar__home {
@@ -414,6 +460,10 @@ img, svg, video {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--gold-hi);
 }
 
 .pbar__home {
@@ -432,13 +482,7 @@ img, svg, video {
   }
 
   .pbar__name {
-    font-size: .9rem;
-  }
-}
-
-@media (max-width: 340px) {
-  .pbar__name {
-    display: none;
+    font-size: 1.02rem;
   }
 }
 
@@ -833,7 +877,7 @@ img, svg, video {
   place-items: center;
   background:
     radial-gradient(70% 80% at 50% 115%, var(--accent-glow), transparent 70%),
-    repeating-linear-gradient(45deg, rgba(242, 210, 139, .045) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(45deg, rgba(var(--gold-hi-rgb), .045) 0 1px, transparent 1px 18px),
     var(--navy-850);
 }
 
@@ -903,7 +947,7 @@ img, svg, video {
   width: 58px;
   height: 58px;
   margin: -29px;
-  border: 1.5px solid rgba(242, 210, 139, .7);
+  border: 1.5px solid rgba(var(--gold-hi-rgb), .7);
   border-radius: 50%;
   color: var(--gold-hi);
   background: rgba(2, 9, 20, .62);
@@ -1732,7 +1776,7 @@ img, svg, video {
   padding: 7px 14px 7px 12px;
   border: 1px solid var(--gold-line);
   border-radius: 999px;
-  background: linear-gradient(90deg, rgba(215, 170, 80, .07), rgba(255, 255, 255, .02));
+  background: linear-gradient(90deg, rgba(var(--gold-rgb), .07), rgba(255, 255, 255, .02));
   font-size: .86rem;
   font-weight: 700;
   line-height: 1.4;
@@ -1812,7 +1856,7 @@ img, svg, video {
   font-weight: 700;
   line-height: 1.4;
   color: var(--text-2);
-  background: rgba(242, 210, 139, .06);
+  background: rgba(var(--gold-hi-rgb), .06);
   box-shadow: inset 0 0 0 1px var(--gold-line);
 }
 
@@ -1848,7 +1892,7 @@ img, svg, video {
   --u: min(calc((100vw - 20px) / 380), calc(100vh / 430), 3px);
   --u: min(calc((100vw - 20px) / 380), calc(100dvh / 430), 3px);
   --ours-x: 108;
-  --gold-stroke: linear-gradient(90deg, transparent, rgba(242, 210, 139, .2) 12%, #f2d28b 42%, #fff4d6 50%, #d7aa50 58%, rgba(215, 170, 80, .2) 88%, transparent);
+  --gold-stroke: linear-gradient(90deg, transparent, rgba(var(--gold-hi-rgb), .2) 12%, rgb(var(--gold-hi-rgb)) 42%, rgb(var(--gold-fff4d6-rgb)) 50%, rgb(var(--gold-rgb)) 58%, rgba(var(--gold-rgb), .2) 88%, transparent);
   --spectrum-stroke: linear-gradient(90deg, transparent, rgba(255, 77, 77, .25) 10%, #ff5a4a 22%, #ffb020 36%, #fff6e0 50%, #3ddc84 62%, #38b6ff 76%, #a35cff 88%, transparent);
   position: fixed;
   top: 0;
@@ -1890,13 +1934,13 @@ img, svg, video {
 .cintro__bar--top {
   top: 0;
   --from: -100%;
-  box-shadow: 0 1px 0 rgba(242, 210, 139, .08);
+  box-shadow: 0 1px 0 rgba(var(--gold-hi-rgb), .08);
 }
 
 .cintro__bar--bottom {
   bottom: 0;
   --from: 100%;
-  box-shadow: 0 -1px 0 rgba(242, 210, 139, .08);
+  box-shadow: 0 -1px 0 rgba(var(--gold-hi-rgb), .08);
 }
 
 .cintro.is-go .cintro__bar {
@@ -1908,7 +1952,7 @@ img, svg, video {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(calc(240 * var(--u)) calc(150 * var(--u)) at 50% 46%, rgba(215, 170, 80, .14), transparent 70%),
+    radial-gradient(calc(240 * var(--u)) calc(150 * var(--u)) at 50% 46%, rgba(var(--gold-rgb), .14), transparent 70%),
     radial-gradient(calc(420 * var(--u)) calc(90 * var(--u)) at 50% 74%, rgba(56, 182, 255, .07), transparent 70%);
   opacity: 0;
   animation: cintro-fade .6s ease-out both;
@@ -1978,7 +2022,7 @@ img, svg, video {
 }
 
 .cintro__side--ours .cintro__aura {
-  background: radial-gradient(closest-side, rgba(242, 210, 139, .38), rgba(215, 170, 80, .12) 55%, transparent);
+  background: radial-gradient(closest-side, rgba(var(--gold-hi-rgb), .38), rgba(var(--gold-rgb), .12) 55%, transparent);
 }
 
 .cintro__side--partner .cintro__aura {
@@ -2002,13 +2046,13 @@ img, svg, video {
   font-family: var(--font-display);
   font-size: calc(22 * var(--u));
   font-weight: 700;
-  color: #e7c27a;
-  background: linear-gradient(180deg, #fff1cc 0%, #f2d28b 45%, #c8973f 100%);
+  color: rgb(var(--gold-e7c27a-rgb));
+  background: linear-gradient(180deg, #fff1cc 0%, rgb(var(--gold-hi-rgb)) 45%, rgb(var(--gold-c8973f-rgb)) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   text-shadow: none;
-  filter: drop-shadow(0 calc(2 * var(--u)) calc(6 * var(--u)) rgba(215, 170, 80, .35));
+  filter: drop-shadow(0 calc(2 * var(--u)) calc(6 * var(--u)) rgba(var(--gold-rgb), .35));
 }
 
 /* theirs in their own spectrum */
@@ -2050,7 +2094,7 @@ img, svg, video {
 .cintro__stroke--gold {
   --turn: 42deg;
   background: var(--gold-stroke);
-  box-shadow: 0 0 calc(10 * var(--u)) rgba(242, 210, 139, .55);
+  box-shadow: 0 0 calc(10 * var(--u)) rgba(var(--gold-hi-rgb), .55);
 }
 
 .cintro__stroke--spectrum {
@@ -2066,7 +2110,7 @@ img, svg, video {
   height: calc(46 * var(--u));
   border-radius: 50%;
   translate: -50% -50%;
-  background: radial-gradient(closest-side, #fff, rgba(255, 244, 214, .85) 18%, rgba(242, 210, 139, .35) 45%, transparent);
+  background: radial-gradient(closest-side, #fff, rgba(255, 244, 214, .85) 18%, rgba(var(--gold-hi-rgb), .35) 45%, transparent);
   opacity: 0;
   transform: scale(0);
 }
@@ -2075,8 +2119,8 @@ img, svg, video {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 1px solid rgba(242, 210, 139, .55);
-  box-shadow: 0 0 calc(14 * var(--u)) rgba(215, 170, 80, .25), inset 0 0 calc(14 * var(--u)) rgba(215, 170, 80, .18);
+  border: 1px solid rgba(var(--gold-hi-rgb), .55);
+  box-shadow: 0 0 calc(14 * var(--u)) rgba(var(--gold-rgb), .25), inset 0 0 calc(14 * var(--u)) rgba(var(--gold-rgb), .18);
   -webkit-mask: conic-gradient(from 0deg, #000 var(--sweep, 0deg), transparent 0);
   mask: conic-gradient(from 0deg, #000 var(--sweep, 0deg), transparent 0);
   opacity: 0;
@@ -2101,8 +2145,8 @@ img, svg, video {
   width: calc(3 * var(--u));
   height: calc(3 * var(--u));
   border-radius: 50%;
-  background: #fff4d6;
-  box-shadow: 0 0 calc(6 * var(--u)) rgba(242, 210, 139, .9);
+  background: rgb(var(--gold-fff4d6-rgb));
+  box-shadow: 0 0 calc(6 * var(--u)) rgba(var(--gold-hi-rgb), .9);
   opacity: 0;
 }
 
@@ -2124,7 +2168,7 @@ img, svg, video {
   min-height: 36px;
   margin: 0;
   padding: 0 16px;
-  border: 1px solid rgba(242, 210, 139, .28);
+  border: 1px solid rgba(var(--gold-hi-rgb), .28);
   border-radius: 999px;
   background: rgba(1, 6, 14, .55);
   -webkit-backdrop-filter: blur(6px);
@@ -2132,15 +2176,15 @@ img, svg, video {
   direction: rtl;
   font: 600 13px/1 var(--font-ui);
   letter-spacing: .02em;
-  color: rgba(242, 228, 196, .9);
+  color: rgba(var(--gold-f2e4c4-rgb), .9);
   cursor: pointer;
   opacity: 0;
   animation: cintro-fade .5s ease-out .5s both;
 }
 
 .cintro__skip:hover {
-  border-color: rgba(242, 210, 139, .55);
-  color: #fff4d6;
+  border-color: rgba(var(--gold-hi-rgb), .55);
+  color: rgb(var(--gold-fff4d6-rgb));
 }
 
 /* ---- the timeline (only once both logos can be drawn) ---- */
@@ -2366,7 +2410,7 @@ img, svg, video {
 .cintro {
   z-index: 9;
   background:
-    radial-gradient(60% 46% at 50% 46%, rgba(215, 170, 80, .12), transparent 70%),
+    radial-gradient(60% 46% at 50% 46%, rgba(var(--gold-rgb), .12), transparent 70%),
     radial-gradient(80% 60% at 50% 46%, rgba(18, 56, 95, .6), transparent 75%),
     linear-gradient(180deg, var(--navy-900, #061a31), var(--ink, #020914) 70%);
 }
@@ -2615,7 +2659,7 @@ html[data-collab-reveal] .pg {
 .bk-alert[data-tone="info"] {
   border-color: var(--gold-line-strong);
   color: var(--accent-hi);
-  background: rgba(215, 170, 80, .08);
+  background: rgba(var(--gold-rgb), .08);
 }
 
 .bk-form {
@@ -3503,12 +3547,7 @@ html[data-collab-reveal] .pg {
   stroke-linejoin: round;
 }
 
-/* three controls leave no room for the name on a phone; the logo stays */
-@media (max-width: 420px) {
-  .pbar:has(.acct-badge) .pbar__name {
-    display: none;
-  }
-}
+/* the name stays on a phone too (site redesign W1/S5: it used to hide); it gives way by ellipsis */
 
 /* moving between the site's pages feels like one app: the browser keeps the bar still and fades the page
    (Phase 8 track P, assets/js/nav.js). Where unsupported, the page simply loads. */
@@ -3547,7 +3586,7 @@ html:active-view-transition-type(site-page)::view-transition-new(root) {
   height: 44px;
   min-height: 44px;
   padding: 0 !important;
-  border: 1px solid var(--gold-line-strong, rgba(242, 210, 139, .36));
+  border: 1px solid var(--gold-line-strong, rgba(var(--gold-hi-rgb), .36));
   border-radius: 50%;
   overflow: hidden;
   color: transparent !important;
@@ -3563,7 +3602,7 @@ html:active-view-transition-type(site-page)::view-transition-new(root) {
   margin: auto;
   width: 22px;
   height: 22px;
-  background: var(--gold-hi, #f2d28b);
+  background: var(--gold-hi, rgb(var(--gold-hi-rgb)));
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 10.6 12 4l8 6.6V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.5h-6v5.5H5.5A1.5 1.5 0 0 1 4 19z'/%3E%3C/svg%3E") center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 10.6 12 4l8 6.6V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.5h-6v5.5H5.5A1.5 1.5 0 0 1 4 19z'/%3E%3C/svg%3E") center / contain no-repeat;
 }

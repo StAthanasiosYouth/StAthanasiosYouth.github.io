@@ -507,3 +507,39 @@ test('the sweeps: stale pending rows, old codes and sessions go; IP hashes are b
   assert.equal((await h.db.prepare('SELECT reg_ip_hash FROM participants').first()).reg_ip_hash, null);
   assert.equal((await h.db.prepare('SELECT COUNT(*) AS n FROM participants').first()).n, 1, 'the account itself stays');
 });
+
+/* ---------- the site colour (site redesign W2) ---------- */
+
+test('prefs.tint: gold until chosen, kept in the account, read on any device, only the seven colours', async () => {
+  const h = await world();
+  const a = await register(h);
+  const s1 = (await signin(h, a.email, a.password)).body.session.token;
+  const auth = t => ({ authorization: 'Bearer ' + t });
+  assert.equal((await me(h, s1)).body.account.tint, 'gold');
+  assert.equal((await h.call('/v1/account/prefs', { headers: auth(s1) })).body.tint, 'gold');
+
+  const saved = await post(h, '/v1/account/prefs', { prefs: { tint: 'sea' } }, auth(s1));
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.equal(saved.body.tint, 'sea');
+  assert.ok(Array.isArray(saved.body.groups), 'the notification groups still come back');
+
+  // another device: a new session, the same colour
+  const s2 = (await signin(h, a.email, a.password)).body.session.token;
+  assert.equal((await me(h, s2)).body.account.tint, 'sea');
+  assert.equal((await h.call('/v1/account/summary', { headers: auth(s2) })).body.account.tint, 'sea');
+
+  // anything else is refused and changes nothing
+  for (const bad of ['red', '', 1, null, { id: 'sea' }]) {
+    const r = await post(h, '/v1/account/prefs', { prefs: { tint: bad } }, auth(s1));
+    assert.equal(r.status, 400, 'tint ' + JSON.stringify(bad));
+  }
+  assert.equal((await me(h, s1)).body.account.tint, 'sea');
+
+  // back to gold: nothing kept
+  assert.equal((await post(h, '/v1/account/prefs', { prefs: { tint: 'gold' } }, auth(s1))).body.tint, 'gold');
+  const row = await h.db.prepare('SELECT site_tint FROM participants WHERE email = ?').bind(a.email).first();
+  assert.equal(row.site_tint, null);
+
+  // no session: nothing
+  assert.equal((await post(h, '/v1/account/prefs', { prefs: { tint: 'rose' } })).status, 401);
+});

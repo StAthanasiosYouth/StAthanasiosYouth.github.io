@@ -28,15 +28,65 @@
   unicode-range: U+0021-0040, U+005B-0060, U+007B-007E, U+2013-2014, U+2018-201D, U+2022, U+2026;
 }
 
+@font-face {
+  font-family: "Aref Ruqaa";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/aref-ruqaa-arabic.woff2") format("woff2");
+  unicode-range: U+0020-0021, U+00A0, U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
+}
+
 :root {
+  /* gold tokens (site redesign W1): every gold in the site CSS is one of these
+     triplets, used as rgb(var(--gold-…-rgb)) / rgba(var(--gold-…-rgb), a).
+     assets/js/look.js swaps them for the member's colour before the first paint.
+     Same block in main.css, page.css, comp.css, legal.css, xp-clip.css (tests/gold-tokens.test.mjs). */
+  --gold-rgb: 215, 170, 80;
+  --gold-1a1205-rgb: 26, 18, 5;
+  --gold-3b2a0a-rgb: 59, 42, 10;
+  --gold-4e3e1e-rgb: 78, 62, 30;
+  --gold-6f4f1b-rgb: 111, 79, 27;
+  --gold-8a6a2c-rgb: 138, 106, 44;
+  --gold-8c6423-rgb: 140, 100, 35;
+  --gold-a8792b-rgb: 168, 121, 43;
+  --gold-b8862f-rgb: 184, 134, 47;
+  --gold-b8862f-shade-rgb: 184, 134, 47;
+  --gold-b98a35-rgb: 185, 138, 53;
+  --gold-c39340-rgb: 195, 147, 64;
+  --gold-c89235-rgb: 200, 146, 53;
+  --gold-c8973f-rgb: 200, 151, 63;
+  --gold-c99135-rgb: 201, 145, 53;
+  --gold-c99a45-rgb: 201, 154, 69;
+  --gold-d8ab51-rgb: 216, 171, 81;
+  --gold-deep-rgb: 107, 76, 23;
+  --gold-e0b55c-rgb: 224, 181, 92;
+  --gold-e7c27a-rgb: 231, 194, 122;
+  --gold-f2e4c4-rgb: 242, 228, 196;
+  --gold-f3d48e-rgb: 243, 212, 142;
+  --gold-f7d796-rgb: 247, 215, 150;
+  --gold-f7dc9b-rgb: 247, 220, 155;
+  --gold-f7dc9e-rgb: 247, 220, 158;
+  --gold-f7e2ad-rgb: 247, 226, 173;
+  --gold-fbf6ec-rgb: 251, 246, 236;
+  --gold-ffe9ba-rgb: 255, 233, 186;
+  --gold-fff4d6-rgb: 255, 244, 214;
+  --gold-hi-rgb: 242, 210, 139;
+  --gold-ink-rgb: 27, 19, 6;
+  --gold-light-rgb: 255, 236, 190;
+  --gold-soft-rgb: 231, 207, 156;
+  /* end gold tokens */
+
   color-scheme: dark;
   --navy: #030b18;
   --navy-2: #08213d;
-  --gold: #d7aa50;
-  --gold-hi: #f2d28b;
+  --gold: rgb(var(--gold-rgb));
+  --gold-hi: rgb(var(--gold-hi-rgb));
+  --gold-line: rgba(var(--gold-hi-rgb), .14);
+  --gold-line-strong: rgba(var(--gold-hi-rgb), .36);
   --text: #eef2f8;
   --text-2: #b9c5d6;
-  --line: rgba(242, 210, 139, .2);
+  --line: rgba(var(--gold-hi-rgb), .2);
 }
 
 * {
@@ -56,7 +106,7 @@ body {
   line-height: 1.9;
   color: var(--text);
   background:
-    radial-gradient(70% 40% at 50% 0%, rgba(215, 170, 80, .1), transparent 70%),
+    radial-gradient(70% 40% at 50% 0%, rgba(var(--gold-rgb), .1), transparent 70%),
     linear-gradient(180deg, #0a2140, var(--navy) 420px);
 }
 
@@ -77,7 +127,7 @@ body {
   width: 84px;
   height: 84px;
   border-radius: 50%;
-  box-shadow: 0 0 0 1px var(--line), 0 16px 40px -18px rgba(215, 170, 80, .55);
+  box-shadow: 0 0 0 1px var(--line), 0 16px 40px -18px rgba(var(--gold-rgb), .55);
 }
 
 .legal__site {
@@ -182,4 +232,59 @@ html:active-view-transition-type(site-page)::view-transition-new(root) {
   @view-transition {
     navigation: none;
   }
+}
+
+
+/* ---------- the site's bar (site redesign W1: one bar on every page) ---------- */
+
+.lbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: max(10px, env(safe-area-inset-top)) max(16px, calc((100% - 820px) / 2)) 10px;
+  background: rgba(4, 17, 39, .9);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--gold-line);
+}
+
+.lbar__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.lbar__brand img {
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--gold-line-strong);
+}
+
+.lbar__brand span {
+  font-family: "Aref Ruqaa", serif;
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--gold-hi);
+}
+
+.lbar__home {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: 999px;
+  color: var(--gold-hi);
+  font-weight: 700;
+  font-size: .88rem;
+  text-decoration: none;
+}
+
+.lbar a:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: 2px;
 }

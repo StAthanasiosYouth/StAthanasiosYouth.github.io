@@ -91,6 +91,10 @@ const failHit = async (ctx, bucket, who, max, windowS) => hit(ctx.env.DB, bucket
 
 const findByCanon = (db, canon) => retry(() => db.prepare("SELECT * FROM participants WHERE email_canon = ? AND status <> 'deleted'").bind(canon).first());
 
+/* the member's site colour («لون الموقع», site redesign W2): the ids of assets/js/look.js; none kept = gold */
+export const TINTS = ['gold', 'sea', 'emerald', 'rose', 'ember', 'violet', 'silver'];
+const tintOf = account => TINTS.includes(account.site_tint) ? account.site_tint : 'gold';
+
 export function accountViewOf(account, settings, now = Date.now()) {
   const e = eligibility(account, rulesFrom(settings), now);
   return {
@@ -102,6 +106,7 @@ export function accountViewOf(account, settings, now = Date.now()) {
     birthDate: account.birth_date,
     avatar: account.avatar_key ? account.avatar_version : null,
     onboarded: !!account.onboarded_at,
+    tint: tintOf(account),
     eligible: e.state === 'eligible',
     eligibility: { state: e.state, soon: e.soon, leavesAt: e.soon ? e.leavesAt : null }
   };
@@ -382,11 +387,12 @@ async function prefsView(ctx, account) {
   const saved = Object.fromEntries(results.map(r => [r.grp, r.mode]));
   return {
     groups: Object.entries(GROUPS).map(([key, g]) => ({ key, label: g.label, optIn: g.tier === 3, on: saved[key] ? saved[key] === 'on' : g.tier === 2 })),
-    always: ALWAYS_ON
+    always: ALWAYS_ON,
+    tint: tintOf(account)
   };
 }
 
-/* POST /v1/account/prefs { prefs: { group: true|false } }: only the member changes these, never an admin */
+/* POST /v1/account/prefs { prefs: { group: true|false, tint: id } }: only the member changes these, never an admin */
 export async function accountPrefsSave(ctx) {
   const settings = await gate(ctx);
   const { account } = await requireAccount(ctx, settings);
@@ -396,12 +402,19 @@ export async function accountPrefsSave(ctx) {
   const db = ctx.env.DB;
   const now = Date.now();
   const stmts = [];
+  let tint = null;
   for (const [key, on] of Object.entries(prefs)) {
+    if (key === 'tint') {
+      if (!TINTS.includes(on)) throw new ApiError('bad', 'prefs');
+      tint = on;
+      continue;
+    }
     if (!GROUPS[key] || typeof on !== 'boolean') throw new ApiError('bad', 'prefs');
     stmts.push(db.prepare('INSERT INTO member_prefs (participant_id, grp, mode, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(participant_id, grp) DO UPDATE SET mode = excluded.mode, updated_at = excluded.updated_at').bind(account.id, key, on ? 'on' : 'off', now));
   }
+  if (tint) stmts.push(db.prepare('UPDATE participants SET site_tint = ? WHERE id = ?').bind(tint === 'gold' ? null : tint, account.id));
   if (stmts.length) await retry(() => db.batch(stmts));
-  return prefsView(ctx, account);
+  return prefsView(ctx, tint ? { ...account, site_tint: tint === 'gold' ? null : tint } : account);
 }
 
 /* POST /v1/account/logout { all? }: this device, or every device. Quiet without a session. */

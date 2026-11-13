@@ -48,6 +48,45 @@
 /* ---------- tokens (main.css) ---------- */
 
 :root {
+  /* gold tokens (site redesign W1): every gold in the site CSS is one of these
+     triplets, used as rgb(var(--gold-…-rgb)) / rgba(var(--gold-…-rgb), a).
+     assets/js/look.js swaps them for the member's colour before the first paint.
+     Same block in main.css, page.css, comp.css, legal.css, xp-clip.css (tests/gold-tokens.test.mjs). */
+  --gold-rgb: 215, 170, 80;
+  --gold-1a1205-rgb: 26, 18, 5;
+  --gold-3b2a0a-rgb: 59, 42, 10;
+  --gold-4e3e1e-rgb: 78, 62, 30;
+  --gold-6f4f1b-rgb: 111, 79, 27;
+  --gold-8a6a2c-rgb: 138, 106, 44;
+  --gold-8c6423-rgb: 140, 100, 35;
+  --gold-a8792b-rgb: 168, 121, 43;
+  --gold-b8862f-rgb: 184, 134, 47;
+  --gold-b8862f-shade-rgb: 184, 134, 47;
+  --gold-b98a35-rgb: 185, 138, 53;
+  --gold-c39340-rgb: 195, 147, 64;
+  --gold-c89235-rgb: 200, 146, 53;
+  --gold-c8973f-rgb: 200, 151, 63;
+  --gold-c99135-rgb: 201, 145, 53;
+  --gold-c99a45-rgb: 201, 154, 69;
+  --gold-d8ab51-rgb: 216, 171, 81;
+  --gold-deep-rgb: 107, 76, 23;
+  --gold-e0b55c-rgb: 224, 181, 92;
+  --gold-e7c27a-rgb: 231, 194, 122;
+  --gold-f2e4c4-rgb: 242, 228, 196;
+  --gold-f3d48e-rgb: 243, 212, 142;
+  --gold-f7d796-rgb: 247, 215, 150;
+  --gold-f7dc9b-rgb: 247, 220, 155;
+  --gold-f7dc9e-rgb: 247, 220, 158;
+  --gold-f7e2ad-rgb: 247, 226, 173;
+  --gold-fbf6ec-rgb: 251, 246, 236;
+  --gold-ffe9ba-rgb: 255, 233, 186;
+  --gold-fff4d6-rgb: 255, 244, 214;
+  --gold-hi-rgb: 242, 210, 139;
+  --gold-ink-rgb: 27, 19, 6;
+  --gold-light-rgb: 255, 236, 190;
+  --gold-soft-rgb: 231, 207, 156;
+  /* end gold tokens */
+
   --ink: #020914;
   --navy-950: #041127;
   --navy-900: #061a31;
@@ -55,11 +94,11 @@
   --navy-800: #0b2a4c;
   --navy-700: #12385f;
 
-  --gold: #d7aa50;
-  --gold-hi: #f2d28b;
-  --gold-ink: #1b1306;
-  --gold-line: rgba(242, 210, 139, .14);
-  --gold-line-strong: rgba(242, 210, 139, .36);
+  --gold: rgb(var(--gold-rgb));
+  --gold-hi: rgb(var(--gold-hi-rgb));
+  --gold-ink: rgb(var(--gold-ink-rgb));
+  --gold-line: rgba(var(--gold-hi-rgb), .14);
+  --gold-line-strong: rgba(var(--gold-hi-rgb), .36);
 
   --text: #f5f7fb;
   --text-2: #b9c5d5;
@@ -87,11 +126,11 @@
 /* the competition's theme: only the accent changes (SECTION_THEMES) */
 :root,
 [data-theme="gold"] {
-  --accent: #d7aa50;
-  --accent-hi: #f2d28b;
-  --accent-deep: #6b4c17;
-  --accent-glow: rgba(215, 170, 80, .3);
-  --accent-ink: #1b1306;
+  --accent: rgb(var(--gold-rgb));
+  --accent-hi: rgb(var(--gold-hi-rgb));
+  --accent-deep: rgb(var(--gold-deep-rgb));
+  --accent-glow: rgba(var(--gold-rgb), .3);
+  --accent-ink: rgb(var(--gold-ink-rgb));
 }
 
 [data-theme="ember"] {
@@ -272,6 +311,15 @@ img, svg {
   background: linear-gradient(180deg, rgba(2, 9, 20, .9) 55%, rgba(2, 9, 20, 0));
 }
 
+/* a competition's own page (the bar with the timer): a solid surface like the home's (S4) */
+.cbar:has(.cbar__timer) {
+  padding-block: max(10px, env(safe-area-inset-top)) 10px;
+  background: linear-gradient(180deg, rgba(4, 17, 39, .94), rgba(4, 17, 39, .78));
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--gold-line);
+}
+
 /* the site's sound toggle (ui-sound.js): the home page's 🔊/🔇, next to «ارجع للموقع» */
 .usound {
   display: inline-grid;
@@ -331,8 +379,23 @@ img, svg {
   text-decoration: none;
 }
 
+/* the bar is one bar on every page (site redesign W1): the logo 36, the name in Ruqaa */
 .cbar__brand img {
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--gold-line-strong);
+}
+
+.cbar:has(.cbar__timer) .cbar__brand img {
+  box-shadow: 0 0 0 1px var(--gold-line-strong), 0 4px 12px -4px #000;
+}
+
+.cbar__name {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--gold-hi);
 }
 
 .cbar__timer {
@@ -414,7 +477,7 @@ img, svg {
     linear-gradient(180deg, rgba(255, 255, 255, .042), rgba(255, 255, 255, .012) 60%),
     var(--navy-900);
   box-shadow:
-    inset 0 1px 0 rgba(242, 210, 139, .09),
+    inset 0 1px 0 rgba(var(--gold-hi-rgb), .09),
     0 22px 44px -28px rgba(0, 0, 0, .8);
 }
 
@@ -458,7 +521,7 @@ img, svg {
   border-radius: var(--radius-lg);
   background:
     radial-gradient(80% 90% at 50% 120%, var(--accent-glow), transparent 70%),
-    repeating-linear-gradient(45deg, rgba(242, 210, 139, .045) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(45deg, rgba(var(--gold-hi-rgb), .045) 0 1px, transparent 1px 18px),
     var(--navy-850);
 }
 
@@ -1126,7 +1189,7 @@ fieldset.q {
   padding: 8px 12px;
   border-radius: var(--radius-sm);
   color: #ffe2a8;
-  background: rgba(215, 170, 80, .12);
+  background: rgba(var(--gold-rgb), .12);
 }
 
 .result__line--hint {
@@ -1612,7 +1675,7 @@ dialog.order[open] {
   padding: 12px 14px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--gold-line-strong);
-  background: rgba(215, 170, 80, .08);
+  background: rgba(var(--gold-rgb), .08);
 }
 
 .store-state__icon {

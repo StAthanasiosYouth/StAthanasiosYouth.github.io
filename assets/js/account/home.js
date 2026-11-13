@@ -153,6 +153,7 @@ export function createMine({ main, S, authed, api, sessionOver, signOut, openFor
         h('span', { class: 'ac-rail__sep' }),
         railLink('#me/profile', 'user', 'بياناتي', 'profile'),
         railLink('#me/notifications', 'bell', 'الإشعارات', 'notifications'),
+        window.SiteLook ? h('button', { type: 'button', class: 'ac-rail__a', 'data-nav': 'tint', onclick: () => openLook() }, h('span', { class: 'ac-rail__tint', 'aria-hidden': 'true' }), 'لون الموقع') : null,
         railLink('#me/security', 'shield', 'أمان الحساب', 'security'),
         railLink('#me/support', 'help', 'الدعم الفني', 'support')),
       signoutButton());
@@ -241,9 +242,36 @@ export function createMine({ main, S, authed, api, sessionOver, signOut, openFor
     row({ icon: 'star', title: 'نقاطي والمتجر', sub: w.points, href: '#me/points', attrs: { 'data-nav': 'points' } }),
     row({ icon: 'bag', title: 'طلباتي', sub: w.orders, href: '#me/orders', attrs: { 'data-nav': 'orders' } }));
 
+  /* «لون الموقع» (site redesign W2 / S3): the sheet opens here, and the colour is kept in the account */
+  const openLook = async () => {
+    const { openTint } = await import('../tint.js');
+    openTint({
+      save: async tint => {
+        const reply = await authed('POST', '/v1/account/prefs', { prefs: { tint } });
+        if (reply.code === 'session') {
+          sessionOver();
+          throw new Error('session');
+        }
+        if (!reply.ok || reply.tint !== tint) {
+          cue('nope');
+          throw new Error(reply.code || 'tint');
+        }
+        keep('/v1/account/prefs', reply);
+        if (S.account) S.account = { ...S.account, tint };
+        cue('pop');
+      },
+      onSaved: tint => toast('اتحفظ اللون: ' + window.SiteLook.tints[tint].name)
+    });
+  };
+  const tintRow = () => window.SiteLook ? h('button', { class: 'ac-row', type: 'button', 'data-nav': 'tint', onclick: openLook },
+    h('span', { class: 'ac-tint-ic', 'aria-hidden': 'true' }, h('i')),
+    h('span', { class: 'ac-row__body' }, h('span', { class: 'ac-row__t' }, 'لون الموقع'), h('span', { class: 'ac-row__s' }, 'الموقع بيفتح باللون اللي تختاره')),
+    ic('go', 'ac-row__go')) : null;
+
   const accountRows = () => rows(
     row({ icon: 'user', title: 'بياناتي', sub: 'اسمك وإيميلك وموبايلك', href: '#me/profile', attrs: { 'data-nav': 'profile' } }),
     row({ icon: 'bell', title: 'الإشعارات', sub: 'الإيميلات اللي بتوصلك', href: '#me/notifications', attrs: { 'data-nav': 'notifications' } }),
+    tintRow(),
     row({ icon: 'shield', title: 'أمان الحساب', sub: 'الأجهزة والباسورد', href: '#me/security', attrs: { 'data-nav': 'security' } }),
     row({ icon: 'help', title: 'الدعم الفني', sub: 'مشكلة أو تصحيح بيانات', href: '#me/support', attrs: { 'data-nav': 'support' } }));
 

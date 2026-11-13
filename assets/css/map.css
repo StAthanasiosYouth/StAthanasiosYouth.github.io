@@ -188,7 +188,7 @@
   border: 3px solid var(--gold-hi);
   border-radius: 50%;
   background: var(--navy-900);
-  box-shadow: 0 0 0 5px rgba(242, 210, 139, .22), 0 2px 6px rgba(0, 0, 0, .6);
+  box-shadow: 0 0 0 5px rgba(var(--gold-hi-rgb), .22), 0 2px 6px rgba(0, 0, 0, .6);
 }
 
 /* the route: gold with a soft glow */
@@ -311,7 +311,7 @@
 .route__mode[aria-pressed="true"] {
   color: var(--gold-hi);
   border-color: var(--gold);
-  background: rgba(215, 170, 80, .16);
+  background: rgba(var(--gold-rgb), .16);
 }
 
 .route__hint {
@@ -334,7 +334,7 @@
 .route__pick[aria-pressed="true"] {
   color: var(--gold-hi);
   border-color: var(--gold);
-  background: rgba(215, 170, 80, .12);
+  background: rgba(var(--gold-rgb), .12);
 }
 
 .route__status {

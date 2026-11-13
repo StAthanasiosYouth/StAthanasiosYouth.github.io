@@ -11,6 +11,8 @@ export const FROM_KEY = 'athanasios.account.from.v1';
 /* the icon's first letter and photo: beside the session, and gone with it */
 export const FACE_KEY = 'athanasios.account.face.v1';
 export const MODE_KEY = 'athanasios.account.mode.v1';
+/* the account's site colour (look.js reads it before the first paint): beside the session, and gone with it */
+export const LOOK_KEY = 'athanasios.account.look.v1';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const USER_ICON = 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c1-4.4 4-6 8-6s7 1.6 8 6';
@@ -51,6 +53,7 @@ export function clearSession(local, session) {
       if (store) {
         store.removeItem(SESSION_KEY);
         store.removeItem(FACE_KEY);
+        store.removeItem(LOOK_KEY);
       }
     }
     catch { /* nothing to clear */ }

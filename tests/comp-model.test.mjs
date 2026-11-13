@@ -254,7 +254,10 @@ test('stub page: the site\'s exact CSP, data-slug, escaped head, absolute OG URL
   assert.match(html, /<script type="module" src="\.\.\/\.\.\/assets\/js\/comp\/main\.js"><\/script>/);
   assert.match(html, /<link rel="stylesheet" href="\.\.\/\.\.\/assets\/css\/comp\.css">/);
   assert.match(html, /<noscript>/);
-  assert.equal((html.match(/<script/g) || []).length, 1, 'no inline script');
+  // the site colour before the first paint (site redesign W2), then the engine; no inline script
+  assert.match(html, /<script src="\.\.\/\.\.\/assets\/js\/look\.js"><\/script>/);
+  assert.equal((html.match(/<script/g) || []).length, 2, 'look.js and the engine only');
+  assert.equal((html.match(/<script(?![^>]*\ssrc=)/g) || []).length, 0, 'no inline script');
   assert.ok(!/style=/.test(html), 'no inline style');
   for (const secret of ['مين بنى الفلك', 'نوح', 'التكوين', 'شرح سري']) assert.ok(!html.includes(secret), secret);
   // no banner: the site's picture

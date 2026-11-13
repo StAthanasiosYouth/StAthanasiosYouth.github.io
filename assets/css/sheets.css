@@ -42,7 +42,7 @@ dialog.sheet::backdrop {
   border-bottom: 0;
   border-radius: 26px 26px 0 0;
   background:
-    radial-gradient(100% 40% at 50% 0%, rgba(215, 170, 80, .1), transparent 70%),
+    radial-gradient(100% 40% at 50% 0%, rgba(var(--gold-rgb), .1), transparent 70%),
     var(--navy-900);
   box-shadow: 0 -20px 60px -10px rgba(0, 0, 0, .8);
 }
@@ -459,7 +459,7 @@ dialog.viewer::backdrop {
 
 .program__stage.is-now {
   border-color: var(--gold-line-strong);
-  background: rgba(215, 170, 80, .1);
+  background: rgba(var(--gold-rgb), .1);
 }
 
 .program__stage.is-now .program__time {
@@ -473,7 +473,7 @@ dialog.viewer::backdrop {
   border-radius: 999px;
   font-size: .74rem;
   color: var(--gold-hi);
-  background: rgba(215, 170, 80, .16);
+  background: rgba(var(--gold-rgb), .16);
 }
 
 
@@ -536,7 +536,7 @@ dialog.viewer::backdrop {
 
 .note-item.is-new {
   border-color: var(--gold-line-strong);
-  background: rgba(215, 170, 80, .08);
+  background: rgba(var(--gold-rgb), .08);
 }
 
 .note-item.is-new::after {
@@ -548,7 +548,7 @@ dialog.viewer::backdrop {
   height: 9px;
   border-radius: 50%;
   background: var(--gold);
-  box-shadow: 0 0 0 3px rgba(215, 170, 80, .2);
+  box-shadow: 0 0 0 3px rgba(var(--gold-rgb), .2);
 }
 
 .note-item__icon {
@@ -578,7 +578,7 @@ dialog.viewer::backdrop {
 
 .note-item--meeting .note-item__icon {
   color: var(--gold-hi);
-  background: rgba(215, 170, 80, .16);
+  background: rgba(var(--gold-rgb), .16);
 }
 
 .note-item__text {

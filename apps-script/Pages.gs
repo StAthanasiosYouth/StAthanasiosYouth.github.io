@@ -2113,6 +2113,7 @@ var PAGE_SHELL_FALLBACK = [
   '  <link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png">',
   '  <link rel="preload" href="../assets/fonts/cairo-arabic.woff2" as="font" type="font/woff2" crossorigin>',
   '  <link rel="manifest" href="../manifest.webmanifest">',
+  '  <script src="../assets/js/look.js"></script>',
   '  <link rel="stylesheet" href="../assets/css/page.css">',
   '  <script src="../assets/js/page/collab.js"></script>',
   '  <script type="module" src="../assets/js/page/main.js"></script>',
