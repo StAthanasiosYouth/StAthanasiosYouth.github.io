@@ -20,7 +20,7 @@ import { accountSession } from './accounts.js';
 import { bookApiUrl } from '../page/book-config.js';
 import * as F from './flow.js';
 import { icon, leftText } from './view.js';
-import { remindMe } from './remind.js';
+import { remindButton } from './remind.js';
 import { listOf } from './listing.js';
 
 const ROOT = new URL('../../../', import.meta.url);
@@ -92,17 +92,8 @@ function card(c, def, result, now) {
     const d = dayOf(c.startAt);
     meta.push(h('span', { class: 'cc__chip cc__chip--soon' }, `بتبدأ ${untilText(Math.max(0, realMinutesBetween(now, c.startAt) || 0))}`));
     meta.push(h('span', { class: 'cc__chip' }, `${formatDate(d)} · ${formatTime(d.minutes)}`));
-    const bell = h('button', {
-      type: 'button', class: 'cc__go cc__go--ghost',
-      'aria-label': `فكّرني لما تبدأ ${c.title}`,
-      onclick: () => {
-        if (!remindMe({ slug: c.slug, title: c.title, startAt: c.startAt, endAt: c.endAt }, page)) return;
-        bell.textContent = 'هنفكّرك ✓';
-        bell.disabled = true;
-        announce('اتنزّل ملف التذكير، افتحه علشان يتضاف لتقويمك');
-      }
-    }, 'فكّرني');
-    meta.push(bell);
+    const [bell, note] = remindButton({ slug: c.slug, title: c.title, word: 'فكّرني', className: 'cc__go cc__go--ghost', announce });
+    meta.push(bell, note);
   }
   else {
     meta.push(h('span', { class: 'cc__chip cc__chip--done' }, 'خلصت'));

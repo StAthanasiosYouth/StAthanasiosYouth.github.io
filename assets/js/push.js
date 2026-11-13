@@ -626,3 +626,54 @@ export function invite() {
   });
 
 }
+
+/* =========================================================
+   «فكّرني لما تبدأ» (site wave 5, S4): one competition, this device
+========================================================= */
+
+const SUPPORT_TEXT = {
+  'ios-install': 'على الآيفون: ضيف الموقع للشاشة الرئيسية الأول، وافتحه من الأيقونة.',
+  'ios-safari': 'على الآيفون: افتح الموقع في Safari وضيفه للشاشة الرئيسية الأول.',
+  inapp: 'افتح الموقع في Chrome أو Safari علشان الإشعارات تشتغل.',
+  unsupported: 'المتصفح ده مبيدعمش الإشعارات.'
+};
+
+/** the competitions this device asked about (push-env's memo: no network) */
+export const remindedSlugs = () => (Array.isArray(loadMemo().reminders) ? loadMemo().reminders : []);
+
+/**
+ * on: turns notifications on first when they are off (inside the tap), then asks the Worker; off: cancels.
+ * → { ok: true, on } | { ok: false, text }
+ */
+export async function remindToggle(slug, on) {
+  if (!PUSH_CONFIG.workerUrl) return { ok: false, text: SUPPORT_TEXT.unsupported };
+  if (on) {
+    const support = pushSupport();
+    if (support !== 'ok') return { ok: false, text: SUPPORT_TEXT[support] || SUPPORT_TEXT.unsupported };
+    if (!loadMemo().token || permission() !== 'granted') await enable();
+    if (!loadMemo().token || permission() !== 'granted') return { ok: false, text: 'فعّل الإشعارات الأول علشان نقدر نفكّرك.' };
+  }
+  const token = loadMemo().token;
+  const ask = async () => {
+    const response = await fetch(PUSH_CONFIG.workerUrl + '/v1/push/remind', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, slug, on }), credentials: 'omit', cache: 'no-store'
+    });
+    return response.json();
+  };
+  try {
+    let reply = token ? await ask() : { ok: true, on: false };
+    // the server forgot this device (cleaned up): register it again, once
+    if (reply && reply.code === 'no_device' && (await server('pushSubscribe', { token, platform: platformOf() }))) reply = await ask();
+    if (!reply || !reply.ok) {
+      const text = { started: 'المسابقة بدأت خلاص، ادخل دلوقتي.', not_found: 'المسابقة دي مش متاحة.' }[reply && reply.code] || 'ما قدرناش نسجّل التذكير. جرّب تاني بعد شوية.';
+      return { ok: false, text };
+    }
+    const memo = loadMemo();
+    const list = remindedSlugs().filter(x => x !== slug);
+    saveMemo({ ...memo, reminders: reply.on ? [...list, slug].slice(-20) : list });
+    return { ok: true, on: !!reply.on };
+  }
+  catch {
+    return { ok: false, text: 'النت فاصل؟ جرّب تاني.' };
+  }
+}

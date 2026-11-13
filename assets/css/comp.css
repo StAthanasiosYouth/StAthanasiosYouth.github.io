@@ -2405,6 +2405,11 @@ html.cx body:has(.netbar:not([hidden])) .comp { padding-bottom: calc(96px + env(
 }
 @media (prefers-reduced-motion: reduce) { .cx .cx-hero .hero__icon, .cx-score .on, .cx-burst i { animation: none; } .cx-burst { display: none; } }
 .cx-remind { width: 100%; margin-top: 10px; }
+/* «فكّرني» set (a second tap cancels), and why it could not be set */
+.cx-remind.is-on { background: none; border: 1px solid var(--gold-line-strong); color: var(--gold-hi); box-shadow: none; }
+.cc__go--ghost.is-on { background: rgba(var(--gold-rgb), .14); }
+.remind-note { flex-basis: 100%; margin: 6px 0 0; font-size: .85rem; line-height: 1.7; color: var(--text-2); }
+.cc .remind-note { position: relative; z-index: 1; }
 /* desktop: the title beside the details */
 @media (min-width: 960px) {
   .cx .comp:has(> .step.intro) { width: min(100%, 1120px); max-width: none; }

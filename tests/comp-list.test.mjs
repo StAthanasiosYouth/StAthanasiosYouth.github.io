@@ -1,9 +1,8 @@
-// Site wave 5 (S4): the «المسابقات» list (/competitions/), its home shortcut, «فكّرني» (.ics) and the sitemap entry.
+// Site wave 5 (S4): the «المسابقات» list (/competitions/), its home shortcut, «فكّرني» (push) and the sitemap entry.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { listOf, hasCompetitions, RECENT_DAYS } from '../assets/js/comp/listing.js';
-import { remindIcs } from '../assets/js/comp/remind.js';
 import { loadGs } from '../tools/lib/gs.mjs';
 
 const read = p => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
@@ -32,15 +31,16 @@ test('the home shortcut shows only while the page has something', () => {
   assert.match(read('assets/js/home.js'), /hasCompetitions\(content\.competitions, nowStamp\) \? chip\('trophy', 'المسابقات', new URL\('competitions\/', ROOT\)\.href\)/);
 });
 
-test('«فكّرني»: a calendar file with the start in UTC and an alarm at the start', () => {
-  const ics = remindIcs({ slug: 'soon-a', title: 'مسابقة; تجربة, ١', startAt: '2026-11-17T18:00', endAt: '2026-11-30T23:59' }, 'https://stathanasiosyouth.github.io/competition/soon-a/', Date.UTC(2026, 10, 14));
-  assert.match(ics, /^BEGIN:VCALENDAR\r\n/);
-  assert.match(ics, /\r\nDTSTART:20261117T160000Z\r\n/, 'Cairo 18:00 in November = 16:00 UTC');
-  assert.match(ics, /\r\nDTEND:20261117T170000Z\r\n/, 'an hour long');
-  assert.match(ics, /\r\nSUMMARY:بدأت: مسابقة\\; تجربة\\, ١\r\n/, 'text escaped');
-  assert.match(ics, /\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\n[^\r]+\r\nTRIGGER:PT0M\r\nEND:VALARM\r\n/);
-  assert.match(ics, /\r\nURL:https:\/\/stathanasiosyouth\.github\.io\/competition\/soon-a\/\r\n/);
-  assert.equal(remindIcs({ slug: 'x', title: 'x', startAt: '' }, ''), null);
+test('«فكّرني»: a push to this device through the Worker (no calendar file); a second tap cancels', () => {
+  const remind = read('assets/js/comp/remind.js');
+  const push = read('assets/js/push.js');
+  assert.doesNotMatch(remind + push + read('assets/js/comp/list.js') + read('assets/js/comp/view.js'), /text\/calendar|\.ics\b|VCALENDAR/, 'owner: no .ics');
+  assert.match(push, /export async function remindToggle\(slug, on\)/);
+  assert.match(push, /'\/v1\/push\/remind'/);
+  assert.match(push, /if \(!loadMemo\(\)\.token \|\| permission\(\) !== 'granted'\) await enable\(\);/, 'notifications off: turned on in the same tap first');
+  assert.match(remind, /const ON_WORD = 'هنفكّرك ✓';/);
+  assert.match(remind, /remindToggle\(slug, !on\)/, 'the same button cancels');
+  assert.match(read('assets/js/comp/view.js'), /kind === 'scheduled' && def\.startAt && def\.slug \? remindParts\(def\) : null/);
 });
 
 test('the page: its own SEO head; the sitemap lists it only while a competition is published', () => {

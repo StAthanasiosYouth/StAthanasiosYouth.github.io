@@ -15,7 +15,7 @@ import {
   isAnswered, progress, unanswered, resultSummary, LIMITS
 } from './flow.js';
 import { realMinutesBetween } from '../schedule.js';
-import { remindMe } from './remind.js';
+import { remindButton } from './remind.js';
 
 /* ---------- small inline icons (static, trusted markup built as nodes) ---------- */
 
@@ -187,17 +187,9 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
       : h('p', { class: 'note__text' }, textValue);
   }
 
-  /* S4: «فكّرني لما تبدأ» (remind.js) */
-  function remindButton(def) {
-    const page = new URL(def.slug ? `competition/${def.slug}/` : 'competitions/', rootUrl).href;
-    const b = btn('فكّرني لما تبدأ', () => {
-      if (!remindMe({ slug: def.slug, title: def.title, startAt: def.startAt, endAt: def.endAt }, page)) return;
-      b.textContent = 'هنفكّرك ✓';
-      b.disabled = true;
-      announce('اتنزّل ملف التذكير، افتحه علشان يتضاف لتقويمك');
-    }, { kind: 'primary', class: 'btn btn--primary cx-remind' });
-    return b;
-  }
+  /* S4: «فكّرني لما تبدأ» (remind.js): a push to this device at the start; a second tap cancels */
+  const remindParts = def => remindButton({ slug: def.slug, title: def.title, word: 'فكّرني لما تبدأ', className: 'btn btn--primary cx-remind', announce });
+
 
   /* =========================================================
      SCREENS
@@ -272,7 +264,7 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
       hero(def),
       h('section', { class: 'card intro__body' },
         status,
-        kind === 'scheduled' && def.startAt ? remindButton(def) : null,
+        kind === 'scheduled' && def.startAt && def.slug ? remindParts(def) : null,
         stats(def),
         until(m, kind),
         def.description ? h('p', { class: 'intro__desc' }, def.description) : null,

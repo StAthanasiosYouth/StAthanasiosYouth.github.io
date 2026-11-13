@@ -42,6 +42,8 @@ export function toast(message) {
 
   const el = document.getElementById('toast');
 
+  if (!el) return;   // a page without the home's toast (the competition pages)
+
   el.textContent = message;
   el.classList.add('is-visible');
 
