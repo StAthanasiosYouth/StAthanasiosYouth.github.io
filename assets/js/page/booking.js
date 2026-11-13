@@ -38,12 +38,14 @@ import { accountSession, loadDraft, saveDraft, clearDraft, loadMine, rememberBoo
 import { prepareImage, UNSUPPORTED } from './image.js';
 import { createBookApi } from './book-api.js';
 import { bookApiUrl } from './book-config.js';
-import { icon } from './view.js';
+import { icon, dayWords } from './view.js';
 import { mountTurnstile } from './turnstile.js';
 
 const PROOF_ID = /^prf-[a-z2-7]{8}$/;
 
 const STEP_TITLES = { a: 'مين جاي؟', b: 'الدفع', c: 'صورة التحويل وتأكيد الطلب' };
+// S6: the steps' short names on the stepper (مين جاي · الدفع · التأكيد)
+const STEP_NAMES = { a: 'مين جاي', b: 'الدفع', c: 'التأكيد' };
 
 const SECTION_CLASS = { open: 'is-open', not_open: 'is-before', closed: 'is-closed', full: 'is-closed' };
 
@@ -212,6 +214,8 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
   function applyState(next) {
 
     live = next;
+    // the phone's booking bar (view.js dock) shows the places left
+    section.dispatchEvent(new CustomEvent('bk:live', { detail: { live: next.live, line: next.line } }));
     if (next.live === 'fallback') {
       fallback();
       return;
@@ -423,7 +427,10 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
     const body = step === 'a' ? stepWho() : step === 'b' ? stepPay() : stepSend();
 
     stepEl = h('div', { class: 'bk-flow', 'data-step': step },
-      h('p', { class: 'bk-flow__progress' }, `خطوة ${arabicDigits(at + 1)} من ${arabicDigits(steps.length)}`),
+      h('p', { class: 'bk-flow__progress visually-hidden' }, `خطوة ${arabicDigits(at + 1)} من ${arabicDigits(steps.length)}`),
+      // S6: the steps as a stepper (the words above stay for screen readers)
+      h('ol', { class: 'bk-steps', 'aria-hidden': 'true' }, steps.map((key, i) => h('li', { class: i < at ? 'is-done' : i === at ? 'is-on' : '' },
+        h('span', { class: 'bk-steps__n' }, i < at ? '✓' : arabicDigits(i + 1)), h('span', { class: 'bk-steps__t' }, STEP_NAMES[key] || '')))),
       heading,
       alertEl,
       body
@@ -958,7 +965,8 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
         h('div', { class: 'bk-plans' },
           choice('full', 'دفع كامل', money(total)),
           choice('part', 'دفع قسط', `من ${money(min)}`))),
-        details);
+        // no details box → no child at all (a null child was written as the word «null»)
+        ...(details ? [details] : []));
     }
 
     function payCard(servant, method, reply) {
@@ -1422,10 +1430,15 @@ export function mountBooking({ event, rootUrl, announce = () => {}, reduced = fa
     });
 
     const heading = h('h3', { class: 'bk-flow__title', id: 'bk-step-title', tabindex: '-1' }, 'طلبك وصل');
-    flowEl.replaceChildren(h('div', { class: 'bk-flow bk-done', 'data-step': 'done' },
+    // S6: the done screen as a ticket — the event, the day, the place, and a track (اتبعت ✓ · الخادم بيراجع · اتأكد)
+    flowEl.replaceChildren(h('div', { class: 'bk-flow bk-done bk-ticket', 'data-step': 'done' },
       heading,
-      h('p', { class: 'bk-done__ref' }, h('span', {}, 'رقم الحجز'), h('bdi', { dir: 'ltr', class: 'bk-done__code' }, reply.ref)),
+      h('p', { class: 'bk-done__ref' }, h('span', {}, 'رقم الحجز'), h('bdi', { dir: 'ltr', class: 'bk-done__code' }, reply.ref),
+        h('span', { class: 'bk-ticket__meta' }, [['الفعالية', event.shortTitle || event.title], ['الميعاد', dayWords(event.startAt)], ['المكان', event.location ? event.location.name : '']]
+          .map(([k, v]) => h('span', { class: 'bk-ticket__row' }, h('small', {}, k), h('b', {}, v))))),
       h('p', { class: 'bk-done__status' }, statusWord('pending')),
+      h('ol', { class: 'bk-track' }, [['اتبعت', 'is-done'], ['الخادم بيراجع', 'is-on'], ['اتأكد', '']]
+        .map(([word, cls]) => h('li', { class: cls }, h('i', { 'aria-hidden': 'true' }), h('span', {}, word)))),
       reply.priceChanged && Number.isInteger(reply.quotedTotal)
         ? h('p', { class: 'bk-alert', 'data-tone': 'info' }, `السعر اتغير من شوية. الإجمالي دلوقتي ${money(reply.quotedTotal)}.`)
         : null,

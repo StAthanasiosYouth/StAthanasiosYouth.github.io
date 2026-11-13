@@ -368,6 +368,8 @@ test('happy path at 360×740: state → who → servant + WhatsApp → a real JP
   await step(page, 'a');
   assert.equal(await page.evaluate(() => document.activeElement.id), 'bk-step-title');
   assert.equal(await textOf(page, '.bk-flow__progress'), 'خطوة ١ من ٣');
+  // S6: the steps as a stepper (the words stay for screen readers)
+  assert.deepEqual(await page.$$eval('.bk-steps li', els => els.map(li => [li.className, li.textContent])), [['is-on', '١مين جاي'], ['', '٢الدفع'], ['', '٣التأكيد']]);
   const key = (await storage(page))[DRAFT].requestKey;
   assert.match(key, /^web\.[a-z0-9]{22}$/, 'the requestKey is made at step a and kept in the draft');
   // gentle checks first
@@ -441,6 +443,9 @@ test('happy path at 360×740: state → who → servant + WhatsApp → a real JP
   assert.equal(await textOf(page, '.bk-done__code'), 'B-7K2QX');
   assert.equal(await textOf(page, '.bk-done__status'), 'قيد المراجعة');
   assert.match(await textOf(page, '.bk-done'), /هتوصلك رسالة من الخادم بعد التأكيد/);
+  // S6: the done screen is a ticket — the event, its day, its place; the track (sent ✓ · being checked · confirmed)
+  assert.equal((await page.$$('.bk-done.bk-ticket .bk-ticket__row')).length, 3);
+  assert.deepEqual(await page.$$eval('.bk-track li', els => els.map(li => [li.className, li.textContent])), [['is-done', 'اتبعت'], ['is-on', 'الخادم بيراجع'], ['', 'اتأكد']]);
   assert.equal(await page.$eval('#bk-link', el => el.value), `${BASE}/events/online-trip/#b/${TOKEN}`);
   assert.equal(await textOf(page, '.bk-copy'), 'انسخ الرابط');
   assert.doesNotMatch(await textOf(page, '#book'), /null|undefined/);

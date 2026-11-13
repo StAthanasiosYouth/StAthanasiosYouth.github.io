@@ -3778,3 +3778,86 @@ html[data-arrive] main > *:nth-child(n+3) { animation-delay: .12s; }
   .svc-tabs a, .svc-more__card { transition: none; }
   .svc-more__card:hover { transform: none; }
 }
+
+
+/* =========================================================
+   EVENT + BOOKING — site redesign S6 (wave 4, W7): no poster → the date is
+   the picture; «فاضل ٤ أيام», «من ٧٥ جنيه للفرد»; the facts as two tiles; the
+   phone's booking bar; the steps as a stepper; the pay card and the done
+   screen as tickets; on a wide screen the booking beside the details.
+   The event's theme colour is --accent.
+========================================================= */
+
+/* hero without a poster: the date is the picture */
+.evt .evt-media { display: grid; place-items: center; max-height: 46vh; aspect-ratio: 4 / 3.2; background: radial-gradient(70% 80% at 50% 110%, var(--accent-glow), transparent 70%), repeating-linear-gradient(135deg, rgba(255, 255, 255, .03) 0 1px, transparent 1px 16px), var(--navy-850); }
+.evt .evt-media > *:not(.evt-date) { display: none !important; }
+.evt-date { position: relative; z-index: 1; display: grid; justify-items: center; width: min(62vw, 240px); padding: 0 0 18px; border-radius: 28px; overflow: hidden; background: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .02)); border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); box-shadow: 0 30px 60px -30px #000, 0 0 60px -10px var(--accent-glow); }
+.evt-date__wd { width: 100%; padding: 10px; text-align: center; font-weight: 800; color: var(--ink, #020914); background: linear-gradient(180deg, var(--accent-hi), var(--accent)); }
+.evt-date__d { font-size: clamp(4.4rem, 22vw, 6.4rem); line-height: 1.1; font-weight: 900; color: var(--text); margin-top: 8px; }
+.evt-date__m { font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; color: var(--accent-hi); }
+.evt-left { order: -1; height: 30px; padding: 0 14px; border-radius: 999px; display: inline-flex; align-items: center; background: color-mix(in srgb, var(--accent) 22%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); color: var(--accent-hi); font-weight: 800; font-size: .86rem; }
+.evt-from { display: flex; align-items: baseline; gap: 6px; margin: 2px 0 0; color: var(--text-2); font-size: .9rem; }
+.evt-from b { font-size: 1.5rem; font-weight: 900; color: var(--text); }
+
+/* the facts as two tiles */
+.evt .facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0; border: 0; background: none; }
+.evt .facts > * { padding: 14px; border-radius: var(--radius-md, 18px); border: 1px solid var(--gold-line); background: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, .01)); margin: 0; }
+
+/* the phone's booking bar */
+.evt-dock { position: fixed; z-index: 40; inset-inline: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 12px; padding: 10px; padding-inline-start: 16px; border-radius: 22px; border: 1px solid var(--gold-line-strong); background: rgba(6, 26, 49, .9); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); box-shadow: 0 20px 40px -16px #000; transition: transform .35s cubic-bezier(.22, 1, .36, 1), opacity .25s; }
+.evt-dock.is-off { transform: translateY(140%); opacity: 0; pointer-events: none; visibility: hidden; transition: transform .35s cubic-bezier(.22, 1, .36, 1), opacity .25s, visibility 0s .35s; }
+.evt-dock__info { flex: 1; min-width: 0; }
+.evt-dock__info b { display: block; font-size: .95rem; }
+.evt-dock__info small { display: block; color: var(--text-2); font-size: .78rem; }
+.evt-dock .btn { flex: none; min-height: 48px; padding-inline: 22px; }
+@media (min-width: 900px) { .evt-dock { display: none; } }
+
+/* the stepper */
+.bk-steps { list-style: none; display: flex; margin: 4px 0 18px; padding: 0; }
+.bk-steps li { position: relative; flex: 1; display: grid; justify-items: center; gap: 6px; color: var(--text-3); font-size: .8rem; font-weight: 700; }
+.bk-steps li + li::before { content: ""; position: absolute; top: 17px; inset-inline-end: 50%; width: 100%; height: 2px; background: rgba(255, 255, 255, .12); z-index: 0; }
+.bk-steps li.is-done + li::before, .bk-steps li.is-on::before { background: linear-gradient(90deg, var(--accent), var(--accent-hi)); }
+.bk-steps__n { position: relative; z-index: 1; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--navy-850); border: 2px solid rgba(255, 255, 255, .16); font-weight: 900; }
+.bk-steps li.is-on { color: var(--text); }
+.bk-steps li.is-on .bk-steps__n { border-color: var(--accent-hi); color: var(--accent-hi); box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 22%, transparent); }
+.bk-steps li.is-done .bk-steps__n { background: var(--accent); border-color: var(--accent); color: var(--ink, #020914); }
+
+/* choices: bigger, clearer selected */
+.evt .bk-pick { border-radius: var(--radius-md, 18px); }
+.evt .bk-choices label, .evt .bk-chip { min-height: 48px; }
+
+/* the pay card as a ticket */
+.evt .bk-paycard { position: relative; border: 1px dashed color-mix(in srgb, var(--accent) 60%, transparent); background: radial-gradient(90% 60% at 50% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%), var(--navy-900); }
+.evt .bk-paycard__number { font-size: clamp(1.8rem, 8vw, 2.4rem); letter-spacing: .04em; padding: 10px; border-radius: 14px; background: rgba(2, 9, 20, .5); }
+.evt .bk-paycard__steps { counter-reset: p; list-style: none; padding: 0; display: grid; gap: 8px; }
+.evt .bk-paycard__steps li { counter-increment: p; display: flex; gap: 10px; align-items: flex-start; }
+.evt .bk-paycard__steps li::before { content: counter(p, arabic-indic); flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent-hi); font-weight: 900; font-size: .8rem; }
+
+/* done: a ticket with a track */
+.evt .bk-ticket { position: relative; padding-top: 22px; border-radius: 26px; background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 14%, transparent), transparent 40%), var(--navy-900); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+.evt .bk-done__code { font-size: clamp(2.2rem, 10vw, 3rem); letter-spacing: .06em; }
+.bk-ticket__meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0; padding: 14px 0; border-block: 1px dashed color-mix(in srgb, var(--accent) 40%, transparent); }
+.bk-ticket__row { display: block; }
+.bk-ticket__meta small { display: block; color: var(--text-3); font-size: .74rem; }
+.bk-ticket__meta b { display: block; font-size: .9rem; }
+.bk-track { list-style: none; display: flex; margin: 14px 0; padding: 0; }
+.bk-track li { position: relative; flex: 1; display: grid; justify-items: center; gap: 6px; font-size: .78rem; font-weight: 700; color: var(--text-3); text-align: center; }
+.bk-track li + li::before { content: ""; position: absolute; top: 9px; inset-inline-end: 50%; width: 100%; height: 2px; background: rgba(255, 255, 255, .14); }
+.bk-track li.is-on::before { background: linear-gradient(90deg, var(--accent), rgba(255, 255, 255, .14)); }
+.bk-track i { position: relative; z-index: 1; width: 20px; height: 20px; border-radius: 50%; background: var(--navy-850); border: 2px solid rgba(255, 255, 255, .2); }
+.bk-track li.is-done { color: var(--text); }
+.bk-track li.is-done i { background: var(--accent); border-color: var(--accent); }
+.bk-track li.is-on { color: var(--accent-hi); }
+.bk-track li.is-on i { border-color: var(--accent-hi); box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 25%, transparent); animation: bk-pulse 1.6s ease-in-out infinite; }
+@keyframes bk-pulse { 50% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--accent) 8%, transparent); } }
+@media (prefers-reduced-motion: reduce) {
+  .bk-track li.is-on i { animation: none; }
+  .evt-dock, .evt-dock.is-off { transition: none; }
+}
+
+/* a wide screen: the booking beside the details */
+@media (min-width: 1100px) {
+  .evt { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 32px; align-items: start; }
+  .evt > * { grid-column: 1; }
+  .evt > #book { grid-column: 2; grid-row: 1 / span 6; position: sticky; top: 84px; margin-top: 0; }
+}

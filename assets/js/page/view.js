@@ -75,6 +75,19 @@ export function icon(name, extra = '') {
 
 const KIND_WORDS = { trip: 'رحلة', conference: 'مؤتمر', funday: 'يوم ترفيهي' };
 
+// S6: the event's day as a picture (the date block) and on the done ticket
+export const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+export const DAYS = ['الأحد', 'الاتنين', 'التلات', 'الأربع', 'الخميس', 'الجمعة', 'السبت'];
+/** "2026-11-14T09:00" (the event's own clock) → a UTC Date of that calendar day */
+export const dayOf = value => new Date(Date.UTC(+value.slice(0, 4), +value.slice(5, 7) - 1, +value.slice(8, 10)));
+/** «السبت ١٤ نوفمبر» */
+export const dayWords = value => { const d = dayOf(value); return `${DAYS[d.getUTCDay()]} ${arabicDigits(d.getUTCDate())} ${MONTHS[d.getUTCMonth()]}`; };
+/** the lowest price above zero («من ٧٥ جنيه»), 0 when none */
+const fromPrice = booking => {
+  const prices = booking && booking.pricing ? booking.pricing.categories.map(c => c.price).filter(p => p > 0) : [];
+  return prices.length ? Math.min(...prices) : 0;
+};
+
 const sameDay = (a, b) => a.slice(0, 10) === b.slice(0, 10);
 const minutesOfDay = value => (stampToMinutes(value) ?? 0) % 1440;
 
@@ -110,7 +123,12 @@ export function createView({ main, live, rootUrl, mediaUrl, onClip }) {
     setTimeout(() => { live.textContent = message; }, 60);
   }
 
+  let spyOff = null;   // the service page's section bar (spy)
+  let dockOff = null;  // the event's phone booking bar (dock)
+
   function show(state, ...children) {
+    if (dockOff) dockOff();
+    if (spyOff) spyOff();
     main.dataset.state = state;
     main.setAttribute('aria-busy', state === 'loading' ? 'true' : 'false');
     main.replaceChildren(...children);
@@ -429,7 +447,6 @@ export function createView({ main, live, rootUrl, mediaUrl, onClip }) {
   }
 
   /* the section bar: the section at the top of the screen is «on» */
-  let spyOff = null;
   function spy(tabs) {
     if (spyOff) spyOff();
     const links = [...tabs.querySelectorAll('a')];
@@ -446,7 +463,7 @@ export function createView({ main, live, rootUrl, mediaUrl, onClip }) {
       }
     };
     addEventListener('scroll', mark, { passive: true });
-    spyOff = () => removeEventListener('scroll', mark);
+    spyOff = () => { removeEventListener('scroll', mark); spyOff = null; };
     mark();
   }
 
@@ -617,17 +634,30 @@ export function createView({ main, live, rootUrl, mediaUrl, onClip }) {
       });
     }
 
-    show('ready',
-      h('article', { class: 'evt' },
-        hero({
-          media: posterMedia(data.cover),
-          poster: true,
-          kicker: kind ? h('p', { class: 'chip chip--kind' }, kind) : null,
-          title: data.title,
-          lead: data.summary,
-          extra: jump,
-          partner: data.partner
-        }),
+    /* S6: no poster → the date is the picture (weekday · day · month); «فاضل ٤ أيام»; «من ٧٥ جنيه للفرد» */
+    const media = posterMedia(data.cover);
+    if (!data.cover) media.node = h('div', { class: 'evt-date', 'aria-hidden': 'true' },
+      h('span', { class: 'evt-date__wd' }, DAYS[dayOf(data.startAt).getUTCDay()]),
+      h('b', { class: 'evt-date__d' }, arabicDigits(dayOf(data.startAt).getUTCDate())),
+      h('span', { class: 'evt-date__m' }, MONTHS[dayOf(data.startAt).getUTCMonth()]));
+    const daysLeft = Math.ceil(((stampToMinutes(data.startAt) ?? 0) - (stampToMinutes(nowStamp) ?? 0)) / 1440);
+    const left = daysLeft > 0 ? h('p', { class: 'evt-left' }, daysLeft === 1 ? 'بكرة!' : daysLeft === 2 ? 'فاضل يومين' : `فاضل ${arabicDigits(daysLeft)} أيام`) : null;
+    const from = fromPrice(data.booking);
+    const fromLine = from ? h('p', { class: 'evt-from' }, h('span', {}, 'من'), h('b', {}, `${arabicDigits(from)} جنيه`), h('span', {}, 'للفرد')) : null;
+
+    const top = hero({
+      media,
+      poster: true,
+      kicker: kind || left ? [left, kind ? h('p', { class: 'chip chip--kind' }, kind) : null] : null,
+      title: data.title,
+      lead: data.summary,
+      extra: jump || fromLine ? [jump, fromLine] : null,
+      partner: data.partner
+    });
+    if (!data.cover) top.querySelector('.phero__media').classList.add('evt-media');
+
+    const article = h('article', { class: 'evt' },
+        top,
 
         h('section', { class: 'facts', 'aria-label': 'المعاد والمكان' },
           h('p', { class: 'fact' }, icon('clock'), h('span', {}, whenText(data.startAt, data.endAt))),
@@ -651,13 +681,47 @@ export function createView({ main, live, rootUrl, mediaUrl, onClip }) {
             paragraphs(data.terms, 'terms__p')
           )
           : null
-      )
     );
+    show('ready', article);
+    if (booking) dock(article, booking.node, data, from, reduced);
 
     return { phase: booking ? booking.phase : '' };
 
   }
 
+
+  /*
+   * S6, the phone's booking bar: «احجز الآن» with the event's short title,
+   * «من X جنيه» and the places left (the live state, booking.js «bk:live»),
+   * until the booking section is on screen (hidden ≥ 900px by the CSS).
+   */
+  function dock(article, book, data, from, reduced) {
+    if (dockOff) dockOff();
+    const small = h('small', {});
+    const paint = line => {
+      small.textContent = [from ? `من ${arabicDigits(from)} جنيه` : '', line || ''].filter(Boolean).join(' · ');
+      small.hidden = !small.textContent;
+    };
+    paint('');
+    const go = h('a', { class: 'btn btn--primary', href: '#book' }, 'احجز الآن');
+    go.addEventListener('click', e => {
+      e.preventDefault();
+      book.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
+    });
+    const bar = h('div', { class: 'evt-dock is-off' }, h('div', { class: 'evt-dock__info' }, h('b', {}, data.shortTitle || data.title), small), go);
+    // on the body: a fixed bar inside a moving ancestor would scroll with it
+    document.body.appendChild(bar);
+    let onBook = false;
+    const set = () => bar.classList.toggle('is-off', onBook || scrollY < 200);
+    const io = typeof IntersectionObserver === 'function'
+      ? new IntersectionObserver(([entry]) => { onBook = entry.isIntersecting; set(); }, { rootMargin: '0px 0px -20% 0px' })
+      : null;
+    if (io) io.observe(book);
+    const live = e => paint(e.detail && e.detail.live === 'open' ? e.detail.line : '');
+    book.addEventListener('bk:live', live);
+    addEventListener('scroll', set, { passive: true });
+    dockOff = () => { if (io) io.disconnect(); removeEventListener('scroll', set); bar.remove(); dockOff = null; };
+  }
 
   // «الكل ‹» (S2): the events, the services and the news
   const lists = createLists({ show, picture, rootUrl, homeHref, announce });
