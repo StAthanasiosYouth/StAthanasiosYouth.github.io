@@ -26,7 +26,7 @@ const CHROME = [
 
 const PHONE = { width: 360, height: 780, isMobile: true, hasTouch: true, deviceScaleFactor: 2 };
 const DESKTOP = { width: 1366, height: 900, deviceScaleFactor: 1 };
-const ENTRANCES = ['rise-depth', 'arch-in', 'logo-in', 'cross-in', 'name-in'];
+const ENTRANCES = ['rise-depth'];
 
 let server;
 let browser;
@@ -82,7 +82,8 @@ for (const [name, viewport] of Object.entries({ phone: PHONE, desktop: DESKTOP }
     const { page, problems } = await open(viewport);
 
     const areas = await page.$$eval('[data-area]', els => [...new Set(els.map(e => e.dataset.area))]);
-    assert.deepEqual(areas.slice(0, 7), ['hero', 'meeting', 'live-game', 'announcement', 'featured', 'news', 'games']);
+    // the home's arrangement (S2, home.js): Suggestions (the featured card), the greeting + the meeting, then the admin's order
+    assert.deepEqual(areas.slice(0, 9), ['s2-sugg', 'featured', 's2-side', 's2-join', 'meeting', 'live-game', 'announcement', 'news', 'games']);
 
     assert.ok(await page.$('.topic'), 'meeting topic shown');
     assert.ok(await page.$('.game--live .game__play[href^="https://"]'), 'live game is playable');
@@ -98,9 +99,11 @@ for (const [name, viewport] of Object.entries({ phone: PHONE, desktop: DESKTOP }
       .map(el => {
         const target = el.classList.contains('stretched') ? el.closest('article') : el;
         const r = target.getBoundingClientRect();
-        return { text: (el.textContent || el.getAttribute('aria-label') || '').trim().slice(0, 30), w: Math.round(r.width), h: Math.round(r.height) };
+        // the home's own controls (S2) keep the approved sizes: 30px at least (PLAN §3, the S9 audit)
+        const min = el.matches('.s2-chip, .s2-all, .s2-arrows button, .s2-sugg__dots button, .s2-join__x, .s2-join__tint') ? 30 : 44;
+        return { text: (el.textContent || el.getAttribute('aria-label') || '').trim().slice(0, 30), w: Math.round(r.width), h: Math.round(r.height), min };
       })
-      .filter(r => r.w < 44 || r.h < 44));
+      .filter(r => r.w < r.min || r.h < r.min));
     assert.deepEqual(small, [], 'touch targets under 44px');
 
     await page.setBypassCSP(true);
@@ -247,7 +250,7 @@ test('sound: on by default, woken by the first gesture; a mute is remembered', a
 });
 
 
-test('reduced motion: no particles, no rim, no intro animation', async () => {
+test('reduced motion: no particles, no rim, still slides', async () => {
 
   const context = await browser.createBrowserContext();
   const page = await context.newPage();
@@ -257,13 +260,13 @@ test('reduced motion: no particles, no rim, no intro animation', async () => {
   await page.waitForSelector('.game--live');
 
   const report = await page.evaluate(() => ({
-    dust: getComputedStyle(document.querySelector('.hero__dust')).display,
+    hero: !!document.querySelector('.hero, .hero__dust'),
     embers: getComputedStyle(document.querySelector('.game__embers')).display,
     rim: getComputedStyle(document.querySelector('.game--live'), '::before').animationName,
-    name: getComputedStyle(document.querySelector('.hero__name-lead')).animationName
+    dots: getComputedStyle(document.querySelector('.s2-sugg__dots .on i'), '::after').animationName
   }));
 
-  assert.deepEqual(report, { dust: 'none', embers: 'none', rim: 'none', name: 'none' });
+  assert.deepEqual(report, { hero: false, embers: 'none', rim: 'none', dots: 'none' });
   await page.close();
 
 });

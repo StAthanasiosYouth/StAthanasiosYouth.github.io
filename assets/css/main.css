@@ -370,7 +370,7 @@ ol {
   will-change: transform;
 }
 
-/* Coptic cross lattice, faded out below the hero */
+/* Coptic cross lattice, faded out down the page */
 .backdrop__lattice {
   position: absolute;
   inset: 0;
@@ -538,134 +538,6 @@ ol {
   color: #fff;
   background: var(--carmine);
   white-space: nowrap;
-}
-
-
-/* =========================================================
-   HERO
-========================================================= */
-
-.hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 18px 4px 10px;
-  text-align: center;
-  border: 0;
-  background: none;
-  box-shadow: none;
-}
-
-/* the logo in an arched "door" (iconostasis). Layers the intro stages:
-   light (::before), door (.hero__frame), logo, cross (::after) */
-.hero__arch {
-  --arch-r: 66px;
-  position: relative;
-  display: grid;
-  place-items: end center;
-  width: 132px;
-  height: 156px;
-  padding-bottom: 11px;
-  margin-top: 14px;
-  margin-bottom: 16px;
-}
-
-.hero__frame {
-  position: absolute;
-  inset: 0;
-  border: 1px solid var(--gold-line-strong);
-  border-radius: var(--arch-r) var(--arch-r) calc(var(--arch-r) / 3) calc(var(--arch-r) / 3);
-  background:
-    radial-gradient(circle at 50% 62%, rgba(var(--gold-rgb), .22), rgba(var(--gold-rgb), 0) 62%),
-    linear-gradient(180deg, var(--navy-800), var(--navy-950));
-  box-shadow:
-    0 0 0 6px rgba(2, 9, 20, .6),
-    0 0 0 7px var(--gold-line),
-    0 24px 50px -20px rgba(0, 0, 0, .9),
-    0 0 60px -10px rgba(var(--gold-rgb), .25);
-  pointer-events: none;
-}
-
-/* the inner hairline of the door */
-.hero__frame::before {
-  content: "";
-  position: absolute;
-  inset: 5px;
-  border: 1px solid var(--gold-line);
-  border-radius: calc(var(--arch-r) - 6px) calc(var(--arch-r) - 6px) calc(var(--arch-r) / 3 - 5px) calc(var(--arch-r) / 3 - 5px);
-}
-
-/* a warm light behind the door (the intro's bloom settles into it) */
-.hero__arch::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  top: 52%;
-  left: 50%;
-  /* never wider than the screen (a phone would zoom out to show it) */
-  width: min(290%, 92vw);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(var(--gold-hi-rgb), .38), rgba(var(--gold-rgb), .13) 32%, rgba(var(--gold-rgb), 0) 64%);
-  opacity: .45;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-
-/* small cross above the arch */
-.hero__arch::after {
-  content: "";
-  position: absolute;
-  top: -27px;
-  left: 50%;
-  width: 18px;
-  height: 18px;
-  background: var(--gold);
-  transform: translateX(-50%);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M10.2 3h3.6l-.9 8.1 8.1-.9v3.6l-8.1-.9.9 8.1h-3.6l.9-8.1-8.1.9v-3.6l8.1.9Z'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M10.2 3h3.6l-.9 8.1 8.1-.9v3.6l-8.1-.9.9 8.1h-3.6l.9-8.1-8.1.9v-3.6l8.1.9Z'/%3E%3C/svg%3E") center / contain no-repeat;
-}
-
-.hero__logo {
-  position: relative;
-  width: 112px;
-  height: 112px;
-  border-radius: 50%;
-  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .55));
-}
-
-.hero__name {
-  max-width: 22em;
-  font-family: var(--font-display);
-  font-weight: 700;
-  line-height: 1.45;
-  color: var(--gold-hi);
-}
-
-.hero__name-lead {
-  display: block;
-  font-size: clamp(2rem, 8.6vw, 2.75rem);
-  line-height: 1.3;
-  text-shadow: 0 2px 28px rgba(var(--gold-rgb), .28);
-}
-
-.hero__name-rest {
-  display: block;
-  margin-top: 4px;
-  font-size: clamp(1.15rem, 4.6vw, 1.4rem);
-  color: var(--gold-soft);
-}
-
-/* when the name is short enough to be a single block */
-.hero__name--single {
-  font-size: clamp(1.6rem, 6.6vw, 2.3rem);
-}
-
-.hero__tagline {
-  margin-top: 10px;
-  font-size: .98rem;
-  font-weight: 600;
-  color: var(--text-2);
 }
 
 
@@ -2419,10 +2291,6 @@ ol {
     grid-column: 1 / -1;
   }
 
-  .hero {
-    padding-top: 28px;
-  }
-
   .featured {
     align-self: stretch;
   }
@@ -2445,20 +2313,6 @@ ol {
   }
 
   /* the opening: row 1, placed so the lit stage can share the row */
-  [data-area="hero"] {
-    grid-row: 1;
-    grid-column: 1 / span 5;
-    align-self: start;
-  }
-
-  [data-area="hero"][data-wide] {
-    grid-column: 1 / -1;
-  }
-
-  [data-area="hero"]:not([data-wide]) + [data-area="meeting"] {
-    grid-row: 1;
-    grid-column: 6 / -1;
-  }
 
   [data-area="meeting"] {
     grid-column: span 7;
@@ -2482,20 +2336,6 @@ ol {
 
   [data-area][data-wide] {
     grid-column: 1 / -1;
-  }
-
-  .hero__arch {
-    --arch-r: 94px;
-    width: 188px;
-    height: 224px;
-    padding-bottom: 14px;
-    margin-top: 26px;
-    margin-bottom: 24px;
-  }
-
-  .hero__logo {
-    width: 164px;
-    height: 164px;
   }
 
   .featured {
@@ -2660,25 +2500,13 @@ html.has-sheet {
 
 /* ---------- top bar ---------- */
 
-/* One bar, every step between two moments, never changing height:
-   --p (0 → 1 over the first 120px): surface, hairline, buttons settling;
-   --pb (as the hero's name passes under it): logo + compact name glide in.
-   Scroll-driven where supported, else main.js sets them per frame.
-   Reduced motion: the end frames only (.is-compact). */
-
-@property --p {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0;
-}
-
-@property --pb {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0;
-}
+/* One bar, never changing height, the logo and the name always in it (the
+   big hero left the home, S2): its surface and hairline are there from the
+   top; only the buttons' discs settle into it over the first 120px
+   (scroll-driven where supported; else, and in reduced motion, still). */
 
 .topbar {
+  --p: 1;
   --bar-h: 60px;
   position: sticky;
   top: 0;
@@ -2709,7 +2537,6 @@ html.has-sheet {
     linear-gradient(180deg, rgba(9, 35, 64, .97), rgba(5, 20, 42, .95) 64%, rgba(4, 17, 39, .9));
   -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 34px), rgba(0, 0, 0, .55) calc(100% - 20px), transparent);
   mask-image: linear-gradient(180deg, #000 calc(100% - 34px), rgba(0, 0, 0, .55) calc(100% - 20px), transparent);
-  opacity: var(--p);
   pointer-events: none;
 }
 
@@ -2732,8 +2559,6 @@ html.has-sheet {
   height: 1px;
   background: linear-gradient(90deg, rgba(var(--gold-hi-rgb), 0), rgba(var(--gold-hi-rgb), .12) 22%, rgba(var(--gold-hi-rgb), .42) 50%, rgba(var(--gold-hi-rgb), .12) 78%, rgba(var(--gold-hi-rgb), 0));
   box-shadow: 0 0 12px 0 rgba(var(--gold-hi-rgb), .12);
-  opacity: var(--p);
-  transform: scaleX(var(--p));
   pointer-events: none;
 }
 
@@ -2742,8 +2567,6 @@ html.has-sheet {
   align-items: center;
   gap: 10px;
   min-width: 0;
-  opacity: var(--pb);
-  transform: translateY(calc((1 - var(--pb)) * 12px));
   pointer-events: none;
 }
 
@@ -2788,8 +2611,8 @@ html.has-sheet {
   transition: transform .45s var(--spring);
 }
 
-/* the button's own disc: floats on the hero, then settles into the bar
-   (smaller, quieter); only its opacity and scale change */
+/* the button's own disc: full at the top of the page, then settles into
+   the bar (smaller, quieter); only its opacity and scale change */
 .topbar__btn::before {
   content: "";
   position: absolute;
@@ -2854,40 +2677,12 @@ html.has-sheet {
 /* the compositor runs it where the browser can (no script per frame) */
 @supports (animation-timeline: scroll()) {
 
-  .topbar::before {
-    animation: bar-surface linear both;
-    animation-timeline: scroll(root block);
-    animation-range: 0 120px;
-  }
-
-  .topbar::after {
-    animation: bar-line linear both;
-    animation-timeline: scroll(root block);
-    animation-range: 20px 150px;
-  }
-
   .topbar__btn::before {
     animation: bar-settle linear both;
     animation-timeline: scroll(root block);
     animation-range: 0 120px;
   }
 
-  .topbar__brand {
-    animation: bar-brand linear both;
-    animation-timeline: scroll(root block);
-    animation-range: var(--brand-at, 160px) calc(var(--brand-at, 160px) + 90px);
-  }
-
-}
-
-@keyframes bar-surface {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes bar-line {
-  from { opacity: 0; transform: scaleX(0); }
-  to { opacity: 1; transform: scaleX(1); }
 }
 
 @keyframes bar-settle {
@@ -2895,31 +2690,13 @@ html.has-sheet {
   to { opacity: .55; transform: scale(.92); }
 }
 
-@keyframes bar-brand {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: none; }
-}
-
-/* reduced motion: no movement, only the two end states */
+/* reduced motion: no movement, the discs stay full */
 :root[data-motion="reduced"] .topbar {
   --p: 0;
-  --pb: 0;
 }
 
-:root[data-motion="reduced"] .topbar.is-compact {
-  --p: 1;
-  --pb: 1;
-}
-
-:root[data-motion="reduced"] .topbar::before,
-:root[data-motion="reduced"] .topbar::after,
-:root[data-motion="reduced"] .topbar__btn::before,
-:root[data-motion="reduced"] .topbar__brand {
+:root[data-motion="reduced"] .topbar__btn::before {
   animation: none !important;
-}
-
-:root[data-motion="reduced"] .topbar__brand {
-  transform: none;
 }
 
 .bell .icon {
@@ -2948,106 +2725,13 @@ html.has-sheet {
 }
 
 
-/* ---------- hero: dust + intro scene + scroll depth ---------- */
-
-.hero {
-  position: relative;
-}
-
-.hero__dust {
-  position: absolute;
-  inset: -20px -16px 0;
-  width: calc(100% + 32px);
-  height: calc(100% + 20px);
-  pointer-events: none;
-}
-
-.hero__frame {
-  animation: arch-in 1s var(--ease-out-expo) backwards;
-}
-
-.hero__arch::before {
-  animation: bloom-in 1.4s var(--ease-out) backwards;
-}
-
-.hero__logo {
-  animation: logo-in .9s var(--spring) .25s both;
-}
-
-@keyframes bloom-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(.6);
-  }
-}
-
-.hero__arch::after {
-  animation: cross-in .7s var(--spring) .7s both;
-}
-
-.hero__name-lead {
-  animation: name-in .8s var(--ease-out-expo) .4s both;
-}
-
-.hero__name-rest {
-  animation: name-in .8s var(--ease-out-expo) .52s both;
-}
-
-.hero__tagline {
-  animation: name-in .8s var(--ease-out-expo) .64s both;
-}
-
-@keyframes arch-in {
-  from {
-    clip-path: inset(100% -20px -20px -20px round var(--arch-r) var(--arch-r) 22px 22px);
-    opacity: .3;
-  }
-  to {
-    clip-path: inset(-20px round var(--arch-r) var(--arch-r) 22px 22px);
-  }
-}
-
-@keyframes logo-in {
-  from {
-    opacity: 0;
-    transform: scale(.82) translateY(10px);
-  }
-}
-
-@keyframes cross-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -12px);
-  }
-}
-
-@keyframes name-in {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-    filter: blur(6px);
-  }
-}
-
-/* the hero recedes a little as you scroll (where supported) */
+/* the lattice drifts a little as you scroll (where supported) */
 @supports (animation-timeline: scroll()) {
   @media (prefers-reduced-motion: no-preference) {
-    .hero {
-      animation: hero-depth linear both;
-      animation-timeline: scroll(root block);
-      animation-range: 0 70vh;
-    }
     .backdrop__lattice {
       animation: lattice-drift linear both;
       animation-timeline: scroll(root block);
     }
-  }
-}
-
-@keyframes hero-depth {
-  to {
-    transform: translateY(-28px) scale(.96);
-    opacity: .55;
   }
 }
 
@@ -3062,8 +2746,7 @@ html.has-sheet {
 
 .widget.is-entering {
   animation: rise-depth .9s var(--ease-out-expo) both;
-  /* --intro-wait: the first visit's intro (feel.js), else 0 */
-  animation-delay: calc(var(--intro-wait, 0ms) + 180ms + var(--i, 0) * 70ms);
+  animation-delay: calc(180ms + var(--i, 0) * 70ms);
 }
 
 @keyframes rise-depth {
@@ -3536,16 +3219,7 @@ html.has-sheet {
 
 @media (prefers-reduced-motion: reduce) {
 
-  .hero,
   .backdrop__lattice,
-  .hero__arch,
-  .hero__frame,
-  .hero__arch::before,
-  .hero__logo,
-  .hero__arch::after,
-  .hero__name-lead,
-  .hero__name-rest,
-  .hero__tagline,
   .note-item,
   .game--live::before,
   .game.is-waking,
@@ -3553,7 +3227,6 @@ html.has-sheet {
     animation: none !important;
   }
 
-  .hero__dust,
   .game__embers {
     display: none;
   }
@@ -4313,16 +3986,14 @@ img[style*="background-color"] {
 /* lite: the same page, lighter */
 :root[data-motion="lite"] .widget.is-entering {
   animation-duration: .5s;
-  animation-delay: calc(var(--intro-wait, 0ms) + var(--i, 0) * 40ms);
+  animation-delay: calc(var(--i, 0) * 40ms);
 }
 
-:root[data-motion="lite"] .hero__dust,
 :root[data-motion="lite"] .game__embers,
 :root[data-motion="lite"] .fx::before {
   display: none;
 }
 
-:root[data-motion="lite"] .hero,
 :root[data-motion="lite"] .backdrop__lattice {
   animation: none;
 }
@@ -4379,78 +4050,6 @@ img[style*="background-color"] {
       linear-gradient(rgba(13, 48, 88, .5), rgba(6, 26, 49, .26) 58%, transparent);
     -webkit-mask-image: linear-gradient(#000 calc(100% - 260px), transparent);
     mask-image: linear-gradient(#000 calc(100% - 260px), transparent);
-    pointer-events: none;
-  }
-
-  .hero {
-    padding: 18px 0 30px;
-  }
-
-  /* the great arch: the door's outline at the scale of the room */
-  .hero::after {
-    content: "";
-    position: absolute;
-    z-index: -1;
-    top: 0;
-    left: 50%;
-    width: min(100%, 392px);
-    height: 600px;
-    border: 1px solid rgba(var(--gold-hi-rgb), .1);
-    border-bottom: 0;
-    border-radius: 196px 196px 0 0;
-    background: linear-gradient(rgba(var(--gold-rgb), .045), transparent 55%);
-    translate: -50% 0;
-    -webkit-mask-image: linear-gradient(#000 30%, transparent 88%);
-    mask-image: linear-gradient(#000 30%, transparent 88%);
-    pointer-events: none;
-  }
-
-  .hero__name {
-    max-width: 13em;
-  }
-
-  .hero__name-lead {
-    font-size: 3.2rem;
-    line-height: 1.22;
-  }
-
-  .hero__name-rest {
-    margin-top: 10px;
-    font-size: 1.42rem;
-    line-height: 1.5;
-  }
-
-  .hero__tagline {
-    margin-top: 18px;
-    font-size: 1.05rem;
-  }
-
-  /* the meeting in the same light, lit from the identity's side (right) */
-  [data-area="hero"]:not([data-wide]) + .meeting:not([data-theme], [data-surface]) {
-    border-color: rgba(var(--gold-hi-rgb), .2);
-    background:
-      radial-gradient(72% 58% at 100% 6%, rgba(var(--gold-rgb), .14), transparent 64%),
-      linear-gradient(rgba(255, 255, 255, .05), rgba(255, 255, 255, .012) 52%),
-      rgba(6, 26, 49, .8);
-  }
-
-  [data-area="hero"]:not([data-wide]) + .meeting {
-    --pad: 30px;
-    margin-top: 10px;
-    box-shadow: inset 0 1px 0 rgba(var(--gold-hi-rgb), .14), 0 50px 90px -50px rgba(0, 0, 0, .95);
-  }
-
-  /* its edge catches that light, brighter on the side facing it */
-  [data-area="hero"]:not([data-wide]) + .meeting:not([data-surface])::after {
-    content: "";
-    position: absolute;
-    inset: -1px;
-    padding: 1px;
-    border-radius: inherit;
-    background: linear-gradient(255deg, rgba(var(--gold-hi-rgb), .62), rgba(var(--gold-hi-rgb), .16) 38%, transparent 72%);
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
     pointer-events: none;
   }
 
@@ -4595,226 +4194,6 @@ img[style*="background-color"] {
     grid-template-columns: minmax(0, 1fr);
   }
 
-
-}
-
-
-/* =========================================================
-   INTRO (first visit of a session; assets/js/intro.js)
-   The hero itself, staged (nothing duplicated, nothing resized):
-   0 → .9 s the light blooms, the logo comes out of the dark in the
-   middle of the screen; .4 → 1.6 the name writes itself in; 1.45 the
-   identity glides into place, the logo settles, the door draws itself;
-   the top bar and the sections rise (feel.js); done by 2.7.
-   --intro-dx/-dy: hero → screen centre (only the start is approximate).
-========================================================= */
-
-html[data-intro="play"] {
-  --intro-dx: 0px;
-  --intro-dy: max(0px, calc(40svh - 190px - env(safe-area-inset-top)));
-  --intro-s: 1.36;
-}
-
-@media (min-width: 1024px) {
-
-  html[data-intro="play"] {
-    /* the hero's column centre → the screen's centre (RTL: to the left) */
-    --intro-dx: calc(-.2917 * (min(100vw, 1120px) - 48px) - 6px);
-    --intro-dy: max(0px, calc(40vh - 248px));
-    --intro-s: 1.42;
-  }
-
-  html[data-intro="play"] .hero[data-wide] {
-    --intro-dx: 0px;
-  }
-
-}
-
-/* the identity travels over the page while it assembles; a tap goes
-   through it to the real page underneath */
-html[data-intro-state="playing"] .hero {
-  z-index: 2;
-  pointer-events: none;
-}
-
-/* the page's own scrollbar appears with the page */
-html[data-intro-state="playing"]::-webkit-scrollbar-thumb {
-  background-color: transparent;
-}
-
-html[data-intro="play"] .backdrop {
-  animation: intro-dawn 2.4s linear backwards;
-}
-
-html[data-intro="play"] .hub::before,
-html[data-intro="play"] .hero::after {
-  animation: intro-fade 1.1s var(--ease-out) 1.4s backwards;
-}
-
-html[data-intro="play"] .topbar {
-  animation: intro-fade .7s var(--ease-out) 1.95s backwards;
-}
-
-html[data-intro="play"] :is(.skeleton, .hero__dust) {
-  animation: intro-fade .8s var(--ease-out) 1.95s backwards;
-}
-
-html[data-intro="play"] :is(.hero__arch, .hero__name) {
-  animation: intro-glide .95s cubic-bezier(.68, 0, .16, 1) 1.45s backwards;
-}
-
-html[data-intro="play"] .hero__logo {
-  animation: intro-logo 2.4s linear backwards;
-}
-
-html[data-intro="play"] .hero__arch::before {
-  animation: intro-bloom 2.6s linear backwards;
-}
-
-html[data-intro="play"] .hero__frame {
-  animation: arch-in 1s var(--ease-out-expo) 1.62s backwards;
-}
-
-html[data-intro="play"] .hero__arch::after {
-  animation: cross-in .7s var(--spring) 2.05s both;
-}
-
-html[data-intro="play"] .hero__name-lead {
-  animation: intro-write 1.05s cubic-bezier(.45, 0, .2, 1) .38s backwards;
-}
-
-html[data-intro="play"] .hero__name-rest {
-  animation: intro-write .95s cubic-bezier(.45, 0, .2, 1) .7s backwards;
-}
-
-html[data-intro="play"] .hero__tagline {
-  animation: name-in .8s var(--ease-out-expo) 2s backwards;
-}
-
-@keyframes intro-dawn {
-  0% { opacity: .3; }
-  50% { opacity: .42; animation-timing-function: cubic-bezier(.4, 0, .2, 1); }
-  100% { opacity: 1; }
-}
-
-@keyframes intro-fade {
-  from { opacity: 0; }
-}
-
-@keyframes intro-glide {
-  from { translate: var(--intro-dx) var(--intro-dy); }
-}
-
-/* out of the dark, a slow push, then it settles to its real size */
-@keyframes intro-logo {
-  0% {
-    scale: var(--intro-s);
-    filter: brightness(.12) blur(4px) drop-shadow(0 6px 14px rgba(0, 0, 0, .55));
-    animation-timing-function: cubic-bezier(.3, 0, .2, 1);
-  }
-  39% {
-    scale: calc(var(--intro-s) * .985);
-    filter: brightness(1.06) blur(0) drop-shadow(0 6px 14px rgba(0, 0, 0, .55));
-  }
-  60.4% {
-    scale: calc(var(--intro-s) * .975);
-    filter: brightness(1) blur(0) drop-shadow(0 6px 14px rgba(0, 0, 0, .55));
-    animation-timing-function: cubic-bezier(.68, 0, .16, 1);
-  }
-  100% {
-    scale: 1;
-    filter: brightness(1) blur(0) drop-shadow(0 6px 14px rgba(0, 0, 0, .55));
-  }
-}
-
-@keyframes intro-bloom {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(.3); animation-timing-function: cubic-bezier(.2, .7, .3, 1); }
-  36% { opacity: 1; transform: translate(-50%, -50%) scale(.92); }
-  56% { opacity: 1; transform: translate(-50%, -50%) scale(1); animation-timing-function: cubic-bezier(.5, 0, .2, 1); }
-  100% { opacity: .45; transform: translate(-50%, -50%) scale(1); }
-}
-
-/* the name writes itself in from the right, where Arabic starts */
-@keyframes intro-write {
-  from {
-    clip-path: inset(-30% -6% -30% 100%);
-    opacity: .25;
-    filter: blur(5px);
-  }
-  to {
-    clip-path: inset(-30% -6% -30% -6%);
-    opacity: 1;
-    filter: blur(0);
-  }
-}
-
-/* =========================================================
-   DESKTOP OPENING, CENTRED: the identity stands at the upper centre of
-   the lit stage (centred, kept high, not in the middle of the screen),
-   the meeting sits under it in the same light. The intro's glide then
-   only rises (no sideways travel).
-========================================================= */
-
-@media (min-width: 1024px) {
-
-  [data-area="hero"],
-  [data-area="hero"][data-wide] {
-    grid-row: 1;
-    grid-column: 1 / -1;
-    justify-self: center;
-    width: min(100%, 720px);
-  }
-
-  [data-area="hero"] + [data-area="meeting"],
-  [data-area="hero"]:not([data-wide]) + [data-area="meeting"] {
-    grid-row: 2;
-    grid-column: 1 / -1;
-    justify-self: center;
-    width: min(100%, 880px);
-  }
-
-  .hero {
-    padding: 6px 0 8px;
-  }
-
-  /* the stage now holds both rows, its light on the identity's axis */
-  .hub::before {
-    grid-row: 1 / span 2;
-    background:
-      radial-gradient(38% 46% at 50% 24%, rgba(var(--gold-rgb), .14), transparent 72%),
-      radial-gradient(60% 56% at 50% 62%, rgba(18, 56, 95, .4), transparent 76%),
-      linear-gradient(rgba(13, 48, 88, .5), rgba(6, 26, 49, .26) 58%, transparent);
-  }
-
-  /* only when the admin's order puts the meeting right after the identity:
-     anything else keeps its own place (the same order as on a phone) */
-  .hub:not(:has(> [data-area="hero"] + [data-area="meeting"]))::before {
-    grid-row: 1;
-  }
-
-  /* the meeting is lit from above now (the identity is over it) */
-  [data-area="hero"]:not([data-wide]) + .meeting:not([data-theme], [data-surface]),
-  [data-area="hero"] + .meeting:not([data-theme], [data-surface]) {
-    background:
-      radial-gradient(70% 70% at 50% 0%, rgba(var(--gold-rgb), .13), transparent 64%),
-      linear-gradient(rgba(255, 255, 255, .05), rgba(255, 255, 255, .012) 52%),
-      rgba(6, 26, 49, .8);
-  }
-
-  [data-area="hero"]:not([data-wide]) + .meeting:not([data-surface])::after,
-  [data-area="hero"] + .meeting:not([data-surface])::after {
-    background: linear-gradient(180deg, rgba(var(--gold-hi-rgb), .55), rgba(var(--gold-hi-rgb), .14) 40%, transparent 74%);
-  }
-
-  [data-area="hero"] + .meeting {
-    margin-top: 0;
-  }
-
-  /* the intro: the identity already sits on the centre line */
-  html[data-intro="play"],
-  html[data-intro="play"] .hero[data-wide] {
-    --intro-dx: 0px;
-  }
 
 }
 
@@ -5092,3 +4471,150 @@ html[data-intro="member"]::after {
 html[data-intro="member"]::after { background: #020914; }
 html[data-intro="card"] { overflow: hidden; }
 @keyframes intro-cover-off { to { opacity: 0; visibility: hidden; } }
+
+/* =========================================================
+   HOME (site redesign S2, W4; assets/js/home.js): Suggestions + the quick links on top, the greeting and the
+   meeting beside them (desktop) or under them (phone), the rails, «الكل ‹», the people as a pair.
+   The approved layer (docs/site-redesign/final.css) moved in as it was; golds are the W1 tokens.
+========================================================= */
+
+.hub {
+  padding-top: max(10px, env(safe-area-inset-top));
+}
+
+/* every block full width on the phone; the desktop places them below */
+.hub[data-state="ready"] > * {
+  grid-column: 1 / -1 !important;
+  grid-row: auto !important;
+}
+
+.hub[data-state="ready"]::before {
+  display: none;
+}
+
+/* ---------- Suggestions ---------- */
+.s2-sugg { position: relative; min-width: 0; }
+.s2-sugg__track { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; border-radius: var(--radius-lg, 24px); }
+.s2-sugg__track::-webkit-scrollbar { display: none; }
+.s2-slide { position: relative; flex: 0 0 100%; scroll-snap-align: center; margin: 0 !important; min-width: 0; }
+.s2-slide__tag { position: absolute; z-index: 3; top: 12px; inset-inline-start: 12px; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: 999px; background: rgb(2 9 20 / .72); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border: 1px solid var(--gold-line-strong); color: var(--gold-hi); font-size: 12.5px; font-weight: 800; pointer-events: none; }
+.s2-slide__tag .icon { width: 15px; height: 15px; }
+.s2-sugg__dots { display: flex; justify-content: center; gap: 6px; margin-top: 12px; }
+.s2-sugg__dots[hidden] { display: none; }
+.s2-sugg__dots button { position: relative; width: 22px; height: 18px; padding: 0; border: 0; background: none; cursor: pointer; transition: width .3s; }
+.s2-sugg__dots button i { position: absolute; inset: 7px 0; border-radius: 4px; background: rgba(var(--gold-hi-rgb), .22); overflow: hidden; }
+.s2-sugg__dots button.on { width: 44px; }
+.s2-sugg__dots button.on i::after { content: ""; position: absolute; inset: 0; background: var(--gold-hi); transform-origin: right; animation: s2-fill 5s linear forwards; }
+@keyframes s2-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+:root[data-motion="reduced"] .s2-sugg__dots button.on i::after { animation: none; }
+.s2-chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 12px calc(-1 * max(16px, env(safe-area-inset-left))) 0; padding: 2px max(16px, env(safe-area-inset-left)); }
+.s2-chips::-webkit-scrollbar { display: none; }
+.s2-chip { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--gold-line-strong); background: rgb(8 33 61 / .72); color: var(--text); font-weight: 700; font-size: .9rem; text-decoration: none; transition: border-color .2s, background .2s; }
+.s2-chip:hover { border-color: var(--gold-hi); background: rgba(var(--gold-rgb), .1); }
+.s2-chip .icon { width: 18px; height: 18px; color: var(--gold-hi); }
+
+/* ---------- side column: account nudge / greeting + the live meeting ---------- */
+.s2-side { display: grid; gap: var(--gap); align-content: start; min-width: 0; }
+.s2-join { display: flex; align-items: center; gap: 14px; padding: 14px 16px !important; background: linear-gradient(90deg, rgba(var(--gold-rgb), .14), rgb(8 33 61 / .5) 65%) !important; border-color: var(--gold-line-strong) !important; }
+.s2-join > div { flex: 1; min-width: 0; }
+.s2-join b { display: block; font-size: 1rem; } .s2-join small { display: block; color: var(--text-2); font-size: .8rem; line-height: 1.6; }
+.s2-join__ic, .s2-join__av { flex: none; width: 46px; height: 46px; border-radius: 15px; display: grid; place-items: center; background: linear-gradient(135deg, var(--gold-hi), var(--gold)); color: var(--gold-ink); font-weight: 900; font-size: 20px; }
+.s2-join__ic .icon, .s2-join__av .icon { width: 22px; height: 22px; }
+.s2-join__av { overflow: hidden; }
+.s2-join__av img { width: 100%; height: 100%; object-fit: cover; }
+.s2-join .btn { flex: none; }
+.s2-join__x { flex: none; width: 30px; height: 30px; margin-inline-start: -6px; border: 0; border-radius: 50%; background: none; color: var(--text-3); font-size: 20px; cursor: pointer; }
+/* the member's entry to «لون الموقع» (the sheet: tint.js + tint.css, loaded on the press) */
+.s2-join__tint { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--gold-line-strong); background: rgb(2 9 20 / .35); color: var(--gold-hi); font: 800 .8rem var(--font-body, Cairo), sans-serif; cursor: pointer; }
+.s2-join__tint i { width: 16px; height: 16px; border-radius: 50%; background: conic-gradient(rgb(var(--gold-d8ab51-rgb)), #4cc3cb, #4fca8c, #e8789f, #ef8a4c, #9a95ee, rgb(var(--gold-d8ab51-rgb))); }
+
+/* ---------- section heads: the live title + «الكل ‹» (+ arrows on the desktop) ---------- */
+.s2-head { display: flex; align-items: center; gap: 10px; }
+.s2-head .widget__title { margin: 0; display: flex; align-items: center; gap: 8px; }
+.s2-head .widget__title .icon { color: var(--gold-hi); }
+.s2-all { margin-inline-start: auto; display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--gold-line-strong); color: var(--gold-hi); font-weight: 800; font-size: .86rem; text-decoration: none; white-space: nowrap; }
+.s2-all:hover { background: rgba(var(--gold-rgb), .1); }
+.s2-arrows { display: none; gap: 6px; }
+.s2-arrows button { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--gold-line-strong); background: rgb(8 33 61 / .7); color: var(--gold-soft); display: grid; place-items: center; cursor: pointer; }
+.s2-arrows button .icon { width: 18px; height: 18px; }
+.s2-arrows [data-dir="1"] .icon { transform: rotate(-90deg); } .s2-arrows [data-dir="-1"] .icon { transform: rotate(90deg); }
+.items--services .s2-head .widget__title { margin: 0; }
+
+/* ---------- rails ---------- */
+.s2-rail { display: flex !important; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; margin: 14px -4px 0 !important; padding: 2px 4px 6px !important; }
+.s2-rail::-webkit-scrollbar { display: none; }
+.s2-rail > * { flex: none; scroll-snap-align: start; }
+.s2-rail--sv > li { width: 86%; }
+
+.s2-ev { position: relative; width: min(72vw, 270px); aspect-ratio: 4 / 5; border-radius: 20px; overflow: hidden; border: 1px solid var(--gold-line-strong); display: flex; align-items: flex-end; background: var(--navy-850); color: var(--text); text-decoration: none; transition: transform .35s var(--ease-out, ease), border-color .2s; }
+.s2-ev:hover { transform: translateY(-3px); border-color: var(--gold-hi); }
+.s2-ev img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.s2-ev::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, rgb(2 9 20 / .96), rgb(2 9 20 / .25) 58%, transparent); }
+.s2-ev__body { position: relative; z-index: 1; padding: 14px; }
+.s2-ev__date { display: inline-flex; flex-direction: column; align-items: center; padding: 5px 10px; margin-bottom: 8px; border-radius: 13px; background: rgba(var(--gold-rgb), .18); border: 1px solid var(--gold-line-strong); color: var(--gold-hi); font-weight: 800; line-height: 1.15; }
+.s2-ev__date b { font-size: 1.2rem; } .s2-ev__date small { font-size: .7rem; }
+.s2-ev h3 { margin: 0; font-size: 1.05rem; line-height: 1.4; }
+.s2-ev p { margin: 2px 0 0; font-size: .8rem; color: var(--text-2); }
+.s2-ev__tag { display: inline-flex; align-items: center; margin-top: 8px; height: 24px; padding: 0 10px; border-radius: 999px; background: var(--gold-hi); color: var(--gold-ink); font-size: .72rem; font-weight: 800; }
+
+.s2-nw { position: relative; width: min(78vw, 320px); display: flex; gap: 12px; padding: 14px 14px 38px; border-radius: 18px; border: 1px solid var(--gold-line); background: rgb(8 33 61 / .55); color: var(--text); text-decoration: none; }
+.s2-nw:hover { border-color: var(--gold-line-strong); }
+.s2-nw__ic { flex: none; width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: rgba(var(--gold-rgb), .14); color: var(--gold-hi); }
+.s2-nw b { display: block; font-size: .95rem; line-height: 1.5; } .s2-nw small { display: block; margin-top: 2px; color: var(--text-3); font-size: .76rem; }
+.s2-nw__new { position: absolute; top: 10px; inset-inline-end: 12px; height: 20px; padding: 0 8px; border-radius: 999px; background: #ff5c5c; color: #fff; font-size: .66rem; font-weight: 800; display: inline-flex; align-items: center; }
+
+/* ---------- the two people cards: stacked on the phone, a pair on wider screens ---------- */
+.s2-people { display: grid; gap: var(--gap); min-width: 0; }
+
+/* ---------- tablet ---------- */
+@media (min-width: 640px) {
+  .s2-people { grid-template-columns: 1fr 1fr; align-items: start; }
+  .s2-rail--sv > li { width: calc((100% - 12px) / 2); }
+  .s2-chips { margin-inline: 0; padding-inline: 0; flex-wrap: wrap; overflow: visible; }
+}
+
+/* ---------- desktop: Suggestions + the meeting on top, rails fill the width ---------- */
+@media (min-width: 1024px) {
+  .hub[data-state="ready"] > .s2-sugg { grid-column: 1 / span 7 !important; grid-row: 1 !important; }
+  .hub[data-state="ready"] > .s2-side { grid-column: 8 / -1 !important; grid-row: 1 !important; }
+  .s2-arrows { display: flex; }
+  .s2-rail { display: grid !important; grid-auto-flow: column; }
+  .s2-rail--nw { grid-auto-columns: calc((100% - 2 * 12px) / 3); }
+  .s2-rail > *, .s2-rail--sv > li { width: auto; }
+  .s2-nw { width: auto; }
+  .s2-chips { flex-wrap: nowrap; }
+  .s2-chip { justify-content: center; }
+}
+
+/* fixes after the first look */
+@media (max-width: 639px) {
+  .s2-join { flex-wrap: wrap; row-gap: 12px; }
+  .s2-join > div { flex: 1 1 calc(100% - 100px); }
+  .s2-join .btn { flex: 1 1 auto; order: 3; }
+  .s2-join__x { position: absolute; top: 8px; inset-inline-end: 8px; margin: 0; }
+  .s2-join { position: relative; padding-inline-end: 40px !important; }
+}
+.s2-chip { white-space: nowrap; }
+@media (min-width: 1024px) {
+  .s2-chip { flex: 1 1 auto; font-size: .84rem; padding: 0 12px; gap: 6px; }
+  .s2-chip .icon { width: 16px; height: 16px; }
+  .s2-rail--ev { grid-auto-columns: calc((100% - 2 * 12px) / 3); }
+}
+/* desktop review: the pair side by side, posters shown whole, services fill the row */
+.s2-people > * { grid-column: auto !important; margin: 0 !important; }
+/* desktop: the two people stay a matched pair of equal height (polish A) */
+@media (min-width: 1024px) { .s2-people { align-items: stretch; } }
+.s2-rail--sv > li { max-width: none; } .s2-rail--sv > li > .item-card { height: 100%; }
+@media (min-width: 1024px) {
+  .s2-ev { width: auto; aspect-ratio: 4 / 5; }
+  .s2-rail.s2-rail--sv { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; grid-auto-flow: row; overflow: visible; }
+}
+@media (max-width: 1023px) { .s2-rail.s2-rail--sv { grid-template-columns: none !important; } }
+/* S9 audit: the slide dots are real tap targets (32 px tall), the bar stays thin */
+.s2-sugg__dots { gap: 2px; margin-top: 4px; }
+.s2-sugg__dots button { height: 32px; min-width: 32px; }
+.s2-sugg__dots button i { inset: 14px 5px; }
+.s2-sugg__dots button.on { width: 54px; }
+.s2-all:focus-visible, .s2-arrows button:focus-visible, .s2-sugg__dots button:focus-visible, .s2-join__x:focus-visible, .s2-join__tint:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 2px; }
+/* inside a scrolling track the ring is drawn inside the card (the track would clip it outside) */
+.s2-chip:focus-visible, .s2-ev:focus-visible, .s2-nw:focus-visible, .s2-slide:has(.stretched:focus-visible), .s2-rail--sv .item-card:has(.stretched:focus-visible) { outline: 2px solid var(--gold-hi); outline-offset: -2px; }

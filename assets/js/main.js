@@ -16,7 +16,6 @@ import { itemSheetContent, typeOf, visibleItems } from './items.js';
 import { isSectionLive, liveSections } from './layout.js';
 import { openExperience, prepareExperience, hasScene } from './xp.js';
 import { iconNode } from './icons.js';
-import { particles } from './motion.js';
 import { startFeel } from './feel.js';
 import { play, soundEnabled, setSoundEnabled } from './sound.js';
 import { accountBadge } from './account/link.js';
@@ -245,7 +244,6 @@ function setupTopbar() {
   const bell = document.getElementById('bell');
   const sound = document.getElementById('sound-toggle');
   const bar = document.getElementById('topbar');
-  const hero = document.querySelector('.hero');
 
   bell.addEventListener('click', () => {
     if (current) go('notifications');
@@ -270,12 +268,10 @@ function setupTopbar() {
   accountBadge(bar.querySelector('.topbar__actions'), new URL('../../', import.meta.url), { cls: 'topbar__btn', before: sound });
   mountNav();
 
-  scrollBar(bar, hero.querySelector('.hero__name'));
-
   // a soft tap sound on buttons and cards (only when enabled)
   document.addEventListener('click', event => {
     if (event.target.closest('#sound-toggle, .sheet__close')) return;
-    if (event.target.closest('button, a.btn, .tile, .row-link, .note-item, .news-card, .news-lead')) play('tap');
+    if (event.target.closest('button, a.btn, .tile, .row-link, .note-item, .news-card, .news-lead, .s2-ev, .s2-nw, .s2-chip, .s2-all')) play('tap');
   });
 
   // a social link: its scene starts loading as the finger lands (or the mouse arrives)
@@ -294,69 +290,6 @@ function setupTopbar() {
     for (const type of ['pointerdown', 'keydown']) document.removeEventListener(type, warm, true);
   };
   for (const type of ['pointerdown', 'keydown']) document.addEventListener(type, warm, { capture: true, passive: true });
-
-  particles(hero.querySelector('.hero__dust'), 'dust');
-
-}
-
-
-/*
- * The bar follows the scroll continuously (main.css, "top bar"):
- * --brand-at = how far the page scrolls before the hero's name passes under
- * the bar (the compact name glides in from there). Browsers without
- * scroll-driven animations get --p / --pb from here, once per frame.
- * .is-compact (the reduced-motion end state) flips when the name is gone.
- */
-function scrollBar(bar, name) {
-
-  const RANGE = 120;
-  const BRAND = 90;
-  const native = typeof CSS !== 'undefined' && CSS.supports('animation-timeline: scroll()');
-  let brandAt = 160;
-  let pending = false;
-
-  const measure = () => {
-    // layout position (offsets ignore the hero's own scroll transform)
-    let top = name.offsetHeight;
-    for (let el = name; el; el = el.offsetParent) top += el.offsetTop;
-    brandAt = Math.max(24, Math.round(top - bar.offsetHeight - 28));
-    bar.style.setProperty('--brand-at', `${brandAt}px`);
-  };
-
-  const clamp = v => Math.min(1, Math.max(0, v));
-
-  const paint = () => {
-    pending = false;
-    if (document.documentElement.dataset.motion === 'reduced') {
-      bar.style.removeProperty('--p');
-      bar.style.removeProperty('--pb');
-      return;
-    }
-    const y = scrollY;
-    bar.style.setProperty('--p', clamp(y / RANGE).toFixed(3));
-    bar.style.setProperty('--pb', clamp((y - brandAt) / BRAND).toFixed(3));
-  };
-
-  const schedule = () => {
-    if (!pending) {
-      pending = true;
-      requestAnimationFrame(paint);
-    }
-  };
-
-  // again whenever the page above the fold reflows (fonts, the rendered
-  // widgets next to the hero on desktop, a rotated phone)
-  measure();
-  new ResizeObserver(() => { measure(); if (!native) schedule(); }).observe(document.getElementById('main'));
-
-  if (!native) {
-    addEventListener('scroll', schedule, { passive: true });
-    schedule();
-  }
-
-  new IntersectionObserver(entries => {
-    bar.classList.toggle('is-compact', !entries[0].isIntersecting);
-  }, { rootMargin: `-${bar.offsetHeight + 4}px 0px 0px 0px` }).observe(name);
 
 }
 

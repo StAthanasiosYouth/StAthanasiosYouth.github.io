@@ -39,10 +39,6 @@
 }
 @media (prefers-reduced-motion: reduce) { .tint-sheet__box, .tint-sheet__scrim, .tint-opt { transition: none; } }
 
-/* the welcome card's entry to the sheet (the card itself comes with the home, W4) */
-.s2-join__tint { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--gold-line-strong); background: rgb(2 9 20 / .35); color: var(--gold-hi); font: 800 .8rem var(--font-body, Cairo), sans-serif; cursor: pointer; }
-.s2-join__tint i { width: 16px; height: 16px; border-radius: 50%; background: conic-gradient(rgb(var(--gold-d8ab51-rgb)), #4cc3cb, #4fca8c, #e8789f, #ef8a4c, #9a95ee, rgb(var(--gold-d8ab51-rgb))); }
-
 /* the sheet's message when the colour could not be kept */
 .tint-msg { margin: 12px 2px 0; color: #ffb4a8; font-size: .86rem; line-height: 1.6; }
 .tint-msg[hidden] { display: none; }

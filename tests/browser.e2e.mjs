@@ -105,15 +105,15 @@ for (const [name, viewport] of Object.entries(VIEWPORTS)) {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     assert.ok(overflow <= 0, `horizontal overflow ${overflow}px`);
 
-    // the agreed content order on the page
+    // the agreed content order on the page (S2: Suggestions, the greeting + the meeting, then the admin's order)
     const order = await page.$$eval('[data-area]', els => els.map(e => e.dataset.area));
     assert.deepEqual(order.filter((a, i) => order.indexOf(a) === i),
-      ['hero', 'meeting', 'featured', 'location', 'section', 'contacts', 'support', 'share', 'footer']);
+      ['s2-sugg', 'featured', 's2-side', 's2-join', 'meeting', 'items', 'location', 'section', 's2-people', 'contacts', 'support', 'share', 'footer']);
 
     // measure after the entrance animations (cards start slightly scaled down)
     await page.waitForFunction(names => document.getAnimations()
       .filter(a => names.includes(a.animationName))
-      .every(a => a.playState !== 'running'), { timeout: 8000 }, ['rise-depth', 'arch-in', 'logo-in', 'cross-in', 'name-in']);
+      .every(a => a.playState !== 'running'), { timeout: 8000 }, ['rise-depth']);
 
     // touch targets: every link/button at least 44x44 (stretched card link counts as its card)
     const small = await page.$$eval('a[href], button', els => els
@@ -121,10 +121,12 @@ for (const [name, viewport] of Object.entries(VIEWPORTS)) {
       .map(el => {
         const target = el.classList.contains('stretched') ? el.closest('.widget') : el;
         const r = target.getBoundingClientRect();
-        return { text: (el.textContent || el.getAttribute('aria-label') || '').trim().slice(0, 30), w: Math.round(r.width), h: Math.round(r.height) };
+        // the home's own controls (S2) keep the approved sizes: 30px at least (PLAN §3, the S9 audit)
+        const min = el.matches('.s2-chip, .s2-all, .s2-arrows button, .s2-sugg__dots button, .s2-join__x, .s2-join__tint') ? 30 : 44;
+        return { text: (el.textContent || el.getAttribute('aria-label') || '').trim().slice(0, 30), w: Math.round(r.width), h: Math.round(r.height), min };
       })
-      .filter(r => r.w < 44 || r.h < 44));
-    assert.deepEqual(small, [], 'touch targets under 44px');
+      .filter(r => r.w < r.min || r.h < r.min));
+    assert.deepEqual(small, [], 'touch targets under 44px (30px for the S2 controls)');
 
     // external links open safely
     const unsafe = await page.$$eval('a[target="_blank"]', els => els.filter(a => !/\bnoopener\b/.test(a.rel)).map(a => a.href));

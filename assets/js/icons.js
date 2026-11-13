@@ -184,6 +184,10 @@ const LINE_ICONS = {
   chevron:
     '<path d="m6 9 6 6 6-6"/>',
 
+  // the home's account nudge (S2)
+  user:
+    '<circle class="duo" cx="12" cy="8" r="4"/><path d="M4 20.5c1.2-4 4.4-6 8-6s6.8 2 8 6"/>',
+
   retry:
     '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/>'
 };

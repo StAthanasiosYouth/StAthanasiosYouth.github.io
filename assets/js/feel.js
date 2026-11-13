@@ -16,7 +16,7 @@ const html = document.documentElement;
 const reducedQuery = matchMedia('(prefers-reduced-motion: reduce)');
 const finePointer = matchMedia('(hover: hover) and (pointer: fine)');
 
-const CARDS = '.tile, .featured, .item-card, .news-card, .news-lead, .game, .topic, .row-link';
+const CARDS = '.tile, .featured, .item-card, .news-card, .news-lead, .game, .topic, .row-link, .s2-ev, .s2-nw';
 const PRESSABLE = `${CARDS}, .btn, .note-item, .share-row .btn, .topbar__btn`;
 
 let slowFrames = 0;
@@ -183,18 +183,6 @@ function reveal(widget) {
 
 }
 
-/* while the intro plays: how long until the sections rise (the identity
-   leads; they rise as it lands, never under it on its way) */
-const INTRO_ASSEMBLE = 1950;
-
-function introWait() {
-
-  if (html.dataset.introState !== 'playing') return 0;
-
-  return Math.max(0, Math.round(Number(html.dataset.introAt || 0) + INTRO_ASSEMBLE - performance.now()));
-
-}
-
 /**
  * Called after the page's widgets are in the DOM. Widgets on screen enter
  * with a stagger; the rest wait until they scroll in. Reduced / lite:
@@ -209,7 +197,6 @@ export function choreograph(widgets) {
   }
 
   const fold = innerHeight * 0.92;
-  const wait = introWait();
   let index = 0;
 
   for (const widget of widgets) {
@@ -217,8 +204,6 @@ export function choreograph(widgets) {
     if (top < fold) {
       widget.classList.add('is-entering', 'is-new');
       widget.style.setProperty('--i', String(index++));
-      // the first visit's intro (intro.js): they rise as the page assembles
-      widget.style.setProperty('--intro-wait', `${wait}ms`);
       widget.addEventListener('animationend', event => {
         if (event.target === widget) widget.classList.remove('is-entering');
       });

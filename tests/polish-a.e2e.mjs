@@ -146,7 +146,7 @@ const scaleX = matrix => (matrix === 'none' ? 1 : Number(matrix.match(/matrix\((
 
 for (const [name, viewport] of Object.entries({ phone: PHONE, desktop: DESKTOP })) {
 
-  test(`${name}: the top bar changes continuously, with no layout shift`, async () => {
+  test(`${name}: the top bar keeps the logo and the name, and never moves the page`, async () => {
 
     const { page, problems, close } = await open({ viewport });
 
@@ -160,48 +160,40 @@ for (const [name, viewport] of Object.entries({ phone: PHONE, desktop: DESKTOP }
     const mainTop = () => page.evaluate(() => Math.round(document.getElementById('main').getBoundingClientRect().top + scrollY));
     const mainBefore = await mainTop();
 
+    // the big hero left the home (S2): the bar is the identity, whole, from the very top
     const top = await barState(page);
-    assert.ok(top.surface < 0.05, `no surface at the very top (${top.surface})`);
-    assert.ok(top.brand < 0.05, `no compact name at the top (${top.brand})`);
-    assert.ok(scaleX(top.line) < 0.05, 'the hairline is not drawn yet');
+    assert.ok(top.surface > 0.95, `the surface is there at the top (${top.surface})`);
+    assert.ok(top.brand > 0.95, `the logo and the name at the top (${top.brand})`);
+    assert.ok(scaleX(top.line) > 0.95, 'the hairline is drawn');
     // full-bleed: the whole layout width (refine A keeps a stable scrollbar
     // gutter on mouse screens, so that is the viewport minus the gutter)
     assert.equal(top.width, await page.evaluate(() => Math.round(document.body.getBoundingClientRect().width)), 'full-bleed');
 
-    // part way: in between (continuous, not a switch)
-    await scrollTo(page, 60);
-    const mid = await barState(page);
-    assert.ok(mid.surface > 0.2 && mid.surface < 0.8, `half a surface at 60px (${mid.surface})`);
-
     await scrollTo(page, 900);
     const scrolled = await barState(page);
-    assert.ok(scrolled.surface > 0.95, `the surface is there (${scrolled.surface})`);
-    assert.ok(scrolled.brand > 0.95, `the compact name is there (${scrolled.brand})`);
-    assert.ok(scaleX(scrolled.line) > 0.95, 'the hairline is drawn');
+    assert.ok(scrolled.surface > 0.95 && scrolled.brand > 0.95);
     assert.equal(scrolled.top, 0, 'sticky at the top');
     assert.equal(scrolled.height, top.height, 'the bar never changes height');
-    assert.equal(await page.$eval('#topbar', bar => bar.classList.contains('is-compact')), true);
 
     // the page under it did not move, nothing shifted
     assert.equal(await mainTop(), mainBefore);
     assert.ok(await page.evaluate(() => window.__shift) < 0.001, `layout shift ${await page.evaluate(() => window.__shift)}`);
 
-    // the bar's content lines up with the page's widgets
+    // the bar's content lines up with the page's widgets (their outer edges)
     const edges = await page.evaluate(() => {
       const inner = document.querySelector('.topbar__inner').getBoundingClientRect();
       const brand = document.querySelector('.topbar__brand img').getBoundingClientRect();
       const bell = document.getElementById('bell').getBoundingClientRect();
-      // a widget that spans the whole page width
-      const widget = document.querySelector('#main > [data-wide]:not([data-area="hero"])').getBoundingClientRect();
-      return { brandRight: Math.round(brand.right), bellLeft: Math.round(bell.left), widgetRight: Math.round(widget.right), widgetLeft: Math.round(widget.left), inner: Math.round(inner.width) };
+      const boxes = [...document.querySelectorAll('#main > :is(.widget, .s2-sugg, .s2-side, .s2-people)')].map(n => n.getBoundingClientRect()).filter(r => r.width);
+      return { brandRight: Math.round(brand.right), bellLeft: Math.round(bell.left), widgetRight: Math.round(Math.max(...boxes.map(r => r.right))), widgetLeft: Math.round(Math.min(...boxes.map(r => r.left))), inner: Math.round(inner.width) };
     });
     assert.ok(Math.abs(edges.brandRight - edges.widgetRight) <= 2, `logo aligned with the widgets (${edges.brandRight} / ${edges.widgetRight})`);
     assert.ok(Math.abs(edges.bellLeft - edges.widgetLeft) <= 2, `buttons aligned with the widgets (${edges.bellLeft} / ${edges.widgetLeft})`);
 
-    // back to the top: the end state again
+    // back to the top: still whole
     await scrollTo(page, 0, 300);
     const back = await barState(page);
-    assert.ok(back.surface < 0.05 && back.brand < 0.05);
+    assert.ok(back.surface > 0.95 && back.brand > 0.95);
 
     assert.deepEqual(problems, []);
     await close();
@@ -246,7 +238,7 @@ test('top bar: dialogs sit above it; the bell and the sound button still work', 
 
 });
 
-test('top bar without scroll-driven animations: the script drives it', async () => {
+test('top bar without scroll-driven animations: the logo and the name are there, no script per frame', async () => {
 
   const { page, problems, close } = await open({
     before: () => {
@@ -256,11 +248,9 @@ test('top bar without scroll-driven animations: the script drives it', async () 
   });
 
   await scrollTo(page, 40);
-  const mid = await page.$eval('#topbar', bar => Number(bar.style.getPropertyValue('--p')));
-  assert.ok(mid > 0.2 && mid < 0.5, `--p follows the scroll (${mid})`);
-  await scrollTo(page, 900);
-  const end = await page.$eval('#topbar', bar => ({ p: bar.style.getPropertyValue('--p'), pb: bar.style.getPropertyValue('--pb') }));
-  assert.deepEqual(end, { p: '1.000', pb: '1.000' });
+  const state = await barState(page);
+  assert.ok(state.brand > 0.95 && state.surface > 0.95, JSON.stringify(state));
+  assert.equal(await page.$eval('#topbar', bar => bar.getAttribute('style')), null, 'nothing set per frame');
 
   assert.deepEqual(problems, []);
   await close();
@@ -561,7 +551,8 @@ test('meeting sheet: the poster is the hero, then the topic in order', async () 
 
 /* ---------------- section banners ---------------- */
 
-const bannerCounts = page => page.evaluate(() => [...document.querySelectorAll('#main > [data-area]')]
+// every widget: the page's own, and those the home places in its Suggestions, side column and pair (S2)
+const bannerCounts = page => page.evaluate(() => [...document.querySelectorAll('#main > [data-area]:not(.s2-sugg, .s2-side, .s2-people), .s2-sugg__track > [data-area], .s2-side > [data-area], .s2-people > [data-area]')]
   .map(el => ({ area: el.dataset.area, banners: el.querySelectorAll(':scope > .section-banner').length })));
 
 test('demo --banners: every section shows its banner exactly once; pairs stay balanced', async () => {
@@ -626,6 +617,8 @@ for (const tier of ['reduced', 'lite']) {
     for (let y = 0; y <= height; y += 400) { await page.evaluate(top => window.scrollTo(0, top), y); await wait(80); }
     await showContacts(page);
     await wait(tier === 'lite' ? 3200 : 400);
+    // the push hint's bell pulses three times and stops on its own (push.css): let it finish
+    await page.waitForFunction(() => !document.getAnimations().some(a => a.animationName === 'bell-halo' && a.playState === 'running'), { timeout: 12000 });
 
     const report = await page.evaluate(() => {
       const ours = '#topbar, .person-card, .media-hero';

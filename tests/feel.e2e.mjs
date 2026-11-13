@@ -124,7 +124,7 @@ test('touch: one tap opens, the ripple is decoration only and cleans up', async 
   // a plain button on the page: the first tap still does its job
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('dialog.sheet'));
-  const details = await page.$('.news-lead');
+  const details = await page.$('.s2-nw');
   await details.scrollIntoView();
   await wait(1200);
   await details.tap();
@@ -139,7 +139,7 @@ test('desktop: the light follows the pointer, posters drift, clicks still land',
 
   const { page, problems, close } = await open({ viewport: DESKTOP });
 
-  const card = await page.$('.news-lead');
+  const card = await page.$('.s2-nw');
   await card.scrollIntoView();
   await wait(1300);
   const box = await card.boundingBox();
@@ -148,7 +148,7 @@ test('desktop: the light follows the pointer, posters drift, clicks still land',
   await wait(100);
 
   const lit = await page.evaluate(() => {
-    const c = document.querySelector('.news-lead');
+    const c = document.querySelector('.s2-nw');
     return { lit: c.classList.contains('is-lit'), mx: c.style.getPropertyValue('--mx'), px: c.style.getPropertyValue('--px') };
   });
   assert.equal(lit.lit, true);
@@ -192,9 +192,10 @@ test('a weak phone gets the lite tier: no waiting, no dust, still one-tap', asyn
   const state = await page.evaluate(() => ({
     tier: document.documentElement.dataset.motion,
     waiting: document.querySelectorAll('.will-reveal').length,
-    dust: getComputedStyle(document.querySelector('.hero__dust')).display
+    // the dust lived in the big hero, which left the home (S2): none anywhere
+    dust: !!document.querySelector('.hero__dust')
   }));
-  assert.deepEqual(state, { tier: 'lite', waiting: 0, dust: 'none' });
+  assert.deepEqual(state, { tier: 'lite', waiting: 0, dust: false });
   assert.deepEqual(await hiddenWidgets(page).then(list => list.filter(c => !/is-entering/.test(c))), []);
 
   const tile = await page.$('[data-experience="tiktok"]');

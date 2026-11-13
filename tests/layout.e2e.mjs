@@ -93,10 +93,15 @@ const THURSDAY_NOON = '2026-10-08T09:00:00Z';
 
 
 test('the default page: every section in its usual order', async () => {
-  const { areas, problems, close } = await open(publish(), THURSDAY_NOON);
-  assert.deepEqual(areas.filter(a => a !== 'section'), ['hero', 'meeting', 'banner', 'featured', 'news', 'location', 'contacts', 'support', 'share', 'footer'].filter(a => areas.includes(a)));
-  assert.ok(areas.indexOf('meeting') < areas.indexOf('section'));
-  assert.ok(areas.indexOf('section') < areas.indexOf('contacts'));
+  const { page, areas, problems, close } = await open(publish(), THURSDAY_NOON);
+  // the home's arrangement (S2, home.js): Suggestions, then the greeting + the meeting, then the admin's order;
+  // the two people as a pair
+  assert.deepEqual(areas.filter(a => a !== 'section'), ['s2-sugg', 's2-side', 'banner', 'news', 'location', 's2-people', 'share', 'footer'].filter(a => areas.includes(a)));
+  assert.ok(await page.$('[data-area="s2-side"] > [data-area="meeting"]'), 'the meeting beside Suggestions');
+  assert.ok(await page.$('[data-area="s2-sugg"] [data-area="featured"]'), 'the featured card is a slide');
+  assert.deepEqual(await page.$$eval('[data-area="s2-people"] > [data-area]', n => n.map(x => x.dataset.area)), ['contacts', 'support']);
+  assert.ok(areas.indexOf('s2-side') < areas.indexOf('section'));
+  assert.ok(areas.indexOf('section') < areas.indexOf('s2-people'));
   assert.deepEqual(problems, []);
   await close();
 });
@@ -108,7 +113,8 @@ test('only the social links and one news item: everything else is gone', async (
     }
   });
   const { page, areas, problems, close } = await open(content, THURSDAY_NOON);
-  assert.deepEqual(areas.filter(a => !['hero', 'footer'].includes(a)), ['news', 'section']);
+  // no featured card and no meeting: no Suggestions; the side keeps the account nudge
+  assert.deepEqual(areas.filter(a => a !== 'footer'), ['s2-side', 'news', 'section']);
   assert.deepEqual(await sectionTitles(page), ['تابعنا']);
   assert.equal(await page.$('[data-area="meeting"]'), null);
   // the bell has no meeting notification either
@@ -124,7 +130,8 @@ test('sections follow the admin\'s order', async () => {
     for (let i = 0; i < 12; i++) gs.apiMoveSection('location', -1);
   });
   const { areas, problems, close } = await open(content, THURSDAY_NOON);
-  assert.equal(areas[1], 'location', areas.join(' > '));
+  // Suggestions and the meeting lead the home (S2); the admin's order follows
+  assert.equal(areas[areas.indexOf('s2-side') + 1], 'location', areas.join(' > '));
   assert.deepEqual(problems, []);
   await close();
 });
@@ -141,7 +148,7 @@ test('a scheduled section appears at its Cairo time, not before', async () => {
 
   const after = await open(content, '2026-10-09T17:00:00Z'); // 20:00 Cairo
   assert.ok(after.areas.includes('news'), after.areas.join(' > '));
-  assert.equal(await after.page.$eval('.news .section-head__sub', n => n.textContent), 'كل جديد عندنا');
+  assert.equal(await after.page.$eval('[data-area="news"] .section-head__sub', n => n.textContent), 'كل جديد عندنا');
   assert.deepEqual(after.problems, []);
   await after.close();
 });
@@ -168,8 +175,9 @@ test('older content without a layout still renders the usual page', async () => 
   const content = publish();
   delete content.layout;
   content.schema = 2;
-  const { areas, problems, close } = await open(content, THURSDAY_NOON);
-  assert.ok(areas.includes('meeting') && areas.includes('share') && areas.includes('section'));
+  const { page, areas, problems, close } = await open(content, THURSDAY_NOON);
+  // the meeting sits in the side column (S2)
+  assert.ok(await page.$('[data-area="s2-side"] > [data-area="meeting"]') && areas.includes('share') && areas.includes('section'));
   assert.deepEqual(problems, []);
   await close();
 });
@@ -179,11 +187,11 @@ test('older content without a layout still renders the usual page', async () => 
 
 const WEBP = Buffer.concat([Buffer.from('RIFF'), Buffer.from([0x20, 0, 0, 0]), Buffer.from('WEBPVP8L'), Buffer.alloc(40, 5)]).toString('base64');
 
-test('an item without a poster gets built-in art in its section colour', async () => {
+test('the news rail keeps its section colour; every card has its icon (S2)', async () => {
   const content = publish(gs => gs.apiSaveSection({ key: 'news', title: 'جديد الأسرة', theme: 'ember' }));
   const { page, problems, close } = await open(content, THURSDAY_NOON);
   assert.equal(await page.$eval('[data-area="news"]', n => n.dataset.theme), 'ember');
-  assert.ok(await page.$('[data-area="news"] .art'), 'art instead of an empty box');
+  assert.deepEqual(await page.$$eval('[data-area="news"] .s2-nw', cards => cards.map(c => !!c.querySelector('.s2-nw__ic .icon'))), [true]);
   assert.equal(await page.$('[data-area="news"] .news-card--text'), null);
   assert.deepEqual(problems, []);
   await close();
@@ -231,13 +239,17 @@ test('competitions and activities: own sections; a competition opens its link on
   assert.equal(comp.title, 'المسابقات');
   assert.match(comp.state, /تبدأ بعد/);
   assert.equal(comp.link, false, 'no link before the start');
-  const trip = await before.page.$eval('[data-key="activities"] .item-card', c => ({
-    type: c.querySelector('.item-card__type').textContent,
-    cta: c.querySelector('.item-card__cta').getAttribute('href'),
-    where: c.querySelector('.item-card__when').textContent
+  // «الفعاليات الجاية» (S2): the poster card, its date and day; it opens the activity's sheet (the link is inside)
+  const trip = await before.page.$eval('[data-key="activities"] .s2-ev', c => ({
+    title: c.querySelector('h3').textContent,
+    date: c.querySelector('.s2-ev__date').textContent,
+    when: c.querySelector('p').textContent,
+    href: c.getAttribute('href')
   }));
-  assert.deepEqual([trip.type, trip.cta], ['رحلة', 'https://forms.gle/trip']);
-  assert.match(trip.where, /الغردقة/);
+  assert.equal(trip.title, 'رحلة الغردقة');
+  assert.equal(trip.date, '١٦أكتوبر');
+  assert.match(trip.when, /^الجمعة · من /);
+  assert.match(trip.href, /^#activity\//);
   assert.deepEqual(before.problems, []);
   await before.close();
 
@@ -252,7 +264,7 @@ test('an activity opens in a sheet (deep link), with its share row', async () =>
   const { page, problems, close } = await open(content, THURSDAY_NOON);
 
   // the card's first tap opens the sheet, not the external link
-  await page.click('[data-key="activities"] .item-card__title a');
+  await page.click('[data-key="activities"] .s2-ev');
   await page.waitForSelector('dialog.sheet[open] .detail');
   assert.equal(new URL(page.url()).hash, `#activity/${trip.id}`);
   const sheet = await page.$eval('dialog.sheet[open]', d => ({

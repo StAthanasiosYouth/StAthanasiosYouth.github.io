@@ -3,10 +3,11 @@
  *
  * Builds the widgets from sanitized content, in the order of the page
  * layout (layout.js): the sections the admin switched on, each showing
- * only inside its own time window (Cairo). The hero is always first and
- * the footer always last. Default order (older content):
- *   hero → meeting → banner → featured → news → games → location
+ * only inside its own time window (Cairo). The footer is always last.
+ * Default order (older content):
+ *   meeting → banner → featured → news → games → location
  *   → link sections → service contact → technical support → share → footer
+ * home.js then places them (S2): Suggestions and the meeting on top.
  */
 
 import { h, external } from './dom.js';
@@ -24,45 +25,27 @@ import { choreograph, motionTier } from './feel.js';
 import { hasScene } from './xp.js';
 import { play } from './sound.js';
 import { pageUrl } from './share.js';
+import { arrangeHome, startHome } from './home.js';
 
 
 /* =========================================================
-   HERO
+   THE NAME (the big hero left the home in the redesign, S2: the logo
+   and the name live in the top bar; the page's h1 is for readers)
 ========================================================= */
 
 export function updateHero(site) {
 
+  if (!site.name) return;
+
+  const words = site.name.split(/\s+/);
   const nameEl = document.getElementById('site-name');
-  const taglineEl = document.getElementById('site-tagline');
 
-  if (site.name) {
+  if (nameEl) nameEl.textContent = site.name;
+  document.title = site.name;
 
-    const words = site.name.split(/\s+/);
-
-    // long names: the first three words lead, the rest sit underneath
-    if (words.length > 5) {
-      nameEl.className = 'hero__name';
-      nameEl.replaceChildren(
-        h('span', { class: 'hero__name-lead' }, words.slice(0, 3).join(' ')),
-        ' ',
-        h('span', { class: 'hero__name-rest' }, words.slice(3).join(' '))
-      );
-    }
-    else {
-      nameEl.className = 'hero__name hero__name--single';
-      nameEl.textContent = site.name;
-    }
-
-    document.title = site.name;
-
-    // the top bar's compact name: the name's lead words
-    const compact = document.querySelector('.topbar__name');
-    if (compact) compact.textContent = words.length > 5 ? words.slice(0, 3).join(' ') : site.name;
-
-  }
-
-  taglineEl.textContent = site.tagline;
-  taglineEl.hidden = !site.tagline;
+  // the top bar's name: the name's lead words
+  const compact = document.querySelector('.topbar__name');
+  if (compact) compact.textContent = words.length > 5 ? words.slice(0, 3).join(' ') : site.name;
 
 }
 
@@ -892,7 +875,6 @@ const WIDE_SPAN = { featured: 7, location: 5, contacts: 6, support: 6 };
 
 function pairsWith(a, b) {
 
-  if (a.kind === 'hero') return b.kind === 'meeting';
   // two short lists of activities (two cards or fewer each) share a row
   if (a.kind === 'items' && b.kind === 'items') return shortList(a.el) && shortList(b.el);
   return !!WIDE_SPAN[a.kind] && !!WIDE_SPAN[b.kind] && WIDE_SPAN[a.kind] + WIDE_SPAN[b.kind] === 12;
@@ -991,7 +973,6 @@ PHONE.addEventListener('change', () => surfaced.forEach(([el, section]) => paint
 export function renderPage(content, clock, actions, { animate = false } = {}) {
 
   const main = document.getElementById('main');
-  const hero = main.querySelector('[data-area="hero"]');
 
   updateHero(content.site);
 
@@ -1110,20 +1091,22 @@ export function renderPage(content, clock, actions, { animate = false } = {}) {
     dressed.add(item.section);
   }
 
-  pairUp([{ el: hero, kind: 'hero' }, ...flow]);
+  pairUp(flow);
 
   // «نقاطي / المتجر» is no longer a section of the home page (owner, Phase 8 track P, 2026-11-04): the top
   // bar's star keeps the way in, and «المزيد» lists the page
 
   topbarPoints(content.points);
 
-  const widgets = flow.map(item => item.el).concat(footer(content));
+  // the home's own arrangement (S2): Suggestions, the greeting + the meeting, the rails (home.js)
+  const widgets = arrangeHome(flow, footer(content), { content, nowStamp: clock.stamp, news: parts.news });
 
   main.querySelectorAll('[data-dynamic]').forEach(el => el.remove());
 
   widgets.forEach(el => el.setAttribute('data-dynamic', ''));
   main.append(...widgets);
   main.dataset.state = 'ready';
+  startHome(main);
   sharpenVisibleBanners(main);
 
   // on screen: a staggered entrance; further down: rise in when scrolled to
