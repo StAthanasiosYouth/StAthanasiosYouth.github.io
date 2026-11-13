@@ -2222,19 +2222,23 @@ ol {
 }
 
 .footer__links {
-  margin-top: 6px;
+  margin-top: 0;
 }
 
+/* a 44px tap height each (touch-target rule), the lines stay close */
 .footer__links a,
 .footer__credit a {
   display: inline-block;
-  padding: 6px 2px;
+  min-height: 44px;
+  padding: 12px 4px;
+  line-height: 20px;
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
 .footer__credit {
+  margin-top: -10px;
   font-size: .76rem;
   opacity: .85;
 }

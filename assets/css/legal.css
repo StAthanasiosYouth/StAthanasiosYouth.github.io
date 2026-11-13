@@ -531,10 +531,11 @@ html.legal-s8 {
   font-size: .9rem;
 }
 
+/* inline-block, not flex: the words and the <bdi> name keep their spaces */
 .legal-projects__links a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
+  display: inline-block;
+  padding: 4px 0;
+  line-height: 24px;
 }
 
 .legal-foot-links a,

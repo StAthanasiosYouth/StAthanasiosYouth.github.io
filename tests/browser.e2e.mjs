@@ -211,8 +211,8 @@ test('tampered content.json cannot inject links or markup', async () => {
 
   assert.equal(await page.evaluate(() => window.__pwned), undefined);
   const hrefs = await page.$$eval('a[href]', els => els.map(a => a.getAttribute('href')));
-  // (and the site's own pages: «نقاطي» and a competition, same tab)
-  const SAFE = /^(https:|tel:\+|#|meeting\.ics$|points\/$|competition\/[a-z0-9-]{2,40}\/$)/;
+  // (and the site's own pages: «نقاطي», a competition, the footer's fixed pages, same tab)
+  const SAFE = /^(https:|tel:\+|#|meeting\.ics$|points\/$|competition\/[a-z0-9-]{2,40}\/$|(about|about-site|privacy|terms)\/$)/;
   assert.ok(hrefs.every(h => SAFE.test(h)), `unsafe href: ${hrefs.filter(h => !SAFE.test(h))}`);
   assert.equal(await page.$eval('#site-tagline', el => el.textContent), '<img src=x onerror="window.__pwned=1">', 'shown as text');
   // only the logo, plus posters from our own media/ folder (real content has some)
