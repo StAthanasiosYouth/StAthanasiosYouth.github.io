@@ -280,3 +280,30 @@ export function leftText(minutes) {
   return `فاضل ${countDuration(left >= 60 ? Math.floor(left / 60) * 60 : left)}`;
 
 }
+
+
+/* a Cairo wall-time stamp "YYYY-MM-DDTHH:MM" in parts (the home's and the lists' event cards) */
+export function stampDate(stamp) {
+
+  const y = +stamp.slice(0, 4), m = +stamp.slice(5, 7), d = +stamp.slice(8, 10);
+
+  return { y, m, d, weekday: new Date(Date.UTC(y, m - 1, d)).getUTCDay(), minutes: +stamp.slice(11, 13) * 60 + +stamp.slice(14, 16), day: stamp.slice(0, 10) };
+
+}
+
+
+/* an event card's line: «السبت · من ٩ الصبح», or «١٨–٢٠ ديسمبر» for more than one day */
+export function eventWhen(item) {
+
+  const a = stampDate(item.startAt);
+
+  if (item.endAt && item.endAt.slice(0, 10) !== a.day) {
+    const b = stampDate(item.endAt);
+    return a.m === b.m
+      ? `${arabicDigits(a.d)}–${arabicDigits(b.d)} ${MONTH_NAMES[a.m - 1]}`
+      : `${arabicDigits(a.d)} ${MONTH_NAMES[a.m - 1]} – ${arabicDigits(b.d)} ${MONTH_NAMES[b.m - 1]}`;
+  }
+
+  return item.startAt.length > 10 && a.minutes ? `${DAY_NAMES[a.weekday]} · من ${formatTime(a.minutes)}` : DAY_NAMES[a.weekday];
+
+}

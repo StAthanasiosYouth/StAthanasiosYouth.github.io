@@ -6,6 +6,8 @@
  *   page    /<slug>/            → ./page.json?v=<data-v>   (stub, same depth as the shell)
  *   event   /events/<slug>/     → ./event.json?v=<data-v>  (stub, one level deeper)
  *   events  /events/            → content.json events[]    (the list)
+ *   services /services/         → content.json activities (the «خدماتنا» section)
+ *   news    /news/              → content.json news[]       (lists.js: the «الكل ‹» pages)
  *   (none)  /pages/             → ?preview: the admin's preview frame; else the home page
  * URLs of the site are built from this module's own address (import.meta.url),
  * never from the page's; the JSON sits next to the page (relative to it).
@@ -27,7 +29,8 @@ import { mountNav } from '../nav.js';
 
 const ROOT = new URL('../../../', import.meta.url);
 const html = document.documentElement;
-const KIND = ['page', 'event', 'events'].includes(html.dataset.kind) ? html.dataset.kind : '';
+const KIND = ['page', 'event', 'events', 'services', 'news'].includes(html.dataset.kind) ? html.dataset.kind : '';
+const LISTS = ['events', 'services', 'news'];
 const PREVIEW = !KIND && new URLSearchParams(location.search).has('preview');
 const FRAMED = window.parent !== window;
 const SITE = 'أسرة البابا أثناسيوس';
@@ -74,7 +77,6 @@ const UNAVAILABLE = { page: 'الصفحة دي مش متاحة دلوقتي', ev
 
 let shown = null;       // { kind, data } on screen
 let phaseKey = '';      // the event's booking phase / the list's state (re-render when it changes)
-let listPartners = {};  // the list's partners (content.json partners: the cards' «بإشراف» chips)
 
 function render(kind, data) {
 
@@ -102,13 +104,16 @@ function render(kind, data) {
     phaseKey = view.event(data, nowStamp(), { reduced: reduced() }).phase;
     online(data);
   }
+  else if (kind === 'events') {
+    view.events(eventsList(data.events, nowStamp()), nowStamp(), data.partners || {});
+    phaseKey = listKey(data.events);
+  }
   else {
-    const list = eventsList(data, nowStamp());
-    view.events(list, nowStamp(), listPartners);
-    phaseKey = listKey(data);
+    view[kind](data, nowStamp());
+    phaseKey = '';
   }
 
-  if (!PREVIEW && kind !== 'events') document.title = `${data.title} – ${SITE}`;
+  if (!PREVIEW && !LISTS.includes(kind)) document.title = `${data.title} – ${SITE}`;
 
 }
 
@@ -128,7 +133,7 @@ function tick() {
       else render('event', shown.data);
     }
   }
-  if (shown.kind === 'events' && listKey(shown.data) !== phaseKey) render('events', shown.data);
+  if (shown.kind === 'events' && listKey(shown.data.events) !== phaseKey) render('events', shown.data);
 }
 
 
@@ -212,29 +217,25 @@ async function boot() {
 
   view.loading();
 
-  if (KIND === 'events') {
+  if (LISTS.includes(KIND)) {
     const loaded = await fetchJson(new URL('content.json', ROOT), { kind: 'content', onNewer: newer(async raw => {
       const { sanitizeContent } = await import('../content.js');
       const content = sanitizeContent(raw);
-      if (quiet('events')) {
-        listPartners = content.partners || {};
-        render('events', content.events);
-      }
+      if (quiet(KIND)) render(KIND, content);
     }) });
     if (loaded.raw) {
       try {
         // the home page's own sanitizer (loaded only here)
         const { sanitizeContent } = await import('../content.js');
         const content = sanitizeContent(loaded.raw);
-        listPartners = content.partners || {};
-        render('events', content.events);
+        render(KIND, content);
         return;
       }
       catch {
         // a broken file: below
       }
     }
-    view.error('مش قادرين نحمّل الفعاليات. اتأكد من النت وجرّب تاني.', boot);
+    view.error({ events: 'مش قادرين نحمّل الفعاليات. اتأكد من النت وجرّب تاني.', services: 'مش قادرين نحمّل الخدمات. اتأكد من النت وجرّب تاني.', news: 'مش قادرين نحمّل الأخبار. اتأكد من النت وجرّب تاني.' }[KIND], boot);
     return;
   }
 

@@ -15,8 +15,8 @@
 import { h } from './dom.js';
 import { iconNode } from './icons.js';
 import { go } from './router.js';
-import { DAY_NAMES, MONTH_NAMES, arabicDigits, formatTime, relativeTime } from './words.js';
-import { entryButton, entryHref, typeOf, visibleItems } from './items.js';
+import { MONTH_NAMES, arabicDigits, relativeTime, stampDate as parts, eventWhen as whenLine } from './words.js';
+import { entryButton, entryHref, typeOf, visibleItems, partnerChip } from './items.js';
 import { sectionBanner } from './hub.js';
 import { readSession, readFace } from './account/link.js';
 import { bookApiUrl } from './page/book-config.js';
@@ -37,26 +37,6 @@ function storage(name) {
 }
 
 const signedIn = () => !!readSession(storage('localStorage'), storage('sessionStorage'));
-
-
-/* ---------- dates (Cairo wall-time stamps "YYYY-MM-DDTHH:MM") ---------- */
-
-function parts(stamp) {
-  const y = +stamp.slice(0, 4), m = +stamp.slice(5, 7), d = +stamp.slice(8, 10);
-  return { y, m, d, weekday: new Date(Date.UTC(y, m - 1, d)).getUTCDay(), minutes: +stamp.slice(11, 13) * 60 + +stamp.slice(14, 16), day: stamp.slice(0, 10) };
-}
-
-/* «السبت · من ٩ الصبح», or «١٨–٢٠ ديسمبر» for more than one day */
-function whenLine(item) {
-  const a = parts(item.startAt);
-  if (item.endAt && item.endAt.slice(0, 10) !== a.day) {
-    const b = parts(item.endAt);
-    return a.m === b.m
-      ? `${arabicDigits(a.d)}–${arabicDigits(b.d)} ${MONTH_NAMES[a.m - 1]}`
-      : `${arabicDigits(a.d)} ${MONTH_NAMES[a.m - 1]} – ${arabicDigits(b.d)} ${MONTH_NAMES[b.m - 1]}`;
-  }
-  return item.startAt.length > 10 && a.minutes ? `${DAY_NAMES[a.weekday]} · من ${formatTime(a.minutes)}` : DAY_NAMES[a.weekday];
-}
 
 
 /* ---------- section heads: the live title + «الكل ‹» + arrows (desktop) ---------- */
@@ -260,17 +240,18 @@ function greeting() {
 
 /* ---------- «الفعاليات الجاية» ---------- */
 
-function eventCard(item, nowStamp) {
+function eventCard(item, nowStamp, partners) {
   const entry = entryButton(item, nowStamp);
   const href = entry ? entry.href : `#activity/${item.id}`;
   const open = entry ? null : event => { event.preventDefault(); go('activity', item.id); };
   const when = item.startAt ? parts(item.startAt) : null;
   const tag = (entry && (entry.chip || entry.label)) || '';
-  return h('a', { class: 's2-ev', href, onclick: open },
+  return h('a', { class: 's2-ev', href, onclick: open, 'data-entry': entry ? entry.kind : null },
     item.image ? h('img', { src: item.image.thumb || item.image.src, alt: '', loading: 'lazy', decoding: 'async' }) : null,
     h('div', { class: 's2-ev__body' },
       when ? h('span', { class: 's2-ev__date' }, h('b', {}, arabicDigits(when.d)), h('small', {}, MONTH_NAMES[when.m - 1])) : null,
       h('h3', {}, item.title),
+      partnerChip(item, partners),
       when ? h('p', {}, whenLine(item)) : item.subtitle ? h('p', {}, item.subtitle) : null,
       tag ? h('span', { class: 's2-ev__tag' }, tag) : null));
 }
@@ -289,10 +270,10 @@ function adopt(rail, from) {
   return rail;
 }
 
-function eventsSection(section, items, nowStamp) {
+function eventsSection(section, items, nowStamp, partners) {
   return h('section', { class: 'widget s2-sec', 'data-area': 'items', 'data-key': section.key, 'aria-labelledby': 's2-events-title' },
     head(section.icon || 'calendar', section.title === 'الفعاليات' || !section.title ? 'الفعاليات الجاية' : section.title, 's2-events-title', 'events/', items.length),
-    h('div', { class: 's2-rail s2-rail--ev' }, items.map(item => eventCard(item, nowStamp))));
+    h('div', { class: 's2-rail s2-rail--ev' }, items.map(item => eventCard(item, nowStamp, partners))));
 }
 
 
@@ -308,8 +289,7 @@ function newsCard(item, nowStamp) {
 
 function newsRail(section, items, nowStamp) {
   return h('section', { class: 'widget s2-sec', 'data-area': 'news', 'aria-labelledby': 's2-news-title' },
-    // «الكل ‹»: when its page is approved and built (owner, 2026-11-13: the «الكل» pages are designed first)
-    head(section.icon || 'megaphone', section.title || 'جديد الأسرة', 's2-news-title', '', items.length),
+    head(section.icon || 'megaphone', section.title || 'جديد الأسرة', 's2-news-title', 'news/', items.length),
     h('div', { class: 's2-rail s2-rail--nw' }, items.map(item => newsCard(item, nowStamp))));
 }
 
@@ -369,7 +349,7 @@ export function arrangeHome(flow, footer, { content, nowStamp, news }) {
     if (item.kind === 'featured' || item.kind === 'meeting') continue;
     if (item.kind === 'items' && item.section && item.section.key === 'activities') {
       const list = visibleItems(content, 'activities', nowStamp);
-      out.push(list.length ? adopt(eventsSection(item.section, list, nowStamp), item.el) : item.el);
+      out.push(list.length ? adopt(eventsSection(item.section, list, nowStamp, content.partners), item.el) : item.el);
       continue;
     }
     if (item.kind === 'news') {
@@ -378,8 +358,10 @@ export function arrangeHome(flow, footer, { content, nowStamp, news }) {
     }
     if (item === servicesItem) {
       const sh = item.el.querySelector('.section-head');
-      // «الكل ‹»: when its page is approved and built (as the news)
-      if (sh) sh.classList.add('s2-head');
+      if (sh) {
+        sh.classList.add('s2-head');
+        sh.append(allLink('services/', item.el.querySelectorAll('.items__list > li').length));
+      }
       item.el.querySelector('.items__list')?.classList.add('s2-rail', 's2-rail--sv');
       out.push(item.el);
       continue;

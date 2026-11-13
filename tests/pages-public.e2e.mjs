@@ -554,9 +554,12 @@ test('/events/: the published events, linked same-tab', async () => {
   const { context, page, problems } = await open('/events/', PHONE);
   await ready(page);
   assert.equal(await textOf(page, '.evlist__title'), 'الفعاليات');
-  const cards = await page.$$eval('.ecard', els => els.map(el => ({ href: el.querySelector('a.stretched').href, target: el.querySelector('a.stretched').target, chip: el.querySelector('.chip--kind')?.textContent, cta: el.querySelector('.ecard__cta').textContent })));
+  // the «الكل ‹» page (S2): back to the home, the month, the home's poster cards
+  assert.equal(await page.$eval('.all-back', a => a.href), `${BASE}/index.html`);
+  const cards = await page.$$eval('.all-grid .s2-ev', els => els.map(el => ({ href: el.href, target: el.target, tag: el.querySelector('.s2-ev__tag').textContent })));
   await page.screenshot({ path: `${SHOTS}events-360.png`, fullPage: true });
-  assert.deepEqual(cards, [{ href: `${BASE}/events/ain-sokhna-trip/`, target: '', chip: 'رحلة', cta: 'احجز الآن' }]);
+  assert.deepEqual(cards, [{ href: `${BASE}/events/ain-sokhna-trip/`, target: '', tag: 'احجز الآن' }]);
+  assert.equal((await page.$$('.all-month')).length, 1);
   assert.ok(await overflow(page) <= 0);
   assert.deepEqual(problems, []);
   await context.close();
@@ -564,7 +567,7 @@ test('/events/: the published events, linked same-tab', async () => {
   clock = AFTER_EVENT;
   const after = await open('/events/', PHONE);
   await ready(after.page);
-  assert.equal((await after.page.$$('.ecard')).length, 0, 'gone 12 h after the event');
+  assert.equal((await after.page.$$('.s2-ev')).length, 0, 'gone 12 h after the event');
   assert.equal(await textOf(after.page, '.pg-empty__title'), 'مفيش فعاليات دلوقتي');
   await after.context.close();
   clock = WINDOW_OPEN;
@@ -605,7 +608,11 @@ test('preview: the draft by postMessage from a same-origin parent; images swappe
    THE HOME PAGE
 ========================================================= */
 
-const homeCards = page => page.$$eval('.item-card[data-entry]', els => els.map(el => {
+// the services' item cards, and «الفعاليات الجاية»'s poster cards (S2: the whole card is the link, its tag the button's words)
+const homeCards = page => page.$$eval('.item-card[data-entry], .s2-ev[data-entry]', els => els.map(el => {
+  if (el.matches('.s2-ev')) {
+    return { kind: el.dataset.entry, title: el.querySelector('h3').textContent.trim(), section: el.closest('[data-key]').dataset.key, label: el.querySelector('.s2-ev__tag').textContent.trim(), href: el.href, target: el.getAttribute('target'), chip: '' };
+  }
   const cta = el.querySelector('.item-card__cta');
   return {
     kind: el.dataset.entry,
@@ -630,7 +637,7 @@ test('home: «خدماتنا» with the page card («شاهد», same tab); the 
   let { context, page, problems } = await home();
   assert.equal(await textOf(page, '[data-key="services"] .widget__title'), 'خدماتنا');
   assert.deepEqual(await homeCards(page), [
-    { kind: 'event', title: 'رحلة العين السخنة', section: 'activities', label: 'احجز الآن', href: `${BASE}/events/ain-sokhna-trip/`, target: null, chip: 'بعد ١١ يوم' },
+    { kind: 'event', title: 'رحلة العين السخنة', section: 'activities', label: 'احجز الآن', href: `${BASE}/events/ain-sokhna-trip/`, target: null, chip: '' },
     { kind: 'page', title: 'المسرح الأسود', section: 'services', label: 'شاهد', href: `${BASE}/black-theatre/`, target: null, chip: '' }
   ]);
   assert.equal(await page.evaluate(() => document.body.textContent.includes('المسرح الصامت')), false, 'a card whose page isn\'t in content.pages is dropped');
@@ -646,13 +653,13 @@ test('home: «خدماتنا» with the page card («شاهد», same tab); the 
   clock = BEFORE_OPEN;
   ({ context, page } = await home());
   let event = (await homeCards(page)).find(c => c.kind === 'event');
-  assert.deepEqual([event.label, event.chip], ['اعرف التفاصيل', 'الحجز يفتح السبت ١٠ أكتوبر']);
+  assert.deepEqual([event.label, event.chip], ['الحجز يفتح السبت ١٠ أكتوبر', '']);
   await context.close();
 
   clock = AFTER_CLOSE;
   ({ context, page } = await home(DESKTOP));
   event = (await homeCards(page)).find(c => c.kind === 'event');
-  assert.deepEqual([event.label, event.chip, event.href], ['اعرف التفاصيل', 'الحجز اتقفل', `${BASE}/events/ain-sokhna-trip/`]);
+  assert.deepEqual([event.label, event.chip, event.href], ['الحجز اتقفل', '', `${BASE}/events/ain-sokhna-trip/`]);
   assert.ok(await overflow(page) <= 0);
   await context.close();
 
@@ -881,12 +888,13 @@ test('B.U.G. in the admin preview: the lockup, never the intro; a partner logo f
 test('B.U.G. chip: «بإشراف B.U.G.» on the partnered home card and its /events/ card, never on others; axe', async () => {
   clock = WINDOW_OPEN;
   const { context, page, problems } = await home();
-  const chips = await page.$$eval('.item-card', els => els.map(el => {
+  // the home's event cards are the poster cards of «الفعاليات الجاية» (S2); the chip is the same
+  const chips = await page.$$eval('.item-card, .s2-ev', els => els.map(el => {
     const chip = el.querySelector('.item-card__partner');
     return chip && { entry: el.dataset.entry, text: chip.textContent.replace(/\s+/g, ' ').trim(), src: chip.querySelector('img').getAttribute('src'), alt: chip.querySelector('img').alt, plate: getComputedStyle(chip.querySelector('.partner-plate')).backgroundColor };
   }).filter(Boolean));
   assert.deepEqual(chips, [{ entry: 'event', text: 'بإشراف B.U.G.', src: 'assets/img/partners/bug-symbol-320.webp', alt: '', plate: 'rgb(255, 253, 249)' }]);
-  const card = await page.$('.item-card[data-entry="event"]');
+  const card = await page.$('.s2-ev[data-entry="event"]');
   await card.scrollIntoView();
   await page.waitForFunction(() => { const img = document.querySelector('.item-card__partner img'); return img.complete && img.naturalWidth === 320; }, { timeout: 5000 });
   assert.ok(await overflow(page) <= 0);
@@ -897,7 +905,7 @@ test('B.U.G. chip: «بإشراف B.U.G.» on the partnered home card and its /e
 
   const list = await open('/events/', PHONE);
   await ready(list.page);
-  assert.equal(await textOf(list.page, '.ecard .pchip'), 'بإشراف B.U.G.');
+  assert.equal(await textOf(list.page, '.s2-ev .pchip'), 'بإشراف B.U.G.');
   await list.page.waitForFunction(() => { const img = document.querySelector('.pchip img'); return img.complete && img.naturalWidth === 320; }, { timeout: 5000 });
   await list.page.screenshot({ path: `${SHOTS}partner-events-360.png` });
   assert.deepEqual(await axe(list.page), []);

@@ -12,7 +12,8 @@
  *   event   cover hero, kind chip, title, when / where, body, gallery,
  *           «احجز الآن» (prices + optional counter, the window, the
  *           servants' WhatsApp), terms
- *   events  the published events (content.json events[]), upcoming first
+ *   events  the published events (content.json events[]), upcoming first;
+ *           with services and news: the «الكل ‹» pages (lists.js)
  *   partner «بإشراف» (§12): one quiet co-brand line under the title, the
  *           chip on the list's cards (collab.js plays the intro)
  */
@@ -24,6 +25,7 @@ import {
   bookingPhase, entryCta, startCounts, stepCount, canStep, totalOf, seatsOf, money,
   bookingMessage, waWithText, eventHref
 } from './model.js';
+import { createLists } from './lists.js';
 
 
 /* ---------- small inline icons (static, trusted markup built as nodes) ---------- */
@@ -555,63 +557,9 @@ export function createView({ main, live, rootUrl, mediaUrl, onClip }) {
   }
 
 
-  /* =========================================================
-     EVENTS LIST (/events/)
-  ========================================================= */
+  // «الكل ‹» (S2): the events, the services and the news
+  const lists = createLists({ show, picture, rootUrl, homeHref, announce });
 
-  function eventCard(item, nowStamp, partners) {
-    const { label, chip } = entryCta('event', item, nowStamp);
-    const href = new URL(eventHref(item.slug), rootUrl).href;
-    const kind = item.kindLabel || KIND_WORDS[item.kind] || '';
-    const over = nowStamp > (item.endAt || item.startAt);
-    return h('article', { class: `ecard${over ? ' is-over' : ''}` },
-      h('div', { class: 'ecard__media' }, item.cover ? picture(item.cover, { className: 'ecard__img', sizes: '(min-width: 1024px) 380px, (min-width: 640px) 46vw, 92vw' }) : art('calendar')),
-      h('div', { class: 'ecard__body' },
-        h('p', { class: 'ecard__meta' },
-          kind ? h('span', { class: 'chip chip--kind' }, kind) : null,
-          over ? h('span', { class: 'chip' }, 'خلصت') : chip ? h('span', { class: 'chip chip--state' }, chip) : null
-        ),
-        h('h2', { class: 'ecard__title' }, h('a', { class: 'stretched', href }, item.title)),
-        partnerChip(item.partner && Object.prototype.hasOwnProperty.call(partners, item.partner) ? partners[item.partner] : null),
-        item.summary ? h('p', { class: 'ecard__sub' }, item.summary) : null,
-        h('p', { class: 'ecard__when' }, icon('clock'), formatStamp(item.startAt)),
-        h('span', { class: 'ecard__cta', 'aria-hidden': 'true' }, label, icon('arrow'))
-      )
-    );
-  }
-
-  /* «بإشراف B.U.G.»: the mark on a small light plate and the short name (§12) */
-  function partnerChip(partner) {
-    if (!partner) return null;
-    const mark = partner.mark;
-    return h('p', { class: 'pchip', 'data-partner': partner.key },
-      mark
-        ? h('span', { class: 'pchip__plate', 'aria-hidden': 'true' },
-          h('img', { src: mediaUrl(mark.src), width: mark.w, height: mark.h, alt: '', loading: 'lazy', decoding: 'async' }))
-        : null,
-      h('span', {}, 'بإشراف ', h('bdi', {}, partner.short))
-    );
-  }
-
-  function events(list, nowStamp, partners = {}) {
-    show('ready',
-      h('section', { class: 'evlist', 'aria-labelledby': 'page-title' },
-        h('div', { class: 'evlist__head' },
-          h('h1', { class: 'evlist__title', id: 'page-title', tabindex: '-1' }, 'الفعاليات'),
-          h('p', { class: 'evlist__sub' }, 'رحلات ومؤتمرات وأيام حلوة مع بعض. اختار واعرف التفاصيل.')
-        ),
-        list.length
-          ? h('ul', { class: 'egrid' }, list.map(item => h('li', {}, eventCard(item, nowStamp, partners))))
-          : h('div', { class: 'pg-empty pg-empty--inline' },
-            icon('calendar', 'pg-empty__icon'),
-            h('p', { class: 'pg-empty__title' }, 'مفيش فعاليات دلوقتي'),
-            h('p', { class: 'muted' }, 'أول ما ننزّل رحلة أو يوم جديد هتلاقيه هنا.'),
-            homeLink()
-          )
-      )
-    );
-  }
-
-  return { loading, unavailable, error, page, event, events, announce };
+  return { loading, unavailable, error, page, event, events: lists.events, services: lists.services, news: lists.news, announce };
 
 }

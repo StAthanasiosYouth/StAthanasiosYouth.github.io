@@ -4618,3 +4618,4 @@ html[data-intro="card"] { overflow: hidden; }
 .s2-all:focus-visible, .s2-arrows button:focus-visible, .s2-sugg__dots button:focus-visible, .s2-join__x:focus-visible, .s2-join__tint:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 2px; }
 /* inside a scrolling track the ring is drawn inside the card (the track would clip it outside) */
 .s2-chip:focus-visible, .s2-ev:focus-visible, .s2-nw:focus-visible, .s2-slide:has(.stretched:focus-visible), .s2-rail--sv .item-card:has(.stretched:focus-visible) { outline: 2px solid var(--gold-hi); outline-offset: -2px; }
+.s2-ev .item-card__partner { position: relative; margin: 4px 0 2px; }

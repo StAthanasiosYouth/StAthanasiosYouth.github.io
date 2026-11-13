@@ -269,6 +269,8 @@ export function currentTab(path = location.pathname) {
   if (rest === '' || rest === 'index.html') return 'home';
   if (/^(?:points|competition)\//.test(rest)) return 'comps';
   if (/^account\//.test(rest)) return 'account';
+  // the home's «الكل ‹» pages of the services and the news: none of the bar's tabs
+  if (/^(?:services|news)\//.test(rest)) return '';
   return 'events';
 }
 
