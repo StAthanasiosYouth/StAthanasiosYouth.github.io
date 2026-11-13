@@ -244,6 +244,8 @@ node scripts/load.mjs           # STAGING ONLY: latency, idempotency races, burs
 
 Content publishes from the admin never touch `worker/`, so they never deploy.
 
+A change to `apps-script/*.gs` reaches the Worker only through `src/content/gs.gen.js` (`cd tools && node build-worker-gs.mjs`); rebuild `admin/review-kit.js` with it (`node build-review-kit.mjs`), or the test step fails and nothing deploys.
+
 **One-time setup** (a repository admin):
 
 1. In Cloudflare, go to **My Profile → API Tokens → Create Token** and choose **"Edit Cloudflare Workers"**. Add **Account → D1 → Edit**. Scope it to this account only.
