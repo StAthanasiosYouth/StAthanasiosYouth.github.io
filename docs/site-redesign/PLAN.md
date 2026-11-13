@@ -130,8 +130,8 @@
 - e2e: `comp-public` ١٢/١٢، `comp-portal` ٩/٩، `comp-portal2` و`points-widget` (غير «news item with an icon» القديم). `comp-admin*` و`comp-accounts`: نفس الـ٦ الفاشلين على main. `account-page`/`account-badge`: «the door» وحجم الصفحة في CRLF (قدام). الاختبارات اتعدّلت لـ: المربعات بدل الـchips، والأرقام ظاهرة على طول (٤٠px، معتمد)، وفلاتر المتجر ٣٨px (معتمد)، و«فاضلك ٨٥٠ نقطة».
 - `audit` (القايمة، والمسابقة مفتوحة وجاية، والحساب، والمتجر، والرئيسية) × ٤ مقاسات: سليم.
 - لون الموقع: السبع ألوان على القايمة والمسابقة والمتجر. «تقليل الحركة»: مفيش حركة ولا فرقعة. Tab: البيت ← الشريط ← الفلاتر ← الكروت ← «فكّرني».
-- الـWorker: `publish.test` ٢٠/٢٠. الـdeploy بالـCI (Staging وبعدين Production).
-- الرجوع: `git revert` للـcommits دي، و`npx wrangler rollback` (+ `--env staging`).
+- الـWorker: `npm test` ٤٩٤/٤٩٤ (بعد ما `admin/review-kit.js` اتبنى تاني مع `gs.gen.js`). اتنشر بالـCI: Staging وبعدين Production، والـsmoke عدّى (706d624).
+- الرجوع: `git revert 706d624 3001d43 9d37e66 5e6ea8d 3437c74`، و`npx wrangler rollback` (+ `--env staging`).
 
 ### موجة ٤ = W6 الخدمات (S5) + W7 الفعالية والحجز (S6) (2026-11-13) — على main
 
