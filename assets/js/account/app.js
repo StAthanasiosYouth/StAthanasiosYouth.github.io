@@ -341,7 +341,7 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
       return;
     }
     const dest = takeDest(tab) || (cleanRoute(location.hash) === '#me' ? '' : cleanRoute(location.hash));
-    history.replaceState(null, '', location.pathname + location.search + dest);
+    history.replaceState(history.state, '', location.pathname + location.search + dest);
     if (fresh) cue('enter');
     mine.openRoute({ kind: fresh ? 'enter' : '' });
     if (onSignedIn) onSignedIn(account);
@@ -720,7 +720,7 @@ export function mountAccount(main, { onSignedIn = null } = {}) {
     S.notice = notice || (forgetDevice ? 'خرجت، والجهاز ده نسي الحساب. الباسورد المحفوظ في المتصفح بيتمسح من إعدادات المتصفح.' : 'خرجت من حسابك.');
     S.asked = null;
     S.exists = null;
-    history.replaceState(null, '', location.pathname + location.search);
+    history.replaceState(history.state, '', location.pathname + location.search);
     cue('leave');
     leaving = true;
     viewSignin();

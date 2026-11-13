@@ -115,6 +115,39 @@ function leaveThen(go) {
   addEventListener('pageshow', () => document.documentElement.removeAttribute('data-leaving'), { once: true });
 }
 
+/* The history entry this page was opened on carries a mark, so a press on Home after sections (#me/points…)
+   were opened can still go back to the home page in one step. */
+const LANDING = 'athanasiosNavLanding';
+function markLanding() {
+  try {
+    const state = history.state;
+    if (state === null || (typeof state === 'object' && !Array.isArray(state))) history.replaceState({ ...(state || {}), [LANDING]: 1 }, '');
+  }
+  catch { /* Home then opens the home page afresh */ }
+}
+
+/* how to go back to the home page this page was opened from, past every section opened here since; null when
+   the way back is not known (Home then opens the home page afresh) */
+export function homeEntry(nav = window.navigation, hist = history) {
+  try {
+    const current = nav && nav.currentEntry;
+    if (current && typeof nav.entries === 'function' && typeof nav.traverseTo === 'function') {
+      const entries = nav.entries();
+      const here = new URL(current.url);
+      for (let i = current.index - 1; i >= 0; i -= 1) {
+        const url = new URL(entries[i].url);
+        if (url.origin === here.origin && url.pathname === here.pathname && url.search === here.search) continue;
+        if (!isHomeUrl(url)) return null;
+        const key = entries[i].key;
+        return () => nav.traverseTo(key);
+      }
+      return null;
+    }
+  }
+  catch { /* the history mark below */ }
+  return hist.state && hist.state[LANDING] ? () => hist.back() : null;
+}
+
 /* the home link and the «الرئيسية» tab */
 function goHome(event) {
   if (event.defaultPrevented || event.button > 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -125,9 +158,13 @@ function goHome(event) {
   }
   const link = event.currentTarget;
   if (cameFromHome()) {
-    event.preventDefault();
-    leaveThen(() => history.back());
-    return;
+    // the home page's own history entry, however many sections (#me/…) were opened since: one press, home
+    const back = homeEntry();
+    if (back) {
+      event.preventDefault();
+      leaveThen(back);
+      return;
+    }
   }
   if (sectionOf() && link && link.href) {
     event.preventDefault();
@@ -593,6 +630,7 @@ function withSheet(done) {
 export function mountNav() {
   if (mounted) return;
   mounted = true;
+  markLanding();
   try {
     if (window.top !== window.self) return;
   }
