@@ -112,6 +112,8 @@ test('structured data: parses, one family / church / site with shared @ids, the 
   const person = byId.get(SITE + 'about-site/#developer');
   assert.equal(person['@type'], 'Person');
   assert.equal(person.name, 'مينا زكريا');
+  assert.equal(person.alternateName, 'مينا زكريا عطاالله متى');
+  assert.equal(person.email, 'mailto:menazakmena@gmail.com');
   assert.deepEqual(person.sameAs, ['https://github.com/MenaZak']);
   assert.equal(site.creator['@id'], person['@id']);
   // the home's social links = content.json's (no invented profiles)
@@ -126,6 +128,9 @@ test('the developer page: the four project links exactly as given, WhatsApp supp
     assert.ok(html.includes(`href="${url}"`), url);
   }
   assert.match(html, /href="https:\/\/wa\.me\/201276162016[?"]/);
+  assert.match(html, /href="mailto:menazakmena@gmail\.com"/);
+  // no fixed meeting time on «عن الأسرة» (it changes from the admin; the home has it live)
+  assert.doesNotMatch(read('about/index.html'), /الساعة [٠-٩]|٨ لحد/);
   assert.doesNotMatch(html, /linkedin|portfolio/i);
   const body = html.slice(html.indexOf('<body>'));
   assert.deepEqual([...body.matchAll(/<img [^>]*src="([^"]+)"/g)].map(m => m[1]).filter(src => !/logo-128\.webp$/.test(src)), [], 'only the family logo');
