@@ -20,6 +20,7 @@ import { entryButton, entryHref, typeOf, visibleItems, partnerChip } from './ite
 import { sectionBanner } from './hub.js';
 import { readSession, readFace } from './account/link.js';
 import { bookApiUrl } from './page/book-config.js';
+import { hasCompetitions } from './comp/listing.js';
 
 const ROOT = new URL('../../', import.meta.url);
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
@@ -311,7 +312,6 @@ export function arrangeHome(flow, footer, { content, nowStamp, news }) {
   const contact = flow.find(f => f.kind === 'contacts');
   const support = flow.find(f => f.kind === 'support');
   const location = flow.find(f => f.kind === 'location');
-  const competitions = flow.find(f => f.kind === 'items' && f.section && f.section.key === 'competitions');
 
   /* Suggestions: the featured cards, then the services that have their own page */
   const servicesSection = servicesItem ? servicesItem.section : {};
@@ -326,7 +326,8 @@ export function arrangeHome(flow, footer, { content, nowStamp, news }) {
   const chips = [
     meeting ? chip('calendar', 'الاجتماع الجاي', meeting.el) : null,
     mapEl ? chip('map', 'مكان الاجتماع', location.el) : null,
-    competitions ? chip('trophy', 'المسابقات', competitions.el) : null,
+    // site redesign W5: «المسابقات» opens /competitions/ while it has a competition (open, coming or just ended)
+    hasCompetitions(content.competitions, nowStamp) ? chip('trophy', 'المسابقات', new URL('competitions/', ROOT).href) : null,
     content.points ? chip('star', 'نقاطي', new URL(content.points.url, ROOT).href) : null,
     contact ? chip('phone', 'كلّم الخدمة', contact.el) : null
   ];

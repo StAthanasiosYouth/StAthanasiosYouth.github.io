@@ -58,6 +58,7 @@ function mount(id, make) {
 
 const ROOT = new URL('../../../', import.meta.url);
 const html = document.documentElement;
+html.classList.add('cx');   // the S4 look (comp.css «site redesign S4»): this engine page only, not «نقاطي»
 const PREVIEW = new URLSearchParams(location.search).has('preview');
 const FRAMED = window.parent !== window;
 
@@ -172,6 +173,7 @@ function model() {
     startsIn: S.def && S.def.startAt ? realMinutesBetween(nowStamp(), S.def.startAt) : undefined,
     clock: Number.isFinite(left) ? F.formatClock(left) : null,
     clockLow: left < 60000,
+    clockLeft: left,
     online: S.online,
     queueReason: S.queueReason,
     retryLoad: S.state.name === 'error' && !S.def,

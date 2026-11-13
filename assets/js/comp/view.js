@@ -14,6 +14,8 @@ import {
   ar, countQuestions, countPoints, countMinutesShort, stampText, startsInText, answerText,
   isAnswered, progress, unanswered, resultSummary, LIMITS
 } from './flow.js';
+import { realMinutesBetween } from '../schedule.js';
+import { remindMe } from './remind.js';
 
 /* ---------- small inline icons (static, trusted markup built as nodes) ---------- */
 
@@ -30,8 +32,48 @@ const ICONS = {
   gift: ['M4 9.5h16v3H4Z', 'M5.5 12.5V20h13v-7.5M12 9.5V20', 'M12 9.5C10 9.5 7.5 8.8 7.5 7a2 2 0 0 1 4.5-.5v3Zm0 0c2 0 4.5-.7 4.5-2.5a2 2 0 0 0-4.5-.5'],
   bag: ['M5.5 8.5h13l-1 11.5h-11Z', 'M9 8.5V7a3 3 0 0 1 6 0v1.5'],
   list: ['M9 6.5h11M9 12h11M9 17.5h11', 'M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01'],
-  logout: ['M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4', 'M10 8l-4 4 4 4M6 12h10']
+  logout: ['M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4', 'M10 8l-4 4 4 4M6 12h10'],
+  /* site redesign S4 */
+  ask: ['M9.6 9.3a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.4M12 16.8h.01', 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z'],
+  star: ['m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9Z'],
+  watch: ['M12 7v5l3 2', 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z'],
+  /* the list's cards (comp-list.html): open · coming · finished */
+  cup: ['M8 4h8v5a4 4 0 0 1-8 0Z', 'M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7M9.5 17h5'],
+  book: ['M5 4.5h11a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3Z', 'M5 16.5a3 3 0 0 1 3-3h11M9 8h6'],
+  padlock: ['M7.5 10.5h9a2.5 2.5 0 0 1 2.5 2.5v4.5a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 17.5V13a2.5 2.5 0 0 1 2.5-2.5Z', 'M8 10.5V8a4 4 0 0 1 8 0v2.5']
 };
+
+/* the S4 rings: a track and a stroke that a CSS custom property fills (CSSOM: the CSP blocks style="") */
+function ring(cls, r, size) {
+  const svg = document.createElementNS(SVG, 'svg');
+  svg.setAttribute('class', cls);
+  svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  for (const on of [false, true]) {
+    const c = document.createElementNS(SVG, 'circle');
+    c.setAttribute('cx', String(size / 2));
+    c.setAttribute('cy', String(size / 2));
+    c.setAttribute('r', String(r));
+    c.setAttribute('pathLength', '100');
+    if (on) c.setAttribute('class', 'on');
+    svg.appendChild(c);
+  }
+  return svg;
+}
+
+const LETTERS = ['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح'];
+
+/** «فاضل N أيام» before a deadline (the list page too) */
+export function leftText(days) {
+  return days === 1 ? 'آخر يوم' : days === 2 ? 'فاضل يومين' : `فاضل ${ar(days)}${days <= 10 ? ' أيام' : ' يوم'}`;
+}
+
+/* a count as a tile: ٦ over أسئلة (flow.js's words, the number apart) */
+function tileParts(textValue, n) {
+  const m = textValue.match(/[٠-٩\d]+/);
+  return m ? { num: m[0], label: textValue.replace(m[0], '').trim() } : { num: ar(n), label: textValue.split(' ')[0] };
+}
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -101,20 +143,55 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
       ? h('figure', { class: 'hero__media' }, picture(def.banner, { eager: true, className: 'hero__img' }))
       : h('div', { class: 'hero__art', 'aria-hidden': 'true' }, def.icon ? picture(def.icon, { eager: true, className: 'hero__icon-img', sizes: '96px' }) : icon('trophy', 'hero__icon'));
     if (def.banner && def.banner.w && def.banner.h) media.style.setProperty('--ar', `${def.banner.w} / ${def.banner.h}`);
-    return h('header', { class: `hero${compact ? ' hero--compact' : ''}` },
+    return h('header', { class: `hero${compact ? ' hero--compact' : ''}${def.banner ? '' : ' cx-hero'}` },
       media,
       h('p', { class: 'hero__kicker' }, 'مسابقة'),
       compact ? h('p', { class: 'hero__title' }, def.title) : heading(def.title, 'h1', 'hero__title')
     );
   }
 
-  function chips(def) {
+  /* S4: the numbers as three tiles (أسئلة · نقطة · دقايق) */
+  function stats(def) {
     const items = [];
-    if (def.questionCount) items.push(countQuestions(def.questionCount));
-    if (def.showPoints && def.totalPoints) items.push(countPoints(def.totalPoints));
-    if (def.timeLimit) items.push(`الوقت ${countMinutesShort(def.timeLimit)}`);
-    if (def.endAt) items.push(`متاحة لحد ${stampText(def.endAt)}`);
-    return items.length ? h('ul', { class: 'chips', 'aria-label': 'عن المسابقة' }, items.map(t => h('li', { class: 'chip' }, t))) : null;
+    if (def.questionCount) items.push(['ask', tileParts(countQuestions(def.questionCount), def.questionCount)]);
+    if (def.showPoints && def.totalPoints) items.push(['star', tileParts(countPoints(def.totalPoints), def.totalPoints)]);
+    if (def.timeLimit) items.push(['watch', tileParts(countMinutesShort(def.timeLimit), def.timeLimit)]);
+    return items.length ? h('ul', { class: 'cx-stats', 'aria-label': 'عن المسابقة' }, items.map(([ic, t]) => h('li', { class: 'cx-stat' },
+      h('span', { class: 'cx-stat__ic' }, icon(ic)),
+      h('b', { class: 'cx-stat__n' }, t.num),
+      h('span', { class: 'cx-stat__l' }, t.label)))) : null;
+  }
+
+  /* S4: the deadline, with «فاضل N أيام» while it is open */
+  function until(m, kind) {
+    const def = m.def;
+    if (!def.endAt || kind === 'closed') return null;
+    const minutes = kind === 'open' ? realMinutesBetween(m.nowStamp, def.endAt) : null;
+    const days = minutes > 0 ? Math.ceil(minutes / 1440) : 0;
+    return h('p', { class: 'cx-until' },
+      h('span', { class: 'cx-until__ic' }, icon('watch')),
+      h('span', {}, `متاحة لحد ${stampText(def.endAt)}`),
+      days > 0 ? h('b', { class: 'cx-until__left' }, leftText(days)) : null);
+  }
+
+  /* S4: «قبل ما تبدأ» as numbered steps when it has more than one line */
+  function instructions(textValue) {
+    const lines = String(textValue).split('\n').map(s => s.trim()).filter(Boolean);
+    return lines.length > 1
+      ? h('ol', { class: 'cx-steps' }, lines.map(l => h('li', {}, l)))
+      : h('p', { class: 'note__text' }, textValue);
+  }
+
+  /* S4: «فكّرني لما تبدأ» (remind.js) */
+  function remindButton(def) {
+    const page = new URL(def.slug ? `competition/${def.slug}/` : 'competitions/', rootUrl).href;
+    const b = btn('فكّرني لما تبدأ', () => {
+      if (!remindMe({ slug: def.slug, title: def.title, startAt: def.startAt, endAt: def.endAt }, page)) return;
+      b.textContent = 'هنفكّرك ✓';
+      b.disabled = true;
+      announce('اتنزّل ملف التذكير، افتحه علشان يتضاف لتقويمك');
+    }, { kind: 'primary', class: 'btn btn--primary cx-remind' });
+    return b;
   }
 
   /* =========================================================
@@ -185,15 +262,21 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
             m.receipt ? h('span', {}, 'بنجيب نتيجتك…') : def.resultsAt && m.nowStamp < def.resultsAt && def.resultShow !== 'none' ? h('span', {}, `النتايج هتظهر ${stampText(def.resultsAt)}`) : h('span', {}, 'شكرًا لكل اللي شاركوا.')))
         : null;
 
+    // S4: the status is the news, so it leads the card; «فكّرني» before a start; a finished one drops its instructions and deadline
     return h('div', { class: 'step intro' },
       hero(def),
       h('section', { class: 'card intro__body' },
-        chips(def),
-        def.description ? h('p', { class: 'intro__desc' }, def.description) : null,
-        def.instructions ? h('div', { class: 'note' }, h('h2', { class: 'note__title' }, 'قبل ما تبدأ'), h('p', { class: 'note__text' }, def.instructions)) : null,
-        kind === 'open' ? h('p', { class: 'muted' }, 'هتدخل المسابقة بحسابك.') : null,
         status,
+        kind === 'scheduled' && def.startAt ? remindButton(def) : null,
+        stats(def),
+        until(m, kind),
+        def.description ? h('p', { class: 'intro__desc' }, def.description) : null,
+        def.instructions && kind !== 'closed' ? h('div', { class: 'note' }, h('h2', { class: 'note__title' }, 'قبل ما تبدأ'), instructions(def.instructions)) : null,
+        kind === 'open' ? h('p', { class: 'muted' }, 'هتدخل المسابقة بحسابك.') : null,
         errorBox(m.state.error),
+        kind === 'open' && def.wallet && def.showPoints && def.totalPoints
+          ? h('p', { class: 'cx-reward' }, h('span', {}, icon('star')), h('span', {},`اكسب لحد ${countPoints(def.totalPoints)} تتضاف لرصيدك في «نقاطي»`))
+          : null,
         kind === 'open'
           ? h('div', { class: 'actions actions--sticky' }, btn(def.ctaLabel, m.actions.begin, { kind: 'primary', iconName: 'next', iconAfter: true, 'data-cta': '' }))
           : null,
@@ -204,7 +287,7 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
 
   /* ---------- questions ---------- */
 
-  function questionBlock(m, q, index, { numbered = false } = {}) {
+  function questionBlock(m, q, index, { numbered = false, badge = false } = {}) {
 
     const value = m.answers[q.id];
     const pts = m.comp && m.comp.showPoints && q.points ? h('span', { class: 'q__pts' }, countPoints(q.points)) : null;
@@ -227,14 +310,16 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
 
     if (q.type === 'single' || q.type === 'truefalse') {
       const options = q.type === 'truefalse' ? [{ id: 't', text: 'صح' }, { id: 'f', text: 'غلط' }] : q.choices;
-      control = h('div', { class: `choices${q.type === 'truefalse' ? ' choices--tf' : ''}` }, options.map(c => h('label', { class: 'choice' },
+      control = h('div', { class: `choices${q.type === 'truefalse' ? ' choices--tf' : ''}` }, options.map((c, i) => h('label', { class: 'choice' },
         h('input', { type: 'radio', name, value: c.id, checked: value === c.id ? '' : null, required: q.required ? '' : null, onchange: event => onValue(event.target.value) }),
+        h('span', { class: 'cx-letter', 'aria-hidden': 'true' }, LETTERS[i] || ''),
         h('span', { class: 'choice__text' }, c.text)
       )));
     }
     else if (q.type === 'multi') {
-      const box = h('div', { class: 'choices' }, q.choices.map(c => h('label', { class: 'choice choice--multi' },
-        h('input', { type: 'checkbox', name, value: c.id, checked: Array.isArray(value) && value.includes(c.id) ? '' : null, onchange: () => onValue([...box.querySelectorAll('input:checked')].map(i => i.value)) }),
+      const box = h('div', { class: 'choices' }, q.choices.map((c, i) => h('label', { class: 'choice choice--multi' },
+        h('input', { type: 'checkbox', name, value: c.id, checked: Array.isArray(value) && value.includes(c.id) ? '' : null, onchange: () => onValue([...box.querySelectorAll('input:checked')].map(x => x.value)) }),
+        h('span', { class: 'cx-letter', 'aria-hidden': 'true' }, LETTERS[i] || ''),
         h('span', { class: 'choice__text' }, c.text)
       )));
       control = h('div', {}, h('p', { class: 'q__hint' }, 'ممكن تختار أكتر من إجابة'), box);
@@ -262,6 +347,7 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
     h(grouped ? 'legend' : 'p', { class: 'q__text', id: `q-${q.id}-t`, tabindex: '-1', 'data-qfocus': String(index) },
       num, q.text,
       q.required ? h('span', { class: 'req' }, ' (مطلوب)') : null),
+    badge ? h('span', { class: 'cx-qnum', 'aria-hidden': 'true' }, ar(index + 1)) : null,
     pts,
     q.help ? h('p', { class: 'q__help', id: helpId }, q.help) : null,
     q.media ? h('figure', { class: 'q__media' }, picture(q.media)) : null,
@@ -286,7 +372,8 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
   }
 
   function jumpGrid(m, current) {
-    return h('details', { class: 'jump' },
+    // S4: the numbers always on show (the toggle hidden by comp.css), the answered ones filled
+    return h('details', { class: 'jump cx-jump', open: '' },
       h('summary', { class: 'jump__toggle' }, 'كل الأسئلة'),
       h('nav', { 'aria-label': 'الأسئلة' },
         h('ol', { class: 'jump__grid' }, m.questions.map((q, i) => {
@@ -310,7 +397,7 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
     const last = index === m.questions.length - 1;
     return h('div', { class: 'step step--q' },
       h('div', { class: 'qhead' }, h('h1', { class: 'qhead__title' }, m.def.title), progressBlock(m, index), jumpGrid(m, index)),
-      questionBlock(m, q, index),
+      questionBlock(m, q, index, { badge: true }),
       h('div', { class: 'actions actions--bar' },
         index > 0 ? btn('السابق', m.actions.prev, { iconName: 'prev' }) : h('span', { class: 'actions__spacer' }),
         btn(last ? 'راجع إجاباتك' : 'التالي', m.actions.next, { kind: 'primary', iconName: 'next', iconAfter: true, 'data-next': '' })
@@ -328,13 +415,21 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
     );
   }
 
+  /* S4: a ring of how many are answered («٥ من ٦») */
+  function donut(done, total) {
+    const svg = ring('cx-donut__ring', 52, 120);
+    svg.lastChild.style.setProperty('--to', String(total ? 100 - (done / total) * 100 : 100));
+    return h('div', { class: 'cx-donut', 'aria-hidden': 'true' }, svg, h('b', {}, ar(done), h('small', {}, `من ${ar(total)}`)));
+  }
+
   function reviewScreen(m) {
     const p = progress(m.questions, m.answers);
     const missing = unanswered(m.questions, m.answers);
     const required = missing.filter(x => x.required);
     return h('section', { class: 'step card review' },
       heading('راجع قبل ما تبعت'),
-      h('p', { class: 'review__count' }, `جاوبت ${ar(p.answered)} من ${countQuestions(p.total)}`),
+      donut(p.answered, p.total),
+      h('p', { class: 'review__count' },`جاوبت ${ar(p.answered)} من ${countQuestions(p.total)}`),
       missing.length
         ? h('div', {},
           h('h2', { class: 'review__sub' }, required.length ? 'فيه أسئلة لسه متجاوبتش (المطلوب لازم يتجاوب):' : 'الأسئلة دي لسه متجاوبتش:'),
@@ -364,22 +459,71 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
     }
 
     const summary = resultSummary(m.result, m.def, { noPoints: !!m.noPoints });
+    const r = m.result || {};
+    // S4: a score ring that fills, «+٣٥ نقطة · اتضافت لرصيدك», «روح لنقاطي», a short gold burst
+    const scored = summary.lines.some(l => l.kind === 'score') && Number(r.maxScore) > 0;
+    const earned = summary.lines.some(l => l.kind === 'points');
+    let badge = h('div', { class: 'result__badge', 'aria-hidden': 'true' }, icon(r.status === 'void' ? 'cross' : 'check'));
+    if (scored) {
+      const svg = ring('cx-score__ring', 68, 160);
+      const defs = document.createElementNS(SVG, 'defs');
+      const grad = document.createElementNS(SVG, 'linearGradient');
+      for (const [k, v] of [['id', 'cx-score-g'], ['x1', '0'], ['y1', '0'], ['x2', '1'], ['y2', '1']]) grad.setAttribute(k, v);
+      for (const [o, c] of [['0', 'var(--gold-hi)'], ['1', 'var(--gold)']]) {
+        const stop = document.createElementNS(SVG, 'stop');
+        stop.setAttribute('offset', o);
+        stop.setAttribute('stop-color', c);
+        grad.appendChild(stop);
+      }
+      defs.appendChild(grad);
+      svg.prepend(defs);
+      svg.lastChild.style.setProperty('--to', String(100 - Math.max(0, Math.min(1, r.score / r.maxScore)) * 100));
+      badge = h('div', { class: 'cx-score', 'aria-hidden': 'true' }, svg, h('b', {}, ar(r.score), h('small', {}, `من ${ar(r.maxScore)}`)));
+    }
+    const lines = summary.lines.map(l => {
+      if (l.kind === 'score' && scored) return h('li', { class: 'result__line result__line--score visually-hidden', 'data-kind': l.kind }, l.text);
+      if (l.kind === 'points') {
+        return h('li', { class: 'result__line result__line--earned', 'data-kind': l.kind },
+          h('p', { class: 'cx-earned' }, h('span', {}, icon('star')), h('b', {}, `+${ar(r.pointsAwarded)} نقطة`), h('span', {}, 'اتضافت لرصيدك')));
+      }
+      return h('li', { class: `result__line result__line--${l.kind}`, 'data-kind': l.kind }, l.text);
+    });
 
-    return h('div', { class: 'step result' },
-      h('section', { class: 'card result__card', 'aria-labelledby': 'result-t' },
-        h('div', { class: 'result__badge', 'aria-hidden': 'true' }, icon(m.result && m.result.status === 'void' ? 'cross' : 'check')),
-        h('h1', { class: 'result__title', id: 'result-t', tabindex: '-1', 'data-focus': '' }, summary.headline),
-        h('p', { class: 'result__comp' }, m.def.title),
-        summary.lines.length ? h('ul', { class: 'result__lines' }, summary.lines.map(l => h('li', { class: `result__line result__line--${l.kind}`, 'data-kind': l.kind }, l.text))) : null,
-        m.resultNote ? h('p', { class: 'muted' }, m.resultNote) : null,
-        h('div', { class: 'actions' },
-          m.canRetry ? btn('حاول مرة تانية', m.actions.again, { kind: 'primary' }) : null,
-          h('a', { class: `btn${m.canRetry ? '' : ' btn--primary'}`, href: homeHref }, icon('home'), 'ارجع للموقع'))
-      ),
-      summary.review ? reviewList(summary.review) : null
+    const card = h('section', { class: 'card result__card', 'aria-labelledby': 'result-t' },
+      badge,
+      h('h1', { class: 'result__title', id: 'result-t', tabindex: '-1', 'data-focus': '' }, summary.headline),
+      h('p', { class: 'result__comp' }, m.def.title),
+      lines.length ? h('ul', { class: 'result__lines' }, lines) : null,
+      m.resultNote ? h('p', { class: 'muted' }, m.resultNote) : null,
+      h('div', { class: 'actions' },
+        earned ? h('a', { class: 'btn cx-points', href: new URL('points/', rootUrl).href }, 'روح لنقاطي') : null,
+        m.canRetry ? btn('حاول مرة تانية', m.actions.again, { kind: 'primary' }) : null,
+        h('a', { class: `btn${m.canRetry ? '' : ' btn--primary'}`, href: homeHref }, icon('home'), 'ارجع للموقع'))
     );
+    if (scored || earned) burst(card);
+
+    return h('div', { class: 'step result' }, card, summary.review ? reviewList(summary.review) : null);
 
   }
+
+  /* the gold burst when the result shows (once per drawing; none with «تقليل الحركة») */
+  let burstKey = '';
+  function burst(card) {
+    const key = `${m0(lastModel)}`;
+    if (key === burstKey || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    burstKey = key;
+    const b = h('div', { class: 'cx-burst', 'aria-hidden': 'true' });
+    for (let i = 0; i < 26; i++) {
+      const p = h('i');
+      p.style.setProperty('--a', `${(i * 360) / 26}deg`);
+      p.style.setProperty('--d', `${60 + (i % 5) * 22}px`);
+      p.style.setProperty('--t', `${(i % 3) * 60}ms`);
+      b.appendChild(p);
+    }
+    card.appendChild(b);
+    setTimeout(() => b.remove(), 1600);
+  }
+  const m0 = m => (m && m.result ? `${m.result.submittedAt || ''}:${m.result.score ?? ''}` : '');
 
   function reviewList(items) {
     return h('section', { class: 'answers', 'aria-labelledby': 'answers-t' },
@@ -479,7 +623,17 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
       const showClock = typeof m.clock === 'string' && ['question', 'single', 'review'].includes(m.state.name);
       timer.hidden = !showClock;
       if (showClock) {
-        timer.replaceChildren(icon('clock'), h('span', { class: 'visually-hidden' }, 'الوقت الباقي: '), h('span', { class: 'cbar__clock', dir: 'ltr' }, m.clock));
+        // S4: a ring that empties with the time (built once, so its 1 s transition runs)
+        let clock = timer.querySelector('.cbar__clock');
+        if (!clock || !timer.querySelector('.cx-ring')) {
+          clock = h('span', { class: 'cbar__clock', dir: 'ltr' });
+          timer.replaceChildren(ring('cx-ring', 15, 36), h('span', { class: 'visually-hidden' }, 'الوقت الباقي: '), clock);
+        }
+        clock.textContent = m.clock;
+        const limit = m.def && m.def.timeLimit ? m.def.timeLimit * 60000 : 0;
+        if (limit && Number.isFinite(m.clockLeft)) {
+          timer.querySelector('.cx-ring .on').style.setProperty('--to', String(100 - Math.max(0, Math.min(1, m.clockLeft / limit)) * 100));
+        }
         timer.classList.toggle('is-low', !!m.clockLow);
       }
     }

@@ -349,8 +349,8 @@ test('open competition, phone: intro → form → all 7 types → reload restore
   await waitState(page, 'intro');
   assert.equal(await textOf(page, '.hero__title'), BASE_DEF.title);
   assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'azure');
-  assert.match(await textOf(page, '.chips'), /٦ أسئلة/);
-  assert.match(await textOf(page, '.chips'), /٥٠ نقطة/);
+  assert.match(await textOf(page, '.cx-stats'), /٦\s*أسئلة/);   // S4: the numbers as tiles
+  assert.match(await textOf(page, '.cx-stats'), /٥٠\s*نقطة/);
   assert.match(await textOf(page, '.note'), /اقرا السؤال كويس/);
   assert.match(await page.title(), /سفر يونان/);
   assert.ok(await overflow(page) <= 0, 'no horizontal scroll at 360px');
@@ -404,7 +404,7 @@ test('open competition, phone: intro → form → all 7 types → reload restore
   assert.ok(await overflow(page) <= 0);
 
   // jump grid
-  await page.click('.jump__toggle');
+  // S4: the question numbers are always on show (no toggle)
   assert.equal(await page.$$eval('.jump__btn.is-done', els => els.length), 6, 'answered + info');
   await next(page);
 
@@ -472,7 +472,9 @@ test('accessibility (axe) and layout on every screen, phone and desktop', async 
     const small = await page.$$eval('#comp-main button, #comp-main a[href], .choice', els => els
       .filter(el => el.offsetParent !== null && !el.closest('details:not([open])'))
       .map(el => { const r = el.getBoundingClientRect(); return { t: el.textContent.trim().slice(0, 20), w: Math.round(r.width), h: Math.round(r.height) }; })
-      .filter(r => r.w < 44 || r.h < 44));
+      .filter(r => r.w < 44 || r.h < 44)
+      // S4 (approved): the question numbers are 40px circles
+      .filter(r => !(/^[٠-٩]+$/.test(r.t) && r.w >= 40 && r.h >= 40)));
     assert.deepEqual(small, [], 'touch targets ≥ 44px');
     for (let i = 0; i < 7; i += 1) await next(page);
     await waitState(page, 'review');
@@ -564,6 +566,9 @@ test('offline at submit: queued with the Arabic message, sent when the connectio
 
   mock.offline = true;
   await page.setOfflineMode(true);
+  // the connection bar is fixed at the bottom (the page leaves room under it): the button scrolled clear of it
+  await page.waitForSelector('#comp-net:not([hidden])');
+  await page.$eval('[data-submit]', n => n.scrollIntoView({ block: 'center' }));
   await page.click('[data-submit]');
   await page.waitForSelector('.alert');   // required ones missing first
   await page.click('[data-missing="2"]');
@@ -676,7 +681,7 @@ test('time limit: the clock runs from the server deadline and submits by itself 
 
   const mock = createMock({ timedMs: 4000 });
   const { context, page, problems } = await open('/competition/quiz-timed/', { mock });
-  assert.match(await textOf(page, '.chips'), /الوقت دقيقة/);
+  assert.match(await textOf(page, '.cx-stats'), /١\s*دقيقة/);
   await page.click('[data-cta]');
   await waitState(page, 'question');
   await page.waitForSelector('#comp-timer:not([hidden])');
@@ -739,7 +744,7 @@ test('admin preview: definition by postMessage, no network, no storage, result f
   await page.waitForFunction(() => window.msgs.some(m => m.type === 'athanasios:comp-preview-shown'));
   await frame.waitForFunction(() => document.getElementById('comp-main').dataset.state === 'intro');
   assert.equal(await frame.$eval('.hero__title', e => e.textContent), 'مسودة مسابقة');
-  assert.match(await frame.$eval('.chips', e => e.textContent), /٣ أسئلة/);
+  assert.match(await frame.$eval('.cx-stats', e => e.textContent), /٣\s*أسئلة/);
 
   // a message from anyone but the parent is ignored
   await frame.evaluate(() => window.postMessage({ type: 'athanasios:comp-preview', definition: { title: 'evil' }, state: 'open' }, location.origin));
@@ -792,7 +797,6 @@ test('the narrowest phones (280px): nothing wider than the screen', async () => 
   assert.ok(await overflow(page) <= 0, 'intro');
   await page.click('[data-cta]');
   await waitState(page, 'question');
-  await page.click('.jump__toggle');
   assert.ok(await overflow(page) <= 0, 'question + jump grid');
   await page.screenshot({ path: `${SHOTS}mobile-280-question.png` });
   for (let i = 0; i < 7; i += 1) await next(page);

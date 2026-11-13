@@ -2275,6 +2275,8 @@ function siteSitemapXml_(content, siteUrl) {
 
   slugs(content && content.pages).forEach(function (slug) { add(slug + '/'); });
   slugs(content && content.events).forEach(function (slug) { add('events/' + slug + '/'); });
+  // «المسابقات» (site wave 5): its list page while at least one competition is published
+  if (slugs(content && content.competitions).length) add('competitions/');
   slugs(content && content.competitions).forEach(function (slug) { add('competition/' + slug + '/'); });
 
   return '<?xml version="1.0" encoding="UTF-8"?>\n' +

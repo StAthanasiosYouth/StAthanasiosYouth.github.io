@@ -16,6 +16,7 @@ const content = JSON.parse(read('content.json'));
 const FIXED = ['', 'about/', 'events/', 'services/', 'news/', 'about-site/', 'privacy/', 'terms/'];
 const PUBLIC = [
   ...FIXED,
+  'competitions/',   // site wave 5: in the sitemap only while a competition is published (tests/comp-list.test.mjs)
   ...(content.pages || []).map(p => p.slug + '/'),
   ...(content.events || []).map(e => 'events/' + e.slug + '/'),
   ...(content.competitions || []).map(c => 'competition/' + c.slug + '/')
@@ -166,11 +167,12 @@ test('sitemap.xml = what a publish writes from content.json (every public page, 
   const xml = gs.siteSitemapXml_(content, SITE);
   assert.equal(read('sitemap.xml').replace(/\r\n/g, '\n'), xml);
   const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1]);
-  assert.deepEqual([...locs].sort(), PUBLIC.map(p => SITE + p).sort());
+  assert.deepEqual([...locs].sort(), PUBLIC.filter(p => p !== 'competitions/' || (content.competitions || []).length).map(p => SITE + p).sort());
   // a published event / competition joins; a bad slug never does
   const more = gs.siteSitemapXml_({ ...content, events: [{ slug: 'trip-1' }, { slug: '../x' }], competitions: [{ slug: 'quiz' }] }, SITE);
   assert.match(more, /<loc>https:\/\/stathanasiosyouth\.github\.io\/events\/trip-1\/<\/loc>/);
   assert.match(more, /<loc>https:\/\/stathanasiosyouth\.github\.io\/competition\/quiz\/<\/loc>/);
+  assert.match(more, /<loc>https:\/\/stathanasiosyouth\.github\.io\/competitions\/<\/loc>/, 'the list page with them');
   assert.doesNotMatch(more, /\.\.\/x/);
 });
 
