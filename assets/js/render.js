@@ -41,7 +41,7 @@ export function updateHero(site) {
   const nameEl = document.getElementById('site-name');
 
   if (nameEl) nameEl.textContent = site.name;
-  document.title = site.name;
+  // the tab title stays the page's own (index.html <title>, the words people search for), site wave 3
 
   // the top bar's name: the name's lead words
   const compact = document.querySelector('.topbar__name');

@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { harness } from './helpers.mjs';
 import { signSync } from '../src/lib/sync.js';
 import { pathKind, privateKey } from '../src/publish.js';
+import { revisionPath } from '../src/publish-mirror.js';
 
 const repo = p => readFileSync(new URL('../../' + p, import.meta.url), 'utf8');
 const SITE = {
@@ -41,6 +42,20 @@ test('pathKind: the files a publish writes, nothing else', () => {
     '../x/page.json', 'events/x/y/event.json', 'assets/js/main.js', 'media/a.webp', 'events/x/comp.json']) {
     assert.equal(pathKind(bad), null, bad);
   }
+});
+
+test('sitemap.xml (site wave 3): a publish file of its own, checked, stored and mirrored to the same path', async () => {
+  assert.deepEqual(pathKind('sitemap.xml'), { kind: 'sitemap', key: 'site' });
+  assert.equal(pathKind('x/sitemap.xml'), null);
+  assert.equal(revisionPath('sitemap', 'site'), 'sitemap.xml');
+  const h = harness();
+  const bad = await post(h, pub('pub-sm-0', { ...SITE, 'sitemap.xml': '<html>not a sitemap</html>' }));
+  assert.equal(bad.status, 400, JSON.stringify(bad.body));
+  const r = await post(h, pub('pub-sm-1', { ...SITE, 'sitemap.xml': repo('sitemap.xml') }));
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.ok((await live(h)).includes('sitemap:site@1'));
+  const row = await h.db.prepare("SELECT body FROM published_revisions WHERE kind = 'sitemap' AND live = 1").first();
+  assert.equal(row.body, repo('sitemap.xml'));
 });
 
 test('privateKey: the real published files carry none; any private key is found at any depth', () => {

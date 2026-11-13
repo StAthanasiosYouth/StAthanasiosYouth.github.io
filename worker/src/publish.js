@@ -45,6 +45,7 @@ const TYPES = {
   event: 'application/json; charset=utf-8',
   comp: 'application/json; charset=utf-8',
   ics: 'text/calendar; charset=utf-8',
+  sitemap: 'application/xml; charset=utf-8',
   stub: 'text/html; charset=utf-8'
 };
 
@@ -54,6 +55,7 @@ export function pathKind(path) {
   let m;
   if (p === 'content.json') return { kind: 'content', key: 'site' };
   if (p === 'meeting.ics') return { kind: 'ics', key: 'site' };
+  if (p === 'sitemap.xml') return { kind: 'sitemap', key: 'site' };
   if ((m = /^events\/([^/]+)\/(event\.json|index\.html)$/.exec(p)) && slugOk(m[1])) {
     return m[2] === 'event.json' ? { kind: 'event', key: m[1] } : { kind: 'stub', key: 'events/' + m[1] };
   }
@@ -95,6 +97,8 @@ async function checkFile(path, text) {
   let revision = '';
   if (where.kind === 'ics') {
     if (!/^BEGIN:VCALENDAR/.test(text)) throw new ApiError('bad', 'ics ' + path);
+  } else if (where.kind === 'sitemap') {
+    if (!/^<\?xml[^>]*\?>\s*<urlset\b/.test(text)) throw new ApiError('bad', 'sitemap ' + path);
   } else if (where.kind === 'stub') {
     if (!/^\s*<!doctype html/i.test(text)) throw new ApiError('bad', 'stub ' + path);
   } else {

@@ -1,2 +1,7 @@
+# أسرة البابا أثناسيوس الرسولي للشباب – سفاجا. Search engines and AI assistants are welcome on the
+# public pages. Private pages (the account, points, test pages) carry <meta name="robots" content="noindex">
+# and stay crawlable so that rule can be read; the admin is closed here as well.
 User-agent: *
 Disallow: /admin/
+
+Sitemap: https://stathanasiosyouth.github.io/sitemap.xml

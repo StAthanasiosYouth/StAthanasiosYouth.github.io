@@ -75,6 +75,15 @@ const UNAVAILABLE = { page: 'الصفحة دي مش متاحة دلوقتي', ev
    RENDER
 ========================================================= */
 
+/* a page taken down stays reachable (links people have) but leaves search results (site wave 3) */
+function leaveSearch() {
+  if (document.querySelector('meta[name="robots"]')) return;
+  const meta = document.createElement('meta');
+  meta.name = 'robots';
+  meta.content = 'noindex';
+  document.head.append(meta);
+}
+
 let shown = null;       // { kind, data } on screen
 let phaseKey = '';      // the event's booking phase / the list's state (re-render when it changes)
 
@@ -83,6 +92,7 @@ function render(kind, data) {
   shown = { kind, data };
 
   if (!data || data.withdrawn) {
+    if (data && data.withdrawn) leaveSearch();
     view.unavailable(UNAVAILABLE[kind] || UNAVAILABLE.page);
     phaseKey = '';
     return;

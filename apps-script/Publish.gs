@@ -596,6 +596,11 @@ function publishNow_(expectedRevision) {
         files['meeting.ics'] = ics;
       }
 
+      // sitemap.xml: the public pages as they are after this publish (Pages.gs, site wave 3)
+      if (typeof siteSitemapXml_ === 'function') {
+        files['sitemap.xml'] = siteSitemapXml_(built.content, config.siteUrl);
+      }
+
       // competition/<slug>/index.html + comp.json (or the withdrawn comp.json): the same commit
       if (comps) {
         var compFiles = compPublishFiles_(comps, config.siteUrl, cairoNow_(now), Object.keys(comps.live).some(function (id) { return !comps.live[id].comp || comps.live[id].comp.liveVersion !== comps.live[id].version; }) ? compShellText_() : '');

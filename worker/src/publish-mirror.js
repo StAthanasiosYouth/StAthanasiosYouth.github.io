@@ -29,6 +29,7 @@ export const MIRROR_LATE_MS = 5 * 60 * 1000;
 export function revisionPath(kind, key) {
   if (kind === 'content') return 'content.json';
   if (kind === 'ics') return 'meeting.ics';
+  if (kind === 'sitemap') return 'sitemap.xml';
   if (kind === 'page') return `${key}/page.json`;
   if (kind === 'event') return `events/${key}/event.json`;
   if (kind === 'comp') return `competition/${key}/comp.json`;

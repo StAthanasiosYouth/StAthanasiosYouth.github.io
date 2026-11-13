@@ -2176,6 +2176,8 @@ function pageStubHead_(kind, def, siteUrl) {
   var url = base + (kind === 'event' ? 'events/' : '') + def.slug + '/';
   var title = def.title + ' | ' + COMP_SITE_NAME;
   var description = contentLine_(kind === 'event' ? (def.summary || def.title) : (def.tagline || def.description || def.title)).slice(0, 200);
+  // a short line alone says little to a search engine: who and where (site wave 3)
+  if (description.length < 70) description = (description ? description + ' — ' : '') + (kind === 'event' ? 'فعالية من ' : 'خدمة من ') + 'أسرة البابا أثناسيوس الرسولي للشباب، كنيسة أبي سيفين بسفاجا.';
   var picture = def.cover && def.cover.src ? def.cover : null;
   var imageUrl = picture ? base + picture.src : base + 'assets/img/og-image.png';
   var alt = picture ? (picture.alt || def.title) : 'شعار أسرة البابا أثناسيوس الرسولي مع اسم الخدمة';
@@ -2249,6 +2251,38 @@ function pageStubHtml_(kind, def, siteUrl, shell) {
 function pagesFolder_(kind, slug) {
 
   return (kind === 'event' ? 'events/' : '') + slug + '/';
+
+}
+
+/*
+ * sitemap.xml (site wave 3): the site's public pages, written with every publish so the
+ * published service pages, events and competitions are always listed and taken-down ones
+ * leave. The fixed pages come first (keep in sync with the committed sitemap.xml;
+ * tests/seo.test.mjs checks). Private pages (account, points, admin) are never listed.
+ */
+var SITEMAP_FIXED_PATHS = ['', 'about/', 'events/', 'services/', 'news/', 'about-site/', 'privacy/', 'terms/'];
+
+function siteSitemapXml_(content, siteUrl) {
+
+  var site = safeHttpsUrl(siteUrl || '') || COMP_SITE_URL;
+  var base = site.replace(/\/?$/, '/');
+  var paths = SITEMAP_FIXED_PATHS.slice();
+  var add = function (path) { if (paths.indexOf(path) === -1) paths.push(path); };
+  var slugs = function (list) {
+    return (Array.isArray(list) ? list : []).map(function (x) { return x && x.slug; })
+      .filter(function (slug) { return typeof slug === 'string' && COMP_SLUG.test(slug); });
+  };
+
+  slugs(content && content.pages).forEach(function (slug) { add(slug + '/'); });
+  slugs(content && content.events).forEach(function (slug) { add('events/' + slug + '/'); });
+  slugs(content && content.competitions).forEach(function (slug) { add('competition/' + slug + '/'); });
+
+  return '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+    paths.map(function (path) {
+      return '  <url><loc>' + compEscapeHtml_(base + path) + '</loc></url>';
+    }).join('\n') + '\n' +
+    '</urlset>\n';
 
 }
 

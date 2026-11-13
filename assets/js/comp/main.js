@@ -24,6 +24,15 @@ import { mountNav, homeLink } from '../nav.js';
 import { playGameIntro } from '../game-intro.js';
 import { fetchPublished } from '../content-source.js';
 
+/* a page taken down stays reachable (links people have) but leaves search results (site wave 3) */
+function leaveSearch() {
+  if (document.querySelector('meta[name="robots"]')) return;
+  const meta = document.createElement('meta');
+  meta.name = 'robots';
+  meta.content = 'noindex';
+  document.head.append(meta);
+}
+
 /* the mount points (a stub made from an older shell may only have its own <main>) */
 function mount(id, make) {
   let el = document.getElementById(id);
@@ -585,6 +594,7 @@ async function boot() {
   }
 
   if (S.def.withdrawn) {
+    leaveSearch();
     S.state = { name: 'unavailable' };
     render({ focus: false });
     return;

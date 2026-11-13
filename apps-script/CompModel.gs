@@ -1100,7 +1100,9 @@ function compStubHtml_(def, siteUrl, version, shell) {
     .replace(/[ \t]*<meta\s+name="description"[^>]*>[ \t]*\n?/gi, '')
     .replace(/[ \t]*<link\s+rel="canonical"[^>]*>[ \t]*\n?/gi, '')
     .replace(/[ \t]*<meta\s+property="og:[^"]*"[^>]*>[ \t]*\n?/gi, '')
-    .replace(/[ \t]*<meta\s+name="twitter:[^"]*"[^>]*>[ \t]*\n?/gi, '');
+    .replace(/[ \t]*<meta\s+name="twitter:[^"]*"[^>]*>[ \t]*\n?/gi, '')
+    // the bare shell is not a page people search for; a published competition is (site wave 3)
+    .replace(/[ \t]*<meta\s+name="robots"[^>]*>[ \t]*\n?/gi, '');
 
   html = html.replace(/<html\b([^>]*)>/, function (all, attrs) {
     return '<html' + attrs.replace(/\s+data-(slug|v)="[^"]*"/g, '') + ' data-slug="' + e(def.slug) + '" data-v="' + e(version || '') + '">';

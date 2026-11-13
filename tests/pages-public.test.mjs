@@ -447,8 +447,10 @@ for (const file of ['pages/index.html', 'events/index.html']) {
     assert.doesNotMatch(shell, /<script(?![^>]*\bsrc=)[^>]*>/, 'no inline script');
     assert.doesNotMatch(shell, /<style|\sstyle="/, 'no inline style');
     assert.doesNotMatch(shell, /<html[^>]*data-(slug|v)=/, 'the shell itself has no slug');
+    // the one absolute address: the list page's own canonical (site wave 3, search engines)
+    const canonical = (/<link rel="canonical" href="([^"]+)">/.exec(shell) || [])[1];
     for (const [, url] of shell.matchAll(/\s(?:href|src)="([^"]+)"/g)) {
-      if (url.startsWith('#')) continue;
+      if (url.startsWith('#') || (url === canonical && /^https:\/\/stathanasiosyouth\.github\.io\/(events|services|news)\/$/.test(url))) continue;
       assert.match(url, /^\.\.\//, `${url} is relative to the site root`);
     }
     assert.match(shell, /src="\.\.\/assets\/js\/page\/main\.js"/);
