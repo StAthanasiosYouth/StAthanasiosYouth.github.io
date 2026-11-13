@@ -50,7 +50,7 @@ function markup() {
   return `
 <div class="ic__room"></div>
 <div class="ic__site"></div>
-<div class="ic__world"><div class="ic__church"></div><div class="ic__saint ic__saint--athanasius"><img src="${img('saint-athanasius')}" alt=""><span class="ic__plaque"><b>القديس أثناسيوس الرسولي</b><i>حامي الإيمان</i></span></div><div class="ic__saint ic__saint--sefein"><img src="${img('saint-sefein')}" alt=""><span class="ic__plaque"><b>الشهيد العظيم أبي سيفين</b><i>فيلوباتير مرقوريوس</i></span></div></div>
+<div class="ic__world"><div class="ic__church"><i class="ic__shade"></i></div><div class="ic__saint ic__saint--athanasius"><img src="${img('saint-athanasius')}" alt=""><span class="ic__plaque"><b>القديس أثناسيوس الرسولي</b><i>حامي الإيمان</i></span></div><div class="ic__saint ic__saint--sefein"><img src="${img('saint-sefein')}" alt=""><span class="ic__plaque"><b>الشهيد العظيم أبي سيفين</b><i>فيلوباتير مرقوريوس</i></span></div></div>
 <canvas class="ic__fx"></canvas>
 <div class="ic__rig">
   <div class="ic__card">
@@ -89,7 +89,7 @@ function markup() {
     <button class="ic__seal" type="button" aria-label="ادخل — أسرة البابا أثناسيوس"><img src="${logo}" alt=""></button>
     <p class="ic__hint">دوس على اللوجو علشان تبدأ الرحلة في الموقع</p>
   </div>
-  <div class="ic__shutters" aria-hidden="true"></div>
+  <canvas class="ic__shutters" aria-hidden="true"></canvas>
   <div class="ic__say" aria-live="polite"></div>
 </div>`;
 }
@@ -110,7 +110,9 @@ function makeSound() {
   catch { return null; }
   const node = (at, pan, wet) => { const g = AC.createGain(), p = AC.createStereoPanner ? AC.createStereoPanner() : null; if (p) { p.pan.setValueAtTime(pan || 0, at); g.connect(p); p.connect(bus); if (wet) p.connect(verb); } else { g.connect(bus); if (wet) g.connect(verb); } return { g, p }; };
   const osc = (type, f1, f2, at, dur, vol, o = {}) => { const t = AC.currentTime + at, x = AC.createOscillator(), n = node(t, o.pan, o.wet); x.type = type; x.frequency.setValueAtTime(f1, t); if (f2) x.frequency.exponentialRampToValueAtTime(f2, t + (o.glide || dur)); n.g.gain.setValueAtTime(0, t); n.g.gain.linearRampToValueAtTime(vol, t + (o.atk || 0.005)); n.g.gain.exponentialRampToValueAtTime(0.0001, t + dur); x.connect(n.g); x.start(t); x.stop(t + dur + 0.1); };
-  const noise = (at, dur, type, f1, f2, vol, o = {}) => { const t = AC.currentTime + at, b = AC.createBuffer(1, Math.ceil(AC.sampleRate * dur), AC.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; const s = AC.createBufferSource(), f = AC.createBiquadFilter(), n = node(t, o.pan, o.wet); s.buffer = b; f.type = type; f.Q.value = o.q || 0.9; f.frequency.setValueAtTime(f1, t); f.frequency.exponentialRampToValueAtTime(f2, t + dur); n.g.gain.setValueAtTime(0, t); n.g.gain.linearRampToValueAtTime(vol, t + dur * (o.peak || 0.1)); n.g.gain.exponentialRampToValueAtTime(0.0001, t + dur); if (n.p && o.pan2 != null) n.p.pan.linearRampToValueAtTime(o.pan2, t + dur); s.connect(f); f.connect(n.g); s.start(t); };
+  const WHITE = AC.createBuffer(1, AC.sampleRate * 4, AC.sampleRate);
+  { const d = WHITE.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+  const noise = (at, dur, type, f1, f2, vol, o = {}) => { const t = AC.currentTime + at; const s = AC.createBufferSource(), f = AC.createBiquadFilter(), n = node(t, o.pan, o.wet); s.buffer = WHITE; s.loop = true; f.type = type; f.Q.value = o.q || 0.9; f.frequency.setValueAtTime(f1, t); f.frequency.exponentialRampToValueAtTime(f2, t + dur); n.g.gain.setValueAtTime(0, t); n.g.gain.linearRampToValueAtTime(vol, t + dur * (o.peak || 0.1)); n.g.gain.exponentialRampToValueAtTime(0.0001, t + dur); if (n.p && o.pan2 != null) n.p.pan.linearRampToValueAtTime(o.pan2, t + dur); s.connect(f); f.connect(n.g); s.start(t, Math.random() * 3); s.stop(t + dur + 0.05); };
   const bell = (f, at, dur, vol) => { [1, 2.756, 5.404, 8.933].forEach((k, i) => { osc('sine', f * k, 0, at, dur / (1 + i * 0.8), vol / (1 + i * 1.6), { wet: true, pan: (i % 2 ? 0.25 : -0.25) }); }); };
   const SFX = [
     [0, () => { osc('sine', 150, 38, 0, 0.9, 0.55, { glide: 0.5 }); noise(0, 0.5, 'lowpass', 900, 120, 0.35, { wet: true }); osc('sawtooth', 55, 0, 0, 1.6, 0.05, { wet: true }); }],
@@ -159,7 +161,8 @@ export function playCardIntro({ onEnd } = {}) {
 
     /* particles (deterministic by time) */
     const cv = $('.ic__fx'), ctx = cv.getContext('2d');
-    function sizeCanvas() { const dpr = Math.min(light ? 1 : 2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+    // soft dots: one canvas pixel per CSS pixel looks the same and spares a phone 4–7× the drawing
+    function sizeCanvas() { const dpr = 1; W = innerWidth; H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
     const rnd = i => { const x = Math.sin(i * 127.1) * 43758.5453; return x - Math.floor(x); };
     function drawFx(t) {
       ctx.clearRect(0, 0, W, H);
@@ -239,8 +242,10 @@ export function playCardIntro({ onEnd } = {}) {
       A('.ic__flash', [{ opacity: 0 }, { opacity: 0.9, offset: 0.35 }, { opacity: 0 }], { duration: 650, delay: 3740, easing: 'ease-out' });
       A('.ic__site', [{ opacity: 0 }, { opacity: 1 }], { duration: 300, delay: 3820 });
       A('.ic__world', [{ opacity: 0 }, { opacity: 1 }], { duration: 500, delay: 3780 });
-      const dim = L.portrait ? 'brightness(.36) saturate(.75) blur(4px)' : 'brightness(.34) saturate(.8) blur(2px)';
-      A('.ic__church', [{ transform: 'scale(1.3)', filter: 'brightness(.9) saturate(.8) blur(2px)' }, { transform: 'scale(1)', filter: dim }], { duration: 2400, delay: 3780 });
+      // the church: its blur and colour are baked into the picture (church-soft*.webp); the dimming is a dark shade
+      // (brightness b = a black layer at 1 − b), so no filter is recomputed while it zooms
+      A('.ic__church', [{ transform: 'scale(1.3)' }, { transform: 'scale(1)' }], { duration: 2400, delay: 3780 });
+      A('.ic__shade', [{ opacity: 0.1 }, { opacity: L.portrait ? 0.64 : 0.66 }], { duration: 2400, delay: 3780 });
       A('.ic__saint--athanasius', [{ opacity: 0, transform: 'translateX(-70px) scale(.9)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 850, delay: 4100 });
       A('.ic__saint--sefein', [{ opacity: 0, transform: 'translateX(70px) scale(.9)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 850, delay: 4200 });
       A('.ic__logo', [{ opacity: 0, transform: 'scale(1.6)', filter: 'blur(10px)' }, { opacity: 1, transform: 'scale(1)', filter: 'blur(0)' }], { duration: 620, delay: 3900 });
@@ -308,21 +313,42 @@ export function playCardIntro({ onEnd } = {}) {
     build(); seek(0, true);
     const gate = $('.ic__gate');
     /* the dark cells laid over the wall along its slant, unseen until the welcome closes them one by one (the
-       gate itself comes in all at once, quickly: owner, 2026-11-13) */
+       gate itself comes in all at once, quickly: owner, 2026-11-13). Drawn on ONE canvas: ~100 animated elements
+       were ~100 layers on a phone's graphics chip (the lag on mid-range phones); the cells and their timing are the
+       same. */
     const shutters = $('.ic__shutters');
     const cells = (() => {
-      const cw = Math.max(150, Math.min(innerWidth, innerHeight) * 0.42), ch = cw * 0.63, list = [];
-      shutters.style.setProperty('--cw', cw + 'px');
-      shutters.style.setProperty('--ch', ch + 'px');
-      for (let y = -2; y < Math.ceil(innerHeight / ch) + 3; y++) for (let x = -2; x < Math.ceil(innerWidth / cw) + 3; x++) {
-        const c = document.createElement('i');
-        c.style.left = (x * cw) + 'px';
-        c.style.top = (y * ch) + 'px';
-        shutters.append(c);
-        list.push([c, Math.abs(Math.sin(list.length * 127.1) * 43758.5453) % 1]);
+      // a square as wide as the screen's diagonal, turned along the wall: it covers every corner
+      const D = Math.ceil(Math.hypot(innerWidth, innerHeight)), dpr = Math.min(2, devicePixelRatio || 1), cw = Math.max(150, Math.min(innerWidth, innerHeight) * 0.42) * 1.5, ch = cw * 0.63, list = [];   // the same size as before (the old layer was scaled 1.5)
+      shutters.width = D * dpr;
+      shutters.height = D * dpr;
+      shutters.style.width = shutters.style.height = D + 'px';
+      shutters.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+      shutters.dataset.size = D;
+      for (let y = 0; y < Math.ceil(D / ch); y++) for (let x = 0; x < Math.ceil(D / cw); x++) {
+        list.push({ x: x * cw, y: y * ch, w: cw, h: ch, k: Math.abs(Math.sin(list.length * 127.1) * 43758.5453) % 1 });
       }
-      return list.sort((p, q) => p[1] - q[1]).map(c => c[0]);
+      return list.sort((p, q) => p.k - q.k);
     })();
+    /* the cells closing: cell i starts at from + i·step and takes 700 ms (opacity 0 → 1, scale .92 → 1, ease-out) */
+    function closeCells(from, span) {
+      const g = shutters.getContext('2d'), order = cells.slice().reverse(), step = span / order.length, t0 = performance.now();
+      const ease = p => 1 - (1 - p) * (1 - p);
+      (function draw(now) {
+        const t = now - t0;
+        g.clearRect(0, 0, +shutters.dataset.size, +shutters.dataset.size);
+        g.fillStyle = '#01050d';
+        order.forEach((c, i) => {
+          const p = Math.min(1, Math.max(0, (t - from - i * step) / 700));
+          if (!p) return;
+          const e = ease(p), s = 0.92 + 0.08 * e, w = c.w * s + 2, h = c.h * s + 2;
+          g.globalAlpha = e;
+          g.fillRect(c.x + (c.w - w) / 2, c.y + (c.h - h) / 2, w, h);
+        });
+        g.globalAlpha = 1;
+        if (t < from + span + 750 && document.body.contains(shutters)) requestAnimationFrame(draw);
+      })(t0);
+    }
     // the moving wall: ~4 minutes of the meeting's own videos that loops with no cut (tools/build-gate-world.mjs),
     // loaded at once; nothing still shows before it (owner, 2026-11-13): it fades in once it plays. A weak device or data saver: the dark gate alone.
     const film = $('.ic__film');
@@ -422,12 +448,7 @@ export function playCardIntro({ onEnd } = {}) {
       G('.ic__hint', [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(10px)' }], { duration: 900, delay: WORDS_AT * 1000, easing: 'ease-in', fill: 'forwards' });
       sfx(x => { x.noise(0, 1.4, 'highpass', 4000, 9000, 0.03, { wet: true }); x.bell(1046.5, 0.05, 1.6, 0.03); x.osc('sine', 130, 65, 0, 1.2, 0.12, { glide: 0.8, wet: true }); });
       // 0.5 — the videos go dark one by one: dark tiles laid along the wall's own slant
-      const step = DARK_FOR * 1000 / cells.length;
-      cells.slice().reverse().forEach((c, i) => {
-        c.getAnimations().forEach(x => x.cancel());
-        c.style.opacity = '0';
-        G(c, [{ opacity: 0, transform: 'scale(.92)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 700, delay: DARK_AT * 1000 + i * step, easing: 'ease-out', fill: 'forwards' });
-      });
+      closeCells(DARK_AT * 1000, DARK_FOR * 1000);
       // a soft tick as each video goes dark (a pentatonic run, left and right)
       const PENTA = [1318.5, 1568, 1760, 2093, 2349.3];
       for (let n = 0; n < 16; n++) { const t = DARK_AT + n * DARK_FOR / 16; sfx(x => { x.osc('sine', PENTA[(n * 3) % 5], 0, t, 0.12, 0.024, { wet: true, pan: (n % 2 ? 0.45 : -0.45) }); x.noise(t, 0.06, 'highpass', 6000, 9000, 0.012, { pan: (n % 2 ? 0.45 : -0.45) }); }); }
@@ -493,9 +514,9 @@ export function playCardIntro({ onEnd } = {}) {
       dawn.style.left = (sb.left + sb.width / 2) + 'px';
       dawn.style.top = (sb.top + sb.height / 2) + 'px';
       G(dawn, [
-        { opacity: 0, transform: 'translate(-50%, -50%) scale(.05)' },
-        { opacity: 1, transform: 'translate(-50%, -50%) scale(.3)', offset: 0.35 },
-        { opacity: 0.9, transform: `translate(calc(-50% + ${innerWidth / 2 - (sb.left + sb.width / 2)}px), calc(-50% + ${innerHeight / 2 - (sb.top + sb.height / 2)}px)) scale(1.4)` }
+        { opacity: 0, transform: 'translate(-50%, -50%) scale(.2)' },
+        { opacity: 1, transform: 'translate(-50%, -50%) scale(1.2)', offset: 0.35 },
+        { opacity: 0.9, transform: `translate(calc(-50% + ${innerWidth / 2 - (sb.left + sb.width / 2)}px), calc(-50% + ${innerHeight / 2 - (sb.top + sb.height / 2)}px)) scale(5.6)` }
       ], { duration: 1500, delay: OUT * 1000 + 500, easing: 'cubic-bezier(.5,0,.3,1)', fill: 'forwards' });
       sfx(x => { x.noise(OUT + 0.4, 1.6, 'highpass', 200, 4000, 0.06, { peak: 0.95, wet: true }); x.osc('sine', 196, 392, OUT + 0.5, 1.5, 0.03, { glide: 1.5, wet: true }); });   // no bell here: the card brings its own glint (owner: not the same sound twice)
       G(say, [{ opacity: 1, transform: 'none', filter: 'blur(0)' }, { opacity: 0, transform: 'translateY(-14px)', filter: 'blur(8px)' }], { duration: 800, delay: OUT * 1000, easing: 'ease-in', fill: 'forwards' });

@@ -80,7 +80,8 @@
 
 /* the world on the other side of the card (landscape = the desktop layout) */
 .ic__world { position: absolute; inset: 0; opacity: 0; background: #020a18; }
-.ic__church { position: absolute; inset: 0; background: url(../img/intro/church.webp) no-repeat; filter: brightness(.34) saturate(.8) blur(2px); }
+.ic__church { position: absolute; inset: 0; background: url(../img/intro/church-soft.webp) no-repeat; will-change: transform; }
+.ic__shade { position: absolute; inset: 0; background: #000; opacity: .66; }
 .ic__saint { position: absolute; top: 50%; width: var(--sw); margin-top: calc(var(--sw) * -1.02); opacity: 0; }
 .ic__saint img { width: 100%; display: block; filter: brightness(1.06) drop-shadow(0 34px 44px rgb(0 0 0 / .75)) drop-shadow(0 0 26px rgba(var(--gold-f0d296-rgb), .22)); }
 .ic__saint--athanasius { left: 5vw; }
@@ -93,7 +94,8 @@
 /* portrait (phones, tablets standing up): the approved phone layout, sized by height so it always fits */
 @media (max-aspect-ratio: 4/5) {
   .ic { --sw: min(23vw, 13.5vh); }
-  .ic__church { inset: -6%; background-size: cover !important; background-position: center 40% !important; filter: brightness(.36) saturate(.75) blur(4px) !important; }
+  .ic__church { inset: -6%; background-image: url(../img/intro/church-soft-tall.webp); background-size: cover !important; background-position: center 40% !important; }
+  .ic__shade { opacity: .64; }
   .ic__saint { top: calc(env(safe-area-inset-top) + 9vh); margin-top: 0; }
   .ic__saint--athanasius { left: 8vw; } .ic__saint--sefein { right: 8vw; }
   .ic__plaque { margin-top: .7vh; padding: 0; border: 0; background: none; box-shadow: none; max-width: 34vw; width: auto; font-size: clamp(10.5px, 1.7vh, 16px); }
@@ -157,7 +159,7 @@
 /* ======================= the member's welcome (S2) ======================= */
 .mi { position: fixed; inset: 0; z-index: 200; overflow: hidden; pointer-events: none; }
 .mi__bg { position: absolute; inset: 0; background: #020914; }
-.mi__art { position: absolute; left: 50%; top: 44%; width: 220vmax; height: 220vmax; margin: -110vmax 0 0 -110vmax; background: repeating-conic-gradient(from 0deg, rgba(var(--gold-hi-rgb), .07) 0deg 1.2deg, transparent 1.2deg 9deg); -webkit-mask: radial-gradient(closest-side, #000 4%, transparent 30%); mask: radial-gradient(closest-side, #000 4%, transparent 30%); opacity: 0; }
+.mi__art { position: absolute; left: 50%; top: 44%; width: 70vmax; height: 70vmax; margin: -35vmax 0 0 -35vmax; background: repeating-conic-gradient(from 0deg, rgba(var(--gold-hi-rgb), .07) 0deg 1.2deg, transparent 1.2deg 9deg); -webkit-mask: radial-gradient(closest-side, #000 12.6%, transparent 94.3%); mask: radial-gradient(closest-side, #000 12.6%, transparent 94.3%); opacity: 0; will-change: transform, opacity; }
 .mi__veil { position: absolute; inset: 0; background: radial-gradient(42% 34% at 50% 44%, rgb(16 52 94 / .75), rgb(2 9 20 / .2) 60%, transparent 75%), radial-gradient(120% 90% at 50% 50%, transparent 40%, #01060e 100%); }
 .mi__stage { position: absolute; inset: 0; display: grid; place-items: center; }
 .mi__core { display: flex; flex-direction: column; align-items: center; transform: translateY(-3vh); }
@@ -186,8 +188,7 @@
 
 /* ======================= the welcome (owner, 2026-11-13): between the gate and the card ======================= */
 /* the wall's videos go dark one by one: dark tiles along the wall's slant */
-.ic__shutters { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; transform: rotate(22deg) scale(1.5); }
-.ic__shutters i { position: absolute; width: var(--cw); height: var(--ch); background: #01050d; opacity: 0; box-shadow: 0 0 0 1px #01050d; }
+.ic__shutters { position: absolute; left: 50%; top: 50%; z-index: 0; pointer-events: none; transform: translate(-50%, -50%) rotate(22deg); }
 .ic__gate.is-on .ic__veil, .ic__gate.is-on .ic__dust { z-index: 0; }
 .ic__gate .ic__hall { z-index: 1; }
 /* the words as they are said, under the risen logo */
@@ -201,5 +202,5 @@
 .ic__line:nth-child(2) span:nth-child(n + 2):nth-child(-n + 5), .ic__line:nth-child(3) span:nth-child(n + 2):nth-child(-n + 5) { color: var(--champagne); }
 
 /* the light between the welcome and the card: the logo gathers into it, the card comes out of it */
-.ic__dawn { position: absolute; z-index: 9; left: 50%; top: 50%; width: 120vmax; height: 120vmax; border-radius: 50%; pointer-events: none; opacity: 0;
-  background: radial-gradient(closest-side, rgba(var(--gold-fff1c9-rgb), .55), rgba(var(--gold-f0d28c-rgb), .22) 28%, rgb(13 42 80 / .18) 55%, transparent 72%); transform: translate(-50%, -50%) scale(.05); }
+.ic__dawn { position: absolute; z-index: 9; left: 50%; top: 50%; width: 30vmax; height: 30vmax; will-change: transform, opacity; border-radius: 50%; pointer-events: none; opacity: 0;
+  background: radial-gradient(closest-side, rgba(var(--gold-fff1c9-rgb), .55), rgba(var(--gold-f0d28c-rgb), .22) 28%, rgb(13 42 80 / .18) 55%, transparent 72%); transform: translate(-50%, -50%) scale(.2); }

@@ -406,7 +406,10 @@ function startSite() {
   startFeel();
   setupTopbar();
   startRouter(openRoute);
-  load();
+  // the card opening covers the page: build it once the gate has come in, not during its entrance (a phone's
+  // processor does one thing at a time); with no opening, or the member's welcome, at once as before
+  if (document.documentElement.getAttribute('data-intro') === 'card') setTimeout(load, 1300);
+  else load();
   startIntro();
   startPush();
 
