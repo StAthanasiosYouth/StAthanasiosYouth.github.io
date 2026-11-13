@@ -20,6 +20,8 @@ import { handle as workerHandle } from '../worker/src/index.js';
 import { resetAuthCaches, GOOGLE_JWKS_URL } from '../worker/src/lib/auth.js';
 import { migratedDb } from '../worker/test/d1-sqlite.mjs';
 import GUIDE from './source/admin-guide.mjs';
+import { adminApi, scoredComp, wallAt } from '../tests/fakes/comp.mjs';
+import { compImportTick } from '../worker/src/content/compdrafts.js';
 
 const require = createRequire(`${ROOT}tools/package.json`);
 const puppeteer = require('puppeteer-core');
@@ -84,7 +86,14 @@ world.properties.set('ADMIN_CLIENT_ID', TEST_CLIENT);
 world.gs.apiSaveItem('news', { id: 'news-aaaa1111', title: 'رحلة الصيف', summary: 'سجّل اسمك قبل الخميس' });
 world.gs.apiSaveItem('news', { id: 'news-bbbb2222', title: 'مؤتمر الشباب', summary: 'الجمعة الجاية الساعة ٦' });
 world.gs.apiSaveItem('notifications', { title: 'بوستر المؤتمر نزل', type: 'important', target: 'https://example.org/poster' });
+// «المسابقات»: one demo competition (made-up questions), made in the fake Apps Script world and moved to the local Worker below
+// the same way production moved them (compImportTick) — all in memory, nothing real is read or written
 world.as('');
+{
+  const gcall = adminApi(world);
+  gcall('apiCompSettings', { registry: true, wallet: true });
+  scoredComp(gcall, { title: 'مسابقة تجريبية', slug: 'demo-quiz', description: 'مسابقة للتجربة', startAt: wallAt(world, -60), endAt: wallAt(world, 1440) });
+}
 world.properties.set('WORKER_SYNC_SECRET', SECRET);
 world.properties.set('ADMIN_PLATFORM', 'worker');
 world.gs.API_REQUEST_ = null;
@@ -95,6 +104,22 @@ world.gs.API_REQUEST_ = null;
   const imp = await call('/v1/sync/content-import', { method: 'POST', body: raw, headers: { 'x-sync-ts': ts, 'x-sync-signature': sig } });
   if ((await imp.json()).state !== 'ok') throw new Error('content import failed');
   env.DB.raw.exec("UPDATE settings SET value = '1' WHERE key = 'CONTENT_DRAFTS'");
+  {
+    const APPS = 'https://script.google.test/macros/s/demo/exec';
+    env.APPS_SCRIPT_URL = APPS;
+    world.properties.set('CONTENT_WRITER', 'worker');
+    const appsFetch = async (url, init) => {
+      if (url !== APPS) throw new Error('unexpected fetch ' + url);
+      const reply = world.post(JSON.parse(init.body));
+      delete reply.mime;
+      return new Response(JSON.stringify(reply), { headers: { 'content-type': 'application/json' } });
+    };
+    env.DB.raw.exec("INSERT INTO settings (key, value, updated_at) VALUES ('COMP_IMPORT', 'apply', 0) ON CONFLICT(key) DO UPDATE SET value = 'apply'");
+    const moved = await compImportTick(env, appsFetch);
+    if (!moved || moved.state !== 'applied') throw new Error('demo competition move: ' + JSON.stringify(moved).slice(0, 300));
+    // the fake world's built-in admin never shows: every stamp becomes the demo admin
+    env.DB.raw.exec("UPDATE draft_rows SET data = replace(data, 'menazakmena@gmail.com', '" + ADMIN + "')");
+  }
   env.DB.raw.exec("UPDATE settings SET value = 'on' WHERE key = 'accounts_mode'");
   // «الحجوزات والفلوس»: the module on, one demo trip and four demo bookings (made-up names, 0100… numbers)
   {
