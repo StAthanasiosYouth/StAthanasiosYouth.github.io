@@ -1,0 +1,205 @@
+/*
+ * The home page's openings (site redesign W3): the card intro with its gate (approved S1; the gate's new look
+ * 2026-11-13) and the member's welcome (approved S2). Loaded only when one of them plays (intro-card.js,
+ * intro-member.js). Every gold here is a token (W1), so «لون الموقع» colours it too.
+ */
+
+/* ======================= the card intro (S1) ======================= */
+.ic { --cw: 600px; --pw: 200px; --sw: clamp(130px, min(21vw, 34vh), 520px); --champagne: rgb(var(--gold-e3cf9f-rgb)); --champagne-2: rgb(var(--gold-c9ad74-rgb)); --ink: #f1f4f8; --ink-2: #bcc7d6;
+  position: fixed; inset: 0; z-index: 200; overflow: hidden; perspective: 1400px; line-height: normal; letter-spacing: normal; text-align: start; background: #01050d; color: var(--ink); font-family: "Cairo", system-ui, sans-serif; direction: rtl; transition: opacity .45s cubic-bezier(.16, 1, .3, 1); }
+.ic.is-leaving { opacity: 0; pointer-events: none; }
+.ic * { box-sizing: border-box; }
+.ic__room { position: absolute; inset: 0; background: radial-gradient(50% 46% at 50% 48%, #0d2a50 0%, #05132a 55%, #01050d 100%); }
+.ic__fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.ic__site { position: absolute; inset: 0; background: radial-gradient(62% 56% at 50% 40%, #10305a 0%, #071b38 46%, #020a18 100%); opacity: 0; }
+.ic__flare { position: absolute; left: 50%; top: 50%; width: 140vmax; height: 4px; margin: -2px 0 0 -70vmax; background: linear-gradient(90deg, transparent, rgb(255 244 220 / 0) 20%, rgb(255 244 220 / .85) 50%, rgb(255 244 220 / 0) 80%, transparent); filter: blur(2px); opacity: 0; }
+.ic__flash { position: absolute; inset: 0; background: radial-gradient(circle at 50% 46%, #fff8e8, rgb(var(--gold-e9d3a1-rgb)) 40%, #0b2448 85%); opacity: 0; }
+.ic__rig { position: absolute; inset: 0; display: grid; place-items: center; transform-style: preserve-3d; }
+.ic__card { position: absolute; width: var(--cw); aspect-ratio: 1134 / 543; transform-style: preserve-3d; opacity: 0; }
+.ic__face { position: absolute; inset: 0; border-radius: 4.2% / 8.8%; overflow: hidden; box-shadow: 0 40px 90px -34px #000, 0 0 0 1px rgba(var(--gold-e3cf9f-rgb), .3); }
+.ic__face img { width: 100%; height: 100%; display: block; }
+.ic__face--qr { transform: rotateY(180deg); opacity: 0; }
+.ic__sheen { position: absolute; inset: 0; background: linear-gradient(105deg, transparent 38%, rgb(255 248 230 / .28) 50%, transparent 62%); transform: translateX(-140%); }
+.ic__qrmark { position: absolute; right: 15.2%; top: 25%; width: 22.6%; height: 46.6%; border-radius: 6%; box-shadow: 0 0 0 2px var(--champagne), 0 0 34px 6px rgba(var(--gold-e3cf9f-rgb), .55); opacity: 0; transform: rotateY(180deg) translateZ(2px); }
+
+/* a real iPhone (15 Pro proportions 71.6 × 147.6 mm) */
+.ic__phone { position: absolute; width: var(--pw); aspect-ratio: 71.6 / 147.6; border-radius: calc(var(--pw) * .2); padding: calc(var(--pw) * .022); opacity: 0;
+  background: linear-gradient(118deg, #b7bcc4 0%, #6d727a 9%, #3a3e45 22%, #2a2d32 50%, #4b5058 78%, #a9aeb6 92%, #e2e5ea 100%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .35), inset 0 0 0 2px rgb(0 0 0 / .5), 0 60px 100px -36px #000, 0 20px 40px -24px rgb(0 0 0 / .8); }
+.ic__phone::before { content: ""; position: absolute; left: calc(var(--pw) * -.014); top: 17%; width: calc(var(--pw) * .02); height: 5%; border-radius: 3px 0 0 3px; background: linear-gradient(90deg, #8b9098, #3f434a);
+  box-shadow: 0 calc(var(--pw) * .2) 0 0 #5d626a, 0 calc(var(--pw) * .34) 0 0 #5d626a; }
+.ic__phone::after { content: ""; position: absolute; right: calc(var(--pw) * -.014); top: 25%; width: calc(var(--pw) * .02); height: 13%; border-radius: 0 3px 3px 0; background: linear-gradient(270deg, #8b9098, #3f434a); }
+.ic__screen { position: relative; width: 100%; height: 100%; border-radius: calc(var(--pw) * .18); overflow: hidden; background: #000; box-shadow: inset 0 0 0 calc(var(--pw) * .022) #050505; }
+.ic__glass { position: absolute; inset: 0; z-index: 7; border-radius: inherit; pointer-events: none; background: linear-gradient(125deg, rgb(255 255 255 / .14) 0%, rgb(255 255 255 / 0) 28%, rgb(255 255 255 / 0) 70%, rgb(255 255 255 / .05) 100%); }
+.ic__island { position: absolute; z-index: 6; top: calc(var(--pw) * .045); left: 50%; width: 32%; height: calc(var(--pw) * .088); transform: translateX(-50%); border-radius: 999px; background: #000; }
+.ic__island::after { content: ""; position: absolute; right: 18%; top: 50%; width: calc(var(--pw) * .04); height: calc(var(--pw) * .04); margin-top: calc(var(--pw) * -.02); border-radius: 50%; background: radial-gradient(circle at 35% 35%, #2a3550, #05070c 60%); }
+.ic__status { position: absolute; z-index: 6; top: calc(var(--pw) * .05); left: 0; right: 0; display: flex; justify-content: space-between; padding: 0 calc(var(--pw) * .085); direction: ltr; font: 700 calc(var(--pw) * .052) / 1 -apple-system, "SF Pro Text", Cairo, sans-serif; color: #fff; }
+.ic__status svg { height: calc(var(--pw) * .048); fill: #fff; }
+.ic__status span:last-child { display: flex; gap: calc(var(--pw) * .02); align-items: center; }
+.ic__lock { position: absolute; inset: calc(var(--pw) * .022); border-radius: calc(var(--pw) * .16); overflow: hidden; background: radial-gradient(90% 60% at 30% 20%, #23477a, #0b1d38 55%, #040a16); display: flex; flex-direction: column; align-items: center; }
+.ic__lock b { margin-top: 22%; font: 300 calc(var(--pw) * .26) / 1 -apple-system, "SF Pro Display", Cairo, sans-serif; letter-spacing: -.02em; color: #fff; direction: ltr; }
+.ic__lock small { margin-top: 4%; font-size: calc(var(--pw) * .058); font-weight: 600; color: rgb(255 255 255 / .85); }
+.ic__lock i { position: absolute; bottom: 4%; width: 36%; height: calc(var(--pw) * .02); border-radius: 9px; background: rgb(255 255 255 / .7); }
+.ic__cam { position: absolute; inset: calc(var(--pw) * .022); border-radius: calc(var(--pw) * .16); overflow: hidden; background: #000; opacity: 0; }
+.ic__feed { position: absolute; left: 0; right: 0; top: 14%; bottom: 24%; background-image: url(../img/intro/card-front.webp); background-size: 470% auto; background-position: 20% 50%; }
+.ic__modes { position: absolute; left: 0; right: 0; bottom: 15.5%; display: flex; justify-content: center; gap: 9%; direction: rtl; font-size: calc(var(--pw) * .05); font-weight: 700; color: rgb(255 255 255 / .75); }
+.ic__modes em { font-style: normal; color: #ffd60a; }
+.ic__shutter { position: absolute; left: 50%; bottom: 4.5%; width: calc(var(--pw) * .2); height: calc(var(--pw) * .2); margin-left: calc(var(--pw) * -.1); border-radius: 50%; border: calc(var(--pw) * .012) solid #fff; box-shadow: inset 0 0 0 calc(var(--pw) * .012) #000; background: #fff; background-clip: content-box; }
+.ic__finder { position: absolute; left: 50%; top: 45%; width: 62%; aspect-ratio: 1; transform: translate(-50%, -50%); }
+.ic__finder i { position: absolute; width: 22%; height: 22%; border: calc(var(--pw) * .012) solid #ffd60a; }
+.ic__finder i:nth-child(1) { top: 0; right: 0; border-left: 0; border-bottom: 0; border-radius: 0 14% 0 0; }
+.ic__finder i:nth-child(2) { top: 0; left: 0; border-right: 0; border-bottom: 0; border-radius: 14% 0 0 0; }
+.ic__finder i:nth-child(3) { bottom: 0; right: 0; border-left: 0; border-top: 0; border-radius: 0 0 14% 0; }
+.ic__finder i:nth-child(4) { bottom: 0; left: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 14%; }
+.ic__laser { position: absolute; left: 4%; right: 4%; top: 6%; height: 2px; background: linear-gradient(90deg, transparent, #fff, transparent); box-shadow: 0 0 14px 3px rgb(255 214 10 / .7); opacity: 0; }
+.ic__pill { position: absolute; left: 9%; right: 9%; top: 71%; display: flex; align-items: center; gap: 6%; padding: 3.5% 5%; border-radius: calc(var(--pw) * .06); background: #ffd60a; color: #1a1400; direction: rtl; opacity: 0; }
+.ic__pill svg { flex: none; width: calc(var(--pw) * .085); height: calc(var(--pw) * .085); }
+.ic__pill b { display: block; font-size: calc(var(--pw) * .048); line-height: 1.3; }
+.ic__pill small { display: block; font-size: calc(var(--pw) * .038); direction: ltr; text-align: right; opacity: .75; }
+
+/* the brand: solid text on plain navy */
+.ic__brand { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -52%); display: flex; flex-direction: column; align-items: center; text-align: center;
+  width: max(300px, min(92vw, calc(100vw - 2 * (5vw + var(--sw)) - 3vw), 900px)); }
+.ic__logo { position: relative; width: clamp(96px, 22vh, 260px); aspect-ratio: 1; opacity: 0; flex: none; }
+.ic__logo img { width: 100%; height: 100%; border-radius: 50%; display: block; filter: saturate(.95) brightness(1.06); box-shadow: 0 0 0 2px rgba(var(--gold-f0d8a0-rgb), .7), 0 0 0 7px rgba(var(--gold-f0d8a0-rgb), .12), 0 0 60px 4px rgba(var(--gold-f0d28c-rgb), .32), 0 24px 50px -26px #000; }
+.ic__wave { position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; border: 2px solid rgba(var(--gold-e3cf9f-rgb), .8); opacity: 0; }
+.ic__wave--2 { border-width: 1px; }
+.ic__name { margin: clamp(12px, 2.6vh, 34px) 0 0; font-family: "Aref Ruqaa", serif; font-weight: 700; font-size: clamp(32px, 7.2vh, 96px); line-height: 1.3; color: var(--champagne); opacity: 0; text-wrap: balance; }
+.ic__sub { margin: 2px 0 0; font-family: "Aref Ruqaa", serif; font-size: clamp(15px, 2.6vh, 30px); color: var(--champagne-2); opacity: 0; }
+.ic__slogan { margin: clamp(12px, 2.6vh, 34px) 0 0; font-size: clamp(17px, 3.2vh, 36px); font-weight: 800; color: var(--ink); opacity: 0; text-wrap: balance; }
+.ic__welcome { margin: clamp(4px, 1vh, 14px) 0 0; max-width: 34em; font-size: clamp(13.5px, 2.2vh, 23px); line-height: 1.8; color: var(--ink-2); opacity: 0; text-wrap: balance; }
+.ic__welcome b { color: var(--champagne); }
+.ic__cta { margin: clamp(14px, 3vh, 40px) 0 0; width: min(100%, clamp(340px, 32vw, 620px)); padding: clamp(12px, 2vh, 24px); border-radius: clamp(16px, 2.4vh, 26px); background: rgb(8 26 54 / .92); border: 1px solid rgba(var(--gold-f0d8a0-rgb), .5); box-shadow: 0 30px 60px -30px #000; opacity: 0; text-align: start; visibility: hidden; }
+.ic__cta.is-on { visibility: visible; }
+.ic__cta p { margin: 0 0 clamp(8px, 1.4vh, 16px); font-size: clamp(13px, 1.75vh, 19px); line-height: 1.75; color: var(--ink-2); }
+.ic__cta p b { display: block; color: var(--ink); font-size: clamp(14.5px, 2vh, 22px); }
+.ic__row { display: flex; gap: 10px; }
+.ic__cta a, .ic__cta button { flex: 1; display: grid; place-items: center; height: clamp(42px, 6vh, 60px); border-radius: 14px; font: 800 clamp(14px, 1.9vh, 20px) Cairo, sans-serif; cursor: pointer; border: 1px solid rgba(var(--gold-f0d8a0-rgb), .7); background: rgba(var(--gold-f0d8a0-rgb), .08); color: rgb(var(--gold-f2dcaa-rgb)); text-decoration: none; }
+.ic__cta .is-main { border: 0; background: linear-gradient(180deg, rgb(var(--gold-f6dfa4-rgb)), rgb(var(--gold-dcb45f-rgb))); color: rgb(var(--gold-1b1203-rgb)); box-shadow: 0 0 0 1px rgb(255 240 200 / .5) inset, 0 14px 30px -12px rgba(var(--gold-e6be64-rgb), .85); }
+.ic__cta :is(a, button):focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+/* the world on the other side of the card (landscape = the desktop layout) */
+.ic__world { position: absolute; inset: 0; opacity: 0; background: #020a18; }
+.ic__church { position: absolute; inset: 0; background: url(../img/intro/church.webp) no-repeat; filter: brightness(.34) saturate(.8) blur(2px); }
+.ic__saint { position: absolute; top: 50%; width: var(--sw); margin-top: calc(var(--sw) * -1.02); opacity: 0; }
+.ic__saint img { width: 100%; display: block; filter: brightness(1.06) drop-shadow(0 34px 44px rgb(0 0 0 / .75)) drop-shadow(0 0 26px rgba(var(--gold-f0d296-rgb), .22)); }
+.ic__saint--athanasius { left: 5vw; }
+.ic__saint--sefein { right: 5vw; }
+.ic__plaque { display: block; margin: clamp(8px, 1.4vh, 18px) auto 0; width: max-content; max-width: 130%; padding: .5em 1.1em .55em; border-radius: 12px; text-align: center; background: rgb(4 16 34 / .85); border: 1px solid rgba(var(--gold-f0d8a0-rgb), .55); box-shadow: 0 10px 24px -12px #000; font-size: clamp(13px, 1.9vh, 22px); }
+.ic__plaque b { display: block; font-size: 1em; font-weight: 800; color: rgb(var(--gold-f4dfae-rgb)); line-height: 1.5; }
+.ic__plaque i { display: block; font-style: normal; font-size: .76em; font-weight: 600; color: var(--ink-2); }
+@media (min-aspect-ratio: 4/5) and (max-height: 560px) { .ic__sub, .ic__welcome { display: none; } .ic__plaque i { display: none; } }
+
+/* portrait (phones, tablets standing up): the approved phone layout, sized by height so it always fits */
+@media (max-aspect-ratio: 4/5) {
+  .ic { --sw: min(23vw, 13.5vh); }
+  .ic__church { inset: -6%; background-size: cover !important; background-position: center 40% !important; filter: brightness(.36) saturate(.75) blur(4px) !important; }
+  .ic__saint { top: calc(env(safe-area-inset-top) + 9vh); margin-top: 0; }
+  .ic__saint--athanasius { left: 8vw; } .ic__saint--sefein { right: 8vw; }
+  .ic__plaque { margin-top: .7vh; padding: 0; border: 0; background: none; box-shadow: none; max-width: 34vw; width: auto; font-size: clamp(10.5px, 1.7vh, 16px); }
+  .ic__plaque b { line-height: 1.4; } .ic__plaque i { display: none; }
+  .ic__brand { top: 0; bottom: 0; left: 5vw; right: 5vw; width: auto; transform: none; padding: calc(env(safe-area-inset-top) + 9vh + var(--sw) * 1.22) 0 calc(env(safe-area-inset-bottom) + 2.6vh); }
+  .ic__logo { width: min(28vw, 15vh); }
+  .ic__name { margin-top: 1.8vh; font-size: clamp(26px, 4.6vh, 56px); }
+  .ic__sub { font-size: clamp(13px, 2vh, 24px); }
+  .ic__slogan { margin-top: 2.2vh; font-size: clamp(15px, 2.6vh, 30px); }
+  .ic__welcome { margin-top: .6vh; font-size: clamp(12.5px, 1.95vh, 20px); }
+  .ic__cta { margin-top: clamp(16px, 4vh, 48px); width: min(100%, 560px); padding: clamp(11px, 1.8vh, 20px); }
+  .ic__cta p { font-size: clamp(12.5px, 1.8vh, 18px); } .ic__cta p b { font-size: clamp(14px, 2.1vh, 21px); }
+  .ic__cta :is(a, button) { height: clamp(40px, 6.2vh, 58px); font-size: clamp(14px, 2vh, 19px); }
+}
+@media (max-aspect-ratio: 4/5) and (max-height: 600px) { .ic__welcome { display: none; } }
+
+/* ======================= the gate (2026-11-13: «أهلاً بيك», the big logo, the site behind) ======================= */
+.ic__gate { position: absolute; inset: 0; z-index: 8; overflow: hidden; background: #01050d; transition: opacity .55s cubic-bezier(.16, 1, .3, 1), transform .7s cubic-bezier(.16, 1, .3, 1); }
+.ic__gate.is-off { opacity: 0; transform: scale(1.06); pointer-events: none; }
+/* the wall: rows of the site's own pictures (services, activities, videos), sliding slowly, seen through the dark */
+/* the moving wall: one seamless looping video of the meeting's clips flowing from the top-left to the bottom-right
+   (tools/build-gate-video.mjs: every tile and every row loops with no cut); it fades in over the still wall */
+.ic__film { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .9s ease-out; pointer-events: none; }
+.ic__gate.is-film .ic__film { opacity: .55; }
+/* the dark that lets the site through only around the edges, and the light behind the logo */
+.ic__veil { position: absolute; inset: 0; background:
+  radial-gradient(closest-side at 50% 47%, rgba(var(--gold-f0d28c-rgb), .16), rgba(var(--gold-f0d28c-rgb), 0) 70%) 50% 47% / min(110vw, 92vh) min(110vw, 92vh) no-repeat,
+  radial-gradient(64% 50% at 50% 47%, rgb(3 13 30 / .95) 0%, rgb(3 13 30 / .86) 40%, rgb(1 5 13 / .4) 74%, rgb(1 5 13 / .45) 100%),
+  linear-gradient(180deg, rgb(1 5 13 / .55), transparent 18%, transparent 80%, rgb(1 5 13 / .7)); }
+.ic__dust { position: absolute; inset: 0; pointer-events: none; background-image:
+  radial-gradient(1.5px 1.5px at 12% 24%, rgba(var(--gold-e3cf9f-rgb), .7), transparent), radial-gradient(1px 1px at 84% 18%, rgba(var(--gold-e3cf9f-rgb), .6), transparent),
+  radial-gradient(1.5px 1.5px at 72% 78%, rgba(var(--gold-e3cf9f-rgb), .55), transparent), radial-gradient(1px 1px at 22% 82%, rgba(var(--gold-e3cf9f-rgb), .6), transparent),
+  radial-gradient(1.2px 1.2px at 92% 56%, rgba(var(--gold-e3cf9f-rgb), .5), transparent), radial-gradient(1.2px 1.2px at 6% 58%, rgba(var(--gold-e3cf9f-rgb), .5), transparent);
+  animation: ic-twinkle 4.8s ease-in-out infinite alternate; }
+@keyframes ic-twinkle { from { opacity: .35; } to { opacity: 1; } }
+.ic__hall { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(26px, 5vh, 60px); padding: calc(env(safe-area-inset-top) + 16px) 20px calc(env(safe-area-inset-bottom) + 16px); text-align: center; }
+.ic__hello { margin: 0; font: 700 clamp(40px, min(11vw, 8.4vh), 92px) / 1.25 "Aref Ruqaa", serif; color: var(--champagne); text-shadow: 0 0 34px rgba(var(--gold-f0d28c-rgb), .3), 0 2px 0 rgb(0 0 0 / .4); opacity: 0; animation: ic-rise .6s .25s cubic-bezier(.16, 1, .3, 1) forwards; }
+.ic__hello small { display: block; margin-top: 2px; font: 700 clamp(13.5px, 1.9vh, 19px) / 1.6 Cairo, system-ui, sans-serif; color: var(--ink-2); letter-spacing: .01em; }
+.ic__seal { --d: clamp(180px, min(58vw, 36vh), 360px); position: relative; flex: none; width: var(--d); height: var(--d); padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; opacity: 0; animation: ic-seal-in .7s .05s cubic-bezier(.16, 1, .3, 1) forwards; }
+.ic__seal img { position: relative; z-index: 1; width: 100%; height: 100%; display: block; border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(var(--gold-f0d8a0-rgb), .8), 0 0 0 calc(var(--d) * .03) rgba(var(--gold-f0d8a0-rgb), .1), 0 0 calc(var(--d) * .3) calc(var(--d) * .02) rgba(var(--gold-f0d28c-rgb), .3), 0 calc(var(--d) * .12) calc(var(--d) * .2) calc(var(--d) * -.08) #000;
+  transition: transform .5s cubic-bezier(.16, 1, .3, 1), box-shadow .5s; }
+.ic__seal::before, .ic__seal::after { content: ""; position: absolute; inset: calc(var(--d) * -.05); border-radius: 50%; border: 1.5px solid rgba(var(--gold-e3cf9f-rgb), .55); animation: ic-ping 2.6s cubic-bezier(.16, 1, .3, 1) infinite; pointer-events: none; }
+.ic__seal::after { animation-delay: 1.3s; }
+.ic__seal:hover img, .ic__seal:focus-visible img { transform: scale(1.025); box-shadow: 0 0 0 2px rgb(var(--gold-f0d8a0-rgb)), 0 0 0 calc(var(--d) * .03) rgba(var(--gold-f0d8a0-rgb), .16), 0 0 calc(var(--d) * .36) calc(var(--d) * .04) rgba(var(--gold-f0d28c-rgb), .42), 0 calc(var(--d) * .12) calc(var(--d) * .2) calc(var(--d) * -.08) #000; }
+.ic__seal:active img { transform: scale(.97); }
+.ic__seal:focus-visible { outline: 2px solid var(--ink); outline-offset: calc(var(--d) * .07); }
+@keyframes ic-ping { from { transform: scale(.92); opacity: 1; } to { transform: scale(1.32); opacity: 0; } }
+@keyframes ic-seal-in { from { opacity: 0; transform: scale(.82); filter: blur(8px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes ic-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.ic__hint { display: inline-flex; align-items: center; gap: 10px; margin: 0; padding: 10px 20px; white-space: nowrap; max-width: calc(100vw - 32px); border-radius: 999px; border: 1px solid rgba(var(--gold-e3cf9f-rgb), .32); background: rgb(4 16 34 / .7); font-size: clamp(12.5px, min(3.6vw, 1.9vh), 17px); font-weight: 700; color: var(--ink); opacity: 0; animation: ic-rise .6s .45s cubic-bezier(.16, 1, .3, 1) forwards; }
+.ic__hint svg { width: 20px; height: 20px; color: var(--champagne); }
+.ic__hint span { color: var(--ink-2); font-weight: 600; }
+/* short screens (a phone lying down) */
+@media (max-height: 520px) { .ic__seal { --d: min(52vh, 300px); } .ic__hello { font-size: clamp(30px, 9vh, 52px); } .ic__hello small { display: none; } .ic__hall { gap: 10px; } }
+/* wide screens: the greeting beside the logo would be far; keep it stacked, the logo a touch smaller */
+@media (min-aspect-ratio: 16/10) { .ic__seal { --d: clamp(200px, 38vh, 380px); } }
+/* a weak device: no sliding wall (the still picture stays), no twinkle */
+.ic.is-light .ic__dust { animation: none; }
+
+/* ======================= the member's welcome (S2) ======================= */
+.mi { position: fixed; inset: 0; z-index: 200; overflow: hidden; pointer-events: none; }
+.mi__bg { position: absolute; inset: 0; background: #020914; }
+.mi__art { position: absolute; left: 50%; top: 44%; width: 220vmax; height: 220vmax; margin: -110vmax 0 0 -110vmax; background: repeating-conic-gradient(from 0deg, rgba(var(--gold-hi-rgb), .07) 0deg 1.2deg, transparent 1.2deg 9deg); -webkit-mask: radial-gradient(closest-side, #000 4%, transparent 30%); mask: radial-gradient(closest-side, #000 4%, transparent 30%); opacity: 0; }
+.mi__veil { position: absolute; inset: 0; background: radial-gradient(42% 34% at 50% 44%, rgb(16 52 94 / .75), rgb(2 9 20 / .2) 60%, transparent 75%), radial-gradient(120% 90% at 50% 50%, transparent 40%, #01060e 100%); }
+.mi__stage { position: absolute; inset: 0; display: grid; place-items: center; }
+.mi__core { display: flex; flex-direction: column; align-items: center; transform: translateY(-3vh); }
+.mi__seal { --d: clamp(132px, 24vmin, 230px); position: relative; width: var(--d); height: var(--d); }
+.mi__bloom { position: absolute; inset: -60%; border-radius: 50%; background: radial-gradient(closest-side, rgba(var(--gold-hi-rgb), .34), rgba(var(--gold-hi-rgb), .08) 55%, transparent); opacity: 0; pointer-events: none; }
+.mi__svg { position: absolute; inset: -16%; width: 132%; height: 132%; overflow: visible; }
+.mi__svg circle { fill: none; }
+.mi__track { stroke: rgba(var(--gold-hi-rgb), .14); stroke-width: .6; }
+.mi__draw { stroke: url(#miGold); stroke-width: 1.3; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; }
+.mi__g1 { stop-color: rgb(var(--gold-fff1c9-rgb)); } .mi__g2 { stop-color: rgb(var(--gold-e3b862-rgb)); } .mi__g3 { stop-color: rgb(var(--gold-a97b2c-rgb)); }
+.mi__head { position: absolute; inset: -16%; }
+.mi__head i { position: absolute; left: 50%; top: 0; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: rgb(var(--gold-fff6dc-rgb)); box-shadow: 0 0 10px 3px rgba(var(--gold-hi-rgb), .9), 0 0 26px 8px rgba(var(--gold-hi-rgb), .35); }
+.mi__disc { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 1.5px rgba(var(--gold-hi-rgb), .75), 0 30px 60px -30px #000; }
+.mi__disc img { width: 100%; height: 100%; display: block; }
+.mi__shine { position: absolute; inset: -20%; background: linear-gradient(105deg, transparent 38%, rgb(255 246 220 / .55) 50%, transparent 62%); mix-blend-mode: screen; }
+.mi__text { margin-top: calc(var(--d) * .16 + clamp(16px, 3vh, 30px)); text-align: center; }
+.mi__hi { display: block; font: 700 clamp(13px, 2vmin, 18px) / 1 Cairo, system-ui, sans-serif; letter-spacing: .02em; color: rgba(var(--gold-hi-rgb), .72); }
+.mi__name { display: block; margin-top: 6px; font: 700 clamp(38px, 7.4vmin, 76px) / 1.25 "Aref Ruqaa", serif; color: rgb(var(--gold-f6dda0-rgb)); text-shadow: 0 0 30px rgba(var(--gold-hi-rgb), .25); }
+.mi__rule { display: block; width: clamp(90px, 16vh, 150px); height: 1px; margin: 10px auto 0; background: linear-gradient(90deg, transparent, rgb(var(--gold-hi-rgb)), transparent); }
+.mi__chip { display: inline-flex; align-items: center; gap: 8px; margin-top: 14px; padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(var(--gold-hi-rgb), .28); background: rgb(7 26 51 / .6); font: 700 clamp(12.5px, 1.8vmin, 16px) / 1.4 Cairo, system-ui, sans-serif; color: #dfe7f1; }
+.mi__chip b { color: rgb(var(--gold-hi-rgb)); }
+.mi__chip svg { width: 16px; height: 16px; color: rgb(var(--gold-hi-rgb)); }
+.topbar__brand img.is-waiting { opacity: 0; }
+.topbar__brand img.is-landed { border-radius: 50%; animation: mi-land .7s cubic-bezier(.16, 1, .3, 1); }
+@keyframes mi-land { 0% { box-shadow: 0 0 0 0 rgba(var(--gold-hi-rgb), .9); } 100% { box-shadow: 0 0 0 14px rgba(var(--gold-hi-rgb), 0); } }
+
+/* ======================= the welcome (owner, 2026-11-13): between the gate and the card ======================= */
+/* the wall's videos go dark one by one: dark tiles along the wall's slant */
+.ic__shutters { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; transform: rotate(22deg) scale(1.5); }
+.ic__shutters i { position: absolute; width: var(--cw); height: var(--ch); background: #01050d; opacity: 0; box-shadow: 0 0 0 1px #01050d; }
+.ic__gate.is-on .ic__veil, .ic__gate.is-on .ic__dust { z-index: 0; }
+.ic__gate .ic__hall { z-index: 1; }
+/* the words as they are said, under the risen logo */
+.ic__say { position: absolute; z-index: 2; left: 0; right: 0; top: var(--top, 55%); display: flex; flex-direction: column; align-items: center; gap: clamp(8px, 1.6vh, 18px); padding: 0 max(20px, 6vw); text-align: center; pointer-events: none; }
+.ic__line { margin: 0; max-width: 22em; font: 700 clamp(17px, min(4.9vw, 3.1vh), 34px) / 1.65 Cairo, system-ui, sans-serif; color: var(--ink); text-wrap: balance; text-shadow: 0 2px 18px rgb(1 5 13 / .9); }
+.ic__line--big { font: 700 clamp(40px, min(12vw, 8vh), 96px) / 1.25 "Aref Ruqaa", serif; color: var(--champagne); text-shadow: 0 0 34px rgba(var(--gold-f0d28c-rgb), .3), 0 2px 0 rgb(0 0 0 / .4); }
+.ic__line span { display: inline-block; opacity: 0; }
+.ic__line + .ic__line:not(.ic__line--big) { margin-top: -2px; }
+.ic__line:last-child { color: var(--ink-2); font-size: clamp(15.5px, min(4.4vw, 2.7vh), 30px); }
+/* the names in gold: «أسرة البابا أثناسيوس الرسولي» and «الشهيد العظيم أبي سيفين» */
+.ic__line:nth-child(2) span:nth-child(n + 2):nth-child(-n + 5), .ic__line:nth-child(3) span:nth-child(n + 2):nth-child(-n + 5) { color: var(--champagne); }
+
+/* the light between the welcome and the card: the logo gathers into it, the card comes out of it */
+.ic__dawn { position: absolute; z-index: 9; left: 50%; top: 50%; width: 120vmax; height: 120vmax; border-radius: 50%; pointer-events: none; opacity: 0;
+  background: radial-gradient(closest-side, rgba(var(--gold-fff1c9-rgb), .55), rgba(var(--gold-f0d28c-rgb), .22) 28%, rgb(13 42 80 / .18) 55%, transparent 72%); transform: translate(-50%, -50%) scale(.05); }

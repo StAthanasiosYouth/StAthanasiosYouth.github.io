@@ -474,8 +474,32 @@ function startSite() {
   setupTopbar();
   startRouter(openRoute);
   load();
+  startIntro();
   startPush();
 
+}
+
+
+/* the opening (intro.js decided before the first paint): the card intro for someone with no account yet, the
+   member's welcome once the page is drawn (it measures the top bar's logo and tells the next meeting) */
+function startIntro() {
+  const html = document.documentElement;
+  const kind = html.getAttribute('data-intro');
+  const failed = error => { console.warn(error); html.removeAttribute('data-intro'); };
+  if (kind === 'card') {
+    import('./intro-card.js').then(m => m.playCardIntro()).catch(failed);
+  }
+  else if (kind === 'member') {
+    const since = performance.now();
+    const wait = () => {
+      if (current && document.querySelector('#main [data-area="meeting"]:not(.skeleton), #main section.meeting, #main footer')) {
+        import('./intro-member.js').then(m => m.playMemberIntro({ status: meetingSnapshot(), now: new Date() })).catch(failed);
+      }
+      else if (performance.now() - since > 4000) html.removeAttribute('data-intro');
+      else requestAnimationFrame(wait);
+    };
+    wait();
+  }
 }
 
 

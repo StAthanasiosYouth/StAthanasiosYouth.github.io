@@ -115,67 +115,52 @@ async function open({ viewport = PHONE, port = PORT, hash = '', seen = false, re
 
 const ready = page => page.waitForSelector('#main[data-state="ready"]');
 
-const introAnimations = page => page.evaluate(() => document.getAnimations()
-  .filter(a => /^intro-/.test(a.animationName || '') && a.playState === 'running').length);
+/* ---------------- the opening (site redesign W3) ----------------
+   No account on this device: the gate («أهلاً بيك», the logo), the welcome, the card (S1), «اعمل حسابك».
+   An account: the member's short welcome. Automated browsers see it only when they ask (?ic=1). */
 
-const logoBox = page => page.evaluate(() => {
-  const r = document.querySelector('.hero__logo').getBoundingClientRect();
-  return [r.left, r.top + scrollY, r.width, r.height].map(v => Math.round(v * 10) / 10);
-});
-
-
-/* ---------------- the intro ---------------- */
+const IC = '?ic=1';
+const overlay = page => page.evaluate(() => ({
+  intro: document.documentElement.getAttribute('data-intro'),
+  gate: !!document.querySelector('.ic__gate'),
+  ic: !!document.querySelector('.ic'),
+  inert: document.getElementById('main').hasAttribute('inert')
+}));
 
 for (const [name, viewport] of Object.entries({ phone: PHONE, desktop: DESKTOP })) {
 
-  test(`${name}: the intro plays on a first visit and ends exactly on the normal page`, async () => {
+  test(`${name}: the opening — the gate waits for the logo, a tap never cuts it short, «ادخل الموقع» opens the page`, async () => {
 
-    const { page, problems, close } = await open({ viewport, until: 'domcontentloaded' });
+    const { page, problems, close } = await open({ viewport, hash: IC, until: 'domcontentloaded' });
+    await page.waitForSelector('.ic__seal');
+    assert.deepEqual(await overlay(page), { intro: 'card', gate: true, ic: true, inert: true }, 'the gate is up, the page behind it asleep');
 
-    const start = await page.evaluate(() => ({
-      intro: document.documentElement.dataset.intro,
-      state: document.documentElement.dataset.introState,
-      bar: Math.round(document.getElementById('topbar').getBoundingClientRect().height),
-      // the real logo is the intro's hero: on screen, larger, from the first frame
-      scale: getComputedStyle(document.querySelector('.hero__logo')).scale
-    }));
-    assert.equal(start.intro, 'play');
-    assert.equal(start.state, 'playing');
-    assert.notEqual(start.scale, 'none', 'the logo starts staged (scaled)');
+    // the gate waits: a tap beside the logo does nothing
+    await wait(1200);
+    await page.mouse.click(20, 20);
+    await wait(400);
+    assert.equal((await overlay(page)).gate, true, 'only the logo opens it');
 
-    await ready(page);
-    await wait(900);
-    assert.ok(await introAnimations(page) > 0, 'still playing a moment later');
-    const mid = await page.evaluate(() => Math.round(document.getElementById('topbar').getBoundingClientRect().height));
+    // the logo: the welcome, then the card
+    await page.click('.ic__seal');
+    await wait(9500);
+    assert.ok(await page.$eval('.ic__say', el => el.textContent.includes('مرحبا بيك')), 'the welcome says its words');
+    await page.mouse.click(30, 30);               // a tap during the opening never cuts it short
+    await wait(300);
+    assert.ok(await page.$('.ic'), 'still playing after a tap');
+    await page.waitForSelector('.ic__cta.is-on', { timeout: 30000 });
+    assert.equal((await overlay(page)).gate, false, 'the gate has gone into the card');
 
-    await page.waitForFunction(() => document.documentElement.dataset.introState === 'done', { timeout: 4000 });
-    await page.waitForFunction(() => !document.getAnimations().some(a => /^(intro-|rise-depth$)/.test(a.animationName || '') && a.playState === 'running'), { timeout: 4000 });
-
+    await page.click('[data-enter]');
+    await page.waitForFunction(() => !document.querySelector('.ic'), { timeout: 3000 });
     const end = await page.evaluate(() => ({
-      bar: Math.round(document.getElementById('topbar').getBoundingClientRect().height),
-      scale: getComputedStyle(document.querySelector('.hero__logo')).scale,
-      translate: getComputedStyle(document.querySelector('.hero__arch')).translate,
-      shift: window.__shift,
-      overflow: document.documentElement.scrollWidth - innerWidth
+      intro: document.documentElement.hasAttribute('data-intro'),
+      inert: document.getElementById('main').hasAttribute('inert'),
+      overflow: Math.max(0, document.documentElement.scrollWidth - innerWidth)
     }));
-    assert.equal(start.bar, mid, 'the top bar never changes height');
-    assert.equal(end.bar, start.bar);
-    assert.deepEqual([end.scale, end.translate], ['none', 'none'], 'nothing staged is left');
-    assert.ok(end.shift < 0.001, `layout shift ${end.shift}`);
-    assert.ok(end.overflow <= 0, `horizontal overflow ${end.overflow}`);
-
-    // the logo is exactly where it lives without the intro
-    const after = await logoBox(page);
-    const plain = await open({ viewport, seen: true });
-    await ready(plain.page);
-    await wait(1400);
-    assert.deepEqual(after, await logoBox(plain.page), 'the logo lands in its real place');
-    await plain.close();
-
-    // the page is fully interactive: the bell opens its sheet
+    assert.deepEqual(end, { intro: false, inert: false, overflow: 0 });
     await page.click('#bell');
     await page.waitForSelector('dialog.sheet[open]');
-
     assert.deepEqual(problems, []);
     await close();
 
@@ -183,37 +168,70 @@ for (const [name, viewport] of Object.entries({ phone: PHONE, desktop: DESKTOP }
 
 }
 
-test('the intro: a repeat visit in the same session skips it', async () => {
+test('the opening: «اعمل حساب» on the card leads to the account page', async () => {
 
-  const { page, problems, close } = await open();
-  await ready(page);
-  assert.equal(await page.evaluate(() => document.documentElement.dataset.intro), 'play');
-  await page.reload({ waitUntil: 'networkidle0' });
-  await ready(page);
-  assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-intro')), false, 'not again in this session');
-  assert.equal(await introAnimations(page), 0);
+  // (the gate's film streams on, so the network is never idle: wait for the gate itself)
+  const { page, problems, close } = await open({ hash: IC, until: 'domcontentloaded' });
+  await page.waitForSelector('.ic__cta');
+  assert.match(await page.$eval('.ic__cta .is-main', a => a.getAttribute('href')), /\/account\/$/);
   assert.deepEqual(problems, []);
   await close();
 
 });
 
+test('the opening: once a session, then not again', async () => {
+
+  const { page, problems, close } = await open({ hash: IC, until: 'domcontentloaded' });
+  await page.waitForSelector('.ic__seal');
+  assert.equal((await overlay(page)).intro, 'card');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await ready(page);
+  assert.deepEqual(await overlay(page), { intro: null, gate: false, ic: false, inert: false });
+  assert.deepEqual(problems, []);
+  await close();
+
+});
+
+test('the opening: someone with an account gets the short welcome, and the logo lands in the bar', async () => {
+
+  const context = await browser.createBrowserContext();
+  const page = await context.newPage();
+  const problems = [];
+  page.on('pageerror', error => problems.push(error.message));
+  await page.evaluateOnNewDocument(() => {
+    try {
+      localStorage.setItem('athanasios.account.v1', JSON.stringify({ token: 'as1.test', email: 'test@example.invalid' }));
+      localStorage.setItem('athanasios.account.face.v1', JSON.stringify({ firstName: 'مينا', photo: '', version: 0 }));
+    }
+    catch { /* about:blank */ }
+  });
+  await page.setViewport(PHONE);
+  await page.goto(`http://localhost:${PORT}/${IC}`, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('.mi', { timeout: 6000 });
+  assert.equal(await page.$eval('.mi__name', el => el.textContent), 'مينا');
+  assert.equal(await page.$('.ic'), null, 'no card for someone with an account');
+  await page.waitForFunction(() => !document.querySelector('.mi'), { timeout: 5000 });
+  assert.ok(await page.$eval('.topbar__brand img', img => img.classList.contains('is-landed')));
+  assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-intro')), false);
+  assert.deepEqual(problems, []);
+  await context.close();
+
+});
+
 for (const [label, options] of Object.entries({
-  'a deep link': { hash: '#meeting' },
-  'reduced motion': { reduced: true },
-  'a weak device': { weak: true },
-  "the admin's preview": { preview: true }
+  'a deep link': { hash: IC + '#meeting' },
+  'reduced motion': { hash: IC, reduced: true },
+  "the admin's preview": { hash: IC, preview: true },
+  'an automated browser that did not ask': {}
 })) {
 
-  test(`the intro never plays for ${label}`, async () => {
+  test(`the opening never plays for ${label}`, async () => {
 
     const { page, problems, close } = await open({ ...options, until: 'domcontentloaded' });
-    await wait(300);
-    const state = await page.evaluate(() => ({
-      intro: document.documentElement.hasAttribute('data-intro'),
-      running: document.getAnimations().filter(a => /^intro-/.test(a.animationName || '')).length,
-      logo: getComputedStyle(document.querySelector('.hero__logo')).scale
-    }));
-    assert.deepEqual(state, { intro: false, running: 0, logo: 'none' });
+    await wait(400);
+    const state = await overlay(page).catch(() => null);
+    assert.equal(state && state.ic, false);
+    assert.equal(state && state.intro, null);
     if (!options.preview) await ready(page);
     assert.deepEqual(problems.filter(p => !/preview|postMessage/i.test(p)), []);
     await close();
@@ -222,30 +240,7 @@ for (const [label, options] of Object.entries({
 
 }
 
-test('the intro never blocks a tap: the first tap works and fast-forwards it', async () => {
-
-  const { page, problems, close } = await open({ viewport: DESKTOP, until: 'domcontentloaded' });
-  await ready(page);
-  assert.equal(await page.evaluate(() => document.documentElement.dataset.introState), 'playing');
-
-  // a real control on the page, tapped while the intro is still playing
-  const toggle = await page.$('.meeting__actions button[aria-controls="cal-menu"]');
-  await toggle.click();
-  assert.equal(await page.$eval('.meeting__actions button[aria-controls="cal-menu"]', b => b.getAttribute('aria-expanded')), 'true', 'the tap did its job');
-  assert.equal(await page.evaluate(() => document.documentElement.dataset.introState), 'done');
-
-  // everything still on its way arrives within a few frames
-  await page.waitForFunction(() => !document.getAnimations().some(a => /^(intro-|rise-depth$)/.test(a.animationName || '') && a.playState === 'running'), { timeout: 900 });
-  const hidden = await page.evaluate(() => [...document.querySelectorAll('#topbar, .hero__logo, .hero__name, .hero__tagline, #main > [data-area="meeting"]')]
-    .filter(el => Number(getComputedStyle(el).opacity) < 1).map(el => el.className || el.id));
-  assert.deepEqual(hidden, []);
-
-  assert.deepEqual(problems, []);
-  await close();
-
-});
-
-test('the intro script stays tiny and decides before the body is parsed', async () => {
+test('the opening script stays tiny and decides before the body is parsed', async () => {
 
   const html = readFileSync(`${ROOT}index.html`, 'utf8');
   const head = html.slice(0, html.indexOf('</head>'));
