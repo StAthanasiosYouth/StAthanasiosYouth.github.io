@@ -223,9 +223,9 @@ async function axe(page, selector = '') {
    SERVICE PAGE
 ========================================================= */
 
-test('service page: hero, title, tagline, cards, team; 1 / 2 / 3 columns; no overflow; axe', async () => {
+test('service page: hero, title, tagline, cards, team; 1 / 2 / 2 columns (S5: two on a wide screen); no overflow; axe', async () => {
   clock = WINDOW_OPEN;
-  for (const [viewport, cols] of [[PHONE, 1], [TABLET, 2], [DESKTOP, 3]]) {
+  for (const [viewport, cols] of [[PHONE, 1], [TABLET, 2], [DESKTOP, 2]]) {
     const { context, page, problems, outside } = await open('/black-theatre/', viewport);
     await ready(page);
     assert.equal(await page.$eval('main', el => el.dataset.state), 'ready');
@@ -249,6 +249,12 @@ test('service page: hero, title, tagline, cards, team; 1 / 2 / 3 columns; no ove
     assert.equal(wa.length, 2);
     assert.match(wa[0][0], /^https:\/\/wa\.me\/201001234567\?text=/);
     assert.deepEqual(wa[0].slice(1), ['_blank', 'noopener']);
+    // S5: the two actions under the banner, the section bar, the shows first, «أحدث عرض» on the first card
+    assert.deepEqual(await page.$$eval('.phero .svc-acts .btn', els => els.map(b => b.textContent.trim())), ['اتفرّج على أحدث عرض', 'شارك']);
+    const tabs = await page.$$eval('.svc-tabs a', els => els.map(a => [a.textContent, a.getAttribute('href')]));
+    assert.ok(tabs.length >= 2 && tabs[0][0] === 'العروض' && tabs.every(([, href]) => /^#svc-/.test(href)), JSON.stringify(tabs));
+    assert.equal(await textOf(page, '.mcard .svc-new'), 'أحدث عرض');
+    assert.equal(await page.$$eval('.svc > section', els => els[0].id), 'svc-shows');
     await page.screenshot({ path: `${SHOTS}page-${viewport.width}.png`, fullPage: true });
     if (viewport === PHONE) assert.deepEqual(await axe(page), []);
     assert.deepEqual(problems, []);

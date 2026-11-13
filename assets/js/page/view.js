@@ -42,6 +42,10 @@ const ICONS = {
   minus: ['M6 12h12'],
   plus: ['M12 6v12M6 12h12'],
   pause: [['M7 5h3.5v14H7ZM13.5 5H17v14h-3.5Z', 'fill']],
+  // the service page's own (site redesign S5): the round play, share, «شاهد كاملة ↗»
+  'play-round': [['M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z', 'fill']],
+  share: ['M15.5 5.5a2.5 2.5 0 1 0 5 0 2.5 2.5 0 1 0-5 0Z', 'M3.5 12a2.5 2.5 0 1 0 5 0 2.5 2.5 0 1 0-5 0Z', 'M15.5 18.5a2.5 2.5 0 1 0 5 0 2.5 2.5 0 1 0-5 0Z', 'm8.2 10.8 7.6-4M8.2 13.2l7.6 4'],
+  'open-full': ['M14 5h5v5M19 5l-8 8M18 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4'],
   theatre: ['M4 4.5c2.6 1 5.4 1 8 0v6.2A4 4 0 0 1 8 14.7a4 4 0 0 1-4-4Z', 'M12 9.3c2.6 1 5.4 1 8 0v6.2a4 4 0 0 1-4 4 4 4 0 0 1-4-4'],
   whatsapp: [['M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.64.07-.3-.15-1.25-.46-2.39-1.48-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.03-.52-.07-.15-.67-1.61-.92-2.21-.24-.58-.49-.5-.67-.51-.17-.01-.37-.01-.57-.01-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.06 2.88 1.21 3.07.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2.01-1.41.25-.69.25-1.29.17-1.41-.07-.12-.27-.2-.57-.35m-5.42 7.4h0a9.87 9.87 0 0 1-5.03-1.38l-.36-.21-3.74.98 1-3.65-.23-.37a9.86 9.86 0 0 1-1.51-5.26c0-5.45 4.44-9.88 9.89-9.88 2.64 0 5.12 1.03 6.99 2.9a9.82 9.82 0 0 1 2.89 6.99c0 5.45-4.44 9.88-9.88 9.88m8.41-18.3A11.81 11.81 0 0 0 12.05 0C5.5 0 .16 5.33.16 11.89c0 2.1.55 4.14 1.59 5.95L.06 24l6.3-1.65a11.88 11.88 0 0 0 5.68 1.45h.01c6.55 0 11.89-5.33 11.89-11.89a11.82 11.82 0 0 0-3.48-8.41Z', 'fill']]
 };
@@ -306,15 +310,26 @@ export function createView({ main, live, rootUrl, mediaUrl, onClip }) {
 
     if (isClip) trigger.addEventListener('click', () => onClip(cards, index, trigger));
 
-    return h('article', { class: `mcard${isClip ? '' : ' mcard--link'}` },
+    // S5: the clip's length, «أحدث عرض» on the first, «شاهد كاملة ↗» (the card's own full link)
+    const clipLength = isClip && card.clip && card.clip.end ? Math.max(1, Math.round(card.clip.end - (card.clip.start || 0))) : 0;
+    const full = card.fullUrl
+      ? h('a', { class: 'svc-full', href: card.fullUrl, target: '_blank', rel: 'noopener' },
+        h('span', {}, card.ctaLabel || 'شاهد كاملة'), icon('open-full', 'svc-ic'),
+        h('span', { class: 'visually-hidden' }, ' (بيفتح في صفحة جديدة)'))
+      : null;
+
+    return h('article', { class: `mcard${isClip ? '' : ' mcard--link'}${index === 0 ? ' svc-latest' : ''}` },
       h('div', { class: 'mcard__media' },
         picture(card.cover, { className: 'mcard__img', sizes: '(min-width: 1024px) 380px, (min-width: 640px) 46vw, 92vw' }),
         h('span', { class: 'mcard__play', 'aria-hidden': 'true' }, icon(isClip ? 'play' : 'external')),
-        card.duration ? h('span', { class: 'mcard__dur' }, card.duration) : null
+        card.duration ? h('span', { class: 'mcard__dur' }, card.duration) : null,
+        clipLength ? h('span', { class: 'svc-len' }, `مقطع · ${clipLength < 60 ? `${arabicDigits(clipLength)} ثانية` : `${arabicDigits(Math.round(clipLength / 60))} دقيقة`}`) : null,
+        index === 0 ? h('span', { class: 'svc-new' }, 'أحدث عرض') : null
       ),
       h('div', { class: 'mcard__body' },
         h('h3', { class: 'mcard__title' }, trigger),
-        card.text ? h('p', { class: 'mcard__text' }, card.text) : null
+        card.text ? h('p', { class: 'mcard__text' }, card.text) : null,
+        full
       )
     );
 
@@ -340,37 +355,124 @@ export function createView({ main, live, rootUrl, mediaUrl, onClip }) {
 
     const clips = data.media.filter(card => card.source === 'clip');
 
-    show('ready',
-      h('article', { class: 'svc' },
-        hero({ media: heroMedia(data.hero, data.cover, reduced), title: data.title, lead: data.tagline, partner: data.partner, banner: true }),
+    /* S5, under the banner: «▶ اتفرّج على أحدث عرض» (the first card, as a tap on it would) and «شارك» */
+    let first = null;
+    const play = data.media.length
+      ? h('button', { class: 'btn btn--primary svc-play', type: 'button' }, h('span', { class: 'svc-ic svc-ic--round' }, icon('play-round')), h('span', {}, 'اتفرّج على أحدث عرض'))
+      : null;
+    if (play) play.addEventListener('click', () => { if (first) first.click(); });
+    const share = h('button', { class: 'btn svc-share', type: 'button' }, icon('share', 'svc-ic'), h('span', {}, 'شارك'));
+    share.addEventListener('click', () => {
+      const url = location.origin + location.pathname;
+      if (navigator.share) navigator.share({ title: document.title, url }).catch(() => {});
+      else if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(() => {
+          share.lastChild.textContent = 'اتنسخ اللينك ✓';
+          announce('اتنسخ اللينك');
+        }).catch(() => {});
+      }
+    });
 
-        data.description
-          ? h('section', { class: 'pg-section pg-about', 'aria-label': 'عن الخدمة' }, paragraphs(data.description, 'pg-about__p'))
-          : null,
+    const shows = data.media.length
+      ? h('section', { class: 'pg-section', id: 'svc-shows', 'aria-labelledby': 'media-title' },
+        h('div', { class: 'pg-head' },
+          h('h2', { class: 'pg-head__title', id: 'media-title' }, clips.length ? 'اتفرّج' : 'العروض'),
+          h('p', { class: 'pg-head__count' }, clips.length ? `${arabicDigits(clips.length)} ${clips.length >= 3 && clips.length <= 10 ? 'فيديوهات' : 'فيديو'}` : '')
+        ),
+        h('ul', { class: 'mgrid' }, data.media.map((card, i) => h('li', {}, mediaCard(card, i, data.media))))
+      )
+      : null;
+    if (shows) first = shows.querySelector('[data-media]');
 
-        data.media.length
-          ? h('section', { class: 'pg-section', 'aria-labelledby': 'media-title' },
-            h('div', { class: 'pg-head' },
-              h('h2', { class: 'pg-head__title', id: 'media-title' }, clips.length ? 'اتفرّج' : 'العروض'),
-              h('p', { class: 'pg-head__count' }, clips.length ? `${arabicDigits(clips.length)} ${clips.length >= 3 && clips.length <= 10 ? 'فيديوهات' : 'فيديو'}` : '')
-            ),
-            h('ul', { class: 'mgrid' }, data.media.map((card, i) => h('li', {}, mediaCard(card, i, data.media))))
-          )
-          : null,
-
-        data.team
-          ? h('section', { class: 'pg-section team', 'aria-labelledby': 'team-title' },
-            h('div', { class: 'team__intro' },
-              icon('users', 'team__icon'),
-              h('h2', { class: 'team__title', id: 'team-title' }, data.team.title),
-              data.team.text ? h('p', { class: 'team__text' }, data.team.text) : null
-            ),
-            data.team.people.length ? h('ul', { class: 'people' }, data.team.people.map(p => h('li', {}, person(p, { wa: p.wa })))) : null
-          )
+    /* «عن الخدمة»: a titled card, the partner's logo at its foot */
+    const p = data.partner;
+    const about = data.description
+      ? h('section', { class: 'pg-section pg-about', id: 'svc-about', 'aria-labelledby': 'about-title' },
+        h('h2', { class: 'pg-head__title svc-h', id: 'about-title' }, 'عن الخدمة'),
+        paragraphs(data.description, 'pg-about__p'),
+        p && p.logo
+          ? h('div', { class: 'svc-partner' },
+            h('img', { src: new URL(p.logo.thumb || p.logo.src, rootUrl).href, alt: p.logo.alt || '', decoding: 'async', loading: 'lazy' }),
+            h('span', {}, `بالتعاون مع ${p.name || ''}`))
           : null
       )
-    );
+      : null;
 
+    const team = data.team
+      ? h('section', { class: 'pg-section team', id: 'svc-team', 'aria-labelledby': 'team-title' },
+        h('div', { class: 'team__intro' },
+          icon('users', 'team__icon'),
+          h('h2', { class: 'team__title', id: 'team-title' }, data.team.title),
+          data.team.text ? h('p', { class: 'team__text' }, data.team.text) : null
+        ),
+        data.team.people.length ? h('ul', { class: 'people' }, data.team.people.map(p => h('li', {}, person(p, { wa: p.wa })))) : null
+      )
+      : null;
+
+    /* the section bar that follows the scroll: العروض · عن الخدمة · الفريق */
+    const parts = [[shows, 'العروض'], [about, 'عن الخدمة'], [team, 'الفريق']].filter(([el]) => el);
+    const tabs = parts.length > 1
+      ? h('nav', { class: 'svc-tabs', 'aria-label': 'أقسام الصفحة' }, parts.map(([el, label]) => h('a', { href: `#${el.id}` }, label)))
+      : null;
+
+    const article = h('article', { class: 'svc' },
+      hero({ media: heroMedia(data.hero, data.cover, reduced), title: data.title, lead: data.tagline, partner: data.partner, banner: true, extra: h('div', { class: 'svc-acts' }, play, share) }),
+      tabs,
+      shows,
+      about,
+      team
+    );
+    show('ready', article);
+    if (tabs) spy(tabs);
+    moreServices(article, data.slug);
+
+  }
+
+  /* the section bar: the section at the top of the screen is «on» */
+  let spyOff = null;
+  function spy(tabs) {
+    if (spyOff) spyOff();
+    const links = [...tabs.querySelectorAll('a')];
+    const mark = () => {
+      let cur = links[0];
+      for (const a of links) {
+        const s = document.getElementById(a.getAttribute('href').slice(1));
+        if (s && s.getBoundingClientRect().top < 140) cur = a;
+      }
+      for (const a of links) {
+        a.classList.toggle('on', a === cur);
+        if (a === cur) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      }
+    };
+    addEventListener('scroll', mark, { passive: true });
+    spyOff = () => removeEventListener('scroll', mark);
+    mark();
+  }
+
+  /* «خدمات تانية»: the other published service pages (content.json), at the end */
+  async function moreServices(article, slug) {
+    let pages = [];
+    try {
+      const res = await fetch(new URL('content.json', rootUrl), { cache: 'no-cache' });
+      if (!res.ok) return;
+      const { sanitizeContent } = await import('../content.js');
+      pages = sanitizeContent(await res.json()).pages.filter(o => o.slug !== slug);
+    }
+    catch {
+      return;
+    }
+    if (!pages.length || !article.isConnected || article.querySelector('.svc-more')) return;
+    article.appendChild(h('section', { class: 'pg-section svc-more', 'aria-labelledby': 'more-title' },
+      h('h2', { class: 'pg-head__title svc-h', id: 'more-title' }, 'خدمات تانية'),
+      h('ul', { class: 'svc-more__list' }, pages.map(o => h('li', {},
+        h('a', { class: 'svc-more__card', href: new URL(`${o.slug}/`, rootUrl).href },
+          o.cover ? h('img', { src: mediaUrl(o.cover.thumb || o.cover.src), alt: '', loading: 'lazy', decoding: 'async', width: o.cover.w, height: o.cover.h }) : null,
+          h('div', { class: 'svc-more__body' }, h('b', {}, o.title), o.tagline ? h('small', {}, o.tagline) : null),
+          h('span', { class: 'svc-more__go', 'aria-hidden': 'true' }, '‹')
+        )
+      )))
+    ));
   }
 
 

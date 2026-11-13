@@ -3710,3 +3710,71 @@ html[data-arrive] main > *:nth-child(n+3) { animation-delay: .12s; }
   .s2-ev:hover { transform: none; }
 }
 .s2-ev .pchip { margin: 4px 0 2px; }
+
+
+/* =========================================================
+   SERVICE PAGE — site redesign S5 (wave 4, W6): the actions under the banner,
+   the section bar, the shows first (length, «أحدث عرض», «شاهد كاملة ↗»),
+   «عن الخدمة» as a card with the partner, the team as cards, «خدمات تانية»
+========================================================= */
+
+/* ---------- hero actions ---------- */
+.svc-acts { display: flex; gap: 10px; margin-top: 8px; width: 100%; }
+.svc-acts .btn { min-height: 50px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.svc-play { flex: 1; }
+.svc-share { flex: none; padding-inline: 18px; }
+.svc-ic { display: inline-grid; width: 18px; height: 18px; }
+.svc-ic svg, svg.svc-ic { width: 18px; height: 18px; }
+.svc-ic--round { width: 26px; height: 26px; padding: 5px; border-radius: 50%; background: rgba(var(--gold-ink-rgb), .18); }
+.svc-ic--round svg { width: 16px; height: 16px; }
+
+/* ---------- section bar ---------- */
+.svc-tabs { position: sticky; top: calc(var(--bar-h, 60px) + 2px); z-index: 5; display: flex; gap: 6px; margin: 18px calc(-1 * var(--gutter)) 0; padding: 8px var(--gutter); background: linear-gradient(180deg, rgba(2, 9, 20, .92), rgba(2, 9, 20, .75)); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border-block: 1px solid var(--gold-line); overflow-x: auto; scrollbar-width: none; }
+.svc-tabs a { flex: none; height: 38px; padding: 0 16px; border-radius: 999px; display: inline-flex; align-items: center; color: var(--text-2); font-weight: 700; font-size: .9rem; text-decoration: none; border: 1px solid transparent; transition: background .2s, color .2s; }
+.svc-tabs a.on { color: var(--gold-ink); background: linear-gradient(180deg, var(--gold-hi), var(--gold)); }
+.svc .pg-section { scroll-margin-top: 130px; }
+.svc-h { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.7rem, 6.4vw, 2.2rem); color: var(--gold-hi); margin: 0 0 12px; }
+.svc .pg-head__title { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.7rem, 6.4vw, 2.2rem); color: var(--gold-hi); }
+
+/* ---------- shows ---------- */
+.svc .mcard__media { position: relative; }
+.svc-len { position: absolute; z-index: 2; bottom: 10px; inset-inline-start: 10px; height: 26px; padding: 0 10px; border-radius: 999px; display: inline-flex; align-items: center; background: rgba(2, 9, 20, .78); color: var(--text); font-size: .76rem; font-weight: 800; direction: rtl; }
+.svc-new { position: absolute; z-index: 2; top: 10px; inset-inline-end: 10px; height: 26px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; background: linear-gradient(180deg, var(--gold-hi), var(--gold)); color: var(--gold-ink); font-size: .76rem; font-weight: 900; }
+.svc .mcard__play { transform: scale(1.15); }
+.svc-full { position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; height: 38px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--gold-line-strong); color: var(--gold-hi); font-weight: 800; font-size: .86rem; text-decoration: none; background: rgba(2, 9, 20, .35); }
+.svc-full:hover { background: rgba(var(--gold-rgb), .12); }
+.svc-full .svc-ic, .svc-full svg.svc-ic { width: 16px; height: 16px; }
+
+/* ---------- about ---------- */
+.svc .pg-about { max-width: none; padding: 20px; border-radius: var(--radius-lg, 24px); border: 1px solid var(--gold-line); background: linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, .01)); }
+.svc .pg-about__p { line-height: 2; }
+.svc-partner { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--gold-line); color: var(--text-3); font-size: .86rem; font-weight: 700; }
+.svc-partner img { height: 40px; width: auto; padding: 4px 8px; border-radius: 10px; background: #fff; }
+
+/* ---------- team ---------- */
+.svc .team .team__title { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.7rem, 6.4vw, 2.2rem); color: var(--gold-hi); }
+.svc .people { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 10px; }
+.svc .person { border-radius: var(--radius-md, 18px); }
+.svc .person__avatar--initial { background: linear-gradient(135deg, var(--gold-hi), var(--gold)); color: var(--gold-ink); font-weight: 900; }
+
+/* ---------- other services ---------- */
+.svc-more__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.svc-more__card { display: grid; grid-template-columns: 132px 1fr auto; align-items: center; gap: 14px; padding: 10px; border-radius: var(--radius-lg, 24px); border: 1px solid var(--gold-line); background: linear-gradient(180deg, var(--navy-800), var(--navy-900)); color: var(--text); text-decoration: none; transition: transform .25s, border-color .2s; }
+.svc-more__card:hover { transform: translateY(-2px); border-color: var(--gold-line-strong); }
+.svc-more__card img { width: 132px; height: auto; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 16px; }
+.svc-more__body b { display: block; font-size: 1.05rem; }
+.svc-more__body small { display: block; color: var(--text-2); font-size: .82rem; line-height: 1.6; }
+.svc-more__go { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(180deg, var(--gold-hi), var(--gold)); color: var(--gold-ink); font-weight: 900; font-size: 1.2rem; }
+
+@media (min-width: 900px) {
+  .svc-acts { width: auto; }
+  .svc-play { flex: none; padding-inline: 28px; }
+  .svc .mgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .svc .mgrid:has(> li:only-child) { grid-template-columns: minmax(0, 760px); }
+  .svc-more__list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .svc-tabs a, .svc-more__card { transition: none; }
+  .svc-more__card:hover { transform: none; }
+}
