@@ -630,12 +630,14 @@ export function createMine({ main, S, authed, api, sessionOver, signOut, openFor
   function viewSupport(kind) {
     const s = (S.config && S.config.support) || {};
     put(h('div', { class: 'ac-view' }, head('الدعم الفني'),
-      h('p', { class: 'ac-lead' }, 'في مشكلة في حسابك أو بياناتك محتاجة تتصلح؟ كلّم ' + (s.name || 'الدعم الفني') + '.'),
+      h('p', { class: 'ac-lead' }, 'مشكلة في الدخول، أو حسابك، أو النقاط، أو المسابقات، أو الحجوزات، أو بيانات محتاجة تتصلح؟ كلّم ' + (s.name || 'الدعم الفني') + '.'),
+      h('p', { class: 'ac-note' }, ic('home'), h('span', {}, 'سؤال عن الاجتماع أو الأنشطة أو الخدمة؟ ده مش دعم فني: كلّم أمين الخدمة من ', h('a', { href: '../about/#contact' }, 'صفحة التواصل مع الأسرة'), '.')),
       rows(row({ icon: 'home', title: 'إزاي تستخدم حسابك', sub: 'شرح سريع لكل أقسام حسابك', onclick: () => openTourNow(false), attrs: { 'data-tour-open': '', 'data-quiet': '' } })),
       rows(
         s.whatsapp ? row({ icon: 'whatsapp', title: 'واتساب', sub: 'أسرع طريقة', href: s.whatsapp, attrs: { target: '_blank', rel: 'noopener', 'data-support': '' } }) : null,
         s.phone ? row({ icon: 'phone', title: 'مكالمة', sub: h('span', { dir: 'ltr' }, s.phone), href: 'tel:' + s.phone }) : null,
-        s.email ? row({ icon: 'mail', title: 'إيميل', sub: h('span', { dir: 'ltr' }, s.email), href: 'mailto:' + s.email }) : null)), kind);
+        s.email ? row({ icon: 'mail', title: 'إيميل', sub: h('span', { dir: 'ltr' }, s.email), href: 'mailto:' + s.email }) : null),
+      rows(row({ icon: 'desktop', title: 'عن الموقع والدعم الفني', sub: 'مين عمل الموقع، وإمتى تكلّم الدعم', href: '../about-site/' }))), kind);
   }
 
   /* ---------- routes ---------- */

@@ -780,9 +780,15 @@ function footer(content) {
     content.location ? h('p', {}, content.location.name) : null,
     // the legal pages (Google sign-in / Gmail need the privacy policy linked from the home page)
     h('p', { class: 'footer__links' },
+      h('a', { href: 'about/' }, 'عن الأسرة'),
+      ' · ',
       h('a', { href: 'privacy/' }, 'سياسة الخصوصية'),
       ' · ',
       h('a', { href: 'terms/' }, 'شروط الاستخدام')
+    ),
+    // who built the site and where technical problems go: quiet, for whoever looks for it (site wave 3)
+    h('p', { class: 'footer__credit' },
+      h('a', { href: 'about-site/' }, 'تطوير الموقع والدعم الفني')
     )
   );
 

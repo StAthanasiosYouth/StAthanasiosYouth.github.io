@@ -2225,10 +2225,22 @@ ol {
   margin-top: 6px;
 }
 
-.footer__links a {
+.footer__links a,
+.footer__credit a {
+  display: inline-block;
+  padding: 6px 2px;
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.footer__credit {
+  font-size: .76rem;
+  opacity: .85;
+}
+
+.footer__credit a {
+  text-decoration-color: rgba(255, 255, 255, .25);
 }
 
 

@@ -305,3 +305,287 @@ html:active-view-transition-type(site-page)::view-transition-new(root) {
   outline: 2px solid var(--gold-hi);
   outline-offset: 2px;
 }
+
+
+/* ---------- the text pages in the S8 look (site wave 3: /about/ «عن الأسرة», /about-site/ «عن الموقع»;
+   the same pieces dress privacy/terms in W9) ---------- */
+
+html.legal-s8 {
+  scroll-padding-top: 130px;
+}
+
+.legal-toc {
+  position: sticky;
+  top: 61px;
+  z-index: 15;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 18px -16px 6px;
+  padding: 10px 16px;
+  background: linear-gradient(180deg, rgba(2, 9, 20, .96), rgba(2, 9, 20, .85));
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-block: 1px solid rgba(var(--gold-hi-rgb), .1);
+}
+
+.legal-toc::-webkit-scrollbar {
+  display: none;
+}
+
+.legal-toc a {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid rgba(var(--gold-hi-rgb), .2);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: .82rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.legal-toc a.on {
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+  border-color: transparent;
+  color: rgb(var(--gold-1b1203-rgb));
+}
+
+.legal-s8 .legal > section {
+  margin: 14px 0 0;
+  padding: 18px 18px 8px;
+  border-radius: 22px;
+  border: 1px solid var(--gold-line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, .01));
+}
+
+.legal-s8 .legal > section > h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 0;
+}
+
+.legal-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid var(--gold-line-strong);
+  background: rgba(var(--gold-rgb), .16);
+  color: var(--gold-hi);
+  font-size: .95rem;
+  font-weight: 900;
+}
+
+.legal-s8 .legal > .legal-lead {
+  border-color: rgba(var(--gold-hi-rgb), .4);
+  background: radial-gradient(90% 70% at 100% 0%, rgba(var(--gold-rgb), .16), transparent 60%), rgba(255, 255, 255, .03);
+}
+
+.legal-s8 .legal > .legal-lead h2 {
+  font-family: "Aref Ruqaa", serif;
+  font-size: 1.6rem;
+  color: var(--gold-hi);
+}
+
+.legal-s8 .legal > .legal-lead p {
+  font-size: 1.05rem;
+  line-height: 2;
+}
+
+/* the actions under a section: a call, WhatsApp, the map */
+.legal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 4px 0 16px;
+}
+
+.legal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: 999px;
+  color: var(--gold-hi);
+  font-weight: 700;
+  font-size: .92rem;
+  text-decoration: none;
+}
+
+.legal-btn svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.legal-btn--primary {
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+  border-color: transparent;
+  color: rgb(var(--gold-1b1203-rgb));
+}
+
+.legal-btn--wa {
+  border-color: rgba(37, 211, 102, .38);
+  background: rgba(37, 211, 102, .09);
+  color: var(--text);
+}
+
+.legal-btn--wa svg {
+  color: #25d366;
+}
+
+/* two ways to reach us, side by side on a wide screen */
+.legal-ways {
+  display: grid;
+  gap: 12px;
+  margin: 6px 0 14px;
+}
+
+@media (min-width: 640px) {
+  .legal-ways {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.legal-way {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 14px 16px 2px;
+  border: 1px solid var(--gold-line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .03);
+}
+
+.legal-way h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--gold-hi);
+}
+
+.legal-way__who {
+  margin: 0;
+  font-size: .9rem;
+  color: var(--text-2);
+}
+
+.legal-way p {
+  margin-bottom: 8px;
+}
+
+/* «ده مش دعم فني»: the line that sends a question to the right person */
+.legal-note {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border-inline-start: 3px solid var(--gold);
+  border-radius: 10px;
+  background: rgba(var(--gold-rgb), .08);
+  font-size: .94rem;
+}
+
+/* the projects: a quiet list, not a gallery */
+.legal-projects {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.legal-projects > li {
+  margin: 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--gold-line);
+}
+
+.legal-projects > li:first-child {
+  border-top: 0;
+  padding-top: 2px;
+}
+
+.legal-projects h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.legal-projects p {
+  margin: 0 0 6px;
+  color: var(--text-2);
+}
+
+.legal-projects__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  font-size: .9rem;
+}
+
+.legal-projects__links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+}
+
+.legal-foot-links a,
+.legal__foot a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+}
+
+/* back to the top */
+.legal-up {
+  position: fixed;
+  z-index: 30;
+  inset-inline-start: 16px;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--gold-line-strong);
+  border-radius: 50%;
+  background: rgba(6, 26, 49, .92);
+  color: var(--gold-hi);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(20px);
+  pointer-events: none;
+  transition: opacity .25s, transform .3s;
+  box-shadow: 0 12px 30px -12px #000;
+}
+
+.legal-up.is-on {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.legal-up svg {
+  width: 22px;
+  height: 22px;
+}
+
+.legal-up:focus-visible,
+.legal-btn:focus-visible,
+.legal-toc a:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .legal-up {
+    transition: none;
+  }
+}
