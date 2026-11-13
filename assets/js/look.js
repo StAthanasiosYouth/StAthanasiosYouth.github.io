@@ -127,6 +127,13 @@
   var current = 'gold';
   apply(saved());
 
+  /* a page the browser keeps and shows again (back/forward cache: the home's button goes back in history) and
+     another tab of the site take the colour chosen meanwhile, without a reload */
+  function again() { var id = saved(); if (id !== current) apply(id); }
+  window.addEventListener('pageshow', function (e) { if (e.persisted) again(); });
+  window.addEventListener('storage', function (e) { if (!e.key || e.key === LOOK_KEY || e.key === SESSION_KEY) again(); });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') again(); });
+
   window.SiteLook = {
     tints: T,
     order: ORDER,

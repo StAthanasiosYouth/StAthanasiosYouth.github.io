@@ -17,9 +17,11 @@ function run({ local = store(), tab = store() } = {}) {
     style: { setProperty: (k, v) => props.set(k, v), removeProperty: k => props.delete(k) },
     setAttribute: (k, v) => { attrs[k] = v; }
   };
-  const window = { localStorage: local, sessionStorage: tab };
-  vm.runInNewContext(SRC, { window, document: { documentElement: html } });
-  return { look: window.SiteLook, props, attrs, local, tab };
+  const on = {};
+  const window = { localStorage: local, sessionStorage: tab, addEventListener: (k, f) => { on[k] = f; } };
+  const document = { documentElement: html, visibilityState: 'visible', addEventListener: (k, f) => { on[k] = f; } };
+  vm.runInNewContext(SRC, { window, document });
+  return { look: window.SiteLook, props, attrs, local, tab, on };
 }
 const SESSION = JSON.stringify({ token: 'as1.test', email: 'a@x.io' });
 const LOOK = 'athanasios.account.look.v1';
@@ -93,4 +95,20 @@ test('the migration only adds', () => {
   const f = readdirSync(dir).find(n => /member_tint/.test(n));
   const sql = readFileSync(new URL(f, dir), 'utf8').replace(/--.*$/gm, '').trim();
   assert.equal(sql, 'ALTER TABLE participants ADD COLUMN site_tint TEXT;');
+});
+
+test('a page shown again from the back/forward cache takes the colour chosen meanwhile', () => {
+  const local = store({ 'athanasios.account.v1': SESSION, [LOOK]: JSON.stringify({ tint: 'gold' }) });
+  const r = run({ local });
+  assert.equal(r.look.current(), 'gold');
+  local.setItem(LOOK, JSON.stringify({ tint: 'rose' })); // chosen on the account page
+  r.on.pageshow({ persisted: true });
+  assert.equal(r.look.current(), 'rose');
+  assert.equal(r.props.get('--gold-rgb'), '232, 120, 159');
+  local.setItem(LOOK, JSON.stringify({ tint: 'sea' })); // another tab
+  r.on.storage({ key: LOOK });
+  assert.equal(r.look.current(), 'sea');
+  local.removeItem('athanasios.account.v1'); // signed out elsewhere
+  r.on.visibilitychange();
+  assert.equal(r.look.current(), 'gold');
 });
