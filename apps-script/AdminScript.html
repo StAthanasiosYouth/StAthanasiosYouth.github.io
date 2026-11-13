@@ -840,6 +840,117 @@
   };
 
   /*
+   * The intro's sound (owner 2026-11-13): one short piece in the panel's own voice (soft sines and triangles, the
+   * same register as «open» / «page»), timed to the intro's motion:
+   *   'start'  — air rising behind the rays, a warm chord blooming with the logo, a bell as the ring closes (0.45 s),
+   *              a run of glints with the light sweep (0.85 s)
+   *   'ready'  — «اللوحة جاهزة ✓»: two notes that resolve the chord
+   *   'fly'    — the logo flies to its place: a soft fall of air, and a small touch when it lands (0.8 s)
+   * Like every sound: only with «الأصوات» on (الإعدادات ← الشكل), never in a hidden tab; synthesized, no file.
+   */
+  A.introSound = function (stage) {
+    if (!A.prefs || !A.prefs.sound || document.hidden) return;
+    try {
+      if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === 'suspended') audio.resume();
+    }
+    catch (ignored) {
+      return;
+    }
+    var c = audio;
+    var t = c.currentTime + 0.02;
+
+    // one bus: a gentle low-pass and a short echo, so every part sits in the same room
+    var bus = c.createGain();
+    bus.gain.value = 1.5;
+    var tone = c.createBiquadFilter();
+    tone.type = 'lowpass';
+    tone.frequency.value = 5200;
+    var echo = c.createDelay(1);
+    echo.delayTime.value = 0.23;
+    var back = c.createGain();
+    back.gain.value = 0.28;
+    var wet = c.createGain();
+    wet.gain.value = 0.32;
+    bus.connect(tone);
+    tone.connect(c.destination);
+    tone.connect(echo);
+    echo.connect(back);
+    back.connect(echo);
+    echo.connect(wet);
+    wet.connect(c.destination);
+
+    function note(type, freq, start, attack, dur, vol, glide) {
+      var o = c.createOscillator();
+      var g = c.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(freq, t + start);
+      if (glide) o.frequency.exponentialRampToValueAtTime(glide, t + start + dur);
+      g.gain.setValueAtTime(0.0001, t + start);
+      g.gain.exponentialRampToValueAtTime(vol, t + start + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + start + dur);
+      o.connect(g);
+      g.connect(bus);
+      o.start(t + start);
+      o.stop(t + start + dur + 0.05);
+    }
+
+    // a bell: the note and two soft partials, decaying
+    function bell(freq, start, vol, dur) {
+      note('sine', freq, start, 0.008, dur, vol);
+      note('sine', freq * 2.01, start, 0.006, dur * 0.55, vol * 0.32);
+      note('triangle', freq * 3.02, start, 0.004, dur * 0.3, vol * 0.12);
+    }
+
+    // air: filtered noise moving from one colour to another
+    function air(start, dur, from, to, vol) {
+      var len = Math.ceil(c.sampleRate * dur);
+      var buf = c.createBuffer(1, len, c.sampleRate);
+      var d = buf.getChannelData(0);
+      for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      var src = c.createBufferSource();
+      src.buffer = buf;
+      var bp = c.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.Q.value = 1.4;
+      bp.frequency.setValueAtTime(from, t + start);
+      bp.frequency.exponentialRampToValueAtTime(to, t + start + dur);
+      var g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t + start);
+      g.gain.exponentialRampToValueAtTime(vol, t + start + dur * 0.55);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + start + dur);
+      src.connect(bp);
+      bp.connect(g);
+      g.connect(bus);
+      src.start(t + start);
+      src.stop(t + start + dur + 0.05);
+    }
+
+    if (stage === 'start') {
+      air(0, 1.3, 260, 2400, 0.05);
+      // the chord blooms with the logo (D · A · E · F#: open, warm, not sad)
+      [146.83, 220, 329.63, 369.99].forEach(function (f, i) {
+        note('sine', f, 0.15 + i * 0.04, 0.45, 1.9, 0.026);
+        note('triangle', f * 1.003, 0.15 + i * 0.04, 0.6, 1.6, 0.008);
+      });
+      bell(1174.66, 0.45, 0.05, 1.3);
+      // the light sweep: glints going up
+      [1479.98, 1760, 2217.46, 2637.02].forEach(function (f, i) { bell(f, 0.85 + i * 0.07, 0.016, 0.5); });
+    }
+    if (stage === 'ready') {
+      bell(880, 0, 0.04, 0.7);
+      bell(1318.51, 0.11, 0.045, 1.1);
+    }
+    if (stage === 'fly') {
+      air(0, 0.7, 2600, 380, 0.035);
+      note('sine', 660, 0.05, 0.02, 0.5, 0.012, 440);
+      // the landing: a small, low touch
+      note('sine', 196, 0.78, 0.006, 0.28, 0.05, 150);
+      bell(1567.98, 0.8, 0.018, 0.45);
+    }
+  };
+
+  /*
    * Phase 8B W7: each kind of control has its own sound, without wiring every button: the area links and the
    * dock say «page», tabs «tab», a switch «on»/«off», a main button «pop», the rest a soft «tap». A sheet's own
    * «open»/«close» stays where it is (A.openSheet); still off until the admin turns sounds on («الشكل»).
@@ -4964,7 +5075,8 @@
     root.classList.add('is-intro');
     // it follows the panel while it settles (the shell arrives, the rail opens) and on a resize
     (function follow() { place(); if (!gone && box.isConnected) requestAnimationFrame(follow); })();
-    if (A.sound) A.sound('open');
+    // the intro's own sound (A.introSound), only with «الأصوات» on
+    if (A.introSound) A.introSound('start');
 
     var anims = [], D = 1900, E = 'cubic-bezier(.16,1,.3,1)', gone = false, ready = false, shown = Date.now();
     function play(sel, kf, o) {
@@ -4999,6 +5111,7 @@
       clearTimeout(timer); clearTimeout(hardStop);
       anims.forEach(function (a) { try { a.finish(); } catch (e) { /* gone */ } });
       box.classList.add('is-leaving');
+      if (A.introSound) A.introSound('fly');
       ['.intro__text', '.intro__load', '.intro__halo', '.intro__ring', '.intro__sweep'].forEach(function (s) {
         var n = box.querySelector(s);
         if (n && n.animate) n.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-8px)' }], { duration: fast ? 160 : 320, fill: 'both', easing: 'ease-in' });
@@ -5026,6 +5139,8 @@
         if (name) sub.textContent = 'أهلاً يا ' + String(name).split(' ')[0];
         status.textContent = 'اللوحة جاهزة ✓';
         box.classList.add('is-ready');
+        // «اللوحة جاهزة ✓»: its two notes, never on top of the opening
+        setTimeout(function () { if (!gone && A.introSound) A.introSound('ready'); }, Math.max(0, 1250 - (Date.now() - shown)));
         var left = D - (Date.now() - shown);
         clearTimeout(timer);
         timer = setTimeout(function () { leave(false); }, Math.max(450, left));
