@@ -788,7 +788,7 @@ function footer(content) {
     ),
     // who built the site and where technical problems go: quiet, for whoever looks for it (site wave 3)
     h('p', { class: 'footer__credit' },
-      h('a', { href: 'about-site/' }, 'تطوير الموقع والدعم الفني')
+      h('a', { href: 'about-site/' }, 'تصميم الموقع وتطويره والدعم الفني: مينا زكريا')
     )
   );
 

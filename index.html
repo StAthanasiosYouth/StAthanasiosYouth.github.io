@@ -26,7 +26,7 @@
 
   <meta property="og:type" content="website">
   <meta property="og:locale" content="ar_EG">
-  <meta property="og:site_name" content="أسرة البابا أثناسيوس – سفاجا">
+  <meta property="og:site_name" content="أسرة البابا أثناسيوس الرسولي للشباب">
   <meta property="og:title" content="أسرة البابا أثناسيوس الرسولي للشباب – كنيسة أبي سيفين بسفاجا">
   <meta property="og:description" content="اجتماع الشباب في كنيسة أبي سيفين بسفاجا: المعاد، والمكان، والفعاليات، وخدماتنا، وصفحاتنا — كل حاجة في لينك واحد.">
   <meta property="og:url" content="https://stathanasiosyouth.github.io/">
@@ -41,7 +41,7 @@
   <meta name="twitter:image" content="https://stathanasiosyouth.github.io/assets/img/og-image.png">
 
   <!-- structured data (a data block, not code: the CSP doesn't run it): the site, the family, its church.
-       The same @ids are used on /about/ and /about-site/ (the developer lives only there). Facts from content.json. -->
+       The same @ids are used on /about/ and /about-site/; the site's name and its developer (the owner's words, 2026-11-13) are the same nodes there. Facts from content.json. -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -50,21 +50,39 @@
         "@type": "WebSite",
         "@id": "https://stathanasiosyouth.github.io/#website",
         "url": "https://stathanasiosyouth.github.io/",
-        "name": "أسرة البابا أثناسيوس الرسولي للشباب – سفاجا",
-        "alternateName": "موقع أسرة البابا أثناسيوس",
+        "name": "أسرة البابا أثناسيوس الرسولي للشباب",
+        "alternateName": [
+          "أسرة البابا أثناسيوس – سفاجا",
+          "موقع أسرة البابا أثناسيوس الرسولي للشباب"
+        ],
         "inLanguage": "ar",
-        "publisher": { "@id": "https://stathanasiosyouth.github.io/#org" }
+        "publisher": {
+          "@id": "https://stathanasiosyouth.github.io/#org"
+        },
+        "creator": {
+          "@id": "https://stathanasiosyouth.github.io/about-site/#developer"
+        },
+        "maintainer": {
+          "@id": "https://stathanasiosyouth.github.io/about-site/#developer"
+        }
       },
       {
         "@type": "Organization",
         "@id": "https://stathanasiosyouth.github.io/#org",
         "name": "أسرة البابا أثناسيوس الرسولي للشباب",
-        "alternateName": ["أسرة البابا أثناسيوس – سفاجا", "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا"],
+        "alternateName": [
+          "أسرة البابا أثناسيوس – سفاجا",
+          "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا"
+        ],
         "url": "https://stathanasiosyouth.github.io/",
         "logo": "https://stathanasiosyouth.github.io/assets/img/favicon-192.png",
         "description": "خدمة الشباب في كنيسة الشهيد العظيم أبي سيفين بسفاجا، البحر الأحمر.",
-        "location": { "@id": "https://stathanasiosyouth.github.io/#church" },
-        "subjectOf": { "@id": "https://stathanasiosyouth.github.io/about/#page" },
+        "location": {
+          "@id": "https://stathanasiosyouth.github.io/#church"
+        },
+        "subjectOf": {
+          "@id": "https://stathanasiosyouth.github.io/about/#page"
+        },
         "sameAs": [
           "https://www.facebook.com/Pope.Athanasius.The.Apostolic.Safaga",
           "https://www.instagram.com/pope.athanasiustheapostolic/",
@@ -76,9 +94,80 @@
         "@id": "https://stathanasiosyouth.github.io/#church",
         "name": "كنيسة الشهيد العظيم أبي سيفين بسفاجا",
         "alternateName": "كنيسة أبي سيفين – سفاجا",
-        "address": { "@type": "PostalAddress", "addressLocality": "سفاجا", "addressRegion": "البحر الأحمر", "addressCountry": "EG" },
-        "geo": { "@type": "GeoCoordinates", "latitude": 26.7314392, "longitude": 33.9379229 },
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "سفاجا",
+          "addressRegion": "البحر الأحمر",
+          "addressCountry": "EG"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 26.7314392,
+          "longitude": 33.9379229
+        },
         "hasMap": "https://maps.app.goo.gl/eCUtm5AftfTzSXmV7"
+      },
+      {
+        "@type": "Person",
+        "@id": "https://stathanasiosyouth.github.io/about-site/#developer",
+        "name": "مينا زكريا",
+        "alternateName": "مينا زكريا عطاالله متى",
+        "jobTitle": "مبرمج ومطوّر موقع أسرة البابا أثناسيوس الرسولي للشباب",
+        "description": "مينا زكريا (مينا زكريا عطاالله متى) مبرمج بيخدم أسرة البابا أثناسيوس الرسولي للشباب في كنيسة أبي سيفين بسفاجا: صمّم موقع الأسرة وطوّره وبيشرف عليه، ومسؤول عن الأنظمة المرتبطة بيه وعن الدعم الفني، وكمان التصميم والمونتاج والمحتوى الإعلامي لأنشطة الأسرة. بيشتغل في البرمجة وتطوير المواقع، والتصميم الجرافيكي، والمونتاج، والإنتاج الإعلامي، وبيستخدم أدوات الذكاء الاصطناعي باحتراف في الشغل التقني والإبداعي. صاحب فكرة لوجو B.U.G. – Brave Under Grace ومصممه وبيدير صفحتها، وصاحب MZ Creative Studio.",
+        "url": "https://stathanasiosyouth.github.io/about-site/",
+        "email": "mailto:menazakmena@gmail.com",
+        "knowsAbout": [
+          "البرمجة",
+          "تطوير المواقع",
+          "التصميم الجرافيكي",
+          "المونتاج",
+          "الموشن جرافيك",
+          "الهويات البصرية",
+          "التصوير",
+          "الإنتاج الإعلامي",
+          "المحتوى الإعلامي",
+          "أدوات الذكاء الاصطناعي"
+        ],
+        "memberOf": [
+          {
+            "@type": "OrganizationRole",
+            "roleName": "صمّم الموقع وطوّره وبيشرف عليه، ومسؤول الدعم الفني، والتصميم والمونتاج والمحتوى الإعلامي لأنشطة الأسرة",
+            "memberOf": {
+              "@id": "https://stathanasiosyouth.github.io/#org"
+            }
+          },
+          {
+            "@type": "OrganizationRole",
+            "roleName": "صاحب فكرة اللوجو ومصممه، وعمل الصفحة وبيديرها، والتصوير والإنتاج الإعلامي، وميديا ومزيكا المسرحيات والعروض، وإدارة المحتوى ونشره",
+            "memberOf": {
+              "@type": "Organization",
+              "@id": "https://stathanasiosyouth.github.io/about-site/#bug",
+              "name": "B.U.G. – Brave Under Grace",
+              "alternateName": "Brave Under Grace",
+              "description": "صفحة النشاط الترفيهي للكنيسة",
+              "url": "https://www.facebook.com/BraveUnderGrace",
+              "sameAs": [
+                "https://www.facebook.com/BraveUnderGrace"
+              ]
+            }
+          }
+        ],
+        "sameAs": [
+          "https://github.com/MenaZak"
+        ],
+        "brand": {
+          "@type": "Organization",
+          "@id": "https://stathanasiosyouth.github.io/about-site/#mz",
+          "name": "MZ Creative Studio",
+          "description": "مشروع مينا زكريا الإبداعي: تصميم جرافيكي، ومونتاج وفيديوهات، وموشن جرافيك، وهويات بصرية، ومحتوى دعائي، بأدوات الذكاء الاصطناعي",
+          "url": "https://www.facebook.com/MZCreativeMediaStudio",
+          "sameAs": [
+            "https://www.facebook.com/MZCreativeMediaStudio"
+          ],
+          "founder": {
+            "@id": "https://stathanasiosyouth.github.io/about-site/#developer"
+          }
+        }
       }
     ]
   }
@@ -156,7 +245,7 @@
       <p class="widget noscript">
         الصفحة محتاجة الجافاسكريبت علشان تعرض المواعيد واللينكات. فعّلها من إعدادات المتصفح.
       </p>
-      <p class="widget noscript"><a href="about/">عن الأسرة</a> · <a href="events/">الفعاليات</a> · <a href="services/">خدماتنا</a> · <a href="news/">جديد الأسرة</a> · <a href="privacy/">سياسة الخصوصية</a> · <a href="terms/">شروط الاستخدام</a> · <a href="about-site/">تطوير الموقع والدعم الفني</a></p>
+      <p class="widget noscript"><a href="about/">عن الأسرة</a> · <a href="events/">الفعاليات</a> · <a href="services/">خدماتنا</a> · <a href="news/">جديد الأسرة</a> · <a href="privacy/">سياسة الخصوصية</a> · <a href="terms/">شروط الاستخدام</a> · <a href="about-site/">تصميم الموقع وتطويره والدعم الفني: مينا زكريا</a></p>
     </noscript>
 
   </main>

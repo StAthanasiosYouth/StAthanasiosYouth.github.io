@@ -43,7 +43,7 @@ var COMP_CHOICE_ID = /^c-[0-9a-z]{6}$/;
 var COMP_SUBMISSION_ID = /^s-[0-9a-f]{12}$/;
 var COMP_SUBMITTED = ['submitted', 'pending_review', 'graded'];
 var COMP_SITE_URL = 'https://stathanasiosyouth.github.io/';
-var COMP_SITE_NAME = 'أسرة البابا أثناسيوس – سفاجا';
+var COMP_SITE_NAME = 'أسرة البابا أثناسيوس الرسولي للشباب';
 
 /* the public site's Content-Security-Policy (index.html): stubs carry exactly the same one (tested) */
 var COMP_SITE_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://tile.openstreetmap.org; font-src 'self'; connect-src 'self' https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com https://athanasios-api.menazak-lab.workers.dev https://athanasios-api-staging.menazak-lab.workers.dev; frame-src https://www.google.com; object-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests";

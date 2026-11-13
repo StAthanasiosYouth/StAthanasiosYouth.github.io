@@ -6,13 +6,13 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="theme-color" content="#030b18">
-  <title>عن الموقع: التطوير والدعم الفني – أسرة البابا أثناسيوس الرسولي للشباب</title>
+  <title>عن الموقع ومطوّره مينا زكريا – أسرة البابا أثناسيوس الرسولي للشباب</title>
   <meta name="description" content="موقع أسرة البابا أثناسيوس الرسولي للشباب في سفاجا عمله مينا زكريا (مينا زكريا عطاالله متى)، مبرمج بيخدم الأسرة: الدعم الفني لمشاكل الدخول والحساب والنقاط والمسابقات والحجوزات.">
   <link rel="canonical" href="https://stathanasiosyouth.github.io/about-site/">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="ar_EG">
-  <meta property="og:site_name" content="أسرة البابا أثناسيوس – سفاجا">
-  <meta property="og:title" content="عن موقع أسرة البابا أثناسيوس: التطوير والدعم الفني">
+  <meta property="og:site_name" content="أسرة البابا أثناسيوس الرسولي للشباب">
+  <meta property="og:title" content="مينا زكريا: تصميم موقع أسرة البابا أثناسيوس وتطويره والدعم الفني">
   <meta property="og:description" content="الدعم الفني للموقع، ومين صمّمه وطوّره.">
   <meta property="og:url" content="https://stathanasiosyouth.github.io/about-site/">
   <meta property="og:image" content="https://stathanasiosyouth.github.io/assets/img/og-image.png">
@@ -21,7 +21,7 @@
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="شعار أسرة البابا أثناسيوس الرسولي مع اسم الخدمة">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="عن موقع أسرة البابا أثناسيوس: التطوير والدعم الفني">
+  <meta name="twitter:title" content="مينا زكريا: تصميم موقع أسرة البابا أثناسيوس وتطويره والدعم الفني">
   <meta name="twitter:description" content="الدعم الفني للموقع، ومين صمّمه وطوّره.">
   <meta name="twitter:image" content="https://stathanasiosyouth.github.io/assets/img/og-image.png">
   <link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
@@ -29,36 +29,46 @@
   <script src="../assets/js/look.js"></script>
   <link rel="stylesheet" href="../assets/css/legal.css">
   <script src="../assets/js/legal.js" defer></script>
-  <!-- structured data (a data block, not code: the CSP doesn't run it). The site's developer: only on this page -->
+  <!-- structured data (a data block, not code: the CSP doesn't run it). The site's developer (the same Person node as on the home page) -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@graph": [
       {
-        "@type": "AboutPage",
+        "@type": [
+          "AboutPage",
+          "ProfilePage"
+        ],
         "@id": "https://stathanasiosyouth.github.io/about-site/#page",
         "url": "https://stathanasiosyouth.github.io/about-site/",
-        "name": "عن الموقع: التطوير والدعم الفني",
+        "name": "عن الموقع ومطوّره مينا زكريا",
         "inLanguage": "ar",
-        "isPartOf": { "@id": "https://stathanasiosyouth.github.io/#website" },
-        "about": { "@id": "https://stathanasiosyouth.github.io/#website" },
-        "mainEntity": { "@id": "https://stathanasiosyouth.github.io/about-site/#developer" },
+        "isPartOf": {
+          "@id": "https://stathanasiosyouth.github.io/#website"
+        },
+        "about": {
+          "@id": "https://stathanasiosyouth.github.io/#website"
+        },
+        "mainEntity": {
+          "@id": "https://stathanasiosyouth.github.io/about-site/#developer"
+        },
         "breadcrumb": {
           "@type": "BreadcrumbList",
           "itemListElement": [
-            { "@type": "ListItem", "position": 1, "name": "الرئيسية", "item": "https://stathanasiosyouth.github.io/" },
-            { "@type": "ListItem", "position": 2, "name": "عن الموقع", "item": "https://stathanasiosyouth.github.io/about-site/" }
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "الرئيسية",
+              "item": "https://stathanasiosyouth.github.io/"
+            },
+            {
+              "@type": "ListItem",
+              "position": 2,
+              "name": "عن الموقع",
+              "item": "https://stathanasiosyouth.github.io/about-site/"
+            }
           ]
         }
-      },
-      {
-        "@type": "WebSite",
-        "@id": "https://stathanasiosyouth.github.io/#website",
-        "url": "https://stathanasiosyouth.github.io/",
-        "name": "أسرة البابا أثناسيوس الرسولي للشباب – سفاجا",
-        "inLanguage": "ar",
-        "publisher": { "@id": "https://stathanasiosyouth.github.io/#org" },
-        "creator": { "@id": "https://stathanasiosyouth.github.io/about-site/#developer" }
       },
       {
         "@type": "Person",
@@ -66,17 +76,60 @@
         "name": "مينا زكريا",
         "alternateName": "مينا زكريا عطاالله متى",
         "jobTitle": "مبرمج ومطوّر موقع أسرة البابا أثناسيوس الرسولي للشباب",
-        "email": "mailto:menazakmena@gmail.com",
-        "memberOf": { "@id": "https://stathanasiosyouth.github.io/#org" },
-        "description": "مينا زكريا عطاالله متى، مبرمج بيخدم أسرة البابا أثناسيوس الرسولي للشباب في كنيسة أبي سيفين بسفاجا: عمل موقع الأسرة (صمّمه وطوّره) والأنظمة المرتبطة بيه، ومسؤول عن الدعم الفني. بيشتغل في البرمجة وتطوير المواقع، والتصميم الجرافيكي، والمونتاج، والمحتوى الإعلامي، وبيستخدم أدوات الذكاء الاصطناعي في الشغل التقني والإبداعي.",
-        "knowsAbout": ["تطوير المواقع", "البرمجة", "التصميم الجرافيكي", "المونتاج", "المحتوى الإعلامي", "أدوات الذكاء الاصطناعي"],
+        "description": "مينا زكريا (مينا زكريا عطاالله متى) مبرمج بيخدم أسرة البابا أثناسيوس الرسولي للشباب في كنيسة أبي سيفين بسفاجا: صمّم موقع الأسرة وطوّره وبيشرف عليه، ومسؤول عن الأنظمة المرتبطة بيه وعن الدعم الفني، وكمان التصميم والمونتاج والمحتوى الإعلامي لأنشطة الأسرة. بيشتغل في البرمجة وتطوير المواقع، والتصميم الجرافيكي، والمونتاج، والإنتاج الإعلامي، وبيستخدم أدوات الذكاء الاصطناعي باحتراف في الشغل التقني والإبداعي. صاحب فكرة لوجو B.U.G. – Brave Under Grace ومصممه وبيدير صفحتها، وصاحب MZ Creative Studio.",
         "url": "https://stathanasiosyouth.github.io/about-site/",
-        "sameAs": ["https://github.com/MenaZak"],
+        "email": "mailto:menazakmena@gmail.com",
+        "knowsAbout": [
+          "البرمجة",
+          "تطوير المواقع",
+          "التصميم الجرافيكي",
+          "المونتاج",
+          "الموشن جرافيك",
+          "الهويات البصرية",
+          "التصوير",
+          "الإنتاج الإعلامي",
+          "المحتوى الإعلامي",
+          "أدوات الذكاء الاصطناعي"
+        ],
+        "memberOf": [
+          {
+            "@type": "OrganizationRole",
+            "roleName": "صمّم الموقع وطوّره وبيشرف عليه، ومسؤول الدعم الفني، والتصميم والمونتاج والمحتوى الإعلامي لأنشطة الأسرة",
+            "memberOf": {
+              "@id": "https://stathanasiosyouth.github.io/#org"
+            }
+          },
+          {
+            "@type": "OrganizationRole",
+            "roleName": "صاحب فكرة اللوجو ومصممه، وعمل الصفحة وبيديرها، والتصوير والإنتاج الإعلامي، وميديا ومزيكا المسرحيات والعروض، وإدارة المحتوى ونشره",
+            "memberOf": {
+              "@type": "Organization",
+              "@id": "https://stathanasiosyouth.github.io/about-site/#bug",
+              "name": "B.U.G. – Brave Under Grace",
+              "alternateName": "Brave Under Grace",
+              "description": "صفحة النشاط الترفيهي للكنيسة",
+              "url": "https://www.facebook.com/BraveUnderGrace",
+              "sameAs": [
+                "https://www.facebook.com/BraveUnderGrace"
+              ]
+            }
+          }
+        ],
+        "sameAs": [
+          "https://github.com/MenaZak"
+        ],
         "brand": {
           "@type": "Organization",
+          "@id": "https://stathanasiosyouth.github.io/about-site/#mz",
           "name": "MZ Creative Studio",
+          "description": "مشروع مينا زكريا الإبداعي: تصميم جرافيكي، ومونتاج وفيديوهات، وموشن جرافيك، وهويات بصرية، ومحتوى دعائي، بأدوات الذكاء الاصطناعي",
           "url": "https://www.facebook.com/MZCreativeMediaStudio",
-          "sameAs": ["https://www.facebook.com/MZCreativeMediaStudio"]
+          "sameAs": [
+            "https://www.facebook.com/MZCreativeMediaStudio"
+          ],
+          "founder": {
+            "@id": "https://stathanasiosyouth.github.io/about-site/#developer"
+          }
         }
       }
     ]
@@ -98,7 +151,7 @@
 
     <nav class="legal-toc" aria-label="في الصفحة دي">
       <a href="#support">الدعم الفني</a>
-      <a href="#developer">تطوير الموقع</a>
+      <a href="#developer">مين عمل الموقع</a>
       <a href="#projects">مشروعات</a>
       <a href="#site">الموقع نفسه</a>
     </nav>
@@ -125,8 +178,8 @@
     </section>
 
     <section id="developer">
-      <h2><span class="legal-num">٢</span>تطوير الموقع</h2>
-      <p>اللي عمل الموقع هو <strong>مينا زكريا</strong> (اسمه بالكامل مينا زكريا عطاالله متى)، مبرمج بيخدم أسرة البابا أثناسيوس الرسولي للشباب. صمّم الموقع وطوّره، وهو المسؤول عن الأنظمة المرتبطة بيه وعن الدعم الفني.</p>
+      <h2><span class="legal-num">٢</span>مين عمل الموقع: مينا زكريا</h2>
+      <p>اللي عمل الموقع هو <strong>مينا زكريا</strong> (اسمه بالكامل مينا زكريا عطاالله متى)، مبرمج بيخدم أسرة البابا أثناسيوس الرسولي للشباب. صمّم الموقع وطوّره وبيشرف عليه، وهو المسؤول عن الأنظمة المرتبطة بيه وعن الدعم الفني، وكمان التصميم والمونتاج والمحتوى الإعلامي لأنشطة الأسرة.</p>
       <p>مينا بيشتغل في البرمجة وتطوير المواقع، والتصميم الجرافيكي، والمونتاج، والمحتوى الإعلامي، وبيستخدم أدوات الذكاء الاصطناعي باحتراف في الشغل التقني والإبداعي.</p>
     </section>
 

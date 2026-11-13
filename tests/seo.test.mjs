@@ -71,22 +71,23 @@ test('the key words people search with are in the right places, without stuffing
   for (const words of ['اجتماع الشباب', 'كنيسة الشهيد العظيم أبي سيفين', 'سفاجا']) assert.ok(about.includes(words), words);
   const site = read('about-site/index.html');
   assert.match(one(site, /<meta name="description" content="([^"]+)">/, 'description'), /مينا زكريا/);
-  // the developer's name never on the home page's head or in its title (quiet credit)
-  assert.doesNotMatch(head(home), /مينا/);
+  // the developer: named on the home page (structured data + the footer line), never in its title
+  assert.doesNotMatch(one(home, /<title>([^<]+)<\/title>/, 'title'), /مينا/);
+  assert.match(head(home), /"name": "مينا زكريا"/);
   for (const path of PUBLIC) {
     const title = one(read(file(path)), /<title>([^<]+)<\/title>/, 'title', path);
     assert.ok(title.length <= 90, `${path}: title not stuffed (${title.length})`);
   }
 });
 
-test('structured data: parses, one family / church / site with shared @ids, the developer only on «عن الموقع»', () => {
+test('structured data: parses, one family / church / site with shared @ids, the developer on the home and «عن الموقع»', () => {
   const byId = new Map();
   for (const path of PUBLIC) {
     const html = read(file(path));
     for (const block of ldBlocks(html)) assert.equal(block['@context'], 'https://schema.org', path);
     for (const node of graph(html)) {
       assert.ok(node['@type'], `${path}: typed`);
-      if (node['@type'] === 'Person') assert.equal(path, 'about-site/', 'a Person only on /about-site/');
+      if (node['@type'] === 'Person') assert.ok(['', 'about-site/'].includes(path), 'the developer on the home and /about-site/ only');
       if (node['@id']) {
         assert.ok(node['@id'].startsWith(SITE), node['@id']);
         const was = byId.get(node['@id']);
@@ -108,6 +109,11 @@ test('structured data: parses, one family / church / site with shared @ids, the 
   assert.equal(church.hasMap, content.location.mapsUrl);
   const site = byId.get(SITE + '#website');
   assert.equal(site['@type'], 'WebSite');
+  // one site name everywhere: WebSite.name = og:site_name on every public page = the generated pages' name
+  assert.equal(site.name, 'أسرة البابا أثناسيوس الرسولي للشباب');
+  for (const path of PUBLIC.filter(p => !['privacy/', 'terms/'].includes(p))) assert.match(read(file(path)), new RegExp(`<meta property="og:site_name" content="${site.name}">`), `${path}: og:site_name`);
+  assert.match(read('apps-script/CompModel.gs'), new RegExp(`var COMP_SITE_NAME = '${site.name}';`));
+  assert.equal(site.maintainer['@id'], SITE + 'about-site/#developer');
   assert.equal(site.publisher['@id'], SITE + '#org');
   const person = byId.get(SITE + 'about-site/#developer');
   assert.equal(person['@type'], 'Person');
@@ -115,6 +121,10 @@ test('structured data: parses, one family / church / site with shared @ids, the 
   assert.equal(person.alternateName, 'مينا زكريا عطاالله متى');
   assert.equal(person.email, 'mailto:menazakmena@gmail.com');
   assert.deepEqual(person.sameAs, ['https://github.com/MenaZak']);
+  assert.deepEqual(person.memberOf.map(r => r.memberOf['@id']), [SITE + '#org', SITE + 'about-site/#bug']);
+  assert.deepEqual(person.memberOf[1].memberOf.sameAs, ['https://www.facebook.com/BraveUnderGrace']);
+  assert.deepEqual(person.brand.sameAs, ['https://www.facebook.com/MZCreativeMediaStudio']);
+  assert.equal(person.brand.founder['@id'], person['@id']);
   assert.equal(site.creator['@id'], person['@id']);
   // the home's social links = content.json's (no invented profiles)
   const social = content.sections.flatMap(s => s.links || []).map(l => l.url);
@@ -135,7 +145,7 @@ test('the developer page: the four project links exactly as given, WhatsApp supp
   const body = html.slice(html.indexOf('<body>'));
   assert.deepEqual([...body.matchAll(/<img [^>]*src="([^"]+)"/g)].map(m => m[1]).filter(src => !/logo-128\.webp$/.test(src)), [], 'only the family logo');
   // the home links to it quietly, from the footer
-  assert.match(read('assets/js/render.js'), /h\('a', \{ href: 'about-site\/' \}, 'تطوير الموقع والدعم الفني'\)/);
+  assert.match(read('assets/js/render.js'), /h\('a', \{ href: 'about-site\/' \}, 'تصميم الموقع وتطويره والدعم الفني: مينا زكريا'\)/);
 });
 
 test('private and test pages: noindex, never in the sitemap', () => {
