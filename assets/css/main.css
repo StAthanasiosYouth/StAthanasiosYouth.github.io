@@ -4568,7 +4568,7 @@ html[data-intro="card"] body > :not(.ic) { visibility: hidden; }
 
 .s2-ev { position: relative; width: min(72vw, 270px); aspect-ratio: 4 / 5; border-radius: 20px; overflow: hidden; border: 1px solid var(--gold-line-strong); display: flex; align-items: flex-end; background: var(--navy-850); color: var(--text); text-decoration: none; transition: transform .35s var(--ease-out, ease), border-color .2s; }
 .s2-ev:hover { transform: translateY(-3px); border-color: var(--gold-hi); }
-.s2-ev img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.s2-ev > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .s2-ev::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, rgb(2 9 20 / .96), rgb(2 9 20 / .25) 58%, transparent); }
 .s2-ev__body { position: relative; z-index: 1; padding: 14px; }
 .s2-ev__date { display: inline-flex; flex-direction: column; align-items: center; padding: 5px 10px; margin-bottom: 8px; border-radius: 13px; background: rgba(var(--gold-rgb), .18); border: 1px solid var(--gold-line-strong); color: var(--gold-hi); font-weight: 800; line-height: 1.15; }
@@ -4638,4 +4638,5 @@ html[data-intro="card"] body > :not(.ic) { visibility: hidden; }
 .s2-all:focus-visible, .s2-arrows button:focus-visible, .s2-sugg__dots button:focus-visible, .s2-join__x:focus-visible, .s2-join__tint:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 2px; }
 /* inside a scrolling track the ring is drawn inside the card (the track would clip it outside) */
 .s2-chip:focus-visible, .s2-ev:focus-visible, .s2-nw:focus-visible, .s2-slide:has(.stretched:focus-visible), .s2-rail--sv .item-card:has(.stretched:focus-visible) { outline: 2px solid var(--gold-hi); outline-offset: -2px; }
-.s2-ev .item-card__partner { position: relative; margin: 4px 0 2px; }
+/* the cover fill above is the card's own picture only (> img): the partner's mark keeps its plate size */
+.s2-ev .item-card__partner { position: relative; margin: 4px 0 2px; font-size: .72rem; color: var(--text-2); }
