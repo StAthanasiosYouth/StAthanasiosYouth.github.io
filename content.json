@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "713d29b111b5",
-  "publishedAt": "2026-11-14T04:55:24.023Z",
+  "revision": "d006c2ad80fa",
+  "publishedAt": "2026-11-14T05:16:00.630Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -252,6 +252,14 @@
         "type": "call",
         "href": "tel:+201220129458",
         "label": "اتصال"
+      },
+      "image": {
+        "src": "media/2026/img-0be3f5a1.webp",
+        "thumb": "media/2026/img-0be3f5a1-480.webp",
+        "w": 1080,
+        "h": 1446,
+        "alt": "",
+        "color": "#868584"
       }
     },
     {
