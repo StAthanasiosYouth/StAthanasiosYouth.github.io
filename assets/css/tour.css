@@ -383,9 +383,11 @@
 .st-hero--chat { animation-delay: .15s; }
 .st-hero b { margin-top: 4px; font-size: .84rem; }
 .st-hero em { font-style: normal; font-size: .66rem; color: var(--accent); font-weight: 700; }
-.st-face--big { width: 82px; height: 82px; border: 0; padding: 3px; background: conic-gradient(from 0deg, var(--gold), transparent 30%, var(--accent) 50%, transparent 80%, var(--gold)); animation: st-turn 6s linear infinite; font-size: 1.6rem; }
-.st-face--big img { border-radius: 50%; animation: st-turn 6s linear infinite reverse; }
-.st-face--letter.st-face--big { animation: none; background: var(--navy-850); border: 2px solid var(--gold); }
+.st-face--big { position: relative; isolation: isolate; width: 82px; height: 82px; border: 0; padding: 3px; background: var(--navy-850); font-size: 1.6rem; }
+.st-face--big::before { content: ""; position: absolute; z-index: -1; inset: -40%; background: conic-gradient(from 0deg, var(--gold), transparent 30%, var(--accent) 50%, transparent 80%, var(--gold)); animation: st-turn 6s linear infinite; }
+.st-face--big img { position: relative; border-radius: 50%; }
+.st-face--letter.st-face--big { border: 2px solid var(--gold); }
+.st-face--letter.st-face--big::before { display: none; }
 .st-hero .st-ring { position: absolute; inset-block-start: 66px; inset-inline-end: calc(50% - 48px); width: 28px; height: 28px; box-shadow: 0 0 0 3px var(--navy-850); }
 .st-hero .st-ring .st-ic { width: 14px; height: 14px; }
 .st-ring--wa { color: #fff; background: #25d366; animation-name: st-call-green; animation-delay: 1.4s; }
