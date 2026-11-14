@@ -35,6 +35,8 @@ export function picture(image, { sizes = '(min-width: 1024px) 360px, 92vw', clas
   // the picture's own colour while it loads (CSSOM: the CSP blocks style="")
   if (image.color) img.style.backgroundColor = image.color;
 
+  holdForGate(img);
+
   return img;
 
 }
@@ -109,7 +111,8 @@ export function sectionBanner(section = {}) {
 
   // the full-size file only when the banner comes near the screen (a phone's
   // first visit gets the thumbnail; a banner on the first screen is sharp at once)
-  const srcset = img.getAttribute('srcset');
+  const srcset = img.getAttribute('srcset') || img.dataset.gateSrcset;
+  if (img.dataset.gateSrcset) { img.removeAttribute('data-gate-srcset'); gated.delete(img); }
   if (srcset && bannerNear) {
     img.removeAttribute('srcset');
     img.dataset.srcset = srcset;
@@ -130,6 +133,8 @@ export function sectionBanner(section = {}) {
    thumbnail (one download, sharp at once) */
 export function sharpenVisibleBanners(root) {
 
+  if (gateUp()) return;          // the page is hidden under the gate: its banners sharpen on the press (releaseGate)
+
   for (const img of root.querySelectorAll('.section-banner__img[data-srcset]')) {
     const r = img.getBoundingClientRect();
     if (r.top < innerHeight + 80 && r.bottom > -80 && !img.srcset) {
@@ -144,11 +149,52 @@ const bannerNear = typeof IntersectionObserver === 'function'
   ? new IntersectionObserver(entries => {
     for (const { target, isIntersecting } of entries) {
       if (!isIntersecting && target.isConnected) continue;
+      if (gateUp()) continue;    // under the gate: kept until the press
       bannerNear.unobserve(target);
       if (isIntersecting) target.srcset = target.dataset.srcset;
     }
   }, { rootMargin: '80px 0px' })
   : null;
+
+/* the first visit's gate (intro-card.js, html[data-intro="card"]) covers the page while it waits for the
+   logo press: the page's full-size pictures wait too (site W10: the first load stays under 2 MB on a phone;
+   the thumbnails still load). The press (event 'intro:press') or the gate's end lets them all go. */
+const gated = new Set();
+const gateUp = () => typeof document !== 'undefined' && document.documentElement.getAttribute('data-intro') === 'card';
+
+function holdForGate(img) {
+  if (!gateUp() || !img.getAttribute('srcset')) return;
+  img.dataset.gateSrcset = img.getAttribute('srcset');
+  img.removeAttribute('srcset');
+  gated.add(img);
+  watchGate();
+}
+
+let watching = false;
+function watchGate() {
+  if (watching) return;
+  watching = true;
+  document.addEventListener('intro:press', releaseGate, { once: true });
+  new MutationObserver((list, observer) => { if (!gateUp()) { observer.disconnect(); releaseGate(); } })
+    .observe(document.documentElement, { attributes: true, attributeFilter: ['data-intro'] });
+}
+
+function releaseGate() {
+  for (const img of gated) {
+    if (img.dataset.gateSrcset) { img.srcset = img.dataset.gateSrcset; img.removeAttribute('data-gate-srcset'); }
+  }
+  gated.clear();
+  const main = document.getElementById('main');
+  if (main) {
+    // as if the gate had never been there: first-screen banners sharp now, the rest when they come near
+    for (const img of main.querySelectorAll('.section-banner__img[data-srcset]')) {
+      if (img.srcset) continue;
+      const r = img.getBoundingClientRect();
+      if (r.top < innerHeight + 80 && r.bottom > -80) { img.srcset = img.dataset.srcset; bannerNear?.unobserve(img); }
+      else bannerNear?.observe(img);
+    }
+  }
+}
 
 
 /* =========================================================

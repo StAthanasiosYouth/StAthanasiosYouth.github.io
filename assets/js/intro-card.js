@@ -369,6 +369,7 @@ export function playCardIntro({ onEnd } = {}) {
     seal.addEventListener('click', () => {
       if (gate.classList.contains('is-on')) return;
       gate.classList.add('is-on');
+      document.dispatchEvent(new Event('intro:press'));     // the page's full-size pictures may load now (hub.js)
       // the press is the gesture: the audio starts inside it
       if (soundEnabled()) sound = makeSound();
       welcome().then(() => {
