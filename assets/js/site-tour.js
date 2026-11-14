@@ -13,8 +13,41 @@
 
 import { h } from './dom.js';
 import { cue } from './ui-sound.js';
-import { readCached } from './content.js';
+import { readCached, fetchContent } from './content.js';
 import { canPrompt, promptInstall } from './install.js';
+import { BRAND_ICONS } from './icons-brand.js';
+
+const brand = key => {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('class', 'st-brand__ic');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', (BRAND_ICONS[key] || BRAND_ICONS.facebook).path);
+  path.setAttribute('fill', 'currentColor');
+  svg.append(path);
+  return svg;
+};
+
+/* the family's social pages from the content (their scene pictures and clip posters), else the usual four */
+function socialsOf(content) {
+  const known = ['facebook', 'instagram', 'tiktok', 'whatsapp', 'youtube', 'telegram'];
+  const links = (Array.isArray(content.sections) ? content.sections : []).flatMap(s => s.links || [])
+    .filter(l => known.includes(l.icon)).slice(0, 4)
+    .map(l => ({
+      key: l.icon,
+      title: l.title,
+      media: (l.gallery || []).map(g => g.poster || g.thumb || g.src).filter(Boolean).slice(0, 3)
+    }));
+  const list = links.length >= 2 ? links : [
+    { key: 'facebook', title: 'فيسبوك', media: [] }, { key: 'instagram', title: 'إنستجرام', media: [] },
+    { key: 'tiktok', title: 'تيك توك', media: [] }, { key: 'whatsapp', title: 'جروب الواتساب', media: [] }];
+  for (const s of list) {
+    s.media = s.media.map(src => (/^https?:/.test(src) ? src : asset(src)));
+    while (s.media.length < 3) s.media.push('');
+  }
+  return list;
+}
 
 const ROOT = new URL('../../', import.meta.url);
 const asset = path => new URL(path, ROOT).href;
@@ -50,7 +83,11 @@ const PATHS = {
   ticket: 'M4 7h16v3a2 2 0 0 0 0 4v3H4v-3a2 2 0 0 0 0-4z',
   download: 'M12 4v11M7 10l5 5 5-5M5 20h14',
   android: 'M7 10h10v8H7zM9 18v3M15 18v3M5 11v5M19 11v5M8.5 7.5L7 5M15.5 7.5L17 5M8 10a4 4 0 0 1 8 0',
-  check: 'M5 12.5l4.5 4.5L19 7.5'
+  check: 'M5 12.5l4.5 4.5L19 7.5',
+  chat: 'M4 12a8 8 0 1 1 3.5 6.6L4 20l1.3-3.6A8 8 0 0 1 4 12z',
+  gift: 'M4 10h16v4H4zM6 14h12v7H6zM12 10v11M12 10S10.5 5 8 5.5 7.5 9 12 10zM12 10s1.5-5 4-4.5.5 3.5-4 4.5',
+  bus: 'M5 4h14v13H5zM5 11h14M8 17v3M16 17v3M8 14h.01M16 14h.01',
+  music: 'M4 14v-2a8 8 0 0 1 16 0v2M4 14h3v6H4zM17 14h3v6h-3z'
 };
 const ic = name => {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -68,15 +105,30 @@ const chip = (icon, word) => h('span', { class: 'st-chip' }, ic(icon), word);
 const finger = () => h('span', { class: 'st-tap', 'aria-hidden': 'true' });
 
 /* the real people from the content: «أمين الخدمة» (service) and «الدعم الفني» (support) */
-function people() {
-  const content = readCached() || {};
+function people(content) {
   const list = Array.isArray(content.contacts) ? content.contacts : [];
   const pick = kind => list.find(c => c && c.kind === kind) || null;
   return { service: pick('service'), support: pick('support') };
 }
-const face = (person, fallback) => person && person.image && person.image.thumb
-  ? h('span', { class: 'st-face' }, h('img', { src: person.image.thumb, alt: '', width: 52, height: 52, decoding: 'async' }))
-  : h('span', { class: 'st-face st-face--letter' }, Array.from((person && person.name) || fallback)[0]);
+const photoOf = (person, big) => person && person.image && (big ? person.image.src || person.image.thumb : person.image.thumb || person.image.src);
+const face = (person, fallback, big = false) => photoOf(person, big)
+  ? h('span', { class: 'st-face' + (big ? ' st-face--big' : '') }, h('img', { src: asset(photoOf(person, big)), alt: '', width: big ? 120 : 52, height: big ? 120 : 52, decoding: 'async' }))
+  : h('span', { class: 'st-face st-face--letter' + (big ? ' st-face--big' : '') }, Array.from((person && person.name) || fallback)[0]);
+
+/* the latest meeting that has a poster or a program, else an example */
+function meeting(content) {
+  const sessions = (Array.isArray(content.sessions) ? content.sessions : []).filter(s => s && s.status !== 'cancelled');
+  const best = sessions.filter(s => s.image || s.program).slice(-1)[0] || sessions.slice(-1)[0] || {};
+  const parts = best.program && best.program.length >= 4 ? best.program.map(p => p.title).slice(0, 4) : ['الترانيم', 'الصلاة', 'الكلمة', 'المسابقة'];
+  return { topic: best.topic || 'موضوع الاجتماع', poster: best.image && best.image.src ? asset(best.image.src) : '', parts };
+}
+
+/* the service pages' own covers (the B.U.G posters) */
+function covers(content) {
+  return (Array.isArray(content.pages) ? content.pages : [])
+    .map(p => ({ title: p.title, src: p.cover && (p.cover.src || p.cover.thumb) }))
+    .filter(p => p.src).slice(0, 2);
+}
 
 /* the daily bread logo is drawn inline so its words get the site's own fonts (an <img> SVG can't load fonts) */
 function breadLogo() {
@@ -98,7 +150,11 @@ function breadLogo() {
 }
 
 function cards() {
-  const { service, support } = people();
+  const content = readCached() || {};
+  const { service, support } = people(content);
+  const meet = meeting(content);
+  const posters = covers(content);
+  const socials = socialsOf(content);
   const serviceName = (service && service.name) || 'أمين الخدمة';
   const supportName = (support && support.name) || 'الدعم الفني';
   return [
@@ -124,24 +180,32 @@ function cards() {
     },
     {
       title: 'موضوع الاجتماع وفقراته',
-      text: 'موضوع كل اجتماع وفقراته بيظهروا هنا. عاوز تقرا فقرة بالظبط؟ دوس عليها وهتتفتح قدامك كاملة.',
-      art: () => h('div', { class: 'st-m' },
-        h('div', { class: 'st-card' },
-          h('span', { class: 'st-card__k' }, ic('book'), 'موضوع الاجتماع'),
-          h('b', { class: 'st-topic' }, 'إيمان بيعيش'),
-          h('div', { class: 'st-list' },
-            h('span', {}, h('i', {}, ar(1)), 'الترانيم'),
-            h('span', { class: 'is-open' }, h('i', {}, ar(2)), 'الكلمة', finger(), h('em', { class: 'st-lines' }, h('u', {}), h('u', {}), h('u', {}))),
-            h('span', {}, h('i', {}, ar(3)), 'المسابقة'))))
+      text: 'بوستر الاجتماع بيظهر هنا: دوس عليه وتقرا تفاصيل الموضوع كاملة. وتحته الفقرات، ووقت الاجتماع بتعرف الفقرة الشغالة في الكنيسة دلوقتي.',
+      art: () => h('div', { class: 'st-meet' },
+        h('div', { class: 'st-poster' },
+          meet.poster
+            ? h('img', { src: meet.poster, alt: '', decoding: 'async' })
+            : h('span', { class: 'st-poster__fake' }, img('assets/img/intro/church-soft.webp', 'st-poster__bg', 320), img('assets/img/logo-128.webp', 'st-poster__logo', 48)),
+          h('span', { class: 'st-poster__shine' }),
+          h('b', { class: 'st-poster__t' }, meet.topic),
+          finger(),
+          h('span', { class: 'st-poster__sheet' }, h('b', {}, meet.topic), h('u', {}), h('u', {}), h('u', {}))),
+        h('div', { class: 'st-live' },
+          h('span', { class: 'st-live__now' }, h('i', {}), 'دلوقتي في الكنيسة'),
+          h('div', { class: 'st-live__steps' }, meet.parts.map(t => h('span', {}, h('i', {}), t))),
+          h('span', { class: 'st-live__bar' }, h('i', {}))))
     },
     {
       title: 'خدماتنا',
       text: 'فرق الخدمة وأعمالها، زي مسرحيات فريق B.U.G (المسرح الصامت والمسرح الأسود). دوس «شاهد أعمالنا» وادخل صفحة الفريق.',
-      art: () => h('div', { class: 'st-m st-services' },
-        img('assets/img/partners/bug-logo-360.webp', 'st-bug', 160),
-        h('div', { class: 'st-duo' },
-          h('div', { class: 'st-card st-card--s' }, ic('theatre'), h('b', {}, 'المسرح الصامت'), h('span', { class: 'st-btn' }, 'شاهد أعمالنا')),
-          h('div', { class: 'st-card st-card--s' }, ic('theatre'), h('b', {}, 'المسرح الأسود'), h('span', { class: 'st-btn' }, 'شاهد أعمالنا', finger()))))
+      art: () => h('div', { class: 'st-services' },
+        h('span', { class: 'st-spot' }),
+        h('div', { class: 'st-fan' }, (posters.length ? posters : [{ title: 'المسرح الصامت' }, { title: 'المسرح الأسود' }]).map(p =>
+          h('span', { class: 'st-fan__card' },
+            p.src ? h('img', { src: asset(p.src), alt: '', decoding: 'async' }) : ic('theatre'),
+            h('b', {}, p.title)))),
+        img('assets/img/partners/bug-symbol-640.webp', 'st-bug', 240),
+        h('span', { class: 'st-btn st-services__cta' }, 'شاهد أعمالنا', finger()))
     },
     {
       title: 'حسابك',
@@ -158,6 +222,58 @@ function cards() {
         h('span', { class: 'st-btn st-btn--gold' }, 'اعمل حساب'))
     },
     {
+      title: 'تعمل حساب إزاي',
+      text: 'من «اعمل حساب»: اكتب إيميلك واسمك ورقم موبايلك وتاريخ ميلادك، راجعها، وبعدين اكتب الكود اللي هيوصلك على الإيميل. خلاص، حسابك جاهز.',
+      art: () => h('div', { class: 'st-signup' },
+        h('div', { class: 'st-steps' }, ['بياناتك', 'راجعها', 'الكود', 'جاهز'].map((t, i) => h('span', {}, h('i', {}, ar(i + 1)), t))),
+        h('div', { class: 'st-form' },
+          h('div', { class: 'st-form__p st-form__p--1' },
+            h('span', { class: 'st-field' }, h('em', {}, 'الإيميل'), h('b', { class: 'st-type ltr' }, 'name@gmail.com')),
+            h('span', { class: 'st-field' }, h('em', {}, 'الاسم الثلاثي'), h('b', { class: 'st-type' }, 'مينا جرجس فهمي')),
+            h('span', { class: 'st-field st-field--row' }, h('em', {}, 'تاريخ الميلاد'), h('b', {}, ar(14)), h('b', {}, 'مايو'), h('b', {}, ar(2008)))),
+          h('div', { class: 'st-form__p st-form__p--2' },
+            h('em', {}, 'الكود اللي وصلك على الإيميل'),
+            h('span', { class: 'st-code' }, [4, 8, 1, 5, 9, 2].map(d => h('b', {}, ar(d))))),
+          h('div', { class: 'st-form__p st-form__p--3' },
+            h('span', { class: 'st-done' }, ic('check')), h('b', {}, 'حسابك جاهز'), h('span', { class: 'st-confetti' }, Array.from({ length: 10 }, () => h('i', {}))))))
+    },
+    {
+      title: 'المتجر',
+      text: 'كل مسابقة تكسب فيها نقط. لما المتجر يفتح، اختار الهدية اللي تعجبك ودوس «استبدل»، والنقط تتخصم من رصيدك. وتتابع طلبك من «طلباتي» لحد ما تستلمه من الخدام.',
+      art: () => h('div', { class: 'st-shop' },
+        h('div', { class: 'st-shop__head' },
+          h('span', { class: 'st-shop__open' }, h('i', {}), 'المتجر مفتوح'),
+          h('span', { class: 'st-coins' }, ic('star'), h('b', { class: 'st-coins__a' }, ar(320)), h('b', { class: 'st-coins__b' }, ar(170)), 'نقطة')),
+        h('div', { class: 'st-shelf' },
+          [
+            ['book', 'كتاب مقدس جيب', 250, 'is-a'],
+            ['gift', 'ميدالية الأسرة', 150, 'is-b'],
+            ['music', 'سماعة بلوتوث', 400, 'is-c']
+          ].map(([icon, name, price, tone]) => h('span', { class: 'st-item ' + tone },
+            h('span', { class: 'st-item__pic' }, ic(icon), h('i', { class: 'st-item__shine' })),
+            h('b', {}, name),
+            h('span', { class: 'st-item__price' }, ic('star'), ar(price), ' نقطة'),
+            tone === 'is-b' ? h('span', { class: 'st-item__cta' }, 'استبدل', finger()) : h('span', { class: 'st-item__cta st-item__cta--off' }, price > 320 ? 'محتاج نقط' : 'استبدل')))),
+        h('span', { class: 'st-shop__toast' }, ic('check'), 'اتطلبت! تابعها من «طلباتي»'))
+    },
+    {
+      title: 'الحجوزات',
+      text: 'الرحلات والمؤتمرات والأنشطة بتنزل على الموقع. دوس «احجز مكانك»، اختار عدد الأماكن، وابعت الحجز. هيظهرلك في «حجوزاتي»: حالته (مستني / مؤكد)، ودفعت كام وباقي كام، ومن هناك تدفع الباقي.',
+      art: () => h('div', { class: 'st-book' },
+        h('div', { class: 'st-trip' },
+          h('span', { class: 'st-trip__pic' }, img('assets/img/intro/church-soft.webp', '', 320), h('i', { class: 'st-trip__sun' })),
+          h('span', { class: 'st-trip__body' },
+            h('span', { class: 'st-trip__k' }, ic('bus'), 'رحلة'),
+            h('b', {}, 'رحلة دير الأنبا أنطونيوس'),
+            h('span', { class: 'st-trip__meta' }, ic('calendar'), 'الجمعة ' + ar(5) + ' ديسمبر', h('i', {}), ar(900) + ' جنيه'),
+            h('span', { class: 'st-seats' }, h('b', { class: 'st-seats__a' }, ar(12)), h('b', { class: 'st-seats__b' }, ar(11)), ' مكان فاضل'),
+            h('span', { class: 'st-btn st-btn--gold st-trip__cta' }, 'احجز مكانك', finger()))),
+        h('div', { class: 'st-ticket' },
+          h('span', { class: 'st-ticket__top' }, h('b', {}, 'رحلة دير الأنبا أنطونيوس'), h('span', { class: 'st-ticket__chip' }, h('em', { class: 'st-ticket__wait' }, 'مستني'), h('em', { class: 'st-ticket__ok' }, ic('check'), 'مؤكد'))),
+          h('span', { class: 'st-ticket__bar' }, h('i', {})),
+          h('span', { class: 'st-ticket__pay' }, 'دفعت ', h('b', {}, ar(600)), ' من ' + ar(900) + ' جنيه', h('span', { class: 'st-ticket__rest' }, 'ادفع الباقي'))))
+    },
+    {
       title: 'تتنقل إزاي',
       text: 'على الموبايل الشريط اللي تحت بيوديك لأي حتة، و«المزيد» فيه كل صفحات الموقع. وفوق: الجرس للإشعارات، والسماعة لأصوات الموقع.',
       art: () => h('div', { class: 'st-m' },
@@ -171,12 +287,24 @@ function cards() {
           h('i', { class: 'st-bar__pill' })))
     },
     {
+      title: 'تابعنا',
+      text: 'صفحاتنا كلها في آخر الرئيسية: فيسبوك وإنستجرام وتيك توك وجروب الواتساب. دوس على أي واحدة وهتشوف الأول فيديوهاتها وصورها جوه الموقع، وبعدين تكمّل على الصفحة نفسها.',
+      art: () => h('div', { class: 'st-social' },
+        h('div', { class: 'st-brands' }, socials.map((s, i) => h('span', { class: 'st-brand st-brand--' + s.key },
+          brand(s.key), h('b', {}, s.title), i === 0 ? finger() : null))),
+        h('div', { class: 'st-reel' },
+          h('span', { class: 'st-reel__head' }, brand(socials[0].key), socials[0].title),
+          h('div', { class: 'st-reel__row' }, socials[0].media.map(src => h('span', { class: 'st-reel__clip' },
+            src ? h('img', { src, alt: '', decoding: 'async' }) : null,
+            h('i', { class: 'st-reel__play' }))))))
+    },
+    {
       title: 'محتاج حد؟',
       text: `سؤال عن الاجتماع أو الأنشطة أو الخدمة؟ كلّم ${serviceName}، أمين الخدمة. مشكلة في الموقع أو حسابك أو نقطك؟ ${supportName} في الدعم الفني بيحلها معاك على واتساب. هتلاقيهم آخر الرئيسية.`,
       art: () => h('div', { class: 'st-m st-help' },
-        h('div', { class: 'st-person st-person--call' },
-          face(service, 'أ'), h('span', {}, h('b', {}, serviceName), 'أمين الخدمة'),
-          h('span', { class: 'st-ring' }, ic('phone'))),
+        h('div', { class: 'st-pair' },
+          h('div', { class: 'st-hero st-hero--call' }, face(service, 'أ', true), h('span', { class: 'st-ring' }, ic('phone')), h('b', {}, serviceName), h('em', {}, 'أمين الخدمة')),
+          h('div', { class: 'st-hero st-hero--chat' }, face(support, 'د', true), h('span', { class: 'st-ring st-ring--wa' }, ic('chat')), h('b', {}, supportName), h('em', {}, 'الدعم الفني'))),
         h('div', { class: 'st-chat' },
           h('span', { class: 'st-bubble st-bubble--me' }, 'معايا مشكلة', ic('check')),
           h('span', { class: 'st-typing' }, face(support, 'د'), h('i', {}), h('i', {}), h('i', {})),
@@ -220,6 +348,7 @@ export async function openSiteTour({ onDone = null } = {}) {
   if (open) return;
   open = true;
   await loadCss();
+  if (!readCached()) await fetchContent().catch(() => null);
 
   const list = cards();
   const dialog = h('dialog', { class: 'st', 'aria-label': 'شرح الموقع' });
