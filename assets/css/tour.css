@@ -127,7 +127,7 @@
 
 /* 7 help: the real people */
 .st-face { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; overflow: hidden; border: 2px solid var(--gold-line-strong); background: var(--navy-850); font-weight: 800; color: var(--gold-hi); }
-.st-face img { width: 100%; height: 100%; object-fit: cover; }
+.st-face img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 15%; }
 .st-ring { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; color: var(--navy-950); background: var(--accent); animation: st-call 1.6s .8s ease-out infinite; }
 .st-ring .st-ic { width: 16px; height: 16px; animation: st-shake 1.6s .8s ease-in-out infinite; }
 .st-chat { position: relative; display: grid; gap: 6px; min-height: 104px; padding: 9px; border: 1px solid var(--gold-line); border-radius: 14px; background: rgba(4, 17, 39, .8); }
