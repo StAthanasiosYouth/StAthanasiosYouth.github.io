@@ -765,7 +765,9 @@ function shareWidget(actions) {
     ),
     h('div', { class: 'share__actions' },
       h('button', { class: 'btn btn--primary', type: 'button', onclick: actions.share }, iconNode('share'), 'شارك اللينك'),
-      h('button', { class: 'btn', type: 'button', onclick: actions.qr }, iconNode('qr'), 'اعرض QR')
+      h('button', { class: 'btn', type: 'button', onclick: actions.qr }, iconNode('qr'), 'اعرض QR'),
+      // the site walkthrough again, any time (site-tour.js)
+      h('button', { class: 'btn', type: 'button', onclick: () => import('./site-tour.js').then(m => m.openSiteTour()).catch(error => console.warn(error)) }, iconNode('info'), 'شرح الموقع')
     )
   );
 
