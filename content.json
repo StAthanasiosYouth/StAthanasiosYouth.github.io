@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "66106f6be011",
-  "publishedAt": "2026-11-14T06:48:51.017Z",
+  "revision": "456879d64db5",
+  "publishedAt": "2026-11-14T06:50:54.834Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -515,7 +515,7 @@
         "color": "#412618"
       },
       "partner": "bug",
-      "v": "a84f6754d026"
+      "v": "d0ac6c019dc0"
     },
     {
       "id": "pg-1212ad29",
