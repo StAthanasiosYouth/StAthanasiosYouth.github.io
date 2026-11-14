@@ -502,6 +502,7 @@ export function moreGroups(content, { home = false, doc = document } = {}) {
   const social = ((content && content.sections) || []).flatMap(s => (s.links || []).filter(l => /^https:\/\//.test(l.url || '')).map(l => ({ title: l.title, url: l.url, icon: l.icon || 'link' })));
   const pages = ((content && content.pages) || []).filter(p => /^[a-z0-9-]{2,40}$/.test(p.slug || '')).map(p => ({ title: p.title, href: new URL(p.slug + '/', ROOT).href, icon: 'theatre' }));
   pages.push({ title: 'نقاطي والمسابقات', href: new URL('points/', ROOT).href, icon: 'trophy' });
+  pages.push({ title: 'شرح الموقع', action: 'tour', icon: 'info' });
   return [
     { title: 'في الرئيسية', items: places },
     { title: 'تابعنا', items: social },
@@ -549,7 +550,15 @@ async function openMore(button) {
     for (const item of group.items) {
       const link = document.createElement('a');
       link.className = 'nav-more__tile';
-      if (item.url) { link.href = item.url; link.target = '_blank'; link.rel = 'noopener'; }
+      if (item.action === 'tour') {
+        link.href = '#';
+        link.addEventListener('click', event => {
+          event.preventDefault();
+          closeMore(dialog);
+          import('./site-tour.js').then(m => m.openSiteTour()).catch(error => console.warn(error));
+        });
+      }
+      else if (item.url) { link.href = item.url; link.target = '_blank'; link.rel = 'noopener'; }
       else if (item.href) link.href = item.href;
       else {
         link.href = new URL('index.html#to-' + item.key, ROOT).href;

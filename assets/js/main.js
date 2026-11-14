@@ -423,7 +423,9 @@ function startIntro() {
   const kind = html.getAttribute('data-intro');
   const failed = error => { console.warn(error); html.removeAttribute('data-intro'); };
   if (kind === 'card') {
-    import('./intro-card.js').then(m => m.playCardIntro()).catch(failed);
+    // «ادخل الموقع»: the site walkthrough, once per device (site-tour.js)
+    const tour = () => import('./site-tour.js').then(t => { if (!t.tourSeen()) t.openSiteTour(); }).catch(error => console.warn(error));
+    import('./intro-card.js').then(m => m.playCardIntro({ onEnd: tour })).catch(failed);
   }
   else if (kind === 'member') {
     const since = performance.now();
