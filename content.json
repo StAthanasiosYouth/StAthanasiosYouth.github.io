@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "bab6d54a6324",
-  "publishedAt": "2026-11-14T00:17:32.818Z",
+  "revision": "3d2d87ba1868",
+  "publishedAt": "2026-11-14T00:31:14.384Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -244,7 +244,7 @@
     {
       "id": "service-leader",
       "kind": "service",
-      "name": "فادي يوسف",
+      "name": "فادي عطاالله",
       "role": "أمين الخدمة",
       "description": "لأي سؤال أو حاجة تخص الاجتماع والخدمة",
       "phoneDisplay": "0122 012 9458",
