@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "11bf8e448bc3",
-  "publishedAt": "2026-11-14T04:53:46.547Z",
+  "revision": "713d29b111b5",
+  "publishedAt": "2026-11-14T04:55:24.023Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -306,7 +306,7 @@
       "display": "banner",
       "displayMobile": "",
       "page": "black-theatre",
-      "ctaLabel": "ادخل صفحة فريق المسرح ال",
+      "ctaLabel": "شاهد أعمالنا",
       "watch": true,
       "partner": "bug"
     },
@@ -335,7 +335,7 @@
       "display": "banner",
       "displayMobile": "",
       "page": "silenttheatre",
-      "ctaLabel": "",
+      "ctaLabel": "شاهد أعمالنا",
       "watch": true,
       "partner": "bug"
     }
