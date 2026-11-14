@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "v": "d0ac6c019dc0",
+  "v": "537602fffeba",
   "id": "pg-0d2eeb07",
   "slug": "black-theatre",
   "title": "المسرح الأسود",
@@ -59,13 +59,13 @@
       "source": "clip",
       "clip": {
         "type": "video",
-        "src": "media/2026/vid-1f68bcf5.mp4",
-        "poster": "media/2026/vid-1f68bcf5-480.webp",
+        "src": "media/2026/vid-10ca85b8.mp4",
+        "poster": "media/2026/vid-10ca85b8-480.webp",
         "w": 854,
         "h": 480,
         "alt": "",
         "start": 0,
-        "end": 19.8
+        "end": 22.3
       },
       "audio": {
         "mode": "original",
@@ -202,5 +202,5 @@
       }
     ]
   },
-  "publishedAt": "2026-11-14T08:50"
+  "publishedAt": "2026-11-14T08:53"
 }
