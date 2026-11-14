@@ -39,3 +39,14 @@ test('404.html: the page shell CSP (a superset of the site and competition polic
   // the two shells it can write in, under its policy
   for (const shell of ['pages/index.html', 'competition/index.html']) assert.match(read(shell), /<html lang="ar" dir="rtl">/, shell);
 });
+
+test('404.html: the S8 page — the logo arch, «٤٠٤», the message as the h1, the four usual places and the way home (site W9)', () => {
+  const html = read('404.html');
+  assert.match(html, /<section class="nf"/);
+  assert.match(html, /<div class="nf__arch"><img src="\/assets\/img\/logo-256\.webp"/);
+  assert.match(html, /<h1 class="nf__t"[^>]*>الصفحة دي مش موجودة<\/h1>/);
+  const places = [...html.matchAll(/<a class="nf__a" href="([^"]+)">/g)].map(m => m[1]);
+  assert.deepEqual(places, ['/', '/events/', '/account/', '/points/']);
+  assert.match(html, /<a class="btn btn--primary nf__home" href="\/">افتح الصفحة الرئيسية<\/a>/);
+  assert.match(html, /<header class="pbar">/, 'the site bar stays (nav.js mounts on it)');
+});

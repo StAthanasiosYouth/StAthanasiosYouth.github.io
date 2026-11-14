@@ -19,10 +19,11 @@ const CHROME = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Pro
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.webp': 'image/webp', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
 const read = p => readFileSync(`${ROOT}${p}`, 'utf8');
 const MARK = 'جديد من الـ Worker ✓';
+// fixtures, not the live test stubs (events/test, competition/test were withdrawn by a real publish)
 const FILES = {
-  '/v1/public/event/new-trip': JSON.stringify({ ...JSON.parse(read('events/test/event.json')), slug: 'new-trip', title: MARK + ' رحلة' }),
+  '/v1/public/event/new-trip': JSON.stringify({ ...JSON.parse(read('tests/fixtures/pages/event.json')), slug: 'new-trip', title: MARK + ' رحلة' }),
   '/v1/public/page/new-page': JSON.stringify({ ...JSON.parse(read('black-theatre/page.json')), slug: 'new-page', title: MARK + ' صفحة' }),
-  '/v1/public/comp/new-quiz': JSON.stringify({ ...JSON.parse(read('competition/test/comp.json')), slug: 'new-quiz', title: MARK + ' مسابقة' }),
+  '/v1/public/comp/new-quiz': JSON.stringify({ ...JSON.parse(read('tests/fixtures/comp/quiz.json')), slug: 'new-quiz', title: MARK + ' مسابقة' }),
   '/v1/public/content': read('content.json')
 };
 let server, browser, down = false;

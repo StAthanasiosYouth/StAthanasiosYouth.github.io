@@ -26,6 +26,15 @@
   });
   document.body.appendChild(up);
 
+  // a chip to a folded section (privacy/terms «English») opens it
+  function unfold() {
+    var target = location.hash && document.getElementById(location.hash.slice(1));
+    var details = target && target.querySelector('details');
+    if (details) details.open = true;
+  }
+  window.addEventListener('hashchange', unfold);
+  unfold();
+
   var queued = false;
 
   function spy() {

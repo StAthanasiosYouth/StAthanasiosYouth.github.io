@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" class="legal-s8">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -12,6 +12,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
   <script src="../assets/js/look.js"></script>
   <link rel="stylesheet" href="../assets/css/legal.css">
+  <script src="../assets/js/legal.js" defer></script>
 </head>
 <body>
   <header class="lbar">
@@ -27,13 +28,21 @@
       <p class="legal__updated">آخر تحديث: ٧ أكتوبر ٢٠٢٦</p>
     </header>
 
-    <section>
-      <h2>عن الموقع</h2>
+    <nav class="legal-toc" aria-label="في الصفحة دي">
+      <a href="#about">عن الموقع</a>
+      <a href="#admin">لوحة التحكم</a>
+      <a href="#use">الاستخدام المناسب</a>
+      <a href="#privacy">الخصوصية</a>
+      <a class="legal-toc__en" href="#en" lang="en" dir="ltr">English</a>
+    </nav>
+
+    <section id="about">
+      <h2><span class="legal-num">١</span>عن الموقع</h2>
       <p>الموقع ده ولوحة التحكم بتاعته معمولين لعرض وإدارة محتوى خدمة الشباب في أسرة البابا أثناسيوس الرسولي (كنيسة أبي سيفين بسفاجا): مواعيد الاجتماعات، الأخبار، الأنشطة، والروابط.</p>
     </section>
 
-    <section>
-      <h2>لوحة التحكم</h2>
+    <section id="admin">
+      <h2><span class="legal-num">٢</span>لوحة التحكم</h2>
       <ul>
         <li>لوحة التحكم للحسابات المسموح لها بس، اللي بتحددها إدارة الخدمة. الدخول بيكون بحساب جوجل.</li>
         <li>ممنوع محاولة الدخول بحساب مش مسموح له، أو مشاركة الدخول مع حد تاني.</li>
@@ -41,8 +50,8 @@
       </ul>
     </section>
 
-    <section>
-      <h2>الاستخدام المناسب</h2>
+    <section id="use">
+      <h2><span class="legal-num">٣</span>الاستخدام المناسب</h2>
       <ul>
         <li>ممنوع إساءة استخدام الموقع أو لوحة التحكم: نشر محتوى غير لائق، أو مضلل، أو مخالف لروح الخدمة، أو أي محاولة لتعطيل الموقع أو اختراقه.</li>
         <li>المحتوى المنشور على الموقع ممكن يتعدّل أو يتشال في أي وقت حسب احتياج الخدمة.</li>
@@ -50,13 +59,14 @@
       </ul>
     </section>
 
-    <section>
-      <h2>الخصوصية</h2>
+    <section id="privacy">
+      <h2><span class="legal-num">٤</span>الخصوصية</h2>
       <p>إزاي بنتعامل مع البيانات مشروح في <a href="../privacy/">سياسة الخصوصية</a>.</p>
     </section>
 
-    <section lang="en" dir="ltr">
-      <h2>Terms of Use (English summary)</h2>
+    <section id="en" class="legal-en" lang="en" dir="ltr">
+      <details>
+      <summary><h2>Terms of Use (English summary)</h2></summary>
       <ul>
         <li>This website and its admin panel exist to publish and manage the content of the St. Athanasius youth service (St. Abu Sefein Church, Safaga): meeting times, news, activities and links.</li>
         <li>Only accounts authorized by the service may access the admin panel, using Google Sign-In. Do not try to access it with an unauthorized account or share access with others.</li>
@@ -64,6 +74,7 @@
         <li>The service may change or remove content, and change or revoke admin access, at any time.</li>
         <li>How data is handled is described in the <a href="../privacy/">Privacy Policy</a>.</li>
       </ul>
+      </details>
     </section>
 
     <nav class="legal__foot" aria-label="روابط">

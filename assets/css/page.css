@@ -3861,3 +3861,17 @@ html[data-arrive] main > *:nth-child(n+3) { animation-delay: .12s; }
   .evt > * { grid-column: 1; }
   .evt > #book { grid-column: 2; grid-row: 1 / span 6; position: sticky; top: 84px; margin-top: 0; }
 }
+
+/* ---------- 404 — site redesign S8 (404.html): the logo in an arch, the message in Ruqaa, the usual places ---------- */
+.nf { display: grid; justify-items: center; text-align: center; gap: 10px; max-width: 520px; margin: clamp(24px, 6vh, 64px) auto 40px; padding: 28px 20px 24px; border-radius: 28px; border: 1px solid var(--gold-line); background: radial-gradient(80% 60% at 50% 0%, rgba(var(--gold-rgb), .14), transparent 70%), linear-gradient(180deg, var(--navy-800), var(--navy-900)); }
+.nf__arch { width: 132px; height: 156px; padding: 14px; border-radius: 66px 66px 22px 22px; border: 1px solid var(--gold-line-strong); background: var(--navy-850); display: grid; place-items: center; box-shadow: 0 0 50px -10px rgba(var(--gold-rgb), .35); }
+.nf__arch img { width: 100%; height: auto; border-radius: 50%; }
+.nf__code { margin: 6px 0 0; font-size: 2.6rem; line-height: 1; font-weight: 900; color: rgba(var(--gold-hi-rgb), .35); letter-spacing: .1em; }
+.nf__t { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: clamp(1.8rem, 7vw, 2.4rem); color: var(--gold-hi); line-height: 1.4; }
+.nf__s { margin: 0; color: var(--text-2); line-height: 1.8; }
+.nf__go { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; width: 100%; margin: 10px 0 0; padding: 0; list-style: none; }
+.nf__a { display: grid; justify-items: center; gap: 6px; padding: 12px 4px; border-radius: 16px; border: 1px solid var(--gold-line); background: rgba(255, 255, 255, .03); color: var(--text); text-decoration: none; font-weight: 700; font-size: .84rem; }
+.nf__a svg { width: 24px; height: 24px; color: var(--gold-hi); }
+.nf__a:hover { border-color: var(--gold-line-strong); }
+.nf__a:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 2px; }
+.nf__home { width: 100%; margin-top: 8px; min-height: 50px; }

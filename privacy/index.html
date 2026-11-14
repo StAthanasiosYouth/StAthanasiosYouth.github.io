@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" class="legal-s8">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -12,6 +12,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
   <script src="../assets/js/look.js"></script>
   <link rel="stylesheet" href="../assets/css/legal.css">
+  <script src="../assets/js/legal.js" defer></script>
 </head>
 <body>
   <header class="lbar">
@@ -27,13 +28,24 @@
       <p class="legal__updated">آخر تحديث: ٣١ أكتوبر ٢٠٢٦</p>
     </header>
 
-    <section>
+    <nav class="legal-toc" aria-label="في الصفحة دي">
+      <a href="#accounts">حسابك</a>
+      <a href="#competitions">المسابقات والنقاط</a>
+      <a href="#bookings">الحجز والدفع</a>
+      <a href="#gmail">الإيميلات والإشعارات</a>
+      <a href="#admin">لوحة التحكم</a>
+      <a href="#storage">فين بياناتك وبنحتفظ بيها لحد إمتى</a>
+      <a href="#delete">تمسح بياناتك إزاي</a>
+      <a class="legal-toc__en" href="#en" lang="en" dir="ltr">English</a>
+    </nav>
+
+    <section class="legal-lead">
       <h2>باختصار</h2>
       <p>الموقع ده خدمة داخلية لشباب الأسرة. بنستخدم بياناتك لأنشطة الأسرة ولحماية حسابك بس. مش بنبيعها، ومفيش إعلانات ولا أدوات تتبع. تقدر تتصفح الموقع من غير ما تدي أي بيانات.</p>
     </section>
 
     <section id="accounts">
-      <h2>حسابك</h2>
+      <h2><span class="legal-num">١</span>حسابك</h2>
       <ul>
         <li>بنحفظ اسمك وإيميلك ورقم موبايلك وتاريخ ميلادك. الإيميل والباسورد للدخول، والموبايل علشان كل شخص يبقى ليه حساب واحد، وتاريخ الميلاد علشان السن المناسب للفعاليات.</li>
         <li>السيستم هو اللي بيعمل الباسورد، وبيتحفظ مشفر، وعمره ما بيتبعت بالإيميل. <strong>المسؤول الرئيسي عن الخدمة يقدر يشوف الباسورد، والخدام اللي ليهم الصلاحية يقدروا يعملولك واحد جديد ويصححوا بياناتك.</strong> وكل حاجة من دي بتتسجل.</li>
@@ -44,7 +56,7 @@
     </section>
 
     <section id="competitions">
-      <h2>المسابقات والنقاط</h2>
+      <h2><span class="legal-num">٢</span>المسابقات والنقاط</h2>
       <ul>
         <li>بنحفظ إجاباتك ونتيجتك ووقت مشاركتك ونقطك وطلبات الجوايز، مربوطين بحسابك. قبل تشغيل الحسابات، المسابقة ممكن تطلب اسمك ورقم موبايلك أو كود مشارك.</li>
         <li>اللي يشوفها الخدام المسؤولين بس، من لوحة التحكم. مش بتتنشر على الموقع، ومفيش ترتيب عام.</li>
@@ -53,7 +65,7 @@
     </section>
 
     <section id="bookings">
-      <h2>الحجز والدفع</h2>
+      <h2><span class="legal-num">٣</span>الحجز والدفع</h2>
       <ul>
         <li>بنطلب اسمك وموبايلك وعدد الأفراد (وساعات أسماء اللي معاك)، والخادم وطريقة الدفع، وأي ملاحظة تكتبها. لو الفعالية ليها سن محدد، لازم حساب.</li>
         <li>صورة إثبات التحويل بتتحفظ في مساحة خاصة من غير لينك عام، وبتتمسح بعد ٦٠ يوم من نهاية الفعالية.</li>
@@ -63,7 +75,7 @@
     </section>
 
     <section id="gmail">
-      <h2>الإيميلات والإشعارات</h2>
+      <h2><span class="legal-num">٤</span>الإيميلات والإشعارات</h2>
       <ul>
         <li>من حساب الخدمة <bdi dir="ltr">athanasius.youth.safaga@gmail.com</bdi> بنبعت رسايل خدمة عن حسابك بس: أكواد التأكيد، تنبيهات الأمان، حجوزاتك ومدفوعاتك (بالمبالغ والمواعيد)، طلبات الجوايز، ونتايجك ونقطك. <strong>مش بنبعت إعلانات.</strong> الرسايل الاختيارية تقدر توقفها من «إشعاراتي» في حسابك.</li>
         <li>خدام لوحة التحكم بتوصلهم تنبيهات شغل، من غير أسماء الزوار أو أرقامهم أو المبالغ.</li>
@@ -72,26 +84,27 @@
       </ul>
     </section>
 
-    <section>
-      <h2>لوحة التحكم</h2>
+    <section id="admin">
+      <h2><span class="legal-num">٥</span>لوحة التحكم</h2>
       <p>الخدام بيدخلوا بحساب جوجل (<bdi>Google Sign-In</bdi>). بنستخدم الإيميل بس علشان نتأكد إن الحساب مسموح له، وبنسجله جنب التعديلات اللي بيعملها.</p>
     </section>
 
-    <section>
-      <h2>فين بياناتك وبنحتفظ بيها لحد إمتى</h2>
+    <section id="storage">
+      <h2><span class="legal-num">٦</span>فين بياناتك وبنحتفظ بيها لحد إمتى</h2>
       <ul>
         <li>البيانات على <bdi>Cloudflare</bdi> في أوروبا الشرقية وعلى خدمات جوجل (<bdi>Sheets</bdi>، <bdi>Drive</bdi>، <bdi>Apps Script</bdi>، <bdi>Gmail</bdi>، <bdi>Firebase</bdi>)، والموقع نفسه على <bdi>GitHub Pages</bdi>. الخدمات دي بتشغّل الموقع بس، ومش بنشارك بياناتك مع أي جهة تانية.</li>
         <li>بيانات حسابك طول ما الحساب موجود. سجل تغييرات الحساب ٣ سنين، وسجل نشاط لوحة التحكم سنة، وسجل الإيميلات ٣٠ يوم.</li>
       </ul>
     </section>
 
-    <section>
-      <h2>تمسح بياناتك إزاي</h2>
+    <section id="delete">
+      <h2><span class="legal-num">٧</span>تمسح بياناتك إزاي</h2>
       <p>كلّم الدعم الفني من أرقام التواصل على <a href="https://stathanasiosyouth.github.io/">الموقع</a>، وهنشيل اسمك وإيميلك وموبايلك وتاريخ ميلادك. نتايجك ونقطك بتفضل من غير أي حاجة تعرّف عليك، علشان حسابات الموسم تفضل صح.</p>
     </section>
 
-    <section lang="en" dir="ltr">
-      <h2>Privacy Policy (English summary)</h2>
+    <section id="en" class="legal-en" lang="en" dir="ltr">
+      <details>
+      <summary><h2>Privacy Policy (English summary)</h2></summary>
       <ul>
         <li>This is an internal service for the church's youth. Personal data is used only for the family's activities and to protect accounts. It is never sold, and there are no ads or trackers. Browsing the site requires no data.</li>
         <li>Accounts hold your name, email, mobile and date of birth, plus your answers, results, points, prize requests and bookings. The password is generated by the system and stored encrypted. The Primary Admin can view it, and authorized servants can reset it and correct your data; every such action is logged.</li>
@@ -100,6 +113,7 @@
         <li>The admin panel uses Google Sign-In only to identify authorized accounts by email. Data is held on Cloudflare (Eastern Europe) and Google services, and the site is hosted on GitHub Pages. It is not shared with anyone else.</li>
         <li>To delete your data, contact Technical Support through the site. Your personal data is removed, and your results and points stay without anything identifying you.</li>
       </ul>
+      </details>
     </section>
 
     <nav class="legal__foot" aria-label="روابط">

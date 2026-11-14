@@ -400,6 +400,37 @@ html.legal-s8 {
   line-height: 2;
 }
 
+/* privacy / terms (site W9, S8): the English summary folded under its title */
+.legal-toc__en {
+  direction: ltr;
+}
+
+.legal-en {
+  direction: ltr;
+  text-align: left;
+}
+
+.legal-en summary {
+  cursor: pointer;
+  font-size: 1.05rem;
+  font-weight: 800;
+  padding: 4px 0 10px;
+  color: var(--gold-hi);
+}
+
+.legal-en summary h2 {
+  display: inline;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+}
+
+.legal-en summary:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
 /* the actions under a section: a call, WhatsApp, the map */
 .legal-actions {
   display: flex;
