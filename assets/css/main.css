@@ -4514,6 +4514,9 @@ html[data-intro="card"] body > :not(.ic) { visibility: hidden; }
 .s2-sugg__track { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; border-radius: var(--radius-lg, 24px); }
 .s2-sugg__track::-webkit-scrollbar { display: none; }
 .s2-slide { position: relative; flex: 0 0 100%; scroll-snap-align: center; margin: 0 !important; min-width: 0; }
+/* the track makes every slide as tall as the tallest one; the extra height must not stretch a slide's banner
+   (a stretched slot no longer has the banner's shape, so the picture shrank to "contain" with bands) */
+.s2-slide > .section-banner { align-self: start; }
 .s2-slide__tag { position: absolute; z-index: 3; top: 12px; inset-inline-start: 12px; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: 999px; background: rgb(2 9 20 / .72); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border: 1px solid var(--gold-line-strong); color: var(--gold-hi); font-size: 12.5px; font-weight: 800; pointer-events: none; }
 .s2-slide__tag .icon { width: 15px; height: 15px; }
 .s2-sugg__dots { display: flex; justify-content: center; gap: 6px; margin-top: 12px; }
