@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "v": "49c0e55f8001",
+  "v": "d3ba202875cf",
   "id": "pg-0d2eeb07",
   "slug": "black-theatre",
   "title": "المسرح الأسود",
@@ -106,6 +106,39 @@
       "ctaLabel": "شاهد المسرحية كاملة"
     }
   ],
-  "team": null,
-  "publishedAt": "2026-11-12T09:58"
+  "team": {
+    "title": "مسؤلين خدمة المسرح الأسود",
+    "text": "عايز تنضم لفريق المسرح؟",
+    "people": [
+      {
+        "id": "srv-3f87eba3",
+        "name": "كريستين عماد",
+        "role": "",
+        "image": null,
+        "wa": "https://wa.me/201205955243"
+      },
+      {
+        "id": "srv-d3942576",
+        "name": "مارتينا هاني",
+        "role": "",
+        "image": null,
+        "wa": "https://wa.me/201221637877"
+      },
+      {
+        "id": "srv-af099f06",
+        "name": "مارتينا حلمي",
+        "role": "",
+        "image": null,
+        "wa": "https://wa.me/201200589358"
+      },
+      {
+        "id": "srv-951e7a2b",
+        "name": "ماري عزيز",
+        "role": "",
+        "image": null,
+        "wa": "https://wa.me/201284674074"
+      }
+    ]
+  },
+  "publishedAt": "2026-11-14T06:42"
 }
