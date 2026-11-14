@@ -1541,7 +1541,6 @@
 
     var abort = typeof AbortController === 'function' ? new AbortController() : null;
     var timedOut = false;
-    var timer = abort ? setTimeout(function () { timedOut = true; abort.abort(); }, TIMING.fail) : null;
     var headers = { authorization: 'Bearer ' + tokenValue, accept: options.raw ? '*/*' : 'application/json' };
     var payload;
 
@@ -1553,6 +1552,12 @@
       payload = JSON.stringify(body);
       headers['content-type'] = 'application/json';
     }
+
+    // a big body (a video, base64 in JSON) needs time just to go up on a slow line: the usual wait
+    // plus 1 s per 25 KB sent (a 4 MB video ≈ +4 min), at most 10 min in all
+    var sent = payload ? (typeof payload === 'string' ? payload.length : payload.size || 0) : 0;
+    var limit = Math.min(600000, TIMING.fail + Math.round(sent / 25));
+    var timer = abort ? setTimeout(function () { timedOut = true; abort.abort(); }, limit) : null;
     if (options.idempotencyKey) headers['idempotency-key'] = options.idempotencyKey;
     headers['x-edit-session'] = EDIT_SESSION;
 
@@ -1585,7 +1590,7 @@
       return result;
     }, function (error) {
       if (timer) clearTimeout(timer);
-      if (timedOut) throw workerError('الخادم مردّش في الوقت المعتاد.', 'ممكن النت ضعيف. جرّب تاني.', { code: 'timeout', retry: true, details: method + ' ' + path + ': no answer after ' + Math.round(TIMING.fail / 1000) + ' s' });
+      if (timedOut) throw workerError('الخادم مردّش في الوقت المعتاد.', 'ممكن النت ضعيف. جرّب تاني.', { code: 'timeout', retry: true, details: method + ' ' + path + ': no answer after ' + Math.round(limit / 1000) + ' s' });
       throw workerError('الاتصال بالإنترنت اتقطع.', 'اتأكد من النت وجرّب تاني.', { code: 'network', retry: true, details: String(error && error.message || error) });
     });
 
