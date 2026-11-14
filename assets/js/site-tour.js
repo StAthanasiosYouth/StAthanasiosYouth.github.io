@@ -328,6 +328,18 @@ function cards() {
           h('span', { class: 'st-btn st-btn--gold' }, 'اعمل حساب'),
           h('span', { class: 'st-btn st-btn--ghost' }, 'ادخل الموقع'),
           h('span', { class: 'st-btn st-btn--soon' }, ic('android'), 'تطبيق أندرويد', h('em', {}, 'قريبًا'))))
+    },
+    {
+      title: 'الشرح ده موجود دايمًا',
+      text: 'لو حبيت تشوف الشرح تاني، هتلاقي زرار «شرح الموقع» في آخر الرئيسية جنب «شارك اللينك»، وكمان في «المزيد».',
+      art: () => h('div', { class: 'st-m st-again' },
+        h('div', { class: 'st-card st-again__box' },
+          h('b', { class: 'st-again__t' }, 'شارك الصفحة'),
+          h('div', { class: 'st-again__row' },
+            h('span', { class: 'st-btn st-btn--gold' }, 'شارك اللينك'),
+            h('span', { class: 'st-btn st-btn--ghost' }, 'اعرض QR')),
+          h('span', { class: 'st-btn st-btn--ghost st-again__me' }, 'شرح الموقع', finger())),
+        h('div', { class: 'st-chips' }, chip('more', 'وفي «المزيد» كمان')))
     }
   ];
 }
@@ -344,7 +356,7 @@ function loadCss() {
 
 let open = false;
 
-export async function openSiteTour({ onDone = null } = {}) {
+export async function openSiteTour({ onDone = null, doneLabel = 'يلا نبدأ' } = {}) {
   if (open) return;
   open = true;
   await loadCss();
@@ -394,7 +406,7 @@ export async function openSiteTour({ onDone = null } = {}) {
     [...dots.children].forEach((dot, i) => dot.classList.toggle('is-on', i === at));
     back.hidden = at === 0;
     actions.classList.toggle('is-first', at === 0);
-    next.textContent = last ? 'يلا نبدأ' : 'التالي';
+    next.textContent = last ? doneLabel : 'التالي';
   }
 
   function move(step) {

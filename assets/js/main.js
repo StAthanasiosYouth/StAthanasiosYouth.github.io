@@ -426,6 +426,16 @@ function startIntro() {
     // «ادخل الموقع»: the site walkthrough, once per device (site-tour.js)
     const tour = () => import('./site-tour.js').then(t => { if (!t.tourSeen()) t.openSiteTour(); }).catch(error => console.warn(error));
     import('./intro-card.js').then(m => m.playCardIntro({ onEnd: tour })).catch(failed);
+    // «اعمل حساب»: the walkthrough first (once per device), then the account page
+    document.addEventListener('click', event => {
+      const link = event.target.closest && event.target.closest('.ic a.is-main');
+      if (!link || event.defaultPrevented || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      event.preventDefault();
+      const go = () => { location.href = link.href; };
+      import('./site-tour.js')
+        .then(t => (t.tourSeen() ? go() : t.openSiteTour({ onDone: go, doneLabel: 'يلا نعمل الحساب' })))
+        .catch(go);
+    }, true);
   }
   else if (kind === 'member') {
     const since = performance.now();

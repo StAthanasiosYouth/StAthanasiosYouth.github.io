@@ -424,3 +424,9 @@
 .st-reel__clip img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .st-reel__play { position: relative; width: 26px; height: 26px; border-radius: 50%; background: rgba(255, 255, 255, .9); box-shadow: 0 4px 12px rgba(0, 0, 0, .5); animation: st-breathe 2s ease-in-out infinite; }
 .st-reel__play::after { content: ""; position: absolute; inset-block-start: 8px; left: 10px; border-block: 5px solid transparent; border-left: 8px solid #061a31; }
+
+/* the last card: where the walkthrough lives */
+.st-again__box { justify-items: center; gap: 9px; padding: 14px; }
+.st-again__t { font: 700 1.1rem var(--font-display); color: var(--gold-hi); }
+.st-again__row { display: flex; gap: 7px; }
+.st-again__me { justify-self: center; box-shadow: 0 0 0 2px var(--gold), 0 0 18px rgba(var(--gold-hi-rgb), .45); animation: st-pop .5s .5s var(--st-spring) both, st-breathe 2.4s 1.2s ease-in-out infinite; }

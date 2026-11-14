@@ -4486,7 +4486,7 @@ html[data-intro="member"]::after {
 }
 html[data-intro="member"]::after { background: #020914; }
 html[data-intro="card"] { overflow: hidden; }
-html[data-intro="card"] body > :not(.ic) { visibility: hidden; }
+html[data-intro="card"] body > :not(.ic):not(dialog.st) { visibility: hidden; }
 @keyframes intro-cover-off { to { opacity: 0; visibility: hidden; } }
 
 /* =========================================================
