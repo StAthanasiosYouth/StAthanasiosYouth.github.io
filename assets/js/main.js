@@ -423,17 +423,22 @@ function startIntro() {
   const kind = html.getAttribute('data-intro');
   const failed = error => { console.warn(error); html.removeAttribute('data-intro'); };
   if (kind === 'card') {
-    // «ادخل الموقع»: the site walkthrough, once per device (site-tour.js)
-    const tour = () => import('./site-tour.js').then(t => { if (!t.tourSeen()) t.openSiteTour(); }).catch(error => console.warn(error));
-    import('./intro-card.js').then(m => m.playCardIntro({ onEnd: tour })).catch(failed);
-    // «اعمل حساب»: the walkthrough first (once per device), then the account page
+    import('./intro-card.js').then(m => m.playCardIntro()).catch(failed);
+    // both welcome buttons show the site walkthrough first (once per device), over the welcome while its music
+    // plays (owner, 2026-11-14), then do what they do: «اعمل حساب» the account page, «ادخل الموقع» the site
     document.addEventListener('click', event => {
-      const link = event.target.closest && event.target.closest('.ic a.is-main');
-      if (!link || event.defaultPrevented || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      const target = event.target.closest && event.target.closest('.ic a.is-main, .ic [data-enter]');
+      if (!target || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      if (target.dataset.toured === '1') return;
       event.preventDefault();
-      const go = () => { location.href = link.href; };
+      event.stopImmediatePropagation();
+      const account = target.matches('a');
+      const go = () => {
+        if (account) location.href = target.href;
+        else { target.dataset.toured = '1'; target.click(); }
+      };
       import('./site-tour.js')
-        .then(t => (t.tourSeen() ? go() : t.openSiteTour({ onDone: go, doneLabel: 'يلا نعمل الحساب' })))
+        .then(t => (t.tourSeen() ? go() : t.openSiteTour({ onDone: go, doneLabel: account ? 'يلا نعمل الحساب' : 'يلا ندخل الموقع' })))
         .catch(go);
     }, true);
   }
