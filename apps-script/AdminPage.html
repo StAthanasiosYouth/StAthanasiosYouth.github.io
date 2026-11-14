@@ -421,6 +421,8 @@
     // «شكل الخلفية»: the cards' background in this section, any kind of section
     var surface = A.choices(A.uid('surface'), SURFACES, row.surface || '');
     var surfaceMobile = A.choices(A.uid('surface-mobile'), [{ value: '', label: 'زي الكمبيوتر' }].concat(SURFACES.slice(1)), row.surfaceMobile || '');
+    // the section's icon in the phone's bottom bar (and «المزيد»); «تلقائي» = the site's own for this kind
+    var tabIcon = A.iconPicker(row.icon || '', { auto: 'تلقائي' });
     var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
 
     save.addEventListener('click', function () {
@@ -435,7 +437,7 @@
         banner: banner.value(),
         surface: surface.value(),
         surfaceMobile: surfaceMobile.value(),
-        icon: row.icon || '',
+        icon: tabIcon.value(),
         enabled: enabled.input.checked
       }, isNew))
         .then(function (next) {
@@ -461,7 +463,8 @@
           info.publicTitle ? A.field('لون القسم', theme.node, 'بيغيّر لمسة اللون والإضاءة بتاعة القسم بس') : null,
           banner.node,
           A.field('شكل الخلفية', surface.node, 'خلفية الكروت اللي في القسم ده. «تلقائي» = زي ما الموقع شايف أحسن'),
-          A.field('على الموبايل', surfaceMobile.node, 'لو عايز شكل تاني على الموبايل بس')
+          A.field('على الموبايل', surfaceMobile.node, 'لو عايز شكل تاني على الموبايل بس'),
+          A.field('أيقونة القسم في شريط الموبايل', tabIcon.node, 'الأيقونة اللي بتظهر للقسم في الشريط اللي تحت على الموبايل وفي «المزيد». «تلقائي» = أيقونة الموقع العادية للقسم')
         ),
         el('div', { class: 'form-group' },
           el('p', { class: 'section-label', text: 'الظهور (بتوقيت مصر)' }),

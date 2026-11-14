@@ -277,8 +277,8 @@ export function currentTab(path = location.pathname) {
 /* ---------- the home page: the three places nearest to where you are ---------- */
 
 /* short words for the bar; the rest says its own title */
-const WORDS = { top: 'الرئيسية', featured: 'مميز', meeting: 'الاجتماع', news: 'الأخبار', games: 'الألعاب', competitions: 'المسابقات', activities: 'الفعاليات', services: 'خدماتنا', location: 'المكان', social: 'تابعنا', contacts: 'تواصل', support: 'الدعم', share: 'شارك', points: 'نقاطي' };
-const GLYPHS = { featured: 'sparkle', meeting: 'calendar', news: 'megaphone', games: 'star', competitions: 'trophy', activities: 'ticket', services: 'church', location: 'map', social: 'users', contacts: 'phone', support: 'info', share: 'share', points: 'trophy' };
+const WORDS = { top: 'الرئيسية', featured: 'مميز', meeting: 'الاجتماع', news: 'الأخبار', games: 'الألعاب', competitions: 'المسابقات', activities: 'الفعاليات', services: 'خدماتنا', location: 'المكان', social: 'تابعنا', contacts: 'تواصل', support: 'الدعم', share: 'شارك', points: 'نقاطي', 's2-people': 'تواصل' };
+const GLYPHS = { featured: 'sparkle', meeting: 'calendar', news: 'megaphone', games: 'star', competitions: 'trophy', activities: 'ticket', services: 'church', location: 'map', social: 'users', contacts: 'phone', support: 'info', share: 'share', points: 'trophy', 's2-sugg': 'sparkle', 's2-side': 'calendar', 's2-people': 'phone' };
 const SKIP = ['hero', 'footer', 'error', 'announcement'];
 
 /* the home page's sections in the order they show, with «الرئيسية» (the top) first */
@@ -319,7 +319,8 @@ function placeTab(place, current) {
   link.href = place.key === 'top' ? new URL('index.html', ROOT).href : new URL('index.html#to-' + place.key, ROOT).href;
   link.dataset.tab = place.key;
   if (place.key === 'top') link.append(icon('home'));
-  else if (iconsModule) link.append(iconsModule.iconNode(GLYPHS[place.key] || 'link'));
+  // the icon chosen for the section in the admin (home.js tabIcon), else the place's own
+  else if (iconsModule) link.append(iconsModule.iconNode(place.el.dataset.tabIcon || GLYPHS[place.key] || 'link'));
   else link.append(icon('more'));
   const label = document.createElement('span');
   label.className = 'tabbar__word';
@@ -496,7 +497,7 @@ export function moreGroups(content, { home = false, doc = document } = {}) {
   };
   const places = layout.filter(e => e.kind !== 'links' && shown(e)).map(e => ({
     key: e.key, kind: e.kind, title: e.title || e.key,
-    icon: e.kind === 'items' ? ITEM_ICON[e.key] || 'calendar' : AREA_ICON[e.kind] || 'link'
+    icon: e.icon || (e.kind === 'items' ? ITEM_ICON[e.key] || 'calendar' : AREA_ICON[e.kind] || 'link')
   }));
   const social = ((content && content.sections) || []).flatMap(s => (s.links || []).filter(l => /^https:\/\//.test(l.url || '')).map(l => ({ title: l.title, url: l.url, icon: l.icon || 'link' })));
   const pages = ((content && content.pages) || []).filter(p => /^[a-z0-9-]{2,40}$/.test(p.slug || '')).map(p => ({ title: p.title, href: new URL(p.slug + '/', ROOT).href, icon: 'theatre' }));

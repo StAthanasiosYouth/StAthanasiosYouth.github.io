@@ -297,6 +297,12 @@ function newsRail(section, items, nowStamp) {
 
 /* ---------- the arrangement ---------- */
 
+/* the phone's bottom bar shows this icon for the section (nav.js placeTab): the one chosen in the admin */
+function tabIcon(el, name) {
+  if (el && name) el.dataset.tabIcon = name;
+  return el;
+}
+
 /**
  * flow: render.js's widgets in the admin's order ({ el, kind, section }); returns the page's top-level elements.
  * extra: { content, nowStamp, news (the visible news, the pinned one left out), points (content.points) }
@@ -335,11 +341,14 @@ export function arrangeHome(flow, footer, { content, nowStamp, news }) {
   let sugg = null;
   if (featured.length || serviceSlides.length) {
     sugg = suggestions(featured, serviceSlides, servicesSection, chips);
+    // the bottom bar's icon for it: the admin's choice for the section, else the first featured link's own icon
+    tabIcon(sugg, (flow.find(f => f.kind === 'featured') || {}).section?.icon || ((content.featured || [])[0] || {}).icon);
     out.push(sugg);
   }
 
   /* beside it: the nudge / greeting, then the meeting */
   const side = h('div', { class: 's2-side', 'data-area': 's2-side' }, member ? greeting() : nudge(), meeting ? meeting.el : null);
+  if (meeting) tabIcon(side, meeting.section?.icon);
   if (side.children.length) out.push(side);
   // no Suggestions: the quick links still lead the page
   if (!sugg && chips.some(Boolean)) out.unshift(h('nav', { class: 's2-chips s2-chips--alone', 'aria-label': 'اختصارات' }, chips));
@@ -350,11 +359,11 @@ export function arrangeHome(flow, footer, { content, nowStamp, news }) {
     if (item.kind === 'featured' || item.kind === 'meeting') continue;
     if (item.kind === 'items' && item.section && item.section.key === 'activities') {
       const list = visibleItems(content, 'activities', nowStamp);
-      out.push(list.length ? adopt(eventsSection(item.section, list, nowStamp, content.partners), item.el) : item.el);
+      out.push(tabIcon(list.length ? adopt(eventsSection(item.section, list, nowStamp, content.partners), item.el) : item.el, item.section?.icon));
       continue;
     }
     if (item.kind === 'news') {
-      out.push(news.length ? adopt(newsRail(item.section || {}, news, nowStamp), item.el) : item.el);
+      out.push(tabIcon(news.length ? adopt(newsRail(item.section || {}, news, nowStamp), item.el) : item.el, item.section?.icon));
       continue;
     }
     if (item === servicesItem) {
@@ -364,18 +373,19 @@ export function arrangeHome(flow, footer, { content, nowStamp, news }) {
         sh.append(allLink('services/', item.el.querySelectorAll('.items__list > li').length));
       }
       item.el.querySelector('.items__list')?.classList.add('s2-rail', 's2-rail--sv');
-      out.push(item.el);
+      out.push(tabIcon(item.el, item.section?.icon));
       continue;
     }
     if (item.kind === 'contacts' || item.kind === 'support') {
       if (!people) {
         people = h('div', { class: 's2-people', 'data-area': 's2-people' });
+        tabIcon(people, item.section?.icon);
         out.push(people);
       }
       people.append(item.el);
       continue;
     }
-    out.push(item.el);
+    out.push(tabIcon(item.el, item.section?.icon));
   }
 
   out.push(footer);

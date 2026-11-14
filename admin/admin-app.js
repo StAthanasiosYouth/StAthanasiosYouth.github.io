@@ -1522,22 +1522,32 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   };
 
-  A.iconPicker = function (selected) {
+  // options.auto: a first «تلقائي» choice that means "no icon of its own" (value '')
+  A.iconPicker = function (selected, options) {
 
+    options = options || {};
     var inputs = [];
     var labels = A.ICON_LABELS || {};
 
-    var node = el('div', { class: 'icon-grid', role: 'radiogroup', 'aria-label': 'الأيقونة' }, A.state.meta.icons.map(function (name) {
+    var tiles = A.state.meta.icons.map(function (name) {
       var input = el('input', { type: 'radio', name: 'icon', value: name, checked: name === selected, onchange: markDirty, 'aria-label': labels[name] || name });
       inputs.push(input);
       return el('label', { class: 'choice', title: labels[name] || name }, input, el('span', {}, icon(name)));
-    }));
+    });
+
+    if (options.auto) {
+      var none = el('input', { type: 'radio', name: 'icon', value: '', checked: !selected, onchange: markDirty, 'aria-label': options.auto });
+      inputs.unshift(none);
+      tiles.unshift(el('label', { class: 'choice', title: options.auto }, none, el('span', { text: options.auto })));
+    }
+
+    var node = el('div', { class: 'icon-grid', role: 'radiogroup', 'aria-label': 'الأيقونة' }, tiles);
 
     return {
       node: node,
       value: function () {
         var checked = inputs.filter(function (i) { return i.checked; })[0];
-        return checked ? checked.value : 'link';
+        return checked ? checked.value : (options.auto ? '' : 'link');
       }
     };
 
@@ -6916,6 +6926,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     // «شكل الخلفية»: the cards' background in this section, any kind of section
     var surface = A.choices(A.uid('surface'), SURFACES, row.surface || '');
     var surfaceMobile = A.choices(A.uid('surface-mobile'), [{ value: '', label: 'زي الكمبيوتر' }].concat(SURFACES.slice(1)), row.surfaceMobile || '');
+    // the section's icon in the phone's bottom bar (and «المزيد»); «تلقائي» = the site's own for this kind
+    var tabIcon = A.iconPicker(row.icon || '', { auto: 'تلقائي' });
     var save = el('button', { class: 'btn btn--primary', type: 'button', text: isNew ? 'إضافة' : 'حفظ' });
 
     save.addEventListener('click', function () {
@@ -6930,7 +6942,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         banner: banner.value(),
         surface: surface.value(),
         surfaceMobile: surfaceMobile.value(),
-        icon: row.icon || '',
+        icon: tabIcon.value(),
         enabled: enabled.input.checked
       }, isNew))
         .then(function (next) {
@@ -6956,7 +6968,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           info.publicTitle ? A.field('لون القسم', theme.node, 'بيغيّر لمسة اللون والإضاءة بتاعة القسم بس') : null,
           banner.node,
           A.field('شكل الخلفية', surface.node, 'خلفية الكروت اللي في القسم ده. «تلقائي» = زي ما الموقع شايف أحسن'),
-          A.field('على الموبايل', surfaceMobile.node, 'لو عايز شكل تاني على الموبايل بس')
+          A.field('على الموبايل', surfaceMobile.node, 'لو عايز شكل تاني على الموبايل بس'),
+          A.field('أيقونة القسم في شريط الموبايل', tabIcon.node, 'الأيقونة اللي بتظهر للقسم في الشريط اللي تحت على الموبايل وفي «المزيد». «تلقائي» = أيقونة الموقع العادية للقسم')
         ),
         el('div', { class: 'form-group' },
           el('p', { class: 'section-label', text: 'الظهور (بتوقيت مصر)' }),
