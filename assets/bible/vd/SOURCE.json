@@ -1,0 +1,755 @@
+{
+  "text": "الكتاب المقدس — ترجمة فاندايك (البستاني–فاندايك)",
+  "license": "Public Domain (eBible.org copr.htm)",
+  "source": {
+    "page": "https://ebible.org/details.php?id=arb-vd",
+    "url": "https://ebible.org/Scriptures/arb-vd_usfm.zip",
+    "file": "arb-vd_usfm.zip",
+    "bytes": 1744910,
+    "sha256": "fd420ac7b224d42be23997fef298c2193d12788d95d2db7103904184cdda766a",
+    "downloaded": "2026-11-17",
+    "ebibleGenerated": "30 Oct 2026",
+    "sourceFilesDated": "12 Dec 2025"
+  },
+  "rules": {
+    "books": "66 books only (decision 5); anything else in the zip is skipped",
+    "tashkeel": "kept as in the source; stripTashkeel() in assets/js/bread/text.js hides it (decision 4)",
+    "psalms": "Van Dyck (Hebrew) numbering; agpeyaPsalm() in assets/js/bread/text.js gives the Agpeya number (decision 6)",
+    "kept": "verse text, psalm superscriptions (titles), Psalm 119 letters (letters)",
+    "dropped": "section headings (\\s1, 1998 of them: editorial, not Van Dyck), book headers apart from \\h, paragraph markers",
+    "cleanup": "whitespace collapsed, bidi marks (U+200E/U+200F) removed; no other change to the text"
+  },
+  "built": {
+    "tool": "tools/build-bible.mjs",
+    "books": 66,
+    "verses": 31104
+  },
+  "books": {
+    "GEN": {
+      "file": "GEN.json",
+      "bytes": 358798,
+      "sha256": "eb0d6a56e2b8eb45b4cf2dad8532f7f4d0fd1f3dbd729939c2dfafebdc1fc4de",
+      "chapters": 50,
+      "verses": 1533,
+      "usfm": {
+        "file": "02-GENarb-vd.usfm",
+        "sha256": "66786072cb85e8459689f934bcfc8330f637b747d203792a25da942050fe1a76"
+      }
+    },
+    "EXO": {
+      "file": "EXO.json",
+      "bytes": 296934,
+      "sha256": "8b93bcdd2aea3c526e8ca8218ff46df251e19e19a0c275263bcf14a91a8f22ce",
+      "chapters": 40,
+      "verses": 1213,
+      "usfm": {
+        "file": "03-EXOarb-vd.usfm",
+        "sha256": "65c6dc6d3f5ef55c5709f02dd0c89919693b151e3d8a0b25938ace2e9b8811fc"
+      }
+    },
+    "LEV": {
+      "file": "LEV.json",
+      "bytes": 210112,
+      "sha256": "88a4c0a79e6f561f61911634000e95e5ef8970a9bdf8aee975fbd00a24508fed",
+      "chapters": 27,
+      "verses": 859,
+      "usfm": {
+        "file": "04-LEVarb-vd.usfm",
+        "sha256": "c3818d3beb7168ebce1e20eb5fbe7599b3c0c35f60dd104852e99adbbc68865f"
+      }
+    },
+    "NUM": {
+      "file": "NUM.json",
+      "bytes": 302204,
+      "sha256": "961b759d11120138fdfe6acbee5e46860c8e0e3520dc884f74213470eb9963ca",
+      "chapters": 36,
+      "verses": 1288,
+      "usfm": {
+        "file": "05-NUMarb-vd.usfm",
+        "sha256": "26927a9ca65864c4f3f2f960dd71d6e80971cddbe20700175ace9b1606f873e0"
+      }
+    },
+    "DEU": {
+      "file": "DEU.json",
+      "bytes": 256056,
+      "sha256": "881faea0f36c692e4e7edcb9a8492060c8207032ca7c88549604b37fce871881",
+      "chapters": 34,
+      "verses": 959,
+      "usfm": {
+        "file": "06-DEUarb-vd.usfm",
+        "sha256": "eaacf5f6a3299793417bf7877878819cf1c27a7436fda7f6a0bf5c1375880365"
+      }
+    },
+    "JOS": {
+      "file": "JOS.json",
+      "bytes": 180684,
+      "sha256": "2eecac714e0b447ee5ddfe75edbb77a991443b6aab21bbfec999abc852363308",
+      "chapters": 24,
+      "verses": 658,
+      "usfm": {
+        "file": "07-JOSarb-vd.usfm",
+        "sha256": "7d3fa9a7efec30079e85dff6b388ee25fabc955c991b85feaaa728d914de74a7"
+      }
+    },
+    "JDG": {
+      "file": "JDG.json",
+      "bytes": 178371,
+      "sha256": "987b26b27148bb45ca4604336416f545e960ddbfe5f0056d59cb826d2ad6624b",
+      "chapters": 21,
+      "verses": 618,
+      "usfm": {
+        "file": "08-JDGarb-vd.usfm",
+        "sha256": "bcd6f7d5313bd9dc9101283c1cba8d6dfa5684f17acca585e2f2b9d825a25482"
+      }
+    },
+    "RUT": {
+      "file": "RUT.json",
+      "bytes": 23470,
+      "sha256": "f897d6d292b49dd61d0f568dd13421e68e1a2b24780961afcdf9dd89cb5231e3",
+      "chapters": 4,
+      "verses": 85,
+      "usfm": {
+        "file": "09-RUTarb-vd.usfm",
+        "sha256": "f4e044fa408205b18f1b693829be341151c1ce24d9eb50dc98ac55fe35b36dbe"
+      }
+    },
+    "1SA": {
+      "file": "1SA.json",
+      "bytes": 239440,
+      "sha256": "8b552385c158de07c7259e1f93c7e43efc5cc6613e6263b51fe918698cc9b3bc",
+      "chapters": 31,
+      "verses": 810,
+      "usfm": {
+        "file": "10-1SAarb-vd.usfm",
+        "sha256": "ca18d043a5c8d53fe3c63524b0b21ca2bb1d5b7625a5705c4bb1895eafe3c78e"
+      }
+    },
+    "2SA": {
+      "file": "2SA.json",
+      "bytes": 195651,
+      "sha256": "783a537c145af66670ad132a167af530a679eb8846f76a07ff3c2dec4e6e6e10",
+      "chapters": 24,
+      "verses": 695,
+      "usfm": {
+        "file": "11-2SAarb-vd.usfm",
+        "sha256": "3885f95b009cb78f247ff00932895fb0f86653262f9409bace79bad698a8c658"
+      }
+    },
+    "1KI": {
+      "file": "1KI.json",
+      "bytes": 235119,
+      "sha256": "793d715e1ced9d4847dd0450e16973b2502a2e5f5a1e23e38e08587a2a0e308c",
+      "chapters": 22,
+      "verses": 816,
+      "usfm": {
+        "file": "12-1KIarb-vd.usfm",
+        "sha256": "6d60457c88fef10ee2dedfd8ca812cd51faa7cb0194993c941fc12893f35d750"
+      }
+    },
+    "2KI": {
+      "file": "2KI.json",
+      "bytes": 219849,
+      "sha256": "4e6f03253bcb260c031d203dd37ab8f300883d35c8d28c1af1f398ea3f5bba9f",
+      "chapters": 25,
+      "verses": 719,
+      "usfm": {
+        "file": "13-2KIarb-vd.usfm",
+        "sha256": "57ed116db8ee8f09cf38d753062d6abf7fbd9c76f347dd7eeb4cd670c9fbaace"
+      }
+    },
+    "1CH": {
+      "file": "1CH.json",
+      "bytes": 200711,
+      "sha256": "5b7e9f79ec5ad7d9797958242ca7eb8ad660f91efb40ebc75f8379b5022ca74a",
+      "chapters": 29,
+      "verses": 942,
+      "usfm": {
+        "file": "14-1CHarb-vd.usfm",
+        "sha256": "aa81fa86a9cc4ba064e3a75eff3ed163c1690188a4a2d117ffcd0c5fb097a046"
+      }
+    },
+    "2CH": {
+      "file": "2CH.json",
+      "bytes": 249126,
+      "sha256": "b96153d699c51025b5b83b6d7df6010175520d4252ea95bf05935cabbf9a1e2c",
+      "chapters": 36,
+      "verses": 822,
+      "usfm": {
+        "file": "15-2CHarb-vd.usfm",
+        "sha256": "82d52f7badf65fb8527f3d9434c26d23a220ffa4c4368b0359484ebae5b0a2f3"
+      }
+    },
+    "EZR": {
+      "file": "EZR.json",
+      "bytes": 72780,
+      "sha256": "24527d1523ff12df413f5808b0622ff33eb5ec033c570fe696115eef1f758626",
+      "chapters": 10,
+      "verses": 280,
+      "usfm": {
+        "file": "16-EZRarb-vd.usfm",
+        "sha256": "19a30d5b0a5d3af2e511b8edc04718ce826add2b58489bae3220ce1072552cf4"
+      }
+    },
+    "NEH": {
+      "file": "NEH.json",
+      "bytes": 103165,
+      "sha256": "c42b688c1008bc98c44435ebd0161ec1b3d0cb82da8feb144683e0be7ffca62f",
+      "chapters": 13,
+      "verses": 406,
+      "usfm": {
+        "file": "17-NEHarb-vd.usfm",
+        "sha256": "f3d649b3375e071a5210195cff7c035835c595312010342d9c77156263fa39b9"
+      }
+    },
+    "EST": {
+      "file": "EST.json",
+      "bytes": 57290,
+      "sha256": "6afd87e2c796b3ced6b38264bb501a05f771bf5b0540dbad0a110281d60f3ba6",
+      "chapters": 10,
+      "verses": 167,
+      "usfm": {
+        "file": "18-ESTarb-vd.usfm",
+        "sha256": "cb0d53a080f10856cdbda20090cf74af34a8438f06f9346deb5b40a75427800b"
+      }
+    },
+    "JOB": {
+      "file": "JOB.json",
+      "bytes": 162542,
+      "sha256": "3a87ccd9ec6842bd9e7a5ac2ccf705a33ba38791544f11c92443f73bdf2e4de2",
+      "chapters": 42,
+      "verses": 1070,
+      "usfm": {
+        "file": "19-JOBarb-vd.usfm",
+        "sha256": "bce6e553c2a1a968901981222bdb9a4315716799014dbb4d2ecbba5226172b96"
+      }
+    },
+    "PSA": {
+      "file": "PSA.json",
+      "bytes": 393984,
+      "sha256": "b99d6bf884e4b5aa94247250c024e4c04928b8396de193c74140eaa06993dd90",
+      "chapters": 150,
+      "verses": 2461,
+      "usfm": {
+        "file": "20-PSAarb-vd.usfm",
+        "sha256": "93e6306ebc4d798a89efeba99bffee727761cbe4cd4a583cdea391aca2bd3dd6"
+      }
+    },
+    "PRO": {
+      "file": "PRO.json",
+      "bytes": 141679,
+      "sha256": "7f5074052b5beb1ccc5713411cc31b30913359d1368e2b194f8c934f7f9bf9ad",
+      "chapters": 31,
+      "verses": 915,
+      "usfm": {
+        "file": "21-PROarb-vd.usfm",
+        "sha256": "35b97766ecd7a7eba3c4e2ec27037fafbbc02c63ffe6d0d9e8c935c48bcb0a4c"
+      }
+    },
+    "ECC": {
+      "file": "ECC.json",
+      "bytes": 53842,
+      "sha256": "d2f0970d84597e8cd94f90f35796d752cc8e7fb43608d05eeb25f1831685d8c6",
+      "chapters": 12,
+      "verses": 222,
+      "usfm": {
+        "file": "22-ECCarb-vd.usfm",
+        "sha256": "746044e7b1c040f119b9469fc6ff4a82bdc115dbf9a34e4d024fedb42e40e545"
+      }
+    },
+    "SNG": {
+      "file": "SNG.json",
+      "bytes": 23898,
+      "sha256": "7d3c47b1b5a235dc920618edb8af3586524ec068da0a5c207360481e75096321",
+      "chapters": 8,
+      "verses": 117,
+      "usfm": {
+        "file": "23-SNGarb-vd.usfm",
+        "sha256": "a68ea11b10433e9bd1f8d6f7c1c978cc8d60e6a3908fa79c99e1149855741bf4"
+      }
+    },
+    "ISA": {
+      "file": "ISA.json",
+      "bytes": 330186,
+      "sha256": "addda38ad274f9fafa8d5f23714039a7c54929c85b1ba0c5e75f0a0e69ae89dd",
+      "chapters": 66,
+      "verses": 1292,
+      "usfm": {
+        "file": "24-ISAarb-vd.usfm",
+        "sha256": "09461ba30a197f5f9f05990ace87a82f4c295ad4c1ab4823ca0255e8ffc6a234"
+      }
+    },
+    "JER": {
+      "file": "JER.json",
+      "bytes": 397438,
+      "sha256": "dbf8a88e308a5ae8b068f448bf97876ca66fee6c2f6a066be1d3e298aaa232c6",
+      "chapters": 52,
+      "verses": 1364,
+      "usfm": {
+        "file": "25-JERarb-vd.usfm",
+        "sha256": "6a3607356fea384095db7213c2b216464ee35de51cd8a07137a1bd0c26b3ae4c"
+      }
+    },
+    "LAM": {
+      "file": "LAM.json",
+      "bytes": 30904,
+      "sha256": "5c0376750f3ebb6f12cea2f9d13864dbdcbe46e6f027edc948768d86da2ed702",
+      "chapters": 5,
+      "verses": 154,
+      "usfm": {
+        "file": "26-LAMarb-vd.usfm",
+        "sha256": "ba255b9025ca3692371498c4af37cf7eae75bc23bf505c8e56cdda8f1e7d890f"
+      }
+    },
+    "EZK": {
+      "file": "EZK.json",
+      "bytes": 354206,
+      "sha256": "2816a75716263a383b897432bbde4ca8667c6de7f99b79ff53078697aa819349",
+      "chapters": 48,
+      "verses": 1273,
+      "usfm": {
+        "file": "27-EZKarb-vd.usfm",
+        "sha256": "fe792360f265ade55195d6468e7dbb85de92b98542c139442b19793c78e425fa"
+      }
+    },
+    "DAN": {
+      "file": "DAN.json",
+      "bytes": 111471,
+      "sha256": "de589963f3574421889bbcbb4d6ffc6fb9f2cf65e998afbc33299c751ed028d1",
+      "chapters": 12,
+      "verses": 357,
+      "usfm": {
+        "file": "28-DANarb-vd.usfm",
+        "sha256": "1ec27b758863daec43d936119895b50d500377f9a6f355b0adc6f64dc38f43c4"
+      }
+    },
+    "HOS": {
+      "file": "HOS.json",
+      "bytes": 46765,
+      "sha256": "ef3d8eacbac1ed2638e57c9acf8cb08fd2db625e480dc6975b2f3ff0ee050779",
+      "chapters": 14,
+      "verses": 197,
+      "usfm": {
+        "file": "29-HOSarb-vd.usfm",
+        "sha256": "cffeee1104bfce7a901e945e16184c30d608a29f00d14d7819ab438070f405d8"
+      }
+    },
+    "JOL": {
+      "file": "JOL.json",
+      "bytes": 18804,
+      "sha256": "14b0af83eefd9780b85e729b7675fb40f99c6dcaa0940d3ccbebbb348668cb70",
+      "chapters": 3,
+      "verses": 73,
+      "usfm": {
+        "file": "30-JOLarb-vd.usfm",
+        "sha256": "27e0a9f51469985c8c9cf46e5ce914be7ecd1e3a89337d66d23eefb6bfe5b127"
+      }
+    },
+    "AMO": {
+      "file": "AMO.json",
+      "bytes": 39078,
+      "sha256": "294898fe386a2b21311f056dc26ab20f5b2b7fa22f5de1d785a25c31c74f1bc6",
+      "chapters": 9,
+      "verses": 146,
+      "usfm": {
+        "file": "31-AMOarb-vd.usfm",
+        "sha256": "053a6a13c32cb181579f33f7a4ab0ea1180f655251ab6acabe1a797fc5d4a394"
+      }
+    },
+    "OBA": {
+      "file": "OBA.json",
+      "bytes": 5536,
+      "sha256": "c1fdb7fe28f5623e943a3df66205d44b325fdadd6a0ccc4edeb03526f98237ef",
+      "chapters": 1,
+      "verses": 21,
+      "usfm": {
+        "file": "32-OBAarb-vd.usfm",
+        "sha256": "d235b4cf9b630846d94d0a70626087b79292e96999dcd5d5606d1e5897073c9a"
+      }
+    },
+    "JON": {
+      "file": "JON.json",
+      "bytes": 12427,
+      "sha256": "42603fd105ea1efea970c2b0c0f69bd9076850c3ccab0278496c59471708b529",
+      "chapters": 4,
+      "verses": 48,
+      "usfm": {
+        "file": "33-JONarb-vd.usfm",
+        "sha256": "8d401e2755fc1012895f9c0072e58ad4114bab222cf3e65dda7ef7f9cd57b9ad"
+      }
+    },
+    "MIC": {
+      "file": "MIC.json",
+      "bytes": 28021,
+      "sha256": "fbd3dd283edfec40f5dd7f221eba1943c415e922829a86581c9df2d3bcae7a22",
+      "chapters": 7,
+      "verses": 105,
+      "usfm": {
+        "file": "34-MICarb-vd.usfm",
+        "sha256": "7be2d5f2a93dc69529fab598d8b64d7248cff65604aa4231e2e32faddd4d0dbb"
+      }
+    },
+    "NAM": {
+      "file": "NAM.json",
+      "bytes": 11437,
+      "sha256": "b28896f801ced57dae378e7c17b5312025468d359cd75f3f48bf26407edd317b",
+      "chapters": 3,
+      "verses": 47,
+      "usfm": {
+        "file": "35-NAMarb-vd.usfm",
+        "sha256": "70ebc92e238322fc70765844e4ada72d3fd0f627cd4c0becf2641d96966605d3"
+      }
+    },
+    "HAB": {
+      "file": "HAB.json",
+      "bytes": 13355,
+      "sha256": "dc2307dd69ea36a884274e69d78d21650387785a5e87ac5cb80e4a3e95a0146a",
+      "chapters": 3,
+      "verses": 56,
+      "usfm": {
+        "file": "36-HABarb-vd.usfm",
+        "sha256": "8f85743ddad86acbc9d398f78eed5e0e29db8c56e00d699f5e03f66f95bf5b8f"
+      }
+    },
+    "ZEP": {
+      "file": "ZEP.json",
+      "bytes": 14628,
+      "sha256": "4d7a8f320d6151bf448d14f1bf2f74a4b8775bce3e3d7c72ba6c3f4f15fda60c",
+      "chapters": 3,
+      "verses": 53,
+      "usfm": {
+        "file": "37-ZEParb-vd.usfm",
+        "sha256": "d0b463865919cbed2b11581c65452b2c2b8adfb270608a2b8af4f9a5737cc90e"
+      }
+    },
+    "HAG": {
+      "file": "HAG.json",
+      "bytes": 11051,
+      "sha256": "fb81bc4540039a7ee19e1669f54cd8a454af06312109cf4283125086043678ab",
+      "chapters": 2,
+      "verses": 38,
+      "usfm": {
+        "file": "38-HAGarb-vd.usfm",
+        "sha256": "0e95e2b3fa808ef560b5b4d07b6d5d495fb95b93f6250326689636ed72bd9cfc"
+      }
+    },
+    "ZEC": {
+      "file": "ZEC.json",
+      "bytes": 58256,
+      "sha256": "d98ffadea56c6896122700340adef3809aa1a81c5bb2432c8178503a5bc27424",
+      "chapters": 14,
+      "verses": 211,
+      "usfm": {
+        "file": "39-ZECarb-vd.usfm",
+        "sha256": "df9a0aaab59bd137334c7e49a49fe57485c20c64e10b81a8247bbc1689c4b848"
+      }
+    },
+    "MAL": {
+      "file": "MAL.json",
+      "bytes": 16309,
+      "sha256": "17130404abe30e9fa6de306790fd8b4ad366ef7638f689acc716fdcfdeeaadcf",
+      "chapters": 4,
+      "verses": 55,
+      "usfm": {
+        "file": "40-MALarb-vd.usfm",
+        "sha256": "4ea9096e65b33ffd7fa2675a68eb39a871e71964bae824ccfaa7a6c718b1510b"
+      }
+    },
+    "MAT": {
+      "file": "MAT.json",
+      "bytes": 237457,
+      "sha256": "753f1319b9ea2d978f713fc7dc37f59d798abd83bbdc641cfb6046c219618104",
+      "chapters": 28,
+      "verses": 1071,
+      "usfm": {
+        "file": "70-MATarb-vd.usfm",
+        "sha256": "6f8b4b7d98036f252abf715b8b4b905688a4e5261a8ecacd88d8656a93c69aac"
+      }
+    },
+    "MRK": {
+      "file": "MRK.json",
+      "bytes": 148632,
+      "sha256": "c36001978124839e320d283480720310bebe649dd9d11a6290e5d4de0c03f227",
+      "chapters": 16,
+      "verses": 678,
+      "usfm": {
+        "file": "71-MRKarb-vd.usfm",
+        "sha256": "8246b899fcd2ec22de1211533a7a8d5308554fdec013e58ead30b52d69a7a4a6"
+      }
+    },
+    "LUK": {
+      "file": "LUK.json",
+      "bytes": 252255,
+      "sha256": "0f450fcb0f9722368d1fa1cd790d01a968217b5fa372b44b03442a0951bdf5a5",
+      "chapters": 24,
+      "verses": 1151,
+      "usfm": {
+        "file": "72-LUKarb-vd.usfm",
+        "sha256": "00c192dd39ba257455ce74e339ae976d184dfd057ad1ad32f38210e68e19b4d0"
+      }
+    },
+    "JHN": {
+      "file": "JHN.json",
+      "bytes": 197457,
+      "sha256": "4914f421d4288586fd6085a9e708d9e5d9f655ee347b169e965dbc8351952dc4",
+      "chapters": 21,
+      "verses": 879,
+      "usfm": {
+        "file": "73-JHNarb-vd.usfm",
+        "sha256": "bc3d34de2b1f54d8a1cb592ce227588d37c45dc3f45a62d8222f16297e310334"
+      }
+    },
+    "ACT": {
+      "file": "ACT.json",
+      "bytes": 259932,
+      "sha256": "041c7ae8a9c6a7fe0ff1c447b2777a4cdfc7cc521676b44cdb6b74fe077c9497",
+      "chapters": 28,
+      "verses": 1007,
+      "usfm": {
+        "file": "74-ACTarb-vd.usfm",
+        "sha256": "9a8735249b8a91bb7309073f9423e37c654ed5f5016ec01c7a23c121c31ed82b"
+      }
+    },
+    "ROM": {
+      "file": "ROM.json",
+      "bytes": 100134,
+      "sha256": "630032988483b8c0e8381f6104df5c14c7a3e7f06143bf130552fb0323d04ec5",
+      "chapters": 16,
+      "verses": 433,
+      "usfm": {
+        "file": "75-ROMarb-vd.usfm",
+        "sha256": "d28127afd4f9f1126e3609c7207196611b7d0363bfbda5738933cba2fe553bf5"
+      }
+    },
+    "1CO": {
+      "file": "1CO.json",
+      "bytes": 99421,
+      "sha256": "c18d71c7e27468979a3b992cd52acd4829f86e64b68eb70659519fef6fd327ed",
+      "chapters": 16,
+      "verses": 437,
+      "usfm": {
+        "file": "76-1COarb-vd.usfm",
+        "sha256": "13e26e245a3f323c3953edda03f0cff1beb87b81f75b0f168f82b75c9b51373b"
+      }
+    },
+    "2CO": {
+      "file": "2CO.json",
+      "bytes": 64111,
+      "sha256": "dc42a904d994843a75dd46f6100ccb51ef59a04d24c8b7a2149130591dc9ed18",
+      "chapters": 13,
+      "verses": 257,
+      "usfm": {
+        "file": "77-2COarb-vd.usfm",
+        "sha256": "47372cd7c17f7d27a4aef7736cc04d129218a455394de80b8001661912abaddb"
+      }
+    },
+    "GAL": {
+      "file": "GAL.json",
+      "bytes": 33362,
+      "sha256": "44829f296fc58775d8e961bf38760adba5215d1385f3e2cab24afda01c1a5ca6",
+      "chapters": 6,
+      "verses": 149,
+      "usfm": {
+        "file": "78-GALarb-vd.usfm",
+        "sha256": "01a9245841eeba70a3e74d5964f04203afa6bacb9e695186ee6b1fad92873375"
+      }
+    },
+    "EPH": {
+      "file": "EPH.json",
+      "bytes": 31720,
+      "sha256": "d9c357198f2e24165b9f5ac575e1b384bdf40da2d0d9fed8c3e21ab031fda944",
+      "chapters": 6,
+      "verses": 155,
+      "usfm": {
+        "file": "79-EPHarb-vd.usfm",
+        "sha256": "d9c8d418371e8fedca4529ad39b7b065415c27eaaea6bb21912dcf51873ac529"
+      }
+    },
+    "PHP": {
+      "file": "PHP.json",
+      "bytes": 23890,
+      "sha256": "53b9d1721fe7a639abaa25e4ad2e59d29f9cddebc2a29f9e68af0a44a4566a82",
+      "chapters": 4,
+      "verses": 104,
+      "usfm": {
+        "file": "80-PHParb-vd.usfm",
+        "sha256": "7fc6ce044087ebc3c6c36000e0333a83e53cb63e379db676ff923d3c10b26e99"
+      }
+    },
+    "COL": {
+      "file": "COL.json",
+      "bytes": 21464,
+      "sha256": "32d74711a37e36f26c6a0ecab41684e7340390449d45ca1eca80dbbe722bf8b2",
+      "chapters": 4,
+      "verses": 95,
+      "usfm": {
+        "file": "81-COLarb-vd.usfm",
+        "sha256": "e7de552aed737dc811ae997defacc851c2e0dba0d9bb2ee08e54d6ecca03072a"
+      }
+    },
+    "1TH": {
+      "file": "1TH.json",
+      "bytes": 20809,
+      "sha256": "0bbd7f52086437473ec5b31673fb8d045ac95d7d6256325d1afc5a9b8422c926",
+      "chapters": 5,
+      "verses": 89,
+      "usfm": {
+        "file": "82-1THarb-vd.usfm",
+        "sha256": "33a7554848b6d213f51f76cde5ac8e91da42cadf703a564beced2f585d157cb4"
+      }
+    },
+    "2TH": {
+      "file": "2TH.json",
+      "bytes": 11064,
+      "sha256": "81b06764a6d3acd7640e127d5a637900a1188be8e962a6de01eea7fce58c8e67",
+      "chapters": 3,
+      "verses": 47,
+      "usfm": {
+        "file": "83-2THarb-vd.usfm",
+        "sha256": "ee13b2a366e4e914d6c1b37dd4f7926cba521a2f326f91983e6c08704b99823b"
+      }
+    },
+    "1TI": {
+      "file": "1TI.json",
+      "bytes": 26851,
+      "sha256": "f5422081460c28214c71adf0daddd4185397bf617d73a95b9cc896497302e1c4",
+      "chapters": 6,
+      "verses": 114,
+      "usfm": {
+        "file": "84-1TIarb-vd.usfm",
+        "sha256": "45fd334e97fb44a6fcc984995d0d63fc219c9561b954b4ad3baba5ab00fdfd36"
+      }
+    },
+    "2TI": {
+      "file": "2TI.json",
+      "bytes": 18779,
+      "sha256": "e76ff0cc43bca3b93050165eb31e4ad55c95ab354b511e9462ffcef0413197f5",
+      "chapters": 4,
+      "verses": 83,
+      "usfm": {
+        "file": "85-2TIarb-vd.usfm",
+        "sha256": "1d49cd03176bf4ac9f7bae34382cc63b0826a084835f95266c13d08dbc02f80c"
+      }
+    },
+    "TIT": {
+      "file": "TIT.json",
+      "bytes": 11477,
+      "sha256": "8c0c96b90953a0c01eb570cca01cfcad03d9a371baf3c89d16315ad9714bd3e0",
+      "chapters": 3,
+      "verses": 46,
+      "usfm": {
+        "file": "86-TITarb-vd.usfm",
+        "sha256": "0e6f053057c24d173287c99ed8d4b5f9d1b4201661510c2adeb1ec154f830e55"
+      }
+    },
+    "PHM": {
+      "file": "PHM.json",
+      "bytes": 4899,
+      "sha256": "e9c32f456a50095ec1001cbdd219f4aefc2b3b621bf38e105a329f4daa943649",
+      "chapters": 1,
+      "verses": 25,
+      "usfm": {
+        "file": "87-PHMarb-vd.usfm",
+        "sha256": "d222290c6eed5f325d1281d934425cde65006578065ab2e8fd450c571eed6a52"
+      }
+    },
+    "HEB": {
+      "file": "HEB.json",
+      "bytes": 71696,
+      "sha256": "92ddd188e5d8bbfe9199e2815df765101769a47f3567c74a14dd0d559a1a7bf0",
+      "chapters": 13,
+      "verses": 303,
+      "usfm": {
+        "file": "88-HEBarb-vd.usfm",
+        "sha256": "c1e9d55b688dfbec3b86f514c95e1922138ccddf1e6e72ee55208671deb6e0a9"
+      }
+    },
+    "JAS": {
+      "file": "JAS.json",
+      "bytes": 24732,
+      "sha256": "41dd596c78d493ad5f2924fb8523d3483969e96767e6f9ce2064d6a8d1d543c1",
+      "chapters": 5,
+      "verses": 108,
+      "usfm": {
+        "file": "89-JASarb-vd.usfm",
+        "sha256": "b02adfde1981bc07e1094cf6205fafe7d5829c66255d67346cfda7a58cba828b"
+      }
+    },
+    "1PE": {
+      "file": "1PE.json",
+      "bytes": 27468,
+      "sha256": "52b6a494ee25eed546eec263554aa77462f213144ee096ccab473cc88bc2720d",
+      "chapters": 5,
+      "verses": 105,
+      "usfm": {
+        "file": "90-1PEarb-vd.usfm",
+        "sha256": "95674a77ae84e585aefa99e4f6b139761e691ef738522baf387f90f540554320"
+      }
+    },
+    "2PE": {
+      "file": "2PE.json",
+      "bytes": 17369,
+      "sha256": "bd2d6973c2e8f57d2a044add9b99b091f67bdcef2d3b5a0c86ea5a0f7a55a138",
+      "chapters": 3,
+      "verses": 61,
+      "usfm": {
+        "file": "91-2PEarb-vd.usfm",
+        "sha256": "6ae6788ce85aa6acfe16ab587e93e44e25c581bd4587020a4dc4bb32a2cf21bc"
+      }
+    },
+    "1JN": {
+      "file": "1JN.json",
+      "bytes": 25971,
+      "sha256": "77ca069b5ea486ad745688bbdf26161eed7043eed64e2574a3b832402cb030ad",
+      "chapters": 5,
+      "verses": 105,
+      "usfm": {
+        "file": "92-1JNarb-vd.usfm",
+        "sha256": "a89cabf01664500bd457e7a4ddd388849f6b4969402cc9f1f08275ff0e89a3f6"
+      }
+    },
+    "2JN": {
+      "file": "2JN.json",
+      "bytes": 3427,
+      "sha256": "cfad83d63d001d594e98e83e9dd9b729d10384c353b3d6ce1e2bf9d5bbeb1ee1",
+      "chapters": 1,
+      "verses": 13,
+      "usfm": {
+        "file": "93-2JNarb-vd.usfm",
+        "sha256": "7fad0779feeec9c395e30bcb33f6e2774fbd221f459a34d71693450c4ebf6235"
+      }
+    },
+    "3JN": {
+      "file": "3JN.json",
+      "bytes": 3600,
+      "sha256": "3868aadaf84d7cceaf414b34303bf1d8b8a6e5ad4e3c382da269eea40c9eadcd",
+      "chapters": 1,
+      "verses": 15,
+      "usfm": {
+        "file": "94-3JNarb-vd.usfm",
+        "sha256": "ef9325dadc19b761cc6505db4d456bddf14c70e814d1d800bbb400a633e523bb"
+      }
+    },
+    "JUD": {
+      "file": "JUD.json",
+      "bytes": 7276,
+      "sha256": "56bbe9aee698ccddb8b7ebf54dae440dfbb913d58dafcee5b2e68ad7f991654d",
+      "chapters": 1,
+      "verses": 25,
+      "usfm": {
+        "file": "95-JUDarb-vd.usfm",
+        "sha256": "2237e17ae38b936150f3791d072197ad35ea9ad1ab7c7087851208f6207a77de"
+      }
+    },
+    "REV": {
+      "file": "REV.json",
+      "bytes": 119280,
+      "sha256": "b137434158b5f68438fd25d616bbf7aa6db5cbae7d9f9cf8b2c607452441f5e3",
+      "chapters": 22,
+      "verses": 404,
+      "usfm": {
+        "file": "96-REVarb-vd.usfm",
+        "sha256": "ad03e3facea6c09e8c318a662544efb0493275804fd7469f3f39db9fa5c146e6"
+      }
+    }
+  }
+}

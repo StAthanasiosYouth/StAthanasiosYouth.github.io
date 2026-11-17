@@ -28,6 +28,15 @@
         "4322"
       ],
       "port": 4322
+    },
+    {
+      "name": "bread-docs",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "docs/daily-bread/tools/static.mjs",
+        "4341"
+      ],
+      "port": 4341
     }
   ]
 }
