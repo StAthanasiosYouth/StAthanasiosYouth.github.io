@@ -55,7 +55,7 @@ async function readSite(env, fetchImpl, path, now) {
  */
 export async function shadowCheck(env, { now = Date.now(), fetchImpl = fetch, seed = false, settle = true } = {}) {
   const db = env.DB;
-  const jobs = await retry(() => db.prepare("SELECT COUNT(*) AS n, MAX(at) AS last FROM publish_jobs WHERE mode <> 'seed'").first());
+  const jobs = await retry(() => db.prepare("SELECT COUNT(*) AS n, MAX(at) AS last FROM publish_jobs WHERE mode NOT IN ('seed', 'bread')").first());
   if (!seed && !jobs.n) return { skipped: 'no publish posted yet' };
   if (settle && jobs.last && now - jobs.last < SETTLE_MS) return { skipped: 'a publish is settling' };
 
@@ -145,7 +145,7 @@ function isWithdrawn(text) {
 /* the gate: since when every run has been clean (seeded counts as clean: it is the starting point) */
 export async function shadowStatus(db, now = Date.now()) {
   const [jobs, last, dirty, first] = await Promise.all([
-    retry(() => db.prepare('SELECT id, mode, revision, state, files, changed, by, at FROM publish_jobs ORDER BY at DESC LIMIT 10').all()),
+    retry(() => db.prepare('SELECT id, mode, revision, state, files, changed, by, at FROM publish_jobs WHERE mode <> \'bread\' ORDER BY at DESC LIMIT 10').all()),
     retry(() => db.prepare('SELECT * FROM shadow_checks ORDER BY at DESC LIMIT 1').first()),
     retry(() => db.prepare('SELECT MAX(at) AS at FROM shadow_checks WHERE equal + seeded < total').first()),
     retry(() => db.prepare('SELECT MIN(at) AS at, COUNT(*) AS n FROM shadow_checks').first())

@@ -32,14 +32,17 @@ const CATALOG = {
   accounts: ['view', 'manage', 'rename'],
   activity: ['view', 'manage'],
   notifications: ['view', 'manage'],
-  system: ['view', 'manage']
+  system: ['view', 'manage'],
+  // «خبزنا اليومي» (docs/daily-bread/PLAN.md W3): the programs, the numbers, the members' reflections (sensitive)
+  bread: ['content', 'stats', 'reflections']
 };
 
 export const PERMS = Object.freeze(Object.entries(CATALOG).flatMap(([m, actions]) => actions.map(a => m + '.' + a)));
 const KNOWN = new Set(PERMS);
 
 /* Never granted by default: the Primary Admin's, until they grant them (§4.3; YOUTH-ACCOUNTS-PLAN §12.2). */
-export const PRIMARY_DEFAULT = Object.freeze(['accounts.manage', 'notifications.manage', 'participants.manage', 'activity.manage', 'accounts.rename']);
+// bread.reflections: decision 10 (2026-11-14) — the reflections are the Primary Admin's until they grant them
+export const PRIMARY_DEFAULT = Object.freeze(['accounts.manage', 'notifications.manage', 'participants.manage', 'activity.manage', 'accounts.rename', 'bread.reflections']);
 
 /* «الصلاحيات» presets: they only pre-fill the checkboxes (§4.3). perm → scope. */
 const views = PERMS.filter(p => p.endsWith('.view') && p !== 'accounts.view' && p !== 'notifications.view');
@@ -179,6 +182,17 @@ export const ROUTE_PERMS = Object.freeze({
   'POST /v1/admin/tools/migration': 'system.manage',
   'POST /v1/admin/tools/migrate': 'system.manage',
   'POST /v1/admin/tools/admins': 'accounts.view',
+  // «خبزنا اليومي» (bread/admin.js); the module / push switches inside the settings are the Primary Admin's
+  'GET /v1/admin/bread/programs': 'bread.content',
+  'POST /v1/admin/bread/programs': 'bread.content',
+  'POST /v1/admin/bread/programs/:id/topics': 'bread.content',
+  'POST /v1/admin/bread/programs/:id/activate': 'bread.content',
+  'POST /v1/admin/bread/programs/:id/stop': 'bread.content',
+  'POST /v1/admin/bread/programs/:id/delete': 'bread.content',
+  'GET /v1/admin/bread/stats': 'bread.stats',
+  'GET /v1/admin/bread/reflections': 'bread.reflections',
+  'GET /v1/admin/bread/settings': 'bread.content',
+  'POST /v1/admin/bread/settings': 'bread.content',
   'GET /v1/admin/comp/seasons': 'competitions.view',
   'GET /v1/admin/comp/:id/submissions': 'competitions.view',
   'GET /v1/admin/comp/submissions/:id': 'competitions.view',

@@ -20,6 +20,7 @@ import { cleanLabel } from '../admin/session.js';
 import { serviceAccount, accountProblem, PROBLEM_TEXT, accessToken, forgetAccessToken, model, fcmMessage, sendOne, checkKey } from './fcm.js';
 import { sources, messageFor, deadStmts, backoffMs, MAX_ATTEMPTS } from '../notify/claim.js';
 import { makeJob } from '../jobs.js';
+import { isBreadSend, personalize } from '../bread/notify.js';
 
 export const PART_SIZE = 45;
 export const RETRY_DELAY_S = 30;
@@ -118,7 +119,12 @@ export async function runPart(env, payload, doFetch = (...a) => fetch(...a), now
     } catch (err) {
       out.error = err && err.code === 'auth' ? 'auth' : 'token';
     }
-    const results = token ? await Promise.all(devices.map(d => sendOne(account, token, fcmMessage(d, m, send.ttl, now), doFetch))) : devices.map(() => 'auth');
+    // «خبزنا اليومي»: each device its own topic; one that read today gets nothing (bread/notify.js)
+    const own = isBreadSend(send.ref) ? await personalize(env, send.ref, devices, m) : null;
+    const results = !token ? devices.map(() => 'auth') : await Promise.all(devices.map(d => {
+      if (own && own.skip.has(d.id)) return 'ok';
+      return sendOne(account, token, fcmMessage(d, (own && own.messages.get(d.id)) || m, send.ttl, now), doFetch);
+    }));
     if (results.includes('auth')) {
       // the next round asks Google for a fresh token
       forgetAccessToken(account);
