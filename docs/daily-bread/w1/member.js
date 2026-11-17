@@ -5,7 +5,7 @@
  *   ?s=today      the reading page (default)
  *       &acct=none|eligible|guest   &refl=empty|typing|sent|edit|locked   &read=1   &t=<topic 0–6>
  *       &late=19 (a late joiner)    &look=dawn   &size=1–4   &plain=1 (no tashkeel)   &share=1   &signin=1
- *   ?s=reminders  «إشعاراتي»      &rem=off|on|denied|ios
+ *   ?s=reminders  «إعداداتي»      &rem=off|on|denied|ios
  *   ?s=empty      the program is over / no program yet
  *   ?s=notif      the notification on Android, iPhone and a computer
  *   &intro=1      play the intro first (&sound=a|b|off, &hold=<ms> freezes it for a screenshot)
@@ -32,7 +32,12 @@ const S = {
   plain: q.get('plain') === '1',
   size: q.get('size') || '2'
 };
-if (q.get('look')) html.dataset.look = q.get('look');
+/* the reading look (owner 2026-11-17): chosen inside the section, independent of the site's own colour, saved for the member.
+   W5: localStorage 'bread.look' for the first paint + the account's prefs (bread_look) when signed in, like the site's tint. */
+const LOOK_KEY = 'bread.look';
+const savedLook = () => { try { return localStorage.getItem(LOOK_KEY); } catch { return null; } };
+function setLook(v) { if (v === 'dawn') html.dataset.look = 'dawn'; else delete html.dataset.look; try { localStorage.setItem(LOOK_KEY, v === 'dawn' ? 'dawn' : 'night'); } catch { /* the page still works */ } }
+if (q.get('look')) { if (q.get('look') === 'dawn') html.dataset.look = 'dawn'; } else if (savedLook() === 'dawn') html.dataset.look = 'dawn';
 html.dataset.size = S.size;
 html.dataset.motion = q.get('motion') || 'full';
 html.dataset.tint = 'gold';
@@ -58,7 +63,7 @@ function topbar() {
     </a>
     <div class="topbar__actions">
       <button class="topbar__btn" type="button" aria-pressed="true" aria-label="أصوات الواجهة: شغالة">${bi('sound')}</button>
-      <a class="topbar__btn" href="?s=reminders" data-nav="reminders" aria-label="إشعاراتي">${bi('remind')}</a>
+      <a class="topbar__btn" href="?s=reminders" data-nav="reminders" aria-label="إعداداتي">${bi('remind')}</a>
       <a class="acct-badge topbar__btn" href="#" aria-label="حسابي"><span class="acct-badge__face">${S.acct === 'none' ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c1-4.4 4-6 8-6s7 1.6 8 6"></path></svg>' : `<b class="br-acct-i">${NAME[0]}</b>`}</span></a>
     </div>
   </div></header>`;
@@ -67,7 +72,7 @@ function topbar() {
 function tabbar(on) {
   const tab = (key, icon, word, href) => `<a class="tabbar__tab" href="${href}" data-tab="${key}" ${key === on ? 'aria-current="page"' : ''}>${icon}<span class="tabbar__word">${word}</span></a>`;
   return `<nav class="tabbar" aria-label="أقسام خبزنا اليومي"><span class="tabbar__lens" aria-hidden="true"></span><div class="tabbar__slots">
-    ${tab('today', bi('bread'), 'النهارده', '?s=today')}${tab('reminders', bi('remind'), 'إشعاراتي', '?s=reminders')}${tab('site', bi('home'), 'الموقع', '../../../index.html')}
+    ${tab('today', bi('bread'), 'النهارده', '?s=today')}${tab('reminders', bi('remind'), 'إعداداتي', '?s=reminders')}${tab('site', bi('home'), 'الموقع', '../../../index.html')}
   </div><a class="acct-badge tabbar__tab tabbar__fixed" href="#" data-tab="account"><span class="acct-badge__face">${S.acct === 'none' ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c1-4.4 4-6 8-6s7 1.6 8 6"></path></svg>' : `<b class="br-acct-i">${NAME[0]}</b>`}</span><span class="tabbar__word">حسابي</span></a></nav>`;
 }
 
@@ -186,7 +191,7 @@ function renderToday() {
   return `${topbar()}<main id="main">${dawn()}<div class="br-main"><div class="br-side" style="gap:16px">${late}${paper()}</div><div class="br-side">${meditation()}${question()}${done()}${remindTeaser()}</div></div>${signature()}</main>${tabbar('today')}`;
 }
 
-/* ---------------- «إشعاراتي» ---------------- */
+/* ---------------- «إعداداتي» ---------------- */
 
 function renderReminders() {
   const r = S.rem;
@@ -196,15 +201,24 @@ function renderReminders() {
   if (r === 'denied') body = `<p class="br-hint br-hint--warn">${si('alert')}<span><b>الإشعارات مقفولة من المتصفح.</b> افتح إعدادات الموقع في المتصفح (القفل جنب العنوان) ← الإشعارات ← اسمح، وبعدها ارجع هنا.</span></p>`;
   if (r === 'ios') body = `<p class="br-hint">${bi('phone')}<span><b>على iPhone:</b> الإشعارات بتشتغل بس لما الموقع يبقى على الشاشة الرئيسية. دوس زرار المشاركة ⬆︎ ← «إضافة إلى الشاشة الرئيسية»، وافتحه من هناك.</span></p>`;
   return `${topbar()}<main id="main" class="br-sheet-page">
-    <div class="br-h1"><span class="br-remind__ic">${bi('remind')}</span><div><h1>إشعاراتي</h1><p>كلمة النهارده توصلك في الميعاد اللي يناسبك.</p></div></div>
+    <div class="br-h1"><span class="br-remind__ic">${bi('remind')}</span><div><h1>إعداداتي</h1><p>إشعارات «خبزنا اليومي» وشكل القراءة. بتوعك إنت بس.</p></div></div>
     <section class="widget br-card"><div class="br-remind"><div><b>فكّرني كل يوم</b><small>${r === 'on' ? 'شغالة على الجهاز ده' : r === 'denied' ? 'محتاجة إذن من المتصفح' : 'مقفولة دلوقتي'}</small></div><button class="br-switch" role="switch" aria-checked="${r === 'on'}" aria-label="فكّرني كل يوم"></button></div>
       ${body}
       ${r === 'on' ? `<div class="br-times">${times.map(t => `<div class="br-time"><span class="br-time__clock">${si('clock')}</span><div><b>${t[0]} <small style="display:inline;font-size:.9rem">${t[1]}</small></b><small>${t[2]}</small></div><button class="br-time__x" type="button" aria-label="شيل الميعاد ده">${si('close')}</button></div>`).join('')}
         <button class="br-add" type="button">${bi('plus')}ضيف ميعاد (لحد ٣)</button></div>` : ''}
       ${r === 'off' ? `<p class="br-hint" style="margin-top:14px">${si('info')}<span>لما تشغّلها، المتصفح هيسألك مرة واحدة تسمح بالإشعارات. الافتراضي ٨:٠٠ الصبح بتوقيت مصر.</span></p>` : ''}
     </section>
+    ${lookCard()}
     <section class="widget br-card"><h2 class="br-kicker">${bi('remind')}شكل الإشعار</h2>${notif}<p class="br-hint" style="margin-top:12px">${si('info')}<span>كل يوم: عنوان موضوعك إنت وأول الآية. لو قريت قبل الميعاد التاني، مش هنفكّرك تاني في نفس اليوم.</span></p></section>
   </main>${tabbar('reminders')}`;
+}
+
+function lookCard() {
+  const dawnOn = html.dataset.look === 'dawn';
+  const opt = (k, name, hint, on) => `<button class="br-look" type="button" role="radio" aria-checked="${on}" data-act="look-${k}"><span class="br-look__pv br-look__pv--${k}" aria-hidden="true"><i></i><b></b><em></em><em></em><em></em></span><span class="br-look__txt"><b>${name}</b><small>${hint}</small></span><span class="br-look__dot" aria-hidden="true"></span></button>`;
+  return `<section class="widget br-card"><h2 class="br-kicker">${bi('sun')}شكل القراءة</h2>
+    <div class="br-looks" role="radiogroup" aria-label="شكل القراءة">${opt('night', 'كحلي + ورق', 'الافتراضي: هادي بالليل، والقراءة على ورقة', !dawnOn)}${opt('dawn', 'الفجر', 'فاتح ودافي، مريح الصبح وفي الشمس', dawnOn)}</div>
+    <p class="br-hint" style="margin-top:12px">${si('info')}<span>بيتحفظ لك: على الجهاز ده، ولو داخل بحسابك بيمشي معاك على أي جهاز. مستقل عن «لون الموقع». تقدر تبدّله كمان من زرار ☀︎ جوه القراءة.</span></p></section>`;
 }
 
 /* ---------------- the program is over ---------------- */
@@ -285,7 +299,8 @@ app.addEventListener('click', e => {
   const act = a.dataset.act;
   if (act === 'bigger' || act === 'smaller') { const n = Math.max(1, Math.min(4, +html.dataset.size + (act === 'bigger' ? 1 : -1))); html.dataset.size = n; q.set('size', n); history.replaceState(null, '', '?' + q); }
   if (act === 'plain') { S.plain = !S.plain; q.set('plain', S.plain ? '1' : '0'); history.replaceState(null, '', '?' + q); render(); }
-  if (act === 'look') { if (html.dataset.look === 'dawn') delete html.dataset.look; else html.dataset.look = 'dawn'; render(); }
+  if (act === 'look') { setLook(html.dataset.look === 'dawn' ? 'night' : 'dawn'); render(); toast(html.dataset.look === 'dawn' ? 'شكل الفجر ☀︎ — اتحفظ' : 'كحلي + ورق 🌙 — اتحفظ'); }
+  if (act === 'look-night' || act === 'look-dawn') { setLook(act === 'look-dawn' ? 'dawn' : 'night'); render(); toast('اتحفظ ✓'); }
   if (act === 'share') go({ share: '1' });
   if (act === 'copy') toast('اتنسخت الآية ✓');
   if (act === 'close') go({ share: null, signin: null });

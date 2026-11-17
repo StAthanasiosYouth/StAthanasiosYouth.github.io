@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>لوجو الأسرة — تجربة التحويل لفيكتور (W1)</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="../../../../../assets/css/main.css">
+<link rel="stylesheet" href="../../review.css">
+<style>
+  body { background: var(--ink); color: var(--text); }
+  .two { display: grid; gap: 16px; }
+  @media (min-width: 900px) { .two { grid-template-columns: 1fr 1fr; } }
+  .two figure { margin: 0; text-align: center; }
+  .two figcaption { margin-top: 8px; font-weight: 800; color: var(--gold-hi); }
+  .two img { width: 100%; max-width: 560px; }
+  .ok { color: #5ad7a0; } .no { color: #ff8a7d; } .mid { color: #f5c56b; }
+  .rv table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  .rv td, .rv th { padding: 9px 10px; border-bottom: 1px solid var(--gold-line); text-align: start; vertical-align: top; color: var(--text-2); line-height: 1.7; }
+  .rv th { color: var(--gold-hi); }
+</style>
+</head>
+<body>
+<main class="rv">
+  <header>
+    <h1>لوجو الأسرة — تجربة التحويل لفيكتور</h1>
+    <p class="rv-lead">من أكبر نسخة أصلية في المشروع (<code>tools/source/logo.png</code>، ٨٤٨ × ٨٥٨). كل شكل متتبَّع من البكسلات نفسها، من غير ما يترسم حاجة من جديد ولا يتغير لون. اتعمل بسكريبت على الجهاز (<code>w1/tools/vectorize-family.mjs</code>)، ومفيش أي برنامج اتنزّل. <b>لسه مش معتمد ولا متركّب في اللوجو ب:</b> مستني قرارك.</p>
+  </header>
+
+  <section class="widget rv-fig">
+    <header><b>اللوجو كله</b></header>
+    <div class="two">
+      <figure><img id="svg" alt="الفيكتور"><figcaption>الفيكتور (SVG)</figcaption></figure>
+      <figure><img src="../../../../../tools/source/logo.png" alt="الأصل"><figcaption>الأصل (PNG)</figcaption></figure>
+    </div>
+    <p>الملف: <a href="family-logo.svgz" style="color:var(--gold-hi)">family-logo.svgz</a> (SVG مضغوط، ≈ ٦ ميجا، Illustrator بيفتحه على طول). ٥٦ لون مسطّح، كل لون مسار واحد باسمه (<code>c01</code> … <code>c56</code>)، وكل لون بيغطي اللي فوقه علشان مفيش فتحات بينهم.</p>
+  </section>
+
+  <section class="widget rv-fig">
+    <header><b>تكبير على أصعب الأجزاء (يمين: الأصل · شمال: الفيكتور)</b></header>
+    <p>الوش · الكتابة على الحلقة · الاسم اليوناني · الفارس والحصان · الريشة والدواية.</p>
+    <img src="compare.webp" alt="مقارنة مكبّرة" style="width:100%;max-width:1260px;border-radius:14px">
+  </section>
+
+  <section class="widget rv-fig">
+    <header><b>إيه اللي اتحوّل بدقة، وإيه لأ</b></header>
+    <table>
+      <tr><th>الجزء</th><th>النتيجة</th></tr>
+      <tr><td>الدايرة الكحلي، الحلقة الدهبي، الصليبين، الأرض الصفرا، البرج والصليب اللي فوقه، الدواية</td><td class="ok">✓ بدقة. أشكال مسطّحة وحوافها نضيفة.</td></tr>
+      <tr><td>الاسم اليوناني ΑΒΒΑ ΑΘΑΝΑCΙΟC، الصليب على الدرج، الهالات</td><td class="ok">✓ مقروء وشكله زي الأصل.</td></tr>
+      <tr><td>الكتابة العربي على الحلقة (شكل الحروف)</td><td class="mid">≈ الحروف نفسها سليمة ومقروءة.</td></tr>
+      <tr><td><b>التشقّقات جوه الحروف</b> (الخطوط الرفيعة اللي مقسّمة الحروف قطع)</td><td class="no">✗ مش بتتحول: عرضها بكسل واحد في الأصل، فبتختفي أو بتبقى بقع. الحروف بتطلع مصمتة.</td></tr>
+      <tr><td><b>التظليل الناعم</b> (الوش، الدقن، الرداء الأحمر، الحصان، الريشة)</td><td class="no">✗ التدرّج بيتحول درجات لون مسطّحة جنب بعض (شكل «قص ولزق»)، مش ناعم زي الأصل. باين لما تكبّر.</td></tr>
+      <tr><td>تفاصيل صغيرة جدًا (عيون الفارس، سيور اللجام، طرف السيف)</td><td class="mid">≈ موجودة بس أخشن من الأصل.</td></tr>
+    </table>
+    <p>القياس: الفرق المتوسط في اللون <b data-k="meanDeltaE"></b> (ΔE)، و<b data-k="over10"></b> من البكسلات فرقها باين (أكتر من ١٠). <a href="difference.png" style="color:var(--gold-hi)">خريطة الفرق</a> بتبيّن إن الفرق كله تقريبًا على الحواف بعرض بكسل، والمساحات نفسها مطابقة.</p>
+  </section>
+
+  <section class="widget rv-fig">
+    <header><b>رأيي، والاختيارات</b></header>
+    <ol class="rv-decide">
+      <li><b>جوه الختم في اللوجو ب (المقترح):</b> الختم مقاسه صغير جدًا (≈ ٨٪ من اللوجو)، وفي المقاس ده الفيكتور والأصل مش بيتفرقوا بالعين. يبقى نركّب الفيكتور هناك، واللوجو ب يبقى فيكتور ١٠٠٪، من غير ولا صورة.</li>
+      <li><b>لوجو الأسرة لوحده بمقاس كبير</b> (بوستر، لافتة): الفيكتور ده مش بديل للأصل، علشان التشقّقات والتظليل. الأصل PNG يفضل هو المرجع لحد ما يبقى فيه نسخة متظبطة.</li>
+      <li><b>لو عايز فيكتور كبير مطابق بجد:</b> اللوحة دي مرسومة بإيد، فمفيش تحويل أوتوماتيك هيطلّع التشقّقات والتظليل زي الأصل. الحل الوحيد إن مصمم يعيد رسمها في Illustrator فوق النسخة دي كأساس. ده شغل يدوي، فمحتاج قرارك.</li>
+      <li><b>تجربة برنامج تحويل تاني:</b> فيه برنامج مفتوح المصدر اسمه vtracer، محتاج تنزيل (بستأذنك قبلها). غالبًا هيدّي حواف أنعم وملف أصغر، بس هيقف عند نفس الحدود دي.</li>
+    </ol>
+  </section>
+</main>
+<script>
+  // the SVG is large: load it after the page
+  fetch('compare.json').then(r => r.json()).then(s => document.querySelectorAll('[data-k]').forEach(n => { n.textContent = String(s[n.dataset.k]).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]).replace('.', '٫'); }));
+  // the committed file is the gzipped SVG (the raw 18 MB SVG stays out of git): unzip it here
+  fetch('family-logo.svgz').then(r => new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).blob()).then(b => { document.getElementById('svg').src = URL.createObjectURL(new Blob([b], { type: 'image/svg+xml' })); });
+</script>
+</body>
+</html>

@@ -803,3 +803,24 @@ html[data-motion="lite"].br-arrive * { filter: none !important; }
 :root[data-look="dawn"] .br-dawn__hills .h2 { fill: #c79a7a; opacity: .7; }
 :root[data-look="dawn"] .br-dawn__hills .h3 { fill: #f6ebd5; }
 #reflect { scroll-margin-top: 80px; }
+
+/* «شكل القراءة» inside the section's own settings (owner 2026-11-17): two looks, saved for the member */
+.br-looks { display: grid; gap: 10px; }
+@media (min-width: 560px) { .br-looks { grid-template-columns: 1fr 1fr; } }
+.br-look { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px 10px 14px; border: 1.5px solid var(--gold-line); border-radius: 18px; text-align: start; font: inherit; color: inherit; background: rgba(255, 255, 255, .025); cursor: pointer; }
+.br-look[aria-checked="true"] { border-color: var(--gold); background: rgba(var(--gold-rgb), .1); box-shadow: 0 0 0 4px rgba(var(--gold-rgb), .12); }
+.br-look__txt { flex: 1; min-width: 0; }
+.br-look__txt b { display: block; font-weight: 800; }
+.br-look__txt small { display: block; font-size: .78rem; line-height: 1.5; color: var(--text-2); }
+.br-look__dot { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--gold-line-strong); display: grid; place-items: center; }
+.br-look[aria-checked="true"] .br-look__dot { border-color: var(--gold); }
+.br-look[aria-checked="true"] .br-look__dot::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--gold); }
+/* a tiny page: sky, title, paper lines */
+.br-look__pv { flex: none; position: relative; width: 58px; height: 72px; overflow: hidden; border-radius: 12px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .25); }
+.br-look__pv--night { background: linear-gradient(180deg, #0b2a4c, #3c4f7a 46%, #c98a5a 62%, #020914 62%); }
+.br-look__pv--dawn { background: linear-gradient(180deg, #8fa6c8, #e9b98e 46%, #fbe6b4 62%, #f6ebd5 62%); }
+.br-look__pv i { position: absolute; left: 14px; right: 14px; top: 12px; height: 5px; border-radius: 3px; background: #f2d28b; }
+.br-look__pv--dawn i { background: #6e1f24; }
+.br-look__pv b { position: absolute; left: 7px; right: 7px; top: 38px; bottom: 0; border-radius: 6px 6px 0 0; background: #fbf3e2; }
+.br-look__pv em { position: absolute; left: 13px; right: 13px; height: 2px; border-radius: 2px; background: rgba(110, 31, 36, .35); }
+.br-look__pv em:nth-of-type(1) { top: 48px; } .br-look__pv em:nth-of-type(2) { top: 55px; } .br-look__pv em:nth-of-type(3) { top: 62px; right: 24px; }
