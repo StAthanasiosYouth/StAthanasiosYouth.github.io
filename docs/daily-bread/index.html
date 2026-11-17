@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>خبزنا اليومي — النسخة التجريبية للمراجعة</title>
+<meta name="robots" content="noindex">
+<style>
+  @font-face { font-family: 'Cairo'; font-weight: 200 900; src: url('../../assets/fonts/cairo-arabic.woff2') format('woff2'); }
+  @font-face { font-family: 'Cairo'; font-weight: 200 900; src: url('../../assets/fonts/cairo-latin.woff2') format('woff2'); unicode-range: U+0000-00FF; }
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Cairo', sans-serif; background: #01060e; color: #f3f6fb; display: grid; grid-template-columns: 320px 1fr; height: 100dvh; }
+  aside { overflow: auto; padding: 18px; border-inline-end: 1px solid rgb(242 210 139 / .14); background: #04101f; }
+  aside header { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
+  aside header img { width: 44px; height: 44px; }
+  aside header b { display: block; font-size: 18px; color: #f2d28b; }
+  aside header small { color: #8798ae; font-size: 12px; }
+  h4 { margin: 16px 0 6px; font-size: 12px; color: #8798ae; font-weight: 700; }
+  .opts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .opts button { border: 1px solid rgb(255 255 255 / .1); background: rgb(14 40 74 / .5); color: #b9c5d6; border-radius: 10px; padding: 6px 10px; font: 600 13px 'Cairo', sans-serif; cursor: pointer; }
+  .opts button.on { background: linear-gradient(180deg, #f1ce82, #d2a148); color: #1b1306; border-color: transparent; }
+  .links a { display: block; color: #f2d28b; font-size: 14px; margin: 6px 0; }
+  .hint { font-size: 12px; color: #8798ae; line-height: 1.6; }
+  main { display: grid; place-items: center; overflow: auto; padding: 20px; background: radial-gradient(60% 50% at 50% 30%, #0b1d36, #01060e); }
+  .frame { border: 0; background: #020914; box-shadow: 0 30px 80px -30px #000; transition: width .4s, height .4s; }
+  .frame.phone { width: 390px; height: 844px; border-radius: 44px; outline: 10px solid #111823; }
+  .frame.desk { width: min(1440px, 100%); height: min(900px, calc(100dvh - 40px)); border-radius: 14px; }
+  @media (max-width: 860px) { body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; } aside { max-height: 46vh; } .frame.phone { width: 100%; height: 80vh; outline: 0; border-radius: 0; } }
+</style>
+</head>
+<body>
+<aside>
+  <header><img src="logo/mark-c.svg" alt=""><div><b>خبزنا اليومي</b><small>نسخة للتجربة · مفيش حاجة بتتحفظ أو تتبعت</small></div></header>
+  <h4>المخدوم</h4>
+  <div class="opts" data-k="screen">
+    <button data-v="app:notif">الإشعار</button><button data-v="app:intro">الانترو</button><button data-v="app:today" class="on">قراءة النهارده</button>
+    <button data-v="app:settings">إشعاراتي</button><button data-v="app:late">مشترك متأخر</button><button data-v="app:empty">المحتوى خلص</button>
+  </div>
+  <h4>الأدمن</h4>
+  <div class="opts" data-k="screen">
+    <button data-v="admin:programs">البرامج</button><button data-v="admin:upload">رفع Excel</button><button data-v="admin:stats">الإحصائيات</button>
+    <button data-v="admin:reflections">التأملات</button><button data-v="admin:settings">الإعدادات</button>
+  </div>
+  <h4>الجهاز</h4>
+  <div class="opts" data-k="device"><button data-v="phone" class="on">موبايل</button><button data-v="desk">كمبيوتر</button></div>
+  <h4>الشكل (للمخدوم)</h4>
+  <div class="opts" data-k="look"><button data-v="navy" class="on">أ · كحلي الأسرة</button><button data-v="parchment">ب · كحلي + ورق</button><button data-v="dawn">ج · الفجر (فاتح)</button></div>
+  <h4>الحساب</h4>
+  <div class="opts" data-k="acct"><button data-v="none" class="on">من غير حساب</button><button data-v="eligible">مؤهل</button><button data-v="guest">ضيف (خارج السن)</button></div>
+  <h4>التأمل</h4>
+  <div class="opts" data-k="post"><button data-v="none" class="on">لسه مكتبش</button><button data-v="fresh">اتبعت من دقايق</button><button data-v="locked">عدّى ٢٠ دقيقة</button></div>
+  <h4>تنبيه الأدمن</h4>
+  <div class="opts" data-k="alert"><button data-v="7">فاضل ٧</button><button data-v="3" class="on">فاضل ٣</button><button data-v="1">فاضل ١</button><button data-v="out">المحتوى خلص</button><button data-v="none">مفيش</button></div>
+  <h4>صلاحية التأملات</h4>
+  <div class="opts" data-k="perm"><button data-v="1" class="on">معاه</button><button data-v="0">مش معاه</button></div>
+  <h4>روابط</h4>
+  <div class="links"><a href="gallery.html" target="_blank">معرض الصور (موبايل + كمبيوتر) ↗</a><a href="logo/index.html" target="_blank">مقترحات اللوجو ↗</a><a href="template/khobzna-template.xlsx">نموذج Excel ↗</a></div>
+  <p class="hint">الانترو بيشتغل بالصوت لو المتصفح سمح، وإلا بيكمّل من غير صوت ومن غير ما يوقّف حاجة. اضغط «الانترو» تاني علشان تعيده.</p>
+</aside>
+<main><iframe class="frame phone" id="f" title="المعاينة"></iframe></main>
+<script>
+  const st = { screen: 'app:today', device: 'phone', look: 'navy', acct: 'none', post: 'none', alert: '3', perm: '1' };
+  const f = document.getElementById('f');
+  function go() {
+    const [page, s] = st.screen.split(':');
+    const p = new URLSearchParams({ s, look: st.look, acct: st.acct, post: st.post, alert: st.alert, perm: st.perm, t: '0' });
+    f.src = `prototype/${page}.html?${p}`;
+    f.className = 'frame ' + st.device;
+  }
+  document.querySelectorAll('.opts').forEach(g => g.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const k = g.dataset.k;
+    document.querySelectorAll(`.opts[data-k="${k}"] button`).forEach(x => x.classList.toggle('on', x === b));
+    st[k] = b.dataset.v; go();
+  }));
+  go();
+</script>
+</body>
+</html>

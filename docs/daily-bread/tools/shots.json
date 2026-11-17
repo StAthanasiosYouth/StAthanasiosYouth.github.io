@@ -1,0 +1,303 @@
+[
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=notif",
+  "out": "docs/daily-bread/shots/01-notif-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=notif",
+  "out": "docs/daily-bread/shots/01-notif-d.png",
+  "w": 1440,
+  "h": 900,
+  "dpr": 1,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=intro&hold=500",
+  "out": "docs/daily-bread/shots/02-intro-1-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 500
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=intro&hold=1300",
+  "out": "docs/daily-bread/shots/02-intro-2-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 500
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=intro&hold=2600",
+  "out": "docs/daily-bread/shots/02-intro-3-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 500
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=intro&hold=2600",
+  "out": "docs/daily-bread/shots/02-intro-d.png",
+  "w": 1440,
+  "h": 900,
+  "dpr": 1,
+  "wait": 500
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=intro&look=dawn&hold=2600",
+  "out": "docs/daily-bread/shots/02-intro-dawn-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 500
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=today",
+  "out": "docs/daily-bread/shots/03-today-navy-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=today&look=parchment&focus=reading",
+  "out": "docs/daily-bread/shots/03-today-parchment-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=today&look=dawn",
+  "out": "docs/daily-bread/shots/03-today-dawn-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=today",
+  "out": "docs/daily-bread/shots/03-today-navy-d.png",
+  "w": 1440,
+  "h": 900,
+  "dpr": 1,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=today&look=parchment",
+  "out": "docs/daily-bread/shots/03-today-parchment-d.png",
+  "w": 1440,
+  "h": 900,
+  "dpr": 1,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=today&look=dawn",
+  "out": "docs/daily-bread/shots/03-today-dawn-d.png",
+  "w": 1440,
+  "h": 900,
+  "dpr": 1,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=today&focus=question",
+  "out": "docs/daily-bread/shots/04-question-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=today&focus=reflect",
+  "out": "docs/daily-bread/shots/05-reflect-none-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=today&acct=eligible&focus=reflect",
+  "out": "docs/daily-bread/shots/05-reflect-eligible-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=today&acct=guest&focus=reflect",
+  "out": "docs/daily-bread/shots/05-reflect-guest-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=today&acct=eligible&post=fresh&focus=reflect",
+  "out": "docs/daily-bread/shots/05-reflect-fresh-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=today&acct=eligible&post=locked&focus=reflect",
+  "out": "docs/daily-bread/shots/05-reflect-locked-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=settings",
+  "out": "docs/daily-bread/shots/06-settings-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=late",
+  "out": "docs/daily-bread/shots/07-late-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/app.html?t=0&s=empty",
+  "out": "docs/daily-bread/shots/07-empty-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/admin.html?s=programs&alert=3",
+  "out": "docs/daily-bread/shots/10-admin-programs-d.png",
+  "w": 1440,
+  "h": 900,
+  "dpr": 1,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/admin.html?s=programs&alert=out",
+  "out": "docs/daily-bread/shots/10-admin-programs-out-d.png",
+  "w": 1440,
+  "h": 900,
+  "dpr": 1,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/admin.html?s=upload&step=1",
+  "out": "docs/daily-bread/shots/11-admin-upload-1-d.png",
+  "w": 1440,
+  "h": 900,
+  "dpr": 1,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/admin.html?s=upload&step=3",
+  "out": "docs/daily-bread/shots/11-admin-upload-3-d.png",
+  "w": 1440,
+  "h": 900,
+  "dpr": 1,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/admin.html?s=upload&step=4",
+  "out": "docs/daily-bread/shots/11-admin-upload-4-d.png",
+  "w": 1440,
+  "h": 900,
+  "dpr": 1,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/admin.html?s=stats",
+  "out": "docs/daily-bread/shots/12-admin-stats-d.png",
+  "w": 1440,
+  "h": 900,
+  "dpr": 1,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/admin.html?s=reflections",
+  "out": "docs/daily-bread/shots/13-admin-reflections-d.png",
+  "w": 1440,
+  "h": 900,
+  "dpr": 1,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/admin.html?s=settings",
+  "out": "docs/daily-bread/shots/14-admin-settings-d.png",
+  "w": 1440,
+  "h": 900,
+  "dpr": 1,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/admin.html?s=programs&alert=7",
+  "out": "docs/daily-bread/shots/10-admin-programs-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/admin.html?s=upload&step=3",
+  "out": "docs/daily-bread/shots/11-admin-upload-3-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/admin.html?s=stats",
+  "out": "docs/daily-bread/shots/12-admin-stats-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/prototype/admin.html?s=reflections",
+  "out": "docs/daily-bread/shots/13-admin-reflections-m.png",
+  "w": 390,
+  "h": 844,
+  "dpr": 2,
+  "mobile": true,
+  "wait": 1400
+ },
+ {
+  "url": "docs/daily-bread/logo/index.html",
+  "out": "docs/daily-bread/shots/00-logos-d.png",
+  "w": 1440,
+  "h": 900,
+  "wait": 1200,
+  "full": true
+ }
+]
