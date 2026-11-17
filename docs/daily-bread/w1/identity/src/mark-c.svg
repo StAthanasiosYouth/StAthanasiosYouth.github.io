@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512" width="512" height="512">
+  <title>خبزنا اليومي — العلامة</title>
+  <rect id="tile" width="512" height="512" rx="112" fill="#0b2a4c"/><g id="mark" transform="translate(0 -24)">
+    <defs>
+      <linearGradient id="mSky" x1="0" y1="112" x2="0" y2="440" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#0b2a4c"/><stop offset=".42" stop-color="#3c4f7a"/><stop offset=".68" stop-color="#c98a5a"/><stop offset=".84" stop-color="#f2c47a"/><stop offset="1" stop-color="#f7dc9b"/></linearGradient>
+      <radialGradient id="mSun" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fffbe8"/><stop offset=".25" stop-color="#ffe7a6" stop-opacity=".95"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient>
+      <linearGradient id="mGilt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2d28b"/><stop offset="1" stop-color="#8c6423"/></linearGradient>
+      <linearGradient id="mRing" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f2d28b"/><stop offset=".5" stop-color="#d7aa50"/><stop offset="1" stop-color="#8c6423"/></linearGradient>
+      <linearGradient id="mGround" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c79a5c"/><stop offset="1" stop-color="#8a6236"/></linearGradient>
+      <clipPath id="mWindow"><path d="M140,448 V240 A116,116 0 0 1 372,240 V448 Z"/></clipPath>
+    </defs>
+    <g id="window" clip-path="url(#mWindow)">
+      <rect id="sky" x="100" y="100" width="312" height="360" fill="url(#mSky)"/>
+      <path id="rays" d="M216.1,333.5 L-2.4,306.9 L216.5,329.5 Z M217.6,324.7 L10.6,250.1 L219,320.9 Z M221.1,316.4 L35.9,197.7 L223.2,313.1 Z M226.3,309.2 L72.2,152.2 L229.2,306.3 Z M233.1,303.2 L117.7,115.9 L236.4,301.1 Z M240.9,299 L170.1,90.6 L244.7,297.6 Z M249.5,296.5 L226.9,77.6 L253.5,296.1 Z M258.5,296.1 L285.1,77.6 L262.5,296.5 Z M267.3,297.6 L341.9,90.6 L271.1,299 Z M275.6,301.1 L394.3,115.9 L278.9,303.2 Z M282.8,306.3 L439.8,152.2 L285.7,309.2 Z M288.8,313.1 L476.1,197.7 L290.9,316.4 Z M293,320.9 L501.4,250.1 L294.4,324.7 Z M295.5,329.5 L514.4,306.9 L295.9,333.5 Z " fill="#fff3cf" opacity="0.22"/>
+      <circle id="sun-disc" cx="256" cy="336" r="170" fill="url(#mSun)"/>
+      <path id="hills" d="M100,352 C150,334 200,340 236,348 C290,330 340,334 412,350 V460 H100 Z" fill="#5d5a73" opacity=".55"/>
+      <path id="table" d="M100,404 C180,394 332,394 412,404 V460 H100 Z" fill="url(#mGround)"/>
+    </g>
+    <g id="arch" fill="none" stroke-linejoin="round">
+      <path d="M128,448 V240 A128,128 0 0 1 384,240 V448" stroke="url(#mRing)" stroke-width="13"/>
+      <path d="M146,448 V240 A110,110 0 0 1 366,240 V448" stroke="#d7aa50" stroke-width="3" opacity=".7"/>
+    </g>
+    <g fill="#f2d28b" id="cross"><path d="M241.9,168 H270.1 V197.9 H300 V226.1 H270.1 V256 H241.9 V226.1 H212 V197.9 H241.9 Z"/><circle cx="242.6" cy="168" r="7.5"/><circle cx="256" cy="161.3" r="7.5"/><circle cx="269.4" cy="168" r="7.5"/><circle cx="300" cy="198.6" r="7.5"/><circle cx="306.7" cy="212" r="7.5"/><circle cx="300" cy="225.4" r="7.5"/><circle cx="269.4" cy="256" r="7.5"/><circle cx="256" cy="262.7" r="7.5"/><circle cx="242.6" cy="256" r="7.5"/><circle cx="212" cy="225.4" r="7.5"/><circle cx="205.3" cy="212" r="7.5"/><circle cx="212" cy="198.6" r="7.5"/></g>
+    <g id="book" transform="translate(56 92) scale(.4)">
+    <path id="book-cover" d="M500,668 C420,630 300,628 214,652 L200,790 C300,770 420,778 500,812 C580,778 700,770 800,790 L786,652 C700,628 580,630 500,668 Z" fill="#6e1f24"/>
+    <path id="book-gilt" d="M500,652 C424,616 312,612 228,636 L216,774 C312,754 424,760 500,796 C576,760 688,754 784,774 L772,636 C688,612 576,616 500,652 Z" fill="url(#mGilt)"/>
+    <path id="page-left" d="M500,640 C426,600 320,596 240,620 L230,758 C320,738 426,744 500,782 Z" fill="#fbf3e2"/>
+    <path id="page-right" d="M500,640 C574,600 680,596 760,620 L770,758 C680,738 574,744 500,782 Z" fill="#fbf3e2"/>
+    <path id="page-shade" d="M500,640 C490,700 492,740 500,782 C508,740 510,700 500,640 Z" fill="#000" opacity=".14"/>
+    <g id="page-lines" stroke="#c9b48a" stroke-width="6" fill="none" stroke-linecap="round" opacity=".85"><path d="M470,668 C430,650 350,646 282,660"/><path d="M530,668 C570,650 650,646 718,660"/><path d="M470,681 C430,663 350,659 282,673"/><path d="M530,681 C570,663 650,659 718,673"/><path d="M470,694 C430,676 350,672 282,686"/><path d="M530,694 C570,676 650,672 718,686"/><path d="M470,707 C430,689 350,685 282,699"/><path d="M530,707 C570,689 650,685 718,699"/><path d="M470,720 C430,702 350,698 282,712"/><path d="M530,720 C570,702 650,698 718,712"/><path d="M470,733 C430,715 350,711 282,725"/><path d="M530,733 C570,715 650,711 718,725"/><path d="M470,746 C430,728 350,724 282,738"/><path d="M530,746 C570,728 650,724 718,738"/></g>
+    <path id="ribbon" d="M506,650 L520,842 L510,830 L498,846 L494,652 Z" fill="#c8433a"/></g></g>
+</svg>

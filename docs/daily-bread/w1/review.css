@@ -1,0 +1,50 @@
+/* review-only helpers (the lab panel, the gallery frames): NOT part of the design layer */
+.w1-lab { position: fixed; z-index: 200; inset: auto auto 96px 12px; width: min(330px, calc(100% - 24px)); display: grid; gap: 8px; padding: 12px; border-radius: 16px; font: 600 12px/1.5 Cairo, sans-serif; color: #e8edf5; background: rgba(4, 14, 28, .92); border: 1px dashed rgba(242, 210, 139, .5); box-shadow: 0 20px 50px -20px #000; }
+.w1-lab b { color: #f2d28b; }
+.w1-lab__row { display: flex; flex-wrap: wrap; gap: 6px; }
+.w1-lab button, .w1-lab a { padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(242, 210, 139, .3); background: rgba(255, 255, 255, .04); color: inherit; font: inherit; text-decoration: none; cursor: pointer; }
+.w1-lab [aria-pressed="true"] { background: #d7aa50; color: #1b1306; }
+@media (min-width: 980px) { .w1-lab { inset: auto auto 18px 18px; } }
+
+/* ---------- W1 review pages: hub, gallery, CHANGES (not part of the design layer) ---------- */
+.rv { width: min(100% - 32px, 1320px); margin: 0 auto; padding: 34px 0 70px; display: grid; gap: 26px; }
+.rv h1 { font-family: var(--font-display); font-size: clamp(2rem, 5vw, 3.1rem); color: var(--gold-hi); line-height: 1.25; }
+.rv h2.rv-g { font-family: var(--font-display); font-size: 1.8rem; color: var(--gold-hi); margin-top: 10px; }
+.rv-lead { color: var(--text-2); max-width: 900px; line-height: 1.9; }
+.rv-links { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+.rv-link { display: grid; gap: 4px; padding: 18px; color: inherit; text-decoration: none; }
+.rv-link b { font-size: 1.05rem; color: var(--gold-hi); }
+.rv-link small { color: var(--text-2); line-height: 1.7; }
+.rv-link code, .rv code { direction: ltr; unicode-bidi: isolate; font-size: .8em; color: var(--gold-soft); }
+.rv-fig { display: grid; gap: 12px; padding: 18px; }
+.rv-fig header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.rv-fig header b { font-size: 1.1rem; }
+.rv-fig header a { font-size: .82rem; font-weight: 700; color: var(--gold-hi); }
+.rv-fig header code { font-size: .74rem; color: var(--text-3); }
+.rv-fig p { font-size: .92rem; line-height: 1.85; color: var(--text-2); }
+.rv-fig p b { color: var(--text); }
+.rv-shots { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.rv-shots a { display: block; border-radius: 14px; overflow: hidden; box-shadow: 0 0 0 1px rgba(var(--gold-hi-rgb), .16), 0 18px 40px -24px #000; }
+.rv-shots img { display: block; height: auto; }
+.rv-shots .m img { width: 240px; }
+.rv-shots .d img { width: min(760px, 100%); }
+.rv-shots .s img { width: 340px; }
+.rv-shots .m { max-height: 520px; overflow: hidden; }
+.rv-pair { display: grid; gap: 14px; }
+@media (min-width: 1000px) { .rv-pair { grid-template-columns: 1fr 1fr; } }
+.rv-col h3 { font-size: .85rem; font-weight: 800; margin-bottom: 8px; color: var(--text-3); }
+.rv-col--new h3 { color: var(--gold-hi); }
+.rv-col .rv-shots .d img { width: 100%; }
+.rv-col .rv-shots .d { width: 100%; }
+.rv-none { padding: 20px; border: 1px dashed rgba(var(--gold-hi-rgb), .25); border-radius: 14px; color: var(--text-3); font-size: .86rem; }
+.rv-tabs { display: flex; flex-wrap: wrap; gap: 8px; position: sticky; top: 0; z-index: 5; padding: 10px 0; background: linear-gradient(180deg, var(--ink) 70%, transparent); }
+.rv-tabs a { padding: 6px 14px; border-radius: 999px; font-size: .86rem; font-weight: 800; color: var(--text-2); text-decoration: none; border: 1px solid var(--gold-line); }
+.rv-tabs a:hover { color: var(--gold-hi); }
+.rv-audio { display: grid; gap: 10px; }
+.rv-audio div { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.rv-audio b { min-width: 110px; color: var(--gold-hi); }
+.rv-audio small { flex: 1 1 260px; color: var(--text-2); }
+.rv-decide { counter-reset: d; display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.rv-decide li { counter-increment: d; position: relative; padding: 14px 54px 14px 16px; border: 1px solid var(--gold-line); border-radius: 16px; background: rgba(255, 255, 255, .025); line-height: 1.8; color: var(--text-2); }
+.rv-decide li::before { content: counter(d, arabic-indic); position: absolute; right: 14px; top: 14px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; font-weight: 800; color: var(--gold-ink); background: var(--gold); }
+.rv-decide b { color: var(--text); }

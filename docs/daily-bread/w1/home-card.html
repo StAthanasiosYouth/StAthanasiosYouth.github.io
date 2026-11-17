@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>خبزنا اليومي — كارت الرئيسية</title></head>
+<body>
+<!-- The LIVE home page (index.html, untouched), loaded as it is with a <base> to the site root, plus the W1 layer
+     (bread.css) and home-inject.js, which adds the card where W5 puts it in home.js (s2-side: after the account
+     nudge, before «اجتماع الشباب»). Review only: the page's CSP meta is left out so the review font (Amiri) loads.
+     ?read=1 — already read today · ?t=<topic> · ?at=start|center (where the card scrolls to) -->
+<script>
+(async () => {
+  const root = new URL('../../../', location.href).href;
+  let html = await (await fetch(root + 'index.html', { cache: 'no-store' })).text();
+  html = html.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/i, '')
+    .replace(/<head>/i, `<head><base href="${root}"><script>try{sessionStorage.setItem('athanasios:intro','1')}catch(e){}<\/script>`)
+    .replace(/<\/head>/i, `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap"><link rel="stylesheet" href="docs/daily-bread/w1/bread.css"><script type="module" src="docs/daily-bread/w1/home-inject.js${location.search}"><\/script></head>`);
+  document.open(); document.write(html); document.close();
+})();
+</script>
+</body>
+</html>

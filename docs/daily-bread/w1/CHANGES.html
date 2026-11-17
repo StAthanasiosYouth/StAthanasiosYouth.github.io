@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>خبزنا اليومي — CHANGES: الدراسة ↔ النهائي (W1)</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" sizes="32x32" href="identity/png/favicon-32.png">
+<link rel="stylesheet" href="../../../assets/css/main.css">
+<link rel="stylesheet" href="review.css">
+<style>body { background: var(--ink); color: var(--text); }</style>
+</head>
+<body>
+<main class="rv">
+  <header>
+    <h1>CHANGES — الدراسة ↔ النهائي</h1>
+    <p class="rv-lead">لكل شاشة: <b>«الدراسة»</b> (صور 2026-11-14، الفكرة والتجربة اللي اتعمدوا) جنب <b>«النهائي»</b> (W1)، وإيه اللي اتغير وليه. الفكرة والترتيب والقرارات الـ١٥ زي ما هي؛ اللي اتغير هو الشكل: بقى مبني على CSS الموقع الحقيقي والأدمن 8B نفسهم. الشاشات الجديدة اللي مكانتش في الدراسة مكتوب جنبها «جديدة».</p>
+  </header>
+  <nav class="rv-tabs" id="tabs"></nav>
+  <div id="list" style="display:grid;gap:18px"></div>
+</main>
+<script type="module">
+const screens = await fetch('screens.json').then(r => r.json());
+const groups = [...new Set(screens.map(s => s.group))];
+document.getElementById('tabs').innerHTML = groups.map((g, i) => `<a href="#g${i}">${g}</a>`).join('') + '<a href="gallery.html">المعرض</a><a href="index.html">رجوع</a>';
+const shot = (f, k) => `<a class="${k}" href="${f}" target="_blank"><img src="${f}" alt=""></a>`;
+document.getElementById('list').innerHTML = groups.map((g, i) => `<h2 class="rv-g" id="g${i}">${g}</h2>` + screens.filter(s => s.group === g).map(s => {
+  const study = s.study.length ? `<div class="rv-shots">${s.study.map(f => shot('../shots/' + f, /-d\.png$/.test(f) ? 'd' : 'm')).join('')}</div>` : '<p class="rv-none">جديدة: مكانتش في الدراسة.</p>';
+  const fin = `<div class="rv-shots">${s.single ? shot(`shots/${s.id}.webp`, 's') : (s.m ? shot(`shots/${s.id}-m.webp`, 'm') : '') + (s.d ? shot(`shots/${s.id}-d.webp`, 'd') : '')}</div>`;
+  return `<section class="widget rv-fig" id="${s.id}"><header><b>${s.title}</b><a href="${s.url}" target="_blank">افتح الحي ↗</a></header>
+    <div class="rv-pair"><div class="rv-col"><h3>الدراسة</h3>${study}</div><div class="rv-col rv-col--new"><h3>النهائي (W1)</h3>${fin}</div></div>
+    <p><b>اتغير:</b> ${s.change}${s.why ? `<br><b>ليه:</b> ${s.why}` : ''}</p></section>`;
+}).join('')).join('');
+</script>
+</body>
+</html>

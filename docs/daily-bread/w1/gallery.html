@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>خبزنا اليومي — W1 معرض الصور (التصميم النهائي)</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" sizes="32x32" href="identity/png/favicon-32.png">
+<link rel="stylesheet" href="../../../assets/css/main.css">
+<link rel="stylesheet" href="review.css">
+<style>body { background: var(--ink); color: var(--text); }</style>
+</head>
+<body>
+<main class="rv">
+  <header>
+    <h1>خبزنا اليومي — المعرض (W1)</h1>
+    <p class="rv-lead">كل شاشة في صورة موبايل ٣٩٠ (2x) وصورة كمبيوتر ١٤٤٠، متصورة من النسخة التجريبية الحية. <b>الصور دي هي المرجع</b>: اللي هيتبني في W4 وW5 لازم يطابقها ١٠٠٪. دوس على أي صورة تكبر، أو «افتح الحي» تجرّب الشاشة.</p>
+  </header>
+  <nav class="rv-tabs" id="tabs"></nav>
+  <div id="list" style="display:grid;gap:18px"></div>
+</main>
+<script type="module">
+const screens = await fetch('screens.json').then(r => r.json());
+const groups = [...new Set(screens.map(s => s.group))];
+document.getElementById('tabs').innerHTML = groups.map((g, i) => `<a href="#g${i}">${g}</a>`).join('') + '<a href="CHANGES.html">الدراسة ↔ النهائي</a><a href="index.html">رجوع</a>';
+const img = (s, k) => { const f = `shots/${s.id}${k === 's' ? '' : '-' + k}.webp`; return `<a class="${k}" href="${f}" target="_blank"><img src="${f}" alt="${s.title}"></a>`; };
+document.getElementById('list').innerHTML = groups.map((g, i) => `<h2 class="rv-g" id="g${i}">${g}</h2>` + screens.filter(s => s.group === g).map(s => `
+  <section class="widget rv-fig" id="${s.id}"><header><b>${s.title}</b><a href="${s.url}" target="_blank">افتح الحي ↗</a><code>${s.id}</code></header>
+    <div class="rv-shots">${s.single ? img(s, 's') : (s.m ? img(s, 'm') : '') + (s.d ? img(s, 'd') : '')}</div>
+    <p>${s.change}${s.why ? ` <b>ليه:</b> ${s.why}` : ''}</p></section>`).join('')).join('');
+</script>
+</body>
+</html>
