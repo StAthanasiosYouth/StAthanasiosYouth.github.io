@@ -28240,6 +28240,35 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return n === 1 ? 'يوم' : n === 2 ? 'يومين' : ar(n) + (n >= 3 && n <= 10 ? ' أيام' : ' يوم');
   }
 
+  /* a name in «…» once (names often carry their own: «سلسلة «النور»») */
+  function quoted(name) {
+    name = String(name || '');
+    return /«/.test(name) ? name : '«' + name + '»';
+  }
+
+  /*
+   * The W1 typed confirmation (docs/daily-bread/w1/admin.js typedConfirm, 21-new-4-now): «إلغاء» first, the
+   * red action after it, locked until the word is typed. Resolves true only on the red action.
+   */
+  function typedConfirm(options) {
+    var word = el('input', { class: 'input modal__typed', type: 'text', autocomplete: 'off', placeholder: options.typed, 'aria-label': 'اكتب «' + options.typed + '» علشان تأكد' });
+    return A.modal({
+      tone: 'danger', icon: 'alert', title: options.title, message: options.message,
+      body: el('label', { class: 'field modal__typed-field' }, el('span', { class: 'field__label', text: 'اكتب «' + options.typed + '» علشان تأكد' }), word),
+      setup: function (dialog, buttons) {
+        var ok = buttons[1];
+        ok.disabled = true;
+        word.addEventListener('input', function () { ok.disabled = word.value.trim() !== options.typed; });
+        word.addEventListener('keydown', function (event) { if (event.key === 'Enter' && !ok.disabled) ok.click(); });
+        word.focus();
+      },
+      actions: [
+        { label: 'إلغاء', value: false },
+        { label: options.confirmLabel, value: true, kind: 'danger' }
+      ]
+    }).then(function (value) { return value === true; });
+  }
+
   function hasPerm(perm) {
     var a = A.access;
     // not known yet (or the Apps Script panel): ask; the Worker refuses («denied» → the lock card)
@@ -28481,7 +28510,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     if (!p || !r) return;
     var al = alertNow();
     p.wait = al ? (al.kind === 'left'
-      ? { label: '«' + al.program.name + '» ' + (al.left <= 0 ? 'آخر يوم فيه النهارده' : al.left === 1 ? 'فاضله يوم واحد' : 'فاضله ' + daysWord(al.left)), where: 'ومفيش برنامج جاي · ارفعه دلوقتي', icon: 'bread' }
+      ? { label: quoted(al.program.name) + ' ' + (al.left <= 0 ? 'آخر يوم فيه النهارده' : al.left === 1 ? 'فاضله يوم واحد' : 'فاضله ' + daysWord(al.left)), where: 'ومفيش برنامج جاي · ارفعه دلوقتي', icon: 'bread' }
       : { label: 'المحتوى خلص: مفيش برنامج شغال', where: 'خبزنا اليومي · ارفع برنامج', icon: 'bread' }) : null;
     var t = todayRow();
     r.wait = t && t.reflections > 0 && hasPerm('bread.reflections')
@@ -28538,7 +28567,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var left = al.left;
     var danger = left <= 1;
     var stage = left <= 1 ? 1 : left <= 3 ? 3 : 7;
-    var title = left <= 0 ? 'النهارده آخر يوم في «' + al.program.name + '»' : left === 1 ? 'بكره آخر يوم في «' + al.program.name + '»' : 'فاضل ' + daysWord(left) + ' على نهاية «' + al.program.name + '»';
+    var title = left <= 0 ? 'النهارده آخر يوم في ' + quoted(al.program.name) : left === 1 ? 'بكره آخر يوم في ' + quoted(al.program.name) : 'فاضل ' + daysWord(left) + ' على نهاية ' + quoted(al.program.name);
     return el('div', { class: 'ba-alert ba-alert--' + (danger ? 'danger' : 'warn'), role: 'status' },
       el('span', { class: 'chipico chipico--' + (danger ? 'danger' : 'warn'), 'aria-hidden': 'true' }, icon('alert')),
       el('div', { class: 'ba-alert__text' },
@@ -28578,7 +28607,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
               next.createdBy ? el('span', { text: 'رفعه ' + nameOf(next.createdBy) + ' · ' + shortDate(new Date(next.createdMs).toISOString().slice(0, 10)) }) : null))));
     }
     return card('calendar', 'البرنامج الجاي', '', null, empty('calendar', 'مفيش برنامج جاي لسه',
-      cur ? 'ارفعه دلوقتي وهيبدأ لوحده بعد «' + cur.name + '»، من غير ما حد يستنى.' : 'ارفعه دلوقتي، وأول ما تفعّله الشباب هيلاقوا كلمة النهارده.',
+      cur ? 'ارفعه دلوقتي وهيبدأ لوحده بعد ' + quoted(cur.name) + '، من غير ما حد يستنى.' : 'ارفعه دلوقتي، وأول ما تفعّله الشباب هيلاقوا كلمة النهارده.',
       btn('برنامج جديد', 'plus', 'btn--primary btn--sm', { onclick: goNew })));
   }
 
@@ -28625,12 +28654,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         el('span', { class: 'chipico chipico--danger', 'aria-hidden': 'true' }, icon('alert')),
         el('div', { class: 'ba-alert__text' },
           el('b', { text: 'المحتوى خلص: مفيش برنامج شغال دلوقتي' }),
-          el('small', { text: '«' + ended.name + '» خلص ' + (gone <= 1 ? 'امبارح' : dayWords(ended.endsOn)) + '. الشباب شايفين «خلّصنا 🤍»، والإشعارات واقفة لحد ما يترفع برنامج.' })),
+          el('small', { text: quoted(ended.name) + ' خلص ' + (gone <= 1 ? 'امبارح' : dayWords(ended.endsOn)) + '. الشباب شايفين «خلّصنا 🤍»، والإشعارات واقفة لحد ما يترفع برنامج.' })),
         btn('كتم التنبيه ده', 'bell', 'btn--sm', { onclick: function (event) { setMuted(true, event.currentTarget); } }),
         btn('ارفع برنامج', 'upload', 'btn--primary', { onclick: goNew })));
     }
     var live = card('bread', 'البرنامج الشغال', '', null, empty('bread', 'مفيش برنامج شغال',
-      next ? '«' + next.name + '» بيبدأ لوحده ' + dayWords(next.startsOn) + '. الشباب شايفين «خلّصنا 🤍» لحد ساعتها.'
+      next ? quoted(next.name) + ' بيبدأ لوحده ' + dayWords(next.startsOn) + '. الشباب شايفين «خلّصنا 🤍» لحد ساعتها.'
         : muted ? 'التنبيه مكتوم لحد ما يترفع برنامج جديد. الشباب شايفين «خلّصنا 🤍».' : 'ارفع برنامج جديد، وأول ما تفعّله الشباب هيلاقوا كلمة النهارده.',
       btn('برنامج جديد', 'plus', 'btn--primary', { onclick: goNew })));
     var mute = card('bell', 'تنبيه «المحتوى خلص»', 'تنبيه واحد للأدمنز لما مايبقاش فيه برنامج شغال', null,
@@ -28649,15 +28678,15 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   function stopProgram(p) {
     var live = p.state === 'live';
-    return A.confirm({
-      tone: 'danger', typed: 'إيقاف', icon: 'pause',
-      title: live ? 'إيقاف «' + p.name + '»؟' : 'إلغاء «' + p.name + '» قبل ما يبدأ؟',
+    return typedConfirm({
+      typed: 'إيقاف',
+      title: live ? 'إيقاف ' + quoted(p.name) + '؟' : 'إلغاء ' + quoted(p.name) + ' قبل ما يبدأ؟',
       message: live ? 'البرنامج هيقف للكل من النهارده، والشباب هيلاقوا «خلّصنا 🤍» لحد ما يترفع برنامج. الأرقام بتفضل، والخطوة دي مبترجعش.' : 'البرنامج مش هيبدأ، والملفات المنشورة بتتشال. الخطوة دي مبترجعش.',
-      confirmLabel: live ? 'وقّف البرنامج' : 'ألغي البرنامج', cancelLabel: 'إلغاء'
+      confirmLabel: live ? 'وقّف البرنامج' : 'ألغي البرنامج'
     }).then(function (ok) {
       if (!ok) return;
       return api('POST', 'programs/' + esc(p.id) + '/stop', { confirm: true }).then(function () {
-        A.toast(live ? 'اتوقف «' + p.name + '»' : 'اتلغى «' + p.name + '»');
+        A.toast(live ? 'اتوقف ' + quoted(p.name) : 'اتلغى ' + quoted(p.name));
         if ((document.getElementById('sheet') || {}).open) A.closeSheet();
         return refresh();
       });
@@ -28668,7 +28697,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   function topicsSheet(p) {
     var box = A.errorBox();
     var body = el('div', { class: 'ba-topics' }, el('p', { class: 'skeleton skeleton--line' }));
-    A.openSheet('مواضيع «' + p.name + '»', [box, body], [
+    A.openSheet('مواضيع ' + quoted(p.name), [box, body], [
       p.state === 'next' ? btn('ألغي البرنامج ده', 'pause', 'btn--small', { onclick: function () { stopProgram(p); } }) : null,
       btn('اقفل', '', 'btn--ghost', { onclick: function () { A.closeSheet(); } })
     ].filter(Boolean), { icon: 'bread', sub: daysWord(p.days) + ' · كل شاب بياخدهم بترتيب مختلف' });
@@ -28933,12 +28962,25 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     });
   }
 
+  /* a reference past the chapter's end, in W1's words: «يوحنا ٦ فيه ٧١ عدد بس، فـ«٧٥–٧٨» مش موجودين. صلّح المرجع في الملف.» */
+  function refProblem(refs, ref, bookFile) {
+    var c = refs.checkRef(ref, bookFile);
+    if (c.ok) return '';
+    var shown = ref.book === 'PSA' ? 'مزمور' : ref.name;
+    var chapters = (bookFile && bookFile.chapters) || [];
+    var bad = [[ref.ch, ref.from], [ref.ch2, ref.to]].filter(function (x) { return chapters[x[0] - 1] && x[1] > chapters[x[0] - 1].length; })[0];
+    if (!bad) return c.error + '. صلّح المرجع في الملف.';
+    var one = ref.ch === ref.ch2 && ref.from === ref.to;
+    var part = ref.ch !== ref.ch2 ? ref.text.replace(/^[^٠-٩]+/, '') : one ? ar(ref.from) : ar(ref.from) + '–' + ar(ref.to);
+    return shown + ' ' + ar(bad[0]) + ' فيه ' + ar(chapters[bad[0] - 1].length) + ' عدد بس، فـ«' + part + '» مش موجود' + (one ? '' : 'ين') + '. صلّح المرجع في الملف.';
+  }
+
   function resolveText(refs, text, row, byCode) {
     var err = function (field, message) { row.errs.push({ field: field, message: message }); };
     if (row.vref.ok) {
       var vb = byCode[row.vref.book];
-      var vc = refs.checkRef(row.vref, vb);
-      if (!vc.ok) err('verseRef', vc.error + '، فالمرجع «' + row.vref.text + '» مش موجود. صلّح المرجع في الملف.');
+      var vp = refProblem(refs, row.vref, vb);
+      if (vp) err('verseRef', 'مرجع الآية: ' + vp);
       else {
         row.verseRef = row.vref.text;
         row.verse = refs.versesOf(row.vref, vb).map(function (x) { return x.text; }).join(' ');
@@ -28954,8 +28996,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }
     if (row.rref.ok) {
       var rb = byCode[row.rref.book];
-      var rc = refs.checkRef(row.rref, rb);
-      if (!rc.ok) err('readingRef', rc.error + '، فـ«' + row.rref.text.replace(/^\S+(\s\S+)*?\s(?=[٠-٩])/, '') + '» مش موجودين. صلّح المرجع في الملف.');
+      var rp = refProblem(refs, row.rref, rb);
+      if (rp) err('readingRef', rp);
       else {
         row.readingRef = row.rref.text;
         var verses = refs.versesOf(row.rref, rb);
@@ -29175,7 +29217,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var w = BR.wiz;
     var cur = current();
     var waiting = upcoming();
-    var name = '«' + w.name + '»';
+    var name = quoted(w.name);
     var today = BR.programs ? BR.programs.today : '';
     var afterStart = cur ? addDays(cur.endsOn, 1) : today;
     if (waiting || !cur) w.mode = cur ? 'now' : 'after';
@@ -29194,11 +29236,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     else {
       choices = [
         choice('after', '', 'بعد البرنامج الحالي', tag('المقترح', 'acc'),
-          waiting ? ['في برنامج مستني بعد الحالي: «' + waiting.name + '». ألغيه الأول من «البرامج» أو استبدل دلوقتي.']
-            : [name + ' يبدأ لوحده ', [dayWords(afterStart)], '، اليوم اللي بعد نهاية «' + cur.name + '». مفيش حد هيفوّت يوم.'],
+          waiting ? ['في برنامج مستني بعد الحالي: ' + quoted(waiting.name) + '. ألغيه الأول من «البرامج» أو استبدل دلوقتي.']
+            : [name + ' يبدأ لوحده ', [dayWords(afterStart)], '، اليوم اللي بعد نهاية ' + quoted(cur.name) + '. مفيش حد هيفوّت يوم.'],
           timeline(['a', 'b']), !!waiting),
         choice('now', 'ba-choice--danger', 'استبدال دلوقتي', null,
-          ['«' + cur.name + '» يقف ', ['النهارده'], ' عند اليوم ' + ar(cur.day) + '، والكل يبدأ ' + name + ' من النهارده. الأيام اللي فاضلة من الحالي مش هتترحّل.'],
+          [quoted(cur.name) + ' يقف ', ['النهارده'], ' عند اليوم ' + ar(cur.day) + '، والكل يبدأ ' + name + ' من النهارده. الأيام اللي فاضلة من الحالي مش هتترحّل.'],
           timeline(['a', 'x', 'b']))
       ];
     }
@@ -29217,18 +29259,18 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var w = BR.wiz;
     var cur = current();
     var now = w.mode === 'now' && !!cur;
-    var ask = now ? A.confirm({
-      tone: 'danger', typed: 'استبدال',
-      title: 'استبدال «' + cur.name + '» دلوقتي؟',
-      message: 'البرنامج الحالي هيقف النهارده عند اليوم ' + ar(cur.day) + '، و«' + w.name + '» يبدأ للكل من النهارده. الخطوة دي مبترجعش.',
-      confirmLabel: 'استبدل', cancelLabel: 'إلغاء'
+    var ask = now ? typedConfirm({
+      typed: 'استبدال',
+      title: 'استبدال ' + quoted(cur.name) + ' دلوقتي؟',
+      message: 'البرنامج الحالي هيقف النهارده عند اليوم ' + ar(cur.day) + '، و' + quoted(w.name) + ' يبدأ للكل من النهارده. الخطوة دي مبترجعش.',
+      confirmLabel: 'استبدل'
     }) : Promise.resolve(true);
     return ask.then(function (ok) {
       if (!ok) return false;
       w.busy = true;
       return A.withBusy(button, api('POST', 'programs/' + esc(w.program) + '/activate', now ? { mode: 'now', confirm: true } : { mode: cur ? w.mode : 'after' })).then(function (reply) {
         var p = reply.program;
-        A.toast(p.startsOn === (BR.programs && BR.programs.today) ? 'اتفعّل «' + p.name + '»: شغال للكل من النهارده' : 'اتجدول: «' + p.name + '» هيبدأ لوحده ' + dayWords(p.startsOn));
+        A.toast(p.startsOn === (BR.programs && BR.programs.today) ? 'اتفعّل ' + quoted(p.name) + ': شغال للكل من النهارده' : 'اتجدول: ' + quoted(p.name) + ' هيبدأ لوحده ' + dayWords(p.startsOn));
         BR.wiz = fresh();
         BR.previewDay = null;
         BR.stats = null;
@@ -29247,6 +29289,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   ======================================================= */
 
   var statsLoading = null;
+  var statsFresh = false;     // read once a visit to the tab (the redraw after it must not ask again)
 
   function loadStats() {
     if (statsLoading) return statsLoading;
@@ -29267,14 +29310,14 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var s = BR.stats;
     if (!s) {
       if (BR.statsError) r.append(failed(A.errorBox(), BR.statsError, function () { BR.statsError = null; A.render(); loadStats(); }));
-      else { r.append(skeleton()); loadStats(); }
+      else { statsFresh = true; r.append(skeleton()); loadStats(); }
       return [r];
     }
     if (!s.program) {
       r.append(card('chart', 'الإحصائيات', '', null, empty('chart', 'مفيش برنامج شغال', 'الأرقام بتبدأ تتعد أول ما برنامج يشتغل.', btn('برنامج جديد', 'plus', 'btn--primary', { onclick: goNew }))));
       return [r];
     }
-    loadStats();
+    if (!statsFresh) { statsFresh = true; loadStats(); }
     var byDay = {};
     (s.days || []).forEach(function (d) { byDay[d.day] = d; });
     var row = function (iso) { return byDay[iso] || { opens: 0, reads: 0, sent: 0, reflections: 0 }; };
@@ -29381,7 +29424,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       if (BR.reflFilter === 'asked' && !x.asked) return false;
       return !q || (x.text + ' ' + x.name + ' ' + x.title).indexOf(q) !== -1;
     });
-    var todayCount = BR.refl.reflections.filter(function (x) { return x.day === today; }).length;
+    // today's count from the day's numbers when the live program's are here (the list holds the latest 50 only)
+    var tr = p === current() ? todayRow() : null;
+    var todayCount = tr ? tr.reflections : BR.refl.reflections.filter(function (x) { return x.day === today; }).length;
     var total = p.totals && p.totals.reflections ? p.totals.reflections : BR.refl.reflections.length;
     var chip = function (key, label) {
       return el('button', { class: 'filter-chip seg__btn', type: 'button', 'aria-pressed': String(BR.reflFilter === key), onclick: function () { BR.reflFilter = key; A.render(); } }, label);
@@ -29412,7 +29457,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           x.editedMs ? el('small', { class: 'edited', text: '· اتعدّل' }) : null),
         el('p', { text: x.text })));
     });
-    if (!list.length) groups.push(el('p', { class: 'ba-no', text: q || BR.reflFilter !== 'all' ? 'مفيش تأملات بالبحث ده.' : 'لسه مفيش تأملات في «' + p.name + '».' }));
+    if (!list.length) groups.push(el('p', { class: 'ba-no', text: q || BR.reflFilter !== 'all' ? 'مفيش تأملات بالبحث ده.' : 'لسه مفيش تأملات في ' + quoted(p.name) + '.' }));
     if (BR.refl.more) groups.push(el('div', { class: 'ba-actions ba-actions--center' }, btn('حمّل أقدم', 'arrow', 'btn--sm', { onclick: function (event) { A.withBusy(event.currentTarget, loadRefl(true)); } })));
     r.append(privacy, card('heartchat', 'التأملات', ar(todayCount) + ' النهارده · ' + num(total) + ' في البرنامج', null, [
       el('div', { class: 'p8-card__filters' },
@@ -29427,6 +29472,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   var go = A.go;
   A.go = function (area, sub) {
     if (area === 'bread' && sub === 'breadrefl' && !(A.area === 'bread' && A.sub.bread === 'breadrefl')) reflAsked = false;
+    if (area === 'bread' && sub === 'breadstats' && !(A.area === 'bread' && A.sub.bread === 'breadstats')) statsFresh = false;
     return go.apply(this, arguments);
   };
 
@@ -29485,7 +29531,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
           setrow('«المحتوى خلص»', s.emptyMuted ? 'مكتوم لحد ما يترفع برنامج جديد' : 'تنبيه واحد، وتقدر تكتمه لحد ما يترفع برنامج', sw(!s.emptyMuted, 'المحتوى خلص', function (event) { saveSetting({ emptyMuted: !event.target.checked }, event.target); }))
         ]),
         setcard('lock', 'التأملات والخصوصية', '', [
-          setrow('مين يشوف التأملات', 'صلاحية «تأملات خبزنا اليومي». بالأساس: الأدمن الأساسي بس', btn('الفريق والصلاحيات', 'users', 'btn--small', { disabled: !mayReflect, onclick: function () { A.go('settings', 'team'); } })),
+          setrow('مين يشوف التأملات', 'صلاحية «تأملات خبزنا اليومي». دلوقتي: الأدمن الأساسي بس', btn('الفريق والصلاحيات', 'users', 'btn--small', { disabled: !mayReflect, onclick: function () { A.go('settings', 'team'); } })),
           setrow('بتتحفظ لحد إمتى', 'نهاية البرنامج + ٩٠ يوم، وبعدها بتتمسح لوحدها', el('span', { class: 'chip chip--info', text: '٩٠ يوم' })),
           setrow('التعديل والمسح', 'أول ٢٠ دقيقة بعد الإرسال بس', el('span', { class: 'chip chip--info', text: '٢٠ دقيقة' }))
         ]),

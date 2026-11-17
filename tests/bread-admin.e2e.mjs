@@ -28,7 +28,7 @@ import { cairoDay, dayAdd } from '../worker/src/bread/model.js';
 const require = createRequire(`${ROOT}tools/package.json`);
 const puppeteer = require('puppeteer-core');
 
-const PORT = 4743;
+const PORT = 4746;
 const LOCAL = `http://127.0.0.1:${PORT}`;
 const SITE = 'https://stathanasiosyouth.github.io';
 const ADMIN = 'mina.servant@example.com';
@@ -77,8 +77,8 @@ function freshWorld() {
 function freshWorker({ left = null, empty = false, next = true } = {}) {
   fake = createBreadWorker({ origin: LOCAL, today: TODAY, admin: ADMIN });
   const day = left === null ? 5 : 30 - left;
-  fake.seed({ name: 'سلسلة «أمثال المسيح»', days: 21, startsOn: dayAdd(TODAY, -80), daily: [{ day: dayAdd(TODAY, -70), opens: 1840, reads: 1220, reflections: 312 }] });
-  fake.seed({ name: '«صلوات قصيرة» — أسبوع الصوم', days: 7, startsOn: dayAdd(TODAY, -45), daily: [{ day: dayAdd(TODAY, -44), opens: 690, reads: 502, reflections: 88 }] });
+  fake.seed({ name: '«صلوات قصيرة» — أسبوع الصوم', days: 7, startsOn: dayAdd(TODAY, -80), daily: [{ day: dayAdd(TODAY, -79), opens: 690, reads: 502, reflections: 88 }] });
+  fake.seed({ name: 'سلسلة «أمثال المسيح»', days: 21, startsOn: dayAdd(TODAY, -60), daily: [{ day: dayAdd(TODAY, -50), opens: 1840, reads: 1220, reflections: 312 }] });
   const series = [[60, 41], [72, 50], [58, 39], [80, 61], [91, 70], [77, 52], [69, 47], [96, 71], [88, 66], [101, 79], [93, 70], [118, 85], [126, 90], [142, 98]];
   const daily = series.map(([opens, reads], i) => ({ day: dayAdd(TODAY, i - 13), opens, reads, sent: i === 13 ? 241 : 200, reflections: i === 13 ? 12 : 9 }));
   const live = empty
@@ -158,9 +158,12 @@ async function go(page, sub) {
 const viewText = page => page.$eval('#view', n => n.innerText);
 const tabs = page => page.$$eval('#subtabs .tab', nodes => nodes.map(n => n.textContent.trim()));
 const writes = path => fake.state.calls.filter(c => c.method === 'POST' && path.test(c.path));
-const shot = async (page, name) => {
+const shot = async (page, name, { keepFocus = false } = {}) => {
   if (!process.env.BREAD_SHOTS) return;
-  await page.evaluate(() => document.activeElement && document.activeElement.blur && document.activeElement.blur());
+  if (!keepFocus) await page.evaluate(() => document.activeElement && document.activeElement.blur && document.activeElement.blur());
+  // the shot is the screen, not this test's last toast or the pointer resting on a card
+  await page.evaluate(() => { const t = document.getElementById('toasts'); if (t) t.replaceChildren(); });
+  await page.mouse.move(2, 2);
   await sleep(700);
   await page.screenshot({ path: `${SHOTS}${name}.png` });
 };
@@ -173,10 +176,19 @@ function xlsxFile(name, rows) {
   return path;
 }
 
-const GOOD = Array.from({ length: 21 }, (_, i) => {
-  const refs = [['يوحنا ٦: ٣٥', 'يوحنا ٦: ٣٢–٣٥'], ['متى ٦: ١١', 'متى ٦: ٩-١٣'], ['مزمور ٢٣: ١', 'مزمور ٢٣: ١–٤'], ['متى ١١: ٢٨', 'متى ١١: ٢٨–٣٠'], ['يو 8:12', 'يوحنا 8: 12-20'], ['لو ١٥: ٢٠', 'لوقا ١٥: ١١–٢٤'], ['1كو 13: 4', 'كورنثوس الأولى 13: 4-7']][i % 7];
-  return ['موضوع ' + (i + 1), refs[0], refs[1], 'تأمل اليوم ' + (i + 1) + ': كلمة قصيرة من خدام الأسرة.', i % 3 ? 'سؤال اليوم ' + (i + 1) + '؟' : ''];
-});
+/* W1's own review rows (docs/daily-bread/w1/admin.js ROWS) + 9 more: «سلسلة «النور»», 21 days, two psalms (Agpeya notes) */
+const W1_ROWS = [
+  ['أنا هو خبز الحياة', 'يوحنا ٦: ٣٥', 'يوحنا ٦: ٣٢–٣٥', 1], ['خبزنا كفافنا', 'متى ٦: ١١', 'متى ٦: ٩–١٣', 1], ['الرب راعيّ', 'مزمور ٢٣: ١', 'مزمور ٢٣: ١–٤', 1],
+  ['تعالوا إليّ', 'متى ١١: ٢٨', 'متى ١١: ٢٨–٣٠', 0], ['سراج لرجلي', 'مزمور ١١٩: ١٠٥', 'مزمور ١١٩: ١٠٥', 1], ['اثبتوا فيّ', 'يوحنا ١٥: ٥', 'يوحنا ١٥: ٤–٥', 1],
+  ['اطلبوا أولًا', 'متى ٦: ٣٣', 'متى ٦: ٣٣–٣٤', 1], ['نور العالم', 'يوحنا ٨: ١٢', 'يوحنا ٨: ١٢–٢٠', 1], ['الكرمة الحقيقية', 'يوحنا ١٥: ١', 'يوحنا ١٥: ١–٨', 1],
+  ['سلامي أعطيكم', 'يوحنا ١٤: ٢٧', 'يوحنا ١٤: ٢٥–٢٧', 1], ['الابن الضال', 'لوقا ١٥: ٢٠', 'لوقا ١٥: ١١–٢٤', 1], ['الراعي الصالح', 'يوحنا ١٠: ١١', 'يوحنا ١٠: ١١–١٦', 1],
+  ['المحبة لا تسقط', '1كو 13: 8', 'كورنثوس الأولى 13: 4-8', 1], ['ابن الإنسان', 'مرقس ١٠: ٤٥', 'مرقس ١٠: ٤٢–٤٥', 0], ['السامري الصالح', 'لوقا ١٠: ٣٣', 'لوقا ١٠: ٢٥–٣٧', 1],
+  ['زكا', 'لو 19: 10', 'لوقا 19: 1-10', 1], ['لا تضطرب قلوبكم', 'يوحنا ١٤: ١', 'يوحنا ١٤: ١–٦', 1], ['اذهبوا وتلمذوا', 'متى ٢٨: ١٩', 'متى ٢٨: ١٦–٢٠', 0],
+  ['الإيمان', 'عبرانيين ١١: ١', 'العبرانيين ١١: ١–٦', 1], ['افرحوا', 'فيلبي ٤: ٤', 'فيلبي ٤: ٤–٧', 1], ['نور وملح', 'متى ٥: ١٤', 'متى ٥: ١٣–١٦', 1]
+];
+const GOOD = W1_ROWS.map(([title, verse, reading, q], i) => [title, verse, reading, 'تأمل اليوم ' + (i + 1) + ': كلمة قصيرة من خدام الأسرة.', q ? 'سؤال اليوم ' + (i + 1) + '؟' : '']);
+/* the same file with W1's two red rows (day 9: a reading past John 6's end; day 11: no title) */
+const WITH_ERRORS = GOOD.map((r, i) => (i === 8 ? [r[0], r[1], 'يوحنا ٦: ٧٥–٧٨', r[3], r[4]] : i === 10 ? ['', r[1], r[2], r[3], r[4]] : r));
 
 async function uploadFile(page, path) {
   await go(page, 'breadnew');
@@ -244,8 +256,13 @@ test('a good file: the template, the file read here with the Van Dyck text, the 
   assert.equal(book.sheets[0].rows.length, 4);
   await d.page.click('[data-act="bread-next"]');
   await d.page.waitForSelector('.ba-drop');
-  await shot(d.page, '21-new-2-d');
   await d.page.type('[data-act="bread-name"]', 'سلسلة «النور»');
+  if (process.env.BREAD_SHOTS) {
+    // W1 21-new-2 shows a file half read («١٨ من ٢١»): the same drawing, held at that moment for the shot
+    await d.page.evaluate(() => { Object.assign(A.bread.wiz, { file: 'khobzna-noor.xlsx', reading: { done: 18, total: 21 } }); A.render(); });
+    await shot(d.page, '21-new-2-d');
+    await d.page.evaluate(() => { Object.assign(A.bread.wiz, { file: '', reading: null }); A.render(); });
+  }
 
   const input = await d.page.$('input[type=file][data-act="bread-file"]');
   await input.uploadFile(xlsxFile('noor.xlsx', GOOD));
@@ -260,13 +277,12 @@ test('a good file: the template, the file read here with the Van Dyck text, the 
   await d.page.click('.ba-table tr[data-n="1"]');
   const frame = await (await d.page.waitForSelector('.ba-phone iframe')).contentFrame();
   await frame.waitForFunction(() => document.documentElement.dataset.ready === '1' && document.querySelector('.br-title'), { timeout: 8000 });
-  await frame.waitForFunction(() => document.querySelector('.br-title').textContent === 'موضوع ١' || document.querySelector('.br-title').textContent === 'موضوع 1', { timeout: 8000 });
+  await frame.waitForFunction(() => document.querySelector('.br-title').textContent === 'أنا هو خبز الحياة', { timeout: 8000 });
   const jhn = VD('JHN');
   const pv = await frame.evaluate(() => ({ title: document.querySelector('.br-title').textContent, verse: document.querySelector('.br-verse').textContent, reading: document.querySelector('.br-reading').textContent, ref: document.querySelector('.br-ref').textContent }));
   assert.equal(pv.ref, 'يوحنا ٦: ٣٥');
   assert.ok(pv.verse.includes(jhn.chapters[5][34]), 'the verse is Van Dyck\'s own');
   assert.ok(pv.reading.includes(jhn.chapters[5][31]) && pv.reading.includes(jhn.chapters[5][34]));
-  await d.page.click('.ba-table tr[data-n="3"]');
   await shot(d.page, '21-new-3-ok-d');
 
   // upload: the draft, then the days in parts (20 + 1)
@@ -281,7 +297,7 @@ test('a good file: the template, the file read here with the Van Dyck text, the 
   assert.deepEqual(sent[0].reading[0].verses.map(v => v[0]), [32, 33, 34, 35]);
   assert.equal(sent[2].verseNote, 'مزمور ٢٢ في الأجبية');
   assert.equal(sent[1].question, 'سؤال اليوم 2؟');
-  assert.equal(sent[0].question, undefined, 'no question → none sent');
+  assert.equal(sent[3].question, undefined, 'no question → none sent');
   assert.match(await viewText(d.page), /بعد البرنامج الحالي[\s\S]*استبدال دلوقتي/);
   await shot(d.page, '21-new-4-d');
   await d.page.click('[data-act="bread-activate"]');
@@ -300,26 +316,26 @@ test('a good file: the template, the file read here with the Van Dyck text, the 
 test('a file with errors: by day and field, «التالي» locked; a day the Worker refuses is drawn on its row', async () => {
   freshWorker();
   const d = await open();
-  const bad = GOOD.slice(0, 12).map(r => r.slice());
-  bad[8] = ['الكرمة الحقيقية', 'يوحنا ١٥: ١', 'يوحنا ٦: ٧٥–٧٨', 'تأمل', ''];
-  bad[10] = ['', 'لوقا ١٥: ٢٠', 'لوقا ١٥: ١١–٢٤', 'تأمل', ''];
-  bad[11] = ['الراعي', 'يوحنا 30: 1', 'يوحنا ١٠: ١١–١٦', '', ''];
-  await uploadFile(d.page, xlsxFile('errors.xlsx', bad));
+  await uploadFile(d.page, xlsxFile('errors.xlsx', WITH_ERRORS));
   await setName(d.page, 'سلسلة «النور»');
   const sum = await d.page.$eval('.ba-sum', n => n.innerText);
-  assert.match(sum, /٣ لازم يتصلّحوا/);
+  for (const want of [/٢١ يوم/, /١٧ سليم/, /٢ ملاحظة/, /٢ لازم يتصلّحوا/]) assert.match(sum, want);
   assert.equal(await d.page.$eval('[data-act="bread-to-activate"]', n => n.disabled), true);
   const why = await d.page.$$eval('.ba-table tr.is-err', rows => rows.map(r => ({ n: r.dataset.n, fields: Array.from(r.querySelectorAll('.ba-why'), w => w.dataset.field), text: r.innerText })));
-  assert.deepEqual(why.map(w => w.n), ['9', '11', '12']);
+  assert.deepEqual(why.map(w => w.n), ['9', '11']);
   assert.deepEqual(why[0].fields, ['readingRef']);
-  assert.match(why[0].text, /يوحنا ٦ آخره عدد ٧١/);
+  assert.match(why[0].text, /يوحنا ٦ فيه ٧١ عدد بس، فـ«٧٥–٧٨» مش موجودين\. صلّح المرجع في الملف\./);
   assert.deepEqual(why[1].fields, ['title']);
-  assert.deepEqual(why[2].fields.sort(), ['meditation', 'verseRef']);
-  assert.match(why[2].text, /يوحنا فيه ٢١ أصحاح بس/);
+  assert.match(why[1].text, /العنوان فاضي\. كل يوم محتاج عنوان قصير\./);
   assert.ok(await d.page.$('.ba-table tr[data-n="9"] .ba-ref--bad'), 'the bad reference is marked');
-  assert.match(await viewText(d.page), /صلّح الـ٣ صفوف الحمر/);
-  await d.page.click('.ba-table tr[data-n="3"]');
+  assert.match(await viewText(d.page), /صلّح الصفين الحمر في الملف وارفعه تاني[\s\S]*… و٩ أيام كمان/);
+  assert.equal(await d.page.evaluate(() => A.bread.wiz.day), 3, 'the preview opens on the first day with a note (W1)');
   await shot(d.page, '21-new-3-d');
+  // every field by its name: a chapter past the book's end, an empty meditation
+  await uploadFile(d.page, xlsxFile('errors2.xlsx', [['الراعي', 'يوحنا 30: 1', 'يوحنا ١٠: ١١–١٦', '', '']]));
+  const one = await d.page.$eval('.ba-table tr.is-err', r => ({ fields: Array.from(r.querySelectorAll('.ba-why'), w => w.dataset.field).sort(), text: r.innerText }));
+  assert.deepEqual(one.fields, ['meditation', 'verseRef']);
+  assert.match(one.text, /مرجع الآية: يوحنا فيه ٢١ أصحاح بس/);
   assert.equal(writes(/bread\/programs/).length, 0, 'nothing reaches the Worker');
 
   // a clean file the Worker still refuses (day 2): stored nothing, drawn on row 2 by its field
@@ -341,23 +357,36 @@ test('a file with errors: by day and field, «التالي» locked; a day the W
 /* ---------------- replace now ---------------- */
 
 test('replace now: a typed «استبدال», the current program stops, the new one is live today', async () => {
+  // a program already waiting: only «استبدال دلوقتي» is open
   freshWorker();
+  const w = await open();
+  await uploadFile(w.page, xlsxFile('wait.xlsx', GOOD.slice(0, 7)));
+  await setName(w.page, 'أسبوع «الصلاة»');
+  await w.page.click('[data-act="bread-to-activate"]');
+  await w.page.waitForFunction(() => A.bread.wiz.step === 4, { timeout: 15000 });
+  assert.equal(await w.page.$eval('input[name="bread-when"][value="after"]', n => n.disabled), true);
+  assert.equal(await w.page.$eval('input[name="bread-when"][value="now"]', n => n.checked), true);
+  assert.match(await viewText(w.page), /في برنامج مستني بعد الحالي: سلسلة «النور»/);
+  assert.deepEqual(w.problems, []);
+  await w.context.close();
+
+  // nothing waiting (W1 21-new-4-now): «استبدال دلوقتي» chosen by hand, the typed confirmation
+  freshWorker({ next: false });
   const d = await open();
   await uploadFile(d.page, xlsxFile('now.xlsx', GOOD.slice(0, 7)));
   await setName(d.page, 'أسبوع «الصلاة»');
   await d.page.click('[data-act="bread-to-activate"]');
   await d.page.waitForFunction(() => A.bread.wiz.step === 4, { timeout: 15000 });
-  // «النور» is waiting: only «استبدال دلوقتي» is open
-  assert.equal(await d.page.$eval('input[name="bread-when"][value="after"]', n => n.disabled), true);
-  assert.equal(await d.page.$eval('input[name="bread-when"][value="now"]', n => n.checked), true);
-  assert.match(await viewText(d.page), /في برنامج مستني بعد الحالي: «سلسلة «النور»»/);
-  await shot(d.page, '21-new-4-now-d');
+  assert.equal(await d.page.$eval('input[name="bread-when"][value="after"]', n => n.checked), true, 'after the current one is the suggestion');
+  await d.page.click('.ba-choice--danger');
+  await d.page.waitForFunction(() => document.querySelector('input[name="bread-when"][value="now"]').checked && document.querySelector('[data-act="bread-activate"]').classList.contains('btn--danger'));
   await d.page.click('[data-act="bread-activate"]');
   await d.page.waitForSelector('dialog.modal[open] .modal__typed');
-  const ok = await d.page.$('dialog.modal[open] .modal__actions .btn--danger-solid, dialog.modal[open] .modal__actions button');
+  const ok = await d.page.$('dialog.modal[open] .modal__actions .btn--danger');
+  assert.deepEqual(await d.page.$$eval('dialog.modal[open] .modal__actions button', n => n.map(b => b.textContent)), ['إلغاء', 'استبدل'], 'W1: «إلغاء» first');
   assert.equal(await ok.evaluate(n => n.disabled), true, 'locked until the word');
   await d.page.type('dialog.modal[open] .modal__typed', 'استبد');
-  await shot(d.page, '21-new-4-now-confirm-d');
+  await shot(d.page, '21-new-4-now-d', { keepFocus: true });
   await d.page.type('dialog.modal[open] .modal__typed', 'ال');
   assert.equal(await ok.evaluate(n => n.disabled), false);
   await ok.click();
@@ -381,7 +410,7 @@ test('alerts: «فاضل ٣ أيام» in the tab and the bell (→ «البرا
     const al = await d.page.$eval('.ba-alert', n => ({ text: n.innerText, on: n.querySelector('.ba-steps-left .is-on').textContent, danger: n.classList.contains('ba-alert--danger') }));
     assert.equal(al.on, String(left).replace(/\d/, c => '٠١٢٣٤٥٦٧٨٩'[c]));
     assert.equal(al.danger, left === 1);
-    assert.match(al.text, left === 1 ? /بكره آخر يوم في «سلسلة «خبز الحياة»»/ : /فاضل [٣٧] أيام على نهاية/);
+    assert.match(al.text, left === 1 ? /بكره آخر يوم في سلسلة «خبز الحياة»/ : /فاضل [٣٧] أيام على نهاية/);
     if (left === 7) await shot(d.page, '20-ending7-d');
     if (left === 1) await shot(d.page, '20-ending1-d');
     if (left === 3) {
@@ -392,7 +421,7 @@ test('alerts: «فاضل ٣ أيام» in the tab and the bell (→ «البرا
       await d.page.click('#bell-open');
       await d.page.waitForSelector('.menu--bell');
       const items = await d.page.$$eval('.menu--bell .menu__item', n => n.map(x => x.innerText));
-      assert.ok(items.some(t => /«سلسلة «خبز الحياة»» فاضله ٣ أيام/.test(t) && /ومفيش برنامج جاي/.test(t)), items.join(' | '));
+      assert.ok(items.some(t => /سلسلة «خبز الحياة» فاضله ٣ أيام/.test(t) && /ومفيش برنامج جاي/.test(t)), items.join(' | '));
       assert.ok(items.some(t => /١٢ تأمل جديد النهارده/.test(t)), items.join(' | '));
       await d.page.evaluate(() => A.go('bread', 'breadprograms'));
       await d.page.waitForFunction(() => A.area === 'bread');
@@ -417,7 +446,7 @@ test('alerts: «فاضل ٣ أيام» in the tab and the bell (→ «البرا
   freshWorker({ empty: true });
   const e = await open();
   await go(e.page, 'breadprograms');
-  assert.match(await e.page.$eval('.ba-alert', n => n.innerText), /المحتوى خلص: مفيش برنامج شغال دلوقتي[\s\S]*«سلسلة «خبز الحياة»» خلص امبارح/);
+  assert.match(await e.page.$eval('.ba-alert', n => n.innerText), /المحتوى خلص: مفيش برنامج شغال دلوقتي[\s\S]*سلسلة «خبز الحياة» خلص امبارح/);
   assert.equal(await e.page.evaluate(() => !!A.AREAS.find(a => a.key === 'bread').subs[0].wait), true);
   await shot(e.page, '20-empty-d');
   await e.page.evaluate(() => Array.from(document.querySelectorAll('.ba-alert .btn')).find(b => /كتم/.test(b.textContent)).click());
@@ -441,7 +470,11 @@ test('alerts: «فاضل ٣ أيام» in the tab and the bell (→ «البرا
 test('stats (aggregate), reflections (logged by the Worker; without the permission: the lock), settings saved', async () => {
   freshWorker();
   const d = await open();
+  const statsBefore = fake.state.calls.filter(c => c.path === '/v1/admin/bread/stats').length;
   await go(d.page, 'breadstats');
+  await sleep(1500);
+  const statsAsked = fake.state.calls.filter(c => c.path === '/v1/admin/bread/stats').length - statsBefore;
+  assert.ok(statsAsked >= 1 && statsAsked <= 2, 'the tab reads the numbers once a visit, not on every redraw: ' + statsAsked);
   const s = await viewText(d.page);
   for (const want of ['فتحوا النهارده', '١٤٢', '+١٦ عن امبارح', '٦٩٪ من اللي فتحوا', '٢١٠', 'على ٢٦٤ ميعاد', 'آخر ١٤ يوم', 'أكتر ميعاد', '٨:٠٠ ص', '١٣٢']) assert.ok(s.includes(want), want);
   assert.equal(await d.page.$$eval('.ba-chart__day', n => n.length), 14);
@@ -490,18 +523,53 @@ test('stats (aggregate), reflections (logged by the Worker; without the permissi
 /* ---------------- phones (W1 *-m shots) ---------------- */
 
 test('phones: every screen draws in 390 px with no sideways scroll', async () => {
-  freshWorker();
+  const sideways = async (page, what) => {
+    const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    assert.ok(wide <= 1, what + ' scrolls sideways by ' + wide);
+  };
+  // the programs tab warning (W1 20-ending3-m), and the bell over it (25-bell-m); nothing live (20-empty-m)
+  for (const [opts, name] of [[{ left: 3 }, '20-ending3-m'], [{ empty: true }, '20-empty-m']]) {
+    freshWorker(opts);
+    const p = await open({ viewport: PHONE });
+    await go(p.page, 'breadprograms');
+    await sideways(p.page, name);
+    await shot(p.page, name);
+    if (opts.left) {
+      await p.page.click('#bell-open');
+      await p.page.waitForSelector('.menu--bell');
+      await shot(p.page, '25-bell-m');
+    }
+    assert.deepEqual(p.problems, []);
+    await p.context.close();
+  }
+
+  freshWorker({ next: false });
   const m = await open({ viewport: PHONE });
   for (const [sub, name] of [['breadstats', '22-stats-m'], ['breadrefl', '23-reflections-m'], ['breadsettings', '24-settings-m'], ['breadnew', '21-new-1-m']]) {
     await go(m.page, sub);
     if (sub === 'breadrefl') await m.page.waitForSelector('.ba-refl-item');
-    const wide = await m.page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-    assert.ok(wide <= 1, sub + ' scrolls sideways by ' + wide);
+    await sideways(m.page, sub);
     await shot(m.page, name);
   }
-  await uploadFile(m.page, xlsxFile('m.xlsx', GOOD.slice(0, 12).map((r, i) => (i === 8 ? ['الكرمة', 'يوحنا ١٥: ١', 'يوحنا ٦: ٧٥–٧٨', 'تأمل', ''] : i === 10 ? ['', 'لوقا ١٥: ٢٠', 'لوقا ١٥: ١١–٢٤', 'تأمل', ''] : r))));
+  await uploadFile(m.page, xlsxFile('m.xlsx', WITH_ERRORS));
   await m.page.evaluate(() => window.scrollTo(0, 0));
+  await sideways(m.page, 'the review');
   await shot(m.page, '21-new-3-m');
+  await uploadFile(m.page, xlsxFile('m2.xlsx', GOOD));
+  await setName(m.page, 'سلسلة «النور»');
+  await m.page.click('[data-act="bread-to-activate"]');
+  await m.page.waitForFunction(() => A.bread.wiz.step === 4, { timeout: 15000 });
+  await m.page.evaluate(() => window.scrollTo(0, 0));
+  await sideways(m.page, 'activation');
+  await shot(m.page, '21-new-4-m');
+  await m.page.click('.ba-choice--danger');
+  await m.page.click('[data-act="bread-activate"]');
+  await m.page.waitForSelector('dialog.modal[open] .modal__typed');
+  await m.page.type('dialog.modal[open] .modal__typed', 'استبد');
+  await shot(m.page, '21-new-4-now-m', { keepFocus: true });
+  await m.page.evaluate(() => document.querySelector('dialog.modal[open] .modal__actions button').click());
+  await m.page.waitForFunction(() => !document.querySelector('dialog.modal[open]'));
+  assert.equal(writes(/\/activate$/).length, 0, '«إلغاء» activates nothing');
   assert.deepEqual(m.problems, []);
   await m.context.close();
 });

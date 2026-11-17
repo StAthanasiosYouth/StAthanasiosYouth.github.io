@@ -145,6 +145,18 @@ world.gs.API_REQUEST_ = null;
         ins.run('bkg-demox' + i, ref, status, name, '+20100000000' + i, method, JSON.stringify(counts), status === 'confirmed' ? JSON.stringify(counts) : null, seats, status === 'confirmed' ? seats : 0, total, status === 'confirmed' ? total : null, 'rk-demo' + i, new Date(now - (i + 1) * 3600000).toISOString().slice(0, 16), now - (i + 1) * 3600000, now);
       });
   }
+  // «خبزنا اليومي» (W4): one demo program, live on its day 5, and its numbers (made-up titles, no member, no reflection text)
+  {
+    const { cairoDay, dayAdd } = await import('../worker/src/bread/model.js');
+    const today = cairoDay();
+    const start = dayAdd(today, -4);
+    env.DB.raw.prepare("INSERT INTO bread_programs (id, name, days, status, starts_on, ends_on, purge_on, created_by, created_ms, activated_ms, activated_by) VALUES ('brd-00000000d1', 'سلسلة تجريبية', 30, 'scheduled', ?, ?, ?, ?, ?, ?, ?)")
+      .run(start, dayAdd(start, 29), dayAdd(start, 119), ADMIN, Date.now() - 6 * 86400000, Date.now() - 5 * 86400000, ADMIN);
+    const topic = env.DB.raw.prepare("INSERT INTO bread_topics (program_id, n, title, verse_ref, verse_text, reading_ref, reading_json, meditation, question, body, hash) VALUES ('brd-00000000d1', ?, ?, 'يوحنا ٦: ٣٥', '…', 'يوحنا ٦: ٣٢–٣٥', '[]', 'تأمل تجريبي', ?, '{}', 'x')");
+    for (let n = 1; n <= 30; n++) topic.run(n, 'موضوع تجريبي ' + n, n % 2 ? 'سؤال تجريبي؟' : null);
+    const daily = env.DB.raw.prepare("INSERT INTO bread_daily (day, program_id, opens, reads, sent, reflections) VALUES (?, 'brd-00000000d1', ?, ?, ?, ?)");
+    for (let i = 0; i < 5; i++) daily.run(dayAdd(start, i), 40 + i * 9, 28 + i * 7, 60, 2 + i);
+  }
   const { PRESETS } = await import('../worker/src/lib/perms.js');
   const day = 86400000;
   env.DB.raw.exec(`INSERT INTO admins (email, name, role, active, created_at, last_seen) VALUES

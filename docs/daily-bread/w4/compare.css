@@ -1,0 +1,10 @@
+body { background: var(--ink); color: var(--text); }
+.cmp header { display: flex; gap: 10px; align-items: baseline; }
+.cmp header small { color: var(--text-3); }
+.cmp__pair { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; align-items: start; }
+.cmp--m .cmp__pair { grid-template-columns: repeat(2, minmax(0, 300px)); justify-content: start; }
+.cmp figure { margin: 0; display: grid; gap: 6px; }
+.cmp figcaption { font-size: .8rem; font-weight: 800; color: var(--gold-hi); }
+.cmp img { display: block; width: 100%; height: auto; border-radius: 12px; box-shadow: 0 0 0 1px rgba(var(--gold-hi-rgb), .16); }
+.cmp__miss { color: #ff8a7d; }
+@media (max-width: 760px) { .cmp__pair, .cmp--m .cmp__pair { grid-template-columns: 1fr; } }

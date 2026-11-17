@@ -27,7 +27,8 @@ export const categories = [
   { key: 'comps', title: 'المسابقات', icon: 'trophy', blurb: 'من أول مسابقة جديدة لحد النتيجة' },
   { key: 'youth', title: 'الشباب', icon: 'users', blurb: 'حسابات الشباب ونقاطهم والمتجر' },
   { key: 'site', title: 'الصفحة والصور', icon: 'layers', blurb: 'ترتيب الصفحة، الروابط، المكان، والصور' },
-  { key: 'team', title: 'الفريق والإعدادات', icon: 'gear', blurb: 'حسابك، الإشعارات، الفريق والصلاحيات، والسجل' }
+  { key: 'team', title: 'الفريق والإعدادات', icon: 'gear', blurb: 'حسابك، الإشعارات، الفريق والصلاحيات، والسجل' },
+  { key: 'bread', title: 'خبزنا اليومي', icon: 'bread', blurb: 'الآيات والقراءات اليومية: البرامج، الرفع، الأرقام، والتأملات' }
 ];
 
 // window titles (start of the title) → the article of that window, for windows without options.help
@@ -327,6 +328,49 @@ export const articles = [
       { t: '«إضافة»، وبعدين «راجع وانشر». لو عايزه يوصل الموبايلات كمان، «ابعته موبايل…» تحت.' }
     ],
     related: ['push', 'news-edit']
+  },
+  {
+    id: 'bread-programs', cat: 'bread', icon: 'bread', title: 'خبزنا اليومي: البرامج والتنبيهات',
+    summary: 'البرنامج الشغال وأيامه، اللي جاي بعده، اللي فاتوا، وتنبيهات «فاضل ٧ / ٣ / ١» و«المحتوى خلص».',
+    where: 'الآيات والقراءات اليومية ← البرامج', keywords: 'خبز اليومي آيات قراءات برنامج تنبيه خلص كتم وقف',
+    area: 'bread', module: 'bread', go: 'bread:breadprograms', ctx: ['breadprograms'],
+    steps: [
+      { d: 'دوس «الآيات والقراءات اليومية» في القايمة، تحت «الفعاليات والصفحات».', m: 'دوس «المزيد» ← «الآيات والقراءات اليومية».', shot: 'bread-screen' },
+      { t: 'فوق: البرنامج الشغال، النهارده يومه الكام، وفاضل كام يوم. كل شاب بياخد المواضيع بترتيب مختلف، فالأيام دي أيام البرنامج مش مواضيع بعينها.' },
+      { t: '«المواضيع» بتعرض عناوين الأيام ومراجعها. ⋯ ← «وقّف البرنامج» بيوقفه للكل من النهارده (بتكتب «إيقاف» علشان تأكد).' },
+      { t: 'لو فاضل ٧ أو ٣ أو يوم ومفيش برنامج جاي، هيظهر تنبيه هنا وفي الجرس. «ارفع البرنامج الجاي» بيفتح «برنامج جديد».' },
+      { t: 'لو مفيش برنامج شغال خالص: «المحتوى خلص». تقدر تكتم التنبيه ده لحد ما يترفع برنامج جديد.' }
+    ],
+    notes: ['البرامج اللي فاتت بيفضل منها الاسم والأرقام بس. المحتوى والتأملات بيتمسحوا بعد ٩٠ يوم من النهاية.'],
+    related: ['bread-new', 'bread-stats']
+  },
+  {
+    id: 'bread-new', cat: 'bread', icon: 'upload', title: 'خبزنا اليومي: برنامج جديد من ملف Excel',
+    summary: 'النموذج، الملف، المراجعة والمعاينة، وبعدين التفعيل: بعد الحالي أو استبدال دلوقتي.',
+    where: 'الآيات والقراءات اليومية ← برنامج جديد', keywords: 'رفع excel اكسل نموذج مراجعة معاينة فاندايك تفعيل استبدال مرجع',
+    area: 'bread', sub: 'breadnew', module: 'bread', go: 'bread:breadnew', ctx: ['breadnew'],
+    steps: [
+      { t: '«نزّل النموذج (Excel)» واملاه: كل صف يوم، والعنوان ومرجع الآية ومرجع القراءة والتأمل، والسؤال اختياري.', shot: 'bread-new' },
+      { t: 'اكتب المرجع بس، زي «يوحنا ٦: ٣٢–٣٥». نص الكتاب بييجي لوحده من ترجمة فاندايك، فمفيش غلط في كلام الكتاب.' },
+      { d: 'في خطوة «الملف» اسحب الملف أو دوس «اختار ملف»، واكتب اسم البرنامج.', m: 'في خطوة «الملف» دوس «اختار ملف»، واكتب اسم البرنامج.' },
+      { t: 'في «المراجعة»: الصفوف الحمرا لازم تتصلّح في الملف وترفعه تاني، والصفرا ملاحظات مش بتمنع (زي رقم المزمور في الأجبية). دوس على أي يوم تشوفه في الموبايل زي ما الشباب هيشوفوه.' },
+      { t: '«التالي: التفعيل» بيرفع الأيام. «بعد البرنامج الحالي» بيبدأه لوحده يوم ما الحالي يخلص. «استبدال دلوقتي» بيوقف الحالي النهارده ويبدأ الجديد للكل (بتكتب «استبدال» علشان تأكد).' }
+    ],
+    notes: ['الملف بيتقري على جهازك. اللي بيتبعت للسيرفر هو المواضيع جاهزة بعد المراجعة بس.', 'البرنامج لحد ١٢٠ يوم، والـ٦٦ سفر بس دلوقتي.'],
+    related: ['bread-programs']
+  },
+  {
+    id: 'bread-stats', cat: 'bread', icon: 'chart', title: 'خبزنا اليومي: الإحصائيات والتأملات والإعدادات',
+    summary: 'أرقام إجمالية بس، تأملات الشباب بصلاحية لوحدها، وميعاد الإشعار الافتراضي.',
+    where: 'الآيات والقراءات اليومية ← الإحصائيات / التأملات / الإعدادات', keywords: 'احصائيات ارقام فتحوا قروا تأملات صلاحية ميعاد اشعار',
+    area: 'bread', sub: 'breadstats', module: 'bread', go: 'bread:breadstats', ctx: ['breadstats', 'breadrefl', 'breadsettings'],
+    steps: [
+      { t: '«الإحصائيات»: فتحوا وقروا النهارده، آخر ١٤ يوم، والإشعارات والمشتركين. مفيش أسماء ولا «مين فتح ومين لأ».', shot: 'bread-stats' },
+      { t: '«التأملات»: اللي كتبه الشباب. محتاجة صلاحية «تأملات خبزنا اليومي» (مبدئيًا الأدمن الأساسي بس)، وكل فتح ليها بيتسجل في «سجل النشاط».' },
+      { t: '«الإعدادات»: الميعاد الافتراضي للإشعار، وأقصى عدد مواعيد لكل شخص، وكتم «المحتوى خلص».' }
+    ],
+    notes: ['الصلاحيات التلاتة («البرامج» و«الإحصائيات» و«التأملات» تحت «خبزنا اليومي») بتتدّي من «الفريق والصلاحيات».'],
+    related: ['bread-programs']
   },
   {
     id: 'push', cat: 'content', icon: 'phone', title: 'إشعارات الموبايل',
@@ -834,6 +878,10 @@ export const shots = [
   { id: 'notify-screen', go: 'settings:notify', mark: '#view .setcard' },
   { id: 'system-screen', go: 'settings:system', mark: '#view .setcard' },
   { id: 'book-screen', go: 'bookings:bookings', mark: '#view button::حجز كاش' },
+  // «خبزنا اليومي» (W4): the demo program seeded in tools/guide-shots.mjs
+  { id: 'bread-screen', go: 'bread:breadprograms', mark: '.ba-hero .ba-days', phone: { go: 'bread:breadprograms', mark: '.dockbtn--more' } },
+  { id: 'bread-new', go: 'bread:breadnew', mark: '#view button::نزّل النموذج (Excel)' },
+  { id: 'bread-stats', go: 'bread:breadstats', mark: '.ba-chart' },
   { id: 'book-open', go: 'bookings:bookings', mark: '#view [aria-label="افتح حجز B-DEMO1"]' },
   { id: 'book-sheet', go: 'bookings:bookings', run: 'P("#view button", "افتح حجز B-DEMO1"); await new Promise(r => setTimeout(r, 2500))', mark: 'dialog.sheet[open] button::تأكيد' },
   { id: 'book-confirm', go: 'bookings:bookings', run: 'P("#view button", "افتح حجز B-DEMO1"); await new Promise(r => setTimeout(r, 2500)); P("dialog.sheet[open] button", "تأكيد"); await new Promise(r => setTimeout(r, 2500))', mark: 'dialog.sheet[open] button::تأكيد الحجز' },
