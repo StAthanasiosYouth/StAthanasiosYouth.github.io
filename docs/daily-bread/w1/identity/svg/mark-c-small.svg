@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512" width="512" height="512">
+  <title>خبزنا اليومي — العلامة</title>
+  <rect id="tile" width="512" height="512" rx="112" fill="#0b2a4c"/><g id="mark" transform="translate(256 256) scale(1.16) translate(-256 -280)">
+    <defs>
+      <linearGradient id="mSky" x1="0" y1="112" x2="0" y2="440" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#0b2a4c"/><stop offset=".42" stop-color="#3c4f7a"/><stop offset=".68" stop-color="#c98a5a"/><stop offset=".84" stop-color="#f2c47a"/><stop offset="1" stop-color="#f7dc9b"/></linearGradient>
+      <radialGradient id="mSun" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fffbe8"/><stop offset=".25" stop-color="#ffe7a6" stop-opacity=".95"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient>
+      <linearGradient id="mGilt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2d28b"/><stop offset="1" stop-color="#8c6423"/></linearGradient>
+      <linearGradient id="mRing" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f2d28b"/><stop offset=".5" stop-color="#d7aa50"/><stop offset="1" stop-color="#8c6423"/></linearGradient>
+      <linearGradient id="mGround" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c79a5c"/><stop offset="1" stop-color="#8a6236"/></linearGradient>
+      <clipPath id="mWindow"><path d="M140,448 V240 A116,116 0 0 1 372,240 V448 Z"/></clipPath>
+    </defs>
+    <g id="window" clip-path="url(#mWindow)">
+      <rect id="sky" x="100" y="100" width="312" height="360" fill="url(#mSky)"/>
+      
+      <circle id="sun-disc" cx="256" cy="336" r="96" fill="url(#mSun)"/>
+      <path id="hills" d="M100,352 C150,334 200,340 236,348 C290,330 340,334 412,350 V460 H100 Z" fill="#5d5a73" opacity=".55"/>
+      <path id="table" d="M100,404 C180,394 332,394 412,404 V460 H100 Z" fill="url(#mGround)"/>
+    </g>
+    <g id="arch" fill="none" stroke-linejoin="round">
+      <path d="M128,448 V240 A128,128 0 0 1 384,240 V448" stroke="url(#mRing)" stroke-width="20"/>
+      
+    </g>
+    <g fill="#f2d28b" id="cross"><path d="M238.1,144 H273.9 V182.1 H312 V217.9 H273.9 V256 H238.1 V217.9 H200 V182.1 H238.1 Z"/><circle cx="239" cy="144" r="9.5"/><circle cx="256" cy="135.4" r="9.5"/><circle cx="273" cy="144" r="9.5"/><circle cx="312" cy="183" r="9.5"/><circle cx="320.6" cy="200" r="9.5"/><circle cx="312" cy="217" r="9.5"/><circle cx="273" cy="256" r="9.5"/><circle cx="256" cy="264.6" r="9.5"/><circle cx="239" cy="256" r="9.5"/><circle cx="200" cy="217" r="9.5"/><circle cx="191.4" cy="200" r="9.5"/><circle cx="200" cy="183" r="9.5"/></g>
+    <g id="book" transform="translate(56 98) scale(.4)">
+    <path id="book-cover" d="M500,668 C420,630 300,628 214,652 L200,790 C300,770 420,778 500,812 C580,778 700,770 800,790 L786,652 C700,628 580,630 500,668 Z" fill="#6e1f24"/>
+    <path id="book-gilt" d="M500,652 C424,616 312,612 228,636 L216,774 C312,754 424,760 500,796 C576,760 688,754 784,774 L772,636 C688,612 576,616 500,652 Z" fill="url(#mGilt)"/>
+    <path id="page-left" d="M500,640 C426,600 320,596 240,620 L230,758 C320,738 426,744 500,782 Z" fill="#fbf3e2"/>
+    <path id="page-right" d="M500,640 C574,600 680,596 760,620 L770,758 C680,738 574,744 500,782 Z" fill="#fbf3e2"/>
+    <path id="page-shade" d="M500,640 C490,700 492,740 500,782 C508,740 510,700 500,640 Z" fill="#000" opacity=".14"/>
+    
+    <path id="ribbon" d="M506,650 L520,842 L510,830 L498,846 L494,652 Z" fill="#c8433a"/></g></g>
+</svg>

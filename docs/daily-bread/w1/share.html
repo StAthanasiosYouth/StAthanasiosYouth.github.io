@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>خبزنا اليومي — صورة مشاركة الآية (1080 × 1080)</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap">
+<link rel="stylesheet" href="../../../assets/css/main.css">
+<link rel="stylesheet" href="bread.css">
+<style>html { scrollbar-gutter: auto; } ::-webkit-scrollbar { display: none; } html, body { margin: 0; width: 1080px; height: 1080px; overflow: hidden; background: #020914; }</style>
+</head>
+<body>
+<!-- W5 draws this same composition on a <canvas> in the page (no server), from the day's verse; this page is its reference. -->
+<div id="card"></div>
+<script type="module">
+import { TOPICS } from '../prototype/data.js';
+const t = TOPICS[+(new URLSearchParams(location.search).get('t') || 0) % TOPICS.length];
+document.getElementById('card').innerHTML = `<div class="br-card1080">
+  <span class="br-dawn__rays" aria-hidden="true"></span>
+  <div class="br-card1080__head"><img src="identity/png/icon-192.png" alt=""><b>خبزنا اليومي</b></div>
+  <p class="br-card1080__verse"><q>${t.verse}</q><span class="br-card1080__ref">${t.verseRef}</span></p>
+  <p class="br-card1080__foot"><b>أسرة البابا أثناسيوس الرسولي للشباب – سفاجا</b>stathanasiosyouth.github.io/daily-bread</p>
+  <svg class="br-dawn__hills" viewBox="0 0 1000 150" preserveAspectRatio="none" aria-hidden="true" style="z-index:-1">
+    <path d="M0,40 C120,10 220,24 300,34 C380,6 460,10 540,30 C640,4 760,8 1000,36 V150 H0 Z" fill="#5d5a73" opacity=".55"/>
+    <path d="M0,84 C160,58 300,72 420,82 C560,62 720,58 1000,76 V150 H0 Z" fill="#8a6a5a" opacity=".8"/>
+    <path d="M0,118 C200,100 800,100 1000,118 V150 H0 Z" fill="#c79a5c"/></svg>
+</div>`;
+</script>
+</body>
+</html>
