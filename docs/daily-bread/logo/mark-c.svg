@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>خبزنا اليومي — العلامة</title>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2d28b"/><stop offset="1" stop-color="#d7aa50"/></linearGradient>
+    <radialGradient id="dawn" cx=".5" cy=".62" r=".55"><stop offset="0" stop-color="#f7cf8b" stop-opacity=".55"/><stop offset="1" stop-color="#f7cf8b" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect id="tile" width="512" height="512" rx="112" fill="#0b2a4c"/>
+  <g id="arch" fill="none" stroke="url(#g)" stroke-width="10">
+    <path d="M136,420 V214 A120,120 0 0 1 376,214 V420"/>
+    <path d="M154,420 V218 A102,102 0 0 1 358,218 V420" stroke-width="3" opacity=".7"/>
+  </g>
+  <circle cx="256" cy="300" r="140" fill="url(#dawn)"/>
+  <g fill="#f2d28b" id="cross"><path d="M244.8,161 H267.2 V184.8 H291 V207.2 H267.2 V231 H244.8 V207.2 H221 V184.8 H244.8 Z"/><circle cx="245.4" cy="161" r="6"/><circle cx="256" cy="155.6" r="6"/><circle cx="266.6" cy="161" r="6"/><circle cx="291" cy="185.4" r="6"/><circle cx="296.4" cy="196" r="6"/><circle cx="291" cy="206.6" r="6"/><circle cx="266.6" cy="231" r="6"/><circle cx="256" cy="236.4" r="6"/><circle cx="245.4" cy="231" r="6"/><circle cx="221" cy="206.6" r="6"/><circle cx="215.6" cy="196" r="6"/><circle cx="221" cy="185.4" r="6"/></g>
+  <g id="loaf-book">
+    <path d="M256,300 C222,270 170,266 148,280 L148,380 C176,368 222,370 256,394 C290,370 336,368 364,380 L364,280 C342,266 290,270 256,300 Z" fill="#fbf3e2"/>
+    <path d="M256,300 C222,270 170,266 148,280 L148,380 C176,368 222,370 256,394 C290,370 336,368 364,380 L364,280 C342,266 290,270 256,300 Z" fill="none" stroke="url(#g)" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M256,300 V394" stroke="#d7aa50" stroke-width="6"/>
+    <path d="M176,306 C196,300 214,302 230,312 M176,330 C196,324 214,326 230,336 M282,312 C298,302 316,300 336,306 M282,336 C298,326 316,324 336,330" stroke="#c9a058" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <path d="M250,394 L256,440 L262,394 Z" fill="#c8433a"/>
+  </g>
+</svg>

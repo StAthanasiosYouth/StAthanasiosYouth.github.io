@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>خبزنا اليومي — معرض التصميمات</title>
+<meta name="robots" content="noindex">
+<style>
+  @font-face { font-family: 'Cairo'; font-weight: 200 900; src: url('../../assets/fonts/cairo-arabic.woff2') format('woff2'); }
+  @font-face { font-family: 'Aref Ruqaa'; font-weight: 700; src: url('../../assets/fonts/aref-ruqaa-arabic.woff2') format('woff2'); }
+  :root { color-scheme: dark; }
+  body { margin: 0; font-family: 'Cairo', sans-serif; background: #020914; color: #f3f6fb; line-height: 1.7; }
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 28px 20px 60px; }
+  h1 { font-family: 'Aref Ruqaa', serif; color: #f2d28b; font-size: 42px; margin: 0; }
+  h2 { color: #f2d28b; margin: 40px 0 6px; font-size: 22px; border-top: 1px solid rgb(242 210 139 / .14); padding-top: 22px; }
+  p.lead, p.d { color: #b9c5d6; max-width: 900px; margin: 4px 0 14px; }
+  .row { display: flex; gap: 18px; overflow-x: auto; padding-bottom: 10px; align-items: flex-start; }
+  figure { margin: 0; flex: none; }
+  figure img { display: block; border-radius: 18px; border: 1px solid rgb(242 210 139 / .16); background: #000; }
+  figure.m img { width: 280px; }
+  figure.d img { width: 860px; max-width: 86vw; border-radius: 12px; }
+  figcaption { font-size: 13px; color: #8798ae; margin-top: 6px; max-width: 280px; }
+  figure.d figcaption { max-width: 860px; }
+  nav a { color: #f2d28b; margin-inline-end: 16px; }
+</style>
+</head>
+<body><div class="wrap">
+  <h1>خبزنا اليومي — معرض التصميمات</h1>
+  <p class="lead">صور فعلية من النسخة التجريبية (موبايل ٣٩٠ وكمبيوتر ١٤٤٠). النسخة اللي بتتجرّب بالحركة والصوت: <a href="index.html" style="color:#f2d28b">index.html</a>. الدراسة كاملة: <code>docs/daily-bread/STUDY.md</code>.</p>
+  <nav><a href="#logo">اللوجو</a><a href="#notif">الإشعار</a><a href="#intro">الانترو</a><a href="#today">القراءة</a><a href="#reflect">التأمل</a><a href="#admin">الأدمن</a></nav>
+  <div id="g"></div>
+</div>
+<script>
+  const G = [
+    ['logo', 'اللوجو', 'مقترحين مبنيين على الصورة المرجعية (ب «الأسرة» هو المقترح) + علامة صغيرة للإشعار والأيقونة.', [['d', '00-logos-d', 'لوحة المقترحات (اللوجو كامل، العلامة بالمقاسات، الاسم مع العلامة)']]],
+    ['notif', 'الإشعار', 'عنوان موضوع اليوم + أول الآية. على iPhone الإشعار بيوصل بس لو الموقع متثبّت على الشاشة الرئيسية (قيد من Apple).', [['m', '01-notif-m', 'شاشة القفل: Android وiPhone'], ['d', '01-notif-d', 'كمبيوتر: إشعار Chrome على Windows']]],
+    ['intro', 'الانترو (من الضغط على الإشعار)', 'حوالي ٣ ثواني، ملء الشاشة، من غير Skip. اللوجو بيطلع من الضلمة، الشمس بتشرق ورا الكتاب، الكتاب بيتفتح، الاسم بيتكتب، الصليب بينزل بنور، وبعدين اللوجو بيصغر ويطلع لمكانه فوق والصفحة موجودة تحته من الأول.', [['m', '02-intro-1-m', '٠٫٥ ث: اللوجو طالع من الضلمة'], ['m', '02-intro-2-m', '١٫٣ ث: الشمس والكتاب'], ['m', '02-intro-3-m', '٢٫٦ ث: الاسم والصليب والشعار'], ['m', '02-intro-dawn-m', 'نفس اللحظة بلوجو «الفجر»'], ['d', '02-intro-d', 'كمبيوتر']]],
+    ['today', 'صفحة القراءة — ٣ أشكال', 'أ كحلي الأسرة (زي الموقع) · ب كحلي والقراءة على ورق (أريح في القراءة الطويلة) · ج الفجر الفاتح (أقرب للصورة المرجعية، للصبح).', [['m', '03-today-navy-m', 'أ · كحلي'], ['m', '03-today-parchment-m', 'ب · كحلي + ورق (القراءة)'], ['m', '03-today-dawn-m', 'ج · الفجر'], ['m', '04-question-m', 'التأمل والسؤال الاختياري'], ['d', '03-today-navy-d', 'أ · كحلي — كمبيوتر'], ['d', '03-today-parchment-d', 'ب · كحلي + ورق — كمبيوتر'], ['d', '03-today-dawn-d', 'ج · الفجر — كمبيوتر']]],
+    ['reflect', 'إرسال التأمل', 'القراءة للكل. الإرسال بحساب. ترحيب مختلف للمؤهل والضيف. تعديل ومسح أول ٢٠ دقيقة بس.', [['m', '05-reflect-none-m', 'من غير حساب: «ادخل وابعت»'], ['m', '05-reflect-eligible-m', 'مؤهل لخدمة الشباب'], ['m', '05-reflect-guest-m', 'ضيف (خارج السن)'], ['m', '05-reflect-fresh-m', 'اتبعت: عدّاد الـ٢٠ دقيقة'], ['m', '05-reflect-locked-m', 'بعد الـ٢٠ دقيقة'], ['m', '06-settings-m', 'إشعاراتي: الميعاد والعدد'], ['m', '07-late-m', 'مشترك متأخر'], ['m', '07-empty-m', 'المحتوى خلص']]],
+    ['admin', 'الأدمن: «الآيات والقراءات اليومية»', 'نفس شكل اللوحة الحالية (8B). البرامج، رفع Excel بالمراجعة قبل الحفظ، الإحصائيات الإجمالية، والتأملات لأصحاب الصلاحية بس.', [['d', '10-admin-programs-d', 'البرامج: تنبيه «فاضل ٣ أيام»'], ['d', '10-admin-programs-out-d', 'المحتوى خلص: تنبيه واحد قابل للكتم'], ['d', '11-admin-upload-1-d', 'رفع: النموذج والملف'], ['d', '11-admin-upload-3-d', 'رفع: المراجعة (الأخطاء بالأحمر + معاينة يوم)'], ['d', '11-admin-upload-4-d', 'رفع: التفعيل (بعد الحالي / استبدال فورًا)'], ['d', '12-admin-stats-d', 'الإحصائيات'], ['d', '13-admin-reflections-d', 'التأملات'], ['d', '14-admin-settings-d', 'الإعدادات'], ['m', '10-admin-programs-m', 'موبايل: البرامج (فاضل ٧)'], ['m', '11-admin-upload-3-m', 'موبايل: المراجعة'], ['m', '12-admin-stats-m', 'موبايل: الإحصائيات'], ['m', '13-admin-reflections-m', 'موبايل: التأملات']]]
+  ];
+  document.getElementById('g').innerHTML = G.map(([id, t, d, shots]) => `<h2 id="${id}">${t}</h2><p class="d">${d}</p>
+    <div class="row">${shots.filter(s => s[0] === 'm').map(([k, f, c]) => `<figure class="m"><a href="shots/${f}.png" target="_blank"><img loading="lazy" src="shots/${f}.png" alt="${c}"></a><figcaption>${c}</figcaption></figure>`).join('')}</div>
+    <div class="row">${shots.filter(s => s[0] === 'd').map(([k, f, c]) => `<figure class="d"><a href="shots/${f}.png" target="_blank"><img loading="lazy" src="shots/${f}.png" alt="${c}"></a><figcaption>${c}</figcaption></figure>`).join('')}</div>`).join('');
+</script>
+</body>
+</html>
