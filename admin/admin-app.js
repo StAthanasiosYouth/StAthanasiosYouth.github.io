@@ -4503,6 +4503,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     finance: ['finance.view'],
     paymethods: ['finance.view']
   };
+  // a module adds its own tabs' needs («خبزنا اليومي»: AdminBread)
+  A.SUB_NEEDS = SUB_NEEDS;
 
   A.access = null;
 
@@ -4816,7 +4818,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     // order after their home; the rest fill up (never a locked «قريبًا» area); the others go under «المزيد»
     var main = all.slice(0, 1);
     DOCK_PLACES.forEach(function (key) { var a = all.filter(function (x) { return x.key === key; })[0]; if (a && main.indexOf(a) === -1) main.push(a); });
-    all.forEach(function (a) { if (main.length < DOCK_MAIN && main.indexOf(a) === -1 && !a.soon) main.push(a); });
+    // (an area marked `more` lives under «المزيد» on phones: «الآيات والقراءات اليومية», W1 20-programs-m)
+    all.forEach(function (a) { if (main.length < DOCK_MAIN && main.indexOf(a) === -1 && !a.soon && !a.more) main.push(a); });
     main = main.slice(0, DOCK_MAIN);
     return { main: main, rest: all.filter(function (a) { return main.indexOf(a) === -1; }) };
   }
@@ -4970,7 +4973,9 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var list = [];
     A.visibleAreas().forEach(function (area) {
       (area.subs || []).forEach(function (s) {
-        if (Number(s.badge) > 0) list.push({ n: Number(s.badge), label: s.label, where: area.label, icon: area.icon, go: function () { A.go(area.key, s.key); } });
+        // a tab's own words in the bell («خبزنا اليومي»: «"…" فاضله ٣ أيام»), no number on the item
+        if (s.wait && A.allowedSub(s.key)) list.push({ n: 0, label: s.wait.label, where: s.wait.where || area.label, icon: s.wait.icon || area.icon, go: function () { A.go(area.key, s.key); } });
+        else if (Number(s.badge) > 0) list.push({ n: Number(s.badge), label: s.label, where: area.label, icon: area.icon, go: function () { A.go(area.key, s.key); } });
       });
       if (!(area.subs || []).some(function (s) { return Number(s.badge) > 0; }) && Number(area.badge) > 0) {
         list.push({ n: Number(area.badge), label: area.label, where: '', icon: area.icon, go: function () { A.go(area.key); } });
@@ -7630,12 +7635,15 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     content: 'المحتوى', publish: 'النشر', events: 'الفعاليات والخدام', bookings: 'الحجوزات', finance: 'الفلوس',
     exports: 'التصدير', competitions: 'المسابقات', store: 'المتجر', points: 'النقاط', participants: 'المشتركين',
     media: 'الصور والفيديو', push: 'الإشعارات', accounts: 'الحسابات والصلاحيات', activity: 'سجل النشاط',
-    notifications: 'إعدادات الإشعارات', system: 'النظام'
+    notifications: 'إعدادات الإشعارات', system: 'النظام',
+    // «خبزنا اليومي» (W4): bread.content · bread.stats · bread.reflections
+    bread: 'خبزنا اليومي'
   };
   var PERM_ACTIONS = {
     view: 'يشوف', add: 'يضيف', edit: 'يعدّل', delete: 'يمسح', approve: 'يعتمد', publish: 'ينشر',
     export: 'يصدّر', export_pii: 'يصدّر بأرقام التليفونات', manage: 'يدير', create_cash: 'يسجّل حجز كاش',
-    rename: 'يغيّر أسماء الأدمنز'
+    rename: 'يغيّر أسماء الأدمنز',
+    content: 'البرامج', stats: 'الإحصائيات', reflections: 'التأملات'
   };
   var PROTECTED_REASONS = {
     primary: 'ده الحساب الأساسي: صلاحياته كاملة ومينفعش يتغير أو يتشال.',
@@ -7873,7 +7881,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   var MODULE_ICONS = {
     content: 'megaphone', publish: 'send', events: 'theatre', bookings: 'ticket', finance: 'wallet', exports: 'download',
     competitions: 'trophy', store: 'gift', points: 'star', participants: 'users', media: 'photos', push: 'bell',
-    accounts: 'shield', activity: 'clock', notifications: 'mail', system: 'gear'
+    accounts: 'shield', activity: 'clock', notifications: 'mail', system: 'gear', bread: 'bread'
   };
   // a sensitive permission asks «أكّد» before it is given (team-confirm.png), with what it means
   var SENSITIVE = {
@@ -7885,11 +7893,14 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     'exports.export_pii': 'هيقدر ينزّل ملفات فيها موبايلات وإيميلات الشباب',
     'finance.manage': 'هيقدر يسجّل ويلغي دفعات وتسليمات',
     'system.manage': 'هيقدر يشغّل أدوات النظام',
-    'publish.publish': 'هيقدر ينشر التغييرات على الموقع'
+    'publish.publish': 'هيقدر ينشر التغييرات على الموقع',
+    // decision 10: the members' own words about their faith
+    'bread.reflections': 'هيقدر يقرا تأملات الشباب الشخصية في «خبزنا اليومي»'
   };
   var YOU_VERBS = {
     view: 'تشوف', add: 'تضيف', edit: 'تعدّل', delete: 'تمسح', approve: 'تعتمد', publish: 'تنشر', export: 'تصدّر',
-    export_pii: 'تصدّر بأرقام التليفونات', manage: 'تدير', create_cash: 'تسجّل حجز كاش', rename: 'تغيّر أسماء الأدمنز'
+    export_pii: 'تصدّر بأرقام التليفونات', manage: 'تدير', create_cash: 'تسجّل حجز كاش', rename: 'تغيّر أسماء الأدمنز',
+    content: 'تجهّز برامج', stats: 'تشوف إحصائيات', reflections: 'تقرا تأملات'
   };
   var WEEKDAYS = ['الأحد', 'الاتنين', 'التلات', 'الأربع', 'الخميس', 'الجمعة', 'السبت'];
   var MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
@@ -8776,7 +8787,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     content: 'المحتوى', publish: 'النشر', events: 'الفعاليات والخدام', bookings: 'الحجوزات', finance: 'الفلوس',
     exports: 'التصدير', competitions: 'المسابقات', store: 'المتجر', points: 'النقاط', participants: 'المشتركين',
     media: 'الصور', push: 'الإشعارات', accounts: 'الحسابات والصلاحيات', activity: 'سجل النشاط',
-    notifications: 'إعدادات الإشعارات', system: 'النظام'
+    notifications: 'إعدادات الإشعارات', system: 'النظام', bread: 'خبزنا اليومي'
   };
   var NT_SPECIAL = {
     'accounts.add': 'أدمن جديد اتضاف', 'accounts.grants': 'صلاحيات أدمن اتغيرت', 'accounts.remove': 'أدمن اتشال', 'accounts.signout': 'أدمن اتخرّج من كل الأجهزة', 'accounts.ask': 'طلب صلاحية', 'accounts.enforce': 'تشغيل/قفل تطبيق الصلاحيات',
@@ -8790,6 +8801,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     'booking.update': 'تعديل حجز', 'booking.withdraw': 'زائر لغى طلبه', 'booking.remind': 'تذكير بالدفع', 'payment.add': 'دفعة اتسجلت',
     'payment.refund': 'استرداد', 'handover.add': 'تسليم فلوس للخدمة', 'handover.void': 'إلغاء تسليم فلوس', 'modules.book': 'تشغيل/قفل الحجز',
     'admin.rename': 'اسم أدمن اتغير', 'session.takeover': 'دخول من جهاز تاني',
+    'bread.left': 'خبزنا اليومي: البرنامج قرّب يخلص', 'bread.empty': 'خبزنا اليومي: المحتوى خلص',
     'export.pii': 'تصدير بيانات شخصية', 'export.bookings': 'تصدير الحجوزات', 'booking.ageOverride': 'تجاوز شرط السن في حجز',
     'payment.request': 'طلب دفع الباقي', 'payment.requestReject': 'رفض طلب دفع', 'payment.requestWithdraw': 'زائر سحب طلب دفع',
     'member.mail.dead': 'إيميل لعضو مقدرش يتبعت', 'participant.email': 'تغيير إيميل حساب', 'participant.phoneFix': 'تغيير موبايل حساب',
@@ -28062,7 +28074,1431 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
 })();
 
+/* ---------- AdminBread.html ---------- */
+/*
+ * «خبزنا اليومي» — the admin section «الآيات والقراءات اليومية» (docs/daily-bread/PLAN.md §3 W4), built exactly on
+ * the approved W1 design (docs/daily-bread/w1/admin.js, bread-admin.css → AdminStyles «DAILY BREAD — W1», shots in
+ * docs/daily-bread/w1/shots/20–25). Five tabs:
+ *
+ *   البرامج       the live program (its days, today's numbers), 7 / 3 / 1 and «المحتوى خلص» (+ mute), the next one,
+ *                 the past ones (name and numbers only), «المواضيع» and stopping a program
+ *   برنامج جديد   four steps: the template (admin/xlsx.js) → the file (read on this device; the Scripture text comes
+ *                 from Van Dyck: assets/bible/vd/<BOOK>.json through assets/js/bread/refs.js) → the review (errors by
+ *                 day and field, the day's preview: admin/bread/preview.html) → activation (after the current one /
+ *                 replace now, with a typed confirmation). The days go up in parts (≤ 20 a call, worker W3).
+ *   الإحصائيات    aggregate numbers only (bread.stats)
+ *   التأملات      bread.reflections (the Primary Admin's by default); the Worker logs every read in «سجل النشاط»
+ *   الإعدادات     the reminders' default time and maximum, the «المحتوى خلص» alert, who sees the reflections
+ *
+ * Everything lives on the Worker (worker/src/bread/admin.js) through window.AdminWorker with the Google ID token.
+ * The recovery admin (Apps Script) has no AdminWorker: the section does not appear there. The public switch
+ * BREAD_MODULE only opens the page on the site; the admin works with it off (programs are prepared before launch).
+ * Alerts in the bell (sub.wait) link here; the Worker's push links open #open/bread.
+ */
+(function () {
+
+  'use strict';
+
+  var A = window.A;
+  var el = A.el;
+  var icon = A.icon;
+
+  /* the section's own icons (docs/daily-bread/w1/icons-bread.js), in the panel's icon language */
+  var BREAD_ICONS = {
+    bread: '<path class="duo" d="M12 7.6C10 6.2 6.9 5.8 4 6.4v11.2c2.9-.6 6-.2 8 1.2 2-1.4 5.1-1.8 8-1.2V6.4c-2.9-.6-6-.2-8 1.2Z"/><path d="M12 7.6C10 6.2 6.9 5.8 4 6.4v11.2c2.9-.6 6-.2 8 1.2 2-1.4 5.1-1.8 8-1.2V6.4c-2.9-.6-6-.2-8 1.2Zm0 0v11.2"/><path d="M9.5 3.6a3 3 0 0 1 5 0M12 1.6v.9M8.2 2.6l.5.6M15.8 2.6l-.5.6"/>',
+    sheet: '<rect class="duo" x="4" y="3.5" width="16" height="17" rx="2.5"/><rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M4 9h16M4 14.5h16M10 3.5v17"/>',
+    chart: '<path class="duo" d="M5 20V12h3v8Zm5.5 0V7h3v13Zm5.5 0v-5h3v5Z"/><path d="M4 20h16M5 20V12h3v8M10.5 20V7h3v13M16 20v-5h3v5"/>',
+    heartchat: '<path class="duo" d="M5.5 4h13A2.5 2.5 0 0 1 21 6.5v8a2.5 2.5 0 0 1-2.5 2.5H12l-4.5 3.6V17h-2A2.5 2.5 0 0 1 3 14.5v-8A2.5 2.5 0 0 1 5.5 4Z"/><path d="M5.5 4h13A2.5 2.5 0 0 1 21 6.5v8a2.5 2.5 0 0 1-2.5 2.5H12l-4.5 3.6V17h-2A2.5 2.5 0 0 1 3 14.5v-8A2.5 2.5 0 0 1 5.5 4Z"/><path d="M12 13.5s-2.8-1.7-2.8-3.6a1.4 1.4 0 0 1 2.8-.6 1.4 1.4 0 0 1 2.8.6c0 1.9-2.8 3.6-2.8 3.6Z"/>',
+    phone: '<rect class="duo" x="7" y="3" width="10" height="18" rx="2.5"/><rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/>',
+    dots: '<circle cx="5.5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18.5" cy="12" r="1.4"/>'
+  };
+  Object.keys(BREAD_ICONS).forEach(function (name) {
+    if (!Object.prototype.hasOwnProperty.call(A.ICONS, name)) A.ICONS[name] = '<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + BREAD_ICONS[name] + '</svg>';
+  });
+
+  var TITLE = 'الآيات والقراءات اليومية';
+  var SUBS = [
+    { key: 'breadprograms', label: 'البرامج' },
+    { key: 'breadnew', label: 'برنامج جديد' },
+    { key: 'breadstats', label: 'الإحصائيات' },
+    { key: 'breadrefl', label: 'التأملات' },
+    { key: 'breadsettings', label: 'الإعدادات' }
+  ];
+  var MAX_DAYS = 120;
+  var PART = 20;              // days a call (worker/src/bread/admin.js TOPICS_PER_CALL)
+  var PART_BYTES = 240000;    // and well under UPLOAD_MAX_BYTES (320 KB)
+  var LIMITS = { name: 80, title: 80, ref: 80, verse: 1500, meditation: 2000, question: 300, verseText: 1200, verses: 200 };
+
+  var BR = A.bread = {
+    programs: null,           // GET programs → { today, current, next, programs, settings }
+    programsError: null,
+    stats: null,              // GET stats (the live program) → { program, today, days, totals, subscribers, accounts, topMinute }
+    statsError: null,
+    refl: null,               // GET reflections → { program, reflections, more }
+    reflError: null,
+    reflFilter: 'all',
+    reflQuery: '',
+    wiz: null,                // the new program, step by step (fresh())
+    previewDay: null,         // the day the preview frame draws (admin/bread/preview.html reads it)
+    books: {},                // Van Dyck books by code (Promise)
+    lastTemplate: null        // { filename, bytes } (tests)
+  };
+
+  function fresh() {
+    return { step: 1, file: '', size: 0, name: '', rows: null, reading: null, day: 0, all: false, program: null, sentHash: '', mode: 'after', busy: false, fileError: '' };
+  }
+  BR.wiz = fresh();
+
+  function W() {
+    return window.AdminWorker && window.AdminWorker.available() ? window.AdminWorker : null;
+  }
+
+  function api(method, path, body) {
+    return W().call(method, '/v1/admin/bread/' + path, body, method === 'GET' ? { quiet: true } : undefined);
+  }
+
+  var ar = A.digits;
+
+  /* 1840 → «١٬٨٤٠» */
+  function num(n) {
+    return ar(String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬'));
+  }
+
+  function esc(value) {
+    return encodeURIComponent(String(value || ''));
+  }
+
+  var WEEKDAYS = ['الأحد', 'الاتنين', 'التلات', 'الأربع', 'الخميس', 'الجمعة', 'السبت'];
+  var MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+
+  function isoDate(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+    return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null;
+  }
+
+  /* '2026-12-10' → «الخميس ١٠ ديسمبر» */
+  function dayWords(iso) {
+    var d = isoDate(iso);
+    return d ? WEEKDAYS[d.getUTCDay()] + ' ' + ar(d.getUTCDate()) + ' ' + MONTHS[d.getUTCMonth()] : '';
+  }
+
+  /* '2026-12-10' → «١٠ ديسمبر» */
+  function shortDate(iso) {
+    var d = isoDate(iso);
+    return d ? ar(d.getUTCDate()) + ' ' + MONTHS[d.getUTCMonth()] : '';
+  }
+
+  function addDays(iso, n) {
+    var d = isoDate(iso);
+    if (!d) return '';
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function diffDays(a, b) {
+    var x = isoDate(a);
+    var y = isoDate(b);
+    return x && y ? Math.round((x - y) / 86400000) : 0;
+  }
+
+  /* a moment → «٩:٣٨ ص» (Cairo) */
+  function clock(ms) {
+    var parts = {};
+    new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', hour: 'numeric', minute: '2-digit', hour12: true }).formatToParts(new Date(Number(ms))).forEach(function (p) { parts[p.type] = p.value; });
+    return ar(parts.hour + ':' + parts.minute) + ' ' + (parts.dayPeriod === 'PM' ? 'م' : 'ص');
+  }
+
+  /* 480 → «٨:٠٠ ص»; '20:30' → «٨:٣٠ م» */
+  function minuteWords(m) {
+    if (typeof m === 'string') { var t = /^(\d{1,2}):(\d{2})$/.exec(m); m = t ? +t[1] * 60 + +t[2] : null; }
+    if (m === null || m === undefined || isNaN(m)) return '—';
+    var h = Math.floor(m / 60);
+    var mm = m % 60;
+    return ar((h % 12 || 12) + ':' + (mm < 10 ? '0' : '') + mm) + ' ' + (h < 12 ? 'ص' : 'م');
+  }
+
+  /* «٨:٠٠ ص», «8:00», «20:30», «٨ م» → 'HH:MM' (or null) */
+  function parseTime(text) {
+    var s = String(text || '').replace(/[٠-٩]/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); }).trim();
+    var m = /^(\d{1,2})(?:[:.](\d{2}))?\s*(ص|م|am|pm)?$/i.exec(s);
+    if (!m) return null;
+    var h = +m[1];
+    var mm = +(m[2] || 0);
+    var p = (m[3] || '').toLowerCase();
+    if (p === 'م' || p === 'pm') { if (h < 12) h += 12; }
+    else if ((p === 'ص' || p === 'am') && h === 12) h = 0;
+    if (h > 23 || mm > 59) return null;
+    return (h < 10 ? '0' : '') + h + ':' + (mm < 10 ? '0' : '') + mm;
+  }
+
+  function nameOf(email) {
+    var names = (A.state && A.state.names) || {};
+    return email ? names[email] || String(email).split('@')[0] : '';
+  }
+
+  function daysWord(n) {
+    return n === 1 ? 'يوم' : n === 2 ? 'يومين' : ar(n) + (n >= 3 && n <= 10 ? ' أيام' : ' يوم');
+  }
+
+  function hasPerm(perm) {
+    var a = A.access;
+    // not known yet (or the Apps Script panel): ask; the Worker refuses («denied» → the lock card)
+    if (!a) return true;
+    if (a.primary) return true;
+    if (perm === 'bread.reflections') return !!(a.perms && a.perms[perm]);
+    return !a.enforce || !!(a.perms && a.perms[perm]);
+  }
+
+
+  /* =======================================================
+     THE PANEL'S OWN PIECES (the W1 markup, built as nodes)
+  ======================================================= */
+
+  function card(iconName, title, hint, acts, body, cls, tone) {
+    return el('section', { class: 'card p8-card' + (cls ? ' ' + cls : '') },
+      el('div', { class: 'p8-card__head' },
+        el('span', { class: 'chipico' + (tone ? ' chipico--' + tone : ''), 'aria-hidden': 'true' }, icon(iconName)),
+        el('div', { class: 'p8-card__titles' }, el('h2', { class: 'card__title', text: title }), hint ? el('p', { class: 'card__hint', text: hint }) : null),
+        acts && (!Array.isArray(acts) || acts.length) ? el('div', { class: 'p8-card__acts' }, acts) : null),
+      body);
+  }
+
+  function btn(label, iconName, kind, attrs) {
+    var a = { class: 'btn' + (kind ? ' ' + kind : ''), type: 'button' };
+    Object.keys(attrs || {}).forEach(function (k) { a[k] = attrs[k]; });
+    return el('button', a, iconName ? icon(iconName) : null, label);
+  }
+
+  function tag(text, tone) {
+    return el('span', { class: 'p8-tag p8-tag--' + (tone || 'info'), text: text });
+  }
+
+  function sw(on, label, onchange, disabled) {
+    return el('label', { class: 'switch switch--bare' },
+      el('input', { type: 'checkbox', checked: !!on, 'aria-label': label || '', disabled: !!disabled, onchange: onchange || null }),
+      el('span', { class: 'switch__track', 'aria-hidden': 'true' }));
+  }
+
+  function setrow(label, hint, ctl, attrs) {
+    return el('div', Object.assign({ class: 'setrow' }, attrs || {}),
+      el('div', { class: 'setrow__text' }, el('b', { class: 'setrow__label', text: label }), hint ? el('small', { class: 'setrow__hint', text: hint }) : null),
+      el('div', { class: 'setrow__ctl' }, ctl));
+  }
+
+  function setcard(iconName, title, hint, rows, act) {
+    return el('section', { class: 'card setcard' },
+      el('div', { class: 'setcard__head' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(iconName)),
+        el('div', { class: 'setcard__titles' }, el('h2', { class: 'card__title', text: title }), hint ? el('p', { class: 'card__hint', text: hint }) : null),
+        act || null),
+      rows);
+  }
+
+  function kpi(iconName, label, value, hint) {
+    return el('div', { class: 'kpi' },
+      el('small', {}, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon(iconName)), label),
+      el('b', { text: value }),
+      hint ? el('small', { class: 'kpi__hint', text: hint }) : null);
+  }
+
+  function empty(iconName, title, text, action) {
+    return el('div', { class: 'p8-empty empty-state' },
+      el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon(iconName)),
+      el('b', { text: title }), el('small', { text: text }), action || null);
+  }
+
+  function note(iconName, text, cls) {
+    return el('p', { class: cls || 'ba-note' }, icon(iconName), el('span', {}, text));
+  }
+
+  /* «… <b>…</b> …» from ['text', ['bold'], 'text'] */
+  function rich(parts) {
+    return parts.map(function (p) { return Array.isArray(p) ? el('b', { text: p[0] }) : p; });
+  }
+
+  function check(parts) {
+    return el('li', {}, icon('check'), el('span', {}, rich(parts)));
+  }
+
+  function rules(items) {
+    return el('ul', { class: 'ba-rules' }, items.map(check));
+  }
+
+  function stack() {
+    return el('div', { class: 'ba-stack' }, [].slice.call(arguments));
+  }
+
+  function cols(cls) {
+    return el('div', { class: 'ba-cols' + (cls ? ' ' + cls : '') }, [].slice.call(arguments, 1));
+  }
+
+  function skeleton() {
+    return el('div', { class: 'ba-cols' }, el('div', { class: 'ba-stack' }, el('div', { class: 'skeleton skeleton--card skeleton--tall' })), el('div', { class: 'ba-stack' }, el('div', { class: 'skeleton skeleton--card' })));
+  }
+
+  /* a permission this admin doesn't hold: the W1 lock card (23-noperm) */
+  function locked(title, perm, text) {
+    return card('lock', title, '', null, empty('lock', title + ' محتاجة صلاحية «' + perm + '»', text || 'اطلبها من الأدمن الأساسي في «الفريق والصلاحيات».'));
+  }
+
+  function failed(box, error, retry) {
+    A.fail(error, box);
+    return el('div', { class: 'ba-stack' }, box, el('div', {}, btn('جرّب تاني', 'retry', 'btn--primary', { onclick: retry })));
+  }
+
+  /* the view root: the W1 «.ba» column */
+  function root() {
+    return el('div', { class: 'ba' });
+  }
+
+  function onTab(key) {
+    return A.area === 'bread' && A.sub.bread === key;
+  }
+
+  function redraw(key) {
+    if (onTab(key) && !(document.getElementById('sheet') || {}).open) A.render();
+  }
+
+
+  /* =======================================================
+     THE SECTION'S PLACE: «الشغل», after «الفعاليات والصفحات»
+  ======================================================= */
+
+  function addArea() {
+    if (!W() || A.AREAS.some(function (a) { return a.key === 'bread'; })) return;
+    var at = A.AREAS.map(function (a) { return a.key; }).indexOf('pages');
+    A.AREAS.splice(at < 0 ? A.AREAS.length - 1 : at + 1, 0, {
+      key: 'bread', label: TITLE, short: 'الآيات', icon: 'bread', title: TITLE, crumb: 'خبزنا اليومي', group: 'main', more: true,
+      subs: SUBS.map(function (s) { return { key: s.key, label: s.label }; })
+    });
+    A.sub.bread = A.sub.bread || 'breadprograms';
+    if (A.AREA_NEEDS) A.AREA_NEEDS.bread = ['bread.content', 'bread.stats', 'bread.reflections'];
+    if (A.SUB_NEEDS) {
+      ['breadprograms', 'breadnew', 'breadsettings'].forEach(function (k) { A.SUB_NEEDS[k] = ['bread.content']; });
+      A.SUB_NEEDS.breadstats = ['bread.stats'];
+    }
+    // «برنامج جديد» pressed again on its own tab: back to step 1 (a file half-way stays until then)
+    subOf('breadnew').again = function () { if (BR.wiz.step > 1 && !BR.wiz.busy) { BR.wiz.step = Math.min(BR.wiz.step, 2); A.render(); } };
+    A.renderNav();
+  }
+
+  function subOf(key) {
+    var area = A.AREAS.filter(function (a) { return a.key === 'bread'; })[0];
+    return area ? area.subs.filter(function (s) { return s.key === key; })[0] : null;
+  }
+
+  var start = A.start;
+  A.start = function () {
+    var drawn = start.apply(this, arguments);
+    Promise.resolve(drawn).then(function () {
+      if (!W()) return;
+      addArea();
+      setTimeout(function () { refresh(); }, 400);
+    });
+    return drawn;
+  };
+
+  // the Worker's push / bell links: /admin/#open/bread (worker/src/notify/catalog.js linkOf)
+  var openLink = A.openLink;
+  A.openLink = function (hash) {
+    var m = /^#?open\/bread(?:\/(programs|new|stats|reflections|settings))?$/.exec(String(hash || ''));
+    if (!m) return openLink ? openLink.apply(this, arguments) : Promise.resolve(false);
+    if (!W()) return Promise.resolve(false);
+    addArea();
+    var sub = { programs: 'breadprograms', new: 'breadnew', stats: 'breadstats', reflections: 'breadrefl', settings: 'breadsettings' }[m[1] || 'programs'];
+    return A.go('bread', sub);
+  };
+
+  setInterval(function () {
+    if (W() && document.visibilityState === 'visible' && BR.programs) refresh();
+  }, 300000);
+
+
+  /* =======================================================
+     THE DATA (programs + the live one's numbers), and the bell
+  ======================================================= */
+
+  var loading = null;
+
+  function refresh() {
+    if (!W()) return Promise.resolve(null);
+    if (loading) return loading;
+    loading = api('GET', 'programs').then(function (reply) {
+      BR.programs = reply;
+      BR.programsError = null;
+      return hasPerm('bread.stats') && reply.current ? api('GET', 'stats').then(function (s) { BR.stats = s; BR.statsError = null; }, function (e) { BR.statsError = e; }) : (BR.stats = reply.current ? BR.stats : null);
+    }, function (error) {
+      BR.programsError = error;
+    }).then(function () {
+      loading = null;
+      paintWaits();
+      redraw('breadprograms');
+      return BR.programs;
+    });
+    return loading;
+  }
+  BR.refresh = refresh;
+
+  function programById(id) {
+    return BR.programs && id ? BR.programs.programs.filter(function (p) { return p.id === id; })[0] || null : null;
+  }
+
+  function current() { return programById(BR.programs && BR.programs.current); }
+  function upcoming() { return programById(BR.programs && BR.programs.next); }
+
+  function pastPrograms() {
+    return (BR.programs ? BR.programs.programs : []).filter(function (p) { return p.state === 'ended' || p.state === 'stopped'; });
+  }
+
+  /* the last program that ended (the «المحتوى خلص» alert names it) */
+  function lastEnded() {
+    return pastPrograms().filter(function (p) { return p.endsOn; }).sort(function (a, b) { return a.endsOn < b.endsOn ? 1 : -1; })[0] || null;
+  }
+
+  /* what the bell and the programs tab warn about: { kind: 'left' | 'empty', left, program } or null */
+  function alertNow() {
+    if (!BR.programs) return null;
+    var cur = current();
+    var next = upcoming();
+    if (cur) {
+      if (next || cur.daysLeft === null || cur.daysLeft > 7) return null;
+      return { kind: 'left', left: cur.daysLeft, program: cur };
+    }
+    if (next || BR.programs.settings.emptyMuted) return null;
+    var ended = lastEnded();
+    return ended ? { kind: 'empty', program: ended } : null;
+  }
+
+  function todayRow() {
+    var s = BR.stats;
+    if (!s || !s.days) return null;
+    return s.days.filter(function (d) { return d.day === s.today; })[0] || { day: s.today, opens: 0, reads: 0, sent: 0, reflections: 0 };
+  }
+
+  function paintWaits() {
+    var p = subOf('breadprograms');
+    var r = subOf('breadrefl');
+    if (!p || !r) return;
+    var al = alertNow();
+    p.wait = al ? (al.kind === 'left'
+      ? { label: '«' + al.program.name + '» ' + (al.left <= 0 ? 'آخر يوم فيه النهارده' : al.left === 1 ? 'فاضله يوم واحد' : 'فاضله ' + daysWord(al.left)), where: 'ومفيش برنامج جاي · ارفعه دلوقتي', icon: 'bread' }
+      : { label: 'المحتوى خلص: مفيش برنامج شغال', where: 'خبزنا اليومي · ارفع برنامج', icon: 'bread' }) : null;
+    var t = todayRow();
+    r.wait = t && t.reflections > 0 && hasPerm('bread.reflections')
+      ? { label: (t.reflections === 1 ? 'تأمل واحد جديد' : ar(t.reflections) + ' تأمل جديد') + ' النهارده', where: 'خبزنا اليومي · التأملات', icon: 'heartchat' } : null;
+    A.renderNav();
+  }
+
+  function retry() {
+    BR.programsError = null;
+    BR.programs = null;
+    A.render();
+    refresh();
+  }
+
+
+  /* =======================================================
+     البرامج (W1 20-programs, 20-ending7/3/1, 20-empty, 20-muted)
+  ======================================================= */
+
+  A.views.breadprograms = function () {
+    var r = root();
+    if (!BR.programs) {
+      if (BR.programsError) {
+        if (BR.programsError.code === 'denied') r.append(locked('البرامج', 'محتوى خبزنا اليومي'));
+        else r.append(failed(A.errorBox(), BR.programsError, retry));
+      }
+      else { r.append(skeleton()); refresh(); }
+      return [r];
+    }
+    var cur = current();
+    if (!cur) programsEmpty(r);
+    else programsLive(r, cur);
+    return [r];
+  };
+
+  function goNew() {
+    if (BR.wiz.step === 4 && !BR.wiz.busy) BR.wiz = fresh();
+    return A.go('bread', 'breadnew');
+  }
+
+  function track(p) {
+    var n = p.days;
+    var bars = [];
+    for (var i = 1; i <= n; i++) {
+      bars.push(el('i', { class: (i < p.day ? 'is-done' : i === p.day ? 'is-today' : '') + (i > n - 3 && i > p.day ? ' is-last' : ''), title: 'اليوم ' + ar(i) }));
+    }
+    return [
+      el('div', { class: 'ba-track', style: '--n:' + n, 'aria-label': 'اليوم ' + ar(p.day) + ' من ' + ar(n) }, bars),
+      el('div', { class: 'ba-track__legend' }, el('span', { text: 'بدأ ' + dayWords(p.startsOn) }), el('span', { text: 'بيخلص ' + dayWords(p.endsOn) }))
+    ];
+  }
+
+  function alertBox(al) {
+    var left = al.left;
+    var danger = left <= 1;
+    var stage = left <= 1 ? 1 : left <= 3 ? 3 : 7;
+    var title = left <= 0 ? 'النهارده آخر يوم في «' + al.program.name + '»' : left === 1 ? 'بكره آخر يوم في «' + al.program.name + '»' : 'فاضل ' + daysWord(left) + ' على نهاية «' + al.program.name + '»';
+    return el('div', { class: 'ba-alert ba-alert--' + (danger ? 'danger' : 'warn'), role: 'status' },
+      el('span', { class: 'chipico chipico--' + (danger ? 'danger' : 'warn'), 'aria-hidden': 'true' }, icon('alert')),
+      el('div', { class: 'ba-alert__text' },
+        el('b', { text: title + '، ومفيش برنامج بعده' }),
+        el('small', { text: 'من غير برنامج جاي، الشباب هيلاقوا «خلّصنا 🤍» ومش هتوصلهم إشعارات. التنبيه ده بيوصل لكل اللي عندهم صلاحية «محتوى خبزنا اليومي».' })),
+      el('span', { class: 'ba-steps-left', 'aria-hidden': 'true' }, [7, 3, 1].map(function (n) { return el('span', { class: stage === n ? 'is-on' : '', text: ar(n) }); })),
+      btn('ارفع البرنامج الجاي', 'upload', 'btn--primary', { onclick: goNew }));
+  }
+
+  function past() {
+    var list = pastPrograms().slice(0, 8);
+    return card('info', 'البرامج اللي فاتت', 'الاسم والأرقام بس. المحتوى والتأملات بيتمسحوا بعد ٩٠ يوم من النهاية.', null,
+      list.length ? el('ul', { class: 'p8-list' }, list.map(function (p) {
+        var t = p.totals || {};
+        return el('li', { class: 'p8-item ba-past' }, el('div', { class: 'p8-item__main' },
+          el('b', { text: p.name }),
+          el('span', { class: 'ba-nums' },
+            el('span', { text: daysWord(p.days) }),
+            el('span', {}, 'فتح ', el('b', { text: num(t.opens) })),
+            el('span', {}, 'قروا ', el('b', { text: num(t.reads) })),
+            el('span', {}, 'تأملات ', el('b', { text: num(t.reflections) })))));
+      })) : el('p', { class: 'ba-no', text: 'لسه مفيش برامج خلصت.' }));
+  }
+
+  function nextCard(cur) {
+    var next = upcoming();
+    if (next) {
+      var d = isoDate(next.startsOn);
+      return card('calendar', 'البرنامج الجاي', 'بيبدأ لوحده لما الحالي يخلص', btn('شوف المواضيع', 'eye', 'btn--sm', { onclick: function () { topicsSheet(next); } }),
+        el('div', { class: 'ba-next' },
+          el('span', { class: 'ba-date' }, el('b', { text: d ? ar(d.getUTCDate()) : '' }), el('small', { text: d ? MONTHS[d.getUTCMonth()] : '' })),
+          el('div', {},
+            el('b', { class: 'ba-next__name', text: next.name }),
+            el('div', { class: 'ba-nums' },
+              el('span', {}, el('b', { text: ar(next.days) }), ' يوم'),
+              el('span', { text: 'بيبدأ ' + dayWords(next.startsOn) }),
+              next.createdBy ? el('span', { text: 'رفعه ' + nameOf(next.createdBy) + ' · ' + shortDate(new Date(next.createdMs).toISOString().slice(0, 10)) }) : null))));
+    }
+    return card('calendar', 'البرنامج الجاي', '', null, empty('calendar', 'مفيش برنامج جاي لسه',
+      cur ? 'ارفعه دلوقتي وهيبدأ لوحده بعد «' + cur.name + '»، من غير ما حد يستنى.' : 'ارفعه دلوقتي، وأول ما تفعّله الشباب هيلاقوا كلمة النهارده.',
+      btn('برنامج جديد', 'plus', 'btn--primary btn--sm', { onclick: goNew })));
+  }
+
+  function howCard() {
+    return card('info', 'إزاي بيشتغل', '', null, rules([
+      [['برنامج واحد شغال للكل'], '، وكل شاب بياخد المواضيع بترتيب عشوائي ثابت خاص بيه، من غير تكرار.'],
+      ['اللي يشترك متأخر بياخد ', ['الأيام الباقية بس'], '.'],
+      ['هتوصلك تنبيهات قبل النهاية بـ', ['٧ و٣ ويوم'], '، علشان البرنامج الجاي يبقى جاهز.']
+    ]));
+  }
+
+  function programsLive(r, cur) {
+    var al = alertNow();
+    var left = cur.daysLeft;
+    var t = todayRow();
+    var mini = function (label, value) { return el('div', {}, el('small', { text: label }), el('b', { text: value === null || value === undefined ? '—' : num(value) })); };
+    var more = el('button', { class: 'p8-iconbtn p8-iconbtn--lg', type: 'button', 'aria-label': 'المزيد: إيقاف البرنامج', 'aria-haspopup': 'menu', onclick: function (event) {
+      A.menu(event.currentTarget, 'menu--p8', [A.menuItem('pause', 'وقّف البرنامج', function () { stopProgram(cur); }, { danger: true })], { align: 'start' });
+    } }, icon('dots'));
+    var hero = card('bread', 'البرنامج الشغال', '', [btn('المواضيع', 'eye', 'btn--sm', { onclick: function () { topicsSheet(cur); } }), more],
+      [
+        el('p', { class: 'ba-name' }, cur.name + ' ', tag('شغال', 'ok'), el('small', { text: daysWord(cur.days) + ' · كل شاب ليه ترتيب مختلف' + (cur.createdBy ? ' · رفعه ' + nameOf(cur.createdBy) : '') })),
+        el('div', { class: 'ba-days' },
+          el('div', { class: 'ba-days__head' }, el('b', { text: ar(cur.day) }), el('span', { text: 'من ' + ar(cur.days) + ' يوم' }), el('span', { class: 'sp' }),
+            tag('فاضل ' + ar(left) + ' يوم', left <= 3 ? 'danger' : left <= 7 ? 'warn' : 'info')),
+          track(cur)),
+        el('div', { class: 'ba-mini' },
+          mini('فتحوا النهارده', t ? t.opens : null), mini('قروا', t ? t.reads : null),
+          mini('تأملات النهارده', t ? t.reflections : null), mini('مشتركين في الإشعارات', BR.stats && BR.stats.subscribers ? BR.stats.subscribers.devices : null))
+      ], 'ba-hero card--glow');
+    if (al && al.kind === 'left') r.append(alertBox(al));
+    r.append(cols('', stack(hero, past()), stack(nextCard(cur), howCard())));
+  }
+
+  function programsEmpty(r) {
+    var s = BR.programs.settings;
+    var muted = !!s.emptyMuted;
+    var ended = lastEnded();
+    var next = upcoming();
+    var al = alertNow();
+    if (al && al.kind === 'empty') {
+      var gone = diffDays(BR.programs.today, ended.endsOn);
+      r.append(el('div', { class: 'ba-alert ba-alert--danger', role: 'status' },
+        el('span', { class: 'chipico chipico--danger', 'aria-hidden': 'true' }, icon('alert')),
+        el('div', { class: 'ba-alert__text' },
+          el('b', { text: 'المحتوى خلص: مفيش برنامج شغال دلوقتي' }),
+          el('small', { text: '«' + ended.name + '» خلص ' + (gone <= 1 ? 'امبارح' : dayWords(ended.endsOn)) + '. الشباب شايفين «خلّصنا 🤍»، والإشعارات واقفة لحد ما يترفع برنامج.' })),
+        btn('كتم التنبيه ده', 'bell', 'btn--sm', { onclick: function (event) { setMuted(true, event.currentTarget); } }),
+        btn('ارفع برنامج', 'upload', 'btn--primary', { onclick: goNew })));
+    }
+    var live = card('bread', 'البرنامج الشغال', '', null, empty('bread', 'مفيش برنامج شغال',
+      next ? '«' + next.name + '» بيبدأ لوحده ' + dayWords(next.startsOn) + '. الشباب شايفين «خلّصنا 🤍» لحد ساعتها.'
+        : muted ? 'التنبيه مكتوم لحد ما يترفع برنامج جديد. الشباب شايفين «خلّصنا 🤍».' : 'ارفع برنامج جديد، وأول ما تفعّله الشباب هيلاقوا كلمة النهارده.',
+      btn('برنامج جديد', 'plus', 'btn--primary', { onclick: goNew })));
+    var mute = card('bell', 'تنبيه «المحتوى خلص»', 'تنبيه واحد للأدمنز لما مايبقاش فيه برنامج شغال', null,
+      setrow('كتم التنبيه', muted ? 'مكتوم. بيرجع لوحده أول ما يترفع برنامج.' : 'بيظهر في الجرس وعلى أجهزة الأدمنز', sw(muted, 'كتم التنبيه', function (event) { setMuted(event.target.checked, event.target); })));
+    r.append(cols('', stack(live, mute), stack(nextCard(null), past())));
+  }
+
+  function setMuted(on, control) {
+    return A.withBusy(control, api('POST', 'settings', { emptyMuted: !!on })).then(function (reply) {
+      if (BR.programs && reply && reply.settings) BR.programs.settings = reply.settings;
+      A.toast(on ? 'اتكتم لحد ما يترفع برنامج جديد' : 'التنبيه رجع');
+      paintWaits();
+      A.render();
+    }).catch(function (error) { A.fail(error); A.render(); });
+  }
+
+  function stopProgram(p) {
+    var live = p.state === 'live';
+    return A.confirm({
+      tone: 'danger', typed: 'إيقاف', icon: 'pause',
+      title: live ? 'إيقاف «' + p.name + '»؟' : 'إلغاء «' + p.name + '» قبل ما يبدأ؟',
+      message: live ? 'البرنامج هيقف للكل من النهارده، والشباب هيلاقوا «خلّصنا 🤍» لحد ما يترفع برنامج. الأرقام بتفضل، والخطوة دي مبترجعش.' : 'البرنامج مش هيبدأ، والملفات المنشورة بتتشال. الخطوة دي مبترجعش.',
+      confirmLabel: live ? 'وقّف البرنامج' : 'ألغي البرنامج', cancelLabel: 'إلغاء'
+    }).then(function (ok) {
+      if (!ok) return;
+      return api('POST', 'programs/' + esc(p.id) + '/stop', { confirm: true }).then(function () {
+        A.toast(live ? 'اتوقف «' + p.name + '»' : 'اتلغى «' + p.name + '»');
+        if ((document.getElementById('sheet') || {}).open) A.closeSheet();
+        return refresh();
+      });
+    }).catch(function (error) { A.fail(error); });
+  }
+
+  /* «المواضيع»: the program's days (titles and references; the order differs for each youth) */
+  function topicsSheet(p) {
+    var box = A.errorBox();
+    var body = el('div', { class: 'ba-topics' }, el('p', { class: 'skeleton skeleton--line' }));
+    A.openSheet('مواضيع «' + p.name + '»', [box, body], [
+      p.state === 'next' ? btn('ألغي البرنامج ده', 'pause', 'btn--small', { onclick: function () { stopProgram(p); } }) : null,
+      btn('اقفل', '', 'btn--ghost', { onclick: function () { A.closeSheet(); } })
+    ].filter(Boolean), { icon: 'bread', sub: daysWord(p.days) + ' · كل شاب بياخدهم بترتيب مختلف' });
+    api('GET', 'programs/' + esc(p.id) + '/topics').then(function (reply) {
+      A.fill(body, el('div', { class: 'p8-tablewrap' }, el('table', { class: 'p8-table ba-table' },
+        el('thead', {}, el('tr', {}, ['اليوم', 'العنوان', 'الآية', 'القراءة', 'سؤال'].map(function (h) { return el('th', { scope: 'col', text: h }); }))),
+        el('tbody', {}, reply.topics.map(function (t) {
+          return el('tr', {}, el('td', { text: ar(t.n) }), el('td', {}, el('b', { text: t.title })), el('td', { class: 'ba-ref', text: t.verseRef }), el('td', { class: 'ba-ref', text: t.readingRef }),
+            el('td', {}, t.asked ? el('span', { class: 'ba-yes' }, icon('check')) : el('span', { class: 'ba-no', text: '—' })));
+        })))));
+    }).catch(function (error) { body.replaceChildren(); A.fail(error, box); });
+  }
+
+
+  /* =======================================================
+     برنامج جديد (W1 21-new-1 … 21-new-4-now)
+  ======================================================= */
+
+  var kits = null;
+
+  /* admin/xlsx.js + the Van Dyck helpers (assets/js/bread/refs.js, text.js), on demand */
+  function kit() {
+    if (!kits) {
+      var at = function (path) { return import(new URL(path, location.href).href); };
+      kits = Promise.all([at('xlsx.js'), at('../assets/js/bread/refs.js'), at('../assets/js/bread/text.js')]).then(function (m) {
+        return { xlsx: m[0], refs: m[1], text: m[2] };
+      }, function (error) { kits = null; throw error; });
+    }
+    return kits;
+  }
+  BR.kit = kit;
+
+  function book(code) {
+    if (!BR.books[code]) {
+      BR.books[code] = fetch(new URL('../assets/bible/vd/' + code + '.json', location.href).href).then(function (r) {
+        if (!r.ok) throw new Error('ملف السفر مش موجود (' + code + ')');
+        return r.json();
+      }).catch(function (error) { delete BR.books[code]; throw error; });
+    }
+    return BR.books[code];
+  }
+
+  function stepper(step) {
+    var steps = ['النموذج', 'الملف', 'المراجعة', 'التفعيل'];
+    return el('ol', { class: 'stepper', 'aria-label': 'خطوات البرنامج الجديد' }, steps.map(function (label, i) {
+      var st = i + 1 < step ? 'done' : i + 1 === step ? 'current' : 'todo';
+      return el('li', { class: 'stepper__step is-' + st, 'aria-current': st === 'current' ? 'step' : null },
+        el('span', { class: 'stepper__dot', 'aria-hidden': 'true' }, st === 'done' ? icon('check') : ar(i + 1)),
+        el('span', { class: 'stepper__label', text: label }));
+    }));
+  }
+
+  function wizHead() {
+    return card('upload', 'برنامج جديد', 'ملف Excel واحد: كل صف يوم. النص الكتابي بيتجاب من ترجمة فاندايك المعتمدة بالمرجع، مش بيتكتب بإيد.', null,
+      el('div', { class: 'ba-wiz-head' }, stepper(BR.wiz.step)));
+  }
+
+  function setStep(n) {
+    BR.wiz.step = n;
+    A.render();
+    window.scrollTo({ top: 0 });
+  }
+
+  A.views.breadnew = function () {
+    var r = root();
+    var w = BR.wiz;
+    r.append(wizHead());
+    if (w.step === 1) stepTemplate(r);
+    else if (w.step === 2) stepFile(r);
+    else if (w.step === 3) stepReview(r);
+    else stepActivate(r);
+    return [r];
+  };
+
+  /* ---------- 1. النموذج ---------- */
+
+  var SAMPLE = [
+    ['أنا هو خبز الحياة', 'يوحنا ٦: ٣٥', 'يوحنا ٦: ٣٢–٣٥', 'الجوع اللي جوانا مش بيشبعه غير ربنا. اكتب هنا تأمل اليوم في فقرة قصيرة.', 'إيه الحاجة اللي بتدوّر فيها على الشبع بعيد عن ربنا؟'],
+    ['خبزنا كفافنا', 'متى ٦: ١١', 'متى ٦: ٩–١٣', 'كلمة «كفافنا» معناها اللي يكفينا النهارده. اكتب التأمل هنا.', ''],
+    ['الرب راعيّ', 'مزمور ٢٣: ١', 'مزمور ٢٣: ١–٤', 'الراعي مش بس بيأكّل، ده بيمشي قدامنا. اكتب التأمل هنا.', 'إمتى حسّيت إن ربنا ماشي قدامك؟']
+  ];
+
+  function templateBook(refs) {
+    return {
+      sheets: [
+        { name: 'البرنامج', rtl: true, header: true, filter: false, widths: [7, 26, 20, 24, 60, 40], textColumns: [2, 3],
+          rows: [refs.COLUMNS].concat(SAMPLE.map(function (s, i) { return [i + 1].concat(s); })) },
+        { name: 'إزاي تملاه', rtl: true, widths: [90], rows: [
+          ['إزاي تملا النموذج'],
+          ['كل صف = يوم واحد. عدد الصفوف = مدة البرنامج (أي عدد لحد ١٢٠ يوم).'],
+          ['العنوان: اسم موضوع اليوم، قصير.'],
+          ['مرجع الآية: الآية اللي هتظهر كبيرة. مثال: يوحنا ٦: ٣٥ أو يو 6:35'],
+          ['مرجع القراءة: القراءة كلها. مثال: يوحنا ٦: ٣٢-٣٥ أو متى 5: 1 - 6: 4 (من أصحاح لأصحاح)'],
+          ['متكتبش نص الآية: اللوحة بتجيبه من ترجمة فاندايك المعتمدة.'],
+          ['التأمل: فقرة قصيرة من كتابة خدام الأسرة. لو منقول من كتاب، اكتب المصدر في آخره.'],
+          ['السؤال: اختياري، ممكن يتساب فاضي.'],
+          ['المزامير بترقيم فاندايك (العبري). مزمور ٢٣ = مزمور ٢٢ في الأجبية، والرقم ده بيظهر جنبه لوحده.'],
+          ['الـ٦٦ سفر بس دلوقتي (الأسفار القانونية الثانية لسه).'],
+          ['أسماء الأسفار المختصرة المقبولة: مت، مر، لو، يو، أع، رو، 1كو، 2كو، غل، أف، في، كو، عب، يع، 1بط، 1يو، رؤ، تك، خر، مز، أم، إش، إر…']
+        ] }
+      ]
+    };
+  }
+
+  function downloadTemplate(event) {
+    var button = event.currentTarget;
+    return A.withBusy(button, kit().then(function (k) {
+      var bytes = k.xlsx.writeXlsx(templateBook(k.refs));
+      var filename = 'خبزنا-اليومي-نموذج.xlsx';
+      BR.lastTemplate = { filename: filename, bytes: bytes };
+      k.xlsx.download(bytes, filename);
+      A.toast('اتنزّل النموذج');
+    })).catch(function (error) { A.fail(error); });
+  }
+
+  function stepTemplate(r) {
+    var head = el('tr', {}, ['#', 'العنوان', 'مرجع الآية', 'القراءة', 'التأمل', 'السؤال (اختياري)'].map(function (h, i) { return el('th', { class: i === 5 ? 'opt' : null, text: h }); }));
+    var rows = SAMPLE.map(function (s, i) {
+      return el('tr', {}, el('td', { text: ar(i + 1) }), el('td', { text: s[0] }), el('td', { text: s[1] }), el('td', { text: s[2] }),
+        el('td', { text: s[3].split(' ').slice(0, 3).join(' ') + '…' }), el('td', { text: s[4] ? s[4].split(' ').slice(0, 3).join(' ') + '…' : '' }));
+    });
+    r.append(cols('ba-cols--even',
+      card('sheet', 'النموذج', 'نزّله، املاه، وارفعه في الخطوة الجاية', btn('نزّل النموذج (Excel)', 'download', 'btn--primary', { 'data-act': 'bread-template', onclick: downloadTemplate }),
+        el('div', { class: 'ba-xl' }, el('table', {}, el('thead', {}, head), el('tbody', {}, rows)))),
+      card('info', 'قبل ما تملاه', '', null, rules([
+        [['كل صف = يوم.'], ' البرنامج أي مدة لحد ١٢٠ يوم، وعدد المواضيع = عدد الأيام.'],
+        [['اكتب المرجع بس'], ' («يوحنا ٦: ٣٢–٣٥»)، والنص بييجي من فاندايك لوحده. ده بيمنع أي غلط في كلام الكتاب.'],
+        [['المزامير بترقيم فاندايك'], '، ورقم الأجبية بيظهر جنبه لوحده.'],
+        [['السؤال اختياري.'], ' اليوم اللي مفيهوش سؤال بيظهر فيه «تأملك النهارده» بس.'],
+        ['الـ٦٦ سفر بس دلوقتي (الأسفار القانونية الثانية لسه).']
+      ]))));
+    r.append(el('div', { class: 'ba-actions' }, btn('عندي الملف، كمّل', 'arrow', 'btn--primary', { 'data-act': 'bread-next', onclick: function () { setStep(2); } })));
+  }
+
+  /* ---------- 2. الملف ---------- */
+
+  function stepFile(r) {
+    var w = BR.wiz;
+    var input = el('input', { type: 'file', accept: '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', hidden: true, 'data-act': 'bread-file', onchange: function () { if (input.files[0]) take(input.files[0]); } });
+    var drop = el('div', { class: 'ba-drop' },
+      el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('upload')),
+      el('b', { text: 'اسحب ملف الـExcel هنا' }), el('small', { text: 'أو' }),
+      btn('اختار ملف', 'sheet', 'btn--primary', { onclick: function () { input.click(); } }),
+      el('small', { text: '.xlsx · لحد ١٢٠ صف' }), input);
+    drop.addEventListener('dragover', function (event) { event.preventDefault(); drop.classList.add('is-over'); });
+    drop.addEventListener('dragleave', function () { drop.classList.remove('is-over'); });
+    drop.addEventListener('drop', function (event) { event.preventDefault(); drop.classList.remove('is-over'); var f = event.dataTransfer.files[0]; if (f) take(f); });
+    var fileRow = null;
+    if (w.file) {
+      var pr = w.reading;
+      fileRow = el('div', { class: 'ba-file' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('sheet')),
+        el('div', {},
+          el('b', { text: w.file }),
+          el('small', { text: w.fileError ? w.fileError : pr ? 'بيقرا الصفوف ويجيب النصوص من فاندايك… ' + ar(pr.done) + ' من ' + ar(pr.total) : 'اتقرا ✓' }),
+          el('div', { class: 'ba-bar' }, el('i', { style: '--v:' + (pr && pr.total ? Math.round(pr.done / pr.total * 100) : w.fileError ? 0 : 100) + '%' }))));
+      if (w.fileError) fileRow.classList.add('is-err');
+    }
+    var name = el('input', { class: 'input', value: w.name, maxlength: String(LIMITS.name), placeholder: 'سلسلة «النور»', 'data-act': 'bread-name', oninput: function () { w.name = name.value; } });
+    r.append(cols('ba-cols--even',
+      stack(card('upload', 'الملف', '', null, [drop, fileRow ? el('div', { class: 'ba-gap' }, fileRow) : null])),
+      stack(
+        card('edit', 'اسم البرنامج', 'بيظهر للشباب أول يوم، وفي الإحصائيات', null,
+          el('label', { class: 'field' }, el('span', { class: 'field__label', text: 'الاسم' }), name, el('span', { class: 'field__hint', text: 'قصير، زي «سلسلة النور» أو «أسبوع الصلاة»' }))),
+        note('lock', 'الملف بيتقري على جهازك. اللي بيتبعت للسيرفر هو المواضيع جاهزة بعد المراجعة بس.'))));
+  }
+
+  /* a file chosen: read it here, check every row, bring the text from Van Dyck, then the review */
+  function take(file) {
+    var w = BR.wiz;
+    if (w.busy) return;
+    dropDraft();
+    w.file = file.name;
+    w.size = file.size;
+    w.rows = null;
+    w.fileError = '';
+    w.reading = { done: 0, total: 0 };
+    w.busy = true;
+    A.render();
+    kit().then(function (k) {
+      return file.arrayBuffer().then(function (buffer) { return k.xlsx.readXlsx(new Uint8Array(buffer)); }).then(function (bookFile) {
+        var sheet = k.xlsx.firstDataSheet(bookFile, 'البرنامج');
+        return readRows(k, sheet ? sheet.rows : [], function (done, total) {
+          w.reading = { done: done, total: total };
+          if (onTab('breadnew') && w.step === 2) A.render();
+        });
+      });
+    }).then(function (rows) {
+      w.busy = false;
+      w.reading = null;
+      w.rows = rows;
+      w.all = false;
+      w.program = null;
+      w.sentHash = '';
+      w.day = (rows.filter(function (x) { return x.warns.length && !x.errs.length; })[0] || rows.filter(function (x) { return !x.errs.length; })[0] || rows[0] || {}).n || 0;
+      setStep(3);
+      preview();
+    }).catch(function (error) {
+      w.busy = false;
+      w.reading = null;
+      w.fileError = error && error.message ? error.message : 'الملف ده مش Excel سليم.';
+      A.render();
+    });
+  }
+
+  /*
+   * The rows → [{ n, title, verseRef, readingRef, meditation, question, verse, verseNote, reading, verseAt, errs, warns }].
+   * errs / warns: [{ field, message }] (the same fields the Worker names). A file-level problem throws.
+   */
+  function readRows(k, rows, progress) {
+    var refs = k.refs;
+    var head = (rows[0] || []).map(function (h) { return String(h || '').trim(); });
+    var col = function (name) { for (var i = 0; i < head.length; i++) if (head[i].indexOf(name) === 0) return i; return -1; };
+    var c = { n: col('رقم'), title: col('العنوان'), verse: col('مرجع الآية'), reading: col('مرجع القراءة'), med: col('التأمل'), q: col('السؤال') };
+    if (c.title < 0 || c.verse < 0 || c.reading < 0 || c.med < 0) throw new Error('الملف مش على شكل النموذج: محتاج أعمدة «العنوان» و«مرجع الآية» و«مرجع القراءة» و«التأمل». نزّل النموذج واملاه.');
+    var data = rows.slice(1).filter(function (r) { return r.some(function (v) { return String(v == null ? '' : v).trim(); }); });
+    if (!data.length) throw new Error('الملف فاضي: مفيش ولا يوم.');
+    if (data.length > MAX_DAYS) throw new Error('الملف فيه ' + ar(data.length) + ' صف، والبرنامج لحد ' + ar(MAX_DAYS) + ' يوم بس.');
+    var digits = function (s) { return String(s).replace(/[٠-٩]/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); }); };
+    var out = data.map(function (r, i) {
+      var v = function (key) { return c[key] >= 0 ? String(r[c[key]] == null ? '' : r[c[key]]).replace(/\r\n?/g, '\n').trim() : ''; };
+      var nRaw = digits(v('n'));
+      return { n: /^\d+$/.test(nRaw) ? +nRaw : i + 1, title: v('title'), verseRef: v('verse'), readingRef: v('reading'), meditation: v('med'), question: v('q'), errs: [], warns: [] };
+    });
+    var days = out.length;
+    var seen = {};
+    out.forEach(function (row) {
+      var err = function (field, message) { row.errs.push({ field: field, message: message }); };
+      if (row.n < 1 || row.n > days) err('n', 'رقم اليوم لازم من ١ لـ ' + ar(days) + ' (عدد الصفوف).');
+      else if (seen[row.n]) err('n', 'رقم اليوم ده متكرر.');
+      seen[row.n] = true;
+      if (!row.title) err('title', 'العنوان فاضي. كل يوم محتاج عنوان قصير.');
+      else if (row.title.length > LIMITS.title) err('title', 'العنوان أطول من ' + ar(LIMITS.title) + ' حرف.');
+      if (!row.meditation) err('meditation', 'التأمل فاضي.');
+      else if (row.meditation.length > LIMITS.meditation) err('meditation', 'التأمل أطول من ' + ar(LIMITS.meditation) + ' حرف.');
+      if (row.question.length > LIMITS.question) err('question', 'السؤال أطول من ' + ar(LIMITS.question) + ' حرف.');
+      row.vref = refs.parseRef(row.verseRef);
+      row.rref = refs.parseRef(row.readingRef);
+      if (!row.vref.ok) err('verseRef', 'مرجع الآية: ' + row.vref.error + '.');
+      if (!row.rref.ok) err('readingRef', 'مرجع القراءة: ' + row.rref.error + '.');
+    });
+    // the books the references need, then each row's text
+    var codes = {};
+    out.forEach(function (row) { if (row.vref.ok) codes[row.vref.book] = 1; if (row.rref.ok) codes[row.rref.book] = 1; });
+    var list = Object.keys(codes);
+    var done = 0;
+    progress(0, days);
+    return Promise.all(list.map(function (code) { return book(code); })).then(function (books) {
+      var byCode = {};
+      list.forEach(function (code, i) { byCode[code] = books[i]; });
+      return new Promise(function (resolve) {
+        var at = 0;
+        (function next() {
+          var end = Math.min(days, at + 8);
+          for (; at < end; at++) resolveText(refs, k.text, out[at], byCode);
+          done = at;
+          progress(done, days);
+          if (at < days) setTimeout(next, 0);
+          else resolve(out.sort(function (a, b) { return a.n - b.n; }));
+        })();
+      });
+    });
+  }
+
+  function resolveText(refs, text, row, byCode) {
+    var err = function (field, message) { row.errs.push({ field: field, message: message }); };
+    if (row.vref.ok) {
+      var vb = byCode[row.vref.book];
+      var vc = refs.checkRef(row.vref, vb);
+      if (!vc.ok) err('verseRef', vc.error + '، فالمرجع «' + row.vref.text + '» مش موجود. صلّح المرجع في الملف.');
+      else {
+        row.verseRef = row.vref.text;
+        row.verse = refs.versesOf(row.vref, vb).map(function (x) { return x.text; }).join(' ');
+        if (row.verse.length > LIMITS.verse) err('verseRef', 'الآية طويلة قوي (أكتر من ' + ar(LIMITS.verse) + ' حرف). اختار عدد أو اتنين.');
+        if (row.vref.psalm) {
+          var ag = text.agpeyaPsalm(row.vref.ch, row.vref.from);
+          if (ag && ag !== row.vref.ch) {
+            row.verseNote = 'مزمور ' + ar(ag) + ' في الأجبية';
+            row.warns.push({ field: 'verseRef', message: 'ترقيم فاندايك: ده مزمور ' + ar(ag) + ' في الأجبية. هيظهر جنبه للشباب.' });
+          }
+        }
+      }
+    }
+    if (row.rref.ok) {
+      var rb = byCode[row.rref.book];
+      var rc = refs.checkRef(row.rref, rb);
+      if (!rc.ok) err('readingRef', rc.error + '، فـ«' + row.rref.text.replace(/^\S+(\s\S+)*?\s(?=[٠-٩])/, '') + '» مش موجودين. صلّح المرجع في الملف.');
+      else {
+        row.readingRef = row.rref.text;
+        var verses = refs.versesOf(row.rref, rb);
+        if (verses.length > LIMITS.verses) err('readingRef', 'القراءة طويلة قوي (أكتر من ' + ar(LIMITS.verses) + ' عدد).');
+        var parts = [];
+        verses.forEach(function (x) {
+          var last = parts[parts.length - 1];
+          if (!last || last.chapter !== x.ch) parts.push(last = { book: row.rref.name, chapter: x.ch, verses: [] });
+          last.verses.push([x.v, x.text]);
+        });
+        if (verses.some(function (x) { return x.text.length > LIMITS.verseText; })) err('readingRef', 'عدد في القراءة طويل قوي.');
+        row.reading = parts;
+        if (row.rref.psalm) {
+          var ar2 = text.agpeyaPsalm(row.rref.ch, row.rref.from);
+          row.psalmNote = ar2 && ar2 !== row.rref.ch ? 'مزمور ' + ar(ar2) + ' في الأجبية' : '';
+        }
+        if (row.vref.ok && !row.errs.some(function (e) { return e.field === 'verseRef'; })) {
+          var inside = row.vref.book === row.rref.book && verses.some(function (x) { return x.ch === row.vref.ch && x.v === row.vref.from; });
+          if (inside) row.verseAt = [row.vref.ch, row.vref.from];
+          else row.warns.push({ field: 'verseRef', message: 'الآية مش جوه القراءة. مسموح، بس اتأكد إن ده المقصود.' });
+        }
+      }
+    }
+  }
+  BR.readRows = readRows;
+
+  /* the day sent to the Worker (worker/src/bread/model.js checkTopic) */
+  function topicOf(row) {
+    var t = { n: row.n, title: row.title, verseRef: row.verseRef, verse: row.verse, readingRef: row.readingRef, reading: row.reading, meditation: row.meditation };
+    if (row.verseNote) t.verseNote = row.verseNote;
+    if (row.question) t.question = row.question;
+    return t;
+  }
+
+  /* ---------- 3. المراجعة ---------- */
+
+  function counts(rows) {
+    var errs = rows.filter(function (x) { return x.errs.length; }).length;
+    var warns = rows.filter(function (x) { return !x.errs.length && x.warns.length; }).length;
+    return { errs: errs, warns: warns, ok: rows.length - errs - warns };
+  }
+
+  function stepReview(r) {
+    var w = BR.wiz;
+    var rows = w.rows || [];
+    var n = counts(rows);
+    var nextBtn = btn('التالي: التفعيل', 'arrow', 'btn--primary btn--sm', { 'data-act': 'bread-to-activate', disabled: !!n.errs, 'aria-disabled': n.errs ? 'true' : null, onclick: function (event) { upload(event.currentTarget); } });
+    r.append(el('div', { class: 'ba-sum' },
+      tag(ar(rows.length) + ' يوم', 'info'), tag(ar(n.ok) + ' سليم', 'ok'),
+      n.warns ? tag(ar(n.warns) + ' ملاحظة', 'warn') : null,
+      n.errs ? tag(ar(n.errs) + ' لازم يتصلّحوا', 'danger') : null,
+      el('span', { class: 'sp' }),
+      btn('ارفع ملف تاني', 'upload', 'btn--sm', { onclick: function () { dropDraft(); setStep(2); } }),
+      nextBtn));
+    if (n.errs) {
+      r.append(el('div', { class: 'ba-alert ba-alert--danger', role: 'alert' },
+        el('span', { class: 'chipico chipico--danger', 'aria-hidden': 'true' }, icon('alert')),
+        el('div', { class: 'ba-alert__text' },
+          el('b', { text: n.errs === 1 ? 'صلّح الصف الأحمر في الملف وارفعه تاني' : n.errs === 2 ? 'صلّح الصفين الحمر في الملف وارفعه تاني' : 'صلّح الـ' + ar(n.errs) + ' صفوف الحمر في الملف وارفعه تاني' }),
+          el('small', { text: 'مفيش حاجة بتتحفظ لحد ما الملف كله يبقى سليم. الملاحظات الصفرا مش بتمنع.' }))));
+    }
+    var limit = 12;
+    var shown = w.all ? rows : rows.filter(function (x, i) { return i < limit || x.errs.length || x.warns.length; });
+    var hidden = rows.length - shown.length;
+    var bad = function (row, field) { return row.errs.some(function (e) { return e.field === field; }); };
+    var body = shown.map(function (row) {
+      var why = row.errs[0] || row.warns[0];
+      var kind = row.errs.length ? 'err' : row.warns.length ? 'warn' : '';
+      return el('tr', { class: (kind === 'err' ? 'is-err' : kind === 'warn' ? 'is-warn' : '') + (row.n === w.day ? ' is-on' : ''), 'data-n': String(row.n), tabindex: '0',
+        onclick: function () { pick(row.n); }, onkeydown: function (event) { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); pick(row.n); } } },
+        el('td', { text: ar(row.n) }),
+        el('td', {}, row.title ? el('b', { text: row.title }) : el('b', {}, el('span', { class: 'ba-no', text: '— فاضي —' })),
+          why ? el('div', { class: 'ba-why ba-why--' + kind, 'data-field': why.field }, icon(kind === 'err' ? 'alert' : 'info'), el('span', { text: why.message })) : null,
+          row.errs.slice(1).map(function (e) { return el('div', { class: 'ba-why ba-why--err', 'data-field': e.field }, icon('alert'), el('span', { text: e.message })); })),
+        el('td', { class: 'ba-ref' + (bad(row, 'verseRef') ? ' ba-ref--bad' : ''), text: row.verseRef || '—' }),
+        el('td', { class: 'ba-ref' + (bad(row, 'readingRef') ? ' ba-ref--bad' : ''), text: row.readingRef || '—' }),
+        el('td', {}, row.question ? el('span', { class: 'ba-yes' }, icon('check')) : el('span', { class: 'ba-no', text: '—' })));
+    });
+    if (hidden > 0) {
+      body.push(el('tr', {}, el('td', { colspan: '5', class: 'ba-no ba-more' },
+        el('button', { class: 'ba-more__btn', type: 'button', onclick: function () { w.all = true; A.render(); } }, '… و' + daysWord(hidden) + ' كمان'))));
+    }
+    var table = el('div', { class: 'p8-tablewrap' }, el('table', { class: 'p8-table ba-table' },
+      el('thead', {}, el('tr', {}, ['اليوم', 'العنوان', 'الآية', 'القراءة', 'سؤال'].map(function (h) { return el('th', { scope: 'col', text: h }); }))),
+      el('tbody', {}, body)));
+    var day = rows.filter(function (x) { return x.n === w.day; })[0];
+    var frame = el('iframe', { src: 'bread/preview.html', title: 'معاينة', tabindex: '-1' });
+    frame.addEventListener('load', preview);
+    r.append(cols('ba-cols--review',
+      card('sheet', 'المراجعة', 'دوس على أي يوم تشوفه زي ما الشباب هيشوفوه', null, table),
+      card('phone', 'معاينة يوم ' + ar(w.day || 0), (day && (day.title || '— فاضي —')) || ' ', null, [
+        el('div', { class: 'ba-phone' }, el('div', { class: 'ba-phone__screen' }, frame)),
+        el('div', { class: 'ba-cmp' },
+          btn('قارن بالأنبا تكلا', 'external', 'btn--sm', { onclick: function () {
+            var now = chosen();
+            if (!now || !now.rref || !now.rref.ok) { A.toast('مرجع القراءة في اليوم ده محتاج يتصلّح الأول', 'error'); return; }
+            kit().then(function (k) { var url = k.refs.taklaUrl(now.rref.book, now.rref.ch); if (url) window.open(url, '_blank', 'noopener'); });
+          } }),
+          btn('اليوم الجاي', 'arrow', 'btn--sm', { onclick: function () { var i = rows.indexOf(chosen()); pick((rows[(i + 1) % rows.length] || {}).n); } }))
+      ], 'ba-pv')));
+  }
+
+  function chosen() {
+    var w = BR.wiz;
+    return (w.rows || []).filter(function (x) { return x.n === w.day; })[0] || null;
+  }
+
+  /* a day picked on the review: the row and the preview change in place (the frame stays loaded) */
+  function pick(n) {
+    if (!n) return;
+    BR.wiz.day = n;
+    var view = document.querySelector('#view .ba');
+    var pv = view && view.querySelector('.ba-pv');
+    if (!pv) { A.render(); preview(); return; }
+    view.querySelectorAll('.ba-table tr[data-n]').forEach(function (tr) { tr.classList.toggle('is-on', Number(tr.dataset.n) === n); });
+    var row = chosen();
+    pv.querySelector('.card__title').textContent = 'معاينة يوم ' + ar(n);
+    pv.querySelector('.card__hint').textContent = row ? row.title || '— فاضي —' : '';
+    preview();
+  }
+
+  /* hand the chosen day to the preview frame (admin/bread/preview.html) */
+  function preview() {
+    var w = BR.wiz;
+    var row = (w.rows || []).filter(function (x) { return x.n === w.day; })[0];
+    BR.previewDay = row ? {
+      n: row.n, days: w.rows.length, title: row.title || '— فاضي —', verseRef: row.verseRef, verse: row.verse || '…',
+      readingRef: row.readingRef, reading: row.reading || [], verseAt: row.verseAt || null, psalmNote: row.psalmNote || '',
+      meditation: row.meditation || '—', question: row.question || ''
+    } : null;
+    var frame = document.querySelector('.ba-phone iframe');
+    if (frame && frame.contentWindow) frame.contentWindow.postMessage({ type: 'bread-preview' }, location.origin);
+  }
+
+  /* the rows as sent: a change of file or name means a new draft */
+  function hashOf(w) {
+    return JSON.stringify([w.name, w.rows.map(topicOf)]).length + ':' + w.name + ':' + w.file + ':' + w.size;
+  }
+
+  /* a draft left behind by «ارفع ملف تاني» or a new file: gone at once (the Worker drops forgotten ones after 14 days) */
+  function dropDraft() {
+    var w = BR.wiz;
+    if (w.program && W()) api('POST', 'programs/' + esc(w.program) + '/delete', {}).catch(function () { /* the Worker cleans up */ });
+    w.program = null;
+    w.sentHash = '';
+  }
+
+  /*
+   * «التالي: التفعيل»: the draft (name, days), then the days in parts (≤ 20 a call and well under 320 KB). A part the
+   * Worker refuses stores nothing: its errors come back by day and field and are drawn on the review.
+   */
+  function upload(button) {
+    var w = BR.wiz;
+    w.name = String(w.name || '').trim();
+    if (!w.name) {
+      A.toast('اكتب اسم البرنامج الأول', 'error');
+      setStep(2);
+      setTimeout(function () { var i = document.querySelector('[data-act="bread-name"]'); if (i) i.focus(); }, 50);
+      return Promise.resolve(false);
+    }
+    if (w.name.length > LIMITS.name) { A.toast('اسم البرنامج طويل', 'error'); return Promise.resolve(false); }
+    var hash = hashOf(w);
+    if (w.program && w.sentHash === hash) { setStep(4); return Promise.resolve(true); }
+    dropDraft();
+    var topics = w.rows.map(topicOf);
+    var parts = [];
+    var part = [];
+    var size = 0;
+    topics.forEach(function (t) {
+      var bytes = JSON.stringify(t).length * 2;
+      if (part.length && (part.length >= PART || size + bytes > PART_BYTES)) { parts.push(part); part = []; size = 0; }
+      part.push(t);
+      size += bytes;
+    });
+    if (part.length) parts.push(part);
+    var label = button.lastChild;
+    var sent = 0;
+    w.busy = true;
+    var run = api('POST', 'programs', { name: w.name, days: topics.length }).then(function (reply) {
+      w.program = reply.program.id;
+      return parts.reduce(function (chain, list) {
+        return chain.then(function () {
+          if (label && label.nodeType === 3) label.textContent = 'بيرفع… ' + ar(sent) + ' من ' + ar(topics.length);
+          return api('POST', 'programs/' + esc(w.program) + '/topics', { topics: list }).then(function (res) { sent += list.length; return res; });
+        });
+      }, Promise.resolve(null));
+    }).then(function (res) {
+      if (!res || !res.ready) throw new Error('السيرفر لسه ناقصه أيام: ' + (res && res.missing ? res.missing.map(ar).join('، ') : ''));
+      w.sentHash = hash;
+      return refresh();
+    });
+    return A.withBusy(button, run).then(function () {
+      w.busy = false;
+      setStep(4);
+      return true;
+    }).catch(function (error) {
+      w.busy = false;
+      var errors = error && error.reply && Array.isArray(error.reply.errors) ? error.reply.errors : null;
+      if (errors && errors.length) {
+        errors.forEach(function (e) {
+          var row = w.rows.filter(function (x) { return x.n === Number(e.n); })[0];
+          if (row) row.errs.push({ field: e.field || 'row', message: 'السيرفر: ' + (e.message || 'اليوم ده مش مقبول.') });
+        });
+        dropDraft();
+        A.render();
+        A.toast('في أيام السيرفر رفضها: اتعلّمت بالأحمر', 'error');
+        return false;
+      }
+      A.fail(error);
+      return false;
+    });
+  }
+
+  /* ---------- 4. التفعيل ---------- */
+
+  function stepActivate(r) {
+    var w = BR.wiz;
+    var cur = current();
+    var waiting = upcoming();
+    var name = '«' + w.name + '»';
+    var today = BR.programs ? BR.programs.today : '';
+    var afterStart = cur ? addDays(cur.endsOn, 1) : today;
+    if (waiting || !cur) w.mode = cur ? 'now' : 'after';
+    var now = w.mode === 'now';
+    var choice = function (mode, extraClass, title, tagNode, text, line, disabled) {
+      var input = el('input', { type: 'radio', name: 'bread-when', value: mode, checked: w.mode === mode, disabled: !!disabled, onchange: function () { w.mode = mode; A.render(); } });
+      return el('label', { class: 'ba-choice' + (extraClass ? ' ' + extraClass : '') + (disabled ? ' is-off' : '') }, input,
+        el('span', { class: 'ba-choice__top' }, el('span', { class: 'ba-radio' }), el('b', { text: title }), tagNode),
+        el('p', {}, rich(text)), line);
+    };
+    var timeline = function (kinds) { return el('span', { class: 'ba-timeline' }, kinds.map(function (k) { return el('i', { class: k, style: k === 'a' && kinds.length === 3 ? 'flex:1' : null }); })); };
+    var choices;
+    if (!cur) {
+      choices = [choice('after', '', 'ابدأ النهارده', tag('المقترح', 'acc'), [name + ' يبدأ للكل ', ['النهارده'], '، وأول ما الشباب يفتحوا هيلاقوا كلمة اليوم.'], timeline(['b']))];
+    }
+    else {
+      choices = [
+        choice('after', '', 'بعد البرنامج الحالي', tag('المقترح', 'acc'),
+          waiting ? ['في برنامج مستني بعد الحالي: «' + waiting.name + '». ألغيه الأول من «البرامج» أو استبدل دلوقتي.']
+            : [name + ' يبدأ لوحده ', [dayWords(afterStart)], '، اليوم اللي بعد نهاية «' + cur.name + '». مفيش حد هيفوّت يوم.'],
+          timeline(['a', 'b']), !!waiting),
+        choice('now', 'ba-choice--danger', 'استبدال دلوقتي', null,
+          ['«' + cur.name + '» يقف ', ['النهارده'], ' عند اليوم ' + ar(cur.day) + '، والكل يبدأ ' + name + ' من النهارده. الأيام اللي فاضلة من الحالي مش هتترحّل.'],
+          timeline(['a', 'x', 'b']))
+      ];
+    }
+    var start = now || !cur ? today : afterStart;
+    var facts = el('div', { class: 'ba-facts ba-facts--top' },
+      el('div', {}, el('small', { class: 'muted', text: 'البرنامج' }), el('b', { text: w.name + ' · ' + daysWord(w.rows.length) })),
+      el('div', {}, el('small', { class: 'muted', text: 'بيبدأ' }), el('b', { text: (start === today ? 'النهارده، ' : '') + dayWords(start) })),
+      el('div', {}, el('small', { class: 'muted', text: 'الإشعارات' }), el('b', { text: 'في مواعيد كل شاب، زي ما هي' })));
+    r.append(card('check', 'التفعيل', 'إمتى البرنامج الجديد يبدأ؟', null, [el('div', { class: 'ba-choices' }, choices), facts]));
+    r.append(el('div', { class: 'ba-actions' },
+      btn('رجوع', '', 'btn--sm', { onclick: function () { setStep(3); } }),
+      btn(now ? 'استبدل وفعّل' : 'فعّل البرنامج', 'check', now ? 'btn--danger' : 'btn--primary', { 'data-act': 'bread-activate', onclick: function (event) { activate(event.currentTarget); } })));
+  }
+
+  function activate(button) {
+    var w = BR.wiz;
+    var cur = current();
+    var now = w.mode === 'now' && !!cur;
+    var ask = now ? A.confirm({
+      tone: 'danger', typed: 'استبدال',
+      title: 'استبدال «' + cur.name + '» دلوقتي؟',
+      message: 'البرنامج الحالي هيقف النهارده عند اليوم ' + ar(cur.day) + '، و«' + w.name + '» يبدأ للكل من النهارده. الخطوة دي مبترجعش.',
+      confirmLabel: 'استبدل', cancelLabel: 'إلغاء'
+    }) : Promise.resolve(true);
+    return ask.then(function (ok) {
+      if (!ok) return false;
+      w.busy = true;
+      return A.withBusy(button, api('POST', 'programs/' + esc(w.program) + '/activate', now ? { mode: 'now', confirm: true } : { mode: cur ? w.mode : 'after' })).then(function (reply) {
+        var p = reply.program;
+        A.toast(p.startsOn === (BR.programs && BR.programs.today) ? 'اتفعّل «' + p.name + '»: شغال للكل من النهارده' : 'اتجدول: «' + p.name + '» هيبدأ لوحده ' + dayWords(p.startsOn));
+        BR.wiz = fresh();
+        BR.previewDay = null;
+        BR.stats = null;
+        return refresh().then(function () { return A.go('bread', 'breadprograms'); });
+      });
+    }).catch(function (error) {
+      w.busy = false;
+      A.fail(error);
+      refresh();
+    });
+  }
+
+
+  /* =======================================================
+     الإحصائيات (W1 22-stats) — aggregate only (bread.stats)
+  ======================================================= */
+
+  var statsLoading = null;
+
+  function loadStats() {
+    if (statsLoading) return statsLoading;
+    statsLoading = api('GET', 'stats').then(function (s) { BR.stats = s; BR.statsError = null; }, function (e) { BR.statsError = e; }).then(function () {
+      statsLoading = null;
+      paintWaits();
+      redraw('breadstats');
+    });
+    return statsLoading;
+  }
+
+  A.views.breadstats = function () {
+    var r = root();
+    if (!hasPerm('bread.stats') || (BR.statsError && BR.statsError.code === 'denied')) {
+      r.append(locked('الإحصائيات', 'إحصائيات خبزنا اليومي', 'الأرقام بتتشاف بصلاحية «إحصائيات خبزنا اليومي». اطلبها من الأدمن الأساسي في «الفريق والصلاحيات».'));
+      return [r];
+    }
+    var s = BR.stats;
+    if (!s) {
+      if (BR.statsError) r.append(failed(A.errorBox(), BR.statsError, function () { BR.statsError = null; A.render(); loadStats(); }));
+      else { r.append(skeleton()); loadStats(); }
+      return [r];
+    }
+    if (!s.program) {
+      r.append(card('chart', 'الإحصائيات', '', null, empty('chart', 'مفيش برنامج شغال', 'الأرقام بتبدأ تتعد أول ما برنامج يشتغل.', btn('برنامج جديد', 'plus', 'btn--primary', { onclick: goNew }))));
+      return [r];
+    }
+    loadStats();
+    var byDay = {};
+    (s.days || []).forEach(function (d) { byDay[d.day] = d; });
+    var row = function (iso) { return byDay[iso] || { opens: 0, reads: 0, sent: 0, reflections: 0 }; };
+    var t = row(s.today);
+    var y = row(addDays(s.today, -1));
+    var delta = t.opens - y.opens;
+    var series = [];
+    for (var i = 13; i >= 0; i--) series.push({ iso: addDays(s.today, -i), d: row(addDays(s.today, -i)) });
+    var max = Math.max(10, series.reduce(function (m, x) { return Math.max(m, x.d.opens, x.d.reads); }, 0) * 1.06);
+    var chart = el('div', { class: 'ba-chart', role: 'img', 'aria-label': 'الفتح والقراءة آخر ١٤ يوم' }, series.map(function (x, i) {
+      var date = isoDate(x.iso);
+      return el('div', { class: 'ba-chart__day' + (i === 13 ? ' is-today' : '') },
+        el('div', { class: 'ba-chart__bars' }, el('i', { class: 'o', style: '--o:' + (x.d.opens / max * 100).toFixed(1) + '%' }), el('i', { class: 'r', style: '--r:' + (x.d.reads / max * 100).toFixed(1) + '%' })),
+        el('small', { text: i === 13 ? 'النهارده' : date ? ar(date.getUTCDate()) : '' }));
+    }));
+    var best = (s.days || []).filter(function (d) { return d.opens >= 3; }).map(function (d) { return { iso: d.day, pct: Math.round(d.reads / d.opens * 100) }; })
+      .sort(function (a, b) { return b.pct - a.pct || (a.iso < b.iso ? 1 : -1); }).slice(0, 5);
+    var totals = s.totals || {};
+    var subs = s.subscribers || {};
+    var legend = el('div', { class: 'ba-legend' },
+      el('span', {}, el('i', { class: 'ba-legend__o' }), 'فتحوا'), el('span', {}, el('i', { class: 'ba-legend__r' }), 'قروا'));
+    var facts = function (pairs) { return el('div', { class: 'ba-facts ba-facts--2' }, pairs.map(function (p) { return el('div', {}, el('small', { class: 'muted', text: p[0] }), el('b', { text: p[1] })); })); };
+    r.append(el('div', { class: 'grid g4 kpis', 'aria-label': 'الأرقام النهارده' },
+      kpi('eye', 'فتحوا النهارده', num(t.opens), delta ? (delta > 0 ? '+' : '−') + ar(Math.abs(delta)) + ' عن امبارح' : 'زي امبارح'),
+      kpi('check', 'دوسوا «قريت»', num(t.reads), t.opens ? ar(Math.round(t.reads / t.opens * 100)) + '٪ من اللي فتحوا' : ''),
+      kpi('heartchat', 'تأملات النهارده', num(t.reflections), ''),
+      kpi('bell', 'مشتركين في الإشعارات', num(subs.devices), subs.slots ? 'على ' + num(subs.slots) + ' ميعاد' : '')));
+    r.append(cols('',
+      stack(
+        card('chart', 'آخر ١٤ يوم', '', legend, chart),
+        card('bread', 'الأيام الأكتر تفاعل', 'نسبة اللي دوسوا «قريت» من اللي فتحوا في اليوم ده', null,
+          best.length ? el('div', { class: 'ba-meter' }, best.map(function (b) {
+            return el('div', { class: 'ba-meter__row' }, el('span', { text: dayWords(b.iso) }), el('b', { text: ar(b.pct) + '٪' }), el('div', { class: 'ba-bar' }, el('i', { style: '--v:' + b.pct + '%' })));
+          })) : el('p', { class: 'ba-no', text: 'لسه بدري: الأرقام بتظهر بعد كام يوم.' }))),
+      stack(
+        card('bell', 'إشعارات النهارده', '', null, facts([['اتبعتت', num(t.sent)], ['اتبعتت في البرنامج', num(totals.sent)], ['أكتر ميعاد', minuteWords(s.topMinute)], ['مواعيد متسجلة', num(subs.slots)]])),
+        card('users', 'المشتركين', '', null, facts([['أجهزة عليها «فكّرني»', num(subs.devices)], ['حسابات في البرنامج', num(s.accounts)], ['فتحوا في البرنامج', num(totals.opens)], ['تأملات في البرنامج', num(totals.reflections)]])),
+        note('lock', 'أرقام إجمالية بس. مفيش أسماء ولا «مين فتح ومين لأ»، والفتح الفردي بيتمسح بعد ٣٠ يوم.'))));
+    return [r];
+  };
+
+
+  /* =======================================================
+     التأملات (W1 23-reflections, 23-noperm) — bread.reflections; every read is in «سجل النشاط»
+  ======================================================= */
+
+  /* the program whose reflections show: the live one, else the last one that had any */
+  function reflProgram() {
+    var cur = current();
+    if (cur) return cur;
+    return pastPrograms().filter(function (p) { return !p.purged && (p.totals || {}).reflections; })[0] || null;
+  }
+
+  var reflLoading = null;
+
+  function loadRefl(more) {
+    var p = reflProgram();
+    if (!p || reflLoading) return reflLoading || Promise.resolve();
+    var before = more && BR.refl && BR.refl.more ? '&before=' + BR.refl.more : '';
+    reflLoading = api('GET', 'reflections?program=' + esc(p.id) + before).then(function (reply) {
+      if (more && BR.refl && BR.refl.program.id === reply.program.id) {
+        BR.refl.reflections = BR.refl.reflections.concat(reply.reflections);
+        BR.refl.more = reply.more;
+      }
+      else BR.refl = reply;
+      BR.reflError = null;
+    }, function (error) { BR.reflError = error; }).then(function () {
+      reflLoading = null;
+      redraw('breadrefl');
+    });
+    return reflLoading;
+  }
+
+  var reflAsked = false;
+  var searchTimer = 0;
+
+  A.views.breadrefl = function () {
+    var r = root();
+    if (!hasPerm('bread.reflections') || (BR.reflError && BR.reflError.code === 'denied')) {
+      r.append(card('lock', 'التأملات', '', null, empty('lock', 'التأملات محتاجة صلاحية «تأملات خبزنا اليومي»', 'دي كلام شخصي عن الإيمان، فبتتشاف بصلاحية لوحدها. اطلبها من الأدمن الأساسي في «الفريق والصلاحيات».')));
+      return [r];
+    }
+    if (!BR.programs) {
+      if (BR.programsError) r.append(failed(A.errorBox(), BR.programsError, retry));
+      else { r.append(skeleton()); refresh(); }
+      return [r];
+    }
+    var p = reflProgram();
+    var privacy = note('shield', rich([['التأملات دي خاصة.'], ' بتوصل لأصحاب الصلاحية بس، وكل فتح للصفحة دي بيتسجل في «سجل النشاط». بتتمسح بعد نهاية البرنامج بـ٩٠ يوم.']), 'ba-private');
+    if (!p) {
+      r.append(privacy, card('heartchat', 'التأملات', '', null, empty('heartchat', 'لسه مفيش تأملات', 'أول ما الشباب يكتبوا تأملاتهم في البرنامج الشغال، هتلاقيها هنا.')));
+      return [r];
+    }
+    // one read a visit to the tab (each read is an activity row): the list stays until the tab is opened again
+    if (!reflAsked || !BR.refl || BR.refl.program.id !== p.id) { reflAsked = true; if (!BR.reflError) loadRefl(false); }
+    if (!BR.refl) {
+      r.append(privacy, BR.reflError ? failed(A.errorBox(), BR.reflError, function () { BR.reflError = null; reflAsked = false; A.render(); }) : skeleton());
+      return [r];
+    }
+    var today = BR.programs.today;
+    var q = String(BR.reflQuery || '').trim();
+    var list = BR.refl.reflections.filter(function (x) {
+      if (BR.reflFilter === 'today' && x.day !== today) return false;
+      if (BR.reflFilter === 'asked' && !x.asked) return false;
+      return !q || (x.text + ' ' + x.name + ' ' + x.title).indexOf(q) !== -1;
+    });
+    var todayCount = BR.refl.reflections.filter(function (x) { return x.day === today; }).length;
+    var total = p.totals && p.totals.reflections ? p.totals.reflections : BR.refl.reflections.length;
+    var chip = function (key, label) {
+      return el('button', { class: 'filter-chip seg__btn', type: 'button', 'aria-pressed': String(BR.reflFilter === key), onclick: function () { BR.reflFilter = key; A.render(); } }, label);
+    };
+    var search = el('input', { class: 'p8-search__input', type: 'search', placeholder: 'دوّر في التأملات…', 'aria-label': 'دوّر في التأملات', value: BR.reflQuery,
+      oninput: function () {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(function () {
+          BR.reflQuery = search.value;
+          A.render();
+          var s = document.querySelector('.ba .p8-search__input');
+          if (s) { s.focus(); s.setSelectionRange(s.value.length, s.value.length); }
+        }, 250);
+      } });
+    var groups = [];
+    var lastDay = null;
+    list.forEach(function (x) {
+      if (x.day !== lastDay) {
+        lastDay = x.day;
+        var gap = diffDays(today, x.day);
+        groups.push(el('p', { class: 'ba-day-head', text: gap === 0 ? 'النهارده' : gap === 1 ? 'امبارح' : dayWords(x.day) }));
+      }
+      var who = x.name || 'من غير اسم';
+      groups.push(el('article', { class: 'ba-refl-item' },
+        el('span', { class: 'ba-arch', 'aria-hidden': 'true', text: who.charAt(0) }),
+        el('header', {}, el('b', { text: who }), x.state === 'guest' ? tag('ضيف', 'acc') : null,
+          el('small', { text: clock(x.createdMs) + ' · ' + (x.title || ('اليوم ' + ar(x.n))) }),
+          x.editedMs ? el('small', { class: 'edited', text: '· اتعدّل' }) : null),
+        el('p', { text: x.text })));
+    });
+    if (!list.length) groups.push(el('p', { class: 'ba-no', text: q || BR.reflFilter !== 'all' ? 'مفيش تأملات بالبحث ده.' : 'لسه مفيش تأملات في «' + p.name + '».' }));
+    if (BR.refl.more) groups.push(el('div', { class: 'ba-actions ba-actions--center' }, btn('حمّل أقدم', 'arrow', 'btn--sm', { onclick: function (event) { A.withBusy(event.currentTarget, loadRefl(true)); } })));
+    r.append(privacy, card('heartchat', 'التأملات', ar(todayCount) + ' النهارده · ' + num(total) + ' في البرنامج', null, [
+      el('div', { class: 'p8-card__filters' },
+        el('div', { class: 'seg p8-filter filter-chips', role: 'group', 'aria-label': 'الموضوع' }, chip('all', 'الكل'), chip('today', 'النهارده'), chip('asked', 'بسؤال')),
+        el('label', { class: 'p8-search' }, icon('eye'), search)),
+      el('div', { class: 'ba-refl' }, groups)
+    ]));
+    return [r];
+  };
+
+  // a new visit to «التأملات» reads them again (and is logged again); a redraw inside the tab does not
+  var go = A.go;
+  A.go = function (area, sub) {
+    if (area === 'bread' && sub === 'breadrefl' && !(A.area === 'bread' && A.sub.bread === 'breadrefl')) reflAsked = false;
+    return go.apply(this, arguments);
+  };
+
+
+  /* =======================================================
+     الإعدادات (W1 24-settings)
+  ======================================================= */
+
+  function saveSetting(body, control) {
+    return A.withBusy(control, api('POST', 'settings', body)).then(function (reply) {
+      if (BR.programs && reply && reply.settings) BR.programs.settings = reply.settings;
+      A.toast('اتحفظ ✓');
+      paintWaits();
+      A.render();
+    }).catch(function (error) { A.fail(error); A.render(); });
+  }
+
+  A.views.breadsettings = function () {
+    var r = root();
+    if (!BR.programs) {
+      if (BR.programsError) r.append(BR.programsError.code === 'denied' ? locked('الإعدادات', 'محتوى خبزنا اليومي') : failed(A.errorBox(), BR.programsError, retry));
+      else { r.append(skeleton()); refresh(); }
+      return [r];
+    }
+    var s = BR.programs.settings;
+    var time = el('input', { class: 'input ba-time', value: minuteWords(s.defaultTime), 'aria-label': 'الميعاد الافتراضي', inputmode: 'text', 'data-act': 'bread-time',
+      onchange: function () {
+        var v = parseTime(time.value);
+        if (!v) { A.toast('الميعاد مش مفهوم. اكتبه كده: ٨:٠٠ ص', 'error'); time.value = minuteWords(s.defaultTime); return; }
+        if (v !== s.defaultTime) saveSetting({ defaultTime: v }, time);
+        else time.value = minuteWords(v);
+      } });
+    var maxSeg = el('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'أقصى عدد' }, [1, 2, 3].map(function (n) {
+      return el('label', { class: 'seg__opt' }, el('input', { type: 'radio', name: 'bread-max', checked: s.maxSlots === n, onchange: function (event) { saveSetting({ maxSlots: n }, event.target); } }), el('span', { text: ar(n) }));
+    }));
+    var push = el('div', { class: 'ba-push', 'aria-label': 'شكل الإشعار' },
+      el('div', { class: 'ba-push__top' }, el('img', { src: 'bread/mark-192.png', alt: '' }), 'أسرة البابا أثناسيوس · خبزنا اليومي · ' + minuteWords(s.defaultTime)),
+      el('b', { text: 'أنا هو خبز الحياة' }),
+      el('p', { text: '«أنا هو خبز الحياة. من يقبل إليّ فلا يجوع…» — يوحنا ٦: ٣٥' }));
+    var tpl = el('div', { class: 'setrow ba-setrow--block' },
+      el('label', { class: 'field' }, el('span', { class: 'field__label', text: 'نص الإشعار' }),
+        el('textarea', { class: 'input ba-tpl', 'aria-label': 'نص الإشعار', readonly: true, text: '{العنوان}\n«{أول الآية}…» — {المرجع}' }),
+        el('span', { class: 'field__hint', text: 'كل شاب بيوصله عنوان موضوعه هو. الشكل ده ثابت دلوقتي (قرار ٧): العنوان وأول الآية.' })),
+      el('div', { class: 'ba-tokens' }, ['{العنوان}', '{أول الآية}', '{المرجع}', '{اسم البرنامج}'].map(function (t) { return el('span', { class: 'ba-token', text: t }); })),
+      el('div', { class: 'ba-gap' }, push));
+    var mayReflect = A.access && (A.access.primary || (A.access.perms && A.access.perms['accounts.manage']));
+    r.append(cols('ba-cols--even',
+      stack(setcard('bell', 'إشعارات الشباب', 'المواعيد بتوقيت مصر', [
+        setrow('الميعاد الافتراضي', 'أول ما حد يشغّل «فكّرني»', time),
+        setrow('أقصى عدد مواعيد لكل شخص', '', maxSeg),
+        tpl
+      ])),
+      stack(
+        setcard('alert', 'تنبيهات الأدمن', 'بتظهر في الجرس وعلى أجهزة الأدمنز اللي عندهم الصلاحية', [
+          setrow('قبل النهاية بـ٧ و٣ ويوم', 'لو مفيش برنامج جاي متجدول', sw(true, 'قبل النهاية', null, true)),
+          setrow('«المحتوى خلص»', s.emptyMuted ? 'مكتوم لحد ما يترفع برنامج جديد' : 'تنبيه واحد، وتقدر تكتمه لحد ما يترفع برنامج', sw(!s.emptyMuted, 'المحتوى خلص', function (event) { saveSetting({ emptyMuted: !event.target.checked }, event.target); }))
+        ]),
+        setcard('lock', 'التأملات والخصوصية', '', [
+          setrow('مين يشوف التأملات', 'صلاحية «تأملات خبزنا اليومي». بالأساس: الأدمن الأساسي بس', btn('الفريق والصلاحيات', 'users', 'btn--small', { disabled: !mayReflect, onclick: function () { A.go('settings', 'team'); } })),
+          setrow('بتتحفظ لحد إمتى', 'نهاية البرنامج + ٩٠ يوم، وبعدها بتتمسح لوحدها', el('span', { class: 'chip chip--info', text: '٩٠ يوم' })),
+          setrow('التعديل والمسح', 'أول ٢٠ دقيقة بعد الإرسال بس', el('span', { class: 'chip chip--info', text: '٢٠ دقيقة' }))
+        ]),
+        setcard('bread', 'القسم في الموقع', '', [
+          setrow('«خبزنا اليومي» على الموقع', s.module ? 'مفتوح للشباب' : 'بيتفتح يوم الإطلاق (W7)، بعد تجربة Staging', el('span', { class: 'chip ' + (s.module ? 'chip--ok' : 'chip--off'), text: s.module ? 'مفتوح' : 'مقفول' })),
+          setrow('الكارت في الرئيسية واللينك في القايمة', '/daily-bread/', el('span', { class: 'chip ' + (s.module ? 'chip--ok' : 'chip--off'), text: s.module ? 'ظاهرين' : 'مع فتح القسم' }))
+        ]))));
+    return [r];
+  };
+
+})();
+
 /* ---------- the permission tables (generated from worker/src/lib/perms.js and apps-script/Grants.gs) ---------- */
-A.ROUTE_PERMS = {"DELETE /v1/admin/book/bookings/:id/lock":"bookings.edit","DELETE /v1/admin/proofs/:id":"bookings.manage","GET /v1/admin/accounts":"accounts.view","GET /v1/admin/activity":"activity.view","GET /v1/admin/activity/manage":"activity.manage","GET /v1/admin/activity/manage/archive/:id":"activity.manage","GET /v1/admin/avatars":"*","GET /v1/admin/book/bookings":"bookings.view","GET /v1/admin/book/bookings/:id":"bookings.view","GET /v1/admin/book/events":"bookings.view","GET /v1/admin/book/events/:id/handovers":"finance.view","GET /v1/admin/book/events/:id/reminders":"bookings.view","GET /v1/admin/book/export":"exports.export","GET /v1/admin/book/finance":"finance.view","GET /v1/admin/book/module":"bookings.view","GET /v1/admin/book/report":"exports.export","GET /v1/admin/book/summary":"bookings.view","GET /v1/admin/comp":"competitions.view","GET /v1/admin/comp/:id/submissions":"competitions.view","GET /v1/admin/comp/badges":"*","GET /v1/admin/comp/seasons":"competitions.view","GET /v1/admin/comp/submissions/:id":"competitions.view","GET /v1/admin/content/drafts":"content.view","GET /v1/admin/content/export":"system.manage","GET /v1/admin/content/media-status":"system.view","GET /v1/admin/content/media/:id/file":"media.view","GET /v1/admin/content/review-input":"content.view","GET /v1/admin/content/status":"system.view","GET /v1/admin/diag/book-news":"system.view","GET /v1/admin/me":"*","GET /v1/admin/notify/me":"*","GET /v1/admin/notify/settings":"notifications.view","GET /v1/admin/notify/status":"notifications.view","GET /v1/admin/participants":"participants.view","GET /v1/admin/participants/:id":"participants.view","GET /v1/admin/participants/:id/avatar":"participants.view","GET /v1/admin/participants/export":["participants.view","exports.export_pii"],"GET /v1/admin/participants/review":"participants.view","GET /v1/admin/participants/settings":"participants.view","GET /v1/admin/points/seasons":"points.view","GET /v1/admin/points/seasons/:id/preview":"points.view","GET /v1/admin/proofs/:id":"bookings.view","GET /v1/admin/publish/revisions":"publish.publish","GET /v1/admin/publish/status":"system.view","GET /v1/admin/store/items":"store.view","GET /v1/admin/store/redemptions":"store.view","GET /v1/admin/store/schedule":"store.view","GET /v1/admin/whoami":"*","POST /v1/admin/accounts":"accounts.manage","POST /v1/admin/accounts/:email":"accounts.manage","POST /v1/admin/accounts/:email/name":"*","POST /v1/admin/accounts/:email/remove":"accounts.manage","POST /v1/admin/accounts/:email/signout":"accounts.manage","POST /v1/admin/accounts/enforce":"accounts.manage","POST /v1/admin/activity/manage/archive":"activity.manage","POST /v1/admin/activity/manage/delete":"activity.manage","POST /v1/admin/activity/manage/preview":"activity.manage","POST /v1/admin/book/bookings":"bookings.create_cash","POST /v1/admin/book/bookings/:id/cancel":"bookings.manage","POST /v1/admin/book/bookings/:id/confirm":"bookings.approve","POST /v1/admin/book/bookings/:id/link":"bookings.manage","POST /v1/admin/book/bookings/:id/lock":"bookings.edit","POST /v1/admin/book/bookings/:id/payments":["bookings.approve","finance.manage"],"POST /v1/admin/book/bookings/:id/reject":"bookings.approve","POST /v1/admin/book/bookings/:id/reopen":"bookings.manage","POST /v1/admin/book/bookings/:id/update":"bookings.edit","POST /v1/admin/book/claims/:id/reject":["bookings.approve","finance.manage"],"POST /v1/admin/book/events/:id/cancel-all":"bookings.manage","POST /v1/admin/book/events/:id/handovers":"finance.manage","POST /v1/admin/book/events/:id/notify":"bookings.manage","POST /v1/admin/book/events/:id/purge":"bookings.manage","POST /v1/admin/book/events/:id/reminders":"bookings.edit","POST /v1/admin/book/events/:slug/refresh":"bookings.edit","POST /v1/admin/book/handovers/:id/void":"finance.manage","POST /v1/admin/book/module":"bookings.manage","POST /v1/admin/book/payments/:id/void":"finance.manage","POST /v1/admin/book/servants/:id/purge":"bookings.manage","POST /v1/admin/comp/:id/regrade":"competitions.approve","POST /v1/admin/comp/submissions/:id/grade":"competitions.edit","POST /v1/admin/comp/submissions/:id/void":"competitions.approve","POST /v1/admin/content/call":"*","POST /v1/admin/devices/forget":"*","POST /v1/admin/devices/trust":"*","POST /v1/admin/diag/echo":"system.manage","POST /v1/admin/diag/event-fixture":"system.manage","POST /v1/admin/diag/gmail-health":"system.manage","POST /v1/admin/diag/housekeeping":"system.manage","POST /v1/admin/diag/mail-sample":"system.manage","POST /v1/admin/diag/retention":"system.manage","POST /v1/admin/me/ask-access":"*","POST /v1/admin/me/avatar":"*","POST /v1/admin/me/avatar/delete":"*","POST /v1/admin/me/prefs":"*","POST /v1/admin/media/upload":"*","POST /v1/admin/notify/me":"*","POST /v1/admin/notify/outbox/:id/dismiss":"notifications.manage","POST /v1/admin/notify/settings":"notifications.manage","POST /v1/admin/participants":"participants.add","POST /v1/admin/participants/:id/avatar/delete":"participants.edit","POST /v1/admin/participants/:id/block":"participants.edit","POST /v1/admin/participants/:id/dob":"participants.manage","POST /v1/admin/participants/:id/eligibility":"participants.manage","POST /v1/admin/participants/:id/email":"participants.manage","POST /v1/admin/participants/:id/phone":"participants.manage","POST /v1/admin/participants/:id/points":"points.edit","POST /v1/admin/participants/:id/profile":"participants.edit","POST /v1/admin/participants/:id/resend":"participants.view","POST /v1/admin/participants/:id/reset-password":"participants.manage","POST /v1/admin/participants/:id/sessions/revoke":"participants.manage","POST /v1/admin/participants/:id/transfer":"points.approve","POST /v1/admin/participants/:id/unblock":"participants.manage","POST /v1/admin/participants/:id/view-password":"participants.view","POST /v1/admin/participants/settings":"participants.manage","POST /v1/admin/points/seasons":"points.approve","POST /v1/admin/points/seasons/:id/close":"points.approve","POST /v1/admin/proofs":"bookings.edit","POST /v1/admin/publish/restore":"publish.publish","POST /v1/admin/publish/shadow-check":"system.manage","POST /v1/admin/push/auto":"push.view","POST /v1/admin/push/check":"push.view","POST /v1/admin/push/devices":"*","POST /v1/admin/push/remove":"*","POST /v1/admin/push/schedule":"push.view","POST /v1/admin/push/schedule/cancel":"push.manage","POST /v1/admin/push/send":"push.manage","POST /v1/admin/push/state":"push.view","POST /v1/admin/push/subscribe":"*","POST /v1/admin/push/test":"*","POST /v1/admin/push/unsubscribe":"*","POST /v1/admin/session/end":"*","POST /v1/admin/session/heartbeat":"*","POST /v1/admin/session/renew":"*","POST /v1/admin/session/resume":"*","POST /v1/admin/session/start":"*","POST /v1/admin/store/items":"store.edit","POST /v1/admin/store/items/:id/delete":"store.delete","POST /v1/admin/store/redemptions/:id/status":"store.approve","POST /v1/admin/store/schedule":"store.edit","POST /v1/admin/tools/admins":"accounts.view","POST /v1/admin/tools/fetch-media":"media.add","POST /v1/admin/tools/github":"system.view","POST /v1/admin/tools/live-stage":"content.edit","POST /v1/admin/tools/maps":"content.edit","POST /v1/admin/tools/media":"media.view","POST /v1/admin/tools/migrate":"system.manage","POST /v1/admin/tools/migration":"system.manage"};
+A.ROUTE_PERMS = {"DELETE /v1/admin/book/bookings/:id/lock":"bookings.edit","DELETE /v1/admin/proofs/:id":"bookings.manage","GET /v1/admin/accounts":"accounts.view","GET /v1/admin/activity":"activity.view","GET /v1/admin/activity/manage":"activity.manage","GET /v1/admin/activity/manage/archive/:id":"activity.manage","GET /v1/admin/avatars":"*","GET /v1/admin/book/bookings":"bookings.view","GET /v1/admin/book/bookings/:id":"bookings.view","GET /v1/admin/book/events":"bookings.view","GET /v1/admin/book/events/:id/handovers":"finance.view","GET /v1/admin/book/events/:id/reminders":"bookings.view","GET /v1/admin/book/export":"exports.export","GET /v1/admin/book/finance":"finance.view","GET /v1/admin/book/module":"bookings.view","GET /v1/admin/book/report":"exports.export","GET /v1/admin/book/summary":"bookings.view","GET /v1/admin/bread/programs":"bread.content","GET /v1/admin/bread/programs/:id/topics":"bread.content","GET /v1/admin/bread/reflections":"bread.reflections","GET /v1/admin/bread/settings":"bread.content","GET /v1/admin/bread/stats":"bread.stats","GET /v1/admin/comp":"competitions.view","GET /v1/admin/comp/:id/submissions":"competitions.view","GET /v1/admin/comp/badges":"*","GET /v1/admin/comp/seasons":"competitions.view","GET /v1/admin/comp/submissions/:id":"competitions.view","GET /v1/admin/content/drafts":"content.view","GET /v1/admin/content/export":"system.manage","GET /v1/admin/content/media-status":"system.view","GET /v1/admin/content/media/:id/file":"media.view","GET /v1/admin/content/review-input":"content.view","GET /v1/admin/content/status":"system.view","GET /v1/admin/diag/book-news":"system.view","GET /v1/admin/me":"*","GET /v1/admin/notify/me":"*","GET /v1/admin/notify/settings":"notifications.view","GET /v1/admin/notify/status":"notifications.view","GET /v1/admin/participants":"participants.view","GET /v1/admin/participants/:id":"participants.view","GET /v1/admin/participants/:id/avatar":"participants.view","GET /v1/admin/participants/export":["participants.view","exports.export_pii"],"GET /v1/admin/participants/review":"participants.view","GET /v1/admin/participants/settings":"participants.view","GET /v1/admin/points/seasons":"points.view","GET /v1/admin/points/seasons/:id/preview":"points.view","GET /v1/admin/proofs/:id":"bookings.view","GET /v1/admin/publish/revisions":"publish.publish","GET /v1/admin/publish/status":"system.view","GET /v1/admin/store/items":"store.view","GET /v1/admin/store/redemptions":"store.view","GET /v1/admin/store/schedule":"store.view","GET /v1/admin/whoami":"*","POST /v1/admin/accounts":"accounts.manage","POST /v1/admin/accounts/:email":"accounts.manage","POST /v1/admin/accounts/:email/name":"*","POST /v1/admin/accounts/:email/remove":"accounts.manage","POST /v1/admin/accounts/:email/signout":"accounts.manage","POST /v1/admin/accounts/enforce":"accounts.manage","POST /v1/admin/activity/manage/archive":"activity.manage","POST /v1/admin/activity/manage/delete":"activity.manage","POST /v1/admin/activity/manage/preview":"activity.manage","POST /v1/admin/book/bookings":"bookings.create_cash","POST /v1/admin/book/bookings/:id/cancel":"bookings.manage","POST /v1/admin/book/bookings/:id/confirm":"bookings.approve","POST /v1/admin/book/bookings/:id/link":"bookings.manage","POST /v1/admin/book/bookings/:id/lock":"bookings.edit","POST /v1/admin/book/bookings/:id/payments":["bookings.approve","finance.manage"],"POST /v1/admin/book/bookings/:id/reject":"bookings.approve","POST /v1/admin/book/bookings/:id/reopen":"bookings.manage","POST /v1/admin/book/bookings/:id/update":"bookings.edit","POST /v1/admin/book/claims/:id/reject":["bookings.approve","finance.manage"],"POST /v1/admin/book/events/:id/cancel-all":"bookings.manage","POST /v1/admin/book/events/:id/handovers":"finance.manage","POST /v1/admin/book/events/:id/notify":"bookings.manage","POST /v1/admin/book/events/:id/purge":"bookings.manage","POST /v1/admin/book/events/:id/reminders":"bookings.edit","POST /v1/admin/book/events/:slug/refresh":"bookings.edit","POST /v1/admin/book/handovers/:id/void":"finance.manage","POST /v1/admin/book/module":"bookings.manage","POST /v1/admin/book/payments/:id/void":"finance.manage","POST /v1/admin/book/servants/:id/purge":"bookings.manage","POST /v1/admin/bread/programs":"bread.content","POST /v1/admin/bread/programs/:id/activate":"bread.content","POST /v1/admin/bread/programs/:id/delete":"bread.content","POST /v1/admin/bread/programs/:id/stop":"bread.content","POST /v1/admin/bread/programs/:id/topics":"bread.content","POST /v1/admin/bread/settings":"bread.content","POST /v1/admin/comp/:id/regrade":"competitions.approve","POST /v1/admin/comp/submissions/:id/grade":"competitions.edit","POST /v1/admin/comp/submissions/:id/void":"competitions.approve","POST /v1/admin/content/call":"*","POST /v1/admin/devices/forget":"*","POST /v1/admin/devices/trust":"*","POST /v1/admin/diag/echo":"system.manage","POST /v1/admin/diag/event-fixture":"system.manage","POST /v1/admin/diag/gmail-health":"system.manage","POST /v1/admin/diag/housekeeping":"system.manage","POST /v1/admin/diag/mail-sample":"system.manage","POST /v1/admin/diag/retention":"system.manage","POST /v1/admin/me/ask-access":"*","POST /v1/admin/me/avatar":"*","POST /v1/admin/me/avatar/delete":"*","POST /v1/admin/me/prefs":"*","POST /v1/admin/media/upload":"*","POST /v1/admin/notify/me":"*","POST /v1/admin/notify/outbox/:id/dismiss":"notifications.manage","POST /v1/admin/notify/settings":"notifications.manage","POST /v1/admin/participants":"participants.add","POST /v1/admin/participants/:id/avatar/delete":"participants.edit","POST /v1/admin/participants/:id/block":"participants.edit","POST /v1/admin/participants/:id/dob":"participants.manage","POST /v1/admin/participants/:id/eligibility":"participants.manage","POST /v1/admin/participants/:id/email":"participants.manage","POST /v1/admin/participants/:id/phone":"participants.manage","POST /v1/admin/participants/:id/points":"points.edit","POST /v1/admin/participants/:id/profile":"participants.edit","POST /v1/admin/participants/:id/resend":"participants.view","POST /v1/admin/participants/:id/reset-password":"participants.manage","POST /v1/admin/participants/:id/sessions/revoke":"participants.manage","POST /v1/admin/participants/:id/transfer":"points.approve","POST /v1/admin/participants/:id/unblock":"participants.manage","POST /v1/admin/participants/:id/view-password":"participants.view","POST /v1/admin/participants/settings":"participants.manage","POST /v1/admin/points/seasons":"points.approve","POST /v1/admin/points/seasons/:id/close":"points.approve","POST /v1/admin/proofs":"bookings.edit","POST /v1/admin/publish/restore":"publish.publish","POST /v1/admin/publish/shadow-check":"system.manage","POST /v1/admin/push/auto":"push.view","POST /v1/admin/push/check":"push.view","POST /v1/admin/push/devices":"*","POST /v1/admin/push/remove":"*","POST /v1/admin/push/schedule":"push.view","POST /v1/admin/push/schedule/cancel":"push.manage","POST /v1/admin/push/send":"push.manage","POST /v1/admin/push/state":"push.view","POST /v1/admin/push/subscribe":"*","POST /v1/admin/push/test":"*","POST /v1/admin/push/unsubscribe":"*","POST /v1/admin/session/end":"*","POST /v1/admin/session/heartbeat":"*","POST /v1/admin/session/renew":"*","POST /v1/admin/session/resume":"*","POST /v1/admin/session/start":"*","POST /v1/admin/store/items":"store.edit","POST /v1/admin/store/items/:id/delete":"store.delete","POST /v1/admin/store/redemptions/:id/status":"store.approve","POST /v1/admin/store/schedule":"store.edit","POST /v1/admin/tools/admins":"accounts.view","POST /v1/admin/tools/fetch-media":"media.add","POST /v1/admin/tools/github":"system.view","POST /v1/admin/tools/live-stage":"content.edit","POST /v1/admin/tools/maps":"content.edit","POST /v1/admin/tools/media":"media.view","POST /v1/admin/tools/migrate":"system.manage","POST /v1/admin/tools/migration":"system.manage"};
 A.FN_PERMS = {"apiActivity":"activity.view","apiAddAdmin":"accounts.manage","apiAdminPushDevices":"*","apiAdminPushRemoveDevice":"*","apiAdminPushSubscribe":"*","apiAdminPushUnsubscribe":"*","apiAdmins":"accounts.view","apiAgeRules":"competitions.view","apiAgeRulesSave":"competitions.edit","apiBadges":"*","apiCheckGithub":"system.view","apiCheckMedia":"media.view","apiComp":"competitions.view","apiCompArchive":"competitions.edit","apiCompClose":"competitions.edit","apiCompCreate":"competitions.add","apiCompDelete":"competitions.delete","apiCompDuplicate":"competitions.add","apiCompExport":"exports.export","apiCompFinalize":"competitions.approve","apiCompGrade":"competitions.approve","apiCompGradeGroup":"competitions.approve","apiCompImportApply":"competitions.edit","apiCompImportPreview":"competitions.edit","apiCompPreviewDefinition":"competitions.view","apiCompPreviewGrade":"competitions.view","apiCompQuestionDelete":"competitions.delete","apiCompQuestionDuplicate":"competitions.edit","apiCompQuestionSave":"competitions.edit","apiCompQuestionsReorder":"competitions.edit","apiCompRegrade":"competitions.approve","apiCompResults":"competitions.view","apiCompReviewQueue":"competitions.view","apiCompSave":"competitions.edit","apiCompSettings":"competitions.edit","apiCompSubmission":"competitions.view","apiCompSubmissions":"competitions.view","apiCompVoid":"competitions.approve","apiComps":"competitions.view","apiDeleteContact":"content.delete","apiDeleteItem":"content.delete","apiDeleteLink":"content.delete","apiDeleteMedia":"media.delete","apiDeleteSection":"content.delete","apiDuplicateItem":"content.edit","apiEvent":"events.view","apiEventArchive":"events.edit","apiEventDelete":"events.delete","apiEventSave":"events.edit","apiEventSetEnabled":"events.edit","apiEvents":"events.view","apiFetchMediaUrl":"media.add","apiForgetDevice":"*","apiHeartbeat":"*","apiHomeOrder":"content.edit","apiImportApply":"content.edit","apiImportPreview":"content.edit","apiMediaLibrary":"media.view","apiMediaPreview":"media.view","apiMigrate":"system.manage","apiMoveContact":"content.edit","apiMoveLink":"content.edit","apiMoveSection":"content.edit","apiPage":"content.view","apiPageArchive":"content.edit","apiPageDelete":"content.delete","apiPageMediaDelete":"content.delete","apiPageMediaOrder":"content.edit","apiPageMediaSave":"content.edit","apiPagePreview":"content.view","apiPageSave":"content.edit","apiPageSetEnabled":"content.edit","apiPages":"content.view","apiParticipant":"participants.view","apiParticipantCode":"participants.edit","apiParticipantCodes":"participants.edit","apiParticipantResetCode":"participants.edit","apiParticipantSave":"participants.edit","apiParticipantSetActive":"participants.edit","apiParticipants":"participants.view","apiParticipantsAssign":"participants.edit","apiParticipantsImportApply":"participants.add","apiParticipantsImportPreview":"participants.add","apiParticipantsResetCodes":"participants.edit","apiParticipantsUndoImport":"participants.add","apiPayMethodsSave":"finance.manage","apiPlanMigration":"system.manage","apiPreview":"content.view","apiPublish":"publish.publish","apiPublishRefresh":"content.view","apiPurgeMedia":"media.delete","apiPushAuto":"push.manage","apiPushCheck":"push.view","apiPushSchedule":"push.view","apiPushScheduleCancel":"push.manage","apiPushState":"push.view","apiRemoveAdmin":"accounts.manage","apiResolveMapsUrl":"content.edit","apiRestoreMedia":"media.add","apiReview":"content.view","apiSaveContact":"content.edit","apiSaveItem":"content.edit","apiSaveLink":"content.edit","apiSaveSection":"content.edit","apiSaveSettings":"content.edit","apiSeasonClose":"competitions.approve","apiSeasonClosePreview":"competitions.view","apiSeasonSave":"competitions.edit","apiSeasons":"competitions.view","apiSendPush":"push.manage","apiServantDelete":"events.delete","apiServantPayApprove":"finance.manage","apiServantSave":"finance.manage","apiServantSetActive":"events.edit","apiServants":"events.view","apiSessionEnd":"*","apiSessionResume":"*","apiSessionStart":"*","apiSetAdminName":"*","apiSetItemArchived":"content.edit","apiSetItemEnabled":"content.edit","apiSetLinkEnabled":"content.edit","apiSetLiveStage":"content.edit","apiSetMediaAlt":"media.add","apiSetSectionEnabled":"content.edit","apiShopItemDelete":"store.delete","apiShopItemSave":"store.edit","apiShopItems":"store.view","apiShopRedemptionStatus":"store.approve","apiShopRedemptions":"store.view","apiShopSchedule":"store.view","apiShopScheduleSave":"store.edit","apiState":"*","apiTrustDevice":"*","apiUpdateMedia":"media.add","apiUploadMedia":"media.add","apiWallet":"points.view","apiWalletAdjust":"points.edit","apiWalletParticipant":"points.view","apiWalletSync":"points.edit","apiWorkerSession":"*"};
 A.OWN_SCOPE_ROUTES = ["POST /v1/admin/book/bookings"];

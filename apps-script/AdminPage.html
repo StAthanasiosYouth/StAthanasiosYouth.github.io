@@ -1125,12 +1125,15 @@
     content: 'المحتوى', publish: 'النشر', events: 'الفعاليات والخدام', bookings: 'الحجوزات', finance: 'الفلوس',
     exports: 'التصدير', competitions: 'المسابقات', store: 'المتجر', points: 'النقاط', participants: 'المشتركين',
     media: 'الصور والفيديو', push: 'الإشعارات', accounts: 'الحسابات والصلاحيات', activity: 'سجل النشاط',
-    notifications: 'إعدادات الإشعارات', system: 'النظام'
+    notifications: 'إعدادات الإشعارات', system: 'النظام',
+    // «خبزنا اليومي» (W4): bread.content · bread.stats · bread.reflections
+    bread: 'خبزنا اليومي'
   };
   var PERM_ACTIONS = {
     view: 'يشوف', add: 'يضيف', edit: 'يعدّل', delete: 'يمسح', approve: 'يعتمد', publish: 'ينشر',
     export: 'يصدّر', export_pii: 'يصدّر بأرقام التليفونات', manage: 'يدير', create_cash: 'يسجّل حجز كاش',
-    rename: 'يغيّر أسماء الأدمنز'
+    rename: 'يغيّر أسماء الأدمنز',
+    content: 'البرامج', stats: 'الإحصائيات', reflections: 'التأملات'
   };
   var PROTECTED_REASONS = {
     primary: 'ده الحساب الأساسي: صلاحياته كاملة ومينفعش يتغير أو يتشال.',
@@ -1368,7 +1371,7 @@
   var MODULE_ICONS = {
     content: 'megaphone', publish: 'send', events: 'theatre', bookings: 'ticket', finance: 'wallet', exports: 'download',
     competitions: 'trophy', store: 'gift', points: 'star', participants: 'users', media: 'photos', push: 'bell',
-    accounts: 'shield', activity: 'clock', notifications: 'mail', system: 'gear'
+    accounts: 'shield', activity: 'clock', notifications: 'mail', system: 'gear', bread: 'bread'
   };
   // a sensitive permission asks «أكّد» before it is given (team-confirm.png), with what it means
   var SENSITIVE = {
@@ -1380,11 +1383,14 @@
     'exports.export_pii': 'هيقدر ينزّل ملفات فيها موبايلات وإيميلات الشباب',
     'finance.manage': 'هيقدر يسجّل ويلغي دفعات وتسليمات',
     'system.manage': 'هيقدر يشغّل أدوات النظام',
-    'publish.publish': 'هيقدر ينشر التغييرات على الموقع'
+    'publish.publish': 'هيقدر ينشر التغييرات على الموقع',
+    // decision 10: the members' own words about their faith
+    'bread.reflections': 'هيقدر يقرا تأملات الشباب الشخصية في «خبزنا اليومي»'
   };
   var YOU_VERBS = {
     view: 'تشوف', add: 'تضيف', edit: 'تعدّل', delete: 'تمسح', approve: 'تعتمد', publish: 'تنشر', export: 'تصدّر',
-    export_pii: 'تصدّر بأرقام التليفونات', manage: 'تدير', create_cash: 'تسجّل حجز كاش', rename: 'تغيّر أسماء الأدمنز'
+    export_pii: 'تصدّر بأرقام التليفونات', manage: 'تدير', create_cash: 'تسجّل حجز كاش', rename: 'تغيّر أسماء الأدمنز',
+    content: 'تجهّز برامج', stats: 'تشوف إحصائيات', reflections: 'تقرا تأملات'
   };
   var WEEKDAYS = ['الأحد', 'الاتنين', 'التلات', 'الأربع', 'الخميس', 'الجمعة', 'السبت'];
   var MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
@@ -2271,7 +2277,7 @@
     content: 'المحتوى', publish: 'النشر', events: 'الفعاليات والخدام', bookings: 'الحجوزات', finance: 'الفلوس',
     exports: 'التصدير', competitions: 'المسابقات', store: 'المتجر', points: 'النقاط', participants: 'المشتركين',
     media: 'الصور', push: 'الإشعارات', accounts: 'الحسابات والصلاحيات', activity: 'سجل النشاط',
-    notifications: 'إعدادات الإشعارات', system: 'النظام'
+    notifications: 'إعدادات الإشعارات', system: 'النظام', bread: 'خبزنا اليومي'
   };
   var NT_SPECIAL = {
     'accounts.add': 'أدمن جديد اتضاف', 'accounts.grants': 'صلاحيات أدمن اتغيرت', 'accounts.remove': 'أدمن اتشال', 'accounts.signout': 'أدمن اتخرّج من كل الأجهزة', 'accounts.ask': 'طلب صلاحية', 'accounts.enforce': 'تشغيل/قفل تطبيق الصلاحيات',
@@ -2285,6 +2291,7 @@
     'booking.update': 'تعديل حجز', 'booking.withdraw': 'زائر لغى طلبه', 'booking.remind': 'تذكير بالدفع', 'payment.add': 'دفعة اتسجلت',
     'payment.refund': 'استرداد', 'handover.add': 'تسليم فلوس للخدمة', 'handover.void': 'إلغاء تسليم فلوس', 'modules.book': 'تشغيل/قفل الحجز',
     'admin.rename': 'اسم أدمن اتغير', 'session.takeover': 'دخول من جهاز تاني',
+    'bread.left': 'خبزنا اليومي: البرنامج قرّب يخلص', 'bread.empty': 'خبزنا اليومي: المحتوى خلص',
     'export.pii': 'تصدير بيانات شخصية', 'export.bookings': 'تصدير الحجوزات', 'booking.ageOverride': 'تجاوز شرط السن في حجز',
     'payment.request': 'طلب دفع الباقي', 'payment.requestReject': 'رفض طلب دفع', 'payment.requestWithdraw': 'زائر سحب طلب دفع',
     'member.mail.dead': 'إيميل لعضو مقدرش يتبعت', 'participant.email': 'تغيير إيميل حساب', 'participant.phoneFix': 'تغيير موبايل حساب',
