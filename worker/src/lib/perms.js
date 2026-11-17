@@ -186,6 +186,7 @@ export const ROUTE_PERMS = Object.freeze({
   'GET /v1/admin/bread/programs': 'bread.content',
   'POST /v1/admin/bread/programs': 'bread.content',
   'POST /v1/admin/bread/programs/:id/topics': 'bread.content',
+  'GET /v1/admin/bread/programs/:id/topics': 'bread.content',
   'POST /v1/admin/bread/programs/:id/activate': 'bread.content',
   'POST /v1/admin/bread/programs/:id/stop': 'bread.content',
   'POST /v1/admin/bread/programs/:id/delete': 'bread.content',

@@ -164,6 +164,12 @@ test('admin: draft → upload in parts (bad rows refused) → ready → activate
   const list = await w.admin('GET', 'bread/programs');
   assert.equal(list.body.current, id);
   assert.equal(list.body.programs[0].uploaded, 3);
+  // W4 «المواضيع»: the days' titles and references, no texts
+  const tl = await w.admin('GET', `bread/programs/${id}/topics`);
+  assert.deepEqual(tl.body.topics.map(t => t.n), [1, 2, 3]);
+  assert.ok(tl.body.topics.every(t => t.title && t.verseRef && t.readingRef && typeof t.asked === 'boolean' && !('meditation' in t)));
+  // W4: who uploaded and who activated (the admin shows «رفعه <name>»)
+  assert.ok(list.body.programs[0].createdBy && list.body.programs[0].createdBy === list.body.programs[0].activatedBy);
 });
 
 test('the mirror commits the bread files under daily-bread/data/ (one commit, «daily bread»)', async () => {
@@ -268,6 +274,10 @@ test('public: off → disabled; today for a seed, the files, open/«قريت» c
   assert.ok(hashes.every(h => !h.includes('dev-')), 'never the device id itself');
   const stats = await w.admin('GET', 'bread/stats');
   assert.deepEqual([stats.body.totals.opens, stats.body.totals.reads], [2, 1]);
+  // W4: today's Cairo day for the «النهارده» numbers; no slots yet → no «أكتر ميعاد»
+  assert.deepEqual([stats.body.today, stats.body.topMinute], [cairoDay(), null]);
+  await w.h.db.prepare("INSERT INTO bread_slots (device_id, minute, seed, created_ms) VALUES ('d1', 480, 's', 1), ('d2', 480, 's', 1), ('d3', 1275, 's', 1)").run();
+  assert.equal((await w.admin('GET', 'bread/stats')).body.topMinute, 480);
 });
 
 test('nothing live: empty, or waiting with the next program\'s date', async () => {
@@ -349,6 +359,8 @@ test('reflections: one a day for today\'s topic, edit/delete within 20 minutes o
   const list = await w.admin('GET', `bread/reflections?program=${p.id}`);
   assert.deepEqual(list.body.reflections.map(x => x.text).sort(), ['اتعدل', 'من جديد'].sort());
   assert.ok(list.body.reflections.every(x => x.title.startsWith('موضوع رقم')));
+  // W4 «بسؤال»: whether the day had a question
+  assert.ok(list.body.reflections.every(x => typeof x.asked === 'boolean'));
 });
 
 // ---------- breadTick + the consumer ----------
@@ -425,6 +437,8 @@ test('alerts: 7/3/1 days left once each, none while a program waits; «content f
   const type = typeOf({ action: 'bread.left' });
   assert.deepEqual([type.level, type.perm, type.email], ['important', 'bread.content', false]);
   assert.match(messageOf(type, [{ ...r[0], actor: 'system', action: 'bread.left' }]).body, /فاضل ٧ أيام/);
+  // W4: the alert opens the section's programs tab, not the activity entry
+  assert.equal(messageOf(type, [{ ...r[0], actor: 'system', action: 'bread.left' }]).url, '/admin/#open/bread');
   // the program ended: «content finished», once; muted → nothing
   assert.deepEqual((await breadDaily(w.env, at(10))).alerts, ['empty']);
   assert.deepEqual((await breadDaily(w.env, at(11))).alerts, []);

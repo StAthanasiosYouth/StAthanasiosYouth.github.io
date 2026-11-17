@@ -6,6 +6,7 @@
  *   GET  /v1/admin/bread/programs                       programs + where each stands, the settings
  *   POST /v1/admin/bread/programs            { name, days }               → a draft
  *   POST /v1/admin/bread/programs/:id/topics { topics: [...] }  ≤ 20 a call (the browser resolved the text)
+ *   GET  /v1/admin/bread/programs/:id/topics                    the days' titles and references (W4 «المواضيع»)
  *   POST /v1/admin/bread/programs/:id/activate { mode: 'after' | 'now', confirm }
  *   POST /v1/admin/bread/programs/:id/stop    { confirm }
  *   POST /v1/admin/bread/programs/:id/delete  (a draft / ready program, never one that was published)
@@ -52,7 +53,7 @@ export function stateOf(p, day) {
 const view = (p, day, extra = {}) => ({
   id: p.id, name: p.name, days: p.days, state: stateOf(p, day), startsOn: p.starts_on, endsOn: p.ends_on,
   daysLeft: liveOn(p, day) ? dayDiff(p.ends_on, day) : null, day: liveOn(p, day) ? dayDiff(day, p.starts_on) + 1 : null,
-  createdMs: p.created_ms, activatedMs: p.activated_ms, stoppedMs: p.stopped_ms, purged: !!p.purged_ms, ...extra
+  createdMs: p.created_ms, createdBy: p.created_by || '', activatedMs: p.activated_ms, activatedBy: p.activated_by || '', stoppedMs: p.stopped_ms, purged: !!p.purged_ms, ...extra
 });
 
 /* GET /v1/admin/bread/programs */
@@ -83,7 +84,7 @@ export async function adminBreadCreate(ctx) {
   if (!c.ok) throw bad('في بيانات محتاجة تتصلح.', { errors: c.errors });
   const db = ctx.env.DB;
   const now = Date.now();
-  const p = { id: randomId('brd-', 5), name: c.name, days: c.days };
+  const p = { id: randomId('brd-', 5), name: c.name, days: c.days, created_by: ctx.actor.email };
   await retry(() => db.batch([
     db.prepare("INSERT INTO bread_programs (id, name, days, status, created_by, created_ms) VALUES (?, ?, ?, 'draft', ?, ?)").bind(p.id, p.name, p.days, ctx.actor.email, now),
     act(ctx, 'bread.create', p, 'برنامج جديد: ' + p.days + ' يوم')
@@ -126,6 +127,14 @@ export async function adminBreadTopics(ctx) {
   const missing = [];
   for (let n = 1; n <= p.days && missing.length < 200; n++) if (!have.has(n)) missing.push(n);
   return { uploaded: have.size, days: p.days, missing, ready: have.size === p.days };
+}
+
+/* GET /v1/admin/bread/programs/:id/topics → the days' titles and references (W4 «المواضيع»; no texts) */
+export async function adminBreadTopicList(ctx) {
+  const db = ctx.env.DB;
+  const p = await programOf(db, ctx.params.id);
+  const { results } = await retry(() => db.prepare('SELECT n, title, verse_ref, reading_ref, question IS NOT NULL AS asked FROM bread_topics WHERE program_id = ? ORDER BY n').bind(p.id).all());
+  return { program: view(p, cairoDay()), topics: results.map(t => ({ n: t.n, title: t.title, verseRef: t.verse_ref, readingRef: t.reading_ref, asked: !!t.asked })) };
 }
 
 /*
@@ -233,19 +242,23 @@ export async function adminBreadStats(ctx) {
     id = cur.id;
   }
   const p = await programOf(db, id);
-  const [days, devices, members, reflections] = await retry(() => db.batch([
+  const [days, devices, members, reflections, times] = await retry(() => db.batch([
     db.prepare('SELECT day, opens, reads, sent, reflections FROM bread_daily WHERE program_id = ? ORDER BY day').bind(p.id),
     db.prepare('SELECT COUNT(DISTINCT device_id) AS devices, COUNT(*) AS slots FROM bread_slots'),
     db.prepare('SELECT COUNT(*) AS n FROM bread_members WHERE program_id = ?').bind(p.id),
-    db.prepare('SELECT COUNT(*) AS n FROM bread_reflections WHERE program_id = ? AND deleted_ms IS NULL').bind(p.id)
+    db.prepare('SELECT COUNT(*) AS n FROM bread_reflections WHERE program_id = ? AND deleted_ms IS NULL').bind(p.id),
+    // W4 «أكتر ميعاد»: the Cairo minute most «فكّرني» slots use
+    db.prepare('SELECT minute, COUNT(*) AS n FROM bread_slots GROUP BY minute ORDER BY n DESC, minute LIMIT 1')
   ]));
   const sum = k => days.results.reduce((a, r) => a + (r[k] || 0), 0);
   return {
     program: view(p, day),
+    today: day,
     days: days.results,
     totals: { opens: sum('opens'), reads: sum('reads'), sent: sum('sent'), reflections: reflections.results[0].n },
     subscribers: { devices: devices.results[0].devices, slots: devices.results[0].slots },
-    accounts: members.results[0].n
+    accounts: members.results[0].n,
+    topMinute: times.results.length ? times.results[0].minute : null
   };
 }
 
@@ -258,14 +271,14 @@ export async function adminBreadReflections(ctx) {
   const before = Number(url.searchParams.get('before')) || Number.MAX_SAFE_INTEGER;
   const max = Math.max(1, Math.min(100, Number(url.searchParams.get('limit')) || 50));
   const [rows] = await retry(() => db.batch([
-    db.prepare(`SELECT r.id, r.n, r.day, r.text, r.state, r.created_ms, r.edited_ms, t.title, p.name
+    db.prepare(`SELECT r.id, r.n, r.day, r.text, r.state, r.created_ms, r.edited_ms, t.title, t.question IS NOT NULL AS asked, p.name
       FROM bread_reflections r LEFT JOIN bread_topics t ON t.program_id = r.program_id AND t.n = r.n LEFT JOIN participants p ON p.id = r.participant_id
       WHERE r.program_id = ? AND r.deleted_ms IS NULL AND r.created_ms < ? ORDER BY r.created_ms DESC LIMIT ?`).bind(p.id, before, max),
     act(ctx, 'bread.reflections.view', p, 'فتح تأملات البرنامج')
   ]));
   return {
     program: { id: p.id, name: p.name },
-    reflections: rows.results.map(r => ({ id: r.id, n: r.n, day: r.day, title: r.title || '', text: r.text, state: r.state, name: r.name || '', createdMs: r.created_ms, editedMs: r.edited_ms })),
+    reflections: rows.results.map(r => ({ id: r.id, n: r.n, day: r.day, title: r.title || '', asked: !!r.asked, text: r.text, state: r.state, name: r.name || '', createdMs: r.created_ms, editedMs: r.edited_ms })),
     more: rows.results.length === max ? rows.results[rows.results.length - 1].created_ms : null
   };
 }

@@ -60,7 +60,7 @@ import { pushReceipt } from './push/receipt.js';
 import { pushRemind } from './push/remind.js';
 import { breadFileIndex, breadFileDay, breadToday, breadOpen, breadSlots, breadMe, breadReflect, breadReflectEdit, breadReflectDelete } from './bread/public.js';
 import {
-  adminBreadPrograms, adminBreadCreate, adminBreadTopics, adminBreadActivate, adminBreadStop, adminBreadDelete, adminBreadStats, adminBreadReflections,
+  adminBreadPrograms, adminBreadCreate, adminBreadTopics, adminBreadTopicList, adminBreadActivate, adminBreadStop, adminBreadDelete, adminBreadStats, adminBreadReflections,
   adminBreadSettings, adminBreadSettingsSave, UPLOAD_MAX_BYTES as BREAD_UPLOAD_MAX_BYTES
 } from './bread/admin.js';
 import { breadDaily } from './bread/alerts.js';
@@ -482,6 +482,7 @@ export const ROUTES = [
   { method: 'GET', path: '/v1/admin/bread/programs', auth: 'admin', handler: adminBreadPrograms },
   { method: 'POST', path: '/v1/admin/bread/programs', auth: 'admin', maxBytes: 2048, handler: adminBreadCreate },
   { method: 'POST', path: '/v1/admin/bread/programs/:id/topics', auth: 'admin', maxBytes: BREAD_UPLOAD_MAX_BYTES, handler: adminBreadTopics },
+  { method: 'GET', path: '/v1/admin/bread/programs/:id/topics', auth: 'admin', handler: adminBreadTopicList },
   { method: 'POST', path: '/v1/admin/bread/programs/:id/activate', auth: 'admin', maxBytes: 1024, handler: adminBreadActivate },
   { method: 'POST', path: '/v1/admin/bread/programs/:id/stop', auth: 'admin', maxBytes: 1024, handler: adminBreadStop },
   { method: 'POST', path: '/v1/admin/bread/programs/:id/delete', auth: 'admin', maxBytes: 256, handler: adminBreadDelete },
