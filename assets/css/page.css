@@ -3738,7 +3738,7 @@ html[data-arrive] main > *:nth-child(n+3) { animation-delay: .12s; }
 /* the tabs share the bar's width evenly (no empty run at one end) */
 .svc-tabs a { flex: 1 0 auto; justify-content: center; }
 /* wide screens: the bar's band runs edge to edge, so nothing scrolls past at its sides */
-@media (min-width: 900px) { .svc-tabs { justify-content: center; background: rgba(2, 9, 20, .97); box-shadow: -100vmax 0 0 rgba(2, 9, 20, .97), 100vmax 0 0 rgba(2, 9, 20, .97); clip-path: inset(0 -100vmax -24px); }
+@media (min-width: 900px) { .svc-tabs { justify-content: center; background: none; border-image: linear-gradient(var(--gold-line) 0 1px, rgba(2, 9, 20, .97) 1px calc(100% - 1px), var(--gold-line) 0) fill 0 / 1px 0 / 0 100vmax; }
   .svc-tabs a { flex: 0 0 auto; min-width: 140px; } }
 .svc .pg-section { scroll-margin-top: 130px; }
 .svc-h { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.7rem, 6.4vw, 2.2rem); color: var(--gold-hi); margin: 0 0 12px; }
