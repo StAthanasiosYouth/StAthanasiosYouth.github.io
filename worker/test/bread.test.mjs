@@ -3,7 +3,7 @@
 // breadTick + each device's own text in the consumer, the admin alerts and the retention. Real SQLite, real migrations.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { harness, fakeGoogle } from './helpers.mjs';
 import { migratedDb } from './d1-sqlite.mjs';
 import { orderFor, cairoDay, dayAdd, topicFor, checkTopic } from '../src/bread/model.js';
@@ -24,8 +24,16 @@ const A = 'a@example.com';
 const DAY = 86400000;
 let serial = 700;
 
-/* the prototype's own functions, taken from its file as they are */
+/* the prototype's orders, computed by the prototype itself on 2026-11-17 (pinned: `main` has no docs/daily-bread/) */
+const GOLDEN = [
+  ['k-7f3a91', 'prg-bread-of-life', 7, [1, 3, 0, 2, 5, 4, 6]],
+  ['dev-abc123', 'brd-0123456789', 12, [0, 11, 6, 3, 8, 10, 9, 5, 7, 4, 1, 2]],
+  ['ميناء', 'brd-0123456789', 30, [4, 0, 12, 3, 18, 28, 23, 7, 16, 10, 8, 5, 21, 27, 15, 14, 1, 6, 25, 29, 26, 19, 2, 20, 9, 11, 22, 17, 13, 24]]
+];
+
+/* the prototype's own functions, taken from its file as they are (null where the file is not in the checkout) */
 function prototypeOrder() {
+  if (!existsSync(new URL('../../docs/daily-bread/prototype/app.js', import.meta.url))) return null;
   const src = readFileSync(new URL('../../docs/daily-bread/prototype/app.js', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
   const pick = re => { const m = re.exec(src); assert.ok(m, 'prototype: ' + re); return m[0]; };
   const code = [pick(/function hash32\([^]*?\n/), pick(/function mulberry32\([^]*?\n/), pick(/export function orderFor\([^]*?\n\}\n/).replace('export ', '')].join('\n');
@@ -74,19 +82,18 @@ async function member(w, { birthDate = '2000-03-12' } = {}) {
 // ---------- the order ----------
 
 test('orderFor gives exactly the prototype order (docs/daily-bread/prototype/app.js), a permutation, fixed per seed', () => {
+  for (const [seed, prog, n, want] of GOLDEN) assert.deepEqual(orderFor(seed, prog, n), want, 'pinned ' + seed);
   const proto = prototypeOrder();
   for (const seed of ['k-7f3a91', 'dev-abc123', 'p-00000001', 'x'.repeat(40), 'ميناء']) {
     for (const prog of ['prg-bread-of-life', 'brd-0123456789']) {
       for (const n of [1, 2, 7, 30, 120]) {
         const o = orderFor(seed, prog, n);
-        assert.deepEqual(o, proto(seed, prog, n), seed + ' ' + prog + ' ' + n);
+        if (proto) assert.deepEqual(o, proto(seed, prog, n), seed + ' ' + prog + ' ' + n);
         assert.deepEqual([...o].sort((a, b) => a - b), Array.from({ length: n }, (_, i) => i), 'no repeat, nothing missing');
       }
     }
   }
   assert.notDeepEqual(orderFor('dev-aaaaaa', 'brd-0123456789', 30), orderFor('dev-bbbbbb', 'brd-0123456789', 30), 'another person, another order');
-  // a known value: the prototype's own device in its sample program (pinned so a change shows)
-  assert.deepEqual(orderFor('k-7f3a91', 'prg-bread-of-life', 7), proto('k-7f3a91', 'prg-bread-of-life', 7));
 });
 
 test('topicFor: the Cairo day index, the late joiner gets the rest only, nothing outside the dates', () => {
