@@ -30,14 +30,14 @@ const WITHDRAWABLE = ['page', 'event', 'comp'];
 
 /* the latest real publish (seeds aside): its id and mode */
 async function latest(db) {
-  return retry(() => db.prepare("SELECT id, mode FROM publish_jobs WHERE mode <> 'seed' ORDER BY at DESC, created_at DESC LIMIT 1").first());
+  return retry(() => db.prepare("SELECT id, mode FROM publish_jobs WHERE mode NOT IN ('seed', 'bread') ORDER BY at DESC, created_at DESC LIMIT 1").first());
 }
 
 /* GET /v1/admin/publish/revisions */
 export async function publishRevisions(ctx) {
   const db = ctx.env.DB;
   const [jobs, top] = await Promise.all([
-    retry(() => db.prepare('SELECT id, mode, revision, state, files, changed, by, at FROM publish_jobs WHERE changed > 0 OR mode = \'seed\' ORDER BY at DESC, created_at DESC LIMIT ?').bind(LIST_MAX).all()),
+    retry(() => db.prepare('SELECT id, mode, revision, state, files, changed, by, at FROM publish_jobs WHERE mode <> \'bread\' AND (changed > 0 OR mode = \'seed\') ORDER BY at DESC, created_at DESC LIMIT ?').bind(LIST_MAX).all()),
     latest(db)
   ]);
   return {
@@ -63,9 +63,9 @@ export async function publishRestore(ctx) {
   // what was live right after the target: per (kind, key) the newest revision of a publish not later than it
   const [then, now] = await Promise.all([
     retry(() => db.prepare(
-      "SELECT r.kind, r.key, r.rev, r.hash, r.body, r.withdrawn FROM published_revisions r JOIN publish_jobs j ON j.id = r.publish_id WHERE (j.at < ? OR (j.at = ? AND j.created_at <= ?)) AND r.kind <> 'stub'"
+      "SELECT r.kind, r.key, r.rev, r.hash, r.body, r.withdrawn FROM published_revisions r JOIN publish_jobs j ON j.id = r.publish_id WHERE (j.at < ? OR (j.at = ? AND j.created_at <= ?)) AND r.kind NOT IN ('stub', 'bread')"
     ).bind(target.at, target.at, target.created_at).all()),
-    retry(() => db.prepare("SELECT kind, key, MAX(rev) AS rev, MAX(CASE WHEN live = 1 THEN hash END) AS hash, MAX(CASE WHEN live = 1 THEN withdrawn END) AS withdrawn FROM published_revisions WHERE kind <> 'stub' GROUP BY kind, key").all())
+    retry(() => db.prepare("SELECT kind, key, MAX(rev) AS rev, MAX(CASE WHEN live = 1 THEN hash END) AS hash, MAX(CASE WHEN live = 1 THEN withdrawn END) AS withdrawn FROM published_revisions WHERE kind NOT IN ('stub', 'bread') GROUP BY kind, key").all())
   ]);
   const wanted = new Map();
   for (const r of then.results) {

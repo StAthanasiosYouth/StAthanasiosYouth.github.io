@@ -136,6 +136,17 @@ Emergency (no panel): `wrangler d1 execute <db> --remote --command "UPDATE admin
 - Never bodies, emails, IPs or tokens.
 - Errors and slow requests (≥ 1.5 s) are also kept in D1 `api_log` for 30 days.
 
+## «خبزنا اليومي» (W3, `src/bread/`)
+
+Migration `0033`. Switches (D1 `settings`, off by default): `BREAD_MODULE` (every `/v1/bread/*` route answers `disabled`),
+`BREAD_PUSH` (the minute cron's `breadTick` sends nothing). Settings: `BREAD_EMPTY_MUTED`, `bread_default_time`, `bread_max_slots`.
+Permissions `bread.content`, `bread.stats`, `bread.reflections` (the last is the Primary Admin's by default).
+A program's days and its index are published files (`published_revisions` kind `bread`, `publish_jobs.mode = 'bread'`,
+mirrored to `daily-bread/data/`); site restore, the shadow gate and the stale-publish check skip them.
+Each device's push text is built in the queue consumer (`bread/notify.js` from `push/send.js runPart`).
+Alerts and retention run in the daily housekeeping (`bread/alerts.js`). Record, routes and the serving decision:
+`docs/daily-bread/progress/W3.md`. Live check: `node scripts/bread-check.mjs` (staging, never a real push).
+
 ## Private proofs (R2)
 
 **Rules:**

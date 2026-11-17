@@ -72,7 +72,9 @@ test('known duration: live during, "خلص ✓" after, then next week', () => {
   const after = meetingStatus(meeting, cairo('2026-10-11T22:00'));
   assert.equal(after.state, 'upcoming');
   assert.equal(after.daysUntil, 7);
-  assert.equal(say(meeting, '2026-10-11T22:00').headline, 'الاجتماع خلص ✓ نشوفكم الجاي');
+  assert.equal(say(meeting, '2026-10-11T22:00').headline, 'الاجتماع خلص ✓ مستنيكم في الجاي');
+  assert.equal(say(meeting, '2026-10-11T22:59').headline, 'الاجتماع خلص ✓ مستنيكم في الجاي');
+  assert.equal(say(meeting, '2026-10-11T23:00').headline, 'فاضل ٧ أيام');
   assert.equal(say(meeting, '2026-10-12T09:00').headline, 'فاضل ٦ أيام');
 });
 

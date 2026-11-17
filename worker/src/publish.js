@@ -161,7 +161,8 @@ export async function preparePublish(db, body, now = Date.now()) {
   // one round trip: this id already stored? a newer publish? what is live now and the last rev of each (kind, key)
   const [knownR, newerR, current] = await retry(() => db.batch([
     db.prepare('SELECT hash, result FROM publish_jobs WHERE id = ?').bind(id),
-    db.prepare("SELECT id FROM publish_jobs WHERE at > ? AND mode <> 'seed' LIMIT 1").bind(at),
+    // a «خبزنا اليومي» publish (mode 'bread', src/bread/store.js) is not a site publish: it never makes one look stale
+    db.prepare("SELECT id FROM publish_jobs WHERE at > ? AND mode NOT IN ('seed', 'bread') LIMIT 1").bind(at),
     db.prepare('SELECT kind, key, MAX(rev) AS rev, MAX(CASE WHEN live = 1 THEN hash END) AS live FROM published_revisions GROUP BY kind, key')
   ]));
   const known = knownR.results[0];

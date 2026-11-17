@@ -162,7 +162,7 @@ export function describeMeeting(status, remaining = status.minutesUntil) {
       // the meeting already happened today: say so first
       if (status.endedToday) {
         return {
-          headline: 'الاجتماع خلص ✓ نشوفكم الجاي',
+          headline: 'الاجتماع خلص ✓ مستنيكم في الجاي',
           detail: `${day}، الساعة ${time} (فاضل ${countDays(status.daysUntil)})`
         };
       }

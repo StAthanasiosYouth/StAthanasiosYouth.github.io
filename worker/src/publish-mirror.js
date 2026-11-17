@@ -34,10 +34,12 @@ export function revisionPath(kind, key) {
   if (kind === 'event') return `events/${key}/event.json`;
   if (kind === 'comp') return `competition/${key}/comp.json`;
   if (kind === 'stub') return `${key}/index.html`;
+  // «خبزنا اليومي» (src/bread/store.js): the index and one file a day, under daily-bread/data/
+  if (kind === 'bread') return `daily-bread/data/${key}.json`;
   return '';
 }
 
-const PENDING = "FROM published_revisions r JOIN publish_jobs j ON j.id = r.publish_id WHERE r.live = 1 AND r.mirrored_at IS NULL AND j.mode IN ('worker', 'restore')";
+const PENDING = "FROM published_revisions r JOIN publish_jobs j ON j.id = r.publish_id WHERE r.live = 1 AND r.mirrored_at IS NULL AND j.mode IN ('worker', 'restore', 'bread')";
 
 async function last(db, key = LAST_KEY) {
   const row = await retry(() => db.prepare('SELECT value FROM settings WHERE key = ?').bind(key).first());
@@ -83,13 +85,13 @@ export async function mirrorPending(env, { now = Date.now(), fetchImpl = fetch }
     const prev = await last(db);
     let out;
     try {
-      out = await commitFiles(cfg, files, `Publish content ${revision || '(pages)'} (${cairoText(now)} Cairo, mirror)`, fetchImpl);
+      out = await commitFiles(cfg, files, `Publish content ${revision || (rows.every(r => r.kind === 'bread') ? '(daily bread)' : '(pages)')} (${cairoText(now)} Cairo, mirror)`, fetchImpl);
     } catch (err) {
       const fails = (prev && !prev.ok ? prev.fails || 0 : 0) + 1;
       const error = String(err && err.message).slice(0, 200);
       await retry(() => db.batch([
         setStmt(db, LAST_KEY, JSON.stringify({ at: now, ok: false, fails, error }), now),
-        db.prepare("UPDATE publish_jobs SET state = 'failed', error = ?, updated_at = ? WHERE mode IN ('worker', 'restore') AND state IN ('live', 'failed') AND EXISTS (SELECT 1 FROM published_revisions r WHERE r.publish_id = publish_jobs.id AND r.live = 1 AND r.mirrored_at IS NULL)").bind(error, now)
+        db.prepare("UPDATE publish_jobs SET state = 'failed', error = ?, updated_at = ? WHERE mode IN ('worker', 'restore', 'bread') AND state IN ('live', 'failed') AND EXISTS (SELECT 1 FROM published_revisions r WHERE r.publish_id = publish_jobs.id AND r.live = 1 AND r.mirrored_at IS NULL)").bind(error, now)
       ]));
       logLine({ lvl: 'warn', kind: 'mirror', files: rows.length, fails, err: error });
       return { failed: error, fails };
@@ -99,8 +101,8 @@ export async function mirrorPending(env, { now = Date.now(), fetchImpl = fetch }
     await retry(() => db.batch([
       db.prepare('UPDATE published_revisions SET mirrored_at = ?, github_commit = ? WHERE id IN (SELECT value FROM json_each(?))').bind(now, out.sha, ids),
       // older worker revisions that never made it out on their own: their newer text just did
-      db.prepare("UPDATE published_revisions SET mirrored_at = ? WHERE live = 0 AND mirrored_at IS NULL AND publish_id IN (SELECT id FROM publish_jobs WHERE mode IN ('worker', 'restore'))").bind(now),
-      db.prepare("UPDATE publish_jobs SET state = 'mirrored', error = NULL, updated_at = ? WHERE mode IN ('worker', 'restore') AND state IN ('live', 'failed') AND NOT EXISTS (SELECT 1 FROM published_revisions r WHERE r.publish_id = publish_jobs.id AND r.live = 1 AND r.mirrored_at IS NULL)").bind(now),
+      db.prepare("UPDATE published_revisions SET mirrored_at = ? WHERE live = 0 AND mirrored_at IS NULL AND publish_id IN (SELECT id FROM publish_jobs WHERE mode IN ('worker', 'restore', 'bread'))").bind(now),
+      db.prepare("UPDATE publish_jobs SET state = 'mirrored', error = NULL, updated_at = ? WHERE mode IN ('worker', 'restore', 'bread') AND state IN ('live', 'failed') AND NOT EXISTS (SELECT 1 FROM published_revisions r WHERE r.publish_id = publish_jobs.id AND r.live = 1 AND r.mirrored_at IS NULL)").bind(now),
       setStmt(db, LAST_KEY, JSON.stringify({ at: now, ok: true, fails: 0, sha: out.sha, unchanged: out.unchanged, files: rows.length }), now)
     ]));
     logLine({ kind: 'mirror', files: rows.length, sha: out.sha.slice(0, 7), unchanged: out.unchanged });

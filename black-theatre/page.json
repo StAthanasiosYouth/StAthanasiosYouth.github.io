@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "v": "49c0e55f8001",
+  "v": "537602fffeba",
   "id": "pg-0d2eeb07",
   "slug": "black-theatre",
   "title": "المسرح الأسود",
@@ -46,7 +46,7 @@
     {
       "id": "pm-81b596b6",
       "title": "🎭 ميدلي العذراء",
-      "text": "BUG – Brave Under Grace\nBlack Theater Team",
+      "text": "عرض مميز من فريق المسرح الأسود، بنقدّم فيه مجموعة من الترانيم الجميلة عن أمنا العذراء مريم، في لوحة فنية مليانة حب ومشاعر، بتجمع بين الموسيقى والإضاءة والحركة في تجربة مختلفة ومؤثرة. ✨❤️",
       "duration": "",
       "cover": {
         "src": "media/2026/img-8ffd40eb.webp",
@@ -59,13 +59,13 @@
       "source": "clip",
       "clip": {
         "type": "video",
-        "src": "media/2026/vid-1f68bcf5.mp4",
-        "poster": "media/2026/vid-1f68bcf5-480.webp",
+        "src": "media/2026/vid-10ca85b8.mp4",
+        "poster": "media/2026/vid-10ca85b8-480.webp",
         "w": 854,
         "h": 480,
         "alt": "",
         "start": 0,
-        "end": 19.8
+        "end": 22.3
       },
       "audio": {
         "mode": "original",
@@ -75,9 +75,40 @@
       "ctaLabel": "شاهد المسرحية كاملة"
     },
     {
-      "id": "pm-f641b60e",
-      "title": "جاء المخلص",
-      "text": "",
+      "id": "pm-998f9303",
+      "title": "🎭 قصة الحب العظيم",
+      "text": "دي مش مجرد قصة قدّمها الشباب بشوية لوحات… دي\nرحلة حب… تضحية… وفداء ❤️",
+      "duration": "",
+      "cover": {
+        "src": "media/2026/img-9e16e1b6.webp",
+        "thumb": "media/2026/img-9e16e1b6-480.webp",
+        "w": 1600,
+        "h": 900,
+        "alt": "",
+        "color": "#52453e"
+      },
+      "source": "clip",
+      "clip": {
+        "type": "video",
+        "src": "media/2026/vid-6972e8fb.mp4",
+        "poster": "media/2026/vid-6972e8fb-480.webp",
+        "w": 854,
+        "h": 480,
+        "alt": "",
+        "start": 0,
+        "end": 9.2
+      },
+      "audio": {
+        "mode": "original",
+        "src": null
+      },
+      "fullUrl": "https://www.facebook.com/share/v/1SChbPDyqR/",
+      "ctaLabel": "شاهد المسرحية كاملة"
+    },
+    {
+      "id": "pm-27a7509d",
+      "title": "🎭 جاء المخلّص – الجزء الثاني ✨",
+      "text": "الحكاية لسه مخلصتش… والنور اللي بدأ يشرق، لسه عنده كتير يغيّره. 🌟\nفي الجزء التاني، بنكمّل رحلتنا مع أحداث جديدة ومواقف مؤثرة، ونكتشف أكتر معنى المحبة والرجاء والخلاص. ❤️",
       "duration": "",
       "cover": {
         "src": "media/2026/img-53ca69a3.webp",
@@ -102,10 +133,74 @@
         "mode": "original",
         "src": null
       },
-      "fullUrl": "https://www.facebook.com/share/v/1F4ESNjpdd/",
+      "fullUrl": "https://www.facebook.com/share/v/19wCfpKhN2/",
+      "ctaLabel": "شاهد المسرحية كاملة"
+    },
+    {
+      "id": "pm-f641b60e",
+      "title": "🎭جاء المُخلِّص",
+      "text": "في عالم مليان ظلام وخوف، كان فيه رجاء مستني يتحقق… لحد ما جه النور اللي غيّر كل حاجة. ❤️\nمسرحية بتاخدنا في رحلة مليانة مشاعر، وتحكي أعظم قصة حب عرفتها البشرية… قصة مجيء المخلّص للعالم. ✝️🌟",
+      "duration": "",
+      "cover": {
+        "src": "media/2026/img-53ca69a3.webp",
+        "thumb": "media/2026/img-53ca69a3-480.webp",
+        "w": 1280,
+        "h": 720,
+        "alt": "",
+        "color": "#463a2f"
+      },
+      "source": "clip",
+      "clip": {
+        "type": "video",
+        "src": "media/2026/vid-91def8c7.mp4",
+        "poster": "media/2026/vid-91def8c7-480.webp",
+        "w": 854,
+        "h": 480,
+        "alt": "",
+        "start": 0,
+        "end": 22.5
+      },
+      "audio": {
+        "mode": "original",
+        "src": null
+      },
+      "fullUrl": "https://www.facebook.com/share/v/19z3jPYJGD/",
       "ctaLabel": "شاهد المسرحية كاملة"
     }
   ],
-  "team": null,
-  "publishedAt": "2026-11-12T09:58"
+  "team": {
+    "title": "مسؤلين خدمة المسرح الأسود",
+    "text": "عايز تنضم لفريق المسرح؟",
+    "people": [
+      {
+        "id": "srv-3f87eba3",
+        "name": "كريستين عماد",
+        "role": "",
+        "image": null,
+        "wa": "https://wa.me/201205955243"
+      },
+      {
+        "id": "srv-d3942576",
+        "name": "مارتينا هاني",
+        "role": "",
+        "image": null,
+        "wa": "https://wa.me/201221637877"
+      },
+      {
+        "id": "srv-af099f06",
+        "name": "مارتينا حلمي",
+        "role": "",
+        "image": null,
+        "wa": "https://wa.me/201200589358"
+      },
+      {
+        "id": "srv-951e7a2b",
+        "name": "ماري عزيز",
+        "role": "",
+        "image": null,
+        "wa": "https://wa.me/201284674074"
+      }
+    ]
+  },
+  "publishedAt": "2026-11-14T08:53"
 }

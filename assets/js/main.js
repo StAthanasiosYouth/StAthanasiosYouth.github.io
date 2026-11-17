@@ -424,6 +424,23 @@ function startIntro() {
   const failed = error => { console.warn(error); html.removeAttribute('data-intro'); };
   if (kind === 'card') {
     import('./intro-card.js').then(m => m.playCardIntro()).catch(failed);
+    // both welcome buttons show the site walkthrough first (once per device), over the welcome while its music
+    // plays (owner, 2026-11-14), then do what they do: «اعمل حساب» the account page, «ادخل الموقع» the site
+    document.addEventListener('click', event => {
+      const target = event.target.closest && event.target.closest('.ic a.is-main, .ic [data-enter]');
+      if (!target || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      if (target.dataset.toured === '1') return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const account = target.matches('a');
+      const go = () => {
+        if (account) location.href = target.href;
+        else { target.dataset.toured = '1'; target.click(); }
+      };
+      import('./site-tour.js')
+        .then(t => (t.tourSeen() ? go() : t.openSiteTour({ onDone: go, doneLabel: account ? 'يلا نعمل الحساب' : 'يلا ندخل الموقع' })))
+        .catch(go);
+    }, true);
   }
   else if (kind === 'member') {
     const since = performance.now();

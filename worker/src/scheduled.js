@@ -22,6 +22,8 @@ import { routeSweepStmt } from './route.js';
 import { scheduleTick } from './push/schedule.js';
 import { autoBellTick } from './push/autobell.js';
 import { remindTick, oldRemindersStmt } from './push/remind.js';
+import { breadTick } from './bread/tick.js';
+import { breadDaily } from './bread/alerts.js';
 
 const DAY = 24 * 3600 * 1000;
 export const RETENTION = {
@@ -106,6 +108,8 @@ export async function scheduled(controller, env) {
     await autoBellTick(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'push.bell', err: String(err && err.message).slice(0, 200) }));
     // «فكّرني» (site wave 5): after the bell, so a competition's own push to everyone covers its reminders
     await remindTick(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'push.remind', err: String(err && err.message).slice(0, 200) }));
+    // «خبزنا اليومي»: the devices whose minute it is (one round trip; each device's text is built in the queue)
+    await breadTick(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'bread.tick', err: String(err && err.message).slice(0, 200) }));
     await compReleaseTick(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'comp.release', err: String(err && err.message).slice(0, 200) }));
     // Phase 2: the shadow comparison every 15 minutes (nothing until a publish was posted)
     if (new Date(now).getUTCMinutes() % SHADOW_EVERY_MIN === 0) {
@@ -129,6 +133,8 @@ export async function scheduled(controller, env) {
     return;
   }
   await housekeeping(env, now);
+  // «خبزنا اليومي»: the admin alerts (7/3/1, content finished) and the retention
+  await breadDaily(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'bread', err: String(err && err.message).slice(0, 200) }));
   await blankPhones(env, now);
   // proofs past their retention date, and R2 objects no row names (> 24 h)
   const proofs = await sweepProofs(env, { now });

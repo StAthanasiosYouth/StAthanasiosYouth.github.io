@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000" direction="rtl">
+  <title>خبزنا اليومي — المقترح ب «الأسرة»</title>
+  
+  <defs>
+    <style>
+  @font-face { font-family: 'Aref Ruqaa'; font-weight: 700; src: url('../fonts/aref-ruqaa-arabic.woff2') format('woff2'); }
+  @font-face { font-family: 'Cairo'; font-weight: 200 900; src: url('../fonts/cairo-arabic.woff2') format('woff2'); }
+  .ruqaa { font-family: 'Aref Ruqaa', serif; font-weight: 700; }
+  .cairo { font-family: 'Cairo', sans-serif; }</style>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b2a4c"/><stop offset=".42" stop-color="#3c4f7a"/><stop offset=".66" stop-color="#c98a5a"/><stop offset=".8" stop-color="#f2c47a"/><stop offset="1" stop-color="#f7dc9b"/></linearGradient>
+    <radialGradient id="sun" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fffbe8"/><stop offset=".25" stop-color="#ffe7a6" stop-opacity=".95"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient>
+    <radialGradient id="lampGlow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffd27a" stop-opacity=".55"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient>
+    <linearGradient id="gilt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2d28b"/><stop offset="1" stop-color="#8c6423"/></linearGradient>
+    <linearGradient id="crust" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d7964a"/><stop offset=".6" stop-color="#a4602a"/><stop offset="1" stop-color="#6e3a14"/></linearGradient>
+    <linearGradient id="goldRing" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f2d28b"/><stop offset=".5" stop-color="#d7aa50"/><stop offset="1" stop-color="#8c6423"/></linearGradient>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c79a5c"/><stop offset="1" stop-color="#8a6236"/></linearGradient>
+    <clipPath id="disc"><circle cx="500" cy="500" r="392"/></clipPath>
+    <path id="ringTop" d="M 64,500 A 436,436 0 0 1 936,500"/>
+    <path id="ringBottom" d="M 38,500 A 462,462 0 0 0 962,500"/>
+  </defs>
+  <g id="ring">
+    <circle cx="500" cy="500" r="498" fill="#0b2a4c"/>
+    <circle cx="500" cy="500" r="490" fill="none" stroke="#d7aa50" stroke-width="3"/>
+    <circle cx="500" cy="500" r="398" fill="none" stroke="url(#goldRing)" stroke-width="12"/>
+    <!-- the signature, split over the ring like the family logo: credit on top, the church below -->
+    <text id="ring-credit" class="cairo" font-size="33" font-weight="700" fill="#f2d28b"><textPath href="#ringTop" startOffset="50%" text-anchor="middle"><tspan font-weight="500" fill="#d7aa50">إعداد وإشراف</tspan>  أسرة البابا أثناسيوس الرسولي للشباب</textPath></text>
+    <text id="ring-church" class="cairo" font-size="37" font-weight="700" fill="#f2d28b"><textPath href="#ringBottom" startOffset="50%" text-anchor="middle">كنيسة أبي سيفين بسفاجا</textPath></text>
+    <g fill="#d7aa50" ><path d="M46,475 H62 V492 H79 V508 H62 V525 H46 V508 H29 V492 H46 Z"/><circle cx="46.4" cy="475" r="4.3"/><circle cx="54" cy="471.2" r="4.3"/><circle cx="61.6" cy="475" r="4.3"/><circle cx="79" cy="492.4" r="4.3"/><circle cx="82.8" cy="500" r="4.3"/><circle cx="79" cy="507.6" r="4.3"/><circle cx="61.6" cy="525" r="4.3"/><circle cx="54" cy="528.8" r="4.3"/><circle cx="46.4" cy="525" r="4.3"/><circle cx="29" cy="507.6" r="4.3"/><circle cx="25.2" cy="500" r="4.3"/><circle cx="29" cy="492.4" r="4.3"/></g>
+    <g fill="#d7aa50" ><path d="M938,475 H954 V492 H971 V508 H954 V525 H938 V508 H921 V492 H938 Z"/><circle cx="938.4" cy="475" r="4.3"/><circle cx="946" cy="471.2" r="4.3"/><circle cx="953.6" cy="475" r="4.3"/><circle cx="971" cy="492.4" r="4.3"/><circle cx="974.8" cy="500" r="4.3"/><circle cx="971" cy="507.6" r="4.3"/><circle cx="953.6" cy="525" r="4.3"/><circle cx="946" cy="528.8" r="4.3"/><circle cx="938.4" cy="525" r="4.3"/><circle cx="921" cy="507.6" r="4.3"/><circle cx="917.2" cy="500" r="4.3"/><circle cx="921" cy="492.4" r="4.3"/></g>
+  </g>
+  
+  <g id="scene" clip-path="url(#disc)">
+    <rect id="sky" x="0" y="0" width="1000" height="1000" fill="url(#sky)"/>
+    <g id="landscape" transform="translate(0 0)">
+    <path id="rays" d="M440.1,616.9 L81.6,583.4 L440.4,612.7 Z M441.5,606.5 L94.3,511.3 L442.6,602.5 Z M444.8,596.6 L119.4,442.5 L446.5,592.8 Z M449.7,587.3 L156,379.1 L452.1,583.9 Z M456.1,579.1 L203,323 L459.1,576.1 Z M463.9,572.1 L259.1,276 L467.3,569.7 Z M472.8,566.5 L322.5,239.4 L476.6,564.8 Z M482.5,562.6 L391.3,214.3 L486.5,561.5 Z M492.7,560.4 L463.4,201.6 L496.9,560.1 Z M503.1,560.1 L536.6,201.6 L507.3,560.4 Z M513.5,561.5 L608.7,214.3 L517.5,562.6 Z M523.4,564.8 L677.5,239.4 L527.2,566.5 Z M532.7,569.7 L740.9,276 L536.1,572.1 Z M540.9,576.1 L797,323 L543.9,579.1 Z M547.9,583.9 L844,379.1 L550.3,587.3 Z M553.5,592.8 L880.6,442.5 L555.2,596.6 Z M557.4,602.5 L905.7,511.3 L558.5,606.5 Z M559.6,612.7 L918.4,583.4 L559.9,616.9 Z " fill="#fff3cf" opacity="0.22"/>
+    <circle id="sun-disc" cx="500" cy="620" r="210" fill="url(#sun)"/>
+    <path id="hills-far" d="M0,640 C120,600 220,612 300,628 C380,600 460,604 540,626 C640,596 760,600 1000,630 V1000 H0 Z" fill="#5d5a73" opacity=".55"/>
+    
+  <g id="church" transform="translate(770 600) scale(0.95)">
+    <rect x="-70" y="-40" width="140" height="90" fill="#e7cf9a"/>
+    <rect x="-22" y="-90" width="44" height="60" fill="#e7cf9a"/>
+    <path d="M-22,-90 A22,24 0 0 1 22,-90 Z" fill="#c6a56a"/>
+    <path d="M-62,-40 A26,28 0 0 1 -10,-40 Z" fill="#c6a56a"/>
+    <path d="M10,-40 A26,28 0 0 1 62,-40 Z" fill="#c6a56a"/>
+    <path d="M-10,50 V18 A10,11 0 0 1 10,18 V50 Z" fill="#7a5a2a"/>
+    <path d="M-46,4 V-12 A6,7 0 0 1 -34,-12 V4 Z M34,4 V-12 A6,7 0 0 1 46,-12 V4 Z M-6,-58 V-70 A6,7 0 0 1 6,-70 V-58 Z" fill="#7a5a2a"/>
+    <path d="M0,-114 V-124 M-5,-119 H5 M-36,-68 V-78 M-41,-73 H-31 M36,-68 V-78 M31,-73 H41" stroke="#c6a56a" stroke-width="3"/>
+  </g>
+    <path id="hills-near" d="M0,690 C160,660 300,676 420,690 C560,670 720,664 1000,684 V1000 H0 Z" fill="#8a6a5a" opacity=".75"/>
+    <path id="table" d="M0,792 C200,770 800,770 1000,792 V1000 H0 Z" fill="url(#ground)"/>
+    
+  <g id="lantern" transform="translate(205 610) scale(0.72)">
+    <circle cx="0" cy="40" r="120" fill="url(#lampGlow)"/>
+    <path d="M-34,-70 C-34,-130 34,-130 34,-70" stroke="#2a1d10" stroke-width="7" fill="none"/>
+    <path d="M-40,-62 L40,-62 L30,-40 L-30,-40 Z" fill="#3a2a16"/>
+    <rect x="-44" y="-40" width="88" height="128" rx="10" fill="#ffd98a" opacity=".95"/>
+    <rect x="-44" y="-40" width="88" height="128" rx="10" fill="none" stroke="#2a1d10" stroke-width="7"/>
+    <path d="M-44,24 H44 M0,-40 V88" stroke="#2a1d10" stroke-width="3" opacity=".35"/>
+    <g fill="#7a3a12" ><path d="M-9.3,-5 H9.3 V14.7 H29 V33.3 H9.3 V53 H-9.3 V33.3 H-29 V14.7 H-9.3 Z"/><circle cx="-8.8" cy="-5" r="4.9"/><circle cx="0" cy="-9.4" r="4.9"/><circle cx="8.8" cy="-5" r="4.9"/><circle cx="29" cy="15.2" r="4.9"/><circle cx="33.4" cy="24" r="4.9"/><circle cx="29" cy="32.8" r="4.9"/><circle cx="8.8" cy="53" r="4.9"/><circle cx="0" cy="57.4" r="4.9"/><circle cx="-8.8" cy="53" r="4.9"/><circle cx="-29" cy="32.8" r="4.9"/><circle cx="-33.4" cy="24" r="4.9"/><circle cx="-29" cy="15.2" r="4.9"/></g>
+    <path d="M-52,88 H52 L42,108 H-42 Z" fill="#3a2a16"/>
+  </g>
+    
+  <g id="book">
+    <path id="book-cover" d="M500,668 C420,630 300,628 214,652 L200,790 C300,770 420,778 500,812 C580,778 700,770 800,790 L786,652 C700,628 580,630 500,668 Z" fill="#6e1f24"/>
+    <path id="book-gilt" d="M500,652 C424,616 312,612 228,636 L216,774 C312,754 424,760 500,796 C576,760 688,754 784,774 L772,636 C688,612 576,616 500,652 Z" fill="url(#gilt)"/>
+    <path id="page-left" d="M500,640 C426,600 320,596 240,620 L230,758 C320,738 426,744 500,782 Z" fill="#fbf3e2"/>
+    <path id="page-right" d="M500,640 C574,600 680,596 760,620 L770,758 C680,738 574,744 500,782 Z" fill="#fbf3e2"/>
+    <path id="page-shade" d="M500,640 C490,700 492,740 500,782 C508,740 510,700 500,640 Z" fill="#000" opacity=".12"/>
+    <g id="page-lines" stroke="#c9b48a" stroke-width="2.4" fill="none" stroke-linecap="round" opacity=".85"><path d="M470,668 C430,650 350,646 282,660" /><path d="M530,668 C570,650 650,646 718,660" /><path d="M470,681 C430,663 350,659 282,673" /><path d="M530,681 C570,663 650,659 718,673" /><path d="M470,694 C430,676 350,672 282,686" /><path d="M530,694 C570,676 650,672 718,686" /><path d="M470,707 C430,689 350,685 282,699" /><path d="M530,707 C570,689 650,685 718,699" /><path d="M470,720 C430,702 350,698 282,712" /><path d="M530,720 C570,702 650,698 718,712" /><path d="M470,733 C430,715 350,711 282,725" /><path d="M530,733 C570,715 650,711 718,725" /><path d="M470,746 C430,728 350,724 282,738" /><path d="M530,746 C570,728 650,724 718,738" /></g>
+    <path id="ribbon" d="M506,650 L520,842 L510,830 L498,846 L494,652 Z" fill="#c8433a"/>
+  </g>
+    
+  <g id="bread" transform="translate(0 0)">
+    <path d="M196,818 C180,770 222,738 284,734 C352,730 392,760 398,800 C402,826 380,838 300,840 C230,842 202,838 196,818 Z" fill="url(#crust)"/>
+    <path d="M236,756 C252,748 268,748 282,754 M286,748 C302,742 318,744 332,752 M334,752 C348,750 362,756 372,766" stroke="#f3d39a" stroke-width="5" fill="none" stroke-linecap="round" opacity=".9"/>
+    <path d="M210,822 C260,832 340,832 392,816" stroke="#5a3210" stroke-width="3" fill="none" opacity=".35"/>
+  </g>
+    <g id="wheat">
+      <path d="M232,868 Q313.1,818.1 399.8,778.8" stroke="#c99135" stroke-width="3" fill="none" stroke-linecap="round"/><ellipse cx="310.8" cy="834" rx="5" ry="11" transform="rotate(34 310.8 834)" fill="#c99135"/><ellipse cx="304.2" cy="821.7" rx="5" ry="11" transform="rotate(90 304.2 821.7)" fill="#c99135"/><ellipse cx="324" cy="827" rx="5" ry="11" transform="rotate(34 324 827)" fill="#c99135"/><ellipse cx="317.4" cy="814.7" rx="5" ry="11" transform="rotate(90 317.4 814.7)" fill="#c99135"/><ellipse cx="337.1" cy="820" rx="5" ry="11" transform="rotate(34 337.1 820)" fill="#c99135"/><ellipse cx="330.6" cy="807.7" rx="5" ry="11" transform="rotate(90 330.6 807.7)" fill="#c99135"/><ellipse cx="350.3" cy="813" rx="5" ry="11" transform="rotate(34 350.3 813)" fill="#c99135"/><ellipse cx="343.7" cy="800.7" rx="5" ry="11" transform="rotate(90 343.7 800.7)" fill="#c99135"/><ellipse cx="363.5" cy="806" rx="5" ry="11" transform="rotate(34 363.5 806)" fill="#c99135"/><ellipse cx="356.9" cy="793.6" rx="5" ry="11" transform="rotate(90 356.9 793.6)" fill="#c99135"/><ellipse cx="376.7" cy="799" rx="5" ry="11" transform="rotate(34 376.7 799)" fill="#c99135"/><ellipse cx="370.1" cy="786.6" rx="5" ry="11" transform="rotate(90 370.1 786.6)" fill="#c99135"/><ellipse cx="389.9" cy="792" rx="5" ry="11" transform="rotate(34 389.9 792)" fill="#c99135"/><ellipse cx="383.3" cy="779.6" rx="5" ry="11" transform="rotate(90 383.3 779.6)" fill="#c99135"/><ellipse cx="399.8" cy="778.8" rx="4.5" ry="10" transform="rotate(62 399.8 778.8)" fill="#c99135"/>
+      <path d="M226,878 Q320.3,837.3 418.6,807.9" stroke="#e3b862" stroke-width="3" fill="none" stroke-linecap="round"/><ellipse cx="315.1" cy="853" rx="5" ry="11" transform="rotate(42 315.1 853)" fill="#e3b862"/><ellipse cx="310.3" cy="839.9" rx="5" ry="11" transform="rotate(98 310.3 839.9)" fill="#e3b862"/><ellipse cx="330.2" cy="847.5" rx="5" ry="11" transform="rotate(42 330.2 847.5)" fill="#e3b862"/><ellipse cx="325.4" cy="834.4" rx="5" ry="11" transform="rotate(98 325.4 834.4)" fill="#e3b862"/><ellipse cx="345.4" cy="842" rx="5" ry="11" transform="rotate(42 345.4 842)" fill="#e3b862"/><ellipse cx="340.6" cy="828.9" rx="5" ry="11" transform="rotate(98 340.6 828.9)" fill="#e3b862"/><ellipse cx="360.5" cy="836.5" rx="5" ry="11" transform="rotate(42 360.5 836.5)" fill="#e3b862"/><ellipse cx="355.7" cy="823.3" rx="5" ry="11" transform="rotate(98 355.7 823.3)" fill="#e3b862"/><ellipse cx="375.6" cy="831" rx="5" ry="11" transform="rotate(42 375.6 831)" fill="#e3b862"/><ellipse cx="370.8" cy="817.8" rx="5" ry="11" transform="rotate(98 370.8 817.8)" fill="#e3b862"/><ellipse cx="390.8" cy="825.5" rx="5" ry="11" transform="rotate(42 390.8 825.5)" fill="#e3b862"/><ellipse cx="386" cy="812.3" rx="5" ry="11" transform="rotate(98 386 812.3)" fill="#e3b862"/><ellipse cx="405.9" cy="820" rx="5" ry="11" transform="rotate(42 405.9 820)" fill="#e3b862"/><ellipse cx="401.1" cy="806.8" rx="5" ry="11" transform="rotate(98 401.1 806.8)" fill="#e3b862"/><ellipse cx="418.6" cy="807.9" rx="4.5" ry="10" transform="rotate(70 418.6 807.9)" fill="#e3b862"/>
+      <path d="M240,874 Q303.3,816.9 374,769.3" stroke="#f2d28b" stroke-width="3" fill="none" stroke-linecap="round"/><ellipse cx="304.6" cy="832.4" rx="5" ry="11" transform="rotate(24 304.6 832.4)" fill="#f2d28b"/><ellipse cx="296" cy="821.4" rx="5" ry="11" transform="rotate(80 296 821.4)" fill="#f2d28b"/><ellipse cx="315.1" cy="824.2" rx="5" ry="11" transform="rotate(24 315.1 824.2)" fill="#f2d28b"/><ellipse cx="306.5" cy="813.2" rx="5" ry="11" transform="rotate(80 306.5 813.2)" fill="#f2d28b"/><ellipse cx="325.6" cy="816" rx="5" ry="11" transform="rotate(24 325.6 816)" fill="#f2d28b"/><ellipse cx="317" cy="804.9" rx="5" ry="11" transform="rotate(80 317 804.9)" fill="#f2d28b"/><ellipse cx="336.2" cy="807.7" rx="5" ry="11" transform="rotate(24 336.2 807.7)" fill="#f2d28b"/><ellipse cx="327.5" cy="796.7" rx="5" ry="11" transform="rotate(80 327.5 796.7)" fill="#f2d28b"/><ellipse cx="346.7" cy="799.5" rx="5" ry="11" transform="rotate(24 346.7 799.5)" fill="#f2d28b"/><ellipse cx="338.1" cy="788.5" rx="5" ry="11" transform="rotate(80 338.1 788.5)" fill="#f2d28b"/><ellipse cx="357.2" cy="791.3" rx="5" ry="11" transform="rotate(24 357.2 791.3)" fill="#f2d28b"/><ellipse cx="348.6" cy="780.3" rx="5" ry="11" transform="rotate(80 348.6 780.3)" fill="#f2d28b"/><ellipse cx="367.7" cy="783.1" rx="5" ry="11" transform="rotate(24 367.7 783.1)" fill="#f2d28b"/><ellipse cx="359.1" cy="772" rx="5" ry="11" transform="rotate(80 359.1 772)" fill="#f2d28b"/><ellipse cx="374" cy="769.3" rx="4.5" ry="10" transform="rotate(52 374 769.3)" fill="#f2d28b"/>
+    </g>
+
+    </g>
+  </g>
+  <g id="title" clip-path="url(#disc)">
+    <g fill="#f2d28b" id="top-cross"><path d="M488.8,137 H511.2 V160.8 H535 V183.2 H511.2 V207 H488.8 V183.2 H465 V160.8 H488.8 Z"/><circle cx="489.4" cy="137" r="6"/><circle cx="500" cy="131.6" r="6"/><circle cx="510.6" cy="137" r="6"/><circle cx="535" cy="161.4" r="6"/><circle cx="540.4" cy="172" r="6"/><circle cx="535" cy="182.6" r="6"/><circle cx="510.6" cy="207" r="6"/><circle cx="500" cy="212.4" r="6"/><circle cx="489.4" cy="207" r="6"/><circle cx="465" cy="182.6" r="6"/><circle cx="459.6" cy="172" r="6"/><circle cx="465" cy="161.4" r="6"/></g>
+    <text class="ruqaa" x="500" y="338" text-anchor="middle" font-size="146" fill="#f2d28b" stroke="#061a31" stroke-width="12" paint-order="stroke">خبزنا اليومي</text>
+    <path d="M360,384 C440,366 560,398 640,378" stroke="#d7aa50" stroke-width="5" fill="none" stroke-linecap="round"/>
+  </g>
+  <g id="tagline" clip-path="url(#disc)">
+    <text class="cairo" x="500" y="440" text-anchor="middle" font-size="38" font-weight="700" fill="#fff6e0" stroke="#061a31" stroke-width="7" paint-order="stroke" stroke-linejoin="round">كلمة من الإنجيل تقوّيك كل يوم</text>
+  </g>
+  <!-- the family's own logo, small, as a seal at the foot of the book -->
+  <g id="family-seal">
+    <circle cx="500" cy="846" r="44" fill="#061a31" stroke="url(#goldRing)" stroke-width="5"/>
+    <clipPath id="sealClip"><circle cx="500" cy="846" r="38"/></clipPath>
+    <image href="../../../assets/img/logo-256.webp" x="462" y="808" width="76" height="76" clip-path="url(#sealClip)"/>
+  </g>
+</svg>

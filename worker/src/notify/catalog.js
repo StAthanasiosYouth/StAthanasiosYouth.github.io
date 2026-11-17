@@ -70,6 +70,9 @@ const SPECIAL = {
   'account.recovery.first': ['critical', 'participants.view'],
   'participant.settings': ['important', 'participants.manage'],
   'account.discover.high': ['important', 'participants.view'],
+  // «خبزنا اليومي» (bread/alerts.js): the live program ends in 7 / 3 / 1 days, the content is finished
+  'bread.left': ['important', 'bread.content', { email: false }],
+  'bread.empty': ['important', 'bread.content', { email: false }],
   'admin.rename': ['routine', 'accounts.view'],
   'session.takeover': ['routine', 'accounts.view']
 };
@@ -126,7 +129,9 @@ const ACTION_TEXT = {
   'payment.add': 'سجّل دفعة في حجز', 'payment.refund': 'سجّل استرداد في حجز', 'payment.void': 'لغى دفعة في حجز', 'payment.request': 'طلب دفع الباقي في حجز', 'payment.requestReject': 'رفض طلب دفع في حجز', 'payment.requestWithdraw': 'سحب طلب دفع في حجز',
   'handover.add': 'سجّل تسليم فلوس', 'handover.void': 'لغى تسليم فلوس', 'event.cancelAll': 'لغى كل حجوزات فعالية',
   'modules.book': 'غيّر حالة الحجز', 'job.failed': 'مهمة في الخلفية فشلت', 'notify.failed': 'إشعار مقدرش يتبعت',
-  'gmail.token': 'إرسال الإيميلات واقف: صلاحية جيميل محتاجة تتجدد'
+  'gmail.token': 'إرسال الإيميلات واقف: صلاحية جيميل محتاجة تتجدد',
+  'bread.left': 'خبزنا اليومي: البرنامج قرّب يخلص',
+  'bread.empty': 'خبزنا اليومي: المحتوى خلص'
 };
 const clip = (s, n) => (String(s || '').length > n ? String(s).slice(0, n - 1) + '…' : String(s || ''));
 const arabicDigits = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
@@ -183,6 +188,7 @@ export function messageOf(type, rows, names = {}) {
     title = lineOf(last);
     const changes = parse(last.changes) || {};
     if (rows.length > 1) body = 'و' + arabicDigits(rows.length - 1) + ' كمان';
+    else if (/^bread\./.test(String(last.action))) body = String(last.summary || '');
     else if (Array.isArray(changes.fields) && changes.fields.length) body = 'اتغيّر: ' + changes.fields.slice(0, 4).join('، ');
   }
   return {

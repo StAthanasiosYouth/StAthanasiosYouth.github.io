@@ -388,7 +388,9 @@ async function prefsView(ctx, account) {
   return {
     groups: Object.entries(GROUPS).map(([key, g]) => ({ key, label: g.label, optIn: g.tier === 3, on: saved[key] ? saved[key] === 'on' : g.tier === 2 })),
     always: ALWAYS_ON,
-    tint: tintOf(account)
+    tint: tintOf(account),
+    // «خبزنا اليومي»'s own look (W1 decision 2026-11-17): night (navy + paper) | dawn
+    bread_look: account.bread_look === 'dawn' ? 'dawn' : 'night'
   };
 }
 
@@ -403,7 +405,13 @@ export async function accountPrefsSave(ctx) {
   const now = Date.now();
   const stmts = [];
   let tint = null;
+  let look = null;
   for (const [key, on] of Object.entries(prefs)) {
+    if (key === 'bread_look') {
+      if (on !== 'night' && on !== 'dawn') throw new ApiError('bad', 'prefs');
+      look = on;
+      continue;
+    }
     if (key === 'tint') {
       if (!TINTS.includes(on)) throw new ApiError('bad', 'prefs');
       tint = on;
@@ -413,8 +421,11 @@ export async function accountPrefsSave(ctx) {
     stmts.push(db.prepare('INSERT INTO member_prefs (participant_id, grp, mode, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(participant_id, grp) DO UPDATE SET mode = excluded.mode, updated_at = excluded.updated_at').bind(account.id, key, on ? 'on' : 'off', now));
   }
   if (tint) stmts.push(db.prepare('UPDATE participants SET site_tint = ? WHERE id = ?').bind(tint === 'gold' ? null : tint, account.id));
+  if (look) stmts.push(db.prepare('UPDATE participants SET bread_look = ? WHERE id = ?').bind(look === 'dawn' ? 'dawn' : null, account.id));
   if (stmts.length) await retry(() => db.batch(stmts));
-  return prefsView(ctx, tint ? { ...account, site_tint: tint === 'gold' ? null : tint } : account);
+  let after = tint ? { ...account, site_tint: tint === 'gold' ? null : tint } : account;
+  if (look) after = { ...after, bread_look: look === 'dawn' ? 'dawn' : null };
+  return prefsView(ctx, after);
 }
 
 /* POST /v1/account/logout { all? }: this device, or every device. Quiet without a session. */

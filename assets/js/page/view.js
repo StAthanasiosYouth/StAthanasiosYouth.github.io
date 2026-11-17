@@ -463,7 +463,13 @@ export function createView({ main, live, rootUrl, mediaUrl, onClip }) {
       }
     };
     addEventListener('scroll', mark, { passive: true });
-    spyOff = () => { removeEventListener('scroll', mark); spyOff = null; };
+    /* the bar sticks flush under the page bar, whatever height that bar has */
+    const pbar = document.querySelector('.pbar');
+    const ro = pbar && 'ResizeObserver' in window
+      ? new ResizeObserver(() => document.documentElement.style.setProperty('--svc-top', `${Math.floor(pbar.getBoundingClientRect().height)}px`))
+      : null;
+    if (ro) ro.observe(pbar);
+    spyOff = () => { removeEventListener('scroll', mark); if (ro) ro.disconnect(); spyOff = null; };
     mark();
   }
 

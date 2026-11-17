@@ -1,7 +1,7 @@
 {
   "schema": 3,
-  "revision": "bab6d54a6324",
-  "publishedAt": "2026-11-14T00:31:34.333Z",
+  "revision": "4e96a4007203",
+  "publishedAt": "2026-11-15T08:55:42.916Z",
   "timezone": "Africa/Cairo",
   "site": {
     "name": "أسرة البابا أثناسيوس لخدمة شعب كنيستها الحبيبة في سفاجا",
@@ -252,6 +252,14 @@
         "type": "call",
         "href": "tel:+201220129458",
         "label": "اتصال"
+      },
+      "image": {
+        "src": "media/2026/img-0be3f5a1.webp",
+        "thumb": "media/2026/img-0be3f5a1-480.webp",
+        "w": 1080,
+        "h": 1446,
+        "alt": "",
+        "color": "#868584"
       }
     },
     {
@@ -276,10 +284,51 @@
       }
     }
   ],
-  "sessions": [],
+  "sessions": [
+    {
+      "date": "2026-11-15",
+      "time": "20:00",
+      "topic": "FIND YOUR PATH",
+      "speaker": "أبونا فيلوباتير روماني",
+      "description": "كل واحد فينا عنده طريق نفسه يمشي فيه… بس يا ترى إحنا عارفين طريقنا فعلًا؟ 🤔\nهل انتا بتدرس الحاجة اللي بتحبها؟\nهل عارف إنت شاطر في إيه وإيه اللي محتاج تطوّره في نفسك؟\nولا لسه بتحاول تكتشف إيه الأنسب ليك؟ 👀\nوسط كل الاختيارات دي، ساعات بنحتاج نقف مع نفسنا ونسأل… هو أنا ماشي في الطريق الصح؟\nوالأحد ده هنحاول نجاوب على الأسئلة دي مع راعي اجتماعنا أبونا الحبيب فيلوباتير روماني❤️\n🎬 THE TURNING POINT\nFIND YOUR PATH\nنقطة التحول... تبدأ لما تكتشف طريقك.\nمستنيينكم… يمكن الأحد ده يكون نقطة التحول في طريقك",
+      "image": {
+        "src": "media/2026/img-c657ffbc.webp",
+        "thumb": "media/2026/img-c657ffbc-480.webp",
+        "w": 1288,
+        "h": 1600,
+        "alt": "",
+        "color": "#343743"
+      },
+      "icon": "",
+      "status": "normal",
+      "note": "",
+      "visibleFrom": "",
+      "durationMinutes": 120
+    }
+  ],
   "news": [],
   "games": [],
-  "notifications": [],
+  "notifications": [
+    {
+      "id": "notif-session-2026-11-15",
+      "type": "meeting",
+      "title": "موضوع الاجتماع الجاي",
+      "message": "FIND YOUR PATH — أبونا فيلوباتير روماني",
+      "target": {
+        "kind": "meeting"
+      },
+      "image": {
+        "src": "media/2026/img-c657ffbc.webp",
+        "thumb": "media/2026/img-c657ffbc-480.webp",
+        "w": 1288,
+        "h": 1600,
+        "alt": "",
+        "color": "#343743"
+      },
+      "publishAt": "2026-11-15T10:55",
+      "expireAt": "2026-11-15T20:00"
+    }
+  ],
   "activities": [
     {
       "id": "act-2f7f8204",
@@ -306,7 +355,7 @@
       "display": "banner",
       "displayMobile": "",
       "page": "black-theatre",
-      "ctaLabel": "ادخل صفحة فريق المسرح ال",
+      "ctaLabel": "شاهد أعمالنا",
       "watch": true,
       "partner": "bug"
     },
@@ -335,7 +384,7 @@
       "display": "banner",
       "displayMobile": "",
       "page": "silenttheatre",
-      "ctaLabel": "",
+      "ctaLabel": "شاهد أعمالنا",
       "watch": true,
       "partner": "bug"
     }
@@ -507,7 +556,7 @@
         "color": "#412618"
       },
       "partner": "bug",
-      "v": "49c0e55f8001"
+      "v": "537602fffeba"
     },
     {
       "id": "pg-1212ad29",
