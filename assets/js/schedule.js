@@ -14,6 +14,7 @@
  */
 
 const DAY_MS = 86400000;
+const ENDED_SHOW_MINUTES = 60;
 
 const formatterCache = new Map();
 
@@ -308,8 +309,8 @@ export function meetingStatus(meeting, now, sessions = []) {
       return { ...base, state: 'live', minutesUntil: 0 };
     }
 
-    // today's meeting is over; keep looking
-    endedToday = { date, endMinutes: occ.end };
+    // today's meeting is over; keep looking («خلص» shows for one hour after the end only)
+    if (now.minutes < occ.end + ENDED_SHOW_MINUTES) endedToday = { date, endMinutes: occ.end };
   }
 
   return null;
