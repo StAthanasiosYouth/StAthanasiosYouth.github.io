@@ -109,7 +109,8 @@ test('SOURCE.json records the source and matches every file', () => {
   assert.match(src.license, /Public Domain/);
   assert.equal(Object.keys(src.books).length, 66);
   for (const [code, info] of Object.entries(src.books)) {
-    assert.equal(info.sha256, sha256(raw(`${code}.json`)), `${code}.json changed after the build: run tools/build-bible.mjs again`);
+    // hashed as built (LF); a Windows checkout with core.autocrlf may hand us CRLF
+    assert.equal(info.sha256, sha256(raw(`${code}.json`).replace(/\r\n/g, '\n')), `${code}.json changed after the build: run tools/build-bible.mjs again`);
     assert.match(info.usfm.sha256, /^[0-9a-f]{64}$/);
     assert.equal(info.chapters, book(code).chapters.length);
   }
