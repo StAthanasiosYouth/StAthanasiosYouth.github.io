@@ -55,6 +55,7 @@ export async function compareRun({ only = [], sizes = SIZES } = {}) {
   const seed = seedFor(p.id, 30, 4, 0);
   const eligible = await w.member();
   const guest = await w.member({ guest: true });
+  const newcomer = await w.member();   // the late joiner: an account that never read this program (its own kept seed)
   const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--hide-scrollbars', '--autoplay-policy=no-user-gesture-required'] });
 
   const sent = async (m, agoMs) => {
@@ -81,7 +82,7 @@ export async function compareRun({ only = [], sizes = SIZES } = {}) {
     ['06-reminders', 'member.html?s=reminders&rem=on&intro=0', { member: eligible, push: 'on', path: '?s=reminders' }],
     ['06-reminders-denied', 'member.html?s=reminders&rem=denied&intro=0', { member: eligible, push: 'denied', path: '?s=reminders' }],
     ['06-reminders-ios', 'member.html?s=reminders&rem=ios&intro=0', { member: eligible, push: 'ios', path: '?s=reminders', ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1' }],
-    ['07-late', 'member.html?s=today&intro=0&late=19&t=2', { member: eligible, push: 'on', late: true }],
+    ['07-late', 'member.html?s=today&intro=0&late=19&t=2', { member: newcomer, push: 'on', late: true }],
     ['08-empty', 'member.html?s=empty&intro=0', { member: eligible, push: 'on', over: true }],
     ['09-share', 'member.html?s=today&intro=0&share=1', { member: eligible, push: 'on', after: page => page.click('[data-act="share"]'), wait: 2500 }],
     ['02-intro-a', 'member.html?s=today&intro=1&sound=off&hold=500', { member: eligible, push: 'on', intro: 500 }],
@@ -120,7 +121,7 @@ export async function compareRun({ only = [], sizes = SIZES } = {}) {
           url = `${w.LOCAL}/index.html`;
         }
         else {
-          await prime(page, w.API, { seed: s, member: o.member, look: o.look, extra: { ...(o.extra ? o.extra(n) : {}), ...(o.read ? { 'bread.read': cairoDay() } : {}), ...(o.late ? {} : { ['bread.joined.' + p.id]: dayAdd(cairoDay(), -4) }) } });
+          await prime(page, w.API, { seed: s, member: o.member, look: o.look, extra: { ...(o.extra ? o.extra(n) : {}), ...(o.read ? { 'bread.read': cairoDay() } : {}), ...(o.over ? { 'bread.last': JSON.stringify({ id: p.id, name: PROTO.PROGRAM.name, days: 30, endsOn: dayAdd(cairoDay(), -1) }) } : {}), ...(o.late ? {} : { ['bread.joined.' + p.id]: dayAdd(cairoDay(), -4) }) } });
           const q = o.path || '?';
           url = `${w.LOCAL}/daily-bread/${q}${q.includes('?') && q.length > 1 ? '&' : ''}${o.intro ? '' : 'intro=0'}${o.hash || ''}`;
         }

@@ -134,6 +134,9 @@ test('sw.js: pictures only from the site\'s own media; links only to the site\'s
   assert.equal(await url('/#activity/act-1'), '/index.html#activity/act-1');
   assert.equal(await url('/#notifications'), '/index.html#notifications');
   assert.equal(await url('/index.html#meeting'), '/index.html#meeting');
+  // «خبزنا اليومي» (W5): the section's page itself (its intro plays on that load), never as a service page
+  assert.equal(await url('/daily-bread/?from=push'), '/daily-bread/');
+  assert.equal(await url('/#page/daily-bread'), '/index.html');
   for (const bad of ['https://evil.example/#meeting', 'javascript:alert(1)', '/admin/#meeting', '/#news/', '/#news/<x>', '/?x=1#settings', 42, null]) {
     assert.equal(await url(bad), '/index.html', String(bad));
   }

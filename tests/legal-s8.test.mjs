@@ -9,7 +9,7 @@ const read = p => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const AR = '٠١٢٣٤٥٦٧٨٩';
 const ar = n => String(n).replace(/\d/g, d => AR[d]);
 
-for (const [page, lead, count] of [['privacy', true, 7], ['terms', false, 4]]) {
+for (const [page, lead, count] of [['privacy', true, 8], ['terms', false, 4]]) {
   test(`${page}: S8 markup`, () => {
     const html = read(`${page}/index.html`);
     assert.match(html, /<html lang="ar" dir="rtl" class="legal-s8">/);

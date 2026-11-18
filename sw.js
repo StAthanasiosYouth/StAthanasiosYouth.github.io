@@ -30,9 +30,9 @@ const ICON = '/assets/img/icon-192.png';
 const BADGE = '/assets/img/push-badge.png';
 const HOME = '/index.html';
 const ROUTE = /^#(?:notifications|meeting|points|(?:news|game|activity)\/[\w-]{1,60}|competition\/[a-z0-9-]{2,40}|(?:event|page)\/[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9]))$/;
-/* the site's other pages a tap may open: a competition (the engine), «نقاطي», an event,
+/* the site's other pages a tap may open: a competition (the engine), «نقاطي», «خبزنا اليومي», an event,
    or a service page at the top level (docs/EVENTS.md §17.8; assets/js/page/model.js) */
-const FIXED_PAGE = /^\/(?:competition\/[a-z0-9-]{2,40}|points|events\/[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9]))\/$/;
+const FIXED_PAGE = /^\/(?:competition\/[a-z0-9-]{2,40}|points|daily-bread|events\/[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9]))\/$/;
 const TOP_PAGE = /^\/([a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9]))\/$/;
 const RESERVED = ['admin', 'assets', 'media', 'points', 'competition', 'events', 'pages', 'privacy', 'terms',
   'review', 'tools', 'docs', 'tests', 'apps-script', 'index', 'preview', 'new', 'card-athanasios', 'account', 'daily-bread'];

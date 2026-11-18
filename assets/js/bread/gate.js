@@ -2,7 +2,7 @@
  * «خبزنا اليومي» — is the section open? For the home card and the «المزيد» menu link (PLAN.md W5 «في الموقع»).
  *
  * While BREAD_MODULE ≠ 1 nothing of the section shows on the site (no card, no link). Cheap on purpose:
- *   1. the static index (daily-bread/data/index.json on GitHub Pages). Missing → closed, and the Worker is not asked.
+ *   1. the static index (daily-bread/data/index.json on GitHub Pages). Empty or missing → closed, and the Worker is not asked.
  *   2. it exists → the Worker's index: `disabled` → closed; an answer → open; unreachable → open only if this device
  *      already saw it open (offline / slow).
  * The answer is kept for the tab for 10 minutes (sessionStorage), so moving around the site asks once.
@@ -39,7 +39,8 @@ export function breadGate() {
     let out = { on: false, index: null };
     try {
       const s = await json(new URL('daily-bread/data/index.json', ROOT).href, 6000);
-      if (s.status === 200 && s.body && Array.isArray(s.body.programs)) {
+      // the repo ships an empty index (daily-bread/data/index.json) until the first publish: empty = closed, no Worker call
+      if (s.status === 200 && s.body && Array.isArray(s.body.programs) && s.body.programs.length) {
         const w = await json(bookApiUrl() + '/v1/bread/file/index', 6000).catch(() => null);
         if (w && w.status === 200 && w.body && Array.isArray(w.body.programs)) out = { on: true, index: w.body };
         else if (w && w.body && w.body.code === 'disabled') out = { on: false, index: null };
