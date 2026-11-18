@@ -55,7 +55,8 @@ export async function compareRun({ only = [], sizes = SIZES } = {}) {
   const seed = seedFor(p.id, 30, 4, 0);
   const eligible = await w.member();
   const guest = await w.member({ guest: true });
-  const newcomer = await w.member();   // the late joiner: an account that never read this program (its own kept seed)
+  const newcomer = await w.member();
+  const dawnie = await w.member();     // the dawn look goes to its account: its own, so the other states stay night   // the late joiner: an account that never read this program (its own kept seed)
   const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--hide-scrollbars', '--autoplay-policy=no-user-gesture-required'] });
 
   const sent = async (m, agoMs) => {
@@ -71,7 +72,7 @@ export async function compareRun({ only = [], sizes = SIZES } = {}) {
   const STATES = [
     ['03-today', 'member.html?s=today&intro=0', { member: eligible, push: 'on' }],
     ['03-today-full', 'member.html?s=today&intro=0', { member: eligible, push: 'on', full: true, only: ['390'] }],
-    ['03-dawn', 'member.html?s=today&intro=0&look=dawn', { member: eligible, push: 'on', look: 'dawn' }],
+    ['03-dawn', 'member.html?s=today&intro=0&look=dawn', { member: dawnie, push: 'on', look: 'dawn' }],
     ['04-question', 'member.html?s=today&intro=0&acct=eligible#reflect', { member: eligible, push: 'on', hash: '#reflect' }],
     ['05-reflect-none', 'member.html?s=today&intro=0&acct=none&refl=typing#reflect', { push: 'on', hash: '#reflect', extra: k => ({ [`bread.draft.${p.id}.${k}`]: DRAFT }) }],
     ['05-signin', 'member.html?s=today&intro=0&acct=none&refl=typing&signin=1', { push: 'on', extra: k => ({ [`bread.draft.${p.id}.${k}`]: DRAFT }), after: page => page.click('[data-act="signin"]') }],
