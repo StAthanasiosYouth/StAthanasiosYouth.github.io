@@ -402,6 +402,9 @@ export function startHome(main) {
   if (sugg) turnSlides(sugg);
   else clearInterval(slideTimer);
 
+  // «خبزنا اليومي»: its card beside the greeting, only while the section is open (bread/gate.js)
+  import('./bread/home-card.js').then(m => m.placeCard(main)).catch(error => console.warn(error));
+
   main.querySelectorAll('.s2-head .s2-arrows button').forEach(b => {
     b.addEventListener('click', () => {
       const rail = b.closest('.widget').querySelector('.s2-rail');

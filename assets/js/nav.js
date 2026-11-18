@@ -486,7 +486,7 @@ export function areaElement(entry, doc = document) {
 }
 
 /* what «المزيد» lists: the home page's sections (in the page's order), the social pages, the site's pages */
-export function moreGroups(content, { home = false, doc = document } = {}) {
+export function moreGroups(content, { home = false, doc = document, bread = false } = {}) {
   const layout = (content && content.layout) || [];
   const shown = entry => {
     if (home) return !!areaElement(entry, doc);
@@ -501,6 +501,8 @@ export function moreGroups(content, { home = false, doc = document } = {}) {
   }));
   const social = ((content && content.sections) || []).flatMap(s => (s.links || []).filter(l => /^https:\/\//.test(l.url || '')).map(l => ({ title: l.title, url: l.url, icon: l.icon || 'link' })));
   const pages = ((content && content.pages) || []).filter(p => /^[a-z0-9-]{2,40}$/.test(p.slug || '')).map(p => ({ title: p.title, href: new URL(p.slug + '/', ROOT).href, icon: 'theatre' }));
+  // «خبزنا اليومي»: only while the section is open (bread/gate.js; openMore asks it)
+  if (bread) pages.push({ title: 'خبزنا اليومي', href: new URL('daily-bread/', ROOT).href, icon: 'book' });
   pages.push({ title: 'نقاطي والمسابقات', href: new URL('points/', ROOT).href, icon: 'trophy' });
   pages.push({ title: 'شرح الموقع', action: 'tour', icon: 'info' });
   return [
@@ -520,7 +522,8 @@ function closeMore(dialog) {
 
 async function openMore(button) {
   if (document.querySelector('dialog.nav-more')) return;
-  const [content, icons] = await Promise.all([siteContent(), import('./icons.js').catch(() => null)]);
+  const [content, icons, bread] = await Promise.all([siteContent(), import('./icons.js').catch(() => null),
+    import('./bread/gate.js').then(m => m.breadGate()).then(g => g.on, () => false)]);
   const glyph = name => (icons ? icons.iconNode(name) : icon('more'));
   iconsModule ||= icons;
   const dialog = document.createElement('dialog');
@@ -539,7 +542,7 @@ async function openMore(button) {
   close.addEventListener('click', () => closeMore(dialog));
   head.append(title, close);
   dialog.append(head);
-  const groups = moreGroups(content || {}, { home: onHome() });
+  const groups = moreGroups(content || {}, { home: onHome(), bread });
   for (const group of groups) {
     const section = document.createElement('section');
     section.className = 'nav-more__group';

@@ -10,7 +10,10 @@ import { readFileSync, readdirSync } from 'node:fs';
 const ROOT = new URL('../', import.meta.url);
 const CSS = new URL('assets/css/', ROOT);
 const BASES = ['main.css', 'page.css', 'comp.css', 'legal.css', 'xp-clip.css'];
-const files = readdirSync(CSS).filter(f => f.endsWith('.css'));
+// «خبزنا اليومي» keeps its own look, independent of «لون الموقع» (owner decision 2026-11-17, docs/daily-bread/PLAN.md decision 2):
+// its fixed colours are logo B's sky, sun and paper, not the site's gold
+const OWN_LOOK = ['bread.css'];
+const files = readdirSync(CSS).filter(f => f.endsWith('.css') && !OWN_LOOK.includes(f));
 const read = f => readFileSync(new URL(f, CSS), 'utf8');
 
 function hsl(c) {

@@ -80,6 +80,7 @@ test('a link\'s destination: own routes only, this tab, 30 minutes, once', () =>
   assert.equal(M.cleanReturn('/'), '/');
   assert.equal(M.cleanReturn('/black-theatre/'), '/black-theatre/');
   assert.equal(M.cleanReturn('/pages/about/'), '/pages/about/');
+  assert.equal(M.cleanReturn('/daily-bread/?from=signin#reflect'), '/daily-bread/?from=signin#reflect', '«خبزنا اليومي»: back to the reflection');
   assert.equal(M.cleanReturn('/events/alex-trip/#b/bk1.abc-_.def'), '/events/alex-trip/#b/bk1.abc-_.def');
   for (const bad of ['//evil.example/', 'https://evil.example', '/admin/', 'javascript:alert(1)', '/account/', '/\\evil.example', '/#"><script>']) assert.equal(M.cleanReturn(bad), '', bad);
   for (const bad of ['#//evil.example', 'javascript:alert(1)', 'https://evil.example', '#me/<x>', '#mee', '']) assert.equal(M.cleanRoute(bad), '', bad);

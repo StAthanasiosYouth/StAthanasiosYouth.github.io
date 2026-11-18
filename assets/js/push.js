@@ -677,3 +677,46 @@ export async function remindToggle(slug, on) {
     return { ok: false, text: 'النت فاصل؟ جرّب تاني.' };
   }
 }
+
+
+/* =========================================================
+   «خبزنا اليومي» «فكّرني كل يوم» (daily bread W5): this device's times
+========================================================= */
+
+/** for the section's reminders card, no network: { support, permission, on } */
+export function pushStatus() {
+  return { support: pushSupport(), permission: permission(), on: !!loadMemo().token && permission() === 'granted' };
+}
+
+/**
+ * times: ['HH:MM', …] to save ([] = off), or undefined to read what is saved. Saving a time turns notifications on
+ * first when they are off (inside the tap). seed: the device's «خبزنا اليومي» id (its own topic in the push).
+ * → { ok: true, times, max, defaultTime } | { ok: false, text, reason }
+ */
+export async function breadSlots(times, seed) {
+  if (!PUSH_CONFIG.workerUrl) return { ok: false, text: SUPPORT_TEXT.unsupported, reason: 'unsupported' };
+  if (times && times.length) {
+    const support = pushSupport();
+    if (support !== 'ok') return { ok: false, text: SUPPORT_TEXT[support] || SUPPORT_TEXT.unsupported, reason: support };
+    if (!loadMemo().token || permission() !== 'granted') await enable();
+    if (permission() === 'denied') return { ok: false, text: 'الإشعارات مقفولة من المتصفح.', reason: 'denied' };
+    if (!loadMemo().token || permission() !== 'granted') return { ok: false, text: 'فعّل الإشعارات الأول علشان نقدر نفكّرك.', reason: 'off' };
+  }
+  const token = loadMemo().token;
+  if (!token) return { ok: true, times: [], max: 3, defaultTime: '08:00' };
+  const ask = async () => {
+    const response = await fetch(PUSH_CONFIG.workerUrl + '/v1/bread/slots', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(times === undefined ? { token } : { token, seed, times }), credentials: 'omit', cache: 'no-store'
+    });
+    return response.json();
+  };
+  try {
+    let reply = await ask();
+    if (reply && reply.reason === 'no_device' && (await server('pushSubscribe', { token, platform: platformOf() }))) reply = await ask();
+    if (!reply || !reply.ok) return { ok: false, text: (reply && reply.message) || 'ما قدرناش نحفظ المواعيد. جرّب تاني بعد شوية.', reason: reply && reply.code };
+    return { ok: true, times: reply.times || [], max: reply.max || 3, defaultTime: reply.defaultTime || '08:00' };
+  }
+  catch {
+    return { ok: false, text: 'النت فاصل؟ جرّب تاني.', reason: 'network' };
+  }
+}

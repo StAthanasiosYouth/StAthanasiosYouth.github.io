@@ -47,7 +47,10 @@ function worker({ windows = [] } = {}) {
     }
   };
 
-  vm.runInNewContext(readFileSync(`${ROOT}sw.js`, 'utf8'), { self, URL, console }, { filename: 'sw.js' });
+  // «خبزنا اليومي»'s cache: answered requests go nowhere here
+  const caches = { open: async () => ({ put: async () => {}, match: async () => null, keys: async () => [], delete: async () => true }) };
+  const fetch = async () => { throw new Error('offline in the test'); };
+  vm.runInNewContext(readFileSync(`${ROOT}sw.js`, 'utf8'), { self, URL, console, caches, fetch }, { filename: 'sw.js' });
 
   const fire = async (type, event) => {
     let waiting = null;
@@ -68,11 +71,34 @@ function worker({ windows = [] } = {}) {
 }
 
 
-test('sw.js: no fetch handler, no cache — push and notification taps only', () => {
+test('sw.js: push and taps, and a cache for «خبزنا اليومي» only — every other request is never answered', () => {
   const code = readFileSync(`${ROOT}sw.js`, 'utf8');
   const sw = worker();
-  assert.deepEqual(Object.keys(sw.listeners).sort(), ['activate', 'install', 'notificationclick', 'push']);
-  assert.doesNotMatch(code, /caches\.|addEventListener\(\s*'fetch'|importScripts|firebase/);
+  assert.deepEqual(Object.keys(sw.listeners).sort(), ['activate', 'fetch', 'install', 'message', 'notificationclick', 'push']);
+  assert.doesNotMatch(code, /importScripts|firebase/);
+  assert.match(code, /caches\.open\(BREAD_CACHE\)/);
+  // the fetch handler answers only the section's own files (and the site files its page loads, by referrer)
+  const answered = [];
+  const ask = (url, { method = 'GET', referrer = '' } = {}) => {
+    let took = false;
+    sw.listeners.fetch({ request: { url, method, referrer }, clientId: 'c1', respondWith: p => { took = true; Promise.resolve(p).catch(() => {}); } });
+    if (took) answered.push(url);
+    return took;
+  };
+  const O = ORIGIN;
+  for (const url of [`${O}/`, `${O}/index.html`, `${O}/content.json`, `${O}/assets/js/main.js`, `${O}/assets/css/main.css`, `${O}/points/`,
+    `${O}/assets/js/bread-ish.js`, `${O}/daily-bread/x/`, 'https://athanasios-api.menazak-lab.workers.dev/v1/public/content',
+    'https://athanasios-api.menazak-lab.workers.dev/v1/bread/today', 'https://evil.example/daily-bread/']) {
+    assert.equal(ask(url), false, url);
+  }
+  assert.equal(ask(`${O}/daily-bread/data/brd-0123456789/4.json`, { method: 'POST' }), false, 'never a POST');
+  assert.equal(ask(`${O}/assets/css/main.css`, { referrer: `${O}/index.html` }), false, 'a site file for the site');
+  for (const url of [`${O}/daily-bread/`, `${O}/daily-bread/data/index.json`, `${O}/daily-bread/data/brd-0123456789/4.json`, `${O}/assets/js/bread/page.js`,
+    `${O}/assets/css/bread.css`, `${O}/assets/fonts/amiri/amiri-arabic-400.woff2`, `${O}/assets/img/bread/logo-b.svg`,
+    'https://athanasios-api.menazak-lab.workers.dev/v1/bread/file/index', 'https://athanasios-api.menazak-lab.workers.dev/v1/bread/file/brd-0123456789/12']) {
+    assert.equal(ask(url), true, url);
+  }
+  assert.equal(ask(`${O}/assets/css/main.css`, { referrer: `${O}/daily-bread/` }), true, 'a site file for the section\'s page');
 });
 
 test('sw.js: an FCM data message becomes an Arabic RTL notification with the item\'s link', async () => {

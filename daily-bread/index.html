@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+
+<head>
+
+  <meta charset="utf-8">
+
+  <!-- pinch-zoom stays enabled on purpose (accessibility) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <!-- CSP: the site's own policy (index.html). The section's files and the Worker only. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; media-src 'self'; connect-src 'self' https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com https://athanasios-api.menazak-lab.workers.dev https://athanasios-api-staging.menazak-lab.workers.dev; object-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
+
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+
+  <!-- «خبزنا اليومي» (docs/daily-bread/PLAN.md W5): a verse, a reading, a meditation and an optional question every day.
+       Hidden until BREAD_MODULE = 1 (the page says it is not open yet); noindex until the launch (W7). -->
+  <title>خبزنا اليومي – أسرة البابا أثناسيوس</title>
+
+  <meta name="description" content="«خبزنا اليومي»: كلمة من الإنجيل تقوّيك كل يوم، من أسرة البابا أثناسيوس الرسولي للشباب بسفاجا.">
+
+  <meta name="theme-color" content="#020914">
+  <meta name="color-scheme" content="dark">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="noindex">
+
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="../assets/img/favicon-192.png">
+  <link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png">
+
+  <link rel="manifest" href="../manifest.webmanifest">
+  <meta name="apple-mobile-web-app-title" content="أسرة البابا أثناسيوس - سفاجا">
+
+  <link rel="preload" href="../assets/fonts/cairo-arabic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../assets/fonts/aref-ruqaa-arabic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../assets/fonts/amiri/amiri-arabic-400.woff2" as="font" type="font/woff2" crossorigin>
+
+  <link rel="stylesheet" href="../assets/css/main.css">
+  <link rel="stylesheet" href="../assets/css/nav.css">
+  <link rel="stylesheet" href="../assets/css/bread.css">
+
+  <link rel="modulepreload" href="../assets/js/bread/api.js">
+  <link rel="modulepreload" href="../assets/js/bread/model.js">
+  <link rel="modulepreload" href="../assets/js/bread/intro.js">
+  <script type="module" src="../assets/js/bread/page.js"></script>
+
+</head>
+
+<body class="br-page">
+
+  <a class="skip-link" href="#main">انتقل للمحتوى</a>
+
+  <!-- the intro's own dark until the section is known open (page.js lifts it; CSS lifts it after 6 s anyway) -->
+  <div class="br-cover" id="br-cover" aria-hidden="true"></div>
+
+  <div id="app"></div>
+
+  <noscript><p class="br-noscript">«خبزنا اليومي» محتاج JavaScript يشتغل في المتصفح.</p></noscript>
+
+</body>
+</html>

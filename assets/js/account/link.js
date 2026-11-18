@@ -18,7 +18,7 @@ const SVG = 'http://www.w3.org/2000/svg';
 const USER_ICON = 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c1-4.4 4-6 8-6s7 1.6 8 6';
 
 /* this site's own pages only: never /admin/, another host or a script */
-export const cleanReturn = path => (/^\/(?:index\.html|events\/[a-z0-9-]{1,60}\/|competition\/[a-z0-9-]{2,40}\/|pages\/[a-z0-9-]{1,60}\/|black-theatre\/|points\/)?(?:\?[\w=&-]{0,120})?(?:#[\w./~-]{0,600})?$/.test(String(path || '')) ? String(path) : '');
+export const cleanReturn = path => (/^\/(?:index\.html|events\/[a-z0-9-]{1,60}\/|competition\/[a-z0-9-]{2,40}\/|pages\/[a-z0-9-]{1,60}\/|black-theatre\/|points\/|daily-bread\/)?(?:\?[\w=&-]{0,120})?(?:#[\w./~-]{0,600})?$/.test(String(path || '')) ? String(path) : '');
 
 function storage(name) {
   try {
