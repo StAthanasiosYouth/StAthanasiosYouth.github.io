@@ -4374,6 +4374,8 @@
     finance: ['finance.view'],
     paymethods: ['finance.view']
   };
+  // a module adds its own tabs' needs («خبزنا اليومي»: AdminBread)
+  A.SUB_NEEDS = SUB_NEEDS;
 
   A.access = null;
 
@@ -4687,7 +4689,8 @@
     // order after their home; the rest fill up (never a locked «قريبًا» area); the others go under «المزيد»
     var main = all.slice(0, 1);
     DOCK_PLACES.forEach(function (key) { var a = all.filter(function (x) { return x.key === key; })[0]; if (a && main.indexOf(a) === -1) main.push(a); });
-    all.forEach(function (a) { if (main.length < DOCK_MAIN && main.indexOf(a) === -1 && !a.soon) main.push(a); });
+    // (an area marked `more` lives under «المزيد» on phones: «الآيات والقراءات اليومية», W1 20-programs-m)
+    all.forEach(function (a) { if (main.length < DOCK_MAIN && main.indexOf(a) === -1 && !a.soon && !a.more) main.push(a); });
     main = main.slice(0, DOCK_MAIN);
     return { main: main, rest: all.filter(function (a) { return main.indexOf(a) === -1; }) };
   }
@@ -4841,7 +4844,9 @@
     var list = [];
     A.visibleAreas().forEach(function (area) {
       (area.subs || []).forEach(function (s) {
-        if (Number(s.badge) > 0) list.push({ n: Number(s.badge), label: s.label, where: area.label, icon: area.icon, go: function () { A.go(area.key, s.key); } });
+        // a tab's own words in the bell («خبزنا اليومي»: «"…" فاضله ٣ أيام»), no number on the item
+        if (s.wait && A.allowedSub(s.key)) list.push({ n: 0, label: s.wait.label, where: s.wait.where || area.label, icon: s.wait.icon || area.icon, go: function () { A.go(area.key, s.key); } });
+        else if (Number(s.badge) > 0) list.push({ n: Number(s.badge), label: s.label, where: area.label, icon: area.icon, go: function () { A.go(area.key, s.key); } });
       });
       if (!(area.subs || []).some(function (s) { return Number(s.badge) > 0; }) && Number(area.badge) > 0) {
         list.push({ n: Number(area.badge), label: area.label, where: '', icon: area.icon, go: function () { A.go(area.key); } });

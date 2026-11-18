@@ -164,6 +164,8 @@ function linkOf(key, rows) {
   if (booking && /^(payment|pay)\./.test(String(last.action))) return '/admin/#open/payments/' + booking;
   if (booking) return '/admin/#open/booking/' + booking;
   if (/^(accounts|admin)\./.test(String(last.action)) && last.entity_type === 'admin' && last.entity_id) return '/admin/#open/account/' + accountKey(last.entity_id);
+  // «خبزنا اليومي» (W4): the alerts open the section's programs tab
+  if (/^bread\./.test(String(last.action))) return '/admin/#open/bread';
   return '/admin/#activity/' + last.id;
 }
 
