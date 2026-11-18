@@ -39,21 +39,22 @@ export async function memberKick(env, now = Date.now()) {
   return ids.length;
 }
 
-export async function notifyTick(env, now = Date.now()) {
+/* sw: the minute's switches read once by scheduled.js (minuteSwitches); a step whose switch is off is skipped before its own read */
+export async function notifyTick(env, now = Date.now(), sw = null) {
   const out = {};
   try {
-    out.route = await route(env, now);
+    out.route = sw && sw.NOTIFY_ROUTER !== '1' ? { off: true } : await route(env, now);
   } catch (err) {
     out.error = String(err && err.message).slice(0, 200);
   }
   try {
-    const push = await adminPushTick(env, now);
+    const push = sw && (sw.PUSH_SENDER !== 'worker' || sw.NOTIFY_ROUTER !== '1') ? null : await adminPushTick(env, now);
     if (push) out.push = push;
   } catch (err) {
     out.pushError = String(err && err.message).slice(0, 200);
   }
   try {
-    const ids = await leaseDue(env, now);
+    const ids = sw && sw.NOTIFY_EMAIL !== '1' ? [] : await leaseDue(env, now);
     if (ids.length && env.JOBS) await env.JOBS.send(makeJob('notify.email', { ids }));
     else if (ids.length) out.email = await sendRows(env, ids, now);
     out.leased = ids.length;

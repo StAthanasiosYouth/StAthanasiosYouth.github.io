@@ -94,23 +94,39 @@ export async function blankPhones(env, now = Date.now(), { eventId = null } = {}
   return blanked;
 }
 
+/*
+ * W6: the minute's switches in one read. Each D1 call costs the cron about 1 ms of CPU (Staging, 2026-11-18),
+ * and most steps used to read their own switch only to find it off. A step skipped here would have returned at
+ * once anyway: each still checks its switch itself, so a switch turned on between the two reads waits a minute.
+ */
+const MINUTE_KEYS = ['NOTIFY_ROUTER', 'NOTIFY_EMAIL', 'PUSH_SENDER', 'PUSH_AUTO_BELL', 'COMP_IMPORT', 'PUSH_IMPORT', 'BREAD_MODULE', 'BREAD_PUSH', 'accounts_mode'];
+export async function minuteSwitches(db) {
+  const rows = (await db.prepare(`SELECT key, value FROM settings WHERE key IN (${MINUTE_KEYS.map(() => '?').join(',')})`).bind(...MINUTE_KEYS).all()).results;
+  return Object.fromEntries(rows.map(r => [r.key, r.value]));
+}
+const importAsked = v => v === 'dry' || v === 'apply';
+
 /* wrangler.jsonc: '* * * * *' = the notifications (notify/tick.js); the other cron = the daily housekeeping */
 export async function scheduled(controller, env) {
   const now = controller.scheduledTime || Date.now();
   if (controller.cron === '* * * * *') {
-    await notifyTick(env, now);
+    // null (the read failed): every step reads its own switch, as before
+    const sw = await minuteSwitches(env.DB).catch(() => null);
+    const on = test => !sw || test(sw);
+    const sender = s => s.PUSH_SENDER === 'worker';
+    await notifyTick(env, now, sw);
     // Phase 5B: results whose release moment has come (COMPETITIONS §20.2)
-    await compImportTick(env).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'comp.import', err: String(err && err.message).slice(0, 200) }));
-    await pushImportTick(env).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'push.import', err: String(err && err.message).slice(0, 200) }));
+    if (on(s => importAsked(s.COMP_IMPORT))) await compImportTick(env).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'comp.import', err: String(err && err.message).slice(0, 200) }));
+    if (on(s => importAsked(s.PUSH_IMPORT))) await pushImportTick(env).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'push.import', err: String(err && err.message).slice(0, 200) }));
     // Phase 6 Step 4c: the automatic pushes whose moment has come (push/schedule.js)
-    await scheduleTick(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'push.schedule', err: String(err && err.message).slice(0, 200) }));
+    if (on(sender)) await scheduleTick(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'push.schedule', err: String(err && err.message).slice(0, 200) }));
     // a bell item live now goes as a push by itself (push/autobell.js)
-    await autoBellTick(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'push.bell', err: String(err && err.message).slice(0, 200) }));
+    if (on(s => sender(s) && s.PUSH_AUTO_BELL === '1')) await autoBellTick(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'push.bell', err: String(err && err.message).slice(0, 200) }));
     // «فكّرني» (site wave 5): after the bell, so a competition's own push to everyone covers its reminders
-    await remindTick(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'push.remind', err: String(err && err.message).slice(0, 200) }));
+    if (on(sender)) await remindTick(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'push.remind', err: String(err && err.message).slice(0, 200) }));
     // «خبزنا اليومي»: the devices whose minute it is (one round trip; each device's text is built in the queue)
-    await breadTick(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'bread.tick', err: String(err && err.message).slice(0, 200) }));
-    await compReleaseTick(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'comp.release', err: String(err && err.message).slice(0, 200) }));
+    if (on(s => sender(s) && s.BREAD_MODULE === '1' && s.BREAD_PUSH === '1')) await breadTick(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'bread.tick', err: String(err && err.message).slice(0, 200) }));
+    if (on(s => s.accounts_mode === 'on')) await compReleaseTick(env, now).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'comp.release', err: String(err && err.message).slice(0, 200) }));
     // Phase 2: the shadow comparison every 15 minutes (nothing until a publish was posted)
     if (new Date(now).getUTCMinutes() % SHADOW_EVERY_MIN === 0) {
       await shadowCheck(env, { now }).catch(err => logLine({ lvl: 'warn', kind: 'cron', job: 'shadow', err: String(err && err.message).slice(0, 200) }));
