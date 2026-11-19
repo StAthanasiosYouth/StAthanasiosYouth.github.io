@@ -741,3 +741,43 @@ test('the day form is the whole width of its window, nothing cut; the phone prev
   assert.deepEqual(d.problems, []);
   await d.context.close();
 });
+
+test('W7 round 4: «علّم الكل / شيل الكل», a saint\'s card alone in the phone, the real date on each day, the feast under its day, nothing wider than the phone', async () => {
+  freshWorker({ empty: true });
+  const now = monthOf(TODAY, 0);
+  const file = taklaFile(now);
+  // a long St-Takla-like meditation with long links and one long unbroken word
+  file.days[0].options[0].meditation = ('كلمة طويلة جدا عن المحبة والرجاء [الأسقف](https://st-takla.org/Full-Free-Coptic-Books/Very-Long-Path-Name-Here/With-More-Parts_000-index.html) ').repeat(12) + 'ا'.repeat(120);
+  const left = lastDay(now) - +TODAY.slice(8, 10) + 1;
+  file.feasts = [{ date: TODAY, on: true, name: 'قديس النهارده', title: 'تذكار', word: 'كلمة عنه.', sourceUrl: 'https://st-takla.org/k.html', img: null },
+    { date: `${now}-${String(lastDay(now)).padStart(2, '0')}`, on: true, name: 'قديس آخر الشهر', title: 'تذكار', word: 'كلمة.', sourceUrl: 'https://st-takla.org/k.html', img: null }];
+  fake.state.suggest = { [now]: file };
+  const d = await open();
+  // «الأعياد»: tick all / none, and the phone shows the card alone
+  await go(d.page, 'breadfeasts');
+  await d.page.waitForSelector('[data-act="bread-feasts-all"]', { timeout: 8000 });
+  assert.match(await d.page.$eval('[data-act="bread-feasts-all"]', b => b.textContent), /شيل الكل/);
+  await d.page.click('[data-act="bread-feasts-all"]');
+  await d.page.waitForFunction(() => [...document.querySelectorAll('.ba-feast input')].every(i => !i.checked), { timeout: 5000 });
+  assert.match(await d.page.$eval('[data-act="bread-feasts-all"]', b => b.textContent), /علّم الكل/);
+  await d.page.click('[data-act="bread-feasts-all"]');
+  await d.page.waitForFunction(() => [...document.querySelectorAll('.ba-feast input')].every(i => i.checked), { timeout: 5000 });
+  const inFrame = async (fn, arg) => { const h = await d.page.$('.ba-phone iframe'); const f = await h.contentFrame(); await f.waitForSelector('#app *', { timeout: 8000 }); return f.evaluate(fn, arg); };
+  await d.page.waitForSelector('.ba-phone iframe');
+  await sleep(800);
+  assert.equal(await inFrame(() => document.querySelector('.br-feast__name') && document.querySelector('.br-feast__name').textContent), 'النهارده تذكار قديس النهارده');
+  assert.equal(await inFrame(() => !!document.querySelector('.br-title')), false, 'alone: no topic');
+  // the St-Takla review of the current month: the date first, the feast under today's topic, nothing sideways
+  await go(d.page, 'breadnew');
+  await d.page.click(`[data-act="bread-takla-month"][data-month="${now}"]`);
+  await d.page.click('[data-act="bread-takla"]');
+  await d.page.click('[data-act="bread-takla-ok"]');
+  await d.page.waitForSelector('.ba-daycell', { timeout: 15000 });
+  const first = await d.page.$eval('.ba-table tbody tr .ba-daycell', n => n.innerText.replace(/\s+/g, ' ').trim());
+  assert.match(first, new RegExp('١ من ' + String(left).replace(/\d/g, x => '٠١٢٣٤٥٦٧٨٩'[x])));
+  await sleep(1200);
+  const v = await inFrame(() => ({ feast: !!document.querySelector('.br-feast'), wide: document.documentElement.scrollWidth - document.documentElement.clientWidth }));
+  assert.deepEqual(v, { feast: true, wide: 0 });
+  assert.deepEqual(d.problems, []);
+  await d.context.close();
+});

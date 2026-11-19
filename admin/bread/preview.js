@@ -62,8 +62,9 @@ function tabbar() {
   </div><span class="acct-badge tabbar__tab tabbar__fixed"><span class="acct-badge__face">${FACE}</span><span class="tabbar__word">حسابي</span></span></nav>`;
 }
 
-function dateText() {
-  const d = new Date();
+function dateText(iso) {
+  // W7: the day's real date when the admin knows it (a St-Takla month), else today
+  const d = iso ? new Date(iso + 'T12:00:00Z') : new Date();
   return WEEKDAYS[d.getDay()] + ' ' + AR(d.getDate()) + ' ' + MONTHS[d.getMonth()];
 }
 
@@ -82,7 +83,7 @@ function page(day) {
   return `${topbar()}<main id="main">
     <section class="br-dawn" aria-labelledby="br-title">
       <span class="br-dawn__rays" aria-hidden="true"></span>
-      <p class="br-day">${dateText()} <i></i> اليوم ${AR(day.n)} من ${AR(day.days)}</p>
+      <p class="br-day">${dateText(day.date)} <i></i> اليوم ${AR(day.n)} من ${AR(day.days)}</p>
       <h1 class="br-title" id="br-title">${esc(day.title)}</h1>
       <p class="br-verse"><q>${esc(day.verse)}</q></p>
       <p class="br-ref">${esc(day.verseRef)}</p>
@@ -108,13 +109,29 @@ function page(day) {
       <div class="br-side">
         <section class="widget br-card br-med"><h2 class="br-kicker">${bi('lantern')}تأمل النهارده</h2>${medText(day.meditation)}${byLine(day.source)}</section>
         <section class="widget br-card br-q">${head}</section>
+        ${feastCard(day.feast)}
       </div></div>
   </main>${tabbar()}`;
 }
 
+/* W7: the saint's card, as the member page draws it (assets/js/bread/page.js feast()) */
+function feastCard(f) {
+  if (!f) return '';
+  const pic = f.img && TAKLA.test(f.img) ? `<figure class="br-feast__fig"><img class="br-feast__img" src="${esc(f.img)}" alt="" referrerpolicy="no-referrer"></figure>` : '';
+  return `<section class="widget br-card br-feast"><h2 class="br-kicker">${bi('sun')}نحب نفكّرك</h2>${pic}<p class="br-feast__name">النهارده تذكار ${esc(f.name)}</p>${f.title && f.title !== f.name ? `<p class="br-feast__title">${esc(f.title)}</p>` : ''}${medText(f.word)}<p class="br-med__by br-med__src">من <span class="br-src">سنكسار موقع الأنبا تكلا</span></p></section>`;
+}
+
+/* W7: a feast with no topic that day (the «الأعياد» tab): the card alone, as the youth would see it under any day */
+function feastOnly(day) {
+  return `${topbar()}<main id="main"><div class="br-main"><div class="br-side">
+    <p class="br-day br-day--plain">${dateText(day.date)}</p>
+    ${feastCard(day.feast)}
+  </div></div></main>${tabbar()}`;
+}
+
 function draw(day) {
   if (!day) return;
-  app.innerHTML = `<div class="backdrop" aria-hidden="true"><div class="backdrop__glow"></div><div class="backdrop__lattice"></div></div>${page(day)}`;
+  app.innerHTML = `<div class="backdrop" aria-hidden="true"><div class="backdrop__glow"></div><div class="backdrop__lattice"></div></div>${day.feastOnly ? feastOnly(day) : page(day)}`;
   document.documentElement.dataset.ready = '1';
 }
 

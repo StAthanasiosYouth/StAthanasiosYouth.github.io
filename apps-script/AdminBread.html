@@ -956,7 +956,7 @@
     });
   }
 
-  function feastsBlock(month) {
+  function feastsBlock(month, onPick) {
     var st = BR.feasts[month];
     if (!st || (st.loading && !st.list.length)) return card('calendar', 'أعياد ' + monthName(month), 'بتتحمّل…', null, skeleton());
     if (st.error) return card('calendar', 'أعياد ' + monthName(month), '', null, failed(A.errorBox(), st.error, function () { loadFeasts(month); }));
@@ -966,15 +966,20 @@
     var same = st.published !== null && st.published === key;
     var rows = list.map(function (f) {
       var box = el('input', { type: 'checkbox', checked: f.on ? true : null, onchange: function () { f.on = box.checked; A.render(); } });
-      return el('label', { class: 'ba-feast' }, box,
-        f.img ? el('img', { src: f.img, alt: '', width: '44', height: '44', loading: 'lazy', referrerpolicy: 'no-referrer' }) : null,
-        el('span', {}, el('b', { text: dateWord(f.date) + ' · ' + f.name }), el('small', { text: f.title || '' })));
+      return el('div', { class: 'ba-feast' + (onPick && BR.feastPick === f.date ? ' is-on' : '') },
+        el('label', { class: 'ba-feast__pick' }, box,
+          f.img ? el('img', { src: f.img, alt: '', width: '44', height: '44', loading: 'lazy', referrerpolicy: 'no-referrer' }) : null,
+          el('span', {}, el('b', { text: dateWord(f.date) + ' · ' + f.name }), el('small', { text: f.title || '' }))),
+        onPick ? btn('معاينة', 'phone', 'btn--sm btn--ghost', { 'data-act': 'bread-feast-preview', onclick: function () { onPick(f); } }) : null);
     });
+    // W7 (owner 2026-11-19): tick all / none in one press
+    var allOn = list.length > 0 && list.every(function (f) { return f.on; });
+    var toggle = list.length > 1 ? btn(allOn ? 'شيل الكل' : 'علّم الكل', allOn ? 'x' : 'check', 'btn--sm', { 'data-act': 'bread-feasts-all', onclick: function () { list.forEach(function (f) { f.on = !allOn; }); A.render(); } }) : null;
     var label = same ? 'اتنشرت' : st.published !== null ? 'انشر التعديل (' + ar(on.length) + ')' : 'انشر أعياد الشهر (' + ar(on.length) + ')';
     return card('calendar', 'أعياد ' + monthName(month), list.length ? 'بتظهر للشباب في يومها بالتاريخ: «نحب نفكّرك النهارده تذكار …» مع صورة من الأنبا تكلا، مهما كان البرنامج' : 'مفيش أعياد معروفة في اللي فاضل من الشهر ده', null, [
       list.length ? el('div', { class: 'ba-feasts' }, rows) : null,
-      el('div', { class: 'ba-actions' }, el('span', { class: 'sp' }),
-        same ? tag('اتنشرت ✓', 'ok') : st.published !== null ? tag('فيه تعديل مش منشور', 'warn') : null,
+      el('div', { class: 'ba-actions' }, toggle, el('span', { class: 'sp' }),
+        same ? tag(on.length ? 'اتنشرت ✓' : 'اتنشرت فاضية: مفيش عيد ظاهر', 'ok') : st.published !== null ? tag('فيه تعديل مش منشور', 'warn') : null,
         btn(label, 'check', 'btn--primary btn--sm', { 'data-act': 'bread-feasts', disabled: same || (st.published === null && !on.length), onclick: function (event) {
           var body = { month: month, feasts: on.map(function (f) { return { date: f.date, name: f.name, title: f.title || undefined, word: f.word, url: f.sourceUrl, img: f.img || undefined, praise: f.praise || undefined }; }) };
           A.withBusy(event.currentTarget, api('POST', 'feasts', body).then(function () { st.published = key; A.toast('اتنشرت أعياد ' + monthName(month)); A.render(); })).catch(function (error) { A.fail(error); });
@@ -998,7 +1003,20 @@
     if (!BR.feasts[month]) loadFeasts(month);
     var pick = function (ym) { return btn(monthName(ym), BR.feastMonth === ym ? 'check' : 'calendar', 'btn--sm' + (BR.feastMonth === ym ? ' btn--primary' : ''), { 'data-act': 'bread-feast-month', 'data-month': ym, onclick: function () { BR.feastMonth = ym; A.render(); } }); };
     r.append(el('div', { class: 'ba-actions' }, pick(cairoMonth(0)), pick(cairoMonth(1))));
-    r.append(feastsBlock(month));
+    // the list, and the phone: the saint's card as the youth see it on that date (alone, no topic)
+    var st = BR.feasts[month];
+    var list = st && st.list ? st.list : [];
+    var chosen = list.filter(function (f) { return f.date === BR.feastPick; })[0] || list[0] || null;
+    BR.feastPick = chosen ? chosen.date : null;
+    BR.previewDay = chosen ? { feastOnly: true, date: chosen.date, feast: { name: chosen.name, title: chosen.title, word: chosen.word, img: chosen.img } } : null;
+    var block = feastsBlock(month, function (f) { BR.feastPick = f.date; A.render(); });
+    if (!chosen) { r.append(block); }
+    else {
+      var frame = el('iframe', { src: 'bread/preview.html', title: 'معاينة', tabindex: '-1' });
+      frame.addEventListener('load', function () { if (frame.contentWindow) frame.contentWindow.postMessage({ type: 'bread-preview' }, location.origin); });
+      r.append(cols('ba-cols--review', block, card('phone', 'معاينة ' + dateWord(chosen.date), chosen.name + ' · من غير موضوع', null,
+        el('div', { class: 'ba-phone' }, el('div', { class: 'ba-phone__screen' }, frame)), 'ba-pv')));
+    }
     r.append(note('info', 'الأعياد منفصلة عن البرامج: تقدر تنشرها لوحدها. اللي مش متعلّم مبيظهرش. ولو غيّرت حاجة بعد النشر، الزرار بيرجع «انشر التعديل».'));
     return [r];
   };
@@ -1244,7 +1262,7 @@
       var kind = row.errs.length ? 'err' : row.warns.length ? 'warn' : '';
       return el('tr', { class: (kind === 'err' ? 'is-err' : kind === 'warn' ? 'is-warn' : '') + (row.n === w.day ? ' is-on' : ''), 'data-n': String(row.n), tabindex: '0',
         onclick: function () { pick(row.n); }, onkeydown: function (event) { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); pick(row.n); } } },
-        el('td', { text: ar(row.n) }),
+        w.suggest && wizDate(row.n) ? el('td', { class: 'ba-daycell' }, el('b', { text: dateWord(wizDate(row.n)) }), el('small', { text: ar(row.n) + ' من ' + ar(rows.length) })) : el('td', { text: ar(row.n) }),
         el('td', {}, row.title ? el('b', { text: row.title }) : el('b', {}, el('span', { class: 'ba-no', text: '— فاضي —' })),
           why ? el('div', { class: 'ba-why ba-why--' + kind, 'data-field': why.field }, icon(kind === 'err' ? 'alert' : 'info'), el('span', { text: why.message })) : null,
           row.errs.slice(1).map(function (e) { return el('div', { class: 'ba-why ba-why--err', 'data-field': e.field }, icon('alert'), el('span', { text: e.message })); })),
@@ -1308,6 +1326,7 @@
       n: row.n, days: w.rows.length, title: row.title || '— فاضي —', verseRef: row.verseRef, verse: row.verse || '…',
       readingRef: row.readingRef, reading: row.reading || [], verseAt: row.verseAt || null, psalmNote: row.psalmNote || '',
       meditation: row.meditation || '—', question: row.question || '',
+      date: wizDate(row.n), feast: feastOnDate(wizDate(row.n)),
       source: row.sourceUrl ? { url: row.sourceUrl, refs: row.sourceRefs || '' } : null
     } : null;
     var frame = document.querySelector('.ba-phone iframe');
@@ -1399,6 +1418,21 @@
    * W7 (owner 2026-11-19): a St-Takla month runs in its own month only. Next month: it starts on the 1st by itself
    * (mode 'on'); the current month: today (replacing a live program, typed). Never a month's program in another month.
    */
+  /* W7: a St-Takla month's day n → its real date (current month: from today; next month: from the 1st) */
+  function wizDate(n) {
+    var w = BR.wiz;
+    if (!w.suggest) return null;
+    var start = w.suggest.month === cairoMonth(0) ? cairoToday() : w.suggest.month + '-01';
+    return addDays(start, n - 1);
+  }
+  /* the feast ticked for that date (the month's feasts card), as the youth will see it under the day */
+  function feastOnDate(date) {
+    if (!date) return null;
+    var st = BR.feasts[date.slice(0, 7)];
+    var f = st && st.list.filter(function (x) { return x.on && x.date === date; })[0];
+    return f ? { name: f.name, title: f.title, word: f.word, img: f.img } : null;
+  }
+
   function monthPlan() {
     var w = BR.wiz;
     if (!w.suggest) return null;
