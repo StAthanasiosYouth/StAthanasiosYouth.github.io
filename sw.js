@@ -28,6 +28,8 @@
 const SITE_NAME = 'أسرة البابا أثناسيوس - سفاجا';
 const ICON = '/assets/img/icon-192.png';
 const BADGE = '/assets/img/push-badge.png';
+const BREAD_ICON = '/assets/img/bread/mark-192.png';
+const BREAD_IMAGE = '/assets/img/bread/push-image.webp';
 const HOME = '/index.html';
 const ROUTE = /^#(?:notifications|meeting|points|(?:news|game|activity)\/[\w-]{1,60}|competition\/[a-z0-9-]{2,40}|(?:event|page)\/[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9]))$/;
 /* the site's other pages a tap may open: a competition (the engine), «نقاطي», «خبزنا اليومي», an event,
@@ -86,6 +88,12 @@ function notificationFrom(data) {
 
   if (typeof data.image === 'string' && IMAGE.test(data.image)) {
     options.image = data.image;
+  }
+
+  // «خبزنا اليومي» (W6, owner 2026-11-19): its own mark, and the big picture with the family's seal, so it reads as the family's
+  if (data.group === 'bread') {
+    options.icon = BREAD_ICON;
+    options.image = BREAD_IMAGE;
   }
 
   return { title: text(data.title, 80) || SITE_NAME, options };
