@@ -20,7 +20,8 @@
     "pwa-icons": "node build-pwa-icons.mjs",
     "admin-icons": "node build-admin-icons.mjs",
     "media-matrix": "node xp-media-matrix.mjs",
-    "fit-matrix": "node xp-fit-matrix.mjs"
+    "fit-matrix": "node xp-fit-matrix.mjs",
+    "saints-check": "node bread-saints.mjs check"
   },
   "devDependencies": {
     "axe-core": "^4.13.0",

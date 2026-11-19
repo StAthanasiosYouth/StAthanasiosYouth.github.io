@@ -1,0 +1,1469 @@
+{
+ "schema": 1,
+ "about": "قايمة القديسين الثابتة لـ«خبزنا اليومي». الأيام القبطية \"شهر-يوم\" (١ توت … ١٣ النسيء) بتتحول للميلادي بالكود (tools/lib/coptic.mjs). \"gregorian\" \"شهر-يوم\" للأحداث الحديثة اللي مش في السنكسار. كل يوم ليه source. شغّل: cd tools && npm run saints-check",
+ "categories": {
+  "angels": "السيدة العذراء والملائكة",
+  "prophets": "أنبياء وأبرار العهد القديم",
+  "apostles": "الرسل",
+  "martyrs": "الشهداء",
+  "modern": "شهداء العصر الحديث",
+  "ascetics": "النساك والرهبان",
+  "popes": "البابوات",
+  "bishops": "الأساقفة والمطارنة",
+  "fathers": "الآباء الكهنة والرهبان",
+  "laity": "قديسين من الشعب"
+ },
+ "people": [
+  {
+   "id": "mary",
+   "name": "السيدة العذراء مريم",
+   "cat": "angels",
+   "feasts": [
+    {
+     "kind": "ميلادها",
+     "coptic": "9-1",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=9&imonth=5&iyear=2027&dbl=ar"
+    },
+    {
+     "kind": "دخولها الهيكل",
+     "coptic": "4-3",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=12&imonth=12&iyear=2026&dbl=ar"
+    },
+    {
+     "kind": "تذكار حبل حنة بها",
+     "coptic": "4-13",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=22&imonth=12&iyear=2026&dbl=ar"
+    },
+    {
+     "kind": "نياحتها",
+     "coptic": "5-21",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=29&imonth=1&iyear=2027&dbl=ar"
+    },
+    {
+     "kind": "تجليها بالزيتون",
+     "coptic": "7-24",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=2&imonth=4&iyear=2027&dbl=ar"
+    },
+    {
+     "kind": "مجيء العائلة المقدسة لمصر",
+     "coptic": "9-24",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=1&imonth=6&iyear=2027&dbl=ar"
+    },
+    {
+     "kind": "بشارة يواقيم بميلادها",
+     "coptic": "12-7",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=13&imonth=8&iyear=2027&dbl=ar"
+    },
+    {
+     "kind": "صعود جسدها",
+     "coptic": "12-16",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=22&imonth=8&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "michael",
+   "name": "رئيس الملائكة ميخائيل",
+   "cat": "angels",
+   "feasts": [
+    {
+     "kind": "عيده",
+     "coptic": "3-12",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=21&imonth=11&iyear=2026&dbl=ar"
+    },
+    {
+     "kind": "عيده",
+     "coptic": "10-12",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=19&imonth=6&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "gabriel",
+   "name": "رئيس الملائكة غبريال",
+   "cat": "angels",
+   "feasts": [
+    {
+     "kind": "تذكاره",
+     "coptic": "4-22",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=31&imonth=12&iyear=2026&dbl=ar"
+    },
+    {
+     "kind": "تذكاره",
+     "coptic": "7-30",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=8&imonth=4&iyear=2027&dbl=ar"
+    },
+    {
+     "kind": "تذكاره",
+     "coptic": "10-13",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=20&imonth=6&iyear=2027&dbl=ar"
+    },
+    {
+     "kind": "تكريس كنيسته",
+     "coptic": "10-26",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=3&imonth=7&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "raphael",
+   "name": "رئيس الملائكة روفائيل",
+   "cat": "angels",
+   "feasts": [
+    {
+     "kind": "تذكاره",
+     "coptic": "13-3",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=8&imonth=9&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "suriel",
+   "name": "رئيس الملائكة سوريال",
+   "cat": "angels",
+   "feasts": [
+    {
+     "kind": "تذكاره",
+     "coptic": "5-27",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=4&imonth=2&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "moses",
+   "name": "موسى النبي",
+   "cat": "prophets",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "1-8",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=18&imonth=9&iyear=2026&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "elijah",
+   "name": "إيليا النبي",
+   "cat": "prophets",
+   "feasts": [
+    {
+     "kind": "صعوده إلى السماء",
+     "coptic": "5-6",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=1&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "daniel",
+   "name": "دانيال النبي",
+   "cat": "prophets",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "7-23",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=1&imonth=4&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "jeremiah",
+   "name": "إرميا النبي",
+   "cat": "prophets",
+   "feasts": [
+    {
+     "kind": "استشهاده",
+     "coptic": "9-5",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=13&imonth=5&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "threeyouths",
+   "name": "الفتية الثلاثة القديسين حنانيا وعزريا وميصائيل",
+   "cat": "prophets",
+   "feasts": [
+    {
+     "kind": "نياحتهم",
+     "coptic": "9-10",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=18&imonth=5&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "baptist",
+   "name": "القديس يوحنا المعمدان",
+   "cat": "prophets",
+   "feasts": [
+    {
+     "kind": "استشهاده",
+     "coptic": "1-2",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=12&imonth=9&iyear=2026&dbl=ar"
+    },
+    {
+     "kind": "ميلاده",
+     "coptic": "10-30",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=7&imonth=7&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "mark",
+   "name": "مار مرقس الرسول",
+   "cat": "apostles",
+   "feasts": [
+    {
+     "kind": "ظهور رأسه",
+     "coptic": "2-30",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=9&imonth=11&iyear=2026&dbl=ar"
+    },
+    {
+     "kind": "استشهاده",
+     "coptic": "8-30",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=8&imonth=5&iyear=2027&dbl=ar"
+    },
+    {
+     "kind": "عودة رفاته",
+     "coptic": "10-17",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=24&imonth=6&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "peterpaul",
+   "name": "الرسولان بطرس وبولس",
+   "cat": "apostles",
+   "feasts": [
+    {
+     "kind": "استشهادهما",
+     "coptic": "11-5",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=12&imonth=7&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "stephen",
+   "name": "القديس استفانوس أول الشهداء",
+   "cat": "apostles",
+   "feasts": [
+    {
+     "kind": "استشهاده",
+     "coptic": "5-1",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=9&imonth=1&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "mercurius",
+   "name": "الشهيد العظيم أبي سيفين (فيلوباتير مرقوريوس)",
+   "cat": "martyrs",
+   "note": "شفيع كنيستنا",
+   "feasts": [
+    {
+     "kind": "استشهاده",
+     "coptic": "3-25",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=4&imonth=12&iyear=2026&dbl=ar"
+    },
+    {
+     "kind": "نقل أعضائه",
+     "coptic": "10-9",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=16&imonth=6&iyear=2027&dbl=ar"
+    },
+    {
+     "kind": "تكريس كنيسته",
+     "coptic": "11-25",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=1&imonth=8&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "george",
+   "name": "الشهيد العظيم مار جرجس",
+   "cat": "martyrs",
+   "feasts": [
+    {
+     "kind": "تكريس كنيسته",
+     "coptic": "3-7",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=16&imonth=11&iyear=2026&dbl=ar"
+    },
+    {
+     "kind": "استشهاده",
+     "coptic": "8-23",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=1&imonth=5&iyear=2027&dbl=ar"
+    },
+    {
+     "kind": "إحضار جسده",
+     "coptic": "11-16",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=23&imonth=7&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "mina",
+   "name": "الشهيد مار مينا العجايبي",
+   "cat": "martyrs",
+   "feasts": [
+    {
+     "kind": "استشهاده",
+     "coptic": "3-15",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=24&imonth=11&iyear=2026&dbl=ar"
+    },
+    {
+     "kind": "تكريس كنيسته بمريوط",
+     "coptic": "10-15",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=22&imonth=6&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "theodore",
+   "name": "الأمير تادرس الشطبي",
+   "cat": "martyrs",
+   "feasts": [
+    {
+     "kind": "استشهاده",
+     "coptic": "11-20",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=27&imonth=7&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "theodoreeast",
+   "name": "الشهيد تادرس المشرقي",
+   "cat": "martyrs",
+   "feasts": [
+    {
+     "kind": "استشهاده",
+     "coptic": "5-12",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=20&imonth=1&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "abaskhiron",
+   "name": "الشهيد أباسخيرون القليني",
+   "cat": "martyrs",
+   "feasts": [
+    {
+     "kind": "استشهاده",
+     "coptic": "10-7",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=6&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "abufam",
+   "name": "الشهيد أبو فام الجندي",
+   "cat": "martyrs",
+   "feasts": [
+    {
+     "kind": "تكريس كنيسته",
+     "coptic": "4-1",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=12&iyear=2026&dbl=ar"
+    },
+    {
+     "kind": "استشهاده",
+     "coptic": "5-27",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=4&imonth=2&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "victor",
+   "name": "الشهيد مار بقطر بن رومانيوس",
+   "cat": "martyrs",
+   "feasts": [
+    {
+     "kind": "استشهاده",
+     "coptic": "10-27",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=4&imonth=7&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "abakir",
+   "name": "الشهيدان أباكير ويوحنا",
+   "cat": "martyrs",
+   "feasts": [
+    {
+     "kind": "استشهادهما",
+     "coptic": "10-14",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=21&imonth=6&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "abanoub",
+   "name": "الشهيد أبانوب النهيسي",
+   "cat": "martyrs",
+   "feasts": [
+    {
+     "kind": "استشهاده",
+     "coptic": "11-24",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=31&imonth=7&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "sergius",
+   "name": "الشهيدان سرجيوس وواخس",
+   "cat": "martyrs",
+   "feasts": [
+    {
+     "kind": "استشهاد سرجيوس",
+     "coptic": "2-10",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=20&imonth=10&iyear=2026&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "james",
+   "name": "الشهيد يعقوب المقطع",
+   "cat": "martyrs",
+   "feasts": [
+    {
+     "kind": "تذكاره",
+     "coptic": "7-30",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=8&imonth=4&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "bidaba",
+   "name": "الشهيد الأنبا بضابا ورفيقاه",
+   "cat": "martyrs",
+   "feasts": [
+    {
+     "kind": "استشهادهم",
+     "coptic": "11-19",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=26&imonth=7&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "sevenanthony",
+   "name": "السبعة شهداء بجبل أنطونيوس",
+   "cat": "martyrs",
+   "feasts": [
+    {
+     "kind": "تذكارهم",
+     "coptic": "2-26",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=5&imonth=11&iyear=2026&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "sidhom",
+   "name": "الشهيد سيدهم بشاي",
+   "cat": "martyrs",
+   "feasts": [
+    {
+     "kind": "استشهاده",
+     "coptic": "7-17",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=26&imonth=3&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "demiana",
+   "name": "الشهيدة دميانة",
+   "cat": "martyrs",
+   "feasts": [
+    {
+     "kind": "استشهادها",
+     "coptic": "5-13",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=21&imonth=1&iyear=2027&dbl=ar"
+    },
+    {
+     "kind": "تكريس كنيستها",
+     "coptic": "9-12",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=20&imonth=5&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "marina",
+   "name": "الشهيدة مارينا",
+   "cat": "martyrs",
+   "feasts": [
+    {
+     "kind": "تكريس كنيستها",
+     "coptic": "3-23",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=2&imonth=12&iyear=2026&dbl=ar"
+    },
+    {
+     "kind": "استشهادها",
+     "coptic": "11-23",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=30&imonth=7&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "barbara",
+   "name": "الشهيدة بربارة",
+   "cat": "martyrs",
+   "feasts": [
+    {
+     "kind": "استشهادها",
+     "coptic": "4-8",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=17&imonth=12&iyear=2026&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "rebecca",
+   "name": "الشهيدة رفقة وأولادها الخمسة",
+   "cat": "martyrs",
+   "feasts": [
+    {
+     "kind": "استشهادهم",
+     "coptic": "1-7",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=17&imonth=9&iyear=2026&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "modernmartyrs",
+   "name": "شهداء ليبيا وشهداء العصر الحديث",
+   "cat": "modern",
+   "note": "شهداء ليبيا (١٥ فبراير ٢٠١٥)، والبطرسية (١١ ديسمبر ٢٠١٦)، وأحد الشعانين (٩ أبريل ٢٠١٧)، وطريق دير الأنبا صموئيل (٢٦ مايو ٢٠١٧ و٢ نوفمبر ٢٠١٨). المجمع المقدس جعل ٨ أمشير عيدهم (٢ يونيو ٢٠١٧)",
+   "feasts": [
+    {
+     "kind": "عيد شهداء العصر الحديث",
+     "coptic": "6-8",
+     "source": "https://www.masrawy.com/news/news_egypt/details/2017/6/2/1098005/"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "anthony",
+   "name": "القديس الأنبا أنطونيوس",
+   "cat": "ascetics",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "5-22",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=30&imonth=1&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "paul",
+   "name": "القديس الأنبا بولا أول السواح",
+   "cat": "ascetics",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "6-2",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=9&imonth=2&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "macarius",
+   "name": "القديس الأنبا مقار الكبير",
+   "cat": "ascetics",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "7-27",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=5&imonth=4&iyear=2027&dbl=ar"
+    },
+    {
+     "kind": "عودة جسده",
+     "coptic": "12-19",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=25&imonth=8&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "macariusalex",
+   "name": "القديس مقاريوس السكندري",
+   "cat": "ascetics",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "9-6",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=5&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "bishoy",
+   "name": "القديس الأنبا بيشوي",
+   "cat": "ascetics",
+   "feasts": [
+    {
+     "kind": "نقل جسده",
+     "coptic": "4-4",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=13&imonth=12&iyear=2026&dbl=ar"
+    },
+    {
+     "kind": "نياحته",
+     "coptic": "11-8",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=15&imonth=7&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "mosesblack",
+   "name": "القديس الأنبا موسى الأسود",
+   "cat": "ascetics",
+   "feasts": [
+    {
+     "kind": "استشهاده",
+     "coptic": "10-24",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=1&imonth=7&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "johnshort",
+   "name": "القديس الأنبا يحنس القصير",
+   "cat": "ascetics",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "2-20",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=30&imonth=10&iyear=2026&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "maximus",
+   "name": "القديسان مكسيموس ودوماديوس",
+   "cat": "ascetics",
+   "feasts": [
+    {
+     "kind": "نياحة مكسيموس",
+     "coptic": "5-14",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=22&imonth=1&iyear=2027&dbl=ar"
+    },
+    {
+     "kind": "نياحة دوماديوس",
+     "coptic": "5-17",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=25&imonth=1&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "pachom",
+   "name": "القديس الأنبا باخوميوس أب الشركة",
+   "cat": "ascetics",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "9-14",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=22&imonth=5&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "shenoute",
+   "name": "القديس الأنبا شنودة رئيس المتوحدين",
+   "cat": "ascetics",
+   "feasts": [
+    {
+     "kind": "تكريس كنيسته",
+     "coptic": "4-1",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=12&iyear=2026&dbl=ar"
+    },
+    {
+     "kind": "نياحته",
+     "coptic": "11-7",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=7&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "karas",
+   "name": "القديس الأنبا كاراس السائح",
+   "cat": "ascetics",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "11-8",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=15&imonth=7&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "samuel",
+   "name": "القديس الأنبا صموئيل المعترف",
+   "cat": "ascetics",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "4-8",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=17&imonth=12&iyear=2026&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "takla",
+   "name": "القديس الأنبا تكلا هيمانوت",
+   "cat": "ascetics",
+   "feasts": [
+    {
+     "kind": "ميلاده",
+     "coptic": "4-24",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=2&imonth=1&iyear=2027&dbl=ar"
+    },
+    {
+     "kind": "نياحته",
+     "coptic": "12-24",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=30&imonth=8&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "barsoum",
+   "name": "القديس الأنبا برسوم العريان",
+   "cat": "ascetics",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "13-5",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=9&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "reweis",
+   "name": "القديس الأنبا رويس",
+   "cat": "ascetics",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "2-21",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=31&imonth=10&iyear=2026&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "hedraaswan",
+   "name": "القديس الأنبا هدرا الأسواني",
+   "cat": "ascetics",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "4-12",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=21&imonth=12&iyear=2026&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "sarapamonabutarha",
+   "name": "القديس الأنبا صرابامون أبو طرحة",
+   "cat": "ascetics",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "7-28",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=6&imonth=4&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "yohanneskama",
+   "name": "القديس الأنبا يحنس كاما",
+   "cat": "ascetics",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "4-25",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=3&imonth=1&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "marycopt",
+   "name": "القديسة مريم المصرية",
+   "cat": "ascetics",
+   "feasts": [
+    {
+     "kind": "نياحتها",
+     "coptic": "8-6",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=4&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "athanasius",
+   "name": "القديس البابا أثناسيوس الرسولي",
+   "cat": "popes",
+   "note": "شفيع الأسرة",
+   "feasts": [
+    {
+     "kind": "تذكار معجزته",
+     "coptic": "1-30",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=10&iyear=2026&dbl=ar"
+    },
+    {
+     "kind": "نياحته",
+     "coptic": "9-7",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=15&imonth=5&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "peterseal",
+   "name": "القديس البابا بطرس خاتم الشهداء",
+   "cat": "popes",
+   "feasts": [
+    {
+     "kind": "استشهاده",
+     "coptic": "3-29",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=8&imonth=12&iyear=2026&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "cyril",
+   "name": "القديس البابا كيرلس عمود الدين",
+   "cat": "popes",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "11-3",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=7&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "dioscorus",
+   "name": "القديس البابا ديسقورس",
+   "cat": "popes",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "1-7",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=17&imonth=9&iyear=2026&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "matthew1",
+   "name": "القديس البابا متاؤس الأول",
+   "cat": "popes",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "7-25",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=3&imonth=4&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "cyril4",
+   "name": "البابا كيرلس الرابع أبو الإصلاح",
+   "cat": "popes",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "5-23",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=31&imonth=1&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "cyril5",
+   "name": "القديس البابا كيرلس الخامس",
+   "cat": "popes",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "12-1",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=7&imonth=8&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "cyril6",
+   "name": "القديس البابا كيرلس السادس",
+   "cat": "popes",
+   "feasts": [
+    {
+     "kind": "عيد جلوسه",
+     "gregorian": "05-10",
+     "source": "https://st-takla.org/Saints/Coptic-Synaxarium-Orthodox-Saints-Biography-00-Coptic-Orthodox-Popes/Life-of-Coptic-Pope-116-Pope-Cyril-VI_.html"
+    },
+    {
+     "kind": "نياحته",
+     "coptic": "6-30",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=9&imonth=3&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "shenouda3",
+   "name": "البابا شنودة الثالث",
+   "cat": "popes",
+   "feasts": [
+    {
+     "kind": "عيد جلوسه",
+     "coptic": "3-5",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=11&iyear=2026&dbl=ar"
+    },
+    {
+     "kind": "نياحته",
+     "gregorian": "03-17",
+     "source": "https://copticorthodox.church/en/popes/pope-shenouda-iii/"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "tawadros2",
+   "name": "البابا تواضروس الثاني",
+   "cat": "popes",
+   "note": "البابا الحالي، ربنا يحافظ عليه",
+   "alive": true,
+   "feasts": [
+    {
+     "kind": "عيد جلوسه",
+     "gregorian": "11-18",
+     "source": "https://st-takla.org/Saints/popes/118/pope-tawadrous-ii.html"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "abraam",
+   "name": "القديس الأنبا إبرآم أسقف الفيوم والجيزة",
+   "cat": "bishops",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "10-3",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=6&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "yousababah",
+   "name": "القديس الأنبا يوساب الأبح أسقف جرجا",
+   "cat": "bishops",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "5-17",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=25&imonth=1&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "sarapamonkhartoum",
+   "name": "القديس الأنبا صرابامون مطران الخرطوم",
+   "cat": "bishops",
+   "note": "المجمع المقدس اعترف بقداسته في مايو ٢٠٢٦",
+   "feasts": [
+    {
+     "kind": "تذكار رسامته",
+     "gregorian": "07-12",
+     "source": "https://st-takla.org/Saints/bishops/saad/carabamoun-khartoom.html"
+    },
+    {
+     "kind": "نياحته",
+     "gregorian": "06-18",
+     "source": "https://st-takla.org/Saints/bishops/saad/carabamoun-khartoom.html"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "kirolloskena",
+   "name": "الأنبا كيرلس مطران قنا ومحافظات البحر الأحمر",
+   "cat": "bishops",
+   "feasts": [
+    {
+     "kind": "تذكار رسامته",
+     "gregorian": "12-27",
+     "source": "https://st-takla.org/Saints/bishops/kef/kirollos-kena.html"
+    },
+    {
+     "kind": "نياحته",
+     "gregorian": "07-26",
+     "source": "https://st-takla.org/Saints/bishops/kef/kirollos-kena.html"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "makariosqena",
+   "name": "القديس الأنبا مكاريوس أسقف قنا",
+   "cat": "bishops",
+   "feasts": [
+    {
+     "kind": "تذكار رسامته",
+     "gregorian": "09-19",
+     "source": "https://st-takla.org/Saints/bishops/meem/makarius-quena.html"
+    },
+    {
+     "kind": "نياحته",
+     "gregorian": "02-03",
+     "source": "https://st-takla.org/Saints/bishops/meem/makarius-quena.html"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "theophilus",
+   "name": "الأنبا ثاؤفيلس أول أسقف للبحر الأحمر",
+   "cat": "bishops",
+   "feasts": [
+    {
+     "kind": "تذكار رسامته",
+     "gregorian": "06-14",
+     "source": "https://copticorthodox.church/en/past-bishops/bishop-theophilos/"
+    },
+    {
+     "kind": "نياحته",
+     "gregorian": "02-12",
+     "source": "https://copticorthodox.church/en/past-bishops/bishop-theophilos/"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "ilarion",
+   "name": "الأنبا إيلاريون أسقف البحر الأحمر",
+   "cat": "bishops",
+   "note": "أسقفنا، ربنا يحافظ عليه",
+   "alive": true,
+   "feasts": [
+    {
+     "kind": "عيد رسامته",
+     "gregorian": "06-09",
+     "source": "https://copticorthodox.church/en/bishops/bishop-elarion-2/"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "hedra",
+   "name": "الأنبا هدرا مطران أسوان",
+   "cat": "bishops",
+   "feasts": [
+    {
+     "kind": "تذكار رسامته",
+     "gregorian": "06-22",
+     "source": "https://copticorthodox.church/en/past-bishops/metropolitan-hedra/"
+    },
+    {
+     "kind": "نياحته",
+     "gregorian": "09-27",
+     "source": "https://copticorthodox.church/en/past-bishops/metropolitan-hedra/"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "pachomius",
+   "name": "الأنبا باخوميوس مطران البحيرة",
+   "cat": "bishops",
+   "feasts": [
+    {
+     "kind": "تذكار رسامته",
+     "gregorian": "12-12",
+     "source": "https://st-takla.org/Saints/bishops/baa/bakhomios-beheira.html"
+    },
+    {
+     "kind": "نياحته",
+     "gregorian": "03-30",
+     "source": "https://copticorthodox.church/en/past-bishops/metropolitan-pakhomious/"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "bishoydam",
+   "name": "الأنبا بيشوي مطران دمياط",
+   "cat": "bishops",
+   "feasts": [
+    {
+     "kind": "تذكار رسامته",
+     "gregorian": "09-24",
+     "source": "https://st-takla.org/Saints/bishops/baa/bishoy-demyat.html"
+    },
+    {
+     "kind": "نياحته",
+     "gregorian": "10-03",
+     "source": "https://st-takla.org/Saints/bishops/baa/bishoy-demyat.html"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "samuelserv",
+   "name": "الأنبا صموئيل أسقف الخدمات",
+   "cat": "bishops",
+   "feasts": [
+    {
+     "kind": "تذكار رسامته",
+     "gregorian": "09-30",
+     "source": "https://st-takla.org/Saints/bishops/saad/samoil-services.html"
+    },
+    {
+     "kind": "نياحته",
+     "gregorian": "10-06",
+     "source": "https://st-takla.org/Saints/bishops/saad/samoil-services.html"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "gregorios",
+   "name": "الأنبا غريغوريوس أسقف البحث العلمي",
+   "cat": "bishops",
+   "feasts": [
+    {
+     "kind": "تذكار رسامته",
+     "gregorian": "05-10",
+     "source": "https://st-takla.org/Saints/bishops/ghain/ghrighorios-research.html"
+    },
+    {
+     "kind": "نياحته",
+     "gregorian": "10-22",
+     "source": "https://st-takla.org/Saints/bishops/ghain/ghrighorios-research.html"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "bimen",
+   "name": "الأنبا بيمن أسقف ملوي",
+   "cat": "bishops",
+   "feasts": [
+    {
+     "kind": "تذكار رسامته",
+     "gregorian": "06-22",
+     "source": "https://st-takla.org/Saints/bishops/baa/bimen-mallawy.html"
+    },
+    {
+     "kind": "نياحته",
+     "gregorian": "05-19",
+     "source": "https://st-takla.org/Saints/bishops/baa/bimen-mallawy.html"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "mikhailassiut",
+   "name": "الأنبا ميخائيل مطران أسيوط",
+   "cat": "bishops",
+   "feasts": [
+    {
+     "kind": "تذكار رسامته",
+     "gregorian": "08-25",
+     "source": "https://st-takla.org/Saints/bishops/meem/mikhail-assiut.html"
+    },
+    {
+     "kind": "نياحته",
+     "gregorian": "11-23",
+     "source": "https://st-takla.org/Saints/bishops/meem/mikhail-assiut.html"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "epiphanius",
+   "name": "الأنبا إبيفانيوس أسقف دير أبو مقار",
+   "cat": "bishops",
+   "feasts": [
+    {
+     "kind": "تذكار رسامته",
+     "gregorian": "03-10",
+     "source": "https://st-takla.org/Saints/bishops/alif/abifanios-makar.html"
+    },
+    {
+     "kind": "نياحته",
+     "gregorian": "07-29",
+     "source": "https://st-takla.org/Saints/bishops/alif/abifanios-makar.html"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "athanasiusbs",
+   "name": "الأنبا أثناسيوس مطران بني سويف",
+   "cat": "bishops",
+   "feasts": [
+    {
+     "kind": "تذكار رسامته",
+     "gregorian": "09-09",
+     "source": "https://st-takla.org/Saints/bishops/alif/athnasius-banysweif.html"
+    },
+    {
+     "kind": "نياحته",
+     "gregorian": "11-16",
+     "source": "https://st-takla.org/Saints/bishops/alif/athnasius-banysweif.html"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "youannes",
+   "name": "الأنبا يوأنس أسقف الغربية",
+   "cat": "bishops",
+   "feasts": [
+    {
+     "kind": "تذكار رسامته",
+     "gregorian": "12-12",
+     "source": "https://st-takla.org/Saints/bishops/yaa/youannes-gharbia.html"
+    },
+    {
+     "kind": "نياحته",
+     "gregorian": "11-04",
+     "source": "https://st-takla.org/Saints/bishops/yaa/youannes-gharbia.html"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "karasmahalla",
+   "name": "الأنبا كاراس أسقف المحلة",
+   "cat": "bishops",
+   "feasts": [
+    {
+     "kind": "تذكار رسامته",
+     "gregorian": "11-16",
+     "source": "https://st-takla.org/Saints/bishops/kef/karas-mahalla.html"
+    },
+    {
+     "kind": "نياحته",
+     "gregorian": "10-13",
+     "source": "https://st-takla.org/Saints/bishops/kef/karas-mahalla.html"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "bishoykamel",
+   "name": "القديس القمص بيشوي كامل",
+   "cat": "fathers",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "gregorian": "03-21",
+     "source": "https://st-takla.org/lyrics/en/glorifications/p/pishoy-kamel.html"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "yostos",
+   "name": "القديس أبونا يسطس الأنطوني",
+   "cat": "fathers",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "gregorian": "12-17",
+     "source": "https://st-takla.org/Saints/Coptic-Orthodox-Saints-Biography/Coptic-Saints-Story_1915.html"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "abdelmessih",
+   "name": "أبونا عبد المسيح المناهري",
+   "cat": "fathers",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "8-6",
+     "source": "https://st-takla.org/Saints/Coptic-Orthodox-Saints-Biography/Coptic-Saints-Story_1237.html"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "faltaos",
+   "name": "أبونا فلتاؤس السرياني",
+   "cat": "fathers",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "gregorian": "03-17",
+     "source": "https://www.albawabhnews.com/2998309"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "simon",
+   "name": "القديس سمعان الخراز",
+   "cat": "laity",
+   "feasts": [
+    {
+     "kind": "تذكار نقل جبل المقطم",
+     "gregorian": "11-27",
+     "source": "https://copticorthodox.church/2021/03/04/%D8%A8%D8%AF%D8%A1-%D8%A7%D9%84%D8%AC%D9%84%D8%B3%D8%A9-%D8%A7%D9%84%D8%B9%D8%A7%D9%85%D8%A9-%D9%84%D9%84%D9%85%D8%AC%D9%85%D8%B9-%D8%A7%D9%84%D9%85%D9%82%D8%AF%D8%B3-%D8%A8%D8%AD%D8%B6%D9%88%D8%B1/"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "gohary",
+   "name": "المعلم إبراهيم الجوهري",
+   "cat": "laity",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "9-25",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=2&imonth=6&iyear=2027&dbl=ar"
+    }
+   ],
+   "praise": null,
+   "image": null
+  }
+ ]
+}
