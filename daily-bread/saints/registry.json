@@ -68,7 +68,11 @@
      "title": "صعود جسد القديسة مريم العذراء"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "السلام لك يا مريم",
+    "text": "السلام لكِ يا مريم\nيا أم الله القدوس\nالسلام لكِ يا مريم\nيا بكر بتول وعروس",
+    "source": "https://st-takla.org/Lyrics-Spiritual-Songs/08-Coptic-Taraneem-Kalemat_Meem-Noun/Madi7_Al-Kedisa-Al-3athra2-Mariam-1-Ya-Om-Allah-Al-Koddoos.html"
+   },
    "image": null
   },
   {
@@ -89,7 +93,11 @@
      "title": "عيد رئيس الملائكة الجليل ميخائيل ( 12 بـؤونة)"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "تمجيد الملاك ميخائيل",
+    "text": "السلام لك يا ميخائيل\nرئيس جند السموات\nملاك السلام والتهليل\nخادم رب القوات",
+    "source": "https://st-takla.org/Lyrics-Spiritual-Songs/08-Coptic-Taraneem-Kalemat_Meem-Noun/Madi7_Al-Malak-Mi5a2il.html"
+   },
    "image": null
   },
   {
@@ -333,7 +341,11 @@
      "title": "تذكار تكريس كنيسة ابى سيفين"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "تمجيد مرقوريوس أبوسيفين فيلوباتير",
+    "text": "أنظم مديحي يا حضار\nوأخبركم عن بطل مأنوس\nذلك الشجاع المختار\nفيلوباتير مارقوريوس",
+    "source": "https://st-takla.org/Lyrics-Spiritual-Songs/10-Coptic-Praises-Glorification-Madae7/Tamgeed-AlShahied-Abo-Thefein-4.html"
+   },
    "image": null
   },
   {
@@ -360,7 +372,11 @@
      "title": "إحضار جسد الشهيد العظيم جاؤرجيوس"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "تمجيد الشهيد مار جرجس الروماني",
+    "text": "تعالوا يا أحباء\nلنمدح بالثناء\nبطلنا أمير الشهداء\nالشهيد جيؤرجيوس",
+    "source": "https://st-takla.org/lyrics/ar/praise/geem/gerges.html"
+   },
    "image": null
   },
   {
@@ -381,7 +397,11 @@
      "title": "تذكار كنيسة مارمينا بمريوط ( 15 بـؤونة)"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "تمجيد الشهيد مارمينا العجايبي",
+    "text": "يا ابن أودكسيس\nيا شهيد يسوع المسيح",
+    "source": "https://st-takla.org/Lyrics-Spiritual-Songs/10-Coptic-Praises-Glorification-Madae7/Madi7-Al-Shahid-Mare-Mena-2.html"
+   },
    "image": null
   },
   {
@@ -396,7 +416,11 @@
      "title": "استشهاد القديس ثاؤدورس الشطبى"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "تمجيد الأمير تادرس الشطبي",
+    "text": "أنا أفتح فاي وأصيح\nوأقول يا ثيؤدوروس\nالسلام لشهيد المسيح\nالسلام لثيؤدوروس",
+    "source": "https://st-takla.org/lyrics/ar/praise/taa/tadros-2.html"
+   },
    "image": null
   },
   {
@@ -462,7 +486,11 @@
      "title": "استشهاد القديس مار بقطر بن رومانيوس ( 27 بـؤونة)"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "تمجيد الشهيد العظيم مار بقطر بن رومانوس",
+    "text": "أمام فادي البشرية\nبأصوات روحانية\nبقلوب صارخة نقية\nنمجد الشهيد مار بقطر",
+    "source": "https://st-takla.org/lyrics/ar/praise/baa/boktor.html"
+   },
    "image": null
   },
   {
@@ -609,7 +637,11 @@
      "title": "استشهاد مارينا الشهيدة"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "تمجيد القديسة مارينا الشهيدة",
+    "text": "المجد لإلهنا وبارينا\nالذي تجسد ليفدينا\nوأعطانا للخلاص مينا\nالشهيدة العفيفة مارينا",
+    "source": "https://st-takla.org/lyrics/ar/praise/meem/marina.html"
+   },
    "image": null
   },
   {
@@ -639,7 +671,11 @@
      "title": "استشهاد القديسة رفقة وأولادها الخمسة (أغاثون.بطرس.يوحنا.أمون.امونة) 303-305م"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "تمجيد القديسة رفقة وأولادها الخمسة",
+    "text": "أهديك سلامي\nأنشيك نظامي\nبقلبي ولساني\nيا رفقة وأولادها",
+    "source": "https://st-takla.org/lyrics/ar/praise/raa/refka.html"
+   },
    "image": null
   },
   {
@@ -654,7 +690,11 @@
      "source": "https://www.masrawy.com/news/news_egypt/details/2017/6/2/1098005/"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "تمجيد شهداء مصر بليبيا",
+    "text": "فى سماء الأطهار فى محفل الأبكار\nشهداءنا الأبرار شهداء مصر بليبيا",
+    "source": "https://st-takla.org/lyrics/ar/praise/sheen/libya.html"
+   },
    "image": null
   },
   {
@@ -684,7 +724,11 @@
      "title": "نياحة القديس أنبا بولا أول السياح"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "طوباك يا انبا بولا",
+    "text": "يا أنبا بولا\nيا أول السواح\nيا قديس وبار\nبتنور كالمصباح\nسيرتك نقية\nجيت هنا بسماح\nمن رب القوات\nوقلبك بيه ارتاح\nسِبت العالم كُله\nولا بصيت وراك\nوقلبك كان مشغول\nبالرب اللي فداك\nمين زيك يا حبيب\nده يسوع هو اللي هداك\nتسكن دا المكان\nوحدك ولا حد معاك\nرب القدرة يأمر\nمع كل غروب غُراب\nمعاه نصف خُبزة\nلا تأخر يوم ولا غاب\nده أمر غريب وعجيب\nتحتار فيه الألباب\nطير بيعول إنسان\nلأ ده رب الأرباب",
+    "source": "https://st-takla.org/Lyrics-Spiritual-Songs/08-Coptic-Taraneem-Kalemat_Meem-Noun/Madi7_Al-Kedis-Al-Anba-Boola-2-Ya-Anpa-Paula.html"
+   },
    "image": null
   },
   {
@@ -705,7 +749,11 @@
      "title": "إعادة جسد الانبا مكاريوس الى برية شيهيت"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "تمجيد القديس أبومقار الكبير",
+    "text": "كان رب المجد مع أبينا البار\nاللابس الروح أنبا مقار\nصلى فأعطاه الشيروبيم\nكقوة مرافقة على الدوام",
+    "source": "https://st-takla.org/lyrics/ar/praise/meem/makar.html"
+   },
    "image": null
   },
   {
@@ -741,7 +789,11 @@
      "title": "نياحة القديس العظيم الانبا بيشوى كوكب البرية"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "تمجيد القديس الأنبا بيشوي",
+    "text": "في صفوف المنتصرين\nالأبرار القديسين\nوقف الراهب الأمين\nبينيوت افا بيشوي",
+    "source": "https://st-takla.org/lyrics/ar/praise/baa/pichoi.html"
+   },
    "image": null
   },
   {
@@ -756,7 +808,11 @@
      "title": "استشهاد القديس أنبا موسى الأسود ( 24 بـؤونة)"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "مديح الانبا موسي الاسود",
+    "text": "في كنيسة الأبكار\nفي مجمع الأطهار\nقائم بكل وقار\nبي جوري آفا موسى",
+    "source": "https://st-takla.org/Lyrics-Spiritual-Songs/08-Coptic-Taraneem-Kalemat_Meem-Noun/Madi7_Al-Kedis-Al-Anba-Mousa-Al-Aswad.html"
+   },
    "image": null
   },
   {
@@ -771,7 +827,11 @@
      "title": "نياحة القديس يوحنا القصير الشهير بابي يحنس"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "تمجيد القديس يحنس القصير",
+    "text": "عظيم بين القديسين\nفقت الكثيرين\nيا مثال للكاملين\nبنيوت آفا يوأنس",
+    "source": "https://st-takla.org/lyrics/ar/praise/yaa/yehnes.html"
+   },
    "image": null
   },
   {
@@ -807,7 +867,11 @@
      "title": "نياحة أنبا باخوم أب الشركة"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "مديح أنبا باخوم أب الشركة",
+    "text": "السلام لك يا أنبا باخوميوس\nيا خادم الإله القدوس\nحبيب الرب إيسوس\nبنيوت آفا باخوميوس",
+    "source": "https://st-takla.org/Lyrics-Spiritual-Songs/10-Coptic-Praises-Glorification-Madae7/Tamjeed-Saint-Pachomious-3.html"
+   },
    "image": null
   },
   {
@@ -843,7 +907,11 @@
      "title": "نياحة القديس كاراس شقيق ثاؤدسيوس الملك"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "تمجيد السائح أنبا كاراس",
+    "text": "بمحبة نارية نورت البرية بسياحة سمائية\nبنيوت أفا كاراس",
+    "source": "https://st-takla.org/lyrics/ar/praise/kef/karas.html"
+   },
    "image": null
   },
   {
@@ -879,7 +947,11 @@
      "title": "نياحة القديس تكلاهيمانوت الحبشى"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "تمجيد القديس تكلاهيمانوت",
+    "text": "تعالوا يا مؤمنين\nنُسبح إلهنا العظيم\nونُرتل بالترانيم\nأنبا تكلا هيمانوت",
+    "source": "https://st-takla.org/lyrics/ar/praise/taa/takla.html"
+   },
    "image": null
   },
   {
@@ -1101,7 +1173,11 @@
      "title": "نياحة البابا الانبا كيرلس السادس"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "تمجيد البابا كيرلس السادس",
+    "text": "في بلدة بدمنهور\nأشرق لنا منها النور\nبميلاد أب لجمهور\nبنيوت آفا كيرلس",
+    "source": "https://st-takla.org/lyrics/ar/praise/kef/kirollos.html"
+   },
    "image": null
   },
   {
@@ -1121,7 +1197,11 @@
      "source": "https://copticorthodox.church/en/popes/pope-shenouda-iii/"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "تمجيد البابا شنوده الثالث",
+    "text": "في سماء القديسين .... واقف بطرك عظيم\nشمعة القرن العشرين .... بنيوت افا شنودة",
+    "source": "https://st-takla.org/lyrics/ar/praise/sheen/shenouda-iii.html"
+   },
    "image": null
   },
   {
@@ -1298,7 +1378,11 @@
      "source": "https://copticorthodox.church/en/past-bishops/metropolitan-pakhomious/"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "تمجيد الأنبا باخوميوس مطران البحيرة",
+    "text": "في صفوف السمائيين\nخادم متواضع أمين\nمع الملايكة والقديسين\nالأنبا باخوميوس",
+    "source": "https://st-takla.org/lyrics/ar/praise/baa/bakhomios.html"
+   },
    "image": null
   },
   {
@@ -1483,7 +1567,11 @@
      "source": "https://st-takla.org/lyrics/en/glorifications/p/pishoy-kamel.html"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "تمجيد القمص بيشوي كامل",
+    "text": "في كواكب الأبرار\nكاهن كله أنوار\nحامل الصليب بوقار\nبنيوت امنريت بيشوي",
+    "source": "https://st-takla.org/lyrics/ar/praise/baa/bishoy-kamel.html"
+   },
    "image": null
   },
   {
@@ -1511,7 +1599,11 @@
      "source": "https://st-takla.org/Saints/Coptic-Orthodox-Saints-Biography/Coptic-Saints-Story_1237.html"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "تمجيد القديس أبونا عبد المسيح المناهري",
+    "text": "أنا أفتح فمي بالتسبيح\nأرنم بلحن المديح\nأحكيلكم عن حبيب المسيح\nأبونا عبد المسيح",
+    "source": "https://st-takla.org/Lyrics-Spiritual-Songs/10-Coptic-Praises-Glorification-Madae7/Tamgeed-Abouna-Abdel-Masih-Al-Manahry.html"
+   },
    "image": null
   },
   {
@@ -1525,7 +1617,11 @@
      "source": "https://www.albawabhnews.com/2998309"
     }
    ],
-   "praise": null,
+   "praise": {
+    "title": "تمجيد أبونا فلتاؤس السرياني",
+    "text": "في بستان القديسين\nراهب ناسك وأمين\nمثال الكاملين\nأبونا فلتاؤس",
+    "source": "https://st-takla.org/lyrics/ar/praise/faa/fr-feltaos-el-souriany.html"
+   },
    "image": null
   },
   {
