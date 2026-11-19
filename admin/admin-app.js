@@ -7871,11 +7871,12 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
      itself (change()), and the Worker checks it all again. Apps Script's apiAdmins only gives the names.
   ======================================================= */
 
-  var ROLE_ICONS = { treasurer: 'wallet', servant_bookings: 'ticket', content_editor: 'megaphone', viewer: 'eye', comp_servant: 'trophy', comp_full: 'star' };
+  var ROLE_ICONS = { treasurer: 'wallet', servant_bookings: 'ticket', content_editor: 'megaphone', viewer: 'eye', comp_servant: 'trophy', comp_full: 'star', bread: 'bread' };
   var ROLE_HINTS = {
     treasurer: 'الحجوزات والفلوس والتصدير', servant_bookings: 'يشوف الحجوزات ويسجّل كاش لنفسه',
     content_editor: 'المحتوى والفعاليات والصور والنشر', viewer: 'يشوف كل حاجة من غير تعديل',
     comp_servant: 'يعمل المسابقات ويظبطها ويصحّحها', comp_full: 'المسابقات والنقاط وتحويلها والمتجر وحسابات الشباب',
+    bread: 'البرامج وترشيح الأنبا تكلا والأعياد والإحصائيات',
     custom: 'تختار الصلاحيات بنفسك'
   };
   var MODULE_ICONS = {
@@ -28407,7 +28408,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       A.SUB_NEEDS.breadstats = ['bread.stats'];
     }
     // «برنامج جديد» pressed again on its own tab: back to step 1 (a file half-way stays until then)
-    subOf('breadnew').again = function () { if (BR.wiz.step > 1 && !BR.wiz.busy) { BR.wiz.step = Math.min(BR.wiz.step, 2); A.render(); } };
+    // the tab again: back to the file step; a St-Takla month (W7) goes back to step 1, where its card is
+    subOf('breadnew').again = function () { var w = BR.wiz; if (w.step > 1 && !w.busy) { if (w.suggest) { dropDraft(); BR.wiz = fresh(); } else w.step = Math.min(w.step, 2); A.render(); } };
     A.renderNav();
   }
 
@@ -28588,8 +28590,25 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
             el('span', { text: daysWord(p.days) }),
             el('span', {}, 'فتح ', el('b', { text: num(t.opens) })),
             el('span', {}, 'قروا ', el('b', { text: num(t.reads) })),
-            el('span', {}, 'تأملات ', el('b', { text: num(t.reflections) })))));
+            el('span', {}, 'تأملات ', el('b', { text: num(t.reflections) })))),
+          // W7 (owner 2026-11-19): delete a finished program for good, if wanted
+          btn('امسح', 'trash', 'btn--sm btn--ghost', { 'data-act': 'bread-past-delete', 'aria-label': 'امسح ' + p.name + ' نهائي', onclick: function (event) { deletePast(p, event.currentTarget); } }));
       })) : el('p', { class: 'ba-no', text: 'لسه مفيش برامج خلصت.' }));
+  }
+
+  function deletePast(p, button) {
+    typedConfirm({
+      typed: 'امسح',
+      title: 'تمسح ' + quoted(p.name) + ' نهائي؟',
+      message: 'المواضيع وتأملات الشباب وأرقامه هتتمسح ومش هترجع. الشباب مش هيتأثروا: البرنامج ده خلص.',
+      confirmLabel: 'امسح نهائي'
+    }).then(function (ok) {
+      if (!ok) return null;
+      return A.withBusy(button, api('POST', 'programs/' + esc(p.id) + '/delete', { confirm: true }).then(function () {
+        A.toast('اتمسح ' + quoted(p.name));
+        return refresh();
+      }));
+    }).catch(function (error) { A.fail(error); });
   }
 
   function nextCard(cur) {
@@ -28848,28 +28867,48 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   function takla() {
     var w = BR.wiz;
     if (!w.takMonth) w.takMonth = cairoMonth(1);
-    var pickMonth = function (ym) { return btn(monthName(ym), w.takMonth === ym ? 'check' : 'calendar', 'btn--sm' + (w.takMonth === ym ? ' btn--primary' : ''), { onclick: function () { w.takMonth = ym; A.render(); } }); };
+    var pickMonth = function (ym) { return btn(monthName(ym), w.takMonth === ym ? 'check' : 'calendar', 'btn--sm' + (w.takMonth === ym ? ' btn--primary' : ''), { 'data-act': 'bread-takla-month', 'data-month': ym, onclick: function () { w.takMonth = ym; w.takAsk = null; A.render(); } }); };
     return card('external', 'أو: ترشيح الأنبا تكلا', 'مواضيع الشهر جاهزة من موقع الأنبا تكلا: رسالة من «كلمة منفعة» للبابا شنوده، والآية اللي فيها. تراجعها يوم بيوم وتغيّر أي موضوع.', null, [
       el('div', { class: 'ba-actions' }, pickMonth(cairoMonth(0)), pickMonth(cairoMonth(1)), el('span', { class: 'sp' }),
         btn('هات ترشيح ' + monthName(w.takMonth), 'download', 'btn--primary', { 'data-act': 'bread-takla', onclick: function (event) { loadSuggest(w.takMonth, event.currentTarget); } })),
+      w.takAsk ? el('div', { class: 'ba-alert ba-alert--warn', role: 'alert' },
+        el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('info')),
+        el('div', { class: 'ba-alert__text' },
+          el('b', { text: 'إحنا في ' + monthName(w.takAsk.month) + ' وفاضل ' + daysWord(w.takAsk.left) + ' في الشهر.' }),
+          el('small', { text: 'البرنامج هيبقى ' + daysWord(w.takAsk.left) + ' بس من الترشيح، وأعياد الأيام اللي فاتت مش هتتنشر. موافق؟' })),
+        el('div', { class: 'ba-actions' },
+          btn('ماشي، هات ' + daysWord(w.takAsk.left), 'check', 'btn--primary btn--sm', { 'data-act': 'bread-takla-ok', onclick: function (event) { loadSuggest(w.takAsk.month, event.currentTarget, true); } }),
+          btn('لا', 'x', 'btn--sm', { onclick: function () { w.takAsk = null; A.render(); } }))) : null,
       note('info', 'الأعياد (القديسين) بتظهر في يومها بالتاريخ، مش برقم يوم البرنامج. والمصدر بيظهر تحت كل موضوع بخط صغير.')
     ]);
   }
 
   /* a suggestion option → one Excel-like row (the same reading path as a file) */
   var SUGGEST_HEAD = ['رقم', 'العنوان', 'مرجع الآية', 'مرجع القراءة', 'التأمل', 'السؤال (اختياري)', 'المصدر', 'مراجع المصدر'];
+  var DEFAULT_QUESTIONS = ['إيه أكتر حاجة لمستك في كلام النهارده؟', 'إيه خطوة صغيرة تقدر تعملها النهارده من الكلام ده؟', 'الآية دي بتقولك إيه إنت شخصيًا؟', 'فيه حد محتاج يسمع الكلام ده منك النهارده؟'];
   function suggestRow(n, o) {
-    return [n, o.title || '', o.verseRef || '', o.readingRef || '', o.meditation || '', o.question || '', o.sourceUrl || '', o.sourceRefs || ''];
+    var q = o.question || DEFAULT_QUESTIONS[(n - 1) % DEFAULT_QUESTIONS.length];
+    return [n, o.title || '', o.verseRef || '', o.readingRef || '', o.meditation || '', q, o.sourceUrl || '', o.sourceRefs || ''];
   }
 
-  function loadSuggest(month, button) {
+  /* the days left in the Cairo month, today included */
+  var cairoToday = function () { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); };
+  var daysLeft = function (ym) { var t = cairoToday(); var last = new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7), 0)).getUTCDate(); return t.slice(0, 7) === ym ? last - +t.slice(8, 10) + 1 : last; };
+
+  function loadSuggest(month, button, agreed) {
     var w = BR.wiz;
     if (w.busy) return;
+    var current = month === cairoMonth(0);
+    if (current && !agreed) { w.takAsk = { month: month, left: daysLeft(month) }; A.render(); return; }
+    w.takAsk = null;
     var run = api('GET', 'suggest?month=' + month).then(function (res) {
       if (!res || !res.ready) { A.toast('لسه مفيش ترشيح لشهر ' + monthName(month) + '. بيتعمل أوتوماتيك قبل الشهر.', 'error'); return null; }
       var days = (res.days || []).filter(function (d) { return d && Array.isArray(d.options) && d.options.length; });
       if (!days.length) { A.toast('ملف الترشيح فاضي', 'error'); return null; }
+      if (current) days = days.slice(0, daysLeft(month));
       days.forEach(function (d, i) { d.n = i + 1; d.pick = Math.min(d.pick || 0, d.options.length - 1); });
+      var today = cairoToday();
+      if (current) res.feasts = (res.feasts || []).filter(function (f) { return f.date >= today; });
       return kit().then(function (k) {
         return readRows(k, [SUGGEST_HEAD].concat(days.map(function (d) { return suggestRow(d.n, d.options[d.pick]); })), function () { /* fast */ });
       }).then(function (rows) {
@@ -28963,6 +29002,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         card('edit', 'اسم البرنامج', 'بيظهر للشباب أول يوم، وفي الإحصائيات', null,
           el('label', { class: 'field' }, el('span', { class: 'field__label', text: 'الاسم' }), name, el('span', { class: 'field__hint', text: 'قصير، زي «سلسلة النور» أو «أسبوع الصلاة»' }))),
         note('lock', 'الملف بيتقري على جهازك. اللي بيتبعت للسيرفر هو المواضيع جاهزة بعد المراجعة بس.'))));
+    // W7: a way back to step 1 (the template and «ترشيح الأنبا تكلا»)
+    r.append(el('div', { class: 'ba-actions' }, btn('رجوع', 'back', 'btn--sm', { 'data-act': 'bread-back-1', onclick: function () { if (!w.busy) setStep(1); } })));
   }
 
   /* a file chosen: read it here, check every row, bring the text from Van Dyck, then the review */
@@ -29152,7 +29193,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       n.warns ? tag(ar(n.warns) + ' ملاحظة', 'warn') : null,
       n.errs ? tag(ar(n.errs) + ' لازم يتصلّحوا', 'danger') : null,
       el('span', { class: 'sp' }),
-      btn(w.suggest ? 'ارفع ملف Excel بدل الترشيح' : 'ارفع ملف تاني', 'upload', 'btn--sm', { onclick: function () { dropDraft(); w.suggest = null; w.feasts = null; setStep(2); } }),
+      w.suggest ? btn('رجوع لاختيار الشهر', 'back', 'btn--sm', { 'data-act': 'bread-takla-back', onclick: function () { dropDraft(); w.suggest = null; w.feasts = null; w.rows = null; setStep(1); } }) : null,
+      btn(w.suggest ? 'ارفع ملف Excel بدل الترشيح' : 'ارفع ملف تاني', 'upload', 'btn--sm', { onclick: function () { var wasSuggest = !!w.suggest; dropDraft(); w.suggest = null; w.feasts = null; if (wasSuggest) { w.file = ''; w.rows = null; } setStep(2); } }),
       nextBtn));
     if (n.errs) {
       r.append(el('div', { class: 'ba-alert ba-alert--danger', role: 'alert' },
@@ -29319,8 +29361,46 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 
   /* ---------- 4. التفعيل ---------- */
 
+  /*
+   * W7 (owner 2026-11-19): a St-Takla month runs in its own month only. Next month: it starts on the 1st by itself
+   * (mode 'on'); the current month: today (replacing a live program, typed). Never a month's program in another month.
+   */
+  function monthPlan() {
+    var w = BR.wiz;
+    if (!w.suggest) return null;
+    var month = w.suggest.month;
+    var cur = current();
+    var waiting = upcoming();
+    if (month === cairoMonth(0)) return { month: month, start: BR.programs ? BR.programs.today : cairoToday(), mode: cur ? 'now' : 'after', blocked: '' };
+    var start = month + '-01';
+    var blocked = waiting ? 'في برنامج مستني: ' + quoted(waiting.name) + '. ألغيه الأول من «البرامج».'
+      : cur && cur.endsOn >= start ? quoted(cur.name) + ' شغال لحد ' + dayWords(cur.endsOn) + '، يعني جوه ' + monthName(month) + '. أوقفه الأول من «البرامج»، وبعدين فعّل ده.' : '';
+    return { month: month, start: start, mode: 'on', blocked: blocked };
+  }
+
+  function stepActivateMonth(r, plan) {
+    var w = BR.wiz;
+    var cur = current();
+    var replace = plan.mode === 'now';
+    var text = replace ? [quoted(cur.name) + ' يقف ', ['النهارده'], '، و' + quoted(w.name) + ' يبدأ من النهارده لآخر ' + monthName(plan.month) + '.']
+      : plan.mode === 'on' ? [quoted(w.name) + ' يبدأ لوحده ', [dayWords(plan.start)], '، أول يوم في ' + monthName(plan.month) + '، ويخلص آخر يوم فيه.']
+      : [quoted(w.name) + ' يبدأ ', ['النهارده'], ' لآخر ' + monthName(plan.month) + '.'];
+    var body = [el('p', {}, rich(text))];
+    if (plan.blocked) body.push(el('div', { class: 'ba-alert ba-alert--danger', role: 'alert' }, el('span', { class: 'chipico chipico--danger', 'aria-hidden': 'true' }, icon('alert')), el('div', { class: 'ba-alert__text' }, el('b', { text: plan.blocked }))));
+    var facts = el('div', { class: 'ba-facts ba-facts--top' },
+      el('div', {}, el('small', { class: 'muted', text: 'البرنامج' }), el('b', { text: w.name + ' · ' + daysWord(w.rows.length) })),
+      el('div', {}, el('small', { class: 'muted', text: 'بيبدأ' }), el('b', { text: dayWords(plan.start) })),
+      el('div', {}, el('small', { class: 'muted', text: 'بيخلص' }), el('b', { text: dayWords(addDays(plan.start, w.rows.length - 1)) })));
+    r.append(card('check', 'التفعيل', 'برنامج ' + monthName(plan.month) + ' بيشتغل في شهره بس', null, [body, facts]));
+    r.append(el('div', { class: 'ba-actions' },
+      btn('رجوع', '', 'btn--sm', { onclick: function () { setStep(3); } }),
+      btn(replace ? 'استبدل وفعّل' : plan.mode === 'on' ? 'جدوله لأول الشهر' : 'فعّل البرنامج', 'check', replace ? 'btn--danger' : 'btn--primary', { 'data-act': 'bread-activate', disabled: !!plan.blocked, onclick: function (event) { activate(event.currentTarget); } })));
+  }
+
   function stepActivate(r) {
     var w = BR.wiz;
+    var plan = monthPlan();
+    if (plan) return stepActivateMonth(r, plan);
     var cur = current();
     var waiting = upcoming();
     var name = quoted(w.name);
@@ -29364,6 +29444,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   function activate(button) {
     var w = BR.wiz;
     var cur = current();
+    var plan = monthPlan();
+    if (plan) w.mode = plan.mode;
     var now = w.mode === 'now' && !!cur;
     var ask = now ? typedConfirm({
       typed: 'استبدال',
@@ -29374,7 +29456,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     return ask.then(function (ok) {
       if (!ok) return false;
       w.busy = true;
-      return A.withBusy(button, api('POST', 'programs/' + esc(w.program) + '/activate', now ? { mode: 'now', confirm: true } : { mode: cur ? w.mode : 'after' })).then(function (reply) {
+      return A.withBusy(button, api('POST', 'programs/' + esc(w.program) + '/activate', now ? { mode: 'now', confirm: true } : plan && plan.mode === 'on' ? { mode: 'on', startsOn: plan.start } : { mode: cur ? w.mode : 'after' })).then(function (reply) {
         var p = reply.program;
         A.toast(p.startsOn === (BR.programs && BR.programs.today) ? 'اتفعّل ' + quoted(p.name) + ': شغال للكل من النهارده' : 'اتجدول: ' + quoted(p.name) + ' هيبدأ لوحده ' + dayWords(p.startsOn));
         BR.wiz = fresh();

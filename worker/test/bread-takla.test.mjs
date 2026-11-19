@@ -102,3 +102,45 @@ test('admin: the month\'s suggestions are passed on from the «bread-suggest» b
     globalThis.fetch = real;
   }
 });
+
+test('activate { mode: on, startsOn }: a month\'s program starts on its own day, never today, never inside the live one', async () => {
+  const { cairoDay, dayAdd } = await import('../src/bread/model.js');
+  const w = await world();
+  const today = cairoDay();
+  const make = async days => {
+    const c = await w.admin('POST', 'bread/programs', { name: 'شهر', days });
+    const id = c.body.program.id;
+    const r = await w.admin('POST', `bread/programs/${id}/topics`, { topics: Array.from({ length: days }, (_, i) => topic({ n: i + 1 })) });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    return id;
+  };
+  const a = await make(3);
+  for (const bad of [today, dayAdd(today, -1), '2026-02-30', 'x']) assert.equal((await w.admin('POST', `bread/programs/${a}/activate`, { mode: 'on', startsOn: bad })).status, 400, bad);
+  const on = await w.admin('POST', `bread/programs/${a}/activate`, { mode: 'on', startsOn: dayAdd(today, 10) });
+  assert.equal(on.status, 200, JSON.stringify(on.body));
+  assert.deepEqual([on.body.program.startsOn, on.body.program.endsOn], [dayAdd(today, 10), dayAdd(today, 12)]);
+  const list = await w.admin('GET', 'bread/programs');
+  assert.deepEqual([list.body.current, list.body.next], [null, a], 'not live today: waiting for its day');
+  const b = await make(2);
+  assert.equal((await w.admin('POST', `bread/programs/${b}/activate`, { mode: 'on', startsOn: dayAdd(today, 20) })).status, 409, 'one waiting at a time');
+});
+
+test('delete a past program for good (owner 2026-11-19): only once it is over, with confirm; texts, numbers and the row go', async () => {
+  const { cairoDay, dayAdd } = await import('../src/bread/model.js');
+  const w = await world();
+  const today = cairoDay();
+  const c = await w.admin('POST', 'bread/programs', { name: 'قديم', days: 2 });
+  const id = c.body.program.id;
+  await w.admin('POST', `bread/programs/${id}/topics`, { topics: [topic({ n: 1 }), topic({ n: 2 })] });
+  await w.admin('POST', `bread/programs/${id}/activate`, { mode: 'after' });
+  assert.equal((await w.admin('POST', `bread/programs/${id}/delete`, { confirm: true })).status, 400, 'live: no');
+  // two days later it is over
+  await w.h.db.prepare('UPDATE bread_programs SET starts_on = ?, ends_on = ? WHERE id = ?').bind(dayAdd(today, -3), dayAdd(today, -2), id).run();
+  await w.h.db.prepare("INSERT INTO bread_daily (program_id, day, opens, reads, sent, reflections) VALUES (?, ?, 5, 3, 0, 1)").bind(id, dayAdd(today, -2)).run();
+  assert.equal((await w.admin('POST', `bread/programs/${id}/delete`, {})).body.needsConfirm, true);
+  const r = await w.admin('POST', `bread/programs/${id}/delete`, { confirm: true });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  for (const t of ['bread_programs', 'bread_topics', 'bread_daily']) assert.equal(await w.h.db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).first('n'), 0, t);
+  const live = (await w.h.db.prepare("SELECT body FROM published_revisions WHERE kind = 'bread' AND live = 1 AND key LIKE ?").bind(id + '/%').all()).results;
+  assert.ok(live.length && live.every(x => JSON.parse(x.body).gone === true), 'the published days become a stub');
+});

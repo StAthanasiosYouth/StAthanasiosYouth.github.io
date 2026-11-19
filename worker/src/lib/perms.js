@@ -57,6 +57,9 @@ export const PRESETS = Object.freeze({
   comp_servant: { label: 'خادم مسابقات', grants: allOf(['competitions.view', 'competitions.add', 'competitions.edit', 'competitions.approve', 'participants.view', 'points.view', 'media.view', 'media.add']) },
   // the whole competitions side: delete too, the points (adjust, transfer, seasons), the store (items, orders, opening
   // and closing it), the youth accounts (not their reset: participants.manage stays the Primary Admin's), the export
+  // owner 2026-11-19: the one who runs «خبزنا اليومي»: programs (St-Takla's month, Excel), the feasts, the numbers.
+  // The youth's reflections (bread.reflections) stay a Primary default (decision 10): ticked by hand if wanted.
+  bread: { label: 'مسؤول خبزنا اليومي', grants: allOf(['bread.content', 'bread.stats']) },
   comp_full: { label: 'خادم مسابقات شاملة', grants: allOf(['competitions.view', 'competitions.add', 'competitions.edit', 'competitions.delete', 'competitions.approve', 'points.view', 'points.edit', 'points.approve', 'store.view', 'store.add', 'store.edit', 'store.delete', 'store.approve', 'participants.view', 'participants.add', 'participants.edit', 'media.view', 'media.add', 'exports.export', 'activity.view']) }
 });
 

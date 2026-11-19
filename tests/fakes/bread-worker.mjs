@@ -127,12 +127,17 @@ export function createBreadWorker({ origin, today = cairoDay(), admin = 'admin@t
       const p = find(m[1]);
       const day = state.today;
       const mode = body && body.mode;
-      if (mode !== 'after' && mode !== 'now') throw new Fail('invalid', 'اختار: بعد الحالي ولا استبدال دلوقتي.');
+      if (mode !== 'after' && mode !== 'now' && mode !== 'on') throw new Fail('invalid', 'اختار: بعد الحالي ولا استبدال دلوقتي.');
       if (p.status !== 'ready') throw new Fail('invalid', p.status === 'draft' ? 'البرنامج لسه ناقص أيام.' : 'البرنامج ده اتفعّل قبل كده.');
       const cur = currentOf(dated(), day);
       const waiting = nextOf(dated(), day);
       let start;
-      if (mode === 'after') {
+      if (mode === 'on') {
+        if (!body.startsOn || body.startsOn <= day) throw new Fail('invalid', 'تاريخ البداية لازم يكون يوم جاي.');
+        if (waiting || (cur && body.startsOn <= cur.ends_on)) throw new Fail('conflict', 'في برنامج في الطريق.');
+        start = body.startsOn;
+      }
+      else if (mode === 'after') {
         if (waiting) throw new Fail('conflict', 'في برنامج مستني بعد الحالي: «' + waiting.name + '».');
         start = cur ? dayAdd(cur.ends_on, 1) : day;
       }
@@ -155,10 +160,12 @@ export function createBreadWorker({ origin, today = cairoDay(), admin = 'admin@t
       Object.assign(p, { status: 'stopped', ends_on: st === 'live' ? dayAdd(state.today, -1) : null, stopped_ms: Date.now() });
       return { program: view(p) };
     }],
-    ['POST', /^\/v1\/admin\/bread\/programs\/(brd-[0-9a-f]{10})\/delete$/, m => {
+    ['POST', /^\/v1\/admin\/bread\/programs\/(brd-[0-9a-f]{10})\/delete$/, (m, b) => {
       need('content');
       const p = find(m[1]);
-      if (p.status !== 'draft' && p.status !== 'ready') throw new Fail('invalid', 'البرنامج ده اتفعّل.');
+      const over = p.ends_on && p.ends_on < state.today && (p.status === 'scheduled' || p.status === 'stopped');
+      if (p.status !== 'draft' && p.status !== 'ready' && !over) throw new Fail('invalid', 'البرنامج ده اتفعّل.');
+      if (over && b.confirm !== true) throw new Fail('invalid', 'أكّد الأول.', { needsConfirm: true });
       state.programs = state.programs.filter(x => x.id !== p.id);
       state.topics.delete(p.id);
       return { deleted: p.id };
@@ -199,6 +206,14 @@ export function createBreadWorker({ origin, today = cairoDay(), admin = 'admin@t
         more: rows.length === max ? rows[rows.length - 1].created_ms : null
       };
     }],
+    // W7: St-Takla's month (state.suggest[month] = the file) and the month's feasts
+    ['GET', /^\/v1\/admin\/bread\/suggest$/, (m, body, query) => {
+      need('content');
+      const month = query.get('month');
+      const file = (state.suggest || {})[month];
+      return file ? { month, ready: true, made: file.made, days: clone(file.days), feasts: clone(file.feasts || []) } : { month, ready: false };
+    }],
+    ['POST', /^\/v1\/admin\/bread\/feasts$/, (m, b) => { need('content'); (state.feasts ||= {})[b.month] = b.feasts; return { month: b.month, feasts: b.feasts.length, publish: 'brd-pub-x' }; }],
     ['GET', /^\/v1\/admin\/bread\/settings$/, () => { need('content'); return { settings: clone(state.settings) }; }],
     ['POST', /^\/v1\/admin\/bread\/settings$/, (m, b) => {
       need('content');

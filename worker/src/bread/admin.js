@@ -7,7 +7,7 @@
  *   POST /v1/admin/bread/programs            { name, days }               → a draft
  *   POST /v1/admin/bread/programs/:id/topics { topics: [...] }  ≤ 20 a call (the browser resolved the text)
  *   GET  /v1/admin/bread/programs/:id/topics                    the days' titles and references (W4 «المواضيع»)
- *   POST /v1/admin/bread/programs/:id/activate { mode: 'after' | 'now', confirm }
+ *   POST /v1/admin/bread/programs/:id/activate { mode: 'after' | 'now' | 'on', confirm, startsOn }   ('on': a set future day, W7)
  *   POST /v1/admin/bread/programs/:id/stop    { confirm }
  *   POST /v1/admin/bread/programs/:id/delete  (a draft / ready program, never one that was published)
  *   GET  /v1/admin/bread/stats?program=
@@ -26,6 +26,7 @@ import { limit } from '../lib/ratelimit.js';
 import { activityStmt } from '../lib/activity.js';
 import { checkProgram, checkTopic, checkFeasts, topicFile, cairoDay, dayAdd, dayDiff, currentOf, nextOf, liveOn, PROGRAM_ID, minuteOf } from './model.js';
 import { breadSettings, settingStmt, datedPrograms, publishStmts, fileStmts, mirrorSoon } from './store.js';
+import { purgeStmts } from './alerts.js';
 
 export const TOPICS_PER_CALL = 20;
 export const UPLOAD_MAX_BYTES = 320 * 1024;
@@ -153,14 +154,21 @@ export async function adminBreadActivate(ctx) {
   const day = cairoDay(now);
   const p = await programOf(db, ctx.params.id);
   const mode = ctx.body && ctx.body.mode;
-  if (mode !== 'after' && mode !== 'now') throw bad('اختار: بعد الحالي ولا استبدال دلوقتي.');
+  if (mode !== 'after' && mode !== 'now' && mode !== 'on') throw bad('اختار: بعد الحالي ولا استبدال دلوقتي.');
   if (p.status !== 'ready') throw bad(p.status === 'draft' ? 'البرنامج لسه ناقص أيام.' : 'البرنامج ده اتفعّل قبل كده.');
   const dated = await datedPrograms(db);
   const cur = currentOf(dated, day);
   const waiting = nextOf(dated, day);
   const stmts = [];
   let start;
-  if (mode === 'after') {
+  if (mode === 'on') {
+    // W7 (owner 2026-11-19): a month's program runs in its own month only: it starts on a set day (the 1st), not today
+    const on = ctx.body.startsOn;
+    if (typeof on !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(on) || isNaN(Date.parse(on + 'T00:00:00Z')) || dayAdd(on, 0) !== on || on <= day) throw bad('تاريخ البداية لازم يكون يوم جاي.');
+    if (waiting) throw new ApiError('conflict', 'bread next', { message: 'في برنامج مستني: «' + waiting.name + '». أوقفه الأول.' });
+    if (cur && on <= cur.ends_on) throw new ApiError('conflict', 'bread current', { message: '«' + cur.name + '» شغال لحد ' + cur.ends_on + '. أوقفه الأول أو اختار يوم بعده.' });
+    start = on;
+  } else if (mode === 'after') {
     if (waiting) throw new ApiError('conflict', 'bread next', { message: 'في برنامج مستني بعد الحالي: «' + waiting.name + '». أوقفه الأول أو استبدل دلوقتي.' });
     start = cur ? dayAdd(cur.ends_on, 1) : day;
   } else {
@@ -223,7 +231,24 @@ export async function adminBreadStop(ctx) {
 export async function adminBreadDelete(ctx) {
   const db = ctx.env.DB;
   const p = await programOf(db, ctx.params.id);
-  if (p.status !== 'draft' && p.status !== 'ready') throw bad('البرنامج ده اتفعّل: بيتوقف بس، والأرقام بتفضل.');
+  if (p.status !== 'draft' && p.status !== 'ready') {
+    // W7 (owner 2026-11-19): a program that is over can be deleted for good, on request: texts, reflections, numbers
+    const day = cairoDay();
+    const state = stateOf(p, day);
+    const over = state === 'ended' || state === 'stopped'; // finished, or stopped before it started
+    if (!over) throw bad(p.status === 'stopped' || p.status === 'scheduled' ? 'البرنامج ده لسه شغال أو مستني: أوقفه الأول، وبعد ما يخلص تقدر تمسحه.' : 'البرنامج ده مينفعش يتمسح.');
+    if (ctx.body.confirm !== true) throw bad('المسح نهائي: التأملات والأرقام بتروح. أكّد الأول.', { needsConfirm: true });
+    const now = Date.now();
+    await retry(() => db.batch([
+      ...purgeStmts(db, p.id, now),
+      db.prepare('DELETE FROM bread_daily WHERE program_id = ?').bind(p.id),
+      db.prepare('DELETE FROM bread_opens WHERE program_id = ?').bind(p.id),
+      db.prepare('DELETE FROM bread_programs WHERE id = ?').bind(p.id),
+      act(ctx, 'bread.delete', p, 'اتمسح نهائي بعد ما خلص (من ' + p.starts_on + ' لـ ' + p.ends_on + ')', { severity: 'important' })
+    ]));
+    await mirrorSoon(ctx.env, ctx.defer);
+    return { deleted: p.id };
+  }
   await retry(() => db.batch([
     db.prepare('DELETE FROM bread_topics WHERE program_id = ?').bind(p.id),
     db.prepare("DELETE FROM bread_programs WHERE id = ? AND status IN ('draft', 'ready')").bind(p.id),

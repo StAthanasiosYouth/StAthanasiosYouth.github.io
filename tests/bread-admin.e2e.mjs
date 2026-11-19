@@ -573,3 +573,89 @@ test('phones: every screen draws in 390 px with no sideways scroll', async () =>
   assert.deepEqual(m.problems, []);
   await m.context.close();
 });
+
+// ---------- W7: St-Takla's month (made-up text in St-Takla's file shape; no text of theirs in the repo) ----------
+
+const monthOf = (day, add) => { const d = new Date(Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1 + add, 1)); return d.toISOString().slice(0, 7); };
+const lastDay = ym => new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7), 0)).getUTCDate();
+function taklaFile(month) {
+  const opt = (n, k) => ({ title: `رسالة ${n}-${k}`, verseRef: 'يوحنا ٣: ١٦', readingRef: 'يوحنا ٣: ١٤-١٨', meditation: `كلمة تجربة لليوم ${n} [رابط](https://st-takla.org/x-${n}.html).`, sourceUrl: `https://st-takla.org/p-${n}-${k}.html`, sourceRefs: 'كتاب «تجربة»' });
+  const days = Array.from({ length: lastDay(month) }, (_, i) => ({ n: i + 1, pick: 0, options: [opt(i + 1, 1), opt(i + 1, 2), opt(i + 1, 3)] }));
+  const feasts = [1, 4, lastDay(month)].map(d => ({ date: `${month}-${String(d).padStart(2, '0')}`, on: true, name: 'قديس ' + d, title: 'تذكار ' + d, word: 'كلمة عنه.', sourceUrl: 'https://st-takla.org/k.html', img: null }));
+  return { schema: 2, month, made: 'x', days, feasts };
+}
+
+test('St-Takla: next month starts on its 1st by itself; the default question; «غيّر الموضوع»; back; the month\'s feasts', async () => {
+  freshWorker({ next: false });
+  const next = monthOf(TODAY, 1);
+  fake.state.suggest = { [next]: taklaFile(next) };
+  const d = await open();
+  await go(d.page, 'breadnew');
+  await d.page.click('[data-act="bread-takla"]');
+  await d.page.waitForSelector('.ba-table', { timeout: 15000 });
+  assert.equal(await d.page.evaluate(() => A.bread.wiz.rows.length), lastDay(next));
+  assert.equal(await d.page.evaluate(() => A.bread.wiz.rows[0].question), 'إيه أكتر حاجة لمستك في كلام النهارده؟', 'a day with no question gets the default one');
+  // back to the month choice, and again
+  await d.page.click('[data-act="bread-takla-back"]');
+  await d.page.waitForSelector('[data-act="bread-takla"]');
+  await d.page.click('[data-act="bread-takla"]');
+  await d.page.waitForSelector('[data-act="bread-swap"]', { timeout: 15000 });
+  await d.page.click('[data-act="bread-swap"]');
+  await d.page.waitForFunction(() => A.bread.wiz.rows[0].title === 'رسالة 1-2', { timeout: 8000 });
+  await d.page.click('[data-act="bread-feasts"]');
+  await d.page.waitForFunction(m => true, {}, next);
+  await sleep(800);
+  assert.equal((fake.state.feasts || {})[next].length, 3);
+  // activation: the live program ends inside next month → blocked, never «today»
+  await d.page.click('[data-act="bread-to-activate"]');
+  await d.page.waitForSelector('[data-act="bread-activate"]', { timeout: 15000 });
+  const cur = await d.page.evaluate(() => { const c = A.bread.programs.programs.find(p => p.id === A.bread.programs.current); return c && c.endsOn; });
+  const blocked = await d.page.$eval('[data-act="bread-activate"]', b => b.disabled);
+  assert.equal(blocked, !!cur && cur >= next + '-01', 'blocked only while the live program runs into the month');
+  if (!blocked) {
+    await d.page.click('[data-act="bread-activate"]');
+    await d.page.waitForFunction(() => A.sub.bread === 'breadprograms', { timeout: 8000 });
+    const act = writes(/\/activate$/).pop();
+    assert.deepEqual(act.body, { mode: 'on', startsOn: next + '-01' });
+  }
+  assert.deepEqual(d.problems, []);
+  await d.context.close();
+});
+
+test('St-Takla: the current month asks first (the days left), then only those days and the feasts still to come', async () => {
+  freshWorker({ empty: true });
+  const now = monthOf(TODAY, 0);
+  fake.state.suggest = { [now]: taklaFile(now) };
+  const d = await open();
+  await go(d.page, 'breadnew');
+  await d.page.click(`[data-act="bread-takla-month"][data-month="${now}"]`);
+  await d.page.waitForFunction(m => A.bread.wiz.takMonth === m, { timeout: 5000 }, now);
+  await d.page.click('[data-act="bread-takla"]');
+  await d.page.waitForSelector('[data-act="bread-takla-ok"]', { timeout: 5000 });
+  const left = lastDay(now) - +TODAY.slice(8, 10) + 1;
+  assert.match(await viewText(d.page), new RegExp('فاضل'));
+  await d.page.click('[data-act="bread-takla-ok"]');
+  await d.page.waitForSelector('.ba-table', { timeout: 15000 });
+  assert.equal(await d.page.evaluate(() => A.bread.wiz.rows.length), left);
+  assert.ok(await d.page.evaluate(t => A.bread.wiz.feasts.every(f => f.date >= t), TODAY));
+  assert.deepEqual(d.problems, []);
+  await d.context.close();
+});
+
+test('a past program can be deleted for good: typed «امسح», then it is gone from the list', async () => {
+  freshWorker({ next: false });
+  const d = await open();
+  await go(d.page, 'breadprograms');
+  const before = fake.state.programs.length;
+  const btns = await d.page.$$('[data-act="bread-past-delete"]');
+  assert.ok(btns.length >= 2, 'the past programs have «امسح»');
+  await btns[0].click();
+  await d.page.waitForSelector('dialog.modal[open] .modal__typed');
+  await d.page.type('dialog.modal[open] .modal__typed', 'امسح');
+  await (await d.page.$('dialog.modal[open] .modal__actions .btn--danger')).click();
+  await d.page.waitForFunction(n => A.bread.programs.programs.length === n - 1, { timeout: 8000 }, before);
+  assert.deepEqual(writes(/\/delete$/).map(c => c.body), [{ confirm: true }]);
+  assert.equal(fake.state.programs.length, before - 1);
+  assert.deepEqual(d.problems, []);
+  await d.context.close();
+});

@@ -72,9 +72,14 @@ export async function retentionStmts(db, now = Date.now()) {
     db.prepare("DELETE FROM bread_programs WHERE status IN ('draft', 'ready') AND created_ms < ?").bind(now - DRAFT_DAYS * DAY_MS),
     db.prepare("DELETE FROM bread_slots WHERE device_id NOT IN (SELECT id FROM push_devices WHERE audience = 'public')")
   ];
-  for (const { id } of due) {
-    const publishId = randomId('brd-pub-', 6);
-    stmts.push(
+  for (const { id } of due) stmts.push(...purgeStmts(db, id, now));
+  return { stmts, purged: due.map(d => d.id) };
+}
+
+/* one program's texts gone: its published days become a stub, its topics, reflections and members go (W7: also on demand) */
+export function purgeStmts(db, id, now = Date.now()) {
+  const publishId = randomId('brd-pub-', 6);
+  return [
       // the published days become a stub (the GitHub mirror overwrites them), the old texts go
       db.prepare(`INSERT INTO published_revisions (id, kind, key, rev, hash, body, withdrawn, live, publish_id, published_by, published_at)
         SELECT 'rev' || lower(hex(randomblob(6))), 'bread', r.key, r.rev + 1, 'gone-' || r.key, '{"schema":1,"gone":true}' || char(10), 1, 0, ?, 'retention', ?
@@ -88,9 +93,7 @@ export async function retentionStmts(db, now = Date.now()) {
       db.prepare('DELETE FROM bread_reflections WHERE program_id = ?').bind(id),
       db.prepare('DELETE FROM bread_members WHERE program_id = ?').bind(id),
       db.prepare('UPDATE bread_programs SET purged_ms = ? WHERE id = ?').bind(now, id)
-    );
-  }
-  return { stmts, purged: due.map(d => d.id) };
+  ];
 }
 
 /* the daily cron's step → { alerts, purged } */
