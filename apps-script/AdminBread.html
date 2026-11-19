@@ -51,7 +51,7 @@
   var MAX_DAYS = 120;
   var PART = 20;              // days a call (worker/src/bread/admin.js TOPICS_PER_CALL)
   var PART_BYTES = 240000;    // and well under UPLOAD_MAX_BYTES (320 KB)
-  var LIMITS = { name: 80, title: 80, ref: 80, verse: 1500, meditation: 2000, question: 300, verseText: 1200, verses: 200 };
+  var LIMITS = { name: 80, title: 80, ref: 80, verse: 1500, meditation: 4000, question: 300, verseText: 1200, verses: 200 };
 
   var BR = A.bread = {
     programs: null,           // GET programs → { today, current, next, programs, settings }
@@ -69,7 +69,7 @@
   };
 
   function fresh() {
-    return { step: 1, file: '', size: 0, name: '', rows: null, reading: null, day: 0, all: false, program: null, sentHash: '', mode: 'after', busy: false, fileError: '' };
+    return { step: 1, file: '', size: 0, name: '', rows: null, reading: null, day: 0, all: false, program: null, sentHash: '', mode: 'after', busy: false, fileError: '', suggest: null, feasts: null, feastsSent: '' };
   }
   BR.wiz = fresh();
 
@@ -753,7 +753,107 @@
         [['السؤال اختياري.'], ' اليوم اللي مفيهوش سؤال بيظهر فيه «تأملك النهارده» بس.'],
         ['الـ٦٦ سفر بس دلوقتي (الأسفار القانونية الثانية لسه).']
       ]))));
+    r.append(takla());
     r.append(el('div', { class: 'ba-actions' }, btn('عندي الملف، كمّل', 'arrow', 'btn--primary', { 'data-act': 'bread-next', onclick: function () { setStep(2); } })));
+  }
+
+  /* ---------- W7: ترشيح الأنبا تكلا (docs/daily-bread/progress/W7.md) ---------- */
+
+  var TAKLA_URL = /^https:\/\/(www\.)?st-takla\.org\/[^\s<>"'()[\]]*$/;
+  var MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  var monthName = function (ym) { return MONTHS[+ym.slice(5, 7) - 1] + ' ' + ar(ym.slice(0, 4)); };
+  var dateWord = function (iso) { return ar(+iso.slice(8, 10)) + ' ' + MONTHS[+iso.slice(5, 7) - 1]; };
+  var cairoMonth = function (add) {
+    var p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit' }).format(new Date()).split('-');
+    return new Date(Date.UTC(+p[0], +p[1] - 1 + (add || 0), 1)).toISOString().slice(0, 7);
+  };
+
+  /* step 1: the month's topics suggested from St-Takla (built monthly by tools/bread-takla.mjs) instead of an Excel */
+  function takla() {
+    var w = BR.wiz;
+    if (!w.takMonth) w.takMonth = cairoMonth(1);
+    var pickMonth = function (ym) { return btn(monthName(ym), w.takMonth === ym ? 'check' : 'calendar', 'btn--sm' + (w.takMonth === ym ? ' btn--primary' : ''), { onclick: function () { w.takMonth = ym; A.render(); } }); };
+    return card('external', 'أو: ترشيح الأنبا تكلا', 'مواضيع الشهر جاهزة من موقع الأنبا تكلا: رسالة من «كلمة منفعة» للبابا شنوده، والآية اللي فيها. تراجعها يوم بيوم وتغيّر أي موضوع.', null, [
+      el('div', { class: 'ba-actions' }, pickMonth(cairoMonth(0)), pickMonth(cairoMonth(1)), el('span', { class: 'sp' }),
+        btn('هات ترشيح ' + monthName(w.takMonth), 'download', 'btn--primary', { 'data-act': 'bread-takla', onclick: function (event) { loadSuggest(w.takMonth, event.currentTarget); } })),
+      note('info', 'الأعياد (القديسين) بتظهر في يومها بالتاريخ، مش برقم يوم البرنامج. والمصدر بيظهر تحت كل موضوع بخط صغير.')
+    ]);
+  }
+
+  /* a suggestion option → one Excel-like row (the same reading path as a file) */
+  var SUGGEST_HEAD = ['رقم', 'العنوان', 'مرجع الآية', 'مرجع القراءة', 'التأمل', 'السؤال (اختياري)', 'المصدر', 'مراجع المصدر'];
+  function suggestRow(n, o) {
+    return [n, o.title || '', o.verseRef || '', o.readingRef || '', o.meditation || '', o.question || '', o.sourceUrl || '', o.sourceRefs || ''];
+  }
+
+  function loadSuggest(month, button) {
+    var w = BR.wiz;
+    if (w.busy) return;
+    var run = api('GET', 'suggest?month=' + month).then(function (res) {
+      if (!res || !res.ready) { A.toast('لسه مفيش ترشيح لشهر ' + monthName(month) + '. بيتعمل أوتوماتيك قبل الشهر.', 'error'); return null; }
+      var days = (res.days || []).filter(function (d) { return d && Array.isArray(d.options) && d.options.length; });
+      if (!days.length) { A.toast('ملف الترشيح فاضي', 'error'); return null; }
+      days.forEach(function (d, i) { d.n = i + 1; d.pick = Math.min(d.pick || 0, d.options.length - 1); });
+      return kit().then(function (k) {
+        return readRows(k, [SUGGEST_HEAD].concat(days.map(function (d) { return suggestRow(d.n, d.options[d.pick]); })), function () { /* fast */ });
+      }).then(function (rows) {
+        dropDraft();
+        w.suggest = { month: month, days: days };
+        w.feasts = (res.feasts || []).map(function (f) { return Object.assign({}, f, { on: f.on !== false }); });
+        w.feastsSent = '';
+        w.file = 'ترشيح الأنبا تكلا · ' + monthName(month);
+        w.size = 0;
+        w.rows = rows;
+        w.all = false;
+        if (!w.name) w.name = 'خبزنا اليومي · ' + monthName(month);
+        w.day = (rows.filter(function (x) { return !x.errs.length; })[0] || rows[0] || {}).n || 0;
+        setStep(3);
+        preview();
+        return true;
+      });
+    });
+    A.withBusy(button, run).catch(function (error) { A.fail(error); });
+  }
+
+  /* «غيّر الموضوع»: the day's next option, read again (Van Dyck text and checks), in place */
+  function swapDay(n, button) {
+    var w = BR.wiz;
+    var d = w.suggest && w.suggest.days.filter(function (x) { return x.n === n; })[0];
+    if (!d || d.options.length < 2) { A.toast('مفيش موضوع تاني لليوم ده', 'error'); return; }
+    d.pick = (d.pick + 1) % d.options.length;
+    A.withBusy(button, kit().then(function (k) {
+      return readRows(k, [SUGGEST_HEAD, suggestRow(n, d.options[d.pick])], function () { /* one row */ });
+    }).then(function (one) {
+      var row = one[0];
+      w.rows = w.rows.map(function (x) { return x.n === n ? row : x; });
+      A.render();
+      preview();
+      A.toast('اتغيّر: ' + row.title);
+    })).catch(function (error) { A.fail(error); });
+  }
+
+  /* the month's feasts (by date): switch any off, then publish them; the member page shows each on its own date */
+  function feastsCard() {
+    var w = BR.wiz;
+    if (!w.suggest) return null;
+    var list = w.feasts || [];
+    var on = list.filter(function (f) { return f.on; });
+    var sentKey = JSON.stringify(on.map(function (f) { return f.date; }));
+    var rows = list.map(function (f) {
+      var box = el('input', { type: 'checkbox', checked: f.on ? true : null, onchange: function () { f.on = box.checked; A.render(); } });
+      return el('label', { class: 'ba-feast' }, box,
+        f.img ? el('img', { src: f.img, alt: '', width: '44', height: '44', loading: 'lazy', referrerpolicy: 'no-referrer' }) : null,
+        el('span', {}, el('b', { text: dateWord(f.date) + ' · ' + f.name }), el('small', { text: f.title || '' })));
+    });
+    return card('calendar', 'أعياد ' + monthName(w.suggest.month), list.length ? 'بتظهر للشباب في يومها بالتاريخ: «نحب نفكّرك النهارده تذكار …» مع صورة من الأنبا تكلا' : 'مفيش أعياد معروفة الشهر ده', null, [
+      list.length ? el('div', { class: 'ba-feasts' }, rows) : null,
+      el('div', { class: 'ba-actions' }, el('span', { class: 'sp' }),
+        w.feastsSent === sentKey ? tag('اتنشرت ✓', 'ok') : null,
+        btn('انشر أعياد الشهر (' + ar(on.length) + ')', 'check', 'btn--primary btn--sm', { 'data-act': 'bread-feasts', onclick: function (event) {
+          var body = { month: w.suggest.month, feasts: on.map(function (f) { return { date: f.date, name: f.name, title: f.title || undefined, word: f.word, url: f.sourceUrl, img: f.img || undefined, praise: f.praise || undefined }; }) };
+          A.withBusy(event.currentTarget, api('POST', 'feasts', body).then(function () { w.feastsSent = sentKey; A.toast('اتنشرت أعياد ' + monthName(w.suggest.month)); A.render(); })).catch(function (error) { A.fail(error); });
+        } }))
+    ]);
   }
 
   /* ---------- 2. الملف ---------- */
@@ -835,7 +935,7 @@
     var refs = k.refs;
     var head = (rows[0] || []).map(function (h) { return String(h || '').trim(); });
     var col = function (name) { for (var i = 0; i < head.length; i++) if (head[i].indexOf(name) === 0) return i; return -1; };
-    var c = { n: col('رقم'), title: col('العنوان'), verse: col('مرجع الآية'), reading: col('مرجع القراءة'), med: col('التأمل'), q: col('السؤال') };
+    var c = { n: col('رقم'), title: col('العنوان'), verse: col('مرجع الآية'), reading: col('مرجع القراءة'), med: col('التأمل'), q: col('السؤال'), src: col('المصدر'), refs: col('مراجع المصدر') };
     if (c.title < 0 || c.verse < 0 || c.reading < 0 || c.med < 0) throw new Error('الملف مش على شكل النموذج: محتاج أعمدة «العنوان» و«مرجع الآية» و«مرجع القراءة» و«التأمل». نزّل النموذج واملاه.');
     var data = rows.slice(1).filter(function (r) { return r.some(function (v) { return String(v == null ? '' : v).trim(); }); });
     if (!data.length) throw new Error('الملف فاضي: مفيش ولا يوم.');
@@ -844,7 +944,7 @@
     var out = data.map(function (r, i) {
       var v = function (key) { return c[key] >= 0 ? String(r[c[key]] == null ? '' : r[c[key]]).replace(/\r\n?/g, '\n').trim() : ''; };
       var nRaw = digits(v('n'));
-      return { n: /^\d+$/.test(nRaw) ? +nRaw : i + 1, title: v('title'), verseRef: v('verse'), readingRef: v('reading'), meditation: v('med'), question: v('q'), errs: [], warns: [] };
+      return { n: /^\d+$/.test(nRaw) ? +nRaw : i + 1, title: v('title'), verseRef: v('verse'), readingRef: v('reading'), meditation: v('med'), question: v('q'), sourceUrl: v('src'), sourceRefs: v('refs'), errs: [], warns: [] };
     });
     var days = out.length;
     var seen = {};
@@ -858,6 +958,7 @@
       if (!row.meditation) err('meditation', 'التأمل فاضي.');
       else if (row.meditation.length > LIMITS.meditation) err('meditation', 'التأمل أطول من ' + ar(LIMITS.meditation) + ' حرف.');
       if (row.question.length > LIMITS.question) err('question', 'السؤال أطول من ' + ar(LIMITS.question) + ' حرف.');
+      if (row.sourceUrl && !TAKLA_URL.test(row.sourceUrl)) err('sourceUrl', 'المصدر لازم يكون صفحة على st-takla.org.');
       row.vref = refs.parseRef(row.verseRef);
       row.rref = refs.parseRef(row.readingRef);
       if (!row.vref.ok) err('verseRef', 'مرجع الآية: ' + row.vref.error + '.');
@@ -953,6 +1054,7 @@
     var t = { n: row.n, title: row.title, verseRef: row.verseRef, verse: row.verse, readingRef: row.readingRef, reading: row.reading, meditation: row.meditation };
     if (row.verseNote) t.verseNote = row.verseNote;
     if (row.question) t.question = row.question;
+    if (row.sourceUrl) { t.sourceUrl = row.sourceUrl; if (row.sourceRefs) t.sourceRefs = row.sourceRefs; }
     return t;
   }
 
@@ -974,7 +1076,7 @@
       n.warns ? tag(ar(n.warns) + ' ملاحظة', 'warn') : null,
       n.errs ? tag(ar(n.errs) + ' لازم يتصلّحوا', 'danger') : null,
       el('span', { class: 'sp' }),
-      btn('ارفع ملف تاني', 'upload', 'btn--sm', { onclick: function () { dropDraft(); setStep(2); } }),
+      btn(w.suggest ? 'ارفع ملف Excel بدل الترشيح' : 'ارفع ملف تاني', 'upload', 'btn--sm', { onclick: function () { dropDraft(); w.suggest = null; w.feasts = null; setStep(2); } }),
       nextBtn));
     if (n.errs) {
       r.append(el('div', { class: 'ba-alert ba-alert--danger', role: 'alert' },
@@ -1020,8 +1122,11 @@
             if (!now || !now.rref || !now.rref.ok) { A.toast('مرجع القراءة في اليوم ده محتاج يتصلّح الأول', 'error'); return; }
             kit().then(function (k) { var url = k.refs.taklaUrl(now.rref.book, now.rref.ch); if (url) window.open(url, '_blank', 'noopener'); });
           } }),
+          w.suggest ? btn('غيّر الموضوع', 'swap', 'btn--sm', { 'data-act': 'bread-swap', onclick: function (event) { swapDay(w.day, event.currentTarget); } }) : null,
           btn('اليوم الجاي', 'arrow', 'btn--sm', { onclick: function () { var i = rows.indexOf(chosen()); pick((rows[(i + 1) % rows.length] || {}).n); } }))
       ], 'ba-pv')));
+    var fc = feastsCard();
+    if (fc) r.append(fc);
   }
 
   function chosen() {
@@ -1050,7 +1155,8 @@
     BR.previewDay = row ? {
       n: row.n, days: w.rows.length, title: row.title || '— فاضي —', verseRef: row.verseRef, verse: row.verse || '…',
       readingRef: row.readingRef, reading: row.reading || [], verseAt: row.verseAt || null, psalmNote: row.psalmNote || '',
-      meditation: row.meditation || '—', question: row.question || ''
+      meditation: row.meditation || '—', question: row.question || '',
+      source: row.sourceUrl ? { url: row.sourceUrl, refs: row.sourceRefs || '' } : null
     } : null;
     var frame = document.querySelector('.ba-phone iframe');
     if (frame && frame.contentWindow) frame.contentWindow.postMessage({ type: 'bread-preview' }, location.origin);

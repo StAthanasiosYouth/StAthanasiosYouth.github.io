@@ -83,6 +83,22 @@ export async function loadDay(programId, n) {
   }
 }
 
+/* W7: the month's feasts file (static and Worker together) → the file | null. Missing = no feasts that month. */
+export async function loadFeasts(month) {
+  if (!/^\d{4}-\d{2}$/.test(month)) return null;
+  const key = 'feasts/' + month;
+  const tries = [
+    getJson(new URL(`daily-bread/data/${key}.json`, ROOT).href, WORKER_MAX_MS),
+    getJson(`${api()}/v1/bread/file/${key}`, WORKER_MAX_MS)
+  ].map(p => p.then(r => (r.status === 200 && r.body && Array.isArray(r.body.feasts) ? r.body : null), () => null).then(t => t || Promise.reject(new Error('no'))));
+  try {
+    return await Promise.any(tries);
+  }
+  catch {
+    return null;
+  }
+}
+
 /* POST to the Worker → { ok, status, body } (never throws) */
 export async function post(path, body, { token = '', plain = false, keepalive = false } = {}) {
   try {

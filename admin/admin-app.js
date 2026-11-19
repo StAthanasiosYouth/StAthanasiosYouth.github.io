@@ -28127,7 +28127,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   var MAX_DAYS = 120;
   var PART = 20;              // days a call (worker/src/bread/admin.js TOPICS_PER_CALL)
   var PART_BYTES = 240000;    // and well under UPLOAD_MAX_BYTES (320 KB)
-  var LIMITS = { name: 80, title: 80, ref: 80, verse: 1500, meditation: 2000, question: 300, verseText: 1200, verses: 200 };
+  var LIMITS = { name: 80, title: 80, ref: 80, verse: 1500, meditation: 4000, question: 300, verseText: 1200, verses: 200 };
 
   var BR = A.bread = {
     programs: null,           // GET programs → { today, current, next, programs, settings }
@@ -28145,7 +28145,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   };
 
   function fresh() {
-    return { step: 1, file: '', size: 0, name: '', rows: null, reading: null, day: 0, all: false, program: null, sentHash: '', mode: 'after', busy: false, fileError: '' };
+    return { step: 1, file: '', size: 0, name: '', rows: null, reading: null, day: 0, all: false, program: null, sentHash: '', mode: 'after', busy: false, fileError: '', suggest: null, feasts: null, feastsSent: '' };
   }
   BR.wiz = fresh();
 
@@ -28829,7 +28829,107 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         [['السؤال اختياري.'], ' اليوم اللي مفيهوش سؤال بيظهر فيه «تأملك النهارده» بس.'],
         ['الـ٦٦ سفر بس دلوقتي (الأسفار القانونية الثانية لسه).']
       ]))));
+    r.append(takla());
     r.append(el('div', { class: 'ba-actions' }, btn('عندي الملف، كمّل', 'arrow', 'btn--primary', { 'data-act': 'bread-next', onclick: function () { setStep(2); } })));
+  }
+
+  /* ---------- W7: ترشيح الأنبا تكلا (docs/daily-bread/progress/W7.md) ---------- */
+
+  var TAKLA_URL = /^https:\/\/(www\.)?st-takla\.org\/[^\s<>"'()[\]]*$/;
+  var MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  var monthName = function (ym) { return MONTHS[+ym.slice(5, 7) - 1] + ' ' + ar(ym.slice(0, 4)); };
+  var dateWord = function (iso) { return ar(+iso.slice(8, 10)) + ' ' + MONTHS[+iso.slice(5, 7) - 1]; };
+  var cairoMonth = function (add) {
+    var p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit' }).format(new Date()).split('-');
+    return new Date(Date.UTC(+p[0], +p[1] - 1 + (add || 0), 1)).toISOString().slice(0, 7);
+  };
+
+  /* step 1: the month's topics suggested from St-Takla (built monthly by tools/bread-takla.mjs) instead of an Excel */
+  function takla() {
+    var w = BR.wiz;
+    if (!w.takMonth) w.takMonth = cairoMonth(1);
+    var pickMonth = function (ym) { return btn(monthName(ym), w.takMonth === ym ? 'check' : 'calendar', 'btn--sm' + (w.takMonth === ym ? ' btn--primary' : ''), { onclick: function () { w.takMonth = ym; A.render(); } }); };
+    return card('external', 'أو: ترشيح الأنبا تكلا', 'مواضيع الشهر جاهزة من موقع الأنبا تكلا: رسالة من «كلمة منفعة» للبابا شنوده، والآية اللي فيها. تراجعها يوم بيوم وتغيّر أي موضوع.', null, [
+      el('div', { class: 'ba-actions' }, pickMonth(cairoMonth(0)), pickMonth(cairoMonth(1)), el('span', { class: 'sp' }),
+        btn('هات ترشيح ' + monthName(w.takMonth), 'download', 'btn--primary', { 'data-act': 'bread-takla', onclick: function (event) { loadSuggest(w.takMonth, event.currentTarget); } })),
+      note('info', 'الأعياد (القديسين) بتظهر في يومها بالتاريخ، مش برقم يوم البرنامج. والمصدر بيظهر تحت كل موضوع بخط صغير.')
+    ]);
+  }
+
+  /* a suggestion option → one Excel-like row (the same reading path as a file) */
+  var SUGGEST_HEAD = ['رقم', 'العنوان', 'مرجع الآية', 'مرجع القراءة', 'التأمل', 'السؤال (اختياري)', 'المصدر', 'مراجع المصدر'];
+  function suggestRow(n, o) {
+    return [n, o.title || '', o.verseRef || '', o.readingRef || '', o.meditation || '', o.question || '', o.sourceUrl || '', o.sourceRefs || ''];
+  }
+
+  function loadSuggest(month, button) {
+    var w = BR.wiz;
+    if (w.busy) return;
+    var run = api('GET', 'suggest?month=' + month).then(function (res) {
+      if (!res || !res.ready) { A.toast('لسه مفيش ترشيح لشهر ' + monthName(month) + '. بيتعمل أوتوماتيك قبل الشهر.', 'error'); return null; }
+      var days = (res.days || []).filter(function (d) { return d && Array.isArray(d.options) && d.options.length; });
+      if (!days.length) { A.toast('ملف الترشيح فاضي', 'error'); return null; }
+      days.forEach(function (d, i) { d.n = i + 1; d.pick = Math.min(d.pick || 0, d.options.length - 1); });
+      return kit().then(function (k) {
+        return readRows(k, [SUGGEST_HEAD].concat(days.map(function (d) { return suggestRow(d.n, d.options[d.pick]); })), function () { /* fast */ });
+      }).then(function (rows) {
+        dropDraft();
+        w.suggest = { month: month, days: days };
+        w.feasts = (res.feasts || []).map(function (f) { return Object.assign({}, f, { on: f.on !== false }); });
+        w.feastsSent = '';
+        w.file = 'ترشيح الأنبا تكلا · ' + monthName(month);
+        w.size = 0;
+        w.rows = rows;
+        w.all = false;
+        if (!w.name) w.name = 'خبزنا اليومي · ' + monthName(month);
+        w.day = (rows.filter(function (x) { return !x.errs.length; })[0] || rows[0] || {}).n || 0;
+        setStep(3);
+        preview();
+        return true;
+      });
+    });
+    A.withBusy(button, run).catch(function (error) { A.fail(error); });
+  }
+
+  /* «غيّر الموضوع»: the day's next option, read again (Van Dyck text and checks), in place */
+  function swapDay(n, button) {
+    var w = BR.wiz;
+    var d = w.suggest && w.suggest.days.filter(function (x) { return x.n === n; })[0];
+    if (!d || d.options.length < 2) { A.toast('مفيش موضوع تاني لليوم ده', 'error'); return; }
+    d.pick = (d.pick + 1) % d.options.length;
+    A.withBusy(button, kit().then(function (k) {
+      return readRows(k, [SUGGEST_HEAD, suggestRow(n, d.options[d.pick])], function () { /* one row */ });
+    }).then(function (one) {
+      var row = one[0];
+      w.rows = w.rows.map(function (x) { return x.n === n ? row : x; });
+      A.render();
+      preview();
+      A.toast('اتغيّر: ' + row.title);
+    })).catch(function (error) { A.fail(error); });
+  }
+
+  /* the month's feasts (by date): switch any off, then publish them; the member page shows each on its own date */
+  function feastsCard() {
+    var w = BR.wiz;
+    if (!w.suggest) return null;
+    var list = w.feasts || [];
+    var on = list.filter(function (f) { return f.on; });
+    var sentKey = JSON.stringify(on.map(function (f) { return f.date; }));
+    var rows = list.map(function (f) {
+      var box = el('input', { type: 'checkbox', checked: f.on ? true : null, onchange: function () { f.on = box.checked; A.render(); } });
+      return el('label', { class: 'ba-feast' }, box,
+        f.img ? el('img', { src: f.img, alt: '', width: '44', height: '44', loading: 'lazy', referrerpolicy: 'no-referrer' }) : null,
+        el('span', {}, el('b', { text: dateWord(f.date) + ' · ' + f.name }), el('small', { text: f.title || '' })));
+    });
+    return card('calendar', 'أعياد ' + monthName(w.suggest.month), list.length ? 'بتظهر للشباب في يومها بالتاريخ: «نحب نفكّرك النهارده تذكار …» مع صورة من الأنبا تكلا' : 'مفيش أعياد معروفة الشهر ده', null, [
+      list.length ? el('div', { class: 'ba-feasts' }, rows) : null,
+      el('div', { class: 'ba-actions' }, el('span', { class: 'sp' }),
+        w.feastsSent === sentKey ? tag('اتنشرت ✓', 'ok') : null,
+        btn('انشر أعياد الشهر (' + ar(on.length) + ')', 'check', 'btn--primary btn--sm', { 'data-act': 'bread-feasts', onclick: function (event) {
+          var body = { month: w.suggest.month, feasts: on.map(function (f) { return { date: f.date, name: f.name, title: f.title || undefined, word: f.word, url: f.sourceUrl, img: f.img || undefined, praise: f.praise || undefined }; }) };
+          A.withBusy(event.currentTarget, api('POST', 'feasts', body).then(function () { w.feastsSent = sentKey; A.toast('اتنشرت أعياد ' + monthName(w.suggest.month)); A.render(); })).catch(function (error) { A.fail(error); });
+        } }))
+    ]);
   }
 
   /* ---------- 2. الملف ---------- */
@@ -28911,7 +29011,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var refs = k.refs;
     var head = (rows[0] || []).map(function (h) { return String(h || '').trim(); });
     var col = function (name) { for (var i = 0; i < head.length; i++) if (head[i].indexOf(name) === 0) return i; return -1; };
-    var c = { n: col('رقم'), title: col('العنوان'), verse: col('مرجع الآية'), reading: col('مرجع القراءة'), med: col('التأمل'), q: col('السؤال') };
+    var c = { n: col('رقم'), title: col('العنوان'), verse: col('مرجع الآية'), reading: col('مرجع القراءة'), med: col('التأمل'), q: col('السؤال'), src: col('المصدر'), refs: col('مراجع المصدر') };
     if (c.title < 0 || c.verse < 0 || c.reading < 0 || c.med < 0) throw new Error('الملف مش على شكل النموذج: محتاج أعمدة «العنوان» و«مرجع الآية» و«مرجع القراءة» و«التأمل». نزّل النموذج واملاه.');
     var data = rows.slice(1).filter(function (r) { return r.some(function (v) { return String(v == null ? '' : v).trim(); }); });
     if (!data.length) throw new Error('الملف فاضي: مفيش ولا يوم.');
@@ -28920,7 +29020,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var out = data.map(function (r, i) {
       var v = function (key) { return c[key] >= 0 ? String(r[c[key]] == null ? '' : r[c[key]]).replace(/\r\n?/g, '\n').trim() : ''; };
       var nRaw = digits(v('n'));
-      return { n: /^\d+$/.test(nRaw) ? +nRaw : i + 1, title: v('title'), verseRef: v('verse'), readingRef: v('reading'), meditation: v('med'), question: v('q'), errs: [], warns: [] };
+      return { n: /^\d+$/.test(nRaw) ? +nRaw : i + 1, title: v('title'), verseRef: v('verse'), readingRef: v('reading'), meditation: v('med'), question: v('q'), sourceUrl: v('src'), sourceRefs: v('refs'), errs: [], warns: [] };
     });
     var days = out.length;
     var seen = {};
@@ -28934,6 +29034,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       if (!row.meditation) err('meditation', 'التأمل فاضي.');
       else if (row.meditation.length > LIMITS.meditation) err('meditation', 'التأمل أطول من ' + ar(LIMITS.meditation) + ' حرف.');
       if (row.question.length > LIMITS.question) err('question', 'السؤال أطول من ' + ar(LIMITS.question) + ' حرف.');
+      if (row.sourceUrl && !TAKLA_URL.test(row.sourceUrl)) err('sourceUrl', 'المصدر لازم يكون صفحة على st-takla.org.');
       row.vref = refs.parseRef(row.verseRef);
       row.rref = refs.parseRef(row.readingRef);
       if (!row.vref.ok) err('verseRef', 'مرجع الآية: ' + row.vref.error + '.');
@@ -29029,6 +29130,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     var t = { n: row.n, title: row.title, verseRef: row.verseRef, verse: row.verse, readingRef: row.readingRef, reading: row.reading, meditation: row.meditation };
     if (row.verseNote) t.verseNote = row.verseNote;
     if (row.question) t.question = row.question;
+    if (row.sourceUrl) { t.sourceUrl = row.sourceUrl; if (row.sourceRefs) t.sourceRefs = row.sourceRefs; }
     return t;
   }
 
@@ -29050,7 +29152,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       n.warns ? tag(ar(n.warns) + ' ملاحظة', 'warn') : null,
       n.errs ? tag(ar(n.errs) + ' لازم يتصلّحوا', 'danger') : null,
       el('span', { class: 'sp' }),
-      btn('ارفع ملف تاني', 'upload', 'btn--sm', { onclick: function () { dropDraft(); setStep(2); } }),
+      btn(w.suggest ? 'ارفع ملف Excel بدل الترشيح' : 'ارفع ملف تاني', 'upload', 'btn--sm', { onclick: function () { dropDraft(); w.suggest = null; w.feasts = null; setStep(2); } }),
       nextBtn));
     if (n.errs) {
       r.append(el('div', { class: 'ba-alert ba-alert--danger', role: 'alert' },
@@ -29096,8 +29198,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
             if (!now || !now.rref || !now.rref.ok) { A.toast('مرجع القراءة في اليوم ده محتاج يتصلّح الأول', 'error'); return; }
             kit().then(function (k) { var url = k.refs.taklaUrl(now.rref.book, now.rref.ch); if (url) window.open(url, '_blank', 'noopener'); });
           } }),
+          w.suggest ? btn('غيّر الموضوع', 'swap', 'btn--sm', { 'data-act': 'bread-swap', onclick: function (event) { swapDay(w.day, event.currentTarget); } }) : null,
           btn('اليوم الجاي', 'arrow', 'btn--sm', { onclick: function () { var i = rows.indexOf(chosen()); pick((rows[(i + 1) % rows.length] || {}).n); } }))
       ], 'ba-pv')));
+    var fc = feastsCard();
+    if (fc) r.append(fc);
   }
 
   function chosen() {
@@ -29126,7 +29231,8 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     BR.previewDay = row ? {
       n: row.n, days: w.rows.length, title: row.title || '— فاضي —', verseRef: row.verseRef, verse: row.verse || '…',
       readingRef: row.readingRef, reading: row.reading || [], verseAt: row.verseAt || null, psalmNote: row.psalmNote || '',
-      meditation: row.meditation || '—', question: row.question || ''
+      meditation: row.meditation || '—', question: row.question || '',
+      source: row.sourceUrl ? { url: row.sourceUrl, refs: row.sourceRefs || '' } : null
     } : null;
     var frame = document.querySelector('.ba-phone iframe');
     if (frame && frame.contentWindow) frame.contentWindow.postMessage({ type: 'bread-preview' }, location.origin);
@@ -29545,6 +29651,6 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
 })();
 
 /* ---------- the permission tables (generated from worker/src/lib/perms.js and apps-script/Grants.gs) ---------- */
-A.ROUTE_PERMS = {"DELETE /v1/admin/book/bookings/:id/lock":"bookings.edit","DELETE /v1/admin/proofs/:id":"bookings.manage","GET /v1/admin/accounts":"accounts.view","GET /v1/admin/activity":"activity.view","GET /v1/admin/activity/manage":"activity.manage","GET /v1/admin/activity/manage/archive/:id":"activity.manage","GET /v1/admin/avatars":"*","GET /v1/admin/book/bookings":"bookings.view","GET /v1/admin/book/bookings/:id":"bookings.view","GET /v1/admin/book/events":"bookings.view","GET /v1/admin/book/events/:id/handovers":"finance.view","GET /v1/admin/book/events/:id/reminders":"bookings.view","GET /v1/admin/book/export":"exports.export","GET /v1/admin/book/finance":"finance.view","GET /v1/admin/book/module":"bookings.view","GET /v1/admin/book/report":"exports.export","GET /v1/admin/book/summary":"bookings.view","GET /v1/admin/bread/programs":"bread.content","GET /v1/admin/bread/programs/:id/topics":"bread.content","GET /v1/admin/bread/reflections":"bread.reflections","GET /v1/admin/bread/settings":"bread.content","GET /v1/admin/bread/stats":"bread.stats","GET /v1/admin/comp":"competitions.view","GET /v1/admin/comp/:id/submissions":"competitions.view","GET /v1/admin/comp/badges":"*","GET /v1/admin/comp/seasons":"competitions.view","GET /v1/admin/comp/submissions/:id":"competitions.view","GET /v1/admin/content/drafts":"content.view","GET /v1/admin/content/export":"system.manage","GET /v1/admin/content/media-status":"system.view","GET /v1/admin/content/media/:id/file":"media.view","GET /v1/admin/content/review-input":"content.view","GET /v1/admin/content/status":"system.view","GET /v1/admin/diag/book-news":"system.view","GET /v1/admin/me":"*","GET /v1/admin/notify/me":"*","GET /v1/admin/notify/settings":"notifications.view","GET /v1/admin/notify/status":"notifications.view","GET /v1/admin/participants":"participants.view","GET /v1/admin/participants/:id":"participants.view","GET /v1/admin/participants/:id/avatar":"participants.view","GET /v1/admin/participants/export":["participants.view","exports.export_pii"],"GET /v1/admin/participants/review":"participants.view","GET /v1/admin/participants/settings":"participants.view","GET /v1/admin/points/seasons":"points.view","GET /v1/admin/points/seasons/:id/preview":"points.view","GET /v1/admin/proofs/:id":"bookings.view","GET /v1/admin/publish/revisions":"publish.publish","GET /v1/admin/publish/status":"system.view","GET /v1/admin/store/items":"store.view","GET /v1/admin/store/redemptions":"store.view","GET /v1/admin/store/schedule":"store.view","GET /v1/admin/whoami":"*","POST /v1/admin/accounts":"accounts.manage","POST /v1/admin/accounts/:email":"accounts.manage","POST /v1/admin/accounts/:email/name":"*","POST /v1/admin/accounts/:email/remove":"accounts.manage","POST /v1/admin/accounts/:email/signout":"accounts.manage","POST /v1/admin/accounts/enforce":"accounts.manage","POST /v1/admin/activity/manage/archive":"activity.manage","POST /v1/admin/activity/manage/delete":"activity.manage","POST /v1/admin/activity/manage/preview":"activity.manage","POST /v1/admin/book/bookings":"bookings.create_cash","POST /v1/admin/book/bookings/:id/cancel":"bookings.manage","POST /v1/admin/book/bookings/:id/confirm":"bookings.approve","POST /v1/admin/book/bookings/:id/link":"bookings.manage","POST /v1/admin/book/bookings/:id/lock":"bookings.edit","POST /v1/admin/book/bookings/:id/payments":["bookings.approve","finance.manage"],"POST /v1/admin/book/bookings/:id/reject":"bookings.approve","POST /v1/admin/book/bookings/:id/reopen":"bookings.manage","POST /v1/admin/book/bookings/:id/update":"bookings.edit","POST /v1/admin/book/claims/:id/reject":["bookings.approve","finance.manage"],"POST /v1/admin/book/events/:id/cancel-all":"bookings.manage","POST /v1/admin/book/events/:id/handovers":"finance.manage","POST /v1/admin/book/events/:id/notify":"bookings.manage","POST /v1/admin/book/events/:id/purge":"bookings.manage","POST /v1/admin/book/events/:id/reminders":"bookings.edit","POST /v1/admin/book/events/:slug/refresh":"bookings.edit","POST /v1/admin/book/handovers/:id/void":"finance.manage","POST /v1/admin/book/module":"bookings.manage","POST /v1/admin/book/payments/:id/void":"finance.manage","POST /v1/admin/book/servants/:id/purge":"bookings.manage","POST /v1/admin/bread/programs":"bread.content","POST /v1/admin/bread/programs/:id/activate":"bread.content","POST /v1/admin/bread/programs/:id/delete":"bread.content","POST /v1/admin/bread/programs/:id/stop":"bread.content","POST /v1/admin/bread/programs/:id/topics":"bread.content","POST /v1/admin/bread/settings":"bread.content","POST /v1/admin/comp/:id/regrade":"competitions.approve","POST /v1/admin/comp/submissions/:id/grade":"competitions.edit","POST /v1/admin/comp/submissions/:id/void":"competitions.approve","POST /v1/admin/content/call":"*","POST /v1/admin/devices/forget":"*","POST /v1/admin/devices/trust":"*","POST /v1/admin/diag/echo":"system.manage","POST /v1/admin/diag/event-fixture":"system.manage","POST /v1/admin/diag/gmail-health":"system.manage","POST /v1/admin/diag/housekeeping":"system.manage","POST /v1/admin/diag/mail-sample":"system.manage","POST /v1/admin/diag/retention":"system.manage","POST /v1/admin/me/ask-access":"*","POST /v1/admin/me/avatar":"*","POST /v1/admin/me/avatar/delete":"*","POST /v1/admin/me/prefs":"*","POST /v1/admin/media/upload":"*","POST /v1/admin/notify/me":"*","POST /v1/admin/notify/outbox/:id/dismiss":"notifications.manage","POST /v1/admin/notify/settings":"notifications.manage","POST /v1/admin/participants":"participants.add","POST /v1/admin/participants/:id/avatar/delete":"participants.edit","POST /v1/admin/participants/:id/block":"participants.edit","POST /v1/admin/participants/:id/dob":"participants.manage","POST /v1/admin/participants/:id/eligibility":"participants.manage","POST /v1/admin/participants/:id/email":"participants.manage","POST /v1/admin/participants/:id/phone":"participants.manage","POST /v1/admin/participants/:id/points":"points.edit","POST /v1/admin/participants/:id/profile":"participants.edit","POST /v1/admin/participants/:id/resend":"participants.view","POST /v1/admin/participants/:id/reset-password":"participants.manage","POST /v1/admin/participants/:id/sessions/revoke":"participants.manage","POST /v1/admin/participants/:id/transfer":"points.approve","POST /v1/admin/participants/:id/unblock":"participants.manage","POST /v1/admin/participants/:id/view-password":"participants.view","POST /v1/admin/participants/settings":"participants.manage","POST /v1/admin/points/seasons":"points.approve","POST /v1/admin/points/seasons/:id/close":"points.approve","POST /v1/admin/proofs":"bookings.edit","POST /v1/admin/publish/restore":"publish.publish","POST /v1/admin/publish/shadow-check":"system.manage","POST /v1/admin/push/auto":"push.view","POST /v1/admin/push/check":"push.view","POST /v1/admin/push/devices":"*","POST /v1/admin/push/remove":"*","POST /v1/admin/push/schedule":"push.view","POST /v1/admin/push/schedule/cancel":"push.manage","POST /v1/admin/push/send":"push.manage","POST /v1/admin/push/state":"push.view","POST /v1/admin/push/subscribe":"*","POST /v1/admin/push/test":"*","POST /v1/admin/push/unsubscribe":"*","POST /v1/admin/session/end":"*","POST /v1/admin/session/heartbeat":"*","POST /v1/admin/session/renew":"*","POST /v1/admin/session/resume":"*","POST /v1/admin/session/start":"*","POST /v1/admin/store/items":"store.edit","POST /v1/admin/store/items/:id/delete":"store.delete","POST /v1/admin/store/redemptions/:id/status":"store.approve","POST /v1/admin/store/schedule":"store.edit","POST /v1/admin/tools/admins":"accounts.view","POST /v1/admin/tools/fetch-media":"media.add","POST /v1/admin/tools/github":"system.view","POST /v1/admin/tools/live-stage":"content.edit","POST /v1/admin/tools/maps":"content.edit","POST /v1/admin/tools/media":"media.view","POST /v1/admin/tools/migrate":"system.manage","POST /v1/admin/tools/migration":"system.manage"};
+A.ROUTE_PERMS = {"DELETE /v1/admin/book/bookings/:id/lock":"bookings.edit","DELETE /v1/admin/proofs/:id":"bookings.manage","GET /v1/admin/accounts":"accounts.view","GET /v1/admin/activity":"activity.view","GET /v1/admin/activity/manage":"activity.manage","GET /v1/admin/activity/manage/archive/:id":"activity.manage","GET /v1/admin/avatars":"*","GET /v1/admin/book/bookings":"bookings.view","GET /v1/admin/book/bookings/:id":"bookings.view","GET /v1/admin/book/events":"bookings.view","GET /v1/admin/book/events/:id/handovers":"finance.view","GET /v1/admin/book/events/:id/reminders":"bookings.view","GET /v1/admin/book/export":"exports.export","GET /v1/admin/book/finance":"finance.view","GET /v1/admin/book/module":"bookings.view","GET /v1/admin/book/report":"exports.export","GET /v1/admin/book/summary":"bookings.view","GET /v1/admin/bread/programs":"bread.content","GET /v1/admin/bread/programs/:id/topics":"bread.content","GET /v1/admin/bread/reflections":"bread.reflections","GET /v1/admin/bread/settings":"bread.content","GET /v1/admin/bread/stats":"bread.stats","GET /v1/admin/bread/suggest":"bread.content","GET /v1/admin/comp":"competitions.view","GET /v1/admin/comp/:id/submissions":"competitions.view","GET /v1/admin/comp/badges":"*","GET /v1/admin/comp/seasons":"competitions.view","GET /v1/admin/comp/submissions/:id":"competitions.view","GET /v1/admin/content/drafts":"content.view","GET /v1/admin/content/export":"system.manage","GET /v1/admin/content/media-status":"system.view","GET /v1/admin/content/media/:id/file":"media.view","GET /v1/admin/content/review-input":"content.view","GET /v1/admin/content/status":"system.view","GET /v1/admin/diag/book-news":"system.view","GET /v1/admin/me":"*","GET /v1/admin/notify/me":"*","GET /v1/admin/notify/settings":"notifications.view","GET /v1/admin/notify/status":"notifications.view","GET /v1/admin/participants":"participants.view","GET /v1/admin/participants/:id":"participants.view","GET /v1/admin/participants/:id/avatar":"participants.view","GET /v1/admin/participants/export":["participants.view","exports.export_pii"],"GET /v1/admin/participants/review":"participants.view","GET /v1/admin/participants/settings":"participants.view","GET /v1/admin/points/seasons":"points.view","GET /v1/admin/points/seasons/:id/preview":"points.view","GET /v1/admin/proofs/:id":"bookings.view","GET /v1/admin/publish/revisions":"publish.publish","GET /v1/admin/publish/status":"system.view","GET /v1/admin/store/items":"store.view","GET /v1/admin/store/redemptions":"store.view","GET /v1/admin/store/schedule":"store.view","GET /v1/admin/whoami":"*","POST /v1/admin/accounts":"accounts.manage","POST /v1/admin/accounts/:email":"accounts.manage","POST /v1/admin/accounts/:email/name":"*","POST /v1/admin/accounts/:email/remove":"accounts.manage","POST /v1/admin/accounts/:email/signout":"accounts.manage","POST /v1/admin/accounts/enforce":"accounts.manage","POST /v1/admin/activity/manage/archive":"activity.manage","POST /v1/admin/activity/manage/delete":"activity.manage","POST /v1/admin/activity/manage/preview":"activity.manage","POST /v1/admin/book/bookings":"bookings.create_cash","POST /v1/admin/book/bookings/:id/cancel":"bookings.manage","POST /v1/admin/book/bookings/:id/confirm":"bookings.approve","POST /v1/admin/book/bookings/:id/link":"bookings.manage","POST /v1/admin/book/bookings/:id/lock":"bookings.edit","POST /v1/admin/book/bookings/:id/payments":["bookings.approve","finance.manage"],"POST /v1/admin/book/bookings/:id/reject":"bookings.approve","POST /v1/admin/book/bookings/:id/reopen":"bookings.manage","POST /v1/admin/book/bookings/:id/update":"bookings.edit","POST /v1/admin/book/claims/:id/reject":["bookings.approve","finance.manage"],"POST /v1/admin/book/events/:id/cancel-all":"bookings.manage","POST /v1/admin/book/events/:id/handovers":"finance.manage","POST /v1/admin/book/events/:id/notify":"bookings.manage","POST /v1/admin/book/events/:id/purge":"bookings.manage","POST /v1/admin/book/events/:id/reminders":"bookings.edit","POST /v1/admin/book/events/:slug/refresh":"bookings.edit","POST /v1/admin/book/handovers/:id/void":"finance.manage","POST /v1/admin/book/module":"bookings.manage","POST /v1/admin/book/payments/:id/void":"finance.manage","POST /v1/admin/book/servants/:id/purge":"bookings.manage","POST /v1/admin/bread/feasts":"bread.content","POST /v1/admin/bread/programs":"bread.content","POST /v1/admin/bread/programs/:id/activate":"bread.content","POST /v1/admin/bread/programs/:id/delete":"bread.content","POST /v1/admin/bread/programs/:id/stop":"bread.content","POST /v1/admin/bread/programs/:id/topics":"bread.content","POST /v1/admin/bread/settings":"bread.content","POST /v1/admin/comp/:id/regrade":"competitions.approve","POST /v1/admin/comp/submissions/:id/grade":"competitions.edit","POST /v1/admin/comp/submissions/:id/void":"competitions.approve","POST /v1/admin/content/call":"*","POST /v1/admin/devices/forget":"*","POST /v1/admin/devices/trust":"*","POST /v1/admin/diag/echo":"system.manage","POST /v1/admin/diag/event-fixture":"system.manage","POST /v1/admin/diag/gmail-health":"system.manage","POST /v1/admin/diag/housekeeping":"system.manage","POST /v1/admin/diag/mail-sample":"system.manage","POST /v1/admin/diag/retention":"system.manage","POST /v1/admin/me/ask-access":"*","POST /v1/admin/me/avatar":"*","POST /v1/admin/me/avatar/delete":"*","POST /v1/admin/me/prefs":"*","POST /v1/admin/media/upload":"*","POST /v1/admin/notify/me":"*","POST /v1/admin/notify/outbox/:id/dismiss":"notifications.manage","POST /v1/admin/notify/settings":"notifications.manage","POST /v1/admin/participants":"participants.add","POST /v1/admin/participants/:id/avatar/delete":"participants.edit","POST /v1/admin/participants/:id/block":"participants.edit","POST /v1/admin/participants/:id/dob":"participants.manage","POST /v1/admin/participants/:id/eligibility":"participants.manage","POST /v1/admin/participants/:id/email":"participants.manage","POST /v1/admin/participants/:id/phone":"participants.manage","POST /v1/admin/participants/:id/points":"points.edit","POST /v1/admin/participants/:id/profile":"participants.edit","POST /v1/admin/participants/:id/resend":"participants.view","POST /v1/admin/participants/:id/reset-password":"participants.manage","POST /v1/admin/participants/:id/sessions/revoke":"participants.manage","POST /v1/admin/participants/:id/transfer":"points.approve","POST /v1/admin/participants/:id/unblock":"participants.manage","POST /v1/admin/participants/:id/view-password":"participants.view","POST /v1/admin/participants/settings":"participants.manage","POST /v1/admin/points/seasons":"points.approve","POST /v1/admin/points/seasons/:id/close":"points.approve","POST /v1/admin/proofs":"bookings.edit","POST /v1/admin/publish/restore":"publish.publish","POST /v1/admin/publish/shadow-check":"system.manage","POST /v1/admin/push/auto":"push.view","POST /v1/admin/push/check":"push.view","POST /v1/admin/push/devices":"*","POST /v1/admin/push/remove":"*","POST /v1/admin/push/schedule":"push.view","POST /v1/admin/push/schedule/cancel":"push.manage","POST /v1/admin/push/send":"push.manage","POST /v1/admin/push/state":"push.view","POST /v1/admin/push/subscribe":"*","POST /v1/admin/push/test":"*","POST /v1/admin/push/unsubscribe":"*","POST /v1/admin/session/end":"*","POST /v1/admin/session/heartbeat":"*","POST /v1/admin/session/renew":"*","POST /v1/admin/session/resume":"*","POST /v1/admin/session/start":"*","POST /v1/admin/store/items":"store.edit","POST /v1/admin/store/items/:id/delete":"store.delete","POST /v1/admin/store/redemptions/:id/status":"store.approve","POST /v1/admin/store/schedule":"store.edit","POST /v1/admin/tools/admins":"accounts.view","POST /v1/admin/tools/fetch-media":"media.add","POST /v1/admin/tools/github":"system.view","POST /v1/admin/tools/live-stage":"content.edit","POST /v1/admin/tools/maps":"content.edit","POST /v1/admin/tools/media":"media.view","POST /v1/admin/tools/migrate":"system.manage","POST /v1/admin/tools/migration":"system.manage"};
 A.FN_PERMS = {"apiActivity":"activity.view","apiAddAdmin":"accounts.manage","apiAdminPushDevices":"*","apiAdminPushRemoveDevice":"*","apiAdminPushSubscribe":"*","apiAdminPushUnsubscribe":"*","apiAdmins":"accounts.view","apiAgeRules":"competitions.view","apiAgeRulesSave":"competitions.edit","apiBadges":"*","apiCheckGithub":"system.view","apiCheckMedia":"media.view","apiComp":"competitions.view","apiCompArchive":"competitions.edit","apiCompClose":"competitions.edit","apiCompCreate":"competitions.add","apiCompDelete":"competitions.delete","apiCompDuplicate":"competitions.add","apiCompExport":"exports.export","apiCompFinalize":"competitions.approve","apiCompGrade":"competitions.approve","apiCompGradeGroup":"competitions.approve","apiCompImportApply":"competitions.edit","apiCompImportPreview":"competitions.edit","apiCompPreviewDefinition":"competitions.view","apiCompPreviewGrade":"competitions.view","apiCompQuestionDelete":"competitions.delete","apiCompQuestionDuplicate":"competitions.edit","apiCompQuestionSave":"competitions.edit","apiCompQuestionsReorder":"competitions.edit","apiCompRegrade":"competitions.approve","apiCompResults":"competitions.view","apiCompReviewQueue":"competitions.view","apiCompSave":"competitions.edit","apiCompSettings":"competitions.edit","apiCompSubmission":"competitions.view","apiCompSubmissions":"competitions.view","apiCompVoid":"competitions.approve","apiComps":"competitions.view","apiDeleteContact":"content.delete","apiDeleteItem":"content.delete","apiDeleteLink":"content.delete","apiDeleteMedia":"media.delete","apiDeleteSection":"content.delete","apiDuplicateItem":"content.edit","apiEvent":"events.view","apiEventArchive":"events.edit","apiEventDelete":"events.delete","apiEventSave":"events.edit","apiEventSetEnabled":"events.edit","apiEvents":"events.view","apiFetchMediaUrl":"media.add","apiForgetDevice":"*","apiHeartbeat":"*","apiHomeOrder":"content.edit","apiImportApply":"content.edit","apiImportPreview":"content.edit","apiMediaLibrary":"media.view","apiMediaPreview":"media.view","apiMigrate":"system.manage","apiMoveContact":"content.edit","apiMoveLink":"content.edit","apiMoveSection":"content.edit","apiPage":"content.view","apiPageArchive":"content.edit","apiPageDelete":"content.delete","apiPageMediaDelete":"content.delete","apiPageMediaOrder":"content.edit","apiPageMediaSave":"content.edit","apiPagePreview":"content.view","apiPageSave":"content.edit","apiPageSetEnabled":"content.edit","apiPages":"content.view","apiParticipant":"participants.view","apiParticipantCode":"participants.edit","apiParticipantCodes":"participants.edit","apiParticipantResetCode":"participants.edit","apiParticipantSave":"participants.edit","apiParticipantSetActive":"participants.edit","apiParticipants":"participants.view","apiParticipantsAssign":"participants.edit","apiParticipantsImportApply":"participants.add","apiParticipantsImportPreview":"participants.add","apiParticipantsResetCodes":"participants.edit","apiParticipantsUndoImport":"participants.add","apiPayMethodsSave":"finance.manage","apiPlanMigration":"system.manage","apiPreview":"content.view","apiPublish":"publish.publish","apiPublishRefresh":"content.view","apiPurgeMedia":"media.delete","apiPushAuto":"push.manage","apiPushCheck":"push.view","apiPushSchedule":"push.view","apiPushScheduleCancel":"push.manage","apiPushState":"push.view","apiRemoveAdmin":"accounts.manage","apiResolveMapsUrl":"content.edit","apiRestoreMedia":"media.add","apiReview":"content.view","apiSaveContact":"content.edit","apiSaveItem":"content.edit","apiSaveLink":"content.edit","apiSaveSection":"content.edit","apiSaveSettings":"content.edit","apiSeasonClose":"competitions.approve","apiSeasonClosePreview":"competitions.view","apiSeasonSave":"competitions.edit","apiSeasons":"competitions.view","apiSendPush":"push.manage","apiServantDelete":"events.delete","apiServantPayApprove":"finance.manage","apiServantSave":"finance.manage","apiServantSetActive":"events.edit","apiServants":"events.view","apiSessionEnd":"*","apiSessionResume":"*","apiSessionStart":"*","apiSetAdminName":"*","apiSetItemArchived":"content.edit","apiSetItemEnabled":"content.edit","apiSetLinkEnabled":"content.edit","apiSetLiveStage":"content.edit","apiSetMediaAlt":"media.add","apiSetSectionEnabled":"content.edit","apiShopItemDelete":"store.delete","apiShopItemSave":"store.edit","apiShopItems":"store.view","apiShopRedemptionStatus":"store.approve","apiShopRedemptions":"store.view","apiShopSchedule":"store.view","apiShopScheduleSave":"store.edit","apiState":"*","apiTrustDevice":"*","apiUpdateMedia":"media.add","apiUploadMedia":"media.add","apiWallet":"points.view","apiWalletAdjust":"points.edit","apiWalletParticipant":"points.view","apiWalletSync":"points.edit","apiWorkerSession":"*"};
 A.OWN_SCOPE_ROUTES = ["POST /v1/admin/book/bookings"];

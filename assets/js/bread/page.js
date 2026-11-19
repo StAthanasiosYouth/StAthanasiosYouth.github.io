@@ -16,8 +16,8 @@ import { bi } from './icons.js';
 import { playIntro, logoSvg } from './intro.js';
 import { stripTashkeel, agpeyaPsalm } from './text.js';
 import { parseRef, taklaUrl } from './refs.js';
-import { AR, cairoDay, programsOn, dayOf, dateText, clock, bareName, mmss, newSeed, SEED, dayDiff } from './model.js';
-import { loadIndex, loadDay, beacon, session, me, reflect, reflectEdit, reflectDelete, saveLook } from './api.js';
+import { AR, cairoDay, programsOn, dayOf, dateText, clock, bareName, mmss, newSeed, SEED, dayDiff, feastOn, TAKLA_URL as TAKLA } from './model.js';
+import { loadIndex, loadDay, loadFeasts, beacon, session, me, reflect, reflectEdit, reflectDelete, saveLook } from './api.js';
 import { readFace, RETURN_KEY, FROM_KEY } from '../account/link.js';
 import { soundEnabled, setSoundEnabled } from '../sound.js';
 
@@ -164,7 +164,35 @@ function paper() {
 }
 
 function meditation() {
-  return `<section class="widget br-card br-med" data-d="0"><h2 class="br-kicker">${bi('lantern')}تأمل النهارده</h2><p>${esc(S.topic.meditation)}</p><p class="br-med__by">من خدام الأسرة</p></section>`;
+  const src = S.topic.source;
+  const by = src && TAKLA.test(src.url)
+    ? `<p class="br-med__by br-med__src">بمساعدة <a href="${esc(src.url)}" target="_blank" rel="noopener">موقع الأنبا تكلا</a>${src.refs ? ` · ${esc(src.refs)}` : ''}</p>`
+    : '<p class="br-med__by">من خدام الأسرة</p>';
+  return `<section class="widget br-card br-med" data-d="0"><h2 class="br-kicker">${bi('lantern')}تأمل النهارده</h2>${medText(S.topic.meditation)}${by}</section>`;
+}
+
+/*
+ * W7: a saint's feast or a church feast on today's DATE (not the program day), from the month's feasts file.
+ * Shown after the reflection (the owner's order: verse, reading, meditation, the youth's own words, then the feast).
+ */
+function feast() {
+  const f = S.feast;
+  if (!f) return '';
+  const pic = f.img ? `<img class="br-feast__img" src="${esc(f.img)}" alt="${esc(f.name)}" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '';
+  const praise = f.praise ? ` · <a href="${esc(f.praise)}" target="_blank" rel="noopener">التمجيد</a>` : '';
+  return `<section class="widget br-card br-feast" data-d="0"><h2 class="br-kicker">${bi('sun')}نحب نفكّرك</h2>${pic}<p class="br-feast__name">النهارده تذكار ${esc(f.name)}</p>${f.title && f.title !== f.name ? `<p class="br-feast__title">${esc(f.title)}</p>` : ''}${medText(f.word)}<p class="br-med__by br-med__src">من <a href="${esc(f.url)}" target="_blank" rel="noopener">سنكسار موقع الأنبا تكلا</a>${praise}</p></section>`;
+}
+
+/*
+ * W7: a meditation taken from St-Takla.org keeps their own links as [words](url) (their terms, FAQ 043).
+ * Only https://st-takla.org links become links; everything else stays text. Blank lines = paragraphs.
+ */
+function medText(text) {
+  const link = s => esc(s).replace(/\[([^\]\n]{1,200})\]\(([^)\s]{1,400})\)/g, (m, words, url) => {
+    const raw = url.replace(/&amp;/g, '&');
+    return TAKLA.test(raw) ? `<a href="${esc(raw)}" target="_blank" rel="noopener">${words}</a>` : words;
+  });
+  return String(text || '').split(/\n\s*\n/).map(p => p.trim()).filter(Boolean).map(p => `<p>${link(p)}</p>`).join('');
 }
 
 const PRIV = `<p class="br-priv">${bi('shield')}<span>تأملك بيوصل لخدام الأسرة بس، ومش بيظهر لحد تاني. تقدر تعدّله أو تمسحه أول ٢٠ دقيقة.</span></p>`;
@@ -246,7 +274,7 @@ function signature() {
 function renderToday() {
   const i = S.info;
   const late = i.late && i.firstDay ? `<p class="br-note" data-d="0"><span class="br-note__ic">${bi('sun')}</span><span><b>أهلاً بيك في «${esc(bareName(S.program.name))}» 🤍</b><br>البرنامج بدأ من ${AR(i.lateBy)} يوم، فهتشارك في الـ${AR(i.ofDays)} يوم الباقيين. كل يوم كلمة جديدة ليك إنت.</span></p>` : '';
-  return `${topbar()}<main id="main">${dawn()}<div class="br-main"><div class="br-side br-side--read">${late}${paper()}</div><div class="br-side">${meditation()}${question()}${done()}${remindTeaser()}</div></div>${signature()}</main>${tabbar('today')}`;
+  return `${topbar()}<main id="main">${dawn()}<div class="br-main"><div class="br-side br-side--read">${late}${paper()}</div><div class="br-side">${meditation()}${question()}${done()}${feast()}${remindTeaser()}</div></div>${signature()}</main>${tabbar('today')}`;
 }
 
 /* ---------------- no reading today: finished / waiting / nothing yet / not open ---------------- */
@@ -658,7 +686,9 @@ async function boot() {
     if (!ls.get(jk)) ls.set(jk, S.day);
     S.info = dayOf(live, S.day, S.seed, ls.get(jk));
     S.read = ls.get('bread.read') === S.day;
-    S.topic = S.info ? await loadDay(live.id, S.info.n) : null;
+    const [topic, feasts] = await Promise.all([S.info ? loadDay(live.id, S.info.n) : null, loadFeasts(S.day.slice(0, 7))]);
+    S.topic = topic;
+    S.feast = feastOn(feasts, S.day);
   }
   S.view = S.topic ? 'today' : 'rest';
   render();

@@ -49,6 +49,11 @@ async function serveFile(ctx, key) {
 }
 
 export const breadFileIndex = ctx => serveFile(ctx, 'index');
+export async function breadFileFeasts(ctx) {
+  const { month } = ctx.params;
+  if (!/^20\d\d-(0[1-9]|1[0-2])$/.test(String(month))) throw new ApiError('not_found', 'bread');
+  return serveFile(ctx, 'feasts/' + month);
+}
 export async function breadFileDay(ctx) {
   const { program, n } = ctx.params;
   if (!PROGRAM_ID.test(String(program)) || !/^[1-9]\d{0,2}$/.test(String(n))) throw new ApiError('not_found', 'bread');

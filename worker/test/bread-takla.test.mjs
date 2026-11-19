@@ -1,0 +1,104 @@
+/*
+ * «خبزنا اليومي» W7 part A — St-Takla.org as a content source (docs/daily-bread/progress/W7.md):
+ * a topic's source page, the month's suggestions passed on to the admin, and the month's feasts by date.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { harness, fakeGoogle } from './helpers.mjs';
+import { checkTopic, topicFile, checkFeasts } from '../src/bread/model.js';
+import { SUGGEST_URL } from '../src/bread/admin.js';
+import { forgetAccessToken } from '../src/push/fcm.js';
+
+const KEYS = { PW_PEPPER: 'pepper-test', PW_KEY: Buffer.alloc(32, 7).toString('base64'), OTP_PEPPER: 'otp-test', ACCOUNT_PAD_MS: '0' };
+const P = 'p@example.com';
+const PAGE = 'https://st-takla.org/Full-Free-Coptic-Books/His-Holiness-Pope-Shenouda-III-Books-Online/01-Words-of-Spiritual-Benefit_Pope-Shenouda/100-Mahabet-El-That_Self-Love.html';
+const topic = (over = {}) => ({
+  n: 1, title: 'محبة الذات', verseRef: 'رومية ١٢: ١٠', verse: 'وَادِّينَ بَعْضُكُمْ بَعْضًا', readingRef: 'رومية ١٢: ٩–١٢',
+  reading: [{ book: 'رومية', chapter: 12, verses: [[9, 'نص ٩'], [10, 'نص ١٠']] }], meditation: 'المحبة الحقيقية للذات… [الله](https://st-takla.org/x.html)', ...over
+});
+const feast = (over = {}) => ({ date: '2026-12-04', name: 'الشهيد العظيم أبي سيفين', title: 'استشهاد القديس مرقوريوس', word: 'في مثل هذا اليوم…',
+  url: 'https://st-takla.org/zJ/index.php/ar-readings-katamares?view=reading-arabic&iday=4&imonth=12&iyear=2026', img: 'https://st-takla.org/Gallery/var/resizes/a.jpg', ...over });
+
+async function world() {
+  forgetAccessToken();
+  const g = await fakeGoogle();
+  const h = harness({ env: { ENVIRONMENT: 'staging', ADMIN_EMAILS: '', ...KEYS } });
+  await h.db.prepare(`INSERT INTO admins (email, name, role, active, created_at) VALUES ('${P}', 'P', 'primary', 1, 0)`).run();
+  const admin = async (method, path, body) => h.call('/v1/admin/' + path, { method, body, headers: { authorization: 'Bearer ' + await g.sign(g.claims({ email: P, sub: 's-p' })) }, fetch: g.fetch });
+  return { h, g, admin };
+}
+
+test('a topic keeps its St-Takla page (their terms, FAQ 043); any other host is refused; the file carries it', () => {
+  const ok = checkTopic(topic({ sourceUrl: PAGE, sourceRefs: 'كتاب «كلمة منفعة»' }), 7);
+  assert.equal(ok.ok, true);
+  assert.equal(ok.topic.sourceUrl, PAGE);
+  assert.deepEqual(JSON.parse(topicFile('brd-0123456789', ok.topic)).source, { url: PAGE, refs: 'كتاب «كلمة منفعة»' });
+  const none = checkTopic(topic(), 7);
+  assert.equal(none.ok, true);
+  assert.equal(JSON.parse(topicFile('brd-0123456789', none.topic)).source, undefined, 'an Excel topic has no source');
+  for (const bad of ['https://example.com/x.html', 'http://st-takla.org/x.html', 'https://st-takla.org.evil.com/x', 'javascript:alert(1)']) {
+    const r = checkTopic(topic({ sourceUrl: bad }), 7);
+    assert.equal(r.ok, false, bad);
+    assert.equal(r.errors[0].field, 'sourceUrl');
+  }
+  assert.equal(checkTopic(topic({ meditation: 'x'.repeat(3900) }), 7).ok, true, 'links make the meditation longer: 4000');
+});
+
+test('checkFeasts: dates inside the month, St-Takla links and pictures only, one a day, sorted', () => {
+  const c = checkFeasts({ month: '2026-12', feasts: [feast({ date: '2026-12-17', name: 'الشهيدة بربارة' }), feast()] });
+  assert.equal(c.ok, true);
+  assert.deepEqual(JSON.parse(c.file).feasts.map(f => f.date), ['2026-12-04', '2026-12-17']);
+  assert.equal(checkFeasts({ month: '2026-12', feasts: [feast({ date: '2026-11-30' })] }).ok, false);
+  assert.equal(checkFeasts({ month: '2026-12', feasts: [feast({ date: '2026-12-32' })] }).ok, false);
+  assert.equal(checkFeasts({ month: '2026-12', feasts: [feast(), feast()] }).ok, false, 'twice the same day');
+  assert.equal(checkFeasts({ month: '2026-12', feasts: [feast({ img: 'https://evil.example/x.jpg' })] }).ok, false);
+  assert.equal(checkFeasts({ month: '2026-12', feasts: [feast({ url: 'https://example.com/' })] }).ok, false);
+  assert.equal(checkFeasts({ month: '2026-13', feasts: [] }).ok, false);
+  assert.equal(checkFeasts({ month: '2026-12', feasts: [] }).ok, true, 'an empty month is allowed');
+});
+
+test('admin: the feasts are published as daily-bread/data/feasts/YYYY-MM.json and served by date file (module on)', async () => {
+  const w = await world();
+  const r = await w.admin('POST', 'bread/feasts', { month: '2026-12', feasts: [feast()] });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.feasts, 1);
+  const rev = await w.h.db.prepare("SELECT key, live FROM published_revisions WHERE kind = 'bread' AND key = 'feasts/2026-12'").first();
+  assert.deepEqual({ ...rev }, { key: 'feasts/2026-12', live: 1 });
+  assert.ok(w.h.sent.some(j => j.type === 'publish.mirror'));
+  assert.equal((await w.h.call('/v1/bread/file/feasts/2026-12')).body.code, 'disabled', 'module off: nothing served');
+  await w.h.db.prepare("UPDATE settings SET value = '1' WHERE key = 'BREAD_MODULE'").run();
+  const f = await w.h.call('/v1/bread/file/feasts/2026-12');
+  assert.equal(f.status, 200);
+  assert.equal(f.body.feasts[0].name, 'الشهيد العظيم أبي سيفين');
+  assert.equal((await w.h.call('/v1/bread/file/feasts/2026-13')).status, 404);
+  // again: the new one is live, the old one is not
+  await w.admin('POST', 'bread/feasts', { month: '2026-12', feasts: [] });
+  const live = (await w.h.db.prepare("SELECT body FROM published_revisions WHERE kind = 'bread' AND key = 'feasts/2026-12' AND live = 1").all()).results;
+  assert.equal(live.length, 1);
+  assert.deepEqual(JSON.parse(live[0].body).feasts, []);
+  assert.equal((await w.admin('POST', 'bread/feasts', { month: '2026-12', feasts: [feast({ img: 'https://x.example/a.jpg' })] })).status, 400);
+});
+
+test('admin: the month\'s suggestions are passed on from the «bread-suggest» branch (missing → ready: false)', async () => {
+  const w = await world();
+  const real = globalThis.fetch;
+  const seen = [];
+  globalThis.fetch = async (url, init) => {
+    if (String(url).startsWith(SUGGEST_URL)) {
+      seen.push(String(url));
+      if (String(url).endsWith('2027-01.json')) return new Response('nope', { status: 404 });
+      return new Response(JSON.stringify({ schema: 2, month: '2026-12', made: 'x', days: [{ n: 1, pick: 0, options: [topic({ sourceUrl: PAGE })] }], feasts: [feast()] }), { status: 200 });
+    }
+    return real(url, init);
+  };
+  try {
+    const r = await w.admin('GET', 'bread/suggest?month=2026-12');
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.deepEqual([r.body.ready, r.body.days.length, r.body.feasts.length], [true, 1, 1]);
+    assert.equal((await w.admin('GET', 'bread/suggest?month=2027-01')).body.ready, false);
+    assert.equal((await w.admin('GET', 'bread/suggest?month=bad')).status, 400);
+    assert.deepEqual(seen, [SUGGEST_URL + '2026-12.json', SUGGEST_URL + '2027-01.json']);
+  } finally {
+    globalThis.fetch = real;
+  }
+});

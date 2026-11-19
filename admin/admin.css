@@ -16458,6 +16458,12 @@ html[data-mode="light"] .gdoc__crumb { color: var(--acc-deep); }
 .ba-phone__screen { overflow: hidden; height: 540px; border-radius: 31px; background: #020914; }
 .ba-phone iframe { display: block; width: 390px; height: 720px; border: 0; transform: scale(.7128); transform-origin: top right; pointer-events: none; }
 .ba-cmp { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 12px; }
+/* W7: «خبزنا اليومي» — the St-Takla month's feasts on the review */
+.ba-feasts { display: grid; gap: 8px; }
+.ba-feast { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
+.ba-feast img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; flex: none; }
+.ba-feast span { display: grid; gap: 2px; min-width: 0; }
+.ba-feast small { color: var(--text-3); font-size: .8rem; }
 
 /* activation */
 .ba-choices { display: grid; gap: 14px; }

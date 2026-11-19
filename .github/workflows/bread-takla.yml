@@ -1,0 +1,54 @@
+# «خبزنا اليومي» — next month's suggestions from St-Takla.org (W7 part A, docs/daily-bread/progress/W7.md).
+# Builds suggest/YYYY-MM.json with tools/bread-takla.mjs and keeps it on the «bread-suggest» branch only:
+# never on main, so nothing reaches the site until an admin reviews the month and approves it in the admin.
+# The Worker hands the file to the admin (GET /v1/admin/bread/suggest?month=).
+name: bread-takla
+
+on:
+  schedule:
+    - cron: '0 3 20 * *'   # the 20th of every month, 05:00 Cairo: next month, ten days ahead
+  workflow_dispatch:
+    inputs:
+      month:
+        description: 'YYYY-MM (empty = next month)'
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bread-takla
+  cancel-in-progress: false
+
+jobs:
+  suggest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: src
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build the month
+        env:
+          MONTH: ${{ github.event.inputs.month }}
+        run: |
+          if [ -n "$MONTH" ]; then ARGS="--month $MONTH"; else ARGS=""; fi
+          node src/tools/bread-takla.mjs $ARGS --out out/ --cache cache
+      - name: Keep it on the bread-suggest branch
+        run: |
+          FILE=$(ls out/*.json 2>/dev/null | head -1)
+          test -n "$FILE"
+          git -C src fetch origin bread-suggest || true
+          git -C src worktree add -B bread-suggest ../keep origin/bread-suggest 2>/dev/null || git -C src worktree add --orphan -b bread-suggest ../keep
+          mkdir -p keep/suggest
+          cp "$FILE" keep/suggest/
+          cd keep
+          git config user.name 'bread-takla'
+          git config user.email 'actions@users.noreply.github.com'
+          git add suggest
+          git diff --cached --quiet && echo "no change" && exit 0
+          git commit -m "bread: St-Takla suggestions $(basename "$FILE" .json)"
+          git push origin bread-suggest

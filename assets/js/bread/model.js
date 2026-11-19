@@ -108,6 +108,24 @@ export function newSeed(cryptoObj = globalThis.crypto) {
   return btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+export const TAKLA_URL = /^https:\/\/(www\.)?st-takla\.org\/[^\s<>"'()[\]]*$/;
+
+/*
+ * W7: the month's feasts file (daily-bread/data/feasts/YYYY-MM.json) → today's feast { name, title, word, url, img } | null.
+ * Tied to the Cairo DATE, not to the program day (owner, 2026-11-19). Links and the picture: St-Takla only.
+ */
+export function feastOn(file, day) {
+  if (!file || typeof file !== 'object' || !Array.isArray(file.feasts)) return null;
+  const f = file.feasts.find(x => x && x.date === day);
+  if (!f) return null;
+  const s = (v, max) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : '');
+  const out = { name: s(f.name, 120), title: s(f.title, 160), word: s(f.word, 2000), url: s(f.url, 400), img: s(f.img, 400), praise: s(f.praise, 400) };
+  if (!out.name || !TAKLA_URL.test(out.url)) return null;
+  if (out.img && !TAKLA_URL.test(out.img)) out.img = '';
+  if (out.praise && !TAKLA_URL.test(out.praise)) out.praise = '';
+  return out;
+}
+
 /* the day file → a safe topic object, or null */
 export function cleanTopic(t, programId, n) {
   if (!t || typeof t !== 'object' || t.program !== programId || t.n !== n) return null;
@@ -116,6 +134,9 @@ export function cleanTopic(t, programId, n) {
     book: s(part && part.book, 40), chapter: Number(part && part.chapter) || 0,
     verses: (Array.isArray(part && part.verses) ? part.verses : []).filter(v => Array.isArray(v) && Number.isInteger(v[0]) && typeof v[1] === 'string').slice(0, 200)
   })).filter(p => p.verses.length) : [];
-  const out = { n, title: s(t.title, 80), verseRef: s(t.verseRef, 80), verse: s(t.verse, 1500), verseNote: s(t.verseNote, 80), readingRef: s(t.readingRef, 80), reading, meditation: s(t.meditation, 2000), question: s(t.question, 300) };
+  const out = { n, title: s(t.title, 80), verseRef: s(t.verseRef, 80), verse: s(t.verse, 1500), verseNote: s(t.verseNote, 80), readingRef: s(t.readingRef, 80), reading, meditation: s(t.meditation, 4000), question: s(t.question, 300) };
+  // W7: St-Takla's page the topic came from (the page shows the link only for https://st-takla.org)
+  const src = t.source && typeof t.source === 'object' ? { url: s(t.source.url, 400), refs: s(t.source.refs, 200) } : null;
+  if (src && TAKLA_URL.test(src.url)) out.source = src;
   return out.title && out.verse && out.reading.length && out.meditation ? out : null;
 }

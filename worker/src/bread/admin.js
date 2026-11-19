@@ -12,6 +12,8 @@
  *   POST /v1/admin/bread/programs/:id/delete  (a draft / ready program, never one that was published)
  *   GET  /v1/admin/bread/stats?program=
  *   GET  /v1/admin/bread/reflections?program=&before=
+ *   GET  /v1/admin/bread/suggest?month=YYYY-MM          St-Takla's suggestions for the month (W7)
+ *   POST /v1/admin/bread/feasts { month, feasts }        the month's feasts, published by date (W7)
  *   GET  /v1/admin/bread/settings · POST /v1/admin/bread/settings { defaultTime, maxSlots, emptyMuted, module, push }
  *
  * The upload is split: the Worker's 10 ms never parse a whole Excel or a whole program (STUDY §7.1).
@@ -22,8 +24,8 @@ import { retry } from '../lib/db.js';
 import { sha256, randomId } from '../lib/hash.js';
 import { limit } from '../lib/ratelimit.js';
 import { activityStmt } from '../lib/activity.js';
-import { checkProgram, checkTopic, topicFile, cairoDay, dayAdd, dayDiff, currentOf, nextOf, liveOn, PROGRAM_ID, minuteOf } from './model.js';
-import { breadSettings, settingStmt, datedPrograms, publishStmts, mirrorSoon } from './store.js';
+import { checkProgram, checkTopic, checkFeasts, topicFile, cairoDay, dayAdd, dayDiff, currentOf, nextOf, liveOn, PROGRAM_ID, minuteOf } from './model.js';
+import { breadSettings, settingStmt, datedPrograms, publishStmts, fileStmts, mirrorSoon } from './store.js';
 
 export const TOPICS_PER_CALL = 20;
 export const UPLOAD_MAX_BYTES = 320 * 1024;
@@ -322,4 +324,39 @@ export async function adminBreadSettingsSave(ctx) {
   stmts.push(activityStmt(db, { actor: by, actorName: ctx.actor.name, action: 'bread.settings', entityType: 'bread', entityId: 'settings', summary: 'إعدادات خبزنا اليومي: ' + changed.join('، '), changes: { fields: changed } }));
   await retry(() => db.batch(stmts));
   return adminBreadSettings(ctx);
+}
+
+/*
+ * GET /v1/admin/bread/suggest?month=YYYY-MM → St-Takla's suggestions for that month (W7 part A).
+ * tools/bread-takla.mjs builds the file in GitHub Actions and keeps it on the «bread-suggest» branch, never on main.
+ * The Worker only passes the file on (the admin's CSP reaches the Worker, not GitHub): no parsing of St-Takla here.
+ */
+export const SUGGEST_URL = 'https://raw.githubusercontent.com/StAthanasiosYouth/StAthanasiosYouth.github.io/bread-suggest/suggest/';
+export async function adminBreadSuggest(ctx) {
+  await limit(ctx, 'bread.admin', ctx.actor.email, 60, 60);
+  const month = new URL(ctx.request.url).searchParams.get('month') || '';
+  if (!/^20\d\d-(0[1-9]|1[0-2])$/.test(month)) throw bad('اختار الشهر.');
+  const r = await fetch(SUGGEST_URL + month + '.json', { cf: { cacheTtl: 300 } });
+  if (r.status === 404) return { month, ready: false };
+  if (!r.ok) throw new ApiError('error', 'bread', { message: 'ترشيحات الأنبا تكلا مش متاحة دلوقتي. جرّب كمان شوية.' });
+  const data = await r.json();
+  if (!data || (data.schema !== 1 && data.schema !== 2) || data.month !== month || !Array.isArray(data.days)) throw new ApiError('error', 'bread', { message: 'ملف الترشيحات مش سليم.' });
+  return { month, ready: true, made: data.made, days: data.days, feasts: Array.isArray(data.feasts) ? data.feasts : [] };
+}
+
+/*
+ * POST /v1/admin/bread/feasts { month, feasts: [{ date, name, title, word, url, img, praise }] } (W7 part A)
+ * → publishes daily-bread/data/feasts/YYYY-MM.json. The member page shows a feast on its own Cairo date.
+ * An empty list publishes an empty month (= no feast cards that month).
+ */
+export async function adminBreadFeasts(ctx) {
+  await limit(ctx, 'bread.admin', ctx.actor.email, 20, 60);
+  const db = ctx.env.DB;
+  const c = checkFeasts(ctx.body);
+  if (!c.ok) throw bad('في أعياد محتاجة تتصلح.', { errors: c.errors.slice(0, 31) });
+  const now = Date.now();
+  const pub = await fileStmts(db, { key: 'feasts/' + c.month, body: c.file, by: ctx.actor.email, now });
+  await retry(() => db.batch([...pub.stmts, act(ctx, 'bread.feasts', null, 'أعياد شهر ' + c.month + ': ' + JSON.parse(c.file).feasts.length)]));
+  await mirrorSoon(ctx.env, ctx.defer);
+  return { month: c.month, feasts: JSON.parse(c.file).feasts.length, publish: pub.publishId };
 }

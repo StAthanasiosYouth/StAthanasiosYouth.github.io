@@ -86,3 +86,21 @@ export const breadPath = key => filePath(key);
 export const dailyStmt = (db, day, programId, column, k = 1) => db.prepare(
   `INSERT INTO bread_daily (day, program_id, ${column}) VALUES (?, ?, ?) ON CONFLICT(day, program_id) DO UPDATE SET ${column} = ${column} + excluded.${column}`
 ).bind(day, programId, k);
+
+/* W7: one more published file of kind 'bread' (the month's feasts, key 'feasts/YYYY-MM'), same pipeline and mirror */
+export async function fileStmts(db, { key, body, by, now }) {
+  const publishId = randomId('brd-pub-', 6);
+  const hash = await sha256(body);
+  return {
+    publishId,
+    stmts: [
+      db.prepare(`INSERT INTO published_revisions (id, kind, key, rev, hash, body, withdrawn, live, publish_id, published_by, published_at)
+        SELECT ?, 'bread', ?, 1 + COALESCE((SELECT MAX(rev) FROM published_revisions WHERE kind = 'bread' AND key = ?), 0), ?, ?, 0, 0, ?, ?, ?`)
+        .bind(randomId('rev', 6), key, key, hash, body, publishId, by, now),
+      db.prepare("UPDATE published_revisions SET live = 0 WHERE kind = 'bread' AND key = ? AND live = 1").bind(key),
+      db.prepare('UPDATE published_revisions SET live = 1 WHERE publish_id = ?').bind(publishId),
+      db.prepare(`INSERT INTO publish_jobs (id, mode, revision, hash, state, files, changed, result, by, at, created_at, updated_at)
+        VALUES (?, 'bread', NULL, ?, 'live', 1, 1, '{}', ?, ?, ?, ?)`).bind(publishId, hash, by, now, now, now)
+    ]
+  };
+}

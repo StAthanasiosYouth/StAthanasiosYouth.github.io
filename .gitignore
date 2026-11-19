@@ -39,3 +39,7 @@ review/
 /athanasios-*/
 .wrangler/
 apps-script/*.local.gs
+
+# «خبزنا اليومي» St-Takla fetch (tools/bread-takla.mjs)
+.takla-cache/
+/suggest/

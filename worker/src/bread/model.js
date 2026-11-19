@@ -87,7 +87,10 @@ export function topicFor(seed, p, day) {
 export const SEED = /^[A-Za-z0-9_-]{6,64}$/;
 export const PROGRAM_ID = /^brd-[0-9a-f]{10}$/;
 export const MAX_DAYS = 120;
-export const LIMITS = { name: 80, title: 80, ref: 80, verse: 1500, note: 80, meditation: 2000, question: 300, book: 40, verseText: 1200, verses: 200, reflection: 1000 };
+// W7: a topic taken from St-Takla.org names its page (their terms, FAQ 043). Only their pages are accepted as a source.
+export const TAKLA_URL = /^https:\/\/(www\.)?st-takla\.org\/[^\s<>"'()\[\]]*$/;
+// meditation 4000: St-Takla's own links stay inside the words as [words](url) (FAQ 043 «أ»), and the links are long
+export const LIMITS = { name: 80, title: 80, ref: 80, verse: 1500, note: 80, meditation: 4000, question: 300, sourceUrl: 400, sourceRefs: 200, book: 40, verseText: 1200, verses: 200, reflection: 1000 };
 
 const str = (v, max, { optional = false } = {}) => {
   if (v == null || v === '') return optional ? { ok: true, value: null } : { ok: false };
@@ -121,10 +124,12 @@ export function checkTopic(t, days) {
   const fields = {
     title: str(t.title, LIMITS.title), verseRef: str(t.verseRef, LIMITS.ref), verse: str(t.verse, LIMITS.verse),
     verseNote: str(t.verseNote, LIMITS.note, { optional: true }), readingRef: str(t.readingRef, LIMITS.ref),
-    meditation: str(t.meditation, LIMITS.meditation), question: str(t.question, LIMITS.question, { optional: true })
+    meditation: str(t.meditation, LIMITS.meditation), question: str(t.question, LIMITS.question, { optional: true }),
+    sourceUrl: str(t.sourceUrl, LIMITS.sourceUrl, { optional: true }), sourceRefs: str(t.sourceRefs, LIMITS.sourceRefs, { optional: true })
   };
-  const names = { title: 'العنوان', verseRef: 'مرجع الآية', verse: 'نص الآية', verseNote: 'ملاحظة الآية', readingRef: 'مرجع القراءة', meditation: 'التأمل', question: 'السؤال' };
-  for (const [k, v] of Object.entries(fields)) if (!v.ok) err(k, v.long ? names[k] + ': أطول من المسموح.' : names[k] + ': فاضي.');
+  if (fields.sourceUrl.ok && fields.sourceUrl.value && !TAKLA_URL.test(fields.sourceUrl.value)) fields.sourceUrl = { ok: false, bad: true };
+  const names = { title: 'العنوان', verseRef: 'مرجع الآية', verse: 'نص الآية', verseNote: 'ملاحظة الآية', readingRef: 'مرجع القراءة', meditation: 'التأمل', question: 'السؤال', sourceUrl: 'المصدر', sourceRefs: 'مراجع المصدر' };
+  for (const [k, v] of Object.entries(fields)) if (!v.ok) err(k, v.long ? names[k] + ': أطول من المسموح.' : v.bad ? names[k] + ': لازم يكون صفحة على st-takla.org.' : names[k] + ': فاضي.');
   const reading = [];
   let verses = 0;
   if (!Array.isArray(t.reading) || !t.reading.length || t.reading.length > 10) err('reading', 'نص القراءة ناقص.');
@@ -150,7 +155,7 @@ export function checkTopic(t, days) {
   }
   if (errors.length) return { ok: false, errors };
   const v = k => fields[k].value;
-  return { ok: true, topic: { n, title: v('title'), verseRef: v('verseRef'), verse: v('verse'), verseNote: v('verseNote'), readingRef: v('readingRef'), reading, meditation: v('meditation'), question: v('question') } };
+  return { ok: true, topic: { n, title: v('title'), verseRef: v('verseRef'), verse: v('verse'), verseNote: v('verseNote'), readingRef: v('readingRef'), reading, meditation: v('meditation'), question: v('question'), sourceUrl: v('sourceUrl'), sourceRefs: v('sourceRefs') } };
 }
 
 /* ---------- published files (docs/daily-bread/progress/W3.md «النشر للمخدوم») ---------- */
@@ -162,7 +167,8 @@ export const topicKey = (programId, n) => programId + '/' + n;
 export function topicFile(programId, t) {
   return JSON.stringify({
     schema: 1, program: programId, n: t.n, title: t.title, verseRef: t.verseRef, verse: t.verse, verseNote: t.verseNote || undefined,
-    readingRef: t.readingRef, reading: t.reading, meditation: t.meditation, question: t.question || undefined
+    readingRef: t.readingRef, reading: t.reading, meditation: t.meditation, question: t.question || undefined,
+    source: t.sourceUrl ? { url: t.sourceUrl, refs: t.sourceRefs || undefined } : undefined
   }) + '\n';
 }
 
@@ -171,4 +177,35 @@ export function indexFile(rows, day) {
   const pick = p => p && { id: p.id, name: p.name, days: p.days, startsOn: p.starts_on, endsOn: p.ends_on };
   const programs = [pick(currentOf(rows, day)), pick(nextOf(rows, day))].filter(Boolean);
   return JSON.stringify({ schema: 1, programs }) + '\n';
+}
+
+/*
+ * W7: the month's feasts as approved in the admin → { ok, file } | { ok: false, errors }. Tied to Cairo dates.
+ * Every link and picture is a St-Takla page (their terms, FAQ 043): name, the synaxarium's words, the source link.
+ */
+export const FEAST_LIMITS = { name: 120, title: 160, word: 2000, url: 400 };
+export function checkFeasts(body) {
+  const errors = [];
+  const month = body && body.month;
+  if (typeof month !== 'string' || !/^20\d\d-(0[1-9]|1[0-2])$/.test(month)) return { ok: false, errors: [{ field: 'month', message: 'الشهر مش مفهوم.' }] };
+  const list = body.feasts;
+  if (!Array.isArray(list) || list.length > 31) return { ok: false, errors: [{ field: 'feasts', message: 'الأعياد لازم تكون لحد ٣١.' }] };
+  const out = [];
+  const seen = new Set();
+  for (const f of list) {
+    const date = f && f.date;
+    const err = message => errors.push({ date, message });
+    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || date.slice(0, 7) !== month || isNaN(Date.parse(date + 'T00:00:00Z')) || new Date(date + 'T00:00:00Z').toISOString().slice(0, 10) !== date) { err('التاريخ مش في الشهر.'); continue; }
+    if (seen.has(date)) { err('اليوم ده متكرر.'); continue; }
+    seen.add(date);
+    const name = str(f.name, FEAST_LIMITS.name), title = str(f.title, FEAST_LIMITS.title, { optional: true }), word = str(f.word, FEAST_LIMITS.word);
+    const url = str(f.url, FEAST_LIMITS.url), img = str(f.img, FEAST_LIMITS.url, { optional: true }), praise = str(f.praise, FEAST_LIMITS.url, { optional: true });
+    if (!name.ok || !word.ok) { err('الاسم أو الكلمة فاضيين أو طوال.'); continue; }
+    if (!url.ok || !TAKLA_URL.test(url.value)) { err('رابط المصدر لازم صفحة على st-takla.org.'); continue; }
+    if (!img.ok || (img.value && !TAKLA_URL.test(img.value)) || !praise.ok || (praise.value && !TAKLA_URL.test(praise.value))) { err('الصورة والتمجيد لازم من st-takla.org.'); continue; }
+    out.push({ date, name: name.value, title: title.ok ? title.value : null, word: word.value, url: url.value, img: img.value || undefined, praise: praise.value || undefined });
+  }
+  if (errors.length) return { ok: false, errors };
+  out.sort((a, b) => (a.date < b.date ? -1 : 1));
+  return { ok: true, month, file: JSON.stringify({ schema: 1, month, feasts: out }) + '\n' };
 }

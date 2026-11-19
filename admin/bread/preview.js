@@ -24,6 +24,15 @@ const bi = name => `<svg class="icon icon--line" viewBox="0 0 24 24" aria-hidden
 const si = name => iconSvg(name);
 const AR = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+// W7: the same as the member page (assets/js/bread/page.js): St-Takla's own links stay links, the source in small type
+const TAKLA = /^https:\/\/(www\.)?st-takla\.org\/[^\s<>"'()[\]]*$/;
+const medText = text => String(text || '').split(/\n\s*\n/).map(p => p.trim()).filter(Boolean).map(p => '<p>' + esc(p).replace(/\[([^\]\n]{1,200})\]\(([^)\s]{1,400})\)/g, (m, words, url) => {
+  const raw = url.replace(/&amp;/g, '&');
+  return TAKLA.test(raw) ? '<a href="' + esc(raw) + '" target="_blank" rel="noopener">' + words + '</a>' : words;
+}) + '</p>').join('');
+const byLine = src => (src && TAKLA.test(src.url)
+  ? '<p class="br-med__by br-med__src">بمساعدة <a href="' + esc(src.url) + '" target="_blank" rel="noopener">موقع الأنبا تكلا</a>' + (src.refs ? ' · ' + esc(src.refs) : '') + '</p>'
+  : '<p class="br-med__by">من خدام الأسرة</p>');
 const app = document.getElementById('app');
 const WEEKDAYS = ['الأحد', 'الاتنين', 'التلات', 'الأربع', 'الخميس', 'الجمعة', 'السبت'];
 const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
@@ -97,7 +106,7 @@ function page(day) {
         <footer class="br-paper__foot">${day.psalmNote ? `<span class="br-psalm">${esc(day.psalmNote)}</span>` : ''}<span>ترجمة فاندايك</span><span class="sp"></span><span class="br-takla">التفسير في موقع الأنبا تكلا ${si('external')}</span></footer>
       </article></div>
       <div class="br-side">
-        <section class="widget br-card br-med"><h2 class="br-kicker">${bi('lantern')}تأمل النهارده</h2><p>${esc(day.meditation)}</p><p class="br-med__by">من خدام الأسرة</p></section>
+        <section class="widget br-card br-med"><h2 class="br-kicker">${bi('lantern')}تأمل النهارده</h2>${medText(day.meditation)}${byLine(day.source)}</section>
         <section class="widget br-card br-q">${head}</section>
       </div></div>
   </main>${tabbar()}`;

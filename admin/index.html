@@ -31,7 +31,7 @@
     hosts: firebaseinstallations and fcmregistrations.
   -->
 
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' https://accounts.google.com/gsi/ https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com https://athanasios-api.menazak-lab.workers.dev; frame-src 'self' https://accounts.google.com/gsi/ https://www.google.com; object-src 'none'; base-uri 'self'; form-action 'none'; manifest-src 'self'; worker-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style; img-src 'self' data: blob: https://st-takla.org; media-src 'self' blob:; font-src 'self'; connect-src 'self' https://accounts.google.com/gsi/ https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com https://athanasios-api.menazak-lab.workers.dev; frame-src 'self' https://accounts.google.com/gsi/ https://www.google.com; object-src 'none'; base-uri 'self'; form-action 'none'; manifest-src 'self'; worker-src 'self'">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#020914">
@@ -49,7 +49,7 @@
   <link rel="icon" href="favicon-32.png" sizes="32x32">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="preload" href="../assets/fonts/cairo-arabic.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="admin.css?v=630714d2ad">
+  <link rel="stylesheet" href="admin.css?v=facd0ab4be">
   <link rel="stylesheet" href="gate.css">
 
   <!-- not deferred: after a reload, the gate starts compact («جاري استعادة الجلسة...») -->
@@ -57,7 +57,7 @@
   <!-- Phase 8 A1: this admin's look (theme, accent, density, motion) before the first paint -->
   <script src="look.js"></script>
   <script src="config.js" defer></script>
-  <script src="admin-app.js?v=c20dbc9dd6" defer></script>
+  <script src="admin-app.js?v=e3b6985e21" defer></script>
   <script src="boot.js" defer></script>
   <script src="layout-check.js" defer></script>
 

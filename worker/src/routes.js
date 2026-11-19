@@ -58,10 +58,10 @@ import { adminPushCheck, adminPushTest } from './push/send.js';
 import { publicRoute } from './route.js';
 import { pushReceipt } from './push/receipt.js';
 import { pushRemind } from './push/remind.js';
-import { breadFileIndex, breadFileDay, breadToday, breadOpen, breadSlots, breadMe, breadReflect, breadReflectEdit, breadReflectDelete } from './bread/public.js';
+import { breadFileIndex, breadFileDay, breadFileFeasts, breadToday, breadOpen, breadSlots, breadMe, breadReflect, breadReflectEdit, breadReflectDelete } from './bread/public.js';
 import {
   adminBreadPrograms, adminBreadCreate, adminBreadTopics, adminBreadTopicList, adminBreadActivate, adminBreadStop, adminBreadDelete, adminBreadStats, adminBreadReflections,
-  adminBreadSettings, adminBreadSettingsSave, UPLOAD_MAX_BYTES as BREAD_UPLOAD_MAX_BYTES
+  adminBreadSettings, adminBreadSettingsSave, adminBreadSuggest, adminBreadFeasts, UPLOAD_MAX_BYTES as BREAD_UPLOAD_MAX_BYTES
 } from './bread/admin.js';
 import { breadDaily } from './bread/alerts.js';
 import { adminPushState, adminPushSend } from './push/screen.js';
@@ -470,6 +470,7 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/push/remind', auth: 'public', maxBytes: 1024, handler: pushRemind },
   // «خبزنا اليومي» (bread/public.js): off until BREAD_MODULE = '1'
   { method: 'GET', path: '/v1/bread/file/index', auth: 'public', handler: breadFileIndex },
+  { method: 'GET', path: '/v1/bread/file/feasts/:month', auth: 'public', handler: breadFileFeasts },
   { method: 'GET', path: '/v1/bread/file/:program/:n', auth: 'public', handler: breadFileDay },
   { method: 'POST', path: '/v1/bread/today', auth: 'public', maxBytes: 1024, handler: breadToday },
   { method: 'POST', path: '/v1/bread/open', auth: 'public', maxBytes: 512, handler: breadOpen },
@@ -488,6 +489,8 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/admin/bread/programs/:id/delete', auth: 'admin', maxBytes: 256, handler: adminBreadDelete },
   { method: 'GET', path: '/v1/admin/bread/stats', auth: 'admin', handler: adminBreadStats },
   { method: 'GET', path: '/v1/admin/bread/reflections', auth: 'admin', handler: adminBreadReflections },
+  { method: 'GET', path: '/v1/admin/bread/suggest', auth: 'admin', handler: adminBreadSuggest },
+  { method: 'POST', path: '/v1/admin/bread/feasts', auth: 'admin', maxBytes: 96 * 1024, handler: adminBreadFeasts },
   { method: 'GET', path: '/v1/admin/bread/settings', auth: 'admin', handler: adminBreadSettings },
   { method: 'POST', path: '/v1/admin/bread/settings', auth: 'admin', maxBytes: 1024, handler: adminBreadSettingsSave },
   // Phase 6 Step 5 — the map card's routes (route.js; the key is ORS_API_KEY)

@@ -420,7 +420,8 @@ test('admin/: strict CSP, noindex, no-referrer, no inline code, no redirect, no 
   assert.deepEqual(rules['worker-src'], ["'self'"]);
   // 'self': the competition preview (docs/COMPETITIONS.md §13.3) is competition/index.html?preview in a same-origin frame
   assert.deepEqual(rules['frame-src'], ["'self'", 'https://accounts.google.com/gsi/', 'https://www.google.com']);
-  assert.deepEqual(rules['img-src'], ["'self'", 'data:', 'blob:']);
+  // W7: St-Takla's saint pictures in «خبزنا اليومي» (feasts review), shown from their site with their link
+  assert.deepEqual(rules['img-src'], ["'self'", 'data:', 'blob:', 'https://st-takla.org']);
   assert.deepEqual(rules['object-src'], ["'none'"]);
   assert.deepEqual(rules['base-uri'], ["'self'"], "'self': the preview frame's <base> points at the site (same origin)");
   assert.deepEqual(rules['form-action'], ["'none'"]);
