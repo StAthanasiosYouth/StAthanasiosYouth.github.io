@@ -128,7 +128,12 @@ export async function breadSlots(ctx) {
   const s = await breadSettings(db);
   const out = rows => ({ times: rows.map(r => timeOf(r.minute)), max: s.maxSlots, defaultTime: s.defaultTime });
   if (body.times === undefined) {
-    return out((await retry(() => db.prepare('SELECT minute FROM bread_slots WHERE device_id = ? ORDER BY minute').bind(id).all())).results);
+    const [rows, off] = await retry(() => db.batch([
+      db.prepare('SELECT minute FROM bread_slots WHERE device_id = ? ORDER BY minute').bind(id),
+      db.prepare('SELECT 1 AS y FROM bread_optout WHERE device_id = ?').bind(id)
+    ]));
+    // W6: never chose, never turned off → on at the default time (the page saves it with its own seed)
+    return { ...out(rows.results), auto: !rows.results.length && !off.results.length };
   }
   if (!Array.isArray(body.times) || body.times.length > s.maxSlots) throw bad('لحد ' + s.maxSlots + ' مواعيد.');
   const minutes = [...new Set(body.times.map(minuteOf))];
@@ -141,6 +146,7 @@ export async function breadSlots(ctx) {
   const now = Date.now();
   await retry(() => db.batch([
     db.prepare('DELETE FROM bread_slots WHERE device_id = ?').bind(id),
+    minutes.length ? db.prepare('DELETE FROM bread_optout WHERE device_id = ?').bind(id) : db.prepare('INSERT OR REPLACE INTO bread_optout (device_id, created_ms) VALUES (?, ?)').bind(id, now),
     ...minutes.map(m => db.prepare('INSERT INTO bread_slots (device_id, minute, seed, created_ms) VALUES (?, ?, ?, ?)').bind(id, m, seed, now))
   ]));
   return out(minutes.sort((a, b) => a - b).map(minute => ({ minute })));

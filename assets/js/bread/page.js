@@ -296,7 +296,7 @@ function renderReminders() {
     <div class="br-h1"><span class="br-remind__ic">${bi('remind')}</span><div><h1>إعداداتي</h1><p>إشعارات «خبزنا اليومي» وشكل القراءة. بتوعك إنت بس.</p></div></div>
     <section class="widget br-card"><div class="br-remind"><div><b>فكّرني كل يوم</b><small>${on ? 'شغالة على الجهاز ده' : denied ? 'محتاجة إذن من المتصفح' : 'مقفولة دلوقتي'}</small></div><button class="br-switch" role="switch" aria-checked="${on}" aria-label="فكّرني كل يوم" data-act="remind" ${S.rem.busy ? 'aria-busy="true"' : ''}></button></div>
       ${body}
-      ${on ? `<div class="br-times">${times.map((x, k) => `<div class="br-time"><span class="br-time__clock">${si('clock')}</span><div><b>${clock(x)[0]} <small class="br-time__ap">${clock(x)[1]}</small></b><small>${LABEL(x)}</small></div><button class="br-time__x" type="button" data-act="drop" data-k="${k}" aria-label="شيل الميعاد ده">${si('close')}</button></div>`).join('')}
+      ${on ? `<div class="br-times">${times.map((x, k) => `<div class="br-time"><span class="br-time__clock">${si('clock')}</span><div><b>${clock(x)[0]} <small class="br-time__ap">${clock(x)[1]}</small></b><small>${LABEL(x)}</small></div>${times.length > 1 ? `<button class="br-time__x" type="button" data-act="drop" data-k="${k}" aria-label="شيل الميعاد ده">${si('close')}</button>` : ''}</div>`).join('')}
         ${times.length < S.rem.max ? `<label class="br-add">${bi('plus')}ضيف ميعاد (لحد ${AR(S.rem.max)})<input class="br-add__time" type="time" step="900" aria-label="ميعاد جديد" data-act="add"></label>` : ''}</div>` : ''}
       ${!on && !denied && !ios ? `<p class="br-hint br-gap14">${si('info')}<span>لما تشغّلها، المتصفح هيسألك مرة واحدة تسمح بالإشعارات. الافتراضي ${esc(clock(S.rem.defaultTime).join(' ').replace(' ص', ' الصبح'))} بتوقيت مصر.</span></p>` : ''}
     </section>
@@ -515,6 +515,11 @@ async function loadReminders() {
     if (S.rem.status.on) {
       const r = await p.breadSlots(undefined, S.seed);
       if (r.ok) Object.assign(S.rem, { times: r.times, max: r.max, defaultTime: r.defaultTime });
+      // W6: on by default with the site's notifications: keep the default time with this device's seed (its own topics)
+      if (r.ok && r.auto) {
+        const k = await p.breadSlots([r.defaultTime], S.seed);
+        if (k.ok) Object.assign(S.rem, { times: k.times });
+      }
     }
     else S.rem.times = [];
   }
@@ -569,7 +574,7 @@ app.addEventListener('click', e => {
   else if (act === 'delete') remove();
   else if (act === 'read') markRead();
   else if (act === 'remind') toggleRemind();
-  else if (act === 'drop') { const k = +a.dataset.k; saveTimes(S.rem.times.filter((_, i) => i !== k), 'شيلنا الميعاد'); }
+  else if (act === 'drop') { const k = +a.dataset.k; if (S.rem.times.length < 2) return; saveTimes(S.rem.times.filter((_, i) => i !== k), 'شيلنا الميعاد'); }
 });
 app.addEventListener('keydown', e => {
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role="button"][data-act]')) { e.preventDefault(); e.target.click(); }

@@ -417,6 +417,51 @@ test('breadTick: off unless BREAD_MODULE, BREAD_PUSH and PUSH_SENDER; then each 
   assert.equal(await w.h.db.prepare('SELECT sent FROM bread_daily WHERE program_id = ?').bind(p.id).first('sent'), 3);
 });
 
+test('W6 on by default: a device with the site\'s notifications gets the default time until «فكّرني» is off; seedless → the general text', async () => {
+  const ACCOUNT = JSON.stringify({ project_id: 'athanasios-test', client_email: 'push@athanasios-test.iam.gserviceaccount.com', private_key: await pem() });
+  const w = await world({ env: { FCM_SERVICE_ACCOUNT: ACCOUNT } });
+  await w.program(7);
+  await w.setting('BREAD_MODULE', '1');
+  await w.setting('BREAD_PUSH', '1');
+  await w.h.db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('PUSH_SENDER', 'worker', 0)").run();
+  const dev = [];
+  for (let i = 1; i <= 3; i++) {
+    const token = ('tok_auto_' + i + '_').padEnd(150, 'x');
+    const id = await pushHash(token);
+    await w.h.db.prepare("INSERT INTO push_devices (id, token, audience, topics, created_ms, last_ms) VALUES (?, ?, 'public', '[]', 1, 1)").bind(id, token).run();
+    dev.push({ id, token });
+  }
+  // the read: device 1 is on the default
+  const r = await w.pub('/v1/bread/slots', { token: dev[0].token, seed: 'dev-auto01' });
+  assert.equal(r.body.auto, true);
+  assert.deepEqual(r.body.times, []);
+  // device 2 turns it off; device 3 chose 09:00
+  assert.equal((await w.pub('/v1/bread/slots', { token: dev[1].token, seed: 'dev-auto02', times: [] })).status, 200);
+  assert.equal((await w.pub('/v1/bread/slots', { token: dev[1].token, seed: 'dev-auto02' })).body.auto, false, 'off is remembered');
+  assert.equal((await w.pub('/v1/bread/slots', { token: dev[2].token, seed: 'dev-auto03', times: ['09:00'] })).status, 200);
+  const at = wallMs(cairoDay() + 'T08:00');
+  const t = await breadTick(w.env, at);
+  assert.equal(t.devices, 1, 'only the device on the default');
+  assert.equal(await breadTick(w.env, at + 60000), null, '08:01: nobody');
+  // the default time moved: 08:00 is nobody's now
+  await w.setting('bread_default_time', '07:30');
+  assert.equal(await breadTick(w.env, wallMs(cairoDay() + 'T08:00') + 120000), null);
+  // the consumer: no seed yet → the general text (not skipped)
+  const sends = [];
+  const f = async (url, init) => {
+    if (url === OAUTH_URL) return Response.json({ access_token: 'at', expires_in: 3600 });
+    sends.push(JSON.parse(init.body).message);
+    return Response.json({ name: 'x' });
+  };
+  await runPart(w.env, w.sent.filter(j => j.type === 'push.fanout')[0].payload, f);
+  assert.equal(sends.length, 1);
+  assert.equal(sends[0].token, dev[0].token);
+  assert.equal(sends[0].data.title, 'خبزنا اليومي');
+  // turning it on again (a time) forgets the "off"
+  await w.pub('/v1/bread/slots', { token: dev[1].token, seed: 'dev-auto02', times: ['08:00'] });
+  assert.equal(await w.h.db.prepare('SELECT COUNT(*) AS n FROM bread_optout').first('n'), 0);
+});
+
 // ---------- alerts + retention ----------
 
 test('alerts: 7/3/1 days left once each, none while a program waits; «content finished» once, muted until the next activation', async () => {

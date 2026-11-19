@@ -714,7 +714,7 @@ export async function breadSlots(times, seed) {
     let reply = await ask();
     if (reply && reply.reason === 'no_device' && (await server('pushSubscribe', { token, platform: platformOf() }))) reply = await ask();
     if (!reply || !reply.ok) return { ok: false, text: (reply && reply.message) || 'ما قدرناش نحفظ المواعيد. جرّب تاني بعد شوية.', reason: reply && reply.code };
-    return { ok: true, times: reply.times || [], max: reply.max || 3, defaultTime: reply.defaultTime || '08:00' };
+    return { ok: true, times: reply.times || [], max: reply.max || 3, defaultTime: reply.defaultTime || '08:00', auto: reply.auto === true };
   }
   catch {
     return { ok: false, text: 'النت فاصل؟ جرّب تاني.', reason: 'network' };

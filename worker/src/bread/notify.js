@@ -48,7 +48,8 @@ export async function personalize(env, ref, devices, m) {
     const t = seed ? topicFor(seed, p, day) : null;
     if (t) plan.set(id, { seed, n: t.n });
   }
-  const skip = new Set(ids.filter(id => !plan.has(id)));
+  // no seed at all (on by default, the page never opened here): the general text; a seed with no topic today: nothing
+  const skip = new Set(ids.filter(id => !plan.has(id) && seedOf(id)));
   if (!plan.size) return { messages: new Map(), skip };
   const hashes = new Map();
   for (const [id, x] of plan) hashes.set(id, (await pseudonym(env, 'bread:' + x.seed)).slice(0, 32));
