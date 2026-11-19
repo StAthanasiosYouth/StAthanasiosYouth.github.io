@@ -178,7 +178,7 @@ function meditation() {
 function feast() {
   const f = S.feast;
   if (!f) return '';
-  const pic = f.img ? `<img class="br-feast__img" src="${esc(f.img)}" alt="${esc(f.name)}" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '';
+  const pic = f.img ? `<figure class="br-feast__fig"><img class="br-feast__img" src="${esc(f.img)}" alt="${esc(f.name)}" loading="lazy" decoding="async" referrerpolicy="no-referrer"></figure>` : '';
   const praise = f.praise ? ` · <a href="${esc(f.praise)}" target="_blank" rel="noopener">التمجيد</a>` : '';
   return `<section class="widget br-card br-feast" data-d="0"><h2 class="br-kicker">${bi('sun')}نحب نفكّرك</h2>${pic}<p class="br-feast__name">النهارده تذكار ${esc(f.name)}</p>${f.title && f.title !== f.name ? `<p class="br-feast__title">${esc(f.title)}</p>` : ''}${medText(f.word)}<p class="br-med__by br-med__src">من <a href="${esc(f.url)}" target="_blank" rel="noopener">سنكسار موقع الأنبا تكلا</a>${praise}</p></section>`;
 }

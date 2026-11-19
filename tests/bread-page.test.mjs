@@ -67,11 +67,12 @@ test('the site: «daily-bread» is reserved everywhere a page slug is checked', 
   for (const f of ['sw.js', 'assets/js/not-found.js', 'assets/js/page/model.js']) assert.match(read(f), /'daily-bread'/, f);
 });
 
-test('the page shell: noindex until the launch, the site\'s CSP, no inline style or script', () => {
+test('the page shell: indexed since the launch (W7), the site\'s CSP, no inline style or script', () => {
   const html = read('daily-bread/index.html');
-  assert.match(html, /name="robots" content="noindex"/);
+  assert.doesNotMatch(html, /name="robots"/, 'W7: the launch drops noindex');
+  assert.match(read('apps-script/Pages.gs'), /'daily-bread']/, 'W7: reserved in the Worker too (PAGE_RESERVED_SLUGS)');
   assert.match(html, /script-src 'self'; style-src 'self'/);
-  assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)[^>]*>/, 'no inline script');
+  assert.doesNotMatch(html, /<script(?![^>]*\b(?:src=|type="application\/ld\+json"))[^>]*>/, 'no inline script (the structured data is not code)');
   assert.doesNotMatch(html, /\sstyle="/, 'no style attribute');
   // the page's own markup: no style attributes either (the CSP refuses them)
   for (const f of ['assets/js/bread/page.js', 'assets/js/bread/home-card.js']) assert.doesNotMatch(read(f), /\sstyle="/, f);

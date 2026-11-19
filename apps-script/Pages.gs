@@ -30,7 +30,7 @@ var SERVANT_ID = /^srv-[a-z0-9]{8}$/;
 /* top-level paths a page can never take (the repository's own folders join them at save) */
 var PAGE_RESERVED_SLUGS = ['admin', 'assets', 'media', 'points', 'competition', 'competitions', 'events', 'event', 'pages', 'page',
   'privacy', 'terms', 'review', 'tools', 'docs', 'tests', 'apps-script', 'index', 'preview', 'new', 'card-athanasios', 'account',
-  'graphify-out', 'node-modules', 'content', 'manifest', 'sw', 'robots', 'meeting', 'live', 'favicon', 'api'];
+  'graphify-out', 'node-modules', 'content', 'manifest', 'sw', 'robots', 'meeting', 'live', 'favicon', 'api', 'daily-bread'];
 
 var PAGE_LIMITS = {
   title: 60,
@@ -2260,7 +2260,7 @@ function pagesFolder_(kind, slug) {
  * leave. The fixed pages come first (keep in sync with the committed sitemap.xml;
  * tests/seo.test.mjs checks). Private pages (account, points, admin) are never listed.
  */
-var SITEMAP_FIXED_PATHS = ['', 'about/', 'events/', 'services/', 'news/', 'about-site/', 'privacy/', 'terms/'];
+var SITEMAP_FIXED_PATHS = ['', 'about/', 'events/', 'services/', 'news/', 'about-site/', 'privacy/', 'terms/', 'daily-bread/'];
 
 function siteSitemapXml_(content, siteUrl) {
 

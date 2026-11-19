@@ -13,7 +13,7 @@ const read = p => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const content = JSON.parse(read('content.json'));
 
 // the public pages: fixed ones + the published service pages / events / competitions in content.json
-const FIXED = ['', 'about/', 'events/', 'services/', 'news/', 'about-site/', 'privacy/', 'terms/'];
+const FIXED = ['', 'about/', 'events/', 'services/', 'news/', 'about-site/', 'privacy/', 'terms/', 'daily-bread/'];
 const PUBLIC = [
   ...FIXED,
   'competitions/',   // site wave 5: in the sitemap only while a competition is published (tests/comp-list.test.mjs)
