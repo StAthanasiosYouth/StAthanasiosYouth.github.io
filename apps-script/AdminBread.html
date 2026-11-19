@@ -854,6 +854,49 @@
   }
 
   /* «غيّر الموضوع»: the day's next option, read again (Van Dyck text and checks), in place */
+  /*
+   * W7 (owner 2026-11-19): a day by hand. «عدّل» opens the day as it is; «اكتب موضوع بإيدك» opens it empty.
+   * Saved through the same reading as a file (Van Dyck text and checks). An edited St-Takla day keeps its source;
+   * a day written by hand has none («من خدام الأسرة»).
+   */
+  function editDay(n, fresh) {
+    var w = BR.wiz;
+    var row = (w.rows || []).filter(function (x) { return x.n === n; })[0];
+    if (!row) return;
+    var v = fresh ? {} : row;
+    var field = function (label, value, max, opts) {
+      var input = el(opts && opts.area ? 'textarea' : 'input', { class: 'input', rows: opts && opts.area ? '7' : null, maxlength: String(max), value: opts && opts.area ? null : (value || ''), placeholder: (opts && opts.hint) || '', 'data-field': opts.key });
+      if (opts && opts.area) input.value = value || '';
+      return { input: input, node: el('label', { class: 'field' }, el('span', { class: 'field__label', text: label }), input) };
+    };
+    var f = {
+      title: field('العنوان', v.title, LIMITS.title, { key: 'title', hint: 'اسم موضوع اليوم، قصير' }),
+      verse: field('مرجع الآية', v.verseRef, LIMITS.ref, { key: 'verseRef', hint: 'يوحنا ٣: ١٦' }),
+      reading: field('مرجع القراءة', v.readingRef, LIMITS.ref, { key: 'readingRef', hint: 'يوحنا ٣: ١٤-١٨' }),
+      med: field('التأمل', v.meditation, LIMITS.meditation, { key: 'meditation', area: true }),
+      q: field('السؤال (اختياري)', v.question, LIMITS.question, { key: 'question', hint: 'إيه أكتر حاجة لمستك في كلام النهارده؟' })
+    };
+    var body = el('div', { class: 'ba-dayform' }, f.title.node, el('div', { class: 'ba-dayform__two' }, f.verse.node, f.reading.node), f.med.node, f.q.node,
+      el('small', { class: 'muted', text: 'نص الآية والقراءة بييجي من فاندايك لوحده بالمرجع.' }));
+    A.modal({
+      tone: 'info', icon: fresh ? 'plus' : 'edit', title: (fresh ? 'موضوع بإيدك' : 'تعديل') + ' · يوم ' + ar(n), body: body,
+      actions: [{ label: 'إلغاء', value: false }, { label: 'احفظ', value: true, kind: 'primary', autofocus: false }],
+      setup: function () { f.title.input.focus(); }
+    }).then(function (ok) {
+      if (!ok) return null;
+      var src = fresh ? ['', ''] : [row.sourceUrl || '', row.sourceRefs || ''];
+      var q = f.q.input.value.trim() || DEFAULT_QUESTIONS[(n - 1) % DEFAULT_QUESTIONS.length];
+      var line = [n, f.title.input.value, f.verse.input.value, f.reading.input.value, f.med.input.value, q, src[0], src[1]];
+      return kit().then(function (k) { return readRows(k, [SUGGEST_HEAD, line], function () { /* one row */ }); }).then(function (one) {
+        var next = one[0];
+        w.rows = w.rows.map(function (x) { return x.n === n ? next : x; });
+        A.render();
+        preview();
+        A.toast(next.errs.length ? 'اتحفظ، بس فيه حاجة محتاجة تتصلح: ' + next.errs[0].message : 'اتحفظ يوم ' + ar(n), next.errs.length ? 'error' : undefined);
+      });
+    }).catch(function (error) { A.fail(error); });
+  }
+
   function swapDay(n, button) {
     var w = BR.wiz;
     var d = w.suggest && w.suggest.days.filter(function (x) { return x.n === n; })[0];
@@ -1164,6 +1207,8 @@
             kit().then(function (k) { var url = k.refs.taklaUrl(now.rref.book, now.rref.ch); if (url) window.open(url, '_blank', 'noopener'); });
           } }),
           w.suggest ? btn('غيّر الموضوع', 'swap', 'btn--sm', { 'data-act': 'bread-swap', onclick: function (event) { swapDay(w.day, event.currentTarget); } }) : null,
+          btn('عدّل', 'edit', 'btn--sm', { 'data-act': 'bread-edit-day', onclick: function () { editDay(w.day, false); } }),
+          btn('اكتب موضوع بإيدك', 'plus', 'btn--sm', { 'data-act': 'bread-new-day', onclick: function () { editDay(w.day, true); } }),
           btn('اليوم الجاي', 'arrow', 'btn--sm', { onclick: function () { var i = rows.indexOf(chosen()); pick((rows[(i + 1) % rows.length] || {}).n); } }))
       ], 'ba-pv')));
     var fc = feastsCard();

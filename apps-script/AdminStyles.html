@@ -16423,6 +16423,11 @@ html[data-mode="light"] .gdoc__crumb { color: var(--acc-deep); }
 .ba-cmp { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 12px; }
 /* W7: «خبزنا اليومي» — the St-Takla month's feasts on the review */
 .ba-feasts { display: grid; gap: 8px; }
+/* W7: a day by hand (عدّل / اكتب موضوع بإيدك) */
+.ba-dayform { display: grid; gap: 12px; min-width: min(560px, 80vw); text-align: start; }
+.ba-dayform__two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 560px) { .ba-dayform__two { grid-template-columns: 1fr; } }
+.ba-dayform textarea { resize: vertical; min-height: 140px; }
 .ba-feast { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
 .ba-feast img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; flex: none; }
 .ba-feast span { display: grid; gap: 2px; min-width: 0; }

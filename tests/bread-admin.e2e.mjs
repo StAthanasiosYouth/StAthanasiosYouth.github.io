@@ -659,3 +659,37 @@ test('a past program can be deleted for good: typed «امسح», then it is gon
   assert.deepEqual(d.problems, []);
   await d.context.close();
 });
+
+test('a day by hand: «عدّل» opens the day filled in, «اكتب موضوع بإيدك» opens it empty; saved through the Van Dyck reading', async () => {
+  freshWorker({ next: false });
+  const next = monthOf(TODAY, 1);
+  fake.state.suggest = { [next]: taklaFile(next) };
+  const d = await open();
+  await go(d.page, 'breadnew');
+  await d.page.click('[data-act="bread-takla"]');
+  await d.page.waitForSelector('[data-act="bread-edit-day"]', { timeout: 15000 });
+  // edit: the fields come filled in; change the title only
+  await d.page.click('[data-act="bread-edit-day"]');
+  await d.page.waitForSelector('dialog.modal[open] [data-field="title"]');
+  assert.equal(await d.page.$eval('dialog.modal[open] [data-field="title"]', n => n.value), 'رسالة 1-1');
+  assert.equal(await d.page.$eval('dialog.modal[open] [data-field="verseRef"]', n => n.value), 'يوحنا ٣: ١٦');
+  await d.page.$eval('dialog.modal[open] [data-field="title"]', n => { n.value = 'عنوان اتعدّل'; });
+  await (await d.page.$('dialog.modal[open] .modal__actions .btn--primary')).click();
+  await d.page.waitForFunction(() => A.bread.wiz.rows[0].title === 'عنوان اتعدّل', { timeout: 8000 });
+  assert.equal(await d.page.evaluate(() => A.bread.wiz.rows[0].sourceUrl), 'https://st-takla.org/p-1-1.html', 'an edited St-Takla day keeps its source');
+  // by hand: empty fields, a new day with no source
+  await d.page.click('[data-act="bread-new-day"]');
+  await d.page.waitForSelector('dialog.modal[open] [data-field="title"]');
+  assert.equal(await d.page.$eval('dialog.modal[open] [data-field="title"]', n => n.value), '');
+  await d.page.type('dialog.modal[open] [data-field="title"]', 'موضوعي');
+  await d.page.type('dialog.modal[open] [data-field="verseRef"]', 'مزمور ٢٣: ١');
+  await d.page.type('dialog.modal[open] [data-field="readingRef"]', 'مزمور ٢٣: ١-٤');
+  await d.page.type('dialog.modal[open] [data-field="meditation"]', 'تأمل مكتوب بإيد الخادم.');
+  await (await d.page.$('dialog.modal[open] .modal__actions .btn--primary')).click();
+  await d.page.waitForFunction(() => A.bread.wiz.rows[0].title === 'موضوعي', { timeout: 8000 });
+  const row = await d.page.evaluate(() => { const r = A.bread.wiz.rows[0]; return { verse: r.verse, src: r.sourceUrl, errs: r.errs.length, q: r.question }; });
+  assert.ok(row.verse && row.verse.length > 10, 'the verse text from Van Dyck');
+  assert.deepEqual([row.src, row.errs, row.q], ['', 0, 'إيه أكتر حاجة لمستك في كلام النهارده؟'], 'no source; the default question when left empty');
+  assert.deepEqual(d.problems, []);
+  await d.context.close();
+});
