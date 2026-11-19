@@ -213,6 +213,12 @@ export function createBreadWorker({ origin, today = cairoDay(), admin = 'admin@t
       const file = (state.suggest || {})[month];
       return file ? { month, ready: true, made: file.made, days: clone(file.days), feasts: clone(file.feasts || []) } : { month, ready: false };
     }],
+    ['GET', /^\/v1\/admin\/bread\/feasts$/, (m, body, query) => {
+      need('content');
+      const month = query.get('month');
+      const pub = (state.feasts || {})[month];
+      return pub ? { month, published: true, feasts: clone(pub) } : { month, published: false, feasts: [] };
+    }],
     ['POST', /^\/v1\/admin\/bread\/feasts$/, (m, b) => { need('content'); (state.feasts ||= {})[b.month] = b.feasts; return { month: b.month, feasts: b.feasts.length, publish: 'brd-pub-x' }; }],
     ['GET', /^\/v1\/admin\/bread\/settings$/, () => { need('content'); return { settings: clone(state.settings) }; }],
     ['POST', /^\/v1\/admin\/bread\/settings$/, (m, b) => {

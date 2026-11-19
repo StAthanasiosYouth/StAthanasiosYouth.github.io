@@ -385,3 +385,13 @@ export async function adminBreadFeasts(ctx) {
   await mirrorSoon(ctx.env, ctx.defer);
   return { month: c.month, feasts: JSON.parse(c.file).feasts.length, publish: pub.publishId };
 }
+
+/* GET /v1/admin/bread/feasts?month=YYYY-MM → what is published for that month now (W7: «اتنشرت»), or published: false */
+export async function adminBreadFeastsGet(ctx) {
+  const month = new URL(ctx.request.url).searchParams.get('month') || '';
+  if (!/^20\d\d-(0[1-9]|1[0-2])$/.test(month)) throw bad('اختار الشهر.');
+  const row = await retry(() => ctx.env.DB.prepare("SELECT body, published_at, published_by FROM published_revisions WHERE kind = 'bread' AND key = ? AND live = 1").bind('feasts/' + month).first());
+  if (!row) return { month, published: false, feasts: [] };
+  const file = JSON.parse(row.body);
+  return { month, published: true, at: row.published_at, by: row.published_by, feasts: Array.isArray(file.feasts) ? file.feasts : [] };
+}

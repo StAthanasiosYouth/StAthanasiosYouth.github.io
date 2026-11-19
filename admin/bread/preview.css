@@ -362,7 +362,9 @@ html.bp body::-webkit-scrollbar { display: none; }
 
 /* W7: no scrollbar inside the phone (pointer-events are off anyway). On Windows a classic scrollbar came and went as
    the text re-wrapped around it, and the preview shook (owner 2026-11-19). */
-html, body { overflow: hidden; scrollbar-width: none; }
+/* the owner scrolls the day with the wheel or a finger: it scrolls, with no scrollbar to come and go */
+html { overflow-y: auto; overflow-x: hidden; scrollbar-width: none; overscroll-behavior: contain; }
+body { overflow: visible; }
 html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
 /* W7: the St-Takla source line and links, as assets/css/bread.css */
 .br-med p + p { margin-top: .8em; }

@@ -144,3 +144,12 @@ test('delete a past program for good (owner 2026-11-19): only once it is over, w
   const live = (await w.h.db.prepare("SELECT body FROM published_revisions WHERE kind = 'bread' AND live = 1 AND key LIKE ?").bind(id + '/%').all()).results;
   assert.ok(live.length && live.every(x => JSON.parse(x.body).gone === true), 'the published days become a stub');
 });
+
+test('GET feasts: what is published for the month («اتنشرت» in the admin), or published: false', async () => {
+  const w = await world();
+  assert.deepEqual((await w.admin('GET', 'bread/feasts?month=2026-12')).body.published, false);
+  await w.admin('POST', 'bread/feasts', { month: '2026-12', feasts: [feast()] });
+  const g = await w.admin('GET', 'bread/feasts?month=2026-12');
+  assert.deepEqual([g.body.published, g.body.feasts.length, g.body.feasts[0].date], [true, 1, '2026-12-04']);
+  assert.equal((await w.admin('GET', 'bread/feasts?month=x')).status, 400);
+});

@@ -206,13 +206,13 @@ async function setName(page, name) {
 
 /* ---------------- the section ---------------- */
 
-test('the section: «الشغل» after «الفعاليات والصفحات», five tabs, the live program, the next one, the past ones', async () => {
+test('the section: «الشغل» after «الفعاليات والصفحات», six tabs (W7: «الأعياد»), the live program, the next one, the past ones', async () => {
   freshWorker();
   const d = await open();
   const rail = await d.page.$$eval('#rail-nav .navlink', nodes => nodes.map(n => n.dataset.area));
   assert.equal(rail[rail.indexOf('pages') + 1], 'bread', rail.join(','));
   await go(d.page, 'breadprograms');
-  assert.deepEqual(await tabs(d.page), ['البرامج', 'برنامج جديد', 'الإحصائيات', 'التأملات', 'الإعدادات']);
+  assert.deepEqual(await tabs(d.page), ['البرامج', 'برنامج جديد', 'الأعياد', 'الإحصائيات', 'التأملات', 'الإعدادات']);
   assert.equal(await d.page.$eval('#page-title', n => n.textContent), 'الآيات والقراءات اليومية');
   assert.equal(await d.page.$eval('#crumb', n => n.textContent), 'خبزنا اليومي');
   const text = await viewText(d.page);
@@ -600,8 +600,10 @@ test('St-Takla: next month starts on its 1st by itself; the default question; «
   await d.page.waitForSelector('[data-act="bread-takla"]');
   await d.page.click('[data-act="bread-takla"]');
   await d.page.waitForSelector('[data-act="bread-swap"]', { timeout: 15000 });
+  await d.page.waitForFunction(() => document.querySelectorAll('.ba-feast').length === 3, { timeout: 8000 }); // the feasts card read what is published
   await d.page.click('[data-act="bread-swap"]');
   await d.page.waitForFunction(() => A.bread.wiz.rows[0].title === 'رسالة 1-2', { timeout: 8000 });
+  await d.page.waitForFunction(() => { const b = document.querySelector('[data-act="bread-feasts"]'); return b && !b.disabled && document.querySelectorAll('.ba-feast').length === 3; }, { timeout: 8000 });
   await d.page.click('[data-act="bread-feasts"]');
   await d.page.waitForFunction(m => true, {}, next);
   await sleep(800);
@@ -690,6 +692,52 @@ test('a day by hand: «عدّل» opens the day filled in, «اكتب موضوع
   const row = await d.page.evaluate(() => { const r = A.bread.wiz.rows[0]; return { verse: r.verse, src: r.sourceUrl, errs: r.errs.length, q: r.question }; });
   assert.ok(row.verse && row.verse.length > 10, 'the verse text from Van Dyck');
   assert.deepEqual([row.src, row.errs, row.q], ['', 0, 'إيه أكتر حاجة لمستك في كلام النهارده؟'], 'no source; the default question when left empty');
+  assert.deepEqual(d.problems, []);
+  await d.context.close();
+});
+
+test('«الأعياد»: a tab of its own; published → «اتنشرت ✓» and no second publish until a change («انشر التعديل»)', async () => {
+  freshWorker({ next: false });
+  const next = monthOf(TODAY, 1);
+  fake.state.suggest = { [next]: taklaFile(next) };
+  const d = await open();
+  await go(d.page, 'breadfeasts');
+  await d.page.click(`[data-act="bread-feast-month"][data-month="${next}"]`);
+  await d.page.waitForSelector('.ba-feast', { timeout: 8000 });
+  const button = () => d.page.$eval('[data-act="bread-feasts"]', b => ({ text: b.textContent.trim(), disabled: b.disabled }));
+  assert.equal((await button()).disabled, false);
+  await d.page.click('[data-act="bread-feasts"]');
+  await d.page.waitForFunction(() => /اتنشرت ✓/.test(document.querySelector('#view').innerText), { timeout: 8000 });
+  assert.deepEqual(await button(), { text: 'اتنشرت', disabled: true });
+  assert.equal(fake.state.feasts[next].length, 3);
+  // a reload reads what is published: still «اتنشرت»
+  await d.page.evaluate(m => { delete A.bread.feasts[m]; A.render(); }, next);
+  await d.page.waitForFunction(() => document.querySelector('[data-act="bread-feasts"]') && document.querySelector('[data-act="bread-feasts"]').disabled, { timeout: 8000 });
+  // switch one off: «انشر التعديل»
+  await d.page.click('.ba-feast input[type="checkbox"]');
+  await d.page.waitForFunction(() => /انشر التعديل/.test(document.querySelector('[data-act="bread-feasts"]').textContent), { timeout: 5000 });
+  await d.page.click('[data-act="bread-feasts"]');
+  await d.page.waitForFunction(() => document.querySelector('[data-act="bread-feasts"]').disabled, { timeout: 8000 });
+  assert.equal(fake.state.feasts[next].length, 2);
+  assert.deepEqual(d.problems, []);
+  await d.context.close();
+});
+
+test('the day form is the whole width of its window, nothing cut; the phone preview scrolls', async () => {
+  freshWorker({ next: false });
+  const next = monthOf(TODAY, 1);
+  fake.state.suggest = { [next]: taklaFile(next) };
+  const d = await open({ viewport: { width: 1920, height: 1080 } });
+  await go(d.page, 'breadnew');
+  await d.page.click('[data-act="bread-takla"]');
+  await d.page.waitForSelector('[data-act="bread-edit-day"]', { timeout: 15000 });
+  await d.page.click('[data-act="bread-edit-day"]');
+  await d.page.waitForSelector('dialog.modal[open] .ba-dayform');
+  const fit = await d.page.$eval('dialog.modal[open]', m => ({ scroll: m.scrollWidth - m.clientWidth, actions: [...m.querySelectorAll('.modal__actions button')].every(b => { const r = b.getBoundingClientRect(), o = m.getBoundingClientRect(); return r.left >= o.left - 1 && r.right <= o.right + 1; }) }));
+  assert.deepEqual(fit, { scroll: 0, actions: true });
+  await (await d.page.$('dialog.modal[open] .modal__actions button')).click();
+  const frame = await d.page.$eval('.ba-phone iframe', f => getComputedStyle(f).pointerEvents);
+  assert.notEqual(frame, 'none', 'the preview takes the wheel');
   assert.deepEqual(d.problems, []);
   await d.context.close();
 });
