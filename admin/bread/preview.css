@@ -359,3 +359,13 @@ html.bp, html.bp body { scrollbar-width: none; }
 html.bp body::-webkit-scrollbar { display: none; }
 .br-paper__foot .br-takla { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; color: var(--br-maroon); }
 .br-paper__foot .br-takla svg { width: 16px; height: 16px; }
+
+/* W7: no scrollbar inside the phone (pointer-events are off anyway). On Windows a classic scrollbar came and went as
+   the text re-wrapped around it, and the preview shook (owner 2026-11-19). */
+html, body { overflow: hidden; scrollbar-width: none; }
+html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
+/* W7: the St-Takla source line and links, as assets/css/bread.css */
+.br-med p + p { margin-top: .8em; }
+.br-med a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.br-med__src { display: block; font-size: .72rem; line-height: 1.8; }
+.br-med p { overflow-wrap: anywhere; }
