@@ -41,34 +41,34 @@ const UA = 'Mozilla/5.0 (compatible; daily-reading-fetcher/1.0)';
  */
 export const SAINTS = [
   { match: ['مرقوريوس', 'ابي سيفين', 'ابو سيفين'], name: 'الشهيد العظيم أبي سيفين (فيلوباتير مرقوريوس)', pic: ['سيفين', 'مرقوريوس'], album: 'Gallery/Saints-and-Figures/20-Feh/Saint-Philopatir-Markorios.html' },
-  { match: ['جاورجيوس', 'جرجس'], name: 'الشهيد العظيم مار جرجس', pic: ['جرجس', 'جاورجيوس'] },
-  { match: ['مار مينا', 'مارمينا', 'مينا العجايبي'], name: 'الشهيد مار مينا العجايبي', pic: ['مارمينا', 'مار مينا'] },
-  { match: ['مرقس الرسول', 'مرقس الانجيلي', 'مار مرقس', 'مارمرقس'], name: 'مار مرقس الرسول', pic: ['مرقس الرسول'] },
-  { match: ['والده الاله', 'العذراء مريم', 'السيده العذراء', 'القديسه مريم العذراء'], name: 'السيدة العذراء مريم', pic: ['العذراء'], album: 'Gallery/Saint-Mary/07-Mother-of-God-Theotokos.html' },
-  { match: ['انطونيوس'], name: 'القديس الأنبا أنطونيوس', pic: ['انطونيوس'] },
-  { match: ['الانبا بولا', 'بولا اول السواح'], name: 'القديس الأنبا بولا', pic: ['بولا'] },
+  { match: ['جاورجيوس', 'جرجس'], name: 'الشهيد العظيم مار جرجس', pic: ['جرجس', 'جاورجيوس'], album: 'Gallery/Saints-and-Figures/05-Geem/Saint-George.html' },
+  { match: ['مار مينا', 'مارمينا', 'مينا العجايبي'], name: 'الشهيد مار مينا العجايبي', pic: ['مارمينا', 'مار مينا'], album: 'Gallery/Saints-and-Figures/24-Meem/Saint-Mina.html' },
+  { match: ['مرقس الرسول', 'مرقس الانجيلي', 'مار مرقس', 'مارمرقس'], name: 'مار مرقس الرسول', pic: ['مرقس الرسول'], album: 'Gallery/Saints-and-Figures/24-Meem/Saint-Mark-The-Evangelist.html' },
+  { match: ['والده الاله', 'العذراء مريم', 'السيده العذراء', 'القديسه مريم العذراء'], name: 'السيدة العذراء مريم', pic: ['العذراء'], album: 'Gallery/Saint-Mary/07-Mother-of-God-Theotokos.html', imgPick: 'Mother of God 001' },
+  { match: ['انطونيوس'], name: 'القديس الأنبا أنطونيوس', pic: ['انطونيوس'], album: 'Gallery/Saints-and-Figures/01-Alef-A-E-I-O/Saint-Anthony-the-Great.html' },
+  { match: ['الانبا بولا', 'بولا اول السواح'], name: 'القديس الأنبا بولا', pic: ['بولا'], album: 'Gallery/Saints-and-Figures/02-Beh-B-P/Saint-Paul-the-Anchorite.html' },
   { match: ['اثناسيوس الرسولي'], name: 'القديس البابا أثناسيوس الرسولي', pic: ['اثناسيوس'] },
   { match: ['دميانه'], name: 'الشهيدة دميانة', pic: ['دميانه'] },
-  { match: ['مارينا'], name: 'الشهيدة مارينا', pic: ['مارينا'] },
-  { match: ['ابانوب'], name: 'الشهيد أبانوب', pic: ['ابانوب'] },
+  { match: ['مارينا'], name: 'الشهيدة مارينا', pic: ['مارينا'], album: 'Gallery/Saints-and-Figures/24-Meem/Saint-Marina-the-Martyr.html' },
+  { match: ['ابانوب'], name: 'الشهيد أبانوب', pic: ['ابانوب'], album: 'Gallery/Saints-and-Figures/01-Alef-A-E-I-O/Saint-Abanoub.html' },
   { match: ['موسي الاسود', 'موسي القوي'], name: 'القديس الأنبا موسى الأسود', pic: ['موسي'] },
-  { match: ['برسوم العريان'], name: 'القديس الأنبا برسوم العريان', pic: ['برسوم'] },
+  { match: ['برسوم العريان'], name: 'القديس الأنبا برسوم العريان', pic: ['برسوم'], album: 'Gallery/Saints-and-Figures/02-Beh-B-P/Saint-Barsoum-the-Naked.html' },
   { match: ['كيرلس السادس'], name: 'القديس البابا كيرلس السادس', pic: ['كيرلس السادس'] },
   { match: ['تكلا هيمانوت'], name: 'القديس الأنبا تكلا هيمانوت', pic: ['تكلا'] },
   { match: ['يوحنا المعمدان', 'يوحنا السابق'], name: 'القديس يوحنا المعمدان', pic: ['المعمدان'] },
-  { match: ['رئيس الملائكه ميخائيل', 'الملاك ميخائيل', 'رئيس الملائكه الجليل ميخائيل'], name: 'رئيس الملائكة ميخائيل', pic: ['ميخائيل'] },
-  { match: ['الملاك غبريال', 'رئيس الملائكه غبريال', 'الملاك جبرائيل'], name: 'الملاك غبريال', pic: ['غبريال'] },
+  { match: ['رئيس الملائكه ميخائيل', 'الملاك ميخائيل', 'رئيس الملائكه الجليل ميخائيل'], name: 'رئيس الملائكة ميخائيل', pic: ['ميخائيل'], album: 'Gallery/Angels-and-Archangels/Archangel-Michael.html' },
+  { match: ['الملاك غبريال', 'رئيس الملائكه غبريال', 'الملاك جبرائيل'], name: 'الملاك غبريال', pic: ['غبريال'], album: 'Gallery/Angels-and-Archangels/Archangel-Gabriel.html' },
   { match: ['بطرس وبولس'], name: 'الرسولين بطرس وبولس', pic: ['بطرس'] },
   { match: ['اسطفانوس', 'استفانوس'], name: 'القديس استفانوس أول الشهداء', pic: ['استفانوس', 'اسطفانوس'] },
-  { match: ['الانبا ابرام'], name: 'القديس الأنبا إبرآم', pic: ['ابرام'] },
-  { match: ['الانبا شنوده رئيس المتوحدين'], name: 'القديس الأنبا شنودة رئيس المتوحدين', pic: ['شنوده رئيس'] },
+  { match: ['الانبا ابرام'], name: 'القديس الأنبا إبرآم', pic: ['ابرام'], album: 'Gallery/Saints-and-Figures/01-Alef-A-E-I-O/Saint-Abraam-Bishop-of-Fayoum.html' },
+  { match: ['الانبا شنوده رئيس المتوحدين'], name: 'القديس الأنبا شنودة رئيس المتوحدين', pic: ['شنوده رئيس'], album: 'Gallery/Saints-and-Figures/13-Shein/Saint-Shenouda.html' },
   { match: ['الانبا كاراس'], name: 'القديس الأنبا كاراس', pic: ['كاراس'] },
   { match: ['الانبا رويس', 'فريج'], name: 'القديس الأنبا رويس', pic: ['رويس'] },
   { match: ['مكسيموس ودوماديوس'], name: 'القديسين مكسيموس ودوماديوس', pic: ['مكسيموس'] },
   { match: ['يوحنا القصير'], name: 'القديس الأنبا يوحنا القصير', pic: ['يوحنا القصير'] },
   { match: ['الانبا مقار', 'مقاريوس الكبير'], name: 'القديس الأنبا مقار الكبير', pic: ['مقار'] },
-  { match: ['الانبا بيشوي'], name: 'القديس الأنبا بيشوي', pic: ['بيشوي'] },
-  { match: ['يوليانه', 'بربارة'], name: 'الشهيدة بربارة', pic: ['بربارة'] }
+  { match: ['الانبا بيشوي'], name: 'القديس الأنبا بيشوي', pic: ['بيشوي'], album: 'Gallery/Saints-and-Figures/02-Beh-B-P/Saint-Bishoy.html' },
+  { match: ['يوليانه', 'بربارة'], name: 'الشهيدة بربارة', pic: ['بربارة'], album: 'Gallery/Saints-and-Figures/02-Beh-B-P/Saint-Barbara.html' }
 ];
 
 const arg = (name, dflt) => { const i = process.argv.indexOf('--' + name); return i > 0 ? process.argv[i + 1] : dflt; };
@@ -128,7 +128,8 @@ async function albums(cache) {
 
 /* the first picture of a saint's album → { img, page } (St-Takla's own file; shown from their site with their link) */
 async function pictureOf(saint, list, cache) {
-  const album = saint.album ? { url: SITE + saint.album } : list.find(a => saint.pic.some(w => a.words.includes(T.fold(w))));
+  // only an album pinned by hand: matching by name picked the wrong people (Mar Girgis → El-Moalem Gerges, owner 2026-11-19)
+  const album = saint.album ? { url: SITE + saint.album } : null;
   if (!album) return null;
   const html = await get(album.url, cache);
   if (!html) return null;
@@ -136,7 +137,8 @@ async function pictureOf(saint, list, cache) {
   const thumbs = [...html.matchAll(/<img\b[^>]*class="g-thumbnail"[^>]*>/gi)].map(m => ({
     src: (/src\s*=\s*"([^"]+)"/i.exec(m[0]) || [])[1] || '', alt: (/alt\s*=\s*"([^"]*)"/i.exec(m[0]) || [])[1] || ''
   })).filter(x => /\/Gallery\/var\/thumbs\/.+\.(?:jpe?g|png|webp)(\?|$)/i.test(x.src) && !/\/\.album\./.test(x.src));
-  const best = thumbs.find(x => /coptic|أيقونة|ايقونة/i.test(x.alt)) || thumbs[0];
+  // a picture pinned by its caption when the album's first ones are not right (St Mary's first is a colouring page)
+  const best = (saint.imgPick && thumbs.find(x => x.alt.includes(saint.imgPick))) || thumbs.find(x => /coptic|أيقونة|ايقونة/i.test(x.alt)) || thumbs[0];
   if (!best) return null;
   const img = new URL(T.entities(best.src).replace('/var/thumbs/', '/var/resizes/').replace(/\?.*$/, ''), album.url).href.replace(/^http:/, 'https:');
   return /^https:\/\/(www\.)?st-takla\.org\//.test(img) ? { img, page: album.url } : null;
