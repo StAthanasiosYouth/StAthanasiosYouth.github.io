@@ -44,7 +44,7 @@ test('a topic keeps its St-Takla page (their terms, FAQ 043); any other host is 
   assert.equal(checkTopic(topic({ meditation: 'x'.repeat(3900) }), 7).ok, true, 'links make the meditation longer: 4000');
 });
 
-test('checkFeasts: dates inside the month, St-Takla links and pictures only, one a day, sorted', () => {
+test('checkFeasts: dates inside the month, https sources, St-Takla or our own saint pictures, praise with its source, one a day, sorted', () => {
   const c = checkFeasts({ month: '2026-12', feasts: [feast({ date: '2026-12-17', name: 'الشهيدة بربارة' }), feast()] });
   assert.equal(c.ok, true);
   assert.deepEqual(JSON.parse(c.file).feasts.map(f => f.date), ['2026-12-04', '2026-12-17']);
@@ -52,7 +52,17 @@ test('checkFeasts: dates inside the month, St-Takla links and pictures only, one
   assert.equal(checkFeasts({ month: '2026-12', feasts: [feast({ date: '2026-12-32' })] }).ok, false);
   assert.equal(checkFeasts({ month: '2026-12', feasts: [feast(), feast()] }).ok, false, 'twice the same day');
   assert.equal(checkFeasts({ month: '2026-12', feasts: [feast({ img: 'https://evil.example/x.jpg' })] }).ok, false);
-  assert.equal(checkFeasts({ month: '2026-12', feasts: [feast({ url: 'https://example.com/' })] }).ok, false);
+  assert.equal(checkFeasts({ month: '2026-12', feasts: [feast({ url: 'http://example.com/' })] }).ok, false, 'a source must be https');
+  assert.equal(checkFeasts({ month: '2026-12', feasts: [feast({ url: 'javascript:alert(1)' })] }).ok, false);
+  assert.equal(checkFeasts({ month: '2026-12', feasts: [feast({ url: 'https://copticorthodox.church/en/past-bishops/bishop-theophilos/' })] }).ok, true, 'the registry cites the church site');
+  assert.equal(checkFeasts({ month: '2026-12', feasts: [feast({ img: '/assets/img/saints/mercurius.webp' })] }).ok, true, 'our own copy of a saint picture');
+  assert.equal(checkFeasts({ month: '2026-12', feasts: [feast({ img: '/assets/img/other/x.webp' })] }).ok, false);
+  assert.equal(checkFeasts({ month: '2026-12', feasts: [feast({ img: '//evil.example/assets/img/saints/x.webp' })] }).ok, false);
+  const p = checkFeasts({ month: '2026-12', feasts: [feast({ praise: 'https://st-takla.org/p.html', praiseTitle: 'تمجيد', praiseText: 'سطر ١\nسطر ٢' })] });
+  assert.equal(p.ok, true);
+  assert.equal(JSON.parse(p.file).feasts[0].praiseText, 'سطر ١\nسطر ٢');
+  assert.equal(checkFeasts({ month: '2026-12', feasts: [feast({ praiseText: 'نص من غير مصدر' })] }).ok, false, 'a praise text needs its source');
+  assert.equal(checkFeasts({ month: '2026-12', feasts: [feast({ praise: 'https://st-takla.org/p.html', praiseText: 'x'.repeat(1501) })] }).ok, false);
   assert.equal(checkFeasts({ month: '2026-13', feasts: [] }).ok, false);
   assert.equal(checkFeasts({ month: '2026-12', feasts: [] }).ok, true, 'an empty month is allowed');
 });

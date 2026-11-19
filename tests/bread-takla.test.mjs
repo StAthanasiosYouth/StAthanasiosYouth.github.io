@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as T from '../tools/lib/takla.mjs';
-import { saintOf } from '../tools/bread-takla.mjs';
+import { sectionFor, feastEntry } from '../tools/bread-takla.mjs';
 import { cleanTopic, feastOn } from '../assets/js/bread/model.js';
 
 const enc1256 = s => {
@@ -53,12 +53,22 @@ test('parseKatameros: the liturgy psalm and Gospel, and the synaxarium stories w
   assert.equal(k.gospel, 'متى 25: 1 - 13');
   assert.deepEqual(k.saints.map(s => s.title), ['استشهاد القديس مرقوريوس أبى سيفين', 'تذكار آخر']);
   assert.equal(k.saints[0].paras[0], 'في مثل هذا اليوم استشهد القديس وكان شجاعا.');
-  assert.equal(saintOf(k.saints[0].title).name.startsWith('الشهيد العظيم أبي سيفين'), true);
-  assert.equal(saintOf('نياحة القديس هرمينا السائح'), null, 'whole words only: «هرمينا» is not «مار مينا»');
-  assert.equal(saintOf('نياحة البابا غبريال السادس'), null, 'a pope named Gabriel is not the archangel');
+  // the registry names the exact synaxarium title of the day; no guess by name
+  assert.equal(sectionFor(k.saints, 'استشهاد القديس مرقوريوس أبي سيفين'), k.saints[0], 'hamza / ya folded');
+  assert.equal(sectionFor(k.saints, 'تذكار آخر ( 25 هاتور)'), k.saints[1], 'the day tail is dropped');
+  assert.equal(sectionFor(k.saints, 'نياحة القديس هرمينا السائح'), null);
+  const hit = { date: '2026-12-04', person: { id: 'mercurius', name: 'أبي سيفين', image: { file: 'assets/img/saints/mercurius.webp', source: 'https://x.org/p' }, praise: { title: 'تمجيد', text: 'سطر', source: 'https://st-takla.org/p.html' } }, feast: { kind: 'استشهاده', coptic: '3-25', title: 't', source: 'https://st-takla.org/s' }, others: [] };
+  const e = feastEntry(hit, k.saints[0], 'https://st-takla.org/k');
+  assert.equal(e.sourceUrl, 'https://st-takla.org/k');
+  assert.equal(e.img, '/assets/img/saints/mercurius.webp');
+  assert.equal(e.praiseText, 'سطر');
+  const modern = feastEntry({ ...hit, person: { id: 'th', name: 'الأنبا ثاؤفيلس' }, feast: { kind: 'نياحته', gregorian: '02-12', source: 'https://copticorthodox.church/en/x/' } }, null, 'https://st-takla.org/k');
+  assert.equal(modern.sourceUrl, 'https://copticorthodox.church/en/x/', 'not in the synaxarium: its own source');
+  assert.equal(modern.word, 'النهارده نياحته الأنبا ثاؤفيلس.');
+  assert.equal(modern.img, null);
 });
 
-test('member side: a topic keeps a St-Takla source only; a feast shows on its own date with St-Takla links only', () => {
+test('member side: a topic keeps a St-Takla source only; a feast shows on its own date, https links, St-Takla or our own pictures, a praise only with its source', () => {
   const day = { program: 'brd-0123456789', n: 3, title: 'ع', verseRef: 'ر', verse: 'ن', readingRef: 'ر', reading: [{ book: 'يوحنا', chapter: 3, verses: [[16, 'ن']] }], meditation: 'م' };
   assert.deepEqual(cleanTopic({ ...day, source: { url: 'https://st-takla.org/a.html', refs: 'كتاب' } }, 'brd-0123456789', 3).source, { url: 'https://st-takla.org/a.html', refs: 'كتاب' });
   assert.equal(cleanTopic({ ...day, source: { url: 'https://evil.example/a' } }, 'brd-0123456789', 3).source, undefined);
@@ -67,5 +77,10 @@ test('member side: a topic keeps a St-Takla source only; a feast shows on its ow
   const f = feastOn(file, '2026-12-04');
   assert.equal(f.name, 'أبي سيفين');
   assert.equal(f.img, '', 'a picture from anywhere else is dropped');
-  assert.equal(feastOn({ feasts: [{ ...file.feasts[0], url: 'https://evil.example/' }] }, '2026-12-04'), null);
+  assert.equal(feastOn({ feasts: [{ ...file.feasts[0], url: 'http://evil.example/' }] }, '2026-12-04'), null);
+  assert.equal(feastOn({ feasts: [{ ...file.feasts[0], url: 'javascript:alert(1)' }] }, '2026-12-04'), null);
+  assert.equal(feastOn({ feasts: [{ ...file.feasts[0], img: '/assets/img/saints/mercurius.webp' }] }, '2026-12-04').img, '/assets/img/saints/mercurius.webp');
+  const pr = feastOn({ feasts: [{ ...file.feasts[0], praise: 'https://st-takla.org/p.html', praiseTitle: 'تمجيد', praiseText: 'أ' }] }, '2026-12-04');
+  assert.deepEqual([pr.praise, pr.praiseTitle, pr.praiseText], ['https://st-takla.org/p.html', 'تمجيد', 'أ']);
+  assert.equal(feastOn({ feasts: [{ ...file.feasts[0], praiseText: 'أ' }] }, '2026-12-04').praiseText, '', 'no source, no praise');
 });

@@ -26,6 +26,7 @@ const AR = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 // W7: the same as the member page (assets/js/bread/page.js): St-Takla's own links stay links, the source in small type
 const TAKLA = /^https:\/\/(www\.)?st-takla\.org\/[^\s<>"'()[\]]*$/;
+const SAINT_IMG = /^\/assets\/img\/saints\/[a-z0-9-]+\.(?:webp|jpg|png)$/;
 const medText = text => String(text || '').split(/\n\s*\n/).map(p => p.trim()).filter(Boolean).map(p => '<p>' + esc(p).replace(/\[([^\]\n]{1,200})\]\(([^)\s]{1,400})\)/g, (m, words, url) => {
   const raw = url.replace(/&amp;/g, '&');
   return TAKLA.test(raw) ? '<a href="' + esc(raw) + '" target="_blank" rel="noopener">' + words + '</a>' : words;
@@ -117,8 +118,12 @@ function page(day) {
 /* W7: the saint's card, as the member page draws it (assets/js/bread/page.js feast()) */
 function feastCard(f) {
   if (!f) return '';
-  const pic = f.img && TAKLA.test(f.img) ? `<figure class="br-feast__fig"><img class="br-feast__img" src="${esc(f.img)}" alt="" referrerpolicy="no-referrer"></figure>` : '';
-  return `<section class="widget br-card br-feast"><h2 class="br-kicker">${bi('sun')}نحب نفكّرك</h2>${pic}<p class="br-feast__name">النهارده تذكار ${esc(f.name)}</p>${f.title && f.title !== f.name ? `<p class="br-feast__title">${esc(f.title)}</p>` : ''}${medText(f.word)}<p class="br-med__by br-med__src">من <span class="br-src">سنكسار موقع الأنبا تكلا</span></p></section>`;
+  const pic = f.img && (TAKLA.test(f.img) || SAINT_IMG.test(f.img)) ? `<figure class="br-feast__fig"><img class="br-feast__img" src="${esc(f.img)}" alt="" referrerpolicy="no-referrer"></figure>` : '';
+  // the saint's praise from the registry, only with its source (as the member page)
+  const lines = f.praise && f.praiseText ? f.praiseText.split('\n').map(l => l.trim()).filter(Boolean) : [];
+  const praise = lines.length ? `<blockquote class="br-feast__praise"><p class="br-feast__praise-title">${esc(f.praiseTitle || 'من التمجيد')}</p><p class="br-feast__praise-text">${lines.map(esc).join('<br>')}</p><p class="br-med__by"><span class="br-src">التمجيد كامل</span></p></blockquote>` : '';
+  const src = !f.url || TAKLA.test(f.url) ? 'سنكسار موقع الأنبا تكلا' : 'المصدر';
+  return `<section class="widget br-card br-feast"><h2 class="br-kicker">${bi('sun')}نحب نفكّرك</h2>${pic}<p class="br-feast__name">النهارده تذكار ${esc(f.name)}</p>${f.title && f.title !== f.name ? `<p class="br-feast__title">${esc(f.title)}</p>` : ''}${medText(f.word)}${praise}<p class="br-med__by br-med__src">من <span class="br-src">${src}</span></p></section>`;
 }
 
 /* W7: a feast with no topic that day (the «الأعياد» tab): the card alone, as the youth would see it under any day */

@@ -179,8 +179,14 @@ function feast() {
   const f = S.feast;
   if (!f) return '';
   const pic = f.img ? `<figure class="br-feast__fig"><img class="br-feast__img" src="${esc(f.img)}" alt="${esc(f.name)}" loading="lazy" decoding="async" referrerpolicy="no-referrer"></figure>` : '';
-  const praise = f.praise ? ` · <a href="${esc(f.praise)}" target="_blank" rel="noopener">التمجيد</a>` : '';
-  return `<section class="widget br-card br-feast" data-d="0"><h2 class="br-kicker">${bi('sun')}نحب نفكّرك</h2>${pic}<p class="br-feast__name">النهارده تذكار ${esc(f.name)}</p>${f.title && f.title !== f.name ? `<p class="br-feast__title">${esc(f.title)}</p>` : ''}${medText(f.word)}<p class="br-med__by br-med__src">من <a href="${esc(f.url)}" target="_blank" rel="noopener">سنكسار موقع الأنبا تكلا</a>${praise}</p></section>`;
+  // the saint's own praise (tamgeed / madih) from the registry, always with its source (owner, 2026-11-19)
+  const lines = f.praiseText ? f.praiseText.split('\n').map(l => l.trim()).filter(Boolean) : [];
+  const praise = lines.length
+    ? `<blockquote class="br-feast__praise"><p class="br-feast__praise-title">${esc(f.praiseTitle || 'من التمجيد')}</p><p class="br-feast__praise-text">${lines.map(esc).join('<br>')}</p><p class="br-med__by"><a href="${esc(f.praise)}" target="_blank" rel="noopener">التمجيد كامل</a></p></blockquote>`
+    : '';
+  const praiseLink = !lines.length && f.praise ? ` · <a href="${esc(f.praise)}" target="_blank" rel="noopener">التمجيد</a>` : '';
+  const src = TAKLA.test(f.url) ? 'سنكسار موقع الأنبا تكلا' : 'المصدر';
+  return `<section class="widget br-card br-feast" data-d="0"><h2 class="br-kicker">${bi('sun')}نحب نفكّرك</h2>${pic}<p class="br-feast__name">النهارده تذكار ${esc(f.name)}</p>${f.title && f.title !== f.name ? `<p class="br-feast__title">${esc(f.title)}</p>` : ''}${medText(f.word)}${praise}<p class="br-med__by br-med__src">من <a href="${esc(f.url)}" target="_blank" rel="noopener">${src}</a>${praiseLink}</p></section>`;
 }
 
 /*

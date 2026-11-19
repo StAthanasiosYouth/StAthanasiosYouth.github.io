@@ -109,6 +109,9 @@ export function newSeed(cryptoObj = globalThis.crypto) {
 }
 
 export const TAKLA_URL = /^https:\/\/(www\.)?st-takla\.org\/[^\s<>"'()[\]]*$/;
+// the saints registry: a feast's source may be any https page; a picture is St-Takla's or our own copy
+export const HTTPS_URL = /^https:\/\/[^\s<>"'()[\]]+$/;
+export const SAINT_IMG = /^\/assets\/img\/saints\/[a-z0-9-]+\.(?:webp|jpg|png)$/;
 
 /*
  * W7: the month's feasts file (daily-bread/data/feasts/YYYY-MM.json) → today's feast { name, title, word, url, img } | null.
@@ -119,10 +122,14 @@ export function feastOn(file, day) {
   const f = file.feasts.find(x => x && x.date === day);
   if (!f) return null;
   const s = (v, max) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : '');
-  const out = { name: s(f.name, 120), title: s(f.title, 160), word: s(f.word, 2000), url: s(f.url, 400), img: s(f.img, 400), praise: s(f.praise, 400) };
-  if (!out.name || !TAKLA_URL.test(out.url)) return null;
-  if (out.img && !TAKLA_URL.test(out.img)) out.img = '';
-  if (out.praise && !TAKLA_URL.test(out.praise)) out.praise = '';
+  const out = {
+    name: s(f.name, 120), title: s(f.title, 160), word: s(f.word, 2000), url: s(f.url, 400), img: s(f.img, 400), praise: s(f.praise, 400),
+    praiseTitle: s(f.praiseTitle, 120), praiseText: s(f.praiseText, 1500)
+  };
+  if (!out.name || !HTTPS_URL.test(out.url)) return null;
+  if (out.img && !TAKLA_URL.test(out.img) && !SAINT_IMG.test(out.img)) out.img = '';
+  if (out.praise && !HTTPS_URL.test(out.praise)) out.praise = '';
+  if (!out.praise) out.praiseText = out.praiseTitle = ''; // a praise is shown only with its source
   return out;
 }
 

@@ -22,42 +22,50 @@
     {
      "kind": "ميلادها",
      "coptic": "9-1",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=9&imonth=5&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=9&imonth=5&iyear=2027&dbl=ar",
+     "title": "ميلاد القديسة العذراء والدة الإله"
     },
     {
      "kind": "دخولها الهيكل",
      "coptic": "4-3",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=12&imonth=12&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=12&imonth=12&iyear=2026&dbl=ar",
+     "title": "تذكار تقديم القديسة العذراء مريم الى الهيكل بأورشليم سن 3سنوات"
     },
     {
      "kind": "تذكار حبل حنة بها",
      "coptic": "4-13",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=22&imonth=12&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=22&imonth=12&iyear=2026&dbl=ar",
+     "title": "حبل حنة أم والدة الإله بالعذراء"
     },
     {
      "kind": "نياحتها",
      "coptic": "5-21",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=29&imonth=1&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=29&imonth=1&iyear=2027&dbl=ar",
+     "title": "نياحة والدة الاله القديسة مريم العذراء"
     },
     {
      "kind": "تجليها بالزيتون",
      "coptic": "7-24",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=2&imonth=4&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=2&imonth=4&iyear=2027&dbl=ar",
+     "title": "تجلى العذراء بالزيتون"
     },
     {
      "kind": "مجيء العائلة المقدسة لمصر",
      "coptic": "9-24",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=1&imonth=6&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=1&imonth=6&iyear=2027&dbl=ar",
+     "title": "مجىء العائلة المقدسة الى مصر"
     },
     {
      "kind": "بشارة يواقيم بميلادها",
      "coptic": "12-7",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=13&imonth=8&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=13&imonth=8&iyear=2027&dbl=ar",
+     "title": "بشارة يواقيم بميلاد العذراء"
     },
     {
      "kind": "صعود جسدها",
      "coptic": "12-16",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=22&imonth=8&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=22&imonth=8&iyear=2027&dbl=ar",
+     "title": "صعود جسد القديسة مريم العذراء"
     }
    ],
    "praise": null,
@@ -71,12 +79,14 @@
     {
      "kind": "عيده",
      "coptic": "3-12",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=21&imonth=11&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=21&imonth=11&iyear=2026&dbl=ar",
+     "title": "تذكار رئيس الملائكة الجليل ميخائيل"
     },
     {
      "kind": "عيده",
      "coptic": "10-12",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=19&imonth=6&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=19&imonth=6&iyear=2027&dbl=ar",
+     "title": "عيد رئيس الملائكة الجليل ميخائيل ( 12 بـؤونة)"
     }
    ],
    "praise": null,
@@ -90,22 +100,26 @@
     {
      "kind": "تذكاره",
      "coptic": "4-22",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=31&imonth=12&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=31&imonth=12&iyear=2026&dbl=ar",
+     "title": "تذكار الملاك الجليل غبريال المبشر"
     },
     {
      "kind": "تذكاره",
      "coptic": "7-30",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=8&imonth=4&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=8&imonth=4&iyear=2027&dbl=ar",
+     "title": "تذكار الملاك غبريال"
     },
     {
      "kind": "تذكاره",
      "coptic": "10-13",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=20&imonth=6&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=20&imonth=6&iyear=2027&dbl=ar",
+     "title": "تذكار رئيس الملائكة الجليل جبرائيل \"غبريال\" ( 13 بـؤونة)"
     },
     {
      "kind": "تكريس كنيسته",
      "coptic": "10-26",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=3&imonth=7&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=3&imonth=7&iyear=2027&dbl=ar",
+     "title": "تذكار تكريس كنيسة رئيس الملائكة غبريال ( 26 بـؤونة)"
     }
    ],
    "praise": null,
@@ -119,7 +133,8 @@
     {
      "kind": "تذكاره",
      "coptic": "13-3",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=8&imonth=9&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=8&imonth=9&iyear=2027&dbl=ar",
+     "title": "تذكار الملاك روفائيل"
     }
    ],
    "praise": null,
@@ -133,7 +148,8 @@
     {
      "kind": "تذكاره",
      "coptic": "5-27",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=4&imonth=2&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=4&imonth=2&iyear=2027&dbl=ar",
+     "title": "تذكار رئيس الملائكة سوريال"
     }
    ],
    "praise": null,
@@ -147,7 +163,8 @@
     {
      "kind": "نياحته",
      "coptic": "1-8",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=18&imonth=9&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=18&imonth=9&iyear=2026&dbl=ar",
+     "title": "نياحة موسى النبي عام 1485ق م"
     }
    ],
    "praise": null,
@@ -161,7 +178,8 @@
     {
      "kind": "صعوده إلى السماء",
      "coptic": "5-6",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=1&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=1&iyear=2027&dbl=ar",
+     "title": "تذكار صعود ايليا النبى الى السماء حيا"
     }
    ],
    "praise": null,
@@ -175,7 +193,8 @@
     {
      "kind": "نياحته",
      "coptic": "7-23",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=1&imonth=4&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=1&imonth=4&iyear=2027&dbl=ar",
+     "title": "نياحة دانيال النبى"
     }
    ],
    "praise": null,
@@ -189,7 +208,8 @@
     {
      "kind": "استشهاده",
      "coptic": "9-5",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=13&imonth=5&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=13&imonth=5&iyear=2027&dbl=ar",
+     "title": "استشهاد ارميا النبى"
     }
    ],
    "praise": null,
@@ -203,7 +223,8 @@
     {
      "kind": "نياحتهم",
      "coptic": "9-10",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=18&imonth=5&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=18&imonth=5&iyear=2027&dbl=ar",
+     "title": "نياحة الثلاثة فتية القديسين حنانيا وعزريا وميصائيل"
     }
    ],
    "praise": null,
@@ -217,12 +238,14 @@
     {
      "kind": "استشهاده",
      "coptic": "1-2",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=12&imonth=9&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=12&imonth=9&iyear=2026&dbl=ar",
+     "title": "استشهاد القديس يوحنا المعمدان"
     },
     {
      "kind": "ميلاده",
      "coptic": "10-30",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=7&imonth=7&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=7&imonth=7&iyear=2027&dbl=ar",
+     "title": "ميلاد القديس يوحنا المعمدان ( 30 بـؤونة)"
     }
    ],
    "praise": null,
@@ -236,17 +259,20 @@
     {
      "kind": "ظهور رأسه",
      "coptic": "2-30",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=9&imonth=11&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=9&imonth=11&iyear=2026&dbl=ar",
+     "title": "ظهور راس مارمرقس الانجيلي الرسولي وتكريس كنيسته سنة 360ش"
     },
     {
      "kind": "استشهاده",
      "coptic": "8-30",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=8&imonth=5&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=8&imonth=5&iyear=2027&dbl=ar",
+     "title": "استشهاد مارمرقس الرسول اول باباوات الاسكندرية"
     },
     {
      "kind": "عودة رفاته",
      "coptic": "10-17",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=24&imonth=6&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=24&imonth=6&iyear=2027&dbl=ar",
+     "title": "عودة رفات القديس مارمرقس ( 17 بـؤونة)"
     }
    ],
    "praise": null,
@@ -260,7 +286,8 @@
     {
      "kind": "استشهادهما",
      "coptic": "11-5",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=12&imonth=7&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=12&imonth=7&iyear=2027&dbl=ar",
+     "title": "استشهاد القديسين الرسولين بطرس وبولس وفطر صوم الرسل"
     }
    ],
    "praise": null,
@@ -274,7 +301,8 @@
     {
      "kind": "استشهاده",
      "coptic": "5-1",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=9&imonth=1&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=9&imonth=1&iyear=2027&dbl=ar",
+     "title": "استشهاد القديس اسطفانوس رئيس الشمامسة"
     }
    ],
    "praise": null,
@@ -289,17 +317,20 @@
     {
      "kind": "استشهاده",
      "coptic": "3-25",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=4&imonth=12&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=4&imonth=12&iyear=2026&dbl=ar",
+     "title": "استشهاد القديس مرقوريوس أبى سيفين بالقرن الثالث الميلادى"
     },
     {
      "kind": "نقل أعضائه",
      "coptic": "10-9",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=16&imonth=6&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=16&imonth=6&iyear=2027&dbl=ar",
+     "title": "نقل اعضاء ابى سيفين ( 9 بـؤونة)"
     },
     {
      "kind": "تكريس كنيسته",
      "coptic": "11-25",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=1&imonth=8&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=1&imonth=8&iyear=2027&dbl=ar",
+     "title": "تذكار تكريس كنيسة ابى سيفين"
     }
    ],
    "praise": null,
@@ -313,17 +344,20 @@
     {
      "kind": "تكريس كنيسته",
      "coptic": "3-7",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=16&imonth=11&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=16&imonth=11&iyear=2026&dbl=ar",
+     "title": "تذكار تكريس كنيسة الشهيد العظيم مار جرجس باللد"
     },
     {
      "kind": "استشهاده",
      "coptic": "8-23",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=1&imonth=5&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=1&imonth=5&iyear=2027&dbl=ar",
+     "title": "استشهاد مار جرجس الرومانى"
     },
     {
      "kind": "إحضار جسده",
      "coptic": "11-16",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=23&imonth=7&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=23&imonth=7&iyear=2027&dbl=ar",
+     "title": "إحضار جسد الشهيد العظيم جاؤرجيوس"
     }
    ],
    "praise": null,
@@ -337,12 +371,14 @@
     {
      "kind": "استشهاده",
      "coptic": "3-15",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=24&imonth=11&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=24&imonth=11&iyear=2026&dbl=ar",
+     "title": "استشهاد القديس مارمينا العجايبى"
     },
     {
      "kind": "تكريس كنيسته بمريوط",
      "coptic": "10-15",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=22&imonth=6&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=22&imonth=6&iyear=2027&dbl=ar",
+     "title": "تذكار كنيسة مارمينا بمريوط ( 15 بـؤونة)"
     }
    ],
    "praise": null,
@@ -356,7 +392,8 @@
     {
      "kind": "استشهاده",
      "coptic": "11-20",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=27&imonth=7&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=27&imonth=7&iyear=2027&dbl=ar",
+     "title": "استشهاد القديس ثاؤدورس الشطبى"
     }
    ],
    "praise": null,
@@ -370,7 +407,8 @@
     {
      "kind": "استشهاده",
      "coptic": "5-12",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=20&imonth=1&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=20&imonth=1&iyear=2027&dbl=ar",
+     "title": "استشهاد القديس تادرس المشرقى"
     }
    ],
    "praise": null,
@@ -384,7 +422,8 @@
     {
      "kind": "استشهاده",
      "coptic": "10-7",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=6&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=6&iyear=2027&dbl=ar",
+     "title": "استشهاد القديس ابسخيرون الجندى القلينى ( 7 بـؤونة)"
     }
    ],
    "praise": null,
@@ -398,12 +437,14 @@
     {
      "kind": "تكريس كنيسته",
      "coptic": "4-1",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=12&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=12&iyear=2026&dbl=ar",
+     "title": "تكريس كنيسة الشهيد أبى فام الجندى بأبنوب"
     },
     {
      "kind": "استشهاده",
      "coptic": "5-27",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=4&imonth=2&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=4&imonth=2&iyear=2027&dbl=ar",
+     "title": "استشهاد القديس ابى فام الجندى الاوسيمى"
     }
    ],
    "praise": null,
@@ -417,7 +458,8 @@
     {
      "kind": "استشهاده",
      "coptic": "10-27",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=4&imonth=7&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=4&imonth=7&iyear=2027&dbl=ar",
+     "title": "استشهاد القديس مار بقطر بن رومانيوس ( 27 بـؤونة)"
     }
    ],
    "praise": null,
@@ -431,7 +473,8 @@
     {
      "kind": "استشهادهما",
      "coptic": "10-14",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=21&imonth=6&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=21&imonth=6&iyear=2027&dbl=ar",
+     "title": "استشهاد القديس اباكير ورفيقيه يوحنا وابطلماوس ( 14 بـؤونة)"
     }
    ],
    "praise": null,
@@ -445,7 +488,8 @@
     {
      "kind": "استشهاده",
      "coptic": "11-24",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=31&imonth=7&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=31&imonth=7&iyear=2027&dbl=ar",
+     "title": "استشهاد ابانوب النهيسى"
     }
    ],
    "praise": null,
@@ -459,7 +503,8 @@
     {
      "kind": "استشهاد سرجيوس",
      "coptic": "2-10",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=20&imonth=10&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=20&imonth=10&iyear=2026&dbl=ar",
+     "title": "استشهاد القديس سرجيوس رفيق واخس"
     }
    ],
    "praise": null,
@@ -473,7 +518,8 @@
     {
      "kind": "تذكاره",
      "coptic": "7-30",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=8&imonth=4&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=8&imonth=4&iyear=2027&dbl=ar",
+     "title": "تذكار القديس يعقوب المقطع"
     }
    ],
    "praise": null,
@@ -487,7 +533,8 @@
     {
      "kind": "استشهادهم",
      "coptic": "11-19",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=26&imonth=7&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=26&imonth=7&iyear=2027&dbl=ar",
+     "title": "استشهاد القديس أنبا بضابا ورفيقيه"
     }
    ],
    "praise": null,
@@ -501,7 +548,8 @@
     {
      "kind": "تذكارهم",
      "coptic": "2-26",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=5&imonth=11&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=5&imonth=11&iyear=2026&dbl=ar",
+     "title": "تذكار السبع شهداء بجبل انطونيوس"
     }
    ],
    "praise": null,
@@ -515,7 +563,8 @@
     {
      "kind": "استشهاده",
      "coptic": "7-17",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=26&imonth=3&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=26&imonth=3&iyear=2027&dbl=ar",
+     "title": "استشهاد سيدهم بشاى بدمياط"
     }
    ],
    "praise": null,
@@ -529,12 +578,14 @@
     {
      "kind": "استشهادها",
      "coptic": "5-13",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=21&imonth=1&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=21&imonth=1&iyear=2027&dbl=ar",
+     "title": "استشهاد القديسة دميانة"
     },
     {
      "kind": "تكريس كنيستها",
      "coptic": "9-12",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=20&imonth=5&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=20&imonth=5&iyear=2027&dbl=ar",
+     "title": "تذكار تكريس كنيسة القديسة دميانة بالبرارى وظهور صليب نور"
     }
    ],
    "praise": null,
@@ -548,12 +599,14 @@
     {
      "kind": "تكريس كنيستها",
      "coptic": "3-23",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=2&imonth=12&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=2&imonth=12&iyear=2026&dbl=ar",
+     "title": "تذكار تكريس كنيسة القديسة مارينا الشهيدة"
     },
     {
      "kind": "استشهادها",
      "coptic": "11-23",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=30&imonth=7&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=30&imonth=7&iyear=2027&dbl=ar",
+     "title": "استشهاد مارينا الشهيدة"
     }
    ],
    "praise": null,
@@ -567,7 +620,8 @@
     {
      "kind": "استشهادها",
      "coptic": "4-8",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=17&imonth=12&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=17&imonth=12&iyear=2026&dbl=ar",
+     "title": "استشهاد القديسة بربارة ويوليانة"
     }
    ],
    "praise": null,
@@ -581,7 +635,8 @@
     {
      "kind": "استشهادهم",
      "coptic": "1-7",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=17&imonth=9&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=17&imonth=9&iyear=2026&dbl=ar",
+     "title": "استشهاد القديسة رفقة وأولادها الخمسة (أغاثون.بطرس.يوحنا.أمون.امونة) 303-305م"
     }
    ],
    "praise": null,
@@ -610,7 +665,8 @@
     {
      "kind": "نياحته",
      "coptic": "5-22",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=30&imonth=1&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=30&imonth=1&iyear=2027&dbl=ar",
+     "title": "نياحة القديس العظيم انبا انطونبوس اب جميع الرهبان"
     }
    ],
    "praise": null,
@@ -624,7 +680,8 @@
     {
      "kind": "نياحته",
      "coptic": "6-2",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=9&imonth=2&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=9&imonth=2&iyear=2027&dbl=ar",
+     "title": "نياحة القديس أنبا بولا أول السياح"
     }
    ],
    "praise": null,
@@ -638,12 +695,14 @@
     {
      "kind": "نياحته",
      "coptic": "7-27",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=5&imonth=4&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=5&imonth=4&iyear=2027&dbl=ar",
+     "title": "نياحة القديس مكاريوس الكبير اب الرهبان"
     },
     {
      "kind": "عودة جسده",
      "coptic": "12-19",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=25&imonth=8&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=25&imonth=8&iyear=2027&dbl=ar",
+     "title": "إعادة جسد الانبا مكاريوس الى برية شيهيت"
     }
    ],
    "praise": null,
@@ -657,7 +716,8 @@
     {
      "kind": "نياحته",
      "coptic": "9-6",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=5&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=5&iyear=2027&dbl=ar",
+     "title": "نياحة القديس مقاريوس الاسكندرى"
     }
    ],
    "praise": null,
@@ -671,12 +731,14 @@
     {
      "kind": "نقل جسده",
      "coptic": "4-4",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=13&imonth=12&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=13&imonth=12&iyear=2026&dbl=ar",
+     "title": "تذكار نقل جسد القديسين الانبا بيشوى والانبا بولا الطموهى الى دير الأنبا بيشوي بوادي النطرون"
     },
     {
      "kind": "نياحته",
      "coptic": "11-8",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=15&imonth=7&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=15&imonth=7&iyear=2027&dbl=ar",
+     "title": "نياحة القديس العظيم الانبا بيشوى كوكب البرية"
     }
    ],
    "praise": null,
@@ -690,7 +752,8 @@
     {
      "kind": "استشهاده",
      "coptic": "10-24",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=1&imonth=7&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=1&imonth=7&iyear=2027&dbl=ar",
+     "title": "استشهاد القديس أنبا موسى الأسود ( 24 بـؤونة)"
     }
    ],
    "praise": null,
@@ -704,7 +767,8 @@
     {
      "kind": "نياحته",
      "coptic": "2-20",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=30&imonth=10&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=30&imonth=10&iyear=2026&dbl=ar",
+     "title": "نياحة القديس يوحنا القصير الشهير بابي يحنس"
     }
    ],
    "praise": null,
@@ -718,12 +782,14 @@
     {
      "kind": "نياحة مكسيموس",
      "coptic": "5-14",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=22&imonth=1&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=22&imonth=1&iyear=2027&dbl=ar",
+     "title": "نياحة القديس مكسيموس أخى دوماديوس"
     },
     {
      "kind": "نياحة دوماديوس",
      "coptic": "5-17",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=25&imonth=1&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=25&imonth=1&iyear=2027&dbl=ar",
+     "title": "نياحة القديس دوماديوس أخى مكسيموس"
     }
    ],
    "praise": null,
@@ -737,7 +803,8 @@
     {
      "kind": "نياحته",
      "coptic": "9-14",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=22&imonth=5&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=22&imonth=5&iyear=2027&dbl=ar",
+     "title": "نياحة أنبا باخوم أب الشركة"
     }
    ],
    "praise": null,
@@ -751,12 +818,14 @@
     {
      "kind": "تكريس كنيسته",
      "coptic": "4-1",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=12&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=12&iyear=2026&dbl=ar",
+     "title": "تذكار تكريس كنيسة الانبا شنودة رئيس المتوحدين"
     },
     {
      "kind": "نياحته",
      "coptic": "11-7",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=7&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=7&iyear=2027&dbl=ar",
+     "title": "نياحة القديس شنودة رئيس المتوحدين"
     }
    ],
    "praise": null,
@@ -770,7 +839,8 @@
     {
      "kind": "نياحته",
      "coptic": "11-8",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=15&imonth=7&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=15&imonth=7&iyear=2027&dbl=ar",
+     "title": "نياحة القديس كاراس شقيق ثاؤدسيوس الملك"
     }
    ],
    "praise": null,
@@ -784,7 +854,8 @@
     {
      "kind": "نياحته",
      "coptic": "4-8",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=17&imonth=12&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=17&imonth=12&iyear=2026&dbl=ar",
+     "title": "نياحة القديس أنبا صموئيل المعترف"
     }
    ],
    "praise": null,
@@ -798,12 +869,14 @@
     {
      "kind": "ميلاده",
      "coptic": "4-24",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=2&imonth=1&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=2&imonth=1&iyear=2027&dbl=ar",
+     "title": "ميلاد القديس تكلاهيمانوت الحبشى"
     },
     {
      "kind": "نياحته",
      "coptic": "12-24",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=30&imonth=8&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=30&imonth=8&iyear=2027&dbl=ar",
+     "title": "نياحة القديس تكلاهيمانوت الحبشى"
     }
    ],
    "praise": null,
@@ -817,7 +890,8 @@
     {
      "kind": "نياحته",
      "coptic": "13-5",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=9&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=9&iyear=2027&dbl=ar",
+     "title": "نياحة أنبا برسوم العريان"
     }
    ],
    "praise": null,
@@ -831,7 +905,8 @@
     {
      "kind": "نياحته",
      "coptic": "2-21",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=31&imonth=10&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=31&imonth=10&iyear=2026&dbl=ar",
+     "title": "نياحة القديس الانبا رويس (فريج)"
     }
    ],
    "praise": null,
@@ -845,7 +920,8 @@
     {
      "kind": "نياحته",
      "coptic": "4-12",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=21&imonth=12&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=21&imonth=12&iyear=2026&dbl=ar",
+     "title": "نياحة القديس هدرا الاسوانى"
     }
    ],
    "praise": null,
@@ -859,7 +935,8 @@
     {
      "kind": "نياحته",
      "coptic": "7-28",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=6&imonth=4&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=6&imonth=4&iyear=2027&dbl=ar",
+     "title": "نياحة القديس صرابامون أبو طرحة"
     }
    ],
    "praise": null,
@@ -873,7 +950,8 @@
     {
      "kind": "نياحته",
      "coptic": "4-25",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=3&imonth=1&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=3&imonth=1&iyear=2027&dbl=ar",
+     "title": "نياحة القديس انبا يحنس كاما القس"
     }
    ],
    "praise": null,
@@ -887,7 +965,8 @@
     {
      "kind": "نياحتها",
      "coptic": "8-6",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=4&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=4&iyear=2027&dbl=ar",
+     "title": "نياحة مريم المصرية السائحة"
     }
    ],
    "praise": null,
@@ -902,12 +981,14 @@
     {
      "kind": "تذكار معجزته",
      "coptic": "1-30",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=10&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=10&iyear=2026&dbl=ar",
+     "title": "تذكار المعجزة التي صنعها الرب مع القديس أثناسيوس الرسولي"
     },
     {
      "kind": "نياحته",
      "coptic": "9-7",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=15&imonth=5&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=15&imonth=5&iyear=2027&dbl=ar",
+     "title": "نياحة البابا أثناسيوس الرسولى ال20"
     }
    ],
    "praise": null,
@@ -921,7 +1002,8 @@
     {
      "kind": "استشهاده",
      "coptic": "3-29",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=8&imonth=12&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=8&imonth=12&iyear=2026&dbl=ar",
+     "title": "استشهاد البابا بطرس خاتم الشهداء 17"
     }
    ],
    "praise": null,
@@ -935,7 +1017,8 @@
     {
      "kind": "نياحته",
      "coptic": "11-3",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=7&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=7&iyear=2027&dbl=ar",
+     "title": "استشهاد القديس كيرلس عمود الدين البابا ال24"
     }
    ],
    "praise": null,
@@ -949,7 +1032,8 @@
     {
      "kind": "نياحته",
      "coptic": "1-7",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=17&imonth=9&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=17&imonth=9&iyear=2026&dbl=ar",
+     "title": "نياحة البابا ديسقورس25 (171م - 454 ش)"
     }
    ],
    "praise": null,
@@ -963,7 +1047,8 @@
     {
      "kind": "نياحته",
      "coptic": "7-25",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=3&imonth=4&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=3&imonth=4&iyear=2027&dbl=ar",
+     "title": "نياحة البابا متاؤس"
     }
    ],
    "praise": null,
@@ -977,7 +1062,8 @@
     {
      "kind": "نياحته",
      "coptic": "5-23",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=31&imonth=1&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=31&imonth=1&iyear=2027&dbl=ar",
+     "title": "نياحة البابا كيرلس الرابع ابى الإصلاح ال110"
     }
    ],
    "praise": null,
@@ -991,7 +1077,8 @@
     {
      "kind": "نياحته",
      "coptic": "12-1",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=7&imonth=8&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=7&imonth=8&iyear=2027&dbl=ar",
+     "title": "نياحة البابا القديس كيرلس الخامس بابا الإسكندرية المائة الثاني عشر"
     }
    ],
    "praise": null,
@@ -1010,7 +1097,8 @@
     {
      "kind": "نياحته",
      "coptic": "6-30",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=9&imonth=3&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=9&imonth=3&iyear=2027&dbl=ar",
+     "title": "نياحة البابا الانبا كيرلس السادس"
     }
    ],
    "praise": null,
@@ -1024,7 +1112,8 @@
     {
      "kind": "عيد جلوسه",
      "coptic": "3-5",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=11&iyear=2026&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=11&iyear=2026&dbl=ar",
+     "title": "عيد جلوس قداسة البابا شنودة الثالث"
     },
     {
      "kind": "نياحته",
@@ -1059,7 +1148,8 @@
     {
      "kind": "نياحته",
      "coptic": "10-3",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=6&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=6&iyear=2027&dbl=ar",
+     "title": "نياحة الانبا ابرام أسقف الفيوم ( 3 بـؤونة)"
     }
    ],
    "praise": null,
@@ -1073,7 +1163,8 @@
     {
      "kind": "نياحته",
      "coptic": "5-17",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=25&imonth=1&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=25&imonth=1&iyear=2027&dbl=ar",
+     "title": "نياحة القديس الأنبا يوساب الأبح أسقف جرجا"
     }
    ],
    "praise": null,
@@ -1459,7 +1550,8 @@
     {
      "kind": "نياحته",
      "coptic": "9-25",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=2&imonth=6&iyear=2027&dbl=ar"
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=2&imonth=6&iyear=2027&dbl=ar",
+     "title": "نياحة المعلم إبراهيم الجوهرى"
     }
    ],
    "praise": null,

@@ -380,4 +380,7 @@ html { overflow-x: clip; }
 .br-feast__name { font-weight: 700; font-size: 1.08rem; line-height: 1.7; }
 .br-feast__title { font-size: .86rem; color: var(--text-3); margin-bottom: 6px; }
 .br-feast p { overflow-wrap: anywhere; }
+.br-feast__praise { margin: 12px 0 4px; padding: 10px 14px; border-inline-start: 3px solid var(--gold); border-radius: 10px; background: rgb(255 255 255 / .04); }
+.br-feast .br-feast__praise-title { font-size: .86rem; font-weight: 700; color: var(--gold); margin-bottom: 4px; }
+.br-feast .br-feast__praise-text { font-size: 1rem; line-height: 2; }
 .br-day--plain { margin: 14px auto 10px; text-align: center; }

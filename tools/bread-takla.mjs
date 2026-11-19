@@ -8,8 +8,9 @@
  *   days   — the program's topics, day 1…N of the program, never tied to a date. Each day has three options from
  *            Pope Shenouda III's «كلمة منفعة» / «مقالات روحية»: the message, and the Bible verse it quotes
  *            (verse + the passage around it, resolved later against Van Dyck by the admin, as the Excel).
- *   feasts — the Cairo DATES of the month on which a well-known saint or feast falls (St-Takla's katameros page for
- *            that date: its synaxarium). A short word about the saint, a picture from St-Takla's gallery, the link.
+ *   feasts — the Cairo DATES of the month on which someone in the fixed saints registry (daily-bread/saints/registry.json)
+ *            has a feast (Coptic days turned into Gregorian by code). Who, the picture and the praise come from the
+ *            registry; the short word comes from St-Takla's katameros page for that date (its synaxarium), with its link.
  *            The member page shows it on that date only, whatever program day it is.
  *
  * Every text keeps its page link and St-Takla's own links inside the words (their terms, FAQ 043).
@@ -20,56 +21,18 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as T from './lib/takla.mjs';
 import { BOOKS, parseRef } from '../assets/js/bread/refs.js';
+import { load as loadSaints, feastsOfMonth } from './lib/saints.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SITE = 'https://st-takla.org/';
 const KM = SITE + 'Full-Free-Coptic-Books/His-Holiness-Pope-Shenouda-III-Books-Online/01-Words-of-Spiritual-Benefit_Pope-Shenouda/';
 const SP = SITE + 'Full-Free-Coptic-Books/His-Holiness-Pope-Shenouda-III-Books-Online/02-Spiritual-Articles/';
 const INDEXES = [1, 2, 3, 4, 5, 6, 7].map(i => KM + '000-Kelmet-Manfa3a_index-0' + i + '.html').concat(SP + '00-Makalat-Rohia-Pope-Shenoda-Third-index.html');
-const GALLERY = ['01-Alef-A-E-I-O', '02-Beh-B-P', '05-Geem', '12-Sein', '13-Shein', '18-Ein', '22-Kaf', '24-Meem', '25-Noun', '27-Yeh']
-  .map(x => SITE + 'Gallery/Saints-and-Figures/' + x + '.html').concat(SITE + 'Gallery/Saint-Mary.html', SITE + 'Gallery/Angels-and-Archangels.html');
 export const katamerosUrl = d => `${SITE}zJ/index.php/ar-readings-katamares?view=reading-arabic&dbl=ar&iday=${d.getUTCDate()}&imonth=${d.getUTCMonth() + 1}&iyear=${d.getUTCFullYear()}`;
 const MED_MAX = 700;
 const FEAST_MAX = 450;
 const OPTIONS = 3;
 const UA = 'Mozilla/5.0 (compatible; daily-reading-fetcher/1.0)';
-
-/*
- * The saints and feasts the youth know (the owner: «عيد حد من القديسين بشكل عام»). `match`: words in the synaxarium
- * title (folded, T.fold); `name`: how the card says it; `pic`: words in St-Takla's gallery album name.
- * The admin can switch any feast off before approving the month.
- */
-export const SAINTS = [
-  { match: ['مرقوريوس', 'ابي سيفين', 'ابو سيفين'], name: 'الشهيد العظيم أبي سيفين (فيلوباتير مرقوريوس)', pic: ['سيفين', 'مرقوريوس'], album: 'Gallery/Saints-and-Figures/20-Feh/Saint-Philopatir-Markorios.html' },
-  { match: ['جاورجيوس', 'جرجس'], name: 'الشهيد العظيم مار جرجس', pic: ['جرجس', 'جاورجيوس'], album: 'Gallery/Saints-and-Figures/05-Geem/Saint-George.html' },
-  { match: ['مار مينا', 'مارمينا', 'مينا العجايبي'], name: 'الشهيد مار مينا العجايبي', pic: ['مارمينا', 'مار مينا'], album: 'Gallery/Saints-and-Figures/24-Meem/Saint-Mina.html' },
-  { match: ['مرقس الرسول', 'مرقس الانجيلي', 'مار مرقس', 'مارمرقس'], name: 'مار مرقس الرسول', pic: ['مرقس الرسول'], album: 'Gallery/Saints-and-Figures/24-Meem/Saint-Mark-The-Evangelist.html' },
-  { match: ['والده الاله', 'العذراء مريم', 'السيده العذراء', 'القديسه مريم العذراء'], name: 'السيدة العذراء مريم', pic: ['العذراء'], album: 'Gallery/Saint-Mary/07-Mother-of-God-Theotokos.html', imgPick: 'Mother of God 001' },
-  { match: ['انطونيوس'], name: 'القديس الأنبا أنطونيوس', pic: ['انطونيوس'], album: 'Gallery/Saints-and-Figures/01-Alef-A-E-I-O/Saint-Anthony-the-Great.html' },
-  { match: ['الانبا بولا', 'بولا اول السواح'], name: 'القديس الأنبا بولا', pic: ['بولا'], album: 'Gallery/Saints-and-Figures/02-Beh-B-P/Saint-Paul-the-Anchorite.html' },
-  { match: ['اثناسيوس الرسولي'], name: 'القديس البابا أثناسيوس الرسولي', pic: ['اثناسيوس'] },
-  { match: ['دميانه'], name: 'الشهيدة دميانة', pic: ['دميانه'] },
-  { match: ['مارينا'], name: 'الشهيدة مارينا', pic: ['مارينا'], album: 'Gallery/Saints-and-Figures/24-Meem/Saint-Marina-the-Martyr.html' },
-  { match: ['ابانوب'], name: 'الشهيد أبانوب', pic: ['ابانوب'], album: 'Gallery/Saints-and-Figures/01-Alef-A-E-I-O/Saint-Abanoub.html' },
-  { match: ['موسي الاسود', 'موسي القوي'], name: 'القديس الأنبا موسى الأسود', pic: ['موسي'] },
-  { match: ['برسوم العريان'], name: 'القديس الأنبا برسوم العريان', pic: ['برسوم'], album: 'Gallery/Saints-and-Figures/02-Beh-B-P/Saint-Barsoum-the-Naked.html' },
-  { match: ['كيرلس السادس'], name: 'القديس البابا كيرلس السادس', pic: ['كيرلس السادس'] },
-  { match: ['تكلا هيمانوت'], name: 'القديس الأنبا تكلا هيمانوت', pic: ['تكلا'] },
-  { match: ['يوحنا المعمدان', 'يوحنا السابق'], name: 'القديس يوحنا المعمدان', pic: ['المعمدان'] },
-  { match: ['رئيس الملائكه ميخائيل', 'الملاك ميخائيل', 'رئيس الملائكه الجليل ميخائيل'], name: 'رئيس الملائكة ميخائيل', pic: ['ميخائيل'], album: 'Gallery/Angels-and-Archangels/Archangel-Michael.html' },
-  { match: ['الملاك غبريال', 'رئيس الملائكه غبريال', 'الملاك جبرائيل'], name: 'الملاك غبريال', pic: ['غبريال'], album: 'Gallery/Angels-and-Archangels/Archangel-Gabriel.html' },
-  { match: ['بطرس وبولس'], name: 'الرسولين بطرس وبولس', pic: ['بطرس'] },
-  { match: ['اسطفانوس', 'استفانوس'], name: 'القديس استفانوس أول الشهداء', pic: ['استفانوس', 'اسطفانوس'] },
-  { match: ['الانبا ابرام'], name: 'القديس الأنبا إبرآم', pic: ['ابرام'], album: 'Gallery/Saints-and-Figures/01-Alef-A-E-I-O/Saint-Abraam-Bishop-of-Fayoum.html' },
-  { match: ['الانبا شنوده رئيس المتوحدين'], name: 'القديس الأنبا شنودة رئيس المتوحدين', pic: ['شنوده رئيس'], album: 'Gallery/Saints-and-Figures/13-Shein/Saint-Shenouda.html' },
-  { match: ['الانبا كاراس'], name: 'القديس الأنبا كاراس', pic: ['كاراس'] },
-  { match: ['الانبا رويس', 'فريج'], name: 'القديس الأنبا رويس', pic: ['رويس'] },
-  { match: ['مكسيموس ودوماديوس'], name: 'القديسين مكسيموس ودوماديوس', pic: ['مكسيموس'] },
-  { match: ['يوحنا القصير'], name: 'القديس الأنبا يوحنا القصير', pic: ['يوحنا القصير'] },
-  { match: ['الانبا مقار', 'مقاريوس الكبير'], name: 'القديس الأنبا مقار الكبير', pic: ['مقار'] },
-  { match: ['الانبا بيشوي'], name: 'القديس الأنبا بيشوي', pic: ['بيشوي'], album: 'Gallery/Saints-and-Figures/02-Beh-B-P/Saint-Bishoy.html' },
-  { match: ['يوليانه', 'بربارة'], name: 'الشهيدة بربارة', pic: ['بربارة'], album: 'Gallery/Saints-and-Figures/02-Beh-B-P/Saint-Barbara.html' }
-];
 
 const arg = (name, dflt) => { const i = process.argv.indexOf('--' + name); return i > 0 ? process.argv[i + 1] : dflt; };
 const ar = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
@@ -106,45 +69,7 @@ function shuffle(list, seed) {
 
 const bookName = code => { const b = BOOKS.find(x => x[0] === code); return b[0] === 'PSA' ? 'مزمور' : b[1]; };
 
-/* which known saint a synaxarium title names, or null */
-export function saintOf(title) {
-  const f = ' ' + T.fold(title) + ' ';
-  return SAINTS.find(s => s.match.some(w => f.includes(' ' + T.fold(w) + ' '))) || null;
-}
-
-/* the gallery albums: [{ words (folded), url }] from St-Takla's saints' letter pages */
-async function albums(cache) {
-  const out = [];
-  for (const u of GALLERY) {
-    const html = await get(u, cache);
-    if (!html) continue;
-    for (const m of html.matchAll(/<a\b[^>]*href\s*=\s*"([^"]+\.html)"[^>]*>([\s\S]*?)<\/a>/gi)) {
-      const words = T.fold(T.entities(m[2].replace(/<[^>]+>/g, ' ')));
-      if (/^صور /.test(words) || words.startsWith('صور')) out.push({ words, url: new URL(T.entities(m[1]), u).href });
-    }
-  }
-  return out;
-}
-
-/* the first picture of a saint's album → { img, page } (St-Takla's own file; shown from their site with their link) */
-async function pictureOf(saint, list, cache) {
-  // only an album pinned by hand: matching by name picked the wrong people (Mar Girgis → El-Moalem Gerges, owner 2026-11-19)
-  const album = saint.album ? { url: SITE + saint.album } : null;
-  if (!album) return null;
-  const html = await get(album.url, cache);
-  if (!html) return null;
-  // the album's pictures (thumbnails; not sub-albums «.album.jpg»), a Coptic icon first
-  const thumbs = [...html.matchAll(/<img\b[^>]*class="g-thumbnail"[^>]*>/gi)].map(m => ({
-    src: (/src\s*=\s*"([^"]+)"/i.exec(m[0]) || [])[1] || '', alt: (/alt\s*=\s*"([^"]*)"/i.exec(m[0]) || [])[1] || ''
-  })).filter(x => /\/Gallery\/var\/thumbs\/.+\.(?:jpe?g|png|webp)(\?|$)/i.test(x.src) && !/\/\.album\./.test(x.src));
-  // a picture pinned by its caption when the album's first ones are not right (St Mary's first is a colouring page)
-  const best = (saint.imgPick && thumbs.find(x => x.alt.includes(saint.imgPick))) || thumbs.find(x => /coptic|أيقونة|ايقونة/i.test(x.alt)) || thumbs[0];
-  if (!best) return null;
-  const img = new URL(T.entities(best.src).replace('/var/thumbs/', '/var/resizes/').replace(/\?.*$/, ''), album.url).href.replace(/^http:/, 'https:');
-  return /^https:\/\/(www\.)?st-takla\.org\//.test(img) ? { img, page: album.url } : null;
-}
-
-export async function month(ym, { cache, bibleDir = path.join(ROOT, 'assets/bible/vd') } = {}) {
+export async function month(ym, { cache, bibleDir = path.join(ROOT, 'assets/bible/vd'), saints = loadSaints() } = {}) {
   const [y, m] = ym.split('-').map(Number);
   const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
   const books = fs.readdirSync(bibleDir).filter(f => /^[0-9A-Z]{3}\.json$/.test(f)).map(f => JSON.parse(fs.readFileSync(path.join(bibleDir, f), 'utf8')));
@@ -210,28 +135,46 @@ export async function month(ym, { cache, bibleDir = path.join(ROOT, 'assets/bibl
   process.stdout.write('\n');
 
   // ---- the feasts: tied to a Cairo date
-  const gallery = await albums(cache);
   const feasts = [];
-  for (let d = 1; d <= days; d++) {
-    const date = new Date(Date.UTC(y, m - 1, d));
+  for (const hit of feastsOfMonth(saints, ym)) {
+    const date = new Date(hit.date + 'T00:00:00Z');
     const url = katamerosUrl(date);
-    const html = await get(url, cache);
-    const k = html && T.parseKatameros(html);
-    if (!k) continue;
-    for (const s of k.saints) {
-      const saint = s.title && saintOf(s.title);
-      if (!saint) continue;
-      const pic = await pictureOf(saint, gallery, cache);
-      feasts.push({
-        date: date.toISOString().slice(0, 10), on: true, name: saint.name, title: s.title.slice(0, 120),
-        word: T.excerpt(s.paras, FEAST_MAX), sourceUrl: url, img: pic ? pic.img : null, imgPage: pic ? pic.page : null
-      });
-      break; // one feast a day
+    // the short word: the synaxarium paragraph whose title the registry wrote down for this day (never a name guess)
+    let sec = null;
+    if (hit.feast.title) {
+      const html = await get(url, cache);
+      const k = html && T.parseKatameros(html);
+      sec = k && sectionFor(k.saints, hit.feast.title);
     }
+    feasts.push(feastEntry(hit, sec, url));
     process.stdout.write('·');
   }
   process.stdout.write('\n');
   return { schema: 2, month: ym, made: new Date().toISOString(), source: SITE, days: out, feasts };
+}
+
+/* the synaxarium section of a katameros page whose title is the registry's title (folded; «( 15 بـؤونة)» tails dropped) */
+export function sectionFor(sections, title) {
+  const key = t => T.fold(String(t).replace(/\(\s*\d+\s*[^)]*\)\s*$/, '')).replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const want = key(title);
+  if (!want) return null;
+  return sections.find(s => s.title && key(s.title) === want) || sections.find(s => s.title && (key(s.title).includes(want) || want.includes(key(s.title)))) || null;
+}
+
+/*
+ * One feast of the month file: who and the picture and praise from the registry; the word from the synaxarium (with
+ * St-Takla's link), or the registry's own words for a modern day that is not in the synaxarium (with its source).
+ */
+export function feastEntry(hit, sec, katUrl) {
+  const p = hit.person, f = hit.feast;
+  const word = sec ? T.excerpt(sec.paras, FEAST_MAX) : (p.word || p.note || `النهارده ${f.kind} ${p.name}.`);
+  return {
+    date: hit.date, on: true, id: p.id, name: p.name, kind: f.kind, title: (sec ? sec.title : f.kind + ' ' + p.name).slice(0, 120),
+    word, sourceUrl: sec ? katUrl : f.source,
+    img: p.image ? '/' + p.image.file : null, imgPage: p.image ? p.image.source : null,
+    praise: p.praise ? p.praise.source : null, praiseTitle: p.praise ? p.praise.title || null : null, praiseText: p.praise ? p.praise.text : null,
+    others: hit.others
+  };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

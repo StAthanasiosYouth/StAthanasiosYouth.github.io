@@ -183,7 +183,11 @@ export function indexFile(rows, day) {
  * W7: the month's feasts as approved in the admin → { ok, file } | { ok: false, errors }. Tied to Cairo dates.
  * Every link and picture is a St-Takla page (their terms, FAQ 043): name, the synaxarium's words, the source link.
  */
-export const FEAST_LIMITS = { name: 120, title: 160, word: 2000, url: 400 };
+export const FEAST_LIMITS = { name: 120, title: 160, word: 2000, url: 400, praiseTitle: 120, praiseText: 1500 };
+// saints registry (daily-bread/saints/registry.json): a source may be any https page (the church's site, a news page);
+// a picture is St-Takla's or our own copy under /assets/img/saints/
+export const HTTPS_URL = /^https:\/\/[^\s<>"'()\[\]]+$/;
+export const SAINT_IMG = /^\/assets\/img\/saints\/[a-z0-9-]+\.(?:webp|jpg|png)$/;
 export function checkFeasts(body) {
   const errors = [];
   const month = body && body.month;
@@ -200,10 +204,12 @@ export function checkFeasts(body) {
     seen.add(date);
     const name = str(f.name, FEAST_LIMITS.name), title = str(f.title, FEAST_LIMITS.title, { optional: true }), word = str(f.word, FEAST_LIMITS.word);
     const url = str(f.url, FEAST_LIMITS.url), img = str(f.img, FEAST_LIMITS.url, { optional: true }), praise = str(f.praise, FEAST_LIMITS.url, { optional: true });
+    const praiseTitle = str(f.praiseTitle, FEAST_LIMITS.praiseTitle, { optional: true }), praiseText = str(f.praiseText, FEAST_LIMITS.praiseText, { optional: true });
     if (!name.ok || !word.ok) { err('الاسم أو الكلمة فاضيين أو طوال.'); continue; }
-    if (!url.ok || !TAKLA_URL.test(url.value)) { err('رابط المصدر لازم صفحة على st-takla.org.'); continue; }
-    if (!img.ok || (img.value && !TAKLA_URL.test(img.value)) || !praise.ok || (praise.value && !TAKLA_URL.test(praise.value))) { err('الصورة والتمجيد لازم من st-takla.org.'); continue; }
-    out.push({ date, name: name.value, title: title.ok ? title.value : null, word: word.value, url: url.value, img: img.value || undefined, praise: praise.value || undefined });
+    if (!url.ok || !HTTPS_URL.test(url.value)) { err('رابط المصدر لازم صفحة https.'); continue; }
+    if (!img.ok || (img.value && !TAKLA_URL.test(img.value) && !SAINT_IMG.test(img.value))) { err('الصورة لازم من st-takla.org أو من صور القديسين في الموقع.'); continue; }
+    if (!praise.ok || (praise.value && !HTTPS_URL.test(praise.value)) || !praiseTitle.ok || !praiseText.ok || (praiseText.value && !praise.value)) { err('التمجيد: النص لازم يكون معاه رابط مصدره.'); continue; }
+    out.push({ date, name: name.value, title: title.ok ? title.value : null, word: word.value, url: url.value, img: img.value || undefined, praise: praise.value || undefined, praiseTitle: praiseTitle.value || undefined, praiseText: praiseText.value || undefined });
   }
   if (errors.length) return { ok: false, errors };
   out.sort((a, b) => (a.date < b.date ? -1 : 1));

@@ -930,10 +930,10 @@
     var pub = published && published.published ? published.feasts : null;
     var list = (suggested || []).filter(keep).map(function (f) {
       var on = pub ? pub.some(function (p) { return p.date === f.date && p.name === f.name; }) : f.on !== false;
-      return { date: f.date, name: f.name, title: f.title || '', word: f.word, sourceUrl: f.sourceUrl || f.url, img: f.img || null, praise: f.praise || null, on: on };
+      return { date: f.date, name: f.name, title: f.title || '', word: f.word, sourceUrl: f.sourceUrl || f.url, img: f.img || null, praise: f.praise || null, praiseTitle: f.praiseTitle || null, praiseText: f.praiseText || null, others: f.others || [], on: on };
     });
     (pub || []).forEach(function (p) {
-      if (!list.some(function (f) { return f.date === p.date && f.name === p.name; })) list.push({ date: p.date, name: p.name, title: p.title || '', word: p.word, sourceUrl: p.url, img: p.img || null, praise: p.praise || null, on: true });
+      if (!list.some(function (f) { return f.date === p.date && f.name === p.name; })) list.push({ date: p.date, name: p.name, title: p.title || '', word: p.word, sourceUrl: p.url, img: p.img || null, praise: p.praise || null, praiseTitle: p.praiseTitle || null, praiseText: p.praiseText || null, others: [], on: true });
     });
     list.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
     var state = { list: list, published: null, loading: false, error: null };
@@ -969,7 +969,10 @@
       return el('div', { class: 'ba-feast' + (onPick && BR.feastPick === f.date ? ' is-on' : '') },
         el('label', { class: 'ba-feast__pick' }, box,
           f.img ? el('img', { src: f.img, alt: '', width: '44', height: '44', loading: 'lazy', referrerpolicy: 'no-referrer' }) : null,
-          el('span', {}, el('b', { text: dateWord(f.date) + ' · ' + f.name }), el('small', { text: f.title || '' }))),
+          el('span', {}, el('b', { text: dateWord(f.date) + ' · ' + f.name }), el('small', { text: f.title || '' }),
+            // the saints registry (owner 2026-11-19): the saint's praise, and who else is remembered that day
+            el('small', { class: 'ba-feast__praise', text: f.praiseText ? '♫ ' + f.praiseText.split('\n')[0] : 'من غير تمجيد' }),
+            f.others && f.others.length ? el('small', { text: 'ونفس اليوم: ' + f.others.join('، ') }) : null)),
         onPick ? btn('معاينة', 'phone', 'btn--sm btn--ghost', { 'data-act': 'bread-feast-preview', onclick: function () { onPick(f); } }) : null);
     });
     // W7 (owner 2026-11-19): tick all / none in one press
@@ -981,7 +984,7 @@
       el('div', { class: 'ba-actions' }, toggle, el('span', { class: 'sp' }),
         same ? tag(on.length ? 'اتنشرت ✓' : 'اتنشرت فاضية: مفيش عيد ظاهر', 'ok') : st.published !== null ? tag('فيه تعديل مش منشور', 'warn') : null,
         btn(label, 'check', 'btn--primary btn--sm', { 'data-act': 'bread-feasts', disabled: same || (st.published === null && !on.length), onclick: function (event) {
-          var body = { month: month, feasts: on.map(function (f) { return { date: f.date, name: f.name, title: f.title || undefined, word: f.word, url: f.sourceUrl, img: f.img || undefined, praise: f.praise || undefined }; }) };
+          var body = { month: month, feasts: on.map(function (f) { return { date: f.date, name: f.name, title: f.title || undefined, word: f.word, url: f.sourceUrl, img: f.img || undefined, praise: f.praise || undefined, praiseTitle: f.praiseText ? f.praiseTitle || undefined : undefined, praiseText: f.praiseText || undefined }; }) };
           A.withBusy(event.currentTarget, api('POST', 'feasts', body).then(function () { st.published = key; A.toast('اتنشرت أعياد ' + monthName(month)); A.render(); })).catch(function (error) { A.fail(error); });
         } }))
     ]);
@@ -1008,7 +1011,7 @@
     var list = st && st.list ? st.list : [];
     var chosen = list.filter(function (f) { return f.date === BR.feastPick; })[0] || list[0] || null;
     BR.feastPick = chosen ? chosen.date : null;
-    BR.previewDay = chosen ? { feastOnly: true, date: chosen.date, feast: { name: chosen.name, title: chosen.title, word: chosen.word, img: chosen.img } } : null;
+    BR.previewDay = chosen ? { feastOnly: true, date: chosen.date, feast: { name: chosen.name, title: chosen.title, word: chosen.word, img: chosen.img, url: chosen.sourceUrl, praise: chosen.praise, praiseTitle: chosen.praiseTitle, praiseText: chosen.praiseText } } : null;
     var block = feastsBlock(month, function (f) { BR.feastPick = f.date; A.render(); });
     if (!chosen) { r.append(block); }
     else {
@@ -1430,7 +1433,7 @@
     if (!date) return null;
     var st = BR.feasts[date.slice(0, 7)];
     var f = st && st.list.filter(function (x) { return x.on && x.date === date; })[0];
-    return f ? { name: f.name, title: f.title, word: f.word, img: f.img } : null;
+    return f ? { name: f.name, title: f.title, word: f.word, img: f.img, url: f.sourceUrl, praise: f.praise, praiseTitle: f.praiseTitle, praiseText: f.praiseText } : null;
   }
 
   function monthPlan() {
