@@ -110,10 +110,14 @@ test('structured data: parses, one family / church / site with shared @ids, the 
   assert.equal(church.hasMap, content.location.mapsUrl);
   const site = byId.get(SITE + '#website');
   assert.equal(site['@type'], 'WebSite');
-  // one site name everywhere: WebSite.name = og:site_name on every public page = the generated pages' name
-  assert.equal(site.name, 'أسرة البابا أثناسيوس الرسولي للشباب');
-  for (const path of PUBLIC.filter(p => !['privacy/', 'terms/'].includes(p))) assert.match(read(file(path)), new RegExp(`<meta property="og:site_name" content="${site.name}">`), `${path}: og:site_name`);
-  assert.match(read('apps-script/CompModel.gs'), new RegExp(`var COMP_SITE_NAME = '${site.name}';`));
+  const fullName = 'أسرة البابا أثناسيوس الرسولي للشباب';
+  assert.equal(site.name, 'أسرة البابا أثناسيوس');
+  assert.ok(site.alternateName.includes(fullName));
+  for (const path of PUBLIC.filter(path => !['privacy/', 'terms/'].includes(path))) {
+    const expected = FIXED.includes(path) || path === 'competitions/' ? site.name : fullName;
+    assert.equal(one(read(file(path)), /<meta property="og:site_name" content="([^"]+)">/, 'og:site_name', path), expected);
+  }
+  assert.match(read('apps-script/CompModel.gs'), new RegExp(`var COMP_SITE_NAME = '${fullName}';`));
   assert.equal(site.maintainer['@id'], SITE + 'about-site/#developer');
   assert.equal(site.publisher['@id'], SITE + '#org');
   const person = byId.get(SITE + 'about-site/#developer');
