@@ -113,7 +113,8 @@ test('structured data: parses, one family / church / site with shared @ids, the 
   const site = byId.get(SITE + '#website');
   assert.equal(site['@type'], 'WebSite');
   const fullName = 'أسرة البابا أثناسيوس الرسولي للشباب';
-  assert.equal(site.name, 'أسرة البابا أثناسيوس');
+  // the owner's choice 2026-11-24: the city in the name (other families share «أسرة البابا أثناسيوس»)
+  assert.equal(site.name, 'أسرة البابا أثناسيوس – سفاجا');
   assert.ok(site.alternateName.includes(fullName));
   for (const path of PUBLIC.filter(path => !['privacy/', 'terms/'].includes(path))) {
     const expected = FIXED.includes(path) || path === 'competitions/' ? site.name : fullName;
