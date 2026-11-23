@@ -5,7 +5,8 @@
  * POST /v1/book/submit. The token is checked once with siteverify:
  *
  *   - TURNSTILE_SECRET set   → a token is required and must verify
- *                              (production: and be issued for SITE_URL's host);
+ *                              (production: and be issued for SITE_URL's host
+ *                              or another ALLOWED_ORIGINS host);
  *   - not set, production    → submit refused (`disabled`): never open
  *                              without it;
  *   - not set, elsewhere     → skipped (unit tests, local).
@@ -16,7 +17,7 @@
  * per IP, unclaimed ones are deleted after 24 h).
  */
 
-import { ApiError } from '../lib/http.js';
+import { ApiError, allowedOrigins } from '../lib/http.js';
 import { logLine } from '../lib/log.js';
 
 export const SITEVERIFY = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
@@ -24,6 +25,13 @@ const TIMEOUT_MS = 5000;
 
 export function turnstileSiteKey(env) {
   return env.TURNSTILE_SECRET && env.TURNSTILE_SITEKEY ? String(env.TURNSTILE_SITEKEY) : null;
+}
+
+/* the hosts a production token may be issued for: SITE_URL's and every allowed
+ * origin's (the family domain and the GitHub Pages address both serve the site) */
+export function turnstileHosts(env) {
+  const hosts = [env.SITE_URL, ...allowedOrigins(env)].map(u => { try { return new URL(u).hostname; } catch { return ''; } });
+  return [...new Set(hosts.filter(h => h && h !== 'localhost' && h !== '127.0.0.1'))];
 }
 
 export async function checkTurnstile(ctx, token, ip) {
@@ -54,8 +62,7 @@ export async function checkTurnstile(ctx, token, ip) {
     throw new ApiError('turnstile', 'rejected', { reasons: (out && Array.isArray(out['error-codes']) ? out['error-codes'] : []).slice(0, 4).map(String) });
   }
   if (env.ENVIRONMENT === 'production') {
-    const host = new URL(env.SITE_URL).hostname;
-    if (out.hostname !== host) throw new ApiError('turnstile', 'hostname', { reasons: ['hostname'] });
+    if (!turnstileHosts(env).includes(out.hostname)) throw new ApiError('turnstile', 'hostname', { reasons: ['hostname'] });
   }
   return { ok: true };
 }

@@ -1,0 +1,118 @@
+# The family domain (stathanasiosyouthsafaga.social, a one-year student domain,
+# expires 2027-11-20) — watched every 6 hours. When it stops answering with
+# THIS site (expired, DNS gone, or bought by someone else), the site goes back
+# to https://stathanasiosyouth.github.io on its own, no one has to do anything:
+#   1. tools/site-domain.mjs github  (CNAME removed, canonical/sitemap/og back)
+#   2. commit + push to main, ask GitHub Pages to rebuild, drop the Pages domain
+#   3. start the Worker deploy (SITE_URL back to github.io)
+# Links in emails and push were always on github.io, so they keep working.
+#
+# By hand (Actions → domain-watch → Run workflow):
+#   mode=github  → go back to github.io now
+#   mode=custom  → put the family domain back (after renewing it)
+#
+# Needs nothing new: GITHUB_TOKEN (contents, pages, actions). The Worker deploy
+# uses the existing CLOUDFLARE_* secrets in worker.yml.
+name: domain-watch
+
+on:
+  schedule:
+    - cron: '41 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'auto (check) | github (go back now) | custom (put the domain back)'
+        required: false
+        default: auto
+
+permissions:
+  contents: write
+  pages: write
+  actions: write
+
+concurrency:
+  group: domain-watch
+  cancel-in-progress: false
+
+env:
+  DOMAIN: stathanasiosyouthsafaga.social
+  GH_HOST_SITE: stathanasiosyouth.github.io
+
+jobs:
+  watch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Decide
+        id: decide
+        env:
+          MODE: ${{ github.event.inputs.mode || 'auto' }}
+        run: |
+          now=$(node tools/site-domain.mjs status)
+          echo "now: $now"
+          if [ "$MODE" = "github" ] || [ "$MODE" = "custom" ]; then
+            echo "target=$MODE" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ ! -f CNAME ]; then
+            echo "already on github.io — nothing to watch"; echo "target=none" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # Is the domain still OURS? robots.txt must name our own sitemap on the domain.
+          # 4 tries, 5 minutes apart: one bad minute never moves the site.
+          for i in 1 2 3 4; do
+            body=$(curl -fsSL --max-time 25 "https://$DOMAIN/robots.txt?w=$(date +%s)" || true)
+            if printf '%s' "$body" | grep -q "Sitemap: https://$DOMAIN/sitemap.xml"; then
+              echo "domain OK (try $i)"; echo "target=none" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            echo "domain not answering with this site (try $i)"
+            [ $i -lt 4 ] && sleep 300
+          done
+          # GitHub itself up? (github.io answers 301 to the domain while it is set)
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 25 "https://$GH_HOST_SITE/robots.txt" || echo 000)
+          if [ "$code" = "000" ] || [ "${code#5}" != "$code" ]; then
+            echo "::warning::GitHub Pages itself not answering ($code) — not switching"; echo "target=none" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          echo "::warning::$DOMAIN is not this site any more — going back to $GH_HOST_SITE"
+          echo "target=github" >> "$GITHUB_OUTPUT"
+
+      - name: Switch the files
+        if: steps.decide.outputs.target != 'none'
+        id: switch
+        run: |
+          node tools/site-domain.mjs "${{ steps.decide.outputs.target }}"
+          git config user.name 'domain-watch'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          git commit -m "site: address → ${{ steps.decide.outputs.target }} (domain-watch)"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin main && git push origin HEAD:main && break
+            sleep 10
+          done
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: GitHub Pages domain + rebuild
+        if: steps.decide.outputs.target != 'none'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET: ${{ steps.decide.outputs.target }}
+        run: |
+          repo="${{ github.repository }}"
+          if [ "$TARGET" = "github" ]; then
+            echo '{"cname":null}' | gh api -X PUT "repos/$repo/pages" --input - --silent || echo "::notice::Pages API refused; the CNAME removal does it on the next build"
+          else
+            gh api -X PUT "repos/$repo/pages" -f cname="$DOMAIN" --silent || echo "::notice::Pages API refused; the CNAME file does it on the next build"
+          fi
+          gh api -X POST "repos/$repo/pages/builds" --silent || echo "::notice::Pages build request refused; the push builds it"
+
+      - name: Worker deploy (SITE_URL)
+        if: steps.switch.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run worker.yml --ref main

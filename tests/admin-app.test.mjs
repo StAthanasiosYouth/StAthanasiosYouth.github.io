@@ -10,6 +10,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import { ROOT } from '../tools/lib/gs.mjs';
+import { SITE_URL } from '../tools/site.config.mjs';
 
 const sharp = createRequire(`${ROOT}tools/package.json`)('sharp');
 
@@ -27,7 +28,7 @@ test('manifest: the admin app is its own app (id, scope, start /admin/), named a
   // ?app=admin: the page can tell it was opened as the admin app (not a tab, not another app)
   assert.equal(admin.start_url, '/admin/?app=admin');
   assert.equal(admin.scope, '/admin/');
-  assert.deepEqual(admin.related_applications, [{ platform: 'webapp', url: 'https://stathanasiosyouth.github.io/admin/manifest.webmanifest' }]);
+  assert.deepEqual(admin.related_applications, [{ platform: 'webapp', url: `${SITE_URL}admin/manifest.webmanifest` }]);
   assert.equal(admin.display, 'standalone');
   assert.equal(admin.short_name, 'لوحة تحكم الأسرة');
   assert.equal(admin.name, 'إدارة أسرة البابا أثناسيوس - سفاجا');

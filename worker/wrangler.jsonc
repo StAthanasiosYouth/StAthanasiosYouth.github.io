@@ -13,7 +13,8 @@
 
   "vars": {
     "ENVIRONMENT": "production",
-    "ALLOWED_ORIGINS": "https://stathanasiosyouth.github.io",
+    // both addresses, always: the family domain and GitHub Pages (tools/site-domain.mjs switches SITE_URL only)
+    "ALLOWED_ORIGINS": "https://stathanasiosyouth.github.io,https://stathanasiosyouthsafaga.social",
     "GOOGLE_CLIENT_ID": "246924773718-38p45gji0ouvi7an4jdjsip3obmk6ve4.apps.googleusercontent.com",
     "SITE_URL": "https://stathanasiosyouth.github.io",
     // Phase 2 P2-4: the publish mirror's repository (the secret GITHUB_TOKEN: Contents read/write on it only)
@@ -57,7 +58,7 @@
       "name": "athanasios-api-staging",
       "vars": {
         "ENVIRONMENT": "staging",
-        "ALLOWED_ORIGINS": "https://stathanasiosyouth.github.io,http://localhost:8080,http://127.0.0.1:8080",
+        "ALLOWED_ORIGINS": "https://stathanasiosyouth.github.io,https://stathanasiosyouthsafaga.social,http://localhost:8080,http://127.0.0.1:8080",
         "GOOGLE_CLIENT_ID": "246924773718-38p45gji0ouvi7an4jdjsip3obmk6ve4.apps.googleusercontent.com",
         "SITE_URL": "https://stathanasiosyouth.github.io",
         // never the production repository (src/lib/github.js refuses it outside production): a private test repo

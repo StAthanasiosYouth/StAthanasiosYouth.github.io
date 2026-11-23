@@ -5,10 +5,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { loadGs } from '../tools/lib/gs.mjs';
+import { SITE_URL } from '../tools/site.config.mjs';
 
 const gs = loadGs(['Platforms.gs', 'Content.gs', 'Hub.gs', 'CompModel.gs', 'BookModel.gs', 'Pages.gs']);
 
-const SITE = 'https://stathanasiosyouth.github.io/';
+// the site's address now: the family domain or GitHub Pages (tools/site-domain.mjs)
+const SITE = SITE_URL;
 const read = p => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const content = JSON.parse(read('content.json'));
 
@@ -138,7 +140,7 @@ test('structured data: parses, one family / church / site with shared @ids, the 
 
 test('the developer page: the four project links exactly as given, WhatsApp support, no photo', () => {
   const html = read('about-site/index.html');
-  for (const url of ['https://www.facebook.com/Pope.Athanasius.The.Apostolic.Safaga', 'https://stathanasiosyouth.github.io/',
+  for (const url of ['https://www.facebook.com/Pope.Athanasius.The.Apostolic.Safaga', SITE,
     'https://www.facebook.com/BraveUnderGrace', 'https://www.facebook.com/MZCreativeMediaStudio', 'https://github.com/MenaZak']) {
     assert.ok(html.includes(`href="${url}"`), url);
   }
@@ -161,7 +163,7 @@ test('private and test pages: noindex, never in the sitemap', () => {
   const sitemap = read('sitemap.xml');
   for (const path of PRIVATE) assert.ok(!sitemap.includes(`<loc>${SITE}${path}</loc>`), `${path} not in the sitemap`);
   const robots = read('robots.txt');
-  assert.match(robots, /^Sitemap: https:\/\/stathanasiosyouth\.github\.io\/sitemap\.xml$/m);
+  assert.ok(robots.split(/\r?\n/).includes(`Sitemap: ${SITE}sitemap.xml`), 'robots names the sitemap');
   // no public page is closed to crawlers
   const closed = [...robots.matchAll(/^Disallow: (\S+)$/gm)].map(m => m[1]);
   for (const path of PUBLIC) assert.ok(!closed.some(c => ('/' + path).startsWith(c)), `${path} crawlable`);
@@ -174,9 +176,9 @@ test('sitemap.xml = what a publish writes from content.json (every public page, 
   assert.deepEqual([...locs].sort(), PUBLIC.filter(p => p !== 'competitions/' || (content.competitions || []).length).map(p => SITE + p).sort());
   // a published event / competition joins; a bad slug never does
   const more = gs.siteSitemapXml_({ ...content, events: [{ slug: 'trip-1' }, { slug: '../x' }], competitions: [{ slug: 'quiz' }] }, SITE);
-  assert.match(more, /<loc>https:\/\/stathanasiosyouth\.github\.io\/events\/trip-1\/<\/loc>/);
-  assert.match(more, /<loc>https:\/\/stathanasiosyouth\.github\.io\/competition\/quiz\/<\/loc>/);
-  assert.match(more, /<loc>https:\/\/stathanasiosyouth\.github\.io\/competitions\/<\/loc>/, 'the list page with them');
+  assert.ok(more.includes(`<loc>${SITE}events/trip-1/</loc>`));
+  assert.ok(more.includes(`<loc>${SITE}competition/quiz/</loc>`));
+  assert.ok(more.includes(`<loc>${SITE}competitions/</loc>`), 'the list page with them');
   assert.doesNotMatch(more, /\.\.\/x/);
 });
 
@@ -185,7 +187,7 @@ test('a publish writes sitemap.xml with content.json; generated stubs drop the s
   const shell = read('competition/index.html');
   const stub = gs.compStubHtml_({ slug: 'quiz', title: 'مسابقة', description: 'وصف المسابقة' }, SITE, 'v1', shell);
   assert.doesNotMatch(stub, /name="robots"/);
-  assert.match(stub, /<link rel="canonical" href="https:\/\/stathanasiosyouth\.github\.io\/competition\/quiz\/">/);
+  assert.ok(stub.includes(`<link rel="canonical" href="${SITE}competition/quiz/">`));
 });
 
 test('taken-down pages and competitions leave search results from the browser too', () => {
