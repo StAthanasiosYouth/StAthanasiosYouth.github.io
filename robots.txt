@@ -4,4 +4,4 @@
 User-agent: *
 Disallow: /admin/
 
-Sitemap: https://stathanasiosyouth.github.io/sitemap.xml
+Sitemap: https://stathanasiosyouthsafaga.social/sitemap.xml

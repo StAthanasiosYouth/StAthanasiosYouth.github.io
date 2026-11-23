@@ -64,7 +64,7 @@ function markup() {
     <div class="ic__lock"><b>8:00</b><small>الأحد ٨ نوفمبر</small><i></i></div>
     <div class="ic__cam"><div class="ic__feed"></div>
       <div class="ic__finder"><i></i><i></i><i></i><i></i><span class="ic__laser"></span></div>
-      <div class="ic__pill"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#1a1400"/><path d="M12 4.5 14 12l-2 7.5L10 12Z" fill="#ffd60a"/><path d="M4.5 12 12 10l7.5 2L12 14Z" fill="#ffd60a" opacity=".55"/></svg><div><b>افتح «أسرة البابا أثناسيوس»</b><small>stathanasiosyouth.github.io</small></div></div>
+      <div class="ic__pill"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#1a1400"/><path d="M12 4.5 14 12l-2 7.5L10 12Z" fill="#ffd60a"/><path d="M4.5 12 12 10l7.5 2L12 14Z" fill="#ffd60a" opacity=".55"/></svg><div><b>افتح «أسرة البابا أثناسيوس»</b><small>stathanasiosyouthsafaga.social</small></div></div>
       <div class="ic__modes"><span>فيديو</span><em>صورة</em><span>بورتريه</span></div><span class="ic__shutter"></span>
     </div>
     <span class="ic__glass"></span>
