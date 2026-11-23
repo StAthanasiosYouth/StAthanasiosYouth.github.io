@@ -395,10 +395,11 @@ function startSite() {
   }
 
   // the installed site app lives at /index.html (its manifest scope; /admin/ is another
-  // app): "/" is the same page, so say /index.html in the address. Chrome's «فتح في
-  // التطبيق» hands the app the tab's address, and "/" is outside its scope
-  // («Could not open app»). Shared links still say "/" (share.js).
-  if (location.pathname === '/' && window.top === window.self) {
+  // app): "/" is the same page. Inside the app say /index.html, so it stays in its own
+  // scope; in a browser tab the address stays the clean family domain (owner,
+  // 2026-11-24: "/index.html" looks like a file on a computer, not the family's site).
+  // Shared links say "/" too (share.js).
+  if (location.pathname === '/' && window.top === window.self && (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true)) {
     history.replaceState(history.state, '', `/index.html${location.search}${location.hash}`);
   }
 
