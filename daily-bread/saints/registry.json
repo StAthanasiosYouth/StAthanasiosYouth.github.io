@@ -1,6 +1,7 @@
 {
- "schema": 1,
- "about": "قايمة القديسين الثابتة لـ«خبزنا اليومي». الأيام القبطية \"شهر-يوم\" (١ توت … ١٣ النسيء) بتتحول للميلادي بالكود (tools/lib/coptic.mjs). \"gregorian\" \"شهر-يوم\" للأحداث الحديثة اللي مش في السنكسار. كل يوم ليه source. شغّل: cd tools && npm run saints-check",
+ "schema": 2,
+ "about": "سجل القديسين والشخصيات لـ«خبزنا اليومي». الأيام القبطية \"شهر-يوم\" (١ توت … ١٣ النسيء) بتتحول للميلادي بالكود (tools/lib/coptic.mjs). \"gregorian\" \"شهر-يوم\" للأحداث الحديثة اللي مش في السنكسار. كل يوم ليه source. class: reposed (كارت «النهارده تذكار…») أو living (مناسبات كنيستنا بس). status/missing: الشخص اللي ناقصه \"feasts\" بيفضل في السجل بس مبيدخلش التذكارات ولا الإشعارات التلقائية. album: صور فولدر صاحب المشروع (src نسبةً لـ«صور القديسين/ملفات الصور بتفصيل»)، لسه متستوردتش (P4). شغّل: cd tools && npm run saints-check",
+ "picturesRoot": "صور القديسين/ملفات الصور بتفصيل",
  "categories": {
   "angels": "السيدة العذراء والملائكة",
   "prophets": "أنبياء وأبرار العهد القديم",
@@ -11,13 +12,18 @@
   "popes": "البابوات",
   "bishops": "الأساقفة والمطارنة",
   "fathers": "الآباء الكهنة والرهبان",
-  "laity": "قديسين من الشعب"
+  "laity": "قديسين من الشعب",
+  "teachers": "آباء ومعلمو الكنيسة",
+  "ourchurch": "آباء كنيستنا"
  },
  "people": [
   {
    "id": "mary",
    "name": "السيدة العذراء مريم",
    "cat": "angels",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "ميلادها",
@@ -68,6 +74,12 @@
      "title": "صعود جسد القديسة مريم العذراء"
     }
    ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/02 - السيدة العذراء مريم.png",
+     "type": "ai"
+    }
+   ],
    "praise": {
     "title": "السلام لك يا مريم",
     "text": "السلام لكِ يا مريم\nيا أم الله القدوس\nالسلام لكِ يا مريم\nيا بكر بتول وعروس",
@@ -79,6 +91,9 @@
    "id": "michael",
    "name": "رئيس الملائكة ميخائيل",
    "cat": "angels",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "عيده",
@@ -93,6 +108,12 @@
      "title": "عيد رئيس الملائكة الجليل ميخائيل ( 12 بـؤونة)"
     }
    ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/05 - رئيس الملائكة ميخائيل.png",
+     "type": "ai"
+    }
+   ],
    "praise": {
     "title": "تمجيد الملاك ميخائيل",
     "text": "السلام لك يا ميخائيل\nرئيس جند السموات\nملاك السلام والتهليل\nخادم رب القوات",
@@ -104,6 +125,9 @@
    "id": "gabriel",
    "name": "رئيس الملائكة غبريال",
    "cat": "angels",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تذكاره",
@@ -130,6 +154,12 @@
      "title": "تذكار تكريس كنيسة رئيس الملائكة غبريال ( 26 بـؤونة)"
     }
    ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/06 - رئيس الملائكة غبريال.png",
+     "type": "ai"
+    }
+   ],
    "praise": null,
    "image": null
   },
@@ -137,12 +167,21 @@
    "id": "raphael",
    "name": "رئيس الملائكة روفائيل",
    "cat": "angels",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تذكاره",
      "coptic": "13-3",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=8&imonth=9&iyear=2027&dbl=ar",
      "title": "تذكار الملاك روفائيل"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/07 - رئيس الملائكة روفائيل.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -152,12 +191,21 @@
    "id": "suriel",
    "name": "رئيس الملائكة سوريال",
    "cat": "angels",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تذكاره",
      "coptic": "5-27",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=4&imonth=2&iyear=2027&dbl=ar",
      "title": "تذكار رئيس الملائكة سوريال"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/08 - رئيس الملائكة سوريال.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -167,12 +215,21 @@
    "id": "moses",
    "name": "موسى النبي",
    "cat": "prophets",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "1-8",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=18&imonth=9&iyear=2026&dbl=ar",
      "title": "نياحة موسى النبي عام 1485ق م"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/09 - موسى النبي.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -182,12 +239,21 @@
    "id": "elijah",
    "name": "إيليا النبي",
    "cat": "prophets",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "صعوده إلى السماء",
      "coptic": "5-6",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=1&iyear=2027&dbl=ar",
      "title": "تذكار صعود ايليا النبى الى السماء حيا"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/10 - إيليا النبي.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -197,12 +263,21 @@
    "id": "daniel",
    "name": "دانيال النبي",
    "cat": "prophets",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "7-23",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=1&imonth=4&iyear=2027&dbl=ar",
      "title": "نياحة دانيال النبى"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/11 - دانيال النبي.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -212,12 +287,21 @@
    "id": "jeremiah",
    "name": "إرميا النبي",
    "cat": "prophets",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "استشهاده",
      "coptic": "9-5",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=13&imonth=5&iyear=2027&dbl=ar",
      "title": "استشهاد ارميا النبى"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/12 - إرميا النبي.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -227,12 +311,21 @@
    "id": "threeyouths",
    "name": "الفتية الثلاثة القديسين حنانيا وعزريا وميصائيل",
    "cat": "prophets",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحتهم",
      "coptic": "9-10",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=18&imonth=5&iyear=2027&dbl=ar",
      "title": "نياحة الثلاثة فتية القديسين حنانيا وعزريا وميصائيل"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/13 - الفتية الثلاثة حنانيا وعزريا وميصائيل.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -242,6 +335,9 @@
    "id": "baptist",
    "name": "القديس يوحنا المعمدان",
    "cat": "prophets",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "استشهاده",
@@ -256,6 +352,12 @@
      "title": "ميلاد القديس يوحنا المعمدان ( 30 بـؤونة)"
     }
    ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/14 - القديس يوحنا المعمدان.png",
+     "type": "ai"
+    }
+   ],
    "praise": null,
    "image": null
   },
@@ -263,6 +365,9 @@
    "id": "mark",
    "name": "مار مرقس الرسول",
    "cat": "apostles",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "ظهور رأسه",
@@ -283,6 +388,12 @@
      "title": "عودة رفات القديس مارمرقس ( 17 بـؤونة)"
     }
    ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/15 - مار مرقس الرسول.png",
+     "type": "ai"
+    }
+   ],
    "praise": null,
    "image": null
   },
@@ -290,12 +401,21 @@
    "id": "peterpaul",
    "name": "الرسولان بطرس وبولس",
    "cat": "apostles",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "استشهادهما",
      "coptic": "11-5",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=12&imonth=7&iyear=2027&dbl=ar",
      "title": "استشهاد القديسين الرسولين بطرس وبولس وفطر صوم الرسل"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/16 - الرسولان بطرس وبولس.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -305,12 +425,21 @@
    "id": "stephen",
    "name": "القديس استفانوس أول الشهداء",
    "cat": "apostles",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "استشهاده",
      "coptic": "5-1",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=9&imonth=1&iyear=2027&dbl=ar",
      "title": "استشهاد القديس اسطفانوس رئيس الشمامسة"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/17 - القديس استفانوس أول الشهداء.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -320,6 +449,9 @@
    "id": "mercurius",
    "name": "الشهيد العظيم أبي سيفين (فيلوباتير مرقوريوس)",
    "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "note": "شفيع كنيستنا",
    "feasts": [
     {
@@ -341,6 +473,12 @@
      "title": "تذكار تكريس كنيسة ابى سيفين"
     }
    ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/01 - الشهيد العظيم أبي سيفين.png",
+     "type": "ai"
+    }
+   ],
    "praise": {
     "title": "تمجيد مرقوريوس أبوسيفين فيلوباتير",
     "text": "أنظم مديحي يا حضار\nوأخبركم عن بطل مأنوس\nذلك الشجاع المختار\nفيلوباتير مارقوريوس",
@@ -352,6 +490,9 @@
    "id": "george",
    "name": "الشهيد العظيم مار جرجس",
    "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تكريس كنيسته",
@@ -372,6 +513,12 @@
      "title": "إحضار جسد الشهيد العظيم جاؤرجيوس"
     }
    ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/03 - الشهيد العظيم مار جرجس.png",
+     "type": "ai"
+    }
+   ],
    "praise": {
     "title": "تمجيد الشهيد مار جرجس الروماني",
     "text": "تعالوا يا أحباء\nلنمدح بالثناء\nبطلنا أمير الشهداء\nالشهيد جيؤرجيوس",
@@ -383,6 +530,9 @@
    "id": "mina",
    "name": "الشهيد مار مينا العجايبي",
    "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "استشهاده",
@@ -397,6 +547,12 @@
      "title": "تذكار كنيسة مارمينا بمريوط ( 15 بـؤونة)"
     }
    ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/18 - الشهيد مار مينا العجائبي.png",
+     "type": "ai"
+    }
+   ],
    "praise": {
     "title": "تمجيد الشهيد مارمينا العجايبي",
     "text": "يا ابن أودكسيس\nيا شهيد يسوع المسيح",
@@ -408,12 +564,21 @@
    "id": "theodore",
    "name": "الأمير تادرس الشطبي",
    "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "استشهاده",
      "coptic": "11-20",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=27&imonth=7&iyear=2027&dbl=ar",
      "title": "استشهاد القديس ثاؤدورس الشطبى"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/23 - الأمير تادرس الشطبي.png",
+     "type": "ai"
     }
    ],
    "praise": {
@@ -427,12 +592,21 @@
    "id": "theodoreeast",
    "name": "الشهيد تادرس المشرقي",
    "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "استشهاده",
      "coptic": "5-12",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=20&imonth=1&iyear=2027&dbl=ar",
      "title": "استشهاد القديس تادرس المشرقى"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/24 - الشهيد تادرس المشرقي.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -442,12 +616,21 @@
    "id": "abaskhiron",
    "name": "الشهيد أباسخيرون القليني",
    "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "استشهاده",
      "coptic": "10-7",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=6&iyear=2027&dbl=ar",
      "title": "استشهاد القديس ابسخيرون الجندى القلينى ( 7 بـؤونة)"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/25 - الشهيد أباسخيرون القليني.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -457,6 +640,9 @@
    "id": "abufam",
    "name": "الشهيد أبو فام الجندي",
    "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تكريس كنيسته",
@@ -471,6 +657,12 @@
      "title": "استشهاد القديس ابى فام الجندى الاوسيمى"
     }
    ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/26 - الشهيد أبو فام الجندي.png",
+     "type": "ai"
+    }
+   ],
    "praise": null,
    "image": null
   },
@@ -478,12 +670,21 @@
    "id": "victor",
    "name": "الشهيد مار بقطر بن رومانيوس",
    "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "استشهاده",
      "coptic": "10-27",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=4&imonth=7&iyear=2027&dbl=ar",
      "title": "استشهاد القديس مار بقطر بن رومانيوس ( 27 بـؤونة)"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/27 - الشهيد مار بقطر بن رومانيوس.png",
+     "type": "ai"
     }
    ],
    "praise": {
@@ -497,12 +698,21 @@
    "id": "abakir",
    "name": "الشهيدان أباكير ويوحنا",
    "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "استشهادهما",
      "coptic": "10-14",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=21&imonth=6&iyear=2027&dbl=ar",
      "title": "استشهاد القديس اباكير ورفيقيه يوحنا وابطلماوس ( 14 بـؤونة)"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/28 - الشهيدان أباكير ويوحنا.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -512,12 +722,21 @@
    "id": "abanoub",
    "name": "الشهيد أبانوب النهيسي",
    "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "استشهاده",
      "coptic": "11-24",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=31&imonth=7&iyear=2027&dbl=ar",
      "title": "استشهاد ابانوب النهيسى"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/29 - الشهيد أبانوب النهيسي.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -527,12 +746,21 @@
    "id": "sergius",
    "name": "الشهيدان سرجيوس وواخس",
    "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "استشهاد سرجيوس",
      "coptic": "2-10",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=20&imonth=10&iyear=2026&dbl=ar",
      "title": "استشهاد القديس سرجيوس رفيق واخس"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/30 - الشهيدان سرجيوس وواخس.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -542,12 +770,21 @@
    "id": "james",
    "name": "الشهيد يعقوب المقطع",
    "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تذكاره",
      "coptic": "7-30",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=8&imonth=4&iyear=2027&dbl=ar",
      "title": "تذكار القديس يعقوب المقطع"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/31 - الشهيد يعقوب المقطع.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -557,12 +794,21 @@
    "id": "bidaba",
    "name": "الشهيد الأنبا بضابا ورفيقاه",
    "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "استشهادهم",
      "coptic": "11-19",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=26&imonth=7&iyear=2027&dbl=ar",
      "title": "استشهاد القديس أنبا بضابا ورفيقيه"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/32 - الشهيد الأنبا بضابا ورفيقاه.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -572,12 +818,21 @@
    "id": "sevenanthony",
    "name": "السبعة شهداء بجبل أنطونيوس",
    "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تذكارهم",
      "coptic": "2-26",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=5&imonth=11&iyear=2026&dbl=ar",
      "title": "تذكار السبع شهداء بجبل انطونيوس"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/33 - السبعة شهداء بجبل أنطونيوس.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -587,12 +842,21 @@
    "id": "sidhom",
    "name": "الشهيد سيدهم بشاي",
    "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "استشهاده",
      "coptic": "7-17",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=26&imonth=3&iyear=2027&dbl=ar",
      "title": "استشهاد سيدهم بشاى بدمياط"
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الشهيد سيدهم بشاي.jpg",
+     "type": "photo"
     }
    ],
    "praise": null,
@@ -602,6 +866,9 @@
    "id": "demiana",
    "name": "الشهيدة دميانة",
    "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "استشهادها",
@@ -616,6 +883,12 @@
      "title": "تذكار تكريس كنيسة القديسة دميانة بالبرارى وظهور صليب نور"
     }
    ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/19 - الشهيدة دميانة والأربعون عذراء.png",
+     "type": "ai"
+    }
+   ],
    "praise": null,
    "image": null
   },
@@ -623,6 +896,9 @@
    "id": "marina",
    "name": "الشهيدة مارينا",
    "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تكريس كنيستها",
@@ -637,6 +913,12 @@
      "title": "استشهاد مارينا الشهيدة"
     }
    ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/20 - الشهيدة مارينا.png",
+     "type": "ai"
+    }
+   ],
    "praise": {
     "title": "تمجيد القديسة مارينا الشهيدة",
     "text": "المجد لإلهنا وبارينا\nالذي تجسد ليفدينا\nوأعطانا للخلاص مينا\nالشهيدة العفيفة مارينا",
@@ -648,12 +930,21 @@
    "id": "barbara",
    "name": "الشهيدة بربارة",
    "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "استشهادها",
      "coptic": "4-8",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=17&imonth=12&iyear=2026&dbl=ar",
      "title": "استشهاد القديسة بربارة ويوليانة"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/21 - الشهيدة بربارة.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -663,12 +954,21 @@
    "id": "rebecca",
    "name": "الشهيدة رفقة وأولادها الخمسة",
    "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "استشهادهم",
      "coptic": "1-7",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=17&imonth=9&iyear=2026&dbl=ar",
      "title": "استشهاد القديسة رفقة وأولادها الخمسة (أغاثون.بطرس.يوحنا.أمون.امونة) 303-305م"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/22 - الشهيدة رفقة وأولادها الخمسة.png",
+     "type": "ai"
     }
    ],
    "praise": {
@@ -679,15 +979,78 @@
    "image": null
   },
   {
+   "id": "cosmasdamian",
+   "name": "القديسان قزمان ودميان وإخوتهما وأمهم",
+   "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
+   "feasts": [
+    {
+     "kind": "استشهادهم",
+     "coptic": "3-22",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=1&imonth=12&iyear=2026&dbl=ar",
+     "title": "استشهاد القديس قزمان ودميان وأخوتهما وأمهم (ق3م)"
+    },
+    {
+     "kind": "تكريس كنيستهم",
+     "coptic": "3-30",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=9&imonth=12&iyear=2026&dbl=ar",
+     "title": "تكريس بيعة القديسين قزمان ودميان وأخوتهما وأمهم"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/60 - القديسان قزمان ودميان.png",
+     "type": "ai"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "julius",
+   "name": "الشهيد يوليوس الأقفهصي",
+   "cat": "martyrs",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
+   "feasts": [
+    {
+     "kind": "استشهاده",
+     "coptic": "1-22",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=2&imonth=10&iyear=2026&dbl=ar",
+     "title": "استشهاد القديس يوليوس الإقفهصي كاتب سير الشهداء ومن معه"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/65 - الشهيد يوليوس الأقفهصي.png",
+     "type": "ai"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
    "id": "modernmartyrs",
    "name": "شهداء ليبيا وشهداء العصر الحديث",
    "cat": "modern",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "note": "شهداء ليبيا (١٥ فبراير ٢٠١٥)، والبطرسية (١١ ديسمبر ٢٠١٦)، وأحد الشعانين (٩ أبريل ٢٠١٧)، وطريق دير الأنبا صموئيل (٢٦ مايو ٢٠١٧ و٢ نوفمبر ٢٠١٨). المجمع المقدس جعل ٨ أمشير عيدهم (٢ يونيو ٢٠١٧)",
    "feasts": [
     {
      "kind": "عيد شهداء العصر الحديث",
      "coptic": "6-8",
      "source": "https://www.masrawy.com/news/news_egypt/details/2017/6/2/1098005/"
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/شهداء ليبيا وشهداء العصر الحديث.jpg",
+     "type": "photo"
     }
    ],
    "praise": {
@@ -698,15 +1061,52 @@
    "image": null
   },
   {
+   "id": "minaaboud",
+   "name": "الشهيد القس مينا عبود شاروبيم",
+   "cat": "modern",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
+   "feasts": [
+    {
+     "kind": "استشهاده",
+     "gregorian": "07-06",
+     "year": 2013,
+     "source": "https://www.wataninet.com/?p=1678552",
+     "more": [
+      "https://drpeterazer.github.io/ChurchMartyrsBio_SouthCabinet/bio9.html"
+     ],
+     "note": "استشهد في العريش ٦ يوليو ٢٠١٣ = ٢٩ بؤونه ١٧٢٩ (بالكود). سيرته بتكتب عيده «٦ يوليو / ٢٩ بؤونه». صفحة ٢٩ بؤونه في قطمارس الأنبا تكلا مفيهاش اسمه."
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الشهيد القس مينا عبود شاروبيم.jpg",
+     "type": "photo"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
    "id": "anthony",
    "name": "القديس الأنبا أنطونيوس",
    "cat": "ascetics",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "5-22",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=30&imonth=1&iyear=2027&dbl=ar",
      "title": "نياحة القديس العظيم انبا انطونبوس اب جميع الرهبان"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/04 - القديس الأنبا أنطونيوس.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -716,12 +1116,21 @@
    "id": "paul",
    "name": "القديس الأنبا بولا أول السواح",
    "cat": "ascetics",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "6-2",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=9&imonth=2&iyear=2027&dbl=ar",
      "title": "نياحة القديس أنبا بولا أول السياح"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/34 - القديس الأنبا بولا أول السواح.png",
+     "type": "ai"
     }
    ],
    "praise": {
@@ -735,6 +1144,9 @@
    "id": "macarius",
    "name": "القديس الأنبا مقار الكبير",
    "cat": "ascetics",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
@@ -749,6 +1161,12 @@
      "title": "إعادة جسد الانبا مكاريوس الى برية شيهيت"
     }
    ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/35 - القديس الأنبا مقار الكبير.png",
+     "type": "ai"
+    }
+   ],
    "praise": {
     "title": "تمجيد القديس أبومقار الكبير",
     "text": "كان رب المجد مع أبينا البار\nاللابس الروح أنبا مقار\nصلى فأعطاه الشيروبيم\nكقوة مرافقة على الدوام",
@@ -760,12 +1178,21 @@
    "id": "macariusalex",
    "name": "القديس مقاريوس السكندري",
    "cat": "ascetics",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "9-6",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=5&iyear=2027&dbl=ar",
      "title": "نياحة القديس مقاريوس الاسكندرى"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/36 - القديس الأنبا مقاريوس السكندري.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -775,6 +1202,9 @@
    "id": "bishoy",
    "name": "القديس الأنبا بيشوي",
    "cat": "ascetics",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نقل جسده",
@@ -789,6 +1219,12 @@
      "title": "نياحة القديس العظيم الانبا بيشوى كوكب البرية"
     }
    ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/37 - القديس الأنبا بيشوي.png",
+     "type": "ai"
+    }
+   ],
    "praise": {
     "title": "تمجيد القديس الأنبا بيشوي",
     "text": "في صفوف المنتصرين\nالأبرار القديسين\nوقف الراهب الأمين\nبينيوت افا بيشوي",
@@ -800,12 +1236,21 @@
    "id": "mosesblack",
    "name": "القديس الأنبا موسى الأسود",
    "cat": "ascetics",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "استشهاده",
      "coptic": "10-24",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=1&imonth=7&iyear=2027&dbl=ar",
      "title": "استشهاد القديس أنبا موسى الأسود ( 24 بـؤونة)"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/38 - القديس الأنبا موسى الأسود.png",
+     "type": "ai"
     }
    ],
    "praise": {
@@ -819,12 +1264,21 @@
    "id": "johnshort",
    "name": "القديس الأنبا يحنس القصير",
    "cat": "ascetics",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "2-20",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=30&imonth=10&iyear=2026&dbl=ar",
      "title": "نياحة القديس يوحنا القصير الشهير بابي يحنس"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/39 - القديس الأنبا يحنس القصير.png",
+     "type": "ai"
     }
    ],
    "praise": {
@@ -838,6 +1292,9 @@
    "id": "maximus",
    "name": "القديسان مكسيموس ودوماديوس",
    "cat": "ascetics",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحة مكسيموس",
@@ -852,6 +1309,12 @@
      "title": "نياحة القديس دوماديوس أخى مكسيموس"
     }
    ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/40 - القديسان مكسيموس ودوماديوس.png",
+     "type": "ai"
+    }
+   ],
    "praise": null,
    "image": null
   },
@@ -859,12 +1322,21 @@
    "id": "pachom",
    "name": "القديس الأنبا باخوميوس أب الشركة",
    "cat": "ascetics",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "9-14",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=22&imonth=5&iyear=2027&dbl=ar",
      "title": "نياحة أنبا باخوم أب الشركة"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/41 - القديس الأنبا باخوميوس أب الشركة.png",
+     "type": "ai"
     }
    ],
    "praise": {
@@ -878,6 +1350,9 @@
    "id": "shenoute",
    "name": "القديس الأنبا شنودة رئيس المتوحدين",
    "cat": "ascetics",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تكريس كنيسته",
@@ -892,6 +1367,12 @@
      "title": "نياحة القديس شنودة رئيس المتوحدين"
     }
    ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/42 - القديس الأنبا شنودة رئيس المتوحدين.png",
+     "type": "ai"
+    }
+   ],
    "praise": null,
    "image": null
   },
@@ -899,12 +1380,21 @@
    "id": "karas",
    "name": "القديس الأنبا كاراس السائح",
    "cat": "ascetics",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "11-8",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=15&imonth=7&iyear=2027&dbl=ar",
      "title": "نياحة القديس كاراس شقيق ثاؤدسيوس الملك"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/43 - القديس الأنبا كاراس السائح.png",
+     "type": "ai"
     }
    ],
    "praise": {
@@ -918,12 +1408,21 @@
    "id": "samuel",
    "name": "القديس الأنبا صموئيل المعترف",
    "cat": "ascetics",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "4-8",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=17&imonth=12&iyear=2026&dbl=ar",
      "title": "نياحة القديس أنبا صموئيل المعترف"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/44 - القديس الأنبا صموئيل المعترف.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -933,6 +1432,9 @@
    "id": "takla",
    "name": "القديس الأنبا تكلا هيمانوت",
    "cat": "ascetics",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "ميلاده",
@@ -947,6 +1449,12 @@
      "title": "نياحة القديس تكلاهيمانوت الحبشى"
     }
    ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/45 - القديس الأنبا تكلا هيمانوت الحبشي.png",
+     "type": "ai"
+    }
+   ],
    "praise": {
     "title": "تمجيد القديس تكلاهيمانوت",
     "text": "تعالوا يا مؤمنين\nنُسبح إلهنا العظيم\nونُرتل بالترانيم\nأنبا تكلا هيمانوت",
@@ -958,12 +1466,21 @@
    "id": "barsoum",
    "name": "القديس الأنبا برسوم العريان",
    "cat": "ascetics",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "13-5",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=9&iyear=2027&dbl=ar",
      "title": "نياحة أنبا برسوم العريان"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/46 - القديس الأنبا برسوم العريان.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -973,12 +1490,21 @@
    "id": "reweis",
    "name": "القديس الأنبا رويس",
    "cat": "ascetics",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "2-21",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=31&imonth=10&iyear=2026&dbl=ar",
      "title": "نياحة القديس الانبا رويس (فريج)"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/47 - القديس الأنبا رويس.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -988,12 +1514,21 @@
    "id": "hedraaswan",
    "name": "القديس الأنبا هدرا الأسواني",
    "cat": "ascetics",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "4-12",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=21&imonth=12&iyear=2026&dbl=ar",
      "title": "نياحة القديس هدرا الاسوانى"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/48 - القديس الأنبا هدرا الأسواني.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -1003,12 +1538,21 @@
    "id": "sarapamonabutarha",
    "name": "القديس الأنبا صرابامون أبو طرحة",
    "cat": "ascetics",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "7-28",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=6&imonth=4&iyear=2027&dbl=ar",
      "title": "نياحة القديس صرابامون أبو طرحة"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/49 - القديس الأنبا صرابامون أبو طرحة.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -1018,12 +1562,21 @@
    "id": "yohanneskama",
    "name": "القديس الأنبا يحنس كاما",
    "cat": "ascetics",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "4-25",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=3&imonth=1&iyear=2027&dbl=ar",
      "title": "نياحة القديس انبا يحنس كاما القس"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/50 - القديس الأنبا يحنس كاما.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -1033,12 +1586,46 @@
    "id": "marycopt",
    "name": "القديسة مريم المصرية",
    "cat": "ascetics",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحتها",
      "coptic": "8-6",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=4&iyear=2027&dbl=ar",
      "title": "نياحة مريم المصرية السائحة"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/51 - القديسة مريم المصرية.png",
+     "type": "ai"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "verena",
+   "name": "القديسة فيرينا",
+   "cat": "ascetics",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
+   "feasts": [
+    {
+     "kind": "نياحتها",
+     "coptic": "1-4",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=14&imonth=9&iyear=2026&dbl=ar",
+     "title": "نياحة القديسة فيرونيا",
+     "note": "السنكسار في الأنبا تكلا كاتب اسمها «فيرونيا»."
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/63 - القديسة فيرينا.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -1048,6 +1635,9 @@
    "id": "athanasius",
    "name": "القديس البابا أثناسيوس الرسولي",
    "cat": "popes",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "note": "شفيع الأسرة",
    "feasts": [
     {
@@ -1063,6 +1653,12 @@
      "title": "نياحة البابا أثناسيوس الرسولى ال20"
     }
    ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/52 - القديس البابا أثناسيوس الرسولي.png",
+     "type": "ai"
+    }
+   ],
    "praise": null,
    "image": null
   },
@@ -1070,12 +1666,21 @@
    "id": "peterseal",
    "name": "القديس البابا بطرس خاتم الشهداء",
    "cat": "popes",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "استشهاده",
      "coptic": "3-29",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=8&imonth=12&iyear=2026&dbl=ar",
      "title": "استشهاد البابا بطرس خاتم الشهداء 17"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/53 - القديس البابا بطرس الأول خاتم الشهداء.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -1085,12 +1690,21 @@
    "id": "cyril",
    "name": "القديس البابا كيرلس عمود الدين",
    "cat": "popes",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "11-3",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=7&iyear=2027&dbl=ar",
      "title": "استشهاد القديس كيرلس عمود الدين البابا ال24"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/54 - القديس البابا كيرلس الكبير عمود الدين.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -1100,12 +1714,21 @@
    "id": "dioscorus",
    "name": "القديس البابا ديسقورس",
    "cat": "popes",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "1-7",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=17&imonth=9&iyear=2026&dbl=ar",
      "title": "نياحة البابا ديسقورس25 (171م - 454 ش)"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/55 - القديس البابا ديسقورس الأول.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -1115,12 +1738,22 @@
    "id": "matthew1",
    "name": "القديس البابا متاؤس الأول",
    "cat": "popes",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
-     "coptic": "7-25",
-     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=3&imonth=4&iyear=2027&dbl=ar",
-     "title": "نياحة البابا متاؤس"
+     "coptic": "5-5",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=13&imonth=1&iyear=2027&dbl=ar",
+     "title": "نياحة البابا متاؤس الأول ال87",
+     "note": "كان ٢٥ برمهات غلط: يوم ٢٥ برمهات في السنكسار نياحة البابا متاؤس الثالث (البطريرك المائة)، مش الأول (٨٧)."
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/56 - القديس البابا متاؤس الأول.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -1130,12 +1763,21 @@
    "id": "cyril4",
    "name": "البابا كيرلس الرابع أبو الإصلاح",
    "cat": "popes",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "5-23",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=31&imonth=1&iyear=2027&dbl=ar",
      "title": "نياحة البابا كيرلس الرابع ابى الإصلاح ال110"
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/البابا كيرلس الرابع — أبو الإصلاح.jpg",
+     "type": "photo"
     }
    ],
    "praise": null,
@@ -1145,12 +1787,21 @@
    "id": "cyril5",
    "name": "القديس البابا كيرلس الخامس",
    "cat": "popes",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "12-1",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=7&imonth=8&iyear=2027&dbl=ar",
      "title": "نياحة البابا القديس كيرلس الخامس بابا الإسكندرية المائة الثاني عشر"
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القديس البابا كيرلس الخامس.jpg",
+     "type": "photo"
     }
    ],
    "praise": null,
@@ -1160,6 +1811,9 @@
    "id": "cyril6",
    "name": "القديس البابا كيرلس السادس",
    "cat": "popes",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "عيد جلوسه",
@@ -1173,6 +1827,12 @@
      "title": "نياحة البابا الانبا كيرلس السادس"
     }
    ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القديس البابا كيرلس السادس.jpg",
+     "type": "photo"
+    }
+   ],
    "praise": {
     "title": "تمجيد البابا كيرلس السادس",
     "text": "في بلدة بدمنهور\nأشرق لنا منها النور\nبميلاد أب لجمهور\nبنيوت آفا كيرلس",
@@ -1184,6 +1844,9 @@
    "id": "shenouda3",
    "name": "البابا شنودة الثالث",
    "cat": "popes",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "عيد جلوسه",
@@ -1197,6 +1860,12 @@
      "source": "https://copticorthodox.church/en/popes/pope-shenouda-iii/"
     }
    ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/البابا شنودة الثالث.jpg",
+     "type": "photo"
+    }
+   ],
    "praise": {
     "title": "تمجيد البابا شنوده الثالث",
     "text": "في سماء القديسين .... واقف بطرك عظيم\nشمعة القرن العشرين .... بنيوت افا شنودة",
@@ -1208,13 +1877,22 @@
    "id": "tawadros2",
    "name": "البابا تواضروس الثاني",
    "cat": "popes",
+   "class": "living",
+   "status": "complete",
+   "missing": [],
    "note": "البابا الحالي، ربنا يحافظ عليه",
-   "alive": true,
    "feasts": [
     {
      "kind": "عيد جلوسه",
      "gregorian": "11-18",
-     "source": "https://st-takla.org/Saints/popes/118/pope-tawadrous-ii.html"
+     "source": "https://st-takla.org/Saints/popes/118/pope-tawadrous-ii.html",
+     "year": 2012
+    }
+   ],
+   "album": [
+    {
+     "src": "03-الأحياء-صور-حقيقية/البابا تواضروس الثاني.jpg",
+     "type": "photo"
     }
    ],
    "praise": null,
@@ -1224,12 +1902,21 @@
    "id": "abraam",
    "name": "القديس الأنبا إبرآم أسقف الفيوم والجيزة",
    "cat": "bishops",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "10-3",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=10&imonth=6&iyear=2027&dbl=ar",
      "title": "نياحة الانبا ابرام أسقف الفيوم ( 3 بـؤونة)"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/57 - القديس الأنبا إبرآم أسقف الفيوم والجيزة.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -1239,12 +1926,21 @@
    "id": "yousababah",
    "name": "القديس الأنبا يوساب الأبح أسقف جرجا",
    "cat": "bishops",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "5-17",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=25&imonth=1&iyear=2027&dbl=ar",
      "title": "نياحة القديس الأنبا يوساب الأبح أسقف جرجا"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/58 - القديس الأنبا يوساب الأبح أسقف جرجا.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -1254,6 +1950,9 @@
    "id": "sarapamonkhartoum",
    "name": "القديس الأنبا صرابامون مطران الخرطوم",
    "cat": "bishops",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "note": "المجمع المقدس اعترف بقداسته في مايو ٢٠٢٦",
    "feasts": [
     {
@@ -1267,6 +1966,12 @@
      "source": "https://st-takla.org/Saints/bishops/saad/carabamoun-khartoom.html"
     }
    ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا صرابامون مطران الخرطوم.jpg",
+     "type": "photo"
+    }
+   ],
    "praise": null,
    "image": null
   },
@@ -1274,6 +1979,9 @@
    "id": "kirolloskena",
    "name": "الأنبا كيرلس مطران قنا ومحافظات البحر الأحمر",
    "cat": "bishops",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تذكار رسامته",
@@ -1286,6 +1994,12 @@
      "source": "https://st-takla.org/Saints/bishops/kef/kirollos-kena.html"
     }
    ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا كيرلس مطران قنا ومحافظات البحر الأحمر.jpg",
+     "type": "photo"
+    }
+   ],
    "praise": null,
    "image": null
   },
@@ -1293,16 +2007,29 @@
    "id": "makariosqena",
    "name": "القديس الأنبا مكاريوس أسقف قنا",
    "cat": "bishops",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
+   "note": "كان أسقف قنا وقوص وقفط ونقادة ودشنا والبحر الأحمر (رسمه البابا كيرلس السادس). بعد نياحته بقت البحر الأحمر إيبارشية مستقلة.",
    "feasts": [
     {
      "kind": "تذكار رسامته",
      "gregorian": "09-19",
+     "year": 1965,
      "source": "https://st-takla.org/Saints/bishops/meem/makarius-quena.html"
     },
     {
      "kind": "نياحته",
      "gregorian": "02-03",
-     "source": "https://st-takla.org/Saints/bishops/meem/makarius-quena.html"
+     "year": 1991,
+     "source": "https://st-takla.org/Saints/bishops/meem/makarius-quena.html",
+     "note": "الصفحة بتقول «الأحد الموافق 3 فبراير 1991 م.، 26 طوبة 1707 ش.» بكنيسة مارمرقس بقنا، والكود متفق. رقم ٢٢ اللي في الصفحة هو تاريخ عدد مجلة الكرازة (الجمعة ٢٢ فبراير ١٩٩١ = ١٥ أمشير ١٧٠٧) في الحاشية ٤، مش تاريخ تاني للنياحة."
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا مكاريوس أسقف قنا.jpg",
+     "type": "photo"
     }
    ],
    "praise": null,
@@ -1312,16 +2039,151 @@
    "id": "theophilus",
    "name": "الأنبا ثاؤفيلس أول أسقف للبحر الأحمر",
    "cat": "bishops",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تذكار رسامته",
      "gregorian": "06-14",
-     "source": "https://copticorthodox.church/en/past-bishops/bishop-theophilos/"
+     "year": 1992,
+     "source": "https://copticorthodox.church/en/past-bishops/bishop-theophilos/",
+     "more": [
+      "https://www.youtube.com/watch?v=6RbIo0UUJtk&t=1330"
+     ]
     },
     {
      "kind": "نياحته",
      "gregorian": "02-12",
-     "source": "https://copticorthodox.church/en/past-bishops/bishop-theophilos/"
+     "year": 2019,
+     "source": "https://copticorthodox.church/en/past-bishops/bishop-theophilos/",
+     "note": "الأنبا تكلا والجرايد (الأهرام، اليوم السابع، وطني) كاتبين ١٣ فبراير: ده يوم إعلان الخبر. الموقع الرسمي ومجلة الكرازة: ١٢ فبراير."
+    }
+   ],
+   "milestones": [
+    {
+     "kind": "الميلاد",
+     "date": "1942-04-01",
+     "source": "https://copticorthodox.church/en/past-bishops/bishop-theophilos/",
+     "status": "conflict",
+     "note": "وطني كاتبة ٦ أبريل ١٩٤٢. المعتمد ١ أبريل (الموقع الرسمي)."
+    },
+    {
+     "kind": "الاسم قبل الرهبنة: إرميا نعيم",
+     "source": "https://www.youtube.com/watch?v=6RbIo0UUJtk&t=191",
+     "status": "film",
+     "note": "من كلام إخواته في الفيلم (03:11). مفيش مصدر مكتوب."
+    },
+    {
+     "kind": "التخرج من هندسة عين شمس",
+     "year": 1967,
+     "source": "https://www.youm7.com/story/2019/2/14/افتح-له-يا-رب-أبواب-الراحة-الكنيسة-تودع-أسقف-البحر/4140630",
+     "status": "confirmed"
+    },
+    {
+     "kind": "دخول دير السريان طالب رهبنة",
+     "date": "1975-05-06",
+     "source": "https://www.youtube.com/watch?v=6RbIo0UUJtk&t=732",
+     "status": "film",
+     "note": "من الفيلم بس (12:12). معتمد بقاعدة «الفيلم هو اللي يمشي»."
+    },
+    {
+     "kind": "الرهبنة باسم الراهب أغناطيوس السرياني",
+     "date": "1975-10-05",
+     "source": "https://copticorthodox.church/en/past-bishops/bishop-theophilos/",
+     "more": [
+      "https://www.youtube.com/watch?v=6RbIo0UUJtk&t=877"
+     ],
+     "status": "confirmed",
+     "note": "وطني كاتبة أكتوبر ١٩٧٦ (غلط)."
+    },
+    {
+     "kind": "القسيسية",
+     "date": "1978-01-03",
+     "source": "https://www.youtube.com/watch?v=6RbIo0UUJtk&t=877",
+     "status": "film",
+     "note": "الفيلم (14:37، الأنبا متاؤس): يوم عيد الأنبا يحنس كاما = ٢٥ كيهك، والكود بيقول ٢٥ كيهك ١٦٩٤ = ٣ يناير ١٩٧٨. كان مكتوب عندنا ٢ يناير، واتصلح بقرار صاحب المشروع (P1). اليوم السابع: ١٩٧٨ بس."
+    },
+    {
+     "kind": "القمصية",
+     "date": "1980-10-05",
+     "source": "https://www.youtube.com/watch?v=6RbIo0UUJtk&t=901",
+     "more": [
+      "https://www.youm7.com/story/2019/2/14/افتح-له-يا-رب-أبواب-الراحة-الكنيسة-تودع-أسقف-البحر/4140630"
+     ],
+     "status": "film",
+     "note": "السنة في اليوم السابع، واليوم من الفيلم بس (15:01)."
+    },
+    {
+     "kind": "الخدمة في فرنسا (باريس)",
+     "year": 1982,
+     "until": 1988,
+     "source": "https://www.youm7.com/story/2019/2/14/افتح-له-يا-رب-أبواب-الراحة-الكنيسة-تودع-أسقف-البحر/4140630",
+     "more": [
+      "https://www.youtube.com/watch?v=6RbIo0UUJtk&t=1114"
+     ],
+     "status": "confirmed",
+     "note": "وطني مختلفة (من ١٩٨٠ ولمدة ٦ سنين)."
+    },
+    {
+     "kind": "الأسقفية: أول أسقف للبحر الأحمر",
+     "date": "1992-06-14",
+     "source": "https://copticorthodox.church/en/past-bishops/bishop-theophilos/",
+     "more": [
+      "https://www.youtube.com/watch?v=6RbIo0UUJtk&t=1330"
+     ],
+     "status": "confirmed",
+     "note": "على صورة الرسامة في الفيلم (22:10) إمضا «١٤/٦/٩٢»."
+    },
+    {
+     "kind": "النياحة",
+     "date": "2019-02-12",
+     "source": "https://copticorthodox.church/en/past-bishops/bishop-theophilos/",
+     "status": "confirmed",
+     "note": "مجلة الكرازة كمان. الـ١٣ في الجرايد يوم إعلان الخبر."
+    },
+    {
+     "kind": "الصلاة عليه في الكنيسة البطرسية بالعباسية",
+     "date": "2019-02-14",
+     "source": "https://www.youm7.com/story/2019/2/14/افتح-له-يا-رب-أبواب-الراحة-الكنيسة-تودع-أسقف-البحر/4140630",
+     "status": "confirmed"
+    },
+    {
+     "kind": "الدفن في كاتدرائية الأنبا شنوده بالغردقة",
+     "date": "2019-02-15",
+     "source": "https://en.wataninet.com/?p=27928",
+     "status": "confirmed",
+     "note": "مصدر واحد + لقطات الفيلم (54:05–55:55)."
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا ثاؤفيلس 5.jpg",
+     "type": "photo"
+    },
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا ثاؤفيلس 6.jpg",
+     "type": "photo"
+    },
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا ثاؤفيلس 7.jpg",
+     "type": "photo"
+    },
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا ثاؤفيلس أول أسقف للبحر الأحمر-2.jpg",
+     "type": "photo"
+    },
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا ثاؤفيلس أول أسقف للبحر الأحمر.jpg",
+     "type": "photo"
+    },
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا ثاؤفيلس أول أسقف للبحر الأحمر3.jpg",
+     "type": "photo"
+    },
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا ثاؤفيلس أول أسقف للبحر الأحمر4.jpg",
+     "type": "photo"
     }
    ],
    "praise": null,
@@ -1331,13 +2193,29 @@
    "id": "ilarion",
    "name": "الأنبا إيلاريون أسقف البحر الأحمر",
    "cat": "bishops",
+   "class": "living",
+   "status": "complete",
+   "missing": [],
    "note": "أسقفنا، ربنا يحافظ عليه",
-   "alive": true,
    "feasts": [
     {
      "kind": "عيد رسامته",
      "gregorian": "06-09",
+     "year": 2019,
      "source": "https://copticorthodox.church/en/bishops/bishop-elarion-2/"
+    },
+    {
+     "kind": "عيد تجليسه",
+     "gregorian": "07-27",
+     "year": 2019,
+     "source": "https://gate.ahram.org.eg/News/2248155.aspx",
+     "note": "التجليس في الغردقة مساء السبت ٢٧ يوليو ٢٠١٩. البابا تواضروس رسمه قبلها في الكاتدرائية المرقسية بالأنبا رويس."
+    }
+   ],
+   "album": [
+    {
+     "src": "03-الأحياء-صور-حقيقية/الأنبا إيلاريون.jpg",
+     "type": "photo"
     }
    ],
    "praise": null,
@@ -1347,6 +2225,9 @@
    "id": "hedra",
    "name": "الأنبا هدرا مطران أسوان",
    "cat": "bishops",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تذكار رسامته",
@@ -1359,6 +2240,12 @@
      "source": "https://copticorthodox.church/en/past-bishops/metropolitan-hedra/"
     }
    ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا هدرا مطران أسوان.jpg",
+     "type": "photo"
+    }
+   ],
    "praise": null,
    "image": null
   },
@@ -1366,6 +2253,9 @@
    "id": "pachomius",
    "name": "الأنبا باخوميوس مطران البحيرة",
    "cat": "bishops",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تذكار رسامته",
@@ -1376,6 +2266,12 @@
      "kind": "نياحته",
      "gregorian": "03-30",
      "source": "https://copticorthodox.church/en/past-bishops/metropolitan-pakhomious/"
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا باخوميوس مطران البحيرة.jpg",
+     "type": "photo"
     }
    ],
    "praise": {
@@ -1389,6 +2285,9 @@
    "id": "bishoydam",
    "name": "الأنبا بيشوي مطران دمياط",
    "cat": "bishops",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تذكار رسامته",
@@ -1401,6 +2300,12 @@
      "source": "https://st-takla.org/Saints/bishops/baa/bishoy-demyat.html"
     }
    ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا بيشوي مطران دمياط.jpg",
+     "type": "photo"
+    }
+   ],
    "praise": null,
    "image": null
   },
@@ -1408,6 +2313,9 @@
    "id": "samuelserv",
    "name": "الأنبا صموئيل أسقف الخدمات",
    "cat": "bishops",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تذكار رسامته",
@@ -1420,6 +2328,12 @@
      "source": "https://st-takla.org/Saints/bishops/saad/samoil-services.html"
     }
    ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا صموئيل أسقف الخدمات.jpg",
+     "type": "photo"
+    }
+   ],
    "praise": null,
    "image": null
   },
@@ -1427,6 +2341,9 @@
    "id": "gregorios",
    "name": "الأنبا غريغوريوس أسقف البحث العلمي",
    "cat": "bishops",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تذكار رسامته",
@@ -1439,6 +2356,12 @@
      "source": "https://st-takla.org/Saints/bishops/ghain/ghrighorios-research.html"
     }
    ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا غريغوريوس أسقف البحث العلمي.jpg",
+     "type": "photo"
+    }
+   ],
    "praise": null,
    "image": null
   },
@@ -1446,6 +2369,9 @@
    "id": "bimen",
    "name": "الأنبا بيمن أسقف ملوي",
    "cat": "bishops",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تذكار رسامته",
@@ -1458,6 +2384,12 @@
      "source": "https://st-takla.org/Saints/bishops/baa/bimen-mallawy.html"
     }
    ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا بيمن أسقف ملوي.jpg",
+     "type": "photo"
+    }
+   ],
    "praise": null,
    "image": null
   },
@@ -1465,6 +2397,9 @@
    "id": "mikhailassiut",
    "name": "الأنبا ميخائيل مطران أسيوط",
    "cat": "bishops",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تذكار رسامته",
@@ -1477,6 +2412,12 @@
      "source": "https://st-takla.org/Saints/bishops/meem/mikhail-assiut.html"
     }
    ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا ميخائيل مطران أسيوط.jpg",
+     "type": "photo"
+    }
+   ],
    "praise": null,
    "image": null
   },
@@ -1484,6 +2425,9 @@
    "id": "epiphanius",
    "name": "الأنبا إبيفانيوس أسقف دير أبو مقار",
    "cat": "bishops",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تذكار رسامته",
@@ -1496,6 +2440,12 @@
      "source": "https://st-takla.org/Saints/bishops/alif/abifanios-makar.html"
     }
    ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا إبيفانيوس أسقف دير أبو مقار.jpg",
+     "type": "photo"
+    }
+   ],
    "praise": null,
    "image": null
   },
@@ -1503,6 +2453,9 @@
    "id": "athanasiusbs",
    "name": "الأنبا أثناسيوس مطران بني سويف",
    "cat": "bishops",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تذكار رسامته",
@@ -1515,6 +2468,12 @@
      "source": "https://st-takla.org/Saints/bishops/alif/athnasius-banysweif.html"
     }
    ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا أثناسيوس مطران بني سويف.jpg",
+     "type": "photo"
+    }
+   ],
    "praise": null,
    "image": null
   },
@@ -1522,6 +2481,9 @@
    "id": "youannes",
    "name": "الأنبا يوأنس أسقف الغربية",
    "cat": "bishops",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تذكار رسامته",
@@ -1534,6 +2496,12 @@
      "source": "https://st-takla.org/Saints/bishops/yaa/youannes-gharbia.html"
     }
    ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا يوأنس أسقف الغربية.jpg",
+     "type": "photo"
+    }
+   ],
    "praise": null,
    "image": null
   },
@@ -1541,6 +2509,9 @@
    "id": "karasmahalla",
    "name": "الأنبا كاراس أسقف المحلة",
    "cat": "bishops",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تذكار رسامته",
@@ -1553,6 +2524,12 @@
      "source": "https://st-takla.org/Saints/bishops/kef/karas-mahalla.html"
     }
    ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأنبا كاراس أسقف المحلة.jpg",
+     "type": "photo"
+    }
+   ],
    "praise": null,
    "image": null
   },
@@ -1560,11 +2537,20 @@
    "id": "bishoykamel",
    "name": "القديس القمص بيشوي كامل",
    "cat": "fathers",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "gregorian": "03-21",
      "source": "https://st-takla.org/lyrics/en/glorifications/p/pishoy-kamel.html"
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القديس القمص بيشوي كامل.jpg",
+     "type": "photo"
     }
    ],
    "praise": {
@@ -1578,11 +2564,20 @@
    "id": "yostos",
    "name": "القديس أبونا يسطس الأنطوني",
    "cat": "fathers",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "gregorian": "12-17",
      "source": "https://st-takla.org/Saints/Coptic-Orthodox-Saints-Biography/Coptic-Saints-Story_1915.html"
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القديس أبونا يسطس الأنطوني.jpg",
+     "type": "photo"
     }
    ],
    "praise": null,
@@ -1592,11 +2587,20 @@
    "id": "abdelmessih",
    "name": "أبونا عبد المسيح المناهري",
    "cat": "fathers",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "coptic": "8-6",
      "source": "https://st-takla.org/Saints/Coptic-Orthodox-Saints-Biography/Coptic-Saints-Story_1237.html"
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/أبونا عبد المسيح المناهري.jpg",
+     "type": "photo"
     }
    ],
    "praise": {
@@ -1610,11 +2614,20 @@
    "id": "faltaos",
    "name": "أبونا فلتاؤس السرياني",
    "cat": "fathers",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
      "gregorian": "03-17",
      "source": "https://www.albawabhnews.com/2998309"
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/أبونا فلتاؤس السرياني.jpg",
+     "type": "photo"
     }
    ],
    "praise": {
@@ -1625,14 +2638,273 @@
    "image": null
   },
   {
+   "id": "abdelmessihhabashy",
+   "name": "أبونا عبد المسيح الحبشي",
+   "cat": "fathers",
+   "class": "reposed",
+   "status": "incomplete",
+   "missing": [
+    "feasts"
+   ],
+   "note": "راهب حبشي متوحّد في مغارة جنب دير البراموس من ١٩٣٥، واتنيح في أورشليم.",
+   "feasts": [],
+   "sources": [
+    "https://st-takla.org/Saints/Coptic-Orthodox-Saints-Biography/Coptic-Saints-Story_1235.html"
+   ],
+   "pending": [
+    {
+     "field": "feasts",
+     "need": "يوم وسنة نياحته في أورشليم",
+     "checked": [
+      "https://st-takla.org/Saints/Coptic-Orthodox-Saints-Biography/Coptic-Saints-Story_1235.html"
+     ],
+     "note": "السيرة في الأنبا تكلا بتقول إنه اتنيح في أورشليم من غير تاريخ."
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/أبونا عبد المسيح الحبشي.jpg",
+     "type": "photo"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "andraos",
+   "name": "أبونا أندراوس الصموئيلي",
+   "cat": "fathers",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "gregorian": "02-07",
+     "year": 1989,
+     "source": "https://st-takla.org/Saints/Coptic-Orthodox-Saints-Biography/Coptic-Saints-Story_2086.html",
+     "more": [
+      "https://daranton-international.com/%D8%AA%D8%B0%D9%83%D8%A7%D8%B1-%D8%B9%D8%B4%D9%8A%D8%A9-%D9%86%D9%8A%D8%A7%D8%AD%D8%A9-%D8%A7%D8%A8%D9%88%D9%86%D8%A7-%D8%A3%D9%86%D8%AF%D8%B1%D8%A7%D9%88%D8%B3-%D8%A7%D9%84%D8%B5%D9%85%D9%88%D8%A6/"
+     ],
+     "note": "الأنبا تكلا ودار أنطون: ٧ فبراير ١٩٨٩ = ٣٠ طوبة ١٧٠٥ (بالكود). OrthodoxWiki كاتبة ٧ فبراير ١٩٨٨ (https://orthodoxwiki.org/Andrews_(Ibrahim)_the_Samuelite)، ومش معتمدة."
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/أبونا أندراوس الصموئيلي.jpg",
+     "type": "photo"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "behiry",
+   "name": "القديس القمص ميخائيل البحيري",
+   "cat": "fathers",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "6-16",
+     "year": 1923,
+     "source": "https://www.dostor.org/5435970",
+     "note": "دير المحرق احتفل بالعيد الـ١٠٣ لنياحته يوم الاتنين ٢٣ فبراير ٢٠٢٦ = ١٦ أمشير ١٧٤٢ (بالكود)، يعني النياحة ١٦ أمشير ١٦٣٩ = ٢٣ فبراير ١٩٢٣. صفحة ١٦ أمشير في قطمارس الأنبا تكلا مفيهاش اسمه."
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القديس القمص ميخائيل البحيري.jpg",
+     "type": "photo"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "mikhailibrahim",
+   "name": "القمص ميخائيل إبراهيم",
+   "cat": "fathers",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "gregorian": "03-26",
+     "year": 1975,
+     "source": "https://orthodoxwiki.org/Mikhail_Ibrahim",
+     "note": "٢٦ مارس ١٩٧٥ = ١٧ برمهات ١٦٩١ (بالكود). كاهن كنيسة مارمرقس بشبرا."
+    }
+   ],
+   "pending": [
+    {
+     "field": "milestones",
+     "need": "رابط بيان المجمع المقدس (مايو ٢٠٢٦) بالاعتراف بقداسته، علشان نكتب «القديس» قبل اسمه",
+     "checked": [],
+     "note": "الشغل اللي فات ذكر الاعتراف من غير ما يحفظ الرابط."
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القمص ميخائيل إبراهيم.jpg",
+     "type": "photo"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "salibsoryal",
+   "name": "القمص صليب سوريال",
+   "cat": "fathers",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
+   "note": "كاهن كنيسة مارمرقس بالجيزة. اتولد ٦ فبراير ١٩١٦، واتكرّس ١٩٤٨.",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "gregorian": "09-02",
+     "year": 1994,
+     "source": "https://st-takla.org/characters/priest-pastor-father/saad/salib-soryal.html",
+     "more": [
+      "https://www.frantoniosfahmy.com/authors/68"
+     ],
+     "note": "المصدرين متفقين: ٢ سبتمبر ١٩٩٤ = ٢٧ مسرى ١٧١٠ (بالكود). الحاشية ١ في الأنبا تكلا هي عدد مجلة الكرازة ١٦ سبتمبر ١٩٩٤ ومكتوب «6 توت 1710»، والصح بالكود ٦ توت ١٧١١."
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القمص صليب سوريال.jpg",
+     "type": "photo"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "youssefasaad",
+   "name": "القمص يوسف أسعد",
+   "cat": "fathers",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
+   "note": "كاهن كنيسة العدرا بالعمرانية. اتولد ١٦ سبتمبر ١٩٤٤، واترسم ٤ نوفمبر ١٩٦٧.",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "gregorian": "09-24",
+     "year": 1993,
+     "source": "https://st-takla.org/characters/priest-pastor-father/yaa/yosef-asad.html",
+     "note": "تنيح صباح الجمعة ٢٤ سبتمبر ١٩٩٣ في حادثة وهو رايح إسكندرية = ١٤ توت ١٧١٠ (بالكود)."
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القمص يوسف أسعد.jpg",
+     "type": "photo"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "morcosdawood",
+   "name": "القمص مرقس داود",
+   "cat": "fathers",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
+   "note": "اترسم كاهن صيف ١٩٤٨ للخدمة في أديس أبابا.",
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "gregorian": "10-26",
+     "year": 1986,
+     "source": "https://www.coptstoday.com/articles/Detail.php?Id=295585",
+     "note": "المقال: «تنيح بسلام في 26 أكتوبر 1986» = ١٦ بابه ١٧٠٣ (بالكود). المقال كاتب الاسم «مرقص»، وفيه تعارض داخلي في سنة الميلاد (١٨٧٩ في العنوان و٢٠ مايو ١٨٩٧ في النص)."
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القمص مرقس داود.jpg",
+     "type": "photo"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "lukasidarous",
+   "name": "القمص لوقا سيداروس",
+   "cat": "fathers",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "gregorian": "08-26",
+     "year": 2020,
+     "source": "https://en.wataninet.com/?p=33500",
+     "note": "اتنيح في لوس أنجلوس ٢٦ أغسطس ٢٠٢٠ = ٢٠ مسرى ١٧٣٦ (بالكود). اترسم ١٧ مارس ١٩٦٧ على إيد البابا كيرلس السادس."
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القمص لوقا سيداروس.jpg",
+     "type": "photo"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "mattaelmeskeen",
+   "name": "القمص متى المسكين",
+   "cat": "fathers",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "gregorian": "06-08",
+     "year": 2006,
+     "source": "https://www.dostor.org/5586790",
+     "note": "٨ يونيو ٢٠٠٦ = ١ بؤونه ١٧٢٢ (بالكود). بقرار صاحب المشروع: باسمه «القمص متى المسكين»، من غير لقب «القديس»."
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/القمص متى المسكين.jpg",
+     "type": "photo"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
    "id": "simon",
    "name": "القديس سمعان الخراز",
    "cat": "laity",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "تذكار نقل جبل المقطم",
      "gregorian": "11-27",
      "source": "https://copticorthodox.church/2021/03/04/%D8%A8%D8%AF%D8%A1-%D8%A7%D9%84%D8%AC%D9%84%D8%B3%D8%A9-%D8%A7%D9%84%D8%B9%D8%A7%D9%85%D8%A9-%D9%84%D9%84%D9%85%D8%AC%D9%85%D8%B9-%D8%A7%D9%84%D9%85%D9%82%D8%AF%D8%B3-%D8%A8%D8%AD%D8%B6%D9%88%D8%B1/"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/59 - القديس سمعان الخراز.png",
+     "type": "ai"
     }
    ],
    "praise": null,
@@ -1642,6 +2914,9 @@
    "id": "gohary",
    "name": "المعلم إبراهيم الجوهري",
    "cat": "laity",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
    "feasts": [
     {
      "kind": "نياحته",
@@ -1650,8 +2925,277 @@
      "title": "نياحة المعلم إبراهيم الجوهرى"
     }
    ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/المعلم إبراهيم الجوهري.jpg",
+     "type": "photo"
+    }
+   ],
    "praise": null,
    "image": null
+  },
+  {
+   "id": "habibgirgis",
+   "name": "القديس الأرشيدياكون حبيب جرجس",
+   "cat": "laity",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "gregorian": "08-21",
+     "year": 1951,
+     "source": "https://www.youm7.com/story/2020/8/21/x/4938940",
+     "more": [
+      "https://en.wikipedia.org/wiki/Habib_Girgis"
+     ]
+    }
+   ],
+   "milestones": [
+    {
+     "kind": "الاعتراف بقداسته من المجمع المقدس",
+     "date": "2013-06-20",
+     "source": "https://en.wikipedia.org/wiki/Habib_Girgis",
+     "status": "confirmed",
+     "note": "ويكيبيديا واليوم السابع. بيان المجمع نفسه لسه مش معانا."
+    }
+   ],
+   "album": [
+    {
+     "src": "02-المعاصرون-والمتنيحون-صور-حقيقية/الأرشيدياكون القديس حبيب جرجس.jpg",
+     "type": "photo"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "ephrem",
+   "name": "القديس مار أفرام السرياني",
+   "cat": "teachers",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "11-15",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=22&imonth=7&iyear=2027&dbl=ar",
+     "title": "نياحة القديس الانبا افرام السريانى"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/61 - القديس مار أفرام السرياني.png",
+     "type": "ai"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "severus",
+   "name": "القديس ساويرس الأنطاكي",
+   "cat": "teachers",
+   "class": "reposed",
+   "status": "complete",
+   "missing": [],
+   "feasts": [
+    {
+     "kind": "نياحته",
+     "coptic": "6-14",
+     "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=21&imonth=2&iyear=2027&dbl=ar",
+     "title": "نياحة القديس ساويرس بطريرك انطاكية"
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/62 - القديس ساويرس الأنطاكي.png",
+     "type": "ai"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "isaacsyrian",
+   "name": "القديس مار إسحق السرياني",
+   "cat": "teachers",
+   "class": "reposed",
+   "status": "incomplete",
+   "missing": [
+    "feasts"
+   ],
+   "feasts": [],
+   "pending": [
+    {
+     "field": "feasts",
+     "need": "يوم تذكاره في الكنيسة القبطية (لو له يوم في السنكسار أو قرار من المجمع)",
+     "checked": [
+      "https://st-takla.org/"
+     ],
+     "note": "مالقيتوش في سنكسار الأنبا تكلا. الكنايس التانية بتعيّد له في أيام مختلفة، ومش هناخد واحد منهم من غير مصدر قبطي."
+    }
+   ],
+   "album": [
+    {
+     "src": "01-القديسين-رسومات-AI/64 - القديس مار إسحق السرياني.png",
+     "type": "ai"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "angelosmourad",
+   "name": "أبونا أنجيلوس مراد",
+   "cat": "ourchurch",
+   "class": "living",
+   "status": "complete",
+   "missing": [],
+   "feasts": [
+    {
+     "kind": "عيد رسامته",
+     "gregorian": "03-20",
+     "year": 2021,
+     "source": "https://www.youm7.com/story/2021/11/4/x/5521990",
+     "note": "رقم 3 في قايمة الـ٩ كهنة اللي رسمهم الأنبا إيلاريون في مارس ٢٠٢١ (الشماس بيتر مراد مساك باسم القس أنجليوس). خبر اليوم السابع (٤ نوفمبر ٢٠٢١) بيقول «خلال شهر مارس الماضى» من غير اليوم؛ يوم السبت ٢٠ مارس من صاحب المشروع. الخبر الأصلي بتاريخ اليوم لسه مالقيتوش. ٢٠ مارس ٢٠٢١ = ١١ برمهات ١٧٣٧ (بالكود)."
+    }
+   ],
+   "pending": [
+    {
+     "field": "feasts",
+     "need": "الخبر الأصلي لرسامة الـ٩ كهنة (مارس ٢٠٢١) وفيه اليوم ٢٠ مارس",
+     "checked": [
+      "https://www.youm7.com/story/2021/11/4/x/5521990"
+     ],
+     "note": "اليوم معتمد من صاحب المشروع، والمصدر المكتوب لحد دلوقتي بالشهر بس."
+    }
+   ],
+   "album": [
+    {
+     "src": "03-الأحياء-صور-حقيقية/أبونا أنجيلوس مراد.jpg",
+     "type": "photo"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "philopaterromany",
+   "name": "أبونا فيلوباتير روماني",
+   "cat": "ourchurch",
+   "class": "living",
+   "status": "complete",
+   "missing": [],
+   "feasts": [
+    {
+     "kind": "عيد رسامته",
+     "gregorian": "03-20",
+     "year": 2021,
+     "source": "https://www.youm7.com/story/2021/11/4/x/5521990",
+     "note": "رقم 9 في قايمة الـ٩ كهنة اللي رسمهم الأنبا إيلاريون في مارس ٢٠٢١ (الشماس بيشوى رومانى خليل باسم القس فلوباتير). خبر اليوم السابع (٤ نوفمبر ٢٠٢١) بيقول «خلال شهر مارس الماضى» من غير اليوم؛ يوم السبت ٢٠ مارس من صاحب المشروع. الخبر الأصلي بتاريخ اليوم لسه مالقيتوش. ٢٠ مارس ٢٠٢١ = ١١ برمهات ١٧٣٧ (بالكود)."
+    }
+   ],
+   "pending": [
+    {
+     "field": "feasts",
+     "need": "الخبر الأصلي لرسامة الـ٩ كهنة (مارس ٢٠٢١) وفيه اليوم ٢٠ مارس",
+     "checked": [
+      "https://www.youm7.com/story/2021/11/4/x/5521990"
+     ],
+     "note": "اليوم معتمد من صاحب المشروع، والمصدر المكتوب لحد دلوقتي بالشهر بس."
+    }
+   ],
+   "album": [
+    {
+     "src": "03-الأحياء-صور-حقيقية/أبونا فيلوباتير روماني.jpeg",
+     "type": "photo"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "ibrahimisravim",
+   "name": "القمص إبراهيم إسراڤيم",
+   "cat": "ourchurch",
+   "class": "living",
+   "status": "incomplete",
+   "missing": [
+    "feasts"
+   ],
+   "note": "بيتكلم في فيلم «حكاية أب» (أهم مقطع 24:37).",
+   "feasts": [],
+   "sources": [
+    "https://www.youtube.com/watch?v=6RbIo0UUJtk&t=1477"
+   ],
+   "pending": [
+    {
+     "field": "feasts",
+     "need": "يوم رسامته قس، ويوم ترقيته قمص",
+     "checked": [
+      "https://www.youtube.com/watch?v=6RbIo0UUJtk"
+     ],
+     "note": "محتاجين خبر أو ورقة. نسأل أبونا أو الإيبارشية."
+    }
+   ],
+   "album": [
+    {
+     "src": "03-الأحياء-صور-حقيقية/القمص إبراهيم إسرافيم.png",
+     "type": "photo"
+    }
+   ],
+   "praise": null,
+   "image": null
+  },
+  {
+   "id": "isaacnabih",
+   "name": "أبونا إسحاق نبيه",
+   "cat": "ourchurch",
+   "class": "living",
+   "status": "incomplete",
+   "missing": [
+    "feasts"
+   ],
+   "feasts": [],
+   "pending": [
+    {
+     "field": "feasts",
+     "need": "يوم رسامته",
+     "checked": [],
+     "note": "محتاجين خبر أو ورقة. نسأل أبونا أو الإيبارشية."
+    }
+   ],
+   "album": [
+    {
+     "src": "03-الأحياء-صور-حقيقية/أبونا إسحاق نبيه.jpg",
+     "type": "photo"
+    },
+    {
+     "src": "03-الأحياء-صور-حقيقية/أبونا إسحاق نبيه2.jpg",
+     "type": "photo"
+    }
+   ],
+   "praise": null,
+   "image": null
+  }
+ ],
+ "occasions": [
+  {
+   "id": "redseadiocese",
+   "name": "إيبارشية البحر الأحمر",
+   "kind": "ذكرى سيامة أول أسقف للإيبارشية وبداية عهدها المستقل",
+   "gregorian": "06-14",
+   "year": 1992,
+   "source": "https://copticorthodox.church/en/past-bishops/bishop-theophilos/",
+   "more": [
+    "https://www.youm7.com/story/2019/2/14/افتح-له-يا-رب-أبواب-الراحة-الكنيسة-تودع-أسقف-البحر/4140630",
+    "https://st-takla.org/Saints/bishops/meem/makarius-quena.html",
+    "https://www.youtube.com/watch?v=6RbIo0UUJtk&t=59"
+   ],
+   "note": "البحر الأحمر كانت تبع الأنبا مكاريوس أسقف قنا وقوص وقفط ونقادة ودشنا والبحر الأحمر (١٩٦٥–١٩٩١، نياحته ٣ فبراير ١٩٩١)، وقبله الأنبا كيرلس مطران قنا ومحافظات البحر الأحمر. بعد نياحة الأنبا مكاريوس بقت إيبارشية مستقلة (اليوم السابع)، والبابا شنودة الثالث رسم الأنبا ثاؤفيلس أول أسقف ليها يوم ١٤ يونيو ١٩٩٢ = ٧ بؤونه ١٧٠٨ (بالكود). الفيلم (00:59): الإيبارشية اتقسمت على ٤ أساقفة، والرقم ده من الفيلم بس. نفس اليوم تذكار رسامة الأنبا ثاؤفيلس في كارت القديسين، فـ«مناسبات كنيستنا» لازم تمنع التكرار (P5)."
   }
  ]
 }
