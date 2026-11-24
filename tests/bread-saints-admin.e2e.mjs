@@ -9,7 +9,7 @@
 // Run: cd tools && node --test --test-concurrency=1 ../tests/bread-saints-admin.e2e.mjs
 // Shots (the design sizes, for the side-by-side compare): SAINTS_SHOTS=1 → tools/.cache/bread-saints/
 
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -259,4 +259,31 @@ test('an occasion one time; the person page and the list on a phone (390) withou
   await shot(m.page, '03-person-theophilus-m');
   assert.deepEqual(m.problems, []);
   await m.context.close();
+});
+
+test('P4: «استورد صور الألبومات» while media/import-p4/p4.json is on the site: every picture through the normal upload, every album saved as a draft, once', async () => {
+  const plan = JSON.parse(readFileSync(`${ROOT}media/import-p4/p4.json`, 'utf8')).pictures;
+  freshWorker();
+  const d = await open();
+  await go(d.page, 'breadpeople');
+  await d.page.waitForSelector('[data-import] [data-act="saints-import"]', { timeout: 8000 });
+  assert.match(await d.page.$eval('[data-import]', n => n.textContent), new RegExp(String(plan.length).replace(/\d/g, x => '٠١٢٣٤٥٦٧٨٩'[x]) + ' صورة'));
+  await d.page.click('[data-act="saints-import"]');
+  await d.page.waitForFunction(() => !document.querySelector('[data-import]'), { timeout: 240000, polling: 500 });
+  const media = world.spreadsheet.getSheetByName('Media').getDataRange().getValues().length - 1;
+  assert.equal(media, plan.length, 'one library picture each, through apiUploadMedia');
+  const saves = posts(/\/saints\/item$/);
+  const people = new Set(plan.map(x => x.person));
+  assert.equal(saves.length, people.size, 'one album save a person');
+  const th = fake.state.saints.items.find(i => i.id === 'theophilus').data.album;
+  assert.equal(th.length, 7);
+  assert.equal(th.filter(a => a.main).length, 1);
+  assert.ok(th.every(a => /^media\/\d{4}\/img-[a-z0-9]{8}\.webp$/.test(a.media) && a.credit && a.crop), JSON.stringify(th[0]));
+  assert.ok(th.every(a => a.src), 'the owner file names kept beside, internal');
+  const mercurius = fake.state.saints.items.find(i => i.id === 'mercurius').data.album;
+  assert.equal(mercurius[0].type, 'ai');
+  // the bar is gone and the draft count shows the saved albums («راجع وانشر»)
+  await d.page.waitForFunction(() => /راجع وانشر/.test(document.querySelector('.sa-viewbar') ? document.querySelector('.sa-viewbar').textContent : ''), { timeout: 15000 });
+  assert.deepEqual(d.problems, []);
+  await d.context.close();
 });

@@ -89,7 +89,8 @@ try {
     const mine = DATA.pictures.filter(x => x.person === it.id && map[x.key]);
     if (!mine.length) continue;
     const album = mine.map(x => {
-      const a = { media: map[x.key].path, src: x.src, type: x.type };
+      const a = { media: map[x.key].path, type: x.type };
+      if (x.src) a.src = x.src;
       if (x.main && mine.length > 1) a.main = true;
       if (x.stage) a.stage = x.stage;
       if (x.occasion) a.occasion = x.occasion;

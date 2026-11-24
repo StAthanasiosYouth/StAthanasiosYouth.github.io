@@ -209,6 +209,98 @@
   }
   function fail(error) { A.fail(error); }
 
+  /* ---------- P4: the one-time import of the approved album pictures (docs/daily-bread/saints/P4-PROGRESS.md) ----------
+     While media/import-p4/p4.json is on the site: every picture through the normal media flow (apiUploadMedia: the
+     card copy as full, the 480, the 160, the colour; the library answers `duplicate` for one it has), then each
+     person's album saved with its rev (the draft; «راجع وانشر» as usual). Safe to run again. The folder is deleted
+     right after, and this bar goes with it. */
+  var IMPORT_URL = '../media/import-p4/';
+  var CREDIT = { ai: 'رسم بالذكاء الاصطناعي اتعمل للمشروع', photo: 'من صاحب المشروع · المصدر الأصلي مش متسجل', art: 'رسم من صاحب المشروع · الفنان مش متسجل' };
+  SA.imp = SA.imp || { checked: false, plan: null, busy: false, step: '', done: false };
+  function importCheck() {
+    if (SA.imp.checked) return;
+    SA.imp.checked = true;
+    fetch(IMPORT_URL + 'p4.json', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+      if (d && Array.isArray(d.pictures) && d.pictures.length) { SA.imp.plan = d.pictures; if (K.onTab('breadpeople')) A.render(); }
+    }).catch(function () {});
+  }
+  function b64Of(url) {
+    return fetch(url, { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error('الملف ' + url + ' مش موجود'); return r.blob(); }).then(function (blob) {
+      return new Promise(function (resolve, reject) {
+        var fr = new FileReader();
+        fr.onload = function () { resolve(String(fr.result).split(',')[1]); };
+        fr.onerror = function () { reject(fr.error || new Error('read failed')); };
+        fr.readAsDataURL(blob);
+      });
+    });
+  }
+  function runImport() {
+    var plan = SA.imp.plan;
+    var paths = {};
+    var n = 0;
+    SA.imp.busy = true; SA.imp.step = 'بيرفع الصور: ٠ من ' + ar(plan.length); A.render();
+    var chain = Promise.resolve();
+    plan.forEach(function (x) {
+      chain = chain.then(function () {
+        return Promise.all(['', '-480', '-160'].map(function (s) { return b64Of(IMPORT_URL + x.key + s + '.webp'); }));
+      }).then(function (b) {
+        return A.call('apiUploadMedia', { mime: 'image/webp', full: b[0], thumb: b[1], tiny: b[2], tinyMime: 'image/webp', color: x.color, width: x.w, height: x.h, alt: x.alt, name: x.key });
+      }).then(function (res) {
+        if (!res || !res.media || !res.media.path) throw new Error('الرفع رجع ناقص (' + x.key + ')');
+        paths[x.key] = res.media.path;
+        n++; SA.imp.step = 'بيرفع الصور: ' + ar(n) + ' من ' + ar(plan.length);
+        var s = document.querySelector('[data-imp-step]'); if (s) s.textContent = SA.imp.step;
+      });
+    });
+    return chain.then(function () { return load(true); }).then(function () {
+      var ids = [];
+      plan.forEach(function (x) { if (ids.indexOf(x.person) < 0) ids.push(x.person); });
+      var saved = 0;
+      var c2 = Promise.resolve();
+      ids.forEach(function (id) {
+        c2 = c2.then(function () {
+          var it = itemOf('person', id);
+          if (!it) return;
+          var album = plan.filter(function (x) { return x.person === id; }).map(function (x) {
+            var a = { media: paths[x.key], type: x.type };
+            ['main', 'stage', 'occasion', 'caption'].forEach(function (k) { if (x[k] != null) a[k] = x[k]; });
+            a.credit = CREDIT[x.type] || '';
+            a.crop = x.crop;
+            return a;
+          });
+          // the owner's file names (src) stay as they were, beside the library picture of the same order
+          var old = it.data.album || [];
+          album.forEach(function (a, i) { if (!plan.filter(function (x) { return x.person === id; })[i].fresh && old[i] && old[i].src && !old[i].media) a.src = old[i].src; });
+          if (JSON.stringify(old) === JSON.stringify(album)) return;
+          return api('POST', 'item', { kind: 'person', rev: it.rev, item: Object.assign({}, it.data, { album: album }) }).then(function () {
+            saved++; SA.imp.step = 'بيملا الألبومات: ' + ar(saved) + ' من ' + ar(ids.length);
+            var s = document.querySelector('[data-imp-step]'); if (s) s.textContent = SA.imp.step;
+          });
+        });
+      });
+      return c2;
+    }).then(function () { return load(true); }).then(function () {
+      SA.imp.busy = false; SA.imp.done = true;
+      A.toast('الصور اتستوردت ✓ (لسه مش منشورة: «راجع وانشر»)');
+      A.render();
+    }).catch(function (error) {
+      SA.imp.busy = false; SA.imp.step = '';
+      A.render();
+      fail(error);
+    });
+  }
+  function importBar() {
+    importCheck();
+    var plan = SA.imp.plan;
+    if (!plan || SA.imp.done) return null;
+    var persons = plan.reduce(function (m, x) { m[x.person] = 1; return m; }, {});
+    return el('div', { class: 'ba-alert ba-alert--info sa-dirty', role: 'status', 'data-import': '' },
+      el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('photos')),
+      el('span', {}, el('b', { text: 'صور الألبومات جاهزة للاستيراد' }),
+        el('small', { 'data-imp-step': '', text: SA.imp.busy ? SA.imp.step : ar(plan.length) + ' صورة لـ' + ar(Object.keys(persons).length) + ' شخص، اتراجعت واتوافق عليها (P4). بتدخل مكتبة الصور، والألبومات بتتحفظ مسودة.' })),
+      K.btn(SA.imp.busy ? 'بيستورد…' : 'استورد', 'photos', 'btn--primary', { 'data-act': 'saints-import', disabled: SA.imp.busy, onclick: function () { if (!SA.imp.busy) runImport(); } }));
+  }
+
   /* «فيه تعديل محفوظ ومش منشور» */
   function dirtyBar() {
     var n = SA.data ? SA.data.changes : 0;
@@ -388,6 +480,7 @@
     var all = people().map(function (i) { return i.data; });
     var inc = all.filter(function (p) { return p.status === 'incomplete'; });
     r.append(dirtyBar() || el('span', { hidden: true }));
+    r.append(importBar() || el('span', { hidden: true }));
     r.append(el('div', { class: 'media8-kpis sa-kpis' },
       kpi('users', 'الكل', ar(all.length), ''),
       kpi('cross', 'متنيحين · كارت التذكار', ar(all.filter(function (p) { return p.class === 'reposed'; }).length), 'reposed'),

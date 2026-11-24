@@ -73,12 +73,15 @@ if (!PICS) throw new Error('pictures folder not found');
 await mkdir(OUT, { recursive: true });
 const rows = [];
 for (const p of reg.people) {
-  const album = p.album || [];
+  // plan.replace (owner 2026-11-24): a person's pictures from another file instead of the owner's folder (Anba Abraam:
+  // the Wikimedia Commons picture, downloaded with the owner's yes, instead of the AI one)
+  const rp = plan.replace && plan.replace[p.id];
+  const album = rp ? rp.map(r => ({ file: r.file, type: r.type })) : (p.album || []);
   for (let i = 0; i < album.length; i++) {
     const a = album[i];
     const key = p.id + '-' + (i + 1);
-    const pl = (plan.items && plan.items[a.src]) || {};
-    const input = await readFile(join(PICS, a.src));
+    const pl = rp ? rp[i] : (plan.items && plan.items[a.src]) || {};
+    const input = await readFile(a.file || join(PICS, a.src));
     const meta = await sharp(input).metadata();
     const card = await encode(input, SIZES.card);
     const thumb = await encode(input, SIZES.thumb);
@@ -88,7 +91,7 @@ for (const p of reg.people) {
     await writeFile(join(OUT, key + '-160.webp'), tiny.data);
     const crop = pl.crop || await suggestCrop(input, meta.width, meta.height);
     rows.push({
-      key, person: p.id, name: p.name, cat: p.cat, class: p.class, src: a.src,
+      key, person: p.id, name: p.name, cat: p.cat, class: p.class, src: a.src || '', fresh: !!rp,
       type: pl.type || a.type, main: pl.main != null ? pl.main : album.length === 1,
       stage: pl.stage || '', occasion: pl.occasion || '', caption: pl.caption || '', ask: pl.ask || '', flags: pl.flags || [],
       source: pl.source || plan.defaults[pl.type || a.type].source, terms: pl.terms || plan.defaults[pl.type || a.type].terms,
@@ -102,7 +105,7 @@ for (const p of reg.people) {
     process.stdout.write('.');
   }
 }
-for (const src of Object.keys(plan.items || {})) if (!rows.some(r => r.src === src)) throw new Error('plan.json item not in any album: ' + src);
+for (const src of Object.keys(plan.items || {})) if (!rows.some(r => r.src === src) && !Object.keys(plan.replace || {}).some(id => (reg.people.find(p => p.id === id).album || []).some(a => a.src === src))) throw new Error('plan.json item not in any album: ' + src);
 const persons = reg.people.map(p => ({ id: p.id, name: p.name, cat: p.cat, class: p.class, feasts: (p.feasts || []).map(f => f.kind) }));
 await writeFile(join(HERE, '..', 'pictures.json'), JSON.stringify({ made: new Date().toISOString(), out: OUT, categories: reg.categories, persons, pending: plan.pending || [], pictures: rows }, null, 1) + '\n');
 console.log('\n' + rows.length + ' pictures → ' + OUT);
