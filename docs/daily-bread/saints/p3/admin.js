@@ -63,6 +63,8 @@ function demoDirty() {
   const abraam = byId('abraam');
   if (abraam) { abraam.album.forEach(a => { a.main = false; }); abraam.album.unshift({ src: 'صورة حقيقية للأنبا إبرآم (من P4).webp', type: 'photo', main: true }); changed.add('abraam'); }
 }
+/* a framing done with the crop tool, for the preview: Fr Angelos's photo is tall (his whole body); the face kept */
+{ const ang = byId('angelosmourad'); if (ang && ang.album[0]) ang.album[0].crop = { x: 50, y: 7, z: 1.9 }; }
 let demoComplete = false;
 if (q.get('dirty') === '1' || S.s === 'publish') demoDirty();
 if (q.get('demo') === 'complete') {
@@ -125,7 +127,15 @@ const TITLES = /^(القديس(ة)?|الشهيد(ة)?|البابا|الأنبا|
 const letter = p => { let n = p.name.trim(); for (let k = 0; k < 3 && TITLES.test(n); k++) n = n.replace(TITLES, ''); return esc(n.charAt(0)); };
 const mainOf = p => (p.album || []).find(a => a.main) || (p.album || [])[0] || null;
 const picUrl = (src, w) => PICS && src ? `/__pic/${w}/${src.split('/').map(encodeURIComponent).join('/')}` : '';
-const picImg = (p, w, cls) => { const a = mainOf(p); const u = a && picUrl(a.src, w); return u ? `<img class="${cls}" src="${u}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''; };
+/*
+ * Each photo's own framing (owner 2026-11-24, «زي لما تضيف صورة شخصية»): album item `crop: { x, y, z }` = the point kept
+ * in view (% of the picture) and the zoom (1–3). Every frame (big tile, small face, the person's picture) fills itself
+ * from the same crop, so nothing important is cut and no side stays empty. Without a crop: the top middle (faces).
+ */
+const CROP0 = { x: 50, y: 12, z: 1 };
+const cropOf = a => Object.assign({}, CROP0, a && a.crop);
+const cropStyle = c => `object-position:${c.x}% ${c.y}%;transform:scale(${c.z});transform-origin:${c.x}% ${c.y}%`;
+const picImg = (p, w, cls) => { const a = mainOf(p); const u = a && picUrl(a.src, w); return u ? `<img class="${cls} sa-cropimg" src="${u}" style="${cropStyle(cropOf(a))}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''; };
 const face = (p, big = false) => { const img = picImg(p, big ? 360 : 160, 'ycard__photo'); return `<span class="ycard__face${img ? ' has-photo' : ''}${big ? ' sa-face--big' : ''}" aria-hidden="true"><span class="ycard__letter">${letter(p)}</span>${img}<i class="ycard__dot ycard__dot--${p.status === 'incomplete' ? 'warn' : 'ok'}"></i></span>`; };
 
 /* the bar: what is saved and not published yet */
@@ -152,7 +162,7 @@ const daysTo = iso => Math.round((Date.parse(iso + 'T00:00:00Z') - Date.parse(TO
 const inWords = n => n === 0 ? 'النهارده' : n === 1 ? 'بكره' : n === 2 ? 'بعد يومين' : n <= 10 ? `بعد ${AR(n)} أيام` : `بعد ${AR(n)} يوم`;
 const nextDay = p => p.feasts.length ? p.feasts.map(f => ({ f, at: nextOf(f) })).sort((x, y) => x.at < y.at ? -1 : 1)[0] : null;
 /* the picture whole: contained on a soft blurred copy of itself, never cut (owner 2026-11-24: «ميكونش وشه مقصوص») */
-const wholePic = (p, w, cls) => { const a = mainOf(p); const u = a && picUrl(a.src, w); return u ? `<span class="sa-whole ${cls}"><img class="sa-whole__bg" src="${u}" alt="" aria-hidden="true" loading="lazy" onerror="this.parentNode.remove()"><img class="sa-whole__img" src="${u}" alt="" loading="lazy" decoding="async" onerror="this.parentNode.remove()"></span>` : ''; };
+const wholePic = (p, w, cls) => { const a = mainOf(p); const u = a && picUrl(a.src, w); return u ? `<span class="sa-whole ${cls}"><img class="sa-whole__img sa-cropimg" src="${u}" style="${cropStyle(cropOf(a))}" alt="" loading="lazy" decoding="async" onerror="this.parentNode.remove()"></span>` : ''; };
 /* «كبيرة» / «متوسطة»: the whole picture first, the name in a band under it; the status and «بعد كام يوم» under the card */
 function personTile(p) {
   const img = wholePic(p, S.v === 'large' ? 360 : 160, '');
@@ -225,7 +235,7 @@ function msRow(m, i) {
 }
 function albumTile(a, i, p) {
   const name = a.src.split('/').pop().replace(/\.\w+$/, '');
-  return `<div class="media-tile sa-tile${a.main ? ' is-main' : ''}">${picUrl(a.src, 360) ? `<span class="media-tile__frame"><span class="sa-whole"><img class="sa-whole__bg" src="${picUrl(a.src, 360)}" alt="" aria-hidden="true" loading="lazy"><img class="sa-whole__img" src="${picUrl(a.src, 360)}" alt="" loading="lazy" onerror="this.parentNode.remove()"></span></span>` : `<span class="media-tile__frame sa-tile__frame">${ic('photos')}<small>مستني P4</small></span>`}<span class="media-tile__name">${esc(name)}</span><span class="media-tile__meta">${a.type === 'ai' ? chip('صورة تعبيرية', 'gold') : chip('صورة حقيقية', 'info')}${a.main ? chip('الأساسية', 'ok') : ''}</span><span class="sa-tile__acts">${btn('', 'edit', 'btn--sm btn--ghost btn--icon', `data-m="photo" data-i="${i}" aria-label="عدّل الصورة"`)}${btn('', 'trash', 'btn--sm btn--ghost btn--icon', 'aria-label="شيل من الألبوم"')}</span></div>`;
+  return `<div class="media-tile sa-tile${a.main ? ' is-main' : ''}">${picUrl(a.src, 360) ? `<span class="media-tile__frame"><span class="sa-whole"><img class="sa-whole__img sa-cropimg" src="${picUrl(a.src, 360)}" style="${cropStyle(cropOf(a))}" alt="" loading="lazy" onerror="this.parentNode.remove()"></span></span>` : `<span class="media-tile__frame sa-tile__frame">${ic('photos')}<small>مستني P4</small></span>`}<span class="media-tile__name">${esc(name)}</span><span class="media-tile__meta">${a.type === 'ai' ? chip('صورة تعبيرية', 'gold') : chip('صورة حقيقية', 'info')}${a.main ? chip('الأساسية', 'ok') : ''}</span><span class="sa-tile__acts">${btn('', 'edit', 'btn--sm btn--ghost btn--icon', `data-m="photo" data-i="${i}" aria-label="عدّل الصورة"`)}${btn('', 'trash', 'btn--sm btn--ghost btn--icon', 'aria-label="شيل من الألبوم"')}</span></div>`;
 }
 function viewPerson() {
   const p = byId(S.id) || people[0];
@@ -313,14 +323,65 @@ function history(now) {
 }
 
 /* ---------- modals ---------- */
-function modal({ icon, title, body, ok = 'احفظ', tone = 'info', danger = false }) {
+function modal({ icon, title, body, ok = 'احفظ', tone = 'info', danger = false, onOk = null }) {
   const d = document.createElement('dialog');
   d.className = `modal modal--${tone} modal--form sa-modal`;
-  d.innerHTML = `<span class="modal__icon" aria-hidden="true">${ic(icon)}</span><h2 class="modal__title">${title}</h2>${body}<div class="modal__actions"><button class="btn" type="button" data-close>إلغاء</button><button class="btn ${danger ? 'btn--danger' : 'btn--primary'}" type="button" data-close>${ok}</button></div>`;
+  d.innerHTML = `<span class="modal__icon" aria-hidden="true">${ic(icon)}</span><h2 class="modal__title">${title}</h2>${body}<div class="modal__actions"><button class="btn" type="button" data-close>إلغاء</button><button class="btn ${danger ? 'btn--danger' : 'btn--primary'}" type="button" data-close data-ok>${ok}</button></div>`;
   document.body.appendChild(d);
   d.showModal();
-  d.addEventListener('click', e => { if (e.target === d || e.target.closest('[data-close]')) { d.close(); d.remove(); S.m = ''; } });
+  d.addEventListener('click', e => {
+    if (e.target !== d && !e.target.closest('[data-close]')) return;
+    const okPressed = !!e.target.closest('[data-ok]');
+    d.close(); d.remove(); S.m = '';
+    if (okPressed && onOk) onOk(d);
+  });
   return d;
+}
+
+/*
+ * The crop tool (owner 2026-11-24): the photo in the same arch as the list, dragged to place the face and zoomed with
+ * the slider (or the wheel / two fingers in step B); under it, how it looks as a big card and as the small face.
+ * «زي الأول» = the top middle, no zoom. Saved as the album item's crop { x, y, z } with the rest of the person.
+ */
+function cropper(url, c) {
+  if (!url) return `<p class="ba-note">${ic('photos')}<span>الصورة نفسها بتدخل مكتبة الصور في P4، وبعدها تتظبط هنا.</span></p>`;
+  const st = cropStyle(c);
+  return `<div class="sa-cropper" data-crop data-x="${c.x}" data-y="${c.y}" data-z="${c.z}">
+    <div class="sa-cropper__stage"><span class="sa-cropper__frame" data-drag><img class="sa-cropimg" src="${url}" style="${st}" alt="" draggable="false"><span class="sa-cropper__hint">${ic('grip', 'ico-sm')}اسحب الصورة لحد ما الوش يبقى في النص</span></span>
+      <div class="sa-cropper__side"><b>هتبان كده</b>
+        <span class="sa-cropper__pv sa-cropper__pv--tile"><img class="sa-cropimg" src="${url}" style="${st}" alt=""></span><small>الكارت الكبير</small>
+        <span class="ycard__face has-photo sa-cropper__pv--face"><img class="ycard__photo sa-cropimg" src="${url}" style="${st}" alt=""></span><small>الصورة الصغيرة (القايمة)</small></div></div>
+    <label class="sa-zoom">${ic('search', 'ico-sm')}<span>التكبير</span><input type="range" min="1" max="3" step="0.05" value="${c.z}" data-zoom aria-label="التكبير"><output data-zout>${AR(Math.round(c.z * 100))}٪</output></label>
+    <div class="sa-cropper__acts">${btn('زي الأول', 'retry', 'btn--sm btn--ghost', 'data-crop-reset')}<small class="sa-muted">الضبط ده للصورة دي بس، وبيتطبق في الأدمن والموقع.</small></div></div>`;
+}
+function wireCrop(dlg) {
+  const box = dlg.querySelector('[data-crop]');
+  if (!box) return;
+  const c = { x: +box.dataset.x, y: +box.dataset.y, z: +box.dataset.z };
+  const paint = () => {
+    const st = cropStyle(c);
+    box.querySelectorAll('img.sa-cropimg').forEach(i => { i.style.cssText = st; });
+    box.querySelector('[data-zoom]').value = c.z;
+    box.querySelector('[data-zout]').textContent = AR(Math.round(c.z * 100)) + '٪';
+    Object.assign(box.dataset, { x: Math.round(c.x * 10) / 10, y: Math.round(c.y * 10) / 10, z: c.z });
+  };
+  const frame = box.querySelector('[data-drag]');
+  let drag = null;
+  frame.addEventListener('pointerdown', e => { drag = { px: e.clientX, py: e.clientY, x: c.x, y: c.y }; frame.setPointerCapture(e.pointerId); frame.classList.add('is-dragging'); });
+  frame.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const r = frame.getBoundingClientRect();
+    // dragging the picture right shows more of its left: the kept point moves the other way, slower when zoomed in
+    c.x = Math.max(0, Math.min(100, drag.x - (e.clientX - drag.px) / r.width * 100 / c.z));
+    c.y = Math.max(0, Math.min(100, drag.y - (e.clientY - drag.py) / r.height * 100 / c.z));
+    paint();
+  });
+  const end = () => { drag = null; frame.classList.remove('is-dragging'); };
+  frame.addEventListener('pointerup', end);
+  frame.addEventListener('pointercancel', end);
+  frame.addEventListener('wheel', e => { e.preventDefault(); c.z = Math.max(1, Math.min(3, +(c.z - e.deltaY / 500).toFixed(2))); paint(); }, { passive: false });
+  box.querySelector('[data-zoom]').addEventListener('input', e => { c.z = +e.target.value; paint(); });
+  box.querySelector('[data-crop-reset]').addEventListener('click', () => { Object.assign(c, CROP0); paint(); });
 }
 const monthSel = (val, cop) => `<select class="input" data-mon>${(cop ? MONTHS : GM).map((n, i) => `<option value="${i + 1}" ${i + 1 === val ? 'selected' : ''}>${cop ? AR(i + 1) + ' · ' : ''}${n}</option>`).join('')}</select>`;
 const daySel = (val, max) => `<select class="input" data-day>${Array.from({ length: max }, (_, i) => `<option value="${i + 1}" ${i + 1 === val ? 'selected' : ''}>${AR(i + 1)}</option>`).join('')}</select>`;
@@ -391,11 +452,14 @@ function photoModal(p, i) {
   const tiles = Array.from({ length: 8 }, (_, k) => `<button class="media-tile is-picking sa-pick" type="button" aria-pressed="${k === 0 ? 'true' : 'false'}"><span class="media-tile__frame">${k < lib.length ? `<img class="media-tile__img" src="../../../../${lib[k]}" alt="">` : `<span class="sa-tile__frame">${ic('photos')}</span>`}</span><span class="media-tile__name">${k < lib.length ? 'صورة من المكتبة' : 'بعد P4'}</span></button>`).join('');
   const feasts = p.feasts.map(f => `<option>${esc(f.kind)} · ${dayLabel(f)}</option>`).join('');
   const body = `<div class="ba-dayform">${a ? `<p class="sa-file">${ic('photos')}<bdi>${esc(a.src.split('/').pop())}</bdi></p>` : `<div class="sa-picker"><label class="p8-search">${ic('search')}<input class="p8-search__input" type="search" placeholder="دوّر في مكتبة الصور…"></label>${btn('ارفع صورة', 'upload', 'btn--sm')}</div><div class="media-grid sa-pickgrid">${tiles}</div>`}
+    <div class="field sa-cropfield"><span class="field__label">${a ? 'ظبط الصورة' : 'ظبط الصورة اللي اخترتها'}</span>${cropper(a ? (picUrl(a.src, 720) || '') : '../../../../' + lib[0].replace('-480', ''), cropOf(a))}<span class="field__hint">زي الصورة الشخصية: اسحب وكبّر لحد ما الوش يبان كويس ومش مقصوص</span></div>
     ${field('النوع', seg('ptype', 'النوع', [['ai', 'صورة تعبيرية (AI)'], ['photo', 'صورة حقيقية']], a ? a.type : 'photo'), 'التعبيرية بيتكتب عليها «صورة تعبيرية» صغيرة على الموقع')}
     <div class="ba-dayform__two">${field('المرحلة', input(a && a.stage || '', 'placeholder="اختياري: الرهبنة، الأسقفية…"'))}${field('المناسبة', `<select class="input"><option>أي مناسبة</option>${feasts}</select>`)}</div>
     <label class="sa-check"><input type="checkbox" ${a && a.main ? 'checked' : ''}><span>الصورة الأساسية (بتظهر لو مفيش صورة للمرحلة أو المناسبة)</span></label>
     ${field('مصدر الصورة', `<input class="input input--ltr" dir="ltr" placeholder="اختياري · للإدارة بس، مش بيظهر">`)}</div>`;
-  modal({ icon: a ? 'edit' : 'plus', title: (a ? 'صورة في ألبوم ' : 'ضيف صورة لـ') + esc(p.name), body, ok: a ? 'احفظ' : 'ضيفها' });
+  const dlg = modal({ icon: a ? 'edit' : 'plus', title: (a ? 'صورة في ألبوم ' : 'ضيف صورة لـ') + esc(p.name), body, ok: a ? 'احفظ' : 'ضيفها',
+    onOk: d => { const box = d.querySelector('[data-crop]'); if (a && box) { a.crop = { x: +box.dataset.x, y: +box.dataset.y, z: +box.dataset.z }; changed.add(p.id); render(true); } } });
+  wireCrop(dlg);
 }
 function occModal(i) {
   const o = i >= 0 ? occasions[i] : { name: '', kind: '', coptic: '1-1', source: '', repeat: 'yearly' };

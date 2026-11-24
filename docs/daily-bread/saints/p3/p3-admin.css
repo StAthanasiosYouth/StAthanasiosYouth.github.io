@@ -273,3 +273,33 @@ html[data-mode="light"] .sa-viewbar { background: rgb(255 255 255 / .92); }
 /* round 4 (owner 2026-11-24): no empty sides — the picture fills the frame; the crop tool (step B/next round) saves each photo's own focus and zoom */
 .sa-whole__bg { display: none; }
 .sa-whole__img { object-fit: cover; object-position: center 12%; }
+
+/* round 5 (owner 2026-11-24): each photo's own framing — every frame fills itself from the album item's crop {x, y, z} */
+.sa-cropimg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ycard__face .sa-cropimg { opacity: 1; }
+.sa-whole__img.sa-cropimg { object-fit: cover; }
+.sa-hero__pic .sa-cropimg { border-radius: inherit; }
+.sa-album .sa-whole { position: absolute; inset: 0; overflow: hidden; }
+.sa-cropfield { display: grid; gap: 8px; }
+.sa-cropper { display: grid; gap: 12px; }
+.sa-cropper__stage { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 16px; align-items: start; }
+.sa-cropper__frame { position: relative; display: block; aspect-ratio: 3 / 4; max-height: 420px; overflow: hidden; border-radius: 140px 140px 18px 18px; cursor: grab; touch-action: none; user-select: none; background: var(--navy-900); box-shadow: inset 0 0 0 2px rgb(var(--acc-rgb) / .55), 0 16px 34px -22px #000; }
+.sa-cropper__frame.is-dragging { cursor: grabbing; }
+.sa-cropper__frame::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(rgb(255 255 255 / .14), rgb(255 255 255 / .14)) 33.3% 0 / 1px 100% no-repeat, linear-gradient(rgb(255 255 255 / .14), rgb(255 255 255 / .14)) 66.6% 0 / 1px 100% no-repeat, linear-gradient(rgb(255 255 255 / .14), rgb(255 255 255 / .14)) 0 33.3% / 100% 1px no-repeat, linear-gradient(rgb(255 255 255 / .14), rgb(255 255 255 / .14)) 0 66.6% / 100% 1px no-repeat; }
+.sa-cropper__hint { position: absolute; z-index: 1; inset: auto 10px 10px; display: flex; gap: 6px; align-items: center; justify-content: center; padding: 5px 10px; border-radius: 999px; font-size: .74rem; color: #fff; background: rgb(2 9 20 / .62); pointer-events: none; }
+.sa-cropper__side { display: grid; gap: 6px; justify-items: center; text-align: center; }
+.sa-cropper__side b { font-size: .82rem; color: var(--text-2); }
+.sa-cropper__side small { font-size: .72rem; color: var(--text-3); margin-bottom: 6px; }
+.sa-cropper__pv--tile { position: relative; display: block; width: 120px; aspect-ratio: 3 / 4; overflow: hidden; border-radius: 70px 70px 12px 12px; box-shadow: inset 0 0 0 1px var(--line-strong); }
+.sa-cropper__pv--face { position: relative; }
+.sa-zoom { display: flex; gap: 10px; align-items: center; font-size: .85rem; color: var(--text-2); }
+.sa-zoom input { flex: 1; accent-color: var(--gold); }
+.sa-zoom output { min-width: 44px; text-align: center; font-weight: 800; color: var(--gold); }
+.sa-cropper__acts { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+@media (max-width: 720px) {
+  .sa-cropper__stage { grid-template-columns: 1fr; }
+  .sa-cropper__frame { max-height: 360px; width: min(100%, 270px); justify-self: center; }
+  .sa-cropper__side { grid-template-columns: auto auto; grid-auto-flow: column; grid-template-rows: auto auto; justify-content: center; column-gap: 18px; }
+  .sa-cropper__side b { display: none; }
+  .sa-cropper__pv--tile { width: 84px; }
+}

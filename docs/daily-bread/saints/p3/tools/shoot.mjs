@@ -34,6 +34,8 @@ export const SHOTS = [
   ['07-person-living', '?s=person&id=isaacnabih', 'أب حي: القمص إسحاق نبيه'],
   ['08-person-milestone', '?s=person&id=isaacnabih&m=ms&i=0', 'محطة بالشهر بس (القمصية، أغسطس ٢٠١٩)'],
   ['09-person-photo', '?s=person&id=theophilus&m=photo&i=-1', 'الألبوم: ضيف صورة من المكتبة'],
+  ['09b-person-crop', '?s=person&id=angelosmourad&m=photo&i=0', 'ظبط الصورة: اسحب وكبّر (زي الصورة الشخصية)'],
+  ['09c-person-cropped', '?s=person&id=angelosmourad', 'بعد الظبط: الوش في النص في كل مكان'],
   ['10-occasions', '?s=occasions', 'المناسبات'],
   ['11-occasion-new', '?s=occasions&m=new&i=-1', 'مناسبة جديدة: كل سنة أو مرة واحدة'],
   ['12-publish', '?s=publish&demo=complete', 'راجع وانشر'],
@@ -43,7 +45,7 @@ export const SHOTS = [
 
 const only = process.argv.slice(2);
 mkdirSync(join(P3, OUT), { recursive: true });
-const browser = await puppeteer.launch({ executablePath: CHROME, headless: true });
+const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, protocolTimeout: 240000 });
 const problems = [];
 for (const [name, qs] of SHOTS) {
   if (only.length && !only.some(o => name.startsWith(o))) continue;
