@@ -10,8 +10,9 @@
  *            automatic feasts or notifications, until a day with its source is added (and status/missing follow).
  *   feasts   [{ kind, coptic: 'M-D' | gregorian: 'MM-DD', year?, source, more?: [url], title?, note? }] — the yearly
  *            days. coptic = 1 توت … 13 النسيء, turned into a Gregorian date by code; gregorian = modern events.
- *   milestones? [{ kind, date: 'YYYY-MM-DD' | year: YYYY (until?), source, more?, status: confirmed|film|conflict, note? }]
- *            — one-time events of a life (for a timeline), never a yearly feast.
+ *   milestones? [{ kind, date: 'YYYY-MM-DD' | year: YYYY (until?), source, more?, status: confirmed|film|conflict|pending, note? }]
+ *            — one-time events of a life (for a timeline), never a yearly feast. source 'owner' (status pending) = told by
+ *            the owner, not yet written anywhere.
  *   sources? [url] · pending? [{ field, need, checked: [url], note? }] — what is still to find (the Deep Research list).
  *   album    [{ src, type: 'ai' | 'photo' }] — the owner's picture files (src relative to `picturesRoot`), not yet
  *            imported into the site (P4). `image` stays the site file (assets/img/saints/…) or null.
@@ -27,7 +28,9 @@ export const REGISTRY = path.join(ROOT, 'daily-bread', 'saints', 'registry.json'
 export const IMG_DIR = 'assets/img/saints/';
 export const CLASSES = ['reposed', 'living'];
 export const MISSABLE = ['feasts', 'album'];
-export const MILESTONE_STATUS = ['confirmed', 'film', 'conflict'];
+export const MILESTONE_STATUS = ['confirmed', 'film', 'conflict', 'pending'];
+/* a milestone the owner told us, not yet written anywhere: source 'owner', status 'pending' (never a feast) */
+export const OWNER = 'owner';
 export const ALBUM_TYPES = ['ai', 'photo'];
 
 export function load(file = REGISTRY) {
@@ -95,7 +98,8 @@ export function check(reg, { root = ROOT, pictures = null } = {}) {
     if (p.status !== (want.length ? 'incomplete' : 'complete')) e(`status لازم «${want.length ? 'incomplete' : 'complete'}».`);
     for (const m of p.milestones || []) {
       if (!m || typeof m.kind !== 'string' || !m.kind.trim()) e('محطة من غير نوع (kind).');
-      if (!m || typeof m.source !== 'string' || !URL_RE.test(m.source)) e(`محطة «${m && m.kind}»: المصدر لازم رابط https.`);
+      if (m && m.source === OWNER) { if (m.status !== 'pending') e(`محطة «${m.kind}»: اللي من صاحب المشروع حالتها pending لحد ما يبقى ليها مصدر.`); }
+      else if (!m || typeof m.source !== 'string' || !URL_RE.test(m.source)) e(`محطة «${m && m.kind}»: المصدر لازم رابط https.`);
       for (const u of (m && m.more) || []) if (typeof u !== 'string' || !URL_RE.test(u)) e(`محطة «${m.kind}»: رابط زيادة مش https.`);
       if (!MILESTONE_STATUS.includes(m && m.status)) e(`محطة «${m && m.kind}»: status لازم ${MILESTONE_STATUS.join('/')}.`);
       if (m && m.date != null && !realDate(m.date)) e(`محطة «${m.kind}»: التاريخ «${m.date}» مش صح.`);

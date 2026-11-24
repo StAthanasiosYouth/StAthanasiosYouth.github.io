@@ -3177,7 +3177,7 @@
   },
   {
    "id": "isaacnabih",
-   "name": "أبونا إسحاق نبيه",
+   "name": "القمص إسحاق نبيه",
    "cat": "ourchurch",
    "class": "living",
    "status": "complete",
@@ -3189,6 +3189,25 @@
      "year": 1997,
      "source": "https://st-takla.org/Coptic-History/places/africa/egypt/red-sea/saint-abosefein-church-safaga.html",
      "note": "صفحة كنيستنا في الأنبا تكلا: «القس اسحق نبيه: ر: 31 أغسطس 1997 م.» = 25 مسرى 1713 (بالكود). الصفحة كاتبة «اسحق»."
+    }
+   ],
+   "milestones": [
+    {
+     "kind": "الترقية لرتبة القمصية",
+     "year": 2019,
+     "source": "owner",
+     "status": "pending",
+     "note": "من صاحب المشروع (2026-11-24): «اترقا قمص سنة 2019 بس امتي ظبط معرفش». السنة بس، من غير يوم. محطة، مش عيد: مبتعملش مناسبة ولا إشعار تلقائي لحد ما يبقى فيه تاريخ كامل بمصدر ويتضاف في feasts. صفحة كنيستنا في الأنبا تكلا لسه كاتبة «القس»."
+    }
+   ],
+   "pending": [
+    {
+     "field": "milestones",
+     "need": "يوم ترقيته قمص سنة 2019 (ومين رقّاه)",
+     "checked": [
+      "https://st-takla.org/Coptic-History/places/africa/egypt/red-sea/saint-abosefein-church-safaga.html"
+     ],
+     "note": "بحث 2026-11-24 (اليوم السابع، وطني، الأهرام، الأنبا تكلا) مالقاش خبر. خلي بالك: خبر اليوم السابع 2026-08-22 عن «القس إسحاق نبيه» كاهن العذراء بأرض الجولف (اترسم 2007) ده شخص تاني."
     }
    ],
    "album": [
