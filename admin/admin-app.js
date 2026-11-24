@@ -30140,7 +30140,17 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       chain = chain.then(function () {
         return Promise.all(['', '-480', '-160'].map(function (s) { return b64Of(IMPORT_URL + x.key + s + '.webp'); }));
       }).then(function (b) {
-        return A.call('apiUploadMedia', { mime: 'image/webp', full: b[0], thumb: b[1], tiny: b[2], tinyMime: 'image/webp', color: x.color, width: x.w, height: x.h, alt: x.alt, name: x.key });
+        // the Worker's free plan (10 ms CPU a request): a new library picture sometimes runs out and the request drops
+        // ("Failed to fetch"); the same call again goes through. Up to 25 tries a picture, a little slower each time.
+        var body = { mime: 'image/webp', full: b[0], thumb: b[1], tiny: b[2], tinyMime: 'image/webp', color: x.color, width: x.w, height: x.h, alt: x.alt, name: x.key };
+        var tryUpload = function (n) {
+          return A.call('apiUploadMedia', body).catch(function (error) {
+            var code = error && (error.code || (error.parsed && error.parsed.code));
+            if (n >= 25 || code === 'invalid' || code === 'denied' || code === 'auth') throw error;
+            return new Promise(function (r) { setTimeout(r, Math.min(8000, 1000 + n * 400)); }).then(function () { return tryUpload(n + 1); });
+          });
+        };
+        return tryUpload(1);
       }).then(function (res) {
         if (!res || !res.media || !res.media.path) throw new Error('الرفع رجع ناقص (' + x.key + ')');
         paths[x.key] = res.media.path;
