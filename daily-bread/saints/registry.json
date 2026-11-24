@@ -458,20 +458,32 @@
      "kind": "استشهاده",
      "coptic": "3-25",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=4&imonth=12&iyear=2026&dbl=ar",
-     "title": "استشهاد القديس مرقوريوس أبى سيفين بالقرن الثالث الميلادى"
+     "title": "استشهاد القديس مرقوريوس أبى سيفين بالقرن الثالث الميلادى",
+     "more": [
+      "https://st-takla.org/Coptic-History/places/africa/egypt/red-sea/saint-abosefein-church-safaga.html"
+     ]
     },
     {
      "kind": "نقل أعضائه",
      "coptic": "10-9",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=16&imonth=6&iyear=2027&dbl=ar",
-     "title": "نقل اعضاء ابى سيفين ( 9 بـؤونة)"
+     "title": "نقل اعضاء ابى سيفين ( 9 بـؤونة)",
+     "more": [
+      "https://st-takla.org/Coptic-History/places/africa/egypt/red-sea/saint-abosefein-church-safaga.html"
+     ]
     },
     {
      "kind": "تكريس كنيسته",
      "coptic": "11-25",
      "source": "https://st-takla.org/zJ/index.php/ar-readings-katamares?view=synaxarium-arabic&iday=1&imonth=8&iyear=2027&dbl=ar",
-     "title": "تذكار تكريس كنيسة ابى سيفين"
+     "title": "تذكار تكريس كنيسة ابى سيفين",
+     "more": [
+      "https://st-takla.org/Coptic-History/places/africa/egypt/red-sea/saint-abosefein-church-safaga.html"
+     ]
     }
+   ],
+   "sources": [
+    "https://st-takla.org/Coptic-History/places/africa/egypt/red-sea/saint-abosefein-church-safaga.html"
    ],
    "album": [
     {
@@ -3122,23 +3134,36 @@
    "name": "القمص إبراهيم إسراڤيم",
    "cat": "ourchurch",
    "class": "living",
-   "status": "incomplete",
-   "missing": [
-    "feasts"
-   ],
+   "status": "complete",
+   "missing": [],
    "note": "بيتكلم في فيلم «حكاية أب» (أهم مقطع 24:37).",
-   "feasts": [],
+   "feasts": [
+    {
+     "kind": "عيد رسامته قس",
+     "gregorian": "02-21",
+     "year": 1988,
+     "source": "https://st-takla.org/Coptic-History/places/africa/egypt/red-sea/saint-abosefein-church-safaga.html",
+     "note": "صفحة كنيستنا في الأنبا تكلا: «ر: 21 فبراير 1988 م.» = 13 أمشير 1704 (بالكود). الصفحة كاتبة الاسم «إبراهيم سيرافيم»، والمعتمد «إسراڤيم» (قرار صاحب المشروع في P1). الصفحة مش بتقول مين رسمه؛ سنة ١٩٨٨ كانت البحر الأحمر لسه تبع الأنبا مكاريوس أسقف قنا (اتنيح ١٩٩١)، فغالبًا هو، بس ده استنتاج مش مكتوب."
+    },
+    {
+     "kind": "عيد ترقيته قمص",
+     "gregorian": "04-30",
+     "year": 1990,
+     "source": "https://st-takla.org/Coptic-History/places/africa/egypt/red-sea/saint-abosefein-church-safaga.html",
+     "note": "صفحة كنيستنا في الأنبا تكلا: «ق: 30 إبريل 1990 م.» = 22 برموده 1706 (بالكود)."
+    }
+   ],
    "sources": [
     "https://www.youtube.com/watch?v=6RbIo0UUJtk&t=1477"
    ],
    "pending": [
     {
-     "field": "feasts",
-     "need": "يوم رسامته قس، ويوم ترقيته قمص",
+     "field": "milestones",
+     "need": "مين رسمه قس ومين رقّاه قمص (مكتوب في مصدر)",
      "checked": [
-      "https://www.youtube.com/watch?v=6RbIo0UUJtk"
+      "https://st-takla.org/Coptic-History/places/africa/egypt/red-sea/saint-abosefein-church-safaga.html"
      ],
-     "note": "محتاجين خبر أو ورقة. نسأل أبونا أو الإيبارشية."
+     "note": "الصفحة فيها التاريخين بس. نسأل أبونا نفسه."
     }
    ],
    "album": [
@@ -3155,17 +3180,15 @@
    "name": "أبونا إسحاق نبيه",
    "cat": "ourchurch",
    "class": "living",
-   "status": "incomplete",
-   "missing": [
-    "feasts"
-   ],
-   "feasts": [],
-   "pending": [
+   "status": "complete",
+   "missing": [],
+   "feasts": [
     {
-     "field": "feasts",
-     "need": "يوم رسامته",
-     "checked": [],
-     "note": "محتاجين خبر أو ورقة. نسأل أبونا أو الإيبارشية."
+     "kind": "عيد رسامته",
+     "gregorian": "08-31",
+     "year": 1997,
+     "source": "https://st-takla.org/Coptic-History/places/africa/egypt/red-sea/saint-abosefein-church-safaga.html",
+     "note": "صفحة كنيستنا في الأنبا تكلا: «القس اسحق نبيه: ر: 31 أغسطس 1997 م.» = 25 مسرى 1713 (بالكود). الصفحة كاتبة «اسحق»."
     }
    ],
    "album": [

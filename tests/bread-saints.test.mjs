@@ -73,6 +73,15 @@ test('registry: the owner decisions (names, dates) are in the file', () => {
   assert.equal(day(by('salibsoryal').feasts[0]), '1994-09-02');
   assert.deepEqual(by('ilarion').feasts.map(day), ['2019-06-09', '2019-07-27']);
   for (const id of ['angelosmourad', 'philopaterromany']) assert.equal(day(by(id).feasts[0]), '2021-03-20');
+  // St-Takla's page for our church: Fr Ibrahim priest 1988-02-21, hegumen 1990-04-30; Fr Isaac priest 1997-08-31
+  assert.deepEqual(by('ibrahimisravim').feasts.map(day), ['1988-02-21', '1990-04-30']);
+  assert.deepEqual(by('isaacnabih').feasts.map(day), ['1997-08-31']);
+  assert.deepEqual(toCoptic('1988-02-21'), { y: 1704, m: 6, d: 13 });
+  assert.deepEqual(toCoptic('1990-04-30'), { y: 1706, m: 8, d: 22 });
+  assert.deepEqual(toCoptic('1997-08-31'), { y: 1713, m: 12, d: 25 });
+  // Abu Sefein: the three feasts on our church's page are his feasts (one card, no duplicate occasion)
+  assert.deepEqual(by('mercurius').feasts.map(f => f.coptic), ['3-25', '10-9', '11-25']);
+  assert.ok(!reg.occasions.some(o => /سيفين|مرقوريوس/.test(o.name + o.kind)));
   const th = by('theophilus').milestones;
   const at = word => th.find(m => m.kind.startsWith(word)).date;
   assert.equal(at('القسيسية'), '1978-01-03', 'the film wins: priesthood 3 Jan 1978, not 2 Jan');
@@ -88,7 +97,7 @@ test('registry: the owner decisions (names, dates) are in the file', () => {
 test('registry: missing data keeps the person and keeps them out of the automatic days', () => {
   const reg = load();
   const inc = reg.people.filter(p => p.status === 'incomplete');
-  assert.deepEqual(inc.map(p => p.id).sort(), ['abdelmessihhabashy', 'ibrahimisravim', 'isaacnabih', 'isaacsyrian']);
+  assert.deepEqual(inc.map(p => p.id).sort(), ['abdelmessihhabashy', 'isaacsyrian']);
   for (const p of inc) {
     assert.deepEqual(p.missing, ['feasts']);
     assert.ok(p.album.length > 0, p.id + ' keeps its pictures');
@@ -122,6 +131,8 @@ test('living fathers never reach the saints card; they are in «مناسبات �
     ['2026-06-09 ilarion', '2026-06-14 redseadiocese']);
   assert.deepEqual(occasionsOfMonth(reg, '2027-03').map(o => o.person.id).sort(), ['angelosmourad', 'philopaterromany']);
   assert.equal(occasionsOfMonth(reg, '2026-07').find(o => o.date === '2026-07-27').person.id, 'ilarion');
+  assert.equal(occasionsOfMonth(reg, '2027-02').find(o => o.date === '2027-02-21').person.id, 'ibrahimisravim');
+  assert.equal(occasionsOfMonth(reg, '2027-08').find(o => o.date === '2027-08-31').person.id, 'isaacnabih');
 });
 
 test('registry: check() names each problem', () => {
