@@ -13,16 +13,20 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = normalize(join(HERE, '..', '..', '..', '..', '..'));
 const DATA = JSON.parse(readFileSync(join(HERE, '..', 'pictures.json'), 'utf8'));
 const OUT = join(ROOT, 'media', 'import-p4');
+// the crops the albums got at the first import: the importer replaces a crop only while it is still that one (never a hand-set one)
+let before = {};
+try { before = Object.fromEntries(JSON.parse(readFileSync(join(OUT, 'p4.json'), 'utf8')).pictures.map(p => [p.key, p.cropWas || p.crop])); } catch { /* first run */ }
 mkdirSync(OUT, { recursive: true });
 
 const byPerson = new Map();
 for (const x of DATA.pictures) byPerson.set(x.person, (byPerson.get(x.person) || 0) + 1);
 const pictures = DATA.pictures.map(x => {
-  for (const s of ['', '-480', '-160']) copyFileSync(join(DATA.out, x.key + s + '.webp'), join(OUT, x.key + s + '.webp'));
+  if (!process.argv.includes('--json-only')) for (const s of ['', '-480', '-160']) copyFileSync(join(DATA.out, x.key + s + '.webp'), join(OUT, x.key + s + '.webp'));
   const a = { key: x.key, person: x.person, alt: x.name.slice(0, 120), w: x.card.w, h: x.card.h, color: x.color, type: x.type };
   if (x.main && byPerson.get(x.person) > 1) a.main = true;
   for (const k of ['stage', 'occasion', 'caption']) if (x[k]) a[k] = x[k];
   a.crop = x.crop;
+  if (before[x.key] && JSON.stringify(before[x.key]) !== JSON.stringify(x.crop)) a.cropWas = before[x.key];
   if (x.fresh) a.fresh = true;   // a new file (not the owner's): the old owner file name is not put beside it
   return a;
 });

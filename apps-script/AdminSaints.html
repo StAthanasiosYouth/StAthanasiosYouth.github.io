@@ -288,7 +288,21 @@
             saved++; SA.imp.step = 'بيملا الألبومات: ' + ar(saved) + ' من ' + ar(ids.length);
             var s = document.querySelector('[data-imp-step]'); if (s) s.textContent = SA.imp.step;
           };
-          if (mediaOf(old) === want) { step(); return; }
+          if (mediaOf(old) === want) {
+            // filled: only the crops left (owner 2026-11-24, «ظبطلي الcrop»). A crop changes only while it is still the one
+            // the first import gave (cropWas): a crop set by hand in the admin is never touched.
+            var mine = plan.filter(function (x) { return x.person === id; });
+            var same = function (a, b) { return !!a && !!b && a.x === b.x && a.y === b.y && a.z === b.z; };
+            var next = old.map(function (a, i) {
+              var x = mine[i];
+              return x && x.cropWas && same(a.crop, x.cropWas) ? Object.assign({}, a, { crop: x.crop }) : a;
+            });
+            if (JSON.stringify(next) === JSON.stringify(old)) { step(); return; }
+            album = next;
+          }
+          // what «done» means for this person: the same pictures with the same crops
+          var sig = function (al) { return (al || []).map(function (a) { var c = a.crop || {}; return (a.media || '') + '@' + c.x + ',' + c.y + ',' + c.z; }).join('|'); };
+          var target = sig(album);
           // a save can land while its answer is lost (the free plan's CPU limit): the retry then meets a newer rev.
           // So after a failure: read the person again; filled → done, else save again with the new rev (up to 10 times).
           var trySave = function (n, rev, data) {
@@ -296,7 +310,7 @@
               if (n >= 10 || (error && error.code === 'invalid')) throw error;
               return new Promise(function (r) { setTimeout(r, 1500 + n * 500); }).then(function () { return load(true); }).then(function () {
                 var now = itemOf('person', id);
-                if (now && mediaOf(now.data.album) === want) { step(); return; }
+                if (now && sig(now.data.album) === target) { step(); return; }
                 return trySave(n + 1, now ? now.rev : rev, now ? now.data : data);
               });
             });
