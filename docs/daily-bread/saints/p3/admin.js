@@ -144,24 +144,38 @@ function filtered() {
 function personRow(p) {
   const days = p.feasts;
   const next = days.length ? days.map(f => ({ f, at: nextOf(f) })).sort((a, b) => a.at < b.at ? -1 : 1)[0] : null;
-  const line = next ? `${ic('calendar', 'ycard__ic')}<span>الجاي: <b>${dayLabel(next.f)}</b>${next.f.coptic ? ` = ${gText(next.at)}` : ` ${AR(next.at.slice(0, 4))}`} · ${esc(next.f.kind)}</span>` : `${ic('alert', 'ycard__ic')}<span>من غير يوم تذكار: مش بيدخل الأعياد ولا الإشعارات</span>`;
+  const line = next ? `${ic('calendar', 'ycard__ic')}<span><b class="sa-left${daysTo(next.at) <= 7 ? ' is-soon' : ''}">${inWords(daysTo(next.at))}</b> · <b>${dayLabel(next.f)}</b>${next.f.coptic ? ` = ${gText(next.at)}` : ` ${AR(next.at.slice(0, 4))}`} · ${esc(next.f.kind)}</span>` : `${ic('alert', 'ycard__ic')}<span>من غير يوم تذكار: مش بيدخل الأعياد ولا الإشعارات</span>`;
   return `<article class="ycard sa-pcard" data-open="${p.id}"><button class="ycard__open" type="button" data-open="${p.id}" aria-label="افتح ${esc(p.name)}"></button>${face(p)}<div class="ycard__main"><bdi class="ycard__name">${esc(p.name)}</bdi><span class="ycard__chips">${p.class === 'living' ? chip('حي · مناسبات كنيستنا', 'gold') : ''}${chip(esc(REG.categories[p.cat] || p.cat), 'off')}${p.status === 'incomplete' ? chip('ناقص: ' + p.missing.map(m => MISS[m]).join('، '), 'warn') : ''}${days.length ? chip(days.length === 1 ? 'يوم واحد' : AR(days.length) + ' أيام', 'info') : ''}${p.praise ? chip('تمجيد', 'info') : ''}${p.album.length ? chip(AR(p.album.length) + ' صور', 'off') : ''}${changed.has(p.id) ? chip('مش منشور', 'warn') : ''}</span><span class="ycard__phone sa-next">${line}</span></div><span class="ycard__go" aria-hidden="true">${ic('chevron')}</span></article>`;
 }
-/* «كبيرة» / «متوسطة»: the picture first, the name on it (an arch, like the youth cards' face) */
+/* how far the next day is: «النهارده» / «بكره» / «بعد يومين» / «بعد ٥ أيام» / «بعد ١٢ يوم» */
+const daysTo = iso => Math.round((Date.parse(iso + 'T00:00:00Z') - Date.parse(TODAY + 'T00:00:00Z')) / 864e5);
+const inWords = n => n === 0 ? 'النهارده' : n === 1 ? 'بكره' : n === 2 ? 'بعد يومين' : n <= 10 ? `بعد ${AR(n)} أيام` : `بعد ${AR(n)} يوم`;
+const nextDay = p => p.feasts.length ? p.feasts.map(f => ({ f, at: nextOf(f) })).sort((x, y) => x.at < y.at ? -1 : 1)[0] : null;
+/* the picture whole: contained on a soft blurred copy of itself, never cut (owner 2026-11-24: «ميكونش وشه مقصوص») */
+const wholePic = (p, w, cls) => { const a = mainOf(p); const u = a && picUrl(a.src, w); return u ? `<span class="sa-whole ${cls}"><img class="sa-whole__bg" src="${u}" alt="" aria-hidden="true" loading="lazy" onerror="this.parentNode.remove()"><img class="sa-whole__img" src="${u}" alt="" loading="lazy" decoding="async" onerror="this.parentNode.remove()"></span>` : ''; };
+/* «كبيرة» / «متوسطة»: the whole picture first, the name in a band under it; the status and «بعد كام يوم» under the card */
 function personTile(p) {
-  const img = picImg(p, S.v === 'large' ? 360 : 160, 'sa-ptile__img');
+  const img = wholePic(p, S.v === 'large' ? 360 : 160, '');
   const a = mainOf(p);
-  const sub = p.class === 'living' ? 'حي · مناسبات كنيستنا' : p.feasts.length ? (() => { const n = p.feasts.map(f => ({ f, at: nextOf(f) })).sort((x, y) => x.at < y.at ? -1 : 1)[0]; return `${dayLabel(n.f)} · ${esc(n.f.kind)}`; })() : 'من غير يوم تذكار';
+  const n = nextDay(p);
+  const when = n ? `${dayLabel(n.f)} · ${esc(n.f.kind)}` : p.class === 'living' ? 'مناسبات كنيستنا' : 'من غير يوم تذكار';
+  const left = n ? daysTo(n.at) : null;
+  const status = [
+    n ? `<span class="sa-left${left <= 7 ? ' is-soon' : ''}">${ic('clock', 'ico-sm')}${inWords(left)}</span>` : '',
+    p.class === 'living' ? chip('حي', 'gold') : '',
+    p.status === 'incomplete' ? chip('ناقص: ' + p.missing.map(m => MISS[m]).join('، '), 'warn') : '',
+    changed.has(p.id) ? chip('مش منشور', 'warn') : ''
+  ].join('');
   return `<button class="sa-ptile${p.status === 'incomplete' ? ' is-incomplete' : ''}${p.class === 'living' ? ' is-living' : ''}" type="button" data-open="${p.id}" aria-label="افتح ${esc(p.name)}">
-    <span class="sa-ptile__frame${img ? ' has-photo' : ''}"><span class="sa-ptile__letter" aria-hidden="true">${letter(p)}</span>${img}
-      <span class="sa-ptile__badges">${p.status === 'incomplete' ? `<span class="sa-badge sa-badge--warn">ناقص: ${p.missing.map(m => MISS[m]).join('، ')}</span>` : ''}${p.class === 'living' ? '<span class="sa-badge sa-badge--gold">حي</span>' : ''}${changed.has(p.id) ? '<span class="sa-badge sa-badge--warn">مش منشور</span>' : ''}</span>
-      <span class="sa-ptile__name">${img && a && a.type === 'ai' ? '<i class="sa-ptile__ai">صورة تعبيرية</i>' : ''}<b>${esc(p.name)}</b>${S.v === 'large' ? `<small>${sub}</small>` : ''}</span></span></button>`;
+    <span class="sa-ptile__frame"><span class="sa-ptile__pic">${img || `<span class="sa-ptile__letter" aria-hidden="true">${letter(p)}</span>`}${img && a && a.type === 'ai' ? '<i class="sa-ptile__ai">صورة تعبيرية</i>' : ''}</span>
+      <span class="sa-ptile__name"><b>${esc(p.name)}</b>${S.v === 'large' ? `<small>${when}</small>` : ''}</span></span>
+    <span class="sa-ptile__status">${status}</span></button>`;
 }
 /* «تفاصيل»: one row each, sortable columns in step B */
 function detailsTable(list) {
   return `<div class="p8-tablewrap sa-tablewrap"><table class="p8-table sa-table"><thead><tr><th></th><th>الاسم</th><th>المجموعة</th><th>النوع</th><th>الأيام</th><th>الجاي</th><th>الصور</th><th>الحالة</th></tr></thead><tbody>${list.map(p => {
     const n = p.feasts.length ? p.feasts.map(f => ({ f, at: nextOf(f) })).sort((x, y) => x.at < y.at ? -1 : 1)[0] : null;
-    return `<tr data-open="${p.id}"><td>${face(p)}</td><td><b>${esc(p.name)}</b></td><td>${esc(REG.categories[p.cat])}</td><td>${p.class === 'living' ? chip('حي', 'gold') : 'متنيح'}</td><td>${AR(p.feasts.length)}</td><td>${n ? `${dayLabel(n.f)}<small class="sa-muted"> ${gText(n.at)}</small>` : '—'}</td><td>${AR(p.album.length)}</td><td>${p.status === 'incomplete' ? chip('ناقص', 'warn') : chip('كاملة', 'ok')}${changed.has(p.id) ? chip('مش منشور', 'warn') : ''}</td></tr>`;
+    return `<tr data-open="${p.id}"><td>${face(p)}</td><td><b>${esc(p.name)}</b></td><td>${esc(REG.categories[p.cat])}</td><td>${p.class === 'living' ? chip('حي', 'gold') : 'متنيح'}</td><td>${AR(p.feasts.length)}</td><td>${n ? `${dayLabel(n.f)} <span class="sa-left${daysTo(n.at) <= 7 ? ' is-soon' : ''}">${inWords(daysTo(n.at))}</span>` : '—'}</td><td>${AR(p.album.length)}</td><td>${p.status === 'incomplete' ? chip('ناقص', 'warn') : chip('كاملة', 'ok')}${changed.has(p.id) ? chip('مش منشور', 'warn') : ''}</td></tr>`;
   }).join('')}</tbody></table></div>`;
 }
 function listBody(list) {
@@ -171,9 +185,13 @@ function listBody(list) {
   return Object.entries(REG.categories).map(([k, name]) => { const l = list.filter(p => p.cat === k); return l.length ? `<section class="sa-group"><h3 class="sa-group__head"><span>${name}</span><small>${AR(l.length)}</small></h3>${draw(l)}</section>` : ''; }).join('');
 }
 const VIEWS = [['large', 'grid', 'كبيرة'], ['medium', 'photos', 'متوسطة'], ['list', 'layers', 'قايمة'], ['details', 'sheet', 'تفاصيل']];
+/* the bar that stays under the top bar while the long list scrolls (owner 2026-11-24): search, the view, grouped or not,
+   «شخص جديد», «راجع وانشر» when something is saved, and «لفوق» */
 function viewBar() {
-  return `<div class="sa-viewbar"><div class="seg p8-filter sa-views" role="radiogroup" aria-label="شكل العرض">${VIEWS.map(([v, i, t]) => `<label class="seg__opt"><input type="radio" name="view" value="${v}" ${S.v === v ? 'checked' : ''}><span>${ic(i, 'ico-sm')}${t}</span></label>`).join('')}</div>
-    <div class="seg p8-filter" role="radiogroup" aria-label="التجميع"><label class="seg__opt"><input type="radio" name="group" value="cat" ${S.g === 'cat' ? 'checked' : ''}><span>جمّع بالمجموعة</span></label><label class="seg__opt"><input type="radio" name="group" value="" ${S.g !== 'cat' ? 'checked' : ''}><span>كلهم مع بعض</span></label></div></div>`;
+  return `<div class="sa-viewbar" data-sticky><label class="p8-search sa-vsearch">${ic('search')}<input class="p8-search__input" type="search" placeholder="دوّر بالاسم…" aria-label="بحث" value="${esc(S.q)}" data-q></label>
+    <div class="seg p8-filter sa-views" role="radiogroup" aria-label="شكل العرض">${VIEWS.map(([v, i, t]) => `<label class="seg__opt" title="${t}"><input type="radio" name="view" value="${v}" ${S.v === v ? 'checked' : ''}><span>${ic(i, 'ico-sm')}<em>${t}</em></span></label>`).join('')}</div>
+    <div class="seg p8-filter sa-groupseg" role="radiogroup" aria-label="التجميع"><label class="seg__opt"><input type="radio" name="group" value="cat" ${S.g === 'cat' ? 'checked' : ''}><span><em class="sa-lg">بالمجموعة</em><em class="sa-sm">مجمّع</em></span></label><label class="seg__opt"><input type="radio" name="group" value="" ${S.g !== 'cat' ? 'checked' : ''}><span>كلهم</span></label></div>
+    <span class="sa-viewbar__end">${changed.size ? btn(`راجع وانشر (${AR(changed.size)})`, 'send', 'btn--sm', 'data-go="publish"') : ''}${btn('شخص جديد', 'plus', 'btn--primary btn--sm', 'data-act="new"')}${btn('', 'chevron-up', 'btn--sm btn--ghost btn--icon sa-totop', 'data-act="top" aria-label="لفوق" title="لفوق"')}</span></div>`;
 }
 function viewPeople() {
   const inc = people.filter(p => p.status === 'incomplete');
@@ -185,14 +203,14 @@ function viewPeople() {
   }).join('')}</ul>`, 'sa-misscard', 'warn') : '';
   const list = filtered();
   const cats = Object.entries(REG.categories);
-  const filters = `<div class="p8-card__filters sa-filters"><label class="p8-search">${ic('search')}<input class="p8-search__input" type="search" placeholder="دوّر بالاسم…" aria-label="بحث" value="${esc(S.q)}" data-q></label>
+  const filters = `<div class="p8-card__filters sa-filters">
     ${seg('cls', 'النوع', [['', 'الكل'], ['reposed', 'متنيحين'], ['living', 'أحياء']], S.cls)}
     ${seg('stat', 'البيانات', [['', 'الكل'], ['complete', 'كاملة'], ['incomplete', 'ناقصة']], S.stat)}
     ${seg('photo', 'الصور', [['', 'الصور: الكل'], ['yes', 'فيها صور'], ['no', 'من غير']], S.photo)}
     ${seg('praise', 'التمجيد', [['', 'التمجيد: الكل'], ['yes', 'فيه تمجيد'], ['no', 'من غير']], S.praise)}
     <select class="input sa-cat" aria-label="المجموعة" data-cat><option value="">كل المجموعات</option>${cats.map(([k, v]) => `<option value="${k}" ${S.cat === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`;
-  const body = `${filters}${viewBar()}<p class="sa-count">${list.length === people.length ? `${AR(list.length)} شخص، بترتيب السجل (اللي قبل بيكسب لو اتنين في نفس اليوم)` : `${AR(list.length)} من ${AR(people.length)}`}${PICS ? '' : ' · الصور بتظهر بعد P4'}</p>${listBody(list)}`;
-  return dirtyBar() + kpis + miss + card('users', 'سجل الشخصيات', 'القديسين والمتنيحين والآباء. اضغط على أي حد تفتحه وتعدّل أيامه ومصادره وصوره', btn('شخص جديد', 'plus', 'btn--primary', 'data-act="new"'), body);
+  const body = `${viewBar()}${filters}<p class="sa-count">${list.length === people.length ? `${AR(list.length)} شخص، بترتيب السجل (اللي قبل بيكسب لو اتنين في نفس اليوم)` : `${AR(list.length)} من ${AR(people.length)}`}${PICS ? '' : ' · الصور بتظهر بعد P4'}</p>${listBody(list)}`;
+  return dirtyBar() + kpis + miss + card('users', 'سجل الشخصيات', 'القديسين والمتنيحين والآباء. اضغط على أي حد تفتحه وتعدّل أيامه ومصادره وصوره', '', body, 'sa-regcard');
 }
 
 /* ---------- الشخص ---------- */
@@ -207,7 +225,7 @@ function msRow(m, i) {
 }
 function albumTile(a, i, p) {
   const name = a.src.split('/').pop().replace(/\.\w+$/, '');
-  return `<div class="media-tile sa-tile${a.main ? ' is-main' : ''}">${picUrl(a.src, 360) ? `<span class="media-tile__frame"><img class="media-tile__img" src="${picUrl(a.src, 360)}" alt="" loading="lazy" onerror="this.remove()"></span>` : `<span class="media-tile__frame sa-tile__frame">${ic('photos')}<small>مستني P4</small></span>`}<span class="media-tile__name">${esc(name)}</span><span class="media-tile__meta">${a.type === 'ai' ? chip('صورة تعبيرية', 'gold') : chip('صورة حقيقية', 'info')}${a.main ? chip('الأساسية', 'ok') : ''}</span><span class="sa-tile__acts">${btn('', 'edit', 'btn--sm btn--ghost btn--icon', `data-m="photo" data-i="${i}" aria-label="عدّل الصورة"`)}${btn('', 'trash', 'btn--sm btn--ghost btn--icon', 'aria-label="شيل من الألبوم"')}</span></div>`;
+  return `<div class="media-tile sa-tile${a.main ? ' is-main' : ''}">${picUrl(a.src, 360) ? `<span class="media-tile__frame"><span class="sa-whole"><img class="sa-whole__bg" src="${picUrl(a.src, 360)}" alt="" aria-hidden="true" loading="lazy"><img class="sa-whole__img" src="${picUrl(a.src, 360)}" alt="" loading="lazy" onerror="this.parentNode.remove()"></span></span>` : `<span class="media-tile__frame sa-tile__frame">${ic('photos')}<small>مستني P4</small></span>`}<span class="media-tile__name">${esc(name)}</span><span class="media-tile__meta">${a.type === 'ai' ? chip('صورة تعبيرية', 'gold') : chip('صورة حقيقية', 'info')}${a.main ? chip('الأساسية', 'ok') : ''}</span><span class="sa-tile__acts">${btn('', 'edit', 'btn--sm btn--ghost btn--icon', `data-m="photo" data-i="${i}" aria-label="عدّل الصورة"`)}${btn('', 'trash', 'btn--sm btn--ghost btn--icon', 'aria-label="شيل من الألبوم"')}</span></div>`;
 }
 function viewPerson() {
   const p = byId(S.id) || people[0];
@@ -216,7 +234,7 @@ function viewPerson() {
     ? `بيظهر في «مناسبات كنيستنا» بس${p.feasts.length ? ': ' + p.feasts.map(f => `${dayLabel(f)} (${esc(f.kind)})`).join('، ') : ''}. عمره ما بيظهر في كارت «النهارده تذكار…».`
     : p.feasts.length ? `بيدخل كارت «النهارده تذكار…» لوحده كل سنة: ${p.feasts.map(f => `<b>${dayLabel(f)}</b>`).join(' و')}.` : 'مش بيدخل الأعياد ولا الإشعارات التلقائية لحد ما يتكتب يوم تذكار بمصدره.';
   const head = `<div class="sa-back">${btn('رجوع للشخصيات', 'arrow', 'btn--ghost btn--small', 'data-go="people"')}</div>
-  <section class="card p8-card sa-hero">${face(p, true)}<div class="sa-hero__main"><h2 class="sa-hero__name">${esc(p.name)}</h2><span class="ycard__chips">${living ? chip('حي · مناسبات كنيستنا', 'gold') : chip('متنيح · كارت التذكار', 'info')}${chip(esc(REG.categories[p.cat]), 'off')}${p.status === 'incomplete' ? chip('بيانات ناقصة', 'warn') : chip('كاملة', 'ok')}${changed.has(p.id) ? chip('محفوظ ومش منشور', 'warn') : ''}</span><p class="sa-hero__where">${ic(living ? 'church' : p.feasts.length ? 'check' : 'alert', 'ico-sm')}<span>${where}</span></p></div><div class="sa-hero__acts">${btn('شيل', 'trash', 'btn--ghost btn--sm sa-danger', 'data-m="delete"')}${btn('احفظ', 'check', 'btn--primary', 'data-act="save"')}</div></section>`;
+  <section class="card p8-card sa-hero">${wholePic(p, 720, 'sa-hero__pic') || face(p, true)}<div class="sa-hero__main"><h2 class="sa-hero__name">${esc(p.name)}</h2><span class="ycard__chips">${living ? chip('حي · مناسبات كنيستنا', 'gold') : chip('متنيح · كارت التذكار', 'info')}${chip(esc(REG.categories[p.cat]), 'off')}${p.status === 'incomplete' ? chip('بيانات ناقصة', 'warn') : chip('كاملة', 'ok')}${changed.has(p.id) ? chip('محفوظ ومش منشور', 'warn') : ''}</span><p class="sa-hero__where">${ic(living ? 'church' : p.feasts.length ? 'check' : 'alert', 'ico-sm')}<span>${where}</span></p></div><div class="sa-hero__acts">${btn('شيل', 'trash', 'btn--ghost btn--sm sa-danger', 'data-m="delete"')}${btn('احفظ', 'check', 'btn--primary', 'data-act="save"')}</div></section>`;
   const missing = p.status === 'incomplete' ? `<div class="ba-alert ba-alert--warn sa-missalert" role="status"><span class="chipico chipico--warn" aria-hidden="true">${ic('alert')}</span><div class="ba-alert__text"><b>بيانات ناقصة: ${p.missing.map(m => MISS[m]).join('، ')}</b><small>الشخص محفوظ ومش هيتشال. أول ما تضيف يوم بمصدره وتنشر، بيدخل الأعياد التلقائية لوحده، من غير كود ولا استيراد.</small></div>${p.missing.includes('feasts') ? btn('ضيف يوم', 'plus', 'btn--primary', 'data-m="newday"') : ''}</div>` : '';
   const basics = card('user', 'البيانات الأساسية', '', '', `<div class="ba-dayform">${field('الاسم', input(p.name, 'maxlength="120"'), 'زي ما بيظهر للشباب في الكارت')}
     <div class="ba-dayform__two">${field('النوع', seg('pcls', 'النوع', [['reposed', 'متنيح'], ['living', 'حي']], p.class), living ? '«مناسبات كنيستنا» بس، بصوره الحقيقية' : 'كارت «النهارده تذكار…»')}${field('المجموعة', `<select class="input">${Object.entries(REG.categories).map(([k, v]) => `<option ${k === p.cat ? 'selected' : ''}>${v}</option>`).join('')}</select>`)}</div>
@@ -405,10 +423,17 @@ function view() {
   if (S.s === 'publish') return viewPublish();
   return viewPeople();
 }
+/* the sticky bar sits right under the panel's own top bar, whatever its height on this screen */
+function stickTop() {
+  const t = document.querySelector('.topbar');
+  html.style.setProperty('--sa-top', (t && getComputedStyle(t).position === 'sticky' ? Math.round(t.getBoundingClientRect().height) : 0) + 'px');
+}
+addEventListener('resize', stickTop);
 function render(keepScroll = false) {
   const y = window.scrollY;
   document.body.innerHTML = shell(view());
   html.classList.remove('is-intro');
+  stickTop();
   if (keepScroll) window.scrollTo(0, y);
   const p = byId(S.id);
   if (S.m === 'day' && p) dayModal(p, S.i);
@@ -435,6 +460,7 @@ document.addEventListener('click', e => {
     S.stat = S.f === 'incomplete' ? 'incomplete' : '';
     render(true); return;
   }
+  if (t.dataset.act === 'top') { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
   if (t.dataset.act === 'save') { changed.add(S.id); render(true); return; }
   if (t.dataset.act === 'publish') { S.done = true; render(); window.scrollTo(0, 0); return; }
 });
