@@ -352,7 +352,7 @@ function cropper(url, c) {
         <span class="sa-cropper__pv sa-cropper__pv--tile"><img class="sa-cropimg" src="${url}" style="${st}" alt=""></span><small>الكارت الكبير</small>
         <span class="ycard__face has-photo sa-cropper__pv--face"><img class="ycard__photo sa-cropimg" src="${url}" style="${st}" alt=""></span><small>الصورة الصغيرة (القايمة)</small></div></div>
     <label class="sa-zoom">${ic('search', 'ico-sm')}<span>التكبير</span><input type="range" min="1" max="3" step="0.05" value="${c.z}" data-zoom aria-label="التكبير"><output data-zout>${AR(Math.round(c.z * 100))}٪</output></label>
-    <div class="sa-cropper__acts">${btn('زي الأول', 'retry', 'btn--sm btn--ghost', 'data-crop-reset')}<small class="sa-muted">الضبط ده للصورة دي بس، وبيتطبق في الأدمن والموقع.</small></div></div>`;
+    <div class="sa-cropper__acts">${btn('زي الأول', 'retry', 'btn--sm btn--ghost', 'data-crop-reset')}<small class="sa-muted">الضبط ده للإطارات الصغيرة بس (الأدمن، والصورة الصغيرة). كارت «النهارده تذكار…» على الموقع بيعرض الصورة كاملة زي ما هي.</small></div></div>`;
 }
 function wireCrop(dlg) {
   const box = dlg.querySelector('[data-crop]');
