@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P3 — التصميم المعتمد جنب اللي اتبنى</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="../../../../assets/css/main.css">
+<link rel="stylesheet" href="../../w1/review.css">
+<style>body { background: var(--ink); color: var(--text); }</style>
+</head>
+<body>
+<main class="rv">
+  <header>
+    <h1>P3 — التصميم جنب اللي اتبنى</h1>
+    <p class="rv-lead">على الشمال صورة التصميم اللي اتوافق عليه (المعاينة)، وعلى اليمين الأدمن الحقيقي بعد البناء (اختبار <code>bread-saints-admin.e2e</code>، بالحروف لأن الصور بتدخل في P4). الفرق الوحيد المقصود: زرار «راجع وانشر (١٠٩)» في الشريط قبل أول نشرة، لأن السجل كله لسه مش منشور. <a href="index.html" style="color:var(--gold-hi)">المعاينة</a></p>
+  </header>
+  <div id="list" style="display:grid;gap:18px"></div>
+</main>
+<script type="module">
+const S = [['01-people-d', 'الشخصيات (كمبيوتر)'], ['01a-people-large-d', 'صور كبيرة + الشريط الثابت'], ['01-people-m', 'الشخصيات (موبايل)'], ['01a-people-large-m', 'صور كبيرة (موبايل)'], ['03-person-theophilus-m', 'الشخص (موبايل)'], ['05-person-incomplete-d', 'شخص بياناته ناقصة'], ['06-person-newday-d', 'يوم جديد: التحويل على طول'], ['10-occasions-d', 'المناسبات'], ['12-publish-d', 'راجع وانشر']];
+const col = (t, f, cls) => `<div class="rv-col ${cls}"><h3>${t}</h3><div class="rv-shots"><a class="d" href="${f}" target="_blank"><img src="${f}" alt=""></a></div></div>`;
+document.getElementById('list').innerHTML = S.map(([id, t]) => `<section class="widget rv-fig"><header><b>${t}</b><code>${id}</code></header><div class="rv-pair">${col('التصميم', 'shots/' + id + '.webp', '')}${col('اللي اتبنى', 'built/' + id + '.webp', 'rv-col--new')}</div></section>`).join('');
+</script>
+</body>
+</html>

@@ -56,3 +56,43 @@
   - P3 بيحفظ بس مرحلة كل صورة ومناسبتها، علشان P5 تختار منها.
 
 ## الخطوة ب: التنفيذ
+
+### اللي اتبنى (commit `e68f66f`)
+
+| الجزء | الملفات |
+| --- | --- |
+| القواعد المشتركة | `worker/src/bread/saints.js` و`coptic.js`: الفحص، و`status`/`missing` بتتحسب، وأعياد ومناسبات الشهر، والملف المنشور. الأدوات (`tools/lib/saints.mjs`، `coptic.mjs`) بتستعملهم |
+| D1 | `0035_saints.sql` (`saints_items`، `saints_snapshots`، `BREAD_SAINTS=0`) و`0036_saints_seed.sql` (١٠٨ شخص + مناسبة، متولّد بـ`tools/bread-saints-seed.mjs`، `INSERT OR IGNORE`) |
+| الـWorker | `worker/src/bread/saints-admin.js`: `/v1/admin/bread/saints/*` (صلاحية `bread.saints`، ومقفولة لو `BREAD_SAINTS≠1`). الحفظ بـ`rev`، والشيل والرجوع، والمراجعة، والنشر (`daily-bread/data/saints.json` بنظام نشر `bread` + الـmirror)، والنشرات، و«رجّع النسخة دي». مفتاح `saints` في إعدادات خبزنا اليومي (الأدمن الأساسي) |
+| «الأعياد» | بيقرا السجل المنشور كمان: اليوم اللي اتكمّل واتنشر بيظهر على طول. ترشيح الأنبا تكلا بيقرا `saints.json` أول ما يبقى موجود |
+| الأدمن | `apps-script/AdminSaints.html` (تبويبين «الشخصيات» و«المناسبات»، ظاهرين بس والمفتاح مفتوح)، وطبقة التصميم في `AdminStyles.html` («DAILY BREAD — P3 SAINTS»). أداة ظبط الصورة بتشتغل على صور مكتبة الصور (P4) |
+| الموقع | `_config.yml`: `daily-bread/saints` مش بيتنشر على GitHub Pages |
+
+- **مطابقة التصميم:** [`p3/compare.html`](p3/compare.html): صور التصميم جنب الأدمن الحقيقي. الفرق المقصود الوحيد: «راجع وانشر (١٠٩)» في الشريط قبل أول نشرة.
+- **الاختبارات:**
+  - الـWorker: ٥٣٣ / ٥٣٣ (منهم `bread-saints.test.mjs` ٨).
+  - الموقع: ٨٤٥ ✓، والـ٣ اللي بيقعوا من قبل زي ما هم.
+  - `bread-saints-admin.e2e`: ٤ / ٤.
+  - `bread-admin.e2e`: ١٤ / ١٤. مرة واحدة وقع «a day by hand» بـ«Node is detached»، وعدّى لوحده وفي التشغيلة الكاملة اللي بعدها (نفس نوع الوقعات اللي W7 كاتبها).
+
+### Staging (2026-11-24)
+
+- **Migrations:** `0035` + `0036` على `athanasios-staging` ✅ (١١٣ أمر).
+- **الـWorker:** `e77e4acd-bf6e-4d0d-85cb-b99951f13d97`. **الرجوع:** `npx wrangler rollback f977fa77-0bc3-490d-8e25-a4f66ccc71d6 --env staging`.
+- **Smoke:** نضيف.
+- **الفحص** (`STAGING_KEYS_DIR=… node tools/saints-staging.mjs`) ← **ALL OK**:
+  - المفتاح مقفول ← `disabled`. اتفتح على Staging بس طول الفحص.
+  - ١٠٨ شخص + مناسبة. المراجعة من غير مشاكل. أول نشرة (النسخة ١): الملف من غير `pending` ولا `src` ولا الملحوظات، ومعاه شغلانة mirror.
+  - «الأعياد» بيقرا الملف: الأنبا ثاؤفيلس ١٢ فبراير ٢٠٢٧.
+  - مار إسحق بيوم تجربة (١٧ كيهك): اتحفظ و`status` بقى `complete`، والـ`rev` القديم اترفض (409)، والمراجعة قالت إنه هيدخل، واتنشر، وظهر في ديسمبر ٢٠٢٦ من غير كود ولا استيراد.
+  - «رجّع النسخة ١»: اتنشرت تاني (النسخة ٣)، ومار إسحق رجع من غير يوم.
+  - **المفاتيح بعد الفحص زي ما كانت:** `BREAD_SAINTS=0`، `BREAD_MODULE=0`، `BREAD_PUSH=0`، `NOTIFY_ROUTER=0`، `PERMS_ENFORCE=1`. مفيش Push.
+- **الـCPU (wrangler tail):** `GET saints` ‏١٠ ms، والمراجعة ١١–١٢ ms، و`feasts` ‏٧ ms. طلب الإعدادات العادي على نفس الـWorker ٥–٩ ms (التحقق من التوكن). يعني السجل بيزوّد حوالي ٢–٣ ms. **محتاج متابعة على Production** (الخطة المجانية ١٠ ms).
+- **اللي فاضل على Staging:** سجل الشخصيات اتنشر هناك (النسخة ٣ = بيانات P2). ده مالوش أثر، والمفتاح مقفول.
+
+### Production (لسه، مستني موافقة صاحب المشروع الصريحة)
+
+1. `main` (merge الفرع) ← الـCI بيشغّل الاختبارات، وبعدها Staging، وبعدها Production: migrations ‏`0035` + `0036`، والـWorker. **`BREAD_SAINTS` بيفضل `0`.**
+2. بعد النشر: smoke، والتأكد إن `BREAD_SAINTS=0` والتبويبين مش ظاهرين.
+3. **الرجوع:** `npx wrangler rollback <الـID اللي قبل>`، وبعده `git revert` للـcommits. الـmigrations بتفضل (إضافة بس).
+4. الفتح (`BREAD_SAINTS=1`) بقرار صاحب المشروع لوحده، من «الإعدادات» ← «القسم في الموقع» ← «سجل الشخصيات في الأدمن». وبعده أول «انشر» من الأدمن.
