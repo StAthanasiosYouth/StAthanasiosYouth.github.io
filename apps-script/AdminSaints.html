@@ -171,28 +171,31 @@
     var v = s / z;
     return v >= 1 ? null : { v: v, centre: c / 100 * (1 - v) + v / 2 };
   }
+  /* Round 2 (owner 2026-11-24, the list still cut heads): keeping the centre is not enough in a shorter frame. The
+     owner sets a crop so the head is in view, so a frame keeps the TOP of the part chosen in the crop tool and the
+     same height of picture (the zoom goes down for a wider frame, never under 1); across, it keeps the centre. */
   function placeCrop(img, c) {
     var w = img.naturalWidth, h = img.naturalHeight;
     var box = img.getBoundingClientRect();
-    if (!w || !h || !box.width || !box.height) return { x: c.x, y: c.y };
+    if (!w || !h || !box.width || !box.height) return { x: c.x, y: c.y, z: c.z };
     var a = w / h;
     var fit = function (F) { return a > F ? { sx: F / a, sy: 1 } : { sx: 1, sy: a / F }; };
     var ref = fit(CROP_FRAME), here = fit(box.width / box.height);
-    var out = { x: c.x, y: c.y };
-    [['x', 'sx'], ['y', 'sy']].forEach(function (k) {
-      var from = cropAxis(c[k[0]], ref[k[1]], c.z);
-      var v = here[k[1]] / c.z;
-      if (v >= 1) { out[k[0]] = 50; return; }
-      var centre = from ? from.centre : 0.5;
-      out[k[0]] = Math.max(0, Math.min(100, (centre - v / 2) / (1 - v) * 100));
-    });
-    return out;
+    // the part of the picture the crop tool shows: its height and top, and its centre across
+    var refV = Math.min(1, ref.sy / c.z), refTop = refV >= 1 ? 0 : c.y / 100 * (1 - refV);
+    var refX = cropAxis(c.x, ref.sx, c.z);
+    var centreX = refX ? refX.centre : 0.5;
+    var z = Math.max(1, Math.min(3, here.sy / refV));
+    var vy = here.sy / z, vx = here.sx / z;
+    var y = vy >= 1 ? 50 : Math.max(0, Math.min(100, refTop / (1 - vy) * 100));
+    var x = vx >= 1 ? 50 : Math.max(0, Math.min(100, (centreX - vx / 2) / (1 - vx) * 100));
+    return { x: x, y: y, z: z };
   }
   function applyCrop(img, c) {
     var draw = function () {
       var p = placeCrop(img, c);
       img.style.objectPosition = p.x + '% ' + p.y + '%';
-      img.style.transform = 'scale(' + c.z + ')';
+      img.style.transform = 'scale(' + p.z + ')';
       img.style.transformOrigin = p.x + '% ' + p.y + '%';
     };
     draw();
@@ -933,6 +936,9 @@
       if (main.checked) { p.album.forEach(function (x) { delete x.main; }); v.main = true; } else delete v.main;
       p.album[i] = v;
       touched();
+      // owner 2026-11-24: the picture's «احفظ» saves the person too (before, it only changed the page, and a crop
+      // looked right inside but was never stored — the list and a reload showed the old one)
+      savePerson(null);
     });
   }
 
@@ -941,7 +947,8 @@
     var p = SA.form;
     if (!String(p.name || '').trim()) { A.toast('اكتب الاسم', 'error'); return; }
     var body = { kind: 'person', rev: SA.formRev, item: p };
-    A.withBusy(event.currentTarget, api('POST', 'item', body)).then(function (reply) {
+    var call = api('POST', 'item', body);
+    (event && event.currentTarget ? A.withBusy(event.currentTarget, call) : call).then(function (reply) {
       var it = reply.item;
       var list = SA.data.items.filter(function (x) { return !(x.kind === 'person' && x.id === it.id); });
       list.push(it);
