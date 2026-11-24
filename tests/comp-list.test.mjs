@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { listOf, hasCompetitions, RECENT_DAYS } from '../assets/js/comp/listing.js';
 import { loadGs } from '../tools/lib/gs.mjs';
+import { SITE_URL } from '../tools/site.config.mjs';
 
 const read = p => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const NOW = '2026-11-14T12:00';
@@ -45,7 +46,7 @@ test('«فكّرني»: a push to this device through the Worker (no calendar fi
 
 test('the page: its own SEO head; the sitemap lists it only while a competition is published', () => {
   const html = read('competitions/index.html');
-  assert.match(html, /<link rel="canonical" href="https:\/\/stathanasiosyouth\.github\.io\/competitions\/">/);
+  assert.ok(html.includes(`<link rel="canonical" href="${SITE_URL}competitions/">`));
   assert.doesNotMatch(html, /name="robots"/);
   assert.match(html, /<script type="module" src="\.\.\/assets\/js\/comp\/list\.js"><\/script>/);
   const gs = loadGs(['Platforms.gs', 'Content.gs', 'Hub.gs', 'CompModel.gs', 'BookModel.gs', 'Pages.gs']);

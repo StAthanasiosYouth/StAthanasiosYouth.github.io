@@ -22,8 +22,8 @@ END:DAYLIGHT
 END:VTIMEZONE
 BEGIN:VEVENT
 UID:weekly-meeting@st-athanasius-safaga
-DTSTAMP:20261115T085542Z
-DTSTART;TZID=Africa/Cairo:20261115T200000
+DTSTAMP:20261121T162341Z
+DTSTART;TZID=Africa/Cairo:20261122T200000
 DURATION:PT120M
 RRULE:FREQ=WEEKLY;BYDAY=SU
 SUMMARY:اجتماع الشباب — أسرة البابا أثناسيو
@@ -33,6 +33,6 @@ DESCRIPTION:أسرة البابا أثناسيوس لخدمة شعب كني
 LOCATION:كنيسة أبي سيفين – سفاجا، سفاجا، الب
  حر الأحمر
 GEO:26.7314392;33.9379229
-URL:https://stathanasiosyouth.github.io/
+URL:https://stathanasiosyouthsafaga.social/
 END:VEVENT
 END:VCALENDAR

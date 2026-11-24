@@ -12,7 +12,7 @@ const HILLS = [
   ['M0,84 C160,58 300,72 420,82 C560,62 720,58 1000,76 V150 H0 Z', '#8a6a5a', 0.8],
   ['M0,118 C200,100 800,100 1000,118 V150 H0 Z', '#c79a5c', 1]
 ];
-export const SITE_LINK = 'stathanasiosyouth.github.io/daily-bread';
+export const SITE_LINK = 'stathanasiosyouthsafaga.social/daily-bread';
 
 const loadImage = src => new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src; });
 

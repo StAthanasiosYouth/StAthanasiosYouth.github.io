@@ -17,7 +17,7 @@
     { "src": "/assets/img/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "related_applications": [
-    { "platform": "webapp", "url": "https://stathanasiosyouth.github.io/manifest.webmanifest" }
+    { "platform": "webapp", "url": "https://stathanasiosyouthsafaga.social/manifest.webmanifest" }
   ],
   "prefer_related_applications": false
 }
