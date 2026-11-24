@@ -64,6 +64,10 @@ import {
   adminBreadSettings, adminBreadSettingsSave, adminBreadSuggest, adminBreadFeasts, adminBreadFeastsGet, UPLOAD_MAX_BYTES as BREAD_UPLOAD_MAX_BYTES
 } from './bread/admin.js';
 import { breadDaily } from './bread/alerts.js';
+import {
+  adminSaintsList, adminSaintsSave, adminSaintsDelete, adminSaintsRestoreItem, adminSaintsRevert, adminSaintsReview, adminSaintsPublish,
+  adminSaintsHistory, adminSaintsRestore, adminSaintsFeasts, SAINTS_ITEM_MAX_BYTES
+} from './bread/saints-admin.js';
 import { adminPushState, adminPushSend } from './push/screen.js';
 import { adminToolGithub, adminToolMedia, adminToolMaps, adminToolFetchMedia, adminToolLiveStage, adminToolMigration, adminToolMigrate, adminToolAdmins } from './admin/tools.js';
 import { adminPushAuto, adminPushSchedule, adminPushScheduleCancel } from './push/schedule.js';
@@ -494,6 +498,17 @@ export const ROUTES = [
   { method: 'POST', path: '/v1/admin/bread/feasts', auth: 'admin', maxBytes: 96 * 1024, handler: adminBreadFeasts },
   { method: 'GET', path: '/v1/admin/bread/settings', auth: 'admin', handler: adminBreadSettings },
   { method: 'POST', path: '/v1/admin/bread/settings', auth: 'admin', maxBytes: 1024, handler: adminBreadSettingsSave },
+  // the saints registry (P3, bread/saints-admin.js; off while BREAD_SAINTS = '0')
+  { method: 'GET', path: '/v1/admin/bread/saints', auth: 'admin', handler: adminSaintsList },
+  { method: 'POST', path: '/v1/admin/bread/saints/item', auth: 'admin', maxBytes: SAINTS_ITEM_MAX_BYTES + 1024, handler: adminSaintsSave },
+  { method: 'POST', path: '/v1/admin/bread/saints/item/delete', auth: 'admin', maxBytes: 512, handler: adminSaintsDelete },
+  { method: 'POST', path: '/v1/admin/bread/saints/item/restore', auth: 'admin', maxBytes: 512, handler: adminSaintsRestoreItem },
+  { method: 'POST', path: '/v1/admin/bread/saints/item/revert', auth: 'admin', maxBytes: 512, handler: adminSaintsRevert },
+  { method: 'GET', path: '/v1/admin/bread/saints/review', auth: 'admin', handler: adminSaintsReview },
+  { method: 'POST', path: '/v1/admin/bread/saints/publish', auth: 'admin', maxBytes: 512, handler: adminSaintsPublish },
+  { method: 'GET', path: '/v1/admin/bread/saints/history', auth: 'admin', handler: adminSaintsHistory },
+  { method: 'POST', path: '/v1/admin/bread/saints/restore', auth: 'admin', maxBytes: 256, handler: adminSaintsRestore },
+  { method: 'GET', path: '/v1/admin/bread/saints/feasts', auth: 'admin', handler: adminSaintsFeasts },
   // Phase 6 Step 5 — the map card's routes (route.js; the key is ORS_API_KEY)
   { method: 'POST', path: '/v1/public/route', auth: 'public', maxBytes: 1024, handler: publicRoute },
   // the admin app's service worker: what happened to a push on the device (push/receipt.js)

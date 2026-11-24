@@ -34,7 +34,8 @@ const CATALOG = {
   notifications: ['view', 'manage'],
   system: ['view', 'manage'],
   // «خبزنا اليومي» (docs/daily-bread/PLAN.md W3): the programs, the numbers, the members' reflections (sensitive)
-  bread: ['content', 'stats', 'reflections']
+  // saints (P3, 2026-11-24): the saints and church people registry — edit and publish
+  bread: ['content', 'stats', 'reflections', 'saints']
 };
 
 export const PERMS = Object.freeze(Object.entries(CATALOG).flatMap(([m, actions]) => actions.map(a => m + '.' + a)));
@@ -59,7 +60,8 @@ export const PRESETS = Object.freeze({
   // and closing it), the youth accounts (not their reset: participants.manage stays the Primary Admin's), the export
   // owner 2026-11-19: the one who runs «خبزنا اليومي»: programs (St-Takla's month, Excel), the feasts, the numbers.
   // The youth's reflections (bread.reflections) stay a Primary default (decision 10): ticked by hand if wanted.
-  bread: { label: 'مسؤول خبزنا اليومي', grants: allOf(['bread.content', 'bread.stats']) },
+  // P3 (2026-11-24): and the saints registry (people, days, albums, occasions, publish)
+  bread: { label: 'مسؤول خبزنا اليومي', grants: allOf(['bread.content', 'bread.stats', 'bread.saints']) },
   comp_full: { label: 'خادم مسابقات شاملة', grants: allOf(['competitions.view', 'competitions.add', 'competitions.edit', 'competitions.delete', 'competitions.approve', 'points.view', 'points.edit', 'points.approve', 'store.view', 'store.add', 'store.edit', 'store.delete', 'store.approve', 'participants.view', 'participants.add', 'participants.edit', 'media.view', 'media.add', 'exports.export', 'activity.view']) }
 });
 
@@ -200,6 +202,17 @@ export const ROUTE_PERMS = Object.freeze({
   'POST /v1/admin/bread/feasts': 'bread.content',
   'GET /v1/admin/bread/settings': 'bread.content',
   'POST /v1/admin/bread/settings': 'bread.content',
+  // the saints registry (P3, bread/saints-admin.js)
+  'GET /v1/admin/bread/saints': 'bread.saints',
+  'POST /v1/admin/bread/saints/item': 'bread.saints',
+  'POST /v1/admin/bread/saints/item/delete': 'bread.saints',
+  'POST /v1/admin/bread/saints/item/restore': 'bread.saints',
+  'POST /v1/admin/bread/saints/item/revert': 'bread.saints',
+  'GET /v1/admin/bread/saints/review': 'bread.saints',
+  'POST /v1/admin/bread/saints/publish': 'bread.saints',
+  'GET /v1/admin/bread/saints/history': 'bread.saints',
+  'POST /v1/admin/bread/saints/restore': 'bread.saints',
+  'GET /v1/admin/bread/saints/feasts': 'bread.content',
   'GET /v1/admin/comp/seasons': 'competitions.view',
   'GET /v1/admin/comp/:id/submissions': 'competitions.view',
   'GET /v1/admin/comp/submissions/:id': 'competitions.view',

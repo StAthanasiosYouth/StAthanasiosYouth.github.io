@@ -4,6 +4,11 @@
 // Worker would refuse is refused here too. Not the real engine: publishing, the mirror and the tick are not here.
 
 import { checkProgram, checkTopic, cairoDay, dayAdd, dayDiff, currentOf, nextOf, liveOn, MAX_DAYS } from '../../worker/src/bread/model.js';
+import { readFileSync } from 'node:fs';
+// P3: the saints registry routes (worker/src/bread/saints-admin.js), with the Worker's own rules (the shared module)
+import { checkPerson, checkOccasion, check, withStatus, scheduled, feastsOfMonth, publicFile } from '../../worker/src/bread/saints.js';
+import { LABELS } from '../../worker/src/bread/saints-admin.js';
+const REGISTRY = JSON.parse(readFileSync(new URL('../../daily-bread/saints/registry.json', import.meta.url), 'utf8'));
 
 export const WORKER_URL = 'https://athanasios-api.menazak-lab.workers.dev';
 const TOPICS_PER_CALL = 20;
@@ -29,8 +34,16 @@ export function createBreadWorker({ origin, today = cairoDay(), admin = 'admin@t
     daily: [],                         // { day, program_id, opens, reads, sent, reflections }
     reflections: [],                   // { id, program_id, n, day, text, state, name, created_ms, edited_ms }
     slots: [],                         // { device_id, minute }
-    settings: { module: false, push: false, emptyMuted: false, defaultTime: '08:00', maxSlots: 3 },
-    perms: { content: true, stats: true, reflections: true },
+    settings: { module: false, push: false, emptyMuted: false, defaultTime: '08:00', maxSlots: 3, saints: false },
+    perms: { content: true, stats: true, reflections: true, saints: true },
+    // P3: the draft (like D1 saints_items, seeded from P2), the publishes, the published file
+    saints: {
+      items: [
+        ...REGISTRY.people.map((p, i) => ({ kind: 'person', id: p.id, ord: i + 1, data: withStatus(p), rev: 1, pub_rev: null, deleted: false, at: 0, by: 'P2 import' })),
+        ...(REGISTRY.occasions || []).map((o, i) => ({ kind: 'occasion', id: o.id, ord: i + 1, data: o, rev: 1, pub_rev: null, deleted: false, at: 0, by: 'P2 import' }))
+      ],
+      snapshots: [], file: null
+    },
     calls: [],
     seq: 0
   };
@@ -220,6 +233,7 @@ export function createBreadWorker({ origin, today = cairoDay(), admin = 'admin@t
       return pub ? { month, published: true, feasts: clone(pub) } : { month, published: false, feasts: [] };
     }],
     ['POST', /^\/v1\/admin\/bread\/feasts$/, (m, b) => { need('content'); (state.feasts ||= {})[b.month] = b.feasts; return { month: b.month, feasts: b.feasts.length, publish: 'brd-pub-x' }; }],
+    ...saintsRoutes(),
     ['GET', /^\/v1\/admin\/bread\/settings$/, () => { need('content'); return { settings: clone(state.settings) }; }],
     ['POST', /^\/v1\/admin\/bread\/settings$/, (m, b) => {
       need('content');
@@ -228,10 +242,127 @@ export function createBreadWorker({ origin, today = cairoDay(), admin = 'admin@t
       if (b.maxSlots !== undefined) { if (![1, 2, 3].includes(b.maxSlots)) throw new Fail('invalid', 'من ١ لـ ٣.'); state.settings.maxSlots = b.maxSlots; changed++; }
       if (b.emptyMuted !== undefined) { if (typeof b.emptyMuted !== 'boolean') throw new Fail('invalid', 'الطلب مش مفهوم.'); state.settings.emptyMuted = b.emptyMuted; changed++; }
       for (const k of ['module', 'push']) if (b[k] !== undefined) throw new Fail('denied', 'primary only');
+      if (b.saints !== undefined) { state.settings.saints = !!b.saints; changed++; }
       if (!changed) throw new Fail('invalid', 'مفيش حاجة اتغيرت.');
       return { settings: clone(state.settings) };
     }]
   ];
+
+  /* ---------- P3: the saints registry ---------- */
+  function saintsRoutes() {
+    const S = state.saints;
+    const gate = () => { need('saints'); if (!state.settings.saints) throw new Fail('disabled', 'سجل الشخصيات لسه مقفول.'); };
+    const st = r => (r.deleted ? 'deleted' : r.pub_rev == null ? 'new' : r.rev !== r.pub_rev ? 'changed' : 'published');
+    const view = r => ({ kind: r.kind, id: r.id, ord: r.ord, rev: r.rev, state: st(r), at: r.at, by: r.by, data: clone(r.data) });
+    const live = k => S.items.filter(r => r.kind === k && !r.deleted).sort((a, b) => a.ord - b.ord).map(r => r.data);
+    const reg = () => ({ schema: 2, categories: REGISTRY.categories, people: live('person'), occasions: live('occasion') });
+    const last = () => S.snapshots[S.snapshots.length - 1] || null;
+    const changes = () => S.items.filter(r => st(r) !== 'published');
+    const keyOf = () => JSON.stringify([last() ? last().rev : 0, S.items.map(r => r.kind + r.id + r.rev + (r.deleted ? 'x' : '')).sort()]);
+    const same = (a, b) => JSON.stringify(a == null || (Array.isArray(a) && !a.length) ? null : a) === JSON.stringify(b == null || (Array.isArray(b) && !b.length) ? null : b);
+    function review() {
+      const before = last() ? last().data : { people: [], occasions: [] };
+      const was = new Map([...before.people.map(p => ['person:' + p.id, p]), ...before.occasions.map(o => ['occasion:' + o.id, o])]);
+      const on = g => new Map(g.people.map(withStatus).filter(scheduled).map(p => [p.id, p]));
+      const a = on(before), z = on(reg());
+      return {
+        first: !last(), errors: check(reg()), expect: keyOf(), people: reg().people.length, occasions: reg().occasions.length,
+        changes: changes().map(r => {
+          const old = was.get(r.kind + ':' + r.id);
+          const fields = old ? Object.keys({ ...old, ...r.data }).filter(k => !['status', 'missing', 'id'].includes(k) && !same(old[k], r.data[k])).map(k => ({ field: k, label: LABELS[k] || k })) : [];
+          return { kind: r.kind, id: r.id, rev: r.rev, state: st(r), name: r.data.name, at: r.at, by: r.by, fields };
+        }),
+        joins: [...z.values()].filter(p => !a.has(p.id)).map(p => ({ id: p.id, name: p.name, class: p.class, days: p.feasts })),
+        leaves: [...a.values()].filter(p => !z.has(p.id)).map(p => ({ id: p.id, name: p.name, class: p.class })),
+        published: last() ? { rev: last().rev, at: last().at, by: last().by } : null
+      };
+    }
+    function publishNow(data, note) {
+      const rev = (last() ? last().rev : 0) + 1;
+      S.snapshots.push({ rev, data: clone(data), people: data.people.length, occasions: data.occasions.length, note, at: Date.now(), by: admin });
+      S.file = publicFile(data);
+      return rev;
+    }
+    const row = (kind, id) => S.items.find(r => r.kind === kind && r.id === id);
+    return [
+      ['GET', /^\/v1\/admin\/bread\/saints$/, () => {
+        gate();
+        const items = S.items.slice().sort((a, b) => (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : a.ord - b.ord)).map(view);
+        return { enabled: true, categories: REGISTRY.categories, items, changes: changes().length, published: last() ? { rev: last().rev, at: last().at, by: last().by } : null };
+      }],
+      ['POST', /^\/v1\/admin\/bread\/saints\/item$/, (m, b) => {
+        gate();
+        let item = clone(b.item || {});
+        for (const k of Object.keys(item)) if (item[k] == null) delete item[k];
+        if (b.kind === 'person') item = withStatus({ ...item, feasts: item.feasts || [], album: item.album || [] });
+        const errors = b.kind === 'person' ? checkPerson(item, { cats: REGISTRY.categories }) : checkOccasion(item);
+        if (errors.length) throw new Fail('invalid', 'فيه حاجات محتاجة تتصلح.', { errors });
+        let r = row(b.kind, item.id);
+        if (!b.rev) {
+          if (r) throw new Fail('invalid', 'الـid ده مستعمل.');
+          r = { kind: b.kind, id: item.id, ord: 1 + Math.max(0, ...S.items.filter(x => x.kind === b.kind).map(x => x.ord)), data: item, rev: 1, pub_rev: null, deleted: false, at: Date.now(), by: admin };
+          S.items.push(r);
+        } else {
+          if (!r || r.rev !== b.rev || r.deleted) throw new Fail('stale', 'حد تاني عدّل ده من شوية.');
+          Object.assign(r, { data: item, rev: r.rev + 1, at: Date.now(), by: admin });
+        }
+        return { item: view(r) };
+      }],
+      ['POST', /^\/v1\/admin\/bread\/saints\/item\/delete$/, (m, b) => {
+        gate();
+        const r = row(b.kind, b.id);
+        if (!r || r.rev !== b.rev) throw new Fail('stale', 'حد تاني عدّل ده من شوية.');
+        if (r.pub_rev == null) S.items.splice(S.items.indexOf(r), 1); else Object.assign(r, { deleted: true, rev: r.rev + 1 });
+        return { ok: true };
+      }],
+      ['POST', /^\/v1\/admin\/bread\/saints\/item\/(restore|revert)$/, (m, b) => {
+        gate();
+        const r = row(b.kind, b.id);
+        if (!r) throw new Fail('not_found', 'مفيش حاجة ترجع.');
+        const was = last() && (b.kind === 'person' ? last().data.people : last().data.occasions).find(x => x.id === b.id);
+        if (m[1] === 'restore') Object.assign(r, { deleted: false, rev: r.rev + 1 });
+        else if (was) Object.assign(r, { data: clone(was), deleted: false, rev: r.rev + 1, pub_rev: r.rev + 1 });
+        else S.items.splice(S.items.indexOf(r), 1);
+        return { ok: true };
+      }],
+      ['GET', /^\/v1\/admin\/bread\/saints\/review$/, () => { gate(); return review(); }],
+      ['POST', /^\/v1\/admin\/bread\/saints\/publish$/, (m, b) => {
+        gate();
+        const rv = review();
+        if (rv.errors.length) throw new Fail('invalid', 'فيه حاجات محتاجة تتصلح قبل النشر.', { errors: rv.errors });
+        if (b.expect !== rv.expect) throw new Fail('stale', 'فيه تعديل جديد. راجع تاني وانشر.');
+        const rev = publishNow(reg(), rv.first ? 'أول نشرة' : rv.changes.map(c => c.name).join('، '));
+        S.items = S.items.filter(r => !r.deleted);
+        for (const r of S.items) r.pub_rev = r.rev;
+        state.saintsPublishes = (state.saintsPublishes || 0) + 1;
+        return { rev, people: reg().people.length, occasions: reg().occasions.length, joins: rv.joins, leaves: rv.leaves };
+      }],
+      ['GET', /^\/v1\/admin\/bread\/saints\/history$/, () => {
+        gate();
+        return { publishes: S.snapshots.slice().reverse().map(x => ({ rev: x.rev, people: x.people, occasions: x.occasions, note: x.note, at: x.at, by: x.by })) };
+      }],
+      ['POST', /^\/v1\/admin\/bread\/saints\/restore$/, (m, b) => {
+        gate();
+        const old = S.snapshots.find(x => x.rev === b.rev);
+        if (!old || b.confirm !== true) throw new Fail('invalid', 'الطلب مش مفهوم.');
+        S.items = [
+          ...old.data.people.map((p, i) => ({ kind: 'person', id: p.id, ord: i + 1, data: clone(p), rev: 1, pub_rev: 1, deleted: false, at: Date.now(), by: admin })),
+          ...old.data.occasions.map((o, i) => ({ kind: 'occasion', id: o.id, ord: i + 1, data: clone(o), rev: 1, pub_rev: 1, deleted: false, at: Date.now(), by: admin }))
+        ];
+        return { rev: publishNow(old.data, 'رجوع للنسخة ' + old.rev), from: old.rev };
+      }],
+      ['GET', /^\/v1\/admin\/bread\/saints\/feasts$/, (m, b, query) => {
+        need('content');
+        const month = query.get('month');
+        if (!S.file) return { month, ready: false, feasts: [] };
+        const feasts = feastsOfMonth(S.file, month).map(h => ({
+          date: h.date, on: true, id: h.person.id, name: h.person.name, kind: h.feast.kind, title: h.feast.title || h.feast.kind + ' ' + h.person.name,
+          word: h.person.word || 'النهارده ' + h.feast.kind + ' ' + h.person.name + '.', sourceUrl: h.feast.source, img: null, others: h.others
+        }));
+        return { month, ready: true, feasts };
+      }]
+    ];
+  }
 
   const json = (status, body) => ({ status, headers: { ...cors, 'content-type': 'application/json; charset=utf-8' }, body: JSON.stringify(body) });
 

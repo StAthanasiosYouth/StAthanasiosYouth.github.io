@@ -11,3 +11,6 @@ exclude:
   - DESIGN.md
   - node_modules
   - worker
+  # «خبزنا اليومي» P3: P2's registry (the D1 seed) has the owner's file names and research notes; the site reads
+  # daily-bread/data/saints.json (published from the admin) instead
+  - daily-bread/saints

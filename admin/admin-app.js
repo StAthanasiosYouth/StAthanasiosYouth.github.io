@@ -28403,10 +28403,11 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
       subs: SUBS.map(function (s) { return { key: s.key, label: s.label }; })
     });
     A.sub.bread = A.sub.bread || 'breadprograms';
-    if (A.AREA_NEEDS) A.AREA_NEEDS.bread = ['bread.content', 'bread.stats', 'bread.reflections'];
+    if (A.AREA_NEEDS) A.AREA_NEEDS.bread = ['bread.content', 'bread.stats', 'bread.reflections', 'bread.saints'];
     if (A.SUB_NEEDS) {
       ['breadprograms', 'breadnew', 'breadfeasts', 'breadsettings'].forEach(function (k) { A.SUB_NEEDS[k] = ['bread.content']; });
       A.SUB_NEEDS.breadstats = ['bread.stats'];
+      A.SUB_NEEDS.breadpeople = A.SUB_NEEDS.breadoccasions = ['bread.saints'];
     }
     // «برنامج جديد» pressed again on its own tab: back to step 1 (a file half-way stays until then)
     // the tab again: back to the file step; a St-Takla month (W7) goes back to step 1, where its card is
@@ -28464,6 +28465,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     }).then(function () {
       loading = null;
       paintWaits();
+      if (BR.onSettings) BR.onSettings(BR.programs && BR.programs.settings);
       redraw('breadprograms');
       return BR.programs;
     });
@@ -28690,6 +28692,7 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
   function setMuted(on, control) {
     return A.withBusy(control, api('POST', 'settings', { emptyMuted: !!on })).then(function (reply) {
       if (BR.programs && reply && reply.settings) BR.programs.settings = reply.settings;
+      if (BR.onSettings && reply && reply.settings) BR.onSettings(reply.settings);
       A.toast(on ? 'اتكتم لحد ما يترفع برنامج جديد' : 'التنبيه رجع');
       paintWaits();
       A.render();
@@ -29024,8 +29027,13 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
     if (cur && cur.loading) return;
     BR.feasts[month] = { list: cur ? cur.list : [], published: cur ? cur.published : null, loading: true, error: null };
     var sug = suggested ? Promise.resolve({ ready: true, feasts: suggested }) : api('GET', 'suggest?month=' + month).catch(function () { return { ready: false }; });
-    Promise.all([sug, api('GET', 'feasts?month=' + month)]).then(function (both) {
-      BR.feasts[month] = feastsFrom(month, both[0] && both[0].ready ? both[0].feasts : [], both[1]);
+    // P3: the published saints registry too — a day completed and published today is here today, with no new suggestion
+    var reg = api('GET', 'saints/feasts?month=' + month).catch(function () { return { ready: false }; });
+    Promise.all([sug, api('GET', 'feasts?month=' + month), reg]).then(function (both) {
+      var list = both[0] && both[0].ready ? both[0].feasts.slice() : [];
+      // St-Takla's suggestion keeps its day (the synaxarium's word); the registry adds the days it does not have
+      if (both[2] && both[2].ready) both[2].feasts.forEach(function (f) { if (!list.some(function (x) { return x.date === f.date; })) list.push(f); });
+      BR.feasts[month] = feastsFrom(month, list, both[1]);
       A.render();
     }).catch(function (error) {
       BR.feasts[month] = { list: [], published: null, loading: false, error: error };
@@ -29873,14 +29881,981 @@ window.adminResolveExperience = function (link) { return resolveExperience(link,
         ]),
         setcard('bread', 'القسم في الموقع', '', [
           setrow('«خبزنا اليومي» على الموقع', s.module ? 'مفتوح للشباب' : 'بيتفتح يوم الإطلاق (W7)، بعد تجربة Staging', el('span', { class: 'chip ' + (s.module ? 'chip--ok' : 'chip--off'), text: s.module ? 'مفتوح' : 'مقفول' })),
-          setrow('الكارت في الرئيسية واللينك في القايمة', '/daily-bread/', el('span', { class: 'chip ' + (s.module ? 'chip--ok' : 'chip--off'), text: s.module ? 'ظاهرين' : 'مع فتح القسم' }))
+          setrow('الكارت في الرئيسية واللينك في القايمة', '/daily-bread/', el('span', { class: 'chip ' + (s.module ? 'chip--ok' : 'chip--off'), text: s.module ? 'ظاهرين' : 'مع فتح القسم' })),
+          // P3: the saints registry in the admin (BREAD_SAINTS), the Primary Admin's switch
+          setrow('سجل الشخصيات في الأدمن', s.saints ? '«الشخصيات» و«المناسبات» مفتوحين' : 'مقفول: التبويبين مش ظاهرين', sw(!!s.saints, 'سجل الشخصيات', function (event) { saveSetting({ saints: event.target.checked }, event.target); }, !(A.access && A.access.primary)), { 'data-act': 'bread-saints-switch' })
         ]))));
     return [r];
   };
 
+  /* P3: the section's own pieces, for the saints registry (apps-script/AdminSaints.html) */
+  BR.kit = { api: api, card: card, btn: btn, tag: tag, sw: sw, note: note, stack: stack, cols: cols, root: root, skeleton: skeleton, failed: failed, typedConfirm: typedConfirm, hasPerm: hasPerm, nameOf: nameOf, clock: clock, shortDate: shortDate, dayWords: dayWords, monthName: monthName, cairoToday: cairoToday, cairoMonth: cairoMonth, onTab: onTab, redraw: redraw, W: W, locked: locked };
+
+})();
+
+/* ---------- AdminSaints.html ---------- */
+/*
+ * «خبزنا اليومي» P3 — سجل الشخصيات والمناسبات (docs/daily-bread/saints/P3-PLAN.md), built on the approved preview
+ * (docs/daily-bread/saints/p3/admin.js, p3-admin.css → AdminStyles «DAILY BREAD — P3 SAINTS», shots in p3/shots/).
+ * Two tabs of «الآيات والقراءات اليومية», shown while BREAD_SAINTS = '1' (the Primary Admin's switch in «الإعدادات»):
+ *
+ *   الشخصيات    the numbers (filters), «بيانات ناقصة», the list in 4 looks like a Windows folder (كبيرة / متوسطة /
+ *               قايمة / تفاصيل), grouped or not, a bar that stays while the list scrolls (search, look, «شخص جديد»,
+ *               «راجع وانشر», «لفوق»); a person: days (Coptic ⇄ Gregorian live), milestones, album (crop tool), praise,
+ *               basics, still looking for; «راجع وانشر»: changes, problems, who joins / leaves, the publishes
+ *   المناسبات   the church's days (yearly or one time), the living fathers' days, the two months to come
+ *
+ * Everything on the Worker (worker/src/bread/saints-admin.js) through window.AdminWorker; the rules are the Worker's
+ * (worker/src/bread/saints.js). Saving = the draft (D1); «انشر» = daily-bread/data/saints.json.
+ */
+(function () {
+
+  'use strict';
+
+  var A = window.A;
+  var el = A.el;
+  var icon = A.icon;
+  var BR = A.bread;
+  if (!BR || !BR.kit) return;
+  var K = BR.kit;
+  var ar = A.digits;
+
+  /* ---------- the Coptic calendar (a copy of worker/src/bread/coptic.js; tests/bread-saints-admin.test.mjs compares) ---------- */
+  /* COPTIC START */
+  var CMONTHS = ['توت', 'بابه', 'هاتور', 'كيهك', 'طوبه', 'أمشير', 'برمهات', 'برموده', 'بشنس', 'بؤونه', 'أبيب', 'مسرى', 'النسيء'];
+  var EPOCH = 1825030;
+  function jdnOfCoptic(y, m, d) { return EPOCH - 1 + 365 * (y - 1) + Math.floor(y / 4) + 30 * (m - 1) + d; }
+  function jdnOfGregorian(y, m, d) {
+    var a = Math.floor((14 - m) / 12), yy = y + 4800 - a, mm = m + 12 * a - 3;
+    return d + Math.floor((153 * mm + 2) / 5) + 365 * yy + Math.floor(yy / 4) - Math.floor(yy / 100) + Math.floor(yy / 400) - 32045;
+  }
+  function gregorianOfJdn(j) {
+    var a = j + 32044, b = Math.floor((4 * a + 3) / 146097), c = a - Math.floor(146097 * b / 4);
+    var d = Math.floor((4 * c + 3) / 1461), e = c - Math.floor(1461 * d / 4), m = Math.floor((5 * e + 2) / 153);
+    return { y: 100 * b + d - 4800 + Math.floor(m / 10), m: m + 3 - 12 * Math.floor(m / 10), d: e - Math.floor((153 * m + 2) / 5) + 1 };
+  }
+  function monthDays(y, m) { return m < 13 ? 30 : (y % 4 === 3 ? 6 : 5); }
+  function toGregorian(y, m, d) {
+    var g = gregorianOfJdn(jdnOfCoptic(y, m, d));
+    return g.y + '-' + (g.m < 10 ? '0' : '') + g.m + '-' + (g.d < 10 ? '0' : '') + g.d;
+  }
+  function toCoptic(iso) {
+    var p = iso.split('-').map(Number);
+    var j = jdnOfGregorian(p[0], p[1], p[2]);
+    var y = Math.floor((4 * (j - EPOCH) + 1463) / 1461);
+    var start = jdnOfCoptic(y, 1, 1);
+    var m = Math.floor((j - start) / 30) + 1;
+    return { y: y, m: m, d: j - start - 30 * (m - 1) + 1 };
+  }
+  /* COPTIC END */
+  A.saintsCoptic = { toGregorian: toGregorian, toCoptic: toCoptic, monthDays: monthDays };
+
+  var GM = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  var WD = ['الحد', 'الاتنين', 'التلات', 'الأربع', 'الخميس', 'الجمعة', 'السبت'];
+  var MISS = { feasts: 'يوم التذكار', album: 'الصور' };
+  var MS_STATUS = { confirmed: ['مؤكد', 'ok'], film: ['من الفيلم', 'info'], conflict: ['فيه اختلاف', 'warn'], pending: ['مستني مصدر', 'warn'] };
+  var URL_RE = /^https:\/\/[^\s<>"']+$/;
+  var SUBS = [{ key: 'breadpeople', label: 'الشخصيات' }, { key: 'breadoccasions', label: 'المناسبات' }];
+
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { /* private mode */ } return null; }
+
+  var SA = A.saints = {
+    data: null, error: null, loading: null,
+    mode: 'list', open: null, form: null, formRev: 0, dirtyForm: false,
+    view: store('sa-view') || 'large', group: store('sa-group') !== null ? store('sa-group') : 'cat',
+    f: { cls: '', stat: '', photo: '', praise: '', cat: '', q: '', kpi: '' },
+    review: null, reviewError: null, history: null, published: null
+  };
+
+  function api(method, path, body) { return K.api(method, 'saints' + (path ? '/' + path : ''), body); }
+  function today() { return K.cairoToday(); }
+
+  /* ---------- the tabs follow the switch ---------- */
+  function area() { return A.AREAS.filter(function (a) { return a.key === 'bread'; })[0] || null; }
+  function setSubs(on) {
+    var a = area();
+    if (!a) return;
+    var has = a.subs.some(function (s) { return s.key === 'breadpeople'; });
+    if (on && !has) {
+      var at = a.subs.map(function (s) { return s.key; }).indexOf('breadfeasts');
+      // the tab again (like «برنامج جديد»): back to the list
+      a.subs.splice(at < 0 ? a.subs.length : at + 1, 0, { key: SUBS[0].key, label: SUBS[0].label, again: function () { if (SA.mode !== 'list') back(); } }, { key: SUBS[1].key, label: SUBS[1].label });
+    }
+    if (!on && has) {
+      a.subs = a.subs.filter(function (s) { return s.key !== 'breadpeople' && s.key !== 'breadoccasions'; });
+      if (A.area === 'bread' && (A.sub.bread === 'breadpeople' || A.sub.bread === 'breadoccasions')) { A.sub.bread = 'breadprograms'; A.render(); }
+    }
+    A.renderNav();
+  }
+  BR.onSettings = function (s) { setSubs(!!(s && s.saints)); };
+  var start = A.start;
+  A.start = function () {
+    var drawn = start.apply(this, arguments);
+    // after the section is placed (AdminBread's own then): hidden until the settings say the switch is on
+    Promise.resolve(drawn).then(function () { setTimeout(function () { setSubs(!!(BR.programs && BR.programs.settings && BR.programs.settings.saints)); }, 0); });
+    return drawn;
+  };
+
+  /* ---------- the data ---------- */
+  function load(force) {
+    if (SA.loading && !force) return SA.loading;
+    SA.loading = api('GET', '').then(function (d) {
+      SA.data = d; SA.error = null;
+    }, function (e) { SA.error = e; }).then(function () {
+      SA.loading = null;
+      if (K.onTab('breadpeople') || K.onTab('breadoccasions')) A.render();
+    });
+    return SA.loading;
+  }
+  SA.load = load;
+  function people() { return SA.data ? SA.data.items.filter(function (i) { return i.kind === 'person' && i.state !== 'deleted'; }) : []; }
+  function occasions() { return SA.data ? SA.data.items.filter(function (i) { return i.kind === 'occasion' && i.state !== 'deleted'; }) : []; }
+  function itemOf(kind, id) { return SA.data ? SA.data.items.filter(function (i) { return i.kind === kind && i.id === id; })[0] || null : null; }
+  function cats() { return (SA.data && SA.data.categories) || {}; }
+
+  /* ---------- dates ---------- */
+  function gText(iso, wd) {
+    var p = iso.split('-').map(Number);
+    var w = new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay();
+    return (wd ? WD[w] + ' ' : '') + ar(p[2]) + ' ' + GM[p[1] - 1] + ' ' + ar(p[0]);
+  }
+  function cText(m, d, y) { return ar(d) + ' ' + CMONTHS[m - 1] + (y ? ' ' + ar(y) : ''); }
+  function addDay(iso, n) { var d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+  /* the next Gregorian date of a yearly day (or a one-time date), from a day */
+  function nextOf(f, from) {
+    from = from || today();
+    if (f.repeat === 'once') return f.date;
+    if (f.gregorian) {
+      var y = +from.slice(0, 4);
+      var iso = y + '-' + f.gregorian;
+      if (f.gregorian === '02-29') { while (!/-02-29$/.test(new Date(Date.UTC(y, 1, 29)).toISOString().slice(0, 10)) || y + '-02-29' < from) y++; return y + '-02-29'; }
+      return iso < from ? (y + 1) + '-' + f.gregorian : iso;
+    }
+    var p = f.coptic.split('-').map(Number);
+    var cy = toCoptic(from).y;
+    var at = function (yy) { return toGregorian(yy, p[0], p[0] === 13 ? Math.min(p[1], monthDays(yy, 13)) : p[1]); };
+    var g = at(cy);
+    return g < from ? at(cy + 1) : g;
+  }
+  function dayLabel(f) {
+    if (f.repeat === 'once') return gText(f.date);
+    if (f.coptic) { var c = f.coptic.split('-').map(Number); return cText(c[0], c[1]); }
+    var g = f.gregorian.split('-').map(Number);
+    return ar(g[1]) + ' ' + GM[g[0] - 1];
+  }
+  function daysTo(iso) { return Math.round((Date.parse(iso + 'T00:00:00Z') - Date.parse(today() + 'T00:00:00Z')) / 864e5); }
+  function inWords(n) { return n === 0 ? 'النهارده' : n === 1 ? 'بكره' : n === 2 ? 'بعد يومين' : n <= 10 ? 'بعد ' + ar(n) + ' أيام' : 'بعد ' + ar(n) + ' يوم'; }
+  function nextDay(p) {
+    if (!p.feasts || !p.feasts.length) return null;
+    return p.feasts.map(function (f) { return { f: f, at: nextOf(f) }; }).sort(function (a, b) { return a.at < b.at ? -1 : 1; })[0];
+  }
+  function host(u) { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return u || ''; } }
+  function msDate(m) { return m.date ? gText(m.date) : m.month ? GM[+m.month.slice(5) - 1] + ' ' + ar(m.month.slice(0, 4)) : m.year ? ar(m.year) + (m.until ? '–' + ar(m.until) : '') : 'من غير تاريخ'; }
+
+  /* ---------- pictures: the media library (P4 fills the albums), each with its own crop ---------- */
+  var CROP0 = { x: 50, y: 12, z: 1 };
+  function cropOf(a) { var c = (a && a.crop) || {}; return { x: c.x != null ? c.x : CROP0.x, y: c.y != null ? c.y : CROP0.y, z: c.z || CROP0.z }; }
+  function applyCrop(img, c) {
+    img.style.objectPosition = c.x + '% ' + c.y + '%';
+    img.style.transform = 'scale(' + c.z + ')';
+    img.style.transformOrigin = c.x + '% ' + c.y + '%';
+  }
+  function mainOf(p) { var al = p.album || []; return al.filter(function (a) { return a.main; })[0] || al.filter(function (a) { return a.media; })[0] || null; }
+  function mediaId(path) { return String(path || '').split('/').pop().replace(/\.\w+$/, ''); }
+  /* an <img> that fills its frame from the picture's crop, once the library gives its address */
+  function cropImg(a, cls) {
+    if (!a || !a.media || !A.mediaPreview) return null;
+    var img = el('img', { class: 'sa-cropimg' + (cls ? ' ' + cls : ''), alt: '', loading: 'lazy', decoding: 'async' });
+    applyCrop(img, cropOf(a));
+    A.mediaPreview(mediaId(a.media)).then(function (src) { if (src) img.src = src; else img.remove(); }).catch(function () { img.remove(); });
+    img.addEventListener('error', function () { img.remove(); });
+    return img;
+  }
+  var TITLES = /^(القديس(ة)?|الشهيد(ة)?|البابا|الأنبا|القمص|القس|أبونا|مار|السيدة|رئيس الملائكة|الملاك|العظيم)\s+/;
+  function letter(p) { var n = String(p.name || '؟').trim(); for (var k = 0; k < 3 && TITLES.test(n); k++) n = n.replace(TITLES, ''); return n.charAt(0) || '؟'; }
+  function face(p, big) {
+    var img = cropImg(mainOf(p), 'ycard__photo');
+    return el('span', { class: 'ycard__face' + (img ? ' has-photo' : '') + (big ? ' sa-face--big' : ''), 'aria-hidden': 'true' },
+      el('span', { class: 'ycard__letter', text: letter(p) }), img, el('i', { class: 'ycard__dot ycard__dot--' + (p.status === 'incomplete' ? 'warn' : 'ok') }));
+  }
+
+  /* ---------- small pieces ---------- */
+  function chip(t, tone) { return el('span', { class: 'chip' + (tone ? ' chip--' + tone : ''), text: t }); }
+  function seg(label, opts, val, onpick, cls) {
+    var name = A.uid('saseg');
+    return el('div', { class: 'seg p8-filter' + (cls ? ' ' + cls : ''), role: 'radiogroup', 'aria-label': label }, opts.map(function (o) {
+      return el('label', { class: 'seg__opt', title: o[2] || null },
+        el('input', { type: 'radio', name: name, value: o[0], checked: o[0] === val, onchange: function () { onpick(o[0]); } }),
+        el('span', {}, o[3] ? el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon(o[3])) : null, o[4] ? el('em', { text: o[1] }) : o[1]));
+    }));
+  }
+  function field(label, input, hint, cls) {
+    return el('label', { class: 'field' + (cls ? ' ' + cls : '') }, el('span', { class: 'field__label', text: label }), input, hint ? el('span', { class: 'field__hint', text: hint }) : null);
+  }
+  function input(v, attrs) { return el('input', Object.assign({ class: 'input', value: v == null ? '' : String(v) }, attrs || {})); }
+  function ltr(v, attrs) { return el('input', Object.assign({ class: 'input input--ltr', dir: 'ltr', value: v == null ? '' : String(v) }, attrs || {})); }
+  function area_(v, rows) { var t = el('textarea', { class: 'input', rows: String(rows || 3) }); t.value = v || ''; return t; }
+  function select(opts, val, label) { return el('select', { class: 'input', 'aria-label': label || null }, opts.map(function (o) { return el('option', { value: o[0], selected: o[0] === val ? 'selected' : null, text: o[1] }); })); }
+  function linkLine(u) { return el('span', { class: 'sa-src' }, icon('link'), el('span', { text: host(u) })); }
+  function form(title, iconName, body, ok) {
+    return A.modal({ tone: 'info', icon: iconName, title: title, body: body,
+      actions: [{ label: 'إلغاء', value: false }, { label: ok || 'تمام', value: true, kind: 'primary' }],
+      setup: function (dialog) { dialog.classList.add('modal--form', 'sa-modal'); } });
+  }
+  function fail(error) { A.fail(error); }
+
+  /* «فيه تعديل محفوظ ومش منشور» */
+  function dirtyBar() {
+    var n = SA.data ? SA.data.changes : 0;
+    if (!n) return null;
+    return el('div', { class: 'ba-alert ba-alert--info sa-dirty', role: 'status' },
+      el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('edit')),
+      el('div', { class: 'ba-alert__text' }, el('b', { text: (n === 1 ? 'فيه تعديل واحد' : 'فيه ' + ar(n) + ' تعديلات') + ' محفوظ ومش منشور' }),
+        el('small', { text: 'محفوظ في المسودة. الموقع والأعياد مش بيشوفوه غير بعد «انشر».' })),
+      K.btn('راجع وانشر', 'send', 'btn--primary', { 'data-act': 'saints-review', onclick: openReview }));
+  }
+
+  function gateView(r, title) {
+    if (SA.error) {
+      if (SA.error.code === 'disabled') r.append(K.card('lock', title, 'سجل الشخصيات لسه مقفول. الأدمن الأساسي يفتحه من «الإعدادات».', null, null));
+      else if (SA.error.code === 'denied') r.append(K.locked(title, 'سجل الشخصيات'));
+      else r.append(K.failed(A.errorBox(), SA.error, function () { SA.error = null; load(true); A.render(); }));
+      return true;
+    }
+    if (!SA.data) { r.append(K.skeleton()); load(); return true; }
+    return false;
+  }
+
+  /* =======================================================
+     الشخصيات
+  ======================================================= */
+  A.views.breadpeople = function () {
+    var r = K.root();
+    r.classList.add('sa');
+    if (gateView(r, 'الشخصيات')) return [r];
+    if (SA.mode === 'person' && SA.open) personView(r);
+    else if (SA.mode === 'publish') publishView(r);
+    else listView(r);
+    return [r];
+  };
+
+  function filtered() {
+    var f = SA.f, q = f.q.trim();
+    return people().map(function (i) { return i.data; }).filter(function (p) {
+      return (!f.cls || p.class === f.cls) && (!f.stat || p.status === f.stat) && (!f.cat || p.cat === f.cat)
+        && (!f.photo || (f.photo === 'yes') === !!(p.album && p.album.length)) && (!f.praise || (f.praise === 'yes') === !!p.praise)
+        && (!q || p.name.indexOf(q) >= 0);
+    });
+  }
+  function stateOfId(id) { var i = itemOf('person', id); return i ? i.state : 'published'; }
+  function openPerson(id) {
+    var it = itemOf('person', id);
+    if (!it) return;
+    SA.mode = 'person'; SA.open = id; SA.form = JSON.parse(JSON.stringify(it.data)); SA.formRev = it.rev; SA.dirtyForm = false;
+    A.render(); window.scrollTo(0, 0);
+  }
+  function newPerson() {
+    SA.mode = 'person'; SA.open = '__new';
+    SA.form = { id: 'p' + Date.now().toString(36), name: '', cat: Object.keys(cats())[0] || '', class: 'reposed', feasts: [], album: [], status: 'incomplete', missing: ['feasts', 'album'] };
+    SA.formRev = 0; SA.dirtyForm = true;
+    A.render(); window.scrollTo(0, 0);
+  }
+  function back() {
+    if (SA.dirtyForm) {
+      return A.confirm({ title: 'فيه تعديل مش محفوظ', message: 'لو رجعت دلوقتي التعديل ده هيضيع.', actions: [{ label: 'خليك', value: false }, { label: 'ارجع من غير حفظ', value: true, kind: 'danger' }] })
+        .then(function (ok) { if (ok) { SA.mode = 'list'; SA.open = null; SA.form = null; SA.dirtyForm = false; A.render(); } });
+    }
+    SA.mode = 'list'; SA.open = null; SA.form = null; A.render();
+    return Promise.resolve();
+  }
+
+  function kpi(iconName, label, value, key, tone) {
+    return el('button', { class: 'kpi' + (tone ? ' kpi--' + tone : '') + (SA.f.kpi === key ? ' is-on' : ''), type: 'button', 'data-kpi': key, 'aria-label': label + ': ' + value, onclick: function () {
+      var f = SA.f; f.kpi = f.kpi === key ? '' : key; f.cls = f.kpi === 'reposed' || f.kpi === 'living' ? f.kpi : ''; f.stat = f.kpi === 'incomplete' ? 'incomplete' : ''; A.render();
+    } }, el('small', {}, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon(iconName)), label), el('b', { text: value }));
+  }
+
+  function personRow(p) {
+    var n = nextDay(p);
+    var line = n
+      ? [el('span', { class: 'ycard__ic', 'aria-hidden': 'true' }, icon('calendar')), el('span', {}, el('b', { class: 'sa-left' + (daysTo(n.at) <= 7 ? ' is-soon' : ''), text: inWords(daysTo(n.at)) }), ' · ', el('b', { text: dayLabel(n.f) }), (n.f.coptic ? ' = ' + gText(n.at) : '') + ' · ' + n.f.kind)]
+      : [el('span', { class: 'ycard__ic', 'aria-hidden': 'true' }, icon('alert')), el('span', { text: 'من غير يوم تذكار: مش بيدخل الأعياد ولا الإشعارات' })];
+    var st = stateOfId(p.id);
+    return el('article', { class: 'ycard sa-pcard' },
+      el('button', { class: 'ycard__open', type: 'button', 'data-saint': p.id, 'aria-label': 'افتح ' + p.name, onclick: function () { openPerson(p.id); } }),
+      face(p),
+      el('div', { class: 'ycard__main' },
+        el('bdi', { class: 'ycard__name', text: p.name }),
+        el('span', { class: 'ycard__chips' },
+          p.class === 'living' ? chip('حي · مناسبات كنيستنا', 'gold') : null,
+          chip(cats()[p.cat] || p.cat, 'off'),
+          p.status === 'incomplete' ? chip('ناقص: ' + p.missing.map(function (m) { return MISS[m]; }).join('، '), 'warn') : null,
+          p.feasts.length ? chip(p.feasts.length === 1 ? 'يوم واحد' : ar(p.feasts.length) + ' أيام', 'info') : null,
+          p.praise ? chip('تمجيد', 'info') : null,
+          p.album.length ? chip(ar(p.album.length) + ' صور', 'off') : null,
+          st !== 'published' ? chip('مش منشور', 'warn') : null),
+        el('span', { class: 'ycard__phone sa-next' }, line)),
+      el('span', { class: 'ycard__go', 'aria-hidden': 'true' }, icon('chevron')));
+  }
+
+  function personTile(p) {
+    var a = mainOf(p);
+    var img = cropImg(a);
+    var n = nextDay(p);
+    var when = n ? dayLabel(n.f) + ' · ' + n.f.kind : p.class === 'living' ? 'مناسبات كنيستنا' : 'من غير يوم تذكار';
+    var st = stateOfId(p.id);
+    return el('button', { class: 'sa-ptile' + (p.status === 'incomplete' ? ' is-incomplete' : '') + (p.class === 'living' ? ' is-living' : ''), type: 'button', 'data-saint': p.id, 'aria-label': 'افتح ' + p.name, onclick: function () { openPerson(p.id); } },
+      el('span', { class: 'sa-ptile__frame' },
+        el('span', { class: 'sa-ptile__pic' }, img ? el('span', { class: 'sa-whole' }, img) : el('span', { class: 'sa-ptile__letter', 'aria-hidden': 'true', text: letter(p) }),
+          img && a.type === 'ai' ? el('i', { class: 'sa-ptile__ai', text: 'صورة تعبيرية' }) : null),
+        el('span', { class: 'sa-ptile__name' }, el('b', { text: p.name }), SA.view === 'large' ? el('small', { text: when }) : null)),
+      el('span', { class: 'sa-ptile__status' },
+        n ? el('span', { class: 'sa-left' + (daysTo(n.at) <= 7 ? ' is-soon' : '') }, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon('clock')), inWords(daysTo(n.at))) : null,
+        p.class === 'living' ? chip('حي', 'gold') : null,
+        p.status === 'incomplete' ? chip('ناقص: ' + p.missing.map(function (m) { return MISS[m]; }).join('، '), 'warn') : null,
+        st !== 'published' ? chip('مش منشور', 'warn') : null));
+  }
+
+  function detailsTable(list) {
+    return el('div', { class: 'p8-tablewrap sa-tablewrap' }, el('table', { class: 'p8-table sa-table' },
+      el('thead', {}, el('tr', {}, ['', 'الاسم', 'المجموعة', 'النوع', 'الأيام', 'الجاي', 'الصور', 'الحالة'].map(function (t) { return el('th', { text: t }); }))),
+      el('tbody', {}, list.map(function (p) {
+        var n = nextDay(p);
+        return el('tr', { 'data-saint': p.id, tabindex: '0', onclick: function () { openPerson(p.id); }, onkeydown: function (e) { if (e.key === 'Enter') openPerson(p.id); } },
+          el('td', {}, face(p)), el('td', {}, el('b', { text: p.name })), el('td', { text: cats()[p.cat] || p.cat }),
+          el('td', {}, p.class === 'living' ? chip('حي', 'gold') : 'متنيح'), el('td', { text: ar(p.feasts.length) }),
+          el('td', {}, n ? [dayLabel(n.f) + ' ', el('span', { class: 'sa-left' + (daysTo(n.at) <= 7 ? ' is-soon' : ''), text: inWords(daysTo(n.at)) })] : '—'),
+          el('td', { text: ar(p.album.length) }),
+          el('td', {}, p.status === 'incomplete' ? chip('ناقص', 'warn') : chip('كاملة', 'ok'), stateOfId(p.id) !== 'published' ? chip('مش منشور', 'warn') : null));
+      }))));
+  }
+
+  function listBody(list) {
+    if (!list.length) return el('div', { class: 'p8-empty empty-state' }, el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('users')), el('b', { text: 'مفيش حد بالفلتر ده.' }));
+    var draw = function (l) {
+      if (SA.view === 'list') return el('div', { class: 'comp-list ycards sa-list' }, l.map(personRow));
+      if (SA.view === 'details') return detailsTable(l);
+      return el('div', { class: 'sa-ptiles sa-ptiles--' + (SA.view === 'medium' ? 'medium' : 'large') }, l.map(personTile));
+    };
+    if (SA.group !== 'cat') return draw(list);
+    return Object.keys(cats()).map(function (k) {
+      var l = list.filter(function (p) { return p.cat === k; });
+      return l.length ? el('section', { class: 'sa-group' }, el('h3', { class: 'sa-group__head' }, el('span', { text: cats()[k] }), el('small', { text: ar(l.length) })), draw(l)) : null;
+    });
+  }
+
+  var VIEWS = [['large', 'كبيرة', 'صور كبيرة', 'grid', true], ['medium', 'متوسطة', 'صور متوسطة', 'photos', true], ['list', 'قايمة', 'قايمة', 'layers', true], ['details', 'تفاصيل', 'تفاصيل', 'sheet', true]];
+  var typing = null;
+  function viewBar() {
+    var search = el('input', { class: 'p8-search__input', type: 'search', placeholder: 'دوّر بالاسم…', 'aria-label': 'بحث', value: SA.f.q, 'data-act': 'saints-search' });
+    search.addEventListener('input', function () {
+      clearTimeout(typing);
+      typing = setTimeout(function () {
+        SA.f.q = search.value;
+        A.render();
+        var s = document.querySelector('[data-act="saints-search"]');
+        if (s) { s.focus(); s.setSelectionRange(s.value.length, s.value.length); }
+      }, 250);
+    });
+    var groups = el('div', { class: 'seg p8-filter sa-groupseg', role: 'radiogroup', 'aria-label': 'التجميع' }, [['cat', 'بالمجموعة', 'مجمّع'], ['', 'كلهم', 'كلهم']].map(function (o) {
+      var n = A.uid('sagrp');
+      return el('label', { class: 'seg__opt' }, el('input', { type: 'radio', name: 'sa-group', value: o[0], checked: (SA.group === 'cat') === (o[0] === 'cat'), onchange: function () { SA.group = o[0]; store('sa-group', o[0]); A.render(); }, 'data-n': n }),
+        el('span', {}, el('em', { class: 'sa-lg', text: o[1] }), el('em', { class: 'sa-sm', text: o[2] })));
+    }));
+    return el('div', { class: 'sa-viewbar', 'data-sticky': '' },
+      el('label', { class: 'p8-search sa-vsearch' }, icon('search'), search),
+      seg('شكل العرض', VIEWS, SA.view, function (v) { SA.view = v; store('sa-view', v); A.render(); }, 'sa-views'),
+      groups,
+      el('span', { class: 'sa-viewbar__end' },
+        SA.data.changes ? K.btn('راجع وانشر (' + ar(SA.data.changes) + ')', 'send', 'btn--sm', { onclick: openReview }) : null,
+        K.btn('شخص جديد', 'plus', 'btn--primary btn--sm', { 'data-act': 'saints-new', onclick: newPerson }),
+        el('button', { class: 'btn btn--sm btn--ghost btn--icon sa-totop', type: 'button', 'aria-label': 'لفوق', title: 'لفوق', onclick: function () { window.scrollTo({ top: 0, behavior: 'smooth' }); } }, icon('chevron-up'))));
+  }
+
+  /* the sticky bar sits right under the panel's top bar, whatever its height on this screen */
+  function stickTop() {
+    var t = document.querySelector('.topbar');
+    document.documentElement.style.setProperty('--sa-top', (t && getComputedStyle(t).position === 'sticky' ? Math.round(t.getBoundingClientRect().height) : 0) + 'px');
+  }
+  window.addEventListener('resize', stickTop);
+
+  function listView(r) {
+    var all = people().map(function (i) { return i.data; });
+    var inc = all.filter(function (p) { return p.status === 'incomplete'; });
+    r.append(dirtyBar() || el('span', { hidden: true }));
+    r.append(el('div', { class: 'media8-kpis sa-kpis' },
+      kpi('users', 'الكل', ar(all.length), ''),
+      kpi('cross', 'متنيحين · كارت التذكار', ar(all.filter(function (p) { return p.class === 'reposed'; }).length), 'reposed'),
+      kpi('church', 'أحياء · مناسبات كنيستنا', ar(all.filter(function (p) { return p.class === 'living'; }).length), 'living'),
+      kpi('alert', 'بيانات ناقصة', ar(inc.length), 'incomplete', 'warn')));
+    if (inc.length) {
+      r.append(K.card('alert', 'بيانات ناقصة', 'محفوظين بصورهم وكل المعروف عنهم، بس مش بيدخلوا الأعياد ولا الإشعارات التلقائية لحد ما اليوم يتكتب بمصدره', null,
+        el('ul', { class: 'sa-miss' }, inc.map(function (p) {
+          var pend = (p.pending || []).filter(function (x) { return x.field === 'feasts'; })[0] || (p.pending || [])[0];
+          return el('li', { class: 'sa-miss__row', 'data-incomplete': p.id }, face(p),
+            el('div', { class: 'sa-miss__main' }, el('b', { text: p.name }),
+              el('span', { class: 'ycard__chips' }, p.missing.map(function (m) { return chip('ناقص: ' + MISS[m], 'warn'); }), pend && pend.checked ? chip('اتدوّر في ' + ar(pend.checked.length) + ' مصادر', 'off') : null),
+              pend ? el('small', { text: pend.need }) : null),
+            K.btn('كمّل', 'edit', 'btn--sm', { onclick: function () { openPerson(p.id); } }));
+        })), 'sa-misscard', 'warn'));
+    }
+    var f = SA.f;
+    var catSel = select([['', 'كل المجموعات']].concat(Object.keys(cats()).map(function (k) { return [k, cats()[k]]; })), f.cat, 'المجموعة');
+    catSel.classList.add('sa-cat');
+    catSel.addEventListener('change', function () { f.cat = catSel.value; A.render(); });
+    var pick = function (k) { return function (v) { f[k] = v; f.kpi = ''; A.render(); }; };
+    var filters = el('div', { class: 'p8-card__filters sa-filters' },
+      seg('النوع', [['', 'الكل'], ['reposed', 'متنيحين'], ['living', 'أحياء']], f.cls, pick('cls')),
+      seg('البيانات', [['', 'الكل'], ['complete', 'كاملة'], ['incomplete', 'ناقصة']], f.stat, pick('stat')),
+      seg('الصور', [['', 'الصور: الكل'], ['yes', 'فيها صور'], ['no', 'من غير']], f.photo, pick('photo')),
+      seg('التمجيد', [['', 'التمجيد: الكل'], ['yes', 'فيه تمجيد'], ['no', 'من غير']], f.praise, pick('praise')),
+      catSel);
+    var list = filtered();
+    r.append(K.card('users', 'سجل الشخصيات', 'القديسين والمتنيحين والآباء. اضغط على أي حد تفتحه وتعدّل أيامه ومصادره وصوره', null, [
+      viewBar(), filters,
+      el('p', { class: 'sa-count', text: list.length === all.length ? ar(list.length) + ' شخص، بترتيب السجل (اللي قبل بيكسب لو اتنين في نفس اليوم)' : ar(list.length) + ' من ' + ar(all.length) }),
+      listBody(list)
+    ], 'sa-regcard'));
+    setTimeout(stickTop, 0);
+  }
+
+  /* ---------- الشخص ---------- */
+  function touched() { SA.dirtyForm = true; A.render(); }
+
+  function personView(r) {
+    var p = SA.form;
+    var it = SA.open === '__new' ? null : itemOf('person', SA.open);
+    var living = p.class === 'living';
+    var missing = (p.feasts.length ? [] : ['feasts']).concat(p.album.length ? [] : ['album']);
+    r.append(dirtyBar() || el('span', { hidden: true }));
+    r.append(el('div', { class: 'sa-back' }, K.btn('رجوع للشخصيات', 'arrow', 'btn--ghost btn--small', { 'data-act': 'saints-back', onclick: back })));
+    var where = living
+      ? 'بيظهر في «مناسبات كنيستنا» بس' + (p.feasts.length ? ': ' + p.feasts.map(function (f) { return dayLabel(f) + ' (' + f.kind + ')'; }).join('، ') : '') + '. عمره ما بيظهر في كارت «النهارده تذكار…».'
+      : p.feasts.length ? 'بيدخل كارت «النهارده تذكار…» لوحده كل سنة: ' + p.feasts.map(dayLabel).join(' و') + '.' : 'مش بيدخل الأعياد ولا الإشعارات التلقائية لحد ما يتكتب يوم تذكار بمصدره.';
+    var a = mainOf(p);
+    var heroImg = cropImg(a);
+    r.append(el('section', { class: 'card p8-card sa-hero' },
+      heroImg ? el('span', { class: 'sa-whole sa-hero__pic' }, heroImg) : face(p, true),
+      el('div', { class: 'sa-hero__main' },
+        el('h2', { class: 'sa-hero__name', text: p.name || 'شخص جديد' }),
+        el('span', { class: 'ycard__chips' }, living ? chip('حي · مناسبات كنيستنا', 'gold') : chip('متنيح · كارت التذكار', 'info'), chip(cats()[p.cat] || '—', 'off'),
+          missing.length ? chip('بيانات ناقصة', 'warn') : chip('كاملة', 'ok'), it && it.state !== 'published' ? chip('محفوظ ومش منشور', 'warn') : null, SA.dirtyForm ? chip('فيه تعديل مش محفوظ', 'danger') : null),
+        el('p', { class: 'sa-hero__where' }, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon(living ? 'church' : p.feasts.length ? 'check' : 'alert')), el('span', { text: where }))),
+      el('div', { class: 'sa-hero__acts' },
+        it ? K.btn('شيل', 'trash', 'btn--ghost btn--sm sa-danger', { 'data-act': 'saints-delete', onclick: removePerson }) : null,
+        K.btn('احفظ', 'check', 'btn--primary', { 'data-act': 'saints-save', disabled: !SA.dirtyForm, onclick: savePerson }))));
+    if (missing.indexOf('feasts') >= 0) {
+      r.append(el('div', { class: 'ba-alert ba-alert--warn sa-missalert', role: 'status' },
+        el('span', { class: 'chipico chipico--warn', 'aria-hidden': 'true' }, icon('alert')),
+        el('div', { class: 'ba-alert__text' }, el('b', { text: 'بيانات ناقصة: ' + missing.map(function (m) { return MISS[m]; }).join('، ') }),
+          el('small', { text: 'الشخص محفوظ ومش هيتشال. أول ما تضيف يوم بمصدره وتنشر، بيدخل الأعياد التلقائية لوحده، من غير كود ولا استيراد.' })),
+        K.btn('ضيف يوم', 'plus', 'btn--primary', { 'data-act': 'saints-addday', onclick: function () { dayModal(-1); } })));
+    }
+    r.append(K.cols('sa-cols', K.stack(daysCard(p, living), msCard(p), basicsCard(p, living)), K.stack(albumCard(p), praiseCard(p, living), pendingCard(p))));
+  }
+
+  function daysCard(p, living) {
+    var rows = p.feasts.map(function (f, i) {
+      var at = nextOf(f), c = toCoptic(at);
+      return el('li', { class: 'sa-day' },
+        el('span', { class: 'sa-day__date' }, el('b', { text: dayLabel(f) }), el('small', { text: (f.coptic ? 'قبطي' : 'ميلادي') + (f.year ? ' · من ' + ar(f.year) : '') })),
+        el('span', { class: 'sa-day__main' }, el('b', { text: f.kind }),
+          el('span', { class: 'sa-conv' }, icon('swap'), el('span', {}, f.coptic ? gText(at, true) : cText(c.m, c.d), el('small', { text: ' (السنة دي)' }))),
+          el('span', { class: 'sa-src' }, icon('link'), el('span', { text: host(f.source) + (f.more && f.more.length ? ' + ' + ar(f.more.length) : '') }))),
+        K.btn('عدّل', 'edit', 'btn--sm btn--ghost', { 'data-act': 'saints-day', onclick: function () { dayModal(i); } }));
+    });
+    return K.card('calendar', living ? 'أيام المناسبات' : 'أيام التذكار', 'بتتكرر كل سنة. القبطي بيتحوّل للميلادي بالكود، ولكل يوم مصدره', K.btn('ضيف يوم', 'plus', 'btn--sm', { onclick: function () { dayModal(-1); } }),
+      rows.length ? el('ul', { class: 'sa-days' }, rows) : el('div', { class: 'p8-empty empty-state sa-empty' }, el('span', { class: 'chipico chipico--warn', 'aria-hidden': 'true' }, icon('calendar')), el('b', { text: 'مفيش يوم لسه' }), el('small', { text: 'اكتب اليوم بمصدره، وبعد النشر بيدخل الأعياد لوحده.' })));
+  }
+
+  function msCard(p) {
+    var list = p.milestones || [];
+    return K.card('clock', 'محطات العمر', 'بتحصل مرة واحدة (للخط الزمني في P7)، ومش بتعمل عيد. يوم أو شهر أو سنة، على قد المعروف', K.btn('ضيف محطة', 'plus', 'btn--sm', { onclick: function () { msModal(-1); } }),
+      list.length ? el('ul', { class: 'sa-mss' }, list.map(function (m, i) {
+        var st = MS_STATUS[m.status] || ['؟', 'info'];
+        return el('li', { class: 'sa-ms' }, el('span', { class: 'sa-ms__dot sa-ms__dot--' + st[1], 'aria-hidden': 'true' }), el('span', { class: 'sa-ms__date', text: msDate(m) }),
+          el('span', { class: 'sa-ms__main' }, el('b', { text: m.kind }), el('span', { class: 'sa-src' }, icon('link'), el('span', { text: m.source === 'owner' ? 'صاحب المشروع (مستني مصدر مكتوب)' : host(m.source) }))),
+          K.tag(st[0], st[1]), el('button', { class: 'btn btn--sm btn--ghost btn--icon', type: 'button', 'aria-label': 'عدّل', onclick: function () { msModal(i); } }, icon('edit')));
+      })) : el('p', { class: 'muted sa-pad', text: 'مفيش محطات.' }));
+  }
+
+  function basicsCard(p, living) {
+    var name = input(p.name, { maxlength: '120', 'data-field': 'name' });
+    name.addEventListener('input', function () { p.name = name.value; SA.dirtyForm = true; });
+    name.addEventListener('change', function () { A.render(); });
+    var catSel = select(Object.keys(cats()).map(function (k) { return [k, cats()[k]]; }), p.cat, 'المجموعة');
+    catSel.addEventListener('change', function () { p.cat = catSel.value; touched(); });
+    var sources = el('div', { class: 'sa-links' }, (p.sources || []).map(function (u, i) {
+      return el('span', { class: 'sa-link' }, icon('link'), el('bdi', { text: host(u) }),
+        el('button', { class: 'sa-link__x', type: 'button', 'aria-label': 'شيل الرابط', onclick: function () { p.sources.splice(i, 1); if (!p.sources.length) delete p.sources; touched(); } }, icon('close')));
+    }), K.btn('ضيف رابط', 'plus', 'btn--sm btn--ghost', { onclick: function () {
+      var u = ltr('', { placeholder: 'https://…' });
+      form('رابط للسيرة', 'link', field('الرابط', u, 'https بس'), 'ضيفه').then(function (ok) {
+        if (!ok) return;
+        if (!URL_RE.test(u.value.trim())) { A.toast('الرابط لازم يبدأ بـ https://', 'error'); return; }
+        (p.sources = p.sources || []).push(u.value.trim()); touched();
+      });
+    } }));
+    var word = area_(p.word, 3);
+    word.addEventListener('input', function () { p.word = word.value; if (!p.word) delete p.word; SA.dirtyForm = true; });
+    return K.card('user', 'البيانات الأساسية', '', null, el('div', { class: 'ba-dayform' },
+      field('الاسم', name, 'زي ما بيظهر للشباب في الكارت'),
+      el('div', { class: 'ba-dayform__two' },
+        field('النوع', seg('النوع', [['reposed', 'متنيح'], ['living', 'حي']], p.class, function (v) { p.class = v; touched(); }), living ? '«مناسبات كنيستنا» بس، بصوره الحقيقية' : 'كارت «النهارده تذكار…»'),
+        field('المجموعة', catSel)),
+      field('كلمة عنه (اختياري)', word, 'بتظهر في الكارت لو اليوم مش في السنكسار'),
+      el('div', { class: 'field' }, el('span', { class: 'field__label', text: 'مصادر السيرة' }), sources, el('span', { class: 'field__hint', text: 'روابط https بس. للإدارة، مش بتظهر للشباب' }))));
+  }
+
+  function albumCard(p) {
+    var tiles = p.album.map(function (a, i) {
+      var img = cropImg(a, 'media-tile__img');
+      return el('div', { class: 'media-tile sa-tile' + (a.main ? ' is-main' : '') },
+        img ? el('span', { class: 'media-tile__frame' }, el('span', { class: 'sa-whole' }, img)) : el('span', { class: 'media-tile__frame sa-tile__frame' }, icon('photos'), el('small', { text: a.media ? '…' : 'مستني P4' })),
+        el('span', { class: 'media-tile__name', text: a.caption || a.stage || String(a.src || a.media || '').split('/').pop().replace(/\.\w+$/, '') }),
+        el('span', { class: 'media-tile__meta' }, a.type === 'ai' ? chip('صورة تعبيرية', 'gold') : chip('صورة حقيقية', 'info'), a.main ? chip('الأساسية', 'ok') : null),
+        el('span', { class: 'sa-tile__acts' },
+          el('button', { class: 'btn btn--sm btn--ghost btn--icon', type: 'button', 'aria-label': 'عدّل الصورة', 'data-act': 'saints-photo', onclick: function () { photoModal(i); } }, icon('edit')),
+          el('button', { class: 'btn btn--sm btn--ghost btn--icon', type: 'button', 'aria-label': 'شيل من الألبوم', onclick: function () {
+            A.confirm({ title: 'تشيل الصورة دي من الألبوم؟', message: 'الصورة نفسها بتفضل في مكتبة الصور.', actions: [{ label: 'لأ', value: false }, { label: 'شيلها', value: true, kind: 'danger' }] })
+              .then(function (ok) { if (ok) { p.album.splice(i, 1); touched(); } });
+          } }, icon('trash'))));
+    });
+    return K.card('photos', 'الألبوم', 'الصورة بتتختار حسب المرحلة والمناسبة. التعبيرية عليها «صورة تعبيرية» صغيرة', K.btn('ضيف صورة', 'plus', 'btn--sm', { 'data-act': 'saints-addphoto', onclick: addPhoto }),
+      [tiles.length ? el('div', { class: 'media-grid sa-album' }, tiles) : el('p', { class: 'muted sa-pad', text: 'مفيش صور.' }),
+        K.note('info', 'الصور من فولدرك متسجلة (P2)، وبتدخل مكتبة الصور في P4. أي صورة جديدة: من المكتبة، وتتظبط زي الصورة الشخصية.')]);
+  }
+
+  function praiseCard(p, living) {
+    var edit = function () {
+      var t = area_(p.praise && p.praise.text, 8), s = ltr(p.praise && p.praise.source, { placeholder: 'https://…' }), ti = input(p.praise && p.praise.title, { placeholder: 'اختياري' });
+      form('التمجيد', 'music', el('div', { class: 'ba-dayform' }, field('النص', t, 'لحد ١٥٠٠ حرف'), field('المصدر', s, 'https لازم'), field('العنوان', ti)), 'تمام').then(function (ok) {
+        if (!ok) return;
+        if (!t.value.trim()) { delete p.praise; touched(); return; }
+        if (!URL_RE.test(s.value.trim())) { A.toast('مصدر التمجيد لازم رابط https', 'error'); return; }
+        p.praise = { text: t.value.trim(), source: s.value.trim() };
+        if (ti.value.trim()) p.praise.title = ti.value.trim();
+        touched();
+      });
+    };
+    return K.card('music', 'التمجيد', p.praise ? '' : 'اختياري', p.praise ? K.btn('عدّل', 'edit', 'btn--sm btn--ghost', { onclick: edit }) : K.btn('ضيف تمجيد', 'plus', 'btn--sm', { onclick: edit }),
+      p.praise ? [el('blockquote', { class: 'sa-praise', text: p.praise.text.split('\n').slice(0, 4).join('\n') + (p.praise.text.split('\n').length > 4 ? '\n…' : '') }), el('p', { class: 'sa-src' }, icon('link'), el('span', { text: host(p.praise.source) }))]
+        : el('p', { class: 'muted sa-pad', text: living ? 'الآباء الأحياء مالهمش تمجيد.' : 'من غير تمجيد. الكارت بيظهر عادي.' }));
+  }
+
+  function pendingCard(p) {
+    var list = p.pending || [];
+    var add = function (i) {
+      var q = i >= 0 ? list[i] : { field: 'feasts', need: '', checked: [] };
+      var need = area_(q.need, 2), links = area_((q.checked || []).join('\n'), 3), note = area_(q.note, 2);
+      var fsel = select([['feasts', 'يوم التذكار'], ['album', 'الصور'], ['milestones', 'محطات العمر']], q.field, 'الحقل');
+      form(i >= 0 ? 'لسه بندوّر على' : 'حاجة لسه بندوّر عليها', 'search', el('div', { class: 'ba-dayform' }, field('الحقل', fsel), field('محتاجين إيه', need), field('اتشاف فين', links, 'رابط https في كل سطر'), field('ملحوظة', note)), 'تمام').then(function (ok) {
+        if (!ok) return;
+        var checked = links.value.split(/\s+/).map(function (x) { return x.trim(); }).filter(Boolean);
+        if (!need.value.trim() || checked.some(function (u) { return !URL_RE.test(u); })) { A.toast('اكتب المطلوب، والروابط https بس', 'error'); return; }
+        var v = { field: fsel.value, need: need.value.trim(), checked: checked };
+        if (note.value.trim()) v.note = note.value.trim();
+        p.pending = list.slice();
+        if (i >= 0) p.pending[i] = v; else p.pending.push(v);
+        touched();
+      });
+    };
+    return K.card('search', 'لسه بندوّر على', 'اللي ناقص والمصادر اللي اتشافت', K.btn('ضيف', 'plus', 'btn--sm btn--ghost', { onclick: function () { add(-1); } }),
+      list.length ? el('ul', { class: 'sa-pend' }, list.map(function (x, i) {
+        return el('li', {}, el('b', { text: x.need }), x.checked && x.checked.length ? el('small', { text: 'اتشاف: ' + x.checked.map(host).join('، ') }) : null, x.note ? el('small', { text: x.note }) : null,
+          el('span', { class: 'sa-pend__acts' }, K.btn('عدّل', 'edit', 'btn--sm btn--ghost', { onclick: function () { add(i); } }),
+            K.btn('خلاص لقيناه', 'check', 'btn--sm btn--ghost', { onclick: function () { p.pending = list.filter(function (_, k) { return k !== i; }); if (!p.pending.length) delete p.pending; touched(); } })));
+      })) : el('p', { class: 'muted sa-pad', text: 'مفيش حاجة ناقصة بندوّر عليها.' }));
+  }
+
+  /* ---------- a day: Coptic or Gregorian, the conversion live ---------- */
+  function monthSel(val, cop) { return select((cop ? CMONTHS : GM).map(function (n, i) { return [String(i + 1), (cop ? ar(i + 1) + ' · ' : '') + n]; }), String(val), 'الشهر'); }
+  function daySel(val, max) { var o = []; for (var i = 1; i <= max; i++) o.push([String(i), ar(i)]); return select(o, String(Math.min(val, max)), 'اليوم'); }
+  function convLine(cal, m, d, y) {
+    if (cal === 'coptic') {
+      var f = { coptic: m + '-' + d }, a = nextOf(f), b = nextOf(f, addDay(a, 1));
+      return [el('b', { text: cText(m, d) }), ' = ' + gText(a, true), el('small', { text: 'واللي بعدها ' + gText(b) + (y ? ' · سنة الحدث: ' + cText(m, d, y) + ' = ' + gText(toGregorian(y, m, Math.min(d, monthDays(y, m)))) : '') })];
+    }
+    var mm = (m < 10 ? '0' : '') + m, dd = (d < 10 ? '0' : '') + d;
+    var at = nextOf({ gregorian: mm + '-' + dd }), c = toCoptic(at);
+    var ev = y && !isNaN(Date.parse(y + '-' + mm + '-' + dd + 'T00:00:00Z')) ? toCoptic(y + '-' + mm + '-' + dd) : null;
+    return [el('b', { text: ar(d) + ' ' + GM[m - 1] }), ' = ' + cText(c.m, c.d), el('small', { text: 'السنة دي (' + gText(at, true) + ')' + (ev ? ' · سنة الحدث: ' + ar(d) + ' ' + GM[m - 1] + ' ' + ar(y) + ' = ' + cText(ev.m, ev.d, ev.y) : '') })];
+  }
+  /* the date fields of a day or an occasion: { node, read() → { coptic | gregorian, year } } */
+  function dateFields(f, opts) {
+    opts = opts || {};
+    var cal = f.gregorian ? 'gregorian' : 'coptic';
+    var parts = (f.coptic || f.gregorian || '1-1').split('-').map(Number);
+    var mon = monthSel(parts[0], cal === 'coptic'), day = daySel(parts[1], cal === 'coptic' ? (parts[0] === 13 ? 6 : 30) : 31);
+    var year = input(f.year || '', { inputmode: 'numeric', placeholder: opts.yearHint || 'اختياري', 'data-field': 'year' });
+    var live = el('p', { class: 'sa-live', 'data-live': '' });
+    var monBox = el('span', {}, mon), dayBox = el('span', {}, day);
+    function redraw() {
+      var m = +mon.value, max = cal === 'coptic' ? (m === 13 ? 6 : 30) : new Date(Date.UTC(2028, m, 0)).getUTCDate();
+      var d = Math.min(+day.value, max);
+      if (day.options.length !== max) { day = daySel(d, max); day.addEventListener('change', redraw); dayBox.replaceChildren(day); }
+      var y = +String(year.value).replace(/[٠-٩]/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'.indexOf(x); }) || null;
+      live.replaceChildren.apply(live, [icon('swap')].concat(convLine(cal, m, d, y)));
+    }
+    var calSeg = seg('التقويم', [['coptic', opts.copticLabel || 'قبطي (زي السنكسار)'], ['gregorian', opts.gregLabel || 'ميلادي (حدث حديث)']], cal, function (v) {
+      cal = v; mon = monthSel(Math.min(+mon.value, 12), cal === 'coptic'); mon.addEventListener('change', redraw); monBox.replaceChildren(mon); redraw();
+    });
+    mon.addEventListener('change', redraw); day.addEventListener('change', redraw); year.addEventListener('input', redraw);
+    redraw();
+    var node = el('div', { class: 'sa-datefields' }, field('التقويم', calSeg),
+      el('div', { class: 'sa-three' }, field('الشهر', monBox), field('اليوم', dayBox), field(opts.yearLabel || 'سنة الحدث', year)), live);
+    return {
+      node: node, live: live,
+      read: function () {
+        var m = +mon.value, d = +day.value;
+        var y = String(year.value).replace(/[٠-٩]/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'.indexOf(x); }).trim();
+        var out = cal === 'coptic' ? { coptic: m + '-' + d } : { gregorian: (m < 10 ? '0' : '') + m + '-' + (d < 10 ? '0' : '') + d };
+        if (y) out.year = +y;
+        return out;
+      }
+    };
+  }
+
+  function dayModal(i) {
+    var p = SA.form;
+    var f = i >= 0 ? p.feasts[i] : { kind: '', coptic: '1-1', source: '' };
+    var kind = input(f.kind, { placeholder: 'نياحته، استشهاده، تذكار رسامته…', 'data-field': 'kind' });
+    var dates = dateFields(f);
+    var src = ltr(f.source, { placeholder: 'https://…', 'data-field': 'source' });
+    var more = area_((f.more || []).join('\n'), 2); more.classList.add('input--ltr'); more.dir = 'ltr';
+    var title = input(f.title, { placeholder: 'اختياري: علشان كلمة الأنبا تكلا تتجاب صح' });
+    var note = area_(f.note, 2);
+    var body = el('div', { class: 'ba-dayform sa-dayform' }, field('النوع', kind), dates.node,
+      field('المصدر', src, 'لازم رابط https. التاريخ من غير مصدر مبيتحفظش'), field('مصادر زيادة', more, 'اختياري، رابط في كل سطر'),
+      field('عنوانه في السنكسار', title), field('ملحوظة', note, 'اختياري: لو المصادر مختلفة'),
+      i >= 0 ? el('div', {}, K.btn('شيل اليوم ده', 'trash', 'btn--sm btn--ghost sa-danger', { onclick: function (e) { p.feasts.splice(i, 1); e.target.closest('dialog').querySelector('.modal__actions .btn').click(); touched(); } })) : null);
+    form(i >= 0 ? 'يوم · ' + p.name : 'يوم جديد · ' + (p.name || 'شخص جديد'), i >= 0 ? 'edit' : 'plus', body, 'احفظ اليوم').then(function (ok) {
+      if (!ok) return;
+      var v = Object.assign({ kind: kind.value.trim() }, dates.read(), { source: src.value.trim() });
+      var m = more.value.split(/\s+/).map(function (x) { return x.trim(); }).filter(Boolean);
+      if (m.length) v.more = m;
+      if (title.value.trim()) v.title = title.value.trim();
+      if (note.value.trim()) v.note = note.value.trim();
+      if (!v.kind) { A.toast('اكتب نوع اليوم (نياحته، استشهاده…)', 'error'); return; }
+      if (!URL_RE.test(v.source) || m.some(function (u) { return !URL_RE.test(u); })) { A.toast('المصدر لازم رابط https', 'error'); return; }
+      if (i >= 0) p.feasts[i] = v; else p.feasts.push(v);
+      touched();
+    });
+  }
+
+  function msModal(i) {
+    var p = SA.form;
+    var m = i >= 0 ? p.milestones[i] : { kind: '', status: 'confirmed', source: '' };
+    var prec = m.date ? 'date' : m.month ? 'month' : 'year';
+    var kind = input(m.kind, { placeholder: 'الرهبنة، القسيسية، القمصية…' });
+    var when = ltr(m.date || m.month || m.year || '', { placeholder: '1978-01-03 · 2019-08 · 1980' });
+    var until = input(m.until || '', { placeholder: 'اختياري (فترة)', inputmode: 'numeric' });
+    var status = m.status;
+    var owner = el('input', { type: 'checkbox', checked: m.source === 'owner' });
+    var src = ltr(m.source === 'owner' ? '' : m.source, { placeholder: 'https://…' });
+    var note = area_(m.note, 2);
+    var body = el('div', { class: 'ba-dayform' }, field('المحطة', kind),
+      field('الدقة', seg('الدقة', [['date', 'يوم'], ['month', 'شهر'], ['year', 'سنة']], prec, function (v) { prec = v; }), 'على قد المعروف. مفيش تخمين: لو اليوم مش معروف، شهر أو سنة بس'),
+      el('div', { class: 'ba-dayform__two' }, field('التاريخ (ميلادي)', when), field('لحد سنة', until)),
+      field('الحالة', seg('الحالة', [['confirmed', 'مؤكد'], ['film', 'من الفيلم'], ['conflict', 'فيه اختلاف'], ['pending', 'مستني مصدر']], status, function (v) { status = v; })),
+      field('المصدر', src, 'رابط https، أو علّم «من صاحب المشروع»'),
+      el('label', { class: 'sa-check' }, owner, el('span', { text: 'من صاحب المشروع (لسه مش مكتوب في أي مكان)' })),
+      field('ملحوظة', note),
+      i >= 0 ? el('div', {}, K.btn('شيل المحطة دي', 'trash', 'btn--sm btn--ghost sa-danger', { onclick: function (e) { p.milestones.splice(i, 1); if (!p.milestones.length) delete p.milestones; e.target.closest('dialog').querySelector('.modal__actions .btn').click(); touched(); } })) : null);
+    form(i >= 0 ? 'محطة · ' + p.name : 'محطة جديدة · ' + (p.name || 'شخص جديد'), i >= 0 ? 'edit' : 'plus', body, 'احفظ المحطة').then(function (ok) {
+      if (!ok) return;
+      var w = String(when.value).trim();
+      var v = { kind: kind.value.trim() };
+      if (prec === 'date') v.date = w; else if (prec === 'month') v.month = w; else if (w) v.year = +w;
+      if (until.value.trim()) v.until = +until.value.trim();
+      v.source = owner.checked ? 'owner' : src.value.trim();
+      v.status = owner.checked ? 'pending' : status;
+      if (note.value.trim()) v.note = note.value.trim();
+      if (!v.kind || (prec === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(w)) || (prec === 'month' && !/^\d{4}-\d{2}$/.test(w)) || (prec === 'year' && w && !/^\d{4}$/.test(w))) { A.toast('اكتب المحطة وتاريخها بالشكل ده: 1978-01-03 أو 2019-08 أو 1980', 'error'); return; }
+      if (!owner.checked && !URL_RE.test(v.source)) { A.toast('المصدر لازم رابط https، أو علّم «من صاحب المشروع»', 'error'); return; }
+      p.milestones = (p.milestones || []).slice();
+      if (i >= 0) p.milestones[i] = v; else p.milestones.push(v);
+      touched();
+    });
+  }
+
+  /* ---------- the album: from the library, framed like a profile picture ---------- */
+  function addPhoto() {
+    if (!A.pickFromLibrary) { A.toast('مكتبة الصور مش متاحة هنا', 'error'); return; }
+    A.pickFromLibrary(null).then(function (id) {
+      if (!id) return;
+      var m = ((A.state && A.state.draft && A.state.draft.media) || []).filter(function (x) { return x.id === id; })[0];
+      if (!m || !/^media\/\d{4}\/[a-z]{3}-[a-z0-9]{8}\.(webp|jpg)$/.test(m.path || '')) { A.toast('الصورة دي مش من مكتبة الصور', 'error'); return; }
+      SA.form.album.push({ media: m.path, type: 'photo', main: !SA.form.album.some(function (a) { return a.main; }) });
+      touched();
+      photoModal(SA.form.album.length - 1);
+    });
+  }
+
+  /* the crop tool (owner 2026-11-24): drag the photo inside the arch, zoom; the big card and the small face beside it */
+  function cropper(a) {
+    var c = cropOf(a);
+    var box = el('div', { class: 'sa-cropper', 'data-crop': '' });
+    if (!a.media) { box.append(K.note('photos', 'الصورة نفسها بتدخل مكتبة الصور في P4، وبعدها تتظبط هنا.')); return { node: box, value: function () { return null; } }; }
+    var imgs = [];
+    var mk = function (cls) { var i = el('img', { class: 'sa-cropimg' + (cls ? ' ' + cls : ''), alt: '', draggable: 'false' }); imgs.push(i); return i; };
+    var frame = el('span', { class: 'sa-cropper__frame', 'data-drag': '' }, mk(), el('span', { class: 'sa-cropper__hint' }, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon('grip')), 'اسحب الصورة لحد ما الوش يبقى في النص'));
+    var zoom = el('input', { type: 'range', min: '1', max: '3', step: '0.05', value: String(c.z), 'aria-label': 'التكبير', 'data-zoom': '' });
+    var out = el('output', { text: ar(Math.round(c.z * 100)) + '٪' });
+    function paint() { imgs.forEach(function (i) { applyCrop(i, c); }); zoom.value = String(c.z); out.textContent = ar(Math.round(c.z * 100)) + '٪'; }
+    A.mediaPreview(mediaId(a.media)).then(function (src) { imgs.forEach(function (i) { if (src) i.src = src; }); });
+    var drag = null;
+    frame.addEventListener('pointerdown', function (e) { drag = { px: e.clientX, py: e.clientY, x: c.x, y: c.y }; frame.setPointerCapture(e.pointerId); frame.classList.add('is-dragging'); });
+    frame.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var r = frame.getBoundingClientRect();
+      c.x = Math.max(0, Math.min(100, drag.x - (e.clientX - drag.px) / r.width * 100 / c.z));
+      c.y = Math.max(0, Math.min(100, drag.y - (e.clientY - drag.py) / r.height * 100 / c.z));
+      paint();
+    });
+    var end = function () { drag = null; frame.classList.remove('is-dragging'); };
+    frame.addEventListener('pointerup', end);
+    frame.addEventListener('pointercancel', end);
+    frame.addEventListener('wheel', function (e) { e.preventDefault(); c.z = Math.max(1, Math.min(3, +(c.z - e.deltaY / 500).toFixed(2))); paint(); }, { passive: false });
+    zoom.addEventListener('input', function () { c.z = +zoom.value; paint(); });
+    box.append(
+      el('div', { class: 'sa-cropper__stage' }, frame,
+        el('div', { class: 'sa-cropper__side' }, el('b', { text: 'هتبان كده' }),
+          el('span', { class: 'sa-cropper__pv--tile' }, mk()), el('small', { text: 'الكارت الكبير' }),
+          el('span', { class: 'ycard__face has-photo sa-cropper__pv--face' }, mk('ycard__photo')), el('small', { text: 'الصورة الصغيرة (القايمة)' }))),
+      el('label', { class: 'sa-zoom' }, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon('search')), el('span', { text: 'التكبير' }), zoom, out),
+      el('div', { class: 'sa-cropper__acts' }, K.btn('زي الأول', 'retry', 'btn--sm btn--ghost', { 'data-crop-reset': '', onclick: function () { c.x = CROP0.x; c.y = CROP0.y; c.z = CROP0.z; paint(); } }),
+        el('small', { class: 'muted', text: 'الضبط ده للإطارات الصغيرة بس (الأدمن، والصورة الصغيرة). كارت «النهارده تذكار…» على الموقع بيعرض الصورة كاملة زي ما هي.' })));
+    paint();
+    return { node: box, value: function () { return { x: Math.round(c.x * 10) / 10, y: Math.round(c.y * 10) / 10, z: Math.round(c.z * 100) / 100 }; } };
+  }
+
+  function photoModal(i) {
+    var p = SA.form;
+    var a = p.album[i];
+    var type = a.type;
+    var crop = cropper(a);
+    var stage = input(a.stage, { placeholder: 'اختياري: الرهبنة، الأسقفية…', maxlength: '80' });
+    var occ = select([['', 'أي مناسبة']].concat(p.feasts.map(function (f) { return [f.kind, f.kind + ' · ' + dayLabel(f)]; })), a.occasion || '', 'المناسبة');
+    var main = el('input', { type: 'checkbox', checked: !!a.main });
+    var caption = input(a.caption, { placeholder: 'اختياري', maxlength: '200' });
+    var credit = input(a.credit, { placeholder: 'اختياري · للإدارة بس، مش بيظهر', maxlength: '200' });
+    var body = el('div', { class: 'ba-dayform' },
+      a.src && !a.media ? el('p', { class: 'sa-file' }, icon('photos'), el('bdi', { text: String(a.src).split('/').pop() })) : null,
+      el('div', { class: 'field sa-cropfield' }, el('span', { class: 'field__label', text: 'ظبط الصورة' }), crop.node, el('span', { class: 'field__hint', text: 'زي الصورة الشخصية: اسحب وكبّر لحد ما الوش يبان كويس ومش مقصوص' })),
+      field('النوع', seg('النوع', [['ai', 'صورة تعبيرية (AI)'], ['photo', 'صورة حقيقية']], type, function (v) { type = v; }), 'التعبيرية بيتكتب عليها «صورة تعبيرية» صغيرة على الموقع'),
+      el('div', { class: 'ba-dayform__two' }, field('المرحلة', stage), field('المناسبة', occ)),
+      el('label', { class: 'sa-check' }, main, el('span', { text: 'الصورة الأساسية (بتظهر لو مفيش صورة للمرحلة أو المناسبة)' })),
+      field('وصف', caption), field('مصدر الصورة', credit));
+    form('صورة في ألبوم ' + p.name, 'edit', body, 'احفظ').then(function (ok) {
+      if (!ok) return;
+      var v = Object.assign({}, a, { type: type });
+      ['stage', 'occasion', 'caption', 'credit'].forEach(function (k) { delete v[k]; });
+      if (stage.value.trim()) v.stage = stage.value.trim();
+      if (occ.value) v.occasion = occ.value;
+      if (caption.value.trim()) v.caption = caption.value.trim();
+      if (credit.value.trim()) v.credit = credit.value.trim();
+      var c = crop.value();
+      if (c) v.crop = c;
+      if (main.checked) { p.album.forEach(function (x) { delete x.main; }); v.main = true; } else delete v.main;
+      p.album[i] = v;
+      touched();
+    });
+  }
+
+  /* ---------- save / remove ---------- */
+  function savePerson(event) {
+    var p = SA.form;
+    if (!String(p.name || '').trim()) { A.toast('اكتب الاسم', 'error'); return; }
+    var body = { kind: 'person', rev: SA.formRev, item: p };
+    A.withBusy(event.currentTarget, api('POST', 'item', body)).then(function (reply) {
+      var it = reply.item;
+      var list = SA.data.items.filter(function (x) { return !(x.kind === 'person' && x.id === it.id); });
+      list.push(it);
+      list.sort(function (a, b) { return a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : a.ord - b.ord; });
+      SA.data.items = list;
+      SA.data.changes = list.filter(function (x) { return x.state !== 'published'; }).length;
+      SA.open = it.id; SA.form = JSON.parse(JSON.stringify(it.data)); SA.formRev = it.rev; SA.dirtyForm = false;
+      A.toast('اتحفظ ✓ (لسه مش منشور)');
+      A.render();
+    }).catch(function (error) {
+      if (error && error.code === 'invalid' && error.reply && error.reply.errors) A.toast(error.reply.errors[0], 'error');
+      else fail(error);
+    });
+  }
+  function removePerson() {
+    var it = itemOf('person', SA.open);
+    if (!it) return;
+    K.typedConfirm({ title: 'تشيل «' + it.data.name + '» من السجل؟', message: 'بيتشال من المسودة، ومن الموقع والأعياد بعد النشر. ممكن يرجع قبل النشر من «راجع وانشر»، أو برجوع نسخة قديمة بعده. البيانات الناقصة مش سبب للشيل.', typed: 'شيل', confirmLabel: 'شيل' })
+      .then(function (ok) {
+        if (!ok) return;
+        api('POST', 'item/delete', { kind: 'person', id: it.id, rev: it.rev }).then(function () {
+          SA.mode = 'list'; SA.open = null; SA.form = null; SA.dirtyForm = false;
+          A.toast('اتشال من المسودة');
+          return load(true);
+        }).catch(fail);
+      });
+  }
+
+  /* =======================================================
+     راجع وانشر
+  ======================================================= */
+  function openReview() {
+    if (SA.dirtyForm) { A.toast('احفظ التعديل الأول', 'error'); return; }
+    SA.mode = 'publish'; SA.review = null; SA.reviewError = null; SA.history = null; SA.published = null;
+    if (!(A.area === 'bread' && A.sub.bread === 'breadpeople')) A.go('bread', 'breadpeople'); else A.render();
+    window.scrollTo(0, 0);
+  }
+  function loadReview() {
+    Promise.all([api('GET', 'review'), api('GET', 'history')]).then(function (both) {
+      SA.review = both[0]; SA.history = both[1].publishes;
+    }, function (e) { SA.reviewError = e; }).then(function () { if (K.onTab('breadpeople')) A.render(); });
+  }
+  function publishView(r) {
+    r.append(el('div', { class: 'sa-back' }, K.btn('رجوع للشخصيات', 'arrow', 'btn--ghost btn--small', { onclick: function () { SA.mode = 'list'; A.render(); } })));
+    if (SA.reviewError) { r.append(K.failed(A.errorBox(), SA.reviewError, function () { SA.reviewError = null; loadReview(); })); return; }
+    if (!SA.review) { r.append(K.skeleton()); loadReview(); return; }
+    var v = SA.review;
+    if (SA.published) {
+      r.append(el('div', { class: 'ba-alert ba-alert--info sa-ok', role: 'status' }, el('span', { class: 'chipico chipico--ok', 'aria-hidden': 'true' }, icon('check')),
+        el('div', { class: 'ba-alert__text' }, el('b', { text: 'اتنشر السجل ✓ النسخة ' + ar(SA.published.rev) }),
+          el('small', { text: 'الموقع بيقراه دلوقتي، وGitHub بياخده في دقيقة. تبويب «الأعياد» بيحسب منه على طول، وترشيح الأنبا تكلا الجاي (يوم ٢٠) بيقراه لوحده.' })),
+        K.btn('شوف الأعياد', 'calendar', '', { onclick: function () { A.go('bread', 'breadfeasts'); } })));
+    }
+    var nameOfItem = function (c) { return c.name; };
+    var changes = K.card('edit', 'التغييرات من آخر نشرة', v.first ? 'أول نشرة: السجل كله (' + ar(v.people) + ' شخص و' + ar(v.occasions) + ' مناسبة)' : ar(v.changes.length) + ' · محفوظين في المسودة ومحدش شافهم', null,
+      v.first ? K.note('info', 'دي أول مرة السجل يتنشر من الأدمن: بيتنشر كله زي ما اتسجل في P2، وبعدها أي تعديل بيظهر هنا لوحده.')
+        : v.changes.length ? el('ul', { class: 'sa-changes' }, v.changes.map(function (c) {
+          var it = itemOf(c.kind, c.id);
+          return el('li', { class: 'sa-change', 'data-change': c.id }, it && c.kind === 'person' ? face(it.data) : el('span', { class: 'chipico', 'aria-hidden': 'true' }, icon('church')),
+            el('div', { class: 'sa-change__main' }, el('b', { text: nameOfItem(c) }),
+              el('span', { class: 'sa-diff' }, el('small', { text: c.state === 'new' ? 'جديد' : c.state === 'deleted' ? 'اتشال' : 'اتعدّل' }),
+                el('span', { text: c.state === 'changed' ? (c.fields.map(function (x) { return x.label; }).join('، ') || 'تفاصيل') : c.state === 'new' ? (c.kind === 'person' ? 'شخص جديد في السجل' : 'مناسبة جديدة') : 'هيتشال من الموقع' })),
+              el('small', { class: 'muted', text: K.nameOf(c.by) + ' · ' + K.shortDate(new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date(c.at))) })),
+            K.btn('رجّع', 'retry', 'btn--sm btn--ghost', { 'aria-label': 'رجّع التعديل ده', onclick: function (e) {
+              A.withBusy(e.currentTarget, api('POST', c.state === 'deleted' && !v.first ? 'item/restore' : 'item/revert', { kind: c.kind, id: c.id })).then(function () { SA.review = null; return load(true); }).catch(fail);
+            } }));
+        })) : el('p', { class: 'muted sa-pad', text: 'مفيش تغييرات من آخر نشرة.' }));
+    var auto = K.card('calendar', 'الأعياد التلقائية', 'اللي بيتغيّر في كارت «النهارده تذكار…» و«مناسبات كنيستنا» بعد النشر', null,
+      v.joins.length || v.leaves.length ? el('ul', { class: 'sa-joins' },
+        v.joins.slice(0, v.first ? 0 : 50).map(function (p) { return el('li', {}, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon('plus')), el('span', {}, el('b', { text: p.name }), ' هيدخل' + (p.class === 'living' ? ' «مناسبات كنيستنا»' : '') + ': ' + p.days.map(function (f) { return dayLabel(f) + ' = ' + gText(nextOf(f)); }).join('، '))); }),
+        v.leaves.map(function (p) { return el('li', {}, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon('close')), el('span', {}, el('b', { text: p.name }), ' هيخرج')); }),
+        v.first ? el('li', {}, el('span', { text: ar(v.joins.length) + ' شخص بأيامهم هيدخلوا الأعياد والمناسبات التلقائية.' })) : null)
+        : el('p', { class: 'muted sa-pad', text: 'مفيش حد هيدخل أو يخرج من الأعياد في النشرة دي. التعديلات في التفاصيل بس.' }), null, 'ok');
+    var checks = K.card('shield', 'الفحص', 'نفس قواعد السجل: كل يوم ليه مصدر https، والتاريخ القبطي بالكود', null,
+      v.errors.length ? el('ul', { class: 'sa-checks sa-checks--bad' }, v.errors.map(function (e) { return el('li', {}, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon('alert')), el('span', { text: e })); }))
+        : el('ul', { class: 'sa-checks' }, ['كل يوم ليه نوع ومصدر https', 'التواريخ القبطية والميلادية صح', '«بيانات ناقصة» متحسوبة من البيانات', 'الأحياء بره كارت القديسين'].map(function (t) { return el('li', {}, el('span', { class: 'ico-sm', 'aria-hidden': 'true' }, icon('check')), el('span', { text: t })); })),
+      null, v.errors.length ? 'danger' : 'ok');
+    var can = !v.errors.length && (v.first || v.changes.length);
+    var go = el('section', { class: 'card p8-card sa-go' }, el('div', { class: 'sa-go__text' }, el('b', { text: 'انشر السجل' }),
+      el('small', { text: v.errors.length ? 'فيه حاجات محتاجة تتصلح الأول (فوق).' : 'بيتنشر كله مرة واحدة كنسخة جديدة. الموقع بيقراه على طول، والرجوع لأي نسخة قبلها بدوسة.' })),
+      K.btn('انشر', 'send', 'btn--primary', { 'data-act': 'saints-publish', disabled: !can, onclick: function (e) {
+        A.withBusy(e.currentTarget, api('POST', 'publish', { expect: v.expect })).then(function (reply) {
+          SA.published = reply; SA.review = null; A.toast('اتنشر السجل ✓');
+          if (BR.feasts) Object.keys(BR.feasts).forEach(function (k) { delete BR.feasts[k]; });
+          return load(true);
+        }).catch(function (error) { SA.review = null; fail(error); A.render(); });
+      } }));
+    var hist = K.card('history', 'النشرات اللي فاتت', 'أي نسخة ترجع بدوسة، وبتتنشر تاني كنسخة جديدة، والمسودة بترجع زيها', null,
+      (SA.history || []).length ? el('ul', { class: 'p8-list' }, SA.history.map(function (h, i) {
+        return el('li', { class: 'p8-item sa-hist' }, el('div', { class: 'p8-item__main' }, el('b', {}, 'النسخة ' + ar(h.rev) + ' ', i === 0 ? K.tag('على الموقع', 'ok') : null),
+          el('small', { text: K.shortDate(new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date(h.at))) + ' ' + K.clock(h.at) + ' · ' + K.nameOf(h.by) + ' · ' + (h.note || '') })),
+          i ? K.btn('رجّع النسخة دي', 'retry', 'btn--sm btn--ghost', { onclick: function () {
+            K.typedConfirm({ title: 'ترجّع السجل للنسخة ' + ar(h.rev) + '؟', message: 'السجل كله (والمسودة) بيرجع زي النسخة دي، وبيتنشر على طول كنسخة جديدة. أي تعديل مش منشور هيضيع.', typed: 'رجّع', confirmLabel: 'رجّع وانشر' }).then(function (ok) {
+              if (!ok) return;
+              api('POST', 'restore', { rev: h.rev, confirm: true }).then(function (reply) { SA.published = reply; SA.review = null; A.toast('السجل رجع للنسخة ' + ar(h.rev)); return load(true); }).catch(fail);
+            });
+          } }) : null);
+      })) : el('p', { class: 'muted sa-pad', text: 'لسه مفيش نشرات.' }));
+    r.append(K.cols('sa-cols', K.stack(changes, auto), K.stack(checks, go, hist)));
+  }
+
+  /* =======================================================
+     المناسبات
+  ======================================================= */
+  A.views.breadoccasions = function () {
+    var r = K.root();
+    r.classList.add('sa');
+    if (gateView(r, 'المناسبات')) return [r];
+    r.append(dirtyBar() || el('span', { hidden: true }));
+    var occ = occasions();
+    var church = K.card('church', 'مناسبات الكنيسة', 'أيام مش لشخص: الإيبارشية، والكنيسة، وأي مناسبة. كل سنة أو مرة واحدة', K.btn('مناسبة جديدة', 'plus', 'btn--primary', { 'data-act': 'saints-newocc', onclick: function () { occModal(null); } }),
+      occ.length ? el('ul', { class: 'sa-days' }, occ.map(function (it) {
+        var o = it.data, once = o.repeat === 'once', at = nextOf(o), c = toCoptic(at);
+        return el('li', { class: 'sa-day', 'data-occasion': o.id },
+          el('span', { class: 'sa-day__date' }, el('b', { text: dayLabel(o) }), el('small', { text: once ? 'مرة واحدة' : (o.coptic ? 'قبطي' : 'ميلادي') + ' · كل سنة' + (o.year ? ' · من ' + ar(o.year) : '') })),
+          el('span', { class: 'sa-day__main' }, el('b', { text: o.name }), o.kind ? el('small', { class: 'sa-kind', text: o.kind }) : null,
+            el('span', { class: 'sa-conv' }, icon('swap'), el('span', { text: once ? cText(c.m, c.d, c.y) : o.coptic ? gText(at, true) : cText(c.m, c.d) })),
+            linkLine(o.source)),
+          K.tag(once ? 'مرة واحدة' : 'كل سنة', once ? 'acc' : 'info'), it.state !== 'published' ? K.tag('مش منشور', 'warn') : null,
+          K.btn('عدّل', 'edit', 'btn--sm btn--ghost', { onclick: function () { occModal(it); } }));
+      })) : el('p', { class: 'muted sa-pad', text: 'مفيش مناسبات.' }));
+    var living = people().map(function (i) { return i.data; }).filter(function (p) { return p.class === 'living'; });
+    var fathers = K.card('users', 'أيام الآباء الأحياء', 'بتتعدّل من صفحة كل أب. بتظهر هنا علشان تشوف المناسبات كلها مع بعض', null,
+      el('ul', { class: 'sa-days' }, living.reduce(function (acc, p) {
+        return acc.concat(p.feasts.map(function (f) {
+          return el('li', { class: 'sa-day' }, el('span', { class: 'sa-day__date' }, el('b', { text: dayLabel(f) }), el('small', { text: (f.coptic ? 'قبطي' : 'ميلادي') + (f.year ? ' · من ' + ar(f.year) : '') })),
+            el('span', { class: 'sa-day__main' }, el('b', { text: p.name }), el('small', { class: 'sa-kind', text: f.kind })),
+            K.btn('افتح', 'chevron', 'btn--sm btn--ghost', { onclick: function () { A.sub.bread = 'breadpeople'; openPerson(p.id); A.go('bread', 'breadpeople'); } }));
+        }));
+      }, [])));
+    var months = [K.cairoMonth(1), K.cairoMonth(2)].map(function (ym) {
+      var l = monthOcc(ym, living, occ.map(function (i) { return i.data; }));
+      return el('div', { class: 'sa-month' }, el('b', { text: K.monthName(ym) }),
+        l.length ? el('ul', {}, l.map(function (x) { return el('li', {}, el('span', { text: ar(+x.date.slice(8)) + ' ' + GM[+x.date.slice(5, 7) - 1] }), el('span', {}, x.who, el('small', { text: x.what }))); }))
+          : el('small', { class: 'muted', text: 'مفيش مناسبات' }));
+    });
+    r.append(K.cols('sa-cols', K.stack(church, fathers), K.stack(K.card('calendar', 'الجاي', 'اللي هيظهر في «مناسبات كنيستنا» (P5) بعد النشر', null, el('div', { class: 'sa-months' }, months)),
+      K.note('info', 'أيام الآباء الأحياء ومناسبات الكنيسة مكانها «مناسبات كنيستنا» بس، وعمرها ما بتظهر في كارت القديسين.'))));
+    return [r];
+  };
+
+  function monthOcc(ym, living, occ) {
+    var y = +ym.slice(0, 4), mo = +ym.slice(5, 7), last = new Date(Date.UTC(y, mo, 0)).getUTCDate(), out = [];
+    for (var d = 1; d <= last; d++) {
+      var date = ym + '-' + (d < 10 ? '0' : '') + d, c = toCoptic(date);
+      var on = function (f) { return f.repeat === 'once' ? f.date === date : f.gregorian ? f.gregorian === date.slice(5) : f.coptic === c.m + '-' + c.d || (f.coptic === '13-6' && c.m === 13 && c.d === 5 && monthDays(c.y, 13) === 5); };
+      living.forEach(function (p) { if (p.status === 'complete' || p.feasts.length) p.feasts.forEach(function (f) { if (on(f)) out.push({ date: date, who: p.name, what: f.kind }); }); });
+      occ.forEach(function (o) { if (on(o)) out.push({ date: date, who: o.name, what: o.kind || '' }); });
+    }
+    return out;
+  }
+
+  function occModal(it) {
+    var o = it ? it.data : { id: 'o' + Date.now().toString(36), name: '', kind: '', coptic: '1-1', source: '' };
+    var name = input(o.name, { placeholder: 'زي «إيبارشية البحر الأحمر»', maxlength: '120', 'data-field': 'name' });
+    var kind = input(o.kind, { placeholder: 'ذكرى إيه بالظبط', maxlength: '200' });
+    var repeat = o.repeat === 'once' ? 'once' : 'yearly';
+    var dates = dateFields(o.date ? { gregorian: o.date.slice(5), year: +o.date.slice(0, 4) } : o, { yearLabel: 'السنة', yearHint: 'لازم في «مرة واحدة»', copticLabel: 'قبطي', gregLabel: 'ميلادي' });
+    var src = ltr(o.source, { placeholder: 'https://…', 'data-field': 'source' });
+    var note = area_(o.note, 3);
+    var body = el('div', { class: 'ba-dayform sa-dayform' }, field('الاسم', name), field('المناسبة', kind),
+      field('بتتكرر؟', seg('التكرار', [['yearly', 'كل سنة'], ['once', 'مرة واحدة']], repeat, function (v) { repeat = v; }), 'مرة واحدة: بتظهر في سنتها بس (زي احتفال أو زيارة)، بتاريخها الميلادي'),
+      dates.node, field('المصدر', src, 'لازم رابط https'), field('ملحوظة', note, 'للإدارة بس'),
+      it ? el('div', {}, K.btn('شيل المناسبة', 'trash', 'btn--sm btn--ghost sa-danger', { onclick: function (e) {
+        e.target.closest('dialog').querySelector('.modal__actions .btn').click();
+        api('POST', 'item/delete', { kind: 'occasion', id: it.id, rev: it.rev }).then(function () { A.toast('اتشالت من المسودة'); return load(true); }).catch(fail);
+      } })) : null);
+    form(it ? 'مناسبة · ' + o.name : 'مناسبة جديدة', it ? 'edit' : 'plus', body, 'احفظ').then(function (ok) {
+      if (!ok) return;
+      var d = dates.read();
+      var v = { id: o.id, name: name.value.trim(), source: src.value.trim() };
+      if (kind.value.trim()) v.kind = kind.value.trim();
+      if (repeat === 'once') {
+        if (!d.year || !d.gregorian) { A.toast('المرة الواحدة: اختار «ميلادي» واكتب السنة', 'error'); return; }
+        v.repeat = 'once'; v.date = d.year + '-' + d.gregorian;
+      } else Object.assign(v, d);
+      if (note.value.trim()) v.note = note.value.trim();
+      if (!v.name || !URL_RE.test(v.source)) { A.toast('الاسم والمصدر (https) لازم', 'error'); return; }
+      api('POST', 'item', { kind: 'occasion', rev: it ? it.rev : 0, item: v }).then(function () { A.toast('اتحفظت ✓ (لسه مش منشورة)'); return load(true); }).catch(function (error) {
+        if (error && error.code === 'invalid' && error.reply && error.reply.errors) A.toast(error.reply.errors[0], 'error'); else fail(error);
+      });
+    });
+  }
+
 })();
 
 /* ---------- the permission tables (generated from worker/src/lib/perms.js and apps-script/Grants.gs) ---------- */
-A.ROUTE_PERMS = {"DELETE /v1/admin/book/bookings/:id/lock":"bookings.edit","DELETE /v1/admin/proofs/:id":"bookings.manage","GET /v1/admin/accounts":"accounts.view","GET /v1/admin/activity":"activity.view","GET /v1/admin/activity/manage":"activity.manage","GET /v1/admin/activity/manage/archive/:id":"activity.manage","GET /v1/admin/avatars":"*","GET /v1/admin/book/bookings":"bookings.view","GET /v1/admin/book/bookings/:id":"bookings.view","GET /v1/admin/book/events":"bookings.view","GET /v1/admin/book/events/:id/handovers":"finance.view","GET /v1/admin/book/events/:id/reminders":"bookings.view","GET /v1/admin/book/export":"exports.export","GET /v1/admin/book/finance":"finance.view","GET /v1/admin/book/module":"bookings.view","GET /v1/admin/book/report":"exports.export","GET /v1/admin/book/summary":"bookings.view","GET /v1/admin/bread/feasts":"bread.content","GET /v1/admin/bread/programs":"bread.content","GET /v1/admin/bread/programs/:id/topics":"bread.content","GET /v1/admin/bread/reflections":"bread.reflections","GET /v1/admin/bread/settings":"bread.content","GET /v1/admin/bread/stats":"bread.stats","GET /v1/admin/bread/suggest":"bread.content","GET /v1/admin/comp":"competitions.view","GET /v1/admin/comp/:id/submissions":"competitions.view","GET /v1/admin/comp/badges":"*","GET /v1/admin/comp/seasons":"competitions.view","GET /v1/admin/comp/submissions/:id":"competitions.view","GET /v1/admin/content/drafts":"content.view","GET /v1/admin/content/export":"system.manage","GET /v1/admin/content/media-status":"system.view","GET /v1/admin/content/media/:id/file":"media.view","GET /v1/admin/content/review-input":"content.view","GET /v1/admin/content/status":"system.view","GET /v1/admin/diag/book-news":"system.view","GET /v1/admin/me":"*","GET /v1/admin/notify/me":"*","GET /v1/admin/notify/settings":"notifications.view","GET /v1/admin/notify/status":"notifications.view","GET /v1/admin/participants":"participants.view","GET /v1/admin/participants/:id":"participants.view","GET /v1/admin/participants/:id/avatar":"participants.view","GET /v1/admin/participants/export":["participants.view","exports.export_pii"],"GET /v1/admin/participants/review":"participants.view","GET /v1/admin/participants/settings":"participants.view","GET /v1/admin/points/seasons":"points.view","GET /v1/admin/points/seasons/:id/preview":"points.view","GET /v1/admin/proofs/:id":"bookings.view","GET /v1/admin/publish/revisions":"publish.publish","GET /v1/admin/publish/status":"system.view","GET /v1/admin/store/items":"store.view","GET /v1/admin/store/redemptions":"store.view","GET /v1/admin/store/schedule":"store.view","GET /v1/admin/whoami":"*","POST /v1/admin/accounts":"accounts.manage","POST /v1/admin/accounts/:email":"accounts.manage","POST /v1/admin/accounts/:email/name":"*","POST /v1/admin/accounts/:email/remove":"accounts.manage","POST /v1/admin/accounts/:email/signout":"accounts.manage","POST /v1/admin/accounts/enforce":"accounts.manage","POST /v1/admin/activity/manage/archive":"activity.manage","POST /v1/admin/activity/manage/delete":"activity.manage","POST /v1/admin/activity/manage/preview":"activity.manage","POST /v1/admin/book/bookings":"bookings.create_cash","POST /v1/admin/book/bookings/:id/cancel":"bookings.manage","POST /v1/admin/book/bookings/:id/confirm":"bookings.approve","POST /v1/admin/book/bookings/:id/link":"bookings.manage","POST /v1/admin/book/bookings/:id/lock":"bookings.edit","POST /v1/admin/book/bookings/:id/payments":["bookings.approve","finance.manage"],"POST /v1/admin/book/bookings/:id/reject":"bookings.approve","POST /v1/admin/book/bookings/:id/reopen":"bookings.manage","POST /v1/admin/book/bookings/:id/update":"bookings.edit","POST /v1/admin/book/claims/:id/reject":["bookings.approve","finance.manage"],"POST /v1/admin/book/events/:id/cancel-all":"bookings.manage","POST /v1/admin/book/events/:id/handovers":"finance.manage","POST /v1/admin/book/events/:id/notify":"bookings.manage","POST /v1/admin/book/events/:id/purge":"bookings.manage","POST /v1/admin/book/events/:id/reminders":"bookings.edit","POST /v1/admin/book/events/:slug/refresh":"bookings.edit","POST /v1/admin/book/handovers/:id/void":"finance.manage","POST /v1/admin/book/module":"bookings.manage","POST /v1/admin/book/payments/:id/void":"finance.manage","POST /v1/admin/book/servants/:id/purge":"bookings.manage","POST /v1/admin/bread/feasts":"bread.content","POST /v1/admin/bread/programs":"bread.content","POST /v1/admin/bread/programs/:id/activate":"bread.content","POST /v1/admin/bread/programs/:id/delete":"bread.content","POST /v1/admin/bread/programs/:id/stop":"bread.content","POST /v1/admin/bread/programs/:id/topics":"bread.content","POST /v1/admin/bread/settings":"bread.content","POST /v1/admin/comp/:id/regrade":"competitions.approve","POST /v1/admin/comp/submissions/:id/grade":"competitions.edit","POST /v1/admin/comp/submissions/:id/void":"competitions.approve","POST /v1/admin/content/call":"*","POST /v1/admin/devices/forget":"*","POST /v1/admin/devices/trust":"*","POST /v1/admin/diag/echo":"system.manage","POST /v1/admin/diag/event-fixture":"system.manage","POST /v1/admin/diag/gmail-health":"system.manage","POST /v1/admin/diag/housekeeping":"system.manage","POST /v1/admin/diag/mail-sample":"system.manage","POST /v1/admin/diag/retention":"system.manage","POST /v1/admin/me/ask-access":"*","POST /v1/admin/me/avatar":"*","POST /v1/admin/me/avatar/delete":"*","POST /v1/admin/me/prefs":"*","POST /v1/admin/media/upload":"*","POST /v1/admin/notify/me":"*","POST /v1/admin/notify/outbox/:id/dismiss":"notifications.manage","POST /v1/admin/notify/settings":"notifications.manage","POST /v1/admin/participants":"participants.add","POST /v1/admin/participants/:id/avatar/delete":"participants.edit","POST /v1/admin/participants/:id/block":"participants.edit","POST /v1/admin/participants/:id/dob":"participants.manage","POST /v1/admin/participants/:id/eligibility":"participants.manage","POST /v1/admin/participants/:id/email":"participants.manage","POST /v1/admin/participants/:id/phone":"participants.manage","POST /v1/admin/participants/:id/points":"points.edit","POST /v1/admin/participants/:id/profile":"participants.edit","POST /v1/admin/participants/:id/resend":"participants.view","POST /v1/admin/participants/:id/reset-password":"participants.manage","POST /v1/admin/participants/:id/sessions/revoke":"participants.manage","POST /v1/admin/participants/:id/transfer":"points.approve","POST /v1/admin/participants/:id/unblock":"participants.manage","POST /v1/admin/participants/:id/view-password":"participants.view","POST /v1/admin/participants/settings":"participants.manage","POST /v1/admin/points/seasons":"points.approve","POST /v1/admin/points/seasons/:id/close":"points.approve","POST /v1/admin/proofs":"bookings.edit","POST /v1/admin/publish/restore":"publish.publish","POST /v1/admin/publish/shadow-check":"system.manage","POST /v1/admin/push/auto":"push.view","POST /v1/admin/push/check":"push.view","POST /v1/admin/push/devices":"*","POST /v1/admin/push/remove":"*","POST /v1/admin/push/schedule":"push.view","POST /v1/admin/push/schedule/cancel":"push.manage","POST /v1/admin/push/send":"push.manage","POST /v1/admin/push/state":"push.view","POST /v1/admin/push/subscribe":"*","POST /v1/admin/push/test":"*","POST /v1/admin/push/unsubscribe":"*","POST /v1/admin/session/end":"*","POST /v1/admin/session/heartbeat":"*","POST /v1/admin/session/renew":"*","POST /v1/admin/session/resume":"*","POST /v1/admin/session/start":"*","POST /v1/admin/store/items":"store.edit","POST /v1/admin/store/items/:id/delete":"store.delete","POST /v1/admin/store/redemptions/:id/status":"store.approve","POST /v1/admin/store/schedule":"store.edit","POST /v1/admin/tools/admins":"accounts.view","POST /v1/admin/tools/fetch-media":"media.add","POST /v1/admin/tools/github":"system.view","POST /v1/admin/tools/live-stage":"content.edit","POST /v1/admin/tools/maps":"content.edit","POST /v1/admin/tools/media":"media.view","POST /v1/admin/tools/migrate":"system.manage","POST /v1/admin/tools/migration":"system.manage"};
+A.ROUTE_PERMS = {"DELETE /v1/admin/book/bookings/:id/lock":"bookings.edit","DELETE /v1/admin/proofs/:id":"bookings.manage","GET /v1/admin/accounts":"accounts.view","GET /v1/admin/activity":"activity.view","GET /v1/admin/activity/manage":"activity.manage","GET /v1/admin/activity/manage/archive/:id":"activity.manage","GET /v1/admin/avatars":"*","GET /v1/admin/book/bookings":"bookings.view","GET /v1/admin/book/bookings/:id":"bookings.view","GET /v1/admin/book/events":"bookings.view","GET /v1/admin/book/events/:id/handovers":"finance.view","GET /v1/admin/book/events/:id/reminders":"bookings.view","GET /v1/admin/book/export":"exports.export","GET /v1/admin/book/finance":"finance.view","GET /v1/admin/book/module":"bookings.view","GET /v1/admin/book/report":"exports.export","GET /v1/admin/book/summary":"bookings.view","GET /v1/admin/bread/feasts":"bread.content","GET /v1/admin/bread/programs":"bread.content","GET /v1/admin/bread/programs/:id/topics":"bread.content","GET /v1/admin/bread/reflections":"bread.reflections","GET /v1/admin/bread/saints":"bread.saints","GET /v1/admin/bread/saints/feasts":"bread.content","GET /v1/admin/bread/saints/history":"bread.saints","GET /v1/admin/bread/saints/review":"bread.saints","GET /v1/admin/bread/settings":"bread.content","GET /v1/admin/bread/stats":"bread.stats","GET /v1/admin/bread/suggest":"bread.content","GET /v1/admin/comp":"competitions.view","GET /v1/admin/comp/:id/submissions":"competitions.view","GET /v1/admin/comp/badges":"*","GET /v1/admin/comp/seasons":"competitions.view","GET /v1/admin/comp/submissions/:id":"competitions.view","GET /v1/admin/content/drafts":"content.view","GET /v1/admin/content/export":"system.manage","GET /v1/admin/content/media-status":"system.view","GET /v1/admin/content/media/:id/file":"media.view","GET /v1/admin/content/review-input":"content.view","GET /v1/admin/content/status":"system.view","GET /v1/admin/diag/book-news":"system.view","GET /v1/admin/me":"*","GET /v1/admin/notify/me":"*","GET /v1/admin/notify/settings":"notifications.view","GET /v1/admin/notify/status":"notifications.view","GET /v1/admin/participants":"participants.view","GET /v1/admin/participants/:id":"participants.view","GET /v1/admin/participants/:id/avatar":"participants.view","GET /v1/admin/participants/export":["participants.view","exports.export_pii"],"GET /v1/admin/participants/review":"participants.view","GET /v1/admin/participants/settings":"participants.view","GET /v1/admin/points/seasons":"points.view","GET /v1/admin/points/seasons/:id/preview":"points.view","GET /v1/admin/proofs/:id":"bookings.view","GET /v1/admin/publish/revisions":"publish.publish","GET /v1/admin/publish/status":"system.view","GET /v1/admin/store/items":"store.view","GET /v1/admin/store/redemptions":"store.view","GET /v1/admin/store/schedule":"store.view","GET /v1/admin/whoami":"*","POST /v1/admin/accounts":"accounts.manage","POST /v1/admin/accounts/:email":"accounts.manage","POST /v1/admin/accounts/:email/name":"*","POST /v1/admin/accounts/:email/remove":"accounts.manage","POST /v1/admin/accounts/:email/signout":"accounts.manage","POST /v1/admin/accounts/enforce":"accounts.manage","POST /v1/admin/activity/manage/archive":"activity.manage","POST /v1/admin/activity/manage/delete":"activity.manage","POST /v1/admin/activity/manage/preview":"activity.manage","POST /v1/admin/book/bookings":"bookings.create_cash","POST /v1/admin/book/bookings/:id/cancel":"bookings.manage","POST /v1/admin/book/bookings/:id/confirm":"bookings.approve","POST /v1/admin/book/bookings/:id/link":"bookings.manage","POST /v1/admin/book/bookings/:id/lock":"bookings.edit","POST /v1/admin/book/bookings/:id/payments":["bookings.approve","finance.manage"],"POST /v1/admin/book/bookings/:id/reject":"bookings.approve","POST /v1/admin/book/bookings/:id/reopen":"bookings.manage","POST /v1/admin/book/bookings/:id/update":"bookings.edit","POST /v1/admin/book/claims/:id/reject":["bookings.approve","finance.manage"],"POST /v1/admin/book/events/:id/cancel-all":"bookings.manage","POST /v1/admin/book/events/:id/handovers":"finance.manage","POST /v1/admin/book/events/:id/notify":"bookings.manage","POST /v1/admin/book/events/:id/purge":"bookings.manage","POST /v1/admin/book/events/:id/reminders":"bookings.edit","POST /v1/admin/book/events/:slug/refresh":"bookings.edit","POST /v1/admin/book/handovers/:id/void":"finance.manage","POST /v1/admin/book/module":"bookings.manage","POST /v1/admin/book/payments/:id/void":"finance.manage","POST /v1/admin/book/servants/:id/purge":"bookings.manage","POST /v1/admin/bread/feasts":"bread.content","POST /v1/admin/bread/programs":"bread.content","POST /v1/admin/bread/programs/:id/activate":"bread.content","POST /v1/admin/bread/programs/:id/delete":"bread.content","POST /v1/admin/bread/programs/:id/stop":"bread.content","POST /v1/admin/bread/programs/:id/topics":"bread.content","POST /v1/admin/bread/saints/item":"bread.saints","POST /v1/admin/bread/saints/item/delete":"bread.saints","POST /v1/admin/bread/saints/item/restore":"bread.saints","POST /v1/admin/bread/saints/item/revert":"bread.saints","POST /v1/admin/bread/saints/publish":"bread.saints","POST /v1/admin/bread/saints/restore":"bread.saints","POST /v1/admin/bread/settings":"bread.content","POST /v1/admin/comp/:id/regrade":"competitions.approve","POST /v1/admin/comp/submissions/:id/grade":"competitions.edit","POST /v1/admin/comp/submissions/:id/void":"competitions.approve","POST /v1/admin/content/call":"*","POST /v1/admin/devices/forget":"*","POST /v1/admin/devices/trust":"*","POST /v1/admin/diag/echo":"system.manage","POST /v1/admin/diag/event-fixture":"system.manage","POST /v1/admin/diag/gmail-health":"system.manage","POST /v1/admin/diag/housekeeping":"system.manage","POST /v1/admin/diag/mail-sample":"system.manage","POST /v1/admin/diag/retention":"system.manage","POST /v1/admin/me/ask-access":"*","POST /v1/admin/me/avatar":"*","POST /v1/admin/me/avatar/delete":"*","POST /v1/admin/me/prefs":"*","POST /v1/admin/media/upload":"*","POST /v1/admin/notify/me":"*","POST /v1/admin/notify/outbox/:id/dismiss":"notifications.manage","POST /v1/admin/notify/settings":"notifications.manage","POST /v1/admin/participants":"participants.add","POST /v1/admin/participants/:id/avatar/delete":"participants.edit","POST /v1/admin/participants/:id/block":"participants.edit","POST /v1/admin/participants/:id/dob":"participants.manage","POST /v1/admin/participants/:id/eligibility":"participants.manage","POST /v1/admin/participants/:id/email":"participants.manage","POST /v1/admin/participants/:id/phone":"participants.manage","POST /v1/admin/participants/:id/points":"points.edit","POST /v1/admin/participants/:id/profile":"participants.edit","POST /v1/admin/participants/:id/resend":"participants.view","POST /v1/admin/participants/:id/reset-password":"participants.manage","POST /v1/admin/participants/:id/sessions/revoke":"participants.manage","POST /v1/admin/participants/:id/transfer":"points.approve","POST /v1/admin/participants/:id/unblock":"participants.manage","POST /v1/admin/participants/:id/view-password":"participants.view","POST /v1/admin/participants/settings":"participants.manage","POST /v1/admin/points/seasons":"points.approve","POST /v1/admin/points/seasons/:id/close":"points.approve","POST /v1/admin/proofs":"bookings.edit","POST /v1/admin/publish/restore":"publish.publish","POST /v1/admin/publish/shadow-check":"system.manage","POST /v1/admin/push/auto":"push.view","POST /v1/admin/push/check":"push.view","POST /v1/admin/push/devices":"*","POST /v1/admin/push/remove":"*","POST /v1/admin/push/schedule":"push.view","POST /v1/admin/push/schedule/cancel":"push.manage","POST /v1/admin/push/send":"push.manage","POST /v1/admin/push/state":"push.view","POST /v1/admin/push/subscribe":"*","POST /v1/admin/push/test":"*","POST /v1/admin/push/unsubscribe":"*","POST /v1/admin/session/end":"*","POST /v1/admin/session/heartbeat":"*","POST /v1/admin/session/renew":"*","POST /v1/admin/session/resume":"*","POST /v1/admin/session/start":"*","POST /v1/admin/store/items":"store.edit","POST /v1/admin/store/items/:id/delete":"store.delete","POST /v1/admin/store/redemptions/:id/status":"store.approve","POST /v1/admin/store/schedule":"store.edit","POST /v1/admin/tools/admins":"accounts.view","POST /v1/admin/tools/fetch-media":"media.add","POST /v1/admin/tools/github":"system.view","POST /v1/admin/tools/live-stage":"content.edit","POST /v1/admin/tools/maps":"content.edit","POST /v1/admin/tools/media":"media.view","POST /v1/admin/tools/migrate":"system.manage","POST /v1/admin/tools/migration":"system.manage"};
 A.FN_PERMS = {"apiActivity":"activity.view","apiAddAdmin":"accounts.manage","apiAdminPushDevices":"*","apiAdminPushRemoveDevice":"*","apiAdminPushSubscribe":"*","apiAdminPushUnsubscribe":"*","apiAdmins":"accounts.view","apiAgeRules":"competitions.view","apiAgeRulesSave":"competitions.edit","apiBadges":"*","apiCheckGithub":"system.view","apiCheckMedia":"media.view","apiComp":"competitions.view","apiCompArchive":"competitions.edit","apiCompClose":"competitions.edit","apiCompCreate":"competitions.add","apiCompDelete":"competitions.delete","apiCompDuplicate":"competitions.add","apiCompExport":"exports.export","apiCompFinalize":"competitions.approve","apiCompGrade":"competitions.approve","apiCompGradeGroup":"competitions.approve","apiCompImportApply":"competitions.edit","apiCompImportPreview":"competitions.edit","apiCompPreviewDefinition":"competitions.view","apiCompPreviewGrade":"competitions.view","apiCompQuestionDelete":"competitions.delete","apiCompQuestionDuplicate":"competitions.edit","apiCompQuestionSave":"competitions.edit","apiCompQuestionsReorder":"competitions.edit","apiCompRegrade":"competitions.approve","apiCompResults":"competitions.view","apiCompReviewQueue":"competitions.view","apiCompSave":"competitions.edit","apiCompSettings":"competitions.edit","apiCompSubmission":"competitions.view","apiCompSubmissions":"competitions.view","apiCompVoid":"competitions.approve","apiComps":"competitions.view","apiDeleteContact":"content.delete","apiDeleteItem":"content.delete","apiDeleteLink":"content.delete","apiDeleteMedia":"media.delete","apiDeleteSection":"content.delete","apiDuplicateItem":"content.edit","apiEvent":"events.view","apiEventArchive":"events.edit","apiEventDelete":"events.delete","apiEventSave":"events.edit","apiEventSetEnabled":"events.edit","apiEvents":"events.view","apiFetchMediaUrl":"media.add","apiForgetDevice":"*","apiHeartbeat":"*","apiHomeOrder":"content.edit","apiImportApply":"content.edit","apiImportPreview":"content.edit","apiMediaLibrary":"media.view","apiMediaPreview":"media.view","apiMigrate":"system.manage","apiMoveContact":"content.edit","apiMoveLink":"content.edit","apiMoveSection":"content.edit","apiPage":"content.view","apiPageArchive":"content.edit","apiPageDelete":"content.delete","apiPageMediaDelete":"content.delete","apiPageMediaOrder":"content.edit","apiPageMediaSave":"content.edit","apiPagePreview":"content.view","apiPageSave":"content.edit","apiPageSetEnabled":"content.edit","apiPages":"content.view","apiParticipant":"participants.view","apiParticipantCode":"participants.edit","apiParticipantCodes":"participants.edit","apiParticipantResetCode":"participants.edit","apiParticipantSave":"participants.edit","apiParticipantSetActive":"participants.edit","apiParticipants":"participants.view","apiParticipantsAssign":"participants.edit","apiParticipantsImportApply":"participants.add","apiParticipantsImportPreview":"participants.add","apiParticipantsResetCodes":"participants.edit","apiParticipantsUndoImport":"participants.add","apiPayMethodsSave":"finance.manage","apiPlanMigration":"system.manage","apiPreview":"content.view","apiPublish":"publish.publish","apiPublishRefresh":"content.view","apiPurgeMedia":"media.delete","apiPushAuto":"push.manage","apiPushCheck":"push.view","apiPushSchedule":"push.view","apiPushScheduleCancel":"push.manage","apiPushState":"push.view","apiRemoveAdmin":"accounts.manage","apiResolveMapsUrl":"content.edit","apiRestoreMedia":"media.add","apiReview":"content.view","apiSaveContact":"content.edit","apiSaveItem":"content.edit","apiSaveLink":"content.edit","apiSaveSection":"content.edit","apiSaveSettings":"content.edit","apiSeasonClose":"competitions.approve","apiSeasonClosePreview":"competitions.view","apiSeasonSave":"competitions.edit","apiSeasons":"competitions.view","apiSendPush":"push.manage","apiServantDelete":"events.delete","apiServantPayApprove":"finance.manage","apiServantSave":"finance.manage","apiServantSetActive":"events.edit","apiServants":"events.view","apiSessionEnd":"*","apiSessionResume":"*","apiSessionStart":"*","apiSetAdminName":"*","apiSetItemArchived":"content.edit","apiSetItemEnabled":"content.edit","apiSetLinkEnabled":"content.edit","apiSetLiveStage":"content.edit","apiSetMediaAlt":"media.add","apiSetSectionEnabled":"content.edit","apiShopItemDelete":"store.delete","apiShopItemSave":"store.edit","apiShopItems":"store.view","apiShopRedemptionStatus":"store.approve","apiShopRedemptions":"store.view","apiShopSchedule":"store.view","apiShopScheduleSave":"store.edit","apiState":"*","apiTrustDevice":"*","apiUpdateMedia":"media.add","apiUploadMedia":"media.add","apiWallet":"points.view","apiWalletAdjust":"points.edit","apiWalletParticipant":"points.view","apiWalletSync":"points.edit","apiWorkerSession":"*"};
 A.OWN_SCOPE_ROUTES = ["POST /v1/admin/book/bookings"];

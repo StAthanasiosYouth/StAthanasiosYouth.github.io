@@ -326,10 +326,11 @@
       subs: SUBS.map(function (s) { return { key: s.key, label: s.label }; })
     });
     A.sub.bread = A.sub.bread || 'breadprograms';
-    if (A.AREA_NEEDS) A.AREA_NEEDS.bread = ['bread.content', 'bread.stats', 'bread.reflections'];
+    if (A.AREA_NEEDS) A.AREA_NEEDS.bread = ['bread.content', 'bread.stats', 'bread.reflections', 'bread.saints'];
     if (A.SUB_NEEDS) {
       ['breadprograms', 'breadnew', 'breadfeasts', 'breadsettings'].forEach(function (k) { A.SUB_NEEDS[k] = ['bread.content']; });
       A.SUB_NEEDS.breadstats = ['bread.stats'];
+      A.SUB_NEEDS.breadpeople = A.SUB_NEEDS.breadoccasions = ['bread.saints'];
     }
     // «برنامج جديد» pressed again on its own tab: back to step 1 (a file half-way stays until then)
     // the tab again: back to the file step; a St-Takla month (W7) goes back to step 1, where its card is
@@ -387,6 +388,7 @@
     }).then(function () {
       loading = null;
       paintWaits();
+      if (BR.onSettings) BR.onSettings(BR.programs && BR.programs.settings);
       redraw('breadprograms');
       return BR.programs;
     });
@@ -613,6 +615,7 @@
   function setMuted(on, control) {
     return A.withBusy(control, api('POST', 'settings', { emptyMuted: !!on })).then(function (reply) {
       if (BR.programs && reply && reply.settings) BR.programs.settings = reply.settings;
+      if (BR.onSettings && reply && reply.settings) BR.onSettings(reply.settings);
       A.toast(on ? 'اتكتم لحد ما يترفع برنامج جديد' : 'التنبيه رجع');
       paintWaits();
       A.render();
@@ -947,8 +950,13 @@
     if (cur && cur.loading) return;
     BR.feasts[month] = { list: cur ? cur.list : [], published: cur ? cur.published : null, loading: true, error: null };
     var sug = suggested ? Promise.resolve({ ready: true, feasts: suggested }) : api('GET', 'suggest?month=' + month).catch(function () { return { ready: false }; });
-    Promise.all([sug, api('GET', 'feasts?month=' + month)]).then(function (both) {
-      BR.feasts[month] = feastsFrom(month, both[0] && both[0].ready ? both[0].feasts : [], both[1]);
+    // P3: the published saints registry too — a day completed and published today is here today, with no new suggestion
+    var reg = api('GET', 'saints/feasts?month=' + month).catch(function () { return { ready: false }; });
+    Promise.all([sug, api('GET', 'feasts?month=' + month), reg]).then(function (both) {
+      var list = both[0] && both[0].ready ? both[0].feasts.slice() : [];
+      // St-Takla's suggestion keeps its day (the synaxarium's word); the registry adds the days it does not have
+      if (both[2] && both[2].ready) both[2].feasts.forEach(function (f) { if (!list.some(function (x) { return x.date === f.date; })) list.push(f); });
+      BR.feasts[month] = feastsFrom(month, list, both[1]);
       A.render();
     }).catch(function (error) {
       BR.feasts[month] = { list: [], published: null, loading: false, error: error };
@@ -1796,10 +1804,15 @@
         ]),
         setcard('bread', 'القسم في الموقع', '', [
           setrow('«خبزنا اليومي» على الموقع', s.module ? 'مفتوح للشباب' : 'بيتفتح يوم الإطلاق (W7)، بعد تجربة Staging', el('span', { class: 'chip ' + (s.module ? 'chip--ok' : 'chip--off'), text: s.module ? 'مفتوح' : 'مقفول' })),
-          setrow('الكارت في الرئيسية واللينك في القايمة', '/daily-bread/', el('span', { class: 'chip ' + (s.module ? 'chip--ok' : 'chip--off'), text: s.module ? 'ظاهرين' : 'مع فتح القسم' }))
+          setrow('الكارت في الرئيسية واللينك في القايمة', '/daily-bread/', el('span', { class: 'chip ' + (s.module ? 'chip--ok' : 'chip--off'), text: s.module ? 'ظاهرين' : 'مع فتح القسم' })),
+          // P3: the saints registry in the admin (BREAD_SAINTS), the Primary Admin's switch
+          setrow('سجل الشخصيات في الأدمن', s.saints ? '«الشخصيات» و«المناسبات» مفتوحين' : 'مقفول: التبويبين مش ظاهرين', sw(!!s.saints, 'سجل الشخصيات', function (event) { saveSetting({ saints: event.target.checked }, event.target); }, !(A.access && A.access.primary)), { 'data-act': 'bread-saints-switch' })
         ]))));
     return [r];
   };
+
+  /* P3: the section's own pieces, for the saints registry (apps-script/AdminSaints.html) */
+  BR.kit = { api: api, card: card, btn: btn, tag: tag, sw: sw, note: note, stack: stack, cols: cols, root: root, skeleton: skeleton, failed: failed, typedConfirm: typedConfirm, hasPerm: hasPerm, nameOf: nameOf, clock: clock, shortDate: shortDate, dayWords: dayWords, monthName: monthName, cairoToday: cairoToday, cairoMonth: cairoMonth, onTab: onTab, redraw: redraw, W: W, locked: locked };
 
 })();
 </script>

@@ -14,7 +14,8 @@
  *   GET  /v1/admin/bread/reflections?program=&before=
  *   GET  /v1/admin/bread/suggest?month=YYYY-MM          St-Takla's suggestions for the month (W7)
  *   POST /v1/admin/bread/feasts { month, feasts }        the month's feasts, published by date (W7)
- *   GET  /v1/admin/bread/settings · POST /v1/admin/bread/settings { defaultTime, maxSlots, emptyMuted, module, push }
+ *   GET  /v1/admin/bread/settings · POST /v1/admin/bread/settings { defaultTime, maxSlots, emptyMuted, module, push, saints }
+ *   (the saints registry, P3: bread/saints-admin.js)
  *
  * The upload is split: the Worker's 10 ms never parse a whole Excel or a whole program (STUDY §7.1).
  */
@@ -339,7 +340,7 @@ export async function adminBreadSettingsSave(ctx) {
     if (typeof b.emptyMuted !== 'boolean') throw bad('الطلب مش مفهوم.');
     stmts.push(settingStmt(db, 'BREAD_EMPTY_MUTED', b.emptyMuted ? '1' : '0', by, now)); changed.push('emptyMuted');
   }
-  for (const [k, key] of [['module', 'BREAD_MODULE'], ['push', 'BREAD_PUSH']]) {
+  for (const [k, key] of [['module', 'BREAD_MODULE'], ['push', 'BREAD_PUSH'], ['saints', 'BREAD_SAINTS']]) {
     if (b[k] === undefined) continue;
     if (typeof b[k] !== 'boolean') throw bad('الطلب مش مفهوم.');
     if (ctx.env.ENVIRONMENT !== 'staging' && ctx.env.ENVIRONMENT !== 'test' && ctx.actor.role !== 'primary') throw new ApiError('denied', 'primary only', { perm: 'primary' });

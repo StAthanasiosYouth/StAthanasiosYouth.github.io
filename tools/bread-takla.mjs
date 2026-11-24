@@ -21,7 +21,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as T from './lib/takla.mjs';
 import { BOOKS, parseRef } from '../assets/js/bread/refs.js';
-import { load as loadSaints, feastsOfMonth } from './lib/saints.mjs';
+import { loadForFeasts as loadSaints, feastsOfMonth } from './lib/saints.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SITE = 'https://st-takla.org/';

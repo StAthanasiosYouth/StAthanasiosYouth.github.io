@@ -122,7 +122,7 @@ test('0033: the tables, the settings off by default, bread_look on participants'
   const tables = db.raw.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map(r => r.name);
   for (const t of ['bread_programs', 'bread_topics', 'bread_members', 'bread_slots', 'bread_reflections', 'bread_opens', 'bread_daily']) assert.ok(tables.includes(t), t);
   const s = Object.fromEntries(db.raw.prepare("SELECT key, value FROM settings WHERE key LIKE 'BREAD%' OR key LIKE 'bread%'").all().map(r => [r.key, r.value]));
-  assert.deepEqual(s, { BREAD_MODULE: '0', BREAD_PUSH: '0', BREAD_EMPTY_MUTED: '0', bread_default_time: '08:00', bread_max_slots: '3' });
+  assert.deepEqual(s, { BREAD_MODULE: '0', BREAD_PUSH: '0', BREAD_EMPTY_MUTED: '0', bread_default_time: '08:00', bread_max_slots: '3', BREAD_SAINTS: '0' }, 'P3 (0035) adds BREAD_SAINTS, off');
   assert.ok(db.raw.prepare('PRAGMA table_info(participants)').all().some(c => c.name === 'bread_look'));
   assert.ok(db.raw.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'bread_slots_minute'").get());
 });
