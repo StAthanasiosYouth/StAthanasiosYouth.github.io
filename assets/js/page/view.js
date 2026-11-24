@@ -19,6 +19,7 @@
  */
 
 import { h } from '../dom.js';
+import { homePath } from '../home-path.js';
 import { formatStamp, formatTime, arabicDigits } from '../words.js';
 import { stampToMinutes } from '../schedule.js';
 import {
@@ -115,7 +116,7 @@ const paragraphs = (text, className) => text.split(/\n{2,}/).map(part => h('p', 
 
 export function createView({ main, live, rootUrl, mediaUrl, onClip }) {
 
-  const homeHref = new URL('index.html', rootUrl).href;
+  const homeHref = new URL(homePath(), rootUrl).href;
 
   function announce(message) {
     if (!live) return;

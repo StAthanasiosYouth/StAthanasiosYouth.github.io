@@ -18,6 +18,7 @@
  */
 
 import { accountBadge } from './account/link.js';
+import { homePath } from './home-path.js';
 
 const ROOT = new URL('../../', import.meta.url);
 const PHONE = '(max-width: 767px)';
@@ -316,7 +317,7 @@ let shownWindow = '';
 function placeTab(place, current) {
   const link = document.createElement('a');
   link.className = 'tabbar__tab';
-  link.href = place.key === 'top' ? new URL('index.html', ROOT).href : new URL('index.html#to-' + place.key, ROOT).href;
+  link.href = place.key === 'top' ? new URL(homePath(), ROOT).href : new URL(homePath() + '#to-' + place.key, ROOT).href;
   link.dataset.tab = place.key;
   if (place.key === 'top') link.append(icon('home'));
   // the icon chosen for the section in the admin (home.js tabIcon), else the place's own
@@ -440,9 +441,9 @@ function buildBar() {
   slots.className = 'tabbar__slots';
   bar.append(slots);
   if (!onHome()) {
-    const home = tab(new URL('index.html', ROOT).href, 'home', 'الرئيسية');
+    const home = tab(new URL(homePath(), ROOT).href, 'home', 'الرئيسية');
     home.addEventListener('click', goHome);
-    slots.append(home, tab(new URL('index.html#activities', ROOT).href, 'events', 'الفعاليات'), tab(new URL('points/', ROOT).href, 'comps', 'المسابقات'));
+    slots.append(home, tab(new URL(homePath() + '#activities', ROOT).href, 'events', 'الفعاليات'), tab(new URL('points/', ROOT).href, 'comps', 'المسابقات'));
   }
   // «حسابي» never moves: the account icon itself (its face, its sign-in and «ارجع للموقع» rules), with a word
   const account = accountBadge(bar, ROOT, { cls: 'tabbar__tab tabbar__fixed', caption: 'حسابي' });
@@ -564,7 +565,7 @@ async function openMore(button) {
       else if (item.url) { link.href = item.url; link.target = '_blank'; link.rel = 'noopener'; }
       else if (item.href) link.href = item.href;
       else {
-        link.href = new URL('index.html#to-' + item.key, ROOT).href;
+        link.href = new URL(homePath() + '#to-' + item.key, ROOT).href;
         link.addEventListener('click', event => {
           if (!onHome()) return;
           event.preventDefault();

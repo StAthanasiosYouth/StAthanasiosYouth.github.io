@@ -11,6 +11,7 @@
  */
 
 import { h } from '../dom.js';
+import { homePath } from '../home-path.js';
 import { iconNode } from '../icons.js';
 import { MONTH_NAMES, arabicDigits, relativeTime, stampDate, eventWhen } from '../words.js';
 import { isPublished, visibilityState } from '../schedule.js';
@@ -161,7 +162,7 @@ export function createLists({ show, picture, rootUrl, homeHref, announce }) {
 
   function newsCard(item, nowStamp) {
     const fresh = !!item.publishAt && item.publishAt.slice(0, 10) === nowStamp.slice(0, 10);
-    const card = h('a', { class: 's2-nw', href: new URL(`index.html#news/${item.id}`, rootUrl).href },
+    const card = h('a', { class: 's2-nw', href: new URL(`${homePath()}#news/${item.id}`, rootUrl).href },
       h('span', { class: 's2-nw__ic', 'aria-hidden': 'true' }, iconNode(item.icon || 'megaphone')),
       h('div', {}, h('b', {}, item.title), item.publishAt ? h('small', {}, relativeTime(item.publishAt, nowStamp)) : null),
       fresh ? h('span', { class: 's2-nw__new' }, 'جديد') : null);

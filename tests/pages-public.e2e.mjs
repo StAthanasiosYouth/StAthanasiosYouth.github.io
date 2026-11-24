@@ -544,7 +544,7 @@ test('a withdrawn page says so, with the way home', async () => {
   await ready(page);
   assert.equal(await page.$eval('main', el => el.dataset.state), 'unavailable');
   assert.equal(await textOf(page, '.pg-empty__title'), 'الصفحة دي مش متاحة دلوقتي');
-  assert.equal(await page.$eval('.pg-empty a', a => a.href), `${BASE}/index.html`);
+  assert.equal(await page.$eval('.pg-empty a', a => a.href), `${BASE}/`, 'home in a tab: the clean address');
   assert.deepEqual(problems, []);
   await context.close();
 });
@@ -561,7 +561,7 @@ test('/events/: the published events, linked same-tab', async () => {
   await ready(page);
   assert.equal(await textOf(page, '.evlist__title'), 'الفعاليات');
   // the «الكل ‹» page (S2): back to the home, the month, the home's poster cards
-  assert.equal(await page.$eval('.all-back', a => a.href), `${BASE}/index.html`);
+  assert.equal(await page.$eval('.all-back', a => a.href), `${BASE}/`, 'home in a tab: the clean address');
   const cards = await page.$$eval('.all-grid .s2-ev', els => els.map(el => ({ href: el.href, target: el.target, tag: el.querySelector('.s2-ev__tag').textContent })));
   await page.screenshot({ path: `${SHOTS}events-360.png`, fullPage: true });
   assert.deepEqual(cards, [{ href: `${BASE}/events/ain-sokhna-trip/`, target: '', tag: 'احجز الآن' }]);

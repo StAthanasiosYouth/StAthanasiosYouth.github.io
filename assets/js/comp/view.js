@@ -10,6 +10,7 @@
  */
 
 import { h } from '../dom.js';
+import { homePath } from '../home-path.js';
 import {
   ar, countQuestions, countPoints, countMinutesShort, stampText, startsInText, answerText,
   isAnswered, progress, unanswered, resultSummary, LIMITS
@@ -107,7 +108,7 @@ export function createView({ main, live, timer, net, rootUrl, mediaUrl }) {
   let lastModel = null;
 
   const resolve = src => mediaUrl(src);
-  const homeHref = new URL('index.html', rootUrl).href;
+  const homeHref = new URL(homePath(), rootUrl).href;
 
   function picture(image, { className = '', sizes = '(min-width: 760px) 680px, 92vw', eager = false } = {}) {
     if (!image) return null;
