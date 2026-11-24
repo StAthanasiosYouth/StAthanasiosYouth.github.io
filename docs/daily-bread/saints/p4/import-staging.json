@@ -1,0 +1,581 @@
+{
+ "env": "staging",
+ "at": "2026-11-24T16:00:20.430Z",
+ "media": {
+  "mary-1": {
+   "id": "img-e7cd29a6",
+   "path": "media/2026/img-e7cd29a6.webp",
+   "thumb": "media/2026/img-e7cd29a6-480.webp"
+  },
+  "michael-1": {
+   "id": "img-34b63968",
+   "path": "media/2026/img-34b63968.webp",
+   "thumb": "media/2026/img-34b63968-480.webp"
+  },
+  "gabriel-1": {
+   "id": "img-848af1d1",
+   "path": "media/2026/img-848af1d1.webp",
+   "thumb": "media/2026/img-848af1d1-480.webp"
+  },
+  "raphael-1": {
+   "id": "img-99c12563",
+   "path": "media/2026/img-99c12563.webp",
+   "thumb": "media/2026/img-99c12563-480.webp"
+  },
+  "suriel-1": {
+   "id": "img-2f2e5134",
+   "path": "media/2026/img-2f2e5134.webp",
+   "thumb": "media/2026/img-2f2e5134-480.webp"
+  },
+  "moses-1": {
+   "id": "img-35838c05",
+   "path": "media/2026/img-35838c05.webp",
+   "thumb": "media/2026/img-35838c05-480.webp"
+  },
+  "elijah-1": {
+   "id": "img-3f0cdfa7",
+   "path": "media/2026/img-3f0cdfa7.webp",
+   "thumb": "media/2026/img-3f0cdfa7-480.webp"
+  },
+  "daniel-1": {
+   "id": "img-b31c6c52",
+   "path": "media/2026/img-b31c6c52.webp",
+   "thumb": "media/2026/img-b31c6c52-480.webp"
+  },
+  "jeremiah-1": {
+   "id": "img-b10abd1c",
+   "path": "media/2026/img-b10abd1c.webp",
+   "thumb": "media/2026/img-b10abd1c-480.webp"
+  },
+  "threeyouths-1": {
+   "id": "img-b39e64ed",
+   "path": "media/2026/img-b39e64ed.webp",
+   "thumb": "media/2026/img-b39e64ed-480.webp"
+  },
+  "baptist-1": {
+   "id": "img-ee314e86",
+   "path": "media/2026/img-ee314e86.webp",
+   "thumb": "media/2026/img-ee314e86-480.webp"
+  },
+  "mark-1": {
+   "id": "img-496e549e",
+   "path": "media/2026/img-496e549e.webp",
+   "thumb": "media/2026/img-496e549e-480.webp"
+  },
+  "peterpaul-1": {
+   "id": "img-615bfc5d",
+   "path": "media/2026/img-615bfc5d.webp",
+   "thumb": "media/2026/img-615bfc5d-480.webp"
+  },
+  "stephen-1": {
+   "id": "img-bc8865b9",
+   "path": "media/2026/img-bc8865b9.webp",
+   "thumb": "media/2026/img-bc8865b9-480.webp"
+  },
+  "mercurius-1": {
+   "id": "img-1d1d86c3",
+   "path": "media/2026/img-1d1d86c3.webp",
+   "thumb": "media/2026/img-1d1d86c3-480.webp"
+  },
+  "george-1": {
+   "id": "img-7999771c",
+   "path": "media/2026/img-7999771c.webp",
+   "thumb": "media/2026/img-7999771c-480.webp"
+  },
+  "mina-1": {
+   "id": "img-dc9a91df",
+   "path": "media/2026/img-dc9a91df.webp",
+   "thumb": "media/2026/img-dc9a91df-480.webp"
+  },
+  "theodore-1": {
+   "id": "img-e71d84e9",
+   "path": "media/2026/img-e71d84e9.webp",
+   "thumb": "media/2026/img-e71d84e9-480.webp"
+  },
+  "theodoreeast-1": {
+   "id": "img-ee42f92f",
+   "path": "media/2026/img-ee42f92f.webp",
+   "thumb": "media/2026/img-ee42f92f-480.webp"
+  },
+  "abaskhiron-1": {
+   "id": "img-afd63ef1",
+   "path": "media/2026/img-afd63ef1.webp",
+   "thumb": "media/2026/img-afd63ef1-480.webp"
+  },
+  "abufam-1": {
+   "id": "img-728b6d5d",
+   "path": "media/2026/img-728b6d5d.webp",
+   "thumb": "media/2026/img-728b6d5d-480.webp"
+  },
+  "victor-1": {
+   "id": "img-77f02e42",
+   "path": "media/2026/img-77f02e42.webp",
+   "thumb": "media/2026/img-77f02e42-480.webp"
+  },
+  "abakir-1": {
+   "id": "img-952756e1",
+   "path": "media/2026/img-952756e1.webp",
+   "thumb": "media/2026/img-952756e1-480.webp"
+  },
+  "abanoub-1": {
+   "id": "img-7c06169b",
+   "path": "media/2026/img-7c06169b.webp",
+   "thumb": "media/2026/img-7c06169b-480.webp"
+  },
+  "sergius-1": {
+   "id": "img-b94a037c",
+   "path": "media/2026/img-b94a037c.webp",
+   "thumb": "media/2026/img-b94a037c-480.webp"
+  },
+  "james-1": {
+   "id": "img-f34e941a",
+   "path": "media/2026/img-f34e941a.webp",
+   "thumb": "media/2026/img-f34e941a-480.webp"
+  },
+  "bidaba-1": {
+   "id": "img-603b6c7c",
+   "path": "media/2026/img-603b6c7c.webp",
+   "thumb": "media/2026/img-603b6c7c-480.webp"
+  },
+  "sevenanthony-1": {
+   "id": "img-6990cea0",
+   "path": "media/2026/img-6990cea0.webp",
+   "thumb": "media/2026/img-6990cea0-480.webp"
+  },
+  "sidhom-1": {
+   "id": "img-a9a54e54",
+   "path": "media/2026/img-a9a54e54.webp",
+   "thumb": "media/2026/img-a9a54e54-480.webp"
+  },
+  "demiana-1": {
+   "id": "img-f1b484e8",
+   "path": "media/2026/img-f1b484e8.webp",
+   "thumb": "media/2026/img-f1b484e8-480.webp"
+  },
+  "marina-1": {
+   "id": "img-2340b967",
+   "path": "media/2026/img-2340b967.webp",
+   "thumb": "media/2026/img-2340b967-480.webp"
+  },
+  "barbara-1": {
+   "id": "img-e6322754",
+   "path": "media/2026/img-e6322754.webp",
+   "thumb": "media/2026/img-e6322754-480.webp"
+  },
+  "rebecca-1": {
+   "id": "img-a7a0b190",
+   "path": "media/2026/img-a7a0b190.webp",
+   "thumb": "media/2026/img-a7a0b190-480.webp"
+  },
+  "cosmasdamian-1": {
+   "id": "img-a0163a1c",
+   "path": "media/2026/img-a0163a1c.webp",
+   "thumb": "media/2026/img-a0163a1c-480.webp"
+  },
+  "julius-1": {
+   "id": "img-1902221d",
+   "path": "media/2026/img-1902221d.webp",
+   "thumb": "media/2026/img-1902221d-480.webp"
+  },
+  "modernmartyrs-1": {
+   "id": "img-517129d9",
+   "path": "media/2026/img-517129d9.webp",
+   "thumb": "media/2026/img-517129d9-480.webp"
+  },
+  "minaaboud-1": {
+   "id": "img-5fad1333",
+   "path": "media/2026/img-5fad1333.webp",
+   "thumb": "media/2026/img-5fad1333-480.webp"
+  },
+  "anthony-1": {
+   "id": "img-92bc6766",
+   "path": "media/2026/img-92bc6766.webp",
+   "thumb": "media/2026/img-92bc6766-480.webp"
+  },
+  "paul-1": {
+   "id": "img-7cbf069f",
+   "path": "media/2026/img-7cbf069f.webp",
+   "thumb": "media/2026/img-7cbf069f-480.webp"
+  },
+  "macarius-1": {
+   "id": "img-0a7973dd",
+   "path": "media/2026/img-0a7973dd.webp",
+   "thumb": "media/2026/img-0a7973dd-480.webp"
+  },
+  "macariusalex-1": {
+   "id": "img-70408c8c",
+   "path": "media/2026/img-70408c8c.webp",
+   "thumb": "media/2026/img-70408c8c-480.webp"
+  },
+  "bishoy-1": {
+   "id": "img-b31c8296",
+   "path": "media/2026/img-b31c8296.webp",
+   "thumb": "media/2026/img-b31c8296-480.webp"
+  },
+  "mosesblack-1": {
+   "id": "img-87ad1e76",
+   "path": "media/2026/img-87ad1e76.webp",
+   "thumb": "media/2026/img-87ad1e76-480.webp"
+  },
+  "johnshort-1": {
+   "id": "img-62c45301",
+   "path": "media/2026/img-62c45301.webp",
+   "thumb": "media/2026/img-62c45301-480.webp"
+  },
+  "maximus-1": {
+   "id": "img-dfa73d68",
+   "path": "media/2026/img-dfa73d68.webp",
+   "thumb": "media/2026/img-dfa73d68-480.webp"
+  },
+  "pachom-1": {
+   "id": "img-66ec8fba",
+   "path": "media/2026/img-66ec8fba.webp",
+   "thumb": "media/2026/img-66ec8fba-480.webp"
+  },
+  "shenoute-1": {
+   "id": "img-b08086bc",
+   "path": "media/2026/img-b08086bc.webp",
+   "thumb": "media/2026/img-b08086bc-480.webp"
+  },
+  "karas-1": {
+   "id": "img-6181d42c",
+   "path": "media/2026/img-6181d42c.webp",
+   "thumb": "media/2026/img-6181d42c-480.webp"
+  },
+  "samuel-1": {
+   "id": "img-c4633565",
+   "path": "media/2026/img-c4633565.webp",
+   "thumb": "media/2026/img-c4633565-480.webp"
+  },
+  "takla-1": {
+   "id": "img-46d64c15",
+   "path": "media/2026/img-46d64c15.webp",
+   "thumb": "media/2026/img-46d64c15-480.webp"
+  },
+  "barsoum-1": {
+   "id": "img-b5f98667",
+   "path": "media/2026/img-b5f98667.webp",
+   "thumb": "media/2026/img-b5f98667-480.webp"
+  },
+  "reweis-1": {
+   "id": "img-3ec207c4",
+   "path": "media/2026/img-3ec207c4.webp",
+   "thumb": "media/2026/img-3ec207c4-480.webp"
+  },
+  "hedraaswan-1": {
+   "id": "img-b9b75524",
+   "path": "media/2026/img-b9b75524.webp",
+   "thumb": "media/2026/img-b9b75524-480.webp"
+  },
+  "sarapamonabutarha-1": {
+   "id": "img-2909d02b",
+   "path": "media/2026/img-2909d02b.webp",
+   "thumb": "media/2026/img-2909d02b-480.webp"
+  },
+  "yohanneskama-1": {
+   "id": "img-f058e6c2",
+   "path": "media/2026/img-f058e6c2.webp",
+   "thumb": "media/2026/img-f058e6c2-480.webp"
+  },
+  "marycopt-1": {
+   "id": "img-0742dd52",
+   "path": "media/2026/img-0742dd52.webp",
+   "thumb": "media/2026/img-0742dd52-480.webp"
+  },
+  "verena-1": {
+   "id": "img-d76efce5",
+   "path": "media/2026/img-d76efce5.webp",
+   "thumb": "media/2026/img-d76efce5-480.webp"
+  },
+  "athanasius-1": {
+   "id": "img-43a81d81",
+   "path": "media/2026/img-43a81d81.webp",
+   "thumb": "media/2026/img-43a81d81-480.webp"
+  },
+  "peterseal-1": {
+   "id": "img-7a8662b2",
+   "path": "media/2026/img-7a8662b2.webp",
+   "thumb": "media/2026/img-7a8662b2-480.webp"
+  },
+  "cyril-1": {
+   "id": "img-a89fa1d1",
+   "path": "media/2026/img-a89fa1d1.webp",
+   "thumb": "media/2026/img-a89fa1d1-480.webp"
+  },
+  "dioscorus-1": {
+   "id": "img-295eeb3c",
+   "path": "media/2026/img-295eeb3c.webp",
+   "thumb": "media/2026/img-295eeb3c-480.webp"
+  },
+  "matthew1-1": {
+   "id": "img-f8441bd5",
+   "path": "media/2026/img-f8441bd5.webp",
+   "thumb": "media/2026/img-f8441bd5-480.webp"
+  },
+  "cyril4-1": {
+   "id": "img-ab9d0656",
+   "path": "media/2026/img-ab9d0656.webp",
+   "thumb": "media/2026/img-ab9d0656-480.webp"
+  },
+  "cyril5-1": {
+   "id": "img-97f072c1",
+   "path": "media/2026/img-97f072c1.webp",
+   "thumb": "media/2026/img-97f072c1-480.webp"
+  },
+  "cyril6-1": {
+   "id": "img-222c2f7f",
+   "path": "media/2026/img-222c2f7f.webp",
+   "thumb": "media/2026/img-222c2f7f-480.webp"
+  },
+  "shenouda3-1": {
+   "id": "img-53b5aa99",
+   "path": "media/2026/img-53b5aa99.webp",
+   "thumb": "media/2026/img-53b5aa99-480.webp"
+  },
+  "tawadros2-1": {
+   "id": "img-694a235c",
+   "path": "media/2026/img-694a235c.webp",
+   "thumb": "media/2026/img-694a235c-480.webp"
+  },
+  "abraam-1": {
+   "id": "img-91025eda",
+   "path": "media/2026/img-91025eda.webp",
+   "thumb": "media/2026/img-91025eda-480.webp"
+  },
+  "yousababah-1": {
+   "id": "img-83672589",
+   "path": "media/2026/img-83672589.webp",
+   "thumb": "media/2026/img-83672589-480.webp"
+  },
+  "sarapamonkhartoum-1": {
+   "id": "img-0c5f2b0a",
+   "path": "media/2026/img-0c5f2b0a.webp",
+   "thumb": "media/2026/img-0c5f2b0a-480.webp"
+  },
+  "kirolloskena-1": {
+   "id": "img-4a2d1387",
+   "path": "media/2026/img-4a2d1387.webp",
+   "thumb": "media/2026/img-4a2d1387-480.webp"
+  },
+  "makariosqena-1": {
+   "id": "img-ec700ec1",
+   "path": "media/2026/img-ec700ec1.webp",
+   "thumb": "media/2026/img-ec700ec1-480.webp"
+  },
+  "theophilus-1": {
+   "id": "img-0f208112",
+   "path": "media/2026/img-0f208112.webp",
+   "thumb": "media/2026/img-0f208112-480.webp"
+  },
+  "theophilus-2": {
+   "id": "img-c55923f4",
+   "path": "media/2026/img-c55923f4.webp",
+   "thumb": "media/2026/img-c55923f4-480.webp"
+  },
+  "theophilus-3": {
+   "id": "img-cb46a27b",
+   "path": "media/2026/img-cb46a27b.webp",
+   "thumb": "media/2026/img-cb46a27b-480.webp"
+  },
+  "theophilus-4": {
+   "id": "img-927e934c",
+   "path": "media/2026/img-927e934c.webp",
+   "thumb": "media/2026/img-927e934c-480.webp"
+  },
+  "theophilus-5": {
+   "id": "img-a63b34be",
+   "path": "media/2026/img-a63b34be.webp",
+   "thumb": "media/2026/img-a63b34be-480.webp"
+  },
+  "theophilus-6": {
+   "id": "img-d855de93",
+   "path": "media/2026/img-d855de93.webp",
+   "thumb": "media/2026/img-d855de93-480.webp"
+  },
+  "theophilus-7": {
+   "id": "img-a6946c07",
+   "path": "media/2026/img-a6946c07.webp",
+   "thumb": "media/2026/img-a6946c07-480.webp"
+  },
+  "ilarion-1": {
+   "id": "img-a2d57ca4",
+   "path": "media/2026/img-a2d57ca4.webp",
+   "thumb": "media/2026/img-a2d57ca4-480.webp"
+  },
+  "hedra-1": {
+   "id": "img-6a4f0aea",
+   "path": "media/2026/img-6a4f0aea.webp",
+   "thumb": "media/2026/img-6a4f0aea-480.webp"
+  },
+  "pachomius-1": {
+   "id": "img-d40660ab",
+   "path": "media/2026/img-d40660ab.webp",
+   "thumb": "media/2026/img-d40660ab-480.webp"
+  },
+  "bishoydam-1": {
+   "id": "img-79b90e0f",
+   "path": "media/2026/img-79b90e0f.webp",
+   "thumb": "media/2026/img-79b90e0f-480.webp"
+  },
+  "samuelserv-1": {
+   "id": "img-4e3ec6a1",
+   "path": "media/2026/img-4e3ec6a1.webp",
+   "thumb": "media/2026/img-4e3ec6a1-480.webp"
+  },
+  "gregorios-1": {
+   "id": "img-7e6340ba",
+   "path": "media/2026/img-7e6340ba.webp",
+   "thumb": "media/2026/img-7e6340ba-480.webp"
+  },
+  "bimen-1": {
+   "id": "img-e1d4d657",
+   "path": "media/2026/img-e1d4d657.webp",
+   "thumb": "media/2026/img-e1d4d657-480.webp"
+  },
+  "mikhailassiut-1": {
+   "id": "img-1b6331a2",
+   "path": "media/2026/img-1b6331a2.webp",
+   "thumb": "media/2026/img-1b6331a2-480.webp"
+  },
+  "epiphanius-1": {
+   "id": "img-be462fe4",
+   "path": "media/2026/img-be462fe4.webp",
+   "thumb": "media/2026/img-be462fe4-480.webp"
+  },
+  "athanasiusbs-1": {
+   "id": "img-dd71f5f4",
+   "path": "media/2026/img-dd71f5f4.webp",
+   "thumb": "media/2026/img-dd71f5f4-480.webp"
+  },
+  "youannes-1": {
+   "id": "img-8a5a590b",
+   "path": "media/2026/img-8a5a590b.webp",
+   "thumb": "media/2026/img-8a5a590b-480.webp"
+  },
+  "karasmahalla-1": {
+   "id": "img-c7fec841",
+   "path": "media/2026/img-c7fec841.webp",
+   "thumb": "media/2026/img-c7fec841-480.webp"
+  },
+  "bishoykamel-1": {
+   "id": "img-a65de28c",
+   "path": "media/2026/img-a65de28c.webp",
+   "thumb": "media/2026/img-a65de28c-480.webp"
+  },
+  "yostos-1": {
+   "id": "img-ac6f04bc",
+   "path": "media/2026/img-ac6f04bc.webp",
+   "thumb": "media/2026/img-ac6f04bc-480.webp"
+  },
+  "abdelmessih-1": {
+   "id": "img-94ce8a5b",
+   "path": "media/2026/img-94ce8a5b.webp",
+   "thumb": "media/2026/img-94ce8a5b-480.webp"
+  },
+  "faltaos-1": {
+   "id": "img-b2490eb6",
+   "path": "media/2026/img-b2490eb6.webp",
+   "thumb": "media/2026/img-b2490eb6-480.webp"
+  },
+  "abdelmessihhabashy-1": {
+   "id": "img-137f7f02",
+   "path": "media/2026/img-137f7f02.webp",
+   "thumb": "media/2026/img-137f7f02-480.webp"
+  },
+  "andraos-1": {
+   "id": "img-cd32ffab",
+   "path": "media/2026/img-cd32ffab.webp",
+   "thumb": "media/2026/img-cd32ffab-480.webp"
+  },
+  "behiry-1": {
+   "id": "img-ddb2b38e",
+   "path": "media/2026/img-ddb2b38e.webp",
+   "thumb": "media/2026/img-ddb2b38e-480.webp"
+  },
+  "mikhailibrahim-1": {
+   "id": "img-befa3c9b",
+   "path": "media/2026/img-befa3c9b.webp",
+   "thumb": "media/2026/img-befa3c9b-480.webp"
+  },
+  "salibsoryal-1": {
+   "id": "img-c8508120",
+   "path": "media/2026/img-c8508120.webp",
+   "thumb": "media/2026/img-c8508120-480.webp"
+  },
+  "youssefasaad-1": {
+   "id": "img-e92988e1",
+   "path": "media/2026/img-e92988e1.webp",
+   "thumb": "media/2026/img-e92988e1-480.webp"
+  },
+  "morcosdawood-1": {
+   "id": "img-32ff2e74",
+   "path": "media/2026/img-32ff2e74.webp",
+   "thumb": "media/2026/img-32ff2e74-480.webp"
+  },
+  "lukasidarous-1": {
+   "id": "img-17b97743",
+   "path": "media/2026/img-17b97743.webp",
+   "thumb": "media/2026/img-17b97743-480.webp"
+  },
+  "mattaelmeskeen-1": {
+   "id": "img-35b5ff1a",
+   "path": "media/2026/img-35b5ff1a.webp",
+   "thumb": "media/2026/img-35b5ff1a-480.webp"
+  },
+  "simon-1": {
+   "id": "img-7ea1288d",
+   "path": "media/2026/img-7ea1288d.webp",
+   "thumb": "media/2026/img-7ea1288d-480.webp"
+  },
+  "gohary-1": {
+   "id": "img-356de7d7",
+   "path": "media/2026/img-356de7d7.webp",
+   "thumb": "media/2026/img-356de7d7-480.webp"
+  },
+  "habibgirgis-1": {
+   "id": "img-d95d55ab",
+   "path": "media/2026/img-d95d55ab.webp",
+   "thumb": "media/2026/img-d95d55ab-480.webp"
+  },
+  "ephrem-1": {
+   "id": "img-ac8d6980",
+   "path": "media/2026/img-ac8d6980.webp",
+   "thumb": "media/2026/img-ac8d6980-480.webp"
+  },
+  "severus-1": {
+   "id": "img-28bba6eb",
+   "path": "media/2026/img-28bba6eb.webp",
+   "thumb": "media/2026/img-28bba6eb-480.webp"
+  },
+  "isaacsyrian-1": {
+   "id": "img-a097784e",
+   "path": "media/2026/img-a097784e.webp",
+   "thumb": "media/2026/img-a097784e-480.webp"
+  },
+  "angelosmourad-1": {
+   "id": "img-bdf39401",
+   "path": "media/2026/img-bdf39401.webp",
+   "thumb": "media/2026/img-bdf39401-480.webp"
+  },
+  "philopaterromany-1": {
+   "id": "img-ff390c48",
+   "path": "media/2026/img-ff390c48.webp",
+   "thumb": "media/2026/img-ff390c48-480.webp"
+  },
+  "ibrahimisravim-1": {
+   "id": "img-148263bf",
+   "path": "media/2026/img-148263bf.webp",
+   "thumb": "media/2026/img-148263bf-480.webp"
+  },
+  "isaacnabih-1": {
+   "id": "img-73bb32d6",
+   "path": "media/2026/img-73bb32d6.webp",
+   "thumb": "media/2026/img-73bb32d6-480.webp"
+  },
+  "isaacnabih-2": {
+   "id": "img-a4a8c8b9",
+   "path": "media/2026/img-a4a8c8b9.webp",
+   "thumb": "media/2026/img-a4a8c8b9-480.webp"
+  }
+ }
+}
